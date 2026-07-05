@@ -93,30 +93,67 @@ export const accumulate = <A>(
   });
 };
 
+/**
+ * NOTE: counts the values of a flat source (sync values in the init, one
+ * value per async emission); values nested inside grouped inits produced by
+ * the joins are not counted.
+ */
 export const take =
   (takeNum: number) =>
-  <A>(inst: Instantaneous<A>): Instantaneous<A> => {
-    let provenance: symbol;
-    let numSyncEmissions: number;
-    return r.concat(
-      inst.pipe(
-        r.tap((a) => {
-          if (isInit(a)) {
-            provenance = a.provenance;
-            numSyncEmissions = a.children.filter(
-              (c) => c.type === "value",
-            ).length;
+  <A>(inst: Instantaneous<A>): Instantaneous<A> =>
+    r.defer(() => {
+      let provenance: symbol | undefined;
+      let remaining = takeNum;
+      let closed = false; // a close has been delivered downstream
+      let done = false; // stop pulling from the source
+      return r.concat(
+        inst.pipe(
+          r.map((emit): InstEmit<A> => {
+            if (isInit(emit)) {
+              provenance = emit.provenance;
+              const children = emit.children.flatMap(
+                (child): (InstEmit<A> | InstVal<A> | InstClose)[] => {
+                  if (closed) return [];
+                  if (child.type === "value") {
+                    if (remaining === 0) return [];
+                    remaining -= 1;
+                    return [child];
+                  }
+                  if (child.type === "close") {
+                    closed = true;
+                  }
+                  return [child];
+                },
+              );
+              if (remaining === 0 && !closed) {
+                closed = true;
+                children.push(close);
+              }
+              done = closed;
+              return init({ provenance: emit.provenance, children });
+            }
+            if (emit.child?.type === "close") {
+              closed = true;
+              done = true;
+            } else if (emit.child?.type === "value" && remaining > 0) {
+              remaining -= 1;
+              if (remaining === 0) {
+                done = true;
+              }
+            }
+            return emit;
+          }),
+          r.takeWhile(() => !done, true),
+        ),
+        r.defer(() => {
+          if (closed || provenance === undefined) {
+            return r.EMPTY;
           }
+          closed = true;
+          return r.of(async<A>({ provenance, child: close }));
         }),
-        r.take(takeNum + 1 - numSyncEmissions!), // add one for the 'init' emission
-      ),
-      r.of({
-        type: "async",
-        provenance: provenance!,
-        child: { type: "close" } satisfies InstClose,
-      } satisfies InstAsync<A>),
-    );
-  };
+      );
+    });
 
 export const fromInstantaneous: <A>(obs: Instantaneous<A>) => r.Observable<A> =
   r.pipe(

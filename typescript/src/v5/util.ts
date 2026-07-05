@@ -1,6 +1,6 @@
 import { pipeWith } from "pipe-ts";
 import * as r from "rxjs";
-import { mergeAll, switchAll } from "./joins";
+import { concatAll, exhaustAll, mergeAll, switchAll } from "./joins";
 import { accumulate, map, of } from "./basic-primitives";
 import { Instantaneous } from "./types";
 
@@ -18,6 +18,18 @@ export const mergeMap =
   <A, B>(fn: (a: A) => Instantaneous<B>) =>
   (inst: Instantaneous<A>): Instantaneous<B> => {
     return pipeWith(inst, map(fn), mergeAll());
+  };
+
+export const concatMap =
+  <A, B>(fn: (a: A) => Instantaneous<B>) =>
+  (inst: Instantaneous<A>): Instantaneous<B> => {
+    return pipeWith(inst, map(fn), concatAll);
+  };
+
+export const exhaustMap =
+  <A, B>(fn: (a: A) => Instantaneous<B>) =>
+  (inst: Instantaneous<A>): Instantaneous<B> => {
+    return pipeWith(inst, map(fn), exhaustAll);
   };
 
 export const scan =

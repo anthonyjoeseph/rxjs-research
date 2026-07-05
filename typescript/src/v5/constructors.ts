@@ -49,9 +49,7 @@ export class InstantSubject<T>
 
   subscribe(
     observerOrNext?:
-      | Partial<Observer<InstEmit<T>>>
-      | ((value: InstEmit<T>) => void)
-      | null,
+      Partial<Observer<InstEmit<T>>> | ((value: InstEmit<T>) => void) | null,
   ): Subscription;
   /** @deprecated Instead of passing separate callback arguments, use an observer argument. Signatures taking separate callback arguments will be removed in v8. Details: https://rxjs.dev/deprecations/subscribe-arguments */
   subscribe(
@@ -61,27 +59,23 @@ export class InstantSubject<T>
   ): Subscription;
   subscribe(
     observerOrNext?:
-      | Partial<Observer<InstEmit<T>>>
-      | ((value: InstEmit<T>) => void)
-      | null,
+      Partial<Observer<InstEmit<T>>> | ((value: InstEmit<T>) => void) | null,
     errorArg?: ((error: any) => void) | null,
     completeArg?: (() => void) | null,
   ): r.Subscription {
     const next =
-      observerOrNext === undefined
+      observerOrNext == null
         ? undefined
-        : observerOrNext == null
-          ? undefined
-          : typeof observerOrNext === "function"
-            ? observerOrNext
-            : observerOrNext["next"];
+        : typeof observerOrNext === "function"
+          ? observerOrNext
+          : observerOrNext.next?.bind(observerOrNext);
     const error =
       typeof observerOrNext !== "function" && observerOrNext != null
-        ? observerOrNext["error"]
+        ? observerOrNext.error?.bind(observerOrNext)
         : (errorArg ?? undefined);
     const complete =
       typeof observerOrNext !== "function" && observerOrNext != null
-        ? observerOrNext["complete"]
+        ? observerOrNext.complete?.bind(observerOrNext)
         : (completeArg ?? undefined);
 
     return r

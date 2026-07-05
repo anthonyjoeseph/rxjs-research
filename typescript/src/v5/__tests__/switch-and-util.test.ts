@@ -1,0 +1,292 @@
+import { pipeWith } from "pipe-ts";
+import { EMPTY, of, share } from "../basic-primitives";
+import { cold, InstantSubject } from "../constructors";
+import { mergeAll, switchAll } from "../joins";
+import { Instantaneous, InstEmit } from "../types";
+import {
+  buffer,
+  bufferCount,
+  filter,
+  merge,
+  mergeMap,
+  pairwise,
+  scan,
+  switchMap,
+} from "../util";
+import { record } from "./helpers";
+
+describe("switchAll", () => {
+  it("switches to the latest inner observable", () => {
+    const outer = new InstantSubject<Instantaneous<number>>();
+    const rec = record(pipeWith(outer, switchAll));
+
+    const s1 = new InstantSubject<number>();
+    outer.next(s1);
+    s1.next(1);
+    expect(rec.batches).toEqual([[1]]);
+
+    const s2 = new InstantSubject<number>();
+    outer.next(s2);
+    s1.next(99); // s1 was switched away from: ignored
+    expect(rec.batches).toEqual([[1]]);
+    s2.next(2);
+    expect(rec.batches).toEqual([[1], [2]]);
+
+    outer.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("switchMap", () => {
+  it("flattens each value through the function", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      pipeWith(
+        s,
+        switchMap((n: number) => of(n, n + 1)),
+      ),
+    );
+    s.next(1);
+    expect(rec.batches).toEqual([[1, 2]]);
+    s.next(5);
+    expect(rec.batches).toEqual([
+      [1, 2],
+      [5, 6],
+    ]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("keeps switchMapped values simultaneous with their source", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      merge<number>(
+        s,
+        pipeWith(
+          s,
+          switchMap((n: number) => of(n * 10)),
+        ),
+      ),
+    );
+    s.next(5);
+    expect(rec.batches).toEqual([[5, 50]]);
+    s.next(6);
+    expect(rec.batches).toEqual([
+      [5, 50],
+      [6, 60],
+    ]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("a switchMap branch that filters an instant still releases the batch", () => {
+    const s = new InstantSubject<number>();
+    // the `switched` example from scratch.ts: filter out 0
+    const rec = record(
+      merge<number>(
+        s,
+        pipeWith(
+          s,
+          switchMap((n: number) => (n === 0 ? EMPTY : of(n))),
+        ),
+      ),
+    );
+    s.next(0);
+    expect(rec.batches).toEqual([[0]]);
+    s.next(3);
+    expect(rec.batches).toEqual([[0], [3, 3]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("diamonds through mergeMap", () => {
+  it("batches all inner values with their trigger", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      merge<number>(
+        s,
+        pipeWith(
+          s,
+          mergeMap((n: number) => of(n * 10, n * 100)),
+        ),
+      ),
+    );
+    s.next(5);
+    expect(rec.batches).toEqual([[5, 50, 500]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("filter", () => {
+  it("filter diamond: merge(a, filter(p)(a)) batches passing instants", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      merge<number>(
+        s,
+        pipeWith(
+          s,
+          filter((n: number): n is number => n % 2 === 0),
+        ),
+      ),
+    );
+    s.next(1);
+    expect(rec.batches).toEqual([[1]]);
+    s.next(2);
+    expect(rec.batches).toEqual([[1], [2, 2]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("keeps only passing values", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      pipeWith(
+        s,
+        filter((n: number): n is number => n % 2 === 0),
+      ),
+    );
+    s.next(1);
+    expect(rec.batches).toEqual([]);
+    s.next(2);
+    expect(rec.batches).toEqual([[2]]);
+    s.next(3);
+    s.next(4);
+    expect(rec.batches).toEqual([[2], [4]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("scan", () => {
+  it("accumulates state across emissions", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      pipeWith(
+        s,
+        scan(0, (acc: number, cur: number) => acc + cur),
+      ),
+    );
+    s.next(1);
+    s.next(2);
+    s.next(4);
+    expect(rec.batches).toEqual([[1], [3], [7]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("pairwise", () => {
+  it("pairs consecutive values, seeded with an initial value", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(pipeWith(s, pairwise(0)));
+    s.next(1);
+    s.next(2);
+    expect(rec.batches).toEqual([[[0, 1]], [[1, 2]]]);
+  });
+});
+
+describe("bufferCount", () => {
+  it("emits every n values", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(pipeWith(s, bufferCount(2)));
+    s.next(1);
+    expect(rec.batches).toEqual([]);
+    s.next(2);
+    expect(rec.batches).toEqual([[[1, 2]]]);
+    s.next(3);
+    expect(rec.batches).toEqual([[[1, 2]]]);
+    s.next(4);
+    expect(rec.batches).toEqual([[[1, 2]], [[3, 4]]]);
+  });
+});
+
+describe("buffer (as currently implemented)", () => {
+  // NOTE: unlike rxjs `buffer`, this emits the growing batch on every source
+  // value and resets when the notifier fires, rather than emitting on the
+  // notifier itself
+  it("accumulates values and resets on the notifier", () => {
+    const src = new InstantSubject<number>();
+    const notifier = new InstantSubject<number>();
+    const rec = record(pipeWith(src, buffer(notifier)));
+    src.next(1);
+    expect(rec.batches).toEqual([[[1]]]);
+    src.next(2);
+    expect(rec.batches).toEqual([[[1]], [[1, 2]]]);
+    notifier.next(0);
+    expect(rec.batches).toEqual([[[1]], [[1, 2]]]);
+    src.next(3);
+    expect(rec.batches).toEqual([[[1]], [[1, 2]], [[3]]]);
+  });
+});
+
+describe("EMPTY in combinations", () => {
+  it("emits nothing on its own", () => {
+    const rec = record(EMPTY);
+    expect(rec.batches).toEqual([]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("merge with EMPTY passes the live source through", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(merge<number>(s, EMPTY));
+    s.next(1);
+    expect(rec.batches).toEqual([[1]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("mergeMap to EMPTY drops all values", () => {
+    const rec = record(
+      pipeWith(
+        of(1, 2, 3),
+        mergeMap(() => EMPTY),
+      ),
+    );
+    expect(rec.batches).toEqual([]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("mergeAll with concurrency", () => {
+  it("mergeAll(1) subscribes inners one at a time", () => {
+    const outer = new InstantSubject<Instantaneous<number>>();
+    const rec = record(pipeWith(outer, mergeAll(1)));
+
+    const s1 = new InstantSubject<number>();
+    const s2 = new InstantSubject<number>();
+    outer.next(s1);
+    outer.next(s2); // queued behind s1
+    s1.next(1);
+    s2.next(99); // s2 not yet subscribed: dropped
+    expect(rec.batches).toEqual([[1]]);
+
+    s1.complete(); // s2's turn begins
+    s2.next(2);
+    expect(rec.batches).toEqual([[1], [2]]);
+
+    s2.complete();
+    outer.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("share", () => {
+  it("subscribes the source once and replays the init to late subscribers", () => {
+    let subscriptions = 0;
+    const a = cold<number>(() => {
+      subscriptions += 1;
+    }).pipe(share);
+
+    const first: InstEmit<number>[] = [];
+    const second: InstEmit<number>[] = [];
+    a.subscribe((e) => first.push(e));
+    a.subscribe((e) => second.push(e));
+
+    expect(subscriptions).toBe(1);
+    expect(first).toHaveLength(1);
+    expect(first[0].type).toBe("init");
+    expect(second).toEqual(first);
+  });
+});

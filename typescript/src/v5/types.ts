@@ -79,7 +79,11 @@ export const map = <A, B>(
 export const values = <A>(emit: InstEmit<A>): A[] => {
   if (emit.type === "init") {
     return emit.children.flatMap((child) =>
-      child.type === "value" ? [child.value] : [],
+      child.type === "value"
+        ? [child.value]
+        : child.type === "close"
+          ? []
+          : values(child),
     );
   }
   return emit.child == null
