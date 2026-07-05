@@ -384,13 +384,128 @@ Done (2026-07-05):
     the `unitDelivery` semantics; `nested-mergeMap-diamond` gives the
     batched law for `merge(a, a.mergeMap(f).mergeMap(f′))`.
 
-The roadmap as originally conceived is complete. Natural next frontiers,
-none blocking: takes over non-flat branches (mid-instant cuts — take k of a
-diamond can split an instant, needing value-granular horizons), `of`/`concat`
-in the deep-embedding theorems (subscription-time-parameterized denotations
-for cold sources), and porting the joins themselves (`bindT` as the
-denotation of `mergeMapE` in the embedding, with the sync-burst fresh-origin
-rule threaded through an origin-supply).
+12. **`share` — the aliasing primitive** ([src/Share.agda](src/Share.agda)).
+    share preserves the upstream provenance across subscribers, which is
+    what justifies every theorem that reuses one timed list on both sides
+    of a merge — the diamond theorems were implicitly share theorems all
+    along. The new law is the LATE subscriber (registration-only replay:
+    it missed the first n instants), the time-reversed dual of take:
+
+    ```agda
+    late-diamond : StrictMono xs
+      → batchSpec (mergeT xs (dropT n xs)) ≡ lateDiamondSpec n xs
+    ```
+
+    — single batches before the subscriber joins, doubled after
+    (`[[1],[2,2]]`, mirroring take's `[[1,1],[2]]`), with the counting
+    version (`count-late-diamond`) whose dynamic multiplicity RISES 1 → 2
+    as the subscriber joins (`lateMult`, mirroring `takeMult`'s 2 → 1).
+    The TS implementation is refcounted with registration-only replay, and
+    the oracle's `letShare`/`shareRef` embedding validates shared derived
+    pipelines on random programs. One recorded approximation: intra-batch
+    order for shared fan-out follows the implementation's delivery tree
+    (a share's refs receive consecutively at its connection point) while
+    the model idealizes flat pre-order — the oracle compares
+    share-containing programs up to intra-batch order, exact fan-out order
+    is pinned by unit tests, and a delivery-path order model is the future
+    refinement.
+
+13. **The two-sorted embedding: the join as the primitive**
+    ([src/Derived.agda](src/Derived.agda)). The canonical primitive set
+    makes `mergeAll` primitive; `merge` and `mergeMap` are now **theorems**:
+
+    ```agda
+    merge-derived    : mergeAllD (ofS (a ∷ b ∷ [])) env ≡ mergeT ⟦a⟧ ⟦b⟧
+    mergeMap-derived : AsyncOnly ⟦e⟧
+                     → mergeAllD (mapS g gs e) env ≡ bindT g gs ⟦e⟧
+    ```
+
+    The second sort `ExpS` (`ofS` — a sync burst of inners; `mapS` — inners
+    from triggers) gets its own denotation, with `bindTSplit` carrying the
+    origin supply for sync-burst triggers (the oracle's rule, verbatim);
+    on async triggers it collapses to `bindT`. The batch-shape theorems
+    transfer to the primitive forms by composition (`mergeAll-of-diamond`,
+    `mergeAll-map-diamond`). Oracle-side, the generator now produces
+    `mergeAll` directly over both shapes (n-ary bursts included), and the
+    derivation laws are checked as program equivalences — model and
+    implementation — on random subexpressions.
+
+14. **Dynamic inner arrival — subscribers that join over time**
+    ([src/Grow.agda](src/Grow.agda)). The full-`mergeAll` frontier: a hot
+    shared stream subscribed afresh by *each* trigger of a join
+    (`x.pipe(map(v => hot), mergeAll())`) accumulates late subscriptions at
+    the triggers' join points. This is [src/TakeDeep.agda](src/TakeDeep.agda)
+    time-reversed — leaves carry **delays** instead of horizons (born later
+    instead of dying early). The normal form `expandD` emits, per instant,
+    the values of the already-born leaves, and the theorem quantifies over
+    ANY family of join points:
+
+    ```agda
+    grow-diamond : StrictMono xs
+      → batchSpec (mergeList (xs ∷ map (λ n → dropT n xs) ns))
+      ≡ specD ((id , 0) ∷ map (λ n → (id , n)) ns) xs
+    ```
+
+    — one batch per instant whose multiplicity GROWS as subscribers arrive
+    (`[[7],[8,8]]` for one join at instant 1), with `specD-late` recovering
+    Share's `lateDiamondSpec` as the single-subscriber instance. Nearly
+    every lemma is reused across time's arrow: `merge-expandD` and
+    `batch-expandD` are `merge-expandH`/`batch-expandH` with `pull-left-vals`,
+    `pull-right-vals`, `batch-cons-block` and the `AllAfter` machinery
+    unchanged. Oracle-side, `mapShareS` (hot inners under `mergeAll∘map`)
+    denotes each trigger as the shared list's strict suffix and folds the
+    suffixes with `mergeTimed`; the random sweep exercises it alongside all
+    other shapes. Chasing this law flushed out two real implementation
+    bugs: a routing-level decrement in `batchSimultaneous` that corrupted
+    windows when a source provenance doubled as a join anchor, and
+    `flipInside` re-tagging unit-init trees with the wrapper provenance,
+    destroying the instant-owner anchor. One recorded grammar frontier:
+    self-triggering hot joins (`x.pipe(map(v => x), mergeAll())`, the shared
+    stream triggering its own re-subscription) are excluded from the
+    generator — the re-subscription's registration is indistinguishable
+    from an empty-inner marker in the current emission protocol.
+
+15. **The serial joins: close-time threading** (oracle-side; Agda pending).
+    `concatAll`, `switchAll` and `exhaustAll` mirror rxjs (checked by
+    side-by-side comparison tests running the same program through plain
+    rxjs), and their denotations thread CLOSE TIMES: the model returns
+    `{list, close}` where `close` is `"frame"` (completes within its own
+    subscription instant) or the tick of the async instant it completes at
+    — sources close at drive end, `take` at its nth value, joins by
+    max/threading. concatAll subscribes each inner at the previous close;
+    switchAll passes every burst inner's subscription-frame emissions and
+    keeps only the last live; exhaustAll walks the burst, blocked by the
+    first inner with a pending close (the rest are never subscribed). The
+    semantic decision, consistent with option 1: **a mid-stream
+    subscription instant behaves exactly like the root one** — a queued
+    cold's values are one fresh instant at the closing tick (ordered right
+    after their cause, never batched with it), and its sync-burst mergeMap
+    inners are fresh root causes. The bind rule is now keyed on the
+    ORIGIN CLASS (cold-born vs driver instants), not on tick 0.
+    Chasing this law flushed out two model bugs (closes pointing into the
+    past for already-completed sources; `"frame"` closes reported relative
+    to the wrong frame after the queue advanced) and two implementation
+    bugs, both the same protocol ambiguity: a mid-stream top-level init
+    (a late subscription instant) was converted into an async-wrapped
+    UNIT by enclosing join wrappers — `flipInside` now keeps mid-stream
+    init batches init-headed, and every join's async branch routes
+    init-headed emissions through the sync-burst path (only async-headed
+    emissions are value-triggered unit deliveries). Recorded frontiers:
+    switching away a LIVE (src-backed) inner leaves its registration
+    without a close (the unsubscribe-close protocol gap — generator
+    restricts switched-away inners to cold expressions); shares under
+    serial joins; async stream-of-streams outers for the serial joins.
+
+The primitive set is Anthony's canonical list — `of`, `empty`, `map`,
+`take`, `accumulate`, `share`, `mergeAll`, `concatAll`, `switchAll`,
+`exhaustAll` — with `merge`/`mergeMap` derived. Next frontiers: Agda
+denotations for the serial joins (close-time threading in the deep
+embedding); the unsubscribe-close protocol (switching away live inners);
+shares under serial joins; mid-instant take cuts; delivery-path
+intra-batch order; `accumulate` in the model (a stateful fold over values
+in time order — provenance-transparent, batching-wise identical to map);
+self-triggering hot joins (needs a distinguished re-subscription marker in
+the emission protocol).
 
 ## Building
 

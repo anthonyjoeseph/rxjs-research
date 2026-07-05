@@ -35,6 +35,66 @@ describe("switchAll", () => {
     outer.complete();
     expect(rec.isCompleted()).toBe(true);
   });
+
+  it("subscribes sync-burst inners in turn, keeping only the last live", () => {
+    const s1 = new InstantSubject<number>();
+    const s2 = new InstantSubject<number>();
+    const rec = record(
+      pipeWith(of(...([s1, s2] as Instantaneous<number>[])), switchAll),
+    );
+    s1.next(99); // switched away during the burst: dropped
+    expect(rec.batches).toEqual([]);
+    s2.next(2);
+    expect(rec.batches).toEqual([[2]]);
+  });
+
+  it("sync values of every burst inner pass before the switch", () => {
+    const rec = record(pipeWith(of(of(1, 2), of(3, 4)), switchAll));
+    expect(rec.batches).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  // switching away a LIVE inner synthesizes closes for its registrations —
+  // without them, a diamond across the switch strands the shared
+  // provenance's window (totalNum overcounts a subscription that will
+  // never deliver again)
+  it("diamond across a sync-burst switch: switched-away registration closes", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(
+      merge<number>(
+        s,
+        pipeWith(of(...([s, of(1)] as Instantaneous<number>[])), switchAll),
+      ),
+    );
+    // the burst: s registered then switched away (closed), of(1) emits
+    expect(rec.batches).toEqual([[1]]);
+    s.next(5); // only the root subscription is live: a single delivery
+    expect(rec.batches).toEqual([[1], [5]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("diamond across an async switch: the old inner's registration closes", () => {
+    const s = new InstantSubject<number>();
+    const outer = new InstantSubject<Instantaneous<number>>();
+    const rec = record(merge<number>(s, pipeWith(outer, switchAll)));
+
+    outer.next(s); // second subscription of s: a live diamond
+    s.next(1);
+    expect(rec.batches).toEqual([[1, 1]]);
+
+    outer.next(of(9)); // s's inner subscription switched away and closed
+    expect(rec.batches).toEqual([[1, 1], [9]]);
+    s.next(2); // back to a single delivery
+    expect(rec.batches).toEqual([[1, 1], [9], [2]]);
+
+    s.complete();
+    outer.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
 });
 
 describe("switchMap", () => {

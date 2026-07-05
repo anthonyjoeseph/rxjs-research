@@ -9,13 +9,94 @@ import {
   InstAsync,
 } from "./types";
 import { batchSync } from "../batch-sync";
+import { registrationDeltas } from "./batch-simultaneous";
 import { v4 as uuid } from "uuid";
 
-/** how the children of a flipped init are combined: concurrently (merge,
- * the default), or serially (concat, for concatAll) */
-type Combine = <T>(obs: r.Observable<T>[]) => r.Observable<T>;
-const combineMerge: Combine = (obs) => r.merge(...obs);
-const combineConcat: Combine = (obs) => r.concat(...obs);
+/**
+ * rxjs switchAll, plus the protocol obligation rxjs doesn't have: when a
+ * LIVE inner is switched away (unsubscribed), downstream provenance memory
+ * must learn its registrations ended — an unsubscription emits no closes
+ * of its own, so we track each inner's registration balance and emit
+ * synthesized closes (`init{p, [close]}`, registration-neutral in form)
+ * at the switch. Natural completions balance themselves via the protocol
+ * and are not touched.
+ */
+const switchWithCloses = <A>(
+  outers: r.Observable<Instantaneous<A>>,
+): Instantaneous<A> =>
+  new r.Observable<InstEmit<A>>((observer) => {
+    let current: r.Subscription | undefined;
+    let balance = new Map<symbol, number>();
+    let outerDone = false;
+    let innerDone = true;
+    const outerSub = outers.subscribe({
+      next: (inner) => {
+        const wasLive = current !== undefined && !innerDone;
+        current?.unsubscribe();
+        if (wasLive) {
+          for (const [p, n] of balance) {
+            for (let i = 0; i < n; i++) {
+              observer.next(init<A>({ provenance: p, children: [close] }));
+            }
+          }
+        }
+        balance = new Map();
+        innerDone = false;
+        current = inner.subscribe({
+          next: (e) => {
+            registrationDeltas(e, balance);
+            observer.next(e);
+          },
+          error: (err) => observer.error(err),
+          complete: () => {
+            innerDone = true;
+            current = undefined;
+            if (outerDone) {
+              observer.complete();
+            }
+          },
+        });
+      },
+      error: (err) => observer.error(err),
+      complete: () => {
+        outerDone = true;
+        if (innerDone) {
+          observer.complete();
+        }
+      },
+    });
+    return () => {
+      current?.unsubscribe();
+      outerSub.unsubscribe();
+    };
+  });
+
+/** how the children of a flipped init are combined. Children are tagged:
+ * close markers are protocol bookkeeping (the outer's own completion /
+ * provenance decrements) and must always be delivered — only the "inner"
+ * children participate in the join discipline. merge runs them
+ * concurrently; concat serially after each completes (a close marker in
+ * the chain correctly delays the outer's close past the last inner);
+ * switch and exhaust mirror rxjs on a synchronous burst: each inner is
+ * subscribed in arrival order, switch unsubscribing the previous (its
+ * sync values pass, its async future dies), exhaust dropping an arrival
+ * only while the previous inner is still active. */
+type TaggedChild<T> = { kind: "close" | "inner"; obs: r.Observable<T> };
+type Combine = <A>(
+  children: TaggedChild<InstEmit<A>>[],
+) => r.Observable<InstEmit<A>>;
+const inners = <T>(children: TaggedChild<T>[]): r.Observable<T>[] =>
+  children.filter((c) => c.kind === "inner").map((c) => c.obs);
+const closes = <T>(children: TaggedChild<T>[]): r.Observable<T>[] =>
+  children.filter((c) => c.kind === "close").map((c) => c.obs);
+const combineMerge: Combine = (children) =>
+  r.merge(...children.map((c) => c.obs));
+const combineConcat: Combine = (children) =>
+  r.concat(...children.map((c) => c.obs));
+const combineSwitch: Combine = (children) =>
+  r.merge(switchWithCloses(r.of(...inners(children))), ...closes(children));
+const combineExhaust: Combine = (children) =>
+  r.merge(r.of(...inners(children)).pipe(r.exhaustAll()), ...closes(children));
 
 const flipInside = <A>(
   emit: InstEmit<Instantaneous<A>>,
@@ -30,6 +111,16 @@ const flipInside = <A>(
         batchSync(),
         r.map((batch) => {
           if (batch.type === "async") {
+            if (batch.value.type === "init") {
+              // a MID-STREAM subscription instant (a queued concat inner
+              // subscribing at its predecessor's close): its subtree holds
+              // fresh root causes, and async-wrapping it would coalesce
+              // them into one inherited unit — keep it init-headed
+              return init({
+                provenance: emit.provenance,
+                children: [batch.value],
+              });
+            }
             return async({ provenance: emit.provenance, child: batch.value });
           }
           return init({ provenance: emit.provenance, children: batch.value });
@@ -42,47 +133,13 @@ const flipInside = <A>(
       );
     }
 
-    return r
-      .merge(
-        ...emit.child.children.map((child): r.Observable<InstEmit<A>> => {
-          if (child.type === "close") {
-            return r.of(emit as InstAsync<A>);
-          }
-          if (child.type === "value") {
-            return child.value.pipe(
-              batchSync(),
-              r.map((batch) => {
-                if (batch.type === "async") {
-                  return async({
-                    provenance: emit.provenance,
-                    child: batch.value,
-                  });
-                }
-                return init({
-                  provenance: emit.provenance,
-                  children: batch.value,
-                });
-              }),
-            );
-          }
-          return flipInside(child).pipe(
-            r.map((child) => {
-              if (child.type === "init") {
-                return init({ provenance: emit.provenance, children: [child] });
-              }
-              return async({ provenance: emit.provenance, child });
-            }),
-          );
-        }),
-      )
-      .pipe(
-        r.map((child) => {
-          if (child.type === "init") {
-            return init({ provenance: emit.provenance, children: [child] });
-          }
-          return async({ provenance: emit.provenance, child });
-        }),
-      );
+    // the child is an init tree: flip it as a tree — PRESERVING its own
+    // provenance layers (the inner init's provenance is the instant owner
+    // that downstream window accounting keys on) — and wrap each emission
+    // in this level's routing
+    return flipInside(emit.child).pipe(
+      r.map((child) => async({ provenance: emit.provenance, child })),
+    );
   }
 
   if (emit.children.length === 0) {
@@ -93,37 +150,60 @@ const flipInside = <A>(
   }
 
   return combine(
-    emit.children.map((child): r.Observable<InstEmit<A>> => {
+    emit.children.map((child): TaggedChild<InstEmit<A>> => {
       if (child.type === "close") {
-        return r.of(
-          init<A>({ provenance: emit.provenance, children: [child] }),
-        );
+        return {
+          kind: "close",
+          obs: r.of(
+            init<A>({ provenance: emit.provenance, children: [child] }),
+          ),
+        };
       }
       if (child.type === "value") {
-        return child.value.pipe(
-          batchSync(),
-          r.map((batch) => {
-            if (batch.type === "async") {
-              return async({ provenance: emit.provenance, child: batch.value });
-            }
-            return init({ provenance: emit.provenance, children: batch.value });
-          }),
-        );
+        return {
+          kind: "inner",
+          obs: child.value.pipe(
+            batchSync(),
+            r.map((batch) => {
+              if (batch.type === "async") {
+                if (batch.value.type === "init") {
+                  // mid-stream subscription instant: keep init-headed
+                  // (see the async-value branch above)
+                  return init({
+                    provenance: emit.provenance,
+                    children: [batch.value],
+                  });
+                }
+                return async({
+                  provenance: emit.provenance,
+                  child: batch.value,
+                });
+              }
+              return init({
+                provenance: emit.provenance,
+                children: batch.value,
+              });
+            }),
+          ),
+        };
       }
-      return flipInside(child).pipe(
-        r.map((child) => {
-          if (child.type === "init") {
-            return init({ provenance: child.provenance, children: [child] });
-          }
-          return async({ provenance: child.provenance, child });
-        }),
-        r.map((child) => {
-          if (child.type === "init") {
-            return init({ provenance: emit.provenance, children: [child] });
-          }
-          return async({ provenance: emit.provenance, child });
-        }),
-      );
+      return {
+        kind: "inner",
+        obs: flipInside(child).pipe(
+          r.map((child) => {
+            if (child.type === "init") {
+              return init({ provenance: child.provenance, children: [child] });
+            }
+            return async({ provenance: child.provenance, child });
+          }),
+          r.map((child) => {
+            if (child.type === "init") {
+              return init({ provenance: emit.provenance, children: [child] });
+            }
+            return async({ provenance: emit.provenance, child });
+          }),
+        ),
+      };
     }),
   );
 };
@@ -174,9 +254,12 @@ const unitDelivery = <A>(
 export const switchAll = <A>(
   insts: Instantaneous<Instantaneous<A>>,
 ): Instantaneous<A> => {
-  return insts.pipe(
-    r.map((emit) => (isInit(emit) ? flipInside(emit) : unitDelivery(emit))),
-    r.switchAll(),
+  return switchWithCloses(
+    insts.pipe(
+      r.map((emit) =>
+        isInit(emit) ? flipInside(emit, combineSwitch) : unitDelivery(emit),
+      ),
+    ),
   );
 };
 
@@ -216,7 +299,13 @@ export const mergeAll =
       batchSync(),
       r.map((batchedParent): Instantaneous<A> => {
         if (batchedParent.type === "async") {
-          return unitDelivery(batchedParent.value);
+          // an init-headed emission is a MID-STREAM subscription instant
+          // (a late burst, e.g. a queued concat inner subscribing): its
+          // children are fresh root causes, exactly like the root burst —
+          // only async-headed emissions are value-triggered unit deliveries
+          return isInit(batchedParent.value)
+            ? groupSync(flipInside(batchedParent.value))
+            : unitDelivery(batchedParent.value);
         }
         return groupSync(
           r.merge(...batchedParent.value.map((emit) => flipInside(emit))),
@@ -233,7 +322,10 @@ export const concatAll = <A>(
     batchSync(),
     r.map((batchedParent): Instantaneous<A> => {
       if (batchedParent.type === "async") {
-        return unitDelivery(batchedParent.value);
+        // mid-stream subscription instants stay bursts (see mergeAll)
+        return isInit(batchedParent.value)
+          ? groupSync(flipInside(batchedParent.value, combineConcat))
+          : unitDelivery(batchedParent.value);
       }
       // synchronously delivered inners subscribe serially, each after the
       // previous completes — including the inners nested in a single init
@@ -255,33 +347,22 @@ export const exhaustAll = <A>(
     batchSync(),
     r.map((batchedParent): Instantaneous<A> => {
       if (batchedParent.type === "async") {
-        return unitDelivery(batchedParent.value);
+        // mid-stream subscription instants stay bursts (see mergeAll)
+        return isInit(batchedParent.value)
+          ? groupSync(flipInside(batchedParent.value, combineExhaust))
+          : unitDelivery(batchedParent.value);
       }
-      // of the inners delivered synchronously at subscription, only the
-      // first is subscribed; the rest arrive while it is active and are
-      // dropped, mirroring rxjs exhaust semantics
-      let taken = false;
-      const pruned = batchedParent.value.map(
-        (emit): InstEmit<Instantaneous<A>> => {
-          if (!isInit(emit)) {
-            return emit;
-          }
-          return init({
-            provenance: emit.provenance,
-            children: emit.children.filter((child) => {
-              if (child.type !== "value") {
-                return true;
-              }
-              if (taken) {
-                return false;
-              }
-              taken = true;
-              return true;
-            }),
-          });
-        },
+      // rxjs exhaust semantics on the sync burst: inners are offered in
+      // order, and an arrival is dropped only while the previous inner is
+      // still active — an inner that completes synchronously (of, EMPTY)
+      // frees the slot for the next one in the same burst
+      return groupSync(
+        r.merge(
+          ...batchedParent.value.map((emit) =>
+            flipInside(emit, combineExhaust),
+          ),
+        ),
       );
-      return groupSync(r.merge(...pruned.map((emit) => flipInside(emit))));
     }),
     // inners that arrive while one is active are dropped
     r.exhaustAll(),

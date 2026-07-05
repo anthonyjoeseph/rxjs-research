@@ -139,6 +139,16 @@ concatMap : {A B : Set} → (A → List B) → List A → List B
 concatMap f []       = []
 concatMap f (x ∷ xs) = f x ++ concatMap f xs
 
+map-map : {A B C : Set} (g : B → C) (f : A → B) (l : List A)
+        → map g (map f l) ≡ map (λ a → g (f a)) l
+map-map g f []       = refl
+map-map g f (x ∷ xs) = cong (_∷_ (g (f x))) (map-map g f xs)
+
+map-ext : {A B : Set} {f g : A → B}
+        → ((a : A) → f a ≡ g a) → (l : List A) → map f l ≡ map g l
+map-ext h []       = refl
+map-ext h (x ∷ xs) = cong₂ _∷_ (h x) (map-ext h xs)
+
 infixr 4 _,_
 infixr 2 _×_
 data _×_ (A B : Set) : Set where

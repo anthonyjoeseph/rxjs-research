@@ -219,6 +219,75 @@ const registerSubtree = <A>(
   return registerSubtree(emit.child, memory, emit.provenance, unitProvenance);
 };
 
+/**
+ * The totalNum deltas an emission causes in the provenance memory — the
+ * registration bookkeeping of updateMemoryFromEmit/registerSubtree, as
+ * counts. Exported so joins can synthesize protocol closes for
+ * provenances stranded when a live inner is UNSUBSCRIBED (switch-away):
+ * downstream memory only learns of ended subscriptions through closes,
+ * and an unsubscription emits none (precedent: take synthesizes closes).
+ */
+export const registrationDeltas = <A>(
+  emit: InstEmit<A>,
+  deltas: Map<symbol, number> = new Map(),
+  parentProvenance?: symbol,
+): Map<symbol, number> => {
+  const bump = (p: symbol, d: number) =>
+    deltas.set(p, (deltas.get(p) ?? 0) + d);
+  const subtree = (e: InstEmit<A>, parent: symbol, unitProv: symbol): void => {
+    if (e.type === "init") {
+      if (e.provenance !== parent && e.provenance !== unitProv) {
+        bump(e.provenance, 1);
+      }
+      for (const child of e.children) {
+        if (child.type === "close") {
+          bump(e.provenance, -1);
+        } else if (child.type !== "value") {
+          subtree(child, e.provenance, unitProv);
+        }
+      }
+      return;
+    }
+    if (e.child?.type === "close") {
+      bump(e.provenance, -1);
+    } else if (e.child != null && e.child.type !== "value") {
+      subtree(e.child, e.provenance, unitProv);
+    }
+  };
+  if (emit.type === "init") {
+    if (emit.provenance !== parentProvenance) {
+      bump(emit.provenance, 1);
+    }
+    for (const child of emit.children) {
+      if (child.type === "close") {
+        bump(emit.provenance, -1);
+      } else if (child.type !== "value") {
+        registrationDeltas(child, deltas, emit.provenance);
+      }
+    }
+    return deltas;
+  }
+  if (emit.child?.type === "close") {
+    bump(emit.provenance, -1);
+    return deltas;
+  }
+  if (emit.child == null || emit.child.type === "value") {
+    return deltas;
+  }
+  if (emit.child.type === "init") {
+    // a unit init: only its subtree registers (mirror of registerSubtree)
+    const unit = emit.child;
+    for (const child of unit.children) {
+      if (child.type !== "value" && child.type !== "close") {
+        subtree(child, unit.provenance, unit.provenance);
+      }
+    }
+    return deltas;
+  }
+  // routing wrapper
+  return registrationDeltas(emit.child, deltas);
+};
+
 const updateMemoryFromEmit = <A>(
   emit: InstEmit<A>,
   oldMemory: Record<symbol, ProvenanceState<A>>,
@@ -281,10 +350,12 @@ const updateMemoryFromEmit = <A>(
       batchAppend: values(unit),
     });
   }
-  return updateMemoryFromEmit(
-    emit.child,
-    updateMemory(oldMemory, emit.provenance, { awaitingValueCount: "--" }),
-  );
+  // an async child: this level is pure routing. It must NOT touch window
+  // state — a provenance can be both a real source window and a routing
+  // wrapper (a join anchored on it), and decrementing here opens phantom
+  // windows that strand later values. All accounting happens at the unit
+  // level.
+  return updateMemoryFromEmit(emit.child, oldMemory);
 };
 
 export const batchSimultaneous = <A>(

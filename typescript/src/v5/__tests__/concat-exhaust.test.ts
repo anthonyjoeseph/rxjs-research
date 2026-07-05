@@ -85,7 +85,13 @@ describe("concatAll", () => {
 });
 
 describe("exhaustAll", () => {
-  it("subscribes only the first of synchronously delivered inners", () => {
+  it("a sync-completing inner frees the slot for the next in the burst", () => {
+    const rec = record(pipeWith(of(of(1), of(2)), exhaustAll));
+    expect(rec.batches).toEqual([[1], [2]]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("a live first inner blocks the rest of the burst", () => {
     const s1 = new InstantSubject<number>();
     const s2 = new InstantSubject<number>();
     const inners: Instantaneous<number>[] = [s1, s2];
