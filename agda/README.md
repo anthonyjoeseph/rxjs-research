@@ -363,16 +363,34 @@ Done (2026-07-05):
    mid-window dropped `totalNum` to 1 and the no-diamond shortcut stranded
    the buffered batch — the shortcut now requires no window in flight).
 
-Remaining:
+10. ~~**Take in the deep embedding**~~ —
+    ([src/TakeDeep.agda](src/TakeDeep.agda)) expansion with per-leaf
+    horizons: each root-to-leaf path carries its composed function plus a
+    `Horizon` (takes cap it, `capH`), leaves die as horizons expire, and
 
-10. **Unify take with the deep embedding.** `take-diamond` covers
-    `merge(a, take n a)` at the timed-list level; folding `takeE` into
-    `DiamondOver` (arbitrary trees with per-branch cutoffs) needs expansion
-    with per-leaf horizons.
-11. **Nested binds in Agda.** `mergeMap-diamond` covers one join level;
-    the nested case (bindT after bindT — now implemented and
-    oracle-validated in TS) wants a compositionality lemma:
-    `bindT g′ gs′ ∘ bindT g gs`-fusion at equal times.
+    ```agda
+    dt-diamond : DTOver i e → StrictMono (emits (env i))
+      → batchSpec (emits ⟦ e ⟧) ≡ specH (funsH e) (emits (env i))
+    ```
+
+    — any merge/map tree with takes on flat branches, at any depth, batches
+    to one batch per source instant holding every LIVE leaf's value, and no
+    batch once all horizons expire. `dt-take-two` recovers TakeDiamond's
+    `[[1,1],[2]]` law as the two-leaf instance, tying the modules together.
+11. ~~**Nested binds**~~ — `bind-fusion` in
+    [src/MergeMap.agda](src/MergeMap.agda): a join over a join at inherited
+    times is one join with the composed inner
+    (`bindT g′ gs′ ∘ bindT g gs ≡ bindT (fused)`), the Agda counterpart of
+    the `unitDelivery` semantics; `nested-mergeMap-diamond` gives the
+    batched law for `merge(a, a.mergeMap(f).mergeMap(f′))`.
+
+The roadmap as originally conceived is complete. Natural next frontiers,
+none blocking: takes over non-flat branches (mid-instant cuts — take k of a
+diamond can split an instant, needing value-granular horizons), `of`/`concat`
+in the deep-embedding theorems (subscription-time-parameterized denotations
+for cold sources), and porting the joins themselves (`bindT` as the
+denotation of `mergeMapE` in the embedding, with the sync-burst fresh-origin
+rule threaded through an origin-supply).
 
 ## Building
 

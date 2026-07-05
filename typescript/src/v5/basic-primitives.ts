@@ -1,13 +1,11 @@
 import * as r from "rxjs";
 import { v4 as uuid } from "uuid";
-import Observable = r.Observable;
 import Subject = r.Subject;
 import {
   async,
   close,
   init,
   Instantaneous,
-  InstAsync,
   InstClose,
   InstEmit,
   InstInit,
@@ -33,46 +31,79 @@ export const of = <As extends unknown[]>(
   );
 };
 
+/**
+ * Turn a cold Instantaneous hot: one upstream subscription shared by all
+ * subscribers (refcounted — upstream connects with the first subscriber and
+ * disconnects when the last leaves, after which a new subscriber starts a
+ * fresh life).
+ *
+ * Provenance: the first subscriber receives the upstream's own init (sync
+ * values included); every later subscriber receives a REGISTRATION-ONLY
+ * init carrying the same provenance — it must not re-observe values from
+ * instants it missed (hot semantics), but downstream batching must still
+ * learn that another subscription of this provenance exists.
+ */
 export const share = <A>(inst: Instantaneous<A>): Instantaneous<A> => {
   if ("internalSubject" in inst) {
     return inst;
   }
-  const subj = new Subject<InstEmit<A>>();
-  let isSubscribed = false;
-  let init: InstInit<A> | undefined;
-  let subscription: r.Subscription;
-  return r.defer(() => {
-    if (init !== undefined) {
-      return subj.pipe(
-        r.startWith(init),
-        r.finalize(() => {
-          subscription?.unsubscribe();
-        }),
-      );
+  type Life = {
+    subj: Subject<InstEmit<A>>;
+    registration: InstInit<A> | undefined;
+    refCount: number;
+    upstream: r.Subscription | undefined;
+  };
+  let current: Life | undefined;
+
+  return new r.Observable<InstEmit<A>>((subscriber) => {
+    if (current === undefined) {
+      current = {
+        subj: new Subject<InstEmit<A>>(),
+        registration: undefined,
+        refCount: 0,
+        upstream: undefined,
+      };
     }
-    return r.merge(
-      subj,
-      r.defer(() => {
-        if (!isSubscribed) {
-          subscription = inst.subscribe({
-            next: (emit) => {
-              if (!init) {
-                init = emit as InstInit<A>;
-              }
-              subj.next(emit);
-            },
-            error: (err) => {
-              subj.error(err);
-            },
-            complete: () => {
-              subj.complete();
-            },
-          });
-          isSubscribed = true;
+    const life = current;
+    life.refCount += 1;
+
+    let inner: r.Subscription;
+    if (life.registration !== undefined) {
+      // late subscriber: same provenance, none of the missed values
+      subscriber.next(
+        init<A>({ provenance: life.registration.provenance, children: [] }),
+      );
+      inner = life.subj.subscribe(subscriber);
+    } else {
+      inner = life.subj.subscribe(subscriber);
+      if (life.upstream === undefined) {
+        life.upstream = inst.subscribe({
+          next: (emit) => {
+            if (life.registration === undefined && isInit(emit)) {
+              life.registration = emit;
+            }
+            life.subj.next(emit);
+          },
+          error: (err) => {
+            life.subj.error(err);
+          },
+          complete: () => {
+            life.subj.complete();
+          },
+        });
+      }
+    }
+
+    return () => {
+      inner.unsubscribe();
+      life.refCount -= 1;
+      if (life.refCount === 0) {
+        life.upstream?.unsubscribe();
+        if (current === life) {
+          current = undefined;
         }
-        return r.EMPTY;
-      }),
-    );
+      }
+    };
   });
 };
 
@@ -82,16 +113,23 @@ export const map =
     return inst.pipe(r.map((a) => mapPrimitive(a, fn) as InstEmit<B>));
   };
 
-export const accumulate = <A>(
-  initial: A,
-): ((val: Instantaneous<(a: A) => A>) => Instantaneous<A>) => {
-  let value = initial;
-  return map((fn) => {
-    const newValue = fn(value);
-    value = newValue;
-    return newValue;
-  });
-};
+/**
+ * The state primitive: threads an accumulator through the stream's values.
+ * Provenance-transparent (time-preserving, one value in, one value out —
+ * batchSimultaneous treats it exactly like map). State is per-subscription;
+ * share(accumulate(...)) is how you deliberately share the accumulator.
+ */
+export const accumulate =
+  <A>(initial: A) =>
+  (inst: Instantaneous<(a: A) => A>): Instantaneous<A> =>
+    r.defer(() => {
+      let value = initial;
+      return map<(a: A) => A, A>((fn) => {
+        const newValue = fn(value);
+        value = newValue;
+        return newValue;
+      })(inst);
+    });
 
 /**
  * NOTE: counts the values of a flat source (sync values in the init, one

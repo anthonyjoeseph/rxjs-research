@@ -106,10 +106,6 @@ length : {A : Set} → List A → ℕ
 length []       = 0
 length (x ∷ xs) = suc (length xs)
 
-concatMap : {A B : Set} → (A → List B) → List A → List B
-concatMap f []       = []
-concatMap f (x ∷ xs) = f x ++ concatMap f xs
-
 data Maybe (A : Set) : Set where
   nothing : Maybe A
   just    : A → Maybe A
@@ -138,6 +134,10 @@ map-++ : {A B : Set} (f : A → B) (xs ys : List A)
        → map f (xs ++ ys) ≡ map f xs ++ map f ys
 map-++ f []       ys = refl
 map-++ f (x ∷ xs) ys = cong (_∷_ (f x)) (map-++ f xs ys)
+
+concatMap : {A B : Set} → (A → List B) → List A → List B
+concatMap f []       = []
+concatMap f (x ∷ xs) = f x ++ concatMap f xs
 
 infixr 4 _,_
 infixr 2 _×_

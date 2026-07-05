@@ -14,3 +14,4 @@ import BatchCount
 import Indep
 import TakeDiamond
 import MergeMap
+import TakeDeep
