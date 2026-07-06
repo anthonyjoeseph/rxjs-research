@@ -490,22 +490,27 @@ Done (2026-07-05):
     UNIT by enclosing join wrappers — `flipInside` now keeps mid-stream
     init batches init-headed, and every join's async branch routes
     init-headed emissions through the sync-burst path (only async-headed
-    emissions are value-triggered unit deliveries). Recorded frontiers:
-    switching away a LIVE (src-backed) inner leaves its registration
-    without a close (the unsubscribe-close protocol gap — generator
-    restricts switched-away inners to cold expressions); shares under
-    serial joins; async stream-of-streams outers for the serial joins.
+    emissions are value-triggered unit deliveries). The unsubscribe-close
+    protocol gap is CLOSED: `switchWithCloses` tracks each inner's
+    registration balance (`registrationDeltas`, mirroring the memory's
+    totalNum bookkeeping) and synthesizes decrement-only closes
+    (`async{p, close}` — an `init{p,[close]}` would register then close,
+    net zero) when a live inner is switched away, with `groupSync`
+    preserving async-headed closes as pure decrements. Diamonds across a
+    switch batch correctly and the generator allows arbitrary live
+    switched-away inners.
 
 The primitive set is Anthony's canonical list — `of`, `empty`, `map`,
 `take`, `accumulate`, `share`, `mergeAll`, `concatAll`, `switchAll`,
 `exhaustAll` — with `merge`/`mergeMap` derived. Next frontiers: Agda
 denotations for the serial joins (close-time threading in the deep
-embedding); the unsubscribe-close protocol (switching away live inners);
-shares under serial joins; mid-instant take cuts; delivery-path
-intra-batch order; `accumulate` in the model (a stateful fold over values
-in time order — provenance-transparent, batching-wise identical to map);
-self-triggering hot joins (needs a distinguished re-subscription marker in
-the emission protocol).
+embedding); shares under serial joins (late share-connection modeling);
+async stream-of-streams outers for the serial joins; mid-instant take
+cuts; delivery-path intra-batch order; `accumulate` in the model (a
+stateful fold over values in time order — provenance-transparent,
+batching-wise identical to map); self-triggering hot joins (needs a
+distinguished re-subscription marker in the emission protocol);
+take-over-merge counting.
 
 ## Building
 

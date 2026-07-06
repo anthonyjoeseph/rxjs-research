@@ -21,11 +21,64 @@ export const compareTime = (a: Time, b: Time): number =>
 export const timeEquals = (a: Time, b: Time): boolean =>
   a[0] === b[0] && a[1] === b[1];
 
-export type TimedObs<A> = readonly (readonly [Time, A])[];
+/**
+ * Per-entry DELIVERY metadata (ratified 2026-07-06: intra-batch order is
+ * rxjs delivery order, not syntactic pre-order):
+ *  - `sub`: the tick at which the value's delivering chain subscribed its
+ *    source. Statically wired chains (root subscriptions) have no `sub`
+ *    (rank 0) and keep the list's construction order — which IS delivery
+ *    order for same-time subscriptions (a subject fires its subscribers in
+ *    subscription order, and root subscriptions happen in expression
+ *    order). A chain subscribed LATE (a concat advancing onto a hot
+ *    source, a spawned inner) sits at the END of the subject's list, so
+ *    its entries rank after every earlier subscriber's.
+ *  - `ref`: a share ref's index, used by letShare to regroup the fan-out
+ *    (the share's subject delivers to ALL refs consecutively, at the
+ *    first ref's connection slot).
+ */
+export type EntryMeta = {
+  /** the delivering chain's SUBSCRIPTION KEY: [] for statically wired
+   * (root) chains, [t, ...spawnerKey] for a chain subscribed at tick t by
+   * a spawner chain with key spawnerKey. The source fires subscribers in
+   * subscription order: by tick, then — within one tick's cascade — in
+   * the order the spawner chains themselves fire (their keys). Lexicographic,
+   * shorter-prefix first. */
+  readonly sub?: readonly number[];
+  readonly ref?: number;
+  /** the pre-order slot of the SUBSCRIPTION SITE (src / shareRef leaf)
+   * the value delivers through — used by letShare to place the share's
+   * fan-out block relative to same-source direct chains */
+  readonly slot?: number;
+};
+
+/** lexicographic, missing/exhausted = end-of-array (shorter first) */
+export const compareSub = (
+  a: readonly number[] | undefined,
+  b: readonly number[] | undefined,
+): number => {
+  const x = a ?? [];
+  const y = b ?? [];
+  const n = Math.min(x.length, y.length);
+  for (let i = 0; i < n; i++) {
+    if (x[i] !== y[i]) {
+      return x[i] - y[i];
+    }
+  }
+  return x.length - y.length;
+};
+
+export type TimedEntry<A> = readonly [Time, A, EntryMeta?];
+export type TimedObs<A> = readonly TimedEntry<A>[];
+
+export const entry = <A>(
+  t: Time,
+  v: A,
+  m?: EntryMeta,
+): TimedEntry<A> => (m === undefined ? [t, v] : [t, v, m]);
 
 /** stable merge: on equal Times the left argument's emissions come first */
 export const mergeTimed = <A>(a: TimedObs<A>, b: TimedObs<A>): TimedObs<A> => {
-  const out: (readonly [Time, A])[] = [];
+  const out: TimedEntry<A>[] = [];
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
@@ -41,18 +94,34 @@ export const mergeTimed = <A>(a: TimedObs<A>, b: TimedObs<A>): TimedObs<A> => {
 export const mapTimed = <A, B>(
   obs: TimedObs<A>,
   fn: (a: A) => B,
-): TimedObs<B> => obs.map(([t, v]) => [t, fn(v)] as const);
-
-export const takeTimed = <A>(obs: TimedObs<A>, count: number): TimedObs<A> =>
-  obs.slice(0, count);
+): TimedObs<B> => obs.map(([t, v, m]) => entry(t, fn(v), m));
 
 /**
- * The specification of batchSimultaneous: group consecutive equal Times.
- * (Equal Times are always adjacent in a merged list, since merge sorts.)
+ * Reorder each instant into DELIVERY order: stable sort by subscription
+ * rank (`sub`, root = 0). Chains subscribed at the same moment keep their
+ * construction (expression) order; late subscribers deliver last.
+ */
+export const deliveryOrder = <A>(obs: TimedObs<A>): TimedObs<A> =>
+  obs
+    .map((e, i) => [e, i] as const)
+    .sort(
+      ([a, i], [b, j]) =>
+        compareTime(a[0], b[0]) || compareSub(a[2]?.sub, b[2]?.sub) || i - j,
+    )
+    .map(([e]) => e);
+
+/** take counts values in DELIVERY order — even mid-instant */
+export const takeTimed = <A>(obs: TimedObs<A>, count: number): TimedObs<A> =>
+  deliveryOrder(obs).slice(0, count);
+
+/**
+ * The specification of batchSimultaneous: put each instant in delivery
+ * order, then group equal Times. (Equal Times are always adjacent in a
+ * merged list, since merge sorts.)
  */
 export const batchSpec = <A>(obs: TimedObs<A>): TimedObs<A[]> => {
   const out: [Time, A[]][] = [];
-  for (const [t, v] of obs) {
+  for (const [t, v] of deliveryOrder(obs)) {
     const last = out[out.length - 1];
     if (last !== undefined && timeEquals(last[0], t)) {
       last[1].push(v);

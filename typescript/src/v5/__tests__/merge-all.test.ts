@@ -21,18 +21,17 @@ describe("mergeAll", () => {
     expect(result).toEqual([1, 2, 3]);
   });
 
-  it("mergeMap batches per inner observable", () => {
+  it("mergeMap inners inherit their trigger's instant (transitively)", () => {
+    // 1, 2 and 3 share their of's instant, and each spawned inner inherits
+    // its trigger value's instant — so ALL the inner values are one batch
+    // (the causation rule, ratified 2026-07-06)
     const rec = record(
       pipeWith(
         of(1, 2, 3),
         mergeMap((n: number) => of(n, n * 100)),
       ),
     );
-    expect(rec.batches).toEqual([
-      [1, 100],
-      [2, 200],
-      [3, 300],
-    ]);
+    expect(rec.batches).toEqual([[1, 100, 2, 200, 3, 300]]);
     expect(rec.isCompleted()).toBe(true);
   });
 

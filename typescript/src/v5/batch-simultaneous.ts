@@ -4,17 +4,30 @@ import {
   InstEmit,
   InstAsync,
   async,
+  close,
   init,
   val,
   values,
   InstInit,
   InstClose,
+  InstVal,
 } from "./types";
 
 type ProvenanceState<A> = {
   awaitingValueCount: number | undefined;
   totalNum: number;
+  /** the window's values in DELIVERY order — batches read exactly as the
+   * emissions arrived (rxjs delivery order; ratified 2026-07-06, replacing
+   * the Phase-B syntactic pre-order sorting) */
   batch: A[];
+  /** slots CONSUMED by the current window so far, by the delivering
+   * registration's sub — a cut's extra closes only eat slots of
+   * registrations that have NOT yet delivered (a co-closed registration
+   * that already delivered consumed its own). Sub identity lets multiple
+   * live copies of the same source tell their slots apart; an undefined
+   * key is a consumption whose registration id is unknown and matches
+   * any close (the pre-identity counting rule). */
+  delivered: ReadonlyMap<symbol | undefined, number>;
 };
 
 const deleteKey = <K extends string | number | symbol, A>(
@@ -25,6 +38,45 @@ const deleteKey = <K extends string | number | symbol, A>(
   return rest as Record<K, A>;
 };
 
+/** identity of a protocol node: provenance + registration id. Two nodes
+ * are the SAME registration when provenances match and neither side's sub
+ * contradicts the other (a missing sub matches anything — the structural
+ * pre-identity rules). */
+type NodeId = { prov: symbol; sub: symbol | undefined };
+const sameId = (
+  prov: symbol,
+  sub: symbol | undefined,
+  b: NodeId,
+): boolean =>
+  prov === b.prov &&
+  (sub === undefined || b.sub === undefined || sub === b.sub);
+
+/** mirror of the registration decision shared by registerSubtree,
+ * registrationDeltas and unitProvenanceCloseSubs: EMPTY inits are
+ * registration leaves; a non-empty init re-states its enclosing wrapper
+ * or the unit's anchor spine ONLY when it is the same registration —
+ * same provenance AND (where ids are known) the same sub. A same-source
+ * init with a DIFFERENT sub is a genuine fresh lifecycle (e.g.
+ * take(0)(src) spawned in-frame by a trigger derived from src): it
+ * registers, so its close nets zero. */
+const registersHere = <A>(
+  c: InstInit<A>,
+  parent: NodeId,
+  unitFor: NodeId,
+): boolean =>
+  c.children.length === 0 ||
+  (!sameId(c.provenance, c.sub, parent) &&
+    !sameId(c.provenance, c.sub, unitFor));
+
+const addDelivered = (
+  delivered: ReadonlyMap<symbol | undefined, number>,
+  sub: symbol | undefined,
+): ReadonlyMap<symbol | undefined, number> => {
+  const next = new Map(delivered);
+  next.set(sub, (next.get(sub) ?? 0) + 1);
+  return next;
+};
+
 const updateMemory = <A>(
   memory: Record<symbol, ProvenanceState<A>>,
   provenance: symbol,
@@ -32,10 +84,14 @@ const updateMemory = <A>(
     awaitingValueCount,
     totalNum,
     batchAppend,
+    deliveredSub,
   }: {
     awaitingValueCount?: "--";
     totalNum?: "++" | "--";
     batchAppend?: A[];
+    /** the registration whose slot this consumption spends (recorded
+     * only when awaitingValueCount is decremented) */
+    deliveredSub?: symbol;
   },
 ): Record<symbol, ProvenanceState<A>> => {
   const state = memory[provenance];
@@ -79,11 +135,128 @@ const updateMemory = <A>(
       totalNum: newTotal,
       batch: windowComplete
         ? []
-        : batchAppend !== undefined
+        : batchAppend !== undefined && batchAppend.length > 0
           ? [...currentBatch, ...batchAppend]
           : currentBatch,
+      delivered: windowComplete
+        ? new Map()
+        : awaitingValueCount === "--"
+          ? addDelivered(
+              currentCount === undefined
+                ? new Map()
+                : (state?.delivered ?? new Map()),
+              deliveredSub,
+            )
+          : (state?.delivered ?? new Map()),
     },
   };
+};
+
+/**
+ * The instants of a subscription burst (a top-level init): every value is
+ * keyed by its ROOT CAUSE — the provenance of the nearest enclosing init
+ * reached without crossing an async wrapper. An async-wrapped subtree in a
+ * burst is a derived-spawned UNIT: its whole subtree (however nested)
+ * inherits the unit's instant. The same provenance reached at different
+ * depths is the same instant (a shared cold subscribed twice), so batches
+ * group across the whole tree, ordered by first appearance.
+ */
+const burstBatches = <A>(emit: InstInit<A>): A[][] => {
+  const order: symbol[] = [];
+  const byKey = new Map<symbol, A[]>();
+  const push = (key: symbol, v: A): void => {
+    const existing = byKey.get(key);
+    if (existing === undefined) {
+      byKey.set(key, [v]);
+      order.push(key);
+    } else {
+      existing.push(v);
+    }
+  };
+  const anchorOf = (e: InstAsync<A>): symbol =>
+    e.child != null && e.child.type === "async"
+      ? anchorOf(e.child)
+      : e.provenance;
+  const walk = (e: InstEmit<A>): void => {
+    if (e.type === "async") {
+      // a derived-spawned unit (or a routed close): one instant, all its
+      // values keyed by the instant OWNER — the innermost async provenance
+      // (outer layers are join routing)
+      const anchor = anchorOf(e);
+      for (const v of values(e)) {
+        push(anchor, v);
+      }
+      return;
+    }
+    for (const child of e.children) {
+      if (child.type === "value") {
+        push(e.provenance, child.value);
+      } else if (child.type !== "close") {
+        walk(child);
+      }
+    }
+  };
+  walk(emit);
+  return order
+    .map((k) => byKey.get(k)!)
+    .filter((batch) => batch.length > 0);
+};
+
+/**
+ * Registration-only memory bookkeeping for a subscription burst: totalNum
+ * ++/-- per init/close, async units register their subtrees (and their
+ * unit-level closes decrement), but NO window operations — every value in
+ * the burst was already batched by burstBatches, simultaneous by
+ * construction, and awaits nothing.
+ */
+const registerBurst = <A>(
+  emit: InstEmit<A>,
+  memory: Record<symbol, ProvenanceState<A>>,
+  parent?: NodeId,
+): Record<symbol, ProvenanceState<A>> => {
+  if (emit.type === "init") {
+    const base =
+      parent !== undefined && sameId(emit.provenance, emit.sub, parent)
+        ? memory
+        : updateMemory(memory, emit.provenance, { totalNum: "++" });
+    const selfId = { prov: emit.provenance, sub: emit.sub };
+    return emit.children.reduce((acc, child) => {
+      if (child.type === "value") {
+        return acc;
+      }
+      if (child.type === "close") {
+        return updateMemory(acc, emit.provenance, { totalNum: "--" });
+      }
+      return registerBurst(child, acc, selfId);
+    }, base);
+  }
+  if (emit.child == null || emit.child.type === "value") {
+    return memory;
+  }
+  if (emit.child.type === "close") {
+    return updateMemory(memory, emit.provenance, { totalNum: "--" });
+  }
+  if (emit.child.type === "init") {
+    // a unit: its anchor doesn't re-register; unit-level closes decrement;
+    // nested subtrees (freshly subscribed inners) register
+    const unit = emit.child;
+    const unitId = { prov: unit.provenance, sub: unit.sub };
+    const afterCloses = unit.children.reduce(
+      (acc, child) =>
+        child.type === "close"
+          ? updateMemory(acc, unit.provenance, { totalNum: "--" })
+          : acc,
+      memory,
+    );
+    return unit.children.reduce(
+      (acc, child) =>
+        child.type === "value" || child.type === "close"
+          ? acc
+          : registerSubtree(child, acc, unitId, unitId),
+      afterCloses,
+    );
+  }
+  return registerBurst(emit.child, memory);
 };
 
 const groupInitSiblings = <A>(
@@ -103,7 +276,138 @@ const groupInitSiblings = <A>(
     });
   return init({
     provenance: emit.provenance,
+    sub: emit.sub,
     children: [...otherChildren, ...consolidatedVal],
+  });
+};
+
+/** every close in a unit's tree that ends a PRE-EXISTING registration OF
+ * the unit's own provenance — literal children, nested same-provenance
+ * init-internal closes (re-wrapped close markers), and bare async closes
+ * — each identified by the SUB of the node it closes (the enclosing
+ * init/async; undefined when the id is unknown, e.g. `cancelled`
+ * annotations). Mirrors what the memory update decrements on that
+ * provenance for this emission — EXCEPT closes inside an init that itself
+ * REGISTERS within this unit (an off-spine lifecycle like take(0)(src)
+ * arriving in a src-triggered flush, per registerSubtree's spine rule):
+ * those pair with their own registration and end no outside
+ * subscription. */
+const unitProvenanceCloseSubs = <A>(
+  unit: InstInit<A>,
+): (symbol | undefined)[] => {
+  const prov = unit.provenance;
+  const out: (symbol | undefined)[] = [];
+  /** registrations of the unit's provenance BORN in this unit — a close
+   * matching one of these subs is a self-contained lifecycle (e.g. a
+   * graft re-subscribing an already-completed source: registration and
+   * close arrive as siblings in one unit) and ends no outside
+   * subscription */
+  const born: symbol[] = [];
+  const walk = (
+    children: (InstEmit<A> | InstVal<A> | InstClose)[],
+    enclosing: NodeId,
+    unitFor: NodeId,
+    enclosingRegistered: boolean,
+  ): void => {
+    for (const c of children) {
+      if (c.type === "close") {
+        if (enclosing.prov === prov && !enclosingRegistered) {
+          out.push(enclosing.sub);
+        }
+      } else if (c.type === "value") {
+        // no close
+      } else if (c.type === "init") {
+        // mirror registerSubtree's decision, spine rule included
+        const registered = registersHere(c, enclosing, unitFor);
+        const childUnitFor = sameId(c.provenance, c.sub, unitFor)
+          ? unitFor
+          : { prov: c.provenance, sub: c.sub };
+        if (registered && c.provenance === prov && c.sub !== undefined) {
+          born.push(c.sub);
+        }
+        if (c.provenance === prov) {
+          for (let i = 0; i < (c.cancelled ?? 0); i++) {
+            out.push(undefined);
+          }
+        }
+        walk(
+          c.children,
+          { prov: c.provenance, sub: c.sub },
+          childUnitFor,
+          registered,
+        );
+      } else if (c.child?.type === "close") {
+        if (c.provenance === prov) {
+          out.push(c.sub);
+        }
+      } else if (c.child != null && c.child.type !== "value") {
+        walk([c.child], { prov: c.provenance, sub: c.sub }, unitFor, false);
+      }
+    }
+  };
+  const unitId = { prov, sub: unit.sub };
+  walk(unit.children, unitId, unitId, false);
+  for (let i = 0; i < (unit.cancelled ?? 0); i++) {
+    out.push(undefined);
+  }
+  // pair each born registration with its own close (exact sub match only —
+  // identity-less closes keep the pre-identity counting semantics)
+  for (const s of born) {
+    const idx = out.indexOf(s);
+    if (idx >= 0) {
+      out.splice(idx, 1);
+    }
+  }
+  return out;
+};
+
+/** the unit's closes that consume EXTRA window slots: one close pairs
+ * with the unit's own delivery (preferring the unit's own sub), and each
+ * remaining close is matched against the window's already-spent slots —
+ * exact when identities are known (a close of a registration that
+ * delivered this window eats nothing; one that never delivered eats a
+ * slot), degrading to the pre-identity counting rule through undefined
+ * subs (which match anything). Returns the UNMATCHED closes' subs — each
+ * consumes one awaited slot. */
+const unmatchedExtraCloses = <A>(
+  unit: InstInit<A>,
+  entry: ProvenanceState<A> | undefined,
+): (symbol | undefined)[] => {
+  const subs = unitProvenanceCloseSubs(unit);
+  if (subs.length === 0) {
+    return [];
+  }
+  // the unit's own close pairs with this unit's own delivery
+  const ownIdx = subs.indexOf(unit.sub);
+  const pairIdx =
+    ownIdx >= 0 ? ownIdx : Math.max(subs.indexOf(undefined), 0);
+  subs.splice(pairIdx, 1);
+  const spent = new Map(entry?.delivered ?? []);
+  const consume = (key: symbol | undefined): boolean => {
+    const n = spent.get(key) ?? 0;
+    if (n > 0) {
+      spent.set(key, n - 1);
+      return true;
+    }
+    return false;
+  };
+  return subs.filter((s) => {
+    if (s !== undefined && consume(s)) {
+      return false;
+    }
+    if (consume(undefined)) {
+      return false;
+    }
+    if (s === undefined) {
+      // an identity-less close matches any spent slot
+      for (const [key, n] of spent) {
+        if (n > 0) {
+          spent.set(key, n - 1);
+          return false;
+        }
+      }
+    }
+    return true;
   });
 };
 
@@ -112,6 +416,27 @@ const batchAsync = <A>(
   memory: Record<symbol, ProvenanceState<A>>,
 ): InstEmit<A[]> | null => {
   if (emit.child?.type === "close") {
+    // every subscriber of a provenance delivers something at its close
+    // instant — a value-carrying unit or a bare close — so a bare close
+    // consumes one awaited delivery slot. If it's the last one, the
+    // window flushes WITH the close (otherwise the buffered batch would
+    // be stranded when the entry dies)
+    const entry = memory[emit.provenance];
+    if (
+      entry !== undefined &&
+      entry.awaitingValueCount === 1 &&
+      entry.batch.length > 0
+    ) {
+      return async({
+        provenance: emit.provenance,
+        sub: emit.sub,
+        child: init<A[]>({
+          provenance: emit.provenance,
+          sub: emit.sub,
+          children: [val(entry.batch), close],
+        }),
+      });
+    }
     return emit as InstEmit<A[]>;
   }
   if (emit.child?.type === "async") {
@@ -119,7 +444,8 @@ const batchAsync = <A>(
     // so batching decisions belong to the nested provenance, not this one
     return async({
       provenance: emit.provenance,
-      child: batchOrGroup(emit.child, memory),
+      sub: emit.sub,
+      child: batchAsync(emit.child, memory),
     });
   }
   // the unit level: the child is null, a value, or an init caused by this
@@ -131,11 +457,22 @@ const batchAsync = <A>(
   const unitEntry = memory[unitProvenance];
   const unitAwaiting = unitEntry?.awaitingValueCount;
   const unitBatch = unitEntry?.batch ?? [];
+  // a unit's closes BEYOND the first (its own subscription's) end OTHER
+  // subscriptions that will never deliver — e.g. a take cutting a diamond
+  // closes every branch it passed, having swallowed their deliveries.
+  // Each extra close consumes an awaited slot (mirror of the bare-close
+  // rule), so the window mustn't hold out for them — EXCEPT closes of
+  // registrations that ALREADY delivered this window (a take(n) cut whose
+  // earlier branch values arrived before the cut): those slots are spent.
+  const extraCloses =
+    emit.child?.type === "init"
+      ? unmatchedExtraCloses(emit.child, unitEntry).length
+      : 0;
   if (
     (unitEntry !== undefined &&
       unitAwaiting === undefined &&
-      unitEntry.totalNum > 1) ||
-    (unitAwaiting !== undefined && unitAwaiting > 1)
+      unitEntry.totalNum > 1 + extraCloses) ||
+    (unitAwaiting !== undefined && unitAwaiting > 1 + extraCloses)
   ) {
     // more units of this instant still to come: buffer
     // (the unit's values are recorded in memory by updateMemoryFromEmit)
@@ -160,25 +497,40 @@ const batchAsync = <A>(
       // tree so the memory recursion below sees its structure
       return async({
         provenance: emit.provenance,
+        sub: emit.sub,
         child: groupInitSiblings(emit.child, memory),
       });
     }
-    return async({ provenance: emit.provenance, child: val(unitVals) });
+    return async({
+      provenance: emit.provenance,
+      sub: emit.sub,
+      child: val(unitVals),
+    });
   }
   const fullBatch = [...unitBatch, ...unitVals];
   if (fullBatch.length === 0) {
     return null;
   }
-  return async({ provenance: emit.provenance, child: val(fullBatch) });
+  return async({
+    provenance: emit.provenance,
+    sub: emit.sub,
+    child: val(fullBatch),
+  });
 };
 
 const batchOrGroup = <A>(
   emit: InstEmit<A>,
   memory: Record<symbol, ProvenanceState<A>>,
 ): InstEmit<A[]> | null => {
-  return emit.type === "init"
-    ? groupInitSiblings(emit, memory)
-    : batchAsync(emit, memory);
+  if (emit.type === "init") {
+    // a subscription burst: one emission, one batch per root cause
+    return init({
+      provenance: emit.provenance,
+      sub: emit.sub,
+      children: burstBatches(emit).map((batch) => val(batch)),
+    });
+  }
+  return batchAsync(emit, memory);
 };
 
 /**
@@ -192,14 +544,30 @@ const batchOrGroup = <A>(
 const registerSubtree = <A>(
   emit: InstEmit<A>,
   memory: Record<symbol, ProvenanceState<A>>,
-  parentProvenance: symbol,
-  unitProvenance: symbol,
+  parent: NodeId,
+  unit: NodeId,
 ): Record<symbol, ProvenanceState<A>> => {
   if (emit.type === "init") {
-    const base =
-      emit.provenance === parentProvenance || emit.provenance === unitProvenance
-        ? memory
-        : updateMemory(memory, emit.provenance, { totalNum: "++" });
+    // EMPTY inits are registration LEAVES (a genuine new subscription,
+    // even of the unit's own anchor — a concat advancing back onto the
+    // source whose close advanced it); non-empty SAME-REGISTRATION inits
+    // (same provenance and, where ids are known, same sub) are
+    // self-wrap/routing re-statements and don't re-register. A
+    // same-provenance init with a DIFFERENT sub is a fresh lifecycle and
+    // registers (see registersHere).
+    const base = registersHere(emit, parent, unit)
+      ? updateMemory(memory, emit.provenance, { totalNum: "++" })
+      : memory;
+    // the same-as-unit suppression holds only along the UNBROKEN
+    // anchor-identity spine: routing re-statements re-state their own
+    // level's wrapper. Once nested under a FOREIGN init (a real join
+    // boundary), an anchor-provenance init is a genuine lifecycle of the
+    // same source (e.g. take(0)(src) inside a switch burst delivered by a
+    // src-triggered arrival) — it must register so its close nets zero.
+    const unitForChildren = sameId(emit.provenance, emit.sub, unit)
+      ? unit
+      : { prov: emit.provenance, sub: emit.sub };
+    const selfId = { prov: emit.provenance, sub: emit.sub };
     return emit.children.reduce((acc, child) => {
       if (child.type === "value") {
         return acc;
@@ -207,7 +575,7 @@ const registerSubtree = <A>(
       if (child.type === "close") {
         return updateMemory(acc, emit.provenance, { totalNum: "--" });
       }
-      return registerSubtree(child, acc, emit.provenance, unitProvenance);
+      return registerSubtree(child, acc, selfId, unitForChildren);
     }, base);
   }
   if (emit.child == null || emit.child.type === "value") {
@@ -216,7 +584,12 @@ const registerSubtree = <A>(
   if (emit.child.type === "close") {
     return updateMemory(memory, emit.provenance, { totalNum: "--" });
   }
-  return registerSubtree(emit.child, memory, emit.provenance, unitProvenance);
+  return registerSubtree(
+    emit.child,
+    memory,
+    { prov: emit.provenance, sub: emit.sub },
+    unit,
+  );
 };
 
 /**
@@ -227,65 +600,134 @@ const registerSubtree = <A>(
  * downstream memory only learns of ended subscriptions through closes,
  * and an unsubscription emits none (precedent: take synthesizes closes).
  */
-export const registrationDeltas = <A>(
+const walkDeltas = <A>(
   emit: InstEmit<A>,
-  deltas: Map<symbol, number> = new Map(),
+  bump: (prov: symbol, sub: symbol | undefined, d: number) => void,
   parentProvenance?: symbol,
-): Map<symbol, number> => {
-  const bump = (p: symbol, d: number) =>
-    deltas.set(p, (deltas.get(p) ?? 0) + d);
-  const subtree = (e: InstEmit<A>, parent: symbol, unitProv: symbol): void => {
+): void => {
+  const subtree = (e: InstEmit<A>, parent: NodeId, unitFor: NodeId): void => {
     if (e.type === "init") {
-      if (e.provenance !== parent && e.provenance !== unitProv) {
-        bump(e.provenance, 1);
+      // mirror registerSubtree: EMPTY inits are registration leaves and
+      // always count; non-empty same-REGISTRATION headers (same
+      // provenance and, where ids are known, same sub) are re-statements
+      if (registersHere(e, parent, unitFor)) {
+        bump(e.provenance, e.sub, 1);
       }
+      // mirror registerSubtree's spine rule: same-as-unit suppression dies
+      // when descending under a foreign init (or a foreign sub)
+      const unitForChildren = sameId(e.provenance, e.sub, unitFor)
+        ? unitFor
+        : { prov: e.provenance, sub: e.sub };
+      const selfId = { prov: e.provenance, sub: e.sub };
       for (const child of e.children) {
         if (child.type === "close") {
-          bump(e.provenance, -1);
+          bump(e.provenance, e.sub, -1);
         } else if (child.type !== "value") {
-          subtree(child, e.provenance, unitProv);
+          subtree(child, selfId, unitForChildren);
         }
       }
       return;
     }
     if (e.child?.type === "close") {
-      bump(e.provenance, -1);
+      bump(e.provenance, e.sub, -1);
     } else if (e.child != null && e.child.type !== "value") {
-      subtree(e.child, e.provenance, unitProv);
+      subtree(e.child, { prov: e.provenance, sub: e.sub }, unitFor);
     }
   };
-  if (emit.type === "init") {
-    if (emit.provenance !== parentProvenance) {
-      bump(emit.provenance, 1);
-    }
-    for (const child of emit.children) {
-      if (child.type === "close") {
-        bump(emit.provenance, -1);
-      } else if (child.type !== "value") {
-        registrationDeltas(child, deltas, emit.provenance);
+  // mirror of registerBurst for the init-headed walk
+  const burst = (e: InstEmit<A>, parent?: NodeId): void => {
+    if (e.type === "init") {
+      if (parent === undefined || !sameId(e.provenance, e.sub, parent)) {
+        bump(e.provenance, e.sub, 1);
       }
-    }
-    return deltas;
-  }
-  if (emit.child?.type === "close") {
-    bump(emit.provenance, -1);
-    return deltas;
-  }
-  if (emit.child == null || emit.child.type === "value") {
-    return deltas;
-  }
-  if (emit.child.type === "init") {
-    // a unit init: only its subtree registers (mirror of registerSubtree)
-    const unit = emit.child;
-    for (const child of unit.children) {
-      if (child.type !== "value" && child.type !== "close") {
-        subtree(child, unit.provenance, unit.provenance);
+      const selfId = { prov: e.provenance, sub: e.sub };
+      for (const child of e.children) {
+        if (child.type === "close") {
+          bump(e.provenance, e.sub, -1);
+        } else if (child.type !== "value") {
+          burst(child, selfId);
+        }
       }
+      return;
     }
-    return deltas;
-  }
-  // routing wrapper
-  return registrationDeltas(emit.child, deltas);
+    if (e.child?.type === "close") {
+      bump(e.provenance, e.sub, -1);
+      return;
+    }
+    if (e.child == null || e.child.type === "value") {
+      return;
+    }
+    if (e.child.type === "init") {
+      // a unit init: only its subtree registers (mirror of
+      // registerSubtree), and unit-level closes (a close traveling with a
+      // value) decrement
+      const unit = e.child;
+      const unitId = { prov: unit.provenance, sub: unit.sub };
+      for (const child of unit.children) {
+        if (child.type === "close") {
+          bump(unit.provenance, unit.sub, -1);
+        } else if (child.type !== "value") {
+          subtree(child, unitId, unitId);
+        }
+      }
+      return;
+    }
+    // routing wrapper
+    burst(e.child);
+  };
+  burst(
+    emit,
+    parentProvenance !== undefined
+      ? { prov: parentProvenance, sub: undefined }
+      : undefined,
+  );
+};
+
+export const registrationDeltas = <A>(
+  emit: InstEmit<A>,
+  deltas: Map<symbol, number> = new Map(),
+  parentProvenance?: symbol,
+): Map<symbol, number> => {
+  walkDeltas(
+    emit,
+    (prov, _sub, d) => deltas.set(prov, (deltas.get(prov) ?? 0) + d),
+    parentProvenance,
+  );
+  return deltas;
+};
+
+/** per-registration balance: provenance → sub → live count. Registrations
+ * whose ids are unknown accumulate under the undefined key. */
+export type RegBalance = Map<symbol, Map<symbol | undefined, number>>;
+
+export const registrationDeltasBySub = <A>(
+  emit: InstEmit<A>,
+  balance: RegBalance,
+  parentProvenance?: symbol,
+): RegBalance => {
+  walkDeltas(
+    emit,
+    (prov, sub, d) => {
+      const bySub =
+        balance.get(prov) ?? new Map<symbol | undefined, number>();
+      const next = (bySub.get(sub) ?? 0) + d;
+      // a close whose id is unknown may end a KNOWN registration: soak
+      // negative unknown balance into a positive identified one
+      if (sub === undefined && next < 0) {
+        for (const [k, n] of bySub) {
+          if (k !== undefined && n > 0) {
+            bySub.set(k, n - 1);
+            balance.set(prov, bySub);
+            return;
+          }
+        }
+      }
+      bySub.set(sub, next);
+      balance.set(prov, bySub);
+    },
+    parentProvenance,
+  );
+  return balance;
 };
 
 const updateMemoryFromEmit = <A>(
@@ -294,68 +736,99 @@ const updateMemoryFromEmit = <A>(
   parentProvenance?: symbol,
 ): Record<symbol, ProvenanceState<A>> => {
   if (emit.type === "init") {
-    // an init nested directly inside an init of the same provenance is a
-    // self-wrap artifact of flipInside, not a second subscription
-    const newMemory =
-      emit.provenance === parentProvenance
-        ? oldMemory
-        : updateMemory(oldMemory, emit.provenance, {
-            totalNum: "++",
-          });
-    const withChildrensState = emit.children.reduce((acc, child) => {
-      if (child.type === "close") {
-        return updateMemory(acc, emit.provenance, { totalNum: "--" });
-      }
-      if (child.type === "value") {
-        return updateMemory(acc, emit.provenance, {
-          awaitingValueCount: "--",
-          batchAppend: [child.value],
-        });
-      }
-      return updateMemoryFromEmit(child, acc, emit.provenance);
-    }, newMemory);
-
-    return withChildrensState;
+    // a subscription burst: registration only — its values were batched by
+    // burstBatches and await nothing
+    return registerBurst(
+      emit,
+      oldMemory,
+      parentProvenance !== undefined
+        ? { prov: parentProvenance, sub: undefined }
+        : undefined,
+    );
   }
 
   if (emit.child?.type === "close") {
-    return updateMemory(oldMemory, emit.provenance, { totalNum: "--" });
+    // a bare close consumes one awaited delivery slot of an in-flight
+    // window (see batchAsync) before its registration ends
+    const entry = oldMemory[emit.provenance];
+    const afterWindow =
+      entry?.awaitingValueCount !== undefined
+        ? updateMemory(oldMemory, emit.provenance, {
+            awaitingValueCount: "--",
+            deliveredSub: emit.sub,
+          })
+        : oldMemory;
+    return updateMemory(afterWindow, emit.provenance, { totalNum: "--" });
   }
   if (emit.child?.type === "value") {
     return updateMemory(oldMemory, emit.provenance, {
       awaitingValueCount: "--",
       batchAppend: [emit.child.value],
+      deliveredSub: emit.sub,
     });
   }
   if (emit.child == null) {
     return updateMemory(oldMemory, emit.provenance, {
       awaitingValueCount: "--",
+      deliveredSub: emit.sub,
     });
   }
   if (emit.child.type === "init") {
     // a unit init: one delivery of this instant through a join branch. It
     // does NOT register a new subscription of its own provenance — only its
     // subtree (the freshly subscribed inners) registers. Its values (however
-    // deeply nested) join the provenance's batch window.
+    // deeply nested) join the provenance's batch window FIRST; then its
+    // unit-level closes (a close traveling with the final value, e.g. take)
+    // decrement — the value must land in the window before it shrinks.
     const unit = emit.child;
-    const withSubtree = unit.children.reduce(
+    // the extra closes are computed against the PRE-delivery window state
+    // (mirrors batchAsync, which decided before this update ran)
+    const extras = unmatchedExtraCloses(unit, oldMemory[unit.provenance]);
+    const afterValues = updateMemory(oldMemory, unit.provenance, {
+      awaitingValueCount: "--",
+      batchAppend: values(unit),
+      deliveredSub: unit.sub,
+    });
+    // the first close of the unit's provenance pairs with this unit's own
+    // delivery (already counted above); each FURTHER one — literal or
+    // re-wrapped deeper in the tree — ends another subscription that will
+    // never deliver, so consume its awaited slot (see extraCloses in
+    // batchAsync) — EXCEPT ones whose registration already delivered this
+    // window (its slot was spent by its own delivery; sub identity makes
+    // the match exact). totalNum decrements: literal closes here, nested
+    // ones via registerSubtree.
+    let afterSlots = afterValues;
+    for (const closedSub of extras) {
+      if (afterSlots[unit.provenance]?.awaitingValueCount === undefined) {
+        break;
+      }
+      afterSlots = updateMemory(afterSlots, unit.provenance, {
+        awaitingValueCount: "--",
+        deliveredSub: closedSub,
+      });
+    }
+    const afterCloses = unit.children.reduce(
+      (acc, child) =>
+        child.type === "close"
+          ? updateMemory(acc, unit.provenance, { totalNum: "--" })
+          : acc,
+      afterSlots,
+    );
+    const unitId = { prov: unit.provenance, sub: unit.sub };
+    return unit.children.reduce(
       (acc, child) =>
         child.type === "value" || child.type === "close"
           ? acc
-          : registerSubtree(child, acc, unit.provenance, unit.provenance),
-      oldMemory,
+          : registerSubtree(child, acc, unitId, unitId),
+      afterCloses,
     );
-    return updateMemory(withSubtree, unit.provenance, {
-      awaitingValueCount: "--",
-      batchAppend: values(unit),
-    });
   }
   // an async child: this level is pure routing. It must NOT touch window
   // state — a provenance can be both a real source window and a routing
   // wrapper (a join anchored on it), and decrementing here opens phantom
   // windows that strand later values. All accounting happens at the unit
   // level.
-  return updateMemoryFromEmit(emit.child, oldMemory);
+  return updateMemoryFromEmit(emit.child, oldMemory, undefined);
 };
 
 export const batchSimultaneous = <A>(
@@ -396,13 +869,20 @@ export const batchSimultaneous = <A>(
  *   - can safely ignore
  *   - example - the 'of' in 'of(a, a).pipe(mergeAll())'
  * - an async-wrapped init ("unit init"):
- *   - a new inner subscription caused by an event of the init's provenance
- *     (e.g. switchMap/mergeMap switching to a new inner), carrying that
- *     instant's sync values
- *   - counts as one delivery of the provenance's instant, like a value;
- *     its (possibly zero) values join the batch window
+ *   - one delivery of an instant through a join branch: a new inner
+ *     subscription caused by an event (switchMap/mergeMap), a take's
+ *     final value traveling with its close, or a concat advancement
+ *     grafted onto the closing emission
+ *   - counts against the provenance's window like a value; its (possibly
+ *     zero) values — however deeply nested — join the batch window
  *   - example - merge(a, a.pipe(switchMap(of)))
+ * - a bare async close:
+ *   - consumes one awaited delivery slot (every subscriber delivers
+ *     something at a close instant); flushes the window if it was last
  * - a top-level init:
- *   - a subscription instant: registers its provenances in memory and emits
- *     its value groups directly (never awaited against a window)
+ *   - THE subscription burst: batches per root cause across the whole
+ *     tree (burstBatches — async-wrapped subtrees inherit their unit's
+ *     anchor; same provenance at any depth is the same instant), and
+ *     registers provenances only (registerBurst — burst values await
+ *     nothing)
  */

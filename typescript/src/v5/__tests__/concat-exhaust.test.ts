@@ -3,12 +3,18 @@ import { of } from "../basic-primitives";
 import { InstantSubject } from "../constructors";
 import { concatAll, exhaustAll } from "../joins";
 import { Instantaneous } from "../types";
-import { concatMap, exhaustMap, merge } from "../util";
+import { concat, concatMap, exhaustMap, merge } from "../util";
 import { record } from "./helpers";
 
 describe("concatAll", () => {
   it("flattens synchronous inners in order", () => {
     const rec = record(pipeWith(of(of(1, 2), of(3)), concatAll));
+    expect(rec.batches).toEqual([[1, 2], [3]]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("concat(a, b) is the variadic derived form", () => {
+    const rec = record(concat(of(1, 2), of(3)));
     expect(rec.batches).toEqual([[1, 2], [3]]);
     expect(rec.isCompleted()).toBe(true);
   });
@@ -52,17 +58,17 @@ describe("concatAll", () => {
     expect(rec.isCompleted()).toBe(true);
   });
 
-  it("concatMap flattens each value in order", () => {
+  it("concatMap flattens in order; inners inherit the trigger instant", () => {
+    // both triggers share their of's instant, so the serially subscribed
+    // inners inherit it too — one batch, in subscription order (the
+    // causation rule: derivation creates simultaneity, sync or async)
     const rec = record(
       pipeWith(
         of(1, 2),
         concatMap((n: number) => of(n, n + 1)),
       ),
     );
-    expect(rec.batches).toEqual([
-      [1, 2],
-      [2, 3],
-    ]);
+    expect(rec.batches).toEqual([[1, 2, 2, 3]]);
     expect(rec.isCompleted()).toBe(true);
   });
 

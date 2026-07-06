@@ -69,7 +69,7 @@ describe("share", () => {
     expect(rec2.isCompleted()).toBe(true);
   });
 
-  it("fan-out delivery order: a share's refs receive consecutively", () => {
+  it("fan-out order is delivery order: refs deliver consecutively", () => {
     const s = new InstantSubject<number>();
     const x = share(
       pipeWith(
@@ -77,8 +77,11 @@ describe("share", () => {
         map((n: number) => n * 10),
       ),
     );
-    // merge(x, s, map(+1)(x)): the share connects to s at x's (leftmost)
-    // position, so both refs' values precede the raw branch's
+    // merge(x, s, map(+1)(x)): the share connects to s when its FIRST ref
+    // subscribes (the leftmost x), so at s.next the share's subject fires
+    // before the direct middle branch — and it fans out to BOTH refs
+    // consecutively. Batches read in delivery order (ratified 2026-07-06,
+    // replacing phase-B syntactic sorting): [50, 51, 5]
     const rec = record(
       merge<number>(
         x,

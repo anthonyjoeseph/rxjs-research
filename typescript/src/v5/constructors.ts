@@ -22,12 +22,13 @@ export const cold = <T>(
 ): Instantaneous<T> => {
   return r.defer(() => {
     const provenance = uuid() as unknown as symbol;
+    const sub = uuid() as unknown as symbol;
     return r.concat(
-      r.of(init<T>({ provenance, children: [] })),
+      r.of(init<T>({ provenance, sub, children: [] })),
       new Observable(subscribe).pipe(
-        r.map((value) => async<T>({ provenance, child: val(value) })),
+        r.map((value) => async<T>({ provenance, sub, child: val(value) })),
       ),
-      r.of(async<T>({ provenance, child: close })),
+      r.of(async<T>({ provenance, sub, child: close })),
     );
   });
 };
@@ -78,11 +79,16 @@ export class InstantSubject<T>
         ? observerOrNext.complete?.bind(observerOrNext)
         : (completeArg ?? undefined);
 
+    // each subscriber is its own registration: deliveries relayed through
+    // it are restamped with its sub at the top level
+    const sub = uuid() as unknown as symbol;
     return r
       .concat(
-        r.of(init<T>({ provenance: this._provenance, children: [] })),
-        this.internalSubject,
-        r.of(async<T>({ provenance: this._provenance, child: close })),
+        r.of(init<T>({ provenance: this._provenance, sub, children: [] })),
+        this.internalSubject.pipe(
+          r.map((e): InstEmit<T> => ({ ...e, sub })),
+        ),
+        r.of(async<T>({ provenance: this._provenance, sub, child: close })),
       )
       .subscribe({
         next: (value) => {

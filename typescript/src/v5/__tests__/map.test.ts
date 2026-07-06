@@ -16,7 +16,16 @@ describe("map (emission primitive)", () => {
       children: [val(1), val(2), close],
     });
     expect(mapEmit(emit, (n) => n * 10)).toEqual(
-      init<number>({ provenance: prov, children: [val(10), val(20), close] }),
+      init<number>({
+        provenance: prov,
+        // mapped values are marked derived: a join subscribing them knows
+        // the spawned inner inherits the trigger's instant
+        children: [
+          { ...val(10), derived: true },
+          { ...val(20), derived: true },
+          close,
+        ],
+      }),
     );
   });
 
@@ -28,7 +37,10 @@ describe("map (emission primitive)", () => {
     expect(mapEmit(emit, (n) => n + 1)).toEqual(
       async<number>({
         provenance: prov,
-        child: async<number>({ provenance: inner, child: val(6) }),
+        child: async<number>({
+          provenance: inner,
+          child: { ...val(6), derived: true },
+        }),
       }),
     );
   });

@@ -34,30 +34,7 @@ const makeTiers = (
   hotTriggerArb?: fc.Arbitrary<Exp>,
   withSerialJoins = false,
 ) =>
-  fc.letrec<{ flat: Exp; cold: Exp; exp: Exp }>((tie) => ({
-    // `cold` expressions complete within their subscription frame — the only
-    // inners a switchAll may SWITCH AWAY FROM today: unsubscribing a live
-    // (src-backed) inner leaves its registration without a close in the
-    // provenance memory (the unsubscribe-close protocol gap, a recorded
-    // frontier)
-    cold: fc.oneof(
-      { depthSize: "small", withCrossShrink: true },
-      fc.record({
-        type: fc.constant("of" as const),
-        values: fc.array(valueArb, { maxLength: 3 }),
-      }),
-      fc.record({ type: fc.constant("empty" as const) }),
-      fc.record({
-        type: fc.constant("map" as const),
-        fn: fnArb,
-        arg: tie("cold"),
-      }),
-      fc.record({
-        type: fc.constant("take" as const),
-        count: fc.integer({ min: 0, max: 4 }),
-        arg: tie("cold"),
-      }),
-    ),
+  fc.letrec<{ flat: Exp; exp: Exp }>((tie) => ({
     flat: fc.oneof(
       { depthSize: "small", withCrossShrink: true },
       fc.record({
@@ -80,6 +57,14 @@ const makeTiers = (
         count: fc.integer({ min: 0, max: 4 }),
         arg: tie("flat"),
       }),
+      // the state primitive: accumulator threads in delivery order
+      // (non-flat args are generated in the share-free exp tier below)
+      fc.record({
+        type: fc.constant("scan" as const),
+        init: valueArb,
+        fn: fnArb,
+        arg: tie("flat"),
+      }),
     ),
     exp: fc.oneof(
       { depthSize: "small", withCrossShrink: true },
@@ -89,6 +74,31 @@ const makeTiers = (
         fn: fnArb,
         arg: tie("exp"),
       }),
+      // NON-FLAT take (ratified: take splits instants): counts values
+      // anywhere in emission trees — diamonds and joins. SHARE-FREE tier
+      // only: a cut through a HOT join closes subscriptions whose
+      // deliveries were re-routed as separate units, and "swallowed vs
+      // re-routed delivery" isn't decidable at the emission level — a
+      // recorded frontier.
+      ...(withSerialJoins
+        ? [
+            fc.record({
+              type: fc.constant("take" as const),
+              count: fc.integer({ min: 0, max: 4 }),
+              arg: tie("exp"),
+            }) as fc.Arbitrary<Exp>,
+            // NON-FLAT scan (ratified 2026-07-06, delivery order): the
+            // accumulator threads through a diamond's values exactly as
+            // they arrive — the model folds in the same delivery order
+            // the batches read
+            fc.record({
+              type: fc.constant("scan" as const),
+              init: valueArb,
+              fn: fnArb,
+              arg: tie("exp"),
+            }) as fc.Arbitrary<Exp>,
+          ]
+        : []),
       fc.record({
         type: fc.constant("merge" as const),
         left: tie("exp"),
@@ -140,13 +150,41 @@ const makeTiers = (
               type: fc.constant("exhaustAll" as const),
               inners: fc.array(tie("exp"), { maxLength: 3 }),
             }) as fc.Arbitrary<Exp>,
-            // switched-away inners must be cold (see the `cold` tier note)
-            fc
-              .tuple(fc.array(tie("cold"), { maxLength: 2 }), tie("exp"))
-              .map(([earlier, last]): Exp => ({
-                type: "switchAll",
-                inners: [...earlier, last],
-              })),
+            // switched-away inners may be LIVE: switchWithCloses
+            // synthesizes closes for their stranded registrations
+            fc.record({
+              type: fc.constant("switchAll" as const),
+              inners: fc.array(tie("exp"), { maxLength: 3 }),
+            }) as fc.Arbitrary<Exp>,
+            // ASYNC OUTERS (2026-07-06): each trigger value picks an inner
+            // from the palette — concat queues (advancement inherits the
+            // closing instant), switch switches, exhaust drops while busy.
+            // UNFILTERED (2026-07-06, per-subscription identity): the
+            // on-spine same-source-lifecycle ambiguity and the multi-copy
+            // take slot attribution are both decided exactly by the
+            // protocol's registration ids (InstInit/InstAsync.sub).
+            fc.record({
+              type: fc.constantFrom(
+                "concatAll" as const,
+                "switchAll" as const,
+                "exhaustAll" as const,
+              ),
+              inners: fc.array(tie("exp"), { minLength: 1, maxLength: 2 }),
+              trigger: tie("flat"),
+            }) as fc.Arbitrary<Exp>,
+            // dynamic COLD arrival for the merge join too: mergeMap over
+            // palette-picked src-derived inners
+            fc.record({
+              type: fc.constant("mergeAll" as const),
+              outer: fc.record({
+                type: fc.constant("pickS" as const),
+                inners: fc.array(tie("exp"), {
+                  minLength: 1,
+                  maxLength: 2,
+                }),
+                arg: tie("flat"),
+              }),
+            }) as fc.Arbitrary<Exp>,
           ]
         : []),
     ),
@@ -155,7 +193,306 @@ const makeTiers = (
 const { exp: expArb } = makeTiers([], undefined, true);
 const shareRefLeaf = fc.constant({ type: "shareRef" } as Exp);
 const { exp: bodyArb } = makeTiers([shareRefLeaf]);
-const { exp: bodyHotArb } = makeTiers([shareRefLeaf], expArb);
+// serial joins + non-flat take/scan over share refs (2026-07-06, enabled
+// by per-subscription identity) — paired with TAKE-FREE bindings below:
+// a dynamic trigger can subscribe a ref LATE, and a take-completed share
+// would have reset into a fresh life the one-life model doesn't describe
+// (same rule as the hot-inner tier)
+const { exp: bodySerialArb } = makeTiers([shareRefLeaf], undefined, true);
+// hot-join triggers may reference the shared stream ITSELF (feedback
+// loops); source-derived triggers are filtered out below (upstream race)
+const { exp: bodyHotArb } = makeTiers([shareRefLeaf], bodyArb);
+
+/*
+ * RESOLVED FRONTIERS (2026-07-06, per-subscription identity): two filters
+ * used to guard the dynamic-arrival generators —
+ *  - noSameSrcFrameLifecycles: an in-frame take(0) lifecycle of the
+ *    trigger's own source landed on the arrival unit's anchor spine,
+ *    indistinguishable from a routing re-statement carrying a real close;
+ *  - hasMultiSrcTake: a non-flat take's cut across multiple live copies
+ *    demanded opposite answers from identical counts.
+ * Both are now decided exactly by the protocol's registration ids
+ * (InstInit/InstAsync.sub, minted per actual subscription and preserved by
+ * every re-statement): a same-source init with a foreign sub is a fresh
+ * lifecycle (registers, nets zero), and a cut's extra closes match the
+ * delivered-subs window memory per registration.
+ */
+
+/**
+ * RECORDED FRONTIER (2026-07-06, delivery order): a shareRef inside a
+ * take(0) closes IN FRAME — the share's refcount hits zero mid-unfolding
+ * and the share RECONNECTS at the next ref's site, moving its slot in the
+ * source's subscriber order. The model assumes one hot life with the
+ * connection at the first ref's site (share lifecycle resets have always
+ * been out of the model; syntactic pre-order sorting masked the order
+ * consequence). Filtered from generated share bodies.
+ */
+const hasTransientRef = (e: Exp): boolean => {
+  const containsRef = (x: Exp): boolean => {
+    switch (x.type) {
+      case "shareRef":
+        return true;
+      case "map":
+      case "take":
+      case "scan":
+      case "mergeMap":
+        return containsRef(x.arg);
+      case "merge":
+        return containsRef(x.left) || containsRef(x.right);
+      case "letShare":
+        return containsRef(x.binding) || containsRef(x.body);
+      case "mergeAll":
+        return x.outer.type === "ofS"
+          ? x.outer.inners.some(containsRef)
+          : x.outer.type === "pickS"
+            ? x.outer.inners.some(containsRef) || containsRef(x.outer.arg)
+            : containsRef(x.outer.arg);
+      case "concatAll":
+      case "switchAll":
+      case "exhaustAll":
+        return (
+          x.inners.some(containsRef) ||
+          (x.trigger !== undefined && containsRef(x.trigger))
+        );
+      default:
+        return false;
+    }
+  };
+  switch (e.type) {
+    case "take":
+      return e.count === 0
+        ? containsRef(e.arg)
+        : hasTransientRef(e.arg);
+    case "map":
+    case "scan":
+    case "mergeMap":
+      return hasTransientRef(e.arg);
+    case "merge":
+      return hasTransientRef(e.left) || hasTransientRef(e.right);
+    case "letShare":
+      return hasTransientRef(e.binding) || hasTransientRef(e.body);
+    case "mergeAll":
+      return e.outer.type === "ofS"
+        ? e.outer.inners.some(hasTransientRef)
+        : e.outer.type === "pickS"
+          ? e.outer.inners.some(hasTransientRef) ||
+            hasTransientRef(e.outer.arg)
+          : hasTransientRef(e.outer.arg);
+    case "concatAll":
+    case "exhaustAll":
+      return (
+        e.inners.some(hasTransientRef) ||
+        (e.trigger !== undefined && hasTransientRef(e.trigger))
+      );
+    case "switchAll":
+      // a switched-away inner UNSUBSCRIBES its refs mid-run: the share's
+      // refcount can hit zero and reconnect at a moved slot (the same
+      // physics as the take(0) case above). Statically, every non-final
+      // inner is switched away at frame; dynamically, every arrival
+      // switches away the previous one.
+      return e.trigger !== undefined
+        ? e.inners.some(containsRef) || hasTransientRef(e.trigger)
+        : e.inners.slice(0, -1).some(containsRef) ||
+          e.inners.some(hasTransientRef);
+    default:
+      return false;
+  }
+};
+
+const containsShareRef = (e: Exp): boolean => {
+  switch (e.type) {
+    case "shareRef":
+      return true;
+    case "map":
+    case "take":
+    case "scan":
+    case "mergeMap":
+      return containsShareRef(e.arg);
+    case "merge":
+      return containsShareRef(e.left) || containsShareRef(e.right);
+    case "letShare":
+      return containsShareRef(e.binding) || containsShareRef(e.body);
+    case "mergeAll":
+      return e.outer.type === "ofS"
+        ? e.outer.inners.some(containsShareRef)
+        : e.outer.type === "pickS"
+          ? e.outer.inners.some(containsShareRef) ||
+            containsShareRef(e.outer.arg)
+          : containsShareRef(e.outer.arg);
+    case "concatAll":
+    case "switchAll":
+    case "exhaustAll":
+      return (
+        e.inners.some(containsShareRef) ||
+        (e.trigger !== undefined && containsShareRef(e.trigger))
+      );
+    default:
+      return false;
+  }
+};
+
+/**
+ * RECORDED FRONTIER (2026-07-06, share-serial widening): a STATEFUL
+ * non-flat operator (take's counting, scan's fold) over a share FAN-OUT
+ * (a ref merged with other branches) consumes values in true delivery
+ * order — which includes the fan-out regroup (all refs of an instant
+ * deliver as one block at the connection rank). The model performs that
+ * regroup lazily, once, at the letShare boundary, AFTER inner takes/scans
+ * have already folded in pre-regroup order — so their computed VALUES
+ * (not just display order) can differ. Fixing it needs eager tag
+ * resolution (the connection anchor threaded through ctx into every
+ * deliveryOrder consumer). Filtered: take/scan whose arg holds a ref
+ * inside a join. (Flat ops over refs, and non-flat ops over ref-free
+ * args, remain covered.)
+ */
+const hasStatefulOverRefJoin = (e: Exp): boolean => {
+  const refUnderJoin = (x: Exp): boolean => {
+    switch (x.type) {
+      case "map":
+      case "take":
+      case "scan":
+        return refUnderJoin(x.arg);
+      case "merge":
+        return (
+          containsShareRef(x.left) ||
+          containsShareRef(x.right)
+        );
+      case "mergeMap":
+        return containsShareRef(x.arg);
+      case "letShare":
+        return refUnderJoin(x.binding) || refUnderJoin(x.body);
+      case "mergeAll":
+      case "concatAll":
+      case "switchAll":
+      case "exhaustAll":
+        return containsShareRef(x);
+      default:
+        return false;
+    }
+  };
+  switch (e.type) {
+    case "take":
+    case "scan":
+      return refUnderJoin(e.arg) || hasStatefulOverRefJoin(e.arg);
+    case "map":
+    case "mergeMap":
+      return hasStatefulOverRefJoin(e.arg);
+    case "merge":
+      return (
+        hasStatefulOverRefJoin(e.left) || hasStatefulOverRefJoin(e.right)
+      );
+    case "letShare":
+      return (
+        hasStatefulOverRefJoin(e.binding) || hasStatefulOverRefJoin(e.body)
+      );
+    case "mergeAll":
+      return e.outer.type === "ofS"
+        ? e.outer.inners.some(hasStatefulOverRefJoin)
+        : e.outer.type === "pickS"
+          ? e.outer.inners.some(hasStatefulOverRefJoin) ||
+            hasStatefulOverRefJoin(e.outer.arg)
+          : hasStatefulOverRefJoin(e.outer.arg);
+    case "concatAll":
+    case "switchAll":
+    case "exhaustAll":
+      return (
+        e.inners.some(hasStatefulOverRefJoin) ||
+        (e.trigger !== undefined && hasStatefulOverRefJoin(e.trigger))
+      );
+    default:
+      return false;
+  }
+};
+
+/** guards for REF-SPAWNING dynamic outers (a serial join or pickS whose
+ * inners contain a shareRef — each spawn subscribes the share LATE):
+ *  - the UPSTREAM RACE (same physics as the mapShareS guard below): a
+ *    trigger derived from the share's SOURCE wires the fresh ref
+ *    subscription during the source event's own propagation, so whether
+ *    it sees the current value depends on subject-broadcast order the
+ *    model's strictly-after suffix idealizes away;
+ *  - FEEDBACK-THROUGH-SERIAL-JOINS (recorded frontier, 2026-07-06): a
+ *    trigger containing the ref ITSELF spawns another ref subscription
+ *    mid-delivery of the very instant being fanned out — the regroup and
+ *    strictly-after machinery don't describe a fan-out that grows while
+ *    the instant is in flight (plain mapShareS feedback IS supported;
+ *    the serial-join flavor is not yet modeled);
+ *  - TICK-0 REF SPAWNS (recorded frontier, 2026-07-06): a trigger that
+ *    can fire during the STATIC frame (a nonempty `of` in it) spawns
+ *    refs in ARG-VALUE order, interleaved with static wiring — the model
+ *    ranks tick-0 tags by palette SITE order, which can disagree. */
+const hasUpstreamRaceSpawn = (e: Exp, bindingSrcs: Set<number>): boolean => {
+  const containsNonemptyOf = (x: Exp): boolean => {
+    switch (x.type) {
+      case "of":
+        return x.values.length > 0;
+      case "map":
+      case "take":
+      case "scan":
+      case "mergeMap":
+        return containsNonemptyOf(x.arg);
+      case "merge":
+        return containsNonemptyOf(x.left) || containsNonemptyOf(x.right);
+      case "letShare":
+        return (
+          containsNonemptyOf(x.binding) || containsNonemptyOf(x.body)
+        );
+      case "mergeAll":
+        return x.outer.type === "ofS"
+          ? x.outer.inners.some(containsNonemptyOf)
+          : x.outer.type === "pickS"
+            ? x.outer.inners.some(containsNonemptyOf) ||
+              containsNonemptyOf(x.outer.arg)
+            : containsNonemptyOf(x.outer.arg);
+      case "concatAll":
+      case "switchAll":
+      case "exhaustAll":
+        return (
+          x.inners.some(containsNonemptyOf) ||
+          (x.trigger !== undefined && containsNonemptyOf(x.trigger))
+        );
+      default:
+        return false;
+    }
+  };
+  const races = (trigger: Exp, inners: readonly Exp[]): boolean =>
+    (srcIndicesOf(trigger).some((i) => bindingSrcs.has(i)) ||
+      containsShareRef(trigger) ||
+      containsNonemptyOf(trigger)) &&
+    inners.some(containsShareRef);
+  const walk = (x: Exp): boolean => {
+    switch (x.type) {
+      case "map":
+      case "take":
+      case "scan":
+      case "mergeMap":
+        return walk(x.arg);
+      case "merge":
+        return walk(x.left) || walk(x.right);
+      case "letShare":
+        return walk(x.binding) || walk(x.body);
+      case "mergeAll":
+        return x.outer.type === "ofS"
+          ? x.outer.inners.some(walk)
+          : x.outer.type === "pickS"
+            ? races(x.outer.arg, x.outer.inners) ||
+              x.outer.inners.some(walk) ||
+              walk(x.outer.arg)
+            : walk(x.outer.arg);
+      case "concatAll":
+      case "switchAll":
+      case "exhaustAll":
+        return (
+          (x.trigger !== undefined && races(x.trigger, x.inners)) ||
+          x.inners.some(walk) ||
+          (x.trigger !== undefined && walk(x.trigger))
+        );
+      default:
+        return false;
+    }
+  };
+  return walk(e);
+};
 
 const srcIndicesOf = (e: Exp): number[] => {
   switch (e.type) {
@@ -163,6 +500,7 @@ const srcIndicesOf = (e: Exp): number[] => {
       return [e.index];
     case "map":
     case "take":
+    case "scan":
       return srcIndicesOf(e.arg);
     case "merge":
       return [...srcIndicesOf(e.left), ...srcIndicesOf(e.right)];
@@ -173,11 +511,19 @@ const srcIndicesOf = (e: Exp): number[] => {
     case "mergeAll":
       return e.outer.type === "ofS"
         ? e.outer.inners.flatMap(srcIndicesOf)
-        : srcIndicesOf(e.outer.arg);
+        : e.outer.type === "pickS"
+          ? [
+              ...e.outer.inners.flatMap(srcIndicesOf),
+              ...srcIndicesOf(e.outer.arg),
+            ]
+          : srcIndicesOf(e.outer.arg);
     case "concatAll":
     case "switchAll":
     case "exhaustAll":
-      return e.inners.flatMap(srcIndicesOf);
+      return [
+        ...e.inners.flatMap(srcIndicesOf),
+        ...(e.trigger !== undefined ? srcIndicesOf(e.trigger) : []),
+      ];
     default:
       return [];
   }
@@ -187,6 +533,7 @@ const hotTriggerSrcs = (e: Exp): number[] => {
   switch (e.type) {
     case "map":
     case "take":
+    case "scan":
       return hotTriggerSrcs(e.arg);
     case "merge":
       return [...hotTriggerSrcs(e.left), ...hotTriggerSrcs(e.right)];
@@ -201,11 +548,20 @@ const hotTriggerSrcs = (e: Exp): number[] => {
       if (e.outer.type === "mapShareS") {
         return srcIndicesOf(e.outer.arg);
       }
+      if (e.outer.type === "pickS") {
+        return [
+          ...e.outer.inners.flatMap(hotTriggerSrcs),
+          ...hotTriggerSrcs(e.outer.arg),
+        ];
+      }
       return hotTriggerSrcs(e.outer.arg);
     case "concatAll":
     case "switchAll":
     case "exhaustAll":
-      return e.inners.flatMap(hotTriggerSrcs);
+      return [
+        ...e.inners.flatMap(hotTriggerSrcs),
+        ...(e.trigger !== undefined ? hotTriggerSrcs(e.trigger) : []),
+      ];
     default:
       return [];
   }
@@ -244,11 +600,29 @@ const makeBindingArb = (withTake: boolean) =>
 const topArb: fc.Arbitrary<Exp> = fc.oneof(
   { withCrossShrink: true },
   expArb,
-  fc.record({
-    type: fc.constant("letShare" as const),
-    binding: makeBindingArb(true),
-    body: bodyArb,
-  }),
+  fc
+    .record({
+      type: fc.constant("letShare" as const),
+      binding: makeBindingArb(true),
+      body: bodyArb,
+    })
+    // in-frame transient refs (take(0)(x)) reset the share mid-unfolding
+    // and move its connection slot — a recorded frontier
+    .filter(({ body }) => !hasTransientRef(body)),
+  // serial joins / non-flat take / dynamic outers over share refs:
+  // take-free binding = one hot life spans the run (see bodySerialArb)
+  fc
+    .record({
+      type: fc.constant("letShare" as const),
+      binding: makeBindingArb(false),
+      body: bodySerialArb,
+    })
+    .filter(
+      ({ binding, body }) =>
+        !hasTransientRef(body) &&
+        !hasStatefulOverRefJoin(body) &&
+        !hasUpstreamRaceSpawn(body, new Set(srcIndicesOf(binding))),
+    ),
   fc
     .record({
       type: fc.constant("letShare" as const),
@@ -256,10 +630,20 @@ const topArb: fc.Arbitrary<Exp> = fc.oneof(
       body: bodyHotArb,
     })
     .filter(({ binding, body }) => {
-      // no self-triggering: hot-join triggers must not derive from the
-      // shared stream's own source
+      // FEEDBACK LOOPS (triggers derived from the shared stream ITSELF,
+      // rxjs expand-style) are supported: the subject snapshot makes them
+      // strictly-after, and the trigger tier includes shareRef. But a
+      // trigger derived from the share's SOURCE (upstream) races the
+      // share's own delivery of the same event — the spawned subscription
+      // is wired before the share delivers, so it sees the current value
+      // (exactly as plain rxjs does), while the model's strictly-after
+      // suffix excludes it. Modeling that needs per-value via-the-subject
+      // path tracking: a recorded frontier.
       const bindingSrcs = new Set(srcIndicesOf(binding));
-      return hotTriggerSrcs(body).every((i) => !bindingSrcs.has(i));
+      return (
+        hotTriggerSrcs(body).every((i) => !bindingSrcs.has(i)) &&
+        !hasTransientRef(body)
+      );
     }),
 );
 
@@ -268,40 +652,9 @@ const eventsArb: fc.Arbitrary<SourceEvent[]> = fc.array(
   { maxLength: 8 },
 );
 
-const hasShare = (e: Exp): boolean => {
-  switch (e.type) {
-    case "letShare":
-      return true;
-    case "map":
-    case "take":
-      return hasShare(e.arg);
-    case "merge":
-      return hasShare(e.left) || hasShare(e.right);
-    case "mergeMap":
-      return hasShare(e.arg);
-    case "mergeAll":
-      return e.outer.type === "ofS"
-        ? e.outer.inners.some(hasShare)
-        : e.outer.type === "mapShareS"
-          ? true
-          : hasShare(e.outer.arg);
-    case "concatAll":
-    case "switchAll":
-    case "exhaustAll":
-      return e.inners.some(hasShare);
-    default:
-      return false;
-  }
-};
-
-// Intra-batch order for shared fan-out follows the DELIVERY TREE (a share's
-// refs receive consecutively at the share's connection point), while the
-// model idealizes flat pre-order. Membership and batch sequence are exact
-// everywhere; share-containing programs compare batches up to intra-batch
-// order (the exact fan-out order is pinned by unit tests in share.test.ts).
-// (-0 normalizes to 0: the sort can't order them and toEqual distinguishes)
-const canonBatches = (batches: number[][]): number[][] =>
-  batches.map((b) => b.map((v) => (v === 0 ? 0 : v)).sort((x, y) => x - y));
+// DELIVERY ORDER (ratified 2026-07-06): batches read in raw arrival order —
+// the model computes rxjs delivery order (subscription-key paths, close
+// ranks, share fan-out regroup), so everything is exact-compare.
 
 const runBoth = (exp0: Exp, events: readonly SourceEvent[]) => {
   const exp = assignOrigins(exp0, NUM_SOURCES);
@@ -310,7 +663,7 @@ const runBoth = (exp0: Exp, events: readonly SourceEvent[]) => {
   // last event, so source i closes at tick events.length + 1 + i.
   const sources = sourceTimedLists(NUM_SOURCES, events);
   const expected = valuesOf(
-    batchSpec(denote(exp, sources, (i) => events.length + 1 + i, NUM_SOURCES)),
+    batchSpec(denote(exp, sources, (i) => events.length + 1 + i)),
   );
 
   // the implementation
@@ -332,11 +685,7 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
         const { exp, expected, rec } = runBoth(exp0, events);
         try {
           expect(rec.getError()).toBeUndefined();
-          if (hasShare(exp)) {
-            expect(canonBatches(rec.batches)).toEqual(canonBatches(expected));
-          } else {
-            expect(rec.batches).toEqual(expected);
-          }
+          expect(rec.batches).toEqual(expected);
           expect(rec.isCompleted()).toBe(true);
         } catch (err) {
           throw new Error(
@@ -459,7 +808,7 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
     expect(rec.batches).toEqual(expected);
   });
 
-  it("pins the blessed causal-batching semantics (option 1)", () => {
+  it("pins the causation rule: fully transitive, sync or async alike", () => {
     const mul10: Fn = { op: "mul", k: 10 };
     const src0: Exp = { type: "src", index: 0 };
 
@@ -477,7 +826,9 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
       expect(rec.batches).toEqual(expected);
     }
 
-    // sync-burst triggers: sibling inners are fresh causes, batch separately
+    // a SHARED cold (the same node = one of() call, subscribed twice):
+    // sync-burst triggers' inners inherit the trigger's instant, and 1 and
+    // 2 already share their of's instant — one batch, transitively
     {
       const o12: Exp = { type: "of", values: [1, 2] };
       const { expected, rec } = runBoth(
@@ -488,11 +839,34 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
         },
         [],
       );
-      expect(rec.batches).toEqual([[1, 2], [10], [20]]);
+      expect(rec.batches).toEqual([[1, 2, 10, 20]]);
       expect(rec.batches).toEqual(expected);
     }
 
-    // same wiring, sync vs async source: the non-transitivity, pinned
+    // INDEPENDENT colds (two distinct of nodes): separate root causes —
+    // the left of and the right of never batch, but each trigger's inners
+    // still inherit their own of's instant
+    {
+      const { expected, rec } = runBoth(
+        {
+          type: "merge",
+          left: { type: "of", values: [1, 2] },
+          right: {
+            type: "mergeMap",
+            fns: [mul10],
+            arg: { type: "of", values: [1, 2] },
+          },
+        },
+        [],
+      );
+      expect(rec.batches).toEqual([
+        [1, 2],
+        [10, 20],
+      ]);
+      expect(rec.batches).toEqual(expected);
+    }
+
+    // same wiring, same batch shape — whatever the source
     {
       const id: Fn = { op: "mul", k: 1 };
       const wiring = (x: Exp): Exp => ({
@@ -505,7 +879,7 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
       expect(asyncRun.rec.batches).toEqual(asyncRun.expected);
 
       const syncRun = runBoth(wiring({ type: "of", values: [5] }), []);
-      expect(syncRun.rec.batches).toEqual([[5], [5, 50]]);
+      expect(syncRun.rec.batches).toEqual([[5, 5, 50]]);
       expect(syncRun.rec.batches).toEqual(syncRun.expected);
     }
   });
@@ -602,8 +976,8 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
     expect(coldChain.rec.batches).toEqual([[1, 2], [3]]);
     expect(coldChain.rec.batches).toEqual(coldChain.expected);
 
-    // async close: the queued cold subscribes AT the closing tick, as a
-    // fresh instant ordered right after it (never batched with it)
+    // async close: the queued cold INHERITS the closing instant — the
+    // take's final value and the advanced-to cold's values are one batch
     const takeThenCold = runBoth(
       {
         type: "concatAll",
@@ -614,8 +988,27 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
       },
       [[0, 5]],
     );
-    expect(takeThenCold.rec.batches).toEqual([[5], [7]]);
+    expect(takeThenCold.rec.batches).toEqual([[5, 7]]);
     expect(takeThenCold.rec.batches).toEqual(takeThenCold.expected);
+
+    // ... and a diamond with the root sees the whole advancement cascade
+    // in the root event's instant: [5, 5, 7]
+    const takeThenColdDiamond = runBoth(
+      {
+        type: "merge",
+        left: src0,
+        right: {
+          type: "concatAll",
+          inners: [
+            { type: "take", count: 1, arg: src0 },
+            { type: "of", values: [7] },
+          ],
+        },
+      },
+      [[0, 5]],
+    );
+    expect(takeThenColdDiamond.rec.batches).toEqual([[5, 5, 7]]);
+    expect(takeThenColdDiamond.rec.batches).toEqual(takeThenColdDiamond.expected);
 
     // a queued HOT inner subscribes late: suffix semantics — and a diamond
     // with the root sees multiplicity grow when the queue advances
@@ -664,9 +1057,8 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
     expect(exhaustBurst.rec.batches).toEqual([[1], [5]]);
     expect(exhaustBurst.rec.batches).toEqual(exhaustBurst.expected);
 
-    // a mid-stream subscription instant behaves exactly like the root one:
-    // a queued cold's values are one instant, and their mergeMap inners
-    // are FRESH root causes (never coalesced into one inherited unit)
+    // a queued cold subscribing at an async close inherits the closing
+    // instant, and its mergeMap inners inherit transitively — one batch
     const midStreamBurst = runBoth(
       {
         type: "mergeMap",
@@ -678,8 +1070,48 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
       },
       [],
     );
-    expect(midStreamBurst.rec.batches).toEqual([[100], [107]]);
+    expect(midStreamBurst.rec.batches).toEqual([[100, 107]]);
     expect(midStreamBurst.rec.batches).toEqual(midStreamBurst.expected);
+
+    // intra-batch order is DELIVERY order (ratified 2026-07-06): the
+    // concat branch (leftmost) subscribes src0 LATE — at event 1, when its
+    // take(1) closes and the queue advances — so its subscription sits at
+    // the END of the subject's list and its values deliver LAST at event 2
+    // ([1, 0]), even though the branch reads first in the expression
+    const lateOrder = runBoth(
+      {
+        type: "mergeAll",
+        outer: {
+          type: "ofS",
+          inners: [
+            {
+              type: "concatAll",
+              inners: [
+                { type: "take", count: 1, arg: src0 },
+                { type: "map", fn: { op: "add", k: 0 }, arg: src0 },
+              ],
+            },
+            {
+              type: "mergeAll",
+              outer: {
+                type: "mapS",
+                fns: [{ op: "add", k: 1 }],
+                arg: src0,
+              },
+            },
+          ],
+        },
+      },
+      [
+        [0, 0],
+        [0, 0],
+      ],
+    );
+    expect(lateOrder.rec.batches).toEqual([
+      [0, 1],
+      [1, 0],
+    ]);
+    expect(lateOrder.rec.batches).toEqual(lateOrder.expected);
 
     // sources close at drive end (in index order): the queue advances
     // even with no take in sight
@@ -699,6 +1131,323 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
     );
     expect(driveEndClose.rec.batches).toEqual([[5], [6], [7]]);
     expect(driveEndClose.rec.batches).toEqual(driveEndClose.expected);
+  });
+
+  it("pins feedback loops: a stream re-subscribing ITSELF on each value", () => {
+    // let x = share(src0) in merge(x, mergeAll(map(v => x)(x))) — every
+    // value of x subscribes x again (rxjs expand-style feedback). The
+    // strictly-after rule makes it well-founded: a value never reaches
+    // the subscription it spawned, so multiplicity grows by one per event
+    const feedback: Exp = {
+      type: "letShare",
+      binding: { type: "src", index: 0 },
+      body: {
+        type: "merge",
+        left: { type: "shareRef" },
+        right: {
+          type: "mergeAll",
+          outer: { type: "mapShareS", arg: { type: "shareRef" } },
+        },
+      },
+    };
+    const run = runBoth(feedback, [
+      [0, 5],
+      [0, 7],
+      [0, 9],
+    ]);
+    expect(run.rec.batches).toEqual([[5], [7, 7], [9, 9, 9]]);
+    expect(run.rec.batches).toEqual(run.expected);
+  });
+
+  it("pins non-flat take: take SPLITS instants, counting like rxjs", () => {
+    const src0: Exp = { type: "src", index: 0 };
+    const diamond: Exp = { type: "merge", left: src0, right: src0 };
+
+    // take(1) of a diamond emits ONE value, not the "whole instant"
+    const one = runBoth({ type: "take", count: 1, arg: diamond }, [[0, 5]]);
+    expect(one.rec.batches).toEqual([[5]]);
+    expect(one.rec.batches).toEqual(one.expected);
+
+    // take(3) cuts MID-BATCH at the second instant
+    const three = runBoth({ type: "take", count: 3, arg: diamond }, [
+      [0, 5],
+      [0, 6],
+    ]);
+    expect(three.rec.batches).toEqual([[5, 5], [6]]);
+    expect(three.rec.batches).toEqual(three.expected);
+  });
+
+  it("pins dynamic serial joins: async outers via trigger-picked inners", () => {
+    const src0: Exp = { type: "src", index: 0 };
+    const takeSrc1: Exp = {
+      type: "take",
+      count: 1,
+      arg: { type: "src", index: 1 },
+    };
+    const nine: Exp = { type: "of", values: [9] };
+
+    // concat: arrival while busy queues; the advancement subscribes the
+    // queued inner AT the closing instant — [5, 9] is ONE batch
+    const dynConcat = runBoth(
+      { type: "concatAll", inners: [takeSrc1, nine], trigger: src0 },
+      [
+        [0, 0], // subscribes take(1)(src1)
+        [0, 1], // of(9): busy — queued
+        [1, 5], // inner emits 5 + closes; of(9) advances into the instant
+      ],
+    );
+    expect(dynConcat.rec.batches).toEqual([[5, 9]]);
+    expect(dynConcat.rec.batches).toEqual(dynConcat.expected);
+
+    // switch: each arrival switches at its instant; a trigger sharing the
+    // inner's source silences the old inner (the trigger chain subscribed
+    // earlier, so the switch fires first within the instant)
+    const selfInner: Exp = {
+      type: "map",
+      fn: { op: "add", k: 10 },
+      arg: src0,
+    };
+    const dynSwitch = runBoth(
+      { type: "switchAll", inners: [selfInner], trigger: src0 },
+      [
+        [0, 5],
+        [0, 7],
+        [0, 9],
+      ],
+    );
+    expect(dynSwitch.rec.batches).toEqual([]);
+    expect(dynSwitch.rec.batches).toEqual(dynSwitch.expected);
+
+    // exhaust: arrivals while the inner is live are dropped entirely
+    const dynExhaust = runBoth(
+      { type: "exhaustAll", inners: [takeSrc1], trigger: src0 },
+      [
+        [0, 0], // subscribes take(1)(src1)
+        [0, 0], // busy — dropped
+        [1, 5], // inner emits 5 + closes
+        [0, 0], // free again — re-subscribes
+        [1, 6],
+      ],
+    );
+    expect(dynExhaust.rec.batches).toEqual([[5], [6]]);
+    expect(dynExhaust.rec.batches).toEqual(dynExhaust.expected);
+
+    // pickS: mergeAll over dynamically arriving COLD src-derived inners —
+    // the reused palette node is one cold stream subscribed twice
+    const dynMerge = runBoth(
+      {
+        type: "mergeAll",
+        outer: {
+          type: "pickS",
+          inners: [
+            { type: "map", fn: { op: "add", k: 10 }, arg: { type: "src", index: 1 } },
+            nine,
+          ],
+          arg: src0,
+        },
+      },
+      [
+        [0, 0], // subscribes map(+10)(src1)
+        [0, 1], // of(9)
+        [1, 5], // one live subscription: [15]
+        [0, 0], // second subscription of the SAME inner
+        [1, 7], // both live: [17, 17]
+      ],
+    );
+    expect(dynMerge.rec.batches).toEqual([[9], [15], [17, 17]]);
+    expect(dynMerge.rec.batches).toEqual(dynMerge.expected);
+  });
+
+  it("pins per-subscription identity: copies, lifecycles, cut attribution", () => {
+    const src0: Exp = { type: "src", index: 0 };
+
+    // TWO LIVE COPIES of a self-triggered dynamic serial join (of(0,0)
+    // picks the same palette inner twice; the inner's trigger AND content
+    // are src0). At src0's completion each copy's advancement grafts a
+    // re-subscription of the already-completed src0 — a self-contained
+    // register+close lifecycle inside the unit. Its close pairs with its
+    // OWN registration (born-in-unit, matched by sub) instead of eating
+    // the sibling copy's window slot, so the completion batch stays
+    // whole: [0,0], not [0],[0]. (The latent bug found at seed 667319167.)
+    const twoCopy = runBoth(
+      {
+        type: "mergeAll",
+        outer: {
+          type: "pickS",
+          inners: [
+            {
+              type: "concatAll",
+              inners: [
+                {
+                  type: "switchAll",
+                  inners: [
+                    { type: "of", values: [0] },
+                    {
+                      type: "mergeAll",
+                      outer: { type: "ofS", inners: [src0] },
+                    },
+                  ],
+                },
+                src0,
+              ],
+              trigger: src0,
+            },
+          ],
+          arg: { type: "of", values: [0, 0] },
+        },
+      },
+      [
+        [0, 0],
+        [0, 0],
+      ],
+    );
+    expect(twoCopy.rec.batches).toEqual([
+      [0, 0],
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(twoCopy.rec.batches).toEqual(twoCopy.expected);
+
+    // ON-SPINE SAME-SOURCE LIFECYCLE (formerly filtered by
+    // noSameSrcFrameLifecycles): take(0)(src0) spawned by a trigger
+    // derived from src0 lands its register+close on the arrival unit's
+    // anchor spine. Its foreign sub marks it a FRESH lifecycle (registers,
+    // nets zero) rather than a routing re-statement carrying a real close
+    // — the merge diamond neither fragments nor strands.
+    const onSpine = runBoth(
+      {
+        type: "merge",
+        left: src0,
+        right: {
+          type: "concatAll",
+          inners: [{ type: "take", count: 0, arg: src0 }],
+          trigger: src0,
+        },
+      },
+      [
+        [0, 5],
+        [0, 7],
+      ],
+    );
+    expect(onSpine.rec.batches).toEqual([[5], [7]]);
+    expect(onSpine.rec.batches).toEqual(onSpine.expected);
+
+    // MULTI-SRC TAKE COPIES in a dynamic palette (formerly filtered by
+    // hasMultiSrcTake): two live copies of take(1)(merge(src1, src2));
+    // each cut's extra closes consume only ITS OWN registrations' slots
+    // (matched by sub against the window's delivered map) — one batch.
+    const multiSrcTake = runBoth(
+      {
+        type: "merge",
+        left: { type: "src", index: 1 },
+        right: {
+          type: "mergeAll",
+          outer: {
+            type: "pickS",
+            inners: [
+              {
+                type: "take",
+                count: 1,
+                arg: {
+                  type: "merge",
+                  left: { type: "src", index: 1 },
+                  right: { type: "src", index: 2 },
+                },
+              },
+            ],
+            arg: src0,
+          },
+        },
+      },
+      [
+        [0, 0],
+        [0, 0],
+        [1, 5],
+      ],
+    );
+    expect(multiSrcTake.rec.batches).toEqual([[5, 5, 5]]);
+    expect(multiSrcTake.rec.batches).toEqual(multiSrcTake.expected);
+  });
+
+  it("pins drain grouping: one advancement drains many queued arrivals as one instant", () => {
+    // the live inner's registration balance zeroed EARLY (its closing
+    // traffic ended with net-zero feedback units), so no closing emission
+    // was held — yet the completion's advancement drains BOTH queued
+    // arrivals in one synchronous cascade: one instant, one batch.
+    // (Found at seed 911823318 — a pre-existing bug: the drained flushes
+    // used to fragment into [0],[0] when no window could group them.)
+    const src0: Exp = { type: "src", index: 0 };
+    const run = runBoth(
+      {
+        type: "concatAll",
+        inners: [
+          {
+            type: "merge",
+            left: src0,
+            right: {
+              type: "concatAll",
+              inners: [
+                {
+                  type: "mergeAll",
+                  outer: {
+                    type: "ofS",
+                    inners: [
+                      {
+                        type: "mergeMap",
+                        fns: [],
+                        arg: {
+                          type: "concatAll",
+                          inners: [src0],
+                          trigger: { type: "of", values: [0] },
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+              trigger: src0,
+            },
+          },
+          { type: "concatAll", inners: [{ type: "of", values: [0] }] },
+        ],
+        trigger: src0,
+      },
+      [
+        [0, 0],
+        [0, -1],
+        [0, 3],
+      ],
+    );
+    expect(run.rec.batches).toEqual([[-1], [3], [0, 0]]);
+    expect(run.rec.batches).toEqual(run.expected);
+  });
+
+  it("pins the state primitive: accumulate is batching-transparent", () => {
+    const src0: Exp = { type: "src", index: 0 };
+    // acc' = (acc + v) * 2, starting at 1
+    const scanned: Exp = {
+      type: "scan",
+      init: 1,
+      fn: { op: "mul", k: 2 },
+      arg: src0,
+    };
+    const bare = runBoth(scanned, [
+      [0, 3],
+      [0, 4],
+    ]);
+    expect(bare.rec.batches).toEqual([[8], [24]]);
+    expect(bare.rec.batches).toEqual(bare.expected);
+
+    // the diamond: scanned values stay simultaneous with their source
+    const diamond = runBoth({ type: "merge", left: src0, right: scanned }, [
+      [0, 3],
+      [0, 4],
+    ]);
+    expect(diamond.rec.batches).toEqual([
+      [3, 8],
+      [4, 24],
+    ]);
+    expect(diamond.rec.batches).toEqual(diamond.expected);
   });
 
   it("agrees on the anchor law: batch(merge(a, a)) = map(x => [x, x])(a)", () => {

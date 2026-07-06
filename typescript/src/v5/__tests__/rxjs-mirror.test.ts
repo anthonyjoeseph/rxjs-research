@@ -1,9 +1,10 @@
 import * as r from "rxjs";
 import { pipeWith } from "pipe-ts";
-import { of } from "../basic-primitives";
+import { EMPTY, of } from "../basic-primitives";
 import { InstantSubject } from "../constructors";
 import { concatAll, exhaustAll, mergeAll, switchAll } from "../joins";
 import { Instantaneous } from "../types";
+import { expand } from "../util";
 import { record } from "./helpers";
 
 /** the ***All joins are meant to mirror rxjs semantics exactly: same
@@ -155,6 +156,31 @@ describe("mergeAll mirrors rxjs", () => {
     const expected = collect(r.of(r.of(1, 2), r.of(3)).pipe(r.mergeAll()));
     const rec = record(pipeWith(of(of(1, 2), of(3)), mergeAll()));
     expect(rec.batches.flat().sort()).toEqual([...expected].sort());
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("expand mirrors rxjs", () => {
+  it("same values, same order, for sync expansion chains", () => {
+    const rSubj = new r.Subject<number>();
+    const iSubj = new InstantSubject<number>();
+
+    const expected = collect(
+      rSubj.pipe(r.expand((n) => (n < 8 ? r.of(n * 2, n * 2 + 1) : r.EMPTY))),
+    );
+    const rec = record(
+      pipeWith(
+        iSubj,
+        expand((n: number) => (n < 8 ? of(n * 2, n * 2 + 1) : EMPTY)),
+      ),
+    );
+
+    rSubj.next(1);
+    iSubj.next(1);
+    rSubj.complete();
+    iSubj.complete();
+
+    expect(rec.batches.flat()).toEqual(expected);
     expect(rec.isCompleted()).toBe(true);
   });
 });

@@ -12,6 +12,8 @@ import {
   pairwise,
   scan,
   switchMap,
+  takeUntil,
+  expand,
 } from "../util";
 import { record } from "./helpers";
 
@@ -32,7 +34,14 @@ describe("switchAll", () => {
     s2.next(2);
     expect(rec.batches).toEqual([[1], [2]]);
 
+    // rxjs semantics: outer completion doesn't kill the live inner — the
+    // switch completes only once the inner does. (The outer's protocol
+    // close is valueless traffic: it forwards without switching.)
     outer.complete();
+    expect(rec.isCompleted()).toBe(false);
+    s2.next(3);
+    expect(rec.batches).toEqual([[1], [2], [3]]);
+    s2.complete();
     expect(rec.isCompleted()).toBe(true);
   });
 
@@ -347,6 +356,120 @@ describe("share", () => {
     expect(subscriptions).toBe(1);
     expect(first).toHaveLength(1);
     expect(first[0].type).toBe("init");
-    expect(second).toEqual(first);
+    // the late subscriber shares the provenance and misses the past, but
+    // is its OWN registration: a fresh sub id
+    expect(second).toHaveLength(1);
+    expect(second[0].type).toBe("init");
+    expect(second[0].provenance).toBe(first[0].provenance);
+    expect((second[0] as { children: unknown[] }).children).toEqual(
+      (first[0] as { children: unknown[] }).children,
+    );
+    expect(second[0].sub).toBeDefined();
+    expect(second[0].sub).not.toBe(first[0].sub);
+  });
+});
+
+describe("takeUntil (derived: switchAll onto EMPTY at the notifier)", () => {
+  it("emits until the notifier fires, then completes", () => {
+    const src = new InstantSubject<number>();
+    const stop = new InstantSubject<string>();
+    const rec = record(pipeWith(src, takeUntil(stop)));
+
+    src.next(1);
+    src.next(2);
+    expect(rec.batches).toEqual([[1], [2]]);
+
+    stop.next("go");
+    expect(rec.isCompleted()).toBe(true);
+
+    src.next(3); // dropped: unsubscribed at the switch
+    expect(rec.batches).toEqual([[1], [2]]);
+  });
+
+  it("completes without values when the notifier fires first", () => {
+    const src = new InstantSubject<number>();
+    const stop = new InstantSubject<string>();
+    const rec = record(pipeWith(src, takeUntil(stop)));
+
+    stop.next("go");
+    expect(rec.batches).toEqual([]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("a taken-until branch still batches with its source (diamond)", () => {
+    const src = new InstantSubject<number>();
+    const stop = new InstantSubject<string>();
+    const rec = record(merge<number>(src, pipeWith(src, takeUntil(stop))));
+
+    src.next(5);
+    expect(rec.batches).toEqual([[5, 5]]);
+
+    stop.next("go");
+    src.next(6); // only the direct branch remains — no stranded window
+    expect(rec.batches).toEqual([[5, 5], [6]]);
+
+    src.complete();
+    stop.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("completes when the source completes before the notifier", () => {
+    const src = new InstantSubject<number>();
+    const stop = new InstantSubject<string>();
+    const rec = record(pipeWith(src, takeUntil(stop)));
+
+    src.next(1);
+    src.complete();
+    stop.complete();
+    expect(rec.batches).toEqual([[1]]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+});
+
+describe("expand (derived: recursive mergeMap feedback)", () => {
+  const doubleUntil8 = (n: number): Instantaneous<number> =>
+    n < 8 ? of(n * 2) : EMPTY;
+
+  it("a synchronous expansion chain is ONE instant (the causation rule)", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(pipeWith(s, expand(doubleUntil8)));
+
+    s.next(1);
+    // 1 spawns 2 spawns 4 spawns 8 — all caused by the one event
+    expect(rec.batches).toEqual([[1, 2, 4, 8]]);
+
+    s.next(3);
+    expect(rec.batches).toEqual([
+      [1, 2, 4, 8],
+      [3, 6, 12],
+    ]);
+
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("expansion of a cold source happens at its subscription instant", () => {
+    const rec = record(pipeWith(of(1), expand(doubleUntil8)));
+    expect(rec.batches).toEqual([[1, 2, 4, 8]]);
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("the expanded diamond: cascade batches with its root event", () => {
+    const s = new InstantSubject<number>();
+    const rec = record(merge<number>(s, pipeWith(s, expand(doubleUntil8))));
+    s.next(2);
+    expect(rec.batches).toEqual([[2, 2, 4, 8]]);
+    s.complete();
+    expect(rec.isCompleted()).toBe(true);
+  });
+
+  it("multi-value expansions walk depth-first, like rxjs", () => {
+    // 1 → [10, 20], both terminal; mirrors rxjs expand's synchronous order
+    const fanOut = (n: number): Instantaneous<number> =>
+      n < 10 ? of(n * 10, n * 10 + 10) : EMPTY;
+    const s = new InstantSubject<number>();
+    const rec = record(pipeWith(s, expand(fanOut)));
+    s.next(1);
+    expect(rec.batches).toEqual([[1, 10, 20]]);
   });
 });
