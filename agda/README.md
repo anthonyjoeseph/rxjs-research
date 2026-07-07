@@ -3,7 +3,7 @@
 This directory is the ratified specification of the instantaneous-observable
 semantics. **Agda is the design authority**: semantics questions are settled
 here first, and the TypeScript model
-([typescript/src/burst/model.ts](../typescript/src/burst/model.ts)) is a
+([typescript/src/model.ts](../typescript/src/model.ts)) is a
 line-by-line *transcription* of these files — any divergence over there is a
 transcription bug, checked continuously by the fast-check oracle.
 
