@@ -1,5 +1,6 @@
 import * as r from "rxjs";
 import {
+  bump,
   clo,
   COLD,
   Delivery,
@@ -335,6 +336,108 @@ export const concat = <A>(...srcs: Inst<A>[]): Inst<A> =>
   srcs.length === 0
     ? empty<A>()
     : srcs.reduce((acc, s) => concat2(acc, s));
+
+/** switchAll over a synchronous burst of inners: each inner is subscribed
+ * in turn — every inner's sync values pass — and switching away from a
+ * live inner CUTS it, synthesizing closes for the registrations it passed
+ * downstream (batch accounting must know its slots died). Only the last
+ * inner stays live; the switch finishes with it. */
+export const switchStatic = <A>(insts: Inst<A>[]): Inst<A> =>
+  new r.Observable((sub) => {
+    if (insts.length === 0) {
+      sub.next({ prov: COLD, events: [fin] });
+      sub.complete();
+      return;
+    }
+    const subs: r.Subscription[] = [];
+    for (let i = 0; i < insts.length; i++) {
+      const isLast = i === insts.length - 1;
+      const liveRegs = new Map<number, number>();
+      const state = { cut: false };
+      const s = insts[i].subscribe({
+        next(d) {
+          if (state.cut) return;
+          for (const ev of d.events) {
+            if (ev.t === "reg") bump(liveRegs, ev.p, 1);
+            else if (ev.t === "clo") bump(liveRegs, ev.p, -1);
+          }
+          // a non-last inner's fin is not the switch's fin
+          sub.next(isLast || !hasFin(d) ? d : stripFin(d));
+        },
+        error: (e) => sub.error(e),
+        complete() {
+          if (isLast) sub.complete();
+        },
+      });
+      if (!isLast) {
+        // switch away NOW: the inner had its subscription frame, its async
+        // tail is cut
+        state.cut = true;
+        s.unsubscribe();
+        const clos: Ev<A>[] = [];
+        for (const [p, c] of liveRegs)
+          for (let k = 0; k < c; k++) clos.push(clo(p));
+        if (clos.length > 0) sub.next({ prov: COLD, events: clos });
+      } else {
+        subs.push(s);
+      }
+    }
+    return () => subs.forEach((s) => s.unsubscribe());
+  });
+
+/** exhaustAll over a synchronous burst of inners: an arrival is dropped
+ * only while the previously accepted inner is STILL OPEN — a synchronous
+ * inner completes immediately and frees the slot, so of-then-of runs both.
+ * Once an accepted inner stays open, every remaining arrival is dropped
+ * for good (they arrived during it). */
+export const exhaustStatic = <A>(insts: Inst<A>[]): Inst<A> =>
+  new r.Observable((sub) => {
+    if (insts.length === 0) {
+      sub.next({ prov: COLD, events: [fin] });
+      sub.complete();
+      return;
+    }
+    let liveSub: r.Subscription | null = null;
+    let idx = 0;
+    while (idx < insts.length) {
+      const hasMoreArrivals = idx < insts.length - 1;
+      let inFlush = true;
+      let finnedInFlush = false;
+      let completedInFlush = false;
+      const s = insts[idx].subscribe({
+        next(d) {
+          if (!hasFin(d)) {
+            sub.next(d);
+            return;
+          }
+          if (inFlush) {
+            finnedInFlush = true;
+            // strip iff another arrival will be accepted after this one
+            sub.next(hasMoreArrivals ? stripFin(d) : d);
+          } else {
+            // an async fin: no arrivals remain by construction — the
+            // exhaust finishes here
+            sub.next(d);
+          }
+        },
+        error: (e) => sub.error(e),
+        complete() {
+          if (inFlush) completedInFlush = true;
+          else sub.complete();
+        },
+      });
+      inFlush = false;
+      if (finnedInFlush) {
+        if (!hasMoreArrivals && completedInFlush) sub.complete();
+        idx++;
+      } else {
+        // stays open: the remaining arrivals came during it — dropped
+        liveSub = s;
+        break;
+      }
+    }
+    return () => liveSub?.unsubscribe();
+  });
 
 /** share, with rxjs LIVES (ratified 2026-07-07): connect on first
  * subscriber, reset when the source completes or the refcount drains to

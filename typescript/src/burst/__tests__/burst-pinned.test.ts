@@ -211,6 +211,69 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
     expect(modelBatches(e, 1, d)).toEqual([[5, 5, 9], [6]]);
   });
 
+  test("KNOWN DIVERGENCE (upstream race): trigger-first wiring leaks the in-flight value", () => {
+    // A trigger derived from the share's SOURCE spawns a ref of the share,
+    // and the trigger arm is wired BEFORE the share connects: the spawned
+    // subscription joins the share's internal subject before the share's
+    // own delivery of the same event arrives, so it RECEIVES the in-flight
+    // value (plain rxjs wiring order). The ratified strictly-after spec
+    // (Burst.agda refView, Protocol.agda shareLives) says it misses it —
+    // the spec answer here is [[8], [10, 9]]. The stray value also derails
+    // the counting windows (batches regroup across instants). Wiring the
+    // static arm FIRST avoids it entirely (the share fans out before the
+    // trigger chain spawns). Same frontier the old oracle fenced; excluded
+    // from the generator (refIMin) — to resolve either way in the morning.
+    const src = new BurstSubject<number>();
+    const shared = share(src.inst);
+    const { batches, done } = collect(
+      merge(
+        mergeMap(() => shared)(src.inst), // trigger arm first: races
+        map((n: number) => n + 1)(shared), // static ref connects second
+      ),
+    );
+    src.next(7);
+    src.next(9);
+    done();
+    // (the second event's values are stranded in a miscounted open window)
+    expect(batches).toEqual([[8], [7, 10]]);
+  });
+
+  test("upstream race, static-arm-first wiring: strictly-after holds and matches spec", () => {
+    const src = new BurstSubject<number>();
+    const shared = share(src.inst);
+    const { batches, done } = collect(
+      merge(
+        map((n: number) => n + 1)(shared), // static ref connects FIRST
+        mergeMap(() => shared)(src.inst), // spawns fire after the fan-out
+      ),
+    );
+    src.next(7);
+    src.next(9);
+    done();
+    expect(batches).toEqual([[8], [10, 9]]);
+  });
+
+  test("ranked delivery over plain subjects: impl follows registration order where the flat model cannot", () => {
+    // Non-canonical tree: the spawn arm is written LEFT of the static arm
+    // of the same subject. The impl delivers in REGISTRATION order (the
+    // ratified rank rule, Protocol.agda ranked-delivery): the static arm's
+    // value first. The flat model (left-biased merge) would answer [0, 1]
+    // — this shape is outside its validity domain, excluded from the
+    // oracle generator by the canonicity filter.
+    const trig = new BurstSubject<number>();
+    const src = new BurstSubject<number>();
+    const { batches, done } = collect(
+      merge(
+        mergeMap(() => src.inst)(trig.inst), // spawn arm, written first
+        map((n: number) => n + 1)(src.inst), // static arm, registered first
+      ),
+    );
+    trig.next(0);
+    src.next(0);
+    done();
+    expect(batches).toEqual([[1, 0]]);
+  });
+
   test("plain rxjs sanity mirror: share replay matches real rxjs", () => {
     // the behavior Anthony confirmed on 2026-07-07
     const shared = r.of(5).pipe(r.share());

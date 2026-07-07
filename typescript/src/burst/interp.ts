@@ -2,12 +2,14 @@ import {
   BurstSubject,
   concat,
   empty,
+  exhaustStatic,
   map,
   merge,
   mergeMap,
   of,
   scan,
   share,
+  switchStatic,
   take,
 } from "./core";
 import { batchSimultaneous } from "./machine";
@@ -57,10 +59,16 @@ export const interpret = (e: Exp, slots: Inst<number>[]): Inst<number> => {
         return concat(...e.s.es.map((x) => interpret(x, slots)));
       throw new Error("concatAll over mapS: not implemented impl-side yet");
     }
-    case "switchAll":
-      throw new Error("switchAll: not implemented impl-side yet");
-    case "exhaustAll":
-      throw new Error("exhaustAll: not implemented impl-side yet");
+    case "switchAll": {
+      if (e.s.k === "ofS")
+        return switchStatic(e.s.es.map((x) => interpret(x, slots)));
+      throw new Error("switchAll over mapS: not implemented impl-side yet");
+    }
+    case "exhaustAll": {
+      if (e.s.k === "ofS")
+        return exhaustStatic(e.s.es.map((x) => interpret(x, slots)));
+      throw new Error("exhaustAll over mapS: not implemented impl-side yet");
+    }
   }
 };
 
