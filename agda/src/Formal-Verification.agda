@@ -70,15 +70,78 @@ stamped : {n : ℕ} → Emissions n → Exp n → List (Time × Val)
 stamped em e = stampFrom 0 (groupsOf (compile e) (flatten em))
 
 ------------------------------------------------------------------------
+-- the validity domain: REGISTRATION-CANONICAL trees (v1's ratified
+-- fence, now a real predicate). Share semantics themselves are
+-- untouched — this is a syntactic discipline: per letShareE binder,
+-- the slot's pre-order-FIRST ref is its connecting ref (flagged true,
+-- exactly rxjs's "first subscriber triggers connect") and every later
+-- ref is flagged false. The relation threads "is the connecting ref
+-- still owed" per slot through the tree in registration (pre-order)
+-- order; a spawn arm written left of its slot's connecting static arm
+-- fails, matching v1's ranked-delivery derivation. mapS templates are
+-- quantified over their trigger value and may not change the state (a
+-- spawned ref can never connect).
+
+lookupB : List Bool → ℕ → Bool
+lookupB []       _       = false
+lookupB (b ∷ bs) zero    = b
+lookupB (b ∷ bs) (suc i) = lookupB bs i
+
+clearB : List Bool → ℕ → List Bool
+clearB []       _       = []
+clearB (b ∷ bs) zero    = false ∷ bs
+clearB (b ∷ bs) (suc i) = b ∷ clearB bs i
+
+data CanE {n : ℕ} : List Bool → Exp n → List Bool → Set
+data CanS {n : ℕ} : List Bool → ExpS n → List Bool → Set
+data CanL {n : ℕ} : List Bool → List (Exp n) → List Bool → Set
+
+data CanE {n} where
+  can-src   : {w : List Bool} {i : Fin n} → CanE w (srcE i) w
+  can-empty : {w : List Bool} → CanE w emptyE w
+  can-of    : {w : List Bool} {vs : List Val} → CanE w (ofE vs) w
+  -- a ref's flag must be exactly what its slot is owed: the first
+  -- (pre-order) ref connects and consumes the debt, later refs are late
+  can-ref   : {w : List Bool} {i : ℕ} → ltℕ i (length w) ≡ true
+            → CanE w (shareE (lookupB w i) i) (clearB w i)
+  can-let   : {w w₁ w₂ : List Bool} {b₀ : Bool} {s b : Exp n}
+            → CanE w s w₁ → CanE (true ∷ w₁) b (b₀ ∷ w₂)
+            → CanE w (letShareE s b) w₂
+  can-map   : {w w′ : List Bool} {f : Val → Val} {e : Exp n}
+            → CanE w e w′ → CanE w (mapE f e) w′
+  can-take  : {w w′ : List Bool} {k : ℕ} {e : Exp n}
+            → CanE w e w′ → CanE w (takeE k e) w′
+  can-scan  : {w w′ : List Bool} {f : Val → Val → Val} {z : Val} {e : Exp n}
+            → CanE w e w′ → CanE w (scanE f z e) w′
+  can-mergeAll   : {w w′ : List Bool} {ss : ExpS n}
+                 → CanS w ss w′ → CanE w (mergeAllE ss) w′
+  can-concatAll  : {w w′ : List Bool} {ss : ExpS n}
+                 → CanS w ss w′ → CanE w (concatAllE ss) w′
+  can-switchAll  : {w w′ : List Bool} {ss : ExpS n}
+                 → CanS w ss w′ → CanE w (switchAllE ss) w′
+  can-exhaustAll : {w w′ : List Bool} {ss : ExpS n}
+                 → CanS w ss w′ → CanE w (exhaustAllE ss) w′
+
+data CanS {n} where
+  can-ofS  : {w w′ : List Bool} {es : List (Exp n)}
+           → CanL w es w′ → CanS w (ofS es) w′
+  can-mapS : {w w′ : List Bool} {f : Val → Exp n} {e : Exp n}
+           → CanE w e w′
+           → ((v : Val) → CanE w′ (f v) w′)
+           → CanS w (mapS f e) w′
+
+data CanL {n} where
+  canl-[] : {w : List Bool} → CanL w [] w
+  canl-∷  : {w w₁ w₂ : List Bool} {e : Exp n} {es : List (Exp n)}
+          → CanE w e w₁ → CanL w₁ es w₂ → CanL w (e ∷ es) w₂
+
+Canonical : {n : ℕ} → Exp n → Set
+Canonical e = CanE [] e []
+
+------------------------------------------------------------------------
 -- the remaining holes
 
 postulate
-  -- the validity domain (v1: Canonical + the fenced order corners):
-  -- non-resetting shares, registration-canonical trees. To be defined
-  -- as a recursive predicate; its exact conditions are settled by the
-  -- proofs below (what they need is what it says).
-  Canonical : {n : ℕ} → Exp n → Set
-
   -- THE TWO HALVES OF THE PROOF ------------------------------------
 
   -- (1) counting correctness: the batching machine, fed the pipeline's
@@ -94,7 +157,7 @@ postulate
   -- instant (v1: traceOf-ok + stamp-sound)
   trace-faithful :
     {n : ℕ} (em : Emissions n) (e : Exp n) → Canonical e
-    → stamped em e ≡ list (⟦ e ⟧ em ρ₀ t₀)
+    → stamped em e ≡ emits (⟦ e ⟧ em ρ₀ t₀)
 
 ------------------------------------------------------------------------
 -- THE THEOREM
@@ -107,13 +170,20 @@ formal-verification em e can =
         (cong batchSpecL (trace-faithful em e can))
 
 ------------------------------------------------------------------------
--- sanity instances, PROVEN BY COMPUTATION: the whole implementation
--- pipeline — compile, the joins' scans, the counting machine — reduces
--- on concrete programs, and the theorem's two sides literally agree.
+-- THE THEOREM STATEMENT, PROVEN BY COMPUTATION: both sides are now
+-- fully defined, so on concrete programs Agda normalizes the ENTIRE
+-- pipeline — compile, the joins' scans, the counting machine on one
+-- side; the timed denotation and the clock-grouping referee on the
+-- other — and they literally agree. Every instance below is a data
+-- point the general theorem can no longer be false at.
 
 -- a cold source alone: one frame batch
 em₀ : Emissions 0
 em₀ = emissions [] []
+
+of-full : impl-batchSimultaneous em₀ (ofE (1 ∷ 2 ∷ []))
+        ≡ spec-batchSimultaneous em₀ (ofE (1 ∷ 2 ∷ []))
+of-full = refl
 
 of-batches : impl-batchSimultaneous em₀ (ofE (1 ∷ 2 ∷ []))
            ≡ (1 ∷ 2 ∷ []) ∷ []
@@ -130,42 +200,69 @@ diamond-batches : impl-batchSimultaneous em₁ diamondE
                 ≡ (5 ∷ 6 ∷ []) ∷ []
 diamond-batches = refl
 
--- the referee's view of the same run: both arm values at tick 1
+diamond-full : impl-batchSimultaneous em₁ diamondE
+             ≡ spec-batchSimultaneous em₁ diamondE
+diamond-full = refl
+
+-- the two HALVES of the general proof, instantiated by normalization:
+-- the referee's stamped view of the machine's trace, the counting
+-- machine recovering its batches, and the stamped trace agreeing with
+-- the timed denotation — each a literal instance of its postulate
 diamond-stamped : stamped em₁ diamondE
                 ≡ ((1 , 0) , 5) ∷ ((1 , 0) , 6) ∷ []
 diamond-stamped = refl
 
--- a LITERAL INSTANCE of counting-recovers, by normalization: the blind
--- machine and the clock-reading referee compute the same batches
 diamond-counting : impl-batchSimultaneous em₁ diamondE
                  ≡ batchSpecL (stamped em₁ diamondE)
 diamond-counting = refl
 
+diamond-trace : stamped em₁ diamondE ≡ emits (⟦ diamondE ⟧ em₁ ρ₀ t₀)
+diamond-trace = refl
+
+-- Canonical holds for the diamond (no shares — the discipline is
+-- vacuous), so the general theorem instantiates
+diamond-canonical : Canonical diamondE
+diamond-canonical =
+  can-mergeAll (can-ofS (canl-∷ can-src (canl-∷ (can-map can-src) canl-[])))
+
+diamond-verified :
+  (em : Emissions 1)
+  → impl-batchSimultaneous em diamondE ≡ spec-batchSimultaneous em diamondE
+diamond-verified em = formal-verification em diamondE diamond-canonical
+
 -- take(1) cutting the diamond MID-INSTANT — the corner v1 fenced behind
 -- the runMemCut postulate — and the two sides STILL agree
+take-full : impl-batchSimultaneous em₁ (takeE 1 diamondE)
+          ≡ spec-batchSimultaneous em₁ (takeE 1 diamondE)
+take-full = refl
+
 take-batches : impl-batchSimultaneous em₁ (takeE 1 diamondE)
              ≡ (5 ∷ []) ∷ []
 take-batches = refl
 
-take-counting : impl-batchSimultaneous em₁ (takeE 1 diamondE)
-              ≡ batchSpecL (stamped em₁ (takeE 1 diamondE))
-take-counting = refl
-
 -- a stateful fold across instants
-scan-batches : impl-batchSimultaneous
-                 (emissions ([] ∷ []) ((fzero , 5) ∷ (fzero , 2) ∷ []))
-                 (scanE _+_ 0 (srcE fzero))
-             ≡ (5 ∷ []) ∷ (7 ∷ []) ∷ []
-scan-batches = refl
+scan-full : impl-batchSimultaneous
+              (emissions ([] ∷ []) ((fzero , 5) ∷ (fzero , 2) ∷ []))
+              (scanE _+_ 0 (srcE fzero))
+          ≡ spec-batchSimultaneous
+              (emissions ([] ∷ []) ((fzero , 5) ∷ (fzero , 2) ∷ []))
+              (scanE _+_ 0 (srcE fzero))
+scan-full = refl
 
 -- spawned inners COALESCE: each .next(5) spawns of([5,5]), whose flush
 -- rides the trigger's instant — one batch [5, 5]
+mergeMap-full : impl-batchSimultaneous em₁
+                  (mergeMapE (λ v → ofE (v ∷ v ∷ [])) (srcE fzero))
+              ≡ spec-batchSimultaneous em₁
+                  (mergeMapE (λ v → ofE (v ∷ v ∷ [])) (srcE fzero))
+mergeMap-full = refl
+
 mergeMap-batches : impl-batchSimultaneous em₁
                      (mergeMapE (λ v → ofE (v ∷ v ∷ [])) (srcE fzero))
                  ≡ (5 ∷ 5 ∷ []) ∷ []
 mergeMap-batches = refl
 
--- two sources, interleaved instants, and the counting instance again
+-- two sources, interleaved instants
 em₂ : Emissions 2
 em₂ = emissions ([] ∷ [] ∷ [])
                 ((fzero , 1) ∷ (fsuc fzero , 2) ∷ (fzero , 3) ∷ [])
@@ -173,19 +270,92 @@ em₂ = emissions ([] ∷ [] ∷ [])
 merge2E : Exp 2
 merge2E = mergeE (srcE fzero) (srcE (fsuc fzero))
 
+merge2-full : impl-batchSimultaneous em₂ merge2E
+            ≡ spec-batchSimultaneous em₂ merge2E
+merge2-full = refl
+
 merge2-batches : impl-batchSimultaneous em₂ merge2E
                ≡ (1 ∷ []) ∷ (2 ∷ []) ∷ (3 ∷ []) ∷ []
 merge2-batches = refl
 
-merge2-counting : impl-batchSimultaneous em₂ merge2E
-                ≡ batchSpecL (stamped em₂ merge2E)
-merge2-counting = refl
+-- THE CASCADE: concat(take 1 (src), of(9)) — the queued cold leg
+-- subscribes at the take's cut, INSIDE the trigger's instant
+cascade-full : impl-batchSimultaneous em₁
+                 (concatE (takeE 1 (srcE fzero)) (ofE (9 ∷ [])))
+             ≡ spec-batchSimultaneous em₁
+                 (concatE (takeE 1 (srcE fzero)) (ofE (9 ∷ [])))
+cascade-full = refl
 
--- and the diamond under the full theorem, once Canonical holds for it
-postulate
-  diamond-canonical : Canonical diamondE
+cascade-batches : impl-batchSimultaneous em₁
+                    (concatE (takeE 1 (srcE fzero)) (ofE (9 ∷ [])))
+                ≡ (5 ∷ 9 ∷ []) ∷ []
+cascade-batches = refl
 
-diamond-verified :
-  (em : Emissions 1)
-  → impl-batchSimultaneous em diamondE ≡ spec-batchSimultaneous em diamondE
-diamond-verified em = formal-verification em diamondE diamond-canonical
+-- switch cuts a live inner; exhaust drops arrivals while one is open
+emSE : Emissions 2
+emSE = emissions ([] ∷ [] ∷ [])
+                 ((fzero , 1) ∷ (fzero , 2) ∷ (fsuc fzero , 7) ∷ [])
+
+switch-full : impl-batchSimultaneous emSE
+                (switchAllE (mapS (λ _ → srcE (fsuc fzero)) (srcE fzero)))
+            ≡ spec-batchSimultaneous emSE
+                (switchAllE (mapS (λ _ → srcE (fsuc fzero)) (srcE fzero)))
+switch-full = refl
+
+exhaust-full : impl-batchSimultaneous emSE
+                 (exhaustAllE (mapS (λ _ → srcE (fsuc fzero)) (srcE fzero)))
+             ≡ spec-batchSimultaneous emSE
+                 (exhaustAllE (mapS (λ _ → srcE (fsuc fzero)) (srcE fzero)))
+exhaust-full = refl
+
+-- THE SHARE DIAMOND: bind a hot slot, fan out two refs (the first
+-- connecting), merge — each source event delivers ONE batch [v, v+1]
+shareDiamondE : Exp 1
+shareDiamondE = letShareE (srcE fzero)
+                  (mergeE (shareE true 0) (mapE suc (shareE false 0)))
+
+share-diamond-batches : impl-batchSimultaneous em₁ shareDiamondE
+                      ≡ (5 ∷ 6 ∷ []) ∷ []
+share-diamond-batches = refl
+
+share-diamond-full : impl-batchSimultaneous em₁ shareDiamondE
+                   ≡ spec-batchSimultaneous em₁ shareDiamondE
+share-diamond-full = refl
+
+-- and it is registration-canonical: the pre-order-first ref carries the
+-- connecting flag, the second is late
+share-diamond-canonical : Canonical shareDiamondE
+share-diamond-canonical =
+  can-let can-src
+    (can-mergeAll (can-ofS
+      (canl-∷ (can-ref refl)
+        (canl-∷ (can-map (can-ref refl)) canl-[]))))
+
+-- LATE-JOIN GROWTH (the README's growth law): one static ref plus one
+-- ref spawned by another source's event between the two source events —
+-- [7] then [8, 8]
+growthE : Exp 2
+growthE = letShareE (srcE fzero)
+            (mergeE (shareE true 0)
+                    (mergeAllE (mapS (λ _ → shareE false 0)
+                                     (srcE (fsuc fzero)))))
+
+emG : Emissions 2
+emG = emissions ([] ∷ [] ∷ [])
+                ((fzero , 7) ∷ (fsuc fzero , 0) ∷ (fzero , 8) ∷ [])
+
+growth-batches : impl-batchSimultaneous emG growthE
+               ≡ (7 ∷ []) ∷ (8 ∷ 8 ∷ []) ∷ []
+growth-batches = refl
+
+growth-full : impl-batchSimultaneous emG growthE
+            ≡ spec-batchSimultaneous emG growthE
+growth-full = refl
+
+growth-canonical : Canonical growthE
+growth-canonical =
+  can-let can-src
+    (can-mergeAll (can-ofS
+      (canl-∷ (can-ref refl)
+        (canl-∷ (can-mergeAll (can-mapS can-src (λ v → can-ref refl)))
+                canl-[]))))

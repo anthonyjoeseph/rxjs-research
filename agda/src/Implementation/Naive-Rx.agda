@@ -218,8 +218,120 @@ mergeMapRx {n} {X} {Y} f m = record
 
 -- the serial flattening policies (concatMap queues, switchMap cuts,
 -- exhaustMap drops while busy) — same Running-state architecture as
--- mergeMapRx plus the policy bookkeeping; the remaining operator holes
-postulate
-  concatMapRx  : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
-  switchMapRx  : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
-  exhaustMapRx : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
+-- mergeMapRx plus the policy bookkeeping.
+--
+-- rxjs carries completion on a SEPARATE channel; the machine model
+-- carries it in-band. The serial policies are exactly the operators
+-- that must OBSERVE inner completion (a queued inner subscribes when
+-- the live one completes; an arrival is dropped only while one is
+-- open), so each takes the in-band completion test as its first
+-- argument: `isLast y` = "y is the last element this inner will emit"
+-- (rxjs's complete signal, reified).
+
+-- r.concatMap: one inner live at a time; arrivals queue. When the live
+-- inner completes, the queue drains INSIDE the same step — a queued
+-- inner subscribes at the completion instant and its synchronous flush
+-- rides there; a synchronously completing inner hands off to the next.
+concatMapRx : {n : ℕ} {X Y : Set} → (Y → Bool)
+            → (X → RxObs n Y) → RxObs n X → RxObs n Y
+concatMapRx {n} {X} {Y} isLast f m = record
+  { State = State m × Maybe Running × List X
+  ; start = start m , nothing , []
+  ; step  = λ s i →
+      let u = step m (fst s) i                 -- the outer, first (its rank
+      in go (fst u) (fst (snd s))              --  precedes every inner's)
+            (snd (snd s) ++ snd u) i }
+  where
+    Running : Set
+    Running = Σ X (λ x → State (f x))
+
+    drain : In n → List X → (Maybe Running × List X) × List Y
+    drain i []       = (nothing , []) , []
+    drain i (x ∷ xs) =
+      let r = step (f x) (start (f x)) i
+      in if any isLast (snd r)
+         then (let d = drain i xs in fst d , snd r ++ snd d)
+         else ((just (x ▹ fst r) , xs) , snd r)
+
+    go : State m → Maybe Running → List X → In n
+       → (State m × Maybe Running × List X) × List Y
+    go sm nothing        que i =
+      let d = drain (spawnInput i) que
+      in (sm , fst (fst d) , snd (fst d)) , snd d
+    go sm (just (x ▹ sx)) que i =
+      let r = step (f x) sx i
+      in if any isLast (snd r)
+         then (let d = drain (spawnInput i) que
+               in (sm , fst (fst d) , snd (fst d)) , snd r ++ snd d)
+         else ((sm , just (x ▹ fst r) , que) , snd r)
+
+-- r.switchMap: a new arrival CUTS the live inner BEFORE it reacts to
+-- the in-flight input (the outer's delivery rank precedes every
+-- inner's, and rxjs unsubscription takes effect mid-dispatch). Within
+-- one burst of arrivals each sibling's synchronous flush still fires
+-- before the next sibling cuts it; only the last stays live.
+switchMapRx : {n : ℕ} {X Y : Set} → (Y → Bool)
+            → (X → RxObs n Y) → RxObs n X → RxObs n Y
+switchMapRx {n} {X} {Y} isLast f m = record
+  { State = State m × Maybe Running
+  ; start = start m , nothing
+  ; step  = λ s i →
+      let u = step m (fst s) i
+      in go (fst u) (snd s) (snd u) i }
+  where
+    Running : Set
+    Running = Σ X (λ x → State (f x))
+
+    spawnSeq : In n → List X → Maybe Running × List Y
+    spawnSeq i []       = nothing , []
+    spawnSeq i (x ∷ []) =
+      let r = step (f x) (start (f x)) i
+      in (if any isLast (snd r) then nothing else just (x ▹ fst r)) , snd r
+    spawnSeq i (x ∷ xs@(_ ∷ _)) =
+      let r    = step (f x) (start (f x)) i
+          rest = spawnSeq i xs
+      in fst rest , snd r ++ snd rest
+
+    go : State m → Maybe Running → List X → In n
+       → (State m × Maybe Running) × List Y
+    go sm nothing         [] i = (sm , nothing) , []
+    go sm (just (x ▹ sx)) [] i =
+      let r = step (f x) sx i
+      in (sm , (if any isLast (snd r) then nothing else just (x ▹ fst r)))
+         , snd r
+    go sm live xs@(_ ∷ _) i =                  -- the cut: live never reacts
+      let sp = spawnSeq (spawnInput i) xs
+      in (sm , fst sp) , snd sp
+
+-- r.exhaustMap: an arrival is DROPPED (not queued) while the previously
+-- accepted inner is still open; a synchronously completing inner frees
+-- the slot for its own burst siblings.
+exhaustMapRx : {n : ℕ} {X Y : Set} → (Y → Bool)
+             → (X → RxObs n Y) → RxObs n X → RxObs n Y
+exhaustMapRx {n} {X} {Y} isLast f m = record
+  { State = State m × Maybe Running
+  ; start = start m , nothing
+  ; step  = λ s i →
+      let u = step m (fst s) i
+      in go (fst u) (snd s) (snd u) i }
+  where
+    Running : Set
+    Running = Σ X (λ x → State (f x))
+
+    exSeq : In n → List X → Maybe Running × List Y
+    exSeq i []       = nothing , []
+    exSeq i (x ∷ xs) =
+      let r = step (f x) (start (f x)) i
+      in if any isLast (snd r)
+         then (let rest = exSeq i xs in fst rest , snd r ++ snd rest)
+         else (just (x ▹ fst r) , snd r)       -- still open: xs dropped
+
+    go : State m → Maybe Running → List X → In n
+       → (State m × Maybe Running) × List Y
+    go sm (just (x ▹ sx)) xs i =               -- open: every arrival dropped
+      let r = step (f x) sx i
+      in (sm , (if any isLast (snd r) then nothing else just (x ▹ fst r)))
+         , snd r
+    go sm nothing         xs i =
+      let sp = exSeq (spawnInput i) xs
+      in (sm , fst sp) , snd sp

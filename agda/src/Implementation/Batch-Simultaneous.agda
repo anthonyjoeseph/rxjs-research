@@ -506,6 +506,14 @@ exhaustStep s (emitJ e) =
 ------------------------------------------------------------------------
 -- the joins themselves
 
+-- an inner's item stream completes at its fin — the in-band completion
+-- test the serial policies observe (triggers never appear in inner
+-- streams, so their case is arbitrary)
+lastJ : JoinItem → Bool
+lastJ (trigger _ _ _ _)  = false
+lastJ (flushJ _ finned)  = finned
+lastJ (emitJ e)          = hasFin e
+
 mergeAllI : {n : ℕ} → Joinable n → Inst n Val
 mergeAllI j =
   runOut mergeStep mergeSeed (λ s → not (mClosed s)) mOut
@@ -514,17 +522,17 @@ mergeAllI j =
 concatAllI : {n : ℕ} → Joinable n → Inst n Val
 concatAllI j =
   runOut concatStep serialSeed (λ s → not (hClosed s)) hOut
-         (serialItems concatMapRx (jTemplate j) (jOuter j))
+         (serialItems (concatMapRx lastJ) (jTemplate j) (jOuter j))
 
 switchAllI : {n : ℕ} → Joinable n → Inst n Val
 switchAllI j =
   runOut switchStep serialSeed (λ s → not (hClosed s)) hOut
-         (serialItems switchMapRx (jTemplate j) (jOuter j))
+         (serialItems (switchMapRx lastJ) (jTemplate j) (jOuter j))
 
 exhaustAllI : {n : ℕ} → Joinable n → Inst n Val
 exhaustAllI j =
   runOut exhaustStep serialSeed (λ s → not (hClosed s)) hOut
-         (serialItems exhaustMapRx (jTemplate j) (jOuter j))
+         (serialItems (exhaustMapRx lastJ) (jTemplate j) (jOuter j))
 
 ------------------------------------------------------------------------
 -- share (TS: share — the OTHER inherently stateful TS primitive).

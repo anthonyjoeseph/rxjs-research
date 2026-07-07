@@ -16,9 +16,14 @@ at once — says are correct.
 
 Start reading at [src/Formal-Verification.agda](src/Formal-Verification.agda).
 `formal-verification` is already a *value*, not a postulate: its proof term
-is real, and every remaining piece of work in the development is a **named,
-typed postulate consumed by that proof**. The entire roadmap is laid out in
-types; what remains is defining postulates. A postulate that cannot be
+is real. **Both sides are now fully defined** — the spec, the implementation,
+every Naive-Rx operator, and the validity domain `Canonical` — so the
+theorem statement *computes*: on concrete programs Agda normalizes both
+pipelines end to end and they literally agree (`diamond-full`,
+`share-diamond-full`, `growth-full`, `cascade-full`, … at the bottom of the
+entrypoint, all proven by `refl`). Exactly two postulates remain, the two
+named halves of the general proof (`counting-recovers`, `trace-faithful`),
+each already instantiated by normalization. A postulate that cannot be
 proven as stated is a spec bug to rework, not work around.
 
 (The previous generation of this development — the proven burst-batching
@@ -38,8 +43,9 @@ and the two definitions are given *deliberately unequal powers*:
 - **The spec is clairvoyant.** `spec-batchSimultaneous` receives the entire
   `Emissions` record, past and future, and may cheat freely: it assigns
   every value a timestamp, and batching is just "group equal times". Its
-  timed lists are `MonotonicList`s — sortedness is carried in the type, so
-  the grouping operation is meaningful on every input it can receive, not
+  timed observables carry their well-formedness BY CONSTRUCTION (`TObsOf`:
+  sorted from the subscription time, bounded by the close), so the grouping
+  operation is meaningful on every input it can receive, not
   meaningful-given-a-side-theorem.
 
 - **The implementation cannot see the future — structurally.** It is not a
@@ -187,32 +193,50 @@ teardown.
 ```agda
 Time = ℕ × ℕ                        -- (tick, origin), lexicographic
 
-record MonotonicList (A : Set) : Set where
+record TObsOf (A : Set) (t : Time) : Set where
   field
-    list   : List (Time × A)
-    sorted : Sorted list            -- sortedness carried BY CONSTRUCTION
+    emits   : TimedObs A            -- List (Time × A)
+    close   : Time                  -- load-bearing: serial joins queue on it
+    sorted  : SortedFrom t emits    -- well-formedness carried BY CONSTRUCTION,
+    closeAt : timeLeq t close ≡ true --  RELATIVE to the subscription time
+    bounded : BoundedBy close emits
 ```
 
 Tick 0 is the frame; tick k+1 is async entry k; the origin coordinate
 orders feedback (a reentrant `.next()` lands strictly after the batch that
-caused it). Bundling the sortedness evidence is what makes the spec's
-"group equal adjacent times" mean "group equal times, period".
+caused it). Bundling the evidence is what makes the spec's "group equal
+adjacent times" mean "group equal times, period" — and bundling it
+*relative to the subscription time* is what dissolved v1's separate
+`denote-wf` theorem into the types. Below the record: the raw timed-list
+operators (`mergeL` — stable, left wins on ties, the model counterpart of
+rxjs subscription order — `mapL`, `takeL`, `scanL`, `filterAfterL`) and
+the preservation lemma toolkit every combinator's evidence is assembled
+from, transcribed from the proven v1 Sorting module.
 
 ### [src/Spec/Batch-Simultaneous.agda](src/Spec/Batch-Simultaneous.agda)
 
-The referee. A timed denotation by real structural recursion —
+The referee, **fully defined — no postulates in this file**. A timed
+denotation by real structural recursion —
 
 ```agda
-⟦_⟧ : Exp n → Emissions n → Env → Time → TObs   -- TObs = MonotonicList Val
+⟦_⟧ : Exp n → Emissions n → Env → (t : Time) → TObs t   -- TObs = TObsOf Val
 ```
 
 — where `⟦ e ⟧ em ρ t` is the timed history observed by subscribing `e` at
-time `t`. Cold inner streams denote *functions of their subscription time*
-(`Inner = Time → TObs`), the device that makes burst batching
-compositional; `Env` assigns share slots their connection instant and
-history. The per-primitive combinators (`srcT`, `ofT`, `mapT`, `takeT`,
-`mergeAllT`, …) are the named postulates — each discharges by transcribing
-its proven v1 counterpart into the MonotonicList discipline. Then:
+time `t`, *well-formed at `t` by its type*. Cold inner streams denote
+functions of their subscription time (`Inner = (u : Time) → TObs u` — the
+type is v1's `WFDen` made structural: an inner is well-formed at every
+subscription time because it cannot be anything else), the device that
+makes burst batching compositional; `Env` assigns share slots their
+connection instant and history. Each per-primitive combinator (`srcT` —
+the source history DERIVED from `Emissions`, sync flush at tick 0, k-th
+async at tick k+1, close at K+1+i matching `flatten`'s serialization
+exactly — `ofT`, `mapT`, `takeT`, `refT`, the four joins, `ofST`,
+`mapST`) is its v1 counterpart with the evidence fields constructed
+inline. A source is a hot slot connected at t₀ whose every frame
+subscriber is "connecting" (`refT true` — a subject flushes its frame
+values to every subscriber present during subscribe); spawned refs see
+the strict suffix. Then:
 
 ```agda
 spec-batchSimultaneous em e = batchSpec (⟦ e ⟧ em ρ₀ t₀)
@@ -236,15 +260,26 @@ subscribeRx m em = run m (flatten em)
 ```
 
 No timestamps anywhere — that is the point. Then one operator per rxjs
-export the implementation consumes — and all are DEFINED except the
-three serial flattening policies: `ofRx`, `emptyRx`, `endWithRx`,
-`mapRx`, `scanRx`, `mergeRx`, `takeWhileRx` and `mergeMapRx` are real
-step functions (`mergeMapRx` holds each running inner as a dependent
-pair — which element spawned it, with the state of that element's
-machine — and delivers in registration-rank order: outer chain first,
-spawned flushes riding at their triggers, then existing inners in spawn
-order). `concatMapRx`/`switchMapRx`/`exhaustMapRx` remain postulated —
-same architecture plus the queue/cut/drop policy bookkeeping.
+export the implementation consumes, **all defined — no postulates in
+this file**: `ofRx`, `emptyRx`, `endWithRx`, `mapRx`, `scanRx`,
+`mergeRx`, `takeWhileRx`, `mergeMapRx`, `concatMapRx`, `switchMapRx`,
+`exhaustMapRx` are real step functions. `mergeMapRx` holds each running
+inner as a dependent pair — which element spawned it, with the state of
+that element's machine — and delivers in registration-rank order: outer
+chain first, spawned flushes riding at their triggers, then existing
+inners in spawn order. The three serial policies share that
+architecture plus the policy bookkeeping (`concatMapRx` queues and
+drains the queue INSIDE the completion step, so a queued inner's flush
+rides the completing instant; `switchMapRx` cuts the live inner BEFORE
+it reacts to the in-flight input — the outer's rank precedes every
+inner's, and rxjs unsubscription takes effect mid-dispatch;
+`exhaustMapRx` drops arrivals while one inner is open). One signature
+difference from rxjs, and it is a modeling statement: rxjs carries
+completion on a separate channel, the machine model carries it in-band,
+so the serial policies — exactly the operators that must OBSERVE inner
+completion — take the completion test as a parameter
+(`isLast : Y → Bool`, rxjs's complete signal reified; the joins pass
+`lastJ`, "the item carries a fin").
 
 Several TS operators have NO counterpart here, because the pure model
 dissolves them: `tap`/`finalize` exist only to maintain the multicast
@@ -261,8 +296,7 @@ on the Canonical non-resetting domain the theorem is stated over.
 ### [src/Implementation/Batch-Simultaneous.agda](src/Implementation/Batch-Simultaneous.agda)
 
 The machine side of the theorem, **fully defined — no postulates in this
-file**; the only implementation-side holes left are the Naive-Rx operator
-semantics. It mirrors the TypeScript file for file: one definition per
+file**. It mirrors the TypeScript file for file: one definition per
 `primitives.ts` export (`srcI`, `ofI`, `mapI`, `scanI`, `takeI`,
 `shareRefI`/`letShareI`, the four `…AllI` joins with their
 `JoinItem`/`MergeState`/`SerialState` scans transcribed fold for fold),
@@ -311,16 +345,27 @@ places input j at tick j, so group j's values get time `(j , 0)`.
 stamped em e = stampFrom 0 (groupsOf (compile e) (flatten em))
 ```
 
-The two halves are the load-bearing postulates:
+`Canonical` is the validity domain, now a real predicate: v1's ratified
+**registration-canonical** fence. Share semantics are untouched — this is
+a syntactic discipline. Per `letShareE` binder, the slot's
+pre-order-first ref is its connecting ref (flagged true, exactly rxjs's
+"first subscriber triggers connect") and every later ref is flagged
+false; the relation (`CanE`/`CanS`/`CanL`) threads "is the connecting
+ref still owed" per slot through the tree in registration order, and
+`mapS` templates are quantified over their trigger value and may not
+change the state (a spawned ref can never connect — a spawn arm written
+left of its slot's connecting static arm is rejected, matching v1's
+`ranked-delivery`).
+
+The two halves of the general proof are the ONLY remaining postulates in
+the development:
 
 ```agda
 counting-recovers : … → impl-batchSimultaneous em e ≡ batchSpecL (stamped em e)
-trace-faithful    : … → stamped em e ≡ list (⟦ e ⟧ em ρ₀ t₀)
+trace-faithful    : … → stamped em e ≡ emits (⟦ e ⟧ em ρ₀ t₀)
 ```
 
-`Canonical` is the validity domain (non-resetting shares,
-registration-canonical trees — the v1 fences). The theorem is their
-composition, literally:
+The theorem is their composition, literally:
 
 ```agda
 formal-verification em e can =
@@ -328,15 +373,21 @@ formal-verification em e can =
         (cong batchSpecL (trace-faithful em e can))
 ```
 
-And the statement already **holds by computation** on concrete programs
-— the bottom of the file is a suite of `refl`-proofs where Agda
-normalizes the ENTIRE pipeline (compile, the joins' scans, the counting
-machine) and both theorem sides agree: the diamond batches `[5, 6]`
-from one `.next(5)`; `diamond-counting` and `merge2-counting` are
-literal instances of `counting-recovers`; `take-counting` exercises the
-mid-instant cut v1 had fenced behind `runMemCut`; `mergeMap-batches`
-shows spawned-inner coalescing. What remains is generalizing over all
-canonical programs.
+And since both sides are now fully defined, the theorem statement
+**holds by computation** on concrete programs — the bottom of the file
+is a suite of `refl`-proofs where Agda normalizes BOTH pipelines
+(compile, the joins' scans, the counting machine on one side; the timed
+denotation and the clock-grouping referee on the other) and the two
+sides literally agree, with no postulate in the path: `diamond-full`,
+`take-full` (the mid-instant cut v1 had fenced behind `runMemCut`),
+`scan-full`, `mergeMap-full` (spawned-inner coalescing), `merge2-full`,
+`cascade-full` (a queued concat leg riding the take-cut's instant),
+`switch-full`, `exhaust-full`, `share-diamond-full`, and `growth-full`
+(the late-join growth law, `[7]` then `[8, 8]`). `diamond-counting` and
+`diamond-trace` instantiate each half separately, and
+`diamond-verified` runs the general theorem end to end on a real
+`Canonical` proof term. What remains is generalizing the two halves
+over all canonical programs.
 
 ## Relationship to the TypeScript
 
