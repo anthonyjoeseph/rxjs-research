@@ -201,6 +201,12 @@ drop zero    xs       = xs
 drop (suc n) []       = []
 drop (suc n) (x ∷ xs) = drop n xs
 
+-- keep the first n elements
+take : {A : Set} → ℕ → List A → List A
+take zero    xs       = []
+take (suc n) []       = []
+take (suc n) (x ∷ xs) = x ∷ take n xs
+
 -- index with a default (total; the default is never reached below length)
 at : {A : Set} → ℕ → List A → A → A
 at _       []       d = d

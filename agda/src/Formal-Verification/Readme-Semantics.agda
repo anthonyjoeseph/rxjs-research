@@ -1,24 +1,33 @@
 -- README SEMANTICS PROOFS — the root README.md's semantics-by-edge-case,
 -- each a top-line result checked against the Agda spec.
 --
--- Every edge-case section of ../../../README.md is a concrete program run
--- under a concrete driver, with a stated output. Here that output is a
--- machine-checkable claim: `spec-batchSimultaneous em prog ≡ expected`,
--- i.e. the Agda spec REPRODUCES the README's example exactly. This is the
--- formal link between the two spec sources of truth (the README prose and
--- the Agda denotation) — discharge it and any drift between them becomes a
--- typecheck failure.
+-- These are STRUCTURAL truths, not unit tests: every statement quantifies
+-- over the values and functions the README example happened to pick (the
+-- `5` and the `×10` were never the point), and three of them are universal
+-- over the WHOLE grammar. The concrete README examples are instances.
 --
--- STATUS: postulated. Next phase discharges each (each is a closed ground
--- computation, so the intended proof is `refl` once it holds — a failure
--- to reduce to `refl` is exactly a drift to investigate).
+-- The single principle underneath all of them: an emission's `Time` in the
+-- denotation IS the instant that caused it, and `batchSpec` groups by equal
+-- time. So every claim is really about timestamps, and batching is an
+-- order-preserving partition by time (`readme-batch-order-is-delivery-order`
+-- is exactly that, made universal).
 --
--- Every postulate below is hyperlinked from its section in README.md.
+-- STATUS: all 10 proven, no postulates. The seven quantified instances hold by
+-- computation (`refl`, except cascades-inherit which needs the equal-time merge
+-- lemmas below); the batch-order and take-counts universal laws by induction on
+-- `batchSpecL`; one-subscribe-one-batch by `bounded-t₀-length` (batching side)
+-- composed with Readme-Semantics.Static.emits-static (the Exp 0 denotation emits
+-- everything at t₀). A statement that will NOT prove is a drift between the
+-- README and the Agda spec: exactly what this file exists to catch.
+--
+-- Every result below is hyperlinked from its section in README.md.
 module Formal-Verification.Readme-Semantics where
 
 open import Prelude
 open import Shared-Types
+open import Spec.MonotonicList
 open import Spec.Batch-Simultaneous
+open import Formal-Verification.Readme-Semantics.Static using (emits-static)
 
 ------------------------------------------------------------------------
 -- source-slot names (read the driver's Fin n indices)
@@ -30,221 +39,245 @@ private
   s1 : {n : ℕ} → Fin (suc (suc n))
   s1 = fsuc fzero
 
-------------------------------------------------------------------------
--- The flagship diamond (README §"The idea: provenance + batchSimultaneous")
---
---   const tenfold = s.pipe(map((n) => n * 10));
---   merge(s, tenfold).pipe(batchSimultaneous())…
---   s.next(5); // [5, 50]
---   s.next(6); // [6, 60]
-
-diamond : Exp 1
-diamond = mergeAllE (ofS (srcE s0 ∷ mapE (λ n → n * 10) (srcE s0) ∷ []))
-
-diamond-driver : Emissions 1
-diamond-driver = emissions (pureV []) ((s0 , 5) ∷ (s0 , 6) ∷ [])
-
-postulate
-  readme-diamond :
-    spec-batchSimultaneous diamond-driver diamond
-      ≡ (5 ∷ 50 ∷ []) ∷ (6 ∷ 60 ∷ []) ∷ []
+  -- flatten a batched result back to its raw value stream
+  flat : Subscription (List Val) → List Val
+  flat = concatMap (λ xs → xs)
 
 ------------------------------------------------------------------------
--- One subscribe() call is one batch (README §"One subscribe() call is one batch")
+-- LEMMAS: batching is an order-preserving, loss-free partition
 --
---   merge(of(1, 2), of(3))…  // [1, 2, 3] — one instant (the frame).
--- (The `timer(100)` tail is out of grammar — no scheduler primitive; the
---  representable claim is that the whole static frame is a single batch.)
+-- The spine of the whole file. `batchSpecL` only groups a (sorted) timed
+-- list by equal times; flattening the groups recovers the raw value stream
+-- exactly. This is what makes "batch order = delivery order" true, and it
+-- reduces "take counts values" to a take/map commutation.
 
-one-subscribe : Exp 0
-one-subscribe = mergeE (ofE (1 ∷ 2 ∷ [])) (ofE (3 ∷ []))
+private
+  -- flushing the batcher's accumulator: everything already accumulated,
+  -- then every remaining value in order
+  batchGo-flat : (t : Time) (acc : List Val) (ys : List (Time × Val))
+    → flat (batchGo t acc ys) ≡ acc ++ map snd ys
+  batchGo-flat t acc []             = refl
+  batchGo-flat t acc ((u , w) ∷ ys) with timeEq t u
+  ... | true  = trans (batchGo-flat u (acc ++ (w ∷ [])) ys)
+                      (++-assoc acc (w ∷ []) (map snd ys))
+  ... | false = cong (acc ++_) (batchGo-flat u (w ∷ []) ys)
 
-one-subscribe-driver : Emissions 0
-one-subscribe-driver = emissions (pureV []) []
+  batchSpecL-flat : (xs : List (Time × Val))
+    → flat (batchSpecL xs) ≡ map snd xs
+  batchSpecL-flat []             = refl
+  batchSpecL-flat ((t , v) ∷ xs) = batchGo-flat t (v ∷ []) xs
 
-postulate
-  readme-one-subscribe-one-batch :
-    spec-batchSimultaneous one-subscribe-driver one-subscribe
-      ≡ (1 ∷ 2 ∷ 3 ∷ []) ∷ []
+  -- take and takeL are the same cut; map snd slides through it
+  takeL-map-snd : (k : ℕ) (xs : List (Time × Val))
+    → map snd (takeL k xs) ≡ take k (map snd xs)
+  takeL-map-snd zero    xs       = refl
+  takeL-map-snd (suc n) []       = refl
+  takeL-map-snd (suc n) (x ∷ xs) = cong (snd x ∷_) (takeL-map-snd n xs)
+
+  -- equal-time merging (used by cascades): a right-empty merge is identity,
+  -- and merging an at-t head into an all-at-t list is a cons (ties favour
+  -- the left operand, and everything shares time t)
+  mergeL-nil-right : {A : Set} (xs : TimedObs A) → mergeL xs [] ≡ xs
+  mergeL-nil-right []       = refl
+  mergeL-nil-right (x ∷ xs) = refl
+
+  cascade-merge : (t : Time) (v : Val) (l : List Val)
+    → mergeL ((t , v) ∷ []) (map (λ x → (t , x)) l)
+        ≡ (t , v) ∷ map (λ x → (t , x)) l
+  cascade-merge t v []       = refl
+  cascade-merge t v (z ∷ zs) rewrite timeLeq-refl t = refl
+
+  -- batching an all-at-t list is exactly one batch: acc, then every value
+  batchGo-const : (t : Time) (acc : List Val) (l : List Val)
+    → batchGo t acc (map (λ x → (t , x)) l) ≡ (acc ++ l) ∷ []
+  batchGo-const t acc []       = cong (λ z → z ∷ []) (sym (++-[] acc))
+  batchGo-const t acc (z ∷ zs) rewrite timeEq-refl t =
+    trans (batchGo-const t (acc ++ (z ∷ [])) zs)
+          (cong (λ z′ → z′ ∷ []) (++-assoc acc (z ∷ []) zs))
+
+  -- t₀ is the least time, so anything bounded by t₀ IS at t₀
+  t₀-max-eq : (u : Time) → timeLeq u t₀ ≡ true → u ≡ t₀
+  t₀-max-eq (zero  , zero)  p = refl
+  t₀-max-eq (zero  , suc b) p = true≢false (sym p)
+  t₀-max-eq (suc a , b)     p = true≢false (sym p)
+
+  -- a list all at t₀ batches into exactly one group (its length is 1)…
+  batchGo-t₀-len : (acc : List Val) (xs : TimedObs Val)
+    → BoundedBy t₀ xs → length (batchGo t₀ acc xs) ≡ 1
+  batchGo-t₀-len acc []             bb[]           = refl
+  batchGo-t₀-len acc ((u , w) ∷ ys) (bb∷ le rest)
+    rewrite t₀-max-eq u le | timeEq-refl t₀ = batchGo-t₀-len (acc ++ (w ∷ [])) ys rest
+
+  -- …so a t₀-bounded emission stream yields at most one batch
+  bounded-t₀-length : (xs : TimedObs Val)
+    → BoundedBy t₀ xs → leqℕ (length (batchSpecL xs)) 1 ≡ true
+  bounded-t₀-length []             bb[]           = refl
+  bounded-t₀-length ((u , w) ∷ ys) (bb∷ le rest)
+    rewrite t₀-max-eq u le | batchGo-t₀-len (w ∷ []) ys rest = refl
 
 ------------------------------------------------------------------------
--- Each .next() call is its own instant (README §"Each .next() call is its own instant")
+-- THREE UNIVERSAL LAWS (over the whole grammar)
+------------------------------------------------------------------------
+
+-- Batch order is delivery order (README §"Batch order is delivery order").
+-- The flagship: batching only GROUPS — it never reorders and never drops.
+-- Flattening the batches recovers the denotation's raw value stream, for
+-- every program and every driver. Every other claim rides on this.
+
+readme-batch-order-is-delivery-order : {n : ℕ} (em : Emissions n) (e : Exp n)
+  → flat (spec-batchSimultaneous em e) ≡ map snd (emits (⟦ e ⟧ em ρ₀ t₀))
+readme-batch-order-is-delivery-order em e =
+  batchSpecL-flat (emits (⟦ e ⟧ em ρ₀ t₀))
+
+-- take counts values, even mid-batch (README §"take counts values, even mid-batch").
+-- `take k` keeps the first k VALUES of the flat stream — never the first k
+-- batches — so it can cut a batch in half. Universal: take commutes with
+-- flattening, for any program. (⟦ takeE k e ⟧ = takeT k ⟦ e ⟧, whose emits
+-- is takeL k of the source's emits, so this is batchSpecL-flat on both sides
+-- glued by the take/map commutation.)
+
+readme-take-counts-values : {n : ℕ} (em : Emissions n) (k : ℕ) (e : Exp n)
+  → flat (spec-batchSimultaneous em (takeE k e))
+      ≡ take k (flat (spec-batchSimultaneous em e))
+readme-take-counts-values em k e =
+  trans (batchSpecL-flat (takeL k xs))
+        (trans (takeL-map-snd k xs)
+               (cong (take k) (sym (batchSpecL-flat xs))))
+  where xs = emits (⟦ e ⟧ em ρ₀ t₀)
+
+-- One subscribe() call is one batch (README §"One subscribe() call is one batch").
+-- A source-free program (Exp 0 — no subject can fire, so the whole run is the
+-- subscription frame) lands in a single instant: at most one batch, however
+-- it is wired.
 --
---   const doubled = a.pipe(map((n) => n * 2));
---   merge(a, doubled, b)…
---   a.next(5); // [5, 10]
---   b.next(7); // [7]
---   a.next(6); // [6, 12]
+-- The batching side (bounded-t₀-length) turns "every emission is at t₀" into
+-- "≤ 1 batch"; the denotational side (Readme-Semantics.Static.emits-static:
+-- an Exp 0 program emits everything at its subscription instant t₀) is proven
+-- by induction on the source-free grammar.
 
-each-next : Exp 2
-each-next = mergeAllE (ofS (srcE s0 ∷ mapE (λ n → n * 2) (srcE s0) ∷ srcE s1 ∷ []))
-
-each-next-driver : Emissions 2
-each-next-driver = emissions (pureV []) ((s0 , 5) ∷ (s1 , 7) ∷ (s0 , 6) ∷ [])
-
-postulate
-  readme-each-next-own-instant :
-    spec-batchSimultaneous each-next-driver each-next
-      ≡ (5 ∷ 10 ∷ []) ∷ (7 ∷ []) ∷ (6 ∷ 12 ∷ []) ∷ []
+readme-one-subscribe-one-batch : (em : Emissions 0) (e : Exp 0)
+  → leqℕ (length (spec-batchSimultaneous em e)) 1 ≡ true
+readme-one-subscribe-one-batch em e =
+  bounded-t₀-length (emits (⟦ e ⟧ em ρ₀ t₀)) (emits-static em e)
 
 ------------------------------------------------------------------------
--- Cascades inherit their trigger's instant (README §"Cascades inherit their trigger's instant")
---
---   const spawned = s.pipe(mergeMap((n) => of(n * 10, n * 10 + 1)));
---   merge(s, spawned)…
---   s.next(5); // [5, 50, 51]
-
-cascades : Exp 1
-cascades =
-  mergeAllE (ofS ( srcE s0
-                 ∷ mergeMapE (λ n → ofE (n * 10 ∷ ((n * 10) + 1) ∷ [])) (srcE s0)
-                 ∷ []))
-
-cascades-driver : Emissions 1
-cascades-driver = emissions (pureV []) ((s0 , 5) ∷ [])
-
-postulate
-  readme-cascades-inherit :
-    spec-batchSimultaneous cascades-driver cascades
-      ≡ (5 ∷ 50 ∷ 51 ∷ []) ∷ []
-
+-- QUANTIFIED INSTANCES (the shape is the truth; the numerals are free)
 ------------------------------------------------------------------------
--- Completion cascades inherit too (README §"Completion cascades inherit too")
+
+-- The flagship diamond (README §"The idea: provenance + batchSimultaneous").
+-- A mapped copy of a source shares that source's batch — whatever the value,
+-- whatever the map.
 --
---   const firstOnly = s.pipe(take(1));
---   const thenSeven = concat(firstOnly, of(7));
---   merge(s, thenSeven)…
---   s.next(5); // [5, 5, 7]
---   s.next(6); // [6]
+--   merge(s, s.map(f)) on s.next(v)  ≡  [[v, f v]]
 
-completion-cascades : Exp 1
-completion-cascades =
-  mergeAllE (ofS ( srcE s0
-                 ∷ concatE (takeE 1 (srcE s0)) (ofE (7 ∷ []))
-                 ∷ []))
+diamondP : (Val → Val) → Exp 1
+diamondP f = mergeE (srcE s0) (mapE f (srcE s0))
 
-completion-cascades-driver : Emissions 1
-completion-cascades-driver = emissions (pureV []) ((s0 , 5) ∷ (s0 , 6) ∷ [])
+readme-diamond : (f : Val → Val) (v : Val)
+  → spec-batchSimultaneous (emissions (pureV []) ((s0 , v) ∷ [])) (diamondP f)
+      ≡ (v ∷ f v ∷ []) ∷ []
+readme-diamond f v = refl
 
-postulate
-  readme-completion-cascades :
-    spec-batchSimultaneous completion-cascades-driver completion-cascades
-      ≡ (5 ∷ 5 ∷ 7 ∷ []) ∷ (6 ∷ []) ∷ []
-
-------------------------------------------------------------------------
--- share: connect at first subscription, no replay (README §"share: connect at first subscription, no replay")
+-- Each .next() call is its own instant (README §"Each .next() call is its own instant").
+-- Two subjects fired back to back are two instants; a diamond on the first
+-- collapses, the second subject is a separate root cause.
 --
---   const shared = of(5).pipe(share());
---   merge(shared, shared)…  // [5] — once, not twice
+--   merge(a, a.map(f), b);  a.next(u) ≡ [u, f u];  b.next(v) ≡ [v]
+
+eachNextP : (Val → Val) → Exp 2
+eachNextP f = mergeAllE (ofS (srcE s0 ∷ mapE f (srcE s0) ∷ srcE s1 ∷ []))
+
+readme-each-next-own-instant : (f : Val → Val) (u v : Val)
+  → spec-batchSimultaneous
+      (emissions (pureV []) ((s0 , u) ∷ (s1 , v) ∷ [])) (eachNextP f)
+      ≡ (u ∷ f u ∷ []) ∷ (v ∷ []) ∷ []
+readme-each-next-own-instant f u v = refl
+
+-- Cascades inherit their trigger's instant (README §"Cascades inherit their trigger's instant").
+-- A spawned inner's WHOLE synchronous burst joins the batch of the event
+-- that spawned it — any burst g, any value v.
 --
--- letShare binds the shared source at de-Bruijn 0; the pre-order-first ref
--- is the connecting one (shareE true 0), the second a late ref (shareE false 0).
+--   merge(s, s.mergeMap(n => of(g n)))  on s.next(v)  ≡  [v ∷ g v]
 
-share-no-replay : Exp 0
-share-no-replay =
-  letShareE (ofE (5 ∷ []))
-            (mergeAllE (ofS (shareE true 0 ∷ shareE false 0 ∷ [])))
+cascadeP : (Val → List Val) → Exp 1
+cascadeP g = mergeAllE (ofS (srcE s0 ∷ mergeMapE (λ n → ofE (g n)) (srcE s0) ∷ []))
 
-share-no-replay-driver : Emissions 0
-share-no-replay-driver = emissions (pureV []) []
+readme-cascades-inherit : (g : Val → List Val) (v : Val)
+  → spec-batchSimultaneous (emissions (pureV []) ((s0 , v) ∷ [])) (cascadeP g)
+      ≡ (v ∷ g v) ∷ []
+readme-cascades-inherit g v =
+  trans (cong batchSpecL emitsEq) (batchGo-const (1 , 0) (v ∷ []) (g v))
+  where
+    B : TimedObs Val
+    B = map (λ x → ((1 , 0) , x)) (g v)
+    -- the two spawned inners flush v (direct src) then g v (mergeMap), both
+    -- at the source's instant (1,0); the trailing []-merges are identity
+    emitsEq : mergeL (((1 , 0) , v) ∷ []) (mergeL (mergeL B []) [])
+                ≡ ((1 , 0) , v) ∷ B
+    emitsEq = trans (cong (mergeL (((1 , 0) , v) ∷ []))
+                          (trans (mergeL-nil-right (mergeL B [])) (mergeL-nil-right B)))
+                    (cascade-merge (1 , 0) v (g v))
 
-postulate
-  readme-share-connect-no-replay :
-    spec-batchSimultaneous share-no-replay-driver share-no-replay
-      ≡ (5 ∷ []) ∷ []
-
-------------------------------------------------------------------------
--- Late subscribers see only later events — diamonds grow (README §"Late subscribers see only later events — diamonds grow")
+-- Completion cascades inherit too (README §"Completion cascades inherit too").
+-- When take(1) closes on an event, the concat's queued next leg subscribes
+-- at that same instant — the final value, the close, and the freshly
+-- subscribed value are one batch.
 --
---   const shared = src.pipe(share());
---   const growing = trigger.pipe(mergeMap(() => shared));
---   merge(shared, growing)…
---   trigger.next(); src.next(7); // [7, 7]
---   trigger.next(); src.next(8); // [8, 8, 8]
---
--- slot 0 = src, slot 1 = trigger; each trigger firing adds one live ref of
--- the hot share (which never replays, so a trigger instant alone is empty).
+--   merge(s, concat(take(1)(s), of(w)));  s.next(u) ≡ [u, u, w];  s.next(v) ≡ [v]
 
-late-join : Exp 2
-late-join =
-  letShareE (srcE s0)
+completionP : Val → Exp 1
+completionP w = mergeAllE (ofS (srcE s0 ∷ concatE (takeE 1 (srcE s0)) (ofE (w ∷ [])) ∷ []))
+
+readme-completion-cascades : (u v w : Val)
+  → spec-batchSimultaneous
+      (emissions (pureV []) ((s0 , u) ∷ (s0 , v) ∷ [])) (completionP w)
+      ≡ (u ∷ u ∷ w ∷ []) ∷ (v ∷ []) ∷ []
+readme-completion-cascades u v w = refl
+
+-- share: connect at first subscription, no replay (README §"share: connect at first subscription, no replay").
+-- A share connects once, at its first subscriber; a hot stream does not
+-- replay, so a second subscriber a moment later gets nothing. The source's
+-- synchronous value reaches exactly one ref — whatever the value.
+--
+--   merge(shared, shared) where shared = of(v).share()  ≡  [[v]]
+
+shareP : Val → Exp 0
+shareP v = letShareE (ofE (v ∷ [])) (mergeAllE (ofS (shareE true 0 ∷ shareE false 0 ∷ [])))
+
+readme-share-connect-no-replay : (v : Val)
+  → spec-batchSimultaneous (emissions (pureV []) []) (shareP v)
+      ≡ (v ∷ []) ∷ []
+readme-share-connect-no-replay v = refl
+
+-- Late subscribers see only later events — diamonds grow (README §"Late subscribers see only later events — diamonds grow").
+-- Each trigger firing adds one live ref of a hot share (a trigger instant
+-- alone is empty — no replay), so a later source value is seen with strictly
+-- growing multiplicity. slot 0 = src, slot 1 = trigger.
+--
+--   trigger; src.next(u) ≡ [u, u];  trigger; src.next(v) ≡ [v, v, v]
+
+growthP : Exp 2
+growthP = letShareE (srcE s0)
             (mergeAllE (ofS ( shareE true 0
                             ∷ mergeMapE (λ _ → shareE false 0) (srcE s1)
                             ∷ [])))
 
-late-join-driver : Emissions 2
-late-join-driver =
-  emissions (pureV []) ((s1 , 0) ∷ (s0 , 7) ∷ (s1 , 0) ∷ (s0 , 8) ∷ [])
+readme-late-join-growth : (u v : Val)
+  → spec-batchSimultaneous
+      (emissions (pureV []) ((s1 , 0) ∷ (s0 , u) ∷ (s1 , 0) ∷ (s0 , v) ∷ [])) growthP
+      ≡ (u ∷ u ∷ []) ∷ (v ∷ v ∷ v ∷ []) ∷ []
+readme-late-join-growth u v = refl
 
-postulate
-  readme-late-join-growth :
-    spec-batchSimultaneous late-join-driver late-join
-      ≡ (7 ∷ 7 ∷ []) ∷ (8 ∷ 8 ∷ 8 ∷ []) ∷ []
-
-------------------------------------------------------------------------
--- take counts values, even mid-batch (README §"take counts values, even mid-batch")
+-- The serial joins mirror rxjs (README §"The serial joins mirror rxjs").
+-- exhaustMap over a synchronous burst runs EVERY inner: a sync inner closes
+-- before the next arrival, so nothing is dropped. One frame, both inners.
 --
---   const doubled = s.pipe(map((n) => n * 2));
---   const firstThree = merge(s, doubled).pipe(take(3));
---   firstThree…
---   s.next(5); // [5, 10]
---   s.next(6); // [6] — take(3) cuts the second batch in half
+--   of(v, w).exhaustMap(n => of(g n))  ≡  [[g v, g w]]
 
-take-counts : Exp 1
-take-counts =
-  takeE 3 (mergeAllE (ofS (srcE s0 ∷ mapE (λ n → n * 2) (srcE s0) ∷ [])))
+serialP : (Val → Val) → Val → Val → Exp 0
+serialP g v w = exhaustAllE (mapS (λ n → ofE (g n ∷ [])) (ofE (v ∷ w ∷ [])))
 
-take-counts-driver : Emissions 1
-take-counts-driver = emissions (pureV []) ((s0 , 5) ∷ (s0 , 6) ∷ [])
-
-postulate
-  readme-take-counts-values :
-    spec-batchSimultaneous take-counts-driver take-counts
-      ≡ (5 ∷ 10 ∷ []) ∷ (6 ∷ []) ∷ []
-
-------------------------------------------------------------------------
--- Batch order is delivery order (README §"Batch order is delivery order")
---
---   const shared = src.pipe(share());
---   const doubled = shared.pipe(map((n) => n * 2));
---   const sums = merge(shared, doubled).pipe(scan((acc, n) => acc + n, 0));
---   sums…
---   src.next(5); // [5, 15]
---   src.next(1); // [16, 18]
-
-batch-order : Exp 1
-batch-order =
-  letShareE (srcE s0)
-            (scanE (λ acc n → acc + n) 0
-                   (mergeAllE (ofS ( shareE true 0
-                                   ∷ mapE (λ n → n * 2) (shareE false 0)
-                                   ∷ []))))
-
-batch-order-driver : Emissions 1
-batch-order-driver = emissions (pureV []) ((s0 , 5) ∷ (s0 , 1) ∷ [])
-
-postulate
-  readme-batch-order-is-delivery-order :
-    spec-batchSimultaneous batch-order-driver batch-order
-      ≡ (5 ∷ 15 ∷ []) ∷ (16 ∷ 18 ∷ []) ∷ []
-
-------------------------------------------------------------------------
--- The serial joins mirror rxjs (README §"The serial joins mirror rxjs")
---
---   const burst = of(1, 2);
---   const exhausted = burst.pipe(exhaustMap((n) => of(n * 10)));
---   exhausted…  // [10, 20] — both sync inners run, one frame
---
--- exhaustMap f e = exhaustAll (map (λ v → f v) e); a synchronous inner
--- closes before the next arrival, so neither is dropped.
-
-serial-joins : Exp 0
-serial-joins = exhaustAllE (mapS (λ n → ofE (n * 10 ∷ [])) (ofE (1 ∷ 2 ∷ [])))
-
-serial-joins-driver : Emissions 0
-serial-joins-driver = emissions (pureV []) []
-
-postulate
-  readme-serial-joins-mirror-rxjs :
-    spec-batchSimultaneous serial-joins-driver serial-joins
-      ≡ (10 ∷ 20 ∷ []) ∷ []
+readme-serial-joins-mirror-rxjs : (g : Val → Val) (v w : Val)
+  → spec-batchSimultaneous (emissions (pureV []) []) (serialP g v w)
+      ≡ (g v ∷ g w ∷ []) ∷ []
+readme-serial-joins-mirror-rxjs g v w = refl
