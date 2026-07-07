@@ -100,28 +100,126 @@ subscribeRx : {n : ℕ} {X : Set} → RxObs n X → Emissions n → Subscription
 subscribeRx m em = run m (flatten em)
 
 ------------------------------------------------------------------------
--- the operator set (one postulate per rxjs export the TypeScript uses)
+-- the operator set (one per rxjs export the TypeScript uses).
+-- All DEFINED except the three serial flattening policies.
 
+-- r.of / r.EMPTY: emit everything on the first input received (the
+-- subscription moment), then nothing
+ofRx : {n : ℕ} {X : Set} → List X → RxObs n X
+ofRx xs = record
+  { State = Bool ; start = false
+  ; step  = λ s _ → true , (if s then [] else xs) }
+
+emptyRx : {n : ℕ} {X : Set} → RxObs n X
+emptyRx = ofRx []
+
+-- r.map
+mapRx : {n : ℕ} {X Y : Set} → (X → Y) → RxObs n X → RxObs n Y
+mapRx f m = record
+  { State = State m ; start = start m
+  ; step  = λ s i → let r = step m s i in fst r , map f (snd r) }
+
+-- r.endWith: append one element when the run ends (the `end` input) —
+-- an operator CAN inspect the world input, it just usually doesn't care
+endWithRx : {n : ℕ} {X : Set} → X → RxObs n X → RxObs n X
+endWithRx {n} {X} x m = record
+  { State = State m ; start = start m
+  ; step  = λ s i → let r = step m s i in fst r , atEnd i (snd r) }
+  where
+    atEnd : In n → List X → List X
+    atEnd end os = os ++ (x ∷ [])
+    atEnd _   os = os
+
+-- r.scan: THE fundamental one — a scan IS a Mealy machine. One input
+-- may carry several elements; each threads the accumulator and emits.
+scanRx : {n : ℕ} {X S : Set} → (S → X → S) → S → RxObs n X → RxObs n S
+scanRx {n} {X} {S} f z m = record
+  { State = State m × S ; start = start m , z
+  ; step  = λ s i →
+      let r = step m (fst s) i
+          o = scanOut (snd s) (snd r)
+      in (fst r , fst o) , snd o }
+  where
+    scanOut : S → List X → S × List S
+    scanOut s []       = s , []
+    scanOut s (x ∷ xs) = let r = scanOut (f s x) xs in fst r , f s x ∷ snd r
+
+-- r.merge (binary; n-ary is folded from it). Subscribes left before
+-- right: within one step, left's outputs precede right's (registration
+-- rank as delivery order).
+mergeRx : {n : ℕ} {X : Set} → RxObs n X → RxObs n X → RxObs n X
+mergeRx m₁ m₂ = record
+  { State = State m₁ × State m₂ ; start = start m₁ , start m₂
+  ; step  = λ s i →
+      let r₁ = step m₁ (fst s) i
+          r₂ = step m₂ (snd s) i
+      in (fst r₁ , fst r₂) , snd r₁ ++ snd r₂ }
+
+-- r.takeWhile (inclusive flag as in rxjs); once dead, the upstream is
+-- unsubscribed — its state freezes and nothing more is emitted
+takeWhileRx : {n : ℕ} {X : Set} → (X → Bool) → Bool → RxObs n X → RxObs n X
+takeWhileRx {n} {X} p incl m = record
+  { State = State m × Bool ; start = start m , true
+  ; step  = λ s i →
+      if snd s
+      then (let r = step m (fst s) i
+                t = takeW (snd r)
+            in (fst r , snd t) , fst t)
+      else (s , []) }
+  where
+    takeW : List X → List X × Bool
+    takeW []       = [] , true
+    takeW (x ∷ xs) =
+      if p x
+      then (let r = takeW xs in x ∷ fst r , snd r)
+      else ((if incl then x ∷ [] else []) , false)
+
+-- "subscribing" a machine mid-run: a spawn during the real frame IS a
+-- frame subscription (it sees the sync flushes); a spawn during any
+-- later input gets a synthesized frame with empty flushes — and NOT the
+-- in-flight input itself (an rxjs Subject snapshots its subscribers at
+-- dispatch start: the upstream-race rule)
+spawnInput : {n : ℕ} → In n → In n
+spawnInput (frame ss) = frame ss
+spawnInput _          = frame (pureV [])
+
+-- r.mergeMap: every element spawns an inner machine, all stay live.
+-- The state holds each running inner as a dependent pair — WHICH
+-- element spawned it, paired with the state of that element's machine.
+-- Per step, delivery is in registration-rank order: the outer chain
+-- first (each spawned inner's synchronous flush riding at its trigger's
+-- position), then the existing inners in spawn order.
+mergeMapRx : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
+mergeMapRx {n} {X} {Y} f m = record
+  { State = State m × List (Σ X (λ x → State (f x)))
+  ; start = start m , []
+  ; step  = λ s i →
+      let u  = step m (fst s) i
+          sp = spawnAll (spawnInput i) (snd u)
+          ex = stepAll i (snd s)
+      in (fst u , fst ex ++ fst sp) , snd sp ++ snd ex }
+  where
+    Running : Set
+    Running = Σ X (λ x → State (f x))
+
+    stepAll : In n → List Running → List Running × List Y
+    stepAll i []              = [] , []
+    stepAll i ((x ▹ sx) ∷ rs) =
+      let r    = step (f x) sx i
+          rest = stepAll i rs
+      in ((x ▹ fst r) ∷ fst rest) , snd r ++ snd rest
+
+    spawnAll : In n → List X → List Running × List Y
+    spawnAll i []       = [] , []
+    spawnAll i (x ∷ xs) =
+      let r    = step (f x) (start (f x)) i
+          rest = spawnAll i xs
+      in ((x ▹ fst r) ∷ fst rest) , snd r ++ snd rest
+
+-- the serial flattening policies (concatMap queues, switchMap cuts,
+-- exhaustMap drops while busy) — same Running-state architecture as
+-- mergeMapRx plus the policy bookkeeping; the remaining operator holes
 postulate
-  -- r.of / r.EMPTY: emit everything on the first input received (the
-  -- subscription moment), then nothing
-  ofRx         : {n : ℕ} {X : Set} → List X → RxObs n X
-  emptyRx      : {n : ℕ} {X : Set} → RxObs n X
-  -- r.endWith: append one element when the run ends (the `end` input)
-  endWithRx    : {n : ℕ} {X : Set} → X → RxObs n X → RxObs n X
-  -- r.map
-  mapRx        : {n : ℕ} {X Y : Set} → (X → Y) → RxObs n X → RxObs n Y
-  -- r.scan: THE fundamental one — a scan IS a Mealy machine
-  scanRx       : {n : ℕ} {X S : Set} → (S → X → S) → S → RxObs n X → RxObs n S
-  -- r.merge (binary; n-ary is folded from it). Subscribes left before
-  -- right: within one step, left's outputs precede right's.
-  mergeRx      : {n : ℕ} {X : Set} → RxObs n X → RxObs n X → RxObs n X
-  -- r.takeWhile (inclusive flag as in rxjs)
-  takeWhileRx  : {n : ℕ} {X : Set} → (X → Bool) → Bool → RxObs n X → RxObs n X
-  -- the flattening quartet: spawn an inner machine per element, under
-  -- the operator's native subscription policy (mergeMap: all live;
-  -- concatMap: queue; switchMap: cut; exhaustMap: drop while busy)
-  mergeMapRx   : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
   concatMapRx  : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
   switchMapRx  : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
   exhaustMapRx : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y

@@ -235,12 +235,16 @@ RxObs n X = Machine (In n) X        -- a naive rxjs Observable
 subscribeRx m em = run m (flatten em)
 ```
 
-No timestamps anywhere — that is the point. Then one postulate per rxjs
-operator the implementation consumes: `ofRx`, `emptyRx`, `endWithRx`,
-`mapRx`, `scanRx`, `mergeRx`, `takeWhileRx`, and the flattening quartet
-(`mergeMapRx`/`concatMapRx`/`switchMapRx`/`exhaustMapRx`). Discharging
-one = writing the step function for that operator's synchronous-delivery
-semantics.
+No timestamps anywhere — that is the point. Then one operator per rxjs
+export the implementation consumes — and all are DEFINED except the
+three serial flattening policies: `ofRx`, `emptyRx`, `endWithRx`,
+`mapRx`, `scanRx`, `mergeRx`, `takeWhileRx` and `mergeMapRx` are real
+step functions (`mergeMapRx` holds each running inner as a dependent
+pair — which element spawned it, with the state of that element's
+machine — and delivers in registration-rank order: outer chain first,
+spawned flushes riding at their triggers, then existing inners in spawn
+order). `concatMapRx`/`switchMapRx`/`exhaustMapRx` remain postulated —
+same architecture plus the queue/cut/drop policy bookkeeping.
 
 Several TS operators have NO counterpart here, because the pure model
 dissolves them: `tap`/`finalize` exist only to maintain the multicast
@@ -297,22 +301,26 @@ impl-batchSimultaneous em e = subscribeRx (impl-machine e) em
 
 ### [src/Formal-Verification.agda](src/Formal-Verification.agda)
 
-The entrypoint. Defines the bridge —
+The entrypoint. The bridge is fully DEFINED: `groupsOf` is the referee's
+grouped view of a run (the machine's responses kept grouped by input —
+knowledge `run` concatenates away, as the proven `run-groups` lemma
+states), and `stamped` re-attaches the clock positionally — `flatten`
+places input j at tick j, so group j's values get time `(j , 0)`.
 
 ```agda
-trace em e = run (compile e) (flatten em)        -- the protocol trace (DEFINED)
+stamped em e = stampFrom 0 (groupsOf (compile e) (flatten em))
 ```
 
-— and states the two halves as the load-bearing postulates:
+The two halves are the load-bearing postulates:
 
 ```agda
-counting-recovers : … → impl-batchSimultaneous em e ≡ batchSpecL (stamp em (trace em e))
-trace-faithful    : … → stamp em (trace em e) ≡ list (⟦ e ⟧ em ρ₀ t₀)
+counting-recovers : … → impl-batchSimultaneous em e ≡ batchSpecL (stamped em e)
+trace-faithful    : … → stamped em e ≡ list (⟦ e ⟧ em ρ₀ t₀)
 ```
 
-`stamp` re-attaches the clock the Emissions define; `Canonical` is the
-validity domain (non-resetting shares, registration-canonical trees — the
-v1 fences). The theorem is their composition, literally:
+`Canonical` is the validity domain (non-resetting shares,
+registration-canonical trees — the v1 fences). The theorem is their
+composition, literally:
 
 ```agda
 formal-verification em e can =
@@ -320,8 +328,15 @@ formal-verification em e can =
         (cong batchSpecL (trace-faithful em e can))
 ```
 
-plus `diamond-verified`, the sanity corollary instantiating it at the
-program this project began with.
+And the statement already **holds by computation** on concrete programs
+— the bottom of the file is a suite of `refl`-proofs where Agda
+normalizes the ENTIRE pipeline (compile, the joins' scans, the counting
+machine) and both theorem sides agree: the diamond batches `[5, 6]`
+from one `.next(5)`; `diamond-counting` and `merge2-counting` are
+literal instances of `counting-recovers`; `take-counting` exercises the
+mid-instant cut v1 had fenced behind `runMemCut`; `mergeMap-batches`
+shows spawned-inner coalescing. What remains is generalizing over all
+canonical programs.
 
 ## Relationship to the TypeScript
 

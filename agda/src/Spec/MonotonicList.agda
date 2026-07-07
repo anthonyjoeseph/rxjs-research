@@ -26,6 +26,9 @@ timeLeq : Time → Time → Bool
 timeLeq (a , b) (c , d) =
   if ltℕ a c then true else (if eqℕ a c then leqℕ b d else false)
 
+timeEq : Time → Time → Bool
+timeEq (a , b) (c , d) = eqℕ a c ∧ eqℕ b d
+
 ------------------------------------------------------------------------
 -- sortedness as an inductive predicate mirroring list structure
 

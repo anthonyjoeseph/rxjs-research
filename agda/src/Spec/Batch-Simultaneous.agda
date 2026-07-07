@@ -108,12 +108,20 @@ postulate
 ⟦ e ∷ es ⟧L em ρ = (λ u → ⟦ e ⟧ em ρ u) ∷ ⟦ es ⟧L em ρ
 
 ------------------------------------------------------------------------
--- batching: group equal adjacent times. Stated over the raw list so the
--- verification theorem can rewrite through it; MonotonicList is what
--- makes "adjacent" the same as "equal anywhere".
+-- batching: group equal adjacent times. Defined over the raw list so
+-- the verification theorem can rewrite through it; MonotonicList is
+-- what makes "adjacent" the same as "equal anywhere".
 
-postulate
-  batchSpecL : List (Time × Val) → List (List Val)
+batchGo : Time → List Val → List (Time × Val) → List (List Val)
+batchGo t acc []             = acc ∷ []
+batchGo t acc ((u , w) ∷ ys) =
+  if timeEq t u
+  then batchGo u (acc ++ (w ∷ [])) ys
+  else acc ∷ batchGo u (w ∷ []) ys
+
+batchSpecL : List (Time × Val) → List (List Val)
+batchSpecL []             = []
+batchSpecL ((t , v) ∷ xs) = batchGo t (v ∷ []) xs
 
 batchSpec : TObs → Subscription (List Val)
 batchSpec o = batchSpecL (list o)

@@ -94,6 +94,15 @@ open _×_ public
 infixr 4 _,_
 infixr 2 _×_
 
+-- dependent pair (a running inner machine: which element spawned it,
+-- paired with the state of THAT element's machine)
+record Σ (A : Set) (B : A → Set) : Set where
+  constructor _▹_
+  field
+    proj₁ : A
+    proj₂ : B proj₁
+open Σ public
+
 data Maybe (A : Set) : Set where
   nothing : Maybe A
   just    : A → Maybe A
@@ -179,3 +188,7 @@ data Vec (A : Set) : ℕ → Set where
 lookupV : {A : Set} {n : ℕ} → Vec A n → Fin n → A
 lookupV (x ∷ _)  fzero    = x
 lookupV (_ ∷ xs) (fsuc i) = lookupV xs i
+
+pureV : {A : Set} {n : ℕ} → A → Vec A n
+pureV {n = zero}  x = []
+pureV {n = suc n} x = x ∷ pureV x
