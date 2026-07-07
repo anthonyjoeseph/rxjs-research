@@ -119,6 +119,11 @@ length-map : {A B : Set} (f : A → B) (xs : List A)
 length-map f []       = refl
 length-map f (x ∷ xs) = cong suc (length-map f xs)
 
+drop : {A : Set} → ℕ → List A → List A
+drop zero    xs       = xs
+drop (suc n) []       = []
+drop (suc n) (x ∷ xs) = drop n xs
+
 replicate : {A : Set} → ℕ → A → List A
 replicate zero    x = []
 replicate (suc n) x = x ∷ replicate n x

@@ -5,9 +5,9 @@
 -- WITHOUT clocks — all it ever receives is a stream of protocol events in
 -- delivery order:
 --
---   reg p    a subscription of provenance p came alive
---   val v    a value delivery
---   clo p    a registration of provenance p ended
+--   init p    a subscription of provenance p came alive
+--   value v    a value delivery
+--   close p    a registration of provenance p ended
 --
 -- A Delivery is what one downstream .next() carries: the provenance of the
 -- registration it travels through, plus its events. A Trace is a program's
@@ -22,7 +22,7 @@
 --
 -- The machine (runMem) is the provenance memory as a pure fold, mirroring
 -- the TS scan: totalNum counts live registrations per provenance
--- (maintained from reg/clo events alone), and a delivery arriving with no
+-- (maintained from init/close events alone), and a delivery arriving with no
 -- window open opens the instant of its provenance, owing totalNum p
 -- deliveries; the window drains one per delivery and flushes at zero. NO
 -- TIME COMPARISON decides a flush — timestamps do not exist in the Ev type.
@@ -38,7 +38,7 @@
 -- argument by construction.
 --
 -- This module covers the static fragment: subjects, of, map, merge.
--- take (clo events shrinking windows), the joins (reg events spawning
+-- take (close events shrinking windows), the joins (init events spawning
 -- mid-instant), share lives (reset on completion/refcount-zero, rxjs
 -- semantics ratified 2026-07-07) and delivery ranks extend it.
 module Protocol where
@@ -54,11 +54,18 @@ predℕ : ℕ → ℕ
 predℕ zero    = zero
 predℕ (suc n) = n
 
--- protocol events: no timestamps, anywhere. That is the point.
+-- protocol events: no timestamps, anywhere. That is the point. The
+-- constructors mirror typescript/src/types.ts InstEv exactly:
+--   init p    a subscription chain of ROOT provenance p came alive
+--   value v   a value
+--   close p   a registration of root p ended
+--   fin       the stream completes as part of this delivery (the
+--             completion-cascade carrier; concatAll advances on it)
 data Ev (A : Set) : Set where
-  reg : Prov → Ev A
-  val : A → Ev A
-  clo : Prov → Ev A
+  init  : Prov → Ev A
+  value : A → Ev A
+  close : Prov → Ev A
+  fin   : Ev A
 
 -- one downstream .next(): the registration it travels through + its events
 Delivery : Set → Set
@@ -79,10 +86,11 @@ Driver A = List (ℕ × A)
 -- event bookkeeping ----------------------------------------------------------
 
 valsOf : {A : Set} → List (Ev A) → List A
-valsOf []           = []
-valsOf (reg _ ∷ es) = valsOf es
-valsOf (val v ∷ es) = v ∷ valsOf es
-valsOf (clo _ ∷ es) = valsOf es
+valsOf []             = []
+valsOf (init _ ∷ es)  = valsOf es
+valsOf (value v ∷ es) = v ∷ valsOf es
+valsOf (close _ ∷ es) = valsOf es
+valsOf (fin ∷ es)     = valsOf es
 
 bump : (Prov → ℕ) → Prov → (Prov → ℕ)
 bump tn p q = if eqℕ p q then suc (tn q) else tn q
@@ -91,10 +99,11 @@ drop1 : (Prov → ℕ) → Prov → (Prov → ℕ)
 drop1 tn p q = if eqℕ p q then predℕ (tn q) else tn q
 
 applyEvs : {A : Set} → (Prov → ℕ) → List (Ev A) → (Prov → ℕ)
-applyEvs tn []           = tn
-applyEvs tn (reg p ∷ es) = applyEvs (bump tn p) es
-applyEvs tn (val _ ∷ es) = applyEvs tn es
-applyEvs tn (clo p ∷ es) = applyEvs (drop1 tn p) es
+applyEvs tn []             = tn
+applyEvs tn (init p ∷ es)  = applyEvs (bump tn p) es
+applyEvs tn (value _ ∷ es) = applyEvs tn es
+applyEvs tn (close p ∷ es) = applyEvs (drop1 tn p) es
+applyEvs tn (fin ∷ es)     = applyEvs tn es
 
 -- the machine ------------------------------------------------------------------
 
@@ -139,9 +148,10 @@ machine (tr fr rs) =
 -- the trace combinators (the fragment's protocol semantics) --------------------
 
 mapEv : {A B : Set} → (A → B) → Ev A → Ev B
-mapEv f (reg p) = reg p
-mapEv f (val v) = val (f v)
-mapEv f (clo p) = clo p
+mapEv f (init p)  = init p
+mapEv f (value v) = value (f v)
+mapEv f (close p) = close p
+mapEv f fin       = fin
 
 mapDel : {A B : Set} → (A → B) → Delivery A → Delivery B
 mapDel f (p , es) = p , map (mapEv f) es
@@ -155,27 +165,181 @@ zipConcat (x ∷ xs) (y ∷ ys) = (x ++ y) ∷ zipConcat xs ys
 -- own slot's firings with a single delivery carrying the value
 subjectP : {A : Set} → Driver A → Prov → ℕ → Trace A
 subjectP d p i =
-  tr (reg p ∷ [])
+  tr (init p ∷ [])
      (map (λ jv → if eqℕ (fst jv) i
-                  then ((p , val (snd jv) ∷ []) ∷ [])
+                  then ((p , value (snd jv) ∷ []) ∷ [])
                   else [])
           d)
 
 -- a cold of: registers and emits entirely inside the frame
 ofP : {A : Set} → Driver A → Prov → List A → Trace A
-ofP d p vs = tr (reg p ∷ map val vs) (map (λ _ → []) d)
+ofP d p vs = tr (init p ∷ map value vs) (map (λ _ → []) d)
 
 mapP : {A B : Set} → (A → B) → Trace A → Trace B
 mapP f (tr fr rs) = tr (map (mapEv f) fr) (map (map (mapDel f)) rs)
 
--- the trace semantics of the DERIVED binary merge (mergeAllE ∘ ofS — the
--- *All joins are the primitives, per the canonical grammar; this fragment
--- layer models the derived form directly, and the full-grammar trace
--- denotation goes through the primitives): frames concatenate
--- (subscription order), responses interleave per driver event, left arm
--- first
+-- streams of streams: the *All joins are THE primitives, exactly the
+-- canonical grammar. An outer trace's VALUE events carry inner traces —
+-- ofSP is `of` at the stream sort (Burst's ofS), and a trigger-driven
+-- outer is mapP over the trigger (Burst's mapS). The parallels, primitive
+-- by primitive (typescript/src/primitives.ts mirrors the same table):
+--
+--   Burst grammar      protocol layer            status
+--   ofE / emptyE       ofP                       defined
+--   root subjects      subjectP                  defined
+--   mapE               mapP                      defined
+--   scanE              scanP                     defined
+--   takeE              takeP                     defined
+--   ofS                ofSP                      defined
+--   mapS               mapP (value = a trace)    defined
+--   mergeAllE          mergeAllP                 defined
+--   concatAllE         concatAllP                HOLE (postulated below)
+--   switchAllE         switchAllP                HOLE (postulated below)
+--   exhaustAllE        exhaustAllP               HOLE (postulated below)
+--   shareE/letShareE   shareLives                defined (the lives model)
+--   mergeE/concatE/    DERIVED: mergeAllP ∘ ofSP etc — never primitives
+--   mergeMapE
+
+ofSP : {A : Set} → List (Trace A) → Trace (Trace A)
+ofSP Ts = tr (map value Ts) []
+
+-- subscribing an inner trace: at the frame, everything counts; spawned at
+-- driver event k, its frame rides the trigger's delivery (coalescing) and
+-- it reacts only STRICTLY AFTER k (drop (suc k) — the strictly-after rule
+-- by construction)
+inlineFrame : {A : Set} → List (Ev (Trace A)) → List (Ev A)
+inlineFrame []             = []
+inlineFrame (value T ∷ es) = frame T ++ inlineFrame es
+inlineFrame (init p ∷ es)  = init p ∷ inlineFrame es
+inlineFrame (close p ∷ es) = close p ∷ inlineFrame es
+inlineFrame (fin ∷ es)     = inlineFrame es
+
+frameInners : {A : Set} → List (Ev (Trace A)) → List (Trace A)
+frameInners []             = []
+frameInners (value T ∷ es) = T ∷ frameInners es
+frameInners (init _ ∷ es)  = frameInners es
+frameInners (close _ ∷ es) = frameInners es
+frameInners (fin ∷ es)     = frameInners es
+
+-- fold a family of co-subscribed inners' reacts (singleton special-cased
+-- so a two-arm merge normalizes to a bare zipConcat)
+mergeReacts : {A : Set}
+  → List (List (List (Delivery A))) → List (List (Delivery A))
+mergeReacts []             = []
+mergeReacts (r ∷ [])       = r
+mergeReacts (r ∷ rs@(_ ∷ _)) = zipConcat r (mergeReacts rs)
+
+headL : {X : Set} → List (List X) → List X
+headL []      = []
+headL (x ∷ _) = x
+
+tailL : {X : Set} → List (List X) → List (List X)
+tailL []       = []
+tailL (_ ∷ xs) = xs
+
+spawnDel : {A : Set} → Delivery (Trace A) → Delivery A
+spawnDel (p , es) = p , inlineFrame es
+
+spawnedOf : {A : Set} → List (Delivery (Trace A)) → List (Trace A)
+spawnedOf []             = []
+spawnedOf ((p , es) ∷ ds) = frameInners es ++ spawnedOf ds
+
+-- THE MERGE-ALL PRIMITIVE: per driver event, the outer's own deliveries
+-- come first (its trigger chains registered in the frame, before any
+-- spawned inner), then the already-live inners' — registration order
+goMerge : {A : Set} → ℕ → List (List (Delivery A))
+        → List (List (Delivery (Trace A))) → List (List (Delivery A))
+goMerge k pending [] = pending
+goMerge k pending (r ∷ rs) =
+  (map spawnDel r ++ headL pending) ∷
+  goMerge (suc k)
+    (zipConcat (tailL pending)
+      (mergeReacts (map (λ T → drop (suc k) (reacts T)) (spawnedOf r))))
+    rs
+
+mergeAllP : {A : Set} → Trace (Trace A) → Trace A
+mergeAllP (tr fr rs) =
+  tr (inlineFrame fr)
+     (goMerge 0 (mergeReacts (map reacts (frameInners fr))) rs)
+
+-- the derived forms — NEVER primitives (mirroring Burst.agda's mergeE)
 mergeP : {A : Set} → Trace A → Trace A → Trace A
-mergeP (tr f₁ r₁) (tr f₂ r₂) = tr (f₁ ++ f₂) (zipConcat r₁ r₂)
+mergeP T U = mergeAllP (ofSP (T ∷ U ∷ []))
+
+-- scan, protocol side: the accumulator threads through the value events
+-- in DELIVERY order (frame first, then react by react)
+scanEvs : {A B : Set} → (B → A → B) → B → List (Ev A) → List (Ev B) × B
+scanEvs f z []             = [] , z
+scanEvs f z (init p ∷ es)  =
+  (init p ∷ fst (scanEvs f z es)) , snd (scanEvs f z es)
+scanEvs f z (close p ∷ es) =
+  (close p ∷ fst (scanEvs f z es)) , snd (scanEvs f z es)
+scanEvs f z (fin ∷ es)     =
+  (fin ∷ fst (scanEvs f z es)) , snd (scanEvs f z es)
+scanEvs f z (value v ∷ es) =
+  (value (f z v) ∷ fst (scanEvs f (f z v) es)) , snd (scanEvs f (f z v) es)
+
+scanReacts : {A B : Set} → (B → A → B) → B
+  → List (List (Delivery A)) → List (List (Delivery B))
+scanDels : {A B : Set} → (B → A → B) → B
+  → List (Delivery A) → List (Delivery B) × B
+
+scanReacts f z []       = []
+scanReacts f z (r ∷ rs) =
+  fst (scanDels f z r) ∷ scanReacts f (snd (scanDels f z r)) rs
+
+scanDels f z []             = [] , z
+scanDels f z ((p , es) ∷ ds) =
+  ((p , fst (scanEvs f z es)) ∷ fst (scanDels f (snd (scanEvs f z es)) ds)) ,
+  snd (scanDels f (snd (scanEvs f z es)) ds)
+
+scanP : {A B : Set} → (B → A → B) → B → Trace A → Trace B
+scanP f z (tr fr rs) =
+  tr (fst (scanEvs f z fr)) (scanReacts f (snd (scanEvs f z fr)) rs)
+
+-- take, protocol side: counts VALUES; at the cut it closes every
+-- registration it passed downstream and fins, inside the same delivery
+-- (the completion-cascade carrier); the dead chain forwards nothing
+-- afterwards (empty reacts keep the driver positions aligned)
+removeOne : Prov → List Prov → List Prov
+removeOne p []       = []
+removeOne p (q ∷ qs) = if eqℕ p q then qs else (q ∷ removeOne p qs)
+
+-- events out, remaining budget, live registrations, done?
+takeEvs : {A : Set} → ℕ → List Prov → List (Ev A)
+        → List (Ev A) × (ℕ × (List Prov × Bool))
+takeEvs b regs [] = [] , b , regs , false
+takeEvs b regs (init p ∷ es) =
+  (init p ∷ fst (takeEvs b (p ∷ regs) es)) , snd (takeEvs b (p ∷ regs) es)
+takeEvs b regs (close p ∷ es) =
+  (close p ∷ fst (takeEvs b (removeOne p regs) es)) ,
+  snd (takeEvs b (removeOne p regs) es)
+takeEvs b regs (fin ∷ es) = (fin ∷ []) , b , regs , true
+takeEvs zero regs (value v ∷ es) = takeEvs zero regs es
+takeEvs (suc zero) regs (value v ∷ es) =
+  (value v ∷ map close regs ++ fin ∷ []) , zero , [] , true
+takeEvs (suc (suc b)) regs (value v ∷ es) =
+  (value v ∷ fst (takeEvs (suc b) regs es)) , snd (takeEvs (suc b) regs es)
+
+takeDels : {A : Set} → ℕ → List Prov → List (Delivery A)
+         → List (Delivery A) × (ℕ × (List Prov × Bool))
+takeDels b regs [] = [] , b , regs , false
+takeDels b regs ((p , es) ∷ ds) with takeEvs b regs es
+... | es′ , b′ , regs′ , true  = ((p , es′) ∷ []) , b′ , regs′ , true
+... | es′ , b′ , regs′ , false =
+  ((p , es′) ∷ fst (takeDels b′ regs′ ds)) , snd (takeDels b′ regs′ ds)
+
+takeReacts : {A : Set} → ℕ → List Prov
+           → List (List (Delivery A)) → List (List (Delivery A))
+takeReacts b regs []       = []
+takeReacts b regs (r ∷ rs) with takeDels b regs r
+... | r′ , b′ , regs′ , true  = r′ ∷ map (λ _ → []) rs
+... | r′ , b′ , regs′ , false = r′ ∷ takeReacts b′ regs′ rs
+
+takeP : {A : Set} → ℕ → Trace A → Trace A
+takeP n (tr fr rs) with takeEvs n [] fr
+... | fr′ , b , regs , true  = tr fr′ (map (λ _ → []) rs)
+... | fr′ , b , regs , false = tr fr′ (takeReacts b regs rs)
 
 -- the referee: stamping a trace with the driver's clock ------------------------
 
@@ -208,8 +372,8 @@ stamp (tr fr rs) = atT t₀ (valsOf fr) ++ stampFrom zero rs
 -- as a datatype.
 
 data ValBurst {A : Set} : List (Ev A) → Set where
-  vb1 : {v : A} → ValBurst (val v ∷ [])
-  vb∷ : {v : A} {es : List (Ev A)} → ValBurst es → ValBurst (val v ∷ es)
+  vb1 : {v : A} → ValBurst (value v ∷ [])
+  vb∷ : {v : A} {es : List (Ev A)} → ValBurst es → ValBurst (value v ∷ es)
 
 data Block {A : Set} (p : Prov) : List (Delivery A) → Set where
   bk[] : Block p []
@@ -265,15 +429,15 @@ run-block-ne : {A : Set} (tn : Prov → ℕ) (p : Prov) (es : List (Ev A))
   → ValBurst es → Block p ds′ → suc (length ds′) ≡ tn p
   → runMem (mem tn nothing) (((p , es) ∷ ds′) ++ rest)
     ≡ (valsOf es ++ delVals ds′) ∷ runMem (mem tn nothing) rest
-run-block-ne tn p (val v ∷ []) [] rest vb1 bk[] len
+run-block-ne tn p (value v ∷ []) [] rest vb1 bk[] len
   rewrite sym len = refl
-run-block-ne tn p (val v ∷ es′) [] rest (vb∷ vb′) bk[] len
+run-block-ne tn p (value v ∷ es′) [] rest (vb∷ vb′) bk[] len
   rewrite sym len | applyEvs-vals {es = es′} tn vb′
         | ++-nil (valsOf es′) = refl
-run-block-ne tn p (val v ∷ []) (d″ ∷ ds″) rest vb1 bk′ len
+run-block-ne tn p (value v ∷ []) (d″ ∷ ds″) rest vb1 bk′ len
   rewrite sym len
   = drain tn p (length ds″) v [] (d″ ∷ ds″) rest bk′ refl
-run-block-ne tn p (val v ∷ es′) (d″ ∷ ds″) rest (vb∷ vb′) bk′ len
+run-block-ne tn p (value v ∷ es′) (d″ ∷ ds″) rest (vb∷ vb′) bk′ len
   rewrite sym len | applyEvs-vals {es = es′} tn vb′
   = drain tn p (length ds″) v (valsOf es′) (d″ ∷ ds″) rest bk′ refl
 
@@ -385,12 +549,13 @@ endgame fr rs ot
 
 valsOf-++ : {A : Set} (es fs : List (Ev A))
   → valsOf (es ++ fs) ≡ valsOf es ++ valsOf fs
-valsOf-++ []           fs = refl
-valsOf-++ (reg p ∷ es) fs = valsOf-++ es fs
-valsOf-++ (val v ∷ es) fs = cong (_∷_ v) (valsOf-++ es fs)
-valsOf-++ (clo p ∷ es) fs = valsOf-++ es fs
+valsOf-++ []             fs = refl
+valsOf-++ (init p ∷ es)  fs = valsOf-++ es fs
+valsOf-++ (value v ∷ es) fs = cong (_∷_ v) (valsOf-++ es fs)
+valsOf-++ (close p ∷ es) fs = valsOf-++ es fs
+valsOf-++ (fin ∷ es)     fs = valsOf-++ es fs
 
-valsOf-vals : {A : Set} (vs : List A) → valsOf (map val vs) ≡ vs
+valsOf-vals : {A : Set} (vs : List A) → valsOf (map value vs) ≡ vs
 valsOf-vals []       = refl
 valsOf-vals (v ∷ vs) = cong (_∷_ v) (valsOf-vals vs)
 
@@ -406,7 +571,8 @@ emptyReacts (e ∷ d) = emptyReacts d
 frame-batch : {A : Set} (d : Driver A) (p q : Prov) (vs ws : List A)
   → machine (mergeP (ofP d p vs) (ofP d q ws)) ≡ consNE (vs ++ ws) []
 frame-batch d p q vs ws
-  rewrite valsOf-++ (map val vs) (reg q ∷ map val ws)
+  rewrite ++-nil (map (value {_}) ws)
+        | valsOf-++ (map value vs) (init q ∷ map value ws)
         | valsOf-vals vs
         | valsOf-vals ws
         | emptyReacts {_} d
@@ -425,10 +591,10 @@ diamond-run : {A : Set} (f : A → A) (i : ℕ) (p : Prov) (tn : Prov → ℕ)
       (concatMap (λ r → r)
         (zipConcat
           (map (λ jv → if eqℕ (fst jv) i
-                       then ((p , val (snd jv) ∷ []) ∷ []) else []) d)
+                       then ((p , value (snd jv) ∷ []) ∷ []) else []) d)
           (map (map (mapDel f))
             (map (λ jv → if eqℕ (fst jv) i
-                         then ((p , val (snd jv) ∷ []) ∷ []) else []) d))))
+                         then ((p , value (snd jv) ∷ []) ∷ []) else []) d))))
     ≡ diaB f i d
 diamond-run f i p tn [] tnp = refl
 diamond-run f i p tn ((j , v) ∷ d) tnp with eqℕ j i
@@ -463,7 +629,7 @@ protocol-diamond d p i f =
 --
 -- Counting design ratified with this model: registrations are counted per
 -- ROOT-CAUSE provenance. A share is counting-transparent — each subscriber
--- registers the ROOT subject feeding the share (reg j), fan-out deliveries
+-- registers the ROOT subject feeding the share (init j), fan-out deliveries
 -- travel with the root's provenance, and pure-cold flushes ride their
 -- trigger's window. The machine above needs no share-specific state.
 --
@@ -493,10 +659,10 @@ open ShareSrc public
 -- deliver one value to a live ref: the events it forwards, and whether it
 -- survives (a take budget of 1 emits the value and its own close together)
 recv1 : {A : Set} → Prov → A → LiveRef A → List (Ev A) × Maybe (LiveRef A)
-recv1 j v (f , nothing)             = val (f v) ∷ []         , just (f , nothing)
-recv1 j v (f , just zero)           = clo j ∷ []             , nothing
-recv1 j v (f , just (suc zero))     = val (f v) ∷ clo j ∷ [] , nothing
-recv1 j v (f , just (suc (suc n)))  = val (f v) ∷ []         , just (f , just (suc n))
+recv1 j v (f , nothing)             = value (f v) ∷ []         , just (f , nothing)
+recv1 j v (f , just zero)           = close j ∷ []             , nothing
+recv1 j v (f , just (suc zero))     = value (f v) ∷ close j ∷ [] , nothing
+recv1 j v (f , just (suc (suc n)))  = value (f v) ∷ []         , just (f , just (suc n))
 
 -- replay a cold prefix into one ref
 recvCold : {A : Set} → Prov → List A → LiveRef A → List (Ev A) × Maybe (LiveRef A)
@@ -526,11 +692,11 @@ fanout j v (r ∷ rs) =
 --   live source, subscribers present: hot join — register, replay nothing
 join : {A : Set} → ShareSrc A → List (LiveRef A) → LiveRef A
      → List (Ev A) × List (LiveRef A)
-join (sharesrc cold nothing)  live r = map val (valsOf (fst (recvCold 0 cold r))) , live
+join (sharesrc cold nothing)  live r = map value (valsOf (fst (recvCold 0 cold r))) , live
 join (sharesrc cold (just j)) []   r =
-  (reg j ∷ fst (recvCold j cold r)) , maybeCons (snd (recvCold j cold r)) []
+  (init j ∷ fst (recvCold j cold r)) , maybeCons (snd (recvCold j cold r)) []
 join (sharesrc cold (just j)) live@(_ ∷ _) r =
-  (reg j ∷ []) , live ++ (r ∷ [])
+  (init j ∷ []) , live ++ (r ∷ [])
 
 -- the frame: process frame subscribers (and spawned specs' trigger
 -- registrations) in pre-order — this IS registration order for statics
@@ -538,7 +704,7 @@ frameGo : {A : Set} → ShareSrc A → List (Spec A) → List (LiveRef A)
         → List (Ev A) × List (LiveRef A)
 frameGo src []                     live = [] , live
 frameGo src ((just t  , r) ∷ ss)   live =
-  (reg t ∷ fst (frameGo src ss live)) , snd (frameGo src ss live)
+  (init t ∷ fst (frameGo src ss live)) , snd (frameGo src ss live)
 frameGo src ((nothing , r) ∷ ss)   live =
   (fst (join src live r) ++ fst (frameGo src ss (snd (join src live r)))) ,
   snd (frameGo src ss (snd (join src live r)))
@@ -625,7 +791,7 @@ reset-replay = refl
 -- above; a postulate that cannot be proven as stated is a spec bug and
 -- must be reworked, not worked around.
 
-open import Obs
+open import Obs using (Obs; obs; emits)
 open import Burst using (Exp; ⟦_⟧; Val) renaming (Env to BEnv)
 
 -- pointwise sum of registration counts (merging arms ADDS their counts)
@@ -802,6 +968,15 @@ postulate
     → Canonical e
     → stamp (traceOf e d) ≡ emits (⟦ e ⟧ (envOf d) t₀)
 
+  -- HOLES (the serial-join primitives, protocol side): definable over
+  -- Trace (Trace A) — concatAllP advances on fin, grafting the queued
+  -- inner's frame into the fin-carrying delivery; switchAllP cuts the
+  -- live inner, closing its registrations; exhaustAllP drops arrivals
+  -- while one is open. The derived forms below and traceOf consume them.
+  concatAllP  : {A : Set} → Trace (Trace A) → Trace A
+  switchAllP  : {A : Set} → Trace (Trace A) → Trace A
+  exhaustAllP : {A : Set} → Trace (Trace A) → Trace A
+
   -- HOLE (truncation-aware machine): an upstream take cutting a whole
   -- subtree MID-INSTANT closes registrations whose window slots are
   -- already owed; the refined machine shrinks the open window on closes
@@ -814,6 +989,10 @@ postulate
     → OkTrace tn rs
     → runMemCut (mem tn nothing) (concatMap (λ r → r) rs)
       ≡ runMem (mem tn nothing) (concatMap (λ r → r) rs)
+
+-- the derived serial forms — never primitives (each consumes its hole)
+concatP : {A : Set} → Trace A → Trace A → Trace A
+concatP T U = concatAllP (ofSP (T ∷ U ∷ []))
 
 -- OkTrace only reads the counts at its own blocks, so pointwise-equal
 -- registration counts are interchangeable
@@ -840,7 +1019,7 @@ fragment-endgame (tr fr rs) π tn is al h =
 -- the frame are count-invisible)
 add-two-regs : {A : Set} (p q r : Prov)
   → bump (λ _ → zero) p r + bump (λ _ → zero) q r
-    ≡ applyEvs {A} (λ _ → zero) (reg p ∷ reg q ∷ []) r
+    ≡ applyEvs {A} (λ _ → zero) (init p ∷ init q ∷ []) r
 add-two-regs p q r with eqℕ p r | eqℕ q r
 ... | true  | true  = refl
 ... | true  | false = refl
@@ -849,7 +1028,7 @@ add-two-regs p q r with eqℕ p r | eqℕ q r
 
 applyEvs-valskip : {A : Set} (tn : Prov → ℕ) (vs : List A)
   (es : List (Ev A))
-  → applyEvs tn (map val vs ++ es) ≡ applyEvs tn es
+  → applyEvs tn (map value vs ++ es) ≡ applyEvs tn es
 applyEvs-valskip tn []       es = refl
 applyEvs-valskip tn (v ∷ vs) es = applyEvs-valskip tn vs es
 
@@ -890,7 +1069,7 @@ of-subject-endgame {A} π inj d p vs i h =
     (λ r → trans (add-two-regs {A} p (π i) r)
              (cong (λ g → g r)
                (sym (applyEvs-valskip (bump (λ _ → zero) p) vs
-                      (reg (π i) ∷ [])))))
+                      (init (π i) ∷ [])))))
 
 -- THE FULL ENDGAME, as a value: the machine, fed the protocol behavior of
 -- ANY canonical Burst program, produces exactly the batches the ratified
