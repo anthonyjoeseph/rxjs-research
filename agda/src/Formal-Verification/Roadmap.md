@@ -27,7 +27,7 @@ them, written for whoever picks the work up.
 - **No dangling definitions or postulates.** Everything must be consumed by
   the proof of `formal-verification` (or be a `refl` instance guarding it).
   When you decompose a postulate, the new finer postulates must be consumed
-  by a *defined* value replacing the old one.
+  by a _defined_ value replacing the old one.
 - **Delete superseded code outright.** Git history is the archive.
 - **refl tripwires after every step.** Both sides compute. After ANY change,
   the instance suite at the bottom of `Main-Theorem.agda` must still pass —
@@ -42,7 +42,7 @@ them, written for whoever picks the work up.
   its well-formedness proofs — already transcribed into `Spec/`),
   `Protocol.agda` (trace validity, share lives, ranked delivery, the
   counting endgame for fragments), `BatchImpl.agda`. When a proof below
-  feels hard, find its v1 counterpart and transcribe the *idea*.
+  feels hard, find its v1 counterpart and transcribe the _idea_.
 
 ## 1. The shape of the whole proof
 
@@ -87,7 +87,7 @@ of the BItems so far, and the outputs so far are the collected flushes.
 Watch out:
 
 - `mergeMapRx (λ m → ofMaybe (cFlush m))`'s state holds a list of running
-  `ofMaybe` machines — they are all *dead* after their spawn step (ofRx's
+  `ofMaybe` machines — they are all _dead_ after their spawn step (ofRx's
   Bool state flips to true and they emit nothing ever after). You will
   need a small invariant: "every running inner in the mergeMap state is
   spent" (emits `[]` on every input). Prove that as its own lemma about
@@ -108,7 +108,7 @@ conditions; write them down as the definition of `Accounted`. Candidate
 content (from reading `stepI`/`bStep` and v1's `Protocol.agda`):
 
 - Group 0 (the frame) is unconstrained — `frameStepI` flushes it whole.
-- For each later group `g` with any values: its emits form a *block* such
+- For each later group `g` with any values: its emits form a _block_ such
   that, starting from the registration totals accumulated over all prior
   groups, the window logic (`owedStart` = count of the first emit's root,
   minus one per emit, plus `init`s/`close`s as they pass) reaches ≤ 1

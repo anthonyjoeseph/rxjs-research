@@ -178,6 +178,18 @@ upTo : ℕ → List ℕ
 upTo zero    = []
 upTo (suc n) = 0 ∷ map suc (upTo n)
 
+-- drop the first n elements
+drop : {A : Set} → ℕ → List A → List A
+drop zero    xs       = xs
+drop (suc n) []       = []
+drop (suc n) (x ∷ xs) = drop n xs
+
+-- index with a default (total; the default is never reached below length)
+at : {A : Set} → ℕ → List A → A → A
+at _       []       d = d
+at zero    (x ∷ _)  d = x
+at (suc n) (_ ∷ xs) d = at n xs d
+
 -- large lists (for collections of machines, which live in Set₁)
 data List₁ (A : Set₁) : Set₁ where
   []  : List₁ A
