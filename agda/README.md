@@ -70,24 +70,79 @@ in the file. Resetting shares are layer-2 territory:
 
 ### Layer 2: the protocol and the counting machine (Protocol.agda)
 
-What the machinery actually sees, with **no timestamp anywhere in the
-types**:
+This layer models what the machinery actually sees, with **no timestamp
+anywhere in the types**. Its three core types — `Driver`, `Delivery`,
+`Trace` — are abstractions of concrete rxjs happenings. Take the diamond:
+
+```ts
+const s = new InstantSubject<number>(); // one root subject; call its provenance p
+const doubled = s.pipe(map((n) => n * 2));
+
+merge(s, doubled)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+
+s.next(5); // logs [5, 10]
+```
+
+**`Driver A = List (ℕ × A)`** — everything the outside world does to the
+program after subscribing it: the schedule of subject firings, in order,
+each entry naming a subject slot and a value. The run above is the driver
+`(0 , 5) ∷ []` — slot 0 fired once with 5. One driver entry = one
+`.next()` call = one instant; the driver is where "time" lives, and it
+never enters the protocol itself.
+
+**`Delivery A = Prov × List (Ev A)`** — what ONE downstream `next` callback
+invocation carries between operators (the TypeScript `InstEmit
+{ provenance, events }`). When `s.next(5)` runs, the merge's subscriber's
+`next` fires TWICE — once through each live subscription of `s` — so the
+instant consists of two deliveries, both headed by `s`'s root provenance:
 
 ```
-reg p    a subscription chain of ROOT provenance p came alive
-val v    a value
-clo p    a registration of root p ended (take cuts)
+(p , [ value 5  ])     -- through the direct arm
+(p , [ value 10 ])     -- through the map arm
 ```
 
-A `Delivery` is what one downstream `.next()` carries (the root provenance
-it travels through, plus its events); a `Trace` is the subscription frame
-plus, per driver event, the deliveries a program responds with. The
-**machine** is the provenance memory as a pure fold: `totalNum` counts live
-registrations per root (from reg/clo events alone), a delivery arriving with
-no window open opens its instant owing `totalNum p` deliveries, the window
-drains one per delivery and flushes at zero. The machine's input is the
-*flattened* delivery list — the per-event grouping is erased, and the
-theorem says counting alone recovers it:
+The events inside are the four `InstEv` kinds, each an rxjs happening:
+
+```
+init p    a subscription of root p came alive     (rxjs: .subscribe reached a source)
+value v   a value                                 (rxjs: a next callback's payload)
+close p   a registration of root p ended          (rxjs: take cut a chain, switch switched away)
+fin       the stream completes with this delivery (rxjs: complete — carried IN-BAND so
+                                                   completion cascades stay in their instant)
+```
+
+A delivery can carry several events at once because operators COALESCE:
+everything one incoming delivery causes rides the one outgoing delivery.
+`mergeMap((n) => of([n * 10]))(s)` reacting to `s.next(5)` forwards the
+single delivery `(p , [ value 50 ])` — the trigger value was consumed, the
+spawned inner's synchronous flush rides in its place. A spawned
+*subscription* is the same story with an `init`:
+`mergeMap(() => other)(s)` forwards `(p , [ init q ])` — the new
+registration of root `q`, announced inside the instant that caused it.
+
+**`Trace A`** — one program's complete observable behavior over one driver
+run: the `frame` (every event delivered synchronously during the
+`subscribe()` call — the burst, one instant by definition) and `reacts`,
+one list of deliveries per driver entry. The diamond's trace for the run
+above is literally:
+
+```
+frame  = init p ∷ init p ∷ []                             -- two subscriptions of s
+reacts = ((p , value 5 ∷ []) ∷ (p , value 10 ∷ []) ∷ [])  -- the response to (0 , 5)
+       ∷ []
+```
+
+Now the whole game in one sentence: the grouping of `reacts` by driver
+entry is knowledge only the referee has — the real machinery receives the
+FLATTENED delivery stream (rxjs hands you one `next` at a time, never "this
+instant is over") — and the **machine** must recover the grouping by
+counting. It is the provenance memory as a pure fold: the frame's `init`s
+make `totalNum p ≡ 2`; the first delivery of an instant opens a window
+owing `totalNum p` deliveries; each delivery drains one slot; at zero,
+flush — `[5, 10]`, no clock consulted. The theorem says counting alone
+always recovers what the flattening erased:
 
 ```agda
 endgame : OkTrace (applyEvs (λ _ → zero) fr) rs
@@ -95,11 +150,16 @@ endgame : OkTrace (applyEvs (λ _ → zero) fr) rs
 ```
 
 `OkTrace` is the truthfulness invariant — *"recorded multiplicity equals
-live registrations"*, as a datatype — and `stamp` is the referee's view of
-the same trace. The corollaries `frame-batch` and `protocol-diamond` show
-the two headline behaviors decided by pure counting (two registrations in
-the frame make `totalNum ≡ 2`, so a subject firing drains a two-slot window
-into one batch).
+live registrations"*, as a datatype. `stamp` is the referee's view of the
+same trace: it re-attaches the clock the driver defines (frame values at
+`t₀`, driver entry k's values at tick k+1) and hands the result to layer
+1's `batchSpec`. The diamond's trace stamps to
+`((1 , 0) , 5) ∷ ((1 , 0) , 10) ∷ []`, which batches to one group —
+exactly what the machine computed blind. The corollaries `frame-batch` and
+`protocol-diamond` show the two headline behaviors decided by pure
+counting, and `THE-ENDGAME` states the same equation over the full Burst
+grammar (a proof term whose remaining gaps are named postulates — see
+"Open edges").
 
 **Share lives** (ratified 2026-07-07, confirmed against rxjs 7): a share
 resets when its source completes or its refcount drains to zero, and a
