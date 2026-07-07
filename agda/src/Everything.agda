@@ -1,12 +1,10 @@
--- Typecheck the whole development: agda src/Everything.agda
+-- Typecheck the whole development.
 module Everything where
 
 import Prelude
-import Time
-import TimedObs
-import Sorting
-import Diamond
-import Obs
-import BatchImpl
-import Burst
-import Protocol
+import Shared-Types
+import Spec.MonotonicList
+import Spec.Batch-Simultaneous
+import Implementation.Naive-Rx
+import Implementation.Batch-Simultaneous
+import Formal-Verification
