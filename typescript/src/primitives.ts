@@ -342,287 +342,258 @@ export const mergeAll = <A>(
     r.mergeMap((s) => (s.out === null ? r.EMPTY : r.of(s.out))),
   );
 
-/** concatAll: one inner live at a time; arrivals during a live inner
- * QUEUE; when the live inner FINISHES, the next queued inner subscribes at
- * the closing instant — its flush grafted into the fin-carrying emit, so
- * the final value, the closes, and the queued inner's flush are ONE
- * instant (Agda's concatAllT). */
+/** the serial joins share one architecture: r.connect multicasts the
+ * single outer subscription into a trigger branch and an inner branch —
+ * the inner branch routed through the NATIVE rxjs flattening operator
+ * whose subscription policy IS the semantics (concatMap queues, switchMap
+ * cuts, exhaustMap drops) — and a pure scan reassembles emits, HOLDING an
+ * open group exactly while more synchronous flushes are guaranteed to
+ * follow (advancement flushes ride the fin-carrying emit; spawn flushes
+ * ride their trigger). */
+const serialItems =
+  <A>(
+    flatten: (
+      project: (inner: Instantaneous<A>) => r.Observable<JoinItem<A>>,
+    ) => r.OperatorFunction<Instantaneous<A>, JoinItem<A>>,
+  ) =>
+  (outer: Instantaneous<Instantaneous<A>>): r.Observable<JoinItem<A>> =>
+    outer.pipe(
+      r.connect((sh) =>
+        r.merge(
+          sh.pipe(r.map((e) => triggerItem<A>(e, values(e.events).length))),
+          sh.pipe(
+            r.mergeMap((e) => r.from(values(e.events))),
+            flatten(innerItems),
+          ),
+        ),
+      ),
+    );
+
+type SerialState<A> = {
+  /** an emit being assembled, awaiting guaranteed-synchronous flushes */
+  readonly holding: { readonly prov: number; readonly buf: readonly InstEv<A>[] } | null;
+  /** arrivals not yet started (concat: queued; switch/exhaust: burst countdown) */
+  readonly queued: number;
+  /** the live inner's fin status and (for switch) its registration balance */
+  readonly currentOpen: boolean;
+  readonly curRegs: Readonly<Record<number, number>>;
+  readonly outerDone: boolean;
+  readonly closed: boolean;
+  readonly out: InstEmit<A> | null;
+};
+
+const serialSeed = <A>(): SerialState<A> => ({
+  holding: null,
+  queued: 0,
+  currentOpen: false,
+  curRegs: {},
+  outerDone: false,
+  closed: false,
+  out: null,
+});
+
+const trackRegs = <A>(
+  regs: Readonly<Record<number, number>>,
+  events: readonly InstEv<A>[],
+): Readonly<Record<number, number>> =>
+  events.reduce(
+    (rs, ev) =>
+      ev.type === "init"
+        ? { ...rs, [ev.provenance]: (rs[ev.provenance] ?? 0) + 1 }
+        : ev.type === "close"
+          ? { ...rs, [ev.provenance]: Math.max(0, (rs[ev.provenance] ?? 0) - 1) }
+          : rs,
+    regs,
+  );
+
+const closesFor = <A>(
+  regs: Readonly<Record<number, number>>,
+): InstEv<A>[] =>
+  Object.entries(regs).flatMap(([p, c]) =>
+    Array.from({ length: c }, () => close(Number(p))),
+  );
+
+/** finalize the held emit; the join fins when the outer is done and
+ * nothing is live or queued */
+const finalize = <A>(
+  s: SerialState<A>,
+  extra: { currentOpen: boolean; queued: number; outerDone: boolean },
+): SerialState<A> => {
+  const h = s.holding;
+  if (h === null) return { ...s, ...extra, out: null };
+  const fins =
+    extra.outerDone && !extra.currentOpen && extra.queued === 0 && !s.closed;
+  return {
+    ...s,
+    ...extra,
+    holding: null,
+    closed: s.closed || fins,
+    out: { provenance: h.prov, events: fins ? [...h.buf, fin] : [...h.buf] },
+  };
+};
+
+const runSerial =
+  <A>(step: (s: SerialState<A>, item: JoinItem<A>) => SerialState<A>) =>
+  (items: r.Observable<JoinItem<A>>): Instantaneous<A> =>
+    items.pipe(
+      r.scan(step, serialSeed<A>()),
+      r.takeWhile((s) => !s.closed, true),
+      r.mergeMap((s) => (s.out === null ? r.EMPTY : r.of(s.out))),
+    );
+
+/** concatAll (Agda: the concatAllP hole): one inner live at a time;
+ * arrivals during a live inner QUEUE (concatMap, natively); when the live
+ * inner FINISHES, the queued inner's flush is grafted into the
+ * fin-carrying emit — one instant. */
 export const concatAll = <A>(
   outer: Instantaneous<Instantaneous<A>>,
 ): Instantaneous<A> =>
-  new r.Observable((sub) => {
-    let outerDone = false;
-    let closed = false;
-    let currentOpen = false;
-    let currentSub: r.Subscription | null = null;
-    const queue: Instantaneous<A>[] = [];
+  runSerial<A>((s, item) => {
+    if (item.t === "trigger") {
+      const queued = s.queued + item.spawns;
+      const outerDone = s.outerDone || item.outerFin;
+      const held = { prov: item.provenance, buf: item.others };
+      if (s.currentOpen || item.spawns === 0)
+        // nothing advances now: the arrivals just queue (or none came)
+        return finalize(
+          { ...s, holding: held },
+          { currentOpen: s.currentOpen, queued, outerDone },
+        );
+      // idle: the first inner's flush follows synchronously — hold
+      return { ...s, holding: held, queued, outerDone, out: null };
+    }
+    if (item.t === "flush") {
+      const queued = s.queued - 1;
+      const buf = [...(s.holding?.buf ?? []), ...item.events];
+      const held = { prov: s.holding?.prov ?? COLD, buf };
+      if (item.finned && queued > 0)
+        // this inner finished synchronously and another is queued: its
+        // flush follows synchronously — keep holding
+        return { ...s, holding: held, queued, out: null };
+      return finalize(
+        { ...s, holding: held },
+        { currentOpen: !item.finned, queued, outerDone: s.outerDone },
+      );
+    }
+    // the live inner's later emit
+    if (!hasFin(item.e)) return { ...s, out: item.e };
+    const events = item.e.events.filter((ev) => ev.type !== "fin");
+    const held = { prov: item.e.provenance, buf: events };
+    if (s.queued > 0)
+      // advancement: the next queued inner's flush follows synchronously
+      return { ...s, holding: held, currentOpen: false, out: null };
+    return finalize(
+      { ...s, holding: held },
+      { currentOpen: false, queued: 0, outerDone: s.outerDone },
+    );
+  })(serialItems<A>((project) => r.concatMap(project))(outer));
 
-    const maybeFinish = (out: InstEv<A>[] | null): boolean => {
-      if (outerDone && !currentOpen && queue.length === 0 && !closed) {
-        closed = true;
-        if (out !== null) out.push(fin);
-        return true;
-      }
-      return false;
-    };
-
-    const runInner = (inner: Instantaneous<A>, out: InstEv<A>[]): void => {
-      currentOpen = true;
-      let finnedInFlush = false;
-      let inFlush = true;
-      const s = inner.subscribe({
-        next(e) {
-          if (inFlush) {
-            if (hasFin(e)) finnedInFlush = true;
-            out.push(...e.events.filter((ev) => ev.type !== "fin"));
-            return;
-          }
-          if (!hasFin(e)) {
-            sub.next(e);
-            return;
-          }
-          // the live inner finishes asynchronously: advance INTO this emit
-          const events = e.events.filter((ev) => ev.type !== "fin");
-          currentOpen = false;
-          advance(events);
-          const finishes = maybeFinish(events);
-          sub.next({ provenance: e.provenance, events });
-          if (finishes) sub.complete();
-        },
-        error: (err) => sub.error(err),
-        complete() {
-          /* completion is bookkept via the fin emit */
-        },
-      });
-      inFlush = false;
-      if (finnedInFlush) currentOpen = false;
-      else currentSub = s;
-    };
-
-    const advance = (out: InstEv<A>[]): void => {
-      while (!currentOpen && queue.length > 0) {
-        runInner(queue.shift() as Instantaneous<A>, out);
-      }
-    };
-
-    const o = outer.subscribe({
-      next(e) {
-        const out: InstEv<A>[] = [];
-        for (const ev of e.events) {
-          if (ev.type === "value") {
-            if (currentOpen) queue.push(ev.value);
-            else {
-              runInner(ev.value, out);
-              advance(out);
-            }
-          } else if (ev.type === "fin") outerDone = true;
-          else out.push(ev);
-        }
-        const finishes = maybeFinish(out);
-        sub.next({ provenance: e.provenance, events: out });
-        if (finishes) sub.complete();
-      },
-      error: (err) => sub.error(err),
-      complete() {
-        outerDone = true;
-        if (maybeFinish(null)) sub.complete();
-      },
-    });
-
-    return () => {
-      o.unsubscribe();
-      currentSub?.unsubscribe();
-    };
-  });
-
-/** switchAll: a new arrival CUTS the live inner — its async tail dies, and
- * closes are synthesized for the registrations it passed downstream (batch
- * accounting must know its slots died). Every inner still gets its
- * subscription frame (sync values pass before the next burst arrival cuts
- * it). The outer completing does NOT kill the live inner. */
+/** switchAll (Agda: the switchAllP hole): a new arrival CUTS the live
+ * inner (switchMap, natively) — closes are synthesized for the cut
+ * inner's registrations, riding the switching trigger's emit; every inner
+ * still gets its subscription frame; the outer completing does not kill
+ * the live inner. */
 export const switchAll = <A>(
   outer: Instantaneous<Instantaneous<A>>,
 ): Instantaneous<A> =>
-  new r.Observable((sub) => {
-    let outerDone = false;
-    let closed = false;
-    type Cur = {
-      s: r.Subscription | null;
-      regs: Map<number, number>;
-      cut: boolean;
-      finned: boolean;
-    };
-    let cur: Cur | null = null;
-
-    const cutCurrent = (out: InstEv<A>[]): void => {
-      if (cur !== null && !cur.finned) {
-        cur.cut = true;
-        cur.s?.unsubscribe();
-        for (const [p, c] of cur.regs)
-          for (let k = 0; k < c; k++) out.push(close(p));
+  runSerial<A>((s, item) => {
+    if (item.t === "trigger") {
+      const outerDone = s.outerDone || item.outerFin;
+      const cuts =
+        item.spawns > 0 && s.currentOpen ? closesFor<A>(s.curRegs) : [];
+      const held = { prov: item.provenance, buf: [...item.others, ...cuts] };
+      if (item.spawns === 0)
+        return finalize(
+          { ...s, holding: held },
+          { currentOpen: s.currentOpen, queued: 0, outerDone },
+        );
+      // the new inner's flush follows synchronously — hold; queued counts
+      // the burst down (each spawn's flush cuts its predecessor)
+      return {
+        ...s,
+        holding: held,
+        queued: item.spawns,
+        currentOpen: false,
+        curRegs: {},
+        outerDone,
+        out: null,
+      };
+    }
+    if (item.t === "flush") {
+      const queued = s.queued - 1;
+      const regs = trackRegs<A>({}, item.events);
+      if (queued > 0) {
+        // a later burst sibling follows synchronously and cuts THIS one
+        const cuts = item.finned ? [] : closesFor<A>(regs);
+        const held = {
+          prov: s.holding?.prov ?? COLD,
+          buf: [...(s.holding?.buf ?? []), ...item.events, ...cuts],
+        };
+        return { ...s, holding: held, queued, curRegs: {}, out: null };
       }
-      cur = null;
-    };
+      const held = {
+        prov: s.holding?.prov ?? COLD,
+        buf: [...(s.holding?.buf ?? []), ...item.events],
+      };
+      return finalize(
+        { ...s, holding: held, curRegs: item.finned ? {} : regs },
+        { currentOpen: !item.finned, queued: 0, outerDone: s.outerDone },
+      );
+    }
+    // the live inner's later emit
+    const curRegs = trackRegs(s.curRegs, item.e.events);
+    if (!hasFin(item.e)) return { ...s, curRegs, out: item.e };
+    const events = item.e.events.filter((ev) => ev.type !== "fin");
+    const held = { prov: item.e.provenance, buf: events };
+    return finalize(
+      { ...s, holding: held, curRegs: {} },
+      { currentOpen: false, queued: 0, outerDone: s.outerDone },
+    );
+  })(serialItems<A>((project) => r.switchMap(project))(outer));
 
-    const spawn = (inner: Instantaneous<A>, out: InstEv<A>[]): void => {
-      const state: Cur = { s: null, regs: new Map(), cut: false, finned: false };
-      cur = state;
-      let inFlush = true;
-      const s = inner.subscribe({
-        next(e) {
-          if (state.cut) return;
-          for (const ev of e.events) {
-            if (ev.type === "init") bumpCount(state.regs, ev.provenance, 1);
-            else if (ev.type === "close")
-              bumpCount(state.regs, ev.provenance, -1);
-          }
-          if (inFlush) {
-            if (hasFin(e)) state.finned = true;
-            out.push(...e.events.filter((ev) => ev.type !== "fin"));
-            return;
-          }
-          if (!hasFin(e)) {
-            sub.next(e);
-            return;
-          }
-          state.finned = true;
-          const events = e.events.filter((ev) => ev.type !== "fin");
-          if (outerDone && !closed) {
-            closed = true;
-            sub.next({ provenance: e.provenance, events: [...events, fin] });
-            sub.complete();
-          } else {
-            sub.next({ provenance: e.provenance, events });
-          }
-        },
-        error: (err) => sub.error(err),
-        complete() {
-          /* bookkept via fin */
-        },
-      });
-      state.s = s;
-      inFlush = false;
-    };
-
-    const o = outer.subscribe({
-      next(e) {
-        const out: InstEv<A>[] = [];
-        for (const ev of e.events) {
-          if (ev.type === "value") {
-            cutCurrent(out);
-            spawn(ev.value, out);
-          } else if (ev.type === "fin") outerDone = true;
-          else out.push(ev);
-        }
-        let finishes = false;
-        if (outerDone && (cur === null || cur.finned) && !closed) {
-          closed = true;
-          finishes = true;
-          out.push(fin);
-        }
-        sub.next({ provenance: e.provenance, events: out });
-        if (finishes) sub.complete();
-      },
-      error: (err) => sub.error(err),
-      complete() {
-        outerDone = true;
-        if ((cur === null || cur.finned) && !closed) {
-          closed = true;
-          sub.complete();
-        }
-      },
-    });
-
-    return () => {
-      o.unsubscribe();
-      cur?.s?.unsubscribe();
-    };
-  });
-
-/** exhaustAll: an arrival is dropped only while the previously accepted
- * inner is STILL OPEN — a synchronous inner finishes immediately and frees
- * the slot, so of-then-of runs both. A dropped arrival is emptied, never
- * swallowed (its emit still forwards, valueless). */
+/** exhaustAll (Agda: the exhaustAllP hole): an arrival is dropped only
+ * while the previously accepted inner is STILL OPEN (exhaustMap,
+ * natively — fin makes our completion match rxjs's); a synchronous inner
+ * frees the slot, so of-then-of runs both. Dropped arrivals are emptied,
+ * never swallowed. */
 export const exhaustAll = <A>(
   outer: Instantaneous<Instantaneous<A>>,
 ): Instantaneous<A> =>
-  new r.Observable((sub) => {
-    let outerDone = false;
-    let closed = false;
-    let curOpen = false;
-    let curSub: r.Subscription | null = null;
-
-    const spawn = (inner: Instantaneous<A>, out: InstEv<A>[]): void => {
-      let finned = false;
-      let inFlush = true;
-      const s = inner.subscribe({
-        next(e) {
-          if (inFlush) {
-            if (hasFin(e)) finned = true;
-            out.push(...e.events.filter((ev) => ev.type !== "fin"));
-            return;
-          }
-          if (!hasFin(e)) {
-            sub.next(e);
-            return;
-          }
-          finned = true;
-          curOpen = false;
-          const events = e.events.filter((ev) => ev.type !== "fin");
-          if (outerDone && !closed) {
-            closed = true;
-            sub.next({ provenance: e.provenance, events: [...events, fin] });
-            sub.complete();
-          } else {
-            sub.next({ provenance: e.provenance, events });
-          }
-        },
-        error: (err) => sub.error(err),
-        complete() {
-          /* bookkept via fin */
-        },
-      });
-      inFlush = false;
-      if (!finned) {
-        curOpen = true;
-        curSub = s;
-      }
-    };
-
-    const o = outer.subscribe({
-      next(e) {
-        const out: InstEv<A>[] = [];
-        for (const ev of e.events) {
-          if (ev.type === "value") {
-            if (!curOpen) spawn(ev.value, out);
-            // else: dropped — the emit still forwards, emptied
-          } else if (ev.type === "fin") outerDone = true;
-          else out.push(ev);
-        }
-        let finishes = false;
-        if (outerDone && !curOpen && !closed) {
-          closed = true;
-          finishes = true;
-          out.push(fin);
-        }
-        sub.next({ provenance: e.provenance, events: out });
-        if (finishes) sub.complete();
-      },
-      error: (err) => sub.error(err),
-      complete() {
-        outerDone = true;
-        if (!curOpen && !closed) {
-          closed = true;
-          sub.complete();
-        }
-      },
-    });
-
-    return () => {
-      o.unsubscribe();
-      curSub?.unsubscribe();
-    };
-  });
+  runSerial<A>((s, item) => {
+    if (item.t === "trigger") {
+      const outerDone = s.outerDone || item.outerFin;
+      const held = { prov: item.provenance, buf: item.others };
+      if (s.currentOpen || item.spawns === 0)
+        // all arrivals dropped (or none): the emit forwards, emptied
+        return finalize(
+          { ...s, holding: held },
+          { currentOpen: s.currentOpen, queued: 0, outerDone },
+        );
+      // the first arrival is accepted: its flush follows synchronously
+      return { ...s, holding: held, queued: item.spawns, outerDone, out: null };
+    }
+    if (item.t === "flush") {
+      const queued = s.queued - 1;
+      const buf = [...(s.holding?.buf ?? []), ...item.events];
+      const held = { prov: s.holding?.prov ?? COLD, buf };
+      if (item.finned && queued > 0)
+        // it finished synchronously, so the next burst arrival is
+        // accepted: its flush follows synchronously — keep holding
+        return { ...s, holding: held, queued, out: null };
+      return finalize(
+        { ...s, holding: held },
+        { currentOpen: !item.finned, queued: 0, outerDone: s.outerDone },
+      );
+    }
+    // the live inner's later emit
+    if (!hasFin(item.e)) return { ...s, out: item.e };
+    const events = item.e.events.filter((ev) => ev.type !== "fin");
+    const held = { prov: item.e.provenance, buf: events };
+    return finalize(
+      { ...s, holding: held },
+      { currentOpen: false, queued: 0, outerDone: s.outerDone },
+    );
+  })(serialItems<A>((project) => r.exhaustMap(project))(outer));
 
 /** share, with rxjs LIVES (ratified 2026-07-07): connect on first
  * subscriber, reset when the source completes or the refcount drains to
@@ -632,43 +603,48 @@ export const exhaustAll = <A>(
  * the share (the connecting subscriber's registrations flow through the
  * connection frame itself). */
 export const share = <A>(src: Instantaneous<A>): Instantaneous<A> => {
-  // live root registrations seen through the current connection
-  let roots = new Map<number, number>();
+  // the share is the inherently stateful primitive (multicast + lives),
+  // like the subject — everything else in this file is a pure fold; its
+  // wiring is still combinator-only (defer/merge/finalize, no subscribe)
+  let roots: Readonly<Record<number, number>> = {};
   let connected = false;
+  let refCount = 0;
   const reset = (): void => {
     connected = false;
-    roots = new Map();
+    roots = {};
   };
   const shared = src.pipe(
     r.tap({
       next: (e) => {
-        for (const ev of e.events) {
-          if (ev.type === "init") bumpCount(roots, ev.provenance, 1);
-          else if (ev.type === "close") bumpCount(roots, ev.provenance, -1);
-        }
+        roots = trackRegs(roots, e.events);
       },
       complete: reset,
     }),
     r.share(),
   );
-  let refCount = 0;
-  return new r.Observable((sub) => {
+  return r.defer(() => {
     const late = connected;
     connected = true;
     refCount++;
-    if (late) {
-      // registration-only replay: a late subscriber taps the same roots
-      const events: InstEv<A>[] = [];
-      for (const [p, c] of roots)
-        for (let i = 0; i < c; i++) events.push(init(p));
-      if (events.length > 0) sub.next({ provenance: COLD, events });
-    }
-    const s = shared.subscribe(sub);
-    return () => {
-      s.unsubscribe();
-      refCount--;
-      if (refCount === 0) reset();
-    };
+    // registration-only replay: a late subscriber taps the same roots
+    const regs: InstEv<A>[] = late
+      ? Object.entries(roots).flatMap(([p, c]) =>
+          Array.from({ length: c }, () => init(Number(p))),
+        )
+      : [];
+    return r
+      .merge(
+        regs.length > 0
+          ? r.of({ provenance: COLD, events: regs })
+          : (r.EMPTY as r.Observable<InstEmit<A>>),
+        shared,
+      )
+      .pipe(
+        r.finalize(() => {
+          refCount--;
+          if (refCount === 0) reset();
+        }),
+      );
   });
 };
 

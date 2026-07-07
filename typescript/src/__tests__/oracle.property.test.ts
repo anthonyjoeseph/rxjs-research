@@ -175,17 +175,35 @@ const letShareArb: fc.Arbitrary<Exp> = fc
 const isCanonical = (root: Exp): boolean => {
   let lsCounter = 0;
   const occs: { id: string; delayed: boolean }[] = [];
+  // roots feeding a share: a DIRECT ref of a share's source inside the
+  // letShare body interleaves with the share's fan-out block in the flat
+  // model but delivers outside the block in reality (the ratified
+  // block-at-connection-rank rule) — outside the flat model's domain
+  const forbidden = new Set<string>();
+  let sawForbidden = false;
   const idOf = (slot: number, env: string[]): string =>
     slot < env.length ? env[slot] : `subj${slot - env.length}`;
+  const rootOf = (e: Exp, env: string[]): string | null =>
+    e.k === "shareRef"
+      ? idOf(e.slot, env)
+      : e.k === "map" || e.k === "scan" || e.k === "take"
+        ? rootOf(e.e, env)
+        : null;
   const walk = (e: Exp, env: string[], delayed: boolean): void => {
     switch (e.k) {
-      case "shareRef":
-        occs.push({ id: idOf(e.slot, env), delayed });
+      case "shareRef": {
+        const id = idOf(e.slot, env);
+        if (forbidden.has(id)) sawForbidden = true;
+        occs.push({ id, delayed });
         return;
+      }
       case "letShare": {
         const id = `ls${lsCounter++}`;
         walk(e.src, env, delayed);
+        const srcRoot = rootOf(e.src, env);
+        if (srcRoot !== null) forbidden.add(srcRoot);
         walk(e.body, [id, ...env], delayed);
+        if (srcRoot !== null) forbidden.delete(srcRoot);
         return;
       }
       case "map":
@@ -204,8 +222,11 @@ const isCanonical = (root: Exp): boolean => {
         } else {
           walk(e.s.e, env, delayed);
           const t = e.s.tmpl;
-          if (t.k === "refI")
-            occs.push({ id: idOf(t.slot, env), delayed: true });
+          if (t.k === "refI") {
+            const id = idOf(t.slot, env);
+            if (forbidden.has(id)) sawForbidden = true;
+            occs.push({ id, delayed: true });
+          }
         }
         return;
       }
@@ -215,6 +236,7 @@ const isCanonical = (root: Exp): boolean => {
     }
   };
   walk(root, [], false);
+  if (sawForbidden) return false;
   const delayedSeen = new Map<string, number>();
   for (const o of occs) {
     if (o.delayed)

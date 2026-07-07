@@ -274,6 +274,25 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
     expect(batches).toEqual([[1, 0]]);
   });
 
+  test("share fan-out is one block at the connection rank (flat model out of domain)", () => {
+    // merge(sharedRef, directSourceRef, sharedRef): the share connects at
+    // arm 1 and its subject fires BOTH refs consecutively there — the
+    // direct ref (registered second on the source) delivers after the
+    // whole block, even though its arm sits between the two share arms.
+    // The flat model would interleave by arm position ([1, 10, 1]); the
+    // ratified block rule (Burst.agda INTRA-BATCH ORDER, derived in
+    // Protocol.agda shareLives) says block first. Excluded from the
+    // oracle generator (direct source-refs inside letShare bodies).
+    const src = new InstantSubject<number>();
+    const shared = share(src.inst);
+    const { batches, done } = collect(
+      merge(shared, map((n: number) => n * 10)(src.inst), shared),
+    );
+    src.next(1);
+    done();
+    expect(batches).toEqual([[1, 1, 10]]);
+  });
+
   test("plain rxjs sanity mirror: share replay matches real rxjs", () => {
     // the behavior Anthony confirmed on 2026-07-07
     const shared = r.of(5).pipe(r.share());
