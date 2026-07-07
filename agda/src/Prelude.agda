@@ -24,6 +24,11 @@ data ℕ : Set where
   suc  : ℕ → ℕ
 {-# BUILTIN NATURAL ℕ #-}
 
+infixl 6 _+_
+_+_ : ℕ → ℕ → ℕ
+zero  + b = b
+suc a + b = suc (a + b)
+
 eqℕ : ℕ → ℕ → Bool
 eqℕ zero    zero    = true
 eqℕ zero    (suc _) = false

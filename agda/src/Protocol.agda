@@ -615,3 +615,125 @@ reset-replay : machine (shareLives (sharesrc (5 ∷ []) (just 0))
                  ((0 , 7) ∷ (1 , 9) ∷ (0 , 8) ∷ []))
                ≡ (5 ∷ []) ∷ (5 ∷ []) ∷ (8 ∷ []) ∷ []
 reset-replay = refl
+
+-- OPEN OBLIGATIONS, AS POSTULATES ------------------------------------------------
+--
+-- Everything still owed by this development is stated HERE, as typed
+-- postulates — the queue lives in the code, not in a side channel
+-- (ratified 2026-07-08). Discharging these precedes any further
+-- TypeScript work. Each postulate is believed true of the definitions
+-- above; a postulate that cannot be proven as stated is a spec bug and
+-- must be reworked, not worked around.
+
+open import Obs
+open import Burst using (Exp; ⟦_⟧; Val) renaming (Env to BEnv)
+
+-- pointwise sum of registration counts (merging arms ADDS their counts)
+addF : (Prov → ℕ) → (Prov → ℕ) → (Prov → ℕ)
+addF tn₁ tn₂ p = tn₁ p + tn₂ p
+
+-- OkTrace, refined per driver event: each event's response is a block of
+-- the FIRING SLOT's provenance (π : slot → prov) with truthful length —
+-- the shape the combinator lemmas compose over. Indexed by the driver's
+-- SLOT list (values are irrelevant to alignment, and this lets one
+-- alignment span a mapP's type change).
+data Aligned {A : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
+  : List ℕ → List (List (Delivery A)) → Set where
+  al[] : Aligned π tn [] []
+  al∷  : {i : ℕ} {is : List ℕ}
+         {r : List (Delivery A)} {rs : List (List (Delivery A))}
+       → Block (π i) r → length r ≡ tn (π i)
+       → Aligned π tn is rs
+       → Aligned π tn (i ∷ is) (r ∷ rs)
+
+slotsOf : {A : Set} → Driver A → List ℕ
+slotsOf = map fst
+
+-- the timed environment a driver induces (the referee's view of the
+-- roots): slot i's history at ticks 1.., closing after the drive, one
+-- slot at a time
+slotEmits : ℕ → ℕ → Driver Val → TimedObs Val
+slotEmits i k []             = []
+slotEmits i k ((j , v) ∷ d) =
+  if eqℕ j i
+  then (((suc k , 0) , v) ∷ slotEmits i (suc k) d)
+  else slotEmits i (suc k) d
+
+envOf : Driver Val → BEnv
+envOf d i = (t₀ , obs (slotEmits i 0 d) (suc (length d) + i , 0))
+
+postulate
+  -- (1) COMBINATOR PRESERVATION — truthfulness is compositional: every
+  -- program built from the fragment combinators produces Aligned traces,
+  -- and Aligned traces are OkTrace. mergeP ADDS registration counts and
+  -- CONCATENATES blocks: the diamond argument, by construction.
+  aligned-ok : {A : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
+    (is : List ℕ) (rs : List (List (Delivery A)))
+    → Aligned π tn is rs → OkTrace tn rs
+
+  subjectP-aligned : {A : Set} (π : ℕ → Prov)
+    → ((j k : ℕ) → eqℕ j k ≡ false → eqℕ (π j) (π k) ≡ false)
+    → (d : Driver A) (i : ℕ)
+    → Aligned π (bump (λ _ → zero) (π i)) (slotsOf d)
+              (reacts (subjectP d (π i) i))
+
+  ofP-aligned : {A : Set} (π : ℕ → Prov) (d : Driver A)
+    (p : Prov) (vs : List A)
+    → ((j : ℕ) → eqℕ (π j) p ≡ false)
+    → Aligned π (bump (λ _ → zero) p) (slotsOf d) (reacts (ofP d p vs))
+
+  mapP-aligned : {A B : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
+    (f : A → B) (is : List ℕ) (T : Trace A)
+    → Aligned π tn is (reacts T)
+    → Aligned π tn is (reacts (mapP f T))
+
+  mergeP-aligned : {A : Set} (π : ℕ → Prov) (tn₁ tn₂ : Prov → ℕ)
+    (is : List ℕ) (T U : Trace A)
+    → Aligned π tn₁ is (reacts T) → Aligned π tn₂ is (reacts U)
+    → Aligned π (addF tn₁ tn₂) is (reacts (mergeP T U))
+
+  -- (2) THE STAMP BRIDGE — the referee's view of a merged trace is the
+  -- timed merge of the referees' views: connects the protocol layer to
+  -- every mergeT theorem in Burst.agda/Diamond.agda
+  stamp-mergeP : {A : Set} (T U : Trace A)
+    → length (reacts T) ≡ length (reacts U)
+    → stamp (mergeP T U) ≡ mergeT (stamp T) (stamp U)
+
+  -- (3) SHARELIVES TRUTHFULNESS — the operational share model feeds the
+  -- machine truthful traces (so the endgame applies to it), for
+  -- well-formed configurations (trigger slots distinct from the tail
+  -- slot, budgets not interacting with cold replay, …) — formulating
+  -- WellFormedShare precisely is part of the obligation
+  WellFormedShare : {A : Set}
+    → ShareSrc A → List (Spec A) → Driver A → Set
+  shareLives-endgame : {A : Set} (src : ShareSrc A)
+    (specs : List (Spec A)) (d : Driver A)
+    → WellFormedShare src specs d
+    → machine (shareLives src specs d)
+      ≡ forgetT (batchSpec (stamp (shareLives src specs d)))
+
+  -- (4) THE FULL-GRAMMAR ENDGAME — a trace denotation for the whole Burst
+  -- grammar, agreeing with the machine on one side and the timed
+  -- denotation on the other. Canonical is the validity predicate
+  -- (registration-canonical trees, non-resetting shares — the domain the
+  -- flat referee decides; formulating it precisely is part of the
+  -- obligation, mirroring the TS oracle's isCanonical filter)
+  Canonical : Exp → Set
+  traceOf : Exp → Driver Val → Trace Val
+  endgame-full : (e : Exp) (d : Driver Val)
+    → Canonical e
+    → machine (traceOf e d)
+      ≡ forgetT (batchSpec (emits (⟦ e ⟧ (envOf d) t₀)))
+
+  -- (5) THE TRUNCATION-AWARE MACHINE — an upstream take cutting a whole
+  -- subtree MID-INSTANT closes registrations whose window slots are
+  -- already owed; the refined machine shrinks the open window on closes
+  -- of the window's own provenance (the one v5 behavior the burst
+  -- protocol does not carry yet). It must agree with runMem wherever no
+  -- mid-instant owner-close occurs.
+  runMemCut : {A : Set} → Mem A → List (Delivery A) → List (List A)
+  runMemCut-conservative : {A : Set} (tn : Prov → ℕ)
+    (rs : List (List (Delivery A)))
+    → OkTrace tn rs
+    → runMemCut (mem tn nothing) (concatMap (λ r → r) rs)
+      ≡ runMem (mem tn nothing) (concatMap (λ r → r) rs)
