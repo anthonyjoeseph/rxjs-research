@@ -10,12 +10,37 @@ formal-verification :
 ```
 
 Everything outside this folder is **fully defined** — the spec, the
-implementation, every Naive-Rx operator, `Canonical`, the bridge. The only
-postulates in the whole development are the seven in `Counting-Recovers.agda`
-(four: `counting-factors`, `Accounted`, `counting-groups`,
-`compile-accounted`) and `Trace-Faithful.agda` (three: `Tracks`,
-`tracks-compile`, `tracks-stamped`). This document is the plan for proving
-them, written for whoever picks the work up.
+implementation, every Naive-Rx operator, `Canonical`, the bridge.
+
+## STATUS (updated as postulates fall)
+
+**Four postulates remain**, down from seven:
+
+- ✅ `counting-factors` — **PROVEN** in `Counting-Factors.agda` (new
+  module). The whole mechanical machine-commutation half:
+  `mergeMap-oneshot` (mergeMap of one-shot `ofMaybe` inners = concatMap of
+  spawn-flushes) ∘ `scan-collect` (scan's running states, flushed, =
+  collectB) ∘ `batchSync-bItems` (batchSync+endWith serialize the grouped
+  trace into the `bItems` stream). The reification (`bItems`/`flushOf`/
+  `collectB`/`countBatches`) moved there too. Three enabling refactors,
+  all definitionally identical (refl suite intact): `ofMaybe` no longer
+  matches on its `Maybe` (so `State (ofMaybe mo) = Bool` for neutral mo,
+  killing a dependent-state block); `mergeMapRx`'s per-step `stepAll`/
+  `spawnAll` lifted to top-level `mmStepAll`/`mmSpawnAll`; `scanRx`'s
+  burst-fold lifted to top-level `scanBurst`. These lifted helpers are
+  reusable for the join cases of `tracks-compile`.
+- ✅ `Tracks` — **DEFINED** (was an abstract Set). `spawnFlatten` + the
+  ∀-position-j statement; three refl tripwires in `Trace-Faithful.agda`.
+- ✅ `tracks-stamped` — **PROVEN**: `tr 0 refl` (spawnFlatten em 0 ≡
+  flatten em by computation).
+- ⬜ `Accounted`, `counting-groups`, `compile-accounted`
+  (`Counting-Recovers.agda`) — the counting half's semantic core (§2.2,
+  §2.3 below).
+- ⬜ `tracks-compile` (`Trace-Faithful.agda`) — the grammar induction
+  (§3.2 below). This is the hardest remaining item.
+
+The plan below is written for whoever picks the rest up. §2.1
+(counting-factors) is done — kept for reference.
 
 ## 0. Ground rules (ratified, do not renegotiate)
 

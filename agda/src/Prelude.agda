@@ -153,6 +153,19 @@ map : {A B : Set} → (A → B) → List A → List B
 map f []       = []
 map f (x ∷ xs) = f x ∷ map f xs
 
+++-assoc : {A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ (ys ++ zs)
+++-assoc []       ys zs = refl
+++-assoc (x ∷ xs) ys zs = cong (x ∷_) (++-assoc xs ys zs)
+
+++-[] : {A : Set} (xs : List A) → xs ++ [] ≡ xs
+++-[] []       = refl
+++-[] (x ∷ xs) = cong (x ∷_) (++-[] xs)
+
+map-++ : {A B : Set} (f : A → B) (xs ys : List A)
+  → map f (xs ++ ys) ≡ map f xs ++ map f ys
+map-++ f []       ys = refl
+map-++ f (x ∷ xs) ys = cong (f x ∷_) (map-++ f xs ys)
+
 length : {A : Set} → List A → ℕ
 length []       = zero
 length (_ ∷ xs) = suc (length xs)

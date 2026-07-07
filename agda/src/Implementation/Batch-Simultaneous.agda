@@ -102,9 +102,13 @@ onFirstRx f m = record
 -- (TS: runSerial — r.scan, r.takeWhile(inclusive), r.mergeMap)
 
 -- TS: r.mergeMap((s) => (s.out === null ? r.EMPTY : r.of(s.out)))
+-- Written WITHOUT matching on the Maybe so that `State (ofMaybe mo)`
+-- reduces to `Bool` for any (even neutral) mo — the counting-factors
+-- proof reasons about spawned one-shot inners whose element `out s` is
+-- abstract, and a dependent state would block it. Definitionally this
+-- is the old `nothing ↦ EMPTY, just x ↦ of [x]`.
 ofMaybe : {n : ℕ} {X : Set} → Maybe X → RxObs n X
-ofMaybe nothing  = emptyRx
-ofMaybe (just x) = ofRx (x ∷ [])
+ofMaybe mo = ofRx (maybe′ [] (λ x → x ∷ []) mo)
 
 runOut : {n : ℕ} {S X : Set}
        → (S → X → S) → S → (S → Bool) → (S → Maybe (Emit Val))

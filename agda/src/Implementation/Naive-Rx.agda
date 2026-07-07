@@ -132,17 +132,20 @@ endWithRx {n} {X} x m = record
 
 -- r.scan: THE fundamental one — a scan IS a Mealy machine. One input
 -- may carry several elements; each threads the accumulator and emits.
+-- The burst-fold is TOP-LEVEL so proofs can reason about it: threading
+-- the accumulator through one input's elements, emitting each running
+-- state.
+scanBurst : {X S : Set} → (S → X → S) → S → List X → S × List S
+scanBurst f s []       = s , []
+scanBurst f s (x ∷ xs) = let r = scanBurst f (f s x) xs in fst r , f s x ∷ snd r
+
 scanRx : {n : ℕ} {X S : Set} → (S → X → S) → S → RxObs n X → RxObs n S
 scanRx {n} {X} {S} f z m = record
   { State = State m × S ; start = start m , z
   ; step  = λ s i →
       let r = step m (fst s) i
-          o = scanOut (snd s) (snd r)
+          o = scanBurst f (snd s) (snd r)
       in (fst r , fst o) , snd o }
-  where
-    scanOut : S → List X → S × List S
-    scanOut s []       = s , []
-    scanOut s (x ∷ xs) = let r = scanOut (f s x) xs in fst r , f s x ∷ snd r
 
 -- r.merge (binary; n-ary is folded from it). Subscribes left before
 -- right: within one step, left's outputs precede right's (registration
@@ -189,32 +192,39 @@ spawnInput _          = frame (pureV [])
 -- Per step, delivery is in registration-rank order: the outer chain
 -- first (each spawned inner's synchronous flush riding at its trigger's
 -- position), then the existing inners in spawn order.
+--
+-- The two per-step helpers are TOP-LEVEL (not a where block) so the
+-- proofs can state lemmas about them: stepping the live inners, and
+-- spawning fresh ones. A running inner is a dependent pair — which
+-- element spawned it, paired with the state of that element's machine.
+MMRun : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → Set
+MMRun {n} {X} f = Σ X (λ x → State (f x))
+
+mmStepAll : {n : ℕ} {X Y : Set} (f : X → RxObs n Y)
+          → In n → List (MMRun f) → List (MMRun f) × List Y
+mmStepAll f i []              = [] , []
+mmStepAll f i ((x ▹ sx) ∷ rs) =
+  let r    = step (f x) sx i
+      rest = mmStepAll f i rs
+  in ((x ▹ fst r) ∷ fst rest) , snd r ++ snd rest
+
+mmSpawnAll : {n : ℕ} {X Y : Set} (f : X → RxObs n Y)
+           → In n → List X → List (MMRun f) × List Y
+mmSpawnAll f i []       = [] , []
+mmSpawnAll f i (x ∷ xs) =
+  let r    = step (f x) (start (f x)) i
+      rest = mmSpawnAll f i xs
+  in ((x ▹ fst r) ∷ fst rest) , snd r ++ snd rest
+
 mergeMapRx : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
 mergeMapRx {n} {X} {Y} f m = record
-  { State = State m × List (Σ X (λ x → State (f x)))
+  { State = State m × List (MMRun f)
   ; start = start m , []
   ; step  = λ s i →
       let u  = step m (fst s) i
-          sp = spawnAll (spawnInput i) (snd u)
-          ex = stepAll i (snd s)
+          sp = mmSpawnAll f (spawnInput i) (snd u)
+          ex = mmStepAll f i (snd s)
       in (fst u , fst ex ++ fst sp) , snd sp ++ snd ex }
-  where
-    Running : Set
-    Running = Σ X (λ x → State (f x))
-
-    stepAll : In n → List Running → List Running × List Y
-    stepAll i []              = [] , []
-    stepAll i ((x ▹ sx) ∷ rs) =
-      let r    = step (f x) sx i
-          rest = stepAll i rs
-      in ((x ▹ fst r) ∷ fst rest) , snd r ++ snd rest
-
-    spawnAll : In n → List X → List Running × List Y
-    spawnAll i []       = [] , []
-    spawnAll i (x ∷ xs) =
-      let r    = step (f x) (start (f x)) i
-          rest = spawnAll i xs
-      in ((x ▹ fst r) ∷ fst rest) , snd r ++ snd rest
 
 -- the serial flattening policies (concatMap queues, switchMap cuts,
 -- exhaustMap drops while busy) — same Running-state architecture as

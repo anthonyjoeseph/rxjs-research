@@ -21,10 +21,16 @@ every Naive-Rx operator, and the validity domain `Canonical` — so the
 theorem statement *computes*: on concrete programs Agda normalizes both
 pipelines end to end and they literally agree (`diamond-full`,
 `share-diamond-full`, `growth-full`, `cascade-full`, … at the bottom of the
-entrypoint, all proven by `refl`). Exactly two postulates remain, the two
-named halves of the general proof (`counting-recovers`, `trace-faithful`),
-each already instantiated by normalization. A postulate that cannot be
-proven as stated is a spec bug to rework, not work around.
+entrypoint, all proven by `refl`). **Four postulates remain** (down from
+seven): the two halves of the general proof (`counting-recovers`,
+`trace-faithful`) are values over them. `counting-factors` (the whole
+mechanical machine-commutation half — see
+[Counting-Factors.agda](src/Formal-Verification/Counting-Factors.agda)),
+the `Tracks` simulation relation, and `tracks-stamped` are now all
+**proven/defined**, leaving `Accounted`, `counting-groups`,
+`compile-accounted` (the counting half's semantic core) and
+`tracks-compile` (the trace half's grammar induction). A postulate that
+cannot be proven as stated is a spec bug to rework, not work around.
 
 (The previous generation of this development — the proven burst-batching
 denotation and protocol layer — lives in [v1/](v1/), still building, as the
@@ -367,18 +373,26 @@ left of its slot's connecting static arm is rejected, matching v1's
 `ranked-delivery`).
 
 The two halves of the general proof are both VALUES, each assembled from
-the finer postulates its file names (seven in total — the only postulates
-left in the development; see the Roadmap):
+finer factors — **four postulates in total** now, the only ones left in
+the development (`counting-factors`, `Tracks`, and `tracks-stamped` are
+proven/defined; see the Roadmap):
 
 ```agda
 counting-recovers : … → impl-batchSimultaneous em e ≡ batchSpecL (stamped em e)
   -- = counting-factors ∘ counting-groups ∘ compile-accounted
-  --   (the pipeline reads only the trace; the pure counting theorem on
-  --    Accounted traces; canonical programs keep their books)
+  --   counting-factors: PROVEN (Counting-Factors.agda) — the pipeline
+  --     reads only the trace (mergeMap-oneshot ∘ scan-collect ∘
+  --     batchSync-bItems, pure machine commutation)
+  --   counting-groups / Accounted / compile-accounted: postulated — the
+  --     pure counting theorem on Accounted traces, and that canonical
+  --     programs keep their books
 trace-faithful    : … → stamped em e ≡ emits (⟦ e ⟧ em ρ₀ t₀)
   -- = tracks-stamped ∘ tracks-compile
-  --   (the Tracks simulation relation: spawned at any position j, the
-  --    machine's stamped groups equal the denotation subscribed at (j,0))
+  --   Tracks: DEFINED (spawned at any position j, the machine's stamped
+  --     groups equal the denotation subscribed at (j,0))
+  --   tracks-stamped: PROVEN (the j=0 instance, spawnFlatten em 0 ≡
+  --     flatten em)
+  --   tracks-compile: postulated — the grammar induction
 ```
 
 The theorem is their composition, literally:
