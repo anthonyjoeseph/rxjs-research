@@ -15,7 +15,8 @@
     "oracle": "jest src/__tests__/oracle.property.test.ts",
     "check": "npm run typecheck && npm test",
     "agda": "cd ../agda && agda src/Formal-Verification/All-Verifications.agda",
-    "agda:cli": "cd ../agda && agda --compile --compile-dir=_cli src/CLI/Main.agda"
+    "agda:cli": "cd ../agda && agda --compile --compile-dir=_cli src/CLI/Main.agda",
+    "agda:qc": "cd ../agda && agda --compile --compile-dir=_cli src/QuickCheck.agda"
   },
   "dependencies": {
     "rxjs": "^7.8.2"
