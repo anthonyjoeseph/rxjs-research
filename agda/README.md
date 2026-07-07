@@ -60,9 +60,9 @@ stamped trace IS the spec's timed denotation, value for value).
 Why Mealy machines and not some bespoke operational gadget: **rxjs
 operators genuinely are Mealy machines.** `r.scan` is literally one — a
 state and a step. That is why the TypeScript implementation is written in
-pure-scan style, and why machine composition `_⋙_` (outputs of one step
-fed through the next machine *within the same step*) is exactly
-`.pipe(...)` with synchronous delivery.
+pure-scan style, and why each Naive-Rx operator is a machine *transformer*
+(machines in, machine out) — exactly as rxjs operators are
+`Observable → Observable` functions, with `.pipe(...)` as application.
 
 ## The batchSimultaneous functions, side by side
 
@@ -79,23 +79,22 @@ export const batchSimultaneous = <A>(src: Instantaneous<A>): r.Observable<A[]> =
   );
 ```
 
-The same pipeline in Naive-Rx machines (the target definition of the
-currently-postulated `batchSimultaneousI` in
-[src/Implementation/Batch-Simultaneous.agda](src/Implementation/Batch-Simultaneous.agda)):
+The same pipeline in Naive-Rx machines — the ACTUAL definition in
+[src/Implementation/Batch-Simultaneous.agda](src/Implementation/Batch-Simultaneous.agda):
 
 ```agda
 batchSimultaneousI : {n : ℕ} → Inst n Val → RxObs n (List Val)
 batchSimultaneousI src =
-  mergeMapRx flush
-    (scanRx step initialMem
-      (endWithRx endSentinel src))
+  mergeMapRx (λ m → ofMaybe (cFlush m))
+    (scanRx bStep (mkMem [] nothing nothing)
+      (endWithRx endB
+        (batchSyncRx src)))
 ```
 
 Same stages, same order (Agda application nests where TS pipes, so read
-inside-out), one machine per `.pipe()` stage. The frame boundary needs no
-`batchSync` operator in Agda because the input alphabet says it in a type:
-the `frame` constructor of `In n` *is* the subscribe call, carrying every
-source's synchronous flush as one input.
+inside-out), one machine per `.pipe()` stage — down to `batchSyncRx`,
+which needs no defer gadget in Agda: the machine model structurally knows
+the response to the first input, which IS the subscribe call.
 
 And the two top-level definitions the theorem equates:
 
@@ -159,9 +158,12 @@ record Machine (I O : Set) : Set₁ where
 ```
 
 The implementation's only computational medium, with `feed` (a burst of
-inputs within one step), `run` (the harness), and `_⋙_` (composition =
-`.pipe()`: everything an upstream step emits cascades downstream inside
-the same step — synchronous delivery as a definition).
+inputs within one step) and `run` (the harness). There is deliberately
+NO element-wise composition operator: piping elements one at a time
+would erase which outputs one input caused — the very knowledge the
+frame boundary and an inner's synchronous flush depend on. Operators
+compose by machine-transformer application instead, exactly as rxjs
+operators are `Observable → Observable` functions.
 
 ```agda
 data In (n : ℕ) : Set where
@@ -229,25 +231,44 @@ subscribeRx m em = run m (flatten em)
 ```
 
 No timestamps anywhere — that is the point. Then one postulate per rxjs
-operator the TypeScript imports, and nothing more: `ofRx`, `emptyRx`,
-`deferRx`, `startWithRx`, `endWithRx`, `mapRx`, `scanRx`, `mergeRx`,
-`takeWhileRx`, the flattening quartet (`mergeMapRx`/`concatMapRx`/
-`switchMapRx`/`exhaustMapRx`), `connectRx`, `shareRx`. Discharging one =
-writing the step function for that operator's synchronous-delivery
-semantics. `connectRx` is the careful one: fan-out of deliveries is free in
-a pure model, but the source's `init` contribution must happen ONCE, not
-once per branch — the counting-transparency bookkeeping lives there.
+operator the implementation consumes: `ofRx`, `emptyRx`, `endWithRx`,
+`mapRx`, `scanRx`, `mergeRx`, `takeWhileRx`, and the flattening quartet
+(`mergeMapRx`/`concatMapRx`/`switchMapRx`/`exhaustMapRx`). Discharging
+one = writing the step function for that operator's synchronous-delivery
+semantics.
+
+Several TS operators have NO counterpart here, because the pure model
+dissolves them: `tap`/`finalize` exist only to maintain the multicast
+registry by side effect; `defer`/`startWith` only to wrap the Subject's
+mutable state (the naive subject is a direct machine); and — the big
+one — **`connect`/`share` dissolve because machine values are
+deterministic**: two copies of a machine driven by the same inputs
+produce identical outputs, so multicast fan-out is free. The serial
+joins use the outer machine twice where the TS multicasts it (the value
+branch strips registration events, so nothing double-counts), and
+share's per-ref semantics lives in `shareRefI`'s connecting-flag view,
+on the Canonical non-resetting domain the theorem is stated over.
 
 ### [src/Implementation/Batch-Simultaneous.agda](src/Implementation/Batch-Simultaneous.agda)
 
-The machine side of the theorem, mirroring the TypeScript file for file:
-`compile` builds the pipeline (one postulated primitive per
-`primitives.ts` export — `srcI`, `ofI`, `mapI`, `scanI`, `takeI`,
-`shareRefI`, `letShareI`, the four `…AllI` joins), and `batchSimultaneousI`
-is the counting machine (`batch-simultaneous.ts`). Inner streams reach the
+The machine side of the theorem, **fully defined — no postulates in this
+file**; the only implementation-side holes left are the Naive-Rx operator
+semantics. It mirrors the TypeScript file for file: one definition per
+`primitives.ts` export (`srcI`, `ofI`, `mapI`, `scanI`, `takeI`,
+`shareRefI`/`letShareI`, the four `…AllI` joins with their
+`JoinItem`/`MergeState`/`SerialState` scans transcribed fold for fold),
+and `batchSimultaneousI` is the counting machine
+(`batch-simultaneous.ts`). Three definitions are direct machines rather
+than operator compositions, precisely where the TS, too, steps outside
+combinators: the subject (TS: `new r.Subject` — here a STATELESS machine,
+since the world's input is its state), the per-input grouping
+(`groupFirstRx`/`onFirstRx`, the machine-model counterpart of the TS
+`batchSync` gadget), and the share ref view. Inner streams reach the
 joins **defunctionalized** as a `Joinable` — a static list of compiled
 inners (`ofJ`) or a compiled template spawned per outer value (`mapJ`),
-exactly the `InnerTemplate` device of the TS model.
+exactly the `InnerTemplate` device of the TS model — and every join runs
+the `mapJ` pipeline, because `ofJ` is `of(srcs)` defunctionalized to
+indices (TS: `merge = mergeAll(of(srcs))`, literally).
 
 Why `Joinable` instead of a stream-of-streams wire, as in the TypeScript's
 `Instantaneous<Instantaneous<A>>`? Two checkers force it, and both point
@@ -310,7 +331,7 @@ list and nothing else.
 ## Building
 
 ```sh
-agda src/Everything.agda          # the v2 development (this README)
+agda src/Formal-Verification.agda # the entrypoint — everything else follows
 cd v1 && agda src/Everything.agda # the v1 reference tower
 ```
 

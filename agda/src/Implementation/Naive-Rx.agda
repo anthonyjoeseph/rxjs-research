@@ -7,12 +7,31 @@
 -- (In n): it cannot see the future because the future never exists as
 -- a value. Each postulate below is one rxjs operator; discharging it
 -- means writing the step function that models that operator's
--- synchronous delivery semantics. The set is EXACTLY the operators the
--- TypeScript imports from rxjs — nothing more.
+-- synchronous delivery semantics.
 --
--- (r.tap and r.finalize appear in the TypeScript solely to maintain the
--- multicast registry by side effect; in this pure model that bookkeeping
--- lives INSIDE connectRx/shareRx, so they get no separate counterpart.)
+-- What has NO counterpart here, and why (the pure model dissolves it):
+--   r.tap / r.finalize — exist in the TS solely to maintain the
+--     multicast registry by side effect; pure machines have no effects
+--     to observe.
+--   r.defer / r.startWith — exist in the TS to wrap the Subject's
+--     mutable `ended` flag and registration emit; the naive subject
+--     (srcI) is a direct machine and needs neither.
+--   r.connect / r.share — multicast. Machine values are DETERMINISTIC:
+--     two copies of a machine driven by the same inputs produce
+--     identical outputs, so fan-out is free and the serial joins'
+--     connect dissolves into using the outer machine twice (the value
+--     branch strips registration events, so nothing double-counts).
+--     share's per-ref semantics (connecting ref vs late ref) lives in
+--     shareRefI, on the Canonical (non-resetting) domain the theorem
+--     is stated over.
+--
+-- Spawning semantics shared by the flattening quartet: "subscribing"
+-- an inner machine mid-run means feeding the fresh machine a synthesized
+-- subscription input — `frame` with empty per-source flushes — during
+-- the current step, so its synchronous flush coalesces into the step
+-- that spawned it. The in-flight input itself is NOT delivered to the
+-- new machine (an rxjs Subject snapshots its subscribers at dispatch
+-- start — the upstream-race rule).
 module Implementation.Naive-Rx where
 
 open import Prelude
@@ -36,6 +55,38 @@ data Ev (A : Set) : Set where
 Emit : Set → Set
 Emit A = Prov × List (Ev A)
 
+-- the types.ts helpers, verbatim
+values : {A : Set} → List (Ev A) → List A
+values []             = []
+values (value v ∷ es) = v ∷ values es
+values (_ ∷ es)       = values es
+
+hasFinEvs : {A : Set} → List (Ev A) → Bool
+hasFinEvs []         = false
+hasFinEvs (fin ∷ _)  = true
+hasFinEvs (_ ∷ es)   = hasFinEvs es
+
+hasFin : {A : Set} → Emit A → Bool
+hasFin e = hasFinEvs (snd e)
+
+stripFin : {A : Set} → List (Ev A) → List (Ev A)
+stripFin []         = []
+stripFin (fin ∷ es) = stripFin es
+stripFin (ev ∷ es)  = ev ∷ stripFin es
+
+-- init/close only (TS: triggerItem's `others`)
+initsCloses : {A : Set} → List (Ev A) → List (Ev A)
+initsCloses []             = []
+initsCloses (init p ∷ es)  = init p ∷ initsCloses es
+initsCloses (close p ∷ es) = close p ∷ initsCloses es
+initsCloses (_ ∷ es)       = initsCloses es
+
+-- everything but the values (a late share ref registers, replays nothing)
+dropValues : {A : Set} → List (Ev A) → List (Ev A)
+dropValues []             = []
+dropValues (value _ ∷ es) = dropValues es
+dropValues (ev ∷ es)      = ev ∷ dropValues es
+
 ------------------------------------------------------------------------
 -- a naive rxjs Observable of elements X, in a world with n sources:
 -- a Mealy machine from world inputs to elements
@@ -52,37 +103,25 @@ subscribeRx m em = run m (flatten em)
 -- the operator set (one postulate per rxjs export the TypeScript uses)
 
 postulate
-  -- r.of / r.EMPTY: emit everything at subscription (the frame input),
-  -- then complete
+  -- r.of / r.EMPTY: emit everything on the first input received (the
+  -- subscription moment), then nothing
   ofRx         : {n : ℕ} {X : Set} → List X → RxObs n X
   emptyRx      : {n : ℕ} {X : Set} → RxObs n X
-  -- r.defer: build the machine at subscription time
-  deferRx      : {n : ℕ} {X : Set} → (⊤ → RxObs n X) → RxObs n X
-  -- r.startWith: prepend one element to the frame
-  startWithRx  : {n : ℕ} {X : Set} → X → RxObs n X → RxObs n X
-  -- r.endWith: append one element at completion (the batching machine's
-  -- drain sentinel)
+  -- r.endWith: append one element when the run ends (the `end` input)
   endWithRx    : {n : ℕ} {X : Set} → X → RxObs n X → RxObs n X
   -- r.map
   mapRx        : {n : ℕ} {X Y : Set} → (X → Y) → RxObs n X → RxObs n Y
   -- r.scan: THE fundamental one — a scan IS a Mealy machine
   scanRx       : {n : ℕ} {X S : Set} → (S → X → S) → S → RxObs n X → RxObs n S
-  -- r.merge (binary; n-ary is folded from it)
+  -- r.merge (binary; n-ary is folded from it). Subscribes left before
+  -- right: within one step, left's outputs precede right's.
   mergeRx      : {n : ℕ} {X : Set} → RxObs n X → RxObs n X → RxObs n X
   -- r.takeWhile (inclusive flag as in rxjs)
   takeWhileRx  : {n : ℕ} {X : Set} → (X → Bool) → Bool → RxObs n X → RxObs n X
   -- the flattening quartet: spawn an inner machine per element, under
-  -- the operator's subscription policy
+  -- the operator's native subscription policy (mergeMap: all live;
+  -- concatMap: queue; switchMap: cut; exhaustMap: drop while busy)
   mergeMapRx   : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
   concatMapRx  : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
   switchMapRx  : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
   exhaustMapRx : {n : ℕ} {X Y : Set} → (X → RxObs n Y) → RxObs n X → RxObs n Y
-  -- r.connect: multicast — the selector's branches consume ONE
-  -- subscription of the source. The careful one: in a pure model,
-  -- fan-out of deliveries is free, but the source's registration
-  -- (init) contribution must happen ONCE, not once per branch —
-  -- the counting-transparency bookkeeping lives here.
-  connectRx    : {n : ℕ} {X Y : Set} → (RxObs n X → RxObs n Y) → RxObs n X → RxObs n Y
-  -- r.share: connect on first subscriber, reset on completion /
-  -- refcount-zero, reconnect replays (share LIVES, rxjs-confirmed)
-  shareRx      : {n : ℕ} {X : Set} → RxObs n X → RxObs n X

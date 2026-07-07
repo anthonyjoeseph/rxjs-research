@@ -314,7 +314,7 @@ From `typescript/`:
 npm test           # the full jest suite (pinned Agda-theorem cases + the oracle)
 npm run typecheck
 npm run oracle     # one run of the property oracle (500 random programs)
-npm run agda       # typecheck agda/src/Everything.agda
+npm run agda       # typecheck agda/src/Formal-Verification.agda (+ the v1 tower)
 ```
 
 ## Repository layout
@@ -330,5 +330,5 @@ npm run agda       # typecheck agda/src/Everything.agda
 
 ```sh
 cd typescript && npm install && npm test   # jest + property-based oracle
-cd agda && agda src/Everything.agda        # typecheck the proofs (Agda ≥ 2.6.2, no stdlib needed)
+cd agda && agda src/Formal-Verification.agda # typecheck the proofs (Agda ≥ 2.6.2, no stdlib needed)
 ```

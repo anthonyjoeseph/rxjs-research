@@ -112,17 +112,13 @@ feed m s (i ∷ is) =
 run : {I O : Set} → Machine I O → List I → List O
 run m is = snd (feed m (start m) is)
 
--- machine composition = rxjs .pipe(): outputs of the first are fed
--- through the second within the same step
-_⋙_ : {I X O : Set} → Machine I X → Machine X O → Machine I O
-State (m₁ ⋙ m₂) = State m₁ × State m₂
-start (m₁ ⋙ m₂) = start m₁ , start m₂
-step  (m₁ ⋙ m₂) (s₁ , s₂) i =
-  let r₁ = step m₁ s₁ i
-      r₂ = feed m₂ s₂ (snd r₁)
-  in (fst r₁ , fst r₂) , snd r₂
-
-infixl 6 _⋙_
+-- NOTE there is deliberately no element-wise machine-composition
+-- operator here: piping elements one at a time would ERASE which
+-- outputs one input caused — the very knowledge the frame boundary and
+-- an inner's synchronous flush depend on. Operators compose by
+-- machine-transformer application instead (each Naive-Rx operator maps
+-- whole machines to machines), exactly as rxjs operators are
+-- Observable → Observable functions.
 
 ------------------------------------------------------------------------
 -- the top-level input alphabet: what the world does, one entry at a
