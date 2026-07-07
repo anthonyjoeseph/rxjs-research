@@ -1090,3 +1090,140 @@ readme-late-subscriber : (j k : ℕ) (env : Env) (t t₁ t₂ u c c′ : Time)
               ⟧ env t))
     ≡ (t₁ , 7 ∷ 7 ∷ []) ∷ (t₂ , 8 ∷ 8 ∷ 8 ∷ []) ∷ []
 readme-late-subscriber = late-join-growth 1
+
+-- THE DRIVER CONTRACT AND FEEDBACK -----------------------------------------
+-- Root subjects are the model's async inputs. The driver (the outside
+-- world) guarantees: each .next() call is its OWN instant — per-slot
+-- histories are strictly monotone and distinct slots never share a Time
+-- (tick , origin) — and a REENTRANT .next(), fired from user code while a
+-- batch is delivering, is a FRESH instant strictly after the batch that
+-- caused it (ratified: one .next() = one root cause; feedback never
+-- extends the instant it reacts to). Under that contract feedback is just
+-- a later event, and everything here applies to it unchanged: its own
+-- synchronous cascade batches with IT, not with its cause.
+
+-- slot k is a feedback echo of slot j (user code calls k.next on receiving
+-- j's batch, so the driver stamps it strictly later): the feedback's
+-- serial-join cascade lands in the FEEDBACK's batch
+feedback-emits : (j k : ℕ) (env : Env) (t t₁ u c c′ : Time)
+  → snd (env j) ≡ obs ((t₁ , 1) ∷ []) c
+  → snd (env k) ≡ obs ((u , 2) ∷ []) c′
+  → timeLt t t₁ ≡ true → timeLt t₁ u ≡ true
+  → emits (⟦ mergeE (shareE false j)
+              (concatE (takeE 1 (shareE false k)) (ofE (9 ∷ []))) ⟧ env t)
+    ≡ (t₁ , 1) ∷ (u , 2) ∷ (u , 9) ∷ []
+feedback-emits j k env t t₁ u c c′ eqj eqk l1 l2
+  rewrite eqj | eqk
+        | l1
+        | timeLt-trans t t₁ u l1 l2
+        | timeLeq-refl t
+        | timeLt⇒timeLeq-flip-false t u (timeLt-trans t t₁ u l1 l2)
+        | timeLt⇒timeLeq t₁ u l2
+  = refl
+
+feedback-example : (j k : ℕ) (env : Env) (t t₁ u c c′ : Time)
+  → snd (env j) ≡ obs ((t₁ , 1) ∷ []) c
+  → snd (env k) ≡ obs ((u , 2) ∷ []) c′
+  → timeLt t t₁ ≡ true → timeLt t₁ u ≡ true
+  → batchSpec
+      (emits (⟦ mergeE (shareE false j)
+                 (concatE (takeE 1 (shareE false k)) (ofE (9 ∷ []))) ⟧ env t))
+    ≡ (t₁ , 1 ∷ []) ∷ (u , 2 ∷ 9 ∷ []) ∷ []
+feedback-example j k env t t₁ u c c′ eqj eqk l1 l2 =
+  trans (cong batchSpec (feedback-emits j k env t t₁ u c c′ eqj eqk l1 l2))
+        (batches t₁ u (timeLt⇒timeEq-false t₁ u l2))
+  where
+    batches : (x y : Time) → timeEq x y ≡ false
+      → batchSpec ((x , 1) ∷ (y , 2) ∷ (y , 9) ∷ [])
+        ≡ (x , 1 ∷ []) ∷ (y , 2 ∷ 9 ∷ []) ∷ []
+    batches x y ne rewrite timeEq-refl y | ne = refl
+
+-- FENCED ORACLE FRONTIERS, CLOSED -------------------------------------------
+-- Each of the shapes the TS oracle fenced off now has an Agda answer.
+
+-- transient refs: a take-limited ref leaves early; the connection is one
+-- life per letShare scope (ratified: no refcount reset mid-lifetime), so
+-- the surviving ref keeps receiving — and the shared event still delivers
+-- to both while both live
+transient-ref-example : (j : ℕ) (env : Env) (t t₁ t₂ c : Time)
+  → snd (env j) ≡ obs ((t₁ , 1) ∷ (t₂ , 2) ∷ []) c
+  → timeLt t t₁ ≡ true → timeLt t₁ t₂ ≡ true
+  → batchSpec
+      (emits (⟦ mergeE (takeE 1 (shareE false j)) (shareE false j) ⟧ env t))
+    ≡ (t₁ , 1 ∷ 1 ∷ []) ∷ (t₂ , 2 ∷ []) ∷ []
+transient-ref-example j env t t₁ t₂ c eqj l1 l2
+  rewrite eqj
+        | l1
+        | timeLt-trans t t₁ t₂ l1 l2
+        | timeLeq-refl t₁
+        | timeEq-refl t₂
+        | timeLt⇒timeEq-false t₁ t₂ l2
+        | timeEq-refl t₁
+  = refl
+
+-- upstream race: a ref-triggered inner that emits synchronously mid-fan-out
+-- inherits the trigger's instant — it batches WITH the fan-out, never
+-- splits it
+upstream-race-example : (j : ℕ) (env : Env) (t t₁ c : Time)
+  → snd (env j) ≡ obs ((t₁ , 1) ∷ []) c
+  → timeLt t t₁ ≡ true
+  → batchSpec
+      (emits (⟦ mergeE (shareE false j)
+                 (mergeAllE (mapS (λ _ → ofE (9 ∷ [])) (shareE false j)))
+              ⟧ env t))
+    ≡ (t₁ , 1 ∷ 9 ∷ []) ∷ []
+upstream-race-example j env t t₁ c eqj l1
+  rewrite eqj | l1 | timeLeq-refl t₁
+  = allAt-batch t₁ 1 ((t₁ , 9) ∷ []) (aa∷ aa[])
+
+-- tick-0 ref spawns: a ref spawned by a STATIC trigger subscribes at the
+-- frame itself and behaves exactly like a static ref of the same share
+frame-spawn-example : (j : ℕ) (env : Env) (t t₁ c : Time)
+  → snd (env j) ≡ obs ((t₁ , 1) ∷ []) c
+  → timeLt t t₁ ≡ true
+  → batchSpec
+      (emits (⟦ letShareE (shareE false j)
+                  (mergeE (shareE true 0)
+                          (mergeAllE (mapS (λ _ → shareE false 0)
+                                           (ofE (0 ∷ []))))) ⟧ env t))
+    ≡ (t₁ , 1 ∷ 1 ∷ []) ∷ []
+frame-spawn-example j env t t₁ c eqj l1
+  rewrite timeEq-refl t
+        | filterAfter-absorb t t (emits (snd (env j))) (timeLeq-refl t)
+        | eqj | l1
+        | timeLeq-refl t₁
+  = allAt-batch t₁ 1 ((t₁ , 1) ∷ []) (aa∷ aa[])
+
+-- stateful folds over ref fan-outs: scan threads its accumulator through
+-- the fan-out in delivery order, within and ACROSS batches (ratified:
+-- exactly rxjs scan)
+scan-fanout-example : (j : ℕ) (env : Env) (t t₁ t₂ c : Time)
+  → snd (env j) ≡ obs ((t₁ , 5) ∷ (t₂ , 6) ∷ []) c
+  → timeLt t t₁ ≡ true → timeLt t₁ t₂ ≡ true
+  → batchSpec
+      (emits (⟦ scanE (λ acc _ → suc acc) 0 (nRefs 2 j) ⟧ env t))
+    ≡ (t₁ , 1 ∷ 2 ∷ []) ∷ (t₂ , 3 ∷ 4 ∷ []) ∷ []
+scan-fanout-example j env t t₁ t₂ c eqj l1 l2
+  rewrite eqj
+        | l1
+        | timeLt-trans t t₁ t₂ l1 l2
+        | timeLeq-refl t₁
+        | timeLt⇒timeLeq-flip-false t₁ t₂ l2
+        | timeLeq-refl t₂
+        | timeEq-refl t₂
+        | timeLt⇒timeEq-false t₁ t₂ l2
+        | timeEq-refl t₁
+  = refl
+
+-- multi-value async arrival units: an async inner's whole synchronous
+-- burst is one unit at the trigger's instant — one batch
+multi-value-unit-example : (j : ℕ) (env : Env) (t t₁ c : Time)
+  → snd (env j) ≡ obs ((t₁ , 1) ∷ []) c
+  → timeLt t t₁ ≡ true
+  → batchSpec
+      (emits (⟦ mergeAllE (mapS (λ v → ofE (v ∷ 9 ∷ [])) (shareE false j))
+              ⟧ env t))
+    ≡ (t₁ , 1 ∷ 9 ∷ []) ∷ []
+multi-value-unit-example j env t t₁ c eqj l1
+  rewrite eqj | l1
+  = allAt-batch t₁ 1 ((t₁ , 9) ∷ []) (aa∷ aa[])
