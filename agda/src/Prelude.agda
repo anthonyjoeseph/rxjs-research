@@ -276,6 +276,11 @@ ltℕ-leqℕ-trans a       (suc b) zero    _  ()
 ltℕ-leqℕ-trans zero    (suc b) (suc c) _  _ = refl
 ltℕ-leqℕ-trans (suc a) (suc b) (suc c) p  q = ltℕ-leqℕ-trans a b c p q
 
+ltℕ-false⇒leqℕ-flip : (a b : ℕ) → ltℕ a b ≡ false → leqℕ b a ≡ true
+ltℕ-false⇒leqℕ-flip a       zero    p  = refl
+ltℕ-false⇒leqℕ-flip zero    (suc b) ()
+ltℕ-false⇒leqℕ-flip (suc a) (suc b) p  = ltℕ-false⇒leqℕ-flip a b p
+
 ltℕ-false-split : (a b : ℕ) → ltℕ a b ≡ false → Either (ltℕ b a ≡ true) (a ≡ b)
 ltℕ-false-split zero    zero    p  = right refl
 ltℕ-false-split zero    (suc b) ()
