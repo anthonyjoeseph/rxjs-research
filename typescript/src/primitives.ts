@@ -37,7 +37,7 @@ export class InstantSubject<A> {
   private ended = false;
   private subj = new r.Subject<InstEmit<A>>();
   readonly inst: Instantaneous<A> = r.defer(() =>
-    this.ended
+    (this.ended
       ? // a completed subject completes late subscribers immediately — the
         // fin is part of its history (concat legs behind it must advance)
         r.of({ provenance: COLD, events: [fin] as InstEv<A>[] })
@@ -46,7 +46,18 @@ export class InstantSubject<A> {
             provenance: this.provenance,
             events: [init(this.provenance)] as InstEv<A>[],
           }),
-        ),
+        )
+    ).pipe(
+      // COMPLETE on the in-band fin, not on the separate rxjs complete().
+      // The fin is the single completion channel the whole protocol uses
+      // (a join completes on its inner's fin emit); if the bare subject
+      // instead only completed via rxjs complete(), a `merge(s)`-wrapped
+      // leg would advance on the fin — one dispatch pass EARLIER than a
+      // bare-s leg advancing on complete() — reordering sibling arms
+      // (merge(s) ≠ s). Completing on the fin makes every leg advance in
+      // the same pass, in subscription order, matching the Agda model.
+      r.takeWhile((e) => !hasFin(e), true),
+    ),
   );
   next(v: A): void {
     this.subj.next({ provenance: this.provenance, events: [val(v)] });
