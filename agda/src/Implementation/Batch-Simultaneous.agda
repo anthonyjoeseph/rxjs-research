@@ -221,6 +221,7 @@ takeEv a ev =
     go (close p) = record a { tRegs = bumpDown (tRegs a) p
                             ; tOut = tOut a ++ (close p ∷ []) }
     go fin       = record a { tDone = true ; tOut = tOut a ++ (fin ∷ []) }
+    go (wt k)    = record a { tOut = tOut a ++ (wt k ∷ []) }
     go (value v) =
       if eqℕ (tBudget a) 0 then a
       else if eqℕ (tBudget a) 1
@@ -428,6 +429,13 @@ finalizeS s open′ queued outerDone with hHolding s
               ; hHolding = nothing ; hClosed = hClosed s ∨ fins
               ; hOut = just (p , (if fins then buf ++ (fin ∷ []) else buf)) }
 
+-- mark one coalesced flush with its chain-weight before it joins the held
+-- buffer: the flush counts as `weightOf evs` chains (1 for a plain inner,
+-- more if it already carried nested weight), and its own markers are stripped
+-- so the re-stamp is not double-counted
+markFlush : List (Ev Val) → List (Ev Val)
+markFlush evs = wt (weightOf evs) ∷ stripWt evs
+
 -- concatAll: one inner live at a time; arrivals during a live inner
 -- QUEUE (concatMap, natively); when the live inner FINISHES, the queued
 -- inner's flush is grafted into the fin-carrying emit — one instant
@@ -442,7 +450,7 @@ concatStep s (trigger p others spawns outerFin) =
                    ; hOuterDone = outerDone ; hOut = nothing }
 concatStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
-      held   = just (heldProv s , heldBuf s ++ evs)
+      held   = just (heldProv s , heldBuf s ++ markFlush evs)
   in if finned ∧ ltℕ 0 queued
      then record s { hHolding = held ; hQueued = queued ; hOut = nothing }
      else finalizeS (record s { hHolding = held })
@@ -474,11 +482,11 @@ switchStep s (flushJ evs finned) =
   in if ltℕ 0 queued
      then -- a later burst sibling follows synchronously and cuts THIS one
        (let cuts = if finned then [] else closesFor regs
-            held = just (heldProv s , heldBuf s ++ evs ++ cuts)
+            held = just (heldProv s , heldBuf s ++ markFlush evs ++ cuts)
         in record s { hHolding = held ; hQueued = queued ; hRegs = []
                     ; hOut = nothing })
      else
-       (let held = just (heldProv s , heldBuf s ++ evs)
+       (let held = just (heldProv s , heldBuf s ++ markFlush evs)
         in finalizeS (record s { hHolding = held
                                ; hRegs = (if finned then [] else regs) })
                      (not finned) 0 (hOuterDone s))
@@ -504,7 +512,7 @@ exhaustStep s (trigger p others spawns outerFin) =
                    ; hOuterDone = outerDone ; hOut = nothing }
 exhaustStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
-      held   = just (heldProv s , heldBuf s ++ evs)
+      held   = just (heldProv s , heldBuf s ++ markFlush evs)
   in if finned ∧ ltℕ 0 queued
      then record s { hHolding = held ; hQueued = queued ; hOut = nothing }
      else finalizeS (record s { hHolding = held })
@@ -650,11 +658,12 @@ frameStepI es =
 stepI : MemI → Emit Val → MemI
 stepI m (p , evs) =
   let owedStart = maybe′ (lookupRD 1 (cTotal m) p) fst (cWin m)
+      w         = weightOf evs                 -- chains this emit accounts for
       acc       = maybe′ [] snd (cWin m) ++ values evs
       total     = trackRegs (cTotal m) evs
-  in if leqℕ owedStart 1
+  in if leqℕ owedStart w
      then mkMem total nothing (nonEmptyM acc)
-     else mkMem total (just (owedStart ∸ 1 , acc)) nothing
+     else mkMem total (just (owedStart ∸ w , acc)) nothing
 
 bStep : MemI → BItem → MemI
 bStep m (syncB es)  = frameStepI es

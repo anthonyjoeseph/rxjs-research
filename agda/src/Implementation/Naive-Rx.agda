@@ -49,11 +49,36 @@ data Ev (A : Set) : Set where
   value : A → Ev A      -- a value
   close : Prov → Ev A   -- a registration ended (take cut, switch switched away)
   fin   : Ev A          -- completion, carried IN-BAND with its cascade
+  wt    : ℕ → Ev A      -- weight: this emit accounts for `k` delivery chains
+                        -- this instant (a serial join stamps its coalesce
+                        -- count; absent ⇒ 1). The counting machine drains its
+                        -- owed-count by the weight, so a serial join's single
+                        -- coalesced emit still closes an instant of K chains.
 
 -- what ONE downstream next-callback invocation carries
 -- (TypeScript: InstEmit { provenance, events })
 Emit : Set → Set
 Emit A = Prov × List (Ev A)
+
+-- how many delivery chains this emit accounts for: the SUM of its stamped
+-- weight markers, or 1 if it has none (an ordinary single-chain emit). A
+-- serial join marks each flush it coalesces with one `wt`, so an instant of
+-- K chains folded into one emit reads back as weight K — and because the
+-- markers survive stripFin, nested serial joins' weights propagate outward.
+sumWt : {A : Set} → List (Ev A) → ℕ
+sumWt []          = 0
+sumWt (wt k ∷ es) = k + sumWt es
+sumWt (_ ∷ es)    = sumWt es
+
+weightOf : {A : Set} → List (Ev A) → ℕ
+weightOf evs = let s = sumWt evs in if eqℕ s 0 then 1 else s
+
+-- drop weight markers (a fold re-stamps its own total, so inner markers are
+-- absorbed rather than double-counted)
+stripWt : {A : Set} → List (Ev A) → List (Ev A)
+stripWt []          = []
+stripWt (wt _ ∷ es) = stripWt es
+stripWt (ev ∷ es)   = ev ∷ stripWt es
 
 -- the types.ts helpers, verbatim
 values : {A : Set} → List (Ev A) → List A
