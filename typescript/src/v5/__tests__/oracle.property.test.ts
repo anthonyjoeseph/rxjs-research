@@ -416,7 +416,10 @@ const hasStatefulOverRefJoin = (e: Exp): boolean => {
  *    mid-delivery of the very instant being fanned out — the regroup and
  *    strictly-after machinery don't describe a fan-out that grows while
  *    the instant is in flight (plain mapShareS feedback IS supported;
- *    the serial-join flavor is not yet modeled);
+ *    the serial-join flavor is not yet modeled). Widened 2026-07-06:
+ *    the spawned inner needn't contain a ref — a ref-triggered spawn of
+ *    a sync-emitting COLD delivers its values mid-fan-out too, inside
+ *    the block the model regroups consecutively (seed 753803640);
  *  - TICK-0 REF SPAWNS (recorded frontier, 2026-07-06): a trigger that
  *    can fire during the STATIC frame (a nonempty `of` in it) spawns
  *    refs in ARG-VALUE order, interleaved with static wiring — the model
@@ -456,10 +459,16 @@ const hasUpstreamRaceSpawn = (e: Exp, bindingSrcs: Set<number>): boolean => {
     }
   };
   const races = (trigger: Exp, inners: readonly Exp[]): boolean =>
-    (srcIndicesOf(trigger).some((i) => bindingSrcs.has(i)) ||
+    ((srcIndicesOf(trigger).some((i) => bindingSrcs.has(i)) ||
       containsShareRef(trigger) ||
       containsNonemptyOf(trigger)) &&
-    inners.some(containsShareRef);
+      inners.some(containsShareRef)) ||
+    // a ref-containing trigger spawning a SYNC-EMITTING inner delivers
+    // that inner's values MID-FAN-OUT — inside the very instant being
+    // fanned out, which the model regroups as one consecutive block
+    // (seed 753803640: pick[scan∘scan(x) | concatAll(of(0), trigger=x)]
+    // — rxjs interleaves the spawned 0 between the two ref deliveries)
+    (containsShareRef(trigger) && inners.some(containsNonemptyOf));
   const walk = (x: Exp): boolean => {
     switch (x.type) {
       case "map":
@@ -1419,6 +1428,59 @@ describe("batchSimultaneous vs the timed-list oracle", () => {
       ],
     );
     expect(run.rec.batches).toEqual([[-1], [3], [0, 0]]);
+    expect(run.rec.batches).toEqual(run.expected);
+  });
+
+  it("pins cross-identity graft wrappers: routing re-statements never re-register", () => {
+    // A dynamic serial join whose palette inner take(1)s the TRIGGER's own
+    // source: each queued advancement grafts the deferred flush wrapped in
+    // the TRIGGER's identity, while the unit is anchored at the closing
+    // take's chain. That wrapper is a routing re-statement of the trigger's
+    // live registration — it must NOT register, or every queued advancement
+    // adds a phantom window slot and the next instant's batch strands until
+    // completion. (Found at seed -1062187723: batches came out
+    // [0],[0],[-1],[0] instead of [0],[0],[0],[-1].) The fix: registration
+    // suppression matches ANY enclosing wrapper identity, not just the
+    // immediate parent and unit anchor.
+    const src2: Exp = { type: "src", index: 2 };
+    const run = runBoth(
+      {
+        type: "merge",
+        left: {
+          type: "switchAll",
+          inners: [
+            {
+              type: "concatAll",
+              inners: [
+                {
+                  type: "merge",
+                  left: { type: "of", values: [0] },
+                  right: {
+                    type: "mergeMap",
+                    fns: [],
+                    arg: { type: "take", count: 1, arg: src2 },
+                  },
+                },
+              ],
+              trigger: { type: "map", fn: { op: "add", k: 0 }, arg: src2 },
+            },
+          ],
+        },
+        right: {
+          type: "scan",
+          init: 0,
+          fn: { op: "add", k: 0 },
+          arg: { type: "src", index: 0 },
+        },
+      },
+      [
+        [2, 0],
+        [2, 0],
+        [2, 0],
+        [0, -1],
+      ],
+    );
+    expect(run.rec.batches).toEqual([[0], [0], [0], [-1]]);
     expect(run.rec.batches).toEqual(run.expected);
   });
 

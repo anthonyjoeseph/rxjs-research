@@ -629,7 +629,7 @@ const denoteC = (exp: Exp, ctx: Ctx, subTime: SubTime): Denoted => {
       return {
         list: base
           .filter(([t]) => t[0] > subTick || subTick === 0)
-          .map(([t, v, m]) =>
+          .map(([t, v]) =>
             ctx.sharedDirect === true
               ? // a direct subject subscription: this ref's own slot.
                 // The binding's own delivery meta (sub/slot) describes

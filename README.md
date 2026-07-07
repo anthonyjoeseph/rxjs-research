@@ -171,8 +171,8 @@ events **strictly after** its subscription instant — so diamonds *grow*:
 
 ```ts
 // let x = share(src) in merge(x, mergeMap(() => x)(triggers))
-triggers.next();  src.next(7);   // [7]     — one subscriber so far
-triggers.next();  src.next(8);   // [8, 8]  — two now
+triggers.next();  src.next(7);   // [7, 7]     — the static arm + one spawned
+triggers.next();  src.next(8);   // [8, 8, 8]  — a third subscriber now
 ```
 
 The strictly-after rule is also what makes **feedback loops**
@@ -324,7 +324,7 @@ npm run agda                              # typecheck agda/src/Everything.agda
 | Path | What |
 | --- | --- |
 | [typescript/src/v5/](typescript/src/v5/) | The implementation: emission trees, primitives, joins, `batchSimultaneous` |
-| [typescript/src/v5/\_\_tests\_\_/](typescript/src/v5/__tests__/) | 93 jest tests: every primitive, every join, the diamond in many shapes, feedback loops, `takeUntil`, `expand`, and side-by-side rxjs comparisons |
+| [typescript/src/v5/\_\_tests\_\_/](typescript/src/v5/__tests__/) | 95 jest tests: every primitive, every join, the diamond in many shapes, feedback loops, `takeUntil`, `expand`, and side-by-side rxjs comparisons |
 | [typescript/src/model/](typescript/src/model/) | A pure *timed-list* model of the same semantics + a deep-embedded expression type, used as a [fast-check](https://fast-check.dev/) oracle: random combinator trees are run through both the rxjs machinery and the model, and must agree |
 | [agda/](agda/) | **Formal verification** of `batchSimultaneous` — see [agda/README.md](agda/README.md) for the full approach |
 

@@ -53,20 +53,23 @@ const sameId = (
 
 /** mirror of the registration decision shared by registerSubtree,
  * registrationDeltas and unitProvenanceCloseSubs: EMPTY inits are
- * registration leaves; a non-empty init re-states its enclosing wrapper
- * or the unit's anchor spine ONLY when it is the same registration —
- * same provenance AND (where ids are known) the same sub. A same-source
- * init with a DIFFERENT sub is a genuine fresh lifecycle (e.g.
- * take(0)(src) spawned in-frame by a trigger derived from src): it
- * registers, so its close nets zero. */
+ * registration leaves; a non-empty init is a routing re-statement (does
+ * NOT register) when its identity matches ANY enclosing wrapper on the
+ * path from the delivery's routing chain down to it — same provenance
+ * AND (where ids are known) the same sub. A registration delivers at
+ * most once per identity, so a non-empty init under its own id's wrapper
+ * is always a re-statement (e.g. a graft wrapping a deferred flush in
+ * the TRIGGER's identity while the unit is anchored at the closing
+ * chain's id — seed -1062187723). A same-source init with a DIFFERENT,
+ * unenclosed sub is a genuine fresh lifecycle (e.g. take(0)(src)
+ * spawned in-frame by a trigger derived from src): it registers, so its
+ * close nets zero. */
 const registersHere = <A>(
   c: InstInit<A>,
-  parent: NodeId,
-  unitFor: NodeId,
+  ancestors: readonly NodeId[],
 ): boolean =>
   c.children.length === 0 ||
-  (!sameId(c.provenance, c.sub, parent) &&
-    !sameId(c.provenance, c.sub, unitFor));
+  ancestors.every((a) => !sameId(c.provenance, c.sub, a));
 
 const addDelivered = (
   delivered: ReadonlyMap<symbol | undefined, number>,
@@ -213,6 +216,7 @@ const registerBurst = <A>(
   emit: InstEmit<A>,
   memory: Record<symbol, ProvenanceState<A>>,
   parent?: NodeId,
+  routing: readonly NodeId[] = [],
 ): Record<symbol, ProvenanceState<A>> => {
   if (emit.type === "init") {
     const base =
@@ -227,7 +231,7 @@ const registerBurst = <A>(
       if (child.type === "close") {
         return updateMemory(acc, emit.provenance, { totalNum: "--" });
       }
-      return registerBurst(child, acc, selfId);
+      return registerBurst(child, acc, selfId, [...routing, selfId]);
     }, base);
   }
   if (emit.child == null || emit.child.type === "value") {
@@ -240,6 +244,7 @@ const registerBurst = <A>(
     // a unit: its anchor doesn't re-register; unit-level closes decrement;
     // nested subtrees (freshly subscribed inners) register
     const unit = emit.child;
+    const selfId = { prov: emit.provenance, sub: emit.sub };
     const unitId = { prov: unit.provenance, sub: unit.sub };
     const afterCloses = unit.children.reduce(
       (acc, child) =>
@@ -252,11 +257,14 @@ const registerBurst = <A>(
       (acc, child) =>
         child.type === "value" || child.type === "close"
           ? acc
-          : registerSubtree(child, acc, unitId, unitId),
+          : registerSubtree(child, acc, [...routing, selfId, unitId]),
       afterCloses,
     );
   }
-  return registerBurst(emit.child, memory);
+  return registerBurst(emit.child, memory, undefined, [
+    ...routing,
+    { prov: emit.provenance, sub: emit.sub },
+  ]);
 };
 
 const groupInitSiblings = <A>(
@@ -294,6 +302,7 @@ const groupInitSiblings = <A>(
  * subscription. */
 const unitProvenanceCloseSubs = <A>(
   unit: InstInit<A>,
+  routing: readonly NodeId[] = [],
 ): (symbol | undefined)[] => {
   const prov = unit.provenance;
   const out: (symbol | undefined)[] = [];
@@ -306,7 +315,7 @@ const unitProvenanceCloseSubs = <A>(
   const walk = (
     children: (InstEmit<A> | InstVal<A> | InstClose)[],
     enclosing: NodeId,
-    unitFor: NodeId,
+    ancestors: readonly NodeId[],
     enclosingRegistered: boolean,
   ): void => {
     for (const c of children) {
@@ -317,11 +326,9 @@ const unitProvenanceCloseSubs = <A>(
       } else if (c.type === "value") {
         // no close
       } else if (c.type === "init") {
-        // mirror registerSubtree's decision, spine rule included
-        const registered = registersHere(c, enclosing, unitFor);
-        const childUnitFor = sameId(c.provenance, c.sub, unitFor)
-          ? unitFor
-          : { prov: c.provenance, sub: c.sub };
+        // mirror registerSubtree's decision, enclosing-ancestors included
+        const registered = registersHere(c, ancestors);
+        const cId = { prov: c.provenance, sub: c.sub };
         if (registered && c.provenance === prov && c.sub !== undefined) {
           born.push(c.sub);
         }
@@ -330,23 +337,19 @@ const unitProvenanceCloseSubs = <A>(
             out.push(undefined);
           }
         }
-        walk(
-          c.children,
-          { prov: c.provenance, sub: c.sub },
-          childUnitFor,
-          registered,
-        );
+        walk(c.children, cId, [...ancestors, cId], registered);
       } else if (c.child?.type === "close") {
         if (c.provenance === prov) {
           out.push(c.sub);
         }
       } else if (c.child != null && c.child.type !== "value") {
-        walk([c.child], { prov: c.provenance, sub: c.sub }, unitFor, false);
+        const cId = { prov: c.provenance, sub: c.sub };
+        walk([c.child], cId, [...ancestors, cId], false);
       }
     }
   };
   const unitId = { prov, sub: unit.sub };
-  walk(unit.children, unitId, unitId, false);
+  walk(unit.children, unitId, [...routing, unitId], false);
   for (let i = 0; i < (unit.cancelled ?? 0); i++) {
     out.push(undefined);
   }
@@ -372,8 +375,9 @@ const unitProvenanceCloseSubs = <A>(
 const unmatchedExtraCloses = <A>(
   unit: InstInit<A>,
   entry: ProvenanceState<A> | undefined,
+  routing: readonly NodeId[] = [],
 ): (symbol | undefined)[] => {
-  const subs = unitProvenanceCloseSubs(unit);
+  const subs = unitProvenanceCloseSubs(unit, routing);
   if (subs.length === 0) {
     return [];
   }
@@ -414,6 +418,7 @@ const unmatchedExtraCloses = <A>(
 const batchAsync = <A>(
   emit: InstAsync<A>,
   memory: Record<symbol, ProvenanceState<A>>,
+  routing: readonly NodeId[] = [],
 ): InstEmit<A[]> | null => {
   if (emit.child?.type === "close") {
     // every subscriber of a provenance delivers something at its close
@@ -445,7 +450,10 @@ const batchAsync = <A>(
     return async({
       provenance: emit.provenance,
       sub: emit.sub,
-      child: batchAsync(emit.child, memory),
+      child: batchAsync(emit.child, memory, [
+        ...routing,
+        { prov: emit.provenance, sub: emit.sub },
+      ]),
     });
   }
   // the unit level: the child is null, a value, or an init caused by this
@@ -466,7 +474,10 @@ const batchAsync = <A>(
   // earlier branch values arrived before the cut): those slots are spent.
   const extraCloses =
     emit.child?.type === "init"
-      ? unmatchedExtraCloses(emit.child, unitEntry).length
+      ? unmatchedExtraCloses(emit.child, unitEntry, [
+          ...routing,
+          { prov: emit.provenance, sub: emit.sub },
+        ]).length
       : 0;
   if (
     (unitEntry !== undefined &&
@@ -544,30 +555,22 @@ const batchOrGroup = <A>(
 const registerSubtree = <A>(
   emit: InstEmit<A>,
   memory: Record<symbol, ProvenanceState<A>>,
-  parent: NodeId,
-  unit: NodeId,
+  ancestors: readonly NodeId[],
 ): Record<symbol, ProvenanceState<A>> => {
   if (emit.type === "init") {
     // EMPTY inits are registration LEAVES (a genuine new subscription,
     // even of the unit's own anchor — a concat advancing back onto the
-    // source whose close advanced it); non-empty SAME-REGISTRATION inits
-    // (same provenance and, where ids are known, same sub) are
-    // self-wrap/routing re-statements and don't re-register. A
-    // same-provenance init with a DIFFERENT sub is a fresh lifecycle and
-    // registers (see registersHere).
-    const base = registersHere(emit, parent, unit)
+    // source whose close advanced it); non-empty inits whose identity
+    // matches ANY enclosing wrapper are routing re-statements and don't
+    // re-register (a registration delivers once — its id enclosing this
+    // node means it was already counted). A same-provenance init with a
+    // fresh, unenclosed sub is a genuine lifecycle and registers (see
+    // registersHere).
+    const base = registersHere(emit, ancestors)
       ? updateMemory(memory, emit.provenance, { totalNum: "++" })
       : memory;
-    // the same-as-unit suppression holds only along the UNBROKEN
-    // anchor-identity spine: routing re-statements re-state their own
-    // level's wrapper. Once nested under a FOREIGN init (a real join
-    // boundary), an anchor-provenance init is a genuine lifecycle of the
-    // same source (e.g. take(0)(src) inside a switch burst delivered by a
-    // src-triggered arrival) — it must register so its close nets zero.
-    const unitForChildren = sameId(emit.provenance, emit.sub, unit)
-      ? unit
-      : { prov: emit.provenance, sub: emit.sub };
     const selfId = { prov: emit.provenance, sub: emit.sub };
+    const childAncestors = [...ancestors, selfId];
     return emit.children.reduce((acc, child) => {
       if (child.type === "value") {
         return acc;
@@ -575,7 +578,7 @@ const registerSubtree = <A>(
       if (child.type === "close") {
         return updateMemory(acc, emit.provenance, { totalNum: "--" });
       }
-      return registerSubtree(child, acc, selfId, unitForChildren);
+      return registerSubtree(child, acc, childAncestors);
     }, base);
   }
   if (emit.child == null || emit.child.type === "value") {
@@ -584,12 +587,10 @@ const registerSubtree = <A>(
   if (emit.child.type === "close") {
     return updateMemory(memory, emit.provenance, { totalNum: "--" });
   }
-  return registerSubtree(
-    emit.child,
-    memory,
+  return registerSubtree(emit.child, memory, [
+    ...ancestors,
     { prov: emit.provenance, sub: emit.sub },
-    unit,
-  );
+  ]);
 };
 
 /**
@@ -605,25 +606,21 @@ const walkDeltas = <A>(
   bump: (prov: symbol, sub: symbol | undefined, d: number) => void,
   parentProvenance?: symbol,
 ): void => {
-  const subtree = (e: InstEmit<A>, parent: NodeId, unitFor: NodeId): void => {
+  const subtree = (e: InstEmit<A>, ancestors: readonly NodeId[]): void => {
     if (e.type === "init") {
       // mirror registerSubtree: EMPTY inits are registration leaves and
-      // always count; non-empty same-REGISTRATION headers (same
-      // provenance and, where ids are known, same sub) are re-statements
-      if (registersHere(e, parent, unitFor)) {
+      // always count; non-empty headers whose identity matches ANY
+      // enclosing wrapper are re-statements
+      if (registersHere(e, ancestors)) {
         bump(e.provenance, e.sub, 1);
       }
-      // mirror registerSubtree's spine rule: same-as-unit suppression dies
-      // when descending under a foreign init (or a foreign sub)
-      const unitForChildren = sameId(e.provenance, e.sub, unitFor)
-        ? unitFor
-        : { prov: e.provenance, sub: e.sub };
       const selfId = { prov: e.provenance, sub: e.sub };
+      const childAncestors = [...ancestors, selfId];
       for (const child of e.children) {
         if (child.type === "close") {
           bump(e.provenance, e.sub, -1);
         } else if (child.type !== "value") {
-          subtree(child, selfId, unitForChildren);
+          subtree(child, childAncestors);
         }
       }
       return;
@@ -631,11 +628,15 @@ const walkDeltas = <A>(
     if (e.child?.type === "close") {
       bump(e.provenance, e.sub, -1);
     } else if (e.child != null && e.child.type !== "value") {
-      subtree(e.child, { prov: e.provenance, sub: e.sub }, unitFor);
+      subtree(e.child, [...ancestors, { prov: e.provenance, sub: e.sub }]);
     }
   };
   // mirror of registerBurst for the init-headed walk
-  const burst = (e: InstEmit<A>, parent?: NodeId): void => {
+  const burst = (
+    e: InstEmit<A>,
+    parent?: NodeId,
+    routing: readonly NodeId[] = [],
+  ): void => {
     if (e.type === "init") {
       if (parent === undefined || !sameId(e.provenance, e.sub, parent)) {
         bump(e.provenance, e.sub, 1);
@@ -645,7 +646,7 @@ const walkDeltas = <A>(
         if (child.type === "close") {
           bump(e.provenance, e.sub, -1);
         } else if (child.type !== "value") {
-          burst(child, selfId);
+          burst(child, selfId, [...routing, selfId]);
         }
       }
       return;
@@ -662,18 +663,22 @@ const walkDeltas = <A>(
       // registerSubtree), and unit-level closes (a close traveling with a
       // value) decrement
       const unit = e.child;
+      const selfId = { prov: e.provenance, sub: e.sub };
       const unitId = { prov: unit.provenance, sub: unit.sub };
       for (const child of unit.children) {
         if (child.type === "close") {
           bump(unit.provenance, unit.sub, -1);
         } else if (child.type !== "value") {
-          subtree(child, unitId, unitId);
+          subtree(child, [...routing, selfId, unitId]);
         }
       }
       return;
     }
     // routing wrapper
-    burst(e.child);
+    burst(e.child, undefined, [
+      ...routing,
+      { prov: e.provenance, sub: e.sub },
+    ]);
   };
   burst(
     emit,
@@ -734,6 +739,7 @@ const updateMemoryFromEmit = <A>(
   emit: InstEmit<A>,
   oldMemory: Record<symbol, ProvenanceState<A>>,
   parentProvenance?: symbol,
+  routing: readonly NodeId[] = [],
 ): Record<symbol, ProvenanceState<A>> => {
   if (emit.type === "init") {
     // a subscription burst: registration only — its values were batched by
@@ -783,7 +789,10 @@ const updateMemoryFromEmit = <A>(
     const unit = emit.child;
     // the extra closes are computed against the PRE-delivery window state
     // (mirrors batchAsync, which decided before this update ran)
-    const extras = unmatchedExtraCloses(unit, oldMemory[unit.provenance]);
+    const extras = unmatchedExtraCloses(unit, oldMemory[unit.provenance], [
+      ...routing,
+      { prov: emit.provenance, sub: emit.sub },
+    ]);
     const afterValues = updateMemory(oldMemory, unit.provenance, {
       awaitingValueCount: "--",
       batchAppend: values(unit),
@@ -815,11 +824,12 @@ const updateMemoryFromEmit = <A>(
       afterSlots,
     );
     const unitId = { prov: unit.provenance, sub: unit.sub };
+    const selfId = { prov: emit.provenance, sub: emit.sub };
     return unit.children.reduce(
       (acc, child) =>
         child.type === "value" || child.type === "close"
           ? acc
-          : registerSubtree(child, acc, unitId, unitId),
+          : registerSubtree(child, acc, [...routing, selfId, unitId]),
       afterCloses,
     );
   }
@@ -828,7 +838,10 @@ const updateMemoryFromEmit = <A>(
   // wrapper (a join anchored on it), and decrementing here opens phantom
   // windows that strand later values. All accounting happens at the unit
   // level.
-  return updateMemoryFromEmit(emit.child, oldMemory, undefined);
+  return updateMemoryFromEmit(emit.child, oldMemory, undefined, [
+    ...routing,
+    { prov: emit.provenance, sub: emit.sub },
+  ]);
 };
 
 export const batchSimultaneous = <A>(
