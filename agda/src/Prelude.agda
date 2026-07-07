@@ -114,6 +114,11 @@ length : {A : Set} → List A → ℕ
 length []       = 0
 length (x ∷ xs) = suc (length xs)
 
+length-map : {A B : Set} (f : A → B) (xs : List A)
+           → length (map f xs) ≡ length xs
+length-map f []       = refl
+length-map f (x ∷ xs) = cong suc (length-map f xs)
+
 replicate : {A : Set} → ℕ → A → List A
 replicate zero    x = []
 replicate (suc n) x = x ∷ replicate n x
@@ -131,6 +136,11 @@ infixr 5 _++_
 _++_ : {A : Set} → List A → List A → List A
 []       ++ ys = ys
 (x ∷ xs) ++ ys = x ∷ (xs ++ ys)
+
+length-++ : {A : Set} (xs ys : List A)
+          → length (xs ++ ys) ≡ length xs + length ys
+length-++ []       ys = refl
+length-++ (x ∷ xs) ys = cong suc (length-++ xs ys)
 
 ++-nil : {A : Set} (xs : List A) → xs ++ [] ≡ xs
 ++-nil []       = refl
@@ -254,6 +264,12 @@ ltℕ⇒leqℕ-flip-false zero    zero    ()
 ltℕ⇒leqℕ-flip-false zero    (suc b) _ = refl
 ltℕ⇒leqℕ-flip-false (suc a) zero    ()
 ltℕ⇒leqℕ-flip-false (suc a) (suc b) p = ltℕ⇒leqℕ-flip-false a b p
+
+eqℕ-flip-false : (a b : ℕ) → eqℕ a b ≡ false → eqℕ b a ≡ false
+eqℕ-flip-false zero    zero    ()
+eqℕ-flip-false zero    (suc b) _ = refl
+eqℕ-flip-false (suc a) zero    _ = refl
+eqℕ-flip-false (suc a) (suc b) p = eqℕ-flip-false a b p
 
 eqℕ-complete : (a b : ℕ) → a ≡ b → eqℕ a b ≡ true
 eqℕ-complete a .a refl = eqℕ-refl a

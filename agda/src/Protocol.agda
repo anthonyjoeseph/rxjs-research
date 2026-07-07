@@ -306,7 +306,7 @@ run-ok tn (r ∷ rs) (ot∷ (okB {p} bk len) ot) =
 
 -- THE COUNTING THEOREM, referee side ---------------------------------------------
 
-open import Diamond using (HeadNe; hn[]; hn∷; batchSpec-headNe; insert-ne)
+open import Diamond using (HeadNe; hn[]; hn∷; batchSpec-headNe; insert-ne; diamond2)
 
 consNET : {A : Set} → Time → List A → TimedObs (List A) → TimedObs (List A)
 consNET t []       bs = bs
@@ -649,6 +649,95 @@ data Aligned {A : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
 slotsOf : {A : Set} → Driver A → List ℕ
 slotsOf = map fst
 
+-- (1) COMBINATOR PRESERVATION, DISCHARGED — truthfulness is compositional:
+-- every program built from the fragment combinators produces Aligned
+-- traces, and Aligned traces are OkTrace. mergeP ADDS registration counts
+-- and CONCATENATES blocks: the diamond argument, by construction.
+
+bump-self : (p : Prov) → bump (λ _ → zero) p p ≡ 1
+bump-self p rewrite eqℕ-refl p = refl
+
+bump-other : (p q : Prov) → eqℕ p q ≡ false → bump (λ _ → zero) p q ≡ 0
+bump-other p q ne rewrite ne = refl
+
+aligned-ok : {A : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
+  (is : List ℕ) (rs : List (List (Delivery A)))
+  → Aligned π tn is rs → OkTrace tn rs
+aligned-ok π tn [] [] al[] = ot[]
+aligned-ok π tn (i ∷ is) (r ∷ rs) (al∷ bk len al) =
+  ot∷ (okB bk len) (aligned-ok π tn is rs al)
+
+subjectP-aligned : {A : Set} (π : ℕ → Prov)
+  → ((j k : ℕ) → eqℕ j k ≡ false → eqℕ (π j) (π k) ≡ false)
+  → (d : Driver A) (i : ℕ)
+  → Aligned π (bump (λ _ → zero) (π i)) (slotsOf d)
+            (reacts (subjectP d (π i) i))
+subjectP-aligned π inj [] i = al[]
+subjectP-aligned π inj ((j , v) ∷ d) i with eqℕ j i in e
+... | true rewrite eqℕ-sound j i e =
+  al∷ (bk∷ vb1 bk[]) (sym (bump-self (π i))) (subjectP-aligned π inj d i)
+... | false =
+  al∷ bk[]
+      (sym (bump-other (π i) (π j)
+             (eqℕ-flip-false (π j) (π i) (inj j i e))))
+      (subjectP-aligned π inj d i)
+
+ofP-aligned : {A : Set} (π : ℕ → Prov) (d : Driver A)
+  (p : Prov) (vs : List A)
+  → ((j : ℕ) → eqℕ (π j) p ≡ false)
+  → Aligned π (bump (λ _ → zero) p) (slotsOf d) (reacts (ofP d p vs))
+ofP-aligned π [] p vs h = al[]
+ofP-aligned π ((j , v) ∷ d) p vs h =
+  al∷ bk[]
+      (sym (bump-other p (π j) (eqℕ-flip-false (π j) p (h j))))
+      (ofP-aligned π d p vs h)
+
+mapEv-valburst : {A B : Set} (f : A → B) {es : List (Ev A)}
+  → ValBurst es → ValBurst (map (mapEv f) es)
+mapEv-valburst f vb1      = vb1
+mapEv-valburst f (vb∷ vb) = vb∷ (mapEv-valburst f vb)
+
+mapDel-block : {A B : Set} (f : A → B) (p : Prov) {ds : List (Delivery A)}
+  → Block p ds → Block p (map (mapDel f) ds)
+mapDel-block f p bk[]        = bk[]
+mapDel-block f p (bk∷ vb bk) = bk∷ (mapEv-valburst f vb) (mapDel-block f p bk)
+
+mapP-aligned : {A B : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
+  (f : A → B) (is : List ℕ) (T : Trace A)
+  → Aligned π tn is (reacts T)
+  → Aligned π tn is (reacts (mapP f T))
+mapP-aligned π tn f is (tr fr rs) al = go is rs al
+  where
+    go : (is : List ℕ) (rs : List (List (Delivery _)))
+       → Aligned π tn is rs
+       → Aligned π tn is (map (map (mapDel f)) rs)
+    go [] [] al[] = al[]
+    go (i ∷ is) (r ∷ rs) (al∷ bk len al) =
+      al∷ (mapDel-block f (π i) bk)
+          (trans (length-map (mapDel f) r) len)
+          (go is rs al)
+
+block-++ : {A : Set} (p : Prov) {ds es : List (Delivery A)}
+  → Block p ds → Block p es → Block p (ds ++ es)
+block-++ p bk[]        be = be
+block-++ p (bk∷ vb bk) be = bk∷ vb (block-++ p bk be)
+
+mergeP-aligned : {A : Set} (π : ℕ → Prov) (tn₁ tn₂ : Prov → ℕ)
+  (is : List ℕ) (T U : Trace A)
+  → Aligned π tn₁ is (reacts T) → Aligned π tn₂ is (reacts U)
+  → Aligned π (addF tn₁ tn₂) is (reacts (mergeP T U))
+mergeP-aligned π tn₁ tn₂ is (tr f₁ r₁) (tr f₂ r₂) a₁ a₂ = go is r₁ r₂ a₁ a₂
+  where
+    go : (is : List ℕ) (r₁ r₂ : List (List (Delivery _)))
+       → Aligned π tn₁ is r₁ → Aligned π tn₂ is r₂
+       → Aligned π (addF tn₁ tn₂) is (zipConcat r₁ r₂)
+    go [] [] [] al[] al[] = al[]
+    go (i ∷ is) (r ∷ rs) (u ∷ us) (al∷ b₁ l₁ a₁) (al∷ b₂ l₂ a₂) =
+      al∷ (block-++ (π i) b₁ b₂)
+          (trans (length-++ r u) (cong₂ _+_ l₁ l₂))
+          (go is rs us a₁ a₂)
+
+
 -- the timed environment a driver induces (the referee's view of the
 -- roots): slot i's history at ticks 1.., closing after the drive, one
 -- slot at a time
@@ -662,78 +751,197 @@ slotEmits i k ((j , v) ∷ d) =
 envOf : Driver Val → BEnv
 envOf d i = (t₀ , obs (slotEmits i 0 d) (suc (length d) + i , 0))
 
+-- the remaining holes, and the endgame VALUES that rely on them ---------------
+--
+-- The results we are building toward are written as bona fide proof terms
+-- NOW; every gap in their proofs is a named postulate. The holes are
+-- load-bearing and explicit — discharging them completes the proofs
+-- without touching the statements. A hole that cannot be discharged as
+-- stated is a spec bug and must be reworked, not worked around.
+
 postulate
-  -- (1) COMBINATOR PRESERVATION — truthfulness is compositional: every
-  -- program built from the fragment combinators produces Aligned traces,
-  -- and Aligned traces are OkTrace. mergeP ADDS registration counts and
-  -- CONCATENATES blocks: the diamond argument, by construction.
-  aligned-ok : {A : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
-    (is : List ℕ) (rs : List (List (Delivery A)))
-    → Aligned π tn is rs → OkTrace tn rs
-
-  subjectP-aligned : {A : Set} (π : ℕ → Prov)
-    → ((j k : ℕ) → eqℕ j k ≡ false → eqℕ (π j) (π k) ≡ false)
-    → (d : Driver A) (i : ℕ)
-    → Aligned π (bump (λ _ → zero) (π i)) (slotsOf d)
-              (reacts (subjectP d (π i) i))
-
-  ofP-aligned : {A : Set} (π : ℕ → Prov) (d : Driver A)
-    (p : Prov) (vs : List A)
-    → ((j : ℕ) → eqℕ (π j) p ≡ false)
-    → Aligned π (bump (λ _ → zero) p) (slotsOf d) (reacts (ofP d p vs))
-
-  mapP-aligned : {A B : Set} (π : ℕ → Prov) (tn : Prov → ℕ)
-    (f : A → B) (is : List ℕ) (T : Trace A)
-    → Aligned π tn is (reacts T)
-    → Aligned π tn is (reacts (mapP f T))
-
-  mergeP-aligned : {A : Set} (π : ℕ → Prov) (tn₁ tn₂ : Prov → ℕ)
-    (is : List ℕ) (T U : Trace A)
-    → Aligned π tn₁ is (reacts T) → Aligned π tn₂ is (reacts U)
-    → Aligned π (addF tn₁ tn₂) is (reacts (mergeP T U))
-
-  -- (2) THE STAMP BRIDGE — the referee's view of a merged trace is the
-  -- timed merge of the referees' views: connects the protocol layer to
-  -- every mergeT theorem in Burst.agda/Diamond.agda
+  -- HOLE (bridge): the referee's view of a merged trace is the timed
+  -- merge of the referees' views — connects the protocol layer to every
+  -- mergeT theorem in Burst.agda/Diamond.agda
   stamp-mergeP : {A : Set} (T U : Trace A)
     → length (reacts T) ≡ length (reacts U)
     → stamp (mergeP T U) ≡ mergeT (stamp T) (stamp U)
 
-  -- (3) SHARELIVES TRUTHFULNESS — the operational share model feeds the
-  -- machine truthful traces (so the endgame applies to it), for
-  -- well-formed configurations (trigger slots distinct from the tail
-  -- slot, budgets not interacting with cold replay, …) — formulating
-  -- WellFormedShare precisely is part of the obligation
+  -- HOLE (share wellformedness): the configurations shareLives is
+  -- truthful for (trigger slots distinct from the tail slot, budgets not
+  -- interacting with cold replay, …) — formulating it precisely is part
+  -- of the obligation
   WellFormedShare : {A : Set}
     → ShareSrc A → List (Spec A) → Driver A → Set
-  shareLives-endgame : {A : Set} (src : ShareSrc A)
+
+  -- HOLE (share truthfulness): well-formed share configurations feed the
+  -- machine truthful traces
+  shareLives-ok : {A : Set} (src : ShareSrc A)
     (specs : List (Spec A)) (d : Driver A)
     → WellFormedShare src specs d
-    → machine (shareLives src specs d)
-      ≡ forgetT (batchSpec (stamp (shareLives src specs d)))
+    → OkTrace (applyEvs (λ _ → zero) (frame (shareLives src specs d)))
+              (reacts (shareLives src specs d))
 
-  -- (4) THE FULL-GRAMMAR ENDGAME — a trace denotation for the whole Burst
-  -- grammar, agreeing with the machine on one side and the timed
-  -- denotation on the other. Canonical is the validity predicate
-  -- (registration-canonical trees, non-resetting shares — the domain the
-  -- flat referee decides; formulating it precisely is part of the
-  -- obligation, mirroring the TS oracle's isCanonical filter)
+  -- HOLE (full-grammar trace denotation): the protocol behavior of every
+  -- Burst program, and its validity predicate (registration-canonical
+  -- trees, non-resetting shares — mirroring the TS oracle's isCanonical
+  -- filter); formulating Canonical and defining traceOf by structural
+  -- recursion (threading a provenance supply and share states) is the
+  -- centerpiece obligation
   Canonical : Exp → Set
   traceOf : Exp → Driver Val → Trace Val
-  endgame-full : (e : Exp) (d : Driver Val)
-    → Canonical e
-    → machine (traceOf e d)
-      ≡ forgetT (batchSpec (emits (⟦ e ⟧ (envOf d) t₀)))
 
-  -- (5) THE TRUNCATION-AWARE MACHINE — an upstream take cutting a whole
+  -- HOLE (traceOf is truthful): canonical programs produce truthful traces
+  traceOf-ok : (e : Exp) (d : Driver Val)
+    → Canonical e
+    → OkTrace (applyEvs (λ _ → zero) (frame (traceOf e d)))
+              (reacts (traceOf e d))
+
+  -- HOLE (traceOf is faithful): the stamped trace IS the timed denotation
+  stamp-sound : (e : Exp) (d : Driver Val)
+    → Canonical e
+    → stamp (traceOf e d) ≡ emits (⟦ e ⟧ (envOf d) t₀)
+
+  -- HOLE (truncation-aware machine): an upstream take cutting a whole
   -- subtree MID-INSTANT closes registrations whose window slots are
   -- already owed; the refined machine shrinks the open window on closes
   -- of the window's own provenance (the one v5 behavior the burst
-  -- protocol does not carry yet). It must agree with runMem wherever no
-  -- mid-instant owner-close occurs.
+  -- protocol does not carry yet), and agrees with runMem wherever no
+  -- mid-instant owner-close occurs
   runMemCut : {A : Set} → Mem A → List (Delivery A) → List (List A)
   runMemCut-conservative : {A : Set} (tn : Prov → ℕ)
     (rs : List (List (Delivery A)))
     → OkTrace tn rs
     → runMemCut (mem tn nothing) (concatMap (λ r → r) rs)
       ≡ runMem (mem tn nothing) (concatMap (λ r → r) rs)
+
+-- OkTrace only reads the counts at its own blocks, so pointwise-equal
+-- registration counts are interchangeable
+okTrace-ext : {A : Set} {tn₁ tn₂ : Prov → ℕ} {rs : List (List (Delivery A))}
+  → ((q : Prov) → tn₁ q ≡ tn₂ q)
+  → OkTrace tn₁ rs → OkTrace tn₂ rs
+okTrace-ext h ot[] = ot[]
+okTrace-ext h (ot∷ okε ot) = ot∷ okε (okTrace-ext h ot)
+okTrace-ext h (ot∷ (okB {p} bk len) ot) =
+  ot∷ (okB bk (trans len (h p))) (okTrace-ext h ot)
+
+-- THE FRAGMENT ENDGAME (fully proven — no holes): any trace whose reacts
+-- are Aligned, with frame counts matching, satisfies the endgame. The
+-- preservation lemmas above feed this for every combinator-built program.
+fragment-endgame : {A : Set} (T : Trace A) (π : ℕ → Prov)
+  (tn : Prov → ℕ) (is : List ℕ)
+  → Aligned π tn is (reacts T)
+  → ((q : Prov) → tn q ≡ applyEvs (λ _ → zero) (frame T) q)
+  → machine T ≡ forgetT (batchSpec (stamp T))
+fragment-endgame (tr fr rs) π tn is al h =
+  endgame fr rs (okTrace-ext h (aligned-ok π tn is rs al))
+
+-- registration-count arithmetic for two-registration frames (values in
+-- the frame are count-invisible)
+add-two-regs : {A : Set} (p q r : Prov)
+  → bump (λ _ → zero) p r + bump (λ _ → zero) q r
+    ≡ applyEvs {A} (λ _ → zero) (reg p ∷ reg q ∷ []) r
+add-two-regs p q r with eqℕ p r | eqℕ q r
+... | true  | true  = refl
+... | true  | false = refl
+... | false | true  = refl
+... | false | false = refl
+
+applyEvs-valskip : {A : Set} (tn : Prov → ℕ) (vs : List A)
+  (es : List (Ev A))
+  → applyEvs tn (map val vs ++ es) ≡ applyEvs tn es
+applyEvs-valskip tn []       es = refl
+applyEvs-valskip tn (v ∷ vs) es = applyEvs-valskip tn vs es
+
+-- the diamond through the combinators, end to end (fully proven): the
+-- five preservation lemmas + the fragment endgame in one corollary
+diamond-fragment-endgame : {A : Set} (π : ℕ → Prov)
+  → ((j k : ℕ) → eqℕ j k ≡ false → eqℕ (π j) (π k) ≡ false)
+  → (d : Driver A) (i : ℕ) (f : A → A)
+  → machine (mergeP (subjectP d (π i) i) (mapP f (subjectP d (π i) i)))
+    ≡ forgetT (batchSpec
+        (stamp (mergeP (subjectP d (π i) i) (mapP f (subjectP d (π i) i)))))
+diamond-fragment-endgame {A} π inj d i f =
+  fragment-endgame
+    (mergeP (subjectP d (π i) i) (mapP f (subjectP d (π i) i)))
+    π _ (slotsOf d)
+    (mergeP-aligned π _ _ (slotsOf d)
+      (subjectP d (π i) i) (mapP f (subjectP d (π i) i))
+      (subjectP-aligned π inj d i)
+      (mapP-aligned π _ f (slotsOf d) (subjectP d (π i) i)
+        (subjectP-aligned π inj d i)))
+    (add-two-regs {A} (π i) (π i))
+
+-- a cold source merged with a subject, end to end (fully proven —
+-- consumes ofP-aligned)
+of-subject-endgame : {A : Set} (π : ℕ → Prov)
+  → ((j k : ℕ) → eqℕ j k ≡ false → eqℕ (π j) (π k) ≡ false)
+  → (d : Driver A) (p : Prov) (vs : List A) (i : ℕ)
+  → ((j : ℕ) → eqℕ (π j) p ≡ false)
+  → machine (mergeP (ofP d p vs) (subjectP d (π i) i))
+    ≡ forgetT (batchSpec (stamp (mergeP (ofP d p vs) (subjectP d (π i) i))))
+of-subject-endgame {A} π inj d p vs i h =
+  fragment-endgame (mergeP (ofP d p vs) (subjectP d (π i) i))
+    π _ (slotsOf d)
+    (mergeP-aligned π _ _ (slotsOf d)
+      (ofP d p vs) (subjectP d (π i) i)
+      (ofP-aligned π d p vs h)
+      (subjectP-aligned π inj d i))
+    (λ r → trans (add-two-regs {A} p (π i) r)
+             (cong (λ g → g r)
+               (sym (applyEvs-valskip (bump (λ _ → zero) p) vs
+                      (reg (π i) ∷ [])))))
+
+-- THE FULL ENDGAME, as a value: the machine, fed the protocol behavior of
+-- ANY canonical Burst program, produces exactly the batches the ratified
+-- timed denotation defines. The proof term is real; its gaps are the
+-- named holes above (traceOf-ok, stamp-sound).
+THE-ENDGAME : (e : Exp) (d : Driver Val)
+  → Canonical e
+  → machine (traceOf e d)
+    ≡ forgetT (batchSpec (emits (⟦ e ⟧ (envOf d) t₀)))
+THE-ENDGAME e d can =
+  trans (endgame (frame (traceOf e d)) (reacts (traceOf e d))
+          (traceOf-ok e d can))
+        (cong (λ xs → forgetT (batchSpec xs)) (stamp-sound e d can))
+
+-- the shareLives endgame, as a value: real proof, one hole (truthfulness)
+shareLives-endgame : {A : Set} (src : ShareSrc A)
+  (specs : List (Spec A)) (d : Driver A)
+  → WellFormedShare src specs d
+  → machine (shareLives src specs d)
+    ≡ forgetT (batchSpec (stamp (shareLives src specs d)))
+shareLives-endgame src specs d wfs =
+  endgame (frame (shareLives src specs d)) (reacts (shareLives src specs d))
+          (shareLives-ok src specs d wfs)
+
+-- the truncation-aware machine agrees with the referee on truthful
+-- traces, as a value: real proof, two holes (runMemCut + conservativity)
+machineCut : {A : Set} → Trace A → List (List A)
+machineCut (tr fr rs) =
+  consNE (valsOf fr)
+         (runMemCut (mem (applyEvs (λ _ → zero) fr) nothing)
+                    (concatMap (λ r → r) rs))
+
+machineCut-endgame : {A : Set} (fr : List (Ev A))
+  (rs : List (List (Delivery A)))
+  → OkTrace (applyEvs (λ _ → zero) fr) rs
+  → machineCut (tr fr rs) ≡ forgetT (batchSpec (stamp (tr fr rs)))
+machineCut-endgame fr rs ot =
+  trans (cong (consNE (valsOf fr))
+              (runMemCut-conservative (applyEvs (λ _ → zero) fr) rs ot))
+        (endgame fr rs ot)
+
+-- the merged-diamond referee, as a value relying on the bridge hole: two
+-- traces whose stamps are images of one strictly monotone stream batch,
+-- merged, to the paired images — Diamond.diamond2 through stamp-mergeP
+merged-diamond-batches : {A B : Set} (T U : Trace A)
+  (f g : B → A) (xs : TimedObs B)
+  → stamp T ≡ mapT f xs → stamp U ≡ mapT g xs
+  → StrictMono xs
+  → length (reacts T) ≡ length (reacts U)
+  → batchSpec (stamp (mergeP T U)) ≡ mapT (λ v → f v ∷ g v ∷ []) xs
+merged-diamond-batches T U f g xs eT eU m len =
+  trans (cong batchSpec (stamp-mergeP T U len))
+        (trans (cong₂ (λ a b → batchSpec (mergeT a b)) eT eU)
+               (diamond2 f g xs m))

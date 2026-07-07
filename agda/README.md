@@ -151,14 +151,18 @@ its trigger; a queued concat leg's flush rides the fin-carrying delivery).
 
 ## Open edges
 
-Written **as explicit postulates** at the bottom of
-[Protocol.agda](src/Protocol.agda) — the remaining obligations live in the
-code as typed statements, not in a side channel: combinator preservation
-(any program built from the trace combinators is truthful), the
-stamp↔mergeT bridge, shareLives truthfulness, the full-grammar trace
-denotation with the endgame quantified over `Exp`, and the
-truncation-aware machine (mid-instant take cuts across a diamond).
-Discharging them precedes any further TypeScript work.
+The results we are building toward are written as bona fide **proof
+terms** at the bottom of [Protocol.agda](src/Protocol.agda) — above all
+`THE-ENDGAME` (the machine, fed the protocol behavior of any canonical
+Burst program, produces exactly the batches the timed denotation defines)
+— and every gap in their proofs is a **named postulate**, load-bearing
+and explicit: the stamp↔mergeT bridge, shareLives truthfulness, the
+full-grammar trace denotation (`traceOf`/`Canonical`) with its
+truthfulness and faithfulness, and the truncation-aware machine.
+Combinator preservation is already discharged (fully proven:
+`fragment-endgame`, `diamond-fragment-endgame`, `of-subject-endgame`).
+Discharging the remaining holes completes the proofs without touching
+the statements, and precedes any further TypeScript work.
 
 ## Building
 
