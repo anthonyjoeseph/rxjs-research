@@ -14,7 +14,7 @@ that sees one event at a time and has no clock — produces exactly the
 batches the **spec** — a clairvoyant referee that sees the whole timed run
 at once — says are correct.
 
-Start reading at [src/Formal-Verification.agda](src/Formal-Verification.agda).
+Start reading at [src/Formal-Verification/](src/Formal-Verification/).
 `formal-verification` is already a *value*, not a postulate: its proof term
 is real. **Both sides are now fully defined** — the spec, the implementation,
 every Naive-Rx operator, and the validity domain `Canonical` — so the
@@ -333,9 +333,18 @@ impl-machine e = batchSimultaneousI (compile e)
 impl-batchSimultaneous em e = subscribeRx (impl-machine e) em
 ```
 
-### [src/Formal-Verification.agda](src/Formal-Verification.agda)
+### [src/Formal-Verification/](src/Formal-Verification/)
 
-The entrypoint. The bridge is fully DEFINED: `groupsOf` is the referee's
+The theorem, as a folder — **[Main-Theorem.agda](src/Formal-Verification/Main-Theorem.agda)
+is the entrypoint**, [Bridge.agda](src/Formal-Verification/Bridge.agda) is
+the shared vocabulary of the two proof halves,
+[Counting-Recovers.agda](src/Formal-Verification/Counting-Recovers.agda)
+and [Trace-Faithful.agda](src/Formal-Verification/Trace-Faithful.agda)
+each define their half as a value over finer named postulates, and
+[Roadmap.md](src/Formal-Verification/Roadmap.md) is the detailed plan for
+discharging them.
+
+The bridge is fully DEFINED: `groupsOf` is the referee's
 grouped view of a run (the machine's responses kept grouped by input —
 knowledge `run` concatenates away, as the proven `run-groups` lemma
 states), and `stamped` re-attaches the clock positionally — `flatten`
@@ -357,12 +366,19 @@ change the state (a spawned ref can never connect — a spawn arm written
 left of its slot's connecting static arm is rejected, matching v1's
 `ranked-delivery`).
 
-The two halves of the general proof are the ONLY remaining postulates in
-the development:
+The two halves of the general proof are both VALUES, each assembled from
+the finer postulates its file names (seven in total — the only postulates
+left in the development; see the Roadmap):
 
 ```agda
 counting-recovers : … → impl-batchSimultaneous em e ≡ batchSpecL (stamped em e)
+  -- = counting-factors ∘ counting-groups ∘ compile-accounted
+  --   (the pipeline reads only the trace; the pure counting theorem on
+  --    Accounted traces; canonical programs keep their books)
 trace-faithful    : … → stamped em e ≡ emits (⟦ e ⟧ em ρ₀ t₀)
+  -- = tracks-stamped ∘ tracks-compile
+  --   (the Tracks simulation relation: spawned at any position j, the
+  --    machine's stamped groups equal the denotation subscribed at (j,0))
 ```
 
 The theorem is their composition, literally:
@@ -402,7 +418,7 @@ list and nothing else.
 ## Building
 
 ```sh
-agda src/Formal-Verification.agda # the entrypoint — everything else follows
+agda src/Formal-Verification/Main-Theorem.agda # the entrypoint — everything else follows
 cd v1 && agda src/Everything.agda # the v1 reference tower
 ```
 
