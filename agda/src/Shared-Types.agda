@@ -128,9 +128,20 @@ run m is = snd (feed m (start m) is)
 -- .end() calls (a concat leg spawned when its predecessor completes
 -- registers normally and fins on ITS OWN later input); `end` is the
 -- final teardown sentinel (the TS r.endWith, promoted to a type).
+--
+-- `spawnAt k` is NOT produced by flatten — it is the SYNTHESIZED
+-- subscription input a mid-run spawn feeds a fresh inner (Naive-Rx's
+-- spawnInput). It carries how many sources have already completed by the
+-- spawn instant (k = threshold: slot i is done iff toℕ i < k). A source
+-- subscribed after its own completion must complete immediately — the TS
+-- InstantSubject's `ended ? of([fin])` — and a plain empty frame cannot
+-- express that, since a fresh copy never sees the past endSlot. Because
+-- completions are serialized in slot order at the very end, the current
+-- input pins k exactly (0 during frame/next, suc j at endSlot j, n at end).
 
 data In (n : ℕ) : Set where
   frame   : Vec (List Val) n → In n
+  spawnAt : ℕ → In n
   next    : Fin n → Val → In n
   endSlot : Fin n → In n
   end     : In n

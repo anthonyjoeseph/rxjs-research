@@ -183,8 +183,11 @@ takeWhileRx {n} {X} p incl m = record
 -- in-flight input itself (an rxjs Subject snapshots its subscribers at
 -- dispatch start: the upstream-race rule)
 spawnInput : {n : ℕ} → In n → In n
-spawnInput (frame ss) = frame ss
-spawnInput _          = frame (pureV [])
+spawnInput         (frame ss)  = frame ss
+spawnInput         (spawnAt k) = spawnAt k
+spawnInput         (next _ _)  = spawnAt 0
+spawnInput         (endSlot j) = spawnAt (suc (toℕ j))
+spawnInput {n = n} end         = spawnAt n
 
 -- r.mergeMap: every element spawns an inner machine, all stay live.
 -- The state holds each running inner as a dependent pair — WHICH

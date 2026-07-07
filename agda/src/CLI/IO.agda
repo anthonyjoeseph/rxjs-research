@@ -23,10 +23,11 @@ postulate
   appendStr    : String → String → String
 {-# FOREIGN GHC import qualified Data.Text as T #-}
 {-# FOREIGN GHC import qualified Data.Text.IO as TIO #-}
+{-# FOREIGN GHC import qualified System.IO #-}
 {-# COMPILE GHC returnIO = \_ x -> return x #-}
 {-# COMPILE GHC _>>=_ = \_ _ m k -> m >>= k #-}
 {-# COMPILE GHC getContents = TIO.getContents #-}
-{-# COMPILE GHC putStr = \s -> TIO.putStr s >> return () #-}
+{-# COMPILE GHC putStr = \s -> TIO.putStr s >> System.IO.hFlush System.IO.stdout >> return () #-}
 {-# COMPILE GHC foldString = \_ f z s -> T.foldr (\c acc -> f (fromIntegral (fromEnum c)) acc) z s #-}
 {-# COMPILE GHC natToStr = \n -> T.pack (show (n :: Integer)) #-}
 {-# COMPILE GHC appendStr = T.append #-}

@@ -126,8 +126,10 @@ runOut stp seed alive out items =
 -- in-band fin (its own instant, so a concat leg spawned by another
 -- source's completion still fins on its own later input). The final
 -- teardown sentinel is not the subject's business.
--- A copy spawned mid-run gets a synthesized frame with empty flushes,
--- so it registers without replaying — hot, automatically.
+-- A copy spawned mid-run gets a synthesized `spawnAt k` subscription: it
+-- registers without replaying (hot), UNLESS its slot has already completed
+-- by then (toℕ i < k), in which case it completes the late subscriber
+-- immediately — the TS InstantSubject's `ended ? of([fin])`.
 
 srcI : {n : ℕ} → Fin n → Inst n Val
 srcI i = record { State = ⊤ ; start = tt ; step = λ _ inp → tt , respond inp }
@@ -135,6 +137,13 @@ srcI i = record { State = ⊤ ; start = tt ; step = λ _ inp → tt , respond in
     respond : In _ → List (Emit Val)
     respond (frame ss) =
       (srcProv i , init (srcProv i) ∷ map value (lookupV ss i)) ∷ []
+    -- a mid-run subscription: if this slot has already completed (toℕ i < k)
+    -- it completes the late subscriber immediately (TS: `ended ? of([fin])`,
+    -- COLD, no registration); otherwise it registers hot and replays nothing
+    respond (spawnAt k) =
+      if ltℕ (toℕ i) k
+      then (cold , fin ∷ []) ∷ []
+      else (srcProv i , init (srcProv i) ∷ []) ∷ []
     respond (next j v) =
       if eqℕ (toℕ i) (toℕ j) then (srcProv i , value v ∷ []) ∷ [] else []
     respond (endSlot j) =

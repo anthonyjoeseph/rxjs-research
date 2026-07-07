@@ -25,7 +25,16 @@ Follow these phases in order for any change to the implementation or spec:
 1. **Agda first.** Make the change to the spec/impl in Agda before touching TypeScript.
 2. **QuickCheck dev loop.** Use `npm run agda:qc` (the all-Agda QuickCheck comparing
    `impl-batchSimultaneous` vs `spec-batchSimultaneous`) to align the implementation and
-   spec quickly.
+   spec quickly. **The spec is gospel — do NOT touch it to resolve a mismatch.** When impl
+   and spec disagree, the implementation is wrong by default; change the implementation.
+   Only touch the spec under very special circumstances, and only after asking.
+
+   **Resolving ambiguity.** When the spec seems ambiguous or you're unsure what the "right"
+   answer is, defer to **naive plain rxjs** — the semantics should mirror ordinary rxjs
+   wherever a case is underspecified. Actually run the example in rxjs and see. If that
+   still doesn't resolve it, surface the question to the user with a clear TypeScript rxjs
+   example that **avoids the `*All()` higher-order operators where possible** and follows
+   the style of the README's edge-case examples.
 3. **Ignore `Formal-Verification/` for now.** It may have errors during this phase — that's
    fine. Leave it until the end.
 4. **Port to TypeScript** — but only once QuickCheck passes.
