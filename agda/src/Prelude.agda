@@ -83,6 +83,9 @@ if-false refl = refl
 suc-inj : {m n : ℕ} → suc m ≡ suc n → m ≡ n
 suc-inj refl = refl
 
+true≢false : {A : Set} → true ≡ false → A
+true≢false ()
+
 zero≢suc : {A : Set} {n : ℕ} → zero ≡ suc n → A
 zero≢suc ()
 
@@ -106,6 +109,10 @@ length : {A : Set} → List A → ℕ
 length []       = 0
 length (x ∷ xs) = suc (length xs)
 
+replicate : {A : Set} → ℕ → A → List A
+replicate zero    x = []
+replicate (suc n) x = x ∷ replicate n x
+
 data Maybe (A : Set) : Set where
   nothing : Maybe A
   just    : A → Maybe A
@@ -119,6 +126,15 @@ infixr 5 _++_
 _++_ : {A : Set} → List A → List A → List A
 []       ++ ys = ys
 (x ∷ xs) ++ ys = x ∷ (xs ++ ys)
+
+++-nil : {A : Set} (xs : List A) → xs ++ [] ≡ xs
+++-nil []       = refl
+++-nil (x ∷ xs) = cong (_∷_ x) (++-nil xs)
+
+replicate-snoc : {A : Set} (n : ℕ) (x : A)
+  → replicate n x ++ (x ∷ []) ≡ x ∷ replicate n x
+replicate-snoc zero    x = refl
+replicate-snoc (suc n) x = cong (_∷_ x) (replicate-snoc n x)
 
 ++-snoc : {A : Set} (xs : List A) (y : A) (zs : List A)
         → (xs ++ (y ∷ [])) ++ zs ≡ xs ++ (y ∷ zs)

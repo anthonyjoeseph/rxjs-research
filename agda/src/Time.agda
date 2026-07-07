@@ -200,6 +200,12 @@ timeLt⇒timeEq-false-flip (a , b) (c , d) p with ltℕ a c in lt-ac
         | ltℕ⇒eqℕ-false-flip b d (∧-split-right (eqℕ a c) (ltℕ b d) p)
   = refl
 
+timeLt-asym : (x y : Time) → timeLt x y ≡ true → timeLt y x ≡ false
+timeLt-asym x y p with timeLt y x in k
+... | false = refl
+... | true  = true≢false
+    (trans (sym (timeLt⇒timeLeq y x k)) (timeLt⇒timeLeq-flip-false x y p))
+
 timeLt-irrefl : (t : Time) → timeLt t t ≡ false
 timeLt-irrefl (a , b) rewrite ltℕ-irrefl a | eqℕ-refl a | ltℕ-irrefl b = refl
 

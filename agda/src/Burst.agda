@@ -23,11 +23,24 @@
 --     time, so its synchronous output batches with its cause, transitively
 --     (Phase-A causation; cascade-example).
 --
--- share is the root async input: shareE i reads slot i of the environment,
--- a hot stream — subscribing at t sees emissions strictly after t. Root
--- subjects and share() refs both denote this way (the connect-at-first-ref
--- accounting is deferred; theorems relate slots to bound expressions by
--- hypothesis, as the TS oracle's shareRef does).
+-- share: an environment slot is a hot stream PLUS the instant it
+-- connected. shareE first? i reads slot i; a ref subscribed strictly after
+-- the connection sees only the strict suffix (hot semantics: a subject
+-- does not replay), and the CONNECTING ref — flagged true, the pre-order-
+-- first static ref, exactly the TS model's shareRef.first — additionally
+-- receives the connection frame itself (rxjs: the first subscriber
+-- triggers connect and the source emits synchronously into it). Root
+-- subjects are free slots, referenced with the flag false (a subject has
+-- no subscription-frame values to replay). letShareE src body BINDS slot 0
+-- (de Bruijn: shareE _ 0 in the body is the bound share, shareE _ (suc i)
+-- reaches outward) to src subscribed at the letShare's own subscription
+-- time — the slot's content is DERIVED, not hypothesized. Ratified spec
+-- decisions carried over from the TS model (oracle-validated): the share
+-- connects at the subscription frame and lives exactly once per letShare
+-- scope (no refcount reset mid-lifetime); connection time is provably
+-- irrelevant for hot bindings (filterAfter-absorb), which is why
+-- connecting at the binder rather than literally at the first ref is
+-- faithful.
 module Burst where
 
 open import Prelude
@@ -45,9 +58,17 @@ Val = ℕ
 Inner : Set
 Inner = Time → Obs Val
 
--- an environment assigns every share slot its connected emission history
+-- an environment assigns every share slot its connection instant and its
+-- connected emission history
+Slot : Set
+Slot = Time × Obs Val
+
 Env : Set
-Env = ℕ → Obs Val
+Env = ℕ → Slot
+
+extendEnv : Slot → Env → Env
+extendEnv s env zero    = s
+extendEnv s env (suc i) = env i
 
 data Exp : Set
 data ExpS : Set
@@ -55,7 +76,10 @@ data ExpS : Set
 data Exp where
   emptyE      : Exp
   ofE         : List Val → Exp
-  shareE      : ℕ → Exp
+  -- shareE first? i: a subscription of hot slot i; the flag marks the
+  -- CONNECTING ref (the pre-order-first static ref of its letShare binder)
+  shareE      : Bool → ℕ → Exp
+  letShareE   : Exp → Exp → Exp
   mapE        : (Val → Val) → Exp → Exp
   takeE       : ℕ → Exp → Exp
   scanE       : (Val → Val → Val) → Val → Exp → Exp
@@ -152,6 +176,13 @@ exhaustClose b ((a , d) ∷ os) =
   then exhaustClose b os
   else exhaustClose (close (d a)) os
 
+-- what a ref subscribed at t sees of a share connected at tc: the whole
+-- connected history for the connecting ref subscribed at the connection
+-- instant, the strict suffix otherwise
+refView : Bool → Time → Time → TimedObs Val → TimedObs Val
+refView false t tc xs = filterAfter t xs
+refView true  t tc xs = if timeEq t tc then xs else filterAfter t xs
+
 -- the denotation -----------------------------------------------------------------
 
 ⟦_⟧  : Exp → Env → Time → Obs Val
@@ -161,8 +192,11 @@ denoteFun  : (Val → Exp) → Env → TimedObs Val → TimedObs Inner
 
 ⟦ emptyE ⟧ env t = obs [] t
 ⟦ ofE vs ⟧ env t = obs (map (λ v → (t , v)) vs) t
-⟦ shareE i ⟧ env t =
-  obs (filterAfter t (emits (env i))) (timeMax t (close (env i)))
+⟦ shareE b i ⟧ env t =
+  obs (refView b t (fst (env i)) (emits (snd (env i))))
+      (timeMax t (close (snd (env i))))
+⟦ letShareE src body ⟧ env t =
+  ⟦ body ⟧ (extendEnv (t , ⟦ src ⟧ env t) env) t
 ⟦ mapE f e ⟧ env t =
   obs (mapT f (emits (⟦ e ⟧ env t))) (close (⟦ e ⟧ env t))
 ⟦ takeE n e ⟧ env t =
@@ -210,8 +244,14 @@ open WFAt public
 WFDen : Inner → Set
 WFDen d = (u : Time) → WFAt u (d u)
 
+-- every slot's history is well-formed relative to its connection instant
 EnvWF : Env → Set
-EnvWF env = (i : ℕ) → WF (env i)
+EnvWF env = (i : ℕ) → WFAt (fst (env i)) (snd (env i))
+
+extendEnv-wf : (t : Time) (o : Obs Val) (env : Env)
+  → EnvWF env → WFAt t o → EnvWF (extendEnv (t , o) env)
+extendEnv-wf t o env wfe w zero    = w
+extendEnv-wf t o env wfe w (suc i) = wfe i
 
 -- a predicate on every carried value of a timed list (the inners of a
 -- stream of streams)
@@ -441,11 +481,25 @@ denoteFun-bounded f env ((a , v) ∷ xs) (bb∷ le b) =
 denote-wf emptyE env wfe t = wfAt sf[] (timeLeq-refl t) bb[]
 denote-wf (ofE vs) env wfe t =
   wfAt (const-sortedFrom t vs) (timeLeq-refl t) (const-bounded t vs)
-denote-wf (shareE i) env wfe t =
-  wfAt (filterAfter-from t (emits (env i)) (sorted (wfe i)))
-       (timeMax-left t (close (env i)))
-       (boundedBy-weaken (timeMax-right t (close (env i)))
-         (filterAfter-bounded t (emits (env i)) (bounded (wfe i))))
+denote-wf (shareE false i) env wfe t =
+  wfAt (filterAfter-from t (emits (snd (env i))) (sortedAt (wfe i)))
+       (timeMax-left t (close (snd (env i))))
+       (boundedBy-weaken (timeMax-right t (close (snd (env i))))
+         (filterAfter-bounded t (emits (snd (env i))) (boundedAt (wfe i))))
+denote-wf (shareE true i) env wfe t with timeEq t (fst (env i)) in k
+... | true rewrite timeEq-sound t (fst (env i)) k =
+  wfAt (sortedAt (wfe i))
+       (timeMax-left (fst (env i)) (close (snd (env i))))
+       (boundedBy-weaken (timeMax-right (fst (env i)) (close (snd (env i))))
+         (boundedAt (wfe i)))
+... | false =
+  wfAt (filterAfter-from t (emits (snd (env i))) (sortedAt (wfe i)))
+       (timeMax-left t (close (snd (env i))))
+       (boundedBy-weaken (timeMax-right t (close (snd (env i))))
+         (filterAfter-bounded t (emits (snd (env i))) (boundedAt (wfe i))))
+denote-wf (letShareE src body) env wfe t =
+  denote-wf body (extendEnv (t , ⟦ src ⟧ env t) env)
+    (extendEnv-wf t (⟦ src ⟧ env t) env wfe (denote-wf src env wfe t)) t
 denote-wf (mapE f e) env wfe t with denote-wf e env wfe t
 ... | wfAt s c b =
   wfAt (mapT-sortedFrom f (emits (⟦ e ⟧ env t)) s)
@@ -855,9 +909,9 @@ exhaust-of-example env t =
 -- 9 as ONE batch, at the source event's time.
 cascade-emits : (i : ℕ) (env : Env) (t t₁ : Time) (v₁ : Val)
   (rest : TimedObs Val) (c : Time)
-  → env i ≡ obs ((t₁ , v₁) ∷ rest) c
+  → snd (env i) ≡ obs ((t₁ , v₁) ∷ rest) c
   → timeLt t t₁ ≡ true      -- subscribed before the source's first event
-  → emits (⟦ concatE (takeE 1 (shareE i)) (ofE (9 ∷ [])) ⟧ env t)
+  → emits (⟦ concatE (takeE 1 (shareE false i)) (ofE (9 ∷ [])) ⟧ env t)
     ≡ (t₁ , v₁) ∷ (t₁ , 9) ∷ []
 cascade-emits i env t t₁ v₁ rest c eq lt
   rewrite eq | timeLeq-refl t | lt
@@ -865,9 +919,10 @@ cascade-emits i env t t₁ v₁ rest c eq lt
 
 cascade-example : (i : ℕ) (env : Env) (t t₁ : Time) (v₁ : Val)
   (rest : TimedObs Val) (c : Time)
-  → env i ≡ obs ((t₁ , v₁) ∷ rest) c
+  → snd (env i) ≡ obs ((t₁ , v₁) ∷ rest) c
   → timeLt t t₁ ≡ true
-  → batchSpec (emits (⟦ concatE (takeE 1 (shareE i)) (ofE (9 ∷ [])) ⟧ env t))
+  → batchSpec
+      (emits (⟦ concatE (takeE 1 (shareE false i)) (ofE (9 ∷ [])) ⟧ env t))
     ≡ (t₁ , v₁ ∷ 9 ∷ []) ∷ []
 cascade-example i env t t₁ v₁ rest c eq lt =
   trans (cong batchSpec (cascade-emits i env t t₁ v₁ rest c eq lt))
@@ -876,13 +931,162 @@ cascade-example i env t t₁ v₁ rest c eq lt =
 -- the diamond anchor law transfers: source events keep distinct times, so
 -- batching the self-merge of any strictly monotone denotation still pairs
 -- every value with itself
-mergeT-nil : {A : Set} (xs : TimedObs A) → mergeT xs [] ≡ xs
-mergeT-nil []       = refl
-mergeT-nil (x ∷ xs) = refl
-
 diamond-burst : (e : Exp) (env : Env) (t : Time)
   → StrictMono (emits (⟦ e ⟧ env t))
   → batchSpec (emits (⟦ mergeE e e ⟧ env t))
     ≡ mapT dbl (emits (⟦ e ⟧ env t))
 diamond-burst e env t m
   rewrite mergeT-nil (emits (⟦ e ⟧ env t)) = diamond _ m
+
+-- SHARE CONNECTION, DERIVED ----------------------------------------------
+-- The slot content of a letShare is computed from its binding; nothing
+-- about the share is hypothesized beyond the root subjects' own shape.
+
+-- n merged refs of one hot slot
+nRefs : ℕ → ℕ → Exp
+nRefs n i = mergeAllE (ofS (replicate n (shareE false i)))
+
+nRefs-emits : (n i : ℕ) (env : Env) (t : Time)
+  → emits (⟦ nRefs n i ⟧ env t)
+    ≡ nMerge n (filterAfter t (emits (snd (env i))))
+nRefs-emits zero    i env t = refl
+nRefs-emits (suc n) i env t =
+  cong (mergeT (filterAfter t (emits (snd (env i))))) (nRefs-emits n i env t)
+
+-- THE N-ARY FRAME JOIN (Grow's law, derived): n refs of a hot source
+-- deliver every source event as ONE batch of n copies
+share-growth : (n i : ℕ) (env : Env) (t : Time)
+  → StrictMono (emits (snd (env i)))
+  → batchSpec (emits (⟦ nRefs (suc n) i ⟧ env t))
+    ≡ mapT (λ v → replicate (suc n) v)
+           (filterAfter t (emits (snd (env i))))
+share-growth n i env t m =
+  trans (cong batchSpec (nRefs-emits (suc n) i env t))
+        (diamondN n (filterAfter t (emits (snd (env i))))
+                  (filterAfter-mono t (emits (snd (env i))) m))
+
+-- THE SHARE DIAMOND, END TO END: bind a hot slot with letShare, fan out
+-- two mapped refs (the first flagged as connecting), merge. Both refs see
+-- the same suffix — the connecting ref through the connection frame, the
+-- second because filterAfter t absorbs the binding's own filterAfter t
+-- (connection-time invariance for hot bindings) — so every source event
+-- delivers as ONE batch [f v , g v].
+share-diamond-emits : (j : ℕ) (f g : Val → Val) (env : Env) (t : Time)
+  → emits (⟦ letShareE (shareE false j)
+               (mergeE (mapE f (shareE true 0))
+                       (mapE g (shareE false 0))) ⟧ env t)
+    ≡ mergeT (mapT f (filterAfter t (emits (snd (env j)))))
+             (mapT g (filterAfter t (emits (snd (env j)))))
+share-diamond-emits j f g env t
+  rewrite timeEq-refl t
+        | filterAfter-absorb t t (emits (snd (env j))) (timeLeq-refl t)
+        | mergeT-nil (mapT g (filterAfter t (emits (snd (env j)))))
+  = refl
+
+share-diamond : (j : ℕ) (f g : Val → Val) (env : Env) (t : Time)
+  → StrictMono (emits (snd (env j)))
+  → batchSpec
+      (emits (⟦ letShareE (shareE false j)
+                  (mergeE (mapE f (shareE true 0))
+                          (mapE g (shareE false 0))) ⟧ env t))
+    ≡ mapT (λ v → f v ∷ g v ∷ []) (filterAfter t (emits (snd (env j))))
+share-diamond j f g env t m =
+  trans (cong batchSpec (share-diamond-emits j f g env t))
+        (diamond2 f g (filterAfter t (emits (snd (env j))))
+                  (filterAfter-mono t (emits (snd (env j))) m))
+
+-- a COLD binding: the connecting ref receives the subscription-frame
+-- value, the second ref's registration-only replay misses it (ratified:
+-- hot semantics, matching the TS model's shareRef and the v5 share)
+cold-share-emits : (env : Env) (t : Time)
+  → emits (⟦ letShareE (ofE (5 ∷ []))
+               (mergeE (shareE true 0) (shareE false 0)) ⟧ env t)
+    ≡ (t , 5) ∷ []
+cold-share-emits env t rewrite timeEq-refl t | timeLt-irrefl t = refl
+
+cold-share-example : (env : Env) (t : Time)
+  → batchSpec (emits (⟦ letShareE (ofE (5 ∷ []))
+                          (mergeE (shareE true 0) (shareE false 0)) ⟧ env t))
+    ≡ (t , 5 ∷ []) ∷ []
+cold-share-example env t = cong batchSpec (cold-share-emits env t)
+
+-- THE LATE-JOIN GROWTH LAW (the README's [7,7] then [8,8,8], n-ary):
+-- suc n static refs of hot slot j, plus one ref spawned by slot k's event
+-- at u between the source's two events — the first event delivers suc n
+-- copies as one batch, the second delivers suc (suc n) copies as one
+-- batch. The late ref's suffix (it missed the first event) and the grown
+-- multiplicity are both DERIVED from the denotation.
+late-join-emits : (n j k : ℕ) (env : Env) (t t₁ t₂ u c c′ : Time)
+  → snd (env j) ≡ obs ((t₁ , 7) ∷ (t₂ , 8) ∷ []) c
+  → snd (env k) ≡ obs ((u , 0) ∷ []) c′
+  → timeLt t t₁ ≡ true → timeLt t₁ u ≡ true → timeLt u t₂ ≡ true
+  → emits (⟦ mergeE (nRefs (suc n) j)
+              (mergeAllE (mapS (λ _ → shareE false j) (shareE false k)))
+           ⟧ env t)
+    ≡ mergeT (nMerge (suc n) ((t₁ , 7) ∷ (t₂ , 8) ∷ [])) ((t₂ , 8) ∷ [])
+late-join-emits n j k env t t₁ t₂ u c c′ eqj eqk l1 l2 l3
+  rewrite nRefs-emits (suc n) j env t
+        | eqj
+        | l1
+        | timeLt-trans t t₁ t₂ l1 (timeLt-trans t₁ u t₂ l2 l3)
+        | eqk
+        | timeLt-trans t t₁ u l1 l2
+        -- the spawned ref's view of slot j only surfaces once the trigger
+        -- has reduced — rewrite the slot equation again for it
+        | eqj
+        | timeLt-asym t₁ u l2
+        | l3
+  = refl
+
+late-join-list : {A : Set} (n : ℕ) (t₁ t₂ : Time) (v w : A)
+  → timeLt t₁ t₂ ≡ true
+  → mergeT (nMerge (suc n) ((t₁ , v) ∷ (t₂ , w) ∷ [])) ((t₂ , w) ∷ [])
+    ≡ replicate (suc n) (t₁ , v) ++ replicate (suc (suc n)) (t₂ , w)
+late-join-list n t₁ t₂ v w lt =
+  trans (cong (λ l → mergeT l ((t₂ , w) ∷ []))
+          (trans (nMerge-cons (suc n) (t₁ , v) ((t₂ , w) ∷ []) lt)
+            (cong (_++_ (replicate (suc n) (t₁ , v)))
+              (trans (nMerge-cons (suc n) (t₂ , w) [] refl)
+                (trans (cong (_++_ (replicate (suc n) (t₂ , w)))
+                             (nMerge-nil (suc n)))
+                       (++-nil (replicate (suc n) (t₂ , w))))))))
+  (trans (merge-repL (suc n) t₁ v (replicate (suc n) (t₂ , w))
+           ((t₂ , w) ∷ []) (timeLt⇒timeLeq t₁ t₂ lt))
+         (cong (_++_ (replicate (suc n) (t₁ , v)))
+               (merge-rep-self (suc n) t₂ w)))
+
+late-join-growth : (n j k : ℕ) (env : Env) (t t₁ t₂ u c c′ : Time)
+  → snd (env j) ≡ obs ((t₁ , 7) ∷ (t₂ , 8) ∷ []) c
+  → snd (env k) ≡ obs ((u , 0) ∷ []) c′
+  → timeLt t t₁ ≡ true → timeLt t₁ u ≡ true → timeLt u t₂ ≡ true
+  → batchSpec
+      (emits (⟦ mergeE (nRefs (suc n) j)
+                 (mergeAllE (mapS (λ _ → shareE false j) (shareE false k)))
+              ⟧ env t))
+    ≡ (t₁ , replicate (suc n) 7) ∷ (t₂ , replicate (suc (suc n)) 8) ∷ []
+late-join-growth n j k env t t₁ t₂ u c c′ eqj eqk l1 l2 l3 =
+  trans (cong batchSpec
+    (trans (late-join-emits n j k env t t₁ t₂ u c c′ eqj eqk l1 l2 l3)
+           (late-join-list n t₁ t₂ 7 8 lt₁₂)))
+  (trans (rep-batch n t₁ 7 (replicate (suc (suc n)) (t₂ , 8))
+           (hn∷ (timeLt⇒timeEq-false t₁ t₂ lt₁₂)))
+         (cong (_∷_ (t₁ , replicate (suc n) 7))
+           (trans (cong batchSpec
+                    (sym (++-nil (replicate (suc (suc n)) (t₂ , 8)))))
+                  (rep-batch (suc n) t₂ 8 [] hn[]))))
+  where
+    lt₁₂ : timeLt t₁ t₂ ≡ true
+    lt₁₂ = timeLt-trans t₁ u t₂ l2 l3
+
+-- the README instance: two subscribers see [7 , 7]; a third joins between
+-- the events; everyone sees [8 , 8 , 8]
+readme-late-subscriber : (j k : ℕ) (env : Env) (t t₁ t₂ u c c′ : Time)
+  → snd (env j) ≡ obs ((t₁ , 7) ∷ (t₂ , 8) ∷ []) c
+  → snd (env k) ≡ obs ((u , 0) ∷ []) c′
+  → timeLt t t₁ ≡ true → timeLt t₁ u ≡ true → timeLt u t₂ ≡ true
+  → batchSpec
+      (emits (⟦ mergeE (nRefs 2 j)
+                 (mergeAllE (mapS (λ _ → shareE false j) (shareE false k)))
+              ⟧ env t))
+    ≡ (t₁ , 7 ∷ 7 ∷ []) ∷ (t₂ , 8 ∷ 8 ∷ 8 ∷ []) ∷ []
+readme-late-subscriber = late-join-growth 1

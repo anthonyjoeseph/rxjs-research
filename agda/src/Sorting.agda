@@ -110,6 +110,51 @@ filterAfter-bounded c′ ((t , v) ∷ xs) (bb∷ le b) with timeLt c′ t
 ... | true  = bb∷ le (filterAfter-bounded c′ xs b)
 ... | false = filterAfter-bounded c′ xs b
 
+-- a later filter absorbs an earlier one (a ref's own suffix of an
+-- already-suffixed hot history is just the ref's suffix — connection time
+-- is invariant for hot bindings)
+filterAfter-absorb : {A : Set} (tc u : Time) (xs : TimedObs A)
+  → timeLeq tc u ≡ true
+  → filterAfter u (filterAfter tc xs) ≡ filterAfter u xs
+filterAfter-absorb tc u [] le = refl
+filterAfter-absorb tc u ((x , v) ∷ xs) le with timeLt tc x in k₁
+filterAfter-absorb tc u ((x , v) ∷ xs) le | true with timeLt u x
+... | true  = cong (_∷_ (x , v)) (filterAfter-absorb tc u xs le)
+... | false = filterAfter-absorb tc u xs le
+filterAfter-absorb tc u ((x , v) ∷ xs) le | false with timeLt u x in k₂
+... | false = filterAfter-absorb tc u xs le
+... | true  = true≢false
+    (trans (sym (timeLeq-trans x tc u (timeLt-false⇒timeLeq-flip tc x k₁) le))
+           (timeLt⇒timeLeq-flip-false u x k₂))
+
+-- filtering strictly below a sorted list's lower bound keeps everything
+filterAfter-none : {A : Set} (c b : Time) (xs : TimedObs A)
+  → SortedFrom b xs → timeLt c b ≡ true → filterAfter c xs ≡ xs
+filterAfter-none c b []             sf[]       cb = refl
+filterAfter-none c b ((t , v) ∷ xs) (sf∷ le s) cb
+  rewrite timeLt-leq-trans c b t cb le
+  = cong (_∷_ (t , v)) (filterAfter-none c t xs s (timeLt-leq-trans c b t cb le))
+
+mono⇒sortedFrom : {A : Set} (t : Time) (v : A) (xs : TimedObs A)
+  → StrictMono ((t , v) ∷ xs) → SortedFrom t xs
+mono⇒sortedFrom t v []              mono-one      = sf[]
+mono⇒sortedFrom t v ((t′ , w) ∷ xs) (mono-∷ lt m) =
+  sf∷ (timeLt⇒timeLeq t t′ lt) (mono⇒sortedFrom t′ w xs m)
+
+-- the suffix of one-event-per-instant is one-event-per-instant
+filterAfter-mono : {A : Set} (c : Time) (xs : TimedObs A)
+  → StrictMono xs → StrictMono (filterAfter c xs)
+filterAfter-mono c [] mono-[] = mono-[]
+filterAfter-mono c ((t , v) ∷ []) mono-one with timeLt c t
+... | true  = mono-one
+... | false = mono-[]
+filterAfter-mono c ((t , v) ∷ (t′ , v′) ∷ xs) (mono-∷ lt m) with timeLt c t in k
+... | false = filterAfter-mono c ((t′ , v′) ∷ xs) m
+... | true rewrite filterAfter-none c t′ ((t′ , v′) ∷ xs)
+                     (sf∷ (timeLeq-refl t′) (mono⇒sortedFrom t′ v′ xs m))
+                     (timeLt-trans c t t′ k lt)
+           = mono-∷ lt m
+
 -- append (concat = append past a pivot) ---------------------------------------
 
 append-sortedFrom : {A : Set} {b p : Time} (xs ys : TimedObs A)
