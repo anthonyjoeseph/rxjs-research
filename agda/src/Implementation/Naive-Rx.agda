@@ -73,13 +73,6 @@ sumWt (_ ∷ es)    = sumWt es
 weightOf : {A : Set} → List (Ev A) → ℕ
 weightOf evs = let s = sumWt evs in if eqℕ s 0 then 1 else s
 
--- drop weight markers (a fold re-stamps its own total, so inner markers are
--- absorbed rather than double-counted)
-stripWt : {A : Set} → List (Ev A) → List (Ev A)
-stripWt []          = []
-stripWt (wt _ ∷ es) = stripWt es
-stripWt (ev ∷ es)   = ev ∷ stripWt es
-
 -- the types.ts helpers, verbatim
 values : {A : Set} → List (Ev A) → List A
 values []             = []

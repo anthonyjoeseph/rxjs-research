@@ -404,11 +404,20 @@ record SerialSt : Set where
     hRegs      : Regs
     hOuterDone : Bool
     hClosed    : Bool
+    hWeight    : ℕ                         -- outer emits (chains) coalesced so far
     hOut       : Maybe (Emit Val)
 open SerialSt
 
 serialSeed : SerialSt
-serialSeed = mkSerial nothing 0 false [] false false nothing
+serialSeed = mkSerial nothing 0 false [] false false 0 nothing
+
+-- the chain-weight of the emit being finalized = the number of distinct outer
+-- emits (chains) whose flushes were coalesced into it. Each outer value-emit
+-- is ONE chain regardless of how many values it carried (a take of 2 values is
+-- one chain, a diamond's two arrivals are two) — so we count TRIGGERS, not
+-- flushes. The counting machine drains `owed` by this weight.
+stampWeight : ℕ → List (Ev Val) → List (Ev Val)
+stampWeight w buf = if leqℕ w 1 then buf else wt w ∷ buf
 
 heldProv : SerialSt → Prov
 heldProv s = maybe′ cold fst (hHolding s)
@@ -425,16 +434,10 @@ finalizeS s open′ queued outerDone with hHolding s
            ; hOut = nothing }
 ... | just (p , buf) =
   let fins = outerDone ∧ not open′ ∧ eqℕ queued 0 ∧ not (hClosed s)
+      buf′ = stampWeight (hWeight s) buf
   in record s { hOpen = open′ ; hQueued = queued ; hOuterDone = outerDone
-              ; hHolding = nothing ; hClosed = hClosed s ∨ fins
-              ; hOut = just (p , (if fins then buf ++ (fin ∷ []) else buf)) }
-
--- mark one coalesced flush with its chain-weight before it joins the held
--- buffer: the flush counts as `weightOf evs` chains (1 for a plain inner,
--- more if it already carried nested weight), and its own markers are stripped
--- so the re-stamp is not double-counted
-markFlush : List (Ev Val) → List (Ev Val)
-markFlush evs = wt (weightOf evs) ∷ stripWt evs
+              ; hHolding = nothing ; hClosed = hClosed s ∨ fins ; hWeight = 0
+              ; hOut = just (p , (if fins then buf′ ++ (fin ∷ []) else buf′)) }
 
 -- concatAll: one inner live at a time; arrivals during a live inner
 -- QUEUE (concatMap, natively); when the live inner FINISHES, the queued
@@ -447,10 +450,11 @@ concatStep s (trigger p others spawns outerFin) =
   in if hOpen s ∨ eqℕ spawns 0
      then finalizeS (record s { hHolding = held }) (hOpen s) queued outerDone
      else record s { hHolding = held ; hQueued = queued
+                   ; hWeight = suc (hWeight s)   -- one more chain queued (all deliver)
                    ; hOuterDone = outerDone ; hOut = nothing }
 concatStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
-      held   = just (heldProv s , heldBuf s ++ markFlush evs)
+      held   = just (heldProv s , heldBuf s ++ evs)
   in if finned ∧ ltℕ 0 queued
      then record s { hHolding = held ; hQueued = queued ; hOut = nothing }
      else finalizeS (record s { hHolding = held })
@@ -475,18 +479,19 @@ switchStep s (trigger p others spawns outerFin) =
   in if eqℕ spawns 0
      then finalizeS (record s { hHolding = held }) (hOpen s) 0 outerDone
      else record s { hHolding = held ; hQueued = spawns ; hOpen = false
-                   ; hRegs = [] ; hOuterDone = outerDone ; hOut = nothing }
+                   ; hRegs = [] ; hWeight = 1   -- switch keeps only the latest chain
+                   ; hOuterDone = outerDone ; hOut = nothing }
 switchStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
       regs   = trackRegs [] evs
   in if ltℕ 0 queued
      then -- a later burst sibling follows synchronously and cuts THIS one
        (let cuts = if finned then [] else closesFor regs
-            held = just (heldProv s , heldBuf s ++ markFlush evs ++ cuts)
+            held = just (heldProv s , heldBuf s ++ evs ++ cuts)
         in record s { hHolding = held ; hQueued = queued ; hRegs = []
                     ; hOut = nothing })
      else
-       (let held = just (heldProv s , heldBuf s ++ markFlush evs)
+       (let held = just (heldProv s , heldBuf s ++ evs)
         in finalizeS (record s { hHolding = held
                                ; hRegs = (if finned then [] else regs) })
                      (not finned) 0 (hOuterDone s))
@@ -509,10 +514,11 @@ exhaustStep s (trigger p others spawns outerFin) =
   in if hOpen s ∨ eqℕ spawns 0
      then finalizeS (record s { hHolding = held }) (hOpen s) 0 outerDone
      else record s { hHolding = held ; hQueued = spawns
+                   ; hWeight = 1   -- exhaust keeps only the first chain (others dropped)
                    ; hOuterDone = outerDone ; hOut = nothing }
 exhaustStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
-      held   = just (heldProv s , heldBuf s ++ markFlush evs)
+      held   = just (heldProv s , heldBuf s ++ evs)
   in if finned ∧ ltℕ 0 queued
      then record s { hHolding = held ; hQueued = queued ; hOut = nothing }
      else finalizeS (record s { hHolding = held })

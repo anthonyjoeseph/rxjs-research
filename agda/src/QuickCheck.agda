@@ -8,10 +8,31 @@ module QuickCheck where
 
 open import Prelude
 open import Shared-Types
+open import Implementation.Naive-Rx
 open import Implementation.Batch-Simultaneous
 open import Spec.Batch-Simultaneous
 open import CLI.IO
 open import CLI.Serialize using (encodeBatches ; listEqℕ)
+
+-- raw protocol emits of the compiled program (for diagnosing weights)
+private
+  shEv : Ev Val → String
+  shEv (init p)  = appendStr "i" (natToStr p)
+  shEv (value v) = appendStr "v" (natToStr v)
+  shEv (close p) = appendStr "c" (natToStr p)
+  shEv fin       = "F"
+  shEv (wt k)    = appendStr "w" (natToStr k)
+  shEvs : List (Ev Val) → String
+  shEvs []       = ""
+  shEvs (e ∷ es) = appendStr (shEv e) (appendStr " " (shEvs es))
+  shEmit : Emit Val → String
+  shEmit e = concatStr ("(p" ∷ natToStr (fst e) ∷ ": " ∷ shEvs (snd e) ∷ ")" ∷ [])
+  shEmits : List (Emit Val) → String
+  shEmits []       = ""
+  shEmits (e ∷ es) = appendStr (shEmit e) (appendStr "\n      " (shEmits es))
+
+rawEmits : {n : ℕ} → Emissions n → Exp n → String
+rawEmits em e = shEmits (subscribeRx (compile e) em)
 
 ------------------------------------------------------------------------
 -- randomness (FFI: a pure LCG over Integer, so no unary-ℕ blowup)
@@ -166,7 +187,8 @@ report em e impl spec = concatStr
   ( "  FAIL " ∷ showExp e
   ∷ "\n    driver = " ∷ showAsyncs (asyncs em)
   ∷ "\n    impl   = " ∷ encodeBatches impl
-  ∷ "\n    spec   = " ∷ encodeBatches spec ∷ "\n" ∷ [])
+  ∷ "\n    spec   = " ∷ encodeBatches spec
+  ∷ "\n    raw    = " ∷ rawEmits em e ∷ "\n" ∷ [])
 
 -- one case: nothing if impl ≡ spec, else the report
 oneCase : Gen (Maybe String)
