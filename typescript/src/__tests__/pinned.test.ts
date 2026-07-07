@@ -16,7 +16,7 @@ const collect = (inst: Instantaneous<number>): { batches: number[][]; done: () =
   return { batches, done: () => sub.unsubscribe() };
 };
 
-const ref = (slot: number): Exp => ({ k: "shareRef", first: false, slot });
+const ref = (slot: number): Exp => ({ k: "src", slot });
 
 describe("burst pinned (Agda theorem transcriptions)", () => {
   test("frame-batch: one subscribe = one batch (merge of colds)", () => {
@@ -174,13 +174,13 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   test("model agrees on a letShare diamond program (validity domain)", () => {
     const e: Exp = {
       k: "letShare",
-      src: { k: "shareRef", first: false, slot: 0 },
+      src: { k: "src", slot: 0 }, // the binding's source is subject 0
       body: mergeE(
-        { k: "map", f: { op: "add", k: 1 }, e: { k: "shareRef", first: true, slot: 0 } },
-        { k: "map", f: { op: "mul", k: 10 }, e: { k: "shareRef", first: false, slot: 0 } },
+        { k: "map", f: { op: "add", k: 1 }, e: { k: "share", first: true, slot: 0 } },
+        { k: "map", f: { op: "mul", k: 10 }, e: { k: "share", first: false, slot: 0 } },
       ),
     };
-    // slots inside letShare body: 0 = the share, 1.. = roots (shifted)
+    // inside the letShare body: share 0 = the binding; subjects are `src`
     const d = [{ slot: 0, value: 5 }];
     expect(implBatches(e, 1, d)).toEqual(modelBatches(e, 1, d));
     expect(modelBatches(e, 1, d)).toEqual([[6, 50]]);

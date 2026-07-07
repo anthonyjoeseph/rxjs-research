@@ -22,52 +22,59 @@ import {
   scanStep,
 } from "./model";
 
-/** interpret a deep-embedded program over live slot streams (slot i = the
- * i-th entry; letShare extends at index 0, De Bruijn style, exactly like
- * the model's extendEnv). The joins go through the PRIMITIVE stream-of-
- * streams forms, mirroring the Agda ⟦_⟧S. */
+/** interpret a program over live streams, mirroring the Agda compiler:
+ * `subjects` are the driver subjects (srcE : Fin n), `shares` is the de Bruijn
+ * environment of letShare-bound shares (shareE : ℕ), extended at index 0. The
+ * joins go through the PRIMITIVE stream-of-streams forms, mirroring ⟦_⟧S. */
 const interpretS = (
   s: ExpS,
-  slots: Instantaneous<number>[],
+  subjects: Instantaneous<number>[],
+  shares: Instantaneous<number>[],
 ): Instantaneous<Instantaneous<number>> =>
   s.k === "ofS"
-    ? of(s.es.map((x) => interpret(x, slots)))
-    : map((v: number) => interpret(applyTemplate(s.tmpl, v), slots))(
-        interpret(s.e, slots),
+    ? of(s.es.map((x) => interpret(x, subjects, shares)))
+    : map((v: number) => interpret(applyTemplate(s.tmpl, v), subjects, shares))(
+        interpret(s.e, subjects, shares),
       );
 
 export const interpret = (
   e: Exp,
-  slots: Instantaneous<number>[],
+  subjects: Instantaneous<number>[],
+  shares: Instantaneous<number>[],
 ): Instantaneous<number> => {
   switch (e.k) {
     case "empty":
       return empty();
     case "of":
       return of(e.vs);
-    case "shareRef": {
-      const s = slots[e.slot];
-      if (s === undefined) throw new Error(`unbound slot ${e.slot}`);
+    case "src": {
+      const s = subjects[e.slot];
+      if (s === undefined) throw new Error(`unbound subject ${e.slot}`);
+      return s;
+    }
+    case "share": {
+      const s = shares[e.slot];
+      if (s === undefined) throw new Error(`unbound share ${e.slot}`);
       return s;
     }
     case "letShare": {
-      const shared = share(interpret(e.src, slots));
-      return interpret(e.body, [shared, ...slots]);
+      const shared = share(interpret(e.src, subjects, shares));
+      return interpret(e.body, subjects, [shared, ...shares]);
     }
     case "map":
-      return map(applyFn(e.f))(interpret(e.e, slots));
+      return map(applyFn(e.f))(interpret(e.e, subjects, shares));
     case "take":
-      return take(e.n)(interpret(e.e, slots));
+      return take(e.n)(interpret(e.e, subjects, shares));
     case "scan":
-      return scan(scanStep(e.f), 0)(interpret(e.e, slots));
+      return scan(scanStep(e.f), 0)(interpret(e.e, subjects, shares));
     case "mergeAll":
-      return mergeAll(interpretS(e.s, slots));
+      return mergeAll(interpretS(e.s, subjects, shares));
     case "concatAll":
-      return concatAll(interpretS(e.s, slots));
+      return concatAll(interpretS(e.s, subjects, shares));
     case "switchAll":
-      return switchAll(interpretS(e.s, slots));
+      return switchAll(interpretS(e.s, subjects, shares));
     case "exhaustAll":
-      return exhaustAll(interpretS(e.s, slots));
+      return exhaustAll(interpretS(e.s, subjects, shares));
   }
 };
 
@@ -88,6 +95,7 @@ export const implBatches = (
     interpret(
       e,
       subjects.map((s) => s.inst),
+      [],
     ),
   ).subscribe((batch) => out.push(batch));
   for (const ev of d) subjects[ev.slot].next(ev.value);

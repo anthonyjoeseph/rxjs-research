@@ -20,12 +20,14 @@ import { implBatches } from "../interp";
 
 const NUM_SLOTS = 3;
 
+// values are ℕ-safe (non-negative): the Agda side is Val = ℕ, and batching /
+// ordering behavior is value-agnostic, so this costs nothing in coverage.
 const fnArb: fc.Arbitrary<Fn> = fc.record({
   op: fc.constantFrom("add" as const, "mul" as const),
-  k: fc.integer({ min: -3, max: 3 }),
+  k: fc.integer({ min: 0, max: 3 }),
 });
 
-const valueArb = fc.integer({ min: -5, max: 9 });
+const valueArb = fc.integer({ min: 0, max: 9 });
 
 const slotArb = (max: number): fc.Arbitrary<number> =>
   fc.integer({ min: 0, max: max - 1 });
@@ -51,12 +53,27 @@ const templateArb = (
       k: fc.constant("constOf" as const),
       vs: fc.array(valueArb, { maxLength: 2 }),
     }),
+    // refI spawns a ref of a SUBJECT (a subject index) — never the bound
+    // share, so the upstream-race frontier is excluded by construction
     fc.record({
       k: fc.constant("refI" as const),
-      slot: fc.integer({ min: refIMin, max: numSlots - 1 }),
+      slot: fc.integer({ min: 0, max: NUM_SLOTS - 1 }),
     }),
     fc.record({ k: fc.constant("mapOfv" as const), f: fnArb }),
   );
+
+// a leaf reference: the first `numSlots - NUM_SLOTS` slots are letShare
+// shares (de Bruijn `share`), the rest are driver subjects (`src`). Matches
+// the Agda split srcE / shareE.
+const refLeafArb = (numSlots: number): fc.Arbitrary<Exp> => {
+  const shares = numSlots - NUM_SLOTS;
+  return slotArb(numSlots).map(
+    (s): Exp =>
+      s < shares
+        ? { k: "share", first: false, slot: s }
+        : { k: "src", slot: s - shares },
+  );
+};
 
 const leafArb = (numSlots: number): fc.Arbitrary<Exp> =>
   fc.oneof(
@@ -65,11 +82,7 @@ const leafArb = (numSlots: number): fc.Arbitrary<Exp> =>
       vs: fc.array(valueArb, { maxLength: 3 }),
     }),
     fc.constant({ k: "empty" } as Exp),
-    fc.record({
-      k: fc.constant("shareRef" as const),
-      first: fc.constant(false),
-      slot: slotArb(numSlots),
-    }),
+    refLeafArb(numSlots),
   );
 
 const expArb = (
@@ -155,7 +168,7 @@ const letShareArb: fc.Arbitrary<Exp> = fc
     expArb(NUM_SLOTS + 1, 2, 1),
   )
   .map(([srcSlot, f, body]): Exp => {
-    const srcRef: Exp = { k: "shareRef", first: false, slot: srcSlot };
+    const srcRef: Exp = { k: "src", slot: srcSlot }; // subject-backed binding
     const src: Exp = f === undefined ? srcRef : { k: "map", f, e: srcRef };
     return { k: "letShare", src, body };
   });
@@ -181,18 +194,25 @@ const isCanonical = (root: Exp): boolean => {
   // block-at-connection-rank rule) — outside the flat model's domain
   const forbidden = new Set<string>();
   let sawForbidden = false;
-  const idOf = (slot: number, env: string[]): string =>
-    slot < env.length ? env[slot] : `subj${slot - env.length}`;
+  // subjects id as `subj<i>`; a share ids by its binder (de Bruijn `env`)
   const rootOf = (e: Exp, env: string[]): string | null =>
-    e.k === "shareRef"
-      ? idOf(e.slot, env)
-      : e.k === "map" || e.k === "scan" || e.k === "take"
-        ? rootOf(e.e, env)
-        : null;
+    e.k === "src"
+      ? `subj${e.slot}`
+      : e.k === "share"
+        ? env[e.slot]
+        : e.k === "map" || e.k === "scan" || e.k === "take"
+          ? rootOf(e.e, env)
+          : null;
   const walk = (e: Exp, env: string[], delayed: boolean): void => {
     switch (e.k) {
-      case "shareRef": {
-        const id = idOf(e.slot, env);
+      case "src": {
+        const id = `subj${e.slot}`;
+        if (forbidden.has(id)) sawForbidden = true;
+        occs.push({ id, delayed });
+        return;
+      }
+      case "share": {
+        const id = env[e.slot];
         if (forbidden.has(id)) sawForbidden = true;
         occs.push({ id, delayed });
         return;
@@ -223,7 +243,7 @@ const isCanonical = (root: Exp): boolean => {
           walk(e.s.e, env, delayed);
           const t = e.s.tmpl;
           if (t.k === "refI") {
-            const id = idOf(t.slot, env);
+            const id = `subj${t.slot}`; // refI targets a subject index
             if (forbidden.has(id)) sawForbidden = true;
             occs.push({ id, delayed: true });
           }

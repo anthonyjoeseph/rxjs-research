@@ -5,3 +5,5 @@ agda/_build
 
 **/.DS_Store
 agda/v1/_build
+
+**/_cli

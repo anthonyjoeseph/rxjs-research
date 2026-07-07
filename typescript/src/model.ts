@@ -118,10 +118,20 @@ export const scanStep =
   (acc: number, v: number): number =>
     applyFn(f)(acc) + v;
 
+// The grammar MIRRORS the Agda `Exp n` / `ExpS n` (agda/src/Shared-Types.agda)
+// exactly, so a serialized tree maps one-to-one onto the Agda side. The one
+// difference: Agda carries real `Val → Val` / `Val → Exp` for map/scan/mapS,
+// which we defunctionalize here (`Fn` / `InnerTemplate`) so trees are JSON.
+//
+// Subjects and shares are SPLIT, like Agda's `srcE : Fin n` (a driver subject,
+// no connecting flag — always hot) vs `shareE : Bool → ℕ` (a letShare-bound
+// share, de Bruijn, with the connecting/late flag). `letShare` binds one share
+// at de Bruijn index 0.
 export type Exp =
+  | { k: "src"; slot: number } // srcE (Fin n): a driver subject
   | { k: "empty" }
   | { k: "of"; vs: number[] }
-  | { k: "shareRef"; first: boolean; slot: number }
+  | { k: "share"; first: boolean; slot: number } // shareE: de Bruijn into shares
   | { k: "letShare"; src: Exp; body: Exp }
   | { k: "map"; f: Fn; e: Exp }
   | { k: "take"; n: number; e: Exp }
@@ -132,11 +142,12 @@ export type Exp =
   | { k: "exhaustAll"; s: ExpS };
 
 /** inner templates for mapS — a defunctionalized (v: number) => Exp, so the
- * generator can build and show them */
+ * generator can build and show them. `refI` spawns a ref of a SUBJECT (its
+ * slot is a subject index — templates never reference the bound share). */
 export type InnerTemplate =
   | { k: "ofv"; extra: number[] } // v => of([v, ...extra])
   | { k: "constOf"; vs: number[] } // v => of(vs)
-  | { k: "refI"; slot: number } // v => shareRef(slot)  (late join!)
+  | { k: "refI"; slot: number } // v => src(slot)  (spawned subject ref — late join!)
   | { k: "mapOfv"; f: Fn }; // v => map(f, of([v]))
 
 export type ExpS =
@@ -150,7 +161,7 @@ export const applyTemplate = (tmpl: InnerTemplate, v: number): Exp => {
     case "constOf":
       return { k: "of", vs: tmpl.vs };
     case "refI":
-      return { k: "shareRef", first: false, slot: tmpl.slot };
+      return { k: "src", slot: tmpl.slot };
     case "mapOfv":
       return { k: "map", f: tmpl.f, e: { k: "of", vs: [v] } };
   }
@@ -261,13 +272,25 @@ const refView = (
 
 // the denotation (Burst.agda lines 217–258, verbatim) ---------------------------
 
-export const denote = (e: Exp, env: Env, t: Time): Obs<number> => {
+// `env` is the UNIFIED slot environment [ …depth shares…, subject0, subject1, … ]:
+// letShare prepends a share (extendEnv), so at letShare-depth `d` a `src{slot}`
+// lives at env(d + slot) and a `share{slot}` at env(slot).
+export const denote = (e: Exp, env: Env, t: Time, depth: number): Obs<number> => {
   switch (e.k) {
     case "empty":
       return { emits: [], close: t };
     case "of":
       return { emits: e.vs.map((v): [Time, number] => [t, v]), close: t };
-    case "shareRef": {
+    case "src": {
+      // a driver subject: connecting (Agda srcE = refT true), connected at t₀;
+      // subjects have no t₀ flush so this equals filterAfter(t)
+      const slot = env(depth + e.slot);
+      return {
+        emits: refView(true, t, slot.connT, slot.obs.emits),
+        close: timeMax(t, slot.obs.close),
+      };
+    }
+    case "share": {
       const slot = env(e.slot);
       return {
         emits: refView(e.first, t, slot.connT, slot.obs.emits),
@@ -277,44 +300,45 @@ export const denote = (e: Exp, env: Env, t: Time): Obs<number> => {
     case "letShare":
       return denote(
         e.body,
-        extendEnv({ connT: t, obs: denote(e.src, env, t) }, env),
+        extendEnv({ connT: t, obs: denote(e.src, env, t, depth) }, env),
         t,
+        depth + 1,
       );
     case "map": {
-      const o = denote(e.e, env, t);
+      const o = denote(e.e, env, t, depth);
       return { emits: mapT(applyFn(e.f), o.emits), close: o.close };
     }
     case "take": {
-      const o = denote(e.e, env, t);
+      const o = denote(e.e, env, t, depth);
       return {
         emits: takeT(e.n, o.emits),
         close: takeCloseB(t, e.n, o.emits, o.close),
       };
     }
     case "scan": {
-      const o = denote(e.e, env, t);
+      const o = denote(e.e, env, t, depth);
       return { emits: scanT(scanStep(e.f), 0, o.emits), close: o.close };
     }
     case "mergeAll": {
-      const s = denoteS(e.s, env, t);
+      const s = denoteS(e.s, env, t, depth);
       return { emits: mergeAllT(s.emits), close: maxCloses(s.close, s.emits) };
     }
     case "concatAll": {
-      const s = denoteS(e.s, env, t);
+      const s = denoteS(e.s, env, t, depth);
       return {
         emits: concatAllT(t, s.emits),
         close: timeMax(s.close, concatAllClose(t, s.emits)),
       };
     }
     case "switchAll": {
-      const s = denoteS(e.s, env, t);
+      const s = denoteS(e.s, env, t, depth);
       return {
         emits: switchAllT(s.emits),
         close: timeMax(s.close, lastClose(s.close, s.emits)),
       };
     }
     case "exhaustAll": {
-      const s = denoteS(e.s, env, t);
+      const s = denoteS(e.s, env, t, depth);
       return {
         emits: exhaustAllT(t, s.emits),
         close: timeMax(s.close, exhaustClose(t, s.emits)),
@@ -323,19 +347,22 @@ export const denote = (e: Exp, env: Env, t: Time): Obs<number> => {
   }
 };
 
-const denoteS = (s: ExpS, env: Env, t: Time): Obs<Inner> => {
+const denoteS = (s: ExpS, env: Env, t: Time, depth: number): Obs<Inner> => {
   switch (s.k) {
     case "ofS":
       return {
-        emits: s.es.map((e): [Time, Inner] => [t, (u) => denote(e, env, u)]),
+        emits: s.es.map((e): [Time, Inner] => [
+          t,
+          (u) => denote(e, env, u, depth),
+        ]),
         close: t,
       };
     case "mapS": {
-      const o = denote(s.e, env, t);
+      const o = denote(s.e, env, t, depth);
       return {
         emits: o.emits.map(([a, v]): [Time, Inner] => [
           a,
-          (u) => denote(applyTemplate(s.tmpl, v), env, u),
+          (u) => denote(applyTemplate(s.tmpl, v), env, u, depth),
         ]),
         close: o.close,
       };
@@ -371,6 +398,6 @@ export const modelBatches = (
   numSlots: number,
   d: DriverEvent[],
 ): number[][] =>
-  batchSpec(denote(e, envOfDriver(numSlots, d), timeMin).emits).map(
+  batchSpec(denote(e, envOfDriver(numSlots, d), timeMin, 0).emits).map(
     ([, vs]) => vs,
   );
