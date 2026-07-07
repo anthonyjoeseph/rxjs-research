@@ -34,12 +34,19 @@
 -- no subscription-frame values to replay). letShareE src body BINDS slot 0
 -- (de Bruijn: shareE _ 0 in the body is the bound share, shareE _ (suc i)
 -- reaches outward) to src subscribed at the letShare's own subscription
--- time — the slot's content is DERIVED, not hypothesized. Ratified spec
--- decisions carried over from the TS model (oracle-validated): the share
--- connects at the subscription frame and lives exactly once per letShare
--- scope (no refcount reset mid-lifetime); connection time is provably
--- irrelevant for hot bindings (filterAfter-absorb), which is why
--- connecting at the binder rather than literally at the first ref is
+-- time — the slot's content is DERIVED, not hypothesized. SHARE LIVES
+-- (ratified 2026-07-07, matching rxjs 7 and confirmed against it): a
+-- share RESETS when its source completes or its refcount drains to zero,
+-- and a subscriber arriving after a reset reconnects — a fresh life that
+-- replays a cold source (merge(shared, shared) of a shared of(5) logs 5
+-- TWICE). Lives are non-local (which life a ref joins depends on when its
+-- siblings closed), so they are derived in the operational layer
+-- (Protocol.agda: shareLives, cold-share-lives, reset-replay); THIS
+-- module's flat denotation is valid exactly for programs whose shares
+-- never reset — a subject-backed binding with a subscriber alive from the
+-- frame onward, which is every letShareE theorem below. Connection time
+-- is provably irrelevant for hot bindings (filterAfter-absorb), which is
+-- why connecting at the binder rather than literally at the first ref is
 -- faithful.
 --
 -- INTRA-BATCH ORDER (ratified, matching rxjs): a batch delivers in the
@@ -51,9 +58,11 @@
 -- whose same-slot ref arms appear in registration order (every theorem
 -- below is order-EXACT, not up-to-order). For non-canonical trees (a
 -- spawn arm written left of a static arm of the same share) the flat
--- merge order diverges from the block rule; the rank-tagged delivery
--- model that decides those trees belongs to the counting tower, where
--- delivery order is derived from the implementation's own mechanism.
+-- merge order diverges from the block rule; those trees are DECIDED in
+-- the operational layer, where delivery order is derived from the
+-- mechanism itself — Protocol.agda's shareLives keeps subscribers in
+-- registration order and fans out in that order (theorem
+-- ranked-delivery: the spawn arm written left still delivers second).
 --
 -- NODE REUSE (resolved): cold origins are gone from this spec — ⟦ e ⟧ env
 -- t is a pure function of the tree, the environment and the subscription
@@ -1015,20 +1024,11 @@ share-diamond j f g env t m =
         (diamond2 f g (filterAfter t (emits (snd (env j))))
                   (filterAfter-mono t (emits (snd (env j))) m))
 
--- a COLD binding: the connecting ref receives the subscription-frame
--- value, the second ref's registration-only replay misses it (ratified:
--- hot semantics, matching the TS model's shareRef and the v5 share)
-cold-share-emits : (env : Env) (t : Time)
-  → emits (⟦ letShareE (ofE (5 ∷ []))
-               (mergeE (shareE true 0) (shareE false 0)) ⟧ env t)
-    ≡ (t , 5) ∷ []
-cold-share-emits env t rewrite timeEq-refl t | timeLt-irrefl t = refl
-
-cold-share-example : (env : Env) (t : Time)
-  → batchSpec (emits (⟦ letShareE (ofE (5 ∷ []))
-                          (mergeE (shareE true 0) (shareE false 0)) ⟧ env t))
-    ≡ (t , 5 ∷ []) ∷ []
-cold-share-example env t = cong batchSpec (cold-share-emits env t)
+-- (COLD bindings — a letShareE over a synchronously completing source —
+-- are reset-firing programs, outside this denotation's validity domain:
+-- the first ref drains and RESETS the share, the second reconnects and
+-- replays. Derived in Protocol.agda: cold-share-lives, the
+-- rxjs-confirmed one-batch [5,5].)
 
 -- THE LATE-JOIN GROWTH LAW (the README's [7,7] then [8,8,8], n-ary):
 -- suc n static refs of hot slot j, plus one ref spawned by slot k's event
@@ -1161,10 +1161,10 @@ feedback-example j k env t t₁ u c c′ eqj eqk l1 l2 =
 -- FENCED ORACLE FRONTIERS, CLOSED -------------------------------------------
 -- Each of the shapes the TS oracle fenced off now has an Agda answer.
 
--- transient refs: a take-limited ref leaves early; the connection is one
--- life per letShare scope (ratified: no refcount reset mid-lifetime), so
--- the surviving ref keeps receiving — and the shared event still delivers
--- to both while both live
+-- transient refs: a take-limited ref leaves early, but the OTHER static
+-- ref stays subscribed — the refcount never reaches zero, so no reset
+-- fires (rxjs lives semantics) and the surviving ref keeps receiving; the
+-- shared event still delivers to both while both live
 transient-ref-example : (j : ℕ) (env : Env) (t t₁ t₂ c : Time)
   → snd (env j) ≡ obs ((t₁ , 1) ∷ (t₂ , 2) ∷ []) c
   → timeLt t t₁ ≡ true → timeLt t₁ t₂ ≡ true
