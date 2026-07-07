@@ -41,6 +41,26 @@
 -- irrelevant for hot bindings (filterAfter-absorb), which is why
 -- connecting at the binder rather than literally at the first ref is
 -- faithful.
+--
+-- INTRA-BATCH ORDER (ratified, matching rxjs): a batch delivers in the
+-- implementation's delivery order — a share's subject fires its refs
+-- consecutively as ONE block in registration order (static refs in
+-- pre-order, spawned refs in trigger order) at the connecting ref's
+-- position; a cascade delivers inside the chain of the ref that triggered
+-- it; scan folds in this order. ⟦_⟧ produces exactly this order for trees
+-- whose same-slot ref arms appear in registration order (every theorem
+-- below is order-EXACT, not up-to-order). For non-canonical trees (a
+-- spawn arm written left of a static arm of the same share) the flat
+-- merge order diverges from the block rule; the rank-tagged delivery
+-- model that decides those trees belongs to the counting tower, where
+-- delivery order is derived from the implementation's own mechanism.
+--
+-- NODE REUSE (resolved): cold origins are gone from this spec — ⟦ e ⟧ env
+-- t is a pure function of the tree, the environment and the subscription
+-- time, so subscribing one node twice IS subscribing two copies; cold
+-- sharing is semantically inert, and hot sharing is exactly letShareE.
+-- (The TS transcription must assert the same law: a memoized interpret
+-- may not behave differently from interpreting a copy.)
 module Burst where
 
 open import Prelude
@@ -1115,8 +1135,8 @@ feedback-emits : (j k : ℕ) (env : Env) (t t₁ u c c′ : Time)
 feedback-emits j k env t t₁ u c c′ eqj eqk l1 l2
   rewrite eqj | eqk
         | l1
-        | timeLt-trans t t₁ u l1 l2
         | timeLeq-refl t
+        | timeLt-trans t t₁ u l1 l2
         | timeLt⇒timeLeq-flip-false t u (timeLt-trans t t₁ u l1 l2)
         | timeLt⇒timeLeq t₁ u l2
   = refl
