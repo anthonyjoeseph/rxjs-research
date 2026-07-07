@@ -405,11 +405,12 @@ record SerialSt : Set where
     hOuterDone : Bool
     hClosed    : Bool
     hWeight    : ℕ                         -- outer emits (chains) coalesced so far
+    hLastProv  : Prov                      -- the most recent trigger's root
     hOut       : Maybe (Emit Val)
 open SerialSt
 
 serialSeed : SerialSt
-serialSeed = mkSerial nothing 0 false [] false false 0 nothing
+serialSeed = mkSerial nothing 0 false [] false false 0 cold nothing
 
 -- the chain-weight of the emit being finalized = the number of distinct outer
 -- emits (chains) whose flushes were coalesced into it. Each outer value-emit
@@ -419,8 +420,12 @@ serialSeed = mkSerial nothing 0 false [] false false 0 nothing
 stampWeight : ℕ → List (Ev Val) → List (Ev Val)
 stampWeight w buf = if leqℕ w 1 then buf else wt w ∷ buf
 
+-- the root of the emit being assembled: the held emit's own root, or — if a
+-- previous flush already finalized the held — the most recent trigger's root
+-- (a later flush of the same instant inherits its trigger's provenance, not
+-- cold, so co-arriving chains still batch by their shared root)
 heldProv : SerialSt → Prov
-heldProv s = maybe′ cold fst (hHolding s)
+heldProv s = maybe′ (hLastProv s) fst (hHolding s)
 
 heldBuf : SerialSt → List (Ev Val)
 heldBuf s = maybe′ [] snd (hHolding s)
@@ -448,8 +453,8 @@ concatStep s (trigger p others spawns outerFin) =
       outerDone = hOuterDone s ∨ outerFin
       held      = just (p , others)
   in if hOpen s ∨ eqℕ spawns 0
-     then finalizeS (record s { hHolding = held }) (hOpen s) queued outerDone
-     else record s { hHolding = held ; hQueued = queued
+     then finalizeS (record s { hHolding = held ; hLastProv = p }) (hOpen s) queued outerDone
+     else record s { hHolding = held ; hQueued = queued ; hLastProv = p
                    ; hWeight = suc (hWeight s)   -- one more chain queued (all deliver)
                    ; hOuterDone = outerDone ; hOut = nothing }
 concatStep s (flushJ evs finned) =
@@ -477,8 +482,8 @@ switchStep s (trigger p others spawns outerFin) =
       cuts      = if ltℕ 0 spawns ∧ hOpen s then closesFor (hRegs s) else []
       held      = just (p , others ++ cuts)
   in if eqℕ spawns 0
-     then finalizeS (record s { hHolding = held }) (hOpen s) 0 outerDone
-     else record s { hHolding = held ; hQueued = spawns ; hOpen = false
+     then finalizeS (record s { hHolding = held ; hLastProv = p }) (hOpen s) 0 outerDone
+     else record s { hHolding = held ; hQueued = spawns ; hOpen = false ; hLastProv = p
                    ; hRegs = [] ; hWeight = 1   -- switch keeps only the latest chain
                    ; hOuterDone = outerDone ; hOut = nothing }
 switchStep s (flushJ evs finned) =
@@ -512,8 +517,8 @@ exhaustStep s (trigger p others spawns outerFin) =
   let outerDone = hOuterDone s ∨ outerFin
       held      = just (p , others)
   in if hOpen s ∨ eqℕ spawns 0
-     then finalizeS (record s { hHolding = held }) (hOpen s) 0 outerDone
-     else record s { hHolding = held ; hQueued = spawns
+     then finalizeS (record s { hHolding = held ; hLastProv = p }) (hOpen s) 0 outerDone
+     else record s { hHolding = held ; hQueued = spawns ; hLastProv = p
                    ; hWeight = 1   -- exhaust keeps only the first chain (others dropped)
                    ; hOuterDone = outerDone ; hOut = nothing }
 exhaustStep s (flushJ evs finned) =
