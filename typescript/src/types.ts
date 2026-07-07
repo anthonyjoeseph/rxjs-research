@@ -66,11 +66,8 @@ export const stripFin = <A>(e: InstEmit<A>): InstEmit<A> => ({
   events: e.events.filter((ev) => ev.type !== "fin"),
 });
 
-export const values = <A>(events: InstEv<A>[]): A[] => {
-  const out: A[] = [];
-  for (const ev of events) if (ev.type === "value") out.push(ev.value);
-  return out;
-};
+export const values = <A>(events: readonly InstEv<A>[]): A[] =>
+  events.flatMap((ev) => (ev.type === "value" ? [ev.value] : []));
 
 export const bumpCount = (
   m: Map<number, number>,
