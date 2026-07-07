@@ -55,12 +55,13 @@ Independent events stay in separate batches, and a branch that filters an
 instant out still releases the batch (a filtered diamond logs `[1]` for the
 odd value, `[2, 2]` for the even one).
 
-> **Spec status.** The semantics below — *burst batching* — was ratified in
-> July 2026 and is machine-checked in [agda/](agda/): the timed denotation
-> in [Burst.agda](agda/v1/src/Burst.agda), the clockless counting machine in
-> [Protocol.agda](agda/v1/src/Protocol.agda). The Agda development is the
-> design authority; the TypeScript implementation is validated against a
-> line-by-line transcription of it by a property-based oracle.
+> **Spec status.** The semantics below — *burst batching*, the
+> **semantics-by-edge-case** in this section — is the spec of record. The
+> Agda development in [agda/](agda/) machine-checks that the two-sided model
+> (a clairvoyant timed denotation vs. a blind Mealy machine) agrees on every
+> program; the TypeScript implementation is validated against that model by a
+> property-based oracle. When the edge cases here and the Agda spec disagree,
+> **this section wins.**
 
 ### The counting machine
 
@@ -76,8 +77,8 @@ mechanisms, one per kind of root cause
   live subscription chains each root has. When an instant's first emission
   arrives, the machine knows exactly how many more it is owed, and flushes
   when the count drains. No clock, no scheduler tricks — this is the
-  mechanism proven correct in [Protocol.agda](agda/v1/src/Protocol.agda)'s
-  `endgame` theorem.
+  mechanism the Agda `counting-recovers` half is being proven correct
+  against (see [agda/](agda/)).
 
 ## The semantics: burst batching
 
@@ -298,8 +299,8 @@ by the protocol.
 - **`shareReplay`, share config** — plain `share()` only, with its default
   rxjs *lives*: the share resets when its source completes or its refcount
   drains to zero, and a later subscriber reconnects and replays a cold
-  source (derived in [Protocol.agda](agda/v1/src/Protocol.agda):
-  `shareLives`, `cold-share-lives`, `reset-replay`).
+  source. (Resetting-share lives are a model-vs-real-rxjs divergence owned
+  by the oracle, not the impl≡spec theorem.)
 - **One known open corner (the upstream race)** — a subscriber of a share
   spawned by a trigger derived from the share's *own source*, wired before
   the share connects, receives the in-flight value in real rxjs while the
@@ -313,8 +314,9 @@ From `typescript/`:
 ```sh
 npm test           # the full jest suite (pinned Agda-theorem cases + the oracle)
 npm run typecheck
-npm run oracle     # one run of the property oracle (500 random programs)
-npm run agda       # typecheck agda/src/Formal-Verification/Main-Theorem.agda (+ the v1 tower)
+npm run oracle     # one run of the property oracle (500 random programs;
+                   #   FC_NUM_RUNS / FC_SEED env vars override count and seed)
+npm run agda       # typecheck agda/src/Formal-Verification/Main-Theorem.agda
 ```
 
 ## Repository layout
@@ -323,10 +325,10 @@ npm run agda       # typecheck agda/src/Formal-Verification/Main-Theorem.agda (+
 | --- | --- |
 | [typescript/src/types.ts](typescript/src/types.ts) | The protocol: `InstEmit`, `Instantaneous`, the `init`/`value`/`close`/`fin` events |
 | [typescript/src/primitives.ts](typescript/src/primitives.ts) | The canonical primitives — `of`, `empty`, `map`, `take`, `scan`, `share`, and the four `*All` joins over streams-of-streams; `merge`/`concat`/`mergeMap` are derived one-liners |
-| [typescript/src/batch-simultaneous.ts](typescript/src/batch-simultaneous.ts) | The counting machine (the Agda `Protocol.machine`, transcribed) |
-| [typescript/src/model.ts](typescript/src/model.ts) | The pure timed-list model — a line-by-line transcription of [Burst.agda](agda/v1/src/Burst.agda) |
-| [typescript/src/\_\_tests\_\_/](typescript/src/__tests__/) | Pinned Agda-theorem cases + the [fast-check](https://fast-check.dev/) oracle: random combinator trees run through both the rxjs machinery and the model, compared exactly |
-| [agda/](agda/) | **The design authority** — the ratified spec and proofs; see [agda/README.md](agda/README.md) |
+| [typescript/src/batch-simultaneous.ts](typescript/src/batch-simultaneous.ts) | The counting machine (mirrors the Agda `batchSimultaneousI`) |
+| [typescript/src/model.ts](typescript/src/model.ts) | The pure timed-list model — a transcription of the Agda `Spec/` denotation |
+| [typescript/src/\_\_tests\_\_/](typescript/src/__tests__/) | Pinned theorem cases + the [fast-check](https://fast-check.dev/) oracle: random combinator trees run through both the rxjs machinery and the model, compared exactly |
+| [agda/](agda/) | The machine-checked two-sided model and the `formal-verification` proof; see [agda/README.md](agda/README.md) |
 
 ```sh
 cd typescript && npm install && npm test   # jest + property-based oracle

@@ -49,13 +49,13 @@ postulate
   -- and never across it)
   Accounted : List (List (Emit Val)) → Set
 
-  -- (2) the pure counting theorem (v1: the BatchImpl/endgame layer)
+  -- (2) the pure counting theorem (previously: the BatchImpl/endgame layer)
   counting-groups :
     (gs : List (List (Emit Val))) → Accounted gs
     → countBatches gs ≡ batchSpecL (stampFrom 0 gs)
 
   -- (3) canonical programs keep their books: grammar induction with
-  -- per-operator preservation lemmas (v1: Protocol.agda's trace
+  -- per-operator preservation lemmas (previously: Protocol.agda's trace
   -- validity + ranked delivery)
   compile-accounted :
     {n : ℕ} (em : Emissions n) (e : Exp n) → Canonical e

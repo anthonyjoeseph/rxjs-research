@@ -60,14 +60,17 @@ The plan below is written for whoever picks the rest up. §2.1
   rely on. Run negative controls (assert a wrong value, watch it fail) when
   you add a new instance; a `refl` that can't fail proves nothing.
 - **Build check:** `cd agda && agda src/Formal-Verification/Main-Theorem.agda`
-  and `cd agda/v1 && agda src/Everything.agda`. Both must stay green.
-  (`npm run agda` from `typescript/` does both.)
-- **v1 is the reference, not the target.** `agda/v1/src/` contains the
-  previous generation's PROVEN material: `Burst.agda` (the denotation and
-  its well-formedness proofs — already transcribed into `Spec/`),
-  `Protocol.agda` (trace validity, share lives, ranked delivery, the
-  counting endgame for fragments), `BatchImpl.agda`. When a proof below
-  feels hard, find its v1 counterpart and transcribe the _idea_.
+  (`npm run agda` from `typescript/`). Must stay green.
+- **The spec authority is the root `README.md`'s semantics-by-edge-case**,
+  then Anthony's discretion (ask), then this Agda spec — in that order. If a
+  postulate can't be proven because a definition is wrong, check the edge
+  cases in the root README first; a divergence there is the real bug.
+- **There is no reference tower to transcribe from.** (The previous
+  generation, `agda/v1/`, has been deleted — it was legacy.) Prove the
+  remaining postulates from first principles against the definitions in
+  this tree; the references below to old-generation module names
+  (`Protocol.agda`, `ranked-delivery`, …) are historical hints about the
+  _idea_, not files you can open.
 
 ## 1. The shape of the whole proof
 

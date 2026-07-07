@@ -55,7 +55,7 @@ stamped : {n : ℕ} → Emissions n → Exp n → List (Time × Val)
 stamped em e = stampFrom 0 (groupsOf (compile e) (flatten em))
 
 ------------------------------------------------------------------------
--- the validity domain: REGISTRATION-CANONICAL trees (v1's ratified
+-- the validity domain: REGISTRATION-CANONICAL trees (the previous generation's
 -- fence). Share semantics themselves are untouched — this is a
 -- syntactic discipline: per letShareE binder, the slot's pre-order-
 -- FIRST ref is its connecting ref (flagged true, exactly rxjs's "first
@@ -63,7 +63,7 @@ stamped em e = stampFrom 0 (groupsOf (compile e) (flatten em))
 -- The relation threads "is the connecting ref still owed" per slot
 -- through the tree in registration (pre-order) order; a spawn arm
 -- written left of its slot's connecting static arm fails, matching
--- v1's ranked-delivery derivation. mapS templates are quantified over
+-- the previous generation's ranked-delivery derivation. mapS templates are quantified over
 -- their trigger value and may not change the state (a spawned ref can
 -- never connect).
 

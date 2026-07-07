@@ -101,7 +101,7 @@ diamond-verified :
   → impl-batchSimultaneous em diamondE ≡ spec-batchSimultaneous em diamondE
 diamond-verified em = formal-verification em diamondE diamond-canonical
 
--- take(1) cutting the diamond MID-INSTANT — the corner v1 fenced behind
+-- take(1) cutting the diamond MID-INSTANT — the corner the previous generation fenced behind
 -- the runMemCut postulate — and the two sides STILL agree
 take-full : impl-batchSimultaneous em₁ (takeE 1 diamondE)
           ≡ spec-batchSimultaneous em₁ (takeE 1 diamondE)

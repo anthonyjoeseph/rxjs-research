@@ -43,7 +43,7 @@ timeMax : Time → Time → Time
 timeMax x y = if timeLeq x y then y else x
 
 ------------------------------------------------------------------------
--- the order lemmas (transcribed from the proven v1 tower)
+-- the order lemmas (transcribed from the previous generation)
 
 timeEq-refl : (t : Time) → timeEq t t ≡ true
 timeEq-refl (a , b) rewrite eqℕ-refl a | eqℕ-refl b = refl
@@ -253,7 +253,7 @@ emptyT t = tobs [] t sf[] (timeLeq-refl t) bb[]
 
 ------------------------------------------------------------------------
 -- the preservation toolkit: every operator preserves sortedness and
--- boundedness (transcribed from the proven v1 Sorting module)
+-- boundedness (transcribed from the previous generation's Sorting module)
 
 sortedFrom-weaken : {A : Set} {b b′ : Time} {xs : TimedObs A}
   → timeLeq b′ b ≡ true → SortedFrom b xs → SortedFrom b′ xs

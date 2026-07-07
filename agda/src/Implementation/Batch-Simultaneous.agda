@@ -543,7 +543,7 @@ exhaustAllI j =
 -- Machine determinism replaces the multicast: every ref holds its own
 -- copy of the bound source, and copies driven by the same inputs agree,
 -- so fan-out is free. What remains of share semantics is the PER-REF
--- VIEW (v1: refView, the ratified connecting-ref model, valid on the
+-- VIEW (previously: refView, the ratified connecting-ref model, valid on the
 -- Canonical non-resetting domain the theorem is stated over):
 --   the CONNECTING ref (the grammar's flag) sees everything from the
 --   connection instant; any other ref registers the roots feeding it

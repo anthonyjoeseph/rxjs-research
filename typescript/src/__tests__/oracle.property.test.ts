@@ -267,7 +267,12 @@ describe("burst oracle: impl ≡ model on random programs", () => {
           modelBatches(e, NUM_SLOTS, d),
         );
       }),
-      { numRuns: 500 },
+      {
+        numRuns: Number(process.env.FC_NUM_RUNS ?? 500),
+        ...(process.env.FC_SEED !== undefined
+          ? { seed: Number(process.env.FC_SEED) }
+          : {}),
+      },
     );
   });
 });

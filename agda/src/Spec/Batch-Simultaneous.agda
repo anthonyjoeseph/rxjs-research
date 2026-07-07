@@ -8,10 +8,10 @@
 -- Shape: a timed denotation ⟦_⟧ maps every Exp to a TObs — its complete
 -- timed emission history, WELL-FORMED BY CONSTRUCTION (sorted from the
 -- subscription time, bounded by its close; the evidence travels inside
--- the record, so v1's separate denote-wf theorem is absorbed into the
+-- the record, so the previous generation's separate denote-wf theorem is absorbed into the
 -- types). batchSpec then groups equal times.
 --
--- The technical device (v1's, kept): subscription-time-parameterized
+-- The technical device (the previous generation's, kept): subscription-time-parameterized
 -- denotation. ⟦ e ⟧ em ρ t is the observable obtained by subscribing e
 -- at time t; an inner stream denotes a FUNCTION from subscription time
 -- to observable (Inner) — a cold stream is literally "tell me when you
@@ -32,7 +32,7 @@ TObs : Time → Set
 TObs = TObsOf Val
 
 -- a cold inner stream: subscription time → observable, well-formed AT
--- that time — the type carries what v1 called WFDen
+-- that time — the type carries what the previous generation called WFDen
 Inner : Set
 Inner = (u : Time) → TObs u
 
@@ -68,7 +68,7 @@ filterAfterT t o =
 
 -- what a ref subscribed at t sees of a slot connected at tc: the whole
 -- connected history for the connecting ref subscribed at the connection
--- instant, the strict suffix otherwise (v1: refView)
+-- instant, the strict suffix otherwise (previously: refView)
 refT : Bool → Slot → (t : Time) → TObs t
 refT false (tc ▹ o) t = filterAfterT t o
 refT true  (tc ▹ o) t with timeEq t tc in k

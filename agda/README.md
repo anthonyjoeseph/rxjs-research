@@ -1,4 +1,8 @@
-# The Agda development: the design authority
+# The Agda development: the machine-checked model
+
+(The spec authority is the root [README.md](../README.md)'s
+semantics-by-edge-case; this development machine-checks that the two-sided
+model agrees with itself on every program.)
 
 Everything in this directory exists to give a proof to one type:
 
@@ -32,9 +36,10 @@ the `Tracks` simulation relation, and `tracks-stamped` are now all
 `tracks-compile` (the trace half's grammar induction). A postulate that
 cannot be proven as stated is a spec bug to rework, not work around.
 
-(The previous generation of this development — the proven burst-batching
-denotation and protocol layer — lives in [v1/](v1/), still building, as the
-reference the postulates here are discharged from.)
+(The spec authority is the root [README.md](../README.md)'s
+semantics-by-edge-case, then Anthony's discretion, then this Agda spec — in
+that order. A previous Agda generation existed under `v1/`; it has been
+deleted as legacy.)
 
 ## The broad approach
 
@@ -212,12 +217,12 @@ Tick 0 is the frame; tick k+1 is async entry k; the origin coordinate
 orders feedback (a reentrant `.next()` lands strictly after the batch that
 caused it). Bundling the evidence is what makes the spec's "group equal
 adjacent times" mean "group equal times, period" — and bundling it
-*relative to the subscription time* is what dissolved v1's separate
+*relative to the subscription time* is what dissolved the previous generation's separate
 `denote-wf` theorem into the types. Below the record: the raw timed-list
 operators (`mergeL` — stable, left wins on ties, the model counterpart of
 rxjs subscription order — `mapL`, `takeL`, `scanL`, `filterAfterL`) and
 the preservation lemma toolkit every combinator's evidence is assembled
-from, transcribed from the proven v1 Sorting module.
+from, transcribed from the previous generation's Sorting module.
 
 ### [src/Spec/Batch-Simultaneous.agda](src/Spec/Batch-Simultaneous.agda)
 
@@ -231,14 +236,14 @@ denotation by real structural recursion —
 — where `⟦ e ⟧ em ρ t` is the timed history observed by subscribing `e` at
 time `t`, *well-formed at `t` by its type*. Cold inner streams denote
 functions of their subscription time (`Inner = (u : Time) → TObs u` — the
-type is v1's `WFDen` made structural: an inner is well-formed at every
+type is the previous generation's `WFDen` made structural: an inner is well-formed at every
 subscription time because it cannot be anything else), the device that
 makes burst batching compositional; `Env` assigns share slots their
 connection instant and history. Each per-primitive combinator (`srcT` —
 the source history DERIVED from `Emissions`, sync flush at tick 0, k-th
 async at tick k+1, close at K+1+i matching `flatten`'s serialization
 exactly — `ofT`, `mapT`, `takeT`, `refT`, the four joins, `ofST`,
-`mapST`) is its v1 counterpart with the evidence fields constructed
+`mapST`) is its previous-generation counterpart with the evidence fields constructed
 inline. A source is a hot slot connected at t₀ whose every frame
 subscriber is "connecting" (`refT true` — a subject flushes its frame
 values to every subscriber present during subscribe); spawned refs see
@@ -360,7 +365,7 @@ places input j at tick j, so group j's values get time `(j , 0)`.
 stamped em e = stampFrom 0 (groupsOf (compile e) (flatten em))
 ```
 
-`Canonical` is the validity domain, now a real predicate: v1's ratified
+`Canonical` is the validity domain, now a real predicate: the previous generation's
 **registration-canonical** fence. Share semantics are untouched — this is
 a syntactic discipline. Per `letShareE` binder, the slot's
 pre-order-first ref is its connecting ref (flagged true, exactly rxjs's
@@ -369,7 +374,7 @@ false; the relation (`CanE`/`CanS`/`CanL`) threads "is the connecting
 ref still owed" per slot through the tree in registration order, and
 `mapS` templates are quantified over their trigger value and may not
 change the state (a spawned ref can never connect — a spawn arm written
-left of its slot's connecting static arm is rejected, matching v1's
+left of its slot's connecting static arm is rejected, matching the previous generation's
 `ranked-delivery`).
 
 The two halves of the general proof are both VALUES, each assembled from
@@ -409,7 +414,7 @@ is a suite of `refl`-proofs where Agda normalizes BOTH pipelines
 (compile, the joins' scans, the counting machine on one side; the timed
 denotation and the clock-grouping referee on the other) and the two
 sides literally agree, with no postulate in the path: `diamond-full`,
-`take-full` (the mid-instant cut v1 had fenced behind `runMemCut`),
+`take-full` (the mid-instant cut the previous generation had fenced behind `runMemCut`),
 `scan-full`, `mergeMap-full` (spawned-inner coalescing), `merge2-full`,
 `cascade-full` (a queued concat leg riding the take-cut's instant),
 `switch-full`, `exhaust-full`, `share-diamond-full`, and `growth-full`
@@ -433,7 +438,6 @@ list and nothing else.
 
 ```sh
 agda src/Formal-Verification/Main-Theorem.agda # the entrypoint — everything else follows
-cd v1 && agda src/Everything.agda # the v1 reference tower
 ```
 
 Agda ≥ 2.6.2 (developed with 2.7.0.1). Self-contained — no standard
