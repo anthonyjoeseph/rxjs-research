@@ -1,21 +1,23 @@
 /**
- * The burst oracle: random programs over the ratified grammar, run through
- * BOTH the live rxjs machinery (interp/core/machine) and the pure model
- * (model.ts = the Burst.agda transcription). They must agree exactly —
- * batch boundaries, contents, and intra-batch order.
+ * The GLOBAL oracle: random canonical programs run through BOTH the live
+ * TypeScript rxjs machinery (interp/primitives/batchSimultaneous) AND the
+ * Agda `impl-batchSimultaneous`, via the compiled Agda CLI (agda/_cli/Main,
+ * built by `npm run agda:cli`). They must agree exactly — this checks that
+ * the TS implementation faithfully mirrors the Agda implementation, with no
+ * trusted hand-transcription in between.
  *
- * Generator restrictions (= the model's stated validity domain):
- *  - letShare sources are subject-backed (shareRef / map thereof) — no
- *    sync-completing shares, whose reset-and-replay lives are decided by
- *    Protocol.agda's operational layer, not the flat denotation;
- *  - all four *All joins are generated, over BOTH sorts (ofS sync bursts
- *    and mapS async outers) — the impl goes through the primitive
- *    stream-of-streams forms, exactly like ⟦_⟧S;
- *  - spawned refs of the bound share are excluded (upstream-race frontier —
- *    see templateArb's refIMin note).
+ * The Agda-`spec` arm is dropped for now (Anthony): once impl ≡ spec is
+ * proven in Agda, TS-impl vs Agda-impl suffices. Since a shared bug agrees
+ * between the two impls, this surfaces only genuine TS↔Agda drift.
+ *
+ * Batch mode: fast-check `sample`s N cases (seeded), we serialize them as
+ * NDJSON, run the Agda CLI ONCE, and compare each result to the TS impl.
  */
+import { execFileSync } from "child_process";
+import { existsSync } from "fs";
+import * as path from "path";
 import fc from "fast-check";
-import { DriverEvent, Exp, ExpS, Fn, InnerTemplate, modelBatches } from "../model";
+import { DriverEvent, Exp, ExpS, Fn, InnerTemplate } from "../model";
 import { implBatches } from "../interp";
 
 const NUM_SLOTS = 3;
@@ -279,20 +281,51 @@ const driverArb: fc.Arbitrary<DriverEvent[]> = fc.array(
   { maxLength: 5 },
 );
 
-describe("burst oracle: impl ≡ model on random programs", () => {
-  test("random combinator trees agree with the Burst.agda transcription", () => {
-    fc.assert(
-      fc.property(programArb, driverArb, (e, d) => {
-        expect(implBatches(e, NUM_SLOTS, d)).toEqual(
-          modelBatches(e, NUM_SLOTS, d),
-        );
-      }),
-      {
-        numRuns: Number(process.env.FC_NUM_RUNS ?? 500),
-        ...(process.env.FC_SEED !== undefined
-          ? { seed: Number(process.env.FC_SEED) }
-          : {}),
-      },
+const CLI = path.resolve(__dirname, "../../../agda/_cli/Main");
+
+type Case = { slots: number; exp: Exp; driver: DriverEvent[] };
+
+/** run a batch of cases through the Agda impl-batchSimultaneous CLI */
+const agdaBatch = (cases: Case[]): number[][][] => {
+  const input = cases.map((c) => JSON.stringify(c)).join("\n") + "\n";
+  const out = execFileSync(CLI, {
+    input,
+    encoding: "utf8",
+    maxBuffer: 1 << 28,
+  });
+  return out
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as number[][]);
+};
+
+describe("global oracle: TS impl ≡ Agda impl on random canonical programs", () => {
+  test("TS batchSimultaneous matches the Agda impl-batchSimultaneous", () => {
+    if (!existsSync(CLI))
+      throw new Error(
+        `Agda CLI not built at ${CLI} — run \`npm run agda:cli\` first.`,
+      );
+    const numRuns = Number(process.env.FC_NUM_RUNS ?? 500);
+    const seed = Number(process.env.FC_SEED ?? 0);
+    const cases: [Exp, DriverEvent[]][] = fc.sample(
+      fc.tuple(programArb, driverArb),
+      { numRuns, seed },
     );
+    const agda = agdaBatch(
+      cases.map(([exp, driver]) => ({ slots: NUM_SLOTS, exp, driver })),
+    );
+    for (let i = 0; i < cases.length; i++) {
+      const [e, d] = cases[i];
+      const ts = JSON.stringify(implBatches(e, NUM_SLOTS, d));
+      const ag = JSON.stringify(agda[i]);
+      if (ts !== ag)
+        throw new Error(
+          `TS↔Agda impl MISMATCH (seed=${seed}, case=${i})\n` +
+            `  program = ${JSON.stringify(e)}\n` +
+            `  driver  = ${JSON.stringify(d)}\n` +
+            `  ts-impl   = ${ts}\n` +
+            `  agda-impl = ${ag}`,
+        );
+    }
   });
 });
