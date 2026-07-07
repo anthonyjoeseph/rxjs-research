@@ -9,3 +9,4 @@ import Diamond
 import Obs
 import BatchImpl
 import Burst
+import Protocol

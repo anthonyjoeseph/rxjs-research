@@ -253,6 +253,10 @@ ltℕ⇒leqℕ-flip-false (suc a) (suc b) p = ltℕ⇒leqℕ-flip-false a b p
 eqℕ-complete : (a b : ℕ) → a ≡ b → eqℕ a b ≡ true
 eqℕ-complete a .a refl = eqℕ-refl a
 
+ltℕ-suc : (n : ℕ) → ltℕ n (suc n) ≡ true
+ltℕ-suc zero    = refl
+ltℕ-suc (suc n) = ltℕ-suc n
+
 ltℕ-trans : (a b c : ℕ) → ltℕ a b ≡ true → ltℕ b c ≡ true → ltℕ a c ≡ true
 ltℕ-trans a       b       zero    p  ()
 ltℕ-trans a       zero    (suc c) () q
