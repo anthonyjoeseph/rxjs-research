@@ -1,5 +1,5 @@
 import * as r from "rxjs";
-import { Delivery, Inst } from "./protocol";
+import { InstEmit, Instantaneous } from "./types";
 
 /**
  * batchSimultaneous: the counting machine, transcribed from
@@ -9,12 +9,14 @@ import { Delivery, Inst } from "./protocol";
  * call itself (the batchSync trick), so everything delivered synchronously
  * during subscribe is one batch. After the frame, batching is decided by
  * COUNTING ALONE: totalNum tracks live registrations per root provenance
- * (maintained from reg/clo events); a delivery arriving with no window
- * open opens the instant of its provenance, owing totalNum[prov]
- * deliveries in total; the window drains one per delivery and flushes at
- * zero. Valueless instants (pure protocol traffic) batch nothing.
+ * (maintained from init/close events); an emit arriving with no window
+ * open opens the instant of its provenance, owing totalNum[provenance]
+ * emits in total; the window drains one per emit and flushes at zero.
+ * Valueless instants (pure protocol traffic) batch nothing.
  */
-export const batchSimultaneous = <A>(src: Inst<A>): r.Observable<A[]> =>
+export const batchSimultaneous = <A>(
+  src: Instantaneous<A>,
+): r.Observable<A[]> =>
   new r.Observable<A[]>((sub) => {
     let inFrame = true;
     const totalNum = new Map<number, number>();
@@ -26,18 +28,22 @@ export const batchSimultaneous = <A>(src: Inst<A>): r.Observable<A[]> =>
       if (acc.length > 0) sub.next(acc);
     };
 
-    const step = (d: Delivery<A>): void => {
+    const step = (e: InstEmit<A>): void => {
       // owed is computed from totalNum as of the instant's start — BEFORE
-      // this delivery's reg/clo events apply (Agda: stepD reads tn p, then
+      // this emit's init/close events apply (Agda: stepD reads tn p, then
       // applyEvs)
-      const owedStart = win === null ? (totalNum.get(d.prov) ?? 1) : win.owed;
+      const owedStart =
+        win === null ? (totalNum.get(e.provenance) ?? 1) : win.owed;
       const acc = win === null ? [] : win.acc;
-      for (const ev of d.events) {
-        if (ev.t === "val") acc.push(ev.v);
-        else if (ev.t === "reg")
-          totalNum.set(ev.p, (totalNum.get(ev.p) ?? 0) + 1);
-        else if (ev.t === "clo")
-          totalNum.set(ev.p, Math.max(0, (totalNum.get(ev.p) ?? 0) - 1));
+      for (const ev of e.events) {
+        if (ev.type === "value") acc.push(ev.value);
+        else if (ev.type === "init")
+          totalNum.set(ev.provenance, (totalNum.get(ev.provenance) ?? 0) + 1);
+        else if (ev.type === "close")
+          totalNum.set(
+            ev.provenance,
+            Math.max(0, (totalNum.get(ev.provenance) ?? 0) - 1),
+          );
       }
       const owed = owedStart - 1;
       if (owed <= 0) {
@@ -49,21 +55,27 @@ export const batchSimultaneous = <A>(src: Inst<A>): r.Observable<A[]> =>
     };
 
     const upstream = src.subscribe({
-      next(d) {
+      next(e) {
         if (inFrame) {
-          for (const ev of d.events) {
-            if (ev.t === "val") frameVals.push(ev.v);
-            else if (ev.t === "reg")
-              totalNum.set(ev.p, (totalNum.get(ev.p) ?? 0) + 1);
-            else if (ev.t === "clo")
-              totalNum.set(ev.p, Math.max(0, (totalNum.get(ev.p) ?? 0) - 1));
+          for (const ev of e.events) {
+            if (ev.type === "value") frameVals.push(ev.value);
+            else if (ev.type === "init")
+              totalNum.set(
+                ev.provenance,
+                (totalNum.get(ev.provenance) ?? 0) + 1,
+              );
+            else if (ev.type === "close")
+              totalNum.set(
+                ev.provenance,
+                Math.max(0, (totalNum.get(ev.provenance) ?? 0) - 1),
+              );
           }
           return;
         }
-        step(d);
+        step(e);
       },
-      error(e) {
-        sub.error(e);
+      error(err) {
+        sub.error(err);
       },
       complete() {
         if (inFrame) {

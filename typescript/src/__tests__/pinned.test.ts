@@ -4,13 +4,13 @@
  * inside the model's validity domain, the model too.
  */
 import * as r from "rxjs";
-import { BurstSubject, merge, of, share, take, mergeMap, map, scan, concat } from "../core";
-import { batchSimultaneous } from "../machine";
+import { InstantSubject, merge, of, share, take, mergeMap, map, scan, concat } from "../primitives";
+import { batchSimultaneous } from "../batch-simultaneous";
 import { Exp, mergeE, mergeMapE, concatE, modelBatches } from "../model";
 import { implBatches } from "../interp";
-import { Inst } from "../protocol";
+import { Instantaneous } from "../types";
 
-const collect = (inst: Inst<number>): { batches: number[][]; done: () => void } => {
+const collect = (inst: Instantaneous<number>): { batches: number[][]; done: () => void } => {
   const batches: number[][] = [];
   const sub = batchSimultaneous(inst).subscribe((b) => batches.push(b));
   return { batches, done: () => sub.unsubscribe() };
@@ -32,7 +32,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("protocol-diamond: each .next() batches both copies", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const { batches, done } = collect(
       merge(s.inst, map((n: number) => n * 2)(s.inst)),
     );
@@ -46,8 +46,8 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("two subjects are two instants", () => {
-    const a = new BurstSubject<number>();
-    const b = new BurstSubject<number>();
+    const a = new InstantSubject<number>();
+    const b = new InstantSubject<number>();
     const { batches, done } = collect(merge(a.inst, b.inst));
     a.next(1);
     b.next(2);
@@ -56,7 +56,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("cascade: spawned inner batches with its trigger (multi-value unit)", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const { batches, done } = collect(
       merge(
         s.inst,
@@ -69,7 +69,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("completion cascade: take(1) close pulls the queued cold into the batch", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const { batches, done } = collect(
       merge(s.inst, concat(take(1)(s.inst), of([9]))),
     );
@@ -87,7 +87,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("share-diamond: one connection, two refs, one batch", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const shared = share(s.inst);
     const { batches, done } = collect(
       merge(map((n: number) => n + 1)(shared), map((n: number) => n * 10)(shared)),
@@ -98,8 +98,8 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("late-join growth (readme-late-subscriber): [7,7] then [8,8,8]", () => {
-    const src = new BurstSubject<number>();
-    const trigger = new BurstSubject<number>();
+    const src = new InstantSubject<number>();
+    const trigger = new InstantSubject<number>();
     const { batches, done } = collect(
       merge(src.inst, mergeMap(() => src.inst)(trigger.inst)),
     );
@@ -115,8 +115,8 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("ranked-delivery (Protocol.agda): spawn arm written first still delivers second", () => {
-    const src = new BurstSubject<number>();
-    const trigger = new BurstSubject<number>();
+    const src = new InstantSubject<number>();
+    const trigger = new InstantSubject<number>();
     const shared = share(src.inst);
     const f = (n: number): number => n * 100;
     const g = (n: number): number => n + 1;
@@ -136,7 +136,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("transient ref: take-limited ref leaves, survivor keeps receiving", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const { batches, done } = collect(merge(take(1)(s.inst), s.inst));
     s.next(1);
     s.next(2);
@@ -145,7 +145,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("scan folds in delivery order across the diamond", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const { batches, done } = collect(
       scan((acc: number, n: number) => acc + n, 0)(
         merge(s.inst, map((n: number) => n * 2)(s.inst)),
@@ -161,7 +161,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("take splits instants mid-batch", () => {
-    const s = new BurstSubject<number>();
+    const s = new InstantSubject<number>();
     const { batches, done } = collect(
       take(3)(merge(s.inst, map((n: number) => n * 2)(s.inst))),
     );
@@ -223,7 +223,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
     // static arm FIRST avoids it entirely (the share fans out before the
     // trigger chain spawns). Same frontier the old oracle fenced; excluded
     // from the generator (refIMin) — to resolve either way in the morning.
-    const src = new BurstSubject<number>();
+    const src = new InstantSubject<number>();
     const shared = share(src.inst);
     const { batches, done } = collect(
       merge(
@@ -239,7 +239,7 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
   });
 
   test("upstream race, static-arm-first wiring: strictly-after holds and matches spec", () => {
-    const src = new BurstSubject<number>();
+    const src = new InstantSubject<number>();
     const shared = share(src.inst);
     const { batches, done } = collect(
       merge(
@@ -260,8 +260,8 @@ describe("burst pinned (Agda theorem transcriptions)", () => {
     // value first. The flat model (left-biased merge) would answer [0, 1]
     // — this shape is outside its validity domain, excluded from the
     // oracle generator by the canonicity filter.
-    const trig = new BurstSubject<number>();
-    const src = new BurstSubject<number>();
+    const trig = new InstantSubject<number>();
+    const src = new InstantSubject<number>();
     const { batches, done } = collect(
       merge(
         mergeMap(() => src.inst)(trig.inst), // spawn arm, written first

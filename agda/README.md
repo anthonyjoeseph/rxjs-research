@@ -151,12 +151,14 @@ its trigger; a queued concat leg's flush rides the fin-carrying delivery).
 
 ## Open edges
 
-Tracked in the task queue, not lost: combinator-preservation lemmas for the
-protocol layer (any program built from the trace combinators is truthful);
-`take`/joins inside open windows (mid-instant truncation across a diamond);
-a full-grammar trace denotation `⟦e⟧proto` with the endgame quantified over
-`Exp`; serial joins (`switchAll`/`exhaustAll`) exist in layer 1 and in the
-TS model but are not yet reimplemented in the live TS machinery.
+Written **as explicit postulates** at the bottom of
+[Protocol.agda](src/Protocol.agda) — the remaining obligations live in the
+code as typed statements, not in a side channel: combinator preservation
+(any program built from the trace combinators is truthful), the
+stamp↔mergeT bridge, shareLives truthfulness, the full-grammar trace
+denotation with the endgame quantified over `Exp`, and the
+truncation-aware machine (mid-instant take cuts across a diamond).
+Discharging them precedes any further TypeScript work.
 
 ## Building
 

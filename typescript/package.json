@@ -12,17 +12,12 @@
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "oracle": "jest src/v5/__tests__/oracle.property.test.ts",
-    "oracle:burst": "jest src/burst/__tests__/burst-oracle.property.test.ts",
-    "oracle:replay": "node scripts/oracle-replay.mjs",
-    "oracle:sweep": "node scripts/oracle-sweep.mjs",
+    "oracle": "jest src/__tests__/oracle.property.test.ts",
     "check": "npm run typecheck && npm test",
     "agda": "cd ../agda && agda src/Everything.agda"
   },
   "dependencies": {
-    "pipe-ts": "^0.0.9",
-    "rxjs": "^7.8.2",
-    "uuid": "^11.1.1"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

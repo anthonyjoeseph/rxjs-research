@@ -8,9 +8,9 @@
  *  - letShare sources are subject-backed (shareRef / map thereof) — no
  *    sync-completing shares, whose reset-and-replay lives are decided by
  *    Protocol.agda's operational layer, not the flat denotation;
- *  - switchAll/exhaustAll over async outers (mapS) and concatAll-over-mapS
- *    are model-only for now (not yet reimplemented impl-side) and excluded;
- *    the static (ofS) serial joins ARE generated;
+ *  - all four *All joins are generated, over BOTH sorts (ofS sync bursts
+ *    and mapS async outers) — the impl goes through the primitive
+ *    stream-of-streams forms, exactly like ⟦_⟧S;
  *  - spawned refs of the bound share are excluded (upstream-race frontier —
  *    see templateArb's refIMin note).
  */
@@ -128,6 +128,20 @@ const expArb = (
       arbitrary: fc
         .array(sub, { minLength: 2, maxLength: 3 })
         .map((es): Exp => ({ k: "exhaustAll", s: { k: "ofS", es } })),
+    },
+    {
+      weight: 1,
+      arbitrary: fc
+        .tuple(
+          fc.constantFrom(
+            "concatAll" as const,
+            "switchAll" as const,
+            "exhaustAll" as const,
+          ),
+          templateArb(numSlots, refIMin),
+          sub,
+        )
+        .map(([k, tmpl, e]): Exp => ({ k, s: { k: "mapS", tmpl, e } })),
     },
   );
 };

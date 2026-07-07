@@ -56,30 +56,28 @@ instant out still releases the batch (a filtered diamond logs `[1]` for the
 odd value, `[2, 2]` for the even one).
 
 > **Spec status.** The semantics below — *burst batching* — was ratified in
-> July 2026 and is machine-checked in [agda/src/Burst.agda](agda/src/Burst.agda);
-> the Agda development is the design authority. The TypeScript model and
-> implementation are being brought in line with it.
+> July 2026 and is machine-checked in [agda/](agda/): the timed denotation
+> in [Burst.agda](agda/src/Burst.agda), the clockless counting machine in
+> [Protocol.agda](agda/src/Protocol.agda). The Agda development is the
+> design authority; the TypeScript implementation is validated against a
+> line-by-line transcription of it by a property-based oracle.
 
-### `batchSync()`
+### The counting machine
 
-The building block underneath ([typescript/src/batch-sync.ts](typescript/src/batch-sync.ts)).
-Subscribing to an observable delivers some emissions *synchronously, during the
-subscribe call itself* (e.g. everything `of(1, 2, 3)` will ever emit), and the
-rest later. `batchSync()` makes that boundary observable — it collects the
-synchronous burst into a single `{ type: "sync", value: A[] }` emission, then
-passes every later emission through as `{ type: "async", value: A }`:
+How can `batchSimultaneous` know a batch is over, without time travel? Two
+mechanisms, one per kind of root cause
+([typescript/src/batch-simultaneous.ts](typescript/src/batch-simultaneous.ts)):
 
-```ts
-const s = new InstantSubject<number>();
-
-merge(of(1), of(2), s)
-  .pipe(batchSync())
-  .subscribe(console.log);
-// logs { type: "sync", value: [1, 2] } — everything that fired during subscribe
-
-s.next(3);
-// logs { type: "async", value: 3 }    — one at a time afterwards
-```
+- **The subscription frame** is bounded by the subscribe call itself:
+  everything delivered synchronously during subscribe is one batch.
+- **After the frame, it counts.** Every emission carries the provenance of
+  the root that caused it, and the protocol carries registration events
+  (`init`/`close`) alongside values — so the machine always knows how many
+  live subscription chains each root has. When an instant's first emission
+  arrives, the machine knows exactly how many more it is owed, and flushes
+  when the count drains. No clock, no scheduler tricks — this is the
+  mechanism proven correct in [Protocol.agda](agda/src/Protocol.agda)'s
+  `endgame` theorem.
 
 ## The semantics: burst batching
 
@@ -297,36 +295,38 @@ by the protocol.
   cold/`Subject` constructors may come later.
 - **Schedulers & time** — `delay` and friends are `setTimeout` + the
   existing primitives; no formal impact.
-- **`shareReplay`, share config** — plain `share()` only. The spec models
-  one hot life per share: no refcount-reset when subscribers momentarily
-  drop to zero mid-lifetime, and no replay for late subscribers.
-- **One delivery-order corner** — when a *spawned* subscriber of a share is
-  written syntactically before a *static* subscriber of the same share, the
-  real delivery order (registration order) differs from expression order.
-  The rule is ratified and documented in the spec; deriving it formally is
-  queued behind the counting-tower work.
+- **`shareReplay`, share config** — plain `share()` only, with its default
+  rxjs *lives*: the share resets when its source completes or its refcount
+  drains to zero, and a later subscriber reconnects and replays a cold
+  source (derived in [Protocol.agda](agda/src/Protocol.agda):
+  `shareLives`, `cold-share-lives`, `reset-replay`).
+- **One known open corner (the upstream race)** — a subscriber of a share
+  spawned by a trigger derived from the share's *own source*, wired before
+  the share connects, receives the in-flight value in real rxjs while the
+  spec's strictly-after rule says it misses it. Pinned in the test suite;
+  resolution pending.
 
 ## Running the checks
 
 From `typescript/`:
 
 ```sh
-npm test                                  # the full jest suite
+npm test           # the full jest suite (pinned Agda-theorem cases + the oracle)
 npm run typecheck
-npm run oracle                            # one run of the property oracle (~500 random programs)
-npm run oracle:sweep -- 50                # N oracle runs; prints the counterexample on failure
-npm run oracle:replay -- <seed> "<path>"  # replay a recorded fast-check failure
-npm run agda                              # typecheck agda/src/Everything.agda
+npm run oracle     # one run of the property oracle (500 random programs)
+npm run agda       # typecheck agda/src/Everything.agda
 ```
 
 ## Repository layout
 
 | Path | What |
 | --- | --- |
-| [typescript/src/v5/](typescript/src/v5/) | The implementation: emission trees, primitives, joins, `batchSimultaneous` |
-| [typescript/src/v5/\_\_tests\_\_/](typescript/src/v5/__tests__/) | 95 jest tests: every primitive, every join, the diamond in many shapes, feedback loops, `takeUntil`, `expand`, and side-by-side rxjs comparisons |
-| [typescript/src/model/](typescript/src/model/) | A pure *timed-list* model of the same semantics + a deep-embedded expression type, used as a [fast-check](https://fast-check.dev/) oracle: random combinator trees are run through both the rxjs machinery and the model, and must agree |
-| [agda/](agda/) | **Formal verification** — the ratified burst-batching spec ([Burst.agda](agda/src/Burst.agda)) and the proof tower; see [agda/README.md](agda/README.md) |
+| [typescript/src/types.ts](typescript/src/types.ts) | The protocol: `InstEmit`, `Instantaneous`, the `init`/`value`/`close`/`fin` events |
+| [typescript/src/primitives.ts](typescript/src/primitives.ts) | The canonical primitives — `of`, `empty`, `map`, `take`, `scan`, `share`, and the four `*All` joins over streams-of-streams; `merge`/`concat`/`mergeMap` are derived one-liners |
+| [typescript/src/batch-simultaneous.ts](typescript/src/batch-simultaneous.ts) | The counting machine (the Agda `Protocol.machine`, transcribed) |
+| [typescript/src/model.ts](typescript/src/model.ts) | The pure timed-list model — a line-by-line transcription of [Burst.agda](agda/src/Burst.agda) |
+| [typescript/src/\_\_tests\_\_/](typescript/src/__tests__/) | Pinned Agda-theorem cases + the [fast-check](https://fast-check.dev/) oracle: random combinator trees run through both the rxjs machinery and the model, compared exactly |
+| [agda/](agda/) | **The design authority** — the ratified spec and proofs; see [agda/README.md](agda/README.md) |
 
 ```sh
 cd typescript && npm install && npm test   # jest + property-based oracle

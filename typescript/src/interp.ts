@@ -1,31 +1,45 @@
+import { batchSimultaneous } from "./batch-simultaneous";
 import {
-  BurstSubject,
-  concat,
+  concatAll,
   empty,
-  exhaustStatic,
+  exhaustAll,
+  InstantSubject,
   map,
-  merge,
-  mergeMap,
+  mergeAll,
   of,
   scan,
   share,
-  switchStatic,
+  switchAll,
   take,
-} from "./core";
-import { batchSimultaneous } from "./machine";
-import { Inst } from "./protocol";
+} from "./primitives";
+import { Instantaneous } from "./types";
 import {
   applyFn,
   applyTemplate,
   DriverEvent,
   Exp,
+  ExpS,
   scanStep,
 } from "./model";
 
 /** interpret a deep-embedded program over live slot streams (slot i = the
  * i-th entry; letShare extends at index 0, De Bruijn style, exactly like
- * the model's extendEnv) */
-export const interpret = (e: Exp, slots: Inst<number>[]): Inst<number> => {
+ * the model's extendEnv). The joins go through the PRIMITIVE stream-of-
+ * streams forms, mirroring the Agda ⟦_⟧S. */
+const interpretS = (
+  s: ExpS,
+  slots: Instantaneous<number>[],
+): Instantaneous<Instantaneous<number>> =>
+  s.k === "ofS"
+    ? of(s.es.map((x) => interpret(x, slots)))
+    : map((v: number) => interpret(applyTemplate(s.tmpl, v), slots))(
+        interpret(s.e, slots),
+      );
+
+export const interpret = (
+  e: Exp,
+  slots: Instantaneous<number>[],
+): Instantaneous<number> => {
   switch (e.k) {
     case "empty":
       return empty();
@@ -46,29 +60,14 @@ export const interpret = (e: Exp, slots: Inst<number>[]): Inst<number> => {
       return take(e.n)(interpret(e.e, slots));
     case "scan":
       return scan(scanStep(e.f), 0)(interpret(e.e, slots));
-    case "mergeAll": {
-      if (e.s.k === "ofS")
-        return merge(...e.s.es.map((x) => interpret(x, slots)));
-      const tmpl = e.s.tmpl;
-      return mergeMap((v: number) => interpret(applyTemplate(tmpl, v), slots))(
-        interpret(e.s.e, slots),
-      );
-    }
-    case "concatAll": {
-      if (e.s.k === "ofS")
-        return concat(...e.s.es.map((x) => interpret(x, slots)));
-      throw new Error("concatAll over mapS: not implemented impl-side yet");
-    }
-    case "switchAll": {
-      if (e.s.k === "ofS")
-        return switchStatic(e.s.es.map((x) => interpret(x, slots)));
-      throw new Error("switchAll over mapS: not implemented impl-side yet");
-    }
-    case "exhaustAll": {
-      if (e.s.k === "ofS")
-        return exhaustStatic(e.s.es.map((x) => interpret(x, slots)));
-      throw new Error("exhaustAll over mapS: not implemented impl-side yet");
-    }
+    case "mergeAll":
+      return mergeAll(interpretS(e.s, slots));
+    case "concatAll":
+      return concatAll(interpretS(e.s, slots));
+    case "switchAll":
+      return switchAll(interpretS(e.s, slots));
+    case "exhaustAll":
+      return exhaustAll(interpretS(e.s, slots));
   }
 };
 
@@ -82,7 +81,7 @@ export const implBatches = (
 ): number[][] => {
   const subjects = Array.from(
     { length: numSlots },
-    () => new BurstSubject<number>(),
+    () => new InstantSubject<number>(),
   );
   const out: number[][] = [];
   const sub = batchSimultaneous(

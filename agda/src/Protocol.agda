@@ -168,8 +168,12 @@ ofP d p vs = tr (reg p ∷ map val vs) (map (λ _ → []) d)
 mapP : {A B : Set} → (A → B) → Trace A → Trace B
 mapP f (tr fr rs) = tr (map (mapEv f) fr) (map (map (mapDel f)) rs)
 
--- merge: frames concatenate (subscription order), responses interleave
--- per driver event, left arm first
+-- the trace semantics of the DERIVED binary merge (mergeAllE ∘ ofS — the
+-- *All joins are the primitives, per the canonical grammar; this fragment
+-- layer models the derived form directly, and the full-grammar trace
+-- denotation goes through the primitives): frames concatenate
+-- (subscription order), responses interleave per driver event, left arm
+-- first
 mergeP : {A : Set} → Trace A → Trace A → Trace A
 mergeP (tr f₁ r₁) (tr f₂ r₂) = tr (f₁ ++ f₂) (zipConcat r₁ r₂)
 
