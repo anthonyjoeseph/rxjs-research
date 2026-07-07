@@ -49,6 +49,10 @@ s.next(5); // logs [5, 50]  — one batch, not two emissions
 s.next(6); // logs [6, 60]
 ```
 
+> **Formalized** as `readme-diamond` in
+> [agda/src/Formal-Verification/Readme-Semantics.agda](agda/src/Formal-Verification/Readme-Semantics.agda)
+> — this exact example, checked against the Agda spec.
+
 Independent events stay in separate batches, and a branch that filters an
 instant out still releases the batch (a filtered diamond logs `[1]` for the
 odd value, `[2, 2]` for the even one).
@@ -95,6 +99,8 @@ Everything below is that rule playing out.
 
 ### One `subscribe()` call is one batch
 
+_Formalized: [`readme-one-subscribe-one-batch`](agda/src/Formal-Verification/Readme-Semantics.agda)._
+
 ```ts
 const now = of(1, 2);
 const alsoNow = of(3);
@@ -113,6 +119,8 @@ arrives after the frame ends is caused by some later event and batches with
 _that_.
 
 ### Each `.next()` call is its own instant
+
+_Formalized: [`readme-each-next-own-instant`](agda/src/Formal-Verification/Readme-Semantics.agda)._
 
 ```ts
 const a = new InstantSubject<number>();
@@ -134,6 +142,8 @@ reacts to — feedback never extends the instant it's reacting to.)
 
 ### Cascades inherit their trigger's instant
 
+_Formalized: [`readme-cascades-inherit`](agda/src/Formal-Verification/Readme-Semantics.agda)._
+
 ```ts
 const s = new InstantSubject<number>();
 const spawned = s.pipe(mergeMap((n) => of(n * 10, n * 10 + 1)));
@@ -148,6 +158,8 @@ inner's synchronous output was _caused by_ that event, so it joins the
 event's batch — transitively, through any nesting depth.
 
 ### Completion cascades inherit too
+
+_Formalized: [`readme-completion-cascades`](agda/src/Formal-Verification/Readme-Semantics.agda)._
 
 ```ts
 const s = new InstantSubject<number>();
@@ -168,6 +180,8 @@ values are one batch.
 
 ### `share`: connect at first subscription, no replay
 
+_Formalized: [`readme-share-connect-no-replay`](agda/src/Formal-Verification/Readme-Semantics.agda)._
+
 ```ts
 const shared = of(5).pipe(share());
 
@@ -183,6 +197,8 @@ gets nothing. (Contrast the unshared diamond above, where each branch got its
 own copy of the source.)
 
 ### Late subscribers see only later events — diamonds grow
+
+_Formalized: [`readme-late-join-growth`](agda/src/Formal-Verification/Readme-Semantics.agda)._
 
 ```ts
 const src = new InstantSubject<number>();
@@ -209,6 +225,8 @@ event, so each event adds exactly one subscriber.
 
 ### `take` counts values, even mid-batch
 
+_Formalized: [`readme-take-counts-values`](agda/src/Formal-Verification/Readme-Semantics.agda)._
+
 ```ts
 const s = new InstantSubject<number>();
 const doubled = s.pipe(map((n) => n * 2));
@@ -226,6 +244,8 @@ alternative would make `take` aware of a `batchSimultaneous` applied _later_
 in the pipeline, which no user would expect.
 
 ### Batch order is delivery order
+
+_Formalized: [`readme-batch-order-is-delivery-order`](agda/src/Formal-Verification/Readme-Semantics.agda)._
 
 ```ts
 const src = new InstantSubject<number>();
@@ -251,6 +271,8 @@ values before merging (`map((v) => ["left", v] as const)`) and sort the batch
 array.
 
 ### The serial joins mirror rxjs
+
+_Formalized: [`readme-serial-joins-mirror-rxjs`](agda/src/Formal-Verification/Readme-Semantics.agda)._
 
 ```ts
 const burst = of(1, 2);
