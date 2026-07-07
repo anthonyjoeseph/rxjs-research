@@ -32,42 +32,33 @@ Further reading:
 ## The idea: provenance + `batchSimultaneous`
 
 An `Instantaneous<A>` is implemented as an `Observable<InstEmit<A>>`, where
-every source observable is stamped with a unique **provenance** (a `Symbol()`;
-a uuid in practice, for debugging). The usual primitives — `of`, `empty`,
-`map`, `take`, `mergeAll`, `concatAll`, `switchAll`, `exhaustAll` — are
-reimplemented to preserve provenance through the pipeline.
-
-Alongside the provenance, every protocol node carries a **registration id**
-(`sub`): a fresh id minted at each *actual subscription* of a source and
-preserved verbatim by every re-statement downstream. Provenance answers
-"which source?"; the sub answers "which subscription of it?" — so two live
-copies of the same source (a diamond, a re-subscribed inner, a second
-`share` ref) are distinguishable, closes name exactly which registration
-they end, and a register-and-close lifecycle that lives entirely inside
-one delivery pairs with itself instead of eating a sibling's batch slot.
-
-`batchSimultaneous : Instantaneous<A> → Instantaneous<A[]>` then groups
-emissions that originate from a common source event:
+every emission carries **provenance**: which root cause (which instant) it
+traces back to. The usual primitives — `of`, `empty`, `map`, `take`, `share`,
+`scan`, `mergeAll`, `concatAll`, `switchAll`, `exhaustAll` — are reimplemented
+to preserve provenance through the pipeline, and
+`batchSimultaneous : Instantaneous<A> → Instantaneous<A[]>` groups emissions
+that share a root cause:
 
 ```ts
-import { pipeWith } from "pipe-ts";
-import { InstantSubject } from "./v5/constructors";
-import { fromInstantaneous, map } from "./v5/basic-primitives";
-import { batchSimultaneous } from "./v5/batch-simultaneous";
-import { merge } from "./v5/util";
-
 const s = new InstantSubject<number>();
-const merged = merge(s, pipeWith(s, map((n) => n * 10)));
+const tenfold = s.pipe(map((n) => n * 10));
 
-pipeWith(merged, batchSimultaneous, fromInstantaneous).subscribe(console.log);
+merge(s, tenfold)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
 
 s.next(5); // logs [5, 50]  — one batch, not two emissions
 s.next(6); // logs [6, 60]
 ```
 
-Independent sources stay in separate batches, and a branch that filters an
-instant out still releases the batch (`merge(s, s.pipe(filter(isEven)))` logs
-`[1]` then `[2, 2]`).
+Independent events stay in separate batches, and a branch that filters an
+instant out still releases the batch (a filtered diamond logs `[1]` for the
+odd value, `[2, 2]` for the even one).
+
+> **Spec status.** The semantics below — *burst batching* — was ratified in
+> July 2026 and is machine-checked in [agda/src/Burst.agda](agda/src/Burst.agda);
+> the Agda development is the design authority. The TypeScript model and
+> implementation are being brought in line with it.
 
 ### `batchSync()`
 
@@ -79,219 +70,226 @@ synchronous burst into a single `{ type: "sync", value: A[] }` emission, then
 passes every later emission through as `{ type: "async", value: A }`:
 
 ```ts
-r.merge(of(1), of(2), someSubject)
+const s = new InstantSubject<number>();
+
+merge(of(1), of(2), s)
   .pipe(batchSync())
   .subscribe(console.log);
-// { type: "sync", value: [1, 2] }     — everything that fired during subscribe
-someSubject.next(3);
-// { type: "async", value: 3 }         — one at a time afterwards
+// logs { type: "sync", value: [1, 2] } — everything that fired during subscribe
+
+s.next(3);
+// logs { type: "async", value: 3 }    — one at a time afterwards
 ```
 
-The joins (`mergeAll` and friends) use it to treat the subscription instant as
-one instant: all the `init` emissions of simultaneously subscribed inners are
-grouped into a single tree before flowing downstream.
+## The semantics: burst batching
 
-## The semantics, by its edge cases
+"Simultaneous" is a **causal** notion, not a temporal one. The whole
+semantics is one rule:
 
-"Simultaneous" is a **causal** notion here, not a temporal one: two emissions
-batch together when they trace back to the same root cause — *not* merely
-because they happened in the same synchronous burst of JavaScript. Every
-tricky case below falls out of one rule:
+> **Every emission belongs to the instant of the event that caused it**,
+> transitively — mapped values, spawned inner subscriptions, completion
+> cascades all inherit their trigger's instant. The only *fresh* instants
+> are the root causes, and there are exactly two kinds: **one `subscribe()`
+> call** (the entire synchronous subscription frame is one instant) and
+> **one `.next()` call** (each subject firing is its own instant, even
+> back-to-back).
 
-> **Every emission belongs to the instant of the value that caused it** —
-> transitively: mapped values, spawned inners, subscriptions triggered by an
-> async completion, and their sync flushes all inherit. The only *fresh*
-> instants are the root causes: **each subject firing** (one `.next()` call =
-> one instant — two subjects fired back-to-back are still two instants), and
-> **each cold source** at subscription (every `of` is its own instant). A
-> cold stream *completing during subscription* is part of the static
-> unfolding, not an event — so serial chains stay fragmented.
+Everything below is that rule playing out.
 
-### Derivation creates simultaneity — sync or async alike
+### One `subscribe()` call is one batch
 
 ```ts
-const wiring = (x) => merge(x, pipeWith(x, mergeMap((n) => of(n * 10))));
+const now = of(1, 2);
+const alsoNow = of(3);
+const later = timer(100); // emits 0 after 100 ms
 
-wiring(subject);  subject.next(5);   // [5, 50] — inner inherits its trigger
-wiring(of(5));                       // [5, 50] — same shape for a cold source
+merge(now, alsoNow, later)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+// logs [1, 2, 3] — immediately: the whole subscription frame is one instant
+// logs [0]       — 100 ms later: an async event is its own instant
 ```
 
-The same wiring batches the same way whatever the source. Note the reach of
-transitivity: `of(1, 2)` through that wiring gives **one** batch
-`[1, 2, 10, 20]` — `10` was caused by `1` and `20` by `2`, but `1` and `2`
-already share their `of`'s instant, and inheritance is through the instant.
-Independent colds stay apart, though: `merge(of(1), of(2))` is `[1]`, `[2]` —
-two root causes, two instants.
+Everything that fires synchronously *during* the subscribe call shares one
+root cause: the subscribe call itself. It doesn't matter how the sync values
+are wired — separate `of`s, `concat(of(1, 2), of(3))`, nested merges — a
+static (subject-free) program lands entirely in one batch. Anything that
+arrives after the frame ends is caused by some later event and batches with
+*that*.
 
-How can the machinery tell a `mergeMap`-spawned inner (inherits) from a
-`merge`/`concatAll` inner (its own cause), when both arrive as
-stream-values of an `of`? By **derivation**: `map` marks its output values
-as derived, and a join subscribing a *derived* stream-value knows the
-stream was computed from an upstream value — so its flush inherits that
-value's instant. A literal stream child is static wiring.
-
-### Nested joins: one async instant, however deep
-
-When one async event delivers *multiple* trigger values (a join over a join,
-a diamond used as a join argument), **all** sibling inners inherit it:
+### Each `.next()` call is its own instant
 
 ```ts
-pipeWith(s, mergeMap((n) => of(n, n + 100)), mergeMap((n) => of(n)));
-s.next(5);   // [5, 105] — one batch, one instant, arbitrary nesting depth
+const a = new InstantSubject<number>();
+const b = new InstantSubject<number>();
+const doubled = a.pipe(map((n) => n * 2));
+
+merge(a, doubled, b)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+
+a.next(5); // logs [5, 10] — the diamond: both copies of a's event, one batch
+b.next(7); // logs [7]     — a different subject is a different root cause
+a.next(6); // logs [6, 12]
 ```
+
+A `.next()` call is a fresh root cause. Two subjects fired back-to-back in
+the same JavaScript tick are still two instants — batching follows causation,
+not wall-clock adjacency. (A `.next()` called reentrantly, from inside a
+subscriber callback, is likewise a fresh instant, strictly after the batch it
+reacts to — feedback never extends the instant it's reacting to.)
+
+### Cascades inherit their trigger's instant
+
+```ts
+const s = new InstantSubject<number>();
+const spawned = s.pipe(mergeMap((n) => of(n * 10, n * 10 + 1)));
+
+merge(s, spawned)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+
+s.next(5); // logs [5, 50, 51] — the spawned inner's values batch with their cause
+```
+
+When an event spawns an inner subscription (`mergeMap`, `concatMap`, …), the
+inner's synchronous output was *caused by* that event, so it joins the
+event's batch — transitively, through any nesting depth.
 
 ### Completion cascades inherit too
 
-A completion is an async event like any other. When `concatAll` advances its
-queue because an inner closed, the next inner's subscription flush belongs to
-the closing instant:
-
 ```ts
-merge(x, concat(pipeWith(x, take(1)), of(7)));
-x.next(5);   // [5, 5, 7] — take's last value, its close, and the queued
-             // cold's values are one instant
+const s = new InstantSubject<number>();
+const firstOnly = s.pipe(take(1));
+const thenSeven = concat(firstOnly, of(7));
+
+merge(s, thenSeven)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+
+s.next(5); // logs [5, 5, 7] — take(1) closes on this event, so the queued
+           //                  of(7) subscribes at the same instant
+s.next(6); // logs [6]
 ```
 
-(Mechanically: the taking close travels *with* the final value as one
-protocol unit, and `concatAll` grafts the next inner's subscription flush
-into that unit before it flows downstream — the whole advancement cascade,
-chained sync-closing inners included, is one emission. A queue that
-advances back onto the *same* source it just took from keeps the source's
-registration alive: the close and the re-subscription cancel.)
+A completion is an event like any other. When `concat` advances its queue
+because an inner closed, the next inner's subscription flush belongs to the
+closing instant — the final value, the close, and the freshly subscribed
+values are one batch.
 
-But a queue that advances through *sync-closing* inners stays fragmented
-(subscription-cascade rule): `concat(of(1, 2), of(3))` gives
-`[1,2]`, `[3]`.
-
-### Late subscribers: multiplicity grows over time
-
-A subscriber that joins late (a hot `share`d stream re-subscribed by each
-trigger of a join, or a hot source queued behind a `concatAll`) sees only
-events **strictly after** its subscription instant — so diamonds *grow*:
+### `share`: connect at first subscription, no replay
 
 ```ts
-// let x = share(src) in merge(x, mergeMap(() => x)(triggers))
-triggers.next();  src.next(7);   // [7, 7]     — the static arm + one spawned
-triggers.next();  src.next(8);   // [8, 8, 8]  — a third subscriber now
+const shared = of(5).pipe(share());
+
+merge(shared, shared)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+// logs [5] — once, not twice
 ```
 
-The strictly-after rule is also what makes **feedback loops**
-(`mergeMap(() => x)(x)`, rxjs `expand`-style) well-founded: a
-value never triggers a subscription that sees that same value, so
-multiplicity grows by exactly one per event — supported and
-oracle-verified. One recorded frontier: a trigger derived from the share's
-*source* (upstream of the share) races the share's own delivery of the
-same event — the spawned subscription is wired first and *does* see the
-current value, exactly as plain rxjs behaves, while the model's
-strictly-after suffix idealizes it away.
+A `share` subscribes its source exactly once: when its **first** subscriber
+arrives. That first subscriber triggers the connection and receives the
+source's synchronous values; the second subscriber arrives a moment later,
+after those values already fired, and a hot stream does not replay — so it
+gets nothing. (Contrast the unshared diamond above, where each branch got its
+own copy of the source.)
 
-### `take` splits instants
+### Late subscribers see only later events — diamonds grow
 
-`take(n)` counts values, exactly like rxjs — even mid-batch, even over a
-diamond. `take(1)` of a diamond emits one `5`, not the "whole instant"
-`[5, 5]`; `take(3)` of a diamond cuts the second instant in half:
-`[5, 5]`, `[6]`. The alternative would make `take` aware of a
-`batchSimultaneous` applied *later* in the pipeline, which no user would
-expect. At the cut, `take` synthesizes protocol closes for every
-registration it passed downstream — each carrying the registration id it
-ends — traveling with the final value as one unit, so a `concatAll` queued
-behind a cut diamond still inherits the closing instant, and window
-accounting knows exactly whose delivery slots the cut consumed (this is
-what makes cuts correct even across *multiple live copies* of the same
-`take`, e.g. one spawned per trigger by a dynamic join).
+```ts
+const src = new InstantSubject<number>();
+const shared = src.pipe(share());
+const trigger = new InstantSubject<void>();
 
-### The serial joins mirror rxjs — including the subtle cases
+// each trigger event adds one more live subscription of `shared`
+const growing = trigger.pipe(mergeMap(() => shared));
 
-- `switchAll` on a synchronous burst of inners subscribes each in turn:
-  **every** inner's sync values pass; only the last stays live.
-- exhaust drops an arrival only while the previous inner is **still
-  active** — `pipeWith(of(1, 2), exhaustMap((n) => of(n * 10)))` emits
-  both `10` and `20`, because the first inner completes synchronously and
-  frees the slot.
-- One thing rxjs never had to care about: unsubscribing a live inner
-  (switching away from it) must tell downstream batch accounting that its
-  registrations ended. `switchAll` synthesizes protocol closes for the
-  switched-away inner, so **diamonds across a switch** batch correctly:
+merge(shared, growing)
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
 
-  ```ts
-  merge(s, switchAll(of(s, of(1))));   // s registered, switched away, closed
-  s.next(5);                           // [5] — single, not stranded
-  ```
+trigger.next();
+src.next(7);    // logs [7, 7]    — the static subscription plus one spawned
+trigger.next();
+src.next(8);    // logs [8, 8, 8] — a third subscriber now
+```
 
-  (`rxjs-mirror.test.ts` runs the same programs through plain rxjs
-  side-by-side to keep the value semantics honest.)
+A subscriber that joins a hot stream late sees only events **strictly after**
+its subscription instant. So multiplicity grows over time, one copy per
+spawned subscription. The strictly-after rule is also what makes feedback
+loops (`shared.pipe(mergeMap(() => shared))`, rxjs-`expand`-style)
+well-founded: an event never triggers a subscription that sees that same
+event, so each event adds exactly one subscriber.
 
-### Async outers: inners that arrive over time
+### `take` counts values, even mid-batch
 
-The serial joins also take **asynchronous stream-of-streams outers**
-(`concatMap(v => inner)(trigger)`, `switchMap`, `exhaustMap`), and the
-causation rule extends to them:
+```ts
+const s = new InstantSubject<number>();
+const doubled = s.pipe(map((n) => n * 2));
+const firstThree = merge(s, doubled).pipe(take(3));
 
-- A `concatMap` arrival while an inner is live **queues**; when the live
-  inner ends via an async event, the queued inner subscribes *at the
-  closing instant* — the final value, the closes, and the queued inner's
-  subscription flush are **one batch**.
-- An `exhaustMap` arrival while an inner is live is dropped entirely; a
-  `switchMap` arrival switches at its own instant (and a trigger sharing
-  the live inner's source silences the inner's same-instant value — the
-  trigger chain subscribed first, exactly as in plain rxjs).
-- A swallowed arrival (queued or dropped) still **delivers its protocol
-  side at the arrival instant** — closes ride along, and the delivery's
-  window slot is consumed — so diamonds through a busy serial join never
-  strand a batch. Only the payload (the inner's subscription) is deferred
-  or discarded.
-- Valueless outer emissions (a filtered trigger's empty instant, the
-  outer's own completion) are protocol traffic: they forward at their own
-  instant and never queue, drop, or switch. In particular `switchAll` now
-  mirrors rxjs on completion: the outer completing does **not** kill the
-  live inner.
+firstThree
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+
+s.next(5); // logs [5, 10]
+s.next(6); // logs [6] — take(3) cuts the second batch in half
+```
+
+`take(n)` counts values, exactly like rxjs — even across a diamond.
+`take(1)` of a diamond emits one `5`, not the "whole instant" `[5, 5]`. The
+alternative would make `take` aware of a `batchSimultaneous` applied *later*
+in the pipeline, which no user would expect.
 
 ### Batch order is delivery order
 
-Within a batch, values appear **in the order they arrived** — exactly the
-order plain rxjs would deliver them (ratified 2026-07-06, replacing an
-earlier syntactic-sort design whose position machinery leaked into every
-operator). This is still deterministic and rule-governed:
+```ts
+const src = new InstantSubject<number>();
+const shared = src.pipe(share());
+const doubled = shared.pipe(map((n) => n * 2));
+const sums = merge(shared, doubled).pipe(scan((acc, n) => acc + n, 0));
 
-> A source fires its subscribers in **subscription order**. Everything
-> wired up statically subscribes in expression order, so for ordinary
-> programs the batch reads exactly like the expression:
-> `merge(s, map(f)(s))` batches as `[5, f(5)]`. Order only becomes
-> sensitive to *subscription timing* where timing genuinely differs.
+sums
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
 
-The consequences, concretely:
+src.next(5); // logs [5, 15]  — the accumulator sees 5, then 10, in delivery order
+src.next(1); // logs [16, 18]
+```
 
-- **A `concat` branch that subscribes a hot source *late* delivers last.**
-  In `merge(mergeMap(f)(x), concat(take(1)(x), map(g)(x)))`, the concat's
-  second branch only subscribes `x` when `take(1)` closes — its
-  subscription lands at the *end* of `x`'s subscriber list, so from then
-  on its values appear at the **end** of each batch, even though the
-  branch reads first inside the concat. (Under the old syntactic sort
-  they were re-ordered back to the concat's slot.)
-- **A `share`'s fan-out is consecutive.** The share subscribes its source
-  once, when its first ref subscribes — so all ref-derived values of an
-  instant arrive as one contiguous block at that slot, in ref order:
-  `merge(x, s, map(f)(x))` batches as `[x, f(x), s]`, the two refs
-  adjacent.
-- **A spawned inner's flush arrives inside its trigger's slot** (the
-  trigger chain subscribed the source first), and each live copy of an
-  inner delivers contiguously, in spawn order.
-- **`scan` folds in the same order** — the accumulator threads through a
-  diamond's values exactly as they arrive, so the fold always reads as a
-  left fold over the batch (see below).
+Within a batch, values appear **in the order plain rxjs delivers them**: a
+source fires its subscribers in subscription order, and statically wired
+branches subscribe in expression order — so for ordinary programs the batch
+reads exactly like the expression. A `share`'s subscribers fire consecutively
+as one block, and a spawned inner delivers inside its trigger's slot. `scan`
+folds in this same order (it stays a cheap stateful map that never waits for
+a batch to assemble), so the fold always reads as a left fold over the
+displayed batch. If a specific order matters to you, make it explicit: tag
+values before merging (`map((v) => ["left", v] as const)`) and sort the batch
+array.
 
-If a specific order matters, make it explicit: tag values before merging
-(`map((v) => ["left", v])`) and sort the batch array — local, explicit,
-and independent of subscription timing.
+### The serial joins mirror rxjs
 
-### `scan` processes emissions as they come in
+```ts
+const burst = of(1, 2);
+const exhausted = burst.pipe(exhaustMap((n) => of(n * 10)));
 
-`accumulate`/`scan` stays a cheap, provenance-transparent stateful map,
-exactly like rxjs `scan` — it never waits for an instant to assemble.
-Over a diamond, the accumulator visits the instant's values in delivery
-order, which is also the batch's order, so
-`scan(0, (a, v) => a + v)(merge(s, map(f)(s)))` on `s.next(5)` batches as
-`[5, 5 + f(5)]` — a clean left fold over the displayed batch.
+exhausted
+  .pipe(batchSimultaneous())
+  .subscribe(console.log);
+// logs [10, 20] — one batch (one subscription frame), and BOTH inners ran:
+// a synchronous inner completes immediately, freeing the slot before 2 arrives
+```
+
+`switchMap`, `concatMap` and `exhaustMap` keep their rxjs value semantics,
+including the subtle cases: `exhaustMap` only drops an arrival while the
+previous inner is still open; `switchMap` on a synchronous burst runs every
+inner's sync values and keeps only the last one live; the outer completing
+does not kill a live inner. The one thing rxjs never had to care about —
+telling downstream batch accounting that a switched-away or cut inner's
+registrations ended, so no batch waits forever on a dead branch — is handled
+by the protocol.
 
 ### Out of scope, on purpose
 
@@ -299,12 +297,14 @@ order, which is also the batch's order, so
   cold/`Subject` constructors may come later.
 - **Schedulers & time** — `delay` and friends are `setTimeout` + the
   existing primitives; no formal impact.
-- **`shareReplay`, share config** — plain rxjs `share()` semantics only
-  (refcounted, reset on refcount zero, registration-only replay for late
-  subscribers). One delivery-order corner is outside the verified
-  contract: a ref that closes *during the subscription frame* (e.g.
-  `take(0)(x)` as the first ref) resets the share mid-unfolding, moving
-  its reconnection slot — the oracle's model assumes one hot life.
+- **`shareReplay`, share config** — plain `share()` only. The spec models
+  one hot life per share: no refcount-reset when subscribers momentarily
+  drop to zero mid-lifetime, and no replay for late subscribers.
+- **One delivery-order corner** — when a *spawned* subscriber of a share is
+  written syntactically before a *static* subscriber of the same share, the
+  real delivery order (registration order) differs from expression order.
+  The rule is ratified and documented in the spec; deriving it formally is
+  queued behind the counting-tower work.
 
 ## Running the checks
 
@@ -326,7 +326,7 @@ npm run agda                              # typecheck agda/src/Everything.agda
 | [typescript/src/v5/](typescript/src/v5/) | The implementation: emission trees, primitives, joins, `batchSimultaneous` |
 | [typescript/src/v5/\_\_tests\_\_/](typescript/src/v5/__tests__/) | 95 jest tests: every primitive, every join, the diamond in many shapes, feedback loops, `takeUntil`, `expand`, and side-by-side rxjs comparisons |
 | [typescript/src/model/](typescript/src/model/) | A pure *timed-list* model of the same semantics + a deep-embedded expression type, used as a [fast-check](https://fast-check.dev/) oracle: random combinator trees are run through both the rxjs machinery and the model, and must agree |
-| [agda/](agda/) | **Formal verification** of `batchSimultaneous` — see [agda/README.md](agda/README.md) for the full approach |
+| [agda/](agda/) | **Formal verification** — the ratified burst-batching spec ([Burst.agda](agda/src/Burst.agda)) and the proof tower; see [agda/README.md](agda/README.md) |
 
 ```sh
 cd typescript && npm install && npm test   # jest + property-based oracle
