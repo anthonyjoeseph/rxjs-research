@@ -247,8 +247,21 @@ The machine side of the theorem, mirroring the TypeScript file for file:
 is the counting machine (`batch-simultaneous.ts`). Inner streams reach the
 joins **defunctionalized** as a `Joinable` — a static list of compiled
 inners (`ofJ`) or a compiled template spawned per outer value (`mapJ`),
-exactly the `InnerTemplate` device of the TS model — which also keeps the
-wires in `Set₀` and the compiler structurally recursive.
+exactly the `InnerTemplate` device of the TS model.
+
+Why `Joinable` instead of a stream-of-streams wire, as in the TypeScript's
+`Instantaneous<Instantaneous<A>>`? Two checkers force it, and both point
+the same direction. **Universes**: a machine is a `Set₁` value, so a wire
+carrying machines would need `Ev`/`Emit`/`Machine` lifted a universe level
+(and the joins' states, holding running inners, lifted again) — universe
+creep with no semantic payoff. **Termination**: the alternative of carrying
+inners as raw `Exp`s and handing the joins a compiler
+(`mergeAllI (compileE ρ) …`) passes the compiler to itself under-applied,
+hiding the structural descent from the termination checker — and the
+descent is genuinely subtle there. `Joinable` dissolves both: inners are
+compiled AT the `ofS`/`mapS` node, where `f v` is a constructor-field
+application the checker accepts as smaller, and the wires stay in `Set₀`
+because a `Joinable` is a join *argument*, never a wire payload.
 
 ```agda
 compile : Exp n → Inst n Val                     -- Inst n A = RxObs n (Emit A)
