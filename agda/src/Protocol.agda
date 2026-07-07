@@ -107,9 +107,15 @@ record Mem (A : Set) : Set where
     win      : Maybe (ℕ × List A)
 open Mem public
 
--- owed hits zero → the instant is over, flush; otherwise keep buffering
+consNE : {A : Set} → List A → List (List A) → List (List A)
+consNE []       bs = bs
+consNE (v ∷ vs) bs = (v ∷ vs) ∷ bs
+
+-- owed hits zero → the instant is over, flush (unless it carried no values:
+-- a pure protocol instant — a spawn's registration, a lone close — batches
+-- nothing); otherwise keep buffering
 push : {A : Set} → (Prov → ℕ) → ℕ → List A → Mem A × List (List A)
-push tn zero    acc = mem tn nothing , (acc ∷ [])
+push tn zero    acc = mem tn nothing , consNE acc []
 push tn (suc k) acc = mem tn (just (suc k , acc)) , []
 
 stepD : {A : Set} → Mem A → Delivery A → Mem A × List (List A)
@@ -120,12 +126,8 @@ stepD (mem tn (just (k , acc))) (p , evs) =
 
 runMem : {A : Set} → Mem A → List (Delivery A) → List (List A)
 runMem (mem _  nothing)          [] = []
-runMem (mem _  (just (_ , acc))) [] = acc ∷ []   -- unreachable on truthful traces
+runMem (mem _  (just (_ , acc))) [] = consNE acc []   -- unreachable on truthful traces
 runMem m (d ∷ ds) = snd (stepD m d) ++ runMem (fst (stepD m d)) ds
-
-consNE : {A : Set} → List A → List (List A) → List (List A)
-consNE []       bs = bs
-consNE (v ∷ vs) bs = (v ∷ vs) ∷ bs
 
 -- THE MACHINE: frame values are one batch (the subscribe call is its own
 -- boundary); everything after is decided by counting alone
@@ -233,23 +235,23 @@ neOf (r ∷ rs) = consNE (delVals r) (neOf rs)
 
 -- THE COUNTING THEOREM, delivery side ------------------------------------------
 
--- an open window drains one slot per delivery and flushes exactly at the
--- block boundary
-drain : {A : Set} (tn : Prov → ℕ) (p : Prov) (j : ℕ) (acc : List A)
+-- an open window (with at least one value already buffered) drains one
+-- slot per delivery and flushes exactly at the block boundary
+drain : {A : Set} (tn : Prov → ℕ) (p : Prov) (j : ℕ) (w : A) (acc : List A)
         (ds rest : List (Delivery A))
       → Block p ds → length ds ≡ suc j
-      → runMem (mem tn (just (suc j , acc))) (ds ++ rest)
-        ≡ (acc ++ delVals ds) ∷ runMem (mem tn nothing) rest
-drain tn p j acc [] rest bk[] ()
-drain tn p zero acc ((.p , es) ∷ []) rest (bk∷ vb bk[]) len
+      → runMem (mem tn (just (suc j , w ∷ acc))) (ds ++ rest)
+        ≡ ((w ∷ acc) ++ delVals ds) ∷ runMem (mem tn nothing) rest
+drain tn p j w acc [] rest bk[] ()
+drain tn p zero w acc ((.p , es) ∷ []) rest (bk∷ vb bk[]) len
   rewrite applyEvs-vals {es = es} tn vb | ++-nil (valsOf es) = refl
-drain tn p zero acc ((.p , es) ∷ d′ ∷ ds″) rest (bk∷ vb (bk∷ _ _)) len =
+drain tn p zero w acc ((.p , es) ∷ d′ ∷ ds″) rest (bk∷ vb (bk∷ _ _)) len =
   zero≢suc (suc-inj (sym len))
-drain tn p (suc j′) acc ((.p , es) ∷ []) rest (bk∷ vb bk[]) len =
+drain tn p (suc j′) w acc ((.p , es) ∷ []) rest (bk∷ vb bk[]) len =
   zero≢suc (suc-inj len)
-drain tn p (suc j′) acc ((.p , es) ∷ ds′@(_ ∷ _)) rest (bk∷ vb bk′) len
+drain tn p (suc j′) w acc ((.p , es) ∷ ds′@(_ ∷ _)) rest (bk∷ vb bk′) len
   rewrite applyEvs-vals {es = es} tn vb
-        | drain tn p j′ (acc ++ valsOf es) ds′ rest bk′ (suc-inj len)
+        | drain tn p j′ w (acc ++ valsOf es) ds′ rest bk′ (suc-inj len)
         | ++-assoc acc (valsOf es) (delVals ds′)
   = refl
 
@@ -259,11 +261,17 @@ run-block-ne : {A : Set} (tn : Prov → ℕ) (p : Prov) (es : List (Ev A))
   → ValBurst es → Block p ds′ → suc (length ds′) ≡ tn p
   → runMem (mem tn nothing) (((p , es) ∷ ds′) ++ rest)
     ≡ (valsOf es ++ delVals ds′) ∷ runMem (mem tn nothing) rest
-run-block-ne tn p es [] rest vb bk[] len
-  rewrite sym len | applyEvs-vals {es = es} tn vb | ++-nil (valsOf es) = refl
-run-block-ne tn p es (d″ ∷ ds″) rest vb bk′ len
-  rewrite sym len | applyEvs-vals {es = es} tn vb
-  = drain tn p (length ds″) (valsOf es) (d″ ∷ ds″) rest bk′ refl
+run-block-ne tn p (val v ∷ []) [] rest vb1 bk[] len
+  rewrite sym len = refl
+run-block-ne tn p (val v ∷ es′) [] rest (vb∷ vb′) bk[] len
+  rewrite sym len | applyEvs-vals {es = es′} tn vb′
+        | ++-nil (valsOf es′) = refl
+run-block-ne tn p (val v ∷ []) (d″ ∷ ds″) rest vb1 bk′ len
+  rewrite sym len
+  = drain tn p (length ds″) v [] (d″ ∷ ds″) rest bk′ refl
+run-block-ne tn p (val v ∷ es′) (d″ ∷ ds″) rest (vb∷ vb′) bk′ len
+  rewrite sym len | applyEvs-vals {es = es′} tn vb′
+  = drain tn p (length ds″) v (valsOf es′) (d″ ∷ ds″) rest bk′ refl
 
 -- a value-burst delivery makes the flushed batch visibly nonempty
 consNE-vals : {A : Set} {es : List (Ev A)} → ValBurst es
@@ -435,3 +443,171 @@ protocol-diamond : {A : Set} (d : Driver A) (p : Prov) (i : ℕ) (f : A → A)
     ≡ diaB f i d
 protocol-diamond d p i f =
   diamond-run f i p (bump (bump (λ _ → zero) p) p) d (tn2 p)
+
+-- SHARE LIVES (rxjs semantics, ratified 2026-07-07) ------------------------------
+--
+-- A share connects its source when a subscriber arrives and it has none;
+-- it RESETS when the source completes or its refcount drains to zero; a
+-- subscriber arriving after a reset reconnects — a fresh life — and a cold
+-- source replays into it. Confirmed against rxjs 7: merge(shared, shared)
+-- of a shared of(5) logs 5 TWICE (the first life completes-and-resets
+-- synchronously, inside the frame). Lives are NON-LOCAL — which life a
+-- subscriber joins depends on when its siblings closed — which is exactly
+-- why they live here, in the operational layer, and not in the flat
+-- denotation (Burst.agda), whose share theorems hold for programs whose
+-- shares never reset.
+--
+-- Counting design ratified with this model: registrations are counted per
+-- ROOT-CAUSE provenance. A share is counting-transparent — each subscriber
+-- registers the ROOT subject feeding the share (reg j), fan-out deliveries
+-- travel with the root's provenance, and pure-cold flushes ride their
+-- trigger's window. The machine above needs no share-specific state.
+--
+-- DELIVERY RANKS fall out of the same model: `live` is kept in
+-- REGISTRATION order (joins append), and fan-out walks it in order — so a
+-- subscriber spawned later delivers later, regardless of where its arm
+-- sits syntactically. That is the rank-tagged delivery model, derived from
+-- the mechanism instead of decreed.
+
+-- a live subscriber of a share: its arm, and its remaining take budget
+LiveRef : Set → Set
+LiveRef A = (A → A) × Maybe ℕ
+
+-- a subscriber spec: when it subscribes (nothing = in the frame; just t =
+-- spawned when slot t fires), its arm, its take budget
+Spec : Set → Set
+Spec A = Maybe ℕ × ((A → A) × Maybe ℕ)
+
+-- the share's source: a cold prefix, then (optionally) a root subject
+record ShareSrc (A : Set) : Set where
+  constructor sharesrc
+  field
+    coldVals : List A
+    tail     : Maybe ℕ
+open ShareSrc public
+
+-- deliver one value to a live ref: the events it forwards, and whether it
+-- survives (a take budget of 1 emits the value and its own close together)
+recv1 : {A : Set} → Prov → A → LiveRef A → List (Ev A) × Maybe (LiveRef A)
+recv1 j v (f , nothing)             = val (f v) ∷ []         , just (f , nothing)
+recv1 j v (f , just zero)           = clo j ∷ []             , nothing
+recv1 j v (f , just (suc zero))     = val (f v) ∷ clo j ∷ [] , nothing
+recv1 j v (f , just (suc (suc n)))  = val (f v) ∷ []         , just (f , just (suc n))
+
+-- replay a cold prefix into one ref
+recvCold : {A : Set} → Prov → List A → LiveRef A → List (Ev A) × Maybe (LiveRef A)
+recvCold j []       r = [] , just r
+recvCold j (v ∷ vs) r with recv1 j v r
+... | evs , nothing = evs , nothing
+... | evs , just r′ with recvCold j vs r′
+...   | evs′ , mr = evs ++ evs′ , mr
+
+maybeCons : {X : Set} → Maybe X → List X → List X
+maybeCons nothing  xs = xs
+maybeCons (just x) xs = x ∷ xs
+
+-- the source fires: every live ref receives, in REGISTRATION order
+fanout : {A : Set} → Prov → A → List (LiveRef A)
+       → List (Delivery A) × List (LiveRef A)
+fanout j v []       = [] , []
+fanout j v (r ∷ rs) =
+  ((j , fst (recv1 j v r)) ∷ fst (fanout j v rs)) ,
+  maybeCons (snd (recv1 j v r)) (snd (fanout j v rs))
+
+-- a subscriber joins the share
+--   pure-cold source: connect, replay, source completes, reset — all at once;
+--     no root registration (there is no async root to register)
+--   live source, no subscribers: CONNECT a fresh life — register the root,
+--     receive the cold replay
+--   live source, subscribers present: hot join — register, replay nothing
+join : {A : Set} → ShareSrc A → List (LiveRef A) → LiveRef A
+     → List (Ev A) × List (LiveRef A)
+join (sharesrc cold nothing)  live r = map val (valsOf (fst (recvCold 0 cold r))) , live
+join (sharesrc cold (just j)) []   r =
+  (reg j ∷ fst (recvCold j cold r)) , maybeCons (snd (recvCold j cold r)) []
+join (sharesrc cold (just j)) live@(_ ∷ _) r =
+  (reg j ∷ []) , live ++ (r ∷ [])
+
+-- the frame: process frame subscribers (and spawned specs' trigger
+-- registrations) in pre-order — this IS registration order for statics
+frameGo : {A : Set} → ShareSrc A → List (Spec A) → List (LiveRef A)
+        → List (Ev A) × List (LiveRef A)
+frameGo src []                     live = [] , live
+frameGo src ((just t  , r) ∷ ss)   live =
+  (reg t ∷ fst (frameGo src ss live)) , snd (frameGo src ss live)
+frameGo src ((nothing , r) ∷ ss)   live =
+  (fst (join src live r) ++ fst (frameGo src ss (snd (join src live r)))) ,
+  snd (frameGo src ss (snd (join src live r)))
+
+-- spawned subscribers joining at event i, in spec order; each join rides
+-- its trigger's delivery
+joinsAt : {A : Set} → ShareSrc A → ℕ → List (LiveRef A) → List (Spec A)
+        → List (Delivery A) × List (LiveRef A)
+joinsAt src i live [] = [] , live
+joinsAt src i live ((nothing , r) ∷ ss) = joinsAt src i live ss
+joinsAt src i live ((just t , r) ∷ ss) with eqℕ t i
+... | false = joinsAt src i live ss
+... | true  =
+  ((i , fst (join src live r)) ∷ fst (joinsAt src i (snd (join src live r)) ss)) ,
+  snd (joinsAt src i (snd (join src live r)) ss)
+
+-- fold the driver: fan out first (a spawned ref never sees the event that
+-- spawned it — the strictly-after rule), then process joins
+reactsGo : {A : Set} → ShareSrc A → List (Spec A) → List (LiveRef A)
+         → Driver A → List (List (Delivery A))
+reactsGo src specs live [] = []
+reactsGo (sharesrc cold nothing) specs live ((i , v) ∷ d) =
+  fst (joinsAt (sharesrc cold nothing) i live specs) ∷
+  reactsGo (sharesrc cold nothing) specs
+           (snd (joinsAt (sharesrc cold nothing) i live specs)) d
+reactsGo (sharesrc cold (just j)) specs live ((i , v) ∷ d) with eqℕ j i
+... | false =
+  fst (joinsAt (sharesrc cold (just j)) i live specs) ∷
+  reactsGo (sharesrc cold (just j)) specs
+           (snd (joinsAt (sharesrc cold (just j)) i live specs)) d
+... | true  =
+  (fst (fanout j v live) ++
+   fst (joinsAt (sharesrc cold (just j)) i (snd (fanout j v live)) specs)) ∷
+  reactsGo (sharesrc cold (just j)) specs
+           (snd (joinsAt (sharesrc cold (just j)) i (snd (fanout j v live)) specs)) d
+
+-- the derived trace of a share and its subscribers
+shareLives : {A : Set} → ShareSrc A → List (Spec A) → Driver A → Trace A
+shareLives src specs d =
+  tr (fst (frameGo src specs []))
+     (reactsGo src specs (snd (frameGo src specs [])) d)
+
+-- THEOREM (cold share replays — the rxjs-confirmed [5,5]): two frame
+-- subscribers of a shared, synchronously completing of(5): the first
+-- connects, drains, and RESETS the share inside the frame; the second
+-- reconnects and replays. One frame, one batch, the value twice.
+cold-share-lives : machine (shareLives (sharesrc (5 ∷ []) nothing)
+                     ((nothing , (λ v → v) , nothing) ∷
+                      (nothing , (λ v → v) , nothing) ∷ []) [])
+                   ≡ (5 ∷ 5 ∷ []) ∷ []
+cold-share-lives = refl
+
+-- THEOREM (ranked delivery — the non-canonical tree, decided): the spawn
+-- arm is written FIRST (spec order = syntactic order), but the static arm
+-- registered first — so the batch is [g v , f v], registration order, not
+-- syntactic order. Driver: slot 1 spawns the f-ref, then slot 0 (the
+-- share's root) fires v.
+ranked-delivery : {A : Set} (f g : A → A) (w v : A)
+  → machine (shareLives (sharesrc [] (just 0))
+      ((just 1  , f , nothing) ∷      -- spawn arm, syntactically left
+       (nothing , g , nothing) ∷ [])  -- static arm, syntactically right
+      ((1 , w) ∷ (0 , v) ∷ []))
+    ≡ (g v ∷ f v ∷ []) ∷ []
+ranked-delivery f g w v = refl
+
+-- THEOREM (refcount-zero reset + replay): a take(1) frame subscriber of a
+-- shared (cold 5 + subject 0) drains the cold prefix and closes — refcount
+-- zero, the share resets. Slot 0 fires 7 into a DEAD share: nothing. A ref
+-- spawned by slot 1 reconnects: a fresh life replays the 5 at its
+-- trigger's instant. Slot 0 fires 8 into the new life: [8].
+reset-replay : machine (shareLives (sharesrc (5 ∷ []) (just 0))
+                 ((nothing , (λ v → v) , just 1) ∷
+                  (just 1  , (λ v → v) , nothing) ∷ [])
+                 ((0 , 7) ∷ (1 , 9) ∷ (0 , 8) ∷ []))
+               ≡ (5 ∷ []) ∷ (5 ∷ []) ∷ (8 ∷ []) ∷ []
+reset-replay = refl
