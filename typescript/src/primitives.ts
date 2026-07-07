@@ -1,4 +1,5 @@
 import * as r from "rxjs";
+import { batchSync } from "./batch-sync";
 import {
   bumpCount,
   close,
@@ -11,6 +12,7 @@ import {
   InstEv,
   Instantaneous,
   val,
+  values,
 } from "./types";
 
 /**
@@ -34,18 +36,18 @@ export class InstantSubject<A> {
   readonly provenance = freshProvenance();
   private ended = false;
   private subj = new r.Subject<InstEmit<A>>();
-  readonly inst: Instantaneous<A> = new r.Observable((sub) => {
-    if (this.ended) {
-      // a completed subject completes late subscribers immediately — the
-      // fin is part of its history (concat legs behind it must advance)
-      sub.next({ provenance: COLD, events: [fin] });
-      sub.complete();
-      return;
-    }
-    sub.next({ provenance: this.provenance, events: [init(this.provenance)] });
-    const s = this.subj.subscribe(sub);
-    return () => s.unsubscribe();
-  });
+  readonly inst: Instantaneous<A> = r.defer(() =>
+    this.ended
+      ? // a completed subject completes late subscribers immediately — the
+        // fin is part of its history (concat legs behind it must advance)
+        r.of({ provenance: COLD, events: [fin] as InstEv<A>[] })
+      : this.subj.pipe(
+          r.startWith({
+            provenance: this.provenance,
+            events: [init(this.provenance)] as InstEv<A>[],
+          }),
+        ),
+  );
   next(v: A): void {
     this.subj.next({ provenance: this.provenance, events: [val(v)] });
   }
@@ -59,12 +61,9 @@ export class InstantSubject<A> {
 }
 
 /** cold source: emits everything inside its subscription frame, then is
- * done — no async roots, so no registration */
+ * done — no async roots, so no registration (Agda: ofP) */
 export const of = <A>(vs: A[]): Instantaneous<A> =>
-  new r.Observable((sub) => {
-    sub.next({ provenance: COLD, events: [...vs.map(val), fin] });
-    sub.complete();
-  });
+  r.of({ provenance: COLD, events: [...vs.map(val), fin] });
 
 export const empty = <A>(): Instantaneous<A> => of<A>([]);
 
@@ -80,183 +79,268 @@ export const map =
       })),
     );
 
+/** the accumulator threads through the value events in delivery order —
+ * a pure fold (Agda: scanP/scanEvs) */
 export const scan =
   <A, B>(f: (acc: B, a: A) => B, z: B) =>
   (src: Instantaneous<A>): Instantaneous<B> =>
-    new r.Observable((sub) => {
-      let acc = z;
-      const s = src.subscribe({
-        next(e) {
-          sub.next({
-            provenance: e.provenance,
-            events: e.events.map((ev): InstEv<B> => {
-              if (ev.type !== "value") return ev;
-              acc = f(acc, ev.value);
-              return val(acc);
-            }),
-          });
+    src.pipe(
+      r.scan(
+        (
+          s: { acc: B; out: InstEmit<B> },
+          e: InstEmit<A>,
+        ): { acc: B; out: InstEmit<B> } => {
+          const folded = e.events.reduce(
+            (st: { acc: B; events: InstEv<B>[] }, ev) =>
+              ev.type === "value"
+                ? {
+                    acc: f(st.acc, ev.value),
+                    events: [...st.events, val(f(st.acc, ev.value))],
+                  }
+                : { acc: st.acc, events: [...st.events, ev] },
+            { acc: s.acc, events: [] as InstEv<B>[] },
+          );
+          return {
+            acc: folded.acc,
+            out: { provenance: e.provenance, events: folded.events },
+          };
         },
-        error: (err) => sub.error(err),
-        complete: () => sub.complete(),
-      });
-      return () => s.unsubscribe();
-    });
+        { acc: z, out: { provenance: COLD, events: [] } },
+      ),
+      r.map((s) => s.out),
+    );
 
 /** take counts VALUES, exactly like rxjs — even mid-batch. At the cut it
  * synthesizes closes for every registration it passed downstream and
  * finishes as part of the same emit (the completion cascade carrier). */
+/** take counts VALUES, exactly like rxjs — even mid-batch. At the cut it
+ * closes every registration it passed downstream and finishes inside the
+ * same emit (Agda: takeP/takeEvs — a pure fold over the events). */
+type TakeState<A> = {
+  readonly budget: number;
+  readonly liveRegs: Readonly<Record<number, number>>;
+  readonly done: boolean;
+  readonly out: InstEmit<A> | null;
+};
+
+const takeEvs = <A>(
+  st: { budget: number; liveRegs: Readonly<Record<number, number>>; done: boolean },
+  events: readonly InstEv<A>[],
+): { budget: number; liveRegs: Readonly<Record<number, number>>; done: boolean; out: InstEv<A>[] } =>
+  events.reduce(
+    (acc, ev) => {
+      if (acc.done) return acc;
+      if (ev.type === "init")
+        return {
+          ...acc,
+          liveRegs: {
+            ...acc.liveRegs,
+            [ev.provenance]: (acc.liveRegs[ev.provenance] ?? 0) + 1,
+          },
+          out: [...acc.out, ev],
+        };
+      if (ev.type === "close")
+        return {
+          ...acc,
+          liveRegs: {
+            ...acc.liveRegs,
+            [ev.provenance]: Math.max(0, (acc.liveRegs[ev.provenance] ?? 0) - 1),
+          },
+          out: [...acc.out, ev],
+        };
+      if (ev.type === "fin") return { ...acc, done: true, out: [...acc.out, ev] };
+      // a value
+      if (acc.budget <= 0) return acc;
+      if (acc.budget === 1) {
+        const closes = Object.entries(acc.liveRegs).flatMap(([p, c]) =>
+          Array.from({ length: c }, () => close(Number(p))),
+        );
+        return {
+          budget: 0,
+          liveRegs: {},
+          done: true,
+          out: [...acc.out, ev, ...closes, fin],
+        };
+      }
+      return { ...acc, budget: acc.budget - 1, out: [...acc.out, ev] };
+    },
+    { ...st, out: [] as InstEv<A>[] },
+  );
+
 export const take =
   (n: number) =>
   <A>(src: Instantaneous<A>): Instantaneous<A> =>
-    new r.Observable((sub) => {
-      if (n === 0) {
-        // completes at subscription — still a fin, so a concatAll behind
-        // it advances in the frame
-        sub.next({ provenance: COLD, events: [fin] });
-        sub.complete();
-        return;
-      }
-      let budget = n;
-      let done = false;
-      const liveRegs = new Map<number, number>();
-      const s = src.subscribe({
-        next(e) {
-          if (done) return;
-          const out: InstEv<A>[] = [];
-          for (const ev of e.events) {
-            if (ev.type === "init") {
-              bumpCount(liveRegs, ev.provenance, 1);
-              out.push(ev);
-            } else if (ev.type === "close") {
-              bumpCount(liveRegs, ev.provenance, -1);
-              out.push(ev);
-            } else if (ev.type === "fin") {
-              out.push(ev);
-              done = true;
-            } else {
-              if (budget > 0) {
-                out.push(ev);
-                budget--;
-                if (budget === 0) {
-                  for (const [p, c] of liveRegs)
-                    for (let i = 0; i < c; i++) out.push(close(p));
-                  out.push(fin);
-                  done = true;
-                  break;
-                }
-              }
-            }
-          }
-          sub.next({ provenance: e.provenance, events: out });
-          if (done) sub.complete();
-        },
-        error: (err) => sub.error(err),
-        complete() {
-          if (!done) sub.complete();
-        },
-      });
-      if (done) s.unsubscribe();
-      return () => s.unsubscribe();
-    });
+    n === 0
+      ? // completes at subscription — still a fin, so a concat behind it
+        // advances in the frame
+        r.of({ provenance: COLD, events: [fin] as InstEv<A>[] })
+      : src.pipe(
+          r.scan(
+            (st: TakeState<A>, e: InstEmit<A>): TakeState<A> => {
+              const res = takeEvs(st, e.events);
+              return {
+                budget: res.budget,
+                liveRegs: res.liveRegs,
+                done: res.done,
+                out: { provenance: e.provenance, events: res.out },
+              };
+            },
+            { budget: n, liveRegs: {}, done: false, out: null },
+          ),
+          r.takeWhile((st) => !st.done, true),
+          r.mergeMap((st) => (st.out === null ? r.EMPTY : r.of(st.out))),
+        );
 
 // the joins — THE primitives, over streams of streams -------------------------
 
-/** mergeAll: every arriving inner is subscribed at its arrival; its
- * synchronous flush is COALESCED into the arrival's emit (its cause), so
- * cascades batch with their trigger; its later emits pass through under
- * their own roots. The join finishes when the outer and every inner have
- * finished. */
+/** the tagged item stream a join's scan consumes: the outer's emit (its
+ * trigger chains' events + how many inners it spawns), each spawned
+ * inner's synchronous flush (captured by batchSync — the coalescing), and
+ * inners' later emits. r.merge subscribes in order, so a trigger item is
+ * always followed synchronously by exactly its own flushes. */
+type JoinItem<A> =
+  | {
+      t: "trigger";
+      provenance: number;
+      others: InstEv<A>[];
+      spawns: number;
+      outerFin: boolean;
+    }
+  | { t: "flush"; events: InstEv<A>[]; finned: boolean }
+  | { t: "emit"; e: InstEmit<A> };
+
+const innerItems = <A>(inner: Instantaneous<A>): r.Observable<JoinItem<A>> =>
+  inner.pipe(
+    batchSync<InstEmit<A>>(),
+    r.map(
+      (g): JoinItem<A> =>
+        g.type === "sync"
+          ? {
+              t: "flush",
+              events: g.value.flatMap((em) =>
+                em.events.filter((ev) => ev.type !== "fin"),
+              ),
+              finned: g.value.some(hasFin),
+            }
+          : { t: "emit", e: g.value },
+    ),
+  );
+
+const triggerItem = <A>(
+  e: InstEmit<Instantaneous<A>>,
+  spawns: number,
+): JoinItem<A> => ({
+  t: "trigger",
+  provenance: e.provenance,
+  others: e.events.filter(
+    (ev): ev is InstEv<A> & { type: "init" | "close" } =>
+      ev.type === "init" || ev.type === "close",
+  ),
+  spawns,
+  outerFin: hasFin(e),
+});
+
+type MergeState<A> = {
+  readonly expecting: number;
+  readonly buf: readonly InstEv<A>[];
+  readonly prov: number;
+  readonly pending: number;
+  readonly outerDone: boolean;
+  readonly closed: boolean;
+  readonly out: InstEmit<A> | null;
+};
+
+/** mergeAll (Agda: mergeAllP): every arriving inner is subscribed at its
+ * arrival; its synchronous flush is COALESCED into the arrival's emit
+ * (its cause), so cascades batch with their trigger; its later emits pass
+ * through under their own roots. The join finishes when the outer and
+ * every inner have finished (fin emits, not rxjs completes — completes
+ * lag the emits within a dispatch). A pure scan over the item stream. */
 export const mergeAll = <A>(
   outer: Instantaneous<Instantaneous<A>>,
 ): Instantaneous<A> =>
-  new r.Observable((sub) => {
-    let outerDone = false;
-    // inners that have not FINNED yet (fin emits, not rxjs completes —
-    // completes lag the emits within a dispatch)
-    let pending = 0;
-    let closed = false;
-    const innerSubs = new Set<r.Subscription>();
-
-    const spawn = (inner: Instantaneous<A>, out: InstEv<A>[]): void => {
-      pending++;
-      let finned = false;
-      const noteFin = (): void => {
-        if (!finned) {
-          finned = true;
-          pending--;
+  outer.pipe(
+    r.mergeMap((e): r.Observable<JoinItem<A>> => {
+      const inners = values(e.events);
+      return r.merge<JoinItem<A>[]>(
+        r.of(triggerItem(e, inners.length)),
+        ...inners.map(innerItems),
+      );
+    }),
+    r.scan(
+      (s: MergeState<A>, item: JoinItem<A>): MergeState<A> => {
+        if (item.t === "trigger") {
+          const pending = s.pending + item.spawns;
+          const outerDone = s.outerDone || item.outerFin;
+          if (item.spawns > 0)
+            return {
+              ...s,
+              pending,
+              outerDone,
+              expecting: item.spawns,
+              buf: item.others,
+              prov: item.provenance,
+              out: null,
+            };
+          const closes = outerDone && pending === 0 && !s.closed;
+          return {
+            ...s,
+            pending,
+            outerDone,
+            closed: s.closed || closes,
+            out: {
+              provenance: item.provenance,
+              events: closes ? [...item.others, fin] : item.others,
+            },
+          };
         }
-      };
-      let inFlush = true;
-      let sRef: r.Subscription | null = null;
-      const s = inner.subscribe({
-        next(e) {
-          if (inFlush) {
-            if (hasFin(e)) noteFin();
-            out.push(...e.events.filter((ev) => ev.type !== "fin"));
-            return;
-          }
-          if (!hasFin(e)) {
-            sub.next(e);
-            return;
-          }
-          noteFin();
-          const events = e.events.filter((ev) => ev.type !== "fin");
-          if (outerDone && pending === 0 && !closed) {
-            // the last live inner finishes: the whole join finishes here
-            closed = true;
-            sub.next({ provenance: e.provenance, events: [...events, fin] });
-            sub.complete();
-          } else {
-            sub.next({ provenance: e.provenance, events });
-          }
-        },
-        error: (err) => sub.error(err),
-        complete() {
-          noteFin();
-          if (sRef !== null) innerSubs.delete(sRef);
-          if (!inFlush && outerDone && pending === 0 && !closed) {
-            closed = true;
-            sub.complete();
-          }
-        },
-      });
-      sRef = s;
-      inFlush = false;
-      if (!finned) innerSubs.add(s);
-    };
-
-    const o = outer.subscribe({
-      next(e) {
-        const out: InstEv<A>[] = [];
-        for (const ev of e.events) {
-          if (ev.type === "value") spawn(ev.value, out);
-          else if (ev.type === "fin") outerDone = true;
-          else out.push(ev);
+        if (item.t === "flush") {
+          const pending = item.finned ? s.pending - 1 : s.pending;
+          const expecting = s.expecting - 1;
+          const buf = [...s.buf, ...item.events];
+          if (expecting > 0)
+            return { ...s, pending, expecting, buf, out: null };
+          const closes = s.outerDone && pending === 0 && !s.closed;
+          return {
+            ...s,
+            pending,
+            expecting: 0,
+            buf: [],
+            closed: s.closed || closes,
+            out: {
+              provenance: s.prov,
+              events: closes ? [...buf, fin] : [...buf],
+            },
+          };
         }
-        let finishes = false;
-        if (outerDone && pending === 0 && !closed) {
-          closed = true;
-          finishes = true;
-          out.push(fin);
-        }
-        sub.next({ provenance: e.provenance, events: out });
-        if (finishes) sub.complete();
+        // an inner's later emit
+        if (!hasFin(item.e)) return { ...s, out: item.e };
+        const pending = s.pending - 1;
+        const events = item.e.events.filter((ev) => ev.type !== "fin");
+        const closes = s.outerDone && pending === 0 && !s.closed;
+        return {
+          ...s,
+          pending,
+          closed: s.closed || closes,
+          out: {
+            provenance: item.e.provenance,
+            events: closes ? [...events, fin] : events,
+          },
+        };
       },
-      error: (err) => sub.error(err),
-      complete() {
-        outerDone = true;
-        if (pending === 0 && !closed) {
-          closed = true;
-          sub.complete();
-        }
-      },
-    });
-
-    return () => {
-      o.unsubscribe();
-      innerSubs.forEach((s) => s.unsubscribe());
-    };
-  });
+      {
+        expecting: 0,
+        buf: [],
+        prov: COLD,
+        pending: 0,
+        outerDone: false,
+        closed: false,
+        out: null,
+      } as MergeState<A>,
+    ),
+    r.takeWhile((s) => !s.closed, true),
+    r.mergeMap((s) => (s.out === null ? r.EMPTY : r.of(s.out))),
+  );
 
 /** concatAll: one inner live at a time; arrivals during a live inner
  * QUEUE; when the live inner FINISHES, the next queued inner subscribes at
