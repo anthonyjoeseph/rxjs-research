@@ -14,7 +14,8 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "oracle": "jest src/__tests__/oracle.property.test.ts",
     "check": "npm run typecheck && npm test",
-    "agda": "cd ../agda && agda src/Formal-Verification/All-Verifications.agda"
+    "agda": "cd ../agda && agda src/Formal-Verification/All-Verifications.agda",
+    "agda:cli": "cd ../agda && agda --compile --compile-dir=_cli src/CLI/Main.agda"
   },
   "dependencies": {
     "rxjs": "^7.8.2"
