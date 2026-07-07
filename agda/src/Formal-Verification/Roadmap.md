@@ -55,11 +55,11 @@ The plan below is written for whoever picks the rest up. §2.1
   by a _defined_ value replacing the old one.
 - **Delete superseded code outright.** Git history is the archive.
 - **refl tripwires after every step.** Both sides compute. After ANY change,
-  the instance suite at the bottom of `Main-Theorem.agda` must still pass —
+  the instance suite at the bottom of `Verify-Batch-Simultaneous.agda` must still pass —
   it is the semantics, pinned. Add new `refl` instances for any behavior you
   rely on. Run negative controls (assert a wrong value, watch it fail) when
   you add a new instance; a `refl` that can't fail proves nothing.
-- **Build check:** `cd agda && agda src/Formal-Verification/Main-Theorem.agda`
+- **Build check:** `cd agda && agda src/Formal-Verification/All-Verifications.agda`
   (`npm run agda` from `typescript/`). Must stay green.
 - **The spec authority is the root `README.md`'s semantics-by-edge-case**,
   then Anthony's discretion (ask), then this Agda spec — in that order. If a
@@ -287,7 +287,7 @@ one operator at a time, keep the tree green between each.
 ## 4. Definition of done
 
 - Zero postulates under `src/` (grep `postulate`).
-- `Main-Theorem.agda`'s full refl suite passes unchanged.
+- `All-Verifications.agda`'s full refl suite passes unchanged.
 - Both trees green from a clean build (`rm -rf _build`).
 - `agda/README.md` updated (it currently documents the seven postulates).
 - Anything that changed semantics: a new pinned `refl` instance + a TS

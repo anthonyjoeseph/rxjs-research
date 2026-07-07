@@ -19,10 +19,10 @@ batches the **spec** — a clairvoyant referee that sees the whole timed run
 at once — says are correct.
 
 Start reading at [src/Formal-Verification/](src/Formal-Verification/).
-`formal-verification` is already a *value*, not a postulate: its proof term
+`formal-verification` is already a _value_, not a postulate: its proof term
 is real. **Both sides are now fully defined** — the spec, the implementation,
 every Naive-Rx operator, and the validity domain `Canonical` — so the
-theorem statement *computes*: on concrete programs Agda normalizes both
+theorem statement _computes_: on concrete programs Agda normalizes both
 pipelines end to end and they literally agree (`diamond-full`,
 `share-diamond-full`, `growth-full`, `cascade-full`, … at the bottom of the
 entrypoint, all proven by `refl`). **Four postulates remain** (down from
@@ -49,7 +49,7 @@ world does — per-source synchronous flushes plus a global schedule of
 `.next()` calls), `Subscription` (what a subscriber's callback log reads),
 and one shared grammar `Exp`/`ExpS` of the system's canonical primitives.
 Each side then defines its own `batchSimultaneous` over that vocabulary —
-and the two definitions are given *deliberately unequal powers*:
+and the two definitions are given _deliberately unequal powers_:
 
 - **The spec is clairvoyant.** `spec-batchSimultaneous` receives the entire
   `Emissions` record, past and future, and may cheat freely: it assigns
@@ -65,7 +65,7 @@ and the two definitions are given *deliberately unequal powers*:
   The future never exists as a value it could inspect; there is no list it
   could measure. The harness (`run`, `flatten`) lives in Shared-Types, not
   in Implementation/ — the implementation exports machines and never holds
-  the input list. Causality is a property of the *types*, not a promise.
+  the input list. Causality is a property of the _types_, not a promise.
 
 The bridge between them is the protocol trace: `run (compile e) (flatten em)`
 is the stream of provenance-tagged emits the pipeline produces, and the
@@ -77,7 +77,7 @@ stamped trace IS the spec's timed denotation, value for value).
 Why Mealy machines and not some bespoke operational gadget: **rxjs
 operators genuinely are Mealy machines.** `r.scan` is literally one — a
 state and a step. That is why the TypeScript implementation is written in
-pure-scan style, and why each Naive-Rx operator is a machine *transformer*
+pure-scan style, and why each Naive-Rx operator is a machine _transformer_
 (machines in, machine out) — exactly as rxjs operators are
 `Observable → Observable` functions, with `.pipe(...)` as application.
 
@@ -87,12 +87,14 @@ The counting machine, TypeScript
 ([typescript/src/batch-simultaneous.ts](../typescript/src/batch-simultaneous.ts)):
 
 ```ts
-export const batchSimultaneous = <A>(src: Instantaneous<A>): r.Observable<A[]> =>
+export const batchSimultaneous = <A>(
+  src: Instantaneous<A>,
+): r.Observable<A[]> =>
   src.pipe(
-    batchSync(),                 // the frame boundary: the subscribe call itself
-    r.endWith({ type: "end" }),  // drain sentinel
-    r.scan(step, initialMem),    // the counting machine: pure fold, no clock
-    r.mergeMap(flush),           // emit a batch when a window drains to zero
+    batchSync(), // the frame boundary: the subscribe call itself
+    r.endWith({ type: "end" }), // drain sentinel
+    r.scan(step, initialMem), // the counting machine: pure fold, no clock
+    r.mergeMap(flush), // emit a batch when a window drains to zero
   );
 ```
 
@@ -124,7 +126,7 @@ impl-machine e            = batchSimultaneousI (compile e)
 impl-batchSimultaneous em e = subscribeRx (impl-machine e) em
 ```
 
-Note what the implementation's definitions *don't* take: the machine never
+Note what the implementation's definitions _don't_ take: the machine never
 receives `em`. It meets the world one `In n` at a time.
 
 ## Module map
@@ -217,7 +219,7 @@ Tick 0 is the frame; tick k+1 is async entry k; the origin coordinate
 orders feedback (a reentrant `.next()` lands strictly after the batch that
 caused it). Bundling the evidence is what makes the spec's "group equal
 adjacent times" mean "group equal times, period" — and bundling it
-*relative to the subscription time* is what dissolved the previous generation's separate
+_relative to the subscription time_ is what dissolved the previous generation's separate
 `denote-wf` theorem into the types. Below the record: the raw timed-list
 operators (`mergeL` — stable, left wins on ties, the model counterpart of
 rxjs subscription order — `mapL`, `takeL`, `scanL`, `filterAfterL`) and
@@ -234,7 +236,7 @@ denotation by real structural recursion —
 ```
 
 — where `⟦ e ⟧ em ρ t` is the timed history observed by subscribing `e` at
-time `t`, *well-formed at `t` by its type*. Cold inner streams denote
+time `t`, _well-formed at `t` by its type_. Cold inner streams denote
 functions of their subscription time (`Inner = (u : Time) → TObs u` — the
 type is the previous generation's `WFDen` made structural: an inner is well-formed at every
 subscription time because it cannot be anything else), the device that
@@ -336,7 +338,7 @@ hiding the structural descent from the termination checker — and the
 descent is genuinely subtle there. `Joinable` dissolves both: inners are
 compiled AT the `ofS`/`mapS` node, where `f v` is a constructor-field
 application the checker accepts as smaller, and the wires stay in `Set₀`
-because a `Joinable` is a join *argument*, never a wire payload.
+because a `Joinable` is a join _argument_, never a wire payload.
 
 ```agda
 compile : Exp n → Inst n Val                     -- Inst n A = RxObs n (Emit A)
@@ -346,7 +348,7 @@ impl-batchSimultaneous em e = subscribeRx (impl-machine e) em
 
 ### [src/Formal-Verification/](src/Formal-Verification/)
 
-The theorem, as a folder — **[Main-Theorem.agda](src/Formal-Verification/Main-Theorem.agda)
+The theorem, as a folder — **[Verify-Batch-Simultaneous.agda](src/Formal-Verification/Verify-Batch-Simultaneous.agda)
 is the entrypoint**, [Bridge.agda](src/Formal-Verification/Bridge.agda) is
 the shared vocabulary of the two proof halves,
 [Counting-Recovers.agda](src/Formal-Verification/Counting-Recovers.agda)
@@ -426,10 +428,10 @@ over all canonical programs.
 
 ## Relationship to the TypeScript
 
-Agda proves *implementation ≡ spec*. It cannot prove *Naive-Rx ≡ real
-rxjs* — the claim that `scanRx` faithfully models `r.scan`'s delivery
+Agda proves _implementation ≡ spec_. It cannot prove _Naive-Rx ≡ real
+rxjs_ — the claim that `scanRx` faithfully models `r.scan`'s delivery
 timing is the trust boundary, and it is covered by the fast-check oracle
-on the TypeScript side ([typescript/src/__tests__](../typescript/src/__tests__)).
+on the TypeScript side ([typescript/src/**tests**](../typescript/src/__tests__)).
 The thinner and more literal each naive operator is, the thinner that
 boundary gets — which is why the operator set is exactly the TS import
 list and nothing else.
@@ -437,7 +439,7 @@ list and nothing else.
 ## Building
 
 ```sh
-agda src/Formal-Verification/Main-Theorem.agda # the entrypoint — everything else follows
+agda src/Formal-Verification/All-Verifications.agda # the entrypoint — everything else follows
 ```
 
 Agda ≥ 2.6.2 (developed with 2.7.0.1). Self-contained — no standard

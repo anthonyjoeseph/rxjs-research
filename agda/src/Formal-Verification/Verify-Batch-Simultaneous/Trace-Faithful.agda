@@ -30,7 +30,7 @@
 -- it down IS the first work item of this half: once Tracks is a real
 -- definition, tracks-stamped should be a short proof, and the
 -- per-operator lemmas acquire provable statements.
-module Formal-Verification.Trace-Faithful where
+module Formal-Verification.Verify-Batch-Simultaneous.Trace-Faithful where
 
 open import Prelude
 open import Shared-Types
@@ -38,7 +38,7 @@ open import Spec.MonotonicList
 open import Spec.Batch-Simultaneous
 open import Implementation.Naive-Rx
 open import Implementation.Batch-Simultaneous
-open import Formal-Verification.Bridge
+open import Formal-Verification.Verify-Batch-Simultaneous.Bridge
 
 ------------------------------------------------------------------------
 -- the simulation relation, now DEFINED (Roadmap.md §3.1).

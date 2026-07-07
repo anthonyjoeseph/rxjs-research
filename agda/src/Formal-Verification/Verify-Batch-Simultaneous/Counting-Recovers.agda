@@ -25,7 +25,7 @@
 -- protocol trace invariant the counting machine relies on. Its content
 -- is settled by proving counting-groups first (what the window
 -- invariant needs is what it says) — see the roadmap.
-module Formal-Verification.Counting-Recovers where
+module Formal-Verification.Verify-Batch-Simultaneous.Counting-Recovers where
 
 open import Prelude
 open import Shared-Types
@@ -33,10 +33,10 @@ open import Spec.MonotonicList
 open import Spec.Batch-Simultaneous
 open import Implementation.Naive-Rx
 open import Implementation.Batch-Simultaneous
-open import Formal-Verification.Bridge
+open import Formal-Verification.Verify-Batch-Simultaneous.Bridge
 -- the counting reification (bItems / flushOf / collectB / countBatches)
 -- and the PROVEN counting-factors both live here now
-open import Formal-Verification.Counting-Factors
+open import Formal-Verification.Verify-Batch-Simultaneous.Counting-Factors
 
 ------------------------------------------------------------------------
 -- the two remaining factors

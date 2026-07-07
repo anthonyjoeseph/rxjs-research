@@ -12,13 +12,13 @@
 --     ARE collectB of the item stream.
 --   batchSync-bItems — batchSync + endWith serialize m's grouped trace
 --     into exactly the `bItems` stream countBatches folds over.
-module Formal-Verification.Counting-Factors where
+module Formal-Verification.Verify-Batch-Simultaneous.Counting-Factors where
 
 open import Prelude
 open import Shared-Types
 open import Implementation.Naive-Rx
 open import Implementation.Batch-Simultaneous
-open import Formal-Verification.Bridge
+open import Formal-Verification.Verify-Batch-Simultaneous.Bridge
 
 ------------------------------------------------------------------------
 -- one-shot inners: the mergeMap of `λ s → ofMaybe {n} (out s)`

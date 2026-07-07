@@ -18,7 +18,7 @@
 -- not work around. The theorem statement already HOLDS BY COMPUTATION
 -- on concrete programs — see the refl-proofs at the bottom, where both
 -- sides normalize end to end with no postulate in the path.
-module Formal-Verification.Main-Theorem where
+module Formal-Verification.Verify-Batch-Simultaneous.Main-Theorem where
 
 open import Prelude
 open import Shared-Types
@@ -26,17 +26,17 @@ open import Spec.MonotonicList
 open import Spec.Batch-Simultaneous
 open import Implementation.Naive-Rx
 open import Implementation.Batch-Simultaneous
-open import Formal-Verification.Bridge
-open import Formal-Verification.Counting-Recovers
-open import Formal-Verification.Trace-Faithful
+open import Formal-Verification.Verify-Batch-Simultaneous.Bridge
+open import Formal-Verification.Verify-Batch-Simultaneous.Counting-Recovers
+open import Formal-Verification.Verify-Batch-Simultaneous.Trace-Faithful
 
 ------------------------------------------------------------------------
 -- THE THEOREM
 
-formal-verification :
+verify-batch-simultaneous :
   {n : ℕ} (em : Emissions n) (e : Exp n) → Canonical e
   → impl-batchSimultaneous em e ≡ spec-batchSimultaneous em e
-formal-verification em e can =
+verify-batch-simultaneous em e can =
   trans (counting-recovers em e can)
         (cong batchSpecL (trace-faithful em e can))
 
@@ -99,7 +99,7 @@ diamond-canonical =
 diamond-verified :
   (em : Emissions 1)
   → impl-batchSimultaneous em diamondE ≡ spec-batchSimultaneous em diamondE
-diamond-verified em = formal-verification em diamondE diamond-canonical
+diamond-verified em = verify-batch-simultaneous em diamondE diamond-canonical
 
 -- take(1) cutting the diamond MID-INSTANT — the corner the previous generation fenced behind
 -- the runMemCut postulate — and the two sides STILL agree

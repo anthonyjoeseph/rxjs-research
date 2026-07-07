@@ -1,9 +1,9 @@
 -- The shared vocabulary of the two proof halves: the referee's grouped
 -- view of a run (`groupsOf`), the positional clock (`stamped`), and the
 -- validity domain (`Canonical`). Everything here is DEFINED; both
--- Counting-Recovers and Trace-Faithful import it, and Main-Theorem
+-- Counting-Recovers and Trace-Faithful import it, and Verify-Batch-Simultaneous
 -- composes them.
-module Formal-Verification.Bridge where
+module Formal-Verification.Verify-Batch-Simultaneous.Bridge where
 
 open import Prelude
 open import Shared-Types

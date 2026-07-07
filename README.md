@@ -1,7 +1,7 @@
 # rxjs-research: Instantaneous observables
 
 Research into overcoming the **rxjs diamond problem**: a new kind of observable
-(an `Instantaneous`) that tracks the *provenance* of every emission, so that
+(an `Instantaneous`) that tracks the _provenance_ of every emission, so that
 emissions originating from a common source event can be batched back together.
 
 ## The diamond problem
@@ -20,13 +20,13 @@ reach a subscriber that information is gone: plain rxjs gives you no way to
 know that the `5` you just received and the `10` about to arrive belong
 together, nor when a "group" starts or ends. Downstream state derived from both
 branches passes through an inconsistent intermediate state — the classic
-*glitch* of push-based reactive programming, named after the diamond shape of
+_glitch_ of push-based reactive programming, named after the diamond shape of
 the dependency graph (one source, two paths, one join).
 
 Further reading:
 
 - [Reactive programming — Glitches](https://en.wikipedia.org/wiki/Reactive_programming#Glitches) (Wikipedia)
-- [Rx glitches aren't actually a problem?](https://staltz.com/rx-glitches-arent-actually-a-problem.html) — André Staltz's counterpoint, useful framing for when this *does* matter
+- [Rx glitches aren't actually a problem?](https://staltz.com/rx-glitches-arent-actually-a-problem.html) — André Staltz's counterpoint, useful framing for when this _does_ matter
 - [A Survey on Reactive Programming](https://dl.acm.org/doi/10.1145/2501654.2501666) — Bainomugisha et al., §glitch avoidance
 
 ## The idea: provenance + `batchSimultaneous`
@@ -43,9 +43,7 @@ that share a root cause:
 const s = new InstantSubject<number>();
 const tenfold = s.pipe(map((n) => n * 10));
 
-merge(s, tenfold)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(s, tenfold).pipe(batchSimultaneous()).subscribe(console.log);
 
 s.next(5); // logs [5, 50]  — one batch, not two emissions
 s.next(6); // logs [6, 60]
@@ -55,7 +53,7 @@ Independent events stay in separate batches, and a branch that filters an
 instant out still releases the batch (a filtered diamond logs `[1]` for the
 odd value, `[2, 2]` for the even one).
 
-> **Spec status.** The semantics below — *burst batching*, the
+> **Spec status.** The semantics below — _burst batching_, the
 > **semantics-by-edge-case** in this section — is the spec of record. The
 > Agda development in [agda/](agda/) machine-checks that the two-sided model
 > (a clairvoyant timed denotation vs. a blind Mealy machine) agrees on every
@@ -87,7 +85,7 @@ semantics is one rule:
 
 > **Every emission belongs to the instant of the event that caused it**,
 > transitively — mapped values, spawned inner subscriptions, completion
-> cascades all inherit their trigger's instant. The only *fresh* instants
+> cascades all inherit their trigger's instant. The only _fresh_ instants
 > are the root causes, and there are exactly two kinds: **one `subscribe()`
 > call** (the entire synchronous subscription frame is one instant) and
 > **one `.next()` call** (each subject firing is its own instant, even
@@ -102,19 +100,17 @@ const now = of(1, 2);
 const alsoNow = of(3);
 const later = timer(100); // emits 0 after 100 ms
 
-merge(now, alsoNow, later)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(now, alsoNow, later).pipe(batchSimultaneous()).subscribe(console.log);
 // logs [1, 2, 3] — immediately: the whole subscription frame is one instant
 // logs [0]       — 100 ms later: an async event is its own instant
 ```
 
-Everything that fires synchronously *during* the subscribe call shares one
+Everything that fires synchronously _during_ the subscribe call shares one
 root cause: the subscribe call itself. It doesn't matter how the sync values
 are wired — separate `of`s, `concat(of(1, 2), of(3))`, nested merges — a
 static (subject-free) program lands entirely in one batch. Anything that
 arrives after the frame ends is caused by some later event and batches with
-*that*.
+_that_.
 
 ### Each `.next()` call is its own instant
 
@@ -123,9 +119,7 @@ const a = new InstantSubject<number>();
 const b = new InstantSubject<number>();
 const doubled = a.pipe(map((n) => n * 2));
 
-merge(a, doubled, b)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(a, doubled, b).pipe(batchSimultaneous()).subscribe(console.log);
 
 a.next(5); // logs [5, 10] — the diamond: both copies of a's event, one batch
 b.next(7); // logs [7]     — a different subject is a different root cause
@@ -144,15 +138,13 @@ reacts to — feedback never extends the instant it's reacting to.)
 const s = new InstantSubject<number>();
 const spawned = s.pipe(mergeMap((n) => of(n * 10, n * 10 + 1)));
 
-merge(s, spawned)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(s, spawned).pipe(batchSimultaneous()).subscribe(console.log);
 
 s.next(5); // logs [5, 50, 51] — the spawned inner's values batch with their cause
 ```
 
 When an event spawns an inner subscription (`mergeMap`, `concatMap`, …), the
-inner's synchronous output was *caused by* that event, so it joins the
+inner's synchronous output was _caused by_ that event, so it joins the
 event's batch — transitively, through any nesting depth.
 
 ### Completion cascades inherit too
@@ -162,12 +154,10 @@ const s = new InstantSubject<number>();
 const firstOnly = s.pipe(take(1));
 const thenSeven = concat(firstOnly, of(7));
 
-merge(s, thenSeven)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(s, thenSeven).pipe(batchSimultaneous()).subscribe(console.log);
 
 s.next(5); // logs [5, 5, 7] — take(1) closes on this event, so the queued
-           //                  of(7) subscribes at the same instant
+//                  of(7) subscribes at the same instant
 s.next(6); // logs [6]
 ```
 
@@ -181,9 +171,7 @@ values are one batch.
 ```ts
 const shared = of(5).pipe(share());
 
-merge(shared, shared)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(shared, shared).pipe(batchSimultaneous()).subscribe(console.log);
 // logs [5] — once, not twice
 ```
 
@@ -204,14 +192,12 @@ const trigger = new InstantSubject<void>();
 // each trigger event adds one more live subscription of `shared`
 const growing = trigger.pipe(mergeMap(() => shared));
 
-merge(shared, growing)
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+merge(shared, growing).pipe(batchSimultaneous()).subscribe(console.log);
 
 trigger.next();
-src.next(7);    // logs [7, 7]    — the static subscription plus one spawned
+src.next(7); // logs [7, 7]    — the static subscription plus one spawned
 trigger.next();
-src.next(8);    // logs [8, 8, 8] — a third subscriber now
+src.next(8); // logs [8, 8, 8] — a third subscriber now
 ```
 
 A subscriber that joins a hot stream late sees only events **strictly after**
@@ -228,9 +214,7 @@ const s = new InstantSubject<number>();
 const doubled = s.pipe(map((n) => n * 2));
 const firstThree = merge(s, doubled).pipe(take(3));
 
-firstThree
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+firstThree.pipe(batchSimultaneous()).subscribe(console.log);
 
 s.next(5); // logs [5, 10]
 s.next(6); // logs [6] — take(3) cuts the second batch in half
@@ -238,7 +222,7 @@ s.next(6); // logs [6] — take(3) cuts the second batch in half
 
 `take(n)` counts values, exactly like rxjs — even across a diamond.
 `take(1)` of a diamond emits one `5`, not the "whole instant" `[5, 5]`. The
-alternative would make `take` aware of a `batchSimultaneous` applied *later*
+alternative would make `take` aware of a `batchSimultaneous` applied _later_
 in the pipeline, which no user would expect.
 
 ### Batch order is delivery order
@@ -249,9 +233,7 @@ const shared = src.pipe(share());
 const doubled = shared.pipe(map((n) => n * 2));
 const sums = merge(shared, doubled).pipe(scan((acc, n) => acc + n, 0));
 
-sums
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+sums.pipe(batchSimultaneous()).subscribe(console.log);
 
 src.next(5); // logs [5, 15]  — the accumulator sees 5, then 10, in delivery order
 src.next(1); // logs [16, 18]
@@ -274,9 +256,7 @@ array.
 const burst = of(1, 2);
 const exhausted = burst.pipe(exhaustMap((n) => of(n * 10)));
 
-exhausted
-  .pipe(batchSimultaneous())
-  .subscribe(console.log);
+exhausted.pipe(batchSimultaneous()).subscribe(console.log);
 // logs [10, 20] — one batch (one subscription frame), and BOTH inners ran:
 // a synchronous inner completes immediately, freeing the slot before 2 arrives
 ```
@@ -297,12 +277,12 @@ by the protocol.
 - **Schedulers & time** — `delay` and friends are `setTimeout` + the
   existing primitives; no formal impact.
 - **`shareReplay`, share config** — plain `share()` only, with its default
-  rxjs *lives*: the share resets when its source completes or its refcount
+  rxjs _lives_: the share resets when its source completes or its refcount
   drains to zero, and a later subscriber reconnects and replays a cold
   source. (Resetting-share lives are a model-vs-real-rxjs divergence owned
   by the oracle, not the impl≡spec theorem.)
 - **One known open corner (the upstream race)** — a subscriber of a share
-  spawned by a trigger derived from the share's *own source*, wired before
+  spawned by a trigger derived from the share's _own source_, wired before
   the share connects, receives the in-flight value in real rxjs while the
   spec's strictly-after rule says it misses it. Pinned in the test suite;
   resolution pending.
@@ -316,21 +296,21 @@ npm test           # the full jest suite (pinned Agda-theorem cases + the oracle
 npm run typecheck
 npm run oracle     # one run of the property oracle (500 random programs;
                    #   FC_NUM_RUNS / FC_SEED env vars override count and seed)
-npm run agda       # typecheck agda/src/Formal-Verification/Main-Theorem.agda
+npm run agda       # typecheck agda/src/Formal-Verification/Verify-Batch-Simultaneous.agda
 ```
 
 ## Repository layout
 
-| Path | What |
-| --- | --- |
-| [typescript/src/types.ts](typescript/src/types.ts) | The protocol: `InstEmit`, `Instantaneous`, the `init`/`value`/`close`/`fin` events |
-| [typescript/src/primitives.ts](typescript/src/primitives.ts) | The canonical primitives — `of`, `empty`, `map`, `take`, `scan`, `share`, and the four `*All` joins over streams-of-streams; `merge`/`concat`/`mergeMap` are derived one-liners |
-| [typescript/src/batch-simultaneous.ts](typescript/src/batch-simultaneous.ts) | The counting machine (mirrors the Agda `batchSimultaneousI`) |
-| [typescript/src/model.ts](typescript/src/model.ts) | The pure timed-list model — a transcription of the Agda `Spec/` denotation |
-| [typescript/src/\_\_tests\_\_/](typescript/src/__tests__/) | Pinned theorem cases + the [fast-check](https://fast-check.dev/) oracle: random combinator trees run through both the rxjs machinery and the model, compared exactly |
-| [agda/](agda/) | The machine-checked two-sided model and the `formal-verification` proof; see [agda/README.md](agda/README.md) |
+| Path                                                                         | What                                                                                                                                                                            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [typescript/src/types.ts](typescript/src/types.ts)                           | The protocol: `InstEmit`, `Instantaneous`, the `init`/`value`/`close`/`fin` events                                                                                              |
+| [typescript/src/primitives.ts](typescript/src/primitives.ts)                 | The canonical primitives — `of`, `empty`, `map`, `take`, `scan`, `share`, and the four `*All` joins over streams-of-streams; `merge`/`concat`/`mergeMap` are derived one-liners |
+| [typescript/src/batch-simultaneous.ts](typescript/src/batch-simultaneous.ts) | The counting machine (mirrors the Agda `batchSimultaneousI`)                                                                                                                    |
+| [typescript/src/model.ts](typescript/src/model.ts)                           | The pure timed-list model — a transcription of the Agda `Spec/` denotation                                                                                                      |
+| [typescript/src/\_\_tests\_\_/](typescript/src/__tests__/)                   | Pinned theorem cases + the [fast-check](https://fast-check.dev/) oracle: random combinator trees run through both the rxjs machinery and the model, compared exactly            |
+| [agda/](agda/)                                                               | The machine-checked two-sided model and the `formal-verification` proof; see [agda/README.md](agda/README.md)                                                                   |
 
 ```sh
 cd typescript && npm install && npm test   # jest + property-based oracle
-cd agda && agda src/Formal-Verification/Main-Theorem.agda # typecheck the proofs (Agda ≥ 2.6.2, no stdlib needed)
+cd agda && agda src/Formal-Verification/Verify-Batch-Simultaneous.agda # typecheck the proofs (Agda ≥ 2.6.2, no stdlib needed)
 ```
