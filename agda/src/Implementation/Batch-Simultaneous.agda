@@ -118,7 +118,10 @@ runOut stp seed alive out items =
 -- the sources (TS: InstantSubject). The subject is where TS keeps real
 -- mutable state; here it is a STATELESS machine — the world's input is
 -- its state. Subscribing registers the root (the frame response); one
--- .next() is one emit; `end` completes it with an in-band fin.
+-- .next() is one emit; `endSlot i` completes THIS subject with an
+-- in-band fin (its own instant, so a concat leg spawned by another
+-- source's completion still fins on its own later input). The final
+-- teardown sentinel is not the subject's business.
 -- A copy spawned mid-run gets a synthesized frame with empty flushes,
 -- so it registers without replaying — hot, automatically.
 
@@ -130,7 +133,9 @@ srcI i = record { State = ⊤ ; start = tt ; step = λ _ inp → tt , respond in
       (srcProv i , init (srcProv i) ∷ map value (lookupV ss i)) ∷ []
     respond (next j v) =
       if eqℕ (toℕ i) (toℕ j) then (srcProv i , value v ∷ []) ∷ [] else []
-    respond end        = (srcProv i , fin ∷ []) ∷ []
+    respond (endSlot j) =
+      if eqℕ (toℕ i) (toℕ j) then (srcProv i , fin ∷ []) ∷ [] else []
+    respond end        = []
 
 ------------------------------------------------------------------------
 -- cold sources (TS: of, empty)

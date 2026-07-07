@@ -53,7 +53,8 @@ postulate
   -- (v1: filterAfter)
   filterAfterT : Time → TObs → TObs
   -- the complete timed history of source subject i: its sync flush at
-  -- t₀, its k-th async firing at tick k+1 (v1: envOf / slotEmits)
+  -- t₀, its k-th async firing at tick k+1, its completion at tick
+  -- K+1+i where K = length asyncs (v1: envOf / slotEmits)
   srcT         : {n : ℕ} → Fin n → Emissions n → TObs
   -- (v1: ofB — every value at the subscription instant)
   ofT          : List Val → Time → TObs

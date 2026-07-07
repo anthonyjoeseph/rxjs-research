@@ -167,6 +167,11 @@ toℕ : {n : ℕ} → Fin n → ℕ
 toℕ fzero    = zero
 toℕ (fsuc i) = suc (toℕ i)
 
+-- every index, in slot order
+allFins : {n : ℕ} → List (Fin n)
+allFins {zero}  = []
+allFins {suc n} = fzero ∷ map fsuc allFins
+
 data Vec (A : Set) : ℕ → Set where
   []   : Vec A zero
   _∷_  : {n : ℕ} → A → Vec A n → Vec A (suc n)

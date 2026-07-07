@@ -167,15 +167,20 @@ operators are `Observable → Observable` functions.
 
 ```agda
 data In (n : ℕ) : Set where
-  frame : Vec (List Val) n → In n   -- the subscribe() call, with sync flushes
-  next  : Fin n → Val → In n        -- one .next() = one instant
-  end   : In n                      -- teardown
+  frame   : Vec (List Val) n → In n   -- the subscribe() call, with sync flushes
+  next    : Fin n → Val → In n        -- one .next() = one instant
+  endSlot : Fin n → In n              -- ONE source completes = one instant
+  end     : In n                      -- final teardown sentinel (TS r.endWith)
 
 flatten : Emissions n → List (In n)
 ```
 
 The top-level input alphabet: `flatten` serializes an `Emissions` exactly
-as the machine will experience it, one element at a time.
+as the machine will experience it — subscribe, the `.next()` schedule,
+then the sources completed in slot order (each its own instant, exactly
+like the TS driver's per-subject `.end()` calls — so a concat leg spawned
+by its predecessor's completion still fins on its own later input), then
+teardown.
 
 ### [src/Spec/MonotonicList.agda](src/Spec/MonotonicList.agda)
 

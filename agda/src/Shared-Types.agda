@@ -123,17 +123,25 @@ run m is = snd (feed m (start m) is)
 ------------------------------------------------------------------------
 -- the top-level input alphabet: what the world does, one entry at a
 -- time. `frame` is the subscribe() call itself, carrying every source's
--- synchronous flush; `next` is one .next(); `end` is teardown (the
--- endWith sentinel of the TypeScript, promoted to a type).
+-- synchronous flush; `next` is one .next(); `endSlot i` completes ONE
+-- source — its own instant, exactly like the TS driver's per-subject
+-- .end() calls (a concat leg spawned when its predecessor completes
+-- registers normally and fins on ITS OWN later input); `end` is the
+-- final teardown sentinel (the TS r.endWith, promoted to a type).
 
 data In (n : ℕ) : Set where
-  frame : Vec (List Val) n → In n
-  next  : Fin n → Val → In n
-  end   : In n
+  frame   : Vec (List Val) n → In n
+  next    : Fin n → Val → In n
+  endSlot : Fin n → In n
+  end     : In n
 
 -- flatten: an Emissions record, serialized exactly as the machine will
--- experience it. The machine sees THIS list one element at a time and
--- nothing else.
+-- experience it — subscribe, the .next() schedule, then the sources
+-- completed in slot order, then teardown. The machine sees THIS list
+-- one element at a time and nothing else.
 flatten : {n : ℕ} → Emissions n → List (In n)
 flatten em =
-  frame (syncs em) ∷ (map (λ p → next (fst p) (snd p)) (asyncs em) ++ (end ∷ []))
+  frame (syncs em)
+    ∷ (map (λ p → next (fst p) (snd p)) (asyncs em)
+       ++ map endSlot allFins
+       ++ (end ∷ []))

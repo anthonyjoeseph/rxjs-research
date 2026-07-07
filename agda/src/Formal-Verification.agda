@@ -36,7 +36,9 @@ postulate
   Canonical : {n : ℕ} → Exp n → Set
 
   -- the referee re-attaches the clock the Emissions define: frame
-  -- values at t₀, async entry k's cascade at tick k+1 (v1: stamp)
+  -- values at t₀, async entry k's cascade at tick k+1, source i's
+  -- completion cascade at tick K+1+i where K = length asyncs
+  -- (v1: stamp / envOf's per-slot closes)
   stamp : {n : ℕ} → Emissions n → List (Emit Val) → List (Time × Val)
 
   -- THE TWO HALVES OF THE PROOF ------------------------------------
