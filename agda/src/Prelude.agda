@@ -42,6 +42,10 @@ _+_ : ℕ → ℕ → ℕ
 zero  + n = n
 suc m + n = suc (m + n)
 
+_*_ : ℕ → ℕ → ℕ
+zero  * _ = zero
+suc m * n = n + (m * n)
+
 -- truncated subtraction (monus)
 _∸_ : ℕ → ℕ → ℕ
 m     ∸ zero  = m
