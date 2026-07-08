@@ -563,6 +563,123 @@ cutJ (flushJ evs finned) =
 cutJ (emitJ e)          = emitJ e ∷ []
 cutJ (trigger p o s b)  = trigger p o s b ∷ []
 
+------------------------------------------------------------------------
+-- INTERLEAVED item stream for the switch/exhaust joins.
+--
+-- The plain `serialItems` merges ALL of a step's triggers ahead of ALL its
+-- flushes. That is fine when at most one outer emit arrives per instant, but
+-- a MERGED outer can deliver several emits at one instant — and then the
+-- correct rxjs order is trigger₁, its inners' flushes, trigger₂, its inners'
+-- flushes, … not trigger₁ trigger₂ … flush₁ flush₂. `serialItemsJ` carries
+-- the triggers IN-BAND with their values (left = trigger passthrough, right =
+-- a value to flatten), so each emit's trigger immediately precedes the
+-- flushes of the inners it spawns.
+serialItemsJ : {n : ℕ}
+             → ((Val → RxObs n JoinItem) → RxObs n (Either JoinItem Val)
+                → RxObs n JoinItem)
+             → (Val → Machine (In n) (Emit Val)) → Inst n Val
+             → RxObs n JoinItem
+serialItemsJ flat tmpl om =
+  flat (λ v → innerItems (tmpl v))
+       (mergeMapRx (λ e → ofRx (left (triggerOf e) ∷ map right (values (snd e))))
+                   om)
+
+isRightE : {A B : Set} → Either A B → Bool
+isRightE (left _)  = false
+isRightE (right _) = true
+
+-- exhaustAll's interleaved flatten: an arrival is DROPPED while the accepted
+-- inner is still open. A pre-existing live inner is busy the WHOLE step (it
+-- reacts once, at the end; if it completes the slot only frees next step), so
+-- every right this step is dropped. With no live inner, a run of rights spawns
+-- one at a time — a synchronously completing inner frees the slot for the next
+-- right of the same step; the first that stays open drops the remaining rights.
+-- Triggers (lefts) always pass through in position.
+exhaustFlatJ : {n : ℕ}
+             → (Val → RxObs n JoinItem) → RxObs n (Either JoinItem Val)
+             → RxObs n JoinItem
+exhaustFlatJ {n} f m = record
+  { State = State m × Maybe Running ; start = start m , nothing
+  ; step  = λ s i →
+      let u = step m (fst s) i in react (snd s) (snd u) i (fst u) }
+  where
+    Running : Set
+    Running = Σ Val (λ v → State (f v))
+
+    -- fold the interleaved items; `live` decides drops but is never STEPPED
+    -- here (a pre-existing live is stepped by `react`; a fresh spawn already
+    -- saw its input at spawn time)
+    fold : Maybe Running → List (Either JoinItem Val) → In n
+         → Maybe Running × List JoinItem
+    fold live []              i = live , []
+    fold live (left t ∷ rest) i =
+      let r = fold live rest i in fst r , t ∷ snd r
+    fold nothing (right v ∷ rest) i =
+      let r = step (f v) (start (f v)) (spawnInput i)
+      in if any lastJ (snd r)
+         then (let d = fold nothing rest i in fst d , snd r ++ snd d)
+         else (let d = fold (just (v ▹ fst r)) rest i in fst d , snd r ++ snd d)
+    fold (just live) (right _ ∷ rest) i = fold (just live) rest i   -- busy: drop
+
+    react : Maybe Running → List (Either JoinItem Val) → In n → State m
+          → (State m × Maybe Running) × List JoinItem
+    react nothing         es i sm =
+      let fo = fold nothing es i in (sm , fst fo) , snd fo
+    react (just (v ▹ sx)) es i sm =
+      let r  = step (f v) sx i
+          fo = fold (just (v ▹ sx)) es i          -- old inner busy → drop rights
+          nl = if any lastJ (snd r) then nothing else just (v ▹ fst r)
+      in (sm , nl) , snd fo ++ snd r
+
+-- switchAll's interleaved flatten: a new arrival CUTS the live inner. All of
+-- a step's rights form ONE supersession burst even across interleaved triggers
+-- — every right superseded by a LATER right this step is `cutJ`'d (its open
+-- registrations undone), only the last stays live. The old live inner is
+-- abandoned when any right arrives (its closes are synthesized downstream by
+-- switchStep from hRegs); with no arrivals it reacts normally.
+switchFlatJ : {n : ℕ}
+            → (Val → RxObs n JoinItem) → RxObs n (Either JoinItem Val)
+            → RxObs n JoinItem
+switchFlatJ {n} f m = record
+  { State = State m × Maybe Running ; start = start m , nothing
+  ; step  = λ s i →
+      let u = step m (fst s) i in react (snd s) (snd u) i (fst u) }
+  where
+    Running : Set
+    Running = Σ Val (λ v → State (f v))
+
+    fold : Maybe Running → List (Either JoinItem Val) → In n
+         → Maybe Running × List JoinItem
+    fold live []              i = live , []
+    fold live (left t ∷ rest) i =
+      let r = fold live rest i in fst r , t ∷ snd r
+    fold live (right v ∷ rest) i =
+      let r = step (f v) (start (f v)) (spawnInput i)
+      in if any isRightE rest                       -- superseded by a later right
+         then (let d = fold live rest i in fst d , concatMap cutJ (snd r) ++ snd d)
+         else (let nl = if any lastJ (snd r) then nothing else just (v ▹ fst r)
+                   d  = fold nl rest i
+               in fst d , snd r ++ snd d)
+
+    maybeL : Either JoinItem Val → List JoinItem
+    maybeL (left t)  = t ∷ []
+    maybeL (right _) = []
+
+    reactLive : Maybe Running → In n → Maybe Running × List JoinItem
+    reactLive nothing         i = nothing , []
+    reactLive (just (v ▹ sx)) i =
+      let r = step (f v) sx i
+      in (if any lastJ (snd r) then nothing else just (v ▹ fst r)) , snd r
+
+    react : Maybe Running → List (Either JoinItem Val) → In n → State m
+          → (State m × Maybe Running) × List JoinItem
+    react live es i sm =
+      if any isRightE es
+      then (let fo = fold live es i in (sm , fst fo) , snd fo)   -- arrivals cut old
+      else (let ls = concatMap maybeL es                         -- triggers pass through
+                rc = reactLive live i
+            in (sm , fst rc) , ls ++ snd rc)
+
 mergeAllI : {n : ℕ} → Joinable n → Inst n Val
 mergeAllI j =
   runOut mergeStep mergeSeed (λ s → not (mClosed s)) mOut
@@ -576,12 +693,12 @@ concatAllI j =
 switchAllI : {n : ℕ} → Joinable n → Inst n Val
 switchAllI j =
   runOut switchStep serialSeed (λ s → not (hClosed s)) hOut
-         (serialItems (switchMapRx lastJ cutJ) (jTemplate j) (jOuter j))
+         (serialItemsJ switchFlatJ (jTemplate j) (jOuter j))
 
 exhaustAllI : {n : ℕ} → Joinable n → Inst n Val
 exhaustAllI j =
   runOut exhaustStep serialSeed (λ s → not (hClosed s)) hOut
-         (serialItems (exhaustMapRx lastJ) (jTemplate j) (jOuter j))
+         (serialItemsJ exhaustFlatJ (jTemplate j) (jOuter j))
 
 ------------------------------------------------------------------------
 -- share (TS: share — the OTHER inherently stateful TS primitive).
