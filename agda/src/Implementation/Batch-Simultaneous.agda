@@ -518,8 +518,12 @@ exhaustStep s (trigger p others spawns outerFin) =
       held      = just (p , others)
   in if hOpen s ∨ eqℕ spawns 0
      then finalizeS (record s { hHolding = held ; hLastProv = p }) (hOpen s) 0 outerDone
-     else record s { hHolding = held ; hQueued = spawns ; hLastProv = p
-                   ; hWeight = 1   -- exhaust keeps only the first chain (others dropped)
+     else -- not busy: this trigger's inners all deliver synchronously. A
+          -- co-arriving sibling trigger (same instant, via a merged outer)
+          -- accumulates rather than clobbering the pending count — exactly
+          -- like concat, since with nothing open nothing is dropped.
+          record s { hHolding = held ; hQueued = hQueued s + spawns ; hLastProv = p
+                   ; hWeight = suc (hWeight s)
                    ; hOuterDone = outerDone ; hOut = nothing }
 exhaustStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
