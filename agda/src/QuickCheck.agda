@@ -84,9 +84,15 @@ genVals = genB 4 >>=G λ len → go len
     go zero    = pureG []
     go (suc n) = genB 10 >>=G λ v → go n >>=G λ vs → pureG (v ∷ vs)
 
+-- map/scan value functions. Output is capped mod 100: these functions only
+-- RELABEL values (impl and spec apply the SAME f), so the batch-structure
+-- property under test is unaffected — but the cap keeps `scan (λ acc v → f acc
+-- + v)` from compounding `v * k` GEOMETRICALLY into astronomically large unary
+-- ℕ, whose natToStr/comparison would take ~value operations (the sole cause of
+-- the depth-4 eval "blowups"; the algorithm itself is not slow).
 genFn : Gen (Val → Val)
 genFn = genB 2 >>=G λ op → genB 4 >>=G λ k →
-  pureG (if eqℕ op 0 then (λ v → v + k) else (λ v → v * k))
+  pureG (if eqℕ op 0 then (λ v → natMod (v + k) 100) else (λ v → natMod (v * k) 100))
 
 ------------------------------------------------------------------------
 -- the program generator (share-free ⇒ Canonical), structural on fuel
@@ -232,38 +238,109 @@ report em e impl spec = concatStr
   ∷ "\n    raw    = " ∷ rawEmits em e
   ∷ "\n-- <<<PASTE\n" ∷ aBlock em e ∷ "-- PASTE>>>\n" ∷ [])
 
--- one case: nothing if impl ≡ spec, else the report
-oneCase : Gen (Maybe String)
-oneCase = genEm >>=G λ em → genExp 4 >>=G λ e →
+-- one case at generator depth d: nothing if impl ≡ spec, else the report.
+-- d bounds program NESTING — the only unbounded-in-practice size axis
+-- (values/driver are already tightly capped). Lower d ⇒ strictly smaller
+-- programs, so a depth-capped sweep is a hard SIZE cap, not a timeout.
+oneCase : ℕ → Gen (Maybe String)
+oneCase d = genEm >>=G λ em → genExp d >>=G λ e →
   let impl = impl-batchSimultaneous em e
       spec = spec-batchSimultaneous em e
   in pureG (if eqBatches impl spec then nothing else just (report em e impl spec))
 
 -- run k cases; accumulate (#failures , first failure report)
-runN : ℕ → Gen (ℕ × Maybe String)
-runN zero    = pureG (0 , nothing)
-runN (suc k) = oneCase >>=G λ r → runN k >>=G λ acc →
+runN : ℕ → ℕ → Gen (ℕ × Maybe String)
+runN zero    d = pureG (0 , nothing)
+runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
   pureG ( maybe′ (fst acc) (λ _ → suc (fst acc)) r
         , maybe′ (snd acc) just r )
 
 ------------------------------------------------------------------------
+
+isDigit : ℕ → Bool
+isDigit c = leqℕ 48 c ∧ leqℕ c 57
 
 parseNat : List ℕ → ℕ
 parseNat = go 0
   where
     go : ℕ → List ℕ → ℕ
     go acc []       = acc
-    go acc (c ∷ cs) =
-      if leqℕ 48 c ∧ leqℕ c 57 then go ((acc * 10) + (c ∸ 48)) cs else acc
+    go acc (c ∷ cs) = if isDigit c then go ((acc * 10) + (c ∸ 48)) cs else acc
 
-numRuns : ℕ
-numRuns = 500
+-- stdin is "SEED" or "SEED DEPTH"; depth defaults to 4 when absent
+dropNum dropSep : List ℕ → List ℕ
+dropNum []       = []
+dropNum (c ∷ cs) = if isDigit c then dropNum cs else (c ∷ cs)
+dropSep []       = []
+dropSep (c ∷ cs) = if isDigit c then (c ∷ cs) else dropSep cs
+
+-- the tail after the first n numbers (each a digit-run + separators)
+tailAfter : ℕ → List ℕ → List ℕ
+tailAfter zero    cs = cs
+tailAfter (suc n) cs = tailAfter n (dropSep (dropNum cs))
+
+-- nth leading number, or the default when stdin has fewer
+numAt : ℕ → ℕ → List ℕ → ℕ
+numAt n def cs with dropSep (tailAfter n cs)
+... | []         = def
+... | ds@(_ ∷ _) = parseNat ds
+
+-- AST node count (a cheap size metric that does NOT evaluate the program)
+sizeE  : Exp 3 → ℕ
+sizeEL : List (Exp 3) → ℕ
+sizeES : ExpS 3 → ℕ
+sizeE (srcE _)       = 1
+sizeE emptyE         = 1
+sizeE (ofE vs)       = 1 + length vs
+sizeE (shareE _ _)   = 1
+sizeE (letShareE a b) = (1 + sizeE a) + sizeE b
+sizeE (mapE _ e)     = 1 + sizeE e
+sizeE (takeE _ e)    = 1 + sizeE e
+sizeE (scanE _ _ e)  = 1 + sizeE e
+sizeE (mergeAllE s)  = 1 + sizeES s
+sizeE (concatAllE s) = 1 + sizeES s
+sizeE (switchAllE s) = 1 + sizeES s
+sizeE (exhaustAllE s) = 1 + sizeES s
+sizeEL []       = 0
+sizeEL (e ∷ es) = sizeE e + sizeEL es
+sizeES (ofS es)  = 1 + sizeEL es
+sizeES (mapS t e) = (1 + sizeE (t 0)) + sizeE e
+
+-- the nth generated (em, e), WITHOUT evaluating impl/spec (consumes the RNG
+-- for the first n cases, returns the (n+1)-th's program)
+nthCase : ℕ → ℕ → Gen (Emissions 3 × Exp 3)
+nthCase zero    d = genEm >>=G λ em → genExp d >>=G λ e → pureG (em , e)
+nthCase (suc n) d = genEm >>=G λ _ → genExp d >>=G λ _ → nthCase n d
 
 main : IO Unit
 main = getContents >>= λ s →
-  let seed = parseNat (toCodes s)
-      res  = fst (runN numRuns (randList seed 2000000))
-  in putStr (concatStr
-       ( "seed " ∷ natToStr seed ∷ " — ran " ∷ natToStr numRuns
-       ∷ " cases, " ∷ natToStr (fst res) ∷ " failures\n"
-       ∷ maybe′ "  (all agree)\n" (λ r → r) (snd res) ∷ [])) >>= λ _ → returnIO unit
+  let cs   = toCodes s
+      seed = parseNat cs
+      d    = numAt 1 4 cs          -- 2nd number: generator depth (default 4)
+      runs = numAt 2 500 cs        -- 3rd number: #cases (default 500)
+      dry  = numAt 3 0 cs          -- 4th number >0: DRY mode, print case `runs` w/o eval
+  in if ltℕ 0 dry
+     then (let ce   = fst (nthCase runs d (randList seed 2000000))
+               em   = fst ce
+               e    = snd ce
+               -- dry=2: force BOTH; dry=3: force IMPL only; dry=4: force SPEC only
+               evald = if eqℕ dry 3
+                       then appendStr " IMPL=" (encodeBatches (impl-batchSimultaneous em e))
+                       else if eqℕ dry 4
+                       then appendStr " SPEC=" (encodeBatches (spec-batchSimultaneous em e))
+                       else if leqℕ 2 dry
+                       then (if eqBatches (impl-batchSimultaneous em e)
+                                          (spec-batchSimultaneous em e)
+                             then " EVAL:agree" else " EVAL:DIFFER")
+                       else ""
+           in putStr (concatStr
+                ( "case " ∷ natToStr runs ∷ " (seed " ∷ natToStr seed ∷ " depth " ∷ natToStr d
+                ∷ ") size=" ∷ natToStr (sizeE e) ∷ evald
+                ∷ "\n  prog = " ∷ showExp e
+                ∷ "\n  driver = " ∷ showAsyncs (asyncs em) ∷ "\n" ∷ []))
+              >>= λ _ → returnIO unit)
+     else (let res = fst (runN runs d (randList seed 2000000))
+           in putStr (concatStr
+                ( "seed " ∷ natToStr seed ∷ " depth " ∷ natToStr d ∷ " — ran " ∷ natToStr runs
+                ∷ " cases, " ∷ natToStr (fst res) ∷ " failures\n"
+                ∷ maybe′ "  (all agree)\n" (λ r → r) (snd res) ∷ [])) >>= λ _ → returnIO unit)
