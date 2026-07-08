@@ -546,6 +546,19 @@ lastJ (trigger _ _ _ _)  = false
 lastJ (flushJ _ finned)  = finned
 lastJ (emitJ e)          = hasFin e
 
+-- a superseded (switch-cut) sibling: its already-delivered VALUES survive,
+-- but an OPEN (unfinned) flush's registrations (init/close) are torn down.
+-- A finned flush completed on its own — nothing to undo. The flush ITEM is
+-- always kept (possibly emptied): the counting machine drains hQueued one
+-- flush per spawned sibling, so dropping it entirely would desync the count
+-- and strand the surviving sibling's emit in the buffer.
+cutJ : JoinItem → List JoinItem
+cutJ (flushJ evs finned) =
+  if finned then flushJ evs finned ∷ []
+            else flushJ (map value (values evs)) false ∷ []
+cutJ (emitJ e)          = emitJ e ∷ []
+cutJ (trigger p o s b)  = trigger p o s b ∷ []
+
 mergeAllI : {n : ℕ} → Joinable n → Inst n Val
 mergeAllI j =
   runOut mergeStep mergeSeed (λ s → not (mClosed s)) mOut
@@ -559,7 +572,7 @@ concatAllI j =
 switchAllI : {n : ℕ} → Joinable n → Inst n Val
 switchAllI j =
   runOut switchStep serialSeed (λ s → not (hClosed s)) hOut
-         (serialItems (switchMapRx lastJ) (jTemplate j) (jOuter j))
+         (serialItems (switchMapRx lastJ cutJ) (jTemplate j) (jOuter j))
 
 exhaustAllI : {n : ℕ} → Joinable n → Inst n Val
 exhaustAllI j =

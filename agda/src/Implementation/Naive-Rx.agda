@@ -301,9 +301,14 @@ concatMapRx {n} {X} {Y} isLast f m = record
 -- inner's, and rxjs unsubscription takes effect mid-dispatch). Within
 -- one burst of arrivals each sibling's synchronous flush still fires
 -- before the next sibling cuts it; only the last stays live.
-switchMapRx : {n : ℕ} {X Y : Set} → (Y → Bool)
+-- `cut y` transforms a sibling's synchronous emissions when it is
+-- SUPERSEDED within the same burst (switch keeps only the last of a
+-- burst). rxjs tears the superseded subscription down: values it already
+-- delivered survive, but registrations it left OPEN are undone. For a
+-- generic Y the identity `λ y → y ∷ []` recovers the plain behaviour.
+switchMapRx : {n : ℕ} {X Y : Set} → (Y → Bool) → (Y → List Y)
             → (X → RxObs n Y) → RxObs n X → RxObs n Y
-switchMapRx {n} {X} {Y} isLast f m = record
+switchMapRx {n} {X} {Y} isLast cut f m = record
   { State = State m × Maybe Running
   ; start = start m , nothing
   ; step  = λ s i →
@@ -318,10 +323,10 @@ switchMapRx {n} {X} {Y} isLast f m = record
     spawnSeq i (x ∷ []) =
       let r = step (f x) (start (f x)) i
       in (if any isLast (snd r) then nothing else just (x ▹ fst r)) , snd r
-    spawnSeq i (x ∷ xs@(_ ∷ _)) =
+    spawnSeq i (x ∷ xs@(_ ∷ _)) =                -- x is superseded by xs
       let r    = step (f x) (start (f x)) i
           rest = spawnSeq i xs
-      in fst rest , snd r ++ snd rest
+      in fst rest , concatMap cut (snd r) ++ snd rest
 
     go : State m → Maybe Running → List X → In n
        → (State m × Maybe Running) × List Y

@@ -182,13 +182,55 @@ eqBatches []       []       = true
 eqBatches (x ∷ xs) (y ∷ ys) = listEqℕ x y ∧ eqBatches xs ys
 eqBatches _        _        = false
 
+-- Agda-source emitter: prints a paste-ready Unit-Test block for a failing
+-- program. Hidden value-functions become idv / scz (structure-preserving);
+-- mapS templates become a constant lambda `λ _ → t 0` (templates embed the
+-- outer value only as leaf values, never in structure, so this is faithful to
+-- the batch-boundary discrepancy — see CLAUDE.md "Bug cache").
+aVals : List Val → String
+aVals []       = "[]"
+aVals (v ∷ vs) = concatStr (natToStr v ∷ " ∷ " ∷ aVals vs ∷ [])
+
+aExp  : Exp 3 → String
+aExpL : List (Exp 3) → String
+aExpS : ExpS 3 → String
+
+aExp (srcE i)        = appendStr "srcE s" (natToStr (toℕ i))
+aExp emptyE          = "emptyE"
+aExp (ofE vs)        = concatStr ("ofE (" ∷ aVals vs ∷ ")" ∷ [])
+aExp (shareE _ _)    = "emptyE"      -- QC is share-free; placeholder
+aExp (letShareE _ b) = aExp b
+aExp (mapE _ e)      = concatStr ("mapE idv (" ∷ aExp e ∷ ")" ∷ [])
+aExp (takeE k e)     = concatStr ("takeE " ∷ natToStr k ∷ " (" ∷ aExp e ∷ ")" ∷ [])
+aExp (scanE _ _ e)   = concatStr ("scanE scz 0 (" ∷ aExp e ∷ ")" ∷ [])
+aExp (mergeAllE s)   = concatStr ("mergeAllE (" ∷ aExpS s ∷ ")" ∷ [])
+aExp (concatAllE s)  = concatStr ("concatAllE (" ∷ aExpS s ∷ ")" ∷ [])
+aExp (switchAllE s)  = concatStr ("switchAllE (" ∷ aExpS s ∷ ")" ∷ [])
+aExp (exhaustAllE s) = concatStr ("exhaustAllE (" ∷ aExpS s ∷ ")" ∷ [])
+
+aExpL []       = "[]"
+aExpL (e ∷ es) = concatStr (aExp e ∷ " ∷ " ∷ aExpL es ∷ [])
+
+aExpS (ofS es)  = concatStr ("ofS (" ∷ aExpL es ∷ ")" ∷ [])
+aExpS (mapS t e) = concatStr ("mapS (λ _ → " ∷ aExp (t 0) ∷ ") (" ∷ aExp e ∷ ")" ∷ [])
+
+aAsyncs : List (Fin 3 × Val) → String
+aAsyncs []            = "[]"
+aAsyncs ((i , v) ∷ r) = concatStr ("(s" ∷ natToStr (toℕ i) ∷ " , " ∷ natToStr v ∷ ") ∷ " ∷ aAsyncs r ∷ [])
+
+aBlock : Emissions 3 → Exp 3 → String
+aBlock em e = concatStr
+  ( "_ : Agree (drv {3} (" ∷ aAsyncs (asyncs em) ∷ "))\n          ("
+  ∷ aExp e ∷ ")\n_ = refl\n" ∷ [])
+
 report : Emissions 3 → Exp 3 → List (List Val) → List (List Val) → String
 report em e impl spec = concatStr
   ( "  FAIL " ∷ showExp e
   ∷ "\n    driver = " ∷ showAsyncs (asyncs em)
   ∷ "\n    impl   = " ∷ encodeBatches impl
   ∷ "\n    spec   = " ∷ encodeBatches spec
-  ∷ "\n    raw    = " ∷ rawEmits em e ∷ "\n" ∷ [])
+  ∷ "\n    raw    = " ∷ rawEmits em e
+  ∷ "\n-- <<<PASTE\n" ∷ aBlock em e ∷ "-- PASTE>>>\n" ∷ [])
 
 -- one case: nothing if impl ≡ spec, else the report
 oneCase : Gen (Maybe String)
