@@ -92,10 +92,10 @@ I'm very happy with a lot of the progress I made!
   - added a script that appends failing quickcheck cases to a `UnitTest.agda` module as type-level unit tests
     - this gave us a quickly growing automatically generated list of regression tests
     - faster & simpler than jest - just run the compiler, which we do after each change to the agda code anyway
-- build a 'fast-check' link between typescript and agda
+- build a 'fast-check' link between typescript and `impl-batch-simultaneous`
   - practically, this helps us keep the agda implementation honest - we don't want to be able to do anything in agda that we can't do in typescript
   - theoretically, this is our '99% sure' link between the typescript & the agda implementations
-  - the other 1% is hopefully covered by the visual similarity between the two proofs
+  - the other 1% is hopefully covered by the visual similarity between the two algorithms
   - much simpler than building some kind of shared data-transformation DSL shared by both languages
 
 # Learnings re: Using AI for Proofs (the wrong turns I took)
