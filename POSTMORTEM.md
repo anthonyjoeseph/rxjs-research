@@ -213,11 +213,20 @@ So the model becomes:
   - we use `uniqueness` alongside other type-level information
   - inspired by rxjs traits - https://github.com/cartant/rxjs-traits
 
-- in a world where `map` and `scan` only accept `canonical` functions, (e.g. canonical normal form, for boolean expressions)
+- in a world where `of`, `map`, `scan` and `take` only accept `unique` inputs, tagged with a 'unique' value
   - we model the entire syntax tree as a type
   - we gain equality & proofs at compile-time
-  - we gain the ability to 'reduce' observable trees into _their_ canonical forms
   - this includes 'simultenous' observables literally pointing to the same thread in memory
+  - however! Even literal values like the input for `take` need to be tagged as 'unique', since `2+2` is meaningfully different from `4`
+    - processing takes time, which may affect the outcome of observables if they depend on time at all
+    - although I guess in agda, Nats are normalized at compile-time anyway - `2+2` that's probably fine
+
+- the real solution - rather than tagging things as 'unique', we reduce them to their 'canonical form'
+  - e.g. canonical normal form, for boolean expressions
+  - it's unclear to me which solution is more annoying...
+  - this approach seems to be possible - see [agda-canonical-experiment](https://github.com/anthonyjoeseph/agda-canonical-experiment)
+  - we also gain the ability to 'reduce' observable trees into _their_ canonical forms
+  - programs themselves become canonical - "the calculator", "the space invaders", etc
 
 - we should share as much code as possible between the 'pure-implementation' and the 'io-implementation' sides
   - we'll never truly be able to 'prove' anything about IO
