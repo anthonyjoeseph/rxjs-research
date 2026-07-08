@@ -24,16 +24,23 @@ is exact by construction but costs an id allocation per firing. We are **committ
 counting machine** for now (it is cheaper, and `Observable` is a hot primitive on the order of
 `Promise`/`Array`).
 
-The one finding that would force a change: **definitive proof that the semantics CANNOT be
-defined on observable-level provenance.** The clean form of that proof is **two real-world
-programs whose emit streams are byte-identical (same provenances, same init/close, same values,
-same order) but whose correct batches differ** — the counting machine, being a pure function of
-that stream, must then be wrong for at least one. (A single program where the counter disagrees
-with the spec is only a *bug*, possibly patchable; a byte-identical contradicting *pair* is
-proof of impossibility.) An attempt to build such a pair failed once — distinct-value emits are
-unambiguous, and the registration counts tend to distinguish the ambiguous cases — so it is
-genuinely open. **If you find such a pair, STOP and tell Anthony immediately; do not act on it
-— we decide next steps together.**
+The one finding that would force a change: **definitive proof that observable-level provenance is
+fundamentally lossy — that the IMPLEMENTATION contradicts itself, not merely the spec.** This is
+NOT the same as "impl disagrees with the spec": the spec is gospel and we are not uncertain about
+the desired batching, so a single program where the counting machine gets the wrong answer is
+only a *bug we fix by changing the implementation.* The implementation is a pipeline — the
+primitives render a run to an emit stream, then `batchSimultaneous` (a pure function of that
+stream) recovers the batches. The impossibility proof is **two real programs whose primitives
+produce byte-identical emit streams (same provenances, init/close, values, order) but that
+genuinely batch differently when run** (ground truth = what real rxjs does, i.e. its synchronous
+grouping — independently of the Agda spec). Then a *single* emit stream is demanded to yield two
+different batchings, so NO stream-reading implementation — the entire observable-provenance
+paradigm — can satisfy both. That is the implementation in contradiction with itself: its own
+emit-stream stage collapses two runs that its batching stage must separate, and no change to the
+counting rule can recover information the interface already threw away. An attempt to build such
+a pair failed once (distinct-value emits are unambiguous; registration counts tend to distinguish
+the ambiguous cases), so it is genuinely open. **If you find such a pair, STOP and tell Anthony
+immediately; do not act on it — we decide next steps together.**
 
 ## The goal: nothing short of a proof
 
