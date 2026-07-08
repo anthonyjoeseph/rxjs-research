@@ -664,12 +664,26 @@ frameStepI es =
   let evs = concatMap snd es
   in mkMem (trackRegs [] evs) nothing (nonEmptyM (values evs))
 
+-- how many chains of root p end in this emit (a take/switch cut closes the
+-- registrations it drops). Those chains will NOT deliver this instant, so
+-- the window that is counting p's arrivals must discount them too.
+closesOf : Prov → List (Ev Val) → ℕ
+closesOf p []             = 0
+closesOf p (close q ∷ es) = (if eqℕ q p then 1 else 0) + closesOf p es
+closesOf p (_ ∷ es)       = closesOf p es
+
 -- one async emit — owed is computed from the count as of the instant's
 -- start, BEFORE this emit's init/close events apply
 stepI : MemI → Emit Val → MemI
 stepI m (p , evs) =
   let owedStart = maybe′ (lookupRD 1 (cTotal m) p) fst (cWin m)
-      w         = weightOf evs                 -- chains this emit accounts for
+      -- chains this emit accounts for: those that ARRIVED (weight) or were
+      -- CUT (close-p). A cut chain may also have just arrived (take's last
+      -- value + its own close), so the two overlap — take the max, not the
+      -- sum, so a deliver-then-close chain is not counted twice.
+      wv        = weightOf evs
+      cl        = closesOf p evs
+      w         = if leqℕ wv cl then cl else wv
       acc       = maybe′ [] snd (cWin m) ++ values evs
       total     = trackRegs (cTotal m) evs
   in if leqℕ owedStart w
