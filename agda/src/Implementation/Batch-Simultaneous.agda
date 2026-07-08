@@ -768,20 +768,79 @@ compile : {n : ℕ} → Exp n → Inst n Val
 compile = compileE (λ _ → emptyI)
 
 ------------------------------------------------------------------------
--- batchSimultaneous (typescript/src/batch-simultaneous.ts): each input is
--- one synchronous instant, so batchSync buffers a tick's emits into one
--- group and this flushes that group's values as one batch. No registration
--- counting: the tick boundary is a real signal (batchSyncRx), not something
--- to reconstruct downstream.
+-- the counting machine (typescript/src/batch-simultaneous.ts): decide
+-- batch boundaries from init/close registration counts alone —
+--   src.pipe(batchSync(), endWith(end), scan(step), mergeMap(flush))
+
+data BItem : Set where
+  syncB  : List (Emit Val) → BItem   -- the frame group (TS batchSync "sync")
+  asyncB : Emit Val → BItem          -- one async emit, alone (never grouped:
+                                     -- recovering the grouping IS the job)
+  endB   : BItem                     -- the drain sentinel (TS r.endWith)
+
+-- the frame boundary needs no defer gadget here: the machine model
+-- knows the response to the first input, which IS the subscribe call
+batchSyncRx : {n : ℕ} → Inst n Val → RxObs n BItem
+batchSyncRx = groupFirstRx syncB asyncB
+
+record MemI : Set where
+  constructor mkMem
+  field
+    cTotal : Regs                       -- live registrations per root
+    cWin   : Maybe (ℕ × List Val)       -- open window: owed, accumulated
+    cFlush : Maybe (List Val)           -- the batch this step flushes
+open MemI
 
 nonEmptyM : List Val → Maybe (List Val)
 nonEmptyM []       = nothing
 nonEmptyM (v ∷ vs) = just (v ∷ vs)
 
+-- the frame: one instant, no window needed — its boundary was the
+-- subscribe call
+frameStepI : List (Emit Val) → MemI
+frameStepI es =
+  let evs = concatMap snd es
+  in mkMem (trackRegs [] evs) nothing (nonEmptyM (values evs))
+
+-- how many chains of root p end in this emit (a take/switch cut closes the
+-- registrations it drops). Those chains will NOT deliver this instant, so
+-- the window that is counting p's arrivals must discount them too.
+closesOf : Prov → List (Ev Val) → ℕ
+closesOf p []             = 0
+closesOf p (close q ∷ es) = (if eqℕ q p then 1 else 0) + closesOf p es
+closesOf p (_ ∷ es)       = closesOf p es
+
+-- one async emit — owed is computed from the count as of the instant's
+-- start, BEFORE this emit's init/close events apply
+stepI : MemI → Emit Val → MemI
+stepI m (p , evs) =
+  let owedStart = maybe′ (lookupRD 1 (cTotal m) p) fst (cWin m)
+      -- chains this emit accounts for: those that ARRIVED (weight) or were
+      -- CUT (close-p). A cut chain may also have just arrived (take's last
+      -- value + its own close), so the two overlap — take the max, not the
+      -- sum, so a deliver-then-close chain is not counted twice.
+      wv        = weightOf evs
+      cl        = closesOf p evs
+      w         = if leqℕ wv cl then cl else wv
+      acc       = maybe′ [] snd (cWin m) ++ values evs
+      total     = trackRegs (cTotal m) evs
+  in if leqℕ owedStart w
+     then mkMem total nothing (nonEmptyM acc)
+     else mkMem total (just (owedStart ∸ w , acc)) nothing
+
+bStep : MemI → BItem → MemI
+bStep m (syncB es)  = frameStepI es
+bStep m (asyncB e)  = stepI (record m { cFlush = nothing }) e
+bStep m endB        =
+  -- the stream ending drains a still-open window
+  mkMem (cTotal m) nothing (maybe′ nothing (λ w → nonEmptyM (snd w)) (cWin m))
+
 batchSimultaneousI : {n : ℕ} → Inst n Val → RxObs n (List Val)
 batchSimultaneousI src =
-  mergeMapRx (λ es → ofMaybe (nonEmptyM (concatMap (λ e → values (snd e)) es)))
-    (batchSyncRx src)
+  mergeMapRx (λ m → ofMaybe (cFlush m))
+    (scanRx bStep (mkMem [] nothing nothing)
+      (endWithRx endB
+        (batchSyncRx src)))
 
 ------------------------------------------------------------------------
 -- THE IMPLEMENTATION. A machine per program; the subscription log of

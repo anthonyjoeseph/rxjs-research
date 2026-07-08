@@ -15,6 +15,26 @@ Do not do this. If the Agda impl relies on something the TS cannot do, it has di
 correspondence is void. When in doubt about whether a mechanism is portable, **port it to TS
 and run the oracle before building on it.**
 
+## Open question: is observable-level provenance sufficient? (report immediately if not)
+
+The impl batches by **observable-level provenance** — a provenance minted once per source
+observable, plus a per-provenance subscription count (`cTotal`, the "counting machine") to
+recover instant boundaries. The alternative is **per-emission (per-instant) provenance**, which
+is exact by construction but costs an id allocation per firing. We are **committed to the
+counting machine** for now (it is cheaper, and `Observable` is a hot primitive on the order of
+`Promise`/`Array`).
+
+The one finding that would force a change: **definitive proof that the semantics CANNOT be
+defined on observable-level provenance.** The clean form of that proof is **two real-world
+programs whose emit streams are byte-identical (same provenances, same init/close, same values,
+same order) but whose correct batches differ** — the counting machine, being a pure function of
+that stream, must then be wrong for at least one. (A single program where the counter disagrees
+with the spec is only a *bug*, possibly patchable; a byte-identical contradicting *pair* is
+proof of impossibility.) An attempt to build such a pair failed once — distinct-value emits are
+unambiguous, and the registration counts tend to distinguish the ambiguous cases — so it is
+genuinely open. **If you find such a pair, STOP and tell Anthony immediately; do not act on it
+— we decide next steps together.**
+
 ## The goal: nothing short of a proof
 
 The ultimate and only goal is a **complete machine-checked proof** that the implementation
