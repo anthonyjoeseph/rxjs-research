@@ -164,7 +164,7 @@ showExpL (e ∷ []) = showExp e
 showExpL (e ∷ es) = appendStr (showExp e) (appendStr "," (showExpL es))
 
 showExpS (ofS es)  = appendStr "ofS[" (appendStr (showExpL es) "]")
-showExpS (mapS _ e) = appendStr "mapS(<tmpl>," (appendStr (showExp e) ")")
+showExpS (mapS t e) = concatStr ("mapS(λv→{0↦" ∷ showExp (t 0) ∷ "|1↦" ∷ showExp (t 1) ∷ "|7↦" ∷ showExp (t 7) ∷ "}," ∷ showExp e ∷ ")" ∷ [])
 
 showAsync : Fin 3 × Val → String
 showAsync (i , v) = appendStr (natToStr (toℕ i)) (appendStr ":" (natToStr v))

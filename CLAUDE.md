@@ -70,6 +70,19 @@ Follow these phases in order for any change to the implementation or spec:
    **phases** — leave middle steps as postulates and **commit in-between results**. Work
    until there are **no gaps**: no postulates, everything typechecks.
 
+## Bug cache: type-level unit tests
+
+When you discover an implementation bug, capture it immediately as a **type-level unit test**
+in `agda/src/Implementation/Unit-Test.agda` — a `_ : impl prog ≡ expected` that Agda checks
+by `refl` at compile time. These are a **performance cache** of discovered work: faster to
+recheck than QuickCheck, faster at the type level than at runtime. They pin down the exact
+value the impl must produce for a specific canonical program (spec-derived), so a regression
+fails the typechecker instantly instead of surfacing only in a random seed.
+
+Keep them dead simple — no fancy names, no abstraction, just a wall of little `_ : … ≡ …`
+entries. They exist only to accelerate finding the implementation; they are **not** meant to
+survive past the proof. Delete the module once `Formal-Verification` is discharged.
+
 In some cases, however, it might make sense to adding a new "naive rx" operator to fix an Agda-impl bug.
 
 This is allowed and encouraged when it's the best solution. But follow the port order:
