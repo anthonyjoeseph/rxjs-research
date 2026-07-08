@@ -165,6 +165,19 @@ scanRx {n} {X} {S} f z m = record
           o = scanBurst f (snd s) (snd r)
       in (fst r , fst o) , snd o }
 
+-- batchSync (TS: batch-sync.ts): group each synchronous instant's emits
+-- into one list. In the machine EVERY input is one synchronous instant —
+-- the subscribe frame and each .next()/.complete() run their whole
+-- downstream cascade in a single step — so this simply buffers one input's
+-- outputs into one item. It is the faithful generalisation of the TS
+-- batchSync, which brackets only the SUBSCRIBE frame synchronously (its
+-- `isSync` flag); here the InstantSubject brackets every tick, so batching
+-- needs no downstream count-based recovery.
+batchSyncRx : {n : ℕ} {X : Set} → RxObs n X → RxObs n (List X)
+batchSyncRx m = record
+  { State = State m ; start = start m
+  ; step  = λ s i → let r = step m s i in fst r , (snd r ∷ []) }
+
 -- r.merge (binary; n-ary is folded from it). Subscribes left before
 -- right: within one step, left's outputs precede right's (registration
 -- rank as delivery order).
