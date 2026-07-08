@@ -281,13 +281,17 @@ jOuter (mapJ _ o)  = o
 -- spawns), each spawned inner's synchronous flush, and inners' later
 -- emits
 data JoinItem : Set where
-  trigger : Prov → List (Ev Val) → ℕ → Bool → JoinItem
+  trigger : Prov → List (Ev Val) → ℕ → ℕ → Bool → JoinItem
+    -- root, init/close events, #inners spawned, incoming chain-WEIGHT
+    -- (weightOf the outer emit — 1 for a plain emit, K when the outer is
+    -- itself a serial join that coalesced K chains), outer-fin flag
   flushJ  : List (Ev Val) → Bool → JoinItem
   emitJ   : Emit Val → JoinItem
 
 triggerOf : Emit Val → JoinItem
 triggerOf e =
-  trigger (fst e) (initsCloses (snd e)) (length (values (snd e))) (hasFin e)
+  trigger (fst e) (initsCloses (snd e)) (length (values (snd e)))
+          (weightOf (snd e)) (hasFin e)
 
 -- an inner's item stream (TS: innerItems — batchSync + map): its
 -- response to its OWN subscription input is one flush item; each later
@@ -353,7 +357,7 @@ mergeSeed : MergeSt
 mergeSeed = mkMerge 0 [] cold 0 false false nothing
 
 mergeStep : MergeSt → JoinItem → MergeSt
-mergeStep s (trigger p others spawns outerFin) =
+mergeStep s (trigger p others spawns _ outerFin) =
   let pending   = mPending s + spawns
       outerDone = mOuterDone s ∨ outerFin
   in if ltℕ 0 spawns
@@ -448,14 +452,14 @@ finalizeS s open′ queued outerDone with hHolding s
 -- QUEUE (concatMap, natively); when the live inner FINISHES, the queued
 -- inner's flush is grafted into the fin-carrying emit — one instant
 concatStep : SerialSt → JoinItem → SerialSt
-concatStep s (trigger p others spawns outerFin) =
+concatStep s (trigger p others spawns w outerFin) =
   let queued    = hQueued s + spawns
       outerDone = hOuterDone s ∨ outerFin
       held      = just (p , others)
   in if hOpen s ∨ eqℕ spawns 0
      then finalizeS (record s { hHolding = held ; hLastProv = p }) (hOpen s) queued outerDone
      else record s { hHolding = held ; hQueued = queued ; hLastProv = p
-                   ; hWeight = suc (hWeight s)   -- one more chain queued (all deliver)
+                   ; hWeight = hWeight s + w   -- w more chains queued (all deliver)
                    ; hOuterDone = outerDone ; hOut = nothing }
 concatStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
@@ -477,14 +481,14 @@ concatStep s (emitJ e) =
 -- closes synthesized for the cut inner's registrations ride the
 -- switching trigger's emit
 switchStep : SerialSt → JoinItem → SerialSt
-switchStep s (trigger p others spawns outerFin) =
+switchStep s (trigger p others spawns w outerFin) =
   let outerDone = hOuterDone s ∨ outerFin
       cuts      = if ltℕ 0 spawns ∧ hOpen s then closesFor (hRegs s) else []
       held      = just (p , others ++ cuts)
   in if eqℕ spawns 0
      then finalizeS (record s { hHolding = held ; hLastProv = p }) (hOpen s) 0 outerDone
      else record s { hHolding = held ; hQueued = spawns ; hOpen = false ; hLastProv = p
-                   ; hRegs = [] ; hWeight = 1   -- switch keeps only the latest chain
+                   ; hRegs = [] ; hWeight = w   -- switch keeps only the latest chain (its weight)
                    ; hOuterDone = outerDone ; hOut = nothing }
 switchStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
@@ -513,7 +517,7 @@ switchStep s (emitJ e) =
 -- inner is STILL OPEN (exhaustMap, natively); dropped arrivals are
 -- emptied, never swallowed
 exhaustStep : SerialSt → JoinItem → SerialSt
-exhaustStep s (trigger p others spawns outerFin) =
+exhaustStep s (trigger p others spawns w outerFin) =
   let outerDone = hOuterDone s ∨ outerFin
       held      = just (p , others)
   in if hOpen s ∨ eqℕ spawns 0
@@ -523,7 +527,7 @@ exhaustStep s (trigger p others spawns outerFin) =
           -- accumulates rather than clobbering the pending count — exactly
           -- like concat, since with nothing open nothing is dropped.
           record s { hHolding = held ; hQueued = hQueued s + spawns ; hLastProv = p
-                   ; hWeight = suc (hWeight s)
+                   ; hWeight = hWeight s + w
                    ; hOuterDone = outerDone ; hOut = nothing }
 exhaustStep s (flushJ evs finned) =
   let queued = hQueued s ∸ 1
@@ -546,7 +550,7 @@ exhaustStep s (emitJ e) =
 -- test the serial policies observe (triggers never appear in inner
 -- streams, so their case is arbitrary)
 lastJ : JoinItem → Bool
-lastJ (trigger _ _ _ _)  = false
+lastJ (trigger _ _ _ _ _)  = false
 lastJ (flushJ _ finned)  = finned
 lastJ (emitJ e)          = hasFin e
 
@@ -561,7 +565,7 @@ cutJ (flushJ evs finned) =
   if finned then flushJ evs finned ∷ []
             else flushJ (map value (values evs)) false ∷ []
 cutJ (emitJ e)          = emitJ e ∷ []
-cutJ (trigger p o s b)  = trigger p o s b ∷ []
+cutJ (trigger p o s w b)  = trigger p o s w b ∷ []
 
 ------------------------------------------------------------------------
 -- INTERLEAVED item stream for the switch/exhaust joins.

@@ -149,3 +149,8 @@ _ = refl
 _ : Agree (drv {3} ((s2 , 0) ∷ (s1 , 7) ∷ []))
           (exhaustAllE (mapS (λ _ → ofE (0 ∷ 0 ∷ [])) (mergeAllE (ofS (ofE (4 ∷ 7 ∷ 7 ∷ []) ∷ mapE idv (concatAllE (ofS (srcE s0 ∷ ofE (6 ∷ 8 ∷ 4 ∷ []) ∷ srcE s2 ∷ []))) ∷ srcE s0 ∷ [])))))
 _ = refl
+
+-- seed 436 (pre-existing over-coalesce: two same-root instants merged)
+_ : Agree (drv {3} ((s0 , 5) ∷ (s2 , 5) ∷ (s2 , 2) ∷ (s1 , 5) ∷ (s1 , 6) ∷ []))
+          (exhaustAllE (mapS (λ _ → mapE idv (ofE (0 ∷ []))) (concatAllE (mapS (λ _ → ofE (0 ∷ 1 ∷ 2 ∷ 8 ∷ [])) (mapE idv (mergeAllE (ofS (srcE s2 ∷ srcE s2 ∷ srcE s0 ∷ []))))))))
+_ = refl
