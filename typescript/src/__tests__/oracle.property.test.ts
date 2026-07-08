@@ -69,11 +69,10 @@ const templateArb = (
 // the Agda split srcE / shareE.
 const refLeafArb = (numSlots: number): fc.Arbitrary<Exp> => {
   const shares = numSlots - NUM_SLOTS;
-  return slotArb(numSlots).map(
-    (s): Exp =>
-      s < shares
-        ? { k: "share", first: false, slot: s }
-        : { k: "src", slot: s - shares },
+  return slotArb(numSlots).map((s): Exp =>
+    s < shares
+      ? { k: "share", first: false, slot: s }
+      : { k: "src", slot: s - shares },
   );
 };
 
@@ -98,7 +97,11 @@ const expArb = (
     { weight: 2, arbitrary: leafArb(numSlots) },
     {
       weight: 2,
-      arbitrary: fc.record({ k: fc.constant("map" as const), f: fnArb, e: sub }),
+      arbitrary: fc.record({
+        k: fc.constant("map" as const),
+        f: fnArb,
+        e: sub,
+      }),
     },
     {
       weight: 1,
@@ -110,7 +113,11 @@ const expArb = (
     },
     {
       weight: 1,
-      arbitrary: fc.record({ k: fc.constant("scan" as const), f: fnArb, e: sub }),
+      arbitrary: fc.record({
+        k: fc.constant("scan" as const),
+        f: fnArb,
+        e: sub,
+      }),
     },
     {
       weight: 3,
@@ -122,9 +129,10 @@ const expArb = (
       weight: 2,
       arbitrary: fc
         .tuple(templateArb(numSlots, refIMin), sub)
-        .map(
-          ([tmpl, e]): Exp => ({ k: "mergeAll", s: { k: "mapS", tmpl, e } }),
-        ),
+        .map(([tmpl, e]): Exp => ({
+          k: "mergeAll",
+          s: { k: "mapS", tmpl, e },
+        })),
     },
     {
       weight: 2,
@@ -261,8 +269,7 @@ const isCanonical = (root: Exp): boolean => {
   if (sawForbidden) return false;
   const delayedSeen = new Map<string, number>();
   for (const o of occs) {
-    if (o.delayed)
-      delayedSeen.set(o.id, (delayedSeen.get(o.id) ?? 0) + 1);
+    if (o.delayed) delayedSeen.set(o.id, (delayedSeen.get(o.id) ?? 0) + 1);
     else if (delayedSeen.has(o.id)) return false; // static after delayed
   }
   for (const c of delayedSeen.values()) if (c > 1) return false;
