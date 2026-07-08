@@ -835,12 +835,15 @@ bStep m endB        =
   -- the stream ending drains a still-open window
   mkMem (cTotal m) nothing (maybe′ nothing (λ w → nonEmptyM (snd w)) (cWin m))
 
+perInputRx : {n : ℕ} → Inst n Val → RxObs n (List (Emit Val))
+perInputRx m = record
+  { State = State m ; start = start m
+  ; step = λ s i → let r = step m s i in fst r , (snd r ∷ []) }
+
 batchSimultaneousI : {n : ℕ} → Inst n Val → RxObs n (List Val)
 batchSimultaneousI src =
-  mergeMapRx (λ m → ofMaybe (cFlush m))
-    (scanRx bStep (mkMem [] nothing nothing)
-      (endWithRx endB
-        (batchSyncRx src)))
+  mergeMapRx (λ es → ofMaybe (nonEmptyM (concatMap (λ e → values (snd e)) es)))
+    (perInputRx src)
 
 ------------------------------------------------------------------------
 -- THE IMPLEMENTATION. A machine per program; the subscription log of
