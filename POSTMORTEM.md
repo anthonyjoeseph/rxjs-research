@@ -139,7 +139,7 @@ I'm very happy with a lot of the progress I made!
 - but I truly cannot asume that Fable knows what I'm going for
 - Fable kept finding 'choices' I needed to make to further refine the spec, as it was 'writing' my proof
   - this happened b/c of a miscommunication early on
-  - and when I changed my mind, Fable really didn't want to heart it
+  - and when I changed my mind, Fable really didn't want to hear it
   - and I was tentative b/c I had no idea was going on and I didn't want to break anything
   - ultimately, it turned out that the spec was very simple and consistent
   - but I didn't know that until much later, b/c I assumed the AI had completely defined it when it hadn't
