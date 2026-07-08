@@ -1,4 +1,6 @@
-# Problems
+# Problems With the Current Codebase
+
+Don't solve these! See the [Why We Need to Fundamentally Pivot](#why-we-need-to-fundamentally-pivot) section
 
 ## Exp Tree - Easy
 
@@ -20,6 +22,7 @@
 ### Solution
 
 - [Coinduction?](https://agda.readthedocs.io/en/latest/language/coinduction.html)
+- working around the termination checker will be tricky...
 
 ## Agda Pure-Implementation
 
@@ -29,15 +32,15 @@
 
 ### Solution
 
-We definitely need some plumbing so that what the 'operator' accepts is purely its own previous state, and the actual value, unadorned with extra information
+We definitely need some plumbing so the 'operator' input just `previous-state`x`actual value`, unadorned with extra information
 
 But the main problem is - what gets stored in state? How do we represent the idea of a `merge`, for example - multiple subscriptions being stored & listened to at once?
 
-I think it's a bad idea to directly model the idea of an operator directly dealing with its input observables, calling 'subscribe' and 'unsubscribe', storing subscriptions in state. How the hell to we model 'subscribe' callbacks without opening ourselves up to recursion?
+I think it's a bad idea to directly model the idea of an operator directly dealing with its input observables, calling 'subscribe' and 'unsubscribe', storing subscriptions in state. How the hell to we model 'subscribe' callbacks without opening ourselves up to recursion? This is a termination-checking nightmare
 
 We've bought a lot of power by implementing the primitives the way we did in typescript - we should be able to meaningfully abstract _over_ the idea of a subscription.
 
-But! Whatever distance there is between our 'pure-implementation' and the 'rxjs real world', needs to also be explicitly modelled / accounted for. Maybe that looks like another fast-check linkage to typescript, or maybe that somehow looks like an agda proof - idk.
+But! Whatever distance there is between our 'pure-implementation' and the 'rxjs real world', also needs to be explicitly modelled / accounted for. Maybe that looks like another fast-check linkage to typescript, or maybe that somehow looks like an agda proof - idk.
 
 # What Worked
 
@@ -47,7 +50,7 @@ I'm very happy with a lot of the progress I made!
 
 - `verify-batch-simultaneous` is THE proof
 - equates `spec-batch-simultaneous` and `impl-batch-simultaneous`
-- it uses an Exp tree to represent the idea of "any possible combination of primitives"
+- uses an Exp tree to represent the idea of "any possible combination of primitives"
 
 - `spec-batch-simultaneous`
   - implements batch-simultaneous 'after the fact'
@@ -56,15 +59,15 @@ I'm very happy with a lot of the progress I made!
 
 - `impl-batch-simultaneous`
   - only able to work step-by-step
-  - cannot see into the future
+  - exists in the 'present', cannot see into the 'future'
   - is a 'mealy machine' (Fable's term, actually just a state monad)
 
 - README semantics - smaller proofs
   - the README defines our semantics via 'edge cases'
   - it's easy to read that way
-  - I had the idea - let's formalize those 'edge cases'
+  - I had the idea - let's formalize those 'edge cases'!
   - I wanted them to be more general than unit tests - they each say something interesting about the semantics
-    - they turned out to almost all be different versions of the same lemma!
+    - they turned out to all be different versions of the same lemma (with one exception, i think)
   - The readme links to the actual proofs too!
   - this ensures at compile time that any change to the semantics will always exist within the boundaries of what we already _know_ we want
     - or will provide us positive proof of a contradiction, if one arises
@@ -91,10 +94,12 @@ I'm very happy with a lot of the progress I made!
   - the other 1% is hopefully covered by the visual similarity between the two proofs
   - much simpler than building some kind of shared data-transformation DSL shared by both languages
 
-## Learnings re: Using AI for Proofs
+# Learnings re: Using AI for Proofs (the wrong turns I took)
 
 ### the ai is not that smart - even Fable
 
+- I gave it my typescript implementation and basically told it 'formalize & prove this - have at it'
+- it went off and wrote a bunch of stuff - it got me so excited at first, but I wasn't really able to tell what it was doing
 - I had assumed it had come up with an "overall theorem", like `verify-batch-simultaneous`
 - actually, it was just building up a corpus of random 'proofs' that were meandering about, leading nowhere
 - it was trying to 'build up' rather than 'dig down', but it wasn't even sure what it was trying to 'build up' to
@@ -102,12 +107,14 @@ I'm very happy with a lot of the progress I made!
 
 ### Fable doesn't know what's important
 
-- at first, it was keeping _everything_, long after it had become unused
+- at first, it was keeping _every_ piece of code, long after it had become unused
+  - it was documenting some of it as 'backwards compatible' or 'legacy' or 'v1'
 - I directed it to start pruning things that weren't used
 - so - it deleted `cold()` and it took me a long time to realize it was gone
   - this pointed to another giant mistake it had made:
   - when implementing Exp trees, it assumed that every Observable was hot(!)
-  - there was no notion of `cold()` built into it at all - Fable decided to leave `cold` out of the spec
+  - there was no notion of `cold()` built into it at all
+  - Fable decided to leave `cold` out of the spec early on, and then that oversight caused it to be completely deleted
 
 ### Fable wants to do its own thing
 
@@ -118,6 +125,9 @@ I'm very happy with a lot of the progress I made!
 ### Fable/Opus doesn't think to spend time coming up with tooling / efficiency improvements
 
 - not unless you ask it to
+- it's very happy to waste a lot of tokens
+- even if a better process is obviously available
+- it doesn't think outside of the immediate task you've given it
 
 ### I Have to Understand The Postulates
 
@@ -127,12 +137,12 @@ I'm very happy with a lot of the progress I made!
   - this happened b/c of a miscommunication early on
   - and when I changed my mind, Fable really didn't want to heart it
   - and I was tentative b/c I had no idea was going on and I didn't want to break anything
+  - ultimately, it turned out that the spec was very simple and consistent
+  - but I didn't know that until much later, b/c I assumed the AI had completely defined it when it hadn't
 - I assumed Fable knew what it was doing when it wrote the 'rx-naive' impl-side stuff
   - it turns out - it wasn't really faithfully modelling the behavior of rxjs
   - it was also giving each operator wayyy too much information
   - all of this unintentionally weakened the proof significantly
-- I assumed Fable knew what it was doing when it implemented the Exp tree
-  - turns out
 - I still don't really know how the spec is using monotonicList, come to think of it...
 
 ### Opus is plenty capable
@@ -140,25 +150,27 @@ I'm very happy with a lot of the progress I made!
 - defining an approach
   - Fable came up with the Exp trees and I was floored - I had been trying to come up with that solution for months
   - I thought fable was uniquely good at that sort of thing
-  - but, in retrospect, a much smaller model probably could have helped me come up with that. It's a bog standard approach
+  - but, in retrospect, a much smaller model probably could have helped me come up with that. It's the standard approach to proving things about arbitrarily deeply nested syntax
   - I had been worried that Opus wouldn't be smart enough to come up with an 'overall approach'
   - turns out - Fable's not smart enough for that either!
   - but - what it turns out I actually want, is a _research assistant_ who can tell me common ways to approach a given problem
 - writing proofs
   - Fable is probably smarter at this, as a baseline - it's able to 'think more steps ahead in the chess game'
-  - but 'smarter' is not 'better' - fable wastes a lot of resources doing its 'deep thinking', and these proofs are ultimately fairly straightforward. Stating them properly is the tricky thing
-  - once all of the appropriate tooling was in place, Opus was able to take the ball and run really far with it - to the point that it helped me realize the fundamental problems with the approach (see 'why we need to fundamentally pivot')
+  - but 'smarter' is not 'better' - Fable wastes a lot of resources doing its 'deep thinking', and these proofs are ultimately fairly straightforward. Stating them properly is the tricky thing
+  - once all of the appropriate tooling was in place, Opus was able to take the ball and run really far with it - to the point that it helped me realize the fundamental problems with the approach (see [why we need to fundamentally pivot](#why-we-need-to-fundamentally-pivot))
   - if I were to keep working away at `impl-batch-simultaneous`, I would have told Opus to keep a list of 'failed attempts' in markdown - every time it took a 'path' to try to resolve some bug, and decided that 'path' was causing more problems than it was solving, it should _record_ that so that it learns from its mistakes
+    - this sort of thing is much more efficient and useful than just chucking everything into Fable's gigantic & expensive context memory
 
 ### Opus is still kinda dumb though
 
-- when quickcheck was timing out on certain tests, it determined that it was probably due to excessive depth
+- when quickcheck was timing out on certain tests, it determined that it was probably due to excessive Exp tree depth
 - it put a timeout on the test cases - if execution exceeds the timeout, the test is considered 'passing' (!)
-- this was nearly a disastrous series of decisions
+- this was clearly a disastrous train of thought
 - I asked it - 'at what depth are the tests failing?' it said - four
 - I said - 'that's not very deep, you should investigate further'
-- it found out that - quickcheck was passing in very large natural numbers as observable emissions, which are difficult for agda to represent
+- it found out that - quickcheck was passing in very large natural numbers to represent observable emissions, which cause agda to use a huge amount of memory
 - so the solution turned out to be fairly straightforward
+- and I decided to put in a timeout - but it causes the test to 'fail' rather than 'pass'
 - in conclusion: you need to pay attention to what it's doing
 
 # Why We Need to Fundamentally Pivot
