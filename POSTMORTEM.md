@@ -1,6 +1,10 @@
 # Problems With the Current Codebase
 
-Don't solve these! See the [Why We Need to Fundamentally Pivot](#why-we-need-to-fundamentally-pivot) section
+Don't just solve these! See the [Why We Need to Fundamentally Pivot](#why-we-need-to-fundamentally-pivot) section
+
+Listed here because - these are fundamental problems that will probably arise in the post-pivot versions as well
+
+Solving these first _may_ enable a quicker and easier implementation of the _real_ solutions, or it might be best to just start the new ones from scratch. Who knows? Depends how I'm feeling when the time comes
 
 ## Exp Tree - Easy
 
