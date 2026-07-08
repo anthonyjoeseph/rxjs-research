@@ -3,6 +3,18 @@
 This repo pairs an **Agda model** (`agda/`) with a **TypeScript implementation** (`typescript/`).
 Agda's spec is gospel; TS conforms to it.
 
+## The Agda impl MUST mirror the TS impl
+
+The Agda **implementation** (`Implementation/`, as opposed to the `Spec/`) exists to model
+what the **real rxjs TypeScript** does, operator for operator. It may only use capabilities a
+plain rxjs pipeline actually has. A Mealy machine is globally clocked by its input stream, so
+it is tempting to lean on per-input boundaries that rxjs does NOT expose downstream — e.g.
+grouping *every* synchronous tick's emissions when rxjs's `batchSync` can only bracket the
+**subscribe frame** (its `isSync` flag), treating all later emits as individual `async` ones.
+Do not do this. If the Agda impl relies on something the TS cannot do, it has diverged and the
+correspondence is void. When in doubt about whether a mechanism is portable, **port it to TS
+and run the oracle before building on it.**
+
 ## The goal: nothing short of a proof
 
 The ultimate and only goal is a **complete machine-checked proof** that the implementation
