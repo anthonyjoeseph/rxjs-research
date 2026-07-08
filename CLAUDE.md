@@ -83,6 +83,14 @@ Keep them dead simple — no fancy names, no abstraction, just a wall of little 
 entries. They exist only to accelerate finding the implementation; they are **not** meant to
 survive past the proof. Delete the module once `Formal-Verification` is discharged.
 
+The cache is **append-only**: `scripts/gen-unit-tests.sh [FIRST] [LAST]` appends each new
+counterexample (deduped by program text) and never deletes or overwrites. A fixed bug just
+becomes a passing guard that stays forever. Invariant: **`Unit-Test.agda` fully typechecks ⟺
+no known counterexample remains** — green there is the impl≡spec finish line. `QuickCheck`
+reads `SEED [DEPTH] [RUNS] [DRY]` on stdin: DEPTH caps program nesting (a hard size cap);
+DRY≥1 prints one generated case without evaluating (DRY≥2 forces/​times its eval) — for
+isolating pathological cases.
+
 In some cases, however, it might make sense to adding a new "naive rx" operator to fix an Agda-impl bug.
 
 This is allowed and encouraged when it's the best solution. But follow the port order:
