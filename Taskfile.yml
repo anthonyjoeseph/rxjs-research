@@ -11,3 +11,15 @@ tasks:
     desc: compile/typecheck the agda source
     cmds:
     - agda src/Main.agda
+
+  ts:
+    dir: typescript
+    desc: compile/typecheck the agda source
+    cmds:
+    - npm run start
+
+  ts-check:
+    dir: typescript
+    desc: compile/typecheck the agda source
+    cmds:
+    - npm run typecheck
