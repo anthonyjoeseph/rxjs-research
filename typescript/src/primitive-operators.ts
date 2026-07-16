@@ -1,5 +1,5 @@
 import { Observable } from "rxjs";
-import { InstEmit } from "./inst-emit";
+import { InstEmit } from "./inst-emit.js";
 
 export declare const of: <A>(input: A[]) => Observable<InstEmit<A>>;
 export declare const empty: Observable<InstEmit<never>>;
