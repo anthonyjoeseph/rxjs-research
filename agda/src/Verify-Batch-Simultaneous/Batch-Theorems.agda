@@ -1,9 +1,11 @@
-module Formal-Verification where
+module Verify-Batch-Simultaneous.Batch-Theorems where
 
-------------------------------------------------------------------
--- THE verified object: the batching state machine vs its spec.
--- Quantified over streams — composition with evaluate is definitional.
-------------------------------------------------------------------
+open import Data.List    using (List; _++_)
+open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
+open import Data.Product using (_×_)
+open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Rx.Prim        using (InstEmit)
+open import Implementation using (impl-batchSimultaneous)
 
 postulate
   BatchSt    : Set → Set
@@ -11,10 +13,6 @@ postulate
   step-batch : ∀ {A} → InstEmit A → BatchSt A
              → List (List (InstEmit A)) × BatchSt A     -- groups CLOSED by this step
   flushBatch : ∀ {A} → BatchSt A → List (List (InstEmit A))
-
-  formal-verification-batchSimultaneous :
-    ∀ {A} (xs : List (InstEmit A)) →
-    spec-batchSimultaneous xs ≡ impl-batchSimultaneous xs
 
   -- online-ness (extrinsic no-lookahead): once a group is closed it is
   -- never reopened — output on a prefix is a prefix of output
