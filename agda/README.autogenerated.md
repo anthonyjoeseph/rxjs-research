@@ -27,13 +27,19 @@ settling on `[6, 50]`. This is the diamond problem.
 
 ## 2. The solution, in one paragraph
 
-Every emission is tagged with a provenance **id** — an `InstEmit<A>` is a value
-paired with an id identifying the _instant_ (root cause) it belongs to. All
-emissions synchronously caused by one trigger share its id; independent
-triggers always get distinct ids. A downstream operator, `batchSimultaneous`,
-groups the stream by id, emitting each causally-atomic batch exactly once, as
-soon as it is complete — a single `InstEmit` carrying the instant's id and its
-values in emission order. Consumers act per-batch and never observe glitch
+Every emission is tagged with a provenance **id** — an `InstEmit<A>` carries a
+coalesced list of protocol events (`init`/`value`/`close`/`fin`, v1's protocol)
+plus the id of the _instant_ (root cause) it belongs to and the source it came
+from. All emissions synchronously caused by one trigger share its instant id;
+independent triggers always get distinct ids. A downstream operator,
+`batchSimultaneous`, groups the stream by instant id, emitting each
+causally-atomic batch exactly once, as soon as it is complete — a single
+`InstEmit` whose value is the instant's list of values, still carrying its
+instant id, so a batched stream is again an `Observable<InstEmit>` that feeds
+every primitive (merge it with itself and batch once more). Completeness is
+decided by counting: init/close traffic maintains the live-registration count
+per source, and each live registration forwards exactly one (possibly
+valueless) emit per arrival. Consumers act per-batch and never observe glitch
 states.
 
 The **thesis being verified**: an _online_ batcher — one that sees a single
@@ -377,8 +383,9 @@ subscription-timing bugs hide until they surface several nodes downstream.
 
 ```agda
 spec-batchSimultaneous : List (InstEmit A) → List (InstEmit (List A))
-  -- clairvoyant: sees the whole stream, groups by id;
-  -- one record per instant — its id + the values in emission order
+  -- clairvoyant: sees the whole stream — group emits by instant id,
+  -- concat their values in stream order, drop valueless instants;
+  -- each batch keeps its instant id (a batched stream re-batches)
 
 step-batch : InstEmit A → BatchSt A → List (InstEmit (List A)) × BatchSt A
 impl-batchSimultaneous  = fold step-batch ++ flushBatch

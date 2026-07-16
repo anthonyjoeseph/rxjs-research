@@ -21,9 +21,9 @@ Inputs Γ = ∀ i → ObservableInput (Val Γ (lookup Γ i))
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
 
-Grouped : ∀ {n} → Ctx n → Ty → Set         -- batchSimultaneous's output:
+Grouped : ∀ {n} → Ctx n → Ty → Set         -- batchSimultaneous's output
 Grouped Γ t = List (InstEmit (List (Val Γ t)))
-  -- one record per instant — its id + the values in emission order
+  -- one emit per instant, still a protocol citizen (re-batchable)
 
 ------------------------------------------------------------------
 -- The evaluator and its global scheduler

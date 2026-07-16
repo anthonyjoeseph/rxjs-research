@@ -69,4 +69,4 @@ postulate
 
 postulate
   _≈ˢ_ : ∀ {A} → List (InstEmit A) → List (InstEmit A) → Set
-  _≈ᵍ_ : ∀ {A} → List (List (InstEmit A)) → List (List (InstEmit A)) → Set
+  _≈ᵍ_ : ∀ {A} → List (InstEmit (List A)) → List (InstEmit (List A)) → Set

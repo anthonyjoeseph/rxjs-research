@@ -28,7 +28,7 @@ export type ObservableInput<A> = ObservableInputCold<A> | ObservableInputHot<A>;
 
 export type Inputs = ObservableInput<Val>[]; // one per Γ slot, index-aligned
 export type Stream = InstEmit<Val>[]; // the flat canonical stream
-export type Grouped = InstEmit<Val[]>[]; // batchSimultaneous's output: one record per instant — its prov + the values in emission order
+export type Grouped = InstEmit<Val[]>[]; // batchSimultaneous's output: one emit per instant, still a protocol citizen (re-batchable)
 
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the input slots, index-aligned with inputs.
