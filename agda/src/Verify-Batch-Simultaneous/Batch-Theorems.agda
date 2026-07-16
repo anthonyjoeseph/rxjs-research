@@ -11,8 +11,8 @@ postulate
   BatchSt    : Set → Set
   batch-init : ∀ {A} → BatchSt A
   step-batch : ∀ {A} → InstEmit A → BatchSt A
-             → List (List (InstEmit A)) × BatchSt A     -- groups CLOSED by this step
-  flushBatch : ∀ {A} → BatchSt A → List (List (InstEmit A))
+             → List (InstEmit (List A)) × BatchSt A     -- groups CLOSED by this step
+  flushBatch : ∀ {A} → BatchSt A → List (InstEmit (List A))
 
   -- online-ness (extrinsic no-lookahead): once a group is closed it is
   -- never reopened — output on a prefix is a prefix of output

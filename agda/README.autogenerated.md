@@ -32,7 +32,8 @@ paired with an id identifying the _instant_ (root cause) it belongs to. All
 emissions synchronously caused by one trigger share its id; independent
 triggers always get distinct ids. A downstream operator, `batchSimultaneous`,
 groups the stream by id, emitting each causally-atomic batch exactly once, as
-soon as it is complete. Consumers act per-batch and never observe glitch
+soon as it is complete — a single `InstEmit` carrying the instant's id and its
+values in emission order. Consumers act per-batch and never observe glitch
 states.
 
 The **thesis being verified**: an _online_ batcher — one that sees a single
@@ -375,10 +376,11 @@ subscription-timing bugs hide until they surface several nodes downstream.
 ## 7. The verified object: `batchSimultaneous`
 
 ```agda
-spec-batchSimultaneous : List (InstEmit A) → List (List (InstEmit A))
-  -- clairvoyant: sees the whole stream, groups by id
+spec-batchSimultaneous : List (InstEmit A) → List (InstEmit (List A))
+  -- clairvoyant: sees the whole stream, groups by id;
+  -- one record per instant — its id + the values in emission order
 
-step-batch : InstEmit A → BatchSt A → List (List (InstEmit A)) × BatchSt A
+step-batch : InstEmit A → BatchSt A → List (InstEmit (List A)) × BatchSt A
 impl-batchSimultaneous  = fold step-batch ++ flushBatch
   -- online: one emission at a time, own state only
 
