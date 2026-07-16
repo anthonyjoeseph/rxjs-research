@@ -1,9 +1,10 @@
-
-node_modules
-typescript/node_modules
-agda/_build
-
+# macos
 **/.DS_Store
-agda/v1/_build
 
+#typescript
+**/node_modules
+typescript/node_modules
+
+# agda
+**/_build
 **/_cli

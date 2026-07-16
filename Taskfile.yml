@@ -1,0 +1,13 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+    - task --list
+
+  agda:
+    dir: agda
+    desc: compile/typecheck the agda source
+    cmds:
+    - agda src/Main.agda
