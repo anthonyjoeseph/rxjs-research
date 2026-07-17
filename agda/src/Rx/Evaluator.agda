@@ -1,16 +1,18 @@
 module Rx.Evaluator where
 
-open import Data.Bool    using (Bool; if_then_else_)
+open import Data.Bool    using (Bool; true; false)
 open import Data.Nat     using (zero; suc)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Unit    using (⊤)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Relation.Nullary using (yes; no)
+open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; Source;
                            InstEvent; value; InstEmit; _at_from_; ObservableInput)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; Ctx; Val; Closed; Fn)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn)
 
 
 ------------------------------------------------------------------
@@ -49,11 +51,8 @@ postulate
   -- sync burst — processed NOW, inside cascade `Id` (id-inheritance) —
   -- plus the schedule extended with the source's async future.
   arrSource : ∀ {n} {Γ : Ctx n} → Arrival Γ → Source
-  arrVal    : ∀ {n} {Γ : Ctx n} → Arrival Γ → (s : Ty) → Val Γ s
-    -- the payload, read at the chain's source element type.  Totality
-    -- is a fiction: it is exact only because the registry invariant
-    -- pairs a source only with chains rooted at its element type —
-    -- the eventual EvalSt well-formedness predicate carries this
+  arrTy     : ∀ {n} {Γ : Ctx n} → Arrival Γ → Ty        -- the source's element type
+  arrVal    : ∀ {n} {Γ : Ctx n} → (a : Arrival Γ) → Val Γ (arrTy a)
 
   sameSource : Source → Source → Bool
   NodeId     : Set                                        -- a node instance in the dynamic topology
@@ -111,24 +110,31 @@ postulate
             → Id → Frame Γ s u → List (Val Γ s) → Sched Γ → EvalSt e
             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
 
--- the arrival's source's live chains, in subscription order
+-- the arrival's source's live chains, in subscription order, at
+-- exactly the arrival's element type: a chain is admitted only past a
+-- Ty equality check, so no payload is ever read at the wrong type (a
+-- mistyped registry entry — impossible by the registration invariant —
+-- is dropped, never trusted)
 chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-         → Arrival Γ → EvalSt e → List (Chain e)
-chainsOf {e = e} a st = go (EvalSt.registry st)
+         → (a : Arrival Γ) → EvalSt e → List (Path Γ (arrTy a) t)
+chainsOf {Γ = Γ} {t = t} {e = e} a st = go (EvalSt.registry st)
   where
-  go : List (Source × Chain e) → List (Chain e)
-  go []             = []
-  go ((s , c) ∷ r) = if sameSource (arrSource a) s then c ∷ go r else go r
+  go : List (Source × Chain e) → List (Path Γ (arrTy a) t)
+  go [] = []
+  go ((s , (u , p)) ∷ r) with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+  ... | false | _        = go r
+  ... | true  | no  _    = go r
+  ... | true  | yes refl = p ∷ go r
 
 -- one chain, ONE emit: fold the arrival's value rootward through the
 -- frames, accumulating protocol events; a cut mid-path leaves the fold
 -- running on an empty value list, so the emit is emptied, never
 -- swallowed.  The envelope is assembled here and nowhere else
 chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-          → Id → Arrival Γ → Chain e → Sched Γ → EvalSt e
+          → Id → (a : Arrival Γ) → Path Γ (arrTy a) t → Sched Γ → EvalSt e
           → InstEmit (Val Γ t) × Sched Γ × EvalSt e
-chainStep {Γ = Γ} {t = t} {e = e} id a (s , path) sched st =
-  go path (arrVal a s ∷ []) [] sched st
+chainStep {Γ = Γ} {t = t} {e = e} id a path sched st =
+  go path (arrVal a ∷ []) [] sched st
   where
   go : ∀ {u} → Path Γ u t → List (Val Γ u) → List (InstEvent (Val Γ t))
      → Sched Γ → EvalSt e → InstEmit (Val Γ t) × Sched Γ × EvalSt e
@@ -148,7 +154,7 @@ cascade : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Stream Γ t × Sched Γ × EvalSt e
 cascade {Γ = Γ} {t = t} {e = e} a id sched st = go (chainsOf a st) sched st
   where
-  go : List (Chain e) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
+  go : List (Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   go []           sched st = [] , sched , st
   go (c ∷ chains) sched st =
     let (emit  , sched₁ , st₁) = chainStep id a c sched st

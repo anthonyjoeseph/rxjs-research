@@ -9,6 +9,8 @@ open import Data.Fin     using (Fin)
 open import Data.Product using (_×_)
 open import Data.Unit    using (⊤)
 open import Data.Sum     using (_⊎_)
+open import Relation.Nullary using (Dec)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
 
 ------------------------------------------------------------------
@@ -84,6 +86,7 @@ Closed : ∀ {n} → Ctx n → Ty → Set
 Closed Γ t = Exp Γ [] [] [] t
 
 postulate   -- substitution plumbing (finite structural recursions; define later)
+  _≟ᵗ_    : (s t : Ty) → Dec (s ≡ t)
   evalTm  : ∀ {n} {Γ : Ctx n} {t} → Tm Γ [] [] [] t → Val Γ t
   applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val Γ t
   unfoldμ : ∀ {n} {Γ : Ctx n} {t} → Exp Γ (t ∷ []) [] [] t → Closed Γ t
