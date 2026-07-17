@@ -9,6 +9,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim      using (Tick; Fuel)
 open import Rx.Exp       using (Ctx; Closed; Exp; μᵉ; unfoldμ)
 open import Rx.Evaluator using (Slot; Slots; Stream; evaluate)
+open import Rx.Protocol  using (WellFormed)
 
 
 
@@ -18,6 +19,15 @@ open import Rx.Evaluator using (Slot; Slots; Stream; evaluate)
 ------------------------------------------------------------------
 
 postulate
+  -- the primitives' half of the sandwich (see The-Proof): every
+  -- stream the evaluator renders satisfies the protocol.  Proven,
+  -- this is one preservation lemma per primitive — a primitive is
+  -- correctly implemented iff its stepFrame clause preserves the
+  -- automaton's invariant against the registry EvalSt already keeps
+  evaluate-well-formed :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+    WellFormed (evaluate fuel e ins)
+
   -- fuel is arrivals: processing more arrivals only extends the stream
   fuel-coherent :
     ∀ {n} {Γ : Ctx n} {t} (f₁ f₂ : Fuel) → f₁ ≤ f₂ →
