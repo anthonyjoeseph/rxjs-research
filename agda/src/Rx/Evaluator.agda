@@ -1,7 +1,7 @@
 module Rx.Evaluator where
 
 open import Data.Nat     using (zero; suc)
-open import Data.List    using (List; []; _++_)
+open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Vec     using (lookup)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit    using (⊤)
@@ -54,14 +54,39 @@ postulate
 
   st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
 
-  -- the meat: routes the arrival's value to its live source's node,
-  -- runs the operator logic to quiescence inside cascade Id
-  -- (re-subscribing via subscribeE for μ-unfolding, deferᵉ bodies,
-  -- *All inners); termination is structural (rootward propagation,
-  -- finite bursts, μ behind deferᵉ), so no gas appears here
-  cascade : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-          → Arrival Γ → Id → Sched Γ → EvalSt e
-          → Stream Γ t × Sched Γ × EvalSt e
+  -- a live registration chain: one path from the arrival's source
+  -- rootward through the dynamic topology (which lives in EvalSt);
+  -- chainsOf lists them in subscription order
+  Chain    : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
+  chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+           → Arrival Γ → EvalSt e → List (Chain e)
+
+  -- the per-chain meat: transforms the arrival's value along the
+  -- chain's operator path rootward, COALESCING spawned inners' sync
+  -- bursts (via subscribeE — μ-unfolding, deferᵉ bodies, *All inners)
+  -- into the ONE outgoing emit; updates node states; registers async
+  -- futures.  Termination is structural (rootward propagation, finite
+  -- bursts, μ behind deferᵉ), so no gas appears here
+  chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+            → Id → Arrival Γ → Chain e → Sched Γ → EvalSt e
+            → InstEmit (Val Γ t) × Sched Γ × EvalSt e
+
+-- one arrival, count(source) emits: every live registration chain of
+-- the arrival's source forwards EXACTLY ONE emit (possibly valueless),
+-- in subscription order — the truthfulness invariant, made structural:
+-- chainStep's result type is a single InstEmit, so cascade cannot
+-- swallow or duplicate a chain's contribution
+cascade : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        → Arrival Γ → Id → Sched Γ → EvalSt e
+        → Stream Γ t × Sched Γ × EvalSt e
+cascade {Γ = Γ} {t = t} {e = e} a id sched st = go (chainsOf a st) sched st
+  where
+  go : List (Chain e) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
+  go []           sched st = [] , sched , st
+  go (c ∷ chains) sched st =
+    let (emit  , sched₁ , st₁) = chainStep id a c sched st
+        (emits , sched₂ , st₂) = go chains sched₁ st₁
+    in emit ∷ emits , sched₂ , st₂
 
 -- fuel = ARRIVALS PROCESSED; each arrival's cascade runs to
 -- quiescence (never truncated mid-batch).  The root subscription's
