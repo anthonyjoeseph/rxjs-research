@@ -6,7 +6,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; InstEmit)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Sched; Arrival; EvalSt; Inputs; Stream; evaluate)
+open import Rx.Evaluator using (Sched; Arrival; EvalSt; Slots; Stream; evaluate)
 
 
 ------------------------------------------------------------------
@@ -51,12 +51,12 @@ postulate
 
 postulate
   Retiming : Set                              -- monotone Tick → Tick, order- and
-  retime   : ∀ {n} {Γ : Ctx n}                -- coincidence-preserving on arrivals
-           → Retiming → Inputs Γ → Inputs Γ
+  retime   : ∀ {n} {Γ : Ctx n}                -- coincidence-preserving on arrivals;
+           → Retiming → Slots Γ → Slots Γ    -- acts on scripted slots, fixes shared defs
 
   timing-invariance :
     ∀ {n} {Γ : Ctx n} {t} (ρ : Retiming) (fuel : Fuel)
-      (e : Closed Γ t) (ins : Inputs Γ) →
+      (e : Closed Γ t) (ins : Slots Γ) →
     evaluate fuel e (retime ρ ins) ≡ evaluate fuel e ins
     -- ≡, not ≈: ids come from (tick, ordinal); if freshId uses the raw
     -- tick, weaken to ≈ or mint from arrival ORDINAL POSITION instead —

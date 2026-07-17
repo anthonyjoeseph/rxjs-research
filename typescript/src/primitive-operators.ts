@@ -1,10 +1,20 @@
 import { Observable } from "rxjs";
-import { InstEmit } from "./inst-emit.js";
+import { InstEmit, SourceId } from "./inst-emit.js";
 
 export declare const of: <A>(input: A[]) => Observable<InstEmit<A>>;
 export declare const empty: Observable<InstEmit<never>>;
+// The slot-telescope share (NOT default rxjs share()): all reset
+// options are false by definition. Connects the underlying once, at
+// the first subscription; never disconnects (an unobserved share keeps
+// running); latches completion forever — a post-completion subscriber
+// sees only an immediate close/complete, because completion is
+// re-observable and values are not. Emits init/close per subscriber,
+// and one upstream arrival fans out to every subscriber within the
+// same instant. `source` stamps the fan-out emits — by convention the
+// shared slot's index.
 export declare const share: <A>(
   obs: Observable<InstEmit<A>>,
+  source: SourceId,
 ) => Observable<InstEmit<A>>;
 export declare const defer: <A>(
   fn: () => Observable<InstEmit<A>>,

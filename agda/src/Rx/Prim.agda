@@ -13,7 +13,9 @@ Tick = ℕ ; Fuel = ℕ ; Ordinal = ℕ
 postulate
   Id      : Set                     -- an INSTANT (one arrival's cascade); spec groups by this
   freshId : Tick → Ordinal → Id     -- deterministic minting from arrival identity
-  Source  : Set                     -- a SOURCE observable; impl counts registrations of these
+
+Source : Set                        -- a SOURCE observable; impl counts registrations of these
+Source = ℕ                          -- concrete so the scheduler can mint & compare; the harness compares up to renaming anyway
 
 -- The protocol (v1's, with the instant id moved onto the emission).
 -- Batching is decided downstream by counting registrations, never by

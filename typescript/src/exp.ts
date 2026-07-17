@@ -60,7 +60,10 @@ export type Exp =
   | { type: "map"; ty: Ty; fn: Fn; src: Exp }
   | { type: "take"; ty: Ty; count: Tm; src: Exp } // count evaluated once, at subscription time
   | { type: "scan"; ty: Ty; fn: Fn; init: Tm; src: Exp } // fn's Θ-var 0 = pair(acc, cur)
-  | { type: "share"; ty: Ty; src: Exp }
+  // NOTE: share is NOT an Exp node — share identity is a binding, not
+  // an expression. Shared observables live in the slot telescope
+  // (prop-test's Slot) and are referenced with `input`, exactly like
+  // scripted inputs.
   | { type: "mergeAll"; ty: Ty; src: Exp }
   | { type: "concatAll"; ty: Ty; src: Exp }
   | { type: "switchAll"; ty: Ty; src: Exp }

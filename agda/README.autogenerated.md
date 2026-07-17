@@ -160,20 +160,23 @@ indexed by four contexts:
 
 | Context | Meaning                                                                               |
 | ------- | ------------------------------------------------------------------------------------- |
-| `Γ`     | external inputs (a `Vec Ty n`; `input : Fin n → …` points into the `Inputs Γ` vector) |
+| `Γ`     | program slots (a `Vec Ty n`; `input : Fin n → …` points into the `Slots Γ` telescope — scripted inputs **and** shared observables, §5.5) |
 | `Δᵍ`    | **guarded** recursion variables (bound by `μᵉ`, _not yet usable_)                     |
 | `Δ`     | **usable** recursion variables                                                        |
 | `Θ`     | value variables (bound by function terms)                                             |
 
 ### 5.1 The primitives
 
-`input`, `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ`, `scanᵉ`, `shareᵉ`, `mergeAllᵉ`,
+`input`, `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ`, `scanᵉ`, `mergeAllᵉ`,
 `concatAllᵉ`, `switchAllᵉ`, `exhaustAllᵉ`, `μᵉ`/`varᵉ`, `deferᵉ`.
 
 This set was chosen so that (nearly) all of rxjs is derivable — the claim
 being: if `batchSimultaneous` is correct on every combination of these, it is
 correct on everything built from them. Scheduling operators are out of scope;
-error handling is recovered via `+ᵗ` (Either).
+error handling is recovered via `+ᵗ` (Either). `share` is deliberately
+absent: share identity is a _binding_, not an expression, so shared
+observables live in the slot telescope (§5.5) and are referenced with
+`input`.
 
 Notable signatures:
 
@@ -247,10 +250,12 @@ merge a b     = mergeAllᵉ (ofᵉ (strmᵗ a ∷ strmᵗ b ∷ []))
 filter p      = mergeMap (λ v → if p v then of v else empty)
 completionOf s = concatAllᵉ (ofᵉ (strmᵗ (mergeMap (λ _ → emptyᵉ) s)
                                 ∷ strmᵗ (ofᵉ (unit̂ ∷ [])) ∷ []))
-takeUntil n s = let s' = shareᵉ s in
-                switchAllᵉ (merge (ofᵉ (strmᵗ s' ∷ []))
+
+-- takeUntil needs fan-out, so its source must be a SHARED SLOT (§5.5):
+-- allocate slot j = shared s, then reference it twice
+takeUntil n j = switchAllᵉ (merge (ofᵉ (strmᵗ (input j) ∷ []))
                                   (mapᵉ (strmᵗ emptyᵉ)
-                                        (takeᵉ 1 (merge n (completionOf s')))))
+                                        (takeᵉ 1 (merge n (completionOf (input j))))))
 ```
 
 `completionOf` deserves a note: the naive takeUntil (without it) hangs when
@@ -259,10 +264,67 @@ the model faithfully reproduced a real behavioral gap of the encoding rather
 than papering over it. The fix reifies "completion of s" as an emission using
 the completion machinery already in the primitive set: **take**
 (count-triggered completion) + **concatAll** (completion-triggered
-subscription) + **share** (safe fan-out). Together these make completion a
-first-class value — the load-bearing trio behind takeWhile, endWith,
-skipUntil, etc. If a derived operator ever can't be written, expect the
-deficit to be a missing `Tm` construct, not a missing primitive.
+subscription) + a **shared slot** (safe fan-out). Together these make
+completion a first-class value — the load-bearing trio behind takeWhile,
+endWith, skipUntil, etc. If a derived operator ever can't be written, expect
+the deficit to be a missing `Tm` construct, not a missing primitive.
+Derivations that share are *patterns*, elaborated per use site — each use
+allocates its own slot, exactly as each rxjs call would invoke `share()`
+afresh.
+
+### 5.5 Shared observables: the slot telescope
+
+`share` is not an `Exp` node because share identity is a **binding**, not an
+expression — `const s = src.pipe(share())` used twice is one share, while
+writing `src.pipe(share())` twice is two, and a pure tree erases exactly
+that distinction. So the program carries it structurally:
+
+```agda
+data Slot Γ t : Set where
+  scripted : ObservableInput (Val Γ t) → Slot Γ t   -- hot/cold script
+  shared   : Closed Γ t → Slot Γ t                  -- def, share() at its root
+
+Slots Γ = ∀ i → Slot Γ (lookup Γ i)
+```
+
+A program is a main expression over a slot telescope: `input i` references
+either kind of slot, and a shared def may reference only **strictly
+earlier** slots (a generator/decoder invariant, not enforced by the types —
+a forward reference diverges at connect time). The TS compile of a
+telescope is literally a chain of JS `const`s, which is the correspondence
+argument in one line.
+
+Semantics — rxjs `share` with **every reset option false** ("turn the cold
+observable hot"):
+
+- **Connect once, lazily.** The def is subscribed at its first subscriber's
+  tick (its colds anchor there); a never-referenced slot never runs.
+- **Never disconnect.** Losing all subscribers does not stop the
+  underlying — an unobserved share still burns arrivals (observable through
+  fuel).
+- **Latch completion forever.** A post-completion subscriber gets an
+  immediate close/complete and no values — unlike default rxjs `share()`,
+  whose `resetOnComplete: true` re-runs the source for each late
+  subscriber (`share(of(1,2,3))` replays per subscriber there; here it
+  latches).
+- **Fan-out is the counting protocol.** The share is a `Source` whose id is
+  its slot index (the hots' convention); one upstream arrival yields one
+  emit per registration, all in the same instant. The diamond problem is
+  this clause.
+
+Why all-resets-false is the primitive: the resets are not derivable from it
+(recovering `resetOnComplete: true` needs a fresh *shared* identity minted
+per reset at runtime — cache territory, `shareReplay`'s family), while
+nothing derivable needs them. The one bit of runtime history a late
+subscriber can read is the completion latch — **completion is
+re-observable, values are not** — and that bit is precisely what the
+completion-driven derivations (takeUntil & co.) consume.
+
+The expressiveness boundary, stated consciously: the telescope expresses
+every behavior whose **share-instance count is statically known** — one
+slot per use site. Out of scope: a fresh share per runtime instantiation
+(per-`mergeMap`-lambda invocation, per-μ-unfolding). Derived operators that
+share are therefore top-level patterns, not first-class operators.
 
 ---
 
@@ -271,7 +333,7 @@ deficit to be a missing `Tm` construct, not a missing primitive.
 There is **one** evaluator:
 
 ```agda
-evaluate : Fuel → Closed Γ t → Inputs Γ → Stream Γ t
+evaluate : Fuel → Closed Γ t → Slots Γ → Stream Γ t
 ```
 
 producing the flat **canonical stream** — the single sequence of `InstEmit`s
@@ -280,7 +342,7 @@ that both the spec and the impl of batchSimultaneous consume.
 ### 6.1 The driver loop
 
 ```
-sched := sched-init e ins            -- hots registered at anchor 0
+sched := sched-init e ins            -- hots at anchor 0; shares connect lazily
 repeat fuel times:
   arrival := sched-next sched        -- min by (tick, ordinal)
   run arrival's cascade to quiescence
@@ -308,17 +370,21 @@ type LiveSource<A> = { ordinal: number; pending: [number /*abs tick*/, A][] };
 ```
 
 ```agda
-subscribeE : Closed Γ u → Id → Tick → Sched Γ → EvalSt e
+subscribeE : Closed Γ u → Path Γ u t → Id → Tick → Sched Γ → EvalSt e
            → Stream Γ u × Sched Γ × EvalSt e
 ```
 
 Called by evaluator clauses that subscribe things (`*All`s on inner arrival,
-`deferᵉ`, μ-unfolding). It: fires the cold's **sync burst immediately, inside
-the given cascade id** (id-inheritance is literally this argument being
-reused); resolves the cold's deltas to **absolute** ticks anchored at the
-current tick; registers the async future in `Sched` under a **fresh ordinal
-(subscription order)**; initializes the node states. `deferᵉ` bodies register
-at `tick + 1`.
+`deferᵉ`, μ-unfolding, share connects). The `Path` is the rootward
+continuation registered for every source the subtree contains: a chain
+either reaches the `root` or ends at a `share-sink` — delivery to a shared
+slot, which fans out to that slot's registered chains within the same
+instant (`dispatchShare`). It: fires the cold's **sync burst immediately,
+inside the given cascade id** (id-inheritance is literally this argument
+being reused); resolves the cold's deltas to **absolute** ticks anchored at
+the current tick; registers the async future in `Sched` under a **fresh
+ordinal (subscription order)**; initializes the node states. `deferᵉ` bodies
+register at `tick + 1`.
 
 **Arbitration** — the single discipline both languages must share: arrivals
 are totally ordered by `(tick, ordinal, position-within-source)`; Γ-sources
@@ -436,7 +502,7 @@ Stated against `evaluate`; proven where cheap, differentially tested always:
 | Theorem             | Statement (informally)                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `fuel-coherent`     | more fuel only extends the stream (prefix)                                                                      |
-| `causality`         | inputs agreeing before tick k ⇒ outputs agreeing before tick k (no clairvoyance)                                |
+| `causality`         | scripted slots agreeing before tick k (shared defs equal) ⇒ outputs agreeing before tick k (no clairvoyance)    |
 | `locality`          | each node's next state factors through _its_ inbox + _its_ state                                                |
 | `non-interference`  | perturbing other nodes' states can't reach node v except via emissions actually delivered to v                  |
 | `μ-unfold`          | one μ-unfolding changes nothing observable (fixpoint law — also a free differential test vs TS thunk recursion) |
@@ -485,7 +551,8 @@ untrusted gap is exactly one link.
 
 Components:
 
-1. **One generator** (TypeScript): seed → PRNG → `Exp` tree + `ObservableInput`s.
+1. **One generator** (TypeScript): seed → PRNG → `Exp` tree + slot telescope
+   (`ObservableInput` scripts and shared defs).
    Pass _serialized artifacts_ to Agda, not seeds — then Agda needs no PRNG,
    "same inputs" holds trivially, and failures arrive already in shrinkable,
    regression-corpus JSON form. Make the generator emit μ/`varᵉ` at various

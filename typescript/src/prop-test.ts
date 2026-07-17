@@ -1,6 +1,7 @@
 import { Observable } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
 import { InstEmit } from "./inst-emit.js";
+import { share } from "./primitive-operators.js";
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -26,16 +27,28 @@ export type ObservableInputHot<A> = {
 
 export type ObservableInput<A> = ObservableInputCold<A> | ObservableInputHot<A>;
 
-export type Inputs = ObservableInput<Val>[]; // one per Γ slot, index-aligned
+// Agda: Rx.Evaluator.Slot. Slot i of Γ is either an external scripted
+// input or a SHARED observable — an exp tree with an implicit
+// all-resets-false share() at its root. Share identity is the de
+// Bruijn index: the binding, not the expression, exactly as a JS
+// `const`. Shared defs may reference only strictly earlier slots (a
+// const telescope) — generator invariant, re-checked by the Agda
+// decoder alongside well-typedness and μ-guardedness.
+export type Slot =
+  | { type: "scripted"; input: ObservableInput<Val> }
+  | { type: "shared"; def: Closed };
+
+export type Slots = Slot[]; // one per Γ slot, index-aligned
+
 export type Stream = InstEmit<Val>[]; // the flat canonical stream
 export type Grouped = InstEmit<Val[]>[]; // batchSimultaneous's output: one emit per instant, still a protocol citizen (re-batchable)
 
 // The serializable unit of differential testing: a whole program.
-// ctx is Γ — the types of the input slots, index-aligned with inputs.
+// ctx is Γ — the types of the slots, index-aligned with slots.
 export type TestCase = {
   ctx: Ty[];
   exp: Closed;
-  inputs: Inputs;
+  slots: Slots;
   fuel: Fuel;
 };
 
@@ -82,9 +95,20 @@ declare const compile: (
 
 const evaluateRx = async (testCase: TestCase): Promise<Stream> => {
   const driver = createDriver();
-  const inputs = testCase.inputs.map((input) => makeInputSource(driver, input));
+  // the const telescope, literally: each shared slot compiles against
+  // the prefix of already-built slots and connects through the
+  // protocol share (all resets false; source id = slot index)
+  const slotSources = testCase.slots.reduce<Observable<InstEmit<Val>>[]>(
+    (prefix, slot, index) => [
+      ...prefix,
+      slot.type === "scripted"
+        ? makeInputSource(driver, slot.input)
+        : share(compile(slot.def, driver, prefix), index),
+    ],
+    [],
+  );
   const out: Stream = [];
-  const sub = compile(testCase.exp, driver, inputs).subscribe((emit) => out.push(emit));
+  const sub = compile(testCase.exp, driver, slotSources).subscribe((emit) => out.push(emit));
   // subscribing already ran the root sync burst — fuel pays only for arrivals
   for (let spent = 0; spent < testCase.fuel; spent++) {
     if (!driver.deliverNextArrival()) break;

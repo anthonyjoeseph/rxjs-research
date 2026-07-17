@@ -46,7 +46,10 @@ mutual
                  -- count is a term: evaluated once, at subscription time
     scanᵉ      : ∀ {s t} → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t → Tm Γ Δᵍ Δ Θ t
                → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
-    shareᵉ     : ∀ {t} → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
+               -- NOTE: share is NOT an Exp primitive — share identity is a
+               -- binding, not an expression.  Shared observables live in the
+               -- slot telescope (Rx.Evaluator.Slot) and are referenced with
+               -- `input`, exactly like scripted inputs
     mergeAllᵉ concatAllᵉ switchAllᵉ exhaustAllᵉ :
                  ∀ {t} → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
     μᵉ         : ∀ {t} → Exp Γ (t ∷ Δᵍ) Δ Θ t → Exp Γ Δᵍ Δ Θ t
