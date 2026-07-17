@@ -2,6 +2,9 @@ import { Observable } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
 import { InstEmit } from "./inst-emit.js";
 import { share } from "./primitive-operators.js";
+import { createDriver } from "./driver.js";
+import { makeInputSource } from "./input-source.js";
+import { compile } from "./compile.js";
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -65,33 +68,9 @@ declare const execAgda: (
   serialized: string[],
 ) => Promise<Stream[]>; // one long-lived process, JSON over stdio — not a spawn per case
 
-// The Driver owns virtual time on the rx leg: one queue of pending
-// deliveries keyed (tick, ordinal) — async input values AND defer-node
-// hops — plus the current cascade id, which cold sync bursts inherit.
-export type Driver = {
-  // pop the min (tick, ordinal) delivery, mint its fresh id, run its
-  // cascade synchronously to quiescence; false when the queue is empty
-  deliverNextArrival: () => boolean;
-};
-
-declare const createDriver: () => Driver;
-
-// hot: one Subject, async values registered at absolute ticks up
-// front; cold: a defer factory — sync burst fires in the subscriber's
-// instant, async values register relative to each subscription's tick
-declare const makeInputSource: (
-  driver: Driver,
-  input: ObservableInput<Val>,
-) => Observable<InstEmit<Val>>;
-
-// the per-node switch delegating to the primitive-operators:
-// evalTm/applyFn for of/map/scan/take, unfoldMu + a driver hop for
-// mu/defer
-declare const compile: (
-  exp: Closed,
-  driver: Driver,
-  inputs: Observable<InstEmit<Val>>[],
-) => Observable<InstEmit<Val>>;
+// createDriver (virtual time, the one impure edge), makeInputSource
+// (scripted slots → protocol streams), and compile (the per-node
+// switch onto the primitive-operators) live in their own modules.
 
 const evaluateRx = async (testCase: TestCase): Promise<Stream> => {
   const driver = createDriver();

@@ -11,7 +11,11 @@ export declare const empty: Observable<InstEmit<never>>;
 // re-observable and values are not. Emits init/close per subscriber,
 // and one upstream arrival fans out to every subscriber within the
 // same instant. `source` stamps the fan-out emits — by convention the
-// shared slot's index.
+// shared slot's index. The latch must flip BEFORE the final delivery
+// fans out (as a Subject closes before delivering its completion, and
+// as the Agda dispatchShare latches before its fan-out): a subscriber
+// joining mid-final-cascade already gets the one-shot
+// init/close/complete, never a registration dropped without its close.
 export declare const share: <A>(
   obs: Observable<InstEmit<A>>,
   source: SourceId,

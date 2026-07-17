@@ -254,7 +254,10 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
   field registry        : List (Source × Chain Γ t)   -- live registration chains, subscription order
         nodes           : NodeSt e
         connectedShares : List Source   -- shared slots whose def is live (connect happens once, ever)
-        completedShares : List Source   -- the latch: completion is re-observable, values are not
+        completedSources : List Source  -- the completion latch: completed shares AND spent
+                                        -- scripted sources (a completed Subject re-delivers
+                                        -- complete to late subscribers; values are not
+                                        -- re-observable, completion is)
 
 mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
 mintSource sched =
@@ -313,7 +316,7 @@ subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
 st-init e = record { registry = [] ; nodes = []
-                   ; connectedShares = [] ; completedShares = [] }
+                   ; connectedShares = [] ; completedSources = [] }
   -- all populated by the root subscribeE and by lazy share connects
 
 -- the arrival's source's live chains, in subscription order, at
@@ -659,7 +662,7 @@ subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                     → Sched Γ → EvalSt e
                     → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
 subscribeSharedSlot {Γ = Γ} {e = e} i d κ id now sched st =
-  if memberSource (toℕ i) (EvalSt.completedShares st)
+  if memberSource (toℕ i) (EvalSt.completedSources st)
   then ((init (toℕ i) ∷ close (toℕ i) ∷ complete ∷ []) at id from toℕ i) ∷ []
        , sched , st
   else if memberSource (toℕ i) (EvalSt.connectedShares st)
@@ -680,15 +683,20 @@ subscribeSharedSlot {Γ = Γ} {e = e} i d κ id now sched st =
             (((init (toℕ i) ∷ close (toℕ i) ∷ []) at id from toℕ i) ∷ burst)
             , sched₁ ,
             record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
-                       ; completedShares = toℕ i ∷ EvalSt.completedShares st₂ }
+                       ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
        else ((init (toℕ i) ∷ []) at id from toℕ i) ∷ burst , sched₁ , st₂
 
 subscribeE {Γ = Γ} (input i) κ id now sched st with Sched.slots sched i
 ... | shared d = subscribeSharedSlot i d κ id now sched st
 ... | scripted (hot _) =
-      -- already live (sched-init, source = ordinal = toℕ i); just
-      -- another registration — fan-out IS this multiplicity
-      ((init (toℕ i) ∷ []) at id from toℕ i) ∷ [] , sched , register (toℕ i) κ st
+      if memberSource (toℕ i) (EvalSt.completedSources st)
+      then -- spent script: a completed Subject — immediate
+           -- close/complete, nothing registered
+           ((init (toℕ i) ∷ close (toℕ i) ∷ complete ∷ []) at id from toℕ i) ∷ []
+           , sched , st
+      else -- already live (sched-init, source = ordinal = toℕ i); just
+           -- another registration — fan-out IS this multiplicity
+           ((init (toℕ i) ∷ []) at id from toℕ i) ∷ [] , sched , register (toℕ i) κ st
 ... | scripted (cold sync []) =
       let (burst , sched₁) = oneShotBurst sync id sched
       in burst , sched₁ , st
@@ -812,11 +820,20 @@ foldPath id now envSrc (f ↠ path′) vals evs fin sched st =
 
 -- deliver to the chains of share i, one emit per registration from
 -- source toℕ i (the share's owed count), in subscription order.  A
--- completing def (fin) closes every registration, latches the share,
--- and lets the sweep collect whatever it kept alive
+-- completing def (fin) latches the share BEFORE the fan-out — as a
+-- Subject closes before delivering its completion — so a subscriber
+-- joining mid-dispatch already sees the one-shot close/complete and
+-- never registers only to be dropped silently; then every snapshot
+-- registration closes and the sweep collects whatever the share kept
+-- alive
 dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
-  finish fin (go (admit (EvalSt.registry st)) sched st)
+  finish fin (go (admit (EvalSt.registry st)) sched (latch fin st))
   where
+  latch : Bool → EvalSt e → EvalSt e
+  latch false st₀ = st₀
+  latch true  st₀ =
+    record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀ }
+
   admit : List (Source × Chain Γ t) → List (Path Γ (lookup Γ i) t)
   admit [] = []
   admit ((s , (u , p)) ∷ r) with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
@@ -840,8 +857,7 @@ dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
     let kept = dropSource (toℕ i) (EvalSt.registry st′)
     in emits ,
        record sched′ { live = sweepLive kept (Sched.live sched′) } ,
-       record st′ { registry = kept
-                  ; completedShares = toℕ i ∷ EvalSt.completedShares st′ }
+       record st′ { registry = kept }
 
 -- seed one arrival into one chain: the value, plus fin and this
 -- registration's close when the source is spent (isLast)
@@ -860,8 +876,22 @@ chainStep id a path sched st =
 cascade : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Arrival Γ → Id → Sched Γ → EvalSt e
         → Stream Γ t × Sched Γ × EvalSt e
-cascade {Γ = Γ} {t = t} {e = e} a id sched st = finish (go (chainsOf a st) sched st)
+cascade {Γ = Γ} {t = t} {e = e} a id sched st =
+  finish (go (chainsOf a st) sched (latch st))
   where
+  -- a spent source (final scripted value) is latched completed BEFORE
+  -- its last delivery fans out — as a Subject closes before delivering
+  -- its completion — so a subscriber joining mid-cascade already sees
+  -- the one-shot close/complete and never registers only to be
+  -- dropped silently at finish.  Colds and deferᵉ hops get latched
+  -- too, harmlessly: their sources are per-subscription, never
+  -- re-subscribed
+  latch : EvalSt e → EvalSt e
+  latch st₀ =
+    if Arrival.isLast a
+    then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
+    else st₀
+
   go : List (Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   go []           sched₀ st₀ = [] , sched₀ , st₀
   go (c ∷ chains) sched₀ st₀ =
@@ -869,9 +899,9 @@ cascade {Γ = Γ} {t = t} {e = e} a id sched st = finish (go (chainsOf a st) sch
         (rest  , sched₂ , st₂) = go chains sched₁ st₁
     in emits ++ rest , sched₂ , st₂
 
-  -- a source that delivered its final scripted value is spent: drop
-  -- its registrations (each chain already carried its own close) and
-  -- let the sweep collect its live entry
+  -- the spent source's registrations drop at the end (each snapshot
+  -- chain already carried its own close) and the sweep collects its
+  -- live entry
   finish : Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   finish (emits , sched′ , st′) with Arrival.isLast a
   ... | false = emits , sched′ , st′
