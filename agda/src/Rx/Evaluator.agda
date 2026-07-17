@@ -1,14 +1,16 @@
 module Rx.Evaluator where
 
+open import Data.Bool    using (Bool; if_then_else_)
 open import Data.Nat     using (zero; suc)
-open import Data.List    using (List; []; _∷_; _++_)
+open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Vec     using (lookup)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (Σ; _×_; _,_)
 open import Data.Unit    using (⊤)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 
-open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; InstEmit; ObservableInput)
-open import Rx.Exp  using (Ty; Ctx; Val; Closed)
+open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; Source;
+                           InstEvent; value; InstEmit; _at_from_; ObservableInput)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; Ctx; Val; Closed; Fn)
 
 
 ------------------------------------------------------------------
@@ -46,7 +48,52 @@ postulate
   -- inner, merge on outer next, μ/defer unfolding, …).  Returns the
   -- sync burst — processed NOW, inside cascade `Id` (id-inheritance) —
   -- plus the schedule extended with the source's async future.
-  EvalSt     : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set   -- all node states
+  arrSource : ∀ {n} {Γ : Ctx n} → Arrival Γ → Source
+  arrVal    : ∀ {n} {Γ : Ctx n} → Arrival Γ → (s : Ty) → Val Γ s
+    -- the payload, read at the chain's source element type.  Totality
+    -- is a fiction: it is exact only because the registry invariant
+    -- pairs a source only with chains rooted at its element type —
+    -- the eventual EvalSt well-formedness predicate carries this
+
+  sameSource : Source → Source → Bool
+  NodeId     : Set                                        -- a node instance in the dynamic topology
+  NodeSt     : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set   -- its operator states (scan accs, take counters, *All actives/queues)
+
+------------------------------------------------------------------
+-- Registration chains: the dynamic topology, rootward
+------------------------------------------------------------------
+
+data AllOp : Set where
+  merge concat switch exhaust : AllOp
+
+-- one operator the emission passes through, rootward.  shareᵉ and
+-- deferᵉ contribute NO frame: share is counting-transparent (its
+-- fan-out is registry multiplicity, one chain per subscriber) and
+-- defer merely relays its body
+data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
+  map-f      : ∀ {s u} → Fn Γ [] [] [] s u → Frame Γ s u
+  scan-f     : ∀ {s u} → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId → Frame Γ s u
+  take-f     : ∀ {s} → NodeId → Frame Γ s s
+  from-inner : ∀ {s} → AllOp → NodeId → Frame Γ s s        -- exiting a subscribed inner
+  thru-outer : ∀ {u} → AllOp → NodeId → Frame Γ (obs u) u  -- the value IS an inner obs: consumed, subscribed, burst grafted
+
+data Path {n} (Γ : Ctx n) : Ty → Ty → Set where   -- source element type → root type
+  root : ∀ {t} → Path Γ t t
+  _↠_  : ∀ {s u t} → Frame Γ s u → Path Γ u t → Path Γ s t
+
+Chain : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
+Chain {Γ = Γ} {t = t} e = Σ Ty (λ s → Path Γ s t)
+
+record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
+  field registry : List (Source × Chain e)   -- live registration chains, subscription order
+        nodes    : NodeSt e
+
+postulate
+  -- richer subscribe: called by evaluator clauses (switchAll on a new
+  -- inner, merge on outer next, μ/defer unfolding, …).  Returns the
+  -- sync burst — processed NOW, inside cascade `Id` (id-inheritance) —
+  -- plus the schedule extended with the source's async future, plus
+  -- the state extended with the new registrations
   subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
              → Closed Γ u → Id → Tick
              → Sched Γ → EvalSt e
@@ -54,22 +101,42 @@ postulate
 
   st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
 
-  -- a live registration chain: one path from the arrival's source
-  -- rootward through the dynamic topology (which lives in EvalSt);
-  -- chainsOf lists them in subscription order
-  Chain    : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
-  chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-           → Arrival Γ → EvalSt e → List (Chain e)
+  -- the per-frame meat: map-f/scan-f/take-f do value work (take-f may
+  -- CUT — emit close events, drop registrations, forward no values);
+  -- thru-outer consumes each inner obs, subscribes it via subscribeE,
+  -- and grafts its sync burst into the forwarded values; async futures
+  -- are registered on the Sched.  Termination inside a frame is
+  -- structural (finite bursts, μ behind deferᵉ), so no gas appears
+  stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+            → Id → Frame Γ s u → List (Val Γ s) → Sched Γ → EvalSt e
+            → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
 
-  -- the per-chain meat: transforms the arrival's value along the
-  -- chain's operator path rootward, COALESCING spawned inners' sync
-  -- bursts (via subscribeE — μ-unfolding, deferᵉ bodies, *All inners)
-  -- into the ONE outgoing emit; updates node states; registers async
-  -- futures.  Termination is structural (rootward propagation, finite
-  -- bursts, μ behind deferᵉ), so no gas appears here
-  chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-            → Id → Arrival Γ → Chain e → Sched Γ → EvalSt e
-            → InstEmit (Val Γ t) × Sched Γ × EvalSt e
+-- the arrival's source's live chains, in subscription order
+chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+         → Arrival Γ → EvalSt e → List (Chain e)
+chainsOf {e = e} a st = go (EvalSt.registry st)
+  where
+  go : List (Source × Chain e) → List (Chain e)
+  go []             = []
+  go ((s , c) ∷ r) = if sameSource (arrSource a) s then c ∷ go r else go r
+
+-- one chain, ONE emit: fold the arrival's value rootward through the
+-- frames, accumulating protocol events; a cut mid-path leaves the fold
+-- running on an empty value list, so the emit is emptied, never
+-- swallowed.  The envelope is assembled here and nowhere else
+chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+          → Id → Arrival Γ → Chain e → Sched Γ → EvalSt e
+          → InstEmit (Val Γ t) × Sched Γ × EvalSt e
+chainStep {Γ = Γ} {t = t} {e = e} id a (s , path) sched st =
+  go path (arrVal a s ∷ []) [] sched st
+  where
+  go : ∀ {u} → Path Γ u t → List (Val Γ u) → List (InstEvent (Val Γ t))
+     → Sched Γ → EvalSt e → InstEmit (Val Γ t) × Sched Γ × EvalSt e
+  go root         vals evs sched st =
+    ((evs ++ map value vals) at id from arrSource a) , sched , st
+  go (f ↠ path′) vals evs sched st =
+    let (vals′ , evs′ , sched′ , st′) = stepFrame id f vals sched st
+    in go path′ vals′ (evs ++ evs′) sched′ st′
 
 -- one arrival, count(source) emits: every live registration chain of
 -- the arrival's source forwards EXACTLY ONE emit (possibly valueless),
