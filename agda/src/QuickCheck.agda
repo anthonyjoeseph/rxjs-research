@@ -17,7 +17,8 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Char using (Char; toℕ)
 open import Data.Fin using (Fin; zero; suc)
 open import Data.List using (List; []; _∷_; map; length)
-open import Data.Maybe using (Maybe; just; nothing; maybe′)
+                      renaming (_++_ to _++ᴸ_)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_×_; _,_; proj₁)
@@ -36,6 +37,7 @@ open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp;
                           nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ;
                           add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Rx.Evaluator using (evaluate; Slot; scripted; shared; Slots)
+open import Rx.Protocol using (wellFormed?)
 open import Implementation using (impl-batchSimultaneous)
 open import Spec using (spec-batchSimultaneous)
 open import CLI.IO
@@ -241,6 +243,26 @@ showBatched : List (InstEmit (List ℕ)) → String
 showBatched []       = "·"
 showBatched (e ∷ es) = showEmit e ++ " " ++ showBatched es
 
+-- same, for the RAW canonical stream (values are bare ℕ)
+private
+  showEventR : InstEvent ℕ → String
+  showEventR (init s)    = "i" ++ show s
+  showEventR (value v)   = "v" ++ show v
+  showEventR (close s _) = "c" ++ show s
+  showEventR (handoff s) = "h" ++ show s
+  showEventR complete    = "F"
+
+  showEventsR : List (InstEvent ℕ) → String
+  showEventsR []       = ""
+  showEventsR (e ∷ es) = showEventR e ++ " " ++ showEventsR es
+
+  showEmitR : InstEmit ℕ → String
+  showEmitR (es at i from s as _) = "@" ++ show i ++ "{" ++ showEventsR es ++ "}"
+
+showStream : List (InstEmit ℕ) → String
+showStream []       = "·"
+showStream (e ∷ es) = showEmitR e ++ " " ++ showStream es
+
 ------------------------------------------------------------------------
 -- render a generated program back to Agda source (a paste-ready block for
 -- the Unit-Test cache). Faithful over the fragment the generator emits;
@@ -327,18 +349,33 @@ report e ins impl spec =
        ++ showExp e ++ "\n          " ++ showSlots ins
        ++ "\n_ = refl\n-- PASTE>>>\n"
 
-oneCase : ℕ → Gen (Maybe String)
+-- a WellFormed violation of the evaluator's raw output. The {- WF -}
+-- prefix keeps this block's dedup key (line 2, the program line)
+-- distinct from the Agree block of the same program.
+reportWF : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → List (InstEmit ℕ) → String
+reportWF e ins s =
+  "  WF-FAIL\n    stream = " ++ showStream s
+       ++ "\n-- <<<PASTE\n_ : WellFormedOutput " ++ show FUEL
+       ++ "\n          {- WF -} " ++ showExp e ++ "\n          " ++ showSlots ins
+       ++ "\n_ = refl\n-- PASTE>>>\n"
+
+-- both checks on one generated program: impl ≡ spec on the batched
+-- stream, AND the raw stream satisfies the protocol automaton
+-- (evaluate-well-formed, sampled)
+oneCase : ℕ → Gen (List String)
 oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
   let s    = evaluate FUEL e ins
       impl = impl-batchSimultaneous s
       spec = spec-batchSimultaneous s
-  in pureG (if eqBatched impl spec then nothing else just (report e ins impl spec))
+      agreeFails = if eqBatched impl spec then [] else report e ins impl spec ∷ []
+      wfFails    = if wellFormed? s then [] else reportWF e ins s ∷ []
+  in pureG (agreeFails ++ᴸ wfFails)
 
--- accumulate EVERY failing case's report, in generation order
+-- accumulate EVERY failing case's reports, in generation order
 runN : ℕ → ℕ → Gen (List String)
 runN zero    d = pureG []
-runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
-  pureG (maybe′ (λ x → x ∷ acc) acc r)
+runN (suc k) d = oneCase d >>=G λ rs → runN k d >>=G λ acc →
+  pureG (rs ++ᴸ acc)
 
 ------------------------------------------------------------------------
 -- stdin parsing: "SEED [RUNS] [DEPTH]"

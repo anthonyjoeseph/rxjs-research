@@ -189,3 +189,12 @@ data Accepted {A : Set} : Maybe A → Set where
 
 WellFormed : ∀ {A : Set} → List (InstEmit A) → Set
 WellFormed xs = Accepted (checkFinal (runProtocol protocol-init xs))
+
+-- the Bool twin, for the QuickCheck harness: computes the same
+-- acceptance the Accepted proof witnesses
+accepts? : {A : Set} → Maybe A → Bool
+accepts? nothing  = false
+accepts? (just _) = true
+
+wellFormed? : ∀ {A : Set} → List (InstEmit A) → Bool
+wellFormed? xs = accepts? (checkFinal (runProtocol protocol-init xs))

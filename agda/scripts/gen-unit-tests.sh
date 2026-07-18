@@ -13,6 +13,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# tolerate the whole range arriving as ONE quoted argument ("301 400 200 6")
+# — Task's {{.CLI_ARGS}} and shell quoting both produce that shape
+if [[ $# -eq 1 && "$1" == *" "* ]]; then
+  # shellcheck disable=SC2086
+  set -- $1
+fi
+
 FIRST="${1:-1}"
 LAST="${2:-300}"
 RUNS="${3:-200}"

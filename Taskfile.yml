@@ -69,14 +69,15 @@ tasks:
     dir: agda
     deps: [qc-build]
     desc: >-
-      All-Agda QuickCheck: sweep seeds, evaluate each program, run its stream
-      through impl- AND spec-batchSimultaneous, PRINT every mismatch, and append
-      each new distinct failing program to Implementation/Unit-Test.agda.
-    # Args are "FIRST LAST RUNS DEPTH" (a seed RANGE; defaults "1 300 200 4").
+      All-Agda QuickCheck: sweep seeds, evaluate each program, check the raw
+      stream is WellFormed (Rx.Protocol) AND that impl- ≡ spec-batchSimultaneous
+      on it, PRINT every mismatch, and append each new distinct failing program
+      to Implementation/Unit-Test.agda.
+    # Args are FIRST LAST RUNS DEPTH (a seed RANGE; defaults 1 300 200 4).
     # Each seed expands into RUNS random programs of nesting ≤ DEPTH.
-    #   task quickcheck                       seeds 1..300, 200 runs each
-    #   task quickcheck -- "42 42"            ONE seed (42), 200 runs, depth 4
-    #   task quickcheck -- "1 500 300 5"      seeds 1..500, 300 runs, depth 5
+    #   task quickcheck                     seeds 1..300, 200 runs each
+    #   task quickcheck -- 42 42            ONE seed (42), 200 runs, depth 4
+    #   task quickcheck -- 1 500 300 5      seeds 1..500, 300 runs, depth 5
     # The Unit-Test.agda cache is append-only and deduped: passing when there
     # is no known counterexample, so a clean sweep appends nothing.
     cmds:
