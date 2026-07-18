@@ -5,6 +5,8 @@ import { materializeCompletion, share } from "./primitive-operators.js";
 import { createDriver } from "./driver.js";
 import { makeInputSource } from "./input-source.js";
 import { compile } from "./compile.js";
+import { genSeeds, genTestCases } from "./generator.js";
+import { serialize } from "./serialize.js";
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -55,14 +57,12 @@ export type TestCase = {
   fuel: Fuel;
 };
 
-declare const readOperatorFromCli: () => string | undefined; // generator bias: which operator to feature at/near the root
+// generator bias (which operator to feature at/near the root) and the
+// chosen seed; the CLI readers and the Agda bridge (execAgda) are still
+// stubs — the seeded generator and the corpus encoder now live in
+// generator.ts / serialize.ts
+declare const readOperatorFromCli: () => string | undefined;
 declare const readSeedFromCli: () => string | undefined;
-declare const genSeeds: () => string[];
-declare const genTestCases: (seed: string, operator?: string) => TestCase[];
-
-// JSON — also the regression-corpus format. Agda decodes it, re-checks
-// well-typedness and μ-guardedness, then evaluates.
-declare const serialize: (testCase: TestCase) => string;
 
 declare const execAgda: (
   serialized: string[],
