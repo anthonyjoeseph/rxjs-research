@@ -29,14 +29,24 @@ for s in $(seq "$FIRST" "$LAST"); do
     || { printf '\r  seed %s (err, skipped) ' "$s" >&2; continue; }
   echo "$out" | grep -q '<<<PASTE' \
     || { printf '\r  seed %s ok            ' "$s" >&2; continue; }
-  block="$(echo "$out" | sed -n '/<<<PASTE/,/PASTE>>>/p' | sed '1d;$d')"
-  prog="$(echo "$block" | sed -n '2p')"          # the program line is the dedup key
-  if grep -qF "$prog" "$OUT"; then
-    printf '\r  seed %s FAIL (already cached) ' "$s" >&2; continue
-  fi
-  { echo; echo "-- seed $s"; echo "$block"; } >> "$OUT"
-  added=$((added+1))
-  printf '\r  seed %s FAIL — appended (#%s)  \n' "$s" "$added" >&2
+
+  # a run may report MANY failing programs; carve out each PASTE block
+  # (lines strictly between the markers) into its own temp file
+  tmpd="$(mktemp -d)"
+  echo "$out" | awk -v d="$tmpd" '
+    /<<<PASTE/  { n++; inblk=1; fn=sprintf("%s/blk%04d", d, n); next }
+    /PASTE>>>/  { inblk=0; next }
+    inblk       { print > fn }
+  '
+  for f in "$tmpd"/blk*; do
+    [ -e "$f" ] || continue
+    prog="$(sed -n '2p' "$f")"                   # the program line is the dedup key
+    if grep -qF "$prog" "$OUT"; then continue; fi # skip cached (or just-appended) dupes
+    { echo; echo "-- seed $s"; cat "$f"; } >> "$OUT"
+    added=$((added+1))
+    printf '\r  seed %s FAIL — appended (#%s)  \n' "$s" "$added" >&2
+  done
+  rm -rf "$tmpd"
 done
 printf '\r%*s\r' 40 '' >&2
 echo "appended $added new distinct failing programs to $OUT" >&2

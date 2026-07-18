@@ -16,11 +16,11 @@ module QuickCheck where
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Char using (Char; toℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map; length)
 open import Data.Maybe using (Maybe; just; nothing; maybe′)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Data.String using (String; _++_; toList)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -334,11 +334,11 @@ oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
       spec = spec-batchSimultaneous s
   in pureG (if eqBatched impl spec then nothing else just (report e ins impl spec))
 
-runN : ℕ → ℕ → Gen (ℕ × Maybe String)
-runN zero    d = pureG (0 , nothing)
+-- accumulate EVERY failing case's report, in generation order
+runN : ℕ → ℕ → Gen (List String)
+runN zero    d = pureG []
 runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
-  pureG (maybe′ (λ _ → suc (proj₁ acc)) (proj₁ acc) r
-        , maybe′ just (proj₂ acc) r)
+  pureG (maybe′ (λ x → x ∷ acc) acc r)
 
 ------------------------------------------------------------------------
 -- stdin parsing: "SEED [RUNS] [DEPTH]"
@@ -375,14 +375,21 @@ numAt n def cs with dropSep (tailAfter n cs)
 ... | []         = def
 ... | ds@(_ ∷ _) = parseNat ds
 
+-- every failing case's paste block, concatenated (each is self-delimited
+-- by its own <<<PASTE / PASTE>>> markers, so gen-unit-tests.sh can split
+-- them); "(all agree)" when the run turned up nothing
+dumpFails : List String → String
+dumpFails []       = "  (all agree)\n"
+dumpFails (f ∷ fs) = concatStr (f ∷ fs)
+
 main : IO Unit
 main = getContents >>= λ s →
-  let cs   = toCodes s
-      seed = parseNat cs
-      runs = numAt 1 200 cs
-      d    = numAt 2 4 cs
-      res  = proj₁ (runN runs d (randList seed 2000000))
+  let cs    = toCodes s
+      seed  = parseNat cs
+      runs  = numAt 1 200 cs
+      d     = numAt 2 4 cs
+      fails = proj₁ (runN runs d (randList seed 2000000))
   in putStr (concatStr
        ( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
-       ∷ " cases, " ∷ show (proj₁ res) ∷ " failures\n"
-       ∷ maybe′ (λ r → r) "  (all agree)\n" (proj₂ res) ∷ []))
+       ∷ " cases, " ∷ show (length fails) ∷ " failures\n"
+       ∷ dumpFails fails ∷ []))
