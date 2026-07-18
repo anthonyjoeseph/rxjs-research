@@ -1,26 +1,42 @@
 -- The batch CLI: read NDJSON from stdin (one serialized TestCase per
 -- line, in order), process each, print one JSON result line in the same
--- order. (Decode/evaluate/encode land incrementally; this stage
--- validates the pipe by echoing `null` per case.)
+-- order.
+--
+-- Pipeline status: stdin → JSON parse (CLI.JSON) → [decode → evaluate] →
+-- encode (CLI.Encode) → stdout. The parse and encode halves are wired
+-- and exercised here. The middle — decode (JSON → intrinsically-typed
+-- Closed) and evaluate — is gated on discharging the Agda evaluator's
+-- runtime postulates (freshId, evalTm, applyFn, unfoldμ, _≟ᵗ_, and a
+-- concrete PrimOp); MAlonzo compiles a postulate to a runtime error, so
+-- `evaluate` cannot run until they are defined. Until then a parseable
+-- case emits an empty stream `[]`, an unparseable one `null`.
 module CLI.Main where
 
 open import Data.Char using (Char; toℕ)
-open import Data.List using (List; []; _∷_; map; _++_)
+open import Data.List using (List; []; _∷_; map)
+open import Data.Maybe using (Maybe; just; nothing; maybe)
 open import Data.Nat using (ℕ; _≡ᵇ_)
-open import Data.String using (String; toList; fromList; fromChar)
+open import Data.String using (String; toList; fromChar; _++_)
 open import Data.Bool using (if_then_else_)
+open import Data.Vec using ([])
 
+open import Rx.Exp using (natᵗ)
 open import CLI.IO
+open import CLI.JSON using (parseJSON)
+open import CLI.Encode using (encodeStream)
+
+toCodes : List Char → List ℕ
+toCodes = map toℕ
 
 -- one input line → one output line
 process : List Char → String
-process _ = "null"
+process line =
+  maybe (λ _ → encodeStream {Γ = []} natᵗ []) "null" (parseJSON (toCodes line))
 
 private
   nl : Char
   nl = '\n'
 
-  -- split on '\n' into lines (as Char lists)
   splitLines : List Char → List (List Char)
   splitLines []       = [] ∷ []
   splitLines (c ∷ cs) =
@@ -39,12 +55,12 @@ private
 
   concatStr : List String → String
   concatStr []       = ""
-  concatStr (s ∷ ss) = Data.String._++_ s (concatStr ss)
+  concatStr (s ∷ ss) = s ++ concatStr ss
 
 main : IO Unit
 main =
   getContents >>= λ input →
   putStr
     (concatStr
-      (map (λ line → Data.String._++_ (process line) (fromChar nl))
+      (map (λ line → process line ++ fromChar nl)
            (nonEmpty (splitLines (toList input)))))
