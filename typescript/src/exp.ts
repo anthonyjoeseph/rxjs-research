@@ -86,7 +86,328 @@ export type Closed = Exp;
 // used by the rx compiler: evalTm/applyFn turn Tm functions into host
 // functions for map/scan/take, unfoldMu ties the μ knot. (Agda's wkᵍ
 // has no twin: with de Bruijn indices, weakening is the index shift
-// performed inside unfoldMu.)
-export declare const evalTm: (tm: Tm) => Val; // closed Tm only
-export declare const applyFn: (fn: Fn, arg: Val) => Val;
-export declare const unfoldMu: (body: Exp) => Closed; // substitutes (mu body) for the body's own bound var
+// performed inside unfoldMu — and the substituted term is CLOSED, so
+// no shift is actually needed.)
+
+// ---- evalTm / applyFn: evaluate a Tm in a Θ value-environment ----
+// env is the Θ context, index 0 = innermost binder. A closed Tm is
+// evaluated in the empty environment; a Fn is evaluated with its one
+// argument bound at index 0. The only value language is first-order.
+
+// a nat prim op on two nats; sub is ℕ monus (truncated at 0)
+const applyPrim = (op: PrimOp, arg: Val): Val => {
+  if (op === "not") return !(arg as boolean);
+  const [a, b] = arg as [Val, Val]; // add/sub/mul/eq/lt take a pair
+  switch (op) {
+    case "add":
+      return (a as number) + (b as number);
+    case "sub":
+      return Math.max(0, (a as number) - (b as number));
+    case "mul":
+      return (a as number) * (b as number);
+    case "eq":
+      return valEq(a, b);
+    case "lt":
+      return (a as number) < (b as number);
+  }
+};
+
+// structural equality over the value domain (nats/bools/unit by ===,
+// pairs and sums recursively; observables never reach eq)
+const valEq = (a: Val, b: Val): boolean => {
+  if (Array.isArray(a) && Array.isArray(b))
+    return valEq(a[0], b[0]) && valEq(a[1], b[1]);
+  if (
+    a !== null &&
+    b !== null &&
+    typeof a === "object" &&
+    typeof b === "object" &&
+    "type" in a &&
+    "type" in b &&
+    (a.type === "inl" || a.type === "inr") &&
+    (b.type === "inl" || b.type === "inr")
+  )
+    return a.type === b.type && valEq(a.val, b.val);
+  return a === b;
+};
+
+const evalWith = (tm: Tm, env: Val[]): Val => {
+  switch (tm.type) {
+    case "varT":
+      return env[tm.index];
+    case "unitT":
+      return null;
+    case "boolT":
+      return tm.val;
+    case "natT":
+      return tm.val;
+    case "pairT":
+      return [evalWith(tm.fst, env), evalWith(tm.snd, env)];
+    case "fstT":
+      return (evalWith(tm.pair, env) as [Val, Val])[0];
+    case "sndT":
+      return (evalWith(tm.pair, env) as [Val, Val])[1];
+    case "inlT":
+      return { type: "inl", val: evalWith(tm.val, env) };
+    case "inrT":
+      return { type: "inr", val: evalWith(tm.val, env) };
+    case "caseT": {
+      const s = evalWith(tm.scrut, env) as { type: "inl" | "inr"; val: Val };
+      // the branch binds the unwrapped value as Θ-var 0
+      return s.type === "inl"
+        ? evalWith(tm.onInl, [s.val, ...env])
+        : evalWith(tm.onInr, [s.val, ...env]);
+    }
+    case "ifT":
+      return evalWith(tm.cond, env)
+        ? evalWith(tm.then, env)
+        : evalWith(tm.else, env);
+    case "primT":
+      return applyPrim(tm.op, evalWith(tm.arg, env));
+    case "strmT":
+      // an obs-typed value IS a closed Exp: bake the environment in
+      return closeExp(tm.exp, env, 0);
+  }
+};
+
+export const evalTm = (tm: Tm): Val => evalWith(tm, []);
+export const applyFn = (fn: Fn, arg: Val): Val => evalWith(fn, [arg]);
+
+// ---- closing a runtime observable: syntactic Θ-substitution ----
+// A strmT-wrapped Exp under a Fn carries free Θ-vars (the fn's
+// argument); to become a closed obs value its Tms must have the
+// environment substituted in AS SYNTAX (the observable is compiled
+// later, not evaluated now). `depth` counts Θ-binders local to the exp
+// (map/scan fns, case branches); a varT below depth is local and kept,
+// otherwise it names an environment value, reified to a closed Tm.
+
+// a value → the closed Tm literal denoting it, guided by its type (the
+// type resolves a sum's other, absent branch)
+const reify = (v: Val, ty: Ty): Tm => {
+  switch (ty.type) {
+    case "unit":
+      return { type: "unitT", ty };
+    case "bool":
+      return { type: "boolT", ty, val: v as boolean };
+    case "nat":
+      return { type: "natT", ty, val: v as number };
+    case "prod": {
+      const [a, b] = v as [Val, Val];
+      return {
+        type: "pairT",
+        ty,
+        fst: reify(a, ty.fst),
+        snd: reify(b, ty.snd),
+      };
+    }
+    case "sum": {
+      const s = v as { type: "inl" | "inr"; val: Val };
+      return s.type === "inl"
+        ? { type: "inlT", ty, val: reify(s.val, ty.left) }
+        : { type: "inrT", ty, val: reify(s.val, ty.right) };
+    }
+    case "obs":
+      return { type: "strmT", ty, exp: v as Exp };
+  }
+};
+
+const closeTm = (tm: Tm, env: Val[], depth: number): Tm => {
+  switch (tm.type) {
+    case "varT":
+      // reified environment values are closed, so no weakening by depth
+      return tm.index < depth ? tm : reify(env[tm.index - depth], tm.ty);
+    case "unitT":
+    case "boolT":
+    case "natT":
+      return tm;
+    case "pairT":
+      return {
+        ...tm,
+        fst: closeTm(tm.fst, env, depth),
+        snd: closeTm(tm.snd, env, depth),
+      };
+    case "fstT":
+    case "sndT":
+      return { ...tm, pair: closeTm(tm.pair, env, depth) };
+    case "inlT":
+    case "inrT":
+      return { ...tm, val: closeTm(tm.val, env, depth) };
+    case "caseT":
+      return {
+        ...tm,
+        scrut: closeTm(tm.scrut, env, depth),
+        onInl: closeTm(tm.onInl, env, depth + 1), // branch binds Θ-var 0
+        onInr: closeTm(tm.onInr, env, depth + 1),
+      };
+    case "ifT":
+      return {
+        ...tm,
+        cond: closeTm(tm.cond, env, depth),
+        then: closeTm(tm.then, env, depth),
+        else: closeTm(tm.else, env, depth),
+      };
+    case "primT":
+      return { ...tm, arg: closeTm(tm.arg, env, depth) };
+    case "strmT":
+      return { ...tm, exp: closeExp(tm.exp, env, depth) };
+  }
+};
+
+const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
+  switch (exp.type) {
+    case "input":
+    case "empty":
+    case "varE":
+      return exp; // no Θ subterms
+    case "of":
+      return { ...exp, items: exp.items.map((t) => closeTm(t, env, depth)) };
+    case "map":
+      return {
+        ...exp,
+        fn: closeTm(exp.fn, env, depth + 1), // fn binds its argument
+        src: closeExp(exp.src, env, depth),
+      };
+    case "take":
+      return {
+        ...exp,
+        count: closeTm(exp.count, env, depth),
+        src: closeExp(exp.src, env, depth),
+      };
+    case "scan":
+      return {
+        ...exp,
+        fn: closeTm(exp.fn, env, depth + 1), // fn binds the (acc, cur) pair
+        init: closeTm(exp.init, env, depth),
+        src: closeExp(exp.src, env, depth),
+      };
+    case "mergeAll":
+    case "concatAll":
+    case "switchAll":
+    case "exhaustAll":
+      return { ...exp, src: closeExp(exp.src, env, depth) };
+    case "mu":
+    case "defer":
+      // μ/defer bind μ-vars (Δᵍ/Δ), never Θ — depth unchanged
+      return { ...exp, body: closeExp(exp.body, env, depth) };
+  }
+};
+
+// ---- unfoldMu: one unfolding of the μ knot ----
+// Substitute the μ-var bound by this μ with the (closed) `mu body` node.
+// The var starts in Δᵍ (guarded, unreferenceable); only a deferᵉ moves
+// it into Δ, where a varE can name it — and it is always the OLDEST
+// μ-var (highest index), so removing it never reindexes the others, and
+// the substituted node is closed, so it needs no weakening.
+type MuLoc =
+  { where: "guarded"; idx: number } | { where: "usable"; idx: number };
+type MuSt = { loc: MuLoc; gLen: number }; // gLen = |Δᵍ|
+
+// under a nested μ: Δᵍ grows in front; a guarded target shifts up one
+const muUnder = (st: MuSt): MuSt => ({
+  gLen: st.gLen + 1,
+  loc:
+    st.loc.where === "guarded"
+      ? { where: "guarded", idx: st.loc.idx + 1 }
+      : st.loc,
+});
+
+// under a deferᵉ: Δᵍ empties and prepends onto Δ — a guarded target
+// becomes usable at the same index; a usable one shifts by |Δᵍ|
+const deferUnder = (st: MuSt): MuSt => ({
+  gLen: 0,
+  loc:
+    st.loc.where === "guarded"
+      ? { where: "usable", idx: st.loc.idx }
+      : { where: "usable", idx: st.loc.idx + st.gLen },
+});
+
+const substMuTm = (tm: Tm, st: MuSt, knot: Exp): Tm => {
+  switch (tm.type) {
+    case "varT":
+    case "unitT":
+    case "boolT":
+    case "natT":
+      return tm;
+    case "pairT":
+      return {
+        ...tm,
+        fst: substMuTm(tm.fst, st, knot),
+        snd: substMuTm(tm.snd, st, knot),
+      };
+    case "fstT":
+    case "sndT":
+      return { ...tm, pair: substMuTm(tm.pair, st, knot) };
+    case "inlT":
+    case "inrT":
+      return { ...tm, val: substMuTm(tm.val, st, knot) };
+    case "caseT":
+      return {
+        ...tm,
+        scrut: substMuTm(tm.scrut, st, knot),
+        onInl: substMuTm(tm.onInl, st, knot),
+        onInr: substMuTm(tm.onInr, st, knot),
+      };
+    case "ifT":
+      return {
+        ...tm,
+        cond: substMuTm(tm.cond, st, knot),
+        then: substMuTm(tm.then, st, knot),
+        else: substMuTm(tm.else, st, knot),
+      };
+    case "primT":
+      return { ...tm, arg: substMuTm(tm.arg, st, knot) };
+    case "strmT":
+      return { ...tm, exp: substMuExp(tm.exp, st, knot) };
+  }
+};
+
+const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
+  switch (exp.type) {
+    case "input":
+    case "empty":
+      return exp;
+    case "varE":
+      // the target is namable only once usable; it is the only var we
+      // rewrite (inner μ-vars sit at other indices)
+      return st.loc.where === "usable" && exp.index === st.loc.idx ? knot : exp;
+    case "of":
+      return { ...exp, items: exp.items.map((t) => substMuTm(t, st, knot)) };
+    case "map":
+      return {
+        ...exp,
+        fn: substMuTm(exp.fn, st, knot),
+        src: substMuExp(exp.src, st, knot),
+      };
+    case "take":
+      return {
+        ...exp,
+        count: substMuTm(exp.count, st, knot),
+        src: substMuExp(exp.src, st, knot),
+      };
+    case "scan":
+      return {
+        ...exp,
+        fn: substMuTm(exp.fn, st, knot),
+        init: substMuTm(exp.init, st, knot),
+        src: substMuExp(exp.src, st, knot),
+      };
+    case "mergeAll":
+    case "concatAll":
+    case "switchAll":
+    case "exhaustAll":
+      return { ...exp, src: substMuExp(exp.src, st, knot) };
+    case "mu":
+      return { ...exp, body: substMuExp(exp.body, muUnder(st), knot) };
+    case "defer":
+      return { ...exp, body: substMuExp(exp.body, deferUnder(st), knot) };
+  }
+};
+
+// body lives under one guarded μ-binder (Δᵍ = [t]); the knot is the
+// closed `mu body` node substituted for the var it binds
+export const unfoldMu = (body: Exp): Closed =>
+  substMuExp(
+    body,
+    { loc: { where: "guarded", idx: 0 }, gLen: 1 },
+    { type: "mu", ty: body.ty, body },
+  );
