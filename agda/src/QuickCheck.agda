@@ -30,11 +30,12 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; exhausted; EmitKind;
                            subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn;
+open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
-open import Rx.Evaluator using (evaluate; Slot; scripted; Slots)
+                          nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ;
+                          add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+open import Rx.Evaluator using (evaluate; Slot; scripted; shared; Slots)
 open import Implementation using (impl-batchSimultaneous)
 open import Spec using (spec-batchSimultaneous)
 open import CLI.IO
@@ -241,21 +242,97 @@ showBatched []       = "·"
 showBatched (e ∷ es) = showEmit e ++ " " ++ showBatched es
 
 ------------------------------------------------------------------------
+-- render a generated program back to Agda source (a paste-ready block for
+-- the Unit-Test cache). Faithful over the fragment the generator emits;
+-- constructors it never produces get a placeholder (kept total).
+
+showFin : ∀ {n} → Fin n → String
+showFin zero    = "zero"
+showFin (suc i) = "(suc " ++ showFin i ++ ")"
+
+showNatList : List ℕ → String
+showNatList []       = "[]"
+showNatList (v ∷ vs) = show v ++ " ∷ " ++ showNatList vs
+
+showTimedList : List (Timed ℕ) → String
+showTimedList []                = "[]"
+showTimedList ((after w , v) ∷ ts) =
+  "(after " ++ show w ++ " , " ++ show v ++ ") ∷ " ++ showTimedList ts
+
+showInput : ObservableInput ℕ → String
+showInput (hot a)    = "hot (" ++ showTimedList a ++ ")"
+showInput (cold s a) = "cold (" ++ showNatList s ++ ") (" ++ showTimedList a ++ ")"
+
+showSlot : Slot Γ₂ natᵗ → String
+showSlot (scripted i) = "scripted (" ++ showInput i ++ ")"
+showSlot (shared _)   = "PLACEHOLDER-shared"
+
+showSlots : Slots Γ₂ → String
+showSlots ins =
+  "(λ { zero → " ++ showSlot (ins zero)
+    ++ " ; (suc zero) → " ++ showSlot (ins (suc zero))
+    ++ " ; (suc (suc ())) })"
+
+showPrim : ∀ {s t} → PrimOp s t → String
+showPrim add  = "add"
+showPrim sub  = "sub"
+showPrim mul  = "mul"
+showPrim eqᵖ  = "eqᵖ"
+showPrim ltᵖ  = "ltᵖ"
+showPrim notᵖ = "notᵖ"
+
+showExp : ∀ {Θ t} → Exp Γ₂ [] [] Θ t → String
+showTm  : ∀ {Θ t} → Tm Γ₂ [] [] Θ t → String
+
+showTmList : ∀ {Θ t} → List (Tm Γ₂ [] [] Θ t) → String
+showTmList []       = "[]"
+showTmList (x ∷ xs) = showTm x ++ " ∷ " ++ showTmList xs
+
+showTm (varᵗ (here refl)) = "(varᵗ (here refl))"
+showTm (varᵗ (there _))   = "PLACEHOLDER-var"
+showTm (nat̂ n)            = "(nat̂ " ++ show n ++ ")"
+showTm (pairᵗ a b)        = "(pairᵗ " ++ showTm a ++ " " ++ showTm b ++ ")"
+showTm (fstᵗ p)           = "(fstᵗ " ++ showTm p ++ ")"
+showTm (sndᵗ p)           = "(sndᵗ " ++ showTm p ++ ")"
+showTm (primᵗ op a)       = "(primᵗ " ++ showPrim op ++ " " ++ showTm a ++ ")"
+showTm (strmᵗ e)          = "(strmᵗ " ++ showExp e ++ ")"
+showTm _                  = "PLACEHOLDER-tm"
+
+showExp (input i)       = "(input " ++ showFin i ++ ")"
+showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
+showExp emptyᵉ          = "emptyᵉ"
+showExp (mapᵉ f e)      = "(mapᵉ " ++ showTm f ++ " " ++ showExp e ++ ")"
+showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
+showExp (scanᵉ f s e)   = "(scanᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
+showExp (mergeAllᵉ s)   = "(mergeAllᵉ " ++ showExp s ++ ")"
+showExp (concatAllᵉ s)  = "(concatAllᵉ " ++ showExp s ++ ")"
+showExp (switchAllᵉ s)  = "(switchAllᵉ " ++ showExp s ++ ")"
+showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
+showExp _               = "PLACEHOLDER-exp"
+
+------------------------------------------------------------------------
 -- one case, a run, and reporting
 
 FUEL : ℕ
 FUEL = 30
 
-report : List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → String
-report impl spec = "  FAIL\n    impl = " ++ showBatched impl
-                                ++ "\n    spec = " ++ showBatched spec ++ "\n"
+-- a paste-ready Unit-Test block for a failing program (Agree is defined in
+-- the Unit-Test module). The program line is the dedup key for the script.
+report : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂
+       → List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → String
+report e ins impl spec =
+  "  FAIL\n    impl = " ++ showBatched impl
+       ++ "\n    spec = " ++ showBatched spec
+       ++ "\n-- <<<PASTE\n_ : Agree " ++ show FUEL ++ "\n          "
+       ++ showExp e ++ "\n          " ++ showSlots ins
+       ++ "\n_ = refl\n-- PASTE>>>\n"
 
 oneCase : ℕ → Gen (Maybe String)
 oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
   let s    = evaluate FUEL e ins
       impl = impl-batchSimultaneous s
       spec = spec-batchSimultaneous s
-  in pureG (if eqBatched impl spec then nothing else just (report impl spec))
+  in pureG (if eqBatched impl spec then nothing else just (report e ins impl spec))
 
 runN : ℕ → ℕ → Gen (ℕ × Maybe String)
 runN zero    d = pureG (0 , nothing)
