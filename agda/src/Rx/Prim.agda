@@ -1,6 +1,6 @@
 module Rx.Prim where
 
-open import Data.Nat     using (ℕ)
+open import Data.Nat     using (ℕ; suc; _+_; _*_; ⌊_/2⌋)
 open import Data.List    using (List)
 
 ------------------------------------------------------------------
@@ -13,8 +13,12 @@ Tick = ℕ ; Fuel = ℕ ; Ordinal = ℕ
 Id : Set                            -- an INSTANT (one arrival's cascade); spec groups by this
 Id = ℕ                              -- concrete so the spec can compare; harness compares up to renaming
 
-postulate
-  freshId : Tick → Ordinal → Id     -- deterministic minting from arrival identity
+-- deterministic, injective minting from arrival identity (Cantor
+-- pairing): distinct (tick, ordinal) ⇒ distinct instant id, so the spec's
+-- group-by-id never merges two cascades. The exact numerals are
+-- irrelevant — the harness compares streams up to id renaming.
+freshId : Tick → Ordinal → Id
+freshId t o = ⌊ (t + o) * suc (t + o) /2⌋ + o
 
 Source : Set                        -- a SOURCE observable; impl counts registrations of these
 Source = ℕ                          -- concrete so the scheduler can mint & compare; the harness compares up to renaming anyway
