@@ -4,6 +4,7 @@
 #typescript
 **/node_modules
 typescript/node_modules
+typescript/dist
 
 # agda
 **/_build

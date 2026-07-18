@@ -7,7 +7,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node --disable-warning=ExperimentalWarning src/prop-test.ts",
+    "build": "tsc --outDir dist --rootDir src --noEmit false",
+    "oracle": "npm run build && node dist/prop-test.js",
     "agda:cli": "cd ../agda && agda --compile --compile-dir=_cli src/CLI/Main.agda",
     "agda:qc": "cd ../agda && agda --compile --compile-dir=_cli src/QuickCheck.agda",
     "typecheck": "tsc",

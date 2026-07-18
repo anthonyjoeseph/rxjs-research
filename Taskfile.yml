@@ -1,5 +1,11 @@
 version: "3"
 
+# The compiled Agda binaries and the QuickCheck reports emit non-ASCII
+# (em-dashes, ✓, ·); force a UTF-8 locale so they don't crash at runtime.
+env:
+  LC_ALL: C.UTF-8
+  LANG: C.UTF-8
+
 tasks:
   default:
     desc: Show available tasks
@@ -8,18 +14,62 @@ tasks:
 
   agda:
     dir: agda
-    desc: compile/typecheck the agda source
+    desc: typecheck the Agda source (src/Main.agda)
     cmds:
     - agda src/Main.agda
 
-  ts:
-    dir: typescript
-    desc: compile/typecheck the agda source
-    cmds:
-    - npm run start
-
   ts-check:
     dir: typescript
-    desc: compile/typecheck the agda source
+    desc: typecheck the TypeScript source
     cmds:
     - npm run typecheck
+
+  # ---- the differential test: rxjs (TS) vs the Agda oracle ----
+
+  cli-build:
+    dir: agda
+    desc: compile the Agda differential-test CLI (agda/_cli/Main)
+    cmds:
+    - agda --compile --compile-dir=_cli src/CLI/Main.agda
+
+  oracle:
+    dir: typescript
+    deps: [cli-build]
+    desc: >-
+      The TypeScript "main": generate programs from seeds, evaluate each and
+      run batchSimultaneous, in BOTH rxjs and Agda (the CLI, in parallel), and
+      report every case where the two disagree — on the raw InstEmit stream
+      and on the batched result, compared up to id renaming. Flags go after --,
+      e.g. `task oracle -- --seed 1` or `task oracle -- --operator mergeAll`.
+    cmds:
+    - npm run oracle -- {{.CLI_ARGS}}
+
+  # ---- the all-Agda QuickCheck: impl-batchSimultaneous vs spec ----
+
+  qc-build:
+    dir: agda
+    desc: compile the all-Agda QuickCheck binary (agda/_cli/QuickCheck)
+    cmds:
+    - agda --compile --compile-dir=_cli src/QuickCheck.agda
+
+  quickcheck:
+    dir: agda
+    deps: [qc-build]
+    desc: >-
+      All-Agda QuickCheck: generate programs, evaluate each to a stream, run
+      that stream through impl- AND spec-batchSimultaneous, and print EVERY
+      mismatch. Args are "SEED [RUNS] [DEPTH]" (default "1 200 4"), e.g.
+      `task quickcheck -- "42 500 5"`.
+    cmds:
+    - echo '{{.CLI_ARGS | default "1 200 4"}}' | ./_cli/QuickCheck
+
+  unit-tests:
+    dir: agda
+    deps: [qc-build]
+    desc: >-
+      Sweep seeds through QuickCheck and append every new distinct failing
+      program to Implementation/Unit-Test.agda (append-only bug cache).
+      Args: "FIRST LAST RUNS DEPTH" (default "1 300 200 4"), e.g.
+      `task unit-tests -- "1 500 300 5"`.
+    cmds:
+    - scripts/gen-unit-tests.sh {{.CLI_ARGS}}
