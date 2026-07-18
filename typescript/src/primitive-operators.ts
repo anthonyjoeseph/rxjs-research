@@ -268,11 +268,14 @@ export const take = <A>(
         const cutCloses = open.map(
           (source) => ({ type: "close", source, reason: "cut" }) as const,
         );
+        // the cut RAISES fin on this very emit (Agda take-f returns
+        // fin′ = true; pushBurst/foldPath materialize it right there) —
+        // a downstream join absorbs it, the root keeps it
         return {
           remaining: 0,
           cut: true,
           open: [],
-          out: reassemble(emit, bookkeeping, cutCloses, taken, fin),
+          out: reassemble(emit, bookkeeping, cutCloses, taken, true),
         };
       },
       { remaining: emissions, cut: false, open: [] },
@@ -307,13 +310,18 @@ export const scan = <A, B>(
     rxMap((state) => state.out as InstEmit<B>), // the seed is never emitted, so out is set
   );
 
-// the ROOT materializes the fin bit as a `complete` EVENT on the emit
-// that closes the last live registration (Agda foldPath's root
-// clause) — everywhere else fin travels as rx completion. Applied once,
-// over the full root stream (pipeline output MERGED with the driver's
-// chain emits: the ledger must see a share's plumbing inits AND the
-// chain-emit closes that retire them). Appends at most once; a share's
-// valueless chain traffic after root completion is left untouched.
+// the ROOT materializes the fin bit as a `complete` EVENT on the
+// DELIVERY emit that closes the last live registration (Agda
+// foldPath's root clause — it only runs on arrival cascades; in the
+// subscribe frame, complete events are minted in-band: one-shots at
+// their mint site, take's cut and a spent join at the frame that
+// raises fin, exactly Agda's pushBurst). Applied once, over the full
+// root stream (pipeline output MERGED with the driver's chain emits:
+// the ledger must see a share's plumbing inits AND the chain-emit
+// closes that retire them). Appends at most once; a share's valueless
+// chain traffic after root completion is left untouched, and a
+// transient empty ledger inside the subscribe frame (a connect-died
+// share's [init, close] before its plumbing burst) never triggers.
 export const materializeCompletion = <A>(
   obs: Observable<InstEmit<A>>,
 ): Observable<InstEmit<A>> =>
@@ -322,7 +330,11 @@ export const materializeCompletion = <A>(
       (state, emit) => {
         const open = openAfter(emit, state.open, true);
         const alreadyFin = emit.events.some((ev) => ev.type === "complete");
-        const materialize = !state.done && !alreadyFin && open.length === 0;
+        const materialize =
+          !state.done &&
+          !alreadyFin &&
+          open.length === 0 &&
+          emit.kind === "delivery";
         return {
           open,
           done: state.done || alreadyFin || materialize,

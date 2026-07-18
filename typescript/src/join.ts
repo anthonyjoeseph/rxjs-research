@@ -182,16 +182,17 @@ const joinAll =
         }
         if (parts.fin) outerDone = true;
         const done = joinDone();
-        // the carrying emit under the outer's envelope; a spent-at-
-        // subscribe join materializes its complete here (pushBurst),
-        // a spent delivery leaves that to the root
+        // the carrying emit under the outer's envelope; a join spent
+        // inside the subscribe frame (subscribe OR plumbing carrier)
+        // materializes its complete right here (Agda's pushBurst
+        // appends on fin′), a spent delivery leaves that to the root
         sink.next(
           reassemble(
             emit,
             parts.bookkeeping,
             grafts.bookkeeping,
             grafts.values,
-            done && emit.kind === "subscribe",
+            done && emit.kind !== "delivery",
           ),
         );
         if (parts.fin || done) finishIfDone();
