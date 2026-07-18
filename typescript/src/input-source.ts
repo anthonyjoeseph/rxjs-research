@@ -1,7 +1,8 @@
-import { Observable, Subject, defer, merge, of } from "rxjs";
+import { Observable, defer, merge, of } from "rxjs";
 import { InstEmit, SourceId } from "./inst-emit.js";
 import { Val } from "./exp.js";
 import { Arrival, Driver } from "./driver.js";
+import { cold, hot } from "./constructors.js";
 import type { ObservableInput, Timed } from "./prop-test.js";
 
 // delta-encoded waits → absolute ticks (gap = wait + 1, so a source's
@@ -58,7 +59,7 @@ export const makeInputSource = (
 ): Observable<InstEmit<Val>> => {
   if (input.type === "hot") {
     const source = driver.mintSourceId();
-    const subject = new Subject<InstEmit<Val>>();
+    const [live, sink] = hot<InstEmit<Val>>();
     // the completion latch flips BEFORE the final value fans out —
     // matching the Agda cascade, which latches a spent source before
     // its last delivery — so a subscriber joining mid-final-cascade
@@ -68,8 +69,8 @@ export const makeInputSource = (
     driver.registerSource(
       scriptedDeliveries(source, resolveTicks(0, input.async), (emit, isLast) => {
         if (isLast) completed = true;
-        subject.next(emit);
-        if (isLast) subject.complete();
+        sink.next(emit);
+        if (isLast) sink.complete();
       }),
     );
     return defer(() =>
@@ -91,7 +92,7 @@ export const makeInputSource = (
               source,
               kind: "subscribe",
             }),
-            subject,
+            live,
           ),
     );
   }
@@ -117,14 +118,14 @@ export const makeInputSource = (
       ? of(burst)
       : merge(
           of(burst),
-          new Observable<InstEmit<Val>>((subscriber) =>
+          cold<InstEmit<Val>>((sink) =>
             driver.registerSource(
               scriptedDeliveries(
                 source,
                 resolveTicks(driver.currentTick(), input.async),
                 (emit, isLast) => {
-                  subscriber.next(emit);
-                  if (isLast) subscriber.complete();
+                  sink.next(emit);
+                  if (isLast) sink.complete();
                 },
               ),
             ),
