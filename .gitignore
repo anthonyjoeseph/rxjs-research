@@ -4,7 +4,7 @@
 #typescript
 **/node_modules
 typescript/node_modules
-typescript/dist
+typescript/.oracle-tmp
 
 # agda
 **/_build

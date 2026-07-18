@@ -7,8 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc --outDir dist --rootDir src --noEmit false",
-    "oracle": "npm run build && node dist/prop-test.js",
+    "oracle": "bash scripts/run-oracle.sh",
     "agda:cli": "cd ../agda && agda --compile --compile-dir=_cli src/CLI/Main.agda",
     "agda:qc": "cd ../agda && agda --compile --compile-dir=_cli src/QuickCheck.agda",
     "typecheck": "tsc",

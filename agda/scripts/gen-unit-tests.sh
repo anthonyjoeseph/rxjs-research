@@ -29,6 +29,7 @@ for s in $(seq "$FIRST" "$LAST"); do
     || { printf '\r  seed %s (err, skipped) ' "$s" >&2; continue; }
   echo "$out" | grep -q '<<<PASTE' \
     || { printf '\r  seed %s ok            ' "$s" >&2; continue; }
+  echo "$out"                                     # surface every mismatch on stdout
 
   # a run may report MANY failing programs; carve out each PASTE block
   # (lines strictly between the markers) into its own temp file
