@@ -105,9 +105,12 @@ job.
 
 ```agda
 data EmitKind : Set where
-  subscribe delivery : EmitKind      -- who minted it: a subscription's own
-                                     -- burst (owes nothing) vs an arrival
-                                     -- delivery (pays the owed count)
+  subscribe delivery plumbing : EmitKind
+    -- who minted it: a subscription's own burst (owes nothing) vs an
+    -- arrival delivery (pays the owed count) vs a share's connect
+    -- burst forwarded up its first subscriber (real traffic for the
+    -- root's ledger, but its registrations belong to the share — the
+    -- operators it flows through take no lifecycle signal from it)
 
 data CloseReason : Set where
   cut exhausted : CloseReason        -- an operator ended it vs ran dry

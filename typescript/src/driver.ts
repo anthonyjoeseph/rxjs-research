@@ -1,4 +1,6 @@
-import { Provenance, SourceId } from "./inst-emit.js";
+import { Observable } from "rxjs";
+import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
+import { hot } from "./constructors.js";
 
 // One scheduled delivery popped by the driver. Mirrors Agda's Arrival,
 // minus the fields the fire-closure already captures (source, payload).
@@ -35,6 +37,13 @@ export type Driver = {
   registerSource: (
     pending: { tick: number; fire: (arrival: Arrival) => void }[],
   ) => () => void;
+  // a share's chain emits (the emptied pass-through carrying the
+  // handoff — Agda foldPath's share-sink clause) reach the root
+  // stream directly, not through any subscriber's pipeline: shares
+  // push here, the harness merges this channel into the collected
+  // stream. Valueless by construction, hence InstEmit<never>.
+  pushChainEmit: (emit: InstEmit<never>) => void;
+  chainEmits: Observable<InstEmit<never>>;
   // ---- harness surface ----
   // pop the min (tick, ordinal) delivery, mint its fresh instant, run
   // its cascade synchronously to quiescence; false when the queue is
@@ -55,9 +64,12 @@ export const createDriver = (): Driver => {
   // subscribeE e root (freshId 0 0) 0 …)
   let instant: Provenance = Symbol("subscribe-frame");
   let tick = 0;
+  const [chainEmits, chainSink] = hot<InstEmit<never>>();
 
   return {
     mintSourceId: () => Symbol(`source:${nextSourceId++}`),
+    pushChainEmit: (emit) => chainSink.next(emit),
+    chainEmits,
     currentInstant: () => instant,
     currentTick: () => tick,
     registerSource: (pending) => {

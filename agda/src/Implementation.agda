@@ -7,7 +7,7 @@ open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
 open import Data.Product using (_×_; _,_)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; EmitKind; subscribe; delivery;
+                           complete; EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Protocol using (Owed; countIn; removeOne; hasOwed; bumpOwed;
                                payOwed; allZero)
@@ -49,11 +49,13 @@ closeBatch b with OpenBatch.values b
                  from OpenBatch.source b
                  as OpenBatch.kind b) ∷ []
 
--- Rx.Protocol's settle, clamped total: a subscription's own burst is
--- net zero; a delivery pays owed[s], seeded from live(s) — the
--- multiset BEFORE this emit's events — at s's first delivery
+-- Rx.Protocol's settle, clamped total: a subscription's own burst and
+-- a share's forwarded connect burst are net zero; a delivery pays
+-- owed[s], seeded from live(s) — the multiset BEFORE this emit's
+-- events — at s's first delivery
 settleBatch : EmitKind → Source → List Source → Owed → Owed
 settleBatch subscribe s live owed = owed
+settleBatch plumbing  s live owed = owed
 settleBatch delivery  s live owed =
   let seeded = if hasOwed s owed then owed else bumpOwed s (countIn s live) owed
   in fromMaybe seeded (payOwed s seeded)

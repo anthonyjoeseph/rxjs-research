@@ -7,7 +7,7 @@ open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; EmitKind; subscribe; delivery;
+                           complete; EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 
 ------------------------------------------------------------------
@@ -28,8 +28,8 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
 --                         live multiset never underflows (the
 --                         close REASON is descriptive: cut and
 --                         exhausted count the same here)
---   fan-out exactness   — subscribe emits owe nothing and pay
---                         nothing.  A delivery from s pays owed[s]:
+--   fan-out exactness   — subscribe and plumbing emits owe nothing
+--                         and pay nothing.  A delivery from s pays owed[s]:
 --                         seeded to live(s) at s's first delivery
 --                         of the instant (the arrival's implicit
 --                         announcement), and bumped by live(x) at
@@ -38,7 +38,11 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
 --                         announced-but-missing fan-outs are both
 --                         accounted).  An instant may only be left
 --                         (or the stream end) fully paid.
---   complete discipline — after a complete event the stream ends
+--   complete discipline — after a complete event no further VALUE
+--                         is emitted.  (Not "the stream ends": a
+--                         connected share never disconnects, so its
+--                         valueless chain emits and empty fan-outs
+--                         legitimately outlive the root's completion)
 ------------------------------------------------------------------
 
 Owed : Set                    -- this instant: remaining owed per source
@@ -110,7 +114,8 @@ applyEvents : ∀ {A : Set} → List (InstEvent A)
             → Maybe (List Source × Owed × Bool)
 applyEvents []                 live owed done = just (live , owed , done)
 applyEvents (init x    ∷ es) live owed done = applyEvents es (x ∷ live) owed done
-applyEvents (value _   ∷ es) live owed done = applyEvents es live owed done
+applyEvents (value _   ∷ es) live owed done =
+  if done then nothing else applyEvents es live owed done
 applyEvents (handoff x ∷ es) live owed done =
   applyEvents es live (bumpOwed x (countIn x live) owed) done
 applyEvents (complete  ∷ es) live owed done = applyEvents es live owed true
@@ -118,12 +123,14 @@ applyEvents (close x _ ∷ es) live owed done with removeOne x live
 ... | just live′ = applyEvents es live′ owed done
 ... | nothing    = nothing
 
--- the kind tag IS the payment rule: a subscription's own burst is
--- net zero; a delivery pays owed[s], seeded from live(s) — the
--- multiset BEFORE this emit's events, matching the cascade's
--- chain snapshot — at s's first delivery of the instant
+-- the kind tag IS the payment rule: a subscription's own burst and
+-- a share's forwarded connect burst are net zero; a delivery pays
+-- owed[s], seeded from live(s) — the multiset BEFORE this emit's
+-- events, matching the cascade's chain snapshot — at s's first
+-- delivery of the instant
 settle : EmitKind → Source → List Source → Owed → Maybe Owed
 settle subscribe s live owed = just owed
+settle plumbing  s live owed = just owed
 settle delivery  s live owed =
   if hasOwed s owed
   then payOwed s owed
@@ -134,14 +141,13 @@ settle delivery  s live owed =
 ------------------------------------------------------------------
 
 stepProtocol : ∀ {A : Set} → InstEmit A → ProtocolSt → Maybe ProtocolSt
-stepProtocol (es at i from s as k) ps =
-  if ProtocolSt.done ps then nothing else enter
+stepProtocol (es at i from s as k) ps = enter
   where
   -- run one emit inside instant i (owed so far, instants closed so far)
   go : Owed → List Id → Maybe ProtocolSt
   go owed seen′ with settle k s (ProtocolSt.live ps) owed
   ... | nothing    = nothing
-  ... | just owed′ with applyEvents es (ProtocolSt.live ps) owed′ false
+  ... | just owed′ with applyEvents es (ProtocolSt.live ps) owed′ (ProtocolSt.done ps)
   ...   | nothing                      = nothing
   ...   | just (live′ , owed″ , done′) =
           just (record { live    = live′

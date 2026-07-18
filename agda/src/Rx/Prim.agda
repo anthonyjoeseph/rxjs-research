@@ -32,6 +32,11 @@ Source = ℕ                          -- concrete so the scheduler can mint & co
 data EmitKind : Set where
   subscribe : EmitKind              -- a subscription's own burst — owes nothing, pays nothing
   delivery  : EmitKind              -- an arrival emit — pays the instant's owed count
+  plumbing  : EmitKind              -- a share's connect burst forwarded up its first
+                                    -- subscriber: real protocol traffic for the root's
+                                    -- ledger, but its registrations belong to the share
+                                    -- (they survive the subscriber), so the operators it
+                                    -- flows through take no lifecycle signal from it
 
 data CloseReason : Set where
   cut       : CloseReason           -- an operator ended it (take's cut, switch switching away)

@@ -16,7 +16,7 @@ open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; Source;
                            Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; exhausted;
-                           EmitKind; subscribe; delivery;
+                           EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
                            applyFn; evalTm; unfoldμ;
@@ -677,6 +677,14 @@ subscribeSharedSlot {Γ = Γ} {e = e} i d κ id now sched st =
        , sched , register (toℕ i) κ st
   else connect
   where
+  -- the connect burst is retagged plumbing: it flows up the first
+  -- subscriber's frames as real protocol traffic, but its
+  -- registrations belong to the share (registered at share-sink,
+  -- surviving the subscriber) — a downstream cut or join must not
+  -- adopt them
+  plumb : Stream Γ (lookup Γ i) → Stream Γ (lookup Γ i)
+  plumb = map (λ em → record em { kind = plumbing })
+
   connect : Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
   connect =
     let st₁ = register (toℕ i) κ
@@ -688,11 +696,11 @@ subscribeSharedSlot {Γ = Γ} {e = e} i d κ id now sched st =
        then -- the def died inside its own connect burst: latch, and
             -- this registration closes in the same instant
             (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
-               at id from toℕ i as subscribe) ∷ burst)
+               at id from toℕ i as subscribe) ∷ plumb burst)
             , sched₁ ,
             record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
                        ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
-       else ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ burst
+       else ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ plumb burst
             , sched₁ , st₂
 
 subscribeE {Γ = Γ} (input i) κ id now sched st with Sched.slots sched i
@@ -842,10 +850,16 @@ foldPath id now envSrc (f ↠ path′) vals evs fin sched st =
 dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
   finish fin (go (admit (EvalSt.registry st)) sched (latch fin st))
   where
+  -- latch AND drop: the dying share's registrations leave the
+  -- registry before the fan-out folds (admit already snapshotted
+  -- them), so an operator cut during the fan-out (cutThrough) never
+  -- closes a registration whose exhausted close is already seeded
+  -- on its own fan-out emit — no double close
   latch : Bool → EvalSt e → EvalSt e
   latch false st₀ = st₀
   latch true  st₀ =
-    record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀ }
+    record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀
+               ; registry = dropSource (toℕ i) (EvalSt.registry st₀) }
 
   admit : List (Source × Chain Γ t) → List (Path Γ (lookup Γ i) t)
   admit [] = []
@@ -868,10 +882,9 @@ dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
   finish : Bool → Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   finish false out = out
   finish true  (emits , sched′ , st′) =
-    let kept = dropSource (toℕ i) (EvalSt.registry st′)
-    in emits ,
-       record sched′ { live = sweepLive kept (Sched.live sched′) } ,
-       record st′ { registry = kept }
+    emits ,
+    record sched′ { live = sweepLive (EvalSt.registry st′) (Sched.live sched′) } ,
+    st′
 
 -- seed one arrival into one chain: the value, plus fin and this
 -- registration's close when the source is spent (isLast)
@@ -897,13 +910,18 @@ cascade {Γ = Γ} {t = t} {e = e} a id sched st =
   -- its last delivery fans out — as a Subject closes before delivering
   -- its completion — so a subscriber joining mid-cascade already sees
   -- the one-shot close/complete and never registers only to be
-  -- dropped silently at finish.  Colds and deferᵉ hops get latched
-  -- too, harmlessly: their sources are per-subscription, never
+  -- dropped silently at finish.  Its registrations also leave the
+  -- registry NOW (chainsOf already snapshotted them): each snapshot
+  -- chain seeds its own exhausted close, so an operator cut during
+  -- the cascade (cutThrough) must not see them or it would close
+  -- them a second time.  Colds and deferᵉ hops get latched too,
+  -- harmlessly: their sources are per-subscription, never
   -- re-subscribed
   latch : EvalSt e → EvalSt e
   latch st₀ =
     if Arrival.isLast a
-    then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
+    then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀
+                    ; registry = dropSource (arrSource a) (EvalSt.registry st₀) }
     else st₀
 
   go : List (Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
@@ -913,17 +931,15 @@ cascade {Γ = Γ} {t = t} {e = e} a id sched st =
         (rest  , sched₂ , st₂) = go chains sched₁ st₁
     in emits ++ rest , sched₂ , st₂
 
-  -- the spent source's registrations drop at the end (each snapshot
-  -- chain already carried its own close) and the sweep collects its
-  -- live entry
+  -- registrations were dropped at latch; the sweep collects the
+  -- spent source's live entry once the cascade has run
   finish : Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   finish (emits , sched′ , st′) with Arrival.isLast a
   ... | false = emits , sched′ , st′
   ... | true  =
-        let kept = dropSource (arrSource a) (EvalSt.registry st′)
-        in emits ,
-           record sched′ { live = sweepLive kept (Sched.live sched′) } ,
-           record st′ { registry = kept }
+        emits ,
+        record sched′ { live = sweepLive (EvalSt.registry st′) (Sched.live sched′) } ,
+        st′
 
 -- fuel = ARRIVALS PROCESSED; each arrival's cascade runs to
 -- quiescence (never truncated mid-batch).  The root subscription's

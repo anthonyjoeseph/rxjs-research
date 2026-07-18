@@ -9,52 +9,18 @@ import {
   takeWhile,
 } from "rxjs";
 import {
-  EmitKind,
   InstEmit,
   InstEvent,
-  Provenance,
   SourceId,
+  flattenBurst,
+  openAfter,
+  reassemble,
+  splitEmit,
 } from "./inst-emit.js";
 import { Arrival, Driver } from "./driver.js";
+import { captureSync, cold, hot } from "./constructors.js";
 
-// ---- per-emit plumbing: the mirror of Agda's pushBurst ∘ stepFrame ----
-// A frame transforms the VALUE payloads of one emit; the bookkeeping
-// (init/close/handoff) and the fin bit (a `complete` event) are peeled
-// off first and re-attached after, so every frame reassembles an emit
-// as `bookkeeping ++ frame events ++ values ++ complete?` — Agda's
-// normalized order, where a source's own close precedes the values it
-// rode in with. The fin bit is carried by a materialized `complete`
-// event, present only in subscribe bursts of spent one-shots (of, empty,
-// a spent cold); arrivals complete via rx and so never grow one here.
-
-const splitEmit = <A>(
-  emit: InstEmit<A>,
-): { bookkeeping: InstEvent<never>[]; values: A[]; fin: boolean } => ({
-  bookkeeping: emit.events.filter(
-    (ev): ev is InstEvent<never> =>
-      ev.type !== "value" && ev.type !== "complete",
-  ),
-  values: emit.events.flatMap((ev) => (ev.type === "value" ? [ev.value] : [])),
-  fin: emit.events.some((ev) => ev.type === "complete"),
-});
-
-const reassemble = <B>(
-  envelope: { instant: Provenance; source: SourceId; kind: EmitKind },
-  bookkeeping: InstEvent<never>[],
-  frameEvents: InstEvent<never>[],
-  values: B[],
-  fin: boolean,
-): InstEmit<B> => ({
-  events: [
-    ...bookkeeping,
-    ...frameEvents,
-    ...values.map((value) => ({ type: "value", value }) as const),
-    ...(fin ? [{ type: "complete" } as const] : []),
-  ],
-  instant: envelope.instant,
-  source: envelope.source,
-  kind: envelope.kind,
-});
+export { concatAll, exhaustAll, mergeAll, switchAll } from "./join.js";
 
 // a one-shot subscription burst (Agda's oneShotBurst): a source that
 // lives and dies inside its own subscribe frame — init, its values,
@@ -81,41 +47,133 @@ export const empty = (driver: Driver): Observable<InstEmit<never>> =>
   of<never>(driver, []);
 
 // The slot-telescope share (NOT default rxjs share()): all reset
-// options are false by definition. Connects the underlying once, at
-// the first subscription; never disconnects (an unobserved share keeps
-// running); latches completion forever — a post-completion subscriber
-// sees only an immediate close/complete, because completion is
-// re-observable and values are not. Emits init/close per subscriber,
-// and one upstream arrival fans out to every subscriber within the
-// same instant. `source` stamps the fan-out emits — by convention the
-// shared slot's index. The latch must flip BEFORE the final delivery
-// fans out (as a Subject closes before delivering its completion, and
-// as the Agda dispatchShare latches before its fan-out): a subscriber
-// joining mid-final-cascade already gets the one-shot
-// init/close/complete, never a registration dropped without its close.
-// Protocol duties (mirror of Agda foldPath's share-sink clause): the
-// upstream emit that triggers a fan-out passes through FIRST, emptied
-// of values, with a `handoff` event for this share appended — the
-// writer-asserted announcement that the fan-out follows in the same
-// instant.  Fan-out emits are kind "delivery"; per-subscriber
-// init/one-shot emits are kind "subscribe"; closes minted here (the
-// def completing) carry reason "exhausted".
-export declare const share: <A>(
+// options are false by definition — connect once at the first
+// subscription, never disconnect (an unobserved share keeps burning
+// arrivals), latch completion forever. Mirrors Agda's
+// subscribeSharedSlot + dispatchShare:
+// - the connect burst flows up the FIRST subscriber only, retagged
+//   plumbing (its registrations belong to the share, not to any
+//   operator it flows through);
+// - each upstream arrival emits the emptied pass-through with a
+//   `handoff` announcement straight to the root (driver.pushChainEmit),
+//   then one fan-out emit per subscriber, all in the same instant;
+// - the completion latch flips BEFORE the final fan-out (a Subject
+//   closes before delivering its completion): a subscriber joining
+//   mid-final-cascade — or any time later — gets the immediate
+//   init/close/complete one-shot, never a registration dropped
+//   without its close. Completion is re-observable, values are not.
+export const share = <A>(
+  driver: Driver,
   obs: Observable<InstEmit<A>>,
   source: SourceId,
-) => Observable<InstEmit<A>>;
+): Observable<InstEmit<A>> => {
+  let connected = false;
+  let completed = false;
+  let upstreamOpen: SourceId[] = [];
+  const [broadcast, broadcastSink] = hot<InstEmit<A>>();
+
+  const latchedOneShot = (): InstEmit<A> => ({
+    events: [
+      { type: "init", source },
+      { type: "close", source, reason: "exhausted" },
+      { type: "complete" },
+    ],
+    instant: driver.currentInstant(),
+    source,
+    kind: "subscribe",
+  });
+
+  const initEmit = (extra: InstEvent<never>[]): InstEmit<A> => ({
+    events: [{ type: "init", source }, ...extra],
+    instant: driver.currentInstant(),
+    source,
+    kind: "subscribe",
+  });
+
+  const onUpstreamEmit = (emit: InstEmit<A>) => {
+    const parts = splitEmit(emit);
+    upstreamOpen = openAfter(emit, upstreamOpen, true);
+    const fin = parts.fin || upstreamOpen.length === 0;
+    // the chain's own emit, emptied of values, announcing the handoff —
+    // it reaches the root directly (Agda foldPath's share-sink clause)
+    driver.pushChainEmit({
+      events: [...parts.bookkeeping, { type: "handoff", source }],
+      instant: emit.instant,
+      source: emit.source,
+      kind: emit.kind,
+    });
+    if (fin) completed = true; // latch BEFORE the final fan-out
+    broadcastSink.next({
+      events: [
+        ...(fin
+          ? [{ type: "close", source, reason: "exhausted" } as const]
+          : []),
+        ...parts.values.map((value) => ({ type: "value", value }) as const),
+      ],
+      instant: emit.instant,
+      source,
+      kind: "delivery",
+    });
+    if (fin) broadcastSink.complete();
+  };
+
+  return cold<InstEmit<A>>((sink) => {
+    if (completed) {
+      sink.next(latchedOneShot());
+      sink.complete();
+      return () => {};
+    }
+    if (connected) {
+      // live: join mid-flight, future values only
+      sink.next(initEmit([]));
+      const registration = captureSync(broadcast, sink);
+      return () => registration.unsubscribe();
+    }
+    connected = true;
+    const connect = captureSync(obs, {
+      next: onUpstreamEmit,
+      complete: () => {
+        // fin rides the closing emit (the open multiset); the rx
+        // completion itself is absorbed here
+      },
+    });
+    // never disconnect: the upstream subscription is permanent
+    for (const emit of connect.burst)
+      upstreamOpen = openAfter(emit, upstreamOpen, true);
+    const plumbed = connect.burst.map(
+      (emit): InstEmit<A> => ({ ...emit, kind: "plumbing" }),
+    );
+    const burstFin =
+      connect.completedSync ||
+      flattenBurst(connect.burst).done ||
+      (connect.burst.length > 0 && upstreamOpen.length === 0);
+    if (burstFin) {
+      // the def died inside its own connect burst: latch; this
+      // registration closes in the same instant
+      completed = true;
+      sink.next(initEmit([{ type: "close", source, reason: "exhausted" }]));
+      for (const emit of plumbed) sink.next(emit);
+      sink.complete();
+      return () => {};
+    }
+    sink.next(initEmit([]));
+    const registration = captureSync(broadcast, sink);
+    for (const emit of plumbed) sink.next(emit);
+    return () => registration.unsubscribe();
+  });
+};
 
 // a one-shot driver delivery at the NEXT tick, read per subscription —
 // the async boundary under deferᵉ/μᵉ. Teardown cancels the pending
 // hop (unsubscribing a not-yet-fired defer is free — Agda's sweepLive).
 const oneShotArrival = (driver: Driver, tick: number): Observable<Arrival> =>
-  new Observable<Arrival>((subscriber) =>
+  cold<Arrival>((sink) =>
     driver.registerSource([
       {
         tick,
         fire: (arrival) => {
-          subscriber.next(arrival);
-          subscriber.complete();
+          sink.next(arrival);
+          sink.complete();
         },
       },
     ]),
@@ -123,14 +181,11 @@ const oneShotArrival = (driver: Driver, tick: number): Observable<Arrival> =>
 
 // deferᵉ (NOT rxjs defer): lazy PLUS a one-tick hop, the body's
 // emissions minting fresh ids (an async boundary). Mirrors Agda's
-// deferᵉ clause: a one-shot source — init in the subscriber's
-// instant, the body subscribed when the hop fires at tick + 1, close
-// riding that arrival, the whole completing when the body does.
-// The body thunk compiles AT FIRE TIME, which is what breaks μ's
+// deferᵉ clause: init in the subscriber's instant; when the hop fires
+// the body is subscribed and its sync burst is grafted behind the
+// hop's close into ONE delivery emit (Agda's thru-outer mergeᵒ walk) —
+// the body thunk runs AT FIRE TIME, which is what breaks μ's
 // unfolding regress: each unfolding costs a schedule hop.
-// ⚠ Known coalescing gap vs Agda until mergeAll lands: the close
-// bookkeeping and the body's sync burst arrive as separate emits here,
-// where Agda grafts them into ONE arrival emit (thru-outer mergeᵒ).
 export const defer = <A>(
   driver: Driver,
   compileBody: () => Observable<InstEmit<A>>,
@@ -146,15 +201,21 @@ export const defer = <A>(
       }),
       oneShotArrival(driver, driver.currentTick() + 1).pipe(
         mergeMap(({ instant }) =>
-          merge(
-            rxOf<InstEmit<A>>({
-              events: [{ type: "close", source, reason: "exhausted" }],
-              instant,
-              source,
-              kind: "delivery",
-            }),
-            rxDefer(compileBody),
-          ),
+          cold<InstEmit<A>>((sink) => {
+            const capture = captureSync(compileBody(), sink);
+            const flat = flattenBurst(capture.burst);
+            sink.next(
+              reassemble(
+                { instant, source, kind: "delivery" },
+                [{ type: "close", source, reason: "exhausted" }],
+                flat.bookkeeping,
+                flat.values,
+                false,
+              ),
+            );
+            if (capture.completedSync || flat.done) sink.complete();
+            return () => capture.unsubscribe();
+          }),
         ),
       ),
     );
@@ -174,39 +235,47 @@ export const map = <A, B>(
   );
 
 // take-f: forward the first `emissions` values, then cut. The cut emit
-// carries the taken prefix plus a `close … cut` for the still-live
-// source (Agda's cutThrough), then the stream completes — rx teardown
-// cancelling any scheduled deliveries (Agda's sweepLive). A source that
-// already completed within this emit (a spent one-shot: `fin`) has no
-// live registration to cut, so no close is added — it is simply
-// truncated. Count 0 is routed to `empty` by the compiler (Agda: take 0
-// never subscribes its source), so `emissions ≥ 1` here.
+// carries the taken prefix plus a `close … cut` for EVERY registration
+// still open through this operator (Agda's cutThrough) — tracked from
+// the init/close bookkeeping that flowed through, this emit's own
+// events applied first (a registration whose exhausted close rides the
+// cutting emit is already closed, never closed twice) and plumbing
+// excluded (a share's connect traffic is not ours to cut). Then the
+// stream completes — rx teardown cancelling any scheduled deliveries
+// (Agda's sweepLive). Count 0 is routed to `empty` by the compiler
+// (Agda: take 0 never subscribes its source), so `emissions ≥ 1` here.
 export const take = <A>(
   obs: Observable<InstEmit<A>>,
   emissions: number,
 ): Observable<InstEmit<A>> =>
   obs.pipe(
-    rxScan<InstEmit<A>, { remaining: number; cut: boolean; out?: InstEmit<A> }>(
+    rxScan<
+      InstEmit<A>,
+      { remaining: number; cut: boolean; open: SourceId[]; out?: InstEmit<A> }
+    >(
       (state, emit) => {
         const { bookkeeping, values, fin } = splitEmit(emit);
+        const open = openAfter(emit, state.open, false);
         const taken = values.slice(0, state.remaining);
         const didCut = taken.length === state.remaining; // filled the quota
         if (!didCut)
           return {
             remaining: state.remaining - taken.length,
             cut: false,
+            open,
             out: reassemble(emit, bookkeeping, [], taken, fin),
           };
-        const cutClose: InstEvent<never>[] = fin
-          ? []
-          : [{ type: "close", source: emit.source, reason: "cut" }];
+        const cutCloses = open.map(
+          (source) => ({ type: "close", source, reason: "cut" }) as const,
+        );
         return {
           remaining: 0,
           cut: true,
-          out: reassemble(emit, bookkeeping, cutClose, taken, fin),
+          open: [],
+          out: reassemble(emit, bookkeeping, cutCloses, taken, fin),
         };
       },
-      { remaining: emissions, cut: false },
+      { remaining: emissions, cut: false, open: [] },
     ),
     takeWhile((state) => !state.cut, true), // include the cutting emit, then complete
     rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set
@@ -238,15 +307,31 @@ export const scan = <A, B>(
     rxMap((state) => state.out as InstEmit<B>), // the seed is never emitted, so out is set
   );
 
-export declare const mergeAll: <A>(
-  obs: Observable<InstEmit<Observable<InstEmit<A>>>>,
-) => Observable<InstEmit<A>>;
-export declare const switchAll: <A>(
-  obs: Observable<InstEmit<Observable<InstEmit<A>>>>,
-) => Observable<InstEmit<A>>;
-export declare const concatAll: <A>(
-  obs: Observable<InstEmit<Observable<InstEmit<A>>>>,
-) => Observable<InstEmit<A>>;
-export declare const exhaustAll: <A>(
-  obs: Observable<InstEmit<Observable<InstEmit<A>>>>,
-) => Observable<InstEmit<A>>;
+// the ROOT materializes the fin bit as a `complete` EVENT on the emit
+// that closes the last live registration (Agda foldPath's root
+// clause) — everywhere else fin travels as rx completion. Applied once,
+// over the full root stream (pipeline output MERGED with the driver's
+// chain emits: the ledger must see a share's plumbing inits AND the
+// chain-emit closes that retire them). Appends at most once; a share's
+// valueless chain traffic after root completion is left untouched.
+export const materializeCompletion = <A>(
+  obs: Observable<InstEmit<A>>,
+): Observable<InstEmit<A>> =>
+  obs.pipe(
+    rxScan<InstEmit<A>, { open: SourceId[]; done: boolean; out?: InstEmit<A> }>(
+      (state, emit) => {
+        const open = openAfter(emit, state.open, true);
+        const alreadyFin = emit.events.some((ev) => ev.type === "complete");
+        const materialize = !state.done && !alreadyFin && open.length === 0;
+        return {
+          open,
+          done: state.done || alreadyFin || materialize,
+          out: materialize
+            ? { ...emit, events: [...emit.events, { type: "complete" }] }
+            : emit,
+        };
+      },
+      { open: [], done: false },
+    ),
+    rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set
+  );

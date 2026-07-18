@@ -1,7 +1,7 @@
-import { Observable } from "rxjs";
+import { Observable, merge } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
 import { InstEmit } from "./inst-emit.js";
-import { share } from "./primitive-operators.js";
+import { materializeCompletion, share } from "./primitive-operators.js";
 import { createDriver } from "./driver.js";
 import { makeInputSource } from "./input-source.js";
 import { compile } from "./compile.js";
@@ -82,12 +82,17 @@ const evaluateRx = async (testCase: TestCase): Promise<Stream> => {
       ...prefix,
       slot.type === "scripted"
         ? makeInputSource(driver, slot.input)
-        : share(compile(slot.def, driver, prefix), index),
+        : share(driver, compile(slot.def, driver, prefix), index),
     ],
     [],
   );
   const out: Stream = [];
-  const sub = compile(testCase.exp, driver, slotSources).subscribe((emit) => out.push(emit));
+  // the canonical root stream: the pipeline's emits interleaved (in
+  // push order) with the shares' chain emits, the fin bit materialized
+  // once over the merged ledger — the mirror of Agda's cascade output
+  const sub = materializeCompletion<Val>(
+    merge(driver.chainEmits, compile(testCase.exp, driver, slotSources)),
+  ).subscribe((emit) => out.push(emit));
   // subscribing already ran the root sync burst — fuel pays only for arrivals
   for (let spent = 0; spent < testCase.fuel; spent++) {
     if (!driver.deliverNextArrival()) break;
