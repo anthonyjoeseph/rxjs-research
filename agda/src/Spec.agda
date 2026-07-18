@@ -4,7 +4,8 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.Nat  using (_≡ᵇ_)
 
-open import Rx.Prim using (Id; Source; InstEvent; value; InstEmit; _at_from_)
+open import Rx.Prim using (Id; Source; InstEvent; value; EmitKind;
+                           InstEmit; _at_from_as_)
 
 ------------------------------------------------------------------
 -- Clairvoyant batching: whole stream in view — group emits by
@@ -24,7 +25,7 @@ valuesOf (_       ∷ es) = valuesOf es
 -- every value the stream assigns to instant i, in stream order
 valuesAt : ∀ {A : Set} → Id → List (InstEmit A) → List A
 valuesAt i [] = []
-valuesAt i ((es at j from _) ∷ xs) =
+valuesAt i ((es at j from _ as _) ∷ xs) =
   (if i ≡ᵇ j then valuesOf es else []) ++ valuesAt i xs
 
 seenBefore : Id → List Id → Bool
@@ -32,17 +33,18 @@ seenBefore i []       = false
 seenBefore i (j ∷ js) = if i ≡ᵇ j then true else seenBefore i js
 
 -- one instant's batch: a single value event carrying the instant's
--- list of values, under the instant's own id — dropped when valueless
-batchOf : ∀ {A : Set} → Id → Source → List A → List (InstEmit (List A))
-batchOf i s []       = []
-batchOf i s (v ∷ vs) = ((value (v ∷ vs) ∷ []) at i from s) ∷ []
+-- list of values, under the instant's own id (envelope — source and
+-- kind — from the instant's first emit) — dropped when valueless
+batchOf : ∀ {A : Set} → Id → Source → EmitKind → List A → List (InstEmit (List A))
+batchOf i s k []       = []
+batchOf i s k (v ∷ vs) = ((value (v ∷ vs) ∷ []) at i from s as k) ∷ []
 
 specGo : ∀ {A : Set} → List Id → List (InstEmit A) → List (InstEmit (List A))
 specGo seen [] = []
-specGo seen ((es at i from s) ∷ xs) =
+specGo seen ((es at i from s as k) ∷ xs) =
   if seenBefore i seen
   then specGo seen xs
-  else batchOf i s (valuesOf es ++ valuesAt i xs) ++ specGo (i ∷ seen) xs
+  else batchOf i s k (valuesOf es ++ valuesAt i xs) ++ specGo (i ∷ seen) xs
 
 spec-batchSimultaneous : ∀ {A : Set} → List (InstEmit A) → List (InstEmit (List A))
 spec-batchSimultaneous = specGo []

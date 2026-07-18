@@ -14,8 +14,10 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; Source;
                            Timed; after_,_; ObservableInput; hot; cold;
-                           InstEvent; init; value; close; complete;
-                           InstEmit; _at_from_)
+                           InstEvent; init; value; close; handoff; complete;
+                           CloseReason; cut; exhausted;
+                           EmitKind; subscribe; delivery;
+                           InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
                            applyFn; evalTm; unfoldμ;
                            input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
@@ -229,7 +231,7 @@ cutThrough : ∀ {n} {Γ : Ctx n} {t}
            → List (Source × Chain Γ t) × List (InstEvent (Val Γ t))
 cutThrough nid []              = [] , []
 cutThrough nid ((src , c) ∷ r) with pathHasNode nid (proj₂ c) | cutThrough nid r
-... | true  | kept , closes = kept , close src ∷ closes
+... | true  | kept , closes = kept , close src cut ∷ closes
 ... | false | kept , closes = (src , c) ∷ kept , closes
 
 -- drop dead dynamic sources (no remaining registrations); hot input
@@ -289,8 +291,8 @@ oneShotBurst : ∀ {n} {Γ : Ctx n} {u}
              → List (Val Γ u) → Id → Sched Γ → Stream Γ u × Sched Γ
 oneShotBurst vals id sched =
   let (src , sched₁) = mintSource sched
-  in ((init src ∷ map value vals ++ close src ∷ complete ∷ [])
-       at id from src) ∷ [] , sched₁
+  in ((init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
+       at id from src as subscribe) ∷ [] , sched₁
 
 -- the subscription machine: walk the target expression, minting
 -- NodeIds for its operator nodes and installing their states (evalTm
@@ -343,7 +345,8 @@ splitEvents : ∀ {n} {Γ : Ctx n} {u} {A : Set}
 splitEvents []              = [] , [] , false
 splitEvents (value v  ∷ es) = let (vs , bs , c) = splitEvents es in v ∷ vs , bs , c
 splitEvents (init s   ∷ es) = let (vs , bs , c) = splitEvents es in vs , init s ∷ bs , c
-splitEvents (close s  ∷ es) = let (vs , bs , c) = splitEvents es in vs , close s ∷ bs , c
+splitEvents (close s r ∷ es) = let (vs , bs , c) = splitEvents es in vs , close s r ∷ bs , c
+splitEvents (handoff s ∷ es) = let (vs , bs , c) = splitEvents es in vs , handoff s ∷ bs , c
 splitEvents (complete ∷ es) = let (vs , bs , _) = splitEvents es in vs , bs , true
 
 splitBurst : ∀ {n} {Γ : Ctx n} {u} {A : Set}
@@ -422,7 +425,7 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} id now (take-f nid) κ vals fin sche
   takeVals (suc k)       []       = [] , suc k , false
   takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
   takeVals (suc (suc k)) (v ∷ vs) =
-    let (out , rem , cut) = takeVals (suc k) vs in v ∷ out , rem , cut
+    let (out , rem , didCut) = takeVals (suc k) vs in v ∷ out , rem , didCut
 
   dispatch : Maybe (NodeState Γ)
            → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
@@ -614,10 +617,11 @@ stepFrame {Γ = Γ} {t = t} {e = e} {u = u} id now (thru-outer exhaustᵒ nid) �
 -- ever retag event lists that stepFrame produced, which are value-free
 retagEvents : ∀ {A B : Set} → List (InstEvent A) → List (InstEvent B)
 retagEvents []              = []
-retagEvents (init s   ∷ es) = init s   ∷ retagEvents es
-retagEvents (close s  ∷ es) = close s  ∷ retagEvents es
-retagEvents (complete ∷ es) = complete ∷ retagEvents es
-retagEvents (value _  ∷ es) = retagEvents es
+retagEvents (init s    ∷ es) = init s    ∷ retagEvents es
+retagEvents (close s r ∷ es) = close s r ∷ retagEvents es
+retagEvents (handoff s ∷ es) = handoff s ∷ retagEvents es
+retagEvents (complete  ∷ es) = complete  ∷ retagEvents es
+retagEvents (value _   ∷ es) = retagEvents es
 
 -- push a child subscription's sync burst through the one frame just
 -- built above it: split each emit, step it, reassemble under the same
@@ -634,7 +638,8 @@ pushBurst id now f κ (em ∷ ems) sched st =
       (rest , sched₂ , st₂) = pushBurst id now f κ ems sched₁ st₁
   in ((bookkeeping ++ retagEvents evs ++ map value vals′
         ++ (if fin′ then complete ∷ [] else []))
-       at InstEmit.instant em from InstEmit.source em) ∷ rest , sched₂ , st₂
+       at InstEmit.instant em from InstEmit.source em as InstEmit.kind em)
+       ∷ rest , sched₂ , st₂
 
 -- the shared *All shape: mint the node, install its initial state,
 -- subscribe the outer under a thru-outer frame, push the burst through
@@ -663,11 +668,13 @@ subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                     → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
 subscribeSharedSlot {Γ = Γ} {e = e} i d κ id now sched st =
   if memberSource (toℕ i) (EvalSt.completedSources st)
-  then ((init (toℕ i) ∷ close (toℕ i) ∷ complete ∷ []) at id from toℕ i) ∷ []
+  then ((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
+         at id from toℕ i as subscribe) ∷ []
        , sched , st
   else if memberSource (toℕ i) (EvalSt.connectedShares st)
   then -- live: join mid-flight, future values only
-       ((init (toℕ i) ∷ []) at id from toℕ i) ∷ [] , sched , register (toℕ i) κ st
+       ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
+       , sched , register (toℕ i) κ st
   else connect
   where
   connect : Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
@@ -680,11 +687,13 @@ subscribeSharedSlot {Γ = Γ} {e = e} i d κ id now sched st =
     in if burstCompleted burst
        then -- the def died inside its own connect burst: latch, and
             -- this registration closes in the same instant
-            (((init (toℕ i) ∷ close (toℕ i) ∷ []) at id from toℕ i) ∷ burst)
+            (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+               at id from toℕ i as subscribe) ∷ burst)
             , sched₁ ,
             record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
                        ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
-       else ((init (toℕ i) ∷ []) at id from toℕ i) ∷ burst , sched₁ , st₂
+       else ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ burst
+            , sched₁ , st₂
 
 subscribeE {Γ = Γ} (input i) κ id now sched st with Sched.slots sched i
 ... | shared d = subscribeSharedSlot i d κ id now sched st
@@ -692,11 +701,13 @@ subscribeE {Γ = Γ} (input i) κ id now sched st with Sched.slots sched i
       if memberSource (toℕ i) (EvalSt.completedSources st)
       then -- spent script: a completed Subject — immediate
            -- close/complete, nothing registered
-           ((init (toℕ i) ∷ close (toℕ i) ∷ complete ∷ []) at id from toℕ i) ∷ []
+           ((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
+             at id from toℕ i as subscribe) ∷ []
            , sched , st
       else -- already live (sched-init, source = ordinal = toℕ i); just
            -- another registration — fan-out IS this multiplicity
-           ((init (toℕ i) ∷ []) at id from toℕ i) ∷ [] , sched , register (toℕ i) κ st
+           ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
+           , sched , register (toℕ i) κ st
 ... | scripted (cold sync []) =
       let (burst , sched₁) = oneShotBurst sync id sched
       in burst , sched₁ , st
@@ -710,8 +721,8 @@ subscribeE {Γ = Γ} (input i) κ id now sched st with Sched.slots sched i
                             ; elemTy = lookup Γ i
                             ; pending = resolve now (d ∷ ds) }
                      ∷ Sched.live sched₂ }
-      in ((init src ∷ map value sync) at id from src) ∷ [] , sched₃ ,
-         register src κ st
+      in ((init src ∷ map value sync) at id from src as subscribe) ∷ []
+         , sched₃ , register src κ st
 
 subscribeE (ofᵉ ts) κ id now sched st =
   let (burst , sched₁) = oneShotBurst (map (λ tm → evalTm tm) ts) id sched
@@ -777,7 +788,7 @@ subscribeE {u = u} (deferᵉ body) κ id now sched st =
                         ; elemTy = obs u
                         ; pending = (suc now , body) ∷ [] }
                  ∷ Sched.live sched₃ }
-  in ((init src ∷ []) at id from src) ∷ [] , sched₄ ,
+  in ((init src ∷ []) at id from src as subscribe) ∷ [] , sched₄ ,
      register src (thru-outer mergeᵒ nid ↠ κ)
               (installNode nid (merge-st 0 false) st)
 
@@ -806,13 +817,15 @@ foldPath : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → Stream Γ t × Sched Γ × EvalSt e
 foldPath id now envSrc root vals evs fin sched st =
   ((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
-    at id from envSrc) ∷ [] , sched , st
+    at id from envSrc as delivery) ∷ [] , sched , st
 foldPath id now envSrc (share-sink i) vals evs fin sched st =
-  -- the chain's own (valueless) emit first, then the fan-out: the
-  -- share delivers vals to every chain registered on it, still
-  -- inside this instant — the diamond case, batched by construction
+  -- the chain's own (valueless) emit first — announcing the handoff:
+  -- share i fans out next, still inside this instant.  The share
+  -- delivers vals to every chain registered on it — the diamond
+  -- case, batched by construction
   let (fanout , sched₁ , st₁) = dispatchShare id now i vals fin sched st
-  in ((evs at id from envSrc) ∷ fanout) , sched₁ , st₁
+  in (((evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery) ∷ fanout)
+     , sched₁ , st₁
 foldPath id now envSrc (f ↠ path′) vals evs fin sched st =
   let (vals′ , evs′ , fin′ , sched₁ , st₁) =
         stepFrame id now f path′ vals fin sched st
@@ -847,7 +860,8 @@ dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
   go (p ∷ ps) sched₀ st₀ =
     let (emits , sched₁ , st₁) =
           foldPath id now (toℕ i) p vals
-                   (if fin then close (toℕ i) ∷ [] else []) fin sched₀ st₀
+                   (if fin then close (toℕ i) exhausted ∷ [] else [])
+                   fin sched₀ st₀
         (rest , sched₂ , st₂) = go ps sched₁ st₁
     in emits ++ rest , sched₂ , st₂
 
@@ -866,7 +880,7 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep id a path sched st =
   foldPath id (arrTick a) (arrSource a) path (arrVal a ∷ [])
-           (if Arrival.isLast a then close (arrSource a) ∷ [] else [])
+           (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
 
 -- one arrival, count(source) emits: every live registration chain of

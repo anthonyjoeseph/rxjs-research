@@ -1,13 +1,14 @@
 module Rx.Protocol where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
-open import Data.Nat     using (ℕ; zero; suc; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 
-open import Rx.Prim using (Id; Source; InstEvent; init; value; close; complete;
-                           InstEmit; _at_from_)
+open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
+                           complete; EmitKind; subscribe; delivery;
+                           InstEmit; _at_from_as_)
 
 ------------------------------------------------------------------
 -- The protocol automaton: InstEmit's contract made explicit.
@@ -16,41 +17,28 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; complete;
 -- is the bridge premise that the two vocabularies tell the same
 -- story on a stream: what the evaluator promises
 -- (evaluate-well-formed) and what the batcher assumes
--- (batch-agreement).  stepProtocol rejects (nothing) any emit
--- breaking a clause:
+-- (batch-agreement).  Every fact here is WRITER-ASSERTED (the kind
+-- tag, the handoff announcement, the close reason) and the
+-- automaton only checks; it never reconstructs.  stepProtocol
+-- rejects (nothing) any emit breaking a clause:
 --
 --   instant freshness   — an instant is one contiguous run of
 --                         emits; once left it never recurs
 --   bracketing          — every close matches a live init; the
---                         live multiset never underflows
---   fan-out exactness   — within an instant, a source that fires
---                         delivers EXACTLY ONE emit per live
---                         registration: the owed count snapshots
---                         live(s) at s's first delivery and every
---                         delivery pays it down; an instant may
---                         only be left (or the stream end) fully
---                         paid.  This is the clause that makes
---                         owed = live-count recover boundaries.
+--                         live multiset never underflows (the
+--                         close REASON is descriptive: cut and
+--                         exhausted count the same here)
+--   fan-out exactness   — subscribe emits owe nothing and pay
+--                         nothing.  A delivery from s pays owed[s]:
+--                         seeded to live(s) at s's first delivery
+--                         of the instant (the arrival's implicit
+--                         announcement), and bumped by live(x) at
+--                         every `handoff x` (a share's explicit
+--                         one — so multi-round fan-outs and
+--                         announced-but-missing fan-outs are both
+--                         accounted).  An instant may only be left
+--                         (or the stream end) fully paid.
 --   complete discipline — after a complete event the stream ends
---
--- The contested heart is `settle`: which emits PAY the owed count
--- and which are births that owe nothing.  A registration born in
--- the subscribe frame (or a share-connect burst) emits its own
--- init emit; one born mid-arrival-cascade is silent until the next
--- arrival (dispatch snapshots the registry before it joins).  The
--- stream must let a reader tell these apart — that this is exactly
--- possible is a cousin of the open observable-provenance question,
--- and these clauses are the first concrete conjecture:
---   · init s AND close s in one emit from s: a one-shot (born and
---     died here) — owes nothing, pays nothing
---   · leading init s with live(s) = 0: a fresh registration's
---     subscribe emit — its emit is its own birth, net zero
---   · an emit that is EXACTLY [init s] with live(s) > 0: a bare
---     re-registration of an already-live source — net zero
---   · anything else from s is a delivery and pays
--- Expect QuickCheck to tune this file; the SHAPE (an online
--- automaton over live/seen/owed) is the commitment, the clause
--- list is the current best conjecture.
 ------------------------------------------------------------------
 
 Owed : Set                    -- this instant: remaining owed per source
@@ -86,8 +74,13 @@ removeOne s (x ∷ xs) with s ≡ᵇ x
 ...   | nothing  = nothing
 
 hasOwed : Source → Owed → Bool
-hasOwed s []             = false
+hasOwed s []            = false
 hasOwed s ((x , _) ∷ o) = if s ≡ᵇ x then true else hasOwed s o
+
+bumpOwed : Source → ℕ → Owed → Owed
+bumpOwed s k []            = (s , k) ∷ []
+bumpOwed s k ((x , n) ∷ o) =
+  if s ≡ᵇ x then (x , k + n) ∷ o else (x , n) ∷ bumpOwed s k o
 
 payOwed : Source → Owed → Maybe Owed     -- decrement; nothing on underflow
 payOwed s [] = nothing
@@ -104,73 +97,56 @@ allZero ((_ , zero)  ∷ o) = allZero o
 allZero ((_ , suc _) ∷ o) = false
 
 ------------------------------------------------------------------
--- reading one emit's event list
+-- one emit's events, folded left to right through the state: inits
+-- enlist, closes must match (bracketing), a handoff bumps the
+-- announced share's owed count by its live registrations AT THE
+-- ANNOUNCEMENT (frame traffic earlier in the same emit already
+-- applied — matching the dispatch-time registry), complete flips
+-- done, values carry no traffic
 ------------------------------------------------------------------
 
-hasInit : ∀ {A : Set} → Source → List (InstEvent A) → Bool
-hasInit s []             = false
-hasInit s (init x ∷ es)  = if s ≡ᵇ x then true else hasInit s es
-hasInit s (_      ∷ es)  = hasInit s es
-
-hasClose : ∀ {A : Set} → Source → List (InstEvent A) → Bool
-hasClose s []             = false
-hasClose s (close x ∷ es) = if s ≡ᵇ x then true else hasClose s es
-hasClose s (_       ∷ es) = hasClose s es
-
-leadingInit : ∀ {A : Set} → Source → List (InstEvent A) → Bool
-leadingInit s (init x ∷ _) = s ≡ᵇ x
-leadingInit s _            = false
-
-exactlyInit : ∀ {A : Set} → Source → List (InstEvent A) → Bool
-exactlyInit s (init x ∷ []) = s ≡ᵇ x
-exactlyInit s _             = false
-
--- fold the events through the registry: inits enlist, closes must
--- match (bracketing), complete flips done, values carry no traffic
-applyEvents : ∀ {A : Set} → List (InstEvent A) → List Source → Bool
-            → Maybe (List Source × Bool)
-applyEvents []               live done = just (live , done)
-applyEvents (init x   ∷ es) live done = applyEvents es (x ∷ live) done
-applyEvents (value _  ∷ es) live done = applyEvents es live done
-applyEvents (complete ∷ es) live done = applyEvents es live true
-applyEvents (close x  ∷ es) live done with removeOne x live
-... | just live′ = applyEvents es live′ done
+applyEvents : ∀ {A : Set} → List (InstEvent A)
+            → List Source → Owed → Bool
+            → Maybe (List Source × Owed × Bool)
+applyEvents []                 live owed done = just (live , owed , done)
+applyEvents (init x    ∷ es) live owed done = applyEvents es (x ∷ live) owed done
+applyEvents (value _   ∷ es) live owed done = applyEvents es live owed done
+applyEvents (handoff x ∷ es) live owed done =
+  applyEvents es live (bumpOwed x (countIn x live) owed) done
+applyEvents (complete  ∷ es) live owed done = applyEvents es live owed true
+applyEvents (close x _ ∷ es) live owed done with removeOne x live
+... | just live′ = applyEvents es live′ owed done
 ... | nothing    = nothing
 
--- fan-out payment: snapshot live(s) at s's first delivery of the
--- instant, then every delivery pays one.  live is the multiset
--- BEFORE this emit's events — births inside the delivery (flattened
--- inner subscriptions) never owe this instant
-settle : ∀ {A : Set} → List (InstEvent A) → Source → List Source → Owed
-       → Maybe Owed
-settle es s live owed =
-  if hasInit s es ∧ hasClose s es
-  then just owed                                   -- one-shot: born and died here
-  else if leadingInit s es ∧ (countIn s live ≡ᵇ 0)
-  then just owed                                   -- fresh registration's subscribe emit
-  else if exactlyInit s es
-  then just owed                                   -- bare re-registration, live source
-  else if hasOwed s owed
-  then payOwed s owed                              -- delivery: pay
-  else payOwed s ((s , countIn s live) ∷ owed)     -- first delivery: snapshot, pay
+-- the kind tag IS the payment rule: a subscription's own burst is
+-- net zero; a delivery pays owed[s], seeded from live(s) — the
+-- multiset BEFORE this emit's events, matching the cascade's
+-- chain snapshot — at s's first delivery of the instant
+settle : EmitKind → Source → List Source → Owed → Maybe Owed
+settle subscribe s live owed = just owed
+settle delivery  s live owed =
+  if hasOwed s owed
+  then payOwed s owed
+  else payOwed s (bumpOwed s (countIn s live) owed)
 
 ------------------------------------------------------------------
 -- the step
 ------------------------------------------------------------------
 
 stepProtocol : ∀ {A : Set} → InstEmit A → ProtocolSt → Maybe ProtocolSt
-stepProtocol (es at i from s) ps = if ProtocolSt.done ps then nothing else enter
+stepProtocol (es at i from s as k) ps =
+  if ProtocolSt.done ps then nothing else enter
   where
   -- run one emit inside instant i (owed so far, instants closed so far)
   go : Owed → List Id → Maybe ProtocolSt
-  go owed seen′ with settle es s (ProtocolSt.live ps) owed
+  go owed seen′ with settle k s (ProtocolSt.live ps) owed
   ... | nothing    = nothing
-  ... | just owed′ with applyEvents es (ProtocolSt.live ps) false
-  ...   | nothing              = nothing
-  ...   | just (live′ , done′) =
+  ... | just owed′ with applyEvents es (ProtocolSt.live ps) owed′ false
+  ...   | nothing                      = nothing
+  ...   | just (live′ , owed″ , done′) =
           just (record { live    = live′
                        ; seen    = seen′
-                       ; current = just (i , owed′)
+                       ; current = just (i , owed″)
                        ; done    = done′ })
 
   enter : Maybe ProtocolSt

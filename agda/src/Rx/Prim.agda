@@ -26,10 +26,22 @@ Source = ℕ                          -- concrete so the scheduler can mint & co
 -- of that source forwards EXACTLY ONE InstEmit (possibly valueless —
 -- emits are emptied, never swallowed), so a batcher owes
 -- count(source) emits for an instant and flushes when they've arrived.
+-- Writer-asserted facts (the reader checks, never reconstructs):
+-- every mint site knows definitively whether it is a subscription
+-- burst or an arrival delivery, and why a registration ended.
+data EmitKind : Set where
+  subscribe : EmitKind              -- a subscription's own burst — owes nothing, pays nothing
+  delivery  : EmitKind              -- an arrival emit — pays the instant's owed count
+
+data CloseReason : Set where
+  cut       : CloseReason           -- an operator ended it (take's cut, switch switching away)
+  exhausted : CloseReason           -- the source ran dry on its own
+
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive
   value    : A → InstEvent A
-  close    : Source → InstEvent A   -- a registration of this source ended (take cuts, switches away)
+  close    : Source → CloseReason → InstEvent A   -- a registration of this source ended
+  handoff  : Source → InstEvent A   -- this share fans out next, still inside this instant
   complete : InstEvent A            -- the stream completes as part of THIS emit (concatAll grafts on it)
 
 -- Everything is an InstEmit stream — including batchSimultaneous's
@@ -37,10 +49,11 @@ data InstEvent (A : Set) : Set where
 -- protocol citizen, so a batched stream feeds every primitive again
 -- (e.g. merge it with itself and batch once more).
 record InstEmit (A : Set) : Set where
-  constructor _at_from_
+  constructor _at_from_as_
   field events  : List (InstEvent A)  -- everything caused by one incoming emit, COALESCED
         instant : Id                  -- the instant it belongs to
         source  : Source              -- the arrival's source (owed = its live-registration count)
+        kind    : EmitKind            -- who minted it: a subscription or an arrival cascade
 
 ------------------------------------------------------------------
 -- Timed inputs (delta-encoded; real gap = suc wait, so per-source

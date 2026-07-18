@@ -41,14 +41,16 @@ const deferHop = (
         events: [{ type: "init", source }],
         instant: driver.currentInstant(),
         source,
+        kind: "subscribe",
       }),
       oneShotArrival(driver, driver.currentTick() + 1).pipe(
         mergeMap(({ instant }) =>
           merge(
             rxOf<InstEmit<Val>>({
-              events: [{ type: "close", source }],
+              events: [{ type: "close", source, reason: "exhausted" }],
               instant,
               source,
+              kind: "delivery",
             }),
             rxDefer(compileBody),
           ),

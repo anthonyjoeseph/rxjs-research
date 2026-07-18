@@ -8,10 +8,17 @@ export type SourceId = number | symbol; // a SOURCE observable; the impl counts 
 // of that source forwards EXACTLY ONE InstEmit (possibly valueless —
 // emits are emptied, never swallowed), so a batcher owes count(source)
 // emits for an instant and flushes when they've arrived.
+// Writer-asserted facts (the reader checks, never reconstructs):
+// every mint site knows definitively whether it is a subscription
+// burst or an arrival delivery, and why a registration ended.
+export type EmitKind = "subscribe" | "delivery"; // subscribe: a subscription's own burst — owes nothing; delivery: pays the instant's owed count
+export type CloseReason = "cut" | "exhausted"; // cut: an operator ended it (take, switch); exhausted: the source ran dry
+
 export type InstEvent<A> =
   | { type: "init"; source: SourceId } // a registration chain of this source came alive
   | { type: "value"; value: A }
-  | { type: "close"; source: SourceId } // a registration of this source ended (take cuts, switches away)
+  | { type: "close"; source: SourceId; reason: CloseReason } // a registration of this source ended
+  | { type: "handoff"; source: SourceId } // this share fans out next, still inside this instant
   | { type: "complete" }; // the stream completes as part of THIS emit (concatAll grafts on it)
 
 // Everything is an InstEmit stream — including batchSimultaneous's
@@ -22,4 +29,5 @@ export type InstEmit<A> = {
   events: InstEvent<A>[]; // everything caused by one incoming emit, COALESCED
   instant: Provenance; // the instant it belongs to
   source: SourceId; // the arrival's source (owed = its live-registration count)
+  kind: EmitKind; // who minted it: a subscription or an arrival cascade
 };

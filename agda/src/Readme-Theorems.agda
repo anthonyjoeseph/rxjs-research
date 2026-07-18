@@ -15,7 +15,7 @@ open import Data.Vec     using ([]; _∷_)     -- contexts are Vecs; ∷/[] over
 open import Data.Fin     using (zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim      using (Fuel; InstEmit; _at_from_; after_,_; hot)
+open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_; after_,_; hot)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ;
                                 input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 concatAllᵉ; exhaustAllᵉ; evalTm; applyFn)
@@ -29,7 +29,7 @@ open import Spec         using (spec-batchSimultaneous; valuesOf)
 
 emitValues : ∀ {A : Set} → List (InstEmit A) → List A
 emitValues []                     = []
-emitValues ((es at _ from _) ∷ xs) = valuesOf es ++ emitValues xs
+emitValues ((es at _ from _ as _) ∷ xs) = valuesOf es ++ emitValues xs
 
 ------------------------------------------------------------------
 -- shorthands: merge as mergeAll∘of, and the tiny slot assignments

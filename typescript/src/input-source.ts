@@ -31,11 +31,14 @@ const scriptedDeliveries = (
       deliver(
         {
           events: [
-            ...(isLast ? [{ type: "close", source } as const] : []),
+            ...(isLast
+              ? [{ type: "close", source, reason: "exhausted" } as const]
+              : []),
             { type: "value", value: val } as const,
           ],
           instant,
           source,
+          kind: "delivery",
         },
         isLast,
       ),
@@ -74,17 +77,19 @@ export const makeInputSource = (
         ? of<InstEmit<Val>>({
             events: [
               { type: "init", source },
-              { type: "close", source },
+              { type: "close", source, reason: "exhausted" },
               { type: "complete" },
             ],
             instant: driver.currentInstant(),
             source,
+            kind: "subscribe",
           })
         : merge(
             of<InstEmit<Val>>({
               events: [{ type: "init", source }],
               instant: driver.currentInstant(),
               source,
+              kind: "subscribe",
             }),
             subject,
           ),
@@ -98,11 +103,15 @@ export const makeInputSource = (
         { type: "init", source },
         ...input.sync.map((value) => ({ type: "value", value }) as const),
         ...(spent
-          ? [{ type: "close", source } as const, { type: "complete" } as const]
+          ? [
+              { type: "close", source, reason: "exhausted" } as const,
+              { type: "complete" } as const,
+            ]
           : []),
       ],
       instant: driver.currentInstant(),
       source,
+      kind: "subscribe",
     };
     return spent
       ? of(burst)

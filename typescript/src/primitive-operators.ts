@@ -16,6 +16,13 @@ export declare const empty: Observable<InstEmit<never>>;
 // as the Agda dispatchShare latches before its fan-out): a subscriber
 // joining mid-final-cascade already gets the one-shot
 // init/close/complete, never a registration dropped without its close.
+// Protocol duties (mirror of Agda foldPath's share-sink clause): the
+// upstream emit that triggers a fan-out passes through FIRST, emptied
+// of values, with a `handoff` event for this share appended — the
+// writer-asserted announcement that the fan-out follows in the same
+// instant.  Fan-out emits are kind "delivery"; per-subscriber
+// init/one-shot emits are kind "subscribe"; closes minted here (the
+// def completing) carry reason "exhausted".
 export declare const share: <A>(
   obs: Observable<InstEmit<A>>,
   source: SourceId,
