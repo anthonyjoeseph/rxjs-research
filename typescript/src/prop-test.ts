@@ -57,13 +57,26 @@ export type TestCase = {
   fuel: Fuel;
 };
 
-// generator bias (which operator to feature at/near the root) and the
-// chosen seed; the CLI readers and the Agda bridge (execAgda) are still
-// stubs — the seeded generator and the corpus encoder now live in
-// generator.ts / serialize.ts
-declare const readOperatorFromCli: () => string | undefined;
-declare const readSeedFromCli: () => string | undefined;
+// CLI flags biasing the run: `--operator <op>` features that operator at
+// the root of every generated program (the generator ignores an unknown
+// name); `--seed <s>` pins a single seed, else the full genSeeds() sweep.
+// Both accept `--flag value` and `--flag=value`; absent ⇒ undefined.
+const readFlag = (name: string): string | undefined => {
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === `--${name}`) {
+      const next = argv[i + 1];
+      return next !== undefined && !next.startsWith("--") ? next : undefined;
+    }
+    if (arg.startsWith(`--${name}=`)) return arg.slice(name.length + 3);
+  }
+  return undefined;
+};
+const readOperatorFromCli = (): string | undefined => readFlag("operator");
+const readSeedFromCli = (): string | undefined => readFlag("seed");
 
+// the Agda bridge (execAgda) is still a stub
 declare const execAgda: (
   serialized: string[],
 ) => Promise<Stream[]>; // one long-lived process, JSON over stdio — not a spawn per case
