@@ -7,6 +7,7 @@ import { makeInputSource } from "./input-source.js";
 import { compile } from "./compile.js";
 import { genSeeds, genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
+import { execAgda } from "./agda-bridge.js";
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -76,10 +77,6 @@ const readFlag = (name: string): string | undefined => {
 const readOperatorFromCli = (): string | undefined => readFlag("operator");
 const readSeedFromCli = (): string | undefined => readFlag("seed");
 
-// the Agda bridge (execAgda) is still a stub
-declare const execAgda: (
-  serialized: string[],
-) => Promise<Stream[]>; // one long-lived process, JSON over stdio — not a spawn per case
 
 // createDriver (virtual time, the one impure edge), makeInputSource
 // (scripted slots → protocol streams), and compile (the per-node
