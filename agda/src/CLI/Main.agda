@@ -7,7 +7,7 @@ module CLI.Main where
 
 open import Data.Char using (Char; toℕ)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Maybe using (Maybe; just; nothing; maybe)
+open import Data.Maybe using (Maybe; just; nothing; maybe′)
 open import Data.Nat using (ℕ; _≡ᵇ_)
 open import Data.String using (String; toList; fromChar; _++_)
 open import Data.Bool using (if_then_else_)
@@ -20,11 +20,15 @@ toCodes : List Char → List ℕ
 toCodes = map toℕ
 
 -- one input line → one output line: parse, decode, evaluate, encode; a
--- parse or decode failure prints `null` (kept positional by execAgda)
+-- parse or decode failure prints `null` (kept positional by execAgda).
+-- NB: maybe′ (the NON-dependent eliminator), not maybe — the dependent
+-- `maybe` makes Agda infer a motive over `decodeCase j`, which forces it
+-- to normalize that call symbolically and unfold the whole elaborator
+-- (minutes of typechecking). maybe′'s constant result type sidesteps it.
 process : List Char → String
 process line =
-  maybe (λ j → maybe (λ s → s) "null" (decodeCase j)) "null"
-        (parseJSON (toCodes line))
+  maybe′ (λ j → maybe′ (λ s → s) "null" (decodeCase j)) "null"
+         (parseJSON (toCodes line))
 
 private
   nl : Char

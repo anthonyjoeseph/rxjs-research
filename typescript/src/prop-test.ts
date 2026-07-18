@@ -1,6 +1,6 @@
 import { Observable, firstValueFrom, merge, of, toArray } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
-import { InstEmit } from "./inst-emit.js";
+import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
 import { materializeCompletion, share } from "./primitive-operators.js";
 import { batchSimultaneous } from "./batch-simultaneous.js";
 import { createDriver } from "./driver.js";
@@ -124,11 +124,36 @@ const evaluateRx = async (testCase: TestCase): Promise<EvalResult> => {
   return { stream: out, batches };
 };
 
-// Structural JSON equality (streams/batches are compared up to id
-// renaming in principle, but the two sides mint ids the same way, so a
-// byte-for-byte compare of the normalized JSON is the practical check).
-const sameJSON = (a: unknown, b: unknown): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
+// Streams are compared up to id renaming (≈): the ids' only meaning is
+// the partition structure, so canonicalize both sides before comparing.
+// Instants and sources are separate namespaces (an arrival's cascade vs
+// an observable), each renamed to 0,1,2,… in first-appearance order over
+// the flat stream. This also erases the representation gap — TS mints ids
+// as `symbol` (dropped by JSON.stringify), Agda as ℕ — since each side is
+// renamed independently to the same integers. Values/kinds/event
+// types/order still compare exactly.
+const canonical = <A>(stream: InstEmit<A>[]): unknown => {
+  const inst = new Map<Provenance, number>();
+  const src = new Map<SourceId, number>();
+  const ri = (id: Provenance): number =>
+    inst.has(id) ? inst.get(id)! : (inst.set(id, inst.size), inst.size - 1);
+  const rs = (id: SourceId): number =>
+    src.has(id) ? src.get(id)! : (src.set(id, src.size), src.size - 1);
+  return stream.map((emit) => ({
+    kind: emit.kind,
+    instant: ri(emit.instant),
+    source: rs(emit.source),
+    events: emit.events.map((ev) =>
+      ev.type === "value" || ev.type === "complete"
+        ? ev
+        : { ...ev, source: rs(ev.source) },
+    ),
+  }));
+};
+
+// Structural equality up to id renaming.
+const sameStream = <A>(a: InstEmit<A>[], b: InstEmit<A>[]): boolean =>
+  JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 
 // Compare the Agda (oracle) and rxjs results case by case, on BOTH the
 // raw stream and the batched output, and render a compact report.
@@ -143,19 +168,19 @@ const interpretResults = (
   for (let i = 0; i < n; i++) {
     const a = agdaResults[i];
     const r = rxResults[i];
-    const sEq = sameJSON(a.stream, r.stream);
-    const bEq = sameJSON(a.batches, r.batches);
+    const sEq = sameStream(a.stream, r.stream);
+    const bEq = sameStream(a.batches, r.batches);
     if (sEq) streamOk++;
     if (bEq) batchOk++;
     if (!sEq || !bEq) {
       lines.push(`case ${i}: ${sEq ? "stream ✓" : "stream ✗"} ${bEq ? "batches ✓" : "batches ✗"}`);
       if (!sEq) {
-        lines.push(`  agda.stream  = ${JSON.stringify(a.stream)}`);
-        lines.push(`  rx.stream    = ${JSON.stringify(r.stream)}`);
+        lines.push(`  agda.stream  = ${JSON.stringify(canonical(a.stream))}`);
+        lines.push(`  rx.stream    = ${JSON.stringify(canonical(r.stream))}`);
       }
       if (!bEq) {
-        lines.push(`  agda.batches = ${JSON.stringify(a.batches)}`);
-        lines.push(`  rx.batches   = ${JSON.stringify(r.batches)}`);
+        lines.push(`  agda.batches = ${JSON.stringify(canonical(a.batches))}`);
+        lines.push(`  rx.batches   = ${JSON.stringify(canonical(r.batches))}`);
       }
     }
   }
