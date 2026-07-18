@@ -13,7 +13,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
-open import Data.String using (String; toList)
+open import Data.String using (String; toList) renaming (_++_ to _++ˢ_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (Vec; lookup; fromList)
@@ -30,8 +30,9 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _�
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
                           add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Rx.Evaluator using (Slot; scripted; shared; Slots; evaluate)
+open import Implementation using (impl-batchSimultaneous)
 open import CLI.JSON
-open import CLI.Encode using (encodeStream)
+open import CLI.Encode using (encodeStream; encodeBatched)
 
 ------------------------------------------------------------------------
 -- JSON accessors and Maybe plumbing
@@ -312,4 +313,7 @@ decodeCase j =
   decodeExp BIG (fromList tys) [] [] [] t expJ >>=? λ e →
   getField "slots" j >>=? asArr >>=? decodeSlots BIG (fromList tys) >>=? λ ins →
   getField "fuel" j >>=? asNum >>=? λ f →
-  just (encodeStream t (evaluate f e ins))
+  let stream = evaluate f e ins in
+  just ("{" ++ˢ "\"stream\":" ++ˢ encodeStream t stream
+            ++ˢ ",\"batches\":" ++ˢ encodeBatched t (impl-batchSimultaneous stream)
+            ++ˢ "}")

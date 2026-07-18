@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import type { Stream } from "./prop-test.js";
+import type { EvalResult } from "./prop-test.js";
 
 // The Agda bridge. One long-lived process for the whole batch (not a
 // spawn per case): the compiled CLI reads NDJSON cases on stdin — one
@@ -19,7 +19,7 @@ const defaultBin = resolve(
 );
 const binPath = (): string => process.env.AGDA_CLI_BIN ?? defaultBin;
 
-export const execAgda = (serialized: string[]): Promise<Stream[]> =>
+export const execAgda = (serialized: string[]): Promise<EvalResult[]> =>
   new Promise((resolvePromise, reject) => {
     if (serialized.length === 0) return resolvePromise([]);
     const bin = binPath();
@@ -53,7 +53,14 @@ export const execAgda = (serialized: string[]): Promise<Stream[]> =>
           ),
         );
       try {
-        resolvePromise(lines.map((line) => JSON.parse(line) as Stream));
+        // each line is either `null` (declined case) or
+        // {"stream":[...],"batches":[...]} — normalize null to empty pair
+        resolvePromise(
+          lines.map((line) => {
+            const parsed = JSON.parse(line) as EvalResult | null;
+            return parsed ?? { stream: [], batches: [] };
+          }),
+        );
       } catch (e) {
         reject(new Error(`Agda CLI produced non-JSON output: ${String(e)}`));
       }

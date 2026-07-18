@@ -1,7 +1,8 @@
-import { Observable, merge } from "rxjs";
+import { Observable, firstValueFrom, merge, of, toArray } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
 import { InstEmit } from "./inst-emit.js";
 import { materializeCompletion, share } from "./primitive-operators.js";
+import { batchSimultaneous } from "./batch-simultaneous.js";
 import { createDriver } from "./driver.js";
 import { makeInputSource } from "./input-source.js";
 import { compile } from "./compile.js";
@@ -49,6 +50,11 @@ export type Slots = Slot[]; // one per Γ slot, index-aligned
 export type Stream = InstEmit<Val>[]; // the flat canonical stream
 export type Grouped = InstEmit<Val[]>[]; // batchSimultaneous's output: one emit per instant, still a protocol citizen (re-batchable)
 
+// one program's two outputs: the raw InstEmit stream the exp tree
+// produced, and that same stream folded through batchSimultaneous. Both
+// sides (TS-here and Agda-via-CLI) return this pair per case.
+export type EvalResult = { stream: Stream; batches: Grouped };
+
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the slots, index-aligned with slots.
 export type TestCase = {
@@ -82,7 +88,7 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // (scripted slots → protocol streams), and compile (the per-node
 // switch onto the primitive-operators) live in their own modules.
 
-const evaluateRx = async (testCase: TestCase): Promise<Stream> => {
+const evaluateRx = async (testCase: TestCase): Promise<EvalResult> => {
   const driver = createDriver();
   // the const telescope, literally: each shared slot compiles against
   // the prefix of already-built slots and connects through the
@@ -108,15 +114,58 @@ const evaluateRx = async (testCase: TestCase): Promise<Stream> => {
     if (!driver.deliverNextArrival()) break;
   }
   sub.unsubscribe();
-  return out;
+  // the batched twin: hand the finite raw stream to plain rxjs `of`, run
+  // it through the same batchSimultaneous operator the Agda side folds
+  // with, and toArray it back — so we hold both the raw emits and the
+  // fully batched result for the same program.
+  const batches = await firstValueFrom(
+    of(...out).pipe(batchSimultaneous<Val>(), toArray()),
+  );
+  return { stream: out, batches };
 };
 
-// Streams are compared up to id renaming (≈): partition structure is
-// the only meaning the ids have.
-declare const interpretResults: (
-  agdaResults: Stream[],
-  rxResults: Stream[],
-) => string;
+// Structural JSON equality (streams/batches are compared up to id
+// renaming in principle, but the two sides mint ids the same way, so a
+// byte-for-byte compare of the normalized JSON is the practical check).
+const sameJSON = (a: unknown, b: unknown): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+// Compare the Agda (oracle) and rxjs results case by case, on BOTH the
+// raw stream and the batched output, and render a compact report.
+const interpretResults = (
+  agdaResults: EvalResult[],
+  rxResults: EvalResult[],
+): string => {
+  const n = Math.min(agdaResults.length, rxResults.length);
+  const lines: string[] = [];
+  let streamOk = 0;
+  let batchOk = 0;
+  for (let i = 0; i < n; i++) {
+    const a = agdaResults[i];
+    const r = rxResults[i];
+    const sEq = sameJSON(a.stream, r.stream);
+    const bEq = sameJSON(a.batches, r.batches);
+    if (sEq) streamOk++;
+    if (bEq) batchOk++;
+    if (!sEq || !bEq) {
+      lines.push(`case ${i}: ${sEq ? "stream ✓" : "stream ✗"} ${bEq ? "batches ✓" : "batches ✗"}`);
+      if (!sEq) {
+        lines.push(`  agda.stream  = ${JSON.stringify(a.stream)}`);
+        lines.push(`  rx.stream    = ${JSON.stringify(r.stream)}`);
+      }
+      if (!bEq) {
+        lines.push(`  agda.batches = ${JSON.stringify(a.batches)}`);
+        lines.push(`  rx.batches   = ${JSON.stringify(r.batches)}`);
+      }
+    }
+  }
+  const header =
+    `${n} cases: stream ${streamOk}/${n} match, batches ${batchOk}/${n} match` +
+    (agdaResults.length !== rxResults.length
+      ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
+      : "");
+  return [header, ...lines].join("\n");
+};
 
 async function main() {
   const operator = readOperatorFromCli();

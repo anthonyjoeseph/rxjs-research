@@ -79,3 +79,36 @@ encodeStream t ems = arr (go ems)
     go : List (InstEmit (Val _ t)) → List String
     go []       = []
     go (e ∷ es) = encEmit t e ∷ go es
+
+-- The batched twin: impl-batchSimultaneous folds the stream into
+-- List (InstEmit (List (Val Γ t))) — a value event now carries all of an
+-- instant's values, so it encodes as a JSON array of encoded values.
+private
+  encEventB : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEvent (List (Val Γ t)) → String
+  encEventB t (init s)     = "{" ++ field′ "type" (quote′ "init") ++ "," ++ field′ "source" (show s) ++ "}"
+  encEventB t (value vs)   = "{" ++ field′ "type" (quote′ "value") ++ "," ++ field′ "value" (arr (mapVals vs)) ++ "}"
+    where
+      mapVals : List (Val _ t) → List String
+      mapVals []       = []
+      mapVals (v ∷ vs) = encodeVal t v ∷ mapVals vs
+  encEventB t (close s r)  = "{" ++ field′ "type" (quote′ "close") ++ "," ++ field′ "source" (show s) ++ "," ++ field′ "reason" (encReason r) ++ "}"
+  encEventB t (handoff s)  = "{" ++ field′ "type" (quote′ "handoff") ++ "," ++ field′ "source" (show s) ++ "}"
+  encEventB t complete     = "{" ++ field′ "type" (quote′ "complete") ++ "}"
+
+  encEmitB : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEmit (List (Val Γ t)) → String
+  encEmitB t (es at i from s as k) =
+    "{" ++ field′ "events" (arr (mapEvents es))
+        ++ "," ++ field′ "instant" (show i)
+        ++ "," ++ field′ "source" (show s)
+        ++ "," ++ field′ "kind" (encKind k) ++ "}"
+    where
+      mapEvents : List (InstEvent (List (Val _ t))) → List String
+      mapEvents []       = []
+      mapEvents (e ∷ es) = encEventB t e ∷ mapEvents es
+
+encodeBatched : ∀ {n} {Γ : Ctx n} (t : Ty) → List (InstEmit (List (Val Γ t))) → String
+encodeBatched t ems = arr (go ems)
+  where
+    go : List (InstEmit (List (Val _ t))) → List String
+    go []       = []
+    go (e ∷ es) = encEmitB t e ∷ go es
