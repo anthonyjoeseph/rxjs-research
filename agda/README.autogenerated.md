@@ -28,9 +28,10 @@ settling on `[6, 50]`. This is the diamond problem.
 ## 2. The solution, in one paragraph
 
 Every emission is tagged with a provenance **id** — an `InstEmit<A>` carries a
-coalesced list of protocol events (`init`/`value`/`close`/`fin`, v1's protocol)
-plus the id of the _instant_ (root cause) it belongs to and the source it came
-from. All emissions synchronously caused by one trigger share its instant id;
+coalesced list of protocol events (`init`/`value`/`close`/`handoff`/`complete`)
+plus the id of the _instant_ (root cause) it belongs to, the source it came
+from, and its **kind** (a subscription's own burst vs an arrival delivery).
+All emissions synchronously caused by one trigger share its instant id;
 independent triggers always get distinct ids. A downstream operator,
 `batchSimultaneous`, groups the stream by instant id, emitting each
 causally-atomic batch exactly once, as soon as it is complete — a single
@@ -38,9 +39,13 @@ causally-atomic batch exactly once, as soon as it is complete — a single
 instant id, so a batched stream is again an `Observable<InstEmit>` that feeds
 every primitive (merge it with itself and batch once more). Completeness is
 decided by counting: init/close traffic maintains the live-registration count
-per source, and each live registration forwards exactly one (possibly
-valueless) emit per arrival. Consumers act per-batch and never observe glitch
-states.
+per source, each live registration forwards exactly one (possibly valueless)
+delivery per arrival, and a share announces its fan-out with a `handoff`
+event before it fires. Every fact is **writer-asserted** — each mint site
+knows whether it is a subscription or a delivery, and why a registration
+closed (`cut` by an operator vs `exhausted` on its own) — so a reader checks
+the accounting rather than reconstructing it. Consumers act per-batch and
+never observe glitch states.
 
 The **thesis being verified**: an _online_ batcher — one that sees a single
 emission at a time, keeps only its own state, and never looks ahead — recovers
@@ -99,13 +104,33 @@ job.
 ### 4.1 `InstEmit` — provenance-tagged emissions
 
 ```agda
+data EmitKind : Set where
+  subscribe delivery : EmitKind      -- who minted it: a subscription's own
+                                     -- burst (owes nothing) vs an arrival
+                                     -- delivery (pays the owed count)
+
+data CloseReason : Set where
+  cut exhausted : CloseReason        -- an operator ended it vs ran dry
+
+data InstEvent (A : Set) : Set where
+  init     : Source → InstEvent A                 -- a registration came alive
+  value    : A → InstEvent A
+  close    : Source → CloseReason → InstEvent A   -- a registration ended
+  handoff  : Source → InstEvent A                 -- this share fans out next,
+                                                  -- still inside this instant
+  complete : InstEvent A                          -- the stream completes as
+                                                  -- part of THIS emit
+
 record InstEmit (A : Set) : Set where
-  field val : A
-        iid : Id
+  constructor _at_from_as_
+  field events  : List (InstEvent A)   -- everything caused by one incoming emit
+        instant : Id                   -- the instant it belongs to
+        source  : Source               -- the arrival's source
+        kind    : EmitKind             -- subscription burst or arrival delivery
 ```
 
-In TypeScript, `Id` is a `Symbol()`. Since Symbols do not serialize, all
-cross-language comparison is done **up to id renaming** (`≈`) — what is
+In TypeScript, instant ids are `Symbol()`s. Since Symbols do not serialize,
+all cross-language comparison is done **up to id renaming** (`≈`) — what is
 compared is the _partition structure_, which is the only thing
 batchSimultaneous computes anyway.
 
@@ -310,7 +335,11 @@ observable hot"):
 - **Fan-out is the counting protocol.** The share is a `Source` whose id is
   its slot index (the hots' convention); one upstream arrival yields one
   emit per registration, all in the same instant. The diamond problem is
-  this clause.
+  this clause. The upstream emit that triggers a fan-out passes through
+  first, emptied of values, carrying a **`handoff`** event for the share —
+  the announcement that the fan-out follows in the same instant, which is
+  what lets an online reader account for multi-round fan-outs and never
+  mistake a mid-instant lull for the instant's end.
 
 Why all-resets-false is the primitive: the resets are not derivable from it
 (recovering `resetOnComplete: true` needs a fresh *shared* identity minted
@@ -456,15 +485,42 @@ spec-batchSimultaneous : List (InstEmit A) → List (InstEmit (List A))
 step-batch : InstEmit A → BatchSt A → List (InstEmit (List A)) × BatchSt A
 impl-batchSimultaneous  = fold step-batch ++ flushBatch
   -- online: one emission at a time, own state only
-
-formal-verification-batchSimultaneous :
-  ∀ xs → spec-batchSimultaneous xs ≡ impl-batchSimultaneous xs
 ```
 
-Quantified over **streams**, not trees — composition with `evaluate` in front
-of both sides is definitional. The proof is induction over a list with an
-invariant relating `BatchSt` to the spec's partition-so-far: no tree, no
-scheduler, no operator semantics in sight.
+The two sides read **different** information — the spec reads instant ids,
+the impl reads kinds, counts, and handoffs — so they agree only on streams
+where the two vocabularies tell the same story. That contract is
+`WellFormed` (`Rx.Protocol`): an online automaton over the live-registration
+multiset and the open instant's owed table, checking instant freshness
+(one contiguous run, never recurring), bracketing (every close matches a
+live init), fan-out exactness (subscribe emits owe nothing; a delivery from
+`s` pays `owed[s]`, seeded from `live(s)` at the arrival and bumped by
+`live(x)` at every `handoff x`; instants close fully paid), and complete
+discipline (nothing after `complete`). The proof is a sandwich:
+
+```agda
+evaluate-well-formed :                          -- the primitives' half
+  ∀ fuel e ins → WellFormed (evaluate fuel e ins)
+
+batch-agreement :                               -- the batcher's half
+  ∀ xs → WellFormed xs →
+  spec-batchSimultaneous xs ≡ impl-batchSimultaneous xs
+
+formal-verification-batchSimultaneous :         -- THE verified object
+  ∀ fuel e ins →
+  spec-batchSimultaneous (evaluate fuel e ins)
+    ≡ impl-batchSimultaneous (evaluate fuel e ins)
+formal-verification-batchSimultaneous fuel e ins =
+  batch-agreement _ (evaluate-well-formed fuel e ins)   -- already a definition
+```
+
+`batch-agreement` is quantified over **streams**, not trees — its proof is
+induction over a list with an invariant relating `BatchSt` to the spec's
+partition-so-far: no tree, no scheduler, no operator semantics in sight.
+`evaluate-well-formed` is one preservation lemma per primitive — a primitive
+is correctly implemented iff its clause preserves the protocol automaton's
+invariant. The composition is discharged forever; all remaining proof debt
+lives in the two lemmas.
 
 ### 7.1 The id laws (the bridge premise)
 
@@ -637,9 +693,10 @@ Chronological, because the _reasons_ are the documentation:
 
 Postulates that are really **definitions to write** (finite structural
 recursions; `formal-verification` proofs need them to _compute_):
-`evalTm`, `applyFn`, `unfoldμ`, `wkᵍ`, the evaluator itself,
-`step-batch`/`flushBatch`, and the glue identifying `impl-batchSimultaneous`
-with the fold. `PrimOp` must become a concrete datatype (a postulate can't be
+`evalTm`, `applyFn`, `unfoldμ`, `wkᵍ`, `step-batch`/`flushBatch`, and the
+glue identifying `impl-batchSimultaneous` with the fold (the evaluator,
+`spec-batchSimultaneous`, and the `Rx.Protocol` automaton are already
+defined). `PrimOp` must become a concrete datatype (a postulate can't be
 serialized or given a TS twin). `id-inheritance` and `defer-shift` need their
 `⊤` placeholders replaced once `ids-of` / tick-shift vocabulary is defined.
 
@@ -651,8 +708,8 @@ Suggested order:
    scheduler tests from day one.
 3. Evaluator clauses, one constructor at a time, mirrored in TS; step-level
    differential tests per operator as each lands.
-4. `step-batch` + `spec-batchSimultaneous`; prove
-   `formal-verification-batchSimultaneous` and `batch-online`.
+4. `step-batch` + `flushBatch`; prove `batch-agreement`,
+   `evaluate-well-formed`, and `batch-online`.
 5. Id laws (`id-inheritance`, `id-fresh`) — the bridge premise.
 6. Harness: generator, shrinker, JSON schema (generate TS types + Agda
    decoder from one schema, or round-trip test the codecs), three runners,
