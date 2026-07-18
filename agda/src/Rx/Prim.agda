@@ -10,8 +10,10 @@ open import Data.List    using (List)
 Tick Fuel Ordinal : Set
 Tick = ℕ ; Fuel = ℕ ; Ordinal = ℕ
 
+Id : Set                            -- an INSTANT (one arrival's cascade); spec groups by this
+Id = ℕ                              -- concrete so the spec can compare; harness compares up to renaming
+
 postulate
-  Id      : Set                     -- an INSTANT (one arrival's cascade); spec groups by this
   freshId : Tick → Ordinal → Id     -- deterministic minting from arrival identity
 
 Source : Set                        -- a SOURCE observable; impl counts registrations of these
