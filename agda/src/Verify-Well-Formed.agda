@@ -42,8 +42,8 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; from-inner; thru-outer;
-                                NodeId; NodeState; scan-st; take-st; merge-st;
+                                map-f; scan-f; take-f; from-inner; thru-outer;
+                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 sched-init; st-init; sched-next; LiveSource;
                                 schedGo; schedHeadOf; schedFinish; schedEarlier;
@@ -1530,6 +1530,32 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     done-plumbed-out : ProtocolSt.done S ≡ true →
       allShareSunk (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st)) ≡ true
 
+-- FoldInv reads `st` ONLY through its registry (shadow / done-plumbed /
+-- reg-typed; every other field is over S / evs / sched).  So a frame that
+-- mutates st but leaves the registry fixed — the quiet clauses (scan-f
+-- bookkeeping, take-f below its cut) — preserves FoldInv verbatim.  The three
+-- registry-facing fields transport across the registry equality; the rest copy.
+FoldInv-reg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (envSrc : Source) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st st′ : EvalSt e) (S : ProtocolSt) →
+  EvalSt.registry st ≡ EvalSt.registry st′ →
+  FoldInv id envSrc evs fin sched st S → FoldInv id envSrc evs fin sched st′ S
+FoldInv-reg id envSrc evs fin sched st st′ S req fi = record
+  { ob = FoldInv.ob fi ; hz = FoldInv.hz fi ; ob′ = FoldInv.ob′ fi
+  ; Lv = FoldInv.Lv fi ; Ov = FoldInv.Ov fi
+  ; enters = FoldInv.enters fi ; pays = FoldInv.pays fi ; applies = FoldInv.applies fi
+  ; shadow = λ s h → subst
+      (λ r → countIn s (ProtocolSt.live S) + initCount s evs ≡ countRegs s r + closeCount s evs)
+      req (FoldInv.shadow fi s h)
+  ; done-plumbed = λ deq → subst
+      (λ r → allShareSunk (if fin then dropSource envSrc r else r) ≡ true)
+      req (FoldInv.done-plumbed fi deq)
+  ; reg-typed = subst (λ r → regTyped? r (Sched.live sched) ≡ true) req (FoldInv.reg-typed fi)
+  ; horizon-low = FoldInv.horizon-low fi
+  ; ov-zero = FoldInv.ov-zero fi ; ov-unique = FoldInv.ov-unique fi
+  ; ov-envSrc = FoldInv.ov-envSrc fi
+  ; env-init = FoldInv.env-init fi ; env-close = FoldInv.env-close fi }
+
 postulate
   -- the NON-map frame clauses, still to grind (scan-f / take-f / from-inner /
   -- thru-outer): stepFrame's bookkeeping evs′ brackets against its registry
@@ -1575,6 +1601,22 @@ stepFrame-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
   in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 stepFrame-wf sf id now envSrc (map-f fn) path′ vals evs fin sched st S fi
   rewrite ++-identityʳ evs = fi
+-- scan-f only rewrites the accumulator node; it emits nothing and leaves the
+-- registry (hence FoldInv) fixed.  Mirror stepFrame's dispatch: every node
+-- shape but a type-matching scan-st is a no-op (fi verbatim); the matching
+-- scan-st changes only `nodes`, transported by FoldInv-reg over refl.
+stepFrame-wf {u = u} sf id now envSrc (scan-f fn nid) path′ vals evs fin sched st S fi
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                  rewrite ++-identityʳ evs = fi
+... | just (take-st k)         rewrite ++-identityʳ evs = fi
+... | just (merge-st a b)      rewrite ++-identityʳ evs = fi
+... | just (concat-st q ia od) rewrite ++-identityʳ evs = fi
+... | just (switch-st ci od)   rewrite ++-identityʳ evs = fi
+... | just (exhaust-st ia od)  rewrite ++-identityʳ evs = fi
+... | just (scan-st {w} acc) with w ≟ᵗ u
+...   | no _     rewrite ++-identityʳ evs = fi
+...   | yes refl rewrite ++-identityʳ evs =
+        FoldInv-reg id envSrc evs fin sched st _ S refl fi
 stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi
   = stepFrame-wf-rest sf id now envSrc f path′ vals evs fin sched st S fi
 
