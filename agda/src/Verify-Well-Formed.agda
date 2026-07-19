@@ -334,16 +334,6 @@ postulate
                              (cascadeLatch a st))) ≡ false →
     Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
 
-  -- a cancelled chain folds to nothing (its close already rode the
-  -- cutting emit; its owed was forgiven right there)
-  mid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {nextId : Id} {rid : RegId}
-    {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
-    {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
-    Mid a nextId ((rid , p) ∷ ps) sched st S →
-    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
-    Mid a nextId ps sched st S
-
   -- one surviving chain's emits — the chain emit, any share
   -- fan-outs, any cut closes — are accepted, paying/bumping/
   -- cancelling exactly per the ledger.  THE deep lemma: mirrors
@@ -371,6 +361,67 @@ postulate
     Inv (suc nextId) (proj₁ (cascadeFinish a sched st))
                      (proj₂ (cascadeFinish a sched st)) S
     × (paidUp S ≡ true)
+
+-- a cancelled head contributes nothing to countRemaining (the `if`
+-- takes the then-branch)
+cr-skip : ∀ {X : Set} (rid : RegId) (x : X)
+          (ps : List (RegId × X)) (c : List RegId) →
+          any (_≡ᵇ rid) c ≡ true →
+          countRemaining ((rid , x) ∷ ps) c ≡ countRemaining ps c
+cr-skip rid x ps c h rewrite h = refl
+
+-- and nothing to cascadeGo: its first clause skips a cancelled head
+-- outright, folding the tail with the SAME state (two-column trick —
+-- cascadeGo's `with` won't unfold under rewrite)
+cascadeGo-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (nextId : Id) (rid : RegId)
+  (p : Path Γ (arrTy a) t) (ps : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+  cascadeGo {e = e} a nextId ((rid , p) ∷ ps) sched st
+    ≡ cascadeGo {e = e} a nextId ps sched st
+cascadeGo-skip a nextId rid p ps sched st ceq
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) | ceq
+... | true | refl = refl
+
+-- a cancelled chain folds to nothing (its close already rode the
+-- cutting emit; its owed was forgiven right there): every Mid field is
+-- stable when the snapshot head drops, given the head is cancelled
+mid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {nextId : Id} {rid : RegId}
+  {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
+  {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+  Mid a nextId ps sched st S
+mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
+  { live-others  = Mid.live-others mid
+  ; live-source  = trans (Mid.live-source mid)
+      (cong (λ z → if Arrival.isLast a then z
+                   else countRegs (arrSource a) (EvalSt.registry st))
+            (cr-skip rid p ps (EvalSt.cancelled st) ceq))
+  ; chains-count = Mid.chains-count mid
+  ; horizon-low  = Mid.horizon-low mid
+  ; ledger       = ledger′
+  ; done-plumbed = Mid.done-plumbed mid
+  ; fold-live    = subst (λ z → hasDry (proj₁ z) ≡ false)
+      (cascadeGo-skip a nextId rid p ps sched st ceq)
+      (Mid.fold-live mid)
+  }
+  where
+  ledger′ :
+      (CurrentPast (ProtocolSt.current S) nextId × (paidUp S ≡ true))
+    ⊎ (Σ Owed λ ow →
+         (ProtocolSt.current S ≡ just (nextId , ow))
+       × (lookupOwed (arrSource a) ow
+            ≡ countRemaining ps (EvalSt.cancelled st))
+       × (zeroExcept (arrSource a) ow ≡ true))
+  ledger′ with Mid.ledger mid
+  ... | inj₁ x                    = inj₁ x
+  ... | inj₂ (ow , cur , lk , zx) =
+        inj₂ (ow , cur
+             , trans lk (cr-skip rid p ps (EvalSt.cancelled st) ceq)
+             , zx)
 
 -- the chain fold, composed (mirrors cascadeGo's own recursion —
 -- structural on the snapshot, no termination debt at this level)
