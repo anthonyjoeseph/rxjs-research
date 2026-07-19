@@ -1,14 +1,18 @@
 module Verify-Batch-Simultaneous.The-Proof where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _≤_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; T)
+open import Data.Unit    using (tt)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; n≤1+n; ≤-refl; 1+n≰n)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Function     using (_∋_)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_;
                                          InstEvent; init; value; close; handoff;
@@ -146,6 +150,9 @@ step-accepted x S xs acc with stepProtocol x S | acc
 just-inj : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
 just-inj refl = refl
 
+n≢j : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
+n≢j ()
+
 settle-agree : (k : EmitKind) (s : Source)
   (live : List Source) (owed : Owed) {owed′ : Owed} →
   settle k s live owed ≡ just owed′ → settleBatch k s live owed ≡ owed′
@@ -180,6 +187,105 @@ apply-agree (close x cut ∷ es) live owed done vs eq with removeOne x live | eq
 apply-agree (close x exhausted ∷ es) live owed done vs eq with removeOne x live | eq
 ... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
 
+------------------------------------------------------------------
+-- Freshness bookkeeping: a newly-opened instant i is past everything
+-- already seen, so it's unseen and extends SeenBelow.
+------------------------------------------------------------------
+
+≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
+≡ᵇ→≡ zero    zero    _ = refl
+≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
+
+≡ᵇ-refl : ∀ (i : ℕ) → (i ≡ᵇ i) ≡ true
+≡ᵇ-refl zero    = refl
+≡ᵇ-refl (suc i) = ≡ᵇ-refl i
+
+-- an id is always seen in a list it heads
+seenBefore-hit : ∀ (i : Id) (seen : List Id) → seenBefore i (i ∷ seen) ≡ true
+seenBefore-hit i seen rewrite ≡ᵇ-refl i = refl
+
+-- everything seen is < h ≤ i ⇒ i itself is unseen
+freshBelow : ∀ (seen : List Id) (i h : Id) →
+  SeenBelow seen h → h ≤ i → seenBefore i seen ≡ false
+freshBelow seen i h below h≤i with seenBefore i seen in eq
+... | false = refl
+... | true  = ⊥-elim (1+n≰n (≤-trans (below i eq) h≤i))
+
+-- … and i∷seen stays below suc i
+seenbelow-cons : ∀ (seen : List Id) (i h : Id) →
+  SeenBelow seen h → h ≤ i → SeenBelow (i ∷ seen) (suc i)
+seenbelow-cons seen i h below h≤i k keq with k ≡ᵇ i in eq | keq
+... | true  | _    = s≤s (subst (k ≤_) (≡ᵇ→≡ k i eq) ≤-refl)
+... | false | keq′ = ≤-trans (≤-trans (below k keq′) h≤i) (n≤1+n i)
+
+-- stepProtocol, unfolded on the openFresh path from an idle automaton:
+-- acceptance forces the settle/applyEvents to succeed and pins S′'s shape.
+-- We take the fields explicitly (with `current = nothing` LITERAL) so the
+-- automaton's internal `with current ps` clauses all reduce — an opaque S
+-- with only a propositional `current S ≡ nothing` leaves them stuck.
+stepProtocol-idle-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (lv : List Source) (hz : Id) (dn : Bool) (S′ : ProtocolSt) →
+  stepProtocol (es at i from s as k)
+    (record { live = lv ; horizon = hz ; current = nothing ; done = dn }) ≡ just S′ →
+  Σ Owed λ o₁ → Σ (List Source) λ l″ → Σ Owed λ o″ → Σ Bool λ d″ →
+    (hz ≤ i)
+  × (settle k s lv [] ≡ just o₁)
+  × (applyEvents es lv o₁ dn ≡ just (l″ , o″ , d″))
+  × (S′ ≡ record { live = l″ ; horizon = hz ; current = just (i , o″) ; done = d″ })
+stepProtocol-idle-aux es i s k lv hz dn S′ stepEq with hz ≤ᵇ i in hle
+... | false = ⊥-elim (n≢j stepEq)
+... | true  with settle k s lv []
+...   | nothing = ⊥-elim (n≢j stepEq)
+...   | just o₁ with applyEvents es lv o₁ dn in aeq
+...     | nothing              = ⊥-elim (n≢j stepEq)
+...     | just (l″ , o″ , d″)  =
+          o₁ , l″ , o″ , d″
+          , ≤ᵇ⇒≤ hz i (subst T (sym hle) tt)
+          , refl , aeq , sym (just-inj stepEq)
+
+stepProtocol-idle : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (S S′ : ProtocolSt) →
+  ProtocolSt.current S ≡ nothing →
+  stepProtocol (es at i from s as k) S ≡ just S′ →
+  Σ Owed λ o₁ → Σ (List Source) λ l″ → Σ Owed λ o″ → Σ Bool λ d″ →
+    (ProtocolSt.horizon S ≤ i)
+  × (settle k s (ProtocolSt.live S) [] ≡ just o₁)
+  × (applyEvents es (ProtocolSt.live S) o₁ (ProtocolSt.done S) ≡ just (l″ , o″ , d″))
+  × (S′ ≡ record { live = l″ ; horizon = ProtocolSt.horizon S
+                 ; current = just (i , o″) ; done = d″ })
+stepProtocol-idle es i s k S S′ Sn stepEq =
+  stepProtocol-idle-aux es i s k (ProtocolSt.live S) (ProtocolSt.horizon S)
+    (ProtocolSt.done S) S′
+    (subst (λ c → stepProtocol (es at i from s as k)
+             (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                     ; current = c ; done = ProtocolSt.done S }) ≡ just S′)
+           Sn stepEq)
+
+-- The idle-batcher scenario, over the batcher's FIELDS (current = nothing
+-- literal), so step-batch reduces to its inline settle/apply/flush form
+-- in the goal — the raw settleBatch/applyBatch stay visible, rewritable to
+-- o₁/l″/o″, and the paidOff scrutinee is exposed for the case split.
+brs-idle-aux : ∀ {A : Set} (seen : List Id) (es : List (InstEvent A)) (i : Id)
+  (s : Source) (k : EmitKind) (lvB : List Source) (hz : Id) (dn : Bool)
+  (o₁ : Owed) (l″ : List Source) (o″ : Owed) →
+  settleBatch k s lvB [] ≡ o₁ →
+  proj₁ (applyBatch es lvB o₁ []) ≡ l″ →
+  proj₁ (proj₂ (applyBatch es lvB o₁ [])) ≡ o″ →
+  seenBefore i seen ≡ true →
+  SeenBelow seen (suc i) →
+  BatchRel seen
+    (record { live = l″ ; horizon = hz ; current = just (i , o″) ; done = dn })
+    (proj₂ (step-batch (es at i from s as k)
+              (BatchSt A ∋ record { live = lvB ; current = nothing })))
+brs-idle-aux seen es i s k lvB hz dn o₁ l″ o″ sb al ao si sbc
+  rewrite sb | al | ao with paidOff o″ in po
+... | true  = record
+    { live-eq = refl
+    ; phase = inj₁ (refl , inj₂ ((i , o″) , refl , po , si , sbc)) }
+... | false = record
+    { live-eq = refl
+    ; phase = inj₂ (_ , refl , refl , po , si , sbc) }
+
 postulate
   -- the two heart lemmas of the simulation, one protocol transition
   -- each.  batchrel-step: acceptance keeps the online batcher's state
@@ -189,15 +295,72 @@ postulate
   -- batch's flush plus the spec's contribution for this emit.  [both
   -- provable by case on BatchRel's phase × admitted × paidOff; the
   -- arithmetic alignment is settle/applyEvents-vs-settleBatch/applyBatch]
-  batchrel-step : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt}
-    {B : BatchSt A} (x : InstEmit A) →
-    BatchRel seen S B → stepProtocol x S ≡ just S′ →
-    BatchRel (seen▸ x seen) S′ (proj₂ (step-batch x B))
   flush-step : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt}
     {B : BatchSt A} (x : InstEmit A) (rest : List (InstEmit A)) →
     BatchRel seen S B → stepProtocol x S ≡ just S′ →
     proj₁ (step-batch x B) ++ flushSpec (proj₂ (step-batch x B)) rest
       ≡ flushSpec B (x ∷ rest) ++ specGoHead x seen rest
+  -- batchrel-step's two harder scenarios, ground out separately; the
+  -- idle scenario (both closed, automaton at rest) is proven below
+  brs-open : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt} {B : BatchSt A}
+    (es : List (InstEvent A)) (i : Id) (s : Source) (k : EmitKind)
+    (b : OpenBatch A) →
+    BatchSt.live B ≡ ProtocolSt.live S →
+    BatchSt.current B ≡ just b →
+    ProtocolSt.current S ≡ just (OpenBatch.instant b , OpenBatch.owed b) →
+    paidOff (OpenBatch.owed b) ≡ false →
+    seenBefore (OpenBatch.instant b) seen ≡ true →
+    SeenBelow seen (suc (OpenBatch.instant b)) →
+    stepProtocol (es at i from s as k) S ≡ just S′ →
+    BatchRel (seen▸ (es at i from s as k) seen) S′
+             (proj₂ (step-batch (es at i from s as k) B))
+  brs-held : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt} {B : BatchSt A}
+    (es : List (InstEvent A)) (i : Id) (s : Source) (k : EmitKind)
+    (j : Id) (oⱼ : Owed) →
+    BatchSt.live B ≡ ProtocolSt.live S →
+    BatchSt.current B ≡ nothing →
+    ProtocolSt.current S ≡ just (j , oⱼ) →
+    paidOff oⱼ ≡ true →
+    seenBefore j seen ≡ true →
+    SeenBelow seen (suc j) →
+    stepProtocol (es at i from s as k) S ≡ just S′ →
+    BatchRel (seen▸ (es at i from s as k) seen) S′
+             (proj₂ (step-batch (es at i from s as k) B))
+
+batchrel-step : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt}
+  {B : BatchSt A} (x : InstEmit A) →
+  BatchRel seen S B → stepProtocol x S ≡ just S′ →
+  BatchRel (seen▸ x seen) S′ (proj₂ (step-batch x B))
+batchrel-step {A} {seen} {S} {S′} {B} (es at i from s as k) rel stepEq
+  with BatchRel.phase rel
+... | inj₂ (b , Bj , Sj , np , is , bl) =
+      brs-open {seen = seen} es i s k b (BatchRel.live-eq rel) Bj Sj np is bl stepEq
+... | inj₁ (Bn , inj₂ ((j , oⱼ) , Sj , pj , js , bl)) =
+      brs-held {seen = seen} es i s k j oⱼ (BatchRel.live-eq rel) Bn Sj pj js bl stepEq
+... | inj₁ (Bn , inj₁ (Sn , bl)) = brs-idle
+  where
+  brs-idle : BatchRel (seen▸ (es at i from s as k) seen) S′
+                      (proj₂ (step-batch (es at i from s as k) B))
+  brs-idle with stepProtocol-idle es i s k S S′ Sn stepEq
+  ... | o₁ , l″ , o″ , d″ , hzi , stl , apl , S′eq
+        rewrite S′eq
+              | freshBelow seen i (ProtocolSt.horizon S) bl hzi
+              | cong (λ st → proj₂ (step-batch (es at i from s as k) st))
+                  (subst (λ c → B ≡ (BatchSt A ∋ record { live = BatchSt.live B ; current = c }))
+                         Bn refl)
+        = brs-idle-aux (i ∷ seen) es i s k (BatchSt.live B) (ProtocolSt.horizon S) d″
+            o₁ l″ o″
+            (settle-agree k s (BatchSt.live B) []
+               (subst (λ l → settle k s l [] ≡ just o₁)
+                      (sym (BatchRel.live-eq rel)) stl))
+            (proj₁ (apply-agree es (BatchSt.live B) o₁ (ProtocolSt.done S) []
+               (subst (λ l → applyEvents es l o₁ (ProtocolSt.done S) ≡ just (l″ , o″ , d″))
+                      (sym (BatchRel.live-eq rel)) apl)))
+            (proj₂ (apply-agree es (BatchSt.live B) o₁ (ProtocolSt.done S) []
+               (subst (λ l → applyEvents es l o₁ (ProtocolSt.done S) ≡ just (l″ , o″ , d″))
+                      (sym (BatchRel.live-eq rel)) apl)))
+            (seenBefore-hit i seen)
+            (seenbelow-cons seen i (ProtocolSt.horizon S) bl hzi)
 
 -- THE waypoint, now PROVEN by induction on xs from the two step lemmas:
 -- base is the end-of-stream flush; cons splices step-batch's output,
