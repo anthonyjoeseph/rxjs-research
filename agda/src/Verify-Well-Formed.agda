@@ -1531,12 +1531,13 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       allShareSunk (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st)) ≡ true
 
 postulate
-  -- a frame preserves FoldInv (S untouched — frames don't step the
-  -- automaton): stepFrame's bookkeeping evs′ brackets against its
-  -- registry mutation, and the value transform keeps done-nil.  The
-  -- delivery-side twin of subscribeE-wf's per-clause grind (map/scan/
-  -- take/*All), one obligation per stepFrame clause.
-  stepFrame-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
+  -- the NON-map frame clauses, still to grind (scan-f / take-f / from-inner /
+  -- thru-outer): stepFrame's bookkeeping evs′ brackets against its registry
+  -- mutation, and the value transform keeps done-nil.  The delivery-side twin
+  -- of subscribeE-wf's per-clause grind.  map-f is peeled off below into the
+  -- real stepFrame-wf function; this postulate now covers only the remaining
+  -- frame constructors (the catch-all clause routes here).
+  stepFrame-wf-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (f : Frame Γ w u) (path′ : Path Γ u t)
     (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
@@ -1558,22 +1559,24 @@ postulate
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
 
--- GUARDRAIL-3 hand-check (the trivial frame clause).  map-f discharges
--- stepFrame-wf outright: it emits nothing (evs′ ≡ []) and leaves fin/sched/st
--- untouched (Evaluator 501-502), so with vals gone from FoldInv the value
--- transform is irrelevant and preservation is ++-identityʳ ∘ fi.  This confirms
--- the (vals-free) contract shape is dischargeable by a pass-through clause
--- before the wrap clauses (which add the merge-coherence field) are wired.
-stepFrame-wf-mapf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+-- stepFrame-wf, the real function.  map-f is discharged outright: it emits
+-- nothing (evs′ ≡ []) and leaves fin/sched/st untouched (Evaluator 501-502),
+-- so with vals gone from FoldInv the value transform is irrelevant and
+-- preservation is ++-identityʳ ∘ fi.  Every other frame constructor falls to
+-- the catch-all, routed to the stepFrame-wf-rest postulate — peeled off one at
+-- a time as the wrap clauses land.
+stepFrame-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
   (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  (fn : Fn Γ [] [] [] s u) (path′ : Path Γ u t)
-  (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (f : Frame Γ w u) (path′ : Path Γ u t)
+  (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   FoldInv id envSrc evs fin sched st S →
-  let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (map-f fn) path′ vals fin sched st
+  let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now f path′ vals fin sched st
   in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
-stepFrame-wf-mapf sf id now envSrc fn path′ vals evs fin sched st S fi
+stepFrame-wf sf id now envSrc (map-f fn) path′ vals evs fin sched st S fi
   rewrite ++-identityʳ evs = fi
+stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi
+  = stepFrame-wf-rest sf id now envSrc f path′ vals evs fin sched st S fi
 
 -- the done-discipline, as a precondition: a done automaton (root already
 -- completed) admits only share-bound folds — a chain reaching the root
