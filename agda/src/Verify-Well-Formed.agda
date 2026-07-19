@@ -18,9 +18,10 @@
 module Verify-Well-Formed where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_)
+open import Data.Fin     using (Fin; toℕ)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-refl; 1+n≰n)
-open import Data.List    using (List; []; _∷_; _++_; any; length)
+open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -31,19 +32,26 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (Dec; yes; no)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
+open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
+                                InstEvent; init; value; close; handoff; complete;
+                                EmitKind; delivery; CloseReason; exhausted;
+                                cut; cutPending; _at_from_as_)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_;
+                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 sched-init; st-init; sched-next; LiveSource;
                                 schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; chainsOf; chainsGo; chainStep;
+                                arrTy; arrSource; arrVal; arrTick;
+                                chainsOf; chainsGo; chainStep;
+                                foldPath; dispatchShare; stepFrame;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 sameSource; drySource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp;
+                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
+                                payOwed; paidOff; applyEvents; removeOne;
+                                cancelOwed; bumpOwed; settleInstant;
                                 checkFinal; Accepted; accepted; WellFormed)
 
 ------------------------------------------------------------------
@@ -565,6 +573,174 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- mid-skip (same S); established by mid-init/mid-step (postulated).
     owed-unique  : ∀ (ow : Owed) →
       ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
+
+------------------------------------------------------------------
+-- Protocol foundation for foldPath-wf: a CONSTRUCTIVE stepProtocol.
+-- enterInstant abstracts stepProtocol's enter/openFresh split (idle,
+-- held, continue) into one Maybe (base-owed × horizon-for-go): `just`
+-- means the automaton admits instant i, seeding `go` with that owed and
+-- horizon.  stepProtocol-enter then rebuilds stepProtocol's result from
+-- that plus the settle and applyEvents outcomes — the reverse of
+-- The-Proof's stepProtocol-idle/held/cont (construction, not analysis).
+------------------------------------------------------------------
+
+openFreshᴵ : ProtocolSt → Id → Maybe (Owed × Id)
+openFreshᴵ S i with settleInstant S
+... | nothing = nothing
+... | just hz = if hz ≤ᵇ i then just ([] , hz) else nothing
+
+enterInstant : ProtocolSt → Id → Maybe (Owed × Id)
+enterInstant S i with ProtocolSt.current S
+... | nothing         = openFreshᴵ S i
+... | just (j , owed) = if i ≡ᵇ j
+      then (if paidOff owed then nothing else just (owed , ProtocolSt.horizon S))
+      else openFreshᴵ S i
+
+stepProtocol-enter-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (lv : List Source) (hz : Id) (dn : Bool) (cur : Maybe (Id × Owed))
+  {ob hz′ ob′} {L : List Source} {O : Owed} {D : Bool} →
+  enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
+    ≡ just (ob , hz′) →
+  settle k s lv ob ≡ just ob′ →
+  applyEvents es lv ob′ dn ≡ just (L , O , D) →
+  stepProtocol (es at i from s as k)
+    (record { live = lv ; horizon = hz ; current = cur ; done = dn })
+    ≡ just (record { live = L ; horizon = hz′ ; current = just (i , O) ; done = D })
+stepProtocol-enter-aux es i s k lv hz dn nothing entEq stEq apEq
+  with hz ≤ᵇ i | entEq
+... | true | refl rewrite stEq | apEq = refl
+stepProtocol-enter-aux es i s k lv hz dn (just (j , owed)) entEq stEq apEq
+  with i ≡ᵇ j | entEq
+... | true  | e with paidOff owed | e
+...   | false | refl rewrite stEq | apEq = refl
+stepProtocol-enter-aux es i s k lv hz dn (just (j , owed)) entEq stEq apEq
+    | false | e
+  with allZero owed | e
+...   | true | e′ with suc j ≤ᵇ i | e′
+...     | true | refl rewrite stEq | apEq = refl
+
+stepProtocol-enter : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (S : ProtocolSt) {ob hz′ ob′} {L : List Source} {O : Owed} {D : Bool} →
+  enterInstant S i ≡ just (ob , hz′) →
+  settle k s (ProtocolSt.live S) ob ≡ just ob′ →
+  applyEvents es (ProtocolSt.live S) ob′ (ProtocolSt.done S) ≡ just (L , O , D) →
+  stepProtocol (es at i from s as k) S
+    ≡ just (record { live = L ; horizon = hz′ ; current = just (i , O) ; done = D })
+stepProtocol-enter es i s k S entEq stEq apEq =
+  stepProtocol-enter-aux es i s k (ProtocolSt.live S) (ProtocolSt.horizon S)
+    (ProtocolSt.done S) (ProtocolSt.current S) entEq stEq apEq
+
+-- applyEvents plumbing for the root emit: it splits over ++, the
+-- accumulated bookkeeping (init/close only — never value/complete, which
+-- splitEvents routes to the value list / done flag) leaves `done`
+-- untouched, and the value list + optional complete tack on cleanly.
+just-injᵂ : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
+just-injᵂ refl = refl
+
+applyEvents-++just : ∀ {A : Set} (es₁ es₂ : List (InstEvent A))
+  (lv : List Source) (o : Owed) (d : Bool) {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es₁ lv o d ≡ just (L , O , D) →
+  applyEvents (es₁ ++ es₂) lv o d ≡ applyEvents es₂ L O D
+applyEvents-++just [] es₂ lv o d eq with just-injᵂ eq
+... | refl = refl
+applyEvents-++just (init x ∷ es) es₂ lv o d eq =
+  applyEvents-++just es es₂ (x ∷ lv) o d eq
+applyEvents-++just (value v ∷ es) es₂ lv o d eq with d | eq
+... | false | eq′ = applyEvents-++just es es₂ lv o false eq′
+... | true  | ()
+applyEvents-++just (handoff x ∷ es) es₂ lv o d eq =
+  applyEvents-++just es es₂ lv (bumpOwed x (countIn x lv) o) d eq
+applyEvents-++just (complete ∷ es) es₂ lv o d eq =
+  applyEvents-++just es es₂ lv o true eq
+applyEvents-++just (close x cutPending ∷ es) es₂ lv o d eq
+  with removeOne x lv | cancelOwed x o | eq
+... | just lv′ | just o′ | eq′ = applyEvents-++just es es₂ lv′ o′ d eq′
+... | just lv′ | nothing | ()
+... | nothing  | just o′ | ()
+... | nothing  | nothing | ()
+applyEvents-++just (close x cut ∷ es) es₂ lv o d eq with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-++just es es₂ lv′ o d eq′
+... | nothing  | ()
+applyEvents-++just (close x exhausted ∷ es) es₂ lv o d eq with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-++just es es₂ lv′ o d eq′
+... | nothing  | ()
+
+-- the value list changes nothing but must not ride behind a `complete`
+-- (done-nil: a done automaton delivers no value) — so it folds to identity
+applyEvents-values : ∀ {A : Set} (vals : List A) (lv : List Source) (o : Owed) (d : Bool) →
+  (d ≡ true → vals ≡ []) →
+  applyEvents (map value vals) lv o d ≡ just (lv , o , d)
+applyEvents-values []       lv o d _    = refl
+applyEvents-values (v ∷ vs) lv o d cond with d | cond
+... | false | _ = applyEvents-values vs lv o false (λ ())
+... | true  | c with c refl
+...   | ()
+
+-- the optional trailing complete sets done exactly when fin
+applyEvents-maybeComplete : ∀ {A : Set} (fin : Bool) (lv : List Source) (o : Owed) (d : Bool) →
+  applyEvents {A} (if fin then complete ∷ [] else []) lv o d
+    ≡ just (lv , o , (if fin then true else d))
+applyEvents-maybeComplete true  lv o d = refl
+applyEvents-maybeComplete false lv o d = refl
+
+-- the whole root tail (values then optional complete) after the evs
+applyEvents-vc : ∀ {A : Set} (vals : List A) (fin : Bool)
+  (lv : List Source) (o : Owed) (d : Bool) → (d ≡ true → vals ≡ []) →
+  applyEvents (map value vals ++ (if fin then complete ∷ [] else [])) lv o d
+    ≡ just (lv , o , (if fin then true else d))
+applyEvents-vc vals fin lv o d cond =
+  trans (applyEvents-++just (map value vals) (if fin then complete ∷ [] else [])
+          lv o d (applyEvents-values vals lv o d cond))
+        (applyEvents-maybeComplete fin lv o d)
+
+runProtocol-one : ∀ {A : Set} (S : ProtocolSt) (x : InstEmit A) →
+  runProtocol S (x ∷ []) ≡ stepProtocol x S
+runProtocol-one S x with stepProtocol x S
+... | just S′ = refl
+... | nothing = refl
+
+-- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
+-- its ONE delivery — accumulated bookkeeping evs, then the (possibly
+-- empty) value list, then complete iff the source is spent.  The
+-- automaton admits it (enterInstant), pays envSrc's owed (settle), folds
+-- the evs (which never touch `done`), and the values ride only if not
+-- already done (done-nil).  sched/st are untouched at root.
+foldPath-root-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+  (ob : Owed) (hz : Id) (ob′ : Owed) (Lv : List Source) (Ov : Owed) →
+  enterInstant S id ≡ just (ob , hz) →
+  settle delivery envSrc (ProtocolSt.live S) ob ≡ just ob′ →
+  applyEvents evs (ProtocolSt.live S) ob′ (ProtocolSt.done S)
+    ≡ just (Lv , Ov , ProtocolSt.done S) →
+  (ProtocolSt.done S ≡ true → vals ≡ []) →
+  runProtocol S (proj₁ (foldPath sf gas id now envSrc root vals evs fin sched st))
+    ≡ just (record { live = Lv ; horizon = hz ; current = just (id , Ov)
+                   ; done = (if fin then true else ProtocolSt.done S) })
+foldPath-root-wf sf gas id now envSrc vals evs fin sched st S ob hz ob′ Lv Ov
+  entEq payEq apEq dn =
+  trans (runProtocol-one S _) stepEq
+  where
+  target : ProtocolSt
+  target = record { live = Lv ; horizon = hz ; current = just (id , Ov)
+                  ; done = (if fin then true else ProtocolSt.done S) }
+  apply-full :
+    applyEvents (evs ++ map value vals ++ (if fin then complete ∷ [] else []))
+      (ProtocolSt.live S) ob′ (ProtocolSt.done S)
+      ≡ just (Lv , Ov , (if fin then true else ProtocolSt.done S))
+  apply-full = trans
+    (applyEvents-++just evs (map value vals ++ (if fin then complete ∷ [] else []))
+      (ProtocolSt.live S) ob′ (ProtocolSt.done S) apEq)
+    (applyEvents-vc vals fin Lv Ov (ProtocolSt.done S) dn)
+  stepEq :
+    stepProtocol
+      ((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
+        at id from envSrc as delivery) S
+      ≡ just target
+  stepEq = stepProtocol-enter
+    (evs ++ map value vals ++ (if fin then complete ∷ [] else []))
+    id envSrc delivery S entEq payEq apply-full
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
