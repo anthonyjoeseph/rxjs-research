@@ -565,8 +565,22 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          × (lookupOwed (arrSource a) ow
               ≡ countRemaining ps (EvalSt.cancelled st))
          × (zeroExcept (arrSource a) ow ≡ true))
+    -- after the root completes, only share plumbing survives.  Stated over
+    -- the registry cascadeFinish will KEEP (drop the arrival's source iff
+    -- isLast, exactly as cascadeFinish does): a completing root chain flips
+    -- `done` while its own non-share-sunk registration still sits in the
+    -- registry until cascadeFinish sheds it, so the full-registry form is
+    -- false in that mid-cascade window.  The load-bearing evaluator fact is
+    -- that at the done-flip every non-share-sunk survivor belongs to
+    -- arrSource a (a completion only reaches the root once nothing else can
+    -- deliver) — so dropping arrSource restores allShareSunk.  mid-final
+    -- reads this off directly in both isLast branches (it mirrors
+    -- cascadeFinish); mid-init establishes it from Inv's full-registry form
+    -- (identity when not isLast; allShareSunk-drop when isLast).
     done-plumbed : ProtocolSt.done S ≡ true →
-      allShareSunk (EvalSt.registry st) ≡ true
+      allShareSunk (if Arrival.isLast a
+                    then dropSource (arrSource a) (EvalSt.registry st)
+                    else EvalSt.registry st) ≡ true
     fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
     -- ADDED (owed-key uniqueness): the open instant's owed table has no
     -- repeated key, so ledger's zeroExcept + the arrival's zero remainder
@@ -771,8 +785,12 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                  ≡ just (Lv , Ov , ProtocolSt.done S)
     -- once the root completes only share plumbing survives: every
     -- registration sinks to a share, so a share fan-out's inners are all
-    -- share-bound (their own done-discipline, for dispatchShare-wf)
-    done-plumbed : ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true
+    -- share-bound (their own done-discipline, for dispatchShare-wf).
+    -- Conditioned on `fin` exactly as Mid.done-plumbed is on isLast — the
+    -- seed feeds this through unchanged (envSrc = arrSource a, fin = isLast a)
+    done-plumbed : ProtocolSt.done S ≡ true →
+      allShareSunk (if fin then dropSource envSrc (EvalSt.registry st)
+                    else EvalSt.registry st) ≡ true
 
 postulate
   -- a frame preserves FoldInv (S untouched — frames don't step the
@@ -1387,6 +1405,15 @@ allShareSunk-drop s ((rid , x , (u , p)) ∷ r) h with s ≡ᵇ x
 ... | true  = allShareSunk-drop s r (∧-trueʳ h)
 ... | false = ∧-intro (∧-trueˡ h) (allShareSunk-drop s r (∧-trueʳ h))
 
+-- the conditional form of done-plumbed, established from the full-registry
+-- form: identity when the guard is false, allShareSunk-drop when true
+allShareSunk-if : ∀ {n} {Γ : Ctx n} {t}
+  (b : Bool) (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  allShareSunk reg ≡ true →
+  allShareSunk (if b then dropSource s reg else reg) ≡ true
+allShareSunk-if false s reg h = h
+allShareSunk-if true  s reg h = allShareSunk-drop s reg h
+
 -- cascadeFinish reduced under each isLast branch (two-column trick: the
 -- `with Arrival.isLast a` won't unfold under rewrite).  isLast=false
 -- leaves the state; isLast=true sweeps the spent source's registry
@@ -1482,7 +1509,10 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
       ; reg-typed    = Mid.reg-typed mid
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
       ; current-past = cpast
-      ; done-plumbed = Mid.done-plumbed mid
+      ; done-plumbed = λ deq →
+          subst (λ b → allShareSunk (if b then dropSource (arrSource a) (EvalSt.registry st)
+                          else EvalSt.registry st) ≡ true)
+                isL (Mid.done-plumbed mid deq)
       }
     -- isLast=true: keep cascadeFinish symbolic; convert registry and live
     -- field-by-field, reg-typed via the dropSource/sweepLive preservation
@@ -1502,8 +1532,9 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
       ; done-plumbed = λ deq →
           subst (λ reg → allShareSunk reg ≡ true)
                 (sym (finishReg-true a sched st isL))
-                (allShareSunk-drop (arrSource a) (EvalSt.registry st)
-                  (Mid.done-plumbed mid deq))
+                (subst (λ b → allShareSunk (if b then dropSource (arrSource a) (EvalSt.registry st)
+                                else EvalSt.registry st) ≡ true)
+                       isL (Mid.done-plumbed mid deq))
       }
 
 -- the chain fold, composed (mirrors cascadeGo's own recursion —
@@ -1576,8 +1607,12 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
                        (Inv.reg-typed inv))
   ; horizon-low  = Inv.horizon-low inv
   ; ledger       = inj₁ (Inv.current-past inv , paid)
-  ; done-plumbed = λ deq → subst (λ reg → allShareSunk reg ≡ true)
-                     (sym (latch-registry a st)) (Inv.done-plumbed inv deq)
+  ; done-plumbed = λ deq →
+      subst (λ reg → allShareSunk (if Arrival.isLast a
+                       then dropSource (arrSource a) reg else reg) ≡ true)
+            (sym (latch-registry a st))
+            (allShareSunk-if (Arrival.isLast a) (arrSource a)
+              (EvalSt.registry st) (Inv.done-plumbed inv deq))
   ; fold-live    = nodry
   ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
                      (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
