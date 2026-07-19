@@ -1047,6 +1047,18 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       as threaded FoldInv fields per wrap clause as forced (same discipline as
 --       SHADOW), never globally up front.  Couples with the take-head cut (take-f
 --       flips fin AND emits cutThrough closes, Evaluator 540-548).
+--       MERGE COHERENCE IDENTIFIED (2026-07-19): the thru-outer mergeᵒ wrap
+--       (Evaluator 622-629) completes iff `k ≡ᵇ 0`, and `bump` (609-611) does
+--       suc k per active inner subscribed — so the forced field is
+--         merge k@nid : (merge-st k _ at nid) ⇒ k ≡ countRegsUnder nid (registry)
+--       (the live registrations whose path threads node nid).  When the gate
+--       fires (k ≡ 0, fin ≡ true) those inners are drained, feeding
+--       allShareSunk(dropSource envSrc).  Seed-safe (a count identity, true at
+--       the seed), threaded by stepFrame-wf.  concat/switch/exhaust will force
+--       their own variant (queue length / the just-inner Maybe); DO NOT
+--       generalise this to a global node↔registry theory, and NOT onto the
+--       dispatchShare side (share-sink has its own dying/latch completion story
+--       — let that clause force its own field).
 --     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise
 --       is done ≡ true, vacuous right up until the flip; the flip is mid-cascade,
 --       where Inv does not exist.  Nothing to derive from at the one moment the
