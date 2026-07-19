@@ -43,7 +43,7 @@ open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                takeVals; cutThrough; setNode;
+                                takeVals; cutThrough; setNode; pathHasNode; memberSource;
                                 NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 sched-init; st-init; sched-next; LiveSource;
@@ -1530,6 +1530,44 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))) ≡ true
     done-plumbed-out : ProtocolSt.done S ≡ true →
       allShareSunk (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st)) ≡ true
+
+-- cutThrough per-source close/reg BALANCE (take-cut sub-obligation 2): for a
+-- source s NOT in `dying`, every removed s-registration emits exactly one
+-- s-close (cutThrough skips the close only on delivered ∧ dying, vacuous when
+-- s ∉ dying), so the pre-cut registry count splits into the survivors plus the
+-- emitted closes.  Pure induction on the registry.
+cutThrough-balance : ∀ {n} {Γ : Ctx n} {t}
+  (s : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId)
+  (dying : List Source) (reg : List (RegId × Source × Chain Γ t)) →
+  memberSource s dying ≡ false →
+  countRegs s reg
+    ≡ countRegs s (proj₁ (cutThrough nid dlv wm dying reg))
+      + closeCount s (proj₁ (proj₂ (cutThrough nid dlv wm dying reg)))
+cutThrough-balance s nid dlv wm dying [] mem = refl
+cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
+  with pathHasNode nid (proj₂ c)
+     | cutThrough nid dlv wm dying r
+     | cutThrough-balance s nid dlv wm dying r mem
+-- survivor: kept keeps (rid,src,c); closes unchanged
+... | false | kept , closes , rids | ih with s ≡ᵇ src
+...   | true  = cong suc ih
+...   | false = ih
+-- victim: removed from registry; a close for src is emitted unless delivered∧dying
+cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
+    | true | kept , closes , rids | ih with s ≡ᵇ src in seq
+-- s ≢ src: this victim is not an s-reg; the (src-tagged) close, emitted or not,
+-- contributes nothing to closeCount s, and countRegs s is unchanged
+...   | false with any (_≡ᵇ rid) dlv ∧ memberSource src dying
+...     | true              = ih
+...     | false rewrite seq = ih
+-- s ≡ src: src ≡ s, so memberSource src dying ≡ mem ≡ false ⇒ close ALWAYS emitted
+cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
+    | true | kept , closes , rids | ih | true rewrite sym (≡ᵇ→≡ s src seq)
+  with any (_≡ᵇ rid) dlv
+...   | false rewrite ≡ᵇ-refl s =
+        trans (cong suc ih) (sym (+-suc (countRegs s kept) (closeCount s closes)))
+...   | true  rewrite mem | ≡ᵇ-refl s =
+        trans (cong suc ih) (sym (+-suc (countRegs s kept) (closeCount s closes)))
 
 -- FoldInv reads `st` ONLY through its registry (shadow / done-plumbed /
 -- reg-typed; every other field is over S / evs / sched).  So a frame that
