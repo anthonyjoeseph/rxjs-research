@@ -21,7 +21,7 @@ open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; 
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; +-suc; +-comm; +-assoc; +-identityʳ)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -970,6 +970,27 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --    connection made at mid-step off Mid.live-source + the ledger.  The
 --    take-head corner (head's own cut close + cancellation) is the one edge to
 --    pin with a Unit-Test before relying on it.
+--
+-- VERIFIED 2026-07-19 (foldPath-root-out groundwork):
+--  • live-others-out is now MECHANISED end-to-end for the root: readoff-cancel
+--    = applyEvents-count (drains evs into live) ∘ SHADOW ∘ +-cancelʳ-≡
+--    (cancel the shared closeCount) ⇒ countIn s Lv ≡ countRegs s (registry st).
+--    At root foldSt = st, foldSched = sched (Evaluator 960-962), so the two
+--    registry/sched fields reduce to reg-envSrc-out = refl and reg-typed-out =
+--    FoldInv.reg-typed verbatim.  current-out reads off FoldInv.ov-zero/
+--    ov-unique/ov-envSrc (added today) with Ov = the applies output.
+--  • done-plumbed-out has a CAVEAT the "self-healing" note above understates:
+--    done S′ = if fin then true else done S, so a completing head (fin ≡ true,
+--    done S ≡ false) makes done S′ ≡ true while FoldInv.done-plumbed (keyed on
+--    done S ≡ true) does NOT fire.  The missing fact at the done-FLIP is the
+--    SAME evaluator invariant Mid.done-plumbed encodes — "a completion reaches
+--    the root only once nothing else can deliver, so every non-share-sunk
+--    survivor is envSrc's" — but at the flip, not steady state.  So FoldInv
+--    needs a fin-keyed plumbing field (allShareSunk after dropSource envSrc
+--    whenever fin ≡ true), established at the seed from the isLast branch of
+--    Inv's registry form and threaded — NOT derivable from done-plumbed alone.
+--    This couples with the take-head cut (take-f flips fin AND emits cutThrough
+--    closes, Evaluator 540-548), so both land together in the next increment.
 ------------------------------------------------------------------
 
 -- the fold's output EvalSt (st″) and Sched (sched″)
@@ -1365,6 +1386,19 @@ applyEvents-count (close x cut ∷ es) lv o d {Lv} s eq with removeOne x lv in r
 applyEvents-count (close x exhausted ∷ es) lv o d {Lv} s eq with removeOne x lv in rmv | eq
 ... | just lv′ | eq′ = close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o d s eq′)
 ... | nothing  | ()
+
+-- the live-others readoff: applyEvents drains the pending evs into live,
+-- and SHADOW (registry leads live by the pending evs' init∸close) then
+-- resyncs to a plain live ≡ registry read.  The keystone use of
+-- applyEvents-count + SHADOW, with the shared closeCount cancelled off.
+readoff-cancel : ∀ {A : Set} (s : Source) (evs : List (InstEvent A))
+  (liveS Lv : List Source) (ob′ Ov : Owed) (dn d′ : Bool) (R : ℕ) →
+  applyEvents evs liveS ob′ dn ≡ just (Lv , Ov , d′) →
+  countIn s liveS + initCount s evs ≡ R + closeCount s evs →
+  countIn s Lv ≡ R
+readoff-cancel s evs liveS Lv ob′ Ov dn d′ R apEq shEq =
+  +-cancelʳ-≡ (closeCount s evs) (countIn s Lv) R
+    (trans (applyEvents-count evs liveS ob′ dn s apEq) shEq)
 
 -- paying the key with positive owed decrements it by one (once the `with`
 -- fixes s ≡ᵇ x, payOwed/removeOne on the head reduce, so the equations are
