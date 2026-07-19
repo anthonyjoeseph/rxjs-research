@@ -1288,6 +1288,68 @@ countIn-removeOne-miss x s (y ∷ ys) lv′ sx eq with x ≡ᵇ y in xy
 ...     | true  = cong suc (countIn-removeOne-miss x s ys ys′ sx ry)
 ...     | false = countIn-removeOne-miss x s ys ys′ sx ry
 
+countIn-hit : ∀ (s x : Source) (xs : List Source) →
+  (s ≡ᵇ x) ≡ true → countIn s (x ∷ xs) ≡ suc (countIn s xs)
+countIn-hit s x xs sx with s ≡ᵇ x | sx
+... | true | refl = refl
+
+-- one `close x` event's contribution to the drain count, shared by all three
+-- reasons (closeCount counts the close regardless; owed handling differs but
+-- the live count does not): given the IH over the tail and removeOne x lv,
+-- reconcile the s ≡ x (removeOne-hit) and s ≢ x (removeOne-miss) reads
+close-count : ∀ {A : Set} (x s : Source) (lv lv′ Lv : List Source)
+  (es : List (InstEvent A)) →
+  removeOne x lv ≡ just lv′ →
+  countIn s Lv + closeCount s es ≡ countIn s lv′ + initCount s es →
+  countIn s Lv + (if s ≡ᵇ x then suc (closeCount s es) else closeCount s es)
+    ≡ countIn s lv + initCount s es
+close-count x s lv lv′ Lv es rmv ih with s ≡ᵇ x in sx
+... | false = trans ih (cong (_+ initCount s es)
+                          (sym (countIn-removeOne-miss x s lv lv′ sx rmv)))
+... | true  = trans (+-suc (countIn s Lv) (closeCount s es))
+                    (trans (cong suc ih) (sym (cong (_+ initCount s es) cs)))
+  where s≡x : s ≡ x
+        s≡x = ≡ᵇ→≡ s x sx
+        cs : countIn s lv ≡ suc (countIn s lv′)
+        cs = trans (cong (λ z → countIn z lv) s≡x)
+               (trans (countIn-removeOne-hit x lv lv′ rmv)
+                      (cong suc (cong (λ z → countIn z lv′) (sym s≡x))))
+
+-- draining evs into Lv moves each source's count by initCount ∸ closeCount
+-- (additive form, no monus): the counting core of the live readoff
+applyEvents-count : ∀ {A : Set} (evs : List (InstEvent A)) (lv : List Source)
+  (o : Owed) (d : Bool) {Lv : List Source} {Ov : Owed} {d′ : Bool} (s : Source) →
+  applyEvents evs lv o d ≡ just (Lv , Ov , d′) →
+  countIn s Lv + closeCount s evs ≡ countIn s lv + initCount s evs
+applyEvents-count [] lv o d s eq with just-injᵂ eq
+... | refl = refl
+applyEvents-count (init x ∷ es) lv o d s eq with s ≡ᵇ x in sx
+... | true  = trans (applyEvents-count es (x ∷ lv) o d s eq)
+                    (trans (cong (_+ initCount s es) (countIn-hit s x lv sx))
+                           (sym (+-suc (countIn s lv) (initCount s es))))
+... | false = trans (applyEvents-count es (x ∷ lv) o d s eq)
+                    (cong (_+ initCount s es) (countIn-miss s x lv sx))
+applyEvents-count (value v ∷ es) lv o d s eq with d | eq
+... | false | eq′ = applyEvents-count es lv o false s eq′
+... | true  | ()
+applyEvents-count (handoff x ∷ es) lv o d s eq =
+  applyEvents-count es lv (bumpOwed x (countIn x lv) o) d s eq
+applyEvents-count (complete ∷ es) lv o d s eq =
+  applyEvents-count es lv o true s eq
+applyEvents-count (close x cutPending ∷ es) lv o d {Lv} s eq
+  with removeOne x lv in rmv | cancelOwed x o | eq
+... | just lv′ | just o′ | eq′ =
+      close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o′ d s eq′)
+... | just lv′ | nothing | ()
+... | nothing  | just o′ | ()
+... | nothing  | nothing | ()
+applyEvents-count (close x cut ∷ es) lv o d {Lv} s eq with removeOne x lv in rmv | eq
+... | just lv′ | eq′ = close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o d s eq′)
+... | nothing  | ()
+applyEvents-count (close x exhausted ∷ es) lv o d {Lv} s eq with removeOne x lv in rmv | eq
+... | just lv′ | eq′ = close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o d s eq′)
+... | nothing  | ()
+
 -- paying the key with positive owed decrements it by one (once the `with`
 -- fixes s ≡ᵇ x, payOwed/removeOne on the head reduce, so the equations are
 -- refl / rewrite; the constructed tail term still needs the hit/miss read)
