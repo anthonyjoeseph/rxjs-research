@@ -18,6 +18,7 @@
 module Verify-Well-Formed where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
+open import Data.Bool.Properties using (∨-assoc; ∨-comm; ∨-identityʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
@@ -28,7 +29,7 @@ open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
-open import Data.Empty   using (⊥-elim)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
@@ -2649,6 +2650,134 @@ latch-nodes a st with Arrival.isLast a
 ∨-zeroʳ true  = refl
 ∨-zeroʳ false = refl
 
+------------------------------------------------------------------
+-- pure elemℕ / nubLen / keepAbsent combinatorics — the set-partition
+-- and permutation-invariance behind countLiveInners-partition
+------------------------------------------------------------------
+
+f≢t : false ≡ true → ⊥
+f≢t ()
+
+elemℕ-++ : ∀ (x : NodeId) (xs ys : List NodeId) →
+  elemℕ x (xs ++ ys) ≡ (elemℕ x xs ∨ elemℕ x ys)
+elemℕ-++ x []       ys = refl
+elemℕ-++ x (z ∷ xs) ys =
+  trans (cong ((x ≡ᵇ z) ∨_) (elemℕ-++ x xs ys))
+        (sym (∨-assoc (x ≡ᵇ z) (elemℕ x xs) (elemℕ x ys)))
+
+-- if x∉surv but y∈surv then x≠y
+elem-neq : ∀ (x y : NodeId) (surv : List NodeId) →
+  elemℕ x surv ≡ false → elemℕ y surv ≡ true → (x ≡ᵇ y) ≡ false
+elem-neq x y surv hx hy with x ≡ᵇ y in eqxy
+... | false = refl
+... | true  = ⊥-elim (f≢t (trans (sym hx)
+                (trans (cong (λ z → elemℕ z surv) (≡ᵇ→≡ x y eqxy)) hy)))
+
+-- membership through keepAbsent, on the branch where x is not a survivor
+elemℕ-keepAbsent-absent : ∀ (x : NodeId) (surv xs : List NodeId) →
+  elemℕ x surv ≡ false → elemℕ x (keepAbsent surv xs) ≡ elemℕ x xs
+elemℕ-keepAbsent-absent x surv []       hx = refl
+elemℕ-keepAbsent-absent x surv (y ∷ xs) hx with elemℕ y surv in eqY
+... | true  rewrite elem-neq x y surv hx eqY = elemℕ-keepAbsent-absent x surv xs hx
+... | false = cong ((x ≡ᵇ y) ∨_) (elemℕ-keepAbsent-absent x surv xs hx)
+
+-- THE PARTITION: distinct count of A++B splits into A-minus-B plus B
+nubLen-partition : ∀ (A B : List NodeId) →
+  nubLen (A ++ B) ≡ nubLen (keepAbsent B A) + nubLen B
+nubLen-partition []       B = refl
+nubLen-partition (x ∷ xs) B with elemℕ x B in eqB
+... | true  rewrite elemℕ-++ x xs B | eqB | ∨-zeroʳ (elemℕ x xs) = nubLen-partition xs B
+... | false rewrite elemℕ-++ x xs B | eqB | ∨-identityʳ (elemℕ x xs)
+                  | elemℕ-keepAbsent-absent x B xs eqB with elemℕ x xs
+...   | true  = nubLen-partition xs B
+...   | false = cong suc (nubLen-partition xs B)
+
+-- ── nubLen permutation-invariance (via same membership) ──
+∨-swap : ∀ (a b c : Bool) → (a ∨ (b ∨ c)) ≡ (b ∨ (a ∨ c))
+∨-swap a b c = trans (sym (∨-assoc a b c))
+                     (trans (cong (_∨ c) (∨-comm a b)) (∨-assoc b a c))
+
+≡ᵇ-sym : ∀ (a b : ℕ) → (a ≡ᵇ b) ≡ (b ≡ᵇ a)
+≡ᵇ-sym zero    zero    = refl
+≡ᵇ-sym zero    (suc b) = refl
+≡ᵇ-sym (suc a) zero    = refl
+≡ᵇ-sym (suc a) (suc b) = ≡ᵇ-sym a b
+
+elem-head : ∀ (y : NodeId) (ys : List NodeId) → elemℕ y (y ∷ ys) ≡ true
+elem-head y ys rewrite ≡ᵇ-refl y = refl
+
+elem-cons-neq : ∀ (z y : NodeId) (ys : List NodeId) →
+  (z ≡ᵇ y) ≡ false → elemℕ z (y ∷ ys) ≡ elemℕ z ys
+elem-cons-neq z y ys h rewrite h = refl
+
+elem-cons-recur : ∀ (x : NodeId) (xs : List NodeId) → elemℕ x xs ≡ true →
+  ∀ (z : NodeId) → elemℕ z (x ∷ xs) ≡ elemℕ z xs
+elem-cons-recur x xs hx z with z ≡ᵇ x in ezx
+... | false = refl
+... | true  = sym (trans (cong (λ w → elemℕ w xs) (≡ᵇ→≡ z x ezx)) hx)
+
+removeℕ : NodeId → List NodeId → List NodeId
+removeℕ x []       = []
+removeℕ x (y ∷ ys) = if x ≡ᵇ y then removeℕ x ys else y ∷ removeℕ x ys
+
+removeℕ-absent : ∀ (x : NodeId) (ys : List NodeId) →
+  elemℕ x ys ≡ false → removeℕ x ys ≡ ys
+removeℕ-absent x []       h = refl
+removeℕ-absent x (y ∷ ys) h with x ≡ᵇ y in exy
+... | true  = ⊥-elim (f≢t (sym h))
+... | false = cong (y ∷_) (removeℕ-absent x ys h)
+
+removeℕ-other : ∀ (x z : NodeId) (ys : List NodeId) → (z ≡ᵇ x) ≡ false →
+  elemℕ z (removeℕ x ys) ≡ elemℕ z ys
+removeℕ-other x z []       hzx = refl
+removeℕ-other x z (y ∷ ys) hzx with x ≡ᵇ y in exy
+... | true  = trans (removeℕ-other x z ys hzx)
+                    (sym (elem-cons-neq z y ys
+                      (trans (cong (z ≡ᵇ_) (sym (≡ᵇ→≡ x y exy))) hzx)))
+... | false = cong ((z ≡ᵇ y) ∨_) (removeℕ-other x z ys hzx)
+
+elem-removeℕ-self : ∀ (x : NodeId) (ys : List NodeId) →
+  elemℕ x (removeℕ x ys) ≡ false
+elem-removeℕ-self x []       = refl
+elem-removeℕ-self x (y ∷ ys) with x ≡ᵇ y in exy
+... | true          = elem-removeℕ-self x ys
+... | false rewrite exy = elem-removeℕ-self x ys
+
+nubLen-empty : ∀ (ys : List NodeId) → (∀ z → elemℕ z ys ≡ false) → nubLen ys ≡ 0
+nubLen-empty []       h = refl
+nubLen-empty (y ∷ ys) h = ⊥-elim (f≢t (trans (sym (h y)) (elem-head y ys)))
+
+nubLen-remove : ∀ (x : NodeId) (ys : List NodeId) →
+  elemℕ x ys ≡ true → nubLen ys ≡ suc (nubLen (removeℕ x ys))
+nubLen-remove x []       h = ⊥-elim (f≢t h)
+nubLen-remove x (y ∷ ys) h with x ≡ᵇ y in exy
+... | true  with elemℕ y ys in eqYY
+...   | true  = nubLen-remove x ys (trans (cong (λ w → elemℕ w ys) (≡ᵇ→≡ x y exy)) eqYY)
+...   | false rewrite removeℕ-absent x ys
+                        (trans (cong (λ w → elemℕ w ys) (≡ᵇ→≡ x y exy)) eqYY) = refl
+nubLen-remove x (y ∷ ys) h | false
+  rewrite removeℕ-other x y ys (trans (≡ᵇ-sym y x) exy) with elemℕ y ys in eqYY
+... | true  = nubLen-remove x ys h
+... | false = cong suc (nubLen-remove x ys h)
+
+nubLen-same-elems : ∀ (xs ys : List NodeId) →
+  (∀ z → elemℕ z xs ≡ elemℕ z ys) → nubLen xs ≡ nubLen ys
+nubLen-same-elems []       ys h = sym (nubLen-empty ys (λ z → sym (h z)))
+nubLen-same-elems (x ∷ xs) ys h with elemℕ x xs in eqX
+... | true  = nubLen-same-elems xs ys
+                (λ z → trans (sym (elem-cons-recur x xs eqX z)) (h z))
+... | false =
+      trans (cong suc (nubLen-same-elems xs (removeℕ x ys) h''))
+            (sym (nubLen-remove x ys x∈ys))
+  where
+  x∈ys : elemℕ x ys ≡ true
+  x∈ys = trans (sym (h x)) (elem-head x xs)
+  h'' : ∀ z → elemℕ z xs ≡ elemℕ z (removeℕ x ys)
+  h'' z with z ≡ᵇ x in ezx
+  ... | true  rewrite ≡ᵇ→≡ z x ezx = trans eqX (sym (elem-removeℕ-self x ys))
+  ... | false = trans (trans (sym (elem-cons-neq z x xs ezx)) (h z))
+                      (sym (removeℕ-other x z ys ezx))
+
 -- guard monotone: dropping a source cannot create thru-outer reachability,
 -- so ¬reachable is preserved (the cut case stays vacuous under dropSource)
 mergeReachable-drop-false : ∀ {n} {Γ : Ctx n} {t}
@@ -2660,27 +2789,15 @@ mergeReachable-drop-false nid s ((rid , x , (u , p)) ∷ r) h with sameSource s 
 ... | false rewrite ∨-fˡ (pathThruOuter nid p) (mergeReachable nid r) h =
       mergeReachable-drop-false nid s r (∨-fʳ (pathThruOuter nid p) (mergeReachable nid r) h)
 
--- OUTSIDE-IN POSTULATE — the pure nubLen SET-PARTITION, isolated from the
--- latch/guard/isLast shell (which is now proven, below).  At full ps and
--- cancelled ≡ [] the arrSource inners dropSource removes are EXACTLY those
--- mergeAdjust adds back: countLiveInners of the full registry splits into the
--- adjustment plus countLiveInners of the dropSourced registry.  No evaluator
--- dynamics — combinatorics of innerInstsR / collectAdjInsts / keepAbsent /
--- nubLen over the arrSource source-split (a permutation-invariance of nubLen
--- plus the chainsOf↔arrSource-entries bridge).  The remaining caches gap.
---
--- DISCHARGE PLAN (recorded 2026-07-19): via nubLen-partition
---   nubLen (A ++ B) ≡ nubLen (keepAbsent B A) + nubLen B          (pure list algebra)
--- with A = collectAdjInsts nid [] (chainsOf a reg) = the arrSource entries'
--- nid-insts, B = innerInstsR nid (dropSource arrSource reg) = the non-arrSource
--- ones.  innerInstsR nid reg is a PERMUTATION of A ++ B (registry order vs the
--- source-split order), so it needs nubLen permutation-invariance (adjacent-swap
--- invariance, worked out and true).  DEPENDS ON reg-typed: chainsGo type-filters
--- arrSource entries, so a mistyped arrSource entry would sit in innerInstsR nid
--- reg (LHS) yet be dropped from A (chainsGo) AND from B (dropSource) — the
--- equality fails without "every arrSource entry has type arrTy a".  Holds for
--- all reachable states; applied only at mid-init where Inv.reg-typed is live —
--- thread it into the discharge (add a reg-typed hypothesis then).
+-- the pure nubLen SET-PARTITION (PROVEN, 2026-07-19), isolated from the
+-- latch/guard/isLast shell.  At full ps and cancelled ≡ [] the arrSource inners
+-- dropSource removes are EXACTLY those mergeAdjust adds back: countLiveInners of
+-- the full registry splits into the adjustment plus countLiveInners of the
+-- dropSourced registry.  Discharged (below) via nubLen-partition (nubLen(A++B)
+-- ≡ nubLen(keepAbsent B A) + nubLen B, pure list algebra) + nubLen-same-elems
+-- (permutation-invariance of nubLen, via removeℕ / nubLen-remove) + memб-split
+-- (the source-split membership, reg-typed ruling out mistyped arrSource entries
+-- exactly as count-eq does).  No postulate, no evaluator dynamics.
 -- the adjustment, UNFOLDED over (registry st, cancelled ≡ []) — the form the
 -- goal's `mergeAdjust … (cascadeLatch a st)` reduces to under isLast (the latch
 -- keeps registry, resets cancelled); stated plainly to dodge with-abstraction
@@ -2690,12 +2807,72 @@ mergeAdjustSt nid a st =
   nubLen (keepAbsent (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st)))
                      (collectAdjInsts nid [] (chainsOf a st)))
 
-postulate
-  countLiveInners-partition : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (nid : NodeId) (a : Arrival Γ) (st : EvalSt e) →
-    countLiveInners nid (EvalSt.registry st)
-      ≡ mergeAdjustSt nid a st
-        + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st))
+-- the membership SOURCE-SPLIT: an inst z threads the full registry iff it
+-- threads an arrSource entry (via chainsGo, type-filtered) or a non-arrSource
+-- entry (dropSource).  Mirrors count-eq: the mistyped arrSource case is ruled
+-- out by regTyped? + the live source (liveTypeOK?-extract / sameTy-sound).
+memб-split : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (a : Arrival Γ)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → liveHas (arrSource a) (arrTy a) live ≡ true →
+  ∀ (z : NodeId) →
+  elemℕ z (innerInstsR nid reg)
+    ≡ (elemℕ z (collectAdjInsts nid [] (chainsGo a reg))
+        ∨ elemℕ z (innerInstsR nid (dropSource (arrSource a) reg)))
+memб-split nid a []                      live rt lh z = refl
+memб-split nid a ((rid , s , (u , p)) ∷ r) live rt lh z
+  with sameSource (arrSource a) s in sseq
+... | false =
+      trans (elemℕ-++ z (innerInstsP nid p) (innerInstsR nid r))
+        (trans (cong (elemℕ z (innerInstsP nid p) ∨_)
+                     (memб-split nid a r live (∧-trueʳ rt) lh z))
+          (trans (∨-swap (elemℕ z (innerInstsP nid p))
+                         (elemℕ z (collectAdjInsts nid [] (chainsGo a r)))
+                         (elemℕ z (innerInstsR nid (dropSource (arrSource a) r))))
+                 (cong (elemℕ z (collectAdjInsts nid [] (chainsGo a r)) ∨_)
+                       (sym (elemℕ-++ z (innerInstsP nid p)
+                              (innerInstsR nid (dropSource (arrSource a) r)))))))
+... | true  with u ≟ᵗ arrTy a
+...   | yes refl =
+      trans (elemℕ-++ z (innerInstsP nid p) (innerInstsR nid r))
+        (trans (cong (elemℕ z (innerInstsP nid p) ∨_)
+                     (memб-split nid a r live (∧-trueʳ rt) lh z))
+          (trans (sym (∨-assoc (elemℕ z (innerInstsP nid p))
+                               (elemℕ z (collectAdjInsts nid [] (chainsGo a r)))
+                               (elemℕ z (innerInstsR nid (dropSource (arrSource a) r)))))
+                 (cong (_∨ elemℕ z (innerInstsR nid (dropSource (arrSource a) r)))
+                       (sym (elemℕ-++ z (innerInstsP nid p)
+                              (collectAdjInsts nid [] (chainsGo a r)))))))
+...   | no ¬p = ⊥-elim (¬p (sameTy-sound u (arrTy a)
+                  (liveTypeOK?-extract (arrSource a) u (arrTy a) live
+                    (subst (λ w → liveTypeOK? w u live ≡ true)
+                           (sym (≡ᵇ→≡ (arrSource a) s sseq)) (∧-trueˡ rt))
+                    lh)))
+
+-- countLiveInners of the full registry SPLITS into the adjustment plus
+-- countLiveInners of the dropSourced registry (assembling memб-split with the
+-- nubLen set-partition and permutation-invariance).  reg-typed threaded via the
+-- schedule (mirrors chains-count-derived's liveHas extraction).
+countLiveInners-partition : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (a : Arrival Γ) (sched sched″ : Sched Γ) (st : EvalSt e) →
+  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+  sched-next sched ≡ inj₂ (a , sched″) →
+  countLiveInners nid (EvalSt.registry st)
+    ≡ mergeAdjustSt nid a st
+      + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st))
+countLiveInners-partition nid a sched sched″ st rt eq with schedGo (Sched.live sched) in geq
+... | inj₁ _ with eq
+...   | ()
+countLiveInners-partition nid a sched sched″ st rt eq | inj₂ (a₀ , ls) with eq
+...   | refl =
+      trans (nubLen-same-elems (innerInstsR nid (EvalSt.registry st))
+               (collectAdjInsts nid [] (chainsOf a st)
+                 ++ innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st)))
+               (λ z → trans (memб-split nid a (EvalSt.registry st) (Sched.live sched) rt
+                               (schedGo-mem (Sched.live sched) geq) z)
+                            (sym (elemℕ-++ z (collectAdjInsts nid [] (chainsOf a st))
+                                   (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st)))))))
+            (nubLen-partition (collectAdjInsts nid [] (chainsOf a st))
+              (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st))))
 
 -- mid-init PARTITION, PROVEN down to countLiveInners-partition: the plain
 -- cachesValid (from Inv) implies the full-ps Mid shadow.  Per merge node,
@@ -2703,11 +2880,13 @@ postulate
 -- the exact count k through the partition; non-merge nodes and isLast≡false
 -- are the plain checker verbatim.
 mid-init-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (st : EvalSt e) →
+  (a : Arrival Γ) (sched sched″ : Sched Γ) (st : EvalSt e) →
+  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+  sched-next sched ≡ inj₂ (a , sched″) →
   cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
   cachesValidMid a (chainsOf a st) (EvalSt.nodes (cascadeLatch a st))
                  (cascadeLatch a st) ≡ true
-mid-init-caches {Γ = Γ} a st h rewrite latch-nodes a st = go (EvalSt.nodes st) h
+mid-init-caches {Γ = Γ} a sched sched″ st rt eq h rewrite latch-nodes a st = go (EvalSt.nodes st) h
   where
   nodeOK→Mid : (nid : NodeId) (s : NodeState Γ) →
     nodeCacheOK nid s (EvalSt.registry st) ≡ true →
@@ -2726,7 +2905,7 @@ mid-init-caches {Γ = Γ} a st h rewrite latch-nodes a st = go (EvalSt.nodes st)
         let keq : k ≡ mergeAdjustSt nid a st
                         + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st))
             keq = trans (≡ᵇ→≡ k (countLiveInners nid (EvalSt.registry st)) hn)
-                        (countLiveInners-partition nid a st)
+                        (countLiveInners-partition nid a sched sched″ st rt eq)
             snd : (k ≡ᵇ (mergeAdjustSt nid a st
                           + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st)))) ≡ true
             snd = subst (λ z → (k ≡ᵇ z) ≡ true) keq (≡ᵇ-refl k)
@@ -2769,7 +2948,7 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
             (sym (latch-registry a st))
             (allShareSunk-if (Arrival.isLast a) (arrSource a)
               (EvalSt.registry st) (Inv.done-plumbed inv deq))
-  ; caches       = mid-init-caches a st (Inv.caches inv)
+  ; caches       = mid-init-caches a sched sched′ st (Inv.reg-typed inv) eq (Inv.caches inv)
   ; fold-live    = nodry
   ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
                      (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
