@@ -41,7 +41,9 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f;
+                                map-f; from-inner; thru-outer;
+                                NodeId; NodeState; scan-st; take-st; merge-st;
+                                concat-st; switch-st; exhaust-st;
                                 sched-init; st-init; sched-next; LiveSource;
                                 schedGo; schedHeadOf; schedFinish; schedEarlier;
                                 arrTy; arrSource; arrVal; arrTick;
@@ -201,6 +203,98 @@ allShareSunk : ∀ {n} {Γ : Ctx n} {t}
              → List (RegId × Source × Chain Γ t) → Bool
 allShareSunk []                      = true
 allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
+
+------------------------------------------------------------------
+-- NODE-CACHE VALIDITY (the first GLOBAL coherence field, 2026-07-19).
+--
+-- UNIFYING PRINCIPLE: the registry is GROUND TRUTH; node counters
+-- (merge-st's activeInners, concat's innerActive, switch's cur, exhaust's
+-- act) are WRITER-ASSERTED CACHES of a fact the registry already holds.
+-- This field asserts cache validity WHERE THE CACHE IS STILL READABLE —
+-- the same writer-asserts / reader-checks discipline as the protocol
+-- itself, one level down.  It is NOT seed-provable: merge-st's k is
+-- cross-cascade state (set by bumps/decrements in earlier instants,
+-- summarising registrations that live across cascades), which a fold's
+-- seed and emits carry no information about.  So Inv carries it between
+-- cascades and its BurstInv/Mid/FoldInv shadows thread it through.
+--
+-- The merge counter caches the number of live inner INSTANCES under nid
+-- (one instance can hold several registrations — a multi-source inner —
+-- so we count DISTINCT inst indices in `from-inner _ nid inst` frames,
+-- not registrations).  GUARDED by reachability: `cutThrough` removes the
+-- registrations under nid without touching merge-st k (Evaluator take-f),
+-- leaving the counter overcounting but HARMLESS — the merge's own chains
+-- died in the same cut, so no future fold reads its gate.  So the honest
+-- assertion is "IF some live registration still passes `thru-outer nid`,
+-- THEN k is exact"; without the guard it is provably false after a cut,
+-- with it cut-through preserves it vacuously.
+
+-- distinct-count over ℕ (inst indices): count an element only where it
+-- does not recur later in the list
+elemℕ : NodeId → List NodeId → Bool
+elemℕ x []       = false
+elemℕ x (y ∷ ys) = (x ≡ᵇ y) ∨ elemℕ x ys
+
+nubLen : List NodeId → ℕ
+nubLen []       = 0
+nubLen (x ∷ xs) = if elemℕ x xs then nubLen xs else suc (nubLen xs)
+
+-- the inner INSTANCE indices of node nid mentioned by a frame / path /
+-- registry: a `from-inner _ nid inst` contributes inst (a single path
+-- mentions a given nid at most once, so per-path there is no dup; the
+-- dup is ACROSS registrations of a multi-source inner, collapsed by nubLen)
+innerInstsF : ∀ {n} {Γ : Ctx n} {s u} → NodeId → Frame Γ s u → List NodeId
+innerInstsF nid (from-inner _ k j) = if k ≡ᵇ nid then j ∷ [] else []
+innerInstsF nid _                  = []
+
+innerInstsP : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ s t → List NodeId
+innerInstsP nid root           = []
+innerInstsP nid (share-sink _) = []
+innerInstsP nid (f ↠ p)        = innerInstsF nid f ++ innerInstsP nid p
+
+innerInstsR : ∀ {n} {Γ : Ctx n} {t}
+            → NodeId → List (RegId × Source × Chain Γ t) → List NodeId
+innerInstsR nid []                    = []
+innerInstsR nid ((_ , _ , (_ , p)) ∷ r) = innerInstsP nid p ++ innerInstsR nid r
+
+countLiveInners : ∀ {n} {Γ : Ctx n} {t}
+                → NodeId → List (RegId × Source × Chain Γ t) → ℕ
+countLiveInners nid reg = nubLen (innerInstsR nid reg)
+
+-- the reachability guard: does some live registration's path still pass
+-- `thru-outer nid` (the OUTER chain of merge node nid)?
+frameThruOuter : ∀ {n} {Γ : Ctx n} {s u} → NodeId → Frame Γ s u → Bool
+frameThruOuter nid (thru-outer _ k) = k ≡ᵇ nid
+frameThruOuter nid _                = false
+
+pathThruOuter : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ s t → Bool
+pathThruOuter nid root           = false
+pathThruOuter nid (share-sink _) = false
+pathThruOuter nid (f ↠ p)        = frameThruOuter nid f ∨ pathThruOuter nid p
+
+mergeReachable : ∀ {n} {Γ : Ctx n} {t}
+               → NodeId → List (RegId × Source × Chain Γ t) → Bool
+mergeReachable nid []                    = false
+mergeReachable nid ((_ , _ , (_ , p)) ∷ r) = pathThruOuter nid p ∨ mergeReachable nid r
+
+-- one clause per NodeState constructor; only merge populated today.
+-- concat/switch/exhaust are the SAME cache-validity story (innerActive /
+-- cur / act) and each will be forced when its wrap clause is reached —
+-- given a `true` clause now so those land as clause edits, not new fields.
+nodeCacheOK : ∀ {n} {Γ : Ctx n} {t}
+            → NodeId → NodeState Γ → List (RegId × Source × Chain Γ t) → Bool
+nodeCacheOK nid (merge-st k _)    reg = not (mergeReachable nid reg)
+                                        ∨ (k ≡ᵇ countLiveInners nid reg)
+nodeCacheOK nid (scan-st _)       reg = true
+nodeCacheOK nid (take-st _)       reg = true
+nodeCacheOK nid (concat-st _ _ _) reg = true
+nodeCacheOK nid (switch-st _ _)   reg = true
+nodeCacheOK nid (exhaust-st _ _)  reg = true
+
+cachesValid : ∀ {n} {Γ : Ctx n} {t}
+            → List (NodeId × NodeState Γ) → List (RegId × Source × Chain Γ t) → Bool
+cachesValid []               reg = true
+cachesValid ((nid , s) ∷ ns) reg = nodeCacheOK nid s reg ∧ cachesValid ns reg
 
 -- the registry↔schedule type-consistency invariant (replaces the old
 -- one-lookahead chains-count): every registration's source-type matches
@@ -458,6 +552,9 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- registration can ever carry a value to the root again
     done-plumbed : ProtocolSt.done S ≡ true →
       allShareSunk (EvalSt.registry st) ≡ true
+    -- node counters cache the registry's ground truth (see cachesValid):
+    -- the between-cascades carrier of the first global coherence field
+    caches       : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
 
 ------------------------------------------------------------------
 -- the subscribe frame: BurstInv and its entry/step/exit lemmas
@@ -481,6 +578,7 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                   ⊎ (ProtocolSt.current S ≡ just (id , []))
     done-plumbed  : ProtocolSt.done S ≡ true →
       allShareSunk (EvalSt.registry st) ≡ true
+    caches        : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
 
 -- the empty states are related
 burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
@@ -491,6 +589,7 @@ burst-init e ins = record
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
   ; done-plumbed  = λ ()
+  ; caches        = refl
   }
 
 postulate
@@ -552,6 +651,7 @@ burst-final sched st S binv = inv , paid (BurstInv.current-frame binv)
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)
     ; done-plumbed = BurstInv.done-plumbed binv
+    ; caches       = BurstInv.caches binv
     }
 
 -- the root subscription, composed (at the budget evaluate seeds)
@@ -631,6 +731,18 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       allShareSunk (if Arrival.isLast a
                     then dropSource (arrSource a) (EvalSt.registry st)
                     else EvalSt.registry st) ≡ true
+    -- NOTE (node-cache validity, the Mid shadow — DEFERRED, 2026-07-19):
+    -- Mid carries NO caches field yet.  Neither raw-registry form is true
+    -- throughout the fold: the plain `cachesValid (nodes st)(registry st)`
+    -- fails mid-fold (an inner's `finish` decrements merge-st k while its
+    -- registrations linger until cascadeFinish), and the `if isLast then
+    -- dropSource` form fails at mid-init (arrSource's inners are still live
+    -- and counted by k, so dropping them pre-fold makes k overcount).  The
+    -- honest Mid shadow needs a ps-INDEXED pending-adjustment term (like
+    -- live-matches' initCount/closeCount): k ≡ countLiveInners adjusted by
+    -- the arrSource inners already folded-and-finished but not yet shed.
+    -- Until that shadow is designed, mid-final supplies Inv.caches via the
+    -- postulate cascade-preserves-caches (the genuine deferred content).
     fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
     -- ADDED (owed-key uniqueness): the open instant's owed table has no
     -- repeated key, so ledger's zeroExcept + the arrival's zero remainder
@@ -2204,6 +2316,21 @@ finishSched-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 finishSched-true a sched st eq with Arrival.isLast a | eq
 ... | true | refl = refl
 
+-- OUTSIDE-IN POSTULATE (the deferred hard content of the first global
+-- coherence field): a completed cascade lands node-cache valid.  This is
+-- where the Mid/FoldInv caches shadow — the ps-indexed pending-adjustment
+-- absorbing the finish-decrements-k-before-cascadeFinish-sheds-regs window
+-- — will be discharged once its shape is designed (see the Mid NOTE).  For
+-- now it delivers Inv.caches at every cascade boundary past the first (the
+-- first comes from burst-final ∘ BurstInv.caches ∘ subscribeE-wf), so the
+-- top-line Inv.caches is a real, usable field throughout.
+postulate
+  cascade-preserves-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (nextId : Id) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    Mid a nextId [] sched st S →
+    cachesValid (EvalSt.nodes (proj₂ (cascadeFinish a sched st)))
+                (EvalSt.registry (proj₂ (cascadeFinish a sched st))) ≡ true
+
 -- leaving: all chains folded ⇒ fully paid; finish (drop the spent
 -- source, sweep) lands Inv-related at suc nextId
 mid-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2278,6 +2405,10 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
           subst (λ b → allShareSunk (if b then dropSource (arrSource a) (EvalSt.registry st)
                           else EvalSt.registry st) ≡ true)
                 isL (Mid.done-plumbed mid deq)
+      ; caches       =
+          subst (λ x → cachesValid (EvalSt.nodes (proj₂ x)) (EvalSt.registry (proj₂ x)) ≡ true)
+                (cascadeFinish-false a sched st isL)
+                (cascade-preserves-caches a nextId sched st S mid)
       }
     -- isLast=true: keep cascadeFinish symbolic; convert registry and live
     -- field-by-field, reg-typed via the dropSource/sweepLive preservation
@@ -2300,6 +2431,7 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
                 (subst (λ b → allShareSunk (if b then dropSource (arrSource a) (EvalSt.registry st)
                                 else EvalSt.registry st) ≡ true)
                        isL (Mid.done-plumbed mid deq))
+      ; caches       = cascade-preserves-caches a nextId sched st S mid
       }
 
 -- the chain fold, composed (mirrors cascadeGo's own recursion —
