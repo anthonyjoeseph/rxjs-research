@@ -2630,22 +2630,102 @@ countRemaining-[] : ∀ {X : Set} (ps : List (RegId × X)) →
 countRemaining-[] []             = refl
 countRemaining-[] ((rid , _) ∷ ps) = cong suc (countRemaining-[] ps)
 
--- OUTSIDE-IN POSTULATE — the mid-init PARTITION of the caches shadow.  At
--- entry ps ≡ chainsOf a (ALL arrSource chains), cancelled ≡ [] (the latch
--- just reset it), and no inner has finished yet, so per merge node the full
--- adjustment adds back exactly the arrSource inners dropSource removed:
---   countLiveInners nid registry
---     ≡ mergeAdjust nid a (chainsOf a) st + countLiveInners nid (dropSource … registry)
--- i.e. cachesValid (plain, from Inv) ⇒ cachesValidMid at full ps.  A nubLen
--- set-partition (arrSource-last-source insts vs the rest) plus latch
--- node/registry preservation.  Deferred with mid-step until the counting
--- lemmas are proven.
+-- the latch leaves the node table untouched (only resets the ledger)
+latch-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  EvalSt.nodes (cascadeLatch a st) ≡ EvalSt.nodes st
+latch-nodes a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+-- Bool scaffolding for the guard algebra
+∨-fˡ : ∀ (b c : Bool) → (b ∨ c) ≡ false → b ≡ false
+∨-fˡ false c h = refl
+∨-fˡ true  c h = h
+∨-fʳ : ∀ (b c : Bool) → (b ∨ c) ≡ false → c ≡ false
+∨-fʳ false c h = h
+∨-fʳ true  c ()
+∨-zeroʳ : ∀ (b : Bool) → (b ∨ true) ≡ true
+∨-zeroʳ true  = refl
+∨-zeroʳ false = refl
+
+-- guard monotone: dropping a source cannot create thru-outer reachability,
+-- so ¬reachable is preserved (the cut case stays vacuous under dropSource)
+mergeReachable-drop-false : ∀ {n} {Γ : Ctx n} {t}
+  (nid : NodeId) (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  mergeReachable nid reg ≡ false → mergeReachable nid (dropSource s reg) ≡ false
+mergeReachable-drop-false nid s []                    h = refl
+mergeReachable-drop-false nid s ((rid , x , (u , p)) ∷ r) h with sameSource s x
+... | true  = mergeReachable-drop-false nid s r (∨-fʳ (pathThruOuter nid p) (mergeReachable nid r) h)
+... | false rewrite ∨-fˡ (pathThruOuter nid p) (mergeReachable nid r) h =
+      mergeReachable-drop-false nid s r (∨-fʳ (pathThruOuter nid p) (mergeReachable nid r) h)
+
+-- OUTSIDE-IN POSTULATE — the pure nubLen SET-PARTITION, isolated from the
+-- latch/guard/isLast shell (which is now proven, below).  At full ps and
+-- cancelled ≡ [] the arrSource inners dropSource removes are EXACTLY those
+-- mergeAdjust adds back: countLiveInners of the full registry splits into the
+-- adjustment plus countLiveInners of the dropSourced registry.  No evaluator
+-- dynamics — combinatorics of innerInstsR / collectAdjInsts / keepAbsent /
+-- nubLen over the arrSource source-split (a permutation-invariance of nubLen
+-- plus the chainsOf↔arrSource-entries bridge).  The remaining caches gap.
+-- the adjustment, UNFOLDED over (registry st, cancelled ≡ []) — the form the
+-- goal's `mergeAdjust … (cascadeLatch a st)` reduces to under isLast (the latch
+-- keeps registry, resets cancelled); stated plainly to dodge with-abstraction
+mergeAdjustSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → (a : Arrival Γ) → EvalSt e → ℕ
+mergeAdjustSt nid a st =
+  nubLen (keepAbsent (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st)))
+                     (collectAdjInsts nid [] (chainsOf a st)))
+
 postulate
-  mid-init-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (st : EvalSt e) →
-    cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
-    cachesValidMid a (chainsOf a st) (EvalSt.nodes (cascadeLatch a st))
-                   (cascadeLatch a st) ≡ true
+  countLiveInners-partition : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (a : Arrival Γ) (st : EvalSt e) →
+    countLiveInners nid (EvalSt.registry st)
+      ≡ mergeAdjustSt nid a st
+        + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st))
+
+-- mid-init PARTITION, PROVEN down to countLiveInners-partition: the plain
+-- cachesValid (from Inv) implies the full-ps Mid shadow.  Per merge node,
+-- guard-false stays vacuous (mergeReachable-drop-false) and guard-true feeds
+-- the exact count k through the partition; non-merge nodes and isLast≡false
+-- are the plain checker verbatim.
+mid-init-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
+  cachesValidMid a (chainsOf a st) (EvalSt.nodes (cascadeLatch a st))
+                 (cascadeLatch a st) ≡ true
+mid-init-caches {Γ = Γ} a st h rewrite latch-nodes a st = go (EvalSt.nodes st) h
+  where
+  nodeOK→Mid : (nid : NodeId) (s : NodeState Γ) →
+    nodeCacheOK nid s (EvalSt.registry st) ≡ true →
+    nodeCacheMid nid a (chainsOf a st) s (cascadeLatch a st) ≡ true
+  nodeOK→Mid nid (scan-st _)       hn = refl
+  nodeOK→Mid nid (take-st _)       hn = refl
+  nodeOK→Mid nid (concat-st _ _ _) hn = refl
+  nodeOK→Mid nid (switch-st _ _)   hn = refl
+  nodeOK→Mid nid (exhaust-st _ _)  hn = refl
+  nodeOK→Mid nid (merge-st k od) hn with Arrival.isLast a
+  ... | false = hn
+  ... | true  with mergeReachable nid (EvalSt.registry st) in eqM
+  ...   | false rewrite mergeReachable-drop-false nid (arrSource a) (EvalSt.registry st) eqM = refl
+  ...   | true  =
+        -- `with … in eqM` reduced hn to its second disjunct here: k ≡ᵇ count
+        let keq : k ≡ mergeAdjustSt nid a st
+                        + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st))
+            keq = trans (≡ᵇ→≡ k (countLiveInners nid (EvalSt.registry st)) hn)
+                        (countLiveInners-partition nid a st)
+            snd : (k ≡ᵇ (mergeAdjustSt nid a st
+                          + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st)))) ≡ true
+            snd = subst (λ z → (k ≡ᵇ z) ≡ true) keq (≡ᵇ-refl k)
+        in trans (cong (not (mergeReachable nid (dropSource (arrSource a) (EvalSt.registry st))) ∨_) snd)
+                 (∨-zeroʳ (not (mergeReachable nid (dropSource (arrSource a) (EvalSt.registry st)))))
+
+  go : (nodes : List (NodeId × NodeState Γ)) →
+       cachesValid nodes (EvalSt.registry st) ≡ true →
+       cachesValidMid a (chainsOf a st) nodes (cascadeLatch a st) ≡ true
+  go []              hg = refl
+  go ((nid , s) ∷ ns) hg =
+    ∧-intro (nodeOK→Mid nid s (∧-trueˡ hg)) (go ns (∧-trueʳ hg))
 
 -- entering: the latch opens the ledger; the automaton, Inv-related and
 -- paid, stands ready to open instant nextId (still on the previous,
