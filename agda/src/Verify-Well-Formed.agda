@@ -769,7 +769,10 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     pays     : settle delivery envSrc (ProtocolSt.live S) ob ≡ just ob′
     applies  : applyEvents evs (ProtocolSt.live S) ob′ (ProtocolSt.done S)
                  ≡ just (Lv , Ov , ProtocolSt.done S)
-    done-nil : ProtocolSt.done S ≡ true → vals ≡ []
+    -- once the root completes only share plumbing survives: every
+    -- registration sinks to a share, so a share fan-out's inners are all
+    -- share-bound (their own done-discipline, for dispatchShare-wf)
+    done-plumbed : ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true
 
 postulate
   -- a frame preserves FoldInv (S untouched — frames don't step the
@@ -799,27 +802,46 @@ postulate
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
 
+-- the done-discipline, as a precondition: a done automaton (root already
+-- completed) admits only share-bound folds — a chain reaching the root
+-- after completion would be a value-after-complete, which the protocol
+-- rejects.  At root (sinksToShare = false) this forces done S ≡ false, so
+-- the value list rides; it transfers unchanged through a frame and is
+-- vacuous at a share-sink.
+-- a hypothesis whose codomain reduces to false forces its subject false
+force-false : (b : Bool) → (b ≡ true → false ≡ true) → b ≡ false
+force-false false _ = refl
+force-false true  d with d refl
+... | ()
+
 foldPath-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   FoldInv id envSrc vals evs fin sched st S →
+  (ProtocolSt.done S ≡ true → sinksToShare path ≡ true) →
   Σ ProtocolSt λ S′ →
     runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
       ≡ just S′
-foldPath-wf sf gas id now envSrc root vals evs fin sched st S fi =
+foldPath-wf sf gas id now envSrc root vals evs fin sched st S fi ds =
   _ , foldPath-root-wf sf gas id now envSrc vals evs fin sched st S
         (FoldInv.ob fi) (FoldInv.hz fi) (FoldInv.ob′ fi) (FoldInv.Lv fi) (FoldInv.Ov fi)
-        (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) (FoldInv.done-nil fi)
-foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi =
+        (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) done-nil
+  where
+  df : ProtocolSt.done S ≡ false
+  df = force-false (ProtocolSt.done S) ds
+  done-nil : ProtocolSt.done S ≡ true → vals ≡ []
+  done-nil deq with trans (sym df) deq
+  ... | ()
+foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds =
   foldPath-wf sf gas id now envSrc path′
     (proj₁ (stepFrame sf id now f path′ vals fin sched st))
     (evs ++ proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
     (proj₁ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st))))
     (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
-    S (stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi)
-foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi =
+    S (stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi) ds
+foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds =
   dispatchShare-wf sf gas id now envSrc i vals evs fin sched st S fi
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
