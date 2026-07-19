@@ -600,6 +600,18 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- remainder) plus reading Mid back off the FoldInv result.  Kept as ONE
 -- postulate until FoldInv lands, so no half-stated (possibly-false) leaf
 -- enters the development early — the whole point of the outside-in rule.
+--
+-- WHERE TO SPLIT (verified empirically, 2026-07): the Path-constructor
+-- case split MUST live at foldPath-wf, which — like foldPath itself —
+-- quantifies the chain's SOURCE type `u` FREELY (path : Path Γ u t).
+-- It CANNOT live at mid-step, where the source type is pinned to the
+-- stuck projection `arrTy a`: matching `share-sink i : Path Γ (lookup Γ i) t`
+-- there demands `lookup Γ i ≡ arrTy a`, which Agda's unifier rejects
+-- (two neutrals), so `mid-step {p = share-sink i} = …` will not even
+-- typecheck (root and `f ↠ path′` do — only share-sink clashes).  With a
+-- free `u`, matching share-sink cleanly sets `u := lookup Γ i`.  So:
+-- mid-step invokes foldPath-wf at `u := arrTy a` with the seed; the
+-- three-way induction (root / frame / share) is foldPath-wf's own.
 postulate
   mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {a : Arrival Γ} {nextId : Id} {rid : RegId}
