@@ -2668,6 +2668,19 @@ mergeReachable-drop-false nid s ((rid , x , (u , p)) ∷ r) h with sameSource s 
 -- dynamics — combinatorics of innerInstsR / collectAdjInsts / keepAbsent /
 -- nubLen over the arrSource source-split (a permutation-invariance of nubLen
 -- plus the chainsOf↔arrSource-entries bridge).  The remaining caches gap.
+--
+-- DISCHARGE PLAN (recorded 2026-07-19): via nubLen-partition
+--   nubLen (A ++ B) ≡ nubLen (keepAbsent B A) + nubLen B          (pure list algebra)
+-- with A = collectAdjInsts nid [] (chainsOf a reg) = the arrSource entries'
+-- nid-insts, B = innerInstsR nid (dropSource arrSource reg) = the non-arrSource
+-- ones.  innerInstsR nid reg is a PERMUTATION of A ++ B (registry order vs the
+-- source-split order), so it needs nubLen permutation-invariance (adjacent-swap
+-- invariance, worked out and true).  DEPENDS ON reg-typed: chainsGo type-filters
+-- arrSource entries, so a mistyped arrSource entry would sit in innerInstsR nid
+-- reg (LHS) yet be dropped from A (chainsGo) AND from B (dropSource) — the
+-- equality fails without "every arrSource entry has type arrTy a".  Holds for
+-- all reachable states; applied only at mid-init where Inv.reg-typed is live —
+-- thread it into the discharge (add a reg-typed hypothesis then).
 -- the adjustment, UNFOLDED over (registry st, cancelled ≡ []) — the form the
 -- goal's `mergeAdjust … (cascadeLatch a st)` reduces to under isLast (the latch
 -- keeps registry, resets cancelled); stated plainly to dodge with-abstraction
