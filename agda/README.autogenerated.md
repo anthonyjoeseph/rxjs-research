@@ -40,8 +40,10 @@ instant id, so a batched stream is again an `Observable<InstEmit>` that feeds
 every primitive (merge it with itself and batch once more). Completeness is
 decided by counting: init/close traffic maintains the live-registration count
 per source, each live registration forwards exactly one (possibly valueless)
-delivery per arrival, and a share announces its fan-out with a `handoff`
-event before it fires. Every fact is **writer-asserted** — each mint site
+delivery per arrival — unless an operator cuts it mid-cascade before its
+turn, in which case it delivers nothing (as in rxjs) and its
+`close … cutPending` cancels the emit it was owed — and a share announces
+its fan-out with a `handoff` event before it fires. Every fact is **writer-asserted** — each mint site
 knows whether it is a subscription or a delivery, and why a registration
 closed (`cut` by an operator vs `exhausted` on its own) — so a reader checks
 the accounting rather than reconstructing it. Consumers act per-batch and

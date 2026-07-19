@@ -42,6 +42,12 @@ const payOwed = (s: SourceId, owed: Owed): Owed | null => {
 
 const allZero = (owed: Owed): boolean => owed.every(([, n]) => n === 0);
 
+// a cutPending victim's cancellation: one owed count forgiven (clamped)
+const cancelOwed = (s: SourceId, owed: Owed): Owed =>
+  owed.map(([x, n]): [SourceId, number] =>
+    x === s ? [x, Math.max(0, n - 1)] : [x, n],
+  );
+
 // ---- the batcher state (Agda's OpenBatch / BatchSt) ----
 type OpenBatch<A> = {
   instant: Provenance;
@@ -100,7 +106,14 @@ const applyBatch = <A>(
           : ev.type === "handoff"
             ? [live, bumpOwed(ev.source, countIn(ev.source, live), owed), vs]
             : ev.type === "close"
-              ? [removeOne(ev.source, live) ?? live, owed, vs]
+              ? [
+                  removeOne(ev.source, live) ?? live,
+                  // cutPending: the victim never pays — cancel one owed
+                  ev.reason === "cutPending"
+                    ? cancelOwed(ev.source, owed)
+                    : owed,
+                  vs,
+                ]
               : [live, owed, vs], // complete: no traffic
     [live0, owed0, vs0],
   );

@@ -9,9 +9,13 @@ import {
   takeWhile,
 } from "rxjs";
 import {
+  CutLedger,
   InstEmit,
   InstEvent,
   SourceId,
+  cutLedgerStep,
+  cutVictimCloses,
+  emptyCutLedger,
   flattenBurst,
   openAfter,
   reassemble,
@@ -251,11 +255,18 @@ export const take = <A>(
   obs.pipe(
     rxScan<
       InstEmit<A>,
-      { remaining: number; cut: boolean; open: SourceId[]; out?: InstEmit<A> }
+      {
+        remaining: number;
+        cut: boolean;
+        open: SourceId[];
+        ledger: CutLedger;
+        out?: InstEmit<A>;
+      }
     >(
       (state, emit) => {
         const { bookkeeping, values, fin } = splitEmit(emit);
         const open = openAfter(emit, state.open, false);
+        const ledger = cutLedgerStep(emit, state.ledger);
         const taken = values.slice(0, state.remaining);
         const didCut = taken.length === state.remaining; // filled the quota
         if (!didCut)
@@ -263,22 +274,28 @@ export const take = <A>(
             remaining: state.remaining - taken.length,
             cut: false,
             open,
+            ledger,
             out: reassemble(emit, bookkeeping, [], taken, fin),
           };
-        const cutCloses = open.map(
-          (source) => ({ type: "close", source, reason: "cut" }) as const,
-        );
-        // the cut RAISES fin on this very emit (Agda take-f returns
-        // fin′ = true; pushBurst/foldPath materialize it right there) —
-        // a downstream join absorbs it, the root keeps it
+        // per-victim reasons from the ledger (paid or born this
+        // instant ⇒ cut, else cutPending); the cut RAISES fin on this
+        // very emit (Agda take-f returns fin′ = true) — a downstream
+        // join absorbs it, the root keeps it
         return {
           remaining: 0,
           cut: true,
           open: [],
-          out: reassemble(emit, bookkeeping, cutCloses, taken, true),
+          ledger,
+          out: reassemble(
+            emit,
+            bookkeeping,
+            cutVictimCloses(open, ledger, emit.instant),
+            taken,
+            true,
+          ),
         };
       },
-      { remaining: emissions, cut: false, open: [] },
+      { remaining: emissions, cut: false, open: [], ledger: emptyCutLedger },
     ),
     takeWhile((state) => !state.cut, true), // include the cutting emit, then complete
     rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set

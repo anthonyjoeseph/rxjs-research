@@ -1,8 +1,13 @@
 import { Observable } from "rxjs";
 import {
+  CutLedger,
   InstEmit,
   InstEvent,
+  Provenance,
   SourceId,
+  cutLedgerStep,
+  cutVictimCloses,
+  emptyCutLedger,
   flattenBurst,
   openAfter,
   reassemble,
@@ -37,6 +42,7 @@ type JoinOp = "merge" | "concat" | "switch" | "exhaust";
 
 type InnerHandle = {
   open: SourceId[]; // this inner's live registrations — its fin bit
+  ledger: CutLedger; // who paid / was born this instant, for cut reasons
   unsubscribe: () => void;
 };
 
@@ -74,6 +80,7 @@ const joinAll =
       const forwardInnerEmit = (handle: InnerHandle, emit: InstEmit<A>) => {
         const parts = splitEmit(emit);
         handle.open = openAfter(emit, handle.open, false);
+        handle.ledger = cutLedgerStep(emit, handle.ledger);
         const innerDone = parts.fin || handle.open.length === 0;
         let grafts: Grafts<A> = { bookkeeping: [], values: [] };
         if (innerDone) {
@@ -98,7 +105,11 @@ const joinAll =
       const subscribeInner = (
         innerObs: Observable<InstEmit<A>>,
       ): Grafts<A> & { done: boolean } => {
-        const handle: InnerHandle = { open: [], unsubscribe: () => {} };
+        const handle: InnerHandle = {
+          open: [],
+          ledger: emptyCutLedger,
+          unsubscribe: () => {},
+        };
         const capture = captureSync(innerObs, {
           next: (emit) => forwardInnerEmit(handle, emit),
           complete: () => {
@@ -107,8 +118,10 @@ const joinAll =
           },
         });
         handle.unsubscribe = capture.unsubscribe;
-        for (const emit of capture.burst)
+        for (const emit of capture.burst) {
           handle.open = openAfter(emit, handle.open, false);
+          handle.ledger = cutLedgerStep(emit, handle.ledger);
+        }
         const flat = flattenBurst(capture.burst);
         const done =
           capture.completedSync || flat.done || handle.open.length === 0;
@@ -132,19 +145,22 @@ const joinAll =
         return grafts;
       };
 
-      // switch: end the current inner — close…cut for exactly the
-      // registrations it still holds, teardown cancelling its schedule
-      const cutCurrent = (): InstEvent<never>[] => {
+      // switch: end the current inner — a close for exactly the
+      // registrations it still holds, per-victim reasons from its
+      // ledger (paid/born this instant ⇒ cut, else cutPending),
+      // teardown cancelling its schedule
+      const cutCurrent = (cuttingInstant: Provenance): InstEvent<never>[] => {
         const current = active.shift();
         if (current === undefined) return [];
         current.unsubscribe();
-        return current.open.map(
-          (source) => ({ type: "close", source, reason: "cut" }) as const,
-        );
+        return cutVictimCloses(current.open, current.ledger, cuttingInstant);
       };
 
       // the per-op decision for one arriving inner observable
-      const acceptInner = (innerObs: Observable<InstEmit<A>>): Grafts<A> => {
+      const acceptInner = (
+        innerObs: Observable<InstEmit<A>>,
+        cuttingInstant: Provenance,
+      ): Grafts<A> => {
         switch (op) {
           case "merge":
             return subscribeInner(innerObs);
@@ -156,7 +172,7 @@ const joinAll =
             return subscribeInner(innerObs);
           }
           case "switch": {
-            const closes = cutCurrent();
+            const closes = cutCurrent(cuttingInstant);
             const result = subscribeInner(innerObs);
             return {
               bookkeeping: [...closes, ...result.bookkeeping],
@@ -174,7 +190,7 @@ const joinAll =
         const parts = splitEmit(emit);
         let grafts: Grafts<A> = { bookkeeping: [], values: [] };
         for (const innerObs of parts.values) {
-          const result = acceptInner(innerObs);
+          const result = acceptInner(innerObs, emit.instant);
           grafts = {
             bookkeeping: [...grafts.bookkeeping, ...result.bookkeeping],
             values: [...grafts.values, ...result.values],

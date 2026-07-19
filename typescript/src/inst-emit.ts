@@ -18,7 +18,13 @@ export type EmitKind = "subscribe" | "delivery" | "plumbing";
 //   real protocol traffic for the root's ledger, but its registrations
 //   belong to the share (they survive the subscriber), so the operators
 //   it flows through take no lifecycle signal from it
-export type CloseReason = "cut" | "exhausted"; // cut: an operator ended it (take, switch); exhausted: the source ran dry
+export type CloseReason = "cut" | "cutPending" | "exhausted";
+// cut: an operator ended it (take, switch) after it delivered this
+//   instant, or it was born mid-instant and owed nothing
+// cutPending: an operator ended it BEFORE it delivered the emit it owed
+//   this instant — the victim never pays, the reader cancels one owed
+//   count (a cut registration delivers NOTHING, as in rxjs)
+// exhausted: the source ran dry on its own
 
 export type InstEvent<A> =
   | { type: "init"; source: SourceId } // a registration chain of this source came alive
@@ -100,6 +106,82 @@ const removeOneSource = (
 ): SourceId[] => {
   const at = open.indexOf(source);
   return at === -1 ? open : [...open.slice(0, at), ...open.slice(at + 1)];
+};
+
+// ---- the cut ledger: writer-side bookkeeping for close reasons ----
+// A cut names its victims among the registrations still open through an
+// operator, and the reason is per victim (mirror of Agda's cutThrough
+// against its delivered set and registration watermark): delivered this
+// instant, or born this instant and owing nothing ⇒ "cut"; a
+// pre-existing registration cut before its delivery ⇒ "cutPending",
+// which the reader cancels one owed count against. The ledger tracks,
+// per current instant, which still-open registrations have paid
+// (cascades fold in registration order, so the earliest-registered of a
+// source paid first) and which were born (registered latest). Plumbing
+// emits carry no lifecycle signal.
+export type CutLedger = {
+  instant: Provenance | null;
+  paid: SourceId[]; // still-open registrations that delivered this instant
+  born: SourceId[]; // still-open registrations born this instant
+};
+
+export const emptyCutLedger: CutLedger = {
+  instant: null,
+  paid: [],
+  born: [],
+};
+
+export const cutLedgerStep = <A>(
+  emit: InstEmit<A>,
+  ledger: CutLedger,
+): CutLedger => {
+  if (emit.kind === "plumbing") return ledger;
+  const base =
+    ledger.instant === emit.instant
+      ? ledger
+      : { instant: emit.instant, paid: [], born: [] };
+  let paid =
+    emit.kind === "delivery" ? [...base.paid, emit.source] : base.paid;
+  let born = [...base.born];
+  for (const ev of emit.events) {
+    if (ev.type === "init") born = [...born, ev.source];
+    else if (ev.type === "close") {
+      // a closing registration leaves the ledger: the payer's own close
+      // rides its paying emit; a dying newborn leaves born
+      const inPaid = paid.indexOf(ev.source);
+      if (inPaid !== -1)
+        paid = [...paid.slice(0, inPaid), ...paid.slice(inPaid + 1)];
+      else born = removeOneSource(ev.source, born);
+    }
+  }
+  return { instant: base.instant, paid, born };
+};
+
+// the victims' closes, in registration order, one per open entry:
+// within a source's occurrences the earliest paid(x) delivered and the
+// latest born(x) were born this instant — both "cut"; the middle never
+// paid this instant: "cutPending". A ledger from an older instant
+// contributes nothing (nobody paid or was born this instant).
+export const cutVictimCloses = (
+  open: SourceId[],
+  ledger: CutLedger,
+  cuttingInstant: Provenance,
+): InstEvent<never>[] => {
+  const active = ledger.instant === cuttingInstant;
+  const countOf = (xs: SourceId[], x: SourceId) =>
+    xs.filter((s) => s === x).length;
+  const total = new Map<SourceId, number>();
+  for (const x of open) total.set(x, (total.get(x) ?? 0) + 1);
+  const seen = new Map<SourceId, number>();
+  return open.map((x) => {
+    const i = (seen.get(x) ?? 0) + 1;
+    seen.set(x, i);
+    const paid = active ? countOf(ledger.paid, x) : 0;
+    const born = active ? countOf(ledger.born, x) : 0;
+    const reason: CloseReason =
+      i <= paid || i > (total.get(x) ?? 0) - born ? "cut" : "cutPending";
+    return { type: "close", source: x, reason } as const;
+  });
 };
 
 // the open-registration multiset after one emit's events: inits enlist,

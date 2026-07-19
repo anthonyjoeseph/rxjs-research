@@ -7,10 +7,11 @@ open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
 open import Data.Product using (_×_; _,_)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; EmitKind; subscribe; delivery; plumbing;
+                           complete; CloseReason; cutPending;
+                           EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Protocol using (Owed; countIn; removeOne; hasOwed; bumpOwed;
-                               payOwed; allZero)
+                               payOwed; cancelOwed; allZero)
 
 ------------------------------------------------------------------
 -- The ONLINE batcher: one emission at a time, own state only, no
@@ -72,6 +73,8 @@ applyBatch (value v   ∷ es) live owed vs = applyBatch es live owed (vs ++ v �
 applyBatch (handoff x ∷ es) live owed vs =
   applyBatch es live (bumpOwed x (countIn x live) owed) vs
 applyBatch (complete  ∷ es) live owed vs = applyBatch es live owed vs
+applyBatch (close x cutPending ∷ es) live owed vs =
+  applyBatch es (fromMaybe live (removeOne x live)) (cancelOwed x owed) vs
 applyBatch (close x _ ∷ es) live owed vs =
   applyBatch es (fromMaybe live (removeOne x live)) owed vs
 

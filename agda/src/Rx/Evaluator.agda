@@ -3,7 +3,7 @@ module Rx.Evaluator where
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; any; null)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -15,7 +15,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; Source;
                            Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
-                           CloseReason; cut; exhausted;
+                           CloseReason; cut; cutPending; exhausted;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
@@ -226,40 +226,77 @@ pathHasNode nid (f ↠ p)       = any (_≡ᵇ nid) (frameNodes f) ∨ pathHasNo
 
 -- remove every registration whose chain passes through the given
 -- node, emitting one close per removed registration
+-- registrations carry an identity so a mid-cascade cut can name its
+-- victims: a cancelled registration's snapshot chain must deliver
+-- NOTHING (as in rxjs — an unsubscribed chain is silent), and its
+-- close must say whether it had already paid this instant (cut) or
+-- never will (cutPending, cancelling one owed count downstream)
+RegId : Set
+RegId = ℕ
+
+-- the close reason is writer-asserted per victim: delivered this
+-- cascade, or born since the cascade started (owing nothing) ⇒ cut;
+-- a pre-existing registration cut before its delivery ⇒ cutPending.
+-- A victim of a DYING source that already delivered carried its own
+-- exhausted close on its own emit — no second close for it.  Also
+-- returns the victims' ids for the cascade's cancelled set.
 cutThrough : ∀ {n} {Γ : Ctx n} {t}
-           → NodeId → List (Source × Chain Γ t)
-           → List (Source × Chain Γ t) × List (InstEvent (Val Γ t))
-cutThrough nid []              = [] , []
-cutThrough nid ((src , c) ∷ r) with pathHasNode nid (proj₂ c) | cutThrough nid r
-... | true  | kept , closes = kept , close src cut ∷ closes
-... | false | kept , closes = (src , c) ∷ kept , closes
+           → NodeId → List RegId → RegId → List Source
+           → List (RegId × Source × Chain Γ t)
+           → List (RegId × Source × Chain Γ t)
+             × List (InstEvent (Val Γ t)) × List RegId
+cutThrough nid delivered wm dying [] = [] , [] , []
+cutThrough nid delivered wm dying ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid delivered wm dying r
+... | true  | kept , closes , rids =
+      kept
+      , (if any (_≡ᵇ rid) delivered ∧ memberSource src dying
+         then closes
+         else close src (if any (_≡ᵇ rid) delivered ∨ (wm ≤ᵇ rid)
+                         then cut else cutPending) ∷ closes)
+      , rid ∷ rids
+... | false | kept , closes , rids = (rid , src , c) ∷ kept , closes , rids
 
 -- drop dead dynamic sources (no remaining registrations); hot input
 -- slots (sources < n by convention) keep firing regardless, exactly
 -- like a hot Subject with no subscribers
 sweepLive : ∀ {n} {Γ : Ctx n} {t}
-          → List (Source × Chain Γ t) → List (LiveSource Γ) → List (LiveSource Γ)
+          → List (RegId × Source × Chain Γ t) → List (LiveSource Γ) → List (LiveSource Γ)
 sweepLive {n = n} reg []       = []
 sweepLive {n = n} reg (l ∷ ls) =
   if (LiveSource.source l <ᵇ n)
-     ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ p)) reg
+     ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
   then l ∷ sweepLive reg ls
   else sweepLive reg ls
 
 dropSource : ∀ {n} {Γ : Ctx n} {t}
-           → Source → List (Source × Chain Γ t) → List (Source × Chain Γ t)
-dropSource src []             = []
-dropSource src ((s , c) ∷ r) =
-  if sameSource src s then dropSource src r else (s , c) ∷ dropSource src r
+           → Source → List (RegId × Source × Chain Γ t) → List (RegId × Source × Chain Γ t)
+dropSource src []                  = []
+dropSource src ((rid , s , c) ∷ r) =
+  if sameSource src s then dropSource src r else (rid , s , c) ∷ dropSource src r
 
 record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
-  field registry        : List (Source × Chain Γ t)   -- live registration chains, subscription order
+  field registry        : List (RegId × Source × Chain Γ t)   -- live registration chains, subscription order
+        nextReg         : RegId         -- registration ids, minted by register
         nodes           : NodeSt e
         connectedShares : List Source   -- shared slots whose def is live (connect happens once, ever)
         completedSources : List Source  -- the completion latch: completed shares AND spent
                                         -- scripted sources (a completed Subject re-delivers
                                         -- complete to late subscribers; values are not
                                         -- re-observable, completion is)
+        -- per-cascade bookkeeping (reset by cascade, shared with any
+        -- dispatchShare it triggers):
+        delivered       : List RegId    -- snapshot chains that have folded this cascade
+        cancelled       : List RegId    -- victims cut mid-cascade: their snapshot
+                                        -- chains are skipped outright (an unsubscribed
+                                        -- rxjs chain delivers nothing)
+        regWatermark    : RegId         -- nextReg at cascade start: registrations at or
+                                        -- above it were born this cascade and owe nothing
+        dying           : List Source   -- sources spending their final delivery this
+                                        -- cascade (the isLast arrival, a completing
+                                        -- share): their delivered registrations already
+                                        -- carried their own exhausted closes, and the
+                                        -- whole source's registry entries drop at finish
 
 mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
 mintSource sched =
@@ -273,11 +310,13 @@ mintNode : ∀ {n} {Γ : Ctx n} → Sched Γ → NodeId × Sched Γ
 mintNode sched =
   Sched.nextNode sched , record sched { nextNode = suc (Sched.nextNode sched) }
 
--- append: the registry stays in subscription order
+-- append: the registry stays in subscription order; the id is minted here
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → Source → Path Γ u t → EvalSt e → EvalSt e
 register {u = u} src path st =
-  record st { registry = EvalSt.registry st ++ (src , u , path) ∷ [] }
+  record st { registry = EvalSt.registry st
+                           ++ (EvalSt.nextReg st , src , u , path) ∷ []
+            ; nextReg  = suc (EvalSt.nextReg st) }
 
 installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e
@@ -317,8 +356,10 @@ subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
            → Stream Γ u × Sched Γ × EvalSt e
 
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
-st-init e = record { registry = [] ; nodes = []
-                   ; connectedShares = [] ; completedSources = [] }
+st-init e = record { registry = [] ; nextReg = 0 ; nodes = []
+                   ; connectedShares = [] ; completedSources = []
+                   ; delivered = [] ; cancelled = [] ; regWatermark = 0
+                   ; dying = [] }
   -- all populated by the root subscribeE and by lazy share connects
 
 -- the arrival's source's live chains, in subscription order, at
@@ -327,15 +368,15 @@ st-init e = record { registry = [] ; nodes = []
 -- mistyped registry entry — impossible by the registration invariant —
 -- is dropped, never trusted)
 chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-         → (a : Arrival Γ) → EvalSt e → List (Path Γ (arrTy a) t)
+         → (a : Arrival Γ) → EvalSt e → List (RegId × Path Γ (arrTy a) t)
 chainsOf {Γ = Γ} {t = t} {e = e} a st = go (EvalSt.registry st)
   where
-  go : List (Source × Chain Γ t) → List (Path Γ (arrTy a) t)
+  go : List (RegId × Source × Chain Γ t) → List (RegId × Path Γ (arrTy a) t)
   go [] = []
-  go ((s , (u , p)) ∷ r) with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+  go ((rid , s , (u , p)) ∷ r) with sameSource (arrSource a) s | u ≟ᵗ arrTy a
   ... | false | _        = go r
   ... | true  | no  _    = go r
-  ... | true  | yes refl = p ∷ go r
+  ... | true  | yes refl = (rid , p) ∷ go r
 
 -- split a subscription burst into grafted values, retagged
 -- bookkeeping events, and whether the inner completed synchronously
@@ -434,10 +475,13 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} id now (take-f nid) κ vals fin sche
         out , [] , fin , sched ,
         record st { nodes = setNode nid (take-st rem) (EvalSt.nodes st) }
   ... | out , _   , true  =
-        let (kept , closes) = cutThrough nid (EvalSt.registry st)
+        let (kept , closes , cutRids) =
+              cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                         (EvalSt.dying st) (EvalSt.registry st)
         in out , closes , true ,
            record sched { live = sweepLive kept (Sched.live sched) } ,
            record st { registry = kept
+                     ; cancelled = cutRids ++ EvalSt.cancelled st
                      ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) }
   dispatch _ = [] , [] , fin , sched , st
 
@@ -477,9 +521,23 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} id now (from-inner op allNid inst) �
     record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) }
   finish _ _ = vals , [] , false , sched , st
 
+  -- a fin only completes THIS INNER once nothing under its exit frame
+  -- can ever deliver again: a sibling registration of the dying source
+  -- still queued this cascade, or any other live registration, absorbs
+  -- it (the TS join's open-multiset, read off the registry) — one
+  -- chain's exhaustion is not a multi-registration subtree's completion
+  aliveThrough : RegId × Source × Chain Γ t → Bool
+  aliveThrough (rid , src , (w , p)) =
+    pathHasNode inst p
+    ∧ not (any (_≡ᵇ rid) (EvalSt.cancelled st))
+    ∧ (not (memberSource src (EvalSt.dying st))
+       ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
+
   react : Bool → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
   react false = vals , [] , false , sched , st
-  react true  = finish op (lookupNode allNid (EvalSt.nodes st))
+  react true  = if any aliveThrough (EvalSt.registry st)
+                then vals , [] , false , sched , st
+                else finish op (lookupNode allNid (EvalSt.nodes st))
 
 stepFrame {Γ = Γ} {t = t} {e = e} {u = u} id now (thru-outer mergeᵒ nid) κ vals fin sched st
   = wrap fin (walk vals sched st)
@@ -549,10 +607,13 @@ stepFrame {Γ = Γ} {t = t} {e = e} {u = u} id now (thru-outer switchᵒ nid) κ
        → List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
   kill nothing  sched₀ st₀ = [] , sched₀ , st₀
   kill (just v) sched₀ st₀ =
-    let (kept , closes) = cutThrough v (EvalSt.registry st₀)
+    let (kept , closes , cutRids) =
+          cutThrough v (EvalSt.delivered st₀) (EvalSt.regWatermark st₀)
+                     (EvalSt.dying st₀) (EvalSt.registry st₀)
     in closes ,
        record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
-       record st₀ { registry = kept }
+       record st₀ { registry = kept
+                  ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
 
   consume : Val Γ (obs u) → Sched Γ → EvalSt e
           → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
@@ -850,41 +911,47 @@ foldPath id now envSrc (f ↠ path′) vals evs fin sched st =
 dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
   finish fin (go (admit (EvalSt.registry st)) sched (latch fin st))
   where
-  -- latch AND drop: the dying share's registrations leave the
-  -- registry before the fan-out folds (admit already snapshotted
-  -- them), so an operator cut during the fan-out (cutThrough) never
-  -- closes a registration whose exhausted close is already seeded
-  -- on its own fan-out emit — no double close
+  -- latch completion AND mark the share dying: a delivered fan-out
+  -- registration's exhausted close rides its own emit, so a cut
+  -- during the fan-out suppresses its second close (cutThrough's
+  -- delivered∧dying rule); the registry entries drop at finish
   latch : Bool → EvalSt e → EvalSt e
   latch false st₀ = st₀
   latch true  st₀ =
     record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀
-               ; registry = dropSource (toℕ i) (EvalSt.registry st₀) }
+               ; dying = toℕ i ∷ EvalSt.dying st₀ }
 
-  admit : List (Source × Chain Γ t) → List (Path Γ (lookup Γ i) t)
+  admit : List (RegId × Source × Chain Γ t) → List (RegId × Path Γ (lookup Γ i) t)
   admit [] = []
-  admit ((s , (u , p)) ∷ r) with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
+  admit ((rid , s , (u , p)) ∷ r) with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
   ... | false | _        = admit r
   ... | true  | no  _    = admit r
-  ... | true  | yes refl = p ∷ admit r
+  ... | true  | yes refl = (rid , p) ∷ admit r
 
-  go : List (Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e
+  -- a fan-out chain cancelled earlier in this cascade (an operator
+  -- cut named it a victim) delivers NOTHING — its close already rode
+  -- the cutting emit; the survivors are marked delivered as they fold
+  go : List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e
      → Stream Γ t × Sched Γ × EvalSt e
-  go []       sched₀ st₀ = [] , sched₀ , st₀
-  go (p ∷ ps) sched₀ st₀ =
+  go []               sched₀ st₀ = [] , sched₀ , st₀
+  go ((rid , p) ∷ ps) sched₀ st₀ with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+  ... | true  = go ps sched₀ st₀
+  ... | false =
     let (emits , sched₁ , st₁) =
           foldPath id now (toℕ i) p vals
                    (if fin then close (toℕ i) exhausted ∷ [] else [])
-                   fin sched₀ st₀
+                   fin sched₀
+                   (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
         (rest , sched₂ , st₂) = go ps sched₁ st₁
     in emits ++ rest , sched₂ , st₂
 
   finish : Bool → Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   finish false out = out
   finish true  (emits , sched′ , st′) =
-    emits ,
-    record sched′ { live = sweepLive (EvalSt.registry st′) (Sched.live sched′) } ,
-    st′
+    let kept = dropSource (toℕ i) (EvalSt.registry st′)
+    in emits ,
+       record sched′ { live = sweepLive kept (Sched.live sched′) } ,
+       record st′ { registry = kept }
 
 -- seed one arrival into one chain: the value, plus fin and this
 -- registration's close when the source is spent (isLast)
@@ -917,29 +984,46 @@ cascade {Γ = Γ} {t = t} {e = e} a id sched st =
   -- them a second time.  Colds and deferᵉ hops get latched too,
   -- harmlessly: their sources are per-subscription, never
   -- re-subscribed
+  -- ALSO opens the cascade's per-arrival ledger: delivered/cancelled
+  -- reset, the registration watermark stamped (newer registrations
+  -- were born this cascade and owe nothing), the spent source marked
+  -- dying (each of its chains seeds its own exhausted close; a cut
+  -- never closes a delivered dying registration a second time; its
+  -- registry entries drop at finish)
   latch : EvalSt e → EvalSt e
   latch st₀ =
-    if Arrival.isLast a
-    then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀
-                    ; registry = dropSource (arrSource a) (EvalSt.registry st₀) }
-    else st₀
+    record (if Arrival.isLast a
+            then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
+            else st₀)
+      { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st₀
+      ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
 
-  go : List (Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
-  go []           sched₀ st₀ = [] , sched₀ , st₀
-  go (c ∷ chains) sched₀ st₀ =
-    let (emits , sched₁ , st₁) = chainStep id a c sched₀ st₀
+  -- a chain cancelled earlier in this same cascade (an operator cut
+  -- named it a victim) delivers NOTHING — as in rxjs, where the
+  -- unsubscribed branch of take(1)(merge(s,s)) is silent; its close
+  -- (cut or cutPending) already rode the cutting emit
+  go : List (RegId × Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
+  go []                   sched₀ st₀ = [] , sched₀ , st₀
+  go ((rid , c) ∷ chains) sched₀ st₀ with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+  ... | true  = go chains sched₀ st₀
+  ... | false =
+    let (emits , sched₁ , st₁) =
+          chainStep id a c sched₀
+                    (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
         (rest  , sched₂ , st₂) = go chains sched₁ st₁
     in emits ++ rest , sched₂ , st₂
 
-  -- registrations were dropped at latch; the sweep collects the
-  -- spent source's live entry once the cascade has run
+  -- the spent source's registrations drop at the end (each delivered
+  -- chain carried its own close; cut victims' closes rode the cutting
+  -- emit) and the sweep collects its live entry
   finish : Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
   finish (emits , sched′ , st′) with Arrival.isLast a
   ... | false = emits , sched′ , st′
   ... | true  =
-        emits ,
-        record sched′ { live = sweepLive (EvalSt.registry st′) (Sched.live sched′) } ,
-        st′
+        let kept = dropSource (arrSource a) (EvalSt.registry st′)
+        in emits ,
+           record sched′ { live = sweepLive kept (Sched.live sched′) } ,
+           record st′ { registry = kept }
 
 -- fuel = ARRIVALS PROCESSED; each arrival's cascade runs to
 -- quiescence (never truncated mid-batch).  The root subscription's

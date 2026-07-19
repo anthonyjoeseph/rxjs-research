@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
-                           CloseReason; cut; exhausted; EmitKind;
+                           CloseReason; cut; cutPending; exhausted; EmitKind;
                            subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
@@ -179,9 +179,10 @@ eqKind plumbing  plumbing  = true
 eqKind _         _         = false
 
 eqReason : CloseReason → CloseReason → Bool
-eqReason cut       cut       = true
-eqReason exhausted exhausted = true
-eqReason _         _         = false
+eqReason cut        cut        = true
+eqReason cutPending cutPending = true
+eqReason exhausted  exhausted  = true
+eqReason _          _          = false
 
 eqListℕ : List ℕ → List ℕ → Bool
 eqListℕ []       []       = true

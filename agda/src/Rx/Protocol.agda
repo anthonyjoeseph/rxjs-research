@@ -1,13 +1,14 @@
 module Rx.Protocol where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; EmitKind; subscribe; delivery; plumbing;
+                           complete; CloseReason; cutPending;
+                           EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 
 ------------------------------------------------------------------
@@ -25,9 +26,11 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
 --   instant freshness   — an instant is one contiguous run of
 --                         emits; once left it never recurs
 --   bracketing          — every close matches a live init; the
---                         live multiset never underflows (the
---                         close REASON is descriptive: cut and
---                         exhausted count the same here)
+--                         live multiset never underflows.  The
+--                         close REASON is load-bearing for owed:
+--                         cutPending marks a registration cut
+--                         BEFORE its delivery — it will never pay,
+--                         so one owed count is cancelled against it
 --   fan-out exactness   — subscribe and plumbing emits owe nothing
 --                         and pay nothing.  A delivery from s pays owed[s]:
 --                         seeded to live(s) at s's first delivery
@@ -95,6 +98,13 @@ payOwed s ((x , n) ∷ o) with s ≡ᵇ x | n
 ...   | just o′ = just ((x , n) ∷ o′)
 ...   | nothing = nothing
 
+-- a cutPending victim's cancellation: one owed count forgiven
+-- (clamped; a victim of a source not firing this instant is a no-op)
+cancelOwed : Source → Owed → Owed
+cancelOwed s []            = []
+cancelOwed s ((x , n) ∷ o) =
+  if s ≡ᵇ x then (x , n ∸ 1) ∷ o else (x , n) ∷ cancelOwed s o
+
 allZero : Owed → Bool
 allZero []                = true
 allZero ((_ , zero)  ∷ o) = allZero o
@@ -119,6 +129,9 @@ applyEvents (value _   ∷ es) live owed done =
 applyEvents (handoff x ∷ es) live owed done =
   applyEvents es live (bumpOwed x (countIn x live) owed) done
 applyEvents (complete  ∷ es) live owed done = applyEvents es live owed true
+applyEvents (close x cutPending ∷ es) live owed done with removeOne x live
+... | just live′ = applyEvents es live′ (cancelOwed x owed) done
+... | nothing    = nothing
 applyEvents (close x _ ∷ es) live owed done with removeOne x live
 ... | just live′ = applyEvents es live′ owed done
 ... | nothing    = nothing

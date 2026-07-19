@@ -14,7 +14,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; CloseReason; cut; exhausted;
+                           complete; CloseReason; cut; cutPending; exhausted;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val; Ctx)
@@ -52,8 +52,9 @@ private
   encKind plumbing  = quote′ "plumbing"
 
   encReason : CloseReason → String
-  encReason cut       = quote′ "cut"
-  encReason exhausted = quote′ "exhausted"
+  encReason cut        = quote′ "cut"
+  encReason cutPending = quote′ "cutPending"
+  encReason exhausted  = quote′ "exhausted"
 
   encEvent : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEvent (Val Γ t) → String
   encEvent t (init s)     = "{" ++ field′ "type" (quote′ "init") ++ "," ++ field′ "source" (show s) ++ "}"

@@ -28,8 +28,12 @@ Source = ℕ                          -- concrete so the scheduler can mint & co
 -- comparing clocks: init/close traffic maintains the live-registration
 -- count per source, and for each arrival every live registration chain
 -- of that source forwards EXACTLY ONE InstEmit (possibly valueless —
--- emits are emptied, never swallowed), so a batcher owes
--- count(source) emits for an instant and flushes when they've arrived.
+-- emits are emptied, never swallowed) — UNLESS an operator cuts it
+-- mid-cascade before its turn: a cut chain delivers nothing (as in
+-- rxjs), and its `close … cutPending` on the cutting emit tells the
+-- batcher to cancel the emit it was owed.  So a batcher owes
+-- count(source) emits for an instant, cancels one per cutPending, and
+-- flushes when the remainder have arrived.
 -- Writer-asserted facts (the reader checks, never reconstructs):
 -- every mint site knows definitively whether it is a subscription
 -- burst or an arrival delivery, and why a registration ended.
@@ -43,8 +47,15 @@ data EmitKind : Set where
                                     -- flows through take no lifecycle signal from it
 
 data CloseReason : Set where
-  cut       : CloseReason           -- an operator ended it (take's cut, switch switching away)
-  exhausted : CloseReason           -- the source ran dry on its own
+  cut        : CloseReason          -- an operator ended it (take's cut, switch switching
+                                    -- away) AFTER it delivered this instant (or it was
+                                    -- born mid-instant and owed nothing)
+  cutPending : CloseReason          -- an operator ended it BEFORE it delivered the emit
+                                    -- it owed this instant — the victim will never pay,
+                                    -- so the reader cancels one owed count against it
+                                    -- (a cut registration delivers NOTHING, as in rxjs:
+                                    -- take(1)(merge(s,s)) — the second chain is silent)
+  exhausted  : CloseReason          -- the source ran dry on its own
 
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive
