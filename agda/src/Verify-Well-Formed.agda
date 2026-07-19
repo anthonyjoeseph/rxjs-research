@@ -41,7 +41,8 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f;
+                                map-f; NodeId; merge-st; lookupNode; pathHasNode;
+                                AllOp; mergeᵒ; thru-outer;
                                 sched-init; st-init; sched-next; LiveSource;
                                 schedGo; schedHeadOf; schedFinish; schedEarlier;
                                 arrTy; arrSource; arrVal; arrTick;
@@ -201,6 +202,19 @@ allShareSunk : ∀ {n} {Γ : Ctx n} {t}
              → List (RegId × Source × Chain Γ t) → Bool
 allShareSunk []                      = true
 allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
+
+-- how many live registrations thread node nid (their rootward Chain path
+-- passes through one of nid's frames — pathHasNode, Evaluator 226-229).  This
+-- is the ground truth a merge node's `merge-st k` active-inner counter tracks:
+-- `bump` (Evaluator 609-611) does suc k exactly when subscribeInner adds a
+-- threading inner registration, so the merge-coherence invariant is
+-- k ≡ countRegsUnder nid registry, and the wrap-true completion gate k ≡ᵇ 0
+-- (Evaluator 625-628) reads off "no inner still threads nid".
+countRegsUnder : ∀ {n} {Γ : Ctx n} {t}
+               → NodeId → List (RegId × Source × Chain Γ t) → ℕ
+countRegsUnder nid []                  = 0
+countRegsUnder nid ((_ , _ , (_ , p)) ∷ r) =
+  if pathHasNode nid p then suc (countRegsUnder nid r) else countRegsUnder nid r
 
 -- the registry↔schedule type-consistency invariant (replaces the old
 -- one-lookahead chains-count): every registration's source-type matches
@@ -1230,6 +1244,29 @@ stepFrame-wf-mapf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 stepFrame-wf-mapf sf id now envSrc fn path′ vals evs fin sched st S fi
   rewrite ++-identityʳ evs = fi
+
+-- GUARDRAIL-3 hand-check (the merge thru-outer wrap gate) — the delicate
+-- clause the higher-model call flagged.  We check the SHAPE of the merge-
+-- coherence field against the exact scrutinee the evaluator's wrap-true branch
+-- reads (Evaluator 625-628), on the base case vals ≡ [] where `walk` is a no-op
+-- (registry untouched) so no subscribeInner deltas intervene.  The gate reads
+-- `merge-st k`'s counter and completes iff `k ≡ᵇ 0`; under coherence
+-- (k ≡ countRegsUnder nid registry) that IS `countRegsUnder nid registry ≡ᵇ 0`
+-- — i.e. fin-out fires exactly when no inner registration still threads nid.
+-- This confirms the field statement lines up with the gate before the o∷os
+-- recursion (where the subscribeInner/bump delta lemma — the remaining hole —
+-- must show each threading inner bumps k and countRegsUnder in lockstep).
+mergeWrap-nil-coherent : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : ℕ) (id : Id) (now : Tick) (nid : NodeId)
+  (κ : Path Γ u t) (k : ℕ) (od : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (merge-st k od) →
+  k ≡ countRegsUnder nid (EvalSt.registry st) →
+  let (_ , _ , fin′ , _ , st₁) = stepFrame sf id now (thru-outer mergeᵒ nid) κ [] true sched st
+  in (fin′ ≡ (countRegsUnder nid (EvalSt.registry st) ≡ᵇ 0))
+   × (EvalSt.registry st₁ ≡ EvalSt.registry st)
+mergeWrap-nil-coherent sf id now nid κ k od sched st hlook hcoh
+  rewrite hlook = cong (_≡ᵇ 0) hcoh , refl
 
 -- the done-discipline, as a precondition: a done automaton (root already
 -- completed) admits only share-bound folds — a chain reaching the root
