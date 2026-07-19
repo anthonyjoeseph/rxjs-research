@@ -17,7 +17,7 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.List    using (List; []; _∷_; _++_; any; length)
@@ -25,14 +25,18 @@ open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit)
-open import Rx.Exp       using (Ctx; Closed)
+open import Relation.Nullary using (Dec; yes; no)
+
+open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_;
-                                sched-init; st-init; sched-next;
+                                sched-init; st-init; sched-next; LiveSource;
+                                schedGo; schedHeadOf; schedFinish; schedEarlier;
                                 arrTy; arrSource; chainsOf; chainStep;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
@@ -138,6 +142,98 @@ allShareSunk : ∀ {n} {Γ : Ctx n} {t}
              → List (RegId × Source × Chain Γ t) → Bool
 allShareSunk []                      = true
 allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
+
+-- the registry↔schedule type-consistency invariant (replaces the old
+-- one-lookahead chains-count): every registration's source-type matches
+-- every live source of the same source.  Share-sunk registrations whose
+-- source has no live entry are unconstrained — chainsOf only ever reads
+-- entries of a SCHEDULED source, and those all trace to a LiveSource, so
+-- this pins their type-check to pass (chains-count-derived below)
+sameTy : Ty → Ty → Bool
+sameTy s u with s ≟ᵗ u
+... | yes _ = true
+... | no  _ = false
+
+liveTypeOK? : ∀ {n} {Γ : Ctx n} → Source → Ty → List (LiveSource Γ) → Bool
+liveTypeOK? s u []       = true
+liveTypeOK? s u (l ∷ ls) =
+  (if LiveSource.source l ≡ᵇ s then sameTy u (LiveSource.elemTy l) else true)
+    ∧ liveTypeOK? s u ls
+
+regTyped? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t)
+          → List (LiveSource Γ) → Bool
+regTyped? []                      live = true
+regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r live
+
+≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
+≡ᵇ→≡ zero    zero    _ = refl
+≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
+
+≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
+≡ᵇ-refl zero    = refl
+≡ᵇ-refl (suc m) = ≡ᵇ-refl m
+
+∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
+∧-trueˡ {true} _ = refl
+
+∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
+∧-trueʳ {true} h = h
+
+∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
+∧-intro refl refl = refl
+
+if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
+if-false b eq rewrite eq = refl
+
+if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
+if-true b eq rewrite eq = refl
+
+sameTy-sound : ∀ (a b : Ty) → sameTy a b ≡ true → a ≡ b
+sameTy-sound a b h with a ≟ᵗ b
+... | yes p = p
+... | no  _ = true≢false (sym h)
+
+sameTy-refl : ∀ (a : Ty) → sameTy a a ≡ true
+sameTy-refl a with a ≟ᵗ a
+... | yes _  = refl
+... | no ¬p = ⊥-elim (¬p refl)
+
+-- the arrival a live source pops carries its source and elemTy
+schedHeadOf-match : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ) {a : Arrival Γ} {l′} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  (arrSource a ≡ LiveSource.source l) × (arrTy a ≡ LiveSource.elemTy l)
+schedHeadOf-match l eq with LiveSource.pending l | eq
+... | (t , v) ∷ ps | refl = refl , refl
+
+-- a's source/type is present among the live sources sched-next drew from
+liveHas : ∀ {n} {Γ : Ctx n} → Source → Ty → List (LiveSource Γ) → Bool
+liveHas s τ []       = false
+liveHas s τ (l ∷ ls) =
+  ((LiveSource.source l ≡ᵇ s) ∧ sameTy τ (LiveSource.elemTy l)) ∨ liveHas s τ ls
+
+∨-trueʳ : ∀ (x : Bool) → (x ∨ true) ≡ true
+∨-trueʳ false = refl
+∨-trueʳ true  = refl
+
+-- the arrival schedGo pops is one of the live sources it drew from
+schedGo-mem : ∀ {n} {Γ : Ctx n} (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
+  schedGo live ≡ inj₂ (a , ls) → liveHas (arrSource a) (arrTy a) live ≡ true
+schedGo-mem (l ∷ ls) eq with schedHeadOf l in heq | schedGo ls in geq
+... | inj₁ _        | inj₁ _         with eq
+...   | ()
+schedGo-mem (l ∷ ls) eq | inj₁ _ | inj₂ (a′ , ls′) with eq
+...   | refl rewrite schedGo-mem ls geq = ∨-trueʳ _
+schedGo-mem (l ∷ ls) eq | inj₂ (a₀ , l′) | inj₁ _ with eq
+...   | refl rewrite proj₁ (schedHeadOf-match l heq)
+                   | proj₂ (schedHeadOf-match l heq)
+                   | ≡ᵇ-refl (LiveSource.source l)
+                   | sameTy-refl (LiveSource.elemTy l) = refl
+schedGo-mem (l ∷ ls) eq | inj₂ (a₀ , l′) | inj₂ (a′ , ls′) with schedEarlier a₀ a′ | eq
+...   | true  | refl rewrite proj₁ (schedHeadOf-match l heq)
+                           | proj₂ (schedHeadOf-match l heq)
+                           | ≡ᵇ-refl (LiveSource.source l)
+                           | sameTy-refl (LiveSource.elemTy l) = refl
+...   | false | refl rewrite schedGo-mem ls geq = ∨-trueʳ _
 
 -- the open (or last) instant is strictly in the past
 CurrentPast : Maybe (Id × Owed) → Id → Set
@@ -447,29 +543,6 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- mid-final: leaving the cascade.  Bool/ℕ glue first, then registry
 -- lemmas for the finish sweep, then the assembly.
 ------------------------------------------------------------------
-
-≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
-≡ᵇ→≡ zero    zero    _ = refl
-≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
-≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
-≡ᵇ-refl zero    = refl
-≡ᵇ-refl (suc m) = ≡ᵇ-refl m
-
-∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
-∧-trueˡ {true} _ = refl
-
-∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
-∧-trueʳ {true} h = h
-
-∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
-∧-intro refl refl = refl
-
-if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
-if-false b eq rewrite eq = refl
-
-if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
-if-true b eq rewrite eq = refl
 
 -- a key absent from the table reads zero
 lookupOwed-absent : ∀ (s : Source) (o : Owed) →
