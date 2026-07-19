@@ -739,9 +739,19 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- dropSource` form fails at mid-init (arrSource's inners are still live
     -- and counted by k, so dropping them pre-fold makes k overcount).  The
     -- honest Mid shadow needs a ps-INDEXED pending-adjustment term (like
-    -- live-matches' initCount/closeCount): k ≡ countLiveInners adjusted by
-    -- the arrSource inners already folded-and-finished but not yet shed.
-    -- Until that shadow is designed, mid-final supplies Inv.caches via the
+    -- live-matches' initCount/closeCount).  SHAPE (worked out 2026-07-19,
+    -- verified at both fold endpoints), per merge node nid:
+    --   k ≡ countLiveInners nid (dropSource (arrSource a) registry)
+    --       + (arrSource inner-instances under nid that WILL finish, among
+    --          the unfolded chains ps)
+    -- At ps≡[] (mid-final) the adjustment is 0 ⇒ the dropSource form, true.
+    -- At mid-init (ps≡all) it adds back every arrSource inner ⇒ the plain
+    -- form, true.  REMAINING WRINKLE: "will finish" is aliveThrough-gated,
+    -- not just "arrSource chain unfolded" — a multi-source inner instance
+    -- whose OTHER sources stay live is absorbed (no pred k) when arrSource's
+    -- part folds, so the adjustment counts arrSource insts that are the
+    -- inner's LAST live source.  Needs care (this is why it is deferred, not
+    -- guessed).  Until designed, mid-final supplies Inv.caches via the
     -- postulate cascade-preserves-caches (the genuine deferred content).
     fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
     -- ADDED (owed-key uniqueness): the open instant's owed table has no
