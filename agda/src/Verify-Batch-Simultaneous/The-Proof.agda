@@ -1,26 +1,33 @@
 module Verify-Batch-Simultaneous.The-Proof where
 
-open import Data.Bool    using (true; false; if_then_else_)
+open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _≤_)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
-open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
-open import Rx.Prim               using (InstEmit; Fuel; Id; _at_from_as_)
+open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_;
+                                         InstEvent; init; value; close; handoff;
+                                         complete; EmitKind; subscribe; delivery;
+                                         plumbing; CloseReason; cut; cutPending;
+                                         exhausted)
 open import Rx.Exp                using (Ctx; Closed)
 open import Rx.Evaluator          using (Slots; evaluate)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init;
                                          runProtocol; stepProtocol; checkFinal;
-                                         paidOff; Accepted; accepted; WellFormed)
+                                         paidOff; Accepted; accepted; WellFormed;
+                                         settle; applyEvents; hasOwed; bumpOwed;
+                                         payOwed; cancelOwed; removeOne; countIn)
 open import Verify-Well-Formed    using (evaluate-well-formed)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
                                          step-batch; flushBatch; closeBatch;
+                                         settleBatch; applyBatch;
                                          batch-init; BatchSt; OpenBatch)
 
 ------------------------------------------------------------------
@@ -129,6 +136,49 @@ step-accepted : ∀ {A : Set} (x : InstEmit A) (S : ProtocolSt)
     (stepProtocol x S ≡ just S′) × Accepted (runProtocol S′ xs)
 step-accepted x S xs acc with stepProtocol x S | acc
 ... | just S′ | acc′ = S′ , refl , acc′
+
+------------------------------------------------------------------
+-- Alignment core: on an ACCEPTED emit the batcher's clamped
+-- settleBatch/applyBatch agree with the automaton's settle/applyEvents
+-- (the clamps never fire).  Self-contained inductions.
+------------------------------------------------------------------
+
+just-inj : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
+just-inj refl = refl
+
+settle-agree : (k : EmitKind) (s : Source)
+  (live : List Source) (owed : Owed) {owed′ : Owed} →
+  settle k s live owed ≡ just owed′ → settleBatch k s live owed ≡ owed′
+settle-agree subscribe s live owed eq = just-inj eq
+settle-agree plumbing  s live owed eq = just-inj eq
+settle-agree delivery  s live owed eq with hasOwed s owed | eq
+... | true  | eq′ rewrite eq′ = refl
+... | false | eq′ rewrite eq′ = refl
+
+-- applyEvents accepting ⇒ applyBatch lands the same live and owed
+apply-agree : ∀ {A : Set} (es : List (InstEvent A)) (live : List Source)
+  (owed : Owed) (done : Bool) (vs : List A)
+  {live′ : List Source} {owed′ : Owed} {done′ : Bool} →
+  applyEvents es live owed done ≡ just (live′ , owed′ , done′) →
+  (proj₁ (applyBatch es live owed vs) ≡ live′)
+  × (proj₁ (proj₂ (applyBatch es live owed vs)) ≡ owed′)
+apply-agree []                  live owed done vs eq =
+  cong proj₁ (just-inj eq) , cong (λ t → proj₁ (proj₂ t)) (just-inj eq)
+apply-agree (init x    ∷ es) live owed done vs eq =
+  apply-agree es (x ∷ live) owed done vs eq
+apply-agree (value v   ∷ es) live owed done vs eq with done | eq
+... | false | eq′ = apply-agree es live owed false (vs ++ v ∷ []) eq′
+apply-agree (handoff x ∷ es) live owed done vs eq =
+  apply-agree es live (bumpOwed x (countIn x live) owed) done vs eq
+apply-agree (complete  ∷ es) live owed done vs eq =
+  apply-agree es live owed true vs eq
+apply-agree (close x cutPending ∷ es) live owed done vs eq
+  with removeOne x live | cancelOwed x owed | eq
+... | just live₁ | just owed₁ | eq′ = apply-agree es live₁ owed₁ done vs eq′
+apply-agree (close x cut ∷ es) live owed done vs eq with removeOne x live | eq
+... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
+apply-agree (close x exhausted ∷ es) live owed done vs eq with removeOne x live | eq
+... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
 
 postulate
   -- the two heart lemmas of the simulation, one protocol transition
