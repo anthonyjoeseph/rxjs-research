@@ -19,6 +19,7 @@ module Verify-Well-Formed where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Fin     using (Fin; toℕ)
+open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-refl; 1+n≰n)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
@@ -741,6 +742,85 @@ foldPath-root-wf sf gas id now envSrc vals evs fin sched st S ob hz ob′ Lv Ov
   stepEq = stepProtocol-enter
     (evs ++ map value vals ++ (if fin then complete ∷ [] else []))
     id envSrc delivery S entEq payEq apply-full
+
+------------------------------------------------------------------
+-- foldPath-wf: one chain's fold, by induction on the Path (free source
+-- type u — the split lives HERE, not at mid-step, see the blueprint).
+-- FoldInv is the mid-fold relation: the automaton admits instant id,
+-- pays envSrc, and the bookkeeping accumulated so far (evs) folds
+-- cleanly, with the value list gated by done-nil.  root is PROVEN
+-- (foldPath-root-wf); the frame case is IH ∘ stepFrame-wf (same emits,
+-- definitionally — a frame accumulates evs, never emits); share defers
+-- to dispatchShare-wf.  Acceptance only for now; the Mid-preservation
+-- half (the POST) is the next layer.
+------------------------------------------------------------------
+
+record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+       (id : Id) (envSrc : Source) (vals : List (Val Γ u))
+       (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+       (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) : Set where
+  field
+    ob   : Owed
+    hz   : Id
+    ob′  : Owed
+    Lv   : List Source
+    Ov   : Owed
+    enters   : enterInstant S id ≡ just (ob , hz)
+    pays     : settle delivery envSrc (ProtocolSt.live S) ob ≡ just ob′
+    applies  : applyEvents evs (ProtocolSt.live S) ob′ (ProtocolSt.done S)
+                 ≡ just (Lv , Ov , ProtocolSt.done S)
+    done-nil : ProtocolSt.done S ≡ true → vals ≡ []
+
+postulate
+  -- a frame preserves FoldInv (S untouched — frames don't step the
+  -- automaton): stepFrame's bookkeeping evs′ brackets against its
+  -- registry mutation, and the value transform keeps done-nil.  The
+  -- delivery-side twin of subscribeE-wf's per-clause grind (map/scan/
+  -- take/*All), one obligation per stepFrame clause.
+  stepFrame-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
+    (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (f : Frame Γ w u) (path′ : Path Γ u t)
+    (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    FoldInv id envSrc vals evs fin sched st S →
+    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now f path′ vals fin sched st
+    in FoldInv id envSrc vals′ (evs ++ evs′) fin′ sched₁ st₁ S
+
+  -- the share fan-out: one handoff emit, then one delivery per share
+  -- registration (each its own foldPath) — mutually recursive with
+  -- foldPath-wf.  The handoff's owed bump is repaid across the fan-out.
+  dispatchShare-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i)))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    FoldInv id envSrc vals evs fin sched st S →
+    Σ ProtocolSt λ S′ →
+      runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
+        ≡ just S′
+
+foldPath-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  FoldInv id envSrc vals evs fin sched st S →
+  Σ ProtocolSt λ S′ →
+    runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
+      ≡ just S′
+foldPath-wf sf gas id now envSrc root vals evs fin sched st S fi =
+  _ , foldPath-root-wf sf gas id now envSrc vals evs fin sched st S
+        (FoldInv.ob fi) (FoldInv.hz fi) (FoldInv.ob′ fi) (FoldInv.Lv fi) (FoldInv.Ov fi)
+        (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) (FoldInv.done-nil fi)
+foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi =
+  foldPath-wf sf gas id now envSrc path′
+    (proj₁ (stepFrame sf id now f path′ vals fin sched st))
+    (evs ++ proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
+    (proj₁ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st))))
+    (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
+    S (stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi)
+foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi =
+  dispatchShare-wf sf gas id now envSrc i vals evs fin sched st S fi
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
