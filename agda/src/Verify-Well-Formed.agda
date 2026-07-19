@@ -997,6 +997,56 @@ mid-enters {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq with Mid.led
 mid-enters {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
     | inj₁ (cp , paid) = enterInstant-fresh S nextId cp paid (Mid.horizon-low mid)
 
+------------------------------------------------------------------
+-- The pay/applyEvents seed fields turn on decrementing a key: paying a
+-- positive owed key drops it by one; removing a present live source
+-- drops its count by one.  Small hit/miss reductions feed the two.
+------------------------------------------------------------------
+
+suc-inj : ∀ {m k : ℕ} → suc m ≡ suc k → m ≡ k
+suc-inj refl = refl
+
+lookupOwed-hit : ∀ (s x : Source) (n : ℕ) (o : Owed) →
+  (s ≡ᵇ x) ≡ true → lookupOwed s ((x , n) ∷ o) ≡ n
+lookupOwed-hit s x n o sx with s ≡ᵇ x | sx
+... | true | refl = refl
+
+lookupOwed-miss : ∀ (s x : Source) (n : ℕ) (o : Owed) →
+  (s ≡ᵇ x) ≡ false → lookupOwed s ((x , n) ∷ o) ≡ lookupOwed s o
+lookupOwed-miss s x n o sx with s ≡ᵇ x | sx
+... | false | refl = refl
+
+countIn-miss : ∀ (s x : Source) (xs : List Source) →
+  (s ≡ᵇ x) ≡ false → countIn s (x ∷ xs) ≡ countIn s xs
+countIn-miss s x xs sx with s ≡ᵇ x | sx
+... | false | refl = refl
+
+-- paying the key with positive owed decrements it by one (once the `with`
+-- fixes s ≡ᵇ x, payOwed/removeOne on the head reduce, so the equations are
+-- refl / rewrite; the constructed tail term still needs the hit/miss read)
+payOwed-key : ∀ (s : Source) (ow : Owed) (k : ℕ) →
+  lookupOwed s ow ≡ suc k →
+  Σ Owed λ ow′ → (payOwed s ow ≡ just ow′) × (lookupOwed s ow′ ≡ k)
+payOwed-key s [] k ()
+payOwed-key s ((x , n) ∷ o) k eq with s ≡ᵇ x in sx
+... | true with n | eq
+...   | suc m | refl = (x , m) ∷ o , refl , lookupOwed-hit s x m o sx
+payOwed-key s ((x , n) ∷ o) k eq | false
+  with payOwed-key s o k eq
+... | o′ , po , lk rewrite po =
+      (x , n) ∷ o′ , refl , trans (lookupOwed-miss s x n o′ sx) lk
+
+-- removing a present live source decrements its count by one
+countIn-removeOne : ∀ (s : Source) (lv : List Source) (k : ℕ) →
+  countIn s lv ≡ suc k →
+  Σ (List Source) λ lv′ → (removeOne s lv ≡ just lv′) × (countIn s lv′ ≡ k)
+countIn-removeOne s [] k ()
+countIn-removeOne s (x ∷ xs) k eq with s ≡ᵇ x in sx
+... | true  = xs , refl , suc-inj eq
+countIn-removeOne s (x ∷ xs) k eq | false
+  with countIn-removeOne s xs k eq
+... | xs′ , ro , ci rewrite ro = x ∷ xs′ , refl , trans (countIn-miss s x xs′ sx) ci
+
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
 -- chain's emits — its own delivery, any share fan-outs it triggers, any
