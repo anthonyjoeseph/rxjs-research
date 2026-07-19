@@ -1000,18 +1000,37 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --    registry/sched fields reduce to reg-envSrc-out = refl and reg-typed-out =
 --    FoldInv.reg-typed verbatim.  current-out reads off FoldInv.ov-zero/
 --    ov-unique/ov-envSrc (added today) with Ov = the applies output.
---  • done-plumbed-out has a CAVEAT the "self-healing" note above understates:
---    done S′ = if fin then true else done S, so a completing head (fin ≡ true,
---    done S ≡ false) makes done S′ ≡ true while FoldInv.done-plumbed (keyed on
---    done S ≡ true) does NOT fire.  The missing fact at the done-FLIP is the
---    SAME evaluator invariant Mid.done-plumbed encodes — "a completion reaches
---    the root only once nothing else can deliver, so every non-share-sunk
---    survivor is envSrc's" — but at the flip, not steady state.  So FoldInv
---    needs a fin-keyed plumbing field (allShareSunk after dropSource envSrc
---    whenever fin ≡ true), established at the seed from the isLast branch of
---    Inv's registry form and threaded — NOT derivable from done-plumbed alone.
---    This couples with the take-head cut (take-f flips fin AND emits cutThrough
---    closes, Evaluator 540-548), so both land together in the next increment.
+--  • done-plumbed-out is the ONE genuinely hard field, and it is NOT a
+--    seed-threadable FoldInv invariant — established here (2026-07-19):
+--     - done S′ = if fin then true else done S, so a completing chain
+--       (fin ≡ true, done S ≡ false) sets done S′ ≡ true while
+--       FoldInv.done-plumbed (keyed on done S ≡ true) does NOT fire.  cascadeGo
+--       only builds emits; runProtocol flips done at the first `complete`, so
+--       the first chain of the last arrival flips it and every later ps chain
+--       runs with done ≡ true — the flip case is reachable, not a corner.
+--     - The tempting fix (a FoldInv field `fin ≡ true → allShareSunk(dropSource
+--       envSrc registry)`, threaded like SHADOW) is FALSE at the seed: the seed
+--       fin = isLast a, but a downstream *All frame ABSORBS a completing inner
+--       (stepFrame from-inner `react true`: fin′ ≡ false whenever any sibling
+--       aliveThrough, Evaluator 599-603; `finish` only propagates on the
+--       count/od gate).  So isLast a ≡ true does NOT imply the subtree
+--       completes, and with a live merge sibling every other root-direct source
+--       is still non-share-sunk — allShareSunk(dropSource envSrc registry) is
+--       plainly false there.  A seed field would be a FALSE leaf.
+--     - CONCLUSION: the fin ≡ true plumbing is a ROOT/post-frame property,
+--       established BY the frame recursion — the frame that genuinely completes
+--       (fin false→true via `finish`) is where "every survivor is share-sunk"
+--       becomes true.  So done-plumbed-out stays a per-case FoldOut obligation:
+--       root (bare completion: the unique root-direct source is envSrc, so
+--       dropSource envSrc leaves only share-sunk — needs a completion-discipline
+--       fact NOT currently in Inv/Mid, keyed on done rather than on the flip)
+--       and frame (stepFrame-wf establishes it at the completing frame).  This
+--       is a DESIGN FORK to settle with Anthony: where the root-completion
+--       plumbing fact enters (a new Inv/Mid field vs. derived), before wiring
+--       done-plumbed-out.  It couples with the take-head cut (take-f flips fin
+--       AND emits cutThrough closes, Evaluator 540-548).  NOTE: this is a
+--       mis-keying to REPAIR, not a spec counterexample — the batching is not
+--       in question; no falsifying emit-stream pair was found.
 ------------------------------------------------------------------
 
 -- the fold's output EvalSt (st″) and Sched (sched″)
