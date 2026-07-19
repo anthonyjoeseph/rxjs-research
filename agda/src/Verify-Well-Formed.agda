@@ -20,8 +20,8 @@ module Verify-Well-Formed where
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; +-suc; +-comm; +-assoc; +-identityʳ)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -29,7 +29,7 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Relation.Nullary using (Dec; yes; no)
 
@@ -110,6 +110,26 @@ countRegs : ∀ {n} {Γ : Ctx n} {t}
 countRegs s [] = zero
 countRegs s ((_ , x , _) ∷ r) =
   if s ≡ᵇ x then suc (countRegs s r) else countRegs s r
+
+-- the pending-event ledger: how many init/close for source s sit in an
+-- accumulated evs (frames add registrations + init, cuts remove + close;
+-- the protocol only drains these at the terminal emit, so mid-fold the
+-- registry leads live by exactly initCount ∸ closeCount — the SHADOW three-way)
+initCount : ∀ {A : Set} → Source → List (InstEvent A) → ℕ
+initCount s []              = zero
+initCount s (init x   ∷ es) = if s ≡ᵇ x then suc (initCount s es) else initCount s es
+initCount s (value _  ∷ es) = initCount s es
+initCount s (close _ _ ∷ es) = initCount s es
+initCount s (handoff _ ∷ es) = initCount s es
+initCount s (complete ∷ es) = initCount s es
+
+closeCount : ∀ {A : Set} → Source → List (InstEvent A) → ℕ
+closeCount s []              = zero
+closeCount s (close x _ ∷ es) = if s ≡ᵇ x then suc (closeCount s es) else closeCount s es
+closeCount s (init _   ∷ es) = closeCount s es
+closeCount s (value _  ∷ es) = closeCount s es
+closeCount s (handoff _ ∷ es) = closeCount s es
+closeCount s (complete ∷ es) = closeCount s es
 
 -- snapshot entries still obliged to fire: not yet forgiven by a
 -- cutPending (the automaton's remaining owed for the arrival source)
@@ -783,6 +803,16 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     pays     : settle delivery envSrc (ProtocolSt.live S) ob ≡ just ob′
     applies  : applyEvents evs (ProtocolSt.live S) ob′ (ProtocolSt.done S)
                  ≡ just (Lv , Ov , ProtocolSt.done S)
+    -- SHADOW (three-way): mid-fold the registry LEADS the automaton's live
+    -- multiset by exactly the pending evs (stepFrame mutates the registry and
+    -- brackets it with init/close in evs, but never steps the protocol; the
+    -- terminal emit drains evs into live).  For every source but the chain's
+    -- own, live + pending inits ≡ registry + pending closes.  Collapses to
+    -- Mid.live-others at the seed (evs has no init, its lone close is envSrc's)
+    -- and resyncs to live-others-out once applyEvents drains evs at the root.
+    shadow   : ∀ (s : Source) → sameSource s envSrc ≡ false →
+      countIn s (ProtocolSt.live S) + initCount s evs
+        ≡ countRegs s (EvalSt.registry st) + closeCount s evs
     -- once the root completes only share plumbing survives: every
     -- registration sinks to a share, so a share fan-out's inners are all
     -- share-bound (their own done-discipline, for dispatchShare-wf).
@@ -1265,6 +1295,7 @@ mid-seed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
 mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   { ob = ob ; hz = hz ; ob′ = ob′ ; Lv = proj₁ ap ; Ov = proj₁ (proj₂ ap)
   ; enters = enters ; pays = pays ; applies = proj₂ (proj₂ ap)
+  ; shadow = shadow
   ; done-plumbed = Mid.done-plumbed mid
   }
   where
@@ -1275,6 +1306,16 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   enters = proj₁ (proj₂ (proj₂ (proj₂ ep)))
   pays   = proj₂ (proj₂ (proj₂ (proj₂ ep)))
   ap = seed-applies ob′ mid ceq
+  -- for s ≠ arrSource the seed evs carry no init and (isLast) only an
+  -- arrSource close, so initCount/closeCount vanish: SHADOW ⇔ live-others
+  shadow : ∀ (s : Source) → sameSource s (arrSource a) ≡ false →
+      countIn s (ProtocolSt.live S)
+        + initCount s (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    ≡ countRegs s (EvalSt.registry st)
+        + closeCount s (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+  shadow s neq with Arrival.isLast a
+  ... | false          = cong₂ _+_ (Mid.live-others mid s neq) refl
+  ... | true rewrite neq = cong₂ _+_ (Mid.live-others mid s neq) refl
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
