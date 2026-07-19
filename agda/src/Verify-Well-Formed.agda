@@ -814,8 +814,12 @@ foldPath-root-wf sf gas id now envSrc vals evs fin sched st S ob hz ob′ Lv Ov
 -- half (the POST) is the next layer.
 ------------------------------------------------------------------
 
-record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-       (id : Id) (envSrc : Source) (vals : List (Val Γ u))
+-- (no `vals` parameter: FoldInv constrains only the bookkeeping evs / open
+-- instant, never the carried value list — the value list rides at the root
+-- emit gated by done-nil, outside FoldInv.  Dropping it makes every frame's
+-- value transform irrelevant to FoldInv-preservation.)
+record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+       (id : Id) (envSrc : Source)
        (evs : List (InstEvent (Val Γ t))) (fin : Bool)
        (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) : Set where
   field
@@ -1155,9 +1159,9 @@ postulate
     (f : Frame Γ w u) (path′ : Path Γ u t)
     (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    FoldInv id envSrc vals evs fin sched st S →
+    FoldInv id envSrc evs fin sched st S →
     let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now f path′ vals fin sched st
-    in FoldInv id envSrc vals′ (evs ++ evs′) fin′ sched₁ st₁ S
+    in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
   -- the share fan-out: one handoff emit, then one delivery per share
   -- registration (each its own foldPath) — mutually recursive with
@@ -1167,7 +1171,7 @@ postulate
     (vals : List (Val Γ (lookup Γ i)))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    FoldInv id envSrc vals evs fin sched st S →
+    FoldInv id envSrc evs fin sched st S →
     Σ ProtocolSt λ S′ →
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
@@ -1188,7 +1192,7 @@ foldPath-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-  FoldInv id envSrc vals evs fin sched st S →
+  FoldInv id envSrc evs fin sched st S →
   (ProtocolSt.done S ≡ true → sinksToShare path ≡ true) →
   Σ ProtocolSt λ S′ →
     runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
@@ -1507,7 +1511,7 @@ foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
-  (fi : FoldInv id envSrc vals evs fin sched st S) →
+  (fi : FoldInv id envSrc evs fin sched st S) →
   -- FLIP certificate: completion reached root (done S′ ≡ true) from not-yet-done
   ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
      allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
@@ -1749,7 +1753,7 @@ mid-seed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
   {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-  FoldInv nextId (arrSource a) (arrVal a ∷ [])
+  FoldInv nextId (arrSource a)
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S
 mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
