@@ -1047,6 +1047,35 @@ countIn-removeOne s (x ∷ xs) k eq | false
   with countIn-removeOne s xs k eq
 ... | xs′ , ro , ci rewrite ro = x ∷ xs′ , refl , trans (countIn-miss s x xs′ sx) ci
 
+------------------------------------------------------------------
+-- pay/applyEvents plumbing for the seed: a delivery whose source is
+-- already owed pays it directly (settle-hit); a positive key is owed
+-- (lookup-pos-hasOwed); the isLast close retires one live entry.
+------------------------------------------------------------------
+
+lookup-pos-hasOwed : ∀ (s : Source) (ow : Owed) (k : ℕ) →
+  lookupOwed s ow ≡ suc k → hasOwed s ow ≡ true
+lookup-pos-hasOwed s [] k ()
+lookup-pos-hasOwed s ((x , n) ∷ o) k eq with s ≡ᵇ x in sx
+... | true  = refl
+... | false = lookup-pos-hasOwed s o k eq
+
+settle-hit : ∀ (s : Source) (live : List Source) (owed : Owed) →
+  hasOwed s owed ≡ true → settle delivery s live owed ≡ payOwed s owed
+settle-hit s live owed h = if-true (hasOwed s owed) h
+
+settle-miss : ∀ (s : Source) (live : List Source) (owed : Owed) →
+  hasOwed s owed ≡ false →
+  settle delivery s live owed ≡ payOwed s (bumpOwed s (countIn s live) owed)
+settle-miss s live owed h = if-false (hasOwed s owed) h
+
+-- an exhausted close of a present source retires its one live entry,
+-- leaving owed and done untouched
+applyEvents-close-exh : ∀ {A : Set} (x : Source) (live live′ : List Source)
+  (owed : Owed) (done : Bool) → removeOne x live ≡ just live′ →
+  applyEvents {A} (close x exhausted ∷ []) live owed done ≡ just (live′ , owed , done)
+applyEvents-close-exh x live live′ owed done ro rewrite ro = refl
+
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
 -- chain's emits — its own delivery, any share fan-outs it triggers, any
