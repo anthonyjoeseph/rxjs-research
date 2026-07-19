@@ -657,6 +657,20 @@ regTyped?-sweepLive sweepReg ((_ , s , (u , _)) ∷ r) live rt =
   ∧-intro (liveTypeOK?-sweepLive sweepReg s u live (∧-trueˡ rt))
           (regTyped?-sweepLive sweepReg r live (∧-trueʳ rt))
 
+-- cutThrough's `kept` is a sublist of the registry (it only drops victims), so
+-- registry well-typedness is preserved through it
+regTyped?-cutThrough : ∀ {n} {Γ : Ctx n} {t}
+  (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true →
+  regTyped? (proj₁ (cutThrough nid dlv wm dying reg)) live ≡ true
+regTyped?-cutThrough nid dlv wm dying []                        live rt = refl
+regTyped?-cutThrough nid dlv wm dying ((rid , src , (u , p)) ∷ r) live rt
+  with pathHasNode nid p | cutThrough nid dlv wm dying r
+     | regTyped?-cutThrough nid dlv wm dying r live (∧-trueʳ rt)
+... | false | kept , closes , rids | ih = ∧-intro (∧-trueˡ rt) ih
+... | true  | kept , closes , rids | ih = ih
+
 reg-typed-finish : ∀ {n} {Γ : Ctx n} {t} (src : Source)
   (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true →
@@ -1691,16 +1705,6 @@ postulate
        × (closeCount envSrc (evs ++ closes) ≡ suc zero)
        × (ProtocolSt.done S ≡ true → allShareSunk (dropSource envSrc kept) ≡ true)
 
-  -- cut+sweep preserves registry well-typedness: kept ⊆ registry st and
-  -- sweepLive only drops now-dead live sources, so surviving regs keep their type.
-  cut-reg-typed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
-    regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
-    let (kept , _ , _) =
-          cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                     (EvalSt.dying st) (EvalSt.registry st)
-    in regTyped? kept (sweepLive kept (Sched.live sched)) ≡ true
-
   stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (op : AllOp) (allNid inst : NodeId) (path′ : Path Γ s t)
@@ -1732,9 +1736,28 @@ postulate
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
 
+-- cut+sweep preserves registry well-typedness: kept ⊆ registry (cutThrough only
+-- drops) and sweepLive only removes now-dead live sources (a conjunction shrink)
+cut-reg-typed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+  let (kept , _ , _) =
+        cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                   (EvalSt.dying st) (EvalSt.registry st)
+  in regTyped? kept (sweepLive kept (Sched.live sched)) ≡ true
+cut-reg-typed nid sched st rt =
+  regTyped?-sweepLive
+    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                       (EvalSt.dying st) (EvalSt.registry st)))
+    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                       (EvalSt.dying st) (EvalSt.registry st)))
+    (Sched.live sched)
+    (regTyped?-cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                          (EvalSt.dying st) (EvalSt.registry st) (Sched.live sched) rt)
+
 -- take-cut, PROVEN: assemble the cut result's FoldInv from cutThrough-balance
 -- (shadow), cutThrough-no-init (env-init/shadow), the dying-envSrc field, and the
--- two residue postulates (cut-owed for the ledger, cut-reg-typed for typing).
+-- residue postulate cut-owed (the ledger) plus the proven cut-reg-typed (typing).
 stepFrame-wf-take-cut : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (envSrc : Source) (nid : NodeId)
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
