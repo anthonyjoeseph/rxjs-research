@@ -889,6 +889,114 @@ enterInstant-cont S i ow cur pf =
   enterInstant-cont-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i
     (ProtocolSt.current S) (ProtocolSt.done S) ow cur pf
 
+-- a strictly-greater id is not equal (for the held instant's i ≢ j)
+≢ᵇ-from-< : ∀ {j i : ℕ} → j ≤ i → (suc i ≡ᵇ j) ≡ false
+≢ᵇ-from-< z≤n     = refl
+≢ᵇ-from-< (s≤s q) = ≢ᵇ-from-< q
+
+sucle→≢ᵇ : ∀ {j nextId : ℕ} → suc j ≤ nextId → (nextId ≡ᵇ j) ≡ false
+sucle→≢ᵇ (s≤s q) = ≢ᵇ-from-< q
+
+-- the automaton opens FRESH over an idle slot: settleInstant is the
+-- standing horizon, admitted once horizon ≤ i
+enterInstant-idle-aux : ∀ (lv : List Source) (hz i : Id) (cur : Maybe (Id × Owed))
+  (dn : Bool) → cur ≡ nothing → (hz ≤ᵇ i) ≡ true →
+  enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
+    ≡ just ([] , hz)
+enterInstant-idle-aux lv hz i .nothing dn refl hle rewrite hle = refl
+
+enterInstant-idle : ∀ (S : ProtocolSt) (i : Id) →
+  ProtocolSt.current S ≡ nothing → (ProtocolSt.horizon S ≤ᵇ i) ≡ true →
+  enterInstant S i ≡ just ([] , ProtocolSt.horizon S)
+enterInstant-idle S i cn hle =
+  enterInstant-idle-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i
+    (ProtocolSt.current S) (ProtocolSt.done S) cn hle
+
+-- the automaton opens FRESH over a HELD paid instant j (i ≢ j): the
+-- departed instant pushes the horizon to suc j, admitted once suc j ≤ i
+enterInstant-held-aux : ∀ (lv : List Source) (hz i j : Id) (cur : Maybe (Id × Owed))
+  (ow : Owed) (dn : Bool) → cur ≡ just (j , ow) →
+  (i ≡ᵇ j) ≡ false → allZero ow ≡ true → (suc j ≤ᵇ i) ≡ true →
+  enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
+    ≡ just ([] , suc j)
+enterInstant-held-aux lv hz i j .(just (j , ow)) ow dn refl ieq az sle
+  rewrite ieq | az | sle = refl
+
+enterInstant-held : ∀ (S : ProtocolSt) (i j : Id) (ow : Owed) →
+  ProtocolSt.current S ≡ just (j , ow) → (i ≡ᵇ j) ≡ false →
+  allZero ow ≡ true → (suc j ≤ᵇ i) ≡ true →
+  enterInstant S i ≡ just ([] , suc j)
+enterInstant-held S i j ow cur ieq az sle =
+  enterInstant-held-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i j
+    (ProtocolSt.current S) ow (ProtocolSt.done S) cur ieq az sle
+
+-- a paid automaton holding instant j has that instant's owed all-zero
+-- (else settleInstant would reject and paidUp be false)
+paidUp-held-aux : ∀ (lv : List Source) (hz : Id) (cur : Maybe (Id × Owed))
+  (dn : Bool) (j : Id) (ow : Owed) → cur ≡ just (j , ow) →
+  paidUp (record { live = lv ; horizon = hz ; current = cur ; done = dn }) ≡ true →
+  allZero ow ≡ true
+paidUp-held-aux lv hz .(just (j , ow)) dn j ow refl pu with allZero ow | pu
+... | true  | _  = refl
+... | false | ()
+
+paidUp-held : ∀ (S : ProtocolSt) (j : Id) (ow : Owed) →
+  ProtocolSt.current S ≡ just (j , ow) → paidUp S ≡ true → allZero ow ≡ true
+paidUp-held S j ow cur pu =
+  paidUp-held-aux (ProtocolSt.live S) (ProtocolSt.horizon S) (ProtocolSt.current S)
+    (ProtocolSt.done S) j ow cur pu
+
+-- the fresh-open entry, dispatched on the (explicit) current value so
+-- enterInstant reduces: idle when the slot is empty, held over a paid
+-- departed instant j.  Both need only that the horizon (standing, or the
+-- pushed suc j) does not exceed nextId.
+enterInstant-fresh-aux : ∀ (lv : List Source) (hz i : Id) (cur : Maybe (Id × Owed))
+  (dn : Bool) → CurrentPast cur i →
+  paidUp (record { live = lv ; horizon = hz ; current = cur ; done = dn }) ≡ true →
+  hz ≤ i →
+  Σ Owed λ ob → Σ Id λ hz′ →
+    enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
+      ≡ just (ob , hz′)
+enterInstant-fresh-aux lv hz i nothing dn cp pu hle =
+  [] , hz , enterInstant-idle-aux lv hz i nothing dn refl (≤→≤ᵇ hle)
+enterInstant-fresh-aux lv hz i (just (j , ow)) dn cp pu hle =
+  [] , suc j , enterInstant-held-aux lv hz i j (just (j , ow)) ow dn refl
+    (sucle→≢ᵇ cp) (paidUp-held-aux lv hz (just (j , ow)) dn j ow refl pu) (≤→≤ᵇ cp)
+
+enterInstant-fresh : ∀ (S : ProtocolSt) (i : Id) →
+  CurrentPast (ProtocolSt.current S) i → paidUp S ≡ true → ProtocolSt.horizon S ≤ i →
+  Σ Owed λ ob → Σ Id λ hz′ → enterInstant S i ≡ just (ob , hz′)
+enterInstant-fresh S i cp pu hle =
+  enterInstant-fresh-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i
+    (ProtocolSt.current S) (ProtocolSt.done S) cp pu hle
+
+-- an uncancelled snapshot head is one more obligation than its tail
+cr-fresh : ∀ {X : Set} (rid : RegId) (x : X) (ps : List (RegId × X)) (c : List RegId) →
+  any (_≡ᵇ rid) c ≡ false → countRemaining ((rid , x) ∷ ps) c ≡ suc (countRemaining ps c)
+cr-fresh rid x ps c h rewrite h = refl
+
+-- the seed's protocol-entry field: from Mid's ledger, the automaton admits
+-- instant nextId — continuing an open unpaid instant (inj₂) or opening
+-- fresh over an idle/held paid slot (inj₁)
+mid-enters : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  Σ Owed λ ob → Σ Id λ hz → enterInstant S nextId ≡ just (ob , hz)
+mid-enters {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq with Mid.ledger mid
+... | inj₂ (ow , cur , lk , zx) =
+      ow , ProtocolSt.horizon S , enterInstant-cont S nextId ow cur pf
+  where
+  lk-suc : lookupOwed (arrSource a) ow ≡ suc (countRemaining ps (EvalSt.cancelled st))
+  lk-suc = trans lk (cr-fresh rid p ps (EvalSt.cancelled st) ceq)
+  pf : paidOff ow ≡ false
+  pf = lookup-pos-not-paidOff (arrSource a) ow
+         (countRemaining ps (EvalSt.cancelled st)) lk-suc
+mid-enters {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
+    | inj₁ (cp , paid) = enterInstant-fresh S nextId cp paid (Mid.horizon-low mid)
+
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
 -- chain's emits — its own delivery, any share fan-outs it triggers, any
