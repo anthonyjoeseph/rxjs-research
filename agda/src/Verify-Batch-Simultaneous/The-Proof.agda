@@ -1,23 +1,26 @@
 module Verify-Batch-Simultaneous.The-Proof where
 
-open import Data.Bool    using (true; false)
+open import Data.Bool    using (true; false; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _≤_)
 open import Data.List    using (List; []; _∷_; _++_)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; sym; trans; cong)
 
-open import Rx.Prim               using (InstEmit; Fuel; Id)
+open import Rx.Prim               using (InstEmit; Fuel; Id; _at_from_as_)
 open import Rx.Exp                using (Ctx; Closed)
 open import Rx.Evaluator          using (Slots; evaluate)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init;
-                                         runProtocol; checkFinal; paidOff;
-                                         Accepted; accepted; WellFormed)
+                                         runProtocol; stepProtocol; checkFinal;
+                                         paidOff; Accepted; accepted; WellFormed)
 open import Verify-Well-Formed    using (evaluate-well-formed)
 open import Spec                  using (spec-batchSimultaneous; specGo;
-                                         batchOf; valuesAt; seenBefore)
+                                         batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
+                                         step-batch; flushBatch; closeBatch;
                                          batch-init; BatchSt; OpenBatch)
 
 ------------------------------------------------------------------
@@ -85,16 +88,89 @@ flushSpec B xs with BatchSt.current B
       batchOf (OpenBatch.instant b) (OpenBatch.source b) (OpenBatch.kind b)
               (OpenBatch.values b ++ valuesAt (OpenBatch.instant b) xs)
 
+-- the online close is the spec's batchOf on the open batch's values
+closeBatch≡batchOf : ∀ {A : Set} (b : OpenBatch A) →
+  closeBatch b ≡ batchOf (OpenBatch.instant b) (OpenBatch.source b)
+                         (OpenBatch.kind b) (OpenBatch.values b)
+closeBatch≡batchOf b with OpenBatch.values b
+... | []     = refl
+... | v ∷ vs = refl
+
+-- at stream end the online flush IS the spec's open-batch flush
+flush≡flushSpec[] : ∀ {A : Set} (B : BatchSt A) → flushBatch B ≡ flushSpec B []
+flush≡flushSpec[] B with BatchSt.current B
+... | nothing = refl
+... | just b  = trans (closeBatch≡batchOf b)
+    (cong (batchOf (OpenBatch.instant b) (OpenBatch.source b) (OpenBatch.kind b))
+          (sym (++-identityʳ (OpenBatch.values b))))
+
+-- specGo's contribution for the head emit, and the seen it hands on —
+-- exactly the branches of specGo, factored so the fold can splice them
+specGoHead : ∀ {A : Set} → InstEmit A → List Id → List (InstEmit A)
+           → List (InstEmit (List A))
+specGoHead (es at i from s as k) seen rest =
+  if seenBefore i seen then [] else batchOf i s k (valuesOf es ++ valuesAt i rest)
+
+seen▸ : ∀ {A : Set} → InstEmit A → List Id → List Id
+seen▸ (es at i from s as k) seen = if seenBefore i seen then seen else i ∷ seen
+
+specGo-split : ∀ {A : Set} (x : InstEmit A) (seen : List Id)
+               (rest : List (InstEmit A)) →
+  specGo seen (x ∷ rest) ≡ specGoHead x seen rest ++ specGo (seen▸ x seen) rest
+specGo-split (es at i from s as k) seen rest with seenBefore i seen
+... | true  = refl
+... | false = refl
+
+-- acceptance of a cons peels off: the head steps (never rejects) and
+-- the tail is still accepted
+step-accepted : ∀ {A : Set} (x : InstEmit A) (S : ProtocolSt)
+                (xs : List (InstEmit A)) → Accepted (runProtocol S (x ∷ xs)) →
+  Σ ProtocolSt λ S′ →
+    (stepProtocol x S ≡ just S′) × Accepted (runProtocol S′ xs)
+step-accepted x S xs acc with stepProtocol x S | acc
+... | just S′ | acc′ = S′ , refl , acc′
+
 postulate
-  -- THE waypoint: the generalized fold agreement.  By induction on
-  -- xs; each case is one protocol transition (same-instant continue,
-  -- payoff flush, instant change, stream end), using acceptance to
-  -- rule the clamps out and freshness to keep specGo's guard honest
-  fold-agree : ∀ {A : Set} (seen : List Id) (S : ProtocolSt)
-    (B : BatchSt A) (xs : List (InstEmit A)) →
-    BatchRel seen S B →
-    Accepted (runProtocol S xs) →
-    foldBatch B xs ≡ flushSpec B xs ++ specGo seen xs
+  -- the two heart lemmas of the simulation, one protocol transition
+  -- each.  batchrel-step: acceptance keeps the online batcher's state
+  -- lock-stepped with the automaton's (the clamps never fire, the open
+  -- instant stays in `seen`).  flush-step: the emit's online output
+  -- plus the new open batch's eventual flush equals the old open
+  -- batch's flush plus the spec's contribution for this emit.  [both
+  -- provable by case on BatchRel's phase × admitted × paidOff; the
+  -- arithmetic alignment is settle/applyEvents-vs-settleBatch/applyBatch]
+  batchrel-step : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt}
+    {B : BatchSt A} (x : InstEmit A) →
+    BatchRel seen S B → stepProtocol x S ≡ just S′ →
+    BatchRel (seen▸ x seen) S′ (proj₂ (step-batch x B))
+  flush-step : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt}
+    {B : BatchSt A} (x : InstEmit A) (rest : List (InstEmit A)) →
+    BatchRel seen S B → stepProtocol x S ≡ just S′ →
+    proj₁ (step-batch x B) ++ flushSpec (proj₂ (step-batch x B)) rest
+      ≡ flushSpec B (x ∷ rest) ++ specGoHead x seen rest
+
+-- THE waypoint, now PROVEN by induction on xs from the two step lemmas:
+-- base is the end-of-stream flush; cons splices step-batch's output,
+-- the IH, and specGo's head via associativity (each case one protocol
+-- transition — the transitions live inside batchrel-step/flush-step)
+fold-agree : ∀ {A : Set} (seen : List Id) (S : ProtocolSt)
+  (B : BatchSt A) (xs : List (InstEmit A)) →
+  BatchRel seen S B →
+  Accepted (runProtocol S xs) →
+  foldBatch B xs ≡ flushSpec B xs ++ specGo seen xs
+fold-agree seen S B [] rel acc =
+  trans (flush≡flushSpec[] B) (sym (++-identityʳ (flushSpec B [])))
+fold-agree seen S B (x ∷ rest) rel acc with step-accepted x S rest acc
+... | S′ , stepEq , acc′ =
+  let out = proj₁ (step-batch x B)
+      B′  = proj₂ (step-batch x B)
+      ih  = fold-agree (seen▸ x seen) S′ B′ rest (batchrel-step x rel stepEq) acc′
+  in trans (cong (out ++_) ih)
+       (trans (sym (++-assoc out (flushSpec B′ rest) (specGo (seen▸ x seen) rest)))
+         (trans (cong (_++ specGo (seen▸ x seen) rest) (flush-step x rest rel stepEq))
+           (trans (++-assoc (flushSpec B (x ∷ rest)) (specGoHead x seen rest)
+                            (specGo (seen▸ x seen) rest))
+             (cong (flushSpec B (x ∷ rest) ++_) (sym (specGo-split x seen rest))))))
 
 -- WellFormed is acceptance-and-paid; fold-agree only needs acceptance
 run-accepted : (m : Maybe ProtocolSt) → Accepted (checkFinal m) → Accepted m
