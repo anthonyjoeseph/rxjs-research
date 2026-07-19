@@ -1082,10 +1082,16 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     live-others-out : ∀ (s : Source) → sameSource s envSrc ≡ false →
       countIn s (ProtocolSt.live S′)
         ≡ countRegs s (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
-    -- [→ live-source] the chain delivers envSrc once; every close of envSrc
-    -- (seed exhausted OR a take cut) drops it from live under fin ≡ true
+    -- [→ live-source] envSrc's live count drains by exactly its closes in the
+    -- accumulated evs (the seed exhausted close, plus any take-head cut).  KEYED
+    -- ON closeCount, NOT `if fin` (2026-07-19): the `if fin` form is frame-UNSTABLE
+    -- — an absorbing *All frame leaves fin′ ≡ false (from-inner react true) while
+    -- the seed close still sits in evs draining envSrc, so ∸1 ≢ ∸0 across the
+    -- frame.  closeCount is additive over ++, so it threads (the take-head frame
+    -- that closes envSrc bumps both sides in step).  mid-step bridges closeCount
+    -- envSrc evs → (if isLast a then 1 else 0) at the seed via env-close.
     live-envSrc-out : countIn envSrc (ProtocolSt.live S′)
-      ≡ countIn envSrc (ProtocolSt.live S) ∸ (if fin then suc zero else zero)
+      ≡ countIn envSrc (ProtocolSt.live S) ∸ closeCount envSrc evs
     -- [→ live-source, non-isLast] registry envSrc unchanged (frames touch inner
     -- sources; the seed exhausted defers to cascadeFinish).  no-take-head; the
     -- take-head cut edge (registry ∸ cutCloseCount envSrc) is deferred
@@ -1526,21 +1532,22 @@ foldPath-root-out sf gas id now envSrc vals evs fin sched st S fi flip-cert stea
   ; done-plumbed-out = steady
   }
   where
-  c = if fin then suc zero else zero
+  -- envSrc drains by closeCount: applyEvents-count at envSrc gives
+  -- countIn Lv + closeCount ≡ countIn (live S) + initCount, and env-init kills
+  -- the init term, leaving the ∸ closeCount readoff by m+n∸n≡m.
   ac : countIn envSrc (FoldInv.Lv fi) + closeCount envSrc evs
      ≡ countIn envSrc (ProtocolSt.live S) + initCount envSrc evs
   ac = applyEvents-count evs (ProtocolSt.live S) (FoldInv.ob′ fi) (ProtocolSt.done S)
          envSrc (FoldInv.applies fi)
-  eq : countIn envSrc (FoldInv.Lv fi) + c ≡ countIn envSrc (ProtocolSt.live S)
-  eq = trans (subst (λ z → countIn envSrc (FoldInv.Lv fi) + c
-                             ≡ countIn envSrc (ProtocolSt.live S) + z) (FoldInv.env-init fi)
-               (subst (λ z → countIn envSrc (FoldInv.Lv fi) + z
-                             ≡ countIn envSrc (ProtocolSt.live S) + initCount envSrc evs)
-                      (FoldInv.env-close fi) ac))
+  eq : countIn envSrc (FoldInv.Lv fi) + closeCount envSrc evs
+     ≡ countIn envSrc (ProtocolSt.live S)
+  eq = trans (subst (λ z → countIn envSrc (FoldInv.Lv fi) + closeCount envSrc evs
+                             ≡ countIn envSrc (ProtocolSt.live S) + z) (FoldInv.env-init fi) ac)
              (+-identityʳ (countIn envSrc (ProtocolSt.live S)))
   live-env : countIn envSrc (FoldInv.Lv fi)
-           ≡ countIn envSrc (ProtocolSt.live S) ∸ c
-  live-env = trans (sym (m+n∸n≡m (countIn envSrc (FoldInv.Lv fi)) c)) (cong (_∸ c) eq)
+           ≡ countIn envSrc (ProtocolSt.live S) ∸ closeCount envSrc evs
+  live-env = trans (sym (m+n∸n≡m (countIn envSrc (FoldInv.Lv fi)) (closeCount envSrc evs)))
+                   (cong (_∸ closeCount envSrc evs) eq)
 
 -- paying the key with positive owed decrements it by one (once the `with`
 -- fixes s ≡ᵇ x, payOwed/removeOne on the head reduce, so the equations are
