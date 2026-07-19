@@ -1100,13 +1100,37 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       thru-outer, reason 1), (b) dedup by `inst` (collapses a multi-source
 --       inner, reason 2), and (c) exclude spent registrations mirroring
 --       `aliveThrough`'s liveness (cancelled / dying∧delivered, reason 3).  That
---       is a from-inner-instance liveness count, not countRegsUnder.  Whether
---       even THAT equals k, and whether k≡0 then yields allShareSunk(dropSource
---       envSrc) at the flip (the lingering completed regs of reason 3 must be
---       share-sunk or envSrc-dropped by then), is UNSETTLED — this is the design
---       fork flagged for consult, not something to wire on a guess.  Probe code
+--       is a from-inner-instance liveness count, not countRegsUnder.  Probe code
 --       (countRegsUnder + mergeWrap-nil-coherent) reverted; git has it.  DO NOT
 --       generalise to a global node↔registry theory, and NOT onto dispatchShare.
+--     - flip-plumbed-out IS SOUND — the count field is not even needed (2026-07-19).
+--       A false alarm ("a co-completing inner's lingering reg breaks allShareSunk
+--       (dropSource envSrc)") was chased down and REFUTED by the cascade lifecycle:
+--        • A cascade is SINGLE-SOURCE: cascadeGo folds only chainsOf a (arrSource a
+--          = envSrc); every chain folded in one cascade shares that one source.
+--        • cascadeFinish drops arrSource a's regs at the END of each cascade (Evtr
+--          1088-1093), and sync-completing sources never linger at all (of/empty/
+--          finite-cold never `register`; a share def dying in its connect burst
+--          self-drops, Evtr 830).  Only genuinely-live async/hot sources hold regs.
+--        • So "simultaneous" completions are still SEPARATE cascades (drain pulls
+--          one arrival at a time, distinct ids).  A co-completing inner is a prior
+--          cascade whose cascadeFinish already dropped its reg before envSrc's
+--          cascade runs — it cannot linger into envSrc's flip.
+--       Hence at ANY flip the live registry splits into: (a) envSrc's own regs
+--       (removed by dropSource envSrc), (b) share-sunk regs, (c) other-source LIVE
+--       root-sinkers — but a live root-sinking sibling ABSORBS fin (from-inner
+--       react true / merge-st k>0 / concat queue), so it could not have let fin
+--       reach root in the first place.  (c)-root-sinking is thus incompatible with
+--       the flip; only (a)+(b) coexist with it ⇒ allShareSunk(dropSource envSrc).
+--     - ESTABLISHMENT, REDIRECTED: flip-plumbed-out is therefore NOT a per-frame
+--       node-count fact — it is the contrapositive of ABSORPTION, a CASCADE-level
+--       property: "fin reaches root ⇒ no live non-envSrc root-sinker survived."
+--       The natural carrier is a mid-cascade registry invariant threaded through
+--       cascadeGo (every live non-envSrc, non-share reg keeps some *All gate open,
+--       so its presence forces fin absorption at that gate), NOT a merge-st k
+--       equality.  This kills the countRegsUnder direction outright: the merge
+--       frame's real duty is "wrap-true k≡0 ⇒ this subtree absorbs nothing more,"
+--       provable from the gate + the cascade invariant, no exact count needed.
 --     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise
 --       is done ≡ true, vacuous right up until the flip; the flip is mid-cascade,
 --       where Inv does not exist.  Nothing to derive from at the one moment the
