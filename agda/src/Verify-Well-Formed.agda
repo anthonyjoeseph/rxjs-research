@@ -895,13 +895,52 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- PER-CASE establishment of FoldOut:
 --   root        : all fields concrete from foldPath-root-wf + SHADOW.
 --   f ↠ path′   : foldPath frame ≡ foldPath path′ (transformed state), so the
---                 OUTPUT triple is the recursion's — FoldOut passes THROUGH
---                 unchanged; the frame's bookkeeping is absorbed by SHADOW
---                 (enriched stepFrame-wf re-establishes FoldInv for path′).
+--                 OUTPUT triple is the recursion's — the OUTPUT-ONLY fields
+--                 pass THROUGH unchanged (only st″/sched″/S′, identical for
+--                 outer and recursion); the frame's bookkeeping is absorbed by
+--                 SHADOW (enriched stepFrame-wf re-establishes FoldInv).
 --   share-sink i: handoff + fan-out (enriched dispatchShare-wf).  handoff
 --                 bumps owed[i] by countIn i (live); the fan-out repays one
 --                 per registration and (isLast) dropSource i at finish resyncs
 --                 registry i against the fan-out's closes — the diamond.
+--
+-- WHICH FIELDS ARE FoldOut vs. FoldInv (traced 2026-07):
+--  • OUTPUT-ONLY (clean FoldOut fields — reference only st″/sched″/S′, so they
+--    pass through the frame recursion): live-others-out (s≠envSrc, from SHADOW),
+--    reg-typed-out, horizon-out, current-out, done-plumbed-out.  current-out is
+--      Σ Ov, current S′ ≡ just(id,Ov) × zeroExcept envSrc Ov × UniqueOwed Ov
+--            × lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′
+--    (ob′ = FoldInv.ob′ — post-settle owed, invariant through frames).  OWED
+--    TRACE: settle delivery seeds owed[envSrc]=countIn envSrc live on the first
+--    delivery then pays one (later deliveries just pay); close envSrc exhausted
+--    is non-cutPending so applyEvents leaves owed alone; the fan-out touches
+--    only owed[toℕ i].  Hence lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′,
+--    uniformly.  mid-step then ties lookupOwed envSrc ob′ to countRemaining ps
+--    via the ledger (inj₂ pays the entered owed once; inj₁ seeds countIn∸1).
+--  • The envSrc LIVE/REGISTRY readoff is NOT a clean FoldOut field — it is
+--    entangled with the cascade snapshot and belongs in FoldInv (threaded),
+--    for three reasons found by tracing:
+--     (1) reason-based drops: cut/cutPending drop registry+live together
+--         (cutThrough); the seed exhausted is live-ONLY (registry deferred to
+--         cascadeFinish).  So the envSrc analog of SHADOW must use a
+--         cutCloseCount (cut+cutPending only), not closeCount.
+--     (2) a take in the head path cuts the head's OWN envSrc registration
+--         mid-fold, so any statement keyed on the seed evs undercounts — the
+--         real count is the full accumulated evs, an internal fold quantity, so
+--         it cannot be a FoldOut field parameterised by the seed evs.
+--     (3) isLast vs not use DIFFERENT targets (countRemaining ps vs countRegs),
+--         and mid-cascade countRegs envSrc ≠ countRemaining (delivered isLast
+--         chains linger in the registry), so no single output-only envSrc
+--         identity covers both.
+--    DESIGN NEXT: add envShadow to FoldInv —
+--      countIn envSrc live + initCount envSrc evs
+--        ≡ countRegs envSrc registry + cutCloseCount envSrc evs
+--    (the seed exhausted close is excluded on BOTH sides: not a cutClose, and
+--    it is the lone live-drop the registry defers), threaded by stepFrame-wf/
+--    dispatchShare-wf exactly like SHADOW, with the isLast/countRemaining
+--    connection made at mid-step off Mid.live-source + the ledger.  The
+--    take-head corner (head's own cut close + cancellation) is the one edge to
+--    pin with a Unit-Test before relying on it.
 ------------------------------------------------------------------
 
 postulate
