@@ -7,7 +7,7 @@ open import Rx.Prim               using (InstEmit; Fuel)
 open import Rx.Exp                using (Ctx; Closed)
 open import Rx.Evaluator          using (Slots; evaluate)
 open import Rx.Protocol           using (WellFormed)
-open import Rx.Evaluator-Theorems using (evaluate-well-formed)
+open import Verify-Well-Formed    using (evaluate-well-formed)
 open import Spec                  using (spec-batchSimultaneous)
 open import Implementation        using (impl-batchSimultaneous)
 

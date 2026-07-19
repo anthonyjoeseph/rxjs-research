@@ -1028,17 +1028,20 @@ cascade {Γ = Γ} {t = t} {e = e} a id sched st =
 -- fuel = ARRIVALS PROCESSED; each arrival's cascade runs to
 -- quiescence (never truncated mid-batch).  The root subscription's
 -- burst is free: fuel 0 still yields it.
+-- fuel-many arrivals, each cascading to quiescence.  Top level (not a
+-- where-local of evaluate) so Verify-Well-Formed can induct on it.
+drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      → Fuel → Sched Γ → EvalSt e → Stream Γ t
+drain zero    _     _  = []                    -- out of fuel: truncate (only here)
+drain (suc k) sched st with sched-next sched
+... | inj₁ _            = []                  -- schedule empty: program done
+... | inj₂ (a , sched′) =
+  let (out , sched″ , st′) =
+        cascade a (freshId (arrTick a) (arrOrd a)) sched′ st
+  in out ++ drain k sched″ st′
+
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
-evaluate {Γ = Γ} {t = t} fuel e ins =
+evaluate fuel e ins =
   let (burst , sched₀ , st₀) =
         subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e)
-  in burst ++ loop fuel sched₀ st₀
-  where
-  loop : Fuel → Sched Γ → EvalSt e → Stream Γ t
-  loop zero    _     _  = []                    -- out of fuel: truncate (only here)
-  loop (suc k) sched st with sched-next sched
-  ... | inj₁ _            = []                  -- schedule empty: program done
-  ... | inj₂ (a , sched′) =
-    let (out , sched″ , st′) =
-          cascade a (freshId (arrTick a) (arrOrd a)) sched′ st
-    in out ++ loop k sched″ st′
+  in burst ++ drain fuel sched₀ st₀
