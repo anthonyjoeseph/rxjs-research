@@ -39,10 +39,10 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer;
+                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
                                 NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 sched-init; st-init; sched-next; LiveSource;
@@ -1556,20 +1556,42 @@ FoldInv-reg id envSrc evs fin sched st st′ S req fi = record
   ; ov-envSrc = FoldInv.ov-envSrc fi
   ; env-init = FoldInv.env-init fi ; env-close = FoldInv.env-close fi }
 
+-- the three NON-quiet frame clauses, still to grind, each stated PRECISELY at
+-- its frame constructor (so map-f/scan-f — proven below — are no longer covered
+-- by any postulate).  stepFrame's bookkeeping evs′ brackets against its registry
+-- mutation, and the value transform keeps done-nil.  The delivery-side twin of
+-- subscribeE-wf's per-clause grind.
+--  · take-f: the cut sub-branch drops the registry to cutThrough's `kept`,
+--    closes the victims, and flips fin; the non-cut branch is quiet (a future
+--    split can prove it — the cut edge is the load-bearing one).
+--  · from-inner / thru-outer: the *All wrap clauses, which need the node↔registry
+--    coherence field (caches) threaded into FoldInv before they can be discharged.
 postulate
-  -- the NON-map frame clauses, still to grind (scan-f / take-f / from-inner /
-  -- thru-outer): stepFrame's bookkeeping evs′ brackets against its registry
-  -- mutation, and the value transform keeps done-nil.  The delivery-side twin
-  -- of subscribeE-wf's per-clause grind.  map-f is peeled off below into the
-  -- real stepFrame-wf function; this postulate now covers only the remaining
-  -- frame constructors (the catch-all clause routes here).
-  stepFrame-wf-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
+  stepFrame-wf-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-    (f : Frame Γ w u) (path′ : Path Γ u t)
-    (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (nid : NodeId) (path′ : Path Γ s t)
+    (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     FoldInv id envSrc evs fin sched st S →
-    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now f path′ vals fin sched st
+    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (take-f nid) path′ vals fin sched st
+    in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
+
+  stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (op : AllOp) (allNid inst : NodeId) (path′ : Path Γ s t)
+    (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    FoldInv id envSrc evs fin sched st S →
+    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (from-inner op allNid inst) path′ vals fin sched st
+    in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
+
+  stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (op : AllOp) (nid : NodeId) (path′ : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    FoldInv id envSrc evs fin sched st S →
+    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (thru-outer op nid) path′ vals fin sched st
     in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
   -- the share fan-out: one handoff emit, then one delivery per share
@@ -1617,8 +1639,12 @@ stepFrame-wf {u = u} sf id now envSrc (scan-f fn nid) path′ vals evs fin sched
 ...   | no _     rewrite ++-identityʳ evs = fi
 ...   | yes refl rewrite ++-identityʳ evs =
         FoldInv-reg id envSrc evs fin sched st _ S refl fi
-stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi
-  = stepFrame-wf-rest sf id now envSrc f path′ vals evs fin sched st S fi
+stepFrame-wf sf id now envSrc (take-f nid) path′ vals evs fin sched st S fi
+  = stepFrame-wf-take sf id now envSrc nid path′ vals evs fin sched st S fi
+stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs fin sched st S fi
+  = stepFrame-wf-inner sf id now envSrc op allNid inst path′ vals evs fin sched st S fi
+stepFrame-wf sf id now envSrc (thru-outer op nid) path′ vals evs fin sched st S fi
+  = stepFrame-wf-outer sf id now envSrc op nid path′ vals evs fin sched st S fi
 
 -- the done-discipline, as a precondition: a done automaton (root already
 -- completed) admits only share-bound folds — a chain reaching the root
