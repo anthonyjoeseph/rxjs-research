@@ -19,7 +19,7 @@ module Verify-Well-Formed where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n)
 open import Data.List    using (List; []; _∷_; _++_; any; length)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -386,14 +386,12 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- one for one
     live-matches : ∀ (s : Source) →
       countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
-    -- for any arrival the SCHEDULER can actually produce, the
-    -- snapshot is the full registration count — registry entries are
-    -- well-typed for their scheduled source, so chainsOf's type
-    -- check drops nothing.  (Conditioning on sched-next matters: an
-    -- ill-typed phantom arrival would break the equation vacuously.)
-    chains-count : ∀ (a : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next sched ≡ inj₂ (a , sched″) →
-      countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+    -- registry entries are well-typed for their scheduled source (each
+    -- registration's type matches its live source's elemTy), so chainsOf's
+    -- type check drops nothing — countRegs ≡ length chainsOf for every
+    -- scheduled arrival (chains-count-derived).  A pointwise fact, unlike
+    -- the old one-lookahead form, so it threads across scheduler pops
+    reg-typed    : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     -- freshness is one comparison: ids mint from arrival position
     horizon-low  : ProtocolSt.horizon S ≤ nextId
     current-past : CurrentPast (ProtocolSt.current S) nextId
@@ -418,9 +416,7 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   field
     live-matches  : ∀ (s : Source) →
       countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
-    chains-count  : ∀ (a : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next sched ≡ inj₂ (a , sched″) →
-      countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+    reg-typed     : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low   : ProtocolSt.horizon S ≤ id
     current-frame : (ProtocolSt.current S ≡ nothing)
                   ⊎ (ProtocolSt.current S ≡ just (id , []))
@@ -432,7 +428,7 @@ burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   BurstInv {e = e} 0 (sched-init e ins) (st-init e) protocol-init
 burst-init e ins = record
   { live-matches  = λ s → refl
-  ; chains-count  = λ a sched″ _ → refl
+  ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
   ; done-plumbed  = λ ()
@@ -493,7 +489,7 @@ burst-final sched st S binv = inv , paid (BurstInv.current-frame binv)
   inv : Inv 1 sched st S
   inv = record
     { live-matches = BurstInv.live-matches binv
-    ; chains-count = BurstInv.chains-count binv
+    ; reg-typed    = BurstInv.reg-typed binv
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)
     ; done-plumbed = BurstInv.done-plumbed binv
@@ -551,9 +547,7 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       ≡ (if Arrival.isLast a
          then countRemaining ps (EvalSt.cancelled st)
          else countRegs (arrSource a) (EvalSt.registry st))
-    chains-count : ∀ (a′ : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next sched ≡ inj₂ (a′ , sched″) →
-      countRegs (arrSource a′) (EvalSt.registry st) ≡ length (chainsOf a′ st)
+    reg-typed    : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low  : ProtocolSt.horizon S ≤ nextId
     ledger       :
         (CurrentPast (ProtocolSt.current S) nextId × (paidUp S ≡ true))
@@ -571,31 +565,11 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- mid-skip (same S); established by mid-init/mid-step (postulated).
     owed-unique  : ∀ (ow : Owed) →
       ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
-    -- ADDED (finish scheduler tie): once the spent source is swept from
-    -- both the registry and the live schedule, the finished state's
-    -- chains-count still holds — the registry-membership fact the counts
-    -- alone can't see.  Preserved by mid-skip (same a/sched/st);
-    -- established by mid-init/mid-step (postulated).
-    finish-chains : Arrival.isLast a ≡ true →
-      ∀ (a′ : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next (proj₁ (cascadeFinish a sched st)) ≡ inj₂ (a′ , sched″) →
-      countRegs (arrSource a′) (EvalSt.registry (proj₂ (cascadeFinish a sched st)))
-        ≡ length (chainsOf a′ (proj₂ (cascadeFinish a sched st)))
 
 postulate
   -- entering: the latch opens the ledger; the automaton, Inv-related
   -- and paid, stands ready to open instant nextId.  The dry-freeness
   -- of the whole cascade fold arrives as a premise (split off
-  -- budget-sufficient by the drain composition below)
-  mid-init : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
-    (st : EvalSt e) (S : ProtocolSt) →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    Inv nextId sched st S → paidUp S ≡ true →
-    hasDry (proj₁ (cascadeGo a nextId (chainsOf a st) sched′
-                             (cascadeLatch a st))) ≡ false →
-    Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
-
   -- one surviving chain's emits — the chain emit, any share
   -- fan-outs, any cut closes — are accepted, paying/bumping/
   -- cancelling exactly per the ledger.  THE deep lemma: mirrors
@@ -652,15 +626,14 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
       (cong (λ z → if Arrival.isLast a then z
                    else countRegs (arrSource a) (EvalSt.registry st))
             (cr-skip rid p ps (EvalSt.cancelled st) ceq))
-  ; chains-count = Mid.chains-count mid
+  ; reg-typed    = Mid.reg-typed mid       -- same sched, st
   ; horizon-low  = Mid.horizon-low mid
   ; ledger       = ledger′
   ; done-plumbed = Mid.done-plumbed mid
   ; fold-live    = subst (λ z → hasDry (proj₁ z) ≡ false)
       (cascadeGo-skip a nextId rid p ps sched st ceq)
       (Mid.fold-live mid)
-  ; owed-unique   = Mid.owed-unique mid   -- same S, nextId
-  ; finish-chains = Mid.finish-chains mid  -- same a, sched, st
+  ; owed-unique  = Mid.owed-unique mid      -- same S, nextId
   }
   where
   ledger′ :
@@ -771,6 +744,14 @@ finishReg-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 finishReg-true a sched st eq with Arrival.isLast a | eq
 ... | true | refl = refl
 
+finishSched-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Arrival.isLast a ≡ true →
+  Sched.live (proj₁ (cascadeFinish a sched st))
+    ≡ sweepLive (dropSource (arrSource a) (EvalSt.registry st)) (Sched.live sched)
+finishSched-true a sched st eq with Arrival.isLast a | eq
+... | true | refl = refl
+
 -- leaving: all chains folded ⇒ fully paid; finish (drop the spent
 -- source, sweep) lands Inv-related at suc nextId
 mid-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -838,18 +819,24 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
     -- isLast=false: cascadeFinish is the identity; rewrite the goal flat
     go false isL rewrite cascadeFinish-false a sched st isL = record
       { live-matches = lm-false isL
-      ; chains-count = Mid.chains-count mid
+      ; reg-typed    = Mid.reg-typed mid
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
       ; current-past = cpast
       ; done-plumbed = Mid.done-plumbed mid
       }
-    -- isLast=true: keep cascadeFinish symbolic so chains-count lands on
-    -- finish-chains directly; convert the registry field-by-field
+    -- isLast=true: keep cascadeFinish symbolic; convert registry and live
+    -- field-by-field, reg-typed via the dropSource/sweepLive preservation
     go true isL = record
       { live-matches = λ s →
           subst (λ reg → countIn s (ProtocolSt.live S) ≡ countRegs s reg)
                 (sym (finishReg-true a sched st isL)) (lm-true isL s)
-      ; chains-count = Mid.finish-chains mid isL
+      ; reg-typed    =
+          subst (λ reg → regTyped? reg (Sched.live (proj₁ (cascadeFinish a sched st))) ≡ true)
+                (sym (finishReg-true a sched st isL))
+                (subst (λ lv → regTyped? (dropSource (arrSource a) (EvalSt.registry st)) lv ≡ true)
+                       (sym (finishSched-true a sched st isL))
+                       (reg-typed-finish (arrSource a) (EvalSt.registry st)
+                          (Sched.live sched) (Mid.reg-typed mid)))
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
       ; current-past = cpast
       ; done-plumbed = λ deq →
@@ -890,6 +877,61 @@ cascadeGo-wf a nextId ((rid , p) ∷ ps) sched st S mid
                (record st { delivered = rid ∷ EvalSt.delivered st })))
       _ run₁ run₂
   , mid₂
+
+-- the latch leaves the registry untouched (it only resets the per-cascade
+-- ledger and stamps the watermark / dying set)
+latch-registry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  EvalSt.registry (cascadeLatch a st) ≡ EvalSt.registry st
+latch-registry a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+-- an all-fresh snapshot (no cancellations yet) has every entry obliged
+countRemaining-[] : ∀ {X : Set} (ps : List (RegId × X)) →
+  countRemaining ps [] ≡ length ps
+countRemaining-[] []             = refl
+countRemaining-[] ((rid , _) ∷ ps) = cong suc (countRemaining-[] ps)
+
+-- entering: the latch opens the ledger; the automaton, Inv-related and
+-- paid, stands ready to open instant nextId (still on the previous,
+-- settled instant, so the ledger is the paid branch).  reg-typed threads
+-- from Inv across the scheduler pop; the count fact live-source needs is
+-- read off chains-count-derived
+mid-init : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
+  (st : EvalSt e) (S : ProtocolSt) →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  Inv nextId sched st S → paidUp S ≡ true →
+  hasDry (proj₁ (cascadeGo a nextId (chainsOf a st) sched′
+                           (cascadeLatch a st))) ≡ false →
+  Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
+mid-init nextId sched a sched′ st S eq inv paid nodry = record
+  { live-others  = λ s _ → trans (Inv.live-matches inv s)
+                     (cong (countRegs s) (sym (latch-registry a st)))
+  ; live-source  = live-src
+  ; reg-typed    = subst (λ reg → regTyped? reg (Sched.live sched′) ≡ true)
+                     (sym (latch-registry a st))
+                     (regTyped?-pop-sched sched sched′ (EvalSt.registry st) eq
+                       (Inv.reg-typed inv))
+  ; horizon-low  = Inv.horizon-low inv
+  ; ledger       = inj₁ (Inv.current-past inv , paid)
+  ; done-plumbed = λ deq → subst (λ reg → allShareSunk reg ≡ true)
+                     (sym (latch-registry a st)) (Inv.done-plumbed inv deq)
+  ; fold-live    = nodry
+  ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
+                     (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
+  }
+  where
+  live-src : countIn (arrSource a) (ProtocolSt.live S)
+    ≡ (if Arrival.isLast a
+       then countRemaining (chainsOf a st) (EvalSt.cancelled (cascadeLatch a st))
+       else countRegs (arrSource a) (EvalSt.registry (cascadeLatch a st)))
+  live-src with Arrival.isLast a
+  ... | true  = trans (Inv.live-matches inv (arrSource a))
+                  (trans (chains-count-derived a sched sched′ st (Inv.reg-typed inv) eq)
+                         (sym (countRemaining-[] (chainsOf a st))))
+  ... | false = Inv.live-matches inv (arrSource a)
 
 -- one arrival's cascade, composed.  The dry-freeness premise is
 -- stated on the cascade's own emits — definitionally the cascadeGo
