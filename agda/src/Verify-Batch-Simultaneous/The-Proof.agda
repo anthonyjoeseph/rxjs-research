@@ -477,9 +477,18 @@ postulate
   -- contribution for this emit.  [provable by case on BatchRel's phase ×
   -- admitted × paidOff; the arithmetic alignment is the same
   -- settle/applyEvents-vs-settleBatch/applyBatch used by batchrel-step]
+  --
+  -- The tail-acceptance premise is LOAD-BEARING (not present in the earlier
+  -- form): when the emit completes its instant the online batcher flushes
+  -- batchOf i s k (valuesOf es) NOW, while specGoHead clairvoyantly grabs
+  -- valuesOf es ++ valuesAt i rest.  These agree only because a completed
+  -- (or departed) instant can never recur in an ACCEPTED tail — valuesAt i
+  -- rest ≡ [] — which needs `Accepted (runProtocol S′ rest)`.  fold-agree
+  -- has it as acc′.
   flush-step : ∀ {A : Set} {seen : List Id} {S S′ : ProtocolSt}
     {B : BatchSt A} (x : InstEmit A) (rest : List (InstEmit A)) →
     BatchRel seen S B → stepProtocol x S ≡ just S′ →
+    Accepted (runProtocol S′ rest) →
     proj₁ (step-batch x B) ++ flushSpec (proj₂ (step-batch x B)) rest
       ≡ flushSpec B (x ∷ rest) ++ specGoHead x seen rest
 
@@ -638,7 +647,7 @@ fold-agree seen S B (x ∷ rest) rel acc with step-accepted x S rest acc
       ih  = fold-agree (seen▸ x seen) S′ B′ rest (batchrel-step x rel stepEq) acc′
   in trans (cong (out ++_) ih)
        (trans (sym (++-assoc out (flushSpec B′ rest) (specGo (seen▸ x seen) rest)))
-         (trans (cong (_++ specGo (seen▸ x seen) rest) (flush-step x rest rel stepEq))
+         (trans (cong (_++ specGo (seen▸ x seen) rest) (flush-step x rest rel stepEq acc′))
            (trans (++-assoc (flushSpec B (x ∷ rest)) (specGoHead x seen rest)
                             (specGo (seen▸ x seen) rest))
              (cong (flushSpec B (x ∷ rest) ++_) (sym (specGo-split x seen rest))))))
