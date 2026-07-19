@@ -207,7 +207,8 @@ postulate
   -- one surviving chain's emits — the chain emit, any share
   -- fan-outs, any cut closes — are accepted, paying/bumping/
   -- cancelling exactly per the ledger.  THE deep lemma: mirrors
-  -- foldPath/dispatchShare/stepFrame (same TERMINATING debt)
+  -- foldPath/dispatchShare (gas-structural now) and stepFrame
+  -- (still TERMINATING debt)
   mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {a : Arrival Γ} {nextId : Id} {rid : RegId}
     {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}

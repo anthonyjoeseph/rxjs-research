@@ -862,14 +862,15 @@ subscribeE {u = u} (deferᵉ body) κ id now sched st =
               (installNode nid (merge-st 0 false) st)
 
 -- delivery at a share boundary re-enters chain evaluation: foldPath
--- and dispatchShare are mutually recursive.  TERMINATING because the
--- recursion is bounded by the share telescope — a chain registered on
--- share i sinks only into the root or a strictly later share — but
--- that invariant lives in the registry, invisible to Agda; same
--- proof-phase debt as subscribeE
-{-# TERMINATING #-}
+-- and dispatchShare are mutually recursive.  The recursion is bounded
+-- by the share telescope — a chain registered on share i sinks only
+-- into the root or a strictly later share — so dispatch depth never
+-- exceeds n.  `gas` makes that bound structural: every dispatch
+-- consumes one unit and chainStep seeds n, so the zero clamp is
+-- unreachable on real registries (the telescope invariant, Inv-phase
+-- work) and termination needs no pragma
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → Id → Tick → (i : Fin n)
+              → ℕ → Id → Tick → (i : Fin n)
               → List (Val Γ (lookup Γ i)) → Bool
               → Sched Γ → EvalSt e
               → Stream Γ t × Sched Γ × EvalSt e
@@ -880,25 +881,25 @@ dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- running on an empty value list, so the emit is emptied, never
 -- swallowed.  The envelope is assembled here and nowhere else
 foldPath : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → Id → Tick → Source → Path Γ u t
+         → ℕ → Id → Tick → Source → Path Γ u t
          → List (Val Γ u) → List (InstEvent (Val Γ t)) → Bool
          → Sched Γ → EvalSt e
          → Stream Γ t × Sched Γ × EvalSt e
-foldPath id now envSrc root vals evs fin sched st =
+foldPath gas id now envSrc root vals evs fin sched st =
   ((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
     at id from envSrc as delivery) ∷ [] , sched , st
-foldPath id now envSrc (share-sink i) vals evs fin sched st =
+foldPath gas id now envSrc (share-sink i) vals evs fin sched st =
   -- the chain's own (valueless) emit first — announcing the handoff:
   -- share i fans out next, still inside this instant.  The share
   -- delivers vals to every chain registered on it — the diamond
   -- case, batched by construction
-  let (fanout , sched₁ , st₁) = dispatchShare id now i vals fin sched st
+  let (fanout , sched₁ , st₁) = dispatchShare gas id now i vals fin sched st
   in (((evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery) ∷ fanout)
      , sched₁ , st₁
-foldPath id now envSrc (f ↠ path′) vals evs fin sched st =
+foldPath gas id now envSrc (f ↠ path′) vals evs fin sched st =
   let (vals′ , evs′ , fin′ , sched₁ , st₁) =
         stepFrame id now f path′ vals fin sched st
-  in foldPath id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁
+  in foldPath gas id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁
 
 -- deliver to the chains of share i, one emit per registration from
 -- source toℕ i (the share's owed count), in subscription order.  A
@@ -908,7 +909,8 @@ foldPath id now envSrc (f ↠ path′) vals evs fin sched st =
 -- never registers only to be dropped silently; then every snapshot
 -- registration closes and the sweep collects whatever the share kept
 -- alive
-dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
+dispatchShare zero _ _ _ _ _ sched st = [] , sched , st  -- see above: unreachable
+dispatchShare {Γ = Γ} {t = t} {e = e} (suc gas) id now i vals fin sched st =
   finish fin (go (admit (EvalSt.registry st)) sched (latch fin st))
   where
   -- latch completion AND mark the share dying: a delivered fan-out
@@ -938,7 +940,7 @@ dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
   ... | true  = go ps sched₀ st₀
   ... | false =
     let (emits , sched₁ , st₁) =
-          foldPath id now (toℕ i) p vals
+          foldPath gas id now (toℕ i) p vals
                    (if fin then close (toℕ i) exhausted ∷ [] else [])
                    fin sched₀
                    (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
@@ -958,8 +960,8 @@ dispatchShare {Γ = Γ} {t = t} {e = e} id now i vals fin sched st =
 chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Id → (a : Arrival Γ) → Path Γ (arrTy a) t → Sched Γ → EvalSt e
           → Stream Γ t × Sched Γ × EvalSt e
-chainStep id a path sched st =
-  foldPath id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+chainStep {n = n} id a path sched st =
+  foldPath n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
 
