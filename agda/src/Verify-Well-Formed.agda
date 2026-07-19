@@ -21,7 +21,7 @@ open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; 
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -634,6 +634,27 @@ enterInstant S i with ProtocolSt.current S
 ... | just (j , owed) = if i ≡ᵇ j
       then (if paidOff owed then nothing else just (owed , ProtocolSt.horizon S))
       else openFreshᴵ S i
+
+≡true→T : ∀ (b : Bool) → b ≡ true → T b
+≡true→T true _ = tt
+
+-- the horizon the automaton opens an instant with never exceeds the instant
+-- id: a fresh open only admits when horizon ≤ᵇ id (the openFreshᴵ guard), and
+-- a continued instant keeps horizon S, already ≤ id.  Feeds FoldOut.horizon-out.
+openFreshᴵ-hz≤ : ∀ (S : ProtocolSt) (i : Id) {ob hz′} →
+  openFreshᴵ S i ≡ just (ob , hz′) → hz′ ≤ i
+openFreshᴵ-hz≤ S i eq with settleInstant S | eq
+... | just hz | eq′ with hz ≤ᵇ i in hi | eq′
+...   | true  | refl = ≤ᵇ⇒≤ hz i (≡true→T (hz ≤ᵇ i) hi)
+
+enterInstant-hz≤id : ∀ (S : ProtocolSt) (i : Id) {ob hz′} →
+  enterInstant S i ≡ just (ob , hz′) → ProtocolSt.horizon S ≤ i → hz′ ≤ i
+enterInstant-hz≤id S i eq hle with ProtocolSt.current S | eq
+... | nothing         | eq′ = openFreshᴵ-hz≤ S i eq′
+... | just (j , owed) | eq′ with i ≡ᵇ j | eq′
+...   | false | eq″ = openFreshᴵ-hz≤ S i eq″
+...   | true  | eq″ with paidOff owed | eq″
+...     | false | refl = hle
 
 stepProtocol-enter-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
   (k : EmitKind) (lv : List Source) (hz : Id) (dn : Bool) (cur : Maybe (Id × Owed))
