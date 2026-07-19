@@ -22,7 +22,7 @@ open import Data.Bool.Properties using (∨-assoc; ∨-comm; ∨-identityʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
+open import Data.Nat.Properties using (≤-refl; ≤-reflexive; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.List.Properties using (++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -893,6 +893,19 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- mid-skip (same S); established by mid-init/mid-step (postulated).
     owed-unique  : ∀ (ow : Owed) →
       ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
+    -- SNAPSHOT↔REGISTRY: the not-yet-cancelled snapshot chains inject into the
+    -- live registry entries of arrSource — a snapshot chain leaves the registry
+    -- ONLY via cutThrough, which also cancels its rid, so uncancelled ⇒ still
+    -- registered.  Hence countRemaining ps (the uncancelled snapshot count) is a
+    -- lower bound on the current arrSource registry count.  Establishes at
+    -- mid-init as an EQUALITY (cascadeLatch resets cancelled ≡ [], so
+    -- countRemaining ps [] ≡ length (chainsOf a st) ≡ countRegs, via
+    -- chains-count-derived); mid-skip drops a cancelled head (countRemaining
+    -- unchanged by cr-skip); mid-step carries it.  Feeds countRegs-arrSrc-pos:
+    -- a non-cancelled head forces countRemaining ((rid,p)∷ps) ≥ 1, so the
+    -- registry carries ≥ 1 arrSource entry (the non-isLast registry positivity).
+    reg-bound    : countRemaining ps (EvalSt.cancelled st)
+      ≤ countRegs (arrSource a) (EvalSt.registry st)
 
 ------------------------------------------------------------------
 -- Protocol foundation for foldPath-wf: a CONSTRUCTIVE stepProtocol.
@@ -2071,20 +2084,27 @@ payOwed-seed : ∀ (s : Source) (k : ℕ) →
   payOwed s (bumpOwed s (suc k) []) ≡ just ((s , k) ∷ [])
 payOwed-seed s k rewrite ≡ᵇ-refl s = refl
 
--- NARROW POSTULATE (the non-isLast registry positivity, isolated): a
--- non-cancelled head is a live registration of arrSource, so — when the source
--- is NOT spent — its registry carries ≥ 1 entry.  The snapshot↔registry link
--- (a delivering source is live in the current registry); a scheduler↔automaton
--- fact, unlike the isLast case which is pure live-source arithmetic (below).
-postulate
-  countRegs-arrSrc-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-    {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-    {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
-    {S : ProtocolSt} →
-    Mid a nextId ((rid , p) ∷ ps) sched st S →
-    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-    Arrival.isLast a ≡ false →
-    Σ ℕ λ k → countRegs (arrSource a) (EvalSt.registry st) ≡ suc k
+-- suc on the left of ≤ forces the right side to be a successor
+≤-suc-inv : ∀ {m n} → suc m ≤ n → Σ ℕ λ k → n ≡ suc k
+≤-suc-inv (s≤s {n = n} _) = n , refl
+
+-- the non-isLast registry positivity, DISCHARGED from Mid.reg-bound: a
+-- non-cancelled head bumps countRemaining ((rid,p)∷ps) to suc _ (cr-fresh),
+-- and reg-bound lower-bounds the arrSource registry count by it, so the
+-- registry carries ≥ 1 entry.  (The isLast gate is now vacuous — reg-bound
+-- holds unconditionally — but kept so seed-live-pos's call site is unchanged.)
+countRegs-arrSrc-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  Arrival.isLast a ≡ false →
+  Σ ℕ λ k → countRegs (arrSource a) (EvalSt.registry st) ≡ suc k
+countRegs-arrSrc-pos {a = a} {rid = rid} {p = p} {ps = ps} {st = st} mid ceq _ =
+  ≤-suc-inv (subst (λ z → z ≤ countRegs (arrSource a) (EvalSt.registry st))
+                   (cr-fresh rid p ps (EvalSt.cancelled st) ceq)
+                   (Mid.reg-bound mid))
 
 -- a non-cancelled head is a live registration of its source ⇒ ≥ 1 live entry.
 -- isLast: PROVEN (live-source counts the uncancelled snapshot remainder, ≥ 1
@@ -2355,6 +2375,9 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
       (cascadeGo-skip a nextId rid p ps sched st ceq)
       (Mid.fold-live mid)
   ; owed-unique  = Mid.owed-unique mid      -- same S, nextId
+  ; reg-bound    = subst (λ z → z ≤ countRegs (arrSource a) (EvalSt.registry st))
+                     (cr-skip rid p ps (EvalSt.cancelled st) ceq)
+                     (Mid.reg-bound mid)    -- drop cancelled head, count unchanged
   }
   where
   ledger′ :
@@ -2973,6 +2996,11 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
   ; fold-live    = nodry
   ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
                      (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
+  ; reg-bound    = subst
+      (λ reg → countRemaining (chainsOf a st) [] ≤ countRegs (arrSource a) reg)
+      (sym (latch-registry a st))
+      (≤-reflexive (trans (countRemaining-[] (chainsOf a st))
+        (sym (chains-count-derived a sched sched′ st (Inv.reg-typed inv) eq))))
   }
   where
   live-src : countIn (arrSource a) (ProtocolSt.live S)
