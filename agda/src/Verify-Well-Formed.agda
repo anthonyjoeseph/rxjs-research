@@ -296,6 +296,143 @@ cachesValid : ∀ {n} {Γ : Ctx n} {t}
 cachesValid []               reg = true
 cachesValid ((nid , s) ∷ ns) reg = nodeCacheOK nid s reg ∧ cachesValid ns reg
 
+------------------------------------------------------------------
+-- the Mid (mid-cascade) shadow of cachesValid — the ps-INDEXED
+-- pending-adjustment (see the Mid record NOTE).  During arrSource a's
+-- cascade an inner's `finish` pred-decrements merge-st k while its
+-- registrations linger until cascadeFinish, so k leads the raw registry.
+-- The base is the registry cascadeFinish WILL keep (drop arrSource iff
+-- isLast), and the adjustment adds back the arrSource inner-instances
+-- under nid that have NOT yet finished — the ones still to fold.
+--
+-- mergeAdjust: distinct inner instances of nid drawn from the UNFOLDED,
+-- NOT-CANCELLED arrSource chains ps (W2: cancelled chains skipped,
+-- countRemaining-style — a cut drops their regs without pred-decrementing
+-- k), KEPT only when arrSource is the inst's LAST live source (the inst
+-- is absent from `dropSource arrSource registry`; a multi-source inst
+-- with a surviving non-arrSource reg is absorbed, no pred k, and is
+-- already held by countLiveInners of the dropSourced base — not counted
+-- again here).
+-- inner insts of nid from the NOT-cancelled chains ps (W2: cancelled
+-- chains skipped, countRemaining-style — cutThrough dropped their regs)
+collectAdjInsts : ∀ {n} {Γ : Ctx n} {s t}
+                → NodeId → List RegId → List (RegId × Path Γ s t) → List NodeId
+collectAdjInsts nid cx []              = []
+collectAdjInsts nid cx ((rid , p) ∷ r) =
+  if any (_≡ᵇ rid) cx
+  then collectAdjInsts nid cx r
+  else innerInstsP nid p ++ collectAdjInsts nid cx r
+
+-- keep only insts ABSENT from `surv` (dropSource arrSource fully removed
+-- them ⇒ arrSource is their last live source ⇒ they still owe a `finish`)
+keepAbsent : List NodeId → List NodeId → List NodeId
+keepAbsent surv []       = []
+keepAbsent surv (i ∷ is) = if elemℕ i surv then keepAbsent surv is else i ∷ keepAbsent surv is
+
+mergeAdjust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → (a : Arrival Γ)
+  → List (RegId × Path Γ (arrTy a) t) → EvalSt e → ℕ
+mergeAdjust nid a ps st =
+  nubLen (keepAbsent (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st)))
+                     (collectAdjInsts nid (EvalSt.cancelled st) ps))
+
+-- per-node Mid checker: base = the kept registry (dropSource arrSource iff
+-- isLast), adjustment added only when isLast (a non-final emit finishes no
+-- inner, so k is unchanged and the plain form rides).  Adjustment written
+-- FIRST in the sum so ps≡[] reduces `0 + …` definitionally.
+nodeCacheMid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → (a : Arrival Γ) → List (RegId × Path Γ (arrTy a) t)
+  → NodeState Γ → EvalSt e → Bool
+nodeCacheMid nid a ps (merge-st k _) st =
+  not (mergeReachable nid
+        (if Arrival.isLast a then dropSource (arrSource a) (EvalSt.registry st)
+         else EvalSt.registry st))
+  ∨ (k ≡ᵇ ((if Arrival.isLast a then mergeAdjust nid a ps st else 0)
+             + countLiveInners nid
+                 (if Arrival.isLast a then dropSource (arrSource a) (EvalSt.registry st)
+                  else EvalSt.registry st)))
+nodeCacheMid nid a ps (scan-st _)       st = true
+nodeCacheMid nid a ps (take-st _)       st = true
+nodeCacheMid nid a ps (concat-st _ _ _) st = true
+nodeCacheMid nid a ps (switch-st _ _)   st = true
+nodeCacheMid nid a ps (exhaust-st _ _)  st = true
+
+cachesValidMid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → (a : Arrival Γ) → List (RegId × Path Γ (arrTy a) t)
+  → List (NodeId × NodeState Γ) → EvalSt e → Bool
+cachesValidMid a ps []               st = true
+cachesValidMid a ps ((nid , s) ∷ ns) st = nodeCacheMid nid a ps s st ∧ cachesValidMid a ps ns st
+
+-- SKIP: a cancelled head contributes nothing to the adjustment (collectAdjInsts
+-- skips it), so the Mid shadow is stable when mid-skip drops it from ps.
+collectAdjInsts-skip : ∀ {n} {Γ : Ctx n} {s t}
+  (nid : NodeId) (cx : List RegId) (rid : RegId) (p : Path Γ s t)
+  (ps : List (RegId × Path Γ s t)) →
+  any (_≡ᵇ rid) cx ≡ true →
+  collectAdjInsts nid cx ((rid , p) ∷ ps) ≡ collectAdjInsts nid cx ps
+collectAdjInsts-skip nid cx rid p ps h rewrite h = refl
+
+mergeAdjust-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (a : Arrival Γ) (rid : RegId) (p : Path Γ (arrTy a) t)
+  (ps : List (RegId × Path Γ (arrTy a) t)) (st : EvalSt e) →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+  mergeAdjust nid a ((rid , p) ∷ ps) st ≡ mergeAdjust nid a ps st
+mergeAdjust-skip nid a rid p ps st h =
+  cong (λ z → nubLen (keepAbsent (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st))) z))
+       (collectAdjInsts-skip nid (EvalSt.cancelled st) rid p ps h)
+
+cachesValidMid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (rid : RegId) (p : Path Γ (arrTy a) t)
+  (ps : List (RegId × Path Γ (arrTy a) t))
+  (nodes : List (NodeId × NodeState Γ)) (st : EvalSt e) →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+  cachesValidMid a ((rid , p) ∷ ps) nodes st ≡ cachesValidMid a ps nodes st
+cachesValidMid-skip a rid p ps []              st h = refl
+cachesValidMid-skip a rid p ps ((nid , s) ∷ ns) st h =
+  cong₂ _∧_ (nc s) (cachesValidMid-skip a rid p ps ns st h)
+  where
+  nc : (s : NodeState _) → nodeCacheMid nid a ((rid , p) ∷ ps) s st ≡ nodeCacheMid nid a ps s st
+  nc (merge-st k od) =
+    cong (λ z → not (mergeReachable nid
+                       (if Arrival.isLast a then dropSource (arrSource a) (EvalSt.registry st)
+                        else EvalSt.registry st))
+                ∨ (k ≡ᵇ ((if Arrival.isLast a then z else 0)
+                          + countLiveInners nid
+                              (if Arrival.isLast a then dropSource (arrSource a) (EvalSt.registry st)
+                               else EvalSt.registry st))))
+         (mergeAdjust-skip nid a rid p ps st h)
+  nc (scan-st _)       = refl
+  nc (take-st _)       = refl
+  nc (concat-st _ _ _) = refl
+  nc (switch-st _ _)   = refl
+  nc (exhaust-st _ _)  = refl
+
+-- NIL: at ps≡[] the adjustment vanishes (collectAdjInsts [] ≡ []), so the Mid
+-- shadow collapses to the plain checker over the kept registry — what
+-- mid-final reads into Inv.caches.
+cachesValidMid-nil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (nodes : List (NodeId × NodeState Γ)) (st : EvalSt e) →
+  cachesValidMid a [] nodes st
+    ≡ cachesValid nodes (if Arrival.isLast a
+                         then dropSource (arrSource a) (EvalSt.registry st)
+                         else EvalSt.registry st)
+cachesValidMid-nil a []              st = refl
+cachesValidMid-nil a ((nid , s) ∷ ns) st = cong₂ _∧_ (nc s) (cachesValidMid-nil a ns st)
+  where
+  nc : (s : NodeState _) →
+       nodeCacheMid nid a [] s st
+         ≡ nodeCacheOK nid s (if Arrival.isLast a
+                              then dropSource (arrSource a) (EvalSt.registry st)
+                              else EvalSt.registry st)
+  nc (merge-st k od) with Arrival.isLast a
+  ... | true  = refl
+  ... | false = refl
+  nc (scan-st _)       = refl
+  nc (take-st _)       = refl
+  nc (concat-st _ _ _) = refl
+  nc (switch-st _ _)   = refl
+  nc (exhaust-st _ _)  = refl
+
 -- the registry↔schedule type-consistency invariant (replaces the old
 -- one-lookahead chains-count): every registration's source-type matches
 -- every live source of the same source.  Share-sunk registrations whose
@@ -731,50 +868,23 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       allShareSunk (if Arrival.isLast a
                     then dropSource (arrSource a) (EvalSt.registry st)
                     else EvalSt.registry st) ≡ true
-    -- NOTE (node-cache validity, the Mid shadow — DEFERRED, 2026-07-19):
-    -- Mid carries NO caches field yet.  Neither raw-registry form is true
-    -- throughout the fold: the plain `cachesValid (nodes st)(registry st)`
-    -- fails mid-fold (an inner's `finish` decrements merge-st k while its
-    -- registrations linger until cascadeFinish), and the `if isLast then
-    -- dropSource` form fails at mid-init (arrSource's inners are still live
-    -- and counted by k, so dropping them pre-fold makes k overcount).  The
-    -- honest Mid shadow needs a ps-INDEXED pending-adjustment term (like
-    -- live-matches' initCount/closeCount).  SHAPE (worked out 2026-07-19,
-    -- verified at both fold endpoints), per merge node nid:
-    --   k ≡ countLiveInners nid (dropSource (arrSource a) registry)
-    --       + (arrSource inner-instances under nid that WILL finish, among
-    --          the unfolded chains ps)
-    -- At ps≡[] (mid-final) the adjustment is 0 ⇒ the dropSource form, true.
-    -- At mid-init (ps≡all) it adds back every arrSource inner ⇒ the plain
-    -- form, true.  The adjustment counts arrSource insts that are the inner's
-    -- LAST live source (a multi-source inst whose OTHER sources stay live is
-    -- absorbed — no pred k — and is ALREADY held by countLiveInners(dropSource
-    -- arrSource registry) via its surviving non-arrSource regs, so it must NOT
-    -- be double-counted here); equivalently the insts dropSource arrSource
-    -- fully removes, restricted to the unfolded chains.
-    -- TWO WATCH-POINTS (stronger model, 2026-07-19) — both because
-    -- aliveThrough is read against the EVOLVING ledger, not the snapshot:
-    --  (W1) the gate's verdict changes mid-fold: as earlier ps fold,
-    --       delivered/cancelled grow, so an inst that was not "last live
-    --       source" at entry becomes it a few chains later.  The adjustment
-    --       is recomputed PER STEP against the current ledger; the mid-step
-    --       proof discharges each transition by CONVERTING the very
-    --       aliveThrough scrutinee the evaluator's `react` just matched
-    --       (Evaluator 599-603) — never by predicting from the entry snapshot.
-    --  (W2) a cut can cancel a "will finish" inst before its chain folds:
-    --       it never pred-decrements k, but cutThrough drops its regs — so
-    --       countLiveInners and the adjustment must move together.  The
-    --       adjustment is therefore CANCELLED-GATED: filter the unfolded ps by
-    --       the cancelled set, countRemaining-style (as live-source already
-    --       does), or the shadow goes false at the first mid-cascade cut
-    --       through a merge.
-    -- CONFIRMED no coupling to the owed/counting machine (cTotal): those are
-    -- parallel ledgers — owed tracks registrations-per-source for the batcher;
-    -- these k-caches track inner-instances-per-node, invariant-side only,
-    -- never read by the batcher.  Shared substrate is only registry +
-    -- delivered/cancelled/dying (ground truth for both).  Needs care (this is
-    -- why it is deferred, not guessed).  Until designed, mid-final supplies
-    -- Inv.caches via the postulate cascade-preserves-caches (deferred content).
+    -- node-cache validity, the Mid shadow (cachesValidMid, see its defn):
+    -- the ps-INDEXED form.  base = the registry cascadeFinish keeps (drop
+    -- arrSource iff isLast); adjustment = mergeAdjust (the unfolded, not-
+    -- cancelled, last-live-source arrSource inner-instances under each nid,
+    -- the ones whose `finish` is still pending).  At ps≡[] (mid-final) the
+    -- adjustment is 0 ⇒ the plain checker over the kept registry, read
+    -- verbatim into Inv.caches; at mid-init (ps≡all) it adds back every
+    -- arrSource inner ⇒ the plain form over the full registry, from Inv.
+    -- Two watch-points drive the (postulated) mid-step transition: (W1) the
+    -- last-live-source verdict shifts as delivered/cancelled grow, discharged
+    -- by converting the evaluator's own `react` aliveThrough scrutinee, not
+    -- the entry snapshot; (W2) a cut cancels a will-finish inst without pred-
+    -- decrementing k, so the adjustment is cancelled-gated (mergeAdjust skips
+    -- cancelled chains, matching cutThrough's reg-drop).  No cTotal coupling
+    -- (parallel ledgers; shared substrate is only registry + delivered/
+    -- cancelled/dying).
+    caches       : cachesValidMid a ps (EvalSt.nodes st) st ≡ true
     fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
     -- ADDED (owed-key uniqueness): the open instant's owed table has no
     -- repeated key, so ledger's zeroExcept + the arrival's zero remainder
@@ -2217,6 +2327,8 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   ; horizon-low  = Mid.horizon-low mid
   ; ledger       = ledger′
   ; done-plumbed = Mid.done-plumbed mid
+  ; caches       = trans (sym (cachesValidMid-skip a rid p ps (EvalSt.nodes st) st ceq))
+                         (Mid.caches mid)
   ; fold-live    = subst (λ z → hasDry (proj₁ z) ≡ false)
       (cascadeGo-skip a nextId rid p ps sched st ceq)
       (Mid.fold-live mid)
@@ -2348,20 +2460,14 @@ finishSched-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 finishSched-true a sched st eq with Arrival.isLast a | eq
 ... | true | refl = refl
 
--- OUTSIDE-IN POSTULATE (the deferred hard content of the first global
--- coherence field): a completed cascade lands node-cache valid.  This is
--- where the Mid/FoldInv caches shadow — the ps-indexed pending-adjustment
--- absorbing the finish-decrements-k-before-cascadeFinish-sheds-regs window
--- — will be discharged once its shape is designed (see the Mid NOTE).  For
--- now it delivers Inv.caches at every cascade boundary past the first (the
--- first comes from burst-final ∘ BurstInv.caches ∘ subscribeE-wf), so the
--- top-line Inv.caches is a real, usable field throughout.
-postulate
-  cascade-preserves-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (nextId : Id) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    Mid a nextId [] sched st S →
-    cachesValid (EvalSt.nodes (proj₂ (cascadeFinish a sched st)))
-                (EvalSt.registry (proj₂ (cascadeFinish a sched st))) ≡ true
+-- cascadeFinish never touches the node table (only drops the spent source's
+-- regs and sweeps live) — the node counters ride through unchanged
+finishNodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  EvalSt.nodes (proj₂ (cascadeFinish a sched st)) ≡ EvalSt.nodes st
+finishNodes a sched st with Arrival.isLast a
+... | false = refl
+... | true  = refl
 
 -- leaving: all chains folded ⇒ fully paid; finish (drop the spent
 -- source, sweep) lands Inv-related at suc nextId
@@ -2438,9 +2544,11 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
                           else EvalSt.registry st) ≡ true)
                 isL (Mid.done-plumbed mid deq)
       ; caches       =
-          subst (λ x → cachesValid (EvalSt.nodes (proj₂ x)) (EvalSt.registry (proj₂ x)) ≡ true)
-                (cascadeFinish-false a sched st isL)
-                (cascade-preserves-caches a nextId sched st S mid)
+          subst (λ b → cachesValid (EvalSt.nodes st)
+                          (if b then dropSource (arrSource a) (EvalSt.registry st)
+                           else EvalSt.registry st) ≡ true)
+                isL
+                (trans (sym (cachesValidMid-nil a (EvalSt.nodes st) st)) (Mid.caches mid))
       }
     -- isLast=true: keep cascadeFinish symbolic; convert registry and live
     -- field-by-field, reg-typed via the dropSource/sweepLive preservation
@@ -2463,7 +2571,16 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
                 (subst (λ b → allShareSunk (if b then dropSource (arrSource a) (EvalSt.registry st)
                                 else EvalSt.registry st) ≡ true)
                        isL (Mid.done-plumbed mid deq))
-      ; caches       = cascade-preserves-caches a nextId sched st S mid
+      ; caches       =
+          subst (λ nds → cachesValid nds (EvalSt.registry (proj₂ (cascadeFinish a sched st))) ≡ true)
+                (sym (finishNodes a sched st))
+            (subst (λ reg → cachesValid (EvalSt.nodes st) reg ≡ true)
+                   (sym (finishReg-true a sched st isL))
+              (subst (λ b → cachesValid (EvalSt.nodes st)
+                              (if b then dropSource (arrSource a) (EvalSt.registry st)
+                               else EvalSt.registry st) ≡ true)
+                     isL
+                     (trans (sym (cachesValidMid-nil a (EvalSt.nodes st) st)) (Mid.caches mid))))
       }
 
 -- the chain fold, composed (mirrors cascadeGo's own recursion —
@@ -2513,6 +2630,23 @@ countRemaining-[] : ∀ {X : Set} (ps : List (RegId × X)) →
 countRemaining-[] []             = refl
 countRemaining-[] ((rid , _) ∷ ps) = cong suc (countRemaining-[] ps)
 
+-- OUTSIDE-IN POSTULATE — the mid-init PARTITION of the caches shadow.  At
+-- entry ps ≡ chainsOf a (ALL arrSource chains), cancelled ≡ [] (the latch
+-- just reset it), and no inner has finished yet, so per merge node the full
+-- adjustment adds back exactly the arrSource inners dropSource removed:
+--   countLiveInners nid registry
+--     ≡ mergeAdjust nid a (chainsOf a) st + countLiveInners nid (dropSource … registry)
+-- i.e. cachesValid (plain, from Inv) ⇒ cachesValidMid at full ps.  A nubLen
+-- set-partition (arrSource-last-source insts vs the rest) plus latch
+-- node/registry preservation.  Deferred with mid-step until the counting
+-- lemmas are proven.
+postulate
+  mid-init-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (st : EvalSt e) →
+    cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
+    cachesValidMid a (chainsOf a st) (EvalSt.nodes (cascadeLatch a st))
+                   (cascadeLatch a st) ≡ true
+
 -- entering: the latch opens the ledger; the automaton, Inv-related and
 -- paid, stands ready to open instant nextId (still on the previous,
 -- settled instant, so the ledger is the paid branch).  reg-typed threads
@@ -2542,6 +2676,7 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
             (sym (latch-registry a st))
             (allShareSunk-if (Arrival.isLast a) (arrSource a)
               (EvalSt.registry st) (Inv.done-plumbed inv deq))
+  ; caches       = mid-init-caches a st (Inv.caches inv)
   ; fold-live    = nodry
   ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
                      (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
