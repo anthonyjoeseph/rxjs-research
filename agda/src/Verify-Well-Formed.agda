@@ -954,18 +954,18 @@ enterInstant-fresh-aux : ∀ (lv : List Source) (hz i : Id) (cur : Maybe (Id × 
   (dn : Bool) → CurrentPast cur i →
   paidUp (record { live = lv ; horizon = hz ; current = cur ; done = dn }) ≡ true →
   hz ≤ i →
-  Σ Owed λ ob → Σ Id λ hz′ →
+  Σ Id λ hz′ →
     enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
-      ≡ just (ob , hz′)
+      ≡ just ([] , hz′)
 enterInstant-fresh-aux lv hz i nothing dn cp pu hle =
-  [] , hz , enterInstant-idle-aux lv hz i nothing dn refl (≤→≤ᵇ hle)
+  hz , enterInstant-idle-aux lv hz i nothing dn refl (≤→≤ᵇ hle)
 enterInstant-fresh-aux lv hz i (just (j , ow)) dn cp pu hle =
-  [] , suc j , enterInstant-held-aux lv hz i j (just (j , ow)) ow dn refl
+  suc j , enterInstant-held-aux lv hz i j (just (j , ow)) ow dn refl
     (sucle→≢ᵇ cp) (paidUp-held-aux lv hz (just (j , ow)) dn j ow refl pu) (≤→≤ᵇ cp)
 
 enterInstant-fresh : ∀ (S : ProtocolSt) (i : Id) →
   CurrentPast (ProtocolSt.current S) i → paidUp S ≡ true → ProtocolSt.horizon S ≤ i →
-  Σ Owed λ ob → Σ Id λ hz′ → enterInstant S i ≡ just (ob , hz′)
+  Σ Id λ hz′ → enterInstant S i ≡ just ([] , hz′)
 enterInstant-fresh S i cp pu hle =
   enterInstant-fresh-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i
     (ProtocolSt.current S) (ProtocolSt.done S) cp pu hle
@@ -995,7 +995,7 @@ mid-enters {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq with Mid.led
   pf = lookup-pos-not-paidOff (arrSource a) ow
          (countRemaining ps (EvalSt.cancelled st)) lk-suc
 mid-enters {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
-    | inj₁ (cp , paid) = enterInstant-fresh S nextId cp paid (Mid.horizon-low mid)
+    | inj₁ (cp , paid) = [] , enterInstant-fresh S nextId cp paid (Mid.horizon-low mid)
 
 ------------------------------------------------------------------
 -- The pay/applyEvents seed fields turn on decrementing a key: paying a
@@ -1075,6 +1075,119 @@ applyEvents-close-exh : ∀ {A : Set} (x : Source) (live live′ : List Source)
   (owed : Owed) (done : Bool) → removeOne x live ≡ just live′ →
   applyEvents {A} (close x exhausted ∷ []) live owed done ≡ just (live′ , owed , done)
 applyEvents-close-exh x live live′ owed done ro rewrite ro = refl
+
+-- the seed's applyEvents field: fold the arrival's initial closes.  Not
+-- spent (non-isLast) → no close, live untouched.  Spent (isLast) → the
+-- exhausted close retires this source's one live entry (present because
+-- live-source counts it: countIn = the uncancelled snapshot remainder,
+-- ≥ 1 for a non-cancelled head).
+seed-applies : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {S : ProtocolSt} (ob′ : Owed) →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  Σ (List Source) λ Lv → Σ Owed λ Ov →
+    applyEvents {Val Γ t}
+      (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+      (ProtocolSt.live S) ob′ (ProtocolSt.done S) ≡ just (Lv , Ov , ProtocolSt.done S)
+seed-applies {a = a} {rid = rid} {p = p} {ps = ps} {st = st} {S = S} ob′ mid ceq
+  with Arrival.isLast a | Mid.live-source mid
+... | false | lsm = ProtocolSt.live S , ob′ , refl
+... | true  | lsm =
+      live′ , ob′ , applyEvents-close-exh (arrSource a) (ProtocolSt.live S) live′ ob′
+                     (ProtocolSt.done S) ro
+  where
+  ci-eq : countIn (arrSource a) (ProtocolSt.live S)
+            ≡ suc (countRemaining ps (EvalSt.cancelled st))
+  ci-eq = trans lsm (cr-fresh rid p ps (EvalSt.cancelled st) ceq)
+  rm = countIn-removeOne (arrSource a) (ProtocolSt.live S)
+         (countRemaining ps (EvalSt.cancelled st)) ci-eq
+  live′ = proj₁ rm
+  ro    = proj₁ (proj₂ rm)
+
+-- seeding a fresh instant: a first delivery from s with live count suc k
+-- opens owed[s] = suc k and pays one, leaving k
+payOwed-seed : ∀ (s : Source) (k : ℕ) →
+  payOwed s (bumpOwed s (suc k) []) ≡ just ((s , k) ∷ [])
+payOwed-seed s k rewrite ≡ᵇ-refl s = refl
+
+postulate
+  -- a non-cancelled head is a live registration of its source, so the
+  -- source has ≥ 1 live entry.  For isLast this is live-source + cr-fresh;
+  -- the non-isLast fresh case routes through countRegs (the snapshot↔
+  -- registry link) — a TRUE positivity seeded here pending that lemma.
+  seed-live-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+    {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+    {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+    {S : ProtocolSt} →
+    Mid a nextId ((rid , p) ∷ ps) sched st S →
+    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+    Σ ℕ λ k → countIn (arrSource a) (ProtocolSt.live S) ≡ suc k
+
+-- the enter/pay seed fields: the automaton admits instant nextId and the
+-- delivery pays arrSource — continuing the open owed (inj₂), or opening
+-- fresh and seeding owed[arrSource] from the live count (inj₁)
+seed-enter-pay : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  Σ Owed λ ob → Σ Id λ hz → Σ Owed λ ob′ →
+    (enterInstant S nextId ≡ just (ob , hz))
+  × (settle delivery (arrSource a) (ProtocolSt.live S) ob ≡ just ob′)
+seed-enter-pay {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
+  with Mid.ledger mid
+... | inj₂ (ow , cur , lk , zx) =
+      ow , ProtocolSt.horizon S , proj₁ pk
+      , enterInstant-cont S nextId ow cur
+          (lookup-pos-not-paidOff (arrSource a) ow _ lk-suc)
+      , trans (settle-hit (arrSource a) (ProtocolSt.live S) ow
+                (lookup-pos-hasOwed (arrSource a) ow _ lk-suc))
+              (proj₁ (proj₂ pk))
+  where
+  lk-suc : lookupOwed (arrSource a) ow ≡ suc (countRemaining ps (EvalSt.cancelled st))
+  lk-suc = trans lk (cr-fresh rid p ps (EvalSt.cancelled st) ceq)
+  pk = payOwed-key (arrSource a) ow (countRemaining ps (EvalSt.cancelled st)) lk-suc
+seed-enter-pay {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
+    | inj₁ (cp , paid) =
+      [] , proj₁ ef , (arrSource a , k) ∷ []
+      , proj₂ ef
+      , trans (settle-miss (arrSource a) (ProtocolSt.live S) [] refl)
+              (subst (λ c → payOwed (arrSource a) (bumpOwed (arrSource a) c [])
+                              ≡ just ((arrSource a , k) ∷ []))
+                     (sym ci-eq) (payOwed-seed (arrSource a) k))
+  where
+  ef = enterInstant-fresh S nextId cp paid (Mid.horizon-low mid)
+  pos = seed-live-pos mid ceq
+  k = proj₁ pos
+  ci-eq : countIn (arrSource a) (ProtocolSt.live S) ≡ suc k
+  ci-eq = proj₂ pos
+
+-- THE seed: Mid (head ∷ ps) ⇒ FoldInv at the chainStep seed
+mid-seed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  FoldInv nextId (arrSource a) (arrVal a ∷ [])
+    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S
+mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
+  { ob = ob ; hz = hz ; ob′ = ob′ ; Lv = proj₁ ap ; Ov = proj₁ (proj₂ ap)
+  ; enters = enters ; pays = pays ; applies = proj₂ (proj₂ ap)
+  ; done-plumbed = Mid.done-plumbed mid
+  }
+  where
+  ep = seed-enter-pay mid ceq
+  ob  = proj₁ ep
+  hz  = proj₁ (proj₂ ep)
+  ob′ = proj₁ (proj₂ (proj₂ ep))
+  enters = proj₁ (proj₂ (proj₂ (proj₂ ep)))
+  pays   = proj₂ (proj₂ (proj₂ (proj₂ ep)))
+  ap = seed-applies ob′ mid ceq
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
