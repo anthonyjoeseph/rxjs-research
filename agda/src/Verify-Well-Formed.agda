@@ -17,27 +17,31 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n)
 open import Data.List    using (List; []; _∷_; _++_; any; length)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit)
-open import Rx.Exp       using (Ctx; Closed)
+open import Relation.Nullary using (Dec; yes; no)
+
+open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_;
-                                sched-init; st-init; sched-next;
-                                arrTy; arrSource; chainsOf; chainStep;
+                                sched-init; st-init; sched-next; LiveSource;
+                                schedGo; schedHeadOf; schedFinish; schedEarlier;
+                                arrTy; arrSource; chainsOf; chainsGo; chainStep;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 sameSource; drySource; dryEvent; hasDry;
-                                dropSource; budgetAt)
+                                dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
                                 stepProtocol; runProtocol; paidUp;
                                 checkFinal; Accepted; accepted; WellFormed)
@@ -139,6 +143,236 @@ allShareSunk : ∀ {n} {Γ : Ctx n} {t}
 allShareSunk []                      = true
 allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
 
+-- the registry↔schedule type-consistency invariant (replaces the old
+-- one-lookahead chains-count): every registration's source-type matches
+-- every live source of the same source.  Share-sunk registrations whose
+-- source has no live entry are unconstrained — chainsOf only ever reads
+-- entries of a SCHEDULED source, and those all trace to a LiveSource, so
+-- this pins their type-check to pass (chains-count-derived below)
+sameTy : Ty → Ty → Bool
+sameTy s u with s ≟ᵗ u
+... | yes _ = true
+... | no  _ = false
+
+liveTypeOK? : ∀ {n} {Γ : Ctx n} → Source → Ty → List (LiveSource Γ) → Bool
+liveTypeOK? s u []       = true
+liveTypeOK? s u (l ∷ ls) =
+  (if LiveSource.source l ≡ᵇ s then sameTy u (LiveSource.elemTy l) else true)
+    ∧ liveTypeOK? s u ls
+
+regTyped? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t)
+          → List (LiveSource Γ) → Bool
+regTyped? []                      live = true
+regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r live
+
+≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
+≡ᵇ→≡ zero    zero    _ = refl
+≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
+
+≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
+≡ᵇ-refl zero    = refl
+≡ᵇ-refl (suc m) = ≡ᵇ-refl m
+
+∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
+∧-trueˡ {true} _ = refl
+
+∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
+∧-trueʳ {true} h = h
+
+∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
+∧-intro refl refl = refl
+
+if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
+if-false b eq rewrite eq = refl
+
+if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
+if-true b eq rewrite eq = refl
+
+sameTy-sound : ∀ (a b : Ty) → sameTy a b ≡ true → a ≡ b
+sameTy-sound a b h with a ≟ᵗ b
+... | yes p = p
+... | no  _ = true≢false (sym h)
+
+sameTy-refl : ∀ (a : Ty) → sameTy a a ≡ true
+sameTy-refl a with a ≟ᵗ a
+... | yes _  = refl
+... | no ¬p = ⊥-elim (¬p refl)
+
+-- the arrival a live source pops carries its source and elemTy
+schedHeadOf-match : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ) {a : Arrival Γ} {l′} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  (arrSource a ≡ LiveSource.source l) × (arrTy a ≡ LiveSource.elemTy l)
+schedHeadOf-match l eq with LiveSource.pending l | eq
+... | (t , v) ∷ ps | refl = refl , refl
+
+-- a's source/type is present among the live sources sched-next drew from
+liveHas : ∀ {n} {Γ : Ctx n} → Source → Ty → List (LiveSource Γ) → Bool
+liveHas s τ []       = false
+liveHas s τ (l ∷ ls) =
+  ((LiveSource.source l ≡ᵇ s) ∧ sameTy τ (LiveSource.elemTy l)) ∨ liveHas s τ ls
+
+∨-trueʳ : ∀ (x : Bool) → (x ∨ true) ≡ true
+∨-trueʳ false = refl
+∨-trueʳ true  = refl
+
+-- the arrival schedGo pops is one of the live sources it drew from
+schedGo-mem : ∀ {n} {Γ : Ctx n} (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
+  schedGo live ≡ inj₂ (a , ls) → liveHas (arrSource a) (arrTy a) live ≡ true
+schedGo-mem (l ∷ ls) eq with schedHeadOf l in heq | schedGo ls in geq
+... | inj₁ _        | inj₁ _         with eq
+...   | ()
+schedGo-mem (l ∷ ls) eq | inj₁ _ | inj₂ (a′ , ls′) with eq
+...   | refl rewrite schedGo-mem ls geq = ∨-trueʳ _
+schedGo-mem (l ∷ ls) eq | inj₂ (a₀ , l′) | inj₁ _ with eq
+...   | refl rewrite proj₁ (schedHeadOf-match l heq)
+                   | proj₂ (schedHeadOf-match l heq)
+                   | ≡ᵇ-refl (LiveSource.source l)
+                   | sameTy-refl (LiveSource.elemTy l) = refl
+schedGo-mem (l ∷ ls) eq | inj₂ (a₀ , l′) | inj₂ (a′ , ls′) with schedEarlier a₀ a′ | eq
+...   | true  | refl rewrite proj₁ (schedHeadOf-match l heq)
+                           | proj₂ (schedHeadOf-match l heq)
+                           | ≡ᵇ-refl (LiveSource.source l)
+                           | sameTy-refl (LiveSource.elemTy l) = refl
+...   | false | refl rewrite schedGo-mem ls geq = ∨-trueʳ _
+
+-- a source-matching live source pins the registration's type via regTyped?
+liveTypeOK?-extract : ∀ {n} {Γ : Ctx n} (s : Source) (u τ : Ty)
+  (live : List (LiveSource Γ)) →
+  liveTypeOK? s u live ≡ true → liveHas s τ live ≡ true → sameTy u τ ≡ true
+liveTypeOK?-extract s u τ []       ok has = true≢false (sym has)
+liveTypeOK?-extract s u τ (l ∷ ls) ok has with LiveSource.source l ≡ᵇ s
+... | false = liveTypeOK?-extract s u τ ls (∧-trueʳ ok) has
+... | true  with sameTy τ (LiveSource.elemTy l) in seq
+...   | true  = subst (λ z → sameTy u z ≡ true)
+                  (trans (sameTy-sound u (LiveSource.elemTy l) (∧-trueˡ ok))
+                         (sym (sameTy-sound τ (LiveSource.elemTy l) seq)))
+                  (sameTy-refl u)
+...   | false = liveTypeOK?-extract s u τ ls (∧-trueʳ ok) has
+
+-- the registry induction: every entry of a's source is a's-typed (else
+-- regTyped? + the live source would contradict), so no chainsGo drop
+count-eq : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → liveHas (arrSource a) (arrTy a) live ≡ true →
+  countRegs (arrSource a) reg ≡ length (chainsGo a reg)
+count-eq a []                      live rt lh = refl
+count-eq a ((rid , s , (u , p)) ∷ r) live rt lh
+  with sameSource (arrSource a) s in sseq
+... | false = count-eq a r live (∧-trueʳ rt) lh
+... | true  with u ≟ᵗ arrTy a
+...   | yes refl = cong suc (count-eq a r live (∧-trueʳ rt) lh)
+...   | no ¬p    = ⊥-elim (¬p (sameTy-sound u (arrTy a)
+                    (liveTypeOK?-extract (arrSource a) u (arrTy a) live
+                      (subst (λ z → liveTypeOK? z u live ≡ true)
+                             (sym (≡ᵇ→≡ (arrSource a) s sseq)) (∧-trueˡ rt))
+                      lh)))
+
+-- THE derived fact, recovering the old one-lookahead chains-count from
+-- the pointwise registry↔schedule type-consistency invariant
+chains-count-derived : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched sched″ : Sched Γ) (st : EvalSt e) →
+  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+  sched-next sched ≡ inj₂ (a , sched″) →
+  countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+chains-count-derived a sched sched″ st rt eq with schedGo (Sched.live sched) in geq
+... | inj₁ _ with eq
+...   | ()
+chains-count-derived a sched sched″ st rt eq | inj₂ (a₀ , ls) with eq
+...   | refl = count-eq a₀ (EvalSt.registry st) (Sched.live sched) rt
+                 (schedGo-mem (Sched.live sched) geq)
+
+-- popping an arrival only shortens a live source's pending — source and
+-- elemTy are untouched, so liveTypeOK? (hence regTyped?) is preserved
+schedHeadOf-l′ : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ) {a : Arrival Γ} {l′} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  (LiveSource.source l′ ≡ LiveSource.source l) × (LiveSource.elemTy l′ ≡ LiveSource.elemTy l)
+schedHeadOf-l′ l eq with LiveSource.pending l | eq
+... | (t , v) ∷ ps | refl = refl , refl
+
+liveTypeOK?-swap : ∀ {n} {Γ : Ctx n} (s : Source) (u : Ty)
+  (l l′ : LiveSource Γ) (rest : List (LiveSource Γ)) →
+  LiveSource.source l′ ≡ LiveSource.source l →
+  LiveSource.elemTy l′ ≡ LiveSource.elemTy l →
+  liveTypeOK? s u (l′ ∷ rest) ≡ liveTypeOK? s u (l ∷ rest)
+liveTypeOK?-swap s u l l′ rest seq teq rewrite seq | teq = refl
+
+schedGo-liveTypeOK : ∀ {n} {Γ : Ctx n} (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
+  schedGo live ≡ inj₂ (a , ls) →
+  ∀ (s : Source) (u : Ty) → liveTypeOK? s u ls ≡ liveTypeOK? s u live
+schedGo-liveTypeOK (l ∷ ls) eq s u with schedHeadOf l in heq | schedGo ls in geq
+... | inj₁ _        | inj₁ _         with eq
+...   | ()
+schedGo-liveTypeOK (l ∷ ls) eq s u | inj₁ _ | inj₂ (a′ , ls′) with eq
+...   | refl = cong (_∧_ (if LiveSource.source l ≡ᵇ s
+                          then sameTy u (LiveSource.elemTy l) else true))
+                    (schedGo-liveTypeOK ls geq s u)
+schedGo-liveTypeOK (l ∷ ls) eq s u | inj₂ (a₀ , l′) | inj₁ _ with eq
+...   | refl = liveTypeOK?-swap s u l l′ ls
+                 (proj₁ (schedHeadOf-l′ l heq)) (proj₂ (schedHeadOf-l′ l heq))
+schedGo-liveTypeOK (l ∷ ls) eq s u | inj₂ (a₀ , l′) | inj₂ (a′ , ls′)
+  with schedEarlier a₀ a′ | eq
+...   | true  | refl = liveTypeOK?-swap s u l l′ ls
+                         (proj₁ (schedHeadOf-l′ l heq)) (proj₂ (schedHeadOf-l′ l heq))
+...   | false | refl = cong (_∧_ (if LiveSource.source l ≡ᵇ s
+                                  then sameTy u (LiveSource.elemTy l) else true))
+                            (schedGo-liveTypeOK ls geq s u)
+
+regTyped?-pop : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegId × Source × Chain Γ t))
+  (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
+  schedGo live ≡ inj₂ (a , ls) → regTyped? reg live ≡ true → regTyped? reg ls ≡ true
+regTyped?-pop []                      live sgeq rt = refl
+regTyped?-pop ((_ , s , (u , _)) ∷ r) live sgeq rt =
+  ∧-intro (trans (schedGo-liveTypeOK live sgeq s u) (∧-trueˡ rt))
+          (regTyped?-pop r live sgeq (∧-trueʳ rt))
+
+regTyped?-pop-sched : ∀ {n} {Γ : Ctx n} {t} (sched sched′ : Sched Γ)
+  (reg : List (RegId × Source × Chain Γ t)) {a : Arrival Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  regTyped? reg (Sched.live sched) ≡ true → regTyped? reg (Sched.live sched′) ≡ true
+regTyped?-pop-sched sched sched′ reg eq rt with schedGo (Sched.live sched) in geq
+... | inj₁ _ with eq
+...   | ()
+regTyped?-pop-sched sched sched′ reg eq rt | inj₂ (a₀ , ls) with eq
+...   | refl = regTyped?-pop reg (Sched.live sched) geq rt
+
+-- cascadeFinish preserves type-consistency: dropSource only removes
+-- registrations, sweepLive only removes live sources — both loosen
+-- regTyped?, never tighten it
+regTyped?-dropReg : ∀ {n} {Γ : Ctx n} {t} (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → regTyped? (dropSource src reg) live ≡ true
+regTyped?-dropReg src []                      live rt = refl
+regTyped?-dropReg src ((rid , s , (u , p)) ∷ r) live rt with sameSource src s
+... | true  = regTyped?-dropReg src r live (∧-trueʳ rt)
+... | false = ∧-intro (∧-trueˡ rt) (regTyped?-dropReg src r live (∧-trueʳ rt))
+
+liveTypeOK?-sweepLive : ∀ {n} {Γ : Ctx n} {t}
+  (sweepReg : List (RegId × Source × Chain Γ t)) (s : Source) (u : Ty)
+  (live : List (LiveSource Γ)) →
+  liveTypeOK? s u live ≡ true → liveTypeOK? s u (sweepLive sweepReg live) ≡ true
+liveTypeOK?-sweepLive sweepReg s u []       ok = refl
+liveTypeOK?-sweepLive {n = n} sweepReg s u (l ∷ ls) ok
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) sweepReg
+... | true  = ∧-intro (∧-trueˡ ok) (liveTypeOK?-sweepLive sweepReg s u ls (∧-trueʳ ok))
+... | false = liveTypeOK?-sweepLive sweepReg s u ls (∧-trueʳ ok)
+
+regTyped?-sweepLive : ∀ {n} {Γ : Ctx n} {t}
+  (sweepReg reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → regTyped? reg (sweepLive sweepReg live) ≡ true
+regTyped?-sweepLive sweepReg []                      live rt = refl
+regTyped?-sweepLive sweepReg ((_ , s , (u , _)) ∷ r) live rt =
+  ∧-intro (liveTypeOK?-sweepLive sweepReg s u live (∧-trueˡ rt))
+          (regTyped?-sweepLive sweepReg r live (∧-trueʳ rt))
+
+reg-typed-finish : ∀ {n} {Γ : Ctx n} {t} (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true →
+  regTyped? (dropSource src reg) (sweepLive (dropSource src reg) live) ≡ true
+reg-typed-finish src reg live rt =
+  regTyped?-sweepLive (dropSource src reg) (dropSource src reg) live
+    (regTyped?-dropReg src reg live rt)
+
 -- the open (or last) instant is strictly in the past
 CurrentPast : Maybe (Id × Owed) → Id → Set
 CurrentPast nothing        nextId = ⊤
@@ -152,14 +386,12 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- one for one
     live-matches : ∀ (s : Source) →
       countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
-    -- for any arrival the SCHEDULER can actually produce, the
-    -- snapshot is the full registration count — registry entries are
-    -- well-typed for their scheduled source, so chainsOf's type
-    -- check drops nothing.  (Conditioning on sched-next matters: an
-    -- ill-typed phantom arrival would break the equation vacuously.)
-    chains-count : ∀ (a : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next sched ≡ inj₂ (a , sched″) →
-      countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+    -- registry entries are well-typed for their scheduled source (each
+    -- registration's type matches its live source's elemTy), so chainsOf's
+    -- type check drops nothing — countRegs ≡ length chainsOf for every
+    -- scheduled arrival (chains-count-derived).  A pointwise fact, unlike
+    -- the old one-lookahead form, so it threads across scheduler pops
+    reg-typed    : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     -- freshness is one comparison: ids mint from arrival position
     horizon-low  : ProtocolSt.horizon S ≤ nextId
     current-past : CurrentPast (ProtocolSt.current S) nextId
@@ -184,9 +416,7 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   field
     live-matches  : ∀ (s : Source) →
       countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
-    chains-count  : ∀ (a : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next sched ≡ inj₂ (a , sched″) →
-      countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+    reg-typed     : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low   : ProtocolSt.horizon S ≤ id
     current-frame : (ProtocolSt.current S ≡ nothing)
                   ⊎ (ProtocolSt.current S ≡ just (id , []))
@@ -198,7 +428,7 @@ burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   BurstInv {e = e} 0 (sched-init e ins) (st-init e) protocol-init
 burst-init e ins = record
   { live-matches  = λ s → refl
-  ; chains-count  = λ a sched″ _ → refl
+  ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
   ; done-plumbed  = λ ()
@@ -259,7 +489,7 @@ burst-final sched st S binv = inv , paid (BurstInv.current-frame binv)
   inv : Inv 1 sched st S
   inv = record
     { live-matches = BurstInv.live-matches binv
-    ; chains-count = BurstInv.chains-count binv
+    ; reg-typed    = BurstInv.reg-typed binv
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)
     ; done-plumbed = BurstInv.done-plumbed binv
@@ -317,9 +547,7 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       ≡ (if Arrival.isLast a
          then countRemaining ps (EvalSt.cancelled st)
          else countRegs (arrSource a) (EvalSt.registry st))
-    chains-count : ∀ (a′ : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next sched ≡ inj₂ (a′ , sched″) →
-      countRegs (arrSource a′) (EvalSt.registry st) ≡ length (chainsOf a′ st)
+    reg-typed    : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low  : ProtocolSt.horizon S ≤ nextId
     ledger       :
         (CurrentPast (ProtocolSt.current S) nextId × (paidUp S ≡ true))
@@ -337,31 +565,11 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- mid-skip (same S); established by mid-init/mid-step (postulated).
     owed-unique  : ∀ (ow : Owed) →
       ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
-    -- ADDED (finish scheduler tie): once the spent source is swept from
-    -- both the registry and the live schedule, the finished state's
-    -- chains-count still holds — the registry-membership fact the counts
-    -- alone can't see.  Preserved by mid-skip (same a/sched/st);
-    -- established by mid-init/mid-step (postulated).
-    finish-chains : Arrival.isLast a ≡ true →
-      ∀ (a′ : Arrival Γ) (sched″ : Sched Γ) →
-      sched-next (proj₁ (cascadeFinish a sched st)) ≡ inj₂ (a′ , sched″) →
-      countRegs (arrSource a′) (EvalSt.registry (proj₂ (cascadeFinish a sched st)))
-        ≡ length (chainsOf a′ (proj₂ (cascadeFinish a sched st)))
 
 postulate
   -- entering: the latch opens the ledger; the automaton, Inv-related
   -- and paid, stands ready to open instant nextId.  The dry-freeness
   -- of the whole cascade fold arrives as a premise (split off
-  -- budget-sufficient by the drain composition below)
-  mid-init : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
-    (st : EvalSt e) (S : ProtocolSt) →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    Inv nextId sched st S → paidUp S ≡ true →
-    hasDry (proj₁ (cascadeGo a nextId (chainsOf a st) sched′
-                             (cascadeLatch a st))) ≡ false →
-    Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
-
   -- one surviving chain's emits — the chain emit, any share
   -- fan-outs, any cut closes — are accepted, paying/bumping/
   -- cancelling exactly per the ledger.  THE deep lemma: mirrors
@@ -418,15 +626,14 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
       (cong (λ z → if Arrival.isLast a then z
                    else countRegs (arrSource a) (EvalSt.registry st))
             (cr-skip rid p ps (EvalSt.cancelled st) ceq))
-  ; chains-count = Mid.chains-count mid
+  ; reg-typed    = Mid.reg-typed mid       -- same sched, st
   ; horizon-low  = Mid.horizon-low mid
   ; ledger       = ledger′
   ; done-plumbed = Mid.done-plumbed mid
   ; fold-live    = subst (λ z → hasDry (proj₁ z) ≡ false)
       (cascadeGo-skip a nextId rid p ps sched st ceq)
       (Mid.fold-live mid)
-  ; owed-unique   = Mid.owed-unique mid   -- same S, nextId
-  ; finish-chains = Mid.finish-chains mid  -- same a, sched, st
+  ; owed-unique  = Mid.owed-unique mid      -- same S, nextId
   }
   where
   ledger′ :
@@ -447,29 +654,6 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- mid-final: leaving the cascade.  Bool/ℕ glue first, then registry
 -- lemmas for the finish sweep, then the assembly.
 ------------------------------------------------------------------
-
-≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
-≡ᵇ→≡ zero    zero    _ = refl
-≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
-≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
-≡ᵇ-refl zero    = refl
-≡ᵇ-refl (suc m) = ≡ᵇ-refl m
-
-∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
-∧-trueˡ {true} _ = refl
-
-∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
-∧-trueʳ {true} h = h
-
-∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
-∧-intro refl refl = refl
-
-if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
-if-false b eq rewrite eq = refl
-
-if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
-if-true b eq rewrite eq = refl
 
 -- a key absent from the table reads zero
 lookupOwed-absent : ∀ (s : Source) (o : Owed) →
@@ -560,6 +744,14 @@ finishReg-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 finishReg-true a sched st eq with Arrival.isLast a | eq
 ... | true | refl = refl
 
+finishSched-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Arrival.isLast a ≡ true →
+  Sched.live (proj₁ (cascadeFinish a sched st))
+    ≡ sweepLive (dropSource (arrSource a) (EvalSt.registry st)) (Sched.live sched)
+finishSched-true a sched st eq with Arrival.isLast a | eq
+... | true | refl = refl
+
 -- leaving: all chains folded ⇒ fully paid; finish (drop the spent
 -- source, sweep) lands Inv-related at suc nextId
 mid-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -627,18 +819,24 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
     -- isLast=false: cascadeFinish is the identity; rewrite the goal flat
     go false isL rewrite cascadeFinish-false a sched st isL = record
       { live-matches = lm-false isL
-      ; chains-count = Mid.chains-count mid
+      ; reg-typed    = Mid.reg-typed mid
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
       ; current-past = cpast
       ; done-plumbed = Mid.done-plumbed mid
       }
-    -- isLast=true: keep cascadeFinish symbolic so chains-count lands on
-    -- finish-chains directly; convert the registry field-by-field
+    -- isLast=true: keep cascadeFinish symbolic; convert registry and live
+    -- field-by-field, reg-typed via the dropSource/sweepLive preservation
     go true isL = record
       { live-matches = λ s →
           subst (λ reg → countIn s (ProtocolSt.live S) ≡ countRegs s reg)
                 (sym (finishReg-true a sched st isL)) (lm-true isL s)
-      ; chains-count = Mid.finish-chains mid isL
+      ; reg-typed    =
+          subst (λ reg → regTyped? reg (Sched.live (proj₁ (cascadeFinish a sched st))) ≡ true)
+                (sym (finishReg-true a sched st isL))
+                (subst (λ lv → regTyped? (dropSource (arrSource a) (EvalSt.registry st)) lv ≡ true)
+                       (sym (finishSched-true a sched st isL))
+                       (reg-typed-finish (arrSource a) (EvalSt.registry st)
+                          (Sched.live sched) (Mid.reg-typed mid)))
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
       ; current-past = cpast
       ; done-plumbed = λ deq →
@@ -679,6 +877,61 @@ cascadeGo-wf a nextId ((rid , p) ∷ ps) sched st S mid
                (record st { delivered = rid ∷ EvalSt.delivered st })))
       _ run₁ run₂
   , mid₂
+
+-- the latch leaves the registry untouched (it only resets the per-cascade
+-- ledger and stamps the watermark / dying set)
+latch-registry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  EvalSt.registry (cascadeLatch a st) ≡ EvalSt.registry st
+latch-registry a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+-- an all-fresh snapshot (no cancellations yet) has every entry obliged
+countRemaining-[] : ∀ {X : Set} (ps : List (RegId × X)) →
+  countRemaining ps [] ≡ length ps
+countRemaining-[] []             = refl
+countRemaining-[] ((rid , _) ∷ ps) = cong suc (countRemaining-[] ps)
+
+-- entering: the latch opens the ledger; the automaton, Inv-related and
+-- paid, stands ready to open instant nextId (still on the previous,
+-- settled instant, so the ledger is the paid branch).  reg-typed threads
+-- from Inv across the scheduler pop; the count fact live-source needs is
+-- read off chains-count-derived
+mid-init : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
+  (st : EvalSt e) (S : ProtocolSt) →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  Inv nextId sched st S → paidUp S ≡ true →
+  hasDry (proj₁ (cascadeGo a nextId (chainsOf a st) sched′
+                           (cascadeLatch a st))) ≡ false →
+  Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
+mid-init nextId sched a sched′ st S eq inv paid nodry = record
+  { live-others  = λ s _ → trans (Inv.live-matches inv s)
+                     (cong (countRegs s) (sym (latch-registry a st)))
+  ; live-source  = live-src
+  ; reg-typed    = subst (λ reg → regTyped? reg (Sched.live sched′) ≡ true)
+                     (sym (latch-registry a st))
+                     (regTyped?-pop-sched sched sched′ (EvalSt.registry st) eq
+                       (Inv.reg-typed inv))
+  ; horizon-low  = Inv.horizon-low inv
+  ; ledger       = inj₁ (Inv.current-past inv , paid)
+  ; done-plumbed = λ deq → subst (λ reg → allShareSunk reg ≡ true)
+                     (sym (latch-registry a st)) (Inv.done-plumbed inv deq)
+  ; fold-live    = nodry
+  ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
+                     (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
+  }
+  where
+  live-src : countIn (arrSource a) (ProtocolSt.live S)
+    ≡ (if Arrival.isLast a
+       then countRemaining (chainsOf a st) (EvalSt.cancelled (cascadeLatch a st))
+       else countRegs (arrSource a) (EvalSt.registry (cascadeLatch a st)))
+  live-src with Arrival.isLast a
+  ... | true  = trans (Inv.live-matches inv (arrSource a))
+                  (trans (chains-count-derived a sched sched′ st (Inv.reg-typed inv) eq)
+                         (sym (countRemaining-[] (chainsOf a st))))
+  ... | false = Inv.live-matches inv (arrSource a)
 
 -- one arrival's cascade, composed.  The dry-freeness premise is
 -- stated on the cascade's own emits — definitionally the cascadeGo

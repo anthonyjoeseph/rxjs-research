@@ -422,16 +422,19 @@ st-init e = record { registry = [] ; nextReg = 0 ; nodes = []
 -- Ty equality check, so no payload is ever read at the wrong type (a
 -- mistyped registry entry — impossible by the registration invariant —
 -- is dropped, never trusted)
+-- TOP-LEVEL (not where-local of chainsOf) so Verify-Well-Formed can induct
+-- on it against the registry — the snapshot of a's source-typed chains
+chainsGo : ∀ {n} {Γ : Ctx n} {t} → (a : Arrival Γ)
+         → List (RegId × Source × Chain Γ t) → List (RegId × Path Γ (arrTy a) t)
+chainsGo a [] = []
+chainsGo a ((rid , s , (u , p)) ∷ r) with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+... | false | _        = chainsGo a r
+... | true  | no  _    = chainsGo a r
+... | true  | yes refl = (rid , p) ∷ chainsGo a r
+
 chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          → (a : Arrival Γ) → EvalSt e → List (RegId × Path Γ (arrTy a) t)
-chainsOf {Γ = Γ} {t = t} {e = e} a st = go (EvalSt.registry st)
-  where
-  go : List (RegId × Source × Chain Γ t) → List (RegId × Path Γ (arrTy a) t)
-  go [] = []
-  go ((rid , s , (u , p)) ∷ r) with sameSource (arrSource a) s | u ≟ᵗ arrTy a
-  ... | false | _        = go r
-  ... | true  | no  _    = go r
-  ... | true  | yes refl = (rid , p) ∷ go r
+chainsOf a st = chainsGo a (EvalSt.registry st)
 
 -- split a subscription burst into grafted values, retagged
 -- bookkeeping events, and whether the inner completed synchronously
