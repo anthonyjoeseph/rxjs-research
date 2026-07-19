@@ -21,7 +21,7 @@ open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; 
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -871,6 +871,14 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     ov-zero   : zeroExcept envSrc Ov ≡ true
     ov-unique : UniqueOwed Ov ≡ true
     ov-envSrc : lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′
+    -- envSrc's own footprint in the pending evs: no envSrc init (a chain never
+    -- re-subscribes its own source mid-fold), and exactly (if fin) one envSrc
+    -- close — the seed exhausted close, present iff completing.  With
+    -- applyEvents-count at envSrc these give live-envSrc-out (live drains by
+    -- if fin then 1 else 0).  The take-head cut is the one edge stepFrame-wf must
+    -- carry (a head take flips fin AND closes envSrc), pinned by Unit-Test.
+    env-init  : initCount envSrc evs ≡ 0
+    env-close : closeCount envSrc evs ≡ (if fin then suc zero else zero)
 
 ------------------------------------------------------------------
 -- FoldOut — the readoff companion to FoldInv (DESIGN, worked out 2026-07;
@@ -1478,6 +1486,62 @@ readoff-cancel s evs liveS Lv ob′ Ov dn d′ R apEq shEq =
   +-cancelʳ-≡ (closeCount s evs) (countIn s Lv) R
     (trans (applyEvents-count evs liveS ob′ dn s apEq) shEq)
 
+-- foldPath-root-out: the ROOT clause's FoldOut readoff.  At root foldSt = st and
+-- foldSched = sched (Evaluator 960-962), so six fields read STRAIGHT off FoldInv:
+--   live-others  = readoff-cancel ∘ SHADOW (drains evs into live, cancels closeCount)
+--   live-envSrc  = applyEvents-count at envSrc + env-init/env-close (∸ if fin then 1)
+--   reg-envSrc   = refl (st″ = st)          reg-typed = FoldInv.reg-typed
+--   horizon      = enterInstant-hz≤id ∘ horizon-low
+--   current      = FoldInv.ov-zero/ov-unique/ov-envSrc (Ov = the applies output)
+-- The two plumbing fields take the completion certificate / steady form as
+-- hypotheses — the residual obligations the frame recursion (from-inner's
+-- aliveThrough certificate) and a thru-outer node↔registry coherence field will
+-- discharge.  This VALIDATES the FoldOut field statements (all inhabited).
+foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+  (fi : FoldInv id envSrc vals evs fin sched st S) →
+  -- FLIP certificate: completion reached root (done S′ ≡ true) from not-yet-done
+  ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
+     allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
+  -- STEADY: an already-done registry is fully plumbed
+  (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
+  FoldOut sf gas id now envSrc root vals evs fin sched st (FoldInv.ob′ fi) S
+    (record { live = FoldInv.Lv fi ; horizon = FoldInv.hz fi
+            ; current = just (id , FoldInv.Ov fi)
+            ; done = if fin then true else ProtocolSt.done S })
+foldPath-root-out sf gas id now envSrc vals evs fin sched st S fi flip-cert steady = record
+  { live-others-out = λ s neq →
+      readoff-cancel s evs (ProtocolSt.live S) (FoldInv.Lv fi) (FoldInv.ob′ fi) (FoldInv.Ov fi)
+        (ProtocolSt.done S) (ProtocolSt.done S) (countRegs s (EvalSt.registry st))
+        (FoldInv.applies fi) (FoldInv.shadow fi s neq)
+  ; live-envSrc-out = live-env
+  ; reg-envSrc-out = refl
+  ; reg-typed-out = FoldInv.reg-typed fi
+  ; horizon-out = enterInstant-hz≤id S id (FoldInv.enters fi) (FoldInv.horizon-low fi)
+  ; current-out = FoldInv.Ov fi , refl , FoldInv.ov-zero fi , FoldInv.ov-unique fi
+                , FoldInv.ov-envSrc fi
+  ; flip-plumbed-out = λ dneq dS′ → flip-cert dS′ dneq
+  ; done-plumbed-out = steady
+  }
+  where
+  c = if fin then suc zero else zero
+  ac : countIn envSrc (FoldInv.Lv fi) + closeCount envSrc evs
+     ≡ countIn envSrc (ProtocolSt.live S) + initCount envSrc evs
+  ac = applyEvents-count evs (ProtocolSt.live S) (FoldInv.ob′ fi) (ProtocolSt.done S)
+         envSrc (FoldInv.applies fi)
+  eq : countIn envSrc (FoldInv.Lv fi) + c ≡ countIn envSrc (ProtocolSt.live S)
+  eq = trans (subst (λ z → countIn envSrc (FoldInv.Lv fi) + c
+                             ≡ countIn envSrc (ProtocolSt.live S) + z) (FoldInv.env-init fi)
+               (subst (λ z → countIn envSrc (FoldInv.Lv fi) + z
+                             ≡ countIn envSrc (ProtocolSt.live S) + initCount envSrc evs)
+                      (FoldInv.env-close fi) ac))
+             (+-identityʳ (countIn envSrc (ProtocolSt.live S)))
+  live-env : countIn envSrc (FoldInv.Lv fi)
+           ≡ countIn envSrc (ProtocolSt.live S) ∸ c
+  live-env = trans (sym (m+n∸n≡m (countIn envSrc (FoldInv.Lv fi)) c)) (cong (_∸ c) eq)
+
 -- paying the key with positive owed decrements it by one (once the `with`
 -- fixes s ≡ᵇ x, payOwed/removeOne on the head reduce, so the equations are
 -- refl / rewrite; the constructed tail term still needs the hit/miss read)
@@ -1689,6 +1753,7 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   ; reg-typed = Mid.reg-typed mid
   ; horizon-low = Mid.horizon-low mid
   ; ov-zero = ze′ ; ov-unique = uq′ ; ov-envSrc = refl
+  ; env-init = env-init ; env-close = env-close
   }
   where
   ep = seed-enter-pay mid ceq
@@ -1710,6 +1775,19 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   shadow s neq with Arrival.isLast a
   ... | false          = cong₂ _+_ (Mid.live-others mid s neq) refl
   ... | true rewrite neq = cong₂ _+_ (Mid.live-others mid s neq) refl
+  -- the seed evs is (isLast) a lone envSrc close, else empty: no init either
+  -- way, and its closeCount is exactly if isLast (= fin) then 1 else 0
+  env-init : initCount (arrSource a)
+      (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else []) ≡ 0
+  env-init with Arrival.isLast a
+  ... | false = refl
+  ... | true  = refl
+  env-close : closeCount (arrSource a)
+      (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    ≡ (if Arrival.isLast a then suc zero else zero)
+  env-close with Arrival.isLast a
+  ... | false = refl
+  ... | true  rewrite ≡ᵇ-refl (arrSource a) = refl
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
