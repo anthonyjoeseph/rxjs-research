@@ -435,3 +435,46 @@ evalTm t = evalWith t []ᵃ
 
 applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val Γ t
 applyFn fn v = evalWith fn (v ∷ᵃ []ᵃ)
+
+------------------------------------------------------------------
+-- Syntax size, counting everything — including under deferᵉ and
+-- inside strmᵗ templates.  Seeds the evaluator's sync-fuel budget
+-- (Rx.Evaluator.syncBudget): the budget must dominate a cascade's
+-- recursion depth, and every runtime value is assembled from these
+-- counted templates
+------------------------------------------------------------------
+
+mutual
+  sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  sizeᵉ (input i)        = 1
+  sizeᵉ (ofᵉ ts)         = suc (sizeᵗˢ ts)
+  sizeᵉ emptyᵉ           = 1
+  sizeᵉ (mapᵉ f e)       = suc (sizeᵗ f + sizeᵉ e)
+  sizeᵉ (takeᵉ c e)      = suc (sizeᵗ c + sizeᵉ e)
+  sizeᵉ (scanᵉ f z e)    = suc (sizeᵗ f + sizeᵗ z + sizeᵉ e)
+  sizeᵉ (mergeAllᵉ e)    = suc (sizeᵉ e)
+  sizeᵉ (concatAllᵉ e)   = suc (sizeᵉ e)
+  sizeᵉ (switchAllᵉ e)   = suc (sizeᵉ e)
+  sizeᵉ (exhaustAllᵉ e)  = suc (sizeᵉ e)
+  sizeᵉ (μᵉ e)           = suc (sizeᵉ e)
+  sizeᵉ (varᵉ x)         = 1
+  sizeᵉ (deferᵉ e)       = suc (sizeᵉ e)
+
+  sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  sizeᵗ (varᵗ x)      = 1
+  sizeᵗ unit̂          = 1
+  sizeᵗ (bool̂ _)      = 1
+  sizeᵗ (nat̂ _)       = 1
+  sizeᵗ (pairᵗ a b)   = suc (sizeᵗ a + sizeᵗ b)
+  sizeᵗ (fstᵗ p)      = suc (sizeᵗ p)
+  sizeᵗ (sndᵗ p)      = suc (sizeᵗ p)
+  sizeᵗ (inlᵗ a)      = suc (sizeᵗ a)
+  sizeᵗ (inrᵗ a)      = suc (sizeᵗ a)
+  sizeᵗ (caseᵗ s l r) = suc (sizeᵗ s + sizeᵗ l + sizeᵗ r)
+  sizeᵗ (ifᵗ c a b)   = suc (sizeᵗ c + sizeᵗ a + sizeᵗ b)
+  sizeᵗ (primᵗ _ a)   = suc (sizeᵗ a)
+  sizeᵗ (strmᵗ e)     = suc (sizeᵉ e)
+
+  sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  sizeᵗˢ []       = 1
+  sizeᵗˢ (y ∷ ys) = sizeᵗ y + sizeᵗˢ ys

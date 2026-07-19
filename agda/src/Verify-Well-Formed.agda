@@ -9,8 +9,9 @@
 --      (mid-cascade, indexed by the chains still to fold) — with
 --      their entry/step/exit lemmas.  These are the postulated
 --      waypoints; the step lemmas (subscribeE-wf, mid-step) mirror
---      the evaluator's own recursion and carry the same TERMINATING
---      debt as the functions they follow.
+--      the evaluator's own recursion — fuel-structural since the
+--      pragmas were discharged; the totality debt is now the single
+--      budget-sufficient postulate at the bottom.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -33,7 +34,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 sched-init; st-init; sched-next;
                                 arrTy; arrSource; chainsOf; chainStep;
                                 cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate)
+                                subscribeE; cascade; drain; evaluate;
+                                sameSource; drySource; dryEvent; hasDry;
+                                budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; protocol-init;
                                 stepProtocol; runProtocol; paidUp;
                                 checkFinal; Accepted; accepted; WellFormed)
@@ -65,6 +68,22 @@ run-++-just S xs ys {S₁} e₁ e₂ =
 
 acceptPaid : (S : ProtocolSt) → paidUp S ≡ true → Accepted (checkFinal (just S))
 acceptPaid S eq rewrite eq = accepted
+
+-- dry-freeness splits over ++ (the step lemmas are conditioned on it;
+-- budget-sufficient below asserts it for the whole seeded run)
+true≢false : {A : Set} → true ≡ false → A
+true≢false ()
+
+hasDry-++ : ∀ {A : Set} (xs ys : List (InstEmit A)) →
+  hasDry (xs ++ ys) ≡ false →
+  (hasDry xs ≡ false) × (hasDry ys ≡ false)
+hasDry-++ []        ys h = refl , h
+hasDry-++ (em ∷ xs) ys h
+  with sameSource (InstEmit.source em) drySource
+     | any dryEvent (InstEmit.events em)
+... | true  | _     = true≢false h
+... | false | true  = true≢false h
+... | false | false = hasDry-++ xs ys h
 
 ------------------------------------------------------------------
 -- Inv, CONCRETE: the between-cascades simulation relation
@@ -135,14 +154,17 @@ postulate
 
   -- ONE subscription's burst preserves the frame relation.  The
   -- per-primitive preservation induction: one obligation per
-  -- subscribeE clause, mirrored on its recursion (same TERMINATING
-  -- debt as the function; discharged together, later)
+  -- subscribeE clause, mirrored on its (now fuel-structural)
+  -- recursion.  Conditioned on the run not going dry: a fuel-starved
+  -- burst carries the dry sentinel, which the protocol rejects by
+  -- design — the unconditioned statement would be false at fuel 0
   subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (fuel : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    hasDry (proj₁ (subscribeE fuel b κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE b κ id now sched st
+      let r = subscribeE fuel b κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
 
@@ -153,17 +175,21 @@ postulate
     BurstInv 0 sched st S →
     Inv 1 sched st S × (paidUp S ≡ true)
 
--- the root subscription, composed
+-- the root subscription, composed (at the budget evaluate seeds)
 subscribe-wf :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                            (sched-init e ins) (st-init e))) ≡ false →
   Σ ProtocolSt λ S →
-    let r = subscribeE e root 0 0 (sched-init e ins) (st-init e)
+    let r = subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)
     in (runProtocol protocol-init (proj₁ r) ≡ just S)
        × Inv 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S
        × (paidUp S ≡ true)
-subscribe-wf e ins
-  with subscribeE-wf e root 0 0 (sched-init e ins) (st-init e)
-                     protocol-init (burst-init e ins)
+subscribe-wf e ins nodry
+  with subscribeE-wf (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+                     protocol-init (burst-init e ins) nodry
 ... | S , run , binv
   with burst-final _ _ S binv
 ... | inv , paid = S , run , inv , paid
@@ -207,8 +233,9 @@ postulate
   -- one surviving chain's emits — the chain emit, any share
   -- fan-outs, any cut closes — are accepted, paying/bumping/
   -- cancelling exactly per the ledger.  THE deep lemma: mirrors
-  -- foldPath/dispatchShare (gas-structural now) and stepFrame
-  -- (still TERMINATING debt)
+  -- foldPath/dispatchShare/stepFrame (all gas/fuel-structural now).
+  -- Mid's eventual definition carries the dry-freeness of the
+  -- remaining fold — its arguments determine every future chainStep
   mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {a : Arrival Γ} {nextId : Id} {rid : RegId}
     {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
@@ -309,23 +336,48 @@ drain-wf (suc k) nextId sched st S inv paid with sched-next sched in eq
   , run-++-just S (proj₁ (cascade a nextId sched′ st)) _ run₁ run₂
   , paid₂
 
+-- the reified termination debt: the seeded sync budget never runs
+-- dry on a canonical run.  This is the old TERMINATING pragma's
+-- claim, now a provable statement — the evaluator is total either
+-- way, and QuickCheck's WellFormed check falsifies this postulate at
+-- runtime the moment any program exhausts its budget
+postulate
+  budget-sufficient :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+    hasDry (evaluate fuel e ins) ≡ false
+
 -- the primitives' half of the sandwich: remaining debt is the frame
--- relations and their step lemmas above
+-- relations, their step lemmas, and budget sufficiency above
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate fuel e ins)
 evaluate-well-formed fuel e ins
-  with subscribe-wf e ins
+  with hasDry-++
+         (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                            (sched-init e ins) (st-init e)))
+         (drain fuel 1
+           (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                     (sched-init e ins) (st-init e))))
+           (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                     (sched-init e ins) (st-init e)))))
+         (budget-sufficient fuel e ins)
+... | nodry₀ , _
+  with subscribe-wf e ins nodry₀
 ... | S₀ , run₀ , inv₀ , paid₀
   with drain-wf fuel 1
-         (proj₁ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e))))
-         (proj₂ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e))))
+         (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                   (sched-init e ins) (st-init e))))
+         (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                   (sched-init e ins) (st-init e))))
          S₀ inv₀ paid₀
 ... | S₁ , run₁ , paid₁
   rewrite run-++-just protocol-init
-            (proj₁ (subscribeE e root 0 0 (sched-init e ins) (st-init e)))
+            (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                               (sched-init e ins) (st-init e)))
             (drain fuel 1
-              (proj₁ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e))))
-              (proj₂ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e)))))
+              (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                        (sched-init e ins) (st-init e))))
+              (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                        (sched-init e ins) (st-init e)))))
             run₀ run₁
   = acceptPaid S₁ paid₁
