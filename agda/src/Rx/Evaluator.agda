@@ -967,63 +967,65 @@ chainStep id a path sched st =
 -- the arrival's source forwards EXACTLY ONE emit (possibly valueless),
 -- in subscription order — any further emits a chain contributes are
 -- share fan-outs, themselves one per registration of their share
+-- opens the cascade's per-arrival ledger: delivered/cancelled reset,
+-- the registration watermark stamped (newer registrations were born
+-- this cascade and owe nothing).  A spent source (final scripted
+-- value) is latched completed BEFORE its last delivery fans out — as
+-- a Subject closes before delivering its completion — so a subscriber
+-- joining mid-cascade already sees the one-shot close/complete; it is
+-- also marked dying (each of its chains seeds its own exhausted
+-- close; a cut never closes a delivered dying registration a second
+-- time; its registry entries drop at cascadeFinish).  Colds and
+-- deferᵉ hops get latched too, harmlessly: their sources are
+-- per-subscription, never re-subscribed
+cascadeLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+             → Arrival Γ → EvalSt e → EvalSt e
+cascadeLatch a st₀ =
+  record (if Arrival.isLast a
+          then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
+          else st₀)
+    { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st₀
+    ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
+
+-- fold the snapshot chains.  A chain cancelled earlier in this same
+-- cascade (an operator cut named it a victim) delivers NOTHING — as
+-- in rxjs, where the unsubscribed branch of take(1)(merge(s,s)) is
+-- silent; its close (cut or cutPending) already rode the cutting emit
+cascadeGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+          → (a : Arrival Γ) → Id
+          → List (RegId × Path Γ (arrTy a) t) → Sched Γ → EvalSt e
+          → Stream Γ t × Sched Γ × EvalSt e
+cascadeGo a id []                   sched₀ st₀ = [] , sched₀ , st₀
+cascadeGo a id ((rid , c) ∷ chains) sched₀ st₀
+  with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+... | true  = cascadeGo a id chains sched₀ st₀
+... | false =
+  let (emits , sched₁ , st₁) =
+        chainStep id a c sched₀
+                  (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+      (rest  , sched₂ , st₂) = cascadeGo a id chains sched₁ st₁
+  in emits ++ rest , sched₂ , st₂
+
+-- the spent source's registrations drop at the end (each delivered
+-- chain carried its own close; cut victims' closes rode the cutting
+-- emit) and the sweep collects its live entry
+cascadeFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+              → Arrival Γ → Sched Γ → EvalSt e → Sched Γ × EvalSt e
+cascadeFinish a sched′ st′ with Arrival.isLast a
+... | false = sched′ , st′
+... | true  =
+      let kept = dropSource (arrSource a) (EvalSt.registry st′)
+      in record sched′ { live = sweepLive kept (Sched.live sched′) } ,
+         record st′ { registry = kept }
+
 cascade : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Arrival Γ → Id → Sched Γ → EvalSt e
         → Stream Γ t × Sched Γ × EvalSt e
-cascade {Γ = Γ} {t = t} {e = e} a id sched st =
-  finish (go (chainsOf a st) sched (latch st))
-  where
-  -- a spent source (final scripted value) is latched completed BEFORE
-  -- its last delivery fans out — as a Subject closes before delivering
-  -- its completion — so a subscriber joining mid-cascade already sees
-  -- the one-shot close/complete and never registers only to be
-  -- dropped silently at finish.  Its registrations also leave the
-  -- registry NOW (chainsOf already snapshotted them): each snapshot
-  -- chain seeds its own exhausted close, so an operator cut during
-  -- the cascade (cutThrough) must not see them or it would close
-  -- them a second time.  Colds and deferᵉ hops get latched too,
-  -- harmlessly: their sources are per-subscription, never
-  -- re-subscribed
-  -- ALSO opens the cascade's per-arrival ledger: delivered/cancelled
-  -- reset, the registration watermark stamped (newer registrations
-  -- were born this cascade and owe nothing), the spent source marked
-  -- dying (each of its chains seeds its own exhausted close; a cut
-  -- never closes a delivered dying registration a second time; its
-  -- registry entries drop at finish)
-  latch : EvalSt e → EvalSt e
-  latch st₀ =
-    record (if Arrival.isLast a
-            then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
-            else st₀)
-      { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st₀
-      ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
-
-  -- a chain cancelled earlier in this same cascade (an operator cut
-  -- named it a victim) delivers NOTHING — as in rxjs, where the
-  -- unsubscribed branch of take(1)(merge(s,s)) is silent; its close
-  -- (cut or cutPending) already rode the cutting emit
-  go : List (RegId × Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e
-  go []                   sched₀ st₀ = [] , sched₀ , st₀
-  go ((rid , c) ∷ chains) sched₀ st₀ with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
-  ... | true  = go chains sched₀ st₀
-  ... | false =
-    let (emits , sched₁ , st₁) =
-          chainStep id a c sched₀
-                    (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
-        (rest  , sched₂ , st₂) = go chains sched₁ st₁
-    in emits ++ rest , sched₂ , st₂
-
-  -- the spent source's registrations drop at the end (each delivered
-  -- chain carried its own close; cut victims' closes rode the cutting
-  -- emit) and the sweep collects its live entry
-  finish : Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
-  finish (emits , sched′ , st′) with Arrival.isLast a
-  ... | false = emits , sched′ , st′
-  ... | true  =
-        let kept = dropSource (arrSource a) (EvalSt.registry st′)
-        in emits ,
-           record sched′ { live = sweepLive kept (Sched.live sched′) } ,
-           record st′ { registry = kept }
+cascade a id sched st =
+  let (emits , sched′ , st′) =
+        cascadeGo a id (chainsOf a st) sched (cascadeLatch a st)
+      (sched″ , st″) = cascadeFinish a sched′ st′
+  in emits , sched″ , st″
 
 -- fuel = ARRIVALS PROCESSED; each arrival's cascade runs to
 -- quiescence (never truncated mid-batch).  The root subscription's
