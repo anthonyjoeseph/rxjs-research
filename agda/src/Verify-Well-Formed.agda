@@ -1253,6 +1253,47 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- free `u`, matching share-sink cleanly sets `u := lookup Γ i`.  So:
 -- mid-step invokes foldPath-wf at `u := arrTy a` with the seed; the
 -- three-way induction (root / frame / share) is foldPath-wf's own.
+--
+-- STATE OF THE DECOMPOSITION (2026-07):
+--   PRE   mid-seed : Mid (head∷ps) ⇒ FoldInv              — PROVEN
+--   MID   foldPath-wf : FoldInv ⇒ Σ S′, runProtocol ≡ S′  — PROVEN
+--           (modulo the two structural leaves stepFrame-wf / dispatchShare-wf,
+--            postulated exactly as subscribeE-wf is on the burst side)
+--   POST  readoff : … ⇒ Mid ps                            — the remaining gap
+--
+-- THE READOFF, precisely.  mid-step must return `Mid a nextId ps st″ sched″ S′`
+-- where (·,sched″,st″) = chainStep …, and S′ is foldPath-wf's accepted state.
+-- Its eight fields all reference st″/sched″/S′, so the readoff needs a
+-- CHARACTERISATION of the fold's output triple, not merely `∃ S′`.  For the
+-- ROOT case that characterisation is already in hand — foldPath-root-wf pins
+-- S′ = record{live=Lv; horizon=hz; current=just(nextId,Ov); done= if fin then
+-- true else done S}, and foldPath root leaves the EvalSt untouched, so
+-- st″ = record st{delivered=…} (registry st″ ≡ registry st, sched″ ≡ sched).
+-- That is the proven anchor to read the root chain's Mid ps off.
+--
+-- The obstruction is that the SAME `arrTy a` pinning that forces the case
+-- split into foldPath-wf also forbids a standalone post-hoc readoff on `p`:
+-- Mid ps must be reconstructed by the SAME path induction, so foldPath-wf's
+-- CONCLUSION has to carry the readoff data — a `FoldOut` companion to FoldInv,
+-- quantified over the free `u`, threaded through root (proven, above),
+-- f ↠ path′ (stepFrame-wf, enriched), and share-sink (dispatchShare-wf,
+-- enriched).  FoldOut is a genuinely NEW invariant: what a PARTIAL chain fold
+-- preserves of the live↔registry shadow.  It is deliberately NOT yet stated —
+-- an imprecise FoldOut would be a FALSE postulate (forbidden), and unlike the
+-- done-plumbed window below it is not yet pinned down, so it is left as the
+-- single mid-step postulate until its shape is settled with care.
+--
+-- done-plumbed in the readoff (RESOLVED 2026-07): a completing isLast root
+-- chain flips done S′≡true while its own non-share-sunk registration is still
+-- in registry st″ (dropped only at cascadeFinish).  Handled by the conditional
+-- restatement of Mid/FoldInv.done-plumbed (drop arrSource iff isLast) — see
+-- those fields.  The readoff's isLast-root obligation, allShareSunk(dropSource
+-- arrSource registry st″), then holds BECAUSE at the flip every non-share-sunk
+-- survivor belongs to arrSource (fin reaches root only once nothing else can
+-- deliver).  GUARD: should a reachable flip ever leave a NON-arrival source
+-- holding a root-sinking registration, that falsifies Inv.done-plumbed itself
+-- (a completion emitted while something could still deliver — an evaluator
+-- bug); STOP and surface the trace, do not patch around it.
 postulate
   mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {a : Arrival Γ} {nextId : Id} {rid : RegId}
