@@ -2071,18 +2071,39 @@ payOwed-seed : ∀ (s : Source) (k : ℕ) →
   payOwed s (bumpOwed s (suc k) []) ≡ just ((s , k) ∷ [])
 payOwed-seed s k rewrite ≡ᵇ-refl s = refl
 
+-- NARROW POSTULATE (the non-isLast registry positivity, isolated): a
+-- non-cancelled head is a live registration of arrSource, so — when the source
+-- is NOT spent — its registry carries ≥ 1 entry.  The snapshot↔registry link
+-- (a delivering source is live in the current registry); a scheduler↔automaton
+-- fact, unlike the isLast case which is pure live-source arithmetic (below).
 postulate
-  -- a non-cancelled head is a live registration of its source, so the
-  -- source has ≥ 1 live entry.  For isLast this is live-source + cr-fresh;
-  -- the non-isLast fresh case routes through countRegs (the snapshot↔
-  -- registry link) — a TRUE positivity seeded here pending that lemma.
-  seed-live-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  countRegs-arrSrc-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
     {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
     {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
     {S : ProtocolSt} →
     Mid a nextId ((rid , p) ∷ ps) sched st S →
     any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-    Σ ℕ λ k → countIn (arrSource a) (ProtocolSt.live S) ≡ suc k
+    Arrival.isLast a ≡ false →
+    Σ ℕ λ k → countRegs (arrSource a) (EvalSt.registry st) ≡ suc k
+
+-- a non-cancelled head is a live registration of its source ⇒ ≥ 1 live entry.
+-- isLast: PROVEN (live-source counts the uncancelled snapshot remainder, ≥ 1
+-- for a non-cancelled head — live-source + cr-fresh).  non-isLast: routes
+-- through countRegs-arrSrc-pos (the registry positivity above).
+seed-live-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  Σ ℕ λ k → countIn (arrSource a) (ProtocolSt.live S) ≡ suc k
+seed-live-pos {a = a} {rid = rid} {p = p} {ps = ps} {st = st} mid ceq
+  with Arrival.isLast a in isl | Mid.live-source mid
+... | true  | lsm =
+      countRemaining ps (EvalSt.cancelled st)
+      , trans lsm (cr-fresh rid p ps (EvalSt.cancelled st) ceq)
+... | false | lsm =
+      let (k , req) = countRegs-arrSrc-pos mid ceq isl in k , trans lsm req
 
 -- the enter/pay seed fields: the automaton admits instant nextId and the
 -- delivery pays arrSource — continuing the open owed (inj₂), or opening
