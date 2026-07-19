@@ -20,7 +20,7 @@ module Verify-Well-Formed where
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
 open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; +-suc; +-comm; +-assoc; +-identityʳ)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -131,19 +131,9 @@ closeCount s (value _  ∷ es) = closeCount s es
 closeCount s (handoff _ ∷ es) = closeCount s es
 closeCount s (complete ∷ es) = closeCount s es
 
--- closes that DROP the registration (cut / cutPending, via cutThrough);
--- an `exhausted` close is live-only — the registry defers to cascadeFinish —
--- so it is excluded here.  registry drops track cutCloseCount, live drops
--- track closeCount; the two differ by exactly the deferred exhausted closes
-cutCloseCount : ∀ {A : Set} → Source → List (InstEvent A) → ℕ
-cutCloseCount s []                       = zero
-cutCloseCount s (close x cut        ∷ es) = if s ≡ᵇ x then suc (cutCloseCount s es) else cutCloseCount s es
-cutCloseCount s (close x cutPending ∷ es) = if s ≡ᵇ x then suc (cutCloseCount s es) else cutCloseCount s es
-cutCloseCount s (close x exhausted  ∷ es) = cutCloseCount s es
-cutCloseCount s (init _   ∷ es) = cutCloseCount s es
-cutCloseCount s (value _  ∷ es) = cutCloseCount s es
-cutCloseCount s (handoff _ ∷ es) = cutCloseCount s es
-cutCloseCount s (complete ∷ es) = cutCloseCount s es
+-- (registry-dropping closes — cut/cutPending, excluding the deferred
+-- `exhausted` — will be counted by a cutCloseCount helper when the take-head
+-- edge of reg-envSrc-out is handled; see the FoldOut blueprint above)
 
 -- snapshot entries still obliged to fire: not yet forgiven by a
 -- cutPending (the automaton's remaining owed for the arrival source)
@@ -965,6 +955,65 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --    take-head corner (head's own cut close + cancellation) is the one edge to
 --    pin with a Unit-Test before relying on it.
 ------------------------------------------------------------------
+
+-- the fold's output EvalSt (st″) and Sched (sched″)
+foldSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
+  (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) → EvalSt e
+foldSt sf gas id now envSrc path vals evs fin sched st =
+  proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))
+
+foldSched : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
+  (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) → Sched Γ
+foldSched sf gas id now envSrc path vals evs fin sched st =
+  proj₁ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))
+
+-- FoldOut: the readoff companion to FoldInv (the POST of one chain's fold).
+-- All fields reference only the OUTPUT triple (st″/sched″/S′) plus the input
+-- live S (unchanged by frames) and ob′ — so they pass through the frame
+-- recursion; envSrc live/registry are output deltas (see the blueprint above).
+record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+       (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+       (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
+       (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+       (ob′ : Owed) (S S′ : ProtocolSt) : Set where
+  field
+    -- [Mid ps.live-others] SHADOW resynced by applyEvents at the terminal emit
+    live-others-out : ∀ (s : Source) → sameSource s envSrc ≡ false →
+      countIn s (ProtocolSt.live S′)
+        ≡ countRegs s (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
+    -- [→ live-source] the chain delivers envSrc once; every close of envSrc
+    -- (seed exhausted OR a take cut) drops it from live under fin ≡ true
+    live-envSrc-out : countIn envSrc (ProtocolSt.live S′)
+      ≡ countIn envSrc (ProtocolSt.live S) ∸ (if fin then suc zero else zero)
+    -- [→ live-source, non-isLast] registry envSrc unchanged (frames touch inner
+    -- sources; the seed exhausted defers to cascadeFinish).  no-take-head; the
+    -- take-head cut edge (registry ∸ cutCloseCount envSrc) is deferred
+    reg-envSrc-out : countRegs envSrc (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
+      ≡ countRegs envSrc (EvalSt.registry st)
+    -- [Mid ps.reg-typed]
+    reg-typed-out :
+      regTyped? (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
+                (Sched.live (foldSched sf gas id now envSrc path vals evs fin sched st)) ≡ true
+    -- [Mid ps.horizon-low]
+    horizon-out : ProtocolSt.horizon S′ ≤ id
+    -- [Mid ps.ledger inj₂ + owed-unique] the delivery pays owed[envSrc] once;
+    -- lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′ (applyEvents/fan-out leave
+    -- owed[envSrc] alone); zeroExcept from the share diamond, UniqueOwed from
+    -- bumpOwed.  mid-step ties lookupOwed envSrc ob′ to countRemaining ps
+    current-out : Σ Owed λ Ov →
+        (ProtocolSt.current S′ ≡ just (id , Ov))
+      × (zeroExcept envSrc Ov ≡ true)
+      × (UniqueOwed Ov ≡ true)
+      × (lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′)
+    -- [Mid ps.done-plumbed] conditional exactly as cascadeFinish drops
+    done-plumbed-out : ProtocolSt.done S′ ≡ true →
+      allShareSunk (if fin
+                    then dropSource envSrc (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
+                    else EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st)) ≡ true
 
 postulate
   -- a frame preserves FoldInv (S untouched — frames don't step the
