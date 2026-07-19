@@ -671,6 +671,42 @@ regTyped?-cutThrough nid dlv wm dying ((rid , src , (u , p)) ∷ r) live rt
 ... | false | kept , closes , rids | ih = ∧-intro (∧-trueˡ rt) ih
 ... | true  | kept , closes , rids | ih = ih
 
+-- dropSource removes entries, so all-share-sunk survives it (conjunction shrink)
+allShareSunk-dropSource : ∀ {n} {Γ : Ctx n} {t}
+  (src : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  allShareSunk reg ≡ true → allShareSunk (dropSource src reg) ≡ true
+allShareSunk-dropSource src []                        rt = refl
+allShareSunk-dropSource src ((rid , s , (u , p)) ∷ r) rt with sameSource src s
+... | true  = allShareSunk-dropSource src r (∧-trueʳ rt)
+... | false = ∧-intro (∧-trueˡ rt) (allShareSunk-dropSource src r (∧-trueʳ rt))
+
+-- the cut's kept-after-drop is a sublist of the drop, so all-share-sunk survives
+-- the cut too (single induction handling both the drop and the pathHasNode filter)
+allShareSunk-cutThrough-drop : ∀ {n} {Γ : Ctx n} {t}
+  (src : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  allShareSunk (dropSource src reg) ≡ true →
+  allShareSunk (dropSource src (proj₁ (cutThrough nid dlv wm dying reg))) ≡ true
+allShareSunk-cutThrough-drop src nid dlv wm dying []                        ash = refl
+allShareSunk-cutThrough-drop src nid dlv wm dying ((rid , s , (u , p)) ∷ r) ash
+  with pathHasNode nid p | cutThrough nid dlv wm dying r
+     | allShareSunk-cutThrough-drop src nid dlv wm dying r
+... | false | kept , closes , rids | ih with sameSource src s
+...   | true  = ih ash
+...   | false = ∧-intro (∧-trueˡ ash) (ih (∧-trueʳ ash))
+allShareSunk-cutThrough-drop src nid dlv wm dying ((rid , s , (u , p)) ∷ r) ash
+    | true | kept , closes , rids | ih with sameSource src s
+...   | true  = ih ash
+...   | false = ih (∧-trueʳ ash)
+
+-- FoldInv.done-plumbed's `if fin` form always yields the dropped registry
+allShareSunk-if-drop : ∀ {n} {Γ : Ctx n} {t} (fin : Bool) (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  allShareSunk (if fin then dropSource src reg else reg) ≡ true →
+  allShareSunk (dropSource src reg) ≡ true
+allShareSunk-if-drop true  src reg h = h
+allShareSunk-if-drop false src reg h = allShareSunk-dropSource src reg h
+
 reg-typed-finish : ∀ {n} {Γ : Ctx n} {t} (src : Source)
   (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true →
@@ -1686,8 +1722,9 @@ FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
 postulate
   -- (3+4) the closes' effect on the open instant: applying the cut's closes to
   -- the fold's running (Lv,Ov) succeeds, keeping the owed shape (a close does
-  -- removeOne/cancelOwed, never bumps), closing envSrc exactly once (the head cut,
-  -- folded with `fin`), and leaving only envSrc-owned regs plumbed post-cut.
+  -- removeOne/cancelOwed, never bumps), and closing envSrc exactly once (the head
+  -- cut, folded with `fin`).  (done-plumbed is now proven from the allShareSunk
+  -- monotonicity lemmas, no longer part of this residue.)
   cut-owed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (id : Id) (envSrc : Source) (nid : NodeId)
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
@@ -1703,7 +1740,6 @@ postulate
        × (UniqueOwed Ov ≡ true)
        × (lookupOwed envSrc Ov ≡ lookupOwed envSrc (FoldInv.ob′ fi))
        × (closeCount envSrc (evs ++ closes) ≡ suc zero)
-       × (ProtocolSt.done S ≡ true → allShareSunk (dropSource envSrc kept) ≡ true)
 
   stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -1801,8 +1837,10 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
   zx  = proj₁ (proj₂ (proj₂ (proj₂ spec)))
   uq  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ spec))))
   ovs = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec)))))
-  clo = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec))))))
-  dpl = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec))))))
+  clo = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec)))))
+  dpl : ProtocolSt.done S ≡ true → allShareSunk (dropSource envSrc kept) ≡ true
+  dpl deq = allShareSunk-cutThrough-drop envSrc nid dlv wm dy reg
+              (allShareSunk-if-drop fin envSrc reg (FoldInv.done-plumbed fi deq))
   shadow′ : ∀ (s : Source) → sameSource s envSrc ≡ false →
     countIn s (ProtocolSt.live S) + initCount s (evs ++ closes)
       ≡ countRegs s kept + closeCount s (evs ++ closes)
