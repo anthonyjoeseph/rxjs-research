@@ -144,9 +144,10 @@ export const share = <A>(
     // never disconnect: the upstream subscription is permanent
     for (const emit of connect.burst)
       upstreamOpen = openAfter(emit, upstreamOpen, true);
-    const plumbed = connect.burst.map(
-      (emit): InstEmit<A> => ({ ...emit, kind: "plumbing" }),
-    );
+    const plumbed = connect.burst.map((emit): InstEmit<A> => ({
+      ...emit,
+      kind: "plumbing",
+    }));
     const burstFin =
       connect.completedSync ||
       flattenBurst(connect.burst).done ||

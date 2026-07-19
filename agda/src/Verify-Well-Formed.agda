@@ -6,26 +6,26 @@
 --   1. Inv (CONCRETE below) relates evaluator state to automaton
 --      state between cascades.
 --   2. Two frame relations — BurstInv (mid-subscribe-frame) and Mid
---      (mid-cascade, indexed by the chains still to fold) — with
---      their entry/step/exit lemmas.  These are the postulated
---      waypoints; the step lemmas (subscribeE-wf, mid-step) mirror
---      the evaluator's own recursion — fuel-structural since the
---      pragmas were discharged; the totality debt is now the single
---      budget-sufficient postulate at the bottom.
+--      (mid-cascade, indexed by the chains still to fold) — both
+--      CONCRETE records now, with entry/step/exit lemmas.  Proven:
+--      burst-init, burst-final.  Postulated: the step lemmas
+--      (subscribeE-wf, mid-step — the per-clause preservation
+--      grind), mid-init, mid-skip, mid-final, and the single
+--      budget-sufficient totality conjecture at the bottom.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.List    using (List; []; _∷_; _++_; any; length)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
-open import Data.Unit    using (⊤)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; trans; cong)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit)
 open import Rx.Exp       using (Ctx; Closed)
@@ -97,6 +97,25 @@ countRegs s [] = zero
 countRegs s ((_ , x , _) ∷ r) =
   if s ≡ᵇ x then suc (countRegs s r) else countRegs s r
 
+-- snapshot entries still obliged to fire: not yet forgiven by a
+-- cutPending (the automaton's remaining owed for the arrival source)
+countRemaining : ∀ {X : Set} → List (RegId × X) → List RegId → ℕ
+countRemaining []               c = zero
+countRemaining ((rid , _) ∷ ps) c =
+  if any (_≡ᵇ rid) c then countRemaining ps c else suc (countRemaining ps c)
+
+-- association-list reads on the automaton's owed table
+lookupOwed : Source → Owed → ℕ
+lookupOwed s []            = zero
+lookupOwed s ((x , n) ∷ o) = if s ≡ᵇ x then n else lookupOwed s o
+
+-- every source but s is paid to zero (bumped shares get paid back
+-- down within the very chainStep that announced them)
+zeroExcept : Source → Owed → Bool
+zeroExcept s []            = true
+zeroExcept s ((x , n) ∷ o) =
+  (if s ≡ᵇ x then true else n ≡ᵇ 0) ∧ zeroExcept s o
+
 -- a path that never reaches the root delivers no values there
 sinksToShare : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → Bool
 sinksToShare root           = false
@@ -141,17 +160,39 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- the subscribe frame: BurstInv and its entry/step/exit lemmas
 ------------------------------------------------------------------
 
+-- mid-subscribe-frame, CONCRETE: live shadows the registry exactly
+-- (burst closes and registry cuts move in lockstep), and the open
+-- instant — if any emit has landed — is `id` with a LITERALLY EMPTY
+-- owed table: subscribe/plumbing settle to net zero, handoffs are
+-- minted only by foldPath (never in a burst), and cancelOwed on []
+-- is a no-op, so nothing ever writes an entry
+record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                (id : Id) (sched : Sched Γ) (st : EvalSt e)
+                (S : ProtocolSt) : Set where
+  field
+    live-matches  : ∀ (s : Source) →
+      countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
+    chains-count  : ∀ (a : Arrival Γ) (sched″ : Sched Γ) →
+      sched-next sched ≡ inj₂ (a , sched″) →
+      countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+    horizon-low   : ProtocolSt.horizon S ≤ id
+    current-frame : (ProtocolSt.current S ≡ nothing)
+                  ⊎ (ProtocolSt.current S ≡ just (id , []))
+    done-plumbed  : ProtocolSt.done S ≡ true →
+      allShareSunk (EvalSt.registry st) ≡ true
+
+-- the empty states are related
+burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  BurstInv {e = e} 0 (sched-init e ins) (st-init e) protocol-init
+burst-init e ins = record
+  { live-matches  = λ s → refl
+  ; chains-count  = λ a sched″ _ → refl
+  ; horizon-low   = z≤n
+  ; current-frame = inj₁ refl
+  ; done-plumbed  = λ ()
+  }
+
 postulate
-  -- mid-subscribe-frame: instant `id` open with EMPTY owed (subscribe
-  -- and plumbing emits never seed or pay), live shadowing the
-  -- registry, horizon ≤ id, every init fresh, every close matched
-  BurstInv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-           → Id → Sched Γ → EvalSt e → ProtocolSt → Set
-
-  -- the empty states are related
-  burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    BurstInv {e = e} 0 (sched-init e ins) (st-init e) protocol-init
-
   -- ONE subscription's burst preserves the frame relation.  The
   -- per-primitive preservation induction: one obligation per
   -- subscribeE clause, mirrored on its (now fuel-structural)
@@ -168,12 +209,49 @@ postulate
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
 
-  -- leaving the frame: the open instant settles (owed never seeded ⇒
-  -- paid), landing Inv-related for the first arrival
-  burst-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    BurstInv 0 sched st S →
-    Inv 1 sched st S × (paidUp S ≡ true)
+-- an instant standing on an empty (or absent) owed table settles
+≤-up : ∀ {a b : ℕ} → a ≤ b → a ≤ suc b
+≤-up z≤n     = z≤n
+≤-up (s≤s p) = s≤s (≤-up p)
+
+paid-nothing : (S : ProtocolSt) → ProtocolSt.current S ≡ nothing →
+               paidUp S ≡ true
+paid-nothing S ceq with ProtocolSt.current S | ceq
+... | nothing | refl = refl
+
+paid-empty : (S : ProtocolSt) {j : Id} →
+             ProtocolSt.current S ≡ just (j , []) → paidUp S ≡ true
+paid-empty S ceq with ProtocolSt.current S | ceq
+... | just (j , []) | refl = refl
+
+-- leaving the frame: the open instant settles (owed never seeded ⇒
+-- paid), landing Inv-related for the first arrival
+burst-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv 0 sched st S →
+  Inv 1 sched st S × (paidUp S ≡ true)
+burst-final sched st S binv = inv , paid (BurstInv.current-frame binv)
+  where
+  past : (ProtocolSt.current S ≡ nothing)
+       ⊎ (ProtocolSt.current S ≡ just (0 , [])) →
+       CurrentPast (ProtocolSt.current S) 1
+  past (inj₁ ceq) = subst (λ c → CurrentPast c 1) (sym ceq) tt
+  past (inj₂ ceq) = subst (λ c → CurrentPast c 1) (sym ceq) (s≤s z≤n)
+
+  paid : (ProtocolSt.current S ≡ nothing)
+       ⊎ (ProtocolSt.current S ≡ just (0 , [])) →
+       paidUp S ≡ true
+  paid (inj₁ ceq) = paid-nothing S ceq
+  paid (inj₂ ceq) = paid-empty S ceq
+
+  inv : Inv 1 sched st S
+  inv = record
+    { live-matches = BurstInv.live-matches binv
+    ; chains-count = BurstInv.chains-count binv
+    ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
+    ; current-past = past (BurstInv.current-frame binv)
+    ; done-plumbed = BurstInv.done-plumbed binv
+    }
 
 -- the root subscription, composed (at the budget evaluate seeds)
 subscribe-wf :
@@ -199,25 +277,61 @@ subscribe-wf e ins nodry
 -- composed
 ------------------------------------------------------------------
 
-postulate
-  -- mid-cascade, indexed by the chains still to fold: instant nextId
-  -- open; owed[arrSource] = the remaining chains not yet cancelled
-  -- (a cutPending already forgave each cancelled one); every share
-  -- handoff so far bumped exactly its dispatch fan-out; live shadows
-  -- the registry; the ledger fields (delivered/cancelled/dying/
-  -- watermark) agree with the automaton's arithmetic
-  Mid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      → (a : Arrival Γ) → Id
-      → List (RegId × Path Γ (arrTy a) t)
-      → Sched Γ → EvalSt e → ProtocolSt → Set
+-- mid-cascade, CONCRETE, indexed by the chains still to fold.  Two
+-- asymmetries a naive "live shadows registry" misses:
+--   · for a spent (isLast) arrival the automaton runs AHEAD of the
+--     registry — each delivered chain's exhausted close retires its
+--     live entry on the spot, but the registry entries drop only at
+--     cascadeFinish — so the arrival source's live count equals the
+--     obliged remainder of the snapshot, not the registry count;
+--   · the owed table exists only once the first chain emit has
+--     opened the instant (seeding happens at first delivery), so the
+--     ledger is a sum: not-yet-opened (the automaton still stands on
+--     the previous, settled instant) or opened with owed[arrSource]
+--     = the not-yet-cancelled remainder and every share paid back to
+--     zero (a handoff's bump is repaid within its own chainStep).
+-- fold-live carries dry-freeness for the remaining fold: Mid's
+-- arguments determine every future chainStep, so the premise lives
+-- here instead of infecting every step statement
+record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+           (a : Arrival Γ) (nextId : Id)
+           (ps : List (RegId × Path Γ (arrTy a) t))
+           (sched : Sched Γ) (st : EvalSt e)
+           (S : ProtocolSt) : Set where
+  field
+    live-others  : ∀ (s : Source) → sameSource s (arrSource a) ≡ false →
+      countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
+    live-source  : countIn (arrSource a) (ProtocolSt.live S)
+      ≡ (if Arrival.isLast a
+         then countRemaining ps (EvalSt.cancelled st)
+         else countRegs (arrSource a) (EvalSt.registry st))
+    chains-count : ∀ (a′ : Arrival Γ) (sched″ : Sched Γ) →
+      sched-next sched ≡ inj₂ (a′ , sched″) →
+      countRegs (arrSource a′) (EvalSt.registry st) ≡ length (chainsOf a′ st)
+    horizon-low  : ProtocolSt.horizon S ≤ nextId
+    ledger       :
+        (CurrentPast (ProtocolSt.current S) nextId × (paidUp S ≡ true))
+      ⊎ (Σ Owed λ ow →
+           (ProtocolSt.current S ≡ just (nextId , ow))
+         × (lookupOwed (arrSource a) ow
+              ≡ countRemaining ps (EvalSt.cancelled st))
+         × (zeroExcept (arrSource a) ow ≡ true))
+    done-plumbed : ProtocolSt.done S ≡ true →
+      allShareSunk (EvalSt.registry st) ≡ true
+    fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
 
+postulate
   -- entering: the latch opens the ledger; the automaton, Inv-related
-  -- and paid, stands ready to open instant nextId
+  -- and paid, stands ready to open instant nextId.  The dry-freeness
+  -- of the whole cascade fold arrives as a premise (split off
+  -- budget-sufficient by the drain composition below)
   mid-init : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
     (st : EvalSt e) (S : ProtocolSt) →
     sched-next sched ≡ inj₂ (a , sched′) →
     Inv nextId sched st S → paidUp S ≡ true →
+    hasDry (proj₁ (cascadeGo a nextId (chainsOf a st) sched′
+                             (cascadeLatch a st))) ≡ false →
     Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
 
   -- a cancelled chain folds to nothing (its close already rode the
@@ -290,21 +404,24 @@ cascadeGo-wf a nextId ((rid , p) ∷ ps) sched st S mid
       _ run₁ run₂
   , mid₂
 
--- one arrival's cascade, composed
+-- one arrival's cascade, composed.  The dry-freeness premise is
+-- stated on the cascade's own emits — definitionally the cascadeGo
+-- fold's emits, which is the shape mid-init wants
 cascade-wf :
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
     (st : EvalSt e) (S : ProtocolSt) →
   sched-next sched ≡ inj₂ (a , sched′) →
   Inv nextId sched st S → paidUp S ≡ true →
+  hasDry (proj₁ (cascade a nextId sched′ st)) ≡ false →
   Σ ProtocolSt λ S′ →
     let r = cascade a nextId sched′ st
     in (runProtocol S (proj₁ r) ≡ just S′)
        × Inv (suc nextId) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
        × (paidUp S′ ≡ true)
-cascade-wf nextId sched a sched′ st S eq inv paid
+cascade-wf nextId sched a sched′ st S eq inv paid nodry
   with cascadeGo-wf a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
-         (mid-init nextId sched a sched′ st S eq inv paid)
+         (mid-init nextId sched a sched′ st S eq inv paid nodry)
 ... | S′ , run , mid
   with mid-final mid
 ... | inv′ , paid′ = S′ , run , inv′ , paid′
@@ -318,19 +435,28 @@ drain-wf :
     (fuel : Fuel) (nextId : Id) (sched : Sched Γ) (st : EvalSt e)
     (S : ProtocolSt) →
   Inv nextId sched st S → paidUp S ≡ true →
+  hasDry (drain {e = e} fuel nextId sched st) ≡ false →
   Σ ProtocolSt λ S′ →
     (runProtocol S (drain {e = e} fuel nextId sched st) ≡ just S′)
     × (paidUp S′ ≡ true)
-drain-wf zero    nextId sched st S inv paid = S , refl , paid
-drain-wf (suc k) nextId sched st S inv paid with sched-next sched in eq
+drain-wf zero    nextId sched st S inv paid _  = S , refl , paid
+drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
 ... | inj₁ _            = S , refl , paid
 ... | inj₂ (a , sched′)
-  with cascade-wf nextId sched a sched′ st S eq inv paid
+  -- the with-abstraction has already rewritten hd's type to the
+  -- unfolded `cascade emits ++ drain k …` shape — split it there
+  with hasDry-++ (proj₁ (cascade a nextId sched′ st))
+         (drain k (suc nextId)
+           (proj₁ (proj₂ (cascade a nextId sched′ st)))
+           (proj₂ (proj₂ (cascade a nextId sched′ st))))
+         hd
+... | nodry₁ , nodry₂
+  with cascade-wf nextId sched a sched′ st S eq inv paid nodry₁
 ... | S₁ , run₁ , inv₁ , paid₁
   with drain-wf k (suc nextId)
          (proj₁ (proj₂ (cascade a nextId sched′ st)))
          (proj₂ (proj₂ (cascade a nextId sched′ st)))
-         S₁ inv₁ paid₁
+         S₁ inv₁ paid₁ nodry₂
 ... | S₂ , run₂ , paid₂ =
   S₂
   , run-++-just S (proj₁ (cascade a nextId sched′ st)) _ run₁ run₂
@@ -361,7 +487,7 @@ evaluate-well-formed fuel e ins
            (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                      (sched-init e ins) (st-init e)))))
          (budget-sufficient fuel e ins)
-... | nodry₀ , _
+... | nodry₀ , nodry₁
   with subscribe-wf e ins nodry₀
 ... | S₀ , run₀ , inv₀ , paid₀
   with drain-wf fuel 1
@@ -369,7 +495,7 @@ evaluate-well-formed fuel e ins
                                    (sched-init e ins) (st-init e))))
          (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                    (sched-init e ins) (st-init e))))
-         S₀ inv₀ paid₀
+         S₀ inv₀ paid₀ nodry₁
 ... | S₁ , run₁ , paid₁
   rewrite run-++-just protocol-init
             (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
