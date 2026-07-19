@@ -894,6 +894,10 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- mid-skip (same S); established by mid-init/mid-step (postulated).
     owed-unique  : ∀ (ow : Owed) →
       ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
+    -- the cascade's `dying` set holds only arrSource a (cascadeLatch seeds it to
+    -- [arrSource a] iff isLast, else []); fed to FoldInv.dying-envSrc at the seed.
+    dying-src : ∀ (s : Source) → sameSource s (arrSource a) ≡ false →
+      memberSource s (EvalSt.dying st) ≡ false
     -- SNAPSHOT↔REGISTRY: the not-yet-cancelled snapshot chains inject into the
     -- live registry entries of arrSource — a snapshot chain leaves the registry
     -- ONLY via cutThrough, which also cancels its rid, so uncancelled ⇒ still
@@ -1178,6 +1182,14 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- carry (a head take flips fin AND closes envSrc), pinned by Unit-Test.
     env-init  : initCount envSrc evs ≡ 0
     env-close : closeCount envSrc evs ≡ (if fin then suc zero else zero)
+    -- the cascade's `dying` set holds only envSrc (cascadeLatch seeds it to
+    -- [arrSource a] iff isLast, else []; the fold never grows it).  Stable
+    -- through every frame (no stepFrame clause touches dying), it lets the
+    -- take-cut edge invoke cutThrough-balance for s ≠ envSrc (cutThrough only
+    -- skips a close on delivered ∧ dying, vacuous off envSrc).  Established at
+    -- the Mid→FoldInv seed; carried unchanged by every clause.
+    dying-envSrc : ∀ (s : Source) → sameSource s envSrc ≡ false →
+      memberSource s (EvalSt.dying st) ≡ false
 
 ------------------------------------------------------------------
 -- FoldOut — the readoff companion to FoldInv (DESIGN, worked out 2026-07;
@@ -1569,6 +1581,22 @@ cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
 ...   | true  rewrite mem | ≡ᵇ-refl s =
         trans (cong suc ih) (sym (+-suc (countRegs s kept) (closeCount s closes)))
 
+-- cutThrough emits only `close` events, never `init` — so its close list adds
+-- nothing to any source's init count (take-cut sub-obligation, feeds shadow/env-init).
+cutThrough-no-init : ∀ {n} {Γ : Ctx n} {t}
+  (s : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId)
+  (dying : List Source) (reg : List (RegId × Source × Chain Γ t)) →
+  initCount s (proj₁ (proj₂ (cutThrough nid dlv wm dying reg))) ≡ 0
+cutThrough-no-init s nid dlv wm dying [] = refl
+cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c)
+     | cutThrough nid dlv wm dying r
+     | cutThrough-no-init s nid dlv wm dying r
+... | false | kept , closes , rids | ih = ih
+... | true  | kept , closes , rids | ih with any (_≡ᵇ rid) dlv ∧ memberSource src dying
+...   | true  = ih
+...   | false = ih
+
 -- FoldInv reads `st` ONLY through its registry (shadow / done-plumbed /
 -- reg-typed; every other field is over S / evs / sched).  So a frame that
 -- mutates st but leaves the registry fixed — the quiet clauses (scan-f
@@ -1578,22 +1606,24 @@ FoldInv-reg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (envSrc : Source) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st st′ : EvalSt e) (S : ProtocolSt) →
   EvalSt.registry st ≡ EvalSt.registry st′ →
+  EvalSt.dying st ≡ EvalSt.dying st′ →
   FoldInv id envSrc evs fin sched st S → FoldInv id envSrc evs fin sched st′ S
-FoldInv-reg id envSrc evs fin sched st st′ S req fi = record
+FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
   { ob = FoldInv.ob fi ; hz = FoldInv.hz fi ; ob′ = FoldInv.ob′ fi
   ; Lv = FoldInv.Lv fi ; Ov = FoldInv.Ov fi
   ; enters = FoldInv.enters fi ; pays = FoldInv.pays fi ; applies = FoldInv.applies fi
   ; shadow = λ s h → subst
       (λ r → countIn s (ProtocolSt.live S) + initCount s evs ≡ countRegs s r + closeCount s evs)
       req (FoldInv.shadow fi s h)
-  ; done-plumbed = λ deq → subst
+  ; done-plumbed = λ dq → subst
       (λ r → allShareSunk (if fin then dropSource envSrc r else r) ≡ true)
-      req (FoldInv.done-plumbed fi deq)
+      req (FoldInv.done-plumbed fi dq)
   ; reg-typed = subst (λ r → regTyped? r (Sched.live sched) ≡ true) req (FoldInv.reg-typed fi)
   ; horizon-low = FoldInv.horizon-low fi
   ; ov-zero = FoldInv.ov-zero fi ; ov-unique = FoldInv.ov-unique fi
   ; ov-envSrc = FoldInv.ov-envSrc fi
-  ; env-init = FoldInv.env-init fi ; env-close = FoldInv.env-close fi }
+  ; env-init = FoldInv.env-init fi ; env-close = FoldInv.env-close fi
+  ; dying-envSrc = λ s h → subst (λ d → memberSource s d ≡ false) deq (FoldInv.dying-envSrc fi s h) }
 
 -- the three NON-quiet frame clauses, still to grind, each stated PRECISELY at
 -- its frame constructor (so map-f/scan-f — proven below — are no longer covered
@@ -1637,20 +1667,39 @@ FoldInv-reg id envSrc evs fin sched st st′ S req fi = record
 -- Net: (1) is a cross-cutting thread (Mid + FoldInv + FoldInv-reg + seed); (2)-(4)
 -- are cut-local lemmas.  No lean-legal partial commit exists — the field in (1) is
 -- unused until (2)-(4) assemble — so the whole discharge lands atomically.
+-- take-cut is now PROVEN (stepFrame-wf-take-cut below) from cutThrough-balance +
+-- cutThrough-no-init + the dying-envSrc field + these two precise residues:
 postulate
-  stepFrame-wf-take-cut : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- (3+4) the closes' effect on the open instant: applying the cut's closes to
+  -- the fold's running (Lv,Ov) succeeds, keeping the owed shape (a close does
+  -- removeOne/cancelOwed, never bumps), closing envSrc exactly once (the head cut,
+  -- folded with `fin`), and leaving only envSrc-owned regs plumbed post-cut.
+  cut-owed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (id : Id) (envSrc : Source) (nid : NodeId)
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    FoldInv id envSrc evs fin sched st S →
+    (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+    (fi : FoldInv id envSrc evs fin sched st S) →
     let (kept , closes , cutRids) =
           cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                      (EvalSt.dying st) (EvalSt.registry st)
-    in FoldInv id envSrc (evs ++ closes) true
-         (record sched { live = sweepLive kept (Sched.live sched) })
-         (record st { registry = kept
-                    ; cancelled = cutRids ++ EvalSt.cancelled st
-                    ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) }) S
+    in Σ (List Source) λ Lv → Σ Owed λ Ov →
+         (applyEvents closes (FoldInv.Lv fi) (FoldInv.Ov fi) (ProtocolSt.done S)
+            ≡ just (Lv , Ov , ProtocolSt.done S))
+       × (zeroExcept envSrc Ov ≡ true)
+       × (UniqueOwed Ov ≡ true)
+       × (lookupOwed envSrc Ov ≡ lookupOwed envSrc (FoldInv.ob′ fi))
+       × (closeCount envSrc (evs ++ closes) ≡ suc zero)
+       × (ProtocolSt.done S ≡ true → allShareSunk (dropSource envSrc kept) ≡ true)
+
+  -- cut+sweep preserves registry well-typedness: kept ⊆ registry st and
+  -- sweepLive only drops now-dead live sources, so surviving regs keep their type.
+  cut-reg-typed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+    regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+    let (kept , _ , _) =
+          cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                     (EvalSt.dying st) (EvalSt.registry st)
+    in regTyped? kept (sweepLive kept (Sched.live sched)) ≡ true
 
   stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -1683,6 +1732,68 @@ postulate
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
 
+-- take-cut, PROVEN: assemble the cut result's FoldInv from cutThrough-balance
+-- (shadow), cutThrough-no-init (env-init/shadow), the dying-envSrc field, and the
+-- two residue postulates (cut-owed for the ledger, cut-reg-typed for typing).
+stepFrame-wf-take-cut : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (envSrc : Source) (nid : NodeId)
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  FoldInv id envSrc evs fin sched st S →
+  let (kept , closes , cutRids) =
+        cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                   (EvalSt.dying st) (EvalSt.registry st)
+  in FoldInv id envSrc (evs ++ closes) true
+       (record sched { live = sweepLive kept (Sched.live sched) })
+       (record st { registry = kept
+                  ; cancelled = cutRids ++ EvalSt.cancelled st
+                  ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) }) S
+stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
+  { ob = FoldInv.ob fi ; hz = FoldInv.hz fi ; ob′ = FoldInv.ob′ fi
+  ; Lv = Lv′ ; Ov = Ov′
+  ; enters = FoldInv.enters fi ; pays = FoldInv.pays fi
+  ; applies = trans (applyEvents-++just evs closes (ProtocolSt.live S)
+                       (FoldInv.ob′ fi) (ProtocolSt.done S) (FoldInv.applies fi)) app
+  ; shadow = shadow′
+  ; done-plumbed = dpl
+  ; reg-typed = cut-reg-typed nid sched st (FoldInv.reg-typed fi)
+  ; horizon-low = FoldInv.horizon-low fi
+  ; ov-zero = zx ; ov-unique = uq ; ov-envSrc = ovs
+  ; env-init = trans (initCount-++ envSrc evs closes)
+                     (cong₂ _+_ (FoldInv.env-init fi) (cutThrough-no-init envSrc nid dlv wm dy reg))
+  ; env-close = clo
+  ; dying-envSrc = FoldInv.dying-envSrc fi
+  }
+  where
+  dlv = EvalSt.delivered st
+  wm  = EvalSt.regWatermark st
+  dy  = EvalSt.dying st
+  reg = EvalSt.registry st
+  kept   = proj₁ (cutThrough nid dlv wm dy reg)
+  closes = proj₁ (proj₂ (cutThrough nid dlv wm dy reg))
+  spec = cut-owed id envSrc nid evs fin sched st S fi
+  Lv′ = proj₁ spec
+  Ov′ = proj₁ (proj₂ spec)
+  app = proj₁ (proj₂ (proj₂ spec))
+  zx  = proj₁ (proj₂ (proj₂ (proj₂ spec)))
+  uq  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ spec))))
+  ovs = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec)))))
+  clo = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec))))))
+  dpl = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec))))))
+  shadow′ : ∀ (s : Source) → sameSource s envSrc ≡ false →
+    countIn s (ProtocolSt.live S) + initCount s (evs ++ closes)
+      ≡ countRegs s kept + closeCount s (evs ++ closes)
+  shadow′ s h
+    rewrite initCount-++ s evs closes
+          | cutThrough-no-init s nid dlv wm dy reg
+          | +-identityʳ (initCount s evs)
+          | closeCount-++ s evs closes =
+      trans (FoldInv.shadow fi s h)
+            (trans (cong (_+ closeCount s evs)
+                     (cutThrough-balance s nid dlv wm dy reg (FoldInv.dying-envSrc fi s h)))
+                   (trans (+-assoc (countRegs s kept) (closeCount s closes) (closeCount s evs))
+                          (cong (countRegs s kept +_) (+-comm (closeCount s closes) (closeCount s evs)))))
+
 -- stepFrame-wf, the real function.  map-f is discharged outright: it emits
 -- nothing (evs′ ≡ []) and leaves fin/sched/st untouched (Evaluator 501-502),
 -- so with vals gone from FoldInv the value transform is irrelevant and
@@ -1714,7 +1825,7 @@ stepFrame-wf {u = u} sf id now envSrc (scan-f fn nid) path′ vals evs fin sched
 ... | just (scan-st {w} acc) with w ≟ᵗ u
 ...   | no _     rewrite ++-identityʳ evs = fi
 ...   | yes refl rewrite ++-identityʳ evs =
-        FoldInv-reg id envSrc evs fin sched st _ S refl fi
+        FoldInv-reg id envSrc evs fin sched st _ S refl refl fi
 -- take-f: like scan-f, a no-op on every node shape but a take-st; the take-st
 -- non-cut branch only rewrites the remaining-count node (quiet, FoldInv-reg);
 -- the cut branch drops the registry and closes victims (stepFrame-wf-take-cut).
@@ -1728,7 +1839,7 @@ stepFrame-wf sf id now envSrc (take-f nid) path′ vals evs fin sched st S fi
 ... | just (exhaust-st ia od)  rewrite ++-identityʳ evs = fi
 ... | just (take-st k) with takeVals k vals
 ...   | out , rem , false rewrite ++-identityʳ evs =
-        FoldInv-reg id envSrc evs fin sched st _ S refl fi
+        FoldInv-reg id envSrc evs fin sched st _ S refl refl fi
 ...   | out , rem , true  =
         stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi
 stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs fin sched st S fi
@@ -2353,6 +2464,7 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   ; horizon-low = Mid.horizon-low mid
   ; ov-zero = ze′ ; ov-unique = uq′ ; ov-envSrc = refl
   ; env-init = env-init ; env-close = env-close
+  ; dying-envSrc = Mid.dying-src mid   -- dying (record st{delivered}) ≡ dying st
   }
   where
   ep = seed-enter-pay mid ceq
@@ -2536,6 +2648,7 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
       (cascadeGo-skip a nextId rid p ps sched st ceq)
       (Mid.fold-live mid)
   ; owed-unique  = Mid.owed-unique mid      -- same S, nextId
+  ; dying-src    = Mid.dying-src mid         -- same st
   ; reg-bound    = subst (λ z → z ≤ countRegs (arrSource a) (EvalSt.registry st))
                      (cr-skip rid p ps (EvalSt.cancelled st) ceq)
                      (Mid.reg-bound mid)    -- drop cancelled head, count unchanged
@@ -3157,6 +3270,7 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
   ; fold-live    = nodry
   ; owed-unique  = λ ow cur → ⊥-elim (1+n≰n
                      (subst (λ c → CurrentPast c nextId) cur (Inv.current-past inv)))
+  ; dying-src    = dsrc
   ; reg-bound    = subst
       (λ reg → countRemaining (chainsOf a st) [] ≤ countRegs (arrSource a) reg)
       (sym (latch-registry a st))
@@ -3164,6 +3278,12 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
         (sym (chains-count-derived a sched sched′ st (Inv.reg-typed inv) eq))))
   }
   where
+  -- cascadeLatch sets dying ≡ if isLast then arrSource a ∷ [] else []
+  dsrc : ∀ (s : Source) → sameSource s (arrSource a) ≡ false →
+    memberSource s (EvalSt.dying (cascadeLatch a st)) ≡ false
+  dsrc s h with Arrival.isLast a
+  ... | true  rewrite h = refl
+  ... | false = refl
   live-src : countIn (arrSource a) (ProtocolSt.live S)
     ≡ (if Arrival.isLast a
        then countRemaining (chainsOf a st) (EvalSt.cancelled (cascadeLatch a st))
