@@ -1741,13 +1741,16 @@ postulate
        × (lookupOwed envSrc Ov ≡ lookupOwed envSrc (FoldInv.ob′ fi))
        × (closeCount envSrc (evs ++ closes) ≡ suc zero)
 
+  -- fin ≡ true ONLY: the fin ≡ false branch (react false) is quiet and proven in
+  -- stepFrame-wf below.  This is the completion-ABSORB case — finish decrements
+  -- the *All node counter and recomputes fin′, the merge W1/W2 obligation.
   stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (op : AllOp) (allNid inst : NodeId) (path′ : Path Γ s t)
-    (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t)))
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    FoldInv id envSrc evs fin sched st S →
-    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (from-inner op allNid inst) path′ vals fin sched st
+    FoldInv id envSrc evs true sched st S →
+    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (from-inner op allNid inst) path′ vals true sched st
     in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
   stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1903,8 +1906,12 @@ stepFrame-wf sf id now envSrc (take-f nid) path′ vals evs fin sched st S fi
         FoldInv-reg id envSrc evs fin sched st _ S refl refl fi
 ...   | out , rem , true  =
         stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi
-stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs fin sched st S fi
-  = stepFrame-wf-inner sf id now envSrc op allNid inst path′ vals evs fin sched st S fi
+-- from-inner: fin ≡ false is quiet (react false = no-op); fin ≡ true absorbs the
+-- completion (the narrowed stepFrame-wf-inner residue)
+stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs false sched st S fi
+  rewrite ++-identityʳ evs = fi
+stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs true sched st S fi
+  = stepFrame-wf-inner sf id now envSrc op allNid inst path′ vals evs sched st S fi
 stepFrame-wf sf id now envSrc (thru-outer op nid) path′ vals evs fin sched st S fi
   = stepFrame-wf-outer sf id now envSrc op nid path′ vals evs fin sched st S fi
 
