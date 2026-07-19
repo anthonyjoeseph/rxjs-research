@@ -17,8 +17,9 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.List    using (List; []; _∷_; _++_; any; length)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -36,8 +37,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 sameSource; drySource; dryEvent; hasDry;
-                                budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; protocol-init;
+                                dropSource; budgetAt)
+open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
                                 stepProtocol; runProtocol; paidUp;
                                 checkFinal; Accepted; accepted; WellFormed)
 
@@ -115,6 +116,17 @@ zeroExcept : Source → Owed → Bool
 zeroExcept s []            = true
 zeroExcept s ((x , n) ∷ o) =
   (if s ≡ᵇ x then true else n ≡ᵇ 0) ∧ zeroExcept s o
+
+-- the owed table's keys never repeat (bumpOwed adds to an existing
+-- entry, never a second one): with `zeroExcept s` this pins down every
+-- entry, so a zero at s means the whole table is zero (allZero-clean)
+notKeyOwed : Source → Owed → Bool
+notKeyOwed s []            = true
+notKeyOwed s ((x , _) ∷ o) = not (s ≡ᵇ x) ∧ notKeyOwed s o
+
+UniqueOwed : Owed → Bool
+UniqueOwed []            = true
+UniqueOwed ((x , _) ∷ o) = notKeyOwed x o ∧ UniqueOwed o
 
 -- a path that never reaches the root delivers no values there
 sinksToShare : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → Bool
@@ -319,6 +331,22 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     done-plumbed : ProtocolSt.done S ≡ true →
       allShareSunk (EvalSt.registry st) ≡ true
     fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
+    -- ADDED (owed-key uniqueness): the open instant's owed table has no
+    -- repeated key, so ledger's zeroExcept + the arrival's zero remainder
+    -- force allZero — the payoff mid-final reads out.  Preserved by
+    -- mid-skip (same S); established by mid-init/mid-step (postulated).
+    owed-unique  : ∀ (ow : Owed) →
+      ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
+    -- ADDED (finish scheduler tie): once the spent source is swept from
+    -- both the registry and the live schedule, the finished state's
+    -- chains-count still holds — the registry-membership fact the counts
+    -- alone can't see.  Preserved by mid-skip (same a/sched/st);
+    -- established by mid-init/mid-step (postulated).
+    finish-chains : Arrival.isLast a ≡ true →
+      ∀ (a′ : Arrival Γ) (sched″ : Sched Γ) →
+      sched-next (proj₁ (cascadeFinish a sched st)) ≡ inj₂ (a′ , sched″) →
+      countRegs (arrSource a′) (EvalSt.registry (proj₂ (cascadeFinish a sched st)))
+        ≡ length (chainsOf a′ (proj₂ (cascadeFinish a sched st)))
 
 postulate
   -- entering: the latch opens the ledger; the automaton, Inv-related
@@ -333,16 +361,6 @@ postulate
     hasDry (proj₁ (cascadeGo a nextId (chainsOf a st) sched′
                              (cascadeLatch a st))) ≡ false →
     Mid a nextId (chainsOf a st) sched′ (cascadeLatch a st) S
-
-  -- a cancelled chain folds to nothing (its close already rode the
-  -- cutting emit; its owed was forgiven right there)
-  mid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {nextId : Id} {rid : RegId}
-    {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
-    {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
-    Mid a nextId ((rid , p) ∷ ps) sched st S →
-    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
-    Mid a nextId ps sched st S
 
   -- one surviving chain's emits — the chain emit, any share
   -- fan-outs, any cut closes — are accepted, paying/bumping/
@@ -362,15 +380,273 @@ postulate
       in (runProtocol S (proj₁ r) ≡ just S′)
          × Mid a nextId ps (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
 
-  -- leaving: all chains folded ⇒ fully paid; finish (drop the spent
-  -- source, sweep) lands Inv-related at suc nextId
-  mid-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {nextId : Id}
-    {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
-    Mid a nextId [] sched st S →
-    Inv (suc nextId) (proj₁ (cascadeFinish a sched st))
-                     (proj₂ (cascadeFinish a sched st)) S
-    × (paidUp S ≡ true)
+-- a cancelled head contributes nothing to countRemaining (the `if`
+-- takes the then-branch)
+cr-skip : ∀ {X : Set} (rid : RegId) (x : X)
+          (ps : List (RegId × X)) (c : List RegId) →
+          any (_≡ᵇ rid) c ≡ true →
+          countRemaining ((rid , x) ∷ ps) c ≡ countRemaining ps c
+cr-skip rid x ps c h rewrite h = refl
+
+-- and nothing to cascadeGo: its first clause skips a cancelled head
+-- outright, folding the tail with the SAME state (two-column trick —
+-- cascadeGo's `with` won't unfold under rewrite)
+cascadeGo-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (nextId : Id) (rid : RegId)
+  (p : Path Γ (arrTy a) t) (ps : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+  cascadeGo {e = e} a nextId ((rid , p) ∷ ps) sched st
+    ≡ cascadeGo {e = e} a nextId ps sched st
+cascadeGo-skip a nextId rid p ps sched st ceq
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) | ceq
+... | true | refl = refl
+
+-- a cancelled chain folds to nothing (its close already rode the
+-- cutting emit; its owed was forgiven right there): every Mid field is
+-- stable when the snapshot head drops, given the head is cancelled
+mid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {nextId : Id} {rid : RegId}
+  {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
+  {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+  Mid a nextId ps sched st S
+mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
+  { live-others  = Mid.live-others mid
+  ; live-source  = trans (Mid.live-source mid)
+      (cong (λ z → if Arrival.isLast a then z
+                   else countRegs (arrSource a) (EvalSt.registry st))
+            (cr-skip rid p ps (EvalSt.cancelled st) ceq))
+  ; chains-count = Mid.chains-count mid
+  ; horizon-low  = Mid.horizon-low mid
+  ; ledger       = ledger′
+  ; done-plumbed = Mid.done-plumbed mid
+  ; fold-live    = subst (λ z → hasDry (proj₁ z) ≡ false)
+      (cascadeGo-skip a nextId rid p ps sched st ceq)
+      (Mid.fold-live mid)
+  ; owed-unique   = Mid.owed-unique mid   -- same S, nextId
+  ; finish-chains = Mid.finish-chains mid  -- same a, sched, st
+  }
+  where
+  ledger′ :
+      (CurrentPast (ProtocolSt.current S) nextId × (paidUp S ≡ true))
+    ⊎ (Σ Owed λ ow →
+         (ProtocolSt.current S ≡ just (nextId , ow))
+       × (lookupOwed (arrSource a) ow
+            ≡ countRemaining ps (EvalSt.cancelled st))
+       × (zeroExcept (arrSource a) ow ≡ true))
+  ledger′ with Mid.ledger mid
+  ... | inj₁ x                    = inj₁ x
+  ... | inj₂ (ow , cur , lk , zx) =
+        inj₂ (ow , cur
+             , trans lk (cr-skip rid p ps (EvalSt.cancelled st) ceq)
+             , zx)
+
+------------------------------------------------------------------
+-- mid-final: leaving the cascade.  Bool/ℕ glue first, then registry
+-- lemmas for the finish sweep, then the assembly.
+------------------------------------------------------------------
+
+≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
+≡ᵇ→≡ zero    zero    _ = refl
+≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
+
+≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
+≡ᵇ-refl zero    = refl
+≡ᵇ-refl (suc m) = ≡ᵇ-refl m
+
+∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
+∧-trueˡ {true} _ = refl
+
+∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
+∧-trueʳ {true} h = h
+
+∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
+∧-intro refl refl = refl
+
+if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
+if-false b eq rewrite eq = refl
+
+if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
+if-true b eq rewrite eq = refl
+
+-- a key absent from the table reads zero
+lookupOwed-absent : ∀ (s : Source) (o : Owed) →
+  notKeyOwed s o ≡ true → lookupOwed s o ≡ 0
+lookupOwed-absent s []            _ = refl
+lookupOwed-absent s ((x , n) ∷ o) h with s ≡ᵇ x | h
+... | false | h′ = lookupOwed-absent s o h′
+... | true  | h′ = true≢false (sym h′)
+
+-- with unique keys, zeroExcept + a zero at s forces the whole table
+-- zero.  `with s ≡ᵇ x in seq` rewrites ze/lk in each branch: at the key
+-- (true) lk reads n ≡ 0 and ze drops to the tail; off-key (false) ze's
+-- head gives n ≡ᵇ 0 and lk passes to the tail
+allZero-clean : ∀ (s : Source) (o : Owed) →
+  UniqueOwed o ≡ true → zeroExcept s o ≡ true → lookupOwed s o ≡ 0 →
+  allZero o ≡ true
+allZero-clean s []            _  _  _  = refl
+allZero-clean s ((x , n) ∷ o) uq ze lk with s ≡ᵇ x in seq
+... | true  =
+      subst (λ m → allZero ((x , m) ∷ o) ≡ true) (sym lk)
+        (allZero-clean s o (∧-trueʳ uq) ze
+          (lookupOwed-absent s o
+            (subst (λ z → notKeyOwed z o ≡ true)
+                   (sym (≡ᵇ→≡ s x seq)) (∧-trueˡ uq))))
+... | false =
+      subst (λ m → allZero ((x , m) ∷ o) ≡ true)
+            (sym (≡ᵇ→≡ n 0 (∧-trueˡ ze)))
+        (allZero-clean s o (∧-trueʳ uq) (∧-trueʳ ze) lk)
+
+-- an all-zero owed table settles: paidUp holds
+paid-allzero : (S : ProtocolSt) {j : Id} {ow : Owed} →
+  ProtocolSt.current S ≡ just (j , ow) → allZero ow ≡ true → paidUp S ≡ true
+paid-allzero S ceq az with ProtocolSt.current S | ceq
+... | just (j , ow) | refl rewrite az = refl
+
+-- CurrentPast only weakens as the bound grows
+currentPast-up : (c : Maybe (Id × Owed)) (N : Id) →
+  CurrentPast c N → CurrentPast c (suc N)
+currentPast-up nothing        N cp = tt
+currentPast-up (just (j , _)) N cp = ≤-up cp
+
+-- registry sweep: dropping s zeroes s's own count and leaves others'
+dropSource-self : ∀ {n} {Γ : Ctx n} {t}
+  (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  countRegs s (dropSource s reg) ≡ 0
+dropSource-self s []                  = refl
+dropSource-self s ((rid , x , c) ∷ r) with s ≡ᵇ x in eq
+... | true             = dropSource-self s r
+... | false rewrite eq = dropSource-self s r
+
+dropSource-other : ∀ {n} {Γ : Ctx n} {t}
+  (s s′ : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (s ≡ᵇ s′) ≡ false →
+  countRegs s (dropSource s′ reg) ≡ countRegs s reg
+dropSource-other s s′ []                  neq = refl
+dropSource-other s s′ ((rid , x , c) ∷ r) neq with s ≡ᵇ x in sx | s′ ≡ᵇ x in s′x
+... | true  | true  =
+      let s≡s′ = trans (≡ᵇ→≡ s x sx) (sym (≡ᵇ→≡ s′ x s′x))
+          p    = trans (sym (cong (s ≡ᵇ_) s≡s′)) (≡ᵇ-refl s)
+      in true≢false (trans (sym p) neq)
+... | true  | false rewrite sx = cong suc (dropSource-other s s′ r neq)
+... | false | true             = dropSource-other s s′ r neq
+... | false | false rewrite sx = dropSource-other s s′ r neq
+
+-- dropping preserves "every registration is share-sunk"
+allShareSunk-drop : ∀ {n} {Γ : Ctx n} {t}
+  (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  allShareSunk reg ≡ true → allShareSunk (dropSource s reg) ≡ true
+allShareSunk-drop s []                        h = refl
+allShareSunk-drop s ((rid , x , (u , p)) ∷ r) h with s ≡ᵇ x
+... | true  = allShareSunk-drop s r (∧-trueʳ h)
+... | false = ∧-intro (∧-trueˡ h) (allShareSunk-drop s r (∧-trueʳ h))
+
+-- cascadeFinish reduced under each isLast branch (two-column trick: the
+-- `with Arrival.isLast a` won't unfold under rewrite).  isLast=false
+-- leaves the state; isLast=true sweeps the spent source's registry
+cascadeFinish-false : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Arrival.isLast a ≡ false → cascadeFinish a sched st ≡ (sched , st)
+cascadeFinish-false a sched st eq with Arrival.isLast a | eq
+... | false | refl = refl
+
+finishReg-true : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Arrival.isLast a ≡ true →
+  EvalSt.registry (proj₂ (cascadeFinish a sched st))
+    ≡ dropSource (arrSource a) (EvalSt.registry st)
+finishReg-true a sched st eq with Arrival.isLast a | eq
+... | true | refl = refl
+
+-- leaving: all chains folded ⇒ fully paid; finish (drop the spent
+-- source, sweep) lands Inv-related at suc nextId
+mid-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {nextId : Id}
+  {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
+  Mid a nextId [] sched st S →
+  Inv (suc nextId) (proj₁ (cascadeFinish a sched st))
+                   (proj₂ (cascadeFinish a sched st)) S
+  × (paidUp S ≡ true)
+mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
+  where
+  paidUp-S : paidUp S ≡ true
+  paidUp-S with Mid.ledger mid
+  ... | inj₁ (_ , pd)             = pd
+  ... | inj₂ (ow , cur , lk , zx) =
+        paid-allzero S cur
+          (allZero-clean (arrSource a) ow (Mid.owed-unique mid ow cur) zx lk)
+
+  cpast : CurrentPast (ProtocolSt.current S) (suc nextId)
+  cpast with Mid.ledger mid
+  ... | inj₁ (cp , _)        = currentPast-up (ProtocolSt.current S) nextId cp
+  ... | inj₂ (ow , cur , _ , _) =
+        subst (λ c → CurrentPast c (suc nextId)) (sym cur) ≤-refl
+
+  -- the arrival source's live count, read off Mid.live-source per isLast
+  live-src-nl : Arrival.isLast a ≡ false →
+    countIn (arrSource a) (ProtocolSt.live S)
+      ≡ countRegs (arrSource a) (EvalSt.registry st)
+  live-src-nl isL = trans (Mid.live-source mid) (if-false (Arrival.isLast a) isL)
+
+  live-src-tl : Arrival.isLast a ≡ true →
+    countIn (arrSource a) (ProtocolSt.live S) ≡ 0
+  live-src-tl isL = trans (Mid.live-source mid) (if-true (Arrival.isLast a) isL)
+
+  lm-false : Arrival.isLast a ≡ false → ∀ (s : Source) →
+    countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
+  lm-false isL s with sameSource s (arrSource a) in seq
+  ... | false = Mid.live-others mid s seq
+  ... | true  =
+        subst (λ z → countIn z (ProtocolSt.live S)
+                       ≡ countRegs z (EvalSt.registry st))
+              (sym (≡ᵇ→≡ s (arrSource a) seq)) (live-src-nl isL)
+
+  lm-true : Arrival.isLast a ≡ true → ∀ (s : Source) →
+    countIn s (ProtocolSt.live S)
+      ≡ countRegs s (dropSource (arrSource a) (EvalSt.registry st))
+  lm-true isL s with sameSource s (arrSource a) in seq
+  ... | false = trans (Mid.live-others mid s seq)
+                  (sym (dropSource-other s (arrSource a) (EvalSt.registry st) seq))
+  ... | true  =
+        let s≡ = ≡ᵇ→≡ s (arrSource a) seq in
+        trans (subst (λ z → countIn z (ProtocolSt.live S) ≡ 0) (sym s≡)
+                 (live-src-tl isL))
+              (sym (subst (λ z → countRegs z (dropSource (arrSource a)
+                                   (EvalSt.registry st)) ≡ 0) (sym s≡)
+                     (dropSource-self (arrSource a) (EvalSt.registry st))))
+
+  inv : Inv (suc nextId) (proj₁ (cascadeFinish a sched st))
+                         (proj₂ (cascadeFinish a sched st)) S
+  inv = go (Arrival.isLast a) refl
+    where
+    go : (b : Bool) → Arrival.isLast a ≡ b →
+         Inv (suc nextId) (proj₁ (cascadeFinish a sched st))
+                          (proj₂ (cascadeFinish a sched st)) S
+    -- isLast=false: cascadeFinish is the identity; rewrite the goal flat
+    go false isL rewrite cascadeFinish-false a sched st isL = record
+      { live-matches = lm-false isL
+      ; chains-count = Mid.chains-count mid
+      ; horizon-low  = ≤-up (Mid.horizon-low mid)
+      ; current-past = cpast
+      ; done-plumbed = Mid.done-plumbed mid
+      }
+    -- isLast=true: keep cascadeFinish symbolic so chains-count lands on
+    -- finish-chains directly; convert the registry field-by-field
+    go true isL = record
+      { live-matches = λ s →
+          subst (λ reg → countIn s (ProtocolSt.live S) ≡ countRegs s reg)
+                (sym (finishReg-true a sched st isL)) (lm-true isL s)
+      ; chains-count = Mid.finish-chains mid isL
+      ; horizon-low  = ≤-up (Mid.horizon-low mid)
+      ; current-past = cpast
+      ; done-plumbed = λ deq →
+          subst (λ reg → allShareSunk reg ≡ true)
+                (sym (finishReg-true a sched st isL))
+                (allShareSunk-drop (arrSource a) (EvalSt.registry st)
+                  (Mid.done-plumbed mid deq))
+      }
 
 -- the chain fold, composed (mirrors cascadeGo's own recursion —
 -- structural on the snapshot, no termination debt at this level)
