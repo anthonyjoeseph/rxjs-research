@@ -120,36 +120,40 @@ sched-init {n = n} {Γ = Γ} e ins = record
   ... | scripted (cold _ _)  = []
   ... | shared _             = []
 
--- pop the pending arrival minimal by (tick, ordinal), or report empty
+-- pop the pending arrival minimal by (tick, ordinal), or report empty.
+-- The workers are TOP-LEVEL (not where-local of sched-next) so
+-- Verify-Well-Formed can reason about the arrival sched-next yields —
+-- in particular that it carries its LiveSource's elemTy
+schedEarlier : ∀ {n} {Γ : Ctx n} → Arrival Γ → Arrival Γ → Bool   -- ordinals are unique, so no tie survives
+schedEarlier a a′ = (Arrival.tick a <ᵇ Arrival.tick a′)
+             ∨ ((Arrival.tick a ≡ᵇ Arrival.tick a′) ∧ (Arrival.ordinal a <ᵇ Arrival.ordinal a′))
+
+schedHeadOf : ∀ {n} {Γ : Ctx n} → LiveSource Γ → ⊤ ⊎ (Arrival Γ × LiveSource Γ)
+schedHeadOf l with LiveSource.pending l
+... | []           = inj₁ tt
+... | (t , v) ∷ ps =
+      inj₂ ( record { tick = t ; ordinal = LiveSource.ordinal l
+                    ; source = LiveSource.source l
+                    ; elemTy = LiveSource.elemTy l ; payload = v
+                    ; isLast = null ps }
+           , record l { pending = ps } )
+
+schedGo : ∀ {n} {Γ : Ctx n} → List (LiveSource Γ) → ⊤ ⊎ (Arrival Γ × List (LiveSource Γ))
+schedGo []       = inj₁ tt
+schedGo (l ∷ ls) with schedHeadOf l | schedGo ls
+... | inj₁ _        | inj₁ _          = inj₁ tt
+... | inj₁ _        | inj₂ (a′ , ls′) = inj₂ (a′ , l ∷ ls′)
+... | inj₂ (a , l′) | inj₁ _          = inj₂ (a , l′ ∷ ls)
+... | inj₂ (a , l′) | inj₂ (a′ , ls′) =
+      if schedEarlier a a′ then inj₂ (a , l′ ∷ ls) else inj₂ (a′ , l ∷ ls′)
+
+schedFinish : ∀ {n} {Γ : Ctx n} → Sched Γ →
+              ⊤ ⊎ (Arrival Γ × List (LiveSource Γ)) → ⊤ ⊎ (Arrival Γ × Sched Γ)
+schedFinish sched (inj₁ _)        = inj₁ tt
+schedFinish sched (inj₂ (a , ls)) = inj₂ (a , record sched { live = ls })
+
 sched-next : ∀ {n} {Γ : Ctx n} → Sched Γ → ⊤ ⊎ (Arrival Γ × Sched Γ)
-sched-next {Γ = Γ} sched = finish (go (Sched.live sched))
-  where
-  earlier : Arrival Γ → Arrival Γ → Bool   -- ordinals are unique, so no tie survives
-  earlier a a′ = (Arrival.tick a <ᵇ Arrival.tick a′)
-               ∨ ((Arrival.tick a ≡ᵇ Arrival.tick a′) ∧ (Arrival.ordinal a <ᵇ Arrival.ordinal a′))
-
-  headOf : LiveSource Γ → ⊤ ⊎ (Arrival Γ × LiveSource Γ)
-  headOf l with LiveSource.pending l
-  ... | []           = inj₁ tt
-  ... | (t , v) ∷ ps =
-        inj₂ ( record { tick = t ; ordinal = LiveSource.ordinal l
-                      ; source = LiveSource.source l
-                      ; elemTy = LiveSource.elemTy l ; payload = v
-                      ; isLast = null ps }
-             , record l { pending = ps } )
-
-  go : List (LiveSource Γ) → ⊤ ⊎ (Arrival Γ × List (LiveSource Γ))
-  go []       = inj₁ tt
-  go (l ∷ ls) with headOf l | go ls
-  ... | inj₁ _        | inj₁ _          = inj₁ tt
-  ... | inj₁ _        | inj₂ (a′ , ls′) = inj₂ (a′ , l ∷ ls′)
-  ... | inj₂ (a , l′) | inj₁ _          = inj₂ (a , l′ ∷ ls)
-  ... | inj₂ (a , l′) | inj₂ (a′ , ls′) =
-        if earlier a a′ then inj₂ (a , l′ ∷ ls) else inj₂ (a′ , l ∷ ls′)
-
-  finish : ⊤ ⊎ (Arrival Γ × List (LiveSource Γ)) → ⊤ ⊎ (Arrival Γ × Sched Γ)
-  finish (inj₁ _)        = inj₁ tt
-  finish (inj₂ (a , ls)) = inj₂ (a , record sched { live = ls })
+sched-next sched = schedFinish sched (schedGo (Sched.live sched))
 
 ------------------------------------------------------------------
 -- Node state
