@@ -43,6 +43,7 @@ open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
+                                takeVals; cutThrough; setNode;
                                 NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 sched-init; st-init; sched-next; LiveSource;
@@ -1561,20 +1562,26 @@ FoldInv-reg id envSrc evs fin sched st st′ S req fi = record
 -- by any postulate).  stepFrame's bookkeeping evs′ brackets against its registry
 -- mutation, and the value transform keeps done-nil.  The delivery-side twin of
 -- subscribeE-wf's per-clause grind.
---  · take-f: the cut sub-branch drops the registry to cutThrough's `kept`,
---    closes the victims, and flips fin; the non-cut branch is quiet (a future
---    split can prove it — the cut edge is the load-bearing one).
+--  · take-f CUT edge only: the non-cut branch is quiet and proven below; the
+--    cut sub-branch drops the registry to cutThrough's `kept`, closes the
+--    victims, and flips fin — stated PRECISELY at the cut result (no stepFrame
+--    wrapper), so the non-cut path is no longer covered by any postulate.
 --  · from-inner / thru-outer: the *All wrap clauses, which need the node↔registry
 --    coherence field (caches) threaded into FoldInv before they can be discharged.
 postulate
-  stepFrame-wf-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-    (nid : NodeId) (path′ : Path Γ s t)
-    (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  stepFrame-wf-take-cut : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (id : Id) (envSrc : Source) (nid : NodeId)
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     FoldInv id envSrc evs fin sched st S →
-    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (take-f nid) path′ vals fin sched st
-    in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
+    let (kept , closes , cutRids) =
+          cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                     (EvalSt.dying st) (EvalSt.registry st)
+    in FoldInv id envSrc (evs ++ closes) true
+         (record sched { live = sweepLive kept (Sched.live sched) })
+         (record st { registry = kept
+                    ; cancelled = cutRids ++ EvalSt.cancelled st
+                    ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) }) S
 
   stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -1639,8 +1646,22 @@ stepFrame-wf {u = u} sf id now envSrc (scan-f fn nid) path′ vals evs fin sched
 ...   | no _     rewrite ++-identityʳ evs = fi
 ...   | yes refl rewrite ++-identityʳ evs =
         FoldInv-reg id envSrc evs fin sched st _ S refl fi
+-- take-f: like scan-f, a no-op on every node shape but a take-st; the take-st
+-- non-cut branch only rewrites the remaining-count node (quiet, FoldInv-reg);
+-- the cut branch drops the registry and closes victims (stepFrame-wf-take-cut).
 stepFrame-wf sf id now envSrc (take-f nid) path′ vals evs fin sched st S fi
-  = stepFrame-wf-take sf id now envSrc nid path′ vals evs fin sched st S fi
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                  rewrite ++-identityʳ evs = fi
+... | just (scan-st acc)       rewrite ++-identityʳ evs = fi
+... | just (merge-st a b)      rewrite ++-identityʳ evs = fi
+... | just (concat-st q ia od) rewrite ++-identityʳ evs = fi
+... | just (switch-st ci od)   rewrite ++-identityʳ evs = fi
+... | just (exhaust-st ia od)  rewrite ++-identityʳ evs = fi
+... | just (take-st k) with takeVals k vals
+...   | out , rem , false rewrite ++-identityʳ evs =
+        FoldInv-reg id envSrc evs fin sched st _ S refl fi
+...   | out , rem , true  =
+        stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi
 stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs fin sched st S fi
   = stepFrame-wf-inner sf id now envSrc op allNid inst path′ vals evs fin sched st S fi
 stepFrame-wf sf id now envSrc (thru-outer op nid) path′ vals evs fin sched st S fi
