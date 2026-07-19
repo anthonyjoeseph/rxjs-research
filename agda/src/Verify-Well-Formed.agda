@@ -131,6 +131,20 @@ closeCount s (value _  ∷ es) = closeCount s es
 closeCount s (handoff _ ∷ es) = closeCount s es
 closeCount s (complete ∷ es) = closeCount s es
 
+-- closes that DROP the registration (cut / cutPending, via cutThrough);
+-- an `exhausted` close is live-only — the registry defers to cascadeFinish —
+-- so it is excluded here.  registry drops track cutCloseCount, live drops
+-- track closeCount; the two differ by exactly the deferred exhausted closes
+cutCloseCount : ∀ {A : Set} → Source → List (InstEvent A) → ℕ
+cutCloseCount s []                       = zero
+cutCloseCount s (close x cut        ∷ es) = if s ≡ᵇ x then suc (cutCloseCount s es) else cutCloseCount s es
+cutCloseCount s (close x cutPending ∷ es) = if s ≡ᵇ x then suc (cutCloseCount s es) else cutCloseCount s es
+cutCloseCount s (close x exhausted  ∷ es) = cutCloseCount s es
+cutCloseCount s (init _   ∷ es) = cutCloseCount s es
+cutCloseCount s (value _  ∷ es) = cutCloseCount s es
+cutCloseCount s (handoff _ ∷ es) = cutCloseCount s es
+cutCloseCount s (complete ∷ es) = cutCloseCount s es
+
 -- snapshot entries still obliged to fire: not yet forgiven by a
 -- cutPending (the automaton's remaining owed for the arrival source)
 countRemaining : ∀ {X : Set} → List (RegId × X) → List RegId → ℕ
@@ -813,6 +827,15 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     shadow   : ∀ (s : Source) → sameSource s envSrc ≡ false →
       countIn s (ProtocolSt.live S) + initCount s evs
         ≡ countRegs s (EvalSt.registry st) + closeCount s evs
+    -- ADJUDICATED (2026-07): an envShadow twin of SHADOW here — countIn envSrc
+    -- live + initCount ≡ countRegs envSrc registry + cutCloseCount — is FALSE
+    -- at the mid-seed isLast branch: it reduces to countIn ≡ countRegs, but
+    -- Mid.live-source (isLast) gives countIn ≡ countRemaining, and mid-cascade
+    -- countRegs ≠ countRemaining (delivered isLast chains linger in the
+    -- registry until cascadeFinish).  So envSrc is NOT a seed-provable FoldInv
+    -- invariant; its live-source readoff lives in FoldOut as output deltas
+    -- (live-envSrc-out : live S′ ≡ live S ∸ (if fin then 1 else 0), universal;
+    -- reg-envSrc-out via cutCloseCount over the emit, no-take-head first).
     -- once the root completes only share plumbing survives: every
     -- registration sinks to a share, so a share fan-out's inners are all
     -- share-bound (their own done-discipline, for dispatchShare-wf).
