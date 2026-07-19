@@ -1231,6 +1231,21 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- if fin then 1 else 0).  The take-head cut is the one edge stepFrame-wf must
     -- carry (a head take flips fin AND closes envSrc), pinned by Unit-Test.
     env-init  : initCount envSrc evs ≡ 0
+    -- ⚠ FINDING (2026-07-19): this `if fin` form is FRAME-UNSTABLE under from-inner
+    -- absorption — it makes stepFrame-wf-inner (fin ≡ true) FALSE as stated, so the
+    -- fold cannot thread it and the proof cannot complete without a fix.  At a
+    -- from-inner frame envSrc is the completing inner chain's OWN source, so its
+    -- exhausted close sits in evs (closeCount envSrc evs ≡ 1) with fin ≡ true; if a
+    -- live sibling registration under the same inner instance keeps the subtree
+    -- alive, `react true` ABSORBS the completion (fin′ ≡ false) with evs unchanged,
+    -- so the output demands closeCount envSrc evs ≡ 0 while it is still 1.  This is
+    -- the EXACT instability already fixed on the output side (FoldOut.live-envSrc-out
+    -- was re-keyed from `if fin` to closeCount, 2026-07-19); the input field never
+    -- got the same treatment.  NOTE it is currently consumed by nothing but the
+    -- postulated mid-step (foldPath-root-out derives live-envSrc-out from env-INIT +
+    -- applyEvents-count, NOT this field; FoldInv-reg only re-threads it).  The fix
+    -- (re-key to a frame-stable closeCount form, or drop it and give mid-step the
+    -- bridge from live-envSrc-out) is a core-FoldInv change — awaiting direction.
     env-close : closeCount envSrc evs ≡ (if fin then suc zero else zero)
     -- the cascade's `dying` set holds only envSrc (cascadeLatch seeds it to
     -- [arrSource a] iff isLast, else []; the fold never grows it).  Stable
