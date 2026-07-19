@@ -841,6 +841,15 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     -- reg-typed verbatim and horizon-out reads hz ≤ id off enters + horizon-low.
     reg-typed   : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low : ProtocolSt.horizon S ≤ id
+    -- the open instant's owed table (Ov = the applyEvents output owed, which
+    -- becomes current S′ at the root) keeps the seed's ledger shape all fold:
+    -- zeroExcept envSrc (only envSrc may be owed) and UniqueOwed (no repeated
+    -- key), with owed[envSrc] pinned to ob′'s (settle/fan-out never touch it —
+    -- a handoff bump is repaid within its own dispatch).  These feed FoldOut's
+    -- current-out, from which mid-step rebuilds Mid ps's ledger + owed-unique.
+    ov-zero   : zeroExcept envSrc Ov ≡ true
+    ov-unique : UniqueOwed Ov ≡ true
+    ov-envSrc : lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′
 
 ------------------------------------------------------------------
 -- FoldOut — the readoff companion to FoldInv (DESIGN, worked out 2026-07;
@@ -1372,6 +1381,47 @@ payOwed-key s ((x , n) ∷ o) k eq | false
 ... | o′ , po , lk rewrite po =
       (x , n) ∷ o′ , refl , trans (lookupOwed-miss s x n o′ sx) lk
 
+-- payOwed changes only the VALUE at key s (keys unchanged), so it
+-- preserves both zeroExcept s (which ignores s's own value) and
+-- UniqueOwed (keys drive both).  These carry the seed's owed shape
+-- (zeroExcept + unique) through the settle into ob′ = FoldInv.Ov.
+zeroExcept-payOwed : ∀ (s : Source) (ow ow′ : Owed) →
+  payOwed s ow ≡ just ow′ → zeroExcept s ow ≡ true → zeroExcept s ow′ ≡ true
+zeroExcept-payOwed s [] ow′ () ze
+zeroExcept-payOwed s ((x , n) ∷ o) ow′ eq ze with s ≡ᵇ x in sx
+... | true with n | eq
+...   | zero  | ()
+...   | suc m | refl rewrite sx = ze
+zeroExcept-payOwed s ((x , n) ∷ o) ow′ eq ze | false
+  with payOwed s o in po | eq
+... | just o′ | refl rewrite sx =
+      ∧-intro (∧-trueˡ ze) (zeroExcept-payOwed s o o′ po (∧-trueʳ ze))
+
+-- payOwed preserves every key, hence notKeyOwed z reads the same after it
+payOwed-notKey : ∀ (s z : Source) (ow ow′ : Owed) →
+  payOwed s ow ≡ just ow′ → notKeyOwed z ow ≡ notKeyOwed z ow′
+payOwed-notKey s z [] ow′ ()
+payOwed-notKey s z ((x , n) ∷ o) ow′ eq with s ≡ᵇ x
+... | true with n | eq
+...   | zero  | ()
+...   | suc m | refl = refl
+payOwed-notKey s z ((x , n) ∷ o) ow′ eq | false
+  with payOwed s o in po | eq
+... | just o′ | refl = cong (λ b → not (z ≡ᵇ x) ∧ b) (payOwed-notKey s z o o′ po)
+
+UniqueOwed-payOwed : ∀ (s : Source) (ow ow′ : Owed) →
+  payOwed s ow ≡ just ow′ → UniqueOwed ow ≡ true → UniqueOwed ow′ ≡ true
+UniqueOwed-payOwed s [] ow′ () uq
+UniqueOwed-payOwed s ((x , n) ∷ o) ow′ eq uq with s ≡ᵇ x
+... | true with n | eq
+...   | zero  | ()
+...   | suc m | refl = uq
+UniqueOwed-payOwed s ((x , n) ∷ o) ow′ eq uq | false
+  with payOwed s o in po | eq
+... | just o′ | refl =
+      ∧-intro (trans (sym (payOwed-notKey s x o o′ po)) (∧-trueˡ uq))
+              (UniqueOwed-payOwed s o o′ po (∧-trueʳ uq))
+
 -- removing a present live source decrements its count by one
 countIn-removeOne : ∀ (s : Source) (lv : List Source) (k : ℕ) →
   countIn s lv ≡ suc k →
@@ -1423,15 +1473,15 @@ seed-applies : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
   {S : ProtocolSt} (ob′ : Owed) →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-  Σ (List Source) λ Lv → Σ Owed λ Ov →
+  Σ (List Source) λ Lv →
     applyEvents {Val Γ t}
       (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-      (ProtocolSt.live S) ob′ (ProtocolSt.done S) ≡ just (Lv , Ov , ProtocolSt.done S)
+      (ProtocolSt.live S) ob′ (ProtocolSt.done S) ≡ just (Lv , ob′ , ProtocolSt.done S)
 seed-applies {a = a} {rid = rid} {p = p} {ps = ps} {st = st} {S = S} ob′ mid ceq
   with Arrival.isLast a | Mid.live-source mid
-... | false | lsm = ProtocolSt.live S , ob′ , refl
+... | false | lsm = ProtocolSt.live S , refl
 ... | true  | lsm =
-      live′ , ob′ , applyEvents-close-exh (arrSource a) (ProtocolSt.live S) live′ ob′
+      live′ , applyEvents-close-exh (arrSource a) (ProtocolSt.live S) live′ ob′
                      (ProtocolSt.done S) ro
   where
   ci-eq : countIn (arrSource a) (ProtocolSt.live S)
@@ -1473,6 +1523,8 @@ seed-enter-pay : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
   Σ Owed λ ob → Σ Id λ hz → Σ Owed λ ob′ →
     (enterInstant S nextId ≡ just (ob , hz))
   × (settle delivery (arrSource a) (ProtocolSt.live S) ob ≡ just ob′)
+  × (zeroExcept (arrSource a) ob′ ≡ true)
+  × (UniqueOwed ob′ ≡ true)
 seed-enter-pay {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
   with Mid.ledger mid
 ... | inj₂ (ow , cur , lk , zx) =
@@ -1482,6 +1534,9 @@ seed-enter-pay {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
       , trans (settle-hit (arrSource a) (ProtocolSt.live S) ow
                 (lookup-pos-hasOwed (arrSource a) ow _ lk-suc))
               (proj₁ (proj₂ pk))
+      , zeroExcept-payOwed (arrSource a) ow (proj₁ pk) (proj₁ (proj₂ pk)) zx
+      , UniqueOwed-payOwed (arrSource a) ow (proj₁ pk) (proj₁ (proj₂ pk))
+          (Mid.owed-unique mid ow cur)
   where
   lk-suc : lookupOwed (arrSource a) ow ≡ suc (countRemaining ps (EvalSt.cancelled st))
   lk-suc = trans lk (cr-fresh rid p ps (EvalSt.cancelled st) ceq)
@@ -1494,12 +1549,15 @@ seed-enter-pay {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
               (subst (λ c → payOwed (arrSource a) (bumpOwed (arrSource a) c [])
                               ≡ just ((arrSource a , k) ∷ []))
                      (sym ci-eq) (payOwed-seed (arrSource a) k))
+      , ze′ , refl
   where
   ef = enterInstant-fresh S nextId cp paid (Mid.horizon-low mid)
   pos = seed-live-pos mid ceq
   k = proj₁ pos
   ci-eq : countIn (arrSource a) (ProtocolSt.live S) ≡ suc k
   ci-eq = proj₂ pos
+  ze′ : zeroExcept (arrSource a) ((arrSource a , k) ∷ []) ≡ true
+  ze′ rewrite ≡ᵇ-refl (arrSource a) = refl
 
 -- THE seed: Mid (head ∷ ps) ⇒ FoldInv at the chainStep seed
 mid-seed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
@@ -1512,12 +1570,13 @@ mid-seed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S
 mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
-  { ob = ob ; hz = hz ; ob′ = ob′ ; Lv = proj₁ ap ; Ov = proj₁ (proj₂ ap)
-  ; enters = enters ; pays = pays ; applies = proj₂ (proj₂ ap)
+  { ob = ob ; hz = hz ; ob′ = ob′ ; Lv = proj₁ ap ; Ov = ob′
+  ; enters = enters ; pays = pays ; applies = proj₂ ap
   ; shadow = shadow
   ; done-plumbed = Mid.done-plumbed mid
   ; reg-typed = Mid.reg-typed mid
   ; horizon-low = Mid.horizon-low mid
+  ; ov-zero = ze′ ; ov-unique = uq′ ; ov-envSrc = refl
   }
   where
   ep = seed-enter-pay mid ceq
@@ -1525,7 +1584,9 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   hz  = proj₁ (proj₂ ep)
   ob′ = proj₁ (proj₂ (proj₂ ep))
   enters = proj₁ (proj₂ (proj₂ (proj₂ ep)))
-  pays   = proj₂ (proj₂ (proj₂ (proj₂ ep)))
+  pays   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ ep))))
+  ze′    = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ ep)))))
+  uq′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ ep)))))
   ap = seed-applies ob′ mid ceq
   -- for s ≠ arrSource the seed evs carry no init and (isLast) only an
   -- arrSource close, so initCount/closeCount vanish: SHADOW ⇔ live-others
