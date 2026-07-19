@@ -470,6 +470,120 @@ brs-keep-aux seen es i s k lvB hz dn b o₁ l″ o″ ib sb al ao is bl
                    , cong (λ x → just (x , o″)) (sym (≡ᵇ→≡ (OpenBatch.instant b) i ib))
                    , po , is , bl) }
 
+------------------------------------------------------------------
+-- Protocol freshness, forward: an instant already left behind (below the
+-- horizon) or held paid-off can never recur in an accepted tail, so its
+-- clairvoyant valuesAt is empty.  This is what makes flush-step's paidOff
+-- branches true: the online flush of a completed instant loses nothing.
+------------------------------------------------------------------
+
+-- the current open instant never sits below the horizon
+HorInv : ProtocolSt → Set
+HorInv S = ∀ j o → ProtocolSt.current S ≡ just (j , o) → ProtocolSt.horizon S ≤ j
+
+horinv-just : ∀ (lv : List Source) (hz : Id) (i : Id) (o″ : Owed) (dn : Bool) →
+  hz ≤ i → HorInv (record { live = lv ; horizon = hz ; current = just (i , o″) ; done = dn })
+horinv-just lv hz i o″ dn h j′ o′ eq = subst (hz ≤_) (cong proj₁ (just-inj eq)) h
+
+-- one accepted step: the horizon never decreases, and HorInv is preserved.
+-- Dispatch on the current value as an EXPLICIT argument (not `with current
+-- S`, which would revert stepEq into the reduced openFresh form).
+step-horizon-go : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source) (k : EmitKind)
+  (S S′ : ProtocolSt) (c : Maybe (Id × Owed)) → HorInv S →
+  ProtocolSt.current S ≡ c → stepProtocol (es at i from s as k) S ≡ just S′ →
+  (ProtocolSt.horizon S ≤ ProtocolSt.horizon S′) × HorInv S′
+step-horizon-go es i s k S S′ nothing hi ceq stepEq =
+  let (o₁ , l″ , o″ , d″ , hzi , _ , _ , S′eq) = stepProtocol-idle es i s k S S′ ceq stepEq
+  in subst (λ z → ProtocolSt.horizon S ≤ ProtocolSt.horizon z) (sym S′eq) ≤-refl
+   , subst HorInv (sym S′eq) (horinv-just l″ (ProtocolSt.horizon S) i o″ d″ hzi)
+step-horizon-go es i s k S S′ (just (j , oⱼ)) hi ceq stepEq with paidOff oⱼ in peq
+... | true =
+  let (o₁ , l″ , o″ , d″ , sucj≤i , _ , _ , S′eq) =
+        stepProtocol-held es i s k S S′ j oⱼ ceq peq stepEq
+  in subst (λ z → ProtocolSt.horizon S ≤ ProtocolSt.horizon z) (sym S′eq)
+           (≤-trans (hi j oⱼ ceq) (n≤1+n j))
+   , subst HorInv (sym S′eq) (horinv-just l″ (suc j) i o″ d″ sucj≤i)
+... | false with i ≡ᵇ j in ieq
+...   | true =
+  let (o₁ , l″ , o″ , d″ , _ , _ , S′eq) =
+        stepProtocol-cont es i s k S S′ j oⱼ ceq ieq peq stepEq
+  in subst (λ z → ProtocolSt.horizon S ≤ ProtocolSt.horizon z) (sym S′eq) ≤-refl
+   , subst HorInv (sym S′eq)
+       (horinv-just l″ (ProtocolSt.horizon S) i o″ d″
+          (subst (ProtocolSt.horizon S ≤_) (sym (≡ᵇ→≡ i j ieq)) (hi j oⱼ ceq)))
+...   | false =
+  let (o₁ , l″ , o″ , d″ , sucj≤i , _ , _ , S′eq) =
+        stepProtocol-fresh es i s k S S′ j oⱼ ceq ieq stepEq
+  in subst (λ z → ProtocolSt.horizon S ≤ ProtocolSt.horizon z) (sym S′eq)
+           (≤-trans (hi j oⱼ ceq) (n≤1+n j))
+   , subst HorInv (sym S′eq) (horinv-just l″ (suc j) i o″ d″ sucj≤i)
+
+step-horizon : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source) (k : EmitKind)
+  (S S′ : ProtocolSt) → HorInv S → stepProtocol (es at i from s as k) S ≡ just S′ →
+  (ProtocolSt.horizon S ≤ ProtocolSt.horizon S′) × HorInv S′
+step-horizon es i s k S S′ hi stepEq =
+  step-horizon-go es i s k S S′ (ProtocolSt.current S) hi refl stepEq
+
+-- an instant is STALE (unenterable) once it is below the horizon or is the
+-- currently-held paid-off instant
+Stale : ProtocolSt → Id → Set
+Stale S m = (suc m ≤ ProtocolSt.horizon S)
+          ⊎ (Σ Owed λ o → (ProtocolSt.current S ≡ just (m , o)) × (paidOff o ≡ true))
+
+-- a below-horizon instant rejects any emit (dispatch on current value so
+-- stepEq stays intact) — acceptance would put m at/above the horizon
+below-noaccept-go : ∀ {A : Set} (es : List (InstEvent A)) (s : Source) (k : EmitKind)
+  (S S″ : ProtocolSt) (m : Id) (c : Maybe (Id × Owed)) → HorInv S →
+  suc m ≤ ProtocolSt.horizon S → ProtocolSt.current S ≡ c →
+  stepProtocol (es at m from s as k) S ≡ just S″ → ⊥
+below-noaccept-go es s k S S″ m nothing hi smh ceq stepEq =
+  let (_ , _ , _ , _ , hzm , _ , _ , _) = stepProtocol-idle es m s k S S″ ceq stepEq
+  in 1+n≰n (≤-trans smh hzm)
+below-noaccept-go es s k S S″ m (just (j , oⱼ)) hi smh ceq stepEq with paidOff oⱼ in peq
+... | true =
+  let (_ , _ , _ , _ , sucj≤m , _ , _ , _) = stepProtocol-held es m s k S S″ j oⱼ ceq peq stepEq
+  in 1+n≰n (≤-trans (≤-trans smh (hi j oⱼ ceq)) (≤-trans (n≤1+n j) sucj≤m))
+... | false with m ≡ᵇ j in ieq
+...   | true  = 1+n≰n (≤-trans smh
+                  (subst (ProtocolSt.horizon S ≤_) (sym (≡ᵇ→≡ m j ieq)) (hi j oⱼ ceq)))
+...   | false =
+  let (_ , _ , _ , _ , sucj≤m , _ , _ , _) = stepProtocol-fresh es m s k S S″ j oⱼ ceq ieq stepEq
+  in 1+n≰n (≤-trans (≤-trans smh (hi j oⱼ ceq)) (≤-trans (n≤1+n j) sucj≤m))
+
+-- a stale instant rejects any emit at it
+stale-noaccept : ∀ {A : Set} (es : List (InstEvent A)) (s : Source) (k : EmitKind)
+  (S S″ : ProtocolSt) (m : Id) → HorInv S → Stale S m →
+  stepProtocol (es at m from s as k) S ≡ just S″ → ⊥
+stale-noaccept es s k S S″ m hi (inj₁ smh) stepEq =
+  below-noaccept-go es s k S S″ m (ProtocolSt.current S) hi smh refl stepEq
+stale-noaccept es s k S S″ m hi (inj₂ (o , ceq , po)) stepEq =
+  let (_ , _ , _ , _ , sucm≤m , _ , _ , _) = stepProtocol-held es m s k S S″ m o ceq po stepEq
+  in 1+n≰n sucm≤m
+
+-- staleness is preserved by any accepted step (a held paid-off instant, once
+-- left, sits below the new horizon = suc m)
+stale-step : ∀ {A : Set} (x : InstEmit A) (S S″ : ProtocolSt) (m : Id) →
+  HorInv S → Stale S m → stepProtocol x S ≡ just S″ → Stale S″ m
+stale-step (es at n from s as k) S S″ m hi (inj₁ smh) stepEq =
+  inj₁ (≤-trans smh (proj₁ (step-horizon es n s k S S″ hi stepEq)))
+stale-step (es at n from s as k) S S″ m hi (inj₂ (o , ceq , po)) stepEq =
+  let (_ , _ , _ , _ , _ , _ , _ , S″eq) = stepProtocol-held es n s k S S″ m o ceq po stepEq
+  in inj₁ (subst (λ z → suc m ≤ ProtocolSt.horizon z) (sym S″eq) ≤-refl)
+
+-- THE payoff: a stale instant contributes nothing to an accepted tail
+valuesAt-stale : ∀ {A : Set} (S : ProtocolSt) (rest : List (InstEmit A)) (m : Id) →
+  HorInv S → Stale S m → Accepted (runProtocol S rest) → valuesAt m rest ≡ []
+valuesAt-stale S [] m hi st acc = refl
+valuesAt-stale S ((es at n from s as k) ∷ rest) m hi st acc
+  with step-accepted (es at n from s as k) S rest acc
+... | S″ , stepEq , acc″ with m ≡ᵇ n in meq
+...   | true  = ⊥-elim (stale-noaccept es s k S S″ m hi st
+                  (subst (λ z → stepProtocol (es at z from s as k) S ≡ just S″)
+                         (sym (≡ᵇ→≡ m n meq)) stepEq))
+...   | false = valuesAt-stale S″ rest m
+                  (proj₂ (step-horizon es n s k S S″ hi stepEq))
+                  (stale-step (es at n from s as k) S S″ m hi st stepEq) acc″
+
 postulate
   -- the remaining heart lemma of the simulation (batchrel-step is now
   -- proven below).  flush-step: the emit's online output plus the new open
