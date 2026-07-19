@@ -1122,15 +1122,45 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       react true / merge-st k>0 / concat queue), so it could not have let fin
 --       reach root in the first place.  (c)-root-sinking is thus incompatible with
 --       the flip; only (a)+(b) coexist with it ⇒ allShareSunk(dropSource envSrc).
---     - ESTABLISHMENT, REDIRECTED: flip-plumbed-out is therefore NOT a per-frame
---       node-count fact — it is the contrapositive of ABSORPTION, a CASCADE-level
---       property: "fin reaches root ⇒ no live non-envSrc root-sinker survived."
---       The natural carrier is a mid-cascade registry invariant threaded through
---       cascadeGo (every live non-envSrc, non-share reg keeps some *All gate open,
---       so its presence forces fin absorption at that gate), NOT a merge-st k
---       equality.  This kills the countRegsUnder direction outright: the merge
---       frame's real duty is "wrap-true k≡0 ⇒ this subtree absorbs nothing more,"
---       provable from the gate + the cascade invariant, no exact count needed.
+--     - ESTABLISHMENT, REDIRECTED: flip-plumbed-out is NOT a per-frame node-COUNT
+--       fact — it is the contrapositive of ABSORPTION, assembled from the per-frame
+--       GATE CERTIFICATES along the fold path.  Two ingredients:
+--        (i) TOPOLOGY (verified 2026-07-19): there is no binary static merge —
+--            mergeAllᵉ is the ONLY merge (Evtr 896), so `merge(a,b)` desugars to
+--            mergeAll(of(a,b)) with a,b inners of ONE node nid (from-inner mergeᵒ
+--            nid _).  concat/switch/exhaust likewise.  Hence ANY two root-sinking
+--            sources that must jointly-complete-before-root are inners under a
+--            COMMON *All gate; there are no independent root-sinkers whose fins
+--            race to root ungated.  (foldPath root emits `if fin complete` with no
+--            join, Evtr 960-962 — soundness relies entirely on this gating.)
+--        (ii) CERTIFICATE: when the fold's fin passes a gate on envSrc's path, the
+--            evaluator's own scrutinee fired.  A merge gate absorbs on TWO axes,
+--            and fin passes only when BOTH clear:
+--              · the completing inner's OWN (multi-source) subtree — from-inner
+--                `any aliveThrough registry ≡ false` (Evtr 601).  aliveThrough
+--                tests `pathHasNode inst p` (the completing INSTANCE inst, not the
+--                node), so this axis is structural/no-count and handles reason (2)'s
+--                multi-source inner directly.
+--              · the OTHER active inners — `pred k ≡ᵇ 0` at from-inner finish (Evtr
+--                569), `k ≡ᵇ 0` at the outer's thru-outer wrap (Evtr 625-628).
+--                Sibling inners carry DISTINCT insts, so aliveThrough does NOT see
+--                them; only k does.  So the count is NOT fully avoidable — but the
+--                needed fact is one-directional and liveness-aware:
+--                  merge-cert : (merge-st k _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough
+--                               inner INSTANCE under nid survives
+--                (the CORRECTED coherence: key on from-inner allNid=nid, dedup by
+--                inst, exclude spent — NOT the false raw countRegsUnder equality).
+--       So a live non-envSrc root-sinker r must share a gate g with envSrc's path
+--       (topology); envSrc's fin passing g fired g's certificate; the certificate
+--       (aliveThrough=false for r's own inst, or merge-cert via k for a sibling
+--       inst) says r is not live — contradiction.  ⇒ allShareSunk(dropSource
+--       envSrc).  OPEN (next), both operational (guardrail 1), carried by the
+--       enriched stepFrame-wf: (a) the aliveThrough=false / merge-cert certificate
+--       as from-inner/thru-outer's enriched conclusion; (b) the "root-sinker shares
+--       a gate with envSrc's path" topology lemma over Path (pathHasNode /
+--       frameNodes).  The merge-cert still needs the CORRECTED k↔live-inst
+--       coherence as a threaded FoldInv field — its exact statement (and whether
+--       k≡0⇒none is seed-provable) is the remaining design point, NOT countRegsUnder.
 --     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise
 --       is done ≡ true, vacuous right up until the flip; the flip is mid-cascade,
 --       where Inv does not exist.  Nothing to derive from at the one moment the
