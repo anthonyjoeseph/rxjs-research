@@ -18,7 +18,7 @@
 module Verify-Well-Formed where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.List    using (List; []; _∷_; _++_; any; length)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -41,7 +41,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 sameSource; drySource; dryEvent; hasDry;
-                                dropSource; budgetAt)
+                                dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
                                 stepProtocol; runProtocol; paidUp;
                                 checkFinal; Accepted; accepted; WellFormed)
@@ -280,6 +280,98 @@ chains-count-derived a sched sched″ st rt eq with schedGo (Sched.live sched) i
 chains-count-derived a sched sched″ st rt eq | inj₂ (a₀ , ls) with eq
 ...   | refl = count-eq a₀ (EvalSt.registry st) (Sched.live sched) rt
                  (schedGo-mem (Sched.live sched) geq)
+
+-- popping an arrival only shortens a live source's pending — source and
+-- elemTy are untouched, so liveTypeOK? (hence regTyped?) is preserved
+schedHeadOf-l′ : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ) {a : Arrival Γ} {l′} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  (LiveSource.source l′ ≡ LiveSource.source l) × (LiveSource.elemTy l′ ≡ LiveSource.elemTy l)
+schedHeadOf-l′ l eq with LiveSource.pending l | eq
+... | (t , v) ∷ ps | refl = refl , refl
+
+liveTypeOK?-swap : ∀ {n} {Γ : Ctx n} (s : Source) (u : Ty)
+  (l l′ : LiveSource Γ) (rest : List (LiveSource Γ)) →
+  LiveSource.source l′ ≡ LiveSource.source l →
+  LiveSource.elemTy l′ ≡ LiveSource.elemTy l →
+  liveTypeOK? s u (l′ ∷ rest) ≡ liveTypeOK? s u (l ∷ rest)
+liveTypeOK?-swap s u l l′ rest seq teq rewrite seq | teq = refl
+
+schedGo-liveTypeOK : ∀ {n} {Γ : Ctx n} (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
+  schedGo live ≡ inj₂ (a , ls) →
+  ∀ (s : Source) (u : Ty) → liveTypeOK? s u ls ≡ liveTypeOK? s u live
+schedGo-liveTypeOK (l ∷ ls) eq s u with schedHeadOf l in heq | schedGo ls in geq
+... | inj₁ _        | inj₁ _         with eq
+...   | ()
+schedGo-liveTypeOK (l ∷ ls) eq s u | inj₁ _ | inj₂ (a′ , ls′) with eq
+...   | refl = cong (_∧_ (if LiveSource.source l ≡ᵇ s
+                          then sameTy u (LiveSource.elemTy l) else true))
+                    (schedGo-liveTypeOK ls geq s u)
+schedGo-liveTypeOK (l ∷ ls) eq s u | inj₂ (a₀ , l′) | inj₁ _ with eq
+...   | refl = liveTypeOK?-swap s u l l′ ls
+                 (proj₁ (schedHeadOf-l′ l heq)) (proj₂ (schedHeadOf-l′ l heq))
+schedGo-liveTypeOK (l ∷ ls) eq s u | inj₂ (a₀ , l′) | inj₂ (a′ , ls′)
+  with schedEarlier a₀ a′ | eq
+...   | true  | refl = liveTypeOK?-swap s u l l′ ls
+                         (proj₁ (schedHeadOf-l′ l heq)) (proj₂ (schedHeadOf-l′ l heq))
+...   | false | refl = cong (_∧_ (if LiveSource.source l ≡ᵇ s
+                                  then sameTy u (LiveSource.elemTy l) else true))
+                            (schedGo-liveTypeOK ls geq s u)
+
+regTyped?-pop : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegId × Source × Chain Γ t))
+  (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
+  schedGo live ≡ inj₂ (a , ls) → regTyped? reg live ≡ true → regTyped? reg ls ≡ true
+regTyped?-pop []                      live sgeq rt = refl
+regTyped?-pop ((_ , s , (u , _)) ∷ r) live sgeq rt =
+  ∧-intro (trans (schedGo-liveTypeOK live sgeq s u) (∧-trueˡ rt))
+          (regTyped?-pop r live sgeq (∧-trueʳ rt))
+
+regTyped?-pop-sched : ∀ {n} {Γ : Ctx n} {t} (sched sched′ : Sched Γ)
+  (reg : List (RegId × Source × Chain Γ t)) {a : Arrival Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  regTyped? reg (Sched.live sched) ≡ true → regTyped? reg (Sched.live sched′) ≡ true
+regTyped?-pop-sched sched sched′ reg eq rt with schedGo (Sched.live sched) in geq
+... | inj₁ _ with eq
+...   | ()
+regTyped?-pop-sched sched sched′ reg eq rt | inj₂ (a₀ , ls) with eq
+...   | refl = regTyped?-pop reg (Sched.live sched) geq rt
+
+-- cascadeFinish preserves type-consistency: dropSource only removes
+-- registrations, sweepLive only removes live sources — both loosen
+-- regTyped?, never tighten it
+regTyped?-dropReg : ∀ {n} {Γ : Ctx n} {t} (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → regTyped? (dropSource src reg) live ≡ true
+regTyped?-dropReg src []                      live rt = refl
+regTyped?-dropReg src ((rid , s , (u , p)) ∷ r) live rt with sameSource src s
+... | true  = regTyped?-dropReg src r live (∧-trueʳ rt)
+... | false = ∧-intro (∧-trueˡ rt) (regTyped?-dropReg src r live (∧-trueʳ rt))
+
+liveTypeOK?-sweepLive : ∀ {n} {Γ : Ctx n} {t}
+  (sweepReg : List (RegId × Source × Chain Γ t)) (s : Source) (u : Ty)
+  (live : List (LiveSource Γ)) →
+  liveTypeOK? s u live ≡ true → liveTypeOK? s u (sweepLive sweepReg live) ≡ true
+liveTypeOK?-sweepLive sweepReg s u []       ok = refl
+liveTypeOK?-sweepLive {n = n} sweepReg s u (l ∷ ls) ok
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) sweepReg
+... | true  = ∧-intro (∧-trueˡ ok) (liveTypeOK?-sweepLive sweepReg s u ls (∧-trueʳ ok))
+... | false = liveTypeOK?-sweepLive sweepReg s u ls (∧-trueʳ ok)
+
+regTyped?-sweepLive : ∀ {n} {Γ : Ctx n} {t}
+  (sweepReg reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → regTyped? reg (sweepLive sweepReg live) ≡ true
+regTyped?-sweepLive sweepReg []                      live rt = refl
+regTyped?-sweepLive sweepReg ((_ , s , (u , _)) ∷ r) live rt =
+  ∧-intro (liveTypeOK?-sweepLive sweepReg s u live (∧-trueˡ rt))
+          (regTyped?-sweepLive sweepReg r live (∧-trueʳ rt))
+
+reg-typed-finish : ∀ {n} {Γ : Ctx n} {t} (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true →
+  regTyped? (dropSource src reg) (sweepLive (dropSource src reg) live) ≡ true
+reg-typed-finish src reg live rt =
+  regTyped?-sweepLive (dropSource src reg) (dropSource src reg) live
+    (regTyped?-dropReg src reg live rt)
 
 -- the open (or last) instant is strictly in the past
 CurrentPast : Maybe (Id × Owed) → Id → Set
