@@ -3,8 +3,8 @@
 -- batching sandwich (see Verify-Batch-Simultaneous.The-Proof).
 --
 -- Architecture: a simulation.  `Inv` relates the evaluator's state
--- (scheduler + registry) to the automaton's (live multiset, seen
--- instants, no open instant between cascades); `subscribe-wf` drives
+-- (scheduler + registry + the drain counter) to the automaton's (live
+-- multiset, horizon, no open instant between cascades); `subscribe-wf` drives
 -- the automaton through the root burst, `cascade-wf` through one
 -- arrival's cascade, each landing Inv-related and fully paid.  The
 -- top-level composition — fuel induction over `drain`, glued by
@@ -23,12 +23,12 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; trans; cong)
 
-open import Rx.Prim      using (Fuel; freshId; InstEmit)
+open import Rx.Prim      using (Fuel; Id; InstEmit)
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 sched-init; st-init; sched-next;
                                 subscribeE; cascade; drain; evaluate;
-                                root; arrTick; arrOrd)
+                                root)
 open import Rx.Protocol  using (ProtocolSt; protocol-init; stepProtocol;
                                 runProtocol; paidUp; checkFinal;
                                 Accepted; accepted; WellFormed)
@@ -68,15 +68,14 @@ acceptPaid S eq rewrite eq = accepted
 ------------------------------------------------------------------
 
 postulate
-  -- the simulation relation: the automaton's live multiset is the
-  -- registry's sources; no instant is open; seen covers every past
-  -- instant, and every future (tick, ordinal) the scheduler can mint
-  -- is fresh for it (freshId is injective; arrival ticks are ≥ 1 and
-  -- strictly increase per source, so the subscribe frame's freshId 0 0
-  -- and all future cascade ids stay distinct); done only if the root
-  -- completed, after which no chain can carry a value
+  -- the simulation relation, indexed by the drain counter (the next
+  -- instant id): the automaton's live multiset is the registry's
+  -- sources; no instant is open; the automaton's horizon is at most
+  -- the counter (ids mint from arrival position, so freshness is one
+  -- comparison); done only if the root completed, after which no
+  -- chain can carry a value
   Inv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      → Sched Γ → EvalSt e → ProtocolSt → Set
+      → Id → Sched Γ → EvalSt e → ProtocolSt → Set
 
   -- the root subscription's burst: from the empty automaton to an
   -- Inv-related, fully-paid state.  Proof: per-primitive preservation
@@ -85,9 +84,9 @@ postulate
   subscribe-wf :
     ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     Σ ProtocolSt λ S →
-      let r = subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e)
+      let r = subscribeE e root 0 0 (sched-init e ins) (st-init e)
       in (runProtocol protocol-init (proj₁ r) ≡ just S)
-         × Inv (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S
+         × Inv 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S
          × (paidUp S ≡ true)
 
   -- one arrival's cascade: accepted from any Inv-related paid state,
@@ -99,14 +98,14 @@ postulate
   -- clause
   cascade-wf :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
+      (nextId : Id) (sched : Sched Γ) (a : Arrival Γ) (sched′ : Sched Γ)
       (st : EvalSt e) (S : ProtocolSt) →
     sched-next sched ≡ inj₂ (a , sched′) →
-    Inv sched st S → paidUp S ≡ true →
+    Inv nextId sched st S → paidUp S ≡ true →
     Σ ProtocolSt λ S′ →
-      let r = cascade a (freshId (arrTick a) (arrOrd a)) sched′ st
+      let r = cascade a nextId sched′ st
       in (runProtocol S (proj₁ r) ≡ just S′)
-         × Inv (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+         × Inv (suc nextId) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (paidUp S′ ≡ true)
 
 ------------------------------------------------------------------
@@ -115,26 +114,25 @@ postulate
 
 drain-wf :
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-  Inv sched st S → paidUp S ≡ true →
+    (fuel : Fuel) (nextId : Id) (sched : Sched Γ) (st : EvalSt e)
+    (S : ProtocolSt) →
+  Inv nextId sched st S → paidUp S ≡ true →
   Σ ProtocolSt λ S′ →
-    (runProtocol S (drain {e = e} fuel sched st) ≡ just S′)
+    (runProtocol S (drain {e = e} fuel nextId sched st) ≡ just S′)
     × (paidUp S′ ≡ true)
-drain-wf zero    sched st S inv paid = S , refl , paid
-drain-wf (suc k) sched st S inv paid with sched-next sched in eq
+drain-wf zero    nextId sched st S inv paid = S , refl , paid
+drain-wf (suc k) nextId sched st S inv paid with sched-next sched in eq
 ... | inj₁ _            = S , refl , paid
 ... | inj₂ (a , sched′)
-  with cascade-wf sched a sched′ st S eq inv paid
+  with cascade-wf nextId sched a sched′ st S eq inv paid
 ... | S₁ , run₁ , inv₁ , paid₁
-  with drain-wf k
-         (proj₁ (proj₂ (cascade a (freshId (arrTick a) (arrOrd a)) sched′ st)))
-         (proj₂ (proj₂ (cascade a (freshId (arrTick a) (arrOrd a)) sched′ st)))
+  with drain-wf k (suc nextId)
+         (proj₁ (proj₂ (cascade a nextId sched′ st)))
+         (proj₂ (proj₂ (cascade a nextId sched′ st)))
          S₁ inv₁ paid₁
 ... | S₂ , run₂ , paid₂ =
   S₂
-  , run-++-just S
-      (proj₁ (cascade a (freshId (arrTick a) (arrOrd a)) sched′ st)) _
-      run₁ run₂
+  , run-++-just S (proj₁ (cascade a nextId sched′ st)) _ run₁ run₂
   , paid₂
 
 -- the primitives' half of the sandwich, no longer a postulate: its
@@ -145,15 +143,15 @@ evaluate-well-formed :
 evaluate-well-formed fuel e ins
   with subscribe-wf e ins
 ... | S₀ , run₀ , inv₀ , paid₀
-  with drain-wf fuel
-         (proj₁ (proj₂ (subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e))))
-         (proj₂ (proj₂ (subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e))))
+  with drain-wf fuel 1
+         (proj₁ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e))))
+         (proj₂ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e))))
          S₀ inv₀ paid₀
 ... | S₁ , run₁ , paid₁
   rewrite run-++-just protocol-init
-            (proj₁ (subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e)))
-            (drain fuel
-              (proj₁ (proj₂ (subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e))))
-              (proj₂ (proj₂ (subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e)))))
+            (proj₁ (subscribeE e root 0 0 (sched-init e ins) (st-init e)))
+            (drain fuel 1
+              (proj₁ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e))))
+              (proj₂ (proj₂ (subscribeE e root 0 0 (sched-init e ins) (st-init e)))))
             run₀ run₁
   = acceptPaid S₁ paid₁

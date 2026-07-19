@@ -1,7 +1,7 @@
 module Rx.Protocol where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
+open import Data.Bool    using (Bool; true; false; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _≤ᵇ_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
@@ -53,20 +53,19 @@ Owed = List (Source × ℕ)
 
 record ProtocolSt : Set where
   field live    : List Source          -- multiset: one entry per live registration
-        seen    : List Id              -- closed instants (freshness)
+        horizon : Id                   -- freshness watermark: every past instant is
+                                       -- < horizon (ids mint from arrival position —
+                                       -- 0 the subscribe frame, then 1, 2, … — so
+                                       -- instants strictly increase along the stream)
         current : Maybe (Id × Owed)    -- the open instant, if any
         done    : Bool                 -- a complete event has been consumed
 
 protocol-init : ProtocolSt
-protocol-init = record { live = [] ; seen = [] ; current = nothing ; done = false }
+protocol-init = record { live = [] ; horizon = 0 ; current = nothing ; done = false }
 
 ------------------------------------------------------------------
 -- multiset / association-list plumbing
 ------------------------------------------------------------------
-
-memberℕ : ℕ → List ℕ → Bool
-memberℕ i []       = false
-memberℕ i (j ∷ js) = if i ≡ᵇ j then true else memberℕ i js
 
 countIn : Source → List Source → ℕ
 countIn s []       = zero
@@ -98,12 +97,19 @@ payOwed s ((x , n) ∷ o) with s ≡ᵇ x | n
 ...   | just o′ = just ((x , n) ∷ o′)
 ...   | nothing = nothing
 
--- a cutPending victim's cancellation: one owed count forgiven
--- (clamped; a victim of a source not firing this instant is a no-op)
-cancelOwed : Source → Owed → Owed
-cancelOwed s []            = []
-cancelOwed s ((x , n) ∷ o) =
-  if s ≡ᵇ x then (x , n ∸ 1) ∷ o else (x , n) ∷ cancelOwed s o
+-- a cutPending victim's cancellation: one owed count forgiven.
+-- STRICT: cancelling below zero rejects (the writer claimed a victim
+-- the source was never owed).  A victim of a source with no entry —
+-- one not firing this instant — is a benign no-op: its owed never
+-- seeds, or seeds later from a live count the close already shrank.
+cancelOwed : Source → Owed → Maybe Owed
+cancelOwed s [] = just []
+cancelOwed s ((x , n) ∷ o) with s ≡ᵇ x | n
+... | true  | zero  = nothing
+... | true  | suc m = just ((x , m) ∷ o)
+... | false | _     with cancelOwed s o
+...   | just o′ = just ((x , n) ∷ o′)
+...   | nothing = nothing
 
 allZero : Owed → Bool
 allZero []                = true
@@ -129,9 +135,10 @@ applyEvents (value _   ∷ es) live owed done =
 applyEvents (handoff x ∷ es) live owed done =
   applyEvents es live (bumpOwed x (countIn x live) owed) done
 applyEvents (complete  ∷ es) live owed done = applyEvents es live owed true
-applyEvents (close x cutPending ∷ es) live owed done with removeOne x live
-... | just live′ = applyEvents es live′ (cancelOwed x owed) done
-... | nothing    = nothing
+applyEvents (close x cutPending ∷ es) live owed done
+  with removeOne x live | cancelOwed x owed
+... | just live′ | just owed′ = applyEvents es live′ owed′ done
+... | _          | _          = nothing
 applyEvents (close x _ ∷ es) live owed done with removeOne x live
 ... | just live′ = applyEvents es live′ owed done
 ... | nothing    = nothing
@@ -153,32 +160,43 @@ settle delivery  s live owed =
 -- the step
 ------------------------------------------------------------------
 
+-- leaving the current instant (for a new one, or at end of stream) is
+-- legal only fully paid; the departed instant pushes the horizon.
+-- THE single instant-close judgment — stepProtocol's id-change and
+-- checkFinal both consume it
+settleInstant : ProtocolSt → Maybe Id
+settleInstant ps with ProtocolSt.current ps
+... | nothing         = just (ProtocolSt.horizon ps)
+... | just (j , owed) =
+      if allZero owed then just (suc j) else nothing
+
 stepProtocol : ∀ {A : Set} → InstEmit A → ProtocolSt → Maybe ProtocolSt
 stepProtocol (es at i from s as k) ps = enter
   where
-  -- run one emit inside instant i (owed so far, instants closed so far)
-  go : Owed → List Id → Maybe ProtocolSt
-  go owed seen′ with settle k s (ProtocolSt.live ps) owed
+  -- run one emit inside instant i (owed so far, horizon so far)
+  go : Owed → Id → Maybe ProtocolSt
+  go owed horizon′ with settle k s (ProtocolSt.live ps) owed
   ... | nothing    = nothing
   ... | just owed′ with applyEvents es (ProtocolSt.live ps) owed′ (ProtocolSt.done ps)
   ...   | nothing                      = nothing
   ...   | just (live′ , owed″ , done′) =
           just (record { live    = live′
-                       ; seen    = seen′
+                       ; horizon = horizon′
                        ; current = just (i , owed″)
                        ; done    = done′ })
 
+  -- a new instant: the old one settles fully paid, and freshness is
+  -- one comparison — instants strictly increase (arrival-position ids)
+  openFresh : Maybe ProtocolSt
+  openFresh with settleInstant ps
+  ... | nothing       = nothing
+  ... | just horizon′ = if horizon′ ≤ᵇ i then go [] horizon′ else nothing
+
   enter : Maybe ProtocolSt
   enter with ProtocolSt.current ps
-  ... | nothing = if memberℕ i (ProtocolSt.seen ps)
-                  then nothing                     -- a closed instant recurring
-                  else go [] (ProtocolSt.seen ps)
-  ... | just (j , owed) =
-        if i ≡ᵇ j
-        then go owed (ProtocolSt.seen ps)
-        else if allZero owed ∧ not (memberℕ i (j ∷ ProtocolSt.seen ps))
-        then go [] (j ∷ ProtocolSt.seen ps)        -- j closes fully paid; i opens
-        else nothing
+  ... | nothing         = openFresh
+  ... | just (j , owed) = if i ≡ᵇ j then go owed (ProtocolSt.horizon ps)
+                          else openFresh
 
 runProtocol : ∀ {A : Set} → ProtocolSt → List (InstEmit A) → Maybe ProtocolSt
 runProtocol ps []       = just ps
@@ -186,12 +204,14 @@ runProtocol ps (x ∷ xs) with stepProtocol x ps
 ... | just ps′ = runProtocol ps′ xs
 ... | nothing  = nothing
 
+accepts? : {A : Set} → Maybe A → Bool
+accepts? nothing  = false
+accepts? (just _) = true
+
 -- the stream may end only between cascades: the final instant is
--- held to the same fully-paid bar as a closed one
+-- held to the same settleInstant bar as a departed one
 paidUp : ProtocolSt → Bool
-paidUp ps with ProtocolSt.current ps
-... | nothing         = true
-... | just (_ , owed) = allZero owed
+paidUp ps = accepts? (settleInstant ps)
 
 checkFinal : Maybe ProtocolSt → Maybe ProtocolSt
 checkFinal nothing   = nothing
@@ -203,11 +223,6 @@ data Accepted {A : Set} : Maybe A → Set where
 WellFormed : ∀ {A : Set} → List (InstEmit A) → Set
 WellFormed xs = Accepted (checkFinal (runProtocol protocol-init xs))
 
--- the Bool twin, for the QuickCheck harness: computes the same
--- acceptance the Accepted proof witnesses
-accepts? : {A : Set} → Maybe A → Bool
-accepts? nothing  = false
-accepts? (just _) = true
-
+-- the Bool twin of WellFormed, for the QuickCheck harness
 wellFormed? : ∀ {A : Set} → List (InstEmit A) → Bool
 wellFormed? xs = accepts? (checkFinal (runProtocol protocol-init xs))

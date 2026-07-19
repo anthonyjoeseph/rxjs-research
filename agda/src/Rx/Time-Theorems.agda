@@ -58,9 +58,10 @@ postulate
     ∀ {n} {Γ : Ctx n} {t} (ρ : Retiming) (fuel : Fuel)
       (e : Closed Γ t) (ins : Slots Γ) →
     evaluate fuel e (retime ρ ins) ≡ evaluate fuel e ins
-    -- ≡, not ≈: ids come from (tick, ordinal); if freshId uses the raw
-    -- tick, weaken to ≈ or mint from arrival ORDINAL POSITION instead —
-    -- recommend the latter, then ≡ stands
+    -- ≡, not ≈: ids mint from ARRIVAL POSITION (the drain counter),
+    -- so an arbitration-order-preserving retiming preserves the ids
+    -- themselves — the recommendation this comment used to make is
+    -- now the implementation
 
 
 ------------------------------------------------------------------

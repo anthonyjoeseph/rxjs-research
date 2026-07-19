@@ -74,7 +74,8 @@ applyBatch (handoff x ∷ es) live owed vs =
   applyBatch es live (bumpOwed x (countIn x live) owed) vs
 applyBatch (complete  ∷ es) live owed vs = applyBatch es live owed vs
 applyBatch (close x cutPending ∷ es) live owed vs =
-  applyBatch es (fromMaybe live (removeOne x live)) (cancelOwed x owed) vs
+  applyBatch es (fromMaybe live (removeOne x live))
+             (fromMaybe owed (cancelOwed x owed)) vs
 applyBatch (close x _ ∷ es) live owed vs =
   applyBatch es (fromMaybe live (removeOne x live)) owed vs
 

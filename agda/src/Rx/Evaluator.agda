@@ -12,7 +12,7 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Tick; Fuel; Ordinal; Id; freshId; Source;
+open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
                            Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; cutPending; exhausted;
@@ -1030,18 +1030,19 @@ cascade {Γ = Γ} {t = t} {e = e} a id sched st =
 -- burst is free: fuel 0 still yields it.
 -- fuel-many arrivals, each cascading to quiescence.  Top level (not a
 -- where-local of evaluate) so Verify-Well-Formed can induct on it.
+-- Instant ids mint from ARRIVAL POSITION (the counter threaded here):
+-- structural distinctness, strictly increasing along the stream.
 drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      → Fuel → Sched Γ → EvalSt e → Stream Γ t
-drain zero    _     _  = []                    -- out of fuel: truncate (only here)
-drain (suc k) sched st with sched-next sched
+      → Fuel → Id → Sched Γ → EvalSt e → Stream Γ t
+drain zero    _      _     _  = []            -- out of fuel: truncate (only here)
+drain (suc k) nextId sched st with sched-next sched
 ... | inj₁ _            = []                  -- schedule empty: program done
 ... | inj₂ (a , sched′) =
-  let (out , sched″ , st′) =
-        cascade a (freshId (arrTick a) (arrOrd a)) sched′ st
-  in out ++ drain k sched″ st′
+  let (out , sched″ , st′) = cascade a nextId sched′ st
+  in out ++ drain k (suc nextId) sched″ st′
 
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate fuel e ins =
   let (burst , sched₀ , st₀) =
-        subscribeE e root (freshId 0 0) 0 (sched-init e ins) (st-init e)
-  in burst ++ drain fuel sched₀ st₀
+        subscribeE e root 0 0 (sched-init e ins) (st-init e)
+  in burst ++ drain fuel 1 sched₀ st₀

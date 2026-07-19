@@ -1,11 +1,9 @@
 module Rx.Provenance-Theorems where
 
 open import Data.List    using (List)
-open import Data.Product using (_×_)
 open import Data.Unit    using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim      using (Tick; Fuel; Ordinal; Id; freshId)
+open import Rx.Prim      using (Fuel; Id)
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Slots)
 
@@ -21,9 +19,10 @@ postulate
   -- sync-spawned inners inherit, never mint
   id-inheritance :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    ⊤   -- state as: ids(evaluate fuel e ins) ⊆ᵢ freshId-image of arrivals
+    ⊤   -- state as: ids(evaluate fuel e ins) ⊆ᵢ {0 … fuel}
 
-  -- distinct arrivals never share an id (freshId injective on (tick,ordinal))
-  id-fresh : ∀ (t₁ t₂ : Tick) (o₁ o₂ : Ordinal) →
-             freshId t₁ o₁ ≡ freshId t₂ o₂ → (t₁ ≡ t₂) × (o₁ ≡ o₂)
+-- id-fresh became structural: instants mint from ARRIVAL POSITION
+-- (0 the subscribe frame, then the drain counter), so distinct
+-- cascades carry distinct, strictly increasing ids by construction —
+-- the Protocol's horizon check consumes exactly this.
 
