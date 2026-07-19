@@ -102,10 +102,13 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- one for one
     live-matches : ∀ (s : Source) →
       countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
-    -- every registry entry is well-typed for its source, so the next
-    -- cascade's snapshot is the full registration count (chainsOf's
-    -- type check drops nothing)
-    chains-count : ∀ (a : Arrival Γ) →
+    -- for any arrival the SCHEDULER can actually produce, the
+    -- snapshot is the full registration count — registry entries are
+    -- well-typed for their scheduled source, so chainsOf's type
+    -- check drops nothing.  (Conditioning on sched-next matters: an
+    -- ill-typed phantom arrival would break the equation vacuously.)
+    chains-count : ∀ (a : Arrival Γ) (sched″ : Sched Γ) →
+      sched-next sched ≡ inj₂ (a , sched″) →
       countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
     -- freshness is one comparison: ids mint from arrival position
     horizon-low  : ProtocolSt.horizon S ≤ nextId
