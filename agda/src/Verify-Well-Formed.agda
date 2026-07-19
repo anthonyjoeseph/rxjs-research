@@ -1262,6 +1262,32 @@ countIn-miss : ∀ (s x : Source) (xs : List Source) →
 countIn-miss s x xs sx with s ≡ᵇ x | sx
 ... | false | refl = refl
 
+-- removeOne drops exactly one occurrence of x: the x-count falls by one,
+-- every other source's count is untouched (the two reads applyEvents-count
+-- needs at a `close x` — hit for s ≡ x, miss for s ≢ x)
+countIn-removeOne-hit : ∀ (x : Source) (lv lv′ : List Source) →
+  removeOne x lv ≡ just lv′ → countIn x lv ≡ suc (countIn x lv′)
+countIn-removeOne-hit x []       lv′ ()
+countIn-removeOne-hit x (y ∷ ys) lv′ eq with x ≡ᵇ y in xy
+... | true  = cong suc (cong (countIn x) (just-injᵂ eq))
+... | false with removeOne x ys in ry | eq
+...   | just ys′ | refl rewrite xy = countIn-removeOne-hit x ys ys′ ry
+...   | nothing  | ()
+
+countIn-removeOne-miss : ∀ (x s : Source) (lv lv′ : List Source) →
+  (s ≡ᵇ x) ≡ false → removeOne x lv ≡ just lv′ → countIn s lv ≡ countIn s lv′
+countIn-removeOne-miss x s []       lv′ sx ()
+countIn-removeOne-miss x s (y ∷ ys) lv′ sx eq with x ≡ᵇ y in xy
+... | true  = trans (countIn-miss s y ys s≢y)
+                    (cong (countIn s) (just-injᵂ eq))
+  where s≢y : (s ≡ᵇ y) ≡ false
+        s≢y = trans (sym (cong (λ z → s ≡ᵇ z) (≡ᵇ→≡ x y xy))) sx
+... | false with removeOne x ys in ry | eq
+...   | nothing  | ()
+...   | just ys′ | refl with s ≡ᵇ y
+...     | true  = cong suc (countIn-removeOne-miss x s ys ys′ sx ry)
+...     | false = countIn-removeOne-miss x s ys ys′ sx ry
+
 -- paying the key with positive owed decrements it by one (once the `with`
 -- fixes s ≡ᵇ x, payOwed/removeOne on the head reduce, so the equations are
 -- refl / rewrite; the constructed tail term still needs the hit/miss read)
