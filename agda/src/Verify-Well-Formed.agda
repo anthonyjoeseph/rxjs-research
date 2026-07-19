@@ -566,16 +566,41 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     owed-unique  : ∀ (ow : Owed) →
       ProtocolSt.current S ≡ just (nextId , ow) → UniqueOwed ow ≡ true
 
+-- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
+-- subscribeE-wf — "the per-clause preservation grind").  One surviving
+-- chain's emits — its own delivery, any share fan-outs it triggers, any
+-- cut closes — are accepted, paying/bumping/cancelling exactly per the
+-- ledger.  The tower to grind, mirroring the evaluator's own recursion:
+--
+--   mid-step  ⇐  foldPath-wf  (induction on the Path)
+--                ├─ root         : the chain's ONE delivery emit — the
+--                │                  only place a linear path touches the
+--                │                  protocol; frames merely accumulate
+--                │                  evs/vals (they never step it)
+--                ├─ f ↠ path′    : stepFrame-wf transforms the fold state
+--                │                  (vals,evs,fin,sched,st) WITHOUT
+--                │                  stepping the protocol, then the IH
+--                │                  continues down path′ — the direct
+--                │                  analog of subscribeE-wf's per-clause
+--                │                  induction (map/scan/take/*All)
+--                └─ share-sink i : one handoff emit, then dispatchShare-wf
+--                                   (MUTUALLY RECURSIVE with foldPath-wf,
+--                                   gas-structural) fans out to share i's
+--                                   registrations — the handoff's owed
+--                                   bump is repaid one-per-fan-out, so the
+--                                   share subtree nets owed back to zero
+--                                   (the diamond, batched by construction)
+--
+-- The missing piece is FoldInv — the mid-fold relation foldPath-wf is
+-- stated over (BurstInv's delivery-side analog): unlike BurstInv's
+-- literally-empty owed table, FoldInv carries the PARTIALLY-PAID open
+-- instant (owed[envSrc] = the chain's own unpaid delivery; each pending
+-- share bumped-then-being-repaid across its dispatch).  Once FoldInv is
+-- pinned, mid-step is the chainStep seed (owed[arrSource] = the snapshot
+-- remainder) plus reading Mid back off the FoldInv result.  Kept as ONE
+-- postulate until FoldInv lands, so no half-stated (possibly-false) leaf
+-- enters the development early — the whole point of the outside-in rule.
 postulate
-  -- entering: the latch opens the ledger; the automaton, Inv-related
-  -- and paid, stands ready to open instant nextId.  The dry-freeness
-  -- of the whole cascade fold arrives as a premise (split off
-  -- one surviving chain's emits — the chain emit, any share
-  -- fan-outs, any cut closes — are accepted, paying/bumping/
-  -- cancelling exactly per the ledger.  THE deep lemma: mirrors
-  -- foldPath/dispatchShare/stepFrame (all gas/fuel-structural now).
-  -- Mid's eventual definition carries the dry-freeness of the
-  -- remaining fold — its arguments determine every future chainStep
   mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {a : Arrival Γ} {nextId : Id} {rid : RegId}
     {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
