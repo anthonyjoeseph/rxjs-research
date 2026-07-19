@@ -500,7 +500,10 @@ multiset and the open instant's owed table, checking instant freshness
 (one contiguous run, never recurring), bracketing (every close matches a
 live init), fan-out exactness (subscribe emits owe nothing; a delivery from
 `s` pays `owed[s]`, seeded from `live(s)` at the arrival and bumped by
-`live(x)` at every `handoff x`; instants close fully paid), and complete
+`live(x)` at every `handoff x`; instants close fully paid), instant
+completion (once a seeded instant's obligations hit zero the instant is
+over — the batcher's flush point is protocol law, so no late emit can
+smuggle values into a closed batch), and complete
 discipline (nothing after `complete`). The proof is a sandwich:
 
 ```agda

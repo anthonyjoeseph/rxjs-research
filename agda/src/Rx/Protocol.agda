@@ -41,6 +41,17 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
 --                         announced-but-missing fan-outs are both
 --                         accounted).  An instant may only be left
 --                         (or the stream end) fully paid.
+--   instant completion  — once a SEEDED instant's obligations hit
+--                         zero the instant is OVER: further
+--                         same-instant traffic is rejected.  This
+--                         makes the online batcher's flush point
+--                         protocol law — without it, a post-payoff
+--                         subscribe emit could smuggle values into
+--                         an instant the batcher already closed,
+--                         and batch-agreement would be false.
+--                         (Obligation-free instants — subscribe
+--                         frames, whose owed table never seeds —
+--                         are exempt: paidOff [] is false.)
 --   complete discipline — after a complete event no further VALUE
 --                         is emitted.  (Not "the stream ends": a
 --                         connected share never disconnects, so its
@@ -115,6 +126,14 @@ allZero : Owed → Bool
 allZero []                = true
 allZero ((_ , zero)  ∷ o) = allZero o
 allZero ((_ , suc _) ∷ o) = false
+
+-- obligations existed and are now discharged — the instant is over.
+-- An empty owed table is NOT closure: a subscribe frame never takes
+-- on obligations and stays open until the next instant brackets it.
+-- Shared with Implementation: the batcher flushes exactly here
+paidOff : Owed → Bool
+paidOff []      = false
+paidOff (e ∷ o) = allZero (e ∷ o)
 
 ------------------------------------------------------------------
 -- one emit's events, folded left to right through the state: inits
@@ -195,8 +214,12 @@ stepProtocol (es at i from s as k) ps = enter
   enter : Maybe ProtocolSt
   enter with ProtocolSt.current ps
   ... | nothing         = openFresh
-  ... | just (j , owed) = if i ≡ᵇ j then go owed (ProtocolSt.horizon ps)
-                          else openFresh
+  ... | just (j , owed) =
+        if i ≡ᵇ j
+        then (if paidOff owed
+              then nothing   -- instant completion: the instant is over
+              else go owed (ProtocolSt.horizon ps))
+        else openFresh
 
 runProtocol : ∀ {A : Set} → ProtocolSt → List (InstEmit A) → Maybe ProtocolSt
 runProtocol ps []       = just ps

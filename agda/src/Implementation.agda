@@ -11,7 +11,7 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Protocol using (Owed; countIn; removeOne; hasOwed; bumpOwed;
-                               payOwed; cancelOwed; allZero)
+                               payOwed; cancelOwed; allZero; paidOff)
 
 ------------------------------------------------------------------
 -- The ONLINE batcher: one emission at a time, own state only, no
@@ -79,13 +79,8 @@ applyBatch (close x cutPending ∷ es) live owed vs =
 applyBatch (close x _ ∷ es) live owed vs =
   applyBatch es (fromMaybe live (removeOne x live)) owed vs
 
--- obligations existed and are now discharged — the instant is over.
--- An empty owed table is NOT closure: a subscribe frame never takes
--- on obligations and stays open until the next instant brackets it
-paidOff : Owed → Bool
-paidOff []      = false
-paidOff (e ∷ o) = allZero (e ∷ o)
-
+-- paidOff comes from Rx.Protocol: the flush point IS the protocol's
+-- instant-completion clause — one definition, shared by law
 step-batch : ∀ {A : Set} → InstEmit A → BatchSt A
            → List (InstEmit (List A)) × BatchSt A
 step-batch {A} (es at i from s as k) st = step admitted
