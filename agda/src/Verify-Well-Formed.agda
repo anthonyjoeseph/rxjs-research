@@ -857,15 +857,26 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   1 live-others-out : ∀ s≠envSrc, countIn s (live S′) ≡ countRegs s
 --       (registry st″)                                    [Mid ps.live-others]
 --   2 live-src-out    : countIn envSrc (live S′) ≡
---       countIn envSrc (live S) ∸ (if fin then 1 else 0)  [→ live-source]
---       — terminal close removes envSrc once (isLast); OBLIGATION: frames and
---       shares never emit init/close on envSrc (inner sources are fresh defs;
---       a share node toℕ i is downstream, so envSrc ≢ toℕ i — must be shown,
---       not assumed).  With Mid(head∷ps).live-source: countRemaining(head∷ps)
---       ∸1 = countRemaining ps (head uncancelled, ceq).
+--       countIn envSrc (live S) ∸ closeCount envSrc evsᶠ  [→ live-source]
+--       (evsᶠ = the accumulated evs reaching the root).  KEYED ON closeCount,
+--       NOT on fin: the seed close of envSrc rides evs (isLast), and a take
+--       CUT also emits `close envSrc` (cutThrough, Evaluator 253) — both must
+--       count.  At the seed closeCount envSrc evs = if isLast then 1 else 0.
+--       OBLIGATION: frames/shares emit no OTHER close on envSrc (inner sources
+--       are fresh defs; a share node toℕ i is downstream, so envSrc ≢ toℕ i —
+--       shown, not assumed).  With Mid(head∷ps).live-source (isLast branch):
+--       countRemaining(head∷ps) ∸1 = countRemaining ps (head uncancelled, ceq).
 --   3 reg-envSrc-fixed: countRegs envSrc (registry st″) ≡ countRegs envSrc
---       (registry st) — fold adds/removes no envSrc entry (non-isLast branch
---       of live-source references the registry).
+--       (registry st) ∸ closeCount envSrc evsᶠ — the fold removes an envSrc
+--       registration exactly when it emits an envSrc close (a take cut does
+--       BOTH atomically: cutThrough drops it from `kept` AND emits its close;
+--       the seed isLast close is the LONE exception — it removes from live but
+--       leaves the registration for cascadeFinish).  So for s = envSrc the
+--       SHADOW three-way holds up to that one seed close, which is precisely
+--       why the done-plumbed conditional (drop iff isLast) is correct: an
+--       isLast exhaustion leaves the registration for cascadeFinish (drop
+--       branch); a take completion already removed it in-band (full-registry
+--       branch is clean).  The two completion routes hit the two branches.
 --   4 reg-typed-out   : regTyped? (registry st″) (Sched.live sched″) ≡ true
 --                                                         [Mid ps.reg-typed]
 --   5 horizon-out     : ProtocolSt.horizon S′ ≡ FoldInv.hz ⇒ ≤ nextId, via
@@ -873,11 +884,13 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   6 current-out     : current S′ ≡ just (nextId , Ov) with lookupOwed envSrc
 --       Ov = (owed after the head's delivery decrement)   [ledger inj₂,
 --       owed-unique] — the OUTPUT-side twin of mid-seed's owed arithmetic.
---   7 done-out        : done S′ ≡ (if fin then true else done S); done-plumbed
---       via the conditional field + the arrSource-survivor fact (guarded).
+--   7 done-out        : done S′ ≡ (if finᶠ then true else done S) where finᶠ is
+--       the THREADED fin at the root (a take cut flips it true even when not
+--       isLast — foldPath root, Evaluator 961); done-plumbed via the
+--       conditional field, correct by the field-3 self-healing argument.
 --                                                         [Mid ps.done-plumbed]
---   8 fold-live-out   : hasDry (cascadeGo a nextId ps sched″ st″) ≡ false
---       — peeled from Mid(head∷ps).fold-live.             [Mid ps.fold-live]
+--   (fold-live is NOT a FoldOut field — it names a/nextId/ps, absent from the
+--    fold; mid-step peels it from Mid(head∷ps).fold-live directly.)
 --
 -- PER-CASE establishment of FoldOut:
 --   root        : all fields concrete from foldPath-root-wf + SHADOW.
