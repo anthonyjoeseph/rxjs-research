@@ -1017,20 +1017,32 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --       completes, and with a live merge sibling every other root-direct source
 --       is still non-share-sunk — allShareSunk(dropSource envSrc registry) is
 --       plainly false there.  A seed field would be a FALSE leaf.
---     - CONCLUSION: the fin ≡ true plumbing is a ROOT/post-frame property,
---       established BY the frame recursion — the frame that genuinely completes
---       (fin false→true via `finish`) is where "every survivor is share-sunk"
---       becomes true.  So done-plumbed-out stays a per-case FoldOut obligation:
---       root (bare completion: the unique root-direct source is envSrc, so
---       dropSource envSrc leaves only share-sunk — needs a completion-discipline
---       fact NOT currently in Inv/Mid, keyed on done rather than on the flip)
---       and frame (stepFrame-wf establishes it at the completing frame).  This
---       is a DESIGN FORK to settle with Anthony: where the root-completion
---       plumbing fact enters (a new Inv/Mid field vs. derived), before wiring
---       done-plumbed-out.  It couples with the take-head cut (take-f flips fin
---       AND emits cutThrough closes, Evaluator 540-548).  NOTE: this is a
---       mis-keying to REPAIR, not a spec counterexample — the batching is not
---       in question; no falsifying emit-stream pair was found.
+--     - RESOLUTION (higher model, 2026-07-19): the fin ≡ true plumbing is a
+--       post-frame property, so it belongs in FoldOut keyed on fin-OUT, NOT
+--       threaded from the seed.  fin-out is not returned by foldPath, so encode
+--       it frame-stably as done S ≡ false ∧ done S′ ≡ true (⟺ fin-out ≡ true
+--       under done-nil; done S/S′ are protocol states, identical for outer and
+--       recursion since frames never step the automaton).  Absorption ⇒ done S′
+--       ≡ false ⇒ VACUOUS — which is exactly what lets it establish clause-by-
+--       clause.  Two FoldOut fields now (see the record above):
+--         flip-plumbed-out : done S ≡ false → done S′ ≡ true → allShareSunk(drop)
+--         done-plumbed-out : done S ≡ true  → allShareSunk(full)
+--       ESTABLISHMENT: from-inner comes nearly free — fin passes it only when
+--       the evaluator's own `any aliveThrough ≡ false` scrutinee holds, an
+--       operational certificate the proof converts into the invariant.  thru-
+--       outer wrap gates on NODE counts (merge-st k / concat queue / switch
+--       Maybe), so they force a node↔registry coherence fact — added MINIMALLY
+--       as threaded FoldInv fields per wrap clause as forced (same discipline as
+--       SHADOW), never globally up front.  Couples with the take-head cut (take-f
+--       flips fin AND emits cutThrough closes, Evaluator 540-548).
+--     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise
+--       is done ≡ true, vacuous right up until the flip; the flip is mid-cascade,
+--       where Inv does not exist.  Nothing to derive from at the one moment the
+--       conclusion is needed.
+--     - GUARD (standing): if fin reaches root while a non-envSrc root-sinking
+--       registration survives, that is an evaluator completion BUG, not an
+--       invariant gap — stop and surface it.  (Not a spec counterexample: the
+--       batching is not in question; no falsifying emit-stream pair was found.)
 ------------------------------------------------------------------
 
 -- the fold's output EvalSt (st″) and Sched (sched″)
@@ -1086,11 +1098,37 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       × (zeroExcept envSrc Ov ≡ true)
       × (UniqueOwed Ov ≡ true)
       × (lookupOwed envSrc Ov ≡ lookupOwed envSrc ob′)
-    -- [Mid ps.done-plumbed] conditional exactly as cascadeFinish drops
-    done-plumbed-out : ProtocolSt.done S′ ≡ true →
-      allShareSunk (if fin
-                    then dropSource envSrc (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
-                    else EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st)) ≡ true
+    -- [Mid ps.done-plumbed] — split into the done-FLIP and the STEADY case,
+    -- both keyed on frame-stable protocol states (done S / done S′ are unchanged
+    -- by frames; only the terminal emit steps the automaton), per the higher
+    -- model's 2026-07-19 call.  The old done-S′-keyed-with-`if fin` form was NOT
+    -- establishable: that `fin` is the INPUT fin, but a *All frame ABSORBS
+    -- completion (fin′ ≢ fin, from-inner `react true`), so an `if fin` field
+    -- cannot pass the frame recursion.  Keying on done S / done S′ (protocol
+    -- states, identical for outer (f↠path′,fin) and recursion (path′,fin′)) is
+    -- frame-stable AND encodes fin-out: done S ≡ false ∧ done S′ ≡ true ⟺ this
+    -- fold carried completion to root (fin-out ≡ true) under the done-nil
+    -- discipline; a swallowed completion leaves done S′ ≡ false.
+    --  · FLIP: completion reached root THIS instant.  Then every non-share-sunk
+    --    survivor is envSrc's, so dropSource envSrc restores allShareSunk.
+    --    Absorption-VACUOUS, which makes it establishable clause-by-clause:
+    --    from-inner comes free from the evaluator's own `any aliveThrough ≡
+    --    false` certificate; thru-outer (merge-st k / concat queue / switch) gates
+    --    on NODE counts, so it needs a node↔registry coherence fact, added
+    --    minimally per wrap clause as forced (same discipline as SHADOW), NOT
+    --    globally up front.
+    --  · STEADY: already done coming in (done S ≡ true); the registry is fully
+    --    plumbed and stepFrame only adds share-sunk inners, so the whole output
+    --    registry stays all-share-sunk (⇒ the dropSource form by allShareSunk-drop,
+    --    covering both isLast branches mid-step reads).
+    -- GUARD (standing): if fin reaches root while a non-envSrc root-sinking
+    -- registration survives, that is an evaluator completion BUG, not an
+    -- invariant gap — stop and surface it.
+    flip-plumbed-out : ProtocolSt.done S ≡ false → ProtocolSt.done S′ ≡ true →
+      allShareSunk (dropSource envSrc
+        (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))) ≡ true
+    done-plumbed-out : ProtocolSt.done S ≡ true →
+      allShareSunk (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st)) ≡ true
 
 postulate
   -- a frame preserves FoldInv (S untouched — frames don't step the
