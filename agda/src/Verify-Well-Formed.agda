@@ -17,11 +17,11 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-refl; 1+n≰n)
+open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -843,6 +843,51 @@ foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds =
     S (stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi) ds
 foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds =
   dispatchShare-wf sf gas id now envSrc i vals evs fin sched st S fi
+
+------------------------------------------------------------------
+-- The seed: Mid (head ∷ ps) ⇒ FoldInv at the chainStep seed.  The
+-- "counting machine" arithmetic — a key with a positive owed is not
+-- paid-off; paying it decrements the key; a source present in `live`
+-- can be removed.  These are the owed/live manipulations the enter,
+-- pay, and applyEvents seed fields turn on.
+------------------------------------------------------------------
+
+lookup-pos-not-allZero : ∀ (s : Source) (ow : Owed) (k : ℕ) →
+  lookupOwed s ow ≡ suc k → allZero ow ≡ false
+lookup-pos-not-allZero s [] k ()
+lookup-pos-not-allZero s ((x , zero)  ∷ ow) k eq with s ≡ᵇ x | eq
+... | true  | ()
+... | false | eq′ = lookup-pos-not-allZero s ow k eq′
+lookup-pos-not-allZero s ((x , suc n) ∷ ow) k eq = refl
+
+lookup-pos-not-paidOff : ∀ (s : Source) (ow : Owed) (k : ℕ) →
+  lookupOwed s ow ≡ suc k → paidOff ow ≡ false
+lookup-pos-not-paidOff s [] k ()
+lookup-pos-not-paidOff s (e ∷ ow) k eq = lookup-pos-not-allZero s (e ∷ ow) k eq
+
+T→≡ : ∀ (b : Bool) → T b → b ≡ true
+T→≡ true _ = refl
+
+≤→≤ᵇ : ∀ {m n : ℕ} → m ≤ n → (m ≤ᵇ n) ≡ true
+≤→≤ᵇ {m} {n} p = T→≡ (m ≤ᵇ n) (≤⇒≤ᵇ p)
+
+-- the automaton admits an OPEN unpaid instant: enterInstant continues it,
+-- seeding go with the running owed and the standing horizon.  Fields taken
+-- literally so enterInstant's `with current` reduces (enterInstant reads
+-- only current/horizon, never live/done, so the dummies are harmless)
+enterInstant-cont-aux : ∀ (lv : List Source) (hz i : Id) (cur : Maybe (Id × Owed))
+  (dn : Bool) (ow : Owed) →
+  cur ≡ just (i , ow) → paidOff ow ≡ false →
+  enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
+    ≡ just (ow , hz)
+enterInstant-cont-aux lv hz i .(just (i , ow)) dn ow refl pf rewrite ≡ᵇ-refl i | pf = refl
+
+enterInstant-cont : ∀ (S : ProtocolSt) (i : Id) (ow : Owed) →
+  ProtocolSt.current S ≡ just (i , ow) → paidOff ow ≡ false →
+  enterInstant S i ≡ just (ow , ProtocolSt.horizon S)
+enterInstant-cont S i ow cur pf =
+  enterInstant-cont-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i
+    (ProtocolSt.current S) (ProtocolSt.done S) ow cur pf
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
