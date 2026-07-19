@@ -834,6 +834,13 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     done-plumbed : ProtocolSt.done S ≡ true →
       allShareSunk (if fin then dropSource envSrc (EvalSt.registry st)
                     else EvalSt.registry st) ≡ true
+    -- carried straight through the fold for the readoff's non-live fields:
+    -- registry well-typedness (stepFrame subscribes well-typed inners) and the
+    -- horizon bound (S is untouched until the terminal emit, so horizon S ≤ id
+    -- rides unchanged).  At root st″ = st, sched″ = sched, so reg-typed-out is
+    -- reg-typed verbatim and horizon-out reads hz ≤ id off enters + horizon-low.
+    reg-typed   : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
+    horizon-low : ProtocolSt.horizon S ≤ id
 
 ------------------------------------------------------------------
 -- FoldOut — the readoff companion to FoldInv (DESIGN, worked out 2026-07;
@@ -1509,6 +1516,8 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   ; enters = enters ; pays = pays ; applies = proj₂ (proj₂ ap)
   ; shadow = shadow
   ; done-plumbed = Mid.done-plumbed mid
+  ; reg-typed = Mid.reg-typed mid
+  ; horizon-low = Mid.horizon-low mid
   }
   where
   ep = seed-enter-pay mid ceq
