@@ -746,13 +746,35 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     --          the unfolded chains ps)
     -- At ps≡[] (mid-final) the adjustment is 0 ⇒ the dropSource form, true.
     -- At mid-init (ps≡all) it adds back every arrSource inner ⇒ the plain
-    -- form, true.  REMAINING WRINKLE: "will finish" is aliveThrough-gated,
-    -- not just "arrSource chain unfolded" — a multi-source inner instance
-    -- whose OTHER sources stay live is absorbed (no pred k) when arrSource's
-    -- part folds, so the adjustment counts arrSource insts that are the
-    -- inner's LAST live source.  Needs care (this is why it is deferred, not
-    -- guessed).  Until designed, mid-final supplies Inv.caches via the
-    -- postulate cascade-preserves-caches (the genuine deferred content).
+    -- form, true.  The adjustment counts arrSource insts that are the inner's
+    -- LAST live source (a multi-source inst whose OTHER sources stay live is
+    -- absorbed — no pred k — and is ALREADY held by countLiveInners(dropSource
+    -- arrSource registry) via its surviving non-arrSource regs, so it must NOT
+    -- be double-counted here); equivalently the insts dropSource arrSource
+    -- fully removes, restricted to the unfolded chains.
+    -- TWO WATCH-POINTS (stronger model, 2026-07-19) — both because
+    -- aliveThrough is read against the EVOLVING ledger, not the snapshot:
+    --  (W1) the gate's verdict changes mid-fold: as earlier ps fold,
+    --       delivered/cancelled grow, so an inst that was not "last live
+    --       source" at entry becomes it a few chains later.  The adjustment
+    --       is recomputed PER STEP against the current ledger; the mid-step
+    --       proof discharges each transition by CONVERTING the very
+    --       aliveThrough scrutinee the evaluator's `react` just matched
+    --       (Evaluator 599-603) — never by predicting from the entry snapshot.
+    --  (W2) a cut can cancel a "will finish" inst before its chain folds:
+    --       it never pred-decrements k, but cutThrough drops its regs — so
+    --       countLiveInners and the adjustment must move together.  The
+    --       adjustment is therefore CANCELLED-GATED: filter the unfolded ps by
+    --       the cancelled set, countRemaining-style (as live-source already
+    --       does), or the shadow goes false at the first mid-cascade cut
+    --       through a merge.
+    -- CONFIRMED no coupling to the owed/counting machine (cTotal): those are
+    -- parallel ledgers — owed tracks registrations-per-source for the batcher;
+    -- these k-caches track inner-instances-per-node, invariant-side only,
+    -- never read by the batcher.  Shared substrate is only registry +
+    -- delivered/cancelled/dying (ground truth for both).  Needs care (this is
+    -- why it is deferred, not guessed).  Until designed, mid-final supplies
+    -- Inv.caches via the postulate cascade-preserves-caches (deferred content).
     fold-live    : hasDry (proj₁ (cascadeGo a nextId ps sched st)) ≡ false
     -- ADDED (owed-key uniqueness): the open instant's owed table has no
     -- repeated key, so ledger's zeroExcept + the arrival's zero remainder
