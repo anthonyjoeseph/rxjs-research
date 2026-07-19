@@ -792,6 +792,75 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       allShareSunk (if fin then dropSource envSrc (EvalSt.registry st)
                     else EvalSt.registry st) ≡ true
 
+------------------------------------------------------------------
+-- FoldOut — the readoff companion to FoldInv (DESIGN, worked out 2026-07;
+-- not yet stated as code — see the obligations below, any one of which if
+-- false would make FoldOut a false postulate, so they are discharged before
+-- the record lands).  foldPath-wf will return, alongside `Σ S′ (runProtocol
+-- ≡ just S′)`, a FoldOut relating the fold's OUTPUT triple (S′, st″, sched″)
+-- to its inputs, from which mid-step reads Mid ps off directly.
+--
+-- WHY A THREE-WAY INVARIANT (the frame case is NOT a live↔registry
+-- pass-through).  stepFrame mutates the registry — subscribeInner adds an
+-- entry AND emits `init`; a take/switch cut removes an entry AND emits
+-- `close` (Evaluator take-f, lines ~540) — but stepFrame does NOT step the
+-- protocol.  live S only catches up when the ACCUMULATED evs are applied at
+-- the terminal root/share emit.  So mid-fold the registry LEADS and live LAGS
+-- by exactly the pending evs.  The invariant threading through frames is thus
+-- three-way, per source s ≠ envSrc:
+--
+--   countIn s (live S) + initCount s evs ≡ countRegs s (registry st)
+--                                          + closeCount s evs      … (SHADOW)
+--
+--   (initCount/closeCount = # of `init s` / `close s _` in the pending evs;
+--    envSrc is excluded — its own delivery/close is accounted separately.)
+--   • SEED: evs = if isLast then [close envSrc] else []; for s≠envSrc both
+--     counts are 0, so SHADOW ⇔ Mid.live-others — provided by mid-seed.
+--   • stepFrame PRESERVES SHADOW: each clause's registry delta is matched by
+--     its evs′ init/close delta (bracketing) — the enriched stepFrame-wf duty.
+--   • ROOT base: applyEvents drains evs into live, so countIn s Lv = countIn s
+--     (live S) + initCount − closeCount = countRegs s (registry st) (registry
+--     unchanged by root) ⇒ live-others-out.  SHADOW is thus added to FoldInv.
+--
+-- FoldOut FIELDS (postcondition at the output S′, st″, sched″), each tagged
+-- with the Mid ps field it discharges and its establishing obligation:
+--   1 live-others-out : ∀ s≠envSrc, countIn s (live S′) ≡ countRegs s
+--       (registry st″)                                    [Mid ps.live-others]
+--   2 live-src-out    : countIn envSrc (live S′) ≡
+--       countIn envSrc (live S) ∸ (if fin then 1 else 0)  [→ live-source]
+--       — terminal close removes envSrc once (isLast); OBLIGATION: frames and
+--       shares never emit init/close on envSrc (inner sources are fresh defs;
+--       a share node toℕ i is downstream, so envSrc ≢ toℕ i — must be shown,
+--       not assumed).  With Mid(head∷ps).live-source: countRemaining(head∷ps)
+--       ∸1 = countRemaining ps (head uncancelled, ceq).
+--   3 reg-envSrc-fixed: countRegs envSrc (registry st″) ≡ countRegs envSrc
+--       (registry st) — fold adds/removes no envSrc entry (non-isLast branch
+--       of live-source references the registry).
+--   4 reg-typed-out   : regTyped? (registry st″) (Sched.live sched″) ≡ true
+--                                                         [Mid ps.reg-typed]
+--   5 horizon-out     : ProtocolSt.horizon S′ ≡ FoldInv.hz ⇒ ≤ nextId, via
+--       enters + Mid.horizon-low                          [Mid ps.horizon-low]
+--   6 current-out     : current S′ ≡ just (nextId , Ov) with lookupOwed envSrc
+--       Ov = (owed after the head's delivery decrement)   [ledger inj₂,
+--       owed-unique] — the OUTPUT-side twin of mid-seed's owed arithmetic.
+--   7 done-out        : done S′ ≡ (if fin then true else done S); done-plumbed
+--       via the conditional field + the arrSource-survivor fact (guarded).
+--                                                         [Mid ps.done-plumbed]
+--   8 fold-live-out   : hasDry (cascadeGo a nextId ps sched″ st″) ≡ false
+--       — peeled from Mid(head∷ps).fold-live.             [Mid ps.fold-live]
+--
+-- PER-CASE establishment of FoldOut:
+--   root        : all fields concrete from foldPath-root-wf + SHADOW.
+--   f ↠ path′   : foldPath frame ≡ foldPath path′ (transformed state), so the
+--                 OUTPUT triple is the recursion's — FoldOut passes THROUGH
+--                 unchanged; the frame's bookkeeping is absorbed by SHADOW
+--                 (enriched stepFrame-wf re-establishes FoldInv for path′).
+--   share-sink i: handoff + fan-out (enriched dispatchShare-wf).  handoff
+--                 bumps owed[i] by countIn i (live); the fan-out repays one
+--                 per registration and (isLast) dropSource i at finish resyncs
+--                 registry i against the fan-out's closes — the diamond.
+------------------------------------------------------------------
+
 postulate
   -- a frame preserves FoldInv (S untouched — frames don't step the
   -- automaton): stepFrame's bookkeeping evs′ brackets against its
