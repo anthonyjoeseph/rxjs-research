@@ -23,6 +23,7 @@ open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
 open import Data.Nat.Properties using (≤-refl; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
 open import Data.List    using (List; []; _∷_; _++_; any; length; map)
+open import Data.List.Properties using (++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -37,9 +38,10 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
+                                map-f;
                                 sched-init; st-init; sched-next; LiveSource;
                                 schedGo; schedHeadOf; schedFinish; schedEarlier;
                                 arrTy; arrSource; arrVal; arrTick;
@@ -134,6 +136,30 @@ closeCount s (complete ∷ es) = closeCount s es
 -- (registry-dropping closes — cut/cutPending, excluding the deferred
 -- `exhausted` — will be counted by a cutCloseCount helper when the take-head
 -- edge of reg-envSrc-out is handled; see the FoldOut blueprint above)
+
+-- init/close counts are additive over ++ — the frame threading fact: a frame's
+-- accumulated evs is evs ++ evs′, and its envSrc counts split accordingly.
+initCount-++ : ∀ {A : Set} (s : Source) (xs ys : List (InstEvent A)) →
+  initCount s (xs ++ ys) ≡ initCount s xs + initCount s ys
+initCount-++ s []              ys = refl
+initCount-++ s (init x   ∷ xs) ys with s ≡ᵇ x
+... | true  = cong suc (initCount-++ s xs ys)
+... | false = initCount-++ s xs ys
+initCount-++ s (value _  ∷ xs) ys = initCount-++ s xs ys
+initCount-++ s (close _ _ ∷ xs) ys = initCount-++ s xs ys
+initCount-++ s (handoff _ ∷ xs) ys = initCount-++ s xs ys
+initCount-++ s (complete ∷ xs) ys = initCount-++ s xs ys
+
+closeCount-++ : ∀ {A : Set} (s : Source) (xs ys : List (InstEvent A)) →
+  closeCount s (xs ++ ys) ≡ closeCount s xs + closeCount s ys
+closeCount-++ s []              ys = refl
+closeCount-++ s (close x _ ∷ xs) ys with s ≡ᵇ x
+... | true  = cong suc (closeCount-++ s xs ys)
+... | false = closeCount-++ s xs ys
+closeCount-++ s (init _   ∷ xs) ys = closeCount-++ s xs ys
+closeCount-++ s (value _  ∷ xs) ys = closeCount-++ s xs ys
+closeCount-++ s (handoff _ ∷ xs) ys = closeCount-++ s xs ys
+closeCount-++ s (complete ∷ xs) ys = closeCount-++ s xs ys
 
 -- snapshot entries still obliged to fire: not yet forgiven by a
 -- cutPending (the automaton's remaining owed for the arrival source)
@@ -1187,6 +1213,23 @@ postulate
     Σ ProtocolSt λ S′ →
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
+
+-- GUARDRAIL-3 hand-check (the trivial frame clause).  map-f discharges
+-- stepFrame-wf outright: it emits nothing (evs′ ≡ []) and leaves fin/sched/st
+-- untouched (Evaluator 501-502), so with vals gone from FoldInv the value
+-- transform is irrelevant and preservation is ++-identityʳ ∘ fi.  This confirms
+-- the (vals-free) contract shape is dischargeable by a pass-through clause
+-- before the wrap clauses (which add the merge-coherence field) are wired.
+stepFrame-wf-mapf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (fn : Fn Γ [] [] [] s u) (path′ : Path Γ u t)
+  (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  FoldInv id envSrc evs fin sched st S →
+  let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (map-f fn) path′ vals fin sched st
+  in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
+stepFrame-wf-mapf sf id now envSrc fn path′ vals evs fin sched st S fi
+  rewrite ++-identityʳ evs = fi
 
 -- the done-discipline, as a precondition: a done automaton (root already
 -- completed) admits only share-bound folds — a chain reaching the root
