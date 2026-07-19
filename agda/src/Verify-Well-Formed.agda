@@ -37,7 +37,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_;
                                 sched-init; st-init; sched-next; LiveSource;
                                 schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; chainsOf; chainStep;
+                                arrTy; arrSource; chainsOf; chainsGo; chainStep;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 sameSource; drySource; dryEvent; hasDry;
@@ -234,6 +234,52 @@ schedGo-mem (l ∷ ls) eq | inj₂ (a₀ , l′) | inj₂ (a′ , ls′) with sc
                            | ≡ᵇ-refl (LiveSource.source l)
                            | sameTy-refl (LiveSource.elemTy l) = refl
 ...   | false | refl rewrite schedGo-mem ls geq = ∨-trueʳ _
+
+-- a source-matching live source pins the registration's type via regTyped?
+liveTypeOK?-extract : ∀ {n} {Γ : Ctx n} (s : Source) (u τ : Ty)
+  (live : List (LiveSource Γ)) →
+  liveTypeOK? s u live ≡ true → liveHas s τ live ≡ true → sameTy u τ ≡ true
+liveTypeOK?-extract s u τ []       ok has = true≢false (sym has)
+liveTypeOK?-extract s u τ (l ∷ ls) ok has with LiveSource.source l ≡ᵇ s
+... | false = liveTypeOK?-extract s u τ ls (∧-trueʳ ok) has
+... | true  with sameTy τ (LiveSource.elemTy l) in seq
+...   | true  = subst (λ z → sameTy u z ≡ true)
+                  (trans (sameTy-sound u (LiveSource.elemTy l) (∧-trueˡ ok))
+                         (sym (sameTy-sound τ (LiveSource.elemTy l) seq)))
+                  (sameTy-refl u)
+...   | false = liveTypeOK?-extract s u τ ls (∧-trueʳ ok) has
+
+-- the registry induction: every entry of a's source is a's-typed (else
+-- regTyped? + the live source would contradict), so no chainsGo drop
+count-eq : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ)
+  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  regTyped? reg live ≡ true → liveHas (arrSource a) (arrTy a) live ≡ true →
+  countRegs (arrSource a) reg ≡ length (chainsGo a reg)
+count-eq a []                      live rt lh = refl
+count-eq a ((rid , s , (u , p)) ∷ r) live rt lh
+  with sameSource (arrSource a) s in sseq
+... | false = count-eq a r live (∧-trueʳ rt) lh
+... | true  with u ≟ᵗ arrTy a
+...   | yes refl = cong suc (count-eq a r live (∧-trueʳ rt) lh)
+...   | no ¬p    = ⊥-elim (¬p (sameTy-sound u (arrTy a)
+                    (liveTypeOK?-extract (arrSource a) u (arrTy a) live
+                      (subst (λ z → liveTypeOK? z u live ≡ true)
+                             (sym (≡ᵇ→≡ (arrSource a) s sseq)) (∧-trueˡ rt))
+                      lh)))
+
+-- THE derived fact, recovering the old one-lookahead chains-count from
+-- the pointwise registry↔schedule type-consistency invariant
+chains-count-derived : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched sched″ : Sched Γ) (st : EvalSt e) →
+  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+  sched-next sched ≡ inj₂ (a , sched″) →
+  countRegs (arrSource a) (EvalSt.registry st) ≡ length (chainsOf a st)
+chains-count-derived a sched sched″ st rt eq with schedGo (Sched.live sched) in geq
+... | inj₁ _ with eq
+...   | ()
+chains-count-derived a sched sched″ st rt eq | inj₂ (a₀ , ls) with eq
+...   | refl = count-eq a₀ (EvalSt.registry st) (Sched.live sched) rt
+                 (schedGo-mem (Sched.live sched) geq)
 
 -- the open (or last) instant is strictly in the past
 CurrentPast : Maybe (Id × Owed) → Id → Set
