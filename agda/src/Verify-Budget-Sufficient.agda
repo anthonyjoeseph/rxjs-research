@@ -187,12 +187,14 @@ hasAtLeast-tower zero    = hs hz
 hasAtLeast-tower (suc h) = hasAtLeast-pow2 (hasAtLeast-tower h)
 
 -- what the seeded budget guarantees: the full head plus the tower
+-- (height (4+sz)·(id+1) — three stories above sizeBudgetAt's, the
+-- headroom the wet contract's rank demand consumes)
 budget-hasAtLeast : ∀ (sz : ℕ) (id : Id) →
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (suc sz * suc id))
-    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ (suc sz * suc id))
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((4 + sz) * suc id))
+    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ ((4 + sz) * suc id))
 budget-hasAtLeast sz id =
   hasAtLeast-pad-plus (2 ^ (sz * suc id * suc id))
-                      (hasAtLeast-tower (suc sz * suc id))
+                      (hasAtLeast-tower ((4 + sz) * suc id))
 
 ------------------------------------------------------------------
 -- the machine's value stores, bounded: schedule pendings, scan

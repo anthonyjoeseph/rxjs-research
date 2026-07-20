@@ -397,10 +397,17 @@ hasDry (em ∷ ems) =
 -- The gasPad literal head (the old quadratic budget) is a pure fast
 -- path: every physically runnable consumption stays inside it, so the
 -- tower tail is never forced — evaluation cost is exactly the old
--- ℕ budget's, while the tail carries the theorem's sufficiency
+-- ℕ budget's, while the tail carries the theorem's sufficiency.
+-- Height (4+size)·(id+1), THREE stories above the store bound
+-- (Verify-Budget-Sufficient's sizeBudgetAt, height (1+size)·(id+1)):
+-- the wet contract's demand is polynomial in the store bound with a
+-- syntax-sized exponent (rank of the layer multiset), and a tower
+-- absorbs any polynomial fudge within two stories — the third is
+-- margin.  The extra stories are free: the tower tail is lazy and
+-- never forced on a feasible run
 syncBudget : ℕ → Id → Gas
 syncBudget sz id =
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (suc sz * suc id))
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((4 + sz) * suc id))
 
 -- the size that seeds the budget is the WHOLE program's: root
 -- expression plus every shared slot def — connect subscribes defs,
