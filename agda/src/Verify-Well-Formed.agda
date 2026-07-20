@@ -2194,6 +2194,27 @@ postulate
 --       cutThrough-balance prove sweepLive kept still covers every tail close.
 -- (T) is the invariant-design core (the burst-side analog of the delivery-side
 -- FoldInv envShadow); (H) is mechanical off takeDispatch-cut + cutThrough-balance.
+--
+-- ASSEMBLY PLAN (machinery now in place — frameFresh?, TailRel, pushBurst-take-
+-- zero-transport above).  (T) is now exactly pushBurst-take-zero-transport: the
+-- severed tail runs at S_head to S″ with TailRel carried, PROVIDED
+--   • frameFresh? L ems ≡ true, and
+--   • TailRel id sev L S_head S₁  (sev s = closeCount s (cutThrough-closes)),
+-- both of which the CALLER must supply.  frameFresh? [] burst must be threaded
+-- down from subscribeE-take-wf (each clause's Σ-conclusion gains it; oneShotBurst
+-- is frameFresh by computation, pass-through ops preserve it on the bs skeleton),
+-- with the accumulator advanced per non-cut emit (frameFreshEv) so that at the
+-- cut the acc L holds exactly the still-open severed sources.  TailRel at the cut
+-- comes from BurstInv.live-matches (S₁ live ↔ registry) + cutThrough-balance
+-- (registry ↔ kept + closes): live S₁ = live S_head + sev pointwise, and acc-le
+-- holds because L's opens survive the sweep.  Then cut-cons-run = (H) reaches
+-- S_head + transport reaches S″.  To retire: (1) thread frameFresh through the
+-- take subtree (bounded — subscribeE-take-wf is uncalled pending subscribeE-wf
+-- assembly); (2) prove (H); (3) prove pushBurst-take-zero-transport (the
+-- applyEvents count-relation induction).  NOTE: cut-cons-run AS CURRENTLY STATED
+-- (no frameFresh hypothesis) is FALSE — the close-a-swept-source countermodel —
+-- so it MUST gain the frameFresh/TailRel hypotheses when (1) lands; it is a known
+-- unsound placeholder until then.
 postulate
   cut-cons-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
