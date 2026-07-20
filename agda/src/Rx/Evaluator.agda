@@ -20,7 +20,7 @@ open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
-                           applyFn; evalTm; unfoldμ; sizeᵉ;
+                           applyFn; evalTm; unfoldμ; sizeᵉ; sizeᵛ;
                            input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                            mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                            μᵉ; varᵉ; deferᵉ)
@@ -410,10 +410,20 @@ syncBudget sz id =
   gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((4 + sz) * suc id))
 
 -- the size that seeds the budget is the WHOLE program's: root
--- expression plus every shared slot def — connect subscribes defs,
--- and their μ/inner structure spends fuel just like the root's
+-- expression, every shared slot def (connect subscribes defs, and
+-- their μ/inner structure spends fuel just like the root's), AND
+-- every scripted value — a scripted obs value is delivered and
+-- subscribed like any other inner, so its syntax demands fuel the
+-- root's size knows nothing about
+inputSize : ∀ {n} {Γ : Ctx n} {t} → ObservableInput (Val Γ t) → ℕ
+inputSize {t = t} (hot async)       =
+  suc (sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
+inputSize {t = t} (cold sync async) =
+  suc (sum (map (sizeᵛ t) sync)
+       + sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
+
 slotSize : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
-slotSize (scripted _) = 1
+slotSize (scripted i) = inputSize i
 slotSize (shared d)   = sizeᵉ d
 
 slotsSize : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ

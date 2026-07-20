@@ -522,3 +522,17 @@ mutual
   syncSizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
   syncSizeᵗˢ []       = 1
   syncSizeᵗˢ (y ∷ ys) = syncSizeᵗ y + syncSizeᵗˢ ys
+
+-- the size of a runtime value: embedded observables count their full
+-- syntax; base payloads are opaque.  Scripted slot values are sized
+-- with this too — they are part of the program-as-given, and the
+-- budget must dominate the subscription work THEY demand (a scripted
+-- obs value is subscribed like any other inner)
+sizeᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+sizeᵛ unitᵗ    _        = 1
+sizeᵛ boolᵗ    _        = 1
+sizeᵛ natᵗ     _        = 1
+sizeᵛ (s ×ᵗ t) (a , b)  = suc (sizeᵛ s a + sizeᵛ t b)
+sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
+sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
+sizeᵛ (obs t)  e        = sizeᵉ e

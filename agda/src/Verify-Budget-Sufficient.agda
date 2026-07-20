@@ -34,7 +34,7 @@ module Verify-Budget-Sufficient where
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
                                 if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
-                                _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
+                                _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
                                        ≤-reflexive; <-≤-trans; ≤-pred;
                                        +-suc; +-identityʳ;
@@ -42,11 +42,15 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        +-monoˡ-<; +-monoˡ-≤;
                                        *-monoˡ-≤; *-monoʳ-≤;
                                        *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n)
+                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
+                                       ^-monoʳ-≤;
+                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.List    using (List; []; _∷_; _++_; all; any; length;
-                                sum; tabulate)
+                                sum; tabulate; concat; map)
 open import Data.Fin     using (Fin; toℕ)
+import Data.Fin as Fin
+open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
@@ -65,7 +69,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                                Ctx; Closed; Val; sizeᵉ;
+                                Ctx; Closed; Val; sizeᵉ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
                                 fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
@@ -78,6 +82,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
+                                slotSize; inputSize;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
@@ -107,20 +112,6 @@ hasDry-append (em ∷ xs) ys h₁ h₂
 ... | e₁ , h₁′
   with ∨-false (any dryEvent (InstEmit.events em)) _ h₁′
 ... | e₂ , h₁″ rewrite e₁ | e₂ = hasDry-append xs ys h₁″ h₂
-
-------------------------------------------------------------------
--- the size of a runtime value: embedded observables count their
--- full syntax; base payloads are opaque
-------------------------------------------------------------------
-
-sizeᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
-sizeᵛ unitᵗ    _        = 1
-sizeᵛ boolᵗ    _        = 1
-sizeᵛ natᵗ     _        = 1
-sizeᵛ (s ×ᵗ t) (a , b)  = suc (sizeᵛ s a + sizeᵛ t b)
-sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
-sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
-sizeᵛ (obs t)  e        = sizeᵉ e
 
 ------------------------------------------------------------------
 -- the ℕ-valued SIZE budget for the stored-value invariant: the same
@@ -282,6 +273,9 @@ pop-bounded B sched st eq bnd
 
 T-to : ∀ {b : Bool} → b ≡ true → T b
 T-to refl = tt
+
+T⇒≡true : ∀ b → T b → b ≡ true
+T⇒≡true true _ = refl
 
 -- generic: a pointwise implication lifts through all
 all-impl : ∀ {A : Set} (p q : A → Bool) →
@@ -682,6 +676,85 @@ scanVals-layered fn a₀ (v ∷ vs) la (lv ∷ᵃ lvs) =
   in la′ ∷ᵃ louts , llast
 
 ------------------------------------------------------------------
+-- the INIT leg: the initial machine satisfies the size invariant.
+-- Provable exactly because the budget seeds from script CONTENT
+-- (slotSize counts scripted values): every hot pending value is ≤
+-- its slot's inputSize ≤ slotsSize ≤ the tower.
+------------------------------------------------------------------
+
+n<2^n : ∀ n → n < 2 ^ n
+n<2^n zero    = s≤s z≤n
+n<2^n (suc n) = ≤-trans step (≤-reflexive shape)
+  where
+  step : suc (suc n) ≤ 2 ^ n + 2 ^ n
+  step = ≤-trans (+-monoˡ-≤ (suc n) (s≤s z≤n))
+                 (+-mono-≤ (n<2^n n) (n<2^n n))
+  shape : 2 ^ n + 2 ^ n ≡ 2 ^ suc n
+  shape = cong (2 ^ n +_) (sym (+-identityʳ (2 ^ n)))
+
+k≤towerℕ : ∀ k → k ≤ towerℕ k
+k≤towerℕ zero    = z≤n
+k≤towerℕ (suc k) =
+  ≤-trans (n<2^n k) (^-monoʳ-≤ 2 (k≤towerℕ k))
+
+all-++-intro : ∀ {A : Set} (p : A → Bool) (xs ys : List A) →
+  all p xs ≡ true → all p ys ≡ true → all p (xs ++ ys) ≡ true
+all-++-intro p []       ys hx hy = hy
+all-++-intro p (x ∷ xs) ys hx hy
+  with ∧-true (p x) (all p xs) hx
+... | px , pxs = ∧-intro px (all-++-intro p xs ys pxs hy)
+
+all-concat-tab : ∀ {A : Set} (p : A → Bool) {m} (f : Fin m → List A) →
+  (∀ i → all p (f i) ≡ true) → all p (concat (tabulate f)) ≡ true
+all-concat-tab p {zero}  f h = refl
+all-concat-tab p {suc m} f h =
+  all-++-intro p (f Fin.zero) (concat (tabulate (λ i → f (Fin.suc i))))
+               (h Fin.zero)
+               (all-concat-tab p (λ i → f (Fin.suc i)) (λ i → h (Fin.suc i)))
+
+fᵢ≤sum-tab : ∀ {m} (f : Fin m → ℕ) (i : Fin m) → f i ≤ sum (tabulate f)
+fᵢ≤sum-tab {suc m} f Fin.zero    = m≤m+n (f Fin.zero) _
+fᵢ≤sum-tab {suc m} f (Fin.suc i) =
+  ≤-trans (fᵢ≤sum-tab (λ j → f (Fin.suc j)) i) (m≤n+m _ (f Fin.zero))
+
+-- pending values of a resolved script stay under any bound that
+-- covers the script's total content
+resolve-bounded : ∀ {n} {Γ : Ctx n} {t : Ty} (B : ℕ) (anchor : Tick)
+  (xs : List (Timed (Val Γ t))) →
+  sum (map (λ tv → sizeᵛ t (Timed.val tv)) xs) ≤ B →
+  all (λ p → sizeᵛ t (proj₂ p) ≤ᵇ B) (resolve anchor xs) ≡ true
+resolve-bounded B anchor [] h = refl
+resolve-bounded {t = t} B anchor ((after w , v) ∷ r) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (sizeᵛ t v) _) h)))
+          (resolve-bounded B (anchor + suc w) r
+            (≤-trans (m≤n+m _ (sizeᵛ t v)) h))
+
+mkHot-bounded : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (B : ℕ) (i : Fin n) →
+  slotSize (ins i) ≤ B → all (boundedLive B) (mkHot ins i) ≡ true
+mkHot-bounded ins B i h with ins i | h
+... | scripted (hot async) | h′ =
+      ∧-intro (resolve-bounded B 0 async (≤-trans (n≤1+n _) h′)) refl
+... | scripted (cold _ _)  | _ = refl
+... | shared _             | _ = refl
+
+init-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (id : Id) → stBounded? (sizeBudgetAt e ins id) (sched-init e ins)
+                         (st-init e) ≡ true
+init-bounded {n = n} e ins id =
+  ∧-intro (all-concat-tab (boundedLive B) (mkHot ins) perSlot) refl
+  where
+  B = sizeBudgetAt e ins id
+  slots≤B : slotsSize ins ≤ B
+  slots≤B =
+    ≤-trans (m≤n+m (slotsSize ins) (sizeᵉ e))
+    (≤-trans (n≤1+n _)
+    (≤-trans (m≤m*n (suc (sizeᵉ e + slotsSize ins)) (suc id))
+             (k≤towerℕ (suc (sizeᵉ e + slotsSize ins) * suc id))))
+  perSlot : ∀ i → all (boundedLive B) (mkHot ins i) ≡ true
+  perSlot i = mkHot-bounded ins B i
+                (≤-trans (fᵢ≤sum-tab (λ j → slotSize (ins j)) i) slots≤B)
+
+------------------------------------------------------------------
 -- EDGE 1 — the connect latch, counted.  subscribeSharedSlot's
 -- connect fires only behind memberSource … ≡ false and prepends to
 -- connectedShares, which no machine function ever shrinks; so the
@@ -690,24 +763,57 @@ scanVals-layered fn a₀ (v ∷ vs) la (lv ∷ᵃ lvs) =
 -- and never rises (unconn-cons-≤).
 ------------------------------------------------------------------
 
+unconnAt : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → Fin n → ℕ
+unconnAt sl cs i with sl i
+... | shared _   = if memberSource (toℕ i) cs then 0 else 1
+... | scripted _ = 0
+
 unconn : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
-unconn {n = n} sl cs = sum (tabulate contrib)
+unconn sl cs = sum (tabulate (unconnAt sl cs))
+
+-- pointwise sums over Fin n
+sum-tab-mono : ∀ {m} (f g : Fin m → ℕ) → (∀ i → f i ≤ g i) →
+  sum (tabulate f) ≤ sum (tabulate g)
+sum-tab-mono {zero}  f g h = z≤n
+sum-tab-mono {suc m} f g h =
+  +-mono-≤ (h Fin.zero) (sum-tab-mono _ _ (λ i → h (Fin.suc i)))
+
+sum-tab-strict : ∀ {m} (f g : Fin m → ℕ) → (∀ j → f j ≤ g j) →
+  (i : Fin m) → f i < g i → sum (tabulate f) < sum (tabulate g)
+sum-tab-strict {suc m} f g h Fin.zero    fi<gi =
+  +-mono-<-≤ fi<gi (sum-tab-mono _ _ (λ j → h (Fin.suc j)))
+sum-tab-strict {suc m} f g h (Fin.suc i) fi<gi =
+  +-mono-≤-< (h Fin.zero) (sum-tab-strict _ _ (λ j → h (Fin.suc j)) i fi<gi)
+
+-- adding a member never raises any slot's contribution
+unconnAt-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (s : Source) (i : Fin n) → unconnAt sl (s ∷ cs) i ≤ unconnAt sl cs i
+unconnAt-cons-≤ sl cs s i with sl i
+... | scripted _ = z≤n
+... | shared _ with memberSource (toℕ i) cs
+...   | true  rewrite ∨-zeroʳ (sameSource (toℕ i) s) = z≤n
+...   | false with sameSource (toℕ i) s ∨ false
+...     | true  = z≤n
+...     | false = ≤-refl
+
+unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
+unconn-cons-≤ sl cs s =
+  sum-tab-mono _ _ (unconnAt-cons-≤ sl cs s)
+
+-- connecting a fresh share strictly drops the count: its own slot
+-- goes 1 → 0 and no other slot rises
+unconn-insert : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false →
+  unconn sl (toℕ i ∷ cs) < unconn sl cs
+unconn-insert sl cs i eqi fresh =
+  sum-tab-strict _ _ (unconnAt-cons-≤ sl cs (toℕ i)) i strict
   where
-  contrib : Fin n → ℕ
-  contrib i with sl i
-  ... | shared _   = if memberSource (toℕ i) cs then 0 else 1
-  ... | scripted _ = 0
-
--- pure counting over Fin n — GRINDER: sum/tabulate pointwise
--- comparison, with the single strict position at i
-postulate
-  unconn-insert : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-    (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
-    memberSource (toℕ i) cs ≡ false →
-    unconn sl (toℕ i ∷ cs) < unconn sl cs
-
-  unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-    (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
+  strict : unconnAt sl (toℕ i ∷ cs) i < unconnAt sl cs i
+  strict rewrite eqi | fresh
+               | T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl)
+               = s≤s z≤n
 
 
 ------------------------------------------------------------------
@@ -888,9 +994,6 @@ counts-++ B (x ∷ xs) ys rewrite counts-++ B xs ys =
 ≺ᵛ-⊕ʳ : ∀ {m} {u v : Vec ℕ m} (w : Vec ℕ m) → u ≺ᵛ v → (u ⊕ᵛ w) ≺ᵛ (v ⊕ᵛ w)
 ≺ᵛ-⊕ʳ (z ∷ᵛ w) (≺-here  x<y) = ≺-here (+-monoˡ-< z x<y)
 ≺ᵛ-⊕ʳ (z ∷ᵛ w) (≺-there u≺v) = ≺-there (≺ᵛ-⊕ʳ w u≺v)
-
-T⇒≡true : ∀ b → T b → b ≡ true
-T⇒≡true true _ = refl
 
 -- (suc B ≤ᵇ y) unfolds to (B <ᵇ y), so state the false case there
 ≤⇒<ᵇ-false : ∀ y B → y ≤ B → (B <ᵇ y) ≡ false
