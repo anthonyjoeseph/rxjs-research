@@ -43,7 +43,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        *-monoˡ-≤; *-monoʳ-≤;
                                        *-suc; m≤m+n; m≤n+m; n≤1+n;
                                        m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤;
+                                       ^-monoʳ-≤; *-assoc;
                                        +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.List    using (List; []; _∷_; _++_; all; any; length;
@@ -1089,6 +1089,22 @@ dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} U′<U r′≤R s′≤V
                       (*-monoʳ-≤ (suc R) U′<U))))
   (≤-trans (*-monoʳ-≤ (suc V) (m≤n+m (suc R * U) r))
            (m≤n+m (suc V * (r + suc R * U)) s))))
+
+-- the whole demand under one product — what the seed inequality
+-- compares against the budget tower: dBound ≤ (1+V)(1+R)(1+U)
+dBound-bound : ∀ {V R U r s} → s ≤ V → r ≤ R →
+  dBound V R U r s ≤ suc V * suc R * suc U
+dBound-bound {V} {R} {U} {r} {s} s≤V r≤R =
+  ≤-trans (+-mono-≤ s≤V
+            (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r≤R)))
+  (≤-trans (+-monoˡ-≤ (suc V * (R + suc R * U)) (n≤1+n V))
+  (≤-trans (≤-reflexive (sym (*-suc (suc V) (R + suc R * U))))
+  (≤-trans (*-monoʳ-≤ (suc V) (≤-reflexive shuffle))
+           (≤-reflexive (sym (*-assoc (suc V) (suc R) (suc U)))))))
+  where
+  -- suc (R + suc R * U) ≡ suc R * suc U, definitionally via *-suc
+  shuffle : suc (R + suc R * U) ≡ suc R * suc U
+  shuffle = sym (*-suc (suc R) U)
 
 -- the two decrease lemmas the hop analysis needs (proof-design memo
 -- below), PROVEN: ≺-embed (embedded-value hop — a value reified
