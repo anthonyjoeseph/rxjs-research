@@ -27,7 +27,7 @@ log() { printf '\n=== %s ===\n' "$1"; }
 
 log "GHC + cabal (apt)"
 if ! command -v ghc >/dev/null 2>&1 || ! command -v cabal >/dev/null 2>&1; then
-  sudo apt-get update -y
+  sudo apt-get update -y 2>&1 | grep -v "^Err:\|403\|Forbidden\|no longer signed" || true
   sudo apt-get install -y ghc cabal-install
 else
   echo "ghc $(ghc --numeric-version), cabal $(cabal --numeric-version) already present"
