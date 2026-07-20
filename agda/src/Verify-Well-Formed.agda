@@ -37,7 +37,7 @@ open import Relation.Nullary using (Dec; yes; no)
 
 open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; CloseReason; exhausted;
+                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
                                 dried;
                                 cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
@@ -2086,6 +2086,57 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
       at i from src as ek)
     ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems
               (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))
+
+-- ── frameFresh: the burst-stream prefix discipline ───────────────────────
+-- A well-formed subscription burst brackets every `close` against an `init`
+-- that appeared earlier in the SAME frame (accumulator threaded across emits):
+-- one-shots bracket init/close inside their own emit; shares / cold-async inits
+-- stay OPEN in `acc`; the take-cut's cutThrough closes hit sources whose inits
+-- rode earlier emits and are still in `acc`.  `handoff` is foldPath-only and a
+-- `delivery`-kind emit never appears in a burst (both verified against the
+-- evaluator 2026-07-20), so either makes the predicate false.  This is the
+-- burst-side analog of regTyped? — the discipline `cut-cons-run` needs so its
+-- transformed value-free tail cannot underflow a swept source's close.
+
+-- one emit's events, threading the open-source accumulator; nothing = malformed
+frameFreshEv : ∀ {A : Set} → List Source → List (InstEvent A) → Maybe (List Source)
+frameFreshEv acc []                 = just acc
+frameFreshEv acc (init s    ∷ es)   = frameFreshEv (s ∷ acc) es
+frameFreshEv acc (value _   ∷ es)   = frameFreshEv acc es
+frameFreshEv acc (complete  ∷ es)   = frameFreshEv acc es
+frameFreshEv acc (handoff _ ∷ es)   = nothing
+frameFreshEv acc (close s _ ∷ es)   with removeOne s acc
+... | just acc′ = frameFreshEv acc′ es
+... | nothing   = nothing
+
+-- one emit: a delivery-kind emit is not a burst emit and is rejected
+frameFreshEmit : ∀ {A : Set} → List Source → InstEmit A → Maybe (List Source)
+frameFreshEmit acc em with InstEmit.kind em
+... | subscribe = frameFreshEv acc (InstEmit.events em)
+... | plumbing  = frameFreshEv acc (InstEmit.events em)
+... | delivery  = nothing
+
+frameFresh? : ∀ {A : Set} → List Source → List (InstEmit A) → Bool
+frameFresh? acc []         = true
+frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
+... | just acc′ = frameFresh? acc′ ems
+... | nothing   = false
+
+-- the count relation the transport threads: the raw (S_r) and transformed (S_t)
+-- runs of the cut tail differ only by the cut's severed closes.  `sev s` is the
+-- per-source count of the cut head's cutThrough closes, FIXED for the whole tail
+-- (the tail never touches the registry).  Pointwise on countIn, matching the
+-- live-matches style.  acc-le keeps the in-stream opens present on the
+-- transformed side (so a frameFresh close finds its source live there too).
+record TailRel (id : Id) (sev : Source → ℕ) (acc : List Source)
+               (S_t S_r : ProtocolSt) : Set where
+  field
+    live-rel : ∀ s → countIn s (ProtocolSt.live S_r)
+                       ≡ countIn s (ProtocolSt.live S_t) + sev s
+    acc-le   : ∀ s → countIn s acc ≤ countIn s (ProtocolSt.live S_t)
+    done-t   : ProtocolSt.done S_t ≡ true
+    cur-t    : ProtocolSt.current S_t ≡ just (id , [])
+    cur-r    : ProtocolSt.current S_r ≡ just (id , [])
 
 -- the take fold.  take TRANSFORMS its burst (non-cut passes through; the cut
 -- exhausts the budget, forces `complete`, and cuts the registry), so it reaches
