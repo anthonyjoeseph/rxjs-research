@@ -1189,6 +1189,24 @@ counts-below (suc B) t       Y       aY         t≤
 -- (cascadeGo-wet); the disjointness argument (each registration's
 -- path owns its minted nodes, so per-cascade store traffic is
 -- structure-bounded) supplies the store-boundedness half.
+--
+-- TWO NOTES FOR THE CONTRACT SESSION (2026-07-20 night):
+-- 1. The entry-sum side condition (totᵛ ≤ V) does NOT ride on
+--    stBounded?: a scan fn that discards its input leaves UNUSED
+--    env entries in the derivation — layers with no syntactic
+--    footprint — so layer count is not bounded by sizeᵉ.  Either
+--    track a layer-count invariant alongside stBounded?, or:
+-- 2. THE SHELL OPTION (likely better): make the measure a pure
+--    function of the closed expression — shellSize = syncSize with
+--    strmᵗ subtrees as leaves; M(e) = {shellSize e} ⊎ ⋃ M over
+--    sync-reachable strmᵗ subtrees.  Embedded hop = sub-multiset
+--    SYNTACTICALLY; eval/scan hops preserve shells up to reified
+--    GROUND plugs (elements inflate ≤ B·suc V — a tower absorbs
+--    that inside the +3-story headroom).  Kills all derivation
+--    bookkeeping in the store invariant: the caps become decidable
+--    Bool checks like stBounded?.  The Layered family stays as the
+--    proof that eval outputs are template instances (the closure
+--    lemma is the content of the eval-hop decrease either way).
 ------------------------------------------------------------------
 
 postulate
