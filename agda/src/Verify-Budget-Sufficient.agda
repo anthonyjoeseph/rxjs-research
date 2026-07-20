@@ -13,18 +13,21 @@
 --   stBounded? B          — every stored value's size ≤ B (decidable)
 --   INV at instant id     — stBounded? (budgetAt … id)
 --   burst-dry/-bounded    — the root burst neither dries nor escapes
---   cascade-dry           — one cascade preserves INV and stays wet
+--   cascadeGo-wet         — the chain fold stays wet, lands bounded
+--   cascade-dry (PROVEN)  — latch + fold core + finish, composed
 --   drain-dry (PROVEN)    — the fuel loop composes cascades
 --   budget-sufficient     — (PROVEN from the above) the whole run
 --
--- pop-slots/pop-bounded are PROVEN (by inverting liveNext, hoisted
--- to top level for exactly this).  Three postulated cores remain:
--- burst-* and cascade-dry, the real termination content, to be
--- proven by fuel-accounting induction over the subscription
--- machine's clauses (each of the three decrement edges consumes one
--- unit; the work between decrements is structural), with the growth
--- arithmetic closing the loop.  Not imported by Main until the
--- splice into Verify-Well-Formed replaces its postulate.
+-- PROVEN: pop-slots/pop-bounded (inverting liveNext, hoisted for
+-- exactly this), the cascade's structural ring (latch/sweep/finish/
+-- mono), cascade-dry, drain-dry, and the theorem.  Three postulated
+-- cores remain — burst-dry, burst-bounded, cascadeGo-wet — the real
+-- termination content: fuel-accounting induction over the
+-- subscription machine's clauses (the three decrement edges each
+-- consume one unit; everything between is structural), the
+-- registration-disjointness argument at the fold, and the quadratic
+-- growth arithmetic.  Not imported by Main until the splice into
+-- Verify-Well-Formed replaces its postulate.
 module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_)
@@ -47,7 +50,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 root; sched-init; st-init; sched-next;
                                 liveHead; liveNext; arrEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
-                                dropSource; arrSource;
+                                dropSource; arrSource; chainsOf; cascadeGo;
+                                Path; arrTy;
                                 subscribeE; cascade; drain; evaluate;
                                 hasDry; dryEvent; drySource; sameSource;
                                 budgetAt)
@@ -249,11 +253,38 @@ finish-bounded B a sched st bnd with Arrival.isLast a
                   (Sched.live sched) bls)
                 bns
 
+-- the finish never touches the slots either (record updates only)
+finish-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (cascadeFinish a sched st)) ≡ Sched.slots sched
+finish-slots a sched st with Arrival.isLast a
+... | false = refl
+... | true  = refl
+
 ------------------------------------------------------------------
 -- the three cores
 ------------------------------------------------------------------
 
 postulate
+  -- THE per-cascade termination content: the chain fold at instant
+  -- id, from a latched state within id's budget, stays wet and lands
+  -- within suc id's.  The eventual proof's heart is a DISJOINTNESS
+  -- argument: each registration's path owns its own minted nodes, so
+  -- one cascade touches each value store a structure-bounded number
+  -- of times (its own chain, plus at most the share telescope's
+  -- dispatches) — cross-chain compounding through a single store is
+  -- impossible, and the per-store growth factor 2^(map-tower height)
+  -- ≤ 2^(id·size) is what the quadratic budget dominates
+  cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (id : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    stBounded? (budgetAt e (Sched.slots sched) id) sched st ≡ true →
+    let r = cascadeGo a id chains sched st
+    in (hasDry (proj₁ r) ≡ false)
+       × (stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
   -- the root burst neither dries nor escapes instant 1's budget:
   -- fuel-accounting over subscribeE's clauses — the subscribe frame's
   -- values are evalTm outputs over empty environments, sized within
@@ -268,20 +299,39 @@ postulate
     in stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
-  -- THE termination content, one instant at a time: from a state
-  -- within instant id's budget, the cascade at id stays wet (its
-  -- chainStep seeds exactly this budget) and lands within instant
-  -- suc id's — one cascade's template instantiation multiplies
-  -- stored-value sizes by at most a program-syntax factor, and the
-  -- budget grows by 2^size per instant.  Stated self-referentially
-  -- through each sched's own slots, so no threading lemmas leak in
-  cascade-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-    stBounded? (budgetAt e (Sched.slots sched) id) sched st ≡ true →
-    let r = cascade a id sched st
-    in (hasDry (proj₁ r) ≡ false)
-       × (stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
+------------------------------------------------------------------
+-- one cascade — PROVEN: latch, the postulated fold core, finish
+------------------------------------------------------------------
+
+cascade-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+  stBounded? (budgetAt e (Sched.slots sched) id) sched st ≡ true →
+  let r = cascade a id sched st
+  in (hasDry (proj₁ r) ≡ false)
+     × (stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+cascade-dry {e = e} a id sched st bnd
+  with cascadeGo-wet a id (chainsOf a st) sched (cascadeLatch a st)
+         (latch-bounded (budgetAt e (Sched.slots sched) id) sched a st bnd)
+... | dry , bnd' = dry , final
+  where
+  sched' = proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched
+                                   (cascadeLatch a st)))
+  st'    = proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
+                                   (cascadeLatch a st)))
+  final : stBounded?
+            (budgetAt e (Sched.slots (proj₁ (cascadeFinish a sched' st')))
+                      (suc id))
+            (proj₁ (cascadeFinish a sched' st'))
+            (proj₂ (cascadeFinish a sched' st')) ≡ true
+  final = subst
+            (λ sl → stBounded? (budgetAt e sl (suc id))
+                      (proj₁ (cascadeFinish a sched' st'))
+                      (proj₂ (cascadeFinish a sched' st')) ≡ true)
+            (sym (finish-slots a sched' st'))
+            (finish-bounded (budgetAt e (Sched.slots sched') (suc id))
+                            a sched' st' bnd')
 
 ------------------------------------------------------------------
 -- the fuel loop composes cascades — PROVEN
