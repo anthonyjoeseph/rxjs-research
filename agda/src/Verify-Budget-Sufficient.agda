@@ -5,13 +5,14 @@
 -- Architecture: an instant-indexed size invariant.  The only things
 -- that grow across a run are the runtime values stored in the
 -- machine (schedule pendings, scan accumulators, concat queues);
--- everything else is fixed program syntax.  One cascade's work is
--- template instantiation over those stores, so per instant the
--- largest stored value multiplies by at most the program's own
--- size — dominated by the budget's 2^size-per-instant growth.
+-- everything else is fixed program syntax.  Both fuel demand and
+-- stored-value sizes TOWER (chained obs-typed scans exponentiate at
+-- each story — the 2026-07-19 attack, see syncBudget's comment in
+-- Rx.Evaluator), so the Gas budget is a tower and sizeBudgetAt is
+-- its ℕ shadow for the ≤ᵇ-decidable store invariant.
 --
 --   stBounded? B          — every stored value's size ≤ B (decidable)
---   INV at instant id     — stBounded? (budgetAt … id)
+--   INV at instant id     — stBounded? (sizeBudgetAt … id)
 --   burst-dry/-bounded    — the root burst neither dries nor escapes
 --   cascadeGo-wet         — the chain fold stays wet, lands bounded
 --   cascade-dry (PROVEN)  — latch + fold core + finish, composed
@@ -25,13 +26,13 @@
 -- termination content: fuel-accounting induction over the
 -- subscription machine's clauses (the three decrement edges each
 -- consume one unit; everything between is structural), the
--- registration-disjointness argument at the fold, and the quadratic
--- growth arithmetic.  Not imported by Main until the splice into
+-- registration-disjointness argument at the fold, and the tower
+-- monotonicity/dominance arithmetic.  Not imported by Main until the splice into
 -- Verify-Well-Formed replaces its postulate.
 module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _<ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _<ᵇ_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans)
 open import Data.List    using (List; []; _∷_; _++_; all; any)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -54,7 +55,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Path; arrTy;
                                 subscribeE; cascade; drain; evaluate;
                                 hasDry; dryEvent; drySource; sameSource;
-                                budgetAt)
+                                budgetAt; slotsSize)
 
 ------------------------------------------------------------------
 -- dry-freeness composes over ++ (the other direction from
@@ -87,6 +88,21 @@ sizeᵛ (s ×ᵗ t) (a , b)  = suc (sizeᵛ s a + sizeᵛ t b)
 sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
 sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
 sizeᵛ (obs t)  e        = sizeᵉ e
+
+------------------------------------------------------------------
+-- the ℕ-valued SIZE budget for the stored-value invariant: the same
+-- tower shape as the Gas fuel budget (stored values tower exactly as
+-- fuel demand does — the scan attack compounds both), but as a ℕ so
+-- it can bound sizeᵛ via ≤ᵇ.  Proof-side only: never computed on a
+-- concrete program, so strictness is irrelevant here
+------------------------------------------------------------------
+
+towerℕ : ℕ → ℕ
+towerℕ zero    = 1
+towerℕ (suc h) = 2 ^ towerℕ h
+
+sizeBudgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → ℕ
+sizeBudgetAt e sl id = towerℕ (suc (sizeᵉ e + slotsSize sl) * suc id)
 
 ------------------------------------------------------------------
 -- the machine's value stores, bounded: schedule pendings, scan
@@ -273,16 +289,16 @@ postulate
   -- one cascade touches each value store a structure-bounded number
   -- of times (its own chain, plus at most the share telescope's
   -- dispatches) — cross-chain compounding through a single store is
-  -- impossible, and the per-store growth factor 2^(map-tower height)
-  -- ≤ 2^(id·size) is what the quadratic budget dominates
+  -- impossible, and the per-instant compounding (one tower story per
+  -- chained scan, ≤ size stories) is what the tower budget dominates
   cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
-    stBounded? (budgetAt e (Sched.slots sched) id) sched st ≡ true →
+    stBounded? (sizeBudgetAt e (Sched.slots sched) id) sched st ≡ true →
     let r = cascadeGo a id chains sched st
     in (hasDry (proj₁ r) ≡ false)
-       × (stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+       × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                      (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
   -- the root burst neither dries nor escapes instant 1's budget:
@@ -296,7 +312,7 @@ postulate
   burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)
-    in stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
+    in stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
 
@@ -306,14 +322,14 @@ postulate
 
 cascade-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-  stBounded? (budgetAt e (Sched.slots sched) id) sched st ≡ true →
+  stBounded? (sizeBudgetAt e (Sched.slots sched) id) sched st ≡ true →
   let r = cascade a id sched st
   in (hasDry (proj₁ r) ≡ false)
-     × (stBounded? (budgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+     × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 cascade-dry {e = e} a id sched st bnd
   with cascadeGo-wet a id (chainsOf a st) sched (cascadeLatch a st)
-         (latch-bounded (budgetAt e (Sched.slots sched) id) sched a st bnd)
+         (latch-bounded (sizeBudgetAt e (Sched.slots sched) id) sched a st bnd)
 ... | dry , bnd' = dry , final
   where
   sched' = proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched
@@ -321,16 +337,16 @@ cascade-dry {e = e} a id sched st bnd
   st'    = proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
                                    (cascadeLatch a st)))
   final : stBounded?
-            (budgetAt e (Sched.slots (proj₁ (cascadeFinish a sched' st')))
+            (sizeBudgetAt e (Sched.slots (proj₁ (cascadeFinish a sched' st')))
                       (suc id))
             (proj₁ (cascadeFinish a sched' st'))
             (proj₂ (cascadeFinish a sched' st')) ≡ true
   final = subst
-            (λ sl → stBounded? (budgetAt e sl (suc id))
+            (λ sl → stBounded? (sizeBudgetAt e sl (suc id))
                       (proj₁ (cascadeFinish a sched' st'))
                       (proj₂ (cascadeFinish a sched' st')) ≡ true)
             (sym (finish-slots a sched' st'))
-            (finish-bounded (budgetAt e (Sched.slots sched') (suc id))
+            (finish-bounded (sizeBudgetAt e (Sched.slots sched') (suc id))
                             a sched' st' bnd')
 
 ------------------------------------------------------------------
@@ -339,17 +355,17 @@ cascade-dry {e = e} a id sched st bnd
 
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-  stBounded? (budgetAt e (Sched.slots sched) id) sched st ≡ true →
+  stBounded? (sizeBudgetAt e (Sched.slots sched) id) sched st ≡ true →
   hasDry (drain {e = e} fuel id sched st) ≡ false
 drain-dry zero    id sched st bnd = refl
 drain-dry (suc k) id sched st bnd with sched-next sched in eq
 ... | inj₁ _            = refl
 drain-dry {e = e} (suc k) id sched st bnd | inj₂ (a , sched′) =
-  let bnd′ : stBounded? (budgetAt e (Sched.slots sched′) id) sched′ st ≡ true
+  let bnd′ : stBounded? (sizeBudgetAt e (Sched.slots sched′) id) sched′ st ≡ true
       bnd′ = subst
-               (λ sl → stBounded? (budgetAt e sl id) sched′ st ≡ true)
+               (λ sl → stBounded? (sizeBudgetAt e sl id) sched′ st ≡ true)
                (sym (pop-slots sched eq))
-               (pop-bounded (budgetAt e (Sched.slots sched) id) sched st eq bnd)
+               (pop-bounded (sizeBudgetAt e (Sched.slots sched) id) sched st eq bnd)
       (dry₁ , bnd″) = cascade-dry a id sched′ st bnd′
   in hasDry-append (proj₁ (cascade a id sched′ st)) _
        dry₁

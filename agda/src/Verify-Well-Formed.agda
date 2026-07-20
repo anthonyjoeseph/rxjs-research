@@ -31,7 +31,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (Dec; yes; no)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit)
+open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_;
@@ -442,7 +442,7 @@ postulate
   -- burst carries the dry sentinel, which the protocol rejects by
   -- design — the unconditioned statement would be false at fuel 0
   subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     hasDry (proj₁ (subscribeE fuel b κ id now sched st)) ≡ false →
