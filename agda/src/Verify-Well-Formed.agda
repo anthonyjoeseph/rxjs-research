@@ -2189,22 +2189,110 @@ pushBurst-take-run {Γ = Γ} {s = s} fuel id now nid κ ((es at i from src as ek
                       (takeVals-nil kCount) seq)
                     tailRun)
 
--- BurstInv survives the take burst.  Non-cut emits leave registry/schedule
--- fixed (like scan), so live-matches/reg-typed carry from the IH; a cut emit
--- severs the registry and sweeps live, and the two rebalance by cutThrough-
--- balance (each removed reg emits its close, so countIn/countRegs shift in
--- step).  Scoped exactly like the scan clause's caches lemma; to discharge with
--- cutThrough-balance once the cut edge is threaded through.
+-- BurstInv survives the take burst.  NON-CUT emits leave registry/schedule
+-- fixed (exactly like scan): the reshaped head steps the protocol identically
+-- (stepProtocol-faithful — the automaton ignores value payloads), registry and
+-- schedule are untouched, and the only node write is caches-neutral (take-st ⟹
+-- nodeCacheOK ≡ true), so every BurstInv field but `caches` transfers verbatim
+-- and `caches` survives by cachesValid-setNode-ok.  The recursion threads this to
+-- the tail; only the CUT emit — which severs the registry and sweeps live — is
+-- isolated in pushBurst-take-cut-burstinv (to discharge with cutThrough-balance,
+-- exactly as cut-cons-run isolates the cut run).
 postulate
-  pushBurst-take-burstinv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  pushBurst-take-cut-burstinv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
-    (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (k : ℕ) (S S′ S″ : ProtocolSt) →
+    (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
+    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (k : ℕ) (S S₁ S′ S″ : ProtocolSt) →
     lookupNode nid (EvalSt.nodes st) ≡ just (take-st k) →
+    proj₂ (proj₂ (takeVals k (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
+    stepProtocol (es at i from src as ek) S ≡ just S₁ →
     BurstInv id sched st S′ →
-    runProtocol S burst ≡ just S′ →
-    runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″ →
-    BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st)))
-               (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st))) S″
+    runProtocol S₁ ems ≡ just S′ →
+    runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st)) ≡ just S″ →
+    BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st)))
+               (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st))) S″
+
+pushBurst-take-burstinv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (k : ℕ) (S S′ S″ : ProtocolSt) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (take-st k) →
+  BurstInv id sched st S′ →
+  runProtocol S burst ≡ just S′ →
+  runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″ →
+  BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st)))
+             (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st))) S″
+pushBurst-take-burstinv fuel id now nid κ [] sched st k S S′ S″ lk binv₀ run₀ run″
+  = subst (BurstInv id sched st) (trans (sym (just-injᵂ run₀)) (just-injᵂ run″)) binv₀
+pushBurst-take-burstinv {Γ = Γ} {t = t} {e = e} {s = s} fuel id now nid κ ((es at i from src as ek) ∷ ems)
+  sched st k S S′ S″ lk binv₀ run₀ run″
+  with stepProtocol (es at i from src as ek) S in seq
+... | nothing = ⊥-elim (n≢jᵂ run₀)
+... | just S₁ with takeVals k (proj₁ (splitEvents {A = Val Γ s} es)) in tvEq
+...   | out , rem , true  =
+        pushBurst-take-cut-burstinv fuel id now nid κ es i src ek ems sched st k S S₁ S′ S″
+          lk (takeVals-flag k (proj₁ (splitEvents {A = Val Γ s} es)) tvEq) seq binv₀ run₀ run″
+...   | out , rem , false =
+        let rem′ : ℕ
+            rem′ = proj₁ (proj₂ (takeVals k (proj₁ (splitEvents {A = Val Γ s} es))))
+            ust : EvalSt e
+            ust = record st { nodes = setNode nid (take-st rem′) (EvalSt.nodes st) }
+            dcF : proj₂ (proj₂ (takeVals k (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ false
+            dcF = takeVals-flag k (proj₁ (splitEvents {A = Val Γ s} es)) tvEq
+            -- the reshaped non-cut head steps the protocol to the SAME S₁
+            fstep : stepProtocol
+                      ((proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
+                         ++ map value (proj₁ (takeVals k (proj₁ (splitEvents {A = Val Γ s} es))))
+                         ++ (if proj₂ (proj₂ (splitEvents {A = Val Γ s} es)) then complete ∷ [] else []))
+                        at i from src as ek) S ≡ just S₁
+            fstep = stepProtocol-faithful (λ vs → proj₁ (takeVals k vs)) es i src ek S S₁
+                      (takeVals-nil k) seq
+            -- reduce the whole reshaped run to its cons form, then peel the head
+            run″cons : runProtocol S
+                        (((proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
+                            ++ map value (proj₁ (takeVals k (proj₁ (splitEvents {A = Val Γ s} es))))
+                            ++ (if proj₂ (proj₂ (splitEvents {A = Val Γ s} es)) then complete ∷ [] else []))
+                           at i from src as ek)
+                          ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems sched ust)) ≡ just S″
+            run″cons = subst (λ b → runProtocol S b ≡ just S″)
+                         (pushBurst-take-noncut-cons fuel id now nid κ es i src ek ems sched st k lk dcF)
+                         run″
+            tailRun″ : runProtocol S₁ (proj₁ (pushBurst fuel id now (take-f nid) κ ems sched ust)) ≡ just S″
+            tailRun″ = runProtocol-uncons _ _ S S₁ S″ fstep run″cons
+            -- inside `with stepProtocol (es…) S in seq`, run₀'s type is already
+            -- abstracted to the tail run (runProtocol S₁ ems ≡ just S′)
+            tailRun₀ : runProtocol S₁ ems ≡ just S′
+            tailRun₀ = run₀
+            tailBinv : BurstInv id sched ust S′
+            tailBinv = record
+              { live-matches  = BurstInv.live-matches binv₀
+              ; reg-typed     = BurstInv.reg-typed binv₀
+              ; horizon-low   = BurstInv.horizon-low binv₀
+              ; current-frame = BurstInv.current-frame binv₀
+              ; caches        = cachesValid-setNode-ok nid (take-st rem′)
+                                  (EvalSt.nodes st) (EvalSt.registry st) refl (BurstInv.caches binv₀)
+              }
+            rec : BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ems sched ust)))
+                             (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ems sched ust))) S″
+            rec = pushBurst-take-burstinv fuel id now nid κ ems sched ust rem′ S₁ S′ S″
+                    (lookupNode-setNode nid (take-st rem′) (EvalSt.nodes st))
+                    tailBinv tailRun₀ tailRun″
+            -- the whole burst's residual sched/st ARE the tail's (non-cut head
+            -- leaves sched fixed, writes only the node) — by cong over takeDispatch
+            stateFrom : (List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e)
+                      → Sched Γ × EvalSt e
+            stateFrom fr =
+              ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ems
+                        (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr))))))
+              , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ems
+                        (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))) )
+            stEq : ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st))
+                   , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st)) )
+                 ≡ ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ems sched ust))
+                   , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ems sched ust)) )
+            stEq = cong stateFrom
+                     (takeDispatch-noncut nid (proj₁ (splitEvents {A = Val Γ s} es))
+                        (proj₂ (proj₂ (splitEvents {A = Val Γ s} es))) sched st k lk dcF)
+        in subst (λ (p : Sched Γ × EvalSt e) → BurstInv id (proj₁ p) (proj₂ p) S″) (sym stEq) rec
 
 -- ── the takeᵉ (positive-count) clause of subscribeE-wf ────────────────────
 -- subscribeE (takeᵉ count b) with count ≡ suc k mints+installs the take node,
