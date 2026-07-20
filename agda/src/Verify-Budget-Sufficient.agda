@@ -36,9 +36,11 @@ open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       <-≤-trans; +-suc; +-identityʳ;
+                                       ≤-reflexive; <-≤-trans;
+                                       +-suc; +-identityʳ;
                                        +-comm; +-assoc; +-monoʳ-<;
-                                       *-monoˡ-≤; m≤m+n; m≤n+m)
+                                       +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
+                                       *-suc; m≤m+n; m≤n+m)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.List    using (List; []; _∷_; _++_; all; any; length;
                                 sum; tabulate)
@@ -796,6 +798,50 @@ totᵛ-counts B (x ∷ M)
         | totᵛ-counts B M = refl
 
 ------------------------------------------------------------------
+-- THE DEMAND FUNCTION.  Fuel is depth-consumed, so the wet contract
+-- carries `fuel hasAtLeast suc (dBound V R U r s)` where V bounds
+-- store sizes, R bounds store ranks ((suc V)^(suc B), rank-lt-pow),
+-- U = unconn, r = the current value's rank, s = the current
+-- expression's syncSize.  The three decrement edges each consume
+-- one gs against a strictly smaller demand — the suc V coefficient
+-- absorbs the post-hop reset s′ ≤ V exactly, and suc R absorbs the
+-- post-connect reset r′ ≤ R exactly; all three interface lemmas are
+-- proven below, so the contract's clause proofs only ever apply
+-- them, never redo arithmetic.
+------------------------------------------------------------------
+
+dBound : (V R U r s : ℕ) → ℕ
+dBound V R U r s = s + suc V * (r + suc R * U)
+
+-- edge 2 (μ-unfold): syncSize drops at fixed (U, r)
+dBound-μ : ∀ {V R U r s′ s} → s′ < s →
+  dBound V R U r s′ < dBound V R U r s
+dBound-μ {V} {R} {U} {r} s′<s = +-monoˡ-≤ (suc V * (r + suc R * U)) s′<s
+
+-- edge 3 (inner hop): rank drops, syncSize resets within the store
+dBound-hop : ∀ {V R U r′ r s′ s} → r′ < r → s′ ≤ V →
+  suc (dBound V R U r′ s′) ≤ dBound V R U r s
+dBound-hop {V} {R} {U} {r′} {r} {s′} {s} r′<r s′≤V =
+  ≤-trans (+-monoˡ-≤ (suc V * (r′ + suc R * U)) (s≤s s′≤V))
+  (≤-trans (≤-reflexive (sym (*-suc (suc V) (r′ + suc R * U))))
+  (≤-trans (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′<r))
+           (m≤n+m (suc V * (r + suc R * U)) s)))
+
+-- edge 1 (connect): unconn drops, rank and syncSize reset within
+-- the store bounds
+dBound-connect : ∀ {V R U′ U r′ r s′ s} → U′ < U → r′ ≤ R → s′ ≤ V →
+  suc (dBound V R U′ r′ s′) ≤ dBound V R U r s
+dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} U′<U r′≤R s′≤V =
+  ≤-trans (+-monoˡ-≤ (suc V * (r′ + suc R * U′)) (s≤s s′≤V))
+  (≤-trans (≤-reflexive (sym (*-suc (suc V) (r′ + suc R * U′))))
+  (≤-trans (*-monoʳ-≤ (suc V)
+             (≤-trans (+-monoˡ-≤ (suc R * U′) (s≤s r′≤R))
+             (≤-trans (≤-reflexive (sym (*-suc (suc R) U′)))
+                      (*-monoʳ-≤ (suc R) U′<U))))
+  (≤-trans (*-monoʳ-≤ (suc V) (m≤n+m (suc R * U) r))
+           (m≤n+m (suc V * (r + suc R * U)) s))))
+
+------------------------------------------------------------------
 -- the three cores
 ------------------------------------------------------------------
 
@@ -850,25 +896,24 @@ totᵛ-counts B (x ∷ M)
 --      and can dwarf it.  The S-probes missed this only because
 --      their dup discards v.)
 --
--- THE DEMAND, closed-form.  Fuel is depth-consumed, so the contract
--- bounds D = the deepest chain of decrement edges.  At any machine
--- point the relevant coordinates are U = unconn (edge 1), r = rank V
--- (measureObs B …) of the current value (edge 3), s = syncSizeᵉ of
--- the expression under the walk (edge 2); a μ-unfold drops s at
--- fixed (U, r) (unfoldμ-shrinks), a hop drops r and resets s ≤ V
--- (rank-mono-≺ over ≺-embed/≺-replace), a connect drops U and
--- resets r below the store's max rank.  rank-lt-pow closes the
--- form: any store rank < (suc V)^(suc B), so
+-- THE DEMAND, closed-form and PROVEN (dBound above).  Fuel is
+-- depth-consumed, so the contract carries
 --
---   D  <  (suc V)^(B+2) · suc U        (V the store size bound,
---                                       B the size-class cap)
+--   fuel hasAtLeast suc (dBound V R U r s)
 --
--- one exponential story above the store bound — and the seeded
--- budget's tower gains (suc sz) stories per instant, so
--- budget-hasAtLeast's tower summand dominates with room to spare;
--- every literal-headed demand (no chained scans) is already covered
--- by the 2^(sz·(id+1)²) summand alone.  The exact combination gets
--- refined while proving; the shape is fixed by rank-lt-pow.
+-- with V the store size bound, R = (suc V)^(suc B) the store rank
+-- cap (rank-lt-pow), U = unconn, r = the current value's rank, s =
+-- the current expression's syncSize.  Each decrement edge consumes
+-- one gs against a strictly smaller demand: dBound-μ
+-- (unfoldμ-shrinks drops s), dBound-hop (rank-mono-≺ over
+-- ≺-embed/≺-replace drops r, s resets ≤ V), dBound-connect
+-- (unconn-insert drops U, r resets ≤ R) — all three proven, so the
+-- clause proofs only apply them.  dBound < (suc V)^(B+3)·suc U:
+-- one exponential story above the store bound, while the seeded
+-- budget's tower gains (suc sz) stories per instant —
+-- budget-hasAtLeast's tower summand dominates with room to spare,
+-- and every literal-headed demand (no chained scans) is already
+-- covered by the 2^(sz·(id+1)²) summand alone.
 --
 -- The cores below are the contract instantiated at
 -- the root burst (burst-dry/-bounded) and at the chain fold
