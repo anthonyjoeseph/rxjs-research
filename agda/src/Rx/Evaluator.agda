@@ -109,17 +109,19 @@ resolve anchor ((after w , v) ∷ r) =
 -- slots also own source toℕ i but connect lazily, at their first
 -- subscription; colds and deferᵉ bodies are registered by subscribeE
 -- at subscription time, minting from nextSource/nextOrdinal
+-- top-level (not sched-init-local) so the budget-sufficiency proof
+-- can case-split each slot's initial LiveSource
+mkHot : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (i : Fin n) → List (LiveSource Γ)
+mkHot {Γ = Γ} ins i with ins i
+... | scripted (hot async) = record { source = toℕ i ; ordinal = toℕ i
+                                    ; elemTy = lookup Γ i ; pending = resolve 0 async } ∷ []
+... | scripted (cold _ _)  = []
+... | shared _             = []
+
 sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
 sched-init {n = n} {Γ = Γ} e ins = record
   { nextOrdinal = n ; nextSource = n ; nextNode = 0
-  ; live = concat (tabulate mkHot) ; slots = ins }
-  where
-  mkHot : Fin n → List (LiveSource Γ)
-  mkHot i with ins i
-  ... | scripted (hot async) = record { source = toℕ i ; ordinal = toℕ i
-                                      ; elemTy = lookup Γ i ; pending = resolve 0 async } ∷ []
-  ... | scripted (cold _ _)  = []
-  ... | shared _             = []
+  ; live = concat (tabulate (mkHot ins)) ; slots = ins }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
 -- The workers are TOP-LEVEL (not where-local of sched-next) so

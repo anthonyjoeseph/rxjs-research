@@ -43,6 +43,8 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.List.Relation.Unary.All.Properties
+  using (concat⁺; tabulate⁺)
 open import Data.Vec     using (Vec) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -52,7 +54,8 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; cong; cong₂; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
-                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad)
+                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
+                                Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                                 Ctx; Closed; Val; sizeᵉ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
@@ -65,6 +68,8 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimGExp; elimGTm; elimGTms; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
+                                Slot; scripted; shared; resolve; mkHot;
+                                arrVal;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
@@ -582,6 +587,75 @@ syncSize-unfoldμ body = syncSize-elimG (here refl) (μᵉ body) body
 unfoldμ-shrinks : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
   syncSizeᵉ (unfoldμ body) < syncSizeᵉ (μᵉ body)
 unfoldμ-shrinks body rewrite syncSize-unfoldμ body = ≤-refl
+
+------------------------------------------------------------------
+-- THE STORE INVARIANT — every runtime value the machine holds
+-- carries a layer derivation.  The value-carrying stores are
+-- exactly: scan accumulators and concat queues (NodeState), a
+-- LiveSource's scheduled payloads, an Arrival's payload, and the
+-- slot scripts/defs.  Frames need NOTHING: their Fns are terms, and
+-- evalWith-layered is unconditional in the term — only the env must
+-- be layered.  The wet contract threads StLayered/SchedLayered
+-- alongside stBounded?: preservation is part of the cores' own
+-- induction (every stored value is an evalWith output over layered
+-- inputs); only the base cases live here.
+------------------------------------------------------------------
+
+SlotLayered : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → Set
+SlotLayered {t = t} (scripted (hot async))       =
+  All (λ tv → LayeredV t (Timed.val tv)) async
+SlotLayered {t = t} (scripted (cold sync async)) =
+  All (LayeredV t) sync × All (λ tv → LayeredV t (Timed.val tv)) async
+SlotLayered           (shared def)               = LayeredObs def
+
+SlotsLayered : ∀ {n} {Γ : Ctx n} → Slots Γ → Set
+SlotsLayered sl = ∀ i → SlotLayered (sl i)
+
+LiveLayered : ∀ {n} {Γ : Ctx n} → LiveSource Γ → Set
+LiveLayered l = All (λ p → LayeredV (LiveSource.elemTy l) (proj₂ p))
+                    (LiveSource.pending l)
+
+SchedLayered : ∀ {n} {Γ : Ctx n} → Sched Γ → Set
+SchedLayered sched = All LiveLayered (Sched.live sched)
+                   × SlotsLayered (Sched.slots sched)
+
+ArrLayered : ∀ {n} {Γ : Ctx n} → Arrival Γ → Set
+ArrLayered a = LayeredV (arrTy a) (arrVal a)
+
+NodeLayered : ∀ {n} {Γ : Ctx n} → NodeState Γ → Set
+NodeLayered (scan-st {t} v)     = LayeredV t v
+NodeLayered (take-st _)         = ⊤
+NodeLayered (merge-st _ _)      = ⊤
+NodeLayered (concat-st q _ _)   = All LayeredObs q
+NodeLayered (switch-st _ _)     = ⊤
+NodeLayered (exhaust-st _ _)    = ⊤
+
+StLayered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → Set
+StLayered st = All (λ kv → NodeLayered (proj₂ kv)) (EvalSt.nodes st)
+
+-- base cases: the initial machine is layered
+st-init-layered : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) →
+  StLayered (st-init e)
+st-init-layered e = []ᵃ
+
+resolve-layered : ∀ {n} {Γ : Ctx n} {t : Ty} (anchor : Tick)
+  (xs : List (Timed (Val Γ t))) →
+  All (λ tv → LayeredV t (Timed.val tv)) xs →
+  All (λ p → LayeredV t (proj₂ p)) (resolve anchor xs)
+resolve-layered anchor []                 []ᵃ        = []ᵃ
+resolve-layered anchor ((after w , v) ∷ r) (lv ∷ᵃ lr) =
+  lv ∷ᵃ resolve-layered (anchor + suc w) r lr
+
+sched-init-layered : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
+  (ins : Slots Γ) → SlotsLayered ins → SchedLayered (sched-init e ins)
+sched-init-layered {n = n} {Γ = Γ} e ins sli =
+  concat⁺ (tabulate⁺ perSlot) , sli
+  where
+  perSlot : ∀ i → All LiveLayered (mkHot ins i)
+  perSlot i with ins i | sli i
+  ... | scripted (hot async) | la      = resolve-layered 0 async la ∷ᵃ []ᵃ
+  ... | scripted (cold _ _)  | _       = []ᵃ
+  ... | shared _             | _       = []ᵃ
 
 -- the two decrease lemmas the hop analysis needs (proof-design memo
 -- below).  Pure count-vector arithmetic over the definitions above —
