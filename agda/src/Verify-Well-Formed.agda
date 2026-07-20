@@ -39,7 +39,8 @@ open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
+                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
@@ -467,6 +468,26 @@ regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r 
 ≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
 ≡ᵇ-refl zero    = refl
 ≡ᵇ-refl (suc m) = ≡ᵇ-refl m
+
+-- decidable type-equality is reflexive on the nose — lets stepFrame's scan-f
+-- dispatch (w ≟ᵗ u) reduce when the node was installed at the matching type
+≟ᵗ-refl : ∀ (u : Ty) → (u ≟ᵗ u) ≡ yes refl
+≟ᵗ-refl unitᵗ    = refl
+≟ᵗ-refl boolᵗ    = refl
+≟ᵗ-refl natᵗ     = refl
+≟ᵗ-refl (a ×ᵗ b) rewrite ≟ᵗ-refl a | ≟ᵗ-refl b = refl
+≟ᵗ-refl (a +ᵗ b) rewrite ≟ᵗ-refl a | ≟ᵗ-refl b = refl
+≟ᵗ-refl (obs a)  rewrite ≟ᵗ-refl a = refl
+
+-- reading back the node you just wrote: the scan/take clauses install their node
+-- then read it inside stepFrame, so this pins the lookup that dispatch depends on
+lookupNode-setNode : ∀ {n} {Γ : Ctx n} (nid : NodeId) (s : NodeState Γ)
+  (nodes : List (NodeId × NodeState Γ)) →
+  lookupNode nid (setNode nid s nodes) ≡ just s
+lookupNode-setNode nid s []             rewrite ≡ᵇ-refl nid = refl
+lookupNode-setNode nid s ((k , s′) ∷ r) with k ≡ᵇ nid in keq
+... | true  rewrite ≡ᵇ-refl nid = refl
+... | false rewrite keq = lookupNode-setNode nid s r
 
 ∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
 ∧-trueˡ {true} _ = refl
