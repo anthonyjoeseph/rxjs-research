@@ -1790,6 +1790,21 @@ subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀) =
   binv″ rewrite cong (λ z → proj₁ (proj₂ z)) char
               | cong (λ z → proj₂ (proj₂ z)) char = binv₀
 
+-- ── caches survive a node update whose new state is unconditionally ok ───
+-- (scan-st / take-st: nodeCacheOK is `true` — only merge nodes carry a counter).
+-- The stateful frames (scanᵉ, takeᵉ) update their node per emit; this is what
+-- keeps BurstInv.caches through those updates.
+cachesValid-setNode-ok : ∀ {n} {Γ : Ctx n} {t}
+  (nid : NodeId) (s : NodeState Γ) (nodes : List (NodeId × NodeState Γ))
+  (reg : List (RegId × Source × Chain Γ t)) →
+  nodeCacheOK nid s reg ≡ true →
+  cachesValid nodes reg ≡ true →
+  cachesValid (setNode nid s nodes) reg ≡ true
+cachesValid-setNode-ok nid s []             reg ok cv = ∧-intro ok refl
+cachesValid-setNode-ok nid s ((k , s′) ∷ r) reg ok cv with k ≡ᵇ nid
+... | true  = ∧-intro ok (∧-trueʳ cv)
+... | false = ∧-intro (∧-trueˡ cv) (cachesValid-setNode-ok nid s r reg ok (∧-trueʳ cv))
+
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
 -- empty) value list, then complete iff the source is spent.  The
