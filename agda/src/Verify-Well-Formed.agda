@@ -1310,6 +1310,9 @@ just-injᵂ refl = refl
 n≢jᵂ : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
 n≢jᵂ ()
 
+t≢fᵂ : true ≡ false → ⊥
+t≢fᵂ ()
+
 applyEvents-++just : ∀ {A : Set} (es₁ es₂ : List (InstEvent A))
   (lv : List Source) (o : Owed) (d : Bool) {L : List Source} {O : Owed} {D : Bool} →
   applyEvents es₁ lv o d ≡ just (L , O , D) →
@@ -1365,6 +1368,35 @@ applyEvents-vc vals fin lv o d cond =
   trans (applyEvents-++just (map value vals) (if fin then complete ∷ [] else [])
           lv o d (applyEvents-values vals lv o d cond))
         (applyEvents-maybeComplete fin lv o d)
+
+-- ── done is monotone: once a `complete` has latched it, it stays ─────────
+-- (values reject under done, so a successful run never carries a value past
+-- the flip; every other event leaves done untouched, complete only sets it).
+-- The subscribe-frame fold reads the CONTRAPOSITIVE: a burst whose final state
+-- has done ≡ false never flipped, so done ≡ false held at every emit — exactly
+-- what stepProtocol-faithful needs per step.
+applyEvents-done-mono : ∀ {A : Set} (es : List (InstEvent A)) (lv : List Source)
+  (o : Owed) (d : Bool) {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es lv o d ≡ just (L , O , D) → d ≡ true → D ≡ true
+applyEvents-done-mono [] lv o d hyp dt =
+  trans (sym (cong (λ r → proj₂ (proj₂ r)) (just-injᵂ hyp))) dt
+applyEvents-done-mono (init x ∷ es)    lv o d hyp dt =
+  applyEvents-done-mono es (x ∷ lv) o d hyp dt
+applyEvents-done-mono (value v ∷ es)   lv o d hyp dt
+  rewrite dt = ⊥-elim (n≢jᵂ hyp)
+applyEvents-done-mono (handoff s ∷ es)  lv o d hyp dt =
+  applyEvents-done-mono es lv (bumpOwed s (countIn s lv) o) d hyp dt
+applyEvents-done-mono (complete ∷ es)   lv o d hyp dt =
+  applyEvents-done-mono es lv o true hyp refl
+applyEvents-done-mono (close s cutPending ∷ es) lv o d hyp dt
+  with removeOne s lv | cancelOwed s o | hyp
+... | just lv′ | just o′ | hyp′ = applyEvents-done-mono es lv′ o′ d hyp′ dt
+applyEvents-done-mono (close s cut ∷ es) lv o d hyp dt
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = applyEvents-done-mono es lv′ o d hyp′ dt
+applyEvents-done-mono (close s exhausted ∷ es) lv o d hyp dt
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = applyEvents-done-mono es lv′ o d hyp′ dt
 
 -- ── splitEvents faithfulness: pushBurst's re-emit runs like the original ──
 -- pushBurst re-emits each frame emit as  bookkeeping ++ (frame values) ++
@@ -1515,6 +1547,114 @@ stepProtocol-faithful {B = B} es vals′ i s k S S′ deq stepEq =
   recon : List (InstEvent B)
   recon = proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
           ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else [])
+
+-- stepProtocol preserves a latched done (the automaton analysis, extracting
+-- S′.done and passing it to applyEvents-done-mono)
+stepProtocol-done-mono-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (lv : List Source) (hz : Id) (cur : Maybe (Id × Owed)) (S′ : ProtocolSt) →
+  stepProtocol (es at i from s as k)
+    (record { live = lv ; horizon = hz ; current = cur ; done = true }) ≡ just S′ →
+  ProtocolSt.done S′ ≡ true
+stepProtocol-done-mono-aux es i s k lv hz nothing S′ stepEq
+  with hz ≤ᵇ i
+... | false = ⊥-elim (n≢jᵂ stepEq)
+... | true  with settle k s lv []
+...   | nothing = ⊥-elim (n≢jᵂ stepEq)
+...   | just o₁ with applyEvents es lv o₁ true in aeq
+...     | nothing = ⊥-elim (n≢jᵂ stepEq)
+...     | just (l″ , o″ , d″) =
+          trans (sym (cong ProtocolSt.done (just-injᵂ stepEq)))
+                (applyEvents-done-mono es lv o₁ true aeq refl)
+stepProtocol-done-mono-aux es i s k lv hz (just (j , oⱼ)) S′ stepEq
+  with i ≡ᵇ j
+... | true  with paidOff oⱼ
+...   | true  = ⊥-elim (n≢jᵂ stepEq)
+...   | false with settle k s lv oⱼ
+...     | nothing = ⊥-elim (n≢jᵂ stepEq)
+...     | just o₁ with applyEvents es lv o₁ true in aeq
+...       | nothing = ⊥-elim (n≢jᵂ stepEq)
+...       | just (l″ , o″ , d″) =
+            trans (sym (cong ProtocolSt.done (just-injᵂ stepEq)))
+                  (applyEvents-done-mono es lv o₁ true aeq refl)
+stepProtocol-done-mono-aux es i s k lv hz (just (j , oⱼ)) S′ stepEq
+    | false with allZero oⱼ
+...   | false = ⊥-elim (n≢jᵂ stepEq)
+...   | true  with suc j ≤ᵇ i
+...     | false = ⊥-elim (n≢jᵂ stepEq)
+...     | true  with settle k s lv []
+...       | nothing = ⊥-elim (n≢jᵂ stepEq)
+...       | just o₁ with applyEvents es lv o₁ true in aeq
+...         | nothing = ⊥-elim (n≢jᵂ stepEq)
+...         | just (l″ , o″ , d″) =
+              trans (sym (cong ProtocolSt.done (just-injᵂ stepEq)))
+                    (applyEvents-done-mono es lv o₁ true aeq refl)
+
+stepProtocol-done-mono : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (S S′ : ProtocolSt) →
+  ProtocolSt.done S ≡ true →
+  stepProtocol (es at i from s as k) S ≡ just S′ →
+  ProtocolSt.done S′ ≡ true
+stepProtocol-done-mono es i s k S S′ dt stepEq =
+  stepProtocol-done-mono-aux es i s k (ProtocolSt.live S) (ProtocolSt.horizon S)
+    (ProtocolSt.current S) S′
+    (subst (λ d → stepProtocol (es at i from s as k)
+            (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                    ; current = ProtocolSt.current S ; done = d }) ≡ just S′)
+           dt stepEq)
+
+-- … and so does a whole run
+runProtocol-done-mono : ∀ {A : Set} (S S′ : ProtocolSt) (xs : List (InstEmit A)) →
+  ProtocolSt.done S ≡ true → runProtocol S xs ≡ just S′ → ProtocolSt.done S′ ≡ true
+runProtocol-done-mono S S′ []       dt runEq = trans (sym (cong ProtocolSt.done (just-injᵂ runEq))) dt
+runProtocol-done-mono S S′ (x ∷ xs) dt runEq with x
+... | es at i from s as k with stepProtocol (es at i from s as k) S in seq
+...   | just S₁ = runProtocol-done-mono S₁ S′ xs
+                    (stepProtocol-done-mono es i s k S S₁ dt seq) runEq
+...   | nothing = ⊥-elim (n≢jᵂ runEq)
+
+-- consing a known step onto a known run
+runProtocol-cons : ∀ {A : Set} (x : InstEmit A) (xs : List (InstEmit A))
+  (S S₁ S′ : ProtocolSt) →
+  stepProtocol x S ≡ just S₁ → runProtocol S₁ xs ≡ just S′ →
+  runProtocol S (x ∷ xs) ≡ just S′
+runProtocol-cons x xs S S₁ S′ stepEq restEq with stepProtocol x S | stepEq
+... | just .S₁ | refl = restEq
+
+-- ── the frame fold: a transparent frame's whole re-emitted burst runs like
+-- the original ──────────────────────────────────────────────────────────
+-- reEmit is the per-emit re-emission (bookkeeping ++ frame values ++ maybe-
+-- complete) at the same instant/source/kind; `f` gives the frame's transformed
+-- values for each emit.  runProtocol-faithful folds stepProtocol-faithful over
+-- the burst.  The `done S′ ≡ false` premise is what makes the induction go: a
+-- burst that ends un-completed never flipped done (runProtocol-done-mono), so
+-- done ≡ false held at every emit — the per-step precondition.
+reEmit : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+       → (InstEmit (Val Γ u) → List B) → InstEmit (Val Γ u) → InstEmit B
+reEmit {B = B} f em =
+  (proj₁ (proj₂ (splitEvents {A = B} (InstEmit.events em))) ++ map value (f em)
+    ++ (if proj₂ (proj₂ (splitEvents {A = B} (InstEmit.events em)))
+        then complete ∷ [] else []))
+   at InstEmit.instant em from InstEmit.source em as InstEmit.kind em
+
+runProtocol-faithful : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (f : InstEmit (Val Γ u) → List B) (burst : List (InstEmit (Val Γ u)))
+  (S S′ : ProtocolSt) →
+  ProtocolSt.done S ≡ false → ProtocolSt.done S′ ≡ false →
+  runProtocol S burst ≡ just S′ →
+  runProtocol S (map (reEmit f) burst) ≡ just S′
+runProtocol-faithful f []                          S S′ deq deq′ runEq = runEq
+runProtocol-faithful f ((es at i from s as k) ∷ ems) S S′ deq deq′ runEq
+  with stepProtocol (es at i from s as k) S in seq
+... | nothing = ⊥-elim (n≢jᵂ runEq)
+... | just S₁ =
+      runProtocol-cons (reEmit f (es at i from s as k)) (map (reEmit f) ems) S S₁ S′
+        (stepProtocol-faithful es (f (es at i from s as k)) i s k S S₁ deq seq)
+        (runProtocol-faithful f ems S₁ S′ doneS₁ deq′ runEq)
+  where
+  doneS₁ : ProtocolSt.done S₁ ≡ false
+  doneS₁ with ProtocolSt.done S₁ in d1
+  ... | false = refl
+  ... | true  = ⊥-elim (t≢fᵂ (trans (sym (runProtocol-done-mono S₁ S′ ems d1 runEq)) deq′))
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
