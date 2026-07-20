@@ -54,7 +54,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 foldPath; dispatchShare; stepFrame;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource;
+                                oneShotBurst; mintSource; register;
                                 sameSource; drySource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
@@ -854,6 +854,89 @@ oneShotBurst-wf vals id sched st S binv deq =
         ; current-frame = inj₂ refl
         ; caches        = BurstInv.caches binv
         }
+
+-- ── the register/init balance mechanism (blueprint step 2) ───────────────
+-- `register` appends ONE entry to the tail of the registry; these two snoc
+-- lemmas are how live-matches and reg-typed absorb that append.  Reused by
+-- EVERY registering clause (input hot/cold-async, deferᵉ, share connect).
+
+-- countRegs over a tail-append: the new entry adds 1 iff it is s's source
+countRegs-snoc : ∀ {n} {Γ : Ctx n} {t}
+  (s : Source) (r : List (RegId × Source × Chain Γ t))
+  (rid : RegId) (x : Source) (u : Ty) (p : Path Γ u t) →
+  countRegs s (r ++ (rid , x , u , p) ∷ [])
+    ≡ countRegs s r + (if s ≡ᵇ x then 1 else 0)
+countRegs-snoc s []                        rid x u p with s ≡ᵇ x
+... | true  = refl
+... | false = refl
+countRegs-snoc s ((rid′ , x′ , u′ , p′) ∷ r) rid x u p with s ≡ᵇ x′
+... | true  = cong suc (countRegs-snoc s r rid x u p)
+... | false = countRegs-snoc s r rid x u p
+
+-- regTyped? over a tail-append: stays true when the new entry is well-typed
+regTyped?-snoc : ∀ {n} {Γ : Ctx n} {t}
+  (r : List (RegId × Source × Chain Γ t))
+  (rid : RegId) (s : Source) (u : Ty) (p : Path Γ u t)
+  (live : List (LiveSource Γ)) →
+  regTyped? r live ≡ true →
+  liveTypeOK? s u live ≡ true →
+  regTyped? (r ++ (rid , s , u , p) ∷ []) live ≡ true
+regTyped?-snoc []                        rid s u p live rt lt =
+  ∧-intro lt refl
+regTyped?-snoc ((rid′ , s′ , u′ , p′) ∷ r) rid s u p live rt lt =
+  ∧-intro (∧-trueˡ rt) (regTyped?-snoc r rid s u p live (∧-trueʳ rt) lt)
+
+-- one init-only registering emit: it enlists src (no close, no complete, so
+-- done is untouched) and opens instant id with an empty owed table.  (init/close
+-- carry only sources, so the protocol is agnostic to the emit's value type A.)
+initReg-run : ∀ {A : Set} (id : Id) (src : Source) (S : ProtocolSt) →
+  (ProtocolSt.current S ≡ nothing) ⊎ (ProtocolSt.current S ≡ just (id , [])) →
+  ProtocolSt.horizon S ≤ id →
+  runProtocol S (((init {A} src ∷ []) at id from src as subscribe) ∷ [])
+    ≡ just (record { live = src ∷ ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                   ; current = just (id , []) ; done = ProtocolSt.done S })
+initReg-run id src S (inj₁ ceq) hlow
+  rewrite ceq | settleInstant-nothing S ceq | ≤ᵇ-true (ProtocolSt.horizon S) id hlow = refl
+initReg-run id src S (inj₂ ceq) hlow
+  rewrite ceq | ≡ᵇ-refl id = refl
+
+-- the registering base clause: emit `init src` and `register src (u, κ)`.  The
+-- init balances the new registration (live-matches), the registered chain is
+-- well-typed against the live schedule (reg-typed, from `ltok`), and caches are
+-- inherited (register touches no node; the merge-coherence obligation on the
+-- grown registry is the `cok` premise — see cachesValid's thru-outer keying).
+initReg-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (src : Source) (κ : Path Γ u t) (id : Id)
+  (st : EvalSt e) (sched : Sched Γ) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  liveTypeOK? src u (Sched.live sched) ≡ true →
+  cachesValid (EvalSt.nodes st) (EvalSt.registry (register src κ st)) ≡ true →
+  Σ ProtocolSt λ S′ →
+    runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ []) ≡ just S′
+    × BurstInv id sched (register src κ st) S′
+initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok cok =
+  _ , run , record
+        { live-matches  = lm
+        ; reg-typed     = regTyped?-snoc (EvalSt.registry st) (EvalSt.nextReg st)
+                            src u κ (Sched.live sched) (BurstInv.reg-typed binv) ltok
+        ; horizon-low   = BurstInv.horizon-low binv
+        ; current-frame = inj₂ refl
+        ; caches        = cok
+        }
+  where
+  run : runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ [])
+        ≡ just (record { live = src ∷ ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                       ; current = just (id , []) ; done = ProtocolSt.done S })
+  run = initReg-run {Val Γ u} id src S (BurstInv.current-frame binv) (BurstInv.horizon-low binv)
+
+  lm : ∀ s → countIn s (src ∷ ProtocolSt.live S)
+             ≡ countRegs s (EvalSt.registry (register src κ st))
+  lm s rewrite countRegs-snoc s (EvalSt.registry st) (EvalSt.nextReg st) src u κ
+    with s ≡ᵇ src
+  ... | true  = trans (cong suc (BurstInv.live-matches binv s))
+                      (sym (+-comm (countRegs s (EvalSt.registry st)) 1))
+  ... | false = trans (BurstInv.live-matches binv s)
+                      (sym (+-identityʳ (countRegs s (EvalSt.registry st))))
 
 -- ════════════════════════════════════════════════════════════════════════
 -- SUBSCRIBE-SIDE DECOMPOSITION BLUEPRINT (opened 2026-07-19)
