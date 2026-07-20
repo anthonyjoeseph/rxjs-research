@@ -37,7 +37,7 @@ open import Relation.Nullary using (Dec; yes; no)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; CloseReason; exhausted;
+                                EmitKind; delivery; subscribe; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
@@ -54,6 +54,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 foldPath; dispatchShare; stepFrame;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
+                                oneShotBurst; mintSource;
                                 sameSource; drySource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
@@ -746,6 +747,116 @@ burst-init e ins = record
   ; caches        = refl
   }
 
+-- ── base-case brick: a oneShotBurst's protocol trajectory ────────────────
+-- The single emit  init src ∷ values ++ close src ∷ complete  runs against
+-- any BurstInv-shaped state whose done is still false: the init/close bracket
+-- is net-zero on live (values are protocol-transparent while not done), and
+-- the trailing complete latches done.  Result keeps live and horizon, opens
+-- instant id with an EMPTY owed table, done true — precisely the state the
+-- base clauses of subscribeE-wf must exhibit.
+
+-- a ≤ b reflected as the Bool the protocol's freshness guard tests
+≤ᵇ-true : ∀ (a b : ℕ) → a ≤ b → (a ≤ᵇ b) ≡ true
+≤ᵇ-true a b p with a ≤ᵇ b | ≤⇒≤ᵇ p
+... | true | _ = refl
+
+-- settleInstant on an absent instant just publishes the horizon (its
+-- own current-match must be discharged separately from stepProtocol's)
+settleInstant-nothing : (S : ProtocolSt) → ProtocolSt.current S ≡ nothing →
+  settleInstant S ≡ just (ProtocolSt.horizon S)
+settleInstant-nothing S ceq with ProtocolSt.current S | ceq
+... | nothing | refl = refl
+
+-- values carry no protocol traffic while the stream is not yet done
+applyEvents-vals-through : ∀ {A : Set} (vals : List A)
+  (rest : List (InstEvent A)) (live : List Source) (owed : Owed) →
+  applyEvents (map value vals ++ rest) live owed false
+    ≡ applyEvents rest live owed false
+applyEvents-vals-through []         rest live owed = refl
+applyEvents-vals-through (v ∷ vals) rest live owed =
+  applyEvents-vals-through vals rest live owed
+
+-- the whole event list folds to (live , [] , true): init enlists src, the
+-- values pass through, close brackets it back out, complete latches done
+oneShotBurst-apply : ∀ {n} {Γ : Ctx n} {u}
+  (vals : List (Val Γ u)) (src : Source) (live : List Source) →
+  applyEvents (init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
+              live [] false
+    ≡ just (live , [] , true)
+oneShotBurst-apply vals src live
+  rewrite applyEvents-vals-through vals (close src exhausted ∷ complete ∷ [])
+                             (src ∷ live) []
+        | ≡ᵇ-refl src
+  = refl
+
+-- one emit steps the automaton once: opens (or re-enters) instant id and
+-- settles it to the net-zero-plus-done state above
+oneShotBurst-step : ∀ {n} {Γ : Ctx n} {u}
+  (vals : List (Val Γ u)) (id : Id) (src : Source) (S : ProtocolSt) →
+  ProtocolSt.done S ≡ false →
+  (ProtocolSt.current S ≡ nothing) ⊎ (ProtocolSt.current S ≡ just (id , [])) →
+  ProtocolSt.horizon S ≤ id →
+  stepProtocol ((init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
+                 at id from src as subscribe) S
+    ≡ just (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                   ; current = just (id , []) ; done = true })
+oneShotBurst-step vals id src S deq (inj₁ ceq) hlow
+  rewrite ceq | settleInstant-nothing S ceq
+        | ≤ᵇ-true (ProtocolSt.horizon S) id hlow | deq
+        | oneShotBurst-apply vals src (ProtocolSt.live S) = refl
+oneShotBurst-step vals id src S deq (inj₂ ceq) hlow
+  rewrite ceq | ≡ᵇ-refl id | deq
+        | oneShotBurst-apply vals src (ProtocolSt.live S) = refl
+
+-- lifted to the whole one-emit burst
+oneShotBurst-run : ∀ {n} {Γ : Ctx n} {u}
+  (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) (S : ProtocolSt) →
+  ProtocolSt.done S ≡ false →
+  (ProtocolSt.current S ≡ nothing) ⊎ (ProtocolSt.current S ≡ just (id , [])) →
+  ProtocolSt.horizon S ≤ id →
+  runProtocol S (proj₁ (oneShotBurst vals id sched))
+    ≡ just (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                   ; current = just (id , []) ; done = true })
+oneShotBurst-run vals id sched S deq curr hlow
+  rewrite oneShotBurst-step vals id (Sched.nextSource sched) S deq curr hlow = refl
+
+-- ── the base clause of subscribeE-wf, mechanism-complete ─────────────────
+-- A oneShotBurst (ofᵉ / emptyᵉ / takeᵉ-zero) registers nothing, so it leaves
+-- st untouched and mints only a source.  Given BurstInv on entry, its burst
+-- runs and re-establishes BurstInv.  The mechanism (oneShotBurst-run) is
+-- fully proven; the clause owes exactly TWO things from the surrounding
+-- context, isolated here as premises:
+--   · deq  — `done S ≡ false` at subscribe time (you never subscribe a new
+--     source after the run has completed; the protocol would reject a value
+--     behind `complete`).  This is a subscribe-TIME fact, not a frame-exit
+--     one (done may be true at exit), so BurstInv cannot carry it; it must
+--     come from the walk order.
+--   · ash  — `allShareSunk (registry st) ≡ true`, the obligation the trailing
+--     `complete` hands to done-plumbed.  At the ROOT this is the real content
+--     (a synchronous full completion leaves only share sinks registered); on
+--     the INNER-recursion path (an inner completing amid a live async sibling)
+--     it is FALSE — see the done-plumbed note appended to the blueprint.
+oneShotBurst-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) (st : EvalSt e)
+  (S : ProtocolSt) →
+  BurstInv id sched st S →
+  ProtocolSt.done S ≡ false →
+  allShareSunk (EvalSt.registry st) ≡ true →
+  Σ ProtocolSt λ S′ →
+    runProtocol S (proj₁ (oneShotBurst vals id sched)) ≡ just S′
+    × BurstInv id (proj₂ (oneShotBurst vals id sched)) st S′
+oneShotBurst-wf vals id sched st S binv deq ash =
+  _ , oneShotBurst-run vals id sched S deq (BurstInv.current-frame binv)
+                       (BurstInv.horizon-low binv)
+    , record
+        { live-matches  = λ s → BurstInv.live-matches binv s
+        ; reg-typed     = BurstInv.reg-typed binv
+        ; horizon-low   = BurstInv.horizon-low binv
+        ; current-frame = inj₂ refl
+        ; done-plumbed  = λ _ → ash
+        ; caches        = BurstInv.caches binv
+        }
+
 -- ════════════════════════════════════════════════════════════════════════
 -- SUBSCRIBE-SIDE DECOMPOSITION BLUEPRINT (opened 2026-07-19)
 --
@@ -797,6 +908,39 @@ burst-init e ins = record
 -- residues fall out of (4)-(5) (they too subscribe inners through pushBurst).
 -- TERMINATION: lexicographic (fuel, Exp) — μ drops fuel, every other recursion drops
 -- the Exp; may need an explicit well-founded wrapper if Agda won't see it inline.
+--
+-- ── FORK SURFACED while landing (3) oneShotBurst-wf (2026-07-20) ─────────
+-- oneShotBurst-run PROVES a base burst ALWAYS ends done ≡ true (the trailing
+-- `complete` latches it).  So subscribeE-wf's output BurstInv.done-plumbed is
+-- demanded at EVERY base subscribe as `allShareSunk (registry st) ≡ true`
+-- (base registers nothing, so it's the FULL pre-existing registry).  That is:
+--   · TRUE at the ROOT and wherever the base burst is the emitted stream: a
+--     synchronous full completion leaves only share sinks live.
+--   · FALSE on the INNER-recursion path.  Concrete witness (naive rxjs):
+--       mergeAll(of([asyncInner, empty]))
+--     stepFrame(thru-outer) folds the outer's one emit, subscribing asyncInner
+--     (registers a non-share-sunk async source) THEN empty.  subscribeE(empty,
+--     from-inner ↠ κ) hits the BASE clause (κ is ignored there), emits its raw
+--     init/close/COMPLETE, and oneShotBurst-run flips done ≡ true — while the
+--     async sibling is still a live non-share-sunk registration.  done-plumbed
+--     (even a dropSource-of-empty's-src flip form: empty's src isn't registered,
+--     so dropSource is identity) is violated.
+--   ROOT CAUSE (same class as the dropped FoldInv.env-close/done-plumbed): the
+--   inner's RAW burst carries a `complete` that the ENCLOSING thru-outer frame
+--   STRIPS before emission (a merge inner completing while a sibling lives does
+--   NOT complete the merge).  subscribeE-wf, applied to an inner, is claiming a
+--   protocol run of a stream that is never emitted; its `done ≡ true` is an
+--   artifact of reading the raw burst, not the pushed one.
+--   CONSUMER: BurstInv.done-plumbed is read ONLY by burst-final (root frame-0
+--   exit → Inv.done-plumbed).  It is NEVER read on the inner-recursion path.
+--   So per the standing rule (input-side fields earn their existence from
+--   consumers, not symmetry), done-plumbed should be a ROOT-EXIT obligation,
+--   not threaded through the recursive/inner BurstInv.  RESOLUTION SKETCH:
+--   drop done-plumbed from BurstInv; re-establish it once at burst-final from a
+--   root-only lemma (root-returned stream's done ≡ true ⟹ registry share-sunk,
+--   proven from the walk's structure — the merge-coherence content).  This is a
+--   consumed-field shape change; recorded here, pending Anthony's read (parallel
+--   to the env-close consult) before I dismantle BurstInv.
 -- ════════════════════════════════════════════════════════════════════════
 postulate
   -- ONE subscription's burst preserves the frame relation (see the blueprint
