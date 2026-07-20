@@ -35,7 +35,8 @@ open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
                                 if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; +-suc; +-identityʳ)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
+                                       +-suc; +-identityʳ)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.List    using (List; []; _∷_; _++_; all; any)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -48,15 +49,20 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; cong; subst)
+  using (_≡_; refl; sym; cong; cong₂; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                                Ctx; Closed; Val; sizeᵉ; syncSizeᵉ;
+                                Ctx; Closed; Val; sizeᵉ;
+                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
                                 fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
                                 strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
+                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+                                elimGExp; elimGTm; elimGTms; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
@@ -505,6 +511,78 @@ measureObs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ) →
   LayeredObs e → Vec ℕ (suc B)
 measureObs B l = counts B (layerSizes l)
 
+------------------------------------------------------------------
+-- EDGE 2, DISCHARGED: μ-unfolding preserves sync-reachable size.
+-- elimG never substitutes outside a deferᵉ (the μ-var is guarded in
+-- Δᵍ; only deferᵉ moves it into Δ where elimD can hit it), and
+-- syncSize treats deferᵉ as a leaf — so every clause is homomorphic
+-- and the deferᵉ clause is refl on both sides, subst cast and all.
+-- Hence the μ-unfold decrement edge strictly shrinks syncSize:
+-- the machine swaps μᵉ body (suc …) for unfoldμ body (…).
+------------------------------------------------------------------
+
+mutual
+  syncSize-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    syncSizeᵉ (elimGExp x cl e) ≡ syncSizeᵉ e
+  syncSize-elimG x cl (input i)       = refl
+  syncSize-elimG x cl (ofᵉ ts)        = cong suc (syncSize-elimGᵗˢ x cl ts)
+  syncSize-elimG x cl emptyᵉ          = refl
+  syncSize-elimG x cl (mapᵉ f e)      =
+    cong suc (cong₂ _+_ (syncSize-elimGᵗ x cl f) (syncSize-elimG x cl e))
+  syncSize-elimG x cl (takeᵉ c e)     =
+    cong suc (cong₂ _+_ (syncSize-elimGᵗ x cl c) (syncSize-elimG x cl e))
+  syncSize-elimG x cl (scanᵉ f z e)   =
+    cong suc (cong₂ _+_ (cong₂ _+_ (syncSize-elimGᵗ x cl f)
+                                   (syncSize-elimGᵗ x cl z))
+                        (syncSize-elimG x cl e))
+  syncSize-elimG x cl (mergeAllᵉ e)   = cong suc (syncSize-elimG x cl e)
+  syncSize-elimG x cl (concatAllᵉ e)  = cong suc (syncSize-elimG x cl e)
+  syncSize-elimG x cl (switchAllᵉ e)  = cong suc (syncSize-elimG x cl e)
+  syncSize-elimG x cl (exhaustAllᵉ e) = cong suc (syncSize-elimG x cl e)
+  syncSize-elimG x cl (μᵉ e)          = cong suc (syncSize-elimG (there x) cl e)
+  syncSize-elimG x cl (varᵉ y)        = refl
+  syncSize-elimG x cl (deferᵉ e)      = refl
+
+  syncSize-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (f : Tm Γ Δᵍ Δ Θ u) →
+    syncSizeᵗ (elimGTm x cl f) ≡ syncSizeᵗ f
+  syncSize-elimGᵗ x cl (varᵗ y)      = refl
+  syncSize-elimGᵗ x cl unit̂          = refl
+  syncSize-elimGᵗ x cl (bool̂ b)      = refl
+  syncSize-elimGᵗ x cl (nat̂ k)       = refl
+  syncSize-elimGᵗ x cl (pairᵗ a b)   =
+    cong suc (cong₂ _+_ (syncSize-elimGᵗ x cl a) (syncSize-elimGᵗ x cl b))
+  syncSize-elimGᵗ x cl (fstᵗ p)      = cong suc (syncSize-elimGᵗ x cl p)
+  syncSize-elimGᵗ x cl (sndᵗ p)      = cong suc (syncSize-elimGᵗ x cl p)
+  syncSize-elimGᵗ x cl (inlᵗ a)      = cong suc (syncSize-elimGᵗ x cl a)
+  syncSize-elimGᵗ x cl (inrᵗ a)      = cong suc (syncSize-elimGᵗ x cl a)
+  syncSize-elimGᵗ x cl (caseᵗ s l r) =
+    cong suc (cong₂ _+_ (cong₂ _+_ (syncSize-elimGᵗ x cl s)
+                                   (syncSize-elimGᵗ x cl l))
+                        (syncSize-elimGᵗ x cl r))
+  syncSize-elimGᵗ x cl (ifᵗ c a b)   =
+    cong suc (cong₂ _+_ (cong₂ _+_ (syncSize-elimGᵗ x cl c)
+                                   (syncSize-elimGᵗ x cl a))
+                        (syncSize-elimGᵗ x cl b))
+  syncSize-elimGᵗ x cl (primᵗ op a)  = cong suc (syncSize-elimGᵗ x cl a)
+  syncSize-elimGᵗ x cl (strmᵗ e)     = cong suc (syncSize-elimG x cl e)
+
+  syncSize-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    syncSizeᵗˢ (elimGTms x cl ts) ≡ syncSizeᵗˢ ts
+  syncSize-elimGᵗˢ x cl []       = refl
+  syncSize-elimGᵗˢ x cl (y ∷ ys) =
+    cong₂ _+_ (syncSize-elimGᵗ x cl y) (syncSize-elimGᵗˢ x cl ys)
+
+syncSize-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  syncSizeᵉ (unfoldμ body) ≡ syncSizeᵉ body
+syncSize-unfoldμ body = syncSize-elimG (here refl) (μᵉ body) body
+
+unfoldμ-shrinks : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  syncSizeᵉ (unfoldμ body) < syncSizeᵉ (μᵉ body)
+unfoldμ-shrinks body rewrite syncSize-unfoldμ body = ≤-refl
+
 -- the two decrease lemmas the hop analysis needs (proof-design memo
 -- below).  Pure count-vector arithmetic over the definitions above —
 -- GRINDER: prove counts-++ first (the workhorse), then both ≺ lemmas
@@ -538,11 +616,12 @@ postulate
 --
 --   1. share connect — decreases the UNCONNECTED-SLOT COUNT
 --      (connectedShares latches; a def's walk can only shrink it).
---   2. μ-unfold — decreases SYNC-REACHABLE SIZE (sizeᵉ not counting
---      under deferᵉ): unfoldμ substitutes `μᵉ body` only at var
---      positions, and vars are TYPE-GUARANTEED defer-gated (Δᵍ→Δ
---      moves only at deferᵉ), so the substituted copies are invisible
---      to the synchronous walk.
+--   2. μ-unfold — decreases SYNC-REACHABLE SIZE (syncSizeᵉ, deferᵉ
+--      a leaf): unfoldμ substitutes `μᵉ body` only at var positions,
+--      and vars are TYPE-GUARANTEED defer-gated (Δᵍ→Δ moves only at
+--      deferᵉ), so the substituted copies are invisible to the
+--      synchronous walk.  DISCHARGED above: syncSize-unfoldμ /
+--      unfoldμ-shrinks, machine-checked.
 --   3. subscribeInner — decreases the DERSHOWITZ–MANNA MULTISET of
 --      layer template sizes (the Layered section above: every
 --      runtime obs value is a template instantiated over embedded
