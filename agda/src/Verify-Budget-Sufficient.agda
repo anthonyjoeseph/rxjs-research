@@ -733,6 +733,80 @@ slotLayered-any           (shared def)               = layer def []ᵃ []ˡ
 slotsLayered-any : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) → SlotsLayered sl
 slotsLayered-any sl i = slotLayered-any (sl i)
 
+------------------------------------------------------------------
+-- popping an arrival keeps everything layered — the Set-valued
+-- mirror of the proven pop-bounded ring, and the cascade-side init
+-- leg: cascadeGo receives a layered payload from a layered schedule
+------------------------------------------------------------------
+
+schedHeadOf-layered : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  LiveLayered l → ArrLayered a × LiveLayered l′
+schedHeadOf-layered l eq ll with LiveSource.pending l | eq | ll
+... | (t , v) ∷ ps | refl | (lv ∷ᵃ lps) = lv , lps
+
+schedGo-layered : ∀ {n} {Γ : Ctx n} (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  schedGo ls ≡ inj₂ (a , ls′) →
+  All LiveLayered ls → ArrLayered a × All LiveLayered ls′
+schedGo-layered (l ∷ ls) eq (ll ∷ᵃ lls)
+  with schedHeadOf l in eqH | schedGo ls in eqR
+schedGo-layered (l ∷ ls) refl (ll ∷ᵃ lls) | inj₁ _ | inj₂ (a′ , ls″) =
+  let (la , lls′) = schedGo-layered ls eqR lls
+  in la , ll ∷ᵃ lls′
+schedGo-layered (l ∷ ls) refl (ll ∷ᵃ lls) | inj₂ (a″ , l′) | inj₁ _ =
+  let (la , ll′) = schedHeadOf-layered l eqH ll
+  in la , ll′ ∷ᵃ lls
+schedGo-layered (l ∷ ls) eq (ll ∷ᵃ lls) | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with schedEarlier a″ a′ | eq
+... | true  | refl =
+  let (la , ll′) = schedHeadOf-layered l eqH ll
+  in la , ll′ ∷ᵃ lls
+... | false | refl =
+  let (la , lls′) = schedGo-layered ls eqR lls
+  in la , ll ∷ᵃ lls′
+
+pop-layered : ∀ {n} {Γ : Ctx n}
+  (sched : Sched Γ) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  SchedLayered sched → ArrLayered a × SchedLayered sched′
+pop-layered sched eq (lls , lsl)
+  with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+  let (la , lls′) = schedGo-layered (Sched.live sched) eqL lls
+  in la , (lls′ , lsl)
+
+-- the latch and finish mirrors: ledger fields only, value stores
+-- and slots untouched — layeredness rides along
+latch-layered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  StLayered st → StLayered (cascadeLatch a st)
+latch-layered a st sl with Arrival.isLast a
+... | true  = sl
+... | false = sl
+
+sweepLive-layered : ∀ {n} {Γ : Ctx n} {t}
+  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
+  All LiveLayered ls → All LiveLayered (sweepLive reg ls)
+sweepLive-layered reg []       []ᵃ        = []ᵃ
+sweepLive-layered {n = n} reg (l ∷ ls) (ll ∷ᵃ lls)
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
+... | true  = ll ∷ᵃ sweepLive-layered reg ls lls
+... | false = sweepLive-layered reg ls lls
+
+finish-layered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  SchedLayered sched → StLayered st →
+  SchedLayered (proj₁ (cascadeFinish a sched st))
+    × StLayered (proj₂ (cascadeFinish a sched st))
+finish-layered a sched st (lls , lsl) sl with Arrival.isLast a
+... | false = (lls , lsl) , sl
+... | true  =
+  (sweepLive-layered (dropSource (arrSource a) (EvalSt.registry st))
+                     (Sched.live sched) lls , lsl) , sl
+
 resolve-layered : ∀ {n} {Γ : Ctx n} {t : Ty} (anchor : Tick)
   (xs : List (Timed (Val Γ t))) →
   All (λ tv → LayeredV t (Timed.val tv)) xs →
