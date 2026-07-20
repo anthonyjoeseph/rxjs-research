@@ -2160,7 +2160,7 @@ postulate
     runProtocol S_r ems ≡ just S′ →
     Σ ProtocolSt λ S″ →
       (runProtocol S_t (proj₁ (pushBurst fuel id now (take-f nid) κ ems sched st)) ≡ just S″)
-      × (Σ (List Source) λ L′ → TailRel id sev L′ S′ S″)
+      × (Σ (List Source) λ L′ → TailRel id sev L′ S″ S′)
 
 -- the take fold.  take TRANSFORMS its burst (non-cut passes through; the cut
 -- exhausts the budget, forces `complete`, and cuts the registry), so it reaches
