@@ -537,6 +537,17 @@ aliveThroughᶠ inst st (rid , src , (w , p)) =
   ∧ (not (memberSource src (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
+-- scan's per-emit fold: one running output per input, threading the accumulator.
+-- Top-level (not stepFrame-local) so the well-formedness proof can name the value
+-- transform it feeds to the protocol-transparency fold.
+scanVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
+         → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
+scanVals fn acc []       = [] , acc
+scanVals fn acc (v ∷ vs) =
+  let acc′          = applyFn fn (acc , v)
+      (outs , last) = scanVals fn acc′ vs
+  in acc′ ∷ outs , last
+
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
           → Gas → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
@@ -548,18 +559,11 @@ stepFrame fuel id now (map-f fn) κ vals fin sched st =
 stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} fuel id now (scan-f fn nid) κ vals fin sched st
   = dispatch (lookupNode nid (EvalSt.nodes st))
   where
-  scanVals : Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
-  scanVals acc []       = [] , acc
-  scanVals acc (v ∷ vs) =
-    let acc′          = applyFn fn (acc , v)
-        (outs , last) = scanVals acc′ vs
-    in acc′ ∷ outs , last
-
   dispatch : Maybe (NodeState Γ)
            → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
   dispatch (just (scan-st {w} acc)) with w ≟ᵗ u
   ... | yes refl =
-        let (outs , acc′) = scanVals acc vals
+        let (outs , acc′) = scanVals fn acc vals
         in outs , [] , fin , sched ,
            record st { nodes = setNode nid (scan-st acc′) (EvalSt.nodes st) }
   ... | no _ = [] , [] , fin , sched , st
