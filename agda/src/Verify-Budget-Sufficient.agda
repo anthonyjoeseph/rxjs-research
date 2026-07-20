@@ -36,16 +36,24 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; 
                                 z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; +-suc; +-identityʳ)
 open import Data.List    using (List; []; _∷_; _++_; all; any)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using (All)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
-open import Data.Unit    using (tt)
+open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                                Ctx; Closed; Val; sizeᵉ)
+                                Ctx; Closed; Val; sizeᵉ;
+                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
+                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
+                                evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
@@ -337,6 +345,86 @@ finish-slots a sched st with Arrival.isLast a
 ... | true  = refl
 
 ------------------------------------------------------------------
+-- LAYERED VALUES — the substrate the subscription measure lives on
+-- (proof-design edge 3 below).  Every runtime obs value is a LAYER:
+-- a template instantiated over embedded layered values.  subΘTm
+-- reifies environment values in at var positions, so the embedded
+-- values are literal subtrees of the resulting closed expression;
+-- a value's layer tree is the derivation here, and its measure is
+-- the multiset of its layers' template sizes.  The layer index is
+-- `evalWith (strmᵗ tpl) env` — NOT subΘExp — so BOTH evaluator
+-- clauses (closed template / instantiation) are definitional and
+-- the closure lemma needs no substitution-identity lemma.
+--
+-- evalWith-layered is the machine-checked core of the edge-3
+-- design: the evaluator never leaves the family, so neither can
+-- the machine — every value it subscribes is an evalWith output
+-- (map/scan fns, of-list elements, seeds) over layered inputs.
+-- evalTm-layered/applyFn-layered are the forms the contract will
+-- consume (evalTm at scan seeds and of-lists, applyFn at scan
+-- steps).
+------------------------------------------------------------------
+
+mutual
+  LayeredV : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → Set
+  LayeredV unitᵗ    v = ⊤
+  LayeredV boolᵗ    v = ⊤
+  LayeredV natᵗ     v = ⊤
+  LayeredV (s ×ᵗ t) v = LayeredV s (proj₁ v) × LayeredV t (proj₂ v)
+  LayeredV (s +ᵗ t) (inj₁ a) = LayeredV s a
+  LayeredV (s +ᵗ t) (inj₂ b) = LayeredV t b
+  LayeredV (obs t)  e = LayeredObs e
+
+  data LayeredObs {n} {Γ : Ctx n} {t : Ty} : Closed Γ t → Set where
+    layer : ∀ {Θ} (tpl : Exp Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+            LayeredEnv env → LayeredObs (evalWith (strmᵗ tpl) env)
+
+  data LayeredEnv {n} {Γ : Ctx n} : ∀ {Θ} → All (Val Γ) Θ → Set where
+    []ˡ  : LayeredEnv []ᵃ
+    _∷ˡ_ : ∀ {t Θ} {v : Val Γ t} {vs : All (Val Γ) Θ} →
+           LayeredV t v → LayeredEnv vs → LayeredEnv (v ∷ᵃ vs)
+
+lookupLayered : ∀ {n} {Γ : Ctx n} {Θ t} {env : All (Val Γ) Θ} →
+  LayeredEnv env → (x : t ∈ Θ) → LayeredV t (lookupEnv env x)
+lookupLayered (l ∷ˡ ls) (here refl) = l
+lookupLayered (l ∷ˡ ls) (there x)   = lookupLayered ls x
+
+evalWith-layered : ∀ {n} {Γ : Ctx n} {Θ t} (f : Tm Γ [] [] Θ t)
+  (env : All (Val Γ) Θ) → LayeredEnv env → LayeredV t (evalWith f env)
+evalWith-layered (varᵗ x)      env le = lookupLayered le x
+evalWith-layered unit̂          env le = tt
+evalWith-layered (bool̂ b)      env le = tt
+evalWith-layered (nat̂ n)       env le = tt
+evalWith-layered (pairᵗ a b)   env le =
+  evalWith-layered a env le , evalWith-layered b env le
+evalWith-layered (fstᵗ p)      env le = proj₁ (evalWith-layered p env le)
+evalWith-layered (sndᵗ p)      env le = proj₂ (evalWith-layered p env le)
+evalWith-layered (inlᵗ a)      env le = evalWith-layered a env le
+evalWith-layered (inrᵗ a)      env le = evalWith-layered a env le
+evalWith-layered (caseᵗ sc l r) env le
+  with evalWith sc env | evalWith-layered sc env le
+... | inj₁ x | lx = evalWith-layered l (x ∷ᵃ env) (lx ∷ˡ le)
+... | inj₂ y | ly = evalWith-layered r (y ∷ᵃ env) (ly ∷ˡ le)
+evalWith-layered (ifᵗ c a b)   env le with evalWith c env
+... | true  = evalWith-layered a env le
+... | false = evalWith-layered b env le
+evalWith-layered (primᵗ add arg)  env le = tt
+evalWith-layered (primᵗ sub arg)  env le = tt
+evalWith-layered (primᵗ mul arg)  env le = tt
+evalWith-layered (primᵗ eqᵖ arg)  env le = tt
+evalWith-layered (primᵗ ltᵖ arg)  env le = tt
+evalWith-layered (primᵗ notᵖ arg) env le = tt
+evalWith-layered (strmᵗ e)     env le = layer e env le
+
+evalTm-layered : ∀ {n} {Γ : Ctx n} {t} (f : Tm Γ [] [] [] t) →
+  LayeredV t (evalTm f)
+evalTm-layered f = evalWith-layered f []ᵃ []ˡ
+
+applyFn-layered : ∀ {n} {Γ : Ctx n} {s t} (fn : Fn Γ [] [] [] s t)
+  (v : Val Γ s) → LayeredV s v → LayeredV t (applyFn fn v)
+applyFn-layered fn v lv = evalWith-layered fn (v ∷ᵃ []ᵃ) (lv ∷ˡ []ˡ)
+
+------------------------------------------------------------------
 -- the three cores
 ------------------------------------------------------------------
 
@@ -357,20 +445,41 @@ finish-slots a sched st with Arrival.isLast a
 --      positions, and vars are TYPE-GUARANTEED defer-gated (Δᵍ→Δ
 --      moves only at deferᵉ), so the substituted copies are invisible
 --      to the synchronous walk.
---   3. subscribeInner — decreases (SKELETON, VALUE SIZE) lexically,
---      where a value's skeleton is its syntax with Tm-embedded closed
---      values erased to holes: a SUB-VALUE hop (evalTm of an embedded
---      value, e.g. of[acc,acc]'s leaves) keeps the skeleton and
---      strictly shrinks the value; a SCAN-PRODUCED hop (an acc built
---      by closeUnderFn from a scan fn's strmᵗ body) strictly shrinks
---      the skeleton — the acc's skeleton IS that template body, a
---      proper subterm of the skeleton that carried the scan.
---      (Hypothesis 3 is design-verified, not yet machine-checked:
---      ENDPOINT-VERIFY it on the S-family programs before building
---      the contract on it.)
+--   3. subscribeInner — decreases the DERSHOWITZ–MANNA MULTISET of
+--      layer template sizes (the Layered section above: every
+--      runtime obs value is a template instantiated over embedded
+--      layered values, and evalWith-layered proves the evaluator
+--      never leaves the family).  A value's measure is the multiset
+--      of its layer tree's template sizes; templates come from
+--      program+slot syntax, so size classes are finitely bounded
+--      and the order can be encoded as a count vector, lex
+--      high→low — well-founded with no stdlib machinery.  The hops:
+--        · embedded-value hop (subscribing a value subΘTm reified
+--          into the carrier): strict SUB-multiset, regardless of
+--          relative template sizes.
+--        · scan-produced hop: the carrier-top element is replaced
+--          by strictly smaller ones — the fn body is a proper
+--          subterm of the carrier's template, and the consumed
+--          values' layers either cancel against the carrier's
+--          embedded copies (within one instant, deliveries ≤
+--          syntactic occurrences because subΘ COPIES trees — the
+--          sync-linearity lemma, to be proven with the contract)
+--          or sit strictly below the top.
+--        · share-crossing hop (a template's `input` hits a slot):
+--          exits the per-value measure — it anchors against the
+--          slot's own element of the GLOBAL multiset {program} ⊎
+--          {slots}; that re-anchoring is the ownership half of the
+--          ledger (cascadeGo-wet), not the per-value order.
+--      (The previous edge-3 design — lex (skeleton, value size)
+--      with skeletons ordered by subterm — is REFUTED: chain two
+--      obs-typed scans directly, second fn λ(b,v). mergeAll(of[snd
+--      x]), and the embedded-value hop lands on a first-scan acc
+--      whose template is subterm-incomparable with the carrier's
+--      and can dwarf it.  The S-probes missed this only because
+--      their dup discards v.)
 --
--- `need` then towers only through edge 3's skeleton descent (one
--- story per nested scan template, ≤ program size stories), which
+-- `need` then towers only through edge 3's multiset descent (one
+-- story per size class, ≤ program+slot syntax size classes), which
 -- budget-hasAtLeast's tower summand dominates; every literal-headed
 -- need (no chained scans) is already covered by the 2^(sz·(id+1)²)
 -- summand alone.  The cores below are the contract instantiated at
