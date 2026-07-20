@@ -1231,22 +1231,20 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- if fin then 1 else 0).  The take-head cut is the one edge stepFrame-wf must
     -- carry (a head take flips fin AND closes envSrc), pinned by Unit-Test.
     env-init  : initCount envSrc evs ≡ 0
-    -- ⚠ FINDING (2026-07-19): this `if fin` form is FRAME-UNSTABLE under from-inner
-    -- absorption — it makes stepFrame-wf-inner (fin ≡ true) FALSE as stated, so the
-    -- fold cannot thread it and the proof cannot complete without a fix.  At a
-    -- from-inner frame envSrc is the completing inner chain's OWN source, so its
-    -- exhausted close sits in evs (closeCount envSrc evs ≡ 1) with fin ≡ true; if a
-    -- live sibling registration under the same inner instance keeps the subtree
-    -- alive, `react true` ABSORBS the completion (fin′ ≡ false) with evs unchanged,
-    -- so the output demands closeCount envSrc evs ≡ 0 while it is still 1.  This is
-    -- the EXACT instability already fixed on the output side (FoldOut.live-envSrc-out
-    -- was re-keyed from `if fin` to closeCount, 2026-07-19); the input field never
-    -- got the same treatment.  NOTE it is currently consumed by nothing but the
-    -- postulated mid-step (foldPath-root-out derives live-envSrc-out from env-INIT +
-    -- applyEvents-count, NOT this field; FoldInv-reg only re-threads it).  The fix
-    -- (re-key to a frame-stable closeCount form, or drop it and give mid-step the
-    -- bridge from live-envSrc-out) is a core-FoldInv change — awaiting direction.
-    env-close : closeCount envSrc evs ≡ (if fin then suc zero else zero)
+    -- (DROPPED 2026-07-19) an `env-close : closeCount envSrc evs ≡ if fin then 1
+    -- else 0` field used to live here.  It was FRAME-UNSTABLE under from-inner
+    -- absorption (envSrc = the completing inner chain's own source, so its close
+    -- sits in evs with fin ≡ true; a live sibling under the same instance absorbs
+    -- the completion to fin′ ≡ false with evs unchanged, demanding closeCount ≡ 0
+    -- while it is still 1) — the same instability FoldOut.live-envSrc-out was
+    -- re-keyed off of.  It had NO consumer: foldPath-root-out derives live-envSrc-out
+    -- from env-init + applyEvents-count, and only the postulated mid-step imagined
+    -- wanting it.  Per the keying rule (folded artifacts only) it is gone.
+    -- IF mid-step's eventual proof turns out to need an input-side drain ledger,
+    -- re-add it BORN-STABLE, keyed on the frame-stable quantity `closeCount envSrc
+    -- evs` (additive over ++, so it threads through frames) — e.g. tie the live
+    -- drain to it directly (countIn envSrc (live S) ∸ closeCount …), never `if fin`.
+    -- Re-adding is then a transcription against a real consumer, not a design call.
     -- the cascade's `dying` set holds only envSrc (cascadeLatch seeds it to
     -- [arrSource a] iff isLast, else []; the fold never grows it).  Stable
     -- through every frame (no stepFrame clause touches dying), it lets the
@@ -1687,7 +1685,7 @@ FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
   ; horizon-low = FoldInv.horizon-low fi
   ; ov-zero = FoldInv.ov-zero fi ; ov-unique = FoldInv.ov-unique fi
   ; ov-envSrc = FoldInv.ov-envSrc fi
-  ; env-init = FoldInv.env-init fi ; env-close = FoldInv.env-close fi
+  ; env-init = FoldInv.env-init fi
   ; dying-envSrc = λ s h → subst (λ d → memberSource s d ≡ false) deq (FoldInv.dying-envSrc fi s h) }
 
 -- the three NON-quiet frame clauses, still to grind, each stated PRECISELY at
@@ -1735,11 +1733,10 @@ FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
 -- take-cut is now PROVEN (stepFrame-wf-take-cut below) from cutThrough-balance +
 -- cutThrough-no-init + the dying-envSrc field + these two precise residues:
 postulate
-  -- (3+4) the closes' effect on the open instant: applying the cut's closes to
-  -- the fold's running (Lv,Ov) succeeds, keeping the owed shape (a close does
-  -- removeOne/cancelOwed, never bumps), and closing envSrc exactly once (the head
-  -- cut, folded with `fin`).  (done-plumbed is now proven from the allShareSunk
-  -- monotonicity lemmas, no longer part of this residue.)
+  -- (3) the closes' effect on the open instant: applying the cut's closes to the
+  -- fold's running (Lv,Ov) succeeds, keeping the owed shape (a close does
+  -- removeOne/cancelOwed, never bumps).  (done-plumbed proven from allShareSunk
+  -- monotonicity; env-close dropped with FoldInv.env-close — no longer a residue.)
   cut-owed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (id : Id) (envSrc : Source) (nid : NodeId)
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
@@ -1754,7 +1751,6 @@ postulate
        × (zeroExcept envSrc Ov ≡ true)
        × (UniqueOwed Ov ≡ true)
        × (lookupOwed envSrc Ov ≡ lookupOwed envSrc (FoldInv.ob′ fi))
-       × (closeCount envSrc (evs ++ closes) ≡ suc zero)
 
   -- fin ≡ true ONLY: the fin ≡ false branch (react false) is quiet and proven in
   -- stepFrame-wf below.  This is the completion-ABSORB case — finish decrements
@@ -1838,7 +1834,6 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
   ; ov-zero = zx ; ov-unique = uq ; ov-envSrc = ovs
   ; env-init = trans (initCount-++ envSrc evs closes)
                      (cong₂ _+_ (FoldInv.env-init fi) (cutThrough-no-init envSrc nid dlv wm dy reg))
-  ; env-close = clo
   ; dying-envSrc = FoldInv.dying-envSrc fi
   }
   where
@@ -1854,8 +1849,7 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
   app = proj₁ (proj₂ (proj₂ spec))
   zx  = proj₁ (proj₂ (proj₂ (proj₂ spec)))
   uq  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ spec))))
-  ovs = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec)))))
-  clo = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec)))))
+  ovs = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec))))
   dpl : ProtocolSt.done S ≡ true → allShareSunk (dropSource envSrc kept) ≡ true
   dpl deq = allShareSunk-cutThrough-drop envSrc nid dlv wm dy reg
               (allShareSunk-if-drop fin envSrc reg (FoldInv.done-plumbed fi deq))
@@ -2546,7 +2540,7 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   ; reg-typed = Mid.reg-typed mid
   ; horizon-low = Mid.horizon-low mid
   ; ov-zero = ze′ ; ov-unique = uq′ ; ov-envSrc = refl
-  ; env-init = env-init ; env-close = env-close
+  ; env-init = env-init
   ; dying-envSrc = Mid.dying-src mid   -- dying (record st{delivered}) ≡ dying st
   }
   where
@@ -2576,12 +2570,6 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   env-init with Arrival.isLast a
   ... | false = refl
   ... | true  = refl
-  env-close : closeCount (arrSource a)
-      (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-    ≡ (if Arrival.isLast a then suc zero else zero)
-  env-close with Arrival.isLast a
-  ... | false = refl
-  ... | true  rewrite ≡ᵇ-refl (arrSource a) = refl
 
 -- DECOMPOSITION BLUEPRINT (mid-step, the delivery-side sibling of
 -- subscribeE-wf — "the per-clause preservation grind").  One surviving
