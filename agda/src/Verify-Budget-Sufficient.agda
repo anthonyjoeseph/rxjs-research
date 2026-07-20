@@ -962,6 +962,88 @@ unfoldμ-shrinks : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) �
   syncSizeᵉ (unfoldμ body) < syncSizeᵉ (μᵉ body)
 unfoldμ-shrinks body rewrite syncSize-unfoldμ body = ≤-refl
 
+-- the SHELL mirrors: an unfold leaves the inner multiset untouched
+-- (innerᵉ ignores defers entirely, and elimG substitutes only under
+-- them) and shrinks the host shell by exactly the μ node — so the
+-- walked expression's measure strictly DROPS across the μ edge
+-- (unfoldμ-≺ below): the rank component never wobbles mid-walk.
+shellSize-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+  (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+  shellSizeᵉ (elimGExp x cl e) ≡ shellSizeᵉ e
+shellSize-elimG x cl (input i)       = refl
+shellSize-elimG x cl (ofᵉ ts)        = refl
+shellSize-elimG x cl emptyᵉ          = refl
+shellSize-elimG x cl (mapᵉ f e)      = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (takeᵉ c e)     = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (scanᵉ f z e)   = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (mergeAllᵉ e)   = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (concatAllᵉ e)  = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (switchAllᵉ e)  = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (exhaustAllᵉ e) = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (μᵉ e)          = cong suc (shellSize-elimG (there x) cl e)
+shellSize-elimG x cl (varᵉ y)        = refl
+shellSize-elimG x cl (deferᵉ e)      = refl
+
+mutual
+  inner-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    innerᵉ (elimGExp x cl e) ≡ innerᵉ e
+  inner-elimG x cl (input i)       = refl
+  inner-elimG x cl (ofᵉ ts)        = inner-elimGᵗˢ x cl ts
+  inner-elimG x cl emptyᵉ          = refl
+  inner-elimG x cl (mapᵉ f e)      =
+    cong₂ _++_ (inner-elimGᵗ x cl f) (inner-elimG x cl e)
+  inner-elimG x cl (takeᵉ c e)     =
+    cong₂ _++_ (inner-elimGᵗ x cl c) (inner-elimG x cl e)
+  inner-elimG x cl (scanᵉ f z e)   =
+    cong₂ _++_ (inner-elimGᵗ x cl f)
+               (cong₂ _++_ (inner-elimGᵗ x cl z) (inner-elimG x cl e))
+  inner-elimG x cl (mergeAllᵉ e)   = inner-elimG x cl e
+  inner-elimG x cl (concatAllᵉ e)  = inner-elimG x cl e
+  inner-elimG x cl (switchAllᵉ e)  = inner-elimG x cl e
+  inner-elimG x cl (exhaustAllᵉ e) = inner-elimG x cl e
+  inner-elimG x cl (μᵉ e)          = inner-elimG (there x) cl e
+  inner-elimG x cl (varᵉ y)        = refl
+  inner-elimG x cl (deferᵉ e)      = refl
+
+  inner-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (f : Tm Γ Δᵍ Δ Θ u) →
+    innerᵗ (elimGTm x cl f) ≡ innerᵗ f
+  inner-elimGᵗ x cl (varᵗ y)      = refl
+  inner-elimGᵗ x cl unit̂          = refl
+  inner-elimGᵗ x cl (bool̂ b)      = refl
+  inner-elimGᵗ x cl (nat̂ k)       = refl
+  inner-elimGᵗ x cl (pairᵗ a b)   =
+    cong₂ _++_ (inner-elimGᵗ x cl a) (inner-elimGᵗ x cl b)
+  inner-elimGᵗ x cl (fstᵗ p)      = inner-elimGᵗ x cl p
+  inner-elimGᵗ x cl (sndᵗ p)      = inner-elimGᵗ x cl p
+  inner-elimGᵗ x cl (inlᵗ a)      = inner-elimGᵗ x cl a
+  inner-elimGᵗ x cl (inrᵗ a)      = inner-elimGᵗ x cl a
+  inner-elimGᵗ x cl (caseᵗ sc l r) =
+    cong₂ _++_ (inner-elimGᵗ x cl sc)
+               (cong₂ _++_ (inner-elimGᵗ x cl l) (inner-elimGᵗ x cl r))
+  inner-elimGᵗ x cl (ifᵗ c a b)   =
+    cong₂ _++_ (inner-elimGᵗ x cl c)
+               (cong₂ _++_ (inner-elimGᵗ x cl a) (inner-elimGᵗ x cl b))
+  inner-elimGᵗ x cl (primᵗ op a)  = inner-elimGᵗ x cl a
+  inner-elimGᵗ x cl (strmᵗ e)     =
+    cong₂ _∷_ (shellSize-elimG x cl e) (inner-elimG x cl e)
+
+  inner-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    innerᵗˢ (elimGTms x cl ts) ≡ innerᵗˢ ts
+  inner-elimGᵗˢ x cl []       = refl
+  inner-elimGᵗˢ x cl (y ∷ ys) =
+    cong₂ _++_ (inner-elimGᵗ x cl y) (inner-elimGᵗˢ x cl ys)
+
+shellSize-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  shellSizeᵉ (unfoldμ body) ≡ shellSizeᵉ body
+shellSize-unfoldμ body = shellSize-elimG (here refl) (μᵉ body) body
+
+inner-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  innerᵉ (unfoldμ body) ≡ innerᵉ body
+inner-unfoldμ body = inner-elimG (here refl) (μᵉ body) body
+
 ------------------------------------------------------------------
 -- the INIT leg: the initial machine satisfies the size invariant.
 -- Provable exactly because the budget seeds from script CONTENT
@@ -1331,6 +1413,19 @@ counts-below (suc B) t       Y       aY         t≤
   counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
 ≺-replace B t Y Z aY t≤B rewrite counts-++ B Y Z =
   ≺ᵛ-⊕ʳ (counts B Z) (counts-below B t Y aY t≤B)
+
+-- the μ edge at the measure level: unfolding strictly DROPS the
+-- walked expression's multiset — the μ node's host class steps
+-- down by one and the inner multiset rides along (shell mirrors
+-- of elimG above) — so hop anchors never wobble across unfolds
+unfoldμ-≺ : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  shellSizeᵉ (μᵉ body) ≤ B →
+  measureE B (unfoldμ body) ≺ᵛ measureE B (μᵉ body)
+unfoldμ-≺ B body h
+  rewrite shellSize-unfoldμ body | inner-unfoldμ body =
+  ≺-replace B (suc (shellSizeᵉ body)) (shellSizeᵉ body ∷ []) (innerᵉ body)
+    (≤-refl ∷ᵃ []ᵃ) h
 
 ------------------------------------------------------------------
 -- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
