@@ -569,6 +569,28 @@ scanVals fn acc (v ∷ vs) =
       (outs , last) = scanVals fn acc′ vs
   in acc′ ∷ outs , last
 
+-- take's per-emit step, lifted out of stepFrame so the well-formedness proof
+-- can reason about its reduction over a stuck node lookup.  Non-cut passes the
+-- budgeted prefix through untouched (threading the remaining count); the cut
+-- exhausts the budget, forces `complete`, and severs the registry (cutThrough).
+takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+             → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+takeDispatch nid vals fin sched st (just (take-st k)) =
+  if proj₂ (proj₂ (takeVals k vals))
+  then (let (kept , closes , cutRids) =
+              cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                         (EvalSt.dying st) (EvalSt.registry st)
+        in proj₁ (takeVals k vals) , closes , true ,
+           record sched { live = sweepLive kept (Sched.live sched) } ,
+           record st { registry = kept
+                     ; cancelled = cutRids ++ EvalSt.cancelled st
+                     ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
+  else (proj₁ (takeVals k vals) , [] , fin , sched ,
+        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                                      (EvalSt.nodes st) })
+takeDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
+
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
           → Gas → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
@@ -591,24 +613,7 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} fuel id now (scan-f fn nid) 
   dispatch _ = [] , [] , fin , sched , st
 
 stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (take-f nid) κ vals fin sched st
-  = dispatch (lookupNode nid (EvalSt.nodes st))
-  where
-  dispatch : Maybe (NodeState Γ)
-           → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  dispatch (just (take-st k)) with takeVals k vals
-  ... | out , rem , false =
-        out , [] , fin , sched ,
-        record st { nodes = setNode nid (take-st rem) (EvalSt.nodes st) }
-  ... | out , _   , true  =
-        let (kept , closes , cutRids) =
-              cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                         (EvalSt.dying st) (EvalSt.registry st)
-        in out , closes , true ,
-           record sched { live = sweepLive kept (Sched.live sched) } ,
-           record st { registry = kept
-                     ; cancelled = cutRids ++ EvalSt.cancelled st
-                     ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) }
-  dispatch _ = [] , [] , fin , sched , st
+  = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
 stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (from-inner op allNid inst) κ vals fin sched st
   = react fin
@@ -812,10 +817,11 @@ pushBurst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
           → Stream Γ u × Sched Γ × EvalSt e
 pushBurst fuel id now f κ []         sched st = [] , sched , st
 pushBurst fuel id now f κ (em ∷ ems) sched st =
-  let (vals , bookkeeping , fin) = splitEvents (InstEmit.events em)
-      (vals′ , evs , fin′ , sched₁ , st₁) = stepFrame fuel id now f κ vals fin sched st
+  let sp   = splitEvents (InstEmit.events em)
+      (vals′ , evs , fin′ , sched₁ , st₁) =
+        stepFrame fuel id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
       (rest , sched₂ , st₂) = pushBurst fuel id now f κ ems sched₁ st₁
-  in ((bookkeeping ++ retagEvents evs ++ map value vals′
+  in ((proj₁ (proj₂ sp) ++ retagEvents evs ++ map value vals′
         ++ (if fin′ then complete ∷ [] else []))
        at InstEmit.instant em from InstEmit.source em as InstEmit.kind em)
        ∷ rest , sched₂ , st₂

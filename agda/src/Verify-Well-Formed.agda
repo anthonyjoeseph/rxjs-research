@@ -46,7 +46,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
                                 mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; cutThrough; setNode; pathHasNode; memberSource;
+                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
                                 NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 sched-init; st-init; sched-next; LiveSource;
@@ -57,7 +57,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode;
+                                pushBurst; scanVals; installNode; mintNode; retagEvents;
                                 sameSource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
@@ -1952,6 +1952,131 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
     ; current-frame = BurstInv.current-frame binv₀
     ; caches        = cvFin
     }
+
+-- takeVals never fabricates output from nothing: an empty input yields an
+-- empty take (needed so g = proj₁ ∘ takeVals satisfies stepProtocol-faithful).
+takeVals-nil : ∀ {n} {Γ : Ctx n} {s} (k : ℕ) → proj₁ (takeVals {Γ = Γ} {s = s} k []) ≡ []
+takeVals-nil zero    = refl
+takeVals-nil (suc k) = refl
+
+-- read the cut flag out of a takeVals equation (cleanly-bound implicits so the
+-- element type is pinned at the use site).
+takeVals-flag : ∀ {n} {Γ : Ctx n} {s} (k : ℕ) (vs : List (Val Γ s))
+  {out : List (Val Γ s)} {rem : ℕ} {b : Bool} →
+  takeVals k vs ≡ (out , rem , b) → proj₂ (proj₂ (takeVals k vs)) ≡ b
+takeVals-flag k vs eq = cong (λ x → proj₂ (proj₂ x)) eq
+
+-- forward extraction: peel one accepted event off a run.
+runProtocol-uncons : ∀ {A : Set} (x : InstEmit A) (xs : List (InstEmit A))
+  (S S₁ S′ : ProtocolSt) →
+  stepProtocol x S ≡ just S₁ → runProtocol S (x ∷ xs) ≡ just S′ → runProtocol S₁ xs ≡ just S′
+runProtocol-uncons x xs S S₁ S′ stepEq runEq with stepProtocol x S | stepEq
+... | just .S₁ | refl = runEq
+
+-- takeDispatch over a stuck node lookup reduces to the non-cut re-emit once we
+-- know the node is take-st k and the budget is not exhausted.  Stated over the
+-- stuck `lookupNode` call so `rewrite` can fire it inside pushBurst's goal.
+takeDispatch-noncut : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (k : ℕ) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (take-st k) →
+  proj₂ (proj₂ (takeVals k vals)) ≡ false →
+  takeDispatch {t = t} nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
+    ≡ (proj₁ (takeVals k vals) , [] , fin , sched ,
+       record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                                     (EvalSt.nodes st) })
+takeDispatch-noncut nid vals fin sched st k lk dc rewrite lk | dc = refl
+
+-- ── takeᵉ: reduce pushBurst's non-cut head to a plain re-emit ─────────────
+-- An equation over the stuck pushBurst call (proven by rewriting lookupNode
+-- inside), so the fold can `rewrite` it without touching lookupNode in its own
+-- goal.  A non-exhausted budget re-emits proj₁ (takeVals kCount vals) with no
+-- bookkeeping of its own, threading the remaining count into the node.
+pushBurst-take-noncut-cons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
+  (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
+  proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents es)))) ≡ false →
+  proj₁ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st)
+    ≡ ((proj₁ (proj₂ (splitEvents es))
+         ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents es))))
+         ++ (if proj₂ (proj₂ (splitEvents es)) then complete ∷ [] else []))
+        at i from src as ek)
+      ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems sched
+                (record st { nodes = setNode nid
+                    (take-st (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es))))))
+                    (EvalSt.nodes st) }))
+pushBurst-take-noncut-cons {Γ = Γ} {t = t} {e = e} {s = s}
+  fuel id now nid κ es i src ek ems sched st kCount lk dc
+  = cong consFrom (takeDispatch-noncut nid (proj₁ (splitEvents es))
+                     (proj₂ (proj₂ (splitEvents es))) sched st kCount lk dc)
+  where
+  -- proj₁ (pushBurst (em ∷ ems)) as a function of the frame's step result, so
+  -- `cong` transports takeDispatch-noncut by conversion (bridging the defeq
+  -- forms that a syntactic rewrite/with cannot).
+  consFrom : List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e → Stream Γ s
+  consFrom fr =
+    ((proj₁ (proj₂ (splitEvents es)) ++ retagEvents (proj₁ (proj₂ fr)) ++ map value (proj₁ fr)
+       ++ (if proj₁ (proj₂ (proj₂ fr)) then complete ∷ [] else []))
+      at i from src as ek)
+    ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems
+              (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))
+
+-- the take fold.  take TRANSFORMS its burst (non-cut passes through; the cut
+-- exhausts the budget, forces `complete`, and cuts the registry), so it reaches
+-- a DIFFERENT final state than the inner burst — hence the existential S″.
+-- Non-cut emits run transparently (g = proj₁ ∘ takeVals, threading the count);
+-- the CUT edge is the named residue (its complete latches done, its tail runs
+-- under done via splitEvents-faithful-true, and closes/registry balance by
+-- cutThrough-balance — to discharge).
+postulate
+  pushBurst-take-cut-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+    (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
+    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ S′ : ProtocolSt) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
+    proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
+    stepProtocol (es at i from src as ek) S ≡ just S₁ →
+    runProtocol S₁ ems ≡ just S′ →
+    Σ ProtocolSt λ S″ →
+      runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ
+                            ((es at i from src as ek) ∷ ems) sched st)) ≡ just S″
+
+pushBurst-take-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S′ : ProtocolSt) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
+  runProtocol S burst ≡ just S′ →
+  Σ ProtocolSt λ S″ →
+    runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″
+pushBurst-take-run fuel id now nid κ [] sched st kCount S S′ lk runEq = S , refl
+pushBurst-take-run {Γ = Γ} {s = s} fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk runEq
+  with stepProtocol (es at i from src as ek) S in seq
+... | nothing = ⊥-elim (n≢jᵂ runEq)
+... | just S₁ with takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)) in tvEq
+...   | out , rem , true  = pushBurst-take-cut-run {Γ = Γ} {s = s} fuel id now nid κ es i src ek ems sched st
+                          kCount S S₁ S′ lk
+                          (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)
+                          seq runEq
+...   | out , rem , false =
+        let (S″ , tailRun) =
+              pushBurst-take-run fuel id now nid κ ems sched
+                (record st { nodes = setNode nid
+                    (take-st (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es))))))
+                    (EvalSt.nodes st) })
+                (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es)))))
+                S₁ S′
+                (lookupNode-setNode nid
+                    (take-st (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es))))))
+                    (EvalSt.nodes st))
+                runEq
+        in S″ , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
+                  (sym (pushBurst-take-noncut-cons fuel id now nid κ es i src ek ems sched st kCount lk
+                          (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)))
+                  (runProtocol-cons _ _ S S₁ S″
+                    (stepProtocol-faithful {B = Val Γ s} (λ vs → proj₁ (takeVals kCount vs)) es i src ek S S₁
+                      (takeVals-nil kCount) seq)
+                    tailRun)
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
