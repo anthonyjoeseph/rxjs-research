@@ -2094,43 +2094,48 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
 -- the CUT edge is the named residue (its complete latches done, its tail runs
 -- under done via splitEvents-faithful-true, and closes/registry balance by
 -- cutThrough-balance — to discharge).
--- Two obligations remain on the cut edge.
---
--- cut-head-run: the cut head emit — the original bookkeeping, then the
--- cutThrough closes, then the truncated values, then complete — is accepted
--- and latches done.  The closes balance the severed registry entries by
--- cutThrough-balance; the truncated values are a prefix of the original
--- (accepted while done is still false); complete then sets done.
+-- The remaining cut obligation, on the REDUCED cons form (pushBurst-take-cut-cons
+-- discharges the operational reduction; this asserts only the protocol run of the
+-- result).  Kept as ONE postulate carrying the monolith's hypotheses (lk/dc/seq/
+-- runEq) so it stays exactly as constrained — a value-free-tail split alone is
+-- unsound (a later close can still underflow), so the tail run genuinely rests on
+-- runEq bracketing the same events.  To discharge with the subscribe-frame
+-- invariant: cut-head via cutThrough-balance (its closes match the severed regs),
+-- then the value-free tail simulated against runEq.
 postulate
-  cut-head-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (nid : NodeId) (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
-    (st : EvalSt e) (kCount : ℕ) (S S₁ : ProtocolSt) →
+  cut-cons-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+    (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
+    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ S′ : ProtocolSt) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
     proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
     stepProtocol (es at i from src as ek) S ≡ just S₁ →
-    Σ ProtocolSt λ S₂ →
-      stepProtocol ((proj₁ (proj₂ (splitEvents es))
-                      ++ retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st)
-                            (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st))))
-                      ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
-                      ++ complete ∷ []) at i from src as ek) S ≡ just S₂
-      × ProtocolSt.done S₂ ≡ true
-
--- pushBurst-cut-tail-run: after the cut resets the node to take-st zero, every
--- later emit is pushed through a spent budget, so takeVals zero yields no values
--- and no further cut — the tail re-emits are value-free, hence accepted under
--- done regardless of protocol state.
-postulate
-  pushBurst-cut-tail-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
-    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (S₂ : ProtocolSt) →
-    ProtocolSt.done S₂ ≡ true →
-    lookupNode nid (EvalSt.nodes st) ≡ just (take-st zero) →
+    runProtocol S₁ ems ≡ just S′ →
     Σ ProtocolSt λ S″ →
-      runProtocol S₂ (proj₁ (pushBurst fuel id now (take-f nid) κ ems sched st)) ≡ just S″
+      runProtocol S
+        (((proj₁ (proj₂ (splitEvents es))
+            ++ retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                                     (EvalSt.dying st) (EvalSt.registry st))))
+            ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
+            ++ complete ∷ [])
+           at i from src as ek)
+         ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems
+                   (record sched { live = sweepLive
+                       (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                          (EvalSt.dying st) (EvalSt.registry st)))
+                       (Sched.live sched) })
+                   (record st { registry = proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                                             (EvalSt.dying st) (EvalSt.registry st))
+                              ; cancelled = proj₂ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                                                     (EvalSt.dying st) (EvalSt.registry st)))
+                                            ++ EvalSt.cancelled st
+                              ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })))
+        ≡ just S″
 
--- assembled: reduce the cut cons, run its head to S₂ (done), run the value-free
--- tail from S₂.  The run statement is existential because take transforms the
--- burst — a cut reaches a DIFFERENT final state than the untouched inner run.
+-- assembled: the run statement is existential because take TRANSFORMS the burst —
+-- a cut reaches a DIFFERENT final state than the untouched inner run.  The
+-- operational reduction (pushBurst-take-cut-cons) is proven; only the protocol
+-- run of the reduced form (cut-cons-run) remains.
 pushBurst-take-cut-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
@@ -2143,19 +2148,10 @@ pushBurst-take-cut-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ
                           ((es at i from src as ek) ∷ ems) sched st)) ≡ just S″
 pushBurst-take-cut-run {Γ = Γ} {s = s} fuel id now nid κ es i src ek ems sched st kCount S S₁ S′ lk dc seq runEq =
-  let (S₂ , headRun , doneS₂) = cut-head-run nid es i src ek st kCount S S₁ dc seq
-      (S″ , tailRun) =
-        pushBurst-cut-tail-run fuel id now nid κ ems
-          (record sched { live = sweepLive (proj₁ cutR) (Sched.live sched) })
-          (record st { registry = proj₁ cutR
-                     ; cancelled = proj₂ (proj₂ cutR) ++ EvalSt.cancelled st
-                     ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
-          S₂ doneS₂ (lookupNode-setNode nid (take-st zero) (EvalSt.nodes st))
+  let (S″ , run) = cut-cons-run fuel id now nid κ es i src ek ems sched st kCount S S₁ S′ lk dc seq runEq
   in S″ , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
             (sym (pushBurst-take-cut-cons fuel id now nid κ es i src ek ems sched st kCount lk dc))
-            (runProtocol-cons _ _ S S₂ S″ headRun tailRun)
-  where cutR = cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                          (EvalSt.dying st) (EvalSt.registry st)
+            run
 
 pushBurst-take-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
