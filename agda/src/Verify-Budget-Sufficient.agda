@@ -58,7 +58,7 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc; WellFounded)
@@ -121,12 +121,35 @@ hasDry-append (em ∷ xs) ys h₁ h₂
 -- concrete program, so strictness is irrelevant here
 ------------------------------------------------------------------
 
+n<2^n : ∀ n → n < 2 ^ n
+n<2^n zero    = s≤s z≤n
+n<2^n (suc n) = ≤-trans step (≤-reflexive shape)
+  where
+  step : suc (suc n) ≤ 2 ^ n + 2 ^ n
+  step = ≤-trans (+-monoˡ-≤ (suc n) (s≤s z≤n))
+                 (+-mono-≤ (n<2^n n) (n<2^n n))
+  shape : 2 ^ n + 2 ^ n ≡ 2 ^ suc n
+  shape = cong (2 ^ n +_) (sym (+-identityʳ (2 ^ n)))
+
 towerℕ : ℕ → ℕ
 towerℕ zero    = 1
 towerℕ (suc h) = 2 ^ towerℕ h
 
 sizeBudgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → ℕ
 sizeBudgetAt e sl id = towerℕ (suc (sizeᵉ e + slotsSize sl) * suc id)
+
+towerℕ-mono : ∀ {m n} → m ≤ n → towerℕ m ≤ towerℕ n
+towerℕ-mono {zero}  {zero}  h = ≤-refl
+towerℕ-mono {zero}  {suc n} h =
+  ≤-trans (towerℕ-mono {zero} {n} z≤n)
+          (≤-trans (n≤1+n (towerℕ n)) (n<2^n (towerℕ n)))
+towerℕ-mono {suc m} {suc n} (s≤s h) = ^-monoʳ-≤ 2 (towerℕ-mono h)
+
+sizeBudgetAt-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
+  (sl : Slots Γ) {id id′ : Id} → id ≤ id′ →
+  sizeBudgetAt e sl id ≤ sizeBudgetAt e sl id′
+sizeBudgetAt-mono e sl h =
+  towerℕ-mono (*-monoʳ-≤ (suc (sizeᵉ e + slotsSize sl)) (s≤s h))
 
 ------------------------------------------------------------------
 -- the Gas ordering: `g hasAtLeast n` — n peels are available.  The
@@ -186,6 +209,12 @@ budget-hasAtLeast : ∀ (sz : ℕ) (id : Id) →
 budget-hasAtLeast sz id =
   hasAtLeast-pad-plus (2 ^ (sz * suc id * suc id))
                       (hasAtLeast-tower ((4 + sz) * suc id))
+
+-- the peel every decrement-edge clause performs: enough fuel means
+-- the machine's gs-match succeeds and the tail still has enough
+hasAtLeast-peel : ∀ {g : Gas} {m : ℕ} → g hasAtLeast suc m →
+  Σ Gas (λ g′ → (g ≡ gs g′) × (g′ hasAtLeast m))
+hasAtLeast-peel (hs h) = _ , refl , h
 
 ------------------------------------------------------------------
 -- the machine's value stores, bounded: schedule pendings, scan
@@ -292,6 +321,34 @@ all-impl p q imp (x ∷ xs) h
   where
   T-elim : ∀ {b : Bool} → T b → b ≡ true
   T-elim {true} _ = refl
+
+boundedLive-widen : ∀ {n} {Γ : Ctx n} {B B′ : ℕ} → B ≤ B′ →
+  (l : LiveSource Γ) → boundedLive B l ≡ true → boundedLive B′ l ≡ true
+boundedLive-widen le l =
+  all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ (LiveSource.elemTy l) (proj₂ tv)) le)
+           (LiveSource.pending l)
+
+boundedNode-widen : ∀ {n} {Γ : Ctx n} {B B′ : ℕ} → B ≤ B′ →
+  (ns : NodeState Γ) → boundedNode B ns ≡ true → boundedNode B′ ns ≡ true
+boundedNode-widen le (scan-st {t} v)   h = ≤ᵇ-widen (sizeᵛ t v) le h
+boundedNode-widen le (concat-st q _ _) h =
+  all-impl _ _ (λ o → ≤ᵇ-widen (sizeᵉ o) le) q h
+boundedNode-widen le (take-st _)       h = refl
+boundedNode-widen le (merge-st _ _)    h = refl
+boundedNode-widen le (switch-st _ _)   h = refl
+boundedNode-widen le (exhaust-st _ _)  h = refl
+
+-- the invariant survives raising the bound — composes cascades:
+-- landing within (suc id)'s budget IS starting within (suc id)'s
+stBounded-widen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {B B′ : ℕ} →
+  B ≤ B′ → (sched : Sched Γ) (st : EvalSt e) →
+  stBounded? B sched st ≡ true → stBounded? B′ sched st ≡ true
+stBounded-widen le sched st h
+  with ∧-true _ _ h
+... | hl , hn =
+  ∧-intro (all-impl _ _ (λ l → boundedLive-widen le l) (Sched.live sched) hl)
+          (all-impl _ _ (λ kv → boundedNode-widen le (proj₂ kv))
+                    (EvalSt.nodes st) hn)
 
 -- a bound only ever needs to be respected upward: the id-level bound
 -- entails the suc-id-level one (budgets grow monotonically)
@@ -442,6 +499,21 @@ evalTm-layered f = evalWith-layered f []ᵃ []ˡ
 applyFn-layered : ∀ {n} {Γ : Ctx n} {s t} (fn : Fn Γ [] [] [] s t)
   (v : Val Γ s) → LayeredV s v → LayeredV t (applyFn fn v)
 applyFn-layered fn v lv = evalWith-layered fn (v ∷ᵃ []ᵃ) (lv ∷ˡ []ˡ)
+
+-- every value admits the trivial one-layer derivation (its measure
+-- is the coarse singleton {syncSize}; the contract carries finer
+-- derivations where it matters, but existence is unconditional —
+-- the theorem's hypotheses stay empty)
+layeredV-any : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → LayeredV t v
+layeredV-any unitᵗ    v        = tt
+layeredV-any boolᵗ    v        = tt
+layeredV-any natᵗ     v        = tt
+layeredV-any (s ×ᵗ t) v        =
+  layeredV-any s (proj₁ v) , layeredV-any t (proj₂ v)
+layeredV-any (s +ᵗ t) (inj₁ a) = layeredV-any s a
+layeredV-any (s +ᵗ t) (inj₂ b) = layeredV-any t b
+layeredV-any (obs t)  e        = layer e []ᵃ []ˡ
+
 
 ------------------------------------------------------------------
 -- THE MEASURE — edge 3's Dershowitz–Manna multiset, concretely.
@@ -642,6 +714,25 @@ st-init-layered : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) →
   StLayered (st-init e)
 st-init-layered e = []ᵃ
 
+slotLayered-any : ∀ {n} {Γ : Ctx n} {t} (s : Slot Γ t) → SlotLayered s
+slotLayered-any {t = t} (scripted (hot async))       = anyAll async
+  where
+  anyAll : ∀ xs → All (λ tv → LayeredV t (Timed.val tv)) xs
+  anyAll []        = []ᵃ
+  anyAll (tv ∷ xs) = layeredV-any t (Timed.val tv) ∷ᵃ anyAll xs
+slotLayered-any {t = t} (scripted (cold sync async)) = anyS sync , anyA async
+  where
+  anyS : ∀ xs → All (LayeredV t) xs
+  anyS []       = []ᵃ
+  anyS (v ∷ xs) = layeredV-any t v ∷ᵃ anyS xs
+  anyA : ∀ xs → All (λ tv → LayeredV t (Timed.val tv)) xs
+  anyA []        = []ᵃ
+  anyA (tv ∷ xs) = layeredV-any t (Timed.val tv) ∷ᵃ anyA xs
+slotLayered-any           (shared def)               = layer def []ᵃ []ˡ
+
+slotsLayered-any : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) → SlotsLayered sl
+slotsLayered-any sl i = slotLayered-any (sl i)
+
 resolve-layered : ∀ {n} {Γ : Ctx n} {t : Ty} (anchor : Tick)
   (xs : List (Timed (Val Γ t))) →
   All (λ tv → LayeredV t (Timed.val tv)) xs →
@@ -681,16 +772,6 @@ scanVals-layered fn a₀ (v ∷ vs) la (lv ∷ᵃ lvs) =
 -- (slotSize counts scripted values): every hot pending value is ≤
 -- its slot's inputSize ≤ slotsSize ≤ the tower.
 ------------------------------------------------------------------
-
-n<2^n : ∀ n → n < 2 ^ n
-n<2^n zero    = s≤s z≤n
-n<2^n (suc n) = ≤-trans step (≤-reflexive shape)
-  where
-  step : suc (suc n) ≤ 2 ^ n + 2 ^ n
-  step = ≤-trans (+-monoˡ-≤ (suc n) (s≤s z≤n))
-                 (+-mono-≤ (n<2^n n) (n<2^n n))
-  shape : 2 ^ n + 2 ^ n ≡ 2 ^ suc n
-  shape = cong (2 ^ n +_) (sym (+-identityʳ (2 ^ n)))
 
 k≤towerℕ : ∀ k → k ≤ towerℕ k
 k≤towerℕ zero    = z≤n
