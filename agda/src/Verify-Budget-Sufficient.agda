@@ -40,14 +40,16 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        +-comm; +-assoc; +-monoʳ-<;
                                        *-monoˡ-≤; m≤m+n; m≤n+m)
 open import Data.Nat.Induction  using (<-wellFounded)
-open import Data.List    using (List; []; _∷_; _++_; all; any; length)
+open import Data.List    using (List; []; _∷_; _++_; all; any; length;
+                                sum; tabulate)
+open import Data.Fin     using (Fin; toℕ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
-open import Data.Vec     using (Vec) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
+open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
@@ -71,7 +73,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
-                                arrVal;
+                                arrVal; scanVals; memberSource;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
@@ -659,6 +661,48 @@ sched-init-layered {n = n} {Γ = Γ} e ins sli =
   ... | scripted (cold _ _)  | _       = []ᵃ
   ... | shared _             | _       = []ᵃ
 
+-- the first preservation piece: a scan step keeps the store layered.
+-- Every emitted running output and the landed accumulator are applyFn
+-- images over layered inputs — evalWith-layered does all the work
+scanVals-layered : ∀ {n} {Γ : Ctx n} {s u}
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (a₀ : Val Γ u) (vs : List (Val Γ s)) →
+  LayeredV u a₀ → All (LayeredV s) vs →
+  All (LayeredV u) (proj₁ (scanVals fn a₀ vs))
+    × LayeredV u (proj₂ (scanVals fn a₀ vs))
+scanVals-layered fn a₀ []       la []ᵃ         = []ᵃ , la
+scanVals-layered fn a₀ (v ∷ vs) la (lv ∷ᵃ lvs) =
+  let la′ = applyFn-layered fn (a₀ , v) (la , lv)
+      (louts , llast) = scanVals-layered fn (applyFn fn (a₀ , v)) vs la′ lvs
+  in la′ ∷ᵃ louts , llast
+
+------------------------------------------------------------------
+-- EDGE 1 — the connect latch, counted.  subscribeSharedSlot's
+-- connect fires only behind memberSource … ≡ false and prepends to
+-- connectedShares, which no machine function ever shrinks; so the
+-- number of still-unconnected shared slots is the edge-1 component
+-- of the demand: it strictly drops at every connect (unconn-insert)
+-- and never rises (unconn-cons-≤).
+------------------------------------------------------------------
+
+unconn : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
+unconn {n = n} sl cs = sum (tabulate contrib)
+  where
+  contrib : Fin n → ℕ
+  contrib i with sl i
+  ... | shared _   = if memberSource (toℕ i) cs then 0 else 1
+  ... | scripted _ = 0
+
+-- pure counting over Fin n — GRINDER: sum/tabulate pointwise
+-- comparison, with the single strict position at i
+postulate
+  unconn-insert : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+    (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+    memberSource (toℕ i) cs ≡ false →
+    unconn sl (toℕ i ∷ cs) < unconn sl cs
+
+  unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+    (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
+
 -- the two decrease lemmas the hop analysis needs (proof-design memo
 -- below).  Pure count-vector arithmetic over the definitions above —
 -- GRINDER: prove counts-++ first (the workhorse), then both ≺ lemmas
@@ -806,11 +850,27 @@ totᵛ-counts B (x ∷ M)
 --      and can dwarf it.  The S-probes missed this only because
 --      their dup discards v.)
 --
--- `need` then towers only through edge 3's multiset descent (one
--- story per size class, ≤ program+slot syntax size classes), which
--- budget-hasAtLeast's tower summand dominates; every literal-headed
--- need (no chained scans) is already covered by the 2^(sz·(id+1)²)
--- summand alone.  The cores below are the contract instantiated at
+-- THE DEMAND, closed-form.  Fuel is depth-consumed, so the contract
+-- bounds D = the deepest chain of decrement edges.  At any machine
+-- point the relevant coordinates are U = unconn (edge 1), r = rank V
+-- (measureObs B …) of the current value (edge 3), s = syncSizeᵉ of
+-- the expression under the walk (edge 2); a μ-unfold drops s at
+-- fixed (U, r) (unfoldμ-shrinks), a hop drops r and resets s ≤ V
+-- (rank-mono-≺ over ≺-embed/≺-replace), a connect drops U and
+-- resets r below the store's max rank.  rank-lt-pow closes the
+-- form: any store rank < (suc V)^(suc B), so
+--
+--   D  <  (suc V)^(B+2) · suc U        (V the store size bound,
+--                                       B the size-class cap)
+--
+-- one exponential story above the store bound — and the seeded
+-- budget's tower gains (suc sz) stories per instant, so
+-- budget-hasAtLeast's tower summand dominates with room to spare;
+-- every literal-headed demand (no chained scans) is already covered
+-- by the 2^(sz·(id+1)²) summand alone.  The exact combination gets
+-- refined while proving; the shape is fixed by rank-lt-pow.
+--
+-- The cores below are the contract instantiated at
 -- the root burst (burst-dry/-bounded) and at the chain fold
 -- (cascadeGo-wet); the disjointness argument (each registration's
 -- path owns its minted nodes, so per-cascade store traffic is
