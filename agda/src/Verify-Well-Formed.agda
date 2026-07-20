@@ -731,9 +731,13 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     horizon-low   : ProtocolSt.horizon S ≤ id
     current-frame : (ProtocolSt.current S ≡ nothing)
                   ⊎ (ProtocolSt.current S ≡ just (id , []))
-    done-plumbed  : ProtocolSt.done S ≡ true →
-      allShareSunk (EvalSt.registry st) ≡ true
     caches        : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
+    -- NB: no done-plumbed here.  A base burst always latches done ≡ true, but
+    -- an INNER base completing amid a live async sibling makes the full-registry
+    -- allShareSunk FALSE (the enclosing thru-outer frame strips that complete
+    -- before emission — see the fork note on the blueprint).  done-plumbed's only
+    -- consumer is burst-final (root frame-0 exit), so it is a ROOT-EXIT
+    -- obligation, supplied to burst-final directly, not threaded through here.
 
 -- the empty states are related
 burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
@@ -743,7 +747,6 @@ burst-init e ins = record
   ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
-  ; done-plumbed  = λ ()
   ; caches        = refl
   }
 
@@ -823,29 +826,25 @@ oneShotBurst-run vals id sched S deq curr hlow
 -- ── the base clause of subscribeE-wf, mechanism-complete ─────────────────
 -- A oneShotBurst (ofᵉ / emptyᵉ / takeᵉ-zero) registers nothing, so it leaves
 -- st untouched and mints only a source.  Given BurstInv on entry, its burst
--- runs and re-establishes BurstInv.  The mechanism (oneShotBurst-run) is
--- fully proven; the clause owes exactly TWO things from the surrounding
--- context, isolated here as premises:
+-- runs and re-establishes BurstInv.  The mechanism (oneShotBurst-run) is fully
+-- proven; the clause owes exactly ONE thing from the surrounding context, the
+-- premise `deq`:
 --   · deq  — `done S ≡ false` at subscribe time (you never subscribe a new
 --     source after the run has completed; the protocol would reject a value
 --     behind `complete`).  This is a subscribe-TIME fact, not a frame-exit
 --     one (done may be true at exit), so BurstInv cannot carry it; it must
 --     come from the walk order.
---   · ash  — `allShareSunk (registry st) ≡ true`, the obligation the trailing
---     `complete` hands to done-plumbed.  At the ROOT this is the real content
---     (a synchronous full completion leaves only share sinks registered); on
---     the INNER-recursion path (an inner completing amid a live async sibling)
---     it is FALSE — see the done-plumbed note appended to the blueprint.
+-- (The former `allShareSunk` premise is GONE: done-plumbed left BurstInv and
+--  became a root-exit obligation, so the base clause no longer owes it.)
 oneShotBurst-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) (st : EvalSt e)
   (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →
-  allShareSunk (EvalSt.registry st) ≡ true →
   Σ ProtocolSt λ S′ →
     runProtocol S (proj₁ (oneShotBurst vals id sched)) ≡ just S′
     × BurstInv id (proj₂ (oneShotBurst vals id sched)) st S′
-oneShotBurst-wf vals id sched st S binv deq ash =
+oneShotBurst-wf vals id sched st S binv deq =
   _ , oneShotBurst-run vals id sched S deq (BurstInv.current-frame binv)
                        (BurstInv.horizon-low binv)
     , record
@@ -853,7 +852,6 @@ oneShotBurst-wf vals id sched st S binv deq ash =
         ; reg-typed     = BurstInv.reg-typed binv
         ; horizon-low   = BurstInv.horizon-low binv
         ; current-frame = inj₂ refl
-        ; done-plumbed  = λ _ → ash
         ; caches        = BurstInv.caches binv
         }
 
@@ -861,11 +859,12 @@ oneShotBurst-wf vals id sched st S binv deq ash =
 -- SUBSCRIBE-SIDE DECOMPOSITION BLUEPRINT (opened 2026-07-19)
 --
 -- subscribeE-wf preserves BurstInv across one subscription's burst, and yields
--- a protocol run for that burst.  BurstInv is now CLEAN: fin-independent, its
--- done-plumbed is the full-registry frame-stable form (like Inv's), live-matches
--- is a plain equality countIn s (live S) ≡ countRegs s (registry st) — NO pending
--- init/close events (unlike FoldInv's SHADOW), because the burst's events are
--- reconciled into live by runProtocol, not carried.
+-- a protocol run for that burst.  BurstInv is CLEAN: fin-independent, and (as of
+-- the fork resolution below) carries NO done-plumbed — live-matches is a plain
+-- equality countIn s (live S) ≡ countRegs s (registry st), NO pending init/close
+-- events (unlike FoldInv's SHADOW), because the burst's events are reconciled
+-- into live by runProtocol, not carried.  done-plumbed is a root-exit obligation
+-- (root-done-plumbed), handed to burst-final directly.
 --
 -- THE CENTRAL MECHANISM.  A subscription grows the registry by `register`ing a
 -- source and, in the SAME burst emit, ships an `init` of that source.  runProtocol
@@ -884,8 +883,10 @@ oneShotBurst-wf vals id sched st S binv deq ash =
 --     on that single emit steps the automaton once (enterInstant/settle/applyEvents)
 --     and re-establishes live-matches (init balances the new reg), reg-typed (the
 --     registered chain is well-typed against the added live source), current-frame
---     (the emit opens instant id), done-plumbed (a `complete` only fires share-sunk),
---     caches (installNode/register touch no merge counter incoherently).
+--     (the emit opens instant id), caches (installNode/register touch no merge
+--     counter incoherently).  [DONE for ofᵉ/emptyᵉ/takeᵉ-zero: oneShotBurst-wf,
+--     modulo the `done S ≡ false` at-subscribe premise.  No done-plumbed — it left
+--     BurstInv for the root, see the fork resolution below.]
 --   · FRAME (subscribeE b (f ↠ κ) then pushBurst f κ burst): mapᵉ (f=map-f),
 --     takeᵉ-suc (mintNode+installNode, f=take-f), scanᵉ (mintNode+installNode,
 --     f=scan-f).  Obligation: IH (subscribeE-wf on b, structural) gives BurstInv+run
@@ -934,13 +935,15 @@ oneShotBurst-wf vals id sched st S binv deq ash =
 --   CONSUMER: BurstInv.done-plumbed is read ONLY by burst-final (root frame-0
 --   exit → Inv.done-plumbed).  It is NEVER read on the inner-recursion path.
 --   So per the standing rule (input-side fields earn their existence from
---   consumers, not symmetry), done-plumbed should be a ROOT-EXIT obligation,
---   not threaded through the recursive/inner BurstInv.  RESOLUTION SKETCH:
---   drop done-plumbed from BurstInv; re-establish it once at burst-final from a
---   root-only lemma (root-returned stream's done ≡ true ⟹ registry share-sunk,
---   proven from the walk's structure — the merge-coherence content).  This is a
---   consumed-field shape change; recorded here, pending Anthony's read (parallel
---   to the env-close consult) before I dismantle BurstInv.
+--   consumers, not symmetry), done-plumbed is a ROOT-EXIT obligation, not
+--   threaded through the recursive/inner BurstInv.
+--   RESOLVED (2026-07-20): done-plumbed DROPPED from BurstInv.  It is now
+--   re-established once, at burst-final, from the `root-done-plumbed` postulate
+--   (root-returned stream's done ≡ true ⟹ registry share-sunk — the merge-
+--   coherence content, to be proven with pushBurst-wf/subscribeAll-wf).  This
+--   also DELETED the `allShareSunk` premise the base clause used to owe.  Fully
+--   proof-side (BurstInv is not the spec); makes subscribeE-wf TRUE for inners
+--   (only done-plumbed was false there).  Note kept as the rationale of record.
 -- ════════════════════════════════════════════════════════════════════════
 postulate
   -- ONE subscription's burst preserves the frame relation (see the blueprint
@@ -975,8 +978,9 @@ paid-empty S ceq with ProtocolSt.current S | ceq
 burst-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv 0 sched st S →
+  (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
   Inv 1 sched st S × (paidUp S ≡ true)
-burst-final sched st S binv = inv , paid (BurstInv.current-frame binv)
+burst-final sched st S binv dp = inv , paid (BurstInv.current-frame binv)
   where
   past : (ProtocolSt.current S ≡ nothing)
        ⊎ (ProtocolSt.current S ≡ just (0 , [])) →
@@ -996,9 +1000,26 @@ burst-final sched st S binv = inv , paid (BurstInv.current-frame binv)
     ; reg-typed    = BurstInv.reg-typed binv
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)
-    ; done-plumbed = BurstInv.done-plumbed binv
+    ; done-plumbed = dp
     ; caches       = BurstInv.caches binv
     }
+
+-- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
+-- root subscription's returned stream IS the emitted one, so its done-flip is a
+-- genuine full completion — which leaves only share sinks registered.  (On the
+-- inner-recursion path this is false, but done-plumbed is never read there; it
+-- is consumed ONLY here, at the root frame-0 exit.)  Postulated for now — its
+-- proof is the merge-coherence content, landed with pushBurst-wf/subscribeAll-wf.
+postulate
+  root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    (S : ProtocolSt) →
+    runProtocol protocol-init
+      (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                         (sched-init e ins) (st-init e))) ≡ just S →
+    ProtocolSt.done S ≡ true →
+    allShareSunk (EvalSt.registry
+      (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                (sched-init e ins) (st-init e))))) ≡ true
 
 -- the root subscription, composed (at the budget evaluate seeds)
 subscribe-wf :
@@ -1016,7 +1037,7 @@ subscribe-wf e ins nodry
                      (sched-init e ins) (st-init e)
                      protocol-init (burst-init e ins) nodry
 ... | S , run , binv
-  with burst-final _ _ S binv
+  with burst-final _ _ S binv (root-done-plumbed e ins S run)
 ... | inv , paid = S , run , inv , paid
 
 ------------------------------------------------------------------
