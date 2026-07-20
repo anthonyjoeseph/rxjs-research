@@ -1469,6 +1469,105 @@ splitEvents-faithful (close s exhausted ∷ es) vals′ lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitEvents-faithful es vals′ lv′ o hyp′
 
+-- ── the completing case: faithfulness when the emit ENTERS already done ──
+-- appending a `complete` under done is idempotent
+applyEvents-append-complete-true : ∀ {A : Set} (xs : List (InstEvent A))
+  (lv : List Source) (o : Owed) {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents xs lv o true ≡ just (L , O , D) →
+  applyEvents (xs ++ complete ∷ []) lv o true ≡ just (L , O , true)
+applyEvents-append-complete-true xs lv o hyp =
+  applyEvents-++just xs (complete ∷ []) lv o true hyp
+
+-- under a done entry a successful run carries NO values (a value rejects),
+-- so splitEvents routes nothing to the value list
+splitEvents-novals-true : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+  (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed) {r} →
+  applyEvents es lv o true ≡ just r → proj₁ (splitEvents {A = A} es) ≡ []
+splitEvents-novals-true []               lv o hyp = refl
+splitEvents-novals-true (init s ∷ es)    lv o hyp = splitEvents-novals-true es (s ∷ lv) o hyp
+splitEvents-novals-true (value v ∷ es)   lv o ()
+splitEvents-novals-true (handoff s ∷ es) lv o hyp =
+  splitEvents-novals-true es lv (bumpOwed s (countIn s lv) o) hyp
+splitEvents-novals-true (complete ∷ es)  lv o hyp = splitEvents-novals-true es lv o hyp
+splitEvents-novals-true (close s cutPending ∷ es) lv o hyp
+  with removeOne s lv | cancelOwed s o | hyp
+... | just lv′ | just o′ | hyp′ = splitEvents-novals-true es lv′ o′ hyp′
+splitEvents-novals-true (close s cut ∷ es) lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-novals-true es lv′ o hyp′
+splitEvents-novals-true (close s exhausted ∷ es) lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-novals-true es lv′ o hyp′
+
+-- the bookkeeping alone reproduces a done-entry run's (live, owed), latching
+-- done (values are absent by success, completes are idempotent no-ops)
+splitBk-faithful-true : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed)
+  {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es lv o true ≡ just (L , O , D) →
+  applyEvents (proj₁ (proj₂ (splitEvents {A = B} es))) lv o true ≡ just (L , O , true)
+splitBk-faithful-true []               lv o hyp with just-injᵂ hyp
+... | refl = refl
+splitBk-faithful-true (init s ∷ es)    lv o hyp = splitBk-faithful-true es (s ∷ lv) o hyp
+splitBk-faithful-true (value v ∷ es)   lv o ()
+splitBk-faithful-true (handoff s ∷ es) lv o hyp =
+  splitBk-faithful-true es lv (bumpOwed s (countIn s lv) o) hyp
+splitBk-faithful-true (complete ∷ es)  lv o hyp = splitBk-faithful-true es lv o hyp
+splitBk-faithful-true (close s cutPending ∷ es) lv o hyp
+  with removeOne s lv | cancelOwed s o | hyp
+... | just lv′ | just o′ | hyp′ = splitBk-faithful-true es lv′ o′ hyp′
+splitBk-faithful-true (close s cut ∷ es) lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitBk-faithful-true es lv′ o hyp′
+splitBk-faithful-true (close s exhausted ∷ es) lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitBk-faithful-true es lv′ o hyp′
+
+-- so a done-entry emit's re-emit (bookkeeping + its own maybe-complete)
+-- reproduces the original's (live, owed) and keeps done latched
+splitEvents-faithful-true : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed)
+  {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es lv o true ≡ just (L , O , D) →
+  applyEvents (proj₁ (proj₂ (splitEvents {A = B} es))
+               ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
+              lv o true
+    ≡ just (L , O , true)
+splitEvents-faithful-true {B = B} es lv o {L = L} {O = O} hyp
+  with proj₂ (proj₂ (splitEvents {A = B} es)) in ceq
+... | true  = applyEvents-append-complete-true (proj₁ (proj₂ (splitEvents {A = B} es)))
+                lv o (splitBk-faithful-true es lv o hyp)
+... | false = subst (λ z → applyEvents z lv o true ≡ just (L , O , true))
+                    (sym (++-identityʳ (proj₁ (proj₂ (splitEvents {A = B} es)))))
+                    (splitBk-faithful-true es lv o hyp)
+
+-- ── done-agnostic per-emit faithfulness ─────────────────────────────────
+-- A transparent frame's per-emit value transform `g` (map-f: map applyFn;
+-- scan/take: analogous) is empty-preserving.  Whatever the entry `done`, the
+-- re-emit (bookkeeping ++ map value (g of the emit's values) ++ maybe-complete)
+-- runs applyEvents to the SAME result: done ≡ false is splitEvents-faithful; a
+-- done entry carries no values (splitEvents-novals-true), so g's output vanishes
+-- and it reduces to splitEvents-faithful-true.
+faithful-g : ∀ {n} {Γ : Ctx n} {u} {B : Set} (g : List (Val Γ u) → List B)
+  (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed) (dn : Bool)
+  {L : List Source} {O : Owed} {D : Bool} →
+  g [] ≡ [] →
+  applyEvents es lv o dn ≡ just (L , O , D) →
+  applyEvents (proj₁ (proj₂ (splitEvents {A = B} es))
+               ++ map value (g (proj₁ (splitEvents {A = B} es)))
+               ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
+              lv o dn
+    ≡ just (L , O , D)
+faithful-g {B = B} g es lv o false gempty hyp =
+  splitEvents-faithful es (g (proj₁ (splitEvents {A = B} es))) lv o hyp
+faithful-g {B = B} g es lv o true {L} {O} {D} gempty hyp
+  rewrite trans (cong g (splitEvents-novals-true {A = B} es lv o hyp)) gempty =
+  subst (λ d → applyEvents (proj₁ (proj₂ (splitEvents {A = B} es))
+                 ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
+                lv o true ≡ just (L , O , d))
+        (sym (applyEvents-done-mono es lv o true hyp refl))
+        (splitEvents-faithful-true es lv o hyp)
+
 runProtocol-one : ∀ {A : Set} (S : ProtocolSt) (x : InstEmit A) →
   runProtocol S (x ∷ []) ≡ stepProtocol x S
 runProtocol-one S x with stepProtocol x S
@@ -1477,76 +1576,69 @@ runProtocol-one S x with stepProtocol x S
 
 -- ── per-emit frame transparency: the re-emit steps to the SAME state ─────
 -- A transparent frame (evs = []: map/scan/take-noncut) re-emits an emit as
--- bookkeeping ++ frame-values ++ maybe-complete.  At the same instant/source/
--- kind, its stepProtocol lands on the SAME S′ as the original: whatever owed
--- `ob` the automaton admitted the instant with, the original's applyEvents
--- succeeded there (analysis of the given success), so splitEvents-faithful hands
--- the re-emit the identical applyEvents result, and the automaton rebuilds the
--- identical state.  done ≡ false is the subscribe-frame invariant (you never
--- subscribe behind a completion).  The aux takes the fields literally so the
+-- bookkeeping ++ map value (g of the emit's values) ++ maybe-complete, `g` its
+-- empty-preserving value transform.  At the same instant/source/kind, its
+-- stepProtocol lands on the SAME S′ as the original: whatever owed `ob` the
+-- automaton admitted the instant with, the original's applyEvents succeeded
+-- there (analysis of the given success), so faithful-g hands the re-emit the
+-- identical applyEvents result — for EITHER entry done — and the automaton
+-- rebuilds the identical state.  The aux takes the fields literally so the
 -- `enter`/`go` clauses reduce; the guards and settle are events-independent, so
 -- they drive the original and the re-emit down the same path.
 stepProtocol-faithful-aux : ∀ {n} {Γ : Ctx n} {u} {B : Set}
-  (es : List (InstEvent (Val Γ u))) (vals′ : List B)
+  (g : List (Val Γ u) → List B)
+  (es : List (InstEvent (Val Γ u)))
   (i : Id) (s : Source) (k : EmitKind) (lv : List Source) (hz : Id)
-  (cur : Maybe (Id × Owed)) (S′ : ProtocolSt) →
+  (dn : Bool) (cur : Maybe (Id × Owed)) (S′ : ProtocolSt) →
+  g [] ≡ [] →
   stepProtocol (es at i from s as k)
-    (record { live = lv ; horizon = hz ; current = cur ; done = false }) ≡ just S′ →
-  stepProtocol ((proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
+    (record { live = lv ; horizon = hz ; current = cur ; done = dn }) ≡ just S′ →
+  stepProtocol ((proj₁ (proj₂ (splitEvents {A = B} es))
+                 ++ map value (g (proj₁ (splitEvents {A = B} es)))
                  ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
                 at i from s as k)
-    (record { live = lv ; horizon = hz ; current = cur ; done = false }) ≡ just S′
-stepProtocol-faithful-aux es vals′ i s k lv hz nothing S′ stepEq
+    (record { live = lv ; horizon = hz ; current = cur ; done = dn }) ≡ just S′
+stepProtocol-faithful-aux g es i s k lv hz dn nothing S′ gempty stepEq
   with hz ≤ᵇ i
 ... | false = ⊥-elim (n≢jᵂ stepEq)
 ... | true  with settle k s lv []
 ...   | nothing = ⊥-elim (n≢jᵂ stepEq)
-...   | just o₁ with applyEvents es lv o₁ false in aeq
+...   | just o₁ with applyEvents es lv o₁ dn in aeq
 ...     | nothing = ⊥-elim (n≢jᵂ stepEq)
-...     | just r  rewrite splitEvents-faithful es vals′ lv o₁ aeq = stepEq
-stepProtocol-faithful-aux es vals′ i s k lv hz (just (j , oⱼ)) S′ stepEq
+...     | just r  rewrite faithful-g g es lv o₁ dn gempty aeq = stepEq
+stepProtocol-faithful-aux g es i s k lv hz dn (just (j , oⱼ)) S′ gempty stepEq
   with i ≡ᵇ j
 ... | true  with paidOff oⱼ
 ...   | true  = ⊥-elim (n≢jᵂ stepEq)
 ...   | false with settle k s lv oⱼ
 ...     | nothing = ⊥-elim (n≢jᵂ stepEq)
-...     | just o₁ with applyEvents es lv o₁ false in aeq
+...     | just o₁ with applyEvents es lv o₁ dn in aeq
 ...       | nothing = ⊥-elim (n≢jᵂ stepEq)
-...       | just r  rewrite splitEvents-faithful es vals′ lv o₁ aeq = stepEq
-stepProtocol-faithful-aux es vals′ i s k lv hz (just (j , oⱼ)) S′ stepEq
+...       | just r  rewrite faithful-g g es lv o₁ dn gempty aeq = stepEq
+stepProtocol-faithful-aux g es i s k lv hz dn (just (j , oⱼ)) S′ gempty stepEq
     | false with allZero oⱼ
 ...   | false = ⊥-elim (n≢jᵂ stepEq)
 ...   | true  with suc j ≤ᵇ i
 ...     | false = ⊥-elim (n≢jᵂ stepEq)
 ...     | true  with settle k s lv []
 ...       | nothing = ⊥-elim (n≢jᵂ stepEq)
-...       | just o₁ with applyEvents es lv o₁ false in aeq
+...       | just o₁ with applyEvents es lv o₁ dn in aeq
 ...         | nothing = ⊥-elim (n≢jᵂ stepEq)
-...         | just r  rewrite splitEvents-faithful es vals′ lv o₁ aeq = stepEq
+...         | just r  rewrite faithful-g g es lv o₁ dn gempty aeq = stepEq
 
 stepProtocol-faithful : ∀ {n} {Γ : Ctx n} {u} {B : Set}
-  (es : List (InstEvent (Val Γ u))) (vals′ : List B)
+  (g : List (Val Γ u) → List B)
+  (es : List (InstEvent (Val Γ u)))
   (i : Id) (s : Source) (k : EmitKind) (S S′ : ProtocolSt) →
-  ProtocolSt.done S ≡ false →
+  g [] ≡ [] →
   stepProtocol (es at i from s as k) S ≡ just S′ →
-  stepProtocol ((proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
+  stepProtocol ((proj₁ (proj₂ (splitEvents {A = B} es))
+                 ++ map value (g (proj₁ (splitEvents {A = B} es)))
                  ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
                 at i from s as k) S ≡ just S′
-stepProtocol-faithful {B = B} es vals′ i s k S S′ deq stepEq =
-  subst (λ d → stepProtocol (recon at i from s as k)
-                (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
-                        ; current = ProtocolSt.current S ; done = d }) ≡ just S′)
-        (sym deq)
-        (stepProtocol-faithful-aux es vals′ i s k (ProtocolSt.live S)
-          (ProtocolSt.horizon S) (ProtocolSt.current S) S′
-          (subst (λ d → stepProtocol (es at i from s as k)
-                  (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
-                          ; current = ProtocolSt.current S ; done = d }) ≡ just S′)
-                 deq stepEq))
-  where
-  recon : List (InstEvent B)
-  recon = proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
-          ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else [])
+stepProtocol-faithful g es i s k S S′ gempty stepEq =
+  stepProtocol-faithful-aux g es i s k (ProtocolSt.live S) (ProtocolSt.horizon S)
+    (ProtocolSt.done S) (ProtocolSt.current S) S′ gempty stepEq
 
 -- stepProtocol preserves a latched done (the automaton analysis, extracting
 -- S′.done and passing it to applyEvents-done-mono)
@@ -1622,39 +1714,33 @@ runProtocol-cons x xs S S₁ S′ stepEq restEq with stepProtocol x S | stepEq
 
 -- ── the frame fold: a transparent frame's whole re-emitted burst runs like
 -- the original ──────────────────────────────────────────────────────────
--- reEmit is the per-emit re-emission (bookkeeping ++ frame values ++ maybe-
--- complete) at the same instant/source/kind; `f` gives the frame's transformed
--- values for each emit.  runProtocol-faithful folds stepProtocol-faithful over
--- the burst.  The `done S′ ≡ false` premise is what makes the induction go: a
--- burst that ends un-completed never flipped done (runProtocol-done-mono), so
--- done ≡ false held at every emit — the per-step precondition.
+-- reEmit is the per-emit re-emission (bookkeeping ++ map value (g of the emit's
+-- values) ++ maybe-complete) at the same instant/source/kind; `g` is the frame's
+-- empty-preserving value transform.  runProtocol-faithful folds stepProtocol-
+-- faithful over the burst — done-agnostic, so it covers completing bursts too.
 reEmit : ∀ {n} {Γ : Ctx n} {u} {B : Set}
-       → (InstEmit (Val Γ u) → List B) → InstEmit (Val Γ u) → InstEmit B
-reEmit {B = B} f em =
-  (proj₁ (proj₂ (splitEvents {A = B} (InstEmit.events em))) ++ map value (f em)
+       → (List (Val Γ u) → List B) → InstEmit (Val Γ u) → InstEmit B
+reEmit {B = B} g em =
+  (proj₁ (proj₂ (splitEvents {A = B} (InstEmit.events em)))
+    ++ map value (g (proj₁ (splitEvents {A = B} (InstEmit.events em))))
     ++ (if proj₂ (proj₂ (splitEvents {A = B} (InstEmit.events em)))
         then complete ∷ [] else []))
    at InstEmit.instant em from InstEmit.source em as InstEmit.kind em
 
 runProtocol-faithful : ∀ {n} {Γ : Ctx n} {u} {B : Set}
-  (f : InstEmit (Val Γ u) → List B) (burst : List (InstEmit (Val Γ u)))
+  (g : List (Val Γ u) → List B) (burst : List (InstEmit (Val Γ u)))
   (S S′ : ProtocolSt) →
-  ProtocolSt.done S ≡ false → ProtocolSt.done S′ ≡ false →
+  g [] ≡ [] →
   runProtocol S burst ≡ just S′ →
-  runProtocol S (map (reEmit f) burst) ≡ just S′
-runProtocol-faithful f []                          S S′ deq deq′ runEq = runEq
-runProtocol-faithful f ((es at i from s as k) ∷ ems) S S′ deq deq′ runEq
+  runProtocol S (map (reEmit g) burst) ≡ just S′
+runProtocol-faithful g []                          S S′ gempty runEq = runEq
+runProtocol-faithful g ((es at i from s as k) ∷ ems) S S′ gempty runEq
   with stepProtocol (es at i from s as k) S in seq
 ... | nothing = ⊥-elim (n≢jᵂ runEq)
 ... | just S₁ =
-      runProtocol-cons (reEmit f (es at i from s as k)) (map (reEmit f) ems) S S₁ S′
-        (stepProtocol-faithful es (f (es at i from s as k)) i s k S S₁ deq seq)
-        (runProtocol-faithful f ems S₁ S′ doneS₁ deq′ runEq)
-  where
-  doneS₁ : ProtocolSt.done S₁ ≡ false
-  doneS₁ with ProtocolSt.done S₁ in d1
-  ... | false = refl
-  ... | true  = ⊥-elim (t≢fᵂ (trans (sym (runProtocol-done-mono S₁ S′ ems d1 runEq)) deq′))
+      runProtocol-cons (reEmit g (es at i from s as k)) (map (reEmit g) ems) S S₁ S′
+        (stepProtocol-faithful g es i s k S S₁ gempty seq)
+        (runProtocol-faithful g ems S₁ S′ gempty runEq)
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
