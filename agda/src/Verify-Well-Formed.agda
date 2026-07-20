@@ -671,42 +671,6 @@ regTyped?-cutThrough nid dlv wm dying ((rid , src , (u , p)) ∷ r) live rt
 ... | false | kept , closes , rids | ih = ∧-intro (∧-trueˡ rt) ih
 ... | true  | kept , closes , rids | ih = ih
 
--- dropSource removes entries, so all-share-sunk survives it (conjunction shrink)
-allShareSunk-dropSource : ∀ {n} {Γ : Ctx n} {t}
-  (src : Source) (reg : List (RegId × Source × Chain Γ t)) →
-  allShareSunk reg ≡ true → allShareSunk (dropSource src reg) ≡ true
-allShareSunk-dropSource src []                        rt = refl
-allShareSunk-dropSource src ((rid , s , (u , p)) ∷ r) rt with sameSource src s
-... | true  = allShareSunk-dropSource src r (∧-trueʳ rt)
-... | false = ∧-intro (∧-trueˡ rt) (allShareSunk-dropSource src r (∧-trueʳ rt))
-
--- the cut's kept-after-drop is a sublist of the drop, so all-share-sunk survives
--- the cut too (single induction handling both the drop and the pathHasNode filter)
-allShareSunk-cutThrough-drop : ∀ {n} {Γ : Ctx n} {t}
-  (src : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
-  (reg : List (RegId × Source × Chain Γ t)) →
-  allShareSunk (dropSource src reg) ≡ true →
-  allShareSunk (dropSource src (proj₁ (cutThrough nid dlv wm dying reg))) ≡ true
-allShareSunk-cutThrough-drop src nid dlv wm dying []                        ash = refl
-allShareSunk-cutThrough-drop src nid dlv wm dying ((rid , s , (u , p)) ∷ r) ash
-  with pathHasNode nid p | cutThrough nid dlv wm dying r
-     | allShareSunk-cutThrough-drop src nid dlv wm dying r
-... | false | kept , closes , rids | ih with sameSource src s
-...   | true  = ih ash
-...   | false = ∧-intro (∧-trueˡ ash) (ih (∧-trueʳ ash))
-allShareSunk-cutThrough-drop src nid dlv wm dying ((rid , s , (u , p)) ∷ r) ash
-    | true | kept , closes , rids | ih with sameSource src s
-...   | true  = ih ash
-...   | false = ih (∧-trueʳ ash)
-
--- FoldInv.done-plumbed's `if fin` form always yields the dropped registry
-allShareSunk-if-drop : ∀ {n} {Γ : Ctx n} {t} (fin : Bool) (src : Source)
-  (reg : List (RegId × Source × Chain Γ t)) →
-  allShareSunk (if fin then dropSource src reg else reg) ≡ true →
-  allShareSunk (dropSource src reg) ≡ true
-allShareSunk-if-drop true  src reg h = h
-allShareSunk-if-drop false src reg h = allShareSunk-dropSource src reg h
-
 reg-typed-finish : ∀ {n} {Γ : Ctx n} {t} (src : Source)
   (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true →
@@ -1200,26 +1164,21 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- invariant; its live-source readoff lives in FoldOut as output deltas
     -- (live-envSrc-out : live S′ ≡ live S ∸ (if fin then 1 else 0), universal;
     -- reg-envSrc-out via cutCloseCount over the emit, no-take-head first).
-    -- once the root completes only share plumbing survives: every
-    -- registration sinks to a share, so a share fan-out's inners are all
-    -- share-bound (their own done-discipline, for dispatchShare-wf).
-    -- Conditioned on `fin` exactly as Mid.done-plumbed is on isLast — the
-    -- seed feeds this through unchanged (envSrc = arrSource a, fin = isLast a)
-    -- SAVE (checked 2026-07-19, re: the env-close instability): the `if fin`
-    -- here is NOT frame-unstable like env-close was, because this field earns a
-    -- consumer (foldPath-root-out's flip/steady; mid-final) AND the dangerous
-    -- absorbing case (done S ≡ true ∧ fin ≡ true) cannot arise: this very field
-    -- as hypothesis gives done S ⟹ registry share-sunk modulo envSrc ⟹ no
-    -- root-sinking chain survives ⟹ no fold can carry fin rootward, so under
-    -- done S ≡ true the `if fin` collapses to the (frame-stable) else branch.
-    -- Preservation may spend that derivation — using the invariant-being-
-    -- preserved as hypothesis is what preservation proofs do.  IF it ever proves
-    -- genuinely unstable, the medicine is NOT closeCount but a re-key onto the
-    -- automaton state `done S` (a folded artifact — fin booleans get absorbed,
-    -- done only latches), exactly as this field's output twin was keyed.
-    done-plumbed : ProtocolSt.done S ≡ true →
-      allShareSunk (if fin then dropSource envSrc (EvalSt.registry st)
-                    else EvalSt.registry st) ≡ true
+    -- (DROPPED 2026-07-19) a `done-plumbed : done S ≡ true → allShareSunk (if fin
+    -- then dropSource envSrc reg else reg)` field used to live here.  Its `if fin`
+    -- keying is frame-unstable under from-inner absorption (fin true→false with reg
+    -- unchanged flips the dropSource off, demanding the full registry be share-sunk
+    -- — false mid-cascade, since the completing chain lingers un-swept) — the same
+    -- family as the env-close instability.  And like env-close it has NO wired
+    -- consumer: the ACTUAL root handler foldPath-root-wf takes only enters/pays/
+    -- applies/done-nil (done-nil comes from the `ds` discipline, not this field),
+    -- foldPath-wf returns just the runProtocol result (no FoldOut), and
+    -- foldPath-root-out (a standalone inhabitation check) uses its own steady/flip
+    -- hypotheses.  So this field was threaded but never cashed in.  Dropped — which
+    -- leaves FoldInv fully fin-INDEPENDENT (the point that actually unblocks the
+    -- from-inner fin-flip clauses).  The done-plumbing obligation lives where it has
+    -- readers: Inv.done-plumbed (full registry, between cascades) and Mid.done-plumbed
+    -- (the `if isLast` cascade-window form, read by mid-final).
     -- carried straight through the fold for the readoff's non-live fields:
     -- registry well-typedness (stepFrame subscribes well-typed inners) and the
     -- horizon bound (S is untouched until the terminal emit, so horizon S ≤ id
@@ -1690,9 +1649,6 @@ FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
   ; shadow = λ s h → subst
       (λ r → countIn s (ProtocolSt.live S) + initCount s evs ≡ countRegs s r + closeCount s evs)
       req (FoldInv.shadow fi s h)
-  ; done-plumbed = λ dq → subst
-      (λ r → allShareSunk (if fin then dropSource envSrc r else r) ≡ true)
-      req (FoldInv.done-plumbed fi dq)
   ; reg-typed = subst (λ r → regTyped? r (Sched.live sched) ≡ true) req (FoldInv.reg-typed fi)
   ; horizon-low = FoldInv.horizon-low fi
   ; ov-zero = FoldInv.ov-zero fi ; ov-unique = FoldInv.ov-unique fi
@@ -1814,7 +1770,6 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
   ; applies = trans (applyEvents-++just evs closes (ProtocolSt.live S)
                        (FoldInv.ob′ fi) (ProtocolSt.done S) (FoldInv.applies fi)) app
   ; shadow = shadow′
-  ; done-plumbed = dpl
   ; reg-typed = cut-reg-typed nid sched st (FoldInv.reg-typed fi)
   ; horizon-low = FoldInv.horizon-low fi
   ; ov-zero = zx ; ov-unique = uq ; ov-envSrc = ovs
@@ -1836,9 +1791,6 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
   zx  = proj₁ (proj₂ (proj₂ (proj₂ spec)))
   uq  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ spec))))
   ovs = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ spec))))
-  dpl : ProtocolSt.done S ≡ true → allShareSunk (dropSource envSrc kept) ≡ true
-  dpl deq = allShareSunk-cutThrough-drop envSrc nid dlv wm dy reg
-              (allShareSunk-if-drop fin envSrc reg (FoldInv.done-plumbed fi deq))
   shadow′ : ∀ (s : Source) → sameSource s envSrc ≡ false →
     countIn s (ProtocolSt.live S) + initCount s (evs ++ closes)
       ≡ countRegs s kept + closeCount s (evs ++ closes)
@@ -2522,7 +2474,6 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
   { ob = ob ; hz = hz ; ob′ = ob′ ; Lv = proj₁ ap ; Ov = ob′
   ; enters = enters ; pays = pays ; applies = proj₂ ap
   ; shadow = shadow
-  ; done-plumbed = Mid.done-plumbed mid
   ; reg-typed = Mid.reg-typed mid
   ; horizon-low = Mid.horizon-low mid
   ; ov-zero = ze′ ; ov-unique = uq′ ; ov-envSrc = refl
