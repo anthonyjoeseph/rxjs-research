@@ -41,7 +41,7 @@ open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 dried;
                                 cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; evalTm)
+                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
@@ -2188,6 +2188,59 @@ pushBurst-take-run {Γ = Γ} {s = s} fuel id now nid κ ((es at i from src as ek
                     (stepProtocol-faithful {B = Val Γ s} (λ vs → proj₁ (takeVals kCount vs)) es i src ek S S₁
                       (takeVals-nil kCount) seq)
                     tailRun)
+
+-- BurstInv survives the take burst.  Non-cut emits leave registry/schedule
+-- fixed (like scan), so live-matches/reg-typed carry from the IH; a cut emit
+-- severs the registry and sweeps live, and the two rebalance by cutThrough-
+-- balance (each removed reg emits its close, so countIn/countRegs shift in
+-- step).  Scoped exactly like the scan clause's caches lemma; to discharge with
+-- cutThrough-balance once the cut edge is threaded through.
+postulate
+  pushBurst-take-burstinv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+    (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (k : ℕ) (S S′ S″ : ProtocolSt) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (take-st k) →
+    BurstInv id sched st S′ →
+    runProtocol S burst ≡ just S′ →
+    runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″ →
+    BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st)))
+               (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st))) S″
+
+-- ── the takeᵉ (positive-count) clause of subscribeE-wf ────────────────────
+-- subscribeE (takeᵉ count b) with count ≡ suc k mints+installs the take node,
+-- subscribes b under take-f, pushBursts.  Run side: pushBurst-take-run (PROVEN)
+-- carries the IH's inner run through the frame to an existential S″ (existential
+-- because a cut transforms the burst).  BurstInv side: pushBurst-take-burstinv.
+-- (The count ≡ zero branch is emptyᵉ-shaped, handled by oneShotBurst-wf.)
+subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) (k : ℕ) →
+  evalTm count ≡ suc k →
+  BurstInv id sched st S →
+  (let nid = proj₁ (mintNode sched)
+       r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+               (installNode nid (take-st (suc k)) st)
+   in Σ ProtocolSt λ S′ →
+        (runProtocol S (proj₁ r₀) ≡ just S′)
+        × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
+        × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))) →
+  Σ ProtocolSt λ S″ →
+    (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
+subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv (S′ , run₀ , binv₀ , nodeP)
+  rewrite ecEq =
+  let (S″ , run″) = pushBurst-take-run fuel id now nid κ burst sched₂ st₁ (suc k) S S′ nodeP run₀
+  in S″ , run″
+        , pushBurst-take-burstinv fuel id now nid κ burst sched₂ st₁ (suc k) S S′ S″
+            nodeP binv₀ run₀ run″
+  where
+  nid    = proj₁ (mintNode sched)
+  r₀     = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+             (installNode nid (take-st (suc k)) st)
+  burst  = proj₁ r₀
+  sched₂ = proj₁ (proj₂ r₀)
+  st₁    = proj₂ (proj₂ r₀)
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
