@@ -375,11 +375,17 @@ hasDry (em ∷ ems) =
   ∨ any dryEvent (InstEmit.events em)
   ∨ hasDry ems
 
--- 2 ^ (size · suc id): grows with the instant index because values
--- grow across instants (μ re-entries compound template instantiation
--- one deferᵉ hop at a time)
+-- 2 ^ (size · suc id · suc id): the exponent is QUADRATIC in the
+-- instant index.  Why: template duplication (of[x,x]) creates WIDTH
+-- (sibling copies — sizes at worst double per instant), but a single
+-- subscription's multiplicative blowup is 2^(map-tower HEIGHT), and
+-- height grows only additively (splicing a value into a template
+-- puts it below the template's own maps, ≤ program size per
+-- instant).  So the per-instant blowup factor is ≤ 2^(id·size),
+-- making log(bound) grow like size·id²/2 — a linear exponent is
+-- asymptotically insufficient, quadratic dominates with 2× slack
 syncBudget : ℕ → Id → ℕ
-syncBudget sz id = 2 ^ (sz * suc id)
+syncBudget sz id = 2 ^ (sz * suc id * suc id)
 
 -- the size that seeds the budget is the WHOLE program's: root
 -- expression plus every shared slot def — connect subscribes defs,
