@@ -2138,6 +2138,30 @@ record TailRel (id : Id) (sev : Source → ℕ) (acc : List Source)
     cur-t    : ProtocolSt.current S_t ≡ just (id , [])
     cur-r    : ProtocolSt.current S_r ≡ just (id , [])
 
+-- ── the transport: the value-free tail runs at the severed/done state ─────
+-- The done-side sibling of pushBurst-take-run at kCount ≡ zero.  Given the raw
+-- tail runs at S_r (from the cut's runEq) and the burst is frameFresh w.r.t. an
+-- accumulator L tied to S_t by TailRel, the value-stripped tail (pushBurst at
+-- take-st zero) runs at S_t (done, live swept) to some S″, and the relation
+-- carries to the end (S′ ↔ S″).  frameFresh + TailRel.acc-le TOGETHER exclude
+-- the countermodel that sinks the unqualified statement: a close for a swept
+-- source s has countIn s live_t ≡ 0, so acc-le forces s ∉ L, so frameFresh? L
+-- rejects that close — no valid L admits it.  The proof is an applyEvents
+-- induction shaped like splitEvents-faithful-done, with the count relation in
+-- place of equal lives.  [Postulated top-line result; proof pending.]
+postulate
+  pushBurst-take-zero-transport : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e)
+    (L : List Source) (sev : Source → ℕ) (S_t S_r S′ : ProtocolSt) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (take-st zero) →
+    frameFresh? L ems ≡ true →
+    TailRel id sev L S_t S_r →
+    runProtocol S_r ems ≡ just S′ →
+    Σ ProtocolSt λ S″ →
+      (runProtocol S_t (proj₁ (pushBurst fuel id now (take-f nid) κ ems sched st)) ≡ just S″)
+      × (Σ (List Source) λ L′ → TailRel id sev L′ S′ S″)
+
 -- the take fold.  take TRANSFORMS its burst (non-cut passes through; the cut
 -- exhausts the budget, forces `complete`, and cuts the registry), so it reaches
 -- a DIFFERENT final state than the inner burst — hence the existential S″.
