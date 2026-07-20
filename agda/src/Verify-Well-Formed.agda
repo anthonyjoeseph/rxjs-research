@@ -2099,9 +2099,26 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
 -- result).  Kept as ONE postulate carrying the monolith's hypotheses (lk/dc/seq/
 -- runEq) so it stays exactly as constrained — a value-free-tail split alone is
 -- unsound (a later close can still underflow), so the tail run genuinely rests on
--- runEq bracketing the same events.  To discharge with the subscribe-frame
--- invariant: cut-head via cutThrough-balance (its closes match the severed regs),
--- then the value-free tail simulated against runEq.
+-- runEq bracketing the same events.
+--
+-- SHARPENED (2026-07-20): the reduced form is  cutHead ∷ pushBurst ems severed-st
+-- with severed-st.node ≡ take-st zero, so the TAIL is a fully non-cut pushBurst —
+-- pushBurst-take-run (kCount ≡ zero) already runs it GIVEN a raw run of `ems` at
+-- its start state.  So the whole postulate reduces to two pieces:
+--   (H) cut head:  stepProtocol cutHead S ≡ just S_head, where S_head has done
+--       latched (the forced `complete`) and live swept to sweepLive kept — its
+--       closes discharge exactly the severed regs by cutThrough-balance.
+--   (T) tail run:  runProtocol S_head ems ≡ just S_tail.  This is the ONE hard
+--       piece and the reason runEq alone is not enough: runEq gives the raw tail
+--       at S₁ (done ≡ false, FULL live), but the tail must now run at S_head
+--       (done ≡ true, SWEPT live).  Values are inert under done (splitEvents-
+--       faithful-done), but a `close` in ems for a swept source would UNDERFLOW
+--       at S_head though not at S₁.  Soundness therefore needs the subscribe-frame
+--       invariant: the sweep removes EXACTLY the sources whose remaining closes
+--       the head's cutThrough closes have already pre-paid — i.e. live-matches +
+--       cutThrough-balance prove sweepLive kept still covers every tail close.
+-- (T) is the invariant-design core (the burst-side analog of the delivery-side
+-- FoldInv envShadow); (H) is mechanical off takeDispatch-cut + cutThrough-balance.
 postulate
   cut-cons-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
