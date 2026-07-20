@@ -13,6 +13,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
+                           Gas; g0; gs; gasTower; gasPad;
                            Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; cutPending; exhausted;
@@ -375,11 +376,29 @@ hasDry (em ∷ ems) =
   ∨ any dryEvent (InstEmit.events em)
   ∨ hasDry ems
 
--- 2 ^ (size · suc id): grows with the instant index because values
--- grow across instants (μ re-entries compound template instantiation
--- one deferᵉ hop at a time)
-syncBudget : ℕ → Id → ℕ
-syncBudget sz id = 2 ^ (sz * suc id)
+-- a TOWER of 2s, height (size+1)·(id+1) — no 2^(polynomial) budget is
+-- sufficient.  Why: a scanᵉ with an obs-typed accumulator whose
+-- template embeds the accumulator twice (acc ↦ mergeAll(of[acc,acc]))
+-- converts value COUNT into subscription DEPTH one-for-one (after k
+-- folded values the acc nests k deep, and fuel is depth-consumed —
+-- siblings share it), while SUBSCRIBING that acc emits its 2^k leaves
+-- as values — count exponentiates at each chained scan.  Measured
+-- exactly (2026-07-19): thresholds 2,3,5,9 = 2^d+1 for one scan over
+-- 2^d values; counts 2,6,30,510 = 2^(2^d+1)−2; the next scan's
+-- threshold tracks that count.  So fuel demand towers in the number
+-- of chained scans (≤ size per instant, and scan state compounds one
+-- story per instant across cascades) while syntax stays linear —
+-- e.g. two scans over 2^7 values: size 80, demand ~2^129.  μ adds no
+-- stories across instants (unfoldμ substitutes the ORIGINAL closed
+-- μ).  Height linear in size and instant dominates with slack.
+-- Gas, not ℕ: see Rx.Prim — a tower can never materialize strictly.
+-- The gasPad literal head (the old quadratic budget) is a pure fast
+-- path: every physically runnable consumption stays inside it, so the
+-- tower tail is never forced — evaluation cost is exactly the old
+-- ℕ budget's, while the tail carries the theorem's sufficiency
+syncBudget : ℕ → Id → Gas
+syncBudget sz id =
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (suc sz * suc id))
 
 -- the size that seeds the budget is the WHOLE program's: root
 -- expression plus every shared slot def — connect subscribes defs,
@@ -391,7 +410,7 @@ slotSize (shared d)   = sizeᵉ d
 slotsSize : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
 slotsSize sl = sum (tabulate λ i → slotSize (sl i))
 
-budgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → ℕ
+budgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → Gas
 budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) id
 
 -- the subscription machine: walk the target expression, minting
@@ -406,7 +425,7 @@ budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) id
 -- time (pushBurst → stepFrame), and the *All frames subscribe inners
 -- (stepFrame → subscribeInner → subscribeE)
 subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-           → ℕ → Closed Γ u → Path Γ u t → Id → Tick
+           → Gas → Closed Γ u → Path Γ u t → Id → Tick
            → Sched Γ → EvalSt e
            → Stream Γ u × Sched Γ × EvalSt e
 
@@ -468,14 +487,14 @@ burstCompleted = any (λ em → hasComplete (InstEmit.events em))
 -- current instant, split its burst.  A fuel decrement edge: the inner
 -- is a runtime VALUE, structurally unrelated to the caller
 subscribeInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-               → ℕ → AllOp → NodeId → Path Γ u t → Id → Tick
+               → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
                → Val Γ (obs u) → Sched Γ → EvalSt e
                → NodeId × List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-subscribeInner zero op allNid κ id now o sched st =
+subscribeInner g0 op allNid κ id now o sched st =
   let inst = Sched.nextNode sched
   in inst , [] , close drySource exhausted ∷ [] , false
      , record sched { nextNode = suc inst } , st
-subscribeInner (suc fuel) op allNid κ id now o sched st =
+subscribeInner (gs fuel) op allNid κ id now o sched st =
   let inst = Sched.nextNode sched
       (burst , sched′ , st′) =
         subscribeE fuel o (from-inner op allNid inst ↠ κ) id now
@@ -517,7 +536,7 @@ aliveThroughᶠ inst st (rid , src , (w , p)) =
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-          → ℕ → Id → Tick → Frame Γ s u → Path Γ u t
+          → Gas → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
           → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 
@@ -761,7 +780,7 @@ retagEvents (value _   ∷ es) = retagEvents es
 -- envelope — the burst leaves each subscription level already shaped
 -- like any later emit of its source
 pushBurst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-          → ℕ → Id → Tick → Frame Γ s u → Path Γ u t
+          → Gas → Id → Tick → Frame Γ s u → Path Γ u t
           → Stream Γ s → Sched Γ → EvalSt e
           → Stream Γ u × Sched Γ × EvalSt e
 pushBurst fuel id now f κ []         sched st = [] , sched , st
@@ -777,7 +796,7 @@ pushBurst fuel id now f κ (em ∷ ems) sched st =
 -- the shared *All shape: mint the node, install its initial state,
 -- subscribe the outer under a thru-outer frame, push the burst through
 subscribeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-             → ℕ → AllOp → NodeState Γ → Closed Γ (obs u) → Path Γ u t
+             → Gas → AllOp → NodeState Γ → Closed Γ (obs u) → Path Γ u t
              → Id → Tick → Sched Γ → EvalSt e
              → Stream Γ u × Sched Γ × EvalSt e
 subscribeAll fuel op initialState b κ id now sched st =
@@ -795,7 +814,7 @@ subscribeAll fuel op initialState b κ id now sched st =
 -- an immediate close/complete, because completion is re-observable
 -- and values are not
 subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                    → ℕ → (i : Fin n) → Closed Γ (lookup Γ i)
+                    → Gas → (i : Fin n) → Closed Γ (lookup Γ i)
                     → Path Γ (lookup Γ i) t → Id → Tick
                     → Sched Γ → EvalSt e
                     → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
@@ -822,9 +841,9 @@ subscribeSharedSlot {Γ = Γ} {e = e} fuel i d κ id now sched st =
   -- expression, structurally unrelated to the `input i` being
   -- subscribed.  Fuel is matched here, not at the branches above:
   -- joining a connected share costs nothing
-  connect : ℕ → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
-  connect zero = dryBurst id , sched , st
-  connect (suc fuel′) =
+  connect : Gas → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
+  connect g0 = dryBurst id , sched , st
+  connect (gs fuel′) =
     let st₁ = register (toℕ i) κ
                 (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
         (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) id now sched st₁
@@ -915,8 +934,8 @@ subscribeE fuel (exhaustAllᵉ b) κ id now sched st =
 -- unfolding are deferᵉ-gated, so each re-entry costs a schedule hop —
 -- no synchronous loop.  A fuel decrement edge: the unfolding is
 -- larger than the μ, not a subterm
-subscribeE zero       (μᵉ body) κ id now sched st = dryBurst id , sched , st
-subscribeE (suc fuel) (μᵉ body) κ id now sched st =
+subscribeE g0         (μᵉ body) κ id now sched st = dryBurst id , sched , st
+subscribeE (gs fuel)  (μᵉ body) κ id now sched st =
   subscribeE fuel (unfoldμ body) κ id now sched st
 
 subscribeE fuel (varᵉ ()) κ id now sched st
@@ -949,7 +968,7 @@ subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
 -- unreachable on real registries (the telescope invariant, Inv-phase
 -- work) and termination needs no pragma
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → ℕ       -- sync fuel, handed to stepFrame's re-entries
+              → Gas      -- sync fuel, handed to stepFrame's re-entries
               → ℕ       -- dispatch gas, the telescope bound
               → Id → Tick → (i : Fin n)
               → List (Val Γ (lookup Γ i)) → Bool
@@ -962,7 +981,7 @@ dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- running on an empty value list, so the emit is emptied, never
 -- swallowed.  The envelope is assembled here and nowhere else
 foldPath : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → ℕ → ℕ → Id → Tick → Source → Path Γ u t
+         → Gas → ℕ → Id → Tick → Source → Path Γ u t
          → List (Val Γ u) → List (InstEvent (Val Γ t)) → Bool
          → Sched Γ → EvalSt e
          → Stream Γ t × Sched Γ × EvalSt e

@@ -1,6 +1,6 @@
 module Rx.Prim where
 
-open import Data.Nat     using (ℕ)
+open import Data.Nat     using (ℕ; zero; suc)
 open import Data.List    using (List)
 
 ------------------------------------------------------------------
@@ -9,6 +9,38 @@ open import Data.List    using (List)
 
 Tick Fuel Ordinal : Set
 Tick = ℕ ; Fuel = ℕ ; Ordinal = ℕ
+
+-- Sync-subscription gas: a DEDICATED lazy Peano numeral, deliberately
+-- NOT ℕ.  The needed budget is a tower of exponentials (chained
+-- obs-typed scans convert value count into subscription depth, one
+-- exponentiation per scan — see Verify-Budget-Sufficient), and BUILTIN
+-- ℕ compiles to a strict Integer that would have to materialize the
+-- whole tower at the first pattern match.  A plain datatype compiles
+-- to lazy Haskell constructors: a decrement peels one `gs` thunk, so
+-- forcing is bounded by the work the machine actually does.
+data Gas : Set where
+  g0 : Gas
+  gs : Gas → Gas
+
+gasDouble : Gas → Gas
+gasDouble g0     = g0
+gasDouble (gs g) = gs (gs (gasDouble g))
+
+gasPow2 : Gas → Gas                 -- 2^g, lazily
+gasPow2 g0     = gs g0
+gasPow2 (gs g) = gasDouble (gasPow2 g)
+
+gasTower : ℕ → Gas                  -- tower of 2s of height h (tower 0 = 1)
+gasTower zero    = gs g0
+gasTower (suc h) = gasPow2 (gasTower h)
+
+-- n literal-backed units in front of g.  The ℕ stays a GMP literal
+-- (typechecker) / strict Integer (compiled), so each peel is an O(1)
+-- decrement — a fast path covering every physically runnable
+-- consumption, with the tower tail behind it never forced
+gasPad : ℕ → Gas → Gas
+gasPad zero    g = g
+gasPad (suc n) g = gs (gasPad n g)
 
 Id : Set                            -- an INSTANT (one arrival's cascade); spec groups by this
 Id = ℕ                              -- concrete so the spec can compare; harness compares up to renaming

@@ -35,7 +35,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (Dec; yes; no)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
+open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
@@ -1033,7 +1033,7 @@ postulate
   -- ONE subscription's burst preserves the frame relation (see the blueprint
   -- above for the full clause-by-clause decomposition and build order).
   subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     hasDry (proj₁ (subscribeE fuel b κ id now sched st)) ≡ false →
@@ -1746,7 +1746,7 @@ runProtocol-faithful g ((es at i from s as k) ∷ ems) S S′ gempty runEq
 -- pushBurst over a map-f frame IS the reEmit map: stepFrame (map-f) only relabels
 -- values (evs = [], st/sched untouched), so each emit re-emits transparently
 pushBurst-map-char : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : ℕ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u) (κ : Path Γ u t)
+  (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u) (κ : Path Γ u t)
   (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
   pushBurst fuel id now (map-f fn) κ burst sched st
     ≡ (map (reEmit (map (applyFn fn))) burst , sched , st)
@@ -1762,7 +1762,7 @@ pushBurst-map-char fuel id now fn κ (em ∷ ems) sched st =
 -- it runs to the SAME S′ — so BurstInv transfers verbatim.  map (applyFn f) is
 -- empty-preserving (refl), the fold's `g [] ≡ []` obligation.
 subscribeE-map-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : ℕ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+  (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   (Σ ProtocolSt λ S′ →
@@ -1812,7 +1812,7 @@ cachesValid-setNode-ok nid s ((k , s′) ∷ r) reg ok cv with k ≡ᵇ nid
 -- the evs (which never touch `done`), and the values ride only if not
 -- already done (done-nil).  sched/st are untouched at root.
 foldPath-root-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (ob : Owed) (hz : Id) (ob′ : Owed) (Lv : List Source) (Ov : Owed) →
@@ -2221,14 +2221,14 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
 -- the fold's output EvalSt (st″) and Sched (sched″)
 foldSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) → EvalSt e
 foldSt sf gas id now envSrc path vals evs fin sched st =
   proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))
 
 foldSched : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) → Sched Γ
 foldSched sf gas id now envSrc path vals evs fin sched st =
@@ -2239,7 +2239,7 @@ foldSched sf gas id now envSrc path vals evs fin sched st =
 -- live S (unchanged by frames) and ob′ — so they pass through the frame
 -- recursion; envSrc live/registry are output deltas (see the blueprint above).
 record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-       (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+       (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
        (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
        (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
        (ob′ : Owed) (S S′ : ProtocolSt) : Set where
@@ -2437,7 +2437,7 @@ postulate
   -- concatᵒ is the lone residue: its `drain` subscribes the queued inners, so the
   -- registry grows and shadow/reg-typed genuinely change.
   stepFrame-wf-inner-concat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (sf : Gas) (id : Id) (now : Tick) (envSrc : Source)
     (allNid inst : NodeId) (path′ : Path Γ s t)
     (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t)))
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
@@ -2446,7 +2446,7 @@ postulate
     in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
   stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (sf : Gas) (id : Id) (now : Tick) (envSrc : Source)
     (op : AllOp) (nid : NodeId) (path′ : Path Γ u t)
     (vals : List (Val Γ (obs u))) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
@@ -2458,7 +2458,7 @@ postulate
   -- registration (each its own foldPath) — mutually recursive with
   -- foldPath-wf.  The handoff's owed bump is repaid across the fan-out.
   dispatchShare-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i)))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
@@ -2551,7 +2551,7 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
 -- the catch-all, routed to the stepFrame-wf-rest postulate — peeled off one at
 -- a time as the wrap clauses land.
 stepFrame-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
-  (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Gas) (id : Id) (now : Tick) (envSrc : Source)
   (f : Frame Γ w u) (path′ : Path Γ u t)
   (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
@@ -2654,7 +2654,7 @@ force-false true  d with d refl
 ... | ()
 
 foldPath-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   FoldInv id envSrc evs fin sched st S →
@@ -2973,7 +2973,7 @@ readoff-cancel s evs liveS Lv ob′ Ov dn d′ R apEq shEq =
 -- aliveThrough certificate) and a thru-outer node↔registry coherence field will
 -- discharge.  This VALIDATES the FoldOut field statements (all inhabited).
 foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sf gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (fi : FoldInv id envSrc evs fin sched st S) →
