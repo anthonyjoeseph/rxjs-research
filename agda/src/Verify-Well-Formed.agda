@@ -54,7 +54,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 foldPath; dispatchShare; stepFrame;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register;
+                                oneShotBurst; mintSource; register; splitEvents;
                                 sameSource; drySource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
@@ -1362,6 +1362,77 @@ applyEvents-vc vals fin lv o d cond =
   trans (applyEvents-++just (map value vals) (if fin then complete ∷ [] else [])
           lv o d (applyEvents-values vals lv o d cond))
         (applyEvents-maybeComplete fin lv o d)
+
+-- ── splitEvents faithfulness: pushBurst's re-emit runs like the original ──
+-- pushBurst re-emits each frame emit as  bookkeeping ++ (frame values) ++
+-- maybe-complete, where the bookkeeping/complete-flag come from splitEvents of
+-- the incoming events.  Its protocol effect (live, owed, done) equals that of
+-- the ORIGINAL events: init/close/handoff drive live/owed identically (values
+-- are transparent, so removing/reordering them past bookkeeping is invisible),
+-- the frame's own values are equally transparent, and a `complete` anywhere
+-- collapses to one trailing `complete` (done is idempotent, and success rules
+-- out any value behind it).  This is the pure core of pushBurst-wf / stepFrame-
+-- burst; the frame's transformed values `vals′` are arbitrary here precisely
+-- because the protocol never inspects a value payload.
+
+-- companion, done-side: a successful applyEvents-under-done carries NO values
+-- (they would reject), so the events are bookkeeping + completes; the trailing
+-- complete on the re-emit restores done ≡ true
+splitEvents-faithful-done : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (es : List (InstEvent (Val Γ u))) (vals′ : List B)
+  (lv : List Source) (o : Owed) {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es lv o true ≡ just (L , O , D) →
+  applyEvents (proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′ ++ complete ∷ [])
+              lv o false
+    ≡ just (L , O , D)
+splitEvents-faithful-done []               vals′ lv o hyp with just-injᵂ hyp
+... | refl = applyEvents-vc vals′ true lv o false (λ ())
+splitEvents-faithful-done (init s ∷ es)    vals′ lv o hyp =
+  splitEvents-faithful-done es vals′ (s ∷ lv) o hyp
+splitEvents-faithful-done (value v ∷ es)   vals′ lv o ()
+splitEvents-faithful-done (handoff s ∷ es) vals′ lv o hyp =
+  splitEvents-faithful-done es vals′ lv (bumpOwed s (countIn s lv) o) hyp
+splitEvents-faithful-done (complete ∷ es)  vals′ lv o hyp =
+  splitEvents-faithful-done es vals′ lv o hyp
+splitEvents-faithful-done (close s cutPending ∷ es) vals′ lv o hyp
+  with removeOne s lv | cancelOwed s o | hyp
+... | just lv′ | just o′ | hyp′ = splitEvents-faithful-done es vals′ lv′ o′ hyp′
+splitEvents-faithful-done (close s cut ∷ es) vals′ lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-faithful-done es vals′ lv′ o hyp′
+splitEvents-faithful-done (close s exhausted ∷ es) vals′ lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-faithful-done es vals′ lv′ o hyp′
+
+-- main, done ≡ false: the re-emit's bookkeeping + frame values + maybe-complete
+-- reproduces the original events' (live, owed, done)
+splitEvents-faithful : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (es : List (InstEvent (Val Γ u))) (vals′ : List B)
+  (lv : List Source) (o : Owed) {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es lv o false ≡ just (L , O , D) →
+  applyEvents (proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
+               ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
+              lv o false
+    ≡ just (L , O , D)
+splitEvents-faithful []               vals′ lv o hyp with just-injᵂ hyp
+... | refl = applyEvents-vc vals′ false lv o false (λ ())
+splitEvents-faithful (init s ∷ es)    vals′ lv o hyp =
+  splitEvents-faithful es vals′ (s ∷ lv) o hyp
+splitEvents-faithful (value v ∷ es)   vals′ lv o hyp =
+  splitEvents-faithful es vals′ lv o hyp
+splitEvents-faithful (handoff s ∷ es) vals′ lv o hyp =
+  splitEvents-faithful es vals′ lv (bumpOwed s (countIn s lv) o) hyp
+splitEvents-faithful (complete ∷ es)  vals′ lv o hyp =
+  splitEvents-faithful-done es vals′ lv o hyp
+splitEvents-faithful (close s cutPending ∷ es) vals′ lv o hyp
+  with removeOne s lv | cancelOwed s o | hyp
+... | just lv′ | just o′ | hyp′ = splitEvents-faithful es vals′ lv′ o′ hyp′
+splitEvents-faithful (close s cut ∷ es) vals′ lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-faithful es vals′ lv′ o hyp′
+splitEvents-faithful (close s exhausted ∷ es) vals′ lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-faithful es vals′ lv′ o hyp′
 
 runProtocol-one : ∀ {A : Set} (S : ProtocolSt) (x : InstEmit A) →
   runProtocol S (x ∷ []) ≡ stepProtocol x S
