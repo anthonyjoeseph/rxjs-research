@@ -1205,6 +1205,18 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- share-bound (their own done-discipline, for dispatchShare-wf).
     -- Conditioned on `fin` exactly as Mid.done-plumbed is on isLast — the
     -- seed feeds this through unchanged (envSrc = arrSource a, fin = isLast a)
+    -- SAVE (checked 2026-07-19, re: the env-close instability): the `if fin`
+    -- here is NOT frame-unstable like env-close was, because this field earns a
+    -- consumer (foldPath-root-out's flip/steady; mid-final) AND the dangerous
+    -- absorbing case (done S ≡ true ∧ fin ≡ true) cannot arise: this very field
+    -- as hypothesis gives done S ⟹ registry share-sunk modulo envSrc ⟹ no
+    -- root-sinking chain survives ⟹ no fold can carry fin rootward, so under
+    -- done S ≡ true the `if fin` collapses to the (frame-stable) else branch.
+    -- Preservation may spend that derivation — using the invariant-being-
+    -- preserved as hypothesis is what preservation proofs do.  IF it ever proves
+    -- genuinely unstable, the medicine is NOT closeCount but a re-key onto the
+    -- automaton state `done S` (a folded artifact — fin booleans get absorbed,
+    -- done only latches), exactly as this field's output twin was keyed.
     done-plumbed : ProtocolSt.done S ≡ true →
       allShareSunk (if fin then dropSource envSrc (EvalSt.registry st)
                     else EvalSt.registry st) ≡ true
@@ -1697,41 +1709,15 @@ FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
 --    cut sub-branch drops the registry to cutThrough's `kept`, closes the
 --    victims, and flips fin — stated PRECISELY at the cut result (no stepFrame
 --    wrapper), so the non-cut path is no longer covered by any postulate.
---  · from-inner / thru-outer: the *All wrap clauses, which need the node↔registry
---    coherence field (caches) threaded into FoldInv before they can be discharged.
+--  · from-inner (fin ≡ true) / thru-outer: the *All wrap clauses.  from-inner
+--    fin ≡ false is quiet and proven below; the fin ≡ true absorb case needs the
+--    node↔registry coherence (caches) for its done-plumbed/fin′ recomputation.
 --
--- DISCHARGE PLAN for stepFrame-wf-take-cut (worked out 2026-07-19; the cut edge
--- is not the self-contained cutThrough combinatorics it first looks — its FoldInv
--- fields turn on facts about `delivered`/`dying`/`regWatermark` that FoldInv does
--- NOT yet carry).  The four sub-obligations, in dependency order:
---  (1) A NEW FoldInv field `dying-envSrc : ∀ s → sameSource s envSrc ≡ false →
---      memberSource s (EvalSt.dying st) ≡ false` — dying holds only the cascade's
---      own source (cascadeLatch sets dying ≡ if isLast then arrSource a ∷ [] else
---      []; the fold never grows it, and envSrc ≡ arrSource a at the seed).  This
---      threads: established at the Mid→FoldInv seed (so it also needs a Mid field
---      fed from cascadeLatch through mid-init/mid-skip; mid-step + the three
---      postulated stepFrame clauses carry it free), preserved by map-f (st fixed)
---      and scan-f/take-noncut (dying fixed — extend FoldInv-reg with a dying eq).
---  (2) cutThrough per-source close/reg BALANCE: for s ∉ dying, every removed
---      s-reg emits exactly one s-close, so countRegs s (registry st) ≡
---      countRegs s kept + closeCount s closes.  (cutThrough SKIPS the close only
---      on delivered ∧ dying — vacuous for s ≠ envSrc by (1)).  Pure induction on
---      the registry.  This closes SHADOW (s ≠ envSrc): initCount s closes ≡ 0,
---      and the balance turns input shadow into output shadow.
---  (3) closes-are-live: applyEvents (evs ++ closes) succeeds — via applyEvents-++just
---      it reduces to applyEvents closes Lv Ov (done S), and each close's source is
---      removable from the running live because a cut victim is a live registration
---      (registry↔live, the shadow read the other way).  Yields the new applies /
---      Lv / Ov witnesses; ov-* follow since cancelOwed/removeOne keep the shape.
---  (4) env-close fin-flip: closeCount envSrc (evs ++ closes) ≡ 1 (a head take that
---      cuts envSrc's own chain closes it exactly once, combined with env-close's
---      `if fin`), and done-plumbed over `if true then dropSource envSrc kept` — the
---      registry post-cut is envSrc-plumbed.  The load-bearing, Unit-Test-pinned bit.
--- Net: (1) is a cross-cutting thread (Mid + FoldInv + FoldInv-reg + seed); (2)-(4)
--- are cut-local lemmas.  No lean-legal partial commit exists — the field in (1) is
--- unused until (2)-(4) assemble — so the whole discharge lands atomically.
--- take-cut is now PROVEN (stepFrame-wf-take-cut below) from cutThrough-balance +
--- cutThrough-no-init + the dying-envSrc field + these two precise residues:
+-- take-cut is PROVEN (stepFrame-wf-take-cut below): shadow from cutThrough-balance
+-- + cutThrough-no-init + the dying-envSrc field (dying holds only envSrc, so the
+-- cut's per-source close/reg balance goes through); done-plumbed from allShareSunk
+-- monotonicity; env-init/reg-typed structurally.  The lone residue is cut-owed —
+-- the closes' applyEvents success and owed-shape (registry↔live, genuinely semantic):
 postulate
   -- (3) the closes' effect on the open instant: applying the cut's closes to the
   -- fold's running (Lv,Ov) succeeds, keeping the owed shape (a close does
