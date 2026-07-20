@@ -40,7 +40,7 @@ open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 EmitKind; delivery; subscribe; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_)
+                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; evalTm)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
@@ -56,7 +56,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst;
+                                pushBurst; scanVals; installNode; mintNode;
                                 sameSource; drySource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
@@ -1825,6 +1825,116 @@ cachesValid-setNode-ok nid s []             reg ok cv = ∧-intro ok refl
 cachesValid-setNode-ok nid s ((k , s′) ∷ r) reg ok cv with k ≡ᵇ nid
 ... | true  = ∧-intro ok (∧-trueʳ cv)
 ... | false = ∧-intro (∧-trueˡ cv) (cachesValid-setNode-ok nid s r reg ok (∧-trueʳ cv))
+
+-- ── the scanᵉ frame fold (stateful) ─────────────────────────────────────
+-- scan threads an accumulator node across the burst: each emit reads scan-st,
+-- folds its values (scanVals — one running output per input, count-preserving),
+-- and writes the new accumulator.  The protocol ignores value payloads, so this
+-- runs like the original burst: at each emit the value transform is `scanVals fn
+-- acc` (empty-preserving), stepProtocol-faithful gives the identical step, and
+-- lookupNode-setNode carries the just-written node to the next.  Given the node
+-- is present (lk — the subscribeE clause installs it), no global node-persistence
+-- invariant is needed.
+pushBurst-scan-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (κ : Path Γ u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e)
+  (acc : Val Γ u) (S S′ : ProtocolSt) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (scan-st acc) →
+  runProtocol S burst ≡ just S′ →
+  runProtocol S (proj₁ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)) ≡ just S′
+pushBurst-scan-run fuel id now fn nid κ [] sched st acc S S′ lk runEq = runEq
+pushBurst-scan-run {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ ems) sched st acc S S′ lk runEq
+  with stepProtocol (es at i from s as k) S in seq
+... | nothing = ⊥-elim (n≢jᵂ runEq)
+... | just S₁ rewrite lk | ≟ᵗ-refl u =
+      runProtocol-cons _ _ S S₁ S′
+        (stepProtocol-faithful (λ vs → proj₁ (scanVals fn acc vs)) es i s k S S₁ refl seq)
+        (pushBurst-scan-run fuel id now fn nid κ ems sched
+          (record st { nodes = setNode nid (scan-st acc′) (EvalSt.nodes st) }) acc′ S₁ S′
+          (lookupNode-setNode nid (scan-st acc′) (EvalSt.nodes st)) runEq)
+  where acc′ = proj₂ (scanVals fn acc (proj₁ (splitEvents es)))
+
+-- scan-f leaves registry and schedule untouched and keeps caches valid (each
+-- emit's node update is caches-neutral) — the st-side of the scanᵉ clause's
+-- BurstInv (live-matches/reg-typed carry from the IH since registry is fixed)
+pushBurst-scan-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (κ : Path Γ u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (acc : Val Γ u) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (scan-st acc) →
+  cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
+  (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)))
+     ≡ EvalSt.registry st)
+  × (proj₁ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)) ≡ sched)
+  × (cachesValid (EvalSt.nodes (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st))))
+                 (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st))))
+       ≡ true)
+pushBurst-scan-caches fuel id now fn nid κ [] sched st acc lk cv = refl , refl , cv
+pushBurst-scan-caches {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ ems) sched st acc lk cv
+  rewrite lk | ≟ᵗ-refl u =
+  pushBurst-scan-caches fuel id now fn nid κ ems sched
+    (record st { nodes = setNode nid (scan-st acc′) (EvalSt.nodes st) }) acc′
+    (lookupNode-setNode nid (scan-st acc′) (EvalSt.nodes st))
+    (cachesValid-setNode-ok nid (scan-st acc′) (EvalSt.nodes st) (EvalSt.registry st) refl cv)
+  where acc′ = proj₂ (scanVals fn acc (proj₁ (splitEvents es)))
+
+-- ── the scanᵉ clause of subscribeE-wf (given the IH on b + node persistence) ─
+-- subscribeE (scanᵉ f seed b) = mint+install the scan node, subscribe b under
+-- scan-f, pushBurst.  The IH runs b's burst to S′ under BurstInv and (deferred:
+-- subscribeE only mints fresh nodes) leaves the scan node present; pushBurst-scan-
+-- run threads the accumulator and runs to the SAME S′; pushBurst-scan-caches
+-- shows registry/schedule are untouched (so live-matches/reg-typed carry) and
+-- caches stay valid.  The `acc, nodeP` node-persistence witness is the one piece
+-- still owed from the walk's fresh-node discipline.
+subscribeE-scan-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  (let nid = proj₁ (mintNode sched)
+       r₀  = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+               (installNode nid (scan-st (evalTm seed)) st)
+   in Σ ProtocolSt λ S′ →
+        (runProtocol S (proj₁ r₀) ≡ just S′)
+        × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
+        × (Σ (Val Γ u) λ acc → lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (scan-st acc))) →
+  Σ ProtocolSt λ S″ →
+    (runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S″)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))) S″
+subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv₀ , acc , nodeP) =
+  S′ , run″ , binv″
+  where
+  nid    = proj₁ (mintNode sched)
+  r₀     = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+             (installNode nid (scan-st (evalTm seed)) st)
+  burst  = proj₁ r₀
+  sched₂ = proj₁ (proj₂ r₀)
+  st₁    = proj₂ (proj₂ r₀)
+
+  cRes   = pushBurst-scan-caches fuel id now f nid κ burst sched₂ st₁ acc nodeP (BurstInv.caches binv₀)
+  regEq  = proj₁ cRes
+  schEq  = proj₁ (proj₂ cRes)
+  cvFin  = proj₂ (proj₂ cRes)
+
+  stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
+  schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
+
+  run″ : runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S′
+  run″ = pushBurst-scan-run fuel id now f nid κ burst sched₂ st₁ acc S S′ nodeP run₀
+
+  lmF : ∀ s → countIn s (ProtocolSt.live S′) ≡ countRegs s (EvalSt.registry stF)
+  lmF s rewrite regEq = BurstInv.live-matches binv₀ s
+
+  regTF : regTyped? (EvalSt.registry stF) (Sched.live schF) ≡ true
+  regTF rewrite regEq | schEq = BurstInv.reg-typed binv₀
+
+  binv″ : BurstInv id schF stF S′
+  binv″ = record
+    { live-matches  = lmF
+    ; reg-typed     = regTF
+    ; horizon-low   = BurstInv.horizon-low binv₀
+    ; current-frame = BurstInv.current-frame binv₀
+    ; caches        = cvFin
+    }
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
