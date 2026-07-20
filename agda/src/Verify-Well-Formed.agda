@@ -1307,6 +1307,9 @@ stepProtocol-enter es i s k S entEq stEq apEq =
 just-injᵂ : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
 just-injᵂ refl = refl
 
+n≢jᵂ : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
+n≢jᵂ ()
+
 applyEvents-++just : ∀ {A : Set} (es₁ es₂ : List (InstEvent A))
   (lv : List Source) (o : Owed) (d : Bool) {L : List Source} {O : Owed} {D : Bool} →
   applyEvents es₁ lv o d ≡ just (L , O , D) →
@@ -1439,6 +1442,79 @@ runProtocol-one : ∀ {A : Set} (S : ProtocolSt) (x : InstEmit A) →
 runProtocol-one S x with stepProtocol x S
 ... | just S′ = refl
 ... | nothing = refl
+
+-- ── per-emit frame transparency: the re-emit steps to the SAME state ─────
+-- A transparent frame (evs = []: map/scan/take-noncut) re-emits an emit as
+-- bookkeeping ++ frame-values ++ maybe-complete.  At the same instant/source/
+-- kind, its stepProtocol lands on the SAME S′ as the original: whatever owed
+-- `ob` the automaton admitted the instant with, the original's applyEvents
+-- succeeded there (analysis of the given success), so splitEvents-faithful hands
+-- the re-emit the identical applyEvents result, and the automaton rebuilds the
+-- identical state.  done ≡ false is the subscribe-frame invariant (you never
+-- subscribe behind a completion).  The aux takes the fields literally so the
+-- `enter`/`go` clauses reduce; the guards and settle are events-independent, so
+-- they drive the original and the re-emit down the same path.
+stepProtocol-faithful-aux : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (es : List (InstEvent (Val Γ u))) (vals′ : List B)
+  (i : Id) (s : Source) (k : EmitKind) (lv : List Source) (hz : Id)
+  (cur : Maybe (Id × Owed)) (S′ : ProtocolSt) →
+  stepProtocol (es at i from s as k)
+    (record { live = lv ; horizon = hz ; current = cur ; done = false }) ≡ just S′ →
+  stepProtocol ((proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
+                 ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
+                at i from s as k)
+    (record { live = lv ; horizon = hz ; current = cur ; done = false }) ≡ just S′
+stepProtocol-faithful-aux es vals′ i s k lv hz nothing S′ stepEq
+  with hz ≤ᵇ i
+... | false = ⊥-elim (n≢jᵂ stepEq)
+... | true  with settle k s lv []
+...   | nothing = ⊥-elim (n≢jᵂ stepEq)
+...   | just o₁ with applyEvents es lv o₁ false in aeq
+...     | nothing = ⊥-elim (n≢jᵂ stepEq)
+...     | just r  rewrite splitEvents-faithful es vals′ lv o₁ aeq = stepEq
+stepProtocol-faithful-aux es vals′ i s k lv hz (just (j , oⱼ)) S′ stepEq
+  with i ≡ᵇ j
+... | true  with paidOff oⱼ
+...   | true  = ⊥-elim (n≢jᵂ stepEq)
+...   | false with settle k s lv oⱼ
+...     | nothing = ⊥-elim (n≢jᵂ stepEq)
+...     | just o₁ with applyEvents es lv o₁ false in aeq
+...       | nothing = ⊥-elim (n≢jᵂ stepEq)
+...       | just r  rewrite splitEvents-faithful es vals′ lv o₁ aeq = stepEq
+stepProtocol-faithful-aux es vals′ i s k lv hz (just (j , oⱼ)) S′ stepEq
+    | false with allZero oⱼ
+...   | false = ⊥-elim (n≢jᵂ stepEq)
+...   | true  with suc j ≤ᵇ i
+...     | false = ⊥-elim (n≢jᵂ stepEq)
+...     | true  with settle k s lv []
+...       | nothing = ⊥-elim (n≢jᵂ stepEq)
+...       | just o₁ with applyEvents es lv o₁ false in aeq
+...         | nothing = ⊥-elim (n≢jᵂ stepEq)
+...         | just r  rewrite splitEvents-faithful es vals′ lv o₁ aeq = stepEq
+
+stepProtocol-faithful : ∀ {n} {Γ : Ctx n} {u} {B : Set}
+  (es : List (InstEvent (Val Γ u))) (vals′ : List B)
+  (i : Id) (s : Source) (k : EmitKind) (S S′ : ProtocolSt) →
+  ProtocolSt.done S ≡ false →
+  stepProtocol (es at i from s as k) S ≡ just S′ →
+  stepProtocol ((proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
+                 ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else []))
+                at i from s as k) S ≡ just S′
+stepProtocol-faithful {B = B} es vals′ i s k S S′ deq stepEq =
+  subst (λ d → stepProtocol (recon at i from s as k)
+                (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                        ; current = ProtocolSt.current S ; done = d }) ≡ just S′)
+        (sym deq)
+        (stepProtocol-faithful-aux es vals′ i s k (ProtocolSt.live S)
+          (ProtocolSt.horizon S) (ProtocolSt.current S) S′
+          (subst (λ d → stepProtocol (es at i from s as k)
+                  (record { live = ProtocolSt.live S ; horizon = ProtocolSt.horizon S
+                          ; current = ProtocolSt.current S ; done = d }) ≡ just S′)
+                 deq stepEq))
+  where
+  recon : List (InstEvent B)
+  recon = proj₁ (proj₂ (splitEvents {A = B} es)) ++ map value vals′
+          ++ (if proj₂ (proj₂ (splitEvents {A = B} es)) then complete ∷ [] else [])
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
