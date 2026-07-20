@@ -430,101 +430,6 @@ finish-slots a sched st with Arrival.isLast a
 ... | true  = refl
 
 ------------------------------------------------------------------
--- LAYERED VALUES — the substrate the subscription measure lives on
--- (proof-design edge 3 below).  Every runtime obs value is a LAYER:
--- a template instantiated over embedded layered values.  subΘTm
--- reifies environment values in at var positions, so the embedded
--- values are literal subtrees of the resulting closed expression;
--- a value's layer tree is the derivation here, and its measure is
--- the multiset of its layers' template sizes.  The layer index is
--- `evalWith (strmᵗ tpl) env` — NOT subΘExp — so BOTH evaluator
--- clauses (closed template / instantiation) are definitional and
--- the closure lemma needs no substitution-identity lemma.
---
--- evalWith-layered is the machine-checked core of the edge-3
--- design: the evaluator never leaves the family, so neither can
--- the machine — every value it subscribes is an evalWith output
--- (map/scan fns, of-list elements, seeds) over layered inputs.
--- evalTm-layered/applyFn-layered are the forms the contract will
--- consume (evalTm at scan seeds and of-lists, applyFn at scan
--- steps).
-------------------------------------------------------------------
-
-mutual
-  LayeredV : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → Set
-  LayeredV unitᵗ    v = ⊤
-  LayeredV boolᵗ    v = ⊤
-  LayeredV natᵗ     v = ⊤
-  LayeredV (s ×ᵗ t) v = LayeredV s (proj₁ v) × LayeredV t (proj₂ v)
-  LayeredV (s +ᵗ t) (inj₁ a) = LayeredV s a
-  LayeredV (s +ᵗ t) (inj₂ b) = LayeredV t b
-  LayeredV (obs t)  e = LayeredObs e
-
-  data LayeredObs {n} {Γ : Ctx n} {t : Ty} : Closed Γ t → Set where
-    layer : ∀ {Θ} (tpl : Exp Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-            LayeredEnv env → LayeredObs (evalWith (strmᵗ tpl) env)
-
-  data LayeredEnv {n} {Γ : Ctx n} : ∀ {Θ} → All (Val Γ) Θ → Set where
-    []ˡ  : LayeredEnv []ᵃ
-    _∷ˡ_ : ∀ {t Θ} {v : Val Γ t} {vs : All (Val Γ) Θ} →
-           LayeredV t v → LayeredEnv vs → LayeredEnv (v ∷ᵃ vs)
-
-lookupLayered : ∀ {n} {Γ : Ctx n} {Θ t} {env : All (Val Γ) Θ} →
-  LayeredEnv env → (x : t ∈ Θ) → LayeredV t (lookupEnv env x)
-lookupLayered (l ∷ˡ ls) (here refl) = l
-lookupLayered (l ∷ˡ ls) (there x)   = lookupLayered ls x
-
-evalWith-layered : ∀ {n} {Γ : Ctx n} {Θ t} (f : Tm Γ [] [] Θ t)
-  (env : All (Val Γ) Θ) → LayeredEnv env → LayeredV t (evalWith f env)
-evalWith-layered (varᵗ x)      env le = lookupLayered le x
-evalWith-layered unit̂          env le = tt
-evalWith-layered (bool̂ b)      env le = tt
-evalWith-layered (nat̂ n)       env le = tt
-evalWith-layered (pairᵗ a b)   env le =
-  evalWith-layered a env le , evalWith-layered b env le
-evalWith-layered (fstᵗ p)      env le = proj₁ (evalWith-layered p env le)
-evalWith-layered (sndᵗ p)      env le = proj₂ (evalWith-layered p env le)
-evalWith-layered (inlᵗ a)      env le = evalWith-layered a env le
-evalWith-layered (inrᵗ a)      env le = evalWith-layered a env le
-evalWith-layered (caseᵗ sc l r) env le
-  with evalWith sc env | evalWith-layered sc env le
-... | inj₁ x | lx = evalWith-layered l (x ∷ᵃ env) (lx ∷ˡ le)
-... | inj₂ y | ly = evalWith-layered r (y ∷ᵃ env) (ly ∷ˡ le)
-evalWith-layered (ifᵗ c a b)   env le with evalWith c env
-... | true  = evalWith-layered a env le
-... | false = evalWith-layered b env le
-evalWith-layered (primᵗ add arg)  env le = tt
-evalWith-layered (primᵗ sub arg)  env le = tt
-evalWith-layered (primᵗ mul arg)  env le = tt
-evalWith-layered (primᵗ eqᵖ arg)  env le = tt
-evalWith-layered (primᵗ ltᵖ arg)  env le = tt
-evalWith-layered (primᵗ notᵖ arg) env le = tt
-evalWith-layered (strmᵗ e)     env le = layer e env le
-
-evalTm-layered : ∀ {n} {Γ : Ctx n} {t} (f : Tm Γ [] [] [] t) →
-  LayeredV t (evalTm f)
-evalTm-layered f = evalWith-layered f []ᵃ []ˡ
-
-applyFn-layered : ∀ {n} {Γ : Ctx n} {s t} (fn : Fn Γ [] [] [] s t)
-  (v : Val Γ s) → LayeredV s v → LayeredV t (applyFn fn v)
-applyFn-layered fn v lv = evalWith-layered fn (v ∷ᵃ []ᵃ) (lv ∷ˡ []ˡ)
-
--- every value admits the trivial one-layer derivation (its measure
--- is the coarse singleton {syncSize}; the contract carries finer
--- derivations where it matters, but existence is unconditional —
--- the theorem's hypotheses stay empty)
-layeredV-any : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → LayeredV t v
-layeredV-any unitᵗ    v        = tt
-layeredV-any boolᵗ    v        = tt
-layeredV-any natᵗ     v        = tt
-layeredV-any (s ×ᵗ t) v        =
-  layeredV-any s (proj₁ v) , layeredV-any t (proj₂ v)
-layeredV-any (s +ᵗ t) (inj₁ a) = layeredV-any s a
-layeredV-any (s +ᵗ t) (inj₂ b) = layeredV-any t b
-layeredV-any (obs t)  e        = layer e []ᵃ []ˡ
-
-
-------------------------------------------------------------------
 -- THE MEASURE — edge 3's Dershowitz–Manna multiset, SYNTACTICALLY
 -- (the shell reading, Rx.Exp).  A runtime obs value is a closed
 -- expression; its measure is the multiset of its shells — the
@@ -1057,182 +962,6 @@ unfoldμ-shrinks : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) �
 unfoldμ-shrinks body rewrite syncSize-unfoldμ body = ≤-refl
 
 ------------------------------------------------------------------
--- THE STORE INVARIANT — every runtime value the machine holds
--- carries a layer derivation.  The value-carrying stores are
--- exactly: scan accumulators and concat queues (NodeState), a
--- LiveSource's scheduled payloads, an Arrival's payload, and the
--- slot scripts/defs.  Frames need NOTHING: their Fns are terms, and
--- evalWith-layered is unconditional in the term — only the env must
--- be layered.  The wet contract threads StLayered/SchedLayered
--- alongside stBounded?: preservation is part of the cores' own
--- induction (every stored value is an evalWith output over layered
--- inputs); only the base cases live here.
-------------------------------------------------------------------
-
-SlotLayered : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → Set
-SlotLayered {t = t} (scripted (hot async))       =
-  All (λ tv → LayeredV t (Timed.val tv)) async
-SlotLayered {t = t} (scripted (cold sync async)) =
-  All (LayeredV t) sync × All (λ tv → LayeredV t (Timed.val tv)) async
-SlotLayered           (shared def)               = LayeredObs def
-
-SlotsLayered : ∀ {n} {Γ : Ctx n} → Slots Γ → Set
-SlotsLayered sl = ∀ i → SlotLayered (sl i)
-
-LiveLayered : ∀ {n} {Γ : Ctx n} → LiveSource Γ → Set
-LiveLayered l = All (λ p → LayeredV (LiveSource.elemTy l) (proj₂ p))
-                    (LiveSource.pending l)
-
-SchedLayered : ∀ {n} {Γ : Ctx n} → Sched Γ → Set
-SchedLayered sched = All LiveLayered (Sched.live sched)
-                   × SlotsLayered (Sched.slots sched)
-
-ArrLayered : ∀ {n} {Γ : Ctx n} → Arrival Γ → Set
-ArrLayered a = LayeredV (arrTy a) (arrVal a)
-
-NodeLayered : ∀ {n} {Γ : Ctx n} → NodeState Γ → Set
-NodeLayered (scan-st {t} v)     = LayeredV t v
-NodeLayered (take-st _)         = ⊤
-NodeLayered (merge-st _ _)      = ⊤
-NodeLayered (concat-st q _ _)   = All LayeredObs q
-NodeLayered (switch-st _ _)     = ⊤
-NodeLayered (exhaust-st _ _)    = ⊤
-
-StLayered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → Set
-StLayered st = All (λ kv → NodeLayered (proj₂ kv)) (EvalSt.nodes st)
-
--- base cases: the initial machine is layered
-st-init-layered : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) →
-  StLayered (st-init e)
-st-init-layered e = []ᵃ
-
-slotLayered-any : ∀ {n} {Γ : Ctx n} {t} (s : Slot Γ t) → SlotLayered s
-slotLayered-any {t = t} (scripted (hot async))       = anyAll async
-  where
-  anyAll : ∀ xs → All (λ tv → LayeredV t (Timed.val tv)) xs
-  anyAll []        = []ᵃ
-  anyAll (tv ∷ xs) = layeredV-any t (Timed.val tv) ∷ᵃ anyAll xs
-slotLayered-any {t = t} (scripted (cold sync async)) = anyS sync , anyA async
-  where
-  anyS : ∀ xs → All (LayeredV t) xs
-  anyS []       = []ᵃ
-  anyS (v ∷ xs) = layeredV-any t v ∷ᵃ anyS xs
-  anyA : ∀ xs → All (λ tv → LayeredV t (Timed.val tv)) xs
-  anyA []        = []ᵃ
-  anyA (tv ∷ xs) = layeredV-any t (Timed.val tv) ∷ᵃ anyA xs
-slotLayered-any           (shared def)               = layer def []ᵃ []ˡ
-
-slotsLayered-any : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) → SlotsLayered sl
-slotsLayered-any sl i = slotLayered-any (sl i)
-
-------------------------------------------------------------------
--- popping an arrival keeps everything layered — the Set-valued
--- mirror of the proven pop-bounded ring, and the cascade-side init
--- leg: cascadeGo receives a layered payload from a layered schedule
-------------------------------------------------------------------
-
-schedHeadOf-layered : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ)
-  {a : Arrival Γ} {l′ : LiveSource Γ} →
-  schedHeadOf l ≡ inj₂ (a , l′) →
-  LiveLayered l → ArrLayered a × LiveLayered l′
-schedHeadOf-layered l eq ll with LiveSource.pending l | eq | ll
-... | (t , v) ∷ ps | refl | (lv ∷ᵃ lps) = lv , lps
-
-schedGo-layered : ∀ {n} {Γ : Ctx n} (ls : List (LiveSource Γ))
-  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
-  schedGo ls ≡ inj₂ (a , ls′) →
-  All LiveLayered ls → ArrLayered a × All LiveLayered ls′
-schedGo-layered (l ∷ ls) eq (ll ∷ᵃ lls)
-  with schedHeadOf l in eqH | schedGo ls in eqR
-schedGo-layered (l ∷ ls) refl (ll ∷ᵃ lls) | inj₁ _ | inj₂ (a′ , ls″) =
-  let (la , lls′) = schedGo-layered ls eqR lls
-  in la , ll ∷ᵃ lls′
-schedGo-layered (l ∷ ls) refl (ll ∷ᵃ lls) | inj₂ (a″ , l′) | inj₁ _ =
-  let (la , ll′) = schedHeadOf-layered l eqH ll
-  in la , ll′ ∷ᵃ lls
-schedGo-layered (l ∷ ls) eq (ll ∷ᵃ lls) | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
-  with schedEarlier a″ a′ | eq
-... | true  | refl =
-  let (la , ll′) = schedHeadOf-layered l eqH ll
-  in la , ll′ ∷ᵃ lls
-... | false | refl =
-  let (la , lls′) = schedGo-layered ls eqR lls
-  in la , ll ∷ᵃ lls′
-
-pop-layered : ∀ {n} {Γ : Ctx n}
-  (sched : Sched Γ) {a : Arrival Γ} {sched′ : Sched Γ} →
-  sched-next sched ≡ inj₂ (a , sched′) →
-  SchedLayered sched → ArrLayered a × SchedLayered sched′
-pop-layered sched eq (lls , lsl)
-  with schedGo (Sched.live sched) in eqL | eq
-... | inj₂ (a″ , ls) | refl =
-  let (la , lls′) = schedGo-layered (Sched.live sched) eqL lls
-  in la , (lls′ , lsl)
-
--- the latch and finish mirrors: ledger fields only, value stores
--- and slots untouched — layeredness rides along
-latch-layered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (st : EvalSt e) →
-  StLayered st → StLayered (cascadeLatch a st)
-latch-layered a st sl with Arrival.isLast a
-... | true  = sl
-... | false = sl
-
-sweepLive-layered : ∀ {n} {Γ : Ctx n} {t}
-  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
-  All LiveLayered ls → All LiveLayered (sweepLive reg ls)
-sweepLive-layered reg []       []ᵃ        = []ᵃ
-sweepLive-layered {n = n} reg (l ∷ ls) (ll ∷ᵃ lls)
-  with (LiveSource.source l <ᵇ n)
-       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
-... | true  = ll ∷ᵃ sweepLive-layered reg ls lls
-... | false = sweepLive-layered reg ls lls
-
-finish-layered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-  SchedLayered sched → StLayered st →
-  SchedLayered (proj₁ (cascadeFinish a sched st))
-    × StLayered (proj₂ (cascadeFinish a sched st))
-finish-layered a sched st (lls , lsl) sl with Arrival.isLast a
-... | false = (lls , lsl) , sl
-... | true  =
-  (sweepLive-layered (dropSource (arrSource a) (EvalSt.registry st))
-                     (Sched.live sched) lls , lsl) , sl
-
-resolve-layered : ∀ {n} {Γ : Ctx n} {t : Ty} (anchor : Tick)
-  (xs : List (Timed (Val Γ t))) →
-  All (λ tv → LayeredV t (Timed.val tv)) xs →
-  All (λ p → LayeredV t (proj₂ p)) (resolve anchor xs)
-resolve-layered anchor []                 []ᵃ        = []ᵃ
-resolve-layered anchor ((after w , v) ∷ r) (lv ∷ᵃ lr) =
-  lv ∷ᵃ resolve-layered (anchor + suc w) r lr
-
-sched-init-layered : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
-  (ins : Slots Γ) → SlotsLayered ins → SchedLayered (sched-init e ins)
-sched-init-layered {n = n} {Γ = Γ} e ins sli =
-  concat⁺ (tabulate⁺ perSlot) , sli
-  where
-  perSlot : ∀ i → All LiveLayered (mkHot ins i)
-  perSlot i with ins i | sli i
-  ... | scripted (hot async) | la      = resolve-layered 0 async la ∷ᵃ []ᵃ
-  ... | scripted (cold _ _)  | _       = []ᵃ
-  ... | shared _             | _       = []ᵃ
-
--- the first preservation piece: a scan step keeps the store layered.
--- Every emitted running output and the landed accumulator are applyFn
--- images over layered inputs — evalWith-layered does all the work
-scanVals-layered : ∀ {n} {Γ : Ctx n} {s u}
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (a₀ : Val Γ u) (vs : List (Val Γ s)) →
-  LayeredV u a₀ → All (LayeredV s) vs →
-  All (LayeredV u) (proj₁ (scanVals fn a₀ vs))
-    × LayeredV u (proj₂ (scanVals fn a₀ vs))
-scanVals-layered fn a₀ []       la []ᵃ         = []ᵃ , la
-scanVals-layered fn a₀ (v ∷ vs) la (lv ∷ᵃ lvs) =
-  let la′ = applyFn-layered fn (a₀ , v) (la , lv)
-      (louts , llast) = scanVals-layered fn (applyFn fn (a₀ , v)) vs la′ lvs
-  in la′ ∷ᵃ louts , llast
-
-------------------------------------------------------------------
 -- the INIT leg: the initial machine satisfies the size invariant.
 -- Provable exactly because the budget seeds from script CONTENT
 -- (slotSize counts scripted values): every hot pending value is ≤
@@ -1373,7 +1102,8 @@ unconn-insert sl cs i eqi fresh =
 -- contract therefore inducts on this plain ℕ — no Acc plumbing —
 -- converting hop decreases (≺-embed/≺-replace) via rank-mono-≺,
 -- and discharging the entry-sum side condition via totᵛ-counts
--- (the sum is the layer count, bounded by the store invariant).
+-- (the sum is the shell count, ≤ sizeᵉ by shells-len — free on
+-- stBounded?).
 ------------------------------------------------------------------
 
 totᵛ : ∀ {m} → Vec ℕ m → ℕ
@@ -1615,37 +1345,64 @@ counts-below (suc B) t       Y       aY         t≤
 --      synchronous walk.  DISCHARGED above: syncSize-unfoldμ /
 --      unfoldμ-shrinks, machine-checked.
 --   3. subscribeInner — decreases the DERSHOWITZ–MANNA MULTISET of
---      layer template sizes (the Layered section above: every
---      runtime obs value is a template instantiated over embedded
---      layered values, and evalWith-layered proves the evaluator
---      never leaves the family).  A value's measure is the multiset
---      of its layer tree's template sync-sizes — concretely
---      measureObs = counts B ∘ layerSizes above, ordered by ≺ᵛ
---      (count-vector lex, high class first), with ≺ᵛ-wf as the
---      contract's induction principle.  The hops:
---        · embedded-value hop (subscribing a value subΘTm reified
---          into the carrier): strict SUB-multiset, regardless of
---          relative template sizes — ≺-embed.
---        · scan-produced hop: the carrier-top element is replaced
---          by strictly smaller ones (≺-replace) — the fn body is a
---          proper subterm of the carrier's template, and the
---          consumed values' layers either cancel against the
---          carrier's embedded copies (within one instant,
---          deliveries ≤ syntactic occurrences because subΘ COPIES
---          trees — the sync-linearity lemma, to be proven with the
---          contract) or sit strictly below the top.
+--      SHELL sizes (2026-07-20: the SHELL DESIGN, adopted with
+--      Anthony's approval, replacing the layer-derivation reading).
+--      A runtime obs value IS a closed expression; its measure is
+--      measureE = counts B ∘ shellsᵉ — the multiset of operator-
+--      skeleton sizes of the value and every sync-reachable
+--      embedded observable (Rx.Exp.shellsᵉ), a pure function of
+--      syntax.  Shells count Exp constructors ONLY (Tm material
+--      weightless, strmᵗ/deferᵉ leaves), which buys the design's
+--      two load-bearing facts, both PROVEN above:
+--        · substitution invariance (shellSize-subΘ): subΘ rewrites
+--          only Tm material, so instantiation preserves every
+--          shell size EXACTLY.  No inflation — an instantiated
+--          template's multiset is a class-preserved copy of the
+--          template's plus the plugged obs values' own shells
+--          (reify-inner: a plug's footprint is void, its shells
+--          join the inner multiset verbatim).
+--        · free side conditions: every shell of e is ≤ sizeᵉ e
+--          (shells-≤/shellsᵛ-≤) and shells number ≤ sizeᵉ e
+--          (shells-len) — so stBounded?'s sizeᵛ cap bounds both
+--          the classes (≤ B) and the entry sum (≤ V, the rank
+--          bridge's side condition).  NO new invariant; the whole
+--          Layered derivation apparatus is deleted (git: 1fbc59c).
+--      The hops:
+--        · embedded-value hop (subscribing a value that sits as a
+--          strmᵗ subtree of the carrier — of-list literals under
+--          closed evaluation, evalWith (strmᵗ e) []ᵃ = e): its
+--          shellsᵉ is a CONTIGUOUS sublist of the carrier's inner
+--          (innerᵗ (strmᵗ e) = shellsᵉ e), and the carrier's own
+--          shell rides on top — strict sub-multiset, ≺-embed.
+--        · eval/scan-produced hop (applyFn/evalWith instantiates a
+--          template): by shellSize-subΘ the produced multiset =
+--          the fn-body strmᵗ subtree's sub-multiset, classes on
+--          the nose, ⊎ the plugged obs values' shells.  The first
+--          part is the embed shape again; the plugged part is
+--          where the LEDGER lives — the plugs are prior stored
+--          values whose shells the global multiset already owns
+--          (deliveries ≤ syntactic occurrences because subΘ
+--          COPIES trees — the sync-linearity lemma, to be proven
+--          with the contract).  The exact bookkeeping input is
+--          the subΘ multiset equation: counts of the instantiated
+--          inner ≡ counts of the template inner ⊕ᵛ counts of the
+--          plug shells (per obs-var occurrence) — state it with
+--          a plugsᵉ mirror of subΘ when the contract needs it;
+--          subΘ-capᵉ above is its All-cap shadow, already proven.
 --        · share-crossing hop (a template's `input` hits a slot):
 --          exits the per-value measure — it anchors against the
 --          slot's own element of the GLOBAL multiset {program} ⊎
 --          {slots}; that re-anchoring is the ownership half of the
 --          ledger (cascadeGo-wet), not the per-value order.
---      (The previous edge-3 design — lex (skeleton, value size)
---      with skeletons ordered by subterm — is REFUTED: chain two
+--      (The 2026-07-19 layer-derivation design worked but carried
+--      an unfixable wart: unused env entries gave layers with no
+--      syntactic footprint, so the entry-sum side condition needed
+--      its own invariant.  The design before THAT — lex (skeleton,
+--      value size), subterm-ordered — is REFUTED: chain two
 --      obs-typed scans directly, second fn λ(b,v). mergeAll(of[snd
 --      x]), and the embedded-value hop lands on a first-scan acc
 --      whose template is subterm-incomparable with the carrier's
---      and can dwarf it.  The S-probes missed this only because
---      their dup discards v.)
+--      and can dwarf it.)
 --
 -- THE DEMAND, closed-form and PROVEN (dBound above).  Fuel is
 -- depth-consumed, so the contract carries
@@ -1671,24 +1428,6 @@ counts-below (suc B) t       Y       aY         t≤
 -- (cascadeGo-wet); the disjointness argument (each registration's
 -- path owns its minted nodes, so per-cascade store traffic is
 -- structure-bounded) supplies the store-boundedness half.
---
--- TWO NOTES FOR THE CONTRACT SESSION (2026-07-20 night):
--- 1. The entry-sum side condition (totᵛ ≤ V) does NOT ride on
---    stBounded?: a scan fn that discards its input leaves UNUSED
---    env entries in the derivation — layers with no syntactic
---    footprint — so layer count is not bounded by sizeᵉ.  Either
---    track a layer-count invariant alongside stBounded?, or:
--- 2. THE SHELL OPTION (likely better): make the measure a pure
---    function of the closed expression — shellSize = syncSize with
---    strmᵗ subtrees as leaves; M(e) = {shellSize e} ⊎ ⋃ M over
---    sync-reachable strmᵗ subtrees.  Embedded hop = sub-multiset
---    SYNTACTICALLY; eval/scan hops preserve shells up to reified
---    GROUND plugs (elements inflate ≤ B·suc V — a tower absorbs
---    that inside the +3-story headroom).  Kills all derivation
---    bookkeeping in the store invariant: the caps become decidable
---    Bool checks like stBounded?.  The Layered family stays as the
---    proof that eval outputs are template instances (the closure
---    lemma is the content of the eval-hop decrease either way).
 ------------------------------------------------------------------
 
 postulate
