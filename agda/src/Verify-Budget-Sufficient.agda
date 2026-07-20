@@ -27,11 +27,13 @@
 -- splice into Verify-Well-Formed replaces its postulate.
 module Verify-Budget-Sufficient where
 
-open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≤ᵇ_)
+open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _<ᵇ_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans)
 open import Data.List    using (List; []; _∷_; _++_; all; any)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
+open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; cong; subst)
 
@@ -39,10 +41,13 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                                 Ctx; Closed; Val; sizeᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
+                                RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 root; sched-init; st-init; sched-next;
                                 liveHead; liveNext; arrEarlier;
+                                cascadeLatch; cascadeFinish; sweepLive;
+                                dropSource; arrSource;
                                 subscribeE; cascade; drain; evaluate;
                                 hasDry; dryEvent; drySource; sameSource;
                                 budgetAt)
@@ -157,6 +162,92 @@ pop-bounded B sched st eq bnd
 ... | bls , bns with liveNext (Sched.live sched) in eqL | eq
 ... | inj₂ (a″ , ls) | refl =
       ∧-intro (liveNext-bounded B (Sched.live sched) eqL bls) bns
+
+------------------------------------------------------------------
+-- structural preservation around the cascade — PROVEN pieces the
+-- eventual cascade-dry proof composes, whatever its core shape
+------------------------------------------------------------------
+
+T-to : ∀ {b : Bool} → b ≡ true → T b
+T-to refl = tt
+
+-- generic: a pointwise implication lifts through all
+all-impl : ∀ {A : Set} (p q : A → Bool) →
+  (∀ x → p x ≡ true → q x ≡ true) →
+  ∀ (xs : List A) → all p xs ≡ true → all q xs ≡ true
+all-impl p q imp []       h = refl
+all-impl p q imp (x ∷ xs) h
+  with ∧-true (p x) (all p xs) h
+... | px , pxs = ∧-intro (imp x px) (all-impl p q imp xs pxs)
+
+≤ᵇ-widen : ∀ (v : ℕ) {B B′ : ℕ} → B ≤ B′ → (v ≤ᵇ B) ≡ true → (v ≤ᵇ B′) ≡ true
+≤ᵇ-widen v {B} {B′} le h with ≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ v B (T-to h)) le)
+... | w = T-elim w
+  where
+  T-elim : ∀ {b : Bool} → T b → b ≡ true
+  T-elim {true} _ = refl
+
+-- a bound only ever needs to be respected upward: the id-level bound
+-- entails the suc-id-level one (budgets grow monotonically)
+bounded-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {B B′ : ℕ} → B ≤ B′ → (sched : Sched Γ) (st : EvalSt e) →
+  stBounded? B sched st ≡ true → stBounded? B′ sched st ≡ true
+bounded-mono {B = B} {B′} le sched st bnd
+  with ∧-true (all (boundedLive B) (Sched.live sched)) _ bnd
+... | bls , bns =
+  ∧-intro
+    (all-impl (boundedLive B) (boundedLive B′)
+      (λ l → all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ (LiveSource.elemTy l) (proj₂ tv)) le) (LiveSource.pending l))
+      (Sched.live sched) bls)
+    (all-impl _ _ (λ kv → node-mono (proj₂ kv)) (EvalSt.nodes st) bns)
+  where
+  node-mono : ∀ nd → boundedNode B nd ≡ true → boundedNode B′ nd ≡ true
+  node-mono (scan-st {t} v)   h = ≤ᵇ-widen (sizeᵛ t v) le h
+  node-mono (concat-st q _ _) h = all-impl _ _ (λ o → ≤ᵇ-widen (sizeᵉ o) le) q h
+  node-mono (take-st _)       h = refl
+  node-mono (merge-st _ _)    h = refl
+  node-mono (switch-st _ _)   h = refl
+  node-mono (exhaust-st _ _)  h = refl
+
+-- the latch touches only per-cascade ledger fields — the value
+-- stores are untouched
+latch-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (sched : Sched Γ) (a : Arrival Γ) (st : EvalSt e) →
+  stBounded? B sched st ≡ true →
+  stBounded? B sched (cascadeLatch a st) ≡ true
+latch-bounded B sched a st bnd with Arrival.isLast a
+... | true  = bnd
+... | false = bnd
+
+-- the sweep is a filter: every survivor was already bounded
+sweepLive-bounded : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
+  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
+  all (boundedLive B) ls ≡ true →
+  all (boundedLive B) (sweepLive reg ls) ≡ true
+sweepLive-bounded B reg []       h = refl
+sweepLive-bounded {n = n} B reg (l ∷ ls) h
+  with ∧-true (boundedLive B l) (all (boundedLive B) ls) h
+... | bl , bls
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
+... | true  = ∧-intro bl (sweepLive-bounded B reg ls bls)
+... | false = sweepLive-bounded B reg ls bls
+
+-- the finish drops registry entries (unread by stBounded?) and
+-- filters the live schedule
+finish-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  stBounded? B sched st ≡ true →
+  stBounded? B (proj₁ (cascadeFinish a sched st))
+               (proj₂ (cascadeFinish a sched st)) ≡ true
+finish-bounded B a sched st bnd with Arrival.isLast a
+... | false = bnd
+... | true  with ∧-true (all (boundedLive B) (Sched.live sched)) _ bnd
+...   | bls , bns =
+        ∧-intro (sweepLive-bounded B
+                  (dropSource (arrSource a) (EvalSt.registry st))
+                  (Sched.live sched) bls)
+                bns
 
 ------------------------------------------------------------------
 -- the three cores
