@@ -36,11 +36,13 @@ open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans;
+                                       ≤-reflexive; <-≤-trans; ≤-pred;
                                        +-suc; +-identityʳ;
                                        +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
-                                       *-suc; m≤m+n; m≤n+m)
+                                       +-monoˡ-<; +-monoˡ-≤;
+                                       *-monoˡ-≤; *-monoʳ-≤;
+                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
+                                       m≤n⇒m<n∨m≡n)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.List    using (List; []; _∷_; _++_; all; any; length;
                                 sum; tabulate)
@@ -48,7 +50,7 @@ open import Data.Fin     using (Fin; toℕ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
-  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
@@ -57,7 +59,7 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
@@ -705,22 +707,6 @@ postulate
   unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
     (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
 
--- the two decrease lemmas the hop analysis needs (proof-design memo
--- below).  Pure count-vector arithmetic over the definitions above —
--- GRINDER: prove counts-++ first (the workhorse), then both ≺ lemmas
--- by induction on B/the vectors, splitting on the clamp comparison.
-postulate
-  counts-++ : ∀ B (xs ys : List ℕ) →
-    counts B (xs ++ ys) ≡ counts B xs ⊕ᵛ counts B ys
-  -- embedded-value hop: a value reified into the carrier measures
-  -- strictly below it (its multiset is a strict sub-multiset),
-  -- regardless of relative template sizes
-  ≺-embed : ∀ B t (xs ys M : List ℕ) →
-    counts B M ≺ᵛ counts B (t ∷ xs ++ M ++ ys)
-  -- scan-produced hop: replacing the carrier top with any elements
-  -- strictly below it decreases (t must be a real size class)
-  ≺-replace : ∀ B t (Y Z : List ℕ) → All (_< t) Y → t ≤ B →
-    counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
 
 ------------------------------------------------------------------
 -- RANK — the ≺ᵛ order collapsed to ℕ.  Sync fuel is DEPTH-consumed
@@ -840,6 +826,103 @@ dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} U′<U r′≤R s′≤V
                       (*-monoʳ-≤ (suc R) U′<U))))
   (≤-trans (*-monoʳ-≤ (suc V) (m≤n+m (suc R * U) r))
            (m≤n+m (suc V * (r + suc R * U)) s))))
+
+-- the two decrease lemmas the hop analysis needs (proof-design memo
+-- below), PROVEN: ≺-embed (embedded-value hop — a value reified
+-- into the carrier measures strictly below it, regardless of
+-- relative template sizes) and ≺-replace (scan-produced hop —
+-- replacing the carrier top with elements strictly below it
+-- decreases; t must be a real size class).
+
+⊕ᵛ-identityˡ : ∀ {m} (v : Vec ℕ m) → zerosᵛ ⊕ᵛ v ≡ v
+⊕ᵛ-identityˡ []ᵛ       = refl
+⊕ᵛ-identityˡ (x ∷ᵛ v) = cong (x ∷ᵛ_) (⊕ᵛ-identityˡ v)
+
+⊕ᵛ-assoc : ∀ {m} (a b c : Vec ℕ m) → (a ⊕ᵛ b) ⊕ᵛ c ≡ a ⊕ᵛ (b ⊕ᵛ c)
+⊕ᵛ-assoc []ᵛ       []ᵛ       []ᵛ       = refl
+⊕ᵛ-assoc (x ∷ᵛ a) (y ∷ᵛ b) (z ∷ᵛ c) =
+  cong₂ _∷ᵛ_ (+-assoc x y z) (⊕ᵛ-assoc a b c)
+
+⊕ᵛ-comm : ∀ {m} (a b : Vec ℕ m) → a ⊕ᵛ b ≡ b ⊕ᵛ a
+⊕ᵛ-comm []ᵛ       []ᵛ       = refl
+⊕ᵛ-comm (x ∷ᵛ a) (y ∷ᵛ b) = cong₂ _∷ᵛ_ (+-comm x y) (⊕ᵛ-comm a b)
+
+counts-++ : ∀ B (xs ys : List ℕ) →
+  counts B (xs ++ ys) ≡ counts B xs ⊕ᵛ counts B ys
+counts-++ B []       ys = sym (⊕ᵛ-identityˡ (counts B ys))
+counts-++ B (x ∷ xs) ys rewrite counts-++ B xs ys =
+  sym (⊕ᵛ-assoc (oneAt B x) (counts B xs) (counts B ys))
+
+-- adding any vector with mass strictly grows the lex reading
+≺ᵛ-grow : ∀ {m} (w v : Vec ℕ m) → 1 ≤ totᵛ w → v ≺ᵛ (w ⊕ᵛ v)
+≺ᵛ-grow []ᵛ           []ᵛ       ()
+≺ᵛ-grow (zero  ∷ᵛ w) (y ∷ᵛ v) h = ≺-there (≺ᵛ-grow w v h)
+≺ᵛ-grow (suc x ∷ᵛ w) (y ∷ᵛ v) h = ≺-here (s≤s (m≤n+m y x))
+
+≺-embed : ∀ B t (xs ys M : List ℕ) →
+  counts B M ≺ᵛ counts B (t ∷ xs ++ M ++ ys)
+≺-embed B t xs ys M =
+  subst (counts B M ≺ᵛ_) (sym eq) (≺ᵛ-grow W (counts B M) tot1)
+  where
+  W = oneAt B t ⊕ᵛ (counts B xs ⊕ᵛ counts B ys)
+  eq : counts B (t ∷ xs ++ M ++ ys) ≡ W ⊕ᵛ counts B M
+  eq = trans (cong (oneAt B t ⊕ᵛ_)
+               (trans (counts-++ B xs (M ++ ys))
+                      (cong (counts B xs ⊕ᵛ_) (counts-++ B M ys))))
+       (trans (cong (λ z → oneAt B t ⊕ᵛ (counts B xs ⊕ᵛ z))
+                    (⊕ᵛ-comm (counts B M) (counts B ys)))
+       (trans (cong (oneAt B t ⊕ᵛ_)
+                    (sym (⊕ᵛ-assoc (counts B xs) (counts B ys) (counts B M))))
+              (sym (⊕ᵛ-assoc (oneAt B t)
+                             (counts B xs ⊕ᵛ counts B ys) (counts B M)))))
+  tot1 : 1 ≤ totᵛ W
+  tot1 = subst (1 ≤_)
+           (sym (trans (totᵛ-⊕ᵛ (oneAt B t) (counts B xs ⊕ᵛ counts B ys))
+                       (cong (_+ totᵛ (counts B xs ⊕ᵛ counts B ys))
+                             (totᵛ-oneAt B t))))
+           (s≤s z≤n)
+
+-- lex is compatible with adding a common vector
+≺ᵛ-⊕ʳ : ∀ {m} {u v : Vec ℕ m} (w : Vec ℕ m) → u ≺ᵛ v → (u ⊕ᵛ w) ≺ᵛ (v ⊕ᵛ w)
+≺ᵛ-⊕ʳ (z ∷ᵛ w) (≺-here  x<y) = ≺-here (+-monoˡ-< z x<y)
+≺ᵛ-⊕ʳ (z ∷ᵛ w) (≺-there u≺v) = ≺-there (≺ᵛ-⊕ʳ w u≺v)
+
+T⇒≡true : ∀ b → T b → b ≡ true
+T⇒≡true true _ = refl
+
+-- (suc B ≤ᵇ y) unfolds to (B <ᵇ y), so state the false case there
+≤⇒<ᵇ-false : ∀ y B → y ≤ B → (B <ᵇ y) ≡ false
+≤⇒<ᵇ-false zero    B       z≤n       = refl
+≤⇒<ᵇ-false (suc y) (suc B) (s≤s y≤B) = ≤⇒<ᵇ-false y B y≤B
+
+-- every element strictly below suc B ⇒ the top class stays empty
+counts-tail : ∀ B (Y : List ℕ) → All (_< suc B) Y →
+  counts (suc B) Y ≡ 0 ∷ᵛ counts B Y
+counts-tail B []      []ᵃ        = refl
+counts-tail B (y ∷ Y) (py ∷ᵃ pY)
+  rewrite ≤⇒<ᵇ-false y B (≤-pred py) | counts-tail B Y pY = refl
+
+-- a multiset entirely below class t sits under a single t element
+counts-below : ∀ B t (Y : List ℕ) → All (_< t) Y → t ≤ B →
+  counts B Y ≺ᵛ oneAt B t
+counts-below zero    zero    []      []ᵃ        h = ≺-here (s≤s z≤n)
+counts-below zero    zero    (y ∷ Y) (() ∷ᵃ _)  h
+counts-below zero    (suc t) Y       aY         ()
+counts-below (suc B) t       Y       aY         t≤
+  with m≤n⇒m<n∨m≡n t≤
+... | inj₂ refl
+  rewrite counts-tail B Y aY
+        | T⇒≡true (suc B ≤ᵇ suc B) (≤⇒≤ᵇ (≤-refl {suc B})) = ≺-here (s≤s z≤n)
+... | inj₁ t<sB
+  rewrite counts-tail B Y
+            (mapᴬ (λ py → ≤-trans py (≤-trans (≤-pred t<sB) (n≤1+n B))) aY)
+        | ≤⇒<ᵇ-false t B (≤-pred t<sB)
+  = ≺-there (counts-below B t Y aY (≤-pred t<sB))
+
+≺-replace : ∀ B t (Y Z : List ℕ) → All (_< t) Y → t ≤ B →
+  counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
+≺-replace B t Y Z aY t≤B rewrite counts-++ B Y Z =
+  ≺ᵛ-⊕ʳ (counts B Z) (counts-below B t Y aY t≤B)
 
 ------------------------------------------------------------------
 -- the three cores
