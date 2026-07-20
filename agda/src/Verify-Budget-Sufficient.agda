@@ -13,22 +13,26 @@
 --
 --   stBounded? B          — every stored value's size ≤ B (decidable)
 --   INV at instant id     — stBounded? (sizeBudgetAt … id)
---   burst-dry/-bounded    — the root burst neither dries nor escapes
+--   subscribeE-wet        — THE WET CONTRACT (stated; the induction)
 --   cascadeGo-wet         — the chain fold stays wet, lands bounded
+--   burst-wet (PROVEN)    — the contract at the root + seed-covers
 --   cascade-dry (PROVEN)  — latch + fold core + finish, composed
 --   drain-dry (PROVEN)    — the fuel loop composes cascades
 --   budget-sufficient     — (PROVEN from the above) the whole run
 --
 -- PROVEN: pop-slots/pop-bounded (inverting schedGo, hoisted for
 -- exactly this), the cascade's structural ring (latch/sweep/finish/
--- mono), cascade-dry, drain-dry, and the theorem.  Three postulated
--- cores remain — burst-dry, burst-bounded, cascadeGo-wet — the real
--- termination content: fuel-accounting induction over the
+-- mono), sync-linearity (plugs-len/occs/inner-len-subΘ), the seed
+-- inequality (prod≤3pow/seed-covers — the tower dominance
+-- arithmetic at instant 0, discharging the burst cores from the
+-- contract), cascade-dry, drain-dry, and the theorem.  Two
+-- postulated cores remain — subscribeE-wet, cascadeGo-wet — the
+-- real termination content: fuel-accounting induction over the
 -- subscription machine's clauses (the three decrement edges each
--- consume one unit; everything between is structural), the
--- registration-disjointness argument at the fold, and the tower
--- monotonicity/dominance arithmetic.  Not imported by Main until the splice into
--- Verify-Well-Formed replaces its postulate.
+-- consume one hasAtLeast-peel against dBound-μ/-hop/-connect;
+-- everything between is structural), and the fold's threading
+-- invariant (see cascadeGo-wet's memo).  Not imported by Main until
+-- the splice into Verify-Well-Formed replaces its postulate.
 module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
@@ -44,8 +48,14 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        *-suc; m≤m+n; m≤n+m; n≤1+n;
                                        m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
                                        ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ)
+                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
+                                       *-distribʳ-+; *-identityʳ; <⇒≤;
+                                       ^-monoˡ-≤; ^-*-assoc;
+                                       ^-distribˡ-+-*; *-mono-≤;
+                                       +-monoʳ-≤; *-comm)
 open import Data.Nat.Induction  using (<-wellFounded)
+open import Data.Nat.Solver     using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; all; any; length;
                                 sum; tabulate; concat; map)
 open import Data.Fin     using (Fin; toℕ)
@@ -79,6 +89,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 shellsᵉ; shellsᵛ;
                                 subΘExp; subΘTm; subΘTms;
                                 plugsᵉ; plugsᵗ; plugsᵗˢ;
+                                occsᵉ; occsᵗ; occsᵗˢ;
                                 renExp; renTm; renTms; Ren∈; ext∈;
                                 wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
@@ -96,13 +107,14 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
+                                oneShotBurst; installNode; NodeId;
                                 root; sched-init; st-init; sched-next;
                                 schedHeadOf; schedGo; schedEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
                                 dropSource; arrSource; chainsOf; cascadeGo;
                                 Path; arrTy;
                                 subscribeE; cascade; drain; evaluate;
-                                hasDry; dryEvent; drySource; sameSource;
+                                hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
 
 ------------------------------------------------------------------
@@ -118,10 +130,8 @@ hasDry-append : ∀ {A : Set} (xs ys : List (InstEmit A)) →
   hasDry xs ≡ false → hasDry ys ≡ false → hasDry (xs ++ ys) ≡ false
 hasDry-append []        ys h₁ h₂ = h₂
 hasDry-append (em ∷ xs) ys h₁ h₂
-  with ∨-false (sameSource (InstEmit.source em) drySource) _ h₁
-... | e₁ , h₁′
-  with ∨-false (any dryEvent (InstEmit.events em)) _ h₁′
-... | e₂ , h₁″ rewrite e₁ | e₂ = hasDry-append xs ys h₁″ h₂
+  with ∨-false (any dryEvent (InstEmit.events em)) _ h₁
+... | e₁ , h₁′ rewrite e₁ = hasDry-append xs ys h₁′ h₂
 
 ------------------------------------------------------------------
 -- the ℕ-valued SIZE budget for the stored-value invariant: the same
@@ -160,6 +170,29 @@ sizeBudgetAt-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
   sizeBudgetAt e sl id ≤ sizeBudgetAt e sl id′
 sizeBudgetAt-mono e sl h =
   towerℕ-mono (*-monoʳ-≤ (suc (sizeᵉ e + slotsSize sl)) (s≤s h))
+
+k≤towerℕ : ∀ k → k ≤ towerℕ k
+k≤towerℕ zero    = z≤n
+k≤towerℕ (suc k) =
+  ≤-trans (n<2^n k) (^-monoʳ-≤ 2 (k≤towerℕ k))
+
+-- the budget covers the syntax that seeds it, at every instant
+sz≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → sizeᵉ e + slotsSize sl ≤ sizeBudgetAt e sl id
+sz≤budget e sl id =
+  ≤-trans (n≤1+n _)
+  (≤-trans (m≤m*n (suc (sizeᵉ e + slotsSize sl)) (suc id))
+           (k≤towerℕ (suc (sizeᵉ e + slotsSize sl) * suc id)))
+
+size≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → sizeᵉ e ≤ sizeBudgetAt e sl id
+size≤budget e sl id =
+  ≤-trans (m≤m+n (sizeᵉ e) (slotsSize sl)) (sz≤budget e sl id)
+
+slots≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → slotsSize sl ≤ sizeBudgetAt e sl id
+slots≤budget e sl id =
+  ≤-trans (m≤n+m (slotsSize sl) (sizeᵉ e)) (sz≤budget e sl id)
 
 ------------------------------------------------------------------
 -- the Gas ordering: `g hasAtLeast n` — n peels are available.  The
@@ -681,6 +714,71 @@ shells-len : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
   length (shellsᵉ e) ≤ sizeᵉ e
 shells-len e = inner-lenᵉ e
 
+-- the value-level shadow of shells-len: a runtime value carries no
+-- more shells than its size — so a sizeᵛ cap bounds the entry sum
+-- of any environment entry's contribution to a plug multiset
+shellsᵛ-len : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  length (shellsᵛ t v) ≤ sizeᵛ t v
+shellsᵛ-len unitᵗ    v        = z≤n
+shellsᵛ-len boolᵗ    v        = z≤n
+shellsᵛ-len natᵗ     v        = z≤n
+shellsᵛ-len (s ×ᵗ t) (a , b)  rewrite length-++ (shellsᵛ s a) {shellsᵛ t b} =
+  ≤-trans (+-mono-≤ (shellsᵛ-len s a) (shellsᵛ-len t b)) (n≤1+n _)
+shellsᵛ-len (s +ᵗ t) (inj₁ a) = ≤-trans (shellsᵛ-len s a) (n≤1+n _)
+shellsᵛ-len (s +ᵗ t) (inj₂ b) = ≤-trans (shellsᵛ-len t b) (n≤1+n _)
+shellsᵛ-len (obs t)  e        = inner-lenᵉ e
+
+-- the s-reset side condition, free: the synchronous walk of any
+-- expression is no larger than its full syntax, so a store size cap
+-- caps the contract's s component after every hop
+mutual
+  syncSize≤sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+    syncSizeᵉ e ≤ sizeᵉ e
+  syncSize≤sizeᵉ (input i)       = ≤-refl
+  syncSize≤sizeᵉ (ofᵉ ts)        = s≤s (syncSize≤sizeᵗˢ ts)
+  syncSize≤sizeᵉ emptyᵉ          = ≤-refl
+  syncSize≤sizeᵉ (mapᵉ f e)      =
+    s≤s (+-mono-≤ (syncSize≤sizeᵗ f) (syncSize≤sizeᵉ e))
+  syncSize≤sizeᵉ (takeᵉ c e)     =
+    s≤s (+-mono-≤ (syncSize≤sizeᵗ c) (syncSize≤sizeᵉ e))
+  syncSize≤sizeᵉ (scanᵉ f z e)   =
+    s≤s (+-mono-≤ (+-mono-≤ (syncSize≤sizeᵗ f) (syncSize≤sizeᵗ z))
+                  (syncSize≤sizeᵉ e))
+  syncSize≤sizeᵉ (mergeAllᵉ e)   = s≤s (syncSize≤sizeᵉ e)
+  syncSize≤sizeᵉ (concatAllᵉ e)  = s≤s (syncSize≤sizeᵉ e)
+  syncSize≤sizeᵉ (switchAllᵉ e)  = s≤s (syncSize≤sizeᵉ e)
+  syncSize≤sizeᵉ (exhaustAllᵉ e) = s≤s (syncSize≤sizeᵉ e)
+  syncSize≤sizeᵉ (μᵉ e)          = s≤s (syncSize≤sizeᵉ e)
+  syncSize≤sizeᵉ (varᵉ x)        = ≤-refl
+  syncSize≤sizeᵉ (deferᵉ e)      = s≤s z≤n
+
+  syncSize≤sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
+    syncSizeᵗ tm ≤ sizeᵗ tm
+  syncSize≤sizeᵗ (varᵗ x)      = ≤-refl
+  syncSize≤sizeᵗ unit̂          = ≤-refl
+  syncSize≤sizeᵗ (bool̂ _)      = ≤-refl
+  syncSize≤sizeᵗ (nat̂ _)       = ≤-refl
+  syncSize≤sizeᵗ (pairᵗ a b)   =
+    s≤s (+-mono-≤ (syncSize≤sizeᵗ a) (syncSize≤sizeᵗ b))
+  syncSize≤sizeᵗ (fstᵗ p)      = s≤s (syncSize≤sizeᵗ p)
+  syncSize≤sizeᵗ (sndᵗ p)      = s≤s (syncSize≤sizeᵗ p)
+  syncSize≤sizeᵗ (inlᵗ a)      = s≤s (syncSize≤sizeᵗ a)
+  syncSize≤sizeᵗ (inrᵗ a)      = s≤s (syncSize≤sizeᵗ a)
+  syncSize≤sizeᵗ (caseᵗ s l r) =
+    s≤s (+-mono-≤ (+-mono-≤ (syncSize≤sizeᵗ s) (syncSize≤sizeᵗ l))
+                  (syncSize≤sizeᵗ r))
+  syncSize≤sizeᵗ (ifᵗ c a b)   =
+    s≤s (+-mono-≤ (+-mono-≤ (syncSize≤sizeᵗ c) (syncSize≤sizeᵗ a))
+                  (syncSize≤sizeᵗ b))
+  syncSize≤sizeᵗ (primᵗ _ a)   = s≤s (syncSize≤sizeᵗ a)
+  syncSize≤sizeᵗ (strmᵗ e)     = s≤s (syncSize≤sizeᵉ e)
+
+  syncSize≤sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    syncSizeᵗˢ ts ≤ sizeᵗˢ ts
+  syncSize≤sizeᵗˢ []       = ≤-refl
+  syncSize≤sizeᵗˢ (y ∷ ys) =
+    +-mono-≤ (syncSize≤sizeᵗ y) (syncSize≤sizeᵗˢ ys)
+
 ------------------------------------------------------------------
 -- THE CLOSURE, exactly: substitution preserves every shell size.
 -- subΘ rewrites only Tm material — Exp constructors map 1-1 and a
@@ -1051,11 +1149,6 @@ inner-unfoldμ body = inner-elimG (here refl) (μᵉ body) body
 -- its slot's inputSize ≤ slotsSize ≤ the tower.
 ------------------------------------------------------------------
 
-k≤towerℕ : ∀ k → k ≤ towerℕ k
-k≤towerℕ zero    = z≤n
-k≤towerℕ (suc k) =
-  ≤-trans (n<2^n k) (^-monoʳ-≤ 2 (k≤towerℕ k))
-
 all-++-intro : ∀ {A : Set} (p : A → Bool) (xs ys : List A) →
   all p xs ≡ true → all p ys ≡ true → all p (xs ++ ys) ≡ true
 all-++-intro p []       ys hx hy = hy
@@ -1103,15 +1196,10 @@ init-bounded {n = n} e ins id =
   ∧-intro (all-concat-tab (boundedLive B) (mkHot ins) perSlot) refl
   where
   B = sizeBudgetAt e ins id
-  slots≤B : slotsSize ins ≤ B
-  slots≤B =
-    ≤-trans (m≤n+m (slotsSize ins) (sizeᵉ e))
-    (≤-trans (n≤1+n _)
-    (≤-trans (m≤m*n (suc (sizeᵉ e + slotsSize ins)) (suc id))
-             (k≤towerℕ (suc (sizeᵉ e + slotsSize ins) * suc id))))
   perSlot : ∀ i → all (boundedLive B) (mkHot ins i) ≡ true
   perSlot i = mkHot-bounded ins B i
-                (≤-trans (fᵢ≤sum-tab (λ j → slotSize (ins j)) i) slots≤B)
+                (≤-trans (fᵢ≤sum-tab (λ j → slotSize (ins j)) i)
+                         (slots≤budget e ins id))
 
 ------------------------------------------------------------------
 -- EDGE 1 — the connect latch, counted.  subscribeSharedSlot's
@@ -1173,6 +1261,38 @@ unconn-insert sl cs i eqi fresh =
   strict rewrite eqi | fresh
                | T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl)
                = s≤s z≤n
+
+-- U is syntactically owned: every unconnected slot contributes at
+-- most its own slot size (a shared slot's def is nonempty syntax),
+-- so the connect count sits under the program's slot content — the
+-- U ≤ sz leg of the seed inequality
+sizeᵉ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+  1 ≤ sizeᵉ e
+sizeᵉ-pos (input i)       = s≤s z≤n
+sizeᵉ-pos (ofᵉ ts)        = s≤s z≤n
+sizeᵉ-pos emptyᵉ          = s≤s z≤n
+sizeᵉ-pos (mapᵉ f e)      = s≤s z≤n
+sizeᵉ-pos (takeᵉ c e)     = s≤s z≤n
+sizeᵉ-pos (scanᵉ f z e)   = s≤s z≤n
+sizeᵉ-pos (mergeAllᵉ e)   = s≤s z≤n
+sizeᵉ-pos (concatAllᵉ e)  = s≤s z≤n
+sizeᵉ-pos (switchAllᵉ e)  = s≤s z≤n
+sizeᵉ-pos (exhaustAllᵉ e) = s≤s z≤n
+sizeᵉ-pos (μᵉ e)          = s≤s z≤n
+sizeᵉ-pos (varᵉ x)        = s≤s z≤n
+sizeᵉ-pos (deferᵉ e)      = s≤s z≤n
+
+unconnAt≤slot : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (i : Fin n) → unconnAt sl cs i ≤ slotSize (sl i)
+unconnAt≤slot sl cs i with sl i
+... | scripted s = z≤n
+... | shared d with memberSource (toℕ i) cs
+...   | true  = z≤n
+...   | false = sizeᵉ-pos d
+
+unconn≤slots : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) →
+  unconn sl cs ≤ slotsSize sl
+unconn≤slots sl cs = sum-tab-mono _ _ (unconnAt≤slot sl cs)
 
 
 ------------------------------------------------------------------
@@ -1260,6 +1380,37 @@ measureE-rank B V e h = rank-lt-pow V (counts B (shellsᵉ e))
   (subst (_≤ V) (sym (totᵛ-counts B (shellsᵉ e)))
          (≤-trans (shells-len e) h))
 
+-- a shared slot's def is an element of the global syntactic
+-- multiset {program} ⊎ {slots}: its size sits inside the budget's
+-- slot summand
+slotDef-size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  sizeᵉ d ≤ slotsSize sl
+slotDef-size sl i {d} eq =
+  ≤-trans (≤-reflexive size-eq) (fᵢ≤sum-tab (λ j → slotSize (sl j)) i)
+  where
+  size-eq : sizeᵉ d ≡ slotSize (sl i)
+  size-eq rewrite eq = refl
+
+-- THE OWNERSHIP ANCHOR (the cascadeGo ledger's share-crossing
+-- half), PROVEN: when a walked template's `input i` hits a shared
+-- slot, the connect's resets re-anchor against the slot's OWN
+-- element of the global syntactic multiset — its def d is fixed
+-- slot content, so its rank sits under the store rank cap (feeding
+-- dBound-connect's r′ ≤ R) and its walk under the store bound
+-- (feeding dBound-hop/-connect's s′ ≤ V), straight off the
+-- budget's slot summand: no state invariant consulted
+connect-anchor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  let V = sizeBudgetAt e sl id in
+  (rank V (measureE V d) ≤ suc V ^ suc V) × (syncSizeᵉ d ≤ V)
+connect-anchor e sl id i {d} eq =
+  <⇒≤ (measureE-rank V V d size≤V) , ≤-trans (syncSize≤sizeᵉ d) size≤V
+  where
+  V = sizeBudgetAt e sl id
+  size≤V : sizeᵉ d ≤ V
+  size≤V = ≤-trans (slotDef-size sl i eq) (slots≤budget e sl id)
+
 ------------------------------------------------------------------
 -- THE DEMAND FUNCTION.  Fuel is depth-consumed, so the wet contract
 -- carries `fuel hasAtLeast suc (dBound V R U r s)` where V bounds
@@ -1303,6 +1454,16 @@ dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} U′<U r′≤R s′≤V
                       (*-monoʳ-≤ (suc R) U′<U))))
   (≤-trans (*-monoʳ-≤ (suc V) (m≤n+m (suc R * U) r))
            (m≤n+m (suc V * (r + suc R * U)) s))))
+
+-- structural steps consume no fuel but shrink (or preserve) every
+-- demand component — the interface every non-edge clause of the
+-- contract's induction applies: the child's demand fits the
+-- parent's fuel unchanged
+dBound-mono : ∀ {V R U′ U r′ r s′ s} → U′ ≤ U → r′ ≤ r → s′ ≤ s →
+  dBound V R U′ r′ s′ ≤ dBound V R U r s
+dBound-mono {V} {R} U′≤U r′≤r s′≤s =
+  +-mono-≤ s′≤s
+    (*-monoʳ-≤ (suc V) (+-mono-≤ r′≤r (*-monoʳ-≤ (suc R) U′≤U)))
 
 -- the whole demand under one product — what the seed inequality
 -- compares against the budget tower: dBound ≤ (1+V)(1+R)(1+U)
@@ -1426,6 +1587,23 @@ unfoldμ-≺ B body h
   rewrite shellSize-unfoldμ body | inner-unfoldμ body =
   ≺-replace B (suc (shellSizeᵉ body)) (shellSizeᵉ body ∷ []) (innerᵉ body)
     (≤-refl ∷ᵃ []ᵃ) h
+
+-- the μ clause threads SHELL caps, not sizeᵉ (unfoldμ copies the
+-- closed μ, so sizeᵉ grows — but every shell is preserved or
+-- stepped down, and the shell COUNT is exactly preserved).  These
+-- two transfers are what keep the contract's side conditions alive
+-- across the μ decrement edge
+shells-unfoldμ-cap : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  All (_≤ B) (shellsᵉ (μᵉ body)) → All (_≤ B) (shellsᵉ (unfoldμ body))
+shells-unfoldμ-cap B body (hd ∷ᵃ tl)
+  rewrite shellSize-unfoldμ body | inner-unfoldμ body =
+  ≤-trans (n≤1+n _) hd ∷ᵃ tl
+
+shells-unfoldμ-len : ∀ {n} {Γ : Ctx n} {t}
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  length (shellsᵉ (unfoldμ body)) ≡ length (shellsᵉ (μᵉ body))
+shells-unfoldμ-len body rewrite inner-unfoldμ body = refl
 
 ------------------------------------------------------------------
 -- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
@@ -1567,6 +1745,589 @@ mutual
       (subΘ-countsᵗ B Θloc σ y) (subΘ-countsᵗˢ B Θloc σ ys)
 
 ------------------------------------------------------------------
+-- SYNC-LINEARITY, PROVEN: deliveries ≤ syntactic occurrences.
+-- subΘ COPIES trees — one copy of the plugged value per Θ-var
+-- occurrence — so an instantiation can multiply a stored value's
+-- shells only by the occurrence count of the template, which is
+-- itself capped by the template's sync-reachable syntax
+-- (occs≤syncᵉ).  With the exact cardinality bookkeeping
+-- (inner-len-subΘ, the length shadow of the subΘ multiset
+-- equation), this bounds an instantiated value's entry sum BEFORE
+-- the store re-caps it: length shells ≤ template size + occs · V —
+-- the ledger's cardinality half at every applyFn/evalWith hop.
+------------------------------------------------------------------
+
+-- per-entry cardinality cap on an environment: each plugged value
+-- delivers at most V shells per occurrence
+EnvLen : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) → All (Val Γ) Θ → Set
+EnvLen V []ᵃ                = ⊤
+EnvLen V (_∷ᵃ_ {x = t} v σ) = (length (shellsᵛ t v) ≤ V) × EnvLen V σ
+
+envLen-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (σ : All (Val Γ) Θ) →
+  EnvLen V σ → (z : t ∈ Θ) → length (shellsᵛ t (lookupEnv σ z)) ≤ V
+envLen-lookup V (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
+envLen-lookup V (v ∷ᵃ σ) (hv , hσ) (there z)   = envLen-lookup V σ hσ z
+
+mutual
+  plugs-lenᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvLen V σ → length (plugsᵉ Θloc σ e) ≤ occsᵉ e * V
+  plugs-lenᵉ V Θloc σ (input i)       hσ = z≤n
+  plugs-lenᵉ V Θloc σ (ofᵉ ts)        hσ = plugs-lenᵗˢ V Θloc σ ts hσ
+  plugs-lenᵉ V Θloc σ emptyᵉ          hσ = z≤n
+  plugs-lenᵉ V Θloc σ (mapᵉ {s = s} f e) hσ
+    rewrite length-++ (plugsᵗ (s ∷ Θloc) σ f) {plugsᵉ Θloc σ e}
+          | *-distribʳ-+ V (occsᵗ f) (occsᵉ e) =
+    +-mono-≤ (plugs-lenᵗ V (s ∷ Θloc) σ f hσ) (plugs-lenᵉ V Θloc σ e hσ)
+  plugs-lenᵉ V Θloc σ (takeᵉ c e)     hσ
+    rewrite length-++ (plugsᵗ Θloc σ c) {plugsᵉ Θloc σ e}
+          | *-distribʳ-+ V (occsᵗ c) (occsᵉ e) =
+    +-mono-≤ (plugs-lenᵗ V Θloc σ c hσ) (plugs-lenᵉ V Θloc σ e hσ)
+  plugs-lenᵉ V Θloc σ (scanᵉ {s = s} {t = t} f z e) hσ
+    rewrite length-++ (plugsᵗ ((t ×ᵗ s) ∷ Θloc) σ f)
+                      {plugsᵗ Θloc σ z ++ plugsᵉ Θloc σ e}
+          | length-++ (plugsᵗ Θloc σ z) {plugsᵉ Θloc σ e}
+          | *-distribʳ-+ V (occsᵗ f + occsᵗ z) (occsᵉ e)
+          | *-distribʳ-+ V (occsᵗ f) (occsᵗ z) =
+    ≤-trans (≤-reflexive (sym (+-assoc
+              (length (plugsᵗ ((t ×ᵗ s) ∷ Θloc) σ f))
+              (length (plugsᵗ Θloc σ z)) _)))
+            (+-mono-≤ (+-mono-≤ (plugs-lenᵗ V ((t ×ᵗ s) ∷ Θloc) σ f hσ)
+                                (plugs-lenᵗ V Θloc σ z hσ))
+                      (plugs-lenᵉ V Θloc σ e hσ))
+  plugs-lenᵉ V Θloc σ (mergeAllᵉ e)   hσ = plugs-lenᵉ V Θloc σ e hσ
+  plugs-lenᵉ V Θloc σ (concatAllᵉ e)  hσ = plugs-lenᵉ V Θloc σ e hσ
+  plugs-lenᵉ V Θloc σ (switchAllᵉ e)  hσ = plugs-lenᵉ V Θloc σ e hσ
+  plugs-lenᵉ V Θloc σ (exhaustAllᵉ e) hσ = plugs-lenᵉ V Θloc σ e hσ
+  plugs-lenᵉ V Θloc σ (μᵉ e)          hσ = plugs-lenᵉ V Θloc σ e hσ
+  plugs-lenᵉ V Θloc σ (varᵉ x)        hσ = z≤n
+  plugs-lenᵉ V Θloc σ (deferᵉ e)      hσ = z≤n
+
+  plugs-lenᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvLen V σ → length (plugsᵗ Θloc σ tm) ≤ occsᵗ tm * V
+  plugs-lenᵗ V Θloc σ (varᵗ x) hσ with ∈-++⁻ Θloc x
+  ... | inj₁ y = z≤n
+  ... | inj₂ z =
+    ≤-trans (envLen-lookup V σ hσ z) (≤-reflexive (sym (+-identityʳ V)))
+  plugs-lenᵗ V Θloc σ unit̂          hσ = z≤n
+  plugs-lenᵗ V Θloc σ (bool̂ _)      hσ = z≤n
+  plugs-lenᵗ V Θloc σ (nat̂ _)       hσ = z≤n
+  plugs-lenᵗ V Θloc σ (pairᵗ a b)   hσ
+    rewrite length-++ (plugsᵗ Θloc σ a) {plugsᵗ Θloc σ b}
+          | *-distribʳ-+ V (occsᵗ a) (occsᵗ b) =
+    +-mono-≤ (plugs-lenᵗ V Θloc σ a hσ) (plugs-lenᵗ V Θloc σ b hσ)
+  plugs-lenᵗ V Θloc σ (fstᵗ p)      hσ = plugs-lenᵗ V Θloc σ p hσ
+  plugs-lenᵗ V Θloc σ (sndᵗ p)      hσ = plugs-lenᵗ V Θloc σ p hσ
+  plugs-lenᵗ V Θloc σ (inlᵗ a)      hσ = plugs-lenᵗ V Θloc σ a hσ
+  plugs-lenᵗ V Θloc σ (inrᵗ a)      hσ = plugs-lenᵗ V Θloc σ a hσ
+  plugs-lenᵗ V Θloc σ (caseᵗ {s = s} {t = t} sc l r) hσ
+    rewrite length-++ (plugsᵗ Θloc σ sc)
+                      {plugsᵗ (s ∷ Θloc) σ l ++ plugsᵗ (t ∷ Θloc) σ r}
+          | length-++ (plugsᵗ (s ∷ Θloc) σ l) {plugsᵗ (t ∷ Θloc) σ r}
+          | *-distribʳ-+ V (occsᵗ sc + occsᵗ l) (occsᵗ r)
+          | *-distribʳ-+ V (occsᵗ sc) (occsᵗ l) =
+    ≤-trans (≤-reflexive (sym (+-assoc (length (plugsᵗ Θloc σ sc))
+                                       (length (plugsᵗ (s ∷ Θloc) σ l)) _)))
+            (+-mono-≤ (+-mono-≤ (plugs-lenᵗ V Θloc σ sc hσ)
+                                (plugs-lenᵗ V (s ∷ Θloc) σ l hσ))
+                      (plugs-lenᵗ V (t ∷ Θloc) σ r hσ))
+  plugs-lenᵗ V Θloc σ (ifᵗ c a b)   hσ
+    rewrite length-++ (plugsᵗ Θloc σ c) {plugsᵗ Θloc σ a ++ plugsᵗ Θloc σ b}
+          | length-++ (plugsᵗ Θloc σ a) {plugsᵗ Θloc σ b}
+          | *-distribʳ-+ V (occsᵗ c + occsᵗ a) (occsᵗ b)
+          | *-distribʳ-+ V (occsᵗ c) (occsᵗ a) =
+    ≤-trans (≤-reflexive (sym (+-assoc (length (plugsᵗ Θloc σ c))
+                                       (length (plugsᵗ Θloc σ a)) _)))
+            (+-mono-≤ (+-mono-≤ (plugs-lenᵗ V Θloc σ c hσ)
+                                (plugs-lenᵗ V Θloc σ a hσ))
+                      (plugs-lenᵗ V Θloc σ b hσ))
+  plugs-lenᵗ V Θloc σ (primᵗ _ a)   hσ = plugs-lenᵗ V Θloc σ a hσ
+  plugs-lenᵗ V Θloc σ (strmᵗ e)     hσ = plugs-lenᵉ V Θloc σ e hσ
+
+  plugs-lenᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    EnvLen V σ → length (plugsᵗˢ Θloc σ ts) ≤ occsᵗˢ ts * V
+  plugs-lenᵗˢ V Θloc σ []       hσ = z≤n
+  plugs-lenᵗˢ V Θloc σ (y ∷ ys) hσ
+    rewrite length-++ (plugsᵗ Θloc σ y) {plugsᵗˢ Θloc σ ys}
+          | *-distribʳ-+ V (occsᵗ y) (occsᵗˢ ys) =
+    +-mono-≤ (plugs-lenᵗ V Θloc σ y hσ) (plugs-lenᵗˢ V Θloc σ ys hσ)
+
+-- occurrences are syntactically counted: no template delivers more
+-- copies than its sync-reachable size
+mutual
+  occs≤syncᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+    occsᵉ e ≤ syncSizeᵉ e
+  occs≤syncᵉ (input i)       = z≤n
+  occs≤syncᵉ (ofᵉ ts)        = ≤-trans (occs≤syncᵗˢ ts) (n≤1+n _)
+  occs≤syncᵉ emptyᵉ          = z≤n
+  occs≤syncᵉ (mapᵉ f e)      =
+    ≤-trans (+-mono-≤ (occs≤syncᵗ f) (occs≤syncᵉ e)) (n≤1+n _)
+  occs≤syncᵉ (takeᵉ c e)     =
+    ≤-trans (+-mono-≤ (occs≤syncᵗ c) (occs≤syncᵉ e)) (n≤1+n _)
+  occs≤syncᵉ (scanᵉ f z e)   =
+    ≤-trans (+-mono-≤ (+-mono-≤ (occs≤syncᵗ f) (occs≤syncᵗ z))
+                      (occs≤syncᵉ e))
+            (n≤1+n _)
+  occs≤syncᵉ (mergeAllᵉ e)   = ≤-trans (occs≤syncᵉ e) (n≤1+n _)
+  occs≤syncᵉ (concatAllᵉ e)  = ≤-trans (occs≤syncᵉ e) (n≤1+n _)
+  occs≤syncᵉ (switchAllᵉ e)  = ≤-trans (occs≤syncᵉ e) (n≤1+n _)
+  occs≤syncᵉ (exhaustAllᵉ e) = ≤-trans (occs≤syncᵉ e) (n≤1+n _)
+  occs≤syncᵉ (μᵉ e)          = ≤-trans (occs≤syncᵉ e) (n≤1+n _)
+  occs≤syncᵉ (varᵉ x)        = z≤n
+  occs≤syncᵉ (deferᵉ e)      = z≤n
+
+  occs≤syncᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
+    occsᵗ tm ≤ syncSizeᵗ tm
+  occs≤syncᵗ (varᵗ x)      = ≤-refl
+  occs≤syncᵗ unit̂          = z≤n
+  occs≤syncᵗ (bool̂ _)      = z≤n
+  occs≤syncᵗ (nat̂ _)       = z≤n
+  occs≤syncᵗ (pairᵗ a b)   =
+    ≤-trans (+-mono-≤ (occs≤syncᵗ a) (occs≤syncᵗ b)) (n≤1+n _)
+  occs≤syncᵗ (fstᵗ p)      = ≤-trans (occs≤syncᵗ p) (n≤1+n _)
+  occs≤syncᵗ (sndᵗ p)      = ≤-trans (occs≤syncᵗ p) (n≤1+n _)
+  occs≤syncᵗ (inlᵗ a)      = ≤-trans (occs≤syncᵗ a) (n≤1+n _)
+  occs≤syncᵗ (inrᵗ a)      = ≤-trans (occs≤syncᵗ a) (n≤1+n _)
+  occs≤syncᵗ (caseᵗ s l r) =
+    ≤-trans (+-mono-≤ (+-mono-≤ (occs≤syncᵗ s) (occs≤syncᵗ l))
+                      (occs≤syncᵗ r))
+            (n≤1+n _)
+  occs≤syncᵗ (ifᵗ c a b)   =
+    ≤-trans (+-mono-≤ (+-mono-≤ (occs≤syncᵗ c) (occs≤syncᵗ a))
+                      (occs≤syncᵗ b))
+            (n≤1+n _)
+  occs≤syncᵗ (primᵗ _ a)   = ≤-trans (occs≤syncᵗ a) (n≤1+n _)
+  occs≤syncᵗ (strmᵗ e)     = ≤-trans (occs≤syncᵉ e) (n≤1+n _)
+
+  occs≤syncᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    occsᵗˢ ts ≤ syncSizeᵗˢ ts
+  occs≤syncᵗˢ []       = z≤n
+  occs≤syncᵗˢ (y ∷ ys) = +-mono-≤ (occs≤syncᵗ y) (occs≤syncᵗˢ ys)
+
+-- the length shadow of the subΘ multiset equation, EXACT:
+-- instantiation adds precisely the plugged shells to the inner
+-- multiset's cardinality (read the equation through totᵛ at B = 0)
+inner-len-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+  length (innerᵉ (subΘExp Θloc σ e)) ≡
+    length (innerᵉ e) + length (plugsᵉ Θloc σ e)
+inner-len-subΘ Θloc σ e =
+  trans (sym (totᵛ-counts 0 (innerᵉ (subΘExp Θloc σ e))))
+  (trans (cong totᵛ (subΘ-countsᵉ 0 Θloc σ e))
+  (trans (totᵛ-⊕ᵛ (counts 0 (innerᵉ e)) (counts 0 (plugsᵉ Θloc σ e)))
+         (cong₂ _+_ (totᵛ-counts 0 (innerᵉ e))
+                    (totᵛ-counts 0 (plugsᵉ Θloc σ e)))))
+
+-- sync-linearity, packaged for the hop: an instantiated template's
+-- shell count — its entry sum, the rank bridge's side condition —
+-- is the template's syntax plus occurrences · per-value cap, before
+-- any store re-cap
+subΘ-shells-len : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+  (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+  EnvLen V σ →
+  length (shellsᵉ (subΘExp Θloc σ e)) ≤ sizeᵉ e + occsᵉ e * V
+subΘ-shells-len V Θloc σ e hσ =
+  ≤-trans (≤-reflexive (cong suc (inner-len-subΘ Θloc σ e)))
+          (+-mono-≤ (inner-lenᵉ e) (plugs-lenᵉ V Θloc σ e hσ))
+
+------------------------------------------------------------------
+-- THE SEED INEQUALITY, PROVEN: the contract's whole demand — under
+-- one product by dBound-bound — fits the seeded budget's literal
+-- head plus tower at instant 0.  The engine (prod≤3pow) is generic:
+-- for any store bound V ≥ 2, (1+V)(1+R)(1+U) with R = (1+V)^(1+V)
+-- and U ≤ V sits within THREE exponential stories above V — exactly
+-- the three stories syncBudget's tower height carries above
+-- sizeBudgetAt's (the "(4+sz) vs (1+sz)" gap, now theorem-backed at
+-- the burst; the id > 0 instances are cascadeGo-wet's obligation).
+------------------------------------------------------------------
+
+1≤2^ : ∀ k → 1 ≤ 2 ^ k
+1≤2^ k = ≤-trans (s≤s z≤n) (n<2^n k)
+
+suc-2^ : ∀ k → suc (2 ^ k) ≤ 2 ^ suc k
+suc-2^ k = ≤-trans (+-monoˡ-≤ (2 ^ k) (1≤2^ k))
+                   (≤-reflexive (cong (2 ^ k +_) (sym (+-identityʳ (2 ^ k)))))
+
+k+2≤2^k : ∀ k → 2 ≤ k → k + 2 ≤ 2 ^ k
+k+2≤2^k (suc zero)          (s≤s ())
+k+2≤2^k (suc (suc zero))    _ = ≤ᵇ⇒≤ 4 4 tt
+k+2≤2^k (suc (suc (suc j))) _ =
+  ≤-trans (s≤s (k+2≤2^k (suc (suc j)) (s≤s (s≤s z≤n))))
+          (suc-2^ (suc (suc j)))
+
+2k≤2^k : ∀ k → 2 ≤ k → k + k ≤ 2 ^ k
+2k≤2^k (suc zero)          (s≤s ())
+2k≤2^k (suc (suc zero))    _ = ≤ᵇ⇒≤ 4 4 tt
+2k≤2^k (suc (suc (suc j))) _ =
+  ≤-trans (≤-reflexive (cong suc (+-suc (suc (suc j)) (suc (suc j)))))
+  (+-mono-≤ (^-monoʳ-≤ 2 {x = 1} {y = suc (suc j)} (s≤s z≤n))
+            (≤-trans (2k≤2^k (suc (suc j)) (s≤s (s≤s z≤n)))
+                     (≤-reflexive (sym (+-identityʳ (2 ^ suc (suc j)))))))
+
+prod≤3pow : ∀ (V U : ℕ) → 2 ≤ V → U ≤ V →
+  suc (suc V * suc (suc V ^ suc V) * suc U) ≤ 2 ^ (2 ^ (2 ^ V))
+prod≤3pow V U 2≤V U≤V =
+  ≤-trans (s≤s prod≤2F) (≤-trans (suc-2^ F) (^-monoʳ-≤ 2 sucF≤))
+  where
+  F = V + suc (V * suc V) + V
+
+  hV : suc V ≤ 2 ^ V
+  hV = n<2^n V
+
+  hR : suc (suc V ^ suc V) ≤ 2 ^ suc (V * suc V)
+  hR = ≤-trans (s≤s (≤-trans (^-monoˡ-≤ (suc V) hV)
+                             (≤-reflexive (^-*-assoc 2 V (suc V)))))
+               (suc-2^ (V * suc V))
+
+  hU : suc U ≤ 2 ^ V
+  hU = ≤-trans (s≤s U≤V) hV
+
+  prod≤2F : suc V * suc (suc V ^ suc V) * suc U ≤ 2 ^ F
+  prod≤2F = ≤-trans (*-mono-≤ (*-mono-≤ hV hR) hU)
+    (≤-reflexive
+      (trans (cong (_* 2 ^ V) (sym (^-distribˡ-+-* 2 V (suc (V * suc V)))))
+             (sym (^-distribˡ-+-* 2 (V + suc (V * suc V)) V))))
+
+  -- suc F + slack = (V+2)², counted exactly (the ring identity)
+  slack-eq : (3 + V) + F ≡ (V + 2) * (V + 2)
+  slack-eq = solve 1
+    (λ v → (con 3 :+ v) :+ ((v :+ (con 1 :+ v :* (con 1 :+ v))) :+ v)
+             := (v :+ con 2) :* (v :+ con 2))
+    refl V
+
+  sucF≤ : suc F ≤ 2 ^ (2 ^ V)
+  sucF≤ =
+    ≤-trans (+-monoˡ-≤ F (s≤s (z≤n {suc (suc V)})))   -- suc F ≤ (3+V) + F
+    (≤-trans (≤-reflexive slack-eq)
+    (≤-trans (*-mono-≤ (k+2≤2^k V 2≤V) (k+2≤2^k V 2≤V))
+    (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 V V)))
+             (^-monoʳ-≤ 2 (2k≤2^k V 2≤V)))))
+
+-- the burst's seed step: at instant 0 the demand product sits under
+-- the budget's tower summand alone
+seed-covers : ∀ (sz U : ℕ) → U ≤ sz →
+  let V = towerℕ (suc sz * 1) in
+  suc (suc V * suc (suc V ^ suc V) * suc U)
+    ≤ 2 ^ (sz * 1 * 1) + towerℕ ((4 + sz) * 1)
+seed-covers sz U U≤sz
+  rewrite *-identityʳ sz | *-identityʳ sz =
+  ≤-trans (prod≤3pow (towerℕ (suc sz)) U 2≤V U≤V)
+          (m≤n+m (towerℕ (4 + sz)) (2 ^ sz))
+  where
+  2≤V : 2 ≤ towerℕ (suc sz)
+  2≤V = towerℕ-mono {1} {suc sz} (s≤s z≤n)
+  U≤V : U ≤ towerℕ (suc sz)
+  U≤V = ≤-trans U≤sz (≤-trans (n≤1+n sz) (k≤towerℕ (suc sz)))
+
+------------------------------------------------------------------
+-- GRINDER QUEUE — mechanical waypoints with settled statements,
+-- postulated for the grinder to discharge one at a time.  Each is
+-- a structural induction or ≤-chain shaped exactly like a proven
+-- neighbor (named per item).  None is consumed yet: the consumers
+-- arrive with the subscribeE-wet clause grind (G1-G4 feed the
+-- store-landing bounds at applyFn/evalWith sites — closeUnderFn IS
+-- subΘExp [], so obs-typed eval results are direct subΘ instances)
+-- and the cascade-side seed step (G5).  Replace postulates with
+-- proofs; do NOT reshape statements.
+------------------------------------------------------------------
+
+-- the store-side cap on an environment — what stBounded? hands
+-- out; the shell caps (EnvLen, EnvCap) both follow from it
+EnvSize : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) → All (Val Γ) Θ → Set
+EnvSize V []ᵃ                = ⊤
+EnvSize V (_∷ᵃ_ {x = t} v σ) = (sizeᵛ t v ≤ V) × EnvSize V σ
+
+postulate
+  -- (G1) per-entry cons of shellsᵛ-len / shellsᵛ-≤ with ≤-trans
+  envSize→envLen : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (σ : All (Val Γ) Θ) →
+    EnvSize V σ → EnvLen V σ
+  envSize→envCap : ∀ {n} {Γ : Ctx n} {Θ} (B : ℕ) (σ : All (Val Γ) Θ) →
+    EnvSize B σ → EnvCap B σ
+
+  -- (G2) renamings are size-invariant (constructors map 1-1) —
+  -- mirror shellSize-ren/inner-ren's mutual shape over sizeᵉ/ᵗ/ᵗˢ
+  size-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (e : Exp Γ Δᵍ Δ Θ t) → sizeᵉ (renExp ρg ρd ρt e) ≡ sizeᵉ e
+  size-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (tm : Tm Γ Δᵍ Δ Θ t) → sizeᵗ (renTm ρg ρd ρt tm) ≡ sizeᵗ tm
+  size-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → sizeᵗˢ (renTms ρg ρd ρt ts) ≡ sizeᵗˢ ts
+
+  -- (G3) reification at most doubles: each obs embed adds one
+  -- strmᵗ node, each pair/sum node maps 1-1 (sizeᵉ-pos covers the
+  -- obs base case's off-by-one) — induction like shellsᵛ-len
+  size-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+    sizeᵗ (reify v) ≤ 2 * sizeᵛ t v
+
+  -- (G4) substitution grows size at most linearly in the env cap:
+  -- every varᵗ (size 1) becomes a weakened reified value ≤ 2V
+  -- (G2 + G3), every other constructor maps 1-1 — the multiplicative
+  -- form composes clause-by-clause (1 ≤ suc (2 * V) absorbs each
+  -- suc).  Mutual over ᵉ/ᵗ/ᵗˢ, shaped like subΘ-capᵉ
+  size-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvSize V σ → sizeᵉ (subΘExp Θloc σ e) ≤ sizeᵉ e * suc (2 * V)
+  size-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvSize V σ → sizeᵗ (subΘTm Θloc σ tm) ≤ sizeᵗ tm * suc (2 * V)
+  size-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    EnvSize V σ → sizeᵗˢ (subΘTms Θloc σ ts) ≤ sizeᵗˢ ts * suc (2 * V)
+
+  -- (G5) the id-general seed inequality: prod≤3pow + the
+  -- definitional collapse 2^2^2^(towerℕ h) ≡ towerℕ (3 + h) +
+  -- towerℕ-mono over 3 + suc sz * suc id ≤ (4 + sz) * suc id (the
+  -- slack is 3 * id — solver-friendly) + m≤n+m for the pad head.
+  -- When this lands, rederive seed-covers as its id-0 instance
+  budget-covers : ∀ (sz U id : ℕ) → U ≤ sz →
+    let V = towerℕ (suc sz * suc id) in
+    suc (suc V * suc (suc V ^ suc V) * suc U)
+      ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((4 + sz) * suc id)
+
+  -- (G6) the no-fuel bursts are dry-free: no machine rule emits
+  -- reason `dried`, so a concrete event list rejects dryEvent
+  -- pointwise — a list induction over map value plus the literal
+  -- init/close/complete heads
+  oneShot-dry : ∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (id : Id)
+    (sched : Sched Γ) →
+    hasDry (proj₁ (oneShotBurst vals id sched)) ≡ false
+
+  -- (G7) installing a bounded node state preserves the store
+  -- invariant — all-preservation through setNode (insert or
+  -- overwrite), shaped like sweepLive-bounded
+  install-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
+    (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →
+    boundedNode B ns ≡ true → stBounded? B sched st ≡ true →
+    stBounded? B sched (installNode nid ns st) ≡ true
+
+------------------------------------------------------------------
+-- THE EVAL GROWTH BOUND, PROVEN: one evaluation grows a value at
+-- most to (2+2V)^(3^|tm|) from a V-capped environment.  The naive
+-- per-template LINEAR bound is FALSE — a nested caseᵗ extends the
+-- environment with an already-grown scrutinee component, so caps
+-- compound multiplicatively per nesting level — but the compounding
+-- is exactly a base swap V ↦ (2+2V)^(3^|sc|), and the tripled
+-- exponent absorbs it: 2+2·C^p ≤ C^(p+2) (grow-pow) and
+-- (3^|sc|+2)·3^|branch| ≤ 3^|caseᵗ …| (case-exp).  This is the
+-- store-landing substrate at every applyFn/evalWith site of the
+-- wet contract's clause grind: per application the store jumps at
+-- most one exponential-of-exponential above the current cap, which
+-- the per-instant tower step dwarfs.  Consumes G4 (size-subΘᵉ) at
+-- the strmᵗ instantiation clause.
+------------------------------------------------------------------
+
+envSize-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (σ : All (Val Γ) Θ) →
+  EnvSize V σ → (z : t ∈ Θ) → sizeᵛ t (lookupEnv σ z) ≤ V
+envSize-lookup V (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
+envSize-lookup V (v ∷ᵃ σ) (hv , hσ) (there z)   = envSize-lookup V σ hσ z
+
+envSize-widen : ∀ {n} {Γ : Ctx n} {Θ} {V V′ : ℕ} → V ≤ V′ →
+  (σ : All (Val Γ) Θ) → EnvSize V σ → EnvSize V′ σ
+envSize-widen le []ᵃ       _         = tt
+envSize-widen le (v ∷ᵃ σ) (hv , hσ) =
+  ≤-trans hv le , envSize-widen le σ hσ
+
+-- base facts about the growth base C = 2+2V
+2≤C : ∀ V → 2 ≤ 2 + 2 * V
+2≤C V = m≤m+n 2 (2 * V)
+
+V≤C : ∀ V → V ≤ 2 + 2 * V
+V≤C V = ≤-trans (m≤m+n V (V + 0)) (m≤n+m (2 * V) 2)
+
+one≤pow : ∀ V k → 1 ≤ (2 + 2 * V) ^ k
+one≤pow V k = ≤-trans (1≤2^ k) (^-monoˡ-≤ k (2≤C V))
+
+one≤3^ : ∀ k → 1 ≤ 3 ^ k
+one≤3^ k = ≤-trans (1≤2^ k) (^-monoˡ-≤ k (s≤s (s≤s z≤n)))
+
+k≤3^k : ∀ k → k ≤ 3 ^ k
+k≤3^k k = ≤-trans (≤-trans (n≤1+n k) (n<2^n k))
+                  (^-monoˡ-≤ k (s≤s (s≤s z≤n)))
+
+pow1 : ∀ V {k} → 1 ≤ k → 2 + 2 * V ≤ (2 + 2 * V) ^ k
+pow1 V h = ≤-trans (≤-reflexive (sym (*-identityʳ (2 + 2 * V))))
+                   (^-monoʳ-≤ (2 + 2 * V) h)
+
+-- one growth story: suc under the bound steps the exponent once
+suc-pow-C : ∀ V p → suc ((2 + 2 * V) ^ p) ≤ (2 + 2 * V) ^ suc p
+suc-pow-C V p =
+  ≤-trans (+-monoˡ-≤ X (one≤pow V p))
+  (≤-trans (≤-reflexive (cong (X +_) (sym (+-identityʳ X))))
+           (*-monoˡ-≤ X (2≤C V)))
+  where X = (2 + 2 * V) ^ p
+
+-- two grown children: sizes sum, bounds multiply, all within the
+-- tripled exponent
+m+n≤m*n : ∀ {m n} → 2 ≤ m → 2 ≤ n → m + n ≤ m * n
+m+n≤m*n {m} {suc n′} 2≤m (s≤s 1≤n′) =
+  ≤-trans (+-monoʳ-≤ m
+            (≤-trans (+-mono-≤ 1≤n′ (≤-reflexive (sym (+-identityʳ n′))))
+                     (*-monoˡ-≤ n′ 2≤m)))
+          (≤-reflexive (sym (*-suc m n′)))
+
+pow3-pair : ∀ V (x y sa sb : ℕ) →
+  x ≤ (2 + 2 * V) ^ (3 ^ sa) → y ≤ (2 + 2 * V) ^ (3 ^ sb) →
+  suc (x + y) ≤ (2 + 2 * V) ^ (3 ^ suc (sa + sb))
+pow3-pair V x y sa sb hx hy =
+  ≤-trans (s≤s (+-mono-≤ hx hy))
+  (≤-trans (s≤s (m+n≤m*n 2≤P 2≤Q))
+  (≤-trans (+-monoˡ-≤ (P * Q) (*-mono-≤ (one≤pow V (3 ^ sa)) (one≤pow V (3 ^ sb))))
+  (≤-trans (≤-reflexive (cong (P * Q +_) (sym (+-identityʳ (P * Q)))))
+  (≤-trans (*-monoˡ-≤ (P * Q) (2≤C V))
+  (≤-trans (≤-reflexive (cong ((2 + 2 * V) *_)
+             (sym (^-distribˡ-+-* (2 + 2 * V) (3 ^ sa) (3 ^ sb)))))
+           (^-monoʳ-≤ (2 + 2 * V) exp-arith))))))
+  where
+  P = (2 + 2 * V) ^ (3 ^ sa)
+  Q = (2 + 2 * V) ^ (3 ^ sb)
+  X = 3 ^ (sa + sb)
+  2≤P = ≤-trans (2≤C V) (pow1 V (one≤3^ sa))
+  2≤Q = ≤-trans (2≤C V) (pow1 V (one≤3^ sb))
+  exp-arith : suc (3 ^ sa + 3 ^ sb) ≤ 3 ^ suc (sa + sb)
+  exp-arith =
+    +-mono-≤ (one≤3^ (sa + sb))
+      (+-mono-≤ (^-monoʳ-≤ 3 (m≤m+n sa sb))
+                (≤-trans (^-monoʳ-≤ 3 (m≤n+m sb sa))
+                         (≤-reflexive (sym (+-identityʳ X)))))
+
+-- the case hop: a branch bound over the GROWN cap collapses back —
+-- the base swap costs two exponent units, absorbed by the 3^ jump
+grow-pow : ∀ V p → 2 + 2 * ((2 + 2 * V) ^ p) ≤ (2 + 2 * V) ^ (p + 2)
+grow-pow V p =
+  ≤-trans (+-monoˡ-≤ (2 * X)
+            (+-mono-≤ (one≤pow V p)
+              (+-mono-≤ (one≤pow V p) (z≤n {0}))))
+  (≤-trans (≤-reflexive (solve 1
+             (λ x → con 2 :* x :+ con 2 :* x := x :* con 4) refl X))
+  (≤-trans (*-monoʳ-≤ X
+             (*-mono-≤ (2≤C V)
+               (≤-trans (2≤C V) (≤-reflexive (sym (*-identityʳ (2 + 2 * V)))))))
+           (≤-reflexive (sym (^-distribˡ-+-* (2 + 2 * V) p 2)))))
+  where X = (2 + 2 * V) ^ p
+
+pow3-hop : ∀ V (x p q E : ℕ) →
+  x ≤ (2 + 2 * ((2 + 2 * V) ^ p)) ^ q →
+  (p + 2) * q ≤ E →
+  x ≤ (2 + 2 * V) ^ E
+pow3-hop V x p q E hx hE =
+  ≤-trans hx
+  (≤-trans (^-monoˡ-≤ q (grow-pow V p))
+  (≤-trans (≤-reflexive (^-*-assoc (2 + 2 * V) (p + 2) q))
+           (^-monoʳ-≤ (2 + 2 * V) hE)))
+
+case-exp : ∀ ss b K → ss + b ≤ K → (3 ^ ss + 2) * 3 ^ b ≤ 3 ^ suc K
+case-exp ss b K h =
+  ≤-trans (*-monoˡ-≤ (3 ^ b)
+            (+-monoʳ-≤ Y
+              (+-mono-≤ (one≤3^ ss)
+                (+-mono-≤ (one≤3^ ss) (z≤n {0})))))
+  (≤-trans (≤-reflexive (trans (*-assoc 3 Y (3 ^ b))
+                               (cong (3 *_) (sym (^-distribˡ-+-* 3 ss b)))))
+           (^-monoʳ-≤ 3 (s≤s h)))
+  where Y = 3 ^ ss
+
+-- THE BOUND.  Induction on the term; the caseᵗ clauses re-enter at
+-- the grown cap and collapse via pow3-hop
+evalWith-size : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ)
+  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) → EnvSize V env →
+  sizeᵛ t (evalWith tm env) ≤ (2 + 2 * V) ^ (3 ^ sizeᵗ tm)
+evalWith-size V (varᵗ x) env hσ =
+  ≤-trans (envSize-lookup V env hσ x)
+          (≤-trans (V≤C V) (pow1 V (one≤3^ 1)))
+evalWith-size V unit̂     env hσ = one≤pow V (3 ^ 1)
+evalWith-size V (bool̂ _) env hσ = one≤pow V (3 ^ 1)
+evalWith-size V (nat̂ _)  env hσ = one≤pow V (3 ^ 1)
+evalWith-size V (pairᵗ a b) env hσ =
+  pow3-pair V _ _ (sizeᵗ a) (sizeᵗ b)
+    (evalWith-size V a env hσ) (evalWith-size V b env hσ)
+evalWith-size {t = t} V (fstᵗ p) env hσ
+  with evalWith p env | evalWith-size V p env hσ
+... | (a , b) | ihp =
+  ≤-trans (≤-trans (m≤m+n (sizeᵛ _ a) (sizeᵛ _ b)) (n≤1+n _))
+          (≤-trans ihp
+                   (^-monoʳ-≤ (2 + 2 * V) (^-monoʳ-≤ 3 (n≤1+n (sizeᵗ p)))))
+evalWith-size {t = t} V (sndᵗ p) env hσ
+  with evalWith p env | evalWith-size V p env hσ
+... | (a , b) | ihp =
+  ≤-trans (≤-trans (m≤n+m (sizeᵛ _ b) (sizeᵛ _ a)) (n≤1+n _))
+          (≤-trans ihp
+                   (^-monoʳ-≤ (2 + 2 * V) (^-monoʳ-≤ 3 (n≤1+n (sizeᵗ p)))))
+evalWith-size V (inlᵗ a) env hσ =
+  ≤-trans (s≤s (evalWith-size V a env hσ))
+  (≤-trans (suc-pow-C V (3 ^ sizeᵗ a))
+           (^-monoʳ-≤ (2 + 2 * V)
+             (+-mono-≤ (one≤3^ (sizeᵗ a))
+                       (m≤m+n (3 ^ sizeᵗ a) (3 ^ sizeᵗ a + 0)))))
+evalWith-size V (inrᵗ a) env hσ =
+  ≤-trans (s≤s (evalWith-size V a env hσ))
+  (≤-trans (suc-pow-C V (3 ^ sizeᵗ a))
+           (^-monoʳ-≤ (2 + 2 * V)
+             (+-mono-≤ (one≤3^ (sizeᵗ a))
+                       (m≤m+n (3 ^ sizeᵗ a) (3 ^ sizeᵗ a + 0)))))
+evalWith-size V (caseᵗ {s = s} {t = t} sc l r) env hσ
+  with evalWith sc env | evalWith-size V sc env hσ
+... | inj₁ a | ihsc =
+  pow3-hop V _ (3 ^ sizeᵗ sc) (3 ^ sizeᵗ l) _
+    (evalWith-size ((2 + 2 * V) ^ (3 ^ sizeᵗ sc)) l (a ∷ᵃ env)
+      ( ≤-trans (n≤1+n _) ihsc
+      , envSize-widen (≤-trans (V≤C V) (pow1 V (one≤3^ (sizeᵗ sc)))) env hσ))
+    (case-exp (sizeᵗ sc) (sizeᵗ l) (sizeᵗ sc + sizeᵗ l + sizeᵗ r)
+      (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r)))
+... | inj₂ b | ihsc =
+  pow3-hop V _ (3 ^ sizeᵗ sc) (3 ^ sizeᵗ r) _
+    (evalWith-size ((2 + 2 * V) ^ (3 ^ sizeᵗ sc)) r (b ∷ᵃ env)
+      ( ≤-trans (n≤1+n _) ihsc
+      , envSize-widen (≤-trans (V≤C V) (pow1 V (one≤3^ (sizeᵗ sc)))) env hσ))
+    (case-exp (sizeᵗ sc) (sizeᵗ r) (sizeᵗ sc + sizeᵗ l + sizeᵗ r)
+      (+-monoˡ-≤ (sizeᵗ r) (m≤m+n (sizeᵗ sc) (sizeᵗ l))))
+evalWith-size V (ifᵗ c a b) env hσ with evalWith c env
+... | true  =
+  ≤-trans (evalWith-size V a env hσ)
+          (^-monoʳ-≤ (2 + 2 * V)
+            (^-monoʳ-≤ 3 (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                          (≤-trans (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))
+                                   (n≤1+n _)))))
+... | false =
+  ≤-trans (evalWith-size V b env hσ)
+          (^-monoʳ-≤ (2 + 2 * V)
+            (^-monoʳ-≤ 3 (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))
+                                  (n≤1+n _))))
+evalWith-size V (primᵗ add arg)  env hσ = one≤pow V (3 ^ suc (sizeᵗ arg))
+evalWith-size V (primᵗ sub arg)  env hσ = one≤pow V (3 ^ suc (sizeᵗ arg))
+evalWith-size V (primᵗ mul arg)  env hσ = one≤pow V (3 ^ suc (sizeᵗ arg))
+evalWith-size V (primᵗ eqᵖ arg)  env hσ = one≤pow V (3 ^ suc (sizeᵗ arg))
+evalWith-size V (primᵗ ltᵖ arg)  env hσ = one≤pow V (3 ^ suc (sizeᵗ arg))
+evalWith-size V (primᵗ notᵖ arg) env hσ = one≤pow V (3 ^ suc (sizeᵗ arg))
+evalWith-size V (strmᵗ e) []ᵃ hσ =
+  ≤-trans (≤-trans (n≤1+n (sizeᵉ e)) (n<2^n (sizeᵉ e)))
+  (≤-trans (^-monoˡ-≤ (sizeᵉ e) (2≤C V))
+           (^-monoʳ-≤ (2 + 2 * V)
+             (≤-trans (k≤3^k (sizeᵉ e)) (^-monoʳ-≤ 3 (n≤1+n (sizeᵉ e))))))
+evalWith-size V (strmᵗ e) (v ∷ᵃ vs) hσ =
+  ≤-trans (size-subΘᵉ V [] (v ∷ᵃ vs) e hσ)
+  (≤-trans (*-mono-≤
+             (≤-trans (≤-trans (n≤1+n (sizeᵉ e)) (n<2^n (sizeᵉ e)))
+                      (^-monoˡ-≤ (sizeᵉ e) (2≤C V)))
+             (n≤1+n (suc (2 * V))))
+  (≤-trans (≤-reflexive (*-comm ((2 + 2 * V) ^ sizeᵉ e) (2 + 2 * V)))
+           (^-monoʳ-≤ (2 + 2 * V) (k≤3^k (suc (sizeᵉ e))))))
+
+-- the applyFn/evalTm faces the contract's clause grind consumes
+applyFn-size : ∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
+  (fn : Fn Γ [] [] [] s t) (v : Val Γ s) → sizeᵛ s v ≤ V →
+  sizeᵛ t (applyFn fn v) ≤ (2 + 2 * V) ^ (3 ^ sizeᵗ fn)
+applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
+
+evalTm-size : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
+  sizeᵛ t (evalTm tm) ≤ 2 ^ (3 ^ sizeᵗ tm)
+evalTm-size tm = evalWith-size 0 tm []ᵃ tt
+
+------------------------------------------------------------------
 -- the three cores
 ------------------------------------------------------------------
 
@@ -1626,13 +2387,13 @@ mutual
 --          where the LEDGER lives — the plugs are prior stored
 --          values whose shells the global multiset already owns
 --          (deliveries ≤ syntactic occurrences because subΘ
---          COPIES trees — the sync-linearity lemma, to be proven
---          with the contract).  The exact bookkeeping input is
---          the subΘ multiset equation: counts of the instantiated
---          inner ≡ counts of the template inner ⊕ᵛ counts of the
---          plug shells (per obs-var occurrence) — state it with
---          a plugsᵉ mirror of subΘ when the contract needs it;
---          subΘ-capᵉ above is its All-cap shadow, already proven.
+--          COPIES trees — SYNC-LINEARITY, PROVEN above:
+--          plugs-lenᵉ bounds the plug cardinality by occsᵉ · V,
+--          occs≤syncᵉ caps occurrences syntactically, and
+--          inner-len-subΘ is the exact length bookkeeping).  The
+--          multiset-level input is the subΘ multiset equation
+--          (subΘ-countsᵉ, proven); subΘ-capᵉ is its All-cap
+--          shadow and subΘ-shells-len its entry-sum package.
 --        · share-crossing hop (a template's `input` hits a slot):
 --          exits the per-value measure — it anchors against the
 --          slot's own element of the GLOBAL multiset {program} ⊎
@@ -1672,11 +2433,88 @@ mutual
 -- (cascadeGo-wet); the disjointness argument (each registration's
 -- path owns its minted nodes, so per-cascade store traffic is
 -- structure-bounded) supplies the store-boundedness half.
+--
+-- THE WALK INVARIANT (2026-07-20, the clause-grind session).  The
+-- stated subscribeE-wet is the contract's OUTER FACE only — its
+-- `sizeᵉ b ≤ V` hypothesis holds at both instantiation sites (root
+-- program; stored values) but does NOT self-apply down the walk,
+-- and the induction must generalize internally:
+--   · μ edge: unfoldμ COPIES the closed μ, so sizeᵉ grows past any
+--     fixed cap along iterated unfolds.  Thread the SHELL caps
+--     instead — every shell preserved-or-stepped-down and the
+--     count exactly preserved (shells-unfoldμ-cap/-len above);
+--     sizeᵉ is only needed for STORABILITY, against the (tower)
+--     landing budget, not against V.
+--   · no fixed (V, R) survives the walk: a scan frame folds each
+--     value with NO fuel peel (fuel is depth-consumed; breadth is
+--     free), and each fold is one base swap (applyFn-size), so
+--     mid-walk stores legitimately outgrow the entry cap V and
+--     later inner subscriptions carry ranks past R.  A cap indexed
+--     by REMAINING GAS fails for the same reason (folds do not
+--     peel gas).
+--   · the missing accounting is a per-instant BREADTH LEDGER: the
+--     value-list lengths threading stepFrame/pushBurst.  Breadth
+--     per instant is structurally generated (of-widths, acc
+--     fan-out on subscription) and the measured attack compounds
+--     stores ONE tower story per instant (counts 2^(2^d) after d
+--     instants) — the suc-sz stories sizeBudgetAt adds per instant
+--     dominate.  The internal invariant should carry (grown cap
+--     W, breadth budget) with applyFn-size discharging one swap
+--     per fold and the breadth ledger bounding the fold count;
+--     its closed form is the next design block — decide it BEFORE
+--     stating any pushBurst/stepFrame wet postulate (an imprecise
+--     one would be false: FoldOut rule).
 ------------------------------------------------------------------
 
 postulate
+  -- THE WET CONTRACT, stated at the mutual block's entry point:
+  -- from a store-bounded machine, subscribing any store-sized value
+  -- with fuel for its demand neither dries nor escapes the next
+  -- instant's budget.  This is the strengthened induction of the
+  -- proof design above, to be ground clause by clause through the
+  -- block (subscribeE / stepFrame / pushBurst / subscribeAll /
+  -- subscribeInner / subscribeSharedSlot), each decrement edge
+  -- consuming one hasAtLeast-peel against dBound-μ / dBound-hop /
+  -- dBound-connect.  The internal walk threads a stronger invariant
+  -- (mid-walk states at the SAME instant); only this outer face is
+  -- fixed here.
+  subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    let V = sizeBudgetAt e (Sched.slots sched) id in
+    stBounded? V sched st ≡ true →
+    sizeᵉ b ≤ V →
+    g hasAtLeast
+      suc (dBound V (suc V ^ suc V)
+                  (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+                  (rank V (measureE V b)) (syncSizeᵉ b)) →
+    let r = subscribeE g b κ id now sched st
+    in (hasDry (proj₁ r) ≡ false)
+       × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
   -- the chain fold at instant id, from a latched state within id's
-  -- size budget, stays wet and lands within suc id's
+  -- size budget, stays wet and lands within suc id's.
+  --
+  -- FOLD-THREADING (2026-07-20, the ledger finding): this core does
+  -- NOT decompose into an end-to-end per-chainStep contract at the
+  -- two fixed bounds.  After chain k lands, chain k+1 starts from a
+  -- mid-cascade state that only suc id's budget bounds — and a
+  -- fixed-bound "start @ suc id → land @ suc id" step statement is
+  -- FALSE over its full quantification (a store value near the
+  -- bound grows past it under one more applyFn), so stating it
+  -- would be a forbidden false postulate.  The honest decomposition
+  -- threads per-cascade growth through the fold, and its exponent
+  -- budget is |chains| · demand — but |chains| (the registry's
+  -- cardinality at instant id) has NO syntactic bound: it needs its
+  -- own cumulative invariant (registrations accrue ≤ demand per
+  -- instant) formulated and proven BEFORE a chainStep-wet can be
+  -- shaped truthfully.  Until then this stays one postulate (the
+  -- FoldOut precedent: no half-stated leaf).  What IS proven of the
+  -- ledger: connect-anchor (share crossings re-anchor against the
+  -- global syntactic multiset {program} ⊎ {slots}), and the
+  -- per-cascade delivered/cancelled ledger caps deliveries at one
+  -- per registration (Verify-Well-Formed's cascadeGo-skip ring).
   cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
@@ -1687,19 +2525,55 @@ postulate
        × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                      (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- the root burst neither dries nor escapes instant 1's budget:
-  -- fuel-accounting over subscribeE's clauses — the subscribe frame's
-  -- values are evalTm outputs over empty environments, sized within
-  -- the program's own syntax
-  burst-dry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
-                              (sched-init e ins) (st-init e))) ≡ false
+------------------------------------------------------------------
+-- the burst cores — PROVEN: the contract instantiated at the root.
+-- The root subscribes the program itself from the initial machine:
+-- init-bounded seeds the store invariant, the program is its own
+-- size witness, and the seeded budget covers the demand by
+-- dBound-bound + seed-covers (U ≤ sz through the slot content,
+-- r ≤ R through measureE-rank).
+------------------------------------------------------------------
 
-  burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    let r = subscribeE (budgetAt e ins 0) e root 0 0
-                       (sched-init e ins) (st-init e)
-    in stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+burst-wet : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in (hasDry (proj₁ r) ≡ false)
+     × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
+                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+burst-wet e ins =
+  subscribeE-wet (budgetAt e ins 0) e root 0 0
+                 (sched-init e ins) (st-init e)
+                 (init-bounded e ins 0) size≤V fuel-ok
+  where
+  sz = sizeᵉ e + slotsSize ins
+  V  = sizeBudgetAt e ins 0
+
+  size≤V : sizeᵉ e ≤ V
+  size≤V = size≤budget e ins 0
+
+  U≤sz : unconn ins [] ≤ sz
+  U≤sz = ≤-trans (unconn≤slots ins []) (m≤n+m (slotsSize ins) (sizeᵉ e))
+
+  fuel-ok : budgetAt e ins 0 hasAtLeast
+    suc (dBound V (suc V ^ suc V) (unconn ins [])
+                (rank V (measureE V e)) (syncSizeᵉ e))
+  fuel-ok = hasAtLeast-mono
+    (≤-trans (s≤s (dBound-bound (≤-trans (syncSize≤sizeᵉ e) size≤V)
+                                (<⇒≤ (measureE-rank V V e size≤V))))
+             (seed-covers sz (unconn ins []) U≤sz))
+    (budget-hasAtLeast sz 0)
+
+burst-dry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                            (sched-init e ins) (st-init e))) ≡ false
+burst-dry e ins = proj₁ (burst-wet e ins)
+
+burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
+                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+burst-bounded e ins = proj₂ (burst-wet e ins)
 
 
 ------------------------------------------------------------------

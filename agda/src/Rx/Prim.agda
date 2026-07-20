@@ -87,6 +87,12 @@ data CloseReason : Set where
                                     -- (a cut registration delivers NOTHING, as in rxjs:
                                     -- take(1)(merge(s,s)) — the second chain is silent)
   exhausted  : CloseReason          -- the source ran dry on its own
+  dried      : CloseReason          -- the EVALUATOR ran out of sync fuel — the dry
+                                    -- marker (Rx.Evaluator.dryBurst), never emitted by
+                                    -- any machine rule.  Detection is by THIS REASON
+                                    -- (hasDry), not by a sentinel source: Source is an
+                                    -- unbounded ℕ and mints are breadth-many, so no
+                                    -- numeric sentinel is collision-proof
 
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive

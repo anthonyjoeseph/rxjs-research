@@ -660,3 +660,44 @@ mutual
     → All (Val Γ) Θsub → List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) → List ℕ
   plugsᵗˢ Θloc σ []       = []
   plugsᵗˢ Θloc σ (y ∷ ys) = plugsᵗ Θloc σ y ++ plugsᵗˢ Θloc σ ys
+
+-- the Θ-var occurrence count at sync-reachable positions — the
+-- positions plugsᵉ reads.  subΘ COPIES trees, one copy per
+-- occurrence, so an instantiation delivers each environment value's
+-- shells at most `occs` times: length (plugsᵉ Θloc σ e) ≤ occsᵉ e ·
+-- (per-value shell count) — the sync-linearity lemma
+-- (Verify-Budget-Sufficient.plugs-lenᵉ)
+mutual
+  occsᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  occsᵉ (input i)       = 0
+  occsᵉ (ofᵉ ts)        = occsᵗˢ ts
+  occsᵉ emptyᵉ          = 0
+  occsᵉ (mapᵉ f e)      = occsᵗ f + occsᵉ e
+  occsᵉ (takeᵉ c e)     = occsᵗ c + occsᵉ e
+  occsᵉ (scanᵉ f z e)   = occsᵗ f + occsᵗ z + occsᵉ e
+  occsᵉ (mergeAllᵉ e)   = occsᵉ e
+  occsᵉ (concatAllᵉ e)  = occsᵉ e
+  occsᵉ (switchAllᵉ e)  = occsᵉ e
+  occsᵉ (exhaustAllᵉ e) = occsᵉ e
+  occsᵉ (μᵉ e)          = occsᵉ e
+  occsᵉ (varᵉ x)        = 0
+  occsᵉ (deferᵉ e)      = 0
+
+  occsᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  occsᵗ (varᵗ x)      = 1
+  occsᵗ unit̂          = 0
+  occsᵗ (bool̂ _)      = 0
+  occsᵗ (nat̂ _)       = 0
+  occsᵗ (pairᵗ a b)   = occsᵗ a + occsᵗ b
+  occsᵗ (fstᵗ p)      = occsᵗ p
+  occsᵗ (sndᵗ p)      = occsᵗ p
+  occsᵗ (inlᵗ a)      = occsᵗ a
+  occsᵗ (inrᵗ a)      = occsᵗ a
+  occsᵗ (caseᵗ s l r) = occsᵗ s + occsᵗ l + occsᵗ r
+  occsᵗ (ifᵗ c a b)   = occsᵗ c + occsᵗ a + occsᵗ b
+  occsᵗ (primᵗ _ a)   = occsᵗ a
+  occsᵗ (strmᵗ e)     = occsᵉ e
+
+  occsᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  occsᵗˢ []       = 0
+  occsᵗˢ (y ∷ ys) = occsᵗ y + occsᵗˢ ys

@@ -27,10 +27,7 @@ log() { printf '\n=== %s ===\n' "$1"; }
 
 log "GHC + cabal (apt)"
 if ! command -v ghc >/dev/null 2>&1 || ! command -v cabal >/dev/null 2>&1; then
-  # Some PPA repos may be inaccessible in this cloud environment; allow the update to
-  # proceed despite them by suppressing the error exit code. The standard Ubuntu repos
-  # should be available.
-  sudo apt-get update -y 2>&1 | grep -v "^Err:\|403\|Forbidden\|no longer signed" || true
+  sudo apt-get update -y
   sudo apt-get install -y ghc cabal-install
 else
   echo "ghc $(ghc --numeric-version), cabal $(cabal --numeric-version) already present"
@@ -48,10 +45,12 @@ fi
 
 log "agda-stdlib ${STDLIB_VERSION}"
 if [ ! -d "$STDLIB_DIR" ]; then
-  # Clone the stdlib from git, which is more reliable in restricted network
-  # environments than downloading the tarball via curl.
-  git clone --depth 1 --branch "v${STDLIB_VERSION}" \
-    https://github.com/agda/agda-stdlib.git "$STDLIB_DIR"
+  tarball="/tmp/agda-stdlib-${STDLIB_VERSION}.tar.gz"
+  curl -fsSL \
+    "https://github.com/agda/agda-stdlib/archive/refs/tags/v${STDLIB_VERSION}.tar.gz" \
+    -o "$tarball"
+  tar -xzf "$tarball" -C "$HOME"
+  rm -f "$tarball"
 else
   echo "stdlib already unpacked at ${STDLIB_DIR}"
 fi

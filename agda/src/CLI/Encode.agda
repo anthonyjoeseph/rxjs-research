@@ -55,6 +55,7 @@ private
   encReason cut        = quote′ "cut"
   encReason cutPending = quote′ "cutPending"
   encReason exhausted  = quote′ "exhausted"
+  encReason dried      = quote′ "dried"
 
   encEvent : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEvent (Val Γ t) → String
   encEvent t (init s)     = "{" ++ field′ "type" (quote′ "init") ++ "," ++ field′ "source" (show s) ++ "}"

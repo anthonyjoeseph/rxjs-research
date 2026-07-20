@@ -16,7 +16,7 @@ open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
                            Gas; g0; gs; gasTower; gasPad;
                            Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
-                           CloseReason; cut; cutPending; exhausted;
+                           CloseReason; cut; cutPending; exhausted; dried;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
@@ -345,38 +345,38 @@ oneShotBurst vals id sched =
 -- non-structural edges — a μ unfold, a share connect, an inner-value
 -- subscription — and every other recursion is structural, so
 -- termination is a lexicographic (fuel, expression) descent, no
--- pragma.  A dry run does NOT truncate silently: it emits a close of
--- drySource, a source that is never inited, which the strict protocol
--- rejects on sight — so a fuel-starved run can never be WellFormed,
--- QuickCheck's WF check flags it at runtime, and evaluate-well-formed
--- itself demands budget sufficiency (the old pragma's termination
--- debt, reified as a provable statement).  The seeded budget
--- (syncBudget below) is exponential in program size and instant
--- index — astronomically above the sync work any canonical program
--- performs; proving that is Formal-Verification work
+-- pragma.  A dry run does NOT truncate silently: it emits a close
+-- with reason `dried` — a CloseReason no machine rule ever emits —
+-- so hasDry recognizes it EXACTLY, QuickCheck's WF check flags it at
+-- runtime (the close's source is never inited, which the strict
+-- protocol rejects on sight), and evaluate-well-formed itself demands
+-- budget sufficiency (the old pragma's termination debt, reified as a
+-- provable statement).  The marker is the REASON, not the source:
+-- Source is an unbounded ℕ and mints are breadth-many (fuel is only
+-- depth-consumed), so a burst can legally mint past any numeric
+-- sentinel — a sentinel-source check would misfire on a wet run.
+-- drySource survives only as the envelope's cosmetic source id.  The
+-- seeded budget (syncBudget below) is exponential in program size and
+-- instant index — astronomically above the sync work any canonical
+-- program performs; proving that is Formal-Verification work
 drySource : Source
 drySource = 18446744073709551615
 
 dryBurst : ∀ {A : Set} → Id → List (InstEmit A)
 dryBurst id =
-  ((close drySource exhausted ∷ []) at id from drySource as subscribe) ∷ []
+  ((close drySource dried ∷ []) at id from drySource as subscribe) ∷ []
 
 -- did the run go dry anywhere?  Verify-Well-Formed's step lemmas are
 -- conditioned on `hasDry … ≡ false`, and the budget-sufficient
 -- postulate asserts it for the seeded budget — the totality debt as a
 -- provable statement
 dryEvent : ∀ {A : Set} → InstEvent A → Bool
-dryEvent (init s)    = sameSource s drySource
-dryEvent (close s _) = sameSource s drySource
-dryEvent (handoff s) = sameSource s drySource
-dryEvent _           = false
+dryEvent (close _ dried) = true
+dryEvent _               = false
 
 hasDry : ∀ {A : Set} → List (InstEmit A) → Bool
 hasDry []         = false
-hasDry (em ∷ ems) =
-  sameSource (InstEmit.source em) drySource
-  ∨ any dryEvent (InstEmit.events em)
-  ∨ hasDry ems
+hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 
 -- a TOWER of 2s, height (size+1)·(id+1) — no 2^(polynomial) budget is
 -- sufficient.  Why: a scanᵉ with an obs-typed accumulator whose
@@ -511,7 +511,7 @@ subscribeInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                → NodeId × List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 subscribeInner g0 op allNid κ id now o sched st =
   let inst = Sched.nextNode sched
-  in inst , [] , close drySource exhausted ∷ [] , false
+  in inst , [] , close drySource dried ∷ [] , false
      , record sched { nextNode = suc inst } , st
 subscribeInner (gs fuel) op allNid κ id now o sched st =
   let inst = Sched.nextNode sched

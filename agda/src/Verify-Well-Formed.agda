@@ -38,6 +38,7 @@ open import Relation.Nullary using (Dec; yes; no)
 open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; CloseReason; exhausted;
+                                dried;
                                 cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
                                 unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; evalTm)
@@ -57,7 +58,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 subscribeE; cascade; drain; evaluate;
                                 oneShotBurst; mintSource; register; splitEvents;
                                 pushBurst; scanVals; installNode; mintNode;
-                                sameSource; drySource; dryEvent; hasDry;
+                                sameSource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
                                 stepProtocol; runProtocol; paidUp; settle; hasOwed;
@@ -103,11 +104,9 @@ hasDry-++ : ∀ {A : Set} (xs ys : List (InstEmit A)) →
   (hasDry xs ≡ false) × (hasDry ys ≡ false)
 hasDry-++ []        ys h = refl , h
 hasDry-++ (em ∷ xs) ys h
-  with sameSource (InstEmit.source em) drySource
-     | any dryEvent (InstEmit.events em)
-... | true  | _     = true≢false h
-... | false | true  = true≢false h
-... | false | false = hasDry-++ xs ys h
+  with any dryEvent (InstEmit.events em)
+... | true  = true≢false h
+... | false = hasDry-++ xs ys h
 
 ------------------------------------------------------------------
 -- Inv, CONCRETE: the between-cascades simulation relation
@@ -1362,6 +1361,9 @@ applyEvents-++just (close x cut ∷ es) es₂ lv o d eq with removeOne x lv | eq
 applyEvents-++just (close x exhausted ∷ es) es₂ lv o d eq with removeOne x lv | eq
 ... | just lv′ | eq′ = applyEvents-++just es es₂ lv′ o d eq′
 ... | nothing  | ()
+applyEvents-++just (close x dried ∷ es) es₂ lv o d eq with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-++just es es₂ lv′ o d eq′
+... | nothing  | ()
 
 -- the value list changes nothing but must not ride behind a `complete`
 -- (done-nil: a done automaton delivers no value) — so it folds to identity
@@ -1419,6 +1421,9 @@ applyEvents-done-mono (close s cut ∷ es) lv o d hyp dt
 applyEvents-done-mono (close s exhausted ∷ es) lv o d hyp dt
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = applyEvents-done-mono es lv′ o d hyp′ dt
+applyEvents-done-mono (close s dried ∷ es) lv o d hyp dt
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = applyEvents-done-mono es lv′ o d hyp′ dt
 
 -- ── splitEvents faithfulness: pushBurst's re-emit runs like the original ──
 -- pushBurst re-emits each frame emit as  bookkeeping ++ (frame values) ++
@@ -1460,6 +1465,9 @@ splitEvents-faithful-done (close s cut ∷ es) vals′ lv o hyp
 splitEvents-faithful-done (close s exhausted ∷ es) vals′ lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitEvents-faithful-done es vals′ lv′ o hyp′
+splitEvents-faithful-done (close s dried ∷ es) vals′ lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-faithful-done es vals′ lv′ o hyp′
 
 -- main, done ≡ false: the re-emit's bookkeeping + frame values + maybe-complete
 -- reproduces the original events' (live, owed, done)
@@ -1488,6 +1496,9 @@ splitEvents-faithful (close s cut ∷ es) vals′ lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitEvents-faithful es vals′ lv′ o hyp′
 splitEvents-faithful (close s exhausted ∷ es) vals′ lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-faithful es vals′ lv′ o hyp′
+splitEvents-faithful (close s dried ∷ es) vals′ lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitEvents-faithful es vals′ lv′ o hyp′
 
@@ -1520,6 +1531,9 @@ splitEvents-novals-true (close s cut ∷ es) lv o hyp
 splitEvents-novals-true (close s exhausted ∷ es) lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitEvents-novals-true es lv′ o hyp′
+splitEvents-novals-true (close s dried ∷ es) lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitEvents-novals-true es lv′ o hyp′
 
 -- the bookkeeping alone reproduces a done-entry run's (live, owed), latching
 -- done (values are absent by success, completes are idempotent no-ops)
@@ -1542,6 +1556,9 @@ splitBk-faithful-true (close s cut ∷ es) lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitBk-faithful-true es lv′ o hyp′
 splitBk-faithful-true (close s exhausted ∷ es) lv o hyp
+  with removeOne s lv | hyp
+... | just lv′ | hyp′ = splitBk-faithful-true es lv′ o hyp′
+splitBk-faithful-true (close s dried ∷ es) lv o hyp
   with removeOne s lv | hyp
 ... | just lv′ | hyp′ = splitBk-faithful-true es lv′ o hyp′
 
@@ -3076,6 +3093,9 @@ applyEvents-count (close x cut ∷ es) lv o d {Lv} s eq with removeOne x lv in r
 ... | just lv′ | eq′ = close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o d s eq′)
 ... | nothing  | ()
 applyEvents-count (close x exhausted ∷ es) lv o d {Lv} s eq with removeOne x lv in rmv | eq
+... | just lv′ | eq′ = close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o d s eq′)
+... | nothing  | ()
+applyEvents-count (close x dried ∷ es) lv o d {Lv} s eq with removeOne x lv in rmv | eq
 ... | just lv′ | eq′ = close-count x s lv lv′ Lv es rmv (applyEvents-count es lv′ o d s eq′)
 ... | nothing  | ()
 
