@@ -39,7 +39,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; CloseReason; exhausted;
                                 cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
@@ -55,6 +55,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 cascadeLatch; cascadeGo; cascadeFinish;
                                 subscribeE; cascade; drain; evaluate;
                                 oneShotBurst; mintSource; register; splitEvents;
+                                pushBurst;
                                 sameSource; drySource; dryEvent; hasDry;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
@@ -1741,6 +1742,53 @@ runProtocol-faithful g ((es at i from s as k) ∷ ems) S S′ gempty runEq
       runProtocol-cons (reEmit g (es at i from s as k)) (map (reEmit g) ems) S S₁ S′
         (stepProtocol-faithful g es i s k S S₁ gempty seq)
         (runProtocol-faithful g ems S₁ S′ gempty runEq)
+
+-- pushBurst over a map-f frame IS the reEmit map: stepFrame (map-f) only relabels
+-- values (evs = [], st/sched untouched), so each emit re-emits transparently
+pushBurst-map-char : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : ℕ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u) (κ : Path Γ u t)
+  (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  pushBurst fuel id now (map-f fn) κ burst sched st
+    ≡ (map (reEmit (map (applyFn fn))) burst , sched , st)
+pushBurst-map-char fuel id now fn κ []         sched st = refl
+pushBurst-map-char fuel id now fn κ (em ∷ ems) sched st =
+  cong (λ r → (reEmit (map (applyFn fn)) em ∷ proj₁ r) , proj₂ r)
+       (pushBurst-map-char fuel id now fn κ ems sched st)
+
+-- ── the mapᵉ clause of subscribeE-wf (given the IH on b) ─────────────────
+-- subscribeE (mapᵉ f b) = pushBurst (map-f f) over subscribeE b's burst.  The
+-- IH runs b's burst to S′ under BurstInv; the char rewrites the map frame's
+-- output to the reEmit map (st/sched untouched), and runProtocol-faithful shows
+-- it runs to the SAME S′ — so BurstInv transfers verbatim.  map (applyFn f) is
+-- empty-preserving (refl), the fold's `g [] ≡ []` obligation.
+subscribeE-map-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : ℕ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  (Σ ProtocolSt λ S′ →
+    (runProtocol S (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ just S′)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel b (map-f f ↠ κ) id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel b (map-f f ↠ κ) id now sched st))) S′) →
+  Σ ProtocolSt λ S″ →
+    (runProtocol S (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ just S″)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (mapᵉ f b) κ id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel (mapᵉ f b) κ id now sched st))) S″
+subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀) =
+  S′ , run″ , binv″
+  where
+  r₀ = subscribeE fuel b (map-f f ↠ κ) id now sched st
+  char : subscribeE fuel (mapᵉ f b) κ id now sched st
+         ≡ (map (reEmit (map (applyFn f))) (proj₁ r₀) , proj₁ (proj₂ r₀) , proj₂ (proj₂ r₀))
+  char = pushBurst-map-char fuel id now f κ (proj₁ r₀) (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀))
+
+  run″ : runProtocol S (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ just S′
+  run″ rewrite cong proj₁ char =
+    runProtocol-faithful (map (applyFn f)) (proj₁ r₀) S S′ refl run₀
+
+  binv″ : BurstInv id (proj₁ (proj₂ (subscribeE fuel (mapᵉ f b) κ id now sched st)))
+                     (proj₂ (proj₂ (subscribeE fuel (mapᵉ f b) κ id now sched st))) S′
+  binv″ rewrite cong (λ z → proj₁ (proj₂ z)) char
+              | cong (λ z → proj₂ (proj₂ z)) char = binv₀
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
