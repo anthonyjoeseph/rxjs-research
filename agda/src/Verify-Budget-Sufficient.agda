@@ -36,9 +36,11 @@ open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       +-suc; +-identityʳ)
+                                       <-≤-trans; +-suc; +-identityʳ;
+                                       +-comm; +-assoc; +-monoʳ-<;
+                                       *-monoˡ-≤; m≤m+n; m≤n+m)
 open import Data.Nat.Induction  using (<-wellFounded)
-open import Data.List    using (List; []; _∷_; _++_; all; any)
+open import Data.List    using (List; []; _∷_; _++_; all; any; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
@@ -673,6 +675,81 @@ postulate
   -- strictly below it decreases (t must be a real size class)
   ≺-replace : ∀ B t (Y Z : List ℕ) → All (_< t) Y → t ≤ B →
     counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
+
+------------------------------------------------------------------
+-- RANK — the ≺ᵛ order collapsed to ℕ.  Sync fuel is DEPTH-consumed
+-- (siblings share the remaining gas; only nested decrement edges
+-- stack), so the contract needs to bound the deepest decrement
+-- chain, and with the entry sum bounded by V a count vector IS a
+-- base-(suc V) numeral (high class = high digit): any ≺ᵛ step
+-- strictly decreases its numeric value (rank-mono-≺).  The wet
+-- contract therefore inducts on this plain ℕ — no Acc plumbing —
+-- converting hop decreases (≺-embed/≺-replace) via rank-mono-≺,
+-- and discharging the entry-sum side condition via totᵛ-counts
+-- (the sum is the layer count, bounded by the store invariant).
+------------------------------------------------------------------
+
+totᵛ : ∀ {m} → Vec ℕ m → ℕ
+totᵛ []ᵛ       = 0
+totᵛ (x ∷ᵛ xs) = x + totᵛ xs
+
+rank : ∀ {m} (V : ℕ) → Vec ℕ m → ℕ
+rank           V []ᵛ       = 0
+rank {suc m}   V (x ∷ᵛ xs) = x * (suc V) ^ m + rank V xs
+
+-- a bounded-sum vector reads below the next power (the carry bound)
+rank-lt-pow : ∀ {m} (V : ℕ) (c : Vec ℕ m) →
+  totᵛ c ≤ V → rank V c < (suc V) ^ m
+rank-lt-pow {zero}  V []ᵛ       h = s≤s z≤n
+rank-lt-pow {suc m} V (x ∷ᵛ xs) h =
+  <-≤-trans (subst (x * (suc V) ^ m + rank V xs <_)
+                   (+-comm (x * (suc V) ^ m) ((suc V) ^ m))
+                   (+-monoʳ-< (x * (suc V) ^ m)
+                      (rank-lt-pow V xs (≤-trans (m≤n+m (totᵛ xs) x) h))))
+            (*-monoˡ-≤ ((suc V) ^ m)
+               (s≤s (≤-trans (m≤m+n x (totᵛ xs)) h)))
+
+-- THE BRIDGE: a ≺ᵛ step on a bounded-sum vector is a numeral decrease
+rank-mono-≺ : ∀ {m} (V : ℕ) {c′ c : Vec ℕ m} →
+  c′ ≺ᵛ c → totᵛ c′ ≤ V → rank V c′ < rank V c
+rank-mono-≺ V (≺-here {m} {x} {y} {xs} {ys} x<y) tot≤V =
+  <-≤-trans (subst (x * (suc V) ^ m + rank V xs <_)
+                   (+-comm (x * (suc V) ^ m) ((suc V) ^ m))
+                   (+-monoʳ-< (x * (suc V) ^ m)
+                      (rank-lt-pow V xs (≤-trans (m≤n+m (totᵛ xs) x) tot≤V))))
+            (≤-trans (*-monoˡ-≤ ((suc V) ^ m) x<y)
+                     (m≤m+n (y * (suc V) ^ m) (rank V ys)))
+rank-mono-≺ V (≺-there {m} {x} {xs} {ys} xs≺ys) tot≤V =
+  +-monoʳ-< (x * (suc V) ^ m)
+            (rank-mono-≺ V xs≺ys (≤-trans (m≤n+m (totᵛ xs) x) tot≤V))
+
+-- the entry-sum of a count vector is the multiset's cardinality
+totᵛ-⊕ᵛ : ∀ {m} (a b : Vec ℕ m) → totᵛ (a ⊕ᵛ b) ≡ totᵛ a + totᵛ b
+totᵛ-⊕ᵛ []ᵛ       []ᵛ       = refl
+totᵛ-⊕ᵛ (x ∷ᵛ xs) (y ∷ᵛ ys)
+  rewrite totᵛ-⊕ᵛ xs ys
+        | +-assoc x y (totᵛ xs + totᵛ ys)
+        | sym (+-assoc y (totᵛ xs) (totᵛ ys))
+        | +-comm y (totᵛ xs)
+        | +-assoc (totᵛ xs) y (totᵛ ys)
+        | sym (+-assoc x (totᵛ xs) (y + totᵛ ys)) = refl
+
+totᵛ-zeros : ∀ {m} → totᵛ (zerosᵛ {m}) ≡ 0
+totᵛ-zeros {zero}  = refl
+totᵛ-zeros {suc m} = totᵛ-zeros {m}
+
+totᵛ-oneAt : ∀ B x → totᵛ (oneAt B x) ≡ 1
+totᵛ-oneAt zero    x = refl
+totᵛ-oneAt (suc B) x with suc B ≤ᵇ x
+... | true  = cong suc (totᵛ-zeros {suc B})
+... | false = totᵛ-oneAt B x
+
+totᵛ-counts : ∀ B (M : List ℕ) → totᵛ (counts B M) ≡ length M
+totᵛ-counts B []      = totᵛ-zeros {suc B}
+totᵛ-counts B (x ∷ M)
+  rewrite totᵛ-⊕ᵛ (oneAt B x) (counts B M)
+        | totᵛ-oneAt B x
+        | totᵛ-counts B M = refl
 
 ------------------------------------------------------------------
 -- the three cores
