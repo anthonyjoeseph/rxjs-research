@@ -478,3 +478,47 @@ mutual
   sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
   sizeᵗˢ []       = 1
   sizeᵗˢ (y ∷ ys) = sizeᵗ y + sizeᵗˢ ys
+
+------------------------------------------------------------------
+-- Sync-reachable size: like sizeᵉ, but a deferᵉ subtree counts as
+-- a leaf — nothing under a defer is subscribed within the current
+-- instant.  This is the size class the budget-sufficiency measure
+-- reads (Verify-Budget-Sufficient): unfoldμ substitutes (μᵉ body)
+-- only at defer-gated var positions, so μ-unfolding PRESERVES
+-- syncSize while sizeᵉ grows.
+------------------------------------------------------------------
+
+mutual
+  syncSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  syncSizeᵉ (input i)        = 1
+  syncSizeᵉ (ofᵉ ts)         = suc (syncSizeᵗˢ ts)
+  syncSizeᵉ emptyᵉ           = 1
+  syncSizeᵉ (mapᵉ f e)       = suc (syncSizeᵗ f + syncSizeᵉ e)
+  syncSizeᵉ (takeᵉ c e)      = suc (syncSizeᵗ c + syncSizeᵉ e)
+  syncSizeᵉ (scanᵉ f z e)    = suc (syncSizeᵗ f + syncSizeᵗ z + syncSizeᵉ e)
+  syncSizeᵉ (mergeAllᵉ e)    = suc (syncSizeᵉ e)
+  syncSizeᵉ (concatAllᵉ e)   = suc (syncSizeᵉ e)
+  syncSizeᵉ (switchAllᵉ e)   = suc (syncSizeᵉ e)
+  syncSizeᵉ (exhaustAllᵉ e)  = suc (syncSizeᵉ e)
+  syncSizeᵉ (μᵉ e)           = suc (syncSizeᵉ e)
+  syncSizeᵉ (varᵉ x)         = 1
+  syncSizeᵉ (deferᵉ e)       = 1
+
+  syncSizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  syncSizeᵗ (varᵗ x)      = 1
+  syncSizeᵗ unit̂          = 1
+  syncSizeᵗ (bool̂ _)      = 1
+  syncSizeᵗ (nat̂ _)       = 1
+  syncSizeᵗ (pairᵗ a b)   = suc (syncSizeᵗ a + syncSizeᵗ b)
+  syncSizeᵗ (fstᵗ p)      = suc (syncSizeᵗ p)
+  syncSizeᵗ (sndᵗ p)      = suc (syncSizeᵗ p)
+  syncSizeᵗ (inlᵗ a)      = suc (syncSizeᵗ a)
+  syncSizeᵗ (inrᵗ a)      = suc (syncSizeᵗ a)
+  syncSizeᵗ (caseᵗ s l r) = suc (syncSizeᵗ s + syncSizeᵗ l + syncSizeᵗ r)
+  syncSizeᵗ (ifᵗ c a b)   = suc (syncSizeᵗ c + syncSizeᵗ a + syncSizeᵗ b)
+  syncSizeᵗ (primᵗ _ a)   = suc (syncSizeᵗ a)
+  syncSizeᵗ (strmᵗ e)     = suc (syncSizeᵉ e)
+
+  syncSizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  syncSizeᵗˢ []       = 1
+  syncSizeᵗˢ (y ∷ ys) = syncSizeᵗ y + syncSizeᵗˢ ys

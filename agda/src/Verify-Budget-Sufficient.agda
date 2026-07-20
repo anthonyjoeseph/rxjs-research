@@ -31,25 +31,29 @@
 -- Verify-Well-Formed replaces its postulate.
 module Verify-Budget-Sufficient where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _<ᵇ_;
-                                z≤n; s≤s)
+open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
+                                if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
+                                _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; +-suc; +-identityʳ)
+open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.List    using (List; []; _∷_; _++_; all; any)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.Vec     using (Vec) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
+open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                                Ctx; Closed; Val; sizeᵉ;
+                                Ctx; Closed; Val; sizeᵉ; syncSizeᵉ;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
                                 fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
                                 strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
@@ -425,6 +429,100 @@ applyFn-layered : ∀ {n} {Γ : Ctx n} {s t} (fn : Fn Γ [] [] [] s t)
 applyFn-layered fn v lv = evalWith-layered fn (v ∷ᵃ []ᵃ) (lv ∷ˡ []ˡ)
 
 ------------------------------------------------------------------
+-- THE MEASURE — edge 3's Dershowitz–Manna multiset, concretely.
+-- A layer derivation reads off the multiset of its templates'
+-- sync-sizes (layerSizes); the order is count-vector lex with the
+-- HIGH size class first (counts B).  All templates come from
+-- program+slot syntax, so B is fixed per program and the vector
+-- length is fixed — lex over Vec ℕ is then well-founded (≺ᵛ-wf,
+-- proven below), and that Acc is the induction principle the wet
+-- contract recurses on.  measureObs is the end-to-end reading.
+------------------------------------------------------------------
+
+mutual
+  layerSizes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+    LayeredObs e → List ℕ
+  layerSizes (layer tpl env le) = syncSizeᵉ tpl ∷ layerSizesEnv le
+
+  layerSizesV : ∀ {n} {Γ : Ctx n} (t : Ty) {v : Val Γ t} →
+    LayeredV t v → List ℕ
+  layerSizesV unitᵗ    _  = []
+  layerSizesV boolᵗ    _  = []
+  layerSizesV natᵗ     _  = []
+  layerSizesV (s ×ᵗ t) (la , lb) = layerSizesV s la ++ layerSizesV t lb
+  layerSizesV (s +ᵗ t) {inj₁ a} l = layerSizesV s l
+  layerSizesV (s +ᵗ t) {inj₂ b} l = layerSizesV t l
+  layerSizesV (obs t)  l  = layerSizes l
+
+  layerSizesEnv : ∀ {n} {Γ : Ctx n} {Θ} {env : All (Val Γ) Θ} →
+    LayeredEnv env → List ℕ
+  layerSizesEnv []ˡ       = []
+  layerSizesEnv (_∷ˡ_ {t = t} l ls) = layerSizesV t l ++ layerSizesEnv ls
+
+-- count-vector lex, high class first
+data _≺ᵛ_ : ∀ {m} → Vec ℕ m → Vec ℕ m → Set where
+  ≺-here  : ∀ {m x y} {xs ys : Vec ℕ m} → x < y → (x ∷ᵛ xs) ≺ᵛ (y ∷ᵛ ys)
+  ≺-there : ∀ {m x} {xs ys : Vec ℕ m} → xs ≺ᵛ ys → (x ∷ᵛ xs) ≺ᵛ (x ∷ᵛ ys)
+
+-- well-foundedness: nested induction — vector length outside, then
+-- (Acc of the head, Acc of the tail) lexicographically.  accHead is
+-- handed the tail relation's full well-foundedness (wfm) so a head
+-- decrease can restart the tail at ANY vector.
+accHead : ∀ {m} (wfm : WellFounded (_≺ᵛ_ {m})) (x : ℕ) → Acc _<_ x →
+  (xs : Vec ℕ m) → Acc (_≺ᵛ_ {m}) xs → Acc _≺ᵛ_ (x ∷ᵛ xs)
+accHead wfm x (acc rx) = go
+  where
+  go : ∀ xs → Acc _≺ᵛ_ xs → Acc _≺ᵛ_ (x ∷ᵛ xs)
+  go xs (acc rxs) = acc λ where
+    (≺-here  y<x) → accHead wfm _ (rx y<x) _ (wfm _)
+    (≺-there ys≺) → go _ (rxs ys≺)
+
+≺ᵛ-wf : ∀ {m} → WellFounded (_≺ᵛ_ {m})
+≺ᵛ-wf {zero}  []ᵛ       = acc λ ()
+≺ᵛ-wf {suc m} (x ∷ᵛ xs) = accHead ≺ᵛ-wf x (<-wellFounded x) xs (≺ᵛ-wf xs)
+
+-- counts: the multiset → count-vector reading.  Index 0 is size
+-- class B (high first); oversized elements clamp into class B — the
+-- contract only ever reads it with all elements ≤ B.
+zerosᵛ : ∀ {m} → Vec ℕ m
+zerosᵛ {zero}  = []ᵛ
+zerosᵛ {suc m} = 0 ∷ᵛ zerosᵛ
+
+oneAt : (B x : ℕ) → Vec ℕ (suc B)     -- a single element of size x
+oneAt zero    x = 1 ∷ᵛ []ᵛ
+oneAt (suc B) x = if suc B ≤ᵇ x then 1 ∷ᵛ zerosᵛ else 0 ∷ᵛ oneAt B x
+
+_⊕ᵛ_ : ∀ {m} → Vec ℕ m → Vec ℕ m → Vec ℕ m
+[]ᵛ       ⊕ᵛ []ᵛ       = []ᵛ
+(x ∷ᵛ xs) ⊕ᵛ (y ∷ᵛ ys) = x + y ∷ᵛ (xs ⊕ᵛ ys)
+
+counts : (B : ℕ) → List ℕ → Vec ℕ (suc B)
+counts B []      = zerosᵛ
+counts B (x ∷ M) = oneAt B x ⊕ᵛ counts B M
+
+-- the wet contract's measure of a subscribed value, end to end
+measureObs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ) →
+  LayeredObs e → Vec ℕ (suc B)
+measureObs B l = counts B (layerSizes l)
+
+-- the two decrease lemmas the hop analysis needs (proof-design memo
+-- below).  Pure count-vector arithmetic over the definitions above —
+-- GRINDER: prove counts-++ first (the workhorse), then both ≺ lemmas
+-- by induction on B/the vectors, splitting on the clamp comparison.
+postulate
+  counts-++ : ∀ B (xs ys : List ℕ) →
+    counts B (xs ++ ys) ≡ counts B xs ⊕ᵛ counts B ys
+  -- embedded-value hop: a value reified into the carrier measures
+  -- strictly below it (its multiset is a strict sub-multiset),
+  -- regardless of relative template sizes
+  ≺-embed : ∀ B t (xs ys M : List ℕ) →
+    counts B M ≺ᵛ counts B (t ∷ xs ++ M ++ ys)
+  -- scan-produced hop: replacing the carrier top with any elements
+  -- strictly below it decreases (t must be a real size class)
+  ≺-replace : ∀ B t (Y Z : List ℕ) → All (_< t) Y → t ≤ B →
+    counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
+
+------------------------------------------------------------------
 -- the three cores
 ------------------------------------------------------------------
 
@@ -450,21 +548,21 @@ applyFn-layered fn v lv = evalWith-layered fn (v ∷ᵃ []ᵃ) (lv ∷ˡ []ˡ)
 --      runtime obs value is a template instantiated over embedded
 --      layered values, and evalWith-layered proves the evaluator
 --      never leaves the family).  A value's measure is the multiset
---      of its layer tree's template sizes; templates come from
---      program+slot syntax, so size classes are finitely bounded
---      and the order can be encoded as a count vector, lex
---      high→low — well-founded with no stdlib machinery.  The hops:
+--      of its layer tree's template sync-sizes — concretely
+--      measureObs = counts B ∘ layerSizes above, ordered by ≺ᵛ
+--      (count-vector lex, high class first), with ≺ᵛ-wf as the
+--      contract's induction principle.  The hops:
 --        · embedded-value hop (subscribing a value subΘTm reified
 --          into the carrier): strict SUB-multiset, regardless of
---          relative template sizes.
+--          relative template sizes — ≺-embed.
 --        · scan-produced hop: the carrier-top element is replaced
---          by strictly smaller ones — the fn body is a proper
---          subterm of the carrier's template, and the consumed
---          values' layers either cancel against the carrier's
---          embedded copies (within one instant, deliveries ≤
---          syntactic occurrences because subΘ COPIES trees — the
---          sync-linearity lemma, to be proven with the contract)
---          or sit strictly below the top.
+--          by strictly smaller ones (≺-replace) — the fn body is a
+--          proper subterm of the carrier's template, and the
+--          consumed values' layers either cancel against the
+--          carrier's embedded copies (within one instant,
+--          deliveries ≤ syntactic occurrences because subΘ COPIES
+--          trees — the sync-linearity lemma, to be proven with the
+--          contract) or sit strictly below the top.
 --        · share-crossing hop (a template's `input` hits a slot):
 --          exits the per-value measure — it anchors against the
 --          slot's own element of the GLOBAL multiset {program} ⊎
