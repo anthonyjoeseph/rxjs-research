@@ -32,8 +32,9 @@
 module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _<ᵇ_)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _<ᵇ_;
+                                z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; +-suc; +-identityʳ)
 open import Data.List    using (List; []; _∷_; _++_; all; any)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -41,7 +42,8 @@ open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; cong; subst)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit)
+open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
+                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                                 Ctx; Closed; Val; sizeᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
@@ -103,6 +105,63 @@ towerℕ (suc h) = 2 ^ towerℕ h
 
 sizeBudgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → ℕ
 sizeBudgetAt e sl id = towerℕ (suc (sizeᵉ e + slotsSize sl) * suc id)
+
+------------------------------------------------------------------
+-- the Gas ordering: `g hasAtLeast n` — n peels are available.  The
+-- wet-contract lemmas consume fuel through this view (an `hs` match
+-- exposes the `gs` the machine's decrement edges pattern-match on),
+-- and the budget lemmas below discharge it: the gasPad literal head
+-- alone covers any n ≤ 2^(sz·(id+1)²), and head+tower covers the
+-- tower-sized needs of chained-scan programs
+------------------------------------------------------------------
+
+data _hasAtLeast_ : Gas → ℕ → Set where
+  hz : ∀ {g} → g hasAtLeast zero
+  hs : ∀ {g n} → g hasAtLeast n → gs g hasAtLeast suc n
+
+hasAtLeast-mono : ∀ {g m n} → n ≤ m → g hasAtLeast m → g hasAtLeast n
+hasAtLeast-mono z≤n       _        = hz
+hasAtLeast-mono (s≤s le) (hs h) = hs (hasAtLeast-mono le h)
+
+hasAtLeast-pad : ∀ (m : ℕ) (g : Gas) {n} → n ≤ m → gasPad m g hasAtLeast n
+hasAtLeast-pad m       g z≤n      = hz
+hasAtLeast-pad (suc m) g (s≤s le) = hs (hasAtLeast-pad m g le)
+
+hasAtLeast-pad-plus : ∀ (m : ℕ) {g : Gas} {n} →
+  g hasAtLeast n → gasPad m g hasAtLeast (m + n)
+hasAtLeast-pad-plus zero    h = h
+hasAtLeast-pad-plus (suc m) h = hs (hasAtLeast-pad-plus m h)
+
+hasAtLeast-double : ∀ {g n} → g hasAtLeast n → gasDouble g hasAtLeast (n + n)
+hasAtLeast-double hz = hz
+hasAtLeast-double (hs {g} {n} h) =
+  hs (subst (λ k → gs (gasDouble g) hasAtLeast k) (sym (+-suc n n))
+       (hs (hasAtLeast-double h)))
+
+-- 2^g is never empty, whatever g is
+pow2-min : ∀ (g : Gas) → gasPow2 g hasAtLeast 1
+pow2-min g0     = hs hz
+pow2-min (gs g) =
+  hasAtLeast-mono (s≤s z≤n) (hasAtLeast-double (pow2-min g))
+
+hasAtLeast-pow2 : ∀ {g n} → g hasAtLeast n → gasPow2 g hasAtLeast (2 ^ n)
+hasAtLeast-pow2 {g} hz = pow2-min g
+hasAtLeast-pow2 {n = suc n} (hs {g} h) =
+  subst (λ k → gasDouble (gasPow2 g) hasAtLeast (2 ^ n + k))
+        (sym (+-identityʳ (2 ^ n)))
+        (hasAtLeast-double (hasAtLeast-pow2 h))
+
+hasAtLeast-tower : ∀ (h : ℕ) → gasTower h hasAtLeast towerℕ h
+hasAtLeast-tower zero    = hs hz
+hasAtLeast-tower (suc h) = hasAtLeast-pow2 (hasAtLeast-tower h)
+
+-- what the seeded budget guarantees: the full head plus the tower
+budget-hasAtLeast : ∀ (sz : ℕ) (id : Id) →
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (suc sz * suc id))
+    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ (suc sz * suc id))
+budget-hasAtLeast sz id =
+  hasAtLeast-pad-plus (2 ^ (sz * suc id * suc id))
+                      (hasAtLeast-tower (suc sz * suc id))
 
 ------------------------------------------------------------------
 -- the machine's value stores, bounded: schedule pendings, scan
@@ -281,16 +340,49 @@ finish-slots a sched st with Arrival.isLast a
 -- the three cores
 ------------------------------------------------------------------
 
+------------------------------------------------------------------
+-- THE PROOF DESIGN for the three cores (2026-07-19, after the tower
+-- attack).  The wet contract for the mutual subscription block is one
+-- strengthened induction, consumed through `hasAtLeast`:
+--
+--   fuel hasAtLeast need(args) → no dry × stores land bounded
+--
+-- and the induction that defines/bounds `need` is LEXICOGRAPHIC over
+-- the three decrement edges:
+--
+--   1. share connect — decreases the UNCONNECTED-SLOT COUNT
+--      (connectedShares latches; a def's walk can only shrink it).
+--   2. μ-unfold — decreases SYNC-REACHABLE SIZE (sizeᵉ not counting
+--      under deferᵉ): unfoldμ substitutes `μᵉ body` only at var
+--      positions, and vars are TYPE-GUARANTEED defer-gated (Δᵍ→Δ
+--      moves only at deferᵉ), so the substituted copies are invisible
+--      to the synchronous walk.
+--   3. subscribeInner — decreases (SKELETON, VALUE SIZE) lexically,
+--      where a value's skeleton is its syntax with Tm-embedded closed
+--      values erased to holes: a SUB-VALUE hop (evalTm of an embedded
+--      value, e.g. of[acc,acc]'s leaves) keeps the skeleton and
+--      strictly shrinks the value; a SCAN-PRODUCED hop (an acc built
+--      by closeUnderFn from a scan fn's strmᵗ body) strictly shrinks
+--      the skeleton — the acc's skeleton IS that template body, a
+--      proper subterm of the skeleton that carried the scan.
+--      (Hypothesis 3 is design-verified, not yet machine-checked:
+--      ENDPOINT-VERIFY it on the S-family programs before building
+--      the contract on it.)
+--
+-- `need` then towers only through edge 3's skeleton descent (one
+-- story per nested scan template, ≤ program size stories), which
+-- budget-hasAtLeast's tower summand dominates; every literal-headed
+-- need (no chained scans) is already covered by the 2^(sz·(id+1)²)
+-- summand alone.  The cores below are the contract instantiated at
+-- the root burst (burst-dry/-bounded) and at the chain fold
+-- (cascadeGo-wet); the disjointness argument (each registration's
+-- path owns its minted nodes, so per-cascade store traffic is
+-- structure-bounded) supplies the store-boundedness half.
+------------------------------------------------------------------
+
 postulate
-  -- THE per-cascade termination content: the chain fold at instant
-  -- id, from a latched state within id's budget, stays wet and lands
-  -- within suc id's.  The eventual proof's heart is a DISJOINTNESS
-  -- argument: each registration's path owns its own minted nodes, so
-  -- one cascade touches each value store a structure-bounded number
-  -- of times (its own chain, plus at most the share telescope's
-  -- dispatches) — cross-chain compounding through a single store is
-  -- impossible, and the per-instant compounding (one tower story per
-  -- chained scan, ≤ size stories) is what the tower budget dominates
+  -- the chain fold at instant id, from a latched state within id's
+  -- size budget, stays wet and lands within suc id's
   cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
