@@ -43,6 +43,7 @@ open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
+                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
                                 takeVals; cutThrough; setNode; pathHasNode; memberSource;
                                 NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
@@ -1634,15 +1635,18 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- FoldInv reads `st` ONLY through its registry (shadow / done-plumbed /
 -- reg-typed; every other field is over S / evs / sched).  So a frame that
 -- mutates st but leaves the registry fixed — the quiet clauses (scan-f
--- bookkeeping, take-f below its cut) — preserves FoldInv verbatim.  The three
--- registry-facing fields transport across the registry equality; the rest copy.
+-- bookkeeping, take-f below its cut) — preserves FoldInv verbatim.  Since no
+-- FoldInv field mentions `fin` any more (env-close and done-plumbed dropped), the
+-- fin index is a phantom and is relaxed FREELY here (fin → fin′): the from-inner
+-- fin-flip clauses need exactly that.  The three registry-facing fields transport
+-- across the registry equality; the rest copy verbatim.
 FoldInv-reg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (id : Id) (envSrc : Source) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (id : Id) (envSrc : Source) (evs : List (InstEvent (Val Γ t))) (fin fin′ : Bool)
   (sched : Sched Γ) (st st′ : EvalSt e) (S : ProtocolSt) →
   EvalSt.registry st ≡ EvalSt.registry st′ →
   EvalSt.dying st ≡ EvalSt.dying st′ →
-  FoldInv id envSrc evs fin sched st S → FoldInv id envSrc evs fin sched st′ S
-FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
+  FoldInv id envSrc evs fin sched st S → FoldInv id envSrc evs fin′ sched st′ S
+FoldInv-reg id envSrc evs fin fin′ sched st st′ S req deq fi = record
   { ob = FoldInv.ob fi ; hz = FoldInv.hz fi ; ob′ = FoldInv.ob′ fi
   ; Lv = FoldInv.Lv fi ; Ov = FoldInv.Ov fi
   ; enters = FoldInv.enters fi ; pays = FoldInv.pays fi ; applies = FoldInv.applies fi
@@ -1665,9 +1669,10 @@ FoldInv-reg id envSrc evs fin sched st st′ S req deq fi = record
 --    cut sub-branch drops the registry to cutThrough's `kept`, closes the
 --    victims, and flips fin — stated PRECISELY at the cut result (no stepFrame
 --    wrapper), so the non-cut path is no longer covered by any postulate.
---  · from-inner (fin ≡ true) / thru-outer: the *All wrap clauses.  from-inner
---    fin ≡ false is quiet and proven below; the fin ≡ true absorb case needs the
---    node↔registry coherence (caches) for its done-plumbed/fin′ recomputation.
+--  · from-inner: fin ≡ false quiet, and fin ≡ true merge/switch/exhaust all
+--    proven below (FoldInv is fin-independent + they leave the registry fixed).
+--    Only concatᵒ (drain subscribes inners → registry grows) is left as a residue.
+--  · thru-outer: the outer *All clause (walk subscribes the emitted inners).
 --
 -- take-cut is PROVEN (stepFrame-wf-take-cut below): shadow from cutThrough-balance
 -- + cutThrough-no-init + the dying-envSrc field (dying holds only envSrc, so the
@@ -1694,16 +1699,18 @@ postulate
        × (UniqueOwed Ov ≡ true)
        × (lookupOwed envSrc Ov ≡ lookupOwed envSrc (FoldInv.ob′ fi))
 
-  -- fin ≡ true ONLY: the fin ≡ false branch (react false) is quiet and proven in
-  -- stepFrame-wf below.  This is the completion-ABSORB case — finish decrements
-  -- the *All node counter and recomputes fin′, the merge W1/W2 obligation.
-  stepFrame-wf-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  -- concatᵒ + fin ≡ true ONLY.  fin ≡ false is quiet; the merge/switch/exhaust
+  -- ops at fin ≡ true leave the registry fixed (only the node counter + the now-
+  -- phantom fin change) and are proven in stepFrame-wf below via FoldInv-reg.
+  -- concatᵒ is the lone residue: its `drain` subscribes the queued inners, so the
+  -- registry grows and shadow/reg-typed genuinely change.
+  stepFrame-wf-inner-concat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-    (op : AllOp) (allNid inst : NodeId) (path′ : Path Γ s t)
+    (allNid inst : NodeId) (path′ : Path Γ s t)
     (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t)))
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     FoldInv id envSrc evs true sched st S →
-    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (from-inner op allNid inst) path′ vals true sched st
+    let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (from-inner concatᵒ allNid inst) path′ vals true sched st
     in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
   stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1836,7 +1843,7 @@ stepFrame-wf {u = u} sf id now envSrc (scan-f fn nid) path′ vals evs fin sched
 ... | just (scan-st {w} acc) with w ≟ᵗ u
 ...   | no _     rewrite ++-identityʳ evs = fi
 ...   | yes refl rewrite ++-identityʳ evs =
-        FoldInv-reg id envSrc evs fin sched st _ S refl refl fi
+        FoldInv-reg id envSrc evs fin fin sched st _ S refl refl fi
 -- take-f: like scan-f, a no-op on every node shape but a take-st; the take-st
 -- non-cut branch only rewrites the remaining-count node (quiet, FoldInv-reg);
 -- the cut branch drops the registry and closes victims (stepFrame-wf-take-cut).
@@ -1850,15 +1857,55 @@ stepFrame-wf sf id now envSrc (take-f nid) path′ vals evs fin sched st S fi
 ... | just (exhaust-st ia od)  rewrite ++-identityʳ evs = fi
 ... | just (take-st k) with takeVals k vals
 ...   | out , rem , false rewrite ++-identityʳ evs =
-        FoldInv-reg id envSrc evs fin sched st _ S refl refl fi
+        FoldInv-reg id envSrc evs fin fin sched st _ S refl refl fi
 ...   | out , rem , true  =
         stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi
 -- from-inner: fin ≡ false is quiet (react false = no-op); fin ≡ true absorbs the
 -- completion (the narrowed stepFrame-wf-inner residue)
 stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs false sched st S fi
   rewrite ++-identityʳ evs = fi
-stepFrame-wf sf id now envSrc (from-inner op allNid inst) path′ vals evs true sched st S fi
-  = stepFrame-wf-inner sf id now envSrc op allNid inst path′ vals evs sched st S fi
+-- from-inner fin ≡ true.  merge/switch/exhaust leave the registry (and dying)
+-- fixed — react true either absorbs (state untouched) or finish only rewrites the
+-- *All node counter — so with FoldInv now fin-independent, FoldInv-reg transports
+-- it (st′/fin′ inferred from the reduced goal).  concatᵒ drains → stepFrame-wf-inner-concat.
+stepFrame-wf sf id now envSrc (from-inner mergeᵒ allNid inst) path′ vals evs true sched st S fi
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+... | false with lookupNode allNid (EvalSt.nodes st)
+...   | nothing               rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (scan-st _)      rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (take-st _)      rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (merge-st _ _)   rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (concat-st _ _ _) rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (switch-st _ _)  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (exhaust-st _ _) rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+stepFrame-wf sf id now envSrc (from-inner switchᵒ allNid inst) path′ vals evs true sched st S fi
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+... | false with lookupNode allNid (EvalSt.nodes st)
+...   | nothing               rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (scan-st _)      rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (take-st _)      rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (merge-st _ _)   rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (concat-st _ _ _) rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (exhaust-st _ _) rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (switch-st nothing _)  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (switch-st (just c) _) with c ≡ᵇ inst
+...     | true  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...     | false rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+stepFrame-wf sf id now envSrc (from-inner exhaustᵒ allNid inst) path′ vals evs true sched st S fi
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+... | false with lookupNode allNid (EvalSt.nodes st)
+...   | nothing               rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (scan-st _)      rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (take-st _)      rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (merge-st _ _)   rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (concat-st _ _ _) rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (switch-st _ _)  rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+...   | just (exhaust-st _ _) rewrite ++-identityʳ evs = FoldInv-reg id envSrc evs true _ sched st _ S refl refl fi
+stepFrame-wf sf id now envSrc (from-inner concatᵒ allNid inst) path′ vals evs true sched st S fi
+  = stepFrame-wf-inner-concat sf id now envSrc allNid inst path′ vals evs sched st S fi
 stepFrame-wf sf id now envSrc (thru-outer op nid) path′ vals evs fin sched st S fi
   = stepFrame-wf-outer sf id now envSrc op nid path′ vals evs fin sched st S fi
 

@@ -504,6 +504,18 @@ takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
 takeVals (suc (suc k)) (v ∷ vs) =
   let (out , rem , didCut) = takeVals (suc k) vs in v ∷ out , rem , didCut
 
+-- a from-inner completion is absorbed iff some registration under this inner
+-- instance is still live: its path threads `inst`, it is not cancelled, and it
+-- is not an already-delivered dying-source chain.  Top-level (not from-inner-
+-- local) so the well-formedness proof can case-split the absorb vs. finish paths.
+aliveThroughᶠ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+              → NodeId → EvalSt e → (RegId × Source × Chain Γ t) → Bool
+aliveThroughᶠ inst st (rid , src , (w , p)) =
+  pathHasNode inst p
+  ∧ not (any (_≡ᵇ rid) (EvalSt.cancelled st))
+  ∧ (not (memberSource src (EvalSt.dying st))
+     ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
+
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
           → ℕ → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
@@ -593,16 +605,9 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (from-inner op allNid in
   -- still queued this cascade, or any other live registration, absorbs
   -- it (the TS join's open-multiset, read off the registry) — one
   -- chain's exhaustion is not a multi-registration subtree's completion
-  aliveThrough : RegId × Source × Chain Γ t → Bool
-  aliveThrough (rid , src , (w , p)) =
-    pathHasNode inst p
-    ∧ not (any (_≡ᵇ rid) (EvalSt.cancelled st))
-    ∧ (not (memberSource src (EvalSt.dying st))
-       ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
-
   react : Bool → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
   react false = vals , [] , false , sched , st
-  react true  = if any aliveThrough (EvalSt.registry st)
+  react true  = if any (aliveThroughᶠ inst st) (EvalSt.registry st)
                 then vals , [] , false , sched , st
                 else finish op (lookupNode allNid (EvalSt.nodes st))
 
