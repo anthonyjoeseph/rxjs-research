@@ -17,9 +17,9 @@
 --   drain-dry (PROVEN)    — the fuel loop composes cascades
 --   budget-sufficient     — (PROVEN from the above) the whole run
 --
--- The four postulated cores split cleanly: pop-* are mechanical
--- (sched-next shrinks a pending list, record updates fix slots);
--- burst-* and cascade-dry are the real termination content, to be
+-- pop-slots/pop-bounded are PROVEN (by inverting liveNext, hoisted
+-- to top level for exactly this).  Three postulated cores remain:
+-- burst-* and cascade-dry, the real termination content, to be
 -- proven by fuel-accounting induction over the subscription
 -- machine's clauses (each of the three decrement edges consumes one
 -- unit; the work between decrements is structural), with the growth
@@ -42,6 +42,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 root; sched-init; st-init; sched-next;
+                                liveHead; liveNext; arrEarlier;
                                 subscribeE; cascade; drain; evaluate;
                                 hasDry; dryEvent; drySource; sameSource;
                                 budgetAt)
@@ -104,23 +105,64 @@ stBounded? B sched st =
   ∧ all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st)
 
 ------------------------------------------------------------------
--- the four cores
+-- popping the next arrival: the slots are fixed by the record
+-- update, and boundedness survives because one pending list shrinks
+-- and everything else is untouched — PROVEN by inverting liveNext
+------------------------------------------------------------------
+
+∧-true : ∀ (a b : Bool) → a ∧ b ≡ true → (a ≡ true) × (b ≡ true)
+∧-true true  b h = refl , h
+∧-true false b ()
+
+∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → a ∧ b ≡ true
+∧-intro refl refl = refl
+
+liveHead-bounded : ∀ {n} {Γ : Ctx n} (B : ℕ) (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  liveHead l ≡ inj₂ (a , l′) →
+  boundedLive B l ≡ true → boundedLive B l′ ≡ true
+liveHead-bounded B l eq bnd with LiveSource.pending l | eq | bnd
+... | (t , v) ∷ ps | refl | bnd′ = proj₂ (∧-true _ _ bnd′)
+
+liveNext-bounded : ∀ {n} {Γ : Ctx n} (B : ℕ) (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  liveNext ls ≡ inj₂ (a , ls′) →
+  all (boundedLive B) ls ≡ true → all (boundedLive B) ls′ ≡ true
+liveNext-bounded B (l ∷ ls) eq bnd
+  with ∧-true (boundedLive B l) (all (boundedLive B) ls) bnd
+... | bl , bls with liveHead l in eqH | liveNext ls in eqR
+liveNext-bounded B (l ∷ ls) refl bnd | bl , bls | inj₁ _ | inj₂ (a′ , ls″) =
+  ∧-intro bl (liveNext-bounded B ls eqR bls)
+liveNext-bounded B (l ∷ ls) refl bnd | bl , bls | inj₂ (a″ , l′) | inj₁ _ =
+  ∧-intro (liveHead-bounded B l eqH bl) bls
+liveNext-bounded B (l ∷ ls) eq bnd | bl , bls | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with arrEarlier a″ a′ | eq
+... | true  | refl = ∧-intro (liveHead-bounded B l eqH bl) bls
+... | false | refl = ∧-intro bl (liveNext-bounded B ls eqR bls)
+
+pop-slots : ∀ {n} {Γ : Ctx n}
+  (sched : Sched Γ) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  Sched.slots sched′ ≡ Sched.slots sched
+pop-slots sched eq with liveNext (Sched.live sched) | eq
+... | inj₂ (a″ , ls) | refl = refl
+
+pop-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (sched : Sched Γ) (st : EvalSt e)
+  {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  stBounded? B sched st ≡ true → stBounded? B sched′ st ≡ true
+pop-bounded B sched st eq bnd
+  with ∧-true (all (boundedLive B) (Sched.live sched)) _ bnd
+... | bls , bns with liveNext (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+      ∧-intro (liveNext-bounded B (Sched.live sched) eqL bls) bns
+
+------------------------------------------------------------------
+-- the three cores
 ------------------------------------------------------------------
 
 postulate
-  -- popping the next arrival only shrinks a pending list…
-  pop-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (B : ℕ) (sched : Sched Γ) (st : EvalSt e)
-    {a : Arrival Γ} {sched′ : Sched Γ} →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    stBounded? B sched st ≡ true → stBounded? B sched′ st ≡ true
-
-  -- …and never touches the slots (record updates fix the field)
-  pop-slots : ∀ {n} {Γ : Ctx n}
-    (sched : Sched Γ) {a : Arrival Γ} {sched′ : Sched Γ} →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    Sched.slots sched′ ≡ Sched.slots sched
-
   -- the root burst neither dries nor escapes instant 1's budget:
   -- fuel-accounting over subscribeE's clauses — the subscribe frame's
   -- values are evalTm outputs over empty environments, sized within
