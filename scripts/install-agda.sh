@@ -48,12 +48,10 @@ fi
 
 log "agda-stdlib ${STDLIB_VERSION}"
 if [ ! -d "$STDLIB_DIR" ]; then
-  tarball="/tmp/agda-stdlib-${STDLIB_VERSION}.tar.gz"
-  curl -fsSL \
-    "https://github.com/agda/agda-stdlib/archive/refs/tags/v${STDLIB_VERSION}.tar.gz" \
-    -o "$tarball"
-  tar -xzf "$tarball" -C "$HOME"
-  rm -f "$tarball"
+  # Clone the stdlib from git, which is more reliable in restricted network
+  # environments than downloading the tarball via curl.
+  git clone --depth 1 --branch "v${STDLIB_VERSION}" \
+    https://github.com/agda/agda-stdlib.git "$STDLIB_DIR"
 else
   echo "stdlib already unpacked at ${STDLIB_DIR}"
 fi
