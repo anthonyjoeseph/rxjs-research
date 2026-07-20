@@ -612,3 +612,51 @@ shellsᵛ (s ×ᵗ t) (a , b)  = shellsᵛ s a ++ shellsᵛ t b
 shellsᵛ (s +ᵗ t) (inj₁ a) = shellsᵛ s a
 shellsᵛ (s +ᵗ t) (inj₂ b) = shellsᵛ t b
 shellsᵛ (obs t)  e        = shellsᵉ e
+
+-- the plug shells of a substitution: for each Θsub-var occurrence
+-- (at sync-reachable, non-defer positions — exactly where innerᵉ
+-- looks), the shells of the environment value plugged there.  The
+-- multiset ledger of instantiation: counts (innerᵉ (subΘExp …)) ≡
+-- counts (innerᵉ e) ⊕ᵛ counts (plugsᵉ …) — Verify-Budget-Sufficient
+mutual
+  plugsᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    → All (Val Γ) Θsub → Exp Γ Δᵍ Δ (Θloc ++ Θsub) t → List ℕ
+  plugsᵉ Θloc σ (input i)       = []
+  plugsᵉ Θloc σ (ofᵉ ts)        = plugsᵗˢ Θloc σ ts
+  plugsᵉ Θloc σ emptyᵉ          = []
+  plugsᵉ Θloc σ (mapᵉ {s = s} f e) = plugsᵗ (s ∷ Θloc) σ f ++ plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (takeᵉ c e)     = plugsᵗ Θloc σ c ++ plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (scanᵉ {s = s} {t = t} f z e) =
+    plugsᵗ ((t ×ᵗ s) ∷ Θloc) σ f ++ plugsᵗ Θloc σ z ++ plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (mergeAllᵉ e)   = plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (concatAllᵉ e)  = plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (switchAllᵉ e)  = plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (exhaustAllᵉ e) = plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (μᵉ e)          = plugsᵉ Θloc σ e
+  plugsᵉ Θloc σ (varᵉ x)        = []
+  plugsᵉ Θloc σ (deferᵉ e)      = []
+
+  plugsᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    → All (Val Γ) Θsub → Tm Γ Δᵍ Δ (Θloc ++ Θsub) t → List ℕ
+  plugsᵗ Θloc σ (varᵗ x) with ∈-++⁻ Θloc x
+  ... | inj₁ y = []
+  ... | inj₂ z = shellsᵛ _ (lookupEnv σ z)
+  plugsᵗ Θloc σ unit̂          = []
+  plugsᵗ Θloc σ (bool̂ _)      = []
+  plugsᵗ Θloc σ (nat̂ _)       = []
+  plugsᵗ Θloc σ (pairᵗ a b)   = plugsᵗ Θloc σ a ++ plugsᵗ Θloc σ b
+  plugsᵗ Θloc σ (fstᵗ p)      = plugsᵗ Θloc σ p
+  plugsᵗ Θloc σ (sndᵗ p)      = plugsᵗ Θloc σ p
+  plugsᵗ Θloc σ (inlᵗ a)      = plugsᵗ Θloc σ a
+  plugsᵗ Θloc σ (inrᵗ a)      = plugsᵗ Θloc σ a
+  plugsᵗ Θloc σ (caseᵗ {s = s} {t = t} sc l r) =
+    plugsᵗ Θloc σ sc ++ plugsᵗ (s ∷ Θloc) σ l ++ plugsᵗ (t ∷ Θloc) σ r
+  plugsᵗ Θloc σ (ifᵗ c a b)   =
+    plugsᵗ Θloc σ c ++ plugsᵗ Θloc σ a ++ plugsᵗ Θloc σ b
+  plugsᵗ Θloc σ (primᵗ _ a)   = plugsᵗ Θloc σ a
+  plugsᵗ Θloc σ (strmᵗ e)     = plugsᵉ Θloc σ e
+
+  plugsᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    → All (Val Γ) Θsub → List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) → List ℕ
+  plugsᵗˢ Θloc σ []       = []
+  plugsᵗˢ Θloc σ (y ∷ ys) = plugsᵗ Θloc σ y ++ plugsᵗˢ Θloc σ ys

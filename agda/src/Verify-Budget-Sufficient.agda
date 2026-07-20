@@ -78,6 +78,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
                                 shellsᵉ; shellsᵛ;
                                 subΘExp; subΘTm; subΘTms;
+                                plugsᵉ; plugsᵗ; plugsᵗˢ;
                                 renExp; renTm; renTms; Ren∈; ext∈;
                                 wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
@@ -1168,6 +1169,15 @@ totᵛ-counts B (x ∷ M)
         | totᵛ-oneAt B x
         | totᵛ-counts B M = refl
 
+-- the r ≤ R discharge, packaged: a stored value's rank sits under
+-- the store rank cap purely because its SIZE does — entry sum via
+-- shells-len, all through stBounded?, no extra invariant
+measureE-rank : ∀ {n} {Γ : Ctx n} {t} (B V : ℕ) (e : Closed Γ t) →
+  sizeᵉ e ≤ V → rank V (measureE B e) < (suc V) ^ suc B
+measureE-rank B V e h = rank-lt-pow V (counts B (shellsᵉ e))
+  (subst (_≤ V) (sym (totᵛ-counts B (shellsᵉ e)))
+         (≤-trans (shells-len e) h))
+
 ------------------------------------------------------------------
 -- THE DEMAND FUNCTION.  Fuel is depth-consumed, so the wet contract
 -- carries `fuel hasAtLeast suc (dBound V R U r s)` where V bounds
@@ -1321,6 +1331,145 @@ counts-below (suc B) t       Y       aY         t≤
   counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
 ≺-replace B t Y Z aY t≤B rewrite counts-++ B Y Z =
   ≺ᵛ-⊕ʳ (counts B Z) (counts-below B t Y aY t≤B)
+
+------------------------------------------------------------------
+-- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
+-- instantiated inner multiset is the template's plus the plug
+-- shells, class for class.  With shellSize-subΘ (host preserved)
+-- this fully characterizes instantiation at the measure level.
+------------------------------------------------------------------
+
+⊕ᵛ-medial : ∀ {m} (a b c d : Vec ℕ m) →
+  (a ⊕ᵛ b) ⊕ᵛ (c ⊕ᵛ d) ≡ (a ⊕ᵛ c) ⊕ᵛ (b ⊕ᵛ d)
+⊕ᵛ-medial a b c d =
+  trans (⊕ᵛ-assoc a b (c ⊕ᵛ d))
+  (trans (cong (a ⊕ᵛ_) (trans (sym (⊕ᵛ-assoc b c d))
+                       (trans (cong (_⊕ᵛ d) (⊕ᵛ-comm b c))
+                              (⊕ᵛ-assoc c b d))))
+         (sym (⊕ᵛ-assoc a c (b ⊕ᵛ d))))
+
+-- the 2-way composition step, shared by every two-child clause:
+-- counts (X′ ++ Y′) from recursive equations for X′ and Y′
+counts-2way : ∀ B (X′ Y′ X Y P Q : List ℕ) →
+  counts B X′ ≡ counts B X ⊕ᵛ counts B P →
+  counts B Y′ ≡ counts B Y ⊕ᵛ counts B Q →
+  counts B (X′ ++ Y′) ≡ counts B (X ++ Y) ⊕ᵛ counts B (P ++ Q)
+counts-2way B X′ Y′ X Y P Q ex ey =
+  trans (counts-++ B X′ Y′)
+  (trans (cong₂ _⊕ᵛ_ ex ey)
+  (trans (⊕ᵛ-medial (counts B X) (counts B P) (counts B Y) (counts B Q))
+         (sym (cong₂ _⊕ᵛ_ (counts-++ B X Y) (counts-++ B P Q)))))
+
+-- the 3-way step: fold the right two children first, then medial
+counts-3way : ∀ B (X′ Y′ Z′ X Y Z P Q R : List ℕ) →
+  counts B X′ ≡ counts B X ⊕ᵛ counts B P →
+  counts B Y′ ≡ counts B Y ⊕ᵛ counts B Q →
+  counts B Z′ ≡ counts B Z ⊕ᵛ counts B R →
+  counts B (X′ ++ Y′ ++ Z′) ≡
+    counts B (X ++ Y ++ Z) ⊕ᵛ counts B (P ++ Q ++ R)
+counts-3way B X′ Y′ Z′ X Y Z P Q R ex ey ez =
+  counts-2way B X′ (Y′ ++ Z′) X (Y ++ Z) P (Q ++ R) ex
+    (counts-2way B Y′ Z′ Y Z Q R ey ez)
+
+mutual
+  subΘ-countsᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    counts B (innerᵉ (subΘExp Θloc σ e)) ≡
+      counts B (innerᵉ e) ⊕ᵛ counts B (plugsᵉ Θloc σ e)
+  subΘ-countsᵉ B Θloc σ (input i)       = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵉ B Θloc σ (ofᵉ ts)        = subΘ-countsᵗˢ B Θloc σ ts
+  subΘ-countsᵉ B Θloc σ emptyᵉ          = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵉ B Θloc σ (mapᵉ {s = s} f e) =
+    counts-2way B (innerᵗ (subΘTm (s ∷ Θloc) σ f))
+                  (innerᵉ (subΘExp Θloc σ e))
+                  (innerᵗ f) (innerᵉ e)
+                  (plugsᵗ (s ∷ Θloc) σ f) (plugsᵉ Θloc σ e)
+      (subΘ-countsᵗ B (s ∷ Θloc) σ f) (subΘ-countsᵉ B Θloc σ e)
+  subΘ-countsᵉ B Θloc σ (takeᵉ c e)     =
+    counts-2way B (innerᵗ (subΘTm Θloc σ c))
+                  (innerᵉ (subΘExp Θloc σ e))
+                  (innerᵗ c) (innerᵉ e)
+                  (plugsᵗ Θloc σ c) (plugsᵉ Θloc σ e)
+      (subΘ-countsᵗ B Θloc σ c) (subΘ-countsᵉ B Θloc σ e)
+  subΘ-countsᵉ B Θloc σ (scanᵉ {s = s} {t = t} f z e) =
+    counts-3way B (innerᵗ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f))
+                  (innerᵗ (subΘTm Θloc σ z))
+                  (innerᵉ (subΘExp Θloc σ e))
+                  (innerᵗ f) (innerᵗ z) (innerᵉ e)
+                  (plugsᵗ ((t ×ᵗ s) ∷ Θloc) σ f)
+                  (plugsᵗ Θloc σ z) (plugsᵉ Θloc σ e)
+      (subΘ-countsᵗ B ((t ×ᵗ s) ∷ Θloc) σ f)
+      (subΘ-countsᵗ B Θloc σ z) (subΘ-countsᵉ B Θloc σ e)
+  subΘ-countsᵉ B Θloc σ (mergeAllᵉ e)   = subΘ-countsᵉ B Θloc σ e
+  subΘ-countsᵉ B Θloc σ (concatAllᵉ e)  = subΘ-countsᵉ B Θloc σ e
+  subΘ-countsᵉ B Θloc σ (switchAllᵉ e)  = subΘ-countsᵉ B Θloc σ e
+  subΘ-countsᵉ B Θloc σ (exhaustAllᵉ e) = subΘ-countsᵉ B Θloc σ e
+  subΘ-countsᵉ B Θloc σ (μᵉ e)          = subΘ-countsᵉ B Θloc σ e
+  subΘ-countsᵉ B Θloc σ (varᵉ x)        = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵉ B Θloc σ (deferᵉ e)      = sym (⊕ᵛ-identityˡ zerosᵛ)
+
+  subΘ-countsᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    counts B (innerᵗ (subΘTm Θloc σ tm)) ≡
+      counts B (innerᵗ tm) ⊕ᵛ counts B (plugsᵗ Θloc σ tm)
+  subΘ-countsᵗ B Θloc σ (varᵗ x) with ∈-++⁻ Θloc x
+  ... | inj₁ y = sym (⊕ᵛ-identityˡ zerosᵛ)
+  ... | inj₂ z =
+    trans (cong (counts B)
+            (trans (inner-renᵗ (λ ()) (λ ()) (λ ())
+                               (reify (lookupEnv σ z)))
+                   (reify-inner _ (lookupEnv σ z))))
+          (sym (⊕ᵛ-identityˡ (counts B (shellsᵛ _ (lookupEnv σ z)))))
+  subΘ-countsᵗ B Θloc σ unit̂          = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵗ B Θloc σ (bool̂ _)      = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵗ B Θloc σ (nat̂ _)       = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵗ B Θloc σ (pairᵗ a b)   =
+    counts-2way B (innerᵗ (subΘTm Θloc σ a))
+                  (innerᵗ (subΘTm Θloc σ b))
+                  (innerᵗ a) (innerᵗ b)
+                  (plugsᵗ Θloc σ a) (plugsᵗ Θloc σ b)
+      (subΘ-countsᵗ B Θloc σ a) (subΘ-countsᵗ B Θloc σ b)
+  subΘ-countsᵗ B Θloc σ (fstᵗ p)      = subΘ-countsᵗ B Θloc σ p
+  subΘ-countsᵗ B Θloc σ (sndᵗ p)      = subΘ-countsᵗ B Θloc σ p
+  subΘ-countsᵗ B Θloc σ (inlᵗ a)      = subΘ-countsᵗ B Θloc σ a
+  subΘ-countsᵗ B Θloc σ (inrᵗ a)      = subΘ-countsᵗ B Θloc σ a
+  subΘ-countsᵗ B Θloc σ (caseᵗ {s = s} {t = t} sc l r) =
+    counts-3way B (innerᵗ (subΘTm Θloc σ sc))
+                  (innerᵗ (subΘTm (s ∷ Θloc) σ l))
+                  (innerᵗ (subΘTm (t ∷ Θloc) σ r))
+                  (innerᵗ sc) (innerᵗ l) (innerᵗ r)
+                  (plugsᵗ Θloc σ sc) (plugsᵗ (s ∷ Θloc) σ l)
+                  (plugsᵗ (t ∷ Θloc) σ r)
+      (subΘ-countsᵗ B Θloc σ sc)
+      (subΘ-countsᵗ B (s ∷ Θloc) σ l) (subΘ-countsᵗ B (t ∷ Θloc) σ r)
+  subΘ-countsᵗ B Θloc σ (ifᵗ c a b)   =
+    counts-3way B (innerᵗ (subΘTm Θloc σ c))
+                  (innerᵗ (subΘTm Θloc σ a))
+                  (innerᵗ (subΘTm Θloc σ b))
+                  (innerᵗ c) (innerᵗ a) (innerᵗ b)
+                  (plugsᵗ Θloc σ c) (plugsᵗ Θloc σ a)
+                  (plugsᵗ Θloc σ b)
+      (subΘ-countsᵗ B Θloc σ c)
+      (subΘ-countsᵗ B Θloc σ a) (subΘ-countsᵗ B Θloc σ b)
+  subΘ-countsᵗ B Θloc σ (primᵗ _ a)   = subΘ-countsᵗ B Θloc σ a
+  subΘ-countsᵗ B Θloc σ (strmᵗ e)     =
+    trans (cong₂ _⊕ᵛ_ (cong (oneAt B) (shellSize-subΘ Θloc σ e))
+                      (subΘ-countsᵉ B Θloc σ e))
+          (sym (⊕ᵛ-assoc (oneAt B (shellSizeᵉ e))
+                         (counts B (innerᵉ e))
+                         (counts B (plugsᵉ Θloc σ e))))
+
+  subΘ-countsᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    counts B (innerᵗˢ (subΘTms Θloc σ ts)) ≡
+      counts B (innerᵗˢ ts) ⊕ᵛ counts B (plugsᵗˢ Θloc σ ts)
+  subΘ-countsᵗˢ B Θloc σ []       = sym (⊕ᵛ-identityˡ zerosᵛ)
+  subΘ-countsᵗˢ B Θloc σ (y ∷ ys) =
+    counts-2way B (innerᵗ (subΘTm Θloc σ y))
+                  (innerᵗˢ (subΘTms Θloc σ ys))
+                  (innerᵗ y) (innerᵗˢ ys)
+                  (plugsᵗ Θloc σ y) (plugsᵗˢ Θloc σ ys)
+      (subΘ-countsᵗ B Θloc σ y) (subΘ-countsᵗˢ B Θloc σ ys)
 
 ------------------------------------------------------------------
 -- the three cores
