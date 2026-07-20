@@ -746,13 +746,61 @@ burst-init e ins = record
   ; caches        = refl
   }
 
+-- ════════════════════════════════════════════════════════════════════════
+-- SUBSCRIBE-SIDE DECOMPOSITION BLUEPRINT (opened 2026-07-19)
+--
+-- subscribeE-wf preserves BurstInv across one subscription's burst, and yields
+-- a protocol run for that burst.  BurstInv is now CLEAN: fin-independent, its
+-- done-plumbed is the full-registry frame-stable form (like Inv's), live-matches
+-- is a plain equality countIn s (live S) ≡ countRegs s (registry st) — NO pending
+-- init/close events (unlike FoldInv's SHADOW), because the burst's events are
+-- reconciled into live by runProtocol, not carried.
+--
+-- THE CENTRAL MECHANISM.  A subscription grows the registry by `register`ing a
+-- source and, in the SAME burst emit, ships an `init` of that source.  runProtocol
+-- applies the init to `live`, so countIn and countRegs bump in lockstep and
+-- live-matches is preserved.  Symmetrically a one-shot's `close`+`complete` drain
+-- what its `init` added.  Every clause below is an instance of this balance.
+--
+-- CLAUSE GROUPS (b : Closed Γ u = Exp Γ [] [] [] u), and their obligations:
+--   · ABSURD: varᵉ () — Δ ≡ [] so t ∈ [] is uninhabited.  Proven by ().
+--   · RECURSION: μᵉ — fuel-zero emits dryBurst (hasDry ≡ true, contra nodry, ⊥);
+--     fuel-suc RECURSES on unfoldμ body (fuel ↓).  Structural once dry is killed.
+--   · BASE (oneShotBurst / direct emit): ofᵉ, emptyᵉ, takeᵉ-zero, and input's four
+--     scripted/hot branches, and deferᵉ.  Each emits one InstEmit whose events are
+--     init(+values)(+close+complete) of a fresh/hot source; some also `register`.
+--     Obligation `oneShotBurst-wf` + a `register`-balances-`init` lemma: runProtocol
+--     on that single emit steps the automaton once (enterInstant/settle/applyEvents)
+--     and re-establishes live-matches (init balances the new reg), reg-typed (the
+--     registered chain is well-typed against the added live source), current-frame
+--     (the emit opens instant id), done-plumbed (a `complete` only fires share-sunk),
+--     caches (installNode/register touch no merge counter incoherently).
+--   · FRAME (subscribeE b (f ↠ κ) then pushBurst f κ burst): mapᵉ (f=map-f),
+--     takeᵉ-suc (mintNode+installNode, f=take-f), scanᵉ (mintNode+installNode,
+--     f=scan-f).  Obligation: IH (subscribeE-wf on b, structural) gives BurstInv+run
+--     for b's burst; then `pushBurst-wf` folds stepFrame over each emit, preserving
+--     BurstInv+run.  NOTE pushBurst runs stepFrame under BurstInv, NOT FoldInv — so
+--     it needs a `stepFrame-burst` preservation, the burst-side twin of stepFrame-wf
+--     (same map/scan/take/wrap case split, but re-establishing live-matches equality
+--     rather than SHADOW).  installNode adds a fresh scan/take node — caches-neutral.
+--   · WRAP (subscribeAll = mintNode + subscribeE b (thru-outer op nid ↠ κ) + pushBurst
+--     (thru-outer op nid)): mergeAllᵉ/concatAllᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
+--     as FRAME with f = thru-outer op nid and a minted *All node installed at its
+--     initial state — so it reuses pushBurst-wf's thru-outer case.  This is where the
+--     merge coherence (caches) actually gets exercised (walk subscribes inners).
+--
+-- BUILD ORDER (outside-in): (1) this postulate stays while the pieces land;
+-- (2) prove the register/init balance lemma (pure, the mechanism); (3) oneShotBurst-wf
+-- (base); (4) stepFrame-burst + pushBurst-wf (frame); (5) subscribeAll-wf (wrap, reuses
+-- 4); (6) assemble subscribeE-wf as the fuel/Exp-structural recursion over the above,
+-- retiring this postulate.  dispatchShare-wf and the stepFrame-wf-inner-concat/outer
+-- residues fall out of (4)-(5) (they too subscribe inners through pushBurst).
+-- TERMINATION: lexicographic (fuel, Exp) — μ drops fuel, every other recursion drops
+-- the Exp; may need an explicit well-founded wrapper if Agda won't see it inline.
+-- ════════════════════════════════════════════════════════════════════════
 postulate
-  -- ONE subscription's burst preserves the frame relation.  The
-  -- per-primitive preservation induction: one obligation per
-  -- subscribeE clause, mirrored on its (now fuel-structural)
-  -- recursion.  Conditioned on the run not going dry: a fuel-starved
-  -- burst carries the dry sentinel, which the protocol rejects by
-  -- design — the unconditioned statement would be false at fuel 0
+  -- ONE subscription's burst preserves the frame relation (see the blueprint
+  -- above for the full clause-by-clause decomposition and build order).
   subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (fuel : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
