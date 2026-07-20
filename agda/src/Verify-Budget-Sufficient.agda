@@ -57,6 +57,10 @@ open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
+  renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
+open import Data.List.Properties using (length-++)
+open import Data.List.Membership.Propositional.Properties
+  using (∈-++⁻; ∈-++⁺ˡ)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -69,8 +73,13 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵛ;
+                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
+                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
+                                shellsᵉ; shellsᵛ;
+                                subΘExp; subΘTm; subΘTms;
+                                renExp; renTm; renTms; Ren∈; ext∈;
+                                wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
                                 fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
                                 strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
@@ -516,35 +525,22 @@ layeredV-any (obs t)  e        = layer e []ᵃ []ˡ
 
 
 ------------------------------------------------------------------
--- THE MEASURE — edge 3's Dershowitz–Manna multiset, concretely.
--- A layer derivation reads off the multiset of its templates'
--- sync-sizes (layerSizes); the order is count-vector lex with the
--- HIGH size class first (counts B).  All templates come from
--- program+slot syntax, so B is fixed per program and the vector
--- length is fixed — lex over Vec ℕ is then well-founded (≺ᵛ-wf,
--- proven below), and that Acc is the induction principle the wet
--- contract recurses on.  measureObs is the end-to-end reading.
+-- THE MEASURE — edge 3's Dershowitz–Manna multiset, SYNTACTICALLY
+-- (the shell reading, Rx.Exp).  A runtime obs value is a closed
+-- expression; its measure is the multiset of its shells — the
+-- operator-skeleton sizes of the value and of every sync-reachable
+-- embedded observable (shellsᵉ).  Shells count Exp constructors
+-- only: Tm material is weightless and subΘ rewrites only Tm
+-- material, so INSTANTIATION PRESERVES EVERY SHELL EXACTLY
+-- (shellSize-subΘ below) — an evaluated template's multiset is a
+-- class-preserved copy of the template's, plus the plugged obs
+-- values' own shells.  The order is count-vector lex with the HIGH
+-- size class first (counts B); ≺ᵛ-wf is the semantic justification
+-- and rank (below) the ℕ collapse the contract actually inducts
+-- on.  Both side conditions ride on stBounded? for free: every
+-- shell of e is ≤ sizeᵉ e (shells-≤) and there are ≤ sizeᵉ e of
+-- them (shells-len), so a sizeᵛ cap bounds classes AND entry sum.
 ------------------------------------------------------------------
-
-mutual
-  layerSizes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-    LayeredObs e → List ℕ
-  layerSizes (layer tpl env le) = syncSizeᵉ tpl ∷ layerSizesEnv le
-
-  layerSizesV : ∀ {n} {Γ : Ctx n} (t : Ty) {v : Val Γ t} →
-    LayeredV t v → List ℕ
-  layerSizesV unitᵗ    _  = []
-  layerSizesV boolᵗ    _  = []
-  layerSizesV natᵗ     _  = []
-  layerSizesV (s ×ᵗ t) (la , lb) = layerSizesV s la ++ layerSizesV t lb
-  layerSizesV (s +ᵗ t) {inj₁ a} l = layerSizesV s l
-  layerSizesV (s +ᵗ t) {inj₂ b} l = layerSizesV t l
-  layerSizesV (obs t)  l  = layerSizes l
-
-  layerSizesEnv : ∀ {n} {Γ : Ctx n} {Θ} {env : All (Val Γ) Θ} →
-    LayeredEnv env → List ℕ
-  layerSizesEnv []ˡ       = []
-  layerSizesEnv (_∷ˡ_ {t = t} l ls) = layerSizesV t l ++ layerSizesEnv ls
 
 -- count-vector lex, high class first
 data _≺ᵛ_ : ∀ {m} → Vec ℕ m → Vec ℕ m → Set where
@@ -587,10 +583,406 @@ counts : (B : ℕ) → List ℕ → Vec ℕ (suc B)
 counts B []      = zerosᵛ
 counts B (x ∷ M) = oneAt B x ⊕ᵛ counts B M
 
--- the wet contract's measure of a subscribed value, end to end
-measureObs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ) →
-  LayeredObs e → Vec ℕ (suc B)
-measureObs B l = counts B (layerSizes l)
+-- the wet contract's measure of a subscribed value, end to end —
+-- a pure function of the value's syntax
+measureE : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) → Closed Γ t → Vec ℕ (suc B)
+measureE B e = counts B (shellsᵉ e)
+
+------------------------------------------------------------------
+-- the free side conditions: shells are pointwise ≤ the syntax size
+-- and no more numerous than it, at every level (expression, term,
+-- runtime value) — so stBounded?'s sizeᵛ cap bounds the measure's
+-- classes (≤ B) and entry sum (≤ V) with no new invariant.
+------------------------------------------------------------------
+
+shellSize≤size : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+  shellSizeᵉ e ≤ sizeᵉ e
+shellSize≤size (input i)       = ≤-refl
+shellSize≤size (ofᵉ ts)        = s≤s z≤n
+shellSize≤size emptyᵉ          = ≤-refl
+shellSize≤size (mapᵉ f e)      = s≤s (≤-trans (shellSize≤size e) (m≤n+m _ _))
+shellSize≤size (takeᵉ c e)     = s≤s (≤-trans (shellSize≤size e) (m≤n+m _ _))
+shellSize≤size (scanᵉ f z e)   = s≤s (≤-trans (shellSize≤size e) (m≤n+m _ _))
+shellSize≤size (mergeAllᵉ e)   = s≤s (shellSize≤size e)
+shellSize≤size (concatAllᵉ e)  = s≤s (shellSize≤size e)
+shellSize≤size (switchAllᵉ e)  = s≤s (shellSize≤size e)
+shellSize≤size (exhaustAllᵉ e) = s≤s (shellSize≤size e)
+shellSize≤size (μᵉ e)          = s≤s (shellSize≤size e)
+shellSize≤size (varᵉ x)        = ≤-refl
+shellSize≤size (deferᵉ e)      = s≤s z≤n
+
+mutual
+  inner-≤ᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+    All (_≤ sizeᵉ e) (innerᵉ e)
+  inner-≤ᵉ (input i)       = []ᵃ
+  inner-≤ᵉ (ofᵉ ts)        = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵗˢ ts)
+  inner-≤ᵉ emptyᵉ          = []ᵃ
+  inner-≤ᵉ (mapᵉ f e)      = all-++
+    (mapᴬ (λ p → ≤-trans p (≤-trans (m≤m+n _ _) (n≤1+n _))) (inner-≤ᵗ f))
+    (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _))) (inner-≤ᵉ e))
+  inner-≤ᵉ (takeᵉ c e)     = all-++
+    (mapᴬ (λ p → ≤-trans p (≤-trans (m≤m+n _ _) (n≤1+n _))) (inner-≤ᵗ c))
+    (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _))) (inner-≤ᵉ e))
+  inner-≤ᵉ (scanᵉ f z e)   = all-++
+    (mapᴬ (λ p → ≤-trans p
+            (≤-trans (m≤m+n _ _) (≤-trans (m≤m+n _ _) (n≤1+n _))))
+          (inner-≤ᵗ f))
+    (all-++
+      (mapᴬ (λ p → ≤-trans p
+              (≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f))
+                       (≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ e))
+                                (n≤1+n _))))
+            (inner-≤ᵗ z))
+      (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _)))
+            (inner-≤ᵉ e)))
+  inner-≤ᵉ (mergeAllᵉ e)   = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵉ e)
+  inner-≤ᵉ (concatAllᵉ e)  = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵉ e)
+  inner-≤ᵉ (switchAllᵉ e)  = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵉ e)
+  inner-≤ᵉ (exhaustAllᵉ e) = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵉ e)
+  inner-≤ᵉ (μᵉ e)          = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵉ e)
+  inner-≤ᵉ (varᵉ x)        = []ᵃ
+  inner-≤ᵉ (deferᵉ e)      = []ᵃ
+
+  inner-≤ᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
+    All (_≤ sizeᵗ tm) (innerᵗ tm)
+  inner-≤ᵗ (varᵗ x)      = []ᵃ
+  inner-≤ᵗ unit̂          = []ᵃ
+  inner-≤ᵗ (bool̂ _)      = []ᵃ
+  inner-≤ᵗ (nat̂ _)       = []ᵃ
+  inner-≤ᵗ (pairᵗ a b)   = all-++
+    (mapᴬ (λ p → ≤-trans p (≤-trans (m≤m+n _ _) (n≤1+n _))) (inner-≤ᵗ a))
+    (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _))) (inner-≤ᵗ b))
+  inner-≤ᵗ (fstᵗ p)      = mapᴬ (λ q → ≤-trans q (n≤1+n _)) (inner-≤ᵗ p)
+  inner-≤ᵗ (sndᵗ p)      = mapᴬ (λ q → ≤-trans q (n≤1+n _)) (inner-≤ᵗ p)
+  inner-≤ᵗ (inlᵗ a)      = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵗ a)
+  inner-≤ᵗ (inrᵗ a)      = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵗ a)
+  inner-≤ᵗ (caseᵗ s l r) = all-++
+    (mapᴬ (λ p → ≤-trans p
+            (≤-trans (m≤m+n _ _) (≤-trans (m≤m+n _ _) (n≤1+n _))))
+          (inner-≤ᵗ s))
+    (all-++
+      (mapᴬ (λ p → ≤-trans p
+              (≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ s))
+                       (≤-trans (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r))
+                                (n≤1+n _))))
+            (inner-≤ᵗ l))
+      (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _)))
+            (inner-≤ᵗ r)))
+  inner-≤ᵗ (ifᵗ c a b)   = all-++
+    (mapᴬ (λ p → ≤-trans p
+            (≤-trans (m≤m+n _ _) (≤-trans (m≤m+n _ _) (n≤1+n _))))
+          (inner-≤ᵗ c))
+    (all-++
+      (mapᴬ (λ p → ≤-trans p
+              (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                       (≤-trans (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))
+                                (n≤1+n _))))
+            (inner-≤ᵗ a))
+      (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _)))
+            (inner-≤ᵗ b)))
+  inner-≤ᵗ (primᵗ _ a)   = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵗ a)
+  inner-≤ᵗ (strmᵗ e)     =
+    ≤-trans (shellSize≤size e) (n≤1+n _)
+    ∷ᵃ mapᴬ (λ p → ≤-trans p (n≤1+n _)) (inner-≤ᵉ e)
+
+  inner-≤ᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    All (_≤ sizeᵗˢ ts) (innerᵗˢ ts)
+  inner-≤ᵗˢ []       = []ᵃ
+  inner-≤ᵗˢ (y ∷ ys) = all-++
+    (mapᴬ (λ p → ≤-trans p (m≤m+n _ _)) (inner-≤ᵗ y))
+    (mapᴬ (λ p → ≤-trans p (m≤n+m _ _)) (inner-≤ᵗˢ ys))
+
+shells-≤ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+  All (_≤ sizeᵉ e) (shellsᵉ e)
+shells-≤ e = shellSize≤size e ∷ᵃ inner-≤ᵉ e
+
+shellsᵛ-≤ : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  All (_≤ sizeᵛ t v) (shellsᵛ t v)
+shellsᵛ-≤ unitᵗ    v        = []ᵃ
+shellsᵛ-≤ boolᵗ    v        = []ᵃ
+shellsᵛ-≤ natᵗ     v        = []ᵃ
+shellsᵛ-≤ (s ×ᵗ t) (a , b)  = all-++
+  (mapᴬ (λ p → ≤-trans p (≤-trans (m≤m+n _ _) (n≤1+n _))) (shellsᵛ-≤ s a))
+  (mapᴬ (λ p → ≤-trans p (≤-trans (m≤n+m _ _) (n≤1+n _))) (shellsᵛ-≤ t b))
+shellsᵛ-≤ (s +ᵗ t) (inj₁ a) = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (shellsᵛ-≤ s a)
+shellsᵛ-≤ (s +ᵗ t) (inj₂ b) = mapᴬ (λ p → ≤-trans p (n≤1+n _)) (shellsᵛ-≤ t b)
+shellsᵛ-≤ (obs t)  e        = shells-≤ e
+
+mutual
+  inner-lenᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+    length (innerᵉ e) < sizeᵉ e
+  inner-lenᵉ (input i)       = s≤s z≤n
+  inner-lenᵉ (ofᵉ ts)        = s≤s (inner-lenᵗˢ ts)
+  inner-lenᵉ emptyᵉ          = s≤s z≤n
+  inner-lenᵉ (mapᵉ f e)      rewrite length-++ (innerᵗ f) {innerᵉ e} =
+    s≤s (≤-trans (n≤1+n _) (+-mono-≤-< (inner-lenᵗ f) (inner-lenᵉ e)))
+  inner-lenᵉ (takeᵉ c e)     rewrite length-++ (innerᵗ c) {innerᵉ e} =
+    s≤s (≤-trans (n≤1+n _) (+-mono-≤-< (inner-lenᵗ c) (inner-lenᵉ e)))
+  inner-lenᵉ (scanᵉ f z e)
+    rewrite length-++ (innerᵗ f) {innerᵗ z ++ innerᵉ e}
+          | length-++ (innerᵗ z) {innerᵉ e} =
+    s≤s (≤-trans (≤-reflexive (sym (+-assoc (length (innerᵗ f))
+                                            (length (innerᵗ z)) _)))
+        (≤-trans (n≤1+n _)
+                 (+-mono-≤-< (+-mono-≤ (inner-lenᵗ f) (inner-lenᵗ z))
+                             (inner-lenᵉ e))))
+  inner-lenᵉ (mergeAllᵉ e)   = ≤-trans (inner-lenᵉ e) (n≤1+n _)
+  inner-lenᵉ (concatAllᵉ e)  = ≤-trans (inner-lenᵉ e) (n≤1+n _)
+  inner-lenᵉ (switchAllᵉ e)  = ≤-trans (inner-lenᵉ e) (n≤1+n _)
+  inner-lenᵉ (exhaustAllᵉ e) = ≤-trans (inner-lenᵉ e) (n≤1+n _)
+  inner-lenᵉ (μᵉ e)          = ≤-trans (inner-lenᵉ e) (n≤1+n _)
+  inner-lenᵉ (varᵉ x)        = s≤s z≤n
+  inner-lenᵉ (deferᵉ e)      = s≤s z≤n
+
+  inner-lenᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
+    length (innerᵗ tm) ≤ sizeᵗ tm
+  inner-lenᵗ (varᵗ x)      = z≤n
+  inner-lenᵗ unit̂          = z≤n
+  inner-lenᵗ (bool̂ _)      = z≤n
+  inner-lenᵗ (nat̂ _)       = z≤n
+  inner-lenᵗ (pairᵗ a b)   rewrite length-++ (innerᵗ a) {innerᵗ b} =
+    ≤-trans (+-mono-≤ (inner-lenᵗ a) (inner-lenᵗ b)) (n≤1+n _)
+  inner-lenᵗ (fstᵗ p)      = ≤-trans (inner-lenᵗ p) (n≤1+n _)
+  inner-lenᵗ (sndᵗ p)      = ≤-trans (inner-lenᵗ p) (n≤1+n _)
+  inner-lenᵗ (inlᵗ a)      = ≤-trans (inner-lenᵗ a) (n≤1+n _)
+  inner-lenᵗ (inrᵗ a)      = ≤-trans (inner-lenᵗ a) (n≤1+n _)
+  inner-lenᵗ (caseᵗ s l r)
+    rewrite length-++ (innerᵗ s) {innerᵗ l ++ innerᵗ r}
+          | length-++ (innerᵗ l) {innerᵗ r} =
+    ≤-trans (≤-reflexive (sym (+-assoc (length (innerᵗ s))
+                                       (length (innerᵗ l)) _)))
+    (≤-trans (+-mono-≤ (+-mono-≤ (inner-lenᵗ s) (inner-lenᵗ l))
+                       (inner-lenᵗ r))
+             (n≤1+n _))
+  inner-lenᵗ (ifᵗ c a b)
+    rewrite length-++ (innerᵗ c) {innerᵗ a ++ innerᵗ b}
+          | length-++ (innerᵗ a) {innerᵗ b} =
+    ≤-trans (≤-reflexive (sym (+-assoc (length (innerᵗ c))
+                                       (length (innerᵗ a)) _)))
+    (≤-trans (+-mono-≤ (+-mono-≤ (inner-lenᵗ c) (inner-lenᵗ a))
+                       (inner-lenᵗ b))
+             (n≤1+n _))
+  inner-lenᵗ (primᵗ _ a)   = ≤-trans (inner-lenᵗ a) (n≤1+n _)
+  inner-lenᵗ (strmᵗ e)     = ≤-trans (inner-lenᵉ e) (n≤1+n _)
+
+  inner-lenᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    length (innerᵗˢ ts) ≤ sizeᵗˢ ts
+  inner-lenᵗˢ []       = z≤n
+  inner-lenᵗˢ (y ∷ ys) rewrite length-++ (innerᵗ y) {innerᵗˢ ys} =
+    +-mono-≤ (inner-lenᵗ y) (inner-lenᵗˢ ys)
+
+shells-len : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+  length (shellsᵉ e) ≤ sizeᵉ e
+shells-len e = inner-lenᵉ e
+
+------------------------------------------------------------------
+-- THE CLOSURE, exactly: substitution preserves every shell size.
+-- subΘ rewrites only Tm material — Exp constructors map 1-1 and a
+-- plugged value sits behind ground literals and strmᵗ leaves, both
+-- weightless — so an instantiated template's own shell is its
+-- template's shell, on the nose.  This is what makes the scan hop
+-- an EMBED hop: the produced value's multiset is a class-preserved
+-- copy of the fn-body subtree's sub-multiset (plus plugged obs
+-- values' shells, owned by the ledger).
+------------------------------------------------------------------
+
+shellSize-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+  shellSizeᵉ (subΘExp Θloc σ e) ≡ shellSizeᵉ e
+shellSize-subΘ Θloc σ (input i)       = refl
+shellSize-subΘ Θloc σ (ofᵉ ts)        = refl
+shellSize-subΘ Θloc σ emptyᵉ          = refl
+shellSize-subΘ Θloc σ (mapᵉ f e)      = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (takeᵉ c e)     = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (scanᵉ f z e)   = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (mergeAllᵉ e)   = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (concatAllᵉ e)  = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (switchAllᵉ e)  = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (exhaustAllᵉ e) = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (μᵉ e)          = cong suc (shellSize-subΘ Θloc σ e)
+shellSize-subΘ Θloc σ (varᵉ x)        = refl
+shellSize-subΘ Θloc σ (deferᵉ e)      = refl
+
+-- renamings never touch shells: shellSizeᵉ reads only Exp
+-- constructors and renExp maps them 1-1 (weakening included —
+-- wkExp/wkTm are renamings from empty contexts)
+shellSize-ren : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+  (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+  (e : Exp Γ Δᵍ Δ Θ t) →
+  shellSizeᵉ (renExp ρg ρd ρt e) ≡ shellSizeᵉ e
+shellSize-ren ρg ρd ρt (input i)       = refl
+shellSize-ren ρg ρd ρt (ofᵉ ts)        = refl
+shellSize-ren ρg ρd ρt emptyᵉ          = refl
+shellSize-ren ρg ρd ρt (mapᵉ f e)      = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (takeᵉ c e)     = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (scanᵉ f z e)   = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (mergeAllᵉ e)   = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (concatAllᵉ e)  = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (switchAllᵉ e)  = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (exhaustAllᵉ e) = cong suc (shellSize-ren ρg ρd ρt e)
+shellSize-ren ρg ρd ρt (μᵉ e)          = cong suc (shellSize-ren (ext∈ ρg) ρd ρt e)
+shellSize-ren ρg ρd ρt (varᵉ x)        = refl
+shellSize-ren ρg ρd ρt (deferᵉ e)      = refl
+
+mutual
+  inner-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (e : Exp Γ Δᵍ Δ Θ t) →
+    innerᵉ (renExp ρg ρd ρt e) ≡ innerᵉ e
+  inner-renᵉ ρg ρd ρt (input i)       = refl
+  inner-renᵉ ρg ρd ρt (ofᵉ ts)        = inner-renᵗˢ ρg ρd ρt ts
+  inner-renᵉ ρg ρd ρt emptyᵉ          = refl
+  inner-renᵉ ρg ρd ρt (mapᵉ f e)      =
+    cong₂ _++_ (inner-renᵗ ρg ρd (ext∈ ρt) f) (inner-renᵉ ρg ρd ρt e)
+  inner-renᵉ ρg ρd ρt (takeᵉ c e)     =
+    cong₂ _++_ (inner-renᵗ ρg ρd ρt c) (inner-renᵉ ρg ρd ρt e)
+  inner-renᵉ ρg ρd ρt (scanᵉ f z e)   =
+    cong₂ _++_ (inner-renᵗ ρg ρd (ext∈ ρt) f)
+               (cong₂ _++_ (inner-renᵗ ρg ρd ρt z) (inner-renᵉ ρg ρd ρt e))
+  inner-renᵉ ρg ρd ρt (mergeAllᵉ e)   = inner-renᵉ ρg ρd ρt e
+  inner-renᵉ ρg ρd ρt (concatAllᵉ e)  = inner-renᵉ ρg ρd ρt e
+  inner-renᵉ ρg ρd ρt (switchAllᵉ e)  = inner-renᵉ ρg ρd ρt e
+  inner-renᵉ ρg ρd ρt (exhaustAllᵉ e) = inner-renᵉ ρg ρd ρt e
+  inner-renᵉ ρg ρd ρt (μᵉ e)          = inner-renᵉ (ext∈ ρg) ρd ρt e
+  inner-renᵉ ρg ρd ρt (varᵉ x)        = refl
+  inner-renᵉ ρg ρd ρt (deferᵉ e)      = refl
+
+  inner-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (tm : Tm Γ Δᵍ Δ Θ t) →
+    innerᵗ (renTm ρg ρd ρt tm) ≡ innerᵗ tm
+  inner-renᵗ ρg ρd ρt (varᵗ x)      = refl
+  inner-renᵗ ρg ρd ρt unit̂          = refl
+  inner-renᵗ ρg ρd ρt (bool̂ _)      = refl
+  inner-renᵗ ρg ρd ρt (nat̂ _)       = refl
+  inner-renᵗ ρg ρd ρt (pairᵗ a b)   =
+    cong₂ _++_ (inner-renᵗ ρg ρd ρt a) (inner-renᵗ ρg ρd ρt b)
+  inner-renᵗ ρg ρd ρt (fstᵗ p)      = inner-renᵗ ρg ρd ρt p
+  inner-renᵗ ρg ρd ρt (sndᵗ p)      = inner-renᵗ ρg ρd ρt p
+  inner-renᵗ ρg ρd ρt (inlᵗ a)      = inner-renᵗ ρg ρd ρt a
+  inner-renᵗ ρg ρd ρt (inrᵗ a)      = inner-renᵗ ρg ρd ρt a
+  inner-renᵗ ρg ρd ρt (caseᵗ sc l r) =
+    cong₂ _++_ (inner-renᵗ ρg ρd ρt sc)
+               (cong₂ _++_ (inner-renᵗ ρg ρd (ext∈ ρt) l)
+                           (inner-renᵗ ρg ρd (ext∈ ρt) r))
+  inner-renᵗ ρg ρd ρt (ifᵗ c a b)   =
+    cong₂ _++_ (inner-renᵗ ρg ρd ρt c)
+               (cong₂ _++_ (inner-renᵗ ρg ρd ρt a) (inner-renᵗ ρg ρd ρt b))
+  inner-renᵗ ρg ρd ρt (primᵗ _ a)   = inner-renᵗ ρg ρd ρt a
+  inner-renᵗ ρg ρd ρt (strmᵗ e)     =
+    cong₂ _∷_ (shellSize-ren ρg ρd ρt e) (inner-renᵉ ρg ρd ρt e)
+
+  inner-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    innerᵗˢ (renTms ρg ρd ρt ts) ≡ innerᵗˢ ts
+  inner-renᵗˢ ρg ρd ρt []       = refl
+  inner-renᵗˢ ρg ρd ρt (y ∷ ys) =
+    cong₂ _++_ (inner-renᵗ ρg ρd ρt y) (inner-renᵗˢ ρg ρd ρt ys)
+
+-- a reified value's embedded shells are exactly the value's own:
+-- ground skeleton contributes nothing, obs components sit behind
+-- strmᵗ verbatim
+reify-inner : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  innerᵗ (reify v) ≡ shellsᵛ t v
+reify-inner unitᵗ    v        = refl
+reify-inner boolᵗ    v        = refl
+reify-inner natᵗ     v        = refl
+reify-inner (s ×ᵗ t) (a , b)  = cong₂ _++_ (reify-inner s a) (reify-inner t b)
+reify-inner (s +ᵗ t) (inj₁ a) = reify-inner s a
+reify-inner (s +ᵗ t) (inj₂ b) = reify-inner t b
+reify-inner (obs t)  e        = refl
+
+-- the cap closure: instantiating a capped template over a capped
+-- environment yields capped shells — the substrate of invariant
+-- preservation at every evalWith/applyFn site.  (The host shell is
+-- covered separately and exactly by shellSize-subΘ.)
+EnvCap : ∀ {n} {Γ : Ctx n} {Θ} (B : ℕ) → All (Val Γ) Θ → Set
+EnvCap B []ᵃ              = ⊤
+EnvCap B (_∷ᵃ_ {x = t} v σ) = All (_≤ B) (shellsᵛ t v) × EnvCap B σ
+
+envCap-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (B : ℕ) (σ : All (Val Γ) Θ) →
+  EnvCap B σ → (z : t ∈ Θ) → All (_≤ B) (shellsᵛ t (lookupEnv σ z))
+envCap-lookup B (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
+envCap-lookup B (v ∷ᵃ σ) (hv , hσ) (there z)   = envCap-lookup B σ hσ z
+
+mutual
+  subΘ-capᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    All (_≤ B) (innerᵉ e) → EnvCap B σ →
+    All (_≤ B) (innerᵉ (subΘExp Θloc σ e))
+  subΘ-capᵉ B Θloc σ (input i)       h hσ = []ᵃ
+  subΘ-capᵉ B Θloc σ (ofᵉ ts)        h hσ = subΘ-capᵗˢ B Θloc σ ts h hσ
+  subΘ-capᵉ B Θloc σ emptyᵉ          h hσ = []ᵃ
+  subΘ-capᵉ B Θloc σ (mapᵉ {s = s} f e) h hσ = all-++
+    (subΘ-capᵗ B (s ∷ Θloc) σ f (all-++ˡ (innerᵗ f) h) hσ)
+    (subΘ-capᵉ B Θloc σ e (all-++ʳ (innerᵗ f) h) hσ)
+  subΘ-capᵉ B Θloc σ (takeᵉ c e)     h hσ = all-++
+    (subΘ-capᵗ B Θloc σ c (all-++ˡ (innerᵗ c) h) hσ)
+    (subΘ-capᵉ B Θloc σ e (all-++ʳ (innerᵗ c) h) hσ)
+  subΘ-capᵉ B Θloc σ (scanᵉ {s = s} {t = t} f z e) h hσ = all-++
+    (subΘ-capᵗ B ((t ×ᵗ s) ∷ Θloc) σ f (all-++ˡ (innerᵗ f) h) hσ)
+    (all-++
+      (subΘ-capᵗ B Θloc σ z
+        (all-++ˡ (innerᵗ z) (all-++ʳ (innerᵗ f) h)) hσ)
+      (subΘ-capᵉ B Θloc σ e
+        (all-++ʳ (innerᵗ z) (all-++ʳ (innerᵗ f) h)) hσ))
+  subΘ-capᵉ B Θloc σ (mergeAllᵉ e)   h hσ = subΘ-capᵉ B Θloc σ e h hσ
+  subΘ-capᵉ B Θloc σ (concatAllᵉ e)  h hσ = subΘ-capᵉ B Θloc σ e h hσ
+  subΘ-capᵉ B Θloc σ (switchAllᵉ e)  h hσ = subΘ-capᵉ B Θloc σ e h hσ
+  subΘ-capᵉ B Θloc σ (exhaustAllᵉ e) h hσ = subΘ-capᵉ B Θloc σ e h hσ
+  subΘ-capᵉ B Θloc σ (μᵉ e)          h hσ = subΘ-capᵉ B Θloc σ e h hσ
+  subΘ-capᵉ B Θloc σ (varᵉ x)        h hσ = []ᵃ
+  subΘ-capᵉ B Θloc σ (deferᵉ e)      h hσ = []ᵃ
+
+  subΘ-capᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    All (_≤ B) (innerᵗ tm) → EnvCap B σ →
+    All (_≤ B) (innerᵗ (subΘTm Θloc σ tm))
+  subΘ-capᵗ B Θloc σ (varᵗ x) h hσ with ∈-++⁻ Θloc x
+  ... | inj₁ y = []ᵃ
+  ... | inj₂ z = subst (All (_≤ B))
+      (sym (trans (inner-renᵗ (λ ()) (λ ()) (λ ())
+                              (reify (lookupEnv σ z)))
+                  (reify-inner _ (lookupEnv σ z))))
+      (envCap-lookup B σ hσ z)
+  subΘ-capᵗ B Θloc σ unit̂          h hσ = []ᵃ
+  subΘ-capᵗ B Θloc σ (bool̂ _)      h hσ = []ᵃ
+  subΘ-capᵗ B Θloc σ (nat̂ _)       h hσ = []ᵃ
+  subΘ-capᵗ B Θloc σ (pairᵗ a b)   h hσ = all-++
+    (subΘ-capᵗ B Θloc σ a (all-++ˡ (innerᵗ a) h) hσ)
+    (subΘ-capᵗ B Θloc σ b (all-++ʳ (innerᵗ a) h) hσ)
+  subΘ-capᵗ B Θloc σ (fstᵗ p)      h hσ = subΘ-capᵗ B Θloc σ p h hσ
+  subΘ-capᵗ B Θloc σ (sndᵗ p)      h hσ = subΘ-capᵗ B Θloc σ p h hσ
+  subΘ-capᵗ B Θloc σ (inlᵗ a)      h hσ = subΘ-capᵗ B Θloc σ a h hσ
+  subΘ-capᵗ B Θloc σ (inrᵗ a)      h hσ = subΘ-capᵗ B Θloc σ a h hσ
+  subΘ-capᵗ B Θloc σ (caseᵗ {s = s} {t = t} sc l r) h hσ = all-++
+    (subΘ-capᵗ B Θloc σ sc (all-++ˡ (innerᵗ sc) h) hσ)
+    (all-++
+      (subΘ-capᵗ B (s ∷ Θloc) σ l
+        (all-++ˡ (innerᵗ l) (all-++ʳ (innerᵗ sc) h)) hσ)
+      (subΘ-capᵗ B (t ∷ Θloc) σ r
+        (all-++ʳ (innerᵗ l) (all-++ʳ (innerᵗ sc) h)) hσ))
+  subΘ-capᵗ B Θloc σ (ifᵗ c a b)   h hσ = all-++
+    (subΘ-capᵗ B Θloc σ c (all-++ˡ (innerᵗ c) h) hσ)
+    (all-++
+      (subΘ-capᵗ B Θloc σ a
+        (all-++ˡ (innerᵗ a) (all-++ʳ (innerᵗ c) h)) hσ)
+      (subΘ-capᵗ B Θloc σ b
+        (all-++ʳ (innerᵗ a) (all-++ʳ (innerᵗ c) h)) hσ))
+  subΘ-capᵗ B Θloc σ (primᵗ _ a)   h hσ = subΘ-capᵗ B Θloc σ a h hσ
+  subΘ-capᵗ B Θloc σ (strmᵗ e) (hd ∷ᵃ tl) hσ =
+    subst (_≤ B) (sym (shellSize-subΘ Θloc σ e)) hd
+    ∷ᵃ subΘ-capᵉ B Θloc σ e tl hσ
+
+  subΘ-capᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    All (_≤ B) (innerᵗˢ ts) → EnvCap B σ →
+    All (_≤ B) (innerᵗˢ (subΘTms Θloc σ ts))
+  subΘ-capᵗˢ B Θloc σ []       h hσ = []ᵃ
+  subΘ-capᵗˢ B Θloc σ (y ∷ ys) h hσ = all-++
+    (subΘ-capᵗ B Θloc σ y (all-++ˡ (innerᵗ y) h) hσ)
+    (subΘ-capᵗˢ B Θloc σ ys (all-++ʳ (innerᵗ y) h) hσ)
 
 ------------------------------------------------------------------
 -- EDGE 2, DISCHARGED: μ-unfolding preserves sync-reachable size.

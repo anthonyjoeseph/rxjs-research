@@ -536,3 +536,79 @@ sizeᵛ (s ×ᵗ t) (a , b)  = suc (sizeᵛ s a + sizeᵛ t b)
 sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
 sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
 sizeᵛ (obs t)  e        = sizeᵉ e
+------------------------------------------------------------------
+-- Shells: the shell of an expression is its OPERATOR skeleton —
+-- Exp constructors only, with deferᵉ a leaf, embedded observables
+-- (strmᵗ) a boundary, and Tm material weightless.  subΘ rewrites
+-- only Tm material (Θ var positions), so substitution preserves
+-- every shell size EXACTLY — runtime instantiation neither
+-- inflates nor deflates a shell.  shellsᵉ is the multiset of shell
+-- sizes of e and of every sync-reachable embedded observable,
+-- transitively; a runtime obs value IS a closed expression, so its
+-- subscription measure (Verify-Budget-Sufficient's Dershowitz–
+-- Manna multiset) is counts B ∘ shellsᵉ — a pure function of the
+-- value, no derivation bookkeeping.
+------------------------------------------------------------------
+
+shellSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+shellSizeᵉ (input i)       = 1
+shellSizeᵉ (ofᵉ ts)        = 1
+shellSizeᵉ emptyᵉ          = 1
+shellSizeᵉ (mapᵉ f e)      = suc (shellSizeᵉ e)
+shellSizeᵉ (takeᵉ c e)     = suc (shellSizeᵉ e)
+shellSizeᵉ (scanᵉ f z e)   = suc (shellSizeᵉ e)
+shellSizeᵉ (mergeAllᵉ e)   = suc (shellSizeᵉ e)
+shellSizeᵉ (concatAllᵉ e)  = suc (shellSizeᵉ e)
+shellSizeᵉ (switchAllᵉ e)  = suc (shellSizeᵉ e)
+shellSizeᵉ (exhaustAllᵉ e) = suc (shellSizeᵉ e)
+shellSizeᵉ (μᵉ e)          = suc (shellSizeᵉ e)
+shellSizeᵉ (varᵉ x)        = 1
+shellSizeᵉ (deferᵉ e)      = 1
+
+mutual
+  innerᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → List ℕ
+  innerᵉ (input i)       = []
+  innerᵉ (ofᵉ ts)        = innerᵗˢ ts
+  innerᵉ emptyᵉ          = []
+  innerᵉ (mapᵉ f e)      = innerᵗ f ++ innerᵉ e
+  innerᵉ (takeᵉ c e)     = innerᵗ c ++ innerᵉ e
+  innerᵉ (scanᵉ f z e)   = innerᵗ f ++ innerᵗ z ++ innerᵉ e
+  innerᵉ (mergeAllᵉ e)   = innerᵉ e
+  innerᵉ (concatAllᵉ e)  = innerᵉ e
+  innerᵉ (switchAllᵉ e)  = innerᵉ e
+  innerᵉ (exhaustAllᵉ e) = innerᵉ e
+  innerᵉ (μᵉ e)          = innerᵉ e
+  innerᵉ (varᵉ x)        = []
+  innerᵉ (deferᵉ e)      = []
+
+  innerᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → List ℕ
+  innerᵗ (varᵗ x)      = []
+  innerᵗ unit̂          = []
+  innerᵗ (bool̂ _)      = []
+  innerᵗ (nat̂ _)       = []
+  innerᵗ (pairᵗ a b)   = innerᵗ a ++ innerᵗ b
+  innerᵗ (fstᵗ p)      = innerᵗ p
+  innerᵗ (sndᵗ p)      = innerᵗ p
+  innerᵗ (inlᵗ a)      = innerᵗ a
+  innerᵗ (inrᵗ a)      = innerᵗ a
+  innerᵗ (caseᵗ s l r) = innerᵗ s ++ innerᵗ l ++ innerᵗ r
+  innerᵗ (ifᵗ c a b)   = innerᵗ c ++ innerᵗ a ++ innerᵗ b
+  innerᵗ (primᵗ _ a)   = innerᵗ a
+  innerᵗ (strmᵗ e)     = shellSizeᵉ e ∷ innerᵉ e
+
+  innerᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → List ℕ
+  innerᵗˢ []       = []
+  innerᵗˢ (y ∷ ys) = innerᵗ y ++ innerᵗˢ ys
+
+shellsᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → List ℕ
+shellsᵉ e = shellSizeᵉ e ∷ innerᵉ e
+
+-- the shells of every observable embedded in a runtime value
+shellsᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → List ℕ
+shellsᵛ unitᵗ    _        = []
+shellsᵛ boolᵗ    _        = []
+shellsᵛ natᵗ     _        = []
+shellsᵛ (s ×ᵗ t) (a , b)  = shellsᵛ s a ++ shellsᵛ t b
+shellsᵛ (s +ᵗ t) (inj₁ a) = shellsᵛ s a
+shellsᵛ (s +ᵗ t) (inj₂ b) = shellsᵛ t b
+shellsᵛ (obs t)  e        = shellsᵉ e
