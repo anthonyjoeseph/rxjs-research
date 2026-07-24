@@ -83,7 +83,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 InstEvent; init; value; close; handoff;
-                                complete;
+                                complete; exhausted;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
@@ -94,7 +94,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 subΘExp; subΘTm; subΘTms;
                                 plugsᵉ; plugsᵗ; plugsᵗˢ;
                                 occsᵉ; occsᵗ; occsᵗˢ;
-                                renExp; renTm; renTms; Ren∈; ext∈;
+                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
                                 wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
                                 fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
@@ -111,7 +111,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; NodeId;
+                                oneShotBurst; installNode; setNode; NodeId;
                                 root; share-sink; _↠_; Frame; AllOp;
                                 map-f; scan-f; take-f; from-inner;
                                 thru-outer; Stream;
@@ -2060,74 +2060,296 @@ EnvSize : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) → All (Val Γ) Θ → Set
 EnvSize V []ᵃ                = ⊤
 EnvSize V (_∷ᵃ_ {x = t} v σ) = (sizeᵛ t v ≤ V) × EnvSize V σ
 
-postulate
-  -- (G1) per-entry cons of shellsᵛ-len / shellsᵛ-≤ with ≤-trans
-  envSize→envLen : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (σ : All (Val Γ) Θ) →
-    EnvSize V σ → EnvLen V σ
-  envSize→envCap : ∀ {n} {Γ : Ctx n} {Θ} (B : ℕ) (σ : All (Val Γ) Θ) →
-    EnvSize B σ → EnvCap B σ
+-- an env capped at V looks up values capped at V
+envSize-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (σ : All (Val Γ) Θ) →
+  EnvSize V σ → (z : t ∈ Θ) → sizeᵛ t (lookupEnv σ z) ≤ V
+envSize-lookup V (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
+envSize-lookup V (v ∷ᵃ σ) (hv , hσ) (there z)   = envSize-lookup V σ hσ z
 
-  -- (G2) renamings are size-invariant (constructors map 1-1) —
-  -- mirror shellSize-ren/inner-ren's mutual shape over sizeᵉ/ᵗ/ᵗˢ
+-- (G2) renamings are size-invariant: renExp/renTm/renTms map every
+-- constructor 1-1 (weakening included) and sizeᵉ/ᵗ/ᵗˢ count constructors
+-- plus subterm sizes, so each clause is refl (leaf) or cong/cong₂ over the
+-- recursive calls — the sizeᵉ analog of shellSize-ren/inner-ren.  Renaming
+-- values are irrelevant to size, so the ext∈/++Ren/(λ ()) shifts pass through.
+mutual
   size-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
     (e : Exp Γ Δᵍ Δ Θ t) → sizeᵉ (renExp ρg ρd ρt e) ≡ sizeᵉ e
+  size-renᵉ ρg ρd ρt (input i)       = refl
+  size-renᵉ ρg ρd ρt (ofᵉ ts)        = cong suc (size-renᵗˢ ρg ρd ρt ts)
+  size-renᵉ ρg ρd ρt emptyᵉ          = refl
+  size-renᵉ ρg ρd ρt (mapᵉ f e)      =
+    cong suc (cong₂ _+_ (size-renᵗ ρg ρd (ext∈ ρt) f) (size-renᵉ ρg ρd ρt e))
+  size-renᵉ ρg ρd ρt (takeᵉ c e)     =
+    cong suc (cong₂ _+_ (size-renᵗ ρg ρd ρt c) (size-renᵉ ρg ρd ρt e))
+  size-renᵉ ρg ρd ρt (scanᵉ f z e)   =
+    cong suc (cong₂ _+_ (cong₂ _+_ (size-renᵗ ρg ρd (ext∈ ρt) f) (size-renᵗ ρg ρd ρt z))
+                        (size-renᵉ ρg ρd ρt e))
+  size-renᵉ ρg ρd ρt (mergeAllᵉ e)   = cong suc (size-renᵉ ρg ρd ρt e)
+  size-renᵉ ρg ρd ρt (concatAllᵉ e)  = cong suc (size-renᵉ ρg ρd ρt e)
+  size-renᵉ ρg ρd ρt (switchAllᵉ e)  = cong suc (size-renᵉ ρg ρd ρt e)
+  size-renᵉ ρg ρd ρt (exhaustAllᵉ e) = cong suc (size-renᵉ ρg ρd ρt e)
+  size-renᵉ ρg ρd ρt (μᵉ e)          = cong suc (size-renᵉ (ext∈ ρg) ρd ρt e)
+  size-renᵉ ρg ρd ρt (varᵉ x)        = refl
+  size-renᵉ ρg ρd ρt (deferᵉ e)      = cong suc (size-renᵉ (λ ()) (++Ren ρg ρd) ρt e)
+
   size-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
     (tm : Tm Γ Δᵍ Δ Θ t) → sizeᵗ (renTm ρg ρd ρt tm) ≡ sizeᵗ tm
+  size-renᵗ ρg ρd ρt (varᵗ x)      = refl
+  size-renᵗ ρg ρd ρt unit̂          = refl
+  size-renᵗ ρg ρd ρt (bool̂ _)      = refl
+  size-renᵗ ρg ρd ρt (nat̂ _)       = refl
+  size-renᵗ ρg ρd ρt (pairᵗ a b)   =
+    cong suc (cong₂ _+_ (size-renᵗ ρg ρd ρt a) (size-renᵗ ρg ρd ρt b))
+  size-renᵗ ρg ρd ρt (fstᵗ p)      = cong suc (size-renᵗ ρg ρd ρt p)
+  size-renᵗ ρg ρd ρt (sndᵗ p)      = cong suc (size-renᵗ ρg ρd ρt p)
+  size-renᵗ ρg ρd ρt (inlᵗ a)      = cong suc (size-renᵗ ρg ρd ρt a)
+  size-renᵗ ρg ρd ρt (inrᵗ a)      = cong suc (size-renᵗ ρg ρd ρt a)
+  size-renᵗ ρg ρd ρt (caseᵗ s l r) =
+    cong suc (cong₂ _+_ (cong₂ _+_ (size-renᵗ ρg ρd ρt s) (size-renᵗ ρg ρd (ext∈ ρt) l))
+                        (size-renᵗ ρg ρd (ext∈ ρt) r))
+  size-renᵗ ρg ρd ρt (ifᵗ c a b)   =
+    cong suc (cong₂ _+_ (cong₂ _+_ (size-renᵗ ρg ρd ρt c) (size-renᵗ ρg ρd ρt a))
+                        (size-renᵗ ρg ρd ρt b))
+  size-renᵗ ρg ρd ρt (primᵗ _ a)   = cong suc (size-renᵗ ρg ρd ρt a)
+  size-renᵗ ρg ρd ρt (strmᵗ e)     = cong suc (size-renᵉ ρg ρd ρt e)
+
   size-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
     (ts : List (Tm Γ Δᵍ Δ Θ t)) → sizeᵗˢ (renTms ρg ρd ρt ts) ≡ sizeᵗˢ ts
+  size-renᵗˢ ρg ρd ρt []       = refl
+  size-renᵗˢ ρg ρd ρt (y ∷ ys) =
+    cong₂ _+_ (size-renᵗ ρg ρd ρt y) (size-renᵗˢ ρg ρd ρt ys)
 
-  -- (G3) reification at most doubles: each obs embed adds one
-  -- strmᵗ node, each pair/sum node maps 1-1 (sizeᵉ-pos covers the
-  -- obs base case's off-by-one) — induction like shellsᵛ-len
-  size-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
-    sizeᵗ (reify v) ≤ 2 * sizeᵛ t v
+-- small doubling identities (solver) and the "suc absorbs into the double" step
+private
+  dbl : ∀ X → 2 * X ≡ X + X
+  dbl = solve 1 (λ x → con 2 :* x := x :+ x) refl
+  two-distrib : ∀ a b → 2 * (a + b) ≡ 2 * a + 2 * b
+  two-distrib = solve 2 (λ a b → con 2 :* (a :+ b) := con 2 :* a :+ con 2 :* b) refl
 
-  -- (G4) substitution grows size at most linearly in the env cap:
-  -- every varᵗ (size 1) becomes a weakened reified value ≤ 2V
-  -- (G2 + G3), every other constructor maps 1-1 — the multiplicative
-  -- form composes clause-by-clause (1 ≤ suc (2 * V) absorbs each
-  -- suc).  Mutual over ᵉ/ᵗ/ᵗˢ, shaped like subΘ-capᵉ
+bump : ∀ X → suc (2 * X) ≤ 2 * suc X
+bump X = subst (suc (2 * X) ≤_) (sym (*-suc 2 X)) (n≤1+n (suc (2 * X)))
+
+-- (G3) reification at most doubles: pair/sum/base map 1-1 into a size-1-larger
+-- term but the value grows the same suc, so `bump` absorbs it; the obs base
+-- (strmᵗ e over sizeᵛ = sizeᵉ e) is the only off-by-one and sizeᵉ-pos (1 ≤
+-- sizeᵉ e) covers it.  Induction on the type/value like shellsᵛ-len.
+size-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  sizeᵗ (reify v) ≤ 2 * sizeᵛ t v
+size-reify unitᵗ   _        = s≤s z≤n
+size-reify boolᵗ   _        = s≤s z≤n
+size-reify natᵗ    _        = s≤s z≤n
+size-reify (s ×ᵗ t) (a , b) =
+  ≤-trans (s≤s (+-mono-≤ (size-reify s a) (size-reify t b)))
+          (subst (λ w → suc w ≤ 2 * suc (sizeᵛ s a + sizeᵛ t b))
+                 (two-distrib (sizeᵛ s a) (sizeᵛ t b))
+                 (bump (sizeᵛ s a + sizeᵛ t b)))
+size-reify (s +ᵗ t) (inj₁ a) = ≤-trans (s≤s (size-reify s a)) (bump (sizeᵛ s a))
+size-reify (s +ᵗ t) (inj₂ b) = ≤-trans (s≤s (size-reify t b)) (bump (sizeᵛ t b))
+size-reify (obs t)  e =
+  subst (suc (sizeᵉ e) ≤_) (sym (dbl (sizeᵉ e)))
+        (+-monoˡ-≤ (sizeᵉ e) (sizeᵉ-pos e))
+
+-- (G4) helpers.  Each subΘ clause is a `suc (Σ subterm sizes)` over a
+-- constructor that maps 1-1, so the bound composes multiplicatively:
+--   suc S ≤ suc N * M   from   S ≤ N * M   and   1 ≤ M      (sucmul)
+-- where the S ≤ N * M part sums the IHs and distributes M (sum2 / sum3).
+sucmul : ∀ {S} (N M : ℕ) → S ≤ N * M → 1 ≤ M → suc S ≤ suc N * M
+sucmul N M S≤ 1≤M = ≤-trans (s≤s S≤) (+-monoˡ-≤ (N * M) 1≤M)
+
+sum2 : ∀ {A B} (a b M : ℕ) → A ≤ a * M → B ≤ b * M → A + B ≤ (a + b) * M
+sum2 {A} {B} a b M pa pb =
+  subst (A + B ≤_) (sym (*-distribʳ-+ M a b)) (+-mono-≤ pa pb)
+
+sum3 : ∀ {A B C} (a b c M : ℕ) → A ≤ a * M → B ≤ b * M → C ≤ c * M →
+  (A + B) + C ≤ ((a + b) + c) * M
+sum3 a b c M pa pb pc = sum2 (a + b) c M (sum2 a b M pa pb) pc
+
+-- (G4) substitution grows size at most linearly in the env cap: every varᵗ
+-- (size 1) hitting Θsub becomes wkTm (reify value), which is size-ren-invariant
+-- (G2) and ≤ 2·sizeᵛ ≤ 2V (G3 + the cap), all under 1 * suc (2V); every other
+-- constructor maps 1-1 and composes via sucmul/sum.  Mutual, shaped like
+-- subΘ-capᵉ.
+mutual
   size-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
     (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
     EnvSize V σ → sizeᵉ (subΘExp Θloc σ e) ≤ sizeᵉ e * suc (2 * V)
+  size-subΘᵉ V Θloc σ (input i)       hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵉ V Θloc σ (ofᵉ ts)        hσ =
+    sucmul (sizeᵗˢ ts) (suc (2 * V)) (size-subΘᵗˢ V Θloc σ ts hσ) (s≤s z≤n)
+  size-subΘᵉ V Θloc σ emptyᵉ          hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵉ V Θloc σ (mapᵉ {s = s} f e) hσ =
+    sucmul (sizeᵗ f + sizeᵉ e) (suc (2 * V))
+      (sum2 (sizeᵗ f) (sizeᵉ e) (suc (2 * V))
+            (size-subΘᵗ V (s ∷ Θloc) σ f hσ) (size-subΘᵉ V Θloc σ e hσ))
+      (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (takeᵉ c e)     hσ =
+    sucmul (sizeᵗ c + sizeᵉ e) (suc (2 * V))
+      (sum2 (sizeᵗ c) (sizeᵉ e) (suc (2 * V))
+            (size-subΘᵗ V Θloc σ c hσ) (size-subΘᵉ V Θloc σ e hσ))
+      (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (scanᵉ {s = s} {t = t} f i e) hσ =
+    sucmul ((sizeᵗ f + sizeᵗ i) + sizeᵉ e) (suc (2 * V))
+      (sum3 (sizeᵗ f) (sizeᵗ i) (sizeᵉ e) (suc (2 * V))
+            (size-subΘᵗ V ((t ×ᵗ s) ∷ Θloc) σ f hσ)
+            (size-subΘᵗ V Θloc σ i hσ) (size-subΘᵉ V Θloc σ e hσ))
+      (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (mergeAllᵉ e)   hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (concatAllᵉ e)  hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (switchAllᵉ e)  hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (exhaustAllᵉ e) hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (μᵉ e)          hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+  size-subΘᵉ V Θloc σ (varᵉ x)        hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵉ V Θloc σ (deferᵉ e)      hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+
   size-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
     (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
     EnvSize V σ → sizeᵗ (subΘTm Θloc σ tm) ≤ sizeᵗ tm * suc (2 * V)
+  size-subΘᵗ V Θloc σ (varᵗ x) hσ with ∈-++⁻ Θloc x
+  ... | inj₁ y = m≤m*n 1 (suc (2 * V))
+  ... | inj₂ z =
+    subst (_≤ 1 * suc (2 * V))
+      (sym (size-renᵗ (λ ()) (λ ()) (λ ()) (reify (lookupEnv σ z))))
+      (≤-trans (size-reify _ (lookupEnv σ z))
+        (≤-trans (*-monoʳ-≤ 2 (envSize-lookup V σ hσ z))
+          (subst (2 * V ≤_) (sym (+-identityʳ (suc (2 * V)))) (n≤1+n (2 * V)))))
+  size-subΘᵗ V Θloc σ unit̂         hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵗ V Θloc σ (bool̂ _)     hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵗ V Θloc σ (nat̂ _)      hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵗ V Θloc σ (pairᵗ a b)  hσ =
+    sucmul (sizeᵗ a + sizeᵗ b) (suc (2 * V))
+      (sum2 (sizeᵗ a) (sizeᵗ b) (suc (2 * V))
+            (size-subΘᵗ V Θloc σ a hσ) (size-subΘᵗ V Θloc σ b hσ))
+      (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (fstᵗ p)     hσ =
+    sucmul (sizeᵗ p) (suc (2 * V)) (size-subΘᵗ V Θloc σ p hσ) (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (sndᵗ p)     hσ =
+    sucmul (sizeᵗ p) (suc (2 * V)) (size-subΘᵗ V Θloc σ p hσ) (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (inlᵗ a)     hσ =
+    sucmul (sizeᵗ a) (suc (2 * V)) (size-subΘᵗ V Θloc σ a hσ) (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (inrᵗ a)     hσ =
+    sucmul (sizeᵗ a) (suc (2 * V)) (size-subΘᵗ V Θloc σ a hσ) (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (caseᵗ {s = s} {t = t} sc l r) hσ =
+    sucmul ((sizeᵗ sc + sizeᵗ l) + sizeᵗ r) (suc (2 * V))
+      (sum3 (sizeᵗ sc) (sizeᵗ l) (sizeᵗ r) (suc (2 * V))
+            (size-subΘᵗ V Θloc σ sc hσ)
+            (size-subΘᵗ V (s ∷ Θloc) σ l hσ) (size-subΘᵗ V (t ∷ Θloc) σ r hσ))
+      (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (ifᵗ c a b)  hσ =
+    sucmul ((sizeᵗ c + sizeᵗ a) + sizeᵗ b) (suc (2 * V))
+      (sum3 (sizeᵗ c) (sizeᵗ a) (sizeᵗ b) (suc (2 * V))
+            (size-subΘᵗ V Θloc σ c hσ)
+            (size-subΘᵗ V Θloc σ a hσ) (size-subΘᵗ V Θloc σ b hσ))
+      (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (primᵗ _ a)  hσ =
+    sucmul (sizeᵗ a) (suc (2 * V)) (size-subΘᵗ V Θloc σ a hσ) (s≤s z≤n)
+  size-subΘᵗ V Θloc σ (strmᵗ e)    hσ =
+    sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
+
   size-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
     (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
     EnvSize V σ → sizeᵗˢ (subΘTms Θloc σ ts) ≤ sizeᵗˢ ts * suc (2 * V)
+  size-subΘᵗˢ V Θloc σ []       hσ = m≤m*n 1 (suc (2 * V))
+  size-subΘᵗˢ V Θloc σ (x ∷ xs) hσ =
+    sum2 (sizeᵗ x) (sizeᵗˢ xs) (suc (2 * V))
+         (size-subΘᵗ V Θloc σ x hσ) (size-subΘᵗˢ V Θloc σ xs hσ)
 
-  -- (G5) the id-general seed inequality: prod≤3pow + the
-  -- definitional collapse 2^2^2^(towerℕ h) ≡ towerℕ (3 + h) +
-  -- towerℕ-mono over 3 + (4 + sz) * suc (suc id) ≤ (7 + sz) *
-  -- suc (suc id) (the slack is 3 * suc id — solver-friendly) +
-  -- m≤n+m for the pad head.  The V here is the LANDING budget
-  -- (instant suc id's store bound — the walk contract's demand
-  -- anchor); seed-covers above is NOT its id-0 instance (the burst
-  -- anchors at the entry bound), so both stay
-  budget-covers : ∀ (sz U id : ℕ) → U ≤ sz →
-    let V = towerℕ ((4 + sz) * suc (suc id)) in
-    suc (suc V * suc (suc V ^ suc V) * suc U)
-      ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
+-- (G1) an env capped at V (EnvSize) has short shells (EnvLen) and per-entry
+-- bounded shells (EnvCap): per-entry ≤-trans / mapᴬ of the proven shellsᵛ-len
+-- / shellsᵛ-≤ (both ≤ sizeᵛ) against the entry's own cap.
+envSize→envLen : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (σ : All (Val Γ) Θ) →
+  EnvSize V σ → EnvLen V σ
+envSize→envLen V []ᵃ _ = tt
+envSize→envLen V (_∷ᵃ_ {x = t} v σ) (h , hσ) =
+  ≤-trans (shellsᵛ-len t v) h , envSize→envLen V σ hσ
 
-  -- (G6) the no-fuel bursts are dry-free: no machine rule emits
-  -- reason `dried`, so a concrete event list rejects dryEvent
-  -- pointwise — a list induction over map value plus the literal
-  -- init/close/complete heads
-  oneShot-dry : ∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (id : Id)
-    (sched : Sched Γ) →
-    hasDry (proj₁ (oneShotBurst vals id sched)) ≡ false
+envSize→envCap : ∀ {n} {Γ : Ctx n} {Θ} (B : ℕ) (σ : All (Val Γ) Θ) →
+  EnvSize B σ → EnvCap B σ
+envSize→envCap B []ᵃ _ = tt
+envSize→envCap B (_∷ᵃ_ {x = t} v σ) (h , hσ) =
+  mapᴬ (λ p → ≤-trans p h) (shellsᵛ-≤ t v) , envSize→envCap B σ hσ
 
-  -- (G7) installing a bounded node state preserves the store
-  -- invariant — all-preservation through setNode (insert or
-  -- overwrite), shaped like sweepLive-bounded
-  install-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
-    (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →
-    boundedNode B ns ≡ true → stBounded? B sched st ≡ true →
-    stBounded? B sched (installNode nid ns st) ≡ true
+-- (G6) oneShotBurst emits only init / value / close-exhausted / complete —
+-- never close-dried — so its single emit is dry-free.  List induction over the
+-- value payload (each `value` rejects dryEvent) plus the literal heads.
+oneShot-tail-dry : ∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (src : Source) →
+  any dryEvent (map value vals ++ close src exhausted ∷ complete ∷ []) ≡ false
+oneShot-tail-dry []         src = refl
+oneShot-tail-dry (v ∷ vals) src = oneShot-tail-dry vals src
+
+oneShot-dry : ∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (id : Id)
+  (sched : Sched Γ) →
+  hasDry (proj₁ (oneShotBurst vals id sched)) ≡ false
+oneShot-dry vals id sched = cong (_∨ false) (oneShot-tail-dry vals _)
+
+-- (G7) installing a bounded node preserves the store bound: the schedule's
+-- live is untouched, and setNode either overwrites at nid (new node bounded)
+-- or recurses past a survivor, so all-boundedness survives.  Shaped like
+-- sweepLive-bounded.
+setNode-bounded : ∀ {n} {Γ : Ctx n} (B : ℕ) (nid : NodeId) (ns : NodeState Γ)
+  (nodes : List (NodeId × NodeState Γ)) →
+  boundedNode B ns ≡ true →
+  all (λ kv → boundedNode B (proj₂ kv)) nodes ≡ true →
+  all (λ kv → boundedNode B (proj₂ kv)) (setNode nid ns nodes) ≡ true
+setNode-bounded B nid ns []             bn h = ∧-intro bn refl
+setNode-bounded B nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
+... | true  = ∧-intro bn (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (setNode-bounded B nid ns r bn (proj₂ (∧-true _ _ h)))
+
+install-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →
+  boundedNode B ns ≡ true → stBounded? B sched st ≡ true →
+  stBounded? B sched (installNode nid ns st) ≡ true
+install-bounded B sched st nid ns bn h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (setNode-bounded B nid ns (EvalSt.nodes st) bn (proj₂ (∧-true _ _ h)))
+
+-- (G5) the id-general seed inequality: prod≤3pow lands the demand product
+-- under 2^2^2^(towerℕ h) which is DEFINITIONALLY towerℕ (3 + h) (h = (4+sz)·
+-- (id+2)); towerℕ-mono lifts 3 + h ≤ (7+sz)·(id+2) (slack 3·(id+2) ≥ 3, a
+-- solver identity for the split (4+sz)k + 3k ≡ (7+sz)k), and m≤n+m pads with
+-- the 2^… head.  Shaped like seed-covers.  V here is the LANDING budget.
+budget-covers : ∀ (sz U id : ℕ) → U ≤ sz →
+  let V = towerℕ ((4 + sz) * suc (suc id)) in
+  suc (suc V * suc (suc V ^ suc V) * suc U)
+    ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
+budget-covers sz U id U≤sz =
+  ≤-trans (prod≤3pow (towerℕ h) U 2≤V U≤V)
+  (≤-trans (towerℕ-mono slack)
+           (m≤n+m (towerℕ H) (2 ^ (sz * suc id * suc id))))
+  where
+  h = (4 + sz) * suc (suc id)
+  H = (7 + sz) * suc (suc id)
+
+  2≤V : 2 ≤ towerℕ h
+  2≤V = towerℕ-mono {1} {h} (s≤s z≤n)
+
+  sz≤h : sz ≤ h
+  sz≤h = ≤-trans (m≤n+m sz 4) (m≤m*n (4 + sz) (suc (suc id)))
+
+  U≤V : U ≤ towerℕ h
+  U≤V = ≤-trans U≤sz (≤-trans sz≤h (k≤towerℕ h))
+
+  3≤3k : 3 ≤ 3 * suc (suc id)
+  3≤3k = subst (3 ≤_) (sym (*-suc 3 (suc id))) (m≤m+n 3 (3 * suc id))
+
+  Hsplit : (4 + sz) * suc (suc id) + 3 * suc (suc id) ≡ H
+  Hsplit = solve 2 (λ s i → (con 4 :+ s) :* (con 2 :+ i) :+ con 3 :* (con 2 :+ i)
+                              := (con 7 :+ s) :* (con 2 :+ i)) refl sz id
+
+  slack : 3 + h ≤ H
+  slack = subst (3 + h ≤_) Hsplit
+            (subst (_≤ h + 3 * suc (suc id)) (+-comm h 3)
+              (+-monoʳ-≤ h 3≤3k))
 
 ------------------------------------------------------------------
 -- THE EVAL GROWTH BOUND, PROVEN: one evaluation grows a value at
@@ -2144,11 +2366,6 @@ postulate
 -- the per-instant tower step dwarfs.  Consumes G4 (size-subΘᵉ) at
 -- the strmᵗ instantiation clause.
 ------------------------------------------------------------------
-
-envSize-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (σ : All (Val Γ) Θ) →
-  EnvSize V σ → (z : t ∈ Θ) → sizeᵛ t (lookupEnv σ z) ≤ V
-envSize-lookup V (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
-envSize-lookup V (v ∷ᵃ σ) (hv , hσ) (there z)   = envSize-lookup V σ hσ z
 
 envSize-widen : ∀ {n} {Γ : Ctx n} {Θ} {V V′ : ℕ} → V ≤ V′ →
   (σ : All (Val Γ) Θ) → EnvSize V σ → EnvSize V′ σ
