@@ -45,8 +45,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        +-comm; +-assoc; +-monoʳ-<;
                                        +-monoˡ-<; +-monoˡ-≤;
                                        *-monoˡ-≤; *-monoʳ-≤;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o;
+                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
                                        *-suc; m≤m+n; m≤n+m; n≤1+n;
                                        m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
                                        ^-monoʳ-≤; *-assoc;
@@ -3072,14 +3071,65 @@ postulate
     EnvSize V env → sizeᵗ tm ≤ V →
     sizeᵛ t (evalWith tm env) ≤ sizeᵗ tm * (2 + 2 * V) ^ (3 ^ caseWᵗ tm)
 
-  -- (W4) eval never mints a new fn: every fn embedded in the result
-  -- comes from the template's strm-subtrees (subΘ'd: template fns
-  -- by caseW-subΘ, plug fns from the environment) or the
-  -- environment directly
-  fnCap-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (Ψ : ℕ)
-    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-    EnvFnCap Ψ env → caseWᵗ tm ⊔ fnCapᵗ tm ≤ Ψ →
-    fnCapᵛ t (evalWith tm env) ≤ Ψ
+-- combine a sub-template's caseW and fnCap bounds against the host cap
+cmb : ∀ {cw fw CW FW Ψ} → cw ≤ CW → fw ≤ FW → CW ⊔ FW ≤ Ψ → cw ⊔ fw ≤ Ψ
+cmb hc hf h = ≤-trans (⊔-mono-≤ hc hf) h
+
+-- (W4) eval never mints a new fn: every fn embedded in the result comes from
+-- the template's strm-subtrees (subΘ'd — W2) or the environment.  Structural
+-- induction shaped like evalWith-size; caseᵗ re-enters over the env extended
+-- with the scrutinee component (whose weight is the scrutinee's own IH), ifᵗ
+-- stays at env, strmᵗ is fnCap-subΘᵉ, literals/prims are fn-free.
+fnCap-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (Ψ : ℕ)
+  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+  EnvFnCap Ψ env → caseWᵗ tm ⊔ fnCapᵗ tm ≤ Ψ →
+  fnCapᵛ t (evalWith tm env) ≤ Ψ
+fnCap-evalWith Ψ (varᵗ x)  env hσ h = envfncap-lookup Ψ env hσ x
+fnCap-evalWith Ψ unit̂      env hσ h = z≤n
+fnCap-evalWith Ψ (bool̂ _)  env hσ h = z≤n
+fnCap-evalWith Ψ (nat̂ _)   env hσ h = z≤n
+fnCap-evalWith Ψ (pairᵗ a b) env hσ h =
+  ⊔-lub (fnCap-evalWith Ψ a env hσ
+           (cmb (m≤m+n (caseWᵗ a) (caseWᵗ b)) (m≤m⊔n (fnCapᵗ a) (fnCapᵗ b)) h))
+        (fnCap-evalWith Ψ b env hσ
+           (cmb (m≤n+m (caseWᵗ b) (caseWᵗ a)) (m≤n⊔m (fnCapᵗ a) (fnCapᵗ b)) h))
+fnCap-evalWith Ψ (fstᵗ p) env hσ h with evalWith p env | fnCap-evalWith Ψ p env hσ h
+... | (a , b) | ihp = ⊔ˡ (fnCapᵛ _ a) (fnCapᵛ _ b) ihp
+fnCap-evalWith Ψ (sndᵗ p) env hσ h with evalWith p env | fnCap-evalWith Ψ p env hσ h
+... | (a , b) | ihp = ⊔ʳ (fnCapᵛ _ a) (fnCapᵛ _ b) ihp
+fnCap-evalWith Ψ (inlᵗ a) env hσ h = fnCap-evalWith Ψ a env hσ h
+fnCap-evalWith Ψ (inrᵗ a) env hσ h = fnCap-evalWith Ψ a env hσ h
+fnCap-evalWith Ψ (caseᵗ {s = s} {t = t} sc l r) env hσ h
+  with evalWith sc env
+     | fnCap-evalWith Ψ sc env hσ
+         (cmb (≤-trans (m≤m+n (caseWᵗ sc) (caseWᵗ l))
+                 (≤-trans (m≤m+n (caseWᵗ sc + caseWᵗ l) (caseWᵗ r))
+                          (m≤n+m ((caseWᵗ sc + caseWᵗ l) + caseWᵗ r) 2)))
+              (m≤m⊔n (fnCapᵗ sc) (fnCapᵗ l ⊔ fnCapᵗ r)) h)
+... | inj₁ a | iha = fnCap-evalWith Ψ l (a ∷ᵃ env) (iha , hσ)
+      (cmb (≤-trans (m≤n+m (caseWᵗ l) (caseWᵗ sc))
+              (≤-trans (m≤m+n (caseWᵗ sc + caseWᵗ l) (caseWᵗ r))
+                       (m≤n+m ((caseWᵗ sc + caseWᵗ l) + caseWᵗ r) 2)))
+           (≤-trans (m≤m⊔n (fnCapᵗ l) (fnCapᵗ r)) (m≤n⊔m (fnCapᵗ sc) (fnCapᵗ l ⊔ fnCapᵗ r))) h)
+... | inj₂ b | ihb = fnCap-evalWith Ψ r (b ∷ᵃ env) (ihb , hσ)
+      (cmb (≤-trans (m≤n+m (caseWᵗ r) (caseWᵗ sc + caseWᵗ l))
+                    (m≤n+m ((caseWᵗ sc + caseWᵗ l) + caseWᵗ r) 2))
+           (≤-trans (m≤n⊔m (fnCapᵗ l) (fnCapᵗ r)) (m≤n⊔m (fnCapᵗ sc) (fnCapᵗ l ⊔ fnCapᵗ r))) h)
+fnCap-evalWith Ψ (ifᵗ c a b) env hσ h with evalWith c env
+... | true  = fnCap-evalWith Ψ a env hσ
+      (cmb (≤-trans (m≤n+m (caseWᵗ a) (caseWᵗ c)) (m≤m+n (caseWᵗ c + caseWᵗ a) (caseWᵗ b)))
+           (≤-trans (m≤m⊔n (fnCapᵗ a) (fnCapᵗ b)) (m≤n⊔m (fnCapᵗ c) (fnCapᵗ a ⊔ fnCapᵗ b))) h)
+... | false = fnCap-evalWith Ψ b env hσ
+      (cmb (m≤n+m (caseWᵗ b) (caseWᵗ c + caseWᵗ a))
+           (≤-trans (m≤n⊔m (fnCapᵗ a) (fnCapᵗ b)) (m≤n⊔m (fnCapᵗ c) (fnCapᵗ a ⊔ fnCapᵗ b))) h)
+fnCap-evalWith Ψ (primᵗ add arg)  env hσ h = z≤n
+fnCap-evalWith Ψ (primᵗ sub arg)  env hσ h = z≤n
+fnCap-evalWith Ψ (primᵗ mul arg)  env hσ h = z≤n
+fnCap-evalWith Ψ (primᵗ eqᵖ arg)  env hσ h = z≤n
+fnCap-evalWith Ψ (primᵗ ltᵖ arg)  env hσ h = z≤n
+fnCap-evalWith Ψ (primᵗ notᵖ arg) env hσ h = z≤n
+fnCap-evalWith Ψ (strmᵗ e) []ᵃ       hσ h = h
+fnCap-evalWith Ψ (strmᵗ e) (v ∷ᵃ vs) hσ h = fnCap-subΘᵉ Ψ [] (v ∷ᵃ vs) e hσ h
 
 -- the fold face of (W3), at the machine's applyFn sites
 applyFn-sharp : ∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
