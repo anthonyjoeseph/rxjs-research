@@ -2507,12 +2507,20 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --
 --     WHAT REMAINS is grind, not design: (a) the ofW invariance /
 --     preservation mirrors (W10/W11 below — literal fnCap-grind
---     repeats); (b) the LENGTH LEDGER — restate the walk contracts
---     with event-list lengths ≤ (counter delta)·Ω and path lengths
---     ≤ B threaded, per-clause arithmetic being list concatenation;
---     (c) the lineage-indexed mixed receipt composing (2)'s
---     receipts along lineages instead of globally; (d) the landing:
---     𝔉 into the boundary, replacing the two cores' landing halves.
+--     repeats); (b) the LENGTH LEDGER — the counter-delta bound
+--     S ≤ (2+Ω)^(suc d) is indexed by the REMAINING descent d at
+--     each call, so it RIDES THE DRY-HALF walk induction (the one
+--     that threads and peels hasAtLeast against dBound-μ/-hop/
+--     -connect), NOT the store-half: state them together, one
+--     conjunct per half, when the dry walk is ground.  (Every
+--     operator has exactly ONE Exp child, so each walk mints one
+--     source; fan-out is via emitted values ≤ Ω plus the μ/defer/
+--     connect edges — hence the +2 in the base.)  Event-list
+--     lengths ≤ delta·Ω and path lengths ≤ B thread alongside,
+--     per-clause arithmetic being list concatenation; (c) the
+--     lineage-indexed mixed receipt composing (2)'s receipts along
+--     lineages instead of globally; (d) the landing: 𝔉 into the
+--     boundary, replacing the two cores' landing halves.
 ------------------------------------------------------------------
 
 -- the eval-compounding weight: caseᵗ nodes only; strmᵗ is a leaf
