@@ -38,7 +38,7 @@ module Verify-Budget-Sufficient where
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
                                 if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
-                                _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
                                        ≤-reflexive; <-≤-trans; ≤-pred;
                                        +-suc; +-identityʳ;
@@ -80,6 +80,8 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
+                                InstEvent; init; value; close; handoff;
+                                complete;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
@@ -108,12 +110,17 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
                                 oneShotBurst; installNode; NodeId;
-                                root; sched-init; st-init; sched-next;
+                                root; share-sink; _↠_; Frame;
+                                map-f; scan-f; take-f; from-inner;
+                                thru-outer; Stream;
+                                sched-init; st-init; sched-next;
                                 schedHeadOf; schedGo; schedEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
                                 dropSource; arrSource; chainsOf; cascadeGo;
                                 Path; arrTy;
-                                subscribeE; cascade; drain; evaluate;
+                                subscribeE; stepFrame; pushBurst;
+                                subscribeInner; chainStep;
+                                cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
 
@@ -155,8 +162,12 @@ towerℕ : ℕ → ℕ
 towerℕ zero    = 1
 towerℕ (suc h) = 2 ^ towerℕ h
 
+-- height (4+sz)·(1+id): the per-instant story gain (4+sz) ≥ 5 covers
+-- the walk ledger's worst-case ~4-story spend against the ENTRY cap
+-- (see the walk-invariant memo below) at every program size — the
+-- old (1+sz) height left only 2 stories at sz = 1
 sizeBudgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → ℕ
-sizeBudgetAt e sl id = towerℕ (suc (sizeᵉ e + slotsSize sl) * suc id)
+sizeBudgetAt e sl id = towerℕ ((4 + (sizeᵉ e + slotsSize sl)) * suc id)
 
 towerℕ-mono : ∀ {m n} → m ≤ n → towerℕ m ≤ towerℕ n
 towerℕ-mono {zero}  {zero}  h = ≤-refl
@@ -169,7 +180,7 @@ sizeBudgetAt-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
   (sl : Slots Γ) {id id′ : Id} → id ≤ id′ →
   sizeBudgetAt e sl id ≤ sizeBudgetAt e sl id′
 sizeBudgetAt-mono e sl h =
-  towerℕ-mono (*-monoʳ-≤ (suc (sizeᵉ e + slotsSize sl)) (s≤s h))
+  towerℕ-mono (*-monoʳ-≤ (4 + (sizeᵉ e + slotsSize sl)) (s≤s h))
 
 k≤towerℕ : ∀ k → k ≤ towerℕ k
 k≤towerℕ zero    = z≤n
@@ -180,9 +191,9 @@ k≤towerℕ (suc k) =
 sz≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) → sizeᵉ e + slotsSize sl ≤ sizeBudgetAt e sl id
 sz≤budget e sl id =
-  ≤-trans (n≤1+n _)
-  (≤-trans (m≤m*n (suc (sizeᵉ e + slotsSize sl)) (suc id))
-           (k≤towerℕ (suc (sizeᵉ e + slotsSize sl) * suc id)))
+  ≤-trans (m≤n+m (sizeᵉ e + slotsSize sl) 4)
+  (≤-trans (m≤m*n (4 + (sizeᵉ e + slotsSize sl)) (suc id))
+           (k≤towerℕ ((4 + (sizeᵉ e + slotsSize sl)) * suc id)))
 
 size≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) → sizeᵉ e ≤ sizeBudgetAt e sl id
@@ -244,14 +255,15 @@ hasAtLeast-tower zero    = hs hz
 hasAtLeast-tower (suc h) = hasAtLeast-pow2 (hasAtLeast-tower h)
 
 -- what the seeded budget guarantees: the full head plus the tower
--- (height (4+sz)·(id+1) — three stories above sizeBudgetAt's, the
--- headroom the wet contract's rank demand consumes)
+-- (height (7+sz)·(id+2) — three-plus stories above sizeBudgetAt's
+-- LANDING instant, the headroom the wet contract's rank demand,
+-- anchored at the landing budget, consumes)
 budget-hasAtLeast : ∀ (sz : ℕ) (id : Id) →
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((4 + sz) * suc id))
-    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ ((4 + sz) * suc id))
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((7 + sz) * suc (suc id)))
+    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id)))
 budget-hasAtLeast sz id =
   hasAtLeast-pad-plus (2 ^ (sz * suc id * suc id))
-                      (hasAtLeast-tower ((4 + sz) * suc id))
+                      (hasAtLeast-tower ((7 + sz) * suc (suc id)))
 
 -- the peel every decrement-edge clause performs: enough fuel means
 -- the machine's gs-match succeeds and the tail still has enough
@@ -2006,20 +2018,24 @@ prod≤3pow V U 2≤V U≤V =
              (^-monoʳ-≤ 2 (2k≤2^k V 2≤V)))))
 
 -- the burst's seed step: at instant 0 the demand product sits under
--- the budget's tower summand alone
+-- the budget's tower summand alone.  The demand anchors at the
+-- ENTRY store bound here (the burst is instant 0's whole walk);
+-- prod≤3pow's three stories land inside the gas tower's height
+-- (7+sz)·2 with 7+sz to spare
 seed-covers : ∀ (sz U : ℕ) → U ≤ sz →
-  let V = towerℕ (suc sz * 1) in
+  let V = towerℕ ((4 + sz) * 1) in
   suc (suc V * suc (suc V ^ suc V) * suc U)
-    ≤ 2 ^ (sz * 1 * 1) + towerℕ ((4 + sz) * 1)
+    ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
 seed-covers sz U U≤sz
-  rewrite *-identityʳ sz | *-identityʳ sz =
-  ≤-trans (prod≤3pow (towerℕ (suc sz)) U 2≤V U≤V)
-          (m≤n+m (towerℕ (4 + sz)) (2 ^ sz))
+  rewrite *-identityʳ sz | *-identityʳ sz | *-identityʳ (4 + sz) =
+  ≤-trans (prod≤3pow (towerℕ (4 + sz)) U 2≤V U≤V)
+  (≤-trans (towerℕ-mono (m≤m*n (7 + sz) 2))
+           (m≤n+m (towerℕ ((7 + sz) * 2)) (2 ^ sz)))
   where
-  2≤V : 2 ≤ towerℕ (suc sz)
-  2≤V = towerℕ-mono {1} {suc sz} (s≤s z≤n)
-  U≤V : U ≤ towerℕ (suc sz)
-  U≤V = ≤-trans U≤sz (≤-trans (n≤1+n sz) (k≤towerℕ (suc sz)))
+  2≤V : 2 ≤ towerℕ (4 + sz)
+  2≤V = towerℕ-mono {1} {4 + sz} (s≤s z≤n)
+  U≤V : U ≤ towerℕ (4 + sz)
+  U≤V = ≤-trans U≤sz (≤-trans (m≤n+m sz 4) (k≤towerℕ (4 + sz)))
 
 ------------------------------------------------------------------
 -- GRINDER QUEUE — mechanical waypoints with settled statements,
@@ -2081,13 +2097,16 @@ postulate
 
   -- (G5) the id-general seed inequality: prod≤3pow + the
   -- definitional collapse 2^2^2^(towerℕ h) ≡ towerℕ (3 + h) +
-  -- towerℕ-mono over 3 + suc sz * suc id ≤ (4 + sz) * suc id (the
-  -- slack is 3 * id — solver-friendly) + m≤n+m for the pad head.
-  -- When this lands, rederive seed-covers as its id-0 instance
+  -- towerℕ-mono over 3 + (4 + sz) * suc (suc id) ≤ (7 + sz) *
+  -- suc (suc id) (the slack is 3 * suc id — solver-friendly) +
+  -- m≤n+m for the pad head.  The V here is the LANDING budget
+  -- (instant suc id's store bound — the walk contract's demand
+  -- anchor); seed-covers above is NOT its id-0 instance (the burst
+  -- anchors at the entry bound), so both stay
   budget-covers : ∀ (sz U id : ℕ) → U ≤ sz →
-    let V = towerℕ (suc sz * suc id) in
+    let V = towerℕ ((4 + sz) * suc (suc id)) in
     suc (suc V * suc (suc V ^ suc V) * suc U)
-      ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((4 + sz) * suc id)
+      ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
 
   -- (G6) the no-fuel bursts are dry-free: no machine rule emits
   -- reason `dried`, so a concrete event list rejects dryEvent
@@ -2328,6 +2347,459 @@ evalTm-size : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
 evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 
 ------------------------------------------------------------------
+-- THE WALK LEDGER (2026-07-24 — the settled per-instant invariant).
+--
+-- The blocking question was the closed form of the internal
+-- invariant that survives subscribeE's walk: scan frames fold
+-- value-list breadth with no fuel peel, so no fixed (V, R) and no
+-- gas-indexed cap works.  Settled:
+--
+-- (1) THE SHARP EVAL BOUND.  evalWith-size's exponent 3^|tm| was
+--     the lossy culprit: |tm| grows under substitution, so iterated
+--     folds looked like iterated exponentials.  But the ONLY
+--     constructor that compounds sizes multiplicatively under
+--     evalWith is caseᵗ — its branch runs over an environment
+--     extended with an already-grown scrutinee component; ifᵗ
+--     branches see the unextended environment, pair components
+--     multiply bounds side by side, and reify images (pairᵗ / inlᵗ
+--     / inrᵗ / strmᵗ / literals) are eval-passive.  caseWᵗ counts
+--     exactly that compounding structure, with strmᵗ a LEAF (an
+--     embedded expression is inert during eval: evalWith (strmᵗ e)
+--     σ = subΘ e, LINEAR in the plugs — size-subΘᵉ).  Then (W3):
+--       sizeᵛ (evalWith tm env) ≤ sizeᵗ tm · (2+2V)^(3^caseWᵗ tm)
+--     — the BASE carries the store, the EXPONENT carries only
+--     template structure.  And caseW is EXACTLY substitution-
+--     invariant (caseW-subΘ: plugs land behind reify images, which
+--     weigh 0), so every runtime fn's caseW is its program
+--     template's: ≤ Ψ FOREVER, Ψ seeded once from program+slots
+--     (ΨAt).  fnCap is the max-shaped closure carrying "every
+--     embedded fn's caseW ≤ Ψ" through stores, evals
+--     (fnCap-evalWith), substitution and μ-unfolds.
+--
+-- (2) THE LEDGER.  Freeze W₀ := sizeBudgetAt id at instant entry;
+--     the running cap is capᴱ W₀ E = (2+2W₀)^E with E ≥ 2 the
+--     ledger position.  ONE RULE covers every growth edge: at
+--     E ≥ 2, an eval/fold application multiplies E by at most
+--     3^(suc Ψ) (from (W3) and grow-pow: the recurrence
+--     q′ = E + (q+2)·3^Ψ ≤ q·3^(suc Ψ) for q ≥ E ≥ 2), and a
+--     register / μ-copy / one-shot install multiplies E by at most
+--     2.  A fold-RUN over a value list of length m costs the single
+--     factor 3^(suc Ψ · m) (scanVals-sharp) — the value-list
+--     lengths thread the receipts, and receipts compose
+--     multiplicatively: spendᴱ Ψ r s = 2^r · 3^(suc Ψ · s),
+--     spendᴱ-compose.  Receipts are LOCAL — a clause's spend is its
+--     own sites plus its children's, no global count needed for
+--     preservation.
+--
+-- (3) THE LANDING.  sizeBudgetAt now has height (4+sz)(1+id): the
+--     per-instant gain of (4+sz) ≥ 5 stories dominates the walk's
+--     spend measured against the ENTRY cap: the spend exponent is
+--     (counts)·(suc Ψ), one story for the counts, one for the 3^·,
+--     one for capᴱ, margin for the rest.  The instant's total
+--     application COUNT still needs its a-priori entry-anchored
+--     bound — the one remaining quantitative core: per-subscription
+--     sites are template-invariant (shells, of-widths and caseW all
+--     substitution-invariant), subscriptions ≤ 1 + fuel peels, and
+--     peels are bounded by the lex descent (U, rank, syncSize),
+--     whose ℕ collapse anchors at the LANDING budget (mid-walk
+--     values outgrow the entry cap, but every hop target measures
+--     strictly below its parent).  The dry-half demand therefore
+--     anchors at sizeBudgetAt (suc id) — the gas tower's height
+--     (7+sz)(2+id) covers it (budget-covers) — while the count cap
+--     needs the descent length anchored one story sharper.  Closing
+--     that gap is the remaining quantitative debt, localized in the
+--     two cores below; do NOT restate their landing halves until it
+--     closes.
+--
+-- (4) THE REGISTRY (the fold-threading design block).  INV?
+--     extends stBounded? with: fnCap-boundedness of every store
+--     (Ψ never grows), length (registry) ≤ B (the CARDINALITY
+--     invariant cascadeGo's fold needs: |chains| ≤ registry length
+--     at the latch), and per-chain frame bounds (registered
+--     scan/map fns are runtime material — sizes ride B, caseW
+--     rides Ψ; the "registry entries are fixed syntax" assumption
+--     held only for the root program's chains).  chainStep-wet is
+--     stated against INV?, and cascadeGo-walk (PROVEN below) is
+--     the fold decomposition: it threads INV? and the ledger
+--     position chain by chain — the structure the cascadeGo-wet
+--     memo demanded — leaving the per-chain core and the landing
+--     arithmetic as the only leaves.
+------------------------------------------------------------------
+
+-- the eval-compounding weight: caseᵗ nodes only; strmᵗ is a leaf
+-- (embedded expressions are inert during eval); reify images weigh 0
+caseWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+caseWᵗ (varᵗ x)      = 0
+caseWᵗ unit̂          = 0
+caseWᵗ (bool̂ _)      = 0
+caseWᵗ (nat̂ _)       = 0
+caseWᵗ (pairᵗ a b)   = caseWᵗ a + caseWᵗ b
+caseWᵗ (fstᵗ p)      = caseWᵗ p
+caseWᵗ (sndᵗ p)      = caseWᵗ p
+caseWᵗ (inlᵗ a)      = caseWᵗ a
+caseWᵗ (inrᵗ a)      = caseWᵗ a
+caseWᵗ (caseᵗ s l r) = 2 + (caseWᵗ s + caseWᵗ l + caseWᵗ r)
+caseWᵗ (ifᵗ c a b)   = caseWᵗ c + caseWᵗ a + caseWᵗ b
+caseWᵗ (primᵗ _ a)   = caseWᵗ a
+caseWᵗ (strmᵗ e)     = 0
+
+-- the fn-cap closure: the max caseW of every fn that material
+-- reachable from here can EVER apply — through strmᵗ, deferᵉ, and
+-- every operator's Tm positions (of-elements, fns, seeds, counts
+-- are all eval sites, now or after storage)
+mutual
+  fnCapᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  fnCapᵗ (varᵗ x)      = 0
+  fnCapᵗ unit̂          = 0
+  fnCapᵗ (bool̂ _)      = 0
+  fnCapᵗ (nat̂ _)       = 0
+  fnCapᵗ (pairᵗ a b)   = fnCapᵗ a ⊔ fnCapᵗ b
+  fnCapᵗ (fstᵗ p)      = fnCapᵗ p
+  fnCapᵗ (sndᵗ p)      = fnCapᵗ p
+  fnCapᵗ (inlᵗ a)      = fnCapᵗ a
+  fnCapᵗ (inrᵗ a)      = fnCapᵗ a
+  fnCapᵗ (caseᵗ s l r) = fnCapᵗ s ⊔ (fnCapᵗ l ⊔ fnCapᵗ r)
+  fnCapᵗ (ifᵗ c a b)   = fnCapᵗ c ⊔ (fnCapᵗ a ⊔ fnCapᵗ b)
+  fnCapᵗ (primᵗ _ a)   = fnCapᵗ a
+  fnCapᵗ (strmᵗ e)     = fnCapᵉ e
+
+  fnCapᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  fnCapᵉ (input i)       = 0
+  fnCapᵉ (ofᵉ ts)        = fnCapᵗˢ ts
+  fnCapᵉ emptyᵉ          = 0
+  fnCapᵉ (mapᵉ f e)      = (caseWᵗ f ⊔ fnCapᵗ f) ⊔ fnCapᵉ e
+  fnCapᵉ (takeᵉ c e)     = (caseWᵗ c ⊔ fnCapᵗ c) ⊔ fnCapᵉ e
+  fnCapᵉ (scanᵉ f z e)   =
+    (caseWᵗ f ⊔ fnCapᵗ f) ⊔ ((caseWᵗ z ⊔ fnCapᵗ z) ⊔ fnCapᵉ e)
+  fnCapᵉ (mergeAllᵉ e)   = fnCapᵉ e
+  fnCapᵉ (concatAllᵉ e)  = fnCapᵉ e
+  fnCapᵉ (switchAllᵉ e)  = fnCapᵉ e
+  fnCapᵉ (exhaustAllᵉ e) = fnCapᵉ e
+  fnCapᵉ (μᵉ e)          = fnCapᵉ e
+  fnCapᵉ (varᵉ x)        = 0
+  fnCapᵉ (deferᵉ e)      = fnCapᵉ e
+
+  fnCapᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  fnCapᵗˢ []       = 0
+  fnCapᵗˢ (y ∷ ys) = (caseWᵗ y ⊔ fnCapᵗ y) ⊔ fnCapᵗˢ ys
+
+fnCapᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+fnCapᵛ unitᵗ    v        = 0
+fnCapᵛ boolᵗ    v        = 0
+fnCapᵛ natᵗ     v        = 0
+fnCapᵛ (s ×ᵗ t) (a , b)  = fnCapᵛ s a ⊔ fnCapᵛ t b
+fnCapᵛ (s +ᵗ t) (inj₁ a) = fnCapᵛ s a
+fnCapᵛ (s +ᵗ t) (inj₂ b) = fnCapᵛ t b
+fnCapᵛ (obs t)  e        = fnCapᵉ e
+
+-- the fn-cap face of an environment, shaped like EnvSize
+EnvFnCap : ∀ {n} {Γ : Ctx n} {Θ} (Ψ : ℕ) → All (Val Γ) Θ → Set
+EnvFnCap Ψ []ᵃ                = ⊤
+EnvFnCap Ψ (_∷ᵃ_ {x = t} v σ) = (fnCapᵛ t v ≤ Ψ) × EnvFnCap Ψ σ
+
+postulate
+  -- (W1) caseW is renaming- and substitution-INVARIANT: reify
+  -- images weigh 0 (they contain no caseᵗ), and subΘ rewrites only
+  -- var positions — mirror shellSize-ren / shellSize-subΘ exactly
+  caseW-ren : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (tm : Tm Γ Δᵍ Δ Θ t) → caseWᵗ (renTm ρg ρd ρt tm) ≡ caseWᵗ tm
+  caseW-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+    caseWᵗ (reify v) ≡ 0
+  caseW-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    caseWᵗ (subΘTm Θloc σ tm) ≡ caseWᵗ tm
+
+  -- (W2) fnCap closures: reification reads the value's own cap;
+  -- substitution and μ-unfolding stay under the max of the pieces
+  -- (max-shaped inductions, all clause-homomorphic)
+  fnCap-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+    fnCapᵗ (reify v) ≡ fnCapᵛ t v
+  fnCap-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Ψ : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvFnCap Ψ σ → fnCapᵉ e ≤ Ψ → fnCapᵉ (subΘExp Θloc σ e) ≤ Ψ
+  fnCap-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    fnCapᵉ (elimGExp x cl e) ≤ fnCapᵉ e ⊔ fnCapᵉ cl
+
+  -- (W3) THE SHARP EVAL BOUND — the walk ledger's load-bearing
+  -- fact.  Same induction as evalWith-size, but the caseᵗ clause is
+  -- the ONLY one that re-enters at a grown cap (via grow-pow, cost
+  -- two exponent units + the branch's own weight); every other
+  -- clause stays at V, with the sizeᵗ factor absorbing the +1s.
+  -- The strmᵗ clause is size-subΘᵉ (linear), exponent 1.
+  evalWith-sharp : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ)
+    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+    EnvSize V env → sizeᵗ tm ≤ V →
+    sizeᵛ t (evalWith tm env) ≤ sizeᵗ tm * (2 + 2 * V) ^ (3 ^ caseWᵗ tm)
+
+  -- (W4) eval never mints a new fn: every fn embedded in the result
+  -- comes from the template's strm-subtrees (subΘ'd: template fns
+  -- by caseW-subΘ, plug fns from the environment) or the
+  -- environment directly
+  fnCap-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (Ψ : ℕ)
+    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+    EnvFnCap Ψ env → caseWᵗ tm ⊔ fnCapᵗ tm ≤ Ψ →
+    fnCapᵛ t (evalWith tm env) ≤ Ψ
+
+-- the fold face of (W3), at the machine's applyFn sites
+applyFn-sharp : ∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
+  (fn : Fn Γ [] [] [] s t) (v : Val Γ s) →
+  sizeᵛ s v ≤ V → sizeᵗ fn ≤ V →
+  sizeᵛ t (applyFn fn v) ≤ sizeᵗ fn * (2 + 2 * V) ^ (3 ^ caseWᵗ fn)
+applyFn-sharp V fn v hv hf = evalWith-sharp V fn (v ∷ᵃ []ᵃ) (hv , tt) hf
+
+------------------------------------------------------------------
+-- the ledger: running cap capᴱ W₀ E, multiplicative receipts
+------------------------------------------------------------------
+
+capᴱ : ℕ → ℕ → ℕ
+capᴱ W E = (2 + 2 * W) ^ E
+
+spendᴱ : (Ψ r s : ℕ) → ℕ         -- r cheap edges (×2), s eval edges
+spendᴱ Ψ r s = 2 ^ r * 3 ^ (suc Ψ * s)
+
+capᴱ-mono : ∀ (W : ℕ) {E E′ : ℕ} → E ≤ E′ → capᴱ W E ≤ capᴱ W E′
+capᴱ-mono W = ^-monoʳ-≤ (2 + 2 * W)
+
+W≤capᴱ : ∀ (W : ℕ) {E : ℕ} → 1 ≤ E → W ≤ capᴱ W E
+W≤capᴱ W h = ≤-trans (V≤C W) (pow1 W h)
+
+postulate
+  -- (W5) receipts compose multiplicatively (pure ^-arithmetic)
+  spendᴱ-compose : ∀ (Ψ r₁ s₁ r₂ s₂ : ℕ) →
+    spendᴱ Ψ r₁ s₁ * spendᴱ Ψ r₂ s₂ ≡ spendᴱ Ψ (r₁ + r₂) (s₁ + s₂)
+
+  -- (W6) the fold-run closed form: one scan run over a value list
+  -- of length m, everything (fn size, seed, values) within the
+  -- current cap, lands within the cap grown by the single factor
+  -- 3^(suc caseW · m).  Recurrence: at position q ≥ E ≥ 2 one fold
+  -- lands at E + (q+2)·3^w ≤ q·3^(suc w) (grow-pow + applyFn-sharp)
+  scanVals-sharp : ∀ {n} {Γ : Ctx n} {s u} (W E : ℕ)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u)
+    (vs : List (Val Γ s)) →
+    2 ≤ E →
+    sizeᵗ fn ≤ capᴱ W E → sizeᵛ u acc ≤ capᴱ W E →
+    All (λ v → sizeᵛ s v ≤ capᴱ W E) vs →
+    (sizeᵛ u (proj₂ (scanVals fn acc vs))
+       ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
+    × All (λ o → sizeᵛ u o ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
+          (proj₁ (scanVals fn acc vs))
+
+------------------------------------------------------------------
+-- the machine-side faces of the walk invariant
+------------------------------------------------------------------
+
+fnCapLive : ∀ {n} {Γ : Ctx n} → ℕ → LiveSource Γ → Bool
+fnCapLive Ψ l =
+  all (λ tv → fnCapᵛ (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ Ψ)
+      (LiveSource.pending l)
+
+fnCapNode : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
+fnCapNode Ψ (scan-st {t} v)   = fnCapᵛ t v ≤ᵇ Ψ
+fnCapNode Ψ (concat-st q _ _) = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
+fnCapNode Ψ (take-st _)       = true
+fnCapNode Ψ (merge-st _ _)    = true
+fnCapNode Ψ (switch-st _ _)   = true
+fnCapNode Ψ (exhaust-st _ _)  = true
+
+fnCapBounded? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+              → ℕ → Sched Γ → EvalSt e → Bool
+fnCapBounded? Ψ sched st =
+  all (fnCapLive Ψ) (Sched.live sched)
+  ∧ all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st)
+
+-- registered chains carry RUNTIME fns (chains registered while
+-- subscribing stored values): their sizes ride the store bound,
+-- their weights ride Ψ
+frameB? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → ℕ → Frame Γ s u → Bool
+frameB? B Ψ (map-f fn)         =
+  (sizeᵗ fn ≤ᵇ B) ∧ ((caseWᵗ fn ⊔ fnCapᵗ fn) ≤ᵇ Ψ)
+frameB? B Ψ (scan-f fn _)      =
+  (sizeᵗ fn ≤ᵇ B) ∧ ((caseWᵗ fn ⊔ fnCapᵗ fn) ≤ᵇ Ψ)
+frameB? B Ψ (take-f _)         = true
+frameB? B Ψ (from-inner _ _ _) = true
+frameB? B Ψ (thru-outer _ _)   = true
+
+pathB? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → ℕ → Path Γ s t → Bool
+pathB? B Ψ root           = true
+pathB? B Ψ (share-sink i) = true
+pathB? B Ψ (f ↠ p)        = frameB? B Ψ f ∧ pathB? B Ψ p
+
+regsB? : ∀ {n} {Γ : Ctx n} {t} → ℕ → ℕ
+       → List (RegId × Source × Chain Γ t) → Bool
+regsB? B Ψ = all (λ en → pathB? B Ψ (proj₂ (proj₂ (proj₂ en))))
+
+-- THE COMPOSITE WALK INVARIANT: value stores bounded (stBounded?),
+-- every embedded fn's weight capped (Ψ never grows — caseW is
+-- substitution-invariant), the registry CARDINALITY within the
+-- store bound (the fold-threading budget: |chains| ≤ B at latch),
+-- and every registered chain's frames bounded
+INV? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+     → ℕ → ℕ → Sched Γ → EvalSt e → Bool
+INV? Ψ B sched st =
+  stBounded? B sched st
+  ∧ fnCapBounded? Ψ sched st
+  ∧ (length (EvalSt.registry st) ≤ᵇ B)
+  ∧ regsB? B Ψ (EvalSt.registry st)
+
+-- the Ψ seed: the program's own weight plus every slot's (script
+-- values are delivered and folded like any others; shared defs are
+-- subscribed at connect) — a sum, which dominates the max
+inputFnCap : ∀ {n} {Γ : Ctx n} {t : Ty} → ObservableInput (Val Γ t) → ℕ
+inputFnCap {t = t} (hot async) =
+  sum (map (λ tv → fnCapᵛ t (Timed.val tv)) async)
+inputFnCap {t = t} (cold sync async) =
+  sum (map (fnCapᵛ t) sync)
+  + sum (map (λ tv → fnCapᵛ t (Timed.val tv)) async)
+
+slotFnCap : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
+slotFnCap (scripted i) = inputFnCap i
+slotFnCap (shared d)   = fnCapᵉ d
+
+ΨAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ
+ΨAt e sl = fnCapᵉ e + sum (tabulate λ i → slotFnCap (sl i))
+
+-- in-flight bounds: the values a frame is fed, the events a burst
+-- carries
+valB? : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → (u : Ty) → Val Γ u → Bool
+valB? B Ψ u v = (sizeᵛ u v ≤ᵇ B) ∧ (fnCapᵛ u v ≤ᵇ Ψ)
+
+eventB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → InstEvent (Val Γ u) → Bool
+eventB? {u = u} B Ψ (value v)   = valB? B Ψ u v
+eventB? B Ψ (init _)    = true
+eventB? B Ψ (close _ _) = true
+eventB? B Ψ (handoff _) = true
+eventB? B Ψ complete    = true
+
+burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
+burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
+
+postulate
+  -- (W7) all four in-flight predicates only ever need widening
+  -- upward (≤ᵇ-widen through all, mirror boundedLive-widen)
+  valB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty) (v : Val Γ u) →
+    B ≤ B′ → valB? B Ψ u v ≡ true → valB? B′ Ψ u v ≡ true
+  burstB?-widen : ∀ {n} {Γ : Ctx n} {u} {B B′ Ψ : ℕ} (str : Stream Γ u) →
+    B ≤ B′ → burstB? B Ψ str ≡ true → burstB? B′ Ψ str ≡ true
+  chainsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ} {s : Ty}
+    (chains : List (RegId × Path Γ s t)) → B ≤ B′ →
+    all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
+    all (λ rc → pathB? B′ Ψ (proj₂ rc)) chains ≡ true
+
+------------------------------------------------------------------
+-- the walk contracts, store half — the SHAPE the clause grind
+-- threads (receipts E′ ≤ E · spendᴱ … attach with the cost
+-- instrumentation; the landing stays in the cores below).  Stated
+-- against the frozen instant base W and a ledger position E ≥ 2.
+------------------------------------------------------------------
+
+postulate
+  stepFrame-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (κ : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    2 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    frameB? (capᴱ W E) Ψ f ≡ true →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    all (valB? (capᴱ W E) Ψ s) vals ≡ true →
+    let r = stepFrame g id now f κ vals fin sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+       × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
+       × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+
+  pushBurst-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (κ : Path Γ u t) (ems : Stream Γ s)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    2 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    frameB? (capᴱ W E) Ψ f ≡ true →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    burstB? (capᴱ W E) Ψ ems ≡ true →
+    let r = pushBurst g id now f κ ems sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+  subscribeE-walkS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (Ψ W : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    2 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    let r = subscribeE g b κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+  chainStep-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (Ψ W : ℕ) (id : Id) (a : Arrival Γ)
+    (path : Path Γ (arrTy a) t)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    2 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    pathB? (capᴱ W E) Ψ path ≡ true →
+    valB? (capᴱ W E) Ψ (arrTy a) (arrVal a) ≡ true →
+    let r = chainStep id a path sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+------------------------------------------------------------------
+-- THE FOLD DECOMPOSITION, PROVEN: cascadeGo threads the walk
+-- invariant chain by chain over chainStep-wet.  This is the
+-- structure the cascadeGo-wet memo demanded — per-cascade growth
+-- threads through the fold at a moving ledger position, with the
+-- registry cardinality rider (INV?'s length conjunct) available at
+-- the latch for the eventual receipt arithmetic.  Not consumed yet:
+-- cascade-dry keeps riding the landing core below until the
+-- quantitative debt (memo (3)) closes.
+------------------------------------------------------------------
+
+cascadeGo-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (a : Arrival Γ) (id : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  2 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  all (λ rc → pathB? (capᴱ W E) Ψ (proj₂ rc)) chains ≡ true →
+  valB? (capᴱ W E) Ψ (arrTy a) (arrVal a) ≡ true →
+  let r = cascadeGo a id chains sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+cascadeGo-walk Ψ W a id [] sched st E 2≤E inv chB vB =
+  E , ≤-refl , inv , refl
+cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 2≤E inv chB vB
+  with ∧-true (pathB? (capᴱ W E) Ψ c) _ chB
+... | pc , pchains with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true  = cascadeGo-walk Ψ W a id chains sched st E 2≤E inv pchains vB
+... | false =
+  let st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+      (E₁ , E≤E₁ , inv₁ , em₁) =
+        chainStep-wet Ψ W id a c sched st₀ E 2≤E inv pc vB
+      cap≤ = capᴱ-mono W E≤E₁
+      (E₂ , E₁≤E₂ , inv₂ , em₂) =
+        cascadeGo-walk Ψ W a id chains
+          (proj₁ (proj₂ (chainStep id a c sched st₀)))
+          (proj₂ (proj₂ (chainStep id a c sched st₀)))
+          E₁ (≤-trans 2≤E E≤E₁) inv₁
+          (chainsB?-widen chains cap≤ pchains)
+          (valB?-widen (arrTy a) (arrVal a) cap≤ vB)
+  in E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ ,
+     all-++-intro _ (proj₁ (chainStep id a c sched st₀)) _
+       (burstB?-widen (proj₁ (chainStep id a c sched st₀))
+                      (capᴱ-mono W E₁≤E₂) em₁)
+       em₂
+
+------------------------------------------------------------------
 -- the three cores
 ------------------------------------------------------------------
 
@@ -2453,17 +2925,18 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     by REMAINING GAS fails for the same reason (folds do not
 --     peel gas).
 --   · the missing accounting is a per-instant BREADTH LEDGER: the
---     value-list lengths threading stepFrame/pushBurst.  Breadth
---     per instant is structurally generated (of-widths, acc
---     fan-out on subscription) and the measured attack compounds
---     stores ONE tower story per instant (counts 2^(2^d) after d
---     instants) — the suc-sz stories sizeBudgetAt adds per instant
---     dominate.  The internal invariant should carry (grown cap
---     W, breadth budget) with applyFn-size discharging one swap
---     per fold and the breadth ledger bounding the fold count;
---     its closed form is the next design block — decide it BEFORE
---     stating any pushBurst/stepFrame wet postulate (an imprecise
---     one would be false: FoldOut rule).
+--     value-list lengths threading stepFrame/pushBurst.  SETTLED
+--     2026-07-24 — see THE WALK LEDGER section above: the sharp
+--     eval bound (caseW, substitution-invariant exponent) replaces
+--     applyFn-size's self-inflating one, the ledger is the
+--     multiplicative exponent capᴱ W₀ E with one uniform ×3^(suc Ψ)
+--     rule per eval edge and ×2 per cheap edge, fold-runs cost
+--     3^(suc Ψ · m) by scanVals-sharp, and INV? (store bounds +
+--     fn caps + registry cardinality + chain frames) is the
+--     invariant the walk contracts thread.  What remains open is
+--     ONLY the entry-anchored a-priori count cap (memo (3) there);
+--     until it closes, the landing halves live in these two cores
+--     and nowhere else.
 ------------------------------------------------------------------
 
 postulate

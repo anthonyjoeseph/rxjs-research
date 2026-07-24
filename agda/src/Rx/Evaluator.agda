@@ -398,16 +398,20 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- path: every physically runnable consumption stays inside it, so the
 -- tower tail is never forced — evaluation cost is exactly the old
 -- ℕ budget's, while the tail carries the theorem's sufficiency.
--- Height (4+size)·(id+1), THREE stories above the store bound
--- (Verify-Budget-Sufficient's sizeBudgetAt, height (1+size)·(id+1)):
--- the wet contract's demand is polynomial in the store bound with a
--- syntax-sized exponent (rank of the layer multiset), and a tower
--- absorbs any polynomial fudge within two stories — the third is
--- margin.  The extra stories are free: the tower tail is lazy and
--- never forced on a feasible run
+-- Height (7+size)·(id+2), THREE-plus stories above the store bound
+-- (Verify-Budget-Sufficient's sizeBudgetAt, height (4+size)·(id+1)):
+-- the wet contract's demand anchors at the instant's LANDING budget
+-- (mid-walk stores legitimately outgrow the entry cap, so the
+-- fixed-per-instant demand base is the next instant's store bound,
+-- height (4+size)·(id+2)) and is polynomial in that bound with a
+-- syntax-sized exponent (rank of the shell multiset); a tower
+-- absorbs any polynomial fudge within two stories — the rest is
+-- margin ((7+sz)(id+2) − (4+sz)(id+2) = 3(id+2) ≥ 6).  The extra
+-- stories are free: the tower tail is lazy and never forced on a
+-- feasible run
 syncBudget : ℕ → Id → Gas
 syncBudget sz id =
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((4 + sz) * suc id))
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((7 + sz) * suc (suc id)))
 
 -- the size that seeds the budget is the WHOLE program's: root
 -- expression, every shared slot def (connect subscribes defs, and
