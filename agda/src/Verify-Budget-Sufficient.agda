@@ -2471,24 +2471,39 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     THE ANCHOR: fold counts are now entry-anchored.  A list
 --     delivered to a frame is a concatenation of per-subscription
 --     of-runs, each of length ≤ Ω, so its length ≤ S·Ω with S the
---     instant's subscription count — and S is read off the
---     machine's OWN counters (the nextOrdinal/nextNode delta),
---     with S ≤ suc D₀ because every subscription consumes one
---     lex-descent peel of the entry demand D₀.  Fold-runs along
---     one value LINEAGE number ≤ S·(P₀ + S) (per-segment frame
---     crossings ≤ entry path lengths P₀ — a path-LENGTH conjunct
---     joins the length ledger — plus ≤ one extension per nesting
---     level; segments ≤ S).  The mixed-receipt F is per-lineage,
---     never global, so
---       F ≤ 𝔉 := S·(P₀ + S)·(1 + S·Ω),  S = suc D₀
---     — every factor frozen at instant entry.  Story count, W₀ =
---     tower h: P₀ ≤ tower(h+1), D₀ ≤ tower(h+3) (dBound at
---     R₀ = (suc V)^(suc V)), 𝔉 ≤ tower(h+4), E_fin ≤
---     (E₀+2+𝔉)·3^(suc Ψ·𝔉) ≤ tower(h+5), sizes ≤ capᴱ W₀ E_fin ≤
---     tower(h+6): a CONSTANT story count per instant, absorbed by
---     the height multiplier (bump 4+sz if the grind's constants
---     land above it — verification-side, plus the matching
---     gas-tower bump; both behavior-preserving, Unit-Test guards).
+--     instant's subscription count (the machine's own
+--     nextOrdinal/nextNode delta — the length ledger threads
+--     counter deltas).  S is NOT ≤ the descent length: fuel is
+--     depth-consumed and SIBLINGS SHARE IT (syncBudget's memo —
+--     mints are breadth-many; the measured attack makes 2^k
+--     sibling subscriptions on k peels).  But the breadth TREE has
+--     fan-out ≤ Ω per nesting level — each subscription emits ≤ Ω
+--     values, hence spawns ≤ Ω child subscriptions — and its DEPTH
+--     is the inner-subscription NESTING, which DOES peel the lex
+--     descent: depth ≤ suc D₀.  So
+--       S ≤ Ω ^ suc D₀,   m ≤ S·Ω ≤ Ω ^ (2 + D₀)
+--     — matching the measured attack EXACTLY: Ω = 2, nesting
+--     2^d+1, count 2^(2^d+1) = Ω^nesting (the tower in chained
+--     scans is the DRY side's gas demand; within a wet run each
+--     gadget's output count re-enters as the next one's nesting,
+--     all bounded by the one entry descent).  Fold-runs along one
+--     value LINEAGE number ≤ suc D₀·(P₀ + suc D₀) (per-segment
+--     frame crossings ≤ entry path lengths P₀ — a path-LENGTH
+--     conjunct joins the length ledger — plus one extension per
+--     nesting level; segments ≤ suc D₀), so the mixed-receipt F is
+--     per-lineage with
+--       F ≤ 𝔉 := suc D₀·(P₀ + suc D₀)·(1 + Ω ^ (2 + D₀))
+--     — every factor frozen at instant entry.  The wet and dry
+--     halves consume the SAME descent: D₀ bounds the nesting for
+--     the count cap exactly where dBound bounds it for the fuel.
+--     Story count, W₀ = tower h: Ω syntax-seeded, P₀ ≤ tower(h+1),
+--     D₀ ≤ tower(h+3) (dBound at R₀ = (suc V)^(suc V)), Ω^(2+D₀)
+--     and 𝔉 ≤ tower(h+4), E_fin ≤ (E₀+2+𝔉)·3^(suc Ψ·𝔉) ≤
+--     tower(h+5), sizes ≤ capᴱ W₀ E_fin ≤ tower(h+6): a CONSTANT
+--     story count per instant, absorbed by the height multiplier
+--     (bump 4+sz if the grind's constants land above it —
+--     verification-side, plus the matching gas-tower bump; both
+--     behavior-preserving, Unit-Test guards).
 --
 --     WHAT REMAINS is grind, not design: (a) the ofW invariance /
 --     preservation mirrors (W10/W11 below — literal fnCap-grind
