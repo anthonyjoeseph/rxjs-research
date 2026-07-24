@@ -2424,8 +2424,8 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     with F the total fold count and Σ wᵢ the caseW actually
 --     executed.  The uniform rule stays true and is what the
 --     preservation grind below uses; the boundary consumes the
---     mixed form, whose F needs the a-priori anchor — that anchor
---     is the open piece.
+--     mixed form, whose F needs the a-priori anchor — CLOSED
+--     2026-07-24: see (5) THE WIDTH LEDGER below.
 --
 -- (4) THE REGISTRY (the fold-threading design block).  INV?
 --     extends stBounded? with: fnCap-boundedness of every store
@@ -2440,6 +2440,64 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     position chain by chain — the structure the cascadeGo-wet
 --     memo demanded — leaving the per-chain core and the landing
 --     arithmetic as the only leaves.
+--
+-- (5) THE WIDTH LEDGER (2026-07-24, the anchor session — closes
+--     the count cap).  Two settled findings.
+--
+--     IMPOSSIBILITY: no GLOBAL-SEQUENTIAL count can land.  If the
+--     boundary threads ONE exponent through every fold of the
+--     instant in sequence, the total fold count N is bounded only
+--     through list lengths ≤ value sizes ≤ the FINAL cap — but the
+--     final cap sits a story above N (capᴱ of an N-linear
+--     exponent), so the tower heights demand story(N) ≥
+--     story(cap) + 1 ≥ story(N) + 2: a divergent fixpoint.  No
+--     sharper counting RULE fixes this; the landing must break the
+--     "lengths ≤ sizes" self-reference itself.
+--
+--     THE BREAK: stream WIDTH is substitution-invariant.  Widths
+--     (of-list lengths) are SYNTAX: subΘ/elimG/ren map over the
+--     of-list (length preserved), evalWith on strmᵗ IS subΘ, reify
+--     at obs is strmᵗ, and NO operator converts a value's SIZE
+--     into a stream's WIDTH — ofᵉ is the only width mint and its
+--     list is template-fixed.  (PORTABILITY TRIPWIRE: a
+--     fromArray-style operator — value ↦ stream of its elements —
+--     would break exactly this; the modeled fragment has none, and
+--     adding one re-opens this core.)  So the width cap Ω (ofW,
+--     the max-shaped closure mirroring fnCap clause for clause,
+--     seeded ΩAt = program + slots) NEVER GROWS: it rides the walk
+--     as Ψ does, with NO ledger position at all (widthOK? below —
+--     flat, no existential).
+--
+--     THE ANCHOR: fold counts are now entry-anchored.  A list
+--     delivered to a frame is a concatenation of per-subscription
+--     of-runs, each of length ≤ Ω, so its length ≤ S·Ω with S the
+--     instant's subscription count — and S is read off the
+--     machine's OWN counters (the nextOrdinal/nextNode delta),
+--     with S ≤ suc D₀ because every subscription consumes one
+--     lex-descent peel of the entry demand D₀.  Fold-runs along
+--     one value LINEAGE number ≤ S·(P₀ + S) (per-segment frame
+--     crossings ≤ entry path lengths P₀ — a path-LENGTH conjunct
+--     joins the length ledger — plus ≤ one extension per nesting
+--     level; segments ≤ S).  The mixed-receipt F is per-lineage,
+--     never global, so
+--       F ≤ 𝔉 := S·(P₀ + S)·(1 + S·Ω),  S = suc D₀
+--     — every factor frozen at instant entry.  Story count, W₀ =
+--     tower h: P₀ ≤ tower(h+1), D₀ ≤ tower(h+3) (dBound at
+--     R₀ = (suc V)^(suc V)), 𝔉 ≤ tower(h+4), E_fin ≤
+--     (E₀+2+𝔉)·3^(suc Ψ·𝔉) ≤ tower(h+5), sizes ≤ capᴱ W₀ E_fin ≤
+--     tower(h+6): a CONSTANT story count per instant, absorbed by
+--     the height multiplier (bump 4+sz if the grind's constants
+--     land above it — verification-side, plus the matching
+--     gas-tower bump; both behavior-preserving, Unit-Test guards).
+--
+--     WHAT REMAINS is grind, not design: (a) the ofW invariance /
+--     preservation mirrors (W10/W11 below — literal fnCap-grind
+--     repeats); (b) the LENGTH LEDGER — restate the walk contracts
+--     with event-list lengths ≤ (counter delta)·Ω and path lengths
+--     ≤ B threaded, per-clause arithmetic being list concatenation;
+--     (c) the lineage-indexed mixed receipt composing (2)'s
+--     receipts along lineages instead of globally; (d) the landing:
+--     𝔉 into the boundary, replacing the two cores' landing halves.
 ------------------------------------------------------------------
 
 -- the eval-compounding weight: caseᵗ nodes only; strmᵗ is a leaf
@@ -2738,6 +2796,180 @@ postulate
   mapValue-B : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
     all (valB? B Ψ u) vs ≡ true →
     all (eventB? B Ψ) (map value vs) ≡ true
+
+------------------------------------------------------------------
+-- THE WIDTH LEDGER (memo (5)): the width cap Ω — the largest
+-- of-list LENGTH reachable from here.  Widths are syntax
+-- (substitution plugs single elements), so unlike the size ledger
+-- Ω needs NO running position: the machine can never mint a width
+-- above the entry seed.  Mirrors fnCap clause for clause; the ONE
+-- non-mirror clause is ofᵉ, the only width mint, contributing its
+-- literal list length.
+------------------------------------------------------------------
+
+mutual
+  ofWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  ofWᵗ (varᵗ x)      = 0
+  ofWᵗ unit̂          = 0
+  ofWᵗ (bool̂ _)      = 0
+  ofWᵗ (nat̂ _)       = 0
+  ofWᵗ (pairᵗ a b)   = ofWᵗ a ⊔ ofWᵗ b
+  ofWᵗ (fstᵗ p)      = ofWᵗ p
+  ofWᵗ (sndᵗ p)      = ofWᵗ p
+  ofWᵗ (inlᵗ a)      = ofWᵗ a
+  ofWᵗ (inrᵗ a)      = ofWᵗ a
+  ofWᵗ (caseᵗ s l r) = ofWᵗ s ⊔ (ofWᵗ l ⊔ ofWᵗ r)
+  ofWᵗ (ifᵗ c a b)   = ofWᵗ c ⊔ (ofWᵗ a ⊔ ofWᵗ b)
+  ofWᵗ (primᵗ _ a)   = ofWᵗ a
+  ofWᵗ (strmᵗ e)     = ofWᵉ e
+
+  ofWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  ofWᵉ (input i)       = 0
+  ofWᵉ (ofᵉ ts)        = length ts ⊔ ofWᵗˢ ts
+  ofWᵉ emptyᵉ          = 0
+  ofWᵉ (mapᵉ f e)      = ofWᵗ f ⊔ ofWᵉ e
+  ofWᵉ (takeᵉ c e)     = ofWᵗ c ⊔ ofWᵉ e
+  ofWᵉ (scanᵉ f z e)   = ofWᵗ f ⊔ (ofWᵗ z ⊔ ofWᵉ e)
+  ofWᵉ (mergeAllᵉ e)   = ofWᵉ e
+  ofWᵉ (concatAllᵉ e)  = ofWᵉ e
+  ofWᵉ (switchAllᵉ e)  = ofWᵉ e
+  ofWᵉ (exhaustAllᵉ e) = ofWᵉ e
+  ofWᵉ (μᵉ e)          = ofWᵉ e
+  ofWᵉ (varᵉ x)        = 0
+  ofWᵉ (deferᵉ e)      = ofWᵉ e
+
+  ofWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  ofWᵗˢ []       = 0
+  ofWᵗˢ (y ∷ ys) = ofWᵗ y ⊔ ofWᵗˢ ys
+
+ofWᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+ofWᵛ unitᵗ    v        = 0
+ofWᵛ boolᵗ    v        = 0
+ofWᵛ natᵗ     v        = 0
+ofWᵛ (s ×ᵗ t) (a , b)  = ofWᵛ s a ⊔ ofWᵛ t b
+ofWᵛ (s +ᵗ t) (inj₁ a) = ofWᵛ s a
+ofWᵛ (s +ᵗ t) (inj₂ b) = ofWᵛ t b
+ofWᵛ (obs t)  e        = ofWᵉ e
+
+-- the width face of an environment, shaped like EnvFnCap
+EnvOfW : ∀ {n} {Γ : Ctx n} {Θ} (Ω : ℕ) → All (Val Γ) Θ → Set
+EnvOfW Ω []ᵃ                = ⊤
+EnvOfW Ω (_∷ᵃ_ {x = t} v σ) = (ofWᵛ t v ≤ Ω) × EnvOfW Ω σ
+
+postulate
+  -- (W10) width invariance: EXACT mirrors of W2/W4 with fnCap
+  -- replaced by ofW pointwise — same inductions, same ⊔ algebra;
+  -- the only differing clause (ofᵉ) is length-preserving under
+  -- subΘ/elimG (they map over the of-list)
+  ofW-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+    ofWᵗ (reify v) ≡ ofWᵛ t v
+  ofW-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Ω : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvOfW Ω σ → ofWᵉ e ≤ Ω → ofWᵉ (subΘExp Θloc σ e) ≤ Ω
+  ofW-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    ofWᵉ (elimGExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
+  ofW-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (Ω : ℕ)
+    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+    EnvOfW Ω env → ofWᵗ tm ≤ Ω →
+    ofWᵛ t (evalWith tm env) ≤ Ω
+
+-- machine faces, mirroring fnCapLive / fnCapNode / frameB? /
+-- pathB? / regsB? with the flat cap Ω
+ofWLive : ∀ {n} {Γ : Ctx n} → ℕ → LiveSource Γ → Bool
+ofWLive Ω l =
+  all (λ tv → ofWᵛ (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ Ω)
+      (LiveSource.pending l)
+
+ofWNode : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
+ofWNode Ω (scan-st {t} v)   = ofWᵛ t v ≤ᵇ Ω
+ofWNode Ω (concat-st q _ _) = all (λ o → ofWᵉ o ≤ᵇ Ω) q
+ofWNode Ω (take-st _)       = true
+ofWNode Ω (merge-st _ _)    = true
+ofWNode Ω (switch-st _ _)   = true
+ofWNode Ω (exhaust-st _ _)  = true
+
+frameΩ? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+frameΩ? Ω (map-f fn)         = ofWᵗ fn ≤ᵇ Ω
+frameΩ? Ω (scan-f fn _)      = ofWᵗ fn ≤ᵇ Ω
+frameΩ? Ω (take-f _)         = true
+frameΩ? Ω (from-inner _ _ _) = true
+frameΩ? Ω (thru-outer _ _)   = true
+
+pathΩ? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+pathΩ? Ω root           = true
+pathΩ? Ω (share-sink i) = true
+pathΩ? Ω (f ↠ p)        = frameΩ? Ω f ∧ pathΩ? Ω p
+
+regsΩ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
+       → List (RegId × Source × Chain Γ t) → Bool
+regsΩ? Ω = all (λ en → pathΩ? Ω (proj₂ (proj₂ (proj₂ en))))
+
+-- the Ω seed: program plus slots, a sum dominating the max —
+-- shaped exactly like ΨAt
+inputOfW : ∀ {n} {Γ : Ctx n} {t : Ty} → ObservableInput (Val Γ t) → ℕ
+inputOfW {t = t} (hot async) =
+  sum (map (λ tv → ofWᵛ t (Timed.val tv)) async)
+inputOfW {t = t} (cold sync async) =
+  sum (map (ofWᵛ t) sync)
+  + sum (map (λ tv → ofWᵛ t (Timed.val tv)) async)
+
+slotOfW : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
+slotOfW (scripted i) = inputOfW i
+slotOfW (shared d)   = ofWᵉ d
+
+slotsOfW : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
+slotsOfW sl = sum (tabulate λ i → slotOfW (sl i))
+
+ΩAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ
+ΩAt e sl = ofWᵉ e + slotsOfW sl
+
+-- THE FLAT WIDTH INVARIANT: every width in the machine ≤ Ω —
+-- stores, node states, registered frames, and the (never-changing)
+-- slots.  No ledger position: Ω is a constant of the whole run.
+widthOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+         → ℕ → Sched Γ → EvalSt e → Bool
+widthOK? Ω sched st =
+  all (ofWLive Ω) (Sched.live sched)
+  ∧ all (λ kv → ofWNode Ω (proj₂ kv)) (EvalSt.nodes st)
+  ∧ regsΩ? Ω (EvalSt.registry st)
+  ∧ (slotsOfW (Sched.slots sched) ≤ᵇ Ω)
+
+eventΩ? : ∀ {n} {Γ : Ctx n} {u} → ℕ → InstEvent (Val Γ u) → Bool
+eventΩ? {u = u} Ω (value v) = ofWᵛ u v ≤ᵇ Ω
+eventΩ? Ω (init _)    = true
+eventΩ? Ω (close _ _) = true
+eventΩ? Ω (handoff _) = true
+eventΩ? Ω complete    = true
+
+burstΩ? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ u → Bool
+burstΩ? Ω = all (λ em → all (eventΩ? Ω) (InstEmit.events em))
+
+postulate
+  -- (W11) the width walk: Ω is flat, so these are pure
+  -- preservation statements — no existential, no receipt.  The
+  -- grind literally repeats the fnCap half of subscribeE-walkS /
+  -- cascadeGo-walk with the W10 mirrors in place of W2/W4 (the
+  -- slots conjunct feeds the input/defer clauses exactly as
+  -- slotsFnCap did).
+  subscribeE-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (Ω : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id)
+    (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+    let r = subscribeE g b κ id now sched st
+    in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstΩ? Ω (proj₁ r) ≡ true)
+
+  cascadeGo-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (Ω : ℕ) (a : Arrival Γ) (id : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    widthOK? Ω sched st ≡ true →
+    ofWᵛ (arrTy a) (Arrival.payload a) ≤ Ω →
+    all (λ rc → pathΩ? Ω (proj₂ rc)) chains ≡ true →
+    let r = cascadeGo a id chains sched st
+    in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstΩ? Ω (proj₁ r) ≡ true)
 
 ------------------------------------------------------------------
 -- the walk contracts, store half — the SHAPE the clause grind
@@ -3588,10 +3820,13 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 2≤E inv chB vB
 --     rule per eval edge and ×2 per cheap edge, fold-runs cost
 --     3^(suc Ψ · m) by scanVals-sharp, and INV? (store bounds +
 --     fn caps + registry cardinality + chain frames) is the
---     invariant the walk contracts thread.  What remains open is
---     ONLY the entry-anchored a-priori count cap (memo (3) there);
---     until it closes, the landing halves live in these two cores
---     and nowhere else.
+--     invariant the walk contracts thread.  The count cap's DESIGN
+--     closed 2026-07-24 (memo (5), THE WIDTH LEDGER): widths are
+--     substitution-invariant, so run lengths anchor at S·Ω and the
+--     per-lineage fold count at 𝔉 — all entry-frozen.  What
+--     remains is the length-ledger grind and the landing
+--     composition; until THAT lands, the landing halves live in
+--     these two cores and nowhere else.
 ------------------------------------------------------------------
 
 postulate
