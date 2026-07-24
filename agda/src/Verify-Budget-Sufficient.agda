@@ -2470,36 +2470,45 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --
 --     THE ANCHOR: fold counts are now entry-anchored.  A list
 --     delivered to a frame is a concatenation of per-subscription
---     of-runs, each of length ≤ Ω, so its length ≤ S·Ω with S the
---     instant's subscription count (the machine's own
---     nextOrdinal/nextNode delta — the length ledger threads
---     counter deltas).  S is NOT ≤ the descent length: fuel is
+--     of-runs, each of length ≤ Ω, so run lengths ride the
+--     SUBSCRIPTION COUNT S — the machine's own counter delta
+--     (mintCount below): the length ledger threads counter
+--     deltas.  S is NOT ≤ the descent length: fuel is
 --     depth-consumed and SIBLINGS SHARE IT (syncBudget's memo —
 --     mints are breadth-many; the measured attack makes 2^k
---     sibling subscriptions on k peels).  But the breadth TREE has
---     fan-out ≤ Ω per nesting level — each subscription emits ≤ Ω
---     values, hence spawns ≤ Ω child subscriptions — and its DEPTH
---     is the inner-subscription NESTING, which DOES peel the lex
---     descent: depth ≤ suc D₀.  So
---       S ≤ Ω ^ suc D₀,   m ≤ S·Ω ≤ Ω ^ (2 + D₀)
---     — matching the measured attack EXACTLY: Ω = 2, nesting
---     2^d+1, count 2^(2^d+1) = Ω^nesting (the tower in chained
---     scans is the DRY side's gas demand; within a wet run each
---     gadget's output count re-enters as the next one's nesting,
---     all bounded by the one entry descent).  Fold-runs along one
---     value LINEAGE number ≤ suc D₀·(P₀ + suc D₀) (per-segment
---     frame crossings ≤ entry path lengths P₀ — a path-LENGTH
---     conjunct joins the length ledger — plus one extension per
---     nesting level; segments ≤ suc D₀), so the mixed-receipt F is
---     per-lineage with
---       F ≤ 𝔉 := suc D₀·(P₀ + suc D₀)·(1 + Ω ^ (2 + D₀))
---     — every factor frozen at instant entry.  The wet and dry
---     halves consume the SAME descent: D₀ bounds the nesting for
---     the count cap exactly where dBound bounds it for the fuel.
---     Story count, W₀ = tower h: Ω syntax-seeded, P₀ ≤ tower(h+1),
---     D₀ ≤ tower(h+3) (dBound at R₀ = (suc V)^(suc V)), Ω^(2+D₀)
---     and 𝔉 ≤ tower(h+4), E_fin ≤ (E₀+2+𝔉)·3^(suc Ψ·𝔉) ≤
---     tower(h+5), sizes ≤ capᴱ W₀ E_fin ≤ tower(h+6): a CONSTANT
+--     sibling subscriptions on k peels).
+--
+--     CORRECTION (2026-07-24, the dry-half session): this memo's
+--     first cut claimed per-subscription fan-out ≤ Ω and hence
+--     S ≤ Ω^(suc D₀).  That accounting is WRONG twice over: a
+--     *All frame hops once per VALUE of its child's burst — an
+--     aggregate of the whole child SUBTREE's emissions, not of
+--     one subscription's of-run — and one value can hop again at
+--     every later *All frame it crosses.  The honest call-tree
+--     recurrence (every edge descends the dBound demand d:
+--     structural edges drop s, μ drops s, hops drop r, connects
+--     drop U) is QUADRATIC,
+--       S(d) ≤ c + S(d-1) + burstLen(d-1)·S(d-1),
+--     whose naive closure is doubly exponential in d:
+--       S, burstLen ≤ walkCap Ω ℓ d = ((3+Ω)·suc ℓ)^(3^d)
+--     with ℓ ≥ pathLen κ + d the frame-crossing bound (path
+--     lengths join the base: each value folds/hops at most once
+--     per frame crossed; `pathLen κ + d ≤ ℓ` is preserved on
+--     every edge for free).  Whether dBound's rank-weighting
+--     recovers a singly-exponential form (the rank component
+--     self-limits nested-hop capacity) is OPEN and IRRELEVANT for
+--     the landing: walkCap is frozen at instant entry, one tower
+--     story above the old claim — story counts shift by one and
+--     nothing else changes.  Fold counts per value lineage:
+--       F ≤ 𝔉 := suc ℓ₀ · walkCap Ω ℓ₀ D₀
+--     (crossings per value ≤ suc ℓ₀, values ≤ walkCap) — every
+--     factor frozen at instant entry.  The wet and dry halves
+--     consume the SAME descent: d bounds the hop geometry for the
+--     count cap exactly where dBound bounds it for the fuel.
+--     Story count, W₀ = tower h: Ω syntax-seeded, ℓ₀ ≤ tower(h+3)
+--     (dBound at R₀ = (suc V)^(suc V)), 3^D₀ ≤ tower(h+4),
+--     walkCap and 𝔉 ≤ tower(h+5), E_fin ≤ E₀·3^(suc Ψ·𝔉) ≤
+--     tower(h+6), sizes ≤ capᴱ W₀ E_fin ≤ tower(h+7): a CONSTANT
 --     story count per instant, absorbed by the height multiplier
 --     (bump 4+sz if the grind's constants land above it —
 --     verification-side, plus the matching gas-tower bump; both
@@ -2507,17 +2516,14 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --
 --     WHAT REMAINS is grind, not design: (a) the ofW invariance /
 --     preservation mirrors (W10/W11 below — literal fnCap-grind
---     repeats); (b) the LENGTH LEDGER — the counter-delta bound
---     S ≤ (2+Ω)^(suc d) is indexed by the REMAINING descent d at
---     each call, so it RIDES THE DRY-HALF walk induction (the one
---     that threads and peels hasAtLeast against dBound-μ/-hop/
---     -connect), NOT the store-half: state them together, one
---     conjunct per half, when the dry walk is ground.  (Every
---     operator has exactly ONE Exp child, so each walk mints one
---     source; fan-out is via emitted values ≤ Ω plus the μ/defer/
---     connect edges — hence the +2 in the base.)  Event-list
---     lengths ≤ delta·Ω and path lengths ≤ B thread alongside,
---     per-clause arithmetic being list concatenation; (c) the
+--     repeats); (b) STATED 2026-07-24: subscribeE-walk (below the
+--     W11 block) is the JOINT FACE — the wet conjuncts with their
+--     receipt E′ ≤ E·3^(suc Ψ·walkCap), the dry half, and the
+--     length ledger (mintCount delta, burstLen, registered path
+--     lengths) in one hypothesis block under one ceiling; its
+--     clause grind extends the ground walkS clauses conjunct by
+--     conjunct, consuming W11 for hop targets and hasAtLeast-peel
+--     against dBound-μ/-hop/-connect for the fuel; (c) the
 --     lineage-indexed mixed receipt composing (2)'s receipts along
 --     lineages instead of globally; (d) the landing: 𝔉 into the
 --     boundary, replacing the two cores' landing halves.
@@ -2993,6 +2999,107 @@ postulate
     let r = cascadeGo a id chains sched st
     in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstΩ? Ω (proj₁ r) ≡ true)
+
+------------------------------------------------------------------
+-- THE LENGTH LEDGER's vocabulary (memo (5), corrected form)
+------------------------------------------------------------------
+
+-- path length = frames to cross.  The walk invariant
+-- `pathLen κ + d ≤ ℓ` costs nothing to preserve: a structural
+-- edge adds one frame and drops the descent by one, a hop edge
+-- adds one frame against dBound-hop's strict drop, and a connect
+-- resets to share-sink — so one entry-frozen ℓ bounds every
+-- frame-crossing and every registered path for the whole walk
+pathLen : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+pathLen root           = 0
+pathLen (share-sink i) = 0
+pathLen (f ↠ p)        = suc (pathLen p)
+
+regsLen? : ∀ {n} {Γ : Ctx n} {t} → ℕ
+         → List (RegId × Source × Chain Γ t) → Bool
+regsLen? ℓ = all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
+
+-- the machine's own allocation counter: every source / ordinal /
+-- node / registration mint bumps one of these, so a walk's total
+-- subscription work is a counter delta — what the ledger reads
+mintCount : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+          → Sched Γ → EvalSt e → ℕ
+mintCount sched st =
+  Sched.nextOrdinal sched + Sched.nextSource sched
+  + Sched.nextNode sched + EvalSt.nextReg st
+
+-- one InstEmit costs suc (its event count): burstLen bounds the
+-- emit count and the total event count at once
+burstLen : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → ℕ
+burstLen b = sum (map (λ em → suc (length (InstEmit.events em))) b)
+
+-- THE RECURRENCE-CLOSED CAP.  Per-clause obligations (c ≤ 4 own
+-- mints; oneShotBurst events ≤ 3+Ω; hops ≤ the child's burstLen,
+-- each a fresh subtree at a strictly smaller descent; per-value
+-- fold/hop sites ≤ frame crossings ≤ ℓ) all close under
+--   walkCap(d)² · base + walkCap(d-1) + c ≤ walkCap(suc d)
+-- because the exponent triples per descent step: β^(2·3^d + 2) ≤
+-- β^(3^(suc d)) once 3^d ≥ 2, and the d ∈ {0,1} cases are
+-- degenerate (a demand that small admits no child subtree).
+walkCap : (Ω ℓ d : ℕ) → ℕ
+walkCap Ω ℓ d = ((3 + Ω) * suc ℓ) ^ (3 ^ d)
+
+------------------------------------------------------------------
+-- THE JOINT WALK FACE (2026-07-24): wet half, dry half, and the
+-- length ledger in ONE contract — memo (5)(b)'s "state them
+-- together".  Settled design points:
+--   · d is an UPPER bound on the call's dBound demand (≤, not ≡):
+--     every conjunct is monotone in d, so callers weaken freely
+--     and clause proofs descend by exactly one per edge.
+--   · THE CEILING capᴱ W (E·3^(suc Ψ·walkCap)) ≤ V ties the
+--     halves together: the receipt conjunct E′ ≤ E·3^(…) keeps
+--     every mid-walk ledger position under it, so every mid-walk
+--     store and emission is sized ≤ V — exactly what dBound-hop's
+--     s′ ≤ V reset and the rank machinery's class caps need at
+--     hop edges.  V is the caller's DESCENT ANCHOR — at the root
+--     instantiation, the landing budget sizeBudgetAt (suc id),
+--     where the ceiling becomes memo (5)'s story-count
+--     arithmetic.  No fixed V survives as a store INVARIANT
+--     (folds outgrow it) — it survives as a CEILING on the
+--     receipt, which is why the receipt conjunct is load-bearing
+--     and not instrumentation.
+--   · the dry half consumes hasAtLeast (suc d) peels against
+--     dBound-μ/-hop/-connect; hop targets get their rank drop
+--     from the shell hop machinery and their width bound from W11
+--     applied to the child call.
+--   · subsumption: subscribeE-walkS below is this contract's
+--     store-half projection — its ground clauses lift conjunct by
+--     conjunct in the grind.  The two cores at the bottom stay
+--     until the landing composes (𝔉 into the boundary).
+------------------------------------------------------------------
+
+postulate
+  subscribeE-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (Ψ W Ω V ℓ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E d : ℕ) →
+    2 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound V (suc V ^ suc V)
+           (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (rank V (measureE V b)) (syncSizeᵉ b) ≤ d →
+    g hasAtLeast suc d →
+    pathLen κ + d ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)) ≤ V →
+    let r = subscribeE g b κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ d)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ d)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
 ------------------------------------------------------------------
 -- the walk contracts, store half — the SHAPE the clause grind
@@ -3844,10 +3951,12 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 2≤E inv chB vB
 --     3^(suc Ψ · m) by scanVals-sharp, and INV? (store bounds +
 --     fn caps + registry cardinality + chain frames) is the
 --     invariant the walk contracts thread.  The count cap's DESIGN
---     closed 2026-07-24 (memo (5), THE WIDTH LEDGER): widths are
---     substitution-invariant, so run lengths anchor at S·Ω and the
---     per-lineage fold count at 𝔉 — all entry-frozen.  What
---     remains is the length-ledger grind and the landing
+--     closed 2026-07-24 (memo (5), THE WIDTH LEDGER, corrected to
+--     the recurrence-closed walkCap form): widths are
+--     substitution-invariant, so run lengths and the per-lineage
+--     fold count 𝔉 anchor at walkCap — all entry-frozen.  The
+--     JOINT FACE (subscribeE-walk above) states wet + dry + ledger
+--     together; what remains is its clause grind and the landing
 --     composition; until THAT lands, the landing halves live in
 --     these two cores and nowhere else.
 ------------------------------------------------------------------
