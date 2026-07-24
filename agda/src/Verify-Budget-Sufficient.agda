@@ -3016,45 +3016,107 @@ eventB? B Ψ complete    = true
 burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
 burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 
-postulate
-  -- (W7) all the in-flight predicates only ever need widening
-  -- upward (≤ᵇ-widen through all, mirror boundedLive-widen)
-  valB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty) (v : Val Γ u) →
-    B ≤ B′ → valB? B Ψ u v ≡ true → valB? B′ Ψ u v ≡ true
-  valsB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty)
-    (vs : List (Val Γ u)) → B ≤ B′ →
-    all (valB? B Ψ u) vs ≡ true → all (valB? B′ Ψ u) vs ≡ true
-  burstB?-widen : ∀ {n} {Γ : Ctx n} {u} {B B′ Ψ : ℕ} (str : Stream Γ u) →
-    B ≤ B′ → burstB? B Ψ str ≡ true → burstB? B′ Ψ str ≡ true
-  frameB?-widen : ∀ {n} {Γ : Ctx n} {s u} {B B′ Ψ : ℕ} (f : Frame Γ s u) →
-    B ≤ B′ → frameB? B Ψ f ≡ true → frameB? B′ Ψ f ≡ true
-  pathB?-widen : ∀ {n} {Γ : Ctx n} {s t} {B B′ Ψ : ℕ} (p : Path Γ s t) →
-    B ≤ B′ → pathB? B Ψ p ≡ true → pathB? B′ Ψ p ≡ true
-  chainsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ} {s : Ty}
-    (chains : List (RegId × Path Γ s t)) → B ≤ B′ →
-    all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
-    all (λ rc → pathB? B′ Ψ (proj₂ rc)) chains ≡ true
-  regsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ}
-    (reg : List (RegId × Source × Chain Γ t)) → B ≤ B′ →
-    regsB? B Ψ reg ≡ true → regsB? B′ Ψ reg ≡ true
+-- (W7) all the in-flight predicates only ever need widening
+-- upward (≤ᵇ-widen through all, mirror boundedLive-widen)
+valB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty) (v : Val Γ u) →
+  B ≤ B′ → valB? B Ψ u v ≡ true → valB? B′ Ψ u v ≡ true
+valB?-widen u v B≤ h =
+  ∧-intro (≤ᵇ-widen (sizeᵛ u v) B≤ (proj₁ (∧-true _ _ h)))
+          (proj₂ (∧-true _ _ h))
 
-  -- (W8) burst plumbing: splitting a bounded emit yields bounded
-  -- values; the bookkeeping side and retag images are value-free,
-  -- so any bound covers them; wrapping bounded values back into
-  -- events is pointwise (all list inductions)
-  splitEvents-vals-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ)
-    (es : List (InstEvent (Val Γ s))) →
-    all (eventB? B Ψ) es ≡ true →
-    all (valB? B Ψ s) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
-  splitEvents-bk-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ)
-    (es : List (InstEvent (Val Γ s))) →
-    all (eventB? B Ψ) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
-  retag-B : ∀ {n} {Γ : Ctx n} {u : Ty} {A : Set} (B Ψ : ℕ)
-    (es : List (InstEvent A)) →
-    all (eventB? B Ψ) (retagEvents {B = Val Γ u} es) ≡ true
-  mapValue-B : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
-    all (valB? B Ψ u) vs ≡ true →
-    all (eventB? B Ψ) (map value vs) ≡ true
+valsB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty)
+  (vs : List (Val Γ u)) → B ≤ B′ →
+  all (valB? B Ψ u) vs ≡ true → all (valB? B′ Ψ u) vs ≡ true
+valsB?-widen u vs B≤ h = all-impl _ _ (λ v → valB?-widen u v B≤) vs h
+
+-- per-event widening (only `value` carries a B-sized payload)
+eventB?-widen : ∀ {n} {Γ : Ctx n} {u} {B B′ Ψ : ℕ} (ev : InstEvent (Val Γ u)) →
+  B ≤ B′ → eventB? B Ψ ev ≡ true → eventB? B′ Ψ ev ≡ true
+eventB?-widen (value v)  B≤ h = valB?-widen _ v B≤ h
+eventB?-widen (init _)   B≤ h = refl
+eventB?-widen (close _ _) B≤ h = refl
+eventB?-widen (handoff _) B≤ h = refl
+eventB?-widen complete   B≤ h = refl
+
+burstB?-widen : ∀ {n} {Γ : Ctx n} {u} {B B′ Ψ : ℕ} (str : Stream Γ u) →
+  B ≤ B′ → burstB? B Ψ str ≡ true → burstB? B′ Ψ str ≡ true
+burstB?-widen str B≤ h =
+  all-impl _ _ (λ em → all-impl _ _ (λ ev → eventB?-widen ev B≤)
+                                (InstEmit.events em)) str h
+
+frameB?-widen : ∀ {n} {Γ : Ctx n} {s u} {B B′ Ψ : ℕ} (f : Frame Γ s u) →
+  B ≤ B′ → frameB? B Ψ f ≡ true → frameB? B′ Ψ f ≡ true
+frameB?-widen (map-f fn)         B≤ h =
+  ∧-intro (≤ᵇ-widen (sizeᵗ fn) B≤ (proj₁ (∧-true _ _ h))) (proj₂ (∧-true _ _ h))
+frameB?-widen (scan-f fn _)      B≤ h =
+  ∧-intro (≤ᵇ-widen (sizeᵗ fn) B≤ (proj₁ (∧-true _ _ h))) (proj₂ (∧-true _ _ h))
+frameB?-widen (take-f _)         B≤ h = refl
+frameB?-widen (from-inner _ _ _) B≤ h = refl
+frameB?-widen (thru-outer _ _)   B≤ h = refl
+
+pathB?-widen : ∀ {n} {Γ : Ctx n} {s t} {B B′ Ψ : ℕ} (p : Path Γ s t) →
+  B ≤ B′ → pathB? B Ψ p ≡ true → pathB? B′ Ψ p ≡ true
+pathB?-widen root           B≤ h = refl
+pathB?-widen (share-sink i) B≤ h = refl
+pathB?-widen (f ↠ p)        B≤ h =
+  ∧-intro (frameB?-widen f B≤ (proj₁ (∧-true _ _ h)))
+          (pathB?-widen p B≤ (proj₂ (∧-true _ _ h)))
+
+chainsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ} {s : Ty}
+  (chains : List (RegId × Path Γ s t)) → B ≤ B′ →
+  all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
+  all (λ rc → pathB? B′ Ψ (proj₂ rc)) chains ≡ true
+chainsB?-widen chains B≤ h =
+  all-impl _ _ (λ rc → pathB?-widen (proj₂ rc) B≤) chains h
+
+regsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ}
+  (reg : List (RegId × Source × Chain Γ t)) → B ≤ B′ →
+  regsB? B Ψ reg ≡ true → regsB? B′ Ψ reg ≡ true
+regsB?-widen reg B≤ h =
+  all-impl _ _ (λ en → pathB?-widen (proj₂ (proj₂ (proj₂ en))) B≤) reg h
+
+-- (W8) burst plumbing: splitting a bounded emit yields bounded
+-- values; the bookkeeping side and retag images are value-free,
+-- so any bound covers them; wrapping bounded values back into
+-- events is pointwise (all list inductions)
+splitEvents-vals-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventB? B Ψ) es ≡ true →
+  all (valB? B Ψ s) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+splitEvents-vals-B B Ψ []              h = refl
+splitEvents-vals-B B Ψ (value v  ∷ es) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (splitEvents-vals-B B Ψ es (proj₂ (∧-true _ _ h)))
+splitEvents-vals-B B Ψ (init _   ∷ es) h = splitEvents-vals-B B Ψ es (proj₂ (∧-true _ _ h))
+splitEvents-vals-B B Ψ (close _ _ ∷ es) h = splitEvents-vals-B B Ψ es (proj₂ (∧-true _ _ h))
+splitEvents-vals-B B Ψ (handoff _ ∷ es) h = splitEvents-vals-B B Ψ es (proj₂ (∧-true _ _ h))
+splitEvents-vals-B B Ψ (complete ∷ es) h = splitEvents-vals-B B Ψ es (proj₂ (∧-true _ _ h))
+
+splitEvents-bk-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventB? B Ψ) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
+splitEvents-bk-B B Ψ []              = refl
+splitEvents-bk-B {u = u} B Ψ (value v  ∷ es) = splitEvents-bk-B {u = u} B Ψ es
+splitEvents-bk-B {u = u} B Ψ (init _   ∷ es) = ∧-intro refl (splitEvents-bk-B {u = u} B Ψ es)
+splitEvents-bk-B {u = u} B Ψ (close _ _ ∷ es) = ∧-intro refl (splitEvents-bk-B {u = u} B Ψ es)
+splitEvents-bk-B {u = u} B Ψ (handoff _ ∷ es) = ∧-intro refl (splitEvents-bk-B {u = u} B Ψ es)
+splitEvents-bk-B {u = u} B Ψ (complete ∷ es) = splitEvents-bk-B {u = u} B Ψ es
+
+retag-B : ∀ {n} {Γ : Ctx n} {u : Ty} {A : Set} (B Ψ : ℕ)
+  (es : List (InstEvent A)) →
+  all (eventB? B Ψ) (retagEvents {B = Val Γ u} es) ≡ true
+retag-B B Ψ []              = refl
+retag-B B Ψ (init _   ∷ es) = ∧-intro refl (retag-B B Ψ es)
+retag-B B Ψ (close _ _ ∷ es) = ∧-intro refl (retag-B B Ψ es)
+retag-B B Ψ (handoff _ ∷ es) = ∧-intro refl (retag-B B Ψ es)
+retag-B B Ψ (complete ∷ es) = ∧-intro refl (retag-B B Ψ es)
+retag-B B Ψ (value _  ∷ es) = retag-B B Ψ es
+
+mapValue-B : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  all (valB? B Ψ u) vs ≡ true →
+  all (eventB? B Ψ) (map value vs) ≡ true
+mapValue-B B Ψ u []       h = refl
+mapValue-B B Ψ u (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (mapValue-B B Ψ u vs (proj₂ (∧-true _ _ h)))
 
 ------------------------------------------------------------------
 -- THE WIDTH LEDGER (memo (5)): the width cap Ω — the largest
