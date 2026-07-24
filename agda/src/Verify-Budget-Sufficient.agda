@@ -53,7 +53,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        ^-monoˡ-≤; ^-*-assoc;
                                        ^-distribˡ-+-*; *-mono-≤;
                                        +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m)
+                                       m≤m⊔n; m≤n⊔m; ⊔-lub)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -72,6 +72,7 @@ open import Data.List.Relation.Unary.All.Properties
 open import Data.List.Properties using (length-++)
 open import Data.List.Membership.Propositional.Properties
   using (∈-++⁻; ∈-++⁺ˡ)
+open import Data.Maybe   using (nothing)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -120,7 +121,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 dropSource; arrSource; chainsOf; cascadeGo;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
-                                subscribeInner; chainStep;
+                                subscribeInner; chainStep; subscribeAll;
+                                mintNode; register;
+                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
                                 splitEvents; retagEvents;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
@@ -2411,7 +2414,18 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     needs the descent length anchored one story sharper.  Closing
 --     that gap is the remaining quantitative debt, localized in the
 --     two cores below; do NOT restate their landing halves until it
---     closes.
+--     closes.  REFINEMENT (2026-07-24, the grind session): the
+--     boundary will need the RUN receipts in their sharp MIXED
+--     form, not the uniform ×3^(suc Ψ) rule — for a caseW-0 fn the
+--     run recurrence q′ = E + q + 2 is ADDITIVE (the exponent grows
+--     linearly in the fold count, matching the attack's
+--     one-story-per-instant reality), and only executed CASE-work
+--     compounds multiplicatively: E_fin ≤ (E₀ + 2 + F) · 3^(Σ wᵢ)
+--     with F the total fold count and Σ wᵢ the caseW actually
+--     executed.  The uniform rule stays true and is what the
+--     preservation grind below uses; the boundary consumes the
+--     mixed form, whose F needs the a-priori anchor — that anchor
+--     is the open piece.
 --
 -- (4) THE REGISTRY (the fold-threading design block).  INV?
 --     extends stBounded? with: fnCap-boundedness of every store
@@ -2632,19 +2646,6 @@ regsB? : ∀ {n} {Γ : Ctx n} {t} → ℕ → ℕ
        → List (RegId × Source × Chain Γ t) → Bool
 regsB? B Ψ = all (λ en → pathB? B Ψ (proj₂ (proj₂ (proj₂ en))))
 
--- THE COMPOSITE WALK INVARIANT: value stores bounded (stBounded?),
--- every embedded fn's weight capped (Ψ never grows — caseW is
--- substitution-invariant), the registry CARDINALITY within the
--- store bound (the fold-threading budget: |chains| ≤ B at latch),
--- and every registered chain's frames bounded
-INV? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-     → ℕ → ℕ → Sched Γ → EvalSt e → Bool
-INV? Ψ B sched st =
-  stBounded? B sched st
-  ∧ fnCapBounded? Ψ sched st
-  ∧ (length (EvalSt.registry st) ≤ᵇ B)
-  ∧ regsB? B Ψ (EvalSt.registry st)
-
 -- the Ψ seed: the program's own weight plus every slot's (script
 -- values are delivered and folded like any others; shared defs are
 -- subscribed at connect) — a sum, which dominates the max
@@ -2659,8 +2660,29 @@ slotFnCap : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
 slotFnCap (scripted i) = inputFnCap i
 slotFnCap (shared d)   = fnCapᵉ d
 
+slotsFnCap : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
+slotsFnCap sl = sum (tabulate λ i → slotFnCap (sl i))
+
 ΨAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ
-ΨAt e sl = fnCapᵉ e + sum (tabulate λ i → slotFnCap (sl i))
+ΨAt e sl = fnCapᵉ e + slotsFnCap sl
+
+-- THE COMPOSITE WALK INVARIANT: value stores bounded (stBounded?),
+-- every embedded fn's weight capped (Ψ never grows — caseW is
+-- substitution-invariant), the registry CARDINALITY within the
+-- store bound (the fold-threading budget: |chains| ≤ B at latch),
+-- every registered chain's frames bounded, and the SLOTS bounded
+-- (script values and shared defs are subscribed/delivered mid-walk;
+-- slots never change, so these two conjuncts ride along and only
+-- ever widen)
+INV? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+     → ℕ → ℕ → Sched Γ → EvalSt e → Bool
+INV? Ψ B sched st =
+  stBounded? B sched st
+  ∧ fnCapBounded? Ψ sched st
+  ∧ (length (EvalSt.registry st) ≤ᵇ B)
+  ∧ regsB? B Ψ (EvalSt.registry st)
+  ∧ (slotsSize (Sched.slots sched) ≤ᵇ B)
+  ∧ (slotsFnCap (Sched.slots sched) ≤ᵇ Ψ)
 
 -- in-flight bounds: the values a frame is fed, the events a burst
 -- carries
@@ -2725,15 +2747,38 @@ postulate
 ------------------------------------------------------------------
 
 postulate
-  subscribeE-walkS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ W : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  -- (W9) the node-install ring's fnCap face (mirror G7's
+  -- install-bounded), the μ-copy size bound (elimG substitutes the
+  -- closed μ at ≤ sizeᵉ body var positions), and the two
+  -- state-manipulation clauses of the walk (input touches
+  -- slots/registry/completed-latches across five sub-shapes;
+  -- deferᵉ mints a live hop carrying its body as the pending value
+  -- — both consume only INV?'s slots conjuncts + the register/
+  -- install ring, no recursion)
+  install-fnCap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ : ℕ)
+    (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →
+    fnCapNode Ψ ns ≡ true → fnCapBounded? Ψ sched st ≡ true →
+    fnCapBounded? Ψ sched (installNode nid ns st) ≡ true
+  size-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+    sizeᵉ (unfoldμ body) ≤ sizeᵉ (μᵉ body) * sizeᵉ (μᵉ body)
+  subscribeE-input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (Ψ W : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
     2 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
-    sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
     pathB? (capᴱ W E) Ψ κ ≡ true →
-    let r = subscribeE g b κ id now sched st
+    let r = subscribeE g (input i) κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+  subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (Ψ W : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    2 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ body ≤ capᴱ W E → fnCapᵉ body ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    let r = subscribeE g (deferᵉ body) κ id now sched st
     in Σ ℕ λ E′ → (E ≤ E′)
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
@@ -2875,9 +2920,35 @@ applyFn-fnCap : ∀ {n} {Γ : Ctx n} {s t} (Ψ : ℕ)
   fnCapᵛ t (applyFn fn v) ≤ Ψ
 applyFn-fnCap Ψ fn v hv hfn = fnCap-evalWith Ψ fn (v ∷ᵃ []ᵃ) (hv , tt) hfn
 
+-- the closed-eval face of the ledger rule (of-elements, scan seeds,
+-- take counts): same collapse as evalStep-cap over the empty env
+evalTm-cap : ∀ {n} {Γ : Ctx n} {t} (Ψ W E : ℕ) (tm : Tm Γ [] [] [] t) →
+  2 ≤ E → caseWᵗ tm ≤ Ψ → sizeᵗ tm ≤ capᴱ W E →
+  sizeᵛ t (evalTm tm) ≤ capᴱ W (E * 3 ^ suc Ψ)
+evalTm-cap Ψ W E tm 2≤E w≤Ψ hsz =
+  ≤-trans (evalWith-sharp (capᴱ W E) tm []ᵃ tt hsz)
+  (≤-trans (*-mono-≤ hsz (^-monoˡ-≤ (3 ^ caseWᵗ tm) (grow-pow W E)))
+  (≤-trans (≤-reflexive collapse)
+           (capᴱ-mono W (ledger-step E (caseWᵗ tm) Ψ 2≤E w≤Ψ))))
+  where
+  collapse : capᴱ W E * ((2 + 2 * W) ^ (E + 2)) ^ (3 ^ caseWᵗ tm)
+           ≡ capᴱ W (E + (E + 2) * 3 ^ caseWᵗ tm)
+  collapse =
+    trans (cong (capᴱ W E *_)
+            (^-*-assoc (2 + 2 * W) (E + 2) (3 ^ caseWᵗ tm)))
+          (sym (^-distribˡ-+-* (2 + 2 * W) E ((E + 2) * 3 ^ caseWᵗ tm)))
+
 E≤E*3^ : ∀ (E k : ℕ) → E ≤ E * 3 ^ k
 E≤E*3^ E k = ≤-trans (≤-reflexive (sym (*-identityʳ E)))
                      (*-monoʳ-≤ E (one≤3^ k))
+
+2≤capᴱ : ∀ (W : ℕ) {E : ℕ} → 1 ≤ E → 2 ≤ capᴱ W E
+2≤capᴱ W h = ≤-trans (2≤C W) (pow1 W h)
+
+capᴱ-square : ∀ (W E : ℕ) → capᴱ W (2 * E) ≡ capᴱ W E * capᴱ W E
+capᴱ-square W E =
+  trans (cong ((2 + 2 * W) ^_) (cong (E +_) (+-identityʳ E)))
+        (^-distribˡ-+-* (2 + 2 * W) E E)
 
 -- the invariant only ever needs widening upward in B (Ψ is fixed):
 -- proven legs (stBounded-widen, ≤ᵇ-widen) + the regsB? leg (W7)
@@ -2888,11 +2959,14 @@ INV?-widen {Ψ = Ψ} {B} {B′} sched st le inv
   with ∧-true (stBounded? B sched st) _ inv
 ... | sb , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
 ... | fc , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r2
-... | rl , rb =
+... | rl , r3 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r3
+... | rb , r4 with ∧-true (slotsSize (Sched.slots sched) ≤ᵇ B) _ r4
+... | ss , sf =
   ∧-intro (stBounded-widen le sched st sb)
   (∧-intro fc
   (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) le rl)
-           (regsB?-widen (EvalSt.registry st) le rb)))
+  (∧-intro (regsB?-widen (EvalSt.registry st) le rb)
+  (∧-intro (≤ᵇ-widen (slotsSize (Sched.slots sched)) le ss) sf))))
 
 -- map's whole value list through one eval edge
 map-applyFn-B : ∀ {n} {Γ : Ctx n} {s u} (Ψ W E : ℕ)
@@ -2913,6 +2987,82 @@ map-applyFn-B {s = s} {u = u} Ψ W E fn 2≤E cap sz (v ∷ vs) h
       (T⇒≡true _ (≤⇒≤ᵇ (applyFn-fnCap Ψ fn v
         (≤ᵇ⇒≤ _ _ (T-to hcap)) cap))))
     (map-applyFn-B Ψ W E fn 2≤E cap sz vs hvs)
+
+-- installing a node whose state is bounded on both faces preserves
+-- the whole invariant (only the nodes field changes)
+install-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →
+  boundedNode B ns ≡ true → fnCapNode Ψ ns ≡ true →
+  INV? Ψ B sched st ≡ true → INV? Ψ B sched (installNode nid ns st) ≡ true
+install-INV {Γ = Γ} Ψ B sched st nid ns bn fnn inv
+  with ∧-true (stBounded? B sched st) _ inv
+... | sb , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | fc , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r2
+... | rl , r3 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r3
+... | rb , r4 =
+  ∧-intro (install-bounded B sched st nid ns bn sb)
+  (∧-intro (install-fnCap Ψ sched st nid ns fnn fc)
+  (∧-intro rl (∧-intro rb r4)))
+
+-- registering a chain: the registry grows by ONE entry — the length
+-- rider pays one ×2 ledger edge (B+1 ≤ B·B = capᴱ (2E)), the new
+-- path is bounded by hypothesis, everything else is untouched
+register-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W E : ℕ) (src : Source) (κ : Path Γ u t)
+  (sched : Sched Γ) (st : EvalSt e) → 1 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  INV? Ψ (capᴱ W (2 * E)) sched (register src κ st) ≡ true
+register-INV {u = u} Ψ W E src κ sched st 1≤E inv pκ
+  with ∧-true (stBounded? (capᴱ W E) sched st) _ inv
+... | sb , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | fc , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ capᴱ W E) _ r2
+... | rl , r3 with ∧-true (regsB? (capᴱ W E) Ψ (EvalSt.registry st)) _ r3
+... | rb , r4 with ∧-true (slotsSize (Sched.slots sched) ≤ᵇ capᴱ W E) _ r4
+... | ss , sf =
+  ∧-intro (stBounded-widen cap≤ sched st sb)
+  (∧-intro fc
+  (∧-intro lenOK
+  (∧-intro regOK
+  (∧-intro (≤ᵇ-widen (slotsSize (Sched.slots sched)) cap≤ ss) sf))))
+  where
+  E≤2E = m≤m+n E (E + 0)
+  cap≤ = capᴱ-mono W E≤2E
+  1≤B  = ≤-trans (s≤s z≤n) (2≤capᴱ W 1≤E)
+  lenOK : (length (EvalSt.registry st
+                   ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
+           ≤ᵇ capᴱ W (2 * E)) ≡ true
+  lenOK = T⇒≡true _ (≤⇒≤ᵇ (
+    ≤-trans (≤-reflexive (length-++ (EvalSt.registry st)))
+    (≤-trans (+-monoˡ-≤ 1 (≤ᵇ⇒≤ _ _ (T-to rl)))
+    (≤-trans (+-monoʳ-≤ (capᴱ W E) 1≤B)
+    (≤-trans (m+n≤m*n (2≤capᴱ W 1≤E) (2≤capᴱ W 1≤E))
+             (≤-reflexive (sym (capᴱ-square W E))))))))
+  regOK : regsB? (capᴱ W (2 * E)) Ψ
+            (EvalSt.registry st
+             ++ (EvalSt.nextReg st , src , u , κ) ∷ []) ≡ true
+  regOK = all-++-intro _ (EvalSt.registry st) _
+            (regsB?-widen (EvalSt.registry st) cap≤ rb)
+            (∧-intro (pathB?-widen κ cap≤ pκ) refl)
+
+-- of-list literals through the closed-eval ledger edge, elementwise
+ofVals-B : ∀ {n} {Γ : Ctx n} {u} (Ψ W E : ℕ) → 2 ≤ E →
+  (ts : List (Tm Γ [] [] [] u)) →
+  sizeᵗˢ ts ≤ capᴱ W E → fnCapᵗˢ ts ≤ Ψ →
+  all (valB? (capᴱ W (E * 3 ^ suc Ψ)) Ψ u) (map (λ tm → evalTm tm) ts) ≡ true
+ofVals-B Ψ W E 2≤E [] hsz hfc = refl
+ofVals-B {u = u} Ψ W E 2≤E (y ∷ ys) hsz hfc =
+  ∧-intro
+    (∧-intro
+      (T⇒≡true _ (≤⇒≤ᵇ (evalTm-cap Ψ W E y 2≤E
+        (≤-trans (m≤m⊔n (caseWᵗ y) (fnCapᵗ y))
+                 (≤-trans (m≤m⊔n _ (fnCapᵗˢ ys)) hfc))
+        (≤-trans (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)) hsz))))
+      (T⇒≡true _ (≤⇒≤ᵇ (fnCap-evalWith Ψ y []ᵃ tt
+        (≤-trans (m≤m⊔n _ (fnCapᵗˢ ys)) hfc)))))
+    (ofVals-B Ψ W E 2≤E ys
+      (≤-trans (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)) hsz)
+      (≤-trans (m≤n⊔m _ (fnCapᵗˢ ys)) hfc))
 
 ------------------------------------------------------------------
 -- stepFrame-wet, now a REAL dispatch: the map clause proven end to
@@ -3036,6 +3186,226 @@ pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
           (finList-B (capᴱ W E₂) Ψ (proj₁ (proj₂ (proj₂ step))))))
 
   outAll = ∧-intro headOK restB
+
+------------------------------------------------------------------
+-- subscribeE-walkS, THE REAL INDUCTION: the store half of the wet
+-- contract ground through the machine's clauses, lexicographic on
+-- (gas, expression) exactly as the machine recurses.  Eleven of the
+-- thirteen clauses are proven here (of/empty one-shots pay one eval
+-- edge; map/take/scan/the four *Alls thread install-INV/register
+-- rings, the IH and pushBurst-wet; μ pays the ×2 copy edge against
+-- size-unfoldμ with shells/caps carried by elimG-invariance; varᵉ
+-- is absurd); input and deferᵉ delegate to their named W9 cores.
+------------------------------------------------------------------
+
+subscribeE-walkS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  2 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = subscribeE g b κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+-- the shared *All shape: mint, install (bounded on both faces),
+-- subscribe under the thru-outer frame, push the burst — proven
+-- once, consumed by all four *All clauses
+subscribeAll-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  2 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  boundedNode (capᴱ W E) ns ≡ true → fnCapNode Ψ ns ≡ true →
+  sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = subscribeAll g op ns b κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+subscribeAll-wet Ψ W g op ns b κ id now sched st E 2≤E inv bn fnn szB fcB pB =
+  E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , b₂
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns st
+  inv₀   = install-INV Ψ (capᴱ W E) sched₁ st nid ns bn fnn inv
+  sE      = subscribeE g b (thru-outer op nid ↠ κ) id now sched₁ st₀
+  IH     = subscribeE-walkS Ψ W g b (thru-outer op nid ↠ κ) id now
+             sched₁ st₀ E 2≤E inv₀ szB fcB (∧-intro refl pB)
+  E₁     = proj₁ IH
+  E≤E₁   = proj₁ (proj₂ IH)
+  inv₁   = proj₁ (proj₂ (proj₂ IH))
+  bB₁    = proj₂ (proj₂ (proj₂ IH))
+  cap₁   = capᴱ-mono W E≤E₁
+  PB     = pushBurst-wet Ψ W g id now (thru-outer op nid) κ (proj₁ sE)
+             (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁
+             (≤-trans 2≤E E≤E₁) inv₁ refl (pathB?-widen κ cap₁ pB) bB₁
+  E₂     = proj₁ PB
+  E₁≤E₂  = proj₁ (proj₂ PB)
+  inv₂   = proj₁ (proj₂ (proj₂ PB))
+  b₂     = proj₂ (proj₂ (proj₂ PB))
+
+subscribeE-walkS Ψ W g (input i) κ id now sched st E 2≤E inv szB fcB pB =
+  subscribeE-input-wet Ψ W g i κ id now sched st E 2≤E inv pB
+
+subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (ofᵉ ts) κ id now sched st E 2≤E inv szB fcB pB =
+  E * 3 ^ suc Ψ , E≤E*3^ E (suc Ψ) ,
+  INV?-widen (record sched { nextSource = suc (Sched.nextSource sched) }) st
+    (capᴱ-mono W (E≤E*3^ E (suc Ψ))) inv ,
+  ∧-intro
+    (∧-intro refl
+      (all-++-intro _ (map value (map (λ tm → evalTm tm) ts)) _
+        (mapValue-B (capᴱ W (E * 3 ^ suc Ψ)) Ψ u (map (λ tm → evalTm tm) ts)
+          (ofVals-B Ψ W E 2≤E ts (≤-trans (n≤1+n (sizeᵗˢ ts)) szB) fcB))
+        refl))
+    refl
+
+subscribeE-walkS Ψ W g emptyᵉ κ id now sched st E 2≤E inv szB fcB pB =
+  E , ≤-refl , inv , refl
+
+subscribeE-walkS Ψ W g (mapᵉ f b) κ id now sched st E 2≤E inv szB fcB pB =
+  E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , b₂
+  where
+  szf  = ≤-trans (≤-trans (m≤m+n (sizeᵗ f) (sizeᵉ b)) (n≤1+n _)) szB
+  szb  = ≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f)) (n≤1+n _)) szB
+  capf = ≤-trans (m≤m⊔n (caseWᵗ f ⊔ fnCapᵗ f) (fnCapᵉ b)) fcB
+  fcb  = ≤-trans (m≤n⊔m (caseWᵗ f ⊔ fnCapᵗ f) (fnCapᵉ b)) fcB
+  fB   : frameB? (capᴱ W E) Ψ (map-f f) ≡ true
+  fB   = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ szf)) (T⇒≡true _ (≤⇒≤ᵇ capf))
+  sE    = subscribeE g b (map-f f ↠ κ) id now sched st
+  IH   = subscribeE-walkS Ψ W g b (map-f f ↠ κ) id now sched st E 2≤E inv
+           szb fcb (∧-intro fB pB)
+  E₁   = proj₁ IH
+  E≤E₁ = proj₁ (proj₂ IH)
+  inv₁ = proj₁ (proj₂ (proj₂ IH))
+  bB₁  = proj₂ (proj₂ (proj₂ IH))
+  cap₁ = capᴱ-mono W E≤E₁
+  PB   = pushBurst-wet Ψ W g id now (map-f f) κ (proj₁ sE)
+           (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁ (≤-trans 2≤E E≤E₁)
+           inv₁ (frameB?-widen (map-f f) cap₁ fB) (pathB?-widen κ cap₁ pB) bB₁
+  E₂   = proj₁ PB
+  E₁≤E₂ = proj₁ (proj₂ PB)
+  inv₂ = proj₁ (proj₂ (proj₂ PB))
+  b₂   = proj₂ (proj₂ (proj₂ PB))
+
+subscribeE-walkS Ψ W g (takeᵉ count b) κ id now sched st E 2≤E inv szB fcB pB
+  with evalTm count
+... | zero  = E , ≤-refl , inv , refl
+... | suc k = E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , b₂
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (take-st (suc k)) st
+  szb    = ≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ count)) (n≤1+n _)) szB
+  fcb    = ≤-trans (m≤n⊔m (caseWᵗ count ⊔ fnCapᵗ count) (fnCapᵉ b)) fcB
+  inv₀   = install-INV Ψ (capᴱ W E) sched₁ st nid (take-st (suc k)) refl refl inv
+  sE      = subscribeE g b (take-f nid ↠ κ) id now sched₁ st₀
+  IH     = subscribeE-walkS Ψ W g b (take-f nid ↠ κ) id now sched₁ st₀ E 2≤E
+             inv₀ szb fcb (∧-intro refl pB)
+  E₁     = proj₁ IH
+  E≤E₁   = proj₁ (proj₂ IH)
+  inv₁   = proj₁ (proj₂ (proj₂ IH))
+  bB₁    = proj₂ (proj₂ (proj₂ IH))
+  cap₁   = capᴱ-mono W E≤E₁
+  PB     = pushBurst-wet Ψ W g id now (take-f nid) κ (proj₁ sE)
+             (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁
+             (≤-trans 2≤E E≤E₁) inv₁ refl (pathB?-widen κ cap₁ pB) bB₁
+  E₂     = proj₁ PB
+  E₁≤E₂  = proj₁ (proj₂ PB)
+  inv₂   = proj₁ (proj₂ (proj₂ PB))
+  b₂     = proj₂ (proj₂ (proj₂ PB))
+
+subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 2≤E inv szB fcB pB =
+  E₃ , ≤-trans E≤E₁ (≤-trans E₁≤E₂ E₂≤E₃) , inv₃ , b₃
+  where
+  E₁    = E * 3 ^ suc Ψ
+  E≤E₁  = E≤E*3^ E (suc Ψ)
+  2≤E₁  = ≤-trans 2≤E E≤E₁
+  cap₁  = capᴱ-mono W E≤E₁
+  nid    = Sched.nextNode sched
+  sched₁ = proj₂ (mintNode sched)
+  -- caps out of fnCapᵉ (scanᵉ f z b) = F ⊔ (Z ⊔ R)
+  capf  = ≤-trans (m≤m⊔n (caseWᵗ f ⊔ fnCapᵗ f) _) fcB
+  capz  : caseWᵗ z ⊔ fnCapᵗ z ≤ Ψ
+  capz  = ≤-trans (m≤m⊔n (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ b))
+            (≤-trans (m≤n⊔m (caseWᵗ f ⊔ fnCapᵗ f) _) fcB)
+  fcb   = ≤-trans (m≤n⊔m (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ b))
+            (≤-trans (m≤n⊔m (caseWᵗ f ⊔ fnCapᵗ f) _) fcB)
+  -- sizes out of sizeᵉ (scanᵉ f z b) = suc (sizeᵗ f + sizeᵗ z + sizeᵉ b)
+  szf   = ≤-trans (≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z))
+                   (≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b)) (n≤1+n _))) szB
+  szz   = ≤-trans (≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f))
+                   (≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b)) (n≤1+n _))) szB
+  szb   = ≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f + sizeᵗ z)) (n≤1+n _)) szB
+  -- the seed's install pays one eval edge
+  seedB = evalTm-cap Ψ W E z 2≤E
+            (≤-trans (m≤m⊔n (caseWᵗ z) (fnCapᵗ z)) capz) szz
+  seedF = fnCap-evalWith Ψ z []ᵃ tt capz
+  st₀   = installNode nid (scan-st (evalTm z)) st
+  inv₀  = install-INV Ψ (capᴱ W E₁) sched₁ st nid (scan-st (evalTm z))
+            (T⇒≡true _ (≤⇒≤ᵇ seedB)) (T⇒≡true _ (≤⇒≤ᵇ seedF))
+            (INV?-widen sched₁ st cap₁ inv)
+  fB₁   : frameB? (capᴱ W E₁) Ψ (scan-f f nid) ≡ true
+  fB₁   = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans szf cap₁)))
+                  (T⇒≡true _ (≤⇒≤ᵇ capf))
+  sE     = subscribeE g b (scan-f f nid ↠ κ) id now sched₁ st₀
+  IH    = subscribeE-walkS Ψ W g b (scan-f f nid ↠ κ) id now sched₁ st₀ E₁
+            2≤E₁ inv₀ (≤-trans szb cap₁) fcb
+            (∧-intro fB₁ (pathB?-widen κ cap₁ pB))
+  E₂    = proj₁ IH
+  E₁≤E₂ = proj₁ (proj₂ IH)
+  inv₂  = proj₁ (proj₂ (proj₂ IH))
+  bB₂   = proj₂ (proj₂ (proj₂ IH))
+  cap₂  = capᴱ-mono W E₁≤E₂
+  PB    = pushBurst-wet Ψ W g id now (scan-f f nid) κ (proj₁ sE)
+            (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₂
+            (≤-trans 2≤E₁ E₁≤E₂) inv₂ (frameB?-widen (scan-f f nid) cap₂ fB₁)
+            (pathB?-widen κ (capᴱ-mono W (≤-trans E≤E₁ E₁≤E₂)) pB) bB₂
+  E₃    = proj₁ PB
+  E₂≤E₃ = proj₁ (proj₂ PB)
+  inv₃  = proj₁ (proj₂ (proj₂ PB))
+  b₃    = proj₂ (proj₂ (proj₂ PB))
+
+subscribeE-walkS Ψ W g (mergeAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+  subscribeAll-wet Ψ W g mergeᵒ (merge-st 0 false) b κ id now sched st E
+    2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+subscribeE-walkS {u = u} Ψ W g (concatAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+  subscribeAll-wet Ψ W g concatᵒ (concat-st {t = u} [] false false) b κ id now
+    sched st E 2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+subscribeE-walkS Ψ W g (switchAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+  subscribeAll-wet Ψ W g switchᵒ (switch-st nothing false) b κ id now sched st E
+    2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+subscribeE-walkS Ψ W g (exhaustAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+  subscribeAll-wet Ψ W g exhaustᵒ (exhaust-st false false) b κ id now sched st E
+    2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+
+subscribeE-walkS Ψ W g0 (μᵉ body) κ id now sched st E 2≤E inv szB fcB pB =
+  E , ≤-refl , inv , refl
+subscribeE-walkS Ψ W (gs fuel) (μᵉ body) κ id now sched st E 2≤E inv szB fcB pB =
+  proj₁ IH , ≤-trans E≤2E (proj₁ (proj₂ IH)) ,
+  proj₁ (proj₂ (proj₂ IH)) , proj₂ (proj₂ (proj₂ IH))
+  where
+  E≤2E = m≤m+n E (E + 0)
+  cap2 = capᴱ-mono W E≤2E
+  szU  : sizeᵉ (unfoldμ body) ≤ capᴱ W (2 * E)
+  szU  = ≤-trans (size-unfoldμ body)
+         (≤-trans (*-mono-≤ szB szB) (≤-reflexive (sym (capᴱ-square W E))))
+  fcU  : fnCapᵉ (unfoldμ body) ≤ Ψ
+  fcU  = ≤-trans (fnCap-elimG (here refl) (μᵉ body) body) (⊔-lub fcB fcB)
+  IH   = subscribeE-walkS Ψ W fuel (unfoldμ body) κ id now sched st (2 * E)
+           (≤-trans 2≤E E≤2E) (INV?-widen sched st cap2 inv) szU fcU
+           (pathB?-widen κ cap2 pB)
+
+subscribeE-walkS Ψ W g (varᵉ ()) κ id now sched st E 2≤E inv szB fcB pB
+
+subscribeE-walkS Ψ W g (deferᵉ body) κ id now sched st E 2≤E inv szB fcB pB =
+  subscribeE-defer-wet Ψ W g body κ id now sched st E 2≤E inv
+    (≤-trans (n≤1+n (sizeᵉ body)) szB) fcB pB
 
 ------------------------------------------------------------------
 -- THE FOLD DECOMPOSITION, PROVEN: cascadeGo threads the walk
