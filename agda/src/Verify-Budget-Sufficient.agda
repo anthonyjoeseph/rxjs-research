@@ -2830,19 +2830,65 @@ EnvFnCap : ∀ {n} {Γ : Ctx n} {Θ} (Ψ : ℕ) → All (Val Γ) Θ → Set
 EnvFnCap Ψ []ᵃ                = ⊤
 EnvFnCap Ψ (_∷ᵃ_ {x = t} v σ) = (fnCapᵛ t v ≤ Ψ) × EnvFnCap Ψ σ
 
-postulate
-  -- (W1) caseW is renaming- and substitution-INVARIANT: reify
-  -- images weigh 0 (they contain no caseᵗ), and subΘ rewrites only
-  -- var positions — mirror shellSize-ren / shellSize-subΘ exactly
-  caseW-ren : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
-    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
-    (tm : Tm Γ Δᵍ Δ Θ t) → caseWᵗ (renTm ρg ρd ρt tm) ≡ caseWᵗ tm
-  caseW-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
-    caseWᵗ (reify v) ≡ 0
-  caseW-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    caseWᵗ (subΘTm Θloc σ tm) ≡ caseWᵗ tm
+-- (W1) caseW is renaming- and substitution-INVARIANT: reify images weigh 0
+-- (they contain no caseᵗ), and subΘ rewrites only var positions — a
+-- structural induction over Tm (caseWᵗ ignores the Exp under strmᵗ, so no
+-- mutual recursion is needed), mirroring shellSize-ren / shellSize-subΘ.
+caseW-ren : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+  (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+  (tm : Tm Γ Δᵍ Δ Θ t) → caseWᵗ (renTm ρg ρd ρt tm) ≡ caseWᵗ tm
+caseW-ren ρg ρd ρt (varᵗ x)      = refl
+caseW-ren ρg ρd ρt unit̂          = refl
+caseW-ren ρg ρd ρt (bool̂ _)      = refl
+caseW-ren ρg ρd ρt (nat̂ _)       = refl
+caseW-ren ρg ρd ρt (pairᵗ a b)   = cong₂ _+_ (caseW-ren ρg ρd ρt a) (caseW-ren ρg ρd ρt b)
+caseW-ren ρg ρd ρt (fstᵗ p)      = caseW-ren ρg ρd ρt p
+caseW-ren ρg ρd ρt (sndᵗ p)      = caseW-ren ρg ρd ρt p
+caseW-ren ρg ρd ρt (inlᵗ a)      = caseW-ren ρg ρd ρt a
+caseW-ren ρg ρd ρt (inrᵗ a)      = caseW-ren ρg ρd ρt a
+caseW-ren ρg ρd ρt (caseᵗ s l r) =
+  cong (2 +_) (cong₂ _+_ (cong₂ _+_ (caseW-ren ρg ρd ρt s) (caseW-ren ρg ρd (ext∈ ρt) l))
+                         (caseW-ren ρg ρd (ext∈ ρt) r))
+caseW-ren ρg ρd ρt (ifᵗ c a b)   =
+  cong₂ _+_ (cong₂ _+_ (caseW-ren ρg ρd ρt c) (caseW-ren ρg ρd ρt a)) (caseW-ren ρg ρd ρt b)
+caseW-ren ρg ρd ρt (primᵗ _ a)   = caseW-ren ρg ρd ρt a
+caseW-ren ρg ρd ρt (strmᵗ e)     = refl
 
+caseW-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  caseWᵗ (reify v) ≡ 0
+caseW-reify unitᵗ   _        = refl
+caseW-reify boolᵗ   _        = refl
+caseW-reify natᵗ    _        = refl
+caseW-reify (s ×ᵗ t) (a , b) = cong₂ _+_ (caseW-reify s a) (caseW-reify t b)
+caseW-reify (s +ᵗ t) (inj₁ a) = caseW-reify s a
+caseW-reify (s +ᵗ t) (inj₂ b) = caseW-reify t b
+caseW-reify (obs t)  e       = refl
+
+caseW-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+  caseWᵗ (subΘTm Θloc σ tm) ≡ caseWᵗ tm
+caseW-subΘ Θloc σ (varᵗ x) with ∈-++⁻ Θloc x
+... | inj₁ y = refl
+... | inj₂ z =
+  trans (caseW-ren (λ ()) (λ ()) (λ ()) (reify (lookupEnv σ z)))
+        (caseW-reify _ (lookupEnv σ z))
+caseW-subΘ Θloc σ unit̂         = refl
+caseW-subΘ Θloc σ (bool̂ _)     = refl
+caseW-subΘ Θloc σ (nat̂ _)      = refl
+caseW-subΘ Θloc σ (pairᵗ a b)  = cong₂ _+_ (caseW-subΘ Θloc σ a) (caseW-subΘ Θloc σ b)
+caseW-subΘ Θloc σ (fstᵗ p)     = caseW-subΘ Θloc σ p
+caseW-subΘ Θloc σ (sndᵗ p)     = caseW-subΘ Θloc σ p
+caseW-subΘ Θloc σ (inlᵗ a)     = caseW-subΘ Θloc σ a
+caseW-subΘ Θloc σ (inrᵗ a)     = caseW-subΘ Θloc σ a
+caseW-subΘ Θloc σ (caseᵗ {s = s} {t = t} sc l r) =
+  cong (2 +_) (cong₂ _+_ (cong₂ _+_ (caseW-subΘ Θloc σ sc) (caseW-subΘ (s ∷ Θloc) σ l))
+                         (caseW-subΘ (t ∷ Θloc) σ r))
+caseW-subΘ Θloc σ (ifᵗ c a b)  =
+  cong₂ _+_ (cong₂ _+_ (caseW-subΘ Θloc σ c) (caseW-subΘ Θloc σ a)) (caseW-subΘ Θloc σ b)
+caseW-subΘ Θloc σ (primᵗ _ a)  = caseW-subΘ Θloc σ a
+caseW-subΘ Θloc σ (strmᵗ e)    = refl
+
+postulate
   -- (W2) fnCap closures: reification reads the value's own cap;
   -- substitution and μ-unfolding stay under the max of the pieces
   -- (max-shaped inductions, all clause-homomorphic)
