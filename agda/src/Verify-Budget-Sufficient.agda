@@ -2425,7 +2425,12 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     executed.  The uniform rule stays true and is what the
 --     preservation grind below uses; the boundary consumes the
 --     mixed form, whose F needs the a-priori anchor — CLOSED
---     2026-07-24: see (5) THE WIDTH LEDGER below.
+--     2026-07-24: see (5) THE WIDTH LEDGER below.  SUPERSEDED
+--     (same day, the dry-half session): the joint face's receipt
+--     (E′ ≤ E·3^(suc Ψ·walkCap), subscribeE-walk) anchors the
+--     whole walk's spend a priori, so the boundary consumes THAT
+--     directly — no per-fold count, uniform or mixed, global or
+--     per-lineage, is needed at all.
 --
 -- (4) THE REGISTRY (the fold-threading design block).  INV?
 --     extends stBounded? with: fnCap-boundedness of every store
@@ -2523,10 +2528,18 @@ evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 --     lengths) in one hypothesis block under one ceiling; its
 --     clause grind extends the ground walkS clauses conjunct by
 --     conjunct, consuming W11 for hop targets and hasAtLeast-peel
---     against dBound-μ/-hop/-connect for the fuel; (c) the
---     lineage-indexed mixed receipt composing (2)'s receipts along
---     lineages instead of globally; (d) the landing: 𝔉 into the
---     boundary, replacing the two cores' landing halves.
+--     against dBound-μ/-hop/-connect for the fuel; (c) RETIRED —
+--     the face's receipt anchors the spend a priori, so no
+--     lineage-indexed (or any per-fold) receipt is needed; (d) the
+--     landing: instantiate the face at the root with V =
+--     sizeBudgetAt (suc id) and discharge the ceiling by the
+--     story-count arithmetic above (this WILL need the height-
+--     multiplier bump and its matching gas-tower bump), the fuel
+--     seed by budget-hasAtLeast, and the Ω/ℓ₀/regsLen? seeds at
+--     init — replacing the two cores' landing halves.  The
+--     instant-level (cascadeGo) joint face repeats this design at
+--     the chain fold, but is deliberately NOT stated until (b)'s
+--     grind confirms the subscribeE face survives contact.
 ------------------------------------------------------------------
 
 -- the eval-compounding weight: caseᵗ nodes only; strmᵗ is a leaf
