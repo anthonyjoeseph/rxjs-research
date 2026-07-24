@@ -120,6 +120,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
                                 subscribeInner; chainStep;
+                                splitEvents; retagEvents;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
@@ -2676,16 +2677,41 @@ burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
 burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 
 postulate
-  -- (W7) all four in-flight predicates only ever need widening
+  -- (W7) all the in-flight predicates only ever need widening
   -- upward (≤ᵇ-widen through all, mirror boundedLive-widen)
   valB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty) (v : Val Γ u) →
     B ≤ B′ → valB? B Ψ u v ≡ true → valB? B′ Ψ u v ≡ true
+  valsB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty)
+    (vs : List (Val Γ u)) → B ≤ B′ →
+    all (valB? B Ψ u) vs ≡ true → all (valB? B′ Ψ u) vs ≡ true
   burstB?-widen : ∀ {n} {Γ : Ctx n} {u} {B B′ Ψ : ℕ} (str : Stream Γ u) →
     B ≤ B′ → burstB? B Ψ str ≡ true → burstB? B′ Ψ str ≡ true
+  frameB?-widen : ∀ {n} {Γ : Ctx n} {s u} {B B′ Ψ : ℕ} (f : Frame Γ s u) →
+    B ≤ B′ → frameB? B Ψ f ≡ true → frameB? B′ Ψ f ≡ true
+  pathB?-widen : ∀ {n} {Γ : Ctx n} {s t} {B B′ Ψ : ℕ} (p : Path Γ s t) →
+    B ≤ B′ → pathB? B Ψ p ≡ true → pathB? B′ Ψ p ≡ true
   chainsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ} {s : Ty}
     (chains : List (RegId × Path Γ s t)) → B ≤ B′ →
     all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
     all (λ rc → pathB? B′ Ψ (proj₂ rc)) chains ≡ true
+
+  -- (W8) burst plumbing: splitting a bounded emit yields bounded
+  -- values; the bookkeeping side and retag images are value-free,
+  -- so any bound covers them; wrapping bounded values back into
+  -- events is pointwise (all list inductions)
+  splitEvents-vals-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ)
+    (es : List (InstEvent (Val Γ s))) →
+    all (eventB? B Ψ) es ≡ true →
+    all (valB? B Ψ s) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+  splitEvents-bk-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ)
+    (es : List (InstEvent (Val Γ s))) →
+    all (eventB? B Ψ) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
+  retag-B : ∀ {n} {Γ : Ctx n} {u : Ty} {A : Set} (B Ψ : ℕ)
+    (es : List (InstEvent A)) →
+    all (eventB? B Ψ) (retagEvents {B = Val Γ u} es) ≡ true
+  mapValue-B : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+    all (valB? B Ψ u) vs ≡ true →
+    all (eventB? B Ψ) (map value vs) ≡ true
 
 ------------------------------------------------------------------
 -- the walk contracts, store half — the SHAPE the clause grind
@@ -2712,20 +2738,6 @@ postulate
        × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
        × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
 
-  pushBurst-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t) (ems : Stream Γ s)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    frameB? (capᴱ W E) Ψ f ≡ true →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    burstB? (capᴱ W E) Ψ ems ≡ true →
-    let r = pushBurst g id now f κ ems sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-
   subscribeE-walkS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (Ψ W : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick)
@@ -2751,6 +2763,87 @@ postulate
     in Σ ℕ λ E′ → (E ≤ E′)
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+-- the fin marker's event list is value-free either way
+finList-B : ∀ {n} {Γ : Ctx n} {u} (B Ψ : ℕ) (b : Bool) →
+  all (eventB? {n = n} {Γ = Γ} {u = u} B Ψ)
+      (if b then complete ∷ [] else []) ≡ true
+finList-B B Ψ true  = refl
+finList-B B Ψ false = refl
+
+------------------------------------------------------------------
+-- pushBurst-wet, PROVEN: the burst re-entry threads the walk
+-- invariant emit by emit over stepFrame-wet — the first of the
+-- mutual block's contracts discharged as a real induction (list
+-- induction on the burst; each emit splits, steps its frame at the
+-- current ledger position, and reassembles under widened bounds)
+------------------------------------------------------------------
+
+pushBurst-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t) (ems : Stream Γ s)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  2 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  frameB? (capᴱ W E) Ψ f ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  burstB? (capᴱ W E) Ψ ems ≡ true →
+  let r = pushBurst g id now f κ ems sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+pushBurst-wet Ψ W g id now f κ [] sched st E 2≤E inv fB pB bB =
+  E , ≤-refl , inv , refl
+pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
+              sched st E 2≤E inv fB pB bB =
+  E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , outAll
+  where
+  B₀    = capᴱ W E
+  sp    : List (Val Γ s) × List (InstEvent (Val Γ u)) × Bool
+  sp    = splitEvents (InstEmit.events em)
+  vals  = proj₁ sp
+  emB   = proj₁ (∧-true (all (eventB? B₀ Ψ) (InstEmit.events em)) _ bB)
+  emsB  = proj₂ (∧-true (all (eventB? B₀ Ψ) (InstEmit.events em)) _ bB)
+
+  step  = stepFrame g id now f κ vals (proj₂ (proj₂ sp)) sched st
+  W1    = stepFrame-wet Ψ W g id now f κ vals (proj₂ (proj₂ sp))
+            sched st E 2≤E inv fB pB
+            (splitEvents-vals-B B₀ Ψ (InstEmit.events em) emB)
+  E₁    = proj₁ W1
+  E≤E₁  = proj₁ (proj₂ W1)
+  inv₁  = proj₁ (proj₂ (proj₂ W1))
+  outB  = proj₁ (proj₂ (proj₂ (proj₂ W1)))
+  cap₁  = capᴱ-mono W E≤E₁
+
+  rec   = pushBurst-wet Ψ W g id now f κ ems
+            (proj₁ (proj₂ (proj₂ (proj₂ step))))
+            (proj₂ (proj₂ (proj₂ (proj₂ step))))
+            E₁ (≤-trans 2≤E E≤E₁) inv₁
+            (frameB?-widen f cap₁ fB) (pathB?-widen κ cap₁ pB)
+            (burstB?-widen ems cap₁ emsB)
+  E₂    = proj₁ rec
+  E₁≤E₂ = proj₁ (proj₂ rec)
+  inv₂  = proj₁ (proj₂ (proj₂ rec))
+  restB = proj₂ (proj₂ (proj₂ rec))
+  cap₂  = capᴱ-mono W E₁≤E₂
+
+  headOK : all (eventB? (capᴱ W E₂) Ψ)
+             (proj₁ (proj₂ sp)
+              ++ retagEvents (proj₁ (proj₂ step))
+              ++ map value (proj₁ step)
+              ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+           ≡ true
+  headOK =
+    all-++-intro _ (proj₁ (proj₂ sp)) _
+      (splitEvents-bk-B (capᴱ W E₂) Ψ (InstEmit.events em))
+      (all-++-intro _ (retagEvents (proj₁ (proj₂ step))) _
+        (retag-B (capᴱ W E₂) Ψ (proj₁ (proj₂ step)))
+        (all-++-intro _ (map value (proj₁ step)) _
+          (mapValue-B (capᴱ W E₂) Ψ u (proj₁ step)
+            (valsB?-widen u (proj₁ step) cap₂ outB))
+          (finList-B (capᴱ W E₂) Ψ (proj₁ (proj₂ (proj₂ step))))))
+
+  outAll = ∧-intro headOK restB
 
 ------------------------------------------------------------------
 -- THE FOLD DECOMPOSITION, PROVEN: cascadeGo threads the walk
