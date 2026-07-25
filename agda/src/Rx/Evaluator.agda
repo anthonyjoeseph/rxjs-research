@@ -836,6 +836,43 @@ subscribeAll fuel op initialState b κ id now sched st =
 -- latch completion forever — a post-completion subscriber sees only
 -- an immediate close/complete, because completion is re-observable
 -- and values are not
+-- the connect burst is retagged plumbing: it flows up the first
+-- subscriber's frames as real protocol traffic, but its
+-- registrations belong to the share (registered at share-sink,
+-- surviving the subscriber) — a downstream cut or join must not
+-- adopt them
+sharedPlumb : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Stream Γ u
+sharedPlumb = map (λ em → record em { kind = plumbing })
+
+-- the connect is a fuel decrement edge: the def d is a stored
+-- expression, structurally unrelated to the `input i` being
+-- subscribed.  Fuel is matched here, not at subscribeSharedSlot's
+-- branches: joining an already-connected share costs nothing.
+-- Lifted out of subscribeSharedSlot's where block so the budget
+-- proof can name it (as with takeVals / thruConsume / concatDrain)
+sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+              → Gas → (i : Fin n) → Closed Γ (lookup Γ i)
+              → Path Γ (lookup Γ i) t → Id → Tick
+              → Sched Γ → EvalSt e
+              → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
+sharedConnect g0 i d κ id now sched st = dryBurst id , sched , st
+sharedConnect (gs fuel′) i d κ id now sched st =
+  let st₁ = register (toℕ i) κ
+              (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+      (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) id now sched st₁
+      -- the def's connect burst flows up the first subscriber's own
+      -- frames (the returned burst); dispatch only serves arrivals
+  in if burstCompleted burst
+     then -- the def died inside its own connect burst: latch, and
+          -- this registration closes in the same instant
+          (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+             at id from toℕ i as subscribe) ∷ sharedPlumb burst)
+          , sched₁ ,
+          record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
+                     ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
+     else ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ sharedPlumb burst
+          , sched₁ , st₂
+
 subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                     → Gas → (i : Fin n) → Closed Γ (lookup Γ i)
                     → Path Γ (lookup Γ i) t → Id → Tick
@@ -850,38 +887,7 @@ subscribeSharedSlot {Γ = Γ} {e = e} fuel i d κ id now sched st =
   then -- live: join mid-flight, future values only
        ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
        , sched , register (toℕ i) κ st
-  else connect fuel
-  where
-  -- the connect burst is retagged plumbing: it flows up the first
-  -- subscriber's frames as real protocol traffic, but its
-  -- registrations belong to the share (registered at share-sink,
-  -- surviving the subscriber) — a downstream cut or join must not
-  -- adopt them
-  plumb : Stream Γ (lookup Γ i) → Stream Γ (lookup Γ i)
-  plumb = map (λ em → record em { kind = plumbing })
-
-  -- the connect is a fuel decrement edge: the def d is a stored
-  -- expression, structurally unrelated to the `input i` being
-  -- subscribed.  Fuel is matched here, not at the branches above:
-  -- joining a connected share costs nothing
-  connect : Gas → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
-  connect g0 = dryBurst id , sched , st
-  connect (gs fuel′) =
-    let st₁ = register (toℕ i) κ
-                (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
-        (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) id now sched st₁
-        -- the def's connect burst flows up the first subscriber's own
-        -- frames (the returned burst); dispatch only serves arrivals
-    in if burstCompleted burst
-       then -- the def died inside its own connect burst: latch, and
-            -- this registration closes in the same instant
-            (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
-               at id from toℕ i as subscribe) ∷ plumb burst)
-            , sched₁ ,
-            record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
-                       ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
-       else ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ plumb burst
-            , sched₁ , st₂
+  else sharedConnect fuel i d κ id now sched st
 
 subscribeE {Γ = Γ} fuel (input i) κ id now sched st with Sched.slots sched i
 ... | shared d = subscribeSharedSlot fuel i d κ id now sched st
