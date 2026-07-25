@@ -3212,9 +3212,10 @@ mutual
   fnCap-elimD x cl (varᵉ y)        with compare∈ x y
   ... | inj₁ refl = ≤-reflexive (fnCap-renᵉ (λ ()) (λ ()) (λ ()) cl)
   ... | inj₂ y′   = z≤n
-  fnCap-elimD x cl (deferᵉ e)      =
-    ≤-trans (≤-reflexive (fnCap-substᴱ (⊟-++ʳ x) (elimDExp (∈-++⁺ʳ _ x) cl e)))
-            (fnCap-elimD (∈-++⁺ʳ _ x) cl e)
+  fnCap-elimD {Δᵍ = Δᵍ} x cl (deferᵉ e) =
+    ≤-trans (≤-reflexive (fnCap-substᴱ (⊟-++ʳ {Δᵍ = Δᵍ} x)
+                                    (elimDExp (∈-++⁺ʳ Δᵍ x) cl e)))
+            (fnCap-elimD (∈-++⁺ʳ Δᵍ x) cl e)
 
   fnCap-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
     (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
@@ -3642,7 +3643,8 @@ scanVals-sharp : ∀ {n} {Γ : Ctx n} {s u} (W E : ℕ)
   × All (λ o → sizeᵛ u o ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
         (proj₁ (scanVals fn ac vs))
 scanVals-sharp {s = s} {u = u} W E fn ac [] 3≤E hfn hacc _ =
-  subst (λ e → sizeᵛ u ac ≤ capᴱ W e × All (λ o → sizeᵛ u o ≤ capᴱ W e) [])
+  subst (λ e → sizeᵛ u ac ≤ capᴱ W e
+               × All (λ o → sizeᵛ u o ≤ capᴱ W e) (proj₁ (scanVals fn ac [])))
     (sym (trans (cong (E *_) (cong (3 ^_) (trans (*-comm (suc (caseWᵗ fn)) 0) refl)))
                 (*-identityʳ E)))
     (hacc , []ᵃ)
@@ -4299,9 +4301,10 @@ mutual
   ofW-elimD x cl (varᵉ y)        with compare∈ x y
   ... | inj₁ refl = ≤-reflexive (ofW-renᵉ (λ ()) (λ ()) (λ ()) cl)
   ... | inj₂ y′   = z≤n
-  ofW-elimD x cl (deferᵉ e)      =
-    ≤-trans (≤-reflexive (ofW-substᴱ (⊟-++ʳ x) (elimDExp (∈-++⁺ʳ _ x) cl e)))
-            (ofW-elimD (∈-++⁺ʳ _ x) cl e)
+  ofW-elimD {Δᵍ = Δᵍ} x cl (deferᵉ e) =
+    ≤-trans (≤-reflexive (ofW-substᴱ (⊟-++ʳ {Δᵍ = Δᵍ} x)
+                                    (elimDExp (∈-++⁺ʳ Δᵍ x) cl e)))
+            (ofW-elimD (∈-++⁺ʳ Δᵍ x) cl e)
 
   ofW-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
     (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
@@ -4830,20 +4833,6 @@ size-unfoldμ body =
           (*-monoˡ-≤ (sizeᵉ (μᵉ body)) (n≤1+n (sizeᵉ body)))
 
 postulate
-  -- (W9) the input clause of the walk: it touches slots / registry /
-  -- completed-latches across five sub-shapes, and its `shared` shape
-  -- re-enters subscribeE on the stored def, so it lands in the walk's
-  -- gas-decreasing knot.  (The deferᵉ clause is PROVEN below.)
-  subscribeE-input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (Ψ W : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    let r = subscribeE g (input i) κ id now sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
   chainStep-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (Ψ W : ℕ) (id : Id) (a : Arrival Γ)
     (path : Path Γ (arrTy a) t)
@@ -5446,9 +5435,47 @@ thruWrap-wet Ψ B exhaustᵒ nid true vs bs sched st inv vB bB
 ... | just (concat-st _ _ _) = inv , vB , bB
 ... | just (switch-st _ _)   = inv , vB , bB
 
--- forward declarations: these three join subscribeE-walkS's clique
--- (thruConsume re-enters subscribeE through subscribeInner), so their
--- definitions live after the walk's own signature
+-- forward declarations: these join subscribeE-walkS's clique
+-- (thruConsume re-enters subscribeE through subscribeInner; the input
+-- clause re-enters it through a share's connect), so their definitions
+-- live after the walk's own signature
+subscribeE-input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = subscribeE g (input i) κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+sharedSlot-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ d ≤ capᴱ W E → fnCapᵉ d ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = subscribeSharedSlot g i d κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+sharedConnect-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ d ≤ capᴱ W E → fnCapᵉ d ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = sharedConnect g i d κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
 subscribeInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ W : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
   (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -5827,6 +5854,37 @@ latch-INV Ψ B src sched st inv
                                      (≤ᵇ⇒≤ _ _ (T-to rl)))))
   (∧-intro (dropSource-regs B Ψ src (EvalSt.registry st) rb) r4)))
 
+-- connectedShares is read by no conjunct of INV?, so latching a
+-- connect is invisible to the invariant (record eta does the work)
+connectShare-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (src : Source) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B sched
+    (record st { connectedShares = src ∷ EvalSt.connectedShares st }) ≡ true
+connectShare-INV Ψ B src sched st inv = inv
+
+-- the connect's two landings, factored out of sharedConnect's `if` so
+-- the caller can keep one where-block across both
+connectWrap-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ B : ℕ) (i : Fin n) (id : Id) (c : Bool)
+  (burst : Stream Γ (lookup Γ i)) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true → burstB? B Ψ burst ≡ true →
+  let r = if c
+          then (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+                  at id from toℕ i as subscribe) ∷ sharedPlumb burst)
+               , sched
+               , record st { registry = dropSource (toℕ i) (EvalSt.registry st)
+                           ; completedSources = toℕ i ∷ EvalSt.completedSources st }
+          else ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ sharedPlumb burst
+               , sched , st
+  in (INV? Ψ B (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? B Ψ (proj₁ r) ≡ true)
+connectWrap-wet Ψ B i id true  burst sched st inv bB =
+  latch-INV Ψ B (toℕ i) sched st inv ,
+  ∧-intro refl (sharedPlumb-B B Ψ burst bB)
+connectWrap-wet Ψ B i id false burst sched st inv bB =
+  inv , ∧-intro refl (sharedPlumb-B B Ψ burst bB)
+
 subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ W : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
@@ -6084,6 +6142,122 @@ subscribeE-walkS Ψ W g (deferᵉ body) κ id now sched st E 3≤E inv szB fcB p
     (≤-trans (n≤1+n (sizeᵉ body)) szB) fcB pB
 
 ------------------------------------------------------------------
+-- (W9) THE INPUT CLAUSE.  Five shapes over ONE slot.  INV? carries
+-- the slot VECTOR's size and weight as two sums; slotSize-at and
+-- slotFnCap-at cut out the single summand this subscription reads,
+-- and that is everything the clause knows about what it subscribes.
+-- Four shapes are pure state motion — a registration ring, a
+-- one-shot, a fresh cold anchor.  `shared` is the one that recurses:
+-- its connect walks the stored def, and THAT is the gas edge, so
+-- sharedSlot/sharedConnect join the walk's clique.
+------------------------------------------------------------------
+
+sharedSlot-wet Ψ W g i d κ id now sched st E 3≤E inv szd fcd pB
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+-- a share that already completed: completion is re-observable, values
+-- are not, so a late subscriber gets close/complete and registers nothing
+... | true  = E , ≤-refl , inv , refl
+... | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+-- already connected: join mid-flight, one registration, no ledger walk
+...   | true  = 2 * E , m≤m+n E (E + 0) ,
+                register-INV Ψ W E (toℕ i) κ sched st
+                  (≤-trans (s≤s z≤n) 3≤E) inv pB ,
+                refl
+...   | false = sharedConnect-wet Ψ W g i d κ id now sched st E
+                  3≤E inv szd fcd pB
+
+-- out of fuel: the dry stub carries a lone close and moves nothing
+sharedConnect-wet Ψ W g0 i d κ id now sched st E 3≤E inv szd fcd pB =
+  E , ≤-refl , inv , refl
+sharedConnect-wet Ψ W (gs fuel) i d κ id now sched st E 3≤E inv szd fcd pB =
+  E₂ , E≤E₂ , proj₁ WR , proj₂ WR
+  where
+  E≤2E  = m≤m+n E (E + 0)
+  cap2  = capᴱ-mono W E≤2E
+  -- the share owns its registration: it is planted at share-sink
+  -- BEFORE the def is walked, so the def's own connect burst sees it
+  st₀   = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
+  st₁   = register (toℕ i) κ st₀
+  inv₁  = register-INV Ψ W E (toℕ i) κ sched st₀ (≤-trans (s≤s z≤n) 3≤E)
+            (connectShare-INV Ψ (capᴱ W E) (toℕ i) sched st inv) pB
+  -- the gas edge: d is a STORED expression, structurally unrelated to
+  -- the `input i` being subscribed, so only the fuel decreases here
+  IH    = subscribeE-walkS Ψ W fuel d (share-sink i) id now sched st₁ (2 * E)
+            (≤-trans 3≤E E≤2E) inv₁ (≤-trans szd cap2) fcd refl
+  E₂    = proj₁ IH
+  E≤E₂  = ≤-trans E≤2E (proj₁ (proj₂ IH))
+  inv₂  = proj₁ (proj₂ (proj₂ IH))
+  bB₂   = proj₂ (proj₂ (proj₂ IH))
+  SE    = subscribeE fuel d (share-sink i) id now sched st₁
+  WR    = connectWrap-wet Ψ (capᴱ W E₂) i id (burstCompleted (proj₁ SE))
+            (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)) inv₂ bB₂
+
+subscribeE-input-wet {Γ = Γ} Ψ W g i κ id now sched st E 3≤E inv pB
+  with Sched.slots sched i
+     | slotSize-at Ψ (capᴱ W E) i sched st inv
+     | slotFnCap-at Ψ (capᴱ W E) i sched st inv
+
+-- a shared def: connect once, ever; then join
+... | shared d | szd | fcd =
+      sharedSlot-wet Ψ W g i d κ id now sched st E 3≤E inv szd fcd pB
+
+-- a cold with no async tail: born and spent inside its own burst —
+-- nothing registered, nothing scheduled, one ledger-free one-shot
+... | scripted (cold sy []) | szs | fcs =
+      E , ≤-refl , inv ,
+      ∧-intro
+        (all-++-intro _ (map value sy) _
+          (mapValue-B (capᴱ W E) Ψ (lookup Γ i) sy
+            (sumVals-B (capᴱ W E) Ψ (lookup Γ i) sy
+              (≤-trans (≤-trans (m≤m+n _ 0) (n≤1+n _)) szs)
+              (≤-trans (m≤m+n _ 0) fcs)))
+          refl)
+        refl
+
+-- a cold WITH a tail: per-subscription anchoring — a fresh source and
+-- ordinal, the tail resolved against this subscription's tick, one
+-- registration.  resolve only RETIMES, so both slot bounds ride through
+... | scripted (cold sy (a ∷ as)) | szs | fcs =
+      2 * E , E≤2E ,
+      register-INV Ψ W E src κ sched₃ st (≤-trans (s≤s z≤n) 3≤E) inv₃ pB ,
+      ∧-intro
+        (mapValue-B (capᴱ W (2 * E)) Ψ (lookup Γ i) sy
+          (valsB?-widen (lookup Γ i) sy cap2 syB))
+        refl
+      where
+      E≤2E   = m≤m+n E (E + 0)
+      cap2   = capᴱ-mono W E≤2E
+      src    = Sched.nextSource sched
+      sched₁ = proj₂ (mintSource sched)
+      ord    = Sched.nextOrdinal sched₁
+      sched₂ = proj₂ (mintOrdinal sched₁)
+      L : LiveSource Γ
+      L = record { source = src ; ordinal = ord ; elemTy = lookup Γ i
+                 ; pending = resolve now (a ∷ as) }
+      sched₃ = record sched₂ { live = L ∷ Sched.live sched₂ }
+      -- the tail's own two sums, split off the slot's
+      tailSz = ≤-trans (m≤n+m _ _) (≤-trans (n≤1+n _) szs)
+      tailFc = ≤-trans (m≤n+m _ _) fcs
+      inv₃ = addLive-INV Ψ (capᴱ W E) sched₂ st L
+               (resolve-bounded (capᴱ W E) now (a ∷ as) tailSz)
+               (resolve-measure (fnCapᵛ (lookup Γ i)) Ψ now (a ∷ as) tailFc)
+               inv
+      syB = sumVals-B (capᴱ W E) Ψ (lookup Γ i) sy
+              (≤-trans (≤-trans (m≤m+n _ _) (n≤1+n _)) szs)
+              (≤-trans (m≤m+n _ _) fcs)
+
+-- a hot: already live at the slot's own source/ordinal.  Either it is
+-- spent (immediate close/complete, nothing registered) or this is just
+-- one more registration — fan-out IS that multiplicity
+... | scripted (hot hz) | szs | fcs
+      with memberSource (toℕ i) (EvalSt.completedSources st)
+...   | true  = E , ≤-refl , inv , refl
+...   | false = 2 * E , m≤m+n E (E + 0) ,
+                register-INV Ψ W E (toℕ i) κ sched st
+                  (≤-trans (s≤s z≤n) 3≤E) inv pB ,
+                refl
+
+------------------------------------------------------------------
 -- the *All re-entry, the clique's last link: one inner subscription
 -- per emitted outer value.  g0 is the dry stub (a lone close, no
 -- ledger); gs peels one fuel unit and re-enters subscribeE-walkS on
@@ -6267,7 +6441,8 @@ concatDrain-wet Ψ W g allNid κ id now [] sched st E 3≤E inv pB qz qf =
 concatDrain-wet {s = s} Ψ W g allNid κ id now (o ∷ q) sched st E 3≤E inv pB qz qf
   with subscribeInner g concatᵒ allNid κ id now o sched st
      | subscribeInner-wet Ψ W g concatᵒ allNid κ id now o sched st E 3≤E inv
-         (∧-intro (proj₁ (∧-true _ _ qz)) (proj₁ (∧-true _ _ qf))) pB
+         (∧-intro (proj₁ (∧-true (sizeᵉ o ≤ᵇ capᴱ W E) _ qz))
+                  (proj₁ (∧-true (fnCapᵉ o ≤ᵇ Ψ) _ qf))) pB
 ... | (_ , vs , bs , false , sched₁ , st₁) | (E₁ , E≤E₁ , inv₁ , vsB , bsB) =
   E₁ , E≤E₁ , inv₁ , vsB , bsB ,
   allsz-widen q (capᴱ-mono W E≤E₁) (proj₂ (∧-true _ _ qz)) ,
