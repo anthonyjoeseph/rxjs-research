@@ -1,5 +1,11 @@
 import { OperatorFunction, from, mergeMap, toArray } from "rxjs";
-import { EmitKind, InstEmit, InstEvent, Provenance, SourceId } from "./inst-emit.js";
+import {
+  EmitKind,
+  InstEmit,
+  InstEvent,
+  Provenance,
+  SourceId,
+} from "./inst-emit.js";
 
 // The ONLINE batcher — the TS twin of Agda's impl-batchSimultaneous
 // (Implementation.agda): one emission at a time, own state only, no
@@ -120,8 +126,7 @@ const applyBatch = <A>(
 
 // obligations existed and are now discharged — an EMPTY owed table is
 // not closure (a subscribe frame never takes on obligations)
-const paidOff = (owed: Owed): boolean =>
-  owed.length > 0 && allZero(owed);
+const paidOff = (owed: Owed): boolean => owed.length > 0 && allZero(owed);
 
 const stepBatch = <A>(
   emit: InstEmit<A>,
@@ -169,7 +174,10 @@ const foldBatch = <A>(emits: InstEmit<A>[]): InstEmit<A[]>[] => {
 // the rxjs operator form: collect the stream, fold it, re-emit the
 // batches. The fold has no lookahead (it is online); toArray just hands
 // it the finite stream in one piece, matching Agda's List → List shape.
-export const batchSimultaneous = <A>(): OperatorFunction<
-  InstEmit<A>,
-  InstEmit<A[]>
-> => (source) => source.pipe(toArray(), mergeMap((emits) => from(foldBatch(emits))));
+export const batchSimultaneous =
+  <A>(): OperatorFunction<InstEmit<A>, InstEmit<A[]>> =>
+  (source) =>
+    source.pipe(
+      toArray(),
+      mergeMap((emits) => from(foldBatch(emits))),
+    );

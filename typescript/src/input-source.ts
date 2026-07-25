@@ -67,11 +67,15 @@ export const makeInputSource = (
     // registration that would be dropped without its close
     let completed = false;
     driver.registerSource(
-      scriptedDeliveries(source, resolveTicks(0, input.async), (emit, isLast) => {
-        if (isLast) completed = true;
-        sink.next(emit);
-        if (isLast) sink.complete();
-      }),
+      scriptedDeliveries(
+        source,
+        resolveTicks(0, input.async),
+        (emit, isLast) => {
+          if (isLast) completed = true;
+          sink.next(emit);
+          if (isLast) sink.complete();
+        },
+      ),
     );
     return defer(() =>
       completed

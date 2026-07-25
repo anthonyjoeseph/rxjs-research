@@ -100,10 +100,7 @@ export const flattenBurst = <A>(
     { bookkeeping: [], values: [], done: false },
   );
 
-const removeOneSource = (
-  source: SourceId,
-  open: SourceId[],
-): SourceId[] => {
+const removeOneSource = (source: SourceId, open: SourceId[]): SourceId[] => {
   const at = open.indexOf(source);
   return at === -1 ? open : [...open.slice(0, at), ...open.slice(at + 1)];
 };
@@ -140,8 +137,7 @@ export const cutLedgerStep = <A>(
     ledger.instant === emit.instant
       ? ledger
       : { instant: emit.instant, paid: [], born: [] };
-  let paid =
-    emit.kind === "delivery" ? [...base.paid, emit.source] : base.paid;
+  let paid = emit.kind === "delivery" ? [...base.paid, emit.source] : base.paid;
   let born = [...base.born];
   for (const ev of emit.events) {
     if (ev.type === "init") born = [...born, ev.source];

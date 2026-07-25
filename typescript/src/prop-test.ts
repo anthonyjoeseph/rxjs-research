@@ -83,7 +83,6 @@ const readFlag = (name: string): string | undefined => {
 const readOperatorFromCli = (): string | undefined => readFlag("operator");
 const readSeedFromCli = (): string | undefined => readFlag("seed");
 
-
 // createDriver (virtual time, the one impure edge), makeInputSource
 // (scripted slots → protocol streams), and compile (the per-node
 // switch onto the primitive-operators) live in their own modules.
@@ -173,7 +172,9 @@ const interpretResults = (
     if (sEq) streamOk++;
     if (bEq) batchOk++;
     if (!sEq || !bEq) {
-      lines.push(`case ${i}: ${sEq ? "stream ✓" : "stream ✗"} ${bEq ? "batches ✓" : "batches ✗"}`);
+      lines.push(
+        `case ${i}: ${sEq ? "stream ✓" : "stream ✗"} ${bEq ? "batches ✓" : "batches ✗"}`,
+      );
       if (!sEq) {
         lines.push(`  agda.stream  = ${JSON.stringify(canonical(a.stream))}`);
         lines.push(`  rx.stream    = ${JSON.stringify(canonical(r.stream))}`);
