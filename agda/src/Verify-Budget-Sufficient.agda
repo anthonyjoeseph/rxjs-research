@@ -31,8 +31,8 @@
 -- subscription machine's clauses (the three decrement edges each
 -- consume one hasAtLeast-peel against dBound-μ/-hop/-connect;
 -- everything between is structural), and the fold's threading
--- invariant (see cascadeGo-wet's memo).  Not imported by Main until
--- the splice into Verify-Well-Formed replaces its postulate.
+-- invariant (see cascadeGo-wet's memo).  SPLICED: Verify-Well-Formed
+-- imports budget-sufficient from here instead of postulating it.
 module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;

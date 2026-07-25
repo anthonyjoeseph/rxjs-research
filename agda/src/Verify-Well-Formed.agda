@@ -10,8 +10,9 @@
 --      CONCRETE records now, with entry/step/exit lemmas.  Proven:
 --      burst-init, burst-final.  Postulated: the step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final, and the single
---      budget-sufficient totality conjecture at the bottom.
+--      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
+--      is no longer assumed here: it is imported, proven, from
+--      Verify-Budget-Sufficient.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -35,6 +36,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (Dec; yes; no)
 
+open import Verify-Budget-Sufficient using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
@@ -95,7 +97,7 @@ acceptPaid : (S : ProtocolSt) → paidUp S ≡ true → Accepted (checkFinal (ju
 acceptPaid S eq rewrite eq = accepted
 
 -- dry-freeness splits over ++ (the step lemmas are conditioned on it;
--- budget-sufficient below asserts it for the whole seeded run)
+-- the imported budget-sufficient supplies it for the whole seeded run)
 true≢false : {A : Set} → true ≡ false → A
 true≢false ()
 
@@ -4780,18 +4782,17 @@ drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
   , run-++-just S (proj₁ (cascade a nextId sched′ st)) _ run₁ run₂
   , paid₂
 
--- the reified termination debt: the seeded sync budget never runs
--- dry on a canonical run.  This is the old TERMINATING pragma's
--- claim, now a provable statement — the evaluator is total either
--- way, and QuickCheck's WellFormed check falsifies this postulate at
--- runtime the moment any program exhausts its budget
-postulate
-  budget-sufficient :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    hasDry (evaluate fuel e ins) ≡ false
+-- the reified termination debt — the seeded sync budget never runs
+-- dry on a canonical run, the old TERMINATING pragma's claim.  NO
+-- LONGER A POSTULATE HERE: Verify-Budget-Sufficient PROVES it (the
+-- instant-indexed size invariant, its burst cores, cascade-dry and
+-- drain-dry), and this module now imports that proof.  What the
+-- proof still rests on is named and scoped there — subscribeE-wet
+-- and cascadeGo-wet, the fuel-accounting cores — rather than the
+-- whole totality conjecture assumed outright.
 
 -- the primitives' half of the sandwich: remaining debt is the frame
--- relations, their step lemmas, and budget sufficiency above
+-- relations and their step lemmas
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate fuel e ins)
