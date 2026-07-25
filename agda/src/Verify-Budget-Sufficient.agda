@@ -123,6 +123,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 sched-init; st-init; sched-next;
                                 schedHeadOf; schedGo; schedEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
+                                takeVals; cutThrough; pathHasNode;
                                 dropSource; arrSource; chainsOf; cascadeGo;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
@@ -4731,26 +4732,10 @@ postulate
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
 
-  -- the three remaining per-frame cores of stepFrame-wet (the map and
-  -- scan clauses are PROVEN below).  take is a prefix + cutThrough
-  -- sweep; the *All frames recurse into subscribeInner (the walk's
-  -- mutual knot — they discharge together with subscribeE-walkS)
-  stepFrame-take-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
-    (nid : NodeId) (κ : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    all (valB? (capᴱ W E) Ψ s) vals ≡ true →
-    let r = stepFrame g id now (take-f nid) κ vals fin sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-       × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
-       × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
-
+  -- the two remaining per-frame cores of stepFrame-wet (the map, scan
+  -- and take clauses are PROVEN below).  The *All frames recurse into
+  -- subscribeInner (the walk's mutual knot — they discharge together
+  -- with subscribeE-walkS)
   stepFrame-fromInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
@@ -5095,6 +5080,142 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
   fcRun = scanVals-fnCap Ψ fn acc vals capfn
             (≤ᵇ⇒≤ _ _ (T-to (proj₂ nb)))
             (allB-fnCap (capᴱ W E) Ψ s vals vB)
+
+------------------------------------------------------------------
+-- THE TAKE FRAME, PROVEN.  take emits a prefix of its input (so its
+-- values ride the caller's bound), and on the cutting emit it runs
+-- cutThrough: a filter on the registry whose closes are value-free
+-- and whose survivors keep their frame bounds and can only shrink in
+-- count.  sweepLive then filters the live schedule.  No eval edge:
+-- E′ = E on both branches.
+------------------------------------------------------------------
+
+takeVals-B : ∀ {n} {Γ : Ctx n} {s} (B Ψ : ℕ) (k : ℕ) (vals : List (Val Γ s)) →
+  all (valB? B Ψ s) vals ≡ true →
+  all (valB? B Ψ s) (proj₁ (takeVals k vals)) ≡ true
+takeVals-B B Ψ zero          _        h = refl
+takeVals-B B Ψ (suc k)       []       h = refl
+takeVals-B B Ψ (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
+takeVals-B B Ψ (suc (suc k)) (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (takeVals-B B Ψ (suc k) vs (proj₂ (∧-true _ _ h)))
+
+-- the sweep is a filter on the fn-cap face too (mirror of
+-- sweepLive-bounded)
+sweepLive-fnCap : ∀ {n} {Γ : Ctx n} {t} (Ψ : ℕ)
+  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
+  all (fnCapLive Ψ) ls ≡ true →
+  all (fnCapLive Ψ) (sweepLive reg ls) ≡ true
+sweepLive-fnCap Ψ reg []       h = refl
+sweepLive-fnCap {n = n} Ψ reg (l ∷ ls) h
+  with ∧-true (fnCapLive Ψ l) (all (fnCapLive Ψ) ls) h
+... | bl , bls
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
+... | true  = ∧-intro bl (sweepLive-fnCap Ψ reg ls bls)
+... | false = sweepLive-fnCap Ψ reg ls bls
+
+-- the cut is a filter on the registry: the count only drops, the
+-- survivors keep their frame bounds, and every close it mints is
+-- value-free
+cutThrough-len : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (d : List RegId)
+  (wm : RegId) (dy : List Source) (reg : List (RegId × Source × Chain Γ t)) →
+  length (proj₁ (cutThrough nid d wm dy reg)) ≤ length reg
+cutThrough-len nid d wm dy []                    = z≤n
+cutThrough-len nid d wm dy ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-len nid d wm dy r
+... | true  | kept , closes , rids | ih = ≤-trans ih (n≤1+n _)
+... | false | kept , closes , rids | ih = s≤s ih
+
+cutThrough-regs : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (nid : NodeId)
+  (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  regsB? B Ψ reg ≡ true → regsB? B Ψ (proj₁ (cutThrough nid d wm dy reg)) ≡ true
+cutThrough-regs B Ψ nid d wm dy []                    h = refl
+cutThrough-regs B Ψ nid d wm dy ((rid , src , c) ∷ r) h
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-regs B Ψ nid d wm dy r (proj₂ (∧-true _ _ h))
+... | true  | kept , closes , rids | ih = ih
+... | false | kept , closes , rids | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
+
+cutThrough-closes : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (nid : NodeId)
+  (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  all (eventB? B Ψ) (proj₁ (proj₂ (cutThrough nid d wm dy reg))) ≡ true
+cutThrough-closes B Ψ nid d wm dy []                    = refl
+cutThrough-closes B Ψ nid d wm dy ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-closes B Ψ nid d wm dy r
+... | false | kept , closes , rids | ih = ih
+... | true  | kept , closes , rids | ih
+      with any (_≡ᵇ rid) d ∧ memberSource src dy
+...   | true  = ih
+...   | false = ∧-intro refl ih
+
+stepFrame-take-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (nid : NodeId) (κ : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (valB? (capᴱ W E) Ψ s) vals ≡ true →
+  let r = stepFrame g id now (take-f nid) κ vals fin sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-take-wet {s = s} Ψ W g id now nid κ vals fin sched st E 3≤E inv pB vB
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                = E , ≤-refl , inv , refl , refl
+... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
+... | just (merge-st _ _)    = E , ≤-refl , inv , refl , refl
+... | just (concat-st _ _ _) = E , ≤-refl , inv , refl , refl
+... | just (switch-st _ _)   = E , ≤-refl , inv , refl , refl
+... | just (exhaust-st _ _)  = E , ≤-refl , inv , refl , refl
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | false =
+  E , ≤-refl ,
+  install-INV Ψ (capᴱ W E) sched st nid
+    (take-st (proj₁ (proj₂ (takeVals k vals)))) refl refl inv ,
+  takeVals-B (capᴱ W E) Ψ k vals vB , refl
+...   | true =
+  E , ≤-refl ,
+  ∧-intro
+    (∧-intro (sweepLive-bounded B kept (Sched.live sched) bls)
+             (setNode-bounded B nid (take-st zero) (EvalSt.nodes st) refl bns))
+  (∧-intro
+    (∧-intro (sweepLive-fnCap Ψ kept (Sched.live sched) fls)
+             (setNode-fnCap Ψ nid (take-st zero) (EvalSt.nodes st) refl fns))
+  (∧-intro lenOK
+  (∧-intro (cutThrough-regs B Ψ nid del wm dy (EvalSt.registry st) rb) r4))) ,
+  takeVals-B B Ψ k vals vB ,
+  cutThrough-closes B Ψ nid del wm dy (EvalSt.registry st)
+  where
+  B    = capᴱ W E
+  del  = EvalSt.delivered st
+  wm   = EvalSt.regWatermark st
+  dy   = EvalSt.dying st
+  kept = proj₁ (cutThrough nid del wm dy (EvalSt.registry st))
+  sb   = proj₁ (∧-true _ _ inv)
+  r1   = proj₂ (∧-true _ _ inv)
+  fc   = proj₁ (∧-true _ _ r1)
+  r2   = proj₂ (∧-true _ _ r1)
+  rl   = proj₁ (∧-true _ _ r2)
+  r3   = proj₂ (∧-true _ _ r2)
+  rb   = proj₁ (∧-true _ _ r3)
+  r4   = proj₂ (∧-true _ _ r3)
+  bls  = proj₁ (∧-true _ _ sb)
+  bns  = proj₂ (∧-true _ _ sb)
+  fls  = proj₁ (∧-true _ _ fc)
+  fns  = proj₂ (∧-true _ _ fc)
+  lenOK : (length kept ≤ᵇ B) ≡ true
+  lenOK = T⇒≡true _ (≤⇒≤ᵇ
+    (≤-trans (cutThrough-len nid del wm dy (EvalSt.registry st))
+             (≤ᵇ⇒≤ _ _ (T-to rl))))
 
 ------------------------------------------------------------------
 -- stepFrame-wet, now a REAL dispatch: the map clause proven end to
