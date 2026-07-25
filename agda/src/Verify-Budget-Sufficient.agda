@@ -137,6 +137,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 concatDrain; innerFinish; innerReact;
                                 sharedPlumb; sharedConnect; subscribeSharedSlot;
                                 burstCompleted;
+                                shareLatch; shareAdmit; shareFinish; shareGo;
+                                foldPath; dispatchShare; arrTick;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
@@ -3953,6 +3955,12 @@ chainsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ} {s : Ty}
 chainsB?-widen chains B≤ h =
   all-impl _ _ (λ rc → pathB?-widen (proj₂ rc) B≤) chains h
 
+allPathB-widen : ∀ {n} {Γ : Ctx n} {s t} {B B′ Ψ : ℕ}
+  (ps : List (RegId × Path Γ s t)) → B ≤ B′ →
+  all (λ rp → pathB? B Ψ (proj₂ rp)) ps ≡ true →
+  all (λ rp → pathB? B′ Ψ (proj₂ rp)) ps ≡ true
+allPathB-widen ps B≤ h = all-impl _ _ (λ rp → pathB?-widen (proj₂ rp) B≤) ps h
+
 regsB?-widen : ∀ {n} {Γ : Ctx n} {t} {B B′ Ψ : ℕ}
   (reg : List (RegId × Source × Chain Γ t)) → B ≤ B′ →
   regsB? B Ψ reg ≡ true → regsB? B′ Ψ reg ≡ true
@@ -4834,20 +4842,6 @@ size-unfoldμ body =
   ≤-trans (size-elimGᵉ (here refl) (μᵉ body) body)
           (*-monoˡ-≤ (sizeᵉ (μᵉ body)) (n≤1+n (sizeᵉ body)))
 
-postulate
-  chainStep-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (Ψ W : ℕ) (id : Id) (a : Arrival Γ)
-    (path : Path Γ (arrTy a) t)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    pathB? (capᴱ W E) Ψ path ≡ true →
-    valB? (capᴱ W E) Ψ (arrTy a) (arrVal a) ≡ true →
-    let r = chainStep id a path sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-
 
 ------------------------------------------------------------------
 -- THE LEDGER RULE, PROVEN — memo (2)'s one uniform step: an eval
@@ -5452,6 +5446,65 @@ subscribeE-input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
 
+-- the DELIVERY clique: foldPath walks one chain sinkward, and at a
+-- share boundary hands off to dispatchShare, which folds every
+-- admitted registration back through foldPath.  Lexicographic on
+-- (dispatch gas, path) exactly as the machine recurses: the frame
+-- hops shrink the path at constant gas, the share hop peels one gas
+foldPath-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (path : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ path ≡ true →
+  all (valB? (capᴱ W E) Ψ u) vals ≡ true →
+  all (eventB? (capᴱ W E) Ψ) evs ≡ true →
+  let r = foldPath sf gas id now envSrc path vals evs fin sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+dispatchShare-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  all (valB? (capᴱ W E) Ψ (lookup Γ i)) vals ≡ true →
+  let r = dispatchShare sf gas id now i vals fin sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+shareGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (ps : List (RegId × Path Γ (lookup Γ i) t))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  all (λ rp → pathB? (capᴱ W E) Ψ (proj₂ rp)) ps ≡ true →
+  all (valB? (capᴱ W E) Ψ (lookup Γ i)) vals ≡ true →
+  let r = shareGo sf gas id now i vals fin ps sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
+chainStep-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ W : ℕ) (id : Id) (a : Arrival Γ)
+  (path : Path Γ (arrTy a) t)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ path ≡ true →
+  valB? (capᴱ W E) Ψ (arrTy a) (arrVal a) ≡ true →
+  let r = chainStep id a path sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+
 sharedSlot-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (Ψ W : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
   (κ : Path Γ (lookup Γ i) t)
@@ -5855,6 +5908,77 @@ latch-INV Ψ B src sched st inv
   (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
                                      (≤ᵇ⇒≤ _ _ (T-to rl)))))
   (∧-intro (dropSource-regs B Ψ src (EvalSt.registry st) rb) r4)))
+
+-- a share's close list, the dual of finList-B
+closeList-B : ∀ {n} {Γ : Ctx n} {u} (B Ψ : ℕ) (src : Source) (b : Bool) →
+  all (eventB? {n = n} {Γ = Γ} {u = u} B Ψ)
+      (if b then close src exhausted ∷ [] else []) ≡ true
+closeList-B B Ψ src true  = refl
+closeList-B B Ψ src false = refl
+
+-- completedSources / dying / delivered are read by no conjunct
+shareLatch-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (i : Fin n) (b : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true → INV? Ψ B sched (shareLatch i b st) ≡ true
+shareLatch-INV Ψ B i false sched st inv = inv
+shareLatch-INV Ψ B i true  sched st inv = inv
+
+delivered-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (rid : RegId) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B sched (record st { delivered = rid ∷ EvalSt.delivered st }) ≡ true
+delivered-INV Ψ B rid sched st inv = inv
+
+-- the admitted fan-out chains inherit their bounds from the registry
+shareAdmit-B : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (i : Fin n)
+  (reg : List (RegId × Source × Chain Γ t)) → regsB? B Ψ reg ≡ true →
+  all (λ rp → pathB? B Ψ (proj₂ rp)) (shareAdmit i reg) ≡ true
+shareAdmit-B B Ψ i []                      h = refl
+shareAdmit-B {Γ = Γ} B Ψ i ((rid , src , (u , q)) ∷ r) h
+  with sameSource (toℕ i) src | u ≟ᵗ lookup Γ i
+... | false | _        = shareAdmit-B B Ψ i r (proj₂ (∧-true (pathB? B Ψ q) _ h))
+... | true  | no  _    = shareAdmit-B B Ψ i r (proj₂ (∧-true (pathB? B Ψ q) _ h))
+... | true  | yes refl =
+      ∧-intro (proj₁ (∧-true (pathB? B Ψ q) _ h))
+              (shareAdmit-B B Ψ i r (proj₂ (∧-true (pathB? B Ψ q) _ h)))
+
+-- the share's completion sweep: the registry SHRINKS on both riders
+-- and the live list is filtered, so every conjunct only improves
+shareFinish-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (i : Fin n) (b : Bool) (emits : Stream Γ t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B (proj₁ (proj₂ (shareFinish i b (emits , sched , st))))
+           (proj₂ (proj₂ (shareFinish i b (emits , sched , st)))) ≡ true
+shareFinish-INV Ψ B i false emits sched st inv = inv
+shareFinish-INV Ψ B i true  emits sched st inv =
+  ∧-intro (∧-intro (sweepLive-bounded B kept (Sched.live sched)
+                     (stB-live B sched st sb))
+                   (stB-nodes B sched st sb))
+  (∧-intro (∧-intro (sweepLive-fnCap Ψ kept (Sched.live sched)
+                      (fcB-live Ψ sched st fc))
+                    (fcB-nodes Ψ sched st fc))
+  (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len (toℕ i) (EvalSt.registry st))
+                                     (≤ᵇ⇒≤ _ _ (T-to rl)))))
+  (∧-intro (dropSource-regs B Ψ (toℕ i) (EvalSt.registry st) rb)
+  (∧-intro ss sf))))
+  where
+  kept = dropSource (toℕ i) (EvalSt.registry st)
+  P    = INV-parts Ψ B sched st inv
+  sb   = proj₁ P
+  fc   = proj₁ (proj₂ P)
+  rl   = proj₁ (proj₂ (proj₂ P))
+  rb   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  ss   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  sf   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+
+-- shareFinish never touches the emits it is handed
+shareFinish-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (i : Fin n) (b : Bool) (emits : Stream Γ t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  proj₁ (shareFinish i b (emits , sched , st)) ≡ emits
+shareFinish-burst i false emits sched st = refl
+shareFinish-burst i true  emits sched st = refl
 
 -- connectedShares is read by no conjunct of INV?, so latching a
 -- connect is invisible to the invariant (record eta does the work)
@@ -6265,6 +6389,144 @@ subscribeE-input-wet {Γ = Γ} Ψ W g i κ id now sched st E 3≤E inv pB
                 register-INV Ψ W E (toℕ i) κ sched st
                   (≤-trans (s≤s z≤n) 3≤E) inv pB ,
                 refl
+
+------------------------------------------------------------------
+-- THE DELIVERY CLIQUE.  One arrival, one chain: fold the value list
+-- sinkward through the frames (stepFrame-wet at every hop, which is
+-- where the ledger actually moves), and at a share boundary hand off
+-- to the fan-out — one emit per registration the share owes, each
+-- folded back through foldPath.  Nothing here mints values: the
+-- frames do, and they are already accounted for.
+------------------------------------------------------------------
+
+-- the root: assemble the envelope.  evs, then the values, then the
+-- completion if this emit carries one
+foldPath-wet {u = u} Ψ W sf gas id now envSrc root vals evs fin sched st E
+             3≤E inv pB vB eB =
+  E , ≤-refl , inv ,
+  ∧-intro
+    (all-++-intro _ evs _ eB
+      (all-++-intro _ (map value vals) _
+        (mapValue-B (capᴱ W E) Ψ u vals vB)
+        (finList-B (capᴱ W E) Ψ fin)))
+    refl
+
+-- the share boundary: the chain's own valueless emit announces the
+-- handoff, then the share fans the SAME values out to its own
+-- registrations — the diamond, batched by construction
+foldPath-wet Ψ W sf gas id now envSrc (share-sink i) vals evs fin sched st E
+             3≤E inv pB vB eB =
+  E′ , E≤E′ , inv′ ,
+  ∧-intro (all-++-intro _ evs _ (eventsB?-widen evs cap′ eB) refl) bB′
+  where
+  DS   = dispatchShare-wet Ψ W sf gas id now i vals fin sched st E 3≤E inv vB
+  E′   = proj₁ DS
+  E≤E′ = proj₁ (proj₂ DS)
+  inv′ = proj₁ (proj₂ (proj₂ DS))
+  bB′  = proj₂ (proj₂ (proj₂ DS))
+  cap′ = capᴱ-mono W E≤E′
+
+-- a frame hop: step it, then keep folding down the shorter path
+foldPath-wet Ψ W sf gas id now envSrc (f ↠ path′) vals evs fin sched st E
+             3≤E inv pB vB eB =
+  E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , bB₂
+  where
+  SF   = stepFrame-wet Ψ W sf id now f path′ vals fin sched st E 3≤E inv
+           (proj₁ (∧-true (frameB? (capᴱ W E) Ψ f) _ pB))
+           (proj₂ (∧-true (frameB? (capᴱ W E) Ψ f) _ pB)) vB
+  E₁    = proj₁ SF
+  E≤E₁  = proj₁ (proj₂ SF)
+  inv₁  = proj₁ (proj₂ (proj₂ SF))
+  vB₁   = proj₁ (proj₂ (proj₂ (proj₂ SF)))
+  eB₁   = proj₂ (proj₂ (proj₂ (proj₂ SF)))
+  cap₁  = capᴱ-mono W E≤E₁
+  step  = stepFrame sf id now f path′ vals fin sched st
+  IH    = foldPath-wet Ψ W sf gas id now envSrc path′ (proj₁ step)
+            (evs ++ proj₁ (proj₂ step)) (proj₁ (proj₂ (proj₂ step)))
+            (proj₁ (proj₂ (proj₂ (proj₂ step))))
+            (proj₂ (proj₂ (proj₂ (proj₂ step)))) E₁
+            (≤-trans 3≤E E≤E₁) inv₁
+            (pathB?-widen path′ cap₁
+              (proj₂ (∧-true (frameB? (capᴱ W E) Ψ f) _ pB)))
+            vB₁
+            (all-++-intro _ evs _ (eventsB?-widen evs cap₁ eB) eB₁)
+  E₁≤E₂ = proj₁ (proj₂ IH)
+  E₂    = proj₁ IH
+  inv₂  = proj₁ (proj₂ (proj₂ IH))
+  bB₂   = proj₂ (proj₂ (proj₂ IH))
+
+-- out of dispatch gas: unreachable in a real run (the telescope bound
+-- is the context size), and free when it does fire
+dispatchShare-wet Ψ W sf zero id now i vals fin sched st E 3≤E inv vB =
+  E , ≤-refl , inv , refl
+dispatchShare-wet {Γ = Γ} Ψ W sf (suc gas) id now i vals fin sched st E
+                  3≤E inv vB =
+  E′ , E≤E′ ,
+  shareFinish-INV Ψ (capᴱ W E′) i fin (proj₁ GOr)
+    (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr)) inv′ ,
+  subst (λ b → burstB? (capᴱ W E′) Ψ b ≡ true)
+        (sym (shareFinish-burst i fin (proj₁ GOr)
+               (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))))
+        bB′
+  where
+  st₀  = shareLatch i fin st
+  inv₀ = shareLatch-INV Ψ (capᴱ W E) i fin sched st inv
+  adm  = shareAdmit i (EvalSt.registry st)
+  admB = shareAdmit-B (capᴱ W E) Ψ i (EvalSt.registry st)
+           (proj₁ (proj₂ (proj₂ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv)))))
+  GO   = shareGo-wet Ψ W sf gas id now i vals fin adm sched st₀ E 3≤E inv₀ admB vB
+  GOr  = shareGo sf gas id now i vals fin adm sched st₀
+  E′   = proj₁ GO
+  E≤E′ = proj₁ (proj₂ GO)
+  inv′ = proj₁ (proj₂ (proj₂ GO))
+  bB′  = proj₂ (proj₂ (proj₂ GO))
+
+shareGo-wet Ψ W sf gas id now i vals fin [] sched st E 3≤E inv pB vB =
+  E , ≤-refl , inv , refl
+shareGo-wet {Γ = Γ} Ψ W sf gas id now i vals fin ((rid , q) ∷ ps) sched st E
+            3≤E inv pB vB
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+-- cut earlier this cascade: its close already rode the cutting emit
+... | true  = shareGo-wet Ψ W sf gas id now i vals fin ps sched st E 3≤E inv
+                (proj₂ (∧-true (pathB? (capᴱ W E) Ψ q) _ pB)) vB
+... | false = E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ ,
+              all-++-intro _ (proj₁ FPr) _
+                (burstB?-widen (proj₁ FPr) cap₂ bB₁) bB₂
+  where
+  st₀  = record st { delivered = rid ∷ EvalSt.delivered st }
+  FP   = foldPath-wet Ψ W sf gas id now (toℕ i) q vals
+           (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀ E
+           3≤E (delivered-INV Ψ (capᴱ W E) rid sched st inv)
+           (proj₁ (∧-true (pathB? (capᴱ W E) Ψ q) _ pB)) vB
+           (closeList-B (capᴱ W E) Ψ (toℕ i) fin)
+  FPr  = foldPath sf gas id now (toℕ i) q vals
+           (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
+  E₁   = proj₁ FP
+  E≤E₁ = proj₁ (proj₂ FP)
+  inv₁ = proj₁ (proj₂ (proj₂ FP))
+  bB₁  = proj₂ (proj₂ (proj₂ FP))
+  cap₁ = capᴱ-mono W E≤E₁
+  IH   = shareGo-wet Ψ W sf gas id now i vals fin ps
+           (proj₁ (proj₂ FPr)) (proj₂ (proj₂ FPr)) E₁
+           (≤-trans 3≤E E≤E₁) inv₁
+           (allPathB-widen ps cap₁
+             (proj₂ (∧-true (pathB? (capᴱ W E) Ψ q) _ pB)))
+           (valsB?-widen (lookup Γ i) vals cap₁ vB)
+  E₂    = proj₁ IH
+  E₁≤E₂ = proj₁ (proj₂ IH)
+  inv₂  = proj₁ (proj₂ (proj₂ IH))
+  bB₂   = proj₂ (proj₂ (proj₂ IH))
+  cap₂  = capᴱ-mono W E₁≤E₂
+
+-- one arrival seeded into one chain: chainStep is foldPath with the
+-- arrival's value, its tick, and (when the source is spent) this
+-- registration's own exhausted close
+chainStep-wet {n = n} {e = e} Ψ W id a path sched st E 3≤E inv pB vB =
+  foldPath-wet Ψ W (budgetAt e (Sched.slots sched) id) n id (arrTick a)
+    (arrSource a) path (arrVal a ∷ [])
+    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    (Arrival.isLast a) sched st E 3≤E inv pB (∧-intro vB refl)
+    (closeList-B (capᴱ W E) Ψ (arrSource a) (Arrival.isLast a))
 
 ------------------------------------------------------------------
 -- the *All re-entry, the clique's last link: one inner subscription
