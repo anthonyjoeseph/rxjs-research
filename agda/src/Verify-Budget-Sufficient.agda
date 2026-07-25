@@ -37,7 +37,7 @@ module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
                                 if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
                                 _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
                                        ≤-reflexive; <-≤-trans; ≤-pred;
@@ -133,6 +133,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 splitEvents; splitBurst; retagEvents;
                                 mergeBump; switchKill;
                                 thruConsume; thruWalk; thruWrap;
+                                concatDrain; innerFinish; innerReact;
+                                aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
@@ -4734,25 +4736,6 @@ postulate
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
 
-  -- the last per-frame core of stepFrame-wet (map, scan, take and
-  -- thru-outer are PROVEN below).  from-inner's concat shape drains a
-  -- queue read out of the node state, whose fold is still buried in a
-  -- where block — it needs the same lift thru-outer just got
-  stepFrame-fromInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
-    (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    all (valB? (capᴱ W E) Ψ s) vals ≡ true →
-    let r = stepFrame g id now (from-inner op allNid inst) κ vals fin sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-       × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
-       × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
 
 ------------------------------------------------------------------
 -- THE LEDGER RULE, PROVEN — memo (2)'s one uniform step: an eval
@@ -5411,6 +5394,72 @@ stepFrame-thruOuter-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
      × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
      × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+concatDrain-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ψ W : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (λ o → sizeᵉ o ≤ᵇ capᴱ W E) q ≡ true →
+  all (λ o → fnCapᵉ o ≤ᵇ Ψ) q ≡ true →
+  let r = concatDrain g allNid κ id now q sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+     × (all (λ o → sizeᵉ o ≤ᵇ capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (λ o → fnCapᵉ o ≤ᵇ Ψ) (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+
+innerFinish-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ψ W : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (valB? (capᴱ W E) Ψ s) vals ≡ true →
+  let r = innerFinish g op allNid inst κ id now vals sched st
+            (lookupNode allNid (EvalSt.nodes st))
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+
+-- the inner *All frame: a fin is either absorbed (a sibling
+-- registration still lives) or finishes the *All node.  Only
+-- concatAll's drain moves the ledger
+stepFrame-fromInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (valB? (capᴱ W E) Ψ s) vals ≡ true →
+  let r = stepFrame g id now (from-inner op allNid inst) κ vals fin sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-fromInner-wet Ψ W g id now op allNid inst κ vals false sched st E
+                        3≤E inv pB vB = E , ≤-refl , inv , vB , refl
+stepFrame-fromInner-wet Ψ W g id now op allNid inst κ vals true sched st E
+                        3≤E inv pB vB
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  = E , ≤-refl , inv , vB , refl
+... | false = innerFinish-wet Ψ W g op allNid inst κ id now vals sched st E
+                3≤E inv pB vB
+
+-- the concat queue's stored outers only ever need widening upward
+allsz-widen : ∀ {n} {Γ : Ctx n} {s} {B B′ : ℕ} (q : List (Closed Γ s)) → B ≤ B′ →
+  all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true → all (λ o → sizeᵉ o ≤ᵇ B′) q ≡ true
+allsz-widen q B≤ h = all-impl _ _ (λ o → ≤ᵇ-widen (sizeᵉ o) B≤) q h
+
 stepFrame-thruOuter-wet Ψ W g id now op nid κ vals fin sched st E 3≤E inv pB vB =
   E′ , E≤E′ , proj₁ WR , proj₁ (proj₂ WR) , proj₂ (proj₂ WR)
   where
@@ -5996,6 +6045,129 @@ thruWalk-wet {u = u} Ψ W g op nid κ id now (o ∷ os) sched st E 3≤E inv pB 
   vs′B  = proj₁ (proj₂ (proj₂ (proj₂ IH)))
   bs′B  = proj₂ (proj₂ (proj₂ (proj₂ IH)))
   cap₁₂ = capᴱ-mono W E₁≤E₂
+
+------------------------------------------------------------------
+-- the inner *All frame's drain and finish.  concatAll is the only
+-- op whose completion does more than flip a flag: it walks its
+-- parked queue, subscribing each stored outer until one stays open.
+------------------------------------------------------------------
+
+concatDrain-wet Ψ W g allNid κ id now [] sched st E 3≤E inv pB qz qf =
+  E , ≤-refl , inv , refl , refl , refl , refl
+concatDrain-wet {s = s} Ψ W g allNid κ id now (o ∷ q) sched st E 3≤E inv pB qz qf
+  with subscribeInner g concatᵒ allNid κ id now o sched st
+     | subscribeInner-wet Ψ W g concatᵒ allNid κ id now o sched st E 3≤E inv
+         (∧-intro (proj₁ (∧-true _ _ qz)) (proj₁ (∧-true _ _ qf))) pB
+... | (_ , vs , bs , false , sched₁ , st₁) | (E₁ , E≤E₁ , inv₁ , vsB , bsB) =
+  E₁ , E≤E₁ , inv₁ , vsB , bsB ,
+  allsz-widen q (capᴱ-mono W E≤E₁) (proj₂ (∧-true _ _ qz)) ,
+  proj₂ (∧-true _ _ qf)
+... | (_ , vs , bs , true , sched₁ , st₁) | (E₁ , E≤E₁ , inv₁ , vsB , bsB) =
+  E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ ,
+  all-++-intro _ vs _ (valsB?-widen s vs cap₁₂ vsB) vs′B ,
+  all-++-intro _ bs _ (eventsB?-widen bs cap₁₂ bsB) bs′B ,
+  q′z , q′f
+  where
+  IH    = concatDrain-wet Ψ W g allNid κ id now q sched₁ st₁ E₁
+            (≤-trans 3≤E E≤E₁) inv₁ (pathB?-widen κ (capᴱ-mono W E≤E₁) pB)
+            (allsz-widen q (capᴱ-mono W E≤E₁) (proj₂ (∧-true _ _ qz)))
+            (proj₂ (∧-true _ _ qf))
+  E₂    = proj₁ IH
+  E₁≤E₂ = proj₁ (proj₂ IH)
+  inv₂  = proj₁ (proj₂ (proj₂ IH))
+  vs′B  = proj₁ (proj₂ (proj₂ (proj₂ IH)))
+  bs′B  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IH))))
+  q′z   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
+  q′f   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
+  cap₁₂ = capᴱ-mono W E₁≤E₂
+
+innerFinish-wet Ψ W g mergeᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (merge-st k od)   =
+  E , ≤-refl ,
+  install-INV Ψ (capᴱ W E) sched st allNid (merge-st (pred k) od) refl refl inv ,
+  vB , refl
+... | nothing                = E , ≤-refl , inv , vB , refl
+... | just (scan-st _)       = E , ≤-refl , inv , vB , refl
+... | just (take-st _)       = E , ≤-refl , inv , vB , refl
+... | just (concat-st _ _ _) = E , ≤-refl , inv , vB , refl
+... | just (switch-st _ _)   = E , ≤-refl , inv , vB , refl
+... | just (exhaust-st _ _)  = E , ≤-refl , inv , vB , refl
+innerFinish-wet {s = s} Ψ W g concatᵒ allNid inst κ id now vals sched st E
+                3≤E inv pB vB
+  with lookupNode allNid (EvalSt.nodes st)
+     | lookupNode-B (capᴱ W E) Ψ allNid (EvalSt.nodes st)
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+... | just (concat-st {w} q act od) | nb with w ≟ᵗ s
+...   | yes refl =
+  E′ , E≤E′ ,
+  install-INV Ψ (capᴱ W E′) sched′ st′ allNid (concat-st q′ act′ od)
+    q′z q′f inv′ ,
+  all-++-intro _ vals _ (valsB?-widen s vals (capᴱ-mono W E≤E′) vB) vsB ,
+  bsB
+  where
+  DR    = concatDrain-wet Ψ W g allNid κ id now q sched st E 3≤E inv pB
+            (proj₁ nb) (proj₂ nb)
+  dr    = concatDrain g allNid κ id now q sched st
+  act′  = proj₁ (proj₂ (proj₂ dr))
+  q′    = proj₁ (proj₂ (proj₂ (proj₂ dr)))
+  sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
+  st′   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
+  E′    = proj₁ DR
+  E≤E′  = proj₁ (proj₂ DR)
+  inv′  = proj₁ (proj₂ (proj₂ DR))
+  vsB   = proj₁ (proj₂ (proj₂ (proj₂ DR)))
+  bsB   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ DR))))
+  q′z   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ DR)))))
+  q′f   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ DR)))))
+...   | no _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g concatᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | nothing               | _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g concatᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (scan-st _)      | _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g concatᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (take-st _)      | _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g concatᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (merge-st _ _)   | _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g concatᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (switch-st _ _)  | _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g concatᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (exhaust-st _ _) | _ = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (switch-st (just c) od) with c ≡ᵇ inst
+...   | true  =
+  E , ≤-refl ,
+  install-INV Ψ (capᴱ W E) sched st allNid (switch-st nothing od) refl refl inv ,
+  vB , refl
+...   | false = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (switch-st nothing od) = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | nothing                = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (scan-st _)       = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (take-st _)       = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (merge-st _ _)    = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (concat-st _ _ _) = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+    | just (exhaust-st _ _)  = E , ≤-refl , inv , vB , refl
+innerFinish-wet Ψ W g exhaustᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (exhaust-st act od) =
+  E , ≤-refl ,
+  install-INV Ψ (capᴱ W E) sched st allNid (exhaust-st false od) refl refl inv ,
+  vB , refl
+... | nothing                = E , ≤-refl , inv , vB , refl
+... | just (scan-st _)       = E , ≤-refl , inv , vB , refl
+... | just (take-st _)       = E , ≤-refl , inv , vB , refl
+... | just (merge-st _ _)    = E , ≤-refl , inv , vB , refl
+... | just (concat-st _ _ _) = E , ≤-refl , inv , vB , refl
+... | just (switch-st _ _)   = E , ≤-refl , inv , vB , refl
 
 ------------------------------------------------------------------
 -- THE FOLD DECOMPOSITION, PROVEN: cascadeGo threads the walk
