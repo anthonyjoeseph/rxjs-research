@@ -1,4 +1,4 @@
-.PHONY: all help agda ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -19,6 +19,9 @@ all: help
 help:
 	@echo "Available targets:"
 	@echo "  agda          typecheck the Agda source (src/Main.agda)"
+	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
+	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
+	@echo "                  green here <=> no known counterexample remains)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -33,6 +36,13 @@ help:
 
 agda:
 	cd agda && agda src/Main.agda
+
+# Implementation/Unit-Test.agda is deliberately not imported by Main (it is a
+# throwaway performance cache, deleted once Formal-Verification is discharged),
+# so nothing else in the build would ever notice it rotting.  This target is
+# what makes its invariant enforceable rather than remembered.
+bug-cache:
+	cd agda && agda src/Implementation/Unit-Test.agda
 
 ts-check:
 	cd typescript && npm run typecheck

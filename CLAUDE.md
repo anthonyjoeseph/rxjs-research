@@ -129,8 +129,9 @@ typechecks ⟺ no known counterexample remains** — green there is the impl≡s
 `QuickCheck` reads `SEED [RUNS] [DEPTH]` on stdin (runs before depth; defaults 200 and 4):
 DEPTH caps program nesting, a hard size cap.
 
-Note `Unit-Test.agda` is **not** reachable from `Main.agda`, so `make agda` does not check it;
-run `agda src/Implementation/Unit-Test.agda` to enforce the invariant above.
+Note `Unit-Test.agda` is **not** reachable from `Main.agda`, so `make agda` does not check it.
+Run **`make bug-cache`** to enforce the invariant above — it exists precisely because nothing
+else in the build would notice the cache rotting.
 
 In some cases, however, it might make sense to adding a new "naive rx" operator to fix an Agda-impl bug.
 
