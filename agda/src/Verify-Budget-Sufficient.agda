@@ -1607,6 +1607,95 @@ shells-unfoldμ-cap B body (hd ∷ᵃ tl)
   ≤-trans (n≤1+n _) hd ∷ᵃ tl
 
 ------------------------------------------------------------------
+-- (W12-A) THE STRUCTURAL DESCENT.  The three FUEL edges (μ, inner
+-- hop, connect) each have their dBound lemma above.  A STRUCTURAL
+-- edge — mapᵉ/takeᵉ/scanᵉ/the four *Alls/μ, the operator walking
+-- into its own source — peels no gas, so the fuel accounting is
+-- indifferent to it; but the LENGTH ledger is not, because such an
+-- edge adds one frame to the path.  It pays for that frame out of
+-- the descent: both dBound arguments drop at once.
+--
+--   syncSize  drops because every structural constructor is
+--             `suc (… + syncSizeᵉ e)` — a strict drop, the s side.
+--   rank      drops because shellSizeᵉ steps DOWN by exactly one
+--             (the operator's own node) and the child's inner
+--             multiset is a sub-multiset of the parent's — so the
+--             child's count vector loses a high digit and gains
+--             nothing, the r side.
+--
+-- descent-of below is the single interface: it takes exactly the
+-- two syntactic facts that distinguish the seven constructors (host
+-- shell steps down one; inner multiset grows by some N) and returns
+-- the strict dBound drop.  Instantiating it per clause is then just
+-- naming N — [] for the *Alls and μ, innerᵗ f for map/take,
+-- innerᵗ f ++ innerᵗ z for scan.
+------------------------------------------------------------------
+
+-- lex is compatible with GROWING the larger side (the mirror of
+-- ≺ᵛ-⊕ʳ, which grows both): a zero digit passes the step through,
+-- a positive one settles it right there
+≺ᵛ-⊕ᵇ : ∀ {m} {u v : Vec ℕ m} (w : Vec ℕ m) → u ≺ᵛ v → u ≺ᵛ (v ⊕ᵛ w)
+≺ᵛ-⊕ᵇ (z ∷ᵛ w) (≺-here {y = y} x<y) = ≺-here (<-≤-trans x<y (m≤m+n y z))
+≺ᵛ-⊕ᵇ {u = x ∷ᵛ _} (zero ∷ᵛ w) (≺-there u≺v)
+  rewrite +-identityʳ x = ≺-there (≺ᵛ-⊕ᵇ w u≺v)
+≺ᵛ-⊕ᵇ {u = x ∷ᵛ _} (suc z ∷ᵛ w) (≺-there u≺v) =
+  ≺-here (subst (x <_) (sym (+-suc x z)) (s≤s (m≤m+n x z)))
+
+-- ONE class-s element under ONE class-(suc s) element, with any
+-- extra multiset N riding on the larger side
+shells-drop : ∀ B s (N M : List ℕ) → suc s ≤ B →
+  counts B (s ∷ M) ≺ᵛ counts B (suc s ∷ (N ++ M))
+shells-drop B s N M h =
+  subst (counts B (s ∷ M) ≺ᵛ_) (sym eq)
+    (≺ᵛ-⊕ᵇ (counts B N)
+      (≺-replace B (suc s) (s ∷ []) M (≤-refl ∷ᵃ []ᵃ) h))
+  where
+  eq : counts B (suc s ∷ (N ++ M)) ≡ counts B (suc s ∷ M) ⊕ᵛ counts B N
+  eq = trans (cong (oneAt B (suc s) ⊕ᵛ_)
+               (trans (counts-++ B N M)
+                      (⊕ᵛ-comm (counts B N) (counts B M))))
+             (sym (⊕ᵛ-assoc (oneAt B (suc s)) (counts B M) (counts B N)))
+
+-- the ≺ᵛ step read as a numeral drop, with the entry-sum side
+-- condition discharged off sizeᵉ exactly as measureE-rank does
+rank-drop : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
+  (b : Closed Γ s) (c : Closed Γ u) →
+  measureE V b ≺ᵛ measureE V c → sizeᵉ b ≤ V →
+  rank V (measureE V b) < rank V (measureE V c)
+rank-drop V b c step h =
+  rank-mono-≺ V step
+    (subst (_≤ V) (sym (totᵛ-counts V (shellsᵉ b)))
+           (≤-trans (shells-len b) h))
+
+-- both dBound arguments move at once: rank weakly, syncSize
+-- strictly.  V R U are EXPLICIT: dBound unfolds through _*_, which
+-- matches on its first argument, so implicits here are stuck in the
+-- same way ⊔-elim-help's were
+dBound-struct : ∀ (V R U : ℕ) {r′ r s′ s} → r′ ≤ r → s′ < s →
+  dBound V R U r′ s′ < dBound V R U r s
+dBound-struct V R U r′≤r s′<s =
+  +-mono-<-≤ s′<s (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′≤r))
+
+-- THE STRUCTURAL EDGE, packaged: one operator node crossed, one
+-- unit of demand paid.  The `Σ` argument is the sub-multiset
+-- witness — what the operator's own terms contribute on top of the
+-- child's inner shells
+descent-of : ∀ {n} {Γ : Ctx n} {s u} (V R U : ℕ)
+  (b : Closed Γ s) (c : Closed Γ u) →
+  shellSizeᵉ c ≡ suc (shellSizeᵉ b) →
+  Σ (List ℕ) (λ N → innerᵉ c ≡ N ++ innerᵉ b) →
+  syncSizeᵉ b < syncSizeᵉ c →
+  suc (shellSizeᵉ b) ≤ V → sizeᵉ b ≤ V →
+  dBound V R U (rank V (measureE V b)) (syncSizeᵉ b)
+    < dBound V R U (rank V (measureE V c)) (syncSizeᵉ c)
+descent-of V R U b c hshell (N , hinner) hsync hcap hsize =
+  dBound-struct V R U (<⇒≤ (rank-drop V b c step hsize)) hsync
+  where
+  step : measureE V b ≺ᵛ measureE V c
+  step rewrite hshell | hinner =
+    shells-drop V (shellSizeᵉ b) N (innerᵉ b) hcap
+
+------------------------------------------------------------------
 -- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
 -- instantiated inner multiset is the template's plus the plug
 -- shells, class for class.  With shellSize-subΘ (host preserved)
