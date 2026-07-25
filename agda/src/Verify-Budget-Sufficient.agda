@@ -130,7 +130,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 subscribeInner; chainStep; subscribeAll;
                                 mintNode; mintSource; mintOrdinal; register;
                                 mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                splitEvents; retagEvents;
+                                splitEvents; splitBurst; retagEvents;
+                                mergeBump; switchKill;
+                                thruConsume; thruWalk; thruWrap;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
@@ -4732,10 +4734,10 @@ postulate
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
 
-  -- the two remaining per-frame cores of stepFrame-wet (the map, scan
-  -- and take clauses are PROVEN below).  The *All frames recurse into
-  -- subscribeInner (the walk's mutual knot — they discharge together
-  -- with subscribeE-walkS)
+  -- the last per-frame core of stepFrame-wet (map, scan, take and
+  -- thru-outer are PROVEN below).  from-inner's concat shape drains a
+  -- queue read out of the node state, whose fold is still buried in a
+  -- where block — it needs the same lift thru-outer just got
   stepFrame-fromInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
@@ -4750,22 +4752,6 @@ postulate
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
                              (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
        × (all (valB? (capᴱ W E′) Ψ s) (proj₁ r) ≡ true)
-       × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
-
-  stepFrame-thruOuter-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
-    (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    all (valB? (capᴱ W E) Ψ (obs u)) vals ≡ true →
-    let r = stepFrame g id now (thru-outer op nid) κ vals fin sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-       × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
        × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
 
 ------------------------------------------------------------------
@@ -5218,6 +5204,227 @@ stepFrame-take-wet {s = s} Ψ W g id now nid κ vals fin sched st E 3≤E inv pB
              (≤ᵇ⇒≤ _ _ (T-to rl))))
 
 ------------------------------------------------------------------
+-- THE OUTER *All FRAME.  thruWalk folds the emitted inners; each
+-- step subscribes one inner inside the current instant and rewrites
+-- the *All node.  Only the per-emit step moves the ledger (it is a
+-- subscribeE re-entry); the wrap and the node rewrites are free.
+------------------------------------------------------------------
+
+eventsB?-widen : ∀ {n} {Γ : Ctx n} {u} {B B′ Ψ : ℕ}
+  (es : List (InstEvent (Val Γ u))) → B ≤ B′ →
+  all (eventB? B Ψ) es ≡ true → all (eventB? B′ Ψ) es ≡ true
+eventsB?-widen es B≤ h = all-impl _ _ (λ ev → eventB?-widen ev B≤) es h
+
+-- splitting a whole burst: same two faces as splitEvents, concatenated
+splitBurst-vals-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ) (str : Stream Γ s) →
+  burstB? B Ψ str ≡ true →
+  all (valB? B Ψ s) (proj₁ (splitBurst {A = Val Γ u} str)) ≡ true
+splitBurst-vals-B B Ψ []               h = refl
+splitBurst-vals-B {Γ = Γ} {u = u} B Ψ (em ∷ ems) h =
+  all-++-intro _ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em))) _
+    (splitEvents-vals-B B Ψ (InstEmit.events em) (proj₁ (∧-true _ _ h)))
+    (splitBurst-vals-B {u = u} B Ψ ems (proj₂ (∧-true _ _ h)))
+
+splitBurst-bk-B : ∀ {n} {Γ : Ctx n} {s u : Ty} (B Ψ : ℕ) (str : Stream Γ s) →
+  all (eventB? B Ψ) (proj₁ (proj₂ (splitBurst {A = Val Γ u} str))) ≡ true
+splitBurst-bk-B B Ψ []               = refl
+splitBurst-bk-B {Γ = Γ} {u = u} B Ψ (em ∷ ems) =
+  all-++-intro _ (proj₁ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em)))) _
+    (splitEvents-bk-B {u = u} B Ψ (InstEmit.events em))
+    (splitBurst-bk-B {u = u} B Ψ ems)
+
+-- mergeAll's counter bump: whatever the lookup finds, the invariant
+-- survives (merge-st is value-free, every other shape is a no-op)
+mergeBump-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (nid : NodeId) (d : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B sched (record st { nodes = mergeBump nid d (EvalSt.nodes st) }) ≡ true
+mergeBump-INV Ψ B nid d sched st inv with lookupNode nid (EvalSt.nodes st)
+... | just (merge-st k od)   = install-INV Ψ B sched st nid
+                                 (merge-st (if d then k else suc k) od) refl refl inv
+... | nothing                = inv
+... | just (scan-st _)       = inv
+... | just (take-st _)       = inv
+... | just (concat-st _ _ _) = inv
+... | just (switch-st _ _)   = inv
+... | just (exhaust-st _ _)  = inv
+
+-- switchAll's cut: the same registry filter the take frame runs
+switchKill-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ W E : ℕ)
+  (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  let r = switchKill cur sched st
+  in (INV? Ψ (capᴱ W E) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (all (eventB? (capᴱ W E) Ψ) (proj₁ r) ≡ true)
+switchKill-INV Ψ W E nothing  sched st inv = inv , refl
+switchKill-INV Ψ W E (just v) sched st inv =
+  ∧-intro
+    (∧-intro (sweepLive-bounded B kept (Sched.live sched) bls) bns)
+  (∧-intro
+    (∧-intro (sweepLive-fnCap Ψ kept (Sched.live sched) fls) fns)
+  (∧-intro lenOK
+  (∧-intro (cutThrough-regs B Ψ v del wm dy (EvalSt.registry st) rb) r4))) ,
+  cutThrough-closes B Ψ v del wm dy (EvalSt.registry st)
+  where
+  B    = capᴱ W E
+  del  = EvalSt.delivered st
+  wm   = EvalSt.regWatermark st
+  dy   = EvalSt.dying st
+  kept = proj₁ (cutThrough v del wm dy (EvalSt.registry st))
+  sb   = proj₁ (∧-true _ _ inv)
+  r1   = proj₂ (∧-true _ _ inv)
+  fc   = proj₁ (∧-true _ _ r1)
+  r2   = proj₂ (∧-true _ _ r1)
+  rl   = proj₁ (∧-true _ _ r2)
+  r3   = proj₂ (∧-true _ _ r2)
+  rb   = proj₁ (∧-true _ _ r3)
+  r4   = proj₂ (∧-true _ _ r3)
+  bls  = proj₁ (∧-true _ _ sb)
+  bns  = proj₂ (∧-true _ _ sb)
+  fls  = proj₁ (∧-true _ _ fc)
+  fns  = proj₂ (∧-true _ _ fc)
+  lenOK : (length kept ≤ᵇ B) ≡ true
+  lenOK = T⇒≡true _ (≤⇒≤ᵇ
+    (≤-trans (cutThrough-len v del wm dy (EvalSt.registry st))
+             (≤ᵇ⇒≤ _ _ (T-to rl))))
+
+-- the wrap: values and events pass through, only the *All node's
+-- done-flag is written back (and concat's queue is re-installed as-is)
+thruWrap-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ B : ℕ) (op : AllOp) (nid : NodeId) (fin : Bool)
+  (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  all (valB? B Ψ u) vs ≡ true →
+  all (eventB? B Ψ) bs ≡ true →
+  let r = thruWrap op nid fin (vs , bs , sched , st)
+  in (INV? Ψ B (proj₁ (proj₂ (proj₂ (proj₂ r))))
+               (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? B Ψ u) (proj₁ r) ≡ true)
+     × (all (eventB? B Ψ) (proj₁ (proj₂ r)) ≡ true)
+thruWrap-wet Ψ B op nid false vs bs sched st inv vB bB = inv , vB , bB
+thruWrap-wet Ψ B mergeᵒ nid true vs bs sched st inv vB bB
+  with lookupNode nid (EvalSt.nodes st)
+... | just (merge-st k _)    =
+      install-INV Ψ B sched st nid (merge-st k true) refl refl inv , vB , bB
+... | nothing                = inv , vB , bB
+... | just (scan-st _)       = inv , vB , bB
+... | just (take-st _)       = inv , vB , bB
+... | just (concat-st _ _ _) = inv , vB , bB
+... | just (switch-st _ _)   = inv , vB , bB
+... | just (exhaust-st _ _)  = inv , vB , bB
+thruWrap-wet Ψ B concatᵒ nid true vs bs sched st inv vB bB
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-B B Ψ nid (EvalSt.nodes st)
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+... | just (concat-st q act _) | nb =
+      install-INV Ψ B sched st nid (concat-st q act true)
+        (proj₁ nb) (proj₂ nb) inv , vB , bB
+... | nothing                | _ = inv , vB , bB
+... | just (scan-st _)       | _ = inv , vB , bB
+... | just (take-st _)       | _ = inv , vB , bB
+... | just (merge-st _ _)    | _ = inv , vB , bB
+... | just (switch-st _ _)   | _ = inv , vB , bB
+... | just (exhaust-st _ _)  | _ = inv , vB , bB
+thruWrap-wet Ψ B switchᵒ nid true vs bs sched st inv vB bB
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur _) =
+      install-INV Ψ B sched st nid (switch-st cur true) refl refl inv , vB , bB
+... | nothing                = inv , vB , bB
+... | just (scan-st _)       = inv , vB , bB
+... | just (take-st _)       = inv , vB , bB
+... | just (merge-st _ _)    = inv , vB , bB
+... | just (concat-st _ _ _) = inv , vB , bB
+... | just (exhaust-st _ _)  = inv , vB , bB
+thruWrap-wet Ψ B exhaustᵒ nid true vs bs sched st inv vB bB
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act _) =
+      install-INV Ψ B sched st nid (exhaust-st act true) refl refl inv , vB , bB
+... | nothing                = inv , vB , bB
+... | just (scan-st _)       = inv , vB , bB
+... | just (take-st _)       = inv , vB , bB
+... | just (merge-st _ _)    = inv , vB , bB
+... | just (concat-st _ _ _) = inv , vB , bB
+... | just (switch-st _ _)   = inv , vB , bB
+
+-- forward declarations: these three join subscribeE-walkS's clique
+-- (thruConsume re-enters subscribeE through subscribeInner), so their
+-- definitions live after the walk's own signature
+subscribeInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  valB? (capᴱ W E) Ψ (obs u) o ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = subscribeInner g op allNid κ id now o sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ u) (proj₁ (proj₂ r)) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ (proj₂ r))) ≡ true)
+
+thruConsume-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  valB? (capᴱ W E) Ψ (obs u) o ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = thruConsume g op nid κ id now o sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ r)))
+                           (proj₂ (proj₂ (proj₂ r))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+
+thruWalk-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (valB? (capᴱ W E) Ψ (obs u)) vals ≡ true →
+  let r = thruWalk g op nid κ id now vals sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ r)))
+                           (proj₂ (proj₂ (proj₂ r))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+
+stepFrame-thruOuter-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (valB? (capᴱ W E) Ψ (obs u)) vals ≡ true →
+  let r = stepFrame g id now (thru-outer op nid) κ vals fin sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-thruOuter-wet Ψ W g id now op nid κ vals fin sched st E 3≤E inv pB vB =
+  E′ , E≤E′ , proj₁ WR , proj₁ (proj₂ WR) , proj₂ (proj₂ WR)
+  where
+  WK   = thruWalk-wet Ψ W g op nid κ id now vals sched st E 3≤E inv pB vB
+  E′   = proj₁ WK
+  E≤E′ = proj₁ (proj₂ WK)
+  wr   = thruWalk g op nid κ id now vals sched st
+  WR   = thruWrap-wet Ψ (capᴱ W E′) op nid fin (proj₁ wr) (proj₁ (proj₂ wr))
+           (proj₁ (proj₂ (proj₂ wr))) (proj₂ (proj₂ (proj₂ wr)))
+           (proj₁ (proj₂ (proj₂ WK)))
+           (proj₁ (proj₂ (proj₂ (proj₂ WK))))
+           (proj₂ (proj₂ (proj₂ (proj₂ WK))))
+
+------------------------------------------------------------------
 -- stepFrame-wet, now a REAL dispatch: the map clause proven end to
 -- end on the ledger rule; the other frames delegate to their named
 -- cores above
@@ -5619,6 +5826,176 @@ subscribeE-walkS Ψ W g (varᵉ ()) κ id now sched st E 3≤E inv szB fcB pB
 subscribeE-walkS Ψ W g (deferᵉ body) κ id now sched st E 3≤E inv szB fcB pB =
   subscribeE-defer-wet Ψ W g body κ id now sched st E 3≤E inv
     (≤-trans (n≤1+n (sizeᵉ body)) szB) fcB pB
+
+------------------------------------------------------------------
+-- the *All re-entry, the clique's last link: one inner subscription
+-- per emitted outer value.  g0 is the dry stub (a lone close, no
+-- ledger); gs peels one fuel unit and re-enters subscribeE-walkS on
+-- the inner — a runtime VALUE, so the gas is what decreases.
+------------------------------------------------------------------
+
+subscribeInner-wet Ψ W g0 op allNid κ id now o sched st E 3≤E inv oB pB =
+  E , ≤-refl , inv , refl , refl
+subscribeInner-wet {u = u} Ψ W (gs fuel) op allNid κ id now o sched st E
+                   3≤E inv oB pB =
+  E′ , E≤E′ , inv′ ,
+  splitBurst-vals-B {u = u} (capᴱ W E′) Ψ (proj₁ sE) bB ,
+  splitBurst-bk-B {u = u} (capᴱ W E′) Ψ (proj₁ sE)
+  where
+  inst   = Sched.nextNode sched
+  sched₀ = record sched { nextNode = suc inst }
+  sE     = subscribeE fuel o (from-inner op allNid inst ↠ κ) id now sched₀ st
+  IH     = subscribeE-walkS Ψ W fuel o (from-inner op allNid inst ↠ κ) id now
+             sched₀ st E 3≤E inv
+             (≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ oB))))
+             (≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true _ _ oB))))
+             (∧-intro refl pB)
+  E′     = proj₁ IH
+  E≤E′   = proj₁ (proj₂ IH)
+  inv′   = proj₁ (proj₂ (proj₂ IH))
+  bB     = proj₂ (proj₂ (proj₂ IH))
+
+thruConsume-wet Ψ W g mergeᵒ nid κ id now o sched st E 3≤E inv oB pB =
+  E₁ , E≤E₁ , mergeBump-INV Ψ (capᴱ W E₁) nid done (proj₁ (proj₂ SI₄)) st₁ inv₁ ,
+  vsB , bsB
+  where
+  SI   = subscribeInner-wet Ψ W g mergeᵒ nid κ id now o sched st E 3≤E inv oB pB
+  SI₄  = subscribeInner g mergeᵒ nid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+  E₁   = proj₁ SI
+  E≤E₁ = proj₁ (proj₂ SI)
+  inv₁ = proj₁ (proj₂ (proj₂ SI))
+  vsB  = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsB  = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+thruConsume-wet {u = u} Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-B (capᴱ W E) Ψ nid (EvalSt.nodes st)
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+... | just (concat-st {w} q true od) | nb with w ≟ᵗ u
+...   | yes refl =
+  E , ≤-refl ,
+  install-INV Ψ (capᴱ W E) sched st nid (concat-st (q ++ o ∷ []) true od)
+    (all-++-intro _ q _ (proj₁ nb)
+      (∧-intro (proj₁ (∧-true _ _ oB)) refl))
+    (all-++-intro _ q _ (proj₂ nb)
+      (∧-intro (proj₂ (∧-true _ _ oB)) refl))
+    inv ,
+  refl , refl
+...   | no _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet {u = u} Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | just (concat-st q false od) | nb =
+  E₁ , E≤E₁ ,
+  install-INV Ψ (capᴱ W E₁) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))) st₁ nid
+    (concat-st {t = u} [] (not done) od) refl refl inv₁ ,
+  vsB , bsB
+  where
+  SI   = subscribeInner-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+  SI₄  = subscribeInner g concatᵒ nid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+  E₁   = proj₁ SI
+  E≤E₁ = proj₁ (proj₂ SI)
+  inv₁ = proj₁ (proj₂ (proj₂ SI))
+  vsB  = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsB  = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+thruConsume-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | nothing | _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | just (scan-st _) | _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | just (take-st _) | _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | just (merge-st _ _) | _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | just (switch-st _ _) | _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
+    | just (exhaust-st _ _) | _ = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g switchᵒ nid κ id now o sched st E 3≤E inv oB pB
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) =
+  E₁ , E≤E₁ ,
+  install-INV Ψ (capᴱ W E₁) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))) st₂ nid
+    (switch-st (if done then nothing else just inst) od) refl refl inv₁ ,
+  vsB ,
+  all-++-intro _ closes _
+    (eventsB?-widen closes (capᴱ-mono W E≤E₁) (proj₂ KL)) bsB
+  where
+  KL     = switchKill-INV Ψ W E cur sched st inv
+  closes = proj₁ (switchKill cur sched st)
+  sched₁ = proj₁ (proj₂ (switchKill cur sched st))
+  st₁    = proj₂ (proj₂ (switchKill cur sched st))
+  SI     = subscribeInner-wet Ψ W g switchᵒ nid κ id now o sched₁ st₁ E 3≤E
+             (proj₁ KL) oB pB
+  SI₄    = subscribeInner g switchᵒ nid κ id now o sched₁ st₁
+  inst   = proj₁ SI₄
+  done   = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+  E₁     = proj₁ SI
+  E≤E₁   = proj₁ (proj₂ SI)
+  inv₁   = proj₁ (proj₂ (proj₂ SI))
+  vsB    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsB    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+... | nothing                = E , ≤-refl , inv , refl , refl
+... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
+... | just (take-st _)       = E , ≤-refl , inv , refl , refl
+... | just (merge-st _ _)    = E , ≤-refl , inv , refl , refl
+... | just (concat-st _ _ _) = E , ≤-refl , inv , refl , refl
+... | just (exhaust-st _ _)  = E , ≤-refl , inv , refl , refl
+thruConsume-wet Ψ W g exhaustᵒ nid κ id now o sched st E 3≤E inv oB pB
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st true od)  = E , ≤-refl , inv , refl , refl
+... | just (exhaust-st false od) =
+  E₁ , E≤E₁ ,
+  install-INV Ψ (capᴱ W E₁) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))) st₁ nid
+    (exhaust-st (not done) od) refl refl inv₁ ,
+  vsB , bsB
+  where
+  SI   = subscribeInner-wet Ψ W g exhaustᵒ nid κ id now o sched st E 3≤E inv oB pB
+  SI₄  = subscribeInner g exhaustᵒ nid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+  E₁   = proj₁ SI
+  E≤E₁ = proj₁ (proj₂ SI)
+  inv₁ = proj₁ (proj₂ (proj₂ SI))
+  vsB  = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsB  = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+... | nothing                = E , ≤-refl , inv , refl , refl
+... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
+... | just (take-st _)       = E , ≤-refl , inv , refl , refl
+... | just (merge-st _ _)    = E , ≤-refl , inv , refl , refl
+... | just (concat-st _ _ _) = E , ≤-refl , inv , refl , refl
+... | just (switch-st _ _)   = E , ≤-refl , inv , refl , refl
+
+thruWalk-wet Ψ W g op nid κ id now [] sched st E 3≤E inv pB vB =
+  E , ≤-refl , inv , refl , refl
+thruWalk-wet {u = u} Ψ W g op nid κ id now (o ∷ os) sched st E 3≤E inv pB vB =
+  E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ ,
+  all-++-intro _ vs _ (valsB?-widen u vs cap₁₂ vsB) vs′B ,
+  all-++-intro _ bs _ (eventsB?-widen bs cap₁₂ bsB) bs′B
+  where
+  CS   = thruConsume-wet Ψ W g op nid κ id now o sched st E 3≤E inv
+           (proj₁ (∧-true _ _ vB)) pB
+  cr   = thruConsume g op nid κ id now o sched st
+  vs   = proj₁ cr
+  bs   = proj₁ (proj₂ cr)
+  E₁   = proj₁ CS
+  E≤E₁ = proj₁ (proj₂ CS)
+  inv₁ = proj₁ (proj₂ (proj₂ CS))
+  vsB  = proj₁ (proj₂ (proj₂ (proj₂ CS)))
+  bsB  = proj₂ (proj₂ (proj₂ (proj₂ CS)))
+  cap₁ = capᴱ-mono W E≤E₁
+  IH   = thruWalk-wet Ψ W g op nid κ id now os
+           (proj₁ (proj₂ (proj₂ cr))) (proj₂ (proj₂ (proj₂ cr))) E₁
+           (≤-trans 3≤E E≤E₁) inv₁ (pathB?-widen κ cap₁ pB)
+           (valsB?-widen (obs u) os cap₁ (proj₂ (∧-true _ _ vB)))
+  E₂    = proj₁ IH
+  E₁≤E₂ = proj₁ (proj₂ IH)
+  inv₂  = proj₁ (proj₂ (proj₂ IH))
+  vs′B  = proj₁ (proj₂ (proj₂ (proj₂ IH)))
+  bs′B  = proj₂ (proj₂ (proj₂ (proj₂ IH)))
+  cap₁₂ = capᴱ-mono W E₁≤E₂
 
 ------------------------------------------------------------------
 -- THE FOLD DECOMPOSITION, PROVEN: cascadeGo threads the walk
