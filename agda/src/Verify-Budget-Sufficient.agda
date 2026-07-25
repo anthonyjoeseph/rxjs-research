@@ -3172,22 +3172,134 @@ spendᴱ-compose Ψ r₁ s₁ r₂ s₂ =
   rearrange = solve 4 (λ a₁ b₁ a₂ b₂ →
     (a₁ :* b₁) :* (a₂ :* b₂) := (a₁ :* a₂) :* (b₁ :* b₂)) refl
 
-postulate
-  -- (W6) the fold-run closed form: one scan run over a value list
-  -- of length m, everything (fn size, seed, values) within the
-  -- current cap, lands within the cap grown by the single factor
-  -- 3^(suc caseW · m).  Recurrence: at position q ≥ E ≥ 2 one fold
-  -- lands at E + (q+2)·3^w ≤ q·3^(suc w) (grow-pow + applyFn-sharp)
-  scanVals-sharp : ∀ {n} {Γ : Ctx n} {s u} (W E : ℕ)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u)
-    (vs : List (Val Γ s)) →
-    2 ≤ E →
-    sizeᵗ fn ≤ capᴱ W E → sizeᵛ u acc ≤ capᴱ W E →
-    All (λ v → sizeᵛ s v ≤ capᴱ W E) vs →
-    (sizeᵛ u (proj₂ (scanVals fn acc vs))
-       ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
-    × All (λ o → sizeᵛ u o ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
-          (proj₁ (scanVals fn acc vs))
+-- (W6) pair-size helpers: a scan fold feeds (acc,v) as a pair, so
+-- the input size is 1+2C^E.  grow-pow3 handles the 3-story rebase;
+-- pair-ledger-step closes the exponent recurrence at 3≤E.
+grow-pow3 : ∀ W E → 4 + 4 * capᴱ W E ≤ capᴱ W (E + 3)
+grow-pow3 W E =
+  ≤-trans (+-monoˡ-≤ (4 * X) (*-monoʳ-≤ 4 (one≤pow W E)))
+  (≤-trans (≤-reflexive (solve 1 (λ x → con 4 :* x :+ con 4 :* x := con 8 :* x) refl X))
+  (≤-trans (*-monoˡ-≤ X (^-monoˡ-≤ 3 (2≤C W)))
+           (≤-reflexive (trans (*-comm ((2 + 2 * W) ^ 3) X)
+                               (sym (^-distribˡ-+-* (2 + 2 * W) E 3))))))
+  where X = capᴱ W E
+
+pair-ledger-step : ∀ (E w : ℕ) → 3 ≤ E → E + (E + 3) * 3 ^ w ≤ E * 3 ^ suc w
+pair-ledger-step E w 3≤E =
+  ≤-trans (+-mono-≤ E≤E3w (*-monoˡ-≤ (3 ^ w) E+3≤2E))
+          (≤-reflexive (solve 2 (λ e x → e :* x :+ con 2 :* e :* x := e :* (con 3 :* x)) refl E (3 ^ w)))
+  where
+  E+3≤2E : E + 3 ≤ 2 * E
+  E+3≤2E = ≤-trans (+-monoʳ-≤ E 3≤E)
+                   (≤-reflexive (cong (E +_) (sym (+-identityʳ E))))
+  E≤E3w : E ≤ E * 3 ^ w
+  E≤E3w = ≤-trans (≤-reflexive (sym (*-identityʳ E)))
+                  (*-monoʳ-≤ E (one≤3^ w))
+
+-- (W6) the fold-run closed form: one scan run over a value list
+-- of length m, everything (fn size, seed, values) within the
+-- current cap at 3≤E, lands within the cap grown by 3^(suc caseW·m).
+-- Recurrence: applyFn at the pair (acc,v) uses grow-pow3 + pair-ledger-step
+-- in place of grow-pow + ledger-step.
+scanVals-sharp : ∀ {n} {Γ : Ctx n} {s u} (W E : ℕ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u)
+  (vs : List (Val Γ s)) →
+  3 ≤ E →
+  sizeᵗ fn ≤ capᴱ W E → sizeᵛ u acc ≤ capᴱ W E →
+  All (λ v → sizeᵛ s v ≤ capᴱ W E) vs →
+  (sizeᵛ u (proj₂ (scanVals fn acc vs))
+     ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
+  × All (λ o → sizeᵛ u o ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
+        (proj₁ (scanVals fn acc vs))
+scanVals-sharp {s = s} {u = u} W E fn acc [] 3≤E hfn hacc _ =
+  subst (λ e → sizeᵛ u acc ≤ capᴱ W e × All (λ o → sizeᵛ u o ≤ capᴱ W e) []ᵃ)
+    (trans (cong (E *_) (cong (3 ^_) (trans (*-comm (suc (caseWᵗ fn)) 0) refl)))
+           (*-identityʳ E))
+    (hacc , []ᵃ)
+scanVals-sharp {s = s} {u = u} W E fn acc (v ∷ vs) 3≤E hfn hacc (hv ∷ᵃ hvs) =
+  last-ok , acc'B₁ ∷ᵃ outs-ok
+  where
+  cw    = suc (caseWᵗ fn)
+  m     = length vs
+  C     = 2 + 2 * W
+  E₁    = E * 3 ^ cw
+  3≤E₁  = ≤-trans 3≤E (E≤E*3^ E cw)
+  cap₁  = capᴱ-mono W (E≤E*3^ E cw)
+  acc'  = applyFn fn (acc , v)
+
+  -- pair bound: sizeᵛ (u×s) (acc,v) ≤ 1 + C^E + C^E
+  pairB : sizeᵛ (u ×ᵗ s) (acc , v) ≤ 1 + capᴱ W E + capᴱ W E
+  pairB = s≤s (+-mono-≤ hacc hv)
+
+  -- 2 + 2*(1 + C^E + C^E) = 4 + 4*C^E  by ring arithmetic
+  arith : 2 + 2 * (1 + capᴱ W E + capᴱ W E) ≡ 4 + 4 * capᴱ W E
+  arith = solve 1 (λ x → con 2 :+ con 2 :* (con 1 :+ x :+ x) := con 4 :+ con 4 :* x)
+                  refl (capᴱ W E)
+
+  -- sizeᵗ fn ≤ 1 + C^E + C^E (widened from hfn)
+  hf' : sizeᵗ fn ≤ 1 + capᴱ W E + capᴱ W E
+  hf' = ≤-trans hfn (≤-trans (m≤n+m (capᴱ W E) (capᴱ W E)) (n≤1+n _))
+
+  -- applyFn-sharp at V = 1 + C^E + C^E
+  acc'sz : sizeᵛ u acc' ≤ sizeᵗ fn * (2 + 2 * (1 + capᴱ W E + capᴱ W E)) ^ 3 ^ caseWᵗ fn
+  acc'sz = applyFn-sharp (1 + capᴱ W E + capᴱ W E) fn (acc , v) pairB hf'
+
+  -- substitute arith to expose (4 + 4*C^E)^...
+  acc'sz' : sizeᵛ u acc' ≤ sizeᵗ fn * (4 + 4 * capᴱ W E) ^ 3 ^ caseWᵗ fn
+  acc'sz' = subst (λ b → sizeᵛ u acc' ≤ sizeᵗ fn * b ^ 3 ^ caseWᵗ fn) arith acc'sz
+
+  -- grow-pow3: (4 + 4*C^E) ≤ C^(E+3); lift through ^
+  step1 : sizeᵛ u acc' ≤ sizeᵗ fn * capᴱ W (E + 3) ^ 3 ^ caseWᵗ fn
+  step1 = ≤-trans acc'sz'
+            (*-monoʳ-≤ (sizeᵗ fn) (^-monoˡ-≤ (3 ^ caseWᵗ fn) (grow-pow3 W E)))
+
+  -- *-monoˡ using hfn (sizeᵗ fn ≤ C^E)
+  step2 : sizeᵛ u acc' ≤ capᴱ W E * capᴱ W (E + 3) ^ 3 ^ caseWᵗ fn
+  step2 = ≤-trans step1 (*-monoˡ-≤ (capᴱ W (E + 3) ^ 3 ^ caseWᵗ fn) hfn)
+
+  -- collapse: C^E * (C^(E+3))^(3^cw) = C^(E + (E+3)*3^cw)
+  collapse : capᴱ W E * capᴱ W (E + 3) ^ 3 ^ caseWᵗ fn
+           ≡ capᴱ W (E + (E + 3) * 3 ^ caseWᵗ fn)
+  collapse =
+    trans (cong (capᴱ W E *_) (^-*-assoc C (E + 3) (3 ^ caseWᵗ fn)))
+          (sym (^-distribˡ-+-* C E ((E + 3) * 3 ^ caseWᵗ fn)))
+
+  -- pair-ledger-step: E + (E+3)*3^cw ≤ E*3^suc cw = E₁
+  acc'B : sizeᵛ u acc' ≤ capᴱ W E₁
+  acc'B =
+    ≤-trans step2
+    (≤-trans (≤-reflexive collapse)
+             (capᴱ-mono W (pair-ledger-step E (caseWᵗ fn) 3≤E)))
+
+  -- widen fn and value bounds to E₁
+  hfn₁ : sizeᵗ fn ≤ capᴱ W E₁
+  hfn₁ = ≤-trans hfn cap₁
+  hvs₁ : All (λ v₀ → sizeᵛ s v₀ ≤ capᴱ W E₁) vs
+  hvs₁ = mapᴬ (λ h → ≤-trans h cap₁) hvs
+
+  -- IH at position E₁
+  IH     = scanVals-sharp W E₁ fn acc' vs 3≤E₁ hfn₁ acc'B hvs₁
+  IH-last = proj₁ IH
+  IH-outs = proj₂ IH
+
+  -- E₁ * 3^(cw*m) = E * 3^(cw * suc m)
+  expEq : E₁ * 3 ^ (cw * m) ≡ E * 3 ^ (cw * suc m)
+  expEq =
+    trans (*-assoc E (3 ^ cw) (3 ^ (cw * m)))
+    (cong (E *_)
+      (trans (sym (^-distribˡ-+-* 3 cw (cw * m)))
+             (cong (3 ^_) (+-comm cw (cw * m)))))
+
+  -- transport IH results to exponent cw * suc m
+  cap-eq = ≤-reflexive (cong (capᴱ W) expEq)
+  last-ok : sizeᵛ u (proj₂ (scanVals fn acc' vs)) ≤ capᴱ W (E * 3 ^ (cw * suc m))
+  last-ok = ≤-trans IH-last cap-eq
+  outs-ok : All (λ o → sizeᵛ u o ≤ capᴱ W (E * 3 ^ (cw * suc m))) (proj₁ (scanVals fn acc' vs))
+  outs-ok = mapᴬ (λ h → ≤-trans h cap-eq) IH-outs
+
+  -- acc' itself bounded at E * 3^(cw * suc m)
+  acc'B₁ : sizeᵛ u acc' ≤ capᴱ W (E * 3 ^ (cw * suc m))
+  acc'B₁ = ≤-trans acc'B (≤-trans (capᴱ-mono W (E≤E*3^ E₁ (cw * m))) cap-eq)
 
 ------------------------------------------------------------------
 -- the machine-side faces of the walk invariant
@@ -3640,7 +3752,7 @@ postulate
     (Ψ W Ω V ℓ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (E d : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
     pathB? (capᴱ W E) Ψ κ ≡ true →
@@ -3667,7 +3779,7 @@ postulate
 -- the walk contracts, store half — the SHAPE the clause grind
 -- threads (receipts E′ ≤ E · spendᴱ … attach with the cost
 -- instrumentation; the landing stays in the cores below).  Stated
--- against the frozen instant base W and a ledger position E ≥ 2.
+-- against the frozen instant base W and a ledger position E ≥ 3.
 ------------------------------------------------------------------
 
 postulate
@@ -3688,7 +3800,7 @@ postulate
   subscribeE-input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (Ψ W : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     let r = subscribeE g (input i) κ id now sched st
@@ -3698,7 +3810,7 @@ postulate
   subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (Ψ W : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     sizeᵉ body ≤ capᴱ W E → fnCapᵉ body ≤ Ψ →
     pathB? (capᴱ W E) Ψ κ ≡ true →
@@ -3711,7 +3823,7 @@ postulate
     (Ψ W : ℕ) (id : Id) (a : Arrival Γ)
     (path : Path Γ (arrTy a) t)
     (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     pathB? (capᴱ W E) Ψ path ≡ true →
     valB? (capᴱ W E) Ψ (arrTy a) (arrVal a) ≡ true →
@@ -3730,7 +3842,7 @@ postulate
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     frameB? (capᴱ W E) Ψ (scan-f fn nid) ≡ true →
     pathB? (capᴱ W E) Ψ κ ≡ true →
@@ -3747,7 +3859,7 @@ postulate
     (nid : NodeId) (κ : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     all (valB? (capᴱ W E) Ψ s) vals ≡ true →
@@ -3763,7 +3875,7 @@ postulate
     (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     all (valB? (capᴱ W E) Ψ s) vals ≡ true →
@@ -3779,7 +3891,7 @@ postulate
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (vals : List (Val Γ (obs u))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    2 ≤ E →
+    3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     all (valB? (capᴱ W E) Ψ (obs u)) vals ≡ true →
@@ -3999,7 +4111,7 @@ stepFrame-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Frame Γ s u) (κ : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-  2 ≤ E →
+  3 ≤ E →
   INV? Ψ (capᴱ W E) sched st ≡ true →
   frameB? (capᴱ W E) Ψ f ≡ true →
   pathB? (capᴱ W E) Ψ κ ≡ true →
@@ -4010,10 +4122,10 @@ stepFrame-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
      × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
      × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
-stepFrame-wet Ψ W g id now (map-f fn) κ vals fin sched st E 2≤E inv fB pB vB =
+stepFrame-wet Ψ W g id now (map-f fn) κ vals fin sched st E 3≤E inv fB pB vB =
   E * 3 ^ suc Ψ , E≤E*3^ E (suc Ψ) ,
   INV?-widen sched st (capᴱ-mono W (E≤E*3^ E (suc Ψ))) inv ,
-  map-applyFn-B Ψ W E fn 2≤E capsOK szOK vals vB ,
+  map-applyFn-B Ψ W E fn (≤-trans (n≤1+n 2) 3≤E) capsOK szOK vals vB ,
   refl
   where
   fB2   = ∧-true (sizeᵗ fn ≤ᵇ capᴱ W E) _ fB
@@ -4049,7 +4161,7 @@ pushBurst-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (κ : Path Γ u t) (ems : Stream Γ s)
   (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-  2 ≤ E →
+  3 ≤ E →
   INV? Ψ (capᴱ W E) sched st ≡ true →
   frameB? (capᴱ W E) Ψ f ≡ true →
   pathB? (capᴱ W E) Ψ κ ≡ true →
@@ -4058,10 +4170,10 @@ pushBurst-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   in Σ ℕ λ E′ → (E ≤ E′)
      × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-pushBurst-wet Ψ W g id now f κ [] sched st E 2≤E inv fB pB bB =
+pushBurst-wet Ψ W g id now f κ [] sched st E 3≤E inv fB pB bB =
   E , ≤-refl , inv , refl
 pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
-              sched st E 2≤E inv fB pB bB =
+              sched st E 3≤E inv fB pB bB =
   E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , outAll
   where
   B₀    = capᴱ W E
@@ -4073,7 +4185,7 @@ pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
 
   step  = stepFrame g id now f κ vals (proj₂ (proj₂ sp)) sched st
   W1    = stepFrame-wet Ψ W g id now f κ vals (proj₂ (proj₂ sp))
-            sched st E 2≤E inv fB pB
+            sched st E 3≤E inv fB pB
             (splitEvents-vals-B B₀ Ψ (InstEmit.events em) emB)
   E₁    = proj₁ W1
   E≤E₁  = proj₁ (proj₂ W1)
@@ -4084,7 +4196,7 @@ pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
   rec   = pushBurst-wet Ψ W g id now f κ ems
             (proj₁ (proj₂ (proj₂ (proj₂ step))))
             (proj₂ (proj₂ (proj₂ (proj₂ step))))
-            E₁ (≤-trans 2≤E E≤E₁) inv₁
+            E₁ (≤-trans 3≤E E≤E₁) inv₁
             (frameB?-widen f cap₁ fB) (pathB?-widen κ cap₁ pB)
             (burstB?-widen ems cap₁ emsB)
   E₂    = proj₁ rec
@@ -4126,7 +4238,7 @@ subscribeE-walkS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ W : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-  2 ≤ E →
+  3 ≤ E →
   INV? Ψ (capᴱ W E) sched st ≡ true →
   sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
   pathB? (capᴱ W E) Ψ κ ≡ true →
@@ -4142,7 +4254,7 @@ subscribeAll-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ W : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
   (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-  2 ≤ E →
+  3 ≤ E →
   INV? Ψ (capᴱ W E) sched st ≡ true →
   boundedNode (capᴱ W E) ns ≡ true → fnCapNode Ψ ns ≡ true →
   sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
@@ -4151,7 +4263,7 @@ subscribeAll-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   in Σ ℕ λ E′ → (E ≤ E′)
      × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-subscribeAll-wet Ψ W g op ns b κ id now sched st E 2≤E inv bn fnn szB fcB pB =
+subscribeAll-wet Ψ W g op ns b κ id now sched st E 3≤E inv bn fnn szB fcB pB =
   E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , b₂
   where
   nid    = Sched.nextNode sched
@@ -4160,7 +4272,7 @@ subscribeAll-wet Ψ W g op ns b κ id now sched st E 2≤E inv bn fnn szB fcB pB
   inv₀   = install-INV Ψ (capᴱ W E) sched₁ st nid ns bn fnn inv
   sE      = subscribeE g b (thru-outer op nid ↠ κ) id now sched₁ st₀
   IH     = subscribeE-walkS Ψ W g b (thru-outer op nid ↠ κ) id now
-             sched₁ st₀ E 2≤E inv₀ szB fcB (∧-intro refl pB)
+             sched₁ st₀ E 3≤E inv₀ szB fcB (∧-intro refl pB)
   E₁     = proj₁ IH
   E≤E₁   = proj₁ (proj₂ IH)
   inv₁   = proj₁ (proj₂ (proj₂ IH))
@@ -4168,16 +4280,16 @@ subscribeAll-wet Ψ W g op ns b κ id now sched st E 2≤E inv bn fnn szB fcB pB
   cap₁   = capᴱ-mono W E≤E₁
   PB     = pushBurst-wet Ψ W g id now (thru-outer op nid) κ (proj₁ sE)
              (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁
-             (≤-trans 2≤E E≤E₁) inv₁ refl (pathB?-widen κ cap₁ pB) bB₁
+             (≤-trans 3≤E E≤E₁) inv₁ refl (pathB?-widen κ cap₁ pB) bB₁
   E₂     = proj₁ PB
   E₁≤E₂  = proj₁ (proj₂ PB)
   inv₂   = proj₁ (proj₂ (proj₂ PB))
   b₂     = proj₂ (proj₂ (proj₂ PB))
 
-subscribeE-walkS Ψ W g (input i) κ id now sched st E 2≤E inv szB fcB pB =
-  subscribeE-input-wet Ψ W g i κ id now sched st E 2≤E inv pB
+subscribeE-walkS Ψ W g (input i) κ id now sched st E 3≤E inv szB fcB pB =
+  subscribeE-input-wet Ψ W g i κ id now sched st E 3≤E inv pB
 
-subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (ofᵉ ts) κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (ofᵉ ts) κ id now sched st E 3≤E inv szB fcB pB =
   E * 3 ^ suc Ψ , E≤E*3^ E (suc Ψ) ,
   INV?-widen (record sched { nextSource = suc (Sched.nextSource sched) }) st
     (capᴱ-mono W (E≤E*3^ E (suc Ψ))) inv ,
@@ -4185,14 +4297,14 @@ subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (ofᵉ ts) κ id now sched st E 2≤E 
     (∧-intro refl
       (all-++-intro _ (map value (map (λ tm → evalTm tm) ts)) _
         (mapValue-B (capᴱ W (E * 3 ^ suc Ψ)) Ψ u (map (λ tm → evalTm tm) ts)
-          (ofVals-B Ψ W E 2≤E ts (≤-trans (n≤1+n (sizeᵗˢ ts)) szB) fcB))
+          (ofVals-B Ψ W E (≤-trans (n≤1+n 2) 3≤E) ts (≤-trans (n≤1+n (sizeᵗˢ ts)) szB) fcB))
         refl))
     refl
 
-subscribeE-walkS Ψ W g emptyᵉ κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS Ψ W g emptyᵉ κ id now sched st E 3≤E inv szB fcB pB =
   E , ≤-refl , inv , refl
 
-subscribeE-walkS Ψ W g (mapᵉ f b) κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS Ψ W g (mapᵉ f b) κ id now sched st E 3≤E inv szB fcB pB =
   E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , b₂
   where
   szf  = ≤-trans (≤-trans (m≤m+n (sizeᵗ f) (sizeᵉ b)) (n≤1+n _)) szB
@@ -4202,7 +4314,7 @@ subscribeE-walkS Ψ W g (mapᵉ f b) κ id now sched st E 2≤E inv szB fcB pB =
   fB   : frameB? (capᴱ W E) Ψ (map-f f) ≡ true
   fB   = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ szf)) (T⇒≡true _ (≤⇒≤ᵇ capf))
   sE    = subscribeE g b (map-f f ↠ κ) id now sched st
-  IH   = subscribeE-walkS Ψ W g b (map-f f ↠ κ) id now sched st E 2≤E inv
+  IH   = subscribeE-walkS Ψ W g b (map-f f ↠ κ) id now sched st E 3≤E inv
            szb fcb (∧-intro fB pB)
   E₁   = proj₁ IH
   E≤E₁ = proj₁ (proj₂ IH)
@@ -4210,14 +4322,14 @@ subscribeE-walkS Ψ W g (mapᵉ f b) κ id now sched st E 2≤E inv szB fcB pB =
   bB₁  = proj₂ (proj₂ (proj₂ IH))
   cap₁ = capᴱ-mono W E≤E₁
   PB   = pushBurst-wet Ψ W g id now (map-f f) κ (proj₁ sE)
-           (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁ (≤-trans 2≤E E≤E₁)
+           (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁ (≤-trans 3≤E E≤E₁)
            inv₁ (frameB?-widen (map-f f) cap₁ fB) (pathB?-widen κ cap₁ pB) bB₁
   E₂   = proj₁ PB
   E₁≤E₂ = proj₁ (proj₂ PB)
   inv₂ = proj₁ (proj₂ (proj₂ PB))
   b₂   = proj₂ (proj₂ (proj₂ PB))
 
-subscribeE-walkS Ψ W g (takeᵉ count b) κ id now sched st E 2≤E inv szB fcB pB
+subscribeE-walkS Ψ W g (takeᵉ count b) κ id now sched st E 3≤E inv szB fcB pB
   with evalTm count
 ... | zero  = E , ≤-refl , inv , refl
 ... | suc k = E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ , b₂
@@ -4229,7 +4341,7 @@ subscribeE-walkS Ψ W g (takeᵉ count b) κ id now sched st E 2≤E inv szB fcB
   fcb    = ≤-trans (m≤n⊔m (caseWᵗ count ⊔ fnCapᵗ count) (fnCapᵉ b)) fcB
   inv₀   = install-INV Ψ (capᴱ W E) sched₁ st nid (take-st (suc k)) refl refl inv
   sE      = subscribeE g b (take-f nid ↠ κ) id now sched₁ st₀
-  IH     = subscribeE-walkS Ψ W g b (take-f nid ↠ κ) id now sched₁ st₀ E 2≤E
+  IH     = subscribeE-walkS Ψ W g b (take-f nid ↠ κ) id now sched₁ st₀ E 3≤E
              inv₀ szb fcb (∧-intro refl pB)
   E₁     = proj₁ IH
   E≤E₁   = proj₁ (proj₂ IH)
@@ -4238,18 +4350,18 @@ subscribeE-walkS Ψ W g (takeᵉ count b) κ id now sched st E 2≤E inv szB fcB
   cap₁   = capᴱ-mono W E≤E₁
   PB     = pushBurst-wet Ψ W g id now (take-f nid) κ (proj₁ sE)
              (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₁
-             (≤-trans 2≤E E≤E₁) inv₁ refl (pathB?-widen κ cap₁ pB) bB₁
+             (≤-trans 3≤E E≤E₁) inv₁ refl (pathB?-widen κ cap₁ pB) bB₁
   E₂     = proj₁ PB
   E₁≤E₂  = proj₁ (proj₂ PB)
   inv₂   = proj₁ (proj₂ (proj₂ PB))
   b₂     = proj₂ (proj₂ (proj₂ PB))
 
-subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 3≤E inv szB fcB pB =
   E₃ , ≤-trans E≤E₁ (≤-trans E₁≤E₂ E₂≤E₃) , inv₃ , b₃
   where
   E₁    = E * 3 ^ suc Ψ
   E≤E₁  = E≤E*3^ E (suc Ψ)
-  2≤E₁  = ≤-trans 2≤E E≤E₁
+  3≤E₁  = ≤-trans 3≤E E≤E₁
   cap₁  = capᴱ-mono W E≤E₁
   nid    = Sched.nextNode sched
   sched₁ = proj₂ (mintNode sched)
@@ -4267,7 +4379,7 @@ subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 2
                    (≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b)) (n≤1+n _))) szB
   szb   = ≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f + sizeᵗ z)) (n≤1+n _)) szB
   -- the seed's install pays one eval edge
-  seedB = evalTm-cap Ψ W E z 2≤E
+  seedB = evalTm-cap Ψ W E z (≤-trans (n≤1+n 2) 3≤E)
             (≤-trans (m≤m⊔n (caseWᵗ z) (fnCapᵗ z)) capz) szz
   seedF = fnCap-evalWith Ψ z []ᵃ tt capz
   st₀   = installNode nid (scan-st (evalTm z)) st
@@ -4279,7 +4391,7 @@ subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 2
                   (T⇒≡true _ (≤⇒≤ᵇ capf))
   sE     = subscribeE g b (scan-f f nid ↠ κ) id now sched₁ st₀
   IH    = subscribeE-walkS Ψ W g b (scan-f f nid ↠ κ) id now sched₁ st₀ E₁
-            2≤E₁ inv₀ (≤-trans szb cap₁) fcb
+            3≤E₁ inv₀ (≤-trans szb cap₁) fcb
             (∧-intro fB₁ (pathB?-widen κ cap₁ pB))
   E₂    = proj₁ IH
   E₁≤E₂ = proj₁ (proj₂ IH)
@@ -4288,29 +4400,29 @@ subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 2
   cap₂  = capᴱ-mono W E₁≤E₂
   PB    = pushBurst-wet Ψ W g id now (scan-f f nid) κ (proj₁ sE)
             (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) E₂
-            (≤-trans 2≤E₁ E₁≤E₂) inv₂ (frameB?-widen (scan-f f nid) cap₂ fB₁)
+            (≤-trans 3≤E₁ E₁≤E₂) inv₂ (frameB?-widen (scan-f f nid) cap₂ fB₁)
             (pathB?-widen κ (capᴱ-mono W (≤-trans E≤E₁ E₁≤E₂)) pB) bB₂
   E₃    = proj₁ PB
   E₂≤E₃ = proj₁ (proj₂ PB)
   inv₃  = proj₁ (proj₂ (proj₂ PB))
   b₃    = proj₂ (proj₂ (proj₂ PB))
 
-subscribeE-walkS Ψ W g (mergeAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS Ψ W g (mergeAllᵉ b) κ id now sched st E 3≤E inv szB fcB pB =
   subscribeAll-wet Ψ W g mergeᵒ (merge-st 0 false) b κ id now sched st E
-    2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
-subscribeE-walkS {u = u} Ψ W g (concatAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+    3≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+subscribeE-walkS {u = u} Ψ W g (concatAllᵉ b) κ id now sched st E 3≤E inv szB fcB pB =
   subscribeAll-wet Ψ W g concatᵒ (concat-st {t = u} [] false false) b κ id now
-    sched st E 2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
-subscribeE-walkS Ψ W g (switchAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+    sched st E 3≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+subscribeE-walkS Ψ W g (switchAllᵉ b) κ id now sched st E 3≤E inv szB fcB pB =
   subscribeAll-wet Ψ W g switchᵒ (switch-st nothing false) b κ id now sched st E
-    2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
-subscribeE-walkS Ψ W g (exhaustAllᵉ b) κ id now sched st E 2≤E inv szB fcB pB =
+    3≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+subscribeE-walkS Ψ W g (exhaustAllᵉ b) κ id now sched st E 3≤E inv szB fcB pB =
   subscribeAll-wet Ψ W g exhaustᵒ (exhaust-st false false) b κ id now sched st E
-    2≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
+    3≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
 
-subscribeE-walkS Ψ W g0 (μᵉ body) κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS Ψ W g0 (μᵉ body) κ id now sched st E 3≤E inv szB fcB pB =
   E , ≤-refl , inv , refl
-subscribeE-walkS Ψ W (gs fuel) (μᵉ body) κ id now sched st E 2≤E inv szB fcB pB =
+subscribeE-walkS Ψ W (gs fuel) (μᵉ body) κ id now sched st E 3≤E inv szB fcB pB =
   proj₁ IH , ≤-trans E≤2E (proj₁ (proj₂ IH)) ,
   proj₁ (proj₂ (proj₂ IH)) , proj₂ (proj₂ (proj₂ IH))
   where
@@ -4322,13 +4434,13 @@ subscribeE-walkS Ψ W (gs fuel) (μᵉ body) κ id now sched st E 2≤E inv szB 
   fcU  : fnCapᵉ (unfoldμ body) ≤ Ψ
   fcU  = ≤-trans (fnCap-elimG (here refl) (μᵉ body) body) (⊔-lub fcB fcB)
   IH   = subscribeE-walkS Ψ W fuel (unfoldμ body) κ id now sched st (2 * E)
-           (≤-trans 2≤E E≤2E) (INV?-widen sched st cap2 inv) szU fcU
+           (≤-trans 3≤E E≤2E) (INV?-widen sched st cap2 inv) szU fcU
            (pathB?-widen κ cap2 pB)
 
-subscribeE-walkS Ψ W g (varᵉ ()) κ id now sched st E 2≤E inv szB fcB pB
+subscribeE-walkS Ψ W g (varᵉ ()) κ id now sched st E 3≤E inv szB fcB pB
 
-subscribeE-walkS Ψ W g (deferᵉ body) κ id now sched st E 2≤E inv szB fcB pB =
-  subscribeE-defer-wet Ψ W g body κ id now sched st E 2≤E inv
+subscribeE-walkS Ψ W g (deferᵉ body) κ id now sched st E 3≤E inv szB fcB pB =
+  subscribeE-defer-wet Ψ W g body κ id now sched st E 3≤E inv
     (≤-trans (n≤1+n (sizeᵉ body)) szB) fcB pB
 
 ------------------------------------------------------------------
@@ -4346,7 +4458,7 @@ cascadeGo-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (Ψ W : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-  2 ≤ E →
+  3 ≤ E →
   INV? Ψ (capᴱ W E) sched st ≡ true →
   all (λ rc → pathB? (capᴱ W E) Ψ (proj₂ rc)) chains ≡ true →
   valB? (capᴱ W E) Ψ (arrTy a) (arrVal a) ≡ true →
@@ -4354,22 +4466,22 @@ cascadeGo-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   in Σ ℕ λ E′ → (E ≤ E′)
      × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-cascadeGo-walk Ψ W a id [] sched st E 2≤E inv chB vB =
+cascadeGo-walk Ψ W a id [] sched st E 3≤E inv chB vB =
   E , ≤-refl , inv , refl
-cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 2≤E inv chB vB
+cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
   with ∧-true (pathB? (capᴱ W E) Ψ c) _ chB
 ... | pc , pchains with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true  = cascadeGo-walk Ψ W a id chains sched st E 2≤E inv pchains vB
+... | true  = cascadeGo-walk Ψ W a id chains sched st E 3≤E inv pchains vB
 ... | false =
   let st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
       (E₁ , E≤E₁ , inv₁ , em₁) =
-        chainStep-wet Ψ W id a c sched st₀ E 2≤E inv pc vB
+        chainStep-wet Ψ W id a c sched st₀ E 3≤E inv pc vB
       cap≤ = capᴱ-mono W E≤E₁
       (E₂ , E₁≤E₂ , inv₂ , em₂) =
         cascadeGo-walk Ψ W a id chains
           (proj₁ (proj₂ (chainStep id a c sched st₀)))
           (proj₂ (proj₂ (chainStep id a c sched st₀)))
-          E₁ (≤-trans 2≤E E≤E₁) inv₁
+          E₁ (≤-trans 3≤E E≤E₁) inv₁
           (chainsB?-widen chains cap≤ pchains)
           (valB?-widen (arrTy a) (arrVal a) cap≤ vB)
   in E₂ , ≤-trans E≤E₁ E₁≤E₂ , inv₂ ,
