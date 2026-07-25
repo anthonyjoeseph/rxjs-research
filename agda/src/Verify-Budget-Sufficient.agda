@@ -3121,29 +3121,34 @@ fnCap-substᴱ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Δ′ Θ t} (p : Δ ≡ Δ′) (
 fnCap-substᴱ refl e = refl
 
 -- if a' ≤ a ⊔ c and b' ≤ b ⊔ c then a' ⊔ b' ≤ (a ⊔ b) ⊔ c
-⊔-elim-help : ∀ {a' a b' b c} → a' ≤ a ⊔ c → b' ≤ b ⊔ c → a' ⊔ b' ≤ (a ⊔ b) ⊔ c
-⊔-elim-help ha hb =
-  ⊔-lub (≤-trans ha (⊔-mono-≤ (m≤m⊔n _ _) ≤-refl))
-        (≤-trans hb (⊔-mono-≤ (m≤n⊔m _ _) ≤-refl))
+-- every ⊔ index is given by name: left to itself, these _ 's are metas
+-- under a stuck ⊔ and the solver cannot pick them
+⊔-elim-help : ∀ {a' b'} (a b c : ℕ) →
+  a' ≤ a ⊔ c → b' ≤ b ⊔ c → a' ⊔ b' ≤ (a ⊔ b) ⊔ c
+⊔-elim-help a b c ha hb =
+  ⊔-lub (≤-trans ha (⊔-mono-≤ (m≤m⊔n a b) (≤-refl {c})))
+        (≤-trans hb (⊔-mono-≤ (m≤n⊔m a b) (≤-refl {c})))
 
 -- (cw ⊔ fc) pair bound after elimG/D, using caseW invariance + fnCap IH
 fn-comb-G : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ) (cl : Closed Γ t)
-  (tm : Tm Γ Δᵍ Δ Θ u) {C} →
+  (tm : Tm Γ Δᵍ Δ Θ u) (C : ℕ) →
   fnCapᵗ (elimGTm x cl tm) ≤ fnCapᵗ tm ⊔ C →
   (caseWᵗ (elimGTm x cl tm) ⊔ fnCapᵗ (elimGTm x cl tm)) ≤ (caseWᵗ tm ⊔ fnCapᵗ tm) ⊔ C
-fn-comb-G x cl tm h =
-  ⊔-lub (subst (_≤ _) (sym (caseW-elimGᵗ x cl tm))
-               (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _)))
-        (≤-trans h (⊔-mono-≤ (m≤n⊔m _ _) ≤-refl))
+fn-comb-G x cl tm C h =
+  ⊔-lub (subst (_≤ (caseWᵗ tm ⊔ fnCapᵗ tm) ⊔ C) (sym (caseW-elimGᵗ x cl tm))
+               (≤-trans (m≤m⊔n (caseWᵗ tm) (fnCapᵗ tm))
+                        (m≤m⊔n (caseWᵗ tm ⊔ fnCapᵗ tm) C)))
+        (≤-trans h (⊔-mono-≤ (m≤n⊔m (caseWᵗ tm) (fnCapᵗ tm)) (≤-refl {C})))
 
 fn-comb-D : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ) (cl : Closed Γ t)
-  (tm : Tm Γ Δᵍ Δ Θ u) {C} →
+  (tm : Tm Γ Δᵍ Δ Θ u) (C : ℕ) →
   fnCapᵗ (elimDTm x cl tm) ≤ fnCapᵗ tm ⊔ C →
   (caseWᵗ (elimDTm x cl tm) ⊔ fnCapᵗ (elimDTm x cl tm)) ≤ (caseWᵗ tm ⊔ fnCapᵗ tm) ⊔ C
-fn-comb-D x cl tm h =
-  ⊔-lub (subst (_≤ _) (sym (caseW-elimDᵗ x cl tm))
-               (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _)))
-        (≤-trans h (⊔-mono-≤ (m≤n⊔m _ _) ≤-refl))
+fn-comb-D x cl tm C h =
+  ⊔-lub (subst (_≤ (caseWᵗ tm ⊔ fnCapᵗ tm) ⊔ C) (sym (caseW-elimDᵗ x cl tm))
+               (≤-trans (m≤m⊔n (caseWᵗ tm) (fnCapᵗ tm))
+                        (m≤m⊔n (caseWᵗ tm ⊔ fnCapᵗ tm) C)))
+        (≤-trans h (⊔-mono-≤ (m≤n⊔m (caseWᵗ tm) (fnCapᵗ tm)) (≤-refl {C})))
 
 -- (W2, remaining) elimG/D keep fnCap ≤ host ⊔ closure
 mutual
@@ -3154,14 +3159,19 @@ mutual
   fnCap-elimG x cl (ofᵉ ts)        = fnCap-elimGᵗˢ x cl ts
   fnCap-elimG x cl emptyᵉ          = z≤n
   fnCap-elimG x cl (mapᵉ f e)      =
-    ⊔-elim-help (fn-comb-G x cl f (fnCap-elimGᵗ x cl f))
+    ⊔-elim-help (caseWᵗ f ⊔ fnCapᵗ f) (fnCapᵉ e) (fnCapᵉ cl)
+                (fn-comb-G x cl f (fnCapᵉ cl) (fnCap-elimGᵗ x cl f))
                 (fnCap-elimG x cl e)
   fnCap-elimG x cl (takeᵉ c e)     =
-    ⊔-elim-help (fn-comb-G x cl c (fnCap-elimGᵗ x cl c))
+    ⊔-elim-help (caseWᵗ c ⊔ fnCapᵗ c) (fnCapᵉ e) (fnCapᵉ cl)
+                (fn-comb-G x cl c (fnCapᵉ cl) (fnCap-elimGᵗ x cl c))
                 (fnCap-elimG x cl e)
   fnCap-elimG x cl (scanᵉ f z e)   =
-    ⊔-elim-help (fn-comb-G x cl f (fnCap-elimGᵗ x cl f))
-                (⊔-elim-help (fn-comb-G x cl z (fnCap-elimGᵗ x cl z))
+    ⊔-elim-help (caseWᵗ f ⊔ fnCapᵗ f)
+                ((caseWᵗ z ⊔ fnCapᵗ z) ⊔ fnCapᵉ e) (fnCapᵉ cl)
+                (fn-comb-G x cl f (fnCapᵉ cl) (fnCap-elimGᵗ x cl f))
+                (⊔-elim-help (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ e) (fnCapᵉ cl)
+                              (fn-comb-G x cl z (fnCapᵉ cl) (fnCap-elimGᵗ x cl z))
                               (fnCap-elimG x cl e))
   fnCap-elimG x cl (mergeAllᵉ e)   = fnCap-elimG x cl e
   fnCap-elimG x cl (concatAllᵉ e)  = fnCap-elimG x cl e
@@ -3180,14 +3190,19 @@ mutual
   fnCap-elimD x cl (ofᵉ ts)        = fnCap-elimDᵗˢ x cl ts
   fnCap-elimD x cl emptyᵉ          = z≤n
   fnCap-elimD x cl (mapᵉ f e)      =
-    ⊔-elim-help (fn-comb-D x cl f (fnCap-elimDᵗ x cl f))
+    ⊔-elim-help (caseWᵗ f ⊔ fnCapᵗ f) (fnCapᵉ e) (fnCapᵉ cl)
+                (fn-comb-D x cl f (fnCapᵉ cl) (fnCap-elimDᵗ x cl f))
                 (fnCap-elimD x cl e)
   fnCap-elimD x cl (takeᵉ c e)     =
-    ⊔-elim-help (fn-comb-D x cl c (fnCap-elimDᵗ x cl c))
+    ⊔-elim-help (caseWᵗ c ⊔ fnCapᵗ c) (fnCapᵉ e) (fnCapᵉ cl)
+                (fn-comb-D x cl c (fnCapᵉ cl) (fnCap-elimDᵗ x cl c))
                 (fnCap-elimD x cl e)
   fnCap-elimD x cl (scanᵉ f z e)   =
-    ⊔-elim-help (fn-comb-D x cl f (fnCap-elimDᵗ x cl f))
-                (⊔-elim-help (fn-comb-D x cl z (fnCap-elimDᵗ x cl z))
+    ⊔-elim-help (caseWᵗ f ⊔ fnCapᵗ f)
+                ((caseWᵗ z ⊔ fnCapᵗ z) ⊔ fnCapᵉ e) (fnCapᵉ cl)
+                (fn-comb-D x cl f (fnCapᵉ cl) (fnCap-elimDᵗ x cl f))
+                (⊔-elim-help (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ e) (fnCapᵉ cl)
+                              (fn-comb-D x cl z (fnCapᵉ cl) (fnCap-elimDᵗ x cl z))
                               (fnCap-elimD x cl e))
   fnCap-elimD x cl (mergeAllᵉ e)   = fnCap-elimD x cl e
   fnCap-elimD x cl (concatAllᵉ e)  = fnCap-elimD x cl e
@@ -3209,17 +3224,22 @@ mutual
   fnCap-elimGᵗ x cl (bool̂ _)      = z≤n
   fnCap-elimGᵗ x cl (nat̂ _)       = z≤n
   fnCap-elimGᵗ x cl (pairᵗ a b)   =
-    ⊔-elim-help (fnCap-elimGᵗ x cl a) (fnCap-elimGᵗ x cl b)
+    ⊔-elim-help (fnCapᵗ a) (fnCapᵗ b) (fnCapᵉ cl)
+                (fnCap-elimGᵗ x cl a) (fnCap-elimGᵗ x cl b)
   fnCap-elimGᵗ x cl (fstᵗ p)      = fnCap-elimGᵗ x cl p
   fnCap-elimGᵗ x cl (sndᵗ p)      = fnCap-elimGᵗ x cl p
   fnCap-elimGᵗ x cl (inlᵗ a)      = fnCap-elimGᵗ x cl a
   fnCap-elimGᵗ x cl (inrᵗ a)      = fnCap-elimGᵗ x cl a
   fnCap-elimGᵗ x cl (caseᵗ s l r) =
-    ⊔-elim-help (fnCap-elimGᵗ x cl s)
-                (⊔-elim-help (fnCap-elimGᵗ x cl l) (fnCap-elimGᵗ x cl r))
+    ⊔-elim-help (fnCapᵗ s) ((fnCapᵗ l) ⊔ (fnCapᵗ r)) (fnCapᵉ cl)
+                (fnCap-elimGᵗ x cl s)
+                (⊔-elim-help (fnCapᵗ l) (fnCapᵗ r) (fnCapᵉ cl)
+                             (fnCap-elimGᵗ x cl l) (fnCap-elimGᵗ x cl r))
   fnCap-elimGᵗ x cl (ifᵗ c a b)   =
-    ⊔-elim-help (fnCap-elimGᵗ x cl c)
-                (⊔-elim-help (fnCap-elimGᵗ x cl a) (fnCap-elimGᵗ x cl b))
+    ⊔-elim-help (fnCapᵗ c) ((fnCapᵗ a) ⊔ (fnCapᵗ b)) (fnCapᵉ cl)
+                (fnCap-elimGᵗ x cl c)
+                (⊔-elim-help (fnCapᵗ a) (fnCapᵗ b) (fnCapᵉ cl)
+                             (fnCap-elimGᵗ x cl a) (fnCap-elimGᵗ x cl b))
   fnCap-elimGᵗ x cl (primᵗ _ a)   = fnCap-elimGᵗ x cl a
   fnCap-elimGᵗ x cl (strmᵗ e)     = fnCap-elimG x cl e
 
@@ -3231,17 +3251,22 @@ mutual
   fnCap-elimDᵗ x cl (bool̂ _)      = z≤n
   fnCap-elimDᵗ x cl (nat̂ _)       = z≤n
   fnCap-elimDᵗ x cl (pairᵗ a b)   =
-    ⊔-elim-help (fnCap-elimDᵗ x cl a) (fnCap-elimDᵗ x cl b)
+    ⊔-elim-help (fnCapᵗ a) (fnCapᵗ b) (fnCapᵉ cl)
+                (fnCap-elimDᵗ x cl a) (fnCap-elimDᵗ x cl b)
   fnCap-elimDᵗ x cl (fstᵗ p)      = fnCap-elimDᵗ x cl p
   fnCap-elimDᵗ x cl (sndᵗ p)      = fnCap-elimDᵗ x cl p
   fnCap-elimDᵗ x cl (inlᵗ a)      = fnCap-elimDᵗ x cl a
   fnCap-elimDᵗ x cl (inrᵗ a)      = fnCap-elimDᵗ x cl a
   fnCap-elimDᵗ x cl (caseᵗ s l r) =
-    ⊔-elim-help (fnCap-elimDᵗ x cl s)
-                (⊔-elim-help (fnCap-elimDᵗ x cl l) (fnCap-elimDᵗ x cl r))
+    ⊔-elim-help (fnCapᵗ s) ((fnCapᵗ l) ⊔ (fnCapᵗ r)) (fnCapᵉ cl)
+                (fnCap-elimDᵗ x cl s)
+                (⊔-elim-help (fnCapᵗ l) (fnCapᵗ r) (fnCapᵉ cl)
+                             (fnCap-elimDᵗ x cl l) (fnCap-elimDᵗ x cl r))
   fnCap-elimDᵗ x cl (ifᵗ c a b)   =
-    ⊔-elim-help (fnCap-elimDᵗ x cl c)
-                (⊔-elim-help (fnCap-elimDᵗ x cl a) (fnCap-elimDᵗ x cl b))
+    ⊔-elim-help (fnCapᵗ c) ((fnCapᵗ a) ⊔ (fnCapᵗ b)) (fnCapᵉ cl)
+                (fnCap-elimDᵗ x cl c)
+                (⊔-elim-help (fnCapᵗ a) (fnCapᵗ b) (fnCapᵉ cl)
+                             (fnCap-elimDᵗ x cl a) (fnCap-elimDᵗ x cl b))
   fnCap-elimDᵗ x cl (primᵗ _ a)   = fnCap-elimDᵗ x cl a
   fnCap-elimDᵗ x cl (strmᵗ e)     = fnCap-elimD x cl e
 
@@ -3250,7 +3275,8 @@ mutual
     fnCapᵗˢ (elimGTms x cl ts) ≤ fnCapᵗˢ ts ⊔ fnCapᵉ cl
   fnCap-elimGᵗˢ x cl []       = z≤n
   fnCap-elimGᵗˢ x cl (y ∷ ys) =
-    ⊔-elim-help (fn-comb-G x cl y (fnCap-elimGᵗ x cl y))
+    ⊔-elim-help (caseWᵗ y ⊔ fnCapᵗ y) (fnCapᵗˢ ys) (fnCapᵉ cl)
+                (fn-comb-G x cl y (fnCapᵉ cl) (fnCap-elimGᵗ x cl y))
                 (fnCap-elimGᵗˢ x cl ys)
 
   fnCap-elimDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
@@ -3258,7 +3284,8 @@ mutual
     fnCapᵗˢ (elimDTms x cl ts) ≤ fnCapᵗˢ ts ⊔ fnCapᵉ cl
   fnCap-elimDᵗˢ x cl []       = z≤n
   fnCap-elimDᵗˢ x cl (y ∷ ys) =
-    ⊔-elim-help (fn-comb-D x cl y (fnCap-elimDᵗ x cl y))
+    ⊔-elim-help (caseWᵗ y ⊔ fnCapᵗ y) (fnCapᵗˢ ys) (fnCapᵉ cl)
+                (fn-comb-D x cl y (fnCapᵉ cl) (fnCap-elimDᵗ x cl y))
                 (fnCap-elimDᵗˢ x cl ys)
 
 -- every term has at least one node
@@ -3801,6 +3828,74 @@ eventB? B Ψ complete    = true
 burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
 burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 
+------------------------------------------------------------------
+-- PROJECTING THE INVARIANT.  _∧_ matches on its FIRST argument, so
+-- `∧-true _ _ inv` leaves a metavariable in stuck position and the
+-- solver cannot close it — every peel has to name the Bool it is
+-- splitting off.  Done once here, so no consumer has to spell out
+-- the six-way chain (or get it wrong).
+------------------------------------------------------------------
+
+INV-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → INV? Ψ B sched st ≡ true →
+  (stBounded? B sched st ≡ true)
+  × (fnCapBounded? Ψ sched st ≡ true)
+  × ((length (EvalSt.registry st) ≤ᵇ B) ≡ true)
+  × (regsB? B Ψ (EvalSt.registry st) ≡ true)
+  × ((slotsSize (Sched.slots sched) ≤ᵇ B) ≡ true)
+  × ((slotsFnCap (Sched.slots sched) ≤ᵇ Ψ) ≡ true)
+INV-parts Ψ B sched st inv
+  with ∧-true (stBounded? B sched st) _ inv
+... | sb , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | fc , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r2
+... | rl , r3 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r3
+... | rb , r4 with ∧-true (slotsSize (Sched.slots sched) ≤ᵇ B) _ r4
+... | ss , sf = sb , fc , rl , rb , ss , sf
+
+-- the two halves of each store predicate
+stB-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → stBounded? B sched st ≡ true →
+  all (boundedLive B) (Sched.live sched) ≡ true
+stB-live B sched st h =
+  proj₁ (∧-true (all (boundedLive B) (Sched.live sched)) _ h)
+
+fcB-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → fnCapBounded? Ψ sched st ≡ true →
+  all (fnCapLive Ψ) (Sched.live sched) ≡ true
+fcB-live Ψ sched st h =
+  proj₁ (∧-true (all (fnCapLive Ψ) (Sched.live sched)) _ h)
+
+stB-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → stBounded? B sched st ≡ true →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true
+stB-nodes B sched st h =
+  proj₂ (∧-true (all (boundedLive B) (Sched.live sched)) _ h)
+
+fcB-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → fnCapBounded? Ψ sched st ≡ true →
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st) ≡ true
+fcB-nodes Ψ sched st h =
+  proj₂ (∧-true (all (fnCapLive Ψ) (Sched.live sched)) _ h)
+
+-- and the in-flight ones, same reason
+valB-sz : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (v : Val Γ u) →
+  valB? B Ψ u v ≡ true → sizeᵛ u v ≤ B
+valB-sz B Ψ u v h = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true (sizeᵛ u v ≤ᵇ B) _ h)))
+
+valB-fc : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (v : Val Γ u) →
+  valB? B Ψ u v ≡ true → fnCapᵛ u v ≤ Ψ
+valB-fc B Ψ u v h = ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true (sizeᵛ u v ≤ᵇ B) _ h)))
+
+allB-head : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (v : Val Γ u)
+  (vs : List (Val Γ u)) →
+  all (valB? B Ψ u) (v ∷ vs) ≡ true → valB? B Ψ u v ≡ true
+allB-head B Ψ u v vs h = proj₁ (∧-true (valB? B Ψ u v) _ h)
+
+allB-tail : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (v : Val Γ u)
+  (vs : List (Val Γ u)) →
+  all (valB? B Ψ u) (v ∷ vs) ≡ true → all (valB? B Ψ u) vs ≡ true
+allB-tail B Ψ u v vs h = proj₂ (∧-true (valB? B Ψ u v) _ h)
+
 -- (W7) all the in-flight predicates only ever need widening
 -- upward (≤ᵇ-widen through all, mirror boundedLive-widen)
 valB?-widen : ∀ {n} {Γ : Ctx n} {B B′ Ψ : ℕ} (u : Ty) (v : Val Γ u) →
@@ -4149,17 +4244,22 @@ mutual
     ofWᵉ (elimGExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
   ofW-elimG x cl (input i)       = z≤n
   ofW-elimG x cl (ofᵉ ts)        =
-    ⊔-elim-help (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimGTms x cl ts))
+    ⊔-elim-help (length ts) (ofWᵗˢ ts) (ofWᵉ cl)
+                (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimGTms x cl ts))
                        (m≤m⊔n (length ts) (ofWᵉ cl)))
                 (ofW-elimGᵗˢ x cl ts)
   ofW-elimG x cl emptyᵉ          = z≤n
   ofW-elimG x cl (mapᵉ f e)      =
-    ⊔-elim-help (ofW-elimGᵗ x cl f) (ofW-elimG x cl e)
+    ⊔-elim-help (ofWᵗ f) (ofWᵉ e) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl f) (ofW-elimG x cl e)
   ofW-elimG x cl (takeᵉ c e)     =
-    ⊔-elim-help (ofW-elimGᵗ x cl c) (ofW-elimG x cl e)
+    ⊔-elim-help (ofWᵗ c) (ofWᵉ e) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl c) (ofW-elimG x cl e)
   ofW-elimG x cl (scanᵉ f z e)   =
-    ⊔-elim-help (ofW-elimGᵗ x cl f)
-                (⊔-elim-help (ofW-elimGᵗ x cl z) (ofW-elimG x cl e))
+    ⊔-elim-help (ofWᵗ f) ((ofWᵗ z) ⊔ (ofWᵉ e)) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl f)
+                (⊔-elim-help (ofWᵗ z) (ofWᵉ e) (ofWᵉ cl)
+                             (ofW-elimGᵗ x cl z) (ofW-elimG x cl e))
   ofW-elimG x cl (mergeAllᵉ e)   = ofW-elimG x cl e
   ofW-elimG x cl (concatAllᵉ e)  = ofW-elimG x cl e
   ofW-elimG x cl (switchAllᵉ e)  = ofW-elimG x cl e
@@ -4175,17 +4275,22 @@ mutual
     ofWᵉ (elimDExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
   ofW-elimD x cl (input i)       = z≤n
   ofW-elimD x cl (ofᵉ ts)        =
-    ⊔-elim-help (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimDTms x cl ts))
+    ⊔-elim-help (length ts) (ofWᵗˢ ts) (ofWᵉ cl)
+                (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimDTms x cl ts))
                        (m≤m⊔n (length ts) (ofWᵉ cl)))
                 (ofW-elimDᵗˢ x cl ts)
   ofW-elimD x cl emptyᵉ          = z≤n
   ofW-elimD x cl (mapᵉ f e)      =
-    ⊔-elim-help (ofW-elimDᵗ x cl f) (ofW-elimD x cl e)
+    ⊔-elim-help (ofWᵗ f) (ofWᵉ e) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl f) (ofW-elimD x cl e)
   ofW-elimD x cl (takeᵉ c e)     =
-    ⊔-elim-help (ofW-elimDᵗ x cl c) (ofW-elimD x cl e)
+    ⊔-elim-help (ofWᵗ c) (ofWᵉ e) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl c) (ofW-elimD x cl e)
   ofW-elimD x cl (scanᵉ f z e)   =
-    ⊔-elim-help (ofW-elimDᵗ x cl f)
-                (⊔-elim-help (ofW-elimDᵗ x cl z) (ofW-elimD x cl e))
+    ⊔-elim-help (ofWᵗ f) ((ofWᵗ z) ⊔ (ofWᵉ e)) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl f)
+                (⊔-elim-help (ofWᵗ z) (ofWᵉ e) (ofWᵉ cl)
+                             (ofW-elimDᵗ x cl z) (ofW-elimD x cl e))
   ofW-elimD x cl (mergeAllᵉ e)   = ofW-elimD x cl e
   ofW-elimD x cl (concatAllᵉ e)  = ofW-elimD x cl e
   ofW-elimD x cl (switchAllᵉ e)  = ofW-elimD x cl e
@@ -4206,17 +4311,22 @@ mutual
   ofW-elimGᵗ x cl (bool̂ _)      = z≤n
   ofW-elimGᵗ x cl (nat̂ _)       = z≤n
   ofW-elimGᵗ x cl (pairᵗ a b)   =
-    ⊔-elim-help (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b)
+    ⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b)
   ofW-elimGᵗ x cl (fstᵗ p)      = ofW-elimGᵗ x cl p
   ofW-elimGᵗ x cl (sndᵗ p)      = ofW-elimGᵗ x cl p
   ofW-elimGᵗ x cl (inlᵗ a)      = ofW-elimGᵗ x cl a
   ofW-elimGᵗ x cl (inrᵗ a)      = ofW-elimGᵗ x cl a
   ofW-elimGᵗ x cl (caseᵗ s l r) =
-    ⊔-elim-help (ofW-elimGᵗ x cl s)
-                (⊔-elim-help (ofW-elimGᵗ x cl l) (ofW-elimGᵗ x cl r))
+    ⊔-elim-help (ofWᵗ s) ((ofWᵗ l) ⊔ (ofWᵗ r)) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl s)
+                (⊔-elim-help (ofWᵗ l) (ofWᵗ r) (ofWᵉ cl)
+                             (ofW-elimGᵗ x cl l) (ofW-elimGᵗ x cl r))
   ofW-elimGᵗ x cl (ifᵗ c a b)   =
-    ⊔-elim-help (ofW-elimGᵗ x cl c)
-                (⊔-elim-help (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b))
+    ⊔-elim-help (ofWᵗ c) ((ofWᵗ a) ⊔ (ofWᵗ b)) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl c)
+                (⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
+                             (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b))
   ofW-elimGᵗ x cl (primᵗ _ a)   = ofW-elimGᵗ x cl a
   ofW-elimGᵗ x cl (strmᵗ e)     = ofW-elimG x cl e
 
@@ -4228,17 +4338,22 @@ mutual
   ofW-elimDᵗ x cl (bool̂ _)      = z≤n
   ofW-elimDᵗ x cl (nat̂ _)       = z≤n
   ofW-elimDᵗ x cl (pairᵗ a b)   =
-    ⊔-elim-help (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b)
+    ⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b)
   ofW-elimDᵗ x cl (fstᵗ p)      = ofW-elimDᵗ x cl p
   ofW-elimDᵗ x cl (sndᵗ p)      = ofW-elimDᵗ x cl p
   ofW-elimDᵗ x cl (inlᵗ a)      = ofW-elimDᵗ x cl a
   ofW-elimDᵗ x cl (inrᵗ a)      = ofW-elimDᵗ x cl a
   ofW-elimDᵗ x cl (caseᵗ s l r) =
-    ⊔-elim-help (ofW-elimDᵗ x cl s)
-                (⊔-elim-help (ofW-elimDᵗ x cl l) (ofW-elimDᵗ x cl r))
+    ⊔-elim-help (ofWᵗ s) ((ofWᵗ l) ⊔ (ofWᵗ r)) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl s)
+                (⊔-elim-help (ofWᵗ l) (ofWᵗ r) (ofWᵉ cl)
+                             (ofW-elimDᵗ x cl l) (ofW-elimDᵗ x cl r))
   ofW-elimDᵗ x cl (ifᵗ c a b)   =
-    ⊔-elim-help (ofW-elimDᵗ x cl c)
-                (⊔-elim-help (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b))
+    ⊔-elim-help (ofWᵗ c) ((ofWᵗ a) ⊔ (ofWᵗ b)) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl c)
+                (⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
+                             (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b))
   ofW-elimDᵗ x cl (primᵗ _ a)   = ofW-elimDᵗ x cl a
   ofW-elimDᵗ x cl (strmᵗ e)     = ofW-elimD x cl e
 
@@ -4247,14 +4362,16 @@ mutual
     ofWᵗˢ (elimGTms x cl ts) ≤ ofWᵗˢ ts ⊔ ofWᵉ cl
   ofW-elimGᵗˢ x cl []       = z≤n
   ofW-elimGᵗˢ x cl (y ∷ ys) =
-    ⊔-elim-help (ofW-elimGᵗ x cl y) (ofW-elimGᵗˢ x cl ys)
+    ⊔-elim-help (ofWᵗ y) (ofWᵗˢ ys) (ofWᵉ cl)
+                (ofW-elimGᵗ x cl y) (ofW-elimGᵗˢ x cl ys)
 
   ofW-elimDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
     (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
     ofWᵗˢ (elimDTms x cl ts) ≤ ofWᵗˢ ts ⊔ ofWᵉ cl
   ofW-elimDᵗˢ x cl []       = z≤n
   ofW-elimDᵗˢ x cl (y ∷ ys) =
-    ⊔-elim-help (ofW-elimDᵗ x cl y) (ofW-elimDᵗˢ x cl ys)
+    ⊔-elim-help (ofWᵗ y) (ofWᵗˢ ys) (ofWᵉ cl)
+                (ofW-elimDᵗ x cl y) (ofW-elimDᵗˢ x cl ys)
 
 -- eval never widens: every of-list in the result comes from the
 -- template's strm-subtrees (subΘ'd) or the environment
@@ -4950,15 +5067,15 @@ allB-size : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) �
   all (valB? B Ψ u) vs ≡ true → All (λ v → sizeᵛ u v ≤ B) vs
 allB-size B Ψ u []       h = []ᵃ
 allB-size B Ψ u (v ∷ vs) h =
-  ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ (proj₁ (∧-true _ _ h)))))
-    ∷ᵃ allB-size B Ψ u vs (proj₂ (∧-true _ _ h))
+  valB-sz B Ψ u v (allB-head B Ψ u v vs h)
+    ∷ᵃ allB-size B Ψ u vs (allB-tail B Ψ u v vs h)
 
 allB-fnCap : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
   all (valB? B Ψ u) vs ≡ true → All (λ v → fnCapᵛ u v ≤ Ψ) vs
 allB-fnCap B Ψ u []       h = []ᵃ
 allB-fnCap B Ψ u (v ∷ vs) h =
-  ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ h)))))
-    ∷ᵃ allB-fnCap B Ψ u vs (proj₂ (∧-true _ _ h))
+  valB-fc B Ψ u v (allB-head B Ψ u v vs h)
+    ∷ᵃ allB-fnCap B Ψ u vs (allB-tail B Ψ u v vs h)
 
 allB-zip : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
   All (λ v → sizeᵛ u v ≤ B) vs → All (λ v → fnCapᵛ u v ≤ Ψ) vs →
@@ -5017,8 +5134,8 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
                    3≤E inv fB pB vB
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B (capᴱ W E) Ψ nid (EvalSt.nodes st)
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+         (stB-nodes (capᴱ W E) sched st (proj₁ (INV-parts Ψ (capᴱ W E) sched st inv)))
+         (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
 ... | nothing            | _ = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)   | _ = E , ≤-refl , inv , refl , refl
 ... | just (merge-st _ _)   | _ = E , ≤-refl , inv , refl , refl
@@ -5040,9 +5157,9 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
   E≤E′  = E≤E*3^ E (suc (caseWᵗ fn) * length vals)
   run   = scanVals fn ac vals
   szfn  : sizeᵗ fn ≤ capᴱ W E
-  szfn  = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ fB)))
+  szfn  = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true (sizeᵗ fn ≤ᵇ capᴱ W E) _ fB)))
   capfn : caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ
-  capfn = ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true _ _ fB)))
+  capfn = ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true (sizeᵗ fn ≤ᵇ capᴱ W E) _ fB)))
   szRun = scanVals-sharp W E fn ac vals 3≤E szfn
             (≤ᵇ⇒≤ _ _ (T-to (proj₁ nb)))
             (allB-size (capᴱ W E) Ψ s vals vB)
@@ -5169,18 +5286,17 @@ stepFrame-take-wet {s = s} Ψ W g id now nid κ vals fin sched st E 3≤E inv pB
   wm   = EvalSt.regWatermark st
   dy   = EvalSt.dying st
   kept = proj₁ (cutThrough nid del wm dy (EvalSt.registry st))
-  sb   = proj₁ (∧-true _ _ inv)
-  r1   = proj₂ (∧-true _ _ inv)
-  fc   = proj₁ (∧-true _ _ r1)
-  r2   = proj₂ (∧-true _ _ r1)
-  rl   = proj₁ (∧-true _ _ r2)
-  r3   = proj₂ (∧-true _ _ r2)
-  rb   = proj₁ (∧-true _ _ r3)
-  r4   = proj₂ (∧-true _ _ r3)
-  bls  = proj₁ (∧-true _ _ sb)
-  bns  = proj₂ (∧-true _ _ sb)
-  fls  = proj₁ (∧-true _ _ fc)
-  fns  = proj₂ (∧-true _ _ fc)
+  P    = INV-parts Ψ B sched st inv
+  sb   = proj₁ P
+  fc   = proj₁ (proj₂ P)
+  rl   = proj₁ (proj₂ (proj₂ P))
+  rb   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  r4   = ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  bls  = stB-live B sched st sb
+  bns  = stB-nodes B sched st sb
+  fls  = fcB-live Ψ sched st fc
+  fns  = fcB-nodes Ψ sched st fc
   lenOK : (length kept ≤ᵇ B) ≡ true
   lenOK = T⇒≡true _ (≤⇒≤ᵇ
     (≤-trans (cutThrough-len nid del wm dy (EvalSt.registry st))
@@ -5254,18 +5370,17 @@ switchKill-INV Ψ W E (just v) sched st inv =
   wm   = EvalSt.regWatermark st
   dy   = EvalSt.dying st
   kept = proj₁ (cutThrough v del wm dy (EvalSt.registry st))
-  sb   = proj₁ (∧-true _ _ inv)
-  r1   = proj₂ (∧-true _ _ inv)
-  fc   = proj₁ (∧-true _ _ r1)
-  r2   = proj₂ (∧-true _ _ r1)
-  rl   = proj₁ (∧-true _ _ r2)
-  r3   = proj₂ (∧-true _ _ r2)
-  rb   = proj₁ (∧-true _ _ r3)
-  r4   = proj₂ (∧-true _ _ r3)
-  bls  = proj₁ (∧-true _ _ sb)
-  bns  = proj₂ (∧-true _ _ sb)
-  fls  = proj₁ (∧-true _ _ fc)
-  fns  = proj₂ (∧-true _ _ fc)
+  P    = INV-parts Ψ B sched st inv
+  sb   = proj₁ P
+  fc   = proj₁ (proj₂ P)
+  rl   = proj₁ (proj₂ (proj₂ P))
+  rb   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  r4   = ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  bls  = stB-live B sched st sb
+  bns  = stB-nodes B sched st sb
+  fls  = fcB-live Ψ sched st fc
+  fns  = fcB-nodes Ψ sched st fc
   lenOK : (length kept ≤ᵇ B) ≡ true
   lenOK = T⇒≡true _ (≤⇒≤ᵇ
     (≤-trans (cutThrough-len v del wm dy (EvalSt.registry st))
@@ -5299,8 +5414,8 @@ thruWrap-wet Ψ B mergeᵒ nid true vs bs sched st inv vB bB
 thruWrap-wet Ψ B concatᵒ nid true vs bs sched st inv vB bB
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B B Ψ nid (EvalSt.nodes st)
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+         (stB-nodes B sched st (proj₁ (INV-parts Ψ B sched st inv)))
+         (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ B sched st inv))))
 ... | just (concat-st q act _) | nb =
       install-INV Ψ B sched st nid (concat-st q act true)
         (proj₁ nb) (proj₂ nb) inv , vB , bB
@@ -6015,8 +6130,8 @@ thruConsume-wet Ψ W g mergeᵒ nid κ id now o sched st E 3≤E inv oB pB =
 thruConsume-wet {u = u} Ψ W g concatᵒ nid κ id now o sched st E 3≤E inv oB pB
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B (capᴱ W E) Ψ nid (EvalSt.nodes st)
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+         (stB-nodes (capᴱ W E) sched st (proj₁ (INV-parts Ψ (capᴱ W E) sched st inv)))
+         (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
 ... | just (concat-st {w} q true od) | nb with w ≟ᵗ u
 ...   | yes refl =
   E , ≤-refl ,
@@ -6192,8 +6307,8 @@ innerFinish-wet {s = s} Ψ W g concatᵒ allNid inst κ id now vals sched st E
                 3≤E inv pB vB
   with lookupNode allNid (EvalSt.nodes st)
      | lookupNode-B (capᴱ W E) Ψ allNid (EvalSt.nodes st)
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
-         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+         (stB-nodes (capᴱ W E) sched st (proj₁ (INV-parts Ψ (capᴱ W E) sched st inv)))
+         (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
 ... | just (concat-st {w} q act od) | nb with w ≟ᵗ s
 ...   | yes refl =
   E′ , E≤E′ ,
