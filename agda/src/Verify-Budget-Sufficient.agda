@@ -72,7 +72,7 @@ open import Data.List.Relation.Unary.All.Properties
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Data.List.Properties using (length-++)
 open import Data.List.Membership.Propositional.Properties
-  using (∈-++⁻; ∈-++⁺ˡ)
+  using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe   using (nothing)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -103,7 +103,9 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                                 mergeAllᵉ; concatAllᵉ; switchAllᵉ;
                                 exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms; unfoldμ;
+                                elimGExp; elimGTm; elimGTms;
+                                elimDExp; elimDTm; elimDTms;
+                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
@@ -3051,15 +3053,195 @@ mutual
                     (fnCap-subΘᵗ Ψ Θloc σ x hσ (⊔ʳ (caseWᵗ x) (fnCapᵗ x) hx)))
              (fnCap-subΘᵗˢ Ψ Θloc σ xs hσ (⊔ʳ (caseWᵗ x ⊔ fnCapᵗ x) (fnCapᵗˢ xs) h))
 
-postulate
-  -- (W2, remaining) elimG lowers a global var: fn-weights stay under the
-  -- max of the host and the eliminated closure.  The deferᵉ clause routes
-  -- through elimDExp (with a Δ-context subst), so unlike the ren/subΘ
-  -- mirrors it needs its own elimD companion — left for the stronger model.
+-- caseW is invariant under global/deferred var elimination
+-- (caseWᵗ(strmᵗ _) = 0 regardless; all other constructors map point-to-point)
+caseW-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+  (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+  caseWᵗ (elimGTm x cl tm) ≡ caseWᵗ tm
+caseW-elimGᵗ x cl (varᵗ y)      = refl
+caseW-elimGᵗ x cl unit̂          = refl
+caseW-elimGᵗ x cl (bool̂ _)      = refl
+caseW-elimGᵗ x cl (nat̂ _)       = refl
+caseW-elimGᵗ x cl (pairᵗ a b)   = cong₂ _+_ (caseW-elimGᵗ x cl a) (caseW-elimGᵗ x cl b)
+caseW-elimGᵗ x cl (fstᵗ p)      = caseW-elimGᵗ x cl p
+caseW-elimGᵗ x cl (sndᵗ p)      = caseW-elimGᵗ x cl p
+caseW-elimGᵗ x cl (inlᵗ a)      = caseW-elimGᵗ x cl a
+caseW-elimGᵗ x cl (inrᵗ a)      = caseW-elimGᵗ x cl a
+caseW-elimGᵗ x cl (caseᵗ s l r) =
+  cong (2 +_) (cong₂ _+_ (cong₂ _+_ (caseW-elimGᵗ x cl s) (caseW-elimGᵗ x cl l))
+                           (caseW-elimGᵗ x cl r))
+caseW-elimGᵗ x cl (ifᵗ c a b)   =
+  cong₂ _+_ (cong₂ _+_ (caseW-elimGᵗ x cl c) (caseW-elimGᵗ x cl a)) (caseW-elimGᵗ x cl b)
+caseW-elimGᵗ x cl (primᵗ _ a)   = caseW-elimGᵗ x cl a
+caseW-elimGᵗ x cl (strmᵗ e)     = refl
+
+caseW-elimDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+  (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+  caseWᵗ (elimDTm x cl tm) ≡ caseWᵗ tm
+caseW-elimDᵗ x cl (varᵗ y)      = refl
+caseW-elimDᵗ x cl unit̂          = refl
+caseW-elimDᵗ x cl (bool̂ _)      = refl
+caseW-elimDᵗ x cl (nat̂ _)       = refl
+caseW-elimDᵗ x cl (pairᵗ a b)   = cong₂ _+_ (caseW-elimDᵗ x cl a) (caseW-elimDᵗ x cl b)
+caseW-elimDᵗ x cl (fstᵗ p)      = caseW-elimDᵗ x cl p
+caseW-elimDᵗ x cl (sndᵗ p)      = caseW-elimDᵗ x cl p
+caseW-elimDᵗ x cl (inlᵗ a)      = caseW-elimDᵗ x cl a
+caseW-elimDᵗ x cl (inrᵗ a)      = caseW-elimDᵗ x cl a
+caseW-elimDᵗ x cl (caseᵗ s l r) =
+  cong (2 +_) (cong₂ _+_ (cong₂ _+_ (caseW-elimDᵗ x cl s) (caseW-elimDᵗ x cl l))
+                           (caseW-elimDᵗ x cl r))
+caseW-elimDᵗ x cl (ifᵗ c a b)   =
+  cong₂ _+_ (cong₂ _+_ (caseW-elimDᵗ x cl c) (caseW-elimDᵗ x cl a)) (caseW-elimDᵗ x cl b)
+caseW-elimDᵗ x cl (primᵗ _ a)   = caseW-elimDᵗ x cl a
+caseW-elimDᵗ x cl (strmᵗ e)     = refl
+
+-- subst on the Δ-index of Exp is transparent to fnCapᵉ (J on the equality)
+fnCap-substᴱ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Δ′ Θ t} (p : Δ ≡ Δ′) (e : Exp Γ Δᵍ Δ Θ t) →
+  fnCapᵉ (subst (λ ζ → Exp Γ Δᵍ ζ Θ t) p e) ≡ fnCapᵉ e
+fnCap-substᴱ refl e = refl
+
+-- if a' ≤ a ⊔ c and b' ≤ b ⊔ c then a' ⊔ b' ≤ (a ⊔ b) ⊔ c
+⊔-elim-help : ∀ {a' a b' b c} → a' ≤ a ⊔ c → b' ≤ b ⊔ c → a' ⊔ b' ≤ (a ⊔ b) ⊔ c
+⊔-elim-help ha hb =
+  ⊔-lub (≤-trans ha (⊔-mono-≤ (m≤m⊔n _ _) ≤-refl))
+        (≤-trans hb (⊔-mono-≤ (m≤n⊔m _ _) ≤-refl))
+
+-- (cw ⊔ fc) pair bound after elimG/D, using caseW invariance + fnCap IH
+fn-comb-G : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ) (cl : Closed Γ t)
+  (tm : Tm Γ Δᵍ Δ Θ u) {C} →
+  fnCapᵗ (elimGTm x cl tm) ≤ fnCapᵗ tm ⊔ C →
+  (caseWᵗ (elimGTm x cl tm) ⊔ fnCapᵗ (elimGTm x cl tm)) ≤ (caseWᵗ tm ⊔ fnCapᵗ tm) ⊔ C
+fn-comb-G x cl tm h =
+  ⊔-lub (subst (_≤ _) (sym (caseW-elimGᵗ x cl tm))
+               (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _)))
+        (≤-trans h (⊔-mono-≤ (m≤n⊔m _ _) ≤-refl))
+
+fn-comb-D : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ) (cl : Closed Γ t)
+  (tm : Tm Γ Δᵍ Δ Θ u) {C} →
+  fnCapᵗ (elimDTm x cl tm) ≤ fnCapᵗ tm ⊔ C →
+  (caseWᵗ (elimDTm x cl tm) ⊔ fnCapᵗ (elimDTm x cl tm)) ≤ (caseWᵗ tm ⊔ fnCapᵗ tm) ⊔ C
+fn-comb-D x cl tm h =
+  ⊔-lub (subst (_≤ _) (sym (caseW-elimDᵗ x cl tm))
+               (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _)))
+        (≤-trans h (⊔-mono-≤ (m≤n⊔m _ _) ≤-refl))
+
+-- (W2, remaining) elimG/D keep fnCap ≤ host ⊔ closure
+mutual
   fnCap-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
     (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
     fnCapᵉ (elimGExp x cl e) ≤ fnCapᵉ e ⊔ fnCapᵉ cl
+  fnCap-elimG x cl (input i)       = z≤n
+  fnCap-elimG x cl (ofᵉ ts)        = fnCap-elimGᵗˢ x cl ts
+  fnCap-elimG x cl emptyᵉ          = z≤n
+  fnCap-elimG x cl (mapᵉ f e)      =
+    ⊔-elim-help (fn-comb-G x cl f (fnCap-elimGᵗ x cl f))
+                (fnCap-elimG x cl e)
+  fnCap-elimG x cl (takeᵉ c e)     =
+    ⊔-elim-help (fn-comb-G x cl c (fnCap-elimGᵗ x cl c))
+                (fnCap-elimG x cl e)
+  fnCap-elimG x cl (scanᵉ f z e)   =
+    ⊔-elim-help (fn-comb-G x cl f (fnCap-elimGᵗ x cl f))
+                (⊔-elim-help (fn-comb-G x cl z (fnCap-elimGᵗ x cl z))
+                              (fnCap-elimG x cl e))
+  fnCap-elimG x cl (mergeAllᵉ e)   = fnCap-elimG x cl e
+  fnCap-elimG x cl (concatAllᵉ e)  = fnCap-elimG x cl e
+  fnCap-elimG x cl (switchAllᵉ e)  = fnCap-elimG x cl e
+  fnCap-elimG x cl (exhaustAllᵉ e) = fnCap-elimG x cl e
+  fnCap-elimG x cl (μᵉ e)          = fnCap-elimG (there x) cl e
+  fnCap-elimG x cl (varᵉ y)        = z≤n
+  fnCap-elimG x cl (deferᵉ e)      =
+    ≤-trans (≤-reflexive (fnCap-substᴱ (⊟-++ˡ x) (elimDExp (∈-++⁺ˡ x) cl e)))
+            (fnCap-elimD (∈-++⁺ˡ x) cl e)
 
+  fnCap-elimD : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    fnCapᵉ (elimDExp x cl e) ≤ fnCapᵉ e ⊔ fnCapᵉ cl
+  fnCap-elimD x cl (input i)       = z≤n
+  fnCap-elimD x cl (ofᵉ ts)        = fnCap-elimDᵗˢ x cl ts
+  fnCap-elimD x cl emptyᵉ          = z≤n
+  fnCap-elimD x cl (mapᵉ f e)      =
+    ⊔-elim-help (fn-comb-D x cl f (fnCap-elimDᵗ x cl f))
+                (fnCap-elimD x cl e)
+  fnCap-elimD x cl (takeᵉ c e)     =
+    ⊔-elim-help (fn-comb-D x cl c (fnCap-elimDᵗ x cl c))
+                (fnCap-elimD x cl e)
+  fnCap-elimD x cl (scanᵉ f z e)   =
+    ⊔-elim-help (fn-comb-D x cl f (fnCap-elimDᵗ x cl f))
+                (⊔-elim-help (fn-comb-D x cl z (fnCap-elimDᵗ x cl z))
+                              (fnCap-elimD x cl e))
+  fnCap-elimD x cl (mergeAllᵉ e)   = fnCap-elimD x cl e
+  fnCap-elimD x cl (concatAllᵉ e)  = fnCap-elimD x cl e
+  fnCap-elimD x cl (switchAllᵉ e)  = fnCap-elimD x cl e
+  fnCap-elimD x cl (exhaustAllᵉ e) = fnCap-elimD x cl e
+  fnCap-elimD x cl (μᵉ e)          = fnCap-elimD x cl e
+  fnCap-elimD x cl (varᵉ y)        with compare∈ x y
+  ... | inj₁ refl = ≤-reflexive (fnCap-renᵉ (λ ()) (λ ()) (λ ()) cl)
+  ... | inj₂ y′   = z≤n
+  fnCap-elimD x cl (deferᵉ e)      =
+    ≤-trans (≤-reflexive (fnCap-substᴱ (⊟-++ʳ x) (elimDExp (∈-++⁺ʳ _ x) cl e)))
+            (fnCap-elimD (∈-++⁺ʳ _ x) cl e)
+
+  fnCap-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+    fnCapᵗ (elimGTm x cl tm) ≤ fnCapᵗ tm ⊔ fnCapᵉ cl
+  fnCap-elimGᵗ x cl (varᵗ y)      = z≤n
+  fnCap-elimGᵗ x cl unit̂          = z≤n
+  fnCap-elimGᵗ x cl (bool̂ _)      = z≤n
+  fnCap-elimGᵗ x cl (nat̂ _)       = z≤n
+  fnCap-elimGᵗ x cl (pairᵗ a b)   =
+    ⊔-elim-help (fnCap-elimGᵗ x cl a) (fnCap-elimGᵗ x cl b)
+  fnCap-elimGᵗ x cl (fstᵗ p)      = fnCap-elimGᵗ x cl p
+  fnCap-elimGᵗ x cl (sndᵗ p)      = fnCap-elimGᵗ x cl p
+  fnCap-elimGᵗ x cl (inlᵗ a)      = fnCap-elimGᵗ x cl a
+  fnCap-elimGᵗ x cl (inrᵗ a)      = fnCap-elimGᵗ x cl a
+  fnCap-elimGᵗ x cl (caseᵗ s l r) =
+    ⊔-elim-help (fnCap-elimGᵗ x cl s)
+                (⊔-elim-help (fnCap-elimGᵗ x cl l) (fnCap-elimGᵗ x cl r))
+  fnCap-elimGᵗ x cl (ifᵗ c a b)   =
+    ⊔-elim-help (fnCap-elimGᵗ x cl c)
+                (⊔-elim-help (fnCap-elimGᵗ x cl a) (fnCap-elimGᵗ x cl b))
+  fnCap-elimGᵗ x cl (primᵗ _ a)   = fnCap-elimGᵗ x cl a
+  fnCap-elimGᵗ x cl (strmᵗ e)     = fnCap-elimG x cl e
+
+  fnCap-elimDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+    fnCapᵗ (elimDTm x cl tm) ≤ fnCapᵗ tm ⊔ fnCapᵉ cl
+  fnCap-elimDᵗ x cl (varᵗ y)      = z≤n
+  fnCap-elimDᵗ x cl unit̂          = z≤n
+  fnCap-elimDᵗ x cl (bool̂ _)      = z≤n
+  fnCap-elimDᵗ x cl (nat̂ _)       = z≤n
+  fnCap-elimDᵗ x cl (pairᵗ a b)   =
+    ⊔-elim-help (fnCap-elimDᵗ x cl a) (fnCap-elimDᵗ x cl b)
+  fnCap-elimDᵗ x cl (fstᵗ p)      = fnCap-elimDᵗ x cl p
+  fnCap-elimDᵗ x cl (sndᵗ p)      = fnCap-elimDᵗ x cl p
+  fnCap-elimDᵗ x cl (inlᵗ a)      = fnCap-elimDᵗ x cl a
+  fnCap-elimDᵗ x cl (inrᵗ a)      = fnCap-elimDᵗ x cl a
+  fnCap-elimDᵗ x cl (caseᵗ s l r) =
+    ⊔-elim-help (fnCap-elimDᵗ x cl s)
+                (⊔-elim-help (fnCap-elimDᵗ x cl l) (fnCap-elimDᵗ x cl r))
+  fnCap-elimDᵗ x cl (ifᵗ c a b)   =
+    ⊔-elim-help (fnCap-elimDᵗ x cl c)
+                (⊔-elim-help (fnCap-elimDᵗ x cl a) (fnCap-elimDᵗ x cl b))
+  fnCap-elimDᵗ x cl (primᵗ _ a)   = fnCap-elimDᵗ x cl a
+  fnCap-elimDᵗ x cl (strmᵗ e)     = fnCap-elimD x cl e
+
+  fnCap-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    fnCapᵗˢ (elimGTms x cl ts) ≤ fnCapᵗˢ ts ⊔ fnCapᵉ cl
+  fnCap-elimGᵗˢ x cl []       = z≤n
+  fnCap-elimGᵗˢ x cl (y ∷ ys) =
+    ⊔-elim-help (fn-comb-G x cl y (fnCap-elimGᵗ x cl y))
+                (fnCap-elimGᵗˢ x cl ys)
+
+  fnCap-elimDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    fnCapᵗˢ (elimDTms x cl ts) ≤ fnCapᵗˢ ts ⊔ fnCapᵉ cl
+  fnCap-elimDᵗˢ x cl []       = z≤n
+  fnCap-elimDᵗˢ x cl (y ∷ ys) =
+    ⊔-elim-help (fn-comb-D x cl y (fnCap-elimDᵗ x cl y))
+                (fnCap-elimDᵗˢ x cl ys)
+
+postulate
   -- (W3) THE SHARP EVAL BOUND — the walk ledger's load-bearing
   -- fact.  Same induction as evalWith-size, but the caseᵗ clause is
   -- the ONLY one that re-enters at a grown cap (via grow-pow, cost
