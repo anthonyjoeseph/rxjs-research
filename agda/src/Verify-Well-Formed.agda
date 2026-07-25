@@ -8,7 +8,9 @@
 --   2. Two frame relations — BurstInv (mid-subscribe-frame) and Mid
 --      (mid-cascade, indexed by the chains still to fold) — both
 --      CONCRETE records now, with entry/step/exit lemmas.  Proven:
---      burst-init, burst-final.  Postulated: the step lemmas
+--      burst-init, burst-final.  Postulated (all believed true and
+--      properly hypothesised — no known-false placeholders): the
+--      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
 --      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
 --      is no longer assumed here: it is imported, proven, from
@@ -2124,6 +2126,19 @@ frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
 ... | just acc′ = frameFresh? acc′ ems
 ... | nothing   = false
 
+-- peel one emit: a fresh burst's tail is fresh at the advanced
+-- accumulator.  This is what threads the discipline down a pushBurst
+-- recursion — the acc at the cut then holds exactly the sources whose
+-- inits rode earlier emits and are still open
+frameFresh-cons : ∀ {A : Set} (L : List Source)
+  (em : InstEmit A) (ems : List (InstEmit A)) →
+  frameFresh? L (em ∷ ems) ≡ true →
+  Σ (List Source) λ L′ →
+    (frameFreshEmit L em ≡ just L′) × (frameFresh? L′ ems ≡ true)
+frameFresh-cons L em ems h with frameFreshEmit L em
+... | just L′  = L′ , refl , h
+... | nothing  = true≢false (sym h)
+
 -- the count relation the transport threads: the raw (S_r) and transformed (S_t)
 -- runs of the cut tail differ only by the cut's severed closes.  `sev s` is the
 -- per-source count of the cut head's cutThrough closes, FIXED for the whole tail
@@ -2210,20 +2225,31 @@ postulate
 -- comes from BurstInv.live-matches (S₁ live ↔ registry) + cutThrough-balance
 -- (registry ↔ kept + closes): live S₁ = live S_head + sev pointwise, and acc-le
 -- holds because L's opens survive the sweep.  Then cut-cons-run = (H) reaches
--- S_head + transport reaches S″.  To retire: (1) thread frameFresh through the
--- take subtree (bounded — subscribeE-take-wf is uncalled pending subscribeE-wf
--- assembly); (2) prove (H); (3) prove pushBurst-take-zero-transport (the
--- applyEvents count-relation induction).  NOTE: cut-cons-run AS CURRENTLY STATED
--- (no frameFresh hypothesis) is FALSE — the close-a-swept-source countermodel —
--- so it MUST gain the frameFresh/TailRel hypotheses when (1) lands; it is a known
--- unsound placeholder until then.
+-- S_head + transport reaches S″.
+--
+-- (1) LANDED 2026-07-25 — and it was the urgent one: cut-cons-run WITHOUT a
+-- frameFresh hypothesis is FALSE (the close-a-swept-source countermodel), and a
+-- false postulate makes everything downstream of it vacuous, not merely
+-- unproven.  It is now hypothesised on `frameFresh? L ems`, threaded up the take
+-- subtree by frameFresh-cons: pushBurst-take-run carries the accumulator and
+-- advances it per emit, so the L handed to the cut holds exactly the sources
+-- whose inits rode earlier emits and are still open.  subscribeE-take-wf takes
+-- the burst's `frameFresh? []` from the inner clause's Σ-conclusion, where the
+-- eventual subscribeE-wf assembly must supply it (oneShotBurst is fresh by
+-- computation; pass-through ops preserve it on the bs skeleton).
+--
+-- Still to retire: (2) prove (H); (3) prove pushBurst-take-zero-transport (the
+-- applyEvents count-relation induction).  Both are honest debts now — statements
+-- believed true, not placeholders known false.
 postulate
   cut-cons-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
     (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
-    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ S′ : ProtocolSt) →
+    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
+    (L : List Source) (S S₁ S′ : ProtocolSt) →
     lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
     proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
+    frameFresh? L ems ≡ true →
     stepProtocol (es at i from src as ek) S ≡ just S₁ →
     runProtocol S₁ ems ≡ just S′ →
     Σ ProtocolSt λ S″ →
@@ -2254,36 +2280,42 @@ postulate
 pushBurst-take-cut-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
-  (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ S′ : ProtocolSt) →
+  (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
+  (L : List Source) (S S₁ S′ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
   proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
+  frameFresh? L ems ≡ true →
   stepProtocol (es at i from src as ek) S ≡ just S₁ →
   runProtocol S₁ ems ≡ just S′ →
   Σ ProtocolSt λ S″ →
     runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ
                           ((es at i from src as ek) ∷ ems) sched st)) ≡ just S″
-pushBurst-take-cut-run {Γ = Γ} {s = s} fuel id now nid κ es i src ek ems sched st kCount S S₁ S′ lk dc seq runEq =
-  let (S″ , run) = cut-cons-run fuel id now nid κ es i src ek ems sched st kCount S S₁ S′ lk dc seq runEq
+pushBurst-take-cut-run {Γ = Γ} {s = s} fuel id now nid κ es i src ek ems sched st kCount L S S₁ S′ lk dc ff seq runEq =
+  let (S″ , run) = cut-cons-run fuel id now nid κ es i src ek ems sched st kCount L S S₁ S′ lk dc ff seq runEq
   in S″ , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
             (sym (pushBurst-take-cut-cons fuel id now nid κ es i src ek ems sched st kCount lk dc))
             run
 
 pushBurst-take-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
-  (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S′ : ProtocolSt) →
+  (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
+  (L : List Source) (S S′ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
+  frameFresh? L burst ≡ true →
   runProtocol S burst ≡ just S′ →
   Σ ProtocolSt λ S″ →
     runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″
-pushBurst-take-run fuel id now nid κ [] sched st kCount S S′ lk runEq = S , refl
-pushBurst-take-run {Γ = Γ} {s = s} fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk runEq
+pushBurst-take-run fuel id now nid κ [] sched st kCount L S S′ lk ff runEq = S , refl
+pushBurst-take-run {Γ = Γ} {s = s} fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount L S S′ lk ff runEq
+  with frameFresh-cons L (es at i from src as ek) ems ff
+... | L′ , _ , ff′
   with stepProtocol (es at i from src as ek) S in seq
 ... | nothing = ⊥-elim (n≢jᵂ runEq)
 ... | just S₁ with takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)) in tvEq
 ...   | out , rem , true  = pushBurst-take-cut-run {Γ = Γ} {s = s} fuel id now nid κ es i src ek ems sched st
-                          kCount S S₁ S′ lk
+                          kCount L′ S S₁ S′ lk
                           (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)
-                          seq runEq
+                          ff′ seq runEq
 ...   | out , rem , false =
         let (S″ , tailRun) =
               pushBurst-take-run fuel id now nid κ ems sched
@@ -2291,11 +2323,11 @@ pushBurst-take-run {Γ = Γ} {s = s} fuel id now nid κ ((es at i from src as ek
                     (take-st (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es))))))
                     (EvalSt.nodes st) })
                 (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es)))))
-                S₁ S′
+                L′ S₁ S′
                 (lookupNode-setNode nid
                     (take-st (proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents es))))))
                     (EvalSt.nodes st))
-                runEq
+                ff′ runEq
         in S″ , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
                   (sym (pushBurst-take-noncut-cons fuel id now nid κ es i src ek ems sched st kCount lk
                           (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)))
@@ -2426,14 +2458,15 @@ subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
    in Σ ProtocolSt λ S′ →
         (runProtocol S (proj₁ r₀) ≡ just S′)
         × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
-        × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))) →
+        × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
+        × (frameFresh? [] (proj₁ r₀) ≡ true)) →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
     × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
                (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
-subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv (S′ , run₀ , binv₀ , nodeP)
+subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv (S′ , run₀ , binv₀ , nodeP , ff₀)
   rewrite ecEq =
-  let (S″ , run″) = pushBurst-take-run fuel id now nid κ burst sched₂ st₁ (suc k) S S′ nodeP run₀
+  let (S″ , run″) = pushBurst-take-run fuel id now nid κ burst sched₂ st₁ (suc k) [] S S′ nodeP ff₀ run₀
   in S″ , run″
         , pushBurst-take-burstinv fuel id now nid κ burst sched₂ st₁ (suc k) S S′ S″
             nodeP binv₀ run₀ run″
