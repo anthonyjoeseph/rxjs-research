@@ -4447,13 +4447,9 @@ burstΩ? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ u → Bool
 burstΩ? Ω = all (λ em → all (eventΩ? Ω) (InstEmit.events em))
 
 ------------------------------------------------------------------
--- (W11) THE WIDTH WALK — the last real grind.  Ω is flat, so these
--- are pure preservation statements: no existential, no receipt, no
--- widening.  Every clause is "invariant in, invariant out", which
--- makes each one MUCH shorter than its size-ledger counterpart.
---
--- The two statements below are one mutual clique covering the whole
--- machine, mirroring what is already proven on the size side:
+-- (W11) THE WIDTH WALK — PROVEN (2026-07-25), below.  Ω is flat, so
+-- every statement is pure preservation: no existential, no receipt,
+-- no widening.  The clique lives at the bottom of the file:
 --
 --   subscribeE-width ← subscribeAll-width, pushBurst-width,
 --                      subscribeE-input-width (→ sharedSlot /
@@ -4467,54 +4463,38 @@ burstΩ? Ω = all (λ em → all (eventΩ? Ω) (InstEmit.events em))
 --   cascadeGo-width  ← chainStep-width ← foldPath-width ←
 --                      dispatchShare-width ← shareGo-width
 --
--- and the flat state lemmas mirroring install-INV / register-INV /
--- addLive-INV / latch-INV / shareFinish-INV.  widthOK? has FOUR
--- conjuncts (live, nodes, registry, slots) against INV?'s six —
--- there is no length rider, so register-width is strictly easier
--- than register-INV.  The W10 block (ofW-evalWith, ofW-elimG/D,
--- ofW-subΘ, ofW-reify, len-elimGTms) already supplies every
--- analytic fact; what remains is the threading.
+-- over the flat state lemmas (W11-A) mirroring install-INV /
+-- register-INV / addLive-INV / latch-INV / shareFinish-INV.
+-- widthOK? has FOUR conjuncts (live, nodes, registry, slots) against
+-- INV?'s six: no length rider, so register-width pays no ledger edge
+-- at all where register-INV pays a ×2.  The ONE width mint in the
+-- machine is ofᵉ, and it mints exactly its own list, which the entry
+-- seed ΩAt already dominates — that is why the walk needs no running
+-- position where the size ledger needs capᴱ.
 --
--- WORTH TRYING FIRST: fnCapᵉ and ofWᵉ differ in only two clauses —
+-- Consumed by subscribeE-walk's joint face below (its widthOK? /
+-- ofWᵉ / pathΩ? conjuncts), which is where the width bound feeds the
+-- hop targets' rank drops.
+--
+-- WORTH TRYING, LATER: fnCapᵉ and ofWᵉ differ in only two clauses —
 -- ofᵉ mints a width (`length ts ⊔ …`) where fnCap does not, and
 -- fnCap pairs each fn with its caseWᵗ.  Otherwise they are the same
 -- recursion, and the fnCap half of INV? has the same four-conjunct
 -- shape as widthOK?.  A module parameterised over the measure would
--- collapse this grind and the proven fnCap half into one walk.  That
--- is invasive (it restructures INV?), so it is a deliberate choice,
--- not a refactor to drift into.
+-- collapse this walk and the proven fnCap half into one.
 --
--- DECIDED 2026-07-25: NOT now — grind W11 as a direct mirror.  The
--- fnCap half is not a freestanding artifact (it lives as conjuncts
--- inside subscribeE-walkS's clause induction and the wet clique),
--- the joint face above also states INV?, and the two measures differ
--- per clause, so the abstraction needs hooks and is not free.
--- Restructuring INV? now churns both at once, and an abstraction
--- that turns out unclean halfway leaves INV? half-refactored — the
--- worst outcome.  The width side is the cheap, predictable half.
--- REVISIT at end-of-proof cleanup, once Formal-Verification is
--- discharged and nothing is in flux.
+-- DECIDED 2026-07-25: NOT then — W11 was ground as a direct mirror
+-- instead.  The fnCap half is not a freestanding artifact (it lives
+-- as conjuncts inside subscribeE-walkS's clause induction and the
+-- wet clique), the joint face also states INV?, and the two measures
+-- differ per clause, so the abstraction needs hooks and is not free.
+-- Restructuring INV? mid-proof would churn both at once, and an
+-- abstraction that turned out unclean halfway would leave INV?
+-- half-refactored — the worst outcome.  REVISIT at end-of-proof
+-- cleanup, once Formal-Verification is discharged and nothing is in
+-- flux: the two walks are now both proven, so the merge would be a
+-- pure deduplication with no open risk.
 ------------------------------------------------------------------
-
-postulate
-  subscribeE-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ω : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id)
-    (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
-    let r = subscribeE g b κ id now sched st
-    in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstΩ? Ω (proj₁ r) ≡ true)
-
-  cascadeGo-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (Ω : ℕ) (a : Arrival Γ) (id : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    widthOK? Ω sched st ≡ true →
-    ofWᵛ (arrTy a) (Arrival.payload a) ≤ Ω →
-    all (λ rc → pathΩ? Ω (proj₂ rc)) chains ≡ true →
-    let r = cascadeGo a id chains sched st
-    in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstΩ? Ω (proj₁ r) ≡ true)
 
 ------------------------------------------------------------------
 -- THE LENGTH LEDGER's vocabulary (memo (5), corrected form)
@@ -7220,6 +7200,1151 @@ slotOfW-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
 slotOfW-at Ω i sched st h =
   ≤-trans (fᵢ≤sum-tab (λ j → slotOfW (Sched.slots sched j)) i)
           (≤ᵇ⇒≤ _ _ (T-to (proj₂ (proj₂ (proj₂ (WOK-parts Ω sched st h))))))
+
+------------------------------------------------------------------
+-- (W11-B) THE FRAME ANALYTICS.  Every fact the frames need about
+-- values, nodes and the registry, at the flat width.  These are the
+-- W2/W4 mirrors with the ledger stripped: no caseW rider (widths
+-- are substitution-invariant, so eval never widens), no capᴱ, no E.
+------------------------------------------------------------------
+
+applyFn-ofW : ∀ {n} {Γ : Ctx n} {s t} (Ω : ℕ)
+  (fn : Fn Γ [] [] [] s t) (v : Val Γ s) →
+  ofWᵛ s v ≤ Ω → ofWᵗ fn ≤ Ω → ofWᵛ t (applyFn fn v) ≤ Ω
+applyFn-ofW Ω fn v hv hfn = ofW-evalWith Ω fn (v ∷ᵃ []ᵃ) (hv , tt) hfn
+
+map-applyFn-Ω : ∀ {n} {Γ : Ctx n} {s u} (Ω : ℕ)
+  (fn : Fn Γ [] [] [] s u) → ofWᵗ fn ≤ Ω →
+  (vs : List (Val Γ s)) → all (λ v → ofWᵛ s v ≤ᵇ Ω) vs ≡ true →
+  all (λ v → ofWᵛ u v ≤ᵇ Ω) (map (applyFn fn) vs) ≡ true
+map-applyFn-Ω Ω fn hfn []       h = refl
+map-applyFn-Ω {s = s} Ω fn hfn (v ∷ vs) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (applyFn-ofW Ω fn v
+            (≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true (ofWᵛ s v ≤ᵇ Ω) _ h)))) hfn)))
+          (map-applyFn-Ω Ω fn hfn vs
+            (proj₂ (∧-true (ofWᵛ s v ≤ᵇ Ω) _ h)))
+
+-- one fold run: the accumulator and every output stay under Ω,
+-- because applyFn never widens (ofW-evalWith)
+scanVals-ofW : ∀ {n} {Γ : Ctx n} {s u} (Ω : ℕ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s)) →
+  ofWᵗ fn ≤ Ω → ofWᵛ u ac ≤ Ω →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) vs ≡ true →
+  (ofWᵛ u (proj₂ (scanVals fn ac vs)) ≤ Ω)
+  × (all (λ o → ofWᵛ u o ≤ᵇ Ω) (proj₁ (scanVals fn ac vs)) ≡ true)
+scanVals-ofW Ω fn ac []       hfn hacc _ = hacc , refl
+scanVals-ofW {s = s} Ω fn ac (v ∷ vs) hfn hacc h =
+  proj₁ IH , ∧-intro (T⇒≡true _ (≤⇒≤ᵇ acc′OK)) (proj₂ IH)
+  where
+  hv     = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true (ofWᵛ s v ≤ᵇ Ω) _ h)))
+  acc′OK = applyFn-ofW Ω fn (ac , v) (⊔-lub hacc hv) hfn
+  IH     = scanVals-ofW Ω fn (applyFn fn (ac , v)) vs hfn acc′OK
+             (proj₂ (∧-true (ofWᵛ s v ≤ᵇ Ω) _ h))
+
+takeVals-Ω : ∀ {n} {Γ : Ctx n} {s} (Ω : ℕ) (k : ℕ) (vals : List (Val Γ s)) →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) vals ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ (takeVals k vals)) ≡ true
+takeVals-Ω Ω zero          _        h = refl
+takeVals-Ω Ω (suc k)       []       h = refl
+takeVals-Ω Ω (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
+takeVals-Ω Ω (suc (suc k)) (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (takeVals-Ω Ω (suc k) vs (proj₂ (∧-true _ _ h)))
+
+cutThrough-regsΩ : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ) (nid : NodeId)
+  (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  regsΩ? Ω reg ≡ true → regsΩ? Ω (proj₁ (cutThrough nid d wm dy reg)) ≡ true
+cutThrough-regsΩ Ω nid d wm dy []                    h = refl
+cutThrough-regsΩ Ω nid d wm dy ((rid , src , c) ∷ r) h
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-regsΩ Ω nid d wm dy r (proj₂ (∧-true _ _ h))
+... | true  | kept , closes , rids | ih = ih
+... | false | kept , closes , rids | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
+
+cutThrough-closesΩ : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ) (nid : NodeId)
+  (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  all (eventΩ? Ω) (proj₁ (proj₂ (cutThrough nid d wm dy reg))) ≡ true
+cutThrough-closesΩ Ω nid d wm dy []                    = refl
+cutThrough-closesΩ Ω nid d wm dy ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-closesΩ Ω nid d wm dy r
+... | false | kept , closes , rids | ih = ih
+... | true  | kept , closes , rids | ih
+      with any (_≡ᵇ rid) d ∧ memberSource src dy
+...   | true  = ih
+...   | false = ∧-intro refl ih
+
+-- a node lookup carries the width face of whatever it finds
+NodeΩ : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Set
+NodeΩ Ω nothing   = ⊤
+NodeΩ Ω (just ns) = ofWNode Ω ns ≡ true
+
+lookupNode-Ω : ∀ {n} {Γ : Ctx n} (Ω : ℕ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → ofWNode Ω (proj₂ kv)) nodes ≡ true →
+  NodeΩ Ω (lookupNode nid nodes)
+lookupNode-Ω Ω nid []            h = tt
+lookupNode-Ω Ω nid ((k , s) ∷ r) h with k ≡ᵇ nid
+... | true  = proj₁ (∧-true _ _ h)
+... | false = lookupNode-Ω Ω nid r (proj₂ (∧-true _ _ h))
+
+-- splitting an emit / a whole burst
+splitEvents-vals-Ω : ∀ {n} {Γ : Ctx n} {s u : Ty} (Ω : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventΩ? Ω) es ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+splitEvents-vals-Ω Ω []              h = refl
+splitEvents-vals-Ω Ω (value v  ∷ es) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (splitEvents-vals-Ω Ω es (proj₂ (∧-true _ _ h)))
+splitEvents-vals-Ω Ω (init _   ∷ es) h = splitEvents-vals-Ω Ω es (proj₂ (∧-true _ _ h))
+splitEvents-vals-Ω Ω (close _ _ ∷ es) h = splitEvents-vals-Ω Ω es (proj₂ (∧-true _ _ h))
+splitEvents-vals-Ω Ω (handoff _ ∷ es) h = splitEvents-vals-Ω Ω es (proj₂ (∧-true _ _ h))
+splitEvents-vals-Ω Ω (complete ∷ es) h = splitEvents-vals-Ω Ω es (proj₂ (∧-true _ _ h))
+
+splitEvents-bk-Ω : ∀ {n} {Γ : Ctx n} {s u : Ty} (Ω : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventΩ? Ω) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
+splitEvents-bk-Ω Ω []              = refl
+splitEvents-bk-Ω {u = u} Ω (value v  ∷ es) = splitEvents-bk-Ω {u = u} Ω es
+splitEvents-bk-Ω {u = u} Ω (init _   ∷ es) = ∧-intro refl (splitEvents-bk-Ω {u = u} Ω es)
+splitEvents-bk-Ω {u = u} Ω (close _ _ ∷ es) = ∧-intro refl (splitEvents-bk-Ω {u = u} Ω es)
+splitEvents-bk-Ω {u = u} Ω (handoff _ ∷ es) = ∧-intro refl (splitEvents-bk-Ω {u = u} Ω es)
+splitEvents-bk-Ω {u = u} Ω (complete ∷ es) = splitEvents-bk-Ω {u = u} Ω es
+
+splitBurst-vals-Ω : ∀ {n} {Γ : Ctx n} {s u : Ty} (Ω : ℕ) (str : Stream Γ s) →
+  burstΩ? Ω str ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ (splitBurst {A = Val Γ u} str)) ≡ true
+splitBurst-vals-Ω Ω []               h = refl
+splitBurst-vals-Ω {Γ = Γ} {u = u} Ω (em ∷ ems) h =
+  all-++-intro _ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em))) _
+    (splitEvents-vals-Ω Ω (InstEmit.events em) (proj₁ (∧-true _ _ h)))
+    (splitBurst-vals-Ω {u = u} Ω ems (proj₂ (∧-true _ _ h)))
+
+splitBurst-bk-Ω : ∀ {n} {Γ : Ctx n} {s u : Ty} (Ω : ℕ) (str : Stream Γ s) →
+  all (eventΩ? Ω) (proj₁ (proj₂ (splitBurst {A = Val Γ u} str))) ≡ true
+splitBurst-bk-Ω Ω []               = refl
+splitBurst-bk-Ω {Γ = Γ} {u = u} Ω (em ∷ ems) =
+  all-++-intro _ (proj₁ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em)))) _
+    (splitEvents-bk-Ω {u = u} Ω (InstEmit.events em))
+    (splitBurst-bk-Ω {u = u} Ω ems)
+
+-- retagging drops values, so the result is unconditionally clean
+retag-Ω : ∀ {n} {Γ : Ctx n} {s u : Ty} (Ω : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventΩ? {n = n} {Γ = Γ} {u = u} Ω) (retagEvents es) ≡ true
+retag-Ω Ω []              = refl
+retag-Ω {u = u} Ω (init _   ∷ es) = ∧-intro refl (retag-Ω {u = u} Ω es)
+retag-Ω {u = u} Ω (close _ _ ∷ es) = ∧-intro refl (retag-Ω {u = u} Ω es)
+retag-Ω {u = u} Ω (handoff _ ∷ es) = ∧-intro refl (retag-Ω {u = u} Ω es)
+retag-Ω {u = u} Ω (complete ∷ es) = ∧-intro refl (retag-Ω {u = u} Ω es)
+retag-Ω {u = u} Ω (value _  ∷ es) = retag-Ω {u = u} Ω es
+
+-- mergeAll's counter bump and switchAll's cut, width faces
+mergeBump-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (nid : NodeId) (d : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  widthOK? Ω sched (record st { nodes = mergeBump nid d (EvalSt.nodes st) })
+    ≡ true
+mergeBump-width Ω nid d sched st inv with lookupNode nid (EvalSt.nodes st)
+... | just (merge-st k od)   = install-width Ω sched st nid
+                                 (merge-st (if d then k else suc k) od) refl inv
+... | nothing                = inv
+... | just (scan-st _)       = inv
+... | just (take-st _)       = inv
+... | just (concat-st _ _ _) = inv
+... | just (switch-st _ _)   = inv
+... | just (exhaust-st _ _)  = inv
+
+switchKill-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  let r = switchKill cur sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ r) ≡ true)
+switchKill-width Ω nothing  sched st inv = inv , refl
+switchKill-width Ω (just v) sched st inv =
+  ∧-intro (sweepLive-ofW Ω kept (Sched.live sched) (proj₁ P))
+  (∧-intro (proj₁ (proj₂ P))
+  (∧-intro (cutThrough-regsΩ Ω v del wm dy (EvalSt.registry st)
+              (proj₁ (proj₂ (proj₂ P))))
+           (proj₂ (proj₂ (proj₂ P))))) ,
+  cutThrough-closesΩ Ω v del wm dy (EvalSt.registry st)
+  where
+  del  = EvalSt.delivered st
+  wm   = EvalSt.regWatermark st
+  dy   = EvalSt.dying st
+  kept = proj₁ (cutThrough v del wm dy (EvalSt.registry st))
+  P    = WOK-parts Ω sched st inv
+
+-- the wrap: values and events pass through, only the *All node's
+-- done flag is written back
+thruWrap-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (op : AllOp) (nid : NodeId) (fin : Bool)
+  (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  all (λ v → ofWᵛ u v ≤ᵇ Ω) vs ≡ true →
+  all (eventΩ? Ω) bs ≡ true →
+  let r = thruWrap op nid fin (vs , bs , sched , st)
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (λ v → ofWᵛ u v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+thruWrap-width Ω op nid false vs bs sched st inv vΩ bΩ = inv , vΩ , bΩ
+thruWrap-width Ω mergeᵒ nid true vs bs sched st inv vΩ bΩ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (merge-st k _)    =
+      install-width Ω sched st nid (merge-st k true) refl inv , vΩ , bΩ
+... | nothing                = inv , vΩ , bΩ
+... | just (scan-st _)       = inv , vΩ , bΩ
+... | just (take-st _)       = inv , vΩ , bΩ
+... | just (concat-st _ _ _) = inv , vΩ , bΩ
+... | just (switch-st _ _)   = inv , vΩ , bΩ
+... | just (exhaust-st _ _)  = inv , vΩ , bΩ
+thruWrap-width Ω concatᵒ nid true vs bs sched st inv vΩ bΩ
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-Ω Ω nid (EvalSt.nodes st)
+         (proj₁ (proj₂ (WOK-parts Ω sched st inv)))
+... | just (concat-st q act _) | nb =
+      install-width Ω sched st nid (concat-st q act true) nb inv , vΩ , bΩ
+... | nothing                | _ = inv , vΩ , bΩ
+... | just (scan-st _)       | _ = inv , vΩ , bΩ
+... | just (take-st _)       | _ = inv , vΩ , bΩ
+... | just (merge-st _ _)    | _ = inv , vΩ , bΩ
+... | just (switch-st _ _)   | _ = inv , vΩ , bΩ
+... | just (exhaust-st _ _)  | _ = inv , vΩ , bΩ
+thruWrap-width Ω switchᵒ nid true vs bs sched st inv vΩ bΩ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur _) =
+      install-width Ω sched st nid (switch-st cur true) refl inv , vΩ , bΩ
+... | nothing                = inv , vΩ , bΩ
+... | just (scan-st _)       = inv , vΩ , bΩ
+... | just (take-st _)       = inv , vΩ , bΩ
+... | just (merge-st _ _)    = inv , vΩ , bΩ
+... | just (concat-st _ _ _) = inv , vΩ , bΩ
+... | just (exhaust-st _ _)  = inv , vΩ , bΩ
+thruWrap-width Ω exhaustᵒ nid true vs bs sched st inv vΩ bΩ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act _) =
+      install-width Ω sched st nid (exhaust-st act true) refl inv , vΩ , bΩ
+... | nothing                = inv , vΩ , bΩ
+... | just (scan-st _)       = inv , vΩ , bΩ
+... | just (take-st _)       = inv , vΩ , bΩ
+... | just (merge-st _ _)    = inv , vΩ , bΩ
+... | just (concat-st _ _ _) = inv , vΩ , bΩ
+... | just (switch-st _ _)   = inv , vΩ , bΩ
+
+------------------------------------------------------------------
+-- the two SELF-CONTAINED frames: scan folds under Ω (applyFn never
+-- widens), take passes a prefix through and, on the cutting emit,
+-- runs cutThrough + sweepLive.  Neither re-enters subscribeE, so
+-- both live outside the clique.
+------------------------------------------------------------------
+
+stepFrame-scan-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ω : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  frameΩ? Ω (scan-f fn nid) ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) vals ≡ true →
+  let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (λ v → ofWᵛ u v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-scan-width {s = s} {u = u} Ω g id now fn nid κ vals fin sched st
+                     inv fΩ vΩ
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-Ω Ω nid (EvalSt.nodes st)
+         (proj₁ (proj₂ (WOK-parts Ω sched st inv)))
+... | nothing                | _ = inv , refl , refl
+... | just (take-st _)       | _ = inv , refl , refl
+... | just (merge-st _ _)    | _ = inv , refl , refl
+... | just (concat-st _ _ _) | _ = inv , refl , refl
+... | just (switch-st _ _)   | _ = inv , refl , refl
+... | just (exhaust-st _ _)  | _ = inv , refl , refl
+... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
+...   | no _    = inv , refl , refl
+...   | yes refl =
+  install-width Ω sched st nid (scan-st (proj₂ run))
+    (T⇒≡true _ (≤⇒≤ᵇ (proj₁ run-ok))) inv ,
+  proj₂ run-ok , refl
+  where
+  run    = scanVals fn ac vals
+  ofwfn  : ofWᵗ fn ≤ Ω
+  ofwfn  = ≤ᵇ⇒≤ _ _ (T-to fΩ)
+  run-ok = scanVals-ofW Ω fn ac vals ofwfn (≤ᵇ⇒≤ _ _ (T-to nb)) vΩ
+
+stepFrame-take-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ω : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (nid : NodeId) (κ : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) vals ≡ true →
+  let r = stepFrame g id now (take-f nid) κ vals fin sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-take-width {s = s} Ω g id now nid κ vals fin sched st inv vΩ
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                = inv , refl , refl
+... | just (scan-st _)       = inv , refl , refl
+... | just (merge-st _ _)    = inv , refl , refl
+... | just (concat-st _ _ _) = inv , refl , refl
+... | just (switch-st _ _)   = inv , refl , refl
+... | just (exhaust-st _ _)  = inv , refl , refl
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | false =
+  install-width Ω sched st nid
+    (take-st (proj₁ (proj₂ (takeVals k vals)))) refl inv ,
+  takeVals-Ω Ω k vals vΩ , refl
+...   | true =
+  ∧-intro (sweepLive-ofW Ω kept (Sched.live sched) (proj₁ P))
+  (∧-intro (setNode-ofW Ω nid (take-st zero) (EvalSt.nodes st) refl
+              (proj₁ (proj₂ P)))
+  (∧-intro (cutThrough-regsΩ Ω nid del wm dy (EvalSt.registry st)
+              (proj₁ (proj₂ (proj₂ P))))
+           (proj₂ (proj₂ (proj₂ P))))) ,
+  takeVals-Ω Ω k vals vΩ ,
+  cutThrough-closesΩ Ω nid del wm dy (EvalSt.registry st)
+  where
+  del  = EvalSt.delivered st
+  wm   = EvalSt.regWatermark st
+  dy   = EvalSt.dying st
+  kept = proj₁ (cutThrough nid del wm dy (EvalSt.registry st))
+  P    = WOK-parts Ω sched st inv
+
+-- the connect's two landings, factored out of sharedConnect's `if`
+connectWrap-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (i : Fin n) (id : Id) (c : Bool)
+  (burst : Stream Γ (lookup Γ i)) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → burstΩ? Ω burst ≡ true →
+  let r : Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
+      r = if c
+          then (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+                  at id from toℕ i as subscribe) ∷ sharedPlumb burst)
+               , sched
+               , record st { registry = dropSource (toℕ i) (EvalSt.registry st)
+                           ; completedSources = toℕ i ∷ EvalSt.completedSources st }
+          else (((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ sharedPlumb burst)
+               , sched , st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+connectWrap-width Ω i id true  burst sched st inv bΩ =
+  latch-width Ω (toℕ i) sched st inv ,
+  ∧-intro refl (sharedPlumb-Ω Ω burst bΩ)
+connectWrap-width Ω i id false burst sched st inv bΩ =
+  inv , ∧-intro refl (sharedPlumb-Ω Ω burst bΩ)
+
+-- of-list literals: eval never widens, so each element rides the
+-- list's own ofWᵗˢ max
+ofVals-Ω : ∀ {n} {Γ : Ctx n} {u} (Ω : ℕ) (ts : List (Tm Γ [] [] [] u)) →
+  ofWᵗˢ ts ≤ Ω →
+  all (λ v → ofWᵛ u v ≤ᵇ Ω) (map (λ tm → evalTm tm) ts) ≡ true
+ofVals-Ω Ω []       h = refl
+ofVals-Ω Ω (y ∷ ys) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (ofW-evalWith Ω y []ᵃ tt
+            (≤-trans (m≤m⊔n (ofWᵗ y) (ofWᵗˢ ys)) h))))
+          (ofVals-Ω Ω ys (≤-trans (m≤n⊔m (ofWᵗ y) (ofWᵗˢ ys)) h))
+
+
+------------------------------------------------------------------
+-- THE WIDTH WALK's entry point.  Its clause grind and the clique it
+-- re-enters follow below; the delivery clique after that.
+------------------------------------------------------------------
+
+subscribeE-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id)
+  (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+  let r = subscribeE g b κ id now sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+------------------------------------------------------------------
+-- (W11-D) THE SUBSCRIPTION CLIQUE, width face.  Same shape as the
+-- wet clique — subscribeE re-enters through subscribeAll/pushBurst,
+-- through subscribeInner under the *All frames, and through a
+-- share's connect — but with Ω flat the whole thing is one
+-- preservation statement per clause.  The ONE width mint in the
+-- machine is ofᵉ, and it mints exactly its own list, which the
+-- entry seed already dominates.
+------------------------------------------------------------------
+
+subscribeAll-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → ofWNode Ω ns ≡ true →
+  ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+  let r = subscribeAll g op ns b κ id now sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+pushBurst-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ω : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t) (str : Stream Γ s)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  frameΩ? Ω f ≡ true → pathΩ? Ω κ ≡ true → burstΩ? Ω str ≡ true →
+  let r = pushBurst g id now f κ str sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+stepFrame-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ω : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  frameΩ? Ω f ≡ true → pathΩ? Ω κ ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) vals ≡ true →
+  let r = stepFrame g id now f κ vals fin sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (λ v → ofWᵛ u v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+
+subscribeInner-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  (ofWᵛ (obs u) o ≤ᵇ Ω) ≡ true → pathΩ? Ω κ ≡ true →
+  let r = subscribeInner g op allNid κ id now o sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (all (λ v → ofWᵛ u v ≤ᵇ Ω) (proj₁ (proj₂ r)) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ (proj₂ r))) ≡ true)
+
+thruConsume-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  (ofWᵛ (obs u) o ≤ᵇ Ω) ≡ true → pathΩ? Ω κ ≡ true →
+  let r = thruConsume g op nid κ id now o sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r))) ≡ true)
+     × (all (λ v → ofWᵛ u v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+
+thruWalk-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → pathΩ? Ω κ ≡ true →
+  all (λ v → ofWᵛ (obs u) v ≤ᵇ Ω) vals ≡ true →
+  let r = thruWalk g op nid κ id now vals sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r))) ≡ true)
+     × (all (λ v → ofWᵛ u v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+
+concatDrain-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ω : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → pathΩ? Ω κ ≡ true →
+  all (λ o → ofWᵉ o ≤ᵇ Ω) q ≡ true →
+  let r = concatDrain g allNid κ id now q sched st
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+     × (all (λ o → ofWᵉ o ≤ᵇ Ω) (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+
+innerFinish-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ω : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → pathΩ? Ω κ ≡ true →
+  all (λ v → ofWᵛ s v ≤ᵇ Ω) vals ≡ true →
+  let r = innerFinish g op allNid inst κ id now vals sched st
+            (lookupNode allNid (EvalSt.nodes st))
+  in (widthOK? Ω (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ r) ≡ true)
+     × (all (eventΩ? Ω) (proj₁ (proj₂ r)) ≡ true)
+
+subscribeE-input-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → pathΩ? Ω κ ≡ true →
+  let r = subscribeE g (input i) κ id now sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+sharedSlot-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → ofWᵉ d ≤ Ω → pathΩ? Ω κ ≡ true →
+  let r = subscribeSharedSlot g i d κ id now sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+sharedConnect-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → ofWᵉ d ≤ Ω → pathΩ? Ω κ ≡ true →
+  let r = sharedConnect g i d κ id now sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+------------------------------------------------------------------
+-- the *All shape: mint, install, subscribe under the thru-outer
+-- frame, push the burst
+------------------------------------------------------------------
+
+subscribeAll-width Ω g op ns b κ id now sched st inv nΩ bΩ pΩ =
+  pushBurst-width Ω g id now (thru-outer op nid) κ (proj₁ sE)
+    (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) (proj₁ IH) refl pΩ (proj₂ IH)
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns st
+  sE     = subscribeE g b (thru-outer op nid ↠ κ) id now sched₁ st₀
+  IH     = subscribeE-width Ω g b (thru-outer op nid ↠ κ) id now sched₁ st₀
+             (install-width Ω sched₁ st nid ns nΩ inv) bΩ (∧-intro refl pΩ)
+
+------------------------------------------------------------------
+-- the burst re-entry: split each emit, step its frame, reassemble
+------------------------------------------------------------------
+
+pushBurst-width Ω g id now f κ [] sched st inv fΩ pΩ bΩ = inv , refl
+pushBurst-width {Γ = Γ} {s = s} {u = u} Ω g id now f κ (em ∷ ems) sched st
+                inv fΩ pΩ bΩ =
+  proj₁ IH ,
+  ∧-intro
+    (all-++-intro _ (proj₁ (proj₂ sp)) _
+      (splitEvents-bk-Ω {u = u} Ω (InstEmit.events em))
+      (all-++-intro _ (retagEvents (proj₁ (proj₂ SF))) _
+        (retag-Ω {u = u} Ω (proj₁ (proj₂ SF)))
+        (all-++-intro _ (map value (proj₁ SF)) _
+          (mapValue-Ω Ω u (proj₁ SF) (proj₁ (proj₂ SFw)))
+          (finList-Ω Ω (proj₁ (proj₂ (proj₂ SF)))))))
+    (proj₂ IH)
+  where
+  sp  = splitEvents {A = Val Γ u} (InstEmit.events em)
+  SF  = stepFrame g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  SFw = stepFrame-width Ω g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+          inv fΩ pΩ
+          (splitEvents-vals-Ω {u = u} Ω (InstEmit.events em)
+            (proj₁ (∧-true _ _ bΩ)))
+  IH  = pushBurst-width Ω g id now f κ ems
+          (proj₁ (proj₂ (proj₂ (proj₂ SF))))
+          (proj₂ (proj₂ (proj₂ (proj₂ SF))))
+          (proj₁ SFw) fΩ pΩ (proj₂ (∧-true _ _ bΩ))
+
+------------------------------------------------------------------
+-- the frame dispatch: map is the one real computation (and even it
+-- cannot widen), scan and take are proven above, the two *All
+-- frames re-enter the clique
+------------------------------------------------------------------
+
+stepFrame-width Ω g id now (map-f fn) κ vals fin sched st inv fΩ pΩ vΩ =
+  inv , map-applyFn-Ω Ω fn (≤ᵇ⇒≤ _ _ (T-to fΩ)) vals vΩ , refl
+stepFrame-width Ω g id now (scan-f fn nid) κ vals fin sched st inv fΩ pΩ vΩ =
+  stepFrame-scan-width Ω g id now fn nid κ vals fin sched st inv fΩ vΩ
+stepFrame-width Ω g id now (take-f nid) κ vals fin sched st inv fΩ pΩ vΩ =
+  stepFrame-take-width Ω g id now nid κ vals fin sched st inv vΩ
+stepFrame-width Ω g id now (from-inner op allNid inst) κ vals false sched st
+                inv fΩ pΩ vΩ = inv , vΩ , refl
+stepFrame-width Ω g id now (from-inner op allNid inst) κ vals true sched st
+                inv fΩ pΩ vΩ
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  = inv , vΩ , refl
+... | false = innerFinish-width Ω g op allNid inst κ id now vals sched st
+                inv pΩ vΩ
+stepFrame-width Ω g id now (thru-outer op nid) κ vals fin sched st
+                inv fΩ pΩ vΩ =
+  thruWrap-width Ω op nid fin (proj₁ wr) (proj₁ (proj₂ wr))
+    (proj₁ (proj₂ (proj₂ wr))) (proj₂ (proj₂ (proj₂ wr)))
+    (proj₁ WK) (proj₁ (proj₂ WK)) (proj₂ (proj₂ WK))
+  where
+  wr = thruWalk g op nid κ id now vals sched st
+  WK = thruWalk-width Ω g op nid κ id now vals sched st inv pΩ vΩ
+
+------------------------------------------------------------------
+-- one inner subscription: g0 is the dry stub, gs re-enters
+------------------------------------------------------------------
+
+subscribeInner-width Ω g0 op allNid κ id now o sched st inv oΩ pΩ =
+  inv , refl , refl
+subscribeInner-width {t = t} {u = u} Ω (gs fuel) op allNid κ id now o sched st
+                     inv oΩ pΩ =
+  proj₁ IH ,
+  splitBurst-vals-Ω {s = u} {u = t} Ω (proj₁ sE) (proj₂ IH) ,
+  splitBurst-bk-Ω {s = u} {u = t} Ω (proj₁ sE)
+  where
+  inst   = Sched.nextNode sched
+  sched₀ = record sched { nextNode = suc inst }
+  sE     = subscribeE fuel o (from-inner op allNid inst ↠ κ) id now sched₀ st
+  IH     = subscribeE-width Ω fuel o (from-inner op allNid inst ↠ κ) id now
+             sched₀ st inv (≤ᵇ⇒≤ _ _ (T-to oΩ)) (∧-intro refl pΩ)
+
+------------------------------------------------------------------
+-- the outer *All walk, one emitted inner at a time
+------------------------------------------------------------------
+
+thruConsume-width Ω g mergeᵒ nid κ id now o sched st inv oΩ pΩ =
+  mergeBump-width Ω nid done sched₁ st₁ (proj₁ SI) ,
+  proj₁ (proj₂ SI) , proj₂ (proj₂ SI)
+  where
+  SI     = subscribeInner-width Ω g mergeᵒ nid κ id now o sched st inv oΩ pΩ
+  SI₄    = subscribeInner g mergeᵒ nid κ id now o sched st
+  done   = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+thruConsume-width {u = u} Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-Ω Ω nid (EvalSt.nodes st)
+         (proj₁ (proj₂ (WOK-parts Ω sched st inv)))
+... | just (concat-st {w} q true od) | nb with w ≟ᵗ u
+...   | yes refl =
+  install-width Ω sched st nid (concat-st (q ++ o ∷ []) true od)
+    (all-++-intro _ q _ nb (∧-intro oΩ refl)) inv ,
+  refl , refl
+...   | no _ = inv , refl , refl
+thruConsume-width {u = u} Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | just (concat-st q false od) | nb =
+  install-width Ω (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))) st₁ nid
+    (concat-st {t = u} [] (not done) od) refl (proj₁ SI) ,
+  proj₁ (proj₂ SI) , proj₂ (proj₂ SI)
+  where
+  SI   = subscribeInner-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+  SI₄  = subscribeInner g concatᵒ nid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+thruConsume-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | nothing | _ = inv , refl , refl
+thruConsume-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | just (scan-st _) | _ = inv , refl , refl
+thruConsume-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | just (take-st _) | _ = inv , refl , refl
+thruConsume-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | just (merge-st _ _) | _ = inv , refl , refl
+thruConsume-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | just (switch-st _ _) | _ = inv , refl , refl
+thruConsume-width Ω g concatᵒ nid κ id now o sched st inv oΩ pΩ
+    | just (exhaust-st _ _) | _ = inv , refl , refl
+thruConsume-width Ω g switchᵒ nid κ id now o sched st inv oΩ pΩ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) =
+  install-width Ω (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))) st₂ nid
+    (switch-st (if done then nothing else just inst) od) refl (proj₁ SI) ,
+  proj₁ (proj₂ SI) ,
+  all-++-intro _ closes _ (proj₂ KL) (proj₂ (proj₂ SI))
+  where
+  KL     = switchKill-width Ω cur sched st inv
+  closes = proj₁ (switchKill cur sched st)
+  sched₁ = proj₁ (proj₂ (switchKill cur sched st))
+  st₁    = proj₂ (proj₂ (switchKill cur sched st))
+  SI     = subscribeInner-width Ω g switchᵒ nid κ id now o sched₁ st₁
+             (proj₁ KL) oΩ pΩ
+  SI₄    = subscribeInner g switchᵒ nid κ id now o sched₁ st₁
+  inst   = proj₁ SI₄
+  done   = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+... | nothing                = inv , refl , refl
+... | just (scan-st _)       = inv , refl , refl
+... | just (take-st _)       = inv , refl , refl
+... | just (merge-st _ _)    = inv , refl , refl
+... | just (concat-st _ _ _) = inv , refl , refl
+... | just (exhaust-st _ _)  = inv , refl , refl
+thruConsume-width Ω g exhaustᵒ nid κ id now o sched st inv oΩ pΩ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st true od)  = inv , refl , refl
+... | just (exhaust-st false od) =
+  install-width Ω (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))) st₁ nid
+    (exhaust-st (not done) od) refl (proj₁ SI) ,
+  proj₁ (proj₂ SI) , proj₂ (proj₂ SI)
+  where
+  SI   = subscribeInner-width Ω g exhaustᵒ nid κ id now o sched st inv oΩ pΩ
+  SI₄  = subscribeInner g exhaustᵒ nid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
+... | nothing                = inv , refl , refl
+... | just (scan-st _)       = inv , refl , refl
+... | just (take-st _)       = inv , refl , refl
+... | just (merge-st _ _)    = inv , refl , refl
+... | just (concat-st _ _ _) = inv , refl , refl
+... | just (switch-st _ _)   = inv , refl , refl
+
+thruWalk-width Ω g op nid κ id now [] sched st inv pΩ vΩ = inv , refl , refl
+thruWalk-width {u = u} Ω g op nid κ id now (o ∷ os) sched st inv pΩ vΩ =
+  proj₁ IH ,
+  all-++-intro _ (proj₁ cr) _ (proj₁ (proj₂ CS)) (proj₁ (proj₂ IH)) ,
+  all-++-intro _ (proj₁ (proj₂ cr)) _ (proj₂ (proj₂ CS)) (proj₂ (proj₂ IH))
+  where
+  CS = thruConsume-width Ω g op nid κ id now o sched st inv
+         (proj₁ (∧-true _ _ vΩ)) pΩ
+  cr = thruConsume g op nid κ id now o sched st
+  IH = thruWalk-width Ω g op nid κ id now os
+         (proj₁ (proj₂ (proj₂ cr))) (proj₂ (proj₂ (proj₂ cr)))
+         (proj₁ CS) pΩ (proj₂ (∧-true _ _ vΩ))
+
+------------------------------------------------------------------
+-- the inner *All frame's drain and finish
+------------------------------------------------------------------
+
+concatDrain-width Ω g allNid κ id now [] sched st inv pΩ qΩ =
+  inv , refl , refl , refl
+concatDrain-width {s = s} Ω g allNid κ id now (o ∷ q) sched st inv pΩ qΩ
+  with subscribeInner g concatᵒ allNid κ id now o sched st
+     | subscribeInner-width Ω g concatᵒ allNid κ id now o sched st inv
+         (proj₁ (∧-true (ofWᵉ o ≤ᵇ Ω) _ qΩ)) pΩ
+... | (_ , vs , bs , false , sched₁ , st₁) | (inv₁ , vsΩ , bsΩ) =
+  inv₁ , vsΩ , bsΩ , proj₂ (∧-true (ofWᵉ o ≤ᵇ Ω) _ qΩ)
+... | (_ , vs , bs , true , sched₁ , st₁) | (inv₁ , vsΩ , bsΩ) =
+  proj₁ IH ,
+  all-++-intro _ vs _ vsΩ (proj₁ (proj₂ IH)) ,
+  all-++-intro _ bs _ bsΩ (proj₁ (proj₂ (proj₂ IH))) ,
+  proj₂ (proj₂ (proj₂ IH))
+  where
+  IH = concatDrain-width Ω g allNid κ id now q sched₁ st₁ inv₁ pΩ
+         (proj₂ (∧-true (ofWᵉ o ≤ᵇ Ω) _ qΩ))
+
+innerFinish-width Ω g mergeᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (merge-st k od)   =
+  install-width Ω sched st allNid (merge-st (pred k) od) refl inv , vΩ , refl
+... | nothing                = inv , vΩ , refl
+... | just (scan-st _)       = inv , vΩ , refl
+... | just (take-st _)       = inv , vΩ , refl
+... | just (concat-st _ _ _) = inv , vΩ , refl
+... | just (switch-st _ _)   = inv , vΩ , refl
+... | just (exhaust-st _ _)  = inv , vΩ , refl
+innerFinish-width {s = s} Ω g concatᵒ allNid inst κ id now vals sched st
+                  inv pΩ vΩ
+  with lookupNode allNid (EvalSt.nodes st)
+     | lookupNode-Ω Ω allNid (EvalSt.nodes st)
+         (proj₁ (proj₂ (WOK-parts Ω sched st inv)))
+... | just (concat-st {w} q act od) | nb with w ≟ᵗ s
+...   | yes refl =
+  install-width Ω sched′ st′ allNid (concat-st q′ act′ od)
+    (proj₂ (proj₂ (proj₂ DR))) (proj₁ DR) ,
+  all-++-intro _ vals _ vΩ (proj₁ (proj₂ DR)) ,
+  proj₁ (proj₂ (proj₂ DR))
+  where
+  DR     = concatDrain-width Ω g allNid κ id now q sched st inv pΩ nb
+  dr     = concatDrain g allNid κ id now q sched st
+  act′   = proj₁ (proj₂ (proj₂ dr))
+  q′     = proj₁ (proj₂ (proj₂ (proj₂ dr)))
+  sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
+  st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
+...   | no _ = inv , vΩ , refl
+innerFinish-width Ω g concatᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | nothing               | _ = inv , vΩ , refl
+innerFinish-width Ω g concatᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (scan-st _)      | _ = inv , vΩ , refl
+innerFinish-width Ω g concatᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (take-st _)      | _ = inv , vΩ , refl
+innerFinish-width Ω g concatᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (merge-st _ _)   | _ = inv , vΩ , refl
+innerFinish-width Ω g concatᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (switch-st _ _)  | _ = inv , vΩ , refl
+innerFinish-width Ω g concatᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (exhaust-st _ _) | _ = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (switch-st (just c) od) with c ≡ᵇ inst
+...   | true  =
+  install-width Ω sched st allNid (switch-st nothing od) refl inv , vΩ , refl
+...   | false = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (switch-st nothing od) = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | nothing                = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (scan-st _)       = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (take-st _)       = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (merge-st _ _)    = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (concat-st _ _ _) = inv , vΩ , refl
+innerFinish-width Ω g switchᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+    | just (exhaust-st _ _)  = inv , vΩ , refl
+innerFinish-width Ω g exhaustᵒ allNid inst κ id now vals sched st inv pΩ vΩ
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (exhaust-st act od) =
+  install-width Ω sched st allNid (exhaust-st false od) refl inv , vΩ , refl
+... | nothing                = inv , vΩ , refl
+... | just (scan-st _)       = inv , vΩ , refl
+... | just (take-st _)       = inv , vΩ , refl
+... | just (merge-st _ _)    = inv , vΩ , refl
+... | just (concat-st _ _ _) = inv , vΩ , refl
+... | just (switch-st _ _)   = inv , vΩ , refl
+
+------------------------------------------------------------------
+-- THE INPUT CLAUSE, width face.  slotOfW-at cuts the one slot's
+-- width out of widthOK?'s slots sum; that is all the clause knows.
+------------------------------------------------------------------
+
+sharedSlot-width Ω g i d κ id now sched st inv dΩ pΩ
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  = inv , refl
+... | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+...   | true  = register-width Ω (toℕ i) κ sched st inv pΩ , refl
+...   | false = sharedConnect-width Ω g i d κ id now sched st inv dΩ pΩ
+
+sharedConnect-width Ω g0 i d κ id now sched st inv dΩ pΩ = inv , refl
+sharedConnect-width Ω (gs fuel) i d κ id now sched st inv dΩ pΩ =
+  connectWrap-width Ω i id (burstCompleted (proj₁ SE))
+    (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)) (proj₁ IH) (proj₂ IH)
+  where
+  st₀  = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
+  st₁  = register (toℕ i) κ st₀
+  inv₁ = register-width Ω (toℕ i) κ sched st₀
+           (connectShare-width Ω (toℕ i) sched st inv) pΩ
+  IH   = subscribeE-width Ω fuel d (share-sink i) id now sched st₁ inv₁ dΩ refl
+  SE   = subscribeE fuel d (share-sink i) id now sched st₁
+
+subscribeE-input-width {Γ = Γ} Ω g i κ id now sched st inv pΩ
+  with Sched.slots sched i | slotOfW-at Ω i sched st inv
+
+-- a shared def: connect once, ever; then join
+... | shared d | dΩ = sharedSlot-width Ω g i d κ id now sched st inv dΩ pΩ
+
+-- a cold with no async tail: born and spent inside its own burst
+... | scripted (cold sy []) | sΩ =
+      inv ,
+      ∧-intro
+        (all-++-intro _ (map value sy) _
+          (mapValue-Ω Ω (lookup Γ i) sy
+            (sumVals-Ω Ω (lookup Γ i) sy (≤-trans (m≤m+n _ 0) sΩ)))
+          refl)
+        refl
+
+-- a cold WITH a tail: fresh source and ordinal, the tail resolved
+-- against this subscription's tick, one registration
+... | scripted (cold sy (tv ∷ tvs)) | sΩ =
+      register-width Ω src κ sched₃ st inv₃ pΩ ,
+      ∧-intro (mapValue-Ω Ω (lookup Γ i) sy syΩ) refl
+      where
+      src    = Sched.nextSource sched
+      sched₁ = proj₂ (mintSource sched)
+      ord    = Sched.nextOrdinal sched₁
+      sched₂ = proj₂ (mintOrdinal sched₁)
+      anchored : LiveSource Γ
+      anchored = record { source = src ; ordinal = ord ; elemTy = lookup Γ i
+                        ; pending = resolve now (tv ∷ tvs) }
+      sched₃ = record sched₂ { live = anchored ∷ Sched.live sched₂ }
+      -- both summands named: nothing can recover the sync side by
+      -- inverting _+_
+      syncW  = sum (map (ofWᵛ (lookup Γ i)) sy)
+      tailW  = sum (map (λ p → ofWᵛ (lookup Γ i) (Timed.val p)) (tv ∷ tvs))
+      syΩ    = sumVals-Ω Ω (lookup Γ i) sy (≤-trans (m≤m+n syncW tailW) sΩ)
+      inv₃   = addLive-width Ω sched₂ st anchored
+                 (resolve-measure (ofWᵛ (lookup Γ i)) Ω now (tv ∷ tvs)
+                   (≤-trans (m≤n+m tailW syncW) sΩ))
+                 inv
+
+-- a hot: already live at the slot's own source/ordinal
+... | scripted (hot _) | sΩ
+      with memberSource (toℕ i) (EvalSt.completedSources st)
+...   | true  = inv , refl
+...   | false = register-width Ω (toℕ i) κ sched st inv pΩ , refl
+
+------------------------------------------------------------------
+-- deferᵉ: mint a node, a source and an ordinal, install the merge
+-- node, park the BODY as the lone pending value of a fresh live
+-- source, register the outer chain.  A parked obs value's width IS
+-- the body's own, so the live entry needs no arithmetic.
+------------------------------------------------------------------
+
+subscribeE-defer-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → ofWᵉ body ≤ Ω → pathΩ? Ω κ ≡ true →
+  let r = subscribeE g (deferᵉ body) κ id now sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+subscribeE-defer-width {Γ = Γ} {u = u} Ω g body κ id now sched st inv bΩ pΩ =
+  register-width Ω src (thru-outer mergeᵒ nid ↠ κ) sched₄ st₀ inv₂
+    (∧-intro refl pΩ) ,
+  refl
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  src    = proj₁ (mintSource sched₁)
+  sched₂ = proj₂ (mintSource sched₁)
+  ord    = proj₁ (mintOrdinal sched₂)
+  sched₃ = proj₂ (mintOrdinal sched₂)
+  hop : LiveSource Γ
+  hop = record { source = src ; ordinal = ord ; elemTy = obs u
+               ; pending = (suc now , body) ∷ [] }
+  sched₄ = record sched₃ { live = hop ∷ Sched.live sched₃ }
+  st₀    = installNode nid (merge-st 0 false) st
+  inv₂   = addLive-width Ω sched₃ st₀ hop
+             (∧-intro (T⇒≡true _ (≤⇒≤ᵇ bΩ)) refl)
+             (install-width Ω sched₃ st nid (merge-st 0 false) refl inv)
+
+------------------------------------------------------------------
+-- THE WIDTH WALK ITSELF.  Thirteen clauses, each a ⊔-projection of
+-- the entry bound: ofᵉ is the only width MINT and it mints exactly
+-- its own list; every other clause hands its sub-bound down.
+------------------------------------------------------------------
+
+subscribeE-width Ω g (input i) κ id now sched st inv bΩ pΩ =
+  subscribeE-input-width Ω g i κ id now sched st inv pΩ
+
+subscribeE-width {Γ = Γ} {u = u} Ω g (ofᵉ ts) κ id now sched st inv bΩ pΩ =
+  inv ,
+  ∧-intro
+    (∧-intro refl
+      (all-++-intro _ (map value (map (λ tm → evalTm tm) ts)) _
+        (mapValue-Ω Ω u (map (λ tm → evalTm tm) ts)
+          (ofVals-Ω Ω ts (≤-trans (m≤n⊔m (length ts) (ofWᵗˢ ts)) bΩ)))
+        refl))
+    refl
+
+subscribeE-width Ω g emptyᵉ κ id now sched st inv bΩ pΩ = inv , refl
+
+subscribeE-width Ω g (mapᵉ f b) κ id now sched st inv bΩ pΩ =
+  pushBurst-width Ω g id now (map-f f) κ (proj₁ sE)
+    (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) (proj₁ IH) fΩ pΩ (proj₂ IH)
+  where
+  ofwf = ≤-trans (m≤m⊔n (ofWᵗ f) (ofWᵉ b)) bΩ
+  ofwb = ≤-trans (m≤n⊔m (ofWᵗ f) (ofWᵉ b)) bΩ
+  fΩ : frameΩ? Ω (map-f f) ≡ true
+  fΩ = T⇒≡true _ (≤⇒≤ᵇ ofwf)
+  sE = subscribeE g b (map-f f ↠ κ) id now sched st
+  IH = subscribeE-width Ω g b (map-f f ↠ κ) id now sched st inv ofwb
+         (∧-intro fΩ pΩ)
+
+subscribeE-width Ω g (takeᵉ count b) κ id now sched st inv bΩ pΩ
+  with evalTm count
+... | zero  = inv , refl
+... | suc k =
+  pushBurst-width Ω g id now (take-f nid) κ (proj₁ sE)
+    (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) (proj₁ IH) refl pΩ (proj₂ IH)
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (take-st (suc k)) st
+  ofwb   = ≤-trans (m≤n⊔m (ofWᵗ count) (ofWᵉ b)) bΩ
+  sE     = subscribeE g b (take-f nid ↠ κ) id now sched₁ st₀
+  IH     = subscribeE-width Ω g b (take-f nid ↠ κ) id now sched₁ st₀
+             (install-width Ω sched₁ st nid (take-st (suc k)) refl inv)
+             ofwb (∧-intro refl pΩ)
+
+subscribeE-width {Γ = Γ} {u = u} Ω g (scanᵉ f z b) κ id now sched st inv bΩ pΩ =
+  pushBurst-width Ω g id now (scan-f f nid) κ (proj₁ sE)
+    (proj₁ (proj₂ sE)) (proj₂ (proj₂ sE)) (proj₁ IH) fΩ pΩ (proj₂ IH)
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = proj₂ (mintNode sched)
+  -- ofWᵉ (scanᵉ f z b) = ofWᵗ f ⊔ (ofWᵗ z ⊔ ofWᵉ b)
+  ofwf = ≤-trans (m≤m⊔n (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ b)) bΩ
+  ofwz = ≤-trans (m≤m⊔n (ofWᵗ z) (ofWᵉ b))
+           (≤-trans (m≤n⊔m (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ b)) bΩ)
+  ofwb = ≤-trans (m≤n⊔m (ofWᵗ z) (ofWᵉ b))
+           (≤-trans (m≤n⊔m (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ b)) bΩ)
+  fΩ : frameΩ? Ω (scan-f f nid) ≡ true
+  fΩ = T⇒≡true _ (≤⇒≤ᵇ ofwf)
+  st₀  = installNode nid (scan-st (evalTm z)) st
+  seed = ofW-evalWith Ω z []ᵃ tt ofwz
+  sE   = subscribeE g b (scan-f f nid ↠ κ) id now sched₁ st₀
+  IH   = subscribeE-width Ω g b (scan-f f nid ↠ κ) id now sched₁ st₀
+           (install-width Ω sched₁ st nid (scan-st (evalTm z))
+             (T⇒≡true _ (≤⇒≤ᵇ seed)) inv)
+           ofwb (∧-intro fΩ pΩ)
+
+subscribeE-width Ω g (mergeAllᵉ b) κ id now sched st inv bΩ pΩ =
+  subscribeAll-width Ω g mergeᵒ (merge-st 0 false) b κ id now sched st
+    inv refl bΩ pΩ
+subscribeE-width {u = u} Ω g (concatAllᵉ b) κ id now sched st inv bΩ pΩ =
+  subscribeAll-width Ω g concatᵒ (concat-st {t = u} [] false false) b κ id now
+    sched st inv refl bΩ pΩ
+subscribeE-width Ω g (switchAllᵉ b) κ id now sched st inv bΩ pΩ =
+  subscribeAll-width Ω g switchᵒ (switch-st nothing false) b κ id now sched st
+    inv refl bΩ pΩ
+subscribeE-width Ω g (exhaustAllᵉ b) κ id now sched st inv bΩ pΩ =
+  subscribeAll-width Ω g exhaustᵒ (exhaust-st false false) b κ id now sched st
+    inv refl bΩ pΩ
+
+subscribeE-width Ω g0 (μᵉ body) κ id now sched st inv bΩ pΩ = inv , refl
+subscribeE-width Ω (gs fuel) (μᵉ body) κ id now sched st inv bΩ pΩ =
+  subscribeE-width Ω fuel (unfoldμ body) κ id now sched st inv ofwU pΩ
+  where
+  ofwU : ofWᵉ (unfoldμ body) ≤ Ω
+  ofwU = ≤-trans (ofW-elimG (here refl) (μᵉ body) body) (⊔-lub bΩ bΩ)
+
+subscribeE-width Ω g (varᵉ ()) κ id now sched st inv bΩ pΩ
+
+subscribeE-width Ω g (deferᵉ body) κ id now sched st inv bΩ pΩ =
+  subscribeE-defer-width Ω g body κ id now sched st inv bΩ pΩ
+
+------------------------------------------------------------------
+-- (W11-C) THE DELIVERY CLIQUE, width face.  Same lexicographic
+-- recursion as the wet clique — (dispatch gas, path), frame hops
+-- shrinking the path at constant gas and the share hop peeling one
+-- gas — but with Ω flat there is no receipt to thread and no
+-- widening at the joins, so each clause is its wet twin with the
+-- ledger bookkeeping struck out.
+------------------------------------------------------------------
+
+foldPath-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (path : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  pathΩ? Ω path ≡ true →
+  all (λ v → ofWᵛ u v ≤ᵇ Ω) vals ≡ true →
+  all (eventΩ? Ω) evs ≡ true →
+  let r = foldPath sf gas id now envSrc path vals evs fin sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+dispatchShare-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  all (λ v → ofWᵛ (lookup Γ i) v ≤ᵇ Ω) vals ≡ true →
+  let r = dispatchShare sf gas id now i vals fin sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+shareGo-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (ps : List (RegId × Path Γ (lookup Γ i) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  all (λ rp → pathΩ? Ω (proj₂ rp)) ps ≡ true →
+  all (λ v → ofWᵛ (lookup Γ i) v ≤ᵇ Ω) vals ≡ true →
+  let r = shareGo sf gas id now i vals fin ps sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+chainStep-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  pathΩ? Ω path ≡ true →
+  (ofWᵛ (arrTy a) (arrVal a) ≤ᵇ Ω) ≡ true →
+  let r = chainStep id a path sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+cascadeGo-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ω : ℕ) (a : Arrival Γ) (id : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  (ofWᵛ (arrTy a) (arrVal a) ≤ᵇ Ω) ≡ true →
+  all (λ rc → pathΩ? Ω (proj₂ rc)) chains ≡ true →
+  let r = cascadeGo a id chains sched st
+  in (widthOK? Ω (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstΩ? Ω (proj₁ r) ≡ true)
+
+-- the root: assemble the envelope
+foldPath-width {u = u} Ω sf gas id now envSrc root vals evs fin sched st
+               inv pΩ vΩ eΩ =
+  inv ,
+  ∧-intro
+    (all-++-intro _ evs _ eΩ
+      (all-++-intro _ (map value vals) _
+        (mapValue-Ω Ω u vals vΩ)
+        (finList-Ω Ω fin)))
+    refl
+
+-- the share boundary: valueless handoff emit, then the fan-out
+foldPath-width Ω sf gas id now envSrc (share-sink i) vals evs fin sched st
+               inv pΩ vΩ eΩ =
+  proj₁ DS , ∧-intro (all-++-intro _ evs _ eΩ refl) (proj₂ DS)
+  where
+  DS = dispatchShare-width Ω sf gas id now i vals fin sched st inv vΩ
+
+-- a frame hop: step it, then keep folding down the shorter path
+foldPath-width Ω sf gas id now envSrc (f ↠ path′) vals evs fin sched st
+               inv pΩ vΩ eΩ = IH
+  where
+  fΩ   = proj₁ (∧-true (frameΩ? Ω f) _ pΩ)
+  pΩ′  = proj₂ (∧-true (frameΩ? Ω f) _ pΩ)
+  SF   = stepFrame-width Ω sf id now f path′ vals fin sched st inv fΩ pΩ′ vΩ
+  step = stepFrame sf id now f path′ vals fin sched st
+  IH   = foldPath-width Ω sf gas id now envSrc path′ (proj₁ step)
+           (evs ++ proj₁ (proj₂ step)) (proj₁ (proj₂ (proj₂ step)))
+           (proj₁ (proj₂ (proj₂ (proj₂ step))))
+           (proj₂ (proj₂ (proj₂ (proj₂ step))))
+           (proj₁ SF) pΩ′ (proj₁ (proj₂ SF))
+           (all-++-intro _ evs _ eΩ (proj₂ (proj₂ SF)))
+
+-- out of dispatch gas: unreachable in a real run, free when it fires
+dispatchShare-width Ω sf zero id now i vals fin sched st inv vΩ = inv , refl
+dispatchShare-width Ω sf (suc gas) id now i vals fin sched st inv vΩ =
+  shareFinish-width Ω i fin (proj₁ GOr)
+    (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr)) (proj₁ GO) ,
+  subst (λ b → burstΩ? Ω b ≡ true)
+        (sym (shareFinish-burst i fin (proj₁ GOr)
+               (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))))
+        (proj₂ GO)
+  where
+  st₀  = shareLatch i fin st
+  adm  = shareAdmit i (EvalSt.registry st)
+  admΩ = shareAdmit-Ω Ω i (EvalSt.registry st)
+           (proj₁ (proj₂ (proj₂ (WOK-parts Ω sched st inv))))
+  GO   = shareGo-width Ω sf gas id now i vals fin adm sched st₀
+           (shareLatch-width Ω i fin sched st inv) admΩ vΩ
+  GOr  = shareGo sf gas id now i vals fin adm sched st₀
+
+shareGo-width Ω sf gas id now i vals fin [] sched st inv pΩ vΩ = inv , refl
+shareGo-width {Γ = Γ} Ω sf gas id now i vals fin ((rid , q) ∷ ps) sched st
+              inv pΩ vΩ
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+-- cut earlier this cascade: its close already rode the cutting emit
+... | true  = shareGo-width Ω sf gas id now i vals fin ps sched st inv
+                (proj₂ (∧-true (pathΩ? Ω q) _ pΩ)) vΩ
+... | false = proj₁ IH ,
+              all-++-intro _ (proj₁ FPr) _ (proj₂ FP) (proj₂ IH)
+  where
+  st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+  FP  = foldPath-width Ω sf gas id now (toℕ i) q vals
+          (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
+          (delivered-width Ω rid sched st inv)
+          (proj₁ (∧-true (pathΩ? Ω q) _ pΩ)) vΩ
+          (closeList-Ω Ω (toℕ i) fin)
+  FPr = foldPath sf gas id now (toℕ i) q vals
+          (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
+  IH  = shareGo-width Ω sf gas id now i vals fin ps
+          (proj₁ (proj₂ FPr)) (proj₂ (proj₂ FPr)) (proj₁ FP)
+          (proj₂ (∧-true (pathΩ? Ω q) _ pΩ)) vΩ
+
+chainStep-width {n = n} {e = e} Ω id a path sched st inv pΩ vΩ =
+  foldPath-width Ω (budgetAt e (Sched.slots sched) id) n id (arrTick a)
+    (arrSource a) path (arrVal a ∷ [])
+    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    (Arrival.isLast a) sched st inv pΩ (∧-intro vΩ refl)
+    (closeList-Ω Ω (arrSource a) (Arrival.isLast a))
+
+-- the cascade fold: one emit per surviving registration, in
+-- subscription order
+cascadeGo-width Ω a id []                   sched st inv vΩ pΩ = inv , refl
+cascadeGo-width Ω a id ((rid , c) ∷ chains) sched st inv vΩ pΩ
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true  = cascadeGo-width Ω a id chains sched st inv vΩ
+                (proj₂ (∧-true (pathΩ? Ω c) _ pΩ))
+... | false = proj₁ IH , all-++-intro _ (proj₁ CSr) _ (proj₂ CS) (proj₂ IH)
+  where
+  st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+  CS  = chainStep-width Ω id a c sched st₀
+          (delivered-width Ω rid sched st inv)
+          (proj₁ (∧-true (pathΩ? Ω c) _ pΩ)) vΩ
+  CSr = chainStep id a c sched st₀
+  IH  = cascadeGo-width Ω a id chains
+          (proj₁ (proj₂ CSr)) (proj₂ (proj₂ CSr)) (proj₁ CS) vΩ
+          (proj₂ (∧-true (pathΩ? Ω c) _ pΩ))
 
 postulate
   -- THE WET CONTRACT, stated at the mutual block's entry point:
