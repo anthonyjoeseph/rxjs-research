@@ -6237,9 +6237,16 @@ subscribeE-input-wet {Γ = Γ} Ψ W g i κ id now sched st E 3≤E inv pB
       anchored = record { source = src ; ordinal = ord ; elemTy = lookup Γ i
                         ; pending = resolve now (tv ∷ tvs) }
       sched₃ = record sched₂ { live = anchored ∷ Sched.live sched₂ }
-      -- the tail's own two sums, split off the slot's
-      tailSz = ≤-trans (m≤n+m _ _) (≤-trans (n≤1+n _) szs)
-      tailFc = ≤-trans (m≤n+m _ _) fcs
+      -- the tail's own two sums, split off the slot's.  Both summands
+      -- are given: the goal pins only the tail, and nothing can recover
+      -- the sync side by inverting _+_
+      syncSz = sum (map (sizeᵛ (lookup Γ i)) sy)
+      tailSum = sum (map (λ p → sizeᵛ (lookup Γ i) (Timed.val p)) (tv ∷ tvs))
+      syncFc = sum (map (fnCapᵛ (lookup Γ i)) sy)
+      tailFcSum = sum (map (λ p → fnCapᵛ (lookup Γ i) (Timed.val p)) (tv ∷ tvs))
+      tailSz = ≤-trans (m≤n+m tailSum syncSz)
+                       (≤-trans (n≤1+n (syncSz + tailSum)) szs)
+      tailFc = ≤-trans (m≤n+m tailFcSum syncFc) fcs
       inv₃ = addLive-INV Ψ (capᴱ W E) sched₂ st anchored
                (resolve-bounded (capᴱ W E) now (tv ∷ tvs) tailSz)
                (resolve-measure (fnCapᵛ (lookup Γ i)) Ψ now (tv ∷ tvs) tailFc)
