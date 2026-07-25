@@ -138,35 +138,52 @@ genSlots = genInput >>=G λ i0 → genInput >>=G λ i1 →
 ------------------------------------------------------------------------
 -- the program generator, structural on depth
 
-{-# TERMINATING #-}
-genExp : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
-genObs : ℕ → Gen (Exp Γ₂ [] [] [] (obs natᵗ))
+-- The tree generators are parameterized by the SOURCE LEAF they may reach for.
+-- `genExp` passes the default (either slot), so its random consumption — and
+-- hence every seed's corpus — is exactly what it always was.  The parameter
+-- exists for Burst-Probe, which must build shared slot defs: a def may only
+-- reference STRICTLY EARLIER slots (the const telescope), so slot 0's def gets
+-- a source-free leaf and slot 1's gets `input zero`.
+SrcLeaf : Set
+SrcLeaf = Gen (Exp Γ₂ [] [] [] natᵗ)
 
-genLeaf : Gen (Exp Γ₂ [] [] [] natᵗ)
-genLeaf = genB 3 >>=G λ c →
-  if c ≡ᵇ 0 then (genFin2 >>=G λ i → pureG (inputNat i))
+anySlot : SrcLeaf                -- the default: either slot, uniformly
+anySlot = genFin2 >>=G λ i → pureG (inputNat i)
+
+{-# TERMINATING #-}
+genExpAt : SrcLeaf → ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
+genObsAt : SrcLeaf → ℕ → Gen (Exp Γ₂ [] [] [] (obs natᵗ))
+
+genLeafAt : SrcLeaf → Gen (Exp Γ₂ [] [] [] natᵗ)
+genLeafAt src = genB 3 >>=G λ c →
+  if c ≡ᵇ 0 then src
   else if c ≡ᵇ 1 then pureG emptyᵉ
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofᵉ (nat̂ a ∷ nat̂ b ∷ [])))
 
-genExp zero    = genLeaf
-genExp (suc d) = genB 10 >>=G λ c →
-  if c ≡ᵇ 0 then genLeaf
-  else if c ≡ᵇ 1 then genLeaf
-  else if c ≡ᵇ 2 then (genFn >>=G λ f → genExp d >>=G λ e → pureG (mapᵉ f e))
-  else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genExp d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
+genExpAt src zero    = genLeafAt src
+genExpAt src (suc d) = genB 10 >>=G λ c →
+  if c ≡ᵇ 0 then genLeafAt src
+  else if c ≡ᵇ 1 then genLeafAt src
+  else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt src d >>=G λ e → pureG (mapᵉ f e))
+  else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genExpAt src d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
   else if c ≡ᵇ 4 then
-    (genScanFn >>=G λ f → genNat >>=G λ s → genExp d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
-  else if c ≡ᵇ 5 then (genObs d >>=G λ s → pureG (mergeAllᵉ s))
-  else if c ≡ᵇ 6 then (genObs d >>=G λ s → pureG (concatAllᵉ s))
-  else if c ≡ᵇ 7 then (genObs d >>=G λ s → pureG (switchAllᵉ s))
-  else if c ≡ᵇ 8 then (genObs d >>=G λ s → pureG (exhaustAllᵉ s))
-  else genLeaf
+    (genScanFn >>=G λ f → genNat >>=G λ s → genExpAt src d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
+  else if c ≡ᵇ 5 then (genObsAt src d >>=G λ s → pureG (mergeAllᵉ s))
+  else if c ≡ᵇ 6 then (genObsAt src d >>=G λ s → pureG (concatAllᵉ s))
+  else if c ≡ᵇ 7 then (genObsAt src d >>=G λ s → pureG (switchAllᵉ s))
+  else if c ≡ᵇ 8 then (genObsAt src d >>=G λ s → pureG (exhaustAllᵉ s))
+  else genLeafAt src
 
-genInners : ℕ → ℕ → Gen (List (Tm Γ₂ [] [] [] (obs natᵗ)))
-genInners d zero    = pureG []
-genInners d (suc n) = genExp d >>=G λ e → genInners d n >>=G λ rest → pureG (strmᵗ e ∷ rest)
+genInners : SrcLeaf → ℕ → ℕ → Gen (List (Tm Γ₂ [] [] [] (obs natᵗ)))
+genInners src d zero    = pureG []
+genInners src d (suc n) =
+  genExpAt src d >>=G λ e → genInners src d n >>=G λ rest → pureG (strmᵗ e ∷ rest)
 
-genObs d = genB 2 >>=G λ extra → genInners d (suc (suc extra)) >>=G λ items → pureG (ofᵉ items)
+genObsAt src d =
+  genB 2 >>=G λ extra → genInners src d (suc (suc extra)) >>=G λ items → pureG (ofᵉ items)
+
+genExp : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
+genExp = genExpAt anySlot
 
 ------------------------------------------------------------------------
 -- comparison of two batched streams (impl vs spec fed the SAME evaluate

@@ -61,7 +61,7 @@ open import Rx.Prim using (Fuel; Id; Source; after_,_;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp using (natᵗ; _×ᵗ_; Ctx; Exp; Fn; Closed;
-                          input; ofᵉ; mapᵉ; takeᵉ; scanᵉ;
+                          input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                           nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add)
 open import Rx.Evaluator using (Slot; scripted; shared; Slots; Sched; EvalSt;
@@ -299,6 +299,12 @@ oneProgram prog e ins =
       wits            = concat (map witness logs)
   in (mkStats 1 (b→ℕ (not selfOK)) (b→ℕ (not wfOK)) 0 0 0 0 0 0 0 0 0 0 +ˢ sumStats per)
      , (if selfOK then [] else ("    SELFCHECK-FAIL  prog = " ++ prog ++ "\n") ∷ [])
+       -- a protocol rejection is reported with the whole stream, not just a
+       -- count: it is the one outcome that would make this an evaluator finding
+       -- rather than a measurement, so it must be diagnosable from the report
+       ++ᴸ (if wfOK then []
+            else ("    WF-FAIL      " ++ showStream real
+                    ++ "\n      prog = " ++ prog ++ "\n") ∷ [])
        ++ᴸ wits
   where
   witness : List (InstEmit ⊤) → List Witness
@@ -316,15 +322,28 @@ caseA : ℕ → Gen (Stats × List Witness)
 caseA d = genSlots >>=G λ ins → genExp d >>=G λ e →
   pureG (oneProgram (showExp e ++ "  " ++ showSlots ins) e ins)
 
--- corpus B: the same generator with SHARED slots enabled.  A shared slot's def
--- is an ordinary generated expression; a def referring to its own slot joins the
--- share mid-connect (connectedShares is stamped before the def is subscribed),
--- so no reference pattern diverges.
+-- corpus B: the same generator with SHARED slots enabled, respecting the CONST
+-- TELESCOPE — a def may reference only STRICTLY EARLIER slots.  So slot 0's def
+-- is generated source-free and slot 1's may reach for `input zero` only.  That
+-- restriction is not cosmetic: an unrestricted version of this generator, whose
+-- defs could reference their own or a later slot, produced streams the protocol
+-- rejects (6 wellFormed failures in 360 programs, seeds 1..6 depth 3).  Those
+-- programs are outside the evaluator's contract — the telescope is the
+-- generator's/decoder's obligation, not something the types enforce — so they
+-- say nothing about the evaluator, and admitting them here would have polluted
+-- every counter below with out-of-contract runs.
+noSource : QuickCheck.SrcLeaf                 -- slot 0's def: no earlier slot exists
+noSource = pureG emptyᵉ
+
+slot0Only : QuickCheck.SrcLeaf                -- slot 1's def: slot 0 and no further
+slot0Only = pureG (input zero)
+
 genSharedSlots : ℕ → Gen (Slots Γ₂)
 genSharedSlots d =
   genB 2 >>=G λ c0 → genB 2 >>=G λ c1 →
   QuickCheck.genInput >>=G λ i0 → QuickCheck.genInput >>=G λ i1 →
-  genExp d >>=G λ d0 → genExp d >>=G λ d1 →
+  QuickCheck.genExpAt noSource d >>=G λ d0 →
+  QuickCheck.genExpAt slot0Only d >>=G λ d1 →
   pureG λ where
     zero          → if c0 ≡ᵇ 0 then scripted i0 else shared d0
     (suc zero)    → if c1 ≡ᵇ 0 then scripted i1 else shared d1
@@ -444,14 +463,6 @@ directed =
   ∷ ( "exhaustAll(of[take 2 share, take 2 share])"
     , slots2 (scripted coldBoth) (shared in0)
     , exhaustAllᵉ (ofᵉ (strmᵗ (takeᵉ (nat̂ 2) in1) ∷ strmᵗ (takeᵉ (nat̂ 2) in1) ∷ [])) )
-  -- MUTUAL shares: slot 0's def is slot 1 and vice versa.  The second connect
-  -- finds the first already in connectedShares (it is stamped before the def is
-  -- subscribed) and joins instead of recursing, so this terminates — and it is
-  -- the deepest value-free burst the 2-slot fragment can build
-  ∷ ( "take 2 (share0 := share1 := share0)"
-    , slots2 (shared in1) (shared in0) , takeᵉ (nat̂ 2) in0 )
-  ∷ ( "take 2 (mutual shares, entered at slot 1)"
-    , slots2 (shared in1) (shared in0) , takeᵉ (nat̂ 2) in1 )
   -- take over a plain cold-async source: one emit, the control for "no share"
   ∷ ( "take 1 (cold[1,2,3]+async)"
     , slots2 (scripted coldBoth) (scripted hotIn) , takeᵉ (nat̂ 1) in0 )
