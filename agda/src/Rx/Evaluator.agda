@@ -591,6 +591,111 @@ takeDispatch nid vals fin sched st (just (take-st k)) =
                                       (EvalSt.nodes st) })
 takeDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
 
+-- the outer *All frame's machinery, lifted out of stepFrame so the
+-- budget proof can reason about its reduction.  One walk for all four
+-- ops (they differ only in the per-emit step and the wrap's node read)
+mergeBump : ∀ {n} {Γ : Ctx n} → NodeId → Bool
+          → List (NodeId × NodeState Γ) → List (NodeId × NodeState Γ)
+mergeBump nid done ns with lookupNode nid ns
+... | just (merge-st k od) = setNode nid (merge-st (if done then k else suc k) od) ns
+... | _                    = ns
+
+-- switchAll's cut: the outgoing inner's registrations are severed
+switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+           → Maybe NodeId → Sched Γ → EvalSt e
+           → List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
+switchKill nothing  sched₀ st₀ = [] , sched₀ , st₀
+switchKill (just v) sched₀ st₀ =
+  let (kept , closes , cutRids) =
+        cutThrough v (EvalSt.delivered st₀) (EvalSt.regWatermark st₀)
+                   (EvalSt.dying st₀) (EvalSt.registry st₀)
+  in closes ,
+     record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
+     record st₀ { registry = kept
+                ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
+
+thruConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+            → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
+            → Val Γ (obs u) → Sched Γ → EvalSt e
+            → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
+thruConsume fuel mergeᵒ nid κ id now o sched₀ st₀ =
+  let (_ , vs , bs , done , sched₁ , st₁) =
+        subscribeInner fuel mergeᵒ nid κ id now o sched₀ st₀
+  in vs , bs , sched₁ , record st₁ { nodes = mergeBump nid done (EvalSt.nodes st₁) }
+thruConsume {u = u} fuel concatᵒ nid κ id now o sched₀ st₀
+  with lookupNode nid (EvalSt.nodes st₀)
+... | just (concat-st {w} q true od) with w ≟ᵗ u
+...   | yes refl =
+        [] , [] , sched₀ ,
+        record st₀ { nodes = setNode nid (concat-st (q ++ o ∷ []) true od) (EvalSt.nodes st₀) }
+...   | no _ = [] , [] , sched₀ , st₀
+thruConsume {u = u} fuel concatᵒ nid κ id now o sched₀ st₀
+    | just (concat-st q false od) =
+  let (_ , vs , bs , done , sched₁ , st₁) =
+        subscribeInner fuel concatᵒ nid κ id now o sched₀ st₀
+  in vs , bs , sched₁ ,
+     record st₁ { nodes = setNode nid (concat-st {t = u} [] (not done) od) (EvalSt.nodes st₁) }
+thruConsume fuel concatᵒ nid κ id now o sched₀ st₀ | _ = [] , [] , sched₀ , st₀
+thruConsume fuel switchᵒ nid κ id now o sched₀ st₀
+  with lookupNode nid (EvalSt.nodes st₀)
+... | just (switch-st cur od) =
+      let (closes , sched₁ , st₁) = switchKill cur sched₀ st₀
+          (inst , vs , bs , done , sched₂ , st₂) =
+            subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
+      in vs , closes ++ bs , sched₂ ,
+         record st₂ { nodes = setNode nid
+           (switch-st (if done then nothing else just inst) od) (EvalSt.nodes st₂) }
+... | _ = [] , [] , sched₀ , st₀
+thruConsume fuel exhaustᵒ nid κ id now o sched₀ st₀
+  with lookupNode nid (EvalSt.nodes st₀)
+... | just (exhaust-st true od)  = [] , [] , sched₀ , st₀   -- busy: drop
+... | just (exhaust-st false od) =
+      let (_ , vs , bs , done , sched₁ , st₁) =
+            subscribeInner fuel exhaustᵒ nid κ id now o sched₀ st₀
+      in vs , bs , sched₁ ,
+         record st₁ { nodes = setNode nid (exhaust-st (not done) od) (EvalSt.nodes st₁) }
+... | _ = [] , [] , sched₀ , st₀
+
+thruWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+         → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
+         → List (Val Γ (obs u)) → Sched Γ → EvalSt e
+         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
+thruWalk fuel op nid κ id now []       sched₀ st₀ = [] , [] , sched₀ , st₀
+thruWalk fuel op nid κ id now (o ∷ os) sched₀ st₀ =
+  let (vs  , bs  , sched₁ , st₁) = thruConsume fuel op nid κ id now o sched₀ st₀
+      (vs′ , bs′ , sched₂ , st₂) = thruWalk fuel op nid κ id now os sched₁ st₁
+  in vs ++ vs′ , bs ++ bs′ , sched₂ , st₂
+
+thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+         → AllOp → NodeId → Bool
+         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
+         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+thruWrap op nid false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
+thruWrap mergeᵒ nid true (vs , bs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (merge-st k _) =
+      vs , bs , (k ≡ᵇ 0) , sched′ ,
+      record st′ { nodes = setNode nid (merge-st k true) (EvalSt.nodes st′) }
+... | _ = vs , bs , true , sched′ , st′
+thruWrap concatᵒ nid true (vs , bs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (concat-st q act _) =
+      vs , bs , not act ∧ null q , sched′ ,
+      record st′ { nodes = setNode nid (concat-st q act true) (EvalSt.nodes st′) }
+... | _ = vs , bs , true , sched′ , st′
+thruWrap switchᵒ nid true (vs , bs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (switch-st cur _) =
+      vs , bs , is-nothing cur , sched′ ,
+      record st′ { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st′) }
+... | _ = vs , bs , true , sched′ , st′
+thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (exhaust-st act _) =
+      vs , bs , not act , sched′ ,
+      record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
+... | _ = vs , bs , true , sched′ , st′
+
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
           → Gas → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
@@ -662,139 +767,8 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (from-inner op allNid in
                 then vals , [] , false , sched , st
                 else finish op (lookupNode allNid (EvalSt.nodes st))
 
-stepFrame {Γ = Γ} {t = t} {e = e} {u = u} fuel id now (thru-outer mergeᵒ nid) κ vals fin sched st
-  = wrap fin (walk vals sched st)
-  where
-  bump : Bool → NodeSt e → NodeSt e
-  bump done ns with lookupNode nid ns
-  ... | just (merge-st k od) = setNode nid (merge-st (if done then k else suc k) od) ns
-  ... | _                    = ns
-
-  walk : List (Val Γ (obs u)) → Sched Γ → EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  walk []       sched₀ st₀ = [] , [] , sched₀ , st₀
-  walk (o ∷ os) sched₀ st₀ =
-    let (_ , vs , bs , done , sched₁ , st₁) = subscribeInner fuel mergeᵒ nid κ id now o sched₀ st₀
-        st₂ = record st₁ { nodes = bump done (EvalSt.nodes st₁) }
-        (vs′ , bs′ , sched₂ , st₃) = walk os sched₁ st₂
-    in vs ++ vs′ , bs ++ bs′ , sched₂ , st₃
-
-  wrap : Bool → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  wrap false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
-  wrap true  (vs , bs , sched′ , st′) with lookupNode nid (EvalSt.nodes st′)
-  ... | just (merge-st k _) =
-        vs , bs , (k ≡ᵇ 0) , sched′ ,
-        record st′ { nodes = setNode nid (merge-st k true) (EvalSt.nodes st′) }
-  ... | _ = vs , bs , true , sched′ , st′
-
-stepFrame {Γ = Γ} {t = t} {e = e} {u = u} fuel id now (thru-outer concatᵒ nid) κ vals fin sched st
-  = wrap fin (walk vals sched st)
-  where
-  consume : Val Γ (obs u) → Sched Γ → EvalSt e
-          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  consume o sched₀ st₀ with lookupNode nid (EvalSt.nodes st₀)
-  consume o sched₀ st₀ | just (concat-st {w} q true od) with w ≟ᵗ u
-  consume o sched₀ st₀ | just (concat-st {w} q true od) | yes refl =
-    [] , [] , sched₀ ,
-    record st₀ { nodes = setNode nid (concat-st (q ++ o ∷ []) true od) (EvalSt.nodes st₀) }
-  consume o sched₀ st₀ | just (concat-st {w} q true od) | no _ =
-    [] , [] , sched₀ , st₀
-  consume o sched₀ st₀ | just (concat-st q false od) =
-    let (_ , vs , bs , done , sched₁ , st₁) = subscribeInner fuel concatᵒ nid κ id now o sched₀ st₀
-    in vs , bs , sched₁ ,
-       record st₁ { nodes = setNode nid (concat-st {t = u} [] (not done) od) (EvalSt.nodes st₁) }
-  consume o sched₀ st₀ | _ = [] , [] , sched₀ , st₀
-
-  walk : List (Val Γ (obs u)) → Sched Γ → EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  walk []       sched₀ st₀ = [] , [] , sched₀ , st₀
-  walk (o ∷ os) sched₀ st₀ =
-    let (vs , bs , sched₁ , st₁) = consume o sched₀ st₀
-        (vs′ , bs′ , sched₂ , st₂) = walk os sched₁ st₁
-    in vs ++ vs′ , bs ++ bs′ , sched₂ , st₂
-
-  wrap : Bool → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  wrap false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
-  wrap true  (vs , bs , sched′ , st′) with lookupNode nid (EvalSt.nodes st′)
-  ... | just (concat-st q act _) =
-        vs , bs , not act ∧ null q , sched′ ,
-        record st′ { nodes = setNode nid (concat-st q act true) (EvalSt.nodes st′) }
-  ... | _ = vs , bs , true , sched′ , st′
-
-stepFrame {Γ = Γ} {t = t} {e = e} {u = u} fuel id now (thru-outer switchᵒ nid) κ vals fin sched st
-  = wrap fin (walk vals sched st)
-  where
-  kill : Maybe NodeId → Sched Γ → EvalSt e
-       → List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  kill nothing  sched₀ st₀ = [] , sched₀ , st₀
-  kill (just v) sched₀ st₀ =
-    let (kept , closes , cutRids) =
-          cutThrough v (EvalSt.delivered st₀) (EvalSt.regWatermark st₀)
-                     (EvalSt.dying st₀) (EvalSt.registry st₀)
-    in closes ,
-       record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
-       record st₀ { registry = kept
-                  ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
-
-  consume : Val Γ (obs u) → Sched Γ → EvalSt e
-          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  consume o sched₀ st₀ with lookupNode nid (EvalSt.nodes st₀)
-  ... | just (switch-st cur od) =
-        let (closes , sched₁ , st₁) = kill cur sched₀ st₀
-            (inst , vs , bs , done , sched₂ , st₂) = subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
-        in vs , closes ++ bs , sched₂ ,
-           record st₂ { nodes = setNode nid
-             (switch-st (if done then nothing else just inst) od) (EvalSt.nodes st₂) }
-  ... | _ = [] , [] , sched₀ , st₀
-
-  walk : List (Val Γ (obs u)) → Sched Γ → EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  walk []       sched₀ st₀ = [] , [] , sched₀ , st₀
-  walk (o ∷ os) sched₀ st₀ =
-    let (vs , bs , sched₁ , st₁) = consume o sched₀ st₀
-        (vs′ , bs′ , sched₂ , st₂) = walk os sched₁ st₁
-    in vs ++ vs′ , bs ++ bs′ , sched₂ , st₂
-
-  wrap : Bool → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  wrap false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
-  wrap true  (vs , bs , sched′ , st′) with lookupNode nid (EvalSt.nodes st′)
-  ... | just (switch-st cur _) =
-        vs , bs , is-nothing cur , sched′ ,
-        record st′ { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st′) }
-  ... | _ = vs , bs , true , sched′ , st′
-
-stepFrame {Γ = Γ} {t = t} {e = e} {u = u} fuel id now (thru-outer exhaustᵒ nid) κ vals fin sched st
-  = wrap fin (walk vals sched st)
-  where
-  consume : Val Γ (obs u) → Sched Γ → EvalSt e
-          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  consume o sched₀ st₀ with lookupNode nid (EvalSt.nodes st₀)
-  ... | just (exhaust-st true od)  = [] , [] , sched₀ , st₀   -- busy: drop
-  ... | just (exhaust-st false od) =
-        let (_ , vs , bs , done , sched₁ , st₁) = subscribeInner fuel exhaustᵒ nid κ id now o sched₀ st₀
-        in vs , bs , sched₁ ,
-           record st₁ { nodes = setNode nid (exhaust-st (not done) od) (EvalSt.nodes st₁) }
-  ... | _ = [] , [] , sched₀ , st₀
-
-  walk : List (Val Γ (obs u)) → Sched Γ → EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-  walk []       sched₀ st₀ = [] , [] , sched₀ , st₀
-  walk (o ∷ os) sched₀ st₀ =
-    let (vs , bs , sched₁ , st₁) = consume o sched₀ st₀
-        (vs′ , bs′ , sched₂ , st₂) = walk os sched₁ st₁
-    in vs ++ vs′ , bs ++ bs′ , sched₂ , st₂
-
-  wrap : Bool → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-       → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  wrap false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
-  wrap true  (vs , bs , sched′ , st′) with lookupNode nid (EvalSt.nodes st′)
-  ... | just (exhaust-st act _) =
-        vs , bs , not act , sched′ ,
-        record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
-  ... | _ = vs , bs , true , sched′ , st′
+stepFrame fuel id now (thru-outer op nid) κ vals fin sched st
+  = thruWrap op nid fin (thruWalk fuel op nid κ id now vals sched st)
 
 -- bookkeeping crosses payload types freely — init/close/complete
 -- carry none.  A value cannot cross and is dropped; the callers only
