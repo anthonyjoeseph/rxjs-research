@@ -2145,6 +2145,50 @@ frameFresh-cons L em ems h with frameFreshEmit L em
 -- (the tail never touches the registry).  Pointwise on countIn, matching the
 -- live-matches style.  acc-le keeps the in-stream opens present on the
 -- transformed side (so a frameFresh close finds its source live there too).
+--
+-- ⚠ acc-le IS NOT CONSTRUCTIBLE AT THE CUT AS STATED (found 2026-07-25, while
+-- wiring the (H)+(T) decomposition — do not sink more time into the decomposition
+-- until this is resolved).  The plan was: build TailRel at the cut from
+-- BurstInv.live-matches + cutThrough-balance, with S_t = S_head and S_r = S₁.
+-- live-rel does come out that way.  acc-le does not, and the obstruction is not
+-- a missing lemma — it is that the two sides want opposite things:
+--
+--   • a source s ∈ acc is, by frameFresh's own design note, one whose init rode
+--     an EARLIER emit of THIS burst and is still open — i.e. a share / cold-async
+--     registration minted by the inner subscribe, which ran under take-f nid ↠ κ.
+--   • so pathHasNode nid holds for its chain, so cutThrough makes it a VICTIM and
+--     emits a close for it: sev s ≥ countIn s acc.
+--   • live S_head = live S₁ − (the cut closes), so
+--         countIn s (live S_head) = countIn s (live S₁) − sev s.
+--
+-- Together these give acc-le ⟹ countIn s (live S₁) ≥ 2 · countIn s acc, which is
+-- false in general.  The cut closes PRECISELY the sources acc-le asserts stay
+-- live.  No rule for `sev` recovers this; it is the statement that is wrong.
+--
+-- What the transport actually NEEDS is weaker: not that acc's sources stay live,
+-- but that no close in the tail resolves against acc — i.e. every unmatched close
+-- in `ems` is for a source in `kept`.  If, as frameFresh's design note claims,
+-- one-shots bracket init/close inside a single emit and cross-emit opens (shares,
+-- cold-async) are closed by a LATER FRAME rather than later in this burst, then
+-- `ems` has no acc-matched closes at all and the condition is vacuous.  If that
+-- claim is false, then the reshaped burst really does contain a double close,
+-- applyEvents returns nothing on it (an unmatched close is a hard failure), and
+-- the bug is in the evaluator, not in this file.
+--
+-- Deciding between those two is EMPIRICAL and is exactly the check that was
+-- recorded as done but never run.  Do that first; the right shape for this record
+-- follows from the answer.
+--
+-- Partial evidence for the first branch, already in hand: QuickCheck runs
+-- `wellFormed?` on every generated program's stream (QuickCheck.agda's wfFails),
+-- and 28k programs at depth ≤ 5 report zero WF failures.  A tail close that
+-- underflowed would make applyEvents return nothing and show up there.  So the
+-- evaluator is very likely fine and it is only TailRel that is mis-stated — but
+-- the generator has never been shown to REACH the configuration (a share or
+-- cold-async source open across emits of a burst that a take cut then severs),
+-- so this is evidence of absence, not absence.  The check to write is the direct
+-- one: assert frameFresh? [] on each subscribe burst, and separately count how
+-- often a burst carries an acc-matched close at all.
 record TailRel (id : Id) (sev : Source → ℕ) (acc : List Source)
                (S_t S_r : ProtocolSt) : Set where
   field
