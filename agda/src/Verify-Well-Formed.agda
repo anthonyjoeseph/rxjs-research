@@ -2146,20 +2146,68 @@ frameFresh-cons L em ems h with frameFreshEmit L em
 -- applyEvents returns nothing on it (an unmatched close is a hard failure), and
 -- the bug is in the evaluator, not in this file.
 --
--- Deciding between those two is EMPIRICAL and is exactly the check that was
--- recorded as done but never run.  Do that first; the right shape for this record
--- follows from the answer.
+-- ── MEASURED 2026-07-25.  `make burst-probe` (agda/probe/Burst-Probe.agda) ────
+-- The check was written and run.  Two sweeps, exit 0 on both, over every burst
+-- any subscribeE mints (root and inner alike — the probe logs at the wrapper):
 --
--- Partial evidence for the first branch, already in hand: QuickCheck runs
--- `wellFormed?` on every generated program's stream (QuickCheck.agda's wfFails),
--- and 28k programs at depth ≤ 5 report zero WF failures.  A tail close that
--- underflowed would make applyEvents return nothing and show up there.  So the
--- evaluator is very likely fine and it is only TailRel that is mis-stated — but
--- the generator has never been shown to REACH the configuration (a share or
--- cold-async source open across emits of a burst that a take cut then severs),
--- so this is evidence of absence, not absence.  The check to write is the direct
--- one: assert frameFresh? [] on each subscribe burst, and separately count how
--- often a burst carries an acc-matched close at all.
+--     scripts/burst-probe.sh 1 6 60 3      360 programs/corpus, exit 0
+--     scripts/burst-probe.sh 1 4 60 4      240 programs/corpus, exit 0
+--
+-- reported as depth-3 / depth-4, per corpus:
+--
+--                            A: generator   B: A + shares   C: directed
+--     bursts                  2704 / 2312    3389 / 3486      73 / 73
+--   1 frameFresh failures        0 /    0       0 /    0       0 /  0
+--   2 reach (cross-emit open)    0 /    0      15 /   11      30 / 30
+--   3 acc-matched close          0 /    0       0 /    0      14 / 14
+--       …of them, reason cut     0 /    0       0 /    0      14 / 14
+--     bursts with a cut        132 /  161     113 /  133      18 / 18
+--     cut with a tail            0 /    0       0 /    0       0 /  0
+--   3ᵗ acc-close IN THE TAIL     0 /    0       0 /    0       0 /  0
+--     wellFormed failures        0 /    0       0 /    0       0 /  0
+--
+-- (1) frameFresh? [] holds on EVERY burst measured — 0 failures in ~11.9k.  The
+--     discipline cut-cons-joint hypothesises is real, and it is measured with
+--     Rx.Protocol's frameFresh? itself, not a restatement of it.
+--
+-- (2) The old "28k QuickCheck programs, zero WF failures" argument was evidence
+--     of NOTHING, and not by bad luck — by construction.  QuickCheck's genSlots
+--     mints only `scripted` slots, and a burst gets more than one emit ONLY from
+--     sharedConnect (`own-init emit ∷ sharedPlumb def-burst`; every other clause
+--     mints one emit, or maps pushBurst over its child's and preserves the
+--     count).  No shares ⇒ no multi-emit burst ⇒ reach ≡ 0, which is exactly
+--     what corpus A reports.  Enabling shared slots makes it nonzero.
+--
+-- (3) ACC-MATCHED CLOSES EXIST, and every one is a take cut.  `take k (share)`
+--     over a share whose def stays live mints the share's registration in emit 0
+--     and cutThrough severs it in emit 1:
+--
+--         @0/s{i1} @0/p{i2 c1! v v F}     take 2 (share := cold[1,2,3]+async)
+--
+--     So frameFresh's design-note claim quoted above — that cross-emit opens are
+--     closed by a LATER FRAME rather than later in this burst — is FALSE, and
+--     acc-le fails exactly where the analysis predicted: at the cut, acc holds
+--     the share and live S_head has just lost it.  (Corpus C, 17 hand-built
+--     programs; corpus B reaches cross-emit opens but its random shapes did not
+--     land a cut on one.)
+--
+-- (4) The protocol ACCEPTS every one of them (0 wellFormed failures), so this is
+--     not an evaluator bug.  And, decisively for the transport: every
+--     acc-matched close rides the CUTTING emit itself.  `cut with a tail` is 0
+--     in all three corpora — no burst was seen in which a cutting emit had any
+--     emit after it — so `acc-close IN THE TAIL` is 0.  The structural reason:
+--     multi-emit bursts come only from share connects, and a share connect's
+--     non-final emits (`init i`, or `init i ∷ close i exhausted`) carry NO
+--     values, while a frame handed no values emits none — so a take frame can
+--     only cut on a burst's LAST emit.
+--
+-- WHERE THAT LEAVES THIS RECORD.  acc-le is confirmed false as stated.  The
+-- weaker condition proposed above — no close in the TAIL resolves against acc —
+-- is confirmed vacuous on everything measured.  Restating the record on that
+-- basis is NOT this session's call: the outcome we landed in (acc-matched closes
+-- exist AND the protocol accepts them) is the one reserved for Anthony, and a
+-- measured-vacuous hypothesis is still a hypothesis about all programs, not a
+-- theorem.  Nothing below has been reshaped.
 record TailRel (id : Id) (sev : Source → ℕ) (acc : List Source)
                (S_t S_r : ProtocolSt) : Set where
   field
