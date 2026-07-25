@@ -4483,6 +4483,17 @@ burstΩ? Ω = all (λ em → all (eventΩ? Ω) (InstEmit.events em))
 -- collapse this grind and the proven fnCap half into one walk.  That
 -- is invasive (it restructures INV?), so it is a deliberate choice,
 -- not a refactor to drift into.
+--
+-- DECIDED 2026-07-25: NOT now — grind W11 as a direct mirror.  The
+-- fnCap half is not a freestanding artifact (it lives as conjuncts
+-- inside subscribeE-walkS's clause induction and the wet clique),
+-- the joint face above also states INV?, and the two measures differ
+-- per clause, so the abstraction needs hooks and is not free.
+-- Restructuring INV? now churns both at once, and an abstraction
+-- that turns out unclean halfway leaves INV? half-refactored — the
+-- worst outcome.  The width side is the cheap, predictable half.
+-- REVISIT at end-of-proof cleanup, once Formal-Verification is
+-- discharged and nothing is in flux.
 ------------------------------------------------------------------
 
 postulate
@@ -6998,6 +7009,217 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --     composition; until THAT lands, the landing halves live in
 --     these two cores and nowhere else.
 ------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- (W11-A) THE FLAT STATE LEMMAS.  Ω never moves, so each of these
+-- is "invariant in, invariant out": the size side's ledger edges
+-- (register-INV's ×2 length rider, the widening chains) all vanish,
+-- and widthOK? has no length conjunct to pay them with.  Every
+-- proof below is its fnCap counterpart with the arithmetic deleted.
+------------------------------------------------------------------
+
+-- widthOK? is a FLAT four-way ∧ (no nested stBounded?/fnCapBounded?
+-- pair), so one projector serves the whole block — same reason
+-- INV-parts exists: `∧-true _ _` alone leaves a stuck metavariable
+WOK-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → widthOK? Ω sched st ≡ true →
+  (all (ofWLive Ω) (Sched.live sched) ≡ true)
+  × (all (λ kv → ofWNode Ω (proj₂ kv)) (EvalSt.nodes st) ≡ true)
+  × (regsΩ? Ω (EvalSt.registry st) ≡ true)
+  × ((slotsOfW (Sched.slots sched) ≤ᵇ Ω) ≡ true)
+WOK-parts Ω sched st h
+  with ∧-true (all (ofWLive Ω) (Sched.live sched)) _ h
+... | lv , r1
+  with ∧-true (all (λ kv → ofWNode Ω (proj₂ kv)) (EvalSt.nodes st)) _ r1
+... | nd , r2 with ∧-true (regsΩ? Ω (EvalSt.registry st)) _ r2
+... | rg , sl = lv , nd , rg , sl
+
+-- the node-install ring (mirror of setNode-bounded / setNode-fnCap)
+setNode-ofW : ∀ {n} {Γ : Ctx n} (Ω : ℕ) (nid : NodeId) (ns : NodeState Γ)
+  (nodes : List (NodeId × NodeState Γ)) →
+  ofWNode Ω ns ≡ true →
+  all (λ kv → ofWNode Ω (proj₂ kv)) nodes ≡ true →
+  all (λ kv → ofWNode Ω (proj₂ kv)) (setNode nid ns nodes) ≡ true
+setNode-ofW Ω nid ns []             bn h = ∧-intro bn refl
+setNode-ofW Ω nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
+... | true  = ∧-intro bn (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (setNode-ofW Ω nid ns r bn (proj₂ (∧-true _ _ h)))
+
+install-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →
+  ofWNode Ω ns ≡ true → widthOK? Ω sched st ≡ true →
+  widthOK? Ω sched (installNode nid ns st) ≡ true
+install-width Ω sched st nid ns bn h =
+  ∧-intro (proj₁ P)
+  (∧-intro (setNode-ofW Ω nid ns (EvalSt.nodes st) bn (proj₁ (proj₂ P)))
+  (∧-intro (proj₁ (proj₂ (proj₂ P))) (proj₂ (proj₂ (proj₂ P)))))
+  where P = WOK-parts Ω sched st h
+
+-- registering a chain: one entry appended, its frames bounded by
+-- hypothesis.  No length rider means no ledger edge at all — the
+-- single place where the width walk is strictly cheaper than the
+-- size walk rather than merely equal
+register-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ω : ℕ) (src : Source) (κ : Path Γ u t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → pathΩ? Ω κ ≡ true →
+  widthOK? Ω sched (register src κ st) ≡ true
+register-width {u = u} Ω src κ sched st h pκ =
+  ∧-intro (proj₁ P)
+  (∧-intro (proj₁ (proj₂ P))
+  (∧-intro (all-++-intro _ (EvalSt.registry st) _
+              (proj₁ (proj₂ (proj₂ P))) (∧-intro pκ refl))
+           (proj₂ (proj₂ (proj₂ P)))))
+  where P = WOK-parts Ω sched st h
+
+addLive-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) (l : LiveSource Γ) →
+  ofWLive Ω l ≡ true → widthOK? Ω sched st ≡ true →
+  widthOK? Ω (record sched { live = l ∷ Sched.live sched }) st ≡ true
+addLive-width Ω sched st l bl h =
+  ∧-intro (∧-intro bl (proj₁ P))
+  (∧-intro (proj₁ (proj₂ P))
+  (∧-intro (proj₁ (proj₂ (proj₂ P))) (proj₂ (proj₂ (proj₂ P)))))
+  where P = WOK-parts Ω sched st h
+
+-- the live sweep, width face (mirror of sweepLive-bounded/-fnCap)
+sweepLive-ofW : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ)
+  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
+  all (ofWLive Ω) ls ≡ true →
+  all (ofWLive Ω) (sweepLive reg ls) ≡ true
+sweepLive-ofW Ω reg []       h = refl
+sweepLive-ofW {n = n} Ω reg (l ∷ ls) h
+  with ∧-true (ofWLive Ω l) (all (ofWLive Ω) ls) h
+... | bl , bls
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
+... | true  = ∧-intro bl (sweepLive-ofW Ω reg ls bls)
+... | false = sweepLive-ofW Ω reg ls bls
+
+-- dropping a source only shrinks the registry
+dropSource-regsΩ : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ) (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  regsΩ? Ω reg ≡ true → regsΩ? Ω (dropSource src reg) ≡ true
+dropSource-regsΩ Ω src []                  h = refl
+dropSource-regsΩ Ω src ((rid , s , c) ∷ r) h with sameSource src s
+... | true  = dropSource-regsΩ Ω src r (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (dropSource-regsΩ Ω src r (proj₂ (∧-true _ _ h)))
+
+latch-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (src : Source) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  widthOK? Ω sched
+    (record st { registry = dropSource src (EvalSt.registry st)
+               ; completedSources = src ∷ EvalSt.completedSources st })
+    ≡ true
+latch-width Ω src sched st h =
+  ∧-intro (proj₁ P)
+  (∧-intro (proj₁ (proj₂ P))
+  (∧-intro (dropSource-regsΩ Ω src (EvalSt.registry st)
+              (proj₁ (proj₂ (proj₂ P))))
+           (proj₂ (proj₂ (proj₂ P)))))
+  where P = WOK-parts Ω sched st h
+
+-- completedSources / dying / delivered / connectedShares are read
+-- by no conjunct of widthOK? either
+shareLatch-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (i : Fin n) (b : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → widthOK? Ω sched (shareLatch i b st) ≡ true
+shareLatch-width Ω i false sched st h = h
+shareLatch-width Ω i true  sched st h = h
+
+delivered-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (rid : RegId) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  widthOK? Ω sched (record st { delivered = rid ∷ EvalSt.delivered st })
+    ≡ true
+delivered-width Ω rid sched st h = h
+
+connectShare-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (src : Source) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  widthOK? Ω sched
+    (record st { connectedShares = src ∷ EvalSt.connectedShares st }) ≡ true
+connectShare-width Ω src sched st h = h
+
+-- the admitted fan-out chains inherit their frame widths
+shareAdmit-Ω : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ) (i : Fin n)
+  (reg : List (RegId × Source × Chain Γ t)) → regsΩ? Ω reg ≡ true →
+  all (λ rp → pathΩ? Ω (proj₂ rp)) (shareAdmit i reg) ≡ true
+shareAdmit-Ω Ω i []                      h = refl
+shareAdmit-Ω {Γ = Γ} Ω i ((rid , src , (u , q)) ∷ r) h
+  with sameSource (toℕ i) src | u ≟ᵗ lookup Γ i
+... | false | _        = shareAdmit-Ω Ω i r (proj₂ (∧-true (pathΩ? Ω q) _ h))
+... | true  | no  _    = shareAdmit-Ω Ω i r (proj₂ (∧-true (pathΩ? Ω q) _ h))
+... | true  | yes refl =
+      ∧-intro (proj₁ (∧-true (pathΩ? Ω q) _ h))
+              (shareAdmit-Ω Ω i r (proj₂ (∧-true (pathΩ? Ω q) _ h)))
+
+shareFinish-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (i : Fin n) (b : Bool) (emits : Stream Γ t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true →
+  widthOK? Ω (proj₁ (proj₂ (shareFinish i b (emits , sched , st))))
+             (proj₂ (proj₂ (shareFinish i b (emits , sched , st)))) ≡ true
+shareFinish-width Ω i false emits sched st h = h
+shareFinish-width Ω i true  emits sched st h =
+  ∧-intro (sweepLive-ofW Ω kept (Sched.live sched) (proj₁ P))
+  (∧-intro (proj₁ (proj₂ P))
+  (∧-intro (dropSource-regsΩ Ω (toℕ i) (EvalSt.registry st)
+              (proj₁ (proj₂ (proj₂ P))))
+           (proj₂ (proj₂ (proj₂ P)))))
+  where
+  kept = dropSource (toℕ i) (EvalSt.registry st)
+  P    = WOK-parts Ω sched st h
+
+------------------------------------------------------------------
+-- (W11-A′) THE BURST HELPERS.  eventΩ? only constrains `value`, so
+-- every marker list is refl and the real content is the value lists.
+------------------------------------------------------------------
+
+mapValue-Ω : ∀ {n} {Γ : Ctx n} (Ω : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  all (λ v → ofWᵛ u v ≤ᵇ Ω) vs ≡ true →
+  all (eventΩ? Ω) (map value vs) ≡ true
+mapValue-Ω Ω u []       h = refl
+mapValue-Ω Ω u (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (mapValue-Ω Ω u vs (proj₂ (∧-true _ _ h)))
+
+finList-Ω : ∀ {n} {Γ : Ctx n} {u} (Ω : ℕ) (b : Bool) →
+  all (eventΩ? {n = n} {Γ = Γ} {u = u} Ω)
+      (if b then complete ∷ [] else []) ≡ true
+finList-Ω Ω true  = refl
+finList-Ω Ω false = refl
+
+closeList-Ω : ∀ {n} {Γ : Ctx n} {u} (Ω : ℕ) (src : Source) (b : Bool) →
+  all (eventΩ? {n = n} {Γ = Γ} {u = u} Ω)
+      (if b then close src exhausted ∷ [] else []) ≡ true
+closeList-Ω Ω src true  = refl
+closeList-Ω Ω src false = refl
+
+sharedPlumb-Ω : ∀ {n} {Γ : Ctx n} {u} (Ω : ℕ) (str : Stream Γ u) →
+  burstΩ? Ω str ≡ true → burstΩ? Ω (sharedPlumb str) ≡ true
+sharedPlumb-Ω Ω []         h = refl
+sharedPlumb-Ω Ω (em ∷ ems) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (sharedPlumb-Ω Ω ems (proj₂ (∧-true _ _ h)))
+
+-- a script's sync prefix, elementwise off the slot's ofW SUM (the
+-- width seed is a sum dominating the max, exactly as ΨAt is)
+sumVals-Ω : ∀ {n} {Γ : Ctx n} (Ω : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  sum (map (ofWᵛ u) vs) ≤ Ω → all (λ v → ofWᵛ u v ≤ᵇ Ω) vs ≡ true
+sumVals-Ω Ω u []       hw = refl
+sumVals-Ω Ω u (v ∷ vs) hw =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (ofWᵛ u v) _) hw)))
+          (sumVals-Ω Ω u vs (≤-trans (m≤n+m _ (ofWᵛ u v)) hw))
+
+-- one slot's width, projected out of widthOK?'s slots sum
+slotOfW-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
+  (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+  widthOK? Ω sched st ≡ true → slotOfW (Sched.slots sched i) ≤ Ω
+slotOfW-at Ω i sched st h =
+  ≤-trans (fᵢ≤sum-tab (λ j → slotOfW (Sched.slots sched j)) i)
+          (≤ᵇ⇒≤ _ _ (T-to (proj₂ (proj₂ (proj₂ (WOK-parts Ω sched st h))))))
 
 postulate
   -- THE WET CONTRACT, stated at the mutual block's entry point:
