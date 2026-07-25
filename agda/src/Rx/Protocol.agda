@@ -249,3 +249,42 @@ WellFormed xs = Accepted (checkFinal (runProtocol protocol-init xs))
 -- the Bool twin of WellFormed, for the QuickCheck harness
 wellFormed? : ∀ {A : Set} → List (InstEmit A) → Bool
 wellFormed? xs = accepts? (checkFinal (runProtocol protocol-init xs))
+
+------------------------------------------------------------------
+-- frameFresh: the SUBSCRIPTION-BURST prefix discipline.
+-- A well-formed subscription burst brackets every `close` against an
+-- `init` that appeared earlier in the SAME frame (accumulator threaded
+-- across emits): one-shots bracket init/close inside their own emit;
+-- shares / cold-async inits stay OPEN in `acc`; a take-cut's cutThrough
+-- closes hit sources whose inits rode earlier emits and are still in
+-- `acc`.  `handoff` is foldPath-only and a `delivery`-kind emit never
+-- appears in a burst, so either makes the predicate false.  This is the
+-- burst-side analog of regTyped? — the discipline Verify-Well-Formed's
+-- cut residue needs so its transformed value-free tail cannot underflow
+-- a swept source's close, and the property Burst-Probe asserts (with
+-- acc ≡ []) on every burst the evaluator actually mints.
+------------------------------------------------------------------
+
+-- one emit's events, threading the open-source accumulator; nothing = malformed
+frameFreshEv : ∀ {A : Set} → List Source → List (InstEvent A) → Maybe (List Source)
+frameFreshEv acc []                 = just acc
+frameFreshEv acc (init s    ∷ es)   = frameFreshEv (s ∷ acc) es
+frameFreshEv acc (value _   ∷ es)   = frameFreshEv acc es
+frameFreshEv acc (complete  ∷ es)   = frameFreshEv acc es
+frameFreshEv acc (handoff _ ∷ es)   = nothing
+frameFreshEv acc (close s _ ∷ es)   with removeOne s acc
+... | just acc′ = frameFreshEv acc′ es
+... | nothing   = nothing
+
+-- one emit: a delivery-kind emit is not a burst emit and is rejected
+frameFreshEmit : ∀ {A : Set} → List Source → InstEmit A → Maybe (List Source)
+frameFreshEmit acc em with InstEmit.kind em
+... | subscribe = frameFreshEv acc (InstEmit.events em)
+... | plumbing  = frameFreshEv acc (InstEmit.events em)
+... | delivery  = nothing
+
+frameFresh? : ∀ {A : Set} → List Source → List (InstEmit A) → Bool
+frameFresh? acc []         = true
+frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
+... | just acc′ = frameFresh? acc′ ems
+... | nothing   = false

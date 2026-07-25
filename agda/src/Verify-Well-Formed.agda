@@ -68,7 +68,8 @@ open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-ini
                                 stepProtocol; runProtocol; paidUp; settle; hasOwed;
                                 payOwed; paidOff; applyEvents; removeOne;
                                 cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed)
+                                checkFinal; Accepted; accepted; WellFormed;
+                                frameFreshEv; frameFreshEmit; frameFresh?)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
@@ -2092,39 +2093,9 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
               (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))
 
 -- ── frameFresh: the burst-stream prefix discipline ───────────────────────
--- A well-formed subscription burst brackets every `close` against an `init`
--- that appeared earlier in the SAME frame (accumulator threaded across emits):
--- one-shots bracket init/close inside their own emit; shares / cold-async inits
--- stay OPEN in `acc`; the take-cut's cutThrough closes hit sources whose inits
--- rode earlier emits and are still in `acc`.  `handoff` is foldPath-only and a
--- `delivery`-kind emit never appears in a burst (both verified against the
--- evaluator 2026-07-20), so either makes the predicate false.  This is the
--- burst-side analog of regTyped? — the discipline `cut-cons-joint` needs so its
--- transformed value-free tail cannot underflow a swept source's close.
-
--- one emit's events, threading the open-source accumulator; nothing = malformed
-frameFreshEv : ∀ {A : Set} → List Source → List (InstEvent A) → Maybe (List Source)
-frameFreshEv acc []                 = just acc
-frameFreshEv acc (init s    ∷ es)   = frameFreshEv (s ∷ acc) es
-frameFreshEv acc (value _   ∷ es)   = frameFreshEv acc es
-frameFreshEv acc (complete  ∷ es)   = frameFreshEv acc es
-frameFreshEv acc (handoff _ ∷ es)   = nothing
-frameFreshEv acc (close s _ ∷ es)   with removeOne s acc
-... | just acc′ = frameFreshEv acc′ es
-... | nothing   = nothing
-
--- one emit: a delivery-kind emit is not a burst emit and is rejected
-frameFreshEmit : ∀ {A : Set} → List Source → InstEmit A → Maybe (List Source)
-frameFreshEmit acc em with InstEmit.kind em
-... | subscribe = frameFreshEv acc (InstEmit.events em)
-... | plumbing  = frameFreshEv acc (InstEmit.events em)
-... | delivery  = nothing
-
-frameFresh? : ∀ {A : Set} → List Source → List (InstEmit A) → Bool
-frameFresh? acc []         = true
-frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
-... | just acc′ = frameFresh? acc′ ems
-... | nothing   = false
+-- Defined in Rx.Protocol (shared with the Burst-Probe measurement harness);
+-- see the design note there.  What lives here is the peeling lemma that
+-- threads it down a pushBurst recursion.
 
 -- peel one emit: a fresh burst's tail is fresh at the advanced
 -- accumulator.  This is what threads the discipline down a pushBurst

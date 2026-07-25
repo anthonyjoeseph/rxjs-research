@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -22,6 +22,11 @@ help:
 	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
 	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
 	@echo "                  green here <=> no known counterexample remains)"
+	@echo "  burst-probe   measure the subscription bursts the evaluator mints:"
+	@echo "                  frameFresh? on every burst, cross-emit opens, and"
+	@echo "                  acc-matched closes (see agda/probe/Burst-Probe.agda)"
+	@echo "                  make burst-probe                     (seed 1, 200, depth 4)"
+	@echo "                  make burst-probe ARGS='1 25 200 4'   (seeds 1..25)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -43,6 +48,14 @@ agda:
 # what makes its invariant enforceable rather than remembered.
 bug-cache:
 	cd agda && agda src/Implementation/Unit-Test.agda
+
+# The probe needs an evaluator that records every subscription burst, and
+# Verify-Well-Formed reduces the evaluator's clauses — so instrumenting it in
+# place would break the proofs.  burst-probe.sh therefore instruments a COPY in
+# a scratch project; agda/src is never written.  Not part of `make agda`: this
+# measures the evaluator, it does not check it.
+burst-probe:
+	scripts/burst-probe.sh $(ARGS)
 
 ts-check:
 	cd typescript && npm run typecheck
