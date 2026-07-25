@@ -696,6 +696,66 @@ thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
       record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
 ... | _ = vs , bs , true , sched′ , st′
 
+-- the inner *All frame's machinery, lifted out of stepFrame so the
+-- budget proof can reason about its reduction.  concatAll's drain
+-- walks the queue, subscribing each parked inner until one stays open
+concatDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+            → Gas → NodeId → Path Γ s t → Id → Tick
+            → List (Closed Γ s) → Sched Γ → EvalSt e
+            → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool
+              × List (Closed Γ s) × Sched Γ × EvalSt e
+concatDrain fuel allNid κ id now []      sched₀ st₀ = [] , [] , false , [] , sched₀ , st₀
+concatDrain fuel allNid κ id now (o ∷ q) sched₀ st₀ =
+  let (_ , vs , bs , done , sched₁ , st₁) =
+        subscribeInner fuel concatᵒ allNid κ id now o sched₀ st₀
+  in if done
+     then (let (vs′ , bs′ , act , q′ , sched₂ , st₂) =
+                 concatDrain fuel allNid κ id now q sched₁ st₁
+           in vs ++ vs′ , bs ++ bs′ , act , q′ , sched₂ , st₂)
+     else (vs , bs , true , q , sched₁ , st₁)
+
+innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+            → Gas → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
+            → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+            → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+innerFinish fuel mergeᵒ allNid inst κ id now vals sched st (just (merge-st k od)) =
+  vals , [] , od ∧ (pred k ≡ᵇ 0) , sched ,
+  record st { nodes = setNode allNid (merge-st (pred k) od) (EvalSt.nodes st) }
+innerFinish {s = s} fuel concatᵒ allNid inst κ id now vals sched st
+            (just (concat-st {w} q act od)) with w ≟ᵗ s
+... | yes refl =
+      let (vs , bs , act′ , q′ , sched′ , st′) =
+            concatDrain fuel allNid κ id now q sched st
+      in vals ++ vs , bs , od ∧ not act′ ∧ null q′ , sched′ ,
+         record st′ { nodes = setNode allNid (concat-st q′ act′ od) (EvalSt.nodes st′) }
+... | no _ = vals , [] , false , sched , st
+innerFinish fuel switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od)) =
+  if c ≡ᵇ inst
+  then (vals , [] , od , sched ,
+        record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
+  else (vals , [] , false , sched , st)
+innerFinish fuel exhaustᵒ allNid inst κ id now vals sched st (just (exhaust-st act od)) =
+  vals , [] , od , sched ,
+  record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) }
+innerFinish fuel _ allNid inst κ id now vals sched st _ = vals , [] , false , sched , st
+
+-- a fin only completes THIS INNER once nothing under its exit frame
+-- can ever deliver again: a sibling registration of the dying source
+-- still queued this cascade, or any other live registration, absorbs
+-- it (the TS join's open-multiset, read off the registry) — one
+-- chain's exhaustion is not a multi-registration subtree's completion
+innerReact : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+           → Gas → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
+           → List (Val Γ s) → Sched Γ → EvalSt e → Bool
+           → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+innerReact fuel op allNid inst κ id now vals sched st false =
+  vals , [] , false , sched , st
+innerReact fuel op allNid inst κ id now vals sched st true =
+  if any (aliveThroughᶠ inst st) (EvalSt.registry st)
+  then vals , [] , false , sched , st
+  else innerFinish fuel op allNid inst κ id now vals sched st
+         (lookupNode allNid (EvalSt.nodes st))
+
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
           → Gas → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
@@ -720,52 +780,8 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} fuel id now (scan-f fn nid) 
 stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (take-f nid) κ vals fin sched st
   = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
-stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (from-inner op allNid inst) κ vals fin sched st
-  = react fin
-  where
-  -- the completing inner's flush already rode in on vals; here the
-  -- *All absorbs the completion and reacts
-  drain : List (Closed Γ s) → Sched Γ → EvalSt e
-        → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × List (Closed Γ s) × Sched Γ × EvalSt e
-  drain []       sched₀ st₀ = [] , [] , false , [] , sched₀ , st₀
-  drain (o ∷ q) sched₀ st₀ =
-    let (_ , vs , bs , done , sched₁ , st₁) = subscribeInner fuel concatᵒ allNid κ id now o sched₀ st₀
-    in if done
-       then (let (vs′ , bs′ , act , q′ , sched₂ , st₂) = drain q sched₁ st₁
-             in vs ++ vs′ , bs ++ bs′ , act , q′ , sched₂ , st₂)
-       else (vs , bs , true , q , sched₁ , st₁)
-
-  finish : AllOp → Maybe (NodeState Γ)
-         → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  finish mergeᵒ (just (merge-st k od)) =
-    vals , [] , od ∧ (pred k ≡ᵇ 0) , sched ,
-    record st { nodes = setNode allNid (merge-st (pred k) od) (EvalSt.nodes st) }
-  finish concatᵒ (just (concat-st {w} q act od)) with w ≟ᵗ s
-  ... | yes refl =
-        let (vs , bs , act′ , q′ , sched′ , st′) = drain q sched st
-        in vals ++ vs , bs , od ∧ not act′ ∧ null q′ , sched′ ,
-           record st′ { nodes = setNode allNid (concat-st q′ act′ od) (EvalSt.nodes st′) }
-  ... | no _ = vals , [] , false , sched , st
-  finish switchᵒ (just (switch-st (just c) od)) =
-    if c ≡ᵇ inst
-    then (vals , [] , od , sched ,
-          record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
-    else (vals , [] , false , sched , st)
-  finish exhaustᵒ (just (exhaust-st act od)) =
-    vals , [] , od , sched ,
-    record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) }
-  finish _ _ = vals , [] , false , sched , st
-
-  -- a fin only completes THIS INNER once nothing under its exit frame
-  -- can ever deliver again: a sibling registration of the dying source
-  -- still queued this cascade, or any other live registration, absorbs
-  -- it (the TS join's open-multiset, read off the registry) — one
-  -- chain's exhaustion is not a multi-registration subtree's completion
-  react : Bool → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  react false = vals , [] , false , sched , st
-  react true  = if any (aliveThroughᶠ inst st) (EvalSt.registry st)
-                then vals , [] , false , sched , st
-                else finish op (lookupNode allNid (EvalSt.nodes st))
+stepFrame fuel id now (from-inner op allNid inst) κ vals fin sched st
+  = innerReact fuel op allNid inst κ id now vals sched st fin
 
 stepFrame fuel id now (thru-outer op nid) κ vals fin sched st
   = thruWrap op nid fin (thruWalk fuel op nid κ id now vals sched st)
