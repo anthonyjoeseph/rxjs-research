@@ -996,6 +996,39 @@ subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
 -- consumes one unit and chainStep seeds n, so the zero clamp is
 -- unreachable on real registries (the telescope invariant, Inv-phase
 -- work) and termination needs no pragma
+-- latch completion AND mark the share dying: a delivered fan-out
+-- registration's exhausted close rides its own emit, so a cut during
+-- the fan-out suppresses its second close (cutThrough's
+-- delivered∧dying rule); the registry entries drop at shareFinish
+shareLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+           → (i : Fin n) → Bool → EvalSt e → EvalSt e
+shareLatch i false st₀ = st₀
+shareLatch i true  st₀ =
+  record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀
+             ; dying = toℕ i ∷ EvalSt.dying st₀ }
+
+-- the registrations this share owes an emit: source matches and the
+-- chain's element type is the share's
+shareAdmit : ∀ {n} {Γ : Ctx n} {t} → (i : Fin n)
+           → List (RegId × Source × Chain Γ t)
+           → List (RegId × Path Γ (lookup Γ i) t)
+shareAdmit i [] = []
+shareAdmit {Γ = Γ} i ((rid , s , (u , p)) ∷ r)
+  with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
+... | false | _        = shareAdmit i r
+... | true  | no  _    = shareAdmit i r
+... | true  | yes refl = (rid , p) ∷ shareAdmit i r
+
+shareFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → (i : Fin n) → Bool
+            → Stream Γ t × Sched Γ × EvalSt e
+            → Stream Γ t × Sched Γ × EvalSt e
+shareFinish i false out = out
+shareFinish i true  (emits , sched′ , st′) =
+  let kept = dropSource (toℕ i) (EvalSt.registry st′)
+  in emits ,
+     record sched′ { live = sweepLive kept (Sched.live sched′) } ,
+     record st′ { registry = kept }
+
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Gas      -- sync fuel, handed to stepFrame's re-entries
               → ℕ       -- dispatch gas, the telescope bound
@@ -1003,6 +1036,17 @@ dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → List (Val Γ (lookup Γ i)) → Bool
               → Sched Γ → EvalSt e
               → Stream Γ t × Sched Γ × EvalSt e
+
+-- a fan-out chain cancelled earlier in this cascade (an operator cut
+-- named it a victim) delivers NOTHING — its close already rode the
+-- cutting emit; the survivors are marked delivered as they fold.
+-- Lifted out of dispatchShare's where block so the budget proof can
+-- name it (as with takeVals / thruConsume / sharedConnect)
+shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        → Gas → ℕ → Id → Tick → (i : Fin n)
+        → List (Val Γ (lookup Γ i)) → Bool
+        → List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e
+        → Stream Γ t × Sched Γ × EvalSt e
 
 -- one chain, ONE emit — plus, past a share boundary, the fan-out
 -- emits it causes.  Fold the value list sinkward through the frames,
@@ -1039,50 +1083,23 @@ foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st =
 -- registration closes and the sweep collects whatever the share kept
 -- alive
 dispatchShare sf zero _ _ _ _ _ sched st = [] , sched , st  -- see above: unreachable
-dispatchShare {Γ = Γ} {t = t} {e = e} sf (suc gas) id now i vals fin sched st =
-  finish fin (go (admit (EvalSt.registry st)) sched (latch fin st))
-  where
-  -- latch completion AND mark the share dying: a delivered fan-out
-  -- registration's exhausted close rides its own emit, so a cut
-  -- during the fan-out suppresses its second close (cutThrough's
-  -- delivered∧dying rule); the registry entries drop at finish
-  latch : Bool → EvalSt e → EvalSt e
-  latch false st₀ = st₀
-  latch true  st₀ =
-    record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀
-               ; dying = toℕ i ∷ EvalSt.dying st₀ }
+dispatchShare sf (suc gas) id now i vals fin sched st =
+  shareFinish i fin
+    (shareGo sf gas id now i vals fin
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st))
 
-  admit : List (RegId × Source × Chain Γ t) → List (RegId × Path Γ (lookup Γ i) t)
-  admit [] = []
-  admit ((rid , s , (u , p)) ∷ r) with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
-  ... | false | _        = admit r
-  ... | true  | no  _    = admit r
-  ... | true  | yes refl = (rid , p) ∷ admit r
-
-  -- a fan-out chain cancelled earlier in this cascade (an operator
-  -- cut named it a victim) delivers NOTHING — its close already rode
-  -- the cutting emit; the survivors are marked delivered as they fold
-  go : List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e
-     → Stream Γ t × Sched Γ × EvalSt e
-  go []               sched₀ st₀ = [] , sched₀ , st₀
-  go ((rid , p) ∷ ps) sched₀ st₀ with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
-  ... | true  = go ps sched₀ st₀
-  ... | false =
-    let (emits , sched₁ , st₁) =
-          foldPath sf gas id now (toℕ i) p vals
-                   (if fin then close (toℕ i) exhausted ∷ [] else [])
-                   fin sched₀
-                   (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
-        (rest , sched₂ , st₂) = go ps sched₁ st₁
-    in emits ++ rest , sched₂ , st₂
-
-  finish : Bool → Stream Γ t × Sched Γ × EvalSt e → Stream Γ t × Sched Γ × EvalSt e
-  finish false out = out
-  finish true  (emits , sched′ , st′) =
-    let kept = dropSource (toℕ i) (EvalSt.registry st′)
-    in emits ,
-       record sched′ { live = sweepLive kept (Sched.live sched′) } ,
-       record st′ { registry = kept }
+shareGo sf gas id now i vals fin []               sched₀ st₀ = [] , sched₀ , st₀
+shareGo sf gas id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
+  with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+... | true  = shareGo sf gas id now i vals fin ps sched₀ st₀
+... | false =
+  let (emits , sched₁ , st₁) =
+        foldPath sf gas id now (toℕ i) p vals
+                 (if fin then close (toℕ i) exhausted ∷ [] else [])
+                 fin sched₀
+                 (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+      (rest , sched₂ , st₂) = shareGo sf gas id now i vals fin ps sched₁ st₁
+  in emits ++ rest , sched₂ , st₂
 
 -- seed one arrival into one chain: the value, plus fin and this
 -- registration's close when the source is spent (isLast)
