@@ -196,12 +196,6 @@ towerℕ-mono {zero}  {suc n} h =
           (≤-trans (n≤1+n (towerℕ n)) (n<2^n (towerℕ n)))
 towerℕ-mono {suc m} {suc n} (s≤s h) = ^-monoʳ-≤ 2 (towerℕ-mono h)
 
-sizeBudgetAt-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
-  (sl : Slots Γ) {id id′ : Id} → id ≤ id′ →
-  sizeBudgetAt e sl id ≤ sizeBudgetAt e sl id′
-sizeBudgetAt-mono e sl h =
-  towerℕ-mono (*-monoʳ-≤ (4 + (sizeᵉ e + slotsSize sl)) (s≤s h))
-
 k≤towerℕ : ∀ k → k ≤ towerℕ k
 k≤towerℕ zero    = z≤n
 k≤towerℕ (suc k) =
@@ -424,28 +418,6 @@ stBounded-widen le sched st h
   ∧-intro (all-impl _ _ (λ l → boundedLive-widen le l) (Sched.live sched) hl)
           (all-impl _ _ (λ kv → boundedNode-widen le (proj₂ kv))
                     (EvalSt.nodes st) hn)
-
--- a bound only ever needs to be respected upward: the id-level bound
--- entails the suc-id-level one (budgets grow monotonically)
-bounded-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  {B B′ : ℕ} → B ≤ B′ → (sched : Sched Γ) (st : EvalSt e) →
-  stBounded? B sched st ≡ true → stBounded? B′ sched st ≡ true
-bounded-mono {B = B} {B′} le sched st bnd
-  with ∧-true (all (boundedLive B) (Sched.live sched)) _ bnd
-... | bls , bns =
-  ∧-intro
-    (all-impl (boundedLive B) (boundedLive B′)
-      (λ l → all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ (LiveSource.elemTy l) (proj₂ tv)) le) (LiveSource.pending l))
-      (Sched.live sched) bls)
-    (all-impl _ _ (λ kv → node-mono (proj₂ kv)) (EvalSt.nodes st) bns)
-  where
-  node-mono : ∀ nd → boundedNode B nd ≡ true → boundedNode B′ nd ≡ true
-  node-mono (scan-st {t} v)   h = ≤ᵇ-widen (sizeᵛ t v) le h
-  node-mono (concat-st q _ _) h = all-impl _ _ (λ o → ≤ᵇ-widen (sizeᵉ o) le) q h
-  node-mono (take-st _)       h = refl
-  node-mono (merge-st _ _)    h = refl
-  node-mono (switch-st _ _)   h = refl
-  node-mono (exhaust-st _ _)  h = refl
 
 -- the latch touches only per-cascade ledger fields — the value
 -- stores are untouched
@@ -1499,12 +1471,6 @@ dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} U′<U r′≤R s′≤V
 -- demand component — the interface every non-edge clause of the
 -- contract's induction applies: the child's demand fits the
 -- parent's fuel unchanged
-dBound-mono : ∀ {V R U′ U r′ r s′ s} → U′ ≤ U → r′ ≤ r → s′ ≤ s →
-  dBound V R U′ r′ s′ ≤ dBound V R U r s
-dBound-mono {V} {R} U′≤U r′≤r s′≤s =
-  +-mono-≤ s′≤s
-    (*-monoʳ-≤ (suc V) (+-mono-≤ r′≤r (*-monoʳ-≤ (suc R) U′≤U)))
-
 -- the whole demand under one product — what the seed inequality
 -- compares against the budget tower: dBound ≤ (1+V)(1+R)(1+U)
 dBound-bound : ∀ {V R U r s} → s ≤ V → r ≤ R →
@@ -1639,11 +1605,6 @@ shells-unfoldμ-cap : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
 shells-unfoldμ-cap B body (hd ∷ᵃ tl)
   rewrite shellSize-unfoldμ body | inner-unfoldμ body =
   ≤-trans (n≤1+n _) hd ∷ᵃ tl
-
-shells-unfoldμ-len : ∀ {n} {Γ : Ctx n} {t}
-  (body : Exp Γ (t ∷ []) [] [] t) →
-  length (shellsᵉ (unfoldμ body)) ≡ length (shellsᵉ (μᵉ body))
-shells-unfoldμ-len body rewrite inner-unfoldμ body = refl
 
 ------------------------------------------------------------------
 -- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
@@ -2308,11 +2269,6 @@ oneShot-tail-dry : ∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (src : Sour
 oneShot-tail-dry []         src = refl
 oneShot-tail-dry (v ∷ vals) src = oneShot-tail-dry vals src
 
-oneShot-dry : ∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (id : Id)
-  (sched : Sched Γ) →
-  hasDry (proj₁ (oneShotBurst vals id sched)) ≡ false
-oneShot-dry vals id sched = cong (_∨ false) (oneShot-tail-dry vals _)
-
 -- (G7) installing a bounded node preserves the store bound: the schedule's
 -- live is untouched, and setNode either overwrites at nid (new node bounded)
 -- or recurses past a survivor, so all-boundedness survives.  Shaped like
@@ -2590,10 +2546,6 @@ applyFn-size : ∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
   (fn : Fn Γ [] [] [] s t) (v : Val Γ s) → sizeᵛ s v ≤ V →
   sizeᵛ t (applyFn fn v) ≤ (2 + 2 * V) ^ (3 ^ sizeᵗ fn)
 applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
-
-evalTm-size : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
-  sizeᵛ t (evalTm tm) ≤ 2 ^ (3 ^ sizeᵗ tm)
-evalTm-size tm = evalWith-size 0 tm []ᵃ tt
 
 ------------------------------------------------------------------
 -- THE WALK LEDGER (2026-07-24 — the settled per-instant invariant).
@@ -3585,9 +3537,6 @@ spendᴱ Ψ r s = 2 ^ r * 3 ^ (suc Ψ * s)
 
 capᴱ-mono : ∀ (W : ℕ) {E E′ : ℕ} → E ≤ E′ → capᴱ W E ≤ capᴱ W E′
 capᴱ-mono W = ^-monoʳ-≤ (2 + 2 * W)
-
-W≤capᴱ : ∀ (W : ℕ) {E : ℕ} → 1 ≤ E → W ≤ capᴱ W E
-W≤capᴱ W h = ≤-trans (V≤C W) (pow1 W h)
 
 -- (W5) receipts compose multiplicatively (pure ^-arithmetic): the two
 -- 2^r factors and the two 3^(κ·s) factors each merge by ^-distribˡ-+-*,
