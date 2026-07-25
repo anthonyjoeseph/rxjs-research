@@ -4446,13 +4446,46 @@ eventΩ? Ω complete    = true
 burstΩ? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ u → Bool
 burstΩ? Ω = all (λ em → all (eventΩ? Ω) (InstEmit.events em))
 
+------------------------------------------------------------------
+-- (W11) THE WIDTH WALK — the last real grind.  Ω is flat, so these
+-- are pure preservation statements: no existential, no receipt, no
+-- widening.  Every clause is "invariant in, invariant out", which
+-- makes each one MUCH shorter than its size-ledger counterpart.
+--
+-- The two statements below are one mutual clique covering the whole
+-- machine, mirroring what is already proven on the size side:
+--
+--   subscribeE-width ← subscribeAll-width, pushBurst-width,
+--                      subscribeE-input-width (→ sharedSlot /
+--                      sharedConnect-width), subscribeE-defer-width
+--   stepFrame-width  ← the five frames, as stepFrame-wet:
+--                      map (map-applyFn-Ω off ofW-evalWith),
+--                      scan (scanVals-ofW), take (takeVals-Ω,
+--                      cutThrough-regsΩ/-closesΩ), thru-outer
+--                      (thruConsume/thruWalk/thruWrap-width),
+--                      from-inner (concatDrain/innerFinish-width)
+--   cascadeGo-width  ← chainStep-width ← foldPath-width ←
+--                      dispatchShare-width ← shareGo-width
+--
+-- and the flat state lemmas mirroring install-INV / register-INV /
+-- addLive-INV / latch-INV / shareFinish-INV.  widthOK? has FOUR
+-- conjuncts (live, nodes, registry, slots) against INV?'s six —
+-- there is no length rider, so register-width is strictly easier
+-- than register-INV.  The W10 block (ofW-evalWith, ofW-elimG/D,
+-- ofW-subΘ, ofW-reify, len-elimGTms) already supplies every
+-- analytic fact; what remains is the threading.
+--
+-- WORTH TRYING FIRST: fnCapᵉ and ofWᵉ differ in only two clauses —
+-- ofᵉ mints a width (`length ts ⊔ …`) where fnCap does not, and
+-- fnCap pairs each fn with its caseWᵗ.  Otherwise they are the same
+-- recursion, and the fnCap half of INV? has the same four-conjunct
+-- shape as widthOK?.  A module parameterised over the measure would
+-- collapse this grind and the proven fnCap half into one walk.  That
+-- is invasive (it restructures INV?), so it is a deliberate choice,
+-- not a refactor to drift into.
+------------------------------------------------------------------
+
 postulate
-  -- (W11) the width walk: Ω is flat, so these are pure
-  -- preservation statements — no existential, no receipt.  The
-  -- grind literally repeats the fnCap half of subscribeE-walkS /
-  -- cascadeGo-walk with the W10 mirrors in place of W2/W4 (the
-  -- slots conjunct feeds the input/defer clauses exactly as
-  -- slotsFnCap did).
   subscribeE-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (Ω : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id)
     (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
