@@ -84,6 +84,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
+                                _at_from_as_; EmitKind; subscribe;
                                 InstEvent; init; value; close; handoff;
                                 complete; exhausted;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
@@ -135,6 +136,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 thruConsume; thruWalk; thruWrap;
                                 concatDrain; innerFinish; innerReact;
                                 sharedPlumb; sharedConnect; subscribeSharedSlot;
+                                burstCompleted;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
@@ -6217,7 +6219,7 @@ subscribeE-input-wet {Γ = Γ} Ψ W g i κ id now sched st E 3≤E inv pB
 -- a cold WITH a tail: per-subscription anchoring — a fresh source and
 -- ordinal, the tail resolved against this subscription's tick, one
 -- registration.  resolve only RETIMES, so both slot bounds ride through
-... | scripted (cold sy (a ∷ as)) | szs | fcs =
+... | scripted (cold sy (tv ∷ tvs)) | szs | fcs =
       2 * E , E≤2E ,
       register-INV Ψ W E src κ sched₃ st (≤-trans (s≤s z≤n) 3≤E) inv₃ pB ,
       ∧-intro
@@ -6231,16 +6233,16 @@ subscribeE-input-wet {Γ = Γ} Ψ W g i κ id now sched st E 3≤E inv pB
       sched₁ = proj₂ (mintSource sched)
       ord    = Sched.nextOrdinal sched₁
       sched₂ = proj₂ (mintOrdinal sched₁)
-      L : LiveSource Γ
-      L = record { source = src ; ordinal = ord ; elemTy = lookup Γ i
-                 ; pending = resolve now (a ∷ as) }
-      sched₃ = record sched₂ { live = L ∷ Sched.live sched₂ }
+      anchored : LiveSource Γ
+      anchored = record { source = src ; ordinal = ord ; elemTy = lookup Γ i
+                        ; pending = resolve now (tv ∷ tvs) }
+      sched₃ = record sched₂ { live = anchored ∷ Sched.live sched₂ }
       -- the tail's own two sums, split off the slot's
       tailSz = ≤-trans (m≤n+m _ _) (≤-trans (n≤1+n _) szs)
       tailFc = ≤-trans (m≤n+m _ _) fcs
-      inv₃ = addLive-INV Ψ (capᴱ W E) sched₂ st L
-               (resolve-bounded (capᴱ W E) now (a ∷ as) tailSz)
-               (resolve-measure (fnCapᵛ (lookup Γ i)) Ψ now (a ∷ as) tailFc)
+      inv₃ = addLive-INV Ψ (capᴱ W E) sched₂ st anchored
+               (resolve-bounded (capᴱ W E) now (tv ∷ tvs) tailSz)
+               (resolve-measure (fnCapᵛ (lookup Γ i)) Ψ now (tv ∷ tvs) tailFc)
                inv
       syB = sumVals-B (capᴱ W E) Ψ (lookup Γ i) sy
               (≤-trans (≤-trans (m≤m+n _ _) (n≤1+n _)) szs)
@@ -6249,7 +6251,7 @@ subscribeE-input-wet {Γ = Γ} Ψ W g i κ id now sched st E 3≤E inv pB
 -- a hot: already live at the slot's own source/ordinal.  Either it is
 -- spent (immediate close/complete, nothing registered) or this is just
 -- one more registration — fan-out IS that multiplicity
-... | scripted (hot hz) | szs | fcs
+... | scripted (hot _) | szs | fcs
       with memberSource (toℕ i) (EvalSt.completedSources st)
 ...   | true  = E , ≤-refl , inv , refl
 ...   | false = 2 * E , m≤m+n E (E + 0) ,
