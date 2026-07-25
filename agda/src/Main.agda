@@ -2,6 +2,7 @@ module Main where
 
 open import Readme-Theorems
 open import Verify-Well-Formed
+open import Verify-Budget-Sufficient
 open import Rx.Evaluator-Theorems
 open import Rx.Provenance-Theorems
 open import Rx.Time-Theorems
