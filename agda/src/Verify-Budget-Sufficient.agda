@@ -3936,23 +3936,339 @@ EnvOfW : ∀ {n} {Γ : Ctx n} {Θ} (Ω : ℕ) → All (Val Γ) Θ → Set
 EnvOfW Ω []ᵃ                = ⊤
 EnvOfW Ω (_∷ᵃ_ {x = t} v σ) = (ofWᵛ t v ≤ Ω) × EnvOfW Ω σ
 
-postulate
-  -- (W10) width invariance: EXACT mirrors of W2/W4 with fnCap
-  -- replaced by ofW pointwise — same inductions, same ⊔ algebra;
-  -- the only differing clause (ofᵉ) is length-preserving under
-  -- subΘ/elimG (they map over the of-list)
-  ofW-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
-    ofWᵗ (reify v) ≡ ofWᵛ t v
+envofw-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (Ω : ℕ) (σ : All (Val Γ) Θ) →
+  EnvOfW Ω σ → (z : t ∈ Θ) → ofWᵛ t (lookupEnv σ z) ≤ Ω
+envofw-lookup Ω (v ∷ᵃ σ) (h , hσ) (here refl) = h
+envofw-lookup Ω (v ∷ᵃ σ) (h , hσ) (there z)   = envofw-lookup Ω σ hσ z
+
+------------------------------------------------------------------
+-- (W10) width invariance: the ofW mirrors of W1/W2/W4.  Same
+-- inductions and the same ⊔ algebra as fnCap; the only differing
+-- clause is ofᵉ, whose `length` conjunct rides the fact that ren /
+-- subΘ / elimG / elimD all MAP over the of-list (len-* below).
+------------------------------------------------------------------
+
+len-renTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+  (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+  (ts : List (Tm Γ Δᵍ Δ Θ t)) → length (renTms ρg ρd ρt ts) ≡ length ts
+len-renTms ρg ρd ρt []       = refl
+len-renTms ρg ρd ρt (y ∷ ys) = cong suc (len-renTms ρg ρd ρt ys)
+
+len-subΘTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+  length (subΘTms Θloc σ ts) ≡ length ts
+len-subΘTms Θloc σ []       = refl
+len-subΘTms Θloc σ (y ∷ ys) = cong suc (len-subΘTms Θloc σ ys)
+
+len-elimGTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+  (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+  length (elimGTms x cl ts) ≡ length ts
+len-elimGTms x cl []       = refl
+len-elimGTms x cl (y ∷ ys) = cong suc (len-elimGTms x cl ys)
+
+len-elimDTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+  (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+  length (elimDTms x cl ts) ≡ length ts
+len-elimDTms x cl []       = refl
+len-elimDTms x cl (y ∷ ys) = cong suc (len-elimDTms x cl ys)
+
+-- ofW is renaming-invariant (mirror of fnCap-renᵉ/ᵗ/ᵗˢ)
+mutual
+  ofW-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (e : Exp Γ Δᵍ Δ Θ t) → ofWᵉ (renExp ρg ρd ρt e) ≡ ofWᵉ e
+  ofW-renᵉ ρg ρd ρt (input i)       = refl
+  ofW-renᵉ ρg ρd ρt (ofᵉ ts)        =
+    cong₂ _⊔_ (len-renTms ρg ρd ρt ts) (ofW-renᵗˢ ρg ρd ρt ts)
+  ofW-renᵉ ρg ρd ρt emptyᵉ          = refl
+  ofW-renᵉ ρg ρd ρt (mapᵉ f e)      =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd (ext∈ ρt) f) (ofW-renᵉ ρg ρd ρt e)
+  ofW-renᵉ ρg ρd ρt (takeᵉ c e)     =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt c) (ofW-renᵉ ρg ρd ρt e)
+  ofW-renᵉ ρg ρd ρt (scanᵉ f z e)   =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd (ext∈ ρt) f)
+              (cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt z) (ofW-renᵉ ρg ρd ρt e))
+  ofW-renᵉ ρg ρd ρt (mergeAllᵉ e)   = ofW-renᵉ ρg ρd ρt e
+  ofW-renᵉ ρg ρd ρt (concatAllᵉ e)  = ofW-renᵉ ρg ρd ρt e
+  ofW-renᵉ ρg ρd ρt (switchAllᵉ e)  = ofW-renᵉ ρg ρd ρt e
+  ofW-renᵉ ρg ρd ρt (exhaustAllᵉ e) = ofW-renᵉ ρg ρd ρt e
+  ofW-renᵉ ρg ρd ρt (μᵉ e)          = ofW-renᵉ (ext∈ ρg) ρd ρt e
+  ofW-renᵉ ρg ρd ρt (varᵉ x)        = refl
+  ofW-renᵉ ρg ρd ρt (deferᵉ e)      = ofW-renᵉ (λ ()) (++Ren ρg ρd) ρt e
+
+  ofW-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (tm : Tm Γ Δᵍ Δ Θ t) → ofWᵗ (renTm ρg ρd ρt tm) ≡ ofWᵗ tm
+  ofW-renᵗ ρg ρd ρt (varᵗ x)      = refl
+  ofW-renᵗ ρg ρd ρt unit̂          = refl
+  ofW-renᵗ ρg ρd ρt (bool̂ _)      = refl
+  ofW-renᵗ ρg ρd ρt (nat̂ _)       = refl
+  ofW-renᵗ ρg ρd ρt (pairᵗ a b)   =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt a) (ofW-renᵗ ρg ρd ρt b)
+  ofW-renᵗ ρg ρd ρt (fstᵗ p)      = ofW-renᵗ ρg ρd ρt p
+  ofW-renᵗ ρg ρd ρt (sndᵗ p)      = ofW-renᵗ ρg ρd ρt p
+  ofW-renᵗ ρg ρd ρt (inlᵗ a)      = ofW-renᵗ ρg ρd ρt a
+  ofW-renᵗ ρg ρd ρt (inrᵗ a)      = ofW-renᵗ ρg ρd ρt a
+  ofW-renᵗ ρg ρd ρt (caseᵗ s l r) =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt s)
+              (cong₂ _⊔_ (ofW-renᵗ ρg ρd (ext∈ ρt) l)
+                         (ofW-renᵗ ρg ρd (ext∈ ρt) r))
+  ofW-renᵗ ρg ρd ρt (ifᵗ c a b)   =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt c)
+              (cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt a) (ofW-renᵗ ρg ρd ρt b))
+  ofW-renᵗ ρg ρd ρt (primᵗ _ a)   = ofW-renᵗ ρg ρd ρt a
+  ofW-renᵗ ρg ρd ρt (strmᵗ e)     = ofW-renᵉ ρg ρd ρt e
+
+  ofW-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → ofWᵗˢ (renTms ρg ρd ρt ts) ≡ ofWᵗˢ ts
+  ofW-renᵗˢ ρg ρd ρt []       = refl
+  ofW-renᵗˢ ρg ρd ρt (y ∷ ys) =
+    cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt y) (ofW-renᵗˢ ρg ρd ρt ys)
+
+ofW-reify : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  ofWᵗ (reify v) ≡ ofWᵛ t v
+ofW-reify unitᵗ    _        = refl
+ofW-reify boolᵗ    _        = refl
+ofW-reify natᵗ     _        = refl
+ofW-reify (s ×ᵗ t) (a , b)  = cong₂ _⊔_ (ofW-reify s a) (ofW-reify t b)
+ofW-reify (s +ᵗ t) (inj₁ a) = ofW-reify s a
+ofW-reify (s +ᵗ t) (inj₂ b) = ofW-reify t b
+ofW-reify (obs t)  e        = refl
+
+-- substitution keeps every width ≤ Ω (mirror of fnCap-subΘᵉ/ᵗ/ᵗˢ)
+mutual
   ofW-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Ω : ℕ) (Θloc : List Ty)
     (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
     EnvOfW Ω σ → ofWᵉ e ≤ Ω → ofWᵉ (subΘExp Θloc σ e) ≤ Ω
+  ofW-subΘᵉ Ω Θloc σ (input i)       hσ h = z≤n
+  ofW-subΘᵉ Ω Θloc σ (ofᵉ ts)        hσ h =
+    ⊔-lub (subst (_≤ Ω) (sym (len-subΘTms Θloc σ ts))
+                 (⊔ˡ (length ts) (ofWᵗˢ ts) h))
+          (ofW-subΘᵗˢ Ω Θloc σ ts hσ (⊔ʳ (length ts) (ofWᵗˢ ts) h))
+  ofW-subΘᵉ Ω Θloc σ emptyᵉ          hσ h = z≤n
+  ofW-subΘᵉ Ω Θloc σ (mapᵉ {s = s} f e) hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω (s ∷ Θloc) σ f hσ (⊔ˡ (ofWᵗ f) (ofWᵉ e) h))
+          (ofW-subΘᵉ Ω Θloc σ e hσ (⊔ʳ (ofWᵗ f) (ofWᵉ e) h))
+  ofW-subΘᵉ Ω Θloc σ (takeᵉ c e)     hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω Θloc σ c hσ (⊔ˡ (ofWᵗ c) (ofWᵉ e) h))
+          (ofW-subΘᵉ Ω Θloc σ e hσ (⊔ʳ (ofWᵗ c) (ofWᵉ e) h))
+  ofW-subΘᵉ Ω Θloc σ (scanᵉ {s = s} {t = t} f z e) hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω ((t ×ᵗ s) ∷ Θloc) σ f hσ
+             (⊔ˡ (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ e) h))
+          (⊔-lub (ofW-subΘᵗ Ω Θloc σ z hσ
+                    (⊔ˡ (ofWᵗ z) (ofWᵉ e) (⊔ʳ (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ e) h)))
+                 (ofW-subΘᵉ Ω Θloc σ e hσ
+                    (⊔ʳ (ofWᵗ z) (ofWᵉ e) (⊔ʳ (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ e) h))))
+  ofW-subΘᵉ Ω Θloc σ (mergeAllᵉ e)   hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+  ofW-subΘᵉ Ω Θloc σ (concatAllᵉ e)  hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+  ofW-subΘᵉ Ω Θloc σ (switchAllᵉ e)  hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+  ofW-subΘᵉ Ω Θloc σ (exhaustAllᵉ e) hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+  ofW-subΘᵉ Ω Θloc σ (μᵉ e)          hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+  ofW-subΘᵉ Ω Θloc σ (varᵉ x)        hσ h = z≤n
+  ofW-subΘᵉ Ω Θloc σ (deferᵉ e)      hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+
+  ofW-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Ω : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvOfW Ω σ → ofWᵗ tm ≤ Ω → ofWᵗ (subΘTm Θloc σ tm) ≤ Ω
+  ofW-subΘᵗ Ω Θloc σ (varᵗ x) hσ h with ∈-++⁻ Θloc x
+  ... | inj₁ y = z≤n
+  ... | inj₂ z =
+    subst (_≤ Ω)
+      (sym (trans (ofW-renᵗ (λ ()) (λ ()) (λ ()) (reify (lookupEnv σ z)))
+                  (ofW-reify _ (lookupEnv σ z))))
+      (envofw-lookup Ω σ hσ z)
+  ofW-subΘᵗ Ω Θloc σ unit̂         hσ h = z≤n
+  ofW-subΘᵗ Ω Θloc σ (bool̂ _)     hσ h = z≤n
+  ofW-subΘᵗ Ω Θloc σ (nat̂ _)      hσ h = z≤n
+  ofW-subΘᵗ Ω Θloc σ (pairᵗ a b)  hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω Θloc σ a hσ (⊔ˡ (ofWᵗ a) (ofWᵗ b) h))
+          (ofW-subΘᵗ Ω Θloc σ b hσ (⊔ʳ (ofWᵗ a) (ofWᵗ b) h))
+  ofW-subΘᵗ Ω Θloc σ (fstᵗ p)     hσ h = ofW-subΘᵗ Ω Θloc σ p hσ h
+  ofW-subΘᵗ Ω Θloc σ (sndᵗ p)     hσ h = ofW-subΘᵗ Ω Θloc σ p hσ h
+  ofW-subΘᵗ Ω Θloc σ (inlᵗ a)     hσ h = ofW-subΘᵗ Ω Θloc σ a hσ h
+  ofW-subΘᵗ Ω Θloc σ (inrᵗ a)     hσ h = ofW-subΘᵗ Ω Θloc σ a hσ h
+  ofW-subΘᵗ Ω Θloc σ (caseᵗ {s = s} {t = t} sc l r) hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω Θloc σ sc hσ (⊔ˡ (ofWᵗ sc) (ofWᵗ l ⊔ ofWᵗ r) h))
+          (⊔-lub (ofW-subΘᵗ Ω (s ∷ Θloc) σ l hσ
+                    (⊔ˡ (ofWᵗ l) (ofWᵗ r) (⊔ʳ (ofWᵗ sc) (ofWᵗ l ⊔ ofWᵗ r) h)))
+                 (ofW-subΘᵗ Ω (t ∷ Θloc) σ r hσ
+                    (⊔ʳ (ofWᵗ l) (ofWᵗ r) (⊔ʳ (ofWᵗ sc) (ofWᵗ l ⊔ ofWᵗ r) h))))
+  ofW-subΘᵗ Ω Θloc σ (ifᵗ c a b)  hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω Θloc σ c hσ (⊔ˡ (ofWᵗ c) (ofWᵗ a ⊔ ofWᵗ b) h))
+          (⊔-lub (ofW-subΘᵗ Ω Θloc σ a hσ
+                    (⊔ˡ (ofWᵗ a) (ofWᵗ b) (⊔ʳ (ofWᵗ c) (ofWᵗ a ⊔ ofWᵗ b) h)))
+                 (ofW-subΘᵗ Ω Θloc σ b hσ
+                    (⊔ʳ (ofWᵗ a) (ofWᵗ b) (⊔ʳ (ofWᵗ c) (ofWᵗ a ⊔ ofWᵗ b) h))))
+  ofW-subΘᵗ Ω Θloc σ (primᵗ _ a)  hσ h = ofW-subΘᵗ Ω Θloc σ a hσ h
+  ofW-subΘᵗ Ω Θloc σ (strmᵗ e)    hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+
+  ofW-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Ω : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    EnvOfW Ω σ → ofWᵗˢ ts ≤ Ω → ofWᵗˢ (subΘTms Θloc σ ts) ≤ Ω
+  ofW-subΘᵗˢ Ω Θloc σ []       hσ h = z≤n
+  ofW-subΘᵗˢ Ω Θloc σ (y ∷ ys) hσ h =
+    ⊔-lub (ofW-subΘᵗ Ω Θloc σ y hσ (⊔ˡ (ofWᵗ y) (ofWᵗˢ ys) h))
+          (ofW-subΘᵗˢ Ω Θloc σ ys hσ (⊔ʳ (ofWᵗ y) (ofWᵗˢ ys) h))
+
+-- subst on the Δ-index of Exp is transparent to ofWᵉ (J on the equality)
+ofW-substᴱ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Δ′ Θ t} (p : Δ ≡ Δ′) (e : Exp Γ Δᵍ Δ Θ t) →
+  ofWᵉ (subst (λ ζ → Exp Γ Δᵍ ζ Θ t) p e) ≡ ofWᵉ e
+ofW-substᴱ refl e = refl
+
+-- elimG/D keep every width ≤ host ⊔ closure (mirror of fnCap-elimG/D)
+mutual
   ofW-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
     (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
     ofWᵉ (elimGExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
-  ofW-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (Ω : ℕ)
-    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-    EnvOfW Ω env → ofWᵗ tm ≤ Ω →
-    ofWᵛ t (evalWith tm env) ≤ Ω
+  ofW-elimG x cl (input i)       = z≤n
+  ofW-elimG x cl (ofᵉ ts)        =
+    ⊔-elim-help (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimGTms x cl ts))
+                       (m≤m⊔n (length ts) (ofWᵉ cl)))
+                (ofW-elimGᵗˢ x cl ts)
+  ofW-elimG x cl emptyᵉ          = z≤n
+  ofW-elimG x cl (mapᵉ f e)      =
+    ⊔-elim-help (ofW-elimGᵗ x cl f) (ofW-elimG x cl e)
+  ofW-elimG x cl (takeᵉ c e)     =
+    ⊔-elim-help (ofW-elimGᵗ x cl c) (ofW-elimG x cl e)
+  ofW-elimG x cl (scanᵉ f z e)   =
+    ⊔-elim-help (ofW-elimGᵗ x cl f)
+                (⊔-elim-help (ofW-elimGᵗ x cl z) (ofW-elimG x cl e))
+  ofW-elimG x cl (mergeAllᵉ e)   = ofW-elimG x cl e
+  ofW-elimG x cl (concatAllᵉ e)  = ofW-elimG x cl e
+  ofW-elimG x cl (switchAllᵉ e)  = ofW-elimG x cl e
+  ofW-elimG x cl (exhaustAllᵉ e) = ofW-elimG x cl e
+  ofW-elimG x cl (μᵉ e)          = ofW-elimG (there x) cl e
+  ofW-elimG x cl (varᵉ y)        = z≤n
+  ofW-elimG x cl (deferᵉ e)      =
+    ≤-trans (≤-reflexive (ofW-substᴱ (⊟-++ˡ x) (elimDExp (∈-++⁺ˡ x) cl e)))
+            (ofW-elimD (∈-++⁺ˡ x) cl e)
+
+  ofW-elimD : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    ofWᵉ (elimDExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
+  ofW-elimD x cl (input i)       = z≤n
+  ofW-elimD x cl (ofᵉ ts)        =
+    ⊔-elim-help (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimDTms x cl ts))
+                       (m≤m⊔n (length ts) (ofWᵉ cl)))
+                (ofW-elimDᵗˢ x cl ts)
+  ofW-elimD x cl emptyᵉ          = z≤n
+  ofW-elimD x cl (mapᵉ f e)      =
+    ⊔-elim-help (ofW-elimDᵗ x cl f) (ofW-elimD x cl e)
+  ofW-elimD x cl (takeᵉ c e)     =
+    ⊔-elim-help (ofW-elimDᵗ x cl c) (ofW-elimD x cl e)
+  ofW-elimD x cl (scanᵉ f z e)   =
+    ⊔-elim-help (ofW-elimDᵗ x cl f)
+                (⊔-elim-help (ofW-elimDᵗ x cl z) (ofW-elimD x cl e))
+  ofW-elimD x cl (mergeAllᵉ e)   = ofW-elimD x cl e
+  ofW-elimD x cl (concatAllᵉ e)  = ofW-elimD x cl e
+  ofW-elimD x cl (switchAllᵉ e)  = ofW-elimD x cl e
+  ofW-elimD x cl (exhaustAllᵉ e) = ofW-elimD x cl e
+  ofW-elimD x cl (μᵉ e)          = ofW-elimD x cl e
+  ofW-elimD x cl (varᵉ y)        with compare∈ x y
+  ... | inj₁ refl = ≤-reflexive (ofW-renᵉ (λ ()) (λ ()) (λ ()) cl)
+  ... | inj₂ y′   = z≤n
+  ofW-elimD x cl (deferᵉ e)      =
+    ≤-trans (≤-reflexive (ofW-substᴱ (⊟-++ʳ x) (elimDExp (∈-++⁺ʳ _ x) cl e)))
+            (ofW-elimD (∈-++⁺ʳ _ x) cl e)
+
+  ofW-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+    ofWᵗ (elimGTm x cl tm) ≤ ofWᵗ tm ⊔ ofWᵉ cl
+  ofW-elimGᵗ x cl (varᵗ y)      = z≤n
+  ofW-elimGᵗ x cl unit̂          = z≤n
+  ofW-elimGᵗ x cl (bool̂ _)      = z≤n
+  ofW-elimGᵗ x cl (nat̂ _)       = z≤n
+  ofW-elimGᵗ x cl (pairᵗ a b)   =
+    ⊔-elim-help (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b)
+  ofW-elimGᵗ x cl (fstᵗ p)      = ofW-elimGᵗ x cl p
+  ofW-elimGᵗ x cl (sndᵗ p)      = ofW-elimGᵗ x cl p
+  ofW-elimGᵗ x cl (inlᵗ a)      = ofW-elimGᵗ x cl a
+  ofW-elimGᵗ x cl (inrᵗ a)      = ofW-elimGᵗ x cl a
+  ofW-elimGᵗ x cl (caseᵗ s l r) =
+    ⊔-elim-help (ofW-elimGᵗ x cl s)
+                (⊔-elim-help (ofW-elimGᵗ x cl l) (ofW-elimGᵗ x cl r))
+  ofW-elimGᵗ x cl (ifᵗ c a b)   =
+    ⊔-elim-help (ofW-elimGᵗ x cl c)
+                (⊔-elim-help (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b))
+  ofW-elimGᵗ x cl (primᵗ _ a)   = ofW-elimGᵗ x cl a
+  ofW-elimGᵗ x cl (strmᵗ e)     = ofW-elimG x cl e
+
+  ofW-elimDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+    ofWᵗ (elimDTm x cl tm) ≤ ofWᵗ tm ⊔ ofWᵉ cl
+  ofW-elimDᵗ x cl (varᵗ y)      = z≤n
+  ofW-elimDᵗ x cl unit̂          = z≤n
+  ofW-elimDᵗ x cl (bool̂ _)      = z≤n
+  ofW-elimDᵗ x cl (nat̂ _)       = z≤n
+  ofW-elimDᵗ x cl (pairᵗ a b)   =
+    ⊔-elim-help (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b)
+  ofW-elimDᵗ x cl (fstᵗ p)      = ofW-elimDᵗ x cl p
+  ofW-elimDᵗ x cl (sndᵗ p)      = ofW-elimDᵗ x cl p
+  ofW-elimDᵗ x cl (inlᵗ a)      = ofW-elimDᵗ x cl a
+  ofW-elimDᵗ x cl (inrᵗ a)      = ofW-elimDᵗ x cl a
+  ofW-elimDᵗ x cl (caseᵗ s l r) =
+    ⊔-elim-help (ofW-elimDᵗ x cl s)
+                (⊔-elim-help (ofW-elimDᵗ x cl l) (ofW-elimDᵗ x cl r))
+  ofW-elimDᵗ x cl (ifᵗ c a b)   =
+    ⊔-elim-help (ofW-elimDᵗ x cl c)
+                (⊔-elim-help (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b))
+  ofW-elimDᵗ x cl (primᵗ _ a)   = ofW-elimDᵗ x cl a
+  ofW-elimDᵗ x cl (strmᵗ e)     = ofW-elimD x cl e
+
+  ofW-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    ofWᵗˢ (elimGTms x cl ts) ≤ ofWᵗˢ ts ⊔ ofWᵉ cl
+  ofW-elimGᵗˢ x cl []       = z≤n
+  ofW-elimGᵗˢ x cl (y ∷ ys) =
+    ⊔-elim-help (ofW-elimGᵗ x cl y) (ofW-elimGᵗˢ x cl ys)
+
+  ofW-elimDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    ofWᵗˢ (elimDTms x cl ts) ≤ ofWᵗˢ ts ⊔ ofWᵉ cl
+  ofW-elimDᵗˢ x cl []       = z≤n
+  ofW-elimDᵗˢ x cl (y ∷ ys) =
+    ⊔-elim-help (ofW-elimDᵗ x cl y) (ofW-elimDᵗˢ x cl ys)
+
+-- eval never widens: every of-list in the result comes from the
+-- template's strm-subtrees (subΘ'd) or the environment
+ofW-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (Ω : ℕ)
+  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+  EnvOfW Ω env → ofWᵗ tm ≤ Ω →
+  ofWᵛ t (evalWith tm env) ≤ Ω
+ofW-evalWith Ω (varᵗ x)  env hσ h = envofw-lookup Ω env hσ x
+ofW-evalWith Ω unit̂      env hσ h = z≤n
+ofW-evalWith Ω (bool̂ _)  env hσ h = z≤n
+ofW-evalWith Ω (nat̂ _)   env hσ h = z≤n
+ofW-evalWith Ω (pairᵗ a b) env hσ h =
+  ⊔-lub (ofW-evalWith Ω a env hσ (⊔ˡ (ofWᵗ a) (ofWᵗ b) h))
+        (ofW-evalWith Ω b env hσ (⊔ʳ (ofWᵗ a) (ofWᵗ b) h))
+ofW-evalWith Ω (fstᵗ p) env hσ h with evalWith p env | ofW-evalWith Ω p env hσ h
+... | (a , b) | ihp = ⊔ˡ (ofWᵛ _ a) (ofWᵛ _ b) ihp
+ofW-evalWith Ω (sndᵗ p) env hσ h with evalWith p env | ofW-evalWith Ω p env hσ h
+... | (a , b) | ihp = ⊔ʳ (ofWᵛ _ a) (ofWᵛ _ b) ihp
+ofW-evalWith Ω (inlᵗ a) env hσ h = ofW-evalWith Ω a env hσ h
+ofW-evalWith Ω (inrᵗ a) env hσ h = ofW-evalWith Ω a env hσ h
+ofW-evalWith Ω (caseᵗ {s = s} {t = t} sc l r) env hσ h
+  with evalWith sc env
+     | ofW-evalWith Ω sc env hσ (⊔ˡ (ofWᵗ sc) (ofWᵗ l ⊔ ofWᵗ r) h)
+... | inj₁ a | iha = ofW-evalWith Ω l (a ∷ᵃ env) (iha , hσ)
+      (⊔ˡ (ofWᵗ l) (ofWᵗ r) (⊔ʳ (ofWᵗ sc) (ofWᵗ l ⊔ ofWᵗ r) h))
+... | inj₂ b | ihb = ofW-evalWith Ω r (b ∷ᵃ env) (ihb , hσ)
+      (⊔ʳ (ofWᵗ l) (ofWᵗ r) (⊔ʳ (ofWᵗ sc) (ofWᵗ l ⊔ ofWᵗ r) h))
+ofW-evalWith Ω (ifᵗ c a b) env hσ h with evalWith c env
+... | true  = ofW-evalWith Ω a env hσ
+      (⊔ˡ (ofWᵗ a) (ofWᵗ b) (⊔ʳ (ofWᵗ c) (ofWᵗ a ⊔ ofWᵗ b) h))
+... | false = ofW-evalWith Ω b env hσ
+      (⊔ʳ (ofWᵗ a) (ofWᵗ b) (⊔ʳ (ofWᵗ c) (ofWᵗ a ⊔ ofWᵗ b) h))
+ofW-evalWith Ω (primᵗ add arg)  env hσ h = z≤n
+ofW-evalWith Ω (primᵗ sub arg)  env hσ h = z≤n
+ofW-evalWith Ω (primᵗ mul arg)  env hσ h = z≤n
+ofW-evalWith Ω (primᵗ eqᵖ arg)  env hσ h = z≤n
+ofW-evalWith Ω (primᵗ ltᵖ arg)  env hσ h = z≤n
+ofW-evalWith Ω (primᵗ notᵖ arg) env hσ h = z≤n
+ofW-evalWith Ω (strmᵗ e) []ᵃ       hσ h = h
+ofW-evalWith Ω (strmᵗ e) (v ∷ᵃ vs) hσ h = ofW-subΘᵉ Ω [] (v ∷ᵃ vs) e hσ h
 
 -- machine faces, mirroring fnCapLive / fnCapNode / frameB? /
 -- pathB? / regsB? with the flat cap Ω
