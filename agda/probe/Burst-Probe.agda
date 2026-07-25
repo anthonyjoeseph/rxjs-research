@@ -7,10 +7,12 @@
 -- project, runs scripts/burst-probe-instrument.py on the copied Rx/Evaluator.agda
 -- (adding a write-only `burstLog` to EvalSt and a logging wrapper around
 -- subscribeE), drops this module in beside it and compiles.  The verified tree is
--- never touched.  `selfcheck` below replays the probe's own drain against the real
--- `evaluate` on every program, so an instrumentation that changed behaviour — or
--- a probe drain that drifted from the real one — is a loud failure, not a quiet
--- wrong number.
+-- never touched.  `oneProgram` replays the probe's own drain against the real
+-- `evaluate` on every program, so a probe drain that drifted from `drain` is a
+-- loud failure rather than a quiet wrong number.  That check runs entirely
+-- inside the instrumented build, so it says nothing about whether the
+-- instrumentation itself moved the evaluator — what settles THAT is the grep in
+-- burst-probe.sh confirming burstLog is written and never read.
 --
 -- THREE COUNTERS, per the question they answer:
 --
@@ -391,8 +393,13 @@ directed =
     , slots2 (scripted coldBoth) (shared in0) , takeᵉ (nat̂ 2) in1 )
   ∷ ( "take 1 (share := cold[1,2,3]+async)"
     , slots2 (scripted coldBoth) (shared in0) , takeᵉ (nat̂ 1) in1 )
-  ∷ ( "take 3 (share := cold[1,2,3]+async)  — budget not spent"
+  -- budget exactly spent: take completes on its last admitted value, so this
+  -- still cuts (as rxjs's take(3) does on the third emission)
+  ∷ ( "take 3 (share := cold[1,2,3]+async)"
     , slots2 (scripted coldBoth) (shared in0) , takeᵉ (nat̂ 3) in1 )
+  -- budget NOT spent: no cut, so no severing close for the share at all
+  ∷ ( "take 5 (share := cold[1,2,3]+async)"
+    , slots2 (scripted coldBoth) (shared in0) , takeᵉ (nat̂ 5) in1 )
   -- a def that completes inside its own connect burst: the share latches and
   -- its registration is dropped before the cut can see it
   ∷ ( "take 2 (share := of[1,2])"

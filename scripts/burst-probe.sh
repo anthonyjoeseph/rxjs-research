@@ -11,9 +11,12 @@
 # clauses).  So: copy agda/src to a scratch Agda project, instrument the COPY,
 # drop the probe module in beside it, compile, run.  agda/src is never written.
 #
-# The probe replays its own drain against the real `evaluate` on every program,
-# so an instrumentation that perturbed behaviour shows up as selfcheck failures
-# rather than as plausible-looking numbers.
+# Two guards keep the numbers honest, and they cover different things:
+#   • the probe replays its own drain against `evaluate` on every program, so a
+#     probe drain that drifted from the real one is a loud failure;
+#   • this script greps the instrumented copy to confirm the log is written and
+#     never read, which is what makes the instrumentation behaviour-neutral (the
+#     in-Agda check cannot see that — both sides of it run instrumented).
 set -euo pipefail
 
 # the report is UTF-8 (em-dashes, ∷ in rendered programs)
@@ -39,12 +42,31 @@ LIB
 
 python3 "$REPO/scripts/burst-probe-instrument.py" "$BUILD/src/Rx/Evaluator.agda"
 
+# Behaviour-neutrality.  The probe's in-Agda selfcheck compares probeDrain
+# against `evaluate` INSIDE the instrumented build, so it catches a drifted
+# drain but not an instrumentation that moved the evaluator.  What makes the
+# instrumentation neutral is that burstLog is written and NEVER READ: the log
+# cannot influence a burst, a registry or a schedule.  Enforce exactly that —
+# the only three places allowed to mention it are the field declaration, st-init
+# and logBurst's own body.
+stray="$(grep -n 'burstLog' "$BUILD/src/Rx/Evaluator.agda" \
+         | grep -v -e 'burstLog        : List (List (InstEmit ⊤))' \
+                   -e 'st-init e = record { burstLog = \[\] ;' \
+                   -e 'logBurst b st = record st { burstLog = map probeEmit b ∷ EvalSt.burstLog st }' \
+         || true)"
+if [ -n "$stray" ]; then
+  echo "burst-probe: the instrumented evaluator READS burstLog — not neutral:" >&2
+  echo "$stray" >&2
+  exit 1
+fi
+
 cd "$BUILD"
 # agda reports errors on stdout, so keep stdout and drop only progress chatter;
 # grep must not decide the exit status (it exits 1 on a clean, silent build)
 set +e
 agda --compile --compile-dir=_out src/Burst-Probe.agda 2>&1 \
-  | grep -v -e '^ *Checking ' -e '^Compiling '
+  | grep -v -e '^ *Checking ' -e '^Compiling ' \
+            -e '^\[[0-9]* of [0-9]*\] Compiling ' -e '^Linking ' -e '^Calling: '
 rc="${PIPESTATUS[0]}"
 set -e
 if [ "$rc" -ne 0 ]; then
