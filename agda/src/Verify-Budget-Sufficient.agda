@@ -3241,17 +3241,212 @@ mutual
     ⊔-elim-help (fn-comb-D x cl y (fnCap-elimDᵗ x cl y))
                 (fnCap-elimDᵗˢ x cl ys)
 
-postulate
-  -- (W3) THE SHARP EVAL BOUND — the walk ledger's load-bearing
-  -- fact.  Same induction as evalWith-size, but the caseᵗ clause is
-  -- the ONLY one that re-enters at a grown cap (via grow-pow, cost
-  -- two exponent units + the branch's own weight); every other
-  -- clause stays at V, with the sizeᵗ factor absorbing the +1s.
-  -- The strmᵗ clause is size-subΘᵉ (linear), exponent 1.
-  evalWith-sharp : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ)
-    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-    EnvSize V env → sizeᵗ tm ≤ V →
-    sizeᵛ t (evalWith tm env) ≤ sizeᵗ tm * (2 + 2 * V) ^ (3 ^ caseWᵗ tm)
+-- every term has at least one node
+sizeᵗ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵗ tm
+sizeᵗ-pos (varᵗ _)      = s≤s z≤n
+sizeᵗ-pos unit̂          = s≤s z≤n
+sizeᵗ-pos (bool̂ _)      = s≤s z≤n
+sizeᵗ-pos (nat̂ _)       = s≤s z≤n
+sizeᵗ-pos (pairᵗ _ _)   = s≤s z≤n
+sizeᵗ-pos (fstᵗ _)      = s≤s z≤n
+sizeᵗ-pos (sndᵗ _)      = s≤s z≤n
+sizeᵗ-pos (inlᵗ _)      = s≤s z≤n
+sizeᵗ-pos (inrᵗ _)      = s≤s z≤n
+sizeᵗ-pos (caseᵗ _ _ _) = s≤s z≤n
+sizeᵗ-pos (ifᵗ _ _ _)   = s≤s z≤n
+sizeᵗ-pos (primᵗ _ _)   = s≤s z≤n
+sizeᵗ-pos (strmᵗ _)     = s≤s z≤n
+
+-- a cap scaled by a positive size factor still dominates 1, and (at a
+-- positive exponent) the base cap itself
+one≤scaled : ∀ V N k → 1 ≤ N → 1 ≤ N * ((2 + 2 * V) ^ k)
+one≤scaled V N k hN =
+  ≤-trans (≤-reflexive (sym (+-identityʳ 1))) (*-mono-≤ hN (one≤pow V k))
+
+C≤scaled : ∀ V N k → 1 ≤ N → 1 ≤ k → 2 + 2 * V ≤ N * ((2 + 2 * V) ^ k)
+C≤scaled V N k hN hk =
+  ≤-trans (pow1 V hk)
+          (≤-trans (≤-reflexive (sym (+-identityʳ ((2 + 2 * V) ^ k))))
+                   (*-monoˡ-≤ ((2 + 2 * V) ^ k) hN))
+
+-- 3^ss + 3 ≤ 3^(2+ss):  Y + 3 ≤ 4·Y ≤ 9·Y
+pow3+3 : ∀ ss → 3 ^ ss + 3 ≤ 3 ^ (2 + ss)
+pow3+3 ss =
+  ≤-trans (+-monoʳ-≤ Y (*-monoʳ-≤ 3 (one≤3^ ss)))
+  (≤-trans (*-monoˡ-≤ Y (s≤s (s≤s (s≤s (s≤s z≤n)))))
+           (≤-reflexive (*-assoc 3 3 Y)))
+  where Y = 3 ^ ss
+
+-- the sharp case hop's exponent arithmetic: the scrutinee's exponent
+-- plus the base swap's three units, times the branch's, inside 3^(2+K)
+case-exp-sharp : ∀ ss b K → ss + b ≤ K → (3 ^ ss + 3) * 3 ^ b ≤ 3 ^ (2 + K)
+case-exp-sharp ss b K h =
+  ≤-trans (*-monoˡ-≤ (3 ^ b) (pow3+3 ss))
+  (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 3 (2 + ss) b)))
+           (^-monoʳ-≤ 3 (s≤s (s≤s h))))
+
+-- the base swap: a cap scaled by a size factor N ≤ C costs the
+-- exponent three units — one for N, two for the 2+2· wrapper
+sharp-base : ∀ V N p → N ≤ 2 + 2 * V →
+  2 + 2 * (N * ((2 + 2 * V) ^ p)) ≤ (2 + 2 * V) ^ (p + 3)
+sharp-base V N p hN =
+  ≤-trans (+-monoʳ-≤ 2 (*-monoʳ-≤ 2 (*-monoˡ-≤ ((2 + 2 * V) ^ p) hN)))
+  (≤-trans (grow-pow V (suc p))
+           (≤-reflexive (cong ((2 + 2 * V) ^_) (sym (+-suc p 2)))))
+
+pow3-hop-sharp : ∀ V (N p q E : ℕ) → N ≤ 2 + 2 * V → (p + 3) * q ≤ E →
+  (2 + 2 * (N * ((2 + 2 * V) ^ p))) ^ q ≤ (2 + 2 * V) ^ E
+pow3-hop-sharp V N p q E hN hE =
+  ≤-trans (^-monoˡ-≤ q (sharp-base V N p hN))
+  (≤-trans (≤-reflexive (^-*-assoc (2 + 2 * V) (p + 3) q))
+           (^-monoʳ-≤ (2 + 2 * V) hE))
+
+-- one caseᵗ branch: its bound over the GROWN cap (base scaled by the
+-- scrutinee's size) collapses back to the host cap at 3^(2+K)
+case-branch : ∀ V (X ssc sl S csc cl K : ℕ) →
+  X ≤ sl * (2 + 2 * (ssc * ((2 + 2 * V) ^ (3 ^ csc)))) ^ (3 ^ cl) →
+  ssc ≤ V → sl ≤ S → csc + cl ≤ K →
+  X ≤ S * (2 + 2 * V) ^ (3 ^ (2 + K))
+case-branch V X ssc sl S csc cl K hX hssc hsl hK =
+  ≤-trans hX
+    (*-mono-≤ hsl
+      (pow3-hop-sharp V ssc (3 ^ csc) (3 ^ cl) (3 ^ (2 + K))
+        (≤-trans hssc (V≤C V))
+        (case-exp-sharp csc cl K hK)))
+
+-- (W3) THE SHARP EVAL BOUND — the walk ledger's load-bearing fact.
+-- Same induction as evalWith-size, but the sizeᵗ factor out front
+-- absorbs every constructor's +1, so caseᵗ is the ONLY clause that
+-- moves the exponent: it re-enters at the grown cap (base carrying
+-- the scrutinee's size factor, cost three exponent units) and
+-- collapses through case-branch.  Every other clause stays at V.
+-- The strmᵗ clause is size-subΘᵉ (linear), exponent 3^0 = 1.
+evalWith-sharp : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ)
+  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+  EnvSize V env → sizeᵗ tm ≤ V →
+  sizeᵛ t (evalWith tm env) ≤ sizeᵗ tm * (2 + 2 * V) ^ (3 ^ caseWᵗ tm)
+evalWith-sharp V (varᵗ x) env hσ hs =
+  ≤-trans (envSize-lookup V env hσ x)
+          (≤-trans (V≤C V) (C≤scaled V 1 1 ≤-refl ≤-refl))
+evalWith-sharp V unit̂     env hσ hs = one≤scaled V 1 1 ≤-refl
+evalWith-sharp V (bool̂ _) env hσ hs = one≤scaled V 1 1 ≤-refl
+evalWith-sharp V (nat̂ _)  env hσ hs = one≤scaled V 1 1 ≤-refl
+evalWith-sharp V (pairᵗ a b) env hσ hs =
+  sucmul (sizeᵗ a + sizeᵗ b) M
+    (sum2 (sizeᵗ a) (sizeᵗ b) M
+      (≤-trans (evalWith-sharp V a env hσ
+                 (≤-trans (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b)) (n≤1+n _)) hs))
+               (*-monoʳ-≤ (sizeᵗ a)
+                 (^-monoʳ-≤ (2 + 2 * V)
+                   (^-monoʳ-≤ 3 (m≤m+n (caseWᵗ a) (caseWᵗ b))))))
+      (≤-trans (evalWith-sharp V b env hσ
+                 (≤-trans (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a)) (n≤1+n _)) hs))
+               (*-monoʳ-≤ (sizeᵗ b)
+                 (^-monoʳ-≤ (2 + 2 * V)
+                   (^-monoʳ-≤ 3 (m≤n+m (caseWᵗ b) (caseWᵗ a)))))))
+    (one≤pow V (3 ^ (caseWᵗ a + caseWᵗ b)))
+  where M = (2 + 2 * V) ^ (3 ^ (caseWᵗ a + caseWᵗ b))
+evalWith-sharp V (fstᵗ p) env hσ hs
+  with evalWith p env
+     | evalWith-sharp V p env hσ (≤-trans (n≤1+n (sizeᵗ p)) hs)
+... | (a , b) | ihp =
+  ≤-trans (≤-trans (m≤m+n (sizeᵛ _ a) (sizeᵛ _ b)) (n≤1+n _))
+          (≤-trans ihp (*-monoˡ-≤ _ (n≤1+n (sizeᵗ p))))
+evalWith-sharp V (sndᵗ p) env hσ hs
+  with evalWith p env
+     | evalWith-sharp V p env hσ (≤-trans (n≤1+n (sizeᵗ p)) hs)
+... | (a , b) | ihp =
+  ≤-trans (≤-trans (m≤n+m (sizeᵛ _ b) (sizeᵛ _ a)) (n≤1+n _))
+          (≤-trans ihp (*-monoˡ-≤ _ (n≤1+n (sizeᵗ p))))
+evalWith-sharp V (inlᵗ a) env hσ hs =
+  sucmul (sizeᵗ a) ((2 + 2 * V) ^ (3 ^ caseWᵗ a))
+    (evalWith-sharp V a env hσ (≤-trans (n≤1+n (sizeᵗ a)) hs))
+    (one≤pow V (3 ^ caseWᵗ a))
+evalWith-sharp V (inrᵗ a) env hσ hs =
+  sucmul (sizeᵗ a) ((2 + 2 * V) ^ (3 ^ caseWᵗ a))
+    (evalWith-sharp V a env hσ (≤-trans (n≤1+n (sizeᵗ a)) hs))
+    (one≤pow V (3 ^ caseWᵗ a))
+evalWith-sharp V (caseᵗ {s = s} {t = t} sc l r) env hσ hs
+  with evalWith sc env
+     | evalWith-sharp V sc env hσ
+         (≤-trans (≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
+                    (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+                             (n≤1+n _))) hs)
+... | inj₁ a | ihsc =
+  case-branch V _ (sizeᵗ sc) (sizeᵗ l) _ (caseWᵗ sc) (caseWᵗ l) _
+    (evalWith-sharp (sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))) l (a ∷ᵃ env)
+      (≤-trans (n≤1+n _) ihsc , envSize-widen hV env hσ)
+      (≤-trans (≤-trans hbr hs) hV))
+    hsc hbr (m≤m+n (caseWᵗ sc + caseWᵗ l) (caseWᵗ r))
+  where
+  hsc : sizeᵗ sc ≤ V
+  hsc = ≤-trans (≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
+                  (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+                           (n≤1+n _))) hs
+  hbr : sizeᵗ l ≤ suc ((sizeᵗ sc + sizeᵗ l) + sizeᵗ r)
+  hbr = ≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ sc))
+                (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r)) (n≤1+n _))
+  hV : V ≤ sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))
+  hV = ≤-trans (V≤C V)
+         (C≤scaled V (sizeᵗ sc) (3 ^ caseWᵗ sc)
+                   (sizeᵗ-pos sc) (one≤3^ (caseWᵗ sc)))
+... | inj₂ b | ihsc =
+  case-branch V _ (sizeᵗ sc) (sizeᵗ r) _ (caseWᵗ sc) (caseWᵗ r) _
+    (evalWith-sharp (sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))) r (b ∷ᵃ env)
+      (≤-trans (n≤1+n _) ihsc , envSize-widen hV env hσ)
+      (≤-trans (≤-trans hbr hs) hV))
+    hsc hbr (+-monoˡ-≤ (caseWᵗ r) (m≤m+n (caseWᵗ sc) (caseWᵗ l)))
+  where
+  hsc : sizeᵗ sc ≤ V
+  hsc = ≤-trans (≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
+                  (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+                           (n≤1+n _))) hs
+  hbr : sizeᵗ r ≤ suc ((sizeᵗ sc + sizeᵗ l) + sizeᵗ r)
+  hbr = ≤-trans (m≤n+m (sizeᵗ r) (sizeᵗ sc + sizeᵗ l)) (n≤1+n _)
+  hV : V ≤ sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))
+  hV = ≤-trans (V≤C V)
+         (C≤scaled V (sizeᵗ sc) (3 ^ caseWᵗ sc)
+                   (sizeᵗ-pos sc) (one≤3^ (caseWᵗ sc)))
+evalWith-sharp V (ifᵗ c a b) env hσ hs with evalWith c env
+... | true =
+  ≤-trans (evalWith-sharp V a env hσ (≤-trans hbr hs))
+          (*-mono-≤ hbr
+            (^-monoʳ-≤ (2 + 2 * V)
+              (^-monoʳ-≤ 3 (≤-trans (m≤n+m (caseWᵗ a) (caseWᵗ c))
+                             (m≤m+n (caseWᵗ c + caseWᵗ a) (caseWᵗ b))))))
+  where
+  hbr : sizeᵗ a ≤ suc ((sizeᵗ c + sizeᵗ a) + sizeᵗ b)
+  hbr = ≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                (≤-trans (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)) (n≤1+n _))
+... | false =
+  ≤-trans (evalWith-sharp V b env hσ (≤-trans hbr hs))
+          (*-mono-≤ hbr
+            (^-monoʳ-≤ (2 + 2 * V)
+              (^-monoʳ-≤ 3 (m≤n+m (caseWᵗ b) (caseWᵗ c + caseWᵗ a)))))
+  where
+  hbr : sizeᵗ b ≤ suc ((sizeᵗ c + sizeᵗ a) + sizeᵗ b)
+  hbr = ≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a)) (n≤1+n _)
+evalWith-sharp V (primᵗ add arg)  env hσ hs =
+  one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
+evalWith-sharp V (primᵗ sub arg)  env hσ hs =
+  one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
+evalWith-sharp V (primᵗ mul arg)  env hσ hs =
+  one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
+evalWith-sharp V (primᵗ eqᵖ arg)  env hσ hs =
+  one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
+evalWith-sharp V (primᵗ ltᵖ arg)  env hσ hs =
+  one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
+evalWith-sharp V (primᵗ notᵖ arg) env hσ hs =
+  one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
+evalWith-sharp V (strmᵗ e) []ᵃ hσ hs =
+  ≤-trans (n≤1+n (sizeᵉ e))
+          (≤-trans (≤-reflexive (sym (*-identityʳ (suc (sizeᵉ e)))))
+                   (*-monoʳ-≤ (suc (sizeᵉ e)) (one≤pow V 1)))
+evalWith-sharp V (strmᵗ e) (v ∷ᵃ vs) hσ hs =
+  ≤-trans (size-subΘᵉ V [] (v ∷ᵃ vs) e hσ)
+          (*-mono-≤ (n≤1+n (sizeᵉ e))
+            (≤-trans (n≤1+n (suc (2 * V)))
+                     (≤-reflexive (sym (*-identityʳ (2 + 2 * V))))))
 
 -- combine a sub-template's caseW and fnCap bounds against the host cap
 cmb : ∀ {cw fw CW FW Ψ} → cw ≤ CW → fw ≤ FW → CW ⊔ FW ≤ Ψ → cw ⊔ fw ≤ Ψ
