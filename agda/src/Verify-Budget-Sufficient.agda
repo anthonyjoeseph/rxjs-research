@@ -73,7 +73,8 @@ open import Data.List.Relation.Unary.All.Properties
 open import Data.List.Properties using (length-++)
 open import Data.List.Membership.Propositional.Properties
   using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.Maybe   using (nothing)
+open import Data.Maybe   using (Maybe; nothing; just)
+open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -87,7 +88,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 complete; exhausted;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
@@ -114,7 +115,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
                                 NodeState; scan-st; take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; setNode; NodeId;
+                                oneShotBurst; installNode; setNode; lookupNode;
+                                NodeId;
                                 root; share-sink; _↠_; Frame; AllOp;
                                 map-f; scan-f; take-f; from-inner;
                                 thru-outer; Stream;
@@ -4729,28 +4731,10 @@ postulate
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
 
-  -- the four remaining per-frame cores of stepFrame-wet (the map
-  -- clause is PROVEN below).  scan consumes scanVals-sharp + the
-  -- node-lookup/install ring; take is a prefix + cutThrough sweep;
-  -- the *All frames recurse into subscribeInner (the walk's mutual
-  -- knot — they discharge together with subscribeE-walkS)
-  stepFrame-scan-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    frameB? (capᴱ W E) Ψ (scan-f fn nid) ≡ true →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    all (valB? (capᴱ W E) Ψ s) vals ≡ true →
-    let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-       × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
-       × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
-
+  -- the three remaining per-frame cores of stepFrame-wet (the map and
+  -- scan clauses are PROVEN below).  take is a prefix + cutThrough
+  -- sweep; the *All frames recurse into subscribeInner (the walk's
+  -- mutual knot — they discharge together with subscribeE-walkS)
   stepFrame-take-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
     (nid : NodeId) (κ : Path Γ s t)
@@ -4996,6 +4980,121 @@ ofVals-B {u = u} Ψ W E 2≤E (y ∷ ys) hsz hfc =
     (ofVals-B Ψ W E 2≤E ys
       (≤-trans (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)) hsz)
       (≤-trans (m≤n⊔m _ (fnCapᵗˢ ys)) hfc))
+
+------------------------------------------------------------------
+-- (W6 face) THE SCAN FRAME, PROVEN.  A scan step is a node lookup,
+-- one fold run, and a re-install: no recursion, no burst.  The size
+-- side is scanVals-sharp's closed form (cap grown by
+-- 3^(suc caseW · |vals|)); the fn-cap side is the pointwise
+-- applyFn-fnCap run; the state side is install-INV over the widened
+-- invariant.  The three stuck shapes (no node, wrong node, type
+-- mismatch) emit nothing and move no ledger.
+------------------------------------------------------------------
+
+-- valB? unzips into its two faces and zips back
+allB-size : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  all (valB? B Ψ u) vs ≡ true → All (λ v → sizeᵛ u v ≤ B) vs
+allB-size B Ψ u []       h = []ᵃ
+allB-size B Ψ u (v ∷ vs) h =
+  ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ (proj₁ (∧-true _ _ h)))))
+    ∷ᵃ allB-size B Ψ u vs (proj₂ (∧-true _ _ h))
+
+allB-fnCap : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  all (valB? B Ψ u) vs ≡ true → All (λ v → fnCapᵛ u v ≤ Ψ) vs
+allB-fnCap B Ψ u []       h = []ᵃ
+allB-fnCap B Ψ u (v ∷ vs) h =
+  ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ h)))))
+    ∷ᵃ allB-fnCap B Ψ u vs (proj₂ (∧-true _ _ h))
+
+allB-zip : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  All (λ v → sizeᵛ u v ≤ B) vs → All (λ v → fnCapᵛ u v ≤ Ψ) vs →
+  all (valB? B Ψ u) vs ≡ true
+allB-zip B Ψ u []       _           _           = refl
+allB-zip B Ψ u (v ∷ vs) (hs ∷ᵃ hss) (hf ∷ᵃ hfs) =
+  ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ hs)) (T⇒≡true _ (≤⇒≤ᵇ hf)))
+          (allB-zip B Ψ u vs hss hfs)
+
+-- a node lookup carries both bounded faces of whatever it finds
+NodeB : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Maybe (NodeState Γ) → Set
+NodeB B Ψ nothing   = ⊤
+NodeB B Ψ (just ns) = (boundedNode B ns ≡ true) × (fnCapNode Ψ ns ≡ true)
+
+lookupNode-B : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode B (proj₂ kv)) nodes ≡ true →
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) nodes ≡ true →
+  NodeB B Ψ (lookupNode nid nodes)
+lookupNode-B B Ψ nid []            hb hf = tt
+lookupNode-B B Ψ nid ((k , s) ∷ r) hb hf with k ≡ᵇ nid
+... | true  = proj₁ (∧-true _ _ hb) , proj₁ (∧-true _ _ hf)
+... | false = lookupNode-B B Ψ nid r (proj₂ (∧-true _ _ hb)) (proj₂ (∧-true _ _ hf))
+
+-- the fn-cap face of one fold run: no applyFn ever mints a new fn
+scanVals-fnCap : ∀ {n} {Γ : Ctx n} {s u} (Ψ : ℕ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u) (vs : List (Val Γ s)) →
+  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ → fnCapᵛ u acc ≤ Ψ →
+  All (λ v → fnCapᵛ s v ≤ Ψ) vs →
+  (fnCapᵛ u (proj₂ (scanVals fn acc vs)) ≤ Ψ)
+  × All (λ o → fnCapᵛ u o ≤ Ψ) (proj₁ (scanVals fn acc vs))
+scanVals-fnCap Ψ fn acc []       hfn hacc _            = hacc , []ᵃ
+scanVals-fnCap Ψ fn acc (v ∷ vs) hfn hacc (hv ∷ᵃ hvs) =
+  proj₁ IH , acc′OK ∷ᵃ proj₂ IH
+  where
+  acc′OK = applyFn-fnCap Ψ fn (acc , v) (⊔-lub hacc hv) hfn
+  IH     = scanVals-fnCap Ψ fn (applyFn fn (acc , v)) vs hfn acc′OK hvs
+
+stepFrame-scan-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  frameB? (capᴱ W E) Ψ (scan-f fn nid) ≡ true →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  all (valB? (capᴱ W E) Ψ s) vals ≡ true →
+  let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
+     × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
+                   3≤E inv fB pB vB
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-B (capᴱ W E) Ψ nid (EvalSt.nodes st)
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ inv))))
+         (proj₂ (∧-true _ _ (proj₁ (∧-true _ _ (proj₂ (∧-true _ _ inv))))))
+... | nothing            | _ = E , ≤-refl , inv , refl , refl
+... | just (take-st _)   | _ = E , ≤-refl , inv , refl , refl
+... | just (merge-st _ _)   | _ = E , ≤-refl , inv , refl , refl
+... | just (concat-st _ _ _) | _ = E , ≤-refl , inv , refl , refl
+... | just (switch-st _ _)  | _ = E , ≤-refl , inv , refl , refl
+... | just (exhaust-st _ _) | _ = E , ≤-refl , inv , refl , refl
+... | just (scan-st {w} acc) | nb with w ≟ᵗ u
+...   | no _    = E , ≤-refl , inv , refl , refl
+...   | yes refl =
+  E′ , E≤E′ ,
+  install-INV Ψ (capᴱ W E′) sched st nid (scan-st (proj₂ run))
+    (T⇒≡true _ (≤⇒≤ᵇ (proj₁ szRun)))
+    (T⇒≡true _ (≤⇒≤ᵇ (proj₁ fcRun)))
+    (INV?-widen sched st (capᴱ-mono W E≤E′) inv) ,
+  allB-zip (capᴱ W E′) Ψ u (proj₁ run) (proj₂ szRun) (proj₂ fcRun) ,
+  refl
+  where
+  E′    = E * 3 ^ (suc (caseWᵗ fn) * length vals)
+  E≤E′  = E≤E*3^ E (suc (caseWᵗ fn) * length vals)
+  run   = scanVals fn acc vals
+  szfn  : sizeᵗ fn ≤ capᴱ W E
+  szfn  = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ fB)))
+  capfn : caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ
+  capfn = ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true _ _ fB)))
+  szRun = scanVals-sharp W E fn acc vals 3≤E szfn
+            (≤ᵇ⇒≤ _ _ (T-to (proj₁ nb)))
+            (allB-size (capᴱ W E) Ψ s vals vB)
+  fcRun = scanVals-fnCap Ψ fn acc vals capfn
+            (≤ᵇ⇒≤ _ _ (T-to (proj₂ nb)))
+            (allB-fnCap (capᴱ W E) Ψ s vals vB)
 
 ------------------------------------------------------------------
 -- stepFrame-wet, now a REAL dispatch: the map clause proven end to
