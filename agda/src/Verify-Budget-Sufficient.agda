@@ -35,7 +35,7 @@
 -- the splice into Verify-Well-Formed replaces its postulate.
 module Verify-Budget-Sufficient where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_;
+open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
                                 if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
                                 _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
@@ -134,6 +134,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 mergeBump; switchKill;
                                 thruConsume; thruWalk; thruWrap;
                                 concatDrain; innerFinish; innerReact;
+                                sharedPlumb; sharedConnect; subscribeSharedSlot;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
@@ -1197,16 +1198,24 @@ fᵢ≤sum-tab {suc m} f (Fin.suc i) =
   ≤-trans (fᵢ≤sum-tab (λ j → f (Fin.suc j)) i) (m≤n+m _ (f Fin.zero))
 
 -- pending values of a resolved script stay under any bound that
--- covers the script's total content
+-- covers the script's total content.  resolve only RETIMES, so this
+-- holds for any per-value measure: the size face feeds boundedLive,
+-- the fnCap face feeds fnCapLive
+resolve-measure : ∀ {n} {Γ : Ctx n} {t : Ty} (f : Val Γ t → ℕ)
+  (B : ℕ) (anchor : Tick) (xs : List (Timed (Val Γ t))) →
+  sum (map (λ tv → f (Timed.val tv)) xs) ≤ B →
+  all (λ p → f (proj₂ p) ≤ᵇ B) (resolve anchor xs) ≡ true
+resolve-measure f B anchor [] h = refl
+resolve-measure f B anchor ((after w , v) ∷ r) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (f v) _) h)))
+          (resolve-measure f B (anchor + suc w) r
+            (≤-trans (m≤n+m _ (f v)) h))
+
 resolve-bounded : ∀ {n} {Γ : Ctx n} {t : Ty} (B : ℕ) (anchor : Tick)
   (xs : List (Timed (Val Γ t))) →
   sum (map (λ tv → sizeᵛ t (Timed.val tv)) xs) ≤ B →
   all (λ p → sizeᵛ t (proj₂ p) ≤ᵇ B) (resolve anchor xs) ≡ true
-resolve-bounded B anchor [] h = refl
-resolve-bounded {t = t} B anchor ((after w , v) ∷ r) h =
-  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (sizeᵛ t v) _) h)))
-          (resolve-bounded B (anchor + suc w) r
-            (≤-trans (m≤n+m _ (sizeᵛ t v)) h))
+resolve-bounded {t = t} = resolve-measure (sizeᵛ t)
 
 mkHot-bounded : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (B : ℕ) (i : Fin n) →
   slotSize (ins i) ≤ B → all (boundedLive B) (mkHot ins i) ≡ true
@@ -2396,6 +2405,10 @@ one≤pow V k = ≤-trans (1≤2^ k) (^-monoˡ-≤ k (2≤C V))
 one≤3^ : ∀ k → 1 ≤ 3 ^ k
 one≤3^ k = ≤-trans (1≤2^ k) (^-monoˡ-≤ k (s≤s (s≤s z≤n)))
 
+E≤E*3^ : ∀ (E k : ℕ) → E ≤ E * 3 ^ k
+E≤E*3^ E k = ≤-trans (≤-reflexive (sym (*-identityʳ E)))
+                     (*-monoʳ-≤ E (one≤3^ k))
+
 k≤3^k : ∀ k → k ≤ 3 ^ k
 k≤3^k k = ≤-trans (≤-trans (n≤1+n k) (n<2^n k))
                   (^-monoˡ-≤ k (s≤s (s≤s z≤n)))
@@ -3278,11 +3291,17 @@ C≤scaled V N k hN hk =
 
 -- 3^ss + 3 ≤ 3^(2+ss):  Y + 3 ≤ 4·Y ≤ 9·Y
 pow3+3 : ∀ ss → 3 ^ ss + 3 ≤ 3 ^ (2 + ss)
-pow3+3 ss =
-  ≤-trans (+-monoʳ-≤ Y (*-monoʳ-≤ 3 (one≤3^ ss)))
-  (≤-trans (*-monoˡ-≤ Y (s≤s (s≤s (s≤s (s≤s z≤n)))))
-           (≤-reflexive (*-assoc 3 3 Y)))
-  where Y = 3 ^ ss
+pow3+3 ss = ≤-trans lo hi
+  where
+  Y = 3 ^ ss
+  -- 3 = 3 * 1 ≤ 3 * Y
+  lo : 3 ^ ss + 3 ≤ Y + 3 * Y
+  lo = +-monoʳ-≤ Y (*-monoʳ-≤ 3 (one≤3^ ss))
+  -- 3 ^ (2 + ss) IS 3 * (3 * Y).  Everything here is given explicitly:
+  -- a metavariable under _*_ would send the unifier inverting
+  -- multiplication against the stuck Y
+  hi : Y + 3 * Y ≤ 3 ^ (2 + ss)
+  hi = +-mono-≤ (m≤m+n Y (Y + (Y + 0))) (m≤m+n (3 * Y) (3 * Y + 0))
 
 -- the sharp case hop's exponent arithmetic: the scrutinee's exponent
 -- plus the base swap's three units, times the branch's, inside 3^(2+K)
@@ -3332,64 +3351,64 @@ evalWith-sharp : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ)
   (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
   EnvSize V env → sizeᵗ tm ≤ V →
   sizeᵛ t (evalWith tm env) ≤ sizeᵗ tm * (2 + 2 * V) ^ (3 ^ caseWᵗ tm)
-evalWith-sharp V (varᵗ x) env hσ hs =
+evalWith-sharp V (varᵗ x) env hσ hsz =
   ≤-trans (envSize-lookup V env hσ x)
           (≤-trans (V≤C V) (C≤scaled V 1 1 ≤-refl ≤-refl))
-evalWith-sharp V unit̂     env hσ hs = one≤scaled V 1 1 ≤-refl
-evalWith-sharp V (bool̂ _) env hσ hs = one≤scaled V 1 1 ≤-refl
-evalWith-sharp V (nat̂ _)  env hσ hs = one≤scaled V 1 1 ≤-refl
-evalWith-sharp V (pairᵗ a b) env hσ hs =
+evalWith-sharp V unit̂     env hσ hsz = one≤scaled V 1 1 ≤-refl
+evalWith-sharp V (bool̂ _) env hσ hsz = one≤scaled V 1 1 ≤-refl
+evalWith-sharp V (nat̂ _)  env hσ hsz = one≤scaled V 1 1 ≤-refl
+evalWith-sharp V (pairᵗ a b) env hσ hsz =
   sucmul (sizeᵗ a + sizeᵗ b) M
     (sum2 (sizeᵗ a) (sizeᵗ b) M
       (≤-trans (evalWith-sharp V a env hσ
-                 (≤-trans (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b)) (n≤1+n _)) hs))
+                 (≤-trans (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b)) (n≤1+n _)) hsz))
                (*-monoʳ-≤ (sizeᵗ a)
                  (^-monoʳ-≤ (2 + 2 * V)
                    (^-monoʳ-≤ 3 (m≤m+n (caseWᵗ a) (caseWᵗ b))))))
       (≤-trans (evalWith-sharp V b env hσ
-                 (≤-trans (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a)) (n≤1+n _)) hs))
+                 (≤-trans (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a)) (n≤1+n _)) hsz))
                (*-monoʳ-≤ (sizeᵗ b)
                  (^-monoʳ-≤ (2 + 2 * V)
                    (^-monoʳ-≤ 3 (m≤n+m (caseWᵗ b) (caseWᵗ a)))))))
     (one≤pow V (3 ^ (caseWᵗ a + caseWᵗ b)))
   where M = (2 + 2 * V) ^ (3 ^ (caseWᵗ a + caseWᵗ b))
-evalWith-sharp V (fstᵗ p) env hσ hs
+evalWith-sharp V (fstᵗ p) env hσ hsz
   with evalWith p env
-     | evalWith-sharp V p env hσ (≤-trans (n≤1+n (sizeᵗ p)) hs)
+     | evalWith-sharp V p env hσ (≤-trans (n≤1+n (sizeᵗ p)) hsz)
 ... | (a , b) | ihp =
   ≤-trans (≤-trans (m≤m+n (sizeᵛ _ a) (sizeᵛ _ b)) (n≤1+n _))
           (≤-trans ihp (*-monoˡ-≤ _ (n≤1+n (sizeᵗ p))))
-evalWith-sharp V (sndᵗ p) env hσ hs
+evalWith-sharp V (sndᵗ p) env hσ hsz
   with evalWith p env
-     | evalWith-sharp V p env hσ (≤-trans (n≤1+n (sizeᵗ p)) hs)
+     | evalWith-sharp V p env hσ (≤-trans (n≤1+n (sizeᵗ p)) hsz)
 ... | (a , b) | ihp =
   ≤-trans (≤-trans (m≤n+m (sizeᵛ _ b) (sizeᵛ _ a)) (n≤1+n _))
           (≤-trans ihp (*-monoˡ-≤ _ (n≤1+n (sizeᵗ p))))
-evalWith-sharp V (inlᵗ a) env hσ hs =
+evalWith-sharp V (inlᵗ a) env hσ hsz =
   sucmul (sizeᵗ a) ((2 + 2 * V) ^ (3 ^ caseWᵗ a))
-    (evalWith-sharp V a env hσ (≤-trans (n≤1+n (sizeᵗ a)) hs))
+    (evalWith-sharp V a env hσ (≤-trans (n≤1+n (sizeᵗ a)) hsz))
     (one≤pow V (3 ^ caseWᵗ a))
-evalWith-sharp V (inrᵗ a) env hσ hs =
+evalWith-sharp V (inrᵗ a) env hσ hsz =
   sucmul (sizeᵗ a) ((2 + 2 * V) ^ (3 ^ caseWᵗ a))
-    (evalWith-sharp V a env hσ (≤-trans (n≤1+n (sizeᵗ a)) hs))
+    (evalWith-sharp V a env hσ (≤-trans (n≤1+n (sizeᵗ a)) hsz))
     (one≤pow V (3 ^ caseWᵗ a))
-evalWith-sharp V (caseᵗ {s = s} {t = t} sc l r) env hσ hs
+evalWith-sharp V (caseᵗ {s = s} {t = t} sc l r) env hσ hsz
   with evalWith sc env
      | evalWith-sharp V sc env hσ
          (≤-trans (≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
                     (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
-                             (n≤1+n _))) hs)
+                             (n≤1+n _))) hsz)
 ... | inj₁ a | ihsc =
   case-branch V _ (sizeᵗ sc) (sizeᵗ l) _ (caseWᵗ sc) (caseWᵗ l) _
     (evalWith-sharp (sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))) l (a ∷ᵃ env)
       (≤-trans (n≤1+n _) ihsc , envSize-widen hV env hσ)
-      (≤-trans (≤-trans hbr hs) hV))
+      (≤-trans (≤-trans hbr hsz) hV))
     hsc hbr (m≤m+n (caseWᵗ sc + caseWᵗ l) (caseWᵗ r))
   where
   hsc : sizeᵗ sc ≤ V
   hsc = ≤-trans (≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
                   (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
-                           (n≤1+n _))) hs
+                           (n≤1+n _))) hsz
   hbr : sizeᵗ l ≤ suc ((sizeᵗ sc + sizeᵗ l) + sizeᵗ r)
   hbr = ≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ sc))
                 (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r)) (n≤1+n _))
@@ -3401,22 +3420,22 @@ evalWith-sharp V (caseᵗ {s = s} {t = t} sc l r) env hσ hs
   case-branch V _ (sizeᵗ sc) (sizeᵗ r) _ (caseWᵗ sc) (caseWᵗ r) _
     (evalWith-sharp (sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))) r (b ∷ᵃ env)
       (≤-trans (n≤1+n _) ihsc , envSize-widen hV env hσ)
-      (≤-trans (≤-trans hbr hs) hV))
+      (≤-trans (≤-trans hbr hsz) hV))
     hsc hbr (+-monoˡ-≤ (caseWᵗ r) (m≤m+n (caseWᵗ sc) (caseWᵗ l)))
   where
   hsc : sizeᵗ sc ≤ V
   hsc = ≤-trans (≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
                   (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
-                           (n≤1+n _))) hs
+                           (n≤1+n _))) hsz
   hbr : sizeᵗ r ≤ suc ((sizeᵗ sc + sizeᵗ l) + sizeᵗ r)
   hbr = ≤-trans (m≤n+m (sizeᵗ r) (sizeᵗ sc + sizeᵗ l)) (n≤1+n _)
   hV : V ≤ sizeᵗ sc * ((2 + 2 * V) ^ (3 ^ caseWᵗ sc))
   hV = ≤-trans (V≤C V)
          (C≤scaled V (sizeᵗ sc) (3 ^ caseWᵗ sc)
                    (sizeᵗ-pos sc) (one≤3^ (caseWᵗ sc)))
-evalWith-sharp V (ifᵗ c a b) env hσ hs with evalWith c env
+evalWith-sharp V (ifᵗ c a b) env hσ hsz with evalWith c env
 ... | true =
-  ≤-trans (evalWith-sharp V a env hσ (≤-trans hbr hs))
+  ≤-trans (evalWith-sharp V a env hσ (≤-trans hbr hsz))
           (*-mono-≤ hbr
             (^-monoʳ-≤ (2 + 2 * V)
               (^-monoʳ-≤ 3 (≤-trans (m≤n+m (caseWᵗ a) (caseWᵗ c))
@@ -3426,30 +3445,30 @@ evalWith-sharp V (ifᵗ c a b) env hσ hs with evalWith c env
   hbr = ≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
                 (≤-trans (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)) (n≤1+n _))
 ... | false =
-  ≤-trans (evalWith-sharp V b env hσ (≤-trans hbr hs))
+  ≤-trans (evalWith-sharp V b env hσ (≤-trans hbr hsz))
           (*-mono-≤ hbr
             (^-monoʳ-≤ (2 + 2 * V)
               (^-monoʳ-≤ 3 (m≤n+m (caseWᵗ b) (caseWᵗ c + caseWᵗ a)))))
   where
   hbr : sizeᵗ b ≤ suc ((sizeᵗ c + sizeᵗ a) + sizeᵗ b)
   hbr = ≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a)) (n≤1+n _)
-evalWith-sharp V (primᵗ add arg)  env hσ hs =
+evalWith-sharp V (primᵗ add arg)  env hσ hsz =
   one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
-evalWith-sharp V (primᵗ sub arg)  env hσ hs =
+evalWith-sharp V (primᵗ sub arg)  env hσ hsz =
   one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
-evalWith-sharp V (primᵗ mul arg)  env hσ hs =
+evalWith-sharp V (primᵗ mul arg)  env hσ hsz =
   one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
-evalWith-sharp V (primᵗ eqᵖ arg)  env hσ hs =
+evalWith-sharp V (primᵗ eqᵖ arg)  env hσ hsz =
   one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
-evalWith-sharp V (primᵗ ltᵖ arg)  env hσ hs =
+evalWith-sharp V (primᵗ ltᵖ arg)  env hσ hsz =
   one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
-evalWith-sharp V (primᵗ notᵖ arg) env hσ hs =
+evalWith-sharp V (primᵗ notᵖ arg) env hσ hsz =
   one≤scaled V (suc (sizeᵗ arg)) (3 ^ caseWᵗ arg) (s≤s z≤n)
-evalWith-sharp V (strmᵗ e) []ᵃ hσ hs =
+evalWith-sharp V (strmᵗ e) []ᵃ hσ hsz =
   ≤-trans (n≤1+n (sizeᵉ e))
           (≤-trans (≤-reflexive (sym (*-identityʳ (suc (sizeᵉ e)))))
                    (*-monoʳ-≤ (suc (sizeᵉ e)) (one≤pow V 1)))
-evalWith-sharp V (strmᵗ e) (v ∷ᵃ vs) hσ hs =
+evalWith-sharp V (strmᵗ e) (v ∷ᵃ vs) hσ hsz =
   ≤-trans (size-subΘᵉ V [] (v ∷ᵃ vs) e hσ)
           (*-mono-≤ (n≤1+n (sizeᵉ e))
             (≤-trans (n≤1+n (suc (2 * V)))
@@ -3556,7 +3575,7 @@ spendᴱ-compose Ψ r₁ s₁ r₂ s₂ =
   rearrange = solve 4 (λ a₁ b₁ a₂ b₂ →
     (a₁ :* b₁) :* (a₂ :* b₂) := (a₁ :* a₂) :* (b₁ :* b₂)) refl
 
--- (W6) pair-size helpers: a scan fold feeds (acc,v) as a pair, so
+-- (W6) pair-size helpers: a scan fold feeds (ac,v) as a pair, so
 -- the input size is 1+2C^E.  grow-pow3 handles the 3-story rebase;
 -- pair-ledger-step closes the exponent recurrence at 3≤E.
 grow-pow3 : ∀ W E → 4 + 4 * capᴱ W E ≤ capᴱ W (E + 3)
@@ -3583,24 +3602,24 @@ pair-ledger-step E w 3≤E =
 -- (W6) the fold-run closed form: one scan run over a value list
 -- of length m, everything (fn size, seed, values) within the
 -- current cap at 3≤E, lands within the cap grown by 3^(suc caseW·m).
--- Recurrence: applyFn at the pair (acc,v) uses grow-pow3 + pair-ledger-step
+-- Recurrence: applyFn at the pair (ac,v) uses grow-pow3 + pair-ledger-step
 -- in place of grow-pow + ledger-step.
 scanVals-sharp : ∀ {n} {Γ : Ctx n} {s u} (W E : ℕ)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u)
   (vs : List (Val Γ s)) →
   3 ≤ E →
-  sizeᵗ fn ≤ capᴱ W E → sizeᵛ u acc ≤ capᴱ W E →
+  sizeᵗ fn ≤ capᴱ W E → sizeᵛ u ac ≤ capᴱ W E →
   All (λ v → sizeᵛ s v ≤ capᴱ W E) vs →
-  (sizeᵛ u (proj₂ (scanVals fn acc vs))
+  (sizeᵛ u (proj₂ (scanVals fn ac vs))
      ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
   × All (λ o → sizeᵛ u o ≤ capᴱ W (E * 3 ^ (suc (caseWᵗ fn) * length vs)))
-        (proj₁ (scanVals fn acc vs))
-scanVals-sharp {s = s} {u = u} W E fn acc [] 3≤E hfn hacc _ =
-  subst (λ e → sizeᵛ u acc ≤ capᴱ W e × All (λ o → sizeᵛ u o ≤ capᴱ W e) []ᵃ)
-    (trans (cong (E *_) (cong (3 ^_) (trans (*-comm (suc (caseWᵗ fn)) 0) refl)))
-           (*-identityʳ E))
+        (proj₁ (scanVals fn ac vs))
+scanVals-sharp {s = s} {u = u} W E fn ac [] 3≤E hfn hacc _ =
+  subst (λ e → sizeᵛ u ac ≤ capᴱ W e × All (λ o → sizeᵛ u o ≤ capᴱ W e) [])
+    (sym (trans (cong (E *_) (cong (3 ^_) (trans (*-comm (suc (caseWᵗ fn)) 0) refl)))
+                (*-identityʳ E)))
     (hacc , []ᵃ)
-scanVals-sharp {s = s} {u = u} W E fn acc (v ∷ vs) 3≤E hfn hacc (hv ∷ᵃ hvs) =
+scanVals-sharp {s = s} {u = u} W E fn ac (v ∷ vs) 3≤E hfn hacc (hv ∷ᵃ hvs) =
   last-ok , acc'B₁ ∷ᵃ outs-ok
   where
   cw    = suc (caseWᵗ fn)
@@ -3609,10 +3628,10 @@ scanVals-sharp {s = s} {u = u} W E fn acc (v ∷ vs) 3≤E hfn hacc (hv ∷ᵃ h
   E₁    = E * 3 ^ cw
   3≤E₁  = ≤-trans 3≤E (E≤E*3^ E cw)
   cap₁  = capᴱ-mono W (E≤E*3^ E cw)
-  acc'  = applyFn fn (acc , v)
+  acc'  = applyFn fn (ac , v)
 
-  -- pair bound: sizeᵛ (u×s) (acc,v) ≤ 1 + C^E + C^E
-  pairB : sizeᵛ (u ×ᵗ s) (acc , v) ≤ 1 + capᴱ W E + capᴱ W E
+  -- pair bound: sizeᵛ (u×s) (ac,v) ≤ 1 + C^E + C^E
+  pairB : sizeᵛ (u ×ᵗ s) (ac , v) ≤ 1 + capᴱ W E + capᴱ W E
   pairB = s≤s (+-mono-≤ hacc hv)
 
   -- 2 + 2*(1 + C^E + C^E) = 4 + 4*C^E  by ring arithmetic
@@ -3626,7 +3645,7 @@ scanVals-sharp {s = s} {u = u} W E fn acc (v ∷ vs) 3≤E hfn hacc (hv ∷ᵃ h
 
   -- applyFn-sharp at V = 1 + C^E + C^E
   acc'sz : sizeᵛ u acc' ≤ sizeᵗ fn * (2 + 2 * (1 + capᴱ W E + capᴱ W E)) ^ 3 ^ caseWᵗ fn
-  acc'sz = applyFn-sharp (1 + capᴱ W E + capᴱ W E) fn (acc , v) pairB hf'
+  acc'sz = applyFn-sharp (1 + capᴱ W E + capᴱ W E) fn (ac , v) pairB hf'
 
   -- substitute arith to expose (4 + 4*C^E)^...
   acc'sz' : sizeᵛ u acc' ≤ sizeᵗ fn * (4 + 4 * capᴱ W E) ^ 3 ^ caseWᵗ fn
@@ -3672,7 +3691,7 @@ scanVals-sharp {s = s} {u = u} W E fn acc (v ∷ vs) 3≤E hfn hacc (hv ∷ᵃ h
     trans (*-assoc E (3 ^ cw) (3 ^ (cw * m)))
     (cong (E *_)
       (trans (sym (^-distribˡ-+-* 3 cw (cw * m)))
-             (cong (3 ^_) (+-comm cw (cw * m)))))
+             (cong (3 ^_) (sym (*-suc cw m)))))
 
   -- transport IH results to exponent cw * suc m
   cap-eq = ≤-reflexive (cong (capᴱ W) expEq)
@@ -4504,21 +4523,6 @@ install-fnCap Ψ sched st nid ns bn h =
   ∧-intro (proj₁ (∧-true _ _ h))
           (setNode-fnCap Ψ nid ns (EvalSt.nodes st) bn (proj₂ (∧-true _ _ h)))
 
--- every expression has at least one node
-sizeᵉ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵉ e
-sizeᵉ-pos (input i)       = s≤s z≤n
-sizeᵉ-pos (ofᵉ ts)        = s≤s z≤n
-sizeᵉ-pos emptyᵉ          = s≤s z≤n
-sizeᵉ-pos (mapᵉ f e)      = s≤s z≤n
-sizeᵉ-pos (takeᵉ c e)     = s≤s z≤n
-sizeᵉ-pos (scanᵉ f z e)   = s≤s z≤n
-sizeᵉ-pos (mergeAllᵉ e)   = s≤s z≤n
-sizeᵉ-pos (concatAllᵉ e)  = s≤s z≤n
-sizeᵉ-pos (switchAllᵉ e)  = s≤s z≤n
-sizeᵉ-pos (exhaustAllᵉ e) = s≤s z≤n
-sizeᵉ-pos (μᵉ e)          = s≤s z≤n
-sizeᵉ-pos (varᵉ x)        = s≤s z≤n
-sizeᵉ-pos (deferᵉ e)      = s≤s z≤n
 
 lift1 : ∀ {M} → 1 ≤ M → 1 ≤ 1 * M
 lift1 {M} h = ≤-trans h (≤-reflexive (sym (+-identityʳ M)))
@@ -4809,10 +4813,6 @@ evalTm-cap Ψ W E tm 2≤E w≤Ψ hsz =
             (^-*-assoc (2 + 2 * W) (E + 2) (3 ^ caseWᵗ tm)))
           (sym (^-distribˡ-+-* (2 + 2 * W) E ((E + 2) * 3 ^ caseWᵗ tm)))
 
-E≤E*3^ : ∀ (E k : ℕ) → E ≤ E * 3 ^ k
-E≤E*3^ E k = ≤-trans (≤-reflexive (sym (*-identityʳ E)))
-                     (*-monoʳ-≤ E (one≤3^ k))
-
 2≤capᴱ : ∀ (W : ℕ) {E : ℕ} → 1 ≤ E → 2 ≤ capᴱ W E
 2≤capᴱ W h = ≤-trans (2≤C W) (pow1 W h)
 
@@ -4964,8 +4964,8 @@ allB-zip : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
   All (λ v → sizeᵛ u v ≤ B) vs → All (λ v → fnCapᵛ u v ≤ Ψ) vs →
   all (valB? B Ψ u) vs ≡ true
 allB-zip B Ψ u []       _           _           = refl
-allB-zip B Ψ u (v ∷ vs) (hs ∷ᵃ hss) (hf ∷ᵃ hfs) =
-  ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ hs)) (T⇒≡true _ (≤⇒≤ᵇ hf)))
+allB-zip B Ψ u (v ∷ vs) (hsz ∷ᵃ hss) (hf ∷ᵃ hfs) =
+  ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ hsz)) (T⇒≡true _ (≤⇒≤ᵇ hf)))
           (allB-zip B Ψ u vs hss hfs)
 
 -- a node lookup carries both bounded faces of whatever it finds
@@ -4985,17 +4985,17 @@ lookupNode-B B Ψ nid ((k , s) ∷ r) hb hf with k ≡ᵇ nid
 
 -- the fn-cap face of one fold run: no applyFn ever mints a new fn
 scanVals-fnCap : ∀ {n} {Γ : Ctx n} {s u} (Ψ : ℕ)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u) (vs : List (Val Γ s)) →
-  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ → fnCapᵛ u acc ≤ Ψ →
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s)) →
+  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ → fnCapᵛ u ac ≤ Ψ →
   All (λ v → fnCapᵛ s v ≤ Ψ) vs →
-  (fnCapᵛ u (proj₂ (scanVals fn acc vs)) ≤ Ψ)
-  × All (λ o → fnCapᵛ u o ≤ Ψ) (proj₁ (scanVals fn acc vs))
-scanVals-fnCap Ψ fn acc []       hfn hacc _            = hacc , []ᵃ
-scanVals-fnCap Ψ fn acc (v ∷ vs) hfn hacc (hv ∷ᵃ hvs) =
+  (fnCapᵛ u (proj₂ (scanVals fn ac vs)) ≤ Ψ)
+  × All (λ o → fnCapᵛ u o ≤ Ψ) (proj₁ (scanVals fn ac vs))
+scanVals-fnCap Ψ fn ac []       hfn hacc _            = hacc , []ᵃ
+scanVals-fnCap Ψ fn ac (v ∷ vs) hfn hacc (hv ∷ᵃ hvs) =
   proj₁ IH , acc′OK ∷ᵃ proj₂ IH
   where
-  acc′OK = applyFn-fnCap Ψ fn (acc , v) (⊔-lub hacc hv) hfn
-  IH     = scanVals-fnCap Ψ fn (applyFn fn (acc , v)) vs hfn acc′OK hvs
+  acc′OK = applyFn-fnCap Ψ fn (ac , v) (⊔-lub hacc hv) hfn
+  IH     = scanVals-fnCap Ψ fn (applyFn fn (ac , v)) vs hfn acc′OK hvs
 
 stepFrame-scan-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
@@ -5025,7 +5025,7 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
 ... | just (concat-st _ _ _) | _ = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)  | _ = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _) | _ = E , ≤-refl , inv , refl , refl
-... | just (scan-st {w} acc) | nb with w ≟ᵗ u
+... | just (scan-st {w} ac) | nb with w ≟ᵗ u
 ...   | no _    = E , ≤-refl , inv , refl , refl
 ...   | yes refl =
   E′ , E≤E′ ,
@@ -5038,15 +5038,15 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
   where
   E′    = E * 3 ^ (suc (caseWᵗ fn) * length vals)
   E≤E′  = E≤E*3^ E (suc (caseWᵗ fn) * length vals)
-  run   = scanVals fn acc vals
+  run   = scanVals fn ac vals
   szfn  : sizeᵗ fn ≤ capᴱ W E
   szfn  = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ fB)))
   capfn : caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ
   capfn = ≤ᵇ⇒≤ _ _ (T-to (proj₂ (∧-true _ _ fB)))
-  szRun = scanVals-sharp W E fn acc vals 3≤E szfn
+  szRun = scanVals-sharp W E fn ac vals 3≤E szfn
             (≤ᵇ⇒≤ _ _ (T-to (proj₁ nb)))
             (allB-size (capᴱ W E) Ψ s vals vB)
-  fcRun = scanVals-fnCap Ψ fn acc vals capfn
+  fcRun = scanVals-fnCap Ψ fn ac vals capfn
             (≤ᵇ⇒≤ _ _ (T-to (proj₂ nb)))
             (allB-fnCap (capᴱ W E) Ψ s vals vB)
 
@@ -5620,6 +5620,98 @@ addLive-INV Ψ B sched st l bl fl inv
   (∧-intro (∧-intro (∧-intro fl (proj₁ (∧-true _ _ fc))) (proj₂ (∧-true _ _ fc)))
            r2)
 
+------------------------------------------------------------------
+-- (W9 face) THE SLOTS, READ ONE AT A TIME.  INV? carries the whole
+-- slot vector's size and weight as two sums; a single slot is one
+-- summand, so fᵢ≤sum-tab projects the per-slot bound the input
+-- clause needs.  The slots themselves never change, so these are
+-- the ONLY facts the input clause has about what it is subscribing.
+------------------------------------------------------------------
+
+slotSize-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true → slotSize (Sched.slots sched i) ≤ B
+slotSize-at {Γ = Γ} Ψ B i sched st inv
+  with ∧-true (stBounded? B sched st) _ inv
+... | _ , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | _ , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r2
+... | _ , r3 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r3
+... | _ , r4 with ∧-true (slotsSize (Sched.slots sched) ≤ᵇ B) _ r4
+... | ss , _ =
+  ≤-trans (fᵢ≤sum-tab (λ j → slotSize (Sched.slots sched j)) i)
+          (≤ᵇ⇒≤ _ _ (T-to ss))
+
+slotFnCap-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true → slotFnCap (Sched.slots sched i) ≤ Ψ
+slotFnCap-at {Γ = Γ} Ψ B i sched st inv
+  with ∧-true (stBounded? B sched st) _ inv
+... | _ , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | _ , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r2
+... | _ , r3 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r3
+... | _ , r4 with ∧-true (slotsSize (Sched.slots sched) ≤ᵇ B) _ r4
+... | _ , sf =
+  ≤-trans (fᵢ≤sum-tab (λ j → slotFnCap (Sched.slots sched j)) i)
+          (≤ᵇ⇒≤ _ _ (T-to sf))
+
+-- a script's sync prefix, elementwise, off the slot's two sums
+sumVals-B : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (u : Ty) (vs : List (Val Γ u)) →
+  sum (map (sizeᵛ u) vs) ≤ B → sum (map (fnCapᵛ u) vs) ≤ Ψ →
+  all (valB? B Ψ u) vs ≡ true
+sumVals-B B Ψ u []       hsz hf = refl
+sumVals-B B Ψ u (v ∷ vs) hsz hf =
+  ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (sizeᵛ u v) _) hsz)))
+                   (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (fnCapᵛ u v) _) hf))))
+          (sumVals-B B Ψ u vs (≤-trans (m≤n+m _ (sizeᵛ u v)) hsz)
+                              (≤-trans (m≤n+m _ (fnCapᵛ u v)) hf))
+
+-- retagging an emit's kind leaves its EVENTS alone, so the share's
+-- plumbing relabel is invisible to every in-flight bound
+sharedPlumb-B : ∀ {n} {Γ : Ctx n} {u} (B Ψ : ℕ) (str : Stream Γ u) →
+  burstB? B Ψ str ≡ true → burstB? B Ψ (sharedPlumb str) ≡ true
+sharedPlumb-B B Ψ []         h = refl
+sharedPlumb-B B Ψ (em ∷ ems) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (sharedPlumb-B B Ψ ems (proj₂ (∧-true _ _ h)))
+
+-- the completion latch: dropping a source SHRINKS the registry on
+-- both riders, and completedSources / connectedShares are read by no
+-- conjunct at all
+dropSource-len : ∀ {n} {Γ : Ctx n} {t} (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  length (dropSource src reg) ≤ length reg
+dropSource-len src []                  = z≤n
+dropSource-len src ((rid , s , c) ∷ r) with sameSource src s
+... | true  = ≤-trans (dropSource-len src r) (n≤1+n _)
+... | false = s≤s (dropSource-len src r)
+
+dropSource-regs : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  regsB? B Ψ reg ≡ true → regsB? B Ψ (dropSource src reg) ≡ true
+dropSource-regs B Ψ src []                  h = refl
+dropSource-regs B Ψ src ((rid , s , c) ∷ r) h with sameSource src s
+... | true  = dropSource-regs B Ψ src r (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (dropSource-regs B Ψ src r (proj₂ (∧-true _ _ h)))
+
+latch-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (src : Source) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B sched
+    (record st { registry = dropSource src (EvalSt.registry st)
+               ; completedSources = src ∷ EvalSt.completedSources st })
+    ≡ true
+latch-INV Ψ B src sched st inv
+  with ∧-true (stBounded? B sched st) _ inv
+... | sb , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | fc , r2 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r2
+... | rl , r3 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r3
+... | rb , r4 =
+  ∧-intro sb
+  (∧-intro fc
+  (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
+                                     (≤ᵇ⇒≤ _ _ (T-to rl)))))
+  (∧-intro (dropSource-regs B Ψ src (EvalSt.registry st) rb) r4)))
+
 subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ W : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
@@ -5885,11 +5977,13 @@ subscribeE-walkS Ψ W g (deferᵉ body) κ id now sched st E 3≤E inv szB fcB p
 
 subscribeInner-wet Ψ W g0 op allNid κ id now o sched st E 3≤E inv oB pB =
   E , ≤-refl , inv , refl , refl
-subscribeInner-wet {u = u} Ψ W (gs fuel) op allNid κ id now o sched st E
+subscribeInner-wet {t = t} {u = u} Ψ W (gs fuel) op allNid κ id now o sched st E
                    3≤E inv oB pB =
   E′ , E≤E′ , inv′ ,
-  splitBurst-vals-B {u = u} (capᴱ W E′) Ψ (proj₁ sE) bB ,
-  splitBurst-bk-B {u = u} (capᴱ W E′) Ψ (proj₁ sE)
+  -- s is the burst's element type (u); the phantom A is the ROOT's
+  -- (Val Γ t) — that is what subscribeInner's back-channel carries
+  splitBurst-vals-B {s = u} {u = t} (capᴱ W E′) Ψ (proj₁ sE) bB ,
+  splitBurst-bk-B {s = u} {u = t} (capᴱ W E′) Ψ (proj₁ sE)
   where
   inst   = Sched.nextNode sched
   sched₀ = record sched { nextNode = suc inst }
@@ -5905,12 +5999,13 @@ subscribeInner-wet {u = u} Ψ W (gs fuel) op allNid κ id now o sched st E
   bB     = proj₂ (proj₂ (proj₂ IH))
 
 thruConsume-wet Ψ W g mergeᵒ nid κ id now o sched st E 3≤E inv oB pB =
-  E₁ , E≤E₁ , mergeBump-INV Ψ (capᴱ W E₁) nid done (proj₁ (proj₂ SI₄)) st₁ inv₁ ,
+  E₁ , E≤E₁ , mergeBump-INV Ψ (capᴱ W E₁) nid done sched₁ st₁ inv₁ ,
   vsB , bsB
   where
   SI   = subscribeInner-wet Ψ W g mergeᵒ nid κ id now o sched st E 3≤E inv oB pB
   SI₄  = subscribeInner g mergeᵒ nid κ id now o sched st
   done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
   st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
   E₁   = proj₁ SI
   E≤E₁ = proj₁ (proj₂ SI)
@@ -6294,7 +6389,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --      its own invariant.  The design before THAT — lex (skeleton,
 --      value size), subterm-ordered — is REFUTED: chain two
 --      obs-typed scans directly, second fn λ(b,v). mergeAll(of[snd
---      x]), and the embedded-value hop lands on a first-scan acc
+--      x]), and the embedded-value hop lands on a first-scan ac
 --      whose template is subterm-incomparable with the carrier's
 --      and can dwarf it.)
 --
