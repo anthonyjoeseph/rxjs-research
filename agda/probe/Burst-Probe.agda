@@ -218,10 +218,10 @@ sumStats (s ∷ ss) = s +ˢ sumStats ss
 ------------------------------------------------------------------------
 -- running one program, collecting its bursts.
 --
--- probeDrain mirrors Rx.Evaluator.drain (which discards its final state, so the
--- log would be lost).  `selfcheck` compares the stream it produces against the
--- real `evaluate` — if this mirror ever drifts, or the instrumentation perturbs
--- the evaluator, the run reports it instead of reporting numbers.
+-- probeDrain mirrors Rx.Evaluator.drain, which discards its final state — and
+-- the log rides in that state.  oneProgram compares the stream this mirror
+-- produces against the real `evaluate`, so a drift shows up as a selfcheck
+-- failure rather than as quietly-wrong counters.
 
 FUEL : Fuel
 FUEL = 30
