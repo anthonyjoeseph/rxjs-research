@@ -125,7 +125,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
                                 subscribeInner; chainStep; subscribeAll;
-                                mintNode; register;
+                                mintNode; mintSource; mintOrdinal; register;
                                 mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
                                 splitEvents; retagEvents;
                                 cascade; drain; evaluate;
@@ -4702,11 +4702,10 @@ size-unfoldμ body =
           (*-monoˡ-≤ (sizeᵉ (μᵉ body)) (n≤1+n (sizeᵉ body)))
 
 postulate
-  -- (W9) the two state-manipulation clauses of the walk (input
-  -- touches slots/registry/completed-latches across five sub-shapes;
-  -- deferᵉ mints a live hop carrying its body as the pending value
-  -- — both consume only INV?'s slots conjuncts + the register/
-  -- install ring, no recursion)
+  -- (W9) the input clause of the walk: it touches slots / registry /
+  -- completed-latches across five sub-shapes, and its `shared` shape
+  -- re-enters subscribeE on the stored def, so it lands in the walk's
+  -- gas-decreasing knot.  (The deferᵉ clause is PROVEN below.)
   subscribeE-input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (Ψ W : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
@@ -4717,18 +4716,6 @@ postulate
     in Σ ℕ λ E′ → (E ≤ E′)
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-  subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ W : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
-    3 ≤ E →
-    INV? Ψ (capᴱ W E) sched st ≡ true →
-    sizeᵉ body ≤ capᴱ W E → fnCapᵉ body ≤ Ψ →
-    pathB? (capᴱ W E) Ψ κ ≡ true →
-    let r = subscribeE g (deferᵉ body) κ id now sched st
-    in Σ ℕ λ E′ → (E ≤ E′)
-       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-
   chainStep-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (Ψ W : ℕ) (id : Id) (a : Arrival Γ)
     (path : Path Γ (arrTy a) t)
@@ -5132,6 +5119,66 @@ pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
           (finList-B (capᴱ W E₂) Ψ (proj₁ (proj₂ (proj₂ step))))))
 
   outAll = ∧-intro headOK restB
+
+------------------------------------------------------------------
+-- (W9, deferᵉ) THE DEFER HOP, PROVEN.  deferᵉ is the one walk clause
+-- that mints machinery without recursing: a node, a source and an
+-- ordinal are minted, the merge node installed, the BODY itself
+-- parked as the single pending value of a fresh live source, and the
+-- outer chain registered.  The only ledger cost is register-INV's ×2
+-- length edge; the burst is a lone `init`, so it is bounded by refl.
+------------------------------------------------------------------
+
+-- adding a live hop: only the live conjuncts move, and both faces of
+-- the new entry come from the caller
+addLive-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) (l : LiveSource Γ) →
+  boundedLive B l ≡ true → fnCapLive Ψ l ≡ true →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B (record sched { live = l ∷ Sched.live sched }) st ≡ true
+addLive-INV Ψ B sched st l bl fl inv
+  with ∧-true (stBounded? B sched st) _ inv
+... | sb , r1 with ∧-true (fnCapBounded? Ψ sched st) _ r1
+... | fc , r2 =
+  ∧-intro (∧-intro (∧-intro bl (proj₁ (∧-true _ _ sb))) (proj₂ (∧-true _ _ sb)))
+  (∧-intro (∧-intro (∧-intro fl (proj₁ (∧-true _ _ fc))) (proj₂ (∧-true _ _ fc)))
+           r2)
+
+subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W : ℕ) (g : Gas) (body : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ body ≤ capᴱ W E → fnCapᵉ body ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  let r = subscribeE g (deferᵉ body) κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+subscribeE-defer-wet {Γ = Γ} {u = u} Ψ W g body κ id now sched st E
+                     3≤E inv szB fcB pB =
+  2 * E , m≤m+n E (E + 0) ,
+  register-INV Ψ W E src (thru-outer mergeᵒ nid ↠ κ) sched₄ st₀
+    (≤-trans (s≤s z≤n) 3≤E) inv₂ (∧-intro refl pB) ,
+  refl
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  src    = proj₁ (mintSource sched₁)
+  sched₂ = proj₂ (mintSource sched₁)
+  ord    = proj₁ (mintOrdinal sched₂)
+  sched₃ = proj₂ (mintOrdinal sched₂)
+  hop : LiveSource Γ
+  hop = record { source = src ; ordinal = ord ; elemTy = obs u
+               ; pending = (suc now , body) ∷ [] }
+  sched₄ = record sched₃ { live = hop ∷ Sched.live sched₃ }
+  st₀    = installNode nid (merge-st 0 false) st
+  inv₁   = install-INV Ψ (capᴱ W E) sched₃ st nid (merge-st 0 false)
+             refl refl inv
+  inv₂   = addLive-INV Ψ (capᴱ W E) sched₃ st₀ hop
+             (∧-intro (T⇒≡true _ (≤⇒≤ᵇ szB)) refl)
+             (∧-intro (T⇒≡true _ (≤⇒≤ᵇ fcB)) refl)
+             inv₁
 
 ------------------------------------------------------------------
 -- subscribeE-walkS, THE REAL INDUCTION: the store half of the wet
