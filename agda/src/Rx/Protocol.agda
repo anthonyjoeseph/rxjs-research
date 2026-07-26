@@ -288,3 +288,35 @@ frameFresh? acc []         = true
 frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
 ... | just acc′ = frameFresh? acc′ ems
 ... | nothing   = false
+
+------------------------------------------------------------------
+-- valsLast: the SUBSCRIPTION-BURST payload discipline.
+-- A burst carries its values in its LAST emit or not at all — every
+-- earlier emit is bookkeeping only.  That is how the evaluator builds
+-- bursts: values enter a burst at a leaf (a cold's sync prefix, an
+-- `ofᵉ`), which is one emit; `sharedConnect` only ever PREPENDS a
+-- value-free `init` emit to its def's burst; `pushBurst` is 1:1 on
+-- emits and an inner subscription's whole burst is flattened into one
+-- emit by splitBurst.  So no construction puts a payload ahead of a
+-- later emit.
+--
+-- It is the invariant that collapses the take cut: a cut happens on an
+-- emit that ADMITTED values, so under valsLast? that emit is the last
+-- one and the burst tail pushBurst would re-run at the post-cut state
+-- is empty.  Asserted on every burst the evaluator mints by
+-- Burst-Probe.
+------------------------------------------------------------------
+
+hasValue : ∀ {A : Set} → List (InstEvent A) → Bool
+hasValue []               = false
+hasValue (value _   ∷ es) = true
+hasValue (init _    ∷ es) = hasValue es
+hasValue (close _ _ ∷ es) = hasValue es
+hasValue (handoff _ ∷ es) = hasValue es
+hasValue (complete  ∷ es) = hasValue es
+
+valsLast? : ∀ {A : Set} → List (InstEmit A) → Bool
+valsLast? []               = true
+valsLast? (em ∷ [])        = true
+valsLast? (em ∷ em′ ∷ ems) =
+  if hasValue (InstEmit.events em) then false else valsLast? (em′ ∷ ems)
