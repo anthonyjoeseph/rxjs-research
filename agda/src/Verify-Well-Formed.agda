@@ -69,7 +69,7 @@ open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-ini
                                 payOwed; paidOff; applyEvents; removeOne;
                                 cancelOwed; bumpOwed; settleInstant;
                                 checkFinal; Accepted; accepted; WellFormed;
-                                frameFreshEv; frameFreshEmit; frameFresh?)
+                                hasValue; valsLast?)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
@@ -1066,6 +1066,15 @@ postulate
       let r = subscribeE fuel b κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+         -- the PAYLOAD DISCIPLINE, carried alongside the state relation: a burst
+         -- puts its values in its last emit or nowhere.  Not a fact about the
+         -- automaton, so BurstInv is the wrong home for it — but a take frame
+         -- ABOVE this subscription needs it about THIS burst (it is what empties
+         -- the cut's tail), so the burst-shaped conclusion is.  Every clause
+         -- supplies it: one-shots are single-emit, sharedConnect prepends a
+         -- value-free init emit, and the pushing operators cannot manufacture a
+         -- payload from none (pushBurst-take-valsLast for takeᵉ).
+         × (valsLast? (proj₁ r) ≡ true)
 
 -- an instant standing on an empty (or absent) owed table settles
 ≤-up : ∀ {a b : ℕ} → a ≤ b → a ≤ suc b
@@ -1145,7 +1154,7 @@ subscribe-wf e ins nodry
   with subscribeE-wf (budgetAt e ins 0) e root 0 0
                      (sched-init e ins) (st-init e)
                      protocol-init (burst-init e ins) nodry
-... | S , run , binv
+... | S , run , binv , _
   with burst-final _ _ S binv (root-done-plumbed e ins S run)
 ... | inv , paid = S , run , inv , paid
 
@@ -1988,7 +1997,7 @@ takeDispatch-noncut nid vals fin sched st k lk dc rewrite lk | dc = refl
 -- The cut severs the registry (keeping only the regs cutThrough spares),
 -- sweeps `live` to match, and resets the node's budget to zero.  This pair of
 -- names is the single vocabulary for that residue: takeDispatch-cut computes
--- it, pushBurst-take-cut-cons pushes the tail through it, and cut-cons-joint
+-- it, pushBurst-take-cut-cons reduces the cut head onto it, and cut-head-joint
 -- states its obligations over it.  They are plain transparent definitions, so
 -- everything downstream still converts with the raw record forms.
 cutSched : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2092,301 +2101,262 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
     ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems
               (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))
 
--- ── frameFresh: the burst-stream prefix discipline ───────────────────────
+-- ── valsLast: the burst payload discipline ───────────────────────────────
 -- Defined in Rx.Protocol (shared with the Burst-Probe measurement harness);
--- see the design note there.  What lives here is the peeling lemma that
--- threads it down a pushBurst recursion.
+-- see the design note there.  What lives here is the peeling, the fact that a
+-- take cut needs a payload — which together EMPTY the cut's tail — and the
+-- preservation lemma that carries the discipline through a pushBurst.
 
--- peel one emit: a fresh burst's tail is fresh at the advanced
--- accumulator.  This is what threads the discipline down a pushBurst
--- recursion — the acc at the cut then holds exactly the sources whose
--- inits rode earlier emits and are still open
-frameFresh-cons : ∀ {A : Set} (L : List Source)
-  (em : InstEmit A) (ems : List (InstEmit A)) →
-  frameFresh? L (em ∷ ems) ≡ true →
-  Σ (List Source) λ L′ →
-    (frameFreshEmit L em ≡ just L′) × (frameFresh? L′ ems ≡ true)
-frameFresh-cons L em ems h with frameFreshEmit L em
-... | just L′  = L′ , refl , h
-... | nothing  = true≢false (sym h)
+∧-true : (x y : Bool) → x ∧ y ≡ true → (x ≡ true) × (y ≡ true)
+∧-true true  y eq = refl , eq
+∧-true false y ()
 
--- the count relation the transport threads: the raw (S_r) and transformed (S_t)
--- runs of the cut tail differ only by the cut's severed closes.  `sev s` is the
--- per-source count of the cut head's cutThrough closes, FIXED for the whole tail
--- (the tail never touches the registry).  Pointwise on countIn, matching the
--- live-matches style.  acc-le keeps the in-stream opens present on the
--- transformed side (so a frameFresh close finds its source live there too).
---
--- ⚠ acc-le IS NOT CONSTRUCTIBLE AT THE CUT AS STATED (found 2026-07-25, while
--- wiring the (H)+(T) decomposition — do not sink more time into the decomposition
--- until this is resolved).  The plan was: build TailRel at the cut from
--- BurstInv.live-matches + cutThrough-balance, with S_t = S_head and S_r = S₁.
--- live-rel does come out that way.  acc-le does not, and the obstruction is not
--- a missing lemma — it is that the two sides want opposite things:
---
---   • a source s ∈ acc is, by frameFresh's own design note, one whose init rode
---     an EARLIER emit of THIS burst and is still open — i.e. a share / cold-async
---     registration minted by the inner subscribe, which ran under take-f nid ↠ κ.
---   • so pathHasNode nid holds for its chain, so cutThrough makes it a VICTIM and
---     emits a close for it: sev s ≥ countIn s acc.
---   • live S_head = live S₁ − (the cut closes), so
---         countIn s (live S_head) = countIn s (live S₁) − sev s.
---
--- Together these give acc-le ⟹ countIn s (live S₁) ≥ 2 · countIn s acc, which is
--- false in general.  The cut closes PRECISELY the sources acc-le asserts stay
--- live.  No rule for `sev` recovers this; it is the statement that is wrong.
---
--- What the transport actually NEEDS is weaker: not that acc's sources stay live,
--- but that no close in the tail resolves against acc — i.e. every unmatched close
--- in `ems` is for a source in `kept`.  If, as frameFresh's design note claims,
--- one-shots bracket init/close inside a single emit and cross-emit opens (shares,
--- cold-async) are closed by a LATER FRAME rather than later in this burst, then
--- `ems` has no acc-matched closes at all and the condition is vacuous.  If that
--- claim is false, then the reshaped burst really does contain a double close,
--- applyEvents returns nothing on it (an unmatched close is a hard failure), and
--- the bug is in the evaluator, not in this file.
---
--- ── MEASURED 2026-07-25.  `make burst-probe` (agda/probe/Burst-Probe.agda) ────
--- The check was written and run.  Two sweeps, exit 0 on both, over every burst
--- any subscribeE mints (root and inner alike — the probe logs at the wrapper):
---
---     scripts/burst-probe.sh 1 6 60 3      360 programs/corpus, exit 0
---     scripts/burst-probe.sh 1 4 60 4      240 programs/corpus, exit 0
---
--- reported as depth-3 / depth-4, per corpus:
---
---                            A: generator   B: A + shares   C: directed
---     bursts                  2704 / 2312    3389 / 3486      73 / 73
---   1 frameFresh failures        0 /    0       0 /    0       0 /  0
---   2 reach (cross-emit open)    0 /    0      15 /   11      30 / 30
---   3 acc-matched close          0 /    0       0 /    0      14 / 14
---       …of them, reason cut     0 /    0       0 /    0      14 / 14
---     bursts with a cut        132 /  161     113 /  133      18 / 18
---     cut with a tail            0 /    0       0 /    0       0 /  0
---   3ᵗ acc-close IN THE TAIL     0 /    0       0 /    0       0 /  0
---     wellFormed failures        0 /    0       0 /    0       0 /  0
---
--- (1) frameFresh? [] holds on EVERY burst measured — 0 failures in ~11.9k.  The
---     discipline cut-cons-joint hypothesises is real, and it is measured with
---     Rx.Protocol's frameFresh? itself, not a restatement of it.
---
--- (2) The old "28k QuickCheck programs, zero WF failures" argument was evidence
---     of NOTHING, and not by bad luck — by construction.  QuickCheck's genSlots
---     mints only `scripted` slots, and a burst gets more than one emit ONLY from
---     sharedConnect (`own-init emit ∷ sharedPlumb def-burst`; every other clause
---     mints one emit, or maps pushBurst over its child's and preserves the
---     count).  No shares ⇒ no multi-emit burst ⇒ reach ≡ 0, which is exactly
---     what corpus A reports.  Enabling shared slots makes it nonzero.
---
--- (3) ACC-MATCHED CLOSES EXIST, and every one is a take cut.  `take k (share)`
---     over a share whose def stays live mints the share's registration in emit 0
---     and cutThrough severs it in emit 1:
---
---         @0/s{i1} @0/p{i2 c1! v v F}     take 2 (share := cold[1,2,3]+async)
---
---     So frameFresh's design-note claim quoted above — that cross-emit opens are
---     closed by a LATER FRAME rather than later in this burst — is FALSE, and
---     acc-le fails exactly where the analysis predicted: at the cut, acc holds
---     the share and live S_head has just lost it.  (Corpus C, 17 hand-built
---     programs; corpus B reaches cross-emit opens but its random shapes did not
---     land a cut on one.)
---
--- (4) The protocol ACCEPTS every one of them (0 wellFormed failures), so this is
---     not an evaluator bug.  And, decisively for the transport: every
---     acc-matched close rides the CUTTING emit itself.  `cut with a tail` is 0
---     in all three corpora — no burst was seen in which a cutting emit had any
---     emit after it — so `acc-close IN THE TAIL` is 0.  The structural reason:
---     multi-emit bursts come only from share connects, and a share connect's
---     non-final emits (`init i`, or `init i ∷ close i exhausted`) carry NO
---     values, while a frame handed no values emits none — so a take frame can
---     only cut on a burst's LAST emit.
---
--- WHERE THAT LEAVES THIS RECORD.  acc-le is confirmed false as stated.  The
--- weaker condition proposed above — no close in the TAIL resolves against acc —
--- is confirmed vacuous on everything measured.  Restating the record on that
--- basis is NOT this session's call: the outcome we landed in (acc-matched closes
--- exist AND the protocol accepts them) is the one reserved for Anthony, and a
--- measured-vacuous hypothesis is still a hypothesis about all programs, not a
--- theorem.  Nothing below has been reshaped.
-record TailRel (id : Id) (sev : Source → ℕ) (acc : List Source)
-               (S_t S_r : ProtocolSt) : Set where
-  field
-    live-rel : ∀ s → countIn s (ProtocolSt.live S_r)
-                       ≡ countIn s (ProtocolSt.live S_t) + sev s
-    acc-le   : ∀ s → countIn s acc ≤ countIn s (ProtocolSt.live S_t)
-    done-t   : ProtocolSt.done S_t ≡ true
-    cur-t    : ProtocolSt.current S_t ≡ just (id , [])
-    cur-r    : ProtocolSt.current S_r ≡ just (id , [])
+not-true : (b : Bool) → not b ≡ true → b ≡ false
+not-true false eq = refl
+not-true true  ()
 
--- ── the transport: the value-free tail runs at the severed/done state ─────
--- The done-side sibling of pushBurst-take-joint at kCount ≡ zero.  Given the raw
--- tail runs at S_r (from the cut's runEq) and the burst is frameFresh w.r.t. an
--- accumulator L tied to S_t by TailRel, the value-stripped tail (pushBurst at
--- take-st zero) runs at S_t (done, live swept) to some S″, and the relation
--- carries to the end (S′ ↔ S″).  frameFresh + TailRel.acc-le TOGETHER exclude
--- the countermodel that sinks the unqualified statement: a close for a swept
--- source s has countIn s live_t ≡ 0, so acc-le forces s ∉ L, so frameFresh? L
--- rejects that close — no valid L admits it.  The proof is an applyEvents
--- induction shaped like splitEvents-faithful-done, with the count relation in
--- place of equal lives.  [Postulated top-line result; proof pending.]
+-- peel one emit: the tail of a valsLast burst is valsLast
+valsLast-tail : ∀ {A : Set} (em : InstEmit A) (ems : List (InstEmit A)) →
+  valsLast? (em ∷ ems) ≡ true → valsLast? ems ≡ true
+valsLast-tail em []          vl = refl
+valsLast-tail em (em′ ∷ ems) vl = proj₂ (∧-true _ _ vl)
+
+-- THE COLLAPSE: a payload-carrying emit is the LAST emit of a valsLast burst
+valsLast-cut : ∀ {A : Set} (em : InstEmit A) (ems : List (InstEmit A)) →
+  hasValue (InstEmit.events em) ≡ true → valsLast? (em ∷ ems) ≡ true → ems ≡ []
+valsLast-cut em []          hv vl = refl
+valsLast-cut em (em′ ∷ ems) hv vl =
+  true≢false (trans (sym hv) (not-true _ (proj₁ (∧-true _ _ vl))))
+
+-- a takeVals cut NEEDS a payload: budget zero and an empty value list both leave
+-- the flag down, so a raised flag means the emit really carried a value
+takeVals-cut-cons : ∀ {n} {Γ : Ctx n} {s} (k : ℕ) (vs : List (Val Γ s)) →
+  proj₂ (proj₂ (takeVals k vs)) ≡ true →
+  Σ (Val Γ s) λ v → Σ (List (Val Γ s)) λ vs′ → vs ≡ v ∷ vs′
+takeVals-cut-cons zero          vs       ()
+takeVals-cut-cons (suc k)       []       ()
+takeVals-cut-cons (suc zero)    (v ∷ vs) dc = v , vs , refl
+takeVals-cut-cons (suc (suc k)) (v ∷ vs) dc = v , vs , refl
+
+takeVals-nil-flag : ∀ {n} {Γ : Ctx n} {s} (k : ℕ) →
+  proj₂ (proj₂ (takeVals {Γ = Γ} {s = s} k [])) ≡ false
+takeVals-nil-flag zero    = refl
+takeVals-nil-flag (suc k) = refl
+
+-- splitEvents' two halves against hasValue: a nonempty grafted value list means
+-- the emit carried a payload, an absent one means it did not, and the retagged
+-- bookkeeping skeleton never carries one at all
+splitEvents-vals-hasValue : ∀ {n} {Γ : Ctx n} {s} {A : Set}
+  (es : List (InstEvent (Val Γ s))) (v : Val Γ s) (vs : List (Val Γ s)) →
+  proj₁ (splitEvents {A = A} es) ≡ v ∷ vs → hasValue es ≡ true
+splitEvents-vals-hasValue []               v vs ()
+splitEvents-vals-hasValue (value _   ∷ es) v vs eq = refl
+splitEvents-vals-hasValue (init _    ∷ es) v vs eq = splitEvents-vals-hasValue es v vs eq
+splitEvents-vals-hasValue (close _ _ ∷ es) v vs eq = splitEvents-vals-hasValue es v vs eq
+splitEvents-vals-hasValue (handoff _ ∷ es) v vs eq = splitEvents-vals-hasValue es v vs eq
+splitEvents-vals-hasValue (complete  ∷ es) v vs eq = splitEvents-vals-hasValue es v vs eq
+
+splitEvents-noValue : ∀ {n} {Γ : Ctx n} {s} {A : Set}
+  (es : List (InstEvent (Val Γ s))) →
+  hasValue es ≡ false → proj₁ (splitEvents {A = A} es) ≡ []
+splitEvents-noValue []               hv = refl
+splitEvents-noValue (value _   ∷ es) ()
+splitEvents-noValue (init _    ∷ es) hv = splitEvents-noValue es hv
+splitEvents-noValue (close _ _ ∷ es) hv = splitEvents-noValue es hv
+splitEvents-noValue (handoff _ ∷ es) hv = splitEvents-noValue es hv
+splitEvents-noValue (complete  ∷ es) hv = splitEvents-noValue es hv
+
+splitEvents-bs-valueFree : ∀ {n} {Γ : Ctx n} {s} {A : Set}
+  (es : List (InstEvent (Val Γ s))) →
+  hasValue (proj₁ (proj₂ (splitEvents {A = A} es))) ≡ false
+splitEvents-bs-valueFree []               = refl
+splitEvents-bs-valueFree (value _   ∷ es) = splitEvents-bs-valueFree es
+splitEvents-bs-valueFree (init _    ∷ es) = splitEvents-bs-valueFree es
+splitEvents-bs-valueFree (close _ _ ∷ es) = splitEvents-bs-valueFree es
+splitEvents-bs-valueFree (handoff _ ∷ es) = splitEvents-bs-valueFree es
+splitEvents-bs-valueFree (complete  ∷ es) = splitEvents-bs-valueFree es
+
+hasValue-++ : ∀ {A : Set} (xs ys : List (InstEvent A)) →
+  hasValue xs ≡ false → hasValue ys ≡ false → hasValue (xs ++ ys) ≡ false
+hasValue-++ []               ys hx hy = hy
+hasValue-++ (value _   ∷ xs) ys ()  hy
+hasValue-++ (init _    ∷ xs) ys hx hy = hasValue-++ xs ys hx hy
+hasValue-++ (close _ _ ∷ xs) ys hx hy = hasValue-++ xs ys hx hy
+hasValue-++ (handoff _ ∷ xs) ys hx hy = hasValue-++ xs ys hx hy
+hasValue-++ (complete  ∷ xs) ys hx hy = hasValue-++ xs ys hx hy
+
+hasValue-if-complete : ∀ {A : Set} (b : Bool) →
+  hasValue {A = A} (if b then complete ∷ [] else []) ≡ false
+hasValue-if-complete true  = refl
+hasValue-if-complete false = refl
+
+-- the cut's tail is empty, packaged for the one place that consumes it
+cut-tail-nil : ∀ {n} {Γ : Ctx n} {s} (kCount : ℕ)
+  (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
+  (ems : Stream Γ s) →
+  proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
+  valsLast? ((es at i from src as ek) ∷ ems) ≡ true →
+  ems ≡ []
+cut-tail-nil {Γ = Γ} {s = s} kCount es i src ek ems dc vl
+  with takeVals-cut-cons kCount (proj₁ (splitEvents {A = Val Γ s} es)) dc
+... | v , vs′ , veq =
+      valsLast-cut (es at i from src as ek) ems
+        (splitEvents-vals-hasValue es v vs′ veq) vl
+
+-- ── pushBurst through a take frame preserves the discipline ──────────────
+-- A value-free emit hands the frame no values, so takeVals returns none — its
+-- flag stays down, so such an emit can never BE the cut — and the re-emitted
+-- events are pure bookkeeping: splitEvents' skeleton (which drops values by
+-- construction) plus an optional `complete`.  So a burst whose payload rides its
+-- last emit is pushed to a burst whose payload rides its last emit.  This is
+-- what lets subscribeE-wf's Σ-conclusion carry valsLast? through takeᵉ.
+pushBurst-take-valsLast : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
+  valsLast? burst ≡ true →
+  valsLast? (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ true
+pushBurst-take-valsLast fuel id now nid κ [] sched st kCount lk vl = refl
+pushBurst-take-valsLast fuel id now nid κ (em ∷ []) sched st kCount lk vl = refl
+pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
+  fuel id now nid κ ((es at i from src as ek) ∷ em′ ∷ ems) sched st kCount lk vl =
+  subst (λ (b : Stream Γ s) → valsLast? b ≡ true) (sym red)
+    (cong₂ _∧_ (cong not headFree)
+      (pushBurst-take-valsLast fuel id now nid κ (em′ ∷ ems) sched ust rem′
+        (lookupNode-setNode nid (take-st rem′) (EvalSt.nodes st))
+        (proj₂ (∧-true _ _ vl))))
+  where
+  hv0 : hasValue es ≡ false
+  hv0 = not-true _ (proj₁ (∧-true _ _ vl))
+
+  nilv : proj₁ (splitEvents {A = Val Γ s} es) ≡ []
+  nilv = splitEvents-noValue es hv0
+
+  dc : proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ false
+  dc = trans (cong (λ vs → proj₂ (proj₂ (takeVals kCount vs))) nilv)
+             (takeVals-nil-flag kCount)
+
+  valsNil : proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))) ≡ []
+  valsNil = trans (cong (λ vs → proj₁ (takeVals kCount vs)) nilv) (takeVals-nil kCount)
+
+  rem′ : ℕ
+  rem′ = proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
+
+  ust : EvalSt e
+  ust = record st { nodes = setNode nid (take-st rem′) (EvalSt.nodes st) }
+
+  red = pushBurst-take-noncut-cons fuel id now nid κ es i src ek (em′ ∷ ems) sched st kCount lk dc
+
+  headFree : hasValue (proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
+                        ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
+                        ++ (if proj₂ (proj₂ (splitEvents {A = Val Γ s} es))
+                            then complete ∷ [] else []))
+             ≡ false
+  headFree =
+    hasValue-++ (proj₁ (proj₂ (splitEvents {A = Val Γ s} es))) _
+      (splitEvents-bs-valueFree es)
+      (subst (λ vs → hasValue (map value vs
+                       ++ (if proj₂ (proj₂ (splitEvents {A = Val Γ s} es))
+                           then complete ∷ [] else []))
+                     ≡ false)
+        (sym valsNil)
+        (hasValue-if-complete (proj₂ (proj₂ (splitEvents {A = Val Γ s} es)))))
+
+-- ── the take cut's residue: ONE emit ─────────────────────────────────────
+-- RESOLVED 2026-07-26 — this is what replaced TailRel and the tail transport.
+--
+-- The shape this residue used to have was: cut head emit, THEN a value-stripped
+-- tail re-run at the severed/done state.  That tail was the whole difficulty.
+-- Running it needed a relation (TailRel) between the raw and the transformed
+-- state, and TailRel's `acc-le` field — "the accumulator's still-open sources
+-- survive on the transformed side" — turned out not to be constructible at the
+-- cut: the cut closes PRECISELY the sources acc-le asserts stay live, so the two
+-- sides wanted opposite things.  Measurement (make burst-probe) confirmed the
+-- design note behind acc-le was simply false — cross-emit opens are NOT closed by
+-- a later frame, the take cut closes them in the same burst — while also
+-- reporting `cut with a tail` ≡ 0 across every corpus.
+--
+-- The invariant behind that zero is valsLast?, and it is stronger and simpler
+-- than anything TailRel was reaching for: a burst carries its payload in its
+-- LAST emit or not at all.  Values enter a burst at a leaf (one emit);
+-- sharedConnect only PREPENDS a value-free `init` emit to its def's burst;
+-- pushBurst is 1:1 on emits and cannot manufacture a payload out of none
+-- (pushBurst-take-valsLast); an inner subscription's whole burst is flattened
+-- into one emit by splitBurst.  A cut fires only on an emit that admitted values
+-- (takeVals-cut-cons), so under valsLast? the cutting emit is the last one and
+-- THERE IS NO TAIL.  cut-tail-nil is that argument in three lines.
+--
+-- So the residue collapses to the head alone, and with it go TailRel, the
+-- transport, and the frameFresh threading that existed only to keep the tail
+-- honest.  (frameFresh? survives in Rx.Protocol as the probe's assertion; it has
+-- no consumer in this file any more.)  What is left is exactly (H):
+--   the reshaped cutting emit — bookkeeping, the cutThrough closes, the truncated
+--   values, a forced `complete` — steps the protocol, and BurstInv is
+--   re-established over the CUT registry/schedule.  Its closes are pre-paid by
+--   cutThrough-balance against BurstInv.live-matches, which the joint induction
+--   puts in scope here.  Mechanical off takeDispatch-cut; postulated while it is
+--   written.
 postulate
-  pushBurst-take-zero-transport : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
-    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e)
-    (L : List Source) (sev : Source → ℕ) (S_t S_r S′ : ProtocolSt) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (take-st zero) →
-    frameFresh? L ems ≡ true →
-    TailRel id sev L S_t S_r →
-    runProtocol S_r ems ≡ just S′ →
-    Σ ProtocolSt λ S″ →
-      (runProtocol S_t (proj₁ (pushBurst fuel id now (take-f nid) κ ems sched st)) ≡ just S″)
-      × (Σ (List Source) λ L′ → TailRel id sev L′ S″ S′)
-
--- the take fold.  take TRANSFORMS its burst (non-cut passes through; the cut
--- exhausts the budget, forces `complete`, and cuts the registry), so it reaches
--- a DIFFERENT final state than the inner burst — hence the existential S″.
--- Non-cut emits run transparently (g = proj₁ ∘ takeVals, threading the count);
--- the CUT edge is the named residue (its complete latches done, its tail runs
--- under done via splitEvents-faithful-true, and closes/registry balance by
--- cutThrough-balance — to discharge).
---
--- FUSED (2026-07-25): the protocol run and BurstInv are now ONE joint induction
--- (pushBurst-take-joint) over the burst, and correspondingly ONE cut residue
--- (cut-cons-joint) instead of two.  The split shape walked the burst twice: the
--- BurstInv half took the reshaped run as an INPUT and had to re-derive its own
--- tail run by uncons'ing it, and the cut's BurstInv obligation was stated apart
--- from the cut's run obligation — so BurstInv.live-matches was not in hand where
--- the cut needs it.  Stating them together (the same joint-face pattern that
--- carries subscribeE-walk on the budget side) hands the tail run straight to the
--- tail BurstInv and, at the cut, puts live-matches in scope: that is exactly the
--- ingredient TailRel needs, so the fusion REPLACES the second induction rather
--- than duplicating it.
---
--- The cut residue stays on the REDUCED cons form (pushBurst-take-cut-cons
--- discharges the operational reduction, takeDispatch-cut the residual state), so
--- the postulate asserts only what the (H)+(T) decomposition must supply.  The
--- reduced form is  cutHead ∷ pushBurst ems severed-st  with severed-st.node ≡
--- take-st zero, so the TAIL is a fully non-cut pushBurst — pushBurst-take-joint
--- (kCount ≡ zero) already runs it GIVEN a raw run of `ems` at its start state.
--- So the whole postulate reduces to two pieces:
---   (H) cut head:  stepProtocol cutHead S ≡ just S_head, where S_head has done
---       latched (the forced `complete`) and live swept to sweepLive kept — its
---       closes discharge exactly the severed regs by cutThrough-balance.
---   (T) tail run:  runProtocol S_head ems ≡ just S_tail.  This is the ONE hard
---       piece and the reason runEq alone is not enough: runEq gives the raw tail
---       at S₁ (done ≡ false, FULL live), but the tail must now run at S_head
---       (done ≡ true, SWEPT live).  Values are inert under done (splitEvents-
---       faithful-done), but a `close` in ems for a swept source would UNDERFLOW
---       at S_head though not at S₁.  Soundness therefore needs the subscribe-frame
---       invariant: the sweep removes EXACTLY the sources whose remaining closes
---       the head's cutThrough closes have already pre-paid — i.e. live-matches +
---       cutThrough-balance prove sweepLive kept still covers every tail close.
--- (T) is the invariant-design core (the burst-side analog of the delivery-side
--- FoldInv envShadow); (H) is mechanical off takeDispatch-cut + cutThrough-balance.
---
--- ASSEMBLY PLAN.  (T) is exactly pushBurst-take-zero-transport: the severed tail
--- runs at S_head to S″ with TailRel carried, PROVIDED
---   • frameFresh? L ems ≡ true, and
---   • TailRel id sev L S_head S₁  (sev s = closeCount s (cutThrough-closes)).
--- The first is threaded down from subscribeE-take-wf (each clause's Σ-conclusion
--- carries frameFresh? [] burst; oneShotBurst is frameFresh by computation,
--- pass-through ops preserve it on the bs skeleton), with the accumulator advanced
--- per emit by frameFresh-cons, so at the cut the acc L holds exactly the
--- still-open severed sources.  The second is now IN HAND at the cut, which is the
--- point of the fusion: BurstInv.live-matches (S₁ live ↔ registry) +
--- cutThrough-balance (registry ↔ kept + closes) give live S₁ = live S_head + sev
--- pointwise, and acc-le holds because L's opens survive the sweep.  Then
--- cut-cons-joint = (H) reaches S_head + transport reaches S″.
---
--- TO CHECK while wiring (3): whether the transport's conclusion needs
--- strengthening for the final BurstInv at S″ to be rebuilt over the CUT registry.
--- The ending TailRel plus the swept live may not alone re-establish live-matches.
--- If it does not, strengthen the transport's statement then and there — it is
--- still postulated, so the change is cheap now and expensive once it has a proof.
---
--- (1) LANDED 2026-07-25 — and it was the urgent one: the cut residue WITHOUT a
--- frameFresh hypothesis is FALSE (the close-a-swept-source countermodel), and a
--- false postulate makes everything downstream of it vacuous, not merely
--- unproven.  It is now hypothesised on `frameFresh? L ems`, threaded up the take
--- subtree by frameFresh-cons: pushBurst-take-joint carries the accumulator and
--- advances it per emit, so the L handed to the cut holds exactly the sources
--- whose inits rode earlier emits and are still open.  The hypothesis is load-
--- bearing for soundness and must never be dropped to make a clause go through.
---
--- Still to retire: (2) prove (H); (3) prove pushBurst-take-zero-transport (the
--- applyEvents count-relation induction).  Both are honest debts — statements
--- believed true, not placeholders known false.
-postulate
-  cut-cons-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (id : Id) (nid : NodeId)
     (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
-    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
-    (L : List Source) (S S₁ S′ : ProtocolSt) →
+    (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ : ProtocolSt) →
     lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
     proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
-    frameFresh? L ems ≡ true →
     stepProtocol (es at i from src as ek) S ≡ just S₁ →
-    BurstInv id sched st S′ →
-    runProtocol S₁ ems ≡ just S′ →
+    BurstInv id sched st S₁ →
     Σ ProtocolSt λ S″ →
-      (runProtocol S
-        (((proj₁ (proj₂ (splitEvents es))
-            ++ retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                                                     (EvalSt.dying st) (EvalSt.registry st))))
-            ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
-            ++ complete ∷ [])
-           at i from src as ek)
-         ∷ proj₁ (pushBurst fuel id now (take-f nid) κ ems (cutSched nid sched st) (cutSt nid st)))
-        ≡ just S″)
-      × BurstInv id
-          (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ems (cutSched nid sched st) (cutSt nid st))))
-          (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ems (cutSched nid sched st) (cutSt nid st)))) S″
+      (stepProtocol
+        ((proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
+           ++ retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                                    (EvalSt.dying st) (EvalSt.registry st))))
+           ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
+           ++ complete ∷ [])
+          at i from src as ek) S ≡ just S″)
+      × BurstInv id (cutSched nid sched st) (cutSt nid st) S″
 
--- assembled: both halves of the cut, transported off the reduced cons form onto
--- the unreduced pushBurst.  The run rides pushBurst-take-cut-cons; the residual
+-- assembled: the cut, transported off the reduced cons form onto the unreduced
+-- pushBurst.  The emit list rides pushBurst-take-cut-cons (at the empty tail, so
+-- the pushed burst is a singleton and its run IS the head's step); the residual
 -- sched/st ride takeDispatch-cut, by the same cong-over-the-frame-result trick
 -- the non-cut clause uses.  Existential in S″ because take TRANSFORMS the burst —
 -- a cut reaches a DIFFERENT final state than the untouched inner run.
 pushBurst-take-cut-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
-  (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
-  (L : List Source) (S S₁ S′ : ProtocolSt) →
+  (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
   proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
-  frameFresh? L ems ≡ true →
   stepProtocol (es at i from src as ek) S ≡ just S₁ →
-  BurstInv id sched st S′ →
-  runProtocol S₁ ems ≡ just S′ →
+  BurstInv id sched st S₁ →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ
-                            ((es at i from src as ek) ∷ ems) sched st)) ≡ just S″)
+                            ((es at i from src as ek) ∷ []) sched st)) ≡ just S″)
     × BurstInv id
-        (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st)))
-        (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st))) S″
+        (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ []) sched st)))
+        (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ []) sched st))) S″
 pushBurst-take-cut-joint {Γ = Γ} {t = t} {e = e} {s = s}
-  fuel id now nid κ es i src ek ems sched st kCount L S S₁ S′ lk dc ff seq binv₀ runEq =
-  let (S″ , run , binv″) =
-        cut-cons-joint fuel id now nid κ es i src ek ems sched st kCount L S S₁ S′ lk dc ff seq binv₀ runEq
+  fuel id now nid κ es i src ek sched st kCount S S₁ lk dc seq binv₁ =
+  let (S″ , step , binv″) =
+        cut-head-joint id nid es i src ek sched st kCount S S₁ lk dc seq binv₁
   in S″
    , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
-       (sym (pushBurst-take-cut-cons fuel id now nid κ es i src ek ems sched st kCount lk dc))
-       run
+       (sym (pushBurst-take-cut-cons fuel id now nid κ es i src ek [] sched st kCount lk dc))
+       (runProtocol-cons _ [] S S″ S″ step refl)
    , subst (λ (p : Sched Γ × EvalSt e) → BurstInv id (proj₁ p) (proj₂ p) S″) (sym stEq) binv″
   where
-  -- proj₂ (pushBurst (em ∷ ems)) as a function of the frame's step result, so
+  -- proj₂ (pushBurst (em ∷ [])) as a function of the frame's step result, so
   -- `cong` transports takeDispatch-cut by conversion
   stateFrom : (List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e)
             → Sched Γ × EvalSt e
   stateFrom fr =
-    ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ems
+    ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ []
               (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr))))))
-    , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ems
+    , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ []
               (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))) )
-  stEq : ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st))
-         , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ ems) sched st)) )
-       ≡ ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ems (cutSched nid sched st) (cutSt nid st)))
-         , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ems (cutSched nid sched st) (cutSt nid st))) )
+  stEq : ( proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ []) sched st))
+         , proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ []) sched st)) )
+       ≡ ( cutSched nid sched st , cutSt nid st )
   stEq = cong stateFrom (takeDispatch-cut nid (proj₁ (splitEvents {A = Val Γ s} es))
                           (proj₂ (proj₂ (splitEvents {A = Val Γ s} es))) sched st kCount lk dc)
 
@@ -2397,36 +2367,40 @@ pushBurst-take-cut-joint {Γ = Γ} {t = t} {e = e} {s = s}
 -- faithful — the automaton ignores value payloads), and the only node write is
 -- caches-neutral (take-st ⟹ nodeCacheOK ≡ true), so every BurstInv field but
 -- `caches` transfers verbatim and `caches` survives by cachesValid-setNode-ok.
--- The recursion threads run + invariant + the frameFresh accumulator together;
--- only the CUT emit — which severs the registry and sweeps live — is the named
--- residue (pushBurst-take-cut-joint).
+-- The recursion threads run + invariant + the valsLast discipline together; only
+-- the CUT emit — which severs the registry and sweeps live — is the named
+-- residue, and valsLast? makes it the burst's LAST emit (cut-tail-nil), so the
+-- residue is a single step rather than a step plus a re-run tail.
 pushBurst-take-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
-  (L : List Source) (S S′ : ProtocolSt) →
+  (S S′ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
-  frameFresh? L burst ≡ true →
+  valsLast? burst ≡ true →
   BurstInv id sched st S′ →
   runProtocol S burst ≡ just S′ →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″)
     × BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st)))
                   (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st))) S″
-pushBurst-take-joint fuel id now nid κ [] sched st kCount L S S′ lk ff binv₀ runEq
+pushBurst-take-joint fuel id now nid κ [] sched st kCount S S′ lk vl binv₀ runEq
   = S , refl , subst (BurstInv id sched st) (sym (just-injᵂ runEq)) binv₀
 pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
-  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount L S S′ lk ff binv₀ runEq
-  with frameFresh-cons L (es at i from src as ek) ems ff
-... | L′ , _ , ff′
+  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk vl binv₀ runEq
   with stepProtocol (es at i from src as ek) S in seq
 ... | nothing = ⊥-elim (n≢jᵂ runEq)
 ... | just S₁ with takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)) in tvEq
-...   | out , rem , true  =
-        pushBurst-take-cut-joint {Γ = Γ} {s = s} fuel id now nid κ es i src ek ems sched st
-          kCount L′ S S₁ S′ lk
-          (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)
-          ff′ seq binv₀ runEq
-...   | out , rem , false =
+...   | out , rem , true
+        with cut-tail-nil kCount es i src ek ems
+               (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq) vl
+...     | refl =
+          pushBurst-take-cut-joint {Γ = Γ} {s = s} fuel id now nid κ es i src ek sched st
+            kCount S S₁ lk
+            (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)
+            seq (subst (BurstInv id sched st) (sym (just-injᵂ runEq)) binv₀)
+pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
+  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk vl binv₀ runEq
+  | just S₁ | out , rem , false =
         let rem′ : ℕ
             rem′ = proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
             ust : EvalSt e
@@ -2467,9 +2441,9 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
                      (takeDispatch-noncut nid (proj₁ (splitEvents {A = Val Γ s} es))
                         (proj₂ (proj₂ (splitEvents {A = Val Γ s} es))) sched st kCount lk dcF)
             (S″ , tailRun , rec) =
-              pushBurst-take-joint fuel id now nid κ ems sched ust rem′ L′ S₁ S′
+              pushBurst-take-joint fuel id now nid κ ems sched ust rem′ S₁ S′
                 (lookupNode-setNode nid (take-st rem′) (EvalSt.nodes st))
-                ff′ tailBinv runEq
+                (valsLast-tail (es at i from src as ek) ems vl) tailBinv runEq
         in S″
          , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
              (sym (pushBurst-take-noncut-cons fuel id now nid κ es i src ek ems sched st kCount lk dcF))
@@ -2480,7 +2454,8 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
 -- subscribeE (takeᵉ count b) with count ≡ suc k mints+installs the take node,
 -- subscribes b under take-f, pushBursts.  ONE call to pushBurst-take-joint now
 -- carries the IH's inner run AND its BurstInv through the frame to an existential
--- S″ (existential because a cut transforms the burst).
+-- S″ (existential because a cut transforms the burst); pushBurst-take-valsLast
+-- carries the payload discipline the next take up the tree will need.
 -- (The count ≡ zero branch is emptyᵉ-shaped, handled by oneShotBurst-wf.)
 subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
@@ -2494,14 +2469,18 @@ subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         (runProtocol S (proj₁ r₀) ≡ just S′)
         × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
         × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
-        × (frameFresh? [] (proj₁ r₀) ≡ true)) →
+        × (valsLast? (proj₁ r₀) ≡ true)) →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
     × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
                (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
-subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv (S′ , run₀ , binv₀ , nodeP , ff₀)
+    × (valsLast? (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ true)
+subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv (S′ , run₀ , binv₀ , nodeP , vl₀)
   rewrite ecEq =
-  pushBurst-take-joint fuel id now nid κ burst sched₂ st₁ (suc k) [] S S′ nodeP ff₀ binv₀ run₀
+  let (S″ , run , binv″) =
+        pushBurst-take-joint fuel id now nid κ burst sched₂ st₁ (suc k) S S′ nodeP vl₀ binv₀ run₀
+  in S″ , run , binv″
+   , pushBurst-take-valsLast fuel id now nid κ burst sched₂ st₁ (suc k) nodeP vl₀
   where
   nid    = proj₁ (mintNode sched)
   r₀     = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))

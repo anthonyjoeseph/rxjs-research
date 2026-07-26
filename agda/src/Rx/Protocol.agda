@@ -1,6 +1,6 @@
 module Rx.Protocol where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _≤ᵇ_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -258,11 +258,14 @@ wellFormed? xs = accepts? (checkFinal (runProtocol protocol-init xs))
 -- shares / cold-async inits stay OPEN in `acc`; a take-cut's cutThrough
 -- closes hit sources whose inits rode earlier emits and are still in
 -- `acc`.  `handoff` is foldPath-only and a `delivery`-kind emit never
--- appears in a burst, so either makes the predicate false.  This is the
--- burst-side analog of regTyped? — the discipline Verify-Well-Formed's
--- cut residue needs so its transformed value-free tail cannot underflow
--- a swept source's close, and the property Burst-Probe asserts (with
--- acc ≡ []) on every burst the evaluator actually mints.
+-- appears in a burst, so either makes the predicate false.
+--
+-- Measured by Burst-Probe (with acc ≡ []) on every burst the evaluator
+-- mints, and never violated.  It has no consumer in the proof: the
+-- take-cut residue it was introduced for is now discharged by valsLast?
+-- below, which empties the cut's tail outright instead of constraining
+-- what that tail may close.  Kept as the probe's assertion — a live
+-- statement about the evaluator, checked on every run.
 ------------------------------------------------------------------
 
 -- one emit's events, threading the open-source accumulator; nothing = malformed
@@ -319,4 +322,4 @@ valsLast? : ∀ {A : Set} → List (InstEmit A) → Bool
 valsLast? []               = true
 valsLast? (em ∷ [])        = true
 valsLast? (em ∷ em′ ∷ ems) =
-  if hasValue (InstEmit.events em) then false else valsLast? (em′ ∷ ems)
+  not (hasValue (InstEmit.events em)) ∧ valsLast? (em′ ∷ ems)
