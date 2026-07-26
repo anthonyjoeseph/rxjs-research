@@ -383,7 +383,7 @@ genSharedSlots d =
 
 caseB : ℕ → Gen (Stats × List Witness)
 caseB d = genSharedSlots d >>=G λ ins → genExp d >>=G λ e →
-  pureG (oneProgram (showExp e ++ "  <shared-slots>") e ins)
+  pureG (oneProgram (showExp e ++ "  " ++ showSlots ins) e ins)
 
 runN : (ℕ → Gen (Stats × List Witness)) → ℕ → ℕ → Gen (Stats × List Witness)
 runN f zero    d = pureG (zeroStats , [])
@@ -668,6 +668,23 @@ witnessBlock label ws@(_ ∷ _) =
 pick : ℕ → ℕ → List String → List String
 pick sel k xs = if (sel ≡ᵇ 0) ∨ (sel ≡ᵇ k) then xs else []
 
+-- CORPUS 5 / 6: LIST the generated programs of A / B without running any of
+-- them.  Generation is cheap and evaluation is not, so when a sweep does not
+-- come back, this is what turns "program N of corpus B is the expensive one"
+-- into the program text — which the seed alone cannot give you.
+listOne : (ℕ → Gen (Slots Γ₂)) → ℕ → Gen String
+listOne slots d = slots d >>=G λ ins → genExp d >>=G λ e →
+  pureG ("    " ++ showExp e ++ "\n      slots = " ++ showSlots ins ++ "\n")
+
+listN : (ℕ → Gen (Slots Γ₂)) → ℕ → ℕ → ℕ → Gen (List String)
+listN slots zero    d _ = pureG []
+listN slots (suc k) d i =
+  listOne slots d >>=G λ txt → listN slots k d (suc i) >>=G λ rest →
+  pureG (("  #" ++ show i ++ "\n" ++ txt) ∷ rest)
+
+listCorpus : (ℕ → Gen (Slots Γ₂)) → ℕ → ℕ → ℕ → List String
+listCorpus slots seed runs d = proj₁ (listN slots runs d 1 (randList seed 2000000))
+
 -- stdin: "FIRST [LAST] [RUNS] [DEPTH] [CORPUS]" — seeds FIRST..LAST, RUNS each
 main : IO Unit
 main = getContents >>= λ s →
@@ -697,4 +714,10 @@ main = getContents >>= λ s →
              ∷ witnessBlock "C witnesses" (proj₂ rC) ∷ "\n" ∷ [])
        ++ᴸ pick sel 4
              ( pad (proj₁ rC₃) "C₃. directed programs (3 slots: two live shares)"
-             ∷ witnessBlock "C₃ witnesses" (proj₂ rC₃) ∷ [])))
+             ∷ witnessBlock "C₃ witnesses" (proj₂ rC₃) ∷ [])
+       ++ᴸ pick sel 5
+             ("A programs, generation only (no run):\n"
+              ∷ listCorpus (λ _ → genSlots) first runs d)
+       ++ᴸ pick sel 6
+             ("B programs, generation only (no run):\n"
+              ∷ listCorpus genSharedSlots (first + 100000) runs d)))

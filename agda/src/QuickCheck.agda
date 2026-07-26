@@ -303,16 +303,6 @@ showInput : ObservableInput ℕ → String
 showInput (hot a)    = "hot (" ++ showTimedList a ++ ")"
 showInput (cold s a) = "cold (" ++ showNatList s ++ ") (" ++ showTimedList a ++ ")"
 
-showSlot : Slot Γ₂ natᵗ → String
-showSlot (scripted i) = "scripted (" ++ showInput i ++ ")"
-showSlot (shared _)   = "PLACEHOLDER-shared"
-
-showSlots : Slots Γ₂ → String
-showSlots ins =
-  "(λ { zero → " ++ showSlot (ins zero)
-    ++ " ; (suc zero) → " ++ showSlot (ins (suc zero))
-    ++ " ; (suc (suc ())) })"
-
 showPrim : ∀ {s t} → PrimOp s t → String
 showPrim add  = "add"
 showPrim sub  = "sub"
@@ -349,6 +339,19 @@ showExp (concatAllᵉ s)  = "(concatAllᵉ " ++ showExp s ++ ")"
 showExp (switchAllᵉ s)  = "(switchAllᵉ " ++ showExp s ++ ")"
 showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
 showExp _               = "PLACEHOLDER-exp"
+
+-- slots render AFTER showExp because a shared slot's DEF is an expression and
+-- must be printed: a corpus-B witness whose slots read "shared" is not
+-- reproducible, which is the whole point of printing a witness
+showSlot : Slot Γ₂ natᵗ → String
+showSlot (scripted i) = "scripted (" ++ showInput i ++ ")"
+showSlot (shared d)   = "shared " ++ showExp d
+
+showSlots : Slots Γ₂ → String
+showSlots ins =
+  "(λ { zero → " ++ showSlot (ins zero)
+    ++ " ; (suc zero) → " ++ showSlot (ins (suc zero))
+    ++ " ; (suc (suc ())) })"
 
 ------------------------------------------------------------------------
 -- one case, a run, and reporting
