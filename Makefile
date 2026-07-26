@@ -27,6 +27,7 @@ help:
 	@echo "                  acc-matched closes (see agda/probe/Burst-Probe.agda)"
 	@echo "                  make burst-probe                     (seed 1, 200, depth 4)"
 	@echo "                  make burst-probe ARGS='1 25 200 4'   (seeds 1..25)"
+	@echo "                  make burst-probe ARGS='1 1 20 5 4'   (corpus C₃ only)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Build and run the BURST PROBE (agda/probe/Burst-Probe.agda).
 #
-#   scripts/burst-probe.sh [FIRST] [LAST] [RUNS] [DEPTH]   (defaults 1 1 200 4)
+#   scripts/burst-probe.sh [FIRST] [LAST] [RUNS] [DEPTH] [CORPUS]  (1 1 200 4 0)
 #
 # Seeds FIRST..LAST, RUNS generated programs per seed per corpus, DEPTH capping
-# program nesting — the same knobs as scripts/gen-unit-tests.sh.
+# program nesting — the same knobs as scripts/gen-unit-tests.sh.  CORPUS picks one
+# corpus (0 all, 1 A, 2 B, 3 C, 4 C₃); with the report arriving in one block at
+# the end, that is how a long run that wedged or got reaped is bisected — seed
+# range narrows the seed, CORPUS the corpus, halving RUNS the program.
 #
 # The probe needs an evaluator that records every subscription burst, and the
 # verified evaluator must stay byte-identical (Verify-Well-Formed reduces its
@@ -27,6 +30,7 @@ FIRST="${1:-1}"
 LAST="${2:-$FIRST}"
 RUNS="${3:-200}"
 DEPTH="${4:-4}"
+CORPUS="${5:-0}"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="${BURST_PROBE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/burst-probe.XXXXXX")}"
@@ -66,7 +70,7 @@ cd "$BUILD"
 set +e
 agda --compile --compile-dir=_out src/Burst-Probe.agda 2>&1 \
   | grep -v -e '^ *Checking ' -e '^Compiling ' \
-            -e '^\[[0-9]* of [0-9]*\] Compiling ' -e '^Linking ' -e '^Calling: '
+            -e '^\[ *[0-9]* of *[0-9]*\] Compiling ' -e '^Linking ' -e '^Calling: '
 rc="${PIPESTATUS[0]}"
 set -e
 if [ "$rc" -ne 0 ]; then
@@ -74,4 +78,4 @@ if [ "$rc" -ne 0 ]; then
   exit "$rc"
 fi
 
-echo "$FIRST $LAST $RUNS $DEPTH" | ./_out/Burst-Probe
+echo "$FIRST $LAST $RUNS $DEPTH $CORPUS" | ./_out/Burst-Probe

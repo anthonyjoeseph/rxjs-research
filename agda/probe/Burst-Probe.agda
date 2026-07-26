@@ -659,7 +659,16 @@ witnessBlock label ws@(_ ∷ _) =
   "  " ++ label ++ " (" ++ show (length ws) ++ " total, first 12):\n"
   ++ concatStr (firstN 12 ws)
 
--- stdin: "FIRST [LAST] [RUNS] [DEPTH]" — seeds FIRST..LAST, RUNS programs each
+-- corpus selector: 0 (or absent) reports all four, 1..4 pick A / B / C / C₃.
+-- The report is one block at the end, so a deep sweep that runs for hours gives
+-- no clue WHERE it is.  With this, a wedged or reaped run is bisectable: the seed
+-- range already localises the seed, this localises the corpus, and halving RUNS
+-- localises the program.  Everything is lazy, so an unselected corpus is never
+-- forced — picking one really does skip the others' work.
+pick : ℕ → ℕ → List String → List String
+pick sel k xs = if (sel ≡ᵇ 0) ∨ (sel ≡ᵇ k) then xs else []
+
+-- stdin: "FIRST [LAST] [RUNS] [DEPTH] [CORPUS]" — seeds FIRST..LAST, RUNS each
 main : IO Unit
 main = getContents >>= λ s →
   let cs    = toCodes s
@@ -667,6 +676,7 @@ main = getContents >>= λ s →
       last  = numAt 1 first cs
       runs  = numAt 2 200 cs
       d     = numAt 3 4 cs
+      sel   = numAt 4 0 cs
       count = suc (last ∸ first)
       rA    = sweep caseA first count runs d
       rB    = sweep caseB (first + 100000) count runs d
@@ -674,16 +684,17 @@ main = getContents >>= λ s →
       rC₃   = runDirected directed₃
   in putStr (concatStr
        ( "BURST PROBE — seeds " ∷ show first ∷ ".." ∷ show last ∷ ", " ∷ show runs
-       ∷ " programs/seed, depth " ∷ show d ∷ "\n\n"
-       ∷ pad (proj₁ rA) "A. QuickCheck generator (scripted slots only)"
-       ∷ witnessBlock "A witnesses" (proj₂ rA)
-       ∷ "\n"
-       ∷ pad (proj₁ rB) "B. generator with SHARED slots enabled"
-       ∷ witnessBlock "B witnesses" (proj₂ rB)
-       ∷ "\n"
-       ∷ pad (proj₁ rC) "C. directed programs (2 slots)"
-       ∷ witnessBlock "C witnesses" (proj₂ rC)
-       ∷ "\n"
-       ∷ pad (proj₁ rC₃) "C₃. directed programs (3 slots: two live shares)"
-       ∷ witnessBlock "C₃ witnesses" (proj₂ rC₃)
-       ∷ []))
+       ∷ " programs/seed, depth " ∷ show d ∷ ", corpus " ∷ show sel ∷ "\n\n"
+       ∷ []
+       ++ᴸ pick sel 1
+             ( pad (proj₁ rA) "A. QuickCheck generator (scripted slots only)"
+             ∷ witnessBlock "A witnesses" (proj₂ rA) ∷ "\n" ∷ [])
+       ++ᴸ pick sel 2
+             ( pad (proj₁ rB) "B. generator with SHARED slots enabled"
+             ∷ witnessBlock "B witnesses" (proj₂ rB) ∷ "\n" ∷ [])
+       ++ᴸ pick sel 3
+             ( pad (proj₁ rC) "C. directed programs (2 slots)"
+             ∷ witnessBlock "C witnesses" (proj₂ rC) ∷ "\n" ∷ [])
+       ++ᴸ pick sel 4
+             ( pad (proj₁ rC₃) "C₃. directed programs (3 slots: two live shares)"
+             ∷ witnessBlock "C₃ witnesses" (proj₂ rC₃) ∷ [])))
