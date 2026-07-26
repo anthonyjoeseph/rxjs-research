@@ -2286,6 +2286,25 @@ pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
 -- (takeVals-cut-cons), so under valsLast? the cutting emit is the last one and
 -- THERE IS NO TAIL.  cut-tail-nil is that argument in three lines.
 --
+-- MEASURED, as counter 0 of `make burst-probe` — with Rx.Protocol's valsLast?
+-- itself, on every burst any subscribeE mints.  Depth 3 / depth 4, per corpus
+-- (A: the plain generator; B: A with shared slots; C: 19 directed 2-slot
+-- programs; C₃: 26 directed 3-slot ones, whose bottom slot is a scripted cold so
+-- BOTH shares above it stay live past their connect — the only way to get
+-- several live connects onto one subscribe frame, which is the shape that would
+-- put two payloads in one burst):
+--
+--                          A            B          C        C₃
+--   bursts             2704/3415   3389/5194    86/86   157/157
+--   multi-emit bursts      0/  0     172/ 219    41/41    62/ 62
+--   bursts with values  1717/2250   2147/3351    76/76   153/153
+--   valsLast failures      0/  0       0/   0     0/ 0     0/  0
+--   …with 2+ val emits     0/  0       0/   0     0/ 0     0/  0
+--
+-- Not one burst in ~13k had a payload anywhere but its last emit, and not one
+-- had two payload-carrying emits at all.  `cut with a tail` is 0 for the same
+-- reason, and is now visibly the consequence rather than the claim.
+--
 -- So the residue collapses to the head alone, and with it go TailRel, the
 -- transport, and the frameFresh threading that existed only to keep the tail
 -- honest.  (frameFresh? survives in Rx.Protocol as the probe's assertion; it has
