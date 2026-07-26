@@ -2289,19 +2289,24 @@ pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
 -- MEASURED, as counter 0 of `make burst-probe` — with Rx.Protocol's valsLast?
 -- itself, on every burst any subscribeE mints.  Depth 3 / depth 4, per corpus
 -- (A: the plain generator; B: A with shared slots; C: 19 directed 2-slot
--- programs; C₃: 26 directed 3-slot ones, whose bottom slot is a scripted cold so
--- BOTH shares above it stay live past their connect — the only way to get
--- several live connects onto one subscribe frame, which is the shape that would
--- put two payloads in one burst):
+-- programs; C₃: 36 directed 3-slot ones — the original 26 plus 10 adversarial
+-- programs targeting the thru-outer drain path specifically: sync-only inners
+-- that trigger the drain during the connect burst itself, and scaled versions of
+-- the deep *All nest that made corpus-B depth 5 expensive.  Bottom slot of C₃ is
+-- a scripted cold so BOTH shares stay live past their connect — the only way to
+-- put two live connects on one subscribe frame, which is the shape that would put
+-- two payloads in one burst.  Directed corpora are independent of depth; all
+-- three depth rows give the same 228 C₃ bursts):
 --
 --                          A            B          C        C₃
---   bursts             2704/3415   3389/5194    86/86   157/157
---   multi-emit bursts      0/  0     172/ 219    41/41    62/ 62
---   bursts with values  1717/2250   2147/3351    76/76   153/153
+--   bursts d3/d4       2704/3415   3389/5194    86/86   228/228
+--   bursts d5 (1 seed)      269         335        86       228
+--   multi-emit bursts      0/  0     172/ 219    41/41    80/ 80
+--   bursts with values  1717/2250   2147/3351    76/76   224/224
 --   valsLast failures      0/  0       0/   0     0/ 0     0/  0
 --   …with 2+ val emits     0/  0       0/   0     0/ 0     0/  0
 --
--- Not one burst in ~13k had a payload anywhere but its last emit, and not one
+-- Not one burst in ~14k had a payload anywhere but its last emit, and not one
 -- had two payload-carrying emits at all.  `cut with a tail` is 0 for the same
 -- reason, and is now visibly the consequence rather than the claim.
 --

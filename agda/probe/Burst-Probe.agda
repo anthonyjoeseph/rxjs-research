@@ -615,6 +615,54 @@ directed₃ =
   ∷ ( "take 2 (mergeAll(of[share1, share2]))   (over cold sync-only)"
     , slots3 (scripted coldSync) (shared j0) (shared j0)
     , takeᵉ (nat̂ 2) (mergeAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) )
+  -- ADVERSARIAL: valsLast? stress test for the thru-outer drain path.
+  -- concatAll over two sync-only inners: the first inner (j1) sync-completes
+  -- inside thruConsume, so the second inner (j2) is subscribed immediately by
+  -- the SAME thruConsume call — the drain fires during the connect burst itself
+  -- rather than in a later cascade.  The drain's values are captured by thruWalk
+  -- and all go into the single output emit: valsLast? holds by construction
+  -- (one outer emit → one output emit, always).
+  ∷ ( "concatAll(of[share1, share2])   (sync-only: drain fires in connect)"
+    , slots3 (scripted coldSync) (shared j0) (shared j0)
+    , concatAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ [])) )
+  ∷ ( "take 2 (concatAll(of[share1, share2]))   (sync-only)"
+    , slots3 (scripted coldSync) (shared j0) (shared j0)
+    , takeᵉ (nat̂ 2) (concatAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) )
+  ∷ ( "switchAll(of[share1, share2])   (sync-only)"
+    , slots3 (scripted coldSync) (shared j0) (shared j0)
+    , switchAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ [])) )
+  ∷ ( "exhaustAll(of[share1, share2])   (sync-only)"
+    , slots3 (scripted coldSync) (shared j0) (shared j0)
+    , exhaustAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ [])) )
+  -- ADVERSARIAL: scaled program-#8 shape — nested *All over two live shares,
+  -- small inputs.  Program-#8 in depth-5 corpus B was a deep switchAll/concatAll/
+  -- exhaustAll nest over two shared slots; it cost ~95min due to gas scaling.
+  -- These are structurally similar but shallow enough to run cheaply.  The
+  -- drain-grafting question ("can the drain attach values to a value-free fin-
+  -- carrying emit that is not last?") applies to the outer *All's thruConsume;
+  -- the answer is no because splitBurst in subscribeInner already flattens the
+  -- entire inner subscription into one (vs,bs,done) triple before returning.
+  ∷ ( "concatAll(of[switchAll(of[share1, share2])])"
+    , twoShares
+    , concatAllᵉ (ofᵉ (strmᵗ (switchAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ [])) )
+  ∷ ( "switchAll(of[concatAll(of[share1, share2])])"
+    , twoShares
+    , switchAllᵉ (ofᵉ (strmᵗ (concatAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ [])) )
+  ∷ ( "exhaustAll(of[concatAll(of[share1, share2])])"
+    , twoShares
+    , exhaustAllᵉ (ofᵉ (strmᵗ (concatAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ [])) )
+  ∷ ( "concatAll(of[exhaustAll(of[share1, share2])])"
+    , twoShares
+    , concatAllᵉ (ofᵉ (strmᵗ (exhaustAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ [])) )
+  -- outer take on nested *All: the cut happens above the inner subscriptions
+  ∷ ( "take 2 (concatAll(of[switchAll(of[share1, share2])]))"
+    , twoShares
+    , takeᵉ (nat̂ 2)
+        (concatAllᵉ (ofᵉ (strmᵗ (switchAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ []))) )
+  ∷ ( "take 2 (switchAll(of[concatAll(of[share1, share2])]))"
+    , twoShares
+    , takeᵉ (nat̂ 2)
+        (switchAllᵉ (ofᵉ (strmᵗ (concatAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ []))) )
   ∷ []
 
 runDirected : ∀ {n} {Γ : Ctx n}
