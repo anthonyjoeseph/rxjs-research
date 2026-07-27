@@ -47,6 +47,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Exp
 open import Data.Bool using (true)
 open import Verify-Budget-Sufficient using (measureE; counts; _≺ᵛ_; ≺-here; ≺-there)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ)
 
 Γ : Ctx 1
 Γ = natᵗ ∷ᵛ []ᵛ
@@ -188,3 +189,76 @@ _ = refl
 hop-fn-data-false : measureE 5 o₃ ≺ᵛ measureE 5 carrier₃ → ⊥
 hop-fn-data-false (≺-here ())
 hop-fn-data-false (≺-there (≺-here (s≤s ())))
+
+------------------------------------------------------------------
+-- THE CANDIDATE, MEASURED.  hopD (Rx.Hop-Depth) is the proposed
+-- replacement for dBound's `r`: an upper bound on the *All frames a
+-- subscription can still enter.  Below, every witness above descends
+-- STRICTLY under it — the check the refuted measure fails.
+--
+-- The hop edge to satisfy is  hopDᵉ V o < hopDᵉ V (mergeAllᵉ carrier),
+-- the *All frame being what owns the demand.  V is irrelevant here
+-- (no scanᵉ in any witness), so these hold at every V; 0 is shown.
+------------------------------------------------------------------
+
+-- witness 1, the caseᵗ of-literals hop:  2 ↦ 1
+_ : hopDᵉ 0 (mergeAllᵉ carrier) ≡ 2
+_ = refl
+
+_ : hopDᵉ 0 o ≡ 1
+_ = refl
+
+-- witness 2, the two-use mapᵉ hop:  2 ↦ 1
+_ : hopDᵉ 0 (mergeAllᵉ carrier₂) ≡ 2
+_ = refl
+
+_ : hopDᵉ 0 o₂ ≡ 1
+_ = refl
+
+-- witness 3, the data-source caseᵗ hop:  2 ↦ 1
+_ : hopDᵉ 0 (mergeAllᵉ carrier₃) ≡ 2
+_ = refl
+
+_ : hopDᵉ 0 o₃ ≡ 1
+_ = refl
+
+------------------------------------------------------------------
+-- THE LIFTED-LEAF VARIANT, which is why mapᵉ composes by `+` and not
+-- by `⊔`.  Same shape as witness 2 with the leaf `big` replaced by
+-- mergeAll (of (strm big)) — one hop deeper.  Under the real
+-- definition the hop reads 4 ↦ 2, strict.  Under a `⊔`-at-mapᵉ
+-- variant it would read 2 ↦ 2 and fail, so this pins the choice.
+------------------------------------------------------------------
+
+bigL : Closed Γ natᵗ
+bigL = mergeAllᵉ (ofᵉ (strmᵗ big ∷ []))
+
+srcL : Closed Γ (obs natᵗ)
+srcL = ofᵉ (strmᵗ bigL ∷ [])
+
+carrierL : Closed Γ (obs natᵗ)
+carrierL = mapᵉ dupF srcL
+
+oL : Val Γ (obs natᵗ)
+oL = applyFn dupF bigL
+
+_ : hopDᵉ 0 bigL ≡ 1
+_ = refl
+
+-- the leaf now contributes 1, and mapᵉ ADDS it to dupF's own 1,
+-- doubled by dupF's two occurrences: 1 + 2*1 ≡ 3, plus the frame
+_ : hopDᵉ 0 (mergeAllᵉ carrierL) ≡ 4
+_ = refl
+
+_ : hopDᵉ 0 oL ≡ 2
+_ = refl
+
+-- and the `⊔`-at-mapᵉ reading of the same carrier, spelled out: it
+-- would be 1 ⊔ 1 ≡ 1 for carrierL, so 2 for the frame, against oL's
+-- 2 — a tie, hence not a descent.  (hopDᵗ dupF and hopDᵉ srcL are the
+-- two operands `⊔` would have combined.)
+_ : hopDᵗ 0 dupF ≡ 1
+_ = refl
+
+_ : hopDᵉ 0 srcL ≡ 1
+_ = refl
