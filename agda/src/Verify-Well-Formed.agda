@@ -2320,24 +2320,198 @@ pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
 --   cutThrough-balance against BurstInv.live-matches, which the joint induction
 --   puts in scope here.  Mechanical off takeDispatch-cut; postulated while it is
 --   written.
+-- cut+sweep preserves registry well-typedness: kept ⊆ registry (cutThrough only
+-- drops) and sweepLive only removes now-dead live sources (a conjunction shrink)
+cut-reg-typed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
+  let (kept , _ , _) =
+        cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                   (EvalSt.dying st) (EvalSt.registry st)
+  in regTyped? kept (sweepLive kept (Sched.live sched)) ≡ true
+cut-reg-typed nid sched st rt =
+  regTyped?-sweepLive
+    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                       (EvalSt.dying st) (EvalSt.registry st)))
+    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                       (EvalSt.dying st) (EvalSt.registry st)))
+    (Sched.live sched)
+    (regTyped?-cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                          (EvalSt.dying st) (EvalSt.registry st) (Sched.live sched) rt)
+
+-- under done ≡ true, a successful applyEvents implies hasValue ≡ false
+applyEvents-val-done-absurd : ∀ {A : Set} (es : List (InstEvent A))
+  (lv : List Source) (o : Owed) {r} →
+  applyEvents es lv o true ≡ just r → hasValue es ≡ false
+applyEvents-val-done-absurd []                   lv o _ = refl
+applyEvents-val-done-absurd (value _ ∷ _)       lv o ()
+applyEvents-val-done-absurd (init x ∷ es)       lv o eq =
+  applyEvents-val-done-absurd es (x ∷ lv) o eq
+applyEvents-val-done-absurd (handoff x ∷ es)    lv o eq =
+  applyEvents-val-done-absurd es lv (bumpOwed x (countIn x lv) o) eq
+applyEvents-val-done-absurd (complete ∷ es)     lv o eq =
+  applyEvents-val-done-absurd es lv o eq
+applyEvents-val-done-absurd (close x cutPending ∷ es) lv o eq
+  with removeOne x lv | cancelOwed x o | eq
+... | just lv′ | just o′ | eq′ = applyEvents-val-done-absurd es lv′ o′ eq′
+applyEvents-val-done-absurd (close x cut ∷ es)      lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-val-done-absurd es lv′ o eq′
+applyEvents-val-done-absurd (close x exhausted ∷ es) lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-val-done-absurd es lv′ o eq′
+applyEvents-val-done-absurd (close x dried ∷ es)    lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-val-done-absurd es lv′ o eq′
+
 postulate
-  cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (id : Id) (nid : NodeId)
-    (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
-    (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ : ProtocolSt) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
-    proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
-    stepProtocol (es at i from src as ek) S ≡ just S₁ →
-    BurstInv id sched st S₁ →
-    Σ ProtocolSt λ S″ →
-      (stepProtocol
-        ((proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
-           ++ retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                                                    (EvalSt.dying st) (EvalSt.registry st))))
-           ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
-           ++ complete ∷ [])
-          at i from src as ek) S ≡ just S″)
-      × BurstInv id (cutSched nid sched st) (cutSt nid st) S″
+  -- bk gives the same live and zero owed as es; done stays false (no complete in bk)
+  applyEvents-bk-result : ∀ {n} {Γ : Ctx n} {u}
+    (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed)
+    {L : List Source} {D : Bool} →
+    applyEvents es lv o false ≡ just (L , [] , D) →
+    applyEvents (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) lv o false
+      ≡ just (L , [] , false)
+
+  -- cutThrough closes, applied to L₁ matching the old registry, give L′ matching kept
+  cutThrough-live-apply : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
+    (∀ s → countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
+    Σ (List Source) λ L′ →
+      applyEvents {A}
+        (retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                                (EvalSt.dying st) (EvalSt.registry st)))))
+        L₁ [] false ≡ just (L′ , [] , false)
+      × (∀ s → countIn s L′ ≡ countRegs s
+                 (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                    (EvalSt.dying st) (EvalSt.registry st))))
+
+  -- cutting the registry (removing entries) preserves cachesValid
+  cachesValid-cutThrough : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (st : EvalSt e) →
+    cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
+    cachesValid (EvalSt.nodes st)
+      (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                        (EvalSt.dying st) (EvalSt.registry st))) ≡ true
+
+  -- inversion of a successful stepProtocol: extract enterInstant/settle/applyEvents witnesses
+  stepProtocol-extract-enter : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+    (k : EmitKind) (S : ProtocolSt) {S′ : ProtocolSt} →
+    stepProtocol (es at i from s as k) S ≡ just S′ →
+    Σ Owed λ ob → Σ Id λ hz′ → Σ Owed λ ob′ → Σ Owed λ O →
+      enterInstant S i ≡ just (ob , hz′)
+      × settle k s (ProtocolSt.live S) ob ≡ just ob′
+      × applyEvents es (ProtocolSt.live S) ob′ (ProtocolSt.done S)
+          ≡ just (ProtocolSt.live S′ , O , ProtocolSt.done S′)
+      × ProtocolSt.horizon S′ ≡ hz′
+      × ProtocolSt.current S′ ≡ just (i , O)
+
+cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (id : Id) (nid : NodeId)
+  (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
+  (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ : ProtocolSt) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
+  proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
+  stepProtocol (es at i from src as ek) S ≡ just S₁ →
+  BurstInv id sched st S₁ →
+  Σ ProtocolSt λ S″ →
+    (stepProtocol
+      ((proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
+         ++ retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                                  (EvalSt.dying st) (EvalSt.registry st))))
+         ++ map value (proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
+         ++ complete ∷ [])
+        at i from src as ek) S ≡ just S″)
+    × BurstInv id (cutSched nid sched st) (cutSt nid st) S″
+cut-head-joint {Γ = Γ} {e = e} {s = s}
+  id nid es i src ek sched st kCount S S₁ lk dc step binv₁
+  with stepProtocol-extract-enter es i src ek S step
+... | ob , hz′ , ob′ , O₁ , entEq , stEq , aeEq , hzEq , curEq = S″ , cutStep , binv″
+  where
+  lv   = ProtocolSt.live S
+  bk   = proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
+  vs   = proj₁ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))
+  CT   = cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                    (EvalSt.dying st) (EvalSt.registry st)
+  kept = proj₁ CT
+  cuts = retagEvents (proj₁ (proj₂ CT))
+  tv   = takeVals-cut-cons kCount (proj₁ (splitEvents {A = Val Γ s} es)) dc
+  hv   : hasValue es ≡ true
+  hv   = splitEvents-vals-hasValue es (proj₁ tv) (proj₁ (proj₂ tv)) (proj₂ (proj₂ tv))
+  -- extract i = id and O₁ = [] from BurstInv.current-frame
+  cur-id-nil : just (i , O₁) ≡ just (id , [])
+  cur-id-nil with BurstInv.current-frame binv₁
+  ... | inj₁ cn = ⊥-elim (n≢jᵂ (sym (trans (sym curEq) cn)))
+  ... | inj₂ cj = trans (sym curEq) cj
+  i=id : i ≡ id
+  i=id = cong proj₁ (just-injᵂ cur-id-nil)
+  O₁-nil : O₁ ≡ []
+  O₁-nil = cong proj₂ (just-injᵂ cur-id-nil)
+  -- done S = false: if done were true, applyEvents would reject the value
+  dn-false : applyEvents es lv ob′ (ProtocolSt.done S)
+               ≡ just (ProtocolSt.live S₁ , O₁ , ProtocolSt.done S₁) →
+             ProtocolSt.done S ≡ false
+  dn-false ae with ProtocolSt.done S
+  ... | false = refl
+  ... | true  = ⊥-elim (t≢fᵂ (trans (sym hv) (applyEvents-val-done-absurd es lv ob′ ae)))
+  done-false : ProtocolSt.done S ≡ false
+  done-false = dn-false aeEq
+  -- normalize aeEq with done = false and O₁ = []
+  aeEq₁ : applyEvents es lv ob′ false
+             ≡ just (ProtocolSt.live S₁ , O₁ , ProtocolSt.done S₁)
+  aeEq₁ = subst (λ d → applyEvents es lv ob′ d
+                          ≡ just (ProtocolSt.live S₁ , O₁ , ProtocolSt.done S₁))
+                done-false aeEq
+  aeEq₀ : applyEvents es lv ob′ false
+             ≡ just (ProtocolSt.live S₁ , [] , ProtocolSt.done S₁)
+  aeEq₀ = subst (λ O → applyEvents es lv ob′ false
+                          ≡ just (ProtocolSt.live S₁ , O , ProtocolSt.done S₁))
+                O₁-nil aeEq₁
+  -- bookkeeping events give the same live, zero owed, done = false
+  bk-res : applyEvents bk lv ob′ false ≡ just (ProtocolSt.live S₁ , [] , false)
+  bk-res = applyEvents-bk-result es lv ob′ aeEq₀
+  -- cutThrough closes applied to S₁.live give L′ matching kept
+  CTA : Σ (List Source) λ Lx →
+          applyEvents {Val Γ s} cuts (ProtocolSt.live S₁) [] false ≡ just (Lx , [] , false)
+          × (∀ s₁ → countIn s₁ Lx ≡ countRegs s₁ kept)
+  CTA      = cutThrough-live-apply {Val Γ s} nid st (ProtocolSt.live S₁) (BurstInv.live-matches binv₁)
+  L′ : List Source
+  L′       = proj₁ CTA
+  cuts-res : applyEvents {Val Γ s} cuts (ProtocolSt.live S₁) [] false ≡ just (L′ , [] , false)
+  cuts-res = proj₁ (proj₂ CTA)
+  lm′ : ∀ s₁ → countIn s₁ L′ ≡ countRegs s₁ kept
+  lm′      = proj₂ (proj₂ CTA)
+  -- full cut event list steps applyEvents to just (L′, [], true)
+  full-ae  : applyEvents (bk ++ cuts ++ map value vs ++ complete ∷ []) lv ob′ false
+             ≡ just (L′ , [] , true)
+  full-ae  =
+    trans (applyEvents-++just bk (cuts ++ map value vs ++ complete ∷ []) lv ob′ false bk-res)
+    (trans (applyEvents-++just cuts (map value vs ++ complete ∷ []) (ProtocolSt.live S₁) [] false cuts-res)
+           (applyEvents-vc vs true L′ [] false (λ ())))
+  -- coerce done S (= false) to match stepProtocol-enter's expectation
+  full-ae′ : applyEvents (bk ++ cuts ++ map value vs ++ complete ∷ []) lv ob′ (ProtocolSt.done S)
+             ≡ just (L′ , [] , true)
+  full-ae′ = subst (λ d → applyEvents (bk ++ cuts ++ map value vs ++ complete ∷ []) lv ob′ d
+                           ≡ just (L′ , [] , true))
+                   (sym done-false) full-ae
+  -- the cut protocol state
+  S″ : ProtocolSt
+  S″ = record { live = L′ ; horizon = hz′ ; current = just (i , []) ; done = true }
+  -- assemble the cut step
+  cutStep : stepProtocol ((bk ++ cuts ++ map value vs ++ complete ∷ []) at i from src as ek) S
+            ≡ just S″
+  cutStep = stepProtocol-enter (bk ++ cuts ++ map value vs ++ complete ∷ []) i src ek S
+              entEq stEq full-ae′
+  -- assemble BurstInv for S″
+  binv″ : BurstInv id (cutSched nid sched st) (cutSt nid st) S″
+  binv″ = record
+    { live-matches  = lm′
+    ; reg-typed     = cut-reg-typed nid sched st (BurstInv.reg-typed binv₁)
+    ; horizon-low   = subst (λ hz → hz ≤ id) hzEq (BurstInv.horizon-low binv₁)
+    ; current-frame = inj₂ (cong (λ j → just (j , [])) i=id)
+    ; caches        = cachesValid-setNode-ok nid (take-st zero) (EvalSt.nodes st) kept refl
+                        (cachesValid-cutThrough nid st (BurstInv.caches binv₁))
+    }
 
 -- assembled: the cut, transported off the reduced cons form onto the unreduced
 -- pushBurst.  The emit list rides pushBurst-take-cut-cons (at the empty tail, so
@@ -3174,25 +3348,6 @@ postulate
     Σ ProtocolSt λ S′ →
       runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
         ≡ just S′
-
--- cut+sweep preserves registry well-typedness: kept ⊆ registry (cutThrough only
--- drops) and sweepLive only removes now-dead live sources (a conjunction shrink)
-cut-reg-typed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
-  regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true →
-  let (kept , _ , _) =
-        cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                   (EvalSt.dying st) (EvalSt.registry st)
-  in regTyped? kept (sweepLive kept (Sched.live sched)) ≡ true
-cut-reg-typed nid sched st rt =
-  regTyped?-sweepLive
-    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                       (EvalSt.dying st) (EvalSt.registry st)))
-    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                       (EvalSt.dying st) (EvalSt.registry st)))
-    (Sched.live sched)
-    (regTyped?-cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                          (EvalSt.dying st) (EvalSt.registry st) (Sched.live sched) rt)
 
 -- take-cut, PROVEN: assemble the cut result's FoldInv from cutThrough-balance
 -- (shadow), cutThrough-no-init (env-init/shadow), the dying-envSrc field, and the
