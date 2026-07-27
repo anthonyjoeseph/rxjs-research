@@ -1335,6 +1335,60 @@ stepProtocol-enter es i s k S entEq stEq apEq =
   stepProtocol-enter-aux es i s k (ProtocolSt.live S) (ProtocolSt.horizon S)
     (ProtocolSt.done S) (ProtocolSt.current S) entEq stEq apEq
 
+-- the exact converse of stepProtocol-enter: a step that succeeded must have
+-- gone through enterInstant, settle and applyEvents, and its result state is
+-- pinned by their outputs.  Analysis, where stepProtocol-enter is construction.
+-- The branching mirrors stepProtocol's own `enter` — continue an open unpaid
+-- instant, or open fresh over an idle slot / a held paid one — so each guard
+-- inverted here also settles enterInstant's value on the nose (hence refl).
+stepProtocol-extract-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (lv : List Source) (hz : Id) (dn : Bool) (cur : Maybe (Id × Owed))
+  {S′ : ProtocolSt} →
+  stepProtocol (es at i from s as k)
+    (record { live = lv ; horizon = hz ; current = cur ; done = dn }) ≡ just S′ →
+  Σ Owed λ ob → Σ Id λ hz′ → Σ Owed λ ob′ → Σ Owed λ O →
+    enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
+      ≡ just (ob , hz′)
+    × settle k s lv ob ≡ just ob′
+    × applyEvents es lv ob′ dn ≡ just (ProtocolSt.live S′ , O , ProtocolSt.done S′)
+    × ProtocolSt.horizon S′ ≡ hz′
+    × ProtocolSt.current S′ ≡ just (i , O)
+stepProtocol-extract-aux es i s k lv hz dn nothing eq
+  with hz ≤ᵇ i in hi | eq
+... | true | eq₁ with settle k s lv [] in seq | eq₁
+...   | just o₂ | eq₂ with applyEvents es lv o₂ dn in aeq | eq₂
+...     | just (L , O , D) | refl =
+          [] , hz , o₂ , O , refl , seq , aeq , refl , refl
+stepProtocol-extract-aux es i s k lv hz dn (just (j , owed)) eq
+  with i ≡ᵇ j in ij | eq
+... | true | eq₁ with paidOff owed in po | eq₁
+...   | false | eq₂ with settle k s lv owed in seq | eq₂
+...     | just o₂ | eq₃ with applyEvents es lv o₂ dn in aeq | eq₃
+...       | just (L , O , D) | refl =
+            owed , hz , o₂ , O , refl , seq , aeq , refl , refl
+stepProtocol-extract-aux es i s k lv hz dn (just (j , owed)) eq
+    | false | eq₁
+  with allZero owed in az | eq₁
+... | true | eq₂ with suc j ≤ᵇ i in sj | eq₂
+...   | true | eq₃ with settle k s lv [] in seq | eq₃
+...     | just o₂ | eq₄ with applyEvents es lv o₂ dn in aeq | eq₄
+...       | just (L , O , D) | refl =
+            [] , suc j , o₂ , O , refl , seq , aeq , refl , refl
+
+stepProtocol-extract-enter : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
+  (k : EmitKind) (S : ProtocolSt) {S′ : ProtocolSt} →
+  stepProtocol (es at i from s as k) S ≡ just S′ →
+  Σ Owed λ ob → Σ Id λ hz′ → Σ Owed λ ob′ → Σ Owed λ O →
+    enterInstant S i ≡ just (ob , hz′)
+    × settle k s (ProtocolSt.live S) ob ≡ just ob′
+    × applyEvents es (ProtocolSt.live S) ob′ (ProtocolSt.done S)
+        ≡ just (ProtocolSt.live S′ , O , ProtocolSt.done S′)
+    × ProtocolSt.horizon S′ ≡ hz′
+    × ProtocolSt.current S′ ≡ just (i , O)
+stepProtocol-extract-enter es i s k S eq =
+  stepProtocol-extract-aux es i s k (ProtocolSt.live S) (ProtocolSt.horizon S)
+    (ProtocolSt.done S) (ProtocolSt.current S) eq
+
 -- applyEvents plumbing for the root emit: it splits over ++, the
 -- accumulated bookkeeping (init/close only — never value/complete, which
 -- splitEvents routes to the value list / done flag) leaves `done`
@@ -2393,18 +2447,6 @@ postulate
     cachesValid (EvalSt.nodes st)
       (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                         (EvalSt.dying st) (EvalSt.registry st))) ≡ true
-
-  -- inversion of a successful stepProtocol: extract enterInstant/settle/applyEvents witnesses
-  stepProtocol-extract-enter : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
-    (k : EmitKind) (S : ProtocolSt) {S′ : ProtocolSt} →
-    stepProtocol (es at i from s as k) S ≡ just S′ →
-    Σ Owed λ ob → Σ Id λ hz′ → Σ Owed λ ob′ → Σ Owed λ O →
-      enterInstant S i ≡ just (ob , hz′)
-      × settle k s (ProtocolSt.live S) ob ≡ just ob′
-      × applyEvents es (ProtocolSt.live S) ob′ (ProtocolSt.done S)
-          ≡ just (ProtocolSt.live S′ , O , ProtocolSt.done S′)
-      × ProtocolSt.horizon S′ ≡ hz′
-      × ProtocolSt.current S′ ≡ just (i , O)
 
 cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (id : Id) (nid : NodeId)
