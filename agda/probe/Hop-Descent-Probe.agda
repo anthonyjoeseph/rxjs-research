@@ -48,6 +48,7 @@ open import Rx.Exp
 open import Data.Bool using (true)
 open import Verify-Budget-Sufficient using (measureE; counts; _≺ᵛ_; ≺-here; ≺-there)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ)
+open import Data.Product using (_,_)
 
 Γ : Ctx 1
 Γ = natᵗ ∷ᵛ []ᵛ
@@ -262,3 +263,77 @@ _ = refl
 
 _ : hopDᵉ 0 srcL ≡ 1
 _ = refl
+
+------------------------------------------------------------------
+-- THE SCAN REFOLD, which is the clause that forced hopD to take V.
+-- This is syncBudget's own 2026-07-19 program: an obs-typed
+-- accumulator whose template embeds the accumulator TWICE,
+--   acc ↦ mergeAll (of [acc , acc])
+-- so each folded value nests the accumulator one deeper.  Built here
+-- by hand, fold by fold, against hopD's scan clause.
+------------------------------------------------------------------
+
+-- the acc-doubling step function, acc : obs natᵗ, source : natᵗ
+scanF : Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+scanF = strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl))
+                            ∷ fstᵗ (varᵗ (here refl)) ∷ [])))
+
+scanSrc : Closed Γ natᵗ
+scanSrc = ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ [])
+
+theScan : Closed Γ (obs natᵗ)
+theScan = scanᵉ scanF (strmᵗ big) scanSrc
+
+-- the accumulator after k folds, applied literally
+acc₀ acc₁ acc₂ acc₃ : Val Γ (obs natᵗ)
+acc₀ = evalTm (strmᵗ big)
+acc₁ = applyFn scanF (acc₀ , 1)
+acc₂ = applyFn scanF (acc₁ , 2)
+acc₃ = applyFn scanF (acc₂ , 3)
+
+-- it nests exactly one per fold — the memo's "after k folded values
+-- the acc nests k deep", now a refl-check rather than a measurement
+_ : hopDᵉ 4 acc₀ ≡ 0
+_ = refl
+
+_ : hopDᵉ 4 acc₁ ≡ 1
+_ = refl
+
+_ : hopDᵉ 4 acc₂ ≡ 2
+_ = refl
+
+_ : hopDᵉ 4 acc₃ ≡ 3
+_ = refl
+
+-- and hopD's scan clause dominates every one of them: with occsᵗ
+-- scanF ≡ 2 the clause pays (2+2)^V, which at V ≡ 4 is 256 against a
+-- depth of 4.  The margin is the point — the clause has to hold for
+-- EVERY k ≤ V, and it is exponential where the refold is linear
+_ : occsᵗ scanF ≡ 2
+_ = refl
+
+_ : hopDᵉ 4 theScan ≡ 256
+_ = refl
+
+------------------------------------------------------------------
+-- THE μ EDGE.  The directive's caution was not to assume unfoldμ-≺
+-- transfers — it is a fact about the shell multiset, and hopD of an
+-- unfolding is a different question.  It is: an unfold substitutes the
+-- original closed μ for a Δᵍ variable, and Δᵍ variables are reachable
+-- only under deferᵉ, which hopD cuts to 0.  So hopD is EQUAL across an
+-- unfold, not merely ≤ — the μ edge stays weakly monotone in r and
+-- keeps paying with dBound-μ's s, exactly as it already did.
+------------------------------------------------------------------
+
+μbody : Exp Γ (natᵗ ∷ []) [] [] natᵗ
+μbody = mergeAllᵉ (ofᵉ (strmᵗ (deferᵉ (varᵉ (here refl))) ∷ []))
+
+_ : hopDᵉ 4 (μᵉ μbody) ≡ 1
+_ = refl
+
+_ : hopDᵉ 4 (unfoldμ μbody) ≡ 1
+_ = refl
+
+-- stated as the edge the walk will consume
+μ-hopD-stable : hopDᵉ 4 (unfoldμ μbody) ≡ hopDᵉ 4 (μᵉ μbody)
+μ-hopD-stable = refl
