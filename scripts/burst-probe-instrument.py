@@ -29,8 +29,13 @@ DECL_LEN = 4  # the declaration is exactly four lines
 ANCHORS = [
     # (exact line, text inserted after it)
     (
+        "                           μᵉ; varᵉ; deferᵉ)",
+        "open import Rx.Hop-Depth using (hopD\u1d49; hopD\u1d5b)   -- HOP PROBE\n",
+    ),
+    (
         "  field registry        : List (RegId × Source × Chain Γ t)   -- live registration chains, subscription order",
-        "        burstLog        : List (List (InstEmit ⊤))  -- BURST PROBE (write-only)\n",
+        "        burstLog        : List (List (InstEmit ⊤))  -- BURST PROBE (write-only)\n"
+        "        hopLog          : List (ℕ × List ℕ)         -- HOP PROBE (write-only)\n",
     ),
     (
         "retagEvents (value _   ∷ es) = retagEvents es",
@@ -54,6 +59,31 @@ probeEmit (es at i from s as k) = probeRetag es at i from s as k
 logBurst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {A : Set}
          → List (InstEmit A) → EvalSt e → EvalSt e
 logBurst b st = record st { burstLog = map probeEmit b ∷ EvalSt.burstLog st }
+
+-- ── HOP PROBE ────────────────────────────────────────────────────────
+-- The burst log erases payloads, but the hop measurement needs their
+-- DEPTHS, so this is a second, numeric log: for each subscribe, hopD of
+-- the expression walked, against hopD of every value it handed back.
+-- That pair is exactly the emitted-value invariant the hop edge
+-- consumes — hopD (mergeAllᵉ c) is suc (hopD c), so `every emitted value
+-- of c is ≤ hopD c` is what makes the hop strict.
+hopValsE : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) → List (InstEvent (Val Γ u)) → List ℕ
+hopValsE V []                     = []
+hopValsE V (init _    ∷ es)       = hopValsE V es
+hopValsE V (close _ _ ∷ es)       = hopValsE V es
+hopValsE V (handoff _ ∷ es)       = hopValsE V es
+hopValsE V (complete  ∷ es)       = hopValsE V es
+hopValsE {u = u} V (value v ∷ es) = hopDᵛ V u v ∷ hopValsE V es
+
+hopValsB : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) → List (InstEmit (Val Γ u)) → List ℕ
+hopValsB V []         = []
+hopValsB V (em ∷ ems) = hopValsE V (InstEmit.events em) ++ hopValsB V ems
+
+logHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+       → Closed Γ u → Slots Γ → List (InstEmit (Val Γ u)) → EvalSt e → EvalSt e
+logHop {e = e} b sl burst st =
+  let V = sizeᵉ e + slotsSize sl
+  in record st { hopLog = (hopDᵉ V b , hopValsB V burst) ∷ EvalSt.hopLog st }
 -- ─────────────────────────────────────────────────────────────────────
 """,
     ),
@@ -63,7 +93,7 @@ logBurst b st = record st { burstLog = map probeEmit b ∷ EvalSt.burstLog st }
 -- ── BURST PROBE: the logging wrapper every call site resolves to ─────
 subscribeE fuel b κ id now sched st =
   let (burst , sched′ , st′) = subscribeE′ fuel b κ id now sched st
-  in burst , sched′ , logBurst burst st′
+  in burst , sched′ , logHop b (Sched.slots sched) burst (logBurst burst st′)
 -- ─────────────────────────────────────────────────────────────────────
 """,
     ),
@@ -72,7 +102,7 @@ subscribeE fuel b κ id now sched st =
 REPLACEMENTS = [
     (
         "st-init e = record { registry = [] ; nextReg = 0 ; nodes = []",
-        "st-init e = record { burstLog = [] ; registry = [] ; nextReg = 0 ; nodes = []",
+        "st-init e = record { burstLog = [] ; hopLog = [] ; registry = [] ; nextReg = 0 ; nodes = []",
     ),
     (
         "module Rx.Evaluator where",

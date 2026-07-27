@@ -65,6 +65,20 @@ if [ -n "$stray" ]; then
   exit 1
 fi
 
+# same rule for the HOP PROBE's numeric log: declaration, st-init, logHop's own
+# body, and nothing else.  logHop is CALLED from the wrapper, but a call does not
+# mention hopLog, so the wrapper must not appear here either.
+strayHop="$(grep -n 'hopLog' "$BUILD/src/Rx/Evaluator.agda" \
+            | grep -v -e 'hopLog          : List (ℕ × List ℕ)' \
+                      -e 'st-init e = record { burstLog = \[\] ; hopLog = \[\] ;' \
+                      -e 'in record st { hopLog = (hopDᵉ V b , hopValsB V burst) ∷ EvalSt.hopLog st }' \
+            || true)"
+if [ -n "$strayHop" ]; then
+  echo "burst-probe: the instrumented evaluator READS hopLog — not neutral:" >&2
+  echo "$strayHop" >&2
+  exit 1
+fi
+
 cd "$BUILD"
 # agda reports errors on stdout, so keep stdout and drop only progress chatter;
 # grep must not decide the exit status (it exits 1 on a clean, silent build)

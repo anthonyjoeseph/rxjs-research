@@ -189,16 +189,21 @@ record Stats : Set where
   field programs selfFail wfFail bursts multiEmit freshFail walkMismatch : ℕ
   field reach accClose accCloseCut cutBursts cutNotLast accCloseTail : ℕ
   field valsFail valBursts multiVal : ℕ
+  -- HOP PROBE: hopObs counts every (walked expression, emitted value) pair
+  -- observed; hopViol counts those where the value's hopD EXCEEDS the
+  -- expression's — each one a counterexample to the emitted-value invariant,
+  -- and so to hopD as dBound's `r`
+  field hopObs hopViol : ℕ
 
 zeroStats : Stats
-zeroStats = mkStats 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+zeroStats = mkStats 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
 _+ˢ_ : Stats → Stats → Stats
-mkStats a b c d e f m g h i j k l p q r
-  +ˢ mkStats a′ b′ c′ d′ e′ f′ m′ g′ h′ i′ j′ k′ l′ p′ q′ r′ =
+mkStats a b c d e f m g h i j k l p q r x y
+  +ˢ mkStats a′ b′ c′ d′ e′ f′ m′ g′ h′ i′ j′ k′ l′ p′ q′ r′ x′ y′ =
   mkStats (a + a′) (b + b′) (c + c′) (d + d′) (e + e′) (f + f′) (m + m′)
           (g + g′) (h + h′) (i + i′) (j + j′) (k + k′) (l + l′)
-          (p + p′) (q + q′) (r + r′)
+          (p + p′) (q + q′) (r + r′) (x + x′) (y + y′)
 
 b→ℕ : Bool → ℕ
 b→ℕ true  = 1
@@ -228,7 +233,7 @@ burstStats b =
              (b→ℕ (Walk.crossOpen w)) (b→ℕ (Walk.matched w))
              (b→ℕ (Walk.matchedCut w)) (b→ℕ (anyCut w))
              (b→ℕ (Walk.cutNotLast w)) (b→ℕ (Walk.matchedTail w))
-             (b→ℕ (not (valsLast? b))) (b→ℕ (1 ≤ᵇ nv)) (b→ℕ (2 ≤ᵇ nv))
+             (b→ℕ (not (valsLast? b))) (b→ℕ (1 ≤ᵇ nv)) (b→ℕ (2 ≤ᵇ nv)) 0 0
   where
   _xnor_ : Bool → Bool → Bool
   true  xnor y = y
@@ -264,12 +269,12 @@ probeDrain (suc k) nextId sched st with sched-next sched
 -- generated corpora stay at Γ₂.  Nothing here is Γ₂-specific — `Val Γ natᵗ` is ℕ
 -- for every Γ, which is also why showStream applies.
 runProbe : ∀ {n} {Γ : Ctx n} → (e : Exp Γ [] [] [] natᵗ) → Slots Γ
-         → Stream Γ natᵗ × List (List (InstEmit ⊤))
+         → Stream Γ natᵗ × List (List (InstEmit ⊤)) × List (ℕ × List ℕ)
 runProbe e ins =
   let (burst , sched₀ , st₀) =
         subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
       (rest , st₁) = probeDrain FUEL 1 sched₀ st₀
-  in burst ++ᴸ rest , EvalSt.burstLog st₁
+  in burst ++ᴸ rest , EvalSt.burstLog st₁ , EvalSt.hopLog st₁
 
 -- stream equality, via the canonical rendering (events, values, instants,
 -- sources and order all appear in it)
@@ -316,18 +321,58 @@ witnessOf tag prog b =
   "    " ++ tag ++ "  " ++ showBurst b ++ "\n      prog = " ++ prog ++ "\n"
 
 ------------------------------------------------------------------------
+-- HOP PROBE analytics.
+--
+-- One hopLog entry per subscribe: (hopD of the expression walked, hopD of
+-- every value it handed back).  The invariant under test is the one the hop
+-- edge consumes — every emitted value's depth is ≤ the walked expression's.
+-- With hopD (mergeAllᵉ c) ≡ suc (hopD c), that is exactly what makes a hop
+-- strictly descend, so a single violation is a counterexample to hopD as
+-- dBound's `r` and the candidate dies the way rank ∘ measureE did.
+--
+-- V is the budget's own seed size, sizeᵉ e + slotsSize sl (see logHop in the
+-- instrumented evaluator).  hopD is monotone in V and only its scanᵉ clause
+-- reads it, so this is the smallest V the proof could plausibly use — the
+-- conservative direction for a refutation hunt.
+
+countGT : ℕ → List ℕ → ℕ
+countGT p []       = 0
+countGT p (d ∷ ds) = b→ℕ (not (d ≤ᵇ p)) + countGT p ds
+
+hopObsOf : List (ℕ × List ℕ) → ℕ
+hopObsOf []             = 0
+hopObsOf ((p , ds) ∷ r) = length ds + hopObsOf r
+
+hopViolOf : List (ℕ × List ℕ) → ℕ
+hopViolOf []             = 0
+hopViolOf ((p , ds) ∷ r) = countGT p ds + hopViolOf r
+
+showNats : List ℕ → String
+showNats []       = ""
+showNats (d ∷ []) = show d
+showNats (d ∷ ds) = show d ++ "," ++ showNats ds
+
+-- only the offending entries are rendered: a passing run has thousands
+showHops : List (ℕ × List ℕ) → String
+showHops []             = ""
+showHops ((p , ds) ∷ r) =
+  (if countGT p ds ≡ᵇ 0 then "" else
+     "[" ++ show p ++ " ↦ " ++ showNats ds ++ "] ") ++ showHops r
+
+------------------------------------------------------------------------
 -- one program: counters + witnesses
 
 oneProgram : ∀ {n} {Γ : Ctx n}
            → String → Exp Γ [] [] [] natᵗ → Slots Γ → Stats × List Witness
 oneProgram prog e ins =
-  let (stream , logs) = runProbe e ins
+  let (stream , logs , hops) = runProbe e ins
       real            = evaluate FUEL e ins
       selfOK          = eqStream stream real
       wfOK            = wellFormed? real
       per             = map burstStats logs
       wits            = concat (map witness logs)
   in (mkStats 1 (b→ℕ (not selfOK)) (b→ℕ (not wfOK)) 0 0 0 0 0 0 0 0 0 0 0 0 0
+        (hopObsOf hops) (hopViolOf hops)
         +ˢ sumStats per)
      , (if selfOK then [] else ("    SELFCHECK-FAIL  prog = " ++ prog ++ "\n") ∷ [])
        -- a protocol rejection is reported with the whole stream, not just a
@@ -335,6 +380,9 @@ oneProgram prog e ins =
        -- rather than a measurement, so it must be diagnosable from the report
        ++ᴸ (if wfOK then []
             else ("    WF-FAIL      " ++ showStream real
+                    ++ "\n      prog = " ++ prog ++ "\n") ∷ [])
+       ++ᴸ (if hopViolOf hops ≡ᵇ 0 then []
+            else ("    HOPD-GROWS   " ++ showHops hops
                     ++ "\n      prog = " ++ prog ++ "\n") ∷ [])
        ++ᴸ wits
   where
@@ -695,6 +743,8 @@ pad s label =
   ++ "    bursts with a cut   " ++ show (Stats.cutBursts s) ++ "\n"
   ++ "    cut with a tail     " ++ show (Stats.cutNotLast s) ++ "\n"
   ++ "  3ᵗ acc-close IN TAIL  " ++ show (Stats.accCloseTail s) ++ "\n"
+  ++ "  4 hopD observations   " ++ show (Stats.hopObs s) ++ "\n"
+  ++ "  4 hopD VIOLATIONS     " ++ show (Stats.hopViol s) ++ "\n"
 
 firstN : ℕ → List String → List String
 firstN zero    _        = []
