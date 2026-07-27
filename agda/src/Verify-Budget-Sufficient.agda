@@ -89,7 +89,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 complete; exhausted;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_;
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
@@ -4757,18 +4757,32 @@ postulate
     o ∈ map (λ tm → evalTm tm) ts →
     measureE B o ≺ᵛ measureE B (ofᵉ ts)
 
-  -- SITE 2, fn-produced: applyFn instantiates a template, and
-  -- shellSize-subΘ preserves classes on the nose, so the produced
-  -- multiset is the body's strmᵗ sub-multiset ⊎ the plugged values'
-  -- shells — the embed shape with a ledgered remainder
-  hop-fn : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ)
+  -- SITE 2a, fn-produced from a DATA source: applyFn instantiates the
+  -- template with a value carrying no syntax, so by shellSize-subΘ the
+  -- produced multiset is exactly the body's strmᵗ sub-multiset — the embed
+  -- shape again, no remainder.  This is the case the restriction makes
+  -- common: every scripted slot now feeds it.
+  hop-fn-data : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ) {ok : T (isData s)}
     (f : Fn Γ [] [] [] s (obs u)) (b : Closed Γ s) (v : Val Γ s) →
     measureE B (applyFn f v) ≺ᵛ measureE B (mapᵉ f b)
 
-  -- SITE 3, μ-unfold: proven shape, restated at the hop's face
-  hop-μ : ∀ {n} {Γ : Ctx n} {u} (B : ℕ)
-    (body : Exp Γ (obs u ∷ []) [] [] (obs u)) →
-    measureE B (unfoldμ body) ≺ᵛ measureE B (μᵉ body)
+  -- SITE 2b, fn-produced from an OBS-CARRYING source — THE UNCERTAIN ONE.
+  -- Here v itself carries syntax, and applyFn's result owns v's shells as
+  -- well as the template's.  Those shells need NOT sit inside the carrier,
+  -- so the bare ≺ᵛ drop is FALSE and the premise below is doing real work:
+  -- the plug's own measure must already be under the carrier's.  That
+  -- premise is the sync-linearity ledger's obligation (plugs-lenᵉ /
+  -- occs≤syncᵉ / inner-len-subΘ, all proven) and discharging it against the
+  -- walk is the open part of this site.
+  hop-fn-obs : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ)
+    (f : Fn Γ [] [] [] s (obs u)) (b : Closed Γ s) (v : Val Γ s) →
+    counts B (shellsᵛ s v) ≺ᵛ measureE B (mapᵉ f b) →
+    measureE B (applyFn f v) ≺ᵛ measureE B (mapᵉ f b)
+
+  -- SITE 3, μ-unfold: ALREADY PROVEN as unfoldμ-≺ above, side condition and
+  -- all (shellSizeᵉ (μᵉ body) ≤ B, threaded from the walk's shell caps).  No
+  -- postulate here — an earlier draft restated it and silently dropped that
+  -- hypothesis, which made the restatement strictly stronger than the truth.
 
 -- the assembly: what a burst's observable values are worth to the
 -- *All clause.  `hop-descends` feeds dBound-hop, `hop-anchored` feeds
@@ -4840,6 +4854,70 @@ postulate
     memberSource s
       (EvalSt.connectedShares (proj₂ (proj₂ (subscribeE g b κ id now sched st))))
       ≡ true
+
+-- THE SHARE BOUNDARY'S PAYMENT, assembled.  sharedConnect adds i to
+-- connectedShares before walking the def, so unconn-insert's strict drop is
+-- taken at the connect itself; subscribeE-slots keeps the telescope fixed and
+-- subscribeE-connected-mono keeps i connected, so unconn-antitone carries the
+-- drop across everything the def does on its way up.  Both exit branches
+-- return sched₁ and a state whose connectedShares is st₂'s (the completed
+-- branch rewrites registry and completedSources only), so the split is
+-- cosmetic.  This is the `hop-anchored` disjunct's payment obligation.
+-- the drop, on the pieces sharedConnect threads (one clause, so the where
+-- block is visible; the burstCompleted split above it is cosmetic)
+sharedConnect-drop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
+  Sched.slots sched i ≡ shared dd →
+  memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
+  unconn (Sched.slots (proj₁ (proj₂ (subscribeE fuel d (share-sink i) id now sched
+            (register (toℕ i) κ (record st
+              { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))))))
+         (EvalSt.connectedShares (proj₂ (proj₂ (subscribeE fuel d (share-sink i) id now sched
+            (register (toℕ i) κ (record st
+              { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))))))
+  < unconn (Sched.slots sched) (EvalSt.connectedShares st)
+sharedConnect-drop fuel i d κ id now sched st eqi fresh
+  rewrite subscribeE-slots fuel d (share-sink i) id now sched
+            (register (toℕ i) κ (record st
+              { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+  = ≤-trans (s≤s step≤) step<
+  where
+  st₁ = register (toℕ i) κ
+          (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+  st₂ = proj₂ (proj₂ (subscribeE fuel d (share-sink i) id now sched st₁))
+  -- i stays connected through the def's walk
+  kept : ∀ s → memberSource s (toℕ i ∷ EvalSt.connectedShares st) ≡ true →
+               memberSource s (EvalSt.connectedShares st₂) ≡ true
+  kept s h = subscribeE-connected-mono fuel d (share-sink i) id now sched st₁ s h
+  step≤ : unconn (Sched.slots sched) (EvalSt.connectedShares st₂)
+        ≤ unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st)
+  step≤ = unconn-antitone (Sched.slots sched)
+            (toℕ i ∷ EvalSt.connectedShares st) (EvalSt.connectedShares st₂) kept
+  step< : unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st)
+        < unconn (Sched.slots sched) (EvalSt.connectedShares st)
+  step< = unconn-insert (Sched.slots sched) (EvalSt.connectedShares st) i eqi fresh
+
+-- and the same drop read off sharedConnect's own result: both exit branches
+-- return sched₁ and a state whose connectedShares is st₂'s (the completed
+-- branch rewrites registry and completedSources only)
+sharedConnect-unconn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
+  Sched.slots sched i ≡ shared dd →
+  memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
+  unconn (Sched.slots (proj₁ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
+         (EvalSt.connectedShares
+           (proj₂ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
+  < unconn (Sched.slots sched) (EvalSt.connectedShares st)
+sharedConnect-unconn fuel i d κ id now sched st eqi fresh
+  with burstCompleted (proj₁ (subscribeE fuel d (share-sink i) id now sched
+         (register (toℕ i) κ
+           (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))))
+... | true  = sharedConnect-drop fuel i d κ id now sched st eqi fresh
+... | false = sharedConnect-drop fuel i d κ id now sched st eqi fresh
 
 
 ------------------------------------------------------------------
