@@ -1260,6 +1260,31 @@ unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
 unconn-cons-≤ sl cs s =
   sum-tab-mono _ _ (unconnAt-cons-≤ sl cs s)
 
+f≡t-absurd : ∀ {A : Set} → false ≡ true → A
+f≡t-absurd ()
+
+-- unconn is ANTITONE in the connected set: connecting more can only
+-- lower the count.  Paired with subscribeE-connected-mono this is what
+-- carries unconn-insert's strict drop across the def's own walk, so the
+-- connect edge's payment survives everything the def does on its way up
+unconnAt-antitone : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs cs′ : List Source)
+  (i : Fin n) →
+  (memberSource (toℕ i) cs ≡ true → memberSource (toℕ i) cs′ ≡ true) →
+  unconnAt sl cs′ i ≤ unconnAt sl cs i
+unconnAt-antitone sl cs cs′ i h with sl i
+... | scripted _ = z≤n
+... | shared _ with memberSource (toℕ i) cs′ | memberSource (toℕ i) cs | h
+...   | true  | _     | _  = z≤n
+...   | false | false | _  = ≤-refl
+...   | false | true  | h′ = f≡t-absurd (h′ refl)
+
+unconn-antitone : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs cs′ : List Source) →
+  (∀ s → memberSource s cs ≡ true → memberSource s cs′ ≡ true) →
+  unconn sl cs′ ≤ unconn sl cs
+unconn-antitone sl cs cs′ mono =
+  sum-tab-mono (unconnAt sl cs′) (unconnAt sl cs)
+    (λ i → unconnAt-antitone sl cs cs′ i (mono (toℕ i)))
+
 -- connecting a fresh share strictly drops the count: its own slot
 -- goes 1 → 0 and no other slot rises
 unconn-insert : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
@@ -4770,6 +4795,52 @@ postulate
     let r = subscribeE g b κ id now sched st
     in o ∈ proj₁ (splitBurst {A = Val Γ t} (proj₁ r)) →
        HopAcct B V b sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) o
+
+-- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
+-- `scripted` demands T (isData (obs u)), and isData (obs u) is false, so
+-- the constructor is uninhabited here and Agda discharges it with (). This
+-- is the whole content of the 2026-07-27 restriction, in one absurd pattern:
+-- before it, this lemma was false and the *All input clause had a case that
+-- could not be paid for.  Every hop that reaches a slot is now a connect.
+obs-slot-shared : ∀ {n} {Γ : Ctx n} {u} (s : Slot Γ (obs u)) →
+  Σ (Closed Γ (obs u)) λ d → s ≡ shared d
+obs-slot-shared (shared d)       = d , refl
+obs-slot-shared (scripted {ok = ()} _)
+
+-- and the two NON-connecting share paths carry no values: a spent share
+-- emits init/close/complete, a live one emits a bare init, both pure
+-- bookkeeping.  So no hop originates there, and the input site reduces to
+-- sharedConnect alone — the one path that pays with unconn
+share-live-novals : ∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
+  proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
+          (((init s ∷ []) at id from s as subscribe) ∷ [])) ≡ []
+share-live-novals s id = refl
+
+share-spent-novals : ∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
+  proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
+          (((init s ∷ close s exhausted ∷ complete ∷ []) at id from s as subscribe) ∷ []))
+    ≡ []
+share-spent-novals s id = refl
+
+postulate
+  -- the slot telescope is read-only: no clause of the machine rewrites
+  -- Sched.slots, so unconn's first argument is walk-invariant
+  subscribeE-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
+      ≡ Sched.slots sched
+
+  -- connectedShares is append-only: a share, once connected, stays
+  -- connected for the rest of the cascade
+  subscribeE-connected-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (s : Source) →
+    memberSource s (EvalSt.connectedShares st) ≡ true →
+    memberSource s
+      (EvalSt.connectedShares (proj₂ (proj₂ (subscribeE g b κ id now sched st))))
+      ≡ true
+
 
 ------------------------------------------------------------------
 -- the walk contracts, store half — the SHAPE the clause grind
