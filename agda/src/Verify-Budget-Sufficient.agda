@@ -4767,16 +4767,47 @@ postulate
 -- unfolding substitutes SYNTAX for a Δᵍ variable under a guard, never
 -- a shell-carrying value, so nothing is copied.
 --
--- WHAT `r` MUST BE INSTEAD is open.  Ruled out so far, each by the
--- same duplication witness: the shell multiset (above), syncSizeᵉ
--- (16 ↦ 17 on the witness), sizeᵉ, the obs-depth of the subscribed
--- type (constant along the witness's hop chain: natᵗ, natᵗ, natᵗ),
--- and strmᵗ-nesting depth (1, 1, 0 — non-strict at the first hop).
--- The shape the evidence points at is a TOWER, matching syncBudget's
--- own comment that chained obs-typed scans exponentiate per story:
--- duplication is width, and width at one story becomes size at the
--- next.  Any replacement must survive the probe, so extend the probe
--- FIRST and only then restate the interface.
+-- WHAT `r` MUST BE INSTEAD is open.  Note first that this is the
+-- SAME pattern syncBudget's memo already records as the reason the
+-- budget must be a tower at all — "a scanᵉ with an obs-typed
+-- accumulator whose template embeds the accumulator twice
+-- (acc ↦ mergeAll(of[acc,acc]))", measured 2026-07-19.  That memo
+-- read the pattern as a demand SIZE problem and towered the budget
+-- for it; what went unnoticed is that the same two-use template also
+-- destroys the per-hop ORDER the demand was to descend in.  The size
+-- half is fine and stays.
+--
+-- Ruled out as `r` so far, each against the probe's witness:
+--   · the shell multiset — the refutation above
+--   · syncSizeᵉ — 16 ↦ 17 across the witness's first hop
+--   · sizeᵉ — same, and for the same reason
+--   · obs-depth of the subscribed type — CONSTANT along the
+--     witness's hop chain (natᵗ, natᵗ, natᵗ), so never strict
+--   · strmᵗ-nesting depth — 1, 1, 0: non-strict at the first hop
+--
+-- The one candidate that survives the witness is a REMAINING-HOP
+-- count: how many *All frames a subscription can still enter.  It has
+-- to compose along map (a fn's template is applied to the source's
+-- values, so the chains concatenate) rather than take a max —
+--     T (mergeAllᵉ c) = suc (T c)     T (mapᵉ f e) = T f + T e
+--     T (strmᵗ e)     = T e           T (ofᵉ ts)   = max over ts
+-- — and with `max` at mapᵉ instead of `+` it is already false:
+-- lifting the witness's leaf from `big` to mergeAll(of(strm big))
+-- gives 2 ↦ 2 at the first hop.  With `+` both witnesses descend
+-- strictly (2↦1 and 3↦2).
+--
+-- But T is NOT a syntactic quantity, and this is the crux: at scanᵉ
+-- the accumulator is refolded, so T(accₖ) = k · T(f) + T(acc₀) and
+-- the count k is bounded only by the value count — exactly the memo's
+-- "after k folded values the acc nests k deep".  So any working `r`
+-- is bounded by the STORE bound V, not by the program, which is
+-- consistent with dBound already allowing r ≤ R = suc V ^ suc V.  The
+-- replacement is therefore a V-bounded remaining-hop depth plus the
+-- lemma that a scan accumulator's depth stays under it — not a
+-- re-choice of syntactic measure.  That is a redesign of the demand
+-- function, not an edit, so it is stated here and left open rather
+-- than guessed at.  Any candidate must be run against the probe
+-- FIRST; only then restate the interface.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
