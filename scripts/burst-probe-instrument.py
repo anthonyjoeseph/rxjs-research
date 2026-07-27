@@ -81,9 +81,21 @@ hopValsB V (em ∷ ems) = hopValsE V (InstEmit.events em) ++ hopValsB V ems
 
 logHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        → Closed Γ u → Slots Γ → List (InstEmit (Val Γ u)) → EvalSt e → EvalSt e
+-- V IS CAPPED, and deliberately.  hopD's scanᵉ clause is
+-- (2 + occs)^V, so the real V — the budget's seed size — makes every
+-- subscribe compute a bignum, and a depth-4 corpus OOMs on it.  The
+-- generated corpora fold few values per frame, so a small V is a
+-- faithful parent allowance here, and it is the CONSERVATIVE direction:
+-- a smaller V shrinks the parent's allowance and can only make the test
+-- harder.  The cost is that a violation whose parent is a scanᵉ might be
+-- "V too small" rather than structural, so such a witness must be
+-- classified before it is believed.  probeV is swept (4/8/16) to check
+-- the cap is not itself deciding the answer.
+probeV : ℕ
+probeV = 8
+
 logHop {e = e} b sl burst st =
-  let V = sizeᵉ e + slotsSize sl
-  in record st { hopLog = (hopDᵉ V b , hopValsB V burst) ∷ EvalSt.hopLog st }
+  record st { hopLog = (hopDᵉ probeV b , hopValsB probeV burst) ∷ EvalSt.hopLog st }
 -- ─────────────────────────────────────────────────────────────────────
 """,
     ),

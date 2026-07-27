@@ -71,7 +71,7 @@ fi
 strayHop="$(grep -n 'hopLog' "$BUILD/src/Rx/Evaluator.agda" \
             | grep -v -e 'hopLog          : List (ℕ × List ℕ)' \
                       -e 'st-init e = record { burstLog = \[\] ; hopLog = \[\] ;' \
-                      -e 'in record st { hopLog = (hopDᵉ V b , hopValsB V burst) ∷ EvalSt.hopLog st }' \
+                      -e 'record st { hopLog = (hopDᵉ probeV b , hopValsB probeV burst) ∷ EvalSt.hopLog st }' \
             || true)"
 if [ -n "$strayHop" ]; then
   echo "burst-probe: the instrumented evaluator READS hopLog — not neutral:" >&2
