@@ -311,8 +311,8 @@ that distinction. So the program carries it structurally:
 
 ```agda
 data Slot Γ t : Set where
-  scripted : ObservableInput (Val Γ t) → Slot Γ t   -- hot/cold script
-  shared   : Closed Γ t → Slot Γ t                  -- def, share() at its root
+  scripted : ObservableInput (Val Γ t) → Slot Γ t   -- hot/cold script; t observable-free
+  shared   : Closed Γ t → Slot Γ t                  -- def, share() at its root; any t
 
 Slots Γ = ∀ i → Slot Γ (lookup Γ i)
 ```
@@ -323,6 +323,31 @@ earlier** slots (a generator/decoder invariant, not enforced by the types —
 a forward reference diverges at connect time). The TS compile of a
 telescope is literally a chain of JS `const`s, which is the correspondence
 argument in one line.
+
+**Scripted slots are observable-free.** `obs` may not occur anywhere in a
+`scripted` slot's element type — observables enter only as `strmᵗ` subtrees
+or `shared` defs, i.e. as program text. A scripted slot models an
+_external_ input source: its script is opaque runtime data, and every
+theorem quantifies over all scripts the outside world could feed it. If a
+script could carry observables, one thing it could carry is the pipeline
+itself:
+
+```typescript
+const inners$ = new Subject<Observable<number>>();
+const out$ = inners$.pipe(mergeAll());
+inners$.next(out$); // unbounded recursion — real rxjs diverges here too
+```
+
+No termination budget derived from the program's text can bound a walk over
+an observable that is not in the program's text (a machine-checked witness
+of this regress is what forced the restriction). Nothing concrete is lost:
+every rxjs program you can actually write has its observables in its text,
+so higher-order streams are built in-program and scripted inputs carry
+first-order data that _selects or parameterizes_ them
+(`mode$.pipe(map(m => m ? fast$ : slow$), mergeAll())`). The exclusion is
+only quantification over unknown observables injected from outside the
+modeled world — a class that contains programs real rxjs cannot run
+either.
 
 Semantics — rxjs `share` with **every reset option false** ("turn the cold
 observable hot"):
@@ -354,7 +379,7 @@ subscriber can read is the completion latch — **completion is
 re-observable, values are not** — and that bit is precisely what the
 completion-driven derivations (takeUntil & co.) consume.
 
-The expressiveness boundary, stated consciously: the telescope expresses
+The second expressiveness boundary, stated consciously: the telescope expresses
 every behavior whose **share-instance count is statically known** — one
 slot per use site. Out of scope: a fresh share per runtime instantiation
 (per-`mergeMap`-lambda invocation, per-μ-unfolding). Derived operators that
