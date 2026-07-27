@@ -4687,6 +4687,91 @@ postulate
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
 ------------------------------------------------------------------
+-- HOP DESCENT, the *All clause's missing edge.  subscribeInner
+-- re-enters subscribeE on an observable VALUE o carried by the
+-- carrier's burst, so the clause owes a strictly smaller dBound
+-- demand for o.  Two accounting routes, matching the two proven
+-- decrement lemmas — and, since 2026-07-27, exactly two:
+--
+--   hop-descends  measureE B o ≺ᵛ measureE B b — o's shells sit inside
+--             b's.  Fed to dBound-hop through rank-mono-≺, which
+--             drops r and resets s ≤ V.  Three syntactic sites:
+--             of-literals (≺-embed), fn-produced values from
+--             map/scan (≺-replace over the subΘ multiset equation),
+--             and μ-unfolds (unfoldμ-≺).
+--
+--   hop-anchored  o crossed a SHARE boundary — it came out of slot i's
+--             def, whose shells are unrelated to b's.  This exits
+--             the per-value order entirely and pays with U instead:
+--             the connect edge strictly drops unconn, and o is
+--             store-sized, so connect-anchor re-anchors rank ≤ R.
+--             Fed to dBound-connect.
+--
+-- There is no third route.  A SCRIPTED slot could once supply one —
+-- `Val Γ (obs u) = Closed Γ u`, so a scripted obs slot's script
+-- could emit the walked program itself, demanding
+-- measureE V b ≺ᵛ measureE V b — and the regress was real, not
+-- merely undescending (the program re-enters itself at every finite
+-- gas).  Rx.Evaluator.Slot now restricts scripted slots to data
+-- types, which removes the site by construction.  THAT restriction
+-- is what makes this statement total, and it is why the two
+-- disjuncts below are exhaustive rather than merely the cases we
+-- know how to prove.
+--
+-- Stated per-site first, then assembled: the assembly is what the
+-- *All clause consumes, so it is what has to typecheck before any
+-- site is proven.
+------------------------------------------------------------------
+
+postulate
+  -- SITE 1, of-literals: closed evaluation of a `strmᵗ e` term hands
+  -- back e itself, and innerᵗ (strmᵗ e) ≡ shellsᵉ e sits contiguously
+  -- inside the carrier's shells, under the carrier's own shell
+  hop-of : ∀ {n} {Γ : Ctx n} {u} (B : ℕ)
+    (ts : List (Tm Γ [] [] [] (obs u))) (o : Val Γ (obs u)) →
+    o ∈ map (λ tm → evalTm tm) ts →
+    measureE B o ≺ᵛ measureE B (ofᵉ ts)
+
+  -- SITE 2, fn-produced: applyFn instantiates a template, and
+  -- shellSize-subΘ preserves classes on the nose, so the produced
+  -- multiset is the body's strmᵗ sub-multiset ⊎ the plugged values'
+  -- shells — the embed shape with a ledgered remainder
+  hop-fn : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ)
+    (f : Fn Γ [] [] [] s (obs u)) (b : Closed Γ s) (v : Val Γ s) →
+    measureE B (applyFn f v) ≺ᵛ measureE B (mapᵉ f b)
+
+  -- SITE 3, μ-unfold: proven shape, restated at the hop's face
+  hop-μ : ∀ {n} {Γ : Ctx n} {u} (B : ℕ)
+    (body : Exp Γ (obs u ∷ []) [] [] (obs u)) →
+    measureE B (unfoldμ body) ≺ᵛ measureE B (μᵉ body)
+
+-- the assembly: what a burst's observable values are worth to the
+-- *All clause.  `hop-descends` feeds dBound-hop, `hop-anchored` feeds
+-- dBound-connect; the *All clause peels one gs against whichever
+-- comes back
+data HopAcct {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+     (B V : ℕ) (b : Closed Γ (obs u))
+     (sched : Sched Γ) (st : EvalSt e)
+     (sched′ : Sched Γ) (st′ : EvalSt e) (o : Val Γ (obs u)) : Set where
+  hop-descends : measureE B o ≺ᵛ measureE B b → HopAcct B V b sched st sched′ st′ o
+  hop-anchored : sizeᵉ o ≤ V
+           → unconn (Sched.slots sched′) (EvalSt.connectedShares st′)
+             < unconn (Sched.slots sched) (EvalSt.connectedShares st)
+           → HopAcct B V b sched st sched′ st′ o
+
+postulate
+  -- THE ASSEMBLY.  Every observable value a carrier's subscription
+  -- burst hands to the *All frame is accounted, one way or the other
+  burst-hop-acct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (B V : ℕ) (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (o : Val Γ (obs u)) →
+    sizeᵉ b ≤ V →
+    let r = subscribeE g b κ id now sched st
+    in o ∈ proj₁ (splitBurst {A = Val Γ t} (proj₁ r)) →
+       HopAcct B V b sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) o
+
+------------------------------------------------------------------
 -- the walk contracts, store half — the SHAPE the clause grind
 -- threads (receipts E′ ≤ E · spendᴱ … attach with the cost
 -- instrumentation; the landing stays in the cores below).  Stated
