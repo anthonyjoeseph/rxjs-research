@@ -2501,7 +2501,21 @@ applyEvents-bk-result (close x dried ∷ es)     lv o eq
 ... | just lv′ | eq′ = applyEvents-bk-result es lv′ o eq′
 
 postulate
-  -- cutThrough closes, applied to L₁ matching the old registry, give L′ matching kept
+  -- cutThrough closes, applied to L₁ matching the old registry, give L′ matching kept.
+  --
+  -- SUSPECT AS STATED — it is missing the guard cutThrough-balance carries.
+  -- cutThrough does NOT emit a close for every victim: a victim that already
+  -- delivered this cascade AND whose source is `dying` is skipped, because it
+  -- carried its own exhausted close on its own emit.  For such a registration
+  -- the registry loses an entry while the live list does not, so the balance
+  -- here (and in cutThrough-balance, which demands `memberSource s dying ≡
+  -- false` for exactly this reason) breaks.  Before discharging it, this needs
+  -- the same per-source guard — or the observation that discharges it wholesale:
+  -- `dying` is written ONLY by cascadeLatch and never touched inside a burst, so
+  -- at a ROOT subscribe (st-init sets dying ≡ []) it is empty outright.  An
+  -- INNER subscribe mid-cascade inherits the enclosing `dying`, so the guard has
+  -- to be threaded from there — through cut-head-joint and
+  -- pushBurst-take-cut-joint — rather than assumed.
   cutThrough-live-apply : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
     (∀ s → countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
