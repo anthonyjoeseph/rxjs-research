@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -32,6 +32,9 @@ help:
 	@echo "                  proportional to def sizes (budgetAt = syncBudget sizeᵉ),"
 	@echo "                  making each program ≫ 90 min per seed.  Corpora A, C,"
 	@echo "                  and C₃ can be run at depth 5 without issue."
+	@echo "  cut-caches-probe  the counterexample that cachesValid is not a burst"
+	@echo "                  invariant: it fails BOTH ways across a merge inner's"
+	@echo "                  subscribe (see agda/probe/Cut-Caches-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -61,6 +64,12 @@ bug-cache:
 # measures the evaluator, it does not check it.
 burst-probe:
 	scripts/burst-probe.sh $(ARGS)
+
+# Four refl-checked computations pinning down why BurstInv cannot carry
+# cachesValid.  Standalone (it only computes on hand-built configurations), so
+# it is not reached by src/Main.agda and needs its own target to stay honest.
+cut-caches-probe:
+	cd agda && agda -i src -i probe probe/Cut-Caches-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
