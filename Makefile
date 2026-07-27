@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -35,6 +35,9 @@ help:
 	@echo "  cut-caches-probe  the counterexample that cachesValid is not a burst"
 	@echo "                  invariant: it fails BOTH ways across a merge inner's"
 	@echo "                  subscribe (see agda/probe/Cut-Caches-Probe.agda)"
+	@echo "  hop-descent-probe  the refutation that a burst's observable value"
+	@echo "                  measures below its carrier — false at all three"
+	@echo "                  sites (see agda/probe/Hop-Descent-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -70,6 +73,14 @@ burst-probe:
 # it is not reached by src/Main.agda and needs its own target to stay honest.
 cut-caches-probe:
 	cd agda && agda -i src -i probe probe/Cut-Caches-Probe.agda
+
+# The three absurd-pattern refutations of hop descent: an observable value
+# carried by a burst does NOT measure below its carrier, because a template
+# with two uses of its bound variable copies the plugged value's shells twice.
+# Standalone (hand-built expressions only), so src/Main.agda never reaches it —
+# and it must not rot, because it is the reason dBound's `r` is still open.
+hop-descent-probe:
+	cd agda && agda -i src -i probe probe/Hop-Descent-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck

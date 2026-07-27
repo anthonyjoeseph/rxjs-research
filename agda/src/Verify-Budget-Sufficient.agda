@@ -4712,103 +4712,72 @@ postulate
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
 ------------------------------------------------------------------
--- HOP DESCENT, the *All clause's missing edge.  subscribeInner
--- re-enters subscribeE on an observable VALUE o carried by the
--- carrier's burst, so the clause owes a strictly smaller dBound
--- demand for o.  Two accounting routes, matching the two proven
--- decrement lemmas — and, since 2026-07-27, exactly two:
+-- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
+-- subscribeInner re-enters subscribeE on an observable VALUE o
+-- carried by the carrier's burst, so the clause owes a strictly
+-- smaller dBound demand for o.  Two routes were stated for it.  One
+-- survives; the other was REFUTED 2026-07-27 and is gone.
 --
---   hop-descends  measureE B o ≺ᵛ measureE B b — o's shells sit inside
---             b's.  Fed to dBound-hop through rank-mono-≺, which
---             drops r and resets s ≤ V.  Three syntactic sites:
---             of-literals (≺-embed), fn-produced values from
---             map/scan (≺-replace over the subΘ multiset equation),
---             and μ-unfolds (unfoldμ-≺).
---
---   hop-anchored  o crossed a SHARE boundary — it came out of slot i's
---             def, whose shells are unrelated to b's.  This exits
---             the per-value order entirely and pays with U instead:
---             the connect edge strictly drops unconn, and o is
+--   hop-anchored (SURVIVES)  o crossed a SHARE boundary — it came out
+--             of slot i's def, whose shells are unrelated to b's.
+--             This exits the per-value order entirely and pays with U:
+--             the connect edge strictly drops unconn
+--             (sharedConnect-unconn, proven below), and o is
 --             store-sized, so connect-anchor re-anchors rank ≤ R.
 --             Fed to dBound-connect.
 --
--- There is no third route.  A SCRIPTED slot could once supply one —
--- `Val Γ (obs u) = Closed Γ u`, so a scripted obs slot's script
--- could emit the walked program itself, demanding
--- measureE V b ≺ᵛ measureE V b — and the regress was real, not
--- merely undescending (the program re-enters itself at every finite
--- gas).  Rx.Evaluator.Slot now restricts scripted slots to data
--- types, which removes the site by construction.  THAT restriction
--- is what makes this statement total, and it is why the two
--- disjuncts below are exhaustive rather than merely the cases we
--- know how to prove.
+--   hop-descends (FALSE)  measureE B o ≺ᵛ measureE B b — "o's shells
+--             sit inside b's", fed to dBound-hop through rank-mono-≺.
+--             This does not hold, at ANY of its three claimed sites.
+--             agda/probe/Hop-Descent-Probe.agda refutes all three by
+--             absurd pattern (make hop-descent-probe).
 --
--- Stated per-site first, then assembled: the assembly is what the
--- *All clause consumes, so it is what has to typecheck before any
--- site is proven.
+-- WHY IT IS FALSE, in one line: a hop value is a TEMPLATE
+-- INSTANTIATED WITH A VALUE, and a template may use its bound
+-- variable more than once.  subΘ then copies that value's shells
+-- once per occurrence — precisely the plugs summand that
+-- subΘ-countsᵗ makes exact — while the carrier holds them once.  So
+-- duplication makes the hop's multiset strictly BIGGER and ≺ᵛ points
+-- the wrong way.  The probe's witness is
+--   mergeAll (map (x ↦ merge (of (x , x))) (of (strm big)))
+-- whose hop grows class-4 from 1 to 2.  Note it needs no `caseᵗ` and
+-- no exotic typing — an ordinary two-use lambda over an obs-typed
+-- source does it.
+--
+-- Three things this KILLS, and it is worth being exact about each:
+--
+--   · the isData restriction (2026-07-27) does NOT rescue site 2a.
+--     It empties the plug when the SOURCE is data, but `caseᵗ` mints
+--     an obs-carrying value from a closed term — `inlᵗ (strmᵗ big)` —
+--     and binds it to a Θ var the branch then uses twice.  The
+--     restriction is still right for its own reason (it removes the
+--     scripted-slot regress, see obs-slot-shared) but it does not
+--     touch this.
+--   · site 2b's guarding premise does not rescue it either.  The
+--     probe DISCHARGES that premise and the conclusion still fails.
+--   · subscribeE-walk above is therefore SUSPECT, not merely
+--     unproven.  Its `r` is rank V (measureE V b); it hands the *All
+--     clause a demand `d` that the clause was to peel with
+--     dBound-hop.  With the hop's measure able to exceed the
+--     carrier's, that peel is unavailable, and `d` may simply
+--     under-count the walk.  Do not build on subscribeE-walk's *All
+--     clause until `r` is replaced.
+--
+-- Site 3, μ-unfold, is UNAFFECTED and stays proven as unfoldμ-≺:
+-- unfolding substitutes SYNTAX for a Δᵍ variable under a guard, never
+-- a shell-carrying value, so nothing is copied.
+--
+-- WHAT `r` MUST BE INSTEAD is open.  Ruled out so far, each by the
+-- same duplication witness: the shell multiset (above), syncSizeᵉ
+-- (16 ↦ 17 on the witness), sizeᵉ, the obs-depth of the subscribed
+-- type (constant along the witness's hop chain: natᵗ, natᵗ, natᵗ),
+-- and strmᵗ-nesting depth (1, 1, 0 — non-strict at the first hop).
+-- The shape the evidence points at is a TOWER, matching syncBudget's
+-- own comment that chained obs-typed scans exponentiate per story:
+-- duplication is width, and width at one story becomes size at the
+-- next.  Any replacement must survive the probe, so extend the probe
+-- FIRST and only then restate the interface.
 ------------------------------------------------------------------
-
-postulate
-  -- SITE 1, of-literals: closed evaluation of a `strmᵗ e` term hands
-  -- back e itself, and innerᵗ (strmᵗ e) ≡ shellsᵉ e sits contiguously
-  -- inside the carrier's shells, under the carrier's own shell
-  hop-of : ∀ {n} {Γ : Ctx n} {u} (B : ℕ)
-    (ts : List (Tm Γ [] [] [] (obs u))) (o : Val Γ (obs u)) →
-    o ∈ map (λ tm → evalTm tm) ts →
-    measureE B o ≺ᵛ measureE B (ofᵉ ts)
-
-  -- SITE 2a, fn-produced from a DATA source: applyFn instantiates the
-  -- template with a value carrying no syntax, so by shellSize-subΘ the
-  -- produced multiset is exactly the body's strmᵗ sub-multiset — the embed
-  -- shape again, no remainder.  This is the case the restriction makes
-  -- common: every scripted slot now feeds it.
-  hop-fn-data : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ) {ok : T (isData s)}
-    (f : Fn Γ [] [] [] s (obs u)) (b : Closed Γ s) (v : Val Γ s) →
-    measureE B (applyFn f v) ≺ᵛ measureE B (mapᵉ f b)
-
-  -- SITE 2b, fn-produced from an OBS-CARRYING source — THE UNCERTAIN ONE.
-  -- Here v itself carries syntax, and applyFn's result owns v's shells as
-  -- well as the template's.  Those shells need NOT sit inside the carrier,
-  -- so the bare ≺ᵛ drop is FALSE and the premise below is doing real work:
-  -- the plug's own measure must already be under the carrier's.  That
-  -- premise is the sync-linearity ledger's obligation (plugs-lenᵉ /
-  -- occs≤syncᵉ / inner-len-subΘ, all proven) and discharging it against the
-  -- walk is the open part of this site.
-  hop-fn-obs : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ)
-    (f : Fn Γ [] [] [] s (obs u)) (b : Closed Γ s) (v : Val Γ s) →
-    counts B (shellsᵛ s v) ≺ᵛ measureE B (mapᵉ f b) →
-    measureE B (applyFn f v) ≺ᵛ measureE B (mapᵉ f b)
-
-  -- SITE 3, μ-unfold: ALREADY PROVEN as unfoldμ-≺ above, side condition and
-  -- all (shellSizeᵉ (μᵉ body) ≤ B, threaded from the walk's shell caps).  No
-  -- postulate here — an earlier draft restated it and silently dropped that
-  -- hypothesis, which made the restatement strictly stronger than the truth.
-
--- the assembly: what a burst's observable values are worth to the
--- *All clause.  `hop-descends` feeds dBound-hop, `hop-anchored` feeds
--- dBound-connect; the *All clause peels one gs against whichever
--- comes back
-data HopAcct {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-     (B V : ℕ) (b : Closed Γ (obs u))
-     (sched : Sched Γ) (st : EvalSt e)
-     (sched′ : Sched Γ) (st′ : EvalSt e) (o : Val Γ (obs u)) : Set where
-  hop-descends : measureE B o ≺ᵛ measureE B b → HopAcct B V b sched st sched′ st′ o
-  hop-anchored : sizeᵉ o ≤ V
-           → unconn (Sched.slots sched′) (EvalSt.connectedShares st′)
-             < unconn (Sched.slots sched) (EvalSt.connectedShares st)
-           → HopAcct B V b sched st sched′ st′ o
-
-postulate
-  -- THE ASSEMBLY.  Every observable value a carrier's subscription
-  -- burst hands to the *All frame is accounted, one way or the other
-  burst-hop-acct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (B V : ℕ) (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
-    (o : Val Γ (obs u)) →
-    sizeᵉ b ≤ V →
-    let r = subscribeE g b κ id now sched st
-    in o ∈ proj₁ (splitBurst {A = Val Γ t} (proj₁ r)) →
-       HopAcct B V b sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) o
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
 -- `scripted` demands T (isData (obs u)), and isData (obs u) is false, so
