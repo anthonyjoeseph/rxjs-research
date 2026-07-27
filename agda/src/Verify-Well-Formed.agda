@@ -2440,15 +2440,67 @@ applyEvents-val-done-absurd (close x dried ∷ es)    lv o eq
   with removeOne x lv | eq
 ... | just lv′ | eq′ = applyEvents-val-done-absurd es lv′ o eq′
 
-postulate
-  -- bk gives the same live and zero owed as es; done stays false (no complete in bk)
-  applyEvents-bk-result : ∀ {n} {Γ : Ctx n} {u}
-    (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed)
-    {L : List Source} {D : Bool} →
-    applyEvents es lv o false ≡ just (L , [] , D) →
-    applyEvents (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) lv o false
-      ≡ just (L , [] , false)
+-- done only ever gates VALUE events, and a value under done fails outright, so a
+-- run that SUCCEEDS with done already set never consulted the flag: the same
+-- events reach the same live and owed starting from done ≡ false.  (The final
+-- flag is not the same — a `complete` still latches it — hence the Σ.)
+applyEvents-done-drop : ∀ {A : Set} (es : List (InstEvent A))
+  (lv : List Source) (o : Owed) {L : List Source} {O : Owed} {D : Bool} →
+  applyEvents es lv o true ≡ just (L , O , D) →
+  Σ Bool λ D′ → applyEvents es lv o false ≡ just (L , O , D′)
+applyEvents-done-drop []                   lv o refl = false , refl
+applyEvents-done-drop (value _ ∷ _)        lv o ()
+applyEvents-done-drop (init x ∷ es)        lv o eq = applyEvents-done-drop es (x ∷ lv) o eq
+applyEvents-done-drop (handoff x ∷ es)     lv o eq =
+  applyEvents-done-drop es lv (bumpOwed x (countIn x lv) o) eq
+applyEvents-done-drop (complete ∷ es)      lv o eq = _ , eq
+applyEvents-done-drop (close x cutPending ∷ es) lv o eq
+  with removeOne x lv | cancelOwed x o | eq
+... | just lv′ | just o′ | eq′ = applyEvents-done-drop es lv′ o′ eq′
+applyEvents-done-drop (close x cut ∷ es)       lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-done-drop es lv′ o eq′
+applyEvents-done-drop (close x exhausted ∷ es) lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-done-drop es lv′ o eq′
+applyEvents-done-drop (close x dried ∷ es)     lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-done-drop es lv′ o eq′
 
+-- bk gives the same live and owed as es: splitEvents routes values and complete
+-- out of the bookkeeping list, and those are exactly applyEvents' two
+-- traffic-free cases — a value moves nothing (while not done) and a complete
+-- only sets the flag.  So the skeleton lands on the same state with done still
+-- false.  The `complete` clause is where applyEvents-done-drop is spent: the
+-- events AFTER a complete ran with the flag set, and the skeleton runs them
+-- without it.
+applyEvents-bk-result : ∀ {n} {Γ : Ctx n} {u}
+  (es : List (InstEvent (Val Γ u))) (lv : List Source) (o : Owed)
+  {L : List Source} {D : Bool} →
+  applyEvents es lv o false ≡ just (L , [] , D) →
+  applyEvents (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) lv o false
+    ≡ just (L , [] , false)
+applyEvents-bk-result []                lv o refl = refl
+applyEvents-bk-result (value v ∷ es)    lv o eq = applyEvents-bk-result es lv o eq
+applyEvents-bk-result (init x ∷ es)     lv o eq = applyEvents-bk-result es (x ∷ lv) o eq
+applyEvents-bk-result (handoff x ∷ es)  lv o eq =
+  applyEvents-bk-result es lv (bumpOwed x (countIn x lv) o) eq
+applyEvents-bk-result (complete ∷ es)   lv o eq =
+  applyEvents-bk-result es lv o (proj₂ (applyEvents-done-drop es lv o eq))
+applyEvents-bk-result (close x cutPending ∷ es) lv o eq
+  with removeOne x lv | cancelOwed x o | eq
+... | just lv′ | just o′ | eq′ = applyEvents-bk-result es lv′ o′ eq′
+applyEvents-bk-result (close x cut ∷ es)       lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-bk-result es lv′ o eq′
+applyEvents-bk-result (close x exhausted ∷ es) lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-bk-result es lv′ o eq′
+applyEvents-bk-result (close x dried ∷ es)     lv o eq
+  with removeOne x lv | eq
+... | just lv′ | eq′ = applyEvents-bk-result es lv′ o eq′
+
+postulate
   -- cutThrough closes, applied to L₁ matching the old registry, give L′ matching kept
   cutThrough-live-apply : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
