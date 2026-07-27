@@ -757,7 +757,19 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     horizon-low   : ProtocolSt.horizon S ≤ id
     current-frame : (ProtocolSt.current S ≡ nothing)
                   ⊎ (ProtocolSt.current S ≡ just (id , []))
-    caches        : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
+    -- NB: no caches here either, and for a sharper reason than done-plumbed's:
+    -- cachesValid is not merely inconvenient mid-burst, it is FALSE there.
+    -- nodeCacheOK's only load-bearing clause is merge — while the outer is
+    -- registered, activeInners must equal countLiveInners — and a subscribe
+    -- burst breaks that equality in BOTH directions.  thruConsume mergeᵒ runs
+    -- subscribeInner FIRST and applies mergeBump only after, so throughout an
+    -- inner's burst the inner's registrations exist while activeInners has not
+    -- been incremented (the count TRAILS the registry); and a take-cut strips
+    -- registrations without touching activeInners (the count LEADS it).  No
+    -- relation between the two survives both, so no weakening of the field
+    -- would work — it has to leave.  agda/probe/Cut-Caches-Probe.agda checks
+    -- all of this by computation (`make cut-caches-probe`).  Like done-plumbed
+    -- it is re-established once, at the root exit, from `root-caches`.
     -- NB: no done-plumbed here.  A base burst always latches done ≡ true, but
     -- an INNER base completing amid a live async sibling makes the full-registry
     -- allShareSunk FALSE (the enclosing thru-outer frame strips that complete
@@ -773,7 +785,6 @@ burst-init e ins = record
   ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
-  ; caches        = refl
   }
 
 -- ── base-case brick: a oneShotBurst's protocol trajectory ────────────────
@@ -878,7 +889,6 @@ oneShotBurst-wf vals id sched st S binv deq =
         ; reg-typed     = BurstInv.reg-typed binv
         ; horizon-low   = BurstInv.horizon-low binv
         ; current-frame = inj₂ refl
-        ; caches        = BurstInv.caches binv
         }
 
 -- ── the register/init balance mechanism (blueprint step 2) ───────────────
@@ -927,27 +937,23 @@ initReg-run id src S (inj₂ ceq) hlow
   rewrite ceq | ≡ᵇ-refl id = refl
 
 -- the registering base clause: emit `init src` and `register src (u, κ)`.  The
--- init balances the new registration (live-matches), the registered chain is
--- well-typed against the live schedule (reg-typed, from `ltok`), and caches are
--- inherited (register touches no node; the merge-coherence obligation on the
--- grown registry is the `cok` premise — see cachesValid's thru-outer keying).
+-- init balances the new registration (live-matches), and the registered chain
+-- is well-typed against the live schedule (reg-typed, from `ltok`).
 initReg-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (src : Source) (κ : Path Γ u t) (id : Id)
   (st : EvalSt e) (sched : Sched Γ) (S : ProtocolSt) →
   BurstInv id sched st S →
   liveTypeOK? src u (Sched.live sched) ≡ true →
-  cachesValid (EvalSt.nodes st) (EvalSt.registry (register src κ st)) ≡ true →
   Σ ProtocolSt λ S′ →
     runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ []) ≡ just S′
     × BurstInv id sched (register src κ st) S′
-initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok cok =
+initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
   _ , run , record
         { live-matches  = lm
         ; reg-typed     = regTyped?-snoc (EvalSt.registry st) (EvalSt.nextReg st)
                             src u κ (Sched.live sched) (BurstInv.reg-typed binv) ltok
         ; horizon-low   = BurstInv.horizon-low binv
         ; current-frame = inj₂ refl
-        ; caches        = cok
         }
   where
   run : runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ [])
@@ -991,11 +997,10 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok cok =
 --     Obligation `oneShotBurst-wf` + a `register`-balances-`init` lemma: runProtocol
 --     on that single emit steps the automaton once (enterInstant/settle/applyEvents)
 --     and re-establishes live-matches (init balances the new reg), reg-typed (the
---     registered chain is well-typed against the added live source), current-frame
---     (the emit opens instant id), caches (installNode/register touch no merge
---     counter incoherently).  [DONE for ofᵉ/emptyᵉ/takeᵉ-zero: oneShotBurst-wf,
---     modulo the `done S ≡ false` at-subscribe premise.  No done-plumbed — it left
---     BurstInv for the root, see the fork resolution below.]
+--     registered chain is well-typed against the added live source) and current-frame
+--     (the emit opens instant id).  [DONE for ofᵉ/emptyᵉ/takeᵉ-zero: oneShotBurst-wf,
+--     modulo the `done S ≡ false` at-subscribe premise.  No done-plumbed and no
+--     caches — both left BurstInv for the root, see the fork resolutions below.]
 --   · FRAME (subscribeE b (f ↠ κ) then pushBurst f κ burst): mapᵉ (f=map-f),
 --     takeᵉ-suc (mintNode+installNode, f=take-f), scanᵉ (mintNode+installNode,
 --     f=scan-f).  Obligation: IH (subscribeE-wf on b, structural) gives BurstInv+run
@@ -1008,7 +1013,9 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok cok =
 --     (thru-outer op nid)): mergeAllᵉ/concatAllᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
 --     as FRAME with f = thru-outer op nid and a minted *All node installed at its
 --     initial state — so it reuses pushBurst-wf's thru-outer case.  This is where the
---     merge coherence (caches) actually gets exercised (walk subscribes inners).
+--     merge coherence (root-caches) actually gets exercised (walk subscribes
+--     inners) — and where the SECOND fork below says the counter cannot be kept
+--     coherent emit-by-emit, only re-established at the exit.
 --
 -- BUILD ORDER (outside-in): (1) this postulate stays while the pieces land;
 -- (2) prove the register/init balance lemma (pure, the mechanism); (3) oneShotBurst-wf
@@ -1053,6 +1060,30 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok cok =
 --   also DELETED the `allShareSunk` premise the base clause used to owe.  Fully
 --   proof-side (BurstInv is not the spec); makes subscribeE-wf TRUE for inners
 --   (only done-plumbed was false there).  Note kept as the rationale of record.
+--
+-- ── SECOND FORK, same shape, surfaced while proving cut-head-joint (2026-07-27) ─
+-- BurstInv.caches asserted cachesValid of every intermediate burst state.  It is
+-- FALSE there, and — unlike done-plumbed, which merely failed on one path — it
+-- fails in BOTH DIRECTIONS, so no weakening rescues it:
+--   · thruConsume mergeᵒ runs subscribeInner FIRST and applies mergeBump only
+--     after, so for the whole of an inner's subscribe burst the inner's
+--     registrations exist while activeInners has not been incremented — the
+--     counter TRAILS the registry.
+--   · a take-cut hands cutThrough the registry and never touches activeInners,
+--     so the counter LEADS it.
+-- nodeCacheOK's merge clause demands equality while the outer is registered, and
+-- the outer IS registered across both (subscribeAll registers it before pushBurst).
+-- agda/probe/Cut-Caches-Probe.agda checks all of this by computation; the two
+-- halves are `make cut-caches-probe`.
+--   CONSUMER: exactly as with done-plumbed — BurstInv.caches was read ONLY by
+--   burst-final (root frame-0 exit → Inv.caches).
+--   RESOLVED (2026-07-27): caches DROPPED from BurstInv, re-established once at
+--   burst-final from the `root-caches` postulate — the settled state, by which
+--   point every mergeBump has landed.  This also DELETED initReg-wf's `cok`
+--   premise and cachesValid-setNode-ok (both existed only to feed the field), and
+--   reduced pushBurst-scan-caches to pushBurst-scan-fixed.  root-caches is the
+--   same merge-coherence content root-done-plumbed is waiting on, so the two
+--   discharge together with pushBurst-wf/subscribeAll-wf.
 -- ════════════════════════════════════════════════════════════════════════
 postulate
   -- ONE subscription's burst preserves the frame relation (see the blueprint
@@ -1097,8 +1128,9 @@ burst-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv 0 sched st S →
   (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
+  cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
   Inv 1 sched st S × (paidUp S ≡ true)
-burst-final sched st S binv dp = inv , paid (BurstInv.current-frame binv)
+burst-final sched st S binv dp cv = inv , paid (BurstInv.current-frame binv)
   where
   past : (ProtocolSt.current S ≡ nothing)
        ⊎ (ProtocolSt.current S ≡ just (0 , [])) →
@@ -1119,7 +1151,7 @@ burst-final sched st S binv dp = inv , paid (BurstInv.current-frame binv)
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)
     ; done-plumbed = dp
-    ; caches       = BurstInv.caches binv
+    ; caches       = cv
     }
 
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
@@ -1139,6 +1171,18 @@ postulate
       (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                 (sched-init e ins) (st-init e))))) ≡ true
 
+  -- ROOT-EXIT caches, migrated out of BurstInv for the reason recorded on the
+  -- record: the merge count trails the registry inside an inner's burst and
+  -- leads it after a take-cut, so only the SETTLED state at the root exit — by
+  -- which point every mergeBump has landed — satisfies cachesValid.  This is
+  -- the same merge-coherence content root-done-plumbed is waiting on.
+  root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    cachesValid
+      (EvalSt.nodes (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                              (sched-init e ins) (st-init e)))))
+      (EvalSt.registry (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                                 (sched-init e ins) (st-init e))))) ≡ true
+
 -- the root subscription, composed (at the budget evaluate seeds)
 subscribe-wf :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
@@ -1155,7 +1199,7 @@ subscribe-wf e ins nodry
                      (sched-init e ins) (st-init e)
                      protocol-init (burst-init e ins) nodry
 ... | S , run , binv , _
-  with burst-final _ _ S binv (root-done-plumbed e ins S run)
+  with burst-final _ _ S binv (root-done-plumbed e ins S run) (root-caches e ins)
 ... | inv , paid = S , run , inv , paid
 
 ------------------------------------------------------------------
@@ -1896,21 +1940,6 @@ subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀) =
   binv″ rewrite cong (λ z → proj₁ (proj₂ z)) char
               | cong (λ z → proj₂ (proj₂ z)) char = binv₀
 
--- ── caches survive a node update whose new state is unconditionally ok ───
--- (scan-st / take-st: nodeCacheOK is `true` — only merge nodes carry a counter).
--- The stateful frames (scanᵉ, takeᵉ) update their node per emit; this is what
--- keeps BurstInv.caches through those updates.
-cachesValid-setNode-ok : ∀ {n} {Γ : Ctx n} {t}
-  (nid : NodeId) (s : NodeState Γ) (nodes : List (NodeId × NodeState Γ))
-  (reg : List (RegId × Source × Chain Γ t)) →
-  nodeCacheOK nid s reg ≡ true →
-  cachesValid nodes reg ≡ true →
-  cachesValid (setNode nid s nodes) reg ≡ true
-cachesValid-setNode-ok nid s []             reg ok cv = ∧-intro ok refl
-cachesValid-setNode-ok nid s ((k , s′) ∷ r) reg ok cv with k ≡ᵇ nid
-... | true  = ∧-intro ok (∧-trueʳ cv)
-... | false = ∧-intro (∧-trueˡ cv) (cachesValid-setNode-ok nid s r reg ok (∧-trueʳ cv))
-
 -- ── the scanᵉ frame fold (stateful) ─────────────────────────────────────
 -- scan threads an accumulator node across the burst: each emit reads scan-st,
 -- folds its values (scanVals — one running output per input, count-preserving),
@@ -1939,36 +1968,31 @@ pushBurst-scan-run {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ ems)
           (lookupNode-setNode nid (scan-st acc′) (EvalSt.nodes st)) runEq)
   where acc′ = proj₂ (scanVals fn acc (proj₁ (splitEvents es)))
 
--- scan-f leaves registry and schedule untouched and keeps caches valid (each
--- emit's node update is caches-neutral) — the st-side of the scanᵉ clause's
--- BurstInv (live-matches/reg-typed carry from the IH since registry is fixed)
-pushBurst-scan-caches : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+-- scan-f leaves registry and schedule untouched: every emit only rewrites the
+-- accumulator in the node table — the st-side of the scanᵉ clause's BurstInv
+-- (live-matches/reg-typed carry from the IH since the registry is fixed)
+pushBurst-scan-fixed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
   (κ : Path Γ u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (acc : Val Γ u) →
   lookupNode nid (EvalSt.nodes st) ≡ just (scan-st acc) →
-  cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
   (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)))
      ≡ EvalSt.registry st)
   × (proj₁ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)) ≡ sched)
-  × (cachesValid (EvalSt.nodes (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st))))
-                 (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st))))
-       ≡ true)
-pushBurst-scan-caches fuel id now fn nid κ [] sched st acc lk cv = refl , refl , cv
-pushBurst-scan-caches {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ ems) sched st acc lk cv
+pushBurst-scan-fixed fuel id now fn nid κ [] sched st acc lk = refl , refl
+pushBurst-scan-fixed {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ ems) sched st acc lk
   rewrite lk | ≟ᵗ-refl u =
-  pushBurst-scan-caches fuel id now fn nid κ ems sched
+  pushBurst-scan-fixed fuel id now fn nid κ ems sched
     (record st { nodes = setNode nid (scan-st acc′) (EvalSt.nodes st) }) acc′
     (lookupNode-setNode nid (scan-st acc′) (EvalSt.nodes st))
-    (cachesValid-setNode-ok nid (scan-st acc′) (EvalSt.nodes st) (EvalSt.registry st) refl cv)
   where acc′ = proj₂ (scanVals fn acc (proj₁ (splitEvents es)))
 
 -- ── the scanᵉ clause of subscribeE-wf (given the IH on b + node persistence) ─
 -- subscribeE (scanᵉ f seed b) = mint+install the scan node, subscribe b under
 -- scan-f, pushBurst.  The IH runs b's burst to S′ under BurstInv and (deferred:
 -- subscribeE only mints fresh nodes) leaves the scan node present; pushBurst-scan-
--- run threads the accumulator and runs to the SAME S′; pushBurst-scan-caches
--- shows registry/schedule are untouched (so live-matches/reg-typed carry) and
--- caches stay valid.  The `acc, nodeP` node-persistence witness is the one piece
+-- run threads the accumulator and runs to the SAME S′; pushBurst-scan-fixed
+-- shows registry/schedule are untouched, so live-matches/reg-typed carry.
+-- The `acc, nodeP` node-persistence witness is the one piece
 -- still owed from the walk's fresh-node discipline.
 subscribeE-scan-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
@@ -1995,10 +2019,9 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
   sched₂ = proj₁ (proj₂ r₀)
   st₁    = proj₂ (proj₂ r₀)
 
-  cRes   = pushBurst-scan-caches fuel id now f nid κ burst sched₂ st₁ acc nodeP (BurstInv.caches binv₀)
+  cRes   = pushBurst-scan-fixed fuel id now f nid κ burst sched₂ st₁ acc nodeP
   regEq  = proj₁ cRes
-  schEq  = proj₁ (proj₂ cRes)
-  cvFin  = proj₂ (proj₂ cRes)
+  schEq  = proj₂ cRes
 
   stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
   schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
@@ -2018,7 +2041,6 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
     ; reg-typed     = regTF
     ; horizon-low   = BurstInv.horizon-low binv₀
     ; current-frame = BurstInv.current-frame binv₀
-    ; caches        = cvFin
     }
 
 -- takeVals never fabricates output from nothing: an empty input yields an
@@ -2440,14 +2462,6 @@ postulate
                  (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                                     (EvalSt.dying st) (EvalSt.registry st))))
 
-  -- cutting the registry (removing entries) preserves cachesValid
-  cachesValid-cutThrough : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (nid : NodeId) (st : EvalSt e) →
-    cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
-    cachesValid (EvalSt.nodes st)
-      (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                        (EvalSt.dying st) (EvalSt.registry st))) ≡ true
-
 cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (id : Id) (nid : NodeId)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
@@ -2551,8 +2565,6 @@ cut-head-joint {Γ = Γ} {e = e} {s = s}
     ; reg-typed     = cut-reg-typed nid sched st (BurstInv.reg-typed binv₁)
     ; horizon-low   = subst (λ hz → hz ≤ id) hzEq (BurstInv.horizon-low binv₁)
     ; current-frame = inj₂ (cong (λ j → just (j , [])) i=id)
-    ; caches        = cachesValid-setNode-ok nid (take-st zero) (EvalSt.nodes st) kept refl
-                        (cachesValid-cutThrough nid st (BurstInv.caches binv₁))
     }
 
 -- assembled: the cut, transported off the reduced cons form onto the unreduced
@@ -2605,8 +2617,7 @@ pushBurst-take-cut-joint {Γ = Γ} {t = t} {e = e} {s = s}
 -- the BurstInv at its end.  NON-CUT emits leave registry/schedule fixed (exactly
 -- like scan): the reshaped head steps the protocol identically (stepProtocol-
 -- faithful — the automaton ignores value payloads), and the only node write is
--- caches-neutral (take-st ⟹ nodeCacheOK ≡ true), so every BurstInv field but
--- `caches` transfers verbatim and `caches` survives by cachesValid-setNode-ok.
+-- the take counter, so every BurstInv field transfers verbatim.
 -- The recursion threads run + invariant + the valsLast discipline together; only
 -- the CUT emit — which severs the registry and sweeps live — is the named
 -- residue, and valsLast? makes it the burst's LAST emit (cut-tail-nil), so the
@@ -2661,8 +2672,6 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
               ; reg-typed     = BurstInv.reg-typed binv₀
               ; horizon-low   = BurstInv.horizon-low binv₀
               ; current-frame = BurstInv.current-frame binv₀
-              ; caches        = cachesValid-setNode-ok nid (take-st rem′)
-                                  (EvalSt.nodes st) (EvalSt.registry st) refl (BurstInv.caches binv₀)
               }
             -- the whole burst's residual sched/st ARE the tail's (non-cut head
             -- leaves sched fixed, writes only the node) — by cong over takeDispatch
