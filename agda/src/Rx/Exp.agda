@@ -28,6 +28,20 @@ data Ty : Set where
 Ctx : ℕ → Set
 Ctx n = Vec Ty n
 
+-- A type is DATA when no `obs` occurs anywhere inside it.  `Val Γ (obs u)`
+-- is `Closed Γ u` — an observable value IS an arbitrary closed expression —
+-- so a value at a non-data type smuggles unbounded syntax in from outside
+-- the program.  Nested occurrences count: `natᵗ ×ᵗ obs natᵗ` is reachable
+-- with `mapᵉ (sndᵗ …)`, so the check has to be hereditary.  This is the
+-- side condition on scripted slots (Rx.Evaluator.Slot).
+isData : Ty → Bool
+isData unitᵗ    = true
+isData boolᵗ    = true
+isData natᵗ     = true
+isData (s ×ᵗ t) = if isData s then isData t else false
+isData (s +ᵗ t) = if isData s then isData t else false
+isData (obs _)  = false
+
 -- concrete now (the JSON bridge fixes exactly this set): the binary ops
 -- take a pair; sub is ℕ monus; eq/lt compare nats
 data PrimOp : Ty → Ty → Set where

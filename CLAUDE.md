@@ -60,6 +60,24 @@ process: try approaches, keep what passes QuickCheck/oracle, revert what doesn't
 wins. Only pause to ask when a change would touch the **spec** (`Spec/`, the root README's
 semantics), or when the spec is genuinely ambiguous (then follow the ambiguity rule below).
 
+## Running long Agda builds: keep the container awake
+
+`make agda` takes ~10-25 minutes; the Bash tool's ceiling is 600s, after which it moves the
+command to the background. **Background processes barely advance** — the container suspends
+between tool calls, so a backgrounded build can sit at the same module for an hour. Only a
+**foreground** tool call holds the container awake.
+
+So: kick the build off (it will background itself at 600s), then keep issuing foreground
+calls that block until it finishes — e.g.
+
+```
+for i in $(seq 1 55); do grep -q 'EXIT=' log && break; sleep 10; done
+```
+
+as a foreground `Bash` call, repeated until the build reports. Each such call holds the
+container awake for its duration, so the background build actually runs. Do **not** end the
+turn expecting a backgrounded build to finish on its own.
+
 ## Agda: work from the outside in
 
 Define and refine the **datatypes, primitives, and end goals first**, then link them

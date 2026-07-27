@@ -16,10 +16,11 @@ open import Data.Fin     using (zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_; after_,_; hot)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ;
+open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; isData;
                                 input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 concatAllᵉ; exhaustAllᵉ; evalTm; applyFn)
 open import Rx.Evaluator using (Slot; scripted; shared; Slots; evaluate)
+open import Data.Bool using (T)
 open import Spec         using (spec-batchSimultaneous; valuesOf)
 
 ------------------------------------------------------------------
@@ -39,16 +40,18 @@ emitValues ((es at _ from _ as _) ∷ xs) = valuesOf es ++ emitValues xs
 mergeOf : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → Closed Γ t
 mergeOf es = mergeAllᵉ (ofᵉ (map strmᵗ es))
 
-hotOnce : ∀ {n} {Γ : Ctx n} {t} → Val Γ t → Slot Γ t
-hotOnce v = scripted (hot ((after 0 , v) ∷ []))
+-- scripted slots carry data only (Rx.Evaluator.Slot); these theorems
+-- therefore quantify over data types, which is every type they are read at
+hotOnce : ∀ {n} {Γ : Ctx n} {t} {ok : T (isData t)} → Val Γ t → Slot Γ t
+hotOnce {ok = ok} v = scripted {ok = ok} (hot ((after 0 , v) ∷ []))
 
 oneSlot : ∀ {t} → Slot (t ∷ []) t → Slots (t ∷ [])
 oneSlot s zero    = s
 oneSlot s (suc ())
 
-twoHots : ∀ {t} → Val (t ∷ t ∷ []) t → Val (t ∷ t ∷ []) t → Slots (t ∷ t ∷ [])
-twoHots u v zero          = hotOnce u
-twoHots u v (suc zero)    = hotOnce v
+twoHots : ∀ {t} {ok : T (isData t)} → Val (t ∷ t ∷ []) t → Val (t ∷ t ∷ []) t → Slots (t ∷ t ∷ [])
+twoHots {ok = ok} u v zero          = hotOnce {ok = ok} u
+twoHots {ok = ok} u v (suc zero)    = hotOnce {ok = ok} v
 twoHots u v (suc (suc ()))
 
 noSlots : Slots []
@@ -143,11 +146,11 @@ growthProgram =
           ∷ mergeAllᵉ (mapᵉ (strmᵗ (input (suc (suc zero)))) (input (suc zero)))
           ∷ [])
 
-growthSlots : ∀ {t} (u v w x : Val (growthCtx t) t) → Slots (growthCtx t)
-growthSlots u v w x zero =                              -- src: ticks 2 and 4
-  scripted (hot ((after 1 , u) ∷ (after 1 , v) ∷ []))
-growthSlots u v w x (suc zero) =                        -- trigger: ticks 1 and 3
-  scripted (hot ((after 0 , w) ∷ (after 1 , x) ∷ []))
+growthSlots : ∀ {t} {ok : T (isData t)} (u v w x : Val (growthCtx t) t) → Slots (growthCtx t)
+growthSlots {ok = ok} u v w x zero =                     -- src: ticks 2 and 4
+  scripted {ok = ok} (hot ((after 1 , u) ∷ (after 1 , v) ∷ []))
+growthSlots {ok = ok} u v w x (suc zero) =               -- trigger: ticks 1 and 3
+  scripted {ok = ok} (hot ((after 0 , w) ∷ (after 1 , x) ∷ []))
 growthSlots u v w x (suc (suc zero)) = shared (input zero)
 growthSlots u v w x (suc (suc (suc ())))
 
@@ -161,28 +164,28 @@ serialProgram g a b =
 
 postulate
   readme-diamond :
-    ∀ {t} (f : Fn (t ∷ []) [] [] [] t t) (v : Val (t ∷ []) t) →
+    ∀ {t} {ok : T (isData t)} (f : Fn (t ∷ []) [] [] [] t t) (v : Val (t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 1 (diamondProgram f) (oneSlot (hotOnce v))))
+                 (evaluate 1 (diamondProgram f) (oneSlot (hotOnce {ok = ok} v))))
       ≡ (v ∷ applyFn f v ∷ []) ∷ []
 
   readme-each-next-own-instant :
-    ∀ {t} (f : Fn (t ∷ t ∷ []) [] [] [] t t) (u v : Val (t ∷ t ∷ []) t) →
+    ∀ {t} {ok : T (isData t)} (f : Fn (t ∷ t ∷ []) [] [] [] t t) (u v : Val (t ∷ t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 2 (eachNextProgram f) (twoHots u v)))
+                 (evaluate 2 (eachNextProgram f) (twoHots {ok = ok} u v)))
       ≡ (u ∷ applyFn f u ∷ []) ∷ (v ∷ []) ∷ []
 
   readme-cascades-inherit :
-    ∀ {t} (ws : List (Fn (t ∷ []) [] [] [] t t)) (v : Val (t ∷ []) t) →
+    ∀ {t} {ok : T (isData t)} (ws : List (Fn (t ∷ []) [] [] [] t t)) (v : Val (t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 1 (cascadeProgram ws) (oneSlot (hotOnce v))))
+                 (evaluate 1 (cascadeProgram ws) (oneSlot (hotOnce {ok = ok} v))))
       ≡ (v ∷ map (λ w → applyFn w v) ws) ∷ []
 
   readme-completion-cascades :
-    ∀ {t} (w : Tm (t ∷ []) [] [] [] t) (u v : Val (t ∷ []) t) →
+    ∀ {t} {ok : T (isData t)} (w : Tm (t ∷ []) [] [] [] t) (u v : Val (t ∷ []) t) →
     emitValues (spec-batchSimultaneous
                  (evaluate 2 (completionProgram w)
-                   (oneSlot (scripted (hot ((after 0 , u) ∷ (after 0 , v) ∷ []))))))
+                   (oneSlot (scripted {ok = ok} (hot ((after 0 , u) ∷ (after 0 , v) ∷ []))))))
       ≡ (u ∷ u ∷ evalTm w ∷ []) ∷ (v ∷ []) ∷ []
 
   readme-share-connect-no-replay :
@@ -192,9 +195,9 @@ postulate
       ≡ (evalTm v ∷ []) ∷ []
 
   readme-late-join-growth :
-    ∀ {t} (u v w x : Val (growthCtx t) t) →
+    ∀ {t} {ok : T (isData t)} (u v w x : Val (growthCtx t) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 4 growthProgram (growthSlots u v w x)))
+                 (evaluate 4 growthProgram (growthSlots {ok = ok} u v w x)))
       ≡ (u ∷ u ∷ []) ∷ (v ∷ v ∷ v ∷ []) ∷ []
 
   readme-serial-joins-mirror-rxjs :

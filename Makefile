@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -35,9 +35,6 @@ help:
 	@echo "  cut-caches-probe  the counterexample that cachesValid is not a burst"
 	@echo "                  invariant: it fails BOTH ways across a merge inner's"
 	@echo "                  subscribe (see agda/probe/Cut-Caches-Probe.agda)"
-	@echo "  hop-descent-probe  the emission site where hop-descent cannot be"
-	@echo "                  STATED: a scripted slot emits the walked program"
-	@echo "                  itself (see agda/probe/Hop-Descent-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -73,12 +70,6 @@ burst-probe:
 # it is not reached by src/Main.agda and needs its own target to stay honest.
 cut-caches-probe:
 	cd agda && agda -i src -i probe probe/Cut-Caches-Probe.agda
-
-# The hop-descent crux, decided by computation rather than by proof: the value
-# handed to subscribeInner IS the whole program, so the descent the hop edge
-# demands does not exist at that site.  Standalone, like the probe above.
-hop-descent-probe:
-	cd agda && agda -i src -i probe probe/Hop-Descent-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck

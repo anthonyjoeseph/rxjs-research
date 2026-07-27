@@ -4,7 +4,7 @@
 -- is the elaborator the CLI's decode→evaluate→encode middle was owed.
 module CLI.Decode where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; T)
 open import Data.Char using () renaming (toℕ to charToℕ)
 open import Data.Fin using (Fin; zero; suc)
 open import Data.List using (List; []; _∷_; map; length)
@@ -21,7 +21,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEmit)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
                           Ctx; Val; Closed; Exp; Tm; Fn;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
@@ -286,11 +286,17 @@ decodeInput fuel Γ t j = getField "type" j >>=? asStr >>=? λ tag →
      getField "async" j >>=? asArr >>=? mapMaybe (decodeTimed fuel Γ t) >>=? λ a → just (cold s a))
   else nothing
 
+tOf : (b : Bool) → Maybe (T b)
+tOf true  = just tt
+tOf false = nothing
+
 decodeSlotAt : ℕ → ∀ {n} (Γ : Ctx n) → List JSON → (i : Fin n) → Maybe (Slot Γ (lookup Γ i))
 decodeSlotAt fuel Γ slotsJ i = nth slotsJ (Data.Fin.toℕ i) >>=? λ j →
   getField "type" j >>=? asStr >>=? λ tag →
   if tag is "scripted" then
-    (getField "input" j >>=? decodeInput fuel Γ (lookup Γ i) >>=? λ inp → just (scripted inp))
+    (getField "input" j >>=? decodeInput fuel Γ (lookup Γ i) >>=? λ inp →
+     tOf (isData (lookup Γ i)) >>=? λ ok → just (scripted {ok = ok} inp))
+     -- scripted slots carry data only; an obs-typed slot must be `shared`
   else if tag is "shared" then
     (getField "def" j >>=? decodeExp fuel Γ [] [] [] (lookup Γ i) >>=? λ d → just (shared d))
   else nothing

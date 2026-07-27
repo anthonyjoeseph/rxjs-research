@@ -1,6 +1,6 @@
 module Rx.Evaluator where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
@@ -19,7 +19,7 @@ open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
                            CloseReason; cut; cutPending; exhausted; dried;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; isData;
                            applyFn; evalTm; unfoldμ; sizeᵉ; sizeᵛ;
                            input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                            mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
@@ -37,8 +37,20 @@ open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn;
 -- reference only strictly earlier slots (a const telescope) — checked
 -- by the generator/decoder, not by these types; a forward reference
 -- would diverge at connect time
+--
+-- SCRIPTED SLOTS CARRY DATA ONLY (`T (isData t)`, discharged by unification
+-- at every data type, so ordinary scripts are written unchanged).  An
+-- observable-typed slot would be a hole in the walk's descent order:
+-- `Val Γ (obs u) = Closed Γ u`, so its script could emit the very program
+-- being walked, and the *All hop off it would be asked for
+-- `measureE V e ≺ᵛ measureE V e`.  The regress is real, not merely
+-- undescending — such a program re-enters itself at every finite gas — so
+-- no edge can pay for it and the restriction is by construction.
+-- Higher-order pipelines are unaffected: an observable-typed slot is a
+-- `shared` def, which IS walked, so its emissions are syntactically inside
+-- it and the crossing is the connect edge (anchored by connect-anchor).
 data Slot {n} (Γ : Ctx n) (t : Ty) : Set where
-  scripted : ObservableInput (Val Γ t) → Slot Γ t
+  scripted : {ok : T (isData t)} → ObservableInput (Val Γ t) → Slot Γ t
   shared   : Closed Γ t → Slot Γ t
 
 Slots : ∀ {n} → Ctx n → Set
