@@ -68,6 +68,16 @@ and the top-line results fully stated and typechecking _in terms of postulates_.
 start chipping the postulates away, one at a time, until everything is defined and there are
 no gaps.
 
+**This rule applies recursively, and violating it inside a subproblem is an anti-pattern:
+never prove pieces before their assembly exists.** For any lemma cluster, first state the
+assembly — the statement that *consumes* the pieces — with the pieces as postulates, and
+make the whole thing typecheck. Only then prove pieces, starting with the **most uncertain
+one**, so that if the assembly has to change it changes *in place*, cheaply, instead of
+invalidating a pile of finished proofs. Pieces proven ahead of their assembly are
+speculative inventory: they may get thrown out wholesale, and worse, their sunk cost biases
+the design toward keeping them. Better to have a wrong assembly you can amend than proven
+pieces with no assembly at all.
+
 ## Keep the repo lean — no fat
 
 This repo always represents the **most present, up-to-date code**. Every definition must be
