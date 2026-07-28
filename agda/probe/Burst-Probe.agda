@@ -891,8 +891,41 @@ mentionUntaken =
         (varᵗ (here refl))
         (sndᵗ (pairᵗ (varᵗ (there (there (here refl)))) (varᵗ (there (here refl)))))
 
+-- THE MULTIPLIER SHAPE, for the second refutation.  An outer template
+-- that mentions its observable EXACTLY ONCE and duplicates nothing,
+-- over an inner map whose own coefficient multiplies whatever lands in
+-- its source.  Under any coefficient that counts occurrences instead of
+-- composing multipliers, the plug's depth is scaled by a factor the
+-- allowance never saw.  mulG's three uses sit at primᵗ positions (which
+-- hopD scores 0, so their true multiplier is 0 and a count of 3 is
+-- fiction); mulG₂'s single use sits at a hop-carrying one.
+mulG : Tm Γ₂ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+mulG = primᵗ add (pairᵗ (varᵗ (here refl))
+         (primᵗ add (pairᵗ (varᵗ (here refl)) (varᵗ (here refl)))))
+
+-- the template mentions the outer observable and so does the source, so
+-- the multiplier is genuinely 2 — the case a `⊔`-only reading misses
+mulG₂ : Tm Γ₂ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+mulG₂ = sndᵗ (pairᵗ (varᵗ (there (here refl))) (varᵗ (here refl)))
+
+mulB : Exp Γ₂ [] [] Θ₁ natᵗ
+mulB = mergeAllᵉ (ofᵉ (varᵗ (here refl) ∷ []))
+
+mulV : Exp Γ₂ [] [] [] natᵗ
+mulV = mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 3 ∷ nat̂ 4 ∷ [])) ∷ []))
+
 directedD : List (String × Slots Γ₂ × Exp Γ₂ [] [] [] natᵗ)
 directedD =
+    ( "mergeAll(map (λo → strm(map (λn → o+o+o `seq` n) (mergeAll(of[o])))) (of[mulV]))"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mulG mulB)) (ofᵉ (strmᵗ mulV ∷ []))) )
+  ∷ ( "… with the inner mention at a hop-carrying position (multiplier 2)"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mulG₂ mulB)) (ofᵉ (strmᵗ mulV ∷ []))) )
+  ∷ ( "… the multiplier shape under concatAll"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , concatAllᵉ (mapᵉ (strmᵗ (mapᵉ mulG₂ mulB)) (ofᵉ (strmᵗ mulV ∷ []))) )
+  ∷
     ( "mergeAll(map (λo → strm(map (λn → snd(o,n)) (mergeAll(of[of 5 6])))) (of[bushy]))"
     , slots2 (scripted coldSync) (scripted coldSync)
     , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody)) bushySrc) )

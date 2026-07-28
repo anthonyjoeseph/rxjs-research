@@ -47,7 +47,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Exp
 open import Data.Bool using (true)
 open import Verify-Budget-Sufficient using (measureE; counts; _≺ᵛ_; ≺-here; ≺-there)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵉ; pmᵗ)
 open import Data.Product using (_,_)
 
 Γ : Ctx 1
@@ -246,9 +246,11 @@ oL = applyFn dupF bigL
 _ : hopDᵉ 0 bigL ≡ 1
 _ = refl
 
--- the leaf now contributes 1, and mapᵉ ADDS it to dupF's own 1,
--- doubled by dupF's two occurrences: 1 + 2*1 ≡ 3, plus the frame
-_ : hopDᵉ 0 (mergeAllᵉ carrierL) ≡ 4
+-- the leaf now contributes 1, and mapᵉ ADDS it to dupF's own 1:
+-- 1 + 1*1 ≡ 2, plus the frame.  dupF's two mentions sit under an
+-- `ofᵉ`, where hopD combines by `⊔`, so the multiplier there is 1 —
+-- this is the `⊔` half of why a coefficient is not a count
+_ : hopDᵉ 0 (mergeAllᵉ carrierL) ≡ 3
 _ = refl
 
 _ : hopDᵉ 0 oL ≡ 2
@@ -305,19 +307,20 @@ _ = refl
 _ : hopDᵉ 4 acc₃ ≡ 3
 _ = refl
 
--- and hopD's scan clause dominates every one of them: with occs0ᵗ
--- scanF ≡ 2 the clause pays (2+2)^V, which at V ≡ 4 is 256 against a
--- depth of 4.  The margin is the point — the clause has to hold for
--- EVERY k ≤ V, and it is exponential where the refold is linear.
--- (Both of scanF's mentions are of its own bound variable, so the two
--- counts agree here; the section below is where they part.)
-_ : occs0ᵗ scanF ≡ 2
+-- and hopD's scan clause dominates every one of them: with the
+-- multiplier pmᵗ scanF ≡ 1 the clause pays (2+1)^V, which at V ≡ 4 is
+-- 81 against a depth of 4.  The margin is the point — the clause has
+-- to hold for EVERY k ≤ V, and it is exponential where the refold is
+-- linear.  (scanF mentions its accumulator twice, but both mentions
+-- sit under an `ofᵉ`'s `⊔`, so the multiplier is 1 where a count
+-- would have said 2 and paid (2+2)^V ≡ 256 for nothing.)
+_ : pmᵗ 4 0 scanF ≡ 1
 _ = refl
 
 _ : occsᵗ scanF ≡ 2
 _ = refl
 
-_ : hopDᵉ 4 theScan ≡ 256
+_ : hopDᵉ 4 theScan ≡ 81
 _ = refl
 
 ------------------------------------------------------------------
@@ -344,49 +347,52 @@ _ = refl
 μ-hopD-stable = refl
 
 ------------------------------------------------------------------
--- WHY THE COEFFICIENT IS occs0ᵗ AND NOT occsᵗ.
+-- REFUTATION 1 OF A COUNT: IT OVER-PRICES A PHANTOM.
 --
 -- Built 2026-07-28 while starting phase 3, by trying to construct the
--- worst case for hopD-subΘᵉ before proving it.  Against the occsᵗ
+-- worst case for hopD-subΘᵉ before proving it.  Against the `occsᵗ`
 -- draft of hopD this program REFUTED the walk conjunct
 --
 --     every value a subscription emits has hopD ≤ hopD of what was
 --     subscribed
 --
 -- reading 3 against an allowance of 2, and it refuted it with a
--- plugged value of hop depth ZERO.  Under occs0ᵗ it reads 1 ≤ 1 and
--- the section below is the standing guard for that repair: if the
--- coefficient ever drifts back to an index-blind count, `emitted-fits`
--- stops typechecking.
+-- plugged value of hop depth ZERO.
 --
--- THE MECHANISM.  hopD's mapᵉ coefficient means "how often is this
--- binder's argument duplicated".  occsᵗ counts EVERY varᵗ in the
+-- THE MECHANISM.  hopD's mapᵉ coefficient prices how much of the
+-- SOURCE's depth reaches the result.  occsᵗ counts EVERY varᵗ in the
 -- template, whatever binder it belongs to.  Substitution replaces an
 -- OUTER Θ variable by a reified observable, and that observable
 -- carries its own map/scan templates — whose bound variables occsᵗ
--- then counts too.  So the coefficient INFLATES under a substitution
--- that duplicated nothing: those occurrences belong to a different
--- binder.  occs0ᵗ counts only index 0, and a plug is Θ-closed, so
--- every variable it brings is compared against an already-bumped
--- index and contributes 0 — the coefficient cannot move.
+-- then counts too.  So the coefficient INFLATED under a substitution
+-- that duplicated nothing: the new occurrences belong to a different
+-- binder.
 --
--- Below, `plugged` is Θ-BUSHY but hop-SHALLOW: occsᵉ 2, hopD 0 — two
--- map templates over emptyᵉ.  Plugging it raised the occsᵗ
--- coefficient from 2 to 3, and that lone extra unit multiplied the
--- inner source's hop depth of 1.  Under occs0ᵗ the same coefficient
--- reads 1 before and after.
+-- Below, `plugged` is Θ-BUSHY but hop-SHALLOW — two map templates over
+-- emptyᵉ, occsᵉ 2 and hopDᵉ 0.  Plugging it raised the occsᵗ
+-- coefficient 2 ↦ 3, and that lone extra unit multiplied an inner
+-- source's hop depth of 1.
+--
+-- Any per-BINDER quantity fixes this one, because a plug is Θ-closed:
+-- every variable it brings is compared against an index already bumped
+-- past it and contributes nothing.  The multiplier hopD now uses reads
+-- 1 before and 1 after, so `emitted-fits` below is the standing guard —
+-- if a coefficient ever drifts back to an index-blind count, it stops
+-- typechecking.  (It is not the whole story: the NEXT section refutes
+-- the per-binder count too.)
 ------------------------------------------------------------------
 
 -- a Θ-BUSHY but hop-SHALLOW value: occsᵉ 2, hopDᵉ 0.  Both of its
--- varᵗ live under its own map binders, so occs0ᵉ reads 0 — this is
--- the Θ-closedness that makes the coefficient substitution-stable
+-- varᵗ live under its own map binders, so its multiplier at index 0
+-- reads 0 — the Θ-closedness that makes a coefficient
+-- substitution-stable
 plugged : Closed Γ natᵗ
 plugged = mapᵉ idFn (mapᵉ idFn emptyᵉ)
 
 _ : occsᵉ plugged ≡ 2
 _ = refl
 
-_ : occs0ᵉ plugged ≡ 0
+_ : pmᵉ 4 0 plugged ≡ 0
 _ = refl
 
 _ : hopDᵉ 4 plugged ≡ 0
@@ -402,12 +408,12 @@ innerSrc = mergeAllᵉ (ofᵉ (strmᵗ emptyᵉ ∷ []))
 innerFn : Tm Γ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
 innerFn = sndᵗ (pairᵗ (varᵗ (there (here refl))) (varᵗ (here refl)))
 
--- THE TWO COUNTS, side by side.  occsᵗ sees the discarded outer
--- mention; occs0ᵗ sees only the binder whose argument is plugged here
+-- SIDE BY SIDE.  occsᵗ sees the discarded outer mention; the
+-- multiplier sees only the binder whose argument is plugged here
 _ : occsᵗ innerFn ≡ 2
 _ = refl
 
-_ : occs0ᵗ innerFn ≡ 1
+_ : pmᵗ 4 0 innerFn ≡ 1
 _ = refl
 
 innerBody : Exp Γ [] [] (obs natᵗ ∷ []) natᵗ
@@ -449,3 +455,98 @@ _ = refl
 -- under the index-blind count it demanded 3 ≤ 2
 emitted-fits : hopDᵛ 4 (obs natᵗ) emitted ≤ hopDᵉ 4 prog
 emitted-fits = s≤s z≤n
+
+------------------------------------------------------------------
+-- REFUTATION 2 OF A COUNT: IT UNDER-PRICES A MULTIPLIER.
+--
+-- Built 2026-07-28 while setting up phase 3's induction.  Working out
+-- what the mapᵉ clause needs from its recursive calls, the coefficient
+-- that makes the induction close is not an occurrence count at all —
+-- and this program shows the per-binder count `occs0ᵗ`, which fixes
+-- refutation 1, failing anyway.
+--
+-- THE MECHANISM.  hopD's mapᵉ clause MULTIPLIES its source's depth by
+-- the template's coefficient.  A substitution plugs its value into the
+-- source position of an INNER map, where that inner template's
+-- coefficient multiplies it — and the OUTER coefficient, being a count
+-- of occurrences, prices the plug at 1 no matter how large the inner
+-- factor is.  So depth reaches the emission scaled by something the
+-- allowance never saw.
+--
+-- Under `occs0ᵗ`, the numbers below read: g3's coefficient 3 (three
+-- uses of its own variable), fMul's own depth 3·1 ≡ 3, the outer
+-- coefficient 1 (one mention, nothing duplicated), an allowance of
+-- 3 + 1·1 ≡ 4 — and an emission of 3·(1+1) ≡ 6.
+--
+-- The outer template mentions its argument exactly once and duplicates
+-- nothing, so this is not refutation 1 wearing a different hat.  No
+-- occurrence count of any kind can fix it: the quantity these clauses
+-- need is the MULTIPLIER hopD itself applies along the path to the
+-- plug, and multipliers are composed, not counted.  That is `pmᵗ`,
+-- which hopD now uses, and under which the same program reads 2 ≤ 2 —
+-- because pmᵗ also sees that g3's three uses sit at primᵗ positions
+-- hopD reads as 0, so their multiplier is 0 and the count of 3 was
+-- fiction in the other direction too.
+------------------------------------------------------------------
+
+-- three uses of its own variable, all at primᵗ positions — hopD reads
+-- those as 0, so the depth that can flow through them is 0 and the
+-- multiplier is 0, where a count says 3
+g3 : Tm Γ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+g3 = primᵗ add (pairᵗ (varᵗ (here refl))
+       (primᵗ add (pairᵗ (varᵗ (here refl)) (varᵗ (here refl)))))
+
+_ : occsᵗ g3 ≡ 3
+_ = refl
+
+_ : pmᵗ 4 0 g3 ≡ 0
+_ = refl
+
+_ : hopDᵗ 4 g3 ≡ 0
+_ = refl
+
+-- the outer observable, mentioned ONCE, in a position that carries a hop
+bMention : Exp Γ [] [] (obs natᵗ ∷ []) natᵗ
+bMention = mergeAllᵉ (ofᵉ (varᵗ (here refl) ∷ []))
+
+_ : hopDᵉ 4 bMention ≡ 1
+_ = refl
+
+-- the template's own depth: 3 under the count, 1 under the multiplier
+fMul : Fn Γ [] [] [] (obs natᵗ) (obs natᵗ)
+fMul = strmᵗ (mapᵉ g3 bMention)
+
+_ : hopDᵗ 4 fMul ≡ 1
+_ = refl
+
+-- and the OUTER coefficient is 1 either way: one mention, no duplication
+_ : pmᵗ 4 0 fMul ≡ 1
+_ = refl
+
+vDeep : Closed Γ natᵗ
+vDeep = mergeAllᵉ (ofᵉ (strmᵗ emptyᵉ ∷ []))
+
+_ : hopDᵉ 4 vDeep ≡ 1
+_ = refl
+
+progMul : Closed Γ (obs natᵗ)
+progMul = mapᵉ fMul (ofᵉ (strmᵗ vDeep ∷ []))
+
+-- the allowance: 1 + 1·1  (it was 3 + 1·1 ≡ 4 under the count)
+_ : hopDᵉ 4 progMul ≡ 2
+_ = refl
+
+emittedMul : Val Γ (obs natᵗ)
+emittedMul = applyFn fMul vDeep
+
+-- the emission: the plug landed in bMention, inside g3.  Under the
+-- count that was 3·(1+1) ≡ 6 against an allowance of 4; under the
+-- multiplier it is 1·(1+1) ≡ 2 against an allowance of 2
+_ : hopDᵛ 4 (obs natᵗ) emittedMul ≡ 2
+_ = refl
+
+-- the standing guard for refutation 2.  Under any coefficient that
+-- counts occurrences rather than composing multipliers, this is 6 ≤ 4
+-- and stops typechecking
+mul-fits : hopDᵛ 4 (obs natᵗ) emittedMul ≤ hopDᵉ 4 progMul
+mul-fits = s≤s (s≤s z≤n)

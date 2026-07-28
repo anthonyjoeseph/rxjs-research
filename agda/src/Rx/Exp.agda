@@ -716,73 +716,17 @@ mutual
   occsᵗˢ []       = 0
   occsᵗˢ (y ∷ ys) = occsᵗ y + occsᵗˢ ys
 
--- THE PER-BINDER OCCURRENCE COUNT.  `occsᵗ` above is index-BLIND: it
--- reads every varᵗ as 1 whatever binder the variable belongs to.  That
--- is right for plugs-lenᵉ, which bounds the copying done by a
--- WHOLE-environment substitution, and wrong for any coefficient that
--- means "how often is THIS binder's argument duplicated".  Under that
--- reading a mention of an unrelated variable already inflates the
--- count, and substituting for an OUTER variable inflates it again —
--- the plugged term arrives carrying its own binders' variables, which
--- occsᵗ then counts as if they were this binder's.  (Refuted
--- 2026-07-28 in agda/probe/Hop-Descent-Probe.agda; Rx.Hop-Depth's
--- three coefficients are the consumers.)
+-- THE DE BRUIJN POSITION of a Θ variable.  Rx.Hop-Depth's plug
+-- multiplier is the consumer: its coefficients ask "is this the
+-- variable THIS binder binds", which is a question about the index,
+-- not about how many variables a term mentions.
 --
--- occsAtᵗ k counts occurrences of the de Bruijn index k and bumps k at
--- every Θ binder — mapᵉ/scanᵉ's Fn and caseᵗ's two branches, the only
--- three in the syntax.  occs0ᵗ ≡ occsAtᵗ 0 is the innermost binder's
--- own count, which is what a Fn coefficient wants.  Keeping the index
--- general rather than hard-coding 0 is what makes the shift
--- bookkeeping explicit at each binder, where an off-by-one would
--- otherwise hide.
---
--- THE INVARIANCE that makes it the right coefficient: subΘ plugs
--- Θ-CLOSED values, and a Θ-closed term has occsAt k ≡ 0 at every k —
--- each of its variables is bound inside it, hence compared against a k
--- already bumped past it.  So occs0 is unchanged by substituting for
--- an outer variable, which is exactly what occsᵗ is not.
+-- `occsᵗ` above is index-BLIND on purpose — it bounds the copying a
+-- WHOLE-environment substitution does, which is exactly what
+-- plugs-lenᵉ needs, and exactly what a per-binder coefficient must not
+-- use.  Two refutations on 2026-07-28 pinned that down, and then a
+-- third showed that no occurrence count of any kind is the right
+-- quantity for such a coefficient; see the Rx.Hop-Depth header.
 varIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → ℕ
 varIx (here _)  = 0
 varIx (there p) = suc (varIx p)
-
-mutual
-  occsAtᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → Exp Γ Δᵍ Δ Θ t → ℕ
-  occsAtᵉ k (input i)       = 0
-  occsAtᵉ k (ofᵉ ts)        = occsAtᵗˢ k ts
-  occsAtᵉ k emptyᵉ          = 0
-  occsAtᵉ k (mapᵉ f e)      = occsAtᵗ (suc k) f + occsAtᵉ k e
-  occsAtᵉ k (takeᵉ c e)     = occsAtᵗ k c + occsAtᵉ k e
-  occsAtᵉ k (scanᵉ f z e)   = occsAtᵗ (suc k) f + occsAtᵗ k z + occsAtᵉ k e
-  occsAtᵉ k (mergeAllᵉ e)   = occsAtᵉ k e
-  occsAtᵉ k (concatAllᵉ e)  = occsAtᵉ k e
-  occsAtᵉ k (switchAllᵉ e)  = occsAtᵉ k e
-  occsAtᵉ k (exhaustAllᵉ e) = occsAtᵉ k e
-  occsAtᵉ k (μᵉ e)          = occsAtᵉ k e
-  occsAtᵉ k (varᵉ x)        = 0
-  occsAtᵉ k (deferᵉ e)      = 0
-
-  occsAtᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → Tm Γ Δᵍ Δ Θ t → ℕ
-  occsAtᵗ k (varᵗ x)      = if varIx x ≡ᵇ k then 1 else 0
-  occsAtᵗ k unit̂          = 0
-  occsAtᵗ k (bool̂ _)      = 0
-  occsAtᵗ k (nat̂ _)       = 0
-  occsAtᵗ k (pairᵗ a b)   = occsAtᵗ k a + occsAtᵗ k b
-  occsAtᵗ k (fstᵗ p)      = occsAtᵗ k p
-  occsAtᵗ k (sndᵗ p)      = occsAtᵗ k p
-  occsAtᵗ k (inlᵗ a)      = occsAtᵗ k a
-  occsAtᵗ k (inrᵗ a)      = occsAtᵗ k a
-  occsAtᵗ k (caseᵗ s l r) =
-    occsAtᵗ k s + occsAtᵗ (suc k) l + occsAtᵗ (suc k) r
-  occsAtᵗ k (ifᵗ c a b)   = occsAtᵗ k c + occsAtᵗ k a + occsAtᵗ k b
-  occsAtᵗ k (primᵗ _ a)   = occsAtᵗ k a
-  occsAtᵗ k (strmᵗ e)     = occsAtᵉ k e
-
-  occsAtᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  occsAtᵗˢ k []       = 0
-  occsAtᵗˢ k (y ∷ ys) = occsAtᵗ k y + occsAtᵗˢ k ys
-
-occs0ᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-occs0ᵉ = occsAtᵉ 0
-
-occs0ᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
-occs0ᵗ = occsAtᵗ 0

@@ -96,7 +96,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 shellsᵉ; shellsᵛ;
                                 subΘExp; subΘTm; subΘTms;
                                 plugsᵉ; plugsᵗ; plugsᵗˢ;
-                                occsᵉ; occsᵗ; occsᵗˢ; occs0ᵗ;
+                                occsᵉ; occsᵗ; occsᵗˢ;
                                 renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
                                 wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
@@ -109,7 +109,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -1416,29 +1416,50 @@ totᵛ-counts B (x ∷ M)
 -- def's, and demands r′ ≤ R.  A def is fixed slot content, so this
 -- is a cap on hopD over STORE-SIZED expressions and nothing more.
 --
--- hopD's scanᵉ clause pays (2 + occs)^V at every node, and a size-s
--- expression has s nodes with occs ≤ s, so the cap is (2+s)^(V·s) —
--- ONE POLYNOMIAL higher in the exponent than the retired rank's
--- (1+V)^(1+V).  prod≤3pow below absorbs that inside the SAME three
--- exponential stories (a cube where it used to square), which is why
--- the budget tower does not move: R rising by a polynomial in the
--- exponent is invisible to a tower of 2s.
+-- hopD's scanᵉ clause pays (2 + pm f)^V at every node, where pm is the
+-- plug MULTIPLIER (Rx.Hop-Depth) rather than an occurrence count.  A
+-- count would be ≤ s and the cap would be (2+s)^(V·s), one polynomial
+-- above the retired rank's (1+V)^(1+V).  A multiplier is not bounded by
+-- s: pm's own scanᵉ clause is (2 + pm f)^V, so each nesting level of
+-- scanᵉ multiplies the exponent by V instead of adding to it, and d
+-- nested scans give V^d.  With d ≤ s the cap is (2+s)^(V′^s), and at
+-- s ≤ V that is hopR V = (2+V)^((1+V)^(1+V)) — an EXPONENTIAL exponent
+-- where the count gave a polynomial one.
+--
+-- prod≤3pow below still absorbs it inside the SAME three exponential
+-- stories.  Its slack identity closes on (V+2)^(V+3) where the
+-- polynomial version closed on (V+2)³, and its side condition is
+-- (V+2)² ≤ 2^V (true from V ≥ 6) where that one wanted 3V ≤ 2^V (true
+-- from 4).  THE BUDGET TOWER DOES NOT MOVE: V is a tower of 2s of
+-- height (4+sz)(1+id) ≥ 2^65536, and a tower cannot notice the
+-- difference between a polynomial and an exponential in an exponent —
+-- both vanish into the first story.
 ------------------------------------------------------------------
 
 hopR : ℕ → ℕ
-hopR V = (2 + V) ^ (suc V * suc V)
+hopR V = (2 + V) ^ (suc V ^ suc V)
 
 postulate
   -- (P1) hopD is bounded by SIZE, at the shape the clause recursion
-  -- gives.  Induction on e, one ≤-chain per clause, all with slack:
-  --   mapᵉ    2·(2+s)^(V′(s-1)+1)  ≤ (2+s)^(V′s)   needs 2 ≤ (2+s)^V
-  --   scanᵉ   3·(2+s)^(V+V′(s-1))  ≤ (2+s)^(V′s)   needs 3 ≤ 2+s
-  --   *Allᵉ   suc ((2+s)^(V′(s-1))) ≤ (2+s)^(V′s)
-  -- where V′ = suc V and s = sizeᵉ e.  Nothing here is tight; the
-  -- statement is deliberately loose so every clause closes by
+  -- gives.  The exponent is V′^s, not V′·s, and that is forced: the
+  -- coefficient is a MULTIPLIER (pm), not an occurrence count, so it is
+  -- not bounded by s.  pm's own scanᵉ clause is (2 + pm f)^V, which
+  -- means each nesting level of scanᵉ raises the exponent by a FACTOR
+  -- of V rather than adding one — d nested scans give V^d.  With d ≤ s
+  -- that is V′^s.  Under the retired occurrence count the coefficient
+  -- WAS ≤ s and the bound was (2+s)^(V′·s); that statement is false for
+  -- pm and has been retracted rather than left standing.
+  --
+  -- Induction on e, one ≤-chain per clause, all with slack, and the
+  -- same statement for pm (which the mapᵉ/scanᵉ clauses read):
+  --   mapᵉ    P(s₁) + (P(s₁)+1)·P(s₂)     ≤ P(s)   via V′^s₁+V′^s₂ ≤ V′^(s-1)
+  --   scanᵉ   (2+P(s₁))^V · 3·P(s-1)      ≤ P(s)   via V·V′^s₁ ≤ V′^(s₁+1)
+  --   *Allᵉ   suc (P(s-1))                ≤ P(s)
+  -- where P(s) = (2+s)^(V′^s), V′ = suc V, s = sizeᵉ e.  Nothing here is
+  -- tight; the statement is deliberately loose so every clause closes by
   -- ^-monoˡ/ʳ-≤ without arithmetic identities.
   hopD-size : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
-    hopDᵉ V e ≤ (2 + sizeᵉ e) ^ (suc V * sizeᵉ e)
+    hopDᵉ V e ≤ (2 + sizeᵉ e) ^ (suc V ^ sizeᵉ e)
 
 -- the r ≤ R discharge, packaged: a stored expression's hop depth sits
 -- under the store rank cap purely because its SIZE does — all through
@@ -1447,8 +1468,8 @@ hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ �
   sizeᵉ e ≤ V → hopDᵉ V e ≤ hopR V
 hopD-cap V e h =
   ≤-trans (hopD-size V e)
-  (≤-trans (^-monoˡ-≤ (suc V * sizeᵉ e) (+-monoʳ-≤ 2 h))
-           (^-monoʳ-≤ (2 + V) (*-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
+  (≤-trans (^-monoˡ-≤ (suc V ^ sizeᵉ e) (+-monoʳ-≤ 2 h))
+           (^-monoʳ-≤ (2 + V) (^-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
 
 -- a shared slot's def is an element of the global syntactic
 -- multiset {program} ⊎ {slots}: its size sits inside the budget's
@@ -1763,8 +1784,8 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
   hopD-map : ∀ {s u} (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) →
     hopDᵉ V b ≤ hopDᵉ V (mapᵉ f b)
   hopD-map f b =
-    ≤-trans (1*≤ (hopDᵉ V b) (occs0ᵗ f ⊔ 1) (m≤n⊔m (occs0ᵗ f) 1))
-            (m≤n+m ((occs0ᵗ f ⊔ 1) * hopDᵉ V b) (hopDᵗ V f))
+    ≤-trans (1*≤ (hopDᵉ V b) (pmᵗ V 0 f ⊔ 1) (m≤n⊔m (pmᵗ V 0 f) 1))
+            (m≤n+m ((pmᵗ V 0 f ⊔ 1) * hopDᵉ V b) (hopDᵗ V f))
 
   hopD-take : ∀ {u} (c : Tm Γ Δᵍ Δ Θ natᵗ) (b : Exp Γ Δᵍ Δ Θ u) →
     hopDᵉ V b ≤ hopDᵉ V (takeᵉ c b)
@@ -1774,7 +1795,7 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
     (b : Exp Γ Δᵍ Δ Θ s) → hopDᵉ V b ≤ hopDᵉ V (scanᵉ f z b)
   hopD-scan f z b =
     ≤-trans (m≤n+m (hopDᵉ V b) (hopDᵗ V f + hopDᵗ V z))
-            (1*≤ _ _ (1≤pow (suc (occs0ᵗ f)) V))
+            (1*≤ _ _ (1≤pow (suc (pmᵗ V 0 f)) V))
 
   -- the four hop carriers: the operator's own frame is the `suc`
   hopD-all : ∀ {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
@@ -2142,45 +2163,54 @@ k+2≤2^k (suc (suc (suc j))) _ =
             (≤-trans (2k≤2^k (suc (suc j)) (s≤s (s≤s z≤n)))
                      (≤-reflexive (sym (+-identityʳ (2 ^ suc (suc j)))))))
 
--- the CUBE's side condition, where the square needed 2k≤2^k.  hopR's
--- exponent is one polynomial degree higher than the retired rank's, so
--- the slack identity below closes on (V+2)³ and wants 3V ≤ 2^V — true
--- from V ≥ 4 (at V ≡ 4 it is 12 ≤ 16), where the square was true from 2
-3k≤2^k : ∀ k → 4 ≤ k → k + (k + k) ≤ 2 ^ k
-3k≤2^k (suc zero)                      (s≤s ())
-3k≤2^k (suc (suc zero))                (s≤s (s≤s ()))
-3k≤2^k (suc (suc (suc zero)))          (s≤s (s≤s (s≤s ())))
-3k≤2^k (suc (suc (suc (suc zero))))    _ = ≤ᵇ⇒≤ 12 16 tt
--- the recursive call spells `m` out: it is a where-binding, and the
--- termination checker is syntactic
-3k≤2^k (suc (suc (suc (suc (suc j))))) _ =
-  ≤-trans (≤-reflexive shape)
-  (≤-trans (+-mono-≤ 3≤2^m
-             (3k≤2^k (suc (suc (suc (suc j)))) (s≤s (s≤s (s≤s (s≤s z≤n))))))
-           (≤-reflexive (sym (cong (2 ^ m +_) (+-identityʳ (2 ^ m))))))
+-- THE SQUARE's side condition.  The retired occurrence count made
+-- hopR's exponent a polynomial and this was 3k ≤ 2^k (true from 4);
+-- pm's scanᵉ clause makes it an exponential, (1+V)^(1+V), so the slack
+-- identity below closes on (V+2)^(V+3) and wants (V+2)² ≤ 2^V — true
+-- from V ≥ 6, where at V ≡ 6 it is exactly 64 ≤ 64.  V is a tower of
+-- 2s of height ≥ 5, so 6 is as free as 4 was.
+--
+-- The step needs no side condition of its own: (j+9)² ≤ 2·(j+8)² holds
+-- at every j, with j²+14j+47 to spare.  Only the base is delicate, and
+-- it is delicate by exactly zero.
+sq≤2^ : ∀ k → 6 ≤ k → (2 + k) * (2 + k) ≤ 2 ^ k
+sq≤2^ zero                                         ()
+sq≤2^ (suc zero)                                   (s≤s ())
+sq≤2^ (suc (suc zero))                             (s≤s (s≤s ()))
+sq≤2^ (suc (suc (suc zero)))                       (s≤s (s≤s (s≤s ())))
+sq≤2^ (suc (suc (suc (suc zero))))                 (s≤s (s≤s (s≤s (s≤s ()))))
+sq≤2^ (suc (suc (suc (suc (suc zero)))))           (s≤s (s≤s (s≤s (s≤s (s≤s ())))))
+sq≤2^ (suc (suc (suc (suc (suc (suc zero))))))     _ = ≤ᵇ⇒≤ 64 64 tt
+-- the recursive call spells its argument out: the termination checker
+-- is syntactic and would not see through a where-binding
+sq≤2^ (suc (suc (suc (suc (suc (suc (suc j))))))) _ =
+  ≤-trans (≤-trans (m≤m+n ((9 + j) * (9 + j)) (j * j + 14 * j + 47))
+                   (≤-reflexive ident))
+          (*-monoʳ-≤ 2 (sq≤2^ (suc (suc (suc (suc (suc (suc j))))))
+                              (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n)))))))) 
   where
-  m = suc (suc (suc (suc j)))
-  shape : suc m + (suc m + suc m) ≡ 3 + (m + (m + m))
-  shape = solve 1
-    (λ v → (con 1 :+ v) :+ ((con 1 :+ v) :+ (con 1 :+ v))
-             := con 3 :+ (v :+ (v :+ v)))
-    refl m
-  3≤2^m : 3 ≤ 2 ^ m
-  3≤2^m = ≤-trans (s≤s (s≤s (s≤s z≤n))) (k+2≤2^k m (s≤s (s≤s z≤n)))
+  ident : (9 + j) * (9 + j) + (j * j + 14 * j + 47)
+        ≡ 2 * ((8 + j) * (8 + j))
+  ident = solve 1
+    (λ v → ((con 9 :+ v) :* (con 9 :+ v))
+             :+ (v :* v :+ con 14 :* v :+ con 47)
+             := con 2 :* ((con 8 :+ v) :* (con 8 :+ v)))
+    refl j
 
 2+k≤2^k : ∀ k → 2 ≤ k → 2 + k ≤ 2 ^ k
 2+k≤2^k k h = ≤-trans (≤-reflexive (+-comm 2 k)) (k+2≤2^k k h)
 
-prod≤3pow : ∀ (V U : ℕ) → 4 ≤ V → U ≤ V →
+prod≤3pow : ∀ (V U : ℕ) → 6 ≤ V → U ≤ V →
   suc (suc V * suc (hopR V) * suc U) ≤ 2 ^ (2 ^ (2 ^ V))
-prod≤3pow V U 4≤V U≤V =
+prod≤3pow V U 6≤V U≤V =
   ≤-trans (s≤s prod≤2F) (≤-trans (suc-2^ F) (^-monoʳ-≤ 2 sucF≤))
   where
   2≤V : 2 ≤ V
-  2≤V = ≤-trans (≤ᵇ⇒≤ 2 4 tt) 4≤V
+  2≤V = ≤-trans (≤ᵇ⇒≤ 2 6 tt) 6≤V
 
-  Q = V * (suc V * suc V)
+  Q = V * (suc V ^ suc V)
   F = V + suc Q + V
+  X = (2 + V) ^ (2 + V)
 
   hV : suc V ≤ 2 ^ V
   hV = n<2^n V
@@ -2189,8 +2219,8 @@ prod≤3pow V U 4≤V U≤V =
   hB = 2+k≤2^k V 2≤V
 
   hR : suc (hopR V) ≤ 2 ^ suc Q
-  hR = ≤-trans (s≤s (≤-trans (^-monoˡ-≤ (suc V * suc V) hB)
-                             (≤-reflexive (^-*-assoc 2 V (suc V * suc V)))))
+  hR = ≤-trans (s≤s (≤-trans (^-monoˡ-≤ (suc V ^ suc V) hB)
+                             (≤-reflexive (^-*-assoc 2 V (suc V ^ suc V)))))
                (suc-2^ Q)
 
   hU : suc U ≤ 2 ^ V
@@ -2202,24 +2232,59 @@ prod≤3pow V U 4≤V U≤V =
       (trans (cong (_* 2 ^ V) (sym (^-distribˡ-+-* 2 V (suc Q))))
              (sym (^-distribˡ-+-* 2 (V + suc Q) V))))
 
-  -- suc F + slack = (V+2)³, counted exactly (the ring identity)
-  slack-eq : (7 + (4 * (V * V) + 9 * V)) + F ≡ (V + 2) * ((V + 2) * (V + 2))
-  slack-eq = solve 1
-    (λ v → (con 7 :+ (con 4 :* (v :* v) :+ con 9 :* v))
-             :+ ((v :+ (con 1 :+ v :* ((con 1 :+ v) :* (con 1 :+ v)))) :+ v)
-             := (v :+ con 2) :* ((v :+ con 2) :* (v :+ con 2)))
-    refl V
+  -- Q sits under X: V ≤ 2+V and (1+V)^(1+V) ≤ (2+V)^(1+V), and
+  -- (2+V)·(2+V)^(1+V) IS X
+  Q≤ : Q ≤ X
+  Q≤ = *-mono-≤ (≤-trans (n≤1+n V) (n≤1+n (suc V)))
+                (^-monoˡ-≤ (suc V) (n≤1+n (suc V)))
+
+  -- and so does the linear part, via the square
+  sq≤X : (2 + V) * (2 + V) ≤ X
+  sq≤X = *-monoʳ-≤ (2 + V)
+           (≤-trans (≤-reflexive (sym (*-identityʳ (2 + V))))
+                    (*-monoʳ-≤ (2 + V) (1≤pow (suc V) V)))
+
+  lin≤ : 2 + (V + V) ≤ X
+  lin≤ = ≤-trans (≤-trans (m≤m+n (2 + (V + V)) (2 + 2 * V + V * V))
+                          (≤-reflexive linId))
+                 sq≤X
+    where
+    linId : (2 + (V + V)) + (2 + 2 * V + V * V) ≡ (2 + V) * (2 + V)
+    linId = solve 1
+      (λ v → (con 2 :+ (v :+ v)) :+ (con 2 :+ con 2 :* v :+ v :* v)
+               := (con 2 :+ v) :* (con 2 :+ v))
+      refl V
+
+  -- V·(V+3) ≤ (V+2)², with V+4 to spare — the exponent's own slack
+  expo≤ : V * (3 + V) ≤ 2 ^ V
+  expo≤ = ≤-trans (≤-trans (m≤m+n (V * (3 + V)) (V + 4))
+                           (≤-reflexive expId))
+                  (sq≤2^ V 6≤V)
+    where
+    expId : V * (3 + V) + (V + 4) ≡ (2 + V) * (2 + V)
+    expId = solve 1
+      (λ v → v :* (con 3 :+ v) :+ (v :+ con 4) := (con 2 :+ v) :* (con 2 :+ v))
+      refl V
+
+  reshape : suc F ≡ (2 + (V + V)) + Q
+  reshape = solve 2
+    (λ v q → con 1 :+ ((v :+ (con 1 :+ q)) :+ v)
+               := (con 2 :+ (v :+ v)) :+ q)
+    refl V Q
+
+  -- X + X ≤ (2+V)·X, and (2+V)·X IS (2+V)^(3+V)
+  twoX : X + X ≤ (2 + V) ^ (3 + V)
+  twoX = ≤-trans (≤-reflexive (sym (cong (X +_) (+-identityʳ X))))
+                 (*-monoˡ-≤ X (≤-trans (≤ᵇ⇒≤ 2 2 tt) (m≤m+n 2 V)))
 
   sucF≤ : suc F ≤ 2 ^ (2 ^ V)
   sucF≤ =
-    ≤-trans (+-monoˡ-≤ F (s≤s (z≤n {6 + (4 * (V * V) + 9 * V)})))
-    (≤-trans (≤-reflexive slack-eq)
-    (≤-trans (*-mono-≤ (k+2≤2^k V 2≤V)
-                       (*-mono-≤ (k+2≤2^k V 2≤V) (k+2≤2^k V 2≤V)))
-    (≤-trans (≤-reflexive
-               (trans (cong (2 ^ V *_) (sym (^-distribˡ-+-* 2 V V)))
-                      (sym (^-distribˡ-+-* 2 V (V + V)))))
-             (^-monoʳ-≤ 2 (3k≤2^k V 4≤V)))))
+    ≤-trans (≤-reflexive reshape)
+    (≤-trans (+-mono-≤ lin≤ Q≤)
+    (≤-trans twoX
+    (≤-trans (^-monoˡ-≤ (3 + V) hB)
+    (≤-trans (≤-reflexive (^-*-assoc 2 V (3 + V)))
+             (^-monoʳ-≤ 2 expo≤)))))
 
 -- the burst's seed step: at instant 0 the demand product sits under
 -- the budget's tower summand alone.  The demand anchors at the
@@ -2232,13 +2297,13 @@ seed-covers : ∀ (sz U : ℕ) → U ≤ sz →
     ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
 seed-covers sz U U≤sz
   rewrite *-identityʳ sz | *-identityʳ sz | *-identityʳ (4 + sz) =
-  ≤-trans (prod≤3pow (towerℕ (4 + sz)) U 4≤V U≤V)
+  ≤-trans (prod≤3pow (towerℕ (4 + sz)) U 6≤V U≤V)
   (≤-trans (towerℕ-mono (m≤m*n (7 + sz) 2))
            (m≤n+m (towerℕ ((7 + sz) * 2)) (2 ^ sz)))
   where
-  -- towerℕ 2 ≡ 4, and the seed's height is 4 + sz
-  4≤V : 4 ≤ towerℕ (4 + sz)
-  4≤V = towerℕ-mono {2} {4 + sz} (s≤s (s≤s z≤n))
+  -- towerℕ 3 ≡ 16, and the seed's height is 4 + sz
+  6≤V : 6 ≤ towerℕ (4 + sz)
+  6≤V = ≤-trans (≤ᵇ⇒≤ 6 16 tt) (towerℕ-mono {3} {4 + sz} (s≤s (s≤s (s≤s z≤n))))
   U≤V : U ≤ towerℕ (4 + sz)
   U≤V = ≤-trans U≤sz (≤-trans (m≤n+m sz 4) (k≤towerℕ (4 + sz)))
 
@@ -2518,15 +2583,17 @@ budget-covers : ∀ (sz U id : ℕ) → U ≤ sz →
   suc (suc V * suc (hopR V) * suc U)
     ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
 budget-covers sz U id U≤sz =
-  ≤-trans (prod≤3pow (towerℕ h) U 4≤V U≤V)
+  ≤-trans (prod≤3pow (towerℕ h) U 6≤V U≤V)
   (≤-trans (towerℕ-mono slack)
            (m≤n+m (towerℕ H) (2 ^ (sz * suc id * suc id))))
   where
   h = (4 + sz) * suc (suc id)
   H = (7 + sz) * suc (suc id)
 
-  4≤V : 4 ≤ towerℕ h
-  4≤V = towerℕ-mono {2} {h} (s≤s (s≤s z≤n))
+  6≤V : 6 ≤ towerℕ h
+  6≤V = ≤-trans (≤ᵇ⇒≤ 6 16 tt)
+          (towerℕ-mono {3} {h}
+            (≤-trans (s≤s (s≤s (s≤s z≤n))) (m≤m*n (4 + sz) (suc (suc id)))))
 
   sz≤h : sz ≤ h
   sz≤h = ≤-trans (m≤n+m sz 4) (m≤m*n (4 + sz) (suc (suc id)))
@@ -4954,8 +5021,12 @@ postulate
 --   B  generated, shared slots       1000 progs   17739 obs   0 viol
 --   C  directed, 2 slots               19 progs     199 obs   0 viol
 --   C₃ directed, 3 slots, 2 shares     36 progs     681 obs   0 viol
---   D  directed, obs into templates    11 progs     130 obs   0 viol
---   D  generated, obs into templates  650 progs   16614 obs   0 viol
+--   D  directed, obs into templates    14 progs     172 obs   0 viol
+--   D  generated, obs into templates  700 progs   17804 obs   0 viol
+--
+-- Re-measured in full after the coefficient became a multiplier: the
+-- coefficient sits on both sides of every one of these inequalities,
+-- so none of the earlier greens carried over.
 --
 -- B was first run at 6 programs (three seeds deep) and REBALANCED
 -- 2026-07-28 toward breadth — 40 seeds × 25 programs at depth 3 —
@@ -4981,17 +5052,27 @@ postulate
 -- coefficient found zero violations.  The directed half forces the
 -- conjunction, and measured both ways on identical programs it reads
 --
---   occsᵗ  (the refuted count)   130 obs   9 VIOLATIONS
---   occs0ᵗ (the repair)          130 obs   0 violations
+--   occsᵗ (the index-blind count)   130 obs   9 VIOLATIONS
+--   the multiplier                  130 obs   0 violations
 --
--- Eight of its eleven programs fire under occsᵗ; the other three are
+-- Eight of those eleven programs fire under occsᵗ; the other three are
 -- controls whose shapes are correct by construction.  That 9 ↦ 0 is
 -- the evidence that the corpus can see the mechanism at all — a corpus
--- that cannot fail on the bug it guards is decoration.  (Four of
--- thirty D seeds time out on pathological programs and are excluded
--- from the count above; the self-doubling scan step is not generated
--- at all, since its syntax doubles per folded value.  Its hop
--- behaviour is refl-checked statically instead.)
+-- that cannot fail on the bug it guards is decoration.
+--
+-- Three further directed programs (mulG/mulG₂) carry the SECOND
+-- refutation, the one the per-binder count `occs0ᵗ` also failed: an
+-- outer template that mentions its observable once and duplicates
+-- nothing, over an inner map whose coefficient multiplies whatever
+-- lands in its source.  Their machine-checked static counterpart is
+-- Hop-Descent-Probe's mul-exceeds (6 against an allowance of 4 under
+-- occs0ᵗ) and mul-fits (2 ≤ 2 under the multiplier); the corpus
+-- carries the runtime guard.
+--
+-- (Two of thirty D seeds time out on pathological programs and are
+-- excluded from the count above; the self-doubling scan step is not
+-- generated at all, since its syntax doubles per folded value.  Its
+-- hop behaviour is refl-checked statically instead.)
 --
 -- selfcheck and wellFormed clean throughout, so the log does not move
 -- the evaluator.  The probe's V is capped at 8 (the real V makes
@@ -5026,7 +5107,10 @@ postulate
 --
 --   · `r` is hopDᵉ V b, a plain ℕ.  rank ∘ measureE is gone and
 --     NOTHING replaces the rank wrapper — hopD is already the number.
---   · `R` is hopR V = (2+V)^((1+V)²), replacing (1+V)^(1+V).  hopD's
+--   · `R` is hopR V = (2+V)^((1+V)^(1+V)), replacing (1+V)^(1+V).
+--     (Stated as (2+V)^((1+V)²) on the day, when the coefficient was
+--     still a count; the exponent became exponential when it became a
+--     multiplier.  See the hop-rank-cap memo above.)  hopD's
 --     scan clause pays (2+occs)^V per node, so a store-sized def costs
 --     one polynomial degree more in the exponent.  prod≤3pow absorbs
 --     it inside the SAME three exponential stories — its slack
@@ -5056,68 +5140,80 @@ postulate
 -- first emission is 3.
 --
 -- WHY, and it is a CALIBRATION bug in one coefficient rather than a
--- failure of the remaining-hop idea.  hopD's mapᵉ clause scales by
--- `occsᵗ f ⊔ 1`, and occsᵗ counts EVERY varᵗ in the template.  The
--- coefficient exists to price how many times the SOURCE's value gets
--- duplicated, which is the occurrences of the map's OWN bound
--- variable — index 0.  Those two counts agree on a template, and come
--- apart under substitution: subΘ replaces an OUTER Θ variable by a
--- reified observable, and that observable carries its own map/scan
--- templates whose own bound variables occsᵗ then counts as well.  So
--- the coefficient inflates although nothing about the source's value
--- was duplicated — the new occurrences belong to a different binder.
+-- failure of the remaining-hop idea.  hopD's mapᵉ clause scales by a
+-- coefficient, and the question is what that coefficient counts.
+-- Three answers were tried in one day; the first two are refuted by
+-- machine-checked witnesses in agda/probe/Hop-Descent-Probe.agda.
 --
--- The witness makes that stark by plugging a value of hop depth ZERO:
--- `mapᵉ idFn (mapᵉ idFn emptyᵉ)`, occsᵉ 2, hopD 0.  Plugging it lifts
--- an inner coefficient 2 ↦ 3, and the extra unit multiplies an inner
--- source's hop depth of 1.  The template even DISCARDS the plugged
--- observable (`sndᵗ`) — it is mentioned and thrown away, and the
--- mention alone is enough.
+-- (1) occsᵗ, the index-blind count the sync-linearity ledger uses.
+-- It counts EVERY varᵗ in the template.  The coefficient exists to
+-- price the SOURCE's value, which is the occurrences of the map's OWN
+-- bound variable — those agree on a template and come apart under
+-- substitution, since subΘ replaces an OUTER Θ variable by a reified
+-- observable carrying its own templates, whose own bound variables
+-- occsᵗ then counts as well.  So it inflates although nothing was
+-- duplicated.  `plugged` makes that stark with a value of hop depth
+-- ZERO: occsᵉ 2, hopD 0, lifting an inner coefficient 2 ↦ 3, and the
+-- extra unit multiplies an inner source's hop depth of 1.  The
+-- template even DISCARDS the plugged observable (sndᵗ) — the mention
+-- alone is enough.
 --
--- Note this is NOT the two-use duplication that killed measureE.  That
--- one was real duplication the measure failed to price; this one is
--- phantom duplication the measure prices when it should not.  hopD
--- over-counts where the shell multiset under-counted.
+-- (2) occs0ᵗ, the same count restricted to the binder's own index.
+-- It fixes (1) and stays put under substitution — a plug is Θ-closed,
+-- so every variable it brings is compared against an already-bumped
+-- index.  It was gated the full way (corpora re-run, static witnesses
+-- re-checked) and taken.  It is still wrong, and for a reason that
+-- has nothing to do with which variables get counted: it is a COUNT.
+-- hopD combines by `⊔` at ofᵉ and pairᵗ, where two mentions cost what
+-- one costs; and it MULTIPLIES at mapᵉ, where a plug landing in an
+-- inner map's SOURCE is scaled by that inner template's coefficient —
+-- a factor no count of outer mentions can see.  `mul-exceeds` is that
+-- witness: an outer template that mentions its argument exactly once
+-- and duplicates nothing, emitting at hop depth 6 against an
+-- allowance of 4.
 --
--- THE REPAIR, TAKEN 2026-07-28 AFTER RE-GATING: scale by occurrences
--- of the bound variable at index 0 — Rx.Exp.occs0ᵗ, defined as
--- occsAtᵗ 0 with the index bumped at every Θ binder — instead of
--- occsᵗ, at all three of hopD's coefficients (mapᵉ's scale, caseᵗ's
--- scrutinee scale, scanᵉ's exponential base).  All three had the same
--- index-blindness and all three mean the same thing.  occs0 is exactly
--- the multiplicity the clause intends, it is strictly smaller, and —
--- the property that matters — it is INVARIANT under substitution for
--- an outer variable, since a plug is Θ-closed and so contributes no
--- occurrence at any index.  On the witness it reads 1 ≤ 1.
+-- Note (1) and (2) point in OPPOSITE directions: (1) over-prices
+-- phantom duplication, (2) under-prices real multiplication.  That is
+-- what makes the third answer determined rather than guessed — it is
+-- pinned from both sides.
 --
--- The index is kept GENERAL rather than hard-coded to 0 so the shift
--- bookkeeping sits visibly at each binder, where an off-by-one would
--- otherwise hide; it is also the shape subΘ's per-variable plug
--- accounting will want, which keeps the measure and the substitution
--- lemma in lockstep by construction.  No per-index count existed to
--- reuse: plugsᵗ accumulates a Θloc LIST and returns plug sizes, not a
--- count, so occsAt is new rather than a rename.
+-- Neither is the two-use duplication that killed measureE.  That was
+-- real duplication the measure failed to price at all.
 --
--- IT WAS NOT TAKEN ON ARGUMENT — occs0 shrinks hopD on BOTH sides of
--- every inequality, so every prior green was unproven for the
--- successor and phase 1's discipline applied again.  Re-run against
--- it: all four static refutation witnesses still descend strictly
--- (2↦1, 2↦1, 2↦1, 4↦2), the lifted-leaf variant still reads 4↦2 so
--- mapᵉ still composes by `+` and not `⊔`, the scan refold still pays
--- 256 against a depth of 4, the μ edge is still an equality, and every
--- corpus above is clean — including corpus D, which was built for this
--- mechanism and demonstrably fails without the repair.
+-- (3) THE ANSWER, and it is what these coefficients always meant: the
+-- plug MULTIPLIER, Rx.Hop-Depth.pmᵗ.  Read hopD as a function of one
+-- substituted value's depth; it is affine in that depth,
 --
--- WHAT STOOD THROUGHOUT: hopR and the cube (R caps hopD over
--- store-sized syntax whatever the coefficient), hopD-size, the
--- structural facts, the μ edge, and `r`'s slot being a plain ℕ.  What
--- was retracted for a day and is now RESTATED: the emitted-value
+--     hopD (e[v]) ≤ hopD e + pm k e · hopD v
+--
+-- and pm is the slope — the factor hopD's own arithmetic applies along
+-- every path from the root to an occurrence of the variable at index
+-- k.  pm is hopD's own recursion with two changes: a variable at index
+-- k contributes 1 where hopD contributes 0, and the *All frames drop
+-- their `suc`, an operator's hop being added to the plug's depth
+-- rather than multiplied by it.  Same tree, a different semiring at
+-- the leaves — which is exactly the shape phase 3 was told to look
+-- for, arrived at from the induction rather than from the analogy.
+--
+-- pm inherits the substitution-invariance that made occs0 usable, for
+-- the same reason and at the same index.  It also reads the witnesses
+-- of (1) and (2) correctly in BOTH directions: 1 where occsᵗ said 3,
+-- and 1 where occs0ᵗ's ×3 came from primᵗ positions hopD scores as 0.
+--
+-- WHAT IT COST, all inside the same three exponential stories: hopR's
+-- exponent went from polynomial to exponential (see the hop-rank-cap
+-- memo), hopD-size was restated at (2+s)^(V′^s) — the old (2+s)^(V′·s)
+-- is FALSE for a multiplier and was retracted rather than left
+-- standing — and prod≤3pow's side condition moved from 3V ≤ 2^V (V ≥ 4)
+-- to (V+2)² ≤ 2^V (V ≥ 6).  The budget tower did not move.
+--
+-- WHAT STOOD THROUGHOUT: the structural facts, the μ edge, `r`'s slot
+-- being a plain ℕ, and R being a cap on hopD over store-sized syntax
+-- whatever the coefficient.  What is RESTATED: the emitted-value
 -- conjunct, burstHopD? above, carried by subscribeE-walk.  Its engine
--- (hopD-evalWith / hopD-subΘᵉ) stays deleted and is the next thing to
--- build — on subΘ-countsᵗ's induction skeleton, which walks the same
--- substitution with the same multiplicity accounting and should
--- transfer clause for clause with a different semiring at the leaves.
--- A clause that does not transfer is itself the finding.
+-- (hopD-evalWith / hopD-subΘᵉ) is the next thing to build, and pm is
+-- what makes its induction close: the mapᵉ clause needs exactly
+-- `pm 0 f` from its recursive calls, which is how pm was found.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
