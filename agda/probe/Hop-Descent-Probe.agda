@@ -41,13 +41,13 @@ open import Data.Vec  using (Vec) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥)
 open import Data.Nat  using (_<_; _≤_; s≤s; z≤n)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp
 open import Data.Bool using (true)
 open import Verify-Budget-Sufficient using (measureE; counts; _≺ᵛ_; ≺-here; ≺-there)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ)
 open import Data.Product using (_,_)
 
 Γ : Ctx 1
@@ -337,3 +337,85 @@ _ = refl
 -- stated as the edge the walk will consume
 μ-hopD-stable : hopDᵉ 4 (unfoldμ μbody) ≡ hopDᵉ 4 (μᵉ μbody)
 μ-hopD-stable = refl
+
+------------------------------------------------------------------
+-- THE EMITTED-VALUE INVARIANT IS FALSE AS hopD IS CURRENTLY WRITTEN.
+--
+-- Built 2026-07-28 while starting phase 3, by trying to construct the
+-- worst case for hopD-subΘᵉ before proving it.  The witness refutes
+-- not just that lemma but the walk conjunct it was to serve:
+--
+--     every value a subscription emits has hopD ≤ hopD of what was
+--     subscribed
+--
+-- and it refutes it with a plugged value of hop depth ZERO.
+--
+-- THE MECHANISM.  hopD's mapᵉ coefficient is `occsᵗ f ⊔ 1`, and occsᵗ
+-- counts EVERY varᵗ in the template, not the occurrences of the
+-- variable the source's value is actually plugged into.  Substitution
+-- replaces an OUTER Θ variable by a reified observable, and that
+-- observable carries its own map/scan templates — whose own bound
+-- variables occsᵗ then counts too.  So the coefficient INFLATES under
+-- substitution even though nothing about the source's value was
+-- duplicated: those occurrences belong to a different binder.
+--
+-- Below, `plugged` has occsᵉ 2 and hopD 0 — two map templates over
+-- emptyᵉ.  Plugging it raises the inner coefficient from 2 to 3, and
+-- that lone extra unit multiplies the inner source's hop depth of 1.
+-- The emission comes out at 3 against the program's allowance of 2.
+------------------------------------------------------------------
+
+-- a Θ-BUSHY but hop-SHALLOW value: occsᵉ 2, hopDᵉ 0
+plugged : Closed Γ natᵗ
+plugged = mapᵉ idFn (mapᵉ idFn emptyᵉ)
+
+_ : occsᵉ plugged ≡ 2
+_ = refl
+
+_ : hopDᵉ 4 plugged ≡ 0
+_ = refl
+
+-- the inner source: one hop, no occurrences
+innerSrc : Exp Γ [] [] (obs natᵗ ∷ []) natᵗ
+innerSrc = mergeAllᵉ (ofᵉ (strmᵗ emptyᵉ ∷ []))
+
+-- the inner template.  `sndᵗ` DISCARDS the outer observable — it is
+-- mentioned and thrown away, which is the point: it contributes
+-- nothing semantically and still moves occsᵗ
+innerFn : Tm Γ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+innerFn = sndᵗ (pairᵗ (varᵗ (there (here refl))) (varᵗ (here refl)))
+
+innerBody : Exp Γ [] [] (obs natᵗ ∷ []) natᵗ
+innerBody = mapᵉ innerFn innerSrc
+
+-- the outer program: map an observable-valued template over a source
+-- that emits `plugged`
+outerFn : Fn Γ [] [] [] (obs natᵗ) (obs natᵗ)
+outerFn = strmᵗ innerBody
+
+outerSrc : Closed Γ (obs natᵗ)
+outerSrc = ofᵉ (strmᵗ plugged ∷ [])
+
+prog : Closed Γ (obs natᵗ)
+prog = mapᵉ outerFn outerSrc
+
+-- the source emits exactly `plugged`
+_ : evalTm (strmᵗ plugged) ≡ plugged
+_ = refl
+
+-- the program's allowance
+_ : hopDᵉ 4 prog ≡ 2
+_ = refl
+
+-- what the map frame emits for it: stepFrame (map-f fn) is
+-- `map (applyFn fn)`, so this IS the burst's value
+emitted : Val Γ (obs natᵗ)
+emitted = applyFn outerFn plugged
+
+_ : hopDᵛ 4 (obs natᵗ) emitted ≡ 3
+_ = refl
+
+-- 3 ≤ 2 has no inhabitant.  This is the walk conjunct burstHopD?
+-- demands of this very program, and it does not hold
+emitted-exceeds : hopDᵛ 4 (obs natᵗ) emitted ≤ hopDᵉ 4 prog → ⊥
+emitted-exceeds (s≤s (s≤s ()))

@@ -2109,74 +2109,6 @@ subΘ-shells-len V Θloc σ e hσ =
           (+-mono-≤ (inner-lenᵉ e) (plugs-lenᵉ V Θloc σ e hσ))
 
 ------------------------------------------------------------------
--- (P2) THE EMITTED-VALUE INVARIANT's ENGINE — the one genuinely open
--- piece of the hopD assembly, and the only place its correctness is
--- in question rather than merely unwritten.
---
--- Everything else the walk needs about hopD is syntactic and cheap
--- (the structural facts above are one line each; the store cap is a
--- size induction; the μ edge is refl).  What is NOT cheap is the
--- statement that a template, INSTANTIATED, does not emit deeper than
--- the template plus what was plugged into it — because that is where
--- the retired shell measure was actually refuted.  A template may use
--- its bound variable more than once, and subΘ copies the plugged
--- value once per occurrence; the whole point of hopD's occsᵗ scaling
--- is to price that copying instead of being surprised by it.  So this
--- is the same multiplicity that killed the old measure, now carried
--- BY the measure — and these two statements are where that has to be
--- made good.
---
--- THE SKELETON IS NOT NEW.  subΘ-countsᵗ above already walks this
--- exact substitution with this exact multiplicity accounting, and its
--- ledger (plugs-lenᵗ, inner-len-subΘ) is proven.  hopD's version is
--- meant to be the SAME induction with a different semiring at the
--- leaves: `⊕ᵛ`/`counts` become `+`/`⊔` on ℕ, and the plugs summand
--- becomes occsᵗ · m.  Follow it clause for clause.  If a clause of it
--- does NOT transfer, that clause is a FINDING about hopD, not an
--- obstacle to push through — surface it.
---
--- They are mutually recursive for the reason the measure is: evalWith
--- at `strmᵗ e` with a non-empty environment IS closeUnderFn, i.e.
--- subΘExp [] — the value side bottoms out in the expression side.
--- caseᵗ is the interesting clause both ways: it BINDS, so the branch
--- runs under an environment one entry longer, whose new entry is the
--- scrutinee's own value.  That is exactly why hopD's caseᵗ clause
--- scales by occurrences rather than taking a max.
-------------------------------------------------------------------
-
-EnvHopD : ∀ {n} {Γ : Ctx n} {Θ} (V m : ℕ) → All (Val Γ) Θ → Set
-EnvHopD V m []ᵃ                = ⊤
-EnvHopD V m (_∷ᵃ_ {x = t} v σ) = (hopDᵛ V t v ≤ m) × EnvHopD V m σ
-
-postulate
-  hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (V m : ℕ)
-    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) → EnvHopD V m env →
-    hopDᵛ V t (evalWith tm env) ≤ hopDᵗ V tm + occsᵗ tm * m
-
-  hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V m : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    EnvHopD V m σ →
-    hopDᵉ V (subΘExp Θloc σ e) ≤ hopDᵉ V e + occsᵉ e * m
-
--- what the mapᵉ clause actually calls: stepFrame's map-f is
--- `map (applyFn fn)`, and this is hopD's mapᵉ clause exactly
-hopD-applyFn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
-  (f : Fn Γ [] [] [] s u) (v : Val Γ s) →
-  hopDᵛ V u (applyFn f v) ≤ hopDᵗ V f + (occsᵗ f ⊔ 1) * hopDᵛ V s v
-hopD-applyFn {s = s} V f v =
-  ≤-trans (hopD-evalWith V (hopDᵛ V s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
-          (+-monoʳ-≤ (hopDᵗ V f)
-                     (*-monoˡ-≤ (hopDᵛ V s v) (m≤m⊔n (occsᵗ f) 1)))
-
--- and the ofᵉ clause: a closed term's value cannot out-hop the term
-hopD-evalTm : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (tm : Tm Γ [] [] [] t) →
-  hopDᵛ V t (evalTm tm) ≤ hopDᵗ V tm
-hopD-evalTm V tm =
-  ≤-trans (hopD-evalWith V 0 tm []ᵃ tt)
-          (≤-reflexive (trans (cong (hopDᵗ V tm +_) (*-zeroʳ (occsᵗ tm)))
-                              (+-identityʳ (hopDᵗ V tm))))
-
-------------------------------------------------------------------
 -- THE SEED INEQUALITY, PROVEN: the contract's whole demand — under
 -- one product by dBound-bound — fits the seeded budget's literal
 -- head plus tower at instant 0.  The engine (prod≤3pow) is generic:
@@ -4068,55 +4000,6 @@ burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
 burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 
 ------------------------------------------------------------------
--- THE EMITTED-VALUE INVARIANT — the walk conjunct that makes a hop
--- edge strict, and the whole reason `r` could become a plain ℕ.
---
--- A subscription's burst carries VALUES, and at a *All those values
--- are the observables the clause hops into.  So the walk must return
--- a bound on what it emitted, not merely on what it walked:
---
---     every value in (subscribeE g b κ …)'s burst has hopD ≤ hopD b.
---
--- Given that, the hop edge needs NO lemma of its own.  hopD's *All
--- clauses are literally `suc (hopD carrier)`, so for a hop target o
--- out of the carrier's burst
---
---     hopD o ≤ hopD carrier < suc (hopD carrier) ≡ hopD (mergeAllᵉ …)
---
--- and dBound-hop takes it directly.  The strictness is definitional;
--- the CONTENT is entirely in this conjunct.  That is the trade the
--- retired shell measure could not make — it tried to prove the hop
--- edge from syntax alone, and syntax does not know what a template
--- emits once a value is plugged into it.
-------------------------------------------------------------------
-
-hopDev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → InstEvent (Val Γ u) → Bool
-hopDev? {u = u} V h (value v) = hopDᵛ V u v ≤ᵇ h
-hopDev? V h (init _)    = true
-hopDev? V h (close _ _) = true
-hopDev? V h (handoff _) = true
-hopDev? V h complete    = true
-
-burstHopD? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
-burstHopD? V h = all (λ em → all (hopDev? V h) (InstEmit.events em))
-
--- the conjunct only ever widens as it rides up a walk: a caller whose
--- own hopD is larger inherits the callee's bound
-hopDev?-widen : ∀ {n} {Γ : Ctx n} {u} {V h h′ : ℕ} (ev : InstEvent (Val Γ u)) →
-  h ≤ h′ → hopDev? V h ev ≡ true → hopDev? V h′ ev ≡ true
-hopDev?-widen {u = u} {V = V} (value v) h≤ hv = ≤ᵇ-widen (hopDᵛ V u v) h≤ hv
-hopDev?-widen (init _)    h≤ hv = refl
-hopDev?-widen (close _ _) h≤ hv = refl
-hopDev?-widen (handoff _) h≤ hv = refl
-hopDev?-widen complete    h≤ hv = refl
-
-burstHopD?-widen : ∀ {n} {Γ : Ctx n} {u} {V h h′ : ℕ} (str : Stream Γ u) →
-  h ≤ h′ → burstHopD? V h str ≡ true → burstHopD? V h′ str ≡ true
-burstHopD?-widen str h≤ h =
-  all-impl _ _ (λ em → all-impl _ _ (λ ev → hopDev?-widen ev h≤)
-                                    (InstEmit.events em)) str h
-
-------------------------------------------------------------------
 -- PROJECTING THE INVARIANT.  _∧_ matches on its FIRST argument, so
 -- `∧-true _ _ inv` leaves a metavariable in stuck position and the
 -- solver cannot close it — every peel has to name the Bool it is
@@ -4924,7 +4807,6 @@ postulate
        × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d))
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-       × (burstHopD? V (hopDᵉ V b) (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
             ≤ mintCount sched st + walkCap Ω ℓ d)
@@ -5094,23 +4976,72 @@ postulate
 --     Both are free at V = towerℕ (4+sz) ≥ 2^65536.  THE BUDGET TOWER
 --     DOES NOT MOVE: a tower of 2s cannot notice a polynomial in an
 --     exponent.
---   · the hop edge needs NO postulate.  hopD's *All clauses are
---     literally suc (hopD carrier), so once the walk returns the
---     emitted-value bound the strictness is definitional.  That is the
---     whole trade: the content moved out of a syntactic order and into
---     a statement about what a subscription EMITS.
 --   · the structural edge stopped being a sub-multiset argument.
 --     hopD-map/-take/-scan/-all above are one line each.
 --   · the μ edge is not even an inequality — see the hopD structural
 --     block's header.
 --
--- WHAT IS STILL POSTULATED, and it is deliberately just two things:
--- hopD-size (P1, a routine size induction) and the emitted-value
--- engine (P2: hopD-evalWith / hopD-subΘᵉ).  Phase 3 proves them
--- most-uncertain-first, which is P2 — the scan bound reduces to INV?
--- and boundedNode, the μ edge is settled, and P1 has slack in every
--- clause.  P2 is where the multiplicity that refuted the old measure
--- has to be made good, and its skeleton is subΘ-countsᵗ's.
+-- AND THEN THE HOP EDGE ITSELF WAS REFUTED, same day, before anything
+-- was proven — which is what phase 2 existed to find out.
+--
+-- The plan was that the hop edge needs no postulate: hopD's *All
+-- clauses are literally suc (hopD carrier), so a walk conjunct
+--
+--     every value a subscription emits has hopD ≤ hopD of what was
+--     subscribed                                        (burstHopD?)
+--
+-- would make the strictness definitional.  That conjunct is FALSE for
+-- hopD as written.  agda/probe/Hop-Descent-Probe.agda (make
+-- hop-descent-probe) carries the witness as refl-checked numbers plus
+-- an absurd pattern: a program whose allowance is 2 and whose very
+-- first emission is 3.
+--
+-- WHY, and it is a CALIBRATION bug in one coefficient rather than a
+-- failure of the remaining-hop idea.  hopD's mapᵉ clause scales by
+-- `occsᵗ f ⊔ 1`, and occsᵗ counts EVERY varᵗ in the template.  The
+-- coefficient exists to price how many times the SOURCE's value gets
+-- duplicated, which is the occurrences of the map's OWN bound
+-- variable — index 0.  Those two counts agree on a template, and come
+-- apart under substitution: subΘ replaces an OUTER Θ variable by a
+-- reified observable, and that observable carries its own map/scan
+-- templates whose own bound variables occsᵗ then counts as well.  So
+-- the coefficient inflates although nothing about the source's value
+-- was duplicated — the new occurrences belong to a different binder.
+--
+-- The witness makes that stark by plugging a value of hop depth ZERO:
+-- `mapᵉ idFn (mapᵉ idFn emptyᵉ)`, occsᵉ 2, hopD 0.  Plugging it lifts
+-- an inner coefficient 2 ↦ 3, and the extra unit multiplies an inner
+-- source's hop depth of 1.  The template even DISCARDS the plugged
+-- observable (`sndᵗ`) — it is mentioned and thrown away, and the
+-- mention alone is enough.
+--
+-- Note this is NOT the two-use duplication that killed measureE.  That
+-- one was real duplication the measure failed to price; this one is
+-- phantom duplication the measure prices when it should not.  hopD
+-- over-counts where the shell multiset under-counted.
+--
+-- THE CANDIDATE REPAIR, NOT TAKEN HERE: scale by occurrences of the
+-- bound variable at index 0 (call it occs0ᵗ) instead of occsᵗ, at
+-- mapᵉ, scanᵉ and caseᵗ.  occs0 is exactly the multiplicity the clause
+-- means, it is strictly smaller, and — the property that matters — it
+-- is INVARIANT under substitution of outer variables, since a reified
+-- plug is Θ-closed and contributes no index-0 occurrence.  On this
+-- witness it reads 1 ≤ 1 instead of 3 ≤ 2.
+--
+-- It is not taken because it is a change to the MEASURE, and the
+-- measure is gated on measurement: occs0 shrinks hopD on both sides of
+-- every inequality, so the corpora and the four original refutation
+-- witnesses have to be re-run against it before anything is restated.
+-- Phase 1's discipline applies to its successor.
+--
+-- WHAT STANDS regardless: hopR and the cube (R is a cap on hopD over
+-- store-sized syntax, whatever the coefficient), hopD-size, the
+-- structural facts, the μ edge, and `r`'s slot being a plain ℕ.  What
+-- is retracted: the emitted-value conjunct and its engine
+-- (hopD-evalWith / hopD-subΘᵉ), which were postulated for one day and
+-- are gone rather than left standing as false.  subscribeE-walk's *All
+-- clause is therefore still without a hop edge — the same position
+-- phase 1 left it in, but now with a diagnosis and a candidate.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
