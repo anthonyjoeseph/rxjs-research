@@ -17,14 +17,27 @@
 --     measure is already false: lift the probe's leaf from `big` to
 --     mergeAll (of (strm big)) and the first hop reads 2 ↦ 2.
 --
---   · OCCURRENCE WEIGHTING.  A first draft used a bare `+` and did
---     not survive a nested map: substitution plugs the value at EVERY
---     Θ-var occurrence, and when two of those sit on opposite sides of
---     a `+` the plugged depth is counted twice.  So the source's depth
---     enters scaled by occsᵗ — the same multiplicity the proven
---     sync-linearity ledger (plugs-lenᵉ, inner-len-subΘ) already uses.
---     `⊔ 1` keeps the scale ≥ 1 so a fn that drops its argument still
---     dominates the source's own walk.
+--   · OCCURRENCE WEIGHTING, AT THE BINDER.  A first draft used a bare
+--     `+` and did not survive a nested map: substitution plugs the
+--     value at EVERY occurrence of the bound variable, and when two of
+--     those sit on opposite sides of a `+` the plugged depth is counted
+--     twice.  So the source's depth enters scaled by the template's
+--     occurrence count, and `⊔ 1` keeps the scale ≥ 1 so a fn that
+--     drops its argument still dominates the source's own walk.
+--
+--     The count is `occs0ᵗ`, NOT `occsᵗ`.  A second draft used occsᵗ —
+--     the index-blind count the sync-linearity ledger (plugs-lenᵉ,
+--     inner-len-subΘ) uses — and that was refuted on 2026-07-28: occsᵗ
+--     reads every varᵗ as 1, so a template that merely MENTIONS an
+--     outer Θ variable inflates the coefficient, and substituting a
+--     reified observable for that outer variable inflates it again
+--     (the plug arrives carrying its own binders' variables).  The
+--     coefficient then grows under a substitution that duplicated
+--     nothing, and the emitted value escapes its subscriber's
+--     allowance.  occs0ᵗ counts only the occurrences of the binder
+--     whose argument is actually being plugged, and is invariant under
+--     substitution for an outer variable because a plug is Θ-closed.
+--     See the witness at the end of agda/probe/Hop-Descent-Probe.agda.
 --
 -- WHY IT IS V-PARAMETERISED: at scanᵉ the accumulator is REFOLDED, so
 -- its depth compounds once per folded value — syncBudget's memo,
@@ -60,7 +73,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                          occsᵗ)
+                          occs0ᵗ)
 
 mutual
   hopDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
@@ -71,12 +84,12 @@ mutual
   hopDᵉ V emptyᵉ          = 0
   -- the fn's chain concatenates with the source's, and the source's
   -- depth lands at every Θ-var occurrence
-  hopDᵉ V (mapᵉ f e)      = hopDᵗ V f + (occsᵗ f ⊔ 1) * hopDᵉ V e
+  hopDᵉ V (mapᵉ f e)      = hopDᵗ V f + (occs0ᵗ f ⊔ 1) * hopDᵉ V e
   -- the count is a natᵗ term: its value carries no observable
   hopDᵉ V (takeᵉ c e)     = hopDᵉ V e
   -- the refold, bounded by V — see the header
   hopDᵉ V (scanᵉ f z e)   =
-    (2 + occsᵗ f) ^ V * (hopDᵗ V f + hopDᵗ V z + hopDᵉ V e)
+    (2 + occs0ᵗ f) ^ V * (hopDᵗ V f + hopDᵗ V z + hopDᵉ V e)
   -- THE HOP EDGE: entering an inner costs exactly one
   hopDᵉ V (mergeAllᵉ e)   = suc (hopDᵉ V e)
   hopDᵉ V (concatAllᵉ e)  = suc (hopDᵉ V e)
@@ -103,7 +116,7 @@ mutual
   -- caseᵗ BINDS, so it plugs like a fn: the scrutinee's depth lands at
   -- every occurrence of the branch's bound variable
   hopDᵗ V (caseᵗ s l r) =
-    (hopDᵗ V l ⊔ hopDᵗ V r) + (occsᵗ l ⊔ occsᵗ r ⊔ 1) * hopDᵗ V s
+    (hopDᵗ V l ⊔ hopDᵗ V r) + (occs0ᵗ l ⊔ occs0ᵗ r ⊔ 1) * hopDᵗ V s
   hopDᵗ V (ifᵗ c a b)   = hopDᵗ V a ⊔ hopDᵗ V b
   -- every PrimOp lands in natᵗ or boolᵗ, so its value carries nothing
   hopDᵗ V (primᵗ _ a)   = 0

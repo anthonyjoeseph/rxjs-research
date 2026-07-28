@@ -305,10 +305,15 @@ _ = refl
 _ : hopDᵉ 4 acc₃ ≡ 3
 _ = refl
 
--- and hopD's scan clause dominates every one of them: with occsᵗ
+-- and hopD's scan clause dominates every one of them: with occs0ᵗ
 -- scanF ≡ 2 the clause pays (2+2)^V, which at V ≡ 4 is 256 against a
 -- depth of 4.  The margin is the point — the clause has to hold for
--- EVERY k ≤ V, and it is exponential where the refold is linear
+-- EVERY k ≤ V, and it is exponential where the refold is linear.
+-- (Both of scanF's mentions are of its own bound variable, so the two
+-- counts agree here; the section below is where they part.)
+_ : occs0ᵗ scanF ≡ 2
+_ = refl
+
 _ : occsᵗ scanF ≡ 2
 _ = refl
 
@@ -339,37 +344,49 @@ _ = refl
 μ-hopD-stable = refl
 
 ------------------------------------------------------------------
--- THE EMITTED-VALUE INVARIANT IS FALSE AS hopD IS CURRENTLY WRITTEN.
+-- WHY THE COEFFICIENT IS occs0ᵗ AND NOT occsᵗ.
 --
 -- Built 2026-07-28 while starting phase 3, by trying to construct the
--- worst case for hopD-subΘᵉ before proving it.  The witness refutes
--- not just that lemma but the walk conjunct it was to serve:
+-- worst case for hopD-subΘᵉ before proving it.  Against the occsᵗ
+-- draft of hopD this program REFUTED the walk conjunct
 --
 --     every value a subscription emits has hopD ≤ hopD of what was
 --     subscribed
 --
--- and it refutes it with a plugged value of hop depth ZERO.
+-- reading 3 against an allowance of 2, and it refuted it with a
+-- plugged value of hop depth ZERO.  Under occs0ᵗ it reads 1 ≤ 1 and
+-- the section below is the standing guard for that repair: if the
+-- coefficient ever drifts back to an index-blind count, `emitted-fits`
+-- stops typechecking.
 --
--- THE MECHANISM.  hopD's mapᵉ coefficient is `occsᵗ f ⊔ 1`, and occsᵗ
--- counts EVERY varᵗ in the template, not the occurrences of the
--- variable the source's value is actually plugged into.  Substitution
--- replaces an OUTER Θ variable by a reified observable, and that
--- observable carries its own map/scan templates — whose own bound
--- variables occsᵗ then counts too.  So the coefficient INFLATES under
--- substitution even though nothing about the source's value was
--- duplicated: those occurrences belong to a different binder.
+-- THE MECHANISM.  hopD's mapᵉ coefficient means "how often is this
+-- binder's argument duplicated".  occsᵗ counts EVERY varᵗ in the
+-- template, whatever binder it belongs to.  Substitution replaces an
+-- OUTER Θ variable by a reified observable, and that observable
+-- carries its own map/scan templates — whose bound variables occsᵗ
+-- then counts too.  So the coefficient INFLATES under a substitution
+-- that duplicated nothing: those occurrences belong to a different
+-- binder.  occs0ᵗ counts only index 0, and a plug is Θ-closed, so
+-- every variable it brings is compared against an already-bumped
+-- index and contributes 0 — the coefficient cannot move.
 --
--- Below, `plugged` has occsᵉ 2 and hopD 0 — two map templates over
--- emptyᵉ.  Plugging it raises the inner coefficient from 2 to 3, and
--- that lone extra unit multiplies the inner source's hop depth of 1.
--- The emission comes out at 3 against the program's allowance of 2.
+-- Below, `plugged` is Θ-BUSHY but hop-SHALLOW: occsᵉ 2, hopD 0 — two
+-- map templates over emptyᵉ.  Plugging it raised the occsᵗ
+-- coefficient from 2 to 3, and that lone extra unit multiplied the
+-- inner source's hop depth of 1.  Under occs0ᵗ the same coefficient
+-- reads 1 before and after.
 ------------------------------------------------------------------
 
--- a Θ-BUSHY but hop-SHALLOW value: occsᵉ 2, hopDᵉ 0
+-- a Θ-BUSHY but hop-SHALLOW value: occsᵉ 2, hopDᵉ 0.  Both of its
+-- varᵗ live under its own map binders, so occs0ᵉ reads 0 — this is
+-- the Θ-closedness that makes the coefficient substitution-stable
 plugged : Closed Γ natᵗ
 plugged = mapᵉ idFn (mapᵉ idFn emptyᵉ)
 
 _ : occsᵉ plugged ≡ 2
+_ = refl
+
+_ : occs0ᵉ plugged ≡ 0
 _ = refl
 
 _ : hopDᵉ 4 plugged ≡ 0
@@ -384,6 +401,14 @@ innerSrc = mergeAllᵉ (ofᵉ (strmᵗ emptyᵉ ∷ []))
 -- nothing semantically and still moves occsᵗ
 innerFn : Tm Γ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
 innerFn = sndᵗ (pairᵗ (varᵗ (there (here refl))) (varᵗ (here refl)))
+
+-- THE TWO COUNTS, side by side.  occsᵗ sees the discarded outer
+-- mention; occs0ᵗ sees only the binder whose argument is plugged here
+_ : occsᵗ innerFn ≡ 2
+_ = refl
+
+_ : occs0ᵗ innerFn ≡ 1
+_ = refl
 
 innerBody : Exp Γ [] [] (obs natᵗ ∷ []) natᵗ
 innerBody = mapᵉ innerFn innerSrc
@@ -403,8 +428,9 @@ prog = mapᵉ outerFn outerSrc
 _ : evalTm (strmᵗ plugged) ≡ plugged
 _ = refl
 
--- the program's allowance
-_ : hopDᵉ 4 prog ≡ 2
+-- the program's allowance (it was 2 under occsᵗ: the inner
+-- coefficient counted the discarded mention)
+_ : hopDᵉ 4 prog ≡ 1
 _ = refl
 
 -- what the map frame emits for it: stepFrame (map-f fn) is
@@ -412,10 +438,14 @@ _ = refl
 emitted : Val Γ (obs natᵗ)
 emitted = applyFn outerFn plugged
 
-_ : hopDᵛ 4 (obs natᵗ) emitted ≡ 3
+-- 3 under occsᵗ — the substitution had raised the coefficient from 2
+-- to 3 and that unit multiplied the inner source's one hop
+_ : hopDᵛ 4 (obs natᵗ) emitted ≡ 1
 _ = refl
 
--- 3 ≤ 2 has no inhabitant.  This is the walk conjunct burstHopD?
--- demands of this very program, and it does not hold
-emitted-exceeds : hopDᵛ 4 (obs natᵗ) emitted ≤ hopDᵉ 4 prog → ⊥
-emitted-exceeds (s≤s (s≤s ()))
+-- the coefficient did not move under the substitution — 1 before and
+-- 1 after, where occsᵗ went 2 ↦ 3 — and so the emission fits.  The
+-- walk conjunct burstHopD? holds of this program, where
+-- under the index-blind count it demanded 3 ≤ 2
+emitted-fits : hopDᵛ 4 (obs natᵗ) emitted ≤ hopDᵉ 4 prog
+emitted-fits = s≤s z≤n

@@ -96,7 +96,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 shellsᵉ; shellsᵛ;
                                 subΘExp; subΘTm; subΘTms;
                                 plugsᵉ; plugsᵗ; plugsᵗˢ;
-                                occsᵉ; occsᵗ; occsᵗˢ;
+                                occsᵉ; occsᵗ; occsᵗˢ; occs0ᵗ;
                                 renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
                                 wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
@@ -1763,8 +1763,8 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
   hopD-map : ∀ {s u} (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) →
     hopDᵉ V b ≤ hopDᵉ V (mapᵉ f b)
   hopD-map f b =
-    ≤-trans (1*≤ (hopDᵉ V b) (occsᵗ f ⊔ 1) (m≤n⊔m (occsᵗ f) 1))
-            (m≤n+m ((occsᵗ f ⊔ 1) * hopDᵉ V b) (hopDᵗ V f))
+    ≤-trans (1*≤ (hopDᵉ V b) (occs0ᵗ f ⊔ 1) (m≤n⊔m (occs0ᵗ f) 1))
+            (m≤n+m ((occs0ᵗ f ⊔ 1) * hopDᵉ V b) (hopDᵗ V f))
 
   hopD-take : ∀ {u} (c : Tm Γ Δᵍ Δ Θ natᵗ) (b : Exp Γ Δᵍ Δ Θ u) →
     hopDᵉ V b ≤ hopDᵉ V (takeᵉ c b)
@@ -1774,7 +1774,7 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
     (b : Exp Γ Δᵍ Δ Θ s) → hopDᵉ V b ≤ hopDᵉ V (scanᵉ f z b)
   hopD-scan f z b =
     ≤-trans (m≤n+m (hopDᵉ V b) (hopDᵗ V f + hopDᵗ V z))
-            (1*≤ _ _ (1≤pow (suc (occsᵗ f)) V))
+            (1*≤ _ _ (1≤pow (suc (occs0ᵗ f)) V))
 
   -- the four hop carriers: the operator's own frame is the `suc`
   hopD-all : ∀ {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
