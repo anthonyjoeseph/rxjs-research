@@ -109,7 +109,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -1801,6 +1801,113 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
   hopD-all : ∀ {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
     hopDᵉ V b ≤ suc (hopDᵉ V b)
   hopD-all b = n≤1+n (hopDᵉ V b)
+
+------------------------------------------------------------------
+-- PHASE 3, THE ASSEMBLY: the emitted-value invariant's engine.
+--
+-- burstHopD? (above) says every value a burst carries has hop depth at
+-- most the subscribed expression's.  Every such value is produced by
+-- evalWith on a SUBTERM of that expression — the mapᵉ frame's applyFn,
+-- the ofᵉ frame's evalTm — and evalWith at an obs type IS subΘExp
+-- (closeUnderFn is subΘExp []).  So the conjunct reduces to a bound on
+-- substitution, and that bound is AFFINE in the plugged depth:
+--
+--     hopD (e[v]) ≤ hopD e + pm k e · hopD v
+--
+-- with pm the slope.  This is where pm came from — the mapᵉ clause
+-- needs exactly `pmᵗ V 0 f` from its recursive calls, and no
+-- occurrence count is that quantity (see the hop-descent memo).
+--
+-- Stated here with its three pieces postulated, per the outside-in
+-- rule, so the consumer exists before any of them is proven.  The
+-- consumer is hopD-map-emit at the bottom: the shape subscribeE-walk's
+-- mapᵉ clause applies, with no arithmetic left in it.
+------------------------------------------------------------------
+
+-- every value in an environment is at most D deep
+EnvHopD : ∀ {n} {Γ : Ctx n} {Θ} (V D : ℕ) → All (Val Γ) Θ → Set
+EnvHopD V D []ᵃ                = ⊤
+EnvHopD V D (_∷ᵃ_ {x = t} v σ) = (hopDᵛ V t v ≤ D) × EnvHopD V D σ
+
+-- the slope over a WHOLE environment: one pm per substituted variable,
+-- read at the index that variable occupies once the local binders
+-- between it and the root have been counted.  m is the environment's
+-- length, k the offset where it starts.
+sumPmᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
+sumPmᵉ V k zero    e = 0
+sumPmᵉ V k (suc m) e = pmᵉ V k e + sumPmᵉ V (suc k) m e
+
+sumPmᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
+sumPmᵗ V k zero    t = 0
+sumPmᵗ V k (suc m) t = pmᵗ V k t + sumPmᵗ V (suc k) m t
+
+postulate
+  -- (H0) A COEFFICIENT DOES NOT MOVE UNDER SUBSTITUTION.  This is what
+  -- makes (H1)'s mapᵉ clause close at all: the instantiated template's
+  -- coefficient must be the template's, or the affine bound has a
+  -- different slope on each side and there is nothing to induct on.
+  --
+  -- True because subΘ plugs Θ-CLOSED values.  A local index k < |Θloc|
+  -- is untouched (the substitution keeps Θloc as a prefix, so a local
+  -- variable keeps its position), and every variable a plug brings is
+  -- bound inside the plug, hence compared against an index already
+  -- bumped past it.  Two pieces, in that order: varIx is preserved on
+  -- the ∈-++⁻ left injection, and pm of a weakened Θ-closed term is 0
+  -- at every index.
+  pm-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V k : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    k < length Θloc →
+    pmᵗ V k (subΘTm Θloc σ tm) ≡ pmᵗ V k tm
+
+  -- (H1) THE AFFINE BOUND at expressions.  Induction on e following
+  -- subΘ-countsᵉ/ᵗ clause for clause — the same substitution walked
+  -- with the same multiplicity accounting, a different semiring at the
+  -- leaves.  Each clause needs (H0) to rewrite its coefficient and
+  -- then closes by +/*-monotonicity; the varᵗ leaf splits on ∈-++⁻
+  -- exactly as subΘ-countsᵗ's does, with the plug's own depth ≤ D on
+  -- the right injection.
+  hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V D : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvHopD V D σ →
+    hopDᵉ V (subΘExp Θloc σ e)
+      ≤ hopDᵉ V e + sumPmᵉ V (length Θloc) (length Θsub) e * D
+
+  -- (H2) and the same at terms, which is what evalWith reduces to.
+  -- Its strmᵗ clause is (H1) at Θloc ≡ []; its caseᵗ clause is the one
+  -- that extends the environment, and lands on hopD's own caseᵗ shape
+  -- because the branch's slope at index 0 is what multiplies the
+  -- scrutinee's depth in both.
+  hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V D : ℕ)
+    (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) →
+    EnvHopD V D env →
+    hopDᵛ V u (evalWith tm env) ≤ hopDᵗ V tm + sumPmᵗ V 0 (length Θ) tm * D
+
+-- a one-value environment: the slope collapses to the single pm the
+-- mapᵉ clause's coefficient is built from
+hopD-applyFn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
+  (f : Fn Γ [] [] [] s u) (v : Val Γ s) →
+  hopDᵛ V u (applyFn f v) ≤ hopDᵗ V f + (pmᵗ V 0 f ⊔ 1) * hopDᵛ V s v
+hopD-applyFn {s = s} V f v =
+  ≤-trans (hopD-evalWith V (hopDᵛ V s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
+          (+-monoʳ-≤ (hopDᵗ V f)
+            (*-monoˡ-≤ (hopDᵛ V s v)
+              (≤-trans (≤-reflexive (+-identityʳ (pmᵗ V 0 f)))
+                       (m≤m⊔n (pmᵗ V 0 f) 1))))
+
+-- THE CONSUMER, and the whole point of the block: a mapᵉ frame's
+-- emission sits under the mapᵉ's OWN hop depth, given only that the
+-- source's value sat under the source's.  That is burstHopD? at the
+-- mapᵉ clause, with the arithmetic already done — and with hopDᵉ
+-- (mergeAllᵉ c) ≡ suc (hopDᵉ c) definitional, it is also the hop
+-- edge's strictness.
+hopD-map-emit : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ)
+  (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) (v : Val Γ s) →
+  (f₀ : Fn Γ [] [] [] s u) → hopDᵗ V f₀ ≤ hopDᵗ V f → pmᵗ V 0 f₀ ≤ pmᵗ V 0 f →
+  hopDᵛ V s v ≤ hopDᵉ V b →
+  hopDᵛ V u (applyFn f₀ v) ≤ hopDᵉ V (mapᵉ f b)
+hopD-map-emit V f b v f₀ hf hp hv =
+  ≤-trans (hopD-applyFn V f₀ v)
+          (+-mono-≤ hf (*-mono-≤ (⊔-mono-≤ hp ≤-refl) hv))
 
 ------------------------------------------------------------------
 -- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
