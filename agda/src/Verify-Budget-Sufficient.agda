@@ -3999,6 +3999,29 @@ eventB? B Ψ complete    = true
 burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
 burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 
+-- THE EMITTED-VALUE INVARIANT, in the same shape: every value a burst
+-- carries has hop depth at most `r`, the depth of the expression that
+-- was subscribed.  Stated here so subscribeE-walk can carry it as a
+-- conjunct, which is what makes the *All clause's hop edge STRICT with
+-- no arithmetic at all: hopDᵉ (mergeAllᵉ c) is DEFINITIONALLY suc
+-- (hopDᵉ c), so an inner drawn from a carrier's burst has hopD ≤
+-- hopDᵉ c < hopDᵉ (mergeAllᵉ c), and dBound-hop's r′ < r is discharged
+-- by the definition rather than by a lemma.
+--
+-- This conjunct was postulated on 2026-07-28, REFUTED the same day
+-- against the index-blind coefficient, retracted, and restated here
+-- once occs0 had been re-gated — see the hop-descent memo below for the
+-- mechanism and the corpus numbers both ways.
+hopDev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → InstEvent (Val Γ u) → Bool
+hopDev? {u = u} V r (value v)   = hopDᵛ V u v ≤ᵇ r
+hopDev? V r (init _)    = true
+hopDev? V r (close _ _) = true
+hopDev? V r (handoff _) = true
+hopDev? V r complete    = true
+
+burstHopD? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
+burstHopD? V r = all (λ em → all (hopDev? V r) (InstEmit.events em))
+
 ------------------------------------------------------------------
 -- PROJECTING THE INVARIANT.  _∧_ matches on its FIRST argument, so
 -- `∧-true _ _ inv` leaves a metavariable in stuck position and the
@@ -4807,6 +4830,10 @@ postulate
        × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d))
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       -- the hop edge: what comes out is no deeper than what went in,
+       -- so entering an inner strictly descends by the *All clause's
+       -- own `suc`
+       × (burstHopD? V (hopDᵉ V b) (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
             ≤ mintCount sched st + walkCap Ω ℓ d)
@@ -4923,16 +4950,48 @@ postulate
 -- that the hop edge consumes — with hopD (mergeAllᵉ c) ≡ suc (hopD c),
 -- that inequality is exactly what makes a hop strict:
 --
---   A  generated, scripted slots      360 progs    6340 obs   0 viol
+--   A  generated, scripted slots     1000 progs   11010 obs   0 viol
 --   B  generated, shared slots       1000 progs   17739 obs   0 viol
 --   C  directed, 2 slots               19 progs     199 obs   0 viol
 --   C₃ directed, 3 slots, 2 shares     36 progs     681 obs   0 viol
+--   D  directed, obs into templates    11 progs     130 obs   0 viol
+--   D  generated, obs into templates  650 progs   16614 obs   0 viol
 --
 -- B was first run at 6 programs (three seeds deep) and REBALANCED
 -- 2026-07-28 toward breadth — 40 seeds × 25 programs at depth 3 —
 -- because random SHARE shapes are where a surprise would hide and
--- depth had been bought at coverage's expense.  It is now the largest
--- corpus of the four.
+-- depth had been bought at coverage's expense.
+--
+-- D WAS ADDED 2026-07-28 to close a structural blind spot, and it is
+-- the only one of the six with a demonstrated ability to see the bug
+-- this measure was calibrated against.  A, B, C and C₃ keep every
+-- observable inside `ofᵉ (strmᵗ e ∷ …)` with e Θ-CLOSED — the
+-- QuickCheck generator's only Fns are natᵗ → natᵗ — so across ~25k hop
+-- observations NO program ever substituted an observable into a
+-- template.  That is the single mechanism both refutations live in
+-- (measureE's duplicated shells; hopD-with-occsᵗ's phantom
+-- coefficient), and both were found by adversarial construction rather
+-- than by the corpus.  D generates obs-typed templates: an obs-typed
+-- source may be wrapped in a mapᵉ whose bound variable is an
+-- observable, or a scanᵉ whose accumulator is one.
+--
+-- D has a DIRECTED half as well, because the generated half could not
+-- be trusted alone: reaching the mechanism needs several draws to line
+-- up, and 500 generated programs run against the KNOWN-BUGGY occsᵗ
+-- coefficient found zero violations.  The directed half forces the
+-- conjunction, and measured both ways on identical programs it reads
+--
+--   occsᵗ  (the refuted count)   130 obs   9 VIOLATIONS
+--   occs0ᵗ (the repair)          130 obs   0 violations
+--
+-- Eight of its eleven programs fire under occsᵗ; the other three are
+-- controls whose shapes are correct by construction.  That 9 ↦ 0 is
+-- the evidence that the corpus can see the mechanism at all — a corpus
+-- that cannot fail on the bug it guards is decoration.  (Four of
+-- thirty D seeds time out on pathological programs and are excluded
+-- from the count above; the self-doubling scan step is not generated
+-- at all, since its syntax doubles per folded value.  Its hop
+-- behaviour is refl-checked statically instead.)
 --
 -- selfcheck and wellFormed clean throughout, so the log does not move
 -- the evaluator.  The probe's V is capped at 8 (the real V makes
@@ -5020,28 +5079,45 @@ postulate
 -- phantom duplication the measure prices when it should not.  hopD
 -- over-counts where the shell multiset under-counted.
 --
--- THE CANDIDATE REPAIR, NOT TAKEN HERE: scale by occurrences of the
--- bound variable at index 0 (call it occs0ᵗ) instead of occsᵗ, at
--- mapᵉ, scanᵉ and caseᵗ.  occs0 is exactly the multiplicity the clause
--- means, it is strictly smaller, and — the property that matters — it
--- is INVARIANT under substitution of outer variables, since a reified
--- plug is Θ-closed and contributes no index-0 occurrence.  On this
--- witness it reads 1 ≤ 1 instead of 3 ≤ 2.
+-- THE REPAIR, TAKEN 2026-07-28 AFTER RE-GATING: scale by occurrences
+-- of the bound variable at index 0 — Rx.Exp.occs0ᵗ, defined as
+-- occsAtᵗ 0 with the index bumped at every Θ binder — instead of
+-- occsᵗ, at all three of hopD's coefficients (mapᵉ's scale, caseᵗ's
+-- scrutinee scale, scanᵉ's exponential base).  All three had the same
+-- index-blindness and all three mean the same thing.  occs0 is exactly
+-- the multiplicity the clause intends, it is strictly smaller, and —
+-- the property that matters — it is INVARIANT under substitution for
+-- an outer variable, since a plug is Θ-closed and so contributes no
+-- occurrence at any index.  On the witness it reads 1 ≤ 1.
 --
--- It is not taken because it is a change to the MEASURE, and the
--- measure is gated on measurement: occs0 shrinks hopD on both sides of
--- every inequality, so the corpora and the four original refutation
--- witnesses have to be re-run against it before anything is restated.
--- Phase 1's discipline applies to its successor.
+-- The index is kept GENERAL rather than hard-coded to 0 so the shift
+-- bookkeeping sits visibly at each binder, where an off-by-one would
+-- otherwise hide; it is also the shape subΘ's per-variable plug
+-- accounting will want, which keeps the measure and the substitution
+-- lemma in lockstep by construction.  No per-index count existed to
+-- reuse: plugsᵗ accumulates a Θloc LIST and returns plug sizes, not a
+-- count, so occsAt is new rather than a rename.
 --
--- WHAT STANDS regardless: hopR and the cube (R is a cap on hopD over
--- store-sized syntax, whatever the coefficient), hopD-size, the
+-- IT WAS NOT TAKEN ON ARGUMENT — occs0 shrinks hopD on BOTH sides of
+-- every inequality, so every prior green was unproven for the
+-- successor and phase 1's discipline applied again.  Re-run against
+-- it: all four static refutation witnesses still descend strictly
+-- (2↦1, 2↦1, 2↦1, 4↦2), the lifted-leaf variant still reads 4↦2 so
+-- mapᵉ still composes by `+` and not `⊔`, the scan refold still pays
+-- 256 against a depth of 4, the μ edge is still an equality, and every
+-- corpus above is clean — including corpus D, which was built for this
+-- mechanism and demonstrably fails without the repair.
+--
+-- WHAT STOOD THROUGHOUT: hopR and the cube (R caps hopD over
+-- store-sized syntax whatever the coefficient), hopD-size, the
 -- structural facts, the μ edge, and `r`'s slot being a plain ℕ.  What
--- is retracted: the emitted-value conjunct and its engine
--- (hopD-evalWith / hopD-subΘᵉ), which were postulated for one day and
--- are gone rather than left standing as false.  subscribeE-walk's *All
--- clause is therefore still without a hop edge — the same position
--- phase 1 left it in, but now with a diagnosis and a candidate.
+-- was retracted for a day and is now RESTATED: the emitted-value
+-- conjunct, burstHopD? above, carried by subscribeE-walk.  Its engine
+-- (hopD-evalWith / hopD-subΘᵉ) stays deleted and is the next thing to
+-- build — on subΘ-countsᵗ's induction skeleton, which walks the same
+-- substitution with the same multiplicity accounting and should
+-- transfer clause for clause with a different semiring at the leaves.
+-- A clause that does not transfer is itself the finding.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
