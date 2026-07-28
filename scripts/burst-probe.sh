@@ -5,10 +5,10 @@
 #
 # Seeds FIRST..LAST, RUNS generated programs per seed per corpus, DEPTH capping
 # program nesting — the same knobs as scripts/gen-unit-tests.sh.  CORPUS picks one
-# corpus (0 all, 1 A, 2 B, 3 C, 4 C₃; 5/6 LIST A/B's programs without running
-# them).  With the report arriving in one block at the end, that is how a long run
-# that wedged or got reaped is bisected: the seed range narrows the seed, CORPUS
-# the corpus, halving RUNS the program — and then 5/6 print the program itself.
+# corpus (0 all, 1 A, 2 B, 3 C, 4 C₃, 5 D; 6/7/8 LIST A/B/D's programs without
+# running them).  With the report arriving in one block at the end, that is how a
+# long run that wedged or got reaped is bisected: the seed range narrows the seed,
+# CORPUS the corpus, halving RUNS the program — then 6/7/8 print the program.
 #
 # The probe needs an evaluator that records every subscription burst, and the
 # verified evaluator must stay byte-identical (Verify-Well-Formed reduces its

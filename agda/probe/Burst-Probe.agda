@@ -55,14 +55,14 @@ open import Data.Fin using (zero; suc)
 open import Data.List using (List; []; _∷_; map; length; concat)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _⊓_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String; _++_) renaming (_==_ to _==ˢ_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Fuel; Id; Source; after_,_;
@@ -71,16 +71,17 @@ open import Rx.Prim using (Fuel; Id; Source; after_,_;
                            CloseReason; cut; cutPending; exhausted; dried;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
-open import Rx.Exp using (natᵗ; _×ᵗ_; Ctx; Exp; Fn; Closed;
+open import Rx.Exp using (Ty; unitᵗ; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; Closed;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add)
+                          unit̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ;
+                          inlᵗ; inrᵗ; caseᵗ; add; wkExp; renTm)
 open import Rx.Evaluator using (Slot; scripted; shared; Slots; Sched; EvalSt;
                                 Stream; evaluate; subscribeE; cascade; sched-next;
                                 sched-init; st-init; budgetAt; root)
 open import Rx.Protocol using (wellFormed?; frameFresh?; valsLast?; hasValue)
 open import QuickCheck using (Gen; _>>=G_; pureG; genB; randList; Γ₂;
-                              genExp; genSlots;
+                              genExp; genSlots; ObsWrap; noWrap; anySlot;
                               showExp; showSlots; showStream;
                               toCodes; parseNat; numAt; concatStr)
 open import CLI.IO
@@ -422,8 +423,8 @@ genSharedSlots : ℕ → Gen (Slots Γ₂)
 genSharedSlots d =
   genB 2 >>=G λ c0 → genB 2 >>=G λ c1 →
   QuickCheck.genInput >>=G λ i0 → QuickCheck.genInput >>=G λ i1 →
-  QuickCheck.genExpAt noSource d >>=G λ d0 →
-  QuickCheck.genExpAt slot0Only d >>=G λ d1 →
+  QuickCheck.genExpAt noSource noWrap d >>=G λ d0 →
+  QuickCheck.genExpAt slot0Only noWrap d >>=G λ d1 →
   pureG λ where
     zero          → if c0 ≡ᵇ 0 then scripted i0 else shared d0
     (suc zero)    → if c1 ≡ᵇ 0 then scripted i1 else shared d1
@@ -431,6 +432,131 @@ genSharedSlots d =
 
 caseB : ℕ → Gen (Stats × List Witness)
 caseB d = genSharedSlots d >>=G λ ins → genExp d >>=G λ e →
+  pureG (oneProgram (showExp e ++ "  " ++ showSlots ins) e ins)
+
+------------------------------------------------------------------------
+-- corpus D: OBSERVABLES SUBSTITUTED INTO TEMPLATES.
+--
+-- The blind spot this closes.  Corpora A and B keep every observable inside
+-- `ofᵉ (strmᵗ e ∷ …)` with `e` Θ-CLOSED: the only Fns the QuickCheck generator
+-- builds are natᵗ → natᵗ.  So no program in ~25k hop observations ever
+-- substituted an observable into a template — and template substitution is the
+-- one mechanism BOTH 2026-07-27/28 refutations live in (measureE's duplicated
+-- shells, hopD-with-occsᵗ's phantom coefficient).  Both were found by
+-- adversarial construction, neither could have been found by the corpus.
+-- Twice is a pattern, so the corpus gets the mechanism.
+--
+-- What it generates: an obs-typed source may be WRAPPED before an *All eats
+-- it — in a `mapᵉ` whose bound variable is an OBSERVABLE, or in a `scanᵉ`
+-- whose ACCUMULATOR is one.  The templates are built recursively over that
+-- variable, so the enumerated cases all arise, at random depths and in random
+-- combination rather than only where they were thought of:
+--
+--   0 uses      strmᵗ of a generated Θ-closed filler
+--   1 use       the variable itself
+--   2+ uses     both sides of an *All's `ofᵉ`, or of a pairᵗ
+--   discarded   fstᵗ/sndᵗ of a pairᵗ that mentions it on the other side
+--   untaken     a caseᵗ branch that is not the scrutinee's injection
+--   shifted     mentioned under a nested caseᵗ or mapᵉ binder, where its
+--               de Bruijn index is no longer 0
+--   refolded    a scan step that rebuilds the accumulator from itself
+--
+-- The wrap is where the recursion stops: templates are filled with `noWrap`
+-- material, so a template never contains another template.
+
+Θ₁ : List Ty                                -- one obs-typed bound variable
+Θ₁ = obs natᵗ ∷ []
+
+v₀ : Tm Γ₂ [] [] Θ₁ (obs natᵗ)
+v₀ = varᵗ (here refl)
+
+-- push a template under one more binder: the variable is still there, at a
+-- shifted index.  This is what makes "mentioned under a nested binder" a
+-- reachable shape rather than a special case
+shift₁ : ∀ {s} → Tm Γ₂ [] [] Θ₁ (obs natᵗ) → Tm Γ₂ [] [] (s ∷ Θ₁) (obs natᵗ)
+shift₁ = renTm (λ ()) (λ ()) there
+
+genFill : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
+genFill d = QuickCheck.genExpAt anySlot noWrap d
+
+{-# TERMINATING #-}
+genTmpObs  : ℕ → Gen (Tm Γ₂ [] [] Θ₁ (obs natᵗ))
+genTmpBody : ℕ → Gen (Exp Γ₂ [] [] Θ₁ natᵗ)
+
+genTmpObs zero = genB 2 >>=G λ c →
+  if c ≡ᵇ 0 then pureG v₀
+  else (genFill 1 >>=G λ w → pureG (strmᵗ (wkExp w)))
+genTmpObs (suc d) = genB 6 >>=G λ c →
+  if c ≡ᵇ 0 then genTmpObs 0
+  else if c ≡ᵇ 1 then (genTmpBody d >>=G λ b → pureG (strmᵗ b))
+  else if c ≡ᵇ 2 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                        pureG (fstᵗ (pairᵗ a b)))
+  else if c ≡ᵇ 3 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                        pureG (sndᵗ (pairᵗ a b)))
+  -- scrutinee is inlᵗ, so the LEFT branch runs and the right one is dead
+  -- weight that still mentions the outer variable
+  else if c ≡ᵇ 4 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                        pureG (caseᵗ (inlᵗ {t = unitᵗ} a)
+                                     (varᵗ (here refl)) (shift₁ b)))
+  -- and the mirror: inrᵗ, so the left branch is the dead one
+  else (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+         pureG (caseᵗ (inrᵗ {s = obs natᵗ} unit̂) (shift₁ a) (shift₁ b)))
+
+genTmpBody zero    = genFill 1 >>=G λ w → pureG (wkExp w)
+genTmpBody (suc d) = genB 6 >>=G λ c →
+  if c ≡ᵇ 0 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                   pureG (mergeAllᵉ (ofᵉ (a ∷ b ∷ []))))
+  else if c ≡ᵇ 1 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                   pureG (concatAllᵉ (ofᵉ (a ∷ b ∷ []))))
+  else if c ≡ᵇ 2 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                   pureG (switchAllᵉ (ofᵉ (a ∷ b ∷ []))))
+  else if c ≡ᵇ 3 then (genTmpObs d >>=G λ a → genTmpObs d >>=G λ b →
+                   pureG (exhaustAllᵉ (ofᵉ (a ∷ b ∷ []))))
+  -- the outer observable mentioned under a nested mapᵉ binder and thrown
+  -- away: it contributes nothing and still moves an index-blind count
+  else if c ≡ᵇ 4 then (genTmpBody d >>=G λ b →
+                   pureG (mapᵉ (sndᵗ (pairᵗ (varᵗ (there (here refl)))
+                                            (varᵗ (here refl)))) b))
+  else (genTmpObs d >>=G λ a → pureG (mergeAllᵉ (ofᵉ (a ∷ []))))
+
+-- the scan step, over an OBSERVABLE accumulator: (acc , cur) is the one bound
+-- variable, so both projections read it.  Each of these REFOLDS the
+-- accumulator — the mechanism that forced hopD to take V — and each nests it
+-- one deeper per folded value, which is the memo's linear growth.
+--
+-- What is deliberately NOT here: `acc ↦ mergeAll (of [acc , acc])`, the
+-- SELF-doubling step.  Its hop depth also grows linearly, but its SYNTAX
+-- doubles, so a source of k values leaves an accumulator of 2^k nodes and
+-- subscribing it costs 2^k — nested inside another *All that is a tower, and
+-- it OOM-killed a 25-program seed.  It is not lost coverage: acc₀…acc₃ of
+-- exactly that step are refl-checked in agda/probe/Hop-Descent-Probe.agda,
+-- where the cost is a typechecker's rather than an evaluator's.
+genScanObs : Gen (Fn Γ₂ [] [] [] (obs natᵗ ×ᵗ obs natᵗ) (obs natᵗ))
+genScanObs = genB 4 >>=G λ c →
+  pureG (if c ≡ᵇ 0 then fstᵗ p
+    else if c ≡ᵇ 1 then sndᵗ p
+    else if c ≡ᵇ 2 then strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ p ∷ sndᵗ p ∷ [])))
+    else strmᵗ (concatAllᵉ (ofᵉ (fstᵗ p ∷ sndᵗ p ∷ []))))
+  where p : Tm Γ₂ [] [] ((obs natᵗ ×ᵗ obs natᵗ) ∷ []) (obs natᵗ ×ᵗ obs natᵗ)
+        p = varᵗ (here refl)
+
+-- Templates are capped at depth 2 and the wrap fires half the time.  Both
+-- caps are cost, not coverage: every shape in the menu is already reachable
+-- at depth 2 (the deepest is a caseᵗ whose branch is a two-use *All), and a
+-- template is duplicated once per value its source emits, so an uncapped one
+-- multiplies against the program it sits in.
+obsWrapD : ObsWrap
+obsWrapD d s = genB 4 >>=G λ c →
+  if c ≤ᵇ 1 then pureG s
+  else if c ≡ᵇ 2 then (genTmpObs (d ⊓ 2) >>=G λ f → pureG (mapᵉ f s))
+  else (genScanObs >>=G λ f → genFill 1 >>=G λ z →
+         pureG (scanᵉ f (strmᵗ z) s))
+
+genExpD : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
+genExpD = QuickCheck.genExpAt anySlot obsWrapD
+
+caseD : ℕ → Gen (Stats × List Witness)
+caseD d = genSharedSlots d >>=G λ ins → genExpD d >>=G λ e →
   pureG (oneProgram (showExp e ++ "  " ++ showSlots ins) e ins)
 
 runN : (ℕ → Gen (Stats × List Witness)) → ℕ → ℕ → Gen (Stats × List Witness)
@@ -713,6 +839,113 @@ directed₃ =
         (switchAllᵉ (ofᵉ (strmᵗ (concatAllᵉ (ofᵉ (strmᵗ j1 ∷ strmᵗ j2 ∷ []))) ∷ []))) )
   ∷ []
 
+------------------------------------------------------------------------
+-- corpus D, DIRECTED half: the mechanism built rather than hoped for.
+--
+-- The random half reaches these shapes only when several independent draws
+-- line up — a template that mentions its OUTER observable under a nested
+-- binder, over a body that already has a hop, fed a value that is
+-- occurrence-bushy but hop-shallow.  Measured, that conjunction is around one
+-- program in a thousand: 500 generated programs found none.  Too thin to call
+-- a gate, so the conjunction is forced here.
+--
+-- The point of a gate is that it FAILS on the bug it guards.  Under the
+-- index-blind coefficient these report hopD violations; under occs0 they do
+-- not.  That is the only evidence that corpus D can see the mechanism at all,
+-- and it is why the directed half sits next to the random one rather than
+-- replacing it: the directed half proves the corpus has teeth, the random half
+-- looks where nobody aimed.
+
+idN : Fn Γ₂ [] [] [] natᵗ natᵗ
+idN = varᵗ (here refl)
+
+-- occurrence-BUSHY, hop-SHALLOW, and it emits: occsᵉ 2, hopDᵉ 0
+bushy : Exp Γ₂ [] [] [] natᵗ
+bushy = mapᵉ idN (mapᵉ idN (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ [])))
+
+bushySrc : Exp Γ₂ [] [] [] (obs natᵗ)
+bushySrc = ofᵉ (strmᵗ bushy ∷ [])
+
+-- a template body that already carries a hop.  Θ-closed, so it weakens into
+-- whichever binder the template under test happens to have
+hopBodyC : Exp Γ₂ [] [] [] natᵗ
+hopBodyC = mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 5 ∷ nat̂ 6 ∷ [])) ∷ []))
+
+hopBody : Exp Γ₂ [] [] Θ₁ natᵗ
+hopBody = wkExp hopBodyC
+
+-- the outer observable mentioned under a nested mapᵉ binder — so its index is
+-- 1, not 0 — and thrown away by sndᵗ.  It contributes nothing semantically
+mentionDrop : Tm Γ₂ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+mentionDrop = sndᵗ (pairᵗ (varᵗ (there (here refl))) (varᵗ (here refl)))
+
+-- the same, mentioning it twice
+mentionDrop₂ : Tm Γ₂ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+mentionDrop₂ = sndᵗ (pairᵗ (varᵗ (there (here refl)))
+                 (sndᵗ (pairᵗ (varᵗ (there (here refl))) (varᵗ (here refl)))))
+
+-- mentioned in a caseᵗ branch that the scrutinee does not take
+mentionUntaken : Tm Γ₂ [] [] (natᵗ ∷ obs natᵗ ∷ []) natᵗ
+mentionUntaken =
+  caseᵗ (inlᵗ {t = unitᵗ} (varᵗ (here refl)))
+        (varᵗ (here refl))
+        (sndᵗ (pairᵗ (varᵗ (there (there (here refl)))) (varᵗ (there (here refl)))))
+
+directedD : List (String × Slots Γ₂ × Exp Γ₂ [] [] [] natᵗ)
+directedD =
+    ( "mergeAll(map (λo → strm(map (λn → snd(o,n)) (mergeAll(of[of 5 6])))) (of[bushy]))"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody)) bushySrc) )
+  -- two mentions of the discarded observable: the inflation scales with them
+  ∷ ( "… with the outer observable mentioned TWICE and still discarded"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop₂ hopBody)) bushySrc) )
+  -- the mention lives in a caseᵗ branch the scrutinee never takes
+  ∷ ( "… with the mention in an UNTAKEN caseᵗ branch"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionUntaken hopBody)) bushySrc) )
+  -- the plugged value comes off a SHARED slot rather than a literal
+  ∷ ( "… with the bushy value delivered by a shared slot"
+    , slots2 (shared (mapᵉ idN (mapᵉ idN (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ [])))))
+             (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody))
+                      (ofᵉ (strmᵗ (mapᵉ idN (mapᵉ idN (input zero))) ∷ []))) )
+  -- concatAll rather than mergeAll above the template
+  ∷ ( "concatAll over the same template"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , concatAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody)) bushySrc) )
+  ∷ ( "switchAll over the same template"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , switchAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody)) bushySrc) )
+  ∷ ( "exhaustAll over the same template"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , exhaustAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody)) bushySrc) )
+  -- the same inflation reached through a scanᵉ whose ACCUMULATOR is the
+  -- observable: the step's template is what the plug lands in
+  ∷ ( "scan with an observable accumulator, step mentions and drops it"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (scanᵉ (strmᵗ (mapᵉ (sndᵗ (pairᵗ (fstᵗ (varᵗ (there (here refl))))
+                                                (varᵗ (here refl))))
+                                    (wkExp hopBodyC)))
+                       (strmᵗ bushy) bushySrc) )
+  -- a template that uses its observable TWICE, the measureE refutation's shape
+  ∷ ( "template that uses its observable twice"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mergeAllᵉ (ofᵉ (varᵗ (here refl)
+                                            ∷ varᵗ (here refl) ∷ []))))
+                      bushySrc) )
+  -- a template that DISCARDS it outright: the `⊔ 1` floor is what keeps the
+  -- source's own walk dominated when the coefficient would otherwise be 0
+  ∷ ( "template that discards its observable entirely"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (ofᵉ (nat̂ 3 ∷ nat̂ 4 ∷ []))) bushySrc) )
+  -- a template over a template's output: the plug is itself an instantiation
+  ∷ ( "template over a template's output"
+    , slots2 (scripted coldSync) (scripted coldSync)
+    , mergeAllᵉ (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody))
+                      (mapᵉ (strmᵗ (mapᵉ mentionDrop hopBody)) bushySrc)) )
+  ∷ []
+
 runDirected : ∀ {n} {Γ : Ctx n}
             → List (String × Slots Γ × Exp Γ [] [] [] natᵗ) → Stats × List Witness
 runDirected []                    = zeroStats , []
@@ -757,7 +990,7 @@ witnessBlock label ws@(_ ∷ _) =
   "  " ++ label ++ " (" ++ show (length ws) ++ " total, first 12):\n"
   ++ concatStr (firstN 12 ws)
 
--- corpus selector: 0 (or absent) reports all four, 1..4 pick A / B / C / C₃.
+-- corpus selector: 0 (or absent) reports all five, 1..5 pick A / B / C / C₃ / D.
 -- The report is one block at the end, so a deep sweep that runs for hours gives
 -- no clue WHERE it is.  With this, a wedged or reaped run is bisectable: the seed
 -- range already localises the seed, this localises the corpus, and halving RUNS
@@ -766,22 +999,25 @@ witnessBlock label ws@(_ ∷ _) =
 pick : ℕ → ℕ → List String → List String
 pick sel k xs = if (sel ≡ᵇ 0) ∨ (sel ≡ᵇ k) then xs else []
 
--- CORPUS 5 / 6: LIST the generated programs of A / B without running any of
--- them.  Generation is cheap and evaluation is not, so when a sweep does not
--- come back, this is what turns "program N of corpus B is the expensive one"
+-- CORPUS 6 / 7 / 8: LIST the generated programs of A / B / D without running
+-- any of them.  Generation is cheap and evaluation is not, so when a sweep does
+-- not come back, this is what turns "program N of corpus B is the expensive one"
 -- into the program text — which the seed alone cannot give you.
-listOne : (ℕ → Gen (Slots Γ₂)) → ℕ → Gen String
-listOne slots d = slots d >>=G λ ins → genExp d >>=G λ e →
+listOne : (ℕ → Gen (Slots Γ₂)) → (ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)) → ℕ → Gen String
+listOne slots gen d = slots d >>=G λ ins → gen d >>=G λ e →
   pureG ("    " ++ showExp e ++ "\n      slots = " ++ showSlots ins ++ "\n")
 
-listN : (ℕ → Gen (Slots Γ₂)) → ℕ → ℕ → ℕ → Gen (List String)
-listN slots zero    d _ = pureG []
-listN slots (suc k) d i =
-  listOne slots d >>=G λ txt → listN slots k d (suc i) >>=G λ rest →
+listN : (ℕ → Gen (Slots Γ₂)) → (ℕ → Gen (Exp Γ₂ [] [] [] natᵗ))
+      → ℕ → ℕ → ℕ → Gen (List String)
+listN slots gen zero    d _ = pureG []
+listN slots gen (suc k) d i =
+  listOne slots gen d >>=G λ txt → listN slots gen k d (suc i) >>=G λ rest →
   pureG (("  #" ++ show i ++ "\n" ++ txt) ∷ rest)
 
-listCorpus : (ℕ → Gen (Slots Γ₂)) → ℕ → ℕ → ℕ → List String
-listCorpus slots seed runs d = proj₁ (listN slots runs d 1 (randList seed 2000000))
+listCorpus : (ℕ → Gen (Slots Γ₂)) → (ℕ → Gen (Exp Γ₂ [] [] [] natᵗ))
+           → ℕ → ℕ → ℕ → List String
+listCorpus slots gen seed runs d =
+  proj₁ (listN slots gen runs d 1 (randList seed 2000000))
 
 -- stdin: "FIRST [LAST] [RUNS] [DEPTH] [CORPUS]" — seeds FIRST..LAST, RUNS each
 main : IO Unit
@@ -797,6 +1033,8 @@ main = getContents >>= λ s →
       rB    = sweep caseB (first + 100000) count runs d
       rC    = runDirected directed
       rC₃   = runDirected directed₃
+      rD    = sweep caseD (first + 200000) count runs d
+      rDd   = runDirected directedD
   in putStr (concatStr
        ( "BURST PROBE — seeds " ∷ show first ∷ ".." ∷ show last ∷ ", " ∷ show runs
        ∷ " programs/seed, depth " ∷ show d ∷ ", corpus " ∷ show sel ∷ "\n\n"
@@ -812,10 +1050,18 @@ main = getContents >>= λ s →
              ∷ witnessBlock "C witnesses" (proj₂ rC) ∷ "\n" ∷ [])
        ++ᴸ pick sel 4
              ( pad (proj₁ rC₃) "C₃. directed programs (3 slots: two live shares)"
-             ∷ witnessBlock "C₃ witnesses" (proj₂ rC₃) ∷ [])
+             ∷ witnessBlock "C₃ witnesses" (proj₂ rC₃) ∷ "\n" ∷ [])
        ++ᴸ pick sel 5
-             ("A programs, generation only (no run):\n"
-              ∷ listCorpus (λ _ → genSlots) first runs d)
+             ( pad (proj₁ rDd) "D. observables into templates — DIRECTED"
+             ∷ witnessBlock "D directed witnesses" (proj₂ rDd) ∷ "\n"
+             ∷ pad (proj₁ rD) "D. observables into templates — generated"
+             ∷ witnessBlock "D generated witnesses" (proj₂ rD) ∷ [])
        ++ᴸ pick sel 6
+             ("A programs, generation only (no run):\n"
+              ∷ listCorpus (λ _ → genSlots) genExp first runs d)
+       ++ᴸ pick sel 7
              ("B programs, generation only (no run):\n"
-              ∷ listCorpus genSharedSlots (first + 100000) runs d)))
+              ∷ listCorpus genSharedSlots genExp (first + 100000) runs d)
+       ++ᴸ pick sel 8
+             ("D programs, generation only (no run):\n"
+              ∷ listCorpus genSharedSlots genExpD (first + 200000) runs d)))

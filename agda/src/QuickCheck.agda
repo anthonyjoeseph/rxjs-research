@@ -31,11 +31,14 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; cutPending; exhausted; EmitKind;
                            subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_;
+                          Ctx; Exp; Tm; Fn; PrimOp;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ;
+                          unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ;
+                          varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ;
                           add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Evaluator using (evaluate; Slot; scripted; shared; Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Implementation using (impl-batchSimultaneous)
@@ -150,9 +153,23 @@ SrcLeaf = Gen (Exp Γ₂ [] [] [] natᵗ)
 anySlot : SrcLeaf                -- the default: either slot, uniformly
 anySlot = genFin2 >>=G λ i → pureG (inputNat i)
 
+-- The second hook: what an obs-typed source may be WRAPPED in before an *All
+-- consumes it.  Everything this generator otherwise builds keeps its
+-- observables in `ofᵉ (strmᵗ e ∷ …)` with `e` Θ-CLOSED, so no generated
+-- program ever substitutes an observable into a template — which left the
+-- burst probe's hop-depth corpora structurally unable to see the one mechanism
+-- both 2026-07-27 refutations live in (Burst-Probe's corpus D is what closes
+-- that).  `noWrap` draws no randomness, so `genExp` consumes exactly the bits
+-- it always did and every existing seed's corpus is unchanged.
+ObsWrap : Set
+ObsWrap = ℕ → Exp Γ₂ [] [] [] (obs natᵗ) → Gen (Exp Γ₂ [] [] [] (obs natᵗ))
+
+noWrap : ObsWrap
+noWrap d s = pureG s
+
 {-# TERMINATING #-}
-genExpAt : SrcLeaf → ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
-genObsAt : SrcLeaf → ℕ → Gen (Exp Γ₂ [] [] [] (obs natᵗ))
+genExpAt : SrcLeaf → ObsWrap → ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
+genObsAt : SrcLeaf → ObsWrap → ℕ → Gen (Exp Γ₂ [] [] [] (obs natᵗ))
 
 genLeafAt : SrcLeaf → Gen (Exp Γ₂ [] [] [] natᵗ)
 genLeafAt src = genB 3 >>=G λ c →
@@ -160,30 +177,31 @@ genLeafAt src = genB 3 >>=G λ c →
   else if c ≡ᵇ 1 then pureG emptyᵉ
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofᵉ (nat̂ a ∷ nat̂ b ∷ [])))
 
-genExpAt src zero    = genLeafAt src
-genExpAt src (suc d) = genB 10 >>=G λ c →
+genExpAt src w zero    = genLeafAt src
+genExpAt src w (suc d) = genB 10 >>=G λ c →
   if c ≡ᵇ 0 then genLeafAt src
   else if c ≡ᵇ 1 then genLeafAt src
-  else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt src d >>=G λ e → pureG (mapᵉ f e))
-  else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genExpAt src d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
+  else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt src w d >>=G λ e → pureG (mapᵉ f e))
+  else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genExpAt src w d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
   else if c ≡ᵇ 4 then
-    (genScanFn >>=G λ f → genNat >>=G λ s → genExpAt src d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
-  else if c ≡ᵇ 5 then (genObsAt src d >>=G λ s → pureG (mergeAllᵉ s))
-  else if c ≡ᵇ 6 then (genObsAt src d >>=G λ s → pureG (concatAllᵉ s))
-  else if c ≡ᵇ 7 then (genObsAt src d >>=G λ s → pureG (switchAllᵉ s))
-  else if c ≡ᵇ 8 then (genObsAt src d >>=G λ s → pureG (exhaustAllᵉ s))
+    (genScanFn >>=G λ f → genNat >>=G λ s → genExpAt src w d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
+  else if c ≡ᵇ 5 then (genObsAt src w d >>=G λ s → pureG (mergeAllᵉ s))
+  else if c ≡ᵇ 6 then (genObsAt src w d >>=G λ s → pureG (concatAllᵉ s))
+  else if c ≡ᵇ 7 then (genObsAt src w d >>=G λ s → pureG (switchAllᵉ s))
+  else if c ≡ᵇ 8 then (genObsAt src w d >>=G λ s → pureG (exhaustAllᵉ s))
   else genLeafAt src
 
-genInners : SrcLeaf → ℕ → ℕ → Gen (List (Tm Γ₂ [] [] [] (obs natᵗ)))
-genInners src d zero    = pureG []
-genInners src d (suc n) =
-  genExpAt src d >>=G λ e → genInners src d n >>=G λ rest → pureG (strmᵗ e ∷ rest)
+genInners : SrcLeaf → ObsWrap → ℕ → ℕ → Gen (List (Tm Γ₂ [] [] [] (obs natᵗ)))
+genInners src w d zero    = pureG []
+genInners src w d (suc n) =
+  genExpAt src w d >>=G λ e → genInners src w d n >>=G λ rest → pureG (strmᵗ e ∷ rest)
 
-genObsAt src d =
-  genB 2 >>=G λ extra → genInners src d (suc (suc extra)) >>=G λ items → pureG (ofᵉ items)
+genObsAt src w d =
+  genB 2 >>=G λ extra → genInners src w d (suc (suc extra)) >>=G λ items →
+  w d (ofᵉ items)
 
 genExp : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
-genExp = genExpAt anySlot
+genExp = genExpAt anySlot noWrap
 
 ------------------------------------------------------------------------
 -- comparison of two batched streams (impl vs spec fed the SAME evaluate
@@ -318,15 +336,29 @@ showTmList : ∀ {Θ t} → List (Tm Γ₂ [] [] Θ t) → String
 showTmList []       = "[]"
 showTmList (x ∷ xs) = showTm x ++ " ∷ " ++ showTmList xs
 
-showTm (varᵗ (here refl)) = "(varᵗ (here refl))"
-showTm (varᵗ (there _))   = "PLACEHOLDER-var"
+-- a variable is rendered by its de Bruijn PATH, not just as "here": corpus D
+-- builds templates with nested binders, and a witness that cannot say WHICH
+-- binder a variable belongs to is not reproducible — which is the only reason
+-- witnesses are printed at all
+showIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → String
+showIx (here refl) = "(here refl)"
+showIx (there x)   = "(there " ++ showIx x ++ ")"
+
+showTm (varᵗ x)           = "(varᵗ " ++ showIx x ++ ")"
+showTm unit̂               = "unit̂"
+showTm (bool̂ b)           = "(bool̂ " ++ (if b then "true" else "false") ++ ")"
 showTm (nat̂ n)            = "(nat̂ " ++ show n ++ ")"
 showTm (pairᵗ a b)        = "(pairᵗ " ++ showTm a ++ " " ++ showTm b ++ ")"
 showTm (fstᵗ p)           = "(fstᵗ " ++ showTm p ++ ")"
 showTm (sndᵗ p)           = "(sndᵗ " ++ showTm p ++ ")"
+showTm (inlᵗ a)           = "(inlᵗ " ++ showTm a ++ ")"
+showTm (inrᵗ a)           = "(inrᵗ " ++ showTm a ++ ")"
+showTm (caseᵗ s l r)      =
+  "(caseᵗ " ++ showTm s ++ " " ++ showTm l ++ " " ++ showTm r ++ ")"
+showTm (ifᵗ c a b)        =
+  "(ifᵗ " ++ showTm c ++ " " ++ showTm a ++ " " ++ showTm b ++ ")"
 showTm (primᵗ op a)       = "(primᵗ " ++ showPrim op ++ " " ++ showTm a ++ ")"
 showTm (strmᵗ e)          = "(strmᵗ " ++ showExp e ++ ")"
-showTm _                  = "PLACEHOLDER-tm"
 
 showExp (input i)       = "(input " ++ showFin i ++ ")"
 showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
