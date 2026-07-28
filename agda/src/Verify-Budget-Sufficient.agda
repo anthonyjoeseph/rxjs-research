@@ -2018,18 +2018,32 @@ EnvHopD V D (_∷ᵃ_ {x = t} v σ) = (hopDᵛ V t v ≤ D) × EnvHopD V D σ
 -- read at the index that variable occupies once the local binders
 -- between it and the root have been counted.  m is the environment's
 -- length, k the offset where it starts.
+-- …summed over one index range.  Routing all three sorts through a
+-- single sum over a ℕ → ℕ is not tidiness: it makes every clause where
+-- hopD merely PASSES ITS SLOPE THROUGH (mergeAllᵉ, takeᵉ, μᵉ, strmᵗ,
+-- fstᵗ, …) hold definitionally, and it makes the cross-sort ones —
+-- sumPmᵉ of `ofᵉ ts` being sumPmᵗˢ of ts — hold definitionally too,
+-- because the two functions beta-reduce to each other.  Defined
+-- sort-by-sort, each of those would be its own induction on m, and
+-- there are a dozen of them.
+sumF : (ℕ → ℕ) → ℕ → ℕ → ℕ
+sumF g k zero    = 0
+sumF g k (suc m) = g k + sumF g (suc k) m
+
+sumF-cong : ∀ (g h : ℕ → ℕ) (k m : ℕ) → (∀ j → g j ≡ h j) →
+  sumF g k m ≡ sumF h k m
+sumF-cong g h k zero    p = refl
+sumF-cong g h k (suc m) p = cong₂ _+_ (p k) (sumF-cong g h (suc k) m p)
+
 sumPmᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
-sumPmᵉ V k zero    e = 0
-sumPmᵉ V k (suc m) e = pmᵉ V k e + sumPmᵉ V (suc k) m e
+sumPmᵉ V k m e = sumF (λ j → pmᵉ V j e) k m
 
 sumPmᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
-sumPmᵗ V k zero    t = 0
-sumPmᵗ V k (suc m) t = pmᵗ V k t + sumPmᵗ V (suc k) m t
+sumPmᵗ V k m t = sumF (λ j → pmᵗ V j t) k m
 
 sumPmᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ)
   → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-sumPmᵗˢ V k zero    ts = 0
-sumPmᵗˢ V k (suc m) ts = pmᵗˢ V k ts + sumPmᵗˢ V (suc k) m ts
+sumPmᵗˢ V k m ts = sumF (λ j → pmᵗˢ V j ts) k m
 
 -- HOW THE SLOPE DECOMPOSES, which is what (H1)'s clauses need from
 -- their recursive calls.  A clause of hopD is either MULTIPLYING (mapᵉ,
