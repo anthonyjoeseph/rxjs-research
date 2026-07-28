@@ -4785,29 +4785,63 @@ postulate
 --     witness's hop chain (natᵗ, natᵗ, natᵗ), so never strict
 --   · strmᵗ-nesting depth — 1, 1, 0: non-strict at the first hop
 --
--- The one candidate that survives the witness is a REMAINING-HOP
--- count: how many *All frames a subscription can still enter.  It has
--- to compose along map (a fn's template is applied to the source's
--- values, so the chains concatenate) rather than take a max —
---     T (mergeAllᵉ c) = suc (T c)     T (mapᵉ f e) = T f + T e
---     T (strmᵗ e)     = T e           T (ofᵉ ts)   = max over ts
--- — and with `max` at mapᵉ instead of `+` it is already false:
--- lifting the witness's leaf from `big` to mergeAll(of(strm big))
--- gives 2 ↦ 2 at the first hop.  With `+` both witnesses descend
--- strictly (2↦1 and 3↦2).
+-- THE CANDIDATE, now stated as Rx.Hop-Depth.hopD: a REMAINING-HOP
+-- count — how many *All frames a subscription can still enter.  Two
+-- of its clauses were forced by witnesses rather than chosen:
 --
--- But T is NOT a syntactic quantity, and this is the crux: at scanᵉ
--- the accumulator is refolded, so T(accₖ) = k · T(f) + T(acc₀) and
--- the count k is bounded only by the value count — exactly the memo's
--- "after k folded values the acc nests k deep".  So any working `r`
--- is bounded by the STORE bound V, not by the program, which is
--- consistent with dBound already allowing r ≤ R = suc V ^ suc V.  The
--- replacement is therefore a V-bounded remaining-hop depth plus the
--- lemma that a scan accumulator's depth stays under it — not a
--- re-choice of syntactic measure.  That is a redesign of the demand
--- function, not an edit, so it is stated here and left open rather
--- than guessed at.  Any candidate must be run against the probe
--- FIRST; only then restate the interface.
+--   · mapᵉ composes by `+`, not `⊔`.  A fn's template is applied to
+--     the source's values, so the chains CONCATENATE.  Lifting the
+--     probe's leaf from `big` to mergeAll (of (strm big)) reads 4 ↦ 2
+--     under `+` and 2 ↦ 2 — a tie — under `⊔`.
+--   · the source's depth enters scaled by occsᵗ.  A bare `+` did not
+--     survive a nested map: subΘ plugs the value at EVERY Θ-var
+--     occurrence, so two occurrences either side of a `+` count the
+--     plugged depth twice.  Same multiplicity the proven
+--     sync-linearity ledger already uses.
+--
+-- V enters at scanᵉ, where the accumulator is REFOLDED: hopD(accₖ)
+-- grows once per folded value — the 07-19 memo's "after k folded
+-- values the acc nests k deep" — so the clause pays (2 + occs)^V,
+-- from solving aₖ ≤ F + c·(aₖ₋₁ ⊔ m) at k ≤ V.  hopD is therefore a
+-- function of the expression AND the store bound, which is what
+-- dBound already anticipates in allowing r ≤ R = suc V ^ suc V.
+--
+-- MEASURED (2026-07-27) before anything below took a dependency on it.
+-- Static, in agda/probe/Hop-Descent-Probe.agda — all four refutation
+-- witnesses descend strictly (2↦1, 2↦1, 2↦1, 4↦2); the scan
+-- accumulator's depth is 0,1,2,3 after 0..3 folds, against a clause
+-- paying 256 at V ≡ 4; and hopD is EQUAL across a μ unfold, since an
+-- unfold substitutes for a Δᵍ variable and those sit only under
+-- deferᵉ, which hopD cuts.  So the μ edge is weakly monotone in r and
+-- keeps paying with dBound-μ's s — unfoldμ-≺ was NOT assumed to
+-- transfer, it is a fact about the shell multiset and says nothing
+-- about hopD.
+--
+-- Corpus-wide, via the burst probe's numeric hopLog (make
+-- burst-probe), testing the emitted-value invariant hopD v ≤ hopD b
+-- that the hop edge consumes — with hopD (mergeAllᵉ c) ≡ suc (hopD c),
+-- that inequality is exactly what makes a hop strict:
+--
+--   A  generated, scripted slots      360 progs   6340 obs   0 viol
+--   B  generated, shared slots          6 progs    130 obs   0 viol
+--   C  directed, 2 slots                19 progs    199 obs   0 viol
+--   C₃ directed, 3 slots, 2 shares      36 progs    681 obs   0 viol
+--
+-- selfcheck and wellFormed clean throughout, so the log does not move
+-- the evaluator.  The probe's V is capped at 8 (the real V makes
+-- (2+occs)^V a bignum per subscribe and OOMs a depth-4 corpus); a
+-- smaller V shrinks the PARENT's allowance, so the cap can only make
+-- the test harder, never hide a violation.  Sweeping it over 4/8/16
+-- gives identical counts and no violations, so the cap is not deciding
+-- the answer.
+--
+-- STILL OWED, and it is the piece whose failure would reshape the
+-- assembly: k ≤ V measured directly — whether the store bound really
+-- does bound a scan's per-frame fold count.  The corpora above only
+-- show that the scan clause dominates the fold depths THEY reach; they
+-- do not measure k against V.  Until that lands, hopD is a gated
+-- candidate, not a settled choice, and nothing here is restated
+-- against subscribeE-walk.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
