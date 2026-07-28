@@ -4835,13 +4835,34 @@ postulate
 -- gives identical counts and no violations, so the cap is not deciding
 -- the answer.
 --
--- STILL OWED, and it is the piece whose failure would reshape the
--- assembly: k ≤ V measured directly — whether the store bound really
--- does bound a scan's per-frame fold count.  The corpora above only
--- show that the scan clause dominates the fold depths THEY reach; they
--- do not measure k against V.  Until that lands, hopD is a gated
--- candidate, not a settled choice, and nothing here is restated
--- against subscribeE-walk.
+-- AND k ≤ V, the piece whose failure would have reshaped the assembly,
+-- turns out to need no measurement at all — it is a CONSEQUENCE of the
+-- store invariant this proof already carries, not a new premise:
+--
+--   · a scan accumulator is a STORED value, and boundedNode above reads
+--     exactly `boundedNode B (scan-st v) = sizeᵛ v ≤ᵇ B`, so INV? at
+--     instant id already gives sizeᵛ accₖ ≤ sizeBudgetAt e sl id ≡ V;
+--   · a fold that DEEPENS the accumulator adds at least one syntax
+--     constructor, so k ≤ sizeᵛ accₖ; a fold that does not deepen it
+--     does not raise hopD either, so it costs nothing;
+--   · hence k ≤ sizeᵛ accₖ ≤ V, which is the scan clause's side
+--     condition, discharged from INV? rather than assumed.
+--
+-- The margin is not close, and that is why no corpus counter was
+-- written for it: V is towerℕ ((4 + size) · suc id), so V ≥ towerℕ 5 ≡
+-- 2^65536.  A counter comparing a run's fold count against a number
+-- that cannot be computed would be vacuous, not evidence.  (k≤towerℕ,
+-- already proven above, is the arithmetic half.)
+--
+-- SO THE GATE IS PASSED and hopD is the candidate to state.  What is
+-- deliberately NOT done here: nothing above is yet restated in terms of
+-- it.  Phase 2 is the assembly — swap r := a hopD-based rank into
+-- subscribeE-walk, restate the hop edge as hopD o < hopD b, thread the
+-- emitted-value invariant as a walk conjunct, all as postulates, and
+-- get the whole thing typechecking before any site is proven.  Phase 3
+-- then proves pieces most-uncertain-first, which is now the
+-- emitted-value invariant across subΘ, since the scan bound above
+-- reduces to INV? and the μ edge is settled.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.

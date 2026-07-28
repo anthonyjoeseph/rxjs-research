@@ -32,8 +32,17 @@
 -- store bound, not by the program, so hopD takes V and the scan clause
 -- pays (2 + occs)^V.  Solving aₖ ≤ F + c·(aₖ₋₁ ⊔ m) with a₀ = Z gives
 -- aₖ ≤ (1 + c)^k · (F + Z + m), which is that clause with k ≤ V.
--- This is the premise the probe has to check: that V really does bound
--- the per-frame fold count.
+--
+-- k ≤ V IS NOT AN EXTRA ASSUMPTION.  A scan accumulator is a STORED
+-- value — Verify-Budget-Sufficient's boundedNode reads exactly
+-- `boundedNode B (scan-st v) = sizeᵛ v ≤ᵇ B` — so the store invariant
+-- the proof already carries bounds its SIZE by V.  A fold that deepens
+-- the accumulator adds at least one constructor, so k ≤ sizeᵛ accₖ ≤ V,
+-- and a fold that does not deepen it does not raise hopD either.  The
+-- margin is not close: V is sizeBudgetAt, a TOWER of 2s of height
+-- (4 + size)(1 + id), hence ≥ towerℕ 5 ≡ 2^65536.  This is why there is
+-- no corpus counter for k ≤ V — V is not even computable, so the
+-- comparison would be vacuous rather than informative.
 --
 -- Everything here is an UPPER bound; no clause needs to be tight.
 ------------------------------------------------------------------
