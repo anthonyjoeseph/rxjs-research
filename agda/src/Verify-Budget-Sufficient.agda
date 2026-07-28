@@ -54,7 +54,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        ^-monoˡ-≤; ^-*-assoc;
                                        ^-distribˡ-+-*; *-mono-≤;
                                        +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub)
+                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -109,6 +109,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -1408,14 +1409,46 @@ totᵛ-counts B (x ∷ M)
         | totᵛ-oneAt B x
         | totᵛ-counts B M = refl
 
--- the r ≤ R discharge, packaged: a stored value's rank sits under
--- the store rank cap purely because its SIZE does — entry sum via
--- shells-len, all through stBounded?, no extra invariant
-measureE-rank : ∀ {n} {Γ : Ctx n} {t} (B V : ℕ) (e : Closed Γ t) →
-  sizeᵉ e ≤ V → rank V (measureE B e) < (suc V) ^ suc B
-measureE-rank B V e h = rank-lt-pow V (counts B (shellsᵉ e))
-  (subst (_≤ V) (sym (totᵛ-counts B (shellsᵉ e)))
-         (≤-trans (shells-len e) h))
+------------------------------------------------------------------
+-- THE HOP RANK CAP — dBound's R, now that `r` is hopD.
+--
+-- R exists for ONE edge: dBound-connect resets r to the connected
+-- def's, and demands r′ ≤ R.  A def is fixed slot content, so this
+-- is a cap on hopD over STORE-SIZED expressions and nothing more.
+--
+-- hopD's scanᵉ clause pays (2 + occs)^V at every node, and a size-s
+-- expression has s nodes with occs ≤ s, so the cap is (2+s)^(V·s) —
+-- ONE POLYNOMIAL higher in the exponent than the retired rank's
+-- (1+V)^(1+V).  prod≤3pow below absorbs that inside the SAME three
+-- exponential stories (a cube where it used to square), which is why
+-- the budget tower does not move: R rising by a polynomial in the
+-- exponent is invisible to a tower of 2s.
+------------------------------------------------------------------
+
+hopR : ℕ → ℕ
+hopR V = (2 + V) ^ (suc V * suc V)
+
+postulate
+  -- (P1) hopD is bounded by SIZE, at the shape the clause recursion
+  -- gives.  Induction on e, one ≤-chain per clause, all with slack:
+  --   mapᵉ    2·(2+s)^(V′(s-1)+1)  ≤ (2+s)^(V′s)   needs 2 ≤ (2+s)^V
+  --   scanᵉ   3·(2+s)^(V+V′(s-1))  ≤ (2+s)^(V′s)   needs 3 ≤ 2+s
+  --   *Allᵉ   suc ((2+s)^(V′(s-1))) ≤ (2+s)^(V′s)
+  -- where V′ = suc V and s = sizeᵉ e.  Nothing here is tight; the
+  -- statement is deliberately loose so every clause closes by
+  -- ^-monoˡ/ʳ-≤ without arithmetic identities.
+  hopD-size : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
+    hopDᵉ V e ≤ (2 + sizeᵉ e) ^ (suc V * sizeᵉ e)
+
+-- the r ≤ R discharge, packaged: a stored expression's hop depth sits
+-- under the store rank cap purely because its SIZE does — all through
+-- stBounded?, no extra invariant
+hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
+  sizeᵉ e ≤ V → hopDᵉ V e ≤ hopR V
+hopD-cap V e h =
+  ≤-trans (hopD-size V e)
+  (≤-trans (^-monoˡ-≤ (suc V * sizeᵉ e) (+-monoʳ-≤ 2 h))
+           (^-monoʳ-≤ (2 + V) (*-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
 
 -- a shared slot's def is an element of the global syntactic
 -- multiset {program} ⊎ {slots}: its size sits inside the budget's
@@ -1433,16 +1466,16 @@ slotDef-size sl i {d} eq =
 -- half), PROVEN: when a walked template's `input i` hits a shared
 -- slot, the connect's resets re-anchor against the slot's OWN
 -- element of the global syntactic multiset — its def d is fixed
--- slot content, so its rank sits under the store rank cap (feeding
--- dBound-connect's r′ ≤ R) and its walk under the store bound
+-- slot content, so its hop depth sits under the store rank cap
+-- (feeding dBound-connect's r′ ≤ R) and its walk under the store bound
 -- (feeding dBound-hop/-connect's s′ ≤ V), straight off the
 -- budget's slot summand: no state invariant consulted
 connect-anchor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
   let V = sizeBudgetAt e sl id in
-  (rank V (measureE V d) ≤ suc V ^ suc V) × (syncSizeᵉ d ≤ V)
+  (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
 connect-anchor e sl id i {d} eq =
-  <⇒≤ (measureE-rank V V d size≤V) , ≤-trans (syncSize≤sizeᵉ d) size≤V
+  hopD-cap V d size≤V , ≤-trans (syncSize≤sizeᵉ d) size≤V
   where
   V = sizeBudgetAt e sl id
   size≤V : sizeᵉ d ≤ V
@@ -1701,24 +1734,52 @@ dBound-struct : ∀ (V R U : ℕ) {r′ r s′ s} → r′ ≤ r → s′ < s �
 dBound-struct V R U r′≤r s′<s =
   +-mono-<-≤ s′<s (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′≤r))
 
--- THE STRUCTURAL EDGE, packaged: one operator node crossed, one
--- unit of demand paid.  The `Σ` argument is the sub-multiset
--- witness — what the operator's own terms contribute on top of the
--- child's inner shells
-descent-of : ∀ {n} {Γ : Ctx n} {s u} (V R U : ℕ)
-  (b : Closed Γ s) (c : Closed Γ u) →
-  shellSizeᵉ c ≡ suc (shellSizeᵉ b) →
-  Σ (List ℕ) (λ N → innerᵉ c ≡ N ++ innerᵉ b) →
-  syncSizeᵉ b < syncSizeᵉ c →
-  suc (shellSizeᵉ b) ≤ V → sizeᵉ b ≤ V →
-  dBound V R U (rank V (measureE V b)) (syncSizeᵉ b)
-    < dBound V R U (rank V (measureE V c)) (syncSizeᵉ c)
-descent-of V R U b c hshell (N , hinner) hsync hcap hsize =
-  dBound-struct V R U (<⇒≤ (rank-drop V b c step hsize)) hsync
-  where
-  step : measureE V b ≺ᵛ measureE V c
-  step rewrite hshell | hinner =
-    shells-drop V (shellSizeᵉ b) N (innerᵉ b) hcap
+------------------------------------------------------------------
+-- THE STRUCTURAL EDGE's r side, in hopD.  With `r` a remaining-hop
+-- COUNT rather than a shell multiset, this stops being a sub-multiset
+-- argument and becomes seven one-line clause facts: every structural
+-- constructor keeps its source's hop depth, because every clause
+-- either passes it through, scales it by a factor that is ≥ 1, or
+-- (at a *All) adds the one hop the operator itself will take.
+--
+-- Note what is NOT here and does not need to be: an inequality for
+-- the μ edge.  hopD (μᵉ body) is hopD body BY DEFINITION, so the
+-- structural μ step is refl and the UNFOLD step — where the retired
+-- measure needed unfoldμ-≺ — is an equality too (Δᵍ vars live only
+-- under deferᵉ, which hopD cuts).  The μ edge pays entirely with
+-- dBound-μ's s, exactly as it already did.
+------------------------------------------------------------------
+
+-- a factor of at least one never shrinks
+1*≤ : ∀ (x k : ℕ) → 1 ≤ k → x ≤ k * x
+1*≤ x k h = ≤-trans (≤-reflexive (sym (+-identityʳ x))) (*-monoˡ-≤ x h)
+
+1≤pow : ∀ (b k : ℕ) → 1 ≤ suc b ^ k
+1≤pow b zero    = ≤-refl
+1≤pow b (suc k) = ≤-trans (1≤pow b k) (m≤m+n _ _)
+
+module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
+
+  hopD-map : ∀ {s u} (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) →
+    hopDᵉ V b ≤ hopDᵉ V (mapᵉ f b)
+  hopD-map f b =
+    ≤-trans (1*≤ (hopDᵉ V b) (occsᵗ f ⊔ 1) (m≤n⊔m (occsᵗ f) 1))
+            (m≤n+m ((occsᵗ f ⊔ 1) * hopDᵉ V b) (hopDᵗ V f))
+
+  hopD-take : ∀ {u} (c : Tm Γ Δᵍ Δ Θ natᵗ) (b : Exp Γ Δᵍ Δ Θ u) →
+    hopDᵉ V b ≤ hopDᵉ V (takeᵉ c b)
+  hopD-take c b = ≤-refl
+
+  hopD-scan : ∀ {s u} (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u) (z : Tm Γ Δᵍ Δ Θ u)
+    (b : Exp Γ Δᵍ Δ Θ s) → hopDᵉ V b ≤ hopDᵉ V (scanᵉ f z b)
+  hopD-scan f z b =
+    ≤-trans (m≤n+m (hopDᵉ V b) (hopDᵗ V f + hopDᵗ V z))
+            (1*≤ _ _ (1≤pow (suc (occsᵗ f)) V))
+
+  -- the four hop carriers: the operator's own frame is the `suc`
+  hopD-all : ∀ {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
+    hopDᵉ V b ≤ suc (hopDᵉ V b)
+  hopD-all b = n≤1+n (hopDᵉ V b)
 
 ------------------------------------------------------------------
 -- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
@@ -2048,6 +2109,74 @@ subΘ-shells-len V Θloc σ e hσ =
           (+-mono-≤ (inner-lenᵉ e) (plugs-lenᵉ V Θloc σ e hσ))
 
 ------------------------------------------------------------------
+-- (P2) THE EMITTED-VALUE INVARIANT's ENGINE — the one genuinely open
+-- piece of the hopD assembly, and the only place its correctness is
+-- in question rather than merely unwritten.
+--
+-- Everything else the walk needs about hopD is syntactic and cheap
+-- (the structural facts above are one line each; the store cap is a
+-- size induction; the μ edge is refl).  What is NOT cheap is the
+-- statement that a template, INSTANTIATED, does not emit deeper than
+-- the template plus what was plugged into it — because that is where
+-- the retired shell measure was actually refuted.  A template may use
+-- its bound variable more than once, and subΘ copies the plugged
+-- value once per occurrence; the whole point of hopD's occsᵗ scaling
+-- is to price that copying instead of being surprised by it.  So this
+-- is the same multiplicity that killed the old measure, now carried
+-- BY the measure — and these two statements are where that has to be
+-- made good.
+--
+-- THE SKELETON IS NOT NEW.  subΘ-countsᵗ above already walks this
+-- exact substitution with this exact multiplicity accounting, and its
+-- ledger (plugs-lenᵗ, inner-len-subΘ) is proven.  hopD's version is
+-- meant to be the SAME induction with a different semiring at the
+-- leaves: `⊕ᵛ`/`counts` become `+`/`⊔` on ℕ, and the plugs summand
+-- becomes occsᵗ · m.  Follow it clause for clause.  If a clause of it
+-- does NOT transfer, that clause is a FINDING about hopD, not an
+-- obstacle to push through — surface it.
+--
+-- They are mutually recursive for the reason the measure is: evalWith
+-- at `strmᵗ e` with a non-empty environment IS closeUnderFn, i.e.
+-- subΘExp [] — the value side bottoms out in the expression side.
+-- caseᵗ is the interesting clause both ways: it BINDS, so the branch
+-- runs under an environment one entry longer, whose new entry is the
+-- scrutinee's own value.  That is exactly why hopD's caseᵗ clause
+-- scales by occurrences rather than taking a max.
+------------------------------------------------------------------
+
+EnvHopD : ∀ {n} {Γ : Ctx n} {Θ} (V m : ℕ) → All (Val Γ) Θ → Set
+EnvHopD V m []ᵃ                = ⊤
+EnvHopD V m (_∷ᵃ_ {x = t} v σ) = (hopDᵛ V t v ≤ m) × EnvHopD V m σ
+
+postulate
+  hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} (V m : ℕ)
+    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) → EnvHopD V m env →
+    hopDᵛ V t (evalWith tm env) ≤ hopDᵗ V tm + occsᵗ tm * m
+
+  hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V m : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    EnvHopD V m σ →
+    hopDᵉ V (subΘExp Θloc σ e) ≤ hopDᵉ V e + occsᵉ e * m
+
+-- what the mapᵉ clause actually calls: stepFrame's map-f is
+-- `map (applyFn fn)`, and this is hopD's mapᵉ clause exactly
+hopD-applyFn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
+  (f : Fn Γ [] [] [] s u) (v : Val Γ s) →
+  hopDᵛ V u (applyFn f v) ≤ hopDᵗ V f + (occsᵗ f ⊔ 1) * hopDᵛ V s v
+hopD-applyFn {s = s} V f v =
+  ≤-trans (hopD-evalWith V (hopDᵛ V s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
+          (+-monoʳ-≤ (hopDᵗ V f)
+                     (*-monoˡ-≤ (hopDᵛ V s v) (m≤m⊔n (occsᵗ f) 1)))
+
+-- and the ofᵉ clause: a closed term's value cannot out-hop the term
+hopD-evalTm : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (tm : Tm Γ [] [] [] t) →
+  hopDᵛ V t (evalTm tm) ≤ hopDᵗ V tm
+hopD-evalTm V tm =
+  ≤-trans (hopD-evalWith V 0 tm []ᵃ tt)
+          (≤-reflexive (trans (cong (hopDᵗ V tm +_) (*-zeroʳ (occsᵗ tm)))
+                              (+-identityʳ (hopDᵗ V tm))))
+
+------------------------------------------------------------------
 -- THE SEED INEQUALITY, PROVEN: the contract's whole demand — under
 -- one product by dBound-bound — fits the seeded budget's literal
 -- head plus tower at instant 0.  The engine (prod≤3pow) is generic:
@@ -2081,44 +2210,84 @@ k+2≤2^k (suc (suc (suc j))) _ =
             (≤-trans (2k≤2^k (suc (suc j)) (s≤s (s≤s z≤n)))
                      (≤-reflexive (sym (+-identityʳ (2 ^ suc (suc j)))))))
 
-prod≤3pow : ∀ (V U : ℕ) → 2 ≤ V → U ≤ V →
-  suc (suc V * suc (suc V ^ suc V) * suc U) ≤ 2 ^ (2 ^ (2 ^ V))
-prod≤3pow V U 2≤V U≤V =
+-- the CUBE's side condition, where the square needed 2k≤2^k.  hopR's
+-- exponent is one polynomial degree higher than the retired rank's, so
+-- the slack identity below closes on (V+2)³ and wants 3V ≤ 2^V — true
+-- from V ≥ 4 (at V ≡ 4 it is 12 ≤ 16), where the square was true from 2
+3k≤2^k : ∀ k → 4 ≤ k → k + (k + k) ≤ 2 ^ k
+3k≤2^k (suc zero)                      (s≤s ())
+3k≤2^k (suc (suc zero))                (s≤s (s≤s ()))
+3k≤2^k (suc (suc (suc zero)))          (s≤s (s≤s (s≤s ())))
+3k≤2^k (suc (suc (suc (suc zero))))    _ = ≤ᵇ⇒≤ 12 16 tt
+-- the recursive call spells `m` out: it is a where-binding, and the
+-- termination checker is syntactic
+3k≤2^k (suc (suc (suc (suc (suc j))))) _ =
+  ≤-trans (≤-reflexive shape)
+  (≤-trans (+-mono-≤ 3≤2^m
+             (3k≤2^k (suc (suc (suc (suc j)))) (s≤s (s≤s (s≤s (s≤s z≤n))))))
+           (≤-reflexive (sym (cong (2 ^ m +_) (+-identityʳ (2 ^ m))))))
+  where
+  m = suc (suc (suc (suc j)))
+  shape : suc m + (suc m + suc m) ≡ 3 + (m + (m + m))
+  shape = solve 1
+    (λ v → (con 1 :+ v) :+ ((con 1 :+ v) :+ (con 1 :+ v))
+             := con 3 :+ (v :+ (v :+ v)))
+    refl m
+  3≤2^m : 3 ≤ 2 ^ m
+  3≤2^m = ≤-trans (s≤s (s≤s (s≤s z≤n))) (k+2≤2^k m (s≤s (s≤s z≤n)))
+
+2+k≤2^k : ∀ k → 2 ≤ k → 2 + k ≤ 2 ^ k
+2+k≤2^k k h = ≤-trans (≤-reflexive (+-comm 2 k)) (k+2≤2^k k h)
+
+prod≤3pow : ∀ (V U : ℕ) → 4 ≤ V → U ≤ V →
+  suc (suc V * suc (hopR V) * suc U) ≤ 2 ^ (2 ^ (2 ^ V))
+prod≤3pow V U 4≤V U≤V =
   ≤-trans (s≤s prod≤2F) (≤-trans (suc-2^ F) (^-monoʳ-≤ 2 sucF≤))
   where
-  F = V + suc (V * suc V) + V
+  2≤V : 2 ≤ V
+  2≤V = ≤-trans (≤ᵇ⇒≤ 2 4 tt) 4≤V
+
+  Q = V * (suc V * suc V)
+  F = V + suc Q + V
 
   hV : suc V ≤ 2 ^ V
   hV = n<2^n V
 
-  hR : suc (suc V ^ suc V) ≤ 2 ^ suc (V * suc V)
-  hR = ≤-trans (s≤s (≤-trans (^-monoˡ-≤ (suc V) hV)
-                             (≤-reflexive (^-*-assoc 2 V (suc V)))))
-               (suc-2^ (V * suc V))
+  hB : 2 + V ≤ 2 ^ V
+  hB = 2+k≤2^k V 2≤V
+
+  hR : suc (hopR V) ≤ 2 ^ suc Q
+  hR = ≤-trans (s≤s (≤-trans (^-monoˡ-≤ (suc V * suc V) hB)
+                             (≤-reflexive (^-*-assoc 2 V (suc V * suc V)))))
+               (suc-2^ Q)
 
   hU : suc U ≤ 2 ^ V
   hU = ≤-trans (s≤s U≤V) hV
 
-  prod≤2F : suc V * suc (suc V ^ suc V) * suc U ≤ 2 ^ F
+  prod≤2F : suc V * suc (hopR V) * suc U ≤ 2 ^ F
   prod≤2F = ≤-trans (*-mono-≤ (*-mono-≤ hV hR) hU)
     (≤-reflexive
-      (trans (cong (_* 2 ^ V) (sym (^-distribˡ-+-* 2 V (suc (V * suc V)))))
-             (sym (^-distribˡ-+-* 2 (V + suc (V * suc V)) V))))
+      (trans (cong (_* 2 ^ V) (sym (^-distribˡ-+-* 2 V (suc Q))))
+             (sym (^-distribˡ-+-* 2 (V + suc Q) V))))
 
-  -- suc F + slack = (V+2)², counted exactly (the ring identity)
-  slack-eq : (3 + V) + F ≡ (V + 2) * (V + 2)
+  -- suc F + slack = (V+2)³, counted exactly (the ring identity)
+  slack-eq : (7 + (4 * (V * V) + 9 * V)) + F ≡ (V + 2) * ((V + 2) * (V + 2))
   slack-eq = solve 1
-    (λ v → (con 3 :+ v) :+ ((v :+ (con 1 :+ v :* (con 1 :+ v))) :+ v)
-             := (v :+ con 2) :* (v :+ con 2))
+    (λ v → (con 7 :+ (con 4 :* (v :* v) :+ con 9 :* v))
+             :+ ((v :+ (con 1 :+ v :* ((con 1 :+ v) :* (con 1 :+ v)))) :+ v)
+             := (v :+ con 2) :* ((v :+ con 2) :* (v :+ con 2)))
     refl V
 
   sucF≤ : suc F ≤ 2 ^ (2 ^ V)
   sucF≤ =
-    ≤-trans (+-monoˡ-≤ F (s≤s (z≤n {suc (suc V)})))   -- suc F ≤ (3+V) + F
+    ≤-trans (+-monoˡ-≤ F (s≤s (z≤n {6 + (4 * (V * V) + 9 * V)})))
     (≤-trans (≤-reflexive slack-eq)
-    (≤-trans (*-mono-≤ (k+2≤2^k V 2≤V) (k+2≤2^k V 2≤V))
-    (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 V V)))
-             (^-monoʳ-≤ 2 (2k≤2^k V 2≤V)))))
+    (≤-trans (*-mono-≤ (k+2≤2^k V 2≤V)
+                       (*-mono-≤ (k+2≤2^k V 2≤V) (k+2≤2^k V 2≤V)))
+    (≤-trans (≤-reflexive
+               (trans (cong (2 ^ V *_) (sym (^-distribˡ-+-* 2 V V)))
+                      (sym (^-distribˡ-+-* 2 V (V + V)))))
+             (^-monoʳ-≤ 2 (3k≤2^k V 4≤V)))))
 
 -- the burst's seed step: at instant 0 the demand product sits under
 -- the budget's tower summand alone.  The demand anchors at the
@@ -2127,16 +2296,17 @@ prod≤3pow V U 2≤V U≤V =
 -- (7+sz)·2 with 7+sz to spare
 seed-covers : ∀ (sz U : ℕ) → U ≤ sz →
   let V = towerℕ ((4 + sz) * 1) in
-  suc (suc V * suc (suc V ^ suc V) * suc U)
+  suc (suc V * suc (hopR V) * suc U)
     ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
 seed-covers sz U U≤sz
   rewrite *-identityʳ sz | *-identityʳ sz | *-identityʳ (4 + sz) =
-  ≤-trans (prod≤3pow (towerℕ (4 + sz)) U 2≤V U≤V)
+  ≤-trans (prod≤3pow (towerℕ (4 + sz)) U 4≤V U≤V)
   (≤-trans (towerℕ-mono (m≤m*n (7 + sz) 2))
            (m≤n+m (towerℕ ((7 + sz) * 2)) (2 ^ sz)))
   where
-  2≤V : 2 ≤ towerℕ (4 + sz)
-  2≤V = towerℕ-mono {1} {4 + sz} (s≤s z≤n)
+  -- towerℕ 2 ≡ 4, and the seed's height is 4 + sz
+  4≤V : 4 ≤ towerℕ (4 + sz)
+  4≤V = towerℕ-mono {2} {4 + sz} (s≤s (s≤s z≤n))
   U≤V : U ≤ towerℕ (4 + sz)
   U≤V = ≤-trans U≤sz (≤-trans (m≤n+m sz 4) (k≤towerℕ (4 + sz)))
 
@@ -2413,18 +2583,18 @@ install-bounded B sched st nid ns bn h =
 -- the 2^… head.  Shaped like seed-covers.  V here is the LANDING budget.
 budget-covers : ∀ (sz U id : ℕ) → U ≤ sz →
   let V = towerℕ ((4 + sz) * suc (suc id)) in
-  suc (suc V * suc (suc V ^ suc V) * suc U)
+  suc (suc V * suc (hopR V) * suc U)
     ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
 budget-covers sz U id U≤sz =
-  ≤-trans (prod≤3pow (towerℕ h) U 2≤V U≤V)
+  ≤-trans (prod≤3pow (towerℕ h) U 4≤V U≤V)
   (≤-trans (towerℕ-mono slack)
            (m≤n+m (towerℕ H) (2 ^ (sz * suc id * suc id))))
   where
   h = (4 + sz) * suc (suc id)
   H = (7 + sz) * suc (suc id)
 
-  2≤V : 2 ≤ towerℕ h
-  2≤V = towerℕ-mono {1} {h} (s≤s z≤n)
+  4≤V : 4 ≤ towerℕ h
+  4≤V = towerℕ-mono {2} {h} (s≤s (s≤s z≤n))
 
   sz≤h : sz ≤ h
   sz≤h = ≤-trans (m≤n+m sz 4) (m≤m*n (4 + sz) (suc (suc id)))
@@ -3898,6 +4068,55 @@ burstB? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
 burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 
 ------------------------------------------------------------------
+-- THE EMITTED-VALUE INVARIANT — the walk conjunct that makes a hop
+-- edge strict, and the whole reason `r` could become a plain ℕ.
+--
+-- A subscription's burst carries VALUES, and at a *All those values
+-- are the observables the clause hops into.  So the walk must return
+-- a bound on what it emitted, not merely on what it walked:
+--
+--     every value in (subscribeE g b κ …)'s burst has hopD ≤ hopD b.
+--
+-- Given that, the hop edge needs NO lemma of its own.  hopD's *All
+-- clauses are literally `suc (hopD carrier)`, so for a hop target o
+-- out of the carrier's burst
+--
+--     hopD o ≤ hopD carrier < suc (hopD carrier) ≡ hopD (mergeAllᵉ …)
+--
+-- and dBound-hop takes it directly.  The strictness is definitional;
+-- the CONTENT is entirely in this conjunct.  That is the trade the
+-- retired shell measure could not make — it tried to prove the hop
+-- edge from syntax alone, and syntax does not know what a template
+-- emits once a value is plugged into it.
+------------------------------------------------------------------
+
+hopDev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → InstEvent (Val Γ u) → Bool
+hopDev? {u = u} V h (value v) = hopDᵛ V u v ≤ᵇ h
+hopDev? V h (init _)    = true
+hopDev? V h (close _ _) = true
+hopDev? V h (handoff _) = true
+hopDev? V h complete    = true
+
+burstHopD? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
+burstHopD? V h = all (λ em → all (hopDev? V h) (InstEmit.events em))
+
+-- the conjunct only ever widens as it rides up a walk: a caller whose
+-- own hopD is larger inherits the callee's bound
+hopDev?-widen : ∀ {n} {Γ : Ctx n} {u} {V h h′ : ℕ} (ev : InstEvent (Val Γ u)) →
+  h ≤ h′ → hopDev? V h ev ≡ true → hopDev? V h′ ev ≡ true
+hopDev?-widen {u = u} {V = V} (value v) h≤ hv = ≤ᵇ-widen (hopDᵛ V u v) h≤ hv
+hopDev?-widen (init _)    h≤ hv = refl
+hopDev?-widen (close _ _) h≤ hv = refl
+hopDev?-widen (handoff _) h≤ hv = refl
+hopDev?-widen complete    h≤ hv = refl
+
+burstHopD?-widen : ∀ {n} {Γ : Ctx n} {u} {V h h′ : ℕ} (str : Stream Γ u) →
+  h ≤ h′ → burstHopD? V h str ≡ true → burstHopD? V h′ str ≡ true
+burstHopD?-widen str h≤ h =
+  all-impl _ _ (λ em → all-impl _ _ (λ ev → hopDev?-widen ev h≤)
+                                    (InstEmit.events em)) str h
+
+------------------------------------------------------------------
 -- PROJECTING THE INVARIANT.  _∧_ matches on its FIRST argument, so
 -- `∧-true _ _ inv` leaves a metavariable in stuck position and the
 -- solver cannot close it — every peel has to name the Bool it is
@@ -4693,9 +4912,9 @@ postulate
     sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
-    dBound V (suc V ^ suc V)
+    dBound V (hopR V)
            (unconn (Sched.slots sched) (EvalSt.connectedShares st))
-           (rank V (measureE V b)) (syncSizeᵉ b) ≤ d →
+           (hopDᵉ V b) (syncSizeᵉ b) ≤ d →
     g hasAtLeast suc d →
     pathLen κ + d ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
@@ -4705,6 +4924,7 @@ postulate
        × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d))
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? V (hopDᵉ V b) (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
             ≤ mintCount sched st + walkCap Ω ℓ d)
@@ -4755,17 +4975,16 @@ postulate
 --     touch this.
 --   · site 2b's guarding premise does not rescue it either.  The
 --     probe DISCHARGES that premise and the conclusion still fails.
---   · subscribeE-walk above is therefore SUSPECT, not merely
---     unproven.  Its `r` is rank V (measureE V b); it hands the *All
---     clause a demand `d` that the clause was to peel with
---     dBound-hop.  With the hop's measure able to exceed the
---     carrier's, that peel is unavailable, and `d` may simply
---     under-count the walk.  Do not build on subscribeE-walk's *All
---     clause until `r` is replaced.
+--   · subscribeE-walk's `r` had to be REPLACED, not merely proven.
+--     While it was rank V (measureE V b) the walk handed the *All
+--     clause a demand `d` that the clause was to peel with dBound-hop,
+--     and with the hop's measure able to exceed the carrier's that
+--     peel was unavailable — `d` could simply under-count the walk.
+--     SETTLED 2026-07-28: `r` is now hopDᵉ V b (phase 2 below).
 --
--- Site 3, μ-unfold, is UNAFFECTED and stays proven as unfoldμ-≺:
--- unfolding substitutes SYNTAX for a Δᵍ variable under a guard, never
--- a shell-carrying value, so nothing is copied.
+-- Site 3, μ-unfold, was unaffected and had been proven as unfoldμ-≺;
+-- under hopD it is not even an inequality (hopD is EQUAL across an
+-- unfold), so the shell version is retired with the rest.
 --
 -- WHAT `r` MUST BE INSTEAD is open.  Note first that this is the
 -- SAME pattern syncBudget's memo already records as the reason the
@@ -4822,10 +5041,16 @@ postulate
 -- that the hop edge consumes — with hopD (mergeAllᵉ c) ≡ suc (hopD c),
 -- that inequality is exactly what makes a hop strict:
 --
---   A  generated, scripted slots      360 progs   6340 obs   0 viol
---   B  generated, shared slots          6 progs    130 obs   0 viol
---   C  directed, 2 slots                19 progs    199 obs   0 viol
---   C₃ directed, 3 slots, 2 shares      36 progs    681 obs   0 viol
+--   A  generated, scripted slots      360 progs    6340 obs   0 viol
+--   B  generated, shared slots       1000 progs   17739 obs   0 viol
+--   C  directed, 2 slots               19 progs     199 obs   0 viol
+--   C₃ directed, 3 slots, 2 shares     36 progs     681 obs   0 viol
+--
+-- B was first run at 6 programs (three seeds deep) and REBALANCED
+-- 2026-07-28 toward breadth — 40 seeds × 25 programs at depth 3 —
+-- because random SHARE shapes are where a surprise would hide and
+-- depth had been bought at coverage's expense.  It is now the largest
+-- corpus of the four.
 --
 -- selfcheck and wellFormed clean throughout, so the log does not move
 -- the evaluator.  The probe's V is capped at 8 (the real V makes
@@ -4854,15 +5079,38 @@ postulate
 -- that cannot be computed would be vacuous, not evidence.  (k≤towerℕ,
 -- already proven above, is the arithmetic half.)
 --
--- SO THE GATE IS PASSED and hopD is the candidate to state.  What is
--- deliberately NOT done here: nothing above is yet restated in terms of
--- it.  Phase 2 is the assembly — swap r := a hopD-based rank into
--- subscribeE-walk, restate the hop edge as hopD o < hopD b, thread the
--- emitted-value invariant as a walk conjunct, all as postulates, and
--- get the whole thing typechecking before any site is proven.  Phase 3
--- then proves pieces most-uncertain-first, which is now the
--- emitted-value invariant across subΘ, since the scan bound above
--- reduces to INV? and the μ edge is settled.
+-- THE GATE PASSED, and PHASE 2 (the assembly) is DONE as of
+-- 2026-07-28 — everything below is now stated in terms of hopD and
+-- typechecks.  What moved, and what it cost:
+--
+--   · `r` is hopDᵉ V b, a plain ℕ.  rank ∘ measureE is gone and
+--     NOTHING replaces the rank wrapper — hopD is already the number.
+--   · `R` is hopR V = (2+V)^((1+V)²), replacing (1+V)^(1+V).  hopD's
+--     scan clause pays (2+occs)^V per node, so a store-sized def costs
+--     one polynomial degree more in the exponent.  prod≤3pow absorbs
+--     it inside the SAME three exponential stories — its slack
+--     identity closes on (V+2)³ where it used to close on (V+2)², and
+--     it now wants 3V ≤ 2^V (V ≥ 4) where it wanted 2V ≤ 2^V (V ≥ 2).
+--     Both are free at V = towerℕ (4+sz) ≥ 2^65536.  THE BUDGET TOWER
+--     DOES NOT MOVE: a tower of 2s cannot notice a polynomial in an
+--     exponent.
+--   · the hop edge needs NO postulate.  hopD's *All clauses are
+--     literally suc (hopD carrier), so once the walk returns the
+--     emitted-value bound the strictness is definitional.  That is the
+--     whole trade: the content moved out of a syntactic order and into
+--     a statement about what a subscription EMITS.
+--   · the structural edge stopped being a sub-multiset argument.
+--     hopD-map/-take/-scan/-all above are one line each.
+--   · the μ edge is not even an inequality — see the hopD structural
+--     block's header.
+--
+-- WHAT IS STILL POSTULATED, and it is deliberately just two things:
+-- hopD-size (P1, a routine size induction) and the emitted-value
+-- engine (P2: hopD-evalWith / hopD-subΘᵉ).  Phase 3 proves them
+-- most-uncertain-first, which is P2 — the scan bound reduces to INV?
+-- and boundedNode, the μ edge is settled, and P1 has slack in every
+-- clause.  P2 is where the multiplicity that refuted the old measure
+-- has to be made good, and its skeleton is subΘ-countsᵗ's.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
@@ -8743,9 +8991,9 @@ postulate
     stBounded? V sched st ≡ true →
     sizeᵉ b ≤ V →
     g hasAtLeast
-      suc (dBound V (suc V ^ suc V)
+      suc (dBound V (hopR V)
                   (unconn (Sched.slots sched) (EvalSt.connectedShares st))
-                  (rank V (measureE V b)) (syncSizeᵉ b)) →
+                  (hopDᵉ V b) (syncSizeᵉ b)) →
     let r = subscribeE g b κ id now sched st
     in (hasDry (proj₁ r) ≡ false)
        × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
@@ -8813,11 +9061,11 @@ burst-wet e ins =
   U≤sz = ≤-trans (unconn≤slots ins []) (m≤n+m (slotsSize ins) (sizeᵉ e))
 
   fuel-ok : budgetAt e ins 0 hasAtLeast
-    suc (dBound V (suc V ^ suc V) (unconn ins [])
-                (rank V (measureE V e)) (syncSizeᵉ e))
+    suc (dBound V (hopR V) (unconn ins [])
+                (hopDᵉ V e) (syncSizeᵉ e))
   fuel-ok = hasAtLeast-mono
     (≤-trans (s≤s (dBound-bound (≤-trans (syncSize≤sizeᵉ e) size≤V)
-                                (<⇒≤ (measureE-rank V V e size≤V))))
+                                (hopD-cap V e size≤V)))
              (seed-covers sz (unconn ins []) U≤sz))
     (budget-hasAtLeast sz 0)
 
