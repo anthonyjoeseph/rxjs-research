@@ -2185,6 +2185,22 @@ EnvHopD : ∀ {n} {Γ : Ctx n} {Θ} (V D : ℕ) → All (Val Γ) Θ → Set
 EnvHopD V D []ᵃ                = ⊤
 EnvHopD V D (_∷ᵃ_ {x = t} v σ) = (hopDᵛ V t v ≤ D) × EnvHopD V D σ
 
+-- …and the per-position version, which (H2) needs because evalWith's
+-- caseᵗ extends the environment with a value the incoming bound says
+-- nothing about
+EnvHopDs : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) → All (Val Γ) Θ → (ℕ → ℕ) → Set
+EnvHopDs V []ᵃ                Ds = ⊤
+EnvHopDs V (_∷ᵃ_ {x = t} v σ) Ds =
+  (hopDᵛ V t v ≤ Ds 0) × EnvHopDs V σ (λ j → Ds (suc j))
+
+-- the slope weighted position by position.  Both the slope and the
+-- weight shift together at the head, which is what makes the caseᵗ
+-- clause's bookkeeping line up: pushing a value onto the environment
+-- shifts every outer position by one, on both sides at once.
+sumW : (ℕ → ℕ) → (ℕ → ℕ) → ℕ → ℕ
+sumW g w zero    = 0
+sumW g w (suc m) = g 0 * w 0 + sumW (λ j → g (suc j)) (λ j → w (suc j)) m
+
 -- the slope over a WHOLE environment: one pm per substituted variable,
 -- read at the index that variable occupies once the local binders
 -- between it and the root have been counted.  m is the environment's
@@ -2353,157 +2369,34 @@ sumPm-var-hit {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θsub = Θsub} {t = t}
 
 postulate
   -- (H2) and the same at terms, which is what evalWith reduces to.
-  -- Its strmᵗ clause is (H1) at Θloc ≡ []; its caseᵗ clause is the one
-  -- that extends the environment, and lands on hopD's own caseᵗ shape
-  -- because the branch's slope at index 0 is what multiplies the
-  -- scrutinee's depth in both.
-  hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V D : ℕ)
-    (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) →
-    EnvHopD V D env →
-    hopDᵛ V u (evalWith tm env) ≤ hopDᵗ V tm + sumPmᵗ V 0 (length Θ) tm * D
-
--- the two regroupings the multiplying clauses need
-map-mix : ∀ a s d c b u →
-  (a + s * d) + c * (b + u * d) ≡ (a + c * b) + (s + c * u) * d
-map-mix = solve 6
-  (λ a s d c b u → (a :+ s :* d) :+ c :* (b :+ u :* d)
-                     := (a :+ c :* b) :+ (s :+ c :* u) :* d) refl
-
-scan-mix : ∀ p a s b t c u d →
-  p * ((a + s * d) + (b + t * d) + (c + u * d))
-    ≡ p * (a + b + c) + (p * (s + t + u)) * d
-scan-mix = solve 8
-  (λ p a s b t c u d →
-     p :* ((a :+ s :* d) :+ (b :+ t :* d) :+ (c :+ u :* d))
-       := p :* (a :+ b :+ c) :+ (p :* (s :+ t :+ u)) :* d) refl
-
-envHopD-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V D : ℕ) (σ : All (Val Γ) Θ) →
-  EnvHopD V D σ → (z : t ∈ Θ) → hopDᵛ V t (lookupEnv σ z) ≤ D
-envHopD-lookup V D (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
-envHopD-lookup V D (v ∷ᵃ σ) (hv , hσ) (there z)   = envHopD-lookup V D σ hσ z
-
--- a max of two bounded things is bounded by the max of the bounds, with
--- the slopes maxed — the shape every `⊔` clause of (H1) closes by
-⊔-bound : ∀ {a b} (Ha Hb Sa Sb S D : ℕ) →
-  a ≤ Ha + Sa * D → b ≤ Hb + Sb * D → Sa ⊔ Sb ≤ S →
-  a ⊔ b ≤ (Ha ⊔ Hb) + S * D
-⊔-bound Ha Hb Sa Sb S D bA bB bS =
-  ≤-trans (⊔-mono-≤ bA bB)
-  (≤-trans (⊔-+-split Ha (Sa * D) Hb (Sb * D))
-           (+-monoʳ-≤ (Ha ⊔ Hb)
-             (≤-trans (⊔-lub (*-monoˡ-≤ D (m≤m⊔n Sa Sb))
-                             (*-monoˡ-≤ D (m≤n⊔m Sa Sb)))
-                      (*-monoˡ-≤ D bS))))
-
-mutual
-  hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V D : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    EnvHopD V D σ →
-    hopDᵉ V (subΘExp Θloc σ e)
-      ≤ hopDᵉ V e + sumPmᵉ V (length Θloc) (length Θsub) e * D
-  hopD-subΘᵉ V D Θloc σ (input i) hσ = z≤n
-  hopD-subΘᵉ V D Θloc σ (ofᵉ ts)  hσ = hopD-subΘᵗˢ V D Θloc σ ts hσ
-  hopD-subΘᵉ V D Θloc σ emptyᵉ    hσ = z≤n
-  hopD-subΘᵉ {Θsub = Θsub} V D Θloc σ (mapᵉ {s = s} f e) hσ
-    rewrite pm-subΘᵗ V 0 (s ∷ Θloc) σ f (s≤s z≤n)
-          | sumPm-mapᵉ V (length Θloc) (length Θsub) f e =
-    ≤-trans (+-mono-≤ (hopD-subΘᵗ V D (s ∷ Θloc) σ f hσ)
-                      (*-monoʳ-≤ (pmᵗ V 0 f ⊔ 1) (hopD-subΘᵉ V D Θloc σ e hσ)))
-            (≤-reflexive
-              (map-mix (hopDᵗ V f)
-                       (sumPmᵗ V (suc (length Θloc)) (length Θsub) f) D
-                       (pmᵗ V 0 f ⊔ 1) (hopDᵉ V e)
-                       (sumPmᵉ V (length Θloc) (length Θsub) e)))
-  hopD-subΘᵉ V D Θloc σ (takeᵉ c e) hσ = hopD-subΘᵉ V D Θloc σ e hσ
-  hopD-subΘᵉ {Θsub = Θsub} V D Θloc σ (scanᵉ {s = s} {t = t} f z e) hσ
-    rewrite pm-subΘᵗ V 0 ((t ×ᵗ s) ∷ Θloc) σ f (s≤s z≤n)
-          | sumPm-scanᵉ V (length Θloc) (length Θsub) f z e =
-    ≤-trans (*-monoʳ-≤ ((2 + pmᵗ V 0 f) ^ V)
-              (+-mono-≤ (+-mono-≤ (hopD-subΘᵗ V D ((t ×ᵗ s) ∷ Θloc) σ f hσ)
-                                  (hopD-subΘᵗ V D Θloc σ z hσ))
-                        (hopD-subΘᵉ V D Θloc σ e hσ)))
-            (≤-reflexive
-              (scan-mix ((2 + pmᵗ V 0 f) ^ V)
-                (hopDᵗ V f) (sumPmᵗ V (suc (length Θloc)) (length Θsub) f)
-                (hopDᵗ V z) (sumPmᵗ V (length Θloc) (length Θsub) z)
-                (hopDᵉ V e) (sumPmᵉ V (length Θloc) (length Θsub) e) D))
-  hopD-subΘᵉ V D Θloc σ (mergeAllᵉ e)   hσ = s≤s (hopD-subΘᵉ V D Θloc σ e hσ)
-  hopD-subΘᵉ V D Θloc σ (concatAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V D Θloc σ e hσ)
-  hopD-subΘᵉ V D Θloc σ (switchAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V D Θloc σ e hσ)
-  hopD-subΘᵉ V D Θloc σ (exhaustAllᵉ e) hσ = s≤s (hopD-subΘᵉ V D Θloc σ e hσ)
-  hopD-subΘᵉ V D Θloc σ (μᵉ e)     hσ = hopD-subΘᵉ V D Θloc σ e hσ
-  hopD-subΘᵉ V D Θloc σ (varᵉ x)   hσ = z≤n
-  hopD-subΘᵉ V D Θloc σ (deferᵉ e) hσ = z≤n
-
-  hopD-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V D : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    EnvHopD V D σ →
-    hopDᵗ V (subΘTm Θloc σ tm)
-      ≤ hopDᵗ V tm + sumPmᵗ V (length Θloc) (length Θsub) tm * D
-  hopD-subΘᵗ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θsub = Θsub}
-             V D Θloc σ (varᵗ x) hσ with ∈-++⁻ Θloc x in eq
-  ... | inj₁ y = z≤n
-  ... | inj₂ z =
-    ≤-trans (≤-reflexive (hopD-wkReify V _ (lookupEnv σ z)))
-    (≤-trans (envHopD-lookup V D σ hσ z)
-             (1*≤ D (sumPmᵗ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ}
-                            V (length Θloc) (length Θsub) (varᵗ x))
-                    (sumPm-var-hit {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} V Θloc x eq)))
-  hopD-subΘᵗ V D Θloc σ unit̂     hσ = z≤n
-  hopD-subΘᵗ V D Θloc σ (bool̂ _) hσ = z≤n
-  hopD-subΘᵗ V D Θloc σ (nat̂ _)  hσ = z≤n
-  hopD-subΘᵗ {Θsub = Θsub} V D Θloc σ (pairᵗ a b) hσ =
-    ⊔-bound (hopDᵗ V a) (hopDᵗ V b)
-            (sumPmᵗ V (length Θloc) (length Θsub) a)
-            (sumPmᵗ V (length Θloc) (length Θsub) b)
-            (sumPmᵗ V (length Θloc) (length Θsub) (pairᵗ a b)) D
-            (hopD-subΘᵗ V D Θloc σ a hσ) (hopD-subΘᵗ V D Θloc σ b hσ)
-            (sumPm-pairᵗ V (length Θloc) (length Θsub) a b)
-  hopD-subΘᵗ V D Θloc σ (fstᵗ q) hσ = hopD-subΘᵗ V D Θloc σ q hσ
-  hopD-subΘᵗ V D Θloc σ (sndᵗ q) hσ = hopD-subΘᵗ V D Θloc σ q hσ
-  hopD-subΘᵗ V D Θloc σ (inlᵗ a) hσ = hopD-subΘᵗ V D Θloc σ a hσ
-  hopD-subΘᵗ V D Θloc σ (inrᵗ a) hσ = hopD-subΘᵗ V D Θloc σ a hσ
-  hopD-subΘᵗ {Θsub = Θsub} V D Θloc σ (caseᵗ {s = s} {t = t} sc l r) hσ
-    rewrite pm-subΘᵗ V 0 (s ∷ Θloc) σ l (s≤s z≤n)
-          | pm-subΘᵗ V 0 (t ∷ Θloc) σ r (s≤s z≤n) =
-    ≤-trans (+-mono-≤
-              (⊔-bound (hopDᵗ V l) (hopDᵗ V r) SL SR (SL ⊔ SR) D
-                       (hopD-subΘᵗ V D (s ∷ Θloc) σ l hσ)
-                       (hopD-subΘᵗ V D (t ∷ Θloc) σ r hσ)
-                       ≤-refl)
-              (*-monoʳ-≤ C (hopD-subΘᵗ V D Θloc σ sc hσ)))
-    (≤-trans (≤-reflexive
-               (map-mix (hopDᵗ V l ⊔ hopDᵗ V r) (SL ⊔ SR) D C (hopDᵗ V sc) SSC))
-             (+-monoʳ-≤ ((hopDᵗ V l ⊔ hopDᵗ V r) + C * hopDᵗ V sc)
-               (*-monoˡ-≤ D (sumPm-caseᵗ V (length Θloc) (length Θsub) sc l r))))
-    where
-    C   = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
-    SL  = sumPmᵗ V (suc (length Θloc)) (length Θsub) l
-    SR  = sumPmᵗ V (suc (length Θloc)) (length Θsub) r
-    SSC = sumPmᵗ V (length Θloc) (length Θsub) sc
-  hopD-subΘᵗ {Θsub = Θsub} V D Θloc σ (ifᵗ c a b) hσ =
-    ⊔-bound (hopDᵗ V a) (hopDᵗ V b)
-            (sumPmᵗ V (length Θloc) (length Θsub) a)
-            (sumPmᵗ V (length Θloc) (length Θsub) b)
-            (sumPmᵗ V (length Θloc) (length Θsub) (ifᵗ c a b)) D
-            (hopD-subΘᵗ V D Θloc σ a hσ) (hopD-subΘᵗ V D Θloc σ b hσ)
-            (sumPm-ifᵗ V (length Θloc) (length Θsub) c a b)
-  hopD-subΘᵗ V D Θloc σ (primᵗ _ a) hσ = z≤n
-  hopD-subΘᵗ V D Θloc σ (strmᵗ e)   hσ = hopD-subΘᵉ V D Θloc σ e hσ
-
-  hopD-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V D : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
-    EnvHopD V D σ →
-    hopDᵗˢ V (subΘTms Θloc σ ts)
-      ≤ hopDᵗˢ V ts + sumPmᵗˢ V (length Θloc) (length Θsub) ts * D
-  hopD-subΘᵗˢ V D Θloc σ []       hσ = z≤n
-  hopD-subΘᵗˢ {Θsub = Θsub} V D Θloc σ (y ∷ ys) hσ =
-    ⊔-bound (hopDᵗ V y) (hopDᵗˢ V ys)
-            (sumPmᵗ V (length Θloc) (length Θsub) y)
-            (sumPmᵗˢ V (length Θloc) (length Θsub) ys)
-            (sumPmᵗˢ V (length Θloc) (length Θsub) (y ∷ ys)) D
-            (hopD-subΘᵗ V D Θloc σ y hσ) (hopD-subΘᵗˢ V D Θloc σ ys hσ)
-            (sumPm-consᵗˢ V (length Θloc) (length Θsub) y ys)
+  -- Its strmᵗ clause is (H1) at Θloc ≡ []; its varᵗ, projection and
+  -- injection clauses read the value off the environment; caseᵗ is the
+  -- one that EXTENDS the environment, and it is why this statement is
+  -- shaped differently from (H1)'s.
+  --
+  -- THE CLAUSE THAT DID NOT TRANSFER, and the reason for `Ds`.  (H1)
+  -- carries a single bound D for the whole environment, which is fine
+  -- there because subΘ never extends it.  evalWith's caseᵗ does: the
+  -- scrutinee's VALUE is bound at index 0 of the branch, and that value
+  -- can be deeper than anything in the incoming environment.  With one
+  -- D the branch's IH has to be taken at D′ ≥ D ⊔ (scrutinee's depth),
+  -- and then the branch's slope for the OUTER variables gets multiplied
+  -- by the scrutinee's depth as well — a product with no counterpart on
+  -- the right, since hopD's caseᵗ clause prices the scrutinee by the
+  -- branch's coefficient AT INDEX 0 only, which is exactly right and
+  -- exactly not what a single D delivers.
+  --
+  -- So the environment is bounded POSITION BY POSITION and the slope is
+  -- weighted to match.  Then the clause closes termwise: the branch's
+  -- index-0 slope pays for the scrutinee (pmᵗ V 0 l ≤ the caseᵗ
+  -- coefficient), and its shifted slopes pay for the outer variables
+  -- (each under the ⊔ of the two branches').  This is the honest affine
+  -- statement in several variables; (H1)'s single D is the special case
+  -- where every position has the same bound.
+  hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (Ds : ℕ → ℕ)
+    (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) → EnvHopDs V env Ds →
+    hopDᵛ V u (evalWith tm env)
+      ≤ hopDᵗ V tm + sumW (λ j → pmᵗ V j tm) Ds (length Θ)
 
 -- a one-value environment: the slope collapses to the single pm the
 -- mapᵉ clause's coefficient is built from
@@ -2511,11 +2404,10 @@ hopD-applyFn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
   (f : Fn Γ [] [] [] s u) (v : Val Γ s) →
   hopDᵛ V u (applyFn f v) ≤ hopDᵗ V f + (pmᵗ V 0 f ⊔ 1) * hopDᵛ V s v
 hopD-applyFn {s = s} V f v =
-  ≤-trans (hopD-evalWith V (hopDᵛ V s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
+  ≤-trans (hopD-evalWith V (λ _ → hopDᵛ V s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
           (+-monoʳ-≤ (hopDᵗ V f)
-            (*-monoˡ-≤ (hopDᵛ V s v)
-              (≤-trans (≤-reflexive (+-identityʳ (pmᵗ V 0 f)))
-                       (m≤m⊔n (pmᵗ V 0 f) 1))))
+            (≤-trans (≤-reflexive (+-identityʳ (pmᵗ V 0 f * hopDᵛ V s v)))
+                     (*-monoˡ-≤ (hopDᵛ V s v) (m≤m⊔n (pmᵗ V 0 f) 1))))
 
 -- THE CONSUMER, and the whole point of the block: a mapᵉ frame's
 -- emission sits under the mapᵉ's OWN hop depth, given only that the
