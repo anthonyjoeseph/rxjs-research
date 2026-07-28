@@ -2026,6 +2026,126 @@ sumPmᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ) → Tm Γ Δᵍ Δ
 sumPmᵗ V k zero    t = 0
 sumPmᵗ V k (suc m) t = pmᵗ V k t + sumPmᵗ V (suc k) m t
 
+sumPmᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k m : ℕ)
+  → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+sumPmᵗˢ V k zero    ts = 0
+sumPmᵗˢ V k (suc m) ts = pmᵗˢ V k ts + sumPmᵗˢ V (suc k) m ts
+
+-- HOW THE SLOPE DECOMPOSES, which is what (H1)'s clauses need from
+-- their recursive calls.  A clause of hopD is either MULTIPLYING (mapᵉ,
+-- scanᵉ, caseᵗ: a coefficient times a subterm's depth) or MAXIMISING
+-- (pairᵗ, ifᵗ, ofᵉ).  The two behave differently under the sum, and the
+-- difference is not cosmetic — it is why the bound is tight at one and
+-- loose at the other.
+
+-- the multiplying shape, twice: (a + c·b) + (a′ + c·b′) regrouped
++*-shuffle : ∀ a b c a′ b′ →
+  (a + c * b) + (a′ + c * b′) ≡ (a + a′) + c * (b + b′)
++*-shuffle = solve 5
+  (λ a b c a′ b′ → (a :+ c :* b) :+ (a′ :+ c :* b′)
+                     := (a :+ a′) :+ c :* (b :+ b′)) refl
+
+*3-shuffle : ∀ p a b c a′ b′ c′ →
+  p * (a + b + c) + p * (a′ + b′ + c′)
+    ≡ p * ((a + a′) + (b + b′) + (c + c′))
+*3-shuffle = solve 7
+  (λ p a b c a′ b′ c′ → p :* (a :+ b :+ c) :+ p :* (a′ :+ b′ :+ c′)
+                          := p :* ((a :+ a′) :+ (b :+ b′) :+ (c :+ c′)))
+  refl
+
+-- AT A MULTIPLYING CLAUSE the sum distributes exactly: the coefficient
+-- is read at index 0 and so is the same at every term of the sum (that
+-- is (H0)'s content, here as a definitional fact — the index does not
+-- move because the sum only moves the OTHER index).
+sumPm-mapᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V k m : ℕ)
+  (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (e : Exp Γ Δᵍ Δ Θ s) →
+  sumPmᵉ V k m (mapᵉ f e)
+    ≡ sumPmᵗ V (suc k) m f + (pmᵗ V 0 f ⊔ 1) * sumPmᵉ V k m e
+sumPm-mapᵉ V k zero    f e = sym (*-zeroʳ (pmᵗ V 0 f ⊔ 1))
+sumPm-mapᵉ V k (suc m) f e
+  rewrite sumPm-mapᵉ V (suc k) m f e =
+  +*-shuffle (pmᵗ V (suc k) f) (pmᵉ V k e) (pmᵗ V 0 f ⊔ 1)
+             (sumPmᵗ V (suc (suc k)) m f) (sumPmᵉ V (suc k) m e)
+
+sumPm-scanᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V k m : ℕ)
+  (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u) (z : Tm Γ Δᵍ Δ Θ u)
+  (e : Exp Γ Δᵍ Δ Θ s) →
+  sumPmᵉ V k m (scanᵉ f z e)
+    ≡ (2 + pmᵗ V 0 f) ^ V
+        * (sumPmᵗ V (suc k) m f + sumPmᵗ V k m z + sumPmᵉ V k m e)
+sumPm-scanᵉ V k zero    f z e = sym (*-zeroʳ ((2 + pmᵗ V 0 f) ^ V))
+sumPm-scanᵉ V k (suc m) f z e
+  rewrite sumPm-scanᵉ V (suc k) m f z e =
+  *3-shuffle ((2 + pmᵗ V 0 f) ^ V)
+             (pmᵗ V (suc k) f) (pmᵗ V k z) (pmᵉ V k e)
+             (sumPmᵗ V (suc (suc k)) m f) (sumPmᵗ V (suc k) m z)
+             (sumPmᵉ V (suc k) m e)
+
+-- AT A MAXIMISING CLAUSE it does not distribute, and does not need to:
+-- a max of sums sits under the sum of maxes, termwise.  This is the one
+-- place (H1) is genuinely loose, and it is loose in the safe direction —
+-- the slope on the right is bigger than what the branches deliver.
+⊔-+-split : ∀ x y u v → (x + y) ⊔ (u + v) ≤ (x ⊔ u) + (y ⊔ v)
+⊔-+-split x y u v =
+  ⊔-lub (+-mono-≤ (m≤m⊔n x u) (m≤m⊔n y v))
+        (+-mono-≤ (m≤n⊔m x u) (m≤n⊔m y v))
+
+sumPm-pairᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (V k m : ℕ)
+  (a : Tm Γ Δᵍ Δ Θ s) (b : Tm Γ Δᵍ Δ Θ t) →
+  sumPmᵗ V k m a ⊔ sumPmᵗ V k m b ≤ sumPmᵗ V k m (pairᵗ a b)
+sumPm-pairᵗ V k zero    a b = z≤n
+sumPm-pairᵗ V k (suc m) a b =
+  ≤-trans (⊔-+-split (pmᵗ V k a) (sumPmᵗ V (suc k) m a)
+                     (pmᵗ V k b) (sumPmᵗ V (suc k) m b))
+          (+-monoʳ-≤ (pmᵗ V k a ⊔ pmᵗ V k b) (sumPm-pairᵗ V (suc k) m a b))
+
+-- caseᵗ is BOTH at once — it maximises over the branches and multiplies
+-- the scrutinee — so it is stated as the inequality (H1) actually
+-- consumes: the slope its recursive calls deliver sits under the slope
+-- the clause claims.
+sumPm-caseᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t u} (V k m : ℕ)
+  (sc : Tm Γ Δᵍ Δ Θ (s +ᵗ t))
+  (l : Tm Γ Δᵍ Δ (s ∷ Θ) u) (r : Tm Γ Δᵍ Δ (t ∷ Θ) u) →
+  (sumPmᵗ V (suc k) m l ⊔ sumPmᵗ V (suc k) m r)
+    + (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * sumPmᵗ V k m sc
+  ≤ sumPmᵗ V k m (caseᵗ sc l r)
+sumPm-caseᵗ V k zero    sc l r =
+  ≤-reflexive (*-zeroʳ (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1))
+sumPm-caseᵗ V k (suc m) sc l r =
+  ≤-trans (+-monoˡ-≤ (C * (pmᵗ V k sc + SSC))
+            (⊔-+-split (pmᵗ V (suc k) l) SL (pmᵗ V (suc k) r) SR))
+  (≤-trans (≤-reflexive (sym (+*-shuffle X (pmᵗ V k sc) C Y SSC)))
+           (+-monoʳ-≤ (X + C * pmᵗ V k sc) (sumPm-caseᵗ V (suc k) m sc l r)))
+  where
+  C   = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  SL  = sumPmᵗ V (suc (suc k)) m l
+  SR  = sumPmᵗ V (suc (suc k)) m r
+  SSC = sumPmᵗ V (suc k) m sc
+  X   = pmᵗ V (suc k) l ⊔ pmᵗ V (suc k) r
+  Y   = SL ⊔ SR
+
+-- the other two maximising clauses, same proof: ifᵗ ignores its
+-- condition exactly as hopD does (a boolᵗ carries no observable), and
+-- ofᵉ maximises down its list
+sumPm-ifᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V k m : ℕ)
+  (c : Tm Γ Δᵍ Δ Θ boolᵗ) (a b : Tm Γ Δᵍ Δ Θ u) →
+  sumPmᵗ V k m a ⊔ sumPmᵗ V k m b ≤ sumPmᵗ V k m (ifᵗ c a b)
+sumPm-ifᵗ V k zero    c a b = z≤n
+sumPm-ifᵗ V k (suc m) c a b =
+  ≤-trans (⊔-+-split (pmᵗ V k a) (sumPmᵗ V (suc k) m a)
+                     (pmᵗ V k b) (sumPmᵗ V (suc k) m b))
+          (+-monoʳ-≤ (pmᵗ V k a ⊔ pmᵗ V k b) (sumPm-ifᵗ V (suc k) m c a b))
+
+sumPm-consᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V k m : ℕ)
+  (y : Tm Γ Δᵍ Δ Θ u) (ys : List (Tm Γ Δᵍ Δ Θ u)) →
+  sumPmᵗ V k m y ⊔ sumPmᵗˢ V k m ys ≤ sumPmᵗˢ V k m (y ∷ ys)
+sumPm-consᵗˢ V k zero    y ys = z≤n
+sumPm-consᵗˢ V k (suc m) y ys =
+  ≤-trans (⊔-+-split (pmᵗ V k y) (sumPmᵗ V (suc k) m y)
+                     (pmᵗˢ V k ys) (sumPmᵗˢ V (suc k) m ys))
+          (+-monoʳ-≤ (pmᵗ V k y ⊔ pmᵗˢ V k ys)
+                     (sumPm-consᵗˢ V (suc k) m y ys))
+
 postulate
   -- (H1) THE AFFINE BOUND at expressions.  Induction on e following
   -- subΘ-countsᵉ/ᵗ clause for clause — the same substitution walked
