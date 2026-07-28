@@ -2030,10 +2030,30 @@ postulate
   -- (H1) THE AFFINE BOUND at expressions.  Induction on e following
   -- subΘ-countsᵉ/ᵗ clause for clause — the same substitution walked
   -- with the same multiplicity accounting, a different semiring at the
-  -- leaves.  Each clause needs (H0) to rewrite its coefficient and
-  -- then closes by +/*-monotonicity; the varᵗ leaf splits on ∈-++⁻
-  -- exactly as subΘ-countsᵗ's does, with the plug's own depth ≤ D on
-  -- the right injection.
+  -- leaves.  Each clause rewrites its coefficient by (H0) — now proven
+  -- above — and then closes by +/*-monotonicity; the varᵗ leaf splits
+  -- on ∈-++⁻ exactly as subΘ-countsᵗ's does, with the plug's own depth
+  -- ≤ D on the right injection.
+  --
+  -- WHAT IT NEEDS FIRST, worked out but not yet built: sumPm has to
+  -- distribute over each clause, so that the slope on the right of the
+  -- inequality decomposes the way the IHs deliver it.  At mapᵉ that is
+  --
+  --   sumPmᵉ V k m (mapᵉ f e)
+  --     ≡ sumPmᵗ V (suc k) m f + (pmᵗ V 0 f ⊔ 1) * sumPmᵉ V k m e
+  --
+  -- by induction on m and one ring identity, and the clause then reads
+  -- (A + C·B) + (A′ + C·B′) ≡ (A + A′) + C·(B + B′).  scanᵉ and caseᵗ
+  -- are the same shape with their own coefficients.
+  --
+  -- The `⊔` clauses (pairᵗ, ifᵗ, ofᵉ) do NOT distribute and do not need
+  -- to: they want only
+  --
+  --   sumPm … a ⊔ sumPm … b ≤ sumPm … (pairᵗ a b)
+  --
+  -- which holds termwise, since a ⊔ of sums is under the sum of ⊔s.
+  -- That is the one place the bound is genuinely loose, and it is loose
+  -- in the safe direction.
   hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V D : ℕ) (Θloc : List Ty)
     (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
     EnvHopD V D σ →
