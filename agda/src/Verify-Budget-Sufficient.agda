@@ -1934,6 +1934,177 @@ pm-wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) (tm : Tm Γ [] [] [] 
   pmᵗ V k (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} tm) ≡ 0
 pm-wkTm V k tm = pm-ren0ᵗ V k (λ ()) (λ ()) (λ ()) (λ ()) tm
 
+-- A RENAMING THAT KEEPS EVERY POSITION keeps both measures — pm reads
+-- positions, and hopD reads pm for its coefficients.  The instance that
+-- matters is weakening OUT OF EMPTY contexts, whose hypothesis is
+-- vacuous; the generality is only so the induction can pass under
+-- binders, where ext∈ preserves positions exactly when ρt does.
+ext-ix : ∀ {Θ Θ′ s} (ρt : Ren∈ Θ Θ′) →
+  (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+  (∀ {u} (x : u ∈ s ∷ Θ) → varIx (ext∈ ρt x) ≡ varIx x)
+ext-ix ρt p (here refl) = refl
+ext-ix ρt p (there y)   = cong suc (p y)
+
+mutual
+  pm-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V k : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+    (e : Exp Γ Δᵍ Δ Θ t) → pmᵉ V k (renExp ρg ρd ρt e) ≡ pmᵉ V k e
+  pm-renᵉ V k ρg ρd ρt p (input i) = refl
+  pm-renᵉ V k ρg ρd ρt p (ofᵉ ts)  = pm-renᵗˢ V k ρg ρd ρt p ts
+  pm-renᵉ V k ρg ρd ρt p emptyᵉ    = refl
+  pm-renᵉ V k ρg ρd ρt p (mapᵉ f e)
+    rewrite pm-renᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | pm-renᵉ V k ρg ρd ρt p e = refl
+  pm-renᵉ V k ρg ρd ρt p (takeᵉ c e) = pm-renᵉ V k ρg ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (scanᵉ f z e)
+    rewrite pm-renᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | pm-renᵗ V k ρg ρd ρt p z
+          | pm-renᵉ V k ρg ρd ρt p e = refl
+  pm-renᵉ V k ρg ρd ρt p (mergeAllᵉ e)   = pm-renᵉ V k ρg ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (concatAllᵉ e)  = pm-renᵉ V k ρg ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (switchAllᵉ e)  = pm-renᵉ V k ρg ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (exhaustAllᵉ e) = pm-renᵉ V k ρg ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (μᵉ e)     = pm-renᵉ V k (ext∈ ρg) ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (varᵉ x)   = refl
+  pm-renᵉ V k ρg ρd ρt p (deferᵉ e) = refl
+
+  pm-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V k : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+    (tm : Tm Γ Δᵍ Δ Θ t) → pmᵗ V k (renTm ρg ρd ρt tm) ≡ pmᵗ V k tm
+  pm-renᵗ V k ρg ρd ρt p (varᵗ x)  =
+    cong (λ i → if i ≡ᵇ k then 1 else 0) (p x)
+  pm-renᵗ V k ρg ρd ρt p unit̂      = refl
+  pm-renᵗ V k ρg ρd ρt p (bool̂ _)  = refl
+  pm-renᵗ V k ρg ρd ρt p (nat̂ _)   = refl
+  pm-renᵗ V k ρg ρd ρt p (pairᵗ a b)
+    rewrite pm-renᵗ V k ρg ρd ρt p a | pm-renᵗ V k ρg ρd ρt p b = refl
+  pm-renᵗ V k ρg ρd ρt p (fstᵗ q)  = pm-renᵗ V k ρg ρd ρt p q
+  pm-renᵗ V k ρg ρd ρt p (sndᵗ q)  = pm-renᵗ V k ρg ρd ρt p q
+  pm-renᵗ V k ρg ρd ρt p (inlᵗ a)  = pm-renᵗ V k ρg ρd ρt p a
+  pm-renᵗ V k ρg ρd ρt p (inrᵗ a)  = pm-renᵗ V k ρg ρd ρt p a
+  pm-renᵗ V k ρg ρd ρt p (caseᵗ sc l r)
+    rewrite pm-renᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-ix ρt p) l
+          | pm-renᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-ix ρt p) r
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) l
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) r
+          | pm-renᵗ V k ρg ρd ρt p sc = refl
+  pm-renᵗ V k ρg ρd ρt p (ifᵗ c a b)
+    rewrite pm-renᵗ V k ρg ρd ρt p a | pm-renᵗ V k ρg ρd ρt p b = refl
+  pm-renᵗ V k ρg ρd ρt p (primᵗ _ a) = refl
+  pm-renᵗ V k ρg ρd ρt p (strmᵗ e)   = pm-renᵉ V k ρg ρd ρt p e
+
+  pm-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V k : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    pmᵗˢ V k (renTms ρg ρd ρt ts) ≡ pmᵗˢ V k ts
+  pm-renᵗˢ V k ρg ρd ρt p []       = refl
+  pm-renᵗˢ V k ρg ρd ρt p (y ∷ ys)
+    rewrite pm-renᵗ V k ρg ρd ρt p y | pm-renᵗˢ V k ρg ρd ρt p ys = refl
+
+mutual
+  hopD-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+    (e : Exp Γ Δᵍ Δ Θ t) → hopDᵉ V (renExp ρg ρd ρt e) ≡ hopDᵉ V e
+  hopD-renᵉ V ρg ρd ρt p (input i) = refl
+  hopD-renᵉ V ρg ρd ρt p (ofᵉ ts)  = hopD-renᵗˢ V ρg ρd ρt p ts
+  hopD-renᵉ V ρg ρd ρt p emptyᵉ    = refl
+  hopD-renᵉ V ρg ρd ρt p (mapᵉ f e)
+    rewrite hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | hopD-renᵉ V ρg ρd ρt p e = refl
+  hopD-renᵉ V ρg ρd ρt p (takeᵉ c e) = hopD-renᵉ V ρg ρd ρt p e
+  hopD-renᵉ V ρg ρd ρt p (scanᵉ f z e)
+    rewrite pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | hopD-renᵗ V ρg ρd ρt p z
+          | hopD-renᵉ V ρg ρd ρt p e = refl
+  hopD-renᵉ V ρg ρd ρt p (mergeAllᵉ e)   = cong suc (hopD-renᵉ V ρg ρd ρt p e)
+  hopD-renᵉ V ρg ρd ρt p (concatAllᵉ e)  = cong suc (hopD-renᵉ V ρg ρd ρt p e)
+  hopD-renᵉ V ρg ρd ρt p (switchAllᵉ e)  = cong suc (hopD-renᵉ V ρg ρd ρt p e)
+  hopD-renᵉ V ρg ρd ρt p (exhaustAllᵉ e) = cong suc (hopD-renᵉ V ρg ρd ρt p e)
+  hopD-renᵉ V ρg ρd ρt p (μᵉ e)     = hopD-renᵉ V (ext∈ ρg) ρd ρt p e
+  hopD-renᵉ V ρg ρd ρt p (varᵉ x)   = refl
+  hopD-renᵉ V ρg ρd ρt p (deferᵉ e) = refl
+
+  hopD-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+    (tm : Tm Γ Δᵍ Δ Θ t) → hopDᵗ V (renTm ρg ρd ρt tm) ≡ hopDᵗ V tm
+  hopD-renᵗ V ρg ρd ρt p (varᵗ x)  = refl
+  hopD-renᵗ V ρg ρd ρt p unit̂      = refl
+  hopD-renᵗ V ρg ρd ρt p (bool̂ _)  = refl
+  hopD-renᵗ V ρg ρd ρt p (nat̂ _)   = refl
+  hopD-renᵗ V ρg ρd ρt p (pairᵗ a b)
+    rewrite hopD-renᵗ V ρg ρd ρt p a | hopD-renᵗ V ρg ρd ρt p b = refl
+  hopD-renᵗ V ρg ρd ρt p (fstᵗ q)  = hopD-renᵗ V ρg ρd ρt p q
+  hopD-renᵗ V ρg ρd ρt p (sndᵗ q)  = hopD-renᵗ V ρg ρd ρt p q
+  hopD-renᵗ V ρg ρd ρt p (inlᵗ a)  = hopD-renᵗ V ρg ρd ρt p a
+  hopD-renᵗ V ρg ρd ρt p (inrᵗ a)  = hopD-renᵗ V ρg ρd ρt p a
+  hopD-renᵗ V ρg ρd ρt p (caseᵗ sc l r)
+    rewrite hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) l
+          | hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) r
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) l
+          | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) r
+          | hopD-renᵗ V ρg ρd ρt p sc = refl
+  hopD-renᵗ V ρg ρd ρt p (ifᵗ c a b)
+    rewrite hopD-renᵗ V ρg ρd ρt p a | hopD-renᵗ V ρg ρd ρt p b = refl
+  hopD-renᵗ V ρg ρd ρt p (primᵗ _ a) = refl
+  hopD-renᵗ V ρg ρd ρt p (strmᵗ e)   = hopD-renᵉ V ρg ρd ρt p e
+
+  hopD-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    hopDᵗˢ V (renTms ρg ρd ρt ts) ≡ hopDᵗˢ V ts
+  hopD-renᵗˢ V ρg ρd ρt p []       = refl
+  hopD-renᵗˢ V ρg ρd ρt p (y ∷ ys)
+    rewrite hopD-renᵗ V ρg ρd ρt p y | hopD-renᵗˢ V ρg ρd ρt p ys = refl
+
+-- a reified value measures as the value did — the obs case is refl,
+-- since reify of an observable IS strmᵗ of it — and weakening it in
+-- changes nothing, since weakening out of the empty context moves no
+-- position
+hopD-wkReify : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} (V : ℕ) (t : Ty) (v : Val Γ t) →
+  hopDᵗ V (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify v)) ≡ hopDᵛ V t v
+hopD-wkReify V unitᵗ    v        = refl
+hopD-wkReify V boolᵗ    v        = refl
+hopD-wkReify V natᵗ     v        = refl
+hopD-wkReify V (s ×ᵗ t) (a , b) =
+  cong₂ _⊔_ (hopD-wkReify V s a) (hopD-wkReify V t b)
+hopD-wkReify V (s +ᵗ t) (inj₁ a) = hopD-wkReify V s a
+hopD-wkReify V (s +ᵗ t) (inj₂ b) = hopD-wkReify V t b
+hopD-wkReify V (obs t)  e        = hopD-renᵉ V (λ ()) (λ ()) (λ ()) (λ ()) e
+
+-- AND THE SUM FIRES.  On the right injection the plug's depth has to be
+-- paid for by the slope, so the slope must be at least 1 there — and it
+-- is, because the substituted variable's position is length Θloc past
+-- the local binders, which is exactly one of the indices the sum runs
+-- over.  Three small facts: where the position lands, that it lands
+-- inside the range, and that a sum with a hit is at least 1.
+varIx-ix : ∀ {t} (Θloc : List Ty) {Θsub} (x : t ∈ Θloc ++ Θsub)
+  {z : t ∈ Θsub} → ∈-++⁻ Θloc x ≡ inj₂ z → varIx x ≡ length Θloc + varIx z
+varIx-ix []          x          refl = refl
+varIx-ix (u ∷ Θloc) (here refl) ()
+varIx-ix (u ∷ Θloc) (there x)   eq with ∈-++⁻ Θloc x in eq′
+varIx-ix (u ∷ Θloc) (there x)   ()   | inj₁ y′
+varIx-ix (u ∷ Θloc) (there x)   refl | inj₂ z′ = cong suc (varIx-ix Θloc x eq′)
+
+varIx<len : ∀ {t} {Θ : List Ty} (z : t ∈ Θ) → varIx z < length Θ
+varIx<len (here _)  = s≤s z≤n
+varIx<len (there p) = s≤s (varIx<len p)
+
+ifEq : ∀ (a b : ℕ) → a ≡ b → 1 ≤ (if a ≡ᵇ b then 1 else 0)
+ifEq a b e with a ≡ᵇ b in q
+... | true  = s≤s z≤n
+... | false = ⊥-elim (subst T q (≡⇒≡ᵇ a b e))
+
+
 -- (H0), PROVEN.  A coefficient is read at index 0 of the clause's own
 -- binder — a LOCAL index — and this says substitution leaves every
 -- local index alone.  The two pieces do the work: on the left
@@ -2159,6 +2330,26 @@ sumPm-consᵗˢ V k (suc m) y ys =
                      (pmᵗˢ V k ys) (sumPmᵗˢ V (suc k) m ys))
           (+-monoʳ-≤ (pmᵗ V k y ⊔ pmᵗˢ V k ys)
                      (sumPm-consᵗˢ V (suc k) m y ys))
+
+sumF-hit : ∀ (g : ℕ → ℕ) (k m j : ℕ) → j < m → 1 ≤ g (k + j) → 1 ≤ sumF g k m
+sumF-hit g k (suc m) zero    lt hit
+  rewrite +-identityʳ k = ≤-trans hit (m≤m+n (g k) (sumF g (suc k) m))
+sumF-hit g k (suc m) (suc j) lt hit =
+  ≤-trans (sumF-hit g (suc k) m j (≤-pred lt)
+            (subst (λ i → 1 ≤ g i) (+-suc k j) hit))
+          (m≤n+m (sumF g (suc k) m) (g k))
+
+sumPm-var-hit : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
+  (x : t ∈ Θloc ++ Θsub) {z : t ∈ Θsub} → ∈-++⁻ Θloc x ≡ inj₂ z →
+  1 ≤ sumPmᵗ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} V (length Θloc) (length Θsub) (varᵗ x)
+sumPm-var-hit {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θsub = Θsub} {t = t}
+              V Θloc x {z = z} eq =
+  sumF-hit (λ j → pmᵗ V j v) (length Θloc) (length Θsub) (varIx z)
+           (varIx<len z)
+           (ifEq (varIx x) (length Θloc + varIx z) (varIx-ix Θloc x eq))
+  where
+  v : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t
+  v = varᵗ x
 
 postulate
   -- (H1) THE AFFINE BOUND at expressions.  Induction on e following
