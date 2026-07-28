@@ -54,7 +54,9 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        ^-monoˡ-≤; ^-*-assoc;
                                        ^-distribˡ-+-*; *-mono-≤;
                                        +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ)
+                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
+                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -96,7 +98,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 shellsᵉ; shellsᵛ;
                                 subΘExp; subΘTm; subΘTms;
                                 plugsᵉ; plugsᵗ; plugsᵗˢ;
-                                occsᵉ; occsᵗ; occsᵗˢ;
+                                occsᵉ; occsᵗ; occsᵗˢ; varIx;
                                 renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
                                 wkExp; wkTm; reify;
                                 Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
@@ -1824,6 +1826,189 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
 -- mapᵉ clause applies, with no arithmetic left in it.
 ------------------------------------------------------------------
 
+-- (H0)'s TWO PIECES, proven.  A coefficient is read at a LOCAL index —
+-- one of the binders between it and the root — and substitution has to
+-- leave it alone, or the affine bound has a different slope on each
+-- side and there is nothing to induct on.
+--
+-- subΘ keeps Θloc as a PREFIX, so a local variable keeps its position;
+-- and a plug is Θ-CLOSED, so every variable it brings is bound inside
+-- it and is compared against an index already bumped past it.  Those
+-- are the two pieces, in that order.
+
+-- a de Bruijn position survives the ∈-++⁻ left injection …
+varIx-++ˡ : ∀ {t} (Θloc : List Ty) {Θsub} (x : t ∈ Θloc ++ Θsub)
+  {y : t ∈ Θloc} → ∈-++⁻ Θloc x ≡ inj₁ y → varIx y ≡ varIx x
+varIx-++ˡ []          x          ()
+varIx-++ˡ (u ∷ Θloc) (here refl) refl = refl
+varIx-++ˡ (u ∷ Θloc) (there x)   eq with ∈-++⁻ Θloc x in eq′
+varIx-++ˡ (u ∷ Θloc) (there x)   refl | inj₁ y′ = cong suc (varIx-++ˡ Θloc x eq′)
+varIx-++ˡ (u ∷ Θloc) (there x)   ()   | inj₂ z′
+
+-- … and on the right injection the position is past every local binder
+varIx-++ʳ : ∀ {t} (Θloc : List Ty) {Θsub} (x : t ∈ Θloc ++ Θsub)
+  {z : t ∈ Θsub} → ∈-++⁻ Θloc x ≡ inj₂ z → length Θloc ≤ varIx x
+varIx-++ʳ []          x          eq = z≤n
+varIx-++ʳ (u ∷ Θloc) (here refl) ()
+varIx-++ʳ (u ∷ Θloc) (there x)   eq with ∈-++⁻ Θloc x in eq′
+varIx-++ʳ (u ∷ Θloc) (there x)   ()   | inj₁ y′
+varIx-++ʳ (u ∷ Θloc) (there x)   refl | inj₂ z′ = s≤s (varIx-++ʳ Θloc x eq′)
+
+-- the pm leaf at a position that is not the one being asked about
+ifNeq : ∀ (a b : ℕ) → (a ≡ b → ⊥) → (if a ≡ᵇ b then 1 else 0) ≡ 0
+ifNeq a b ne with a ≡ᵇ b in eq
+... | false = refl
+... | true  = ⊥-elim (ne (≡ᵇ⇒≡ a b (subst T (sym eq) tt)))
+
+-- pm of a RENAMED term is 0 at any index no variable is renamed onto.
+-- Stated over an arbitrary renaming rather than over wkTm directly, so
+-- the induction can pass under binders — where the index and the
+-- renaming shift together, and the hypothesis shifts with them.
+ext-≢ : ∀ {Θ Θ′ s} (k : ℕ) (ρt : Ren∈ Θ Θ′) →
+  (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ k → ⊥) →
+  (∀ {u} (x : u ∈ s ∷ Θ) → varIx (ext∈ ρt x) ≡ suc k → ⊥)
+ext-≢ k ρt h (here refl) ()
+ext-≢ k ρt h (there y)   eq = h y (suc-injective eq)
+
+mutual
+  pm-ren0ᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V k : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ k → ⊥) →
+    (e : Exp Γ Δᵍ Δ Θ t) → pmᵉ V k (renExp ρg ρd ρt e) ≡ 0
+  pm-ren0ᵉ V k ρg ρd ρt h (input i)  = refl
+  pm-ren0ᵉ V k ρg ρd ρt h (ofᵉ ts)   = pm-ren0ᵗˢ V k ρg ρd ρt h ts
+  pm-ren0ᵉ V k ρg ρd ρt h emptyᵉ     = refl
+  pm-ren0ᵉ V k ρg ρd ρt h (mapᵉ f e)
+    rewrite pm-ren0ᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-≢ k ρt h) f
+          | pm-ren0ᵉ V k ρg ρd ρt h e =
+    *-zeroʳ (pmᵗ V 0 (renTm ρg ρd (ext∈ ρt) f) ⊔ 1)
+  pm-ren0ᵉ V k ρg ρd ρt h (takeᵉ c e) = pm-ren0ᵉ V k ρg ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (scanᵉ f z e)
+    rewrite pm-ren0ᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-≢ k ρt h) f
+          | pm-ren0ᵗ V k ρg ρd ρt h z
+          | pm-ren0ᵉ V k ρg ρd ρt h e =
+    *-zeroʳ (suc (suc (pmᵗ V 0 (renTm ρg ρd (ext∈ ρt) f))) ^ V)
+  pm-ren0ᵉ V k ρg ρd ρt h (mergeAllᵉ e)   = pm-ren0ᵉ V k ρg ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (concatAllᵉ e)  = pm-ren0ᵉ V k ρg ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (switchAllᵉ e)  = pm-ren0ᵉ V k ρg ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (exhaustAllᵉ e) = pm-ren0ᵉ V k ρg ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (μᵉ e)     = pm-ren0ᵉ V k (ext∈ ρg) ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (varᵉ x)   = refl
+  pm-ren0ᵉ V k ρg ρd ρt h (deferᵉ e) = refl
+
+  pm-ren0ᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V k : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ k → ⊥) →
+    (tm : Tm Γ Δᵍ Δ Θ t) → pmᵗ V k (renTm ρg ρd ρt tm) ≡ 0
+  pm-ren0ᵗ V k ρg ρd ρt h (varᵗ x)    = ifNeq (varIx (ρt x)) k (h x)
+  pm-ren0ᵗ V k ρg ρd ρt h unit̂        = refl
+  pm-ren0ᵗ V k ρg ρd ρt h (bool̂ _)    = refl
+  pm-ren0ᵗ V k ρg ρd ρt h (nat̂ _)     = refl
+  pm-ren0ᵗ V k ρg ρd ρt h (pairᵗ a b)
+    rewrite pm-ren0ᵗ V k ρg ρd ρt h a | pm-ren0ᵗ V k ρg ρd ρt h b = refl
+  pm-ren0ᵗ V k ρg ρd ρt h (fstᵗ p)    = pm-ren0ᵗ V k ρg ρd ρt h p
+  pm-ren0ᵗ V k ρg ρd ρt h (sndᵗ p)    = pm-ren0ᵗ V k ρg ρd ρt h p
+  pm-ren0ᵗ V k ρg ρd ρt h (inlᵗ a)    = pm-ren0ᵗ V k ρg ρd ρt h a
+  pm-ren0ᵗ V k ρg ρd ρt h (inrᵗ a)    = pm-ren0ᵗ V k ρg ρd ρt h a
+  pm-ren0ᵗ V k ρg ρd ρt h (caseᵗ sc l r)
+    rewrite pm-ren0ᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-≢ k ρt h) l
+          | pm-ren0ᵗ V (suc k) ρg ρd (ext∈ ρt) (ext-≢ k ρt h) r
+          | pm-ren0ᵗ V k ρg ρd ρt h sc =
+    *-zeroʳ (pmᵗ V 0 (renTm ρg ρd (ext∈ ρt) l)
+             ⊔ pmᵗ V 0 (renTm ρg ρd (ext∈ ρt) r) ⊔ 1)
+  pm-ren0ᵗ V k ρg ρd ρt h (ifᵗ c a b)
+    rewrite pm-ren0ᵗ V k ρg ρd ρt h a | pm-ren0ᵗ V k ρg ρd ρt h b = refl
+  pm-ren0ᵗ V k ρg ρd ρt h (primᵗ _ a) = refl
+  pm-ren0ᵗ V k ρg ρd ρt h (strmᵗ e)   = pm-ren0ᵉ V k ρg ρd ρt h e
+
+  pm-ren0ᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V k : ℕ)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
+    (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ k → ⊥) →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → pmᵗˢ V k (renTms ρg ρd ρt ts) ≡ 0
+  pm-ren0ᵗˢ V k ρg ρd ρt h []       = refl
+  pm-ren0ᵗˢ V k ρg ρd ρt h (y ∷ ys)
+    rewrite pm-ren0ᵗ V k ρg ρd ρt h y | pm-ren0ᵗˢ V k ρg ρd ρt h ys = refl
+
+-- the case that matters: a Θ-closed plug, weakened in, is invisible
+pm-wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) (tm : Tm Γ [] [] [] t) →
+  pmᵗ V k (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} tm) ≡ 0
+pm-wkTm V k tm = pm-ren0ᵗ V k (λ ()) (λ ()) (λ ()) (λ ()) tm
+
+-- (H0), PROVEN.  A coefficient is read at index 0 of the clause's own
+-- binder — a LOCAL index — and this says substitution leaves every
+-- local index alone.  The two pieces do the work: on the left
+-- injection varIx is preserved, so a local variable reads the same;
+-- on the right the plug is Θ-closed and weakened in, so pm-wkTm makes
+-- it 0, and the original was 0 too because its position was past every
+-- local binder.
+--
+-- Every binder clause needs the lemma at TWO indices: at suc k for the
+-- body, and at 0 for the coefficient the clause multiplies by.  Both
+-- are instances of the same statement, which is why the coefficient's
+-- invariance falls out of the same induction rather than needing its
+-- own.
+mutual
+  pm-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V k : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    k < length Θloc → pmᵉ V k (subΘExp Θloc σ e) ≡ pmᵉ V k e
+  pm-subΘᵉ V k Θloc σ (input i)  h = refl
+  pm-subΘᵉ V k Θloc σ (ofᵉ ts)   h = pm-subΘᵗˢ V k Θloc σ ts h
+  pm-subΘᵉ V k Θloc σ emptyᵉ     h = refl
+  pm-subΘᵉ V k Θloc σ (mapᵉ {s = s} f e) h
+    rewrite pm-subΘᵗ V (suc k) (s ∷ Θloc) σ f (s≤s h)
+          | pm-subΘᵗ V 0 (s ∷ Θloc) σ f (s≤s z≤n)
+          | pm-subΘᵉ V k Θloc σ e h = refl
+  pm-subΘᵉ V k Θloc σ (takeᵉ c e) h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (scanᵉ {s = s} {t = t} f z e) h
+    rewrite pm-subΘᵗ V (suc k) ((t ×ᵗ s) ∷ Θloc) σ f (s≤s h)
+          | pm-subΘᵗ V 0 ((t ×ᵗ s) ∷ Θloc) σ f (s≤s z≤n)
+          | pm-subΘᵗ V k Θloc σ z h
+          | pm-subΘᵉ V k Θloc σ e h = refl
+  pm-subΘᵉ V k Θloc σ (mergeAllᵉ e)   h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (concatAllᵉ e)  h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (switchAllᵉ e)  h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (exhaustAllᵉ e) h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (μᵉ e)     h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (varᵉ x)   h = refl
+  pm-subΘᵉ V k Θloc σ (deferᵉ e) h = refl
+
+  pm-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V k : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    k < length Θloc → pmᵗ V k (subΘTm Θloc σ tm) ≡ pmᵗ V k tm
+  pm-subΘᵗ V k Θloc σ (varᵗ x) h with ∈-++⁻ Θloc x in eq
+  ... | inj₁ y = cong (λ i → if i ≡ᵇ k then 1 else 0) (varIx-++ˡ Θloc x eq)
+  ... | inj₂ z =
+    trans (pm-wkTm V k (reify (lookupEnv σ z)))
+          (sym (ifNeq (varIx x) k
+                 (λ ix≡k → <-irrefl (sym ix≡k)
+                             (≤-trans h (varIx-++ʳ Θloc x eq)))))
+  pm-subΘᵗ V k Θloc σ unit̂       h = refl
+  pm-subΘᵗ V k Θloc σ (bool̂ _)   h = refl
+  pm-subΘᵗ V k Θloc σ (nat̂ _)    h = refl
+  pm-subΘᵗ V k Θloc σ (pairᵗ a b) h
+    rewrite pm-subΘᵗ V k Θloc σ a h | pm-subΘᵗ V k Θloc σ b h = refl
+  pm-subΘᵗ V k Θloc σ (fstᵗ p) h = pm-subΘᵗ V k Θloc σ p h
+  pm-subΘᵗ V k Θloc σ (sndᵗ p) h = pm-subΘᵗ V k Θloc σ p h
+  pm-subΘᵗ V k Θloc σ (inlᵗ a) h = pm-subΘᵗ V k Θloc σ a h
+  pm-subΘᵗ V k Θloc σ (inrᵗ a) h = pm-subΘᵗ V k Θloc σ a h
+  pm-subΘᵗ V k Θloc σ (caseᵗ {s = s} {t = t} sc l r) h
+    rewrite pm-subΘᵗ V (suc k) (s ∷ Θloc) σ l (s≤s h)
+          | pm-subΘᵗ V (suc k) (t ∷ Θloc) σ r (s≤s h)
+          | pm-subΘᵗ V 0 (s ∷ Θloc) σ l (s≤s z≤n)
+          | pm-subΘᵗ V 0 (t ∷ Θloc) σ r (s≤s z≤n)
+          | pm-subΘᵗ V k Θloc σ sc h = refl
+  pm-subΘᵗ V k Θloc σ (ifᵗ c a b) h
+    rewrite pm-subΘᵗ V k Θloc σ a h | pm-subΘᵗ V k Θloc σ b h = refl
+  pm-subΘᵗ V k Θloc σ (primᵗ _ a) h = refl
+  pm-subΘᵗ V k Θloc σ (strmᵗ e)   h = pm-subΘᵉ V k Θloc σ e h
+
+  pm-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V k : ℕ) (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    k < length Θloc → pmᵗˢ V k (subΘTms Θloc σ ts) ≡ pmᵗˢ V k ts
+  pm-subΘᵗˢ V k Θloc σ []       h = refl
+  pm-subΘᵗˢ V k Θloc σ (y ∷ ys) h
+    rewrite pm-subΘᵗ V k Θloc σ y h | pm-subΘᵗˢ V k Θloc σ ys h = refl
+
 -- every value in an environment is at most D deep
 EnvHopD : ∀ {n} {Γ : Ctx n} {Θ} (V D : ℕ) → All (Val Γ) Θ → Set
 EnvHopD V D []ᵃ                = ⊤
@@ -1842,23 +2027,6 @@ sumPmᵗ V k zero    t = 0
 sumPmᵗ V k (suc m) t = pmᵗ V k t + sumPmᵗ V (suc k) m t
 
 postulate
-  -- (H0) A COEFFICIENT DOES NOT MOVE UNDER SUBSTITUTION.  This is what
-  -- makes (H1)'s mapᵉ clause close at all: the instantiated template's
-  -- coefficient must be the template's, or the affine bound has a
-  -- different slope on each side and there is nothing to induct on.
-  --
-  -- True because subΘ plugs Θ-CLOSED values.  A local index k < |Θloc|
-  -- is untouched (the substitution keeps Θloc as a prefix, so a local
-  -- variable keeps its position), and every variable a plug brings is
-  -- bound inside the plug, hence compared against an index already
-  -- bumped past it.  Two pieces, in that order: varIx is preserved on
-  -- the ∈-++⁻ left injection, and pm of a weakened Θ-closed term is 0
-  -- at every index.
-  pm-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V k : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    k < length Θloc →
-    pmᵗ V k (subΘTm Θloc σ tm) ≡ pmᵗ V k tm
-
   -- (H1) THE AFFINE BOUND at expressions.  Induction on e following
   -- subΘ-countsᵉ/ᵗ clause for clause — the same substitution walked
   -- with the same multiplicity accounting, a different semiring at the
