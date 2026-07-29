@@ -2271,29 +2271,6 @@ envHopDs-lookup V Ds (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
 envHopDs-lookup V Ds (v ∷ᵃ σ) (hv , hσ) (there z)   =
   envHopDs-lookup V (λ j → Ds (suc j)) σ hσ z
 
-postulate
-  -- (H2) THE AFFINE BOUND at evalWith, which is what the walk's frames
-  -- actually call.  Its strmᵗ clause is (H1) at Θloc ≡ []; its varᵗ and
-  -- projection clauses read the value off the environment; caseᵗ is the
-  -- one that EXTENDS the environment, and it is why every statement in
-  -- this block is weighted rather than carrying a single bound.
-  --
-  -- THE CLAUSE THAT DID NOT TRANSFER.  With one bound D for the whole
-  -- environment, the branch's IH has to be taken at D′ ≥ D ⊔ (the
-  -- scrutinee's depth) — and then the branch's slope for the OUTER
-  -- variables is multiplied by the scrutinee's depth as well, a product
-  -- with no counterpart on the right, because hopD's caseᵗ clause prices
-  -- the scrutinee by the branch's coefficient AT INDEX 0 only.  That
-  -- pricing is correct; a single D simply cannot deliver it.  Weighted,
-  -- the clause closes termwise: the branch's index-0 slope pays for the
-  -- scrutinee (pmᵗ V 0 of a branch is under the caseᵗ coefficient by
-  -- construction) and its shifted slopes pay for the outer variables,
-  -- each under the ⊔ of the two branches'.
-  hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (Ds : ℕ → ℕ)
-    (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) → EnvHopDs V env Ds →
-    hopDᵛ V u (evalWith tm env)
-      ≤ hopDᵗ V tm + sumW (λ j → pmᵗ V j tm) Ds (length Θ)
-
 -- the two regroupings the multiplying clauses need.  With the slope
 -- weighted, D no longer appears — it is inside the sum
 +*-mix : ∀ a s c b u → (a + s) + c * (b + u) ≡ (a + c * b) + (s + c * u)
@@ -2469,6 +2446,141 @@ mutual
             (hopD-subΘᵗ V Ds Θloc σ y hσ) (hopD-subΘᵗˢ V Ds Θloc σ ys hσ)
             (sumW-⊔ (λ j → pmᵗ V (length Θloc + j) y)
                     (λ j → pmᵗˢ V (length Θloc + j) ys) Ds (length Θsub))
+
+-- (H2), PROVEN.  The affine bound at evalWith, which is what the walk's
+-- frames actually call: a mapᵉ frame's applyFn, an ofᵉ frame's evalTm.
+-- Its strmᵗ clause is (H1) at Θloc ≡ [] — closeUnderFn IS subΘExp [] —
+-- and its varᵗ and projection clauses read the value off the
+-- environment.
+--
+-- caseᵗ is the clause that EXTENDS the environment, and the reason every
+-- statement in this block is weighted rather than carrying a single
+-- bound.  The scrutinee's value is pushed on at index 0 and can be
+-- deeper than anything already there; with one bound the branch's IH
+-- would have to be taken at that depth for ALL positions, and the
+-- branch's slope for the outer variables would get multiplied by the
+-- scrutinee's depth — a product with no counterpart on the right,
+-- because hopD's caseᵗ clause prices the scrutinee by the branch's
+-- coefficient AT INDEX 0 only.  Weighted, it closes termwise: index 0's
+-- slope pays for the scrutinee (a branch's pmᵗ V 0 is under the caseᵗ
+-- coefficient by construction) and the shifted slopes pay for the outer
+-- variables, each under the ⊔ of the two branches'.
+case-shape : ∀ a b c d → a + ((b + c) + d) ≡ (a + b) + (d + c)
+case-shape = solve 4
+  (λ a b c d → a :+ ((b :+ c) :+ d) := (a :+ b) :+ (d :+ c)) refl
+
+hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (Ds : ℕ → ℕ)
+  (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) → EnvHopDs V env Ds →
+  hopDᵛ V u (evalWith tm env)
+    ≤ hopDᵗ V tm + sumW (λ j → pmᵗ V j tm) Ds (length Θ)
+hopD-evalWith {Γ = Γ} {Θ = Θ} V Ds (varᵗ x) env hσ =
+  ≤-trans (envHopDs-lookup V Ds env hσ x)
+          (sumW-hit (λ j → pmᵗ {Γ = Γ} {Δᵍ = []} {Δ = []} V j (varᵗ x))
+                    Ds (length Θ) (varIx x)
+                    (varIx<len x) (ifEq (varIx x) (varIx x) refl))
+hopD-evalWith V Ds unit̂     env hσ = z≤n
+hopD-evalWith V Ds (bool̂ _) env hσ = z≤n
+hopD-evalWith V Ds (nat̂ _)  env hσ = z≤n
+hopD-evalWith {Θ = Θ} V Ds (pairᵗ a b) env hσ =
+  ⊔-bound (hopDᵗ V a) (hopDᵗ V b)
+          (sumW (λ j → pmᵗ V j a) Ds (length Θ))
+          (sumW (λ j → pmᵗ V j b) Ds (length Θ))
+          (sumW (λ j → pmᵗ V j (pairᵗ a b)) Ds (length Θ))
+          (hopD-evalWith V Ds a env hσ) (hopD-evalWith V Ds b env hσ)
+          (sumW-⊔ (λ j → pmᵗ V j a) (λ j → pmᵗ V j b) Ds (length Θ))
+hopD-evalWith V Ds (fstᵗ q) env hσ =
+  ≤-trans (m≤m⊔n _ _) (hopD-evalWith V Ds q env hσ)
+hopD-evalWith V Ds (sndᵗ q) env hσ =
+  ≤-trans (m≤n⊔m _ _) (hopD-evalWith V Ds q env hσ)
+hopD-evalWith V Ds (inlᵗ a) env hσ = hopD-evalWith V Ds a env hσ
+hopD-evalWith V Ds (inrᵗ a) env hσ = hopD-evalWith V Ds a env hσ
+-- the scrutinee's VALUE and the bound on it are abstracted together, so
+-- the branch sees the bound already specialised to its own injection
+hopD-evalWith {Θ = Θ} V Ds (caseᵗ {s = s} {t = t} sc l r) env hσ
+  with evalWith sc env | hopD-evalWith V Ds sc env hσ
+... | inj₁ x | ihsc =
+  ≤-trans (hopD-evalWith V (λ { zero → hopDᵛ V s x ; (suc j) → Ds j })
+                         l (x ∷ᵃ env) (≤-refl , hσ))
+  (≤-trans (+-mono-≤ (m≤m⊔n (hopDᵗ V l) (hopDᵗ V r))
+             (+-mono-≤
+               (≤-trans (*-monoˡ-≤ (hopDᵛ V s x) pm0l≤C)
+                        (≤-trans (*-monoʳ-≤ C ihsc)
+                                 (≤-reflexive (*-distribˡ-+ C (hopDᵗ V sc) SSC))))
+               (sumW-mono GL (λ j → GL j ⊔ GR j) Ds (length Θ)
+                          (λ j → m≤m⊔n (GL j) (GR j)))))
+  (≤-trans (≤-reflexive
+             (case-shape (hopDᵗ V l ⊔ hopDᵗ V r) (C * hopDᵗ V sc)
+                         (C * SSC) SLR))
+           (+-monoʳ-≤ ((hopDᵗ V l ⊔ hopDᵗ V r) + C * hopDᵗ V sc) fold)))
+  where
+  C    = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  GL   = λ j → pmᵗ V (suc j) l
+  GR   = λ j → pmᵗ V (suc j) r
+  GSC  = λ j → pmᵗ V j sc
+  SSC  = sumW GSC Ds (length Θ)
+  SLR  = sumW (λ j → GL j ⊔ GR j) Ds (length Θ)
+  pm0l≤C : pmᵗ V 0 l ≤ C
+  pm0l≤C = ≤-trans (m≤m⊔n (pmᵗ V 0 l) (pmᵗ V 0 r))
+                   (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1)
+  fold : SLR + C * SSC ≤ sumW (λ j → (GL j ⊔ GR j) + C * GSC j) Ds (length Θ)
+  fold = ≤-reflexive
+    (trans (cong (SLR +_) (sumW-* C GSC Ds (length Θ)))
+           (sumW-+ (λ j → GL j ⊔ GR j) (λ j → C * GSC j) Ds (length Θ)))
+... | inj₂ y | ihsc =
+  ≤-trans (hopD-evalWith V (λ { zero → hopDᵛ V t y ; (suc j) → Ds j })
+                         r (y ∷ᵃ env) (≤-refl , hσ))
+  (≤-trans (+-mono-≤ (m≤n⊔m (hopDᵗ V l) (hopDᵗ V r))
+             (+-mono-≤
+               (≤-trans (*-monoˡ-≤ (hopDᵛ V t y) pm0r≤C)
+                        (≤-trans (*-monoʳ-≤ C ihsc)
+                                 (≤-reflexive (*-distribˡ-+ C (hopDᵗ V sc) SSC))))
+               (sumW-mono GR (λ j → GL j ⊔ GR j) Ds (length Θ)
+                          (λ j → m≤n⊔m (GL j) (GR j)))))
+  (≤-trans (≤-reflexive
+             (case-shape (hopDᵗ V l ⊔ hopDᵗ V r) (C * hopDᵗ V sc)
+                         (C * SSC) SLR))
+           (+-monoʳ-≤ ((hopDᵗ V l ⊔ hopDᵗ V r) + C * hopDᵗ V sc) fold)))
+  where
+  C    = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  GL   = λ j → pmᵗ V (suc j) l
+  GR   = λ j → pmᵗ V (suc j) r
+  GSC  = λ j → pmᵗ V j sc
+  SSC  = sumW GSC Ds (length Θ)
+  SLR  = sumW (λ j → GL j ⊔ GR j) Ds (length Θ)
+  pm0r≤C : pmᵗ V 0 r ≤ C
+  pm0r≤C = ≤-trans (m≤n⊔m (pmᵗ V 0 l) (pmᵗ V 0 r))
+                   (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1)
+  fold : SLR + C * SSC ≤ sumW (λ j → (GL j ⊔ GR j) + C * GSC j) Ds (length Θ)
+  fold = ≤-reflexive
+    (trans (cong (SLR +_) (sumW-* C GSC Ds (length Θ)))
+           (sumW-+ (λ j → GL j ⊔ GR j) (λ j → C * GSC j) Ds (length Θ)))
+hopD-evalWith {Θ = Θ} V Ds (ifᵗ c a b) env hσ with evalWith c env
+... | true =
+  ≤-trans (hopD-evalWith V Ds a env hσ)
+          (+-mono-≤ (m≤m⊔n (hopDᵗ V a) (hopDᵗ V b))
+                    (sumW-mono (λ j → pmᵗ V j a)
+                               (λ j → pmᵗ V j a ⊔ pmᵗ V j b) Ds (length Θ)
+                               (λ j → m≤m⊔n (pmᵗ V j a) (pmᵗ V j b))))
+... | false =
+  ≤-trans (hopD-evalWith V Ds b env hσ)
+          (+-mono-≤ (m≤n⊔m (hopDᵗ V a) (hopDᵗ V b))
+                    (sumW-mono (λ j → pmᵗ V j b)
+                               (λ j → pmᵗ V j a ⊔ pmᵗ V j b) Ds (length Θ)
+                               (λ j → m≤n⊔m (pmᵗ V j a) (pmᵗ V j b))))
+-- every PrimOp lands in natᵗ or boolᵗ, so its value carries no hops —
+-- one clause per operator, since the result type is what makes that true
+hopD-evalWith V Ds (primᵗ add  a) env hσ = z≤n
+hopD-evalWith V Ds (primᵗ sub  a) env hσ = z≤n
+hopD-evalWith V Ds (primᵗ mul  a) env hσ = z≤n
+hopD-evalWith V Ds (primᵗ eqᵖ  a) env hσ = z≤n
+hopD-evalWith V Ds (primᵗ ltᵖ  a) env hσ = z≤n
+hopD-evalWith V Ds (primᵗ notᵖ a) env hσ = z≤n
+-- and the two strmᵗ clauses: a closed template IS its own value, and an
+-- open one is closed by substitution — which is (H1) at Θloc ≡ []
+hopD-evalWith V Ds (strmᵗ e) []ᵃ       hσ =
+  ≤-reflexive (sym (+-identityʳ (hopDᵉ V e)))
+hopD-evalWith V Ds (strmᵗ e) (v ∷ᵃ vs) hσ =
+  hopD-subΘᵉ V Ds [] (v ∷ᵃ vs) e hσ
 
 -- a one-value environment: the weighted sum collapses to exactly the pm
 -- the mapᵉ clause's coefficient is built from
@@ -5904,10 +6016,25 @@ postulate
 -- WHAT STOOD THROUGHOUT: the structural facts, the μ edge, `r`'s slot
 -- being a plain ℕ, and R being a cap on hopD over store-sized syntax
 -- whatever the coefficient.  What is RESTATED: the emitted-value
--- conjunct, burstHopD? above, carried by subscribeE-walk.  Its engine
--- (hopD-evalWith / hopD-subΘᵉ) is the next thing to build, and pm is
--- what makes its induction close: the mapᵉ clause needs exactly
--- `pm 0 f` from its recursive calls, which is how pm was found.
+-- conjunct, burstHopD? above, carried by subscribeE-walk.
+--
+-- PHASE 3 IS DISCHARGED (2026-07-29).  The conjunct's engine is built
+-- and contains no postulate:
+--
+--   pm-subΘ          a coefficient does not move under substitution
+--   hopD-subΘᵉ/ᵗ/ᵗˢ  hopD is AFFINE in the substituted depths, with pm
+--                    as the slope — subΘ-countsᵉ/ᵗ's induction clause
+--                    for clause, no clause failing to transfer
+--   hopD-evalWith    the same at evalWith, which is what frames call
+--   hopD-applyFn     the one-value instance
+--   hopD-map-emit    the shape the walk's mapᵉ clause applies
+--
+-- pm is what makes the induction close, and finding it was the point:
+-- the mapᵉ clause needs exactly `pm 0 f` from its recursive calls, and
+-- no occurrence count is that quantity.  The one statement that had to
+-- change along the way was the environment bound — evalWith's caseᵗ
+-- pushes the scrutinee's value onto the environment, so the bound is
+-- per-position and the slope weighted to match; see hopD-evalWith.
 ------------------------------------------------------------------
 
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
