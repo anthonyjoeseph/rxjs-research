@@ -346,6 +346,84 @@ _ : (6 ≤ᵇ outWᵉ 2 insₛ progₛ₂) ≡ true
 _ = refl
 
 ------------------------------------------------------------------
+-- REFUTATION: THE HEIGHT IS **NOT** FIXED BY THE SYNTAX.
+--
+-- Everything above measured step functions whose plug lands under
+-- `mergeAllᵉ`/`ofᵉ`, where a width is multiplied by a constant.  Put the
+-- plug in an inner scanᵉ's SOURCE and it stops being a factor and
+-- becomes the FOLD COUNT — that is, the tower's EXPONENT:
+--
+--   deepScan  acc ↦ mergeAll (scan wrap2 seed (mergeAll (of [acc])))
+--
+-- Now each outer fold re-subscribes the inner scan, and the inner scan
+-- folds once per payload the accumulator carries.  Writing wₖ for the
+-- accumulator's width after k outer folds, the inner scan folds wₖ times
+-- with doubling widths, so
+--
+--     w₀ = 1,   wₖ₊₁ = 2^(wₖ + 1) − 2      →   1, 2, 6, 126, 2^127 − 2
+--
+-- MEASURED, against the real evaluator:
+--
+--   two folds (literal source)    →  8  =  w₁ + w₂  =  2 + 6
+--   ONE arrival, scripted         →  2
+--   TWO arrivals, scripted        →  8
+--
+-- The last two are the ones that matter.  The fold count grows by one
+-- per INSTANT — that is exactly what the defer-loop measurement above
+-- established — so wₖ is a tower whose HEIGHT grows with the instant
+-- count.  A shape with height fixed by the syntax and base linear in the
+-- instants cannot bound it.
+--
+-- WHY THE EARLIER MEASUREMENTS DID NOT SEE THIS.  They are not wrong,
+-- they are incomplete.  progₛ and prog₂ each cross from one chain into
+-- another ONCE, and there the heights add.  Here the crossing is
+-- RE-ENTERED once per fold, and per-fold re-entry compounds where a
+-- single crossing adds.  "Heights add past the first crossing" — the
+-- one thing this probe listed as asserted rather than measured — is
+-- precisely what fails.
+--
+-- CONSEQUENCE, recorded and NOT patched around: Verify-Budget-Sufficient's
+-- reachCap is too small as defined, and reach-covers is false as stated.
+-- The fix is a shape decision, not an implementation detail.
+------------------------------------------------------------------
+
+-- Θ-generic so the same template can sit under an inner scan's binder
+accVᵍ : ∀ {n} {Γ : Ctx n} {Θ} → Tm Γ [] [] (obs natᵗ ×ᵗ natᵗ ∷ Θ) (obs natᵗ)
+accVᵍ = fstᵗ (varᵗ (here refl))
+
+wrap2ᵍ : ∀ {n} {Γ : Ctx n} {Θ} → Tm Γ [] [] ((obs natᵗ ×ᵗ natᵗ) ∷ Θ) (obs natᵗ)
+wrap2ᵍ = strmᵗ (mergeAllᵉ (ofᵉ (accVᵍ ∷ accVᵍ ∷ [])))
+
+seedᵍ : ∀ {n} {Γ : Ctx n} {Θ} → Tm Γ [] [] Θ (obs natᵗ)
+seedᵍ = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
+
+-- the plug lands in an inner scan's SOURCE
+deepScan : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+deepScan = strmᵗ (mergeAllᵉ (scanᵉ wrap2ᵍ seedᵍ (mergeAllᵉ (ofᵉ (accVᵍ ∷ [])))))
+
+progD : Closed Γ₀ natᵗ
+progD = mergeAllᵉ (scanᵉ deepScan seedᵍ src2)
+
+-- 2 + 6, where a non-compounding shape predicts 2 + 4
+_ : countVals (evaluate 20 progD ins) ≡ 8
+_ = refl
+
+-- AND ACROSS INSTANTS, which is the refutation proper: one more arrival
+-- buys one more level of the tower, not one more wrap
+insD₁ insD₂ : Slots Γ₁
+insD₁ fz = scripted (hot ((after 0 , 1) ∷ []))
+insD₂ fz = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ []))
+
+progDT : Closed Γ₁ natᵗ
+progDT = mergeAllᵉ (scanᵉ deepScan seedᵍ (input fz))
+
+_ : countVals (evaluate 40 progDT insD₁) ≡ 2
+_ = refl
+
+_ : countVals (evaluate 40 progDT insD₂) ≡ 8
+_ = refl
+
+------------------------------------------------------------------
 -- WHAT THIS PROBE DOES NOT SHOW, stated so it is not over-read: that
 -- NO program anywhere has store-driven frame work.  Three structural
 -- facts carry that, and all three are read off Rx/Exp.agda's datatype
@@ -363,14 +441,9 @@ _ = refl
 --     frame cannot re-enter its own μ, which is why the counts above
 --     terminate in the syntax instead of running away.
 --
---   · CROSS-CHAIN COMPOSITION PAST ONE CROSSING.  Both routings — the
---     syntactic one (prog₂) and the share one (progₛ) — are measured at
---     ONE crossing, and both raise the height by exactly one, which is
---     what "heights add" predicts.  A second crossing would deliver on
---     the order of 2^126 payloads and does not normalise, so additivity
---     is measured at one crossing and asserted beyond it.  That gap is
---     real and should be closed by the induction, not by a bigger
---     probe.
+--   · (This slot used to say additivity past one crossing was merely
+--     unmeasured.  It is now REFUTED — see the deepScan section above.
+--     Per-fold re-entry compounds where a single crossing adds.)
 --
 -- Together those say the per-frame fold count is a function of the
 -- program; the measurements say what that function looks like.

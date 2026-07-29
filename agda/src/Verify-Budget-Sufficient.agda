@@ -82,11 +82,15 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FOUR POSTULATES REMAIN — three faces, plus reach-covers, which is
--- round 3's only outstanding debt and the answer
--- round3b-ledger-reset-absurd demands.  reachCap itself is DEFINED, out
--- of Rx.Frame-Width's syntactic frame-width measures, and 2≤reachCap is
--- proven from it.  The two real cores are subscribeE-wet and
+-- FOUR POSTULATES REMAIN — three faces, plus reach-covers.
+--
+-- STOP: reach-covers is FALSE AS STATED and reachCap is too small.  A
+-- scan whose step function contains a scan over the accumulator towers
+-- once per fold, and folds grow per instant, so no fixed-height cap
+-- exists.  Machine-checked in agda/probe/Frame-Work-Probe.agda
+-- (deepScan); the full account is at reachCap's definition.  Round 3's
+-- face is unaffected in form — what is missing is anything to
+-- instantiate Ŝ, R̂, F at.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
 -- decrement edges each consume one hasAtLeast-peel against
@@ -6703,15 +6707,56 @@ round3-anchor-indexed-absurd Ψ W Ω ℓ E G 3≤E h =
 -- a simplification worth taking deliberately rather than discovering.
 ------------------------------------------------------------------
 
+------------------------------------------------------------------
+-- REFUTED AS SHAPED (2026-07-29, agda/probe/Frame-Work-Probe.agda's
+-- deepScan section).  READ THIS BEFORE USING ANYTHING BELOW.
+--
+-- reachCap is defined here on the measured claim that a reachable
+-- observable's size is a tower whose HEIGHT is fixed by the syntax and
+-- whose BASE grows linearly in the instant count.  That claim is FALSE.
+--
+-- Every program that supported it puts the step function's plug under a
+-- mergeAllᵉ/ofᵉ, where a width is multiplied by a constant.  Put the plug
+-- in an INNER scanᵉ's SOURCE and it becomes the inner scan's FOLD COUNT
+-- — the tower's exponent, not a factor:
+--
+--   deepScan  acc ↦ mergeAll (scan wrap2 seed (mergeAll (of [acc])))
+--
+-- With wₖ the accumulator's width after k outer folds,
+--
+--     w₀ = 1,   wₖ₊₁ = 2^(wₖ + 1) − 2      →   1, 2, 6, 126, 2^127 − 2
+--
+-- and the fold count grows by ONE PER INSTANT (the defer-loop
+-- measurement).  So the height grows with `id`, and no fixed-height
+-- shape bounds it.  Measured: one arrival ↦ 2 payloads, two arrivals ↦ 8.
+--
+-- What this kills, precisely:
+--   · foldBudget/reachCap below are TOO SMALL.  Not off by a constant —
+--     off by an unbounded number of tower levels.
+--   · reach-covers is FALSE as stated.
+--   · round 3's face is unaffected in FORM: Ŝ, R̂, F are still ordinary
+--     parameters and walk-hyps-round3b still holds.  What is missing is
+--     any entry-determined value to instantiate them AT.
+--   · round3b-ledger-reset-absurd still forbids using the ledger, so
+--     this is not a matter of falling back to capᴱ either.
+--
+-- NOT PATCHED, deliberately: which shape replaces it is a design
+-- decision, and the standing rule is to report a refutation of this kind
+-- rather than work around it.  The definitions are left in place, marked,
+-- because deleting them would lose the record of exactly what was tried
+-- and how far it got.
+------------------------------------------------------------------
+
 -- THE FOLD BUDGET: how many times any scan in the run can fold up to
--- instant `id`.  Per frame it is the frame's payload count; across
+-- instant `id`.  KNOWN TOO SMALL — see the refutation directly above.  Per frame it is the frame's payload count; across
 -- instants the folds simply ADD, which is what the cross-instant
 -- measurement says — progT's three instants buy the accumulator exactly
 -- the depth prog₁'s three synchronous folds do, and no more
 foldBudget : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → ℕ
 foldBudget {n = n} e sl id = suc id * outWᵉ n sl e
 
--- THE REACH CAP, DEFINED.  Each fold scales a stored observable by at
+-- THE REACH CAP, DEFINED — AND REFUTED AS SHAPED.  Kept, marked, for
+-- the record of what was tried.  Each fold scales a stored observable by at
 -- most the program's own syntax, so the size after k folds is a single
 -- exponential with the syntax as base and the fold budget as exponent.
 -- HEIGHT FIXED BY THE SYNTAX — it sits inside outWᵉ, which towers on the
@@ -6738,7 +6783,9 @@ reachCap e sl id = (2 + sizeᵉ e + slotsSize sl) ^ suc (foldBudget e sl id)
                 (s≤s z≤n))
 
 postulate
-  -- THE FACE, and now the ONLY postulate in the cluster.  Stated at the
+  -- THE FACE — FALSE AS STATED, because reachCap above is too small.
+  -- Kept so the shape of what is owed stays visible; it must be
+  -- re-stated at whatever cap replaces reachCap.  Stated at the
   -- predicate the ledger already uses, so nothing new is defined: only
   -- the CAP changes, from capᴱ — which is walkCap-indexed, hence
   -- circular — to reachCap, which is not
