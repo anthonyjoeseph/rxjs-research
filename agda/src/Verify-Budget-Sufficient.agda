@@ -6297,6 +6297,19 @@ walk-hyps-absurd Ψ W Ω V ℓ R U r s d E 3≤E 1≤ dem ceil =
   X : ℕ
   X = E * 3 ^ (suc Ψ * walkCap Ω ℓ d)
 
+-- AND THE CONTRAST, which pins the diagnosis: measure the demand at
+-- the entry store bound B₀ instead of at V, change nothing else, and
+-- the same constraint set is satisfiable — for every choice of the
+-- other parameters, and with V and d written down explicitly.  The
+-- circle was the whole problem; nothing else about the face is.
+walk-hyps-splitAnchor : ∀ (Ψ W Ω ℓ E B₀ R U r s : ℕ) →
+  Σ ℕ λ V → Σ ℕ λ d →
+    (dBound B₀ R U r s ≤ d)
+    × (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)) ≤ V)
+walk-hyps-splitAnchor Ψ W Ω ℓ E B₀ R U r s =
+  capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ (dBound B₀ R U r s)))
+  , dBound B₀ R U r s , ≤-refl , ≤-refl
+
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
 -- subscribeInner re-enters subscribeE on an observable VALUE o
