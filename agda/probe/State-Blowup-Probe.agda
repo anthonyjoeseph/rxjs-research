@@ -1,0 +1,423 @@
+------------------------------------------------------------------
+-- THE STATE-BLOWUP PROBE: what does ONE instant do to the store?
+--
+-- Round 4 replaced the refuted fixed-height cap with a recurrence,
+-- Caps (suc id) = frameBlowup (Caps id).  Its width component was gated
+-- against deepScan; `sizeBlowup` and `regBlowup` were left as named
+-- postulates precisely so they could not be guessed.  This is their
+-- gate, and it is deliberately built the same way deepScan's was: read
+-- the REAL quantities `capsOK?` bounds off a REAL run, then ask whether
+-- the candidate covers them.
+--
+-- To do that it needs the evaluator's STATE, not its output stream, so
+-- it re-runs the drain loop keeping `Sched`/`EvalSt` and reads
+-- `sizeᵛ`/`outWᵛ`/`length ∘ registry` — the three conjuncts of
+-- `capsOK?`, nothing else.
+--
+-- WHAT IT FINDS.  Three refutations and one clean answer.
+--
+--   (1) `outWᵉ` is ZERO on every scripted-input program, so the base
+--       case's width cap does not cover even its own seed.
+--   (2) The base case's SIZE cap is smaller than the state its own
+--       subscribe frame leaves behind — a synchronous source folds
+--       inside the root frame, and the entry measure does not pay for
+--       it.
+--   (3) `foldStep` is too small: measured against the quantity
+--       `capsOK?` actually bounds (`outWᵛ` of the stored accumulator,
+--       not the payload count deepScan measured), ONE fold takes a
+--       width of 1 to 6 while `foldStep 1` allows 4.
+--
+--   (4) And the answer to the composition question: registrations
+--       compose ADDITIVELY across live sources, not multiplicatively.
+--
+-- (1)–(3) are all "the cap is too small", none of them needs a
+-- quantity outside `Caps`, so the round-5 gate — `frameBlowup : Caps →
+-- Caps`, no ledger, no receipt, no E — is untouched by any of them.
+------------------------------------------------------------------
+module State-Blowup-Probe where
+
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤ᵇ_; _⊔_)
+open import Data.Bool using (Bool; true; false)
+open import Data.List using (List; []; _∷_; sum; map; length; foldr)
+open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
+open import Data.Fin  using (Fin) renaming (zero to fz; suc to fsuc)
+open import Data.Sum  using (inj₁; inj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+
+open import Rx.Prim using (Fuel; Id; after_,_; hot)
+open import Rx.Exp  using (Ctx; Closed; Tm; Fn; Ty; natᵗ; obs; _×ᵗ_; input;
+                           ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; nat̂; fstᵗ; varᵗ;
+                           sizeᵉ; sizeᵛ)
+open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
+                                NodeState; scan-st; take-st; merge-st;
+                                concat-st; switch-st; exhaust-st;
+                                sched-init; sched-next; st-init; budgetAt;
+                                subscribeE; cascade; slotsSize; root)
+open import Rx.Frame-Width using (outWᵉ; outWᵛ)
+open import Verify-Budget-Sufficient using (foldStep)
+
+------------------------------------------------------------------
+-- THE HARNESS: drain, but keep the state.  This is `drain`/`evaluate`
+-- from Rx.Evaluator with the emit stream dropped instead of the state —
+-- no other change, so the runs below are the evaluator's own
+------------------------------------------------------------------
+
+drainSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        → Fuel → Id → Sched Γ → EvalSt e → Sched Γ × EvalSt e
+drainSt zero    _      sched st = sched , st
+drainSt (suc k) nextId sched st with sched-next sched
+... | inj₁ _            = sched , st
+... | inj₂ (a , sched′) =
+      let (_ , sched″ , st′) = cascade a nextId sched′ st
+      in drainSt k (suc nextId) sched″ st′
+
+runSt : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
+      → Sched Γ × EvalSt e
+runSt fuel e ins =
+  let (_ , sched₀ , st₀) =
+        subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+  in drainSt fuel 1 sched₀ st₀
+
+------------------------------------------------------------------
+-- the three quantities capsOK? bounds, and NOTHING else: stBounded?'s
+-- sizes, widLive/widNode's frame widths, and the registry's length
+------------------------------------------------------------------
+
+nodeSize : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
+nodeSize (scan-st {t} v)   = sizeᵛ t v
+nodeSize (concat-st q _ _) = sum (map sizeᵉ q)
+nodeSize (take-st _)       = 0
+nodeSize (merge-st _ _)    = 0
+nodeSize (switch-st _ _)   = 0
+nodeSize (exhaust-st _ _)  = 0
+
+nodeWid : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → ℕ
+nodeWid j sl (scan-st {t} v)   = outWᵛ j sl t v
+nodeWid j sl (concat-st q _ _) = foldr (λ o m → outWᵉ j sl o ⊔ m) 0 q
+nodeWid j sl (take-st _)       = 0
+nodeWid j sl (merge-st _ _)    = 0
+nodeWid j sl (switch-st _ _)   = 0
+nodeWid j sl (exhaust-st _ _)  = 0
+
+liveSize : ∀ {n} {Γ : Ctx n} → LiveSource Γ → ℕ
+liveSize l = foldr (λ tv m → sizeᵛ (LiveSource.elemTy l) (proj₂ tv) ⊔ m) 0
+                   (LiveSource.pending l)
+
+liveWid : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → LiveSource Γ → ℕ
+liveWid j sl l = foldr (λ tv m → outWᵛ j sl (LiveSource.elemTy l) (proj₂ tv) ⊔ m) 0
+                       (LiveSource.pending l)
+
+-- max stored size after `fuel` cascades
+mSize : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mSize fuel e ins =
+  let (sched , st) = runSt fuel e ins
+  in foldr (λ kv m → nodeSize (proj₂ kv) ⊔ m) 0 (EvalSt.nodes st)
+     ⊔ foldr (λ l m → liveSize l ⊔ m) 0 (Sched.live sched)
+
+-- max stored FRAME WIDTH after `fuel` cascades
+mWid : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mWid {n = n} fuel e ins =
+  let (sched , st) = runSt fuel e ins
+  in foldr (λ kv m → nodeWid n (Sched.slots sched) (proj₂ kv) ⊔ m) 0 (EvalSt.nodes st)
+     ⊔ foldr (λ l m → liveWid n (Sched.slots sched) l ⊔ m) 0 (Sched.live sched)
+
+-- live registrations after `fuel` cascades
+mReg : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mReg fuel e ins = length (EvalSt.registry (proj₂ (runSt fuel e ins)))
+
+------------------------------------------------------------------
+-- THE PROGRAMS.  Each is the sharpest amplifier for one component
+------------------------------------------------------------------
+
+Γ₁ : Ctx 1
+Γ₁ = natᵗ ∷ᵛ []ᵛ
+
+accV : ∀ {n} {Γ : Ctx n} {Θ} → Tm Γ [] [] (obs natᵗ ×ᵗ natᵗ ∷ Θ) (obs natᵗ)
+accV = fstᵗ (varᵗ (here refl))
+
+seed : ∀ {n} {Γ : Ctx n} {Θ} → Tm Γ [] [] Θ (obs natᵗ)
+seed = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
+
+src3 : ∀ {n} {Γ : Ctx n} → Closed Γ natᵗ
+src3 = ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ [])
+
+-- one arrival per instant, so an instant is exactly one fold
+ins3 : Slots Γ₁
+ins3 fz = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ (after 0 , 3) ∷ []))
+
+-- (A) THE SIZE ADVERSARY: three accumulator occurrences, so every fold
+-- copies the whole stored accumulator three times
+wrap3 : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrap3 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ accV ∷ [])))
+
+pA : Closed Γ₁ natᵗ
+pA = mergeAllᵉ (scanᵉ wrap3 seed (input fz))
+
+-- (B) deepScan, the program that killed the fixed-height cap, now
+-- measured on the STORE rather than the emit stream
+wrap2ᵍ : ∀ {n} {Γ : Ctx n} {Θ} → Tm Γ [] [] ((obs natᵗ ×ᵗ natᵗ) ∷ Θ) (obs natᵗ)
+wrap2ᵍ = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ [])))
+
+deepScan : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+deepScan = strmᵗ (mergeAllᵉ (scanᵉ wrap2ᵍ seed (mergeAllᵉ (ofᵉ (accV ∷ [])))))
+
+pD : Closed Γ₁ natᵗ
+pD = mergeAllᵉ (scanᵉ deepScan seed (input fz))
+
+-- (C) THE REGISTRATION ADVERSARY.  A registry entry survives only while
+-- its SOURCE is live — an `ofᵉ` source completes inside its own frame
+-- and cascadeFinish drops its entries — so growing the registry needs
+-- the accumulator to keep re-subscribing the LIVE scripted input.  Each
+-- fold doubles the number of `input` references it carries
+wrapIn : Fn Γ₁ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrapIn = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ strmᵗ (input fz) ∷ [])))
+
+pR : Closed Γ₁ natᵗ
+pR = mergeAllᵉ (scanᵉ wrapIn seed (input fz))
+
+-- the same thing SYNCHRONOUSLY: three folds inside the root subscribe
+-- frame, so every registration and every size step is paid before the
+-- first cascade even runs
+pRs : Closed Γ₁ natᵗ
+pRs = mergeAllᵉ (scanᵉ wrapIn seed src3)
+
+-- (D) TWO live sources, the accumulator referencing both: this is where
+-- multiplicative composition would show if it existed
+Γ₂ : Ctx 2
+Γ₂ = natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+ins2 : Slots Γ₂
+ins2 fz        = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ (after 0 , 3) ∷ []))
+ins2 (fsuc fz) = scripted (hot ((after 0 , 4) ∷ (after 0 , 5) ∷ (after 0 , 6) ∷ []))
+
+wrapIn2 : Fn Γ₂ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrapIn2 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ strmᵗ (input fz)
+                                     ∷ strmᵗ (input (fsuc fz)) ∷ [])))
+
+pR2 : Closed Γ₂ natᵗ
+pR2 = mergeAllᵉ (scanᵉ wrapIn2 seed (input fz))
+
+------------------------------------------------------------------
+-- MEASUREMENT 1: SIZE.  One fold multiplies the stored accumulator by
+-- the step function's OCCURRENCE COUNT and adds its own syntax, so a
+-- single scan's size recurrence is s ↦ k·s + c — here 3·s + 15, exactly
+-- wrap3's three occurrences.  Linear per fold, exponential in the
+-- instant count.  This is `size-subΘᵉ`'s `sizeᵉ e * suc (2 * V)` seen
+-- from the run, and it is the shape `sizeBlowup` has to iterate
+------------------------------------------------------------------
+
+_ : mSize 0 pA ins3 ≡ 3
+_ = refl
+
+_ : mSize 1 pA ins3 ≡ 24
+_ = refl
+
+_ : mSize 2 pA ins3 ≡ 87
+_ = refl
+
+_ : mSize 3 pA ins3 ≡ 276
+_ = refl
+
+-- deepScan's store, for contrast: its step function has only ONE
+-- accumulator occurrence, so its SIZE grows slower than pA's even
+-- though its WIDTH towers.  Size and width are moved by different
+-- features of the step function — the occurrence count and the plug's
+-- position — which is the concrete reason cSize and cWid are separate
+-- fields rather than one
+_ : mSize 1 pD ins3 ≡ 24
+_ = refl
+
+_ : mSize 2 pD ins3 ≡ 45
+_ = refl
+
+------------------------------------------------------------------
+-- REFUTATION (a): `sizeBlowup` MAY NOT ITERATE A FIXED NUMBER OF TIMES,
+-- AND MAY NOT READ cSize ALONE.
+--
+-- pR and pRs are the SAME step function over the SAME seed — so their
+-- per-fold size step is identical, and every cSize-derived quantity
+-- about them agrees.  They differ only in how many times that step runs
+-- inside one frame: pR's source is the scripted input, which delivers
+-- one payload per instant, while pRs's is a three-element literal,
+-- which delivers three inside the root subscribe frame.
+--
+-- One frame of pRs therefore does what three instants of pR do: 3 ↦ 30
+-- against 3 ↦ 12.  A blowup that applies its step a fixed number of
+-- times, or that reads only the size, returns one answer for both and
+-- must undershoot one of them.  The iteration count has to be the FOLD
+-- COUNT — and a fold count is a width, so `sizeBlowup` must read cWid.
+-- This is reach-via-size-absurd's circularity in the other direction:
+-- not "width from size", but "how many size steps" from a width
+------------------------------------------------------------------
+
+_ : mSize 0 pR ins3 ≡ 3
+_ = refl
+
+_ : mSize 1 pR ins3 ≡ 12        -- ONE fold
+_ = refl
+
+_ : mSize 0 pRs ins3 ≡ 30       -- THREE folds, same step, one frame
+_ = refl
+
+_ : (30 ≤ᵇ 12) ≡ false
+_ = refl
+
+------------------------------------------------------------------
+-- MEASUREMENT 2: WIDTH — and REFUTATION (b), `foldStep` IS TOO SMALL.
+--
+-- deepScan's gate measured the PAYLOAD COUNT recurrence (1, 2, 6, 126)
+-- and `foldStep w = 2 ^ suc w` dominates that by exactly 2 per level.
+-- But the quantity `capsOK?` bounds is not the payload count — it is
+-- `outWᵛ` of the value actually sitting in the scan node, which is a
+-- BOUND on that count and grows faster.  Measured on the store, ONE
+-- fold takes deepScan's stored width from 1 to 6, and `foldStep 1` is 4.
+--
+-- The round-4 gate was therefore gating the wrong quantity.  The reason
+-- it is wrong is structural, not numeric: a fold substitutes the
+-- accumulator into the step function, and `innWᵉ (scanᵉ f z e)` puts the
+-- source's width in an EXPONENT whose base is read off `f`'s syntax.  So
+-- the per-fold width multiplier is a property of the step function, and
+-- the only thing in `Caps` that bounds a step function's syntax is
+-- cSize.  A width step that reads only the width cannot see it
+------------------------------------------------------------------
+
+_ : mWid 0 pD ins3 ≡ 1
+_ = refl
+
+_ : mWid 1 pD ins3 ≡ 6
+_ = refl
+
+_ : foldStep 1 ≡ 4
+_ = refl
+
+_ : (6 ≤ᵇ foldStep 1) ≡ false
+_ = refl
+
+-- the same measure on pA, where the step function has no inner scan and
+-- the stored width just triples — one occurrence-count per fold
+_ : mWid 0 pA ins3 ≡ 1
+_ = refl
+
+_ : mWid 1 pA ins3 ≡ 3
+_ = refl
+
+_ : mWid 2 pA ins3 ≡ 9
+_ = refl
+
+_ : mWid 3 pA ins3 ≡ 27
+_ = refl
+
+-- and deepScan's second cascade, for scale: 6 ↦ 3072
+_ : mWid 2 pD ins3 ≡ 3072
+_ = refl
+
+------------------------------------------------------------------
+-- REFUTATION (c): `outWᵉ` IS ZERO ON A SCRIPTED INPUT, so the base
+-- case's width cap does not cover its own seed.
+--
+-- `outWᵉ (suc j) sl (input i)` descends into a `shared` def but returns
+-- 0 for a `scripted` slot, and every clause above it is multiplicative,
+-- so the whole program measures 0.  All seven runs the measure was
+-- gated against used either a literal source or a shared slot — the
+-- scripted case was never gated, and it is the common one.
+--
+-- The state after pA's root subscribe already holds a width-1
+-- accumulator (its seed), so the cap fails at instant 0, before any
+-- cascade.  A per-instant recurrence cannot recover from a base case
+-- that is already false
+------------------------------------------------------------------
+
+_ : outWᵉ 1 ins3 pA ≡ 0
+_ = refl
+
+_ : outWᵉ 1 ins3 pD ≡ 0
+_ = refl
+
+_ : outWᵉ 1 ins3 pR ≡ 0
+_ = refl
+
+_ : (1 ≤ᵇ outWᵉ 1 ins3 pA) ≡ false
+_ = refl
+
+------------------------------------------------------------------
+-- REFUTATION (d): THE BASE CASE'S SIZE CAP IS SMALLER THAN ITS OWN
+-- SUBSCRIBE FRAME'S RESULT.
+--
+-- `capsAt e sl zero`'s size component is `2 + sizeᵉ e + slotsSize sl` —
+-- the program plus its slot telescope, no allowance for work.  But the
+-- ROOT SUBSCRIBE IS ITSELF A FRAME: a synchronous source folds inside
+-- it, so the state it hands to instant 0 has already grown.  pRs folds
+-- three times before the first cascade, ending at 30 with a cap of 25.
+--
+-- This one does not touch the recurrence at all — the base case simply
+-- has to be one frame's blowup above the syntax, which is what
+-- `caps-frame` says about every OTHER frame already
+------------------------------------------------------------------
+
+_ : sizeᵉ pRs ≡ 19
+_ = refl
+
+_ : slotsSize ins3 ≡ 4
+_ = refl
+
+-- so the cap is 25, and the frame it is supposed to survive ended at 30
+_ : (30 ≤ᵇ 2 + sizeᵉ pRs + slotsSize ins3) ≡ false
+_ = refl
+
+------------------------------------------------------------------
+-- MEASUREMENT 3: REGISTRATIONS — and the clean answer.
+--
+-- pA and deepScan never grow the registry at all: their sources are
+-- `ofᵉ` literals, which complete inside their own frame, and
+-- cascadeFinish drops a spent source's entries.  Only a LIVE source
+-- accumulates, which is what pR is for — and there the increment tracks
+-- the accumulator's width (1 then 2, against widths 1 then 2), because
+-- the new registrations are exactly the input references the fold
+-- copied.  The sequence stops where the scripted source completes: a
+-- spent source's entries drop at cascadeFinish, which is the same reason
+-- pA and deepScan never accumulate at all
+------------------------------------------------------------------
+
+_ : mReg 2 pA ins3 ≡ 1
+_ = refl
+
+_ : mReg 2 pD ins3 ≡ 1
+_ = refl
+
+_ : mReg 0 pR ins3 ≡ 1
+_ = refl
+
+_ : mReg 1 pR ins3 ≡ 2
+_ = refl
+
+_ : mReg 2 pR ins3 ≡ 4
+_ = refl
+
+-- synchronously, the same folds cost the same registrations — six in
+-- the root frame, paid before instant 0.  Frames and instants charge
+-- alike, which is the fact that lets one `frameBlowup` serve both
+_ : mReg 0 pRs ins3 ≡ 6
+_ = refl
+
+------------------------------------------------------------------
+-- AND THE COMPOSITION QUESTION, ANSWERED: registrations compose
+-- ADDITIVELY across live sources, not multiplicatively.
+--
+-- pR2's accumulator references TWO live inputs, so a multiplicative
+-- rule would square where the single-source run doubled.  It does not:
+-- the first cascade takes 1 to 3, one new registration per referenced
+-- source, because a fold subscribes each reference exactly once.  So
+-- `regBlowup` needs a product of cWid and cReg — the subscriptions one
+-- instant's folds can mint — and no cross-source factor
+------------------------------------------------------------------
+
+_ : mReg 0 pR2 ins2 ≡ 1
+_ = refl
+
+_ : mReg 1 pR2 ins2 ≡ 3
+_ = refl
+
+_ : mReg 2 pR2 ins2 ≡ 3
+_ = refl

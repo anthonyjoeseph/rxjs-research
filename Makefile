@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -41,6 +41,9 @@ help:
 	@echo "  frame-work-probe  is a subscribe frame's work entry-determined?"
 	@echo "                  refl-checked payload counts for the deepening scan"
 	@echo "                  (see agda/probe/Frame-Work-Probe.agda).  SLOW (~30 min)"
+	@echo "  state-blowup-probe  what does ONE instant do to the STORE?  reads"
+	@echo "                  capsOK?'s own three quantities off a real run"
+	@echo "                  (see agda/probe/State-Blowup-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -93,6 +96,14 @@ hop-descent-probe:
 # finding, so they are not shrunk.  ~30 min.
 frame-work-probe:
 	cd agda && agda -i src -i probe probe/Frame-Work-Probe.agda
+
+# The gate for sizeBlowup and regBlowup — and, as it turned out, three
+# refutations of round 4's other components.  It reads capsOK?'s own
+# conjuncts (sizeᵛ, outWᵛ, the registry's length) off a real run, which
+# needs the evaluator's STATE, so it re-runs the drain loop keeping
+# Sched/EvalSt.  Standalone, so src/Main.agda never reaches it.
+state-blowup-probe:
+	cd agda && agda -i src -i probe probe/State-Blowup-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
