@@ -6752,6 +6752,28 @@ postulate
           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (reachCap e (Sched.slots sched) id) Ψ (proj₁ r) ≡ true)
 
+-- THE TRAP IN PROVING reach-covers, machine-checked so that nobody walks
+-- into it.  The obvious route is two steps: bound a reachable
+-- observable's SIZE by the cap, then bound its WIDTH by some function of
+-- its size — the way hopD-sizeᵉ bounds hop depth by szB of size.  THAT
+-- ROUTE IS CIRCULAR.  outW is not polynomial in size: outWᵉ (mergeAllᵉ e)
+-- is outWᵉ e * innWᵉ e and innWᵉ towers at a scanᵉ, so any size-to-width
+-- bound is at least exponential, and the cap would have to dominate an
+-- exponential of itself.
+--
+-- The non-circular route is to bound the width DIRECTLY by the
+-- construction: a reachable observable is the accumulator after k folds,
+-- its width is the template's slope to the k, and k ≤ foldBudget.  That
+-- is slope ^ foldBudget — which is exactly the shape reachCap already
+-- has.  Both the size and the width come out of the same fold count;
+-- neither is derived from the other.
+--
+-- This is the fourth time this loop has been available in this proof
+-- (walk-hyps-absurd, hop-anchor-absurd, round3b-ledger-reset-absurd, and
+-- now here), so it gets a witness rather than a warning
+reach-via-size-absurd : ∀ (C : ℕ) → 2 ^ C ≤ C → ⊥
+reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
+
 -- THE WIRING, proven rather than postulated: a value inside the cap
 -- discharges BOTH of the walk's reset obligations at once.  This is what
 -- makes the cluster one object instead of three coincidences, and it is
