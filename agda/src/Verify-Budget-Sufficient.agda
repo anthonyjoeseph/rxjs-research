@@ -82,14 +82,20 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- THREE POSTULATES REMAIN.  The two real cores are subscribeE-wet and
+-- SIX POSTULATES REMAIN — three faces, and a three-part reachability
+-- cluster (reachCap, 2≤reachCap, reach-covers) that is round 3's only
+-- outstanding debt and the answer round3b-ledger-reset-absurd demands.
+-- The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
 -- decrement edges each consume one hasAtLeast-peel against
 -- dBound-μ/-hop/-connect; everything between is structural), and the
 -- fold's threading invariant (see cascadeGo-wet's memo).  The third is
 -- subscribeE-walk, the joint wet/dry/length face they are stated
--- against.  PROVEN 2026-07-29: hopD-size (the hop measure is now
+-- against.  The reachability cluster is what supplies its three entry
+-- caps Ŝ, R̂, F — one measure in three roles, so F cannot drift to an
+-- unaudited source (reach-resets, PROVEN, is that wiring).
+-- PROVEN 2026-07-29: hopD-size (the hop measure is now
 -- derived end to end), and the walk's two bookkeeping companions
 -- subscribeE-slots and subscribeE-connected-mono — one joint `Keeps`
 -- induction over subscribeE's whole clique.  SPLICED: Verify-Well-Formed imports
@@ -6637,6 +6643,94 @@ round3-anchor-indexed-absurd Ψ W Ω ℓ E G 3≤E h =
   X = E * 3 ^ (suc Ψ * walkCap Ω ℓ G)
   X<A : X < capᴱ W X
   X<A = ≤-trans (n<2^n X) (^-monoˡ-≤ X (s≤s (s≤s z≤n)))
+
+------------------------------------------------------------------
+-- THE REACHABILITY FACE — round 3's only remaining debt, and the answer
+-- round3b-ledger-reset-absurd demands.
+--
+-- That refutation says the reset caps may not be the ledger.  So they
+-- come from REACHABILITY instead: a bound on the size of an observable a
+-- run can actually reach, computed from the program rather than from how
+-- far the size ledger has been allowed to climb.
+--
+-- ONE MEASURE, THREE ROLES — and, as with anchorᴬ and with the collapse,
+-- that is structural rather than a discipline to be remembered:
+--
+--     Ŝ = reachCap …            the s′ reset at hop and connect edges
+--     F = reachCap …            hopD's index, off the store anchor
+--     R̂ = hopR (reachCap …)     the r reset at connect edges
+--
+-- F CANNOT drift to a different, unaudited source, because it is the
+-- same number as Ŝ.  And none of the three needs a new definition: hopR
+-- already exists, and hopD-cap already turns a size bound into a hop
+-- bound at the same index.  reach-resets below is that, proven.
+--
+-- WHAT THE PROBE SAYS IT MUST BE (agda/probe/Frame-Work-Probe.agda —
+-- nine measurements, all against the real evaluator):
+--
+--   · A TOWER WHOSE HEIGHT IS THE PROGRAM'S scan/*All CHAIN DEPTH AND
+--     WHOSE BASE GROWS LINEARLY IN THE INSTANT COUNT.  Not
+--     sizeBudgetAt's shape, whose height climbs per instant.  The
+--     difference is not merely headroom: it is what makes the invariant
+--     PRESERVABLE by a per-frame induction at all.  An invariant whose
+--     height climbs each instant would demand the next tower level at
+--     every frame crossing; fixed height with a growing base composes.
+--
+--   · duplication widens the BASE by the syntactic occurrence count and
+--     leaves the height alone — 39 against 14 on the same three folds.
+--
+--   · a defer loop adds ONE wrap per tick and nothing more: 14, 30, 62,
+--     which is 2^(N+1) − 2.  It cannot compound, because unfoldμ
+--     substitutes the ORIGINAL closed μ, so a deferred self-reference
+--     re-subscribes a FRESH pipeline with a FRESH accumulator.  μ
+--     recursion is syntactic re-subscription, not state feedback.
+--
+--   · a share crossing costs exactly what syntactic nesting costs, and
+--     re-entry costs nothing at all: 6, 6, 6.
+--
+-- WHAT IS NOT MEASURED, and what the induction therefore owes: that
+-- heights ADD past the FIRST crossing.  Both routings raise the height
+-- by exactly one; beyond one crossing the payload counts stop
+-- normalising and additivity is asserted.
+--
+-- NOTE FOR WHOEVER PROVES THIS.  reach-covers is INV? at a cap that does
+-- not move, so if it goes through it SUBSUMES the walk face's own INV?
+-- conjunct, and the receipt E′ ≤ E·3^(…) stops being load-bearing for
+-- the descent — it would carry only the instant-boundary story.  That is
+-- a simplification worth taking deliberately rather than discovering.
+------------------------------------------------------------------
+
+postulate
+  -- the measure itself: still to be defined, and the round's last piece
+  reachCap : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (Ω id : ℕ) → ℕ
+
+  -- ≥ 2, so the hop machinery's side condition stays free at every call
+  -- site exactly as it does for the store bound
+  2≤reachCap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (Ω id : ℕ) → 2 ≤ reachCap e sl Ω id
+
+  -- THE FACE.  Stated at the predicate the ledger already uses, so
+  -- nothing new is defined: only the CAP changes, from capᴱ — which is
+  -- walkCap-indexed, hence circular — to reachCap, which is not
+  reach-covers : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (Ψ Ω id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    INV? Ψ (reachCap e (Sched.slots sched) Ω id) sched st ≡ true →
+    sizeᵉ b ≤ reachCap e (Sched.slots sched) Ω id → fnCapᵉ b ≤ Ψ →
+    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω →
+    let r = subscribeE g b κ bid now sched st
+    in (INV? Ψ (reachCap e (Sched.slots sched) Ω id)
+          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (reachCap e (Sched.slots sched) Ω id) Ψ (proj₁ r) ≡ true)
+
+-- THE WIRING, proven rather than postulated: a value inside the cap
+-- discharges BOTH of the walk's reset obligations at once.  This is what
+-- makes the cluster one object instead of three coincidences, and it is
+-- why F needs no separate justification — it is Ŝ
+reach-resets : ∀ (C : ℕ) → 2 ≤ C →
+  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+  (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
+reach-resets C hC o h = ≤-trans (syncSize≤sizeᵉ o) h , hopD-cap C o hC h
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.

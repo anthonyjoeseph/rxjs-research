@@ -41,7 +41,7 @@ open import Rx.Prim using (InstEmit; InstEvent; value; init; close; handoff;
 open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; input;
                            ofᵉ; mergeAllᵉ; scanᵉ; μᵉ; deferᵉ; varᵉ;
                            varᵗ; nat̂; fstᵗ; strmᵗ; syncSizeᵉ)
-open import Rx.Evaluator using (evaluate; Slots; Slot; scripted)
+open import Rx.Evaluator using (evaluate; Slots; Slot; scripted; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Verify-Budget-Sufficient using (ofWᵉ)
 
@@ -264,6 +264,52 @@ _ : countVals (evaluate 4 feedback ins) ≡ 62
 _ = refl
 
 ------------------------------------------------------------------
+-- A SHARE CROSSING COSTS WHAT SYNTACTIC NESTING COSTS.  The other half
+-- of cross-chain composition, and the routing most likely to compound
+-- if anything does: a share is the one place a chain is reached other
+-- than by descending into it syntactically.
+--
+-- The same inner chain is written twice — once as a `shared` slot def
+-- reached through `input`, once inline — under the same outer scan.
+-- Both deliver 6.  A share crossing raises the height by exactly one,
+-- like every other *All level, and compounds nothing.
+--
+-- And re-entry is free: TWO references to the same slot, merged, also
+-- deliver 6, not 12 and not 36.  The second arrival finds the slot
+-- connected and does not re-walk the def — sharedConnect-unconn's
+-- content, measured rather than assumed.  So a share adds to neither
+-- the tower's height nor its base.
+------------------------------------------------------------------
+
+src1 : ∀ {n} {Γ : Ctx n} → Closed Γ natᵗ
+src1 = ofᵉ (nat̂ 1 ∷ [])
+
+Γₛ : Ctx 1
+Γₛ = natᵗ ∷ᵛ []ᵛ
+
+insₛ : Slots Γₛ
+insₛ fz = shared (mergeAllᵉ (scanᵉ wrap2 seed src1))
+
+progₛ : Closed Γₛ natᵗ                    -- composition through a SHARE
+progₛ = mergeAllᵉ (scanᵉ wrap2 seed (input fz))
+
+progₙ : Closed Γₛ natᵗ                    -- the syntactic twin
+progₙ = mergeAllᵉ (scanᵉ wrap2 seed (mergeAllᵉ (scanᵉ wrap2 seed src1)))
+
+progₛ₂ : Closed Γₛ natᵗ                   -- TWO subscribers to one slot
+progₛ₂ = mergeAllᵉ (scanᵉ wrap2 seed
+           (mergeAllᵉ (ofᵉ (strmᵗ (input fz) ∷ strmᵗ (input fz) ∷ []))))
+
+_ : countVals (evaluate 20 progₛ insₛ) ≡ 6
+_ = refl
+
+_ : countVals (evaluate 20 progₙ insₛ) ≡ 6
+_ = refl
+
+_ : countVals (evaluate 20 progₛ₂ insₛ) ≡ 6
+_ = refl
+
+------------------------------------------------------------------
 -- WHAT THIS PROBE DOES NOT SHOW, stated so it is not over-read: that
 -- NO program anywhere has store-driven frame work.  Three structural
 -- facts carry that, and all three are read off Rx/Exp.agda's datatype
@@ -281,17 +327,14 @@ _ = refl
 --     frame cannot re-enter its own μ, which is why the counts above
 --     terminate in the syntax instead of running away.
 --
---   · CROSS-CHAIN COMPOSITION PAST ONE CROSSING.  prog₂ measures ONE
---     chain embedded in another and the height goes up by exactly one,
---     which is what "heights add" predicts.  A second crossing would
---     deliver on the order of 2^126 payloads and does not normalise, so
---     additivity is measured at one crossing and asserted beyond it.
---     That gap is real and should be closed by the induction, not by a
---     bigger probe.
---
---   · SHARE RE-ENTRY IS U-CAPPED.  A second arrival at a slot finds it
---     connected and does not re-walk the def (the connect descent,
---     sharedConnect-unconn).
+--   · CROSS-CHAIN COMPOSITION PAST ONE CROSSING.  Both routings — the
+--     syntactic one (prog₂) and the share one (progₛ) — are measured at
+--     ONE crossing, and both raise the height by exactly one, which is
+--     what "heights add" predicts.  A second crossing would deliver on
+--     the order of 2^126 payloads and does not normalise, so additivity
+--     is measured at one crossing and asserted beyond it.  That gap is
+--     real and should be closed by the induction, not by a bigger
+--     probe.
 --
 -- Together those say the per-frame fold count is a function of the
 -- program; the measurements say what that function looks like.
