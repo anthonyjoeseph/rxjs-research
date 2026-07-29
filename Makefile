@@ -40,7 +40,7 @@ help:
 	@echo "                  sites (see agda/probe/Hop-Descent-Probe.agda)"
 	@echo "  frame-work-probe  is a subscribe frame's work entry-determined?"
 	@echo "                  refl-checked payload counts for the deepening scan"
-	@echo "                  (see agda/probe/Frame-Work-Probe.agda).  SLOW (~20 min)"
+	@echo "                  (see agda/probe/Frame-Work-Probe.agda).  SLOW (~30 min)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -89,8 +89,8 @@ hop-descent-probe:
 # for the deepening scan (an obs-typed accumulator that re-wraps itself), which
 # is what licenses re-indexing hopD's scan clause off the store anchor.
 # Standalone, so src/Main.agda never reaches it.  SLOW — prog₂ delivers 126
-# payloads in one frame and takes ~20 min to normalise; that number IS the
-# finding, so it is not shrunk.
+# payloads in one frame and the defer loop another 62; those numbers ARE the
+# finding, so they are not shrunk.  ~30 min.
 frame-work-probe:
 	cd agda && agda -i src -i probe probe/Frame-Work-Probe.agda
 

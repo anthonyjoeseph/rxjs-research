@@ -39,7 +39,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (InstEmit; InstEvent; value; init; close; handoff;
                            complete; ObservableInput; hot; Timed; after_,_)
 open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; input;
-                           ofᵉ; mergeAllᵉ; scanᵉ;
+                           ofᵉ; mergeAllᵉ; scanᵉ; μᵉ; deferᵉ; varᵉ;
                            varᵗ; nat̂; fstᵗ; strmᵗ; syncSizeᵉ)
 open import Rx.Evaluator using (evaluate; Slots; Slot; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
@@ -87,6 +87,12 @@ wrap1 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ [])))
 wrap2 : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
 wrap2 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ [])))
 
+-- THREE copies, to separate the tower's base from its height: k
+-- accumulator occurrences must widen the base by k and leave the height
+-- alone
+wrap3 : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrap3 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ accV ∷ [])))
+
 seed : ∀ {n} {Γ : Ctx n} → Tm Γ [] [] [] (obs natᵗ)
 seed = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
 
@@ -101,6 +107,9 @@ prog₀ = mergeAllᵉ (scanᵉ wrap1 seed src3)
 
 prog₁ : Closed Γ₀ natᵗ                    -- three folds, accₖ carries 2^k
 prog₁ = mergeAllᵉ (scanᵉ wrap2 seed src3)
+
+prog₁′ : Closed Γ₀ natᵗ                   -- three folds, accₖ carries 3^k
+prog₁′ = mergeAllᵉ (scanᵉ wrap3 seed src3)
 
 -- TWO syntactic levels: the inner run's payloads ARE the outer scan's
 -- folds.  This is the amplification test — if a fold count can ever be
@@ -121,6 +130,15 @@ _ = refl
 -- The exponent is the fold count, and the fold count is the literal
 -- list's length — syntax, with no store quantity anywhere in it
 _ : countVals (evaluate 20 prog₁ ins) ≡ 14
+_ = refl
+
+-- (1′) DUPLICATION WIDENS THE BASE, NOT THE HEIGHT.  Same three folds,
+-- three accumulator occurrences instead of two: 3 + 9 + 27 where prog₁
+-- gave 2 + 4 + 8.  The exponent — the accumulator's depth, and so the
+-- tower's height — is unmoved at 3; only the base went 2 ↦ 3, by the
+-- syntactic occurrence count.  This is the occs0 lesson in its
+-- quantitative form, and it is what a plug MULTIPLIER has to read
+_ : countVals (evaluate 20 prog₁′ ins) ≡ 39
 _ = refl
 
 -- (2) AND THE AMPLIFICATION.  A two-element literal, nested twice: the
@@ -204,6 +222,48 @@ _ : countVals (evaluate 40 progT ins₁) ≡ 14
 _ = refl
 
 ------------------------------------------------------------------
+-- CROSS-TICK FEEDBACK: THE HEIGHT IS INSTANT-FREE.  The sharpest test
+-- of the fixed-height shape, and the one that could have killed it.
+--
+-- μᵉ binds into Δᵍ and deferᵉ is the sole gate moving Δᵍ into Δ, so a
+-- self-reference NECESSARILY crosses a tick.  `ticker` is that loop: it
+-- emits one value now and reruns itself next tick, forever, with no
+-- scripted input at all.  Feeding it to the doubling wrap makes the
+-- accumulator deepen once per tick and then unwraps it, so the payload
+-- count reads the depth directly.
+--
+-- If a defer loop could compound depth — if instant k's ACCUMULATED
+-- state could drive instant k+1's fold count — the height would climb
+-- per instant and reachCap as shaped would be dead.  It cannot, and the
+-- reason is structural: unfoldμ substitutes the ORIGINAL closed μ for
+-- the Δᵍ variable, so the deferred self-reference re-subscribes a FRESH
+-- copy of the pipeline with a fresh accumulator.  State crosses a tick
+-- only as VALUES through the store, and each tick applies one fixed
+-- syntactic wrap.  μ recursion is syntactic re-subscription, not state
+-- feedback.
+--
+-- Measured, over three fuels: 14, 30, 62 — that is 2^(N+1) − 2, one
+-- extra wrap per tick and nothing more.  A single exponential in the
+-- instant count; the tower's height never moves.
+------------------------------------------------------------------
+
+ticker : Closed Γ₀ natᵗ
+ticker = μᵉ (mergeAllᵉ (ofᵉ ( strmᵗ (ofᵉ (nat̂ 1 ∷ []))
+                            ∷ strmᵗ (deferᵉ (varᵉ (here refl))) ∷ [])))
+
+feedback : Closed Γ₀ natᵗ
+feedback = mergeAllᵉ (scanᵉ wrap2 seed ticker)
+
+_ : countVals (evaluate 2 feedback ins) ≡ 14
+_ = refl
+
+_ : countVals (evaluate 3 feedback ins) ≡ 30
+_ = refl
+
+_ : countVals (evaluate 4 feedback ins) ≡ 62
+_ = refl
+
+------------------------------------------------------------------
 -- WHAT THIS PROBE DOES NOT SHOW, stated so it is not over-read: that
 -- NO program anywhere has store-driven frame work.  Three structural
 -- facts carry that, and all three are read off Rx/Exp.agda's datatype
@@ -220,6 +280,14 @@ _ = refl
 --     only constructor moving Δᵍ into Δ — and it crosses a tick.  A
 --     frame cannot re-enter its own μ, which is why the counts above
 --     terminate in the syntax instead of running away.
+--
+--   · CROSS-CHAIN COMPOSITION PAST ONE CROSSING.  prog₂ measures ONE
+--     chain embedded in another and the height goes up by exactly one,
+--     which is what "heights add" predicts.  A second crossing would
+--     deliver on the order of 2^126 payloads and does not normalise, so
+--     additivity is measured at one crossing and asserted beyond it.
+--     That gap is real and should be closed by the induction, not by a
+--     bigger probe.
 --
 --   · SHARE RE-ENTRY IS U-CAPPED.  A second arrival at a slot finds it
 --     connected and does not re-walk the def (the connect descent,
