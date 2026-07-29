@@ -31,16 +31,17 @@ module Frame-Work-Probe where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_)
 open import Data.List using (List; []; _∷_; sum; map)
-open import Data.Vec  using () renaming ([] to []ᵛ)
+open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
+open import Data.Fin  using (Fin) renaming (zero to fz)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (InstEmit; InstEvent; value; init; close; handoff;
-                           complete)
-open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
+                           complete; ObservableInput; hot; Timed; after_,_)
+open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; input;
                            ofᵉ; mergeAllᵉ; scanᵉ;
                            varᵗ; nat̂; fstᵗ; strmᵗ; syncSizeᵉ)
-open import Rx.Evaluator using (evaluate; Slots)
+open import Rx.Evaluator using (evaluate; Slots; Slot; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Verify-Budget-Sufficient using (ofWᵉ)
 
@@ -72,21 +73,21 @@ ins ()
 
 -- a scan's bound variable is the PAIR (acc , x); the accumulator is
 -- its first projection
-accV : Tm Γ₀ [] [] (obs natᵗ ×ᵗ natᵗ ∷ []) (obs natᵗ)
+accV : ∀ {n} {Γ : Ctx n} → Tm Γ [] [] (obs natᵗ ×ᵗ natᵗ ∷ []) (obs natᵗ)
 accV = fstᵗ (varᵗ (here refl))
 
 -- ONE copy: acc ↦ mergeAll (of [acc]).  Each fold adds exactly one hop
 -- edge and no width, so the payload count reads the FOLD COUNT
-wrap1 : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrap1 : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
 wrap1 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ [])))
 
 -- TWO copies: acc ↦ mergeAll (of [acc, acc]).  Each fold adds one hop
 -- edge and DOUBLES the emissions, so the payload count reads the
 -- accumulator's DEPTH off the run
-wrap2 : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrap2 : ∀ {n} {Γ : Ctx n} → Fn Γ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
 wrap2 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ [])))
 
-seed : Tm Γ₀ [] [] [] (obs natᵗ)
+seed : ∀ {n} {Γ : Ctx n} → Tm Γ [] [] [] (obs natᵗ)
 seed = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
 
 src2 : Closed Γ₀ natᵗ
@@ -164,6 +165,42 @@ _ : hopDᵉ 1 prog₁ ≡ 4
 _ = refl
 
 _ : hopDᵉ 2 prog₁ ≡ 10
+_ = refl
+
+------------------------------------------------------------------
+-- ACROSS INSTANTS: THE HEIGHT IS FIXED BY THE SYNTAX.  This is the
+-- fact reachCap needs, and it is the one that says there is room.
+--
+-- A scan accumulator persists, so it keeps deepening for the whole run,
+-- and the obvious worry is that it towers once per instant — which is
+-- what sizeBudgetAt assumes (its height is (4 + sz)·(1 + id), growing
+-- with the instant).  It does not.  One scan folds once per arrival, so
+-- its accumulator gains exactly ONE wrap per instant: depth linear in
+-- the instant count, base of a single exponential.
+--
+-- What DOES tower is syntactic nesting — prog₂ above, where one extra
+-- *All level takes 6 payloads to 126.  So a reachable observable's size
+-- is a tower whose HEIGHT is the program's scan/*All chain depth and
+-- whose BASE grows linearly in the instant count.  sizeBudgetAt's
+-- height grows per instant; this does not.  That gap is the headroom
+-- round 3's reset caps have to live in.
+------------------------------------------------------------------
+
+Γ₁ : Ctx 1
+Γ₁ = natᵗ ∷ᵛ []ᵛ
+
+-- three arrivals, one instant apart
+ins₁ : Slots Γ₁
+ins₁ fz = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ (after 0 , 3) ∷ []))
+
+progT : Closed Γ₁ natᵗ
+progT = mergeAllᵉ (scanᵉ wrap2 seed (input fz))
+
+-- 2 + 4 + 8, one fold per instant — the SAME total as prog₁'s three
+-- synchronous folds.  Spreading the folds across instants buys the
+-- accumulator no extra depth, so instants add linearly where syntax
+-- multiplies
+_ : countVals (evaluate 40 progT ins₁) ≡ 14
 _ = refl
 
 ------------------------------------------------------------------
