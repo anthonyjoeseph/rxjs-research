@@ -1458,24 +1458,38 @@ hopR : ℕ → ℕ
 hopR V = (2 + V) ^ (suc V ^ suc V)
 
 postulate
-  -- (P1) hopD is bounded by SIZE, at the shape the clause recursion
-  -- gives.  The exponent is V′^s, not V′·s, and that is forced: the
-  -- coefficient is a MULTIPLIER (pm), not an occurrence count, so it is
-  -- not bounded by s.  pm's own scanᵉ clause is (2 + pm f)^V, which
-  -- means each nesting level of scanᵉ raises the exponent by a FACTOR
-  -- of V rather than adding one — d nested scans give V^d.  With d ≤ s
-  -- that is V′^s.  Under the retired occurrence count the coefficient
-  -- WAS ≤ s and the bound was (2+s)^(V′·s); that statement is false for
-  -- pm and has been retracted rather than left standing.
+  -- (P1) hopD is bounded by SIZE.  The exponent is V′^s, not V′·s, and
+  -- that is forced: the coefficient is a MULTIPLIER (pm), not an
+  -- occurrence count, so it is not bounded by s.  pm's own scanᵉ clause
+  -- is (2 + pm f)^V, so each nesting level of scanᵉ raises the exponent
+  -- by a FACTOR of V rather than adding one — d nested scans give V^d.
+  -- With d ≤ s that is V′^s.  Under the retired occurrence count the
+  -- coefficient WAS ≤ s and the bound was (2+s)^(V′·s); that statement
+  -- is false for pm and has been retracted rather than left standing.
   --
-  -- Induction on e, one ≤-chain per clause, all with slack, and the
-  -- same statement for pm (which the mapᵉ/scanᵉ clauses read):
-  --   mapᵉ    P(s₁) + (P(s₁)+1)·P(s₂)     ≤ P(s)   via V′^s₁+V′^s₂ ≤ V′^(s-1)
-  --   scanᵉ   (2+P(s₁))^V · 3·P(s-1)      ≤ P(s)   via V·V′^s₁ ≤ V′^(s₁+1)
-  --   *Allᵉ   suc (P(s-1))                ≤ P(s)
-  -- where P(s) = (2+s)^(V′^s), V′ = suc V, s = sizeᵉ e.  Nothing here is
-  -- tight; the statement is deliberately loose so every clause closes by
-  -- ^-monoˡ/ʳ-≤ without arithmetic identities.
+  -- WHAT THE INDUCTION NEEDS, worked out 2026-07-29 and written down
+  -- because the shape is not the obvious one.  The statement must be
+  -- JOINT — the same bound for pm, since hopD's clauses read pm for
+  -- their coefficients — and then, with P(s) = (2+s)^(V′^s):
+  --
+  --   mapᵉ    P(s₁) + P(s₁)·P(s₂)      ≤ P(s)   via 3·V′^(s-1) ≤ V′^s
+  --   *Allᵉ   suc (P(s-1))             ≤ P(s)
+  --   ofᵉ/⊔   each child under P of the whole, by monotonicity
+  --   scanᵉ   (2 + P(s₁))^V · 3·P(s-1) ≤ P(s)
+  --
+  -- The scanᵉ clause is the one with a trap.  Bounding (2+B)^V by B^(2V)
+  -- — the obvious move — is too lossy: it wants 2V+2 ≤ V′, the induction
+  -- does not close, and it reads at first like the STATEMENT being
+  -- false.  It is not.  The slack is in the CHILD SIZES: a scanᵉ has
+  -- three children each of size ≥ 1, so the step function's own size is
+  -- s₁ ≤ s-3 and its bound's exponent is V′^(s-3) — a factor V′² below
+  -- the clause's budget.  That is what pays for the (2+·)^V and the
+  -- constant 3.  A proof that does not track WHICH child's size it is
+  -- using will appear to fail.
+  --
+  -- Nothing here is tight, and V is a tower, so the side conditions
+  -- (V ≥ 2, sizes ≥ 1) are free at every call site — hopD-cap's premise
+  -- sizeᵉ e ≤ V already gives V ≥ 1, since every expression has size ≥ 1.
   hopD-size : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
     hopDᵉ V e ≤ (2 + sizeᵉ e) ^ (suc V ^ sizeᵉ e)
 
