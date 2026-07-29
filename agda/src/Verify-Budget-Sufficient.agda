@@ -50,12 +50,16 @@
 --                       child's anchor exceeds the parent's d, and the
 --                       child's demand exceeds it in turn.
 --
--- ROUND 3 IS NOW THE FACE (walk-hyps-round3 + the restated
--- subscribeE-walk).  ONE shared entry-determined anchor, anchorᴬ, in
--- all three roles; walkCap indexed by a d-free work index G; the hop
--- component measured at an anchor-free F that is threaded UNCHANGED
--- into the hop child, so parent and child finally read the same index.
--- The hop edge that killed round 2 is now dBound-hop verbatim.
+-- ROUND 3 IS NOW THE FACE (walk-hyps-round3b + the restated
+-- subscribeE-walk), and it COLLAPSED to a single measure on the way in.
+-- Anthony's DAG carried a work index G and a separate fuel demand d;
+-- both turned out to need the same reset caps at a hop edge, so they
+-- stand or fall together and are now one number.  G is the fuel budget,
+-- the descent order, and walkCap's index at once, with every cap in it
+-- — the s′ reset Ŝ, the r reset R̂, the hop index F — fixed at ENTRY
+-- rather than at the ledger.  F is threaded UNCHANGED into the hop
+-- child, so parent and child finally read the same index, and the hop
+-- edge that killed round 2 is dBound-hop verbatim.
 --
 -- Two further hypotheses had to move, each forced by its own
 -- machine-checked absurdity rather than by taste:
@@ -65,25 +69,27 @@
 --   · round3-anchor-indexed-absurd — the work index may not be measured
 --     at the anchor, which is what forces `r` off hopDᵉ's V-index.
 --
--- ONE NEW POSTULATE, walkWorkᵉ: the work index's measure.  It is
--- postulated, not defined, because it is the round's most uncertain
--- piece and the assembly has to exist first.  agda/probe/
--- Frame-Work-Probe.agda measures what it has to be — the fold count is
--- the source's per-frame payload count, so it IS entry-determined, and
--- it is an iterated exponential in the nesting depth, so it is a tower
--- and must not be written as anything shaped like `3 + Ω`.
+-- NO NEW POSTULATE.  The work index is not a new measure at all — it
+-- is dBound at entry caps, so Ŝ, R̂ and F are ordinary ℕ parameters
+-- carried like Ψ, Ω and ℓ.  What they cost instead is ONE semantic
+-- debt, named by round3b-ledger-reset-absurd: the caps may not be the
+-- ledger.  There has to be an entry-determined bound on the size of an
+-- observable a run can REACH, or the measure re-anchors at capᴱ and
+-- dies as rounds 1 and 2 did.  agda/probe/Frame-Work-Probe.agda is the
+-- evidence such a bound exists — the fold count is the source's
+-- per-frame payload count, which bottoms out in ofᵉ list lengths — and
+-- also the warning about its size: it is an iterated exponential in the
+-- nesting depth, so it is a tower and must not be written as anything
+-- shaped like `3 + Ω`.
 --
--- FOUR POSTULATES REMAIN — three faces and one measure.  The two real
--- cores are subscribeE-wet and
+-- THREE POSTULATES REMAIN.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
 -- decrement edges each consume one hasAtLeast-peel against
 -- dBound-μ/-hop/-connect; everything between is structural), and the
 -- fold's threading invariant (see cascadeGo-wet's memo).  The third is
 -- subscribeE-walk, the joint wet/dry/length face they are stated
--- against.  The fourth is walkWorkᵉ, round 3's work measure — the next
--- piece to define, and the only one that is not a face.
--- PROVEN 2026-07-29: hopD-size (the hop measure is now
+-- against.  PROVEN 2026-07-29: hopD-size (the hop measure is now
 -- derived end to end), and the walk's two bookkeeping companions
 -- subscribeE-slots and subscribeE-connected-mono — one joint `Keeps`
 -- induction over subscribeE's whole clique.  SPLICED: Verify-Well-Formed imports
@@ -6156,7 +6162,7 @@ walkCap Ω ℓ d = ((3 + Ω) * suc ℓ) ^ (3 ^ d)
 
 ------------------------------------------------------------------
 -- ROUND 3's VOCABULARY (2026-07-29): one shared anchor, one d-free
--- work index.  See the round-3 memo below walk-hyps-round3.
+-- work index.  See the round-3 memo below walk-hyps-round3b.
 ------------------------------------------------------------------
 
 -- THE ANCHOR — ONE object in all three roles the face needs: the
@@ -6168,36 +6174,6 @@ walkCap Ω ℓ d = ((3 + Ω) * suc ℓ) ^ (3 ^ d)
 anchorᴬ : (Ψ W Ω ℓ G E : ℕ) → ℕ
 anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 
-postulate
-  -- THE WORK INDEX's measure.  An entry-determined, ANCHOR-FREE upper
-  -- bound on the work a subscribe frame rooted at `b` can still do —
-  -- what walkCap is indexed by and what the length ledger is paid out
-  -- of.  Postulated rather than defined because it is this round's most
-  -- uncertain piece and the assembly has to exist first (the outside-in
-  -- rule); defining it ahead of the face would be speculative
-  -- inventory of exactly the kind that rule forbids.
-  --
-  -- Two things are already known about what it must be, both measured
-  -- in agda/probe/Frame-Work-Probe.agda rather than assumed:
-  --
-  --   · IT IS DRIVEN BY THE FOLD COUNT, and a scan's fold count is its
-  --     source's per-frame payload count — which for a literal source
-  --     is the ofᵉ list's length.  That is what makes it entry-
-  --     determined at all, and it is the whole reason round 3 exists.
-  --
-  --   · IT IS AN ITERATED EXPONENTIAL in the syntactic nesting depth,
-  --     not a polynomial in the syntax.  Each *All level multiplies the
-  --     payload count by the emitted observables' own width: two levels
-  --     take a 2-wide program to 126 payloads in ONE frame.  So do not
-  --     write it as anything shaped like `3 + Ω` — Ω is a per-NODE
-  --     width, and om-is-not-a-frame-budget is the counterexample.
-  --
-  -- It will need the same plug-multiplier discipline hopD needed (pm),
-  -- and for the same reason: a template may use its bound variable more
-  -- than once, so a coefficient here is a slope, not a count.  hopD
-  -- took three machine-checked refutations to get that right; this
-  -- measure is not going to be guessed in passing.
-  walkWorkᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
 
 ------------------------------------------------------------------
 -- THE JOINT WALK FACE (2026-07-24): wet half, dry half, and the
@@ -6254,33 +6230,34 @@ postulate
   -- which is exactly the failure mode of rounds 1 and 2, removed at the
   -- level of the statement instead of patched at the level of a bound.
   --
-  -- walk-hyps-round3 discharges every edge of this shape for arbitrary
-  -- entry data.  What it does NOT establish, and what walkWorkᵉ is
-  -- postulated for, is that an entry-determined index really bounds the
-  -- frame work — measured, not proven, in Frame-Work-Probe.
+  -- walk-hyps-round3b discharges every edge of this shape for arbitrary
+  -- entry data.  What it does NOT establish — and what
+  -- round3b-ledger-reset-absurd names as the price — is that Ŝ, R̂ and F
+  -- can be sourced from REACHABILITY rather than from the ledger.
+  -- Frame-Work-Probe is the evidence, not a proof.
   subscribeE-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ W Ω ℓ F G : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) (E d : ℕ) →
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
     3 ≤ E →
     INV? Ψ (capᴱ W E) sched st ≡ true →
     sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
-    -- the work index: entry-determined and anchor-free
-    walkWorkᵉ b ≤ G →
-    -- the demand.  Multipliers and reset bounds at the ONE shared
-    -- anchor; the hop component at the anchor-free F
-    dBound (anchorᴬ Ψ W Ω ℓ G E) (hopR (anchorᴬ Ψ W Ω ℓ G E))
-           (unconn (Sched.slots sched) (EvalSt.connectedShares st))
-           (hopDᵉ F b) (syncSizeᵉ b) ≤ d →
-    g hasAtLeast suc d →
+    -- THE ONE MEASURE.  Same flattening the demand always had, but every
+    -- cap in it — the s′ reset Ŝ, the r reset R̂, the hop index F — is
+    -- fixed at ENTRY instead of at the ledger.  It is the fuel budget,
+    -- the descent order, and walkCap's index at once
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
     -- d-free: refuted in its old form by round3-old-ell-absurd
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     let r = subscribeE g b κ id now sched st
     in Σ ℕ λ E′ → (E ≤ E′)
-       -- the ceiling, and it is anchorᴬ's own argument by construction
+       -- the ceiling: this is anchorᴬ Ψ W Ω ℓ G E's own argument, so the
+       -- store ceiling and the receipt are one object rather than two
        × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
@@ -6503,10 +6480,10 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- demand anchor, the s′ reset bound at hop edges, and the receipt's
 -- ceiling.  It can be, precisely because walkCap's index is now G and
 -- not d, so nothing to the right of the arrow feeds anything left of
--- it.  walk-hyps-round3's TYPE is that order: G, ℓ, p, U, r, s are
+-- it.  walk-hyps-round3b's TYPE is that order: Ŝ, R̂, U, r, s are
 -- universally quantified — fixed before anything store-shaped exists —
--- and A, d are existentially produced from them.  A statement of that
--- shape cannot hide a cycle.
+-- and G is existentially produced from them, ℓ from G.  A statement of
+-- that shape cannot hide a cycle.
 --
 -- WHY IT IS NOT TRIVIALLY TRUE, since "pick d enormous" is exactly
 -- what round 2 could not do: there the hop child re-anchored at
@@ -6561,41 +6538,67 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- level exponentiates it, so G is an iterated exponential in the
 -- nesting depth rather than a polynomial in the syntax.  That does not
 -- threaten anything above — anchorᴬ is DEFINED from G and dwarfs it at
--- any size — but it is what walkWorkᵉ has to be written as.
+-- any size — but it is what the entry caps have to be written as.
 ------------------------------------------------------------------
 
--- the DAG, satisfiable, with every edge of the walk discharged
-walk-hyps-round3 : ∀ (Ψ W Ω E G p U r s : ℕ) →
-  Σ ℕ λ A → Σ ℕ λ d →
-      -- (0) shared anchor and receipt ceiling are ONE expression
-      (A ≡ anchorᴬ Ψ W Ω (p + G) G E)
-      -- (1) the ceiling, at that anchor
-    × (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)) ≤ A)
-      -- (2) the demand, at that SAME anchor
-    × (dBound A (hopR A) U r s ≤ d)
-      -- (3) the restated, d-free length hypothesis at entry
+-- THE DAG, satisfiable, with every edge of the walk discharged — and
+-- COLLAPSED: d and G turned out to need the SAME reset caps, so they are
+-- one measure, not two.  The quantifier order is the acyclicity claim:
+-- Ŝ, R̂, U, r, s are entry data, G is produced from them, ℓ from G.
+walk-hyps-round3b : ∀ (Ψ W Ω E p Ŝ R̂ U r s : ℕ) →
+  Σ ℕ λ G →
+      -- (1) the one measure, at ENTRY caps rather than at the ledger
+      (dBound Ŝ R̂ U r s ≤ G)
+      -- (2) the d-free length hypothesis at entry
     × (p + G ≤ p + G)
-      -- (4) THE HOP EDGE — where round 2 died
-    × (∀ r″ s″ → r″ < r → s″ ≤ A → suc (dBound A (hopR A) U r″ s″) ≤ d)
+      -- (3) the ledger ceiling anchorᴬ induces is the receipt's own
+      --     argument — one object, not two constrained to agree
+    × (anchorᴬ Ψ W Ω (p + G) G E
+         ≡ capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)))
+      -- (4) THE HOP EDGE — where round 2 died.  dBound-hop verbatim
+    × (∀ r″ s″ → r″ < r → s″ ≤ Ŝ → suc (dBound Ŝ R̂ U r″ s″) ≤ G)
       -- (5) the connect edge
-    × (∀ U″ r″ s″ → U″ < U → r″ ≤ hopR A → s″ ≤ A →
-         suc (dBound A (hopR A) U″ r″ s″) ≤ d)
+    × (∀ U″ r″ s″ → U″ < U → r″ ≤ R̂ → s″ ≤ Ŝ →
+         suc (dBound Ŝ R̂ U″ r″ s″) ≤ G)
       -- (6) the μ edge
-    × (∀ s″ → s″ < s → suc (dBound A (hopR A) U r s″) ≤ d)
-      -- (7) a frame crossing preserves (3), with no reference to d
+    × (∀ s″ → s″ < s → suc (dBound Ŝ R̂ U r s″) ≤ G)
+      -- (7) a frame crossing preserves (2), with no reference to a demand
     × (∀ q G′ → q + suc G′ ≤ p + G → suc q + G′ ≤ p + G)
-walk-hyps-round3 Ψ W Ω E G p U r s =
-    A , dBound A (hopR A) U r s
-  , refl , ≤-refl , ≤-refl , ≤-refl
-  , (λ r″ s″ r″<r s″≤A →
-       dBound-hop {A} {hopR A} {U} {r″} {r} {s″} {s} r″<r s″≤A)
-  , (λ U″ r″ s″ U″<U r″≤R s″≤A →
-       dBound-connect {A} {hopR A} {U″} {U} {r″} {r} {s″} {s} U″<U r″≤R s″≤A)
-  , (λ s″ s″<s → dBound-μ {A} {hopR A} {U} {r} {s″} {s} s″<s)
+walk-hyps-round3b Ψ W Ω E p Ŝ R̂ U r s =
+    dBound Ŝ R̂ U r s
+  , ≤-refl , ≤-refl , refl
+  , (λ r″ s″ r″<r s″≤Ŝ → dBound-hop {Ŝ} {R̂} {U} {r″} {r} {s″} {s} r″<r s″≤Ŝ)
+  , (λ U″ r″ s″ U″<U r″≤R̂ s″≤Ŝ →
+       dBound-connect {Ŝ} {R̂} {U″} {U} {r″} {r} {s″} {s} U″<U r″≤R̂ s″≤Ŝ)
+  , (λ s″ s″<s → dBound-μ {Ŝ} {R̂} {U} {r} {s″} {s} s″<s)
   , (λ q G′ h → ≤-trans (≤-reflexive (sym (+-suc q G′))) h)
+
+-- (c) AND THE PRICE OF THE COLLAPSE, which is the round's whole
+-- remaining debt: the reset caps may not be the LEDGER.  If the only
+-- available bound on a hop child's syncSize is the store ceiling — that
+-- is, if there is no entry-determined cap on the size of an observable a
+-- run can reach — then the one measure is anchored at capᴱ again and
+-- dies exactly as rounds 1 and 2 did.  So Ŝ and R̂ have to come from
+-- reachability, not from the ledger, and that is a semantic fact about
+-- the machine rather than an arithmetic one
+round3b-ledger-reset-absurd : ∀ (Ψ W Ω E p U r s G : ℕ) → 3 ≤ E →
+  1 ≤ r + suc (hopR (anchorᴬ Ψ W Ω (p + G) G E)) * U →
+  dBound (anchorᴬ Ψ W Ω (p + G) G E)
+         (hopR (anchorᴬ Ψ W Ω (p + G) G E)) U r s ≤ G →
+  ⊥
+round3b-ledger-reset-absurd Ψ W Ω E p U r s G 3≤E 1≤ dem =
+  <-irrefl refl (<-≤-trans X<A (≤-trans (≤-trans (n≤1+n A) A<G) G≤X))
   where
+  X : ℕ
+  X = E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)
   A : ℕ
-  A = anchorᴬ Ψ W Ω (p + G) G E
+  A = capᴱ W X
+  X<A : X < A
+  X<A = ≤-trans (n<2^n X) (^-monoˡ-≤ X (s≤s (s≤s z≤n)))
+  A<G : A < G
+  A<G = sucV≤d A (hopR A) U r s G 1≤ dem
+  G≤X : G ≤ X
+  G≤X = d≤walkArg Ψ Ω (p + G) G E 3≤E
 
 -- (a) the OLD length hypothesis, under the shared anchor: still absurd
 round3-old-ell-absurd : ∀ (Ψ W Ω ℓ E G p U r s d : ℕ) → 3 ≤ E →
