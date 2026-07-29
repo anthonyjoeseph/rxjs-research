@@ -29,7 +29,8 @@
 ------------------------------------------------------------------
 module Frame-Work-Probe where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _≤ᵇ_)
+open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_; sum; map)
 open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Fin  using (Fin) renaming (zero to fz)
@@ -43,6 +44,7 @@ open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; input;
                            varᵗ; nat̂; fstᵗ; strmᵗ; syncSizeᵉ)
 open import Rx.Evaluator using (evaluate; Slots; Slot; scripted; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Frame-Width using (outWᵉ)
 open import Verify-Budget-Sufficient using (ofWᵉ)
 
 ------------------------------------------------------------------
@@ -307,6 +309,40 @@ _ : countVals (evaluate 20 progₙ insₛ) ≡ 6
 _ = refl
 
 _ : countVals (evaluate 20 progₛ₂ insₛ) ≡ 6
+_ = refl
+
+------------------------------------------------------------------
+-- THE GATE: Rx.Frame-Width's measures must DOMINATE every run above.
+--
+-- This is what keeps the measure honest.  outWᵉ is pure syntax — it
+-- never looks at the store — so each of these is instant to check, and
+-- a draft that under-counts any measured run is refuted on the spot.
+-- The plug slopes got their shape from exactly this: a single-slope
+-- draft cannot even state the *All clause, and an occurrence count
+-- under-counts the duplication case.
+------------------------------------------------------------------
+
+_ : (3   ≤ᵇ outWᵉ 2 ins prog₀)  ≡ true
+_ = refl
+
+_ : (14  ≤ᵇ outWᵉ 2 ins prog₁)  ≡ true
+_ = refl
+
+_ : (39  ≤ᵇ outWᵉ 2 ins prog₁′) ≡ true
+_ = refl
+
+_ : (126 ≤ᵇ outWᵉ 2 ins prog₂)  ≡ true
+_ = refl
+
+-- and through a share, where `input` is not structural and the measure
+-- spends slot fuel instead
+_ : (6 ≤ᵇ outWᵉ 2 insₛ progₛ)  ≡ true
+_ = refl
+
+_ : (6 ≤ᵇ outWᵉ 2 insₛ progₙ)  ≡ true
+_ = refl
+
+_ : (6 ≤ᵇ outWᵉ 2 insₛ progₛ₂) ≡ true
 _ = refl
 
 ------------------------------------------------------------------

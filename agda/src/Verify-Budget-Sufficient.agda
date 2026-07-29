@@ -82,10 +82,11 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- SIX POSTULATES REMAIN — three faces, and a three-part reachability
--- cluster (reachCap, 2≤reachCap, reach-covers) that is round 3's only
--- outstanding debt and the answer round3b-ledger-reset-absurd demands.
--- The two real cores are subscribeE-wet and
+-- FOUR POSTULATES REMAIN — three faces, plus reach-covers, which is
+-- round 3's only outstanding debt and the answer
+-- round3b-ledger-reset-absurd demands.  reachCap itself is DEFINED, out
+-- of Rx.Frame-Width's syntactic frame-width measures, and 2≤reachCap is
+-- proven from it.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
 -- decrement edges each consume one hasAtLeast-peel against
@@ -94,7 +95,8 @@
 -- subscribeE-walk, the joint wet/dry/length face they are stated
 -- against.  The reachability cluster is what supplies its three entry
 -- caps Ŝ, R̂, F — one measure in three roles, so F cannot drift to an
--- unaudited source (reach-resets, PROVEN, is that wiring).
+-- unaudited source (reach-resets, PROVEN, is that wiring), and reachCap
+-- is now a definition rather than a hole.
 -- PROVEN 2026-07-29: hopD-size (the hop measure is now
 -- derived end to end), and the walk's two bookkeeping companions
 -- subscribeE-slots and subscribeE-connected-mono — one joint `Keeps`
@@ -178,6 +180,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
+open import Rx.Frame-Width using (outWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
@@ -6700,28 +6703,54 @@ round3-anchor-indexed-absurd Ψ W Ω ℓ E G 3≤E h =
 -- a simplification worth taking deliberately rather than discovering.
 ------------------------------------------------------------------
 
+-- THE FOLD BUDGET: how many times any scan in the run can fold up to
+-- instant `id`.  Per frame it is the frame's payload count; across
+-- instants the folds simply ADD, which is what the cross-instant
+-- measurement says — progT's three instants buy the accumulator exactly
+-- the depth prog₁'s three synchronous folds do, and no more
+foldBudget : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → ℕ
+foldBudget {n = n} e sl id = suc id * outWᵉ n sl e
+
+-- THE REACH CAP, DEFINED.  Each fold scales a stored observable by at
+-- most the program's own syntax, so the size after k folds is a single
+-- exponential with the syntax as base and the fold budget as exponent.
+-- HEIGHT FIXED BY THE SYNTAX — it sits inside outWᵉ, which towers on the
+-- *All nesting depth — and BASE LINEAR IN THE INSTANT COUNT.  That is
+-- exactly the shape Frame-Work-Probe measured, and it is the shape a
+-- per-frame induction can preserve: an invariant whose height climbed
+-- each instant would demand the next tower level at every frame
+-- crossing.
+--
+-- Ω IS NOT AN ARGUMENT, deliberately.  om-is-not-a-frame-budget: Ω is a
+-- per-node width and a frame's total is Ω-to-the-depth, so a cap built
+-- out of Ω would be off by an iterated exponential.  outWᵉ computes the
+-- depth itself, and Ω has nothing left to contribute.
+reachCap : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → ℕ
+reachCap e sl id = (2 + sizeᵉ e + slotsSize sl) ^ suc (foldBudget e sl id)
+
+-- ≥ 2, so the hop machinery's side condition stays free at every call
+-- site exactly as it does for the store bound
+2≤reachCap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 ≤ reachCap e sl id
+2≤reachCap e sl id =
+  ≤-trans (s≤s (s≤s z≤n))
+          (x≤x^ (suc (sizeᵉ e + slotsSize sl)) (suc (foldBudget e sl id))
+                (s≤s z≤n))
+
 postulate
-  -- the measure itself: still to be defined, and the round's last piece
-  reachCap : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (Ω id : ℕ) → ℕ
-
-  -- ≥ 2, so the hop machinery's side condition stays free at every call
-  -- site exactly as it does for the store bound
-  2≤reachCap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (Ω id : ℕ) → 2 ≤ reachCap e sl Ω id
-
-  -- THE FACE.  Stated at the predicate the ledger already uses, so
-  -- nothing new is defined: only the CAP changes, from capᴱ — which is
-  -- walkCap-indexed, hence circular — to reachCap, which is not
+  -- THE FACE, and now the ONLY postulate in the cluster.  Stated at the
+  -- predicate the ledger already uses, so nothing new is defined: only
+  -- the CAP changes, from capᴱ — which is walkCap-indexed, hence
+  -- circular — to reachCap, which is not
   reach-covers : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ Ω id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (Ψ id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    INV? Ψ (reachCap e (Sched.slots sched) Ω id) sched st ≡ true →
-    sizeᵉ b ≤ reachCap e (Sched.slots sched) Ω id → fnCapᵉ b ≤ Ψ →
-    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω →
+    INV? Ψ (reachCap e (Sched.slots sched) id) sched st ≡ true →
+    sizeᵉ b ≤ reachCap e (Sched.slots sched) id → fnCapᵉ b ≤ Ψ →
     let r = subscribeE g b κ bid now sched st
-    in (INV? Ψ (reachCap e (Sched.slots sched) Ω id)
+    in (INV? Ψ (reachCap e (Sched.slots sched) id)
           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (reachCap e (Sched.slots sched) Ω id) Ψ (proj₁ r) ≡ true)
+       × (burstB? (reachCap e (Sched.slots sched) id) Ψ (proj₁ r) ≡ true)
 
 -- THE WIRING, proven rather than postulated: a value inside the cap
 -- discharges BOTH of the walk's reset obligations at once.  This is what
