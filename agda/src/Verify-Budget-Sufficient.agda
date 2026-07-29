@@ -25,14 +25,30 @@
 -- mono), sync-linearity (plugs-len/occs/inner-len-subΘ), the seed
 -- inequality (prod≤3pow/seed-covers — the tower dominance
 -- arithmetic at instant 0, discharging the burst cores from the
--- contract), cascade-dry, drain-dry, and the theorem.  Two
--- postulated cores remain — subscribeE-wet, cascadeGo-wet — the
--- real termination content: fuel-accounting induction over the
--- subscription machine's clauses (the three decrement edges each
--- consume one hasAtLeast-peel against dBound-μ/-hop/-connect;
--- everything between is structural), and the fold's threading
--- invariant (see cascadeGo-wet's memo).  SPLICED: Verify-Well-Formed
--- imports budget-sufficient from here instead of postulating it.
+-- contract), cascade-dry, drain-dry, and the theorem.
+--
+-- AND THE HOP MEASURE, in full (2026-07-27..29).  dBound's `r` is
+-- hopD, a remaining-hop count; the emitted-value invariant the *All
+-- clause consumes — every value a burst carries is no deeper than what
+-- was subscribed — is proven end to end, with no postulate in its
+-- chain: pm-subΘ, hopD-subΘᵉ/ᵗ/ᵗˢ (hopD is AFFINE in a substituted
+-- value's depth), hopD-evalWith, hopD-applyFn, hopD-map-emit.  Getting
+-- the measure's coefficient right took three machine-checked
+-- refutations; see the hop-descent memo below and
+-- agda/probe/Hop-Descent-Probe.agda.
+--
+-- SIX POSTULATES REMAIN.  The two real cores are subscribeE-wet and
+-- cascadeGo-wet — the termination content proper: fuel-accounting
+-- induction over the subscription machine's clauses (the three
+-- decrement edges each consume one hasAtLeast-peel against
+-- dBound-μ/-hop/-connect; everything between is structural), and the
+-- fold's threading invariant (see cascadeGo-wet's memo).  Then
+-- subscribeE-walk (the joint wet/dry/length face they are stated
+-- against) with its two bookkeeping companions subscribeE-slots and
+-- subscribeE-connected-mono, and hopD-size — a size bound on hopD that
+-- is pure ℕ-and-^ arithmetic, the last piece of the hop measure that
+-- is asserted rather than derived.  SPLICED: Verify-Well-Formed imports
+-- budget-sufficient from here instead of postulating it.
 module Verify-Budget-Sufficient where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
