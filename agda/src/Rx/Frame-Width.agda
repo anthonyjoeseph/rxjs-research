@@ -60,6 +60,8 @@ module Rx.Frame-Width where
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≡ᵇ_)
 open import Data.Bool using (if_then_else_)
 open import Data.List using (List; []; _∷_; length)
+open import Data.Product using (_,_)
+open import Data.Sum using (inj₁; inj₂)
 
 open import Rx.Exp
 open import Rx.Evaluator using (Slots; Slot; scripted; shared)
@@ -200,3 +202,14 @@ mutual
   innWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
   innWᵗˢ j sl []       = 0
   innWᵗˢ j sl (y ∷ ys) = innWᵗ j sl y ⊔ innWᵗˢ j sl ys
+
+-- the frame width of a runtime VALUE: an embedded observable carries its
+-- expression's, a ground payload carries none.  Mirrors ofWᵛ/hopDᵛ
+outWᵛ : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty) → Val Γ t → ℕ
+outWᵛ j sl unitᵗ    _        = 0
+outWᵛ j sl boolᵗ    _        = 0
+outWᵛ j sl natᵗ     _        = 0
+outWᵛ j sl (s ×ᵗ t) (a , b)  = outWᵛ j sl s a ⊔ outWᵛ j sl t b
+outWᵛ j sl (s +ᵗ t) (inj₁ a) = outWᵛ j sl s a
+outWᵛ j sl (s +ᵗ t) (inj₂ b) = outWᵛ j sl t b
+outWᵛ j sl (obs t)  e        = outWᵉ j sl e

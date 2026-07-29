@@ -29,7 +29,7 @@
 ------------------------------------------------------------------
 module Frame-Work-Probe where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _≤ᵇ_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _^_; _≤ᵇ_)
 open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_; sum; map)
 open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
@@ -421,6 +421,36 @@ _ : countVals (evaluate 40 progDT insD₁) ≡ 2
 _ = refl
 
 _ : countVals (evaluate 40 progDT insD₂) ≡ 8
+_ = refl
+
+------------------------------------------------------------------
+-- THE ROUND-4 RECURRENCE STEP, GATED BEFORE IT IS BUILT.
+--
+-- The replacement shape defines the caps by recursion on the instant,
+-- Caps (suc id) = frameBlowup (Caps id), with frameBlowup the worst one
+-- instant's cascades can do.  deepScan is what it has to cover, so the
+-- candidate step is gated against deepScan's OWN measured recurrence
+-- before anything is defined in terms of it.
+--
+-- The measured recurrence is wₖ₊₁ = 2^(wₖ + 1) − 2.  The candidate step
+-- is 2^(w + 1) — which dominates it by exactly 2 at every level, so this
+-- is tight rather than slack, and a candidate any smaller is refuted
+-- here rather than three modules downstream.
+------------------------------------------------------------------
+
+foldStep : ℕ → ℕ
+foldStep w = 2 ^ suc w
+
+-- w₀ = 1 ↦ w₁ = 2
+_ : (2 ≤ᵇ foldStep 1) ≡ true
+_ = refl
+
+-- w₁ = 2 ↦ w₂ = 6   (the 8-payload run: 2 + 6)
+_ : (6 ≤ᵇ foldStep 2) ≡ true
+_ = refl
+
+-- w₂ = 6 ↦ w₃ = 126  (derived from the recurrence, not normalisable)
+_ : (126 ≤ᵇ foldStep 6) ≡ true
 _ = refl
 
 ------------------------------------------------------------------

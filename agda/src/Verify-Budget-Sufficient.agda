@@ -82,15 +82,17 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FOUR POSTULATES REMAIN — three faces, plus reach-covers.
+-- FIVE POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
+-- subscribeE-walk), the round-4 per-instant caps face (caps-frame /
+-- caps-tick), and the two unprobed components of frameBlowup.
 --
--- STOP: reach-covers is FALSE AS STATED and reachCap is too small.  A
--- scan whose step function contains a scan over the accumulator towers
--- once per fold, and folds grow per instant, so no fixed-height cap
--- exists.  Machine-checked in agda/probe/Frame-Work-Probe.agda
--- (deepScan); the full account is at reachCap's definition.  Round 3's
--- face is unaffected in form — what is missing is anything to
--- instantiate Ŝ, R̂, F at.  The two real cores are subscribeE-wet and
+-- ROUND 4 (2026-07-29): the caps are defined BY RECURRENCE on the
+-- instant, Caps (suc id) = frameBlowup (Caps id), after deepScan refuted
+-- every fixed-height shape.  The width component of frameBlowup is
+-- defined and gated against deepScan's own recurrence; sizeBlowup and
+-- regBlowup are named gaps awaiting their own gates.  Round 3's face is
+-- untouched — it was only ever missing something to instantiate Ŝ, R̂, F
+-- at.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
 -- decrement edges each consume one hasAtLeast-peel against
@@ -99,8 +101,7 @@
 -- subscribeE-walk, the joint wet/dry/length face they are stated
 -- against.  The reachability cluster is what supplies its three entry
 -- caps Ŝ, R̂, F — one measure in three roles, so F cannot drift to an
--- unaudited source (reach-resets, PROVEN, is that wiring), and reachCap
--- is now a definition rather than a hole.
+-- unaudited source (reach-resets, PROVEN, is that wiring).
 -- PROVEN 2026-07-29: hopD-size (the hop measure is now
 -- derived end to end), and the walk's two bookkeeping companions
 -- subscribeE-slots and subscribeE-connected-mono — one joint `Keeps`
@@ -184,7 +185,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (outWᵉ)
+open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
@@ -6652,168 +6653,193 @@ round3-anchor-indexed-absurd Ψ W Ω ℓ E G 3≤E h =
   X<A = ≤-trans (n<2^n X) (^-monoˡ-≤ X (s≤s (s≤s z≤n)))
 
 ------------------------------------------------------------------
--- THE REACHABILITY FACE — round 3's only remaining debt, and the answer
+-- THE REACHABILITY CLUSTER — round 3's remaining debt, and the answer
 -- round3b-ledger-reset-absurd demands.
 --
 -- That refutation says the reset caps may not be the ledger.  So they
--- come from REACHABILITY instead: a bound on the size of an observable a
--- run can actually reach, computed from the program rather than from how
+-- come from REACHABILITY instead: a bound on what a run can actually
+-- reach, computed from the program and the clock rather than from how
 -- far the size ledger has been allowed to climb.
 --
--- ONE MEASURE, THREE ROLES — and, as with anchorᴬ and with the collapse,
--- that is structural rather than a discipline to be remembered:
+-- ONE SOURCE, THREE ROLES — structural rather than a discipline to be
+-- remembered.  With C the instant's cap (Caps below):
 --
---     Ŝ = reachCap …            the s′ reset at hop and connect edges
---     F = reachCap …            hopD's index, off the store anchor
---     R̂ = hopR (reachCap …)     the r reset at connect edges
+--     Ŝ = Caps.cSize C           the s′ reset at hop and connect edges
+--     F = Caps.cSize C           hopD's index, off the store anchor
+--     R̂ = hopR (Caps.cSize C)    the r reset at connect edges
 --
--- F CANNOT drift to a different, unaudited source, because it is the
--- same number as Ŝ.  And none of the three needs a new definition: hopR
--- already exists, and hopD-cap already turns a size bound into a hop
--- bound at the same index.  reach-resets below is that, proven.
+-- F cannot drift to a different, unaudited source because it IS Ŝ, and
+-- none of the three needs a new definition: hopR already exists and
+-- hopD-cap already turns a size bound into a hop bound at the same
+-- index.  reach-resets below is that, proven.
 --
--- WHAT THE PROBE SAYS IT MUST BE (agda/probe/Frame-Work-Probe.agda —
--- nine measurements, all against the real evaluator):
---
---   · A TOWER WHOSE HEIGHT IS THE PROGRAM'S scan/*All CHAIN DEPTH AND
---     WHOSE BASE GROWS LINEARLY IN THE INSTANT COUNT.  Not
---     sizeBudgetAt's shape, whose height climbs per instant.  The
---     difference is not merely headroom: it is what makes the invariant
---     PRESERVABLE by a per-frame induction at all.  An invariant whose
---     height climbs each instant would demand the next tower level at
---     every frame crossing; fixed height with a growing base composes.
---
---   · duplication widens the BASE by the syntactic occurrence count and
---     leaves the height alone — 39 against 14 on the same three folds.
---
---   · a defer loop adds ONE wrap per tick and nothing more: 14, 30, 62,
---     which is 2^(N+1) − 2.  It cannot compound, because unfoldμ
---     substitutes the ORIGINAL closed μ, so a deferred self-reference
---     re-subscribes a FRESH pipeline with a FRESH accumulator.  μ
---     recursion is syntactic re-subscription, not state feedback.
---
---   · a share crossing costs exactly what syntactic nesting costs, and
---     re-entry costs nothing at all: 6, 6, 6.
---
--- WHAT IS NOT MEASURED, and what the induction therefore owes: that
--- heights ADD past the FIRST crossing.  Both routings raise the height
--- by exactly one; beyond one crossing the payload counts stop
--- normalising and additivity is asserted.
---
--- NOTE FOR WHOEVER PROVES THIS.  reach-covers is INV? at a cap that does
--- not move, so if it goes through it SUBSUMES the walk face's own INV?
--- conjunct, and the receipt E′ ≤ E·3^(…) stops being load-bearing for
--- the descent — it would carry only the instant-boundary story.  That is
--- a simplification worth taking deliberately rather than discovering.
+-- The remaining question was only ever what to instantiate them AT.  A
+-- fixed-height tower was tried and refuted (deepScan); the Caps
+-- recurrence below is the replacement.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- REFUTED AS SHAPED (2026-07-29, agda/probe/Frame-Work-Probe.agda's
--- deepScan section).  READ THIS BEFORE USING ANYTHING BELOW.
+-- ROUND 4: PER-INSTANT CAPS, BY RECURRENCE ON THE INSTANT.
 --
--- reachCap is defined here on the measured claim that a reachable
--- observable's size is a tower whose HEIGHT is fixed by the syntax and
--- whose BASE grows linearly in the instant count.  That claim is FALSE.
+-- deepScan killed the fixed-height cap (see the refutation below).  What
+-- replaces it is NOT a bigger closed formula — it is a recurrence:
 --
--- Every program that supported it puts the step function's plug under a
--- mergeAllᵉ/ofᵉ, where a width is multiplied by a constant.  Put the plug
--- in an INNER scanᵉ's SOURCE and it becomes the inner scan's FOLD COUNT
--- — the tower's exponent, not a factor:
+--     Caps 0        = the entry measure (program + slot telescope)
+--     Caps (suc id) = frameBlowup (Caps id)
 --
---   deepScan  acc ↦ mergeAll (scan wrap2 seed (mergeAll (of [acc])))
+-- with frameBlowup the worst one instant's cascades can do to a state
+-- already inside a given cap.  deepScan itself says what that has to
+-- cover: within a frame, fold counts are bounded by current WIDTHS, and
+-- each fold adds a tower level, so frameBlowup is a tower of height ~its
+-- argument and Caps is Ackermann-flavoured in id.  That is acceptable —
+-- it is computable, and it is entry-determined GIVEN id, which was
+-- always a budget parameter (sizeBudgetAt already takes it).
 --
--- With wₖ the accumulator's width after k outer folds,
+-- WHY THE OLD PRESERVABILITY OBJECTION DOES NOT APPLY.  The fixed-height
+-- shape was justified by "an invariant whose height climbs per instant
+-- cannot be preserved by a per-frame induction".  That conflated frame
+-- crossings with TICK crossings.  Within one frame `id` is FROZEN: every
+-- hop, connect and μ edge of a single walk happens at one instant, so
+-- the walk face takes its caps as ordinary fixed numbers however they
+-- depend on id.  The height climbs only at tick boundaries — which is
+-- exactly where the top-level per-instant induction hands over anyway.
+-- That is why the face below has TWO halves and only one of them moves.
 --
---     w₀ = 1,   wₖ₊₁ = 2^(wₖ + 1) − 2      →   1, 2, 6, 126, 2^127 − 2
+-- THE ROUND-5 GATE IS THE TYPE.  `frameBlowup : Caps → Caps` cannot read
+-- the ledger, the receipt, or E, because they are not arguments.  If any
+-- within-frame quantity turns out to be boundable ONLY by the ledger,
+-- round3b-ledger-reset-absurd fires again and that is a stop-and-report,
+-- not a signature to widen.
 --
--- and the fold count grows by ONE PER INSTANT (the defer-loop
--- measurement).  So the height grows with `id`, and no fixed-height
--- shape bounds it.  Measured: one arrival ↦ 2 payloads, two arrivals ↦ 8.
---
--- What this kills, precisely:
---   · foldBudget/reachCap below are TOO SMALL.  Not off by a constant —
---     off by an unbounded number of tower levels.
---   · reach-covers is FALSE as stated.
---   · round 3's face is unaffected in FORM: Ŝ, R̂, F are still ordinary
---     parameters and walk-hyps-round3b still holds.  What is missing is
---     any entry-determined value to instantiate them AT.
---   · round3b-ledger-reset-absurd still forbids using the ledger, so
---     this is not a matter of falling back to capᴱ either.
---
--- NOT PATCHED, deliberately: which shape replaces it is a design
--- decision, and the standing rule is to report a refutation of this kind
--- rather than work around it.  The definitions are left in place, marked,
--- because deleting them would lose the record of exactly what was tried
--- and how far it got.
+-- THE TUPLE, and why hop rank is not in it: cSize and cWid are
+-- independent — reach-via-size-absurd shows width cannot be derived from
+-- size — and cReg counts the cascades whose blowups compose within one
+-- instant.  Hop rank IS derivable, from cSize by hopD-cap, which is what
+-- reach-resets proves; carrying it would be a synonym.
 ------------------------------------------------------------------
 
--- THE FOLD BUDGET: how many times any scan in the run can fold up to
--- instant `id`.  KNOWN TOO SMALL — see the refutation directly above.  Per frame it is the frame's payload count; across
--- instants the folds simply ADD, which is what the cross-instant
--- measurement says — progT's three instants buy the accumulator exactly
--- the depth prog₁'s three synchronous folds do, and no more
-foldBudget : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → ℕ
-foldBudget {n = n} e sl id = suc id * outWᵉ n sl e
+record Caps : Set where
+  constructor caps
+  field
+    cSize : ℕ      -- every reachable value's size
+    cWid  : ℕ      -- every reachable observable's FRAME width
+    cReg  : ℕ      -- live registrations, hence cascades, in one instant
 
--- THE REACH CAP, DEFINED — AND REFUTED AS SHAPED.  Kept, marked, for
--- the record of what was tried.  Each fold scales a stored observable by at
--- most the program's own syntax, so the size after k folds is a single
--- exponential with the syntax as base and the fold budget as exponent.
--- HEIGHT FIXED BY THE SYNTAX — it sits inside outWᵉ, which towers on the
--- *All nesting depth — and BASE LINEAR IN THE INSTANT COUNT.  That is
--- exactly the shape Frame-Work-Probe measured, and it is the shape a
--- per-frame induction can preserve: an invariant whose height climbed
--- each instant would demand the next tower level at every frame
--- crossing.
---
--- Ω IS NOT AN ARGUMENT, deliberately.  om-is-not-a-frame-budget: Ω is a
--- per-node width and a frame's total is Ω-to-the-depth, so a cap built
--- out of Ω would be off by an iterated exponential.  outWᵉ computes the
--- depth itself, and Ω has nothing left to contribute.
-reachCap : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → ℕ
-reachCap e sl id = (2 + sizeᵉ e + slotsSize sl) ^ suc (foldBudget e sl id)
+-- the frame-width half of the state predicate.  NOT widthOK? — that is
+-- ofW, a per-NODE width, and om-is-not-a-frame-budget is the
+-- counterexample to conflating the two
+widLive : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → LiveSource Γ → Bool
+widLive {n = n} W sl l =
+  all (λ tv → outWᵛ n sl (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ W)
+      (LiveSource.pending l)
 
--- ≥ 2, so the hop machinery's side condition stays free at every call
--- site exactly as it does for the store bound
-2≤reachCap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  2 ≤ reachCap e sl id
-2≤reachCap e sl id =
-  ≤-trans (s≤s (s≤s z≤n))
-          (x≤x^ (suc (sizeᵉ e + slotsSize sl)) (suc (foldBudget e sl id))
-                (s≤s z≤n))
+widNode : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
+widNode {n = n} W sl (scan-st {t} v)   = outWᵛ n sl t v ≤ᵇ W
+widNode {n = n} W sl (concat-st q _ _) = all (λ o → outWᵉ n sl o ≤ᵇ W) q
+widNode W sl (take-st _)               = true
+widNode W sl (merge-st _ _)            = true
+widNode W sl (switch-st _ _)           = true
+widNode W sl (exhaust-st _ _)          = true
+
+capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        → Caps → Sched Γ → EvalSt e → Bool
+capsOK? c sched st =
+  stBounded? (Caps.cSize c) sched st
+  ∧ all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
+  ∧ all (λ kv → widNode (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
+        (EvalSt.nodes st)
+  ∧ (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
+
+-- ONE FOLD's worst case on a width.  deepScan's measured recurrence is
+-- wₖ₊₁ = 2^(wₖ + 1) − 2 and this dominates it by exactly 2 at every
+-- level, so it is tight rather than slack.  Gated in Frame-Work-Probe
+-- against the measured 2, 6, 126
+foldStep : ℕ → ℕ
+foldStep w = 2 ^ suc w
+
+iterFold : ℕ → ℕ → ℕ
+iterFold zero    w = w
+iterFold (suc k) w = iterFold k (foldStep w)
 
 postulate
-  -- THE FACE — FALSE AS STATED, because reachCap above is too small.
-  -- Kept so the shape of what is owed stays visible; it must be
-  -- re-stated at whatever cap replaces reachCap.  Stated at the
-  -- predicate the ledger already uses, so nothing new is defined: only
-  -- the CAP changes, from capᴱ — which is walkCap-indexed, hence
-  -- circular — to reachCap, which is not
-  reach-covers : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    INV? Ψ (reachCap e (Sched.slots sched) id) sched st ≡ true →
-    sizeᵉ b ≤ reachCap e (Sched.slots sched) id → fnCapᵉ b ≤ Ψ →
-    let r = subscribeE g b κ bid now sched st
-    in (INV? Ψ (reachCap e (Sched.slots sched) id)
-          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (reachCap e (Sched.slots sched) id) Ψ (proj₁ r) ≡ true)
+  -- THE TWO COMPONENTS NOT YET PROBED, named rather than buried.  Each
+  -- owes its own deepScan-style gate before it is defined; writing a
+  -- plausible formula for them now is exactly the move that produced
+  -- reachCap
+  sizeBlowup regBlowup : Caps → ℕ
 
--- THE TRAP IN PROVING reach-covers, machine-checked so that nobody walks
--- into it.  The obvious route is two steps: bound a reachable
--- observable's SIZE by the cap, then bound its WIDTH by some function of
--- its size — the way hopD-sizeᵉ bounds hop depth by szB of size.  THAT
--- ROUTE IS CIRCULAR.  outW is not polynomial in size: outWᵉ (mergeAllᵉ e)
+-- THE WORST ONE INSTANT CAN DO, and a function of Caps ALONE — the
+-- signature is the round-5 gate, not a comment about one.  The width
+-- component is the one deepScan attacked and the one that killed round
+-- 3, so it is the one that is defined: folds per cascade are bounded by
+-- the current width, cascades in an instant by the registration count,
+-- and each fold costs one foldStep
+frameBlowup : Caps → Caps
+frameBlowup c =
+  caps (sizeBlowup c)
+       (iterFold (Caps.cWid c * Caps.cReg c) (Caps.cWid c))
+       (regBlowup c)
+
+-- BY RECURRENCE, never in closed form
+capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
+capsAt {n = n} e sl zero =
+  caps (2 + sizeᵉ e + slotsSize sl)
+       (outWᵉ n sl e)
+       (suc (sizeᵉ e + slotsSize sl))
+capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
+
+postulate
+  -- (a) WITHIN A FRAME, `id` is frozen and the caps do not move.  This is
+  -- the half the walk face consumes, and it is why round 3's face needs
+  -- no change at all: Ŝ := cSize, F := cSize, R̂ := hopR cSize, all
+  -- ordinary numbers for the duration of one walk
+  caps-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (capsAt e sl id) →
+    let r = subscribeE g b κ bid now sched st
+    in capsOK? (capsAt e sl id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+  -- (b) ACROSS A TICK, one instant's cascade blows the caps up by exactly
+  -- one application of frameBlowup.  This is the half the top-level
+  -- per-instant induction consumes, and the ONLY place the height climbs
+  caps-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    let r = cascade a nextId sched st
+    in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+------------------------------------------------------------------
+-- WHAT WAS HERE, AND WHY IT IS GONE.  A fixed-height reach cap —
+-- foldBudget, reachCap, reach-covers — built on the measured claim that
+-- a reachable observable's tower has its HEIGHT fixed by the syntax and
+-- only its BASE growing with the instant count.
+--
+-- deepScan refuted it: a scan whose step function contains a scan over
+-- the accumulator towers ONCE PER FOLD, and folds grow one per instant,
+-- so the height grows with `id`.  The machine-checked account, with the
+-- recurrence and the payload counts, is the deepScan section of
+-- agda/probe/Frame-Work-Probe.agda.  The Caps recurrence above is the
+-- replacement; git history is the archive for the rest.
+------------------------------------------------------------------
+
+-- WHY cSize AND cWid ARE SEPARATE FIELDS, machine-checked so that nobody
+-- collapses them.  The tempting move is to carry size only and derive
+-- width from it — the way hopD-sizeᵉ derives hop depth from szB of size,
+-- which is exactly why cHop is NOT a field.  THAT ROUTE IS CIRCULAR for
+-- width.  outW is not polynomial in size: outWᵉ (mergeAllᵉ e)
 -- is outWᵉ e * innWᵉ e and innWᵉ towers at a scanᵉ, so any size-to-width
 -- bound is at least exponential, and the cap would have to dominate an
 -- exponential of itself.
 --
--- The non-circular route is to bound the width DIRECTLY by the
--- construction: a reachable observable is the accumulator after k folds,
--- its width is the template's slope to the k, and k ≤ foldBudget.  That
--- is slope ^ foldBudget — which is exactly the shape reachCap already
--- has.  Both the size and the width come out of the same fold count;
--- neither is derived from the other.
+-- The non-circular route is to iterate them TOGETHER, which is what the
+-- Caps recurrence does: one instant's folds are counted by the current
+-- width and each fold costs one foldStep, so the next width comes from
+-- the current width and the current cascade count — never from the size.
 --
 -- This is the fourth time this loop has been available in this proof
 -- (walk-hyps-absurd, hop-anchor-absurd, round3b-ledger-reset-absurd, and
