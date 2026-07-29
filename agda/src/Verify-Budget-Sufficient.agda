@@ -82,15 +82,19 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FIVE POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
--- subscribeE-walk), the round-4 per-instant caps face (caps-frame /
--- caps-tick), and the two unprobed components of frameBlowup.
+-- FOUR POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
+-- subscribeE-walk) and the round-4 per-instant caps face (caps-frame /
+-- caps-tick).  frameBlowup is now fully defined: no gaps inside it.
 --
 -- ROUND 4 (2026-07-29): the caps are defined BY RECURRENCE on the
 -- instant, Caps (suc id) = frameBlowup (Caps id), after deepScan refuted
--- every fixed-height shape.  The width component of frameBlowup is
--- defined and gated against deepScan's own recurrence; sizeBlowup and
--- regBlowup are named gaps awaiting their own gates.  Round 3's face is
+-- every fixed-height shape.  All three components of frameBlowup are
+-- defined and gated in State-Blowup-Probe, which measures capsOK?'s own
+-- conjuncts off a real run — and in doing so refuted three parts of the
+-- first round-4 draft: foldStep (gated against payload counts, too small
+-- for the outWᵛ it actually bounds, so it now reads cSize), outWᵉ's
+-- scripted clause (0, collapsing every scripted program's width cap),
+-- and the base case (which now pays for its own root frame).  Round 3's face is
 -- untouched — it was only ever missing something to instantiate Ŝ, R̂, F
 -- at.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
@@ -6741,51 +6745,107 @@ widNode W sl (merge-st _ _)            = true
 widNode W sl (switch-st _ _)           = true
 widNode W sl (exhaust-st _ _)          = true
 
+-- THE CHAIN HALF, and why cSize has to cover it.  A chain's map-f /
+-- scan-f frames carry STEP FUNCTIONS, and `sizeStep` below reads a step
+-- function's size as its multiplier — so a size cap that bounds only
+-- stored values leaves the multiplier unbounded.  This is `regsB?`'s
+-- size conjunct without the Ψ half, which capsOK? has no use for.
+--
+-- Measured (State-Blowup-Probe): step functions in chains do NOT grow —
+-- 10, 10, 10, 10 across pA's cascades — because subscribeE installs a
+-- syntactic subterm of what was already in the store.  So cSize covers
+-- them without a fourth field and, crucially, WITHOUT the ledger:
+-- round3b-ledger-reset-absurd stays unavailable
+regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
+regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
+  where
+  frameSz? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+  frameSz? B (map-f fn)         = sizeᵗ fn ≤ᵇ B
+  frameSz? B (scan-f fn _)      = sizeᵗ fn ≤ᵇ B
+  frameSz? B (take-f _)         = true
+  frameSz? B (from-inner _ _ _) = true
+  frameSz? B (thru-outer _ _)   = true
+
+  pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+  pathSz? B root           = true
+  pathSz? B (share-sink i) = true
+  pathSz? B (f ↠ p)        = frameSz? B f ∧ pathSz? B p
+
 capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
 capsOK? c sched st =
   stBounded? (Caps.cSize c) sched st
+  ∧ regsSz? (Caps.cSize c) (EvalSt.registry st)
   ∧ all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
   ∧ all (λ kv → widNode (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
         (EvalSt.nodes st)
   ∧ (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
 
--- ONE FOLD's worst case on a width.  deepScan's measured recurrence is
--- wₖ₊₁ = 2^(wₖ + 1) − 2 and this dominates it by exactly 2 at every
--- level, so it is tight rather than slack.  Gated in Frame-Work-Probe
--- against the measured 2, 6, 126
-foldStep : ℕ → ℕ
-foldStep w = 2 ^ suc w
+-- ONE FOLD's worst case on a width — AND WHY IT READS THE SIZE.
+--
+-- The earlier `2 ^ suc w` was gated against deepScan's PAYLOAD count and
+-- is refuted against the quantity capsOK? actually bounds: one fold
+-- takes deepScan's stored width 1 ↦ 6 where it allowed 4
+-- (State-Blowup-Probe).  The reason is structural — `innWᵉ (scanᵉ f z e)`
+-- puts the source's width in an EXPONENT whose base is read off the step
+-- function's syntax — so the per-fold multiplier is a property of `f`,
+-- and cSize is the only thing in Caps that bounds a step function.
+--
+-- Note this is a strict GENERALISATION: at S = 2 it is exactly the old
+-- step, so Frame-Work-Probe's 2 / 6 / 126 gates still read as before
+foldStep : ℕ → ℕ → ℕ
+foldStep S w = S ^ suc w
 
-iterFold : ℕ → ℕ → ℕ
-iterFold zero    w = w
-iterFold (suc k) w = iterFold k (foldStep w)
+iterFold : ℕ → ℕ → ℕ → ℕ
+iterFold S zero    w = w
+iterFold S (suc k) w = iterFold S k (foldStep S w)
 
-postulate
-  -- THE TWO COMPONENTS NOT YET PROBED, named rather than buried.  Each
-  -- owes its own deepScan-style gate before it is defined; writing a
-  -- plausible formula for them now is exactly the move that produced
-  -- reachCap
-  sizeBlowup regBlowup : Caps → ℕ
+-- ONE FOLD's worst case on a SIZE, straight off size-subΘᵉ: a fold
+-- substitutes the accumulator into the step function, and
+-- size-subΘᵉ bounds that by `sizeᵉ f * suc (2 * V)` with V the env cap.
+-- Both `sizeᵉ f` and V are ≤ cSize, hence S in both positions
+sizeStep : ℕ → ℕ → ℕ
+sizeStep S s = S * suc (2 * s)
+
+iterSize : ℕ → ℕ → ℕ → ℕ
+iterSize S zero    s = s
+iterSize S (suc k) s = iterSize S k (sizeStep S s)
 
 -- THE WORST ONE INSTANT CAN DO, and a function of Caps ALONE — the
--- signature is the round-5 gate, not a comment about one.  The width
--- component is the one deepScan attacked and the one that killed round
--- 3, so it is the one that is defined: folds per cascade are bounded by
--- the current width, cascades in an instant by the registration count,
--- and each fold costs one foldStep
+-- signature is the round-5 gate, not a comment about one.
+--
+-- All three components share ONE iteration count, `cWid * cReg`: folds
+-- per cascade are bounded by the current width, cascades in an instant
+-- by the registration count.  That count is why sizeBlowup must read
+-- cWid — pR and pRs have identical step functions and differ only in
+-- how many times it runs per frame, 3 ↦ 12 against 3 ↦ 30, so a fixed
+-- number of size steps undershoots one of them (State-Blowup-Probe).
+--
+-- regBlowup is ADDITIVE in the sources, not multiplicative: pR2's two
+-- live inputs take the registry 1 ↦ 3, one new registration per
+-- referenced source, because a fold subscribes each reference once.  Its
+-- cSize factor is exactly that reference count — a fold can subscribe no
+-- more references than its step function mentions — and pR2 is why it is
+-- there: with `cReg * suc cWid` alone the measured 1 ↦ 3 does not fit
 frameBlowup : Caps → Caps
 frameBlowup c =
-  caps (sizeBlowup c)
-       (iterFold (Caps.cWid c * Caps.cReg c) (Caps.cWid c))
-       (regBlowup c)
+  caps (iterSize (Caps.cSize c) (Caps.cWid c * Caps.cReg c) (Caps.cSize c))
+       (iterFold (Caps.cSize c) (Caps.cWid c * Caps.cReg c) (Caps.cWid c))
+       (Caps.cReg c * suc (Caps.cWid c * Caps.cSize c))
 
--- BY RECURRENCE, never in closed form
+-- BY RECURRENCE, never in closed form.
+--
+-- THE BASE CASE PAYS FOR ITS OWN FRAME.  The root subscribe IS a frame:
+-- a synchronous source folds inside it, so the state handed to instant 0
+-- has already grown.  pRs ends its root frame at size 30 where the bare
+-- syntactic measure allows 25 (State-Blowup-Probe), so the base is one
+-- frameBlowup above the syntax — exactly what caps-frame already says
+-- about every other frame
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
-  caps (2 + sizeᵉ e + slotsSize sl)
-       (outWᵉ n sl e)
-       (suc (sizeᵉ e + slotsSize sl))
+  frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
+                    (suc (outWᵉ n sl e))
+                    (suc (sizeᵉ e + slotsSize sl)))
 capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
 
 postulate

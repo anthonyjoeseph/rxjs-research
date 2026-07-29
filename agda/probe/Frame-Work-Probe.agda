@@ -45,7 +45,7 @@ open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; input;
 open import Rx.Evaluator using (evaluate; Slots; Slot; scripted; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Frame-Width using (outWᵉ)
-open import Verify-Budget-Sufficient using (ofWᵉ)
+open import Verify-Budget-Sufficient using (ofWᵉ; foldStep)
 
 ------------------------------------------------------------------
 -- counting: how many payloads did a run actually deliver
@@ -432,25 +432,27 @@ _ = refl
 -- candidate step is gated against deepScan's OWN measured recurrence
 -- before anything is defined in terms of it.
 --
--- The measured recurrence is wₖ₊₁ = 2^(wₖ + 1) − 2.  The candidate step
--- is 2^(w + 1) — which dominates it by exactly 2 at every level, so this
--- is tight rather than slack, and a candidate any smaller is refuted
--- here rather than three modules downstream.
+-- The measured recurrence is wₖ₊₁ = 2^(wₖ + 1) − 2.  The step dominates
+-- it by exactly 2 at every level, so this is tight rather than slack,
+-- and a candidate any smaller is refuted here rather than three modules
+-- downstream.
+--
+-- These are the S = 2 instances of `foldStep`.  Its size argument was
+-- added after State-Blowup-Probe refuted the size-free version against
+-- the quantity capsOK? actually bounds — the PAYLOAD counts measured
+-- here are the S = 2 case, and they still read exactly as before.
 ------------------------------------------------------------------
 
-foldStep : ℕ → ℕ
-foldStep w = 2 ^ suc w
-
 -- w₀ = 1 ↦ w₁ = 2
-_ : (2 ≤ᵇ foldStep 1) ≡ true
+_ : (2 ≤ᵇ foldStep 2 1) ≡ true
 _ = refl
 
 -- w₁ = 2 ↦ w₂ = 6   (the 8-payload run: 2 + 6)
-_ : (6 ≤ᵇ foldStep 2) ≡ true
+_ : (6 ≤ᵇ foldStep 2 2) ≡ true
 _ = refl
 
 -- w₂ = 6 ↦ w₃ = 126  (derived from the recurrence, not normalisable)
-_ : (126 ≤ᵇ foldStep 6) ≡ true
+_ : (126 ≤ᵇ foldStep 2 6) ≡ true
 _ = refl
 
 ------------------------------------------------------------------

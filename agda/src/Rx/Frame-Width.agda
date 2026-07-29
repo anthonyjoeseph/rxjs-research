@@ -145,7 +145,11 @@ mutual
   -- lexicographic outer measure and every connect spends one
   outWᵉ zero    sl (input i) = 0
   outWᵉ (suc j) sl (input i) with sl i
-  ... | scripted _ = 0
+  -- ONE PAYLOAD PER ARRIVAL.  A scripted source delivers a single data
+  -- value per instant; 0 here made every clause above it — all of which
+  -- are multiplicative — collapse the whole program to 0, which
+  -- State-Blowup-Probe refutes as a width cap
+  ... | scripted _ = 1
   ... | shared d   = outWᵉ j sl d
   outWᵉ j sl (ofᵉ ts)        = length ts
   outWᵉ j sl emptyᵉ          = 0
@@ -164,7 +168,10 @@ mutual
   innWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
   innWᵉ zero    sl (input i) = 0
   innWᵉ (suc j) sl (input i) with sl i
-  ... | scripted _ = 0
+  -- a scripted payload is DATA, so it carries no inner observable — but
+  -- 1 rather than 0 keeps innW usable as a multiplier and an exponent
+  -- base, which is how the scanᵉ clause below consumes it
+  ... | scripted _ = 1
   ... | shared d   = innWᵉ j sl d
   innWᵉ j sl (ofᵉ ts)        = innWᵗˢ j sl ts
   innWᵉ j sl emptyᵉ          = 0

@@ -16,8 +16,8 @@
 --
 -- WHAT IT FINDS.  Three refutations and one clean answer.
 --
---   (1) `outWᵉ` is ZERO on every scripted-input program, so the base
---       case's width cap does not cover even its own seed.
+--   (1) `outWᵉ` was ZERO on every scripted-input program, so the base
+--       case's width cap did not cover even its own seed.
 --   (2) The base case's SIZE cap is smaller than the state its own
 --       subscribe frame leaves behind — a synchronous source folds
 --       inside the root frame, and the entry measure does not pay for
@@ -56,7 +56,8 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
                                 sched-init; sched-next; st-init; budgetAt;
                                 subscribeE; cascade; slotsSize; root)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
-open import Verify-Budget-Sufficient using (foldStep)
+open import Verify-Budget-Sufficient using (foldStep; sizeStep; iterSize;
+                                            Caps; capsAt)
 
 ------------------------------------------------------------------
 -- THE HARNESS: drain, but keep the state.  This is `drain`/`evaluate`
@@ -289,10 +290,15 @@ _ = refl
 _ : mWid 1 pD ins3 ≡ 6
 _ = refl
 
-_ : foldStep 1 ≡ 4
+-- the refuted candidate, written out because it no longer exists as a
+-- definition: a width step reading only the width
+_ : (6 ≤ᵇ 2 ^ suc 1) ≡ false
 _ = refl
 
-_ : (6 ≤ᵇ foldStep 1) ≡ false
+-- and the replacement, at the step function's own measured size.  S = 3
+-- is deepScan's stored size at that instant; the real cap is larger, so
+-- this is the tight end of the gate
+_ : (6 ≤ᵇ foldStep 3 1) ≡ true
 _ = refl
 
 -- the same measure on pA, where the step function has no inner scan and
@@ -314,31 +320,32 @@ _ : mWid 2 pD ins3 ≡ 3072
 _ = refl
 
 ------------------------------------------------------------------
--- REFUTATION (c): `outWᵉ` IS ZERO ON A SCRIPTED INPUT, so the base
--- case's width cap does not cover its own seed.
+-- REFUTATION (c), NOW FIXED: `outWᵉ` WAS ZERO ON A SCRIPTED INPUT, so
+-- the base case's width cap did not cover its own seed.
 --
--- `outWᵉ (suc j) sl (input i)` descends into a `shared` def but returns
+-- `outWᵉ (suc j) sl (input i)` descends into a `shared` def but returned
 -- 0 for a `scripted` slot, and every clause above it is multiplicative,
--- so the whole program measures 0.  All seven runs the measure was
--- gated against used either a literal source or a shared slot — the
--- scripted case was never gated, and it is the common one.
+-- so the whole program measured 0 — while the state after pA's root
+-- subscribe already holds a width-1 accumulator (its seed).  All seven
+-- runs the measure was gated against used either a literal source or a
+-- shared slot; the scripted case, the common one, was never gated.
 --
--- The state after pA's root subscribe already holds a width-1
--- accumulator (its seed), so the cap fails at instant 0, before any
--- cascade.  A per-instant recurrence cannot recover from a base case
--- that is already false
+-- The clause now yields 1, one payload per arrival, and these are the
+-- gates that keep it honest.  (The refuted form is not restatable here
+-- because `outWᵉ` takes no parameter to vary; commit a981e30 holds it
+-- machine-checked, and git history is the archive.)
 ------------------------------------------------------------------
 
-_ : outWᵉ 1 ins3 pA ≡ 0
+_ : outWᵉ 1 ins3 pA ≡ 9
 _ = refl
 
-_ : outWᵉ 1 ins3 pD ≡ 0
+_ : (1 ≤ᵇ outWᵉ 1 ins3 pA) ≡ true
 _ = refl
 
-_ : outWᵉ 1 ins3 pR ≡ 0
+_ : (1 ≤ᵇ outWᵉ 1 ins3 pD) ≡ true
 _ = refl
 
-_ : (1 ≤ᵇ outWᵉ 1 ins3 pA) ≡ false
+_ : (1 ≤ᵇ outWᵉ 1 ins3 pR) ≡ true
 _ = refl
 
 ------------------------------------------------------------------
@@ -420,4 +427,99 @@ _ : mReg 1 pR2 ins2 ≡ 3
 _ = refl
 
 _ : mReg 2 pR2 ins2 ≡ 3
+_ = refl
+
+------------------------------------------------------------------
+-- THE GATE.  Every measured step above, against the candidate that
+-- replaced the refuted one — at the tight end, with the MEASURED
+-- quantities rather than the caps, so a candidate that only survives
+-- because the caps are astronomical is refuted here.
+--
+-- Widths use a single `foldStep` per fold rather than the composed
+-- `iterFold`: the composition is a tower and does not normalise, and the
+-- single step is the sharper test anyway.  Sizes use `sizeStep`'s
+-- multiplier at the measured CHAIN size — 10 for pA, 20 for deepScan, 8
+-- for pR, all constant across the run — because that is the step
+-- function's size, which is what size-subΘᵉ reads
+------------------------------------------------------------------
+
+-- width, one fold at a time: pA 1 ↦ 3 ↦ 9 ↦ 27 at sizes 3, 24, 87
+_ : (3 ≤ᵇ foldStep 3 1) ≡ true
+_ = refl
+
+_ : (9 ≤ᵇ foldStep 24 3) ≡ true
+_ = refl
+
+_ : (27 ≤ᵇ foldStep 87 9) ≡ true
+_ = refl
+
+-- and deepScan's second fold, the tower's steepest measured step
+_ : (3072 ≤ᵇ foldStep 24 6) ≡ true
+_ = refl
+
+-- size, one fold at a time.  pA's chains hold a size-10 step function
+_ : (24 ≤ᵇ sizeStep 10 3) ≡ true
+_ = refl
+
+_ : (87 ≤ᵇ sizeStep 10 24) ≡ true
+_ = refl
+
+_ : (276 ≤ᵇ sizeStep 10 87) ≡ true
+_ = refl
+
+-- deepScan's is size 20
+_ : (24 ≤ᵇ sizeStep 20 3) ≡ true
+_ = refl
+
+_ : (45 ≤ᵇ sizeStep 20 24) ≡ true
+_ = refl
+
+-- pR's is size 8
+_ : (12 ≤ᵇ sizeStep 8 3) ≡ true
+_ = refl
+
+_ : (21 ≤ᵇ sizeStep 8 12) ≡ true
+_ = refl
+
+_ : (30 ≤ᵇ sizeStep 8 21) ≡ true
+_ = refl
+
+-- and pRs, the THREE-fold frame that refuted a fixed iteration count:
+-- the same step function, iterated three times, covers 3 ↦ 30
+_ : (30 ≤ᵇ iterSize 8 3 3) ≡ true
+_ = refl
+
+-- registrations: pR 1 ↦ 2 ↦ 4 at widths 1, 2 and sizes 3, 12
+_ : (2 ≤ᵇ 1 * suc (1 * 3)) ≡ true
+_ = refl
+
+_ : (4 ≤ᵇ 2 * suc (2 * 12)) ≡ true
+_ = refl
+
+-- pR2's two live sources, 1 ↦ 3 — and the reason regBlowup carries a
+-- cSize factor: `cReg * suc cWid` alone gives 2 and does not fit
+_ : (3 ≤ᵇ 1 * suc (1 * 3)) ≡ true
+_ = refl
+
+_ : (3 ≤ᵇ 1 * suc 1) ≡ false
+_ = refl
+
+------------------------------------------------------------------
+-- AND THE BASE CASE, now that it pays for its own frame: capsAt's
+-- instant-0 caps must cover the state the ROOT SUBSCRIBE leaves, which
+-- for pRs is three folds' worth.  Only cSize and cReg are checked — the
+-- width component composes to a tower and does not normalise, which is
+-- why the width gates above are per-fold
+------------------------------------------------------------------
+
+_ : (30 ≤ᵇ Caps.cSize (capsAt pRs ins3 0)) ≡ true
+_ = refl
+
+_ : (6 ≤ᵇ Caps.cReg (capsAt pRs ins3 0)) ≡ true
+_ = refl
+
+_ : (3 ≤ᵇ Caps.cSize (capsAt pA ins3 0)) ≡ true
+_ = refl
+
+_ : (1 ≤ᵇ Caps.cReg (capsAt pA ins3 0)) ≡ true
 _ = refl
