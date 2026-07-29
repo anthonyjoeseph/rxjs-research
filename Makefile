@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -38,6 +38,9 @@ help:
 	@echo "  hop-descent-probe  the refutation that a burst's observable value"
 	@echo "                  measures below its carrier — false at all three"
 	@echo "                  sites (see agda/probe/Hop-Descent-Probe.agda)"
+	@echo "  frame-work-probe  is a subscribe frame's work entry-determined?"
+	@echo "                  refl-checked payload counts for the deepening scan"
+	@echo "                  (see agda/probe/Frame-Work-Probe.agda).  SLOW (~20 min)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -81,6 +84,15 @@ cut-caches-probe:
 # and it must not rot, because it is the reason dBound's `r` is still open.
 hop-descent-probe:
 	cd agda && agda -i src -i probe probe/Hop-Descent-Probe.agda
+
+# Is a subscribe frame's work entry-determined?  refl-checked payload counts
+# for the deepening scan (an obs-typed accumulator that re-wraps itself), which
+# is what licenses re-indexing hopD's scan clause off the store anchor.
+# Standalone, so src/Main.agda never reaches it.  SLOW — prog₂ delivers 126
+# payloads in one frame and takes ~20 min to normalise; that number IS the
+# finding, so it is not shrunk.
+frame-work-probe:
+	cd agda && agda -i src -i probe probe/Frame-Work-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
