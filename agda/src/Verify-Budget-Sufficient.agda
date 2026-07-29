@@ -1427,6 +1427,14 @@ totᵛ-counts B (x ∷ M)
         | totᵛ-oneAt B x
         | totᵛ-counts B M = refl
 
+-- a factor of at least one never shrinks
+1*≤ : ∀ (x k : ℕ) → 1 ≤ k → x ≤ k * x
+1*≤ x k h = ≤-trans (≤-reflexive (sym (+-identityʳ x))) (*-monoˡ-≤ x h)
+
+1≤pow : ∀ (b k : ℕ) → 1 ≤ suc b ^ k
+1≤pow b zero    = ≤-refl
+1≤pow b (suc k) = ≤-trans (1≤pow b k) (m≤m+n _ _)
+
 ------------------------------------------------------------------
 -- THE HOP RANK CAP — dBound's R, now that `r` is hopD.
 --
@@ -1457,51 +1465,473 @@ totᵛ-counts B (x ∷ M)
 hopR : ℕ → ℕ
 hopR V = (2 + V) ^ (suc V ^ suc V)
 
-postulate
-  -- (P1) hopD is bounded by SIZE.  The exponent is V′^s, not V′·s, and
-  -- that is forced: the coefficient is a MULTIPLIER (pm), not an
-  -- occurrence count, so it is not bounded by s.  pm's own scanᵉ clause
-  -- is (2 + pm f)^V, so each nesting level of scanᵉ raises the exponent
-  -- by a FACTOR of V rather than adding one — d nested scans give V^d.
-  -- With d ≤ s that is V′^s.  Under the retired occurrence count the
-  -- coefficient WAS ≤ s and the bound was (2+s)^(V′·s); that statement
-  -- is false for pm and has been retracted rather than left standing.
-  --
-  -- WHAT THE INDUCTION NEEDS, worked out 2026-07-29 and written down
-  -- because the shape is not the obvious one.  The statement must be
-  -- JOINT — the same bound for pm, since hopD's clauses read pm for
-  -- their coefficients — and then, with P(s) = (2+s)^(V′^s):
-  --
-  --   mapᵉ    P(s₁) + P(s₁)·P(s₂)      ≤ P(s)   via 3·V′^(s-1) ≤ V′^s
-  --   *Allᵉ   suc (P(s-1))             ≤ P(s)
-  --   ofᵉ/⊔   each child under P of the whole, by monotonicity
-  --   scanᵉ   (2 + P(s₁))^V · 3·P(s-1) ≤ P(s)
-  --
-  -- The scanᵉ clause is the one with a trap.  Bounding (2+B)^V by B^(2V)
-  -- — the obvious move — is too lossy: it wants 2V+2 ≤ V′, the induction
-  -- does not close, and it reads at first like the STATEMENT being
-  -- false.  It is not.  The slack is in the CHILD SIZES: a scanᵉ has
-  -- three children each of size ≥ 1, so the step function's own size is
-  -- s₁ ≤ s-3 and its bound's exponent is V′^(s-3) — a factor V′² below
-  -- the clause's budget.  That is what pays for the (2+·)^V and the
-  -- constant 3.  A proof that does not track WHICH child's size it is
-  -- using will appear to fail.
-  --
-  -- Nothing here is tight, and V is a tower, so the side conditions
-  -- (V ≥ 2, sizes ≥ 1) are free at every call site — hopD-cap's premise
-  -- sizeᵉ e ≤ V already gives V ≥ 1, since every expression has size ≥ 1.
-  hopD-size : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
-    hopDᵉ V e ≤ (2 + sizeᵉ e) ^ (suc V ^ sizeᵉ e)
+-- (P1) hopD is bounded by SIZE.  The exponent is V′^s, not V′·s, and
+-- that is forced: the coefficient is a MULTIPLIER (pm), not an
+-- occurrence count, so it is not bounded by s.  pm's own scanᵉ clause
+-- is (2 + pm f)^V, so each nesting level of scanᵉ raises the exponent
+-- by a FACTOR of V rather than adding one — d nested scans give V^d.
+-- With d ≤ s that is V′^s.  Under the retired occurrence count the
+-- coefficient WAS ≤ s and the bound was (2+s)^(V′·s); that statement
+-- is false for pm and has been retracted rather than left standing.
+--
+-- WHAT THE INDUCTION NEEDS, worked out 2026-07-29 and written down
+-- because the shape is not the obvious one.  The statement must be
+-- JOINT — the same bound for pm, since hopD's clauses read pm for
+-- their coefficients — and then, with P(s) = (2+s)^(V′^s):
+--
+--   mapᵉ    P(s₁) + P(s₁)·P(s₂)      ≤ P(s)   via 3·V′^(s-1) ≤ V′^s
+--   *Allᵉ   suc (P(s-1))             ≤ P(s)
+--   ofᵉ/⊔   each child under P of the whole, by monotonicity
+--   scanᵉ   (2 + P(s₁))^V · 3·P(s-1) ≤ P(s)
+--
+-- The scanᵉ clause is the one with a trap.  Bounding (2+B)^V by B^(2V)
+-- — the obvious move — is too lossy: it wants 2V+2 ≤ V′, the induction
+-- does not close, and it reads at first like the STATEMENT being
+-- false.  It is not.  The slack is in the CHILD SIZES: a scanᵉ has
+-- three children each of size ≥ 1, so the step function's own size is
+-- s₁ ≤ s-3 and its bound's exponent is V′^(s-3) — a factor V′² below
+-- the clause's budget.  That is what pays for the (2+·)^V and the
+-- constant 3.  A proof that does not track WHICH child's size it is
+-- using will appear to fail.
+--
+-- Nothing here is tight, and V is a tower, so the side conditions
+-- (V ≥ 2, sizes ≥ 1) are free at every call site — hopD-cap's premise
+-- sizeᵉ e ≤ V already gives V ≥ 1, since every expression has size ≥ 1.
+
+-- the pm leaf is 0 or 1 either way
+ifLe1 : ∀ (a b : ℕ) → (if a ≡ᵇ b then 1 else 0) ≤ 1
+ifLe1 a b with a ≡ᵇ b
+... | true  = ≤-refl
+... | false = z≤n
+
+-- OPAQUE on purpose.  Everything below states bounds in terms of szB
+-- and never needs its definition; leaving it transparent makes Agda try
+-- to invert `^` to solve the monotonicity lemmas' implicit sizes, which
+-- costs an inversion-depth warning per clause and then fails outright.
+-- Only the two places that genuinely compare szB against hopR unfold it.
+opaque
+  szB : ℕ → ℕ → ℕ
+  szB V s = (2 + s) ^ (suc V ^ s)
+
+  szB-mono : ∀ (V : ℕ) {s s′ : ℕ} → s ≤ s′ → szB V s ≤ szB V s′
+  szB-mono V {s} {s′} h =
+    ≤-trans (^-monoˡ-≤ (suc V ^ s) (+-monoʳ-≤ 2 h))
+            (^-monoʳ-≤ (2 + s′) (^-monoʳ-≤ (suc V) h))
+
+  1≤szB : ∀ (V s : ℕ) → 1 ≤ szB V s
+  1≤szB V s = 1≤pow (suc s) (suc V ^ s)
+
+-- every expression and term has at least one node
+1≤sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵉ e
+1≤sizeᵉ (input i)       = ≤-refl
+1≤sizeᵉ (ofᵉ ts)        = s≤s z≤n
+1≤sizeᵉ emptyᵉ          = ≤-refl
+1≤sizeᵉ (mapᵉ f e)      = s≤s z≤n
+1≤sizeᵉ (takeᵉ c e)     = s≤s z≤n
+1≤sizeᵉ (scanᵉ f z e)   = s≤s z≤n
+1≤sizeᵉ (mergeAllᵉ e)   = s≤s z≤n
+1≤sizeᵉ (concatAllᵉ e)  = s≤s z≤n
+1≤sizeᵉ (switchAllᵉ e)  = s≤s z≤n
+1≤sizeᵉ (exhaustAllᵉ e) = s≤s z≤n
+1≤sizeᵉ (μᵉ e)          = s≤s z≤n
+1≤sizeᵉ (varᵉ x)        = ≤-refl
+1≤sizeᵉ (deferᵉ e)      = s≤s z≤n
+
+1≤sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵗ tm
+1≤sizeᵗ (varᵗ x)      = ≤-refl
+1≤sizeᵗ unit̂          = ≤-refl
+1≤sizeᵗ (bool̂ _)      = ≤-refl
+1≤sizeᵗ (nat̂ _)       = ≤-refl
+1≤sizeᵗ (pairᵗ a b)   = s≤s z≤n
+1≤sizeᵗ (fstᵗ q)      = s≤s z≤n
+1≤sizeᵗ (sndᵗ q)      = s≤s z≤n
+1≤sizeᵗ (inlᵗ a)      = s≤s z≤n
+1≤sizeᵗ (inrᵗ a)      = s≤s z≤n
+1≤sizeᵗ (caseᵗ sc l r) = s≤s z≤n
+1≤sizeᵗ (ifᵗ c a b)   = s≤s z≤n
+1≤sizeᵗ (primᵗ _ a)   = s≤s z≤n
+1≤sizeᵗ (strmᵗ e)     = s≤s z≤n
+
+1≤sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+  1 ≤ sizeᵗˢ ts
+1≤sizeᵗˢ []       = ≤-refl
+1≤sizeᵗˢ (y ∷ ys) = ≤-trans (1≤sizeᵗ y) (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))
+
+-- THE THREE ARITHMETIC FACTS the clauses reduce to.  Each is a
+-- statement about ℕ and `^` alone — no syntax, no measure — which is
+-- what leaves the induction below with no arithmetic in it at all.
+opaque
+  unfolding szB
+
+  -- a base of at least 1 is under any of its powers
+  x≤x^ : ∀ (x k : ℕ) → 1 ≤ k → suc x ≤ suc x ^ k
+  x≤x^ x k hk =
+    ≤-trans (≤-reflexive (sym (*-identityʳ (suc x)))) (^-monoʳ-≤ (suc x) hk)
+
+  3≤szB : ∀ (V p : ℕ) → 1 ≤ p → 3 ≤ szB V p
+  3≤szB V p hp =
+    ≤-trans (+-monoʳ-≤ 2 hp) (x≤x^ (suc p) (suc V ^ p) (1≤pow V p))
+
+  -- B + B ≤ B · B, the step every clause starts from
+  dbl≤sq : ∀ (V p : ℕ) → 1 ≤ p → szB V p + szB V p ≤ szB V p * szB V p
+  dbl≤sq V p hp =
+    ≤-trans (≤-reflexive (cong (szB V p +_) (sym (+-identityʳ (szB V p)))))
+            (*-monoˡ-≤ (szB V p) (≤-trans (≤ᵇ⇒≤ 2 3 tt) (3≤szB V p hp)))
+
+  -- and the exponent side: k copies of W^p sit under W^(suc p) as soon
+  -- as k ≤ W.  This is where V ≥ 2 is spent — the szB-sq clause needs
+  -- three copies, so it needs 3 ≤ suc V
+  pow-step : ∀ (V p k : ℕ) → k ≤ suc V → k * (suc V ^ p) ≤ suc V ^ suc p
+  pow-step V p k h = *-monoˡ-≤ (suc V ^ p) h
+
+  szB-suc : ∀ (V p : ℕ) → 2 ≤ V → 1 ≤ p →
+    suc (szB V p) ≤ szB V (suc p)
+  szB-suc V p hV hp =
+    ≤-trans (+-monoˡ-≤ B (1≤szB V p))
+    (≤-trans (dbl≤sq V p hp)
+    (≤-trans (≤-reflexive (sym (^-distribˡ-+-* (2 + p) (suc V ^ p) (suc V ^ p))))
+    (≤-trans (^-monoˡ-≤ (suc V ^ p + suc V ^ p) (n≤1+n (2 + p)))
+             (^-monoʳ-≤ (3 + p) two))))
+    where
+    B : ℕ
+    B = (2 + p) ^ (suc V ^ p)
+    two : suc V ^ p + suc V ^ p ≤ suc V ^ suc p
+    two = ≤-trans (≤-reflexive (cong (suc V ^ p +_)
+                                     (sym (+-identityʳ (suc V ^ p)))))
+                  (pow-step V p 2 (≤-trans (≤ᵇ⇒≤ 2 3 tt) (s≤s hV)))
+
+  szB-sq : ∀ (V p : ℕ) → 2 ≤ V → 1 ≤ p →
+    szB V p + szB V p * szB V p ≤ szB V (suc p)
+  szB-sq V p hV hp =
+    ≤-trans (+-monoˡ-≤ (B * B) (1*≤ B B (1≤szB V p)))
+    (≤-trans (≤-trans (≤-reflexive (cong (B * B +_) (sym (+-identityʳ (B * B)))))
+                      (*-monoˡ-≤ (B * B) (≤-trans (≤ᵇ⇒≤ 2 3 tt) (3≤szB V p hp))))
+    (≤-trans (≤-reflexive
+               (trans (cong (B *_)
+                        (sym (^-distribˡ-+-* (2 + p) (suc V ^ p) (suc V ^ p))))
+                      (sym (^-distribˡ-+-* (2 + p) (suc V ^ p)
+                                           (suc V ^ p + suc V ^ p)))))
+    (≤-trans (^-monoˡ-≤ (suc V ^ p + (suc V ^ p + suc V ^ p)) (n≤1+n (2 + p)))
+             (^-monoʳ-≤ (3 + p) three))))
+    where
+    B : ℕ
+    B = (2 + p) ^ (suc V ^ p)
+    three : suc V ^ p + (suc V ^ p + suc V ^ p) ≤ suc V ^ suc p
+    three = ≤-trans (≤-reflexive (cong (λ z → suc V ^ p + (suc V ^ p + z))
+                                       (sym (+-identityʳ (suc V ^ p)))))
+                    (pow-step V p 3 (s≤s hV))
+
+  -- THE REFOLD, and the one place the child sizes matter.  The step
+  -- function's own size is s₁, and the scanᵉ's other two children cost
+  -- at least 1 each, so s₁ + 2 ≤ p.  That is a factor (suc V)² of slack
+  -- in the exponent, and it is exactly what pays for the (2+·)^V and
+  -- the three copies.  Bounding (2 + B₁)^V by B₁^(2V) WITHOUT it wants
+  -- 2V + 2 ≤ suc V and the chain does not close.
+  szB-scan : ∀ (V s₁ s₂ s₃ : ℕ) → 2 ≤ V → 1 ≤ s₁ → 1 ≤ s₂ → 1 ≤ s₃ →
+    (2 + szB V s₁) ^ V
+      * (szB V (s₁ + s₂ + s₃) + szB V (s₁ + s₂ + s₃) + szB V (s₁ + s₂ + s₃))
+    ≤ szB V (suc (s₁ + s₂ + s₃))
+  szB-scan V s₁ s₂ s₃ hV h₁ h₂ h₃ =
+    ≤-trans (*-mono-≤ powBound triple)
+    (≤-trans (≤-reflexive (sym (^-distribˡ-+-* (2 + p)
+                                 ((suc V ^ s₁ + suc V ^ s₁) * V)
+                                 (suc V ^ p + suc V ^ p))))
+    (≤-trans (^-monoˡ-≤ ((suc V ^ s₁ + suc V ^ s₁) * V
+                          + (suc V ^ p + suc V ^ p))
+                        (n≤1+n (2 + p)))
+             (^-monoʳ-≤ (3 + p) expo)))
+    where
+    p : ℕ
+    p  = s₁ + s₂ + s₃
+    1≤p : 1 ≤ p
+    1≤p = ≤-trans h₁ (≤-trans (m≤m+n s₁ s₂) (m≤m+n (s₁ + s₂) s₃))
+    s₁≤p : s₁ ≤ p
+    s₁≤p = ≤-trans (m≤m+n s₁ s₂) (m≤m+n (s₁ + s₂) s₃)
+    s₁+2≤p : s₁ + 2 ≤ p
+    s₁+2≤p = ≤-trans (+-monoʳ-≤ s₁ (+-mono-≤ h₂ h₃))
+                     (≤-reflexive (sym (+-assoc s₁ s₂ s₃)))
+    -- (2 + B₁)^V, flattened into the shared base without ever needing
+    -- (x·y)^n — the step goes through ^-*-assoc instead
+    powBound : (2 + szB V s₁) ^ V
+             ≤ (2 + p) ^ ((suc V ^ s₁ + suc V ^ s₁) * V)
+    powBound =
+      ≤-trans (^-monoˡ-≤ V
+                (≤-trans (≤-trans (+-monoˡ-≤ (szB V s₁)
+                            (≤-trans (≤ᵇ⇒≤ 2 3 tt) (3≤szB V s₁ h₁)))
+                                  (dbl≤sq V s₁ h₁))
+                         (≤-reflexive
+                           (sym (^-distribˡ-+-* (2 + s₁) (suc V ^ s₁)
+                                                (suc V ^ s₁))))))
+      (≤-trans (≤-reflexive (^-*-assoc (2 + s₁) (suc V ^ s₁ + suc V ^ s₁) V))
+               (^-monoˡ-≤ ((suc V ^ s₁ + suc V ^ s₁) * V) (+-monoʳ-≤ 2 s₁≤p)))
+    mul3 : ∀ (b : ℕ) → b + b + b ≡ 3 * b
+    mul3 = solve 1 (λ b → b :+ b :+ b := con 3 :* b) refl
+    triple : szB V p + szB V p + szB V p ≤ (2 + p) ^ (suc V ^ p + suc V ^ p)
+    triple =
+      ≤-trans (≤-reflexive (mul3 (szB V p)))
+      (≤-trans (*-monoˡ-≤ (szB V p) (3≤szB V p 1≤p))
+               (≤-reflexive
+                 (sym (^-distribˡ-+-* (2 + p) (suc V ^ p) (suc V ^ p)))))
+    2V≤W² : V + V ≤ suc V * suc V
+    2V≤W² = ≤-trans (+-mono-≤ (n≤1+n V) (n≤1+n V))
+                    (≤-trans (≤-reflexive (cong (suc V +_)
+                                            (sym (+-identityʳ (suc V)))))
+                             (*-monoˡ-≤ (suc V) (≤-trans hV (n≤1+n V))))
+    swap2 : ∀ (a v : ℕ) → (a + a) * v ≡ a * (v + v)
+    swap2 = solve 2 (λ a v → (a :+ a) :* v := a :* (v :+ v)) refl
+    -- 2V ≤ (suc V)², so the step function's exponent fits in the two
+    -- extra stories that s₁ + 2 ≤ p supplies
+    head≤ : (suc V ^ s₁ + suc V ^ s₁) * V ≤ suc V ^ p
+    head≤ =
+      ≤-trans (≤-reflexive (swap2 (suc V ^ s₁) V))
+      (≤-trans (*-monoʳ-≤ (suc V ^ s₁) 2V≤W²)
+      (≤-trans (≤-reflexive (cong (suc V ^ s₁ *_)
+                              (cong (suc V *_) (sym (*-identityʳ (suc V))))))
+      (≤-trans (≤-reflexive (sym (^-distribˡ-+-* (suc V) s₁ 2)))
+               (^-monoʳ-≤ (suc V) s₁+2≤p))))
+    expo : (suc V ^ s₁ + suc V ^ s₁) * V + (suc V ^ p + suc V ^ p)
+         ≤ suc V ^ suc p
+    expo =
+      ≤-trans (+-monoˡ-≤ (suc V ^ p + suc V ^ p) head≤)
+              (≤-trans (≤-reflexive (cong (λ z → suc V ^ p + (suc V ^ p + z))
+                                          (sym (+-identityʳ (suc V ^ p)))))
+                       (pow-step V p 3 (s≤s hV)))
+
+-- THE INDUCTION, joint in hopD and pm because hopD's clauses read pm
+-- for their coefficients.  Every clause is monotonicity plus one of the
+-- three facts above.
+mutual
+  hopD-sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
+    2 ≤ V → hopDᵉ V e ≤ szB V (sizeᵉ e)
+  hopD-sizeᵉ V (input i) hV = z≤n
+  hopD-sizeᵉ V (ofᵉ ts)  hV =
+    ≤-trans (hopD-sizeᵗˢ V ts hV) (szB-mono V (n≤1+n (sizeᵗˢ ts)))
+  hopD-sizeᵉ V emptyᵉ    hV = z≤n
+  hopD-sizeᵉ V (mapᵉ f e) hV =
+    ≤-trans (+-mono-≤ (≤-trans (hopD-sizeᵗ V f hV)
+                               (szB-mono V (m≤m+n (sizeᵗ f) (sizeᵉ e))))
+                      (*-mono-≤ (⊔-lub (≤-trans (pm-sizeᵗ V 0 f hV)
+                                                (szB-mono V (m≤m+n _ _)))
+                                       (1≤szB V _))
+                                (≤-trans (hopD-sizeᵉ V e hV)
+                                         (szB-mono V (m≤n+m (sizeᵉ e) (sizeᵗ f))))))
+            (szB-sq V (sizeᵗ f + sizeᵉ e) hV
+              (≤-trans (1≤sizeᵗ f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
+  hopD-sizeᵉ V (takeᵉ c e) hV =
+    ≤-trans (hopD-sizeᵉ V e hV)
+            (szB-mono V (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c))
+                                 (n≤1+n (sizeᵗ c + sizeᵉ e))))
+  hopD-sizeᵉ V (scanᵉ f z e) hV =
+    ≤-trans (*-mono-≤ (^-monoˡ-≤ V (+-monoʳ-≤ 2 (pm-sizeᵗ V 0 f hV)))
+              (+-mono-≤ (+-mono-≤ (≤-trans (hopD-sizeᵗ V f hV) (szB-mono V lef))
+                                  (≤-trans (hopD-sizeᵗ V z hV) (szB-mono V lez)))
+                        (≤-trans (hopD-sizeᵉ V e hV) (szB-mono V lee))))
+            (szB-scan V (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) hV
+                      (1≤sizeᵗ f) (1≤sizeᵗ z) (1≤sizeᵉ e))
+    where
+    lef : sizeᵗ f ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
+    lef = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) (m≤m+n _ (sizeᵉ e))
+    lez : sizeᵗ z ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
+    lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
+    lee : sizeᵉ e ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
+    lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
+  hopD-sizeᵉ V (mergeAllᵉ e) hV =
+    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V (concatAllᵉ e) hV =
+    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V (switchAllᵉ e) hV =
+    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V (exhaustAllᵉ e) hV =
+    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V (μᵉ e)     hV =
+    ≤-trans (hopD-sizeᵉ V e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  hopD-sizeᵉ V (varᵉ x)   hV = z≤n
+  hopD-sizeᵉ V (deferᵉ e) hV = z≤n
+
+  hopD-sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (tm : Tm Γ Δᵍ Δ Θ t) →
+    2 ≤ V → hopDᵗ V tm ≤ szB V (sizeᵗ tm)
+  hopD-sizeᵗ V (varᵗ x) hV = z≤n
+  hopD-sizeᵗ V unit̂     hV = z≤n
+  hopD-sizeᵗ V (bool̂ _) hV = z≤n
+  hopD-sizeᵗ V (nat̂ _)  hV = z≤n
+  hopD-sizeᵗ V (pairᵗ a b) hV =
+    ⊔-lub (≤-trans (hopD-sizeᵗ V a hV)
+             (szB-mono V (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b))
+                                  (n≤1+n (sizeᵗ a + sizeᵗ b)))))
+          (≤-trans (hopD-sizeᵗ V b hV)
+             (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a))
+                                  (n≤1+n (sizeᵗ a + sizeᵗ b)))))
+  hopD-sizeᵗ V (fstᵗ q) hV =
+    ≤-trans (hopD-sizeᵗ V q hV) (szB-mono V (n≤1+n (sizeᵗ q)))
+  hopD-sizeᵗ V (sndᵗ q) hV =
+    ≤-trans (hopD-sizeᵗ V q hV) (szB-mono V (n≤1+n (sizeᵗ q)))
+  hopD-sizeᵗ V (inlᵗ a) hV =
+    ≤-trans (hopD-sizeᵗ V a hV) (szB-mono V (n≤1+n (sizeᵗ a)))
+  hopD-sizeᵗ V (inrᵗ a) hV =
+    ≤-trans (hopD-sizeᵗ V a hV) (szB-mono V (n≤1+n (sizeᵗ a)))
+  hopD-sizeᵗ V (caseᵗ sc l r) hV =
+    ≤-trans (+-mono-≤ (⊔-lub (≤-trans (hopD-sizeᵗ V l hV) (szB-mono V cl))
+                             (≤-trans (hopD-sizeᵗ V r hV) (szB-mono V cr)))
+                      (*-mono-≤ (⊔-lub (⊔-lub (≤-trans (pm-sizeᵗ V 0 l hV)
+                                                       (szB-mono V cl))
+                                              (≤-trans (pm-sizeᵗ V 0 r hV)
+                                                       (szB-mono V cr)))
+                                       (1≤szB V _))
+                                (≤-trans (hopD-sizeᵗ V sc hV) (szB-mono V cs))))
+            (szB-sq V (sizeᵗ sc + sizeᵗ l + sizeᵗ r) hV
+                    (≤-trans (1≤sizeᵗ sc) cs))
+    where
+    cs : sizeᵗ sc ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
+    cs = ≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
+                 (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+    cl : sizeᵗ l ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
+    cl = ≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ sc))
+                 (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+    cr : sizeᵗ r ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
+    cr = m≤n+m (sizeᵗ r) (sizeᵗ sc + sizeᵗ l)
+  hopD-sizeᵗ V (ifᵗ c a b) hV =
+    ⊔-lub (≤-trans (hopD-sizeᵗ V a hV)
+             (szB-mono V (≤-trans (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                           (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))
+                                  (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b)))))
+          (≤-trans (hopD-sizeᵗ V b hV)
+             (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))
+                                  (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b)))))
+  hopD-sizeᵗ V (primᵗ _ a) hV = z≤n
+  hopD-sizeᵗ V (strmᵗ e)   hV =
+    ≤-trans (hopD-sizeᵉ V e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+
+  hopD-sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → 2 ≤ V → hopDᵗˢ V ts ≤ szB V (sizeᵗˢ ts)
+  hopD-sizeᵗˢ V []       hV = z≤n
+  hopD-sizeᵗˢ V (y ∷ ys) hV =
+    ⊔-lub (≤-trans (hopD-sizeᵗ V y hV)
+                   (szB-mono V (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))))
+          (≤-trans (hopD-sizeᵗˢ V ys hV)
+                   (szB-mono V (m≤n+m (sizeᵗˢ ys) (sizeᵗ y))))
+
+  pm-sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
+    2 ≤ V → pmᵉ V k e ≤ szB V (sizeᵉ e)
+  pm-sizeᵉ V k (input i) hV = z≤n
+  pm-sizeᵉ V k (ofᵉ ts)  hV =
+    ≤-trans (pm-sizeᵗˢ V k ts hV) (szB-mono V (n≤1+n (sizeᵗˢ ts)))
+  pm-sizeᵉ V k emptyᵉ    hV = z≤n
+  pm-sizeᵉ V k (mapᵉ f e) hV =
+    ≤-trans (+-mono-≤ (≤-trans (pm-sizeᵗ V (suc k) f hV)
+                               (szB-mono V (m≤m+n (sizeᵗ f) (sizeᵉ e))))
+                      (*-mono-≤ (⊔-lub (≤-trans (pm-sizeᵗ V 0 f hV)
+                                                (szB-mono V (m≤m+n _ _)))
+                                       (1≤szB V _))
+                                (≤-trans (pm-sizeᵉ V k e hV)
+                                         (szB-mono V (m≤n+m (sizeᵉ e) (sizeᵗ f))))))
+            (szB-sq V (sizeᵗ f + sizeᵉ e) hV
+              (≤-trans (1≤sizeᵗ f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
+  pm-sizeᵉ V k (takeᵉ c e) hV =
+    ≤-trans (pm-sizeᵉ V k e hV)
+            (szB-mono V (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c))
+                                 (n≤1+n (sizeᵗ c + sizeᵉ e))))
+  pm-sizeᵉ V k (scanᵉ f z e) hV =
+    ≤-trans (*-mono-≤ (^-monoˡ-≤ V (+-monoʳ-≤ 2 (pm-sizeᵗ V 0 f hV)))
+              (+-mono-≤ (+-mono-≤ (≤-trans (pm-sizeᵗ V (suc k) f hV) (szB-mono V lef))
+                                  (≤-trans (pm-sizeᵗ V k z hV) (szB-mono V lez)))
+                        (≤-trans (pm-sizeᵉ V k e hV) (szB-mono V lee))))
+            (szB-scan V (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) hV
+                      (1≤sizeᵗ f) (1≤sizeᵗ z) (1≤sizeᵉ e))
+    where
+    lef : sizeᵗ f ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
+    lef = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) (m≤m+n _ (sizeᵉ e))
+    lez : sizeᵗ z ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
+    lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
+    lee : sizeᵉ e ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
+    lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
+  pm-sizeᵉ V k (mergeAllᵉ e)   hV =
+    ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  pm-sizeᵉ V k (concatAllᵉ e)  hV =
+    ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  pm-sizeᵉ V k (switchAllᵉ e)  hV =
+    ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  pm-sizeᵉ V k (exhaustAllᵉ e) hV =
+    ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  pm-sizeᵉ V k (μᵉ e)     hV =
+    ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  pm-sizeᵉ V k (varᵉ x)   hV = z≤n
+  pm-sizeᵉ V k (deferᵉ e) hV = z≤n
+
+  pm-sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) (tm : Tm Γ Δᵍ Δ Θ t) →
+    2 ≤ V → pmᵗ V k tm ≤ szB V (sizeᵗ tm)
+  pm-sizeᵗ V k (varᵗ x) hV = ≤-trans (ifLe1 (varIx x) k) (1≤szB V 1)
+  pm-sizeᵗ V k unit̂     hV = z≤n
+  pm-sizeᵗ V k (bool̂ _) hV = z≤n
+  pm-sizeᵗ V k (nat̂ _)  hV = z≤n
+  pm-sizeᵗ V k (pairᵗ a b) hV =
+    ⊔-lub (≤-trans (pm-sizeᵗ V k a hV)
+             (szB-mono V (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b))
+                                  (n≤1+n (sizeᵗ a + sizeᵗ b)))))
+          (≤-trans (pm-sizeᵗ V k b hV)
+             (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a))
+                                  (n≤1+n (sizeᵗ a + sizeᵗ b)))))
+  pm-sizeᵗ V k (fstᵗ q) hV =
+    ≤-trans (pm-sizeᵗ V k q hV) (szB-mono V (n≤1+n (sizeᵗ q)))
+  pm-sizeᵗ V k (sndᵗ q) hV =
+    ≤-trans (pm-sizeᵗ V k q hV) (szB-mono V (n≤1+n (sizeᵗ q)))
+  pm-sizeᵗ V k (inlᵗ a) hV =
+    ≤-trans (pm-sizeᵗ V k a hV) (szB-mono V (n≤1+n (sizeᵗ a)))
+  pm-sizeᵗ V k (inrᵗ a) hV =
+    ≤-trans (pm-sizeᵗ V k a hV) (szB-mono V (n≤1+n (sizeᵗ a)))
+  pm-sizeᵗ V k (caseᵗ sc l r) hV =
+    ≤-trans (+-mono-≤ (⊔-lub (≤-trans (pm-sizeᵗ V (suc k) l hV) (szB-mono V cl))
+                             (≤-trans (pm-sizeᵗ V (suc k) r hV) (szB-mono V cr)))
+                      (*-mono-≤ (⊔-lub (⊔-lub (≤-trans (pm-sizeᵗ V 0 l hV)
+                                                       (szB-mono V cl))
+                                              (≤-trans (pm-sizeᵗ V 0 r hV)
+                                                       (szB-mono V cr)))
+                                       (1≤szB V _))
+                                (≤-trans (pm-sizeᵗ V k sc hV) (szB-mono V cs))))
+            (szB-sq V (sizeᵗ sc + sizeᵗ l + sizeᵗ r) hV
+                    (≤-trans (1≤sizeᵗ sc) cs))
+    where
+    cs : sizeᵗ sc ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
+    cs = ≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
+                 (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+    cl : sizeᵗ l ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
+    cl = ≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ sc))
+                 (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+    cr : sizeᵗ r ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
+    cr = m≤n+m (sizeᵗ r) (sizeᵗ sc + sizeᵗ l)
+  pm-sizeᵗ V k (ifᵗ c a b) hV =
+    ⊔-lub (≤-trans (pm-sizeᵗ V k a hV)
+             (szB-mono V (≤-trans (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                           (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))
+                                  (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b)))))
+          (≤-trans (pm-sizeᵗ V k b hV)
+             (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))
+                                  (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b)))))
+  pm-sizeᵗ V k (primᵗ _ a) hV = z≤n
+  pm-sizeᵗ V k (strmᵗ e)   hV =
+    ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+
+  pm-sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → 2 ≤ V → pmᵗˢ V k ts ≤ szB V (sizeᵗˢ ts)
+  pm-sizeᵗˢ V k []       hV = z≤n
+  pm-sizeᵗˢ V k (y ∷ ys) hV =
+    ⊔-lub (≤-trans (pm-sizeᵗ V k y hV)
+                   (szB-mono V (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))))
+          (≤-trans (pm-sizeᵗˢ V k ys hV)
+                   (szB-mono V (m≤n+m (sizeᵗˢ ys) (sizeᵗ y))))
+
 
 -- the r ≤ R discharge, packaged: a stored expression's hop depth sits
 -- under the store rank cap purely because its SIZE does — all through
 -- stBounded?, no extra invariant
-hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
-  sizeᵉ e ≤ V → hopDᵉ V e ≤ hopR V
-hopD-cap V e h =
-  ≤-trans (hopD-size V e)
-  (≤-trans (^-monoˡ-≤ (suc V ^ sizeᵉ e) (+-monoʳ-≤ 2 h))
-           (^-monoʳ-≤ (2 + V) (^-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
+opaque
+  unfolding szB
+
+  hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
+    2 ≤ V → sizeᵉ e ≤ V → hopDᵉ V e ≤ hopR V
+  hopD-cap V e hV h =
+    ≤-trans (hopD-sizeᵉ V e hV)
+    (≤-trans (^-monoˡ-≤ (suc V ^ sizeᵉ e) (+-monoʳ-≤ 2 h))
+             (^-monoʳ-≤ (2 + V) (^-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
 
 -- a shared slot's def is an element of the global syntactic
 -- multiset {program} ⊎ {slots}: its size sits inside the budget's
@@ -1519,6 +1949,16 @@ slotDef-size sl i {d} eq =
 -- half), PROVEN: when a walked template's `input i` hits a shared
 -- slot, the connect's resets re-anchor against the slot's OWN
 -- element of the global syntactic multiset — its def d is fixed
+-- the budget's height is at least 2 at every instant, and towerℕ 2 ≡ 4:
+-- the V ≥ 2 that hopD-size wants is free wherever V is the budget
+2≤sizeBudget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → 2 ≤ sizeBudgetAt e sl id
+2≤sizeBudget e sl id =
+  ≤-trans (≤ᵇ⇒≤ 2 4 tt)
+          (towerℕ-mono {2} {(4 + (sizeᵉ e + slotsSize sl)) * suc id}
+            (≤-trans (s≤s (s≤s z≤n))
+                     (m≤m*n (4 + (sizeᵉ e + slotsSize sl)) (suc id))))
+
 -- slot content, so its hop depth sits under the store rank cap
 -- (feeding dBound-connect's r′ ≤ R) and its walk under the store bound
 -- (feeding dBound-hop/-connect's s′ ≤ V), straight off the
@@ -1528,7 +1968,8 @@ connect-anchor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   let V = sizeBudgetAt e sl id in
   (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
 connect-anchor e sl id i {d} eq =
-  hopD-cap V d size≤V , ≤-trans (syncSize≤sizeᵉ d) size≤V
+  hopD-cap V d (2≤sizeBudget e sl id) size≤V
+  , ≤-trans (syncSize≤sizeᵉ d) size≤V
   where
   V = sizeBudgetAt e sl id
   size≤V : sizeᵉ d ≤ V
@@ -1802,14 +2243,6 @@ dBound-struct V R U r′≤r s′<s =
 -- under deferᵉ, which hopD cuts).  The μ edge pays entirely with
 -- dBound-μ's s, exactly as it already did.
 ------------------------------------------------------------------
-
--- a factor of at least one never shrinks
-1*≤ : ∀ (x k : ℕ) → 1 ≤ k → x ≤ k * x
-1*≤ x k h = ≤-trans (≤-reflexive (sym (+-identityʳ x))) (*-monoˡ-≤ x h)
-
-1≤pow : ∀ (b k : ℕ) → 1 ≤ suc b ^ k
-1≤pow b zero    = ≤-refl
-1≤pow b (suc k) = ≤-trans (1≤pow b k) (m≤m+n _ _)
 
 module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
 
@@ -10019,7 +10452,7 @@ burst-wet e ins =
                 (hopDᵉ V e) (syncSizeᵉ e))
   fuel-ok = hasAtLeast-mono
     (≤-trans (s≤s (dBound-bound (≤-trans (syncSize≤sizeᵉ e) size≤V)
-                                (hopD-cap V e size≤V)))
+                                (hopD-cap V e (2≤sizeBudget e ins 0) size≤V)))
              (seed-covers sz (unconn ins []) U≤sz))
     (budget-hasAtLeast sz 0)
 
