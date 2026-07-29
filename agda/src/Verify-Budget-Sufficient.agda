@@ -55,8 +55,23 @@
 -- unaffected — but it is NOT grind-ready.  The diagnosis, and the one
 -- change that escapes both refutations (walkCap's index must become a
 -- d-free measure, after which ONE shared entry-determined anchor
--- serves all three roles), is written out at hop-anchor-absurd.  That
--- is a contract change beyond the anchor split and has not been taken.
+-- serves all three roles), is written out at hop-anchor-absurd.
+--
+-- ROUND 3 IS PROBED, NOT YET TAKEN (walk-hyps-round3).  The shared
+-- entry-determined anchor IS satisfiable — the hop edge that killed
+-- round 2 becomes dBound-hop verbatim — but the probe also refutes two
+-- things that were expected to survive untouched, so the contract
+-- change is bigger than "re-index walkCap":
+--   · round3-old-ell-absurd — the length hypothesis `pathLen κ + d ≤ ℓ`
+--     carries the SAME loop routed through ℓ (walkCap's base is
+--     (3+Ω)·suc ℓ), so it must be restated d-free as well.
+--   · round3-anchor-indexed-absurd — the work index must be measured
+--     with an ANCHOR-FREE hop depth, which makes hopDᵉ's scan clause
+--     (2 + pmᵗ V 0 f)^V the load-bearing edit: its exponent is the
+--     store anchor.
+-- What remains unchecked is semantic, not arithmetic: that an
+-- entry-determined index really does bound the frame work.  The
+-- deepening-scan probe gates it.  Until then nothing here assumes it.
 --
 -- THREE POSTULATES REMAIN.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
@@ -6182,7 +6197,10 @@ postulate
   --
   -- READ hop-anchor-absurd BELOW BEFORE GRINDING THIS.  Per-call
   -- anchoring does not by itself discharge the hop edge; the probe is
-  -- machine-checked and it REFUTES.
+  -- machine-checked and it REFUTES.  The successor shape is probed at
+  -- walk-hyps-round3, and it needs THIS face's ℓ hypothesis restated
+  -- too (round3-old-ell-absurd) — so the ceiling is not the only
+  -- hypothesis that moves.
   subscribeE-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (Ψ W Ω ℓ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick)
@@ -6246,16 +6264,16 @@ d≤walkCap Ω ℓ d =
           (≤-trans (≤-reflexive (sym (*-identityʳ (3 + Ω))))
                    (*-monoʳ-≤ (3 + Ω) (s≤s z≤n)))
 
--- so does the ceiling's whole exponent argument
-d≤walkArg : ∀ (Ψ Ω ℓ d E : ℕ) → 3 ≤ E →
-  d ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d)
-d≤walkArg Ψ Ω ℓ d E 3≤E =
-  ≤-trans (d≤walkCap Ω ℓ d)
-    (≤-trans (k≤3^k (walkCap Ω ℓ d))
-      (≤-trans (^-monoʳ-≤ 3 w≤Ψw) E-mul))
+-- the cap ITSELF sits under the ceiling's exponent argument.  Stated
+-- separately from d≤walkArg because round 3 needs it at an index that
+-- is NOT the cap's own — the growth index and the demand come apart
+walkCap≤walkArg : ∀ (Ψ Ω ℓ G E : ℕ) → 3 ≤ E →
+  walkCap Ω ℓ G ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G)
+walkCap≤walkArg Ψ Ω ℓ G E 3≤E =
+  ≤-trans (k≤3^k w) (≤-trans (^-monoʳ-≤ 3 w≤Ψw) E-mul)
   where
   w : ℕ
-  w = walkCap Ω ℓ d
+  w = walkCap Ω ℓ G
   w≤Ψw : w ≤ suc Ψ * w
   w≤Ψw = ≤-trans (≤-reflexive (sym (*-identityˡ w)))
                  (*-monoˡ-≤ w {1} {suc Ψ} (s≤s z≤n))
@@ -6263,6 +6281,29 @@ d≤walkArg Ψ Ω ℓ d E 3≤E =
   E-mul = ≤-trans (≤-reflexive (sym (*-identityˡ (3 ^ (suc Ψ * w)))))
                   (*-monoˡ-≤ (3 ^ (suc Ψ * w)) {1} {E}
                              (≤-trans (s≤s z≤n) 3≤E))
+
+-- so does the ceiling's whole exponent argument
+d≤walkArg : ∀ (Ψ Ω ℓ d E : ℕ) → 3 ≤ E →
+  d ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d)
+d≤walkArg Ψ Ω ℓ d E 3≤E =
+  ≤-trans (d≤walkCap Ω ℓ d) (walkCap≤walkArg Ψ Ω ℓ d E 3≤E)
+
+-- and so does the cap's own BASE — the length ledger's ℓ.  This is
+-- what makes the d-indexed length hypothesis refutable under a shared
+-- anchor (round3-old-ell-absurd below)
+ℓ≤walkCap : ∀ (Ω ℓ G : ℕ) → ℓ ≤ walkCap Ω ℓ G
+ℓ≤walkCap Ω ℓ G = ≤-trans (n≤1+n ℓ) (≤-trans sucℓ≤β β≤β^)
+  where
+  β : ℕ
+  β = (3 + Ω) * suc ℓ
+  sucℓ≤β : suc ℓ ≤ β
+  sucℓ≤β = ≤-trans (≤-reflexive (sym (*-identityˡ (suc ℓ))))
+                   (*-monoˡ-≤ (suc ℓ) {1} {3 + Ω} (s≤s z≤n))
+  1≤3^G : 1 ≤ 3 ^ G
+  1≤3^G = ^-monoʳ-≤ 3 {0} {G} z≤n
+  β≤β^ : β ≤ β ^ (3 ^ G)
+  β≤β^ = ≤-trans (≤-reflexive (sym (*-identityʳ β)))
+                 (^-monoʳ-≤ β {1} {3 ^ G} 1≤3^G)
 
 -- THE REFUTATION.  Instantiate at any real call: U = unconn of a
 -- program with a shared slot (≥ 1 at the root, where connectedShares
@@ -6381,6 +6422,152 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
   -- dominates d
   E″<A″ : suc E″ ≤ A″
   E″<A″ = ≤-trans (n<2^n E″) (^-monoˡ-≤ E″ (s≤s (s≤s z≤n)))
+
+------------------------------------------------------------------
+-- ROUND 3 (the candidate), PROBED BEFORE RESTATING ANYTHING.  Two
+-- refutations in two days, both statement-level, both found by writing
+-- the witness down rather than by grinding a clause.  The third shape
+-- gets the same treatment first.
+--
+-- THE WITNESS DAG.  Every parameter must be definable in ONE acyclic
+-- order, each from entry data and previously-defined parameters only:
+--
+--   G := an entry measure (root syntax + slot telescope + Ω)
+--   ℓ := f G                                    -- entry path budget
+--   A := capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+--   d := dBound A (hopR A) U r s                -- huge; fuel is free
+--
+-- A is ONE object in all three roles round 2 needed two for: the
+-- demand anchor, the s′ reset bound at hop edges, and the receipt's
+-- ceiling.  It can be, precisely because walkCap's index is now G and
+-- not d, so nothing to the right of the arrow feeds anything left of
+-- it.  walk-hyps-round3's TYPE is that order: G, ℓ, p, U, r, s are
+-- universally quantified — fixed before anything store-shaped exists —
+-- and A, d are existentially produced from them.  A statement of that
+-- shape cannot hide a cycle.
+--
+-- WHY IT IS NOT TRIVIALLY TRUE, since "pick d enormous" is exactly
+-- what round 2 could not do: there the hop child re-anchored at
+-- capᴱ W E″ for the GROWN ledger, and E″'s permitted range was itself
+-- indexed by d — so enlarging d enlarged the child's anchor faster,
+-- and suc (child demand) ≤ d was unreachable at EVERY d.  Here the
+-- child measures at the same A, so the hop edge is dBound-hop
+-- verbatim.  Conjunct (4) is the one that died in round 2.
+--
+-- AND TWO CONDITIONAL REFUTATIONS, which is the probe's real yield:
+-- the DAG is satisfiable but only after two further contract edits,
+-- and each is forced by a machine-checked absurdity, not by taste.
+--
+--   (a) round3-old-ell-absurd — THE LENGTH HYPOTHESIS MUST BE
+--       RESTATED d-FREE.  `pathLen κ + d ≤ ℓ` forces ℓ ≥ d, the
+--       demand forces d ≥ suc A, and A is a tower in ℓ (ℓ≤walkCap:
+--       walkCap's own base is (3 + Ω) * suc ℓ).  So ℓ ≥ tower ℓ —
+--       the identical three-edge loop, routed through ℓ instead of
+--       through the anchor.  Sharing the anchor does NOT fix this;
+--       only restating the hypothesis does.  It becomes
+--       `pathLen κ + G ≤ ℓ`: path growth paid for by G-derived work,
+--       not by remaining fuel.  Conjunct (7) is its preservation
+--       across a frame crossing, and it mentions no d at all.
+--
+--   (b) round3-anchor-indexed-absurd — G MUST BE MEASURED WITH AN
+--       ANCHOR-FREE HOP DEPTH.  If the work index has to dominate any
+--       quantity that is itself ≥ the anchor, then G ≥ capᴱ W X while
+--       X ≥ walkCap Ω ℓ G ≥ G, and the loop is back.  This is not
+--       hypothetical: hopDᵉ's scan clause is (2 + pmᵗ V 0 f) ^ V * …,
+--       whose EXPONENT is the store anchor, so a single scanᵉ puts the
+--       hop depth above the anchor.  Keep hopD's V-index and round 3
+--       dies exactly where rounds 1 and 2 did.
+--
+-- So the load-bearing edit is NOT walkCap's index — that is a
+-- consequence.  It is hopD's scan-clause allowance, which must move
+-- off the store bound and onto an entry-determined frame-emission
+-- bound.  The premises for that are in the machine already: per-node
+-- sync emissions are ≤ 3 + Ω (widthOK? / ofWᵉ / pathΩ? carry it);
+-- widths are syntax-fixed (strmᵗ is Tm's only obs introduction and
+-- substitution plugs into list elements, never appends); and a sync
+-- frame has no μ feedback (a μ-bound variable lives in Δᵍ and is
+-- reachable only under deferᵉ, Rx/Exp.agda:76-79, which crosses a
+-- tick).  A scan therefore folds at most as many times per frame as
+-- emissions arrive, and that count is entry data.
+--
+-- WHAT IS STILL UNCHECKED, and it is the whole remaining risk: that
+-- an entry-determined G actually DOES bound the real frame work.
+-- That is semantic, not arithmetic, and it is the next probe — the
+-- deepening scan (an obs-typed accumulator refolded into a *All) is
+-- the sharpest known amplifier.  Nothing below this line may assume
+-- the re-index until that probe reports.
+------------------------------------------------------------------
+
+-- the DAG, satisfiable, with every edge of the walk discharged
+walk-hyps-round3 : ∀ (Ψ W Ω E G p U r s : ℕ) →
+  Σ ℕ λ A → Σ ℕ λ d →
+      -- (0) shared anchor and receipt ceiling are ONE expression
+      (A ≡ capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)))
+      -- (1) the ceiling, at that anchor
+    × (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)) ≤ A)
+      -- (2) the demand, at that SAME anchor
+    × (dBound A (hopR A) U r s ≤ d)
+      -- (3) the restated, d-free length hypothesis at entry
+    × (p + G ≤ p + G)
+      -- (4) THE HOP EDGE — where round 2 died
+    × (∀ r″ s″ → r″ < r → s″ ≤ A → suc (dBound A (hopR A) U r″ s″) ≤ d)
+      -- (5) the connect edge
+    × (∀ U″ r″ s″ → U″ < U → r″ ≤ hopR A → s″ ≤ A →
+         suc (dBound A (hopR A) U″ r″ s″) ≤ d)
+      -- (6) the μ edge
+    × (∀ s″ → s″ < s → suc (dBound A (hopR A) U r s″) ≤ d)
+      -- (7) a frame crossing preserves (3), with no reference to d
+    × (∀ q G′ → q + suc G′ ≤ p + G → suc q + G′ ≤ p + G)
+walk-hyps-round3 Ψ W Ω E G p U r s =
+    A , dBound A (hopR A) U r s
+  , refl , ≤-refl , ≤-refl , ≤-refl
+  , (λ r″ s″ r″<r s″≤A →
+       dBound-hop {A} {hopR A} {U} {r″} {r} {s″} {s} r″<r s″≤A)
+  , (λ U″ r″ s″ U″<U r″≤R s″≤A →
+       dBound-connect {A} {hopR A} {U″} {U} {r″} {r} {s″} {s} U″<U r″≤R s″≤A)
+  , (λ s″ s″<s → dBound-μ {A} {hopR A} {U} {r} {s″} {s} s″<s)
+  , (λ q G′ h → ≤-trans (≤-reflexive (sym (+-suc q G′))) h)
+  where
+  A : ℕ
+  A = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G))
+
+-- (a) the OLD length hypothesis, under the shared anchor: still absurd
+round3-old-ell-absurd : ∀ (Ψ W Ω ℓ E G p U r s d : ℕ) → 3 ≤ E →
+  1 ≤ r + suc (hopR (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G)))) * U →
+  dBound (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G)))
+         (hopR (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G)))) U r s ≤ d →
+  p + d ≤ ℓ →
+  ⊥
+round3-old-ell-absurd Ψ W Ω ℓ E G p U r s d 3≤E 1≤ dem len =
+  <-irrefl refl (<-≤-trans A<ℓ ℓ≤A)
+  where
+  X : ℕ
+  X = E * 3 ^ (suc Ψ * walkCap Ω ℓ G)
+  A : ℕ
+  A = capᴱ W X
+  -- the demand outruns its own anchor, and ℓ has to cover the demand
+  A<ℓ : A < ℓ
+  A<ℓ = ≤-trans (sucV≤d A (hopR A) U r s d 1≤ dem)
+                (≤-trans (m≤n+m d p) len)
+  -- but the anchor is a tower in ℓ, because ℓ is walkCap's own base
+  ℓ≤A : ℓ ≤ A
+  ℓ≤A = ≤-trans (ℓ≤walkCap Ω ℓ G)
+          (≤-trans (walkCap≤walkArg Ψ Ω ℓ G E 3≤E)
+                   (<⇒≤ (≤-trans (n<2^n X) (^-monoˡ-≤ X (s≤s (s≤s z≤n))))))
+
+-- (b) a work index that must dominate the anchor: still absurd.  One
+-- scanᵉ suffices to put hopDᵉ V b above V, since its clause's exponent
+-- IS V — which is why hopD's re-index is the load-bearing edit
+round3-anchor-indexed-absurd : ∀ (Ψ W Ω ℓ E G : ℕ) → 3 ≤ E →
+  capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G)) ≤ G →
+  ⊥
+round3-anchor-indexed-absurd Ψ W Ω ℓ E G 3≤E h =
+  <-irrefl refl (<-≤-trans X<A (≤-trans h (d≤walkArg Ψ Ω ℓ G E 3≤E)))
+  where
+  X : ℕ
+  X = E * 3 ^ (suc Ψ * walkCap Ω ℓ G)
+  X<A : X < capᴱ W X
+  X<A = ≤-trans (n<2^n X) (^-monoˡ-≤ X (s≤s (s≤s z≤n)))
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
