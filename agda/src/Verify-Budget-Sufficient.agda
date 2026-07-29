@@ -37,17 +37,17 @@
 -- refutations; see the hop-descent memo below and
 -- agda/probe/Hop-Descent-Probe.agda.
 --
--- SIX POSTULATES REMAIN.  The two real cores are subscribeE-wet and
+-- THREE POSTULATES REMAIN.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
 -- decrement edges each consume one hasAtLeast-peel against
 -- dBound-μ/-hop/-connect; everything between is structural), and the
--- fold's threading invariant (see cascadeGo-wet's memo).  Then
--- subscribeE-walk (the joint wet/dry/length face they are stated
--- against) with its two bookkeeping companions subscribeE-slots and
--- subscribeE-connected-mono, and hopD-size — a size bound on hopD that
--- is pure ℕ-and-^ arithmetic, the last piece of the hop measure that
--- is asserted rather than derived.  SPLICED: Verify-Well-Formed imports
+-- fold's threading invariant (see cascadeGo-wet's memo).  The third is
+-- subscribeE-walk, the joint wet/dry/length face they are stated
+-- against.  PROVEN 2026-07-29: hopD-size (the hop measure is now
+-- derived end to end), and the walk's two bookkeeping companions
+-- subscribeE-slots and subscribeE-connected-mono — one joint `Keeps`
+-- induction over subscribeE's whole clique.  SPLICED: Verify-Well-Formed imports
 -- budget-sufficient from here instead of postulating it.
 module Verify-Budget-Sufficient where
 
@@ -143,7 +143,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 sched-init; st-init; sched-next;
                                 schedHeadOf; schedGo; schedEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
-                                takeVals; cutThrough; pathHasNode;
+                                takeVals; takeDispatch; cutThrough; pathHasNode;
                                 dropSource; arrSource; chainsOf; cascadeGo;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
@@ -6526,24 +6526,490 @@ share-spent-novals : ∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) �
     ≡ []
 share-spent-novals s id = refl
 
-postulate
-  -- the slot telescope is read-only: no clause of the machine rewrites
-  -- Sched.slots, so unconn's first argument is walk-invariant
-  subscribeE-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
-      ≡ Sched.slots sched
+------------------------------------------------------------------
+-- PHASE B — the two structural bookkeeping facts, PROVEN, together.
+--
+-- The slot telescope is read-only and connectedShares is append-only.
+-- Both are one induction over subscribeE's whole clique, so they are
+-- proven jointly: `Keeps` bundles them and the clique is walked once.
+--
+-- What makes the grind mechanical rather than exploratory: across all
+-- of Rx/Evaluator.agda, `slots =` appears exactly ONCE (sched-init) and
+-- `connectedShares =` exactly TWICE (st-init, and sharedConnect, which
+-- PREPENDS toℕ i and touches nothing else).  So every clause is refl,
+-- the IH, or the one cons — and the one cons is `member-cons`.
+--
+-- The clique is subscribeE's own cone: subscribeE, subscribeInner,
+-- thruConsume/-Walk/-Wrap, concatDrain, innerFinish, innerReact,
+-- stepFrame, pushBurst, subscribeAll, sharedConnect,
+-- subscribeSharedSlot, takeDispatch, switchKill.  (foldPath and the
+-- delivery clique are NOT in it — the burst leaves subscribeE and is
+-- pushed through a FRAME, never re-entered through a path.)
+------------------------------------------------------------------
 
-  -- connectedShares is append-only: a share, once connected, stays
-  -- connected for the rest of the cascade
-  subscribeE-connected-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) (s : Source) →
-    memberSource s (EvalSt.connectedShares st) ≡ true →
-    memberSource s
-      (EvalSt.connectedShares (proj₂ (proj₂ (subscribeE g b κ id now sched st))))
-      ≡ true
+-- a RECORD, not a Σ: `keeps-trans` must solve its middle point by
+-- unification, and `EvalSt.connectedShares` is not injective — as a Σ
+-- the whole grind below blocked on metas.  And it is
+-- indexed by the two FIELDS, not by the two states.  The machine
+-- rebuilds a schedule as `record sched { nextNode = suc … }`, which is
+-- not definitionally the schedule it came from — so a state-indexed
+-- record would not accept the recursive call.  Its slots ARE
+-- definitionally the same, and that is all this carries.
+record KeepsC {n} {Γ : Ctx n} (sl sl′ : Slots Γ) (cs cs′ : List Source) : Set where
+  constructor keeps
+  field
+    slotsEq  : sl′ ≡ sl
+    connMono : ∀ s → memberSource s cs ≡ true → memberSource s cs′ ≡ true
+open KeepsC
+
+Keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+        Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
+Keeps sched st sched′ st′ =
+  KeepsC (Sched.slots sched) (Sched.slots sched′)
+         (EvalSt.connectedShares st) (EvalSt.connectedShares st′)
+
+keeps-refl : ∀ {n} {Γ : Ctx n} {sl : Slots Γ} {cs : List Source} → KeepsC sl sl cs cs
+keeps-refl = keeps refl (λ s p → p)
+
+keeps-trans : ∀ {n} {Γ : Ctx n} {a b c : Slots Γ} {x y z : List Source} →
+  KeepsC a b x y → KeepsC b c y z → KeepsC a c x z
+keeps-trans (keeps e₁ m₁) (keeps e₂ m₂) =
+  keeps (trans e₂ e₁) (λ s p → m₂ s (m₁ s p))
+
+-- the ONE fact about connectedShares the connect edge needs
+member-cons : ∀ (s x : Source) (xs : List Source) →
+  memberSource s xs ≡ true → memberSource s (x ∷ xs) ≡ true
+member-cons s x xs p with sameSource s x
+... | true  = refl
+... | false = p
+
+------------------------------------------------------------------
+-- the clique, declared first (mirrors the evaluator's own block)
+------------------------------------------------------------------
+
+subscribeE-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = subscribeE g b κ id now sched st
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+subscribeInner-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = subscribeInner g op allNid κ id now o sched st
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+
+thruConsume-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = thruConsume g op nid κ id now o sched st
+  in Keeps sched st (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
+
+thruWalk-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = thruWalk g op nid κ id now os sched st
+  in Keeps sched st (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
+
+thruWrap-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (fin : Bool)
+  (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = thruWrap op nid fin (vs , bs , sched , st)
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+concatDrain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+  let r = concatDrain g allNid κ id now q sched st
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+
+innerFinish-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (mns : Maybe (NodeState Γ)) →
+  let r = innerFinish g op allNid inst κ id now vals sched st mns
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+innerReact-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (fin : Bool) →
+  let r = innerReact g op allNid inst κ id now vals sched st fin
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+takeDispatch-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (mns : Maybe (NodeState Γ)) →
+  let r = takeDispatch {t = t} {e = e} nid vals fin sched st mns
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+switchKill-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (mv : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  let r = switchKill {t = t} {e = e} mv sched st
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+stepFrame-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = stepFrame g id now f κ vals fin sched st
+  in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                    (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+pushBurst-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+  (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  let r = pushBurst g id now f κ ems sched st
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+subscribeAll-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (ns : NodeState Γ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = subscribeAll g op ns b κ id now sched st
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+sharedConnect-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = sharedConnect g i d κ id now sched st
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+sharedConnect-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let st₁ = register (toℕ i) κ
+              (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+      r   = subscribeE g d (share-sink i) id now sched st₁
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+sharedSlot-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = subscribeSharedSlot g i d κ id now sched st
+  in Keeps sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+------------------------------------------------------------------
+-- the pure leaves: cut/sweep rewrite live, registry, cancelled and
+-- nodes — none of them slots, none of them connectedShares
+------------------------------------------------------------------
+
+takeDispatch-keeps nid vals fin sched st (just (take-st k))
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = keeps refl (λ s p → p)
+... | false = keeps refl (λ s p → p)
+takeDispatch-keeps nid vals fin sched st nothing                  = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (scan-st _))       = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (merge-st _ _))    = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (concat-st _ _ _)) = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (switch-st _ _))   = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))  = keeps-refl
+
+switchKill-keeps nothing  sched st = keeps-refl
+switchKill-keeps (just v) sched st = keeps refl (λ s p → p)
+
+thruWrap-keeps op nid false vs bs sched st = keeps-refl
+thruWrap-keeps mergeᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
+... | just (merge-st k _)      = keeps refl (λ s p → p)
+... | just (scan-st _)         = keeps-refl
+... | just (take-st _)         = keeps-refl
+... | just (concat-st _ _ _)   = keeps-refl
+... | just (switch-st _ _)     = keeps-refl
+... | just (exhaust-st _ _)    = keeps-refl
+... | nothing                  = keeps-refl
+thruWrap-keeps concatᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
+... | just (concat-st q act _) = keeps refl (λ s p → p)
+... | just (scan-st _)         = keeps-refl
+... | just (take-st _)         = keeps-refl
+... | just (merge-st _ _)      = keeps-refl
+... | just (switch-st _ _)     = keeps-refl
+... | just (exhaust-st _ _)    = keeps-refl
+... | nothing                  = keeps-refl
+thruWrap-keeps switchᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur _)   = keeps refl (λ s p → p)
+... | just (scan-st _)         = keeps-refl
+... | just (take-st _)         = keeps-refl
+... | just (merge-st _ _)      = keeps-refl
+... | just (concat-st _ _ _)   = keeps-refl
+... | just (exhaust-st _ _)    = keeps-refl
+... | nothing                  = keeps-refl
+thruWrap-keeps exhaustᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act _)  = keeps refl (λ s p → p)
+... | just (scan-st _)         = keeps-refl
+... | just (take-st _)         = keeps-refl
+... | just (merge-st _ _)      = keeps-refl
+... | just (concat-st _ _ _)   = keeps-refl
+... | just (switch-st _ _)     = keeps-refl
+... | nothing                  = keeps-refl
+
+------------------------------------------------------------------
+-- the recursive members
+------------------------------------------------------------------
+
+subscribeInner-keeps g0 op allNid κ id now o sched st = keeps-refl
+subscribeInner-keeps (gs fuel) op allNid κ id now o sched st =
+  subscribeE-keeps fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+    (record sched { nextNode = suc (Sched.nextNode sched) }) st
+
+thruConsume-keeps g mergeᵒ nid κ id now o sched st =
+  subscribeInner-keeps g mergeᵒ nid κ id now o sched st
+thruConsume-keeps {u = u} g concatᵒ nid κ id now o sched st
+  with lookupNode nid (EvalSt.nodes st)
+... | just (concat-st {w} q true od) with w ≟ᵗ u
+...   | yes refl = keeps-refl
+...   | no _     = keeps-refl
+thruConsume-keeps {u = u} g concatᵒ nid κ id now o sched st
+    | just (concat-st q false od) =
+      subscribeInner-keeps g concatᵒ nid κ id now o sched st
+thruConsume-keeps g concatᵒ nid κ id now o sched st | nothing = keeps-refl
+thruConsume-keeps g concatᵒ nid κ id now o sched st | just (scan-st _) = keeps-refl
+thruConsume-keeps g concatᵒ nid κ id now o sched st | just (take-st _) = keeps-refl
+thruConsume-keeps g concatᵒ nid κ id now o sched st | just (merge-st _ _) = keeps-refl
+thruConsume-keeps g concatᵒ nid κ id now o sched st | just (switch-st _ _) = keeps-refl
+thruConsume-keeps g concatᵒ nid κ id now o sched st | just (exhaust-st _ _) = keeps-refl
+thruConsume-keeps g switchᵒ nid κ id now o sched st
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) =
+      keeps-trans (switchKill-keeps cur sched st)
+                  (subscribeInner-keeps g switchᵒ nid κ id now o
+                     (proj₁ (proj₂ (switchKill cur sched st)))
+                     (proj₂ (proj₂ (switchKill cur sched st))))
+... | just (scan-st _)       = keeps-refl
+... | just (take-st _)       = keeps-refl
+... | just (merge-st _ _)    = keeps-refl
+... | just (concat-st _ _ _) = keeps-refl
+... | just (exhaust-st _ _)  = keeps-refl
+... | nothing                = keeps-refl
+thruConsume-keeps g exhaustᵒ nid κ id now o sched st
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st true od)  = keeps-refl
+... | just (exhaust-st false od) =
+      subscribeInner-keeps g exhaustᵒ nid κ id now o sched st
+... | just (scan-st _)       = keeps-refl
+... | just (take-st _)       = keeps-refl
+... | just (merge-st _ _)    = keeps-refl
+... | just (concat-st _ _ _) = keeps-refl
+... | just (switch-st _ _)   = keeps-refl
+... | nothing                = keeps-refl
+
+thruWalk-keeps g op nid κ id now [] sched st = keeps-refl
+thruWalk-keeps g op nid κ id now (o ∷ os) sched st =
+  keeps-trans (thruConsume-keeps g op nid κ id now o sched st)
+    (thruWalk-keeps g op nid κ id now os
+      (proj₁ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st))))
+      (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))))
+
+concatDrain-keeps g allNid κ id now [] sched st = keeps-refl
+concatDrain-keeps g allNid κ id now (o ∷ q) sched st
+  with proj₁ (proj₂ (proj₂ (proj₂
+        (subscribeInner g concatᵒ allNid κ id now o sched st))))
+... | true =
+      keeps-trans (subscribeInner-keeps g concatᵒ allNid κ id now o sched st)
+        (concatDrain-keeps g allNid κ id now q
+          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+            (subscribeInner g concatᵒ allNid κ id now o sched st))))))
+          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+            (subscribeInner g concatᵒ allNid κ id now o sched st)))))))
+... | false = subscribeInner-keeps g concatᵒ allNid κ id now o sched st
+
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st (just (merge-st k od))   = keeps refl (λ s p → p)
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st nothing                  = keeps-refl
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st (just (scan-st _))       = keeps-refl
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st (just (take-st _))       = keeps-refl
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st (just (concat-st _ _ _)) = keeps-refl
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st (just (switch-st _ _))   = keeps-refl
+innerFinish-keeps g mergeᵒ  allNid inst κ id now vals sched st (just (exhaust-st _ _))  = keeps-refl
+innerFinish-keeps {s = s} g concatᵒ allNid inst κ id now vals sched st
+                  (just (concat-st {w} q act od)) with w ≟ᵗ s
+... | yes refl = concatDrain-keeps g allNid κ id now q sched st
+... | no _     = keeps-refl
+innerFinish-keeps g concatᵒ allNid inst κ id now vals sched st nothing                = keeps-refl
+innerFinish-keeps g concatᵒ allNid inst κ id now vals sched st (just (scan-st _))     = keeps-refl
+innerFinish-keeps g concatᵒ allNid inst κ id now vals sched st (just (take-st _))     = keeps-refl
+innerFinish-keeps g concatᵒ allNid inst κ id now vals sched st (just (merge-st _ _))  = keeps-refl
+innerFinish-keeps g concatᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = keeps-refl
+innerFinish-keeps g concatᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _))= keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od))
+  with c ≡ᵇ inst
+... | true  = keeps refl (λ s p → p)
+... | false = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (switch-st nothing od)) = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st nothing                 = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (scan-st _))      = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (take-st _))      = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (merge-st _ _))   = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _))= keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (exhaust-st act od)) = keeps refl (λ s p → p)
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st nothing                 = keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _))      = keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (take-st _))      = keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (merge-st _ _))   = keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _))= keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _))  = keeps-refl
+
+innerReact-keeps g op allNid inst κ id now vals sched st false = keeps-refl
+innerReact-keeps g op allNid inst κ id now vals sched st true
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  = keeps-refl
+... | false = innerFinish-keeps g op allNid inst κ id now vals sched st
+                (lookupNode allNid (EvalSt.nodes st))
+
+stepFrame-keeps g id now (map-f fn) κ vals fin sched st = keeps-refl
+stepFrame-keeps {u = u} g id now (scan-f fn nid) κ vals fin sched st
+  with lookupNode nid (EvalSt.nodes st)
+... | just (scan-st {w} sacc) with w ≟ᵗ u
+...   | yes refl = keeps refl (λ s p → p)
+...   | no _     = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | nothing = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (take-st _) = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (merge-st _ _) = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (concat-st _ _ _) = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (switch-st _ _) = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (exhaust-st _ _) = keeps-refl
+stepFrame-keeps g id now (take-f nid) κ vals fin sched st =
+  takeDispatch-keeps nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
+stepFrame-keeps g id now (from-inner op allNid inst) κ vals fin sched st =
+  innerReact-keeps g op allNid inst κ id now vals sched st fin
+stepFrame-keeps g id now (thru-outer op nid) κ vals fin sched st =
+  keeps-trans (thruWalk-keeps g op nid κ id now vals sched st)
+    (thruWrap-keeps op nid fin
+      (proj₁ (thruWalk g op nid κ id now vals sched st))
+      (proj₁ (proj₂ (thruWalk g op nid κ id now vals sched st)))
+      (proj₁ (proj₂ (proj₂ (thruWalk g op nid κ id now vals sched st))))
+      (proj₂ (proj₂ (proj₂ (thruWalk g op nid κ id now vals sched st)))))
+
+pushBurst-keeps g id now f κ [] sched st = keeps-refl
+pushBurst-keeps g id now f κ (em ∷ ems) sched st =
+  keeps-trans
+    (stepFrame-keeps g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st)
+    (pushBurst-keeps g id now f κ ems
+       (proj₁ (proj₂ (proj₂ (proj₂ SF))))
+       (proj₂ (proj₂ (proj₂ (proj₂ SF)))))
+  where
+  sp = splitEvents (InstEmit.events em)
+  SF = stepFrame g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+
+subscribeAll-keeps g op ns b κ id now sched st =
+  keeps-trans
+    (subscribeE-keeps g b (thru-outer op (Sched.nextNode sched) ↠ κ) id now
+       (record sched { nextNode = suc (Sched.nextNode sched) })
+       (installNode (Sched.nextNode sched) ns st))
+    (pushBurst-keeps g id now (thru-outer op (Sched.nextNode sched)) κ
+       (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)))
+  where
+  SE = subscribeE g b (thru-outer op (Sched.nextNode sched) ↠ κ) id now
+         (record sched { nextNode = suc (Sched.nextNode sched) })
+         (installNode (Sched.nextNode sched) ns st)
+
+-- the connect's payment, hoisted out of the burstCompleted split: both
+-- exits return sched₁ and a state whose connectedShares is st₂'s, so the
+-- branch is cosmetic and the proof is shared
+sharedConnect-core fuel i d κ id now sched st =
+  keeps (slotsEq K0)
+        (λ s p → connMono K0 s
+                   (member-cons s (toℕ i) (EvalSt.connectedShares st) p))
+  where
+  K0 = subscribeE-keeps fuel d (share-sink i) id now sched
+         (register (toℕ i) κ
+           (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+
+sharedConnect-keeps g0 i d κ id now sched st = keeps-refl
+sharedConnect-keeps (gs fuel) i d κ id now sched st
+  with burstCompleted (proj₁ (subscribeE fuel d (share-sink i) id now sched
+         (register (toℕ i) κ
+           (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))))
+... | true  = sharedConnect-core fuel i d κ id now sched st
+... | false = sharedConnect-core fuel i d κ id now sched st
+
+sharedSlot-keeps g i d κ id now sched st
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  = keeps-refl
+... | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+...   | true  = keeps-refl
+...   | false = sharedConnect-keeps g i d κ id now sched st
+
+subscribeE-keeps {Γ = Γ} g (input i) κ id now sched st with Sched.slots sched i
+... | shared d = sharedSlot-keeps g i d κ id now sched st
+... | scripted (hot _) with memberSource (toℕ i) (EvalSt.completedSources st)
+...   | true  = keeps-refl
+...   | false = keeps-refl
+subscribeE-keeps g (input i) κ id now sched st | scripted (cold sync [])       = keeps-refl
+subscribeE-keeps g (input i) κ id now sched st | scripted (cold sync (x ∷ xs)) = keeps-refl
+subscribeE-keeps g (ofᵉ ts)  κ id now sched st = keeps-refl
+subscribeE-keeps g emptyᵉ    κ id now sched st = keeps-refl
+subscribeE-keeps g (mapᵉ f b) κ id now sched st =
+  keeps-trans (subscribeE-keeps g b (map-f f ↠ κ) id now sched st)
+    (pushBurst-keeps g id now (map-f f) κ
+      (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)))
+  where SE = subscribeE g b (map-f f ↠ κ) id now sched st
+subscribeE-keeps g (takeᵉ count b) κ id now sched st with evalTm count
+... | zero  = keeps-refl
+... | suc k =
+      keeps-trans (subscribeE-keeps g b (take-f (Sched.nextNode sched) ↠ κ) id now
+                    (record sched { nextNode = suc (Sched.nextNode sched) })
+                    (installNode (Sched.nextNode sched) (take-st (suc k)) st))
+        (pushBurst-keeps g id now (take-f (Sched.nextNode sched)) κ
+          (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)))
+      where SE = subscribeE g b (take-f (Sched.nextNode sched) ↠ κ) id now
+                   (record sched { nextNode = suc (Sched.nextNode sched) })
+                   (installNode (Sched.nextNode sched) (take-st (suc k)) st)
+subscribeE-keeps g (scanᵉ f z b) κ id now sched st =
+  keeps-trans (subscribeE-keeps g b (scan-f f (Sched.nextNode sched) ↠ κ) id now
+                (record sched { nextNode = suc (Sched.nextNode sched) })
+                (installNode (Sched.nextNode sched) (scan-st (evalTm z)) st))
+    (pushBurst-keeps g id now (scan-f f (Sched.nextNode sched)) κ
+      (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)))
+  where SE = subscribeE g b (scan-f f (Sched.nextNode sched) ↠ κ) id now
+               (record sched { nextNode = suc (Sched.nextNode sched) })
+               (installNode (Sched.nextNode sched) (scan-st (evalTm z)) st)
+subscribeE-keeps g (mergeAllᵉ b) κ id now sched st =
+  subscribeAll-keeps g mergeᵒ (merge-st 0 false) b κ id now sched st
+subscribeE-keeps {u = u} g (concatAllᵉ b) κ id now sched st =
+  subscribeAll-keeps g concatᵒ (concat-st {t = u} [] false false) b κ id now sched st
+subscribeE-keeps g (switchAllᵉ b) κ id now sched st =
+  subscribeAll-keeps g switchᵒ (switch-st nothing false) b κ id now sched st
+subscribeE-keeps g (exhaustAllᵉ b) κ id now sched st =
+  subscribeAll-keeps g exhaustᵒ (exhaust-st false false) b κ id now sched st
+subscribeE-keeps g0 (μᵉ body) κ id now sched st = keeps-refl
+subscribeE-keeps (gs fuel) (μᵉ body) κ id now sched st =
+  subscribeE-keeps fuel (unfoldμ body) κ id now sched st
+subscribeE-keeps g (varᵉ ()) κ id now sched st
+subscribeE-keeps g (deferᵉ body) κ id now sched st = keeps-refl
+
+------------------------------------------------------------------
+-- the two faces
+
+subscribeE-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
+    ≡ Sched.slots sched
+subscribeE-slots g b κ id now sched st =
+  slotsEq (subscribeE-keeps g b κ id now sched st)
+
+subscribeE-connected-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (s : Source) →
+  memberSource s (EvalSt.connectedShares st) ≡ true →
+  memberSource s
+    (EvalSt.connectedShares (proj₂ (proj₂ (subscribeE g b κ id now sched st))))
+    ≡ true
+subscribeE-connected-mono g b κ id now sched st s =
+  connMono (subscribeE-keeps g b κ id now sched st) s
 
 -- THE SHARE BOUNDARY'S PAYMENT, assembled.  sharedConnect adds i to
 -- connectedShares before walking the def, so unconn-insert's strict drop is
