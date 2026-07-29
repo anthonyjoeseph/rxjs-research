@@ -37,6 +37,17 @@
 -- refutations; see the hop-descent memo below and
 -- agda/probe/Hop-Descent-Probe.agda.
 --
+-- READ THIS FIRST (2026-07-29): subscribeE-walk, the joint face the
+-- two cores were to be derived from, is VACUOUS.  Its demand
+-- hypothesis and its ceiling hypothesis contradict each other on any
+-- call with one unconnected share or one remaining hop —
+-- walk-hyps-absurd, beside the postulate, is the machine-checked
+-- proof.  A single V cannot be both the anchor the demand is measured
+-- at and the ceiling every mid-walk position fits under.  The repair
+-- is a change of contract (split the anchor), so it is NOT applied
+-- here; see the memo at the postulate.  No work should be spent
+-- grinding the walk's clauses until that is settled.
+--
 -- THREE POSTULATES REMAIN.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
 -- induction over the subscription machine's clauses (the three
@@ -6175,6 +6186,116 @@ postulate
             ≤ mintCount sched st + walkCap Ω ℓ d)
        × (burstLen (proj₁ r) ≤ walkCap Ω ℓ d)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+------------------------------------------------------------------
+-- STOP.  THE FACE ABOVE IS VACUOUS — machine-checked, 2026-07-29.
+--
+-- Two of its hypotheses contradict each other on every call that has
+-- ONE unconnected share or ONE remaining hop:
+--
+--   (demand)  dBound V (hopR V) U (hopDᵉ V b) (syncSizeᵉ b) ≤ d
+--   (ceiling) capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d))       ≤ V
+--
+-- V occurs on BOTH sides of a circle, and both directions are
+-- super-exponential:
+--
+--   · (demand) puts d ABOVE V.  dBound V R U r s expands to
+--     s + suc V * (r + suc R * U), so as soon as r + suc R * U ≥ 1 —
+--     which is any unconnected share (U ≥ 1) or any remaining hop
+--     (r ≥ 1, i.e. any *All operator, since hopDᵉ V (mergeAllᵉ e) =
+--     suc …) — we get d ≥ suc V.
+--
+--   · (ceiling) puts V ABOVE a TOWER in d.  walkCap Ω ℓ d is
+--     ((3+Ω)·suc ℓ)^(3^d) ≥ 3^(3^d) ≥ d, so the ceiling's argument X
+--     is ≥ d, and capᴱ W X ≥ 2^X > X.  So V > X ≥ d.
+--
+-- d ≥ suc V and V > d.  Absurd — walk-hyps-absurd below is the proof.
+-- The postulate is therefore TRUE but UNUSABLE: it can never be
+-- instantiated for a program with a share or a higher-order operator,
+-- so it cannot discharge subscribeE-wet, which is the only thing it
+-- exists to do.  Grinding its clauses would prove nothing.
+--
+-- WHY THIS IS A SHAPE BUG, NOT A CONSTANT BUG.  No choice of Ψ, W, Ω,
+-- ℓ, E, or of walkCap's base or exponent, breaks the circle: (demand)
+-- is monotone increasing in V and (ceiling) is monotone increasing in
+-- d, and their composite has no fixed point once one side is a tower.
+-- The circle is the DESIGN: the memo above ties the halves together
+-- with a single V that is at once the descent anchor the demand is
+-- measured at AND the ceiling every mid-walk ledger position must fit
+-- under.  A single anchor cannot be both.
+--
+-- THE REPAIR THAT LOOKS RIGHT (for Anthony to rule on, not to be
+-- taken unilaterally): SPLIT THE ANCHOR.  Measure the demand at the
+-- ENTRY store bound B₀ = capᴱ W E, which is fixed before the walk
+-- starts —
+--
+--   dBound (capᴱ W E) (hopR (capᴱ W E)) U (hopDᵉ (capᴱ W E) b) (syncSizeᵉ b) ≤ d
+--
+-- — and keep the ceiling at V.  Then d is a function of the entry
+-- bound alone, V is free to be chosen as a tower above it, and the
+-- constraint is satisfiable.  This is a real change of contract, not
+-- a constant bump, so it is NOT made here.  Everything it touches
+-- (which anchor hopD's descent lemmas are stated at, whether
+-- dBound-hop's `s′ ≤ V` reset still lands, what burst-wet must
+-- supply) has to be re-derived from it.
+------------------------------------------------------------------
+
+-- (demand) alone already puts d past V, given one share or one hop
+sucV≤d : ∀ (V R U r s d : ℕ) → 1 ≤ r + suc R * U →
+  dBound V R U r s ≤ d → suc V ≤ d
+sucV≤d V R U r s d 1≤ h =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (suc V))))
+                   (*-monoʳ-≤ (suc V) 1≤))
+          (≤-trans (m≤n+m (suc V * (r + suc R * U)) s) h)
+
+-- walkCap's base is ≥ 3 and its exponent is 3^d, so it dominates d
+d≤walkCap : ∀ (Ω ℓ d : ℕ) → d ≤ walkCap Ω ℓ d
+d≤walkCap Ω ℓ d =
+  ≤-trans (k≤3^k d)
+    (≤-trans (^-monoʳ-≤ 3 (k≤3^k d))
+             (^-monoˡ-≤ (3 ^ d) 3≤β))
+  where
+  3≤β : 3 ≤ (3 + Ω) * suc ℓ
+  3≤β = ≤-trans (m≤m+n 3 Ω)
+          (≤-trans (≤-reflexive (sym (*-identityʳ (3 + Ω))))
+                   (*-monoʳ-≤ (3 + Ω) (s≤s z≤n)))
+
+-- so does the ceiling's whole exponent argument
+d≤walkArg : ∀ (Ψ Ω ℓ d E : ℕ) → 3 ≤ E →
+  d ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d)
+d≤walkArg Ψ Ω ℓ d E 3≤E =
+  ≤-trans (d≤walkCap Ω ℓ d)
+    (≤-trans (k≤3^k (walkCap Ω ℓ d))
+      (≤-trans (^-monoʳ-≤ 3 w≤Ψw) E-mul))
+  where
+  w : ℕ
+  w = walkCap Ω ℓ d
+  w≤Ψw : w ≤ suc Ψ * w
+  w≤Ψw = ≤-trans (≤-reflexive (sym (*-identityˡ w)))
+                 (*-monoˡ-≤ w {1} {suc Ψ} (s≤s z≤n))
+  E-mul : 3 ^ (suc Ψ * w) ≤ E * 3 ^ (suc Ψ * w)
+  E-mul = ≤-trans (≤-reflexive (sym (*-identityˡ (3 ^ (suc Ψ * w)))))
+                  (*-monoˡ-≤ (3 ^ (suc Ψ * w)) {1} {E}
+                             (≤-trans (s≤s z≤n) 3≤E))
+
+-- THE REFUTATION.  Instantiate at any real call: U = unconn of a
+-- program with a shared slot (≥ 1 at the root, where connectedShares
+-- is []), or r = hopDᵉ V b of any *All (≥ 1 by hopD's own suc).
+walk-hyps-absurd : ∀ (Ψ W Ω V ℓ R U r s d E : ℕ) →
+  3 ≤ E →
+  1 ≤ r + suc R * U →
+  dBound V R U r s ≤ d →
+  capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)) ≤ V →
+  ⊥
+walk-hyps-absurd Ψ W Ω V ℓ R U r s d E 3≤E 1≤ dem ceil =
+  <-irrefl refl
+    (≤-trans (≤-trans (sucV≤d V R U r s d 1≤ dem)
+                      (d≤walkArg Ψ Ω ℓ d E 3≤E))
+             (≤-trans (<⇒≤ (n<2^n X))
+                      (≤-trans (^-monoˡ-≤ X (s≤s (s≤s z≤n))) ceil)))
+  where
+  X : ℕ
+  X = E * 3 ^ (suc Ψ * walkCap Ω ℓ d)
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
