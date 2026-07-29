@@ -37,16 +37,26 @@
 -- refutations; see the hop-descent memo below and
 -- agda/probe/Hop-Descent-Probe.agda.
 --
--- READ THIS FIRST (2026-07-29): subscribeE-walk, the joint face the
--- two cores were to be derived from, is VACUOUS.  Its demand
--- hypothesis and its ceiling hypothesis contradict each other on any
--- call with one unconnected share or one remaining hop —
--- walk-hyps-absurd, beside the postulate, is the machine-checked
--- proof.  A single V cannot be both the anchor the demand is measured
--- at and the ceiling every mid-walk position fits under.  The repair
--- is a change of contract (split the anchor), so it is NOT applied
--- here; see the memo at the postulate.  No work should be spent
--- grinding the walk's clauses until that is settled.
+-- READ THIS FIRST (2026-07-29).  subscribeE-walk has been refuted
+-- TWICE in one day, and the second refutation is the live one.
+--
+--   walk-hyps-absurd    the 2026-07-24 face was VACUOUS: one V served
+--                       as both the demand anchor and the store
+--                       ceiling, and those two roles contradict.
+--   hop-anchor-absurd   the anchor split (demand at the call's own
+--                       entry bound capᴱ W E) removes the vacuity but
+--                       does NOT close the hop edge: a call and its
+--                       hop child then sit at DIFFERENT anchors, the
+--                       child's anchor exceeds the parent's d, and the
+--                       child's demand exceeds it in turn.
+--
+-- The split face is what stands in the file — it is strictly better
+-- than the vacuous one and its store/width/ledger conjuncts are
+-- unaffected — but it is NOT grind-ready.  The diagnosis, and the one
+-- change that escapes both refutations (walkCap's index must become a
+-- d-free measure, after which ONE shared entry-determined anchor
+-- serves all three roles), is written out at hop-anchor-absurd.  That
+-- is a contract change beyond the anchor split and has not been taken.
 --
 -- THREE POSTULATES REMAIN.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
@@ -6156,8 +6166,25 @@ walkCap Ω ℓ d = ((3 + Ω) * suc ℓ) ^ (3 ^ d)
 ------------------------------------------------------------------
 
 postulate
+  -- THE SPLIT-ANCHOR FACE (2026-07-29).  The 2026-07-24 statement was
+  -- VACUOUS: a single V was at once the demand anchor and the store
+  -- ceiling, and those two roles contradict each other (walk-hyps-absurd
+  -- below).  Repaired here by anchoring the demand — and the emitted-hopD
+  -- conjunct that feeds the *All recursion, which must sit at the SAME
+  -- anchor or the recursion cannot feed itself — at the call's own ENTRY
+  -- bound capᴱ W E.
+  --
+  -- V and the ceiling hypothesis are GONE, not renamed: once the demand
+  -- and burstHopD? move off V, V occurs nowhere in the conclusion, and a
+  -- hypothesis constraining a variable the statement never mentions again
+  -- is dead weight.  The repaired face is strictly smaller than the old
+  -- one.
+  --
+  -- READ hop-anchor-absurd BELOW BEFORE GRINDING THIS.  Per-call
+  -- anchoring does not by itself discharge the hop edge; the probe is
+  -- machine-checked and it REFUTES.
   subscribeE-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (Ψ W Ω V ℓ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (Ψ W Ω ℓ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (E d : ℕ) →
     3 ≤ E →
@@ -6165,22 +6192,20 @@ postulate
     sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
     pathB? (capᴱ W E) Ψ κ ≡ true →
     widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
-    dBound V (hopR V)
+    -- demand, anchored at this call's entry store bound
+    dBound (capᴱ W E) (hopR (capᴱ W E))
            (unconn (Sched.slots sched) (EvalSt.connectedShares st))
-           (hopDᵉ V b) (syncSizeᵉ b) ≤ d →
+           (hopDᵉ (capᴱ W E) b) (syncSizeᵉ b) ≤ d →
     g hasAtLeast suc d →
     pathLen κ + d ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
-    capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)) ≤ V →
     let r = subscribeE g b κ id now sched st
     in Σ ℕ λ E′ → (E ≤ E′)
        × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ d))
        × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
-       -- the hop edge: what comes out is no deeper than what went in,
-       -- so entering an inner strictly descends by the *All clause's
-       -- own `suc`
-       × (burstHopD? V (hopDᵉ V b) (proj₁ r) ≡ true)
+       -- the hop edge's feed: at the SAME anchor as the demand
+       × (burstHopD? (capᴱ W E) (hopDᵉ (capᴱ W E) b) (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
             ≤ mintCount sched st + walkCap Ω ℓ d)
@@ -6188,56 +6213,17 @@ postulate
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
 ------------------------------------------------------------------
--- STOP.  THE FACE ABOVE IS VACUOUS — machine-checked, 2026-07-29.
---
--- Two of its hypotheses contradict each other on every call that has
--- ONE unconnected share or ONE remaining hop:
+-- REFUTATION 1 (the statement): the 2026-07-24 face was vacuous.
 --
 --   (demand)  dBound V (hopR V) U (hopDᵉ V b) (syncSizeᵉ b) ≤ d
 --   (ceiling) capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d))       ≤ V
 --
--- V occurs on BOTH sides of a circle, and both directions are
--- super-exponential:
---
---   · (demand) puts d ABOVE V.  dBound V R U r s expands to
---     s + suc V * (r + suc R * U), so as soon as r + suc R * U ≥ 1 —
---     which is any unconnected share (U ≥ 1) or any remaining hop
---     (r ≥ 1, i.e. any *All operator, since hopDᵉ V (mergeAllᵉ e) =
---     suc …) — we get d ≥ suc V.
---
---   · (ceiling) puts V ABOVE a TOWER in d.  walkCap Ω ℓ d is
---     ((3+Ω)·suc ℓ)^(3^d) ≥ 3^(3^d) ≥ d, so the ceiling's argument X
---     is ≥ d, and capᴱ W X ≥ 2^X > X.  So V > X ≥ d.
---
--- d ≥ suc V and V > d.  Absurd — walk-hyps-absurd below is the proof.
--- The postulate is therefore TRUE but UNUSABLE: it can never be
--- instantiated for a program with a share or a higher-order operator,
--- so it cannot discharge subscribeE-wet, which is the only thing it
--- exists to do.  Grinding its clauses would prove nothing.
---
--- WHY THIS IS A SHAPE BUG, NOT A CONSTANT BUG.  No choice of Ψ, W, Ω,
--- ℓ, E, or of walkCap's base or exponent, breaks the circle: (demand)
--- is monotone increasing in V and (ceiling) is monotone increasing in
--- d, and their composite has no fixed point once one side is a tower.
--- The circle is the DESIGN: the memo above ties the halves together
--- with a single V that is at once the descent anchor the demand is
--- measured at AND the ceiling every mid-walk ledger position must fit
--- under.  A single anchor cannot be both.
---
--- THE REPAIR THAT LOOKS RIGHT (for Anthony to rule on, not to be
--- taken unilaterally): SPLIT THE ANCHOR.  Measure the demand at the
--- ENTRY store bound B₀ = capᴱ W E, which is fixed before the walk
--- starts —
---
---   dBound (capᴱ W E) (hopR (capᴱ W E)) U (hopDᵉ (capᴱ W E) b) (syncSizeᵉ b) ≤ d
---
--- — and keep the ceiling at V.  Then d is a function of the entry
--- bound alone, V is free to be chosen as a tower above it, and the
--- constraint is satisfiable.  This is a real change of contract, not
--- a constant bump, so it is NOT made here.  Everything it touches
--- (which anchor hopD's descent lemmas are stated at, whether
--- dBound-hop's `s′ ≤ V` reset still lands, what burst-wet must
--- supply) has to be re-derived from it.
+-- (demand) puts d ≥ suc V as soon as the call has ONE unconnected
+-- share or ONE remaining hop, since dBound V R U r s expands to
+-- s + suc V * (r + suc R * U).  (ceiling) puts V above a tower in d:
+-- walkCap Ω ℓ d ≥ 3^(3^d) ≥ d, and capᴱ W X ≥ 2^X > X.  d ≥ suc V and
+-- V > d.  walk-hyps-absurd is the proof; walk-hyps-splitAnchor is the
+-- contrast showing the split makes the same constraints satisfiable.
 ------------------------------------------------------------------
 
 -- (demand) alone already puts d past V, given one share or one hop
@@ -6309,6 +6295,92 @@ walk-hyps-splitAnchor : ∀ (Ψ W Ω ℓ E B₀ R U r s : ℕ) →
 walk-hyps-splitAnchor Ψ W Ω ℓ E B₀ R U r s =
   capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ (dBound B₀ R U r s)))
   , dBound B₀ R U r s , ≤-refl , ≤-refl
+
+------------------------------------------------------------------
+-- REFUTATION 2 (the hop edge): THE SPLIT ANCHOR DOES NOT CLOSE
+-- EITHER.  Probed 2026-07-29 BEFORE grinding any clause, per the
+-- outside-in rule — the vacuity had already shown once that this face
+-- can look grind-ready and be uninstantiable, so the most uncertain
+-- piece goes first.  IT REFUTES.
+--
+-- With per-call anchoring, each call measures its demand at its OWN
+-- entry bound.  The outer call sits at A = capᴱ W E with demand ≤ d.
+-- It re-enters (subscribeInner) on an inner observable o drawn from
+-- the carrier's burst.  By then the ledger has moved to E″, and the
+-- face's own receipt conjunct permits E″ anywhere up to
+-- E * 3 ^ (suc Ψ * walkCap Ω ℓ d).  So the inner call's anchor is
+-- A″ = capᴱ W E″, its demand is dBound A″ (hopR A″) U″ r″ s″, and the
+-- hop edge owes  suc (inner demand) ≤ d.
+--
+-- That is impossible at the ledger the face itself permits:
+--
+--   · d  ≤ E″                    (d≤walkArg — the work bound dominates d)
+--   · E″ <  capᴱ W E″ ≡ A″       (n<2^n, then base 2 ≤ 2 + 2W)
+--   · suc A″ ≤ inner demand      (sucV≤d — ONE inner share or ONE
+--                                 remaining hop is enough)
+--
+-- so A″ < d ≤ E″ < A″.  Absurd.
+--
+-- WHAT THIS MEANS.  The split did not remove the circle; it MOVED it,
+-- from between the face's two hypotheses to between a call and its own
+-- hop child.  Both times the mechanism is identical: an anchor that
+-- tracks the store, a demand monotone in that anchor, and a store that
+-- grows super-exponentially in the demand.  Renaming the anchor cannot
+-- fix a loop whose three edges are all still present.
+--
+-- Note the refutation needs NO facts about hopD at all — not its scan
+-- clause, not its monotonicity in the anchor.  It is pure dBound /
+-- capᴱ / walkCap arithmetic, so no recalibration of the hop measure
+-- can escape it.  (Anchor-monotonicity of hopD would make it worse,
+-- not better: hopDᵉ A″ o ≥ hopDᵉ A o, so the inner r″ is inflated too.)
+--
+-- WHAT WOULD ESCAPE IT, stated so the next session does not re-derive
+-- it: the anchor must be SHARED across the whole walk (so the hop edge
+-- never transports between two different anchors) AND
+-- ENTRY-DETERMINED (so it does not depend on d).  That is exactly what
+-- the ceiling was trying and failing to be — it was shared, but it was
+-- indexed by walkCap Ω ℓ d, which is d-dependent, and that is the
+-- edge that closed the loop.  So the change is not to the anchor at
+-- all: it is to the GROWTH CAP.  walkCap's index must become a
+-- d-free measure of the walk's work — the hop depth and the syntax
+-- both bound it, and both are fixed at entry — after which one shared
+-- anchor capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G)) with G entry-
+-- determined serves as the demand anchor, the s′ reset bound, and the
+-- store ceiling at once, with no circularity.
+--
+-- That is a contract change beyond the anchor split, so it is NOT
+-- taken here.
+------------------------------------------------------------------
+
+hop-anchor-absurd : ∀ (Ψ W Ω ℓ E d U″ r″ s″ : ℕ) →
+  3 ≤ E →
+  -- the inner call is nontrivial: one unconnected share or one hop
+  1 ≤ r″ + suc (hopR (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)))) * U″ →
+  -- what the hop edge owes, at the largest ledger the receipt permits
+  suc (dBound (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)))
+              (hopR (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d))))
+              U″ r″ s″) ≤ d →
+  ⊥
+hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
+  <-irrefl refl
+    (≤-trans A″<d (≤-trans (d≤walkArg Ψ Ω ℓ d E 3≤E) (<⇒≤ E″<A″)))
+  where
+  E″ : ℕ
+  E″ = E * 3 ^ (suc Ψ * walkCap Ω ℓ d)
+  A″ : ℕ
+  A″ = capᴱ W E″
+
+  -- the inner demand already exceeds its own anchor, and d exceeds it
+  A″<d : suc A″ ≤ d
+  A″<d = ≤-trans (n≤1+n (suc A″))
+           (≤-trans (s≤s (sucV≤d A″ (hopR A″) U″ r″ s″
+                            (dBound A″ (hopR A″) U″ r″ s″) 1≤ ≤-refl))
+                    owed)
+
+  -- but the anchor is exponential in the ledger, which already
+  -- dominates d
+  E″<A″ : suc E″ ≤ A″
+  E″<A″ = ≤-trans (n<2^n E″) (^-monoˡ-≤ E″ (s≤s (s≤s z≤n)))
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
