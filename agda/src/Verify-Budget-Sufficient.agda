@@ -6998,6 +6998,66 @@ capsOK?-mono c c′ sched st (sz≤ , wd≤ , rg≤) h
                      (EvalSt.nodes st) hWN)
            (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen))))
 
+------------------------------------------------------------------
+-- frameStep IS MONOTONE IN j — the last toolkit piece.  The induction
+-- lifts a sub-result at frameStep (j + a) to frameStep (j + b) for
+-- a ≤ b (via capsOK?-mono), which needs frameStep j c ⊑ᶜ frameStep j′ c
+-- for j ≤ j′.  Each iterated component is inflationary because its step
+-- is: sizeStep needs 1 ≤ S, foldStep needs 2 ≤ S — and cSize (which is
+-- S) is ≥ 2 for every real cap (the base is 2 + sizeᵉ + …).
+------------------------------------------------------------------
+
+-- SIZE: sizeStep is inflationary for S ≥ 1, and iterating it only grows
+s≤2s : ∀ (s : ℕ) → s ≤ 2 * s
+s≤2s s = m≤m+n s (s + 0)
+
+sizeStep-infl : ∀ (S s : ℕ) → 1 ≤ S → s ≤ sizeStep S s
+sizeStep-infl S s hS =
+  ≤-trans (≤-trans (s≤2s s) (n≤1+n (2 * s)))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                   (*-monoˡ-≤ (suc (2 * s)) hS))
+  -- 1 * suc(2s) is definitionally suc(2s), so *-identityˡ closes the gap
+
+iterSize-infl : ∀ (S : ℕ) → 1 ≤ S → ∀ (k s : ℕ) → s ≤ iterSize S k s
+iterSize-infl S hS zero    s = ≤-refl
+iterSize-infl S hS (suc k) s =
+  ≤-trans (sizeStep-infl S s hS) (iterSize-infl S hS k (sizeStep S s))
+
+iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
+  iterSize S j s ≤ iterSize S j′ s
+iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s
+iterSize-mono-count S s hS           (s≤s le)  = iterSize-mono-count S (sizeStep S s) hS le
+
+-- WIDTH: foldStep is inflationary for S ≥ 2 (w < 2^w ≤ 2^(1+w) ≤ S^(1+w))
+foldStep-infl : ∀ (S w : ℕ) → 2 ≤ S → w ≤ foldStep S w
+foldStep-infl S w hS =
+  ≤-trans (<⇒≤ (n<2^n w))
+          (≤-trans (^-monoʳ-≤ 2 (n≤1+n w))    -- 2^w ≤ 2^(suc w)
+                   (^-monoˡ-≤ (suc w) hS))     -- 2^(suc w) ≤ S^(suc w)
+
+iterFold-infl : ∀ (S : ℕ) → 2 ≤ S → ∀ (k w : ℕ) → w ≤ iterFold S k w
+iterFold-infl S hS zero    w = ≤-refl
+iterFold-infl S hS (suc k) w =
+  ≤-trans (foldStep-infl S w hS) (iterFold-infl S hS k (foldStep S w))
+
+iterFold-mono-count : ∀ (S w : ℕ) → 2 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
+  iterFold S j w ≤ iterFold S j′ w
+iterFold-mono-count S w hS {j′ = j′} z≤n      = iterFold-infl S hS j′ w
+iterFold-mono-count S w hS           (s≤s le)  = iterFold-mono-count S (foldStep S w) hS le
+
+-- REG: linear, monotone in j always
+frameStep-reg-mono : ∀ (c : Caps) {j j′ : ℕ} → j ≤ j′ →
+  Caps.cReg (frameStep j c) ≤ Caps.cReg (frameStep j′ c)
+frameStep-reg-mono (caps s w r) le =
+  *-monoʳ-≤ r (s≤s (*-monoˡ-≤ s le))
+
+frameStep-mono-j : ∀ (c : Caps) → 2 ≤ Caps.cSize c → ∀ {j j′ : ℕ} → j ≤ j′ →
+  frameStep j c ⊑ᶜ frameStep j′ c
+frameStep-mono-j c hS le =
+    iterSize-mono-count (Caps.cSize c) (Caps.cSize c) (≤-trans (s≤s z≤n) hS) le
+  , iterFold-mono-count (Caps.cSize c) (Caps.cWid c) hS le
+  , frameStep-reg-mono c le
+
 -- WHAT REPLACES caps-frame, AND WHY IT LIVES ON THE WALK FACE'S RECEIPT
 -- RATHER THAN BESIDE IT.
 --
