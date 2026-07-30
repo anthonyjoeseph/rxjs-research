@@ -82,9 +82,16 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FOUR POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
--- subscribeE-walk) and the round-4 per-instant caps face (caps-frame /
--- caps-tick).  frameBlowup is now fully defined: no gaps inside it.
+-- SIX POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
+-- subscribeE-walk), the caps pair (subscribeE-caps / caps-tick), and
+-- regsSz?-subscribeE.  frameBlowup is fully defined: no gaps inside it.
+--
+-- The count went UP from four, deliberately.  caps-frame was refuted as
+-- uninstantiable (same-level preservation is false: the subscribe frame
+-- itself folds) and split into subscribeE-caps, which reports its growth
+-- as a fold count, plus the chain-half lemma that any repaired face
+-- consumes.  Trading one false postulate for two true ones is progress;
+-- the number is not the metric.
 --
 -- ROUND 4 (2026-07-29): the caps are defined BY RECURRENCE on the
 -- instant, Caps (suc id) = frameBlowup (Caps id), after deepScan refuted
@@ -6827,11 +6834,28 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- cSize factor is exactly that reference count — a fold can subscribe no
 -- more references than its step function mentions — and pR2 is why it is
 -- there: with `cReg * suc cWid` alone the measured 1 ↦ 3 does not fit
+-- j FOLDS' WORTH, so a frame's PROGRESS is explicit rather than
+-- all-or-nothing.  This is the repair caps-frame's refutation forces:
+-- same-level preservation is false, so the face must report growth, and
+-- the honest index of growth inside a frame is the fold count.
+--
+-- The two endpoints are exactly what caps-frame and caps-tick were each
+-- trying to be on their own — j = 0 is frame entry, j = cWid * cReg is
+-- the tick boundary — so they stop being siblings and become the ends of
+-- one measure.  A mid-cascade state, which had no level at all before,
+-- is just a smaller j
+frameStep : ℕ → Caps → Caps
+frameStep j c =
+  caps (iterSize (Caps.cSize c) j (Caps.cSize c))
+       (iterFold (Caps.cSize c) j (Caps.cWid c))
+       (Caps.cReg c * suc (j * Caps.cSize c))
+
 frameBlowup : Caps → Caps
-frameBlowup c =
-  caps (iterSize (Caps.cSize c) (Caps.cWid c * Caps.cReg c) (Caps.cSize c))
-       (iterFold (Caps.cSize c) (Caps.cWid c * Caps.cReg c) (Caps.cWid c))
-       (Caps.cReg c * suc (Caps.cWid c * Caps.cSize c))
+frameBlowup c = frameStep (Caps.cWid c * Caps.cReg c) c
+
+-- the entry endpoint, by computation
+frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
+frameStep-0 (caps s w r) = cong (λ x → caps s w x) (*-identityʳ r)
 
 -- BY RECURRENCE, never in closed form.
 --
@@ -6848,23 +6872,49 @@ capsAt {n = n} e sl zero =
                     (suc (sizeᵉ e + slotsSize sl)))
 capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
 
+-- WHAT REPLACES caps-frame, AND WHY IT LIVES ON THE WALK FACE'S RECEIPT
+-- RATHER THAN BESIDE IT.
+--
+-- caps-frame claimed SAME-LEVEL preservation and is refuted (see
+-- caps-frame-boundary-absurd and the memo below).  The mechanism it
+-- needed already exists one module-section away: subscribeE-walkS does
+-- not claim its cap is preserved either — it concludes
+-- `INV? Ψ (capᴱ W E′)`, the invariant at a GROWN cap, and reports the
+-- growth as a receipt `E ≤ E′` composed along the walk by ≤-trans.  It
+-- is PROVEN in that form.
+--
+-- So caps preservation is not a second face; it is one more component of
+-- that receipt.  `j` rides alongside `E′` and is threaded by exactly the
+-- same discipline — additively rather than multiplicatively, because it
+-- counts folds.  Two accounting mechanisms for one growth was the smell;
+-- this is the one mechanism.
+--
+-- AND IT IS NOT A SECOND LEDGER, which is the thing to check: `j` is
+-- bounded by cWid * cReg, a quantity read off Caps, never off E or the
+-- receipt.  `frameStep : ℕ → Caps → Caps` still cannot see the ledger,
+-- so the round-5 gate is intact.  The two roles stay separate on
+-- purpose: `INV? … (capᴱ W E′)` is the ledger-indexed state invariant,
+-- while capsOK?'s cSize is what feeds Ŝ / R̂ / F — and THAT is the one
+-- round3b-ledger-reset-absurd forbids from being ledger-derived.
 postulate
-  -- (a) WITHIN A FRAME, `id` is frozen and the caps do not move.  This is
-  -- the half the walk face consumes, and it is why round 3's face needs
-  -- no change at all: Ŝ := cSize, F := cSize, R̂ := hopR cSize, all
-  -- ordinary numbers for the duration of one walk
-  caps-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
+  -- folds and reports how many.  j′ folds spent means the caps advance
+  -- from frameStep j to frameStep (j + j′), never staying put
+  subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (capsAt e sl id) →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
     let r = subscribeE g b κ bid now sched st
-    in capsOK? (capsAt e sl id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+    in Σ ℕ λ j′ →
+       capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
-  -- (b) ACROSS A TICK, one instant's cascade blows the caps up by exactly
-  -- one application of frameBlowup.  This is the half the top-level
-  -- per-instant induction consumes, and the ONLY place the height climbs
+  -- (b) ONE CASCADE spends at most a whole frame's worth, so the tick
+  -- boundary is the j = cWid * cReg endpoint.  This is the half the
+  -- top-level per-instant induction consumes, and the only place the
+  -- height climbs.  It is now a COROLLARY shape rather than a sibling:
+  -- what it needs from the frames is (a), summed over the cascade's
+  -- chains, with the total j capped at cWid * cReg
   caps-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
@@ -6872,6 +6922,20 @@ postulate
     capsOK? (capsAt e sl id) sched st ≡ true →
     let r = cascade a nextId sched st
     in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+-- the tick endpoint, by definition rather than by arithmetic: this is
+-- what makes caps-tick the j = full case of (a) rather than a
+-- separate claim
+frameStep-full : ∀ (c : Caps) →
+  frameStep (Caps.cWid c * Caps.cReg c) c ≡ frameBlowup c
+frameStep-full c = refl
+
+-- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
+capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  capsAt e sl (suc id)
+    ≡ frameStep (Caps.cWid (capsAt e sl id) * Caps.cReg (capsAt e sl id))
+                (capsAt e sl id)
+capsAt-suc-full e sl id = refl
 
 ------------------------------------------------------------------
 -- REFUTED: caps-frame AS STATED IS FALSE, TWICE OVER.  Both halves are
