@@ -6776,10 +6776,33 @@ frameSz? B (take-f _)         = true
 frameSz? B (from-inner _ _ _) = true
 frameSz? B (thru-outer _ _)   = true
 
+pathFrames? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+pathFrames? B root           = true
+pathFrames? B (share-sink i) = true
+pathFrames? B (f ↠ p)        = frameSz? B f ∧ pathFrames? B p
+
+-- AND HOW MANY FRAMES — the j-budget probe's finding, and the second
+-- conjunct cSize has to carry.  A payload grows once PER FRAME it
+-- crosses (a map-f crossing is the same size-subΘᵉ substitution a fold
+-- is), so the chain LENGTH is a factor in one cascade's event count, and
+-- nothing else in Caps sees it.  J-Budget-Probe's pM family pins cSize,
+-- cWid and cReg at 7, 1, 1 while its cascades store 15 … 4371 — the
+-- length is the ONLY quantity that moves — so tickFits-absurd refutes
+-- every count computed from the triple until the triple bounds it.
+--
+-- The quantity is `pathLen`, already defined above for the walk's length
+-- ledger, and that is not a coincidence: subscribeE-walk already carries
+-- this invariant in the same shape (`pathLen κ + G ≤ ℓ` in, `regsLen? ℓ`
+-- out), so the conjunct the caps face needs is the ℓ ledger read at
+-- ℓ := cSize rather than a new mechanism.  It reads the chain and
+-- nothing else: no ledger, no receipt, no E.
+--
+-- Measured (J-Budget-Probe): a chain's length is fixed by the root
+-- subscribe and untouched by cascades — 3 ↦ 9 across the family at
+-- instant 0, still 9 after two cascades — and it sits well under the
+-- entry measure, so a per-instant recurrence can carry it
 pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-pathSz? B root           = true
-pathSz? B (share-sink i) = true
-pathSz? B (f ↠ p)        = frameSz? B f ∧ pathSz? B p
+pathSz? B p = pathFrames? B p ∧ (pathLen p ≤ᵇ B)
 
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
@@ -6827,9 +6850,12 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- THE WORST ONE INSTANT CAN DO, and a function of Caps ALONE — the
 -- signature is the round-5 gate, not a comment about one.
 --
--- All three components share ONE iteration count, `cWid * cReg`: folds
--- per cascade are bounded by the current width, cascades in an instant
--- by the registration count.  That count is why sizeBlowup must read
+-- All three components share ONE iteration count, `cWid * cReg * cSize`:
+-- folds per cascade are bounded by the current width, cascades in an
+-- instant by the registration count, and the frames one payload crosses
+-- inside a cascade by the chain-length conjunct of pathSz? (the
+-- j-budget probe; the count without that third factor is refuted by
+-- tickFits-absurd).  The cWid factor is why sizeBlowup must read
 -- cWid — pR and pRs have identical step functions and differ only in
 -- how many times it runs per frame, 3 ↦ 12 against 3 ↦ 30, so a fixed
 -- number of size steps undershoots one of them (State-Blowup-Probe).
@@ -6846,7 +6872,7 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- the honest index of growth inside a frame is the fold count.
 --
 -- The two endpoints are exactly what caps-frame and caps-tick were each
--- trying to be on their own — j = 0 is frame entry, j = cWid * cReg is
+-- trying to be on their own — j = 0 is frame entry, j = the full count is
 -- the tick boundary — so they stop being siblings and become the ends of
 -- one measure.  A mid-cascade state, which had no level at all before,
 -- is just a smaller j
@@ -6856,8 +6882,21 @@ frameStep j c =
        (iterFold (Caps.cSize c) j (Caps.cWid c))
        (Caps.cReg c * suc (j * Caps.cSize c))
 
+-- THE COUNT, and its third factor.  `cWid * cReg` was refuted outright:
+-- J-Budget-Probe's pM family fixes the whole triple at (7, 1, 1) and
+-- still stores 15 … 4371 in one cascade, so no count read off the triple
+-- can work until the triple bounds the CHAIN LENGTH — which is what
+-- pathSz?'s pathLen conjunct now does.  With that, the three factors are
+-- exactly the three dimensions of one cascade's event count:
+--
+--     emissions (cWid)  ×  chains (cReg)  ×  chain length (cSize)
+--
+-- The third reads cSize because that is where the length conjunct puts
+-- it, not because a length is a size: `pathLen p ≤ᵇ cSize` is a separate
+-- conjunct of the same field, and at pM 6 the two genuinely differ (a
+-- 9-frame chain in a state whose largest term measures 7)
 frameBlowup : Caps → Caps
-frameBlowup c = frameStep (Caps.cWid c * Caps.cReg c) c
+frameBlowup c = frameStep (Caps.cWid c * Caps.cReg c * Caps.cSize c) c
 
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
@@ -6945,19 +6984,24 @@ c ⊑ᶜ c′ = (Caps.cSize c ≤ Caps.cSize c′)
         × (Caps.cReg  c ≤ Caps.cReg  c′)
 
 -- the step function's size bound weakens frame by frame
+pathFrames?-widen : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B B′ : ℕ} →
+  B ≤ B′ → pathFrames? B p ≡ true → pathFrames? B′ p ≡ true
+pathFrames?-widen root           le h = refl
+pathFrames?-widen (share-sink i) le h = refl
+pathFrames?-widen (map-f fn ↠ p)  {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathFrames? B p) h
+... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathFrames?-widen p le hp)
+pathFrames?-widen (scan-f fn _ ↠ p) {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathFrames? B p) h
+... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathFrames?-widen p le hp)
+pathFrames?-widen (take-f _ ↠ p)      le h = pathFrames?-widen p le h
+pathFrames?-widen (from-inner _ _ _ ↠ p) le h = pathFrames?-widen p le h
+pathFrames?-widen (thru-outer _ _ ↠ p)   le h = pathFrames?-widen p le h
+
 pathSz?-widen : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B B′ : ℕ} →
   B ≤ B′ → pathSz? B p ≡ true → pathSz? B′ p ≡ true
-pathSz?-widen root           le h = refl
-pathSz?-widen (share-sink i) le h = refl
-pathSz?-widen (map-f fn ↠ p)  {B} le h
-  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathSz? B p) h
-... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathSz?-widen p le hp)
-pathSz?-widen (scan-f fn _ ↠ p) {B} le h
-  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathSz? B p) h
-... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathSz?-widen p le hp)
-pathSz?-widen (take-f _ ↠ p)      le h = pathSz?-widen p le h
-pathSz?-widen (from-inner _ _ _ ↠ p) le h = pathSz?-widen p le h
-pathSz?-widen (thru-outer _ _ ↠ p)   le h = pathSz?-widen p le h
+pathSz?-widen p {B} le h with ∧-true (pathFrames? B p) (pathLen p ≤ᵇ B) h
+... | hf , hl = ∧-intro (pathFrames?-widen p le hf) (≤ᵇ-widen (pathLen p) le hl)
 
 regsSz?-widen : ∀ {n} {Γ : Ctx n} {t}
   (rs : List (RegId × Source × Chain Γ t)) {B B′ : ℕ} →
@@ -7076,7 +7120,7 @@ frameStep-mono-j c hS le =
 -- this is the one mechanism.
 --
 -- AND IT IS NOT A SECOND LEDGER, which is the thing to check: `j` is
--- bounded by cWid * cReg, a quantity read off Caps, never off E or the
+-- bounded by cWid * cReg * cSize, a quantity read off Caps, never off E or the
 -- receipt.  `frameStep : ℕ → Caps → Caps` still cannot see the ledger,
 -- so the round-5 gate is intact.  The two roles stay separate on
 -- purpose: `INV? … (capᴱ W E′)` is the ledger-indexed state invariant,
@@ -7096,11 +7140,14 @@ postulate
        capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
   -- (b) ONE CASCADE spends at most a whole frame's worth, so the tick
-  -- boundary is the j = cWid * cReg endpoint.  This is the half the
-  -- top-level per-instant induction consumes, and the only place the
+  -- boundary is the j = cWid * cReg * cSize endpoint.  This is the half
+  -- the top-level per-instant induction consumes, and the only place the
   -- height climbs.  It is now a COROLLARY shape rather than a sibling:
   -- what it needs from the frames is (a), summed over the cascade's
-  -- chains, with the total j capped at cWid * cReg
+  -- chains, with the total j capped at that count — and the third factor
+  -- of the count is exactly what the j-budget probe had to be run to
+  -- discover, since the first two do not cover the frames a single
+  -- payload crosses on its way to the sink
   caps-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
@@ -7113,13 +7160,14 @@ postulate
 -- what makes caps-tick the j = full case of (a) rather than a
 -- separate claim
 frameStep-full : ∀ (c : Caps) →
-  frameStep (Caps.cWid c * Caps.cReg c) c ≡ frameBlowup c
+  frameStep (Caps.cWid c * Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
 frameStep-full c = refl
 
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
-    ≡ frameStep (Caps.cWid (capsAt e sl id) * Caps.cReg (capsAt e sl id))
+    ≡ frameStep (Caps.cWid (capsAt e sl id) * Caps.cReg (capsAt e sl id)
+                   * Caps.cSize (capsAt e sl id))
                 (capsAt e sl id)
 capsAt-suc-full e sl id = refl
 
@@ -7163,7 +7211,7 @@ capsAt-suc-full e sl id = refl
 -- its own probe): make the mid-instant states explicit with a
 -- CONSUMED-ITERATION index.  One parametric face against level suc id
 -- whose pre-state is bounded by frameBlowup partially applied — k of the
--- cWid * cReg iterations still unspent — and a subscribeE with fold
+-- cWid * cReg * cSize iterations still unspent — and a subscribeE with fold
 -- count j consuming j of k.  caps-frame and caps-tick then become the
 -- two ENDPOINTS (k = full, k = 0) of a single face rather than siblings,
 -- and (2) dissolves because a mid-cascade state is just a smaller k.
@@ -7200,14 +7248,26 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- function that is a SUBTERM of the expression being subscribed — the
 -- map-f/scan-f clauses pass `f` straight through from mapᵉ/scanᵉ — so a
 -- registry bounded by C stays bounded by C as long as the subscribed
--- expression is
+-- expression is.
+--
+-- BOTH conjuncts of pathSz? need a hypothesis, and for opposite reasons.
+-- The frame half needs `sizeᵉ b ≤ C` and `pathFrames? C κ` because the
+-- leaf registers the whole of κ under the frames it pushed: the naive
+-- lemma is FALSE, since κ = scan-f BIG ↠ root over a tiny b registers
+-- BIG.  The LENGTH half needs slack rather than mere boundedness — the
+-- descent lengthens the chain by one frame per shell of b, so the
+-- registered chain is as long as `pathLen κ + sizeᵉ b` and a κ already
+-- AT the cap would overflow it.  That slack is what the caller pays for
+-- with a j: one frameStep at least doubles cSize (sizeStep C s ≥ 2 s for
+-- C ≥ 1), which covers the sum
 postulate
   regsSz?-subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (C : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     regsSz? C (EvalSt.registry st) ≡ true →
     sizeᵉ b ≤ C →
-    pathSz? C κ ≡ true →   -- the continuation is already bounded
+    pathFrames? C κ ≡ true →       -- the continuation's frames are bounded
+    pathLen κ + sizeᵉ b ≤ C →      -- and the chain it will grow into fits
     let r = subscribeE g b κ bid now sched st
     in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
 
