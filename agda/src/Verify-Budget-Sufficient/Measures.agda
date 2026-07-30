@@ -10,8 +10,9 @@
 -- machine-checked absurdity records that shaped it.
 --
 -- Nothing here mentions Caps, and nothing here steps the evaluator.
--- Both of the strata above import this one and neither imports the
--- other, which is what keeps a caps edit off the wet family's clock.
+-- The strata above import this one (the caps face and the wet family
+-- through .Keeps-Ring), and the two faces do not import each other,
+-- which is what keeps a caps edit off the wet family's clock.
 --
 -- The roadmap for the whole proof lives in Verify-Budget-Sufficient.agda.
 module Verify-Budget-Sufficient.Measures where

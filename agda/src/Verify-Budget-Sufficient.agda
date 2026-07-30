@@ -152,12 +152,15 @@
 --   .Measures    the measures — gas, dBound, hopD, seed arithmetic,
 --                size/fnCap/ofW, INV?/widthOK?, the walk face and its
 --                four absurdity records
+--   .Keeps-Ring  the shared structural prerequisite: stepping the
+--                evaluator keeps the slot telescope and the connected
+--                shares (KeepsC), plus the share-boundary facts
 --   .Caps-Face   round 4's per-instant cap recurrence, the caps face
 --                and its companion tree, caps-tick, reach-resets
 --   .Wet         the wet family, the width family, and the theorem
 --                (burst-wet, cascade-dry, drain-dry, budget-sufficient)
 --
--- .Caps-Face and .Wet are SIBLINGS over .Measures, not a stack: the wet
+-- .Caps-Face and .Wet are SIBLINGS over .Keeps-Ring, not a stack: the wet
 -- family never mentions Caps, so grinding the caps face leaves it (and
 -- Verify-Well-Formed, which imports budget-sufficient from .Wet) alone.
 --
@@ -279,9 +282,10 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
 
-open import Verify-Budget-Sufficient.Measures  public
-open import Verify-Budget-Sufficient.Caps-Face public
-open import Verify-Budget-Sufficient.Wet       public
+open import Verify-Budget-Sufficient.Measures   public
+open import Verify-Budget-Sufficient.Keeps-Ring public
+open import Verify-Budget-Sufficient.Caps-Face  public
+open import Verify-Budget-Sufficient.Wet        public
 
 ------------------------------------------------------------------
 -- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the
@@ -305,60 +309,61 @@ capsOK?-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 capsOK?-nextNode c k sched st h = h
 
 -- splitting one emit's events, and a whole burst, at the caps
-splitEvents-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sched : Sched Γ)
+splitEvents-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
   (es : List (InstEvent (Val Γ s))) →
-  all (eventCaps? c sched) es ≡ true →
-  all (valCaps? c sched s) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
-splitEvents-vals-caps c sched []              h = refl
-splitEvents-vals-caps c sched (value v  ∷ es) h =
-  ∧-intro (proj₁ (∧-true _ _ h)) (splitEvents-vals-caps c sched es (proj₂ (∧-true _ _ h)))
-splitEvents-vals-caps c sched (init _    ∷ es) h =
-  splitEvents-vals-caps c sched es (proj₂ (∧-true _ _ h))
-splitEvents-vals-caps c sched (close _ _ ∷ es) h =
-  splitEvents-vals-caps c sched es (proj₂ (∧-true _ _ h))
-splitEvents-vals-caps c sched (handoff _ ∷ es) h =
-  splitEvents-vals-caps c sched es (proj₂ (∧-true _ _ h))
-splitEvents-vals-caps c sched (complete  ∷ es) h =
-  splitEvents-vals-caps c sched es (proj₂ (∧-true _ _ h))
+  all (eventCaps? c sl) es ≡ true →
+  all (valCaps? c sl s) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+splitEvents-vals-caps c sl []              h = refl
+splitEvents-vals-caps c sl (value v  ∷ es) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h)))
+splitEvents-vals-caps c sl (init _    ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-caps c sl (close _ _ ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-caps c sl (handoff _ ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-caps c sl (complete  ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
 
-splitEvents-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sched : Sched Γ)
+splitEvents-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
   (es : List (InstEvent (Val Γ s))) →
-  all (eventCaps? c sched) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
-splitEvents-bk-caps c sched []               = refl
-splitEvents-bk-caps {u = u} c sched (value _  ∷ es) = splitEvents-bk-caps {u = u} c sched es
-splitEvents-bk-caps {u = u} c sched (init _   ∷ es) =
-  ∧-intro refl (splitEvents-bk-caps {u = u} c sched es)
-splitEvents-bk-caps {u = u} c sched (close _ _ ∷ es) =
-  ∧-intro refl (splitEvents-bk-caps {u = u} c sched es)
-splitEvents-bk-caps {u = u} c sched (handoff _ ∷ es) =
-  ∧-intro refl (splitEvents-bk-caps {u = u} c sched es)
-splitEvents-bk-caps {u = u} c sched (complete ∷ es) = splitEvents-bk-caps {u = u} c sched es
+  all (eventCaps? c sl) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
+splitEvents-bk-caps c sl []               = refl
+splitEvents-bk-caps {u = u} c sl (value _  ∷ es) = splitEvents-bk-caps {u = u} c sl es
+splitEvents-bk-caps {u = u} c sl (init _   ∷ es) =
+  ∧-intro refl (splitEvents-bk-caps {u = u} c sl es)
+splitEvents-bk-caps {u = u} c sl (close _ _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-caps {u = u} c sl es)
+splitEvents-bk-caps {u = u} c sl (handoff _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-caps {u = u} c sl es)
+splitEvents-bk-caps {u = u} c sl (complete ∷ es) = splitEvents-bk-caps {u = u} c sl es
 
-splitBurst-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sched : Sched Γ)
+splitBurst-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
   (str : Stream Γ s) →
-  burstCaps? c sched str ≡ true →
-  all (valCaps? c sched s) (proj₁ (splitBurst {A = Val Γ u} str)) ≡ true
-splitBurst-vals-caps c sched []         h = refl
-splitBurst-vals-caps {Γ = Γ} {u = u} c sched (em ∷ ems) h =
+  burstCaps? c sl str ≡ true →
+  all (valCaps? c sl s) (proj₁ (splitBurst {A = Val Γ u} str)) ≡ true
+splitBurst-vals-caps c sl []         h = refl
+splitBurst-vals-caps {Γ = Γ} {u = u} c sl (em ∷ ems) h =
   all-++-intro _ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em))) _
-    (splitEvents-vals-caps c sched (InstEmit.events em) (proj₁ (∧-true _ _ h)))
-    (splitBurst-vals-caps {u = u} c sched ems (proj₂ (∧-true _ _ h)))
+    (splitEvents-vals-caps c sl (InstEmit.events em) (proj₁ (∧-true _ _ h)))
+    (splitBurst-vals-caps {u = u} c sl ems (proj₂ (∧-true _ _ h)))
 
-splitBurst-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sched : Sched Γ)
+splitBurst-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
   (str : Stream Γ s) →
-  all (eventCaps? c sched) (proj₁ (proj₂ (splitBurst {A = Val Γ u} str))) ≡ true
-splitBurst-bk-caps c sched []         = refl
-splitBurst-bk-caps {Γ = Γ} {u = u} c sched (em ∷ ems) =
+  all (eventCaps? c sl) (proj₁ (proj₂ (splitBurst {A = Val Γ u} str))) ≡ true
+splitBurst-bk-caps c sl []         = refl
+splitBurst-bk-caps {Γ = Γ} {u = u} c sl (em ∷ ems) =
   all-++-intro _ (proj₁ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em)))) _
-    (splitEvents-bk-caps {u = u} c sched (InstEmit.events em))
-    (splitBurst-bk-caps {u = u} c sched ems)
+    (splitEvents-bk-caps {u = u} c sl (InstEmit.events em))
+    (splitBurst-bk-caps {u = u} c sl ems)
 
 subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
   capsOK? (frameStep j c) sched st ≡ true →
-  valCaps? (frameStep j c) sched (obs u) o ≡ true →
+  valCaps? (frameStep j c) (Sched.slots sched) (obs u) o ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) + sizeᵛ (obs u) o ≤ Caps.cSize (frameStep j c) →
   let r = subscribeInner g op allNid κ id now o sched st
@@ -366,15 +371,13 @@ subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      (capsOK? (frameStep (j + j′) c)
               (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
               (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
-     × (all (valCaps? (frameStep (j + j′) c)
-                      (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))) u)
+     × (all (valCaps? (frameStep (j + j′) c) (Sched.slots sched) u)
             (proj₁ (proj₂ r)) ≡ true)
-     × (all (eventCaps? (frameStep (j + j′) c)
-                        (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
+     × (all (eventCaps? (frameStep (j + j′) c) (Sched.slots sched))
             (proj₁ (proj₂ (proj₂ r))) ≡ true)
 -- OUT OF GAS: a dry close and nothing else.  The only state change is
 -- the instance counter, which capsOK? does not read
-subscribeInner-caps c j g0 op allNid κ id now o sched st inv vC pC lC =
+subscribeInner-caps c j g0 op allNid κ id now o sched st 2≤S inv vC pC lC =
   0 , subst (λ x → capsOK? (frameStep x c)
                      (record sched { nextNode = suc (Sched.nextNode sched) }) st ≡ true)
             (sym (+-identityʳ j))
@@ -385,10 +388,12 @@ subscribeInner-caps c j g0 op allNid κ id now o sched st inv vC pC lC =
 -- IS sizeᵉ), and its chain hypotheses are κ's, one frame longer — which
 -- is exactly what the extra summand in lC pays for
 subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sched st
-                    inv vC pC lC =
+                    2≤S inv vC pC lC =
   j′ , SUB
-     , splitBurst-vals-caps {s = u} {u = t} (frameStep (j + j′) c) sched′ burst BC
-     , splitBurst-bk-caps {s = u} {u = t} (frameStep (j + j′) c) sched′ burst
+     , splitBurst-vals-caps {s = u} {u = t} (frameStep (j + j′) c)
+         (Sched.slots sched) burst BC
+     , splitBurst-bk-caps {s = u} {u = t} (frameStep (j + j′) c)
+         (Sched.slots sched) burst
   where
   B      = Caps.cSize (frameStep j c)
   sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
@@ -400,7 +405,7 @@ subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sched st
              (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B)
                         (≤⇒≤ᵇ (≤-trans (m≤m+n (suc (pathLen κ)) (sizeᵉ o)) lC)))
                       pC)
-  IH     = subscribeE-caps c j fuel o κ′ id now sched₀ st
+  IH     = subscribeE-caps c j fuel o κ′ id now sched₀ st 2≤S
              (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                sched st inv)
              szo pC′ lC
@@ -409,4 +414,3 @@ subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sched st
   BC     = proj₂ (proj₂ IH)
   res    = subscribeE fuel o κ′ id now sched₀ st
   burst  = proj₁ res
-  sched′ = proj₁ (proj₂ res)
