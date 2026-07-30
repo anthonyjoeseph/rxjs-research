@@ -38,7 +38,9 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (Dec; yes; no)
 
-open import Verify-Budget-Sufficient using (budget-sufficient)
+-- from .Wet, not from the top module: the top module is the active caps
+-- grind, and importing it here would put this file on that clock
+open import Verify-Budget-Sufficient.Wet using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
