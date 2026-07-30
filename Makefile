@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -48,6 +48,10 @@ help:
 	@echo "                  of the Caps triple is, because chain length moves"
 	@echo "                  while the triple stands still"
 	@echo "                  (see agda/probe/J-Budget-Probe.agda)"
+	@echo "  fold-count-probe  does one cascade's FOLD COUNT fit that count?  NO —"
+	@echo "                  nested shares make deliveries exponential in the"
+	@echo "                  number of shared slots while every Caps component"
+	@echo "                  stays linear (see agda/probe/Fold-Count-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -118,6 +122,9 @@ state-blowup-probe:
 # content — 15, 51, 159, 483 against a fixed (7, 1, 1) already says it.
 j-budget-probe:
 	cd agda && agda -i src -i probe probe/J-Budget-Probe.agda
+
+fold-count-probe:
+	cd agda && agda -i src -i probe probe/Fold-Count-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
