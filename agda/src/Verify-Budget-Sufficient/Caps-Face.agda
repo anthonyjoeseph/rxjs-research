@@ -642,6 +642,139 @@ obsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Sched Γ → Closed Γ s → Bo
 obsCaps? {n = n} c sched o =
   (sizeᵉ o ≤ᵇ Caps.cSize c) ∧ (outWᵉ n (Sched.slots sched) o ≤ᵇ Caps.cWid c)
 
+------------------------------------------------------------------
+-- THE WIDENING TOOLKIT, stated here rather than inlined per clause.
+--
+-- Every clause of the companion tree below runs two or more sub-calls in
+-- sequence, and the SECOND one's hypotheses are stated at the first
+-- one's OUTPUT level: a bound established at frameStep j has to be read
+-- at frameStep (j + j₁), and a value carried out of the first call at
+-- frameStep (j + j₁) has to be reported at frameStep ((j + j₁) + j₂).
+-- That is the only arithmetic the tree needs — the receipts compose by
+-- +-assoc, not by iterating frameStep — so the whole obligation is
+-- monotonicity, once per predicate, at ⊑ᶜ.
+--
+-- Note what is NOT here: a frameStep-COMPOSITION law,
+-- frameStep (j + j′) c ≡ frameStep j′ (frameStep j c).  It is FALSE, and
+-- not marginally.  frameStep reads its step base S off the ARGUMENT's
+-- cSize, so the right-hand side iterates at S = cSize (frameStep j c)
+-- while the left iterates at S = cSize c; and the cReg component is
+-- linear rather than iterated, cReg c * suc ((j + j′) * S) against
+-- cReg c * suc (j * S) * suc (j′ * S).  Neither side is a rewriting of
+-- the other.  The tree is shaped to never need it: every companion
+-- takes (c , j) rather than a stepped cap, so a sub-call at a later
+-- level is the SAME c with a bigger j, and bigger-j is exactly
+-- frameStep-mono-j.
+------------------------------------------------------------------
+
+⊑ᶜ-refl : ∀ (c : Caps) → c ⊑ᶜ c
+⊑ᶜ-refl c = ≤-refl , ≤-refl , ≤-refl
+
+⊑ᶜ-trans : ∀ {a b c : Caps} → a ⊑ᶜ b → b ⊑ᶜ c → a ⊑ᶜ c
+⊑ᶜ-trans (s₁ , w₁ , r₁) (s₂ , w₂ , r₂) =
+  ≤-trans s₁ s₂ , ≤-trans w₁ w₂ , ≤-trans r₁ r₂
+
+-- THE SHAPE THE CLAUSES ACTUALLY USE: spending more folds only widens.
+-- Every companion reports `j + j′`, so this is the widening from a
+-- sub-call's entry level to its exit level, with no arithmetic at the
+-- call site
+frameStep-⊑-+ : ∀ (c : Caps) → 2 ≤ Caps.cSize c → ∀ (j j′ : ℕ) →
+  frameStep j c ⊑ᶜ frameStep (j + j′) c
+frameStep-⊑-+ c hS j j′ = frameStep-mono-j c hS (m≤m+n j j′)
+
+frameSz?-widen : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) {B B′ : ℕ} →
+  B ≤ B′ → frameSz? B f ≡ true → frameSz? B′ f ≡ true
+frameSz?-widen (map-f fn)      le h = ≤ᵇ-widen (sizeᵗ fn) le h
+frameSz?-widen (scan-f fn _)   le h = ≤ᵇ-widen (sizeᵗ fn) le h
+frameSz?-widen (take-f _)      le h = refl
+frameSz?-widen (from-inner _ _ _) le h = refl
+frameSz?-widen (thru-outer _ _)   le h = refl
+
+valCaps?-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sched : Sched Γ)
+  (u : Ty) (v : Val Γ u) →
+  c ⊑ᶜ c′ → valCaps? c sched u v ≡ true → valCaps? c′ sched u v ≡ true
+valCaps?-widen {n = n} {c = c} sched u v (sz≤ , wd≤ , _) h
+  with ∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c)
+              (outWᵛ n (Sched.slots sched) u v ≤ᵇ Caps.cWid c) h
+... | hsz , hwd = ∧-intro (≤ᵇ-widen (sizeᵛ u v) sz≤ hsz)
+                          (≤ᵇ-widen (outWᵛ n (Sched.slots sched) u v) wd≤ hwd)
+
+valsCaps?-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sched : Sched Γ)
+  (u : Ty) (vs : List (Val Γ u)) →
+  c ⊑ᶜ c′ → all (valCaps? c sched u) vs ≡ true
+          → all (valCaps? c′ sched u) vs ≡ true
+valsCaps?-widen sched u vs le =
+  all-impl _ _ (λ v → valCaps?-widen sched u v le) vs
+
+eventCaps?-widen : ∀ {n} {Γ : Ctx n} {u} {c c′ : Caps} (sched : Sched Γ)
+  (ev : InstEvent (Val Γ u)) →
+  c ⊑ᶜ c′ → eventCaps? c sched ev ≡ true → eventCaps? c′ sched ev ≡ true
+eventCaps?-widen {u = u} sched (value v) le h = valCaps?-widen sched u v le h
+eventCaps?-widen sched (init _)    le h = refl
+eventCaps?-widen sched (close _ _) le h = refl
+eventCaps?-widen sched (handoff _) le h = refl
+eventCaps?-widen sched complete    le h = refl
+
+eventsCaps?-widen : ∀ {n} {Γ : Ctx n} {u} {c c′ : Caps} (sched : Sched Γ)
+  (evs : List (InstEvent (Val Γ u))) →
+  c ⊑ᶜ c′ → all (eventCaps? c sched) evs ≡ true
+          → all (eventCaps? c′ sched) evs ≡ true
+eventsCaps?-widen sched evs le =
+  all-impl _ _ (λ ev → eventCaps?-widen sched ev le) evs
+
+burstCaps?-widen : ∀ {n} {Γ : Ctx n} {u} {c c′ : Caps} (sched : Sched Γ)
+  (str : Stream Γ u) →
+  c ⊑ᶜ c′ → burstCaps? c sched str ≡ true → burstCaps? c′ sched str ≡ true
+burstCaps?-widen sched str le =
+  all-impl _ _ (λ em → eventsCaps?-widen sched (InstEmit.events em) le) str
+
+obsCaps?-widen : ∀ {n} {Γ : Ctx n} {s} {c c′ : Caps} (sched : Sched Γ)
+  (o : Closed Γ s) →
+  c ⊑ᶜ c′ → obsCaps? c sched o ≡ true → obsCaps? c′ sched o ≡ true
+obsCaps?-widen {n = n} {c = c} sched o (sz≤ , wd≤ , _) h
+  with ∧-true (sizeᵉ o ≤ᵇ Caps.cSize c)
+              (outWᵉ n (Sched.slots sched) o ≤ᵇ Caps.cWid c) h
+... | hsz , hwd = ∧-intro (≤ᵇ-widen (sizeᵉ o) sz≤ hsz)
+                          (≤ᵇ-widen (outWᵉ n (Sched.slots sched) o) wd≤ hwd)
+
+obsListCaps?-widen : ∀ {n} {Γ : Ctx n} {s} {c c′ : Caps} (sched : Sched Γ)
+  (q : List (Closed Γ s)) →
+  c ⊑ᶜ c′ → all (obsCaps? c sched) q ≡ true
+          → all (obsCaps? c′ sched) q ≡ true
+obsListCaps?-widen sched q le =
+  all-impl _ _ (λ o → obsCaps?-widen sched o le) q
+
+-- pathSz? and regsSz? read cSize alone, so they widen at ⊑ᶜ too — same
+-- lemmas as above, projected
+pathSz?-⊑ : ∀ {n} {Γ : Ctx n} {s t} {c c′ : Caps} (p : Path Γ s t) →
+  c ⊑ᶜ c′ → pathSz? (Caps.cSize c) p ≡ true → pathSz? (Caps.cSize c′) p ≡ true
+pathSz?-⊑ p (sz≤ , _ , _) = pathSz?-widen p sz≤
+
+pathsSz?-⊑ : ∀ {n} {Γ : Ctx n} {s t} {A : Set} {c c′ : Caps}
+  (ps : List (A × Path Γ s t)) →
+  c ⊑ᶜ c′ → all (λ rp → pathSz? (Caps.cSize c) (proj₂ rp)) ps ≡ true
+          → all (λ rp → pathSz? (Caps.cSize c′) (proj₂ rp)) ps ≡ true
+pathsSz?-⊑ ps le = all-impl _ _ (λ rp → pathSz?-⊑ (proj₂ rp) le) ps
+
+frameSz?-⊑ : ∀ {n} {Γ : Ctx n} {s u} {c c′ : Caps} (f : Frame Γ s u) →
+  c ⊑ᶜ c′ → frameSz? (Caps.cSize c) f ≡ true → frameSz? (Caps.cSize c′) f ≡ true
+frameSz?-⊑ f (sz≤ , _ , _) = frameSz?-widen f sz≤
+
+-- the burst constructors the delivery clique assembles its emits from
+burstCaps?-∷ : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sched : Sched Γ)
+  (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
+  all (eventCaps? c sched) (InstEmit.events em) ≡ true →
+  burstCaps? c sched str ≡ true →
+  burstCaps? c sched (em ∷ str) ≡ true
+burstCaps?-∷ c sched em str he hst = ∧-intro he hst
+
+burstCaps?-++ : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sched : Sched Γ)
+  (xs ys : Stream Γ u) →
+  burstCaps? c sched xs ≡ true → burstCaps? c sched ys ≡ true →
+  burstCaps? c sched (xs ++ ys) ≡ true
+burstCaps?-++ c sched xs ys hx hy =
+  all-++-intro (λ em → all (eventCaps? c sched) (InstEmit.events em)) xs ys hx hy
+
 postulate
   -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
   -- folds and reports how many.  j′ folds spent means the caps advance
