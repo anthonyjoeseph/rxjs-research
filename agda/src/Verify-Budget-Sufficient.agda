@@ -6763,20 +6763,26 @@ widNode W sl (exhaust-st _ _)          = true
 -- syntactic subterm of what was already in the store.  So cSize covers
 -- them without a fourth field and, crucially, WITHOUT the ledger:
 -- round3b-ledger-reset-absurd stays unavailable
+-- top-level (not a where block) so regsSz?-subscribeE below can name
+-- pathSz? in its hypothesis: the continuation κ a subscribe walks under
+-- must already be size-bounded, or a huge step function in κ would be
+-- registered at the leaf.  This is the honest form — the naive lemma
+-- without the κ hypothesis is FALSE, since κ = scan-f BIG ↠ root over a
+-- tiny b registers BIG
+frameSz? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+frameSz? B (map-f fn)         = sizeᵗ fn ≤ᵇ B
+frameSz? B (scan-f fn _)      = sizeᵗ fn ≤ᵇ B
+frameSz? B (take-f _)         = true
+frameSz? B (from-inner _ _ _) = true
+frameSz? B (thru-outer _ _)   = true
+
+pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+pathSz? B root           = true
+pathSz? B (share-sink i) = true
+pathSz? B (f ↠ p)        = frameSz? B f ∧ pathSz? B p
+
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
-  where
-  frameSz? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
-  frameSz? B (map-f fn)         = sizeᵗ fn ≤ᵇ B
-  frameSz? B (scan-f fn _)      = sizeᵗ fn ≤ᵇ B
-  frameSz? B (take-f _)         = true
-  frameSz? B (from-inner _ _ _) = true
-  frameSz? B (thru-outer _ _)   = true
-
-  pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-  pathSz? B root           = true
-  pathSz? B (share-sink i) = true
-  pathSz? B (f ↠ p)        = frameSz? B f ∧ pathSz? B p
 
 capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
@@ -7021,6 +7027,7 @@ postulate
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     regsSz? C (EvalSt.registry st) ≡ true →
     sizeᵉ b ≤ C →
+    pathSz? C κ ≡ true →   -- the continuation is already bounded
     let r = subscribeE g b κ bid now sched st
     in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
 
