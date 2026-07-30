@@ -6874,6 +6874,93 @@ postulate
     in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
 ------------------------------------------------------------------
+-- REFUTED: caps-frame AS STATED IS FALSE, TWICE OVER.  Both halves are
+-- statement-level — the face is uninstantiable, not merely unproven —
+-- and the same disease class as the original vacuity.
+--
+-- (1) THE BOUNDARY FOLD.  caps-frame's hypothesis admits a state
+-- satisfying capsOK? with ZERO slack and a `b` whose size is exactly the
+-- level's cSize, and demands capsOK? at the SAME level afterwards.  But
+-- the subscribe frame itself folds: subscribeE's scanᵉ clause
+-- (Rx/Evaluator.agda:958) installs `scan-st (evalTm seed)` and runs the
+-- source's sync burst through pushBurst with the scan-f frame, and
+-- dispatch updates that node once per synchronous payload.  A cap-sized
+-- `b` with one duplicating fold therefore lands at sizeStep C C, above
+-- C — and the arithmetic below is uniform in C, so specialising C to
+-- capsAt's own tower does not escape it.
+--
+-- State-Blowup-Probe's framePreserves-absurd is the concrete witness:
+-- pRs, whose size is 19 and whose initial state is bounded by 19, leaves
+-- a size-30 node after its own root subscribe.  (The root subscribe is
+-- one of caps-frame's own instances: κ = root, id = 0, level 0.)
+--
+-- (2) THE MID-CASCADE HYPOTHESIS, an independent defect.  caps-tick says
+-- a whole cascade moves the state from level id to level suc id, so
+-- mid-drain states live strictly BETWEEN the two levels.  A proof of
+-- caps-tick must apply caps-frame at every inner subscribe inside that
+-- cascade, and there are exactly two such call sites:
+--
+--   · subscribeInner   (Rx/Evaluator.agda:531) — a *All consuming an
+--     obs payload mid-cascade, reached from stepFrame
+--   · sharedConnect    (Rx/Evaluator.agda:871) — a shared slot's lazy
+--     connect, which subscribes the def mid-cascade
+--
+-- At both, earlier chains in the SAME cascade have already grown the
+-- store, so the level-id hypothesis is simply unavailable.  Even had (1)
+-- survived, the face could not feed the induction it exists for.
+--
+-- THE REPAIR SHAPE UNDER EVALUATION (not yet taken on faith — it owes
+-- its own probe): make the mid-instant states explicit with a
+-- CONSUMED-ITERATION index.  One parametric face against level suc id
+-- whose pre-state is bounded by frameBlowup partially applied — k of the
+-- cWid * cReg iterations still unspent — and a subscribeE with fold
+-- count j consuming j of k.  caps-frame and caps-tick then become the
+-- two ENDPOINTS (k = full, k = 0) of a single face rather than siblings,
+-- and (2) dissolves because a mid-cascade state is just a smaller k.
+--
+-- AND THE THING TO CHECK BEFORE BUILDING IT: this is structurally the
+-- same bookkeeping the walk face's E′ receipt already does.  Two
+-- parallel accounting mechanisms for one growth is a smell; if E′ can
+-- carry the iteration count, caps preservation falls out of the walk
+-- face instead of standing beside it as a second ledger.
+------------------------------------------------------------------
+
+-- the arithmetic obstruction behind (1), UNIFORM IN C: one fold from a
+-- cap-sized value on a cap-sized step function always overflows the cap,
+-- whatever the cap is.  This is why no choice of level rescues
+-- same-level preservation
+caps-frame-boundary-absurd : ∀ (C : ℕ) → 1 ≤ C → sizeStep C C ≤ C → ⊥
+caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
+  where
+  1≤2C : 1 ≤ 2 * C
+  1≤2C = ≤-trans hC (m≤m+n C (C + 0))
+
+  0<prod : 0 < C * (2 * C)
+  0<prod = *-mono-≤ hC 1≤2C
+
+  C<step : C < sizeStep C C
+  C<step = subst (C <_) (sym (*-suc C (2 * C)))
+                 (subst (_< C + C * (2 * C)) (+-identityʳ C)
+                        (+-monoʳ-< C 0<prod))
+
+-- STEP 3 of the repair, stated now because it is independent of how the
+-- repair lands: the chain half of ANY repaired face consumes exactly
+-- this, and it is the load-bearing structural fact behind the measured
+-- 10, 10, 10, 10.  Every frame subscribeE installs carries a step
+-- function that is a SUBTERM of the expression being subscribed — the
+-- map-f/scan-f clauses pass `f` straight through from mapᵉ/scanᵉ — so a
+-- registry bounded by C stays bounded by C as long as the subscribed
+-- expression is
+postulate
+  regsSz?-subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (C : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    regsSz? C (EvalSt.registry st) ≡ true →
+    sizeᵉ b ≤ C →
+    let r = subscribeE g b κ bid now sched st
+    in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
+
+------------------------------------------------------------------
 -- WHAT WAS HERE, AND WHY IT IS GONE.  A fixed-height reach cap —
 -- foldBudget, reachCap, reach-covers — built on the measured claim that
 -- a reachable observable's tower has its HEIGHT fixed by the syntax and

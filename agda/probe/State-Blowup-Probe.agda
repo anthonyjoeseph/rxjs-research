@@ -36,7 +36,8 @@
 ------------------------------------------------------------------
 module State-Blowup-Probe where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤ᵇ_; _⊔_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; sum; map; length; foldr)
 open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
@@ -57,7 +58,10 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
                                 subscribeE; cascade; slotsSize; root)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Verify-Budget-Sufficient using (foldStep; sizeStep; iterSize;
-                                            Caps; capsAt)
+                                            Caps; capsAt; stBounded?)
+open import Rx.Prim using (Gas; Tick)
+open import Rx.Evaluator using (Path)
+open import Data.Empty using (⊥)
 
 ------------------------------------------------------------------
 -- THE HARNESS: drain, but keep the state.  This is `drain`/`evaluate`
@@ -523,3 +527,48 @@ _ = refl
 
 _ : (1 ≤ᵇ Caps.cReg (capsAt pA ins3 0)) ≡ true
 _ = refl
+
+------------------------------------------------------------------
+-- REFUTATION (e): SAME-LEVEL PRESERVATION IS FALSE — caps-frame's shape
+-- cannot hold, and the witness needs no pre-grown store at all.
+--
+-- caps-frame says: a state satisfying capsOK? at level `id`, subscribed
+-- with a `b` whose size is within that level's cSize, still satisfies
+-- capsOK? AT THE SAME LEVEL afterwards.  But subscribeE's scanᵉ clause
+-- (Rx/Evaluator.agda:958) installs `scan-st (evalTm seed)` and then runs
+-- the source's sync burst through pushBurst with the scan-f frame, and
+-- dispatch updates that node once per synchronous payload — so the
+-- SUBSCRIBE FRAME ITSELF folds.  A `b` at the size cap that folds even
+-- once therefore lands above the cap.
+--
+-- The shape, with the cap as a parameter so it can be exhibited at a
+-- size a real program reaches (capsAt's own cSize is a tower, so no
+-- writable program comes near it — but the obstruction does not depend
+-- on which C is chosen, see caps-frame-boundary-absurd, which is uniform
+-- in C).  Only the stBounded? conjunct is needed to break it
+------------------------------------------------------------------
+
+-- Stated at the ROOT SUBSCRIBE, which is one of caps-frame's own
+-- instances (κ = root, id = 0, level 0).  Phrasing it over `runSt 0` —
+-- the same term the measurements above already normalise — keeps the
+-- refutation cheap; unfolding a fresh `subscribeE` application inside a
+-- `with` costs many gigabytes for no extra content
+FramePreservesAt : ℕ → Set
+FramePreservesAt C = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  stBounded? C (sched-init e ins) (st-init e) ≡ true →
+  sizeᵉ e ≤ C →
+  stBounded? C (proj₁ (runSt 0 e ins)) (proj₂ (runSt 0 e ins)) ≡ true
+
+-- pRs is the witness: its own size is 19, its initial state is bounded
+-- by 19, and its root subscribe leaves a node of size 30
+_ : sizeᵉ pRs ≡ 19
+_ = refl
+
+_ : stBounded? 19 (sched-init pRs ins3) (st-init pRs) ≡ true
+_ = refl
+
+-- and so the shape cannot hold: it demands stBounded? 19 of a state
+-- holding a size-30 node
+framePreserves-absurd : FramePreservesAt 19 → ⊥
+framePreserves-absurd fp with fp pRs ins3 refl (≤ᵇ⇒≤ (sizeᵉ pRs) 19 _)
+... | ()
