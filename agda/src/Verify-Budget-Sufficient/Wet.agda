@@ -687,14 +687,7 @@ sweepLive-fnCap : ∀ {n} {Γ : Ctx n} {t} (Ψ : ℕ)
   (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
   all (fnCapLive Ψ) ls ≡ true →
   all (fnCapLive Ψ) (sweepLive reg ls) ≡ true
-sweepLive-fnCap Ψ reg []       h = refl
-sweepLive-fnCap {n = n} Ψ reg (l ∷ ls) h
-  with ∧-true (fnCapLive Ψ l) (all (fnCapLive Ψ) ls) h
-... | bl , bls
-  with (LiveSource.source l <ᵇ n)
-       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
-... | true  = ∧-intro bl (sweepLive-fnCap Ψ reg ls bls)
-... | false = sweepLive-fnCap Ψ reg ls bls
+sweepLive-fnCap Ψ = sweepLive-all (fnCapLive Ψ)
 
 -- the cut is a filter on the registry: the count only drops, the
 -- survivors keep their frame bounds, and every close it mints is
@@ -1383,22 +1376,10 @@ sharedPlumb-B B Ψ (em ∷ ems) h =
 -- the completion latch: dropping a source SHRINKS the registry on
 -- both riders, and completedSources / connectedShares are read by no
 -- conjunct at all
-dropSource-len : ∀ {n} {Γ : Ctx n} {t} (src : Source)
-  (reg : List (RegId × Source × Chain Γ t)) →
-  length (dropSource src reg) ≤ length reg
-dropSource-len src []                  = z≤n
-dropSource-len src ((rid , s , c) ∷ r) with sameSource src s
-... | true  = ≤-trans (dropSource-len src r) (n≤1+n _)
-... | false = s≤s (dropSource-len src r)
-
 dropSource-regs : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (src : Source)
   (reg : List (RegId × Source × Chain Γ t)) →
   regsB? B Ψ reg ≡ true → regsB? B Ψ (dropSource src reg) ≡ true
-dropSource-regs B Ψ src []                  h = refl
-dropSource-regs B Ψ src ((rid , s , c) ∷ r) h with sameSource src s
-... | true  = dropSource-regs B Ψ src r (proj₂ (∧-true _ _ h))
-... | false = ∧-intro (proj₁ (∧-true _ _ h))
-                      (dropSource-regs B Ψ src r (proj₂ (∧-true _ _ h)))
+dropSource-regs B Ψ = dropSource-all (λ en → pathB? B Ψ (proj₂ (proj₂ (proj₂ en))))
 
 latch-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
   (src : Source) (sched : Sched Γ) (st : EvalSt e) →
@@ -2605,24 +2586,13 @@ sweepLive-ofW : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ)
   (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
   all (ofWLive Ω) ls ≡ true →
   all (ofWLive Ω) (sweepLive reg ls) ≡ true
-sweepLive-ofW Ω reg []       h = refl
-sweepLive-ofW {n = n} Ω reg (l ∷ ls) h
-  with ∧-true (ofWLive Ω l) (all (ofWLive Ω) ls) h
-... | bl , bls
-  with (LiveSource.source l <ᵇ n)
-       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
-... | true  = ∧-intro bl (sweepLive-ofW Ω reg ls bls)
-... | false = sweepLive-ofW Ω reg ls bls
+sweepLive-ofW Ω = sweepLive-all (ofWLive Ω)
 
 -- dropping a source only shrinks the registry
 dropSource-regsΩ : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ) (src : Source)
   (reg : List (RegId × Source × Chain Γ t)) →
   regsΩ? Ω reg ≡ true → regsΩ? Ω (dropSource src reg) ≡ true
-dropSource-regsΩ Ω src []                  h = refl
-dropSource-regsΩ Ω src ((rid , s , c) ∷ r) h with sameSource src s
-... | true  = dropSource-regsΩ Ω src r (proj₂ (∧-true _ _ h))
-... | false = ∧-intro (proj₁ (∧-true _ _ h))
-                      (dropSource-regsΩ Ω src r (proj₂ (∧-true _ _ h)))
+dropSource-regsΩ Ω = dropSource-all (λ en → pathΩ? Ω (proj₂ (proj₂ (proj₂ en))))
 
 latch-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ω : ℕ)
   (src : Source) (sched : Sched Γ) (st : EvalSt e) →

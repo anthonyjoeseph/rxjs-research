@@ -1278,27 +1278,59 @@ capsOK?-delivered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched (record st { delivered = rid ∷ EvalSt.delivered st }) ≡ true
 capsOK?-delivered c rid sched st h = h
 
-postulate
-  -- the admitted snapshot is a SUBLIST of the registry, so its chains
-  -- inherit the registry's size bound (the caps twin of shareAdmit-B)
-  shareAdmit-caps : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (i : Fin n)
-    (rs : List (RegId × Source × Chain Γ t)) →
-    regsSz? B rs ≡ true →
-    all (λ rp → pathSz? B (proj₂ rp)) (shareAdmit i rs) ≡ true
+-- the admitted snapshot is a SUBLIST of the registry — its own filter
+-- rather than dropSource's, because it also has to match the chain's
+-- element type against the share's — so its chains inherit the
+-- registry's size bound
+shareAdmit-caps : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (i : Fin n)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regsSz? B rs ≡ true →
+  all (λ rp → pathSz? B (proj₂ rp)) (shareAdmit i rs) ≡ true
+shareAdmit-caps B i [] h = refl
+shareAdmit-caps {Γ = Γ} B i ((rid , s , (u , p)) ∷ r) h
+  with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
+... | false | _        = shareAdmit-caps B i r (proj₂ (∧-true _ _ h))
+... | true  | no  _    = shareAdmit-caps B i r (proj₂ (∧-true _ _ h))
+... | true  | yes refl = ∧-intro (proj₁ (∧-true _ _ h))
+                                 (shareAdmit-caps B i r (proj₂ (∧-true _ _ h)))
 
-  -- finishing a completing share drops the source's registrations and
-  -- sweeps its live entry: the registry shrinks (so regsSz? and the
-  -- length conjunct survive) and the live list shrinks (so widLive and
-  -- stBounded? survive).  The burst is untouched
-  shareFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (i : Fin n) (fin : Bool) (sl : Slots Γ)
-    (out : Stream Γ t × Sched Γ × EvalSt e) →
-    Sched.slots (proj₁ (proj₂ out)) ≡ sl →
-    capsOK? c (proj₁ (proj₂ out)) (proj₂ (proj₂ out)) ≡ true →
-    burstCaps? c sl (proj₁ out) ≡ true →
-    let r = shareFinish i fin out
-    in (capsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstCaps? c sl (proj₁ r) ≡ true)
+-- finishing a completing share drops the source's registrations and
+-- sweeps its live entry.  Both are the generic filters, so all five of
+-- capsOK?'s conjuncts survive by the same two lemmas: the registry
+-- shrinks (regsSz? by dropSource-all, the count by dropSource-len) and
+-- the live list shrinks (stBounded?'s live half and widLive by
+-- sweepLive-all).  The nodes and the burst are untouched
+shareFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (i : Fin n) (fin : Bool) (sl : Slots Γ)
+  (out : Stream Γ t × Sched Γ × EvalSt e) →
+  capsOK? c (proj₁ (proj₂ out)) (proj₂ (proj₂ out)) ≡ true →
+  burstCaps? c sl (proj₁ out) ≡ true →
+  let r = shareFinish i fin out
+  in (capsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? c sl (proj₁ r) ≡ true)
+shareFinish-caps c i false sl out inv bc = inv , bc
+shareFinish-caps c i true sl (emits , sched′ , st′) inv bc =
+    ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
+                        (Sched.live sched′) (proj₁ (∧-true _ _ h0)))
+                     (proj₂ (∧-true _ _ h0)))
+    (∧-intro (dropSource-all (λ en → pathSz? (Caps.cSize c)
+                                       (proj₂ (proj₂ (proj₂ en))))
+                (toℕ i) (EvalSt.registry st′) h1)
+    (∧-intro (sweepLive-all (widLive (Caps.cWid c) (Sched.slots sched′)) kept
+                (Sched.live sched′) h2)
+    (∧-intro h3
+             (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len (toℕ i)
+                                          (EvalSt.registry st′))
+                                       (≤ᵇ⇒≤ _ _ (T-to h4))))))))
+  , bc
+  where
+  kept = dropSource (toℕ i) (EvalSt.registry st′)
+  P    = capsOK?-parts c sched′ st′ inv
+  h0   = proj₁ P
+  h1   = proj₁ (proj₂ P)
+  h2   = proj₁ (proj₂ (proj₂ P))
+  h3   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4   = proj₂ (proj₂ (proj₂ (proj₂ P)))
 
 ------------------------------------------------------------------
 -- THE DELIVERY CLIQUE, GROUND.  foldPath / dispatchShare / shareGo,
@@ -1474,9 +1506,6 @@ dispatchShare-caps c j sf (suc gas) id now i vals fin sl sched st 2≤S slEq inv
   out = shareGo sf gas id now i vals fin (shareAdmit i (EvalSt.registry st))
           sched st₀
   FIN = shareFinish-caps (frameStep (j + j₁) c) i fin sl out
-          (trans (shareGo-slots sf gas id now i vals fin
-                    (shareAdmit i (EvalSt.registry st)) sched st₀)
-                 slEq)
           (proj₁ (proj₂ GO)) (proj₂ (proj₂ GO))
 
 -- FAN-OUT: one registration at a time.  A cancelled chain delivers

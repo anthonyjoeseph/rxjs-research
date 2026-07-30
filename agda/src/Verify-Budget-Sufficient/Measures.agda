@@ -416,18 +416,47 @@ latch-bounded B sched a st bnd with Arrival.isLast a
 ... | false = bnd
 
 -- the sweep is a filter: every survivor was already bounded
+-- THE TWO REGISTRY FILTERS, generic in the predicate.  sweepLive and
+-- dropSource are both `keep a sublist`, so every face's version of
+-- "the invariant survives the filter" is the SAME induction at a
+-- different P — it was written out three times (bounded, fnCap, ofW,
+-- and the caps face wanted a fourth).  Once, here, instead
+sweepLive-all : ∀ {n} {Γ : Ctx n} {t} (P : LiveSource Γ → Bool)
+  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
+  all P ls ≡ true → all P (sweepLive reg ls) ≡ true
+sweepLive-all P reg []       h = refl
+sweepLive-all {n = n} P reg (l ∷ ls) h
+  with ∧-true (P l) (all P ls) h
+... | bl , bls
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
+... | true  = ∧-intro bl (sweepLive-all P reg ls bls)
+... | false = sweepLive-all P reg ls bls
+
+dropSource-all : ∀ {n} {Γ : Ctx n} {t}
+  (P : RegId × Source × Chain Γ t → Bool) (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  all P reg ≡ true → all P (dropSource src reg) ≡ true
+dropSource-all P src []                  h = refl
+dropSource-all P src ((rid , s , c) ∷ r) h with sameSource src s
+... | true  = dropSource-all P src r (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (dropSource-all P src r (proj₂ (∧-true _ _ h)))
+
+-- and the count, which no predicate sees
+dropSource-len : ∀ {n} {Γ : Ctx n} {t} (src : Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  length (dropSource src reg) ≤ length reg
+dropSource-len src []                  = z≤n
+dropSource-len src ((rid , s , c) ∷ r) with sameSource src s
+... | true  = ≤-trans (dropSource-len src r) (n≤1+n _)
+... | false = s≤s (dropSource-len src r)
+
 sweepLive-bounded : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
   (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
   all (boundedLive B) ls ≡ true →
   all (boundedLive B) (sweepLive reg ls) ≡ true
-sweepLive-bounded B reg []       h = refl
-sweepLive-bounded {n = n} B reg (l ∷ ls) h
-  with ∧-true (boundedLive B l) (all (boundedLive B) ls) h
-... | bl , bls
-  with (LiveSource.source l <ᵇ n)
-       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
-... | true  = ∧-intro bl (sweepLive-bounded B reg ls bls)
-... | false = sweepLive-bounded B reg ls bls
+sweepLive-bounded B = sweepLive-all (boundedLive B)
 
 -- the finish drops registry entries (unread by stBounded?) and
 -- filters the live schedule
