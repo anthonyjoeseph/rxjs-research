@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -44,6 +44,10 @@ help:
 	@echo "  state-blowup-probe  what does ONE instant do to the STORE?  reads"
 	@echo "                  capsOK?'s own three quantities off a real run"
 	@echo "                  (see agda/probe/State-Blowup-Probe.agda)"
+	@echo "  j-budget-probe  is cWid * cReg enough ITERATIONS?  NO — and no count"
+	@echo "                  of the Caps triple is, because chain length moves"
+	@echo "                  while the triple stands still"
+	@echo "                  (see agda/probe/J-Budget-Probe.agda).  SLOW (~10 min)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -104,6 +108,15 @@ frame-work-probe:
 # Sched/EvalSt.  Standalone, so src/Main.agda never reaches it.
 state-blowup-probe:
 	cd agda && agda -i src -i probe probe/State-Blowup-Probe.agda
+
+# The gate for frameBlowup's ITERATION COUNT, the one component round 4
+# left unmeasured.  It refutes `cWid * cReg` — and, via a family whose
+# caps triple is constant while its chain length grows, refutes every
+# count computed from the triple alone.  Standalone, so src/Main.agda
+# never reaches it.  SLOW — pM 6 stores a 4371-node value and that
+# number IS the finding, so it is not shrunk.  ~10 min.
+j-budget-probe:
+	cd agda && agda -i src -i probe probe/J-Budget-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
