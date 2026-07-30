@@ -6930,6 +6930,74 @@ capsAt {n = n} e sl zero =
                     (suc (sizeᵉ e + slotsSize sl)))
 capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
 
+------------------------------------------------------------------
+-- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
+-- everywhere: a subscribe reports growth frameStep j ↦ frameStep (j+j′),
+-- and capsOK? at the smaller caps must weaken to the larger.  Each
+-- conjunct is a `≤ᵇ` bound weakened through `all-impl`, exactly as the
+-- walk face's pathB?-widen does for its own predicate.
+------------------------------------------------------------------
+
+-- caps ordering: pointwise on the three fields
+_⊑ᶜ_ : Caps → Caps → Set
+c ⊑ᶜ c′ = (Caps.cSize c ≤ Caps.cSize c′)
+        × (Caps.cWid  c ≤ Caps.cWid  c′)
+        × (Caps.cReg  c ≤ Caps.cReg  c′)
+
+-- the step function's size bound weakens frame by frame
+pathSz?-widen : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B B′ : ℕ} →
+  B ≤ B′ → pathSz? B p ≡ true → pathSz? B′ p ≡ true
+pathSz?-widen root           le h = refl
+pathSz?-widen (share-sink i) le h = refl
+pathSz?-widen (map-f fn ↠ p)  {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathSz? B p) h
+... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathSz?-widen p le hp)
+pathSz?-widen (scan-f fn _ ↠ p) {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathSz? B p) h
+... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathSz?-widen p le hp)
+pathSz?-widen (take-f _ ↠ p)      le h = pathSz?-widen p le h
+pathSz?-widen (from-inner _ _ _ ↠ p) le h = pathSz?-widen p le h
+pathSz?-widen (thru-outer _ _ ↠ p)   le h = pathSz?-widen p le h
+
+regsSz?-widen : ∀ {n} {Γ : Ctx n} {t}
+  (rs : List (RegId × Source × Chain Γ t)) {B B′ : ℕ} →
+  B ≤ B′ → regsSz? B rs ≡ true → regsSz? B′ rs ≡ true
+regsSz?-widen rs le =
+  all-impl _ _ (λ en → pathSz?-widen (proj₂ (proj₂ (proj₂ en))) le) rs
+
+widLive-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (l : LiveSource Γ) {W W′ : ℕ} →
+  W ≤ W′ → widLive W sl l ≡ true → widLive W′ sl l ≡ true
+widLive-widen {n = n} sl l le =
+  all-impl _ _ (λ tv → ≤ᵇ-widen (outWᵛ n sl (LiveSource.elemTy l) (proj₂ tv)) le)
+           (LiveSource.pending l)
+
+widNode-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (ns : NodeState Γ) {W W′ : ℕ} →
+  W ≤ W′ → widNode W sl ns ≡ true → widNode W′ sl ns ≡ true
+widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (outWᵛ n sl t v) le h
+widNode-widen {n = n} sl (concat-st q _ _) le h =
+  all-impl _ _ (λ o → ≤ᵇ-widen (outWᵉ n sl o) le) q h
+widNode-widen sl (take-st _)     le h = refl
+widNode-widen sl (merge-st _ _)  le h = refl
+widNode-widen sl (switch-st _ _) le h = refl
+widNode-widen sl (exhaust-st _ _) le h = refl
+
+capsOK?-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c c′ : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  c ⊑ᶜ c′ → capsOK? c sched st ≡ true → capsOK? c′ sched st ≡ true
+capsOK?-mono c c′ sched st (sz≤ , wd≤ , rg≤) h
+  with ∧-true _ _ h
+... | hSt , hRest with ∧-true _ _ hRest
+... | hRg , hRest2 with ∧-true _ _ hRest2
+... | hWL , hRest3 with ∧-true _ _ hRest3
+... | hWN , hLen =
+  ∧-intro (stBounded-widen sz≤ sched st hSt)
+  (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
+  (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
+                     (Sched.live sched) hWL)
+  (∧-intro (all-impl _ _ (λ kv → widNode-widen (Sched.slots sched) (proj₂ kv) wd≤)
+                     (EvalSt.nodes st) hWN)
+           (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen))))
+
 -- WHAT REPLACES caps-frame, AND WHY IT LIVES ON THE WALK FACE'S RECEIPT
 -- RATHER THAN BESIDE IT.
 --
