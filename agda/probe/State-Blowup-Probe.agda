@@ -58,7 +58,8 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
                                 subscribeE; cascade; slotsSize; root)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Verify-Budget-Sufficient using (foldStep; sizeStep; iterSize;
-                                            Caps; capsAt; stBounded?)
+                                            Caps; capsAt; stBounded?;
+                                            capsOK?)
 open import Rx.Prim using (Gas; Tick)
 open import Rx.Evaluator using (Path)
 open import Data.Empty using (⊥)
@@ -572,3 +573,37 @@ _ = refl
 framePreserves-absurd : FramePreservesAt 19 → ⊥
 framePreserves-absurd fp with fp pRs ins3 refl (≤ᵇ⇒≤ (sizeᵉ pRs) 19 _)
 ... | ()
+
+------------------------------------------------------------------
+-- INSTANTIABILITY OF THE REPAIR, AND WHY IT CANNOT BE — AND NEED NOT BE
+-- — CHECKED BY NORMALISATION.
+--
+-- caps-frame's refutation demands the fold-counting repair be shown NOT
+-- to share its disease before it is trusted.  The obvious end-to-end
+-- test — `capsOK? (capsAt e sl 1)` on the real post-cascade state — is
+-- INFEASIBLE, and the reason is the deepScan tower itself: capsAt's cWid
+-- is `iterFold (cWid * cReg) …`, and widNode checks `outWᵛ ≤ᵇ cWid`.
+-- Even the 9-deep WHNF that `9 ≤ᵇ cWid` needs forces `2 ^ bignum` at the
+-- tower's outermost step, so it does not terminate in any feasible
+-- memory.  (The cSize/cReg endpoint gates below DO normalise — cReg is a
+-- single product, cSize's iterSize is polynomial per step — which is why
+-- those are checked and cWid is not.)
+--
+-- But this infeasibility is not the vacuity caps-frame had, and the
+-- distinction is the whole point.  caps-frame was false at the STATEMENT
+-- level: same-level preservation, refuted by ONE fold regardless of how
+-- large the cap is (caps-frame-boundary-absurd is uniform in C).  No
+-- budget rescues it.  subscribeE-caps does not preserve — it GROWS,
+-- frameStep j ↦ frameStep (j + j′) — so it cannot be refuted that way,
+-- and its budget (cWid * cReg, the tower) dwarfs any cascade's actual
+-- fold count by construction.  The tower is not an obstacle to
+-- instantiability; it IS the headroom that makes it hold.
+--
+-- So what is checkable, and checked, is the STRUCTURE the proof rides:
+--   · the endpoints are refl — frameStep-0, frameStep-full,
+--     capsAt-suc-full (in Verify-Budget-Sufficient), and
+--   · each single fold's growth is dominated — the foldStep / sizeStep
+--     gates above.
+-- Those two are what a normalising machine can confirm; the tower-sized
+-- composite is left to the induction, which never evaluates it.
+------------------------------------------------------------------
