@@ -360,10 +360,11 @@ splitBurst-bk-caps {Γ = Γ} {u = u} c sl (em ∷ ems) =
 subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-  (sched : Sched Γ) (st : EvalSt e) →
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
   capsOK? (frameStep j c) sched st ≡ true →
-  valCaps? (frameStep j c) (Sched.slots sched) (obs u) o ≡ true →
+  valCaps? (frameStep j c) sl (obs u) o ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) + sizeᵛ (obs u) o ≤ Caps.cSize (frameStep j c) →
   let r = subscribeInner g op allNid κ id now o sched st
@@ -371,13 +372,13 @@ subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      (capsOK? (frameStep (j + j′) c)
               (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
               (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
-     × (all (valCaps? (frameStep (j + j′) c) (Sched.slots sched) u)
+     × (all (valCaps? (frameStep (j + j′) c) sl u)
             (proj₁ (proj₂ r)) ≡ true)
-     × (all (eventCaps? (frameStep (j + j′) c) (Sched.slots sched))
+     × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ (proj₂ r))) ≡ true)
 -- OUT OF GAS: a dry close and nothing else.  The only state change is
 -- the instance counter, which capsOK? does not read
-subscribeInner-caps c j g0 op allNid κ id now o sched st 2≤S inv vC pC lC =
+subscribeInner-caps c j g0 op allNid κ id now o sl sched st 2≤S slEq inv vC pC lC =
   0 , subst (λ x → capsOK? (frameStep x c)
                      (record sched { nextNode = suc (Sched.nextNode sched) }) st ≡ true)
             (sym (+-identityʳ j))
@@ -387,13 +388,11 @@ subscribeInner-caps c j g0 op allNid κ id now o sched st 2≤S inv vC pC lC =
 -- instant.  Its size hypothesis is valCaps?'s cSize half (sizeᵛ (obs u)
 -- IS sizeᵉ), and its chain hypotheses are κ's, one frame longer — which
 -- is exactly what the extra summand in lC pays for
-subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sched st
-                    2≤S inv vC pC lC =
+subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sl sched st
+                    2≤S slEq inv vC pC lC =
   j′ , SUB
-     , splitBurst-vals-caps {s = u} {u = t} (frameStep (j + j′) c)
-         (Sched.slots sched) burst BC
-     , splitBurst-bk-caps {s = u} {u = t} (frameStep (j + j′) c)
-         (Sched.slots sched) burst
+     , splitBurst-vals-caps {s = u} {u = t} (frameStep (j + j′) c) sl burst BC
+     , splitBurst-bk-caps {s = u} {u = t} (frameStep (j + j′) c) sl burst
   where
   B      = Caps.cSize (frameStep j c)
   sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
@@ -405,7 +404,7 @@ subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sched st
              (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B)
                         (≤⇒≤ᵇ (≤-trans (m≤m+n (suc (pathLen κ)) (sizeᵉ o)) lC)))
                       pC)
-  IH     = subscribeE-caps c j fuel o κ′ id now sched₀ st 2≤S
+  IH     = subscribeE-caps c j fuel o κ′ id now sl sched₀ st 2≤S slEq
              (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                sched st inv)
              szo pC′ lC
