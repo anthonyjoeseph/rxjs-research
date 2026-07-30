@@ -116,7 +116,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 schedHeadOf; schedGo; schedEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
                                 takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; cascadeGo;
+                                dropSource; arrSource; chainsOf; chainsGo; cascadeGo;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
                                 subscribeInner; chainStep; subscribeAll;
@@ -972,31 +972,9 @@ postulate
     in Σ ℕ λ j → (j ≤ Caps.cWid c * Caps.cReg c * Caps.cSize c)
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- the two bookends of `cascade`, which touch the registry and the live
-  -- set but never a value: latching clears the per-cascade scratch,
-  -- finishing DROPS the spent source's entries and sweeps its live entry.
-  -- Both can only shrink what capsOK? bounds
-  cascadeLatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    capsOK? c sched (cascadeLatch a st) ≡ true
-
-  cascadeFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    let r = cascadeFinish a sched st
-    in capsOK? c (proj₁ r) (proj₂ r) ≡ true
-
-  -- the cascade's chain snapshot is a SUBLIST of the registry, so both
-  -- of cascadeGo-caps's chain hypotheses come straight off capsOK?
-  chainsOf-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (B : ℕ) (a : Arrival Γ) (st : EvalSt e) →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    all (λ rc → pathSz? B (proj₂ rc)) (chainsOf a st) ≡ true
-
-  chainsOf-length : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (st : EvalSt e) →
-    length (chainsOf a st) ≤ length (EvalSt.registry st)
+  -- the two bookends of `cascade` and the chain snapshot are no longer
+  -- postulated either: they are GROUND below, on the same two filter
+  -- lemmas the share leaves use.
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE-SIDE COMPANION TREE, transcribed from subscribeE-walkS's
@@ -1278,6 +1256,40 @@ capsOK?-delivered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched (record st { delivered = rid ∷ EvalSt.delivered st }) ≡ true
 capsOK?-delivered c rid sched st h = h
 
+-- THE FINISH FILTER, shared by the share's and the cascade's.  Both
+-- ends of a completing source do the same two things — drop its
+-- registrations, sweep its live entry — and every one of capsOK?'s five
+-- conjuncts survives by the two generic filter lemmas: the registry
+-- shrinks (regsSz? by dropSource-all, the count by dropSource-len), the
+-- live list shrinks (stBounded?'s live half and widLive by
+-- sweepLive-all), the nodes and the slots are untouched
+dropSweep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (src : Source) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  capsOK? c (record sched { live = sweepLive (dropSource src (EvalSt.registry st))
+                                             (Sched.live sched) })
+            (record st { registry = dropSource src (EvalSt.registry st) }) ≡ true
+dropSweep-caps c src sched st inv =
+    ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
+                        (Sched.live sched) (proj₁ (∧-true _ _ h0)))
+                     (proj₂ (∧-true _ _ h0)))
+    (∧-intro (dropSource-all (λ en → pathSz? (Caps.cSize c)
+                                       (proj₂ (proj₂ (proj₂ en))))
+                src (EvalSt.registry st) h1)
+    (∧-intro (sweepLive-all (widLive (Caps.cWid c) (Sched.slots sched)) kept
+                (Sched.live sched) h2)
+    (∧-intro h3
+             (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
+                                       (≤ᵇ⇒≤ _ _ (T-to h4))))))))
+  where
+  kept = dropSource src (EvalSt.registry st)
+  P    = capsOK?-parts c sched st inv
+  h0   = proj₁ P
+  h1   = proj₁ (proj₂ P)
+  h2   = proj₁ (proj₂ (proj₂ P))
+  h3   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4   = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
 -- the admitted snapshot is a SUBLIST of the registry — its own filter
 -- rather than dropSource's, because it also has to match the chain's
 -- element type against the share's — so its chains inherit the
@@ -1310,27 +1322,7 @@ shareFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (burstCaps? c sl (proj₁ r) ≡ true)
 shareFinish-caps c i false sl out inv bc = inv , bc
 shareFinish-caps c i true sl (emits , sched′ , st′) inv bc =
-    ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
-                        (Sched.live sched′) (proj₁ (∧-true _ _ h0)))
-                     (proj₂ (∧-true _ _ h0)))
-    (∧-intro (dropSource-all (λ en → pathSz? (Caps.cSize c)
-                                       (proj₂ (proj₂ (proj₂ en))))
-                (toℕ i) (EvalSt.registry st′) h1)
-    (∧-intro (sweepLive-all (widLive (Caps.cWid c) (Sched.slots sched′)) kept
-                (Sched.live sched′) h2)
-    (∧-intro h3
-             (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len (toℕ i)
-                                          (EvalSt.registry st′))
-                                       (≤ᵇ⇒≤ _ _ (T-to h4))))))))
-  , bc
-  where
-  kept = dropSource (toℕ i) (EvalSt.registry st′)
-  P    = capsOK?-parts c sched′ st′ inv
-  h0   = proj₁ P
-  h1   = proj₁ (proj₂ P)
-  h2   = proj₁ (proj₂ (proj₂ P))
-  h3   = proj₁ (proj₂ (proj₂ (proj₂ P)))
-  h4   = proj₂ (proj₂ (proj₂ (proj₂ P)))
+  dropSweep-caps c (toℕ i) sched′ st′ inv , bc
 
 ------------------------------------------------------------------
 -- THE DELIVERY CLIQUE, GROUND.  foldPath / dispatchShare / shareGo,
@@ -1571,6 +1563,67 @@ chainStep-caps {n = n} {e = e} c j id a path sl sched st 2≤S slEq inv pS vC =
     (Arrival.isLast a) sl sched st
     2≤S slEq inv pS (∧-intro vC refl)
     (closeList-caps (frameStep j c) sl (arrSource a) (Arrival.isLast a))
+
+------------------------------------------------------------------
+-- THE CASCADE BOOKENDS AND THE CHAIN SNAPSHOT, ground.  Nothing here
+-- is a caps argument: latching resets per-cascade scratch capsOK? does
+-- not read, finishing is the same drop-and-sweep the share's finish is,
+-- and the snapshot is a filter of the registry.
+------------------------------------------------------------------
+
+-- the latch resets delivered/cancelled/regWatermark/dying and may add
+-- to completedSources — none of the five conjuncts sees any of them
+cascadeLatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched (cascadeLatch a st) ≡ true
+cascadeLatch-caps c a sched st h with Arrival.isLast a
+... | true  = h
+... | false = h
+
+cascadeFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  let r = cascadeFinish a sched st
+  in capsOK? c (proj₁ r) (proj₂ r) ≡ true
+cascadeFinish-caps c a sched st h with Arrival.isLast a
+... | false = h
+... | true  = dropSweep-caps c (arrSource a) sched st h
+
+-- the snapshot is chainsGo's filter: source matches and the chain's
+-- element type is the arrival's.  Same shape as shareAdmit's
+chainsGo-caps : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (a : Arrival Γ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regsSz? B rs ≡ true →
+  all (λ rc → pathSz? B (proj₂ rc)) (chainsGo a rs) ≡ true
+chainsGo-caps B a [] h = refl
+chainsGo-caps B a ((rid , s , (u , p)) ∷ r) h
+  with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+... | false | _        = chainsGo-caps B a r (proj₂ (∧-true _ _ h))
+... | true  | no  _    = chainsGo-caps B a r (proj₂ (∧-true _ _ h))
+... | true  | yes refl = ∧-intro (proj₁ (∧-true _ _ h))
+                                 (chainsGo-caps B a r (proj₂ (∧-true _ _ h)))
+
+chainsOf-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (a : Arrival Γ) (st : EvalSt e) →
+  regsSz? B (EvalSt.registry st) ≡ true →
+  all (λ rc → pathSz? B (proj₂ rc)) (chainsOf a st) ≡ true
+chainsOf-caps B a st = chainsGo-caps B a (EvalSt.registry st)
+
+chainsGo-length : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  length (chainsGo a rs) ≤ length rs
+chainsGo-length a [] = z≤n
+chainsGo-length a ((rid , s , (u , p)) ∷ r)
+  with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+... | false | _        = ≤-trans (chainsGo-length a r) (n≤1+n _)
+... | true  | no  _    = ≤-trans (chainsGo-length a r) (n≤1+n _)
+... | true  | yes refl = s≤s (chainsGo-length a r)
+
+chainsOf-length : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  length (chainsOf a st) ≤ length (EvalSt.registry st)
+chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 
 caps-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
