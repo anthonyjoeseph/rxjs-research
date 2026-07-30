@@ -82,9 +82,16 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FOUR POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
--- subscribeE-walk) and the round-4 per-instant caps face (caps-frame /
--- caps-tick).  frameBlowup is now fully defined: no gaps inside it.
+-- SIX POSTULATES REMAIN — three faces (subscribeE-wet, cascadeGo-wet,
+-- subscribeE-walk), the caps pair (subscribeE-caps / caps-tick), and
+-- regsSz?-subscribeE.  frameBlowup is fully defined: no gaps inside it.
+--
+-- The count went UP from four, deliberately.  caps-frame was refuted as
+-- uninstantiable (same-level preservation is false: the subscribe frame
+-- itself folds) and split into subscribeE-caps, which reports its growth
+-- as a fold count, plus the chain-half lemma that any repaired face
+-- consumes.  Trading one false postulate for two true ones is progress;
+-- the number is not the metric.
 --
 -- ROUND 4 (2026-07-29): the caps are defined BY RECURRENCE on the
 -- instant, Caps (suc id) = frameBlowup (Caps id), after deepScan refuted
@@ -161,7 +168,7 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 _at_from_as_; EmitKind; subscribe;
@@ -6756,20 +6763,26 @@ widNode W sl (exhaust-st _ _)          = true
 -- syntactic subterm of what was already in the store.  So cSize covers
 -- them without a fourth field and, crucially, WITHOUT the ledger:
 -- round3b-ledger-reset-absurd stays unavailable
+-- top-level (not a where block) so regsSz?-subscribeE below can name
+-- pathSz? in its hypothesis: the continuation κ a subscribe walks under
+-- must already be size-bounded, or a huge step function in κ would be
+-- registered at the leaf.  This is the honest form — the naive lemma
+-- without the κ hypothesis is FALSE, since κ = scan-f BIG ↠ root over a
+-- tiny b registers BIG
+frameSz? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+frameSz? B (map-f fn)         = sizeᵗ fn ≤ᵇ B
+frameSz? B (scan-f fn _)      = sizeᵗ fn ≤ᵇ B
+frameSz? B (take-f _)         = true
+frameSz? B (from-inner _ _ _) = true
+frameSz? B (thru-outer _ _)   = true
+
+pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+pathSz? B root           = true
+pathSz? B (share-sink i) = true
+pathSz? B (f ↠ p)        = frameSz? B f ∧ pathSz? B p
+
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
-  where
-  frameSz? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
-  frameSz? B (map-f fn)         = sizeᵗ fn ≤ᵇ B
-  frameSz? B (scan-f fn _)      = sizeᵗ fn ≤ᵇ B
-  frameSz? B (take-f _)         = true
-  frameSz? B (from-inner _ _ _) = true
-  frameSz? B (thru-outer _ _)   = true
-
-  pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-  pathSz? B root           = true
-  pathSz? B (share-sink i) = true
-  pathSz? B (f ↠ p)        = frameSz? B f ∧ pathSz? B p
 
 capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
@@ -6827,11 +6840,80 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- cSize factor is exactly that reference count — a fold can subscribe no
 -- more references than its step function mentions — and pR2 is why it is
 -- there: with `cReg * suc cWid` alone the measured 1 ↦ 3 does not fit
+-- j FOLDS' WORTH, so a frame's PROGRESS is explicit rather than
+-- all-or-nothing.  This is the repair caps-frame's refutation forces:
+-- same-level preservation is false, so the face must report growth, and
+-- the honest index of growth inside a frame is the fold count.
+--
+-- The two endpoints are exactly what caps-frame and caps-tick were each
+-- trying to be on their own — j = 0 is frame entry, j = cWid * cReg is
+-- the tick boundary — so they stop being siblings and become the ends of
+-- one measure.  A mid-cascade state, which had no level at all before,
+-- is just a smaller j
+frameStep : ℕ → Caps → Caps
+frameStep j c =
+  caps (iterSize (Caps.cSize c) j (Caps.cSize c))
+       (iterFold (Caps.cSize c) j (Caps.cWid c))
+       (Caps.cReg c * suc (j * Caps.cSize c))
+
 frameBlowup : Caps → Caps
-frameBlowup c =
-  caps (iterSize (Caps.cSize c) (Caps.cWid c * Caps.cReg c) (Caps.cSize c))
-       (iterFold (Caps.cSize c) (Caps.cWid c * Caps.cReg c) (Caps.cWid c))
-       (Caps.cReg c * suc (Caps.cWid c * Caps.cSize c))
+frameBlowup c = frameStep (Caps.cWid c * Caps.cReg c) c
+
+-- the entry endpoint, by computation
+frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
+frameStep-0 (caps s w r) = cong (λ x → caps s w x) (*-identityʳ r)
+
+------------------------------------------------------------------
+-- THE ARITHMETIC CORE OF THE REPAIR, proven ahead of subscribeE-caps
+-- because it is the piece that would kill the shape if it failed: does
+-- frameStep's per-j increment DOMINATE one fold applied to frameStep j?
+-- The induction consumes exactly this at every clause.  All three
+-- dimensions reduce to "iterating a fixed step commutes", iter-f (suc j)
+-- = f (iter-f j), because sizeStep S / foldStep S apply the SAME S each
+-- time — the whole reason S is read off cSize once rather than per fold.
+------------------------------------------------------------------
+
+-- SIZE.  iterSize S j is the j-fold composition of (sizeStep S), so one
+-- more step at the OUTSIDE equals one more at the inside
+iterSize-suc : ∀ (S j s : ℕ) → iterSize S (suc j) s ≡ sizeStep S (iterSize S j s)
+iterSize-suc S zero    s = refl
+iterSize-suc S (suc j) s = iterSize-suc S j (sizeStep S s)
+
+-- so a size-step on the state at frameStep j lands within frameStep (suc j)
+frameStep-size-suc : ∀ (c : Caps) (j : ℕ) →
+  Caps.cSize (frameStep (suc j) c) ≡ sizeStep (Caps.cSize c) (Caps.cSize (frameStep j c))
+frameStep-size-suc c j = iterSize-suc (Caps.cSize c) j (Caps.cSize c)
+
+-- WIDTH.  identically for foldStep
+iterFold-suc : ∀ (S j w : ℕ) → iterFold S (suc j) w ≡ foldStep S (iterFold S j w)
+iterFold-suc S zero    w = refl
+iterFold-suc S (suc j) w = iterFold-suc S j (foldStep S w)
+
+frameStep-wid-suc : ∀ (c : Caps) (j : ℕ) →
+  Caps.cWid (frameStep (suc j) c) ≡ foldStep (Caps.cSize c) (Caps.cWid (frameStep j c))
+frameStep-wid-suc c j = iterFold-suc (Caps.cSize c) j (Caps.cWid c)
+
+-- REGISTRATIONS.  the cReg dimension is linear in j, so one more j buys
+-- exactly cReg * cSize more headroom — enough for the registrations one
+-- fold mints, which is at most the step function's reference count ≤ cSize
+frameStep-reg-suc : ∀ (c : Caps) (j : ℕ) →
+  Caps.cReg (frameStep j c) + Caps.cReg c * Caps.cSize c
+    ≡ Caps.cReg (frameStep (suc j) c)
+frameStep-reg-suc (caps s w r) j =
+  begin
+    r * suc (j * s) + r * s
+  ≡⟨ cong (_+ r * s) (*-suc r (j * s)) ⟩
+    (r + r * (j * s)) + r * s
+  ≡⟨ +-assoc r (r * (j * s)) (r * s) ⟩
+    r + (r * (j * s) + r * s)
+  ≡⟨ cong (r +_) (sym (*-distribˡ-+ r (j * s) s)) ⟩
+    r + r * (j * s + s)
+  ≡⟨ cong (λ x → r + r * x) (+-comm (j * s) s) ⟩
+    r + r * (suc j * s)
+  ≡⟨ sym (*-suc r (suc j * s)) ⟩
+    r * suc (suc j * s)
+  ∎
+  where open ≡-Reasoning
 
 -- BY RECURRENCE, never in closed form.
 --
@@ -6848,23 +6930,177 @@ capsAt {n = n} e sl zero =
                     (suc (sizeᵉ e + slotsSize sl)))
 capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
 
-postulate
-  -- (a) WITHIN A FRAME, `id` is frozen and the caps do not move.  This is
-  -- the half the walk face consumes, and it is why round 3's face needs
-  -- no change at all: Ŝ := cSize, F := cSize, R̂ := hopR cSize, all
-  -- ordinary numbers for the duration of one walk
-  caps-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (capsAt e sl id) →
-    let r = subscribeE g b κ bid now sched st
-    in capsOK? (capsAt e sl id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+------------------------------------------------------------------
+-- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
+-- everywhere: a subscribe reports growth frameStep j ↦ frameStep (j+j′),
+-- and capsOK? at the smaller caps must weaken to the larger.  Each
+-- conjunct is a `≤ᵇ` bound weakened through `all-impl`, exactly as the
+-- walk face's pathB?-widen does for its own predicate.
+------------------------------------------------------------------
 
-  -- (b) ACROSS A TICK, one instant's cascade blows the caps up by exactly
-  -- one application of frameBlowup.  This is the half the top-level
-  -- per-instant induction consumes, and the ONLY place the height climbs
+-- caps ordering: pointwise on the three fields
+_⊑ᶜ_ : Caps → Caps → Set
+c ⊑ᶜ c′ = (Caps.cSize c ≤ Caps.cSize c′)
+        × (Caps.cWid  c ≤ Caps.cWid  c′)
+        × (Caps.cReg  c ≤ Caps.cReg  c′)
+
+-- the step function's size bound weakens frame by frame
+pathSz?-widen : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B B′ : ℕ} →
+  B ≤ B′ → pathSz? B p ≡ true → pathSz? B′ p ≡ true
+pathSz?-widen root           le h = refl
+pathSz?-widen (share-sink i) le h = refl
+pathSz?-widen (map-f fn ↠ p)  {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathSz? B p) h
+... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathSz?-widen p le hp)
+pathSz?-widen (scan-f fn _ ↠ p) {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathSz? B p) h
+... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathSz?-widen p le hp)
+pathSz?-widen (take-f _ ↠ p)      le h = pathSz?-widen p le h
+pathSz?-widen (from-inner _ _ _ ↠ p) le h = pathSz?-widen p le h
+pathSz?-widen (thru-outer _ _ ↠ p)   le h = pathSz?-widen p le h
+
+regsSz?-widen : ∀ {n} {Γ : Ctx n} {t}
+  (rs : List (RegId × Source × Chain Γ t)) {B B′ : ℕ} →
+  B ≤ B′ → regsSz? B rs ≡ true → regsSz? B′ rs ≡ true
+regsSz?-widen rs le =
+  all-impl _ _ (λ en → pathSz?-widen (proj₂ (proj₂ (proj₂ en))) le) rs
+
+widLive-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (l : LiveSource Γ) {W W′ : ℕ} →
+  W ≤ W′ → widLive W sl l ≡ true → widLive W′ sl l ≡ true
+widLive-widen {n = n} sl l le =
+  all-impl _ _ (λ tv → ≤ᵇ-widen (outWᵛ n sl (LiveSource.elemTy l) (proj₂ tv)) le)
+           (LiveSource.pending l)
+
+widNode-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (ns : NodeState Γ) {W W′ : ℕ} →
+  W ≤ W′ → widNode W sl ns ≡ true → widNode W′ sl ns ≡ true
+widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (outWᵛ n sl t v) le h
+widNode-widen {n = n} sl (concat-st q _ _) le h =
+  all-impl _ _ (λ o → ≤ᵇ-widen (outWᵉ n sl o) le) q h
+widNode-widen sl (take-st _)     le h = refl
+widNode-widen sl (merge-st _ _)  le h = refl
+widNode-widen sl (switch-st _ _) le h = refl
+widNode-widen sl (exhaust-st _ _) le h = refl
+
+capsOK?-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c c′ : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  c ⊑ᶜ c′ → capsOK? c sched st ≡ true → capsOK? c′ sched st ≡ true
+capsOK?-mono c c′ sched st (sz≤ , wd≤ , rg≤) h
+  with ∧-true _ _ h
+... | hSt , hRest with ∧-true _ _ hRest
+... | hRg , hRest2 with ∧-true _ _ hRest2
+... | hWL , hRest3 with ∧-true _ _ hRest3
+... | hWN , hLen =
+  ∧-intro (stBounded-widen sz≤ sched st hSt)
+  (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
+  (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
+                     (Sched.live sched) hWL)
+  (∧-intro (all-impl _ _ (λ kv → widNode-widen (Sched.slots sched) (proj₂ kv) wd≤)
+                     (EvalSt.nodes st) hWN)
+           (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen))))
+
+------------------------------------------------------------------
+-- frameStep IS MONOTONE IN j — the last toolkit piece.  The induction
+-- lifts a sub-result at frameStep (j + a) to frameStep (j + b) for
+-- a ≤ b (via capsOK?-mono), which needs frameStep j c ⊑ᶜ frameStep j′ c
+-- for j ≤ j′.  Each iterated component is inflationary because its step
+-- is: sizeStep needs 1 ≤ S, foldStep needs 2 ≤ S — and cSize (which is
+-- S) is ≥ 2 for every real cap (the base is 2 + sizeᵉ + …).
+------------------------------------------------------------------
+
+-- SIZE: sizeStep is inflationary for S ≥ 1, and iterating it only grows
+s≤2s : ∀ (s : ℕ) → s ≤ 2 * s
+s≤2s s = m≤m+n s (s + 0)
+
+sizeStep-infl : ∀ (S s : ℕ) → 1 ≤ S → s ≤ sizeStep S s
+sizeStep-infl S s hS =
+  ≤-trans (≤-trans (s≤2s s) (n≤1+n (2 * s)))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                   (*-monoˡ-≤ (suc (2 * s)) hS))
+  -- 1 * suc(2s) is definitionally suc(2s), so *-identityˡ closes the gap
+
+iterSize-infl : ∀ (S : ℕ) → 1 ≤ S → ∀ (k s : ℕ) → s ≤ iterSize S k s
+iterSize-infl S hS zero    s = ≤-refl
+iterSize-infl S hS (suc k) s =
+  ≤-trans (sizeStep-infl S s hS) (iterSize-infl S hS k (sizeStep S s))
+
+iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
+  iterSize S j s ≤ iterSize S j′ s
+iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s
+iterSize-mono-count S s hS           (s≤s le)  = iterSize-mono-count S (sizeStep S s) hS le
+
+-- WIDTH: foldStep is inflationary for S ≥ 2 (w < 2^w ≤ 2^(1+w) ≤ S^(1+w))
+foldStep-infl : ∀ (S w : ℕ) → 2 ≤ S → w ≤ foldStep S w
+foldStep-infl S w hS =
+  ≤-trans (<⇒≤ (n<2^n w))
+          (≤-trans (^-monoʳ-≤ 2 (n≤1+n w))    -- 2^w ≤ 2^(suc w)
+                   (^-monoˡ-≤ (suc w) hS))     -- 2^(suc w) ≤ S^(suc w)
+
+iterFold-infl : ∀ (S : ℕ) → 2 ≤ S → ∀ (k w : ℕ) → w ≤ iterFold S k w
+iterFold-infl S hS zero    w = ≤-refl
+iterFold-infl S hS (suc k) w =
+  ≤-trans (foldStep-infl S w hS) (iterFold-infl S hS k (foldStep S w))
+
+iterFold-mono-count : ∀ (S w : ℕ) → 2 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
+  iterFold S j w ≤ iterFold S j′ w
+iterFold-mono-count S w hS {j′ = j′} z≤n      = iterFold-infl S hS j′ w
+iterFold-mono-count S w hS           (s≤s le)  = iterFold-mono-count S (foldStep S w) hS le
+
+-- REG: linear, monotone in j always
+frameStep-reg-mono : ∀ (c : Caps) {j j′ : ℕ} → j ≤ j′ →
+  Caps.cReg (frameStep j c) ≤ Caps.cReg (frameStep j′ c)
+frameStep-reg-mono (caps s w r) le =
+  *-monoʳ-≤ r (s≤s (*-monoˡ-≤ s le))
+
+frameStep-mono-j : ∀ (c : Caps) → 2 ≤ Caps.cSize c → ∀ {j j′ : ℕ} → j ≤ j′ →
+  frameStep j c ⊑ᶜ frameStep j′ c
+frameStep-mono-j c hS le =
+    iterSize-mono-count (Caps.cSize c) (Caps.cSize c) (≤-trans (s≤s z≤n) hS) le
+  , iterFold-mono-count (Caps.cSize c) (Caps.cWid c) hS le
+  , frameStep-reg-mono c le
+
+-- WHAT REPLACES caps-frame, AND WHY IT LIVES ON THE WALK FACE'S RECEIPT
+-- RATHER THAN BESIDE IT.
+--
+-- caps-frame claimed SAME-LEVEL preservation and is refuted (see
+-- caps-frame-boundary-absurd and the memo below).  The mechanism it
+-- needed already exists one module-section away: subscribeE-walkS does
+-- not claim its cap is preserved either — it concludes
+-- `INV? Ψ (capᴱ W E′)`, the invariant at a GROWN cap, and reports the
+-- growth as a receipt `E ≤ E′` composed along the walk by ≤-trans.  It
+-- is PROVEN in that form.
+--
+-- So caps preservation is not a second face; it is one more component of
+-- that receipt.  `j` rides alongside `E′` and is threaded by exactly the
+-- same discipline — additively rather than multiplicatively, because it
+-- counts folds.  Two accounting mechanisms for one growth was the smell;
+-- this is the one mechanism.
+--
+-- AND IT IS NOT A SECOND LEDGER, which is the thing to check: `j` is
+-- bounded by cWid * cReg, a quantity read off Caps, never off E or the
+-- receipt.  `frameStep : ℕ → Caps → Caps` still cannot see the ledger,
+-- so the round-5 gate is intact.  The two roles stay separate on
+-- purpose: `INV? … (capᴱ W E′)` is the ledger-indexed state invariant,
+-- while capsOK?'s cSize is what feeds Ŝ / R̂ / F — and THAT is the one
+-- round3b-ledger-reset-absurd forbids from being ledger-derived.
+postulate
+  -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
+  -- folds and reports how many.  j′ folds spent means the caps advance
+  -- from frameStep j to frameStep (j + j′), never staying put
+  subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    let r = subscribeE g b κ bid now sched st
+    in Σ ℕ λ j′ →
+       capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+  -- (b) ONE CASCADE spends at most a whole frame's worth, so the tick
+  -- boundary is the j = cWid * cReg endpoint.  This is the half the
+  -- top-level per-instant induction consumes, and the only place the
+  -- height climbs.  It is now a COROLLARY shape rather than a sibling:
+  -- what it needs from the frames is (a), summed over the cascade's
+  -- chains, with the total j capped at cWid * cReg
   caps-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
@@ -6872,6 +7108,108 @@ postulate
     capsOK? (capsAt e sl id) sched st ≡ true →
     let r = cascade a nextId sched st
     in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+-- the tick endpoint, by definition rather than by arithmetic: this is
+-- what makes caps-tick the j = full case of (a) rather than a
+-- separate claim
+frameStep-full : ∀ (c : Caps) →
+  frameStep (Caps.cWid c * Caps.cReg c) c ≡ frameBlowup c
+frameStep-full c = refl
+
+-- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
+capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  capsAt e sl (suc id)
+    ≡ frameStep (Caps.cWid (capsAt e sl id) * Caps.cReg (capsAt e sl id))
+                (capsAt e sl id)
+capsAt-suc-full e sl id = refl
+
+------------------------------------------------------------------
+-- REFUTED: caps-frame AS STATED IS FALSE, TWICE OVER.  Both halves are
+-- statement-level — the face is uninstantiable, not merely unproven —
+-- and the same disease class as the original vacuity.
+--
+-- (1) THE BOUNDARY FOLD.  caps-frame's hypothesis admits a state
+-- satisfying capsOK? with ZERO slack and a `b` whose size is exactly the
+-- level's cSize, and demands capsOK? at the SAME level afterwards.  But
+-- the subscribe frame itself folds: subscribeE's scanᵉ clause
+-- (Rx/Evaluator.agda:958) installs `scan-st (evalTm seed)` and runs the
+-- source's sync burst through pushBurst with the scan-f frame, and
+-- dispatch updates that node once per synchronous payload.  A cap-sized
+-- `b` with one duplicating fold therefore lands at sizeStep C C, above
+-- C — and the arithmetic below is uniform in C, so specialising C to
+-- capsAt's own tower does not escape it.
+--
+-- State-Blowup-Probe's framePreserves-absurd is the concrete witness:
+-- pRs, whose size is 19 and whose initial state is bounded by 19, leaves
+-- a size-30 node after its own root subscribe.  (The root subscribe is
+-- one of caps-frame's own instances: κ = root, id = 0, level 0.)
+--
+-- (2) THE MID-CASCADE HYPOTHESIS, an independent defect.  caps-tick says
+-- a whole cascade moves the state from level id to level suc id, so
+-- mid-drain states live strictly BETWEEN the two levels.  A proof of
+-- caps-tick must apply caps-frame at every inner subscribe inside that
+-- cascade, and there are exactly two such call sites:
+--
+--   · subscribeInner   (Rx/Evaluator.agda:531) — a *All consuming an
+--     obs payload mid-cascade, reached from stepFrame
+--   · sharedConnect    (Rx/Evaluator.agda:871) — a shared slot's lazy
+--     connect, which subscribes the def mid-cascade
+--
+-- At both, earlier chains in the SAME cascade have already grown the
+-- store, so the level-id hypothesis is simply unavailable.  Even had (1)
+-- survived, the face could not feed the induction it exists for.
+--
+-- THE REPAIR SHAPE UNDER EVALUATION (not yet taken on faith — it owes
+-- its own probe): make the mid-instant states explicit with a
+-- CONSUMED-ITERATION index.  One parametric face against level suc id
+-- whose pre-state is bounded by frameBlowup partially applied — k of the
+-- cWid * cReg iterations still unspent — and a subscribeE with fold
+-- count j consuming j of k.  caps-frame and caps-tick then become the
+-- two ENDPOINTS (k = full, k = 0) of a single face rather than siblings,
+-- and (2) dissolves because a mid-cascade state is just a smaller k.
+--
+-- AND THE THING TO CHECK BEFORE BUILDING IT: this is structurally the
+-- same bookkeeping the walk face's E′ receipt already does.  Two
+-- parallel accounting mechanisms for one growth is a smell; if E′ can
+-- carry the iteration count, caps preservation falls out of the walk
+-- face instead of standing beside it as a second ledger.
+------------------------------------------------------------------
+
+-- the arithmetic obstruction behind (1), UNIFORM IN C: one fold from a
+-- cap-sized value on a cap-sized step function always overflows the cap,
+-- whatever the cap is.  This is why no choice of level rescues
+-- same-level preservation
+caps-frame-boundary-absurd : ∀ (C : ℕ) → 1 ≤ C → sizeStep C C ≤ C → ⊥
+caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
+  where
+  1≤2C : 1 ≤ 2 * C
+  1≤2C = ≤-trans hC (m≤m+n C (C + 0))
+
+  0<prod : 0 < C * (2 * C)
+  0<prod = *-mono-≤ hC 1≤2C
+
+  C<step : C < sizeStep C C
+  C<step = subst (C <_) (sym (*-suc C (2 * C)))
+                 (subst (_< C + C * (2 * C)) (+-identityʳ C)
+                        (+-monoʳ-< C 0<prod))
+
+-- STEP 3 of the repair, stated now because it is independent of how the
+-- repair lands: the chain half of ANY repaired face consumes exactly
+-- this, and it is the load-bearing structural fact behind the measured
+-- 10, 10, 10, 10.  Every frame subscribeE installs carries a step
+-- function that is a SUBTERM of the expression being subscribed — the
+-- map-f/scan-f clauses pass `f` straight through from mapᵉ/scanᵉ — so a
+-- registry bounded by C stays bounded by C as long as the subscribed
+-- expression is
+postulate
+  regsSz?-subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (C : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    regsSz? C (EvalSt.registry st) ≡ true →
+    sizeᵉ b ≤ C →
+    pathSz? C κ ≡ true →   -- the continuation is already bounded
+    let r = subscribeE g b κ bid now sched st
+    in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
 
 ------------------------------------------------------------------
 -- WHAT WAS HERE, AND WHY IT IS GONE.  A fixed-height reach cap —
