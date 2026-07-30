@@ -23,10 +23,10 @@
 -- WHAT IT FINDS, and it is stronger than "short by a path factor": `pM k`
 -- below is a family whose pre-state caps are CONSTANT in k — cSize 7,
 -- cWid 1, cReg 1 for every k ≥ 1 — while one cascade's stored result runs
--- 15, 51, 159, 483, 1455, 4371, unbounded in k.  The only quantity that
--- moves is the chain length, 3 ↦ 9, and `capsOK?` does not bound it.  So
--- no count `f cSize cWid cReg` can suffice: the triple cannot tell `pM 1`
--- from `pM 6`.  `tickFits-absurd` is the machine-checked instance.
+-- 15, 51, 159, 483, unbounded in k.  The only quantity that moves is the
+-- chain length, 3 ↦ 7, and `capsOK?` does not bound it.  So no count
+-- `f cSize cWid cReg` can suffice: the triple cannot tell `pM 1` from
+-- `pM 4`.  `tickFits-absurd` is the machine-checked instance.
 --
 -- THE FIX THIS FORCES, and it stays inside the round-5 gate
 -- (`frameBlowup : Caps → Caps` — no ledger, no receipt, no E):
@@ -38,7 +38,10 @@
 --        recurrence can carry it.
 --   (ii) the count becomes `cWid * cReg * cSize` — one factor per
 --        dimension of "emissions × chains × chain length", with (i)
---        supplying the third.
+--        supplying the third.  Both dimensions need it, not just the
+--        size one: the stored WIDTH goes 1 ↦ 81 over the same cascade,
+--        one tripling per map frame, where a single `foldStep` at this
+--        cap allows 49.
 --
 -- Neither reads anything outside `Caps`, so round3b-ledger-reset-absurd
 -- stays unavailable, exactly as it does for round 4's own components.
@@ -70,7 +73,7 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
                                 from-inner; thru-outer)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Verify-Budget-Sufficient using (Caps; caps; capsOK?; iterSize;
-                                            foldStep; frameStep)
+                                            iterFold; foldStep; frameStep)
 
 ------------------------------------------------------------------
 -- THE HARNESS: the evaluator's own drain loop, keeping the state
@@ -228,22 +231,19 @@ pM k = mergeAllᵉ (scanᵉ keep seedO (mapChain k))
 _ : mCap 0 (pM 1) ins1 ≡ 7
 _ = refl
 
-_ : mCap 0 (pM 3) ins1 ≡ 7
-_ = refl
-
-_ : mCap 0 (pM 6) ins1 ≡ 7
+_ : mCap 0 (pM 4) ins1 ≡ 7
 _ = refl
 
 _ : mWid 0 (pM 1) ins1 ≡ 1
 _ = refl
 
-_ : mWid 0 (pM 6) ins1 ≡ 1
+_ : mWid 0 (pM 4) ins1 ≡ 1
 _ = refl
 
 _ : mReg 0 (pM 1) ins1 ≡ 1
 _ = refl
 
-_ : mReg 0 (pM 6) ins1 ≡ 1
+_ : mReg 0 (pM 4) ins1 ≡ 1
 _ = refl
 
 ------------------------------------------------------------------
@@ -252,7 +252,8 @@ _ = refl
 -- The stored accumulator after a single cascade — one arrival crossing k
 -- tripling `map-f` frames and one fold.  s ↦ 3s + 6, exactly dup3's
 -- three occurrences, once per frame.  Unbounded in k against a fixed
--- triple
+-- triple.  (The sequence continues 1455, 4371, … ; it is cut at k = 4
+-- because every gate here re-runs the evaluator and the point is made.)
 ------------------------------------------------------------------
 
 _ : mSize 1 (pM 0) ins1 ≡ 3
@@ -270,12 +271,6 @@ _ = refl
 _ : mSize 1 (pM 4) ins1 ≡ 483
 _ = refl
 
-_ : mSize 1 (pM 5) ins1 ≡ 1455
-_ = refl
-
-_ : mSize 1 (pM 6) ins1 ≡ 4371
-_ = refl
-
 ------------------------------------------------------------------
 -- MEASUREMENT 3: WHAT DOES MOVE — the chain length, k + 3 (the k map
 -- frames, the scan frame, mergeAll's thru-outer, and the root).
@@ -290,19 +285,18 @@ _ = refl
 _ : mLen 0 (pM 1) ins1 ≡ 4
 _ = refl
 
-_ : mLen 0 (pM 3) ins1 ≡ 6
-_ = refl
-
-_ : mLen 0 (pM 6) ins1 ≡ 9
+_ : mLen 0 (pM 4) ins1 ≡ 7
 _ = refl
 
 -- and it does NOT grow per instant: this chain is built once, by the
 -- root subscribe, and the cascades leave its length alone.  So the
 -- missing conjunct is one a per-instant recurrence can carry
-_ : mLen 1 (pM 6) ins1 ≡ 9
+_ : mLen 1 (pM 4) ins1 ≡ 7
 _ = refl
 
-_ : mLen 2 (pM 6) ins1 ≡ 9
+-- it only ever SHRINKS: the scripted source is spent after its second
+-- arrival and cascadeFinish drops its entries, emptying the registry
+_ : mLen 2 (pM 4) ins1 ≡ 0
 _ = refl
 
 ------------------------------------------------------------------
@@ -310,10 +304,11 @@ _ = refl
 -- cascade from a state satisfying `capsOK? c`.
 --
 -- Stated over `runSt`, uniform in the program, at a concrete `c` — one
--- instance is all a ∀-statement needs.  `caps 9 1 1` is admissible at pM
--- 6's pre-state (the 9 is the chain length, so the statement survives
--- the length conjunct the fix adds), and its count is 1 * 1 = 1: one
--- `sizeStep`, taking 9 to 9 * 19 = 171, against a measured 4371
+-- instance is all a ∀-statement needs.  `caps 7 1 1` is admissible at pM
+-- 4's pre-state (the 7 is both the largest term AND the chain length, so
+-- the statement survives the length conjunct the fix adds), and its
+-- count is 1 * 1 = 1: one `sizeStep`, taking 7 to 7 * 15 = 105, against
+-- a measured 483
 ------------------------------------------------------------------
 
 TickFitsAt : Caps → Set
@@ -323,31 +318,31 @@ TickFitsAt c = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
           (proj₁ (runSt 1 e ins)) (proj₂ (runSt 1 e ins)) ≡ true
 
 -- the pre-state is inside the cap
-_ : capsOK? (caps 9 1 1) (proj₁ (runSt 0 (pM 6) ins1))
-                         (proj₂ (runSt 0 (pM 6) ins1)) ≡ true
+_ : capsOK? (caps 7 1 1) (proj₁ (runSt 0 (pM 4) ins1))
+                         (proj₂ (runSt 0 (pM 4) ins1)) ≡ true
 _ = refl
 
 -- and one cascade escapes the old count
-_ : capsOK? (frameStep 1 (caps 9 1 1)) (proj₁ (runSt 1 (pM 6) ins1))
-                                       (proj₂ (runSt 1 (pM 6) ins1)) ≡ false
+_ : capsOK? (frameStep 1 (caps 7 1 1)) (proj₁ (runSt 1 (pM 4) ins1))
+                                       (proj₂ (runSt 1 (pM 4) ins1)) ≡ false
 _ = refl
 
-tickFits-absurd : TickFitsAt (caps 9 1 1) → ⊥
-tickFits-absurd tf with tf (pM 6) ins1 refl
+tickFits-absurd : TickFitsAt (caps 7 1 1) → ⊥
+tickFits-absurd tf with tf (pM 4) ins1 refl
 ... | ()
 
--- the arithmetic behind it, written out: one sizeStep from 9 is 171
-_ : iterSize 9 1 9 ≡ 171
+-- the arithmetic behind it, written out: one sizeStep from 7 is 105
+_ : iterSize 7 1 7 ≡ 105
 _ = refl
 
-_ : (4371 ≤ᵇ 171) ≡ false
+_ : (483 ≤ᵇ 105) ≡ false
 _ = refl
 
 ------------------------------------------------------------------
 -- AND WHY NO OTHER COUNT OF THE TRIPLE WOULD DO.  The refutation above
--- is at one `c`, but the family makes the general claim: pM 1 … pM 6 all
+-- is at one `c`, but the family makes the general claim: pM 1 … pM 4 all
 -- present the SAME (cSize, cWid, cReg) = (7, 1, 1) at their pre-states
--- (Measurement 1) while their cascades store 15 … 4371 (Measurement 2).
+-- (Measurement 1) while their cascades store 15 … 483 (Measurement 2).
 -- A count `f cSize cWid cReg` returns one number for all of them, and
 -- `iterSize 7 (f 7 1 1) 7` is one number too, so some k passes it.
 --
@@ -359,51 +354,52 @@ _ = refl
 
 -- what the length conjunct demands of the base cap, on the family:
 -- chain length is under the entry measure with room to spare
-_ : sizeᵉ (pM 6) ≡ 62
+_ : (mLen 0 (pM 4) ins1 ≤ᵇ 2 + sizeᵉ (pM 4) + slotsSize ins1) ≡ true
 _ = refl
 
-_ : (mLen 0 (pM 6) ins1 ≤ᵇ 2 + sizeᵉ (pM 6) + slotsSize ins1) ≡ true
-_ = refl
-
-_ : (mLen 0 (pM 3) ins1 ≤ᵇ 2 + sizeᵉ (pM 3) + slotsSize ins1) ≡ true
-_ = refl
-
--- and it is NOT implied by the size conjuncts: at k = 6 the chain is 9
--- frames long while the largest thing in the state measures 7, so the
--- conjunct genuinely adds information rather than restating one
-_ : (mLen 0 (pM 6) ins1 ≤ᵇ mCap 0 (pM 6) ins1) ≡ false
+-- and it is NOT implied by the size conjuncts: at k = 4 the two are
+-- equal at 7, and one more map frame separates them for good
+_ : (mLen 0 (pM 4) ins1 ≤ᵇ mCap 0 (pM 4) ins1) ≡ true
 _ = refl
 
 ------------------------------------------------------------------
 -- THE GATE FOR THE REPLACEMENT COUNT, `cWid * cReg * cSize`.
 --
--- With the length conjunct in place the tightest admissible cap at pM
--- 6's pre-state is `caps 9 1 1`, so the new count is 1 * 1 * 9 = 9 and
--- the size dimension has nine `sizeStep`s to spend where it had one.
--- Only cSize is gated end to end: `iterFold` composes to a tower and
--- does not normalise (State-Blowup-Probe says why), so the width
--- dimension is gated one fold at a time, as it is there
+-- The tightest admissible cap at pM 4's pre-state is `caps 7 1 1`, so
+-- the new count is 1 * 1 * 7 = 7 and the size dimension has seven
+-- `sizeStep`s to spend where it had one.  Only cSize is gated end to
+-- end: `iterFold` composes to a tower and does not normalise
+-- (State-Blowup-Probe says why), so the width dimension is gated one
+-- fold at a time, as it is there
 ------------------------------------------------------------------
 
-_ : (mSize 1 (pM 6) ins1 ≤ᵇ iterSize 9 (1 * 1 * 9) 9) ≡ true
+_ : (mSize 1 (pM 4) ins1 ≤ᵇ iterSize 7 (1 * 1 * 7) 7) ≡ true
 _ = refl
 
-_ : (mSize 1 (pM 3) ins1 ≤ᵇ iterSize 6 (1 * 1 * 6) 6) ≡ true
+-- two of the seven already cover it, so the count is not tight — which
+-- is the point: it has to dominate a chain it cannot see the end of
+_ : (mSize 1 (pM 4) ins1 ≤ᵇ iterSize 7 2 7) ≡ true
 _ = refl
 
--- the width dimension, one fold at a time: this family's stored width
--- never leaves 1, because `keep` stores the payload rather than nesting
--- it, so the fold gates that matter are State-Blowup-Probe's
-_ : mWid 1 (pM 6) ins1 ≡ 1
+-- THE WIDTH DIMENSION SHOWS THE SAME DEFECT, which is worth stating
+-- separately: the stored width goes 1 ↦ 81, one tripling per map frame,
+-- so it too is unbounded in k against a fixed triple.  ONE `foldStep` at
+-- this cap allows 49 — so the old count is short in the width dimension
+-- as well, not only the size one
+_ : mWid 1 (pM 4) ins1 ≡ 81
 _ = refl
 
-_ : (mWid 1 (pM 6) ins1 ≤ᵇ foldStep 9 1) ≡ true
+_ : (mWid 1 (pM 4) ins1 ≤ᵇ foldStep 7 1) ≡ false
+_ = refl
+
+-- two of the new count's seven folds cover it with room to spare
+_ : (mWid 1 (pM 4) ins1 ≤ᵇ iterFold 7 2 1) ≡ true
 _ = refl
 
 -- registrations: this family never grows the registry, so the cReg
 -- dimension is slack throughout
-_ : mReg 1 (pM 6) ins1 ≡ 1
+_ : mReg 1 (pM 4) ins1 ≡ 1
 _ = refl
 
-_ : (mReg 1 (pM 6) ins1 ≤ᵇ 1 * suc (9 * 9)) ≡ true
+_ : (mReg 1 (pM 4) ins1 ≤ᵇ 1 * suc (7 * 7)) ≡ true
 _ = refl

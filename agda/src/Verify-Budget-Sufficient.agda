@@ -6787,10 +6787,6 @@ frameSz? B (take-f _)         = true
 frameSz? B (from-inner _ _ _) = true
 frameSz? B (thru-outer _ _)   = true
 
-pathFrames? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-pathFrames? B root           = true
-pathFrames? B (share-sink i) = true
-pathFrames? B (f ↠ p)        = frameSz? B f ∧ pathFrames? B p
 
 -- AND HOW MANY FRAMES — the j-budget probe's finding, and the second
 -- conjunct cSize has to carry.  A payload grows once PER FRAME it
@@ -6812,8 +6808,18 @@ pathFrames? B (f ↠ p)        = frameSz? B f ∧ pathFrames? B p
 -- subscribe and untouched by cascades — 3 ↦ 9 across the family at
 -- instant 0, still 9 after two cascades — and it sits well under the
 -- entry measure, so a per-instant recurrence can carry it
+-- BOTH conjuncts, in ONE recursive walk: each frame's step function is
+-- bounded, and so is the length of every suffix — the outermost of which
+-- is the whole chain's, so this says exactly `pathLen p ≤ B`.
+--
+-- It has to be written recursively rather than as `frames ∧ length`: a
+-- non-matching definition unfolds on a NEUTRAL path, so every type
+-- mentioning a registered chain grows the body instead of staying stuck,
+-- and J-Budget-Probe OOMs at 13 GB on precisely that
 pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-pathSz? B p = pathFrames? B p ∧ (pathLen p ≤ᵇ B)
+pathSz? B root           = true
+pathSz? B (share-sink i) = true
+pathSz? B (f ↠ p)        = frameSz? B f ∧ ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p)
 
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
@@ -6995,24 +7001,29 @@ c ⊑ᶜ c′ = (Caps.cSize c ≤ Caps.cSize c′)
         × (Caps.cReg  c ≤ Caps.cReg  c′)
 
 -- the step function's size bound weakens frame by frame
-pathFrames?-widen : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B B′ : ℕ} →
-  B ≤ B′ → pathFrames? B p ≡ true → pathFrames? B′ p ≡ true
-pathFrames?-widen root           le h = refl
-pathFrames?-widen (share-sink i) le h = refl
-pathFrames?-widen (map-f fn ↠ p)  {B} le h
-  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathFrames? B p) h
-... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathFrames?-widen p le hp)
-pathFrames?-widen (scan-f fn _ ↠ p) {B} le h
-  with ∧-true (sizeᵗ fn ≤ᵇ B) (pathFrames? B p) h
-... | hf , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf) (pathFrames?-widen p le hp)
-pathFrames?-widen (take-f _ ↠ p)      le h = pathFrames?-widen p le h
-pathFrames?-widen (from-inner _ _ _ ↠ p) le h = pathFrames?-widen p le h
-pathFrames?-widen (thru-outer _ _ ↠ p)   le h = pathFrames?-widen p le h
-
 pathSz?-widen : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B B′ : ℕ} →
   B ≤ B′ → pathSz? B p ≡ true → pathSz? B′ p ≡ true
-pathSz?-widen p {B} le h with ∧-true (pathFrames? B p) (pathLen p ≤ᵇ B) h
-... | hf , hl = ∧-intro (pathFrames?-widen p le hf) (≤ᵇ-widen (pathLen p) le hl)
+pathSz?-widen root           le h = refl
+pathSz?-widen (share-sink i) le h = refl
+pathSz?-widen (map-f fn ↠ p) {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
+... | hf , hr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hr
+... | hl , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf)
+                  (∧-intro (≤ᵇ-widen (suc (pathLen p)) le hl) (pathSz?-widen p le hp))
+pathSz?-widen (scan-f fn _ ↠ p) {B} le h
+  with ∧-true (sizeᵗ fn ≤ᵇ B) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
+... | hf , hr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hr
+... | hl , hp = ∧-intro (≤ᵇ-widen (sizeᵗ fn) le hf)
+                  (∧-intro (≤ᵇ-widen (suc (pathLen p)) le hl) (pathSz?-widen p le hp))
+pathSz?-widen (take-f _ ↠ p) {B} le h
+  with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) h
+... | hl , hp = ∧-intro (≤ᵇ-widen (suc (pathLen p)) le hl) (pathSz?-widen p le hp)
+pathSz?-widen (from-inner _ _ _ ↠ p) {B} le h
+  with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) h
+... | hl , hp = ∧-intro (≤ᵇ-widen (suc (pathLen p)) le hl) (pathSz?-widen p le hp)
+pathSz?-widen (thru-outer _ _ ↠ p) {B} le h
+  with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) h
+... | hl , hp = ∧-intro (≤ᵇ-widen (suc (pathLen p)) le hl) (pathSz?-widen p le hp)
 
 regsSz?-widen : ∀ {n} {Γ : Ctx n} {t}
   (rs : List (RegId × Source × Chain Γ t)) {B B′ : ℕ} →
@@ -7413,10 +7424,10 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- expression is.
 --
 -- BOTH conjuncts of pathSz? need a hypothesis, and for opposite reasons.
--- The frame half needs `sizeᵉ b ≤ C` and `pathFrames? C κ` because the
--- leaf registers the whole of κ under the frames it pushed: the naive
--- lemma is FALSE, since κ = scan-f BIG ↠ root over a tiny b registers
--- BIG.  The LENGTH half needs slack rather than mere boundedness — the
+-- The frame half needs `sizeᵉ b ≤ C` and `pathSz? C κ` because the leaf
+-- registers the whole of κ under the frames it pushed: the naive lemma
+-- is FALSE, since κ = scan-f BIG ↠ root over a tiny b registers BIG.
+-- The LENGTH half needs slack rather than mere boundedness — the
 -- descent lengthens the chain by one frame per shell of b, so the
 -- registered chain is as long as `pathLen κ + sizeᵉ b` and a κ already
 -- AT the cap would overflow it.  That slack is what the caller pays for
@@ -7428,8 +7439,8 @@ postulate
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     regsSz? C (EvalSt.registry st) ≡ true →
     sizeᵉ b ≤ C →
-    pathFrames? C κ ≡ true →       -- the continuation's frames are bounded
-    pathLen κ + sizeᵉ b ≤ C →      -- and the chain it will grow into fits
+    pathSz? C κ ≡ true →           -- the continuation is already bounded
+    pathLen κ + sizeᵉ b ≤ C →      -- and the chain it will GROW into fits
     let r = subscribeE g b κ bid now sched st
     in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
 

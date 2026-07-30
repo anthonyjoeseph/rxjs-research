@@ -47,7 +47,7 @@ help:
 	@echo "  j-budget-probe  is cWid * cReg enough ITERATIONS?  NO — and no count"
 	@echo "                  of the Caps triple is, because chain length moves"
 	@echo "                  while the triple stands still"
-	@echo "                  (see agda/probe/J-Budget-Probe.agda).  SLOW (~10 min)"
+	@echo "                  (see agda/probe/J-Budget-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -113,8 +113,9 @@ state-blowup-probe:
 # left unmeasured.  It refutes `cWid * cReg` — and, via a family whose
 # caps triple is constant while its chain length grows, refutes every
 # count computed from the triple alone.  Standalone, so src/Main.agda
-# never reaches it.  SLOW — pM 6 stores a 4371-node value and that
-# number IS the finding, so it is not shrunk.  ~10 min.
+# never reaches it.  The family stops at k = 4: every gate re-runs the
+# evaluator, and k = 6 (a 4371-node store) OOMs a 16 GB box for no extra
+# content — 15, 51, 159, 483 against a fixed (7, 1, 1) already says it.
 j-budget-probe:
 	cd agda && agda -i src -i probe probe/J-Budget-Probe.agda
 
