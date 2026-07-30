@@ -168,7 +168,7 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 _at_from_as_; EmitKind; subscribe;
@@ -6862,6 +6862,58 @@ frameBlowup c = frameStep (Caps.cWid c * Caps.cReg c) c
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
 frameStep-0 (caps s w r) = cong (λ x → caps s w x) (*-identityʳ r)
+
+------------------------------------------------------------------
+-- THE ARITHMETIC CORE OF THE REPAIR, proven ahead of subscribeE-caps
+-- because it is the piece that would kill the shape if it failed: does
+-- frameStep's per-j increment DOMINATE one fold applied to frameStep j?
+-- The induction consumes exactly this at every clause.  All three
+-- dimensions reduce to "iterating a fixed step commutes", iter-f (suc j)
+-- = f (iter-f j), because sizeStep S / foldStep S apply the SAME S each
+-- time — the whole reason S is read off cSize once rather than per fold.
+------------------------------------------------------------------
+
+-- SIZE.  iterSize S j is the j-fold composition of (sizeStep S), so one
+-- more step at the OUTSIDE equals one more at the inside
+iterSize-suc : ∀ (S j s : ℕ) → iterSize S (suc j) s ≡ sizeStep S (iterSize S j s)
+iterSize-suc S zero    s = refl
+iterSize-suc S (suc j) s = iterSize-suc S j (sizeStep S s)
+
+-- so a size-step on the state at frameStep j lands within frameStep (suc j)
+frameStep-size-suc : ∀ (c : Caps) (j : ℕ) →
+  Caps.cSize (frameStep (suc j) c) ≡ sizeStep (Caps.cSize c) (Caps.cSize (frameStep j c))
+frameStep-size-suc c j = iterSize-suc (Caps.cSize c) j (Caps.cSize c)
+
+-- WIDTH.  identically for foldStep
+iterFold-suc : ∀ (S j w : ℕ) → iterFold S (suc j) w ≡ foldStep S (iterFold S j w)
+iterFold-suc S zero    w = refl
+iterFold-suc S (suc j) w = iterFold-suc S j (foldStep S w)
+
+frameStep-wid-suc : ∀ (c : Caps) (j : ℕ) →
+  Caps.cWid (frameStep (suc j) c) ≡ foldStep (Caps.cSize c) (Caps.cWid (frameStep j c))
+frameStep-wid-suc c j = iterFold-suc (Caps.cSize c) j (Caps.cWid c)
+
+-- REGISTRATIONS.  the cReg dimension is linear in j, so one more j buys
+-- exactly cReg * cSize more headroom — enough for the registrations one
+-- fold mints, which is at most the step function's reference count ≤ cSize
+frameStep-reg-suc : ∀ (c : Caps) (j : ℕ) →
+  Caps.cReg (frameStep j c) + Caps.cReg c * Caps.cSize c
+    ≡ Caps.cReg (frameStep (suc j) c)
+frameStep-reg-suc (caps s w r) j =
+  begin
+    r * suc (j * s) + r * s
+  ≡⟨ cong (_+ r * s) (*-suc r (j * s)) ⟩
+    (r + r * (j * s)) + r * s
+  ≡⟨ +-assoc r (r * (j * s)) (r * s) ⟩
+    r + (r * (j * s) + r * s)
+  ≡⟨ cong (r +_) (sym (*-distribˡ-+ r (j * s) s)) ⟩
+    r + r * (j * s + s)
+  ≡⟨ cong (λ x → r + r * x) (+-comm (j * s) s) ⟩
+    r + r * (suc j * s)
+  ≡⟨ sym (*-suc r (suc j * s)) ⟩
+    r * suc (suc j * s)
+  ∎
+  where open ≡-Reasoning
 
 -- BY RECURRENCE, never in closed form.
 --
