@@ -552,3 +552,33 @@ _ = refl
 
 _ : (26362 ≤ᵇ 2 ^ 9) ≡ false
 _ = refl
+
+------------------------------------------------------------------
+-- MEASUREMENT 8: THE BRANCHING PROFILES — AND NOT ONE ROW OF IT IS
+-- PINNED HERE, which is a fact about the MEASURES and not about the
+-- numbers.  `mFolds` normalises cheaply because it forces
+-- `EvalSt.delivered`, a list of RegIds.  `mFires` and `mDelivs` read
+-- the cascade's EMIT STREAM, so the typechecker has to build every
+-- emitted value to get at the event constructors, and that is the
+-- expensive half of the evaluator.  Pinning even the share-DAG control
+-- with no scan under it — `mFires 0 pS³ insG³`, a thirty-delivery
+-- cascade — ran past ten minutes; with the ladders in, this file ran
+-- past forty-five and was killed twice.
+--
+-- So MEASUREMENT 8 is MEASURED-NOT-RECHECKED (compiled) IN FULL, and
+-- its tables are in Mint-Loop-Shapes.  What stands in for the `refl`
+-- state is three calibrations the tables carry, each against a number
+-- this wall or the mints table already holds:
+--
+--   · every delivery row SUMS to the pinned `mFolds` — 50, 106, 176,
+--     232, 260 above, and 269 and the whole four-level row next door;
+--   · every generation row SUMS to the recorded `mMints` — 92 at
+--     pL³ 2, 254 at pL³ 6, 575 at pL⁴ 2;
+--   · and the mirror's own fire count (`mFiresM`, off the walk that
+--     produces `j`) equals the evaluator's handoff count on pL² 2,
+--     pL³ 2 and pL⁴ 2, so the two harnesses are counting one event.
+--
+-- A row that could not be measured is still recorded as not measured:
+-- `mGens 0 (pL⁴ 5) insG⁴` and `mGenMax 0 (pL⁴ 5) insG⁴` were killed and
+-- are absent from the tables rather than guessed at
+------------------------------------------------------------------
