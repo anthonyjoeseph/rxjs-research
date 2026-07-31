@@ -69,6 +69,14 @@ protocol, per Anthony:
 
 - **One worker at a time.** Concurrent Agda checks OOM the container (13GB+ single-check
   peaks observed). Sequential workers, each run to completion and reviewed before the next.
+- **Babysit every worker with foreground keep-awake loops.** A background subagent only
+  advances while the container is awake, and the container suspends when the design
+  session's turn ends — observed directly on 2026-07-31: a worker sat frozen for 45
+  minutes until a scheduled check-in woke the container, and `uptime` showed a fresh boot.
+  So after launching a worker, the design session must hold the container awake with
+  repeated foreground Bash loops (~10 min each: `for i in $(seq 1 58); do ...; sleep 10;
+  done`) until the worker goes quiet, and re-arm a `send_later` check-in before ever
+  ending a turn. Worker-side keep-awake loops protect its own builds the same way.
 - **Directives carry the law.** Every worker prompt restates the standing rules it needs:
   spec is gospel; probe-before-grind; the keep-awake loop for long builds; report numbers
   plainly including failures; never extrapolate from shallow probe rows; the
