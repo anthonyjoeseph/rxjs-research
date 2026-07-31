@@ -82,13 +82,13 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- SIXTEEN POSTULATES REMAIN, and the count went UP by one while the
--- tree got smaller — which is the point of the outside-in rule rather
--- than a regression.  They are: the three walk faces (subscribeE-wet,
--- cascadeGo-wet, subscribeE-walk), the caps face subscribeE-caps with
--- its chain-half lemma regsSz?-subscribeE, the two pieces the BUDGET
--- CLAIM is assembled from (cascadeGo-charge and cascadeGo-deliveries),
--- seven of the subscribe-side companions, and the two VALUE clauses
+-- FOURTEEN POSTULATES REMAIN.  They are: the three walk faces
+-- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
+-- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the two
+-- pieces the BUDGET CLAIM is assembled from (cascadeGo-charge and
+-- cascadeGo-deliveries), five of the subscribe-side companions
+-- (subscribeE-input-caps, thruConsume-caps, thruWalk-caps,
+-- concatDrain-caps, innerFinish-caps), and the two VALUE clauses
 -- mapFrame-caps / scanFrame-caps that stepFrame-caps was traded for.
 -- frameBlowup is fully defined, and cascadeGo-caps, the cascade
 -- bookends and the chain snapshot are all ground.
@@ -107,6 +107,20 @@
 -- capsOK?-setNode / cutSweep-caps).  The other two, map-f and scan-f,
 -- are where `applyFn` builds a value, and they are the two new
 -- postulates.
+--
+-- THE SHARED-SLOT PAIR IS PROVEN TOO — sharedSlot-caps and
+-- sharedConnect-caps, the share's join and its connect.  They compose
+-- where the *All edge does not, and for a structural reason worth
+-- naming: the def is subscribed under `share-sink i`, a chain of
+-- LENGTH ZERO, so subscribeE-caps's joint `pathLen κ + sizeᵉ b ≤ cSize`
+-- is discharged by the size hypothesis alone.  The clause that pays for
+-- them is register-caps: registering costs exactly one j, the first
+-- place in the tree a fold is spent on the cReg dimension, and it needs
+-- `1 ≤ Caps.cReg c` — FALSE at cReg c = 0, where cReg (frameStep j c) is
+-- 0 at every j and a registry of length one cannot fit.  That condition
+-- is threaded unchanged exactly as `2 ≤ Caps.cSize c` is, and supplied
+-- at the top by 1≤capsAt-reg, which the recurrence proves.  The delivery
+-- clique never registers and does not carry it.
 --
 -- AND THE *All EDGE IS BLOCKED, one join below.  thruConsume-caps lines
 -- up with subscribeInner-caps verbatim and is provable; thruWalk-caps,

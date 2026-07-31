@@ -129,6 +129,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 sharedPlumb; sharedConnect; subscribeSharedSlot;
                                 burstCompleted;
                                 shareLatch; shareAdmit; shareFinish; shareGo;
+                                dryBurst;
                                 foldPath; dispatchShare; arrTick;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
@@ -1265,38 +1266,6 @@ postulate
   -- THE DELIVERY CLIQUE — foldPath / dispatchShare / shareGo /
   -- chainStep — is no longer postulated: it is GROUND, below the block,
   -- on stepFrame-caps and the three share-bookkeeping leaves.
-  -- the shared-slot pair: the slot's def is subscribed at connect, which
-  -- is a second entry into the walk at the SAME instant
-  sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
-    (κ : Path Γ (lookup Γ i) t)
-    (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ d ≤ Caps.cSize (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    pathLen κ + sizeᵉ d ≤ Caps.cSize (frameStep j c) →
-    let r = subscribeSharedSlot g i d κ id now sched st
-    in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
-                            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-
-  sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
-    (κ : Path Γ (lookup Γ i) t)
-    (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ d ≤ Caps.cSize (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    pathLen κ + sizeᵉ d ≤ Caps.cSize (frameStep j c) →
-    let r = sharedConnect g i d κ id now sched st
-    in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
-                            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-
   -- THE SELF-FEEDING EDGE, and the most uncertain companion in the tree:
   -- the inner observable is drawn from a BURST PAYLOAD, so its size
   -- hypothesis comes from valCaps?'s cSize half rather than from the
@@ -1457,6 +1426,22 @@ capsAt-suc-full e sl id = refl
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 2≤capsAt-size e sl (suc id) =
   2≤frameBlowup-size (capsAt e sl id) (2≤capsAt-size e sl id)
+
+-- 1 ≤ cReg AT EVERY LEVEL, the registering companions' side condition,
+-- and the recurrence proves it the same way: the base's cReg is a `suc`,
+-- and frameBlowup's cReg is `cReg c * suc (…)`, which never drops below
+-- cReg c
+1≤frameBlowup-reg : ∀ (c : Caps) → 1 ≤ Caps.cReg c → 1 ≤ Caps.cReg (frameBlowup c)
+1≤frameBlowup-reg c h = ≤-trans h (m≤m*n (Caps.cReg c) _)
+
+1≤capsAt-reg : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  1 ≤ Caps.cReg (capsAt e sl id)
+1≤capsAt-reg {n = n} e sl zero =
+  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (outWᵉ n sl e))
+                          (suc (sizeᵉ e + slotsSize sl)))
+    (s≤s z≤n)
+1≤capsAt-reg e sl (suc id) =
+  1≤frameBlowup-reg (capsAt e sl id) (1≤capsAt-reg e sl id)
 
 ------------------------------------------------------------------
 -- caps-tick, DERIVED.  This is the joint the whole round was about, and
@@ -1719,6 +1704,217 @@ subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sl sched
   BC     = proj₂ (proj₂ IH)
   res    = subscribeE fuel o κ′ id now sched₀ st
   burst  = proj₁ res
+
+------------------------------------------------------------------
+-- THE SHARED-SLOT PAIR, GROUND — and the second side condition the
+-- tree needs.
+--
+-- REGISTERING COSTS EXACTLY ONE j, and it is the first clause anywhere
+-- in the tree that spends a fold on the cReg dimension rather than on
+-- cSize or cWid.  The registry gains one entry, so the count conjunct
+-- needs one more unit of headroom; frameStep-reg-suc says one j buys
+-- `cReg c * cSize c` of it — which is at least one exactly when the cap
+-- admits a registration at all.
+--
+-- SO THE REGISTERING COMPANIONS CARRY `1 ≤ Caps.cReg c`, alongside
+-- `2 ≤ Caps.cSize c`, and it is not decoration either: at cReg c = 0 the
+-- statement is FALSE, since cReg (frameStep j c) is `0 * suc (j * S)` =
+-- 0 at every j and a registry of length one cannot fit under it.  It is
+-- threaded UNCHANGED (c never moves inside a frame) and is supplied at
+-- the top by 1≤capsAt-reg below, which the recurrence proves rather than
+-- assumes — the same discipline 2≤capsAt-size already follows.  The
+-- delivery clique never registers, so it does not carry it.
+------------------------------------------------------------------
+
+register-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (j : ℕ) (src : Source) (κ : Path Γ u t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  capsOK? (frameStep (suc j) c) sched (register src κ st) ≡ true
+register-caps {u = u} c j src κ sched st 2≤S 1≤R inv pC =
+    ∧-intro h0
+    (∧-intro (all-++-intro (λ en → pathSz? (Caps.cSize (frameStep (suc j) c))
+                                     (proj₂ (proj₂ (proj₂ en))))
+                (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
+                h1 (∧-intro (pathSz?-⊑ κ (frameStep-mono-j c 2≤S (n≤1+n j)) pC) refl))
+    (∧-intro h2
+    (∧-intro h3 COUNT)))
+  where
+  inv′ = capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
+           (frameStep-mono-j c 2≤S (n≤1+n j)) inv
+  P    = capsOK?-parts (frameStep (suc j) c) sched st inv′
+  h0   = proj₁ P
+  h1   = proj₁ (proj₂ P)
+  h2   = proj₁ (proj₂ (proj₂ P))
+  h3   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  1≤RS : 1 ≤ Caps.cReg c * Caps.cSize c
+  1≤RS = ≤-trans (≤-reflexive refl) (*-mono-≤ 1≤R (≤-trans (s≤s z≤n) 2≤S))
+  COUNT : (length (EvalSt.registry st ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
+             ≤ᵇ Caps.cReg (frameStep (suc j) c)) ≡ true
+  COUNT = T⇒≡true _ (≤⇒≤ᵇ
+    (≤-trans (≤-reflexive (length-++ (EvalSt.registry st)))
+      (≤-trans (+-mono-≤ (capsOK?-count (frameStep j c) sched st inv) 1≤RS)
+               (≤-reflexive (frameStep-reg-suc c j)))))
+
+-- a share's connect burst is re-kinded on the way up, and eventCaps?
+-- does not read the kind
+sharedPlumb-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  (str : Stream Γ u) →
+  burstCaps? c sl str ≡ true → burstCaps? c sl (sharedPlumb str) ≡ true
+sharedPlumb-caps c sl []         h = refl
+sharedPlumb-caps c sl (em ∷ ems) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (sharedPlumb-caps c sl ems (proj₂ (∧-true _ _ h)))
+
+-- dropping a source's registrations without sweeping the live set: the
+-- registry shrinks and nothing else moves
+dropOnly-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (src : Source) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched (record st { registry = dropSource src (EvalSt.registry st) })
+    ≡ true
+dropOnly-caps c src sched st inv =
+    ∧-intro h0
+    (∧-intro (dropSource-all (λ en → pathSz? (Caps.cSize c)
+                                       (proj₂ (proj₂ (proj₂ en))))
+                src (EvalSt.registry st) h1)
+    (∧-intro h2
+    (∧-intro h3
+             (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
+                                       (≤ᵇ⇒≤ _ _ (T-to h4))))))))
+  where
+  P  = capsOK?-parts c sched st inv
+  h0 = proj₁ P
+  h1 = proj₁ (proj₂ P)
+  h2 = proj₁ (proj₂ (proj₂ P))
+  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+-- `j + 1` and `j + suc k` against the shapes register-caps and
+-- subscribeE-caps hand back
+j+1 : ∀ (j : ℕ) → j + 1 ≡ suc j
+j+1 j = trans (+-suc j 0) (cong suc (+-identityʳ j))
+
+-- THE CONNECT.  One registration for the joining subscriber, then the
+-- def is subscribed under `share-sink i` — a chain of length zero, so
+-- its joint length-and-size hypothesis is the size hypothesis alone,
+-- which is exactly why this edge composes where the *All edge does not
+sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  pathLen κ + sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  let r = sharedConnect g i d κ id now sched st
+  in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
+                          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+-- OUT OF GAS: a dry close and nothing else
+sharedConnect-caps {Γ = Γ} c j g0 i d κ id now sl sched st 2≤S 1≤R slEq inv szd pC lC =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
+    , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
+                     (dryBurst {A = Val Γ (lookup Γ i)} id) ≡ true)
+            (sym (+-identityʳ j)) refl
+sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
+                   2≤S 1≤R slEq inv szd pC lC
+  with burstCompleted (proj₁ (subscribeE fuel′ d (share-sink i) id now sched
+                               (register (toℕ i) κ
+                                 (record st { connectedShares =
+                                                toℕ i ∷ EvalSt.connectedShares st }))))
+... | true  =
+  suc j₂ , subst (λ x → capsOK? (frameStep x c) sched₁ DROP ≡ true) (sym (+-suc j j₂))
+             (dropOnly-caps (frameStep (suc (j + j₂)) c) (toℕ i) sched₁
+                (record st₂ { completedSources = toℕ i ∷ EvalSt.completedSources st₂ })
+                SUB)
+          , subst (λ x → burstCaps? (frameStep x c) sl
+                           (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+                              at id from toℕ i as subscribe) ∷ sharedPlumb burst)
+                             ≡ true)
+                  (sym (+-suc j j₂))
+                  (∧-intro refl (sharedPlumb-caps (frameStep (suc (j + j₂)) c) sl burst BC))
+  where
+  st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
+  st₁ = register (toℕ i) κ st₀
+  IH  = subscribeE-caps c (suc j) fuel′ d (share-sink i) id now sl sched st₁
+          2≤S slEq
+          (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
+          (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+          refl
+          (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+  j₂  = proj₁ IH
+  SUB = proj₁ (proj₂ IH)
+  BC  = proj₂ (proj₂ IH)
+  res = subscribeE fuel′ d (share-sink i) id now sched st₁
+  burst = proj₁ res
+  sched₁ = proj₁ (proj₂ res)
+  st₂ = proj₂ (proj₂ res)
+  DROP = record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
+                    ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
+... | false =
+  suc j₂ , subst (λ x → capsOK? (frameStep x c) sched₁ st₂ ≡ true) (sym (+-suc j j₂)) SUB
+          , subst (λ x → burstCaps? (frameStep x c) sl
+                           (((init (toℕ i) ∷ []) at id from toℕ i as subscribe)
+                              ∷ sharedPlumb burst) ≡ true)
+                  (sym (+-suc j j₂))
+                  (∧-intro refl (sharedPlumb-caps (frameStep (suc (j + j₂)) c) sl burst BC))
+  where
+  st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
+  st₁ = register (toℕ i) κ st₀
+  IH  = subscribeE-caps c (suc j) fuel′ d (share-sink i) id now sl sched st₁
+          2≤S slEq
+          (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
+          (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+          refl
+          (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+  j₂  = proj₁ IH
+  SUB = proj₁ (proj₂ IH)
+  BC  = proj₂ (proj₂ IH)
+  res = subscribeE fuel′ d (share-sink i) id now sched st₁
+  burst = proj₁ res
+  sched₁ = proj₁ (proj₂ res)
+  st₂ = proj₂ (proj₂ res)
+
+-- THE JOIN.  A spent share answers with a one-shot close, a live one
+-- registers (one j), and an unconnected one connects
+sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  pathLen κ + sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  let r = subscribeSharedSlot g i d κ id now sched st
+  in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
+                          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+sharedSlot-caps {Γ = Γ} c j g i d κ id now sl sched st 2≤S 1≤R slEq inv szd pC lC
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
+    , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
+                     (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
+                        at id from toℕ i as subscribe) ∷ []) ≡ true)
+            (sym (+-identityʳ j)) refl
+... | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+...   | true  =
+  1 , subst (λ x → capsOK? (frameStep x c) sched (register (toℕ i) κ st) ≡ true)
+            (sym (j+1 j)) (register-caps c j (toℕ i) κ sched st 2≤S 1≤R inv pC)
+    , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
+                     (((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []) ≡ true)
+            (sym (j+1 j)) refl
+...   | false = sharedConnect-caps c j g i d κ id now sl sched st
+                  2≤S 1≤R slEq inv szd pC lC
 
 ------------------------------------------------------------------
 -- GRINDING stepFrame-caps, THE CLAUSE THAT PAYS A j.
