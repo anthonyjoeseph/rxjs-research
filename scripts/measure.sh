@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # measure.sh "EXPR" LOG -- print the normal form of a ℕ-valued EXPR from
-# probe/G-Prime-Base by asking Agda to check a deliberate mismatch.  Writes
+# probe/Mint-Loop-Probe by asking Agda to check a deliberate mismatch.  Writes
 # to LOG and appends EXIT=, so a long run can be kicked off and polled:
 # family G′'s deeper rungs take tens of minutes and gigabytes.
 set -u
@@ -13,7 +13,7 @@ module G-Probe where
 open import Data.Nat using (ℕ; _*_; _^_; _≤ᵇ_)
 open import Data.Bool using (Bool; true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import G-Prime-Base
+open import Mint-Loop-Probe
 _ : $1 ≡ 987654
 _ = refl
 AGDA

@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -55,6 +55,10 @@ help:
 	@echo "                  2 ^ cReg * cSize, over four share shapes plus the"
 	@echo "                  standing regression suite"
 	@echo "                  (see agda/probe/Fold-Count-Probe.agda)"
+	@echo "  mint-loop-probe  does the MINTING FEEDBACK LOOP close?  a scan under"
+	@echo "                  a share whose step re-subscribes that share, nested"
+	@echo "                  k deep, so a minted chain can itself mint.  NO — the"
+	@echo "                  deliveries saturate in k while 2 ^ cReg * cSize grows"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -135,6 +139,16 @@ j-budget-probe:
 # it.  SLOW — every assertion re-runs the evaluator, ~40 min.
 fold-count-probe:
 	cd agda && agda -i src -i probe probe/Fold-Count-Probe.agda
+
+# The gate for the one crude spot in `2 ^ cReg * cSize`: shareAdmit reads the
+# registry as of the dispatch, so a mid-cascade mint widens the branching of
+# the cascade that minted it.  Fold-Count-Probe's family G sampled one rung of
+# that loop; this closes it, and finds the deliveries SATURATE in the nesting
+# depth while the budget keeps growing through cSize.  Standalone, so
+# src/Main.agda never reaches it.  SLOW — every fold count re-runs the
+# evaluator through a real cascade.
+mint-loop-probe:
+	cd agda && agda -i src -i probe probe/Mint-Loop-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck

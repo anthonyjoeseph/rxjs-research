@@ -385,6 +385,18 @@ frameStep j c =
 -- extra fan-in only adds edges, and the transitive tournament already
 -- has them all.
 --
+-- WHEN THIS IS PROVEN RATHER THAN GATED, the lemma to reach for is the
+-- INVERTED PAIR, not "one per subset" — the latter is the corollary.
+-- The injection is `paths ↪ subsets`, sending a path to the SET of
+-- registrations it visits, and what has to be shown is that the map is
+-- injective: two distinct traversals of the SAME set would have to
+-- disagree on the order of some pair, and a pair inverted between two
+-- reachability-respecting orders is a cycle, which the DAG forbids.
+-- Note the nodes are the REGISTRATIONS, not the slots — `merge(s1, s1)`
+-- registers twice on one slot and so contributes two nodes — which is
+-- why parallel fan-in never collapses into a shared node and the
+-- one-per-subset count survives it.
+--
 -- cWid IS GONE, and it was never a factor of this count — it bounds how
 -- WIDE one emitted observable is, not how many times a cascade iterates.
 -- Fold-Count-Probe's diamond makes that concrete: `mWid` there is ZERO
@@ -996,7 +1008,25 @@ postulate
   -- dispatch of that slot.  The proof of this conjunct therefore cannot
   -- simply count the pre-state registry; it has to carry the minted
   -- ones, which `frameStep`'s own cReg component (cReg * suc (j*cSize))
-  -- already tracks.  Family G is the measured case.
+  -- already tracks.
+  --
+  -- THE FEEDBACK LOOP THIS OPENS IS MEASURED AND DOES NOT TOWER.  Read
+  -- naively the recursion is vicious — d ≤ 2 ^ R_end with R_end ≤ R₀ +
+  -- d * mints has no closed bound — and family G only sampled its base
+  -- rung.  Mint-Loop-Probe closes it: a scan under a share whose step
+  -- re-subscribes that share, nested k deep, so a minted chain itself
+  -- mints.  The deliveries SATURATE in k (5 flat at one shared level;
+  -- 20, 26, 27, 27 at two; 50 … 269 at three) because a minted
+  -- registration is only reachable by dispatches that come after it and
+  -- how many remain is fixed by the PRE-STATE DAG — while each nesting
+  -- level adds a constant to the step function's syntax and so to cSize,
+  -- which multiplies the budget by `2 ^ cReg` a level.  The worst
+  -- count/budget ratio over that whole sweep is at k = 0, the
+  -- non-nested mint family G already gated, and it FALLS with ladder
+  -- depth.  The mid-cascade subscription that drives the loop is real
+  -- rxjs, not an evaluator artifact — a subscriber added mid-cascade
+  -- misses the in-flight emission and receives the cascade's later ones,
+  -- checked against rxjs 7.8 at the probe's head.
   --
   -- caps-tick is then a COROLLARY rather than a sibling face: widen the
   -- reported level to the endpoint by frameStep-mono-j, and the endpoint
