@@ -1302,7 +1302,45 @@ postulate
   -- hypothesis comes from valCaps?'s cSize half rather than from the
   -- syntax, and re-enters subscribeE-caps as `sizeᵉ o ≤ cSize`.  The
   -- chain it is subscribed under is κ extended by one from-inner frame,
-  -- which is where its length hypothesis has to come from
+  -- which is where its length hypothesis has to come from.
+  --
+  -- ATTEMPTED AND STOPPED (this leg).  thruConsume-caps is provable —
+  -- its hypotheses line up with subscribeInner-caps's verbatim, and the
+  -- per-op node bookkeeping stores nothing the caps do not already bound
+  -- (merge's counter and switch's current-inner carry no payload;
+  -- concatAll's queue stores the payload VERBATIM, so its bound is the
+  -- valCaps? in hand).  ITS CALLER IS NOT.  thruWalk-caps carries
+  --
+  --     all (valCaps? … (obs u)) vals      and     suc (pathLen κ) ≤ cSize
+  --
+  -- and owes thruConsume-caps, per element,
+  --
+  --     suc (pathLen κ) + sizeᵛ (obs u) o ≤ cSize
+  --
+  -- which is a JOINT bound and does not follow from the two separate
+  -- ones — `a ≤ B` and `b ≤ B` do not give `a + b ≤ B`, and at a chain
+  -- of length cSize ∸ 1 carrying a payload of size cSize ∸ 1 the sum is
+  -- twice the cap.  So the two postulates in this block do not compose,
+  -- and one of them is wrong as stated.
+  --
+  -- WHICH ONE, AND WHY THE REPAIR IS A RESHAPE RATHER THAN AN EDIT.
+  -- The joint bound cannot be dropped from thruConsume-caps: it is
+  -- exactly subscribeE-caps's `pathLen κ + sizeᵉ b ≤ cSize`, and
+  -- subscribeInner-caps — PROVEN — consumes it.  So thruWalk-caps has to
+  -- carry it, per payload:
+  --
+  --     all (λ o → suc (pathLen κ) + sizeᵛ (obs u) o ≤ᵇ cSize) vals ≡ true
+  --
+  -- and then stepFrame-caps's thru-outer clause owes the same, so
+  -- stepFrame-caps's `suc (pathLen κ) ≤ cSize` becomes the same `all`
+  -- over its own payload list, and foldPath-caps owes THAT — which means
+  -- the joint conjunct enters the delivery clique (foldPath /
+  -- dispatchShare / shareGo / cascadeGo, all four GROUND today) and,
+  -- because shareGo delivers along REGISTERED chains, regsSz? as well.
+  -- That is a change to the tree's shape and to a state predicate, not a
+  -- clause grind, so it is recorded here rather than made.  The tree
+  -- typechecks unchanged; what does not hold is that these two
+  -- postulates can both be true of the same evaluator
   thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -1554,6 +1592,133 @@ shareFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 shareFinish-caps c i false sl out inv bc = inv , bc
 shareFinish-caps c i true sl (emits , sched′ , st′) inv bc =
   dropSweep-caps c (toℕ i) sched′ st′ inv , bc
+
+------------------------------------------------------------------
+-- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the
+-- self-feeding edge.  The inner observable is drawn from a BURST
+-- PAYLOAD rather than from the syntax, so every hypothesis it hands to
+-- subscribeE-caps comes off valCaps? — its size from the cSize half,
+-- its chain from κ extended by the from-inner frame.  If the caps face
+-- were going to fail to close on itself, it would fail here.
+--
+-- It does not.  The clause is two lines: out of gas, nothing happens
+-- (j′ = 0, a dry close, no values); with gas, subscribeE-caps at the
+-- extended path, then split the burst.
+------------------------------------------------------------------
+
+-- capsOK? reads slots, live and the store — never the node counter, so
+-- minting an instance id is free (record eta makes this refl)
+capsOK?-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (k : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  capsOK? c (record sched { nextNode = k }) st ≡ true
+capsOK?-nextNode c k sched st h = h
+
+-- splitting one emit's events, and a whole burst, at the caps
+splitEvents-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventCaps? c sl) es ≡ true →
+  all (valCaps? c sl s) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+splitEvents-vals-caps c sl []              h = refl
+splitEvents-vals-caps c sl (value v  ∷ es) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h)))
+splitEvents-vals-caps c sl (init _    ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-caps c sl (close _ _ ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-caps c sl (handoff _ ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-caps c sl (complete  ∷ es) h =
+  splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+
+splitEvents-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventCaps? c sl) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
+splitEvents-bk-caps c sl []               = refl
+splitEvents-bk-caps {u = u} c sl (value _  ∷ es) = splitEvents-bk-caps {u = u} c sl es
+splitEvents-bk-caps {u = u} c sl (init _   ∷ es) =
+  ∧-intro refl (splitEvents-bk-caps {u = u} c sl es)
+splitEvents-bk-caps {u = u} c sl (close _ _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-caps {u = u} c sl es)
+splitEvents-bk-caps {u = u} c sl (handoff _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-caps {u = u} c sl es)
+splitEvents-bk-caps {u = u} c sl (complete ∷ es) = splitEvents-bk-caps {u = u} c sl es
+
+splitBurst-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
+  (str : Stream Γ s) →
+  burstCaps? c sl str ≡ true →
+  all (valCaps? c sl s) (proj₁ (splitBurst {A = Val Γ u} str)) ≡ true
+splitBurst-vals-caps c sl []         h = refl
+splitBurst-vals-caps {Γ = Γ} {u = u} c sl (em ∷ ems) h =
+  all-++-intro _ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em))) _
+    (splitEvents-vals-caps c sl (InstEmit.events em) (proj₁ (∧-true _ _ h)))
+    (splitBurst-vals-caps {u = u} c sl ems (proj₂ (∧-true _ _ h)))
+
+splitBurst-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
+  (str : Stream Γ s) →
+  all (eventCaps? c sl) (proj₁ (proj₂ (splitBurst {A = Val Γ u} str))) ≡ true
+splitBurst-bk-caps c sl []         = refl
+splitBurst-bk-caps {Γ = Γ} {u = u} c sl (em ∷ ems) =
+  all-++-intro _ (proj₁ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em)))) _
+    (splitEvents-bk-caps {u = u} c sl (InstEmit.events em))
+    (splitBurst-bk-caps {u = u} c sl ems)
+
+subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep j c) sched st ≡ true →
+  valCaps? (frameStep j c) sl (obs u) o ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) + sizeᵛ (obs u) o ≤ Caps.cSize (frameStep j c) →
+  let r = subscribeInner g op allNid κ id now o sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c)
+              (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+              (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (all (valCaps? (frameStep (j + j′) c) sl u)
+            (proj₁ (proj₂ r)) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl)
+            (proj₁ (proj₂ (proj₂ r))) ≡ true)
+-- OUT OF GAS: a dry close and nothing else.  The only state change is
+-- the instance counter, which capsOK? does not read
+subscribeInner-caps c j g0 op allNid κ id now o sl sched st 2≤S slEq inv vC pC lC =
+  0 , subst (λ x → capsOK? (frameStep x c)
+                     (record sched { nextNode = suc (Sched.nextNode sched) }) st ≡ true)
+            (sym (+-identityʳ j))
+            (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched)) sched st inv)
+    , refl , refl
+-- WITH GAS: the inner is subscribed under one more frame, at the same
+-- instant.  Its size hypothesis is valCaps?'s cSize half (sizeᵛ (obs u)
+-- IS sizeᵉ), and its chain hypotheses are κ's, one frame longer — which
+-- is exactly what the extra summand in lC pays for
+subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sl sched st
+                    2≤S slEq inv vC pC lC =
+  j′ , SUB
+     , splitBurst-vals-caps {s = u} {u = t} (frameStep (j + j′) c) sl burst BC
+     , splitBurst-bk-caps {s = u} {u = t} (frameStep (j + j′) c) sl burst
+  where
+  B      = Caps.cSize (frameStep j c)
+  sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
+  κ′     = from-inner op allNid (Sched.nextNode sched) ↠ κ
+  szo    : sizeᵉ o ≤ B
+  szo    = ≤ᵇ⇒≤ (sizeᵛ (obs u) o) B (T-to (proj₁ (∧-true _ _ vC)))
+  pC′    : pathSz? B κ′ ≡ true
+  pC′    = ∧-intro refl
+             (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B)
+                        (≤⇒≤ᵇ (≤-trans (m≤m+n (suc (pathLen κ)) (sizeᵉ o)) lC)))
+                      pC)
+  IH     = subscribeE-caps c j fuel o κ′ id now sl sched₀ st 2≤S slEq
+             (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
+                               sched st inv)
+             szo pC′ lC
+  j′     = proj₁ IH
+  SUB    = proj₁ (proj₂ IH)
+  BC     = proj₂ (proj₂ IH)
+  res    = subscribeE fuel o κ′ id now sched₀ st
+  burst  = proj₁ res
 
 ------------------------------------------------------------------
 -- GRINDING stepFrame-caps, THE CLAUSE THAT PAYS A j.
