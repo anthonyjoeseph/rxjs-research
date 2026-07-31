@@ -58,7 +58,9 @@ help:
 	@echo "  mint-loop-probe  does the MINTING FEEDBACK LOOP close?  a scan under"
 	@echo "                  a share whose step re-subscribes that share, nested"
 	@echo "                  k deep, so a minted chain can itself mint.  NO — the"
-	@echo "                  deliveries saturate in k while 2 ^ cReg * cSize grows"
+	@echo "                  deliveries saturate in k on three ladders of four,"
+	@echo "                  while 2 ^ cReg * cSize grows.  The fourth is still"
+	@echo "                  climbing where it stops computing.  ~18 min, two files"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -144,12 +146,15 @@ fold-count-probe:
 # registry as of the dispatch, so a mid-cascade mint widens the branching of
 # the cascade that minted it.  Fold-Count-Probe's family G sampled one rung of
 # that loop; this closes it, and finds the deliveries SATURATE in the nesting
-# depth while the budget keeps growing through cSize.  Standalone, so
-# src/Main.agda never reaches it.  SLOW — every fold count re-runs the
-# evaluator through a real cascade.
+# depth while the budget keeps growing through cSize — on three ladders of
+# four.  Standalone, so src/Main.agda never reaches it.  SLOW — every fold
+# count re-runs the evaluator through a real cascade — and split in two
+# because ONE wall over these families does not finish: it ran past fifty
+# minutes and was killed.  Split, it is ~10 min plus ~8 min.
 mint-loop-probe:
 	cd agda && agda -i src -i probe probe/Mint-Loop-Shapes.agda
 	cd agda && agda -i src -i probe probe/Mint-Loop-Probe.agda
+	cd agda && agda -i src -i probe probe/Mint-Loop-Frames.agda
 
 ts-check:
 	cd typescript && npm run typecheck
