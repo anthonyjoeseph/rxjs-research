@@ -1215,7 +1215,56 @@ postulate
   -- hop adds is absorbed by the j that hop pays — frameStep-chain-suc.
   -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
   -- folds and reports how many.  j′ folds spent means the caps advance
-  -- from frameStep j to frameStep (j + j′), never staying put
+  -- from frameStep j to frameStep (j + j′), never staying put.
+  --
+  -- SURVEYED, NOT ATTEMPTED (2026-07-31), now that every COMPANION is
+  -- ground and this is the only caps face left.  Three things it needs
+  -- that are not clause work, recorded so the next leg starts from a
+  -- statement rather than from a grind:
+  --
+  -- (i)  TWO COMPANIONS DO NOT EXIST YET.  Seven of the thirteen clauses
+  --      end in `pushBurst fuel id now f κ burst …` (mapᵉ, takeᵉ, scanᵉ)
+  --      or in `subscribeAll` (the four *All heads), and neither has a
+  --      caps companion.  Both look like ordinary grinds — pushBurst is
+  --      foldPath's `↠` clause per emit, over the now-ground
+  --      stepFrame-caps, and subscribeAll is mintNode + installNode +
+  --      this face at `thru-outer op nid ↠ κ` + pushBurst, one more
+  --      instance of the same one-j-per-hop absorption
+  --      (frameStep-chain-suc) subscribeInner-caps runs on.
+  --
+  -- (ii) TWO CLAUSES BUILD VALUES BY EVALUATION, and land where
+  --      mapFrame-caps / scanFrame-caps already are.  `ofᵉ ts` bursts
+  --      `map evalTm ts` and `scanᵉ f seed b` installs
+  --      `scan-st (evalTm seed)`; evalWith-size is a TOWER in the term's
+  --      syntax, so neither is `sizeᵛ ≤ sizeᵗ` and both want an
+  --      existential j′ of their own.  `μᵉ body` is the same shape once
+  --      more — unfoldμ is LARGER than the μ (only syncSizeᵉ is
+  --      preserved, syncSize-unfoldμ; sizeᵉ is not) — so its recursive
+  --      call has no size hypothesis until one is stated.
+  --
+  -- (iii) AND THE ONE THAT IS A STATEMENT-LEVEL GAP: `deferᵉ body`
+  --      PARKS AN OBSERVABLE ON THE SCHEDULE.  Its clause adds a
+  --      LiveSource at `elemTy = obs u` with `pending = (suc now , body)`,
+  --      so capsOK?'s widLive conjunct demands
+  --      `outWᵉ n sl body ≤ Caps.cWid (frameStep j c)` — a WIDTH bound on
+  --      the subscribed expression.  This face's telescope has no width
+  --      hypothesis at all, and the obvious source is not there either:
+  --      `outWᵉ j sl (deferᵉ e) = 0` BY DEFINITION (Rx.Frame-Width — a
+  --      defer crosses a tick), so the enclosing expression's width says
+  --      nothing about the parked body's.  The scripted-slot branch of
+  --      subscribeE-input-caps escaped the width question because a
+  --      scripted element type is DATA and outWᵛ is identically zero
+  --      there; a defer's payload is `obs`, and it does not escape.
+  --
+  --      So subscribeE-caps needs a third conjunct,
+  --      `outWᵉ n sl b ≤ Caps.cWid (frameStep j c)`, and that is a
+  --      telescope change to the assembly knot: it threads back through
+  --      every caller (subscribeInner-caps and thruWalk-caps can supply
+  --      it from valCaps?'s own width half, which they already carry),
+  --      and it REOPENS the slot side condition on the width axis —
+  --      sharedConnect subscribes a slot DEF, and slotsCaps? is
+  --      size-only precisely because nothing needed widths until now.
+  --      Recorded, not made: it is one ruling, not a clause grind
   subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
