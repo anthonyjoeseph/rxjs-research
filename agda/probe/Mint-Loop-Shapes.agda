@@ -258,6 +258,24 @@ jAt fuel e ins with runSt fuel e ins
 --   pL³  0      7     50       8      0.16
 --   pL³  2      7    176      92      0.52
 --   pL³  6      7    269     254      0.94
+--   pL⁴  0      9    166      15      0.090   ‡
+--   pL⁴  1      9    726     120      0.165   ‡
+--   pL⁴  2      9   2546     575      0.226   ‡
+--   pL⁴  3      9   6914    1940      0.281   †
+--   pL⁴  4      9  14922    4943      0.331   †
+--   pL⁴  5      9  26362    9948      0.377   †
+--
+--   ‡ mints measured through the typechecker (scripts/measure.sh), the D
+--     column `refl`-pinned next door;  † measured through the compiled
+--     harness (probe/Measure-Main.agda), measured-not-rechecked — see THE
+--     L = 4 K-SWEEP below for the provenance rule
+--
+-- The L = 4 ladder does NOT contradict the reading; it sharpens it.  At a
+-- FIXED k the ratio falls with ladder depth (k = 0: 0.60, 0.50, 0.16,
+-- 0.090) and in k it climbs monotonically on every ladder, so "mints track
+-- deliveries" is a statement about DEPTH IN k, and L = 4 is simply four
+-- rungs short of where L = 3 ends up.  It climbs steadily — 0.090, 0.165,
+-- 0.226, 0.281, 0.331, 0.377, still rising at the last row measured.
 --
 -- MINTS TRACK DELIVERIES.  At the deepest rung measured nearly every
 -- delivery mints, and the registry the cascade LEAVES is 261 against an
@@ -482,6 +500,68 @@ pL³ k = mergeAllᵉ (scanᵉ (mintOnly³ k) seedO (input fz))
 -- So: same shape, one more shared level, entry registry 9, cap 512.  The
 -- lean variant only — the accumulating one does not normalise past its
 -- base rung two levels down, let alone here
+------------------------------------------------------------------
+-- THE L = 4 K-SWEEP, and it is the ladder's own answer to the question
+-- MEASUREMENT 7 opened at k = 2 and stopped.  `D ≤ 2 ^ cReg * 2 ^ cReg` is
+-- 4 ^ 9 = 262144 here.
+--
+--   k   cReg  cSize       D    D/262144    mints  mints/D       j    mFib
+--   0     9      3      166    0.00063       15    0.090      182      16
+--   1     9     10      726    0.00277      120    0.165     1542     121
+--   2     9     18     2546    0.00971      575    0.226     8122     576
+--   3     9     26     6914    0.02637     1940    0.281    29234    1941
+--   4     9     34    14922    0.05692     4943    0.331    78010    4944
+--   5     9     42    26362    0.10056     9948    0.377   162666       —
+--   6     9     50        —          —        —        —        —       —
+--
+--   mPre is 46 at every k measured (k = 0 … 4); cReg is 9 at k = 0 … 4, 6
+--   and 10; cSize is 8k + 2 for k ≥ 1 (98 at k = 12), 3 at k = 0.
+--
+-- PROVENANCE, and there is no silent third state.  k = 0, 1, 2 are the
+-- `refl` pins next door, except the mints column, which is
+-- measure.sh-through-the-typechecker.  Everything at k ≥ 3 comes off the
+-- COMPILED harness (`probe/Measure-Main.agda`), so it is
+-- measured-not-rechecked; the typechecker cannot reach it — `mFolds 0
+-- (pL⁴ 3) insG⁴` was killed at 12.6 GB after 20 minutes, and the compiled
+-- run answers it in seconds.  The harness's index 0 and 1 reproduce the
+-- pinned 2546 and 576 exactly, and its `mS 0 (pL⁴ 3)` and `mMints 0
+-- (pL⁴ 2)` agree with the typechecker's own 26 and 575, which is the only
+-- reason any of the rest is believed.
+--
+-- k = 6 IS NOT MEASURED.  40 minutes at 12.4 GB under a compacting
+-- collector with no answer, killed.  Recorded as measured-not-normalised,
+-- not as absent.
+--
+-- WHAT THE SWEEP SAYS.  The bound HOLDS on every row — the largest D
+-- measured anywhere in this file is 26362 against 262144.  But:
+--
+--   · D HAS NOT SATURATED.  Growth per rung is 4.37, 3.51, 2.72, 2.16,
+--     1.77 — the last two rungs still buy 116 % and 77 %.  L = 3 flattened
+--     by k = 5 (268 → 269, under 1 %); L = 4 at k = 5 is still nearly
+--     doubling.  Nothing here observes saturation and nothing here should
+--     be read as observing it.
+--
+--   · THE MARGIN SHRINKS IN k BY TWO ORDERS OF MAGNITUDE — 0.00063 at
+--     k = 0 to 0.10056 at k = 5.  So the "margin GROWS as the ladder
+--     deepens (0.078, 0.026, 0.016, 0.0097)" that Mint-Loop-Probe's
+--     finding (6) records is a SHALLOW-k artefact: it compares L = 3 at
+--     k = 6 with L = 4 at k = 2.  Compared at the deepest k each ladder
+--     reaches, L = 4's 0.10056 is the WORST ratio in the file, worse than
+--     the one-level ladder's 0.078.
+--
+--   · SO THE TEN-TIMES-WORSE GATE IS GONE at L = 4: 26362 * 10 = 263620,
+--     which is over 262144.  The bound has under a factor of ten of head
+--     room at the deepest row measured, and the row above it cannot be
+--     measured in this container
+--
+-- ONE THING THE COLUMNS DO THAT NOBODY ASKED FOR: on this ladder the
+-- largest fibre is the mint count PLUS ONE, on all five rows that have
+-- both (16/15, 121/120, 576/575, 1941/1940, 4944/4943).  It is not a law —
+-- L = 3 at k = 2 has 92 mints and a fibre of 64 — but on the ladder where
+-- the fibre bound died it says exactly what killed it: the worst class's
+-- fibre IS the cascade's minting, so capping it by anything entry-computable
+-- is capping the mints by entry data, which the R_end reading above already
+-- refuted.  Recorded as an observation, not explained
 ------------------------------------------------------------------
 
 Γˢ⁴ : Ctx 5
