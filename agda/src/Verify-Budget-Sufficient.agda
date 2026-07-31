@@ -152,12 +152,21 @@
 --       model clause: it now recurses at `suc j` and reports `suc j₂`,
 --       and `+-suc` is the entire cost of the change.
 --
---   (2) `c` IS NOT TIED TO `sl`.  capsAt's base is
---       `2 + sizeᵉ e + slotsSize sl`, and the connection is gone by the
---       time a companion is stated at an abstract `c` — so nothing lets
---       subscribeE-input-caps bound a SLOT DEF or a scripted value.  The
---       repair is a decidable side condition on the pair (c , sl),
---       threaded unchanged as `2 ≤ cSize c` and `1 ≤ cReg c` already are.
+--   (2) `c` NOT TIED TO `sl` — REPAIRED AT THE TELESCOPE.  capsAt's base
+--       is `2 + sizeᵉ e + slotsSize sl`, and the connection used to be
+--       gone by the time a companion was stated at an abstract `c`, so
+--       nothing let subscribeE-input-caps bound a SLOT DEF or a scripted
+--       value.  `slotsCaps? (Caps.cSize c) sl` is that connection as a
+--       decidable side condition — every shared def's sizeᵉ and every
+--       scripted slot's payload sizes under cSize, as a RECURSIVE walk
+--       over the index list for pathSz?'s reason (a non-matching form
+--       unfolds on a neutral telescope and OOMs).  It threads unchanged
+--       through the whole tree, exactly as `2 ≤ cSize c` and
+--       `1 ≤ cReg c` do, because slots never change during a run; and it
+--       is supplied by slotsCaps?-capsAt, which the recurrence proves:
+--       every payload is a summand of its slot's slotSize, every
+--       slotSize a summand of slotsSize, and slotsSize a summand of the
+--       base, which iterSize only grows.  What is left is the CLAUSE.
 --
 -- WHAT THE stepFrame GRIND FOUND, and it is a live problem rather than
 -- a gap: `sizeStep S s = S * suc (2 * s)` is size-subΘᵉ's bound, the cost
