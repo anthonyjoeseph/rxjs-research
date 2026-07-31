@@ -395,17 +395,31 @@ frameStep j c =
 -- delivery is sent not to the set of registrations it visits but to the
 -- PAIR (the pre-state registrations it visits, an index for which minted
 -- registrations it went through).  The first coordinate ranges over
--- subsets of the entry registry — `2 ^ cReg` of them — and the second is
--- bounded by cSize, because a minted registration is born of a subscribe
--- inside ONE frame and a frame's step function can name no more sources
--- than its own syntax holds.  That gives
+-- subsets of the entry registry — `2 ^ cReg` of them.
 --
---     deliveries ≤ 2 ^ cReg * cSize      frames per delivery ≤ cSize
+-- THE SECOND COORDINATE IS NOT BOUNDED BY cSize, and that was the second
+-- thing measured false here.  It was first stated so, on the reasoning
+-- that a mint is born of a subscribe inside ONE frame and a frame's step
+-- function can name no more sources than its own syntax holds.
+-- Mint-Loop-Probe's MEASUREMENT 6 computes the coordinate directly — the
+-- fibre of a pre-state class — and gets 4 against a cSize of 3 on the
+-- lean two-level ladder and 8 against 3 on the lean three-level one.
+-- The lean families exist for exactly this: they keep the delivery
+-- structure and shrink the syntax the cap is read off.
 --
--- and the count is their product: `2 ^ cReg * cSize * cSize`.  Every row
--- of Mint-Loop-Probe gates the left factor (176 ≤ 128 * 18) and every row
--- of its MEASUREMENT 5 gates the product against j itself, worst case
--- 324 against 2 ^ 7 * 8 * 8.
+-- SO BOTH COORDINATES RANGE OVER SUBSETS OF THE ENTRY REGISTRY.  A
+-- delivery is determined by the pre-state registrations it visits
+-- together with the pre-state registrations whose dispatches minted the
+-- ones it visits — every mint happens during some delivery and every
+-- delivery bottoms out at a pre-state chain, so the second coordinate is
+-- pre-state data too.  That is a story and not yet a proof: it does not
+-- on its own show the recursion bottoms out.  It gives
+--
+--     deliveries ≤ 2 ^ cReg * 2 ^ cReg    frames per delivery ≤ cSize
+--
+-- and the count is their product: `2 ^ cReg * 2 ^ cReg * cSize`.
+-- MEASUREMENT 6 gates both coordinates (22 against 128, 13 against 32)
+-- and MEASUREMENT 5 gates the product against j itself.
 --
 -- The bound is over SUBSETS of registrations, not over branchings, so
 -- m-ary fan-in does not beat it: extra fan-in only adds edges, and the
@@ -446,7 +460,7 @@ frameStep j c =
 -- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
 -- nothing else, so round3b-ledger-reset-absurd stays unavailable
 frameBlowup : Caps → Caps
-frameBlowup c = frameStep (2 ^ Caps.cReg c * Caps.cSize c * Caps.cSize c) c
+frameBlowup c = frameStep (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) c
 
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
@@ -1044,7 +1058,7 @@ postulate
 --   (i)   cascadeGo-charge      j ≤ D * cSize
 --   (ii)  cascadeGo-deliveries  D ≤ preClasses * fibreCap
 --   (iii) preClasses-bound      preClasses ≤ 2 ^ cReg
---         fibreCap-bound        fibreCap   ≤ cSize
+--         fibreCap-bound        fibreCap   ≤ 2 ^ cReg
 --
 -- and `cascadeGo-caps` below is their product, by arithmetic and nothing
 -- else.  (i) is the per-delivery charge: every fold is a frame on some
@@ -1058,14 +1072,20 @@ postulate
 -- WHICH LEG IS WHICH.  `preClasses` is the leg with a known proof
 -- strategy: the INVERTED PAIR argument sited at `frameBlowup`, giving
 -- one class per subset of the entry registry.  `fibreCap` is THE DAMPER
--- and it is the leg with no formal counterpart yet — the claim that only
--- cSize-many deliveries can share a pre-state class, because a minted
--- registration is born of a subscribe inside ONE frame and that frame's
--- step function can name no more sources than its own syntax holds.  It
--- is the reason the count needed a second cSize: without the second
--- coordinate the bound is not loose, it is FALSE (Mint-Loop-Probe's
--- three-level lean ladder delivers 176 times out of an entry registry of
--- 7, and 2 ^ 7 = 128).
+-- and it is the leg with no formal counterpart — it says how many
+-- deliveries can share a pre-state class, which is exactly the question
+-- the mint loop makes hard.  Without the second coordinate the bound is
+-- not loose, it is FALSE (Mint-Loop-Probe's three-level lean ladder
+-- delivers 176 times out of an entry registry of 7, and 2 ^ 7 = 128).
+--
+-- THE DAMPER HAS ALREADY BEEN REFUTED ONCE AT THIS SITE, which is what
+-- the split was built for.  It was first stated `fibreCap ≤ cSize`, on
+-- the reasoning that a mint happens inside one frame; MEASUREMENT 6 gave
+-- the coordinate a definition, measured it, and got 4 against a cSize of
+-- 3 and 8 against a cSize of 3 on the two lean ladders.  The statement
+-- changed, in place, and nothing else in the assembly moved — no clause
+-- proof was invalidated, because there were none to invalidate.  That is
+-- the whole return on stating the assembly before grinding it.
 --
 -- WHAT THE SPLIT DOES AND DOES NOT BUY.  `preClasses` and `fibreCap` are
 -- postulated as FUNCTIONS here, so (ii) + (iii) together are no stronger
@@ -1150,15 +1170,19 @@ postulate
     preClasses a id chains sched st ≤ 2 ^ Caps.cReg c
 
   -- (iii-b) THE DAMPER, and the one statement here with no proof
-  -- strategy behind it: only cSize-many deliveries share a pre-state
-  -- class, because a mint happens inside one frame and a frame's step
-  -- function names no more sources than its syntax holds
+  -- strategy behind it: how many deliveries share a pre-state class.
+  -- The intended content is that the minted registrations a path goes
+  -- through are themselves indexed by the pre-state registrations whose
+  -- dispatches minted them — every mint happens during some delivery and
+  -- every delivery bottoms out at a pre-state chain — so the second
+  -- coordinate is pre-state data too.  `≤ cSize` was tried here first
+  -- and MEASUREMENT 6 refuted it
   fibreCap-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     capsOK? c sched st ≡ true →
-    fibreCap a id chains sched st ≤ Caps.cSize c
+    fibreCap a id chains sched st ≤ 2 ^ Caps.cReg c
 
 -- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -1172,7 +1196,7 @@ cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   length chains ≤ Caps.cReg c →
   let r = cascadeGo a id chains sched st
-  in Σ ℕ λ j → (j ≤ 2 ^ Caps.cReg c * Caps.cSize c * Caps.cSize c)
+  in Σ ℕ λ j → (j ≤ 2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
   proj₁ CH
@@ -1366,13 +1390,13 @@ postulate
 -- what makes caps-tick the j = full case of (a) rather than a
 -- separate claim
 frameStep-full : ∀ (c : Caps) →
-  frameStep (2 ^ Caps.cReg c * Caps.cSize c * Caps.cSize c) c ≡ frameBlowup c
+  frameStep (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
 frameStep-full c = refl
 
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
-    ≡ frameStep (2 ^ Caps.cReg (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+    ≡ frameStep (2 ^ Caps.cReg (capsAt e sl id) * 2 ^ Caps.cReg (capsAt e sl id)
                    * Caps.cSize (capsAt e sl id))
                 (capsAt e sl id)
 capsAt-suc-full e sl id = refl
@@ -1387,7 +1411,7 @@ capsAt-suc-full e sl id = refl
 2≤frameBlowup-size : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 2 ≤ Caps.cSize (frameBlowup c)
 2≤frameBlowup-size c h =
   ≤-trans h (iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h)
-               (2 ^ Caps.cReg c * Caps.cSize c * Caps.cSize c) (Caps.cSize c))
+               (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) (Caps.cSize c))
 
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)

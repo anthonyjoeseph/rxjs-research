@@ -93,8 +93,8 @@
 -- cascadeGo-caps, the cascade bookends and the chain snapshot are all
 -- ground.
 --
--- The thirteenth, subscribeInner-caps, is PROVEN — the grind's first
--- clause, taken first because it was the most uncertain: the *All edge
+-- subscribeInner-caps is PROVEN — the caps grind's first clause, taken
+-- first because it was the most uncertain: the *All edge
 -- where the inner observable comes off a burst payload rather than the
 -- syntax, so every hypothesis it feeds back into subscribeE-caps has to
 -- come from valCaps? and from κ extended by one frame.  It closes.
@@ -104,7 +104,7 @@
 -- changes it here, cheaply, instead of invalidating a pile of finished
 -- clause proofs.  Two things follow immediately, and both are the point.
 --
--- caps-tick is NOT among the twenty-three — it is derived, four lines of
+-- caps-tick is NOT among the nineteen — it is derived, four lines of
 -- assembly over the cascade companions.  And the joint the round was
 -- about (does one cascade's fold count FIT the recurrence's iteration
 -- budget?) is now a named conjunct of cascadeGo-caps rather than
@@ -114,12 +114,16 @@
 -- beat it exponentially), and `2 ^ cReg * cSize`, whose middle step
 -- Mint-Loop-Probe measured false — a mid-cascade mint puts the path
 -- count's R above cReg, and 176 deliveries came out of a 7-registration
--- entry state.  The count is now `2 ^ cReg * cSize * cSize`, the second
--- cSize paying for the injection's second coordinate.  cascadeGo-caps
--- itself is no longer postulated: it is the product of three named
--- pieces — the per-delivery charge, the injection, and the two
--- coordinate bounds — one of which (fibreCap-bound, the damper) is the
--- only one with no proof strategy behind it yet.
+-- entry state.  The count is now `2 ^ cReg * 2 ^ cReg * cSize`: the
+-- second coordinate was tried at cSize and refuted too (MEASUREMENT 6
+-- computes the fibre of a pre-state class and gets 4 against a cSize of
+-- 3), so both coordinates range over subsets of the entry registry.
+-- cascadeGo-caps itself is no longer postulated: it is the product of
+-- three named pieces — the per-delivery charge, the injection, and the
+-- two coordinate bounds — one of which (fibreCap-bound, the damper) is
+-- the only one with no proof strategy behind it.  Stating it that way is
+-- what let the cSize version of the damper be refuted and replaced IN
+-- PLACE, the same day it was written, with no clause proof lost.
 --
 -- caps-frame, likewise, was refuted as uninstantiable (same-level
 -- preservation is false: the subscribe frame itself folds) and split
@@ -141,9 +145,10 @@
 -- slot count while every Caps component stays linear.  And a fifth, from
 -- Mint-Loop-Probe, which measured `j` rather than the deliveries the
 -- earlier probes stood in for and found the path count's `2 ^ cReg`
--- middle step false: the count is `2 ^ cReg * cSize * cSize`, delivery
--- paths (subsets of the ENTRY registry, times a bounded index for the
--- minted registrations a path went through) times frames per path.
+-- middle step false: the count is `2 ^ cReg * 2 ^ cReg * cSize`,
+-- delivery paths (subsets of the ENTRY registry, times an index for the
+-- minted registrations a path went through, itself pre-state data) times
+-- frames per path.
 -- frameStep and its whole monotonicity toolkit are parametric in the
 -- count, so both landed in frameBlowup alone.  Round 3's face is
 -- untouched — it was only ever missing something to instantiate Ŝ, R̂, F

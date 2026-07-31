@@ -66,19 +66,22 @@
 --       refuted, so `D * cSize ≤ 2 ^ cReg * cSize` is unavailable, and
 --       with it the whole "paths × frames-per-path" route.
 --
---       What every row of this file DOES gate is one step weaker and
---       still enough:  D ≤ 2 ^ cReg * cSize.  That is the injection with
---       a SECOND COORDINATE — deliveries into (subset of the pre-state
---       registry) × (an index below cSize) — rather than into subsets
---       alone.  176 ≤ 128 * 18 with three orders of room.
+--       What survives is the same injection with a SECOND COORDINATE:
+--       deliveries into (subset of the pre-state registry) × (an index)
+--       rather than into subsets alone.
 --
---   (5) SO THE COUNT IS `2 ^ cReg * cSize * cSize`, one cSize for the
---       delivery bound and one for the frames a delivery costs.  j is
---       measured against it in MEASUREMENT 5 and the worst row in the
---       file uses a thirty-second of it.
+--   (5) AND THE SECOND COORDINATE IS NOT BOUNDED BY cSize EITHER.  It was
+--       first stated so — a mint happens inside one frame, and a frame's
+--       step function names no more sources than its syntax holds — and
+--       MEASUREMENT 6 measures it directly (the fibre of the pre-state
+--       class) and finds 4 against a cSize of 3 on the lean two-level
+--       ladder, 8 against 3 on the lean three-level one.  Both
+--       coordinates are therefore stated over subsets of the ENTRY
+--       registry, and the count is `2 ^ cReg * 2 ^ cReg * cSize`.
 --
 --   (6) j DOES NOT FALL MONOTONICALLY IN k, which the D-only reading of
---       this file claimed.  L = 3 lean, j / (2 ^ cReg * cSize):
+--       this file claimed.  L = 3 lean, j against the intermediate
+--       `2 ^ cReg * cSize`:
 --
 --         k        0     1     2     3     4     5     6
 --         j       58   226   548   912  1164  1268  1291
@@ -129,8 +132,8 @@
 module Mint-Loop-Probe where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤ᵇ_; _≡ᵇ_; _⊔_)
-open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; sum; map; length; foldr; any)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
+open import Data.List using (List; []; _∷_; _++_; sum; map; length; foldr; any)
 open import Data.Vec  using (lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Fin  using (Fin) renaming (zero to fz; suc to fsuc)
 open import Data.Sum  using (inj₁; inj₂)
@@ -263,71 +266,83 @@ mFolds fuel e ins = length (EvalSt.delivered (postAt fuel e ins))
 -- and not a proof
 ------------------------------------------------------------------
 
+-- a DELIVERY DESCRIPTOR: the registrations on the path from the root
+-- chain down to this delivery, deepest first.  This is the object the
+-- injection at `cascadeGo-deliveries` sends somewhere, made concrete, so
+-- that `preClasses` and `fibreCap` stop being opaque and start being
+-- measurable
+Desc : Set
+Desc = List RegId
+
 fpFolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-        → Gas → ℕ → Id → Tick → Path Γ u t → List (Val Γ u) → Bool
-        → Sched Γ → EvalSt e → ℕ × Sched Γ × EvalSt e
+        → Gas → ℕ → Id → Tick → Desc → Path Γ u t → List (Val Γ u) → Bool
+        → Sched Γ → EvalSt e → ℕ × List Desc × Sched Γ × EvalSt e
 
 dsFolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        → Gas → ℕ → Id → Tick → (i : Fin n)
+        → Gas → ℕ → Id → Tick → Desc → (i : Fin n)
         → List (Val Γ (lookup Γ i)) → Bool
-        → Sched Γ → EvalSt e → ℕ × Sched Γ × EvalSt e
+        → Sched Γ → EvalSt e → ℕ × List Desc × Sched Γ × EvalSt e
 
 sgFolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        → Gas → ℕ → Id → Tick → (i : Fin n)
+        → Gas → ℕ → Id → Tick → Desc → (i : Fin n)
         → List (Val Γ (lookup Γ i)) → Bool
         → List (RegId × Path Γ (lookup Γ i) t)
-        → Sched Γ → EvalSt e → ℕ × Sched Γ × EvalSt e
+        → Sched Γ → EvalSt e → ℕ × List Desc × Sched Γ × EvalSt e
 
-fpFolds sf gas id now root vals fin sched st = 0 , sched , st
-fpFolds sf gas id now (share-sink i) vals fin sched st =
-  dsFolds sf gas id now i vals fin sched st
-fpFolds sf gas id now (f ↠ p) vals fin sched st =
+fpFolds sf gas id now acc root vals fin sched st = 0 , [] , sched , st
+fpFolds sf gas id now acc (share-sink i) vals fin sched st =
+  dsFolds sf gas id now acc i vals fin sched st
+fpFolds sf gas id now acc (f ↠ p) vals fin sched st =
   let (vals′ , _ , fin′ , sched₁ , st₁) = stepFrame sf id now f p vals fin sched st
-      (m , sched₂ , st₂) = fpFolds sf gas id now p vals′ fin′ sched₁ st₁
-  in suc m , sched₂ , st₂
+      (m , ds , sched₂ , st₂) = fpFolds sf gas id now acc p vals′ fin′ sched₁ st₁
+  in suc m , ds , sched₂ , st₂
 
-dsFolds sf zero id now i vals fin sched st = 0 , sched , st
-dsFolds sf (suc gas) id now i vals fin sched st =
-  let (m , sched₁ , st₁) =
-        sgFolds sf gas id now i vals fin
+dsFolds sf zero id now acc i vals fin sched st = 0 , [] , sched , st
+dsFolds sf (suc gas) id now acc i vals fin sched st =
+  let (m , ds , sched₁ , st₁) =
+        sgFolds sf gas id now acc i vals fin
           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
       (_ , sched₂ , st₂) = shareFinish i fin ([] , sched₁ , st₁)
-  in m , sched₂ , st₂
+  in m , ds , sched₂ , st₂
 
-sgFolds sf gas id now i vals fin []               sched st = 0 , sched , st
-sgFolds sf gas id now i vals fin ((rid , p) ∷ ps) sched st
+sgFolds sf gas id now acc i vals fin []               sched st = 0 , [] , sched , st
+sgFolds sf gas id now acc i vals fin ((rid , p) ∷ ps) sched st
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true  = sgFolds sf gas id now i vals fin ps sched st
+... | true  = sgFolds sf gas id now acc i vals fin ps sched st
 ... | false =
-  let (m₁ , sched₁ , st₁) =
-        fpFolds sf gas id now p vals fin sched
+  let d = rid ∷ acc
+      (m₁ , ds₁ , sched₁ , st₁) =
+        fpFolds sf gas id now d p vals fin sched
                 (record st { delivered = rid ∷ EvalSt.delivered st })
-      (m₂ , sched₂ , st₂) = sgFolds sf gas id now i vals fin ps sched₁ st₁
-  in m₁ + m₂ , sched₂ , st₂
+      (m₂ , ds₂ , sched₂ , st₂) = sgFolds sf gas id now acc i vals fin ps sched₁ st₁
+  in m₁ + m₂ , d ∷ (ds₁ ++ ds₂) , sched₂ , st₂
 
 csFolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t)
-        → Sched Γ → EvalSt e → ℕ × Sched Γ × EvalSt e
-csFolds a id []                   sched st = 0 , sched , st
+        → Sched Γ → EvalSt e → ℕ × List Desc × Sched Γ × EvalSt e
+csFolds a id []                   sched st = 0 , [] , sched , st
 csFolds {n = n} {e = e} a id ((rid , c) ∷ chains) sched st
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true  = csFolds a id chains sched st
 ... | false =
-  let (m₁ , sched₁ , st₁) =
-        fpFolds (budgetAt e (Sched.slots sched) id) n id (arrTick a) c
+  let d = rid ∷ []
+      (m₁ , ds₁ , sched₁ , st₁) =
+        fpFolds (budgetAt e (Sched.slots sched) id) n id (arrTick a) d c
                 (arrVal a ∷ []) (Arrival.isLast a) sched
                 (record st { delivered = rid ∷ EvalSt.delivered st })
-      (m₂ , sched₂ , st₂) = csFolds a id chains sched₁ st₁
-  in m₁ + m₂ , sched₂ , st₂
+      (m₂ , ds₂ , sched₂ , st₂) = csFolds a id chains sched₁ st₁
+  in m₁ + m₂ , d ∷ (ds₁ ++ ds₂) , sched₂ , st₂
 
+-- the run: the frames, the descriptors, the post-state, and the RegIds
+-- the ENTRY registry held — the pre-state the first coordinate reads
 jAt : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
-    → ℕ × EvalSt e
+    → ℕ × List Desc × EvalSt e × List RegId
 jAt fuel e ins with runSt fuel e ins
 ... | nid , sched , st with sched-next sched
-...   | inj₁ _            = 0 , st
+...   | inj₁ _            = 0 , [] , st , []
 ...   | inj₂ (a , sched′) =
-        let (m , _ , st′) = csFolds a nid (chainsOf a st) sched′ (cascadeLatch a st)
-        in m , st′
+        let (m , ds , _ , st′) = csFolds a nid (chainsOf a st) sched′ (cascadeLatch a st)
+        in m , ds , st′ , map proj₁ (EvalSt.registry st)
 
 -- the frames one cascade steps
 mJ : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
@@ -335,7 +350,71 @@ mJ fuel e ins = proj₁ (jAt fuel e ins)
 
 -- the same walk's delivery ledger, for the faithfulness check
 mJdel : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
-mJdel fuel e ins = length (EvalSt.delivered (proj₂ (jAt fuel e ins)))
+mJdel fuel e ins = length (EvalSt.delivered (proj₁ (proj₂ (proj₂ (jAt fuel e ins)))))
+
+-- and the descriptor count, which must agree with it: one descriptor per
+-- delivery is the whole point
+mJdesc : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mJdesc fuel e ins = length (proj₁ (proj₂ (jAt fuel e ins)))
+
+------------------------------------------------------------------
+-- THE TWO COORDINATES, DEFINED.  `cascadeGo-deliveries` postulates the
+-- injection `delivery ↦ (pre-state class, index)` and bounds the two
+-- coordinates separately at `preClasses-bound` and `fibreCap-bound`.
+-- Both coordinates are opaque FUNCTIONS in the assembly, which means the
+-- split locates work without proving anything — so here they are given
+-- definitions and measured, which is the cheapest way to find out
+-- whether `fibreCap ≤ cSize` is even true before anyone proves it.
+--
+-- The class of a delivery is the sub-list of its descriptor lying in the
+-- ENTRY registry; the fibre of a class is how many deliveries share it
+------------------------------------------------------------------
+
+memN : ℕ → List ℕ → Bool
+memN x xs = any (_≡ᵇ x) xs
+
+bfilter : (ℕ → Bool) → List ℕ → List ℕ
+bfilter p []       = []
+bfilter p (x ∷ xs) = if p x then x ∷ bfilter p xs else bfilter p xs
+
+eqNL : List ℕ → List ℕ → Bool
+eqNL []       []       = true
+eqNL []       (_ ∷ _)  = false
+eqNL (_ ∷ _)  []       = false
+eqNL (x ∷ xs) (y ∷ ys) = (x ≡ᵇ y) ∧ eqNL xs ys
+
+memNL : List ℕ → List (List ℕ) → Bool
+memNL x []       = false
+memNL x (y ∷ ys) = eqNL x y ∨ memNL x ys
+
+nubGo : List (List ℕ) → List (List ℕ) → List (List ℕ)
+nubGo seen []       = seen
+nubGo seen (x ∷ xs) = nubGo (if memNL x seen then seen else x ∷ seen) xs
+
+countNL : List ℕ → List (List ℕ) → ℕ
+countNL x []       = 0
+countNL x (y ∷ ys) = (if eqNL x y then 1 else 0) + countNL x ys
+
+maxFib : List (List ℕ) → List (List ℕ) → ℕ
+maxFib []       all = 0
+maxFib (c ∷ cs) all = countNL c all ⊔ maxFib cs all
+
+classesOf : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
+          → List Desc
+classesOf fuel e ins with jAt fuel e ins
+... | _ , ds , _ , pre = map (bfilter (λ r → memN r pre)) ds
+
+-- the first coordinate's range: how many distinct pre-state classes the
+-- cascade's deliveries actually occupy.  `preClasses-bound` claims this
+-- is at most 2 ^ cReg
+mPre : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mPre fuel e ins = length (nubGo [] (classesOf fuel e ins))
+
+-- the second coordinate's range: the largest fibre.  `fibreCap-bound`
+-- claims this is at most cSize, and that claim is the DAMPER
+mFib : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mFib fuel e ins =
+  let cls = classesOf fuel e ins in maxFib (nubGo [] cls) cls
 
 ------------------------------------------------------------------
 -- THE SHAPES
@@ -890,4 +969,148 @@ _ : (58 * 10 ≤ᵇ 2 ^ 7 * 3 * 3) ≡ true
 _ = refl
 
 _ : (912 * 10 ≤ᵇ 2 ^ 7 * 26 * 26) ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- MEASUREMENT 6: THE TWO COORDINATES, AND THE DAMPER AS FIRST STATED
+-- IS FALSE.
+--
+-- `cascadeGo-deliveries` sends a delivery to (its pre-state class, an
+-- index), `preClasses-bound` caps the first coordinate at 2 ^ cReg and
+-- `fibreCap-bound` caps the second.  The second was first stated at
+-- cSize, on the reasoning that a mint happens inside ONE frame and a
+-- frame's step function names no more sources than its syntax holds.
+-- Measured, that is wrong twice — and wrong on the LEAN families, which
+-- is the point of them: they keep the whole delivery structure while
+-- shrinking the syntax the cap is read off.
+--
+--   program   cReg  cSize    D   mPre  2^cReg   mFib
+--   pG′  0      3      8     5      4      8      2
+--   pG′  1      3     22     5      4      8      2
+--   pG′  2      3     36     5      4      8      2
+--   pG′² 0      5      8    20     10     32      7
+--   pG′² 1      5     22    26     10     32     12
+--   pG′² 2      5     36    27     10     32     13
+--   pL²  0      5      3    16     10     32      4     ← 4 > 3
+--   pL²  2      5     18    21     10     32      8
+--   pL²  4      5     34    21     10     32      8
+--   pL³  0      7      3    50     22    128      8     ← 8 > 3
+--
+-- WHAT REPLACES IT.  Both coordinates now range over subsets of the
+-- ENTRY registry: a delivery is determined by the pre-state
+-- registrations it visits TOGETHER WITH the pre-state registrations
+-- whose dispatches minted the ones it visits.  Every mint happens during
+-- some delivery and every delivery bottoms out at a pre-state chain, so
+-- the second coordinate is pre-state data too — which is a story rather
+-- than a curve fit, though it is still only a story: it is not a proof
+-- that the recursion bottoms out, and `fibreCap-bound` is postulated.
+-- The count becomes `2 ^ cReg * 2 ^ cReg * cSize`.
+--
+-- Note the first coordinate is nowhere near its cap (22 against 128) and
+-- the second is nowhere near the new one (13 against 32).  It is the
+-- SHAPE that is at issue, not the slack
+------------------------------------------------------------------
+
+-- one descriptor per delivery, which is what makes them a reindexing of
+-- the ledger rather than a separate walk
+_ : mJdesc 0 (pG′ 0) insG ≡ 5
+_ = refl
+
+_ : mJdesc 0 (pG′² 0) insG² ≡ 20
+_ = refl
+
+_ : mPre 0 (pG′ 0) insG ≡ 4
+_ = refl
+
+_ : mFib 0 (pG′ 0) insG ≡ 2
+_ = refl
+
+_ : mPre 0 (pG′ 1) insG ≡ 4
+_ = refl
+
+_ : mFib 0 (pG′ 1) insG ≡ 2
+_ = refl
+
+_ : mPre 0 (pG′ 2) insG ≡ 4
+_ = refl
+
+_ : mFib 0 (pG′ 2) insG ≡ 2
+_ = refl
+
+_ : mS 0 (pG′ 2) insG ≡ 36
+_ = refl
+
+_ : mPre 0 (pG′² 0) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pG′² 0) insG² ≡ 7
+_ = refl
+
+_ : mPre 0 (pG′² 1) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pG′² 1) insG² ≡ 12
+_ = refl
+
+_ : mPre 0 (pG′² 2) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pG′² 2) insG² ≡ 13
+_ = refl
+
+_ : mPre 0 (pL² 0) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pL² 0) insG² ≡ 4
+_ = refl
+
+_ : mPre 0 (pL² 2) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pL² 2) insG² ≡ 8
+_ = refl
+
+_ : mPre 0 (pL² 4) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pL² 4) insG² ≡ 8
+_ = refl
+
+_ : mPre 0 (pL³ 0) insG³ ≡ 22
+_ = refl
+
+_ : mFib 0 (pL³ 0) insG³ ≡ 8
+_ = refl
+
+-- THE REFUTATION: the fibre is over cSize on both lean families
+_ : (4 ≤ᵇ 3) ≡ false
+_ = refl
+
+_ : (8 ≤ᵇ 3) ≡ false
+_ = refl
+
+-- AND THE REPAIRED BOUNDS: both coordinates under 2 ^ cReg
+_ : (4 ≤ᵇ 2 ^ 3) ≡ true
+_ = refl
+
+_ : (2 ≤ᵇ 2 ^ 3) ≡ true
+_ = refl
+
+_ : (10 ≤ᵇ 2 ^ 5) ≡ true
+_ = refl
+
+_ : (13 ≤ᵇ 2 ^ 5) ≡ true
+_ = refl
+
+_ : (22 ≤ᵇ 2 ^ 7) ≡ true
+_ = refl
+
+_ : (8 ≤ᵇ 2 ^ 7) ≡ true
+_ = refl
+
+-- and the count they give, against the worst j in the file
+_ : (324 ≤ᵇ 2 ^ 7 * 2 ^ 7 * 8) ≡ true
+_ = refl
+
+_ : (1291 ≤ᵇ 2 ^ 7 * 2 ^ 7 * 50) ≡ true
 _ = refl
