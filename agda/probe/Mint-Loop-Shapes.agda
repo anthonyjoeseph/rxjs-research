@@ -6,8 +6,15 @@
 --
 -- The narrative — what these families are for and what they settled — is
 -- at the head of Mint-Loop-Probe.  Nothing here is checked by anything
--- here; the assertions that give these definitions their meaning are all
--- in that file.
+-- here; the assertions that give these definitions their meaning are in
+-- that file and in Mint-Loop-Frames.
+--
+-- THIS FILE HOLDS TWO MEASUREMENT TABLES (the mints/R_end table and the
+-- L = 4 k-sweep) AND NO ASSERTIONS, so before reading a trend off either
+-- of them, read the STANDING WARNING at the head of Mint-Loop-Probe.  Its
+-- four instances are all cases where a trend read off this family's
+-- shallow rows was false at the next rung, and two of the four are trends
+-- read off the tables below.
 ------------------------------------------------------------------
 module Mint-Loop-Shapes where
 
