@@ -122,17 +122,36 @@
 -- at the top by 1≤capsAt-reg, which the recurrence proves.  The delivery
 -- clique never registers and does not carry it.
 --
--- AND THE *All EDGE IS BLOCKED, one join below.  thruConsume-caps lines
--- up with subscribeInner-caps verbatim and is provable; thruWalk-caps,
--- its caller, is not, because it owes thruConsume-caps a JOINT bound
--- `suc (pathLen κ) + sizeᵛ (obs u) o ≤ cSize` and carries only the two
--- separate ones.  The joint bound cannot be dropped — it is
--- subscribeE-caps's own `pathLen κ + sizeᵉ b ≤ cSize`, which the proven
--- subscribeInner-caps consumes — so it has to be carried down from the
--- top, through stepFrame-caps and the whole GROUND delivery clique, and
--- into regsSz? because shareGo delivers along registered chains.  That
--- is a reshape of the tree and of a state predicate, so it is recorded
--- at the postulate and not made.
+-- AND WHAT IS LEFT OF THE CAPS TREE IS BLOCKED ON TWO THINGS, BOTH
+-- TREE-WIDE, and every remaining companion fails on one or both of them.
+--
+--   (1) THE JOINT BOUND.  subscribeE-caps demands
+--       `pathLen κ + sizeᵉ b ≤ cSize`; the delivery side carries
+--       `pathLen ≤ cSize` and `size ≤ cSize` SEPARATELY, and a chain of
+--       length cSize-1 under a payload of size cSize-1 sums to twice the
+--       cap.  The joint form is round 3's ℓ ledger, `pathLen κ + G ≤ ℓ`,
+--       which the WALK face carries end to end; the caps tree took that
+--       shape on the subscribe side and the separate bounds on the
+--       delivery side, and they meet at stepFrame.  In one sentence: the
+--       delivery side needs the ℓ ledger too.  This is what blocks
+--       thruWalk-caps (thruConsume-caps itself is provable),
+--       concatDrain-caps and innerFinish-caps.
+--
+--   (2) `c` IS NOT TIED TO `sl`.  capsAt's base is
+--       `2 + sizeᵉ e + slotsSize sl`, and the connection is gone by the
+--       time a companion is stated at an abstract `c` — so nothing lets
+--       subscribeE-input-caps bound a SLOT DEF or a scripted value.  The
+--       repair is a decidable side condition on the pair (c , sl),
+--       threaded unchanged as `2 ≤ cSize c` and `1 ≤ cReg c` already are.
+--
+-- sharedConnect is the one subscribe edge that composes without either,
+-- and for the reason that proves the rule: its chain is `share-sink i`,
+-- of length zero, so the joint bound degenerates to the size bound.
+--
+-- Both repairs change the hypothesis telescope of clauses that are
+-- ALREADY GROUND (foldPath / dispatchShare / shareGo / cascadeGo, and
+-- stepFrame-caps), so they are one ruling rather than two clause grinds.
+-- Recorded at the postulates, not made.
 --
 -- WHAT THE stepFrame GRIND FOUND, and it is a live problem rather than
 -- a gap: `sizeStep S s = S * suc (2 * s)` is size-subΘᵉ's bound, the cost

@@ -1250,7 +1250,57 @@ cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
 ------------------------------------------------------------------
 
 postulate
-  -- a share's connect re-enters subscribeE, so this joins the clique
+  -- a share's connect re-enters subscribeE, so this joins the clique.
+  --
+  -- ATTEMPTED AND STOPPED (this leg), and it fails on the SAME thing the
+  -- *All edge does, which is what makes the two one finding rather than
+  -- two.  Its four branches:
+  --
+  --   scripted (hot _)   GROUND-ABLE.  A spent script answers with a
+  --                      one-shot close; a live one registers, which is
+  --                      register-caps and one j.  Needs nothing new.
+  --   shared d           BLOCKED TWICE.  sharedSlot-caps — proven above —
+  --                      wants `sizeᵉ d ≤ cSize` and
+  --                      `pathLen κ + sizeᵉ d ≤ cSize`, and NOTHING in
+  --                      this companion's hypotheses relates the slot
+  --                      telescope to `c`: `d` is `Sched.slots sched i`,
+  --                      and capsOK? never mentions slotsSize.
+  --   scripted (cold …)  BLOCKED ONCE, the same way: oneShotBurst carries
+  --                      the slot's own sync values, and the async tail
+  --                      becomes a LiveSource whose pendings capsOK?
+  --                      bounds by cSize and cWid.  Both are slot data.
+  --
+  -- SO THERE ARE TWO GAPS AND THEY ARE BOTH TREE-WIDE.
+  --
+  -- (1) `c` IS NOT TIED TO `sl`.  capsAt's base is
+  -- `2 + sizeᵉ e + slotsSize sl`, so the connection exists at the top and
+  -- is thrown away by the time a companion is stated at an abstract `c`.
+  -- The repair is a decidable side condition on the PAIR — every slot
+  -- def's size under cSize and its width under cWid — threaded unchanged
+  -- exactly as `2 ≤ Caps.cSize c` and `1 ≤ Caps.cReg c` are, and supplied
+  -- at the top by a capsAt lemma.  Mechanical, but it touches every
+  -- companion's telescope including the four GROUND clique members.
+  --
+  -- (2) THE JOINT BOUND, which is the *All edge's blocker verbatim.
+  -- subscribeE-caps demands `pathLen κ + sizeᵉ b ≤ cSize`; the delivery
+  -- side carries `pathLen ≤ cSize` and `size ≤ cSize` SEPARATELY, and a
+  -- chain of length cSize ∸ 1 under a payload of size cSize ∸ 1 sums to
+  -- twice the cap.  The joint form is not an accident on the subscribe
+  -- side either — it is round 3's ℓ ledger, `pathLen κ + G ≤ ℓ`, which
+  -- the walk face carries END TO END.  The caps tree adopted that shape
+  -- on the subscribe side and only the separate bounds on the delivery
+  -- side, and the two meet at stepFrame.  THE DIAGNOSIS IS THEREFORE
+  -- ONE SENTENCE: the delivery side needs the ℓ ledger too.
+  --
+  -- sharedConnect is the one subscribe edge that composes without it,
+  -- and for a reason that is the exception proving the rule: its chain
+  -- is `share-sink i`, of length ZERO, so the joint bound degenerates to
+  -- the size bound.  That is why the shared-slot pair is ground above
+  -- and this one is not.
+  --
+  -- Neither repair is made here.  Both change the hypothesis telescope
+  -- of clauses that are already ground, so they are one ruling, not two
+  -- clause grinds, and they should be made together or not at all
   subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
