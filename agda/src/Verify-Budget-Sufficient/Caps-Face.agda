@@ -780,6 +780,54 @@ frameStep-⊑-+ : ∀ (c : Caps) → 2 ≤ Caps.cSize c → ∀ (j j′ : ℕ) �
   frameStep j c ⊑ᶜ frameStep (j + j′) c
 frameStep-⊑-+ c hS j j′ = frameStep-mono-j c hS (m≤m+n j j′)
 
+------------------------------------------------------------------
+-- THE ABSORPTION MECHANIC — what replaces the joint bound, and the one
+-- piece of arithmetic the *All edge runs on.
+--
+-- Joint-Probe measured `pathLen κ + sizeᵉ b ≤ cSize` FALSE at the tight
+-- admissible cSize on all seventeen families, and adm + 1 EXACTLY on
+-- every family carrying a scan: the payload being subscribed IS the
+-- stored accumulator, so its size alone already attains the cap and any
+-- chain at all overshoots.  No constant slackening survives that, so the
+-- joint form is gone and the subscribe side carries the two bounds the
+-- delivery side can actually supply, `suc (pathLen κ) ≤ cSize` and
+-- `sizeᵉ b ≤ cSize`, SEPARATELY.
+--
+-- WHY THE INDUCTION STILL CLOSES.  Each *All hop extends the chain by
+-- ONE from-inner frame and PAYS ONE j for it.  One j at least doubles
+-- cSize — frameStep-size-suc says the next level is
+-- `sizeStep S B = S * suc (2 B)`, which for S ≥ 1 dominates `suc B` —
+-- so the +1 the frame adds fits under the stepped cap with room, and
+-- the receipt joins the sum exactly like the fold receipts do.  The
+-- chain grows by one per hop and the cap grows by a factor per hop, so
+-- the two do not race.
+------------------------------------------------------------------
+
+sucB≤sizeStep : ∀ (S B : ℕ) → 1 ≤ S → suc B ≤ sizeStep S B
+sucB≤sizeStep S B hS =
+  ≤-trans (s≤s (s≤2s B))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * B)))))
+                   (*-monoˡ-≤ (suc (2 * B)) hS))
+
+-- ONE HOP: a chain that fits at level j, extended by one frame, fits at
+-- level suc j.  This is the whole content of the repair
+frameStep-chain-suc : ∀ (c : Caps) (j k : ℕ) → 2 ≤ Caps.cSize c →
+  suc k ≤ Caps.cSize (frameStep j c) →
+  suc (suc k) ≤ Caps.cSize (frameStep (suc j) c)
+frameStep-chain-suc c j k 2≤S h =
+  subst (suc (suc k) ≤_) (sym (frameStep-size-suc c j))
+    (≤-trans (s≤s h)
+             (sucB≤sizeStep (Caps.cSize c) (Caps.cSize (frameStep j c))
+                (≤-trans (s≤s z≤n) 2≤S)))
+
+-- and `2 ≤ cSize` survives every level, which the degenerate chains
+-- (root, share-sink — both of length zero) need to discharge their own
+-- `1 ≤ cSize`
+2≤frameStep-size : ∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c →
+  2 ≤ Caps.cSize (frameStep j c)
+2≤frameStep-size c j h =
+  ≤-trans h (iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h) j (Caps.cSize c))
+
 frameSz?-widen : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) {B B′ : ℕ} →
   B ≤ B′ → frameSz? B f ≡ true → frameSz? B′ f ≡ true
 frameSz?-widen (map-f fn)      le h = ≤ᵇ-widen (sizeᵗ fn) le h
@@ -1029,6 +1077,17 @@ postulate
   -- `2 ≤ Caps.cSize c`.  It is threaded UNCHANGED (c never moves inside
   -- a frame, only j does) and supplied once at the top by
   -- 2≤capsAt-size, which the recurrence proves rather than assumes.
+  -- THE CHAIN HYPOTHESIS IS SEPARATE FROM THE SIZE ONE, and that is the
+  -- joint-bound repair (Joint-Probe, 2026-07-31).  What stood here was
+  -- `pathLen κ + sizeᵉ b ≤ cSize` — a JOINT bound the delivery side
+  -- cannot supply, since it carries the two separately and their sum can
+  -- be twice the cap.  Joint-Probe measured the joint form false at the
+  -- tight admissible cSize on all seventeen families, and adm + 1
+  -- EXACTLY on every scan family: the payload being subscribed IS the
+  -- stored accumulator, so it alone attains the cap and any chain at all
+  -- overshoots.  No slackening survives that.  The pair below is what
+  -- foldPath-caps already splits out of pathSz?, and the +1 each *All
+  -- hop adds is absorbed by the j that hop pays — frameStep-chain-suc.
   -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
   -- folds and reports how many.  j′ folds spent means the caps advance
   -- from frameStep j to frameStep (j + j′), never staying put
@@ -1040,7 +1099,7 @@ postulate
     capsOK? (frameStep j c) sched st ≡ true →
     sizeᵉ b ≤ Caps.cSize (frameStep j c) →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    pathLen κ + sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -1252,55 +1311,46 @@ cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
 postulate
   -- a share's connect re-enters subscribeE, so this joins the clique.
   --
-  -- ATTEMPTED AND STOPPED (this leg), and it fails on the SAME thing the
-  -- *All edge does, which is what makes the two one finding rather than
-  -- two.  Its four branches:
+  -- ATTEMPTED AND STOPPED once on TWO blockages.  ONE OF THEM IS GONE.
+  -- Its four branches:
   --
   --   scripted (hot _)   GROUND-ABLE.  A spent script answers with a
   --                      one-shot close; a live one registers, which is
   --                      register-caps and one j.  Needs nothing new.
-  --   shared d           BLOCKED TWICE.  sharedSlot-caps — proven above —
-  --                      wants `sizeᵉ d ≤ cSize` and
-  --                      `pathLen κ + sizeᵉ d ≤ cSize`, and NOTHING in
-  --                      this companion's hypotheses relates the slot
-  --                      telescope to `c`: `d` is `Sched.slots sched i`,
-  --                      and capsOK? never mentions slotsSize.
-  --   scripted (cold …)  BLOCKED ONCE, the same way: oneShotBurst carries
-  --                      the slot's own sync values, and the async tail
-  --                      becomes a LiveSource whose pendings capsOK?
-  --                      bounds by cSize and cWid.  Both are slot data.
+  --   shared d           needs `sizeᵉ d ≤ cSize` for sharedSlot-caps.
+  --   scripted (cold …)  oneShotBurst carries the slot's own sync
+  --                      values, and the async tail becomes a LiveSource
+  --                      whose pendings capsOK? bounds by cSize and
+  --                      cWid.  Both are slot data.
   --
-  -- SO THERE ARE TWO GAPS AND THEY ARE BOTH TREE-WIDE.
+  -- BLOCKAGE 1 — THE JOINT BOUND — IS RESOLVED, by the design ruling of
+  -- 2026-07-31, and the evidence is Joint-Probe.  What blocked here (and
+  -- at thruWalk / concatDrain / innerFinish) was that subscribeE-caps
+  -- demanded `pathLen κ + sizeᵉ b ≤ cSize` while the delivery side
+  -- carries the two bounds SEPARATELY.  The natural-looking repair —
+  -- thread round 3's ℓ ledger through the delivery clique too — was
+  -- gated first, and the gate came back negative: Joint-Probe measures
+  -- the joint sum against the TIGHT admissible cSize on seventeen
+  -- families and it is violated on every one, at adm + 1 EXACTLY on
+  -- every family carrying a scan.  A subscribed payload that IS the
+  -- stored accumulator already attains the cap by itself, so any chain
+  -- on top overshoots and no constant slackening of the ledger survives.
+  -- So the JOINT FORM went, not the delivery side: subscribeE-caps now
+  -- asks for `suc (pathLen κ) ≤ cSize` and `sizeᵉ b ≤ cSize` separately,
+  -- which is exactly what foldPath-caps already splits out of pathSz?.
+  -- The induction still closes because each *All hop PAYS ONE j for the
+  -- from-inner frame it adds, and one j at least doubles cSize
+  -- (frameStep-chain-suc), so a +1 chain extension is absorbed with
+  -- room.  The extra receipt rides in the same sum the fold receipts do.
   --
-  -- (1) `c` IS NOT TIED TO `sl`.  capsAt's base is
-  -- `2 + sizeᵉ e + slotsSize sl`, so the connection exists at the top and
-  -- is thrown away by the time a companion is stated at an abstract `c`.
-  -- The repair is a decidable side condition on the PAIR — every slot
-  -- def's size under cSize and its width under cWid — threaded unchanged
-  -- exactly as `2 ≤ Caps.cSize c` and `1 ≤ Caps.cReg c` are, and supplied
-  -- at the top by a capsAt lemma.  Mechanical, but it touches every
-  -- companion's telescope including the four GROUND clique members.
-  --
-  -- (2) THE JOINT BOUND, which is the *All edge's blocker verbatim.
-  -- subscribeE-caps demands `pathLen κ + sizeᵉ b ≤ cSize`; the delivery
-  -- side carries `pathLen ≤ cSize` and `size ≤ cSize` SEPARATELY, and a
-  -- chain of length cSize ∸ 1 under a payload of size cSize ∸ 1 sums to
-  -- twice the cap.  The joint form is not an accident on the subscribe
-  -- side either — it is round 3's ℓ ledger, `pathLen κ + G ≤ ℓ`, which
-  -- the walk face carries END TO END.  The caps tree adopted that shape
-  -- on the subscribe side and only the separate bounds on the delivery
-  -- side, and the two meet at stepFrame.  THE DIAGNOSIS IS THEREFORE
-  -- ONE SENTENCE: the delivery side needs the ℓ ledger too.
-  --
-  -- sharedConnect is the one subscribe edge that composes without it,
-  -- and for a reason that is the exception proving the rule: its chain
-  -- is `share-sink i`, of length ZERO, so the joint bound degenerates to
-  -- the size bound.  That is why the shared-slot pair is ground above
-  -- and this one is not.
-  --
-  -- Neither repair is made here.  Both change the hypothesis telescope
-  -- of clauses that are already ground, so they are one ruling, not two
-  -- clause grinds, and they should be made together or not at all
+  -- BLOCKAGE 2 IS WHAT IS LEFT: `c` IS NOT TIED TO `sl`.  capsAt's base
+  -- is `2 + sizeᵉ e + slotsSize sl`, so the connection exists at the top
+  -- and is thrown away by the time a companion is stated at an abstract
+  -- `c`.  Nothing in this companion's hypotheses bounds a slot def or a
+  -- scripted value: `d` is `Sched.slots sched i`, and capsOK? never
+  -- mentions slotsSize.  The repair is a decidable side condition on the
+  -- PAIR, threaded unchanged exactly as `2 ≤ Caps.cSize c` and
+  -- `1 ≤ Caps.cReg c` are, and supplied at the top by a capsAt lemma
   subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -1308,6 +1358,7 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (frameStep j c) sched st ≡ true →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     let r = subscribeE g (input i) κ id now sched st
     in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -1323,43 +1374,23 @@ postulate
   -- chain it is subscribed under is κ extended by one from-inner frame,
   -- which is where its length hypothesis has to come from.
   --
-  -- ATTEMPTED AND STOPPED (this leg).  thruConsume-caps is provable —
-  -- its hypotheses line up with subscribeInner-caps's verbatim, and the
-  -- per-op node bookkeeping stores nothing the caps do not already bound
-  -- (merge's counter and switch's current-inner carry no payload;
-  -- concatAll's queue stores the payload VERBATIM, so its bound is the
-  -- valCaps? in hand).  ITS CALLER IS NOT.  thruWalk-caps carries
+  -- THE PAIR THAT REPLACED THE JOINT BOUND, HERE TOO.  thruConsume-caps
+  -- is provable — its hypotheses line up with subscribeInner-caps's
+  -- verbatim, and the per-op node bookkeeping stores nothing the caps do
+  -- not already bound (merge's counter and switch's current-inner carry
+  -- no payload; concatAll's queue stores the payload VERBATIM, so its
+  -- bound is the valCaps? in hand).  What used to block its CALLER was
+  -- that thruWalk-caps carries
   --
   --     all (valCaps? … (obs u)) vals      and     suc (pathLen κ) ≤ cSize
   --
-  -- and owes thruConsume-caps, per element,
-  --
-  --     suc (pathLen κ) + sizeᵛ (obs u) o ≤ cSize
-  --
-  -- which is a JOINT bound and does not follow from the two separate
-  -- ones — `a ≤ B` and `b ≤ B` do not give `a + b ≤ B`, and at a chain
-  -- of length cSize ∸ 1 carrying a payload of size cSize ∸ 1 the sum is
-  -- twice the cap.  So the two postulates in this block do not compose,
-  -- and one of them is wrong as stated.
-  --
-  -- WHICH ONE, AND WHY THE REPAIR IS A RESHAPE RATHER THAN AN EDIT.
-  -- The joint bound cannot be dropped from thruConsume-caps: it is
-  -- exactly subscribeE-caps's `pathLen κ + sizeᵉ b ≤ cSize`, and
-  -- subscribeInner-caps — PROVEN — consumes it.  So thruWalk-caps has to
-  -- carry it, per payload:
-  --
-  --     all (λ o → suc (pathLen κ) + sizeᵛ (obs u) o ≤ᵇ cSize) vals ≡ true
-  --
-  -- and then stepFrame-caps's thru-outer clause owes the same, so
-  -- stepFrame-caps's `suc (pathLen κ) ≤ cSize` becomes the same `all`
-  -- over its own payload list, and foldPath-caps owes THAT — which means
-  -- the joint conjunct enters the delivery clique (foldPath /
-  -- dispatchShare / shareGo / cascadeGo, all four GROUND today) and,
-  -- because shareGo delivers along REGISTERED chains, regsSz? as well.
-  -- That is a change to the tree's shape and to a state predicate, not a
-  -- clause grind, so it is recorded here rather than made.  The tree
-  -- typechecks unchanged; what does not hold is that these two
-  -- postulates can both be true of the same evaluator
+  -- and owed thruConsume-caps the JOINT
+  -- `suc (pathLen κ) + sizeᵛ (obs u) o ≤ cSize`, which does not follow
+  -- from two separate bounds.  Joint-Probe then measured the joint form
+  -- FALSE on real runs at the tight cap, so it is the joint form that
+  -- went: what is owed now is exactly what the caller already has, and
+  -- the hop's chain extension is paid for with a j instead of with cap
+  -- slack (frameStep-chain-suc)
   thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -1369,7 +1400,7 @@ postulate
     capsOK? (frameStep j c) sched st ≡ true →
     valCaps? (frameStep j c) sl (obs u) o ≡ true →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) + sizeᵛ (obs u) o ≤ Caps.cSize (frameStep j c) →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     let r = thruConsume g op nid κ id now o sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c)
@@ -1408,6 +1439,7 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (frameStep j c) sched st ≡ true →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     all (obsCaps? (frameStep j c) sl) q ≡ true →
     let r = concatDrain g allNid κ id now q sched st
     in Σ ℕ λ j′ →
@@ -1429,6 +1461,7 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (frameStep j c) sched st ≡ true →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     all (valCaps? (frameStep j c) sl s) vals ≡ true →
     let r = innerFinish g op allNid inst κ id now vals sched st
               (lookupNode allNid (EvalSt.nodes st))
@@ -1639,6 +1672,14 @@ shareFinish-caps c i true sl (emits , sched′ , st′) inv bc =
 -- It does not.  The clause is two lines: out of gas, nothing happens
 -- (j′ = 0, a dry close, no values); with gas, subscribeE-caps at the
 -- extended path, then split the burst.
+--
+-- AND THIS IS WHERE THE HOP PAYS ITS j.  Under the old joint bound the
+-- clause consumed `suc (pathLen κ) + sizeᵛ (obs u) o ≤ cSize` and built
+-- the extended chain's hypotheses out of its slack — free, and false on
+-- real runs (Joint-Probe).  Now it recurses at level `suc j` instead:
+-- one j buys `sizeStep S B ≥ suc B`, which is the one extra frame, and
+-- the receipt comes back as `suc j₂` rather than `j₂` — `+-suc` is the
+-- only arithmetic the change costs, three times, once per output.
 ------------------------------------------------------------------
 
 -- capsOK? reads slots, live and the store — never the node counter, so
@@ -1707,7 +1748,7 @@ subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   capsOK? (frameStep j c) sched st ≡ true →
   valCaps? (frameStep j c) sl (obs u) o ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-  suc (pathLen κ) + sizeᵛ (obs u) o ≤ Caps.cSize (frameStep j c) →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   let r = subscribeInner g op allNid κ id now o sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -1726,34 +1767,53 @@ subscribeInner-caps c j g0 op allNid κ id now o sl sched st 2≤S slEq inv vC p
             (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched)) sched st inv)
     , refl , refl
 -- WITH GAS: the inner is subscribed under one more frame, at the same
--- instant.  Its size hypothesis is valCaps?'s cSize half (sizeᵛ (obs u)
--- IS sizeᵉ), and its chain hypotheses are κ's, one frame longer — which
--- is exactly what the extra summand in lC pays for
-subscribeInner-caps {t = t} {u = u} c j (gs fuel) op allNid κ id now o sl sched st
-                    2≤S slEq inv vC pC lC =
-  j′ , SUB
-     , splitBurst-vals-caps {s = u} {u = t} (frameStep (j + j′) c) sl burst BC
-     , splitBurst-bk-caps {s = u} {u = t} (frameStep (j + j′) c) sl burst
+-- instant, and at ONE MORE j.  Its size hypothesis is valCaps?'s cSize
+-- half (sizeᵛ (obs u) IS sizeᵉ), widened by the step; its chain
+-- hypothesis is κ's, one frame longer, which is frameStep-chain-suc
+subscribeInner-caps {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ id now o
+                    sl sched st 2≤S slEq inv vC pC lC =
+  suc j₂ , R1 , R2 , R3
   where
   B      = Caps.cSize (frameStep j c)
+  B′     = Caps.cSize (frameStep (suc j) c)
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n j)
   sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
   κ′     = from-inner op allNid (Sched.nextNode sched) ↠ κ
   szo    : sizeᵉ o ≤ B
   szo    = ≤ᵇ⇒≤ (sizeᵛ (obs u) o) B (T-to (proj₁ (∧-true _ _ vC)))
-  pC′    : pathSz? B κ′ ≡ true
+  pC′    : pathSz? B′ κ′ ≡ true
   pC′    = ∧-intro refl
-             (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B)
-                        (≤⇒≤ᵇ (≤-trans (m≤m+n (suc (pathLen κ)) (sizeᵉ o)) lC)))
-                      pC)
-  IH     = subscribeE-caps c j fuel o κ′ id now sl sched₀ st 2≤S slEq
-             (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
-                               sched st inv)
-             szo pC′ lC
-  j′     = proj₁ IH
+             (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                        (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
+                      (pathSz?-⊑ κ step⊑ pC))
+  IH     = subscribeE-caps c (suc j) fuel o κ′ id now sl sched₀ st 2≤S slEq
+             (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
+                (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
+                                  sched st inv))
+             (≤-trans szo (proj₁ step⊑)) pC′
+             (frameStep-chain-suc c j (pathLen κ) 2≤S lC)
+  j₂     = proj₁ IH
   SUB    = proj₁ (proj₂ IH)
   BC     = proj₂ (proj₂ IH)
   res    = subscribeE fuel o κ′ id now sched₀ st
   burst  = proj₁ res
+  VS     = proj₁ (splitBurst {A = Val Γ t} burst)
+  BS     = proj₁ (proj₂ (splitBurst {A = Val Γ t} burst))
+  R1 : capsOK? (frameStep (j + suc j₂) c)
+                (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true
+  R1 = subst (λ x → capsOK? (frameStep x c)
+                      (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+             (sym (+-suc j j₂)) SUB
+  R2 : all (valCaps? (frameStep (j + suc j₂) c) sl u) VS ≡ true
+  R2 = subst (λ x → all (valCaps? (frameStep x c) sl u) VS ≡ true)
+             (sym (+-suc j j₂))
+             (splitBurst-vals-caps {s = u} {u = t} (frameStep (suc j + j₂) c)
+                sl burst BC)
+  R3 : all (eventCaps? (frameStep (j + suc j₂) c) sl) BS ≡ true
+  R3 = subst (λ x → all (eventCaps? (frameStep x c) sl) BS ≡ true)
+             (sym (+-suc j j₂))
+             (splitBurst-bk-caps {s = u} {u = t} (frameStep (suc j + j₂) c)
+                sl burst)
 
 ------------------------------------------------------------------
 -- THE SHARED-SLOT PAIR, GROUND — and the second side condition the
@@ -1848,9 +1908,10 @@ j+1 : ∀ (j : ℕ) → j + 1 ≡ suc j
 j+1 j = trans (+-suc j 0) (cong suc (+-identityʳ j))
 
 -- THE CONNECT.  One registration for the joining subscriber, then the
--- def is subscribed under `share-sink i` — a chain of length zero, so
--- its joint length-and-size hypothesis is the size hypothesis alone,
--- which is exactly why this edge composes where the *All edge does not
+-- def is subscribed under `share-sink i` — a chain of LENGTH ZERO, so
+-- its own chain hypothesis is `1 ≤ cSize` and nothing else has to be
+-- found for it.  That is why this edge composed even under the old
+-- joint bound, and it composes unchanged under the separate pair
 sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
   (κ : Path Γ (lookup Γ i) t)
@@ -1861,7 +1922,7 @@ sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (frameStep j c) sched st ≡ true →
   sizeᵉ d ≤ Caps.cSize (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-  pathLen κ + sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   let r = sharedConnect g i d κ id now sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -1897,7 +1958,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
           refl
-          (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+          (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S))
   j₂  = proj₁ IH
   SUB = proj₁ (proj₂ IH)
   BC  = proj₂ (proj₂ IH)
@@ -1922,7 +1983,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
           refl
-          (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+          (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S))
   j₂  = proj₁ IH
   SUB = proj₁ (proj₂ IH)
   BC  = proj₂ (proj₂ IH)
@@ -1943,7 +2004,7 @@ sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (frameStep j c) sched st ≡ true →
   sizeᵉ d ≤ Caps.cSize (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-  pathLen κ + sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   let r = subscribeSharedSlot g i d κ id now sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -2247,6 +2308,7 @@ innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   Sched.slots sched ≡ sl →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   all (valCaps? (frameStep j c) sl s) vals ≡ true →
   let r = innerReact g op allNid inst κ id now vals sched st fin
   in Σ ℕ λ j′ →
@@ -2256,13 +2318,13 @@ innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      × (all (valCaps? (frameStep (j + j′) c) sl s) (proj₁ r) ≡ true)
      × (all (eventCaps? (frameStep (j + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
 innerReact-caps c j g op allNid inst κ id now vals false sl sched st
-                2≤S slEq inv pS vC =
+                2≤S slEq inv pS lC vC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → all (valCaps? (frameStep x c) sl _) vals ≡ true)
             (sym (+-identityʳ j)) vC
     , refl
 innerReact-caps c j g op allNid inst κ id now vals true sl sched st
-                2≤S slEq inv pS vC
+                2≤S slEq inv pS lC vC
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -2270,7 +2332,7 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
             (sym (+-identityʳ j)) vC
     , refl
 ... | false = innerFinish-caps c j g op allNid inst κ id now vals sl sched st
-                2≤S slEq inv pS vC
+                2≤S slEq inv pS lC vC
 
 ------------------------------------------------------------------
 -- AND THE TWO CLAUSES THAT DO BUILD VALUES, POSTULATED — with what the
@@ -2486,7 +2548,7 @@ stepFrame-caps c j g id now (take-f nid) κ vals fin sl sched st 2≤S slEq inv 
 stepFrame-caps c j g id now (from-inner op allNid inst) κ vals fin sl sched st
                2≤S slEq inv fS pS lC vC =
   innerReact-caps c j g op allNid inst κ id now vals fin sl sched st
-    2≤S slEq inv pS vC
+    2≤S slEq inv pS lC vC
 
 stepFrame-caps c j g id now (thru-outer op nid) κ vals fin sl sched st
                2≤S slEq inv fS pS lC vC =
@@ -2910,12 +2972,11 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- The frame half needs `sizeᵉ b ≤ C` and `pathSz? C κ` because the leaf
 -- registers the whole of κ under the frames it pushed: the naive lemma
 -- is FALSE, since κ = scan-f BIG ↠ root over a tiny b registers BIG.
--- The LENGTH half needs slack rather than mere boundedness — the
--- descent lengthens the chain by one frame per shell of b, so the
--- registered chain is as long as `pathLen κ + sizeᵉ b` and a κ already
--- AT the cap would overflow it.  That slack is what the caller pays for
--- with a j: one frameStep at least doubles cSize (sizeStep C s ≥ 2 s for
--- C ≥ 1), which covers the sum
+-- The LENGTH half needs the chain to have room to GROW, since the
+-- descent lengthens it by one frame per shell of b.  It used to ask for
+-- `pathLen κ + sizeᵉ b ≤ C`, the joint form Joint-Probe refuted; what it
+-- asks for now is the same pair the face does, and the descent's growth
+-- is paid for one frame at a time by the j each hop spends
 postulate
   regsSz?-subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (C : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
@@ -2923,7 +2984,7 @@ postulate
     regsSz? C (EvalSt.registry st) ≡ true →
     sizeᵉ b ≤ C →
     pathSz? C κ ≡ true →           -- the continuation is already bounded
-    pathLen κ + sizeᵉ b ≤ C →      -- and the chain it will GROW into fits
+    suc (pathLen κ) ≤ C →          -- and the chain it will GROW into fits
     let r = subscribeE g b κ bid now sched st
     in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
 

@@ -109,11 +109,10 @@
 -- postulates.
 --
 -- THE SHARED-SLOT PAIR IS PROVEN TOO — sharedSlot-caps and
--- sharedConnect-caps, the share's join and its connect.  They compose
--- where the *All edge does not, and for a structural reason worth
--- naming: the def is subscribed under `share-sink i`, a chain of
--- LENGTH ZERO, so subscribeE-caps's joint `pathLen κ + sizeᵉ b ≤ cSize`
--- is discharged by the size hypothesis alone.  The clause that pays for
+-- sharedConnect-caps, the share's join and its connect.  The def is
+-- subscribed under `share-sink i`, a chain of LENGTH ZERO, so
+-- subscribeE-caps's chain hypothesis degenerates to `1 ≤ cSize` and
+-- costs the clause nothing at all.  The clause that pays for
 -- them is register-caps: registering costs exactly one j, the first
 -- place in the tree a fold is spent on the cReg dimension, and it needs
 -- `1 ≤ Caps.cReg c` — FALSE at cReg c = 0, where cReg (frameStep j c) is
@@ -122,20 +121,36 @@
 -- at the top by 1≤capsAt-reg, which the recurrence proves.  The delivery
 -- clique never registers and does not carry it.
 --
--- AND WHAT IS LEFT OF THE CAPS TREE IS BLOCKED ON TWO THINGS, BOTH
--- TREE-WIDE, and every remaining companion fails on one or both of them.
+-- THE CAPS TREE WAS BLOCKED ON TWO THINGS, BOTH TREE-WIDE.  ONE OF THEM
+-- IS RESOLVED (2026-07-31); the other is next.
 --
---   (1) THE JOINT BOUND.  subscribeE-caps demands
---       `pathLen κ + sizeᵉ b ≤ cSize`; the delivery side carries
---       `pathLen ≤ cSize` and `size ≤ cSize` SEPARATELY, and a chain of
---       length cSize-1 under a payload of size cSize-1 sums to twice the
---       cap.  The joint form is round 3's ℓ ledger, `pathLen κ + G ≤ ℓ`,
---       which the WALK face carries end to end; the caps tree took that
---       shape on the subscribe side and the separate bounds on the
---       delivery side, and they meet at stepFrame.  In one sentence: the
---       delivery side needs the ℓ ledger too.  This is what blocks
---       thruWalk-caps (thruConsume-caps itself is provable),
---       concatDrain-caps and innerFinish-caps.
+--   (1) THE JOINT BOUND — RESOLVED, BY DELETING IT.  subscribeE-caps
+--       demanded `pathLen κ + sizeᵉ b ≤ cSize` while the delivery side
+--       carries `pathLen ≤ cSize` and `size ≤ cSize` SEPARATELY, and a
+--       chain of length cSize-1 under a payload of size cSize-1 sums to
+--       twice the cap.  The obvious repair — thread round 3's ℓ ledger
+--       through the delivery clique too, since the WALK face carries
+--       `pathLen κ + G ≤ ℓ` end to end — was GATED FIRST, and the gate
+--       came back negative.  Joint-Probe measures the joint sum against
+--       the TIGHT admissible cSize (the largest quantity capsOK?
+--       actually forces cSize to dominate on the state reached) over
+--       seventeen families, and it is violated on every one of them —
+--       at adm + 1 EXACTLY on every family carrying a scan, because the
+--       payload being subscribed IS the stored accumulator, so its size
+--       alone already attains the cap and any chain on top overshoots.
+--       No constant slackening of a ledger survives that.
+--
+--       So the JOINT FORM went rather than the delivery side.
+--       subscribeE-caps and every subscribe-side companion now ask for
+--       `suc (pathLen κ) ≤ cSize` and `sizeᵉ b ≤ cSize` separately —
+--       exactly the pair foldPath-caps already splits out of pathSz?.
+--       THE INDUCTION STILL CLOSES BY ABSORPTION: each *All hop extends
+--       the chain by one from-inner frame and PAYS ONE j for it, and one
+--       j at least doubles cSize (frameStep-size-suc: the next level is
+--       `S * suc (2 B)`), so the +1 fits under the stepped cap with room
+--       — frameStep-chain-suc, three lines.  subscribeInner-caps is the
+--       model clause: it now recurses at `suc j` and reports `suc j₂`,
+--       and `+-suc` is the entire cost of the change.
 --
 --   (2) `c` IS NOT TIED TO `sl`.  capsAt's base is
 --       `2 + sizeᵉ e + slotsSize sl`, and the connection is gone by the
@@ -143,15 +158,6 @@
 --       subscribeE-input-caps bound a SLOT DEF or a scripted value.  The
 --       repair is a decidable side condition on the pair (c , sl),
 --       threaded unchanged as `2 ≤ cSize c` and `1 ≤ cReg c` already are.
---
--- sharedConnect is the one subscribe edge that composes without either,
--- and for the reason that proves the rule: its chain is `share-sink i`,
--- of length zero, so the joint bound degenerates to the size bound.
---
--- Both repairs change the hypothesis telescope of clauses that are
--- ALREADY GROUND (foldPath / dispatchShare / shareGo / cascadeGo, and
--- stepFrame-caps), so they are one ruling rather than two clause grinds.
--- Recorded at the postulates, not made.
 --
 -- WHAT THE stepFrame GRIND FOUND, and it is a live problem rather than
 -- a gap: `sizeStep S s = S * suc (2 * s)` is size-subΘᵉ's bound, the cost
