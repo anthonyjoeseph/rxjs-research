@@ -438,9 +438,9 @@ frameStep j c =
 -- one-per-subset count survives it.
 --
 -- The SECOND coordinate is the damper, and it is the one without a
--- formal counterpart: see the assembly at `cascadeGo-deliveries` below,
--- where it is `fibreCap` and where the two coordinates are separated so
--- that resistance shows up in one named place.
+-- formal counterpart, and splitting it off as its own coordinate was
+-- tried and abandoned: see `cascadeGo-deliveries` below, which now
+-- states the delivery bound whole.
 --
 -- cWid IS GONE, and it was never a factor of this count — it bounds how
 -- WIDE one emitted observable is, not how many times a cascade iterates.
@@ -1055,45 +1055,48 @@ postulate
 -- counts, since every delivering clause of `cascadeGo` and `shareGo`
 -- conses one `rid` onto `delivered`.  Then
 --
---   (i)   cascadeGo-charge      j ≤ D * cSize
---   (ii)  cascadeGo-deliveries  D ≤ preClasses * fibreCap
---   (iii) preClasses-bound      preClasses ≤ 2 ^ cReg
---         fibreCap-bound        fibreCap   ≤ 2 ^ cReg
+--   (i)  cascadeGo-charge      j ≤ D * cSize
+--   (ii) cascadeGo-deliveries  D ≤ 2 ^ cReg * 2 ^ cReg
 --
 -- and `cascadeGo-caps` below is their product, by arithmetic and nothing
 -- else.  (i) is the per-delivery charge: every fold is a frame on some
 -- delivery's chain, and a chain is shorter than cSize by pathSz?'s own
 -- length conjunct — this is the half the induction already carries, in
--- the shape `foldPath-caps` reports it.  (ii) is THE INJECTION: a
--- delivery goes to the pair (which PRE-STATE registrations its path
--- visits, an index for which minted ones it went through).  (iii) bounds
--- the two coordinates separately.
+-- the shape `foldPath-caps` reports it.  (ii) is the delivery bound, and
+-- it is where all the difficulty is.
 --
--- WHICH LEG IS WHICH.  `preClasses` is the leg with a known proof
--- strategy: the INVERTED PAIR argument sited at `frameBlowup`, giving
--- one class per subset of the entry registry.  `fibreCap` is THE DAMPER
--- and it is the leg with no formal counterpart — it says how many
--- deliveries can share a pre-state class, which is exactly the question
--- the mint loop makes hard.  Without the second coordinate the bound is
--- not loose, it is FALSE (Mint-Loop-Probe's three-level lean ladder
--- delivers 176 times out of an entry registry of 7, and 2 ^ 7 = 128).
+-- (ii) WAS SPLIT AND THE SPLIT DIED, twice, in one session — which is
+-- what stating it as an assembly was for.  The split sent a delivery to
+-- the PAIR (which pre-state registrations its path visits, an index for
+-- which minted ones it went through), with `preClasses ≤ 2 ^ cReg` on the
+-- first coordinate and a DAMPER on the second.  Mint-Loop-Probe gave both
+-- coordinates definitions and measured them:
 --
--- THE DAMPER HAS ALREADY BEEN REFUTED ONCE AT THIS SITE, which is what
--- the split was built for.  It was first stated `fibreCap ≤ cSize`, on
--- the reasoning that a mint happens inside one frame; MEASUREMENT 6 gave
--- the coordinate a definition, measured it, and got 4 against a cSize of
--- 3 and 8 against a cSize of 3 on the two lean ladders.  The statement
--- changed, in place, and nothing else in the assembly moved — no clause
--- proof was invalidated, because there were none to invalidate.  That is
--- the whole return on stating the assembly before grinding it.
+--   · `fibreCap ≤ cSize` — the reasoning was that a mint happens inside
+--     ONE frame and a frame's step function names no more sources than
+--     its syntax holds.  Measured 4 against a cSize of 3 on the lean
+--     two-level ladder.  Refuted.
+--   · `fibreCap ≤ 2 ^ cReg` — the reasoning was that every mint happens
+--     during some delivery and every delivery bottoms out at a pre-state
+--     chain, so the second coordinate is pre-state data too.  It ATTAINS
+--     128 against 128 on the three-level ladder and then reaches 576
+--     against a cap of 512 on the four-level one.  Refuted.
 --
--- WHAT THE SPLIT DOES AND DOES NOT BUY.  `preClasses` and `fibreCap` are
--- postulated as FUNCTIONS here, so (ii) + (iii) together are no stronger
--- than the product they imply — the split does not prove anything, it
--- LOCATES the work, and it becomes a real decomposition only when the two
--- get definitions off a reified traversal.  That is deliberate: it is the
--- cheapest arrangement in which the damper can fail visibly, at
--- `fibreCap-bound`, without invalidating the injection or the charge.
+-- AND THE FIRST COORDINATE IS FINE, which is what makes the split
+-- pointless rather than merely unlucky.  `preClasses` measures 4, 10, 22,
+-- 46 for entry registries of 3, 5, 7, 9 — about `2 ^ (cReg / 2)`, and
+-- invariant in the nesting depth, because the pre-state classes really
+-- are fixed by the pre-state DAG.  So D is (something small) times
+-- (something the size of D): the split renames the problem instead of
+-- decomposing it, and the second factor inherits every difficulty the
+-- first was supposed to remove.  The delivery bound is therefore stated
+-- WHOLE, and it is the single place the mint loop has to be beaten.
+--
+-- WHAT THE EVIDENCE FOR (ii) IS.  Every row of Mint-Loop-Probe, with the
+-- margin GROWING as the ladder deepens rather than shrinking: D against
+-- `2 ^ cReg * 2 ^ cReg` runs 0.078, 0.026, 0.016, 0.0097 across the four
+-- ladders.  That is the opposite of the signature the two refuted bounds
+-- showed, both of which had ratios climbing toward 1.
 --
 -- THE FEEDBACK LOOP BEHIND ALL OF THIS IS MEASURED AND DOES NOT TOWER.
 -- Read naively the recursion is vicious — D ≤ 2 ^ R_end with R_end ≤ R₀ +
@@ -1122,15 +1125,6 @@ delivN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → EvalSt e �
 delivN st st′ = length (EvalSt.delivered st′) ∸ length (EvalSt.delivered st)
 
 postulate
-  -- the two coordinates of the injection, as functions of the run.  They
-  -- are opaque here on purpose — see WHAT THE SPLIT DOES AND DOES NOT BUY
-  preClasses : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             → (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t)
-             → Sched Γ → EvalSt e → ℕ
-  fibreCap   : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             → (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t)
-             → Sched Γ → EvalSt e → ℕ
-
   -- (i) THE PER-DELIVERY CHARGE.  The receipt the induction actually
   -- builds, charged to the cascade's own delivery ledger rather than to
   -- a count: every fold is a frame on some delivery's chain, and
@@ -1149,8 +1143,13 @@ postulate
     in Σ ℕ λ j → (j ≤ delivN st (proj₂ (proj₂ r)) * Caps.cSize c)
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- (ii) THE INJECTION.  A delivery ↦ (the pre-state registrations its
-  -- path visits, an index for the minted ones it went through)
+  -- (ii) THE DELIVERY BOUND, WHOLE.  One cascade's deliveries against
+  -- subsets of the entry registry, squared.  This is the mint loop's
+  -- one remaining hiding place: `shareAdmit` reads the registry as of
+  -- the dispatch, so the DAG the paths run through is the END registry,
+  -- and nothing here bounds that by cReg.  Two decompositions of this
+  -- statement have been measured false; it stands on Mint-Loop-Probe's
+  -- gate and on nothing else
   cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
@@ -1158,31 +1157,7 @@ postulate
     capsOK? c sched st ≡ true →
     length chains ≤ Caps.cReg c →
     delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-      ≤ preClasses a id chains sched st * fibreCap a id chains sched st
-
-  -- (iii-a) THE FIRST COORDINATE, one class per subset of the entry
-  -- registry.  This is the inverted-pair leg
-  preClasses-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (a : Arrival Γ) (id : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    preClasses a id chains sched st ≤ 2 ^ Caps.cReg c
-
-  -- (iii-b) THE DAMPER, and the one statement here with no proof
-  -- strategy behind it: how many deliveries share a pre-state class.
-  -- The intended content is that the minted registrations a path goes
-  -- through are themselves indexed by the pre-state registrations whose
-  -- dispatches minted them — every mint happens during some delivery and
-  -- every delivery bottoms out at a pre-state chain — so the second
-  -- coordinate is pre-state data too.  `≤ cSize` was tried here first
-  -- and MEASUREMENT 6 refuted it
-  fibreCap-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (a : Arrival Γ) (id : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    fibreCap a id chains sched st ≤ 2 ^ Caps.cReg c
+      ≤ 2 ^ Caps.cReg c * 2 ^ Caps.cReg c
 
 -- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -1202,9 +1177,7 @@ cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
   proj₁ CH
     , ≤-trans (proj₁ (proj₂ CH))
               (*-monoˡ-≤ (Caps.cSize c)
-                 (≤-trans (cascadeGo-deliveries c a id chains sched st inv lenB)
-                          (*-mono-≤ (preClasses-bound c a id chains sched st inv)
-                                    (fibreCap-bound c a id chains sched st inv))))
+                 (cascadeGo-deliveries c a id chains sched st inv lenB))
     , proj₂ (proj₂ CH)
   where
   CH = cascadeGo-charge c a id chains sl sched st 2≤S slEq inv vC pS lenB

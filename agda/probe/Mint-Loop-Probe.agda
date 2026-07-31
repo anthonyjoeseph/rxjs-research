@@ -70,16 +70,29 @@
 --       deliveries into (subset of the pre-state registry) × (an index)
 --       rather than into subsets alone.
 --
---   (5) AND THE SECOND COORDINATE IS NOT BOUNDED BY cSize EITHER.  It was
---       first stated so — a mint happens inside one frame, and a frame's
---       step function names no more sources than its syntax holds — and
---       MEASUREMENT 6 measures it directly (the fibre of the pre-state
---       class) and finds 4 against a cSize of 3 on the lean two-level
---       ladder, 8 against 3 on the lean three-level one.  Both
---       coordinates are therefore stated over subsets of the ENTRY
---       registry, and the count is `2 ^ cReg * 2 ^ cReg * cSize`.
+--   (5) AND THE SPLIT INTO TWO COORDINATES IS DEAD, both ways it was
+--       tried.  MEASUREMENT 6 gives the coordinates definitions and
+--       measures them: the fibre of a pre-state class is 4 against a
+--       cSize of 3 on the lean two-level ladder, so `≤ cSize` is out; it
+--       then ATTAINS `2 ^ cReg` exactly (128 against 128) on the
+--       three-level one, and MEASUREMENT 7 runs a fourth ladder where it
+--       reaches 576 against a cap of 512, so `≤ 2 ^ cReg` is out too.
+--       The ratio runs 0.25, 0.41, 1.00, 1.13 and is still climbing, so
+--       no constant multiple of `2 ^ cReg` is safe either.
 --
---   (6) j DOES NOT FALL MONOTONICALLY IN k, which the D-only reading of
+--       The FIRST coordinate is exactly what the story said — mPre is
+--       4, 10, 22, 46 for entry registries of 3, 5, 7, 9, about
+--       `2 ^ (cReg / 2)`, and invariant in k because the pre-state
+--       classes are fixed by the pre-state DAG.  Which is precisely why
+--       the split does not decompose anything: D is (something small)
+--       times (something the size of D).
+--
+--   (6) SO THE DELIVERY BOUND IS STATED WHOLE: `D ≤ 2 ^ cReg * 2 ^ cReg`,
+--       gated on every row here with the margin GROWING as the ladder
+--       deepens (0.078, 0.026, 0.016, 0.0097).  The count is
+--       `2 ^ cReg * 2 ^ cReg * cSize`.
+--
+--   (7) j DOES NOT FALL MONOTONICALLY IN k, which the D-only reading of
 --       this file claimed.  L = 3 lean, j against the intermediate
 --       `2 ^ cReg * cSize`:
 --
@@ -519,6 +532,39 @@ mintOnly³ (suc k) = strmᵗ (mergeAllᵉ (scanᵉ (mintOnly³ k) seedO (input f
 
 pL³ : ℕ → Closed Γˢ³ natᵗ
 pL³ k = mergeAllᵉ (scanᵉ (mintOnly³ k) seedO (input fz))
+
+------------------------------------------------------------------
+-- FOUR SHARED LEVELS, and this ladder exists for ONE question.  The
+-- fibre of a pre-state class is capped at `2 ^ cReg` by `fibreCap-bound`
+-- and MEASUREMENT 6 finds it ATTAINING that cap on the three-level lean
+-- ladder — 128 against a 2 ^ cReg of 128, with the approach 8, 29, 64,
+-- 99, 120, 127, 128.  A bound that is attained has no margin, and the
+-- ratio of fibre to cap CLIMBS with ladder depth: 2/8, 13/32, 128/128 —
+-- 0.25, 0.41, 1.00 at entry registries of 3, 5, 7.  Extrapolated, the
+-- next rung breaks it.
+--
+-- So: same shape, one more shared level, entry registry 9, cap 512.  The
+-- lean variant only — the accumulating one does not normalise past its
+-- base rung two levels down, let alone here
+------------------------------------------------------------------
+
+Γˢ⁴ : Ctx 5
+Γˢ⁴ = natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+insG⁴ : Slots Γˢ⁴
+insG⁴ fz                             = shared (dup (input (fsuc fz)))
+insG⁴ (fsuc fz)                      = shared (dup (input (fsuc (fsuc fz))))
+insG⁴ (fsuc (fsuc fz))               = shared (dup (input (fsuc (fsuc (fsuc fz)))))
+insG⁴ (fsuc (fsuc (fsuc fz)))        =
+  shared (dup (input (fsuc (fsuc (fsuc (fsuc fz))))))
+insG⁴ (fsuc (fsuc (fsuc (fsuc fz)))) = scripted (hot ((after 0 , 1) ∷ []))
+
+mintOnly⁴ : ∀ {Θ} → ℕ → Tm Γˢ⁴ [] [] Θ (obs natᵗ)
+mintOnly⁴ zero    = strmᵗ (input fz)
+mintOnly⁴ (suc k) = strmᵗ (mergeAllᵉ (scanᵉ (mintOnly⁴ k) seedO (input fz)))
+
+pL⁴ : ℕ → Closed Γˢ⁴ natᵗ
+pL⁴ k = mergeAllᵉ (scanᵉ (mintOnly⁴ k) seedO (input fz))
 
 ------------------------------------------------------------------
 -- MEASUREMENT 1: THE ENTRY REGISTRY IS INVARIANT IN THE NESTING DEPTH.
@@ -1082,6 +1128,51 @@ _ = refl
 _ : mFib 0 (pL³ 0) insG³ ≡ 8
 _ = refl
 
+-- THE LADDER SWEEP, which is where the second coordinate does all its
+-- growing.  mPre is CONSTANT down each ladder — 4, 10, 22 for entry
+-- registries of 3, 5, 7 — because the pre-state classes are fixed by the
+-- pre-state DAG, exactly as the damper's story says.  Every bit of the
+-- k-dependence lands in the fibre, and on the three-level lean ladder it
+-- climbs to EXACTLY 2 ^ cReg and stops
+_ : mPre 0 (pG′² 3) insG² ≡ 10
+_ = refl
+
+_ : mFib 0 (pG′² 3) insG² ≡ 13
+_ = refl
+
+_ : mPre 0 (pL³ 1) insG³ ≡ 22
+_ = refl
+
+_ : mFib 0 (pL³ 1) insG³ ≡ 29
+_ = refl
+
+_ : mPre 0 (pL³ 2) insG³ ≡ 22
+_ = refl
+
+_ : mFib 0 (pL³ 2) insG³ ≡ 64
+_ = refl
+
+_ : mFib 0 (pL³ 3) insG³ ≡ 99
+_ = refl
+
+_ : mFib 0 (pL³ 4) insG³ ≡ 120
+_ = refl
+
+_ : mFib 0 (pL³ 5) insG³ ≡ 127
+_ = refl
+
+_ : mPre 0 (pL³ 6) insG³ ≡ 22
+_ = refl
+
+_ : mFib 0 (pL³ 6) insG³ ≡ 128
+_ = refl
+
+_ : mPre 0 (pG′³ 0) insG³ ≡ 22
+_ = refl
+
+_ : mFib 0 (pG′³ 0) insG³ ≡ 29
+_ = refl
+
 -- THE REFUTATION: the fibre is over cSize on both lean families
 _ : (4 ≤ᵇ 3) ≡ false
 _ = refl
@@ -1108,9 +1199,129 @@ _ = refl
 _ : (8 ≤ᵇ 2 ^ 7) ≡ true
 _ = refl
 
+-- and the row where the second coordinate is EXACTLY at its cap.  The
+-- fibre down the lean three-level ladder runs 8, 29, 64, 99, 120, 127,
+-- 128 against a 2 ^ cReg of 128: the bound is ATTAINED, so it is tight —
+-- no smaller function of cReg can replace it — and there is no margin
+-- left in it either
+_ : (128 ≤ᵇ 2 ^ 7) ≡ true
+_ = refl
+
+_ : (129 ≤ᵇ 2 ^ 7) ≡ false
+_ = refl
+
 -- and the count they give, against the worst j in the file
 _ : (324 ≤ᵇ 2 ^ 7 * 2 ^ 7 * 8) ≡ true
 _ = refl
 
 _ : (1291 ≤ᵇ 2 ^ 7 * 2 ^ 7 * 50) ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- MEASUREMENT 7: THE LADDER RUNG THAT KILLS THE SPLIT.
+--
+-- MEASUREMENT 6 found the fibre ATTAINING `2 ^ cReg` on the three-level
+-- lean ladder — 128 against 128 — and a bound that is attained has no
+-- margin.  It also found the ratio of fibre to cap climbing with ladder
+-- depth: 2/8, 13/32, 128/128.  So this runs one more rung.
+--
+--   program   cReg  cSize     D   mPre  2^cReg   mFib
+--   pL⁴ 0       9      3    166     46     512     16
+--   pL⁴ 1       9     10    726     46     512    121
+--   pL⁴ 2       9     18   2546     46     512    576   ← 576 > 512
+--
+-- `fibreCap ≤ 2 ^ cReg` IS FALSE.  The second coordinate is not
+-- pre-state data, and no constant multiple of `2 ^ cReg` is safe either:
+-- the ratio runs 0.25, 0.41, 1.00, 1.13 and is still climbing.
+--
+-- THE FIRST COORDINATE, BY CONTRAST, IS EXACTLY WHAT THE STORY SAID.
+-- mPre is 4, 10, 22, 46 down the four ladders — `3 * 2 ^ L - 2`, with an
+-- entry registry of `2L + 1`, so it is about `2 ^ (cReg / 2)` and sits at
+-- a QUARTER of its cap's exponent.  And it is invariant in k: the
+-- pre-state classes are fixed by the pre-state DAG and minting adds none.
+--
+-- SO THE SPLIT IS DEAD, and it is dead for a reason worth writing down.
+-- D = mPre * (fibre), mPre is small and genuinely pre-state, and the
+-- fibre is therefore essentially D itself — 2546 deliveries over 46
+-- classes, worst class 576.  Splitting D into (something small) times
+-- (something the size of D) renames the problem instead of decomposing
+-- it.  Two bounds on that second factor have now been measured false in
+-- one session, and the honest conclusion is that the delivery count has
+-- to be bounded WHOLE.
+--
+-- What survives, on every row in this file and with the ratio FALLING as
+-- the ladder deepens (0.078, 0.026, 0.016, 0.0097), is
+--
+--     D ≤ 2 ^ cReg * 2 ^ cReg
+--
+-- which is what `cascadeGo-deliveries` now states, unsplit
+------------------------------------------------------------------
+
+_ : mReg 0 (pL⁴ 0) insG⁴ ≡ 9
+_ = refl
+
+_ : mReg 0 (pL⁴ 1) insG⁴ ≡ 9
+_ = refl
+
+_ : mReg 0 (pL⁴ 2) insG⁴ ≡ 9
+_ = refl
+
+_ : mS 0 (pL⁴ 0) insG⁴ ≡ 3
+_ = refl
+
+_ : mS 0 (pL⁴ 1) insG⁴ ≡ 10
+_ = refl
+
+_ : mS 0 (pL⁴ 2) insG⁴ ≡ 18
+_ = refl
+
+_ : mFolds 0 (pL⁴ 0) insG⁴ ≡ 166
+_ = refl
+
+_ : mFolds 0 (pL⁴ 1) insG⁴ ≡ 726
+_ = refl
+
+_ : mFolds 0 (pL⁴ 2) insG⁴ ≡ 2546
+_ = refl
+
+_ : mPre 0 (pL⁴ 0) insG⁴ ≡ 46
+_ = refl
+
+_ : mPre 0 (pL⁴ 1) insG⁴ ≡ 46
+_ = refl
+
+_ : mFib 0 (pL⁴ 0) insG⁴ ≡ 16
+_ = refl
+
+_ : mFib 0 (pL⁴ 1) insG⁴ ≡ 121
+_ = refl
+
+_ : mFib 0 (pL⁴ 2) insG⁴ ≡ 576
+_ = refl
+
+-- THE REFUTATION, on the pinned numbers: the fibre is over 2 ^ cReg
+_ : (576 ≤ᵇ 2 ^ 9) ≡ false
+_ = refl
+
+-- THE FIRST COORDINATE, still far inside its cap on the same row
+_ : (46 ≤ᵇ 2 ^ 9) ≡ true
+_ = refl
+
+-- AND THE UNSPLIT DELIVERY BOUND, which every row of the file gates and
+-- whose margin GROWS with ladder depth rather than shrinking
+_ : (5 ≤ᵇ 2 ^ 3 * 2 ^ 3) ≡ true
+_ = refl
+
+_ : (27 ≤ᵇ 2 ^ 5 * 2 ^ 5) ≡ true
+_ = refl
+
+_ : (269 ≤ᵇ 2 ^ 7 * 2 ^ 7) ≡ true
+_ = refl
+
+_ : (2546 ≤ᵇ 2 ^ 9 * 2 ^ 9) ≡ true
+_ = refl
+
+-- stated as the comparison a ratio ten times worse would break, at the
+-- deepest ladder measured
+_ : (2546 * 10 ≤ᵇ 2 ^ 9 * 2 ^ 9) ≡ true
 _ = refl
