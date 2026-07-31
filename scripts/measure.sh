@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # measure.sh LOG EXPR...  -- print the normal form of each ℕ-valued EXPR from
-# probe/Mint-Loop-Probe by asking Agda to check a deliberate mismatch.  The
+# probe/Mint-Loop-Shapes by asking Agda to check a deliberate mismatch.  The
 # deep rungs of family G′ take tens of minutes and gigabytes each, so the
 # expressions run sequentially into one LOG that a single poll can watch.
 set -u
@@ -14,7 +14,7 @@ module G-Probe where
 open import Data.Nat using (ℕ; _*_; _^_; _≤ᵇ_)
 open import Data.Bool using (Bool; true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Mint-Loop-Probe
+open import Mint-Loop-Shapes
 _ : $E ≡ 987654
 _ = refl
 AGDA

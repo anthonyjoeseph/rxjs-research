@@ -1149,7 +1149,19 @@ postulate
   -- the dispatch, so the DAG the paths run through is the END registry,
   -- and nothing here bounds that by cReg.  Two decompositions of this
   -- statement have been measured false; it stands on Mint-Loop-Probe's
-  -- gate and on nothing else
+  -- gate and on nothing else.
+  --
+  -- AND THE ROUTE TO IT IS NOT AN INJECTION.  Mint-Loop-Shapes measures
+  -- R_end and the answer is that MINTS TRACK DELIVERIES — 254 mints on a
+  -- 269-delivery cascade, leaving a registry of 261 against an entry cReg
+  -- of 7.  The inverted-pair argument still proves `D ≤ 2 ^ R_end`, but
+  -- at R_end = 261 against a budget of 2 ^ 18 that is not a usable
+  -- bound, and no subset injection can be, whether or not this statement
+  -- is true.  What is left is what the damper natively is: an ORDERING
+  -- fact.  A minted registration is reachable only by dispatches that
+  -- come after it, so the proof wants a schedule-indexed induction on a
+  -- decreasing remaining-dispatch potential — different machinery from
+  -- every route tried on this conjunct so far
   cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))

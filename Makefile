@@ -148,6 +148,7 @@ fold-count-probe:
 # src/Main.agda never reaches it.  SLOW — every fold count re-runs the
 # evaluator through a real cascade.
 mint-loop-probe:
+	cd agda && agda -i src -i probe probe/Mint-Loop-Shapes.agda
 	cd agda && agda -i src -i probe probe/Mint-Loop-Probe.agda
 
 ts-check:
