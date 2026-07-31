@@ -444,6 +444,20 @@ dropSource-all P src ((rid , s , c) ∷ r) h with sameSource src s
                       (dropSource-all P src r (proj₂ (∧-true _ _ h)))
 
 -- and the count, which no predicate sees
+-- the take/switch cut is a filter on the registry too, by node
+-- membership rather than by source, so its count only drops.  Here
+-- rather than beside its wet siblings because .Caps-Face needs it and
+-- .Caps-Face is a sibling of .Wet, not a layer over it
+cutThrough-len : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (d : List RegId)
+  (wm : RegId) (dy : List Source) (reg : List (RegId × Source × Chain Γ t)) →
+  length (proj₁ (cutThrough nid d wm dy reg)) ≤ length reg
+cutThrough-len nid d wm dy []                    = z≤n
+cutThrough-len nid d wm dy ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-len nid d wm dy r
+... | true  | kept , closes , rids | ih = ≤-trans ih (n≤1+n _)
+... | false | kept , closes , rids | ih = s≤s ih
+
 dropSource-len : ∀ {n} {Γ : Ctx n} {t} (src : Source)
   (reg : List (RegId × Source × Chain Γ t)) →
   length (dropSource src reg) ≤ length reg

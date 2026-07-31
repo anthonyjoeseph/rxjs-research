@@ -795,6 +795,18 @@ valCaps?-widen {n = n} {c = c} sl u v (sz≤ , wd≤ , _) h
 ... | hsz , hwd = ∧-intro (≤ᵇ-widen (sizeᵛ u v) sz≤ hsz)
                           (≤ᵇ-widen (outWᵛ n sl u v) wd≤ hwd)
 
+-- the two halves of valCaps?, which are literally boundedNode's and
+-- widNode's scan-st clauses, so a stored accumulator reads either way
+valCaps?-size : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
+  valCaps? c sl u v ≡ true → (sizeᵛ u v ≤ᵇ Caps.cSize c) ≡ true
+valCaps?-size {n = n} c sl u v h =
+  proj₁ (∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (outWᵛ n sl u v ≤ᵇ Caps.cWid c) h)
+
+valCaps?-wid : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
+  valCaps? c sl u v ≡ true → (outWᵛ n sl u v ≤ᵇ Caps.cWid c) ≡ true
+valCaps?-wid {n = n} c sl u v h =
+  proj₂ (∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (outWᵛ n sl u v ≤ᵇ Caps.cWid c) h)
+
 valsCaps?-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sl : Slots Γ)
   (u : Ty) (vs : List (Val Γ u)) →
   c ⊑ᶜ c′ → all (valCaps? c sl u) vs ≡ true
@@ -1329,31 +1341,6 @@ postulate
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
 
-  -- ONE FRAME, and the clause that pays a j: map-f and scan-f both
-  -- substitute into a step function, which is one sizeStep and one
-  -- foldStep — exactly what frameStep's per-j increment dominates
-  -- (frameStep-size-suc / frameStep-wid-suc)
-  stepFrame-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep j c) sched st ≡ true →
-    frameSz? (Caps.cSize (frameStep j c)) f ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    all (valCaps? (frameStep j c) sl s) vals ≡ true →
-    let r = stepFrame g id now f κ vals fin sched st
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (all (valCaps? (frameStep (j + j′) c) sl u)
-              (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-
   -- concatAll's queue, the one node whose STORED observables the size
   -- conjunct bounds directly, so its residue is reported alongside
   concatDrain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -1569,6 +1556,539 @@ shareFinish-caps c i true sl (emits , sched′ , st′) inv bc =
   dropSweep-caps c (toℕ i) sched′ st′ inv , bc
 
 ------------------------------------------------------------------
+-- GRINDING stepFrame-caps, THE CLAUSE THAT PAYS A j.
+--
+-- Five clauses, and they split cleanly in two.  THREE ARE STRUCTURAL —
+-- take-f is a filter on the payload list plus a registry cut, from-inner
+-- and thru-outer delegate to innerFinish-caps and thruWalk-caps and then
+-- do node bookkeeping — so they spend no folds at all and are ground
+-- here.  TWO ARE ARITHMETIC: map-f and scan-f are the sites where a
+-- value is actually built, by `applyFn`, and what they cost is the
+-- subject of stepFrame-value-caps below.
+--
+-- The leaves first, in the order the clauses consume them.
+------------------------------------------------------------------
+
+-- setNode's caps face.  Measures has the size half (setNode-bounded);
+-- this is the width half, the same three-line induction
+setNode-widNode : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ)
+  (nid : NodeId) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
+  widNode W sl ns ≡ true →
+  all (λ kv → widNode W sl (proj₂ kv)) nodes ≡ true →
+  all (λ kv → widNode W sl (proj₂ kv)) (setNode nid ns nodes) ≡ true
+setNode-widNode W sl nid ns []             bn h = ∧-intro bn refl
+setNode-widNode W sl nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
+... | true  = ∧-intro bn (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (setNode-widNode W sl nid ns r bn (proj₂ (∧-true _ _ h)))
+
+-- so installing one bounded node keeps all five conjuncts: the registry,
+-- the live set and the slot telescope are untouched
+capsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
+  boundedNode (Caps.cSize c) ns ≡ true →
+  widNode (Caps.cWid c) (Sched.slots sched) ns ≡ true →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+capsOK?-setNode {Γ = Γ} c nid ns sched st bn wn inv =
+    ∧-intro (∧-intro (proj₁ hL)
+                     (setNode-bounded (Caps.cSize c) nid ns (EvalSt.nodes st) bn
+                        (proj₂ hL)))
+    (∧-intro h1
+    (∧-intro h2
+    (∧-intro (setNode-widNode (Caps.cWid c) (Sched.slots sched) nid ns
+                (EvalSt.nodes st) wn h3)
+             h4)))
+  where
+  P  = capsOK?-parts c sched st inv
+  h0 = proj₁ P
+  hL = ∧-true (all (boundedLive {Γ = Γ} (Caps.cSize c)) (Sched.live sched))
+              (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) (EvalSt.nodes st))
+              h0
+  h1 = proj₁ (proj₂ P)
+  h2 = proj₁ (proj₂ (proj₂ P))
+  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+-- take's cut is dropSweep's sibling: cutThrough is a filter on the
+-- registry (by node membership rather than by source), its closes carry
+-- no payload, and the live set is swept against what it kept
+cutThrough-regsSz : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (nid : NodeId)
+  (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  regsSz? B reg ≡ true → regsSz? B (proj₁ (cutThrough nid d wm dy reg)) ≡ true
+cutThrough-regsSz B nid d wm dy []                    h = refl
+cutThrough-regsSz B nid d wm dy ((rid , src , c) ∷ r) h
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-regsSz B nid d wm dy r (proj₂ (∧-true _ _ h))
+... | true  | _ | ih = ih
+... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
+
+cutThrough-closes-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (sl : Slots Γ)
+  (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  all (eventCaps? c sl) (proj₁ (proj₂ (cutThrough nid d wm dy reg))) ≡ true
+cutThrough-closes-caps c sl nid d wm dy []                     = refl
+cutThrough-closes-caps c sl nid d wm dy ((rid , src , ch) ∷ r)
+  with pathHasNode nid (proj₂ ch) | cutThrough nid d wm dy r
+     | cutThrough-closes-caps c sl nid d wm dy r
+... | false | _ | ih = ih
+... | true  | _ | ih with any (_≡ᵇ rid) d ∧ memberSource src dy
+...   | true  = ih
+...   | false = ∧-intro refl ih
+
+-- the cut's whole state move, in one lemma: registry filtered, live
+-- swept against the survivors, and one node overwritten
+cutSweep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
+  boundedNode (Caps.cSize c) ns ≡ true →
+  widNode (Caps.cWid c) (Sched.slots sched) ns ≡ true →
+  capsOK? c sched st ≡ true →
+  let kept = proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                               (EvalSt.dying st) (EvalSt.registry st))
+  in capsOK? c (record sched { live = sweepLive kept (Sched.live sched) })
+               (record st { registry  = kept
+                          ; cancelled = proj₂ (proj₂ (cutThrough nid (EvalSt.delivered st)
+                                                       (EvalSt.regWatermark st)
+                                                       (EvalSt.dying st)
+                                                       (EvalSt.registry st)))
+                                        ++ EvalSt.cancelled st
+                          ; nodes     = setNode nid ns (EvalSt.nodes st) }) ≡ true
+cutSweep-caps {Γ = Γ} c nid ns sched st bn wn inv =
+    ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
+                        (Sched.live sched) (proj₁ hL))
+                     (setNode-bounded (Caps.cSize c) nid ns (EvalSt.nodes st) bn
+                        (proj₂ hL)))
+    (∧-intro (cutThrough-regsSz (Caps.cSize c) nid (EvalSt.delivered st)
+                (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st) h1)
+    (∧-intro (sweepLive-all (widLive (Caps.cWid c) (Sched.slots sched)) kept
+                (Sched.live sched) h2)
+    (∧-intro (setNode-widNode (Caps.cWid c) (Sched.slots sched) nid ns
+                (EvalSt.nodes st) wn h3)
+             (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (cutThrough-len nid (EvalSt.delivered st)
+                                          (EvalSt.regWatermark st) (EvalSt.dying st)
+                                          (EvalSt.registry st))
+                                       (≤ᵇ⇒≤ _ _ (T-to h4))))))))
+  where
+  kept = proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                           (EvalSt.dying st) (EvalSt.registry st))
+  P  = capsOK?-parts c sched st inv
+  h0 = proj₁ P
+  hL = ∧-true (all (boundedLive {Γ = Γ} (Caps.cSize c)) (Sched.live sched))
+              (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) (EvalSt.nodes st))
+              h0
+  h1 = proj₁ (proj₂ P)
+  h2 = proj₁ (proj₂ (proj₂ P))
+  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+-- take passes a PREFIX of what it was given, so its payload bound is
+-- inherited rather than paid for
+takeVals-caps : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ)
+  (k : ℕ) (vals : List (Val Γ s)) →
+  all (valCaps? c sl s) vals ≡ true →
+  all (valCaps? c sl s) (proj₁ (takeVals k vals)) ≡ true
+takeVals-caps c sl zero          vals      h = refl
+takeVals-caps c sl (suc k)       []        h = refl
+takeVals-caps c sl (suc zero)    (v ∷ vs)  h = ∧-intro (proj₁ (∧-true _ _ h)) refl
+takeVals-caps c sl (suc (suc k)) (v ∷ vs)  h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (takeVals-caps c sl (suc k) vs (proj₂ (∧-true _ _ h)))
+
+-- THE take-f CLAUSE, and it spends no folds: j′ = 0 either way
+takeDispatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) (mns : Maybe (NodeState Γ)) →
+  Sched.slots sched ≡ sl →
+  capsOK? c sched st ≡ true →
+  all (valCaps? c sl s) vals ≡ true →
+  let r = takeDispatch {t = t} nid vals fin sched st mns
+  in (capsOK? c (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+        ≡ true)
+     × (all (valCaps? c sl s) (proj₁ r) ≡ true)
+     × (all (eventCaps? c sl) (proj₁ (proj₂ r)) ≡ true)
+takeDispatch-caps c nid vals fin sl sched st (just (take-st k)) slEq inv vC
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = cutSweep-caps c nid (take-st zero) sched st refl refl inv
+            , takeVals-caps c sl k vals vC
+            , subst (λ x → all (eventCaps? c x)
+                             (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st)
+                                              (EvalSt.regWatermark st) (EvalSt.dying st)
+                                              (EvalSt.registry st)))) ≡ true)
+                    slEq
+                    (cutThrough-closes-caps c (Sched.slots sched) nid
+                       (EvalSt.delivered st) (EvalSt.regWatermark st)
+                       (EvalSt.dying st) (EvalSt.registry st))
+... | false = capsOK?-setNode c nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                sched st refl refl inv
+            , takeVals-caps c sl k vals vC
+            , refl
+takeDispatch-caps c nid vals fin sl sched st nothing slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (scan-st _)) slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (merge-st _ _)) slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (concat-st _ _ _)) slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (switch-st _ _)) slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (exhaust-st _ _)) slEq inv vC = inv , refl , refl
+
+-- reading a node back out at the caps, so a clause that REINSTALLS one
+-- (thruWrap sets only the `done` flag) can show the payload it keeps is
+-- still bounded.  Mirrors Wet's lookupNode-B
+NodeCaps : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → Maybe (NodeState Γ) → Set
+NodeCaps c sl nothing   = ⊤
+NodeCaps c sl (just ns) =
+  (boundedNode (Caps.cSize c) ns ≡ true) × (widNode (Caps.cWid c) sl ns ≡ true)
+
+lookupNode-caps : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) nodes ≡ true →
+  all (λ kv → widNode (Caps.cWid c) sl (proj₂ kv)) nodes ≡ true →
+  NodeCaps c sl (lookupNode nid nodes)
+lookupNode-caps c sl nid []            hb hw = tt
+lookupNode-caps c sl nid ((k , s) ∷ r) hb hw with k ≡ᵇ nid
+... | true  = proj₁ (∧-true _ _ hb) , proj₁ (∧-true _ _ hw)
+... | false = lookupNode-caps c sl nid r (proj₂ (∧-true _ _ hb)) (proj₂ (∧-true _ _ hw))
+
+-- the two projections of capsOK? the node ring needs
+capsOK?-nodeSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) (EvalSt.nodes st) ≡ true
+capsOK?-nodeSz {Γ = Γ} c sched st h =
+  proj₂ (∧-true (all (boundedLive {Γ = Γ} (Caps.cSize c)) (Sched.live sched))
+                (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) (EvalSt.nodes st))
+                (proj₁ (capsOK?-parts c sched st h)))
+
+capsOK?-nodeWid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  all (λ kv → widNode (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
+      (EvalSt.nodes st) ≡ true
+capsOK?-nodeWid c sched st h = proj₁ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st h))))
+
+-- THE thru-outer WRAP: the walk has already run, and all this does is
+-- stamp `done` on the node it found, keeping that node's payload.  No
+-- values are built, so no folds are spent
+thruWrap-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (op : AllOp) (nid : NodeId) (fin : Bool) (sl : Slots Γ)
+  (out : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+  capsOK? c (proj₁ (proj₂ (proj₂ out))) (proj₂ (proj₂ (proj₂ out))) ≡ true →
+  all (valCaps? c sl u) (proj₁ out) ≡ true →
+  all (eventCaps? c sl) (proj₁ (proj₂ out)) ≡ true →
+  let r = thruWrap op nid fin out
+  in (capsOK? c (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valCaps? c sl u) (proj₁ r) ≡ true)
+     × (all (eventCaps? c sl) (proj₁ (proj₂ r)) ≡ true)
+thruWrap-caps c op nid false sl (vs , bs , sd , st) inv vC eC = inv , vC , eC
+thruWrap-caps c mergeᵒ nid true sl (vs , bs , sd , st) inv vC eC
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-caps c (Sched.slots sd) nid (EvalSt.nodes st)
+         (capsOK?-nodeSz c sd st inv) (capsOK?-nodeWid c sd st inv)
+... | just (merge-st k od) | (bn , wn) =
+      capsOK?-setNode c nid (merge-st k true) sd st refl refl inv , vC , eC
+... | nothing              | _ = inv , vC , eC
+... | just (scan-st _)     | _ = inv , vC , eC
+... | just (take-st _)     | _ = inv , vC , eC
+... | just (concat-st _ _ _) | _ = inv , vC , eC
+... | just (switch-st _ _) | _ = inv , vC , eC
+... | just (exhaust-st _ _) | _ = inv , vC , eC
+thruWrap-caps c concatᵒ nid true sl (vs , bs , sd , st) inv vC eC
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-caps c (Sched.slots sd) nid (EvalSt.nodes st)
+         (capsOK?-nodeSz c sd st inv) (capsOK?-nodeWid c sd st inv)
+... | just (concat-st q act od) | (bn , wn) =
+      capsOK?-setNode c nid (concat-st q act true) sd st bn wn inv , vC , eC
+... | nothing              | _ = inv , vC , eC
+... | just (scan-st _)     | _ = inv , vC , eC
+... | just (take-st _)     | _ = inv , vC , eC
+... | just (merge-st _ _)  | _ = inv , vC , eC
+... | just (switch-st _ _) | _ = inv , vC , eC
+... | just (exhaust-st _ _) | _ = inv , vC , eC
+thruWrap-caps c switchᵒ nid true sl (vs , bs , sd , st) inv vC eC
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) =
+      capsOK?-setNode c nid (switch-st cur true) sd st refl refl inv , vC , eC
+... | nothing              = inv , vC , eC
+... | just (scan-st _)     = inv , vC , eC
+... | just (take-st _)     = inv , vC , eC
+... | just (merge-st _ _)  = inv , vC , eC
+... | just (concat-st _ _ _) = inv , vC , eC
+... | just (exhaust-st _ _) = inv , vC , eC
+thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act od) =
+      capsOK?-setNode c nid (exhaust-st act true) sd st refl refl inv , vC , eC
+... | nothing              = inv , vC , eC
+... | just (scan-st _)     = inv , vC , eC
+... | just (take-st _)     = inv , vC , eC
+... | just (merge-st _ _)  = inv , vC , eC
+... | just (concat-st _ _ _) = inv , vC , eC
+... | just (switch-st _ _) = inv , vC , eC
+
+-- THE from-inner CLAUSE: absorb, or finish.  Both the `fin = false` and
+-- the absorbed branch are the identity on the state; only the finish
+-- delegates, and it delegates to innerFinish-caps verbatim
+innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s)) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  let r = innerReact g op allNid inst κ id now vals sched st fin
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c)
+              (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                ≡ true)
+     × (all (valCaps? (frameStep (j + j′) c) sl s) (proj₁ r) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
+innerReact-caps c j g op allNid inst κ id now vals false sl sched st
+                2≤S slEq inv pS vC =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
+    , subst (λ x → all (valCaps? (frameStep x c) sl _) vals ≡ true)
+            (sym (+-identityʳ j)) vC
+    , refl
+innerReact-caps c j g op allNid inst κ id now vals true sl sched st
+                2≤S slEq inv pS vC
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
+    , subst (λ x → all (valCaps? (frameStep x c) sl _) vals ≡ true)
+            (sym (+-identityʳ j)) vC
+    , refl
+... | false = innerFinish-caps c j g op allNid inst κ id now vals sl sched st
+                2≤S slEq inv pS vC
+
+------------------------------------------------------------------
+-- AND THE TWO CLAUSES THAT DO BUILD VALUES, POSTULATED — with what the
+-- grind found out about what they can cost.
+--
+-- map-f and scan-f are the only clauses of stepFrame that call
+-- `applyFn`, and `applyFn fn v` is `evalWith fn (v ∷ [])`: not a
+-- substitution but an EVALUATION.  That distinction is the whole
+-- content of these two statements, and it is why they are not
+-- one-liners off size-subΘᵉ the way `sizeStep`'s comment reads.
+--
+-- WHAT sizeStep IS READ OFF, AND WHAT applyFn ACTUALLY DOES.  sizeStep
+-- S s = S * suc (2 * s) is exactly size-subΘᵉ's bound, `sizeᵉ f * suc
+-- (2 * V)` — the cost of PLUGGING an env of size V into a template of
+-- size f.  evalWith does more than plug: its `caseᵗ` clause evaluates
+-- the scrutinee and extends the environment WITH THE RESULTING VALUE,
+-- so the env a later `strmᵗ` closes over is not the caller's env.  The
+-- shape that exploits it:
+--
+--     caseᵗ (inlᵗ (pairᵗ x x)) (caseᵗ (inlᵗ (pairᵗ v₀ v₀)) (… ) _) _
+--
+-- nested d deep, each level pairing the binding introduced by the level
+-- above with itself.  `sizeᵗ fn` is Θ(d); the value it computes from an
+-- input of size 1 is Θ(2 ^ d).  So NO j′ = 1 works: one sizeStep is
+-- linear in the cap and the clause is exponential in the step
+-- function's syntax.  .Measures' own bounds say the same thing without
+-- the counterexample — evalWith-size is `(2 + 2 * V) ^ (3 ^ sizeᵗ fn)`,
+-- a tower, and evalWith-sharp only moves the exponent to
+-- `3 ^ caseWᵗ fn`.
+--
+-- THE STATEMENTS ARE STILL TRUE, because j′ is EXISTENTIAL and
+-- iterSize runs away faster than the clause does: sizeStep S s ≥ 2 + 4s
+-- for S ≥ 2, so iterSize S j′ s ≥ 4 ^ j′ * s and a j′ of order
+-- 3 ^ cSize covers the tower.  What is NOT true is that the receipt is
+-- one fold per frame.
+--
+-- SO THE COST MOVES, IT DOES NOT VANISH, AND IT LANDS ON
+-- cascadeGo-charge — `j ≤ D * cSize`, one delivery's frames times a
+-- per-frame charge of cSize.  A single map-f frame over a case-nested
+-- step function needs a j′ exponential in cSize, so `D * cSize` is
+-- short by an exponential on that program.  This is flagged rather than
+-- patched: cascadeGo-charge is the OTHER half of the budget claim and
+-- changing it is a design ruling, not a clause grind.  The two
+-- statements below are stated so that the difficulty has a NAME and a
+-- boundary — no state, no recursion, no mutual induction, just
+-- applyFn — instead of being buried in the hub clause
+------------------------------------------------------------------
+
+postulate
+  -- ONE map-f FRAME.  Every payload is mapped independently, so nothing
+  -- composes and the whole list costs one clause's worth of folds
+  mapFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+    (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+    2 ≤ Caps.cSize c →
+    (sizeᵗ fn ≤ᵇ Caps.cSize (frameStep j c)) ≡ true →
+    all (valCaps? (frameStep j c) sl s) vals ≡ true →
+    Σ ℕ λ j′ →
+      all (valCaps? (frameStep (j + j′) c) sl u) (map (applyFn fn) vals) ≡ true
+
+  -- ONE scan-f FRAME.  Here the folds DO compose — scanVals threads the
+  -- accumulator, so payload i is `applyFn` applied i times — and the
+  -- accumulator has to come back bounded too, because it is reinstalled
+  scanFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u) (vals : List (Val Γ s)) →
+    2 ≤ Caps.cSize c →
+    (sizeᵗ fn ≤ᵇ Caps.cSize (frameStep j c)) ≡ true →
+    valCaps? (frameStep j c) sl u acc ≡ true →
+    all (valCaps? (frameStep j c) sl s) vals ≡ true →
+    Σ ℕ λ j′ →
+      (all (valCaps? (frameStep (j + j′) c) sl u)
+           (proj₁ (scanVals fn acc vals)) ≡ true)
+      × (valCaps? (frameStep (j + j′) c) sl u (proj₂ (scanVals fn acc vals)) ≡ true)
+
+------------------------------------------------------------------
+-- stepFrame-caps, GROUND.  Five clauses over the four leaves above and
+-- the two value postulates; the only arithmetic is widening the entry
+-- invariant to the reported level.
+--
+-- ONE HYPOTHESIS HAD TO BE ADDED, and it was missing rather than
+-- optional: `suc (pathLen κ) ≤ cSize (frameStep j c)`.  The thru-outer
+-- clause hands κ to thruWalk-caps, which requires exactly that conjunct,
+-- and the postulated face carried only `pathSz? … κ` — which says every
+-- PROPER SUFFIX of κ is short, and says nothing about κ itself.  The
+-- caller already has it: foldPath-caps splits `pathSz? B (f ↠ p)` into
+-- `frameSz? B f`, `suc (pathLen p) ≤ᵇ B` and `pathSz? B p`, and was
+-- discarding the middle one.  So the repair costs the call site one
+-- `≤ᵇ⇒≤` and nothing else — no new obligation anywhere in the tree
+------------------------------------------------------------------
+
+-- the six clauses where the node lookup misses or mismatches: the
+-- evaluator emits nothing and touches nothing
+stepFrame-zero-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (j : ℕ) (u : Ty) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? (frameStep j c) sched st ≡ true →
+  Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c) sched st ≡ true)
+     × (all (valCaps? (frameStep (j + j′) c) sl u) [] ≡ true)
+     × (all (eventCaps? {n = n} {Γ = Γ} {u = t} (frameStep (j + j′) c) sl) [] ≡ true)
+stepFrame-zero-caps c j u sl sched st inv =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
+    , refl , refl
+
+stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep j c) sched st ≡ true →
+  frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid) ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c)
+              (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                ≡ true)
+     × (all (valCaps? (frameStep (j + j′) c) sl u)
+            (proj₁ r) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl)
+            (proj₁ (proj₂ r)) ≡ true)
+stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
+                    2≤S slEq inv fS pS vC
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
+         (capsOK?-nodeSz (frameStep j c) sched st inv)
+         (capsOK?-nodeWid (frameStep j c) sched st inv)
+... | nothing                | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (take-st _)       | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (merge-st _ _)    | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (concat-st _ _ _) | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (switch-st _ _)   | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (exhaust-st _ _)  | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
+...   | no _    = stepFrame-zero-caps c j u sl sched st inv
+...   | yes refl =
+  j′ , capsOK?-setNode (frameStep (j + j′) c) nid
+         (scan-st (proj₂ run)) sched st
+         (valCaps?-size (frameStep (j + j′) c) sl _ (proj₂ run) (proj₂ (proj₂ SC)))
+         (subst (λ x → widNode (Caps.cWid (frameStep (j + j′) c)) x
+                         (scan-st (proj₂ run)) ≡ true)
+                (sym slEq)
+                (valCaps?-wid (frameStep (j + j′) c) sl _ (proj₂ run)
+                   (proj₂ (proj₂ SC))))
+         (capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
+            (frameStep-⊑-+ c 2≤S j j′) inv)
+     , proj₁ (proj₂ SC)
+     , refl
+  where
+  run = scanVals fn ac vals
+  SC  = scanFrame-caps c j sl fn ac vals 2≤S fS
+          (∧-intro (proj₁ nb)
+                   (subst (λ x → (outWᵛ _ x u ac ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
+                          slEq (proj₂ nb)))
+          vC
+  j′  = proj₁ SC
+
+stepFrame-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep j c) sched st ≡ true →
+  frameSz? (Caps.cSize (frameStep j c)) f ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  let r = stepFrame g id now f κ vals fin sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c)
+              (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                ≡ true)
+     × (all (valCaps? (frameStep (j + j′) c) sl u)
+            (proj₁ r) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl)
+            (proj₁ (proj₂ r)) ≡ true)
+
+-- MAP: nothing touches the state, so the invariant is only widened
+stepFrame-caps c j g id now (map-f fn) κ vals fin sl sched st 2≤S slEq inv fS pS lC vC =
+  j′ , capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
+         (frameStep-⊑-+ c 2≤S j j′) inv
+     , proj₂ MP
+     , refl
+  where
+  MP = mapFrame-caps c j sl fn vals 2≤S fS vC
+  j′ = proj₁ MP
+
+-- SCAN: its own top-level lemma, as in the wet family — the nested
+-- `with` on the stored accumulator's type cannot be elaborated inside a
+-- clause of the general frame case
+stepFrame-caps c j g id now (scan-f fn nid) κ vals fin sl sched st
+               2≤S slEq inv fS pS lC vC =
+  stepFrame-scan-caps c j g id now fn nid κ vals fin sl sched st 2≤S slEq inv fS pS vC
+
+-- TAKE: a prefix and a cut, no folds
+stepFrame-caps c j g id now (take-f nid) κ vals fin sl sched st 2≤S slEq inv fS pS lC vC =
+  0 , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ (proj₂ (proj₂ TD))))
+                     (proj₂ (proj₂ (proj₂ (proj₂ TD)))) ≡ true)
+            (sym (+-identityʳ j)) (proj₁ TDc)
+    , subst (λ x → all (valCaps? (frameStep x c) sl _) (proj₁ TD) ≡ true)
+            (sym (+-identityʳ j)) (proj₁ (proj₂ TDc))
+    , subst (λ x → all (eventCaps? (frameStep x c) sl) (proj₁ (proj₂ TD)) ≡ true)
+            (sym (+-identityʳ j)) (proj₂ (proj₂ TDc))
+  where
+  TD  = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
+  TDc = takeDispatch-caps (frameStep j c) nid vals fin sl sched st
+          (lookupNode nid (EvalSt.nodes st)) slEq inv vC
+
+-- FROM-INNER and THRU-OUTER: the two *All edges, delegated whole
+stepFrame-caps c j g id now (from-inner op allNid inst) κ vals fin sl sched st
+               2≤S slEq inv fS pS lC vC =
+  innerReact-caps c j g op allNid inst κ id now vals fin sl sched st
+    2≤S slEq inv pS vC
+
+stepFrame-caps c j g id now (thru-outer op nid) κ vals fin sl sched st
+               2≤S slEq inv fS pS lC vC =
+  j′ , proj₁ WR , proj₁ (proj₂ WR) , proj₂ (proj₂ WR)
+  where
+  TW = thruWalk-caps c j g op nid κ id now vals sl sched st
+         2≤S slEq inv pS vC lC
+  j′ = proj₁ TW
+  WK = thruWalk g op nid κ id now vals sched st
+  WR = thruWrap-caps (frameStep (j + j′) c) op nid fin sl WK
+         (proj₁ (proj₂ TW)) (proj₁ (proj₂ (proj₂ TW))) (proj₂ (proj₂ (proj₂ TW)))
+
+------------------------------------------------------------------
 -- THE DELIVERY CLIQUE, GROUND.  foldPath / dispatchShare / shareGo,
 -- mutually recursive on the evaluator's own measure, plus chainStep as
 -- the arrival's entry point.
@@ -1697,7 +2217,8 @@ foldPath-caps c j sf gas id now envSrc (f ↠ p) vals evs fin sl sched st
   pS1  = ∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) pS
   pS2  = ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) (proj₂ pS1)
   SF   = stepFrame-caps c j sf id now f p vals fin sl sched st
-           2≤S slEq inv (proj₁ pS1) (proj₂ pS2) vC
+           2≤S slEq inv (proj₁ pS1) (proj₂ pS2)
+           (≤ᵇ⇒≤ _ _ (T-to (proj₁ pS2))) vC
   j₁   = proj₁ SF
   step = stepFrame sf id now f p vals fin sched st
   sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))

@@ -82,21 +82,45 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FIFTEEN POSTULATES REMAIN.  They are: the three walk faces
--- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
--- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the two
--- pieces the BUDGET CLAIM is assembled from (cascadeGo-charge, the
--- per-delivery charge, and cascadeGo-deliveries, the delivery bound),
--- and eight of the subscribe-side companions transcribed from
--- subscribeE-walkS's clique.  frameBlowup is fully defined: no gaps
--- inside it, and cascadeGo-caps, the cascade bookends and the chain
--- snapshot are all ground.
+-- SIXTEEN POSTULATES REMAIN, and the count went UP by one while the
+-- tree got smaller — which is the point of the outside-in rule rather
+-- than a regression.  They are: the three walk faces (subscribeE-wet,
+-- cascadeGo-wet, subscribeE-walk), the caps face subscribeE-caps with
+-- its chain-half lemma regsSz?-subscribeE, the two pieces the BUDGET
+-- CLAIM is assembled from (cascadeGo-charge and cascadeGo-deliveries),
+-- seven of the subscribe-side companions, and the two VALUE clauses
+-- mapFrame-caps / scanFrame-caps that stepFrame-caps was traded for.
+-- frameBlowup is fully defined, and cascadeGo-caps, the cascade
+-- bookends and the chain snapshot are all ground.
 --
 -- subscribeInner-caps is PROVEN — the caps grind's first clause, taken
 -- first because it was the most uncertain: the *All edge
 -- where the inner observable comes off a burst payload rather than the
 -- syntax, so every hypothesis it feeds back into subscribeE-caps has to
 -- come from valCaps? and from κ extended by one frame.  It closes.
+--
+-- stepFrame-caps is PROVEN TOO, and it is the hub: foldPath-caps's
+-- `↠` clause is the only place the whole delivery clique spends a j,
+-- and this is what it spends it on.  Three of its five clauses are
+-- STRUCTURAL and are now ground with their leaves (takeDispatch-caps,
+-- innerReact-caps, thruWrap-caps, plus the node ring lookupNode-caps /
+-- capsOK?-setNode / cutSweep-caps).  The other two, map-f and scan-f,
+-- are where `applyFn` builds a value, and they are the two new
+-- postulates.
+--
+-- WHAT THE GRIND FOUND THERE, and it is a live problem rather than a
+-- gap: `sizeStep S s = S * suc (2 * s)` is size-subΘᵉ's bound, the cost
+-- of PLUGGING an env into a template — but applyFn EVALUATES, and
+-- evalWith's `caseᵗ` clause extends the environment with the computed
+-- scrutinee.  A step function with d nested cases, each pairing the
+-- binding above it with itself, turns an input of size 1 into a value
+-- of size Θ(2 ^ d) out of syntax of size Θ(d).  The wet family already
+-- pays for this in its own currency — stepFrame-scan-wet's receipt is
+-- `E * 3 ^ (suc (caseWᵗ fn) * length vals)` — and the caps face has to
+-- pay it in j.  The two statements stay TRUE because j′ is existential
+-- and iterSize outruns the clause, but the receipt is NOT one fold per
+-- frame, and that lands on cascadeGo-charge's `j ≤ D * cSize`.  Flagged,
+-- not patched: that is the other half of the budget claim.
 --
 -- The whole tree is STATED BEFORE ANY CLAUSE IS GROUND, which is the
 -- outside-in rule applied at this joint: a change to the shape then

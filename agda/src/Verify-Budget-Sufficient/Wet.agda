@@ -689,19 +689,10 @@ sweepLive-fnCap : ∀ {n} {Γ : Ctx n} {t} (Ψ : ℕ)
   all (fnCapLive Ψ) (sweepLive reg ls) ≡ true
 sweepLive-fnCap Ψ = sweepLive-all (fnCapLive Ψ)
 
--- the cut is a filter on the registry: the count only drops, the
--- survivors keep their frame bounds, and every close it mints is
+-- the cut is a filter on the registry: the count only drops (that half
+-- is cutThrough-len, in .Measures, since the caps face needs it too),
+-- the survivors keep their frame bounds, and every close it mints is
 -- value-free
-cutThrough-len : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (d : List RegId)
-  (wm : RegId) (dy : List Source) (reg : List (RegId × Source × Chain Γ t)) →
-  length (proj₁ (cutThrough nid d wm dy reg)) ≤ length reg
-cutThrough-len nid d wm dy []                    = z≤n
-cutThrough-len nid d wm dy ((rid , src , c) ∷ r)
-  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
-     | cutThrough-len nid d wm dy r
-... | true  | kept , closes , rids | ih = ≤-trans ih (n≤1+n _)
-... | false | kept , closes , rids | ih = s≤s ih
-
 cutThrough-regs : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (nid : NodeId)
   (d : List RegId) (wm : RegId) (dy : List Source)
   (reg : List (RegId × Source × Chain Γ t)) →
