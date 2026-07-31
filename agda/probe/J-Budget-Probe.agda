@@ -30,21 +30,36 @@
 --
 -- THE FIX THIS FORCES, and it stays inside the round-5 gate
 -- (`frameBlowup : Caps → Caps` — no ledger, no receipt, no E):
+-- `pathSz?` must bound a chain's LENGTH by cSize, not only each frame's
+-- step function.  It already walks the chain; the missing conjunct is
+-- `pathLen p ≤ᵇ B`, and Measurement 3 shows it is fixed per chain and
+-- untouched by cascades, so a per-instant recurrence can carry it.  It
+-- reads nothing outside `Caps`, so round3b-ledger-reset-absurd stays
+-- unavailable, exactly as it does for round 4's own components.
 --
---   (i)  `pathSz?` must bound a chain's LENGTH by cSize, not only each
---        frame's step function.  It already walks the chain; the missing
---        conjunct is `pathLen p ≤ᵇ B`, and Measurement 3 shows it is
---        fixed per chain and untouched by cascades, so a per-instant
---        recurrence can carry it.
---   (ii) the count becomes `cWid * cReg * cSize` — one factor per
---        dimension of "emissions × chains × chain length", with (i)
---        supplying the third.  Both dimensions need it, not just the
---        size one: the stored WIDTH goes 1 ↦ 81 over the same cascade,
---        one tripling per map frame, where a single `foldStep` at this
---        cap allows 49.
+-- AND THE COUNT THIS PROBE PROPOSED IS ITSELF REFUTED — read
+-- Fold-Count-Probe before building on anything below.  This file used
+-- to conclude `cWid * cReg * cSize`, one factor per dimension of
+-- "emissions × chains × chain length".  Two things are wrong with it,
+-- and neither is visible from any family here:
 --
--- Neither reads anything outside `Caps`, so round3b-ledger-reset-absurd
--- stays unavailable, exactly as it does for round 4's own components.
+--   · THE COUNT IS SHORT BY A CLASS.  Every program in this file walks
+--     ONE chain per cascade, so none of them can stress the count's
+--     middle factor.  Nested shares make one cascade's deliveries
+--     exponential in the shared-slot count while the whole triple stays
+--     linear — 2 ^ (k+2) - 2 deliveries against 2k + 2 registrations —
+--     and `2 ^ k` passes `12k + 6` for good at k = 7.
+--   · THE cWid FACTOR WAS NEVER A FACTOR OF THIS COUNT.  cWid bounds
+--     how WIDE one emitted observable is, not how many times a cascade
+--     iterates.  The 1 ↦ 81 measured below is a per-fold blowup, and the
+--     per-fold `foldStep` / `sizeStep` gates in State-Blowup-Probe are
+--     what answer it.
+--
+-- The replacement, derived from the share DAG and gated there, is
+-- `2 ^ cReg * cSize`: a DAG on cReg registrations carries at most
+-- `2 ^ cReg - 1` delivery paths, and each path crosses at most cSize
+-- frames — which is the conjunct (i) above supplies.  So this probe's
+-- surviving contribution is the chain-length conjunct, not the product.
 ------------------------------------------------------------------
 module J-Budget-Probe where
 

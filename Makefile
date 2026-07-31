@@ -51,7 +51,10 @@ help:
 	@echo "  fold-count-probe  does one cascade's FOLD COUNT fit that count?  NO —"
 	@echo "                  nested shares make deliveries exponential in the"
 	@echo "                  number of shared slots while every Caps component"
-	@echo "                  stays linear (see agda/probe/Fold-Count-Probe.agda)"
+	@echo "                  stays linear.  Then GATES the replacement,"
+	@echo "                  2 ^ cReg * cSize, over four share shapes plus the"
+	@echo "                  standing regression suite"
+	@echo "                  (see agda/probe/Fold-Count-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -123,6 +126,13 @@ state-blowup-probe:
 j-budget-probe:
 	cd agda && agda -i src -i probe probe/J-Budget-Probe.agda
 
+# The gate for frameBlowup's ITERATION COUNT itself — the receipt
+# cascadeGo-caps hands back, read off the evaluator's own `delivered`
+# ledger.  It refutes `cWid * cReg * cSize` (nested shares deliver
+# exponentially in the shared-slot count) and then gates the
+# replacement, `2 ^ cReg * cSize`, against four share shapes and the
+# standing regression suite.  Standalone, so src/Main.agda never reaches
+# it.  SLOW — every assertion re-runs the evaluator, ~40 min.
 fold-count-probe:
 	cd agda && agda -i src -i probe probe/Fold-Count-Probe.agda
 

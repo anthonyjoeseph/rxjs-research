@@ -330,15 +330,10 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- THE WORST ONE INSTANT CAN DO, and a function of Caps ALONE — the
 -- signature is the round-5 gate, not a comment about one.
 --
--- All three components share ONE iteration count, `cWid * cReg * cSize`:
--- folds per cascade are bounded by the current width, cascades in an
--- instant by the registration count, and the frames one payload crosses
--- inside a cascade by the chain-length conjunct of pathSz? (the
--- j-budget probe; the count without that third factor is refuted by
--- tickFits-absurd).  The cWid factor is why sizeBlowup must read
--- cWid — pR and pRs have identical step functions and differ only in
--- how many times it runs per frame, 3 ↦ 12 against 3 ↦ 30, so a fixed
--- number of size steps undershoots one of them (State-Blowup-Probe).
+-- All three components share ONE iteration count, `j`, and this
+-- function does not name it: `frameStep` is parametric in the count and
+-- every lemma about it below is too, so replacing the count (which has
+-- now happened twice) touches `frameBlowup` and nothing else.
 --
 -- regBlowup is ADDITIVE in the sources, not multiplicative: pR2's two
 -- live inputs take the registry 1 ↦ 3, one new registration per
@@ -362,21 +357,53 @@ frameStep j c =
        (iterFold (Caps.cSize c) j (Caps.cWid c))
        (Caps.cReg c * suc (j * Caps.cSize c))
 
--- THE COUNT, and its third factor.  `cWid * cReg` was refuted outright:
--- J-Budget-Probe's pM family fixes the whole triple at (7, 1, 1) and
--- still stores 15 … 4371 in one cascade, so no count read off the triple
--- can work until the triple bounds the CHAIN LENGTH — which is what
--- pathSz?'s pathLen conjunct now does.  With that, the three factors are
--- exactly the three dimensions of one cascade's event count:
+-- THE COUNT, and it is EXPONENTIAL in cReg — the second correction this
+-- number has taken, each from a probe rather than from the proof.
 --
---     emissions (cWid)  ×  chains (cReg)  ×  chain length (cSize)
+--   · `cWid * cReg` was refuted by J-Budget-Probe: its pM family fixes
+--     the whole triple at (7, 1, 1) and still stores 15 … 4371 in one
+--     cascade, so no count read off the triple can work until the triple
+--     bounds the CHAIN LENGTH — which pathSz?'s pathLen conjunct does.
+--   · `cWid * cReg * cSize` was then refuted by Fold-Count-Probe, and
+--     not by a factor: nested shares make ONE cascade's delivery count
+--     exponential in the number of shared slots (2 ^ (k+2) - 2) while
+--     every component of the triple stays linear (registrations 2k + 2,
+--     cSize and cWid constant).  2 ^ k passes 12k + 6 for good at k = 7.
 --
--- The third reads cSize because that is where the length conjunct puts
--- it, not because a length is a size: `pathLen p ≤ᵇ cSize` is a separate
--- conjunct of the same field, and at pM 6 the two genuinely differ (a
--- 9-frame chain in a state whose largest term measures 7)
+-- THE SHAPE THAT SURVIVES, derived from the share DAG rather than
+-- guessed.  A delivery is a path r₁ → r₂ → … through the registration
+-- DAG — `foldPath` walks a chain without branching and `dispatchShare`
+-- fans out to every registration `shareAdmit` returns — and the path is
+-- simple, since a repeat would be a cycle in the slot graph, which the
+-- slot defs fix at entry.  A DAG on R nodes carries at most `2 ^ R - 1`
+-- paths, one per subset, so
+--
+--     deliveries ≤ 2 ^ cReg      frames per delivery ≤ cSize
+--
+-- and the count is their product.  The bound is over SUBSETS of
+-- registrations, not over branchings, so m-ary fan-in does not beat it:
+-- extra fan-in only adds edges, and the transitive tournament already
+-- has them all.
+--
+-- cWid IS GONE, and it was never a factor of this count — it bounds how
+-- WIDE one emitted observable is, not how many times a cascade iterates.
+-- Fold-Count-Probe's diamond makes that concrete: `mWid` there is ZERO
+-- while the cascade really delivers eight times, so the old product was
+-- identically 0 on a program with real work to do.  The duty cWid was
+-- carrying (pR vs pRs, 3 ↦ 12 against 3 ↦ 30) belongs to the per-fold
+-- `foldStep` / `sizeStep` gates, which is where State-Blowup-Probe
+-- checks it.
+--
+-- The cSize factor still reads cSize because that is where the length
+-- conjunct puts it, not because a length is a size: `pathLen p ≤ᵇ cSize`
+-- is a separate conjunct of the same field, and at pM 6 the two
+-- genuinely differ (a 9-frame chain in a state whose largest term
+-- measures 7).
+--
+-- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
+-- nothing else, so round3b-ledger-reset-absurd stays unavailable
 frameBlowup : Caps → Caps
-frameBlowup c = frameStep (Caps.cWid c * Caps.cReg c * Caps.cSize c) c
+frameBlowup c = frameStep (2 ^ Caps.cReg c * Caps.cSize c) c
 
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
@@ -951,9 +978,25 @@ postulate
 
   -- (b) THE CASCADE COMPANION, and the budget claim itself.  One
   -- cascade spends j folds and j fits the count — that inequality IS
-  -- what the j-budget probe was run to settle, and it is stated here
-  -- rather than buried, because `cWid * cReg` failed it (tickFits-absurd)
-  -- and only the three-factor count survives.
+  -- what the j-budget and fold-count probes were run to settle, and it
+  -- is stated here rather than buried, because two counts have already
+  -- failed it: `cWid * cReg` (tickFits-absurd) and then
+  -- `cWid * cReg * cSize`, which nested shares beat exponentially.
+  --
+  -- The surviving count is `2 ^ cReg * cSize` — delivery paths through
+  -- the share DAG times frames per path — and Fold-Count-Probe's gate
+  -- machine-checks it against the binary ladder, m-ary fan-in, a
+  -- share-of-share diamond, a scan that mints registrations on a shared
+  -- slot mid-cascade, and the standing pM/pR/pRs/pR2/deepScan suite.
+  --
+  -- THE ONE PLACE THIS IS STILL A CLAIM ABOUT `cReg` AND NOT ABOUT THE
+  -- LIVE COUNT: `shareAdmit i` reads the registry as of that dispatch,
+  -- not a snapshot taken at cascade entry, so a fold that mints a
+  -- registration on a shared slot widens branching for every later
+  -- dispatch of that slot.  The proof of this conjunct therefore cannot
+  -- simply count the pre-state registry; it has to carry the minted
+  -- ones, which `frameStep`'s own cReg component (cReg * suc (j*cSize))
+  -- already tracks.  Family G is the measured case.
   --
   -- caps-tick is then a COROLLARY rather than a sibling face: widen the
   -- reported level to the endpoint by frameStep-mono-j, and the endpoint
@@ -969,7 +1012,7 @@ postulate
     all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
     length chains ≤ Caps.cReg c →
     let r = cascadeGo a id chains sched st
-    in Σ ℕ λ j → (j ≤ Caps.cWid c * Caps.cReg c * Caps.cSize c)
+    in Σ ℕ λ j → (j ≤ 2 ^ Caps.cReg c * Caps.cSize c)
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
   -- the two bookends of `cascade` and the chain snapshot are no longer
@@ -1157,14 +1200,13 @@ postulate
 -- what makes caps-tick the j = full case of (a) rather than a
 -- separate claim
 frameStep-full : ∀ (c : Caps) →
-  frameStep (Caps.cWid c * Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
+  frameStep (2 ^ Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
 frameStep-full c = refl
 
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
-    ≡ frameStep (Caps.cWid (capsAt e sl id) * Caps.cReg (capsAt e sl id)
-                   * Caps.cSize (capsAt e sl id))
+    ≡ frameStep (2 ^ Caps.cReg (capsAt e sl id) * Caps.cSize (capsAt e sl id))
                 (capsAt e sl id)
 capsAt-suc-full e sl id = refl
 
@@ -1178,7 +1220,7 @@ capsAt-suc-full e sl id = refl
 2≤frameBlowup-size : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 2 ≤ Caps.cSize (frameBlowup c)
 2≤frameBlowup-size c h =
   ≤-trans h (iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h)
-               (Caps.cWid c * Caps.cReg c * Caps.cSize c) (Caps.cSize c))
+               (2 ^ Caps.cReg c * Caps.cSize c) (Caps.cSize c))
 
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)
@@ -1691,7 +1733,7 @@ caps-tick {e = e} sl id a nextId sched st slEq pre val =
 -- its own probe): make the mid-instant states explicit with a
 -- CONSUMED-ITERATION index.  One parametric face against level suc id
 -- whose pre-state is bounded by frameBlowup partially applied — k of the
--- cWid * cReg * cSize iterations still unspent — and a subscribeE with fold
+-- 2 ^ cReg * cSize iterations still unspent — and a subscribeE with fold
 -- count j consuming j of k.  caps-frame and caps-tick then become the
 -- two ENDPOINTS (k = full, k = 0) of a single face rather than siblings,
 -- and (2) dissolves because a mid-cascade state is just a smaller k.

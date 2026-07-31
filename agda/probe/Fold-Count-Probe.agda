@@ -59,10 +59,19 @@
 -- The escape itself is past what this normalises (k = 7 is 128 folds of
 -- a growing store), so the crossover is stated as arithmetic over the
 -- measured laws rather than as one `refl` at the crossing depth.
+--
+-- AND THEN THE REPLACEMENT, gated in the same file (families E–G and
+-- THE GATE at the bottom).  The count becomes `pathCount cReg * cWid *
+-- cSize` with `pathCount R = suc R ^ suc R` — the number of paths
+-- through the share DAG, derived below from branching × depth.  The
+-- binary ladder alone under-samples the class it discovered, so the
+-- gate adds m-ary fan-in, a share-of-share diamond, and a scan whose
+-- step re-subscribes a SHARED slot (the family that decides whether a
+-- count read off the PRE-state registry can absorb mid-cascade minting).
 ------------------------------------------------------------------
 module Fold-Count-Probe where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤ᵇ_; _⊔_) renaming (_≡ᵇ_ to _≡ᵇⁿ_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤ᵇ_; _⊔_) renaming (_≡ᵇ_ to _≡ᵇⁿ_)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; sum; map; length; foldr; any)
 open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
@@ -347,10 +356,13 @@ pR2 = mergeAllᵉ (scanᵉ wrapIn2 seedO (input fz))
 --
 --     deliveries  2 ^ k        registrations  2 * k
 --
--- If that is what the evaluator does, `j` is exponential in k against a
--- polynomial `cWid * cReg * cSize`, and the count is refuted — not the
--- theorem, but this shape of it: `shareGo` would have to report the MAX
--- of its siblings' receipts rather than their SUM.
+-- That is what the evaluator does, so `j` is exponential in k against a
+-- polynomial `cWid * cReg * cSize` and the count is refuted — not the
+-- theorem, and not `shareGo`'s summing of its siblings' receipts either.
+-- The receipts are right; the BUDGET was the wrong class.  Note the
+-- doubling is correct rxjs, not a bug: `merge(s1, s1)` through a share
+-- genuinely fires twice per upstream emission, and the evaluator is
+-- reproducing diamond fan-out through the share DAG faithfully
 ------------------------------------------------------------------
 
 dup : ∀ {n} {Γ : Ctx n} → Closed Γ natᵗ → Closed Γ natᵗ
@@ -602,4 +614,292 @@ _ : ((2 * 2 * 2 * 2 * 2 * 2) ≤ᵇ 12 * 6 + 6) ≡ true   -- k = 6:  64 ≤ 78
 _ = refl
 
 _ : ((2 * 2 * 2 * 2 * 2 * 2 * 2) ≤ᵇ 12 * 7 + 6) ≡ false  -- k = 7: 128 > 90
+_ = refl
+
+------------------------------------------------------------------
+-- THE REPLACEMENT COUNT, DERIVED FROM THE SHARE DAG.
+--
+-- THE DERIVATION.  One cascade's deliveries are the PATHS of the
+-- registration DAG, read off the three ground clauses:
+--
+--   · `chainStep` seeds every registration of the arrival's source;
+--   · `foldPath (f ↠ p)` walks a chain without branching;
+--   · `foldPath (share-sink i)` hands to `dispatchShare i`, which
+--     `shareAdmit`s EVERY registration of slot i and `shareGo`s each.
+--
+-- So a delivery is a sequence r₁ → r₂ → … with rₖ₊₁ a registration of
+-- the slot rₖ's chain sinks into, and the sequence is simple: a repeat
+-- would be a cycle in the slot graph, which the defs fix at entry.  A
+-- DAG on R nodes carries at most `2 ^ R - 1` paths — one per subset,
+-- the transitive tournament attaining it — so
+--
+--     deliveries ≤ 2 ^ cReg
+--
+-- and each delivery crosses at most `cSize` frames (`pathSz?`'s length
+-- conjunct, the j-budget probe's finding), giving
+--
+--     j ≤ 2 ^ cReg * cSize
+--
+-- M-ARY FAN-IN DOES NOT BEAT IT, which is worth stating because the
+-- ladder alone would suggest the branching factor is what matters: a
+-- slot's def can merge arbitrarily many distinct shares (family E), but
+-- extra fan-in only adds EDGES, and the transitive tournament already
+-- has them all.  The bound is over subsets of registrations, not over
+-- branchings, so it is insensitive to the DAG's shape.  The ladder
+-- measuring `2 ^ (k+2) - 2` against `cReg = 2k+2` is that bound
+-- essentially tight.
+--
+-- cWid IS GONE, and it was never a factor of this count: it bounds how
+-- WIDE one emitted observable is, not how many times the cascade
+-- iterates.  Its refutation duty (pR vs pRs, 3 ↦ 12 against 3 ↦ 30)
+-- was always discharged by the per-fold `foldStep`/`sizeStep` gates.
+--
+-- The count reads the Caps triple and nothing else, so the round-5 gate
+-- holds: `frameBlowup : Caps → Caps` still cannot see the ledger, the
+-- receipt or E.
+--
+-- WHERE THE DERIVATION IS CRUDE, and family G is the gate for it:
+-- `shareAdmit` reads the registry AS OF THAT DISPATCH, not a snapshot
+-- taken at cascade entry, so a fold that MINTS a registration on a
+-- shared slot widens the branching for every later dispatch of that
+-- slot.  The R above is therefore the registry's live count mid-cascade,
+-- not the pre-state `cReg` the count is computed from.  The bound is
+-- self-referential in the crude reading; whether the exponential
+-- headroom absorbs it is exactly what family G measures
+------------------------------------------------------------------
+
+pathCount : ℕ → ℕ
+pathCount R = 2 ^ R
+
+-- the candidate budget, at the tightest caps the pre-state admits
+mPaths : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mPaths fuel e ins = pathCount (mReg fuel e ins) * mS fuel e ins
+
+------------------------------------------------------------------
+-- FAMILY E — M-ARY FAN-IN.  A slot's def merges THREE DISTINCT shares,
+-- each of which is a `dup` of the same scripted source.  The binary
+-- ladder cannot produce this shape: its branching comes from one slot
+-- carrying two registrations, where here one arrival reaches one slot
+-- along three independent routes, each doubled
+------------------------------------------------------------------
+
+merge3 : ∀ {n} {Γ : Ctx n} → Closed Γ natᵗ → Closed Γ natᵗ → Closed Γ natᵗ
+       → Closed Γ natᵗ
+merge3 a b c = mergeAllᵉ (ofᵉ (strmᵗ a ∷ strmᵗ b ∷ strmᵗ c ∷ []))
+
+Γᵐ : Ctx 5
+Γᵐ = natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+insᵐ : Slots Γᵐ
+insᵐ fz = shared (merge3 (input (fsuc fz))
+                         (input (fsuc (fsuc fz)))
+                         (input (fsuc (fsuc (fsuc fz)))))
+insᵐ (fsuc fz)                      = shared (dup (input (fsuc (fsuc (fsuc (fsuc fz))))))
+insᵐ (fsuc (fsuc fz))               = shared (dup (input (fsuc (fsuc (fsuc (fsuc fz))))))
+insᵐ (fsuc (fsuc (fsuc fz)))        = shared (dup (input (fsuc (fsuc (fsuc (fsuc fz))))))
+insᵐ (fsuc (fsuc (fsuc (fsuc fz)))) = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ []))
+
+pEm : Closed Γᵐ natᵗ
+pEm = dup (input fz)
+
+pCm : Closed Γᵐ natᵗ
+pCm = mergeAllᵉ (scanᵉ wrap1 seedO (input fz))
+
+------------------------------------------------------------------
+-- FAMILY F — THE SHARE-OF-SHARE DIAMOND.  Slot 0's def merges slots 1
+-- and 2; both of those are shares OF slot 3.  One arrival at 3 reaches
+-- slot 0 along two paths that rejoin — the shape the ladder never has,
+-- since its levels are a chain
+------------------------------------------------------------------
+
+Γᵈ : Ctx 4
+Γᵈ = natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+insᵈ : Slots Γᵈ
+insᵈ fz = shared (mergeAllᵉ (ofᵉ (strmᵗ (input (fsuc fz))
+                                    ∷ strmᵗ (input (fsuc (fsuc fz))) ∷ [])))
+insᵈ (fsuc fz)               = shared (input (fsuc (fsuc (fsuc fz))))
+insᵈ (fsuc (fsuc fz))        = shared (input (fsuc (fsuc (fsuc fz))))
+insᵈ (fsuc (fsuc (fsuc fz))) = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ []))
+
+pEd : Closed Γᵈ natᵗ
+pEd = dup (input fz)
+
+pCd : Closed Γᵈ natᵗ
+pCd = mergeAllᵉ (scanᵉ wrap1 seedO (input fz))
+
+------------------------------------------------------------------
+-- FAMILY G — MINTING UNDER A SHARE, and the sharpest question the
+-- replacement has to answer.  `wrapS`'s step re-subscribes the SHARED
+-- slot rather than a scripted input, so every fold adds a registration
+-- to a slot that later dispatches in the SAME cascade will admit.  This
+-- is the one shape that makes the derivation's `R` mid-cascade rather
+-- than at entry: if the count read off the pre-state `cReg` still
+-- covers these runs, the exponential headroom absorbs the minting
+------------------------------------------------------------------
+
+wrapS : Fn Γˢ¹ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrapS = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ strmᵗ (input fz) ∷ [])))
+
+pG1 : Closed Γˢ¹ natᵗ
+pG1 = mergeAllᵉ (scanᵉ wrapS seedO (input fz))
+
+wrapS² : Fn Γˢ² [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+wrapS² = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ strmᵗ (input fz) ∷ [])))
+
+pG2 : Closed Γˢ² natᵗ
+pG2 = mergeAllᵉ (scanᵉ wrapS² seedO (input fz))
+
+------------------------------------------------------------------
+-- MEASUREMENT 5: THE THREE NEW SHAPES, at their pre-state caps.
+--
+--   program   shape                       folds  cReg  cSize
+--   pEm       m-ary fan-in                  24    11     1
+--   pCm       …with a scan under it         18    10     6
+--   pEd       share-of-share diamond         8     6     1
+--   pCd       …with a scan under it          6     5     6
+--   pG1       minting under a share (@0)     5     3     8
+--   pG1       the same, one instant on      13     6    21
+--   pG2       minting, two shared levels    20     5     8
+--
+-- Two things to read off it.  M-ARY FAN-IN IS THE DENSER SHAPE: 24
+-- deliveries off 11 registrations, where the binary ladder needs 10
+-- registrations to reach 62 — different constants, same class, and
+-- neither escapes `2 ^ cReg`.  MINTING SHOWS UP AND IS ABSORBED: pG1
+-- delivers 5 where the non-minting pC1 on the same slots delivers 4, and
+-- pG2 delivers 20 against pC2's 10 — the mid-cascade registrations are
+-- real, they double the count at two levels, and the exponential still
+-- swallows them with four orders of magnitude to spare
+------------------------------------------------------------------
+
+_ : mFolds 0 pEm insᵐ ≡ 24
+_ = refl
+
+_ : mReg 0 pEm insᵐ ≡ 11
+_ = refl
+
+_ : mFolds 0 pCm insᵐ ≡ 18
+_ = refl
+
+_ : mReg 0 pCm insᵐ ≡ 10
+_ = refl
+
+_ : mFolds 0 pEd insᵈ ≡ 8
+_ = refl
+
+_ : mReg 0 pEd insᵈ ≡ 6
+_ = refl
+
+_ : mFolds 0 pCd insᵈ ≡ 6
+_ = refl
+
+_ : mFolds 0 pG1 insˢ¹ ≡ 5
+_ = refl
+
+_ : mFolds 1 pG1 insˢ¹ ≡ 13
+_ = refl
+
+_ : mReg 1 pG1 insˢ¹ ≡ 6
+_ = refl
+
+_ : mFolds 0 pG2 insˢ² ≡ 20
+_ = refl
+
+------------------------------------------------------------------
+-- MEASUREMENT 6: THE DIAMOND HAS WIDTH ZERO, which refutes the old
+-- count a SECOND way and is the sharpest argument for dropping cWid.
+--
+-- `pEd` stores no scan accumulator and holds no pending values wider
+-- than nothing, so the tightest admissible cWid at its pre-state is 0 —
+-- and `cWid * cReg * cSize` is therefore IDENTICALLY ZERO on a program
+-- whose next cascade really delivers eight times.  A count with a cWid
+-- factor is not merely short here; it is zero
+------------------------------------------------------------------
+
+_ : mWid 0 pEd insᵈ ≡ 0
+_ = refl
+
+_ : (mFolds 0 pEd insᵈ ≤ᵇ mWid 0 pEd insᵈ * mReg 0 pEd insᵈ * mS 0 pEd insᵈ)
+      ≡ false
+_ = refl
+
+------------------------------------------------------------------
+-- THE GATE.  Every family in this file, against `2 ^ cReg * cSize` at
+-- the TIGHTEST caps its pre-state admits — not at `capsAt`'s, which is
+-- astronomical and would let anything through.
+--
+-- The ladder alone under-samples the class it discovered, so the gate
+-- runs over all four share shapes (binary ladder, m-ary fan-in,
+-- share-of-share diamond, minting-under-a-share) AND the standing
+-- regression suite the earlier probes established — pM's chain-length
+-- family, deepScan, and the pR/pRs/pR2 registry families
+------------------------------------------------------------------
+
+-- the binary ladder, bare and with a scan under it
+_ : (mFolds 0 pS1 insˢ¹ ≤ᵇ mPaths 0 pS1 insˢ¹) ≡ true
+_ = refl
+
+_ : (mFolds 0 pS2 insˢ² ≤ᵇ mPaths 0 pS2 insˢ²) ≡ true
+_ = refl
+
+_ : (mFolds 0 pS3 insˢ³ ≤ᵇ mPaths 0 pS3 insˢ³) ≡ true
+_ = refl
+
+_ : (mFolds 0 pS4 insˢ⁴ ≤ᵇ mPaths 0 pS4 insˢ⁴) ≡ true
+_ = refl
+
+_ : (mFolds 0 pC1 insˢ¹ ≤ᵇ mPaths 0 pC1 insˢ¹) ≡ true
+_ = refl
+
+_ : (mFolds 0 pC2 insˢ² ≤ᵇ mPaths 0 pC2 insˢ²) ≡ true
+_ = refl
+
+_ : (mFolds 0 pC3 insˢ³ ≤ᵇ mPaths 0 pC3 insˢ³) ≡ true
+_ = refl
+
+-- m-ary fan-in
+_ : (mFolds 0 pEm insᵐ ≤ᵇ mPaths 0 pEm insᵐ) ≡ true
+_ = refl
+
+_ : (mFolds 0 pCm insᵐ ≤ᵇ mPaths 0 pCm insᵐ) ≡ true
+_ = refl
+
+-- the share-of-share diamond
+_ : (mFolds 0 pEd insᵈ ≤ᵇ mPaths 0 pEd insᵈ) ≡ true
+_ = refl
+
+_ : (mFolds 0 pCd insᵈ ≤ᵇ mPaths 0 pCd insᵈ) ≡ true
+_ = refl
+
+-- minting under a share, at two pre-states and two depths
+_ : (mFolds 0 pG1 insˢ¹ ≤ᵇ mPaths 0 pG1 insˢ¹) ≡ true
+_ = refl
+
+_ : (mFolds 1 pG1 insˢ¹ ≤ᵇ mPaths 1 pG1 insˢ¹) ≡ true
+_ = refl
+
+_ : (mFolds 0 pG2 insˢ² ≤ᵇ mPaths 0 pG2 insˢ²) ≡ true
+_ = refl
+
+-- and the standing regression suite: chain length, the deepening scan,
+-- and the three registry families
+_ : (mFolds 0 (pM 1) ins1 ≤ᵇ mPaths 0 (pM 1) ins1) ≡ true
+_ = refl
+
+_ : (mFolds 0 (pM 2) ins1 ≤ᵇ mPaths 0 (pM 2) ins1) ≡ true
+_ = refl
+
+_ : (mFolds 0 pD ins1 ≤ᵇ mPaths 0 pD ins1) ≡ true
+_ = refl
+
+_ : (mFolds 0 pR ins1 ≤ᵇ mPaths 0 pR ins1) ≡ true
+_ = refl
+
+_ : (mFolds 1 pR ins1 ≤ᵇ mPaths 1 pR ins1) ≡ true
+_ = refl
+
+_ : (mFolds 0 pRs ins1 ≤ᵇ mPaths 0 pRs ins1) ≡ true
+_ = refl
+
+_ : (mFolds 0 pR2 ins2 ≤ᵇ mPaths 0 pR2 ins2) ≡ true
 _ = refl

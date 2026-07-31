@@ -36,8 +36,9 @@
 ------------------------------------------------------------------
 module State-Blowup-Probe where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_)
-open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_;
+                            z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans)
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; sum; map; length; foldr)
 open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
@@ -58,6 +59,7 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
                                 subscribeE; cascade; slotsSize; root)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Verify-Budget-Sufficient using (foldStep; sizeStep; iterSize;
+                                            iterSize-mono-count;
                                             Caps; capsAt; stBounded?;
                                             capsOK?)
 open import Rx.Prim using (Gas; Tick)
@@ -514,16 +516,53 @@ _ = refl
 -- instant-0 caps must cover the state the ROOT SUBSCRIBE leaves, which
 -- for pRs is three folds' worth.  Only cSize and cReg are checked — the
 -- width component composes to a tower and does not normalise, which is
--- why the width gates above are per-fold
+-- why the width gates above are per-fold.
+--
+-- THE cSIZE HALF IS NO LONGER A `refl`, and the reason is Fold-Count-
+-- Probe: the iteration count is now `2 ^ cReg * cSize`, and pRs enters
+-- at cSize 25 / cReg 24, so the endpoint is `iterSize 25 (2 ^ 24 * 25)
+-- 25` — four hundred million iterations, each squaring, which no
+-- machine unfolds.  So it is checked the way the k = 7 crossover is:
+-- as arithmetic over a law, with the law's small-count instance still
+-- `refl`-gated.  The content is identical — capsAt's instant-0 cSize
+-- dominates ONE fold from the entry caps, and one fold already covers
+-- the 30 the root subscribe leaves.
+--
+-- The cReg half is still `refl`: its endpoint is `cReg * suc (j*cSize)`,
+-- a product of numerals however large j is, with no iteration to unfold
 ------------------------------------------------------------------
 
-_ : (30 ≤ᵇ Caps.cSize (capsAt pRs ins3 0)) ≡ true
-_ = refl
+-- the law, with the COUNT LEFT ABSTRACT — which is what keeps it
+-- checkable: `e` and `sl` are variables, so `Caps.cSize (capsAt e sl 0)`
+-- gets stuck at `iterSize A ⟨count⟩ A` instead of unfolding it
+capsAt0-one-fold : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  1 ≤ 2 ^ suc (sizeᵉ e + slotsSize sl) * (2 + sizeᵉ e + slotsSize sl) →
+  iterSize (2 + sizeᵉ e + slotsSize sl) 1 (2 + sizeᵉ e + slotsSize sl)
+    ≤ Caps.cSize (capsAt e sl 0)
+capsAt0-one-fold e sl h = iterSize-mono-count _ _ (s≤s z≤n) h
+
+-- pRs enters at 25, one fold takes it to 1275, and 1275 covers the 30
+capsAt0-size-pRs : 30 ≤ Caps.cSize (capsAt pRs ins3 0)
+capsAt0-size-pRs = ≤-trans lo hi
+  where
+  A : ℕ
+  A = 2 + sizeᵉ pRs + slotsSize ins3
+  lo : 30 ≤ iterSize A 1 A
+  lo = ≤ᵇ⇒≤ 30 (iterSize A 1 A) _
+  hi : iterSize A 1 A ≤ Caps.cSize (capsAt pRs ins3 0)
+  hi = capsAt0-one-fold pRs ins3 (≤ᵇ⇒≤ 1 _ _)
+
+capsAt0-size-pA : 3 ≤ Caps.cSize (capsAt pA ins3 0)
+capsAt0-size-pA = ≤-trans lo hi
+  where
+  A : ℕ
+  A = 2 + sizeᵉ pA + slotsSize ins3
+  lo : 3 ≤ iterSize A 1 A
+  lo = ≤ᵇ⇒≤ 3 (iterSize A 1 A) _
+  hi : iterSize A 1 A ≤ Caps.cSize (capsAt pA ins3 0)
+  hi = capsAt0-one-fold pA ins3 (≤ᵇ⇒≤ 1 _ _)
 
 _ : (6 ≤ᵇ Caps.cReg (capsAt pRs ins3 0)) ≡ true
-_ = refl
-
-_ : (3 ≤ᵇ Caps.cSize (capsAt pA ins3 0)) ≡ true
 _ = refl
 
 _ : (1 ≤ᵇ Caps.cReg (capsAt pA ins3 0)) ≡ true

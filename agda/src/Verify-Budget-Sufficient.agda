@@ -107,8 +107,10 @@
 -- assembly over the cascade companions.  And the joint the round was
 -- about (does one cascade's fold count FIT the recurrence's iteration
 -- budget?) is now a named conjunct of cascadeGo-caps rather than
--- something hidden inside a face — with the j-budget probe saying which
--- count it has to fit, since `cWid * cReg` is refuted outright.
+-- something hidden inside a face — with the probes saying which count it
+-- has to fit.  Two have been refuted there: `cWid * cReg` (J-Budget-
+-- Probe) and `cWid * cReg * cSize` (Fold-Count-Probe, where nested
+-- shares beat it exponentially).  The count is now `2 ^ cReg * cSize`.
 --
 -- caps-frame, likewise, was refuted as uninstantiable (same-level
 -- preservation is false: the subscribe frame itself folds) and split
@@ -124,7 +126,13 @@
 -- first round-4 draft: foldStep (gated against payload counts, too small
 -- for the outWᵛ it actually bounds, so it now reads cSize), outWᵉ's
 -- scripted clause (0, collapsing every scripted program's width cap),
--- and the base case (which now pays for its own root frame).  Round 3's face is
+-- and the base case (which now pays for its own root frame).  Its
+-- ITERATION COUNT then took a fourth refutation, from Fold-Count-Probe:
+-- nested shares make one cascade's deliveries exponential in the shared-
+-- slot count while every Caps component stays linear, so the count is
+-- `2 ^ cReg * cSize` — delivery paths through the share DAG times frames
+-- per path.  frameStep and its whole monotonicity toolkit are parametric
+-- in the count, so that landed in frameBlowup alone.  Round 3's face is
 -- untouched — it was only ever missing something to instantiate Ŝ, R̂, F
 -- at.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
