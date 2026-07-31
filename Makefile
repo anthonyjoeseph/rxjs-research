@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -61,6 +61,12 @@ help:
 	@echo "                  deliveries saturate in k on three ladders of four,"
 	@echo "                  while 2 ^ cReg * cSize grows.  The fourth is still"
 	@echo "                  climbing where it stops computing.  ~18 min, two files"
+	@echo "  joint-probe   is subscribeE-caps's joint hypothesis, pathLen + size"
+	@echo "                  <= cSize, true at the TIGHT admissible cSize?  NO — it"
+	@echo "                  fails on every one of seventeen families, and the"
+	@echo "                  half-cap chain watermark fails on the simplest of them"
+	@echo "                  (see agda/probe/Joint-Probe.agda)"
+	@echo "                  make joint-probe ARGS='0 80'   (the whole sweep)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -155,6 +161,18 @@ mint-loop-probe:
 	cd agda && agda -i src -i probe probe/Mint-Loop-Shapes.agda
 	cd agda && agda -i src -i probe probe/Mint-Loop-Probe.agda
 	cd agda && agda -i src -i probe probe/Mint-Loop-Frames.agda
+
+# The gate on repairing the caps tree's two blocked companions.
+# subscribeE-caps hypothesises `pathLen κ + sizeᵉ b ≤ cSize` and the
+# delivery side carries the two bounds SEPARATELY; before the ℓ ledger is
+# threaded through four ground clauses and a state predicate, this
+# measures whether the joint form is true at the tight admissible cSize.
+# It is not — see the reading at the head of agda/probe/Joint-Probe.agda.
+# Instruments a COPY of the evaluator (agda/src is never written).
+#   make joint-probe                 (row 0)
+#   make joint-probe ARGS='0 80'     (the whole sweep)
+joint-probe:
+	scripts/joint-probe.sh $(ARGS)
 
 ts-check:
 	cd typescript && npm run typecheck
