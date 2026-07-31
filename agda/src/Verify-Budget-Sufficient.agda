@@ -82,16 +82,30 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FOURTEEN POSTULATES REMAIN.  They are: the three walk faces
+-- TEN POSTULATES REMAIN.  They are: the three walk faces
 -- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
 -- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the two
 -- pieces the BUDGET CLAIM is assembled from (cascadeGo-charge and
--- cascadeGo-deliveries), five of the subscribe-side companions
--- (subscribeE-input-caps, thruConsume-caps, thruWalk-caps,
--- concatDrain-caps, innerFinish-caps), and the two VALUE clauses
--- mapFrame-caps / scanFrame-caps that stepFrame-caps was traded for.
--- frameBlowup is fully defined, and cascadeGo-caps, the cascade
--- bookends and the chain snapshot are all ground.
+-- cascadeGo-deliveries), ONE subscribe-side companion
+-- (subscribeE-input-caps), and the two VALUE clauses mapFrame-caps /
+-- scanFrame-caps that stepFrame-caps was traded for.  frameBlowup is
+-- fully defined, and cascadeGo-caps, the cascade bookends and the chain
+-- snapshot are all ground.
+--
+-- THE WHOLE *All EDGE IS GROUND (2026-07-31), which is what the
+-- joint-bound repair bought: thruConsume-caps, thruWalk-caps,
+-- concatDrain-caps and innerFinish-caps join subscribeInner-caps, and
+-- four postulates leave the tree in one leg.  thruConsume was always
+-- provable and its CALLER was not, because thruWalk owed it a joint
+-- bound nobody could supply; under the separate pair thruWalk hands
+-- down, per payload, the very conjunct it already carries.  The per-op
+-- node bookkeeping stores nothing new — merge's counter, switch's
+-- current-inner and exhaust's flag carry no payload, and concatAll's
+-- queue stores the payload VERBATIM, so `obsCaps?` IS
+-- `valCaps? … (obs s)` definitionally and the drained residue goes back
+-- into the node with the bound it came out with.  switchAll's cut is
+-- the only clause that moves the registry, and it is cutSweep-caps
+-- without the node.
 --
 -- subscribeInner-caps is PROVEN — the caps grind's first clause, taken
 -- first because it was the most uncertain: the *All edge
