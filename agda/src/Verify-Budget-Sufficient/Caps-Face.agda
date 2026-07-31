@@ -24,7 +24,7 @@ module Verify-Budget-Sufficient.Caps-Face where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
                                 if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _∸_; _≤_; _<_;
                                 _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
                                        ≤-reflexive; <-≤-trans; ≤-pred;
@@ -371,31 +371,76 @@ frameStep j c =
 --     cSize and cWid constant).  2 ^ k passes 12k + 6 for good at k = 7.
 --
 -- THE SHAPE THAT SURVIVES, derived from the share DAG rather than
--- guessed.  A delivery is a path r₁ → r₂ → … through the registration
--- DAG — `foldPath` walks a chain without branching and `dispatchShare`
--- fans out to every registration `shareAdmit` returns — and the path is
--- simple, since a repeat would be a cycle in the slot graph, which the
--- slot defs fix at entry.  A DAG on R nodes carries at most `2 ^ R - 1`
--- paths, one per subset, so
+-- guessed, and REPAIRED once since: the first derivation had a false
+-- middle step and Mint-Loop-Probe caught it.
 --
---     deliveries ≤ 2 ^ cReg      frames per delivery ≤ cSize
+-- A delivery is a path r₁ → r₂ → … through the registration DAG —
+-- `foldPath` walks a chain without branching and `dispatchShare` fans out
+-- to every registration `shareAdmit` returns — and the path is simple,
+-- since a repeat would be a cycle in the slot graph, which the slot defs
+-- fix at entry.  A DAG on R nodes carries at most `2 ^ R - 1` paths, one
+-- per subset.  The step that FAILS is reading R as cReg:
 --
--- and the count is their product.  The bound is over SUBSETS of
--- registrations, not over branchings, so m-ary fan-in does not beat it:
--- extra fan-in only adds edges, and the transitive tournament already
--- has them all.
+--     deliveries ≤ 2 ^ cReg          -- FALSE, and measured false
 --
--- WHEN THIS IS PROVEN RATHER THAN GATED, the lemma to reach for is the
--- INVERTED PAIR, not "one per subset" — the latter is the corollary.
--- The injection is `paths ↪ subsets`, sending a path to the SET of
--- registrations it visits, and what has to be shown is that the map is
--- injective: two distinct traversals of the SAME set would have to
--- disagree on the order of some pair, and a pair inverted between two
--- reachability-respecting orders is a cycle, which the DAG forbids.
+-- The R of that count is the registry AT THE END of the cascade, not at
+-- entry, because `shareAdmit` reads the live registry; a fold that mints
+-- on a shared slot adds a node mid-traversal.  Mint-Loop-Probe's
+-- three-level lean ladder at k = 2 delivers 176 times out of an ENTRY
+-- registry of 7, and 2 ^ 7 = 128.  So the excess is real, `D * cSize`
+-- is itself over `2 ^ cReg * cSize`, and the whole paths-times-frames
+-- route through that middle step is gone.
+--
+-- WHAT SURVIVES IS THE SAME INJECTION WITH A SECOND COORDINATE.  A
+-- delivery is sent not to the set of registrations it visits but to the
+-- PAIR (the pre-state registrations it visits, an index for which minted
+-- registrations it went through).  The first coordinate ranges over
+-- subsets of the entry registry — `2 ^ cReg` of them.
+--
+-- THE SECOND COORDINATE IS NOT BOUNDED BY cSize, and that was the second
+-- thing measured false here.  It was first stated so, on the reasoning
+-- that a mint is born of a subscribe inside ONE frame and a frame's step
+-- function can name no more sources than its own syntax holds.
+-- Mint-Loop-Probe's MEASUREMENT 6 computes the coordinate directly — the
+-- fibre of a pre-state class — and gets 4 against a cSize of 3 on the
+-- lean two-level ladder and 8 against 3 on the lean three-level one.
+-- The lean families exist for exactly this: they keep the delivery
+-- structure and shrink the syntax the cap is read off.
+--
+-- SO BOTH COORDINATES RANGE OVER SUBSETS OF THE ENTRY REGISTRY.  A
+-- delivery is determined by the pre-state registrations it visits
+-- together with the pre-state registrations whose dispatches minted the
+-- ones it visits — every mint happens during some delivery and every
+-- delivery bottoms out at a pre-state chain, so the second coordinate is
+-- pre-state data too.  That is a story and not yet a proof: it does not
+-- on its own show the recursion bottoms out.  It gives
+--
+--     deliveries ≤ 2 ^ cReg * 2 ^ cReg    frames per delivery ≤ cSize
+--
+-- and the count is their product: `2 ^ cReg * 2 ^ cReg * cSize`.
+-- MEASUREMENT 6 gates both coordinates (22 against 128, 13 against 32)
+-- and MEASUREMENT 5 gates the product against j itself.
+--
+-- The bound is over SUBSETS of registrations, not over branchings, so
+-- m-ary fan-in does not beat it: extra fan-in only adds edges, and the
+-- transitive tournament already has them all.
+--
+-- WHEN THE FIRST COORDINATE IS PROVEN RATHER THAN GATED, the lemma to
+-- reach for is the INVERTED PAIR, not "one per subset" — the latter is
+-- the corollary.  The injection is `paths ↪ subsets`, sending a path to
+-- the SET of registrations it visits, and what has to be shown is that
+-- the map is injective: two distinct traversals of the SAME set would
+-- have to disagree on the order of some pair, and a pair inverted between
+-- two reachability-respecting orders is a cycle, which the DAG forbids.
 -- Note the nodes are the REGISTRATIONS, not the slots — `merge(s1, s1)`
 -- registers twice on one slot and so contributes two nodes — which is
 -- why parallel fan-in never collapses into a shared node and the
 -- one-per-subset count survives it.
+--
+-- The SECOND coordinate is the damper, and it is the one without a
+-- formal counterpart, and splitting it off as its own coordinate was
+-- tried and abandoned: see `cascadeGo-deliveries` below, which now
+-- states the delivery bound whole.
 --
 -- cWid IS GONE, and it was never a factor of this count — it bounds how
 -- WIDE one emitted observable is, not how many times a cascade iterates.
@@ -415,7 +460,7 @@ frameStep j c =
 -- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
 -- nothing else, so round3b-ledger-reset-absurd stays unavailable
 frameBlowup : Caps → Caps
-frameBlowup c = frameStep (2 ^ Caps.cReg c * Caps.cSize c) c
+frameBlowup c = frameStep (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) c
 
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
@@ -988,50 +1033,103 @@ postulate
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
-  -- (b) THE CASCADE COMPANION, and the budget claim itself.  One
-  -- cascade spends j folds and j fits the count — that inequality IS
-  -- what the j-budget and fold-count probes were run to settle, and it
-  -- is stated here rather than buried, because two counts have already
-  -- failed it: `cWid * cReg` (tickFits-absurd) and then
-  -- `cWid * cReg * cSize`, which nested shares beat exponentially.
-  --
-  -- The surviving count is `2 ^ cReg * cSize` — delivery paths through
-  -- the share DAG times frames per path — and Fold-Count-Probe's gate
-  -- machine-checks it against the binary ladder, m-ary fan-in, a
-  -- share-of-share diamond, a scan that mints registrations on a shared
-  -- slot mid-cascade, and the standing pM/pR/pRs/pR2/deepScan suite.
-  --
-  -- THE ONE PLACE THIS IS STILL A CLAIM ABOUT `cReg` AND NOT ABOUT THE
-  -- LIVE COUNT: `shareAdmit i` reads the registry as of that dispatch,
-  -- not a snapshot taken at cascade entry, so a fold that mints a
-  -- registration on a shared slot widens branching for every later
-  -- dispatch of that slot.  The proof of this conjunct therefore cannot
-  -- simply count the pre-state registry; it has to carry the minted
-  -- ones, which `frameStep`'s own cReg component (cReg * suc (j*cSize))
-  -- already tracks.
-  --
-  -- THE FEEDBACK LOOP THIS OPENS IS MEASURED AND DOES NOT TOWER.  Read
-  -- naively the recursion is vicious — d ≤ 2 ^ R_end with R_end ≤ R₀ +
-  -- d * mints has no closed bound — and family G only sampled its base
-  -- rung.  Mint-Loop-Probe closes it: a scan under a share whose step
-  -- re-subscribes that share, nested k deep, so a minted chain itself
-  -- mints.  The deliveries SATURATE in k (5 flat at one shared level;
-  -- 20, 26, 27, 27 at two; 50 … 269 at three) because a minted
-  -- registration is only reachable by dispatches that come after it and
-  -- how many remain is fixed by the PRE-STATE DAG — while each nesting
-  -- level adds a constant to the step function's syntax and so to cSize,
-  -- which multiplies the budget by `2 ^ cReg` a level.  The worst
-  -- count/budget ratio over that whole sweep is at k = 0, the
-  -- non-nested mint family G already gated, and it FALLS with ladder
-  -- depth.  The mid-cascade subscription that drives the loop is real
-  -- rxjs, not an evaluator artifact — a subscriber added mid-cascade
-  -- misses the in-flight emission and receives the cascade's later ones,
-  -- checked against rxjs 7.8 at the probe's head.
-  --
-  -- caps-tick is then a COROLLARY rather than a sibling face: widen the
-  -- reported level to the endpoint by frameStep-mono-j, and the endpoint
-  -- IS capsAt (suc id) by capsAt-suc-full
-  cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- the two bookends of `cascade` and the chain snapshot are no longer
+  -- postulated either: they are GROUND below, on the same two filter
+  -- lemmas the share leaves use.
+
+------------------------------------------------------------------
+-- (b) THE CASCADE COMPANION, AND THE BUDGET CLAIM, AS AN ASSEMBLY.
+--
+-- This is the most refutation-scarred statement in the file: three
+-- counts have failed it — `cWid * cReg` (tickFits-absurd), then
+-- `cWid * cReg * cSize` (nested shares beat it exponentially), then
+-- `2 ^ cReg * cSize`, whose middle step Mint-Loop-Probe measured false.
+-- Each time the failure was at ROUTE level and each time it was found by
+-- running something rather than by proving something.  So the conjunct is
+-- not stated as one opaque claim here; it is DECOMPOSED first, with the
+-- pieces postulated, so that the next failure lands on a named statement
+-- instead of three clauses into a grind.
+--
+-- THE THREE PIECES.  Write `D` for the deliveries a cascade makes — one
+-- per registration it folds into, which is exactly what its own ledger
+-- counts, since every delivering clause of `cascadeGo` and `shareGo`
+-- conses one `rid` onto `delivered`.  Then
+--
+--   (i)  cascadeGo-charge      j ≤ D * cSize
+--   (ii) cascadeGo-deliveries  D ≤ 2 ^ cReg * 2 ^ cReg
+--
+-- and `cascadeGo-caps` below is their product, by arithmetic and nothing
+-- else.  (i) is the per-delivery charge: every fold is a frame on some
+-- delivery's chain, and a chain is shorter than cSize by pathSz?'s own
+-- length conjunct — this is the half the induction already carries, in
+-- the shape `foldPath-caps` reports it.  (ii) is the delivery bound, and
+-- it is where all the difficulty is.
+--
+-- (ii) WAS SPLIT AND THE SPLIT DIED, twice, in one session — which is
+-- what stating it as an assembly was for.  The split sent a delivery to
+-- the PAIR (which pre-state registrations its path visits, an index for
+-- which minted ones it went through), with `preClasses ≤ 2 ^ cReg` on the
+-- first coordinate and a DAMPER on the second.  Mint-Loop-Probe gave both
+-- coordinates definitions and measured them:
+--
+--   · `fibreCap ≤ cSize` — the reasoning was that a mint happens inside
+--     ONE frame and a frame's step function names no more sources than
+--     its syntax holds.  Measured 4 against a cSize of 3 on the lean
+--     two-level ladder.  Refuted.
+--   · `fibreCap ≤ 2 ^ cReg` — the reasoning was that every mint happens
+--     during some delivery and every delivery bottoms out at a pre-state
+--     chain, so the second coordinate is pre-state data too.  It ATTAINS
+--     128 against 128 on the three-level ladder and then reaches 576
+--     against a cap of 512 on the four-level one.  Refuted.
+--
+-- AND THE FIRST COORDINATE IS FINE, which is what makes the split
+-- pointless rather than merely unlucky.  `preClasses` measures 4, 10, 22,
+-- 46 for entry registries of 3, 5, 7, 9 — about `2 ^ (cReg / 2)`, and
+-- invariant in the nesting depth, because the pre-state classes really
+-- are fixed by the pre-state DAG.  So D is (something small) times
+-- (something the size of D): the split renames the problem instead of
+-- decomposing it, and the second factor inherits every difficulty the
+-- first was supposed to remove.  The delivery bound is therefore stated
+-- WHOLE, and it is the single place the mint loop has to be beaten.
+--
+-- WHAT THE EVIDENCE FOR (ii) IS.  Every row of Mint-Loop-Probe, with the
+-- margin GROWING as the ladder deepens rather than shrinking: D against
+-- `2 ^ cReg * 2 ^ cReg` runs 0.078, 0.026, 0.016, 0.0097 across the four
+-- ladders.  That is the opposite of the signature the two refuted bounds
+-- showed, both of which had ratios climbing toward 1.
+--
+-- THE FEEDBACK LOOP BEHIND ALL OF THIS IS MEASURED AND DOES NOT TOWER.
+-- Read naively the recursion is vicious — D ≤ 2 ^ R_end with R_end ≤ R₀ +
+-- D * mints has no closed bound — and family G only sampled its base
+-- rung.  Mint-Loop-Probe closes it: a scan under a share whose step
+-- re-subscribes that share, nested k deep, so a minted chain itself
+-- mints.  Deliveries SATURATE in k (5 flat at one shared level; 20, 26,
+-- 27, 27 at two; 50 … 269 at three) because a minted registration is
+-- only reachable by dispatches that come after it and how many remain is
+-- fixed by the PRE-STATE DAG.  j saturates too, but LATER — 58, 226,
+-- 548, 912, 1164, 1268, 1291 — because nesting keeps lengthening the
+-- chains after it has stopped widening them, so the count/budget ratio
+-- has an interior peak at k = 3 rather than falling monotonically.  The
+-- mid-cascade subscription that drives the loop is real rxjs, not an
+-- evaluator artifact: a subscriber added mid-cascade misses the
+-- in-flight emission and receives the cascade's later ones, checked
+-- against rxjs 7.8 at the probe's head.
+--
+-- caps-tick is then a COROLLARY rather than a sibling face: widen the
+-- reported level to the endpoint by frameStep-mono-j, and the endpoint
+-- IS capsAt (suc id) by capsAt-suc-full
+------------------------------------------------------------------
+
+-- the deliveries a cascade makes, off the evaluator's own ledger
+delivN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → EvalSt e → ℕ
+delivN st st′ = length (EvalSt.delivered st′) ∸ length (EvalSt.delivered st)
+
+postulate
+  -- (i) THE PER-DELIVERY CHARGE.  The receipt the induction actually
+  -- builds, charged to the cascade's own delivery ledger rather than to
+  -- a count: every fold is a frame on some delivery's chain, and
+  -- pathSz?'s length conjunct caps a chain at cSize
+  cascadeGo-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -1042,12 +1140,47 @@ postulate
     all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
     length chains ≤ Caps.cReg c →
     let r = cascadeGo a id chains sched st
-    in Σ ℕ λ j → (j ≤ 2 ^ Caps.cReg c * Caps.cSize c)
+    in Σ ℕ λ j → (j ≤ delivN st (proj₂ (proj₂ r)) * Caps.cSize c)
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- the two bookends of `cascade` and the chain snapshot are no longer
-  -- postulated either: they are GROUND below, on the same two filter
-  -- lemmas the share leaves use.
+  -- (ii) THE DELIVERY BOUND, WHOLE.  One cascade's deliveries against
+  -- subsets of the entry registry, squared.  This is the mint loop's
+  -- one remaining hiding place: `shareAdmit` reads the registry as of
+  -- the dispatch, so the DAG the paths run through is the END registry,
+  -- and nothing here bounds that by cReg.  Two decompositions of this
+  -- statement have been measured false; it stands on Mint-Loop-Probe's
+  -- gate and on nothing else
+  cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (a : Arrival Γ) (id : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    length chains ≤ Caps.cReg c →
+    delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
+      ≤ 2 ^ Caps.cReg c * 2 ^ Caps.cReg c
+
+-- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
+cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (a : Arrival Γ) (id : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  capsOK? c sched st ≡ true →
+  valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+  length chains ≤ Caps.cReg c →
+  let r = cascadeGo a id chains sched st
+  in Σ ℕ λ j → (j ≤ 2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c)
+     × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
+  proj₁ CH
+    , ≤-trans (proj₁ (proj₂ CH))
+              (*-monoˡ-≤ (Caps.cSize c)
+                 (cascadeGo-deliveries c a id chains sched st inv lenB))
+    , proj₂ (proj₂ CH)
+  where
+  CH = cascadeGo-charge c a id chains sl sched st 2≤S slEq inv vC pS lenB
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE-SIDE COMPANION TREE, transcribed from subscribeE-walkS's
@@ -1230,13 +1363,14 @@ postulate
 -- what makes caps-tick the j = full case of (a) rather than a
 -- separate claim
 frameStep-full : ∀ (c : Caps) →
-  frameStep (2 ^ Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
+  frameStep (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
 frameStep-full c = refl
 
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
-    ≡ frameStep (2 ^ Caps.cReg (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+    ≡ frameStep (2 ^ Caps.cReg (capsAt e sl id) * 2 ^ Caps.cReg (capsAt e sl id)
+                   * Caps.cSize (capsAt e sl id))
                 (capsAt e sl id)
 capsAt-suc-full e sl id = refl
 
@@ -1250,7 +1384,7 @@ capsAt-suc-full e sl id = refl
 2≤frameBlowup-size : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 2 ≤ Caps.cSize (frameBlowup c)
 2≤frameBlowup-size c h =
   ≤-trans h (iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h)
-               (2 ^ Caps.cReg c * Caps.cSize c) (Caps.cSize c))
+               (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) (Caps.cSize c))
 
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)

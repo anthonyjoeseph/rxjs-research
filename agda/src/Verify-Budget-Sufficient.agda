@@ -82,18 +82,18 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- TWENTY-TWO POSTULATES REMAIN, and the number going UP is the plan
--- rather than a regression.  They are: the three walk faces
+-- FIFTEEN POSTULATES REMAIN.  They are: the three walk faces
 -- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
--- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the five
--- cascade companions caps-tick is assembled from (cascadeGo-caps — which
--- carries the BUDGET CLAIM itself — plus cascadeLatch-caps,
--- cascadeFinish-caps, chainsOf-caps, chainsOf-length), and twelve of the
--- thirteen subscribe-side companions transcribed from subscribeE-walkS's
--- clique.  frameBlowup is fully defined: no gaps inside it.
+-- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the two
+-- pieces the BUDGET CLAIM is assembled from (cascadeGo-charge, the
+-- per-delivery charge, and cascadeGo-deliveries, the delivery bound),
+-- and eight of the subscribe-side companions transcribed from
+-- subscribeE-walkS's clique.  frameBlowup is fully defined: no gaps
+-- inside it, and cascadeGo-caps, the cascade bookends and the chain
+-- snapshot are all ground.
 --
--- The thirteenth, subscribeInner-caps, is PROVEN — the grind's first
--- clause, taken first because it was the most uncertain: the *All edge
+-- subscribeInner-caps is PROVEN — the caps grind's first clause, taken
+-- first because it was the most uncertain: the *All edge
 -- where the inner observable comes off a burst payload rather than the
 -- syntax, so every hypothesis it feeds back into subscribeE-caps has to
 -- come from valCaps? and from κ extended by one frame.  It closes.
@@ -103,14 +103,27 @@
 -- changes it here, cheaply, instead of invalidating a pile of finished
 -- clause proofs.  Two things follow immediately, and both are the point.
 --
--- caps-tick is NOT among the twenty-three — it is derived, four lines of
+-- caps-tick is NOT among the fifteen — it is derived, four lines of
 -- assembly over the cascade companions.  And the joint the round was
 -- about (does one cascade's fold count FIT the recurrence's iteration
 -- budget?) is now a named conjunct of cascadeGo-caps rather than
 -- something hidden inside a face — with the probes saying which count it
--- has to fit.  Two have been refuted there: `cWid * cReg` (J-Budget-
--- Probe) and `cWid * cReg * cSize` (Fold-Count-Probe, where nested
--- shares beat it exponentially).  The count is now `2 ^ cReg * cSize`.
+-- has to fit.  THREE have been refuted there: `cWid * cReg` (J-Budget-
+-- Probe), `cWid * cReg * cSize` (Fold-Count-Probe, where nested shares
+-- beat it exponentially), and `2 ^ cReg * cSize`, whose middle step
+-- Mint-Loop-Probe measured false — a mid-cascade mint puts the path
+-- count's R above cReg, and 176 deliveries came out of a 7-registration
+-- entry state.  The count is now `2 ^ cReg * 2 ^ cReg * cSize`, and the
+-- delivery bound behind it is stated WHOLE — the two-coordinate split
+-- was tried and died twice the same session, once at `≤ cSize` (fibre 4
+-- against a cSize of 3) and once at `≤ 2 ^ cReg` (fibre 576 against a cap
+-- of 512, on a four-level ladder built to test exactly that).  The first
+-- coordinate measured fine throughout, which is what makes the split
+-- pointless rather than unlucky: D is (something small) times (something
+-- the size of D).  cascadeGo-caps itself is no longer postulated — it is
+-- the product of the per-delivery charge and the delivery bound — and
+-- all three refutations landed on a stated assembly with no clause proof
+-- underneath it to lose.  That is what the outside-in rule bought.
 --
 -- caps-frame, likewise, was refuted as uninstantiable (same-level
 -- preservation is false: the subscribe frame itself folds) and split
@@ -129,10 +142,15 @@
 -- and the base case (which now pays for its own root frame).  Its
 -- ITERATION COUNT then took a fourth refutation, from Fold-Count-Probe:
 -- nested shares make one cascade's deliveries exponential in the shared-
--- slot count while every Caps component stays linear, so the count is
--- `2 ^ cReg * cSize` — delivery paths through the share DAG times frames
--- per path.  frameStep and its whole monotonicity toolkit are parametric
--- in the count, so that landed in frameBlowup alone.  Round 3's face is
+-- slot count while every Caps component stays linear.  And a fifth, from
+-- Mint-Loop-Probe, which measured `j` rather than the deliveries the
+-- earlier probes stood in for and found the path count's `2 ^ cReg`
+-- middle step false: the count is `2 ^ cReg * 2 ^ cReg * cSize`,
+-- delivery paths against subsets of the entry registry squared, times
+-- frames per path.  The second exponent is not a second coordinate with
+-- a story any more; it is the slack the measurements demand.
+-- frameStep and its whole monotonicity toolkit are parametric in the
+-- count, so both landed in frameBlowup alone.  Round 3's face is
 -- untouched — it was only ever missing something to instantiate Ŝ, R̂, F
 -- at.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
