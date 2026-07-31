@@ -1092,11 +1092,37 @@ postulate
 -- first was supposed to remove.  The delivery bound is therefore stated
 -- WHOLE, and it is the single place the mint loop has to be beaten.
 --
--- WHAT THE EVIDENCE FOR (ii) IS.  Every row of Mint-Loop-Probe, with the
--- margin GROWING as the ladder deepens rather than shrinking: D against
--- `2 ^ cReg * 2 ^ cReg` runs 0.078, 0.026, 0.016, 0.0097 across the four
--- ladders.  That is the opposite of the signature the two refuted bounds
--- showed, both of which had ratios climbing toward 1.
+-- WHAT THE EVIDENCE FOR (ii) IS — AND IT IS WEAKER THAN THIS COMMENT
+-- USED TO SAY.  The bound HOLDS on every row Mint-Loop-Probe and
+-- Mint-Loop-Frames measure; no measurement refutes it.  That is all it
+-- holds by.
+--
+-- The claim that stood here — that the margin GROWS as the ladder
+-- deepens, citing D / (2 ^ cReg * 2 ^ cReg) at 0.078, 0.026, 0.016,
+-- 0.0097 — is FALSE, and it is instance 4 of Mint-Loop-Probe's STANDING
+-- WARNING — DO NOT EXTRAPOLATE FROM SHALLOW ROWS, at that file's head.
+-- Those four numbers compared each ladder at whatever k it had then been
+-- swept to, and the four-level ladder had only been swept to k = 2.
+-- Swept to k = 5 it spends 0.10056 — the WORST ratio in either file,
+-- worse than the ONE-level ladder's 0.078 — so the sequence is
+-- 0.078, 0.026, 0.016, 0.10056 and there is no trend in it at all.
+-- `D * 10 ≤ 2 ^ cReg * 2 ^ cReg` is false at L = 4.
+--
+-- AND THE DEEPEST AFFORDABLE ROW IS NOT SATURATED.  L = 3 has flattened
+-- by k = 5 (under 1 % per rung), but L = 4's per-rung growth runs 4.37,
+-- 3.51, 2.72, 2.16, 1.77 — decelerating, and still buying 77 % at the
+-- last rung either harness can compute.  k = 6 was killed at 40 minutes
+-- and 12.4 GB.  So the spend is at a tenth of budget while still
+-- climbing, and the per-level trend (L = 3 saturated at 0.016, L = 4
+-- unsaturated at ≥ 0.10) points the wrong way: a breach at L = 5 or
+-- L = 6 is expected rather than excluded.
+--
+-- STATUS: (ii) IS UNPROVEN AND SUSPECT, and the grind on it is FROZEN by
+-- design ruling — this conjunct, `preClasses`-style splits, and fibre
+-- caps are not to be attacked, and L = 5 is not to be measured, until
+-- the delivery recurrence has been DERIVED from the evaluator's
+-- structure and used to PREDICT the L = 5 rows.  Measuring them first
+-- would spend the only out-of-sample test the derivation has.
 --
 -- THE FEEDBACK LOOP BEHIND ALL OF THIS IS MEASURED AND DOES NOT TOWER.
 -- Read naively the recursion is vicious — D ≤ 2 ^ R_end with R_end ≤ R₀ +
