@@ -228,15 +228,17 @@ mDelivs fuel e ins ss =
 --
 -- (a) THE FIRES DO NOT MOVE.  At all.
 --
---   program                   slot0  slot1  slot2  slot3
+--   program                   slot0  slot1  slot2  slot3  slot4
 --   pS¹                           2
 --   pS²                           4      2
 --   pS³                           8      4      2
 --   pS⁴                          16      8      4      2
+--   pS⁵                          32     16      8      4      2
 --   pL¹  k = 0 … 5                2
 --   pL²  k = 0 … 5                4      2
 --   pL³  k = 0 … 6                8      4      2
 --   pL⁴  k = 0 … 5               16      8      4      2
+--   pL⁵  k = 0 … 2               32     16      8      4      2
 --   pG′  k = 0, 2                 2
 --   pG′² k = 0, 3                 4      2
 --   pG′³ k = 0                    8      4      2
@@ -249,14 +251,23 @@ mDelivs fuel e ins ss =
 --   registration's path never ends at a `share-sink` and never adds a
 --   fan-out.  Every registration it adds is a CONSUMER.
 --
+--   THIS IS A PROPERTY OF THESE FAMILIES AND NOT OF MINTING.  Move the
+--   minting scan INSIDE a shared def and the fires move: see THE
+--   AMPLIFIER ROWS at the foot of this comment block, where pB's slot 0
+--   fires 7, 11 and 12 times against a pure-DAG 2.
+--
 -- (b) SO THE WHOLE k-DEPENDENCE IS ONE NUMBER: the width of slot 0's
 -- fan-outs.  Deliveries split by dispatching source (the row sums to D):
 --
---   program        slot0  slot1  slot2  slot3  input      D
---   pS¹                4                          2       6
---   pS²                8      4                   2      14
---   pS³               16      8      4            2      30
---   pS⁴               32     16      8      4     2      62
+--   program        slot0  slot1  slot2  slot3  slot4  input      D
+--   pS¹                4                                   2       6
+--   pS²                8      4                            2      14
+--   pS³               16      8      4                     2      30
+--   pS⁴               32     16      8      4              2      62
+--   pS⁵               64     32     16      8      4       2     126
+--   pL⁵  k = 0       528     32     16      8      4       2     590
+--        k = 1      5488     32     16      8      4       2    5550
+--        k = 2     41448     32     16      8      4       2   41510
 --   pL¹  k = 0 … 5     3                          2       5
 --   pL²  k = 0        10      4                   2      16
 --        k = 1        14      4                   2      20
@@ -308,6 +319,11 @@ mDelivs fuel e ins ss =
 --       k = 4     15   105   455  1365  3003          4943
 --       k = 5      —     —     —     —     —            —   (NOT MEASURED:
 --                                                            killed at 20 min)
+--   pL⁵ k = 0     32                                   32
+--       k = 1     32   496                            528
+--       k = 2     32   496  4960                     5488
+--       k = 3      —     —     —                        —   (NOT MEASURED:
+--                                                            out of memory)
 --   pS³, pS⁴       0     0     0     0     0            0
 --
 --   The deepest generation is k + 1 on every row (`mGenMax` reads 6 at
@@ -336,16 +352,22 @@ mDelivs fuel e ins ss =
 --   L = 3, C(8,·)  = 8 28 56 70 56 28 8 1   : 36 92 162 218 246 254 255
 --   L = 4, C(16,·) = 16 120 560 1820 4368 8008 11440 …
 --                                           : 136 696 2516 6884 14892 26332
+--   L = 5, C(32,·) = 32 496 4960 35960 …    : 528 5488 41448
 --
---   Twenty-one measured rows, four ladders, no exceptions — including
+--   Twenty-four measured rows, five ladders, no exceptions — including
 --   every row of the four-level ladder, which is the one that has not
---   saturated.  It is a FIT, not a derivation: nothing here proves the
---   next row obeys it, and the standing warning at the head of
---   Mint-Loop-Probe is about exactly this family.  What is different
---   from the four instances that earned that warning is that this is
---   not a trend read off the shallow rows and extended — it is a
---   closed form that hits the DEEPEST affordable row of every ladder
---   on the nose.
+--   saturated.  It WAS a fit; the L = 5 rows are not, and that is the
+--   point of them.  The closed form was SEALED against L = 5 in
+--   probe/Delivery-Law-Prediction.md (commit 9deeb29) before the L = 5
+--   shapes existed, and the three rungs this container can reach match
+--   it exactly — D 590 / 5550 / 41510, increments C(32,3) and C(32,4)
+--   on the nose, generations 32 / 496 / 4960, fires 32 16 8 4 2, cReg
+--   11, cSize 8k + 2.  The RESULTS section of that file has the
+--   claim-by-claim comparison.  So this is one genuine out-of-sample
+--   test passed, which is more than a fit and still less than a
+--   derivation: nothing here proves the k = 3 row obeys it, and the
+--   standing warning at the head of Mint-Loop-Probe is about exactly
+--   this family.
 --
 -- (e) WHAT THE CLOSED FORM SAYS ABOUT THE BUDGET, AS ARITHMETIC AND
 -- NOT AS MEASUREMENT.  Deliveries saturate at k ≥ 2 ^ L ∸ 2, where the
@@ -363,8 +385,9 @@ mDelivs fuel e ins ss =
 --     4      9     262144       65565          0.2501   k = 14  (NOT MEASURED —
 --                                                        deepest measured is
 --                                                        k = 5 at 26362, 0.1006)
---     5     11    4194304  4294967357       1024.0      k = 30  (NOT MEASURED —
---                                                        by standing ruling)
+--     5     11    4194304  4294967357       1024.0      k = 30  (D_sat NOT
+--                                                        MEASURED; k = 0, 1, 2
+--                                                        ARE — 590, 5550, 41510)
 --
 --   The mismatch is one of KIND, not of constant: D is DOUBLY
 --   exponential in the ladder depth, `2 ^ (2 ^ L)`, and the budget is
@@ -372,12 +395,80 @@ mDelivs fuel e ins ss =
 --   cross between L = 4 and L = 5 and never come back, so no constant
 --   multiple of `2 ^ cReg * 2 ^ cReg` survives either.
 --
---   L = 5 IS NOT MEASURED AND WAS NOT ATTEMPTED, by standing ruling:
---   the design session derives the recurrence from the evaluator`s
---   structure and predicts those rows before anyone runs them, so
---   running them first would spend the only out-of-sample test the
---   derivation has.  The row above is the closed form`s own arithmetic
---   and is labelled as such
+--   L = 5 IS NOW MEASURED, and it was measured SECOND, which is the
+--   whole value of it: the standing ruling held the ladder back until
+--   probe/Delivery-Law-Prediction.md was in history (9deeb29), so the
+--   rows below are an out-of-sample test rather than a fit.  k = 0, 1
+--   and 2 all match the sealed prediction exactly; k = 3 is NOT
+--   MEASURED (`mFolds 0 (pL⁵ 3) insG⁵` died out of memory under a
+--   12 GB address-space cap and again under 14.2 GB on a 15 GB box).
+--
+--   AND THE BUDGET BREAKS ON THIS LADDER, as arithmetic off measured
+--   rows rather than as a measurement.  cReg is 11 at every rung
+--   measured, so the allowance is 4 ^ 11 = 4194304, and the increment
+--   law — exact on both rungs where an increment can be formed — gives
+--
+--       D(5,4) =  1149078   under
+--       D(5,5) =  4514934   OVER
+--
+--   The first breaching rung is k = 5.  That is the Fold-Count
+--   arithmetic economy again: the crossover is not normalisable in this
+--   container and does not need to be
+------------------------------------------------------------------
+-- MEASUREMENT 9: THE AMPLIFIER FAMILY — the minting scan INSIDE a
+-- shared def (`pA` / `insA`, `pB` / `insB`, defined below).
+--
+-- ROWS ONLY.  No trend, no saturation reading, no comparison to any
+-- bound: this family exists because the delivery law's caveat says the
+-- fires-never-move property is a property of the lean ladders and not
+-- of minting, and these rows are input to a derivation that has not
+-- been made.  The standing warning at the head of Mint-Loop-Probe
+-- applies with full force — three values of k on two shapes is three
+-- values of k on two shapes.  All rows compiled harness
+-- (`probe/Measure-Main.agda`, indices 154–236), measured-not-rechecked.
+--
+-- pA — ONE shared slot, def = `mergeAll (scan (mintA k) seed (input 1))`,
+-- slot 1 scripted (two emissions), root `dup (input 0)`.  cReg = 3.
+--
+--   k   cascade   D   mints   fires slot0   deliveries (slot0, input)
+--   0      0      3     1          1          2  1
+--   1      0      3     1          1          2  1
+--   2      0      3     1          1          2  1
+--   0      1      6     0          2          4  2
+--   1      1      6     0          2          4  2
+--   2      1      6     0          2          4  2
+--   0      2      6     0          0          —
+--   2      2      6     0          0          —      (mints 0)
+--
+--   generations at cascade 0: g = 1 holds 1, nothing deeper, at every k.
+--
+-- pB — TWO levels: slot 0 shared with def
+-- `mergeAll (scan (mintB k) seed (input 1))`, slot 1 shared with def
+-- `dup (input 2)`, slot 2 scripted (two emissions), root `dup (input 0)`.
+-- cReg = 5, cSize = 3 / 10 / 18 at k = 0 / 1 / 2.
+--
+--   k   cascade    D   mints   fires (slot0, slot1)   deliveries (0, 1, input)
+--   0      0      11     2          3   2               6    3   2
+--   1      0      11     3          3   2               6    3   2
+--   2      0      11     3          3   2               6    3   2
+--   3      0      11     3          3   2               —
+--   4      0      11     3          3   2               —
+--   0      1      23     1          7   2              14    7   2
+--   1      1      35     3         11   2              22   11   2
+--   2      1      38     4         12   2              24   12   2
+--   3      1      38     —          —   —               —
+--   4      1      38     —          —   —               —
+--
+--   generations, pB: cascade 0 has g = 1 holding 2 / 2 / 2 and g = 2
+--   holding 0 / 1 / 1 at k = 0 / 1 / 2; cascade 1 has g = 1 holding
+--   1 / 3 / 4 and nothing deeper.  Post-cascade registry (`mReg`) at
+--   cascade 1: 7 / 8 / 8.
+--
+-- THE ONE THING THESE ROWS SAY THAT THE LEAN LADDERS DO NOT, stated as
+-- a row and not as a trend: pB's slot 0 fires 3 times at cascade 0 and
+-- 7, 11, 12 times at cascade 1, where the share DAG alone dispatches it
+-- 2 times.  On every lean ladder, at every k measured, the fire count
+-- equals the pure-DAG control's exactly.  Here it does not
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -929,6 +1020,95 @@ pL⁴ k = mergeAllᵉ (scanᵉ (mintOnly⁴ k) seedO (input fz))
 
 
 ------------------------------------------------------------------
+-- FIVE SHARED LEVELS — THE OUT-OF-SAMPLE ROW.  Same lean ladder one
+-- level deeper: five shares, entry cReg = 2L + 1 = 11, and the scripted
+-- input carries TWO emissions (insG³'s script, not insG⁴'s single one),
+-- so cascade 0 is NOT a completing cascade and slot 0's fire count is a
+-- full 2 ^ 5 = 32.  That is the shape the sealed prediction in
+-- probe/Delivery-Law-Prediction.md was written against: it claims
+-- `C(32, ·)` for the generations and `C(32, k+3)` for the delivery
+-- increments, which is the non-completing form.  (pL⁴ scripts a SINGLE
+-- emission and its generations are `C(15, ·)` for exactly that reason.)
+------------------------------------------------------------------
+
+Γˢ⁵ : Ctx 6
+Γˢ⁵ = natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+insG⁵ : Slots Γˢ⁵
+insG⁵ fz                                    = shared (dup (input (fsuc fz)))
+insG⁵ (fsuc fz)                             = shared (dup (input (fsuc (fsuc fz))))
+insG⁵ (fsuc (fsuc fz))                      =
+  shared (dup (input (fsuc (fsuc (fsuc fz)))))
+insG⁵ (fsuc (fsuc (fsuc fz)))               =
+  shared (dup (input (fsuc (fsuc (fsuc (fsuc fz))))))
+insG⁵ (fsuc (fsuc (fsuc (fsuc fz))))        =
+  shared (dup (input (fsuc (fsuc (fsuc (fsuc (fsuc fz)))))))
+insG⁵ (fsuc (fsuc (fsuc (fsuc (fsuc fz))))) =
+  scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ []))
+
+mintOnly⁵ : ∀ {Θ} → ℕ → Tm Γˢ⁵ [] [] Θ (obs natᵗ)
+mintOnly⁵ zero    = strmᵗ (input fz)
+mintOnly⁵ (suc k) = strmᵗ (mergeAllᵉ (scanᵉ (mintOnly⁵ k) seedO (input fz)))
+
+pL⁵ : ℕ → Closed Γˢ⁵ natᵗ
+pL⁵ k = mergeAllᵉ (scanᵉ (mintOnly⁵ k) seedO (input fz))
+
+------------------------------------------------------------------
+-- THE AMPLIFIER FAMILY: THE MINTING SCAN INSIDE A SHARED DEF.
+--
+-- Every ladder above mints from the ROOT program's scan, so a minted
+-- registration's chain ends at `root` and it is a pure CONSUMER — which
+-- is why MEASUREMENT 8(a) finds the fires invariant in k.  Move the same
+-- scan INSIDE a shared def and that stops being true: the minted
+-- registration's chain now ends at that def's sink, `share-sink i`, so
+-- delivering to it DISPATCHES the share.  Mints become fires, and fires
+-- beget registrations beget fires.
+--
+-- `pA` is the minimal instance: ONE shared slot whose def is
+-- `mergeAll (scan (mintA k) seed (input scripted))`.  Its mints land on
+-- the scripted slot.
+--
+-- `pB` is the two-level instance: slot 0's def carries the minting scan
+-- over slot 1, and slot 1 is itself a share (`dup` of the script).  Its
+-- mints land on slot 1 — a SHARE — so a later dispatch of slot 1 in the
+-- same cascade sees the widened registry, which is the feedback edge the
+-- one-level shape does not have.
+--
+-- NO READING IS ATTACHED TO THESE SHAPES HERE.  The rows they produce
+-- are recorded in Mint-Loop-Probe with the four-instance standing
+-- warning in force
+------------------------------------------------------------------
+
+Γᴬ : Ctx 2
+Γᴬ = natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+mintA : ∀ {Θ} → ℕ → Tm Γᴬ [] [] Θ (obs natᵗ)
+mintA zero    = strmᵗ (input (fsuc fz))
+mintA (suc k) = strmᵗ (mergeAllᵉ (scanᵉ (mintA k) seedO (input (fsuc fz))))
+
+insA : ℕ → Slots Γᴬ
+insA k fz        = shared (mergeAllᵉ (scanᵉ (mintA k) seedO (input (fsuc fz))))
+insA k (fsuc fz) = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ []))
+
+pA : Closed Γᴬ natᵗ
+pA = dup (input fz)
+
+Γᴮ : Ctx 3
+Γᴮ = natᵗ ∷ᵛ natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+mintB : ∀ {Θ} → ℕ → Tm Γᴮ [] [] Θ (obs natᵗ)
+mintB zero    = strmᵗ (input (fsuc fz))
+mintB (suc k) = strmᵗ (mergeAllᵉ (scanᵉ (mintB k) seedO (input (fsuc fz))))
+
+insB : ℕ → Slots Γᴮ
+insB k fz               = shared (mergeAllᵉ (scanᵉ (mintB k) seedO (input (fsuc fz))))
+insB k (fsuc fz)        = shared (dup (input (fsuc (fsuc fz))))
+insB k (fsuc (fsuc fz)) = scripted (hot ((after 0 , 1) ∷ (after 0 , 2) ∷ []))
+
+pB : Closed Γᴮ natᵗ
+pB = dup (input fz)
+
+------------------------------------------------------------------
 -- THE NON-NESTED CONTROL: THE SHARE DAG WITH NOTHING UNDER IT.  No
 -- scan, no minting, no k — just `merge(s, s)` through a ladder of
 -- shares, so every dispatch is pre-state and the branching profile is
@@ -955,3 +1135,6 @@ pS³ = dup (input fz)
 
 pS⁴ : Closed Γˢ⁴ natᵗ
 pS⁴ = dup (input fz)
+
+pS⁵ : Closed Γˢ⁵ natᵗ
+pS⁵ = dup (input fz)

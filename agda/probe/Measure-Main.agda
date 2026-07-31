@@ -42,18 +42,20 @@ rowL : String → List ℕ → String
 rowL nm vs = nm ++ " = " ++ showL vs ++ "\n"
 
 -- the slot vectors: slot L is the scripted input and never fans out
-s1 s2 s3 s4 : List ℕ
+s1 s2 s3 s4 s5 : List ℕ
 s1 = 0 ∷ []
 s2 = 0 ∷ 1 ∷ []
 s3 = 0 ∷ 1 ∷ 2 ∷ []
 s4 = 0 ∷ 1 ∷ 2 ∷ 3 ∷ []
+s5 = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ []
 
 -- the same, plus the scripted input, which dispatches the root chains
-d1 d2 d3 d4 : List ℕ
+d1 d2 d3 d4 d5 : List ℕ
 d1 = 0 ∷ 1 ∷ []
 d2 = 0 ∷ 1 ∷ 2 ∷ []
 d3 = 0 ∷ 1 ∷ 2 ∷ 3 ∷ []
 d4 = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ []
+d5 = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ []
 
 gens : List ℕ
 gens = 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 6 ∷ 7 ∷ 8 ∷ 9 ∷ 10 ∷ []
@@ -195,6 +197,134 @@ rows =
   ∷ rowL "DELIV pG2 3" (mDelivs 0 (pG′² 3) insG² d2)
   ∷ rowL "DELIV pG3 0" (mDelivs 0 (pG′³ 0) insG³ d3)
   ∷ rowL "FIRE pL3 6" (mFires 0 (pL³ 6) insG³ s3)
+  -- 122 …: THE L = 5 OUT-OF-SAMPLE ROWS.  The sealed prediction is
+  -- probe/Delivery-Law-Prediction.md, committed at 9deeb29 BEFORE any of
+  -- these existed.  The cheap measures first (mFolds/mMints ride postAt),
+  -- then the profiles, so a rung that dies on the dear ones still reports
+  ∷ row "mFolds 0 (pL5 0) insG5" (mFolds 0 (pL⁵ 0) insG⁵)
+  ∷ row "mMints 0 (pL5 0) insG5" (mMints 0 (pL⁵ 0) insG⁵)
+  ∷ row "mFolds 0 (pL5 1) insG5" (mFolds 0 (pL⁵ 1) insG⁵)
+  ∷ row "mMints 0 (pL5 1) insG5" (mMints 0 (pL⁵ 1) insG⁵)
+  ∷ row "mFolds 0 (pL5 2) insG5" (mFolds 0 (pL⁵ 2) insG⁵)
+  ∷ row "mMints 0 (pL5 2) insG5" (mMints 0 (pL⁵ 2) insG⁵)
+  ∷ row "mFolds 0 (pL5 3) insG5" (mFolds 0 (pL⁵ 3) insG⁵)
+  ∷ row "mMints 0 (pL5 3) insG5" (mMints 0 (pL⁵ 3) insG⁵)
+  ∷ row "mReg 0 (pL5 0) insG5" (mReg 0 (pL⁵ 0) insG⁵)
+  ∷ row "mReg 0 (pL5 1) insG5" (mReg 0 (pL⁵ 1) insG⁵)
+  ∷ row "mReg 0 (pL5 2) insG5" (mReg 0 (pL⁵ 2) insG⁵)
+  ∷ row "mReg 0 (pL5 3) insG5" (mReg 0 (pL⁵ 3) insG⁵)
+  ∷ row "mS 0 (pL5 0) insG5" (mS 0 (pL⁵ 0) insG⁵)
+  ∷ row "mS 0 (pL5 1) insG5" (mS 0 (pL⁵ 1) insG⁵)
+  ∷ row "mS 0 (pL5 2) insG5" (mS 0 (pL⁵ 2) insG⁵)
+  ∷ row "mS 0 (pL5 3) insG5" (mS 0 (pL⁵ 3) insG⁵)
+  ∷ rowL "FIRE pL5 0" (mFires 0 (pL⁵ 0) insG⁵ s5)
+  ∷ rowL "FIRE pL5 1" (mFires 0 (pL⁵ 1) insG⁵ s5)
+  ∷ rowL "FIRE pL5 2" (mFires 0 (pL⁵ 2) insG⁵ s5)
+  ∷ rowL "FIRE pL5 3" (mFires 0 (pL⁵ 3) insG⁵ s5)
+  ∷ rowL "DELIV pL5 0" (mDelivs 0 (pL⁵ 0) insG⁵ d5)
+  ∷ rowL "DELIV pL5 1" (mDelivs 0 (pL⁵ 1) insG⁵ d5)
+  ∷ rowL "DELIV pL5 2" (mDelivs 0 (pL⁵ 2) insG⁵ d5)
+  ∷ rowL "DELIV pL5 3" (mDelivs 0 (pL⁵ 3) insG⁵ d5)
+  ∷ rowL "GEN pL5 0" (mGens 0 (pL⁵ 0) insG⁵ gens)
+  ∷ rowL "GEN pL5 1" (mGens 0 (pL⁵ 1) insG⁵ gens)
+  ∷ rowL "GEN pL5 2" (mGens 0 (pL⁵ 2) insG⁵ gens)
+  ∷ rowL "GEN pL5 3" (mGens 0 (pL⁵ 3) insG⁵ gens)
+  ∷ row "mPre 0 (pL5 0) insG5" (mPre 0 (pL⁵ 0) insG⁵)
+  ∷ row "mPre 0 (pL5 1) insG5" (mPre 0 (pL⁵ 1) insG⁵)
+  ∷ rowL "FIRE pS5" (mFires 0 pS⁵ insG⁵ s5)
+  ∷ rowL "DELIV pS5" (mDelivs 0 pS⁵ insG⁵ d5)
+  -- 154 …: THE AMPLIFIER FAMILY — the minting scan INSIDE a shared def,
+  -- so minted chains end at the share's sink and mints become fires
+  ∷ row "mFolds 0 pA (insA 0)" (mFolds 0 pA (insA 0))
+  ∷ row "mMints 0 pA (insA 0)" (mMints 0 pA (insA 0))
+  ∷ row "mFolds 0 pA (insA 1)" (mFolds 0 pA (insA 1))
+  ∷ row "mMints 0 pA (insA 1)" (mMints 0 pA (insA 1))
+  ∷ row "mFolds 0 pA (insA 2)" (mFolds 0 pA (insA 2))
+  ∷ row "mMints 0 pA (insA 2)" (mMints 0 pA (insA 2))
+  ∷ row "mReg 0 pA (insA 0)" (mReg 0 pA (insA 0))
+  ∷ row "mReg 0 pA (insA 1)" (mReg 0 pA (insA 1))
+  ∷ row "mReg 0 pA (insA 2)" (mReg 0 pA (insA 2))
+  ∷ rowL "FIRE pA 0" (mFires 0 pA (insA 0) s1)
+  ∷ rowL "FIRE pA 1" (mFires 0 pA (insA 1) s1)
+  ∷ rowL "FIRE pA 2" (mFires 0 pA (insA 2) s1)
+  ∷ rowL "DELIV pA 0" (mDelivs 0 pA (insA 0) d1)
+  ∷ rowL "DELIV pA 1" (mDelivs 0 pA (insA 1) d1)
+  ∷ rowL "DELIV pA 2" (mDelivs 0 pA (insA 2) d1)
+  ∷ rowL "GEN pA 0" (mGens 0 pA (insA 0) gens)
+  ∷ rowL "GEN pA 1" (mGens 0 pA (insA 1) gens)
+  ∷ rowL "GEN pA 2" (mGens 0 pA (insA 2) gens)
+  -- 172 …: the same at cascade 1, because the one-level shape's mints
+  -- land on the SCRIPTED slot and the arrival's chains are read at
+  -- cascade entry
+  ∷ row "mFolds 1 pA (insA 0)" (mFolds 1 pA (insA 0))
+  ∷ row "mMints 1 pA (insA 0)" (mMints 1 pA (insA 0))
+  ∷ row "mFolds 1 pA (insA 1)" (mFolds 1 pA (insA 1))
+  ∷ row "mMints 1 pA (insA 1)" (mMints 1 pA (insA 1))
+  ∷ row "mFolds 1 pA (insA 2)" (mFolds 1 pA (insA 2))
+  ∷ row "mMints 1 pA (insA 2)" (mMints 1 pA (insA 2))
+  ∷ rowL "FIRE pA 0 c1" (mFires 1 pA (insA 0) s1)
+  ∷ rowL "FIRE pA 1 c1" (mFires 1 pA (insA 1) s1)
+  ∷ rowL "FIRE pA 2 c1" (mFires 1 pA (insA 2) s1)
+  ∷ rowL "DELIV pA 0 c1" (mDelivs 1 pA (insA 0) d1)
+  ∷ rowL "DELIV pA 1 c1" (mDelivs 1 pA (insA 1) d1)
+  ∷ rowL "DELIV pA 2 c1" (mDelivs 1 pA (insA 2) d1)
+  -- 184 …: the TWO-LEVEL amplifier, whose mints land on a SHARE
+  ∷ row "mFolds 0 pB (insB 0)" (mFolds 0 pB (insB 0))
+  ∷ row "mMints 0 pB (insB 0)" (mMints 0 pB (insB 0))
+  ∷ row "mFolds 0 pB (insB 1)" (mFolds 0 pB (insB 1))
+  ∷ row "mMints 0 pB (insB 1)" (mMints 0 pB (insB 1))
+  ∷ row "mFolds 0 pB (insB 2)" (mFolds 0 pB (insB 2))
+  ∷ row "mMints 0 pB (insB 2)" (mMints 0 pB (insB 2))
+  ∷ row "mReg 0 pB (insB 0)" (mReg 0 pB (insB 0))
+  ∷ row "mReg 0 pB (insB 1)" (mReg 0 pB (insB 1))
+  ∷ row "mReg 0 pB (insB 2)" (mReg 0 pB (insB 2))
+  ∷ rowL "FIRE pB 0" (mFires 0 pB (insB 0) s2)
+  ∷ rowL "FIRE pB 1" (mFires 0 pB (insB 1) s2)
+  ∷ rowL "FIRE pB 2" (mFires 0 pB (insB 2) s2)
+  ∷ rowL "DELIV pB 0" (mDelivs 0 pB (insB 0) d2)
+  ∷ rowL "DELIV pB 1" (mDelivs 0 pB (insB 1) d2)
+  ∷ rowL "DELIV pB 2" (mDelivs 0 pB (insB 2) d2)
+  ∷ rowL "GEN pB 0" (mGens 0 pB (insB 0) gens)
+  ∷ rowL "GEN pB 1" (mGens 0 pB (insB 1) gens)
+  ∷ rowL "GEN pB 2" (mGens 0 pB (insB 2) gens)
+  ∷ row "mFolds 1 pB (insB 0)" (mFolds 1 pB (insB 0))
+  ∷ row "mFolds 1 pB (insB 1)" (mFolds 1 pB (insB 1))
+  ∷ row "mFolds 1 pB (insB 2)" (mFolds 1 pB (insB 2))
+  -- 205 …: pB at cascade 1, where the mints of cascade 0 are in the
+  -- registry the arrival's chains are read off
+  ∷ row "mMints 1 pB (insB 0)" (mMints 1 pB (insB 0))
+  ∷ row "mMints 1 pB (insB 1)" (mMints 1 pB (insB 1))
+  ∷ row "mMints 1 pB (insB 2)" (mMints 1 pB (insB 2))
+  ∷ rowL "FIRE pB 0 c1" (mFires 1 pB (insB 0) s2)
+  ∷ rowL "FIRE pB 1 c1" (mFires 1 pB (insB 1) s2)
+  ∷ rowL "FIRE pB 2 c1" (mFires 1 pB (insB 2) s2)
+  ∷ rowL "DELIV pB 0 c1" (mDelivs 1 pB (insB 0) d2)
+  ∷ rowL "DELIV pB 1 c1" (mDelivs 1 pB (insB 1) d2)
+  ∷ rowL "DELIV pB 2 c1" (mDelivs 1 pB (insB 2) d2)
+  ∷ rowL "GEN pB 0 c1" (mGens 1 pB (insB 0) gens)
+  ∷ rowL "GEN pB 1 c1" (mGens 1 pB (insB 1) gens)
+  ∷ rowL "GEN pB 2 c1" (mGens 1 pB (insB 2) gens)
+  ∷ row "mReg 1 pB (insB 0)" (mReg 1 pB (insB 0))
+  ∷ row "mReg 1 pB (insB 1)" (mReg 1 pB (insB 1))
+  ∷ row "mReg 1 pB (insB 2)" (mReg 1 pB (insB 2))
+  ∷ row "mS 0 pB (insB 0)" (mS 0 pB (insB 0))
+  ∷ row "mS 0 pB (insB 1)" (mS 0 pB (insB 1))
+  ∷ row "mS 0 pB (insB 2)" (mS 0 pB (insB 2))
+  -- 223 …: deeper k on pB's cascade 0, and pA at cascade 2
+  ∷ row "mFolds 0 pB (insB 3)" (mFolds 0 pB (insB 3))
+  ∷ row "mFolds 0 pB (insB 4)" (mFolds 0 pB (insB 4))
+  ∷ row "mMints 0 pB (insB 3)" (mMints 0 pB (insB 3))
+  ∷ row "mMints 0 pB (insB 4)" (mMints 0 pB (insB 4))
+  ∷ rowL "FIRE pB 3" (mFires 0 pB (insB 3) s2)
+  ∷ rowL "FIRE pB 4" (mFires 0 pB (insB 4) s2)
+  ∷ row "mFolds 1 pB (insB 3)" (mFolds 1 pB (insB 3))
+  ∷ row "mFolds 1 pB (insB 4)" (mFolds 1 pB (insB 4))
+  ∷ row "mFolds 2 pA (insA 0)" (mFolds 2 pA (insA 0))
+  ∷ row "mFolds 2 pA (insA 1)" (mFolds 2 pA (insA 1))
+  ∷ row "mFolds 2 pA (insA 2)" (mFolds 2 pA (insA 2))
+  ∷ rowL "FIRE pA 0 c2" (mFires 2 pA (insA 0) s1)
+  ∷ rowL "FIRE pA 2 c2" (mFires 2 pA (insA 2) s1)
+  ∷ row "mMints 2 pA (insA 2)" (mMints 2 pA (insA 2))
   ∷ []
 
 idx : ℕ → List String → String

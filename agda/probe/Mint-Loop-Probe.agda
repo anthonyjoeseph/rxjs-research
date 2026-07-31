@@ -43,6 +43,17 @@
 -- so.  (On the current numbers: L = 3 flattens by k = 5, changing under
 -- 1 % per rung; L = 4 at its last measurable row is still growing 77 %
 -- per rung.  Saturation at L = 4 is NOT OBSERVED.)
+--
+-- WHAT DOES SURVIVE, AND WHAT MAKES IT DIFFERENT.  Exactly one claim
+-- about this family has been tested OUT OF SAMPLE: the delivery closed
+-- form of Mint-Loop-Shapes' MEASUREMENT 8(d) was written down, with five
+-- exact L = 5 rows, and COMMITTED (probe/Delivery-Law-Prediction.md,
+-- 9deeb29) before the L = 5 shapes existed.  Every rung this container
+-- can reach — k = 0, 1, 2 — matched it exactly.  That is not a
+-- counterexample to the four instances above; it is the procedure that
+-- makes the difference.  A trend read off measured rows and extended is
+-- what got punished four times.  A form sealed before the rows exist is
+-- what did not.  The warning is against the first, not the second
 ------------------------------------------------------------------
 -- THE MINT-LOOP PROBE: does the minting feedback loop CLOSE?
 --
