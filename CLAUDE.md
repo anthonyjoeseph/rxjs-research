@@ -60,6 +60,26 @@ process: try approaches, keep what passes QuickCheck/oracle, revert what doesn't
 wins. Only pause to ask when a change would touch the **spec** (`Spec/`, the root README's
 semantics), or when the spec is genuinely ambiguous (then follow the ambiguity rule below).
 
+## Division of labor: Fable directs, Opus grinds (2026-07-31)
+
+The design-authority session runs on Fable 5 and delegates the bulk of the work — clause
+grinds, probe sweeps, build babysitting — to **Opus 5 subagents** (Agent tool, `model:
+"opus"`), to keep Fable spend confined to rulings, directives, and report review. Standing
+protocol, per Anthony:
+
+- **One worker at a time.** Concurrent Agda checks OOM the container (13GB+ single-check
+  peaks observed). Sequential workers, each run to completion and reviewed before the next.
+- **Directives carry the law.** Every worker prompt restates the standing rules it needs:
+  spec is gospel; probe-before-grind; the keep-awake loop for long builds; report numbers
+  plainly including failures; never extrapolate from shallow probe rows; the
+  impossibility-pair stop rule (report, don't act).
+- **Workers commit and push per green task** to the working branch, in the repo's commit
+  voice. `make agda && make bug-cache` green before any commit that touches `agda/src`.
+- **Merging green work to main is authorized** — Anthony, 2026-07-31: "merge to main when
+  you can." After each verified-green worker leg, the design session merges the working
+  branch to main. This authorization is standing for the current autonomous run; it does
+  not extend to spec changes, which still require asking first.
+
 ## Running long Agda builds: keep the container awake
 
 `make agda` takes ~10-25 minutes; the Bash tool's ceiling is 600s, after which it moves the
