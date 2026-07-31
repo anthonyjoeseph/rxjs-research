@@ -79,6 +79,11 @@ protocol, per Anthony:
   you can." After each verified-green worker leg, the design session merges the working
   branch to main. This authorization is standing for the current autonomous run; it does
   not extend to spec changes, which still require asking first.
+- **Run continuously through the weekend** — Anthony, 2026-07-31: "continue and continue,
+  don't stop for context window or usage credits." Do not wind down because a session is
+  long, context is compacting, or spend is high. Work the task queue (tiers 1 → 2 → 3) end
+  to end: when a worker leg finishes, review it, merge it, launch the next. The only full
+  stops are the standing ones: a spec question, or the impossibility pair.
 
 ## Running long Agda builds: keep the container awake
 
