@@ -82,15 +82,16 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- TWENTY-TWO POSTULATES REMAIN, and the number going UP is the plan
--- rather than a regression.  They are: the three walk faces
--- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
--- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the five
--- cascade companions caps-tick is assembled from (cascadeGo-caps — which
--- carries the BUDGET CLAIM itself — plus cascadeLatch-caps,
--- cascadeFinish-caps, chainsOf-caps, chainsOf-length), and twelve of the
--- thirteen subscribe-side companions transcribed from subscribeE-walkS's
--- clique.  frameBlowup is fully defined: no gaps inside it.
+-- NINETEEN POSTULATES REMAIN, and the number going UP is the plan rather
+-- than a regression.  They are: the three walk faces (subscribeE-wet,
+-- cascadeGo-wet, subscribeE-walk), the caps face subscribeE-caps with
+-- its chain-half lemma regsSz?-subscribeE, the six pieces the BUDGET
+-- CLAIM is assembled from (preClasses, fibreCap, cascadeGo-charge,
+-- cascadeGo-deliveries, preClasses-bound, fibreCap-bound), and eight of
+-- the subscribe-side companions transcribed from subscribeE-walkS's
+-- clique.  frameBlowup is fully defined: no gaps inside it, and
+-- cascadeGo-caps, the cascade bookends and the chain snapshot are all
+-- ground.
 --
 -- The thirteenth, subscribeInner-caps, is PROVEN — the grind's first
 -- clause, taken first because it was the most uncertain: the *All edge
@@ -108,9 +109,17 @@
 -- about (does one cascade's fold count FIT the recurrence's iteration
 -- budget?) is now a named conjunct of cascadeGo-caps rather than
 -- something hidden inside a face — with the probes saying which count it
--- has to fit.  Two have been refuted there: `cWid * cReg` (J-Budget-
--- Probe) and `cWid * cReg * cSize` (Fold-Count-Probe, where nested
--- shares beat it exponentially).  The count is now `2 ^ cReg * cSize`.
+-- has to fit.  THREE have been refuted there: `cWid * cReg` (J-Budget-
+-- Probe), `cWid * cReg * cSize` (Fold-Count-Probe, where nested shares
+-- beat it exponentially), and `2 ^ cReg * cSize`, whose middle step
+-- Mint-Loop-Probe measured false — a mid-cascade mint puts the path
+-- count's R above cReg, and 176 deliveries came out of a 7-registration
+-- entry state.  The count is now `2 ^ cReg * cSize * cSize`, the second
+-- cSize paying for the injection's second coordinate.  cascadeGo-caps
+-- itself is no longer postulated: it is the product of three named
+-- pieces — the per-delivery charge, the injection, and the two
+-- coordinate bounds — one of which (fibreCap-bound, the damper) is the
+-- only one with no proof strategy behind it yet.
 --
 -- caps-frame, likewise, was refuted as uninstantiable (same-level
 -- preservation is false: the subscribe frame itself folds) and split
@@ -129,10 +138,14 @@
 -- and the base case (which now pays for its own root frame).  Its
 -- ITERATION COUNT then took a fourth refutation, from Fold-Count-Probe:
 -- nested shares make one cascade's deliveries exponential in the shared-
--- slot count while every Caps component stays linear, so the count is
--- `2 ^ cReg * cSize` — delivery paths through the share DAG times frames
--- per path.  frameStep and its whole monotonicity toolkit are parametric
--- in the count, so that landed in frameBlowup alone.  Round 3's face is
+-- slot count while every Caps component stays linear.  And a fifth, from
+-- Mint-Loop-Probe, which measured `j` rather than the deliveries the
+-- earlier probes stood in for and found the path count's `2 ^ cReg`
+-- middle step false: the count is `2 ^ cReg * cSize * cSize`, delivery
+-- paths (subsets of the ENTRY registry, times a bounded index for the
+-- minted registrations a path went through) times frames per path.
+-- frameStep and its whole monotonicity toolkit are parametric in the
+-- count, so both landed in frameBlowup alone.  Round 3's face is
 -- untouched — it was only ever missing something to instantiate Ŝ, R̂, F
 -- at.  The two real cores are subscribeE-wet and
 -- cascadeGo-wet — the termination content proper: fuel-accounting
