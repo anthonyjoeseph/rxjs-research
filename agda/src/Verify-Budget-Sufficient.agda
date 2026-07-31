@@ -82,20 +82,21 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- TEN POSTULATES REMAIN.  They are: the three walk faces
+-- NINE POSTULATES REMAIN.  They are: the three walk faces
 -- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
 -- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the two
 -- pieces the BUDGET CLAIM is assembled from (cascadeGo-charge and
--- cascadeGo-deliveries), ONE subscribe-side companion
--- (subscribeE-input-caps), and the two VALUE clauses mapFrame-caps /
+-- cascadeGo-deliveries), and the two VALUE clauses mapFrame-caps /
 -- scanFrame-caps that stepFrame-caps was traded for.  frameBlowup is
 -- fully defined, and cascadeGo-caps, the cascade bookends and the chain
 -- snapshot are all ground.
 --
--- THE WHOLE *All EDGE IS GROUND (2026-07-31), which is what the
--- joint-bound repair bought: thruConsume-caps, thruWalk-caps,
--- concatDrain-caps and innerFinish-caps join subscribeInner-caps, and
--- four postulates leave the tree in one leg.  thruConsume was always
+-- EVERY COMPANION OF THE CAPS TREE IS NOW GROUND — subscribeE-caps
+-- itself is the only face left, and it is the assembly knot rather than
+-- a companion.  That is what the two repairs of 2026-07-31 bought:
+-- thruConsume-caps, thruWalk-caps, concatDrain-caps, innerFinish-caps
+-- and subscribeE-input-caps join subscribeInner-caps, and five
+-- postulates leave the tree in one leg.  thruConsume was always
 -- provable and its CALLER was not, because thruWalk owed it a joint
 -- bound nobody could supply; under the separate pair thruWalk hands
 -- down, per payload, the very conjunct it already carries.  The per-op
@@ -106,6 +107,19 @@
 -- into the node with the bound it came out with.  switchAll's cut is
 -- the only clause that moves the registry, and it is cutSweep-caps
 -- without the node.
+--
+-- AND THE SLOT EDGE WITH THEM.  subscribeE-input-caps reads its four
+-- branches straight off the new side condition: the shared def's size
+-- is what sharedSlot-caps asks for, the hot script either answers with a
+-- one-shot close or registers (one j), and the cold slot's sync values
+-- and resolved async pendings are the two conjuncts slotCaps? carries.
+-- THE WIDTH HALF IS FREE, which is why slotsCaps? is a size-only
+-- predicate: a scripted slot's element type is DATA — the `ok` proof the
+-- `scripted` constructor carries IS `T (isData t)` — and outWᵛ is
+-- identically zero on a data type, since only its `obs` clause reads a
+-- width at all.  So the side condition never has to mention cWid, and
+-- capsAt's cWid (which bounds the PROGRAM's width, not the slots')
+-- is never asked to cover slot data.
 --
 -- subscribeInner-caps is PROVEN — the caps grind's first clause, taken
 -- first because it was the most uncertain: the *All edge
