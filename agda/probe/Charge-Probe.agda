@@ -41,9 +41,17 @@
 --   D    deliveries, off the evaluator's own ledger (`mFolds`).
 --   S    the tightest cSize the pre-state admits (`mS`).
 --   R    the entry registry's length (`mReg`), i.e. the tightest cReg.
+--   W    the tightest cWid the pre-state admits (`mW`) — `pWᵛ` of every
+--        stored accumulator and live pending, `pWᵉ` of every queued
+--        concat inner, read off the same state `mS` is read off.
 --
--- and the two gates are `cJ ≤ D * S` (the conjunct as stated) and
--- `cJ ≤ 2 ^ (2 ^ R) * S` (the count `frameBlowup` now spends).
+-- and the gates are `cJ ≤ D * S` (the conjunct as stated),
+-- `cJ ≤ 2 ^ (2 ^ R) * S` (the count `frameBlowup` now spends), and —
+-- added 2026-08-01, §(f) and §(g) below — the two REPAIRS:
+-- `cJ ≤ D * S * suc W`, the design session's width-factor ruling, which
+-- progW STILL BREAKS (47 against 40); and
+-- `cJ ≤ D * S * suc (W * suc S)`, the form the receipt table itself
+-- dictates, which every row fits (47 against 440).
 --
 -- THE FAMILIES ARE THE WIDTH-HEAVY ONES, chosen because they are where
 -- the `length vals` factor is largest:
@@ -64,9 +72,9 @@
 ------------------------------------------------------------------
 module Charge-Probe where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤ᵇ_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _≤ᵇ_; _⊔_)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
-open import Data.List using (List; []; _∷_; _++_; length; map; any)
+open import Data.List using (List; []; _∷_; _++_; length; map; any; foldr)
 open import Data.Vec  using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Fin  using (Fin; toℕ) renaming (zero to fz; suc to fsuc)
 open import Data.Sum  using (inj₁; inj₂)
@@ -78,8 +86,11 @@ open import Rx.Prim using (Fuel; Id; Tick; Gas; after_,_; hot)
 open import Rx.Exp  using (Ctx; Closed; Exp; Tm; Fn; Val; natᵗ; obs; _×ᵗ_;
                            input; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; nat̂;
                            fstᵗ; varᵗ; sizeᵗ)
+open import Rx.Frame-Width using (pWᵉ; pWᵛ)
 open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt;
-                                sched-next; budgetAt;
+                                sched-next; budgetAt; LiveSource;
+                                NodeState; scan-st; take-st; merge-st;
+                                concat-st; switch-st; exhaust-st;
                                 root; Path; share-sink; _↠_;
                                 Frame; map-f; scan-f; take-f;
                                 from-inner; thru-outer;
@@ -369,4 +380,115 @@ _ = refl
 -- (e) AND progD HAS NO CASCADE: the amplifier fires in the root
 -- subscribe frame, so its width is subscribeE-charge's problem
 _ : mFolds 0 progD ins₀ ≡ 0
+_ = refl
+
+------------------------------------------------------------------
+-- THE NEW CHARGE FORM, GATED ON THE SAME ROWS (2026-08-01).
+--
+-- The conjunct this probe refuted is `j ≤ D * cSize`.  The repair the
+-- design session ruled is `j ≤ D * cSize * suc cWid` — the width factor
+-- the receipts actually pay for, since `scanFrame-caps` charges
+-- `suc (length vals * suc (sizeᵗ fn))` and `length vals` is a burst
+-- width.  So the gate has to be re-run at the tight admissible cWid,
+-- exactly as the old one was run at the tight admissible cSize.
+--
+-- `mW` is that denominator: the largest frame width `capsOK?` bounds in
+-- the PRE-CASCADE state — `pWᵛ` of every stored accumulator and every
+-- live pending, `pWᵉ` of every queued concat inner — read off the same
+-- state `mS` is read off.  A row that fits at mW fits at every
+-- admissible cWid, because capsOK? forces cWid ≥ mW.
+------------------------------------------------------------------
+
+nodeW : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → ℕ
+nodeW j sl (scan-st {t} v)   = pWᵛ j sl t v
+nodeW j sl (concat-st q _ _) = foldr (λ o m → pWᵉ j sl o ⊔ m) 0 q
+nodeW j sl (take-st _)       = 0
+nodeW j sl (merge-st _ _)    = 0
+nodeW j sl (switch-st _ _)   = 0
+nodeW j sl (exhaust-st _ _)  = 0
+
+liveW : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → LiveSource Γ → ℕ
+liveW j sl l = foldr (λ tv m → pWᵛ j sl (LiveSource.elemTy l) (proj₂ tv) ⊔ m) 0
+                     (LiveSource.pending l)
+
+-- the tightest cWid the pre-cascade state admits
+mW : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → ℕ
+mW {n = n} fuel e ins =
+  let (sched , st) = stAt fuel e ins
+  in foldr (λ kv m → nodeW n (Sched.slots sched) (proj₂ kv) ⊔ m) 0
+           (EvalSt.nodes st)
+     ⊔ foldr (λ l m → liveW n (Sched.slots sched) l ⊔ m) 0 (Sched.live sched)
+
+-- THE TIGHT DENOMINATORS, measured.  Every one of these programs
+-- carries width ONE in its pre-cascade state: the amplifier has not
+-- folded yet at cascade 0, so `suc cWid` is a factor of TWO and no more
+_ : mW 0 progDT insD₁ ≡ 1
+_ = refl
+
+_ : mW 0 progW insD₂ ≡ 1
+_ = refl
+
+_ : mW 0 pF1 insG ≡ 1
+_ = refl
+
+-- (f) THE RULING'S FORM, `j ≤ D * cSize * suc cWid`, IS STILL FALSE.
+-- progDT now fits (23 against 40) — but progW does NOT: 47 against
+-- 1 * 20 * 2 = 40.  The width factor the state can be charged for at
+-- entry is `suc cWid` = 2, and the frame that costs the 47 reads a
+-- width the state does not have YET: the burst the inner mergeAll
+-- unwraps is produced INSIDE the same cascade.  So a charge linear in
+-- the entry cWid does not reach it
+_ : (cJ 0 progDT insD₁
+       ≤ᵇ mFolds 0 progDT insD₁ * mS 0 progDT insD₁ * suc (mW 0 progDT insD₁))
+      ≡ true
+_ = refl
+
+_ : (cJ 0 progW insD₂
+       ≤ᵇ mFolds 0 progW insD₂ * mS 0 progW insD₂ * suc (mW 0 progW insD₂))
+      ≡ false
+_ = refl
+
+_ : mFolds 0 progW insD₂ * mS 0 progW insD₂ * suc (mW 0 progW insD₂) ≡ 40
+_ = refl
+
+-- (g) THE FORM THE RECEIPT TABLE ITSELF DICTATES, and it covers every
+-- row.  Read it off `frameJ` rather than guessed: one frame costs at
+-- most `suc (length vals * suc (sizeᵗ fn))` ≤ `suc (cWid * suc cSize)`,
+-- a delivery's chain carries at most `pathLen ≤ cSize` frames, and a
+-- cascade makes at most D deliveries —
+--
+--     j ≤ D * cSize * suc (cWid * suc cSize)
+--
+-- which is the same product with the PER-FRAME receipt in place of the
+-- bare width.  It is cubic in the caps where the refuted form was
+-- linear, and that is exactly the difference between charging a frame
+-- `cSize` and charging it its own receipt
+_ : (cJ 0 progDT insD₁
+       ≤ᵇ mFolds 0 progDT insD₁ * mS 0 progDT insD₁
+          * suc (mW 0 progDT insD₁ * suc (mS 0 progDT insD₁)))
+      ≡ true
+_ = refl
+
+_ : (cJ 0 progDT insD₂
+       ≤ᵇ mFolds 0 progDT insD₂ * mS 0 progDT insD₂
+          * suc (mW 0 progDT insD₂ * suc (mS 0 progDT insD₂)))
+      ≡ true
+_ = refl
+
+_ : (cJ 0 progW insD₂
+       ≤ᵇ mFolds 0 progW insD₂ * mS 0 progW insD₂
+          * suc (mW 0 progW insD₂ * suc (mS 0 progW insD₂)))
+      ≡ true
+_ = refl
+
+_ : (cJ 0 pF1 insG
+       ≤ᵇ mFolds 0 pF1 insG * mS 0 pF1 insG
+          * suc (mW 0 pF1 insG * suc (mS 0 pF1 insG)))
+      ≡ true
+_ = refl
+
+-- the margins, so the form is not read as a blank cheque: progW's
+-- breach of 47-against-20 becomes 47 against 440
+_ : mFolds 0 progW insD₂ * mS 0 progW insD₂
+      * suc (mW 0 progW insD₂ * suc (mS 0 progW insD₂)) ≡ 440
 _ = refl

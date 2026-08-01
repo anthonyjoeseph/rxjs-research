@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -83,6 +83,14 @@ help:
 	@echo "                  the 2-tower delivery bound against every measured"
 	@echo "                  ladder and prices the root margin against the"
 	@echo "                  slope (see agda/probe/Width-Count-Probe.agda)"
+	@echo "  mult-width-probe  prices the MULTIPLICATIVE width engine before"
+	@echo "                  it is built: the joint tower slope of a count that"
+	@echo "                  READS cWid (four stories, so budgetAt does not"
+	@echo "                  move), the exchange rate against the exponential"
+	@echo "                  step (one exponential fold IS suc w multiplicative"
+	@echo "                  ones), and the BASE, where the whole root-fuel"
+	@echo "                  margin goes (see agda/probe/Mult-Width-Probe.agda)"
+	@echo "                  Fast, ~15 s"
 	@echo "  charge-probe  does one cascade's j fit D * cSize?  NO - the"
 	@echo "                  receipt-weighted j breaches it on the deepening"
 	@echo "                  scan, and twice over when a second scan sits"
@@ -231,6 +239,16 @@ width-count-probe:
 # src/Main.agda never reaches it.  ~2 min
 charge-probe:
 	cd agda && agda -i src -i probe probe/Charge-Probe.agda
+
+# The price of the MULTIPLICATIVE width engine, paid before the engine is
+# built.  Arithmetic on the recurrence alone: the joint tower slope with a
+# count that READS cWid (four stories on all three axes, so budgetAt's
+# (7+sz)(id+2) does not move), the exchange rate against the exponential
+# foldStep, and the base-height accounting — which is where the root fuel's
+# whole margin turns out to go.  Standalone, so src/Main.agda never reaches
+# it.  Fast, ~15 s
+mult-width-probe:
+	cd agda && agda -i src -i probe probe/Mult-Width-Probe.agda
 
 # The counterexample that killed regsSz?-subscribeE: a FIXED cap cannot
 # survive a subscribe, because subscribeE pushes one frame per shell of
