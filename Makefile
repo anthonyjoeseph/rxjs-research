@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -67,6 +67,14 @@ help:
 	@echo "                  half-cap chain watermark fails on the simplest of them"
 	@echo "                  (see agda/probe/Joint-Probe.agda)"
 	@echo "                  make joint-probe ARGS='0 80'   (the whole sweep)"
+	@echo "  eval-growth-probe  what does ONE application cost?  refutes the"
+	@echo "                  AFFINE reading of the five evaluation obligations"
+	@echo "                  on all three axes — a closed term of size 6k+1"
+	@echo "                  whose value has size 2^(k+1)-1, the same ladder as"
+	@echo "                  a step function, and a mu whose unfolding's parked"
+	@echo "                  width doubles per rung.  Then measures what DOES"
+	@echo "                  pay: two or three j (see agda/probe/"
+	@echo "                  Eval-Growth-Probe.agda).  Fast, ~1 min"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -173,6 +181,16 @@ mint-loop-probe:
 #   make joint-probe ARGS='0 80'     (the whole sweep)
 joint-probe:
 	scripts/joint-probe.sh $(ARGS)
+
+# The gate on the AFFINE-FIRST reading of the eval cluster — the probe
+# that had to run before any of evalTms-caps / evalSeed-caps /
+# unfoldμ-caps / mapFrame-caps / scanFrame-caps was ground.  It refutes
+# affine on every axis the ruling named, and then measures the receipt
+# that does pay (two or three j).  Hand-built syntax only, no evaluator
+# state, so src/Main.agda never reaches it — and it must not rot, since
+# it is the evidence behind whatever shape those five end up with.
+eval-growth-probe:
+	cd agda && agda -i src -i probe probe/Eval-Growth-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
