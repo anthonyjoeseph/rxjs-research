@@ -3841,17 +3841,18 @@ cascadeGo-width Ω a id ((rid , c) ∷ chains) sched st inv vΩ pΩ
 --                          is proven with no running position.
 --   Ψ  ←  NOT a Caps field.  ΨAt e sl.  Ψ never grows (caseW is
 --                          substitution-invariant), so no recurrence.
---   W, E ← the walk's OWN ledger, untouched.  The one joint left open
---                          between the two accounting mechanisms is
---                          arithmetic, not statement-level:
+--   W, E ← the walk's OWN ledger.  The joint this map left open —
 --                            capᴱ W (E · 3^(suc Ψ · walkCap Ω ℓ G))
 --                              ≤ sizeCapAt e sl (suc id)
---                          i.e. the walk's receipt ceiling lands under
---                          the next caps level.  This is the "two
---                          parallel accounting mechanisms for one
+--                          — was recorded here as "arithmetic, not
+--                          statement-level".  IT IS NEITHER: it is
+--                          REFUTED, by walk-hyps-absurd at V := Ŝ.  See
+--                          GAP 4 below (wet-ceiling-absurd).  So the
+--                          "two parallel accounting mechanisms for one
 --                          growth is a smell" note at the end of
---                          .Caps-Face, now with both sides written
---                          down; collapsing E into j is the follow-up.
+--                          .Caps-Face is not a smell but an
+--                          obstruction, and collapsing E into j is not
+--                          a follow-up but the only surviving route.
 --
 -- cascadeGo-charge and cascadeGo-deliveries (.Caps-Face) are FROZEN
 -- and design-owned.  Nothing restated here consumes either of them.
@@ -3879,6 +3880,214 @@ hop-step-needs : ∀ (V R U r s s′ : ℕ) →
 hop-step-needs V R U r s s′ h =
   +-cancelʳ-≤ (suc V * (r + suc R * U)) (suc s′) (s + suc V)
     (≤-trans h (≤-reflexive (dBound-suc-r V R U r s)))
+
+------------------------------------------------------------------
+-- THE μ EDGE's r SIDE — hopD IS EQUAL ACROSS AN UNFOLD.  Asserted by
+-- Rx.Hop-Depth's μ clause ("an unfold cannot change hopD") and by the
+-- hop-descent memo in .Measures ("the UNFOLD step … is an equality
+-- too"); proven here, because dBound-μ holds `r` FIXED and until this
+-- is a theorem `hopDᵉ Ŝ (unfoldμ body)` and `hopDᵉ Ŝ (μᵉ body)` are
+-- simply two different expressions and the edge cannot be taken.
+--
+-- The content is one line of typing: elimGExp rewrites Δᵍ-VARIABLE
+-- positions only, and Δᵍ moves into Δ at deferᵉ and nowhere else, so
+-- every plug lands under a deferᵉ — which hopD reads as 0.  The
+-- coefficient mirror comes first, since hopD's mapᵉ and scanᵉ clauses
+-- read pm for their slopes.
+--
+-- It lives HERE rather than in .Measures for sweepLive-fnCap's
+-- reason: the wet face is its only consumer, and the size face has no
+-- use for it.
+------------------------------------------------------------------
+
+mutual
+  pm-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    pmᵉ V k (elimGExp x cl b) ≡ pmᵉ V k b
+  pm-elimGᵉ V k x cl (input i)       = refl
+  pm-elimGᵉ V k x cl (ofᵉ ts)        = pm-elimGᵗˢ V k x cl ts
+  pm-elimGᵉ V k x cl emptyᵉ          = refl
+  pm-elimGᵉ V k x cl (mapᵉ f b)      =
+    cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
+              (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
+                         (pm-elimGᵉ V k x cl b))
+  pm-elimGᵉ V k x cl (takeᵉ c b)     = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (scanᵉ f z b)   =
+    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
+              (cong₂ _+_ (cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
+                                    (pm-elimGᵗ V k x cl z))
+                         (pm-elimGᵉ V k x cl b))
+  pm-elimGᵉ V k x cl (mergeAllᵉ b)   = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (concatAllᵉ b)  = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (switchAllᵉ b)  = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (exhaustAllᵉ b) = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (μᵉ b)          = pm-elimGᵉ V k (there x) cl b
+  pm-elimGᵉ V k x cl (varᵉ y)        = refl
+  pm-elimGᵉ V k x cl (deferᵉ b)      = refl
+
+  pm-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    pmᵗ V k (elimGTm x cl f) ≡ pmᵗ V k f
+  pm-elimGᵗ V k x cl (varᵗ y)      = refl
+  pm-elimGᵗ V k x cl unit̂          = refl
+  pm-elimGᵗ V k x cl (bool̂ b)      = refl
+  pm-elimGᵗ V k x cl (nat̂ m)       = refl
+  pm-elimGᵗ V k x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
+  pm-elimGᵗ V k x cl (fstᵗ p)      = pm-elimGᵗ V k x cl p
+  pm-elimGᵗ V k x cl (sndᵗ p)      = pm-elimGᵗ V k x cl p
+  pm-elimGᵗ V k x cl (inlᵗ a)      = pm-elimGᵗ V k x cl a
+  pm-elimGᵗ V k x cl (inrᵗ a)      = pm-elimGᵗ V k x cl a
+  pm-elimGᵗ V k x cl (caseᵗ s l r) =
+    cong₂ _+_ (cong₂ _⊔_ (pm-elimGᵗ V (suc k) x cl l)
+                         (pm-elimGᵗ V (suc k) x cl r))
+              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
+                                               (pm-elimGᵗ V 0 x cl r))
+                                    refl)
+                         (pm-elimGᵗ V k x cl s))
+  pm-elimGᵗ V k x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
+  pm-elimGᵗ V k x cl (primᵗ op a)  = refl
+  pm-elimGᵗ V k x cl (strmᵗ b)     = pm-elimGᵉ V k x cl b
+
+  pm-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    pmᵗˢ V k (elimGTms x cl ts) ≡ pmᵗˢ V k ts
+  pm-elimGᵗˢ V k x cl []       = refl
+  pm-elimGᵗˢ V k x cl (y ∷ ys) =
+    cong₂ _⊔_ (pm-elimGᵗ V k x cl y) (pm-elimGᵗˢ V k x cl ys)
+
+mutual
+  hopD-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    hopDᵉ V (elimGExp x cl b) ≡ hopDᵉ V b
+  hopD-elimGᵉ V x cl (input i)       = refl
+  hopD-elimGᵉ V x cl (ofᵉ ts)        = hopD-elimGᵗˢ V x cl ts
+  hopD-elimGᵉ V x cl emptyᵉ          = refl
+  hopD-elimGᵉ V x cl (mapᵉ f b)      =
+    cong₂ _+_ (hopD-elimGᵗ V x cl f)
+              (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
+                         (hopD-elimGᵉ V x cl b))
+  hopD-elimGᵉ V x cl (takeᵉ c b)     = hopD-elimGᵉ V x cl b
+  hopD-elimGᵉ V x cl (scanᵉ f z b)   =
+    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
+              (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V x cl f)
+                                    (hopD-elimGᵗ V x cl z))
+                         (hopD-elimGᵉ V x cl b))
+  hopD-elimGᵉ V x cl (mergeAllᵉ b)   = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (concatAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (μᵉ b)          = hopD-elimGᵉ V (there x) cl b
+  hopD-elimGᵉ V x cl (varᵉ y)        = refl
+  hopD-elimGᵉ V x cl (deferᵉ b)      = refl
+
+  hopD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    hopDᵗ V (elimGTm x cl f) ≡ hopDᵗ V f
+  hopD-elimGᵗ V x cl (varᵗ y)      = refl
+  hopD-elimGᵗ V x cl unit̂          = refl
+  hopD-elimGᵗ V x cl (bool̂ b)      = refl
+  hopD-elimGᵗ V x cl (nat̂ m)       = refl
+  hopD-elimGᵗ V x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
+  hopD-elimGᵗ V x cl (fstᵗ p)      = hopD-elimGᵗ V x cl p
+  hopD-elimGᵗ V x cl (sndᵗ p)      = hopD-elimGᵗ V x cl p
+  hopD-elimGᵗ V x cl (inlᵗ a)      = hopD-elimGᵗ V x cl a
+  hopD-elimGᵗ V x cl (inrᵗ a)      = hopD-elimGᵗ V x cl a
+  hopD-elimGᵗ V x cl (caseᵗ s l r) =
+    cong₂ _+_ (cong₂ _⊔_ (hopD-elimGᵗ V x cl l) (hopD-elimGᵗ V x cl r))
+              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
+                                               (pm-elimGᵗ V 0 x cl r))
+                                    refl)
+                         (hopD-elimGᵗ V x cl s))
+  hopD-elimGᵗ V x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
+  hopD-elimGᵗ V x cl (primᵗ op a)  = refl
+  hopD-elimGᵗ V x cl (strmᵗ b)     = hopD-elimGᵉ V x cl b
+
+  hopD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    hopDᵗˢ V (elimGTms x cl ts) ≡ hopDᵗˢ V ts
+  hopD-elimGᵗˢ V x cl []       = refl
+  hopD-elimGᵗˢ V x cl (y ∷ ys) =
+    cong₂ _⊔_ (hopD-elimGᵗ V x cl y) (hopD-elimGᵗˢ V x cl ys)
+
+-- the instance the μ clause takes
+hopD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
+  hopDᵉ V (unfoldμ body) ≡ hopDᵉ V (μᵉ body)
+hopD-unfoldμ V body = hopD-elimGᵉ V (here refl) (μᵉ body) body
+
+------------------------------------------------------------------
+-- THE THREE GAS EDGES, PACKAGED.  Each one is "the machine's own step
+-- fact, the dBound descent lemma, and the reset supply" fused into the
+-- single inequality a clause proof applies with nothing left to
+-- compute.  Everything else in the wet induction is structural
+-- threading; this is the termination content.
+------------------------------------------------------------------
+
+-- (1) THE μ EDGE.  r is fixed (hopD-unfoldμ), s strictly drops
+-- (unfoldμ-shrinks), U is untouched — an unfold moves no state at all.
+mu-edge : ∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
+  suc (dBound Ŝ R̂ U (hopDᵉ Ŝ (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
+    ≤ dBound Ŝ R̂ U (hopDᵉ Ŝ (μᵉ body)) (syncSizeᵉ (μᵉ body))
+mu-edge Ŝ R̂ U body
+  rewrite hopD-unfoldμ Ŝ body =
+  dBound-μ {Ŝ} {R̂} {U} {hopDᵉ Ŝ body}
+           {syncSizeᵉ (unfoldμ body)} {syncSizeᵉ (μᵉ body)}
+           (unfoldμ-shrinks body)
+
+-- (2) THE HOP EDGE, at the entry-fixed anchor.  The r-drop is the
+-- emitted-value invariant (burstHopD?) against the *All frame's
+-- DEFINITIONAL `suc`; the s reset is reach-resets' first component,
+-- inlined off syncSize≤sizeᵉ so this module still reads nothing from
+-- the caps FACE.  hop-step-needs says the slack is exact: an r-drop of
+-- one buys `s + suc Ŝ`, and `suc Ŝ` alone already covers it.
+hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) → 2 ≤ Ŝ →
+  (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r →
+  suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ (obs u) o) (syncSizeᵉ o))
+    ≤ dBound Ŝ (hopR Ŝ) U r s
+hop-edge Ŝ U r s 2≤Ŝ o szo r′<r =
+  dBound-hop {Ŝ} {hopR Ŝ} {U} {hopDᵉ Ŝ o} {r} {syncSizeᵉ o} {s}
+             r′<r (≤-trans (syncSize≤sizeᵉ o) szo)
+
+-- (3) THE CONNECT EDGE.  U strictly drops (unconn-insert, behind the
+-- machine's own `memberSource … ≡ false` guard), and BOTH of the
+-- child's measures reset at the anchor, because a shared slot's def is
+-- cap-sized entry syntax — reach-resets' two components, again
+-- inlined.
+connect-edge : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
+  (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
+  suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
+    ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s
+connect-edge Ŝ r s 2≤Ŝ sl cs i {d} eqi fresh szd =
+  dBound-connect {Ŝ} {hopR Ŝ} {unconn sl (toℕ i ∷ cs)} {unconn sl cs}
+                 {hopDᵉ Ŝ d} {r} {syncSizeᵉ d} {s}
+                 (unconn-insert sl cs i eqi fresh)
+                 (hopD-cap Ŝ d 2≤Ŝ szd)
+                 (≤-trans (syncSize≤sizeᵉ d) szd)
+
+-- AND U NEVER RISES BETWEEN THE EDGES.  Every structural companion of
+-- the subscribe clique threads the demand's U component past arbitrary
+-- machine work, and this is the whole of what that costs: the Keeps
+-- ring says the slots are literally unchanged and connectedShares only
+-- grows, and unconn is antitone in the latter.  Instantiate at any
+-- member of the clique's *-keeps family.
+unconn-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) (sched′ : Sched Γ) (st′ : EvalSt e) →
+  Keeps sched st sched′ st′ →
+  unconn (Sched.slots sched′) (EvalSt.connectedShares st′)
+    ≤ unconn (Sched.slots sched) (EvalSt.connectedShares st)
+unconn-keeps sched st sched′ st′ K =
+  subst (λ sl → unconn sl (EvalSt.connectedShares st′)
+                  ≤ unconn (Sched.slots sched) (EvalSt.connectedShares st))
+        (sym (KeepsC.slotsEq K))
+        (unconn-antitone (Sched.slots sched)
+                         (EvalSt.connectedShares st)
+                         (EvalSt.connectedShares st′)
+                         (KeepsC.connMono K))
 
 ------------------------------------------------------------------
 -- THE ONE ANCHOR.  Every cap the wet stack measures with is this
@@ -3910,6 +4119,78 @@ size≤sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 size≤sizeCapAt e sl id =
   ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
+
+------------------------------------------------------------------
+-- GAP 4 (2026-08-01, found grinding the gas edges): THE LEDGER CANNOT
+-- DELIVER subscribeE-wet's LANDING LEVEL, AND THAT IS NOT AN OPEN
+-- ARITHMETIC DEBT — IT IS REFUTED.
+--
+-- The restatement's parameter map (above) leaves exactly one thing to
+-- the follow-up, and calls it "arithmetic, not statement-level":
+--
+--     capᴱ W (E · 3^(suc Ψ · walkCap Ω ℓ G)) ≤ sizeCapAt e sl (suc id)
+--
+-- That inequality is the ONLY route from subscribeE-walk's conclusion
+-- (INV? at the ledger position capᴱ W E′, with E′ bounded ABOVE by the
+-- receipt and by nothing else) to subscribeE-wet's conclusion (INV? at
+-- the caps level).  INV? weakens upward in B, so the core's landing
+-- needs its ledger ceiling UNDER Ŝ, and the receipt's ceiling is the
+-- only upper bound on E′ the face provides.
+--
+-- IT IS THE SAME THREE-EDGE LOOP the round-1 vacuity died of, and it
+-- needs no new witness: walk-hyps-absurd (.Measures) IS the refutation,
+-- at V := Ŝ, R := hopR Ŝ, d := G.  The edges, spelled out:
+--
+--   · suc Ŝ ≤ G          the demand is measured AT Ŝ, and one
+--                        unconnected share or one remaining hop puts
+--                        it past its own anchor  (sucV≤d)
+--   · G ≤ X              walkCap's index dominates the demand it is
+--                        indexed by                (d≤walkArg)
+--   · X < capᴱ W X ≤ Ŝ   the ceiling, and capᴱ is exponential (n<2^n)
+--
+-- so Ŝ < Ŝ.  The side condition `1 ≤ r + suc R̂ · U` is not a
+-- restriction worth caring about: it fails only when the call has NO
+-- gas edge left at all (no unconnected share, no hop), i.e. exactly
+-- when the wet contract has no content.
+--
+-- WHAT THIS DOES NOT SAY.  It does not refute subscribeE-wet, and it
+-- does not refute subscribeE-walk.  It refutes the COMPOSITION: the
+-- ledger receipt cannot be the supplier of the caps-level landing, for
+-- any Ψ, W, Ω, ℓ, E, G.  Collapsing E into j is therefore not an
+-- optimisation — it is the only surviving route, and the two
+-- accounting mechanisms cannot be joined at the receipt.
+--
+-- WHAT IS LEFT, then, and it is where the next design ruling belongs.
+-- The other candidate supplier is the caps face, which already lands a
+-- whole cascade from capsAt id to capsAt (suc id) (caps-tick, ground).
+-- Two things stand between it and this core:
+--
+--   (a) NO SUBSCRIBE-LEVEL CHARGE.  subscribeE-caps reports at
+--       `frameStep (j + j′) c` with j′ existentially produced and
+--       UNBOUNDED.  cascadeGo-charge budgets a cascade's j; nothing
+--       budgets a bare subscribe's, so burst-wet's own landing (root
+--       subscribe, capsAt 0 → capsAt 1) has no supplier either.  The
+--       missing companion is a subscribeE-level analogue of
+--       cascadeGo-charge, and it is NAMED here rather than assumed.
+--   (b) capsOK? IS NOT INV?.  They share stBounded? and nothing else:
+--       INV? adds fnCapBounded?, regsB?, slotsFnCap and reads registry
+--       cardinality at cSize where capsOK? reads it at cReg.  Four
+--       conjuncts of the wet predicate have no caps-side counterpart.
+--
+-- Both are statement-level and both are face-level, so per the
+-- outside-in rule the clause grind stops here rather than guessing at
+-- them: the gas edges themselves are ground above and wait on this.
+------------------------------------------------------------------
+
+wet-ceiling-absurd : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) (Ψ W Ω ℓ E G U r s : ℕ) → 3 ≤ E →
+  1 ≤ r + suc (hopR (sizeCapAt e sl (suc id))) * U →
+  dBound (sizeCapAt e sl (suc id)) (hopR (sizeCapAt e sl (suc id))) U r s ≤ G →
+  capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G)) ≤ sizeCapAt e sl (suc id) →
+  ⊥
+wet-ceiling-absurd e sl id Ψ W Ω ℓ E G U r s 3≤E 1≤ dem ceil =
+  walk-hyps-absurd Ψ W Ω (sizeCapAt e sl (suc id)) ℓ
+                   (hopR (sizeCapAt e sl (suc id))) U r s G E 3≤E 1≤ dem ceil
 
 ------------------------------------------------------------------
 -- THE CASCADE BOOKENDS ON THE INV? FACE — the caps face's
