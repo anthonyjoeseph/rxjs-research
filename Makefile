@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -83,6 +83,13 @@ help:
 	@echo "                  the 2-tower delivery bound against every measured"
 	@echo "                  ladder and prices the root margin against the"
 	@echo "                  slope (see agda/probe/Width-Count-Probe.agda)"
+	@echo "  charge-probe  does one cascade's j fit D * cSize?  NO - the"
+	@echo "                  receipt-weighted j breaches it on the deepening"
+	@echo "                  scan, and twice over when a second scan sits"
+	@echo "                  DOWNSTREAM of the amplifier (47 against 20).  The"
+	@echo "                  mint ladders all fit: the corner that breaks it"
+	@echo "                  has FEW deliveries and WIDE payloads"
+	@echo "                  (see agda/probe/Charge-Probe.agda).  ~2 min"
 	@echo "  chain-half-probe  the counterexample that a FIXED cap cannot"
 	@echo "                  survive a subscribe: at C = 5, a tight chain and a"
 	@echo "                  two-shell expression register a chain of length"
@@ -215,6 +222,15 @@ eval-growth-probe:
 # recurrence alone, so src/Main.agda never reaches it.  Fast, ~10 s
 width-count-probe:
 	cd agda && agda -i src -i probe probe/Width-Count-Probe.agda
+
+# The refutation of `cascadeGo-charge` as stated.  It mirrors foldPath /
+# dispatchShare / shareGo / cascadeGo with the RECEIPT stepFrame-caps
+# reports at each frame threaded in place of the emit stream, so the
+# number it returns is a LOWER BOUND on the conjunct's own j — and it
+# breaks `j <= D * cSize` on the deepening scan.  Standalone, so
+# src/Main.agda never reaches it.  ~2 min
+charge-probe:
+	cd agda && agda -i src -i probe probe/Charge-Probe.agda
 
 # The counterexample that killed regsSz?-subscribeE: a FIXED cap cannot
 # survive a subscribe, because subscribeE pushes one frame per shell of
