@@ -45,6 +45,20 @@
 -- and `slope-fits` says a slope of five needs sz ≥ 2 — false on the
 -- smallest programs.
 --
+-- THE OBVIOUS ESCAPE IS CLOSED, AND BY AN EXISTING MEASUREMENT.  The
+-- escape would be a FOURTH Caps component: an ENTRY width that
+-- frameStep passes through unchanged, so the count could read a frame's
+-- payload capacity without reading the growing cWid.  It does not
+-- exist.  Frame-Work-Probe's across-instants rows are exactly this
+-- question — `progDT` under a one-arrival script delivers 2 payloads in
+-- its frame and under a two-arrival script delivers 8 — and its own
+-- reading is that "one more arrival buys one more level of the tower,
+-- not one more wrap", on the measured recurrence wₖ₊₁ = 2 ^ (wₖ + 1) − 2
+-- that `foldStep 2` was built to dominate.  A frame's payload count
+-- climbs the width ladder; it is not fixed at entry.  So the frame half
+-- of the charge is cWid-shaped by measurement, not by the choice of
+-- polynomial.
+--
 -- AND THE FIFTH STORY LOOKS AVOIDABLE: `sq-fits` shows a SQUARE of the
 -- delivery bound still fits in towerℕ (2 + m), provided blowup-tower's
 -- hypothesis is tightened from `cReg c ≤ towerℕ m` to
