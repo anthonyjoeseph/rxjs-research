@@ -59,6 +59,11 @@
 --                   budget of S ^ (1 + M) — and the repair costs no
 --                   receipt, because a scanᵉ node carries three
 --                   children and therefore three spare folds.
+--   §8  iwDef       the SECOND thing the width half needs, which the
+--                   cap does not carry: `innWᵉ` of a slot def.
+--                   slotCaps? bounds `sizeᵉ d` and `pWᵉ d` and nothing
+--                   else, and pW cannot be made to bound innW — here is
+--                   a def with pW 0 and innW 3.
 --
 -- Standalone (hand-built syntax only, no evaluator state), so
 -- src/Main.agda never reaches it: it needs its own make target.
@@ -566,6 +571,47 @@ scan-two-folds-4 = refl
 
 scan-two-folds-6 : (6 ^ 6 * (3 * 6 + 1) ≤ᵇ iterFold 2 2 6) ≡ true
 scan-two-folds-6 = refl
+
+------------------------------------------------------------------
+-- §8  THE SECOND THING THE WIDTH HALF NEEDS, AND THE CAP DOES NOT
+-- CARRY IT: `innWᵉ` OF A SLOT DEF.
+--
+-- Every eval-cluster member concludes `valCaps?`, whose second conjunct
+-- is `pWᵛ ≤ cWid`, so the width of an EVALUATED value has to come out
+-- of the size hypothesis (there is no innW/outW hypothesis on the way
+-- in).  Going through size means bounding `outWᵉ` and `innWᵉ` by the
+-- syntax — and that stops dead at `input i`, whose measures descend
+-- into the slot's def on slot fuel while `sizeᵉ (input i)` is 1.
+--
+-- The cap's slot side condition is `slotCaps?`, and its shared clause
+-- bounds exactly two things: `sizeᵉ d ≤ B` and `pWᵉ n sl d ≤ W`.  It
+-- does NOT bound `innWᵉ n sl d`, and pW cannot be made to — the two are
+-- independent, because innW reads the STEP FUNCTION's embedded
+-- observables while outW/dW read the source's.
+--
+-- Here is a def where they separate: an ofᵉ of three literals inside a
+-- map's step function, over an empty source.  pW is zero on both halves
+-- and innW is three, and the gap widens with the of-list
+------------------------------------------------------------------
+
+iwDef : Exp Γ [] [] [] (obs natᵗ)
+iwDef = mapᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])))
+             (emptyᵉ {t = natᵗ})
+
+_ : outWᵉ 1 ins1 iwDef ≡ 0
+_ = refl
+_ : dWᵉ 1 ins1 iwDef   ≡ 0
+_ = refl
+_ : pWᵉ 1 ins1 iwDef   ≡ 0
+_ = refl
+_ : innWᵉ 1 ins1 iwDef ≡ 3
+_ = refl
+
+-- so the slot side condition is satisfied at W = 0 while the quantity
+-- the width induction needs at `input i` is 3.  No W read off pW alone
+-- bounds it
+iw-escapes-pW : (pWᵉ 1 ins1 iwDef <ᵇ innWᵉ 1 ins1 iwDef) ≡ true
+iw-escapes-pW = refl
 
 ------------------------------------------------------------------
 -- THE READING (2026-08-01).
