@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -75,6 +75,11 @@ help:
 	@echo "                  width doubles per rung.  Then measures what DOES"
 	@echo "                  pay: two or three j (see agda/probe/"
 	@echo "                  Eval-Growth-Probe.agda).  Fast, ~1 min"
+	@echo "  chain-half-probe  the counterexample that a FIXED cap cannot"
+	@echo "                  survive a subscribe: at C = 5, a tight chain and a"
+	@echo "                  two-shell expression register a chain of length"
+	@echo "                  six.  This is why regsSz?-subscribeE is not in the"
+	@echo "                  tree (see agda/probe/Chain-Half-Probe.agda)"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -191,6 +196,15 @@ joint-probe:
 # it is the evidence behind whatever shape those five end up with.
 eval-growth-probe:
 	cd agda && agda -i src -i probe probe/Eval-Growth-Probe.agda
+
+# The counterexample that killed regsSz?-subscribeE: a FIXED cap cannot
+# survive a subscribe, because subscribeE pushes one frame per shell of
+# what it walks and the hypothesis buys room for exactly one.  One
+# hand-built configuration, run through the real subscribeE, so
+# src/Main.agda never reaches it — and it must not rot, because it is
+# the whole reason that postulate is not in the tree.
+chain-half-probe:
+	cd agda && agda -i src -i probe probe/Chain-Half-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck

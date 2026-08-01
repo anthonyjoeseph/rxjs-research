@@ -5,7 +5,7 @@
 -- (valCaps? / eventCaps? / burstCaps? / obsCaps?), the step functions
 -- (sizeStep / foldStep / iterSize / iterFold / frameStep / frameBlowup)
 -- with their monotonicity toolkit, the caps face itself
--- (subscribeE-caps, regsSz?-subscribeE) and the companion tree it is
+-- (subscribeE-caps) and the companion tree it is
 -- decomposed into, caps-tick DERIVED from the cascade companions, and
 -- the reachability cluster (reach-resets) that pays round 3's debt.
 --
@@ -239,10 +239,10 @@ widNode W sl (exhaust-st _ _)          = true
 -- syntactic subterm of what was already in the store.  So cSize covers
 -- them without a fourth field and, crucially, WITHOUT the ledger:
 -- round3b-ledger-reset-absurd stays unavailable
--- top-level (not a where block) so regsSz?-subscribeE below can name
--- pathSz? in its hypothesis: the continuation κ a subscribe walks under
--- must already be size-bounded, or a huge step function in κ would be
--- registered at the leaf.  This is the honest form — the naive lemma
+-- top-level (not a where block) so subscribeE-caps can name pathSz? in
+-- its hypothesis: the continuation κ a subscribe walks under must
+-- already be size-bounded, or a huge step function in κ would be
+-- registered at the leaf.  This is the honest form — the naive version
 -- without the κ hypothesis is FALSE, since κ = scan-f BIG ↠ root over a
 -- tiny b registers BIG
 frameSz? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
@@ -4600,34 +4600,34 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
                  (subst (_< C + C * (2 * C)) (+-identityʳ C)
                         (+-monoʳ-< C 0<prod))
 
--- STEP 3 of the repair, stated now because it is independent of how the
--- repair lands: the chain half of ANY repaired face consumes exactly
--- this, and it is the load-bearing structural fact behind the measured
--- 10, 10, 10, 10.  Every frame subscribeE installs carries a step
--- function that is a SUBTERM of the expression being subscribed — the
--- map-f/scan-f clauses pass `f` straight through from mapᵉ/scanᵉ — so a
--- registry bounded by C stays bounded by C as long as the subscribed
--- expression is.
+------------------------------------------------------------------
+-- WHAT WAS HERE, AND WHY IT IS GONE (2026-08-01).  regsSz?-subscribeE,
+-- "the chain half of ANY repaired face" — a fixed cap C, a registry
+-- bounded by it, an expression of size ≤ C subscribed under a κ with
+-- `pathSz? C κ` and `suc (pathLen κ) ≤ C`, concluding the registry is
+-- still bounded by C.
 --
--- BOTH conjuncts of pathSz? need a hypothesis, and for opposite reasons.
--- The frame half needs `sizeᵉ b ≤ C` and `pathSz? C κ` because the leaf
--- registers the whole of κ under the frames it pushed: the naive lemma
--- is FALSE, since κ = scan-f BIG ↠ root over a tiny b registers BIG.
--- The LENGTH half needs the chain to have room to GROW, since the
--- descent lengthens it by one frame per shell of b.  It used to ask for
--- `pathLen κ + sizeᵉ b ≤ C`, the joint form Joint-Probe refuted; what it
--- asks for now is the same pair the face does, and the descent's growth
--- is paid for one frame at a time by the j each hop spends
-postulate
-  regsSz?-subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (C : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    regsSz? C (EvalSt.registry st) ≡ true →
-    sizeᵉ b ≤ C →
-    pathSz? C κ ≡ true →           -- the continuation is already bounded
-    suc (pathLen κ) ≤ C →          -- and the chain it will GROW into fits
-    let r = subscribeE g b κ bid now sched st
-    in regsSz? C (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
+-- IT IS FALSE, and agda/probe/Chain-Half-Probe.agda computes the
+-- counterexample: at C = 5, a κ of four map-f frames (both hypotheses
+-- TIGHT) and `mapᵉ f (mapᵉ f (input 0))` (sizeᵉ exactly 5) register a
+-- chain of length SIX.  subscribeE pushes one frame per shell of what
+-- it walks, and `suc (pathLen κ) ≤ C` buys room for exactly one.
+--
+-- The defect is the FIXED cap, not the descent.  subscribeE-caps
+-- carries the identical two hypotheses and is GROUND, because it
+-- reports at `frameStep (j + j′) c` and one j at least doubles cSize
+-- (frameStep-size-suc) — so the frame a hop pushes is paid for by the
+-- j that hop spends.  A statement with no j has nothing to pay with,
+-- and no repair of its hypotheses helps: the joint form
+-- `pathLen κ + sizeᵉ b ≤ C` that would make it inductive is the one
+-- Joint-Probe refuted at the tight admissible cSize, and it would in
+-- any case not survive an *All hop, where the chain grows by the
+-- SHELLS OF A PAYLOAD rather than of the syntax.
+--
+-- AND IT WAS REDUNDANT.  `capsOK?`'s second conjunct IS `regsSz?`, so
+-- the ground subscribeE-caps already hands the chain half back at the
+-- level it reports.  The postulate had no consumer in the tree.
+------------------------------------------------------------------
 
 ------------------------------------------------------------------
 -- WHAT WAS HERE, AND WHY IT IS GONE.  A fixed-height reach cap —
