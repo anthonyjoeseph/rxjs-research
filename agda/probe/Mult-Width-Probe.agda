@@ -449,3 +449,160 @@ _ : (2 ^ (2 ^ 1) * 45 * suc 6 ≡ 1260)
 _ = refl
 _ : (512 ≤ᵇ 45 ^ 1260) ≡ true
 _ = refl
+
+------------------------------------------------------------------
+-- §5  AND THE CLAUSE THE RISK CLAUSE NAMED, MEASURED: NO
+--     SYNTAX-COUNTED MULTIPLICATIVE WIDTH LEMMA EXISTS.
+--
+-- The engine swap is not just a change to `frameStep`.  Caps-Face's
+-- width axis is the matching half: `wid-iterFold` bounds every width
+-- measure of an expression by `iterFold S (sizeᵉ e) M` — ONE foldStep
+-- per syntax node, seeded at the slot widths — and every receipt in the
+-- eval cluster is a count of syntax nodes (`suc (sizeᵗ fn)`,
+-- `suc (length vals * suc (sizeᵗ fn))`, `m + suc (m * m)`).  Under the
+-- exponential step, `suc k` folds buy a TOWER of height k over the
+-- seed, which is exactly what a static syntax bound needs.  Under the
+-- multiplicative step the same receipt buys only `M * S ^ suc k`.
+--
+-- SO THE QUESTION IS WHETHER THE STATIC WIDTH IS EVER BIGGER THAN
+-- `M * S ^ (a polynomial in the syntax)`.  It is, and not by a little:
+-- the static measure TOWERS in the syntax, because
+-- `innWᵉ (scanᵉ f z e)` has `outWᵉ e` IN AN EXPONENT and
+-- `outWᵉ (mergeAllᵉ e)` multiplies that back into an outW.  Nest the
+-- two and each level exponentiates the last.
+--
+-- THE FAMILY, four constructors wide: `lvl (suc k)` wraps `lvl k` in a
+-- scan whose step function mentions the accumulator twice (so its plug
+-- slope is 2) and unwraps it with a mergeAll.  Every level is a
+-- LEGITIMATE closed program — this is Frame-Work-Probe's deepScan
+-- shape, one nesting deeper.
+--
+-- The numbers are read off the measures themselves, and the top level's
+-- width is NOT formed as a numeral (it is above 2 ^ 10485760):
+-- `levelStep` is a structural lower bound on one level, and the
+-- comparison against the multiplicative bound is done in the EXPONENT,
+-- where every number is small.  That is the 457bb52 discipline — a
+-- 2-tower is not a numeral — and it is load-bearing here: spelling the
+-- top level as `lvl 3` rather than `wrap (lvl 2)` in the two conclusion
+-- types below sends the conversion checker into normalising it, which
+-- takes the container past 9 GB.
+------------------------------------------------------------------
+
+open import Data.List using (List; []; _∷_)
+open import Data.Vec  using () renaming ([] to []ᵛ)
+open import Data.List.Relation.Unary.Any using (here)
+open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
+                          ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; nat̂; fstᵗ; varᵗ;
+                          sizeᵉ)
+open import Rx.Evaluator using (Slots)
+open import Rx.Frame-Width using (outWᵉ; innWᵉ)
+
+Γ₀ : Ctx 0
+Γ₀ = []ᵛ
+
+ins₀ : Slots Γ₀
+ins₀ ()
+
+accV : ∀ {Θ} → Tm Γ₀ [] [] (obs natᵗ ×ᵗ natᵗ ∷ Θ) (obs natᵗ)
+accV = fstᵗ (varᵗ (here refl))
+
+seedO : ∀ {Θ} → Tm Γ₀ [] [] Θ (obs natᵗ)
+seedO = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
+
+-- the doubling step: two occurrences of the accumulator, so the plug
+-- slope `pmIᵗ 0` is 2 and the scanᵉ clause's base is 2
+W2 : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+W2 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ [])))
+
+wrap : Closed Γ₀ natᵗ → Closed Γ₀ natᵗ
+wrap e = mergeAllᵉ (scanᵉ W2 seedO e)
+
+lvl : ℕ → Closed Γ₀ natᵗ
+lvl zero    = ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ [])
+lvl (suc k) = wrap (lvl k)
+
+-- ONE LEVEL EXPONENTIATES, structurally — no numeral is formed
+grow : ∀ (W P K : ℕ) → 1 ≤ W → 1 ≤ K → P ≤ W * (P * K)
+grow W P K hW hK =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ P))) (*-monoʳ-≤ P hK))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (P * K))))
+                   (*-monoˡ-≤ (P * K) hW))
+
+levelStep : ∀ (e : Closed Γ₀ natᵗ) → 1 ≤ outWᵉ 0 ins₀ e →
+  2 ^ (outWᵉ 0 ins₀ e) ≤ outWᵉ 0 ins₀ (wrap e)
+levelStep e h = grow _ _ _ h (s≤s z≤n)
+
+-- THE MEASURED LEVELS.  outW doubles its way up: 2, 16, and then ten
+-- MILLION at three nesting levels — and the fourth level is
+-- 2 ^ 10485760, which is why it is bounded structurally rather than
+-- computed
+_ : outWᵉ 0 ins₀ (lvl 0) ≡ 2
+_ = refl
+
+_ : outWᵉ 0 ins₀ (lvl 1) ≡ 16
+_ = refl
+
+_ : outWᵉ 0 ins₀ (lvl 2) ≡ 10485760
+_ = refl
+
+-- and the syntax stays small: FORTY-SIX nodes for the whole thing
+_ : sizeᵉ (lvl 3) ≡ 46
+_ = refl
+
+-- THE REFUTATION, STATED OVER AN ABSTRACT CHILD and instantiated at
+-- the measured one — which is not a stylistic choice: instantiating it
+-- with the top level SPELLED OUT would ask Agda to normalise
+-- 2 ^ 10485760, and a 2-tower is not a numeral (457bb52).  Everything
+-- below happens in the EXPONENT, where every number is small.
+--
+-- Read it as: for a program `wrap e` whose syntax is at most 62 nodes
+-- (so its tightest entry cSize is under 2 ^ 6), a multiplicative bound
+-- at ANY count k with 6·k below the child's width is EXCEEDED
+refute : ∀ (e : Closed Γ₀ natᵗ) (k : ℕ) →
+  1 ≤ outWᵉ 0 ins₀ e →
+  2 + sizeᵉ (wrap e) ≤ 2 ^ 6 →
+  suc (6 * k) ≤ outWᵉ 0 ins₀ e →
+  suc ((2 + sizeᵉ (wrap e)) ^ k) ≤ outWᵉ 0 ins₀ (wrap e)
+refute e k h1 hsz hk =
+  ≤-trans (s≤s (≤-trans (^-monoˡ-≤ k hsz)
+                        (≤-reflexive (^-*-assoc 2 6 k))))
+  (≤-trans (+-monoˡ-≤ (2 ^ (6 * k)) (1≤2^ (6 * k)))
+  (≤-trans (≤-reflexive (solve 1 (λ x → x :+ x := con 2 :* x)
+                               refl (2 ^ (6 * k))))
+  (≤-trans (^-monoʳ-≤ 2 hk) (levelStep e h1))))
+
+-- LINEAR IN THE SYNTAX — the count every eval receipt actually reports.
+-- 48 ^ 46 against a width of 2 ^ 10485760
+mult-bound-fails-linear :
+  suc ((2 + sizeᵉ (wrap (lvl 2))) ^ 46) ≤ outWᵉ 0 ins₀ (wrap (lvl 2))
+mult-bound-fails-linear =
+  refute (lvl 2) 46 (≤ᵇ⇒≤ 1 10485760 _) (≤ᵇ⇒≤ 48 64 _) (≤ᵇ⇒≤ 277 10485760 _)
+
+-- AND CUBIC IN IT, so the gap is not a constant factor or a slack
+-- receipt: 6 · 46³ = 584016, still far under the exponent
+mult-bound-fails-cubic :
+  suc ((2 + sizeᵉ (wrap (lvl 2))) ^ (46 * 46 * 46)) ≤ outWᵉ 0 ins₀ (wrap (lvl 2))
+mult-bound-fails-cubic =
+  refute (lvl 2) (46 * 46 * 46)
+         (≤ᵇ⇒≤ 1 10485760 _) (≤ᵇ⇒≤ 48 64 _) (≤ᵇ⇒≤ 584017 10485760 _)
+
+-- WHAT THIS DOES AND DOES NOT SAY.  It does NOT refute the engine: the
+-- entry caps' own cWid is `suc (pWᵉ n sl e ⊔ …)`, which for THIS
+-- program already IS the tower — the base pays for the program's own
+-- static widths, at j = 0.  What it refutes is the width lemma AS
+-- STATED AND CONSUMED: `wid-iterFold`'s seed is the SLOT telescope's
+-- width and its count is the syntax, and the five eval receipts are
+-- counts of syntax nodes.  Those receipts buy a tower under the
+-- exponential step and 2 ^ (6 · count) under the multiplicative one,
+-- and the gap between them is this row.
+--
+-- So the ruling's restructure is not optional, it is the whole job: the
+-- static widths must be paid by an ENTRY CEILING carried in the base
+-- (a ⊔-collect over every subterm of all five measures — syntax, hence
+-- entry-computable), and the receipts may then pay only for the
+-- DYNAMIC growth, which is per-payload and multiplicative.  The
+-- dynamic side is where the engine is right: one fold through a scan
+-- whose source carries W payloads takes a width to ~2 ^ W, and that
+-- frame's receipt is `length vals * suc (sizeᵗ fn)` ≈ W · size folds,
+-- which buys S ^ (W · size) ≥ 2 ^ W.  Exponent and receipt count are
+-- the same number (§1) — on the DELIVERY side only
