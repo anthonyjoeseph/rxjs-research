@@ -34,7 +34,8 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        ^-distribˡ-+-*; *-mono-≤;
                                        +-monoʳ-≤; *-comm;
                                        m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
+                                       suc-injective; <-irrefl; ≡ᵇ⇒≡;
+                                       +-cancelʳ-≤)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
@@ -3657,7 +3658,159 @@ cascadeGo-width Ω a id ((rid , c) ∷ chains) sched st inv vΩ pΩ
           (proj₁ (proj₂ CSr)) (proj₂ (proj₂ CSr)) (proj₁ CS) vΩ
           (proj₂ (∧-true (pathΩ? Ω c) _ pΩ))
 
+------------------------------------------------------------------
+-- THE WET CORES — THE ASSEMBLY, TRANSCRIBED (2026-08-01), AND THREE
+-- STATEMENT-LEVEL GAPS.  Outside-in, at this joint: the companion
+-- tree the wet induction would walk is written down BEFORE any clause
+-- is ground — and writing it down is what found the gaps.  Both cores
+-- are STOPPED on a design ruling; nothing below them is touched.
+--
+-- THE COMPANION TREE.  The wet induction needs no new tree.  It is
+-- subscribeE-walkS's, clause for clause, with the wet payload (hasDry
+-- ≡ false, and one hasAtLeast peel per gas edge) carried alongside the
+-- store payload each member already threads.  Transcribed, with what
+-- each member threads and which of the three gas edges it owns:
+--
+--   subscribeE-walkS      THE WALK, thirteen clauses.  `input` →
+--     -input-wet; of/empty are one-shots (one eval edge, no gas);
+--     map/take/scan are install-INV + the IH + pushBurst-wet (no gas);
+--     the four *Alls → subscribeAll-wet; μᵉ g0 is the dry stub and
+--     μᵉ (gs fuel) is THE μ EDGE (re-enter on unfoldμ at the ×2 copy
+--     edge); varᵉ is absurd; deferᵉ → -defer-wet (mint source +
+--     ordinal, addLive-INV).
+--   subscribeAll-wet      mint node, install-INV, the IH under
+--     `thru-outer op nid ↠ κ`, pushBurst-wet.  Spends no gas itself —
+--     a *All's gas is spent one level down, at subscribeInner.
+--   subscribeE-input-wet  five shapes over ONE slot, cut out of the
+--     telescope by slotSize-at / slotFnCap-at.  cold-without-tail is a
+--     ledger-free one-shot; cold-with-tail and hot are register-INV
+--     (the ×2 length edge); shared → sharedSlot-wet.
+--   sharedSlot-wet        completed → nothing; already connected → one
+--     register-INV; otherwise → sharedConnect-wet.
+--   sharedConnect-wet     THE CONNECT EDGE.  g0 is the dry stub; gs
+--     peels one, latches connectedShares (connectShare-INV), registers
+--     (register-INV), walks the stored def at `share-sink i`, and
+--     lands through connectWrap-wet.
+--   pushBurst-wet         splitBurst, stepFrame-wet, retag.
+--   stepFrame-wet         map-f is the ledger rule itself (×3^(suc Ψ));
+--     scan-f → -scan-wet; take-f → -take-wet; from-inner →
+--     -fromInner-wet (absorb, or innerFinish-wet); thru-outer →
+--     -thruOuter-wet.
+--   thruWalk-wet          one thruConsume-wet per emitted outer value.
+--   thruConsume-wet       the per-op node bookkeeping around the hop:
+--     merge's bump, concat's queue and drain, switch's kill, exhaust's
+--     flag.
+--   subscribeInner-wet    THE HOP EDGE.  g0 is the dry stub; gs peels
+--     one and re-enters the walk on the inner observable VALUE under
+--     `from-inner op allNid inst ↠ κ`.
+--   concatDrain-wet / innerFinish-wet / thruWrap-wet   structural.
+--
+--   and one level out, the delivery clique: cascadeGo-walk →
+--   chainStep-wet → foldPath-wet → (at share-sink) dispatchShare-wet →
+--   shareGo-wet → foldPath-wet.  It spends NO gas at all: a burst
+--   leaves subscribeE through a FRAME and is never re-entered through
+--   a path (the Keeps memo's clique boundary, same reason).
+--
+-- So the structural half transcribes exactly.  What does NOT
+-- transcribe is the two cores' own faces.
+--
+-- GAP 1 — THE INVARIANT IS THE WRONG ONE, IN AND OUT.  Both cores
+-- carry `stBounded? B`: two conjuncts, live pendings and node stores.
+-- Every member of the tree above, and the only face anywhere that
+-- produces `hasDry ≡ false` (subscribeE-walk), carries `INV? Ψ B` —
+-- SIX conjuncts: stBounded?, fnCapBounded?, registry cardinality,
+-- regsB?, slotsSize, slotsFnCap — and the walk face carries widthOK? Ω
+-- / ofWᵉ b ≤ Ω / pathΩ? Ω κ and the length ledger `pathLen κ + G ≤ ℓ`
+-- / regsLen? ℓ on top.  Neither direction closes:
+--
+--   · IN.  `stBounded? V` does not yield `INV? Ψ B` at any (Ψ, B) the
+--     landing arithmetic can afford.  It says nothing about a stored
+--     value's fn weight, the registry's cardinality, or a registered
+--     chain's frames.  Some (Ψ, B) always exists for a FIXED finite
+--     state — that is not the point; the point is that the bound has
+--     to BE the instant's budget.  And subscribeE-wet's κ is
+--     completely unconstrained, where every member above needs
+--     `pathB? (capᴱ W E) Ψ κ` (register-INV consumes it to keep
+--     regsB?).
+--   · OUT.  drain-dry threads instant to instant exactly what
+--     cascade-dry returns.  If the fold's proof consumes INV?, then
+--     cascadeGo-wet has to RETURN INV?, or instant (suc id) cannot be
+--     entered.  A stBounded?-only conclusion cannot re-seed an
+--     INV?-shaped hypothesis, so drain-dry → cascade-dry →
+--     cascadeGo-wet does not close at the stated faces.
+--
+-- This is the class the caps face hit three times (the joint bound,
+-- `c` untied from `sl`, the chain half): a face stated against less
+-- than its own tree threads.
+--
+-- GAP 2 — THE DEMAND'S RESET CAPS ARE THE LEDGER.  subscribeE-wet
+-- measures its demand at V = sizeBudgetAt e slots id — the instant's
+-- STORE bound — in every cap role at once: dBound's V, R as hopR V,
+-- hopD's index, and (through `sizeᵉ b ≤ V`) the entry size.  The hop
+-- edge then owes exactly
+--
+--     suc (syncSize of the inner) ≤ syncSizeᵉ b + suc V
+--
+-- and not one unit more — hop-step-needs below is that, machine-
+-- checked, with hop-step-gives its converse.  The r drop at a *All is
+-- exactly one (hopDᵉ (mergeAllᵉ c) is definitionally suc (hopDᵉ c) and
+-- burstHopD? bounds the inner by hopDᵉ c), so r′ ≡ r ∸ 1 is the case
+-- that must be covered and no larger drop can be relied on.
+--
+-- But the inner is drawn from a MID-WALK burst, and mid-walk values
+-- outgrow V: a scan frame folds every value with NO fuel peel, one
+-- applyFn per fold, and THE WALK INVARIANT memo above already records
+-- it — "no fixed (V, R) survives the walk".  The only stated bound on
+-- such a value is the walk's own ledger ceiling capᴱ W E′, whose
+-- permitted range grows with the walk's work, which grows with the
+-- demand, which is ≥ suc V by sucV≤d.  That is round 3's whole
+-- remaining debt, already named: round3b-ledger-reset-absurd says the
+-- reset caps Ŝ and R̂ may NOT be the ledger, they have to come from
+-- reachability.  subscribeE-wet's V is the ledger.
+--
+-- GAP 3 — THE ARRIVAL IS UNBOUNDED, AND THE POP RING CANNOT BOUND IT.
+-- cascadeGo-wet quantifies over `chains` and over `a` with no bound on
+-- either.  cascadeGo-walk needs `all (λ rc → pathB? …) chains` (which
+-- is INV?'s regsB? conjunct — GAP 1) and, separately,
+-- `valB? … (arrTy a) (arrVal a)`.  Nothing anywhere bounds a POPPED
+-- arrival's value: schedHeadOf-bounded and pop-bounded both keep the
+-- TAIL and drop the popped element on the floor.  The companion that
+-- would supply it — the same schedGo inversion, keeping the HEAD — does
+-- not exist, and any INV?-shaped restatement owes it.
+------------------------------------------------------------------
+
+-- THE EXACT SLACK AT A ONE-STEP HOP, so GAP 2 is a number and not a
+-- worry.  At a FIXED anchor V an r-drop of one buys exactly `s + V` of
+-- syncSize headroom — necessary and sufficient, both directions.  The
+-- whole content is *-suc: dBound's second summand grows by exactly
+-- suc V per unit of r.
+dBound-suc-r : ∀ (V R U r s : ℕ) →
+  dBound V R U (suc r) s ≡ (s + suc V) + suc V * (r + suc R * U)
+dBound-suc-r V R U r s =
+  trans (cong (s +_) (*-suc (suc V) (r + suc R * U)))
+        (sym (+-assoc s (suc V) (suc V * (r + suc R * U))))
+
+hop-step-gives : ∀ (V R U r s s′ : ℕ) → suc s′ ≤ s + suc V →
+  suc (dBound V R U r s′) ≤ dBound V R U (suc r) s
+hop-step-gives V R U r s s′ h =
+  ≤-trans (+-monoˡ-≤ (suc V * (r + suc R * U)) h)
+          (≤-reflexive (sym (dBound-suc-r V R U r s)))
+
+hop-step-needs : ∀ (V R U r s s′ : ℕ) →
+  suc (dBound V R U r s′) ≤ dBound V R U (suc r) s → suc s′ ≤ s + suc V
+hop-step-needs V R U r s s′ h =
+  +-cancelʳ-≤ (suc V * (r + suc R * U)) (suc s′) (s + suc V)
+    (≤-trans h (≤-reflexive (dBound-suc-r V R U r s)))
+
 postulate
+  -- STOPPED 2026-08-01 on GAP 1 and GAP 2 above: the face carries
+  -- stBounded? where its own companion tree carries INV? (and κ
+  -- unconstrained where every member wants pathB?), and its demand's
+  -- reset caps are the instant's store bound, which
+  -- round3b-ledger-reset-absurd rules out.  Not restated here — the
+  -- restatement moves burst-wet's fuel-ok and the whole
+  -- drain-dry/cascade-dry thread with it, and that is a design call.
+  --
   -- THE WET CONTRACT, stated at the mutual block's entry point:
   -- from a store-bounded machine, subscribing any store-sized value
   -- with fuel for its demand neither dries nor escapes the next
@@ -3684,6 +3837,13 @@ postulate
        × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                      (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
+  -- STOPPED 2026-08-01 on GAP 1 and GAP 3 above: the fold's own
+  -- decomposition (cascadeGo-walk, PROVEN) consumes INV? in and out
+  -- plus a bound on the arrival's value, and this face supplies
+  -- neither — nor can drain-dry re-seed INV? from a stBounded?-only
+  -- conclusion.  The fold-threading note below still stands and is
+  -- orthogonal to both.
+  --
   -- the chain fold at instant id, from a latched state within id's
   -- size budget, stays wet and lands within suc id's.
   --
