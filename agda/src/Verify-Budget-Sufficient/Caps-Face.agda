@@ -99,7 +99,8 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
-                                outWᵉ; innWᵉ;
+                                outWᵉ; innWᵉ; innWᵗ; innWᵗˢ;
+                                pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
                                 slotPW; slotsPW; slotsPWgo;
                                 slotIW; slotsIW; slotsIWgo)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
@@ -1231,21 +1232,765 @@ SlotWid {n = n} {Γ = Γ} sl M =
     × (innWᵉ n sl (input {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i) ≤ M)
     × (dWᵉ n sl (input {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i) ≤ M)
 
-postulate
-  -- THE WIDTH LEMMA, in the shape Eval-Growth-Probe §7's clause
-  -- analysis forces: the induction is organised at the MAX of a node's
-  -- children rather than at their running sum, so every non-scanᵉ node
-  -- spends ONE foldStep and `scanᵉ` spends TWO — funded by the three
-  -- children a scanᵉ node carries, each at least one syntax node
-  -- (3 ≤ sizeᵉ (scanᵉ f z e)).  The receipt is still j′ = sizeᵉ,
-  -- syntax-linear
-  wid-iterFold : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (S M : ℕ) → 2 ≤ S →
-    (sl : Slots Γ) → SlotWid sl M → (e : Exp Γ Δᵍ Δ Θ t) →
-    (outWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
-    × (innWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
-    × (dWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+------------------------------------------------------------------
+-- THE WIDTH LEMMA, PROVEN, in the shape Eval-Growth-Probe §7's clause
+-- analysis forces: the induction is organised at the MAX of a node's
+-- children rather than at their running sum, so every non-scanᵉ node
+-- spends ONE foldStep and `scanᵉ` spends TWO — funded by the three
+-- children a scanᵉ node carries, each at least one syntax node.  The
+-- receipt is still j′ = sizeᵉ, syntax-linear.
+--
+-- FIVE MEASURES AT ONCE, because the clauses cross-reference: innW's
+-- mapᵉ clause reads pmI, its scanᵉ clause reads outW in an EXPONENT,
+-- and pmO's *All clause reads both.  Wᴱ / Wᵀ / Wᴸ bundle them under one
+-- number, which is the whole content of "arrives at each node with all
+-- its children's measures already bounded by ONE accumulated M".
+--
+-- THE ARITHMETIC IS TWO OBLIGATIONS.  At the children's bound T (which
+-- is ≥ 4 at every internal node, since one fold off a leaf bound of at
+-- least 1 is already S ^ 2):
+--
+--   one fold    2 T² ≤ S ^ suc T          every clause but scanᵉ
+--   two folds   T ^ T (3T+1) ≤ S ^ suc (S ^ suc T)      scanᵉ
+--
+-- and both reduce to ONE engine, `sq≤pow`: a square is under an
+-- exponential from 4 on.
+------------------------------------------------------------------
 
-  -- AND THE TELESCOPE SUPPLIES THE LEAF, at ONE above the width cap.
+sqStep : ∀ (t : ℕ) → suc t * suc t ≡ t * t + suc (2 * t)
+sqStep = solve 1 (λ a → (con 1 :+ a) :* (con 1 :+ a)
+                      := a :* a :+ (con 1 :+ con 2 :* a)) refl
+
+linStep : ∀ (t : ℕ) → suc (2 * suc t) ≡ suc (2 * t) + 2
+linStep = solve 1 (λ a → con 1 :+ con 2 :* (con 1 :+ a)
+                       := (con 1 :+ con 2 :* a) :+ con 2) refl
+
+dbl : ∀ (y : ℕ) → 2 * y ≡ y + y
+dbl = solve 1 (λ a → con 2 :* a := a :+ a) refl
+
+-- the engine, with the linear fact it needs carried alongside
+sq-exp : ∀ (k : ℕ) →
+  ((4 + k) * (4 + k) ≤ 2 ^ (4 + k)) × (suc (2 * (4 + k)) ≤ 2 ^ (4 + k))
+sq-exp zero    = ≤ᵇ⇒≤ 16 16 tt , ≤ᵇ⇒≤ 9 16 tt
+sq-exp (suc k) = SQ , LIN
+  where
+  t   = 4 + k
+  ih  = sq-exp k
+  half : 2 ^ suc t ≡ 2 ^ t + 2 ^ t
+  half = dbl (2 ^ t)
+  two≤ : 2 ≤ 2 ^ t
+  two≤ = ≤-trans (≤ᵇ⇒≤ 2 4 tt) (^-monoʳ-≤ 2 (≤ᵇ⇒≤ 2 t tt))
+  SQ : suc t * suc t ≤ 2 ^ suc t
+  SQ = ≤-trans (≤-reflexive (sqStep t))
+               (≤-trans (+-mono-≤ (proj₁ ih) (proj₂ ih)) (≤-reflexive (sym half)))
+  LIN : suc (2 * suc t) ≤ 2 ^ suc t
+  LIN = ≤-trans (≤-reflexive (linStep t))
+                (≤-trans (+-mono-≤ (proj₂ ih) two≤) (≤-reflexive (sym half)))
+
+sq≤pow : ∀ (t : ℕ) → 4 ≤ t → t * t ≤ 2 ^ t
+sq≤pow (suc zero)                     (s≤s ())
+sq≤pow (suc (suc zero))               (s≤s (s≤s ()))
+sq≤pow (suc (suc (suc zero)))         (s≤s (s≤s (s≤s ())))
+sq≤pow (suc (suc (suc (suc k))))      _ = proj₁ (sq-exp k)
+
+-- A1: ONE fold dominates every clause but scanᵉ.  Each of them is a
+-- sum or a ⊔ of at most two products of the children's bound, so
+-- `2 T²` covers them all
+one-fold : ∀ (S Tb : ℕ) → 2 ≤ S → 4 ≤ Tb → 2 * (Tb * Tb) ≤ foldStep S Tb
+one-fold S Tb hS hT =
+  ≤-trans (*-monoʳ-≤ 2 (sq≤pow Tb hT)) (^-monoˡ-≤ (suc Tb) hS)
+
+-- A2: TWO folds dominate the scanᵉ clause, whose innW reads
+--   (pmIᵗ 0 f ⊔ 1) ^ outWᵉ e * (innWᵗ f + innWᵗ z + innWᵉ e + 1)
+-- and is therefore Tb ^ Tb * (3 Tb + 1) at the children's bound
+two-folds : ∀ (S Tb : ℕ) → 2 ≤ S → 4 ≤ Tb →
+  Tb ^ Tb * (3 * Tb + 1) ≤ foldStep S (foldStep S Tb)
+two-folds S Tb hS hT =
+  ≤-trans (*-mono-≤ powT lin)
+  (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 (Tb * Tb) (2 + Tb))))
+  (≤-trans (^-monoˡ-≤ (Tb * Tb + (2 + Tb)) hS)
+           (powʳ S hS expfit)))
+  where
+  powʳ : ∀ (X : ℕ) → 2 ≤ X → ∀ {a b} → a ≤ b → X ^ a ≤ X ^ b
+  powʳ (suc zero)    (s≤s ()) le
+  powʳ (suc (suc X)) _        le = ^-monoʳ-≤ (suc (suc X)) le
+  T≤2^T : Tb ≤ 2 ^ Tb
+  T≤2^T = <⇒≤ (n<2^n Tb)
+  powT : Tb ^ Tb ≤ 2 ^ (Tb * Tb)
+  powT = ≤-trans (^-monoˡ-≤ Tb T≤2^T) (≤-reflexive (^-*-assoc 2 Tb Tb))
+  four : ∀ x → 3 * x + x ≡ 4 * x
+  four = solve 1 (λ a → con 3 :* a :+ a := con 4 :* a) refl
+  lin : 3 * Tb + 1 ≤ 2 ^ (2 + Tb)
+  lin = ≤-trans (≤-trans (+-monoʳ-≤ (3 * Tb) (≤-trans (s≤s z≤n) hT))
+                         (≤-reflexive (four Tb)))
+        (≤-trans (*-monoʳ-≤ 4 T≤2^T) (≤-reflexive (*-assoc 2 2 (2 ^ Tb))))
+  expfit : Tb * Tb + (2 + Tb) ≤ suc (foldStep S Tb)
+  expfit =
+    ≤-trans (+-mono-≤ (sq≤pow Tb hT) (s≤s (n<2^n Tb)))
+    (≤-trans (≤-reflexive (+-suc (2 ^ Tb) (2 ^ Tb)))
+             (s≤s (≤-trans (≤-reflexive (sym (dbl (2 ^ Tb))))
+                           (^-monoˡ-≤ (suc Tb) hS))))
+
+------------------------------------------------------------------
+-- THE INDUCTION.
+------------------------------------------------------------------
+
+powʳ1 : ∀ (X : ℕ) → 1 ≤ X → ∀ {a b} → a ≤ b → X ^ a ≤ X ^ b
+powʳ1 (suc X) _ le = ^-monoʳ-≤ (suc X) le
+
+k≤iterFold : ∀ (S k w : ℕ) → 2 ≤ S → k ≤ iterFold S k w
+k≤iterFold S zero    w hS = z≤n
+k≤iterFold S (suc k) w hS =
+  subst (suc k ≤_) (sym (iterFold-suc S k w))
+        (≤-trans (s≤s (k≤iterFold S k w hS))
+                 (suc≤foldStep S (iterFold S k w) hS))
+
+len≤sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+  length ts ≤ sizeᵗˢ ts
+len≤sizeᵗˢ []       = z≤n
+len≤sizeᵗˢ (y ∷ ys) = +-mono-≤ (sizeᵗ-pos y) (len≤sizeᵗˢ ys)
+
+-- 4 ≤ the children's bound, which is what the arithmetic core wants
+4≤iterFold : ∀ (S M m : ℕ) → 2 ≤ S → 1 ≤ M → 1 ≤ m → 4 ≤ iterFold S m M
+4≤iterFold S M (suc m) hS hM _ =
+  ≤-trans (≤-trans (≤-trans (≤ᵇ⇒≤ 4 4 tt) (^-monoʳ-≤ 2 (s≤s hM)))
+                   (^-monoˡ-≤ (suc M) hS))
+          (iterFold-infl S hS m (foldStep S M))
+
+-- everything ONE fold has to dominate, at the children's bound Tb
+one-fits : ∀ (S Tb x : ℕ) → 2 ≤ S → 4 ≤ Tb → x ≤ Tb * Tb + Tb * Tb → x ≤ foldStep S Tb
+one-fits S Tb x hS hT h =
+  ≤-trans (≤-trans h (≤-reflexive (sym (dbl (Tb * Tb))))) (one-fold S Tb hS hT)
+
+T≤TT : ∀ (Tb : ℕ) → 1 ≤ Tb → Tb ≤ Tb * Tb
+T≤TT Tb hT = ≤-trans (≤-reflexive (sym (*-identityʳ Tb))) (*-monoʳ-≤ Tb hT)
+
+
+Wᴱ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Slots Γ → ℕ → Exp Γ Δᵍ Δ Θ t → Set
+Wᴱ {n = n} sl M e = (outWᵉ n sl e ≤ M) × (innWᵉ n sl e ≤ M)
+                  × ((k : ℕ) → pmOᵉ n sl k e ≤ M) × ((k : ℕ) → pmIᵉ n sl k e ≤ M)
+
+Wᵀ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Slots Γ → ℕ → Tm Γ Δᵍ Δ Θ t → Set
+Wᵀ {n = n} sl M tm = (innWᵗ n sl tm ≤ M)
+                   × ((k : ℕ) → pmOᵗ n sl k tm ≤ M) × ((k : ℕ) → pmIᵗ n sl k tm ≤ M)
+
+Wᴸ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Slots Γ → ℕ → List (Tm Γ Δᵍ Δ Θ t) → Set
+Wᴸ {n = n} sl M ts = (innWᵗˢ n sl ts ≤ M) × ((k : ℕ) → pmIᵗˢ n sl k ts ≤ M)
+
+Wᴱ-mono : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) {M M′ : ℕ}
+  (e : Exp Γ Δᵍ Δ Θ t) → M ≤ M′ → Wᴱ sl M e → Wᴱ sl M′ e
+Wᴱ-mono sl e le (a , b , c , d) =
+  ≤-trans a le , ≤-trans b le , (λ k → ≤-trans (c k) le) , (λ k → ≤-trans (d k) le)
+
+Wᵀ-mono : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) {M M′ : ℕ}
+  (tm : Tm Γ Δᵍ Δ Θ t) → M ≤ M′ → Wᵀ sl M tm → Wᵀ sl M′ tm
+Wᵀ-mono sl tm le (a , c , d) =
+  ≤-trans a le , (λ k → ≤-trans (c k) le) , (λ k → ≤-trans (d k) le)
+
+Wᴸ-mono : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) {M M′ : ℕ}
+  (ts : List (Tm Γ Δᵍ Δ Θ t)) → M ≤ M′ → Wᴸ sl M ts → Wᴸ sl M′ ts
+Wᴸ-mono sl ts le (a , d) = ≤-trans a le , (λ k → ≤-trans (d k) le)
+
+node1 : ∀ (S M m N : ℕ) → 2 ≤ S → suc m ≤ N →
+  foldStep S (iterFold S m M) ≤ iterFold S N M
+node1 S M m N hS le =
+  ≤-trans (≤-reflexive (sym (iterFold-suc S m M))) (iterFold-mono-count S M hS le)
+
+node2 : ∀ (S M m N : ℕ) → 2 ≤ S → suc (suc m) ≤ N →
+  foldStep S (foldStep S (iterFold S m M)) ≤ iterFold S N M
+node2 S M m N hS le =
+  ≤-trans (≤-reflexive (sym (trans (iterFold-suc S (suc m) M)
+                                   (cong (foldStep S) (iterFold-suc S m M)))))
+          (iterFold-mono-count S M hS le)
+
+thr : ∀ (x : ℕ) → x + x + x + 1 ≡ 3 * x + 1
+thr = solve 1 (λ a → a :+ a :+ a :+ con 1 := con 3 :* a :+ con 1) refl
+
+thr3 : ∀ (x : ℕ) → x + x + x ≡ 3 * x
+thr3 = solve 1 (λ a → a :+ a :+ a := con 3 :* a) refl
+
+ite≤ : ∀ (b : Bool) {N : ℕ} → 1 ≤ N → (if b then 1 else 0) ≤ N
+ite≤ true  h = h
+ite≤ false h = z≤n
+
+-- suc of the ⊔ of two positives is under their sum, and likewise three
+max2-suc : ∀ (a b : ℕ) → 1 ≤ a → 1 ≤ b → suc (a ⊔ b) ≤ a + b
+max2-suc a b ha hb = ⊔-lub p q
+  where
+  p : suc a ≤ a + b
+  p = ≤-trans (≤-reflexive (sym (+-comm a 1))) (+-monoʳ-≤ a hb)
+  q : suc b ≤ a + b
+  q = +-monoˡ-≤ b ha
+
+max3-suc : ∀ (a b c : ℕ) → 1 ≤ a → 1 ≤ b → 1 ≤ c → suc (a ⊔ b ⊔ c) ≤ a + b + c
+max3-suc a b c ha hb hc =
+  ≤-trans (max2-suc (a ⊔ b) c (≤-trans ha (m≤m⊔n a b)) hc)
+          (+-monoˡ-≤ c (⊔-lub (m≤m+n a b) (m≤n+m b a)))
+
+------------------------------------------------------------------
+-- THE FUEL COLUMN.  outWᵉ and innWᵉ take their `input` clauses FIRST,
+-- so their case trees split on the slot fuel at the root and every
+-- other clause is STUCK at a variable fuel — which is what a structural
+-- induction over the syntax has.  (dWᵉ takes `input` last for exactly
+-- this reason; the comment on it in Rx.Frame-Width says so.)  Rather
+-- than reorder a measure the whole design reads, the induction below
+-- unsticks each constructor once, here.
+------------------------------------------------------------------
+
+module Red {n} {Γ : Ctx n} where
+  oW-of : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    outWᵉ q sl (ofᵉ ts) ≡ length ts
+  oW-of zero    sl ts = refl
+  oW-of (suc _) sl ts = refl
+
+  oW-empty : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} →
+    outWᵉ q sl (emptyᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t}) ≡ 0
+  oW-empty zero    sl  = refl
+  oW-empty (suc _) sl  = refl
+
+  oW-map : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ s t) (e : Exp Γ Δᵍ Δ Θ s) →
+    outWᵉ q sl (mapᵉ f e) ≡ outWᵉ q sl e
+  oW-map zero    sl f e = refl
+  oW-map (suc _) sl f e = refl
+
+  oW-take : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (c : Tm Γ Δᵍ Δ Θ natᵗ) (e : Exp Γ Δᵍ Δ Θ t) →
+    outWᵉ q sl (takeᵉ c e) ≡ outWᵉ q sl e
+  oW-take zero    sl c e = refl
+  oW-take (suc _) sl c e = refl
+
+  oW-scan : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t) (z : Tm Γ Δᵍ Δ Θ t) (e : Exp Γ Δᵍ Δ Θ s) →
+    outWᵉ q sl (scanᵉ f z e) ≡ outWᵉ q sl e
+  oW-scan zero    sl f z e = refl
+  oW-scan (suc _) sl f z e = refl
+
+  oW-merge : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    outWᵉ q sl (mergeAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+  oW-merge zero    sl e = refl
+  oW-merge (suc _) sl e = refl
+
+  oW-concat : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    outWᵉ q sl (concatAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+  oW-concat zero    sl e = refl
+  oW-concat (suc _) sl e = refl
+
+  oW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    outWᵉ q sl (switchAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+  oW-switch zero    sl e = refl
+  oW-switch (suc _) sl e = refl
+
+  oW-exhaust : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    outWᵉ q sl (exhaustAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+  oW-exhaust zero    sl e = refl
+  oW-exhaust (suc _) sl e = refl
+
+  oW-μ : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ (t ∷ Δᵍ) Δ Θ t) →
+    outWᵉ q sl (μᵉ e) ≡ outWᵉ q sl e
+  oW-μ zero    sl e = refl
+  oW-μ (suc _) sl e = refl
+
+  oW-var : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (x : t ∈ Δ) →
+    outWᵉ q sl (varᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Θ = Θ} x) ≡ 0
+  oW-var zero    sl x = refl
+  oW-var (suc _) sl x = refl
+
+  oW-defer : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ [] (Δᵍ ++ Δ) Θ t) →
+    outWᵉ q sl (deferᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} e) ≡ 0
+  oW-defer zero    sl e = refl
+  oW-defer (suc _) sl e = refl
+
+  iW-of : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    innWᵉ q sl (ofᵉ ts) ≡ innWᵗˢ q sl ts
+  iW-of zero    sl ts = refl
+  iW-of (suc _) sl ts = refl
+
+  iW-empty : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} →
+    innWᵉ q sl (emptyᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t}) ≡ 0
+  iW-empty zero    sl  = refl
+  iW-empty (suc _) sl  = refl
+
+  iW-map : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ s t) (e : Exp Γ Δᵍ Δ Θ s) →
+    innWᵉ q sl (mapᵉ f e) ≡ innWᵗ q sl f + (pmIᵗ q sl 0 f ⊔ 1) * innWᵉ q sl e
+  iW-map zero    sl f e = refl
+  iW-map (suc _) sl f e = refl
+
+  iW-take : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (c : Tm Γ Δᵍ Δ Θ natᵗ) (e : Exp Γ Δᵍ Δ Θ t) →
+    innWᵉ q sl (takeᵉ c e) ≡ innWᵉ q sl e
+  iW-take zero    sl c e = refl
+  iW-take (suc _) sl c e = refl
+
+  iW-scan : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t) (z : Tm Γ Δᵍ Δ Θ t) (e : Exp Γ Δᵍ Δ Θ s) →
+    innWᵉ q sl (scanᵉ f z e) ≡ (pmIᵗ q sl 0 f ⊔ 1) ^ outWᵉ q sl e * (innWᵗ q sl f + innWᵗ q sl z + innWᵉ q sl e + 1)
+  iW-scan zero    sl f z e = refl
+  iW-scan (suc _) sl f z e = refl
+
+  iW-merge : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    innWᵉ q sl (mergeAllᵉ e) ≡ innWᵉ q sl e
+  iW-merge zero    sl e = refl
+  iW-merge (suc _) sl e = refl
+
+  iW-concat : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    innWᵉ q sl (concatAllᵉ e) ≡ innWᵉ q sl e
+  iW-concat zero    sl e = refl
+  iW-concat (suc _) sl e = refl
+
+  iW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    innWᵉ q sl (switchAllᵉ e) ≡ innWᵉ q sl e
+  iW-switch zero    sl e = refl
+  iW-switch (suc _) sl e = refl
+
+  iW-exhaust : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    innWᵉ q sl (exhaustAllᵉ e) ≡ innWᵉ q sl e
+  iW-exhaust zero    sl e = refl
+  iW-exhaust (suc _) sl e = refl
+
+  iW-μ : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ (t ∷ Δᵍ) Δ Θ t) →
+    innWᵉ q sl (μᵉ e) ≡ innWᵉ q sl e
+  iW-μ zero    sl e = refl
+  iW-μ (suc _) sl e = refl
+
+  iW-var : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (x : t ∈ Δ) →
+    innWᵉ q sl (varᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Θ = Θ} x) ≡ 0
+  iW-var zero    sl x = refl
+  iW-var (suc _) sl x = refl
+
+  iW-defer : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ [] (Δᵍ ++ Δ) Θ t) →
+    innWᵉ q sl (deferᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} e) ≡ 0
+  iW-defer zero    sl e = refl
+  iW-defer (suc _) sl e = refl
+
+------------------------------------------------------------------
+-- ONE foldStep PER SYNTAX NODE, TWO AT scanᵉ.
+------------------------------------------------------------------
+
+module _ (S M : ℕ) (hS : 2 ≤ S) (hM : 1 ≤ M) where
+
+  mutual
+    widᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (e : Exp Γ Δᵍ Δ Θ t) → Wᴱ sl (iterFold S (sizeᵉ e) M) e
+    widᵉ {n = n} sl hI (input i) =
+      ≤-trans (proj₁ (hI i)) INFL , ≤-trans (proj₁ (proj₂ (hI i))) INFL
+      , (λ k → z≤n) , (λ k → z≤n)
+      where INFL = foldStep-infl S M hS
+    widᵉ {n = n} sl hI emptyᵉ =
+      ≤-trans (≤-reflexive (Red.oW-empty n sl)) z≤n
+      , ≤-trans (≤-reflexive (Red.iW-empty n sl)) z≤n , (λ k → z≤n) , (λ k → z≤n)
+    widᵉ {n = n} sl hI (varᵉ x) =
+      ≤-trans (≤-reflexive (Red.oW-var n sl x)) z≤n
+      , ≤-trans (≤-reflexive (Red.iW-var n sl x)) z≤n , (λ k → z≤n) , (λ k → z≤n)
+    widᵉ {n = n} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} sl hI (deferᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-defer n sl {Δᵍ} {Δ} {Θ} e)) z≤n
+      , ≤-trans (≤-reflexive (Red.iW-defer n sl {Δᵍ} {Δ} {Θ} e)) z≤n
+      , (λ k → z≤n) , (λ k → z≤n)
+    widᵉ {n = n} sl hI (ofᵉ ts) =
+      ≤-trans (≤-reflexive (Red.oW-of n sl ts))
+              (up (≤-trans (len≤sizeᵗˢ ts) (k≤iterFold S (sizeᵗˢ ts) M hS)))
+      , ≤-trans (≤-reflexive (Red.iW-of n sl ts)) (up (proj₁ IH))
+      , (λ k → z≤n) , (λ k → up (proj₂ IH k))
+      where
+      IH = widᵗˢ sl hI ts
+      up : ∀ {x} → x ≤ iterFold S (sizeᵗˢ ts) M → x ≤ iterFold S (suc (sizeᵗˢ ts)) M
+      up h = ≤-trans (≤-trans h (foldStep-infl S _ hS))
+                     (node1 S M (sizeᵗˢ ts) (suc (sizeᵗˢ ts)) hS ≤-refl)
+    widᵉ {n = n} sl hI (mapᵉ f e) =
+      ≤-trans (≤-reflexive (Red.oW-map n sl f e)) (up0 (proj₁ IHe))
+      , ≤-trans (≤-reflexive (Red.iW-map n sl f e)) (FIT INN)
+      , (λ k → up0 (proj₁ (proj₂ (proj₂ IHe)) k))
+      , (λ k → FIT (PMI k))
+      where
+      m   = sizeᵗ f ⊔ sizeᵉ e
+      Tb   = iterFold S m M
+      hT  = 4≤iterFold S M m hS hM (≤-trans (sizeᵗ-pos f) (m≤m⊔n _ _))
+      1≤T = ≤-trans (≤ᵇ⇒≤ 1 4 tt) hT
+      IHf = Wᵀ-mono sl f (iterFold-mono-count S M hS (m≤m⊔n (sizeᵗ f) (sizeᵉ e)))
+              (widᵗ sl hI f)
+      IHe = Wᴱ-mono sl e (iterFold-mono-count S M hS (m≤n⊔m (sizeᵗ f) (sizeᵉ e)))
+              (widᵉ sl hI e)
+      step = node1 S M m (suc (sizeᵗ f + sizeᵉ e)) hS
+               (s≤s (⊔-lub (m≤m+n (sizeᵗ f) (sizeᵉ e)) (m≤n+m (sizeᵉ e) (sizeᵗ f))))
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ f + sizeᵉ e)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+      FIT : ∀ {x} → x ≤ Tb * Tb + Tb * Tb → x ≤ iterFold S (suc (sizeᵗ f + sizeᵉ e)) M
+      FIT h = ≤-trans (one-fits S Tb _ hS hT h) step
+      INN : innWᵗ n sl f + (pmIᵗ n sl 0 f ⊔ 1) * innWᵉ n sl e ≤ Tb * Tb + Tb * Tb
+      INN = +-mono-≤ (≤-trans (proj₁ IHf) (T≤TT Tb 1≤T))
+                     (*-mono-≤ (⊔-lub (proj₂ (proj₂ IHf) 0) 1≤T) (proj₁ (proj₂ IHe)))
+      PMI : ∀ k → pmIᵗ n sl (suc k) f + (pmIᵗ n sl 0 f ⊔ 1) * pmIᵉ n sl k e
+                    ≤ Tb * Tb + Tb * Tb
+      PMI k = +-mono-≤ (≤-trans (proj₂ (proj₂ IHf) (suc k)) (T≤TT Tb 1≤T))
+                       (*-mono-≤ (⊔-lub (proj₂ (proj₂ IHf) 0) 1≤T)
+                                 (proj₂ (proj₂ (proj₂ IHe)) k))
+    widᵉ {n = n} sl hI (takeᵉ c e) =
+      ≤-trans (≤-reflexive (Red.oW-take n sl c e)) (up0 (proj₁ IHe))
+      , ≤-trans (≤-reflexive (Red.iW-take n sl c e)) (up0 (proj₁ (proj₂ IHe)))
+      , (λ k → up0 (proj₁ (proj₂ (proj₂ IHe)) k))
+      , (λ k → up0 (proj₂ (proj₂ (proj₂ IHe)) k))
+      where
+      Tb    = iterFold S (sizeᵉ e) M
+      IHe  = widᵉ sl hI e
+      step = node1 S M (sizeᵉ e) (suc (sizeᵗ c + sizeᵉ e)) hS
+               (s≤s (m≤n+m (sizeᵉ e) (sizeᵗ c)))
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ c + sizeᵉ e)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+    widᵉ {n = n} sl hI (mergeAllᵉ e) =
+      allClause sl hI e (mergeAllᵉ e) (Red.oW-merge n sl e) (Red.iW-merge n sl e)
+                (λ k → refl) (λ k → refl)
+    widᵉ {n = n} sl hI (concatAllᵉ e) =
+      allClause sl hI e (concatAllᵉ e) (Red.oW-concat n sl e) (Red.iW-concat n sl e)
+                (λ k → refl) (λ k → refl)
+    widᵉ {n = n} sl hI (switchAllᵉ e) =
+      allClause sl hI e (switchAllᵉ e) (Red.oW-switch n sl e) (Red.iW-switch n sl e)
+                (λ k → refl) (λ k → refl)
+    widᵉ {n = n} sl hI (exhaustAllᵉ e) =
+      allClause sl hI e (exhaustAllᵉ e) (Red.oW-exhaust n sl e) (Red.iW-exhaust n sl e)
+                (λ k → refl) (λ k → refl)
+    widᵉ {n = n} sl hI (μᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-μ n sl e)) (up0 (proj₁ IHe))
+      , ≤-trans (≤-reflexive (Red.iW-μ n sl e)) (up0 (proj₁ (proj₂ IHe)))
+      , (λ k → up0 (proj₁ (proj₂ (proj₂ IHe)) k))
+      , (λ k → up0 (proj₂ (proj₂ (proj₂ IHe)) k))
+      where
+      Tb    = iterFold S (sizeᵉ e) M
+      IHe  = widᵉ sl hI e
+      step = node1 S M (sizeᵉ e) (suc (sizeᵉ e)) hS ≤-refl
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵉ e)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+    widᵉ {n = n} sl hI (scanᵉ f z e) =
+      ≤-trans (≤-reflexive (Red.oW-scan n sl f z e)) (up0 (proj₁ IHe))
+      , ≤-trans (≤-reflexive (Red.iW-scan n sl f z e)) (FIT2 INN)
+      , (λ k → up0 (proj₁ (proj₂ (proj₂ IHe)) k)) , (λ k → FIT2 (PMI k))
+      where
+      m   = sizeᵗ f ⊔ sizeᵗ z ⊔ sizeᵉ e
+      Tb   = iterFold S m M
+      hT  = 4≤iterFold S M m hS hM
+              (≤-trans (≤-trans (sizeᵗ-pos f) (m≤m⊔n _ _)) (m≤m⊔n _ _))
+      1≤T = ≤-trans (≤ᵇ⇒≤ 1 4 tt) hT
+      IHf = Wᵀ-mono sl f (iterFold-mono-count S M hS
+              (≤-trans (m≤m⊔n (sizeᵗ f) (sizeᵗ z)) (m≤m⊔n _ (sizeᵉ e)))) (widᵗ sl hI f)
+      IHz = Wᵀ-mono sl z (iterFold-mono-count S M hS
+              (≤-trans (m≤n⊔m (sizeᵗ f) (sizeᵗ z)) (m≤m⊔n _ (sizeᵉ e)))) (widᵗ sl hI z)
+      IHe = Wᴱ-mono sl e (iterFold-mono-count S M hS
+              (m≤n⊔m (sizeᵗ f ⊔ sizeᵗ z) (sizeᵉ e))) (widᵉ sl hI e)
+      Σ3    = sizeᵗ f + sizeᵗ z + sizeᵉ e
+      step2 = node2 S M m (suc Σ3) hS
+                (s≤s (max3-suc (sizeᵗ f) (sizeᵗ z) (sizeᵉ e)
+                        (sizeᵗ-pos f) (sizeᵗ-pos z) (sizeᵉ-pos e)))
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc Σ3) M
+      up0 h = ≤-trans (≤-trans (≤-trans h (foldStep-infl S Tb hS))
+                               (foldStep-infl S (foldStep S Tb) hS)) step2
+      FIT2 : ∀ {x} → x ≤ Tb ^ Tb * (3 * Tb + 1) → x ≤ iterFold S (suc Σ3) M
+      FIT2 h = ≤-trans (≤-trans h (two-folds S Tb hS hT)) step2
+      base≤ : pmIᵗ n sl 0 f ⊔ 1 ≤ Tb
+      base≤ = ⊔-lub (proj₂ (proj₂ IHf) 0) 1≤T
+      pw : (pmIᵗ n sl 0 f ⊔ 1) ^ outWᵉ n sl e ≤ Tb ^ Tb
+      pw = ≤-trans (^-monoˡ-≤ (outWᵉ n sl e) base≤) (powʳ1 Tb 1≤T (proj₁ IHe))
+      INN : (pmIᵗ n sl 0 f ⊔ 1) ^ outWᵉ n sl e
+              * (innWᵗ n sl f + innWᵗ n sl z + innWᵉ n sl e + 1)
+            ≤ Tb ^ Tb * (3 * Tb + 1)
+      INN = *-mono-≤ pw
+              (≤-trans (+-mono-≤ (+-mono-≤ (+-mono-≤ (proj₁ IHf) (proj₁ IHz))
+                                           (proj₁ (proj₂ IHe)))
+                                 (≤-refl {1}))
+                       (≤-reflexive (thr Tb)))
+      PMI : ∀ k → (pmIᵗ n sl 0 f ⊔ 1) ^ outWᵉ n sl e
+                    * (pmIᵗ n sl (suc k) f + pmIᵗ n sl k z + pmIᵉ n sl k e)
+                  ≤ Tb ^ Tb * (3 * Tb + 1)
+      PMI k = *-mono-≤ pw
+                (≤-trans (+-mono-≤ (+-mono-≤ (proj₂ (proj₂ IHf) (suc k))
+                                             (proj₂ (proj₂ IHz) k))
+                                   (proj₂ (proj₂ (proj₂ IHe)) k))
+                         (≤-trans (≤-reflexive (thr3 Tb)) (m≤m+n (3 * Tb) 1)))
+
+    -- the four *All nodes, which share a clause: the reduction
+    -- equations come in as arguments so the four differ only in which
+    -- constructor they name
+    allClause : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (e : Exp Γ Δᵍ Δ Θ (obs t)) (E : Exp Γ Δᵍ Δ Θ t) →
+      outWᵉ n sl E ≡ outWᵉ n sl e * innWᵉ n sl e →
+      innWᵉ n sl E ≡ innWᵉ n sl e →
+      ((k : ℕ) → pmOᵉ n sl k E
+                   ≡ outWᵉ n sl e * pmIᵉ n sl k e + pmOᵉ n sl k e * innWᵉ n sl e) →
+      ((k : ℕ) → pmIᵉ n sl k E ≡ pmIᵉ n sl k e) →
+      Wᴱ sl (iterFold S (suc (sizeᵉ e)) M) E
+    allClause {n = n} sl hI e E eo ei ep eq =
+      ≤-trans (≤-reflexive eo)
+              (FIT (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
+                            (m≤m+n (Tb * Tb) (Tb * Tb))))
+      , ≤-trans (≤-reflexive ei) (up0 (proj₁ (proj₂ IHe)))
+      , (λ k → ≤-trans (≤-reflexive (ep k))
+                 (FIT (+-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
+                                (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
+                                          (proj₁ (proj₂ IHe))))))
+      , (λ k → ≤-trans (≤-reflexive (eq k)) (up0 (proj₂ (proj₂ (proj₂ IHe)) k)))
+      where
+      Tb    = iterFold S (sizeᵉ e) M
+      hT   = 4≤iterFold S M (sizeᵉ e) hS hM (sizeᵉ-pos e)
+      IHe  = widᵉ sl hI e
+      step = node1 S M (sizeᵉ e) (suc (sizeᵉ e)) hS ≤-refl
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵉ e)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+      FIT : ∀ {x} → x ≤ Tb * Tb + Tb * Tb → x ≤ iterFold S (suc (sizeᵉ e)) M
+      FIT h = ≤-trans (one-fits S Tb _ hS hT h) step
+
+    widᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (tm : Tm Γ Δᵍ Δ Θ t) → Wᵀ sl (iterFold S (sizeᵗ tm) M) tm
+    widᵗ sl hI (varᵗ x) =
+      z≤n , (λ k → z≤n)
+      , (λ k → ite≤ _ (≤-trans (≤ᵇ⇒≤ 1 4 tt) (4≤iterFold S M 1 hS hM ≤-refl)))
+    widᵗ sl hI unit̂        = z≤n , (λ k → z≤n) , (λ k → z≤n)
+    widᵗ sl hI (bool̂ _)    = z≤n , (λ k → z≤n) , (λ k → z≤n)
+    widᵗ sl hI (nat̂ _)     = z≤n , (λ k → z≤n) , (λ k → z≤n)
+    widᵗ sl hI (primᵗ _ a) = z≤n , (λ k → z≤n) , (λ k → z≤n)
+    widᵗ sl hI (pairᵗ a b) =
+      up0 (⊔-lub (proj₁ IHa) (proj₁ IHb))
+      , (λ k → up0 (⊔-lub (proj₁ (proj₂ IHa) k) (proj₁ (proj₂ IHb) k)))
+      , (λ k → up0 (⊔-lub (proj₂ (proj₂ IHa) k) (proj₂ (proj₂ IHb) k)))
+      where
+      m   = sizeᵗ a ⊔ sizeᵗ b
+      Tb   = iterFold S m M
+      IHa = Wᵀ-mono sl a (iterFold-mono-count S M hS (m≤m⊔n (sizeᵗ a) (sizeᵗ b)))
+              (widᵗ sl hI a)
+      IHb = Wᵀ-mono sl b (iterFold-mono-count S M hS (m≤n⊔m (sizeᵗ a) (sizeᵗ b)))
+              (widᵗ sl hI b)
+      step = node1 S M m (suc (sizeᵗ a + sizeᵗ b)) hS
+               (s≤s (⊔-lub (m≤m+n (sizeᵗ a) (sizeᵗ b)) (m≤n+m (sizeᵗ b) (sizeᵗ a))))
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ a + sizeᵗ b)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+    widᵗ sl hI (fstᵗ p) = unary sl hI p
+    widᵗ sl hI (sndᵗ p) = unary sl hI p
+    widᵗ sl hI (inlᵗ p) = unary sl hI p
+    widᵗ sl hI (inrᵗ p) = unary sl hI p
+    widᵗ sl hI (strmᵗ e) =
+      up0 (proj₁ IHe) , (λ k → up0 (proj₁ (proj₂ (proj₂ IHe)) k))
+      , (λ k → up0 (proj₁ (proj₂ (proj₂ IHe)) k))
+      where
+      Tb    = iterFold S (sizeᵉ e) M
+      IHe  = widᵉ sl hI e
+      step = node1 S M (sizeᵉ e) (suc (sizeᵉ e)) hS ≤-refl
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵉ e)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+    widᵗ sl hI (ifᵗ c a b) =
+      up0 (⊔-lub (proj₁ IHa) (proj₁ IHb))
+      , (λ k → up0 (⊔-lub (proj₁ (proj₂ IHa) k) (proj₁ (proj₂ IHb) k)))
+      , (λ k → up0 (⊔-lub (proj₂ (proj₂ IHa) k) (proj₂ (proj₂ IHb) k)))
+      where
+      m   = sizeᵗ a ⊔ sizeᵗ b
+      Tb   = iterFold S m M
+      IHa = Wᵀ-mono sl a (iterFold-mono-count S M hS (m≤m⊔n (sizeᵗ a) (sizeᵗ b)))
+              (widᵗ sl hI a)
+      IHb = Wᵀ-mono sl b (iterFold-mono-count S M hS (m≤n⊔m (sizeᵗ a) (sizeᵗ b)))
+              (widᵗ sl hI b)
+      step = node1 S M m (suc (sizeᵗ c + sizeᵗ a + sizeᵗ b)) hS
+               (s≤s (⊔-lub (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                    (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))
+                           (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))))
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ c + sizeᵗ a + sizeᵗ b)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+    widᵗ {n = n} sl hI (caseᵗ s l r) =
+      FIT INN , (λ k → FIT (PMO k)) , (λ k → FIT (PMI k))
+      where
+      m   = sizeᵗ s ⊔ sizeᵗ l ⊔ sizeᵗ r
+      Tb   = iterFold S m M
+      hT  = 4≤iterFold S M m hS hM
+              (≤-trans (≤-trans (sizeᵗ-pos s) (m≤m⊔n _ _)) (m≤m⊔n _ _))
+      1≤T = ≤-trans (≤ᵇ⇒≤ 1 4 tt) hT
+      IHs = Wᵀ-mono sl s (iterFold-mono-count S M hS
+              (≤-trans (m≤m⊔n (sizeᵗ s) (sizeᵗ l)) (m≤m⊔n _ (sizeᵗ r)))) (widᵗ sl hI s)
+      IHl = Wᵀ-mono sl l (iterFold-mono-count S M hS
+              (≤-trans (m≤n⊔m (sizeᵗ s) (sizeᵗ l)) (m≤m⊔n _ (sizeᵗ r)))) (widᵗ sl hI l)
+      IHr = Wᵀ-mono sl r (iterFold-mono-count S M hS
+              (m≤n⊔m (sizeᵗ s ⊔ sizeᵗ l) (sizeᵗ r))) (widᵗ sl hI r)
+      step = node1 S M m (suc (sizeᵗ s + sizeᵗ l + sizeᵗ r)) hS
+               (s≤s (⊔-lub (⊔-lub (≤-trans (m≤m+n (sizeᵗ s) (sizeᵗ l))
+                                           (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r)))
+                                  (≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ s))
+                                           (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r))))
+                           (m≤n+m (sizeᵗ r) (sizeᵗ s + sizeᵗ l))))
+      FIT : ∀ {x} → x ≤ Tb * Tb + Tb * Tb →
+            x ≤ iterFold S (suc (sizeᵗ s + sizeᵗ l + sizeᵗ r)) M
+      FIT h = ≤-trans (one-fits S Tb _ hS hT h) step
+      C≤ : pmIᵗ n sl 0 l ⊔ pmIᵗ n sl 0 r ⊔ 1 ≤ Tb
+      C≤ = ⊔-lub (⊔-lub (proj₂ (proj₂ IHl) 0) (proj₂ (proj₂ IHr) 0)) 1≤T
+      INN : (innWᵗ n sl l ⊔ innWᵗ n sl r)
+              + (pmIᵗ n sl 0 l ⊔ pmIᵗ n sl 0 r ⊔ 1) * innWᵗ n sl s
+            ≤ Tb * Tb + Tb * Tb
+      INN = +-mono-≤ (≤-trans (⊔-lub (proj₁ IHl) (proj₁ IHr)) (T≤TT Tb 1≤T))
+                     (*-mono-≤ C≤ (proj₁ IHs))
+      PMO : ∀ k → pmOᵗ n sl (suc k) l ⊔ pmOᵗ n sl (suc k) r
+                    ⊔ (pmIᵗ n sl 0 l ⊔ pmIᵗ n sl 0 r ⊔ 1) * pmOᵗ n sl k s
+                  ≤ Tb * Tb + Tb * Tb
+      PMO k = ⊔-lub (≤-trans (⊔-lub (proj₁ (proj₂ IHl) (suc k))
+                                    (proj₁ (proj₂ IHr) (suc k)))
+                             (≤-trans (T≤TT Tb 1≤T) (m≤m+n _ _)))
+                    (≤-trans (*-mono-≤ C≤ (proj₁ (proj₂ IHs) k)) (m≤m+n _ _))
+      PMI : ∀ k → (pmIᵗ n sl (suc k) l ⊔ pmIᵗ n sl (suc k) r)
+                    + (pmIᵗ n sl 0 l ⊔ pmIᵗ n sl 0 r ⊔ 1) * pmIᵗ n sl k s
+                  ≤ Tb * Tb + Tb * Tb
+      PMI k = +-mono-≤ (≤-trans (⊔-lub (proj₂ (proj₂ IHl) (suc k))
+                                       (proj₂ (proj₂ IHr) (suc k)))
+                                (T≤TT Tb 1≤T))
+                       (*-mono-≤ C≤ (proj₂ (proj₂ IHs) k))
+
+    unary : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (p : Tm Γ Δᵍ Δ Θ t) →
+      (innWᵗ n sl p ≤ iterFold S (suc (sizeᵗ p)) M)
+      × ((k : ℕ) → pmOᵗ n sl k p ≤ iterFold S (suc (sizeᵗ p)) M)
+      × ((k : ℕ) → pmIᵗ n sl k p ≤ iterFold S (suc (sizeᵗ p)) M)
+    unary sl hI p =
+      up0 (proj₁ IH) , (λ k → up0 (proj₁ (proj₂ IH) k))
+      , (λ k → up0 (proj₂ (proj₂ IH) k))
+      where
+      Tb    = iterFold S (sizeᵗ p) M
+      IH   = widᵗ sl hI p
+      step = node1 S M (sizeᵗ p) (suc (sizeᵗ p)) hS ≤-refl
+      up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ p)) M
+      up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
+
+    widᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (ts : List (Tm Γ Δᵍ Δ Θ t)) → Wᴸ sl (iterFold S (sizeᵗˢ ts) M) ts
+    widᵗˢ sl hI []       = z≤n , (λ k → z≤n)
+    widᵗˢ sl hI (y ∷ ys) =
+      ⊔-lub (proj₁ IHy) (proj₁ IHys)
+      , (λ k → ⊔-lub (proj₂ (proj₂ IHy) k) (proj₂ IHys k))
+      where
+      IHy  = Wᵀ-mono sl y (iterFold-mono-count S M hS (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)))
+               (widᵗ sl hI y)
+      IHys = Wᴸ-mono sl ys (iterFold-mono-count S M hS (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)))
+               (widᵗˢ sl hI ys)
+
+  -- THE PARKED HALF.  dW is a plain ⊔-collect with one exception —
+  -- `dWᵉ (deferᵉ e) = outWᵉ e ⊔ dWᵉ e`, the clause the family exists for
+  -- — so it costs no fold anywhere and reads the delivered half above
+  -- at the defer
+  mutual
+    wdᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (e : Exp Γ Δᵍ Δ Θ t) → dWᵉ n sl e ≤ iterFold S (sizeᵉ e) M
+    wdᵉ sl hI (input i) = ≤-trans (proj₂ (proj₂ (hI i))) (foldStep-infl S M hS)
+    wdᵉ sl hI emptyᵉ    = z≤n
+    wdᵉ sl hI (varᵉ x)  = z≤n
+    wdᵉ sl hI (ofᵉ ts)  =
+      ≤-trans (wdᵗˢ sl hI ts)
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵗˢ ts) (suc (sizeᵗˢ ts)) hS ≤-refl))
+    wdᵉ sl hI (deferᵉ e) =
+      ≤-trans (⊔-lub (proj₁ (widᵉ sl hI e)) (wdᵉ sl hI e))
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵉ e) (suc (sizeᵉ e)) hS ≤-refl))
+    wdᵉ sl hI (mapᵉ f e) =
+      ≤-trans (⊔-lub (≤-trans (wdᵗ sl hI f) (mono (m≤m⊔n (sizeᵗ f) (sizeᵉ e))))
+                     (≤-trans (wdᵉ sl hI e) (mono (m≤n⊔m (sizeᵗ f) (sizeᵉ e)))))
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵗ f ⊔ sizeᵉ e) (suc (sizeᵗ f + sizeᵉ e)) hS
+                         (s≤s (⊔-lub (m≤m+n (sizeᵗ f) (sizeᵉ e))
+                                     (m≤n+m (sizeᵉ e) (sizeᵗ f))))))
+      where mono = iterFold-mono-count S M hS
+    wdᵉ sl hI (takeᵉ c e) =
+      ≤-trans (⊔-lub (≤-trans (wdᵗ sl hI c) (mono (m≤m⊔n (sizeᵗ c) (sizeᵉ e))))
+                     (≤-trans (wdᵉ sl hI e) (mono (m≤n⊔m (sizeᵗ c) (sizeᵉ e)))))
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵗ c ⊔ sizeᵉ e) (suc (sizeᵗ c + sizeᵉ e)) hS
+                         (s≤s (⊔-lub (m≤m+n (sizeᵗ c) (sizeᵉ e))
+                                     (m≤n+m (sizeᵉ e) (sizeᵗ c))))))
+      where mono = iterFold-mono-count S M hS
+    wdᵉ sl hI (scanᵉ f z e) =
+      ≤-trans (⊔-lub (⊔-lub (≤-trans (wdᵗ sl hI f) (mono up-f))
+                            (≤-trans (wdᵗ sl hI z) (mono up-z)))
+                     (≤-trans (wdᵉ sl hI e) (mono up-e)))
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M m (suc (sizeᵗ f + sizeᵗ z + sizeᵉ e)) hS
+                         (≤-trans (max3-suc (sizeᵗ f) (sizeᵗ z) (sizeᵉ e)
+                                     (sizeᵗ-pos f) (sizeᵗ-pos z) (sizeᵉ-pos e))
+                                  (n≤1+n _))))
+      where
+      m    = sizeᵗ f ⊔ sizeᵗ z ⊔ sizeᵉ e
+      mono = iterFold-mono-count S M hS
+      up-f = ≤-trans (m≤m⊔n (sizeᵗ f) (sizeᵗ z)) (m≤m⊔n _ (sizeᵉ e))
+      up-z = ≤-trans (m≤n⊔m (sizeᵗ f) (sizeᵗ z)) (m≤m⊔n _ (sizeᵉ e))
+      up-e = m≤n⊔m (sizeᵗ f ⊔ sizeᵗ z) (sizeᵉ e)
+    wdᵉ sl hI (mergeAllᵉ e)   = pass sl hI e
+    wdᵉ sl hI (concatAllᵉ e)  = pass sl hI e
+    wdᵉ sl hI (switchAllᵉ e)  = pass sl hI e
+    wdᵉ sl hI (exhaustAllᵉ e) = pass sl hI e
+    wdᵉ sl hI (μᵉ e)          = pass sl hI e
+
+    pass : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (e : Exp Γ Δᵍ Δ Θ t) → dWᵉ n sl e ≤ iterFold S (suc (sizeᵉ e)) M
+    pass sl hI e =
+      ≤-trans (wdᵉ sl hI e)
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵉ e) (suc (sizeᵉ e)) hS ≤-refl))
+
+    wdᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (tm : Tm Γ Δᵍ Δ Θ t) → dWᵗ n sl tm ≤ iterFold S (sizeᵗ tm) M
+    wdᵗ sl hI (varᵗ x)  = z≤n
+    wdᵗ sl hI unit̂      = z≤n
+    wdᵗ sl hI (bool̂ _)  = z≤n
+    wdᵗ sl hI (nat̂ _)   = z≤n
+    wdᵗ sl hI (strmᵗ e) = pass sl hI e
+    wdᵗ sl hI (fstᵗ p)  = passᵗ sl hI p
+    wdᵗ sl hI (sndᵗ p)  = passᵗ sl hI p
+    wdᵗ sl hI (inlᵗ p)  = passᵗ sl hI p
+    wdᵗ sl hI (inrᵗ p)  = passᵗ sl hI p
+    wdᵗ sl hI (primᵗ _ p) = passᵗ sl hI p
+    wdᵗ sl hI (pairᵗ a b) =
+      ≤-trans (⊔-lub (≤-trans (wdᵗ sl hI a) (mono (m≤m⊔n (sizeᵗ a) (sizeᵗ b))))
+                     (≤-trans (wdᵗ sl hI b) (mono (m≤n⊔m (sizeᵗ a) (sizeᵗ b)))))
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵗ a ⊔ sizeᵗ b) (suc (sizeᵗ a + sizeᵗ b)) hS
+                         (s≤s (⊔-lub (m≤m+n (sizeᵗ a) (sizeᵗ b))
+                                     (m≤n+m (sizeᵗ b) (sizeᵗ a))))))
+      where mono = iterFold-mono-count S M hS
+    wdᵗ sl hI (caseᵗ s l r) = three sl hI s l r
+    wdᵗ sl hI (ifᵗ c a b)   = three sl hI c a b
+
+    passᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (p : Tm Γ Δᵍ Δ Θ t) → dWᵗ n sl p ≤ iterFold S (suc (sizeᵗ p)) M
+    passᵗ sl hI p =
+      ≤-trans (wdᵗ sl hI p)
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M (sizeᵗ p) (suc (sizeᵗ p)) hS ≤-refl))
+
+    three : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ₁ Θ₂ Θ₃ t u v} (sl : Slots Γ) → SlotWid sl M →
+      (a : Tm Γ Δᵍ Δ Θ₁ t) (b : Tm Γ Δᵍ Δ Θ₂ u) (c : Tm Γ Δᵍ Δ Θ₃ v) →
+      dWᵗ n sl a ⊔ dWᵗ n sl b ⊔ dWᵗ n sl c
+        ≤ iterFold S (suc (sizeᵗ a + sizeᵗ b + sizeᵗ c)) M
+    three sl hI a b c =
+      ≤-trans (⊔-lub (⊔-lub (≤-trans (wdᵗ sl hI a) (mono up-a))
+                            (≤-trans (wdᵗ sl hI b) (mono up-b)))
+                     (≤-trans (wdᵗ sl hI c) (mono up-c)))
+              (≤-trans (foldStep-infl S _ hS)
+                       (node1 S M m (suc (sizeᵗ a + sizeᵗ b + sizeᵗ c)) hS
+                         (≤-trans (max3-suc (sizeᵗ a) (sizeᵗ b) (sizeᵗ c)
+                                     (sizeᵗ-pos a) (sizeᵗ-pos b) (sizeᵗ-pos c))
+                                  (n≤1+n _))))
+      where
+      m    = sizeᵗ a ⊔ sizeᵗ b ⊔ sizeᵗ c
+      mono = iterFold-mono-count S M hS
+      up-a = ≤-trans (m≤m⊔n (sizeᵗ a) (sizeᵗ b)) (m≤m⊔n _ (sizeᵗ c))
+      up-b = ≤-trans (m≤n⊔m (sizeᵗ a) (sizeᵗ b)) (m≤m⊔n _ (sizeᵗ c))
+      up-c = m≤n⊔m (sizeᵗ a ⊔ sizeᵗ b) (sizeᵗ c)
+
+    wdᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → SlotWid sl M →
+      (ts : List (Tm Γ Δᵍ Δ Θ t)) → dWᵗˢ n sl ts ≤ iterFold S (sizeᵗˢ ts) M
+    wdᵗˢ sl hI []       = z≤n
+    wdᵗˢ sl hI (y ∷ ys) =
+      ⊔-lub (≤-trans (wdᵗ sl hI y)
+                     (iterFold-mono-count S M hS (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))))
+            (≤-trans (wdᵗˢ sl hI ys)
+                     (iterFold-mono-count S M hS (m≤n+m (sizeᵗˢ ys) (sizeᵗ y))))
+
+-- THE LEMMA, assembled
+wid-iterFold : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
+  (sl : Slots Γ) → SlotWid sl M → (e : Exp Γ Δᵍ Δ Θ t) →
+  (outWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+  × (innWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+  × (dWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+wid-iterFold S M hS hM sl hI e =
+  proj₁ (widᵉ S M hS hM sl hI e)
+  , proj₁ (proj₂ (widᵉ S M hS hM sl hI e))
+  , wdᵉ S M hS hM sl hI e
+
+postulate
+  -- THE TELESCOPE SUPPLIES THE LEAF, at ONE above the width cap.
   -- The shared branch is slotCaps?'s pW and innW conjuncts read one
   -- CONNECT down — `outWᵉ (suc j) sl (input i)` is `outWᵉ j sl d`, one
   -- fuel below what the conjunct states — and the scripted branch is the
@@ -1257,33 +2002,33 @@ postulate
 -- THE VALUE FACE of the width lemma.  A value's obs components ARE
 -- expressions, and sizeᵛ reports exactly their sizeᵉ, so the same count
 -- of folds covers a value
-pWᵛ-iterFold : ∀ {n} {Γ : Ctx n} (S M : ℕ) → 2 ≤ S →
+pWᵛ-iterFold : ∀ {n} {Γ : Ctx n} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
   (sl : Slots Γ) → SlotWid sl M → (u : Ty) (v : Val Γ u) →
   pWᵛ n sl u v ≤ iterFold S (sizeᵛ u v) M
-pWᵛ-iterFold S M hS sl hI unitᵗ v = z≤n
-pWᵛ-iterFold S M hS sl hI boolᵗ v = z≤n
-pWᵛ-iterFold S M hS sl hI natᵗ  v = z≤n
-pWᵛ-iterFold {n = n} S M hS sl hI (s ×ᵗ u) (a , b) =
+pWᵛ-iterFold S M hS hM sl hI unitᵗ v = z≤n
+pWᵛ-iterFold S M hS hM sl hI boolᵗ v = z≤n
+pWᵛ-iterFold S M hS hM sl hI natᵗ  v = z≤n
+pWᵛ-iterFold {n = n} S M hS hM sl hI (s ×ᵗ u) (a , b) =
   ⊔-lub (⊔-lub (≤-trans (m≤m⊔n (outWᵛ n sl s a) (dWᵛ n sl s a)) hA)
                (≤-trans (m≤m⊔n (outWᵛ n sl u b) (dWᵛ n sl u b)) hB))
         (⊔-lub (≤-trans (m≤n⊔m (outWᵛ n sl s a) (dWᵛ n sl s a)) hA)
                (≤-trans (m≤n⊔m (outWᵛ n sl u b) (dWᵛ n sl u b)) hB))
   where
-  hA = ≤-trans (pWᵛ-iterFold S M hS sl hI s a)
+  hA = ≤-trans (pWᵛ-iterFold S M hS hM sl hI s a)
                (iterFold-mono-count S M hS
                   (≤-trans (m≤m+n (sizeᵛ s a) (sizeᵛ u b)) (n≤1+n _)))
-  hB = ≤-trans (pWᵛ-iterFold S M hS sl hI u b)
+  hB = ≤-trans (pWᵛ-iterFold S M hS hM sl hI u b)
                (iterFold-mono-count S M hS
                   (≤-trans (m≤n+m (sizeᵛ u b) (sizeᵛ s a)) (n≤1+n _)))
-pWᵛ-iterFold S M hS sl hI (s +ᵗ u) (inj₁ a) =
-  ≤-trans (pWᵛ-iterFold S M hS sl hI s a)
+pWᵛ-iterFold S M hS hM sl hI (s +ᵗ u) (inj₁ a) =
+  ≤-trans (pWᵛ-iterFold S M hS hM sl hI s a)
           (iterFold-mono-count S M hS (n≤1+n (sizeᵛ s a)))
-pWᵛ-iterFold S M hS sl hI (s +ᵗ u) (inj₂ b) =
-  ≤-trans (pWᵛ-iterFold S M hS sl hI u b)
+pWᵛ-iterFold S M hS hM sl hI (s +ᵗ u) (inj₂ b) =
+  ≤-trans (pWᵛ-iterFold S M hS hM sl hI u b)
           (iterFold-mono-count S M hS (n≤1+n (sizeᵛ u b)))
-pWᵛ-iterFold S M hS sl hI (obs u) e =
-  ⊔-lub (proj₁ (wid-iterFold S M hS sl hI e))
-        (proj₂ (proj₂ (wid-iterFold S M hS sl hI e)))
+pWᵛ-iterFold S M hS hM sl hI (obs u) e =
+  ⊔-lub (proj₁ (wid-iterFold S M hS hM sl hI e))
+        (proj₂ (proj₂ (wid-iterFold S M hS hM sl hI e)))
 
 -- THE BRIDGE, and it is the whole content of the five members' width
 -- halves: a value bounded on the SIZE axis at level `j + a` is bounded
@@ -1306,7 +2051,7 @@ valCaps?-fromSize {n = n} c j a sl 2≤S slC u v hsz =
                       (+-monoʳ-≤ j (m≤m+n a (suc K))))
   WD : pWᵛ n sl u v ≤ Caps.cWid (frameStep (j + (a + suc K)) c)
   WD = subst (λ x → pWᵛ n sl u v ≤ iterFold S x W) (sym (+-shuffle j a K))
-         (≤-trans (≤-trans (pWᵛ-iterFold S (suc W) 2≤S sl
+         (≤-trans (≤-trans (pWᵛ-iterFold S (suc W) 2≤S (s≤s z≤n) sl
                               (slotsCaps?-slotWid S W sl slC) u v)
                            (iterFold-mono-count S (suc W) 2≤S hsz))
                   (iterFold-lift S W K (j + a) 2≤S))
@@ -1323,7 +2068,7 @@ expWid-fromSize : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps) (j a : ℕ)
     ≤ Caps.cWid (frameStep (j + (a + suc (Caps.cSize (frameStep (j + a) c)))) c)
 expWid-fromSize {n = n} c j a sl 2≤S slC e hsz =
   subst (λ x → dWᵉ n sl e ≤ iterFold S x W) (sym (+-shuffle j a K))
-    (≤-trans (≤-trans (proj₂ (proj₂ (wid-iterFold S (suc W) 2≤S sl
+    (≤-trans (≤-trans (proj₂ (proj₂ (wid-iterFold S (suc W) 2≤S (s≤s z≤n) sl
                                        (slotsCaps?-slotWid S W sl slC) e)))
                       (iterFold-mono-count S (suc W) 2≤S hsz))
              (iterFold-lift S W K (j + a) 2≤S))

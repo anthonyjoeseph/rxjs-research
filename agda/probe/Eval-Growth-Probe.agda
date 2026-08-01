@@ -721,11 +721,11 @@ scan-three-rungs-6 = refl
 --
 -- AND THE CLUSTER IS NOW LANDED (2026-08-01).  mapFrame-caps,
 -- scanFrame-caps, evalTms-caps, evalSeed-caps and unfoldμ-caps are all
--- GROUND, over three pieces: the width lemma `wid-iterFold` (one
--- foldStep per syntax node, §7's shape — the induction organised at the
--- MAX of a node's children, one fold per non-scanᵉ node and two per
--- scanᵉ, funded by its three children), the leaf `slotsCaps?-slotWid`
--- (§8's repair), and the size receipts §6 gates.  §9 has the rows.
+-- GROUND, and so is the width lemma `wid-iterFold` they rest on: one
+-- foldStep per syntax node in exactly §7's shape — the induction
+-- organised at the MAX of a node's children, one fold per non-scanᵉ
+-- node and two per scanᵉ, funded by its three children.  §9 has the
+-- rows.  What is left under them is §8's leaf, `slotsCaps?-slotWid`.
 --
 -- NOT MEASURED HERE, and flagged: whether a family exists whose
 -- required j′ exceeds sizeᵗ.  The scan clause's exponent base is

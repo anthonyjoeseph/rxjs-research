@@ -82,17 +82,17 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- SEVEN POSTULATES REMAIN, and the assembly knot is not among them.
+-- SIX POSTULATES REMAIN, and the assembly knot is not among them.
 -- They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
 -- subscribeE-walk), the two pieces the BUDGET CLAIM is assembled from
--- (cascadeGo-charge and cascadeGo-deliveries), and the two pieces the
--- EVAL CLUSTER's width half is assembled from (wid-iterFold and
--- slotsCaps?-slotWid).  3 + 2 + 2 = 7, and that is the whole ledger.
+-- (cascadeGo-charge and cascadeGo-deliveries), and ONE slot-telescope
+-- lemma the eval cluster's width half consumes (slotsCaps?-slotWid).
+-- 3 + 2 + 1 = 6, and that is the whole ledger.
 -- frameBlowup is fully defined, and cascadeGo-caps, the cascade
 -- bookends and the chain snapshot are all ground.
 --
 -- THE FIVE EVALUATION OBLIGATIONS ARE GROUND (2026-08-01), which is
--- what the count 10 → 7 is.  mapFrame-caps, scanFrame-caps,
+-- what the count 10 → 6 is.  mapFrame-caps, scanFrame-caps,
 -- evalTms-caps, evalSeed-caps and unfoldμ-caps all had the same
 -- difficulty and it had the same answer: an evaluated value is FRESH
 -- SYNTAX, so its WIDTH has to come out of its SIZE, and that is
@@ -104,18 +104,27 @@
 -- it just reached, and the width falls out of `wid-iterFold` — the
 -- width lemma, one foldStep per node of the RESULT.
 --
--- WHAT IS LEFT OF THEM IS TWO SYNTAX LEMMAS, no state and no recursion:
+-- THE WIDTH LEMMA ITSELF IS PROVEN TOO.  `wid-iterFold` bounds every
+-- width measure of an expression by `iterFold S (sizeᵉ e) M` off a leaf
+-- bound M, by structural induction organised at the MAX of a node's
+-- children rather than at their running sum: every non-scanᵉ node
+-- spends ONE foldStep and `scanᵉ` spends TWO, funded by the three
+-- children it carries.  Eval-Growth-Probe §7 is the clause-by-clause
+-- reading that forced that shape — mapᵉ and the *All family fit in one
+-- fold, `scanᵉ` does not, its innW clause being M ^ M against a budget
+-- of S ^ (1 + M).
 --
---   wid-iterFold        every width measure of an expression is under
---                       `iterFold S (sizeᵉ e) M` off a leaf bound M.
---                       Eval-Growth-Probe §7 reads the recurrence
---                       clause by clause: mapᵉ and the *All family fit
---                       in ONE fold, `scanᵉ` needs TWO — its innW clause
---                       is M ^ M against a budget of S ^ (1 + M) — and
---                       its three children guarantee three, so the
---                       induction is organised at the MAX of a node's
---                       children rather than at their running sum and
---                       the receipt stays syntax-linear.
+-- FIVE MEASURES HAD TO GO AT ONCE, because the clauses cross-reference:
+-- innW's mapᵉ clause reads pmI, its scanᵉ clause reads outW in an
+-- EXPONENT, and pmO's *All clause reads both.  And the arithmetic is
+-- two obligations at the children's bound Tb — `2 Tb² ≤ S ^ suc Tb` for
+-- one fold and `Tb ^ Tb (3Tb+1) ≤ S ^ suc (S ^ suc Tb)` for two — which
+-- both reduce to one engine, a square under an exponential from 4 on.
+-- Tb is ≥ 4 at every internal node because one fold off a leaf bound of
+-- at least 1 is already S ^ 2.
+--
+-- WHAT IS LEFT OF THEM IS ONE SLOT-TELESCOPE LEMMA:
+--
 --   slotsCaps?-slotWid  the LEAF.  `input i` has `sizeᵉ = 1` and width
 --                       measures that descend into the slot telescope,
 --                       so the side condition has to supply them —
