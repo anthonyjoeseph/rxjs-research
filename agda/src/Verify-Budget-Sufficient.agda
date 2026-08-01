@@ -82,19 +82,20 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- TWELVE POSTULATES REMAIN, and the assembly knot is not among them.
+-- ELEVEN POSTULATES REMAIN, and the assembly knot is not among them.
 -- They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
 -- subscribeE-walk), the caps face's chain-half lemma
 -- regsSz?-subscribeE, the two pieces the BUDGET CLAIM is assembled from
--- (cascadeGo-charge and cascadeGo-deliveries), and SIX EVALUATION
+-- (cascadeGo-charge and cascadeGo-deliveries), and FIVE EVALUATION
 -- OBLIGATIONS — mapFrame-caps and scanFrame-caps, which stepFrame-caps
 -- was traded for, and evalTms-caps, evalSeed-caps and unfoldμ-caps,
--- which subscribeE-caps was.  frameBlowup is fully defined, and
+-- which subscribeE-caps was.  3 + 1 + 2 + 5 = 11, and that is the whole
+-- ledger.  frameBlowup is fully defined, and
 -- cascadeGo-caps, the cascade bookends and the chain snapshot are all
 -- ground.
 --
 -- THE COUNT WENT UP AND THE TREE GOT SMALLER, which is the trade worth
--- making: one opaque face of the whole subscribe machine became five
+-- making: one opaque face of the whole subscribe machine became three
 -- statements about `evalTm` and `unfoldμ` alone — no state, no
 -- recursion, no chain — each of which is the SAME tower difficulty the
 -- two frame postulates already stand on.
