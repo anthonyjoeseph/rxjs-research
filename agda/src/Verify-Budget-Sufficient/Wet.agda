@@ -9,14 +9,14 @@
 --
 -- budget-sufficient IS the export Verify-Well-Formed consumes.
 --
--- This module is a LAYER OVER .Caps-Face as of 2026-08-01: the wet
--- cores' reset caps and per-instant store bound are read off `capsAt`,
--- the caps recurrence, which is the only entry-computable reach bound
--- in the machine (round3b-ledger-reset-absurd rules out the ledger).
--- The cost is that grinding the caps face now re-checks this module and
--- thence Verify-Well-Formed; the lean fix is the Keeps-Ring precedent —
--- extract Caps / frameStep / frameBlowup / capsAt and their four supply
--- lemmas into a `.Caps` prerequisite both faces import.
+-- This module is a LAYER OVER .Caps as of 2026-08-01: the wet cores'
+-- reset caps and per-instant store bound are read off `capsAt`, the caps
+-- recurrence, which is the only entry-computable reach bound in the
+-- machine (round3b-ledger-reset-absurd rules out the ledger).  The
+-- recurrence sits in its own prerequisite module rather than in
+-- .Caps-Face — the Keeps-Ring precedent, taken the same day the layering
+-- landed — so this module and the caps FACE are still siblings and a
+-- caps-face grind does not re-check twenty minutes of wet clauses.
 module Verify-Budget-Sufficient.Wet where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
@@ -134,11 +134,11 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
 
--- .Caps-Face re-exports .Keeps-Ring (which re-exports .Measures), so
--- this one import carries the whole stratum below.  It is here for
--- `Caps` / `capsAt` / the supply lemmas / `reach-resets` only — every
--- clause proof in this module is untouched by the caps face.
-open import Verify-Budget-Sufficient.Caps-Face public
+-- .Caps re-exports .Keeps-Ring (which re-exports .Measures), so this one
+-- import carries the whole stratum below.  It is here for `Caps` /
+-- `capsAt` / the supply lemmas only — this module reads NOTHING from the
+-- caps FACE, which is why the recurrence was extracted out of it.
+open import Verify-Budget-Sufficient.Caps public
 
 ------------------------------------------------------------------
 -- the Keeps ring and the share-boundary facts moved to

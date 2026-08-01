@@ -503,6 +503,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
 
 open import Verify-Budget-Sufficient.Measures   public
 open import Verify-Budget-Sufficient.Keeps-Ring public
+open import Verify-Budget-Sufficient.Caps       public
 open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Wet        public
 
