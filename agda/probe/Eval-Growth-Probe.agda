@@ -46,6 +46,19 @@
 --                   whole at j′ = 2 — which is the finding that
 --                   matters, because it says the width half of
 --                   unfoldμ-caps does not WANT an affine form.
+--   §6  THE RECEIPT THAT LANDED.  `j′ = sizeᵗ` — one iterSize fold per
+--                   syntax node — against every §1 and §2 row, read at
+--                   the WORST admissible base S = 1.  These are the
+--                   regression set for evalWith-iterSize /
+--                   applyFn-iterSize / evalTm-iterSize (Caps-Face).
+--   §7  THE WIDTH HALF'S OWN GATE.  Where one foldStep per node does
+--                   and does not dominate, read off the width
+--                   recurrence's CLAUSES rather than off a program.
+--                   mapᵉ and the *All family fit in one fold; `scanᵉ`
+--                   does NOT — its innW clause is M ^ M against a
+--                   budget of S ^ (1 + M) — and the repair costs no
+--                   receipt, because a scanᵉ node carries three
+--                   children and therefore three spare folds.
 --
 -- Standalone (hand-built syntax only, no evaluator state), so
 -- src/Main.agda never reaches it: it needs its own make target.
@@ -494,6 +507,67 @@ fn-syntax-receipt-14 : (dblV 14 ≤ᵇ iterSize 1 (sizeᵗ (fnDbl 14)) 10) ≡ t
 fn-syntax-receipt-14 = refl
 
 ------------------------------------------------------------------
+-- §7  THE WIDTH HALF'S OWN GATE — where ONE foldStep per syntax node
+-- does and does not dominate, read off the width recurrence's clauses
+-- rather than off a program.
+--
+-- The size half (§6) is settled: `sizeStep` dominates EVERY term
+-- constructor with one fold each, so `evalWith-iterSize` needs no
+-- side conditions.  The width half is not uniform, and this section
+-- pins down exactly which clause breaks it.
+--
+-- READ THE CLAUSE, NOT THE PROGRAM.  A structural induction over an
+-- expression arrives at each node with all its children's out/inn/dW
+-- already bounded by ONE accumulated number, M — and M is the ITERATE,
+-- unrelated to the step base S.  So each clause of `innWᵉ` / `outWᵉ`
+-- becomes an arithmetic obligation "clause read at M ≤ foldStep S M",
+-- at the worst honest base S = 2.  The three that matter:
+--
+--   mapᵉ f e     innWᵗ f + (pmIᵗ 0 f ⊔ 1) * innWᵉ e   ↦   M * M + M
+--   mergeAllᵉ e  outWᵉ e * innWᵉ e                     ↦   M * M
+--   scanᵉ f z e  (pmIᵗ 0 f ⊔ 1) ^ outWᵉ e
+--                  * (innWᵗ f + innWᵗ z + innWᵉ e + 1) ↦   M ^ M * (3 M + 1)
+--
+-- The first two FIT in one fold and the third does not, by orders of
+-- magnitude — the source's width sits in an EXPONENT whose base is
+-- also at M, so the clause is M ^ M against a budget of S ^ (1 + M).
+------------------------------------------------------------------
+
+-- mapᵉ, one fold, at the two tightest rungs and beyond
+map-one-fold-2 : (2 * 2 + 2 ≤ᵇ foldStep 2 2) ≡ true      -- 6 against 8
+map-one-fold-2 = refl
+map-one-fold-3 : (3 * 3 + 3 ≤ᵇ foldStep 2 3) ≡ true      -- 12 against 16
+map-one-fold-3 = refl
+map-one-fold-6 : (6 * 6 + 6 ≤ᵇ foldStep 2 6) ≡ true      -- 42 against 128
+map-one-fold-6 = refl
+
+-- mergeAllᵉ (and its three *All siblings, same clause), one fold
+merge-one-fold-3 : (3 * 3 ≤ᵇ foldStep 2 3) ≡ true        -- 9 against 16
+merge-one-fold-3 = refl
+merge-one-fold-6 : (6 * 6 ≤ᵇ foldStep 2 6) ≡ true        -- 36 against 128
+merge-one-fold-6 = refl
+
+-- scanᵉ, ONE FOLD, REFUTED — and not by a factor
+scan-one-fold-refuted-4 : (foldStep 2 4 <ᵇ 4 ^ 4 * (3 * 4 + 1)) ≡ true
+scan-one-fold-refuted-4 = refl                           -- 32 against 3328
+
+scan-one-fold-refuted-6 : (foldStep 2 6 <ᵇ 6 ^ 6 * (3 * 6 + 1)) ≡ true
+scan-one-fold-refuted-6 = refl                           -- 128 against 887 328
+
+-- AND THE REPAIR COSTS NO RECEIPT.  Two folds swallow the same rows,
+-- and a `scanᵉ` node HAS the folds to spend: it carries THREE children,
+-- each at least one syntax node, so a budget of `sizeᵉ (scanᵉ f z e)`
+-- = suc (sizeᵗ f + sizeᵗ z + sizeᵉ e) leaves three folds over the
+-- LARGEST child.  The induction has to be organised at the MAX of the
+-- children rather than at their running sum — which is the whole of
+-- what this section says has to change
+scan-two-folds-4 : (4 ^ 4 * (3 * 4 + 1) ≤ᵇ iterFold 2 2 4) ≡ true
+scan-two-folds-4 = refl
+
+scan-two-folds-6 : (6 ^ 6 * (3 * 6 + 1) ≤ᵇ iterFold 2 2 6) ≡ true
+scan-two-folds-6 = refl
+
+------------------------------------------------------------------
 -- THE READING (2026-08-01).
 --
 -- AFFINE IS REFUTED ON ALL THREE AXES the ruling named, and none of
@@ -521,6 +595,13 @@ fn-syntax-receipt-14 = refl
 -- per frame.  That is a LINEAR receipt in the syntax, not an affine
 -- bound on the value — a different shape from the one the ruling
 -- proposed, and strictly cheaper than the tower fallback.
+--
+-- THE SIZE HALF IS NOW PROVEN rather than measured — see §6 and
+-- Caps-Face's evalWith-iterSize — and it needed NO hypothesis relating
+-- the term's size to S, which is what lets it instantiate at
+-- S = Caps.cSize c.  THE WIDTH HALF IS NOT THE SAME SHAPE: §7 reads the
+-- width recurrence clause by clause and finds exactly one constructor,
+-- `scanᵉ`, that one fold cannot dominate.
 --
 -- NOT MEASURED HERE, and flagged: whether a family exists whose
 -- required j′ exceeds sizeᵗ.  The scan clause's exponent base is
