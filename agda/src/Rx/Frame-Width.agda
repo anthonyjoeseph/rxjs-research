@@ -345,3 +345,29 @@ slotsPWgo j sl (i ∷ is) = slotPW j sl (sl i) ⊔ slotsPWgo j sl is
 
 slotsPW : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) → ℕ
 slotsPW {n = n} j sl = slotsPWgo j sl (tabulate {n = n} (λ i → i))
+
+------------------------------------------------------------------
+-- AND THE TELESCOPE'S INNER WIDTH, which pW does NOT see.
+--
+-- pW is `outW ⊔ dW`: what a def DELIVERS now and what it PARKS.  A
+-- width induction that meets `input i` reads a third quantity off the
+-- same def — `innWᵉ`, the widest observable that frame can EMIT — and
+-- the two are independent, because innW reads the STEP FUNCTION's
+-- embedded observables while outW/dW read the source's.
+-- Eval-Growth-Probe's §8 `iwDef` separates them: pW 0 against innW 3.
+--
+-- Scripted slots contribute nothing here for the same reason they
+-- contribute nothing to slotsPW — the side condition that consumes
+-- this collector (slotCaps?) is size-only on its scripted clauses —
+-- and the `innWᵉ (input i) = 1` a scripted slot presents to the
+-- induction is paid for by the `suc` on capsAt's base instead
+slotIW : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) → Slot Γ u → ℕ
+slotIW j sl (scripted _) = 0
+slotIW j sl (shared d)   = innWᵉ j sl d
+
+slotsIWgo : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) → List (Fin n) → ℕ
+slotsIWgo j sl []       = 0
+slotsIWgo j sl (i ∷ is) = slotIW j sl (sl i) ⊔ slotsIWgo j sl is
+
+slotsIW : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) → ℕ
+slotsIW {n = n} j sl = slotsIWgo j sl (tabulate {n = n} (λ i → i))
