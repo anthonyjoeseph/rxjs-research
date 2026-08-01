@@ -1069,6 +1069,23 @@ slotsCaps?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) {B B′ W W′ : ℕ} �
   B ≤ B′ → W ≤ W′ → slotsCaps? B W sl ≡ true → slotsCaps? B′ W′ sl ≡ true
 slotsCaps?-widen {n = n} sl le lw = slotsGo?-widen sl (tabulate {n = n} (λ i → i)) le lw
 
+-- one slot's condition, read out of the telescope's
+slotsGo?-tab : ∀ {n m} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ)
+  (f : Fin m → Fin n) (i : Fin m) →
+  slotsGo? B W sl (tabulate f) ≡ true → slotCaps? B W sl (sl (f i)) ≡ true
+slotsGo?-tab B W sl f Fin.zero h =
+  proj₁ (∧-true (slotCaps? B W sl (sl (f Fin.zero)))
+                (slotsGo? B W sl (tabulate (λ k → f (Fin.suc k)))) h)
+slotsGo?-tab B W sl f (Fin.suc i) h =
+  slotsGo?-tab B W sl (λ k → f (Fin.suc k)) i
+    (proj₂ (∧-true (slotCaps? B W sl (sl (f Fin.zero)))
+                   (slotsGo? B W sl (tabulate (λ k → f (Fin.suc k)))) h))
+
+slotsCaps?-lookup : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) (i : Fin n) →
+  slotsCaps? B W sl ≡ true → slotCaps? B W sl (sl i) ≡ true
+slotsCaps?-lookup B W sl i h = slotsGo?-tab B W sl (λ k → k) i h
+
+
 ------------------------------------------------------------------
 -- AND WHY IT HOLDS AT capsAt: every payload a slot carries is a
 -- summand of that slot's slotSize, every slotSize is a summand of
@@ -1989,15 +2006,297 @@ wid-iterFold S M hS hM sl hI e =
   , proj₁ (proj₂ (widᵉ S M hS hM sl hI e))
   , wdᵉ S M hS hM sl hI e
 
-postulate
-  -- THE TELESCOPE SUPPLIES THE LEAF, at ONE above the width cap.
-  -- The shared branch is slotCaps?'s pW and innW conjuncts read one
-  -- CONNECT down — `outWᵉ (suc j) sl (input i)` is `outWᵉ j sl d`, one
-  -- fuel below what the conjunct states — and the scripted branch is the
-  -- constant 1 that outWᵉ / innWᵉ hand back for a data payload, which is
-  -- what the `suc` pays for
-  slotsCaps?-slotWid : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) →
-    slotsCaps? B W sl ≡ true → SlotWid sl (suc W)
+------------------------------------------------------------------
+-- AND THE TELESCOPE SUPPLIES THE LEAF, at ONE above the width cap.
+-- The shared branch is slotCaps?'s pW and innW conjuncts read one
+-- CONNECT down — `outWᵉ (suc j) sl (input i)` is `outWᵉ j sl d`, one
+-- fuel below what the conjunct states — and the scripted branch is the
+-- constant 1 that outWᵉ / innWᵉ hand back for a data payload, which is
+-- what the `suc` pays for.
+------------------------------------------------------------------
+
+-- THE MEASURES ARE MONOTONE IN THE SLOT FUEL.  Only the `input` clauses
+-- read the fuel, and there more fuel means a deeper descent into the
+-- slot telescope; every other clause is a ⊔, a sum, a product or an
+-- exponential of the children, all monotone.  This is what bridges the
+-- slot side condition (stated at the telescope's own fuel `n`) to what
+-- the width induction meets at an `input` leaf, which is one CONNECT
+-- below it.
+module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
+
+  MonoE : ∀ {Δᵍ Δ Θ t} → ℕ → ℕ → Exp Γ Δᵍ Δ Θ t → Set
+  MonoE q q′ e = (outWᵉ q sl e ≤ outWᵉ q′ sl e)
+               × (innWᵉ q sl e ≤ innWᵉ q′ sl e)
+               × ((k : ℕ) → pmOᵉ q sl k e ≤ pmOᵉ q′ sl k e)
+               × ((k : ℕ) → pmIᵉ q sl k e ≤ pmIᵉ q′ sl k e)
+
+  MonoT : ∀ {Δᵍ Δ Θ t} → ℕ → ℕ → Tm Γ Δᵍ Δ Θ t → Set
+  MonoT q q′ tm = (innWᵗ q sl tm ≤ innWᵗ q′ sl tm)
+                × ((k : ℕ) → pmOᵗ q sl k tm ≤ pmOᵗ q′ sl k tm)
+                × ((k : ℕ) → pmIᵗ q sl k tm ≤ pmIᵗ q′ sl k tm)
+
+  MonoL : ∀ {Δᵍ Δ Θ t} → ℕ → ℕ → List (Tm Γ Δᵍ Δ Θ t) → Set
+  MonoL q q′ ts = (innWᵗˢ q sl ts ≤ innWᵗˢ q′ sl ts)
+                × ((k : ℕ) → pmIᵗˢ q sl k ts ≤ pmIᵗˢ q′ sl k ts)
+
+  mutual
+    monoᵉ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+      MonoE q q′ e
+    monoᵉ q {q′} le (ofᵉ ts) =
+      ≤-reflexive (trans (Red.oW-of q sl ts) (sym (Red.oW-of q′ sl ts)))
+      , ≤-trans (≤-reflexive (Red.iW-of q sl ts))
+                (≤-trans (proj₁ (monoᵗˢ q le ts))
+                         (≤-reflexive (sym (Red.iW-of q′ sl ts))))
+      , (λ k → z≤n)
+      , (λ k → proj₂ (monoᵗˢ q le ts) k)
+    monoᵉ q {q′} le emptyᵉ =
+      ≤-trans (≤-reflexive (Red.oW-empty q sl)) z≤n
+      , ≤-trans (≤-reflexive (Red.iW-empty q sl)) z≤n
+      , (λ k → z≤n) , (λ k → z≤n)
+    monoᵉ q {q′} le (varᵉ x) =
+      ≤-trans (≤-reflexive (Red.oW-var q sl x)) z≤n
+      , ≤-trans (≤-reflexive (Red.iW-var q sl x)) z≤n
+      , (λ k → z≤n) , (λ k → z≤n)
+    monoᵉ q {q′} le {Δᵍ} {Δ} {Θ} (deferᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-defer q sl {Δᵍ} {Δ} {Θ} e)) z≤n
+      , ≤-trans (≤-reflexive (Red.iW-defer q sl {Δᵍ} {Δ} {Θ} e)) z≤n
+      , (λ k → z≤n) , (λ k → z≤n)
+    monoᵉ q {q′} le (mapᵉ f e) =
+      ≤-trans (≤-reflexive (Red.oW-map q sl f e))
+              (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-map q′ sl f e))))
+      , ≤-trans (≤-reflexive (Red.iW-map q sl f e))
+                (≤-trans (+-mono-≤ (proj₁ IHf)
+                            (*-mono-≤ (⊔-mono-≤ (proj₂ (proj₂ IHf) 0) ≤-refl)
+                                      (proj₁ (proj₂ IHe))))
+                         (≤-reflexive (sym (Red.iW-map q′ sl f e))))
+      , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
+      , (λ k → +-mono-≤ (proj₂ (proj₂ IHf) (suc k))
+                 (*-mono-≤ (⊔-mono-≤ (proj₂ (proj₂ IHf) 0) ≤-refl)
+                           (proj₂ (proj₂ (proj₂ IHe)) k)))
+      where
+      IHf = monoᵗ q le f
+      IHe = monoᵉ q le e
+    monoᵉ q {q′} le (takeᵉ c e) =
+      ≤-trans (≤-reflexive (Red.oW-take q sl c e))
+              (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-take q′ sl c e))))
+      , ≤-trans (≤-reflexive (Red.iW-take q sl c e))
+                (≤-trans (proj₁ (proj₂ IHe))
+                         (≤-reflexive (sym (Red.iW-take q′ sl c e))))
+      , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
+      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    monoᵉ q {q′} le (scanᵉ f z e) =
+      ≤-trans (≤-reflexive (Red.oW-scan q sl f z e))
+              (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-scan q′ sl f z e))))
+      , ≤-trans (≤-reflexive (Red.iW-scan q sl f z e))
+                (≤-trans (*-mono-≤ POW
+                            (+-mono-≤ (+-mono-≤ (+-mono-≤ (proj₁ IHf) (proj₁ IHz))
+                                                (proj₁ (proj₂ IHe)))
+                                      ≤-refl))
+                         (≤-reflexive (sym (Red.iW-scan q′ sl f z e))))
+      , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
+      , (λ k → *-mono-≤ POW
+                 (+-mono-≤ (+-mono-≤ (proj₂ (proj₂ IHf) (suc k))
+                                     (proj₂ (proj₂ IHz) k))
+                           (proj₂ (proj₂ (proj₂ IHe)) k)))
+      where
+      IHf = monoᵗ q le f
+      IHz = monoᵗ q le z
+      IHe = monoᵉ q le e
+      POW : (pmIᵗ q sl 0 f ⊔ 1) ^ outWᵉ q sl e
+              ≤ (pmIᵗ q′ sl 0 f ⊔ 1) ^ outWᵉ q′ sl e
+      POW = ≤-trans (^-monoˡ-≤ (outWᵉ q sl e)
+                      (⊔-mono-≤ (proj₂ (proj₂ IHf) 0) ≤-refl))
+                    (powʳ1 (pmIᵗ q′ sl 0 f ⊔ 1) (m≤n⊔m (pmIᵗ q′ sl 0 f) 1) (proj₁ IHe))
+    monoᵉ q {q′} le (mergeAllᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-merge q sl e))
+              (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
+                       (≤-reflexive (sym (Red.oW-merge q′ sl e))))
+      , ≤-trans (≤-reflexive (Red.iW-merge q sl e))
+                (≤-trans (proj₁ (proj₂ IHe))
+                         (≤-reflexive (sym (Red.iW-merge q′ sl e))))
+      , (λ k → +-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
+                        (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
+                                  (proj₁ (proj₂ IHe))))
+      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    monoᵉ q {q′} le (concatAllᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-concat q sl e))
+              (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
+                       (≤-reflexive (sym (Red.oW-concat q′ sl e))))
+      , ≤-trans (≤-reflexive (Red.iW-concat q sl e))
+                (≤-trans (proj₁ (proj₂ IHe))
+                         (≤-reflexive (sym (Red.iW-concat q′ sl e))))
+      , (λ k → +-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
+                        (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
+                                  (proj₁ (proj₂ IHe))))
+      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    monoᵉ q {q′} le (switchAllᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-switch q sl e))
+              (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
+                       (≤-reflexive (sym (Red.oW-switch q′ sl e))))
+      , ≤-trans (≤-reflexive (Red.iW-switch q sl e))
+                (≤-trans (proj₁ (proj₂ IHe))
+                         (≤-reflexive (sym (Red.iW-switch q′ sl e))))
+      , (λ k → +-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
+                        (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
+                                  (proj₁ (proj₂ IHe))))
+      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    monoᵉ q {q′} le (exhaustAllᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-exhaust q sl e))
+              (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
+                       (≤-reflexive (sym (Red.oW-exhaust q′ sl e))))
+      , ≤-trans (≤-reflexive (Red.iW-exhaust q sl e))
+                (≤-trans (proj₁ (proj₂ IHe))
+                         (≤-reflexive (sym (Red.iW-exhaust q′ sl e))))
+      , (λ k → +-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
+                        (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
+                                  (proj₁ (proj₂ IHe))))
+      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    monoᵉ q {q′} le (μᵉ e) =
+      ≤-trans (≤-reflexive (Red.oW-μ q sl e))
+              (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-μ q′ sl e))))
+      , ≤-trans (≤-reflexive (Red.iW-μ q sl e))
+                (≤-trans (proj₁ (proj₂ IHe)) (≤-reflexive (sym (Red.iW-μ q′ sl e))))
+      , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
+      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    -- THE ONLY CLAUSE THAT READS THE FUEL, and the only place the
+    -- induction descends on it rather than on the syntax
+    monoᵉ zero {q′} le (input i) = z≤n , z≤n , (λ k → z≤n) , (λ k → z≤n)
+    monoᵉ (suc q) {suc q′} (s≤s le) (input i) with sl i
+    ... | scripted _ = ≤-refl , ≤-refl , (λ k → z≤n) , (λ k → z≤n)
+    ... | shared d   = proj₁ IH , proj₁ (proj₂ IH) , (λ k → z≤n) , (λ k → z≤n)
+      where IH = monoᵉ q le d
+
+    monoᵗ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
+      MonoT q q′ tm
+    monoᵗ q {q′} le (varᵗ x)   = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le unit̂       = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le (bool̂ _)   = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le (nat̂ _)    = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le (primᵗ _ a) = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le (pairᵗ a b) =
+      ⊔-mono-≤ (proj₁ IHa) (proj₁ IHb)
+      , (λ k → ⊔-mono-≤ (proj₁ (proj₂ IHa) k) (proj₁ (proj₂ IHb) k))
+      , (λ k → ⊔-mono-≤ (proj₂ (proj₂ IHa) k) (proj₂ (proj₂ IHb) k))
+      where
+      IHa = monoᵗ q le a
+      IHb = monoᵗ q le b
+    monoᵗ q {q′} le (fstᵗ p) = monoᵗ q le p
+    monoᵗ q {q′} le (sndᵗ p) = monoᵗ q le p
+    monoᵗ q {q′} le (inlᵗ p) = monoᵗ q le p
+    monoᵗ q {q′} le (inrᵗ p) = monoᵗ q le p
+    monoᵗ q {q′} le (ifᵗ c a b) =
+      ⊔-mono-≤ (proj₁ IHa) (proj₁ IHb)
+      , (λ k → ⊔-mono-≤ (proj₁ (proj₂ IHa) k) (proj₁ (proj₂ IHb) k))
+      , (λ k → ⊔-mono-≤ (proj₂ (proj₂ IHa) k) (proj₂ (proj₂ IHb) k))
+      where
+      IHa = monoᵗ q le a
+      IHb = monoᵗ q le b
+    monoᵗ q {q′} le (strmᵗ e) =
+      proj₁ IHe , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
+      , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
+      where IHe = monoᵉ q le e
+    monoᵗ q {q′} le (caseᵗ s l r) =
+      +-mono-≤ (⊔-mono-≤ (proj₁ IHl) (proj₁ IHr)) (*-mono-≤ C≤ (proj₁ IHs))
+      , (λ k → ⊔-mono-≤ (⊔-mono-≤ (proj₁ (proj₂ IHl) (suc k))
+                                  (proj₁ (proj₂ IHr) (suc k)))
+                        (*-mono-≤ C≤ (proj₁ (proj₂ IHs) k)))
+      , (λ k → +-mono-≤ (⊔-mono-≤ (proj₂ (proj₂ IHl) (suc k))
+                                  (proj₂ (proj₂ IHr) (suc k)))
+                        (*-mono-≤ C≤ (proj₂ (proj₂ IHs) k)))
+      where
+      IHs = monoᵗ q le s
+      IHl = monoᵗ q le l
+      IHr = monoᵗ q le r
+      C≤ = ⊔-mono-≤ (⊔-mono-≤ (proj₂ (proj₂ IHl) 0) (proj₂ (proj₂ IHr) 0)) ≤-refl
+
+    monoᵗˢ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ →
+      ∀ {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → MonoL q q′ ts
+    monoᵗˢ q {q′} le []       = ≤-refl , (λ k → ≤-refl)
+    monoᵗˢ q {q′} le (y ∷ ys) =
+      ⊔-mono-≤ (proj₁ IHy) (proj₁ IHys)
+      , (λ k → ⊔-mono-≤ (proj₂ (proj₂ IHy) k) (proj₂ IHys k))
+      where
+      IHy  = monoᵗ q le y
+      IHys = monoᵗˢ q le ys
+
+  -- and the parked half, which reads the delivered one at a defer
+  mutual
+    monoᴰᵉ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
+      dWᵉ q sl e ≤ dWᵉ q′ sl e
+    monoᴰᵉ q le (ofᵉ ts)        = monoᴰᵗˢ q le ts
+    monoᴰᵉ q le emptyᵉ          = z≤n
+    monoᴰᵉ q le (varᵉ x)        = z≤n
+    monoᴰᵉ q le (mapᵉ f e)      = ⊔-mono-≤ (monoᴰᵗ q le f) (monoᴰᵉ q le e)
+    monoᴰᵉ q le (takeᵉ c e)     = ⊔-mono-≤ (monoᴰᵗ q le c) (monoᴰᵉ q le e)
+    monoᴰᵉ q le (scanᵉ f z e)   =
+      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le f) (monoᴰᵗ q le z)) (monoᴰᵉ q le e)
+    monoᴰᵉ q le (mergeAllᵉ e)   = monoᴰᵉ q le e
+    monoᴰᵉ q le (concatAllᵉ e)  = monoᴰᵉ q le e
+    monoᴰᵉ q le (switchAllᵉ e)  = monoᴰᵉ q le e
+    monoᴰᵉ q le (exhaustAllᵉ e) = monoᴰᵉ q le e
+    monoᴰᵉ q le (μᵉ e)          = monoᴰᵉ q le e
+    monoᴰᵉ q le (deferᵉ e)      =
+      ⊔-mono-≤ (proj₁ (monoᵉ q le e)) (monoᴰᵉ q le e)
+    monoᴰᵉ zero    le (input i) = z≤n
+    monoᴰᵉ (suc q) (s≤s le) (input i) with sl i
+    ... | scripted _ = z≤n
+    ... | shared d   = monoᴰᵉ q le d
+
+    monoᴰᵗ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
+      dWᵗ q sl tm ≤ dWᵗ q′ sl tm
+    monoᴰᵗ q le (varᵗ x)     = z≤n
+    monoᴰᵗ q le unit̂         = z≤n
+    monoᴰᵗ q le (bool̂ _)     = z≤n
+    monoᴰᵗ q le (nat̂ _)      = z≤n
+    monoᴰᵗ q le (pairᵗ a b)  = ⊔-mono-≤ (monoᴰᵗ q le a) (monoᴰᵗ q le b)
+    monoᴰᵗ q le (fstᵗ p)     = monoᴰᵗ q le p
+    monoᴰᵗ q le (sndᵗ p)     = monoᴰᵗ q le p
+    monoᴰᵗ q le (inlᵗ p)     = monoᴰᵗ q le p
+    monoᴰᵗ q le (inrᵗ p)     = monoᴰᵗ q le p
+    monoᴰᵗ q le (primᵗ _ a)  = monoᴰᵗ q le a
+    monoᴰᵗ q le (strmᵗ e)    = monoᴰᵉ q le e
+    monoᴰᵗ q le (caseᵗ s l r) =
+      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le s) (monoᴰᵗ q le l)) (monoᴰᵗ q le r)
+    monoᴰᵗ q le (ifᵗ c a b) =
+      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le c) (monoᴰᵗ q le a)) (monoᴰᵗ q le b)
+
+    monoᴰᵗˢ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ →
+      ∀ {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → dWᵗˢ q sl ts ≤ dWᵗˢ q′ sl ts
+    monoᴰᵗˢ q le []       = z≤n
+    monoᴰᵗˢ q le (y ∷ ys) = ⊔-mono-≤ (monoᴰᵗ q le y) (monoᴰᵗˢ q le ys)
+
+------------------------------------------------------------------
+-- THE LEAF, off the slot side condition.
+------------------------------------------------------------------
+
+slotsCaps?-slotWid : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) →
+  slotsCaps? B W sl ≡ true → SlotWid sl (suc W)
+slotsCaps?-slotWid {n = suc m} B W sl h i
+  with sl i | slotsCaps?-lookup B W sl i h
+... | scripted _ | _  = s≤s z≤n , s≤s z≤n , z≤n
+... | shared d   | sd =
+  ≤-trans (≤-trans (proj₁ (monoᵉ sl m (n≤1+n m) d))
+                   (≤-trans (m≤m⊔n (outWᵉ (suc m) sl d) (dWᵉ (suc m) sl d)) pw))
+          (n≤1+n W)
+  , ≤-trans (≤-trans (proj₁ (proj₂ (monoᵉ sl m (n≤1+n m) d))) iw) (n≤1+n W)
+  , ≤-trans (≤-trans (monoᴰᵉ sl m (n≤1+n m) d)
+                     (≤-trans (m≤n⊔m (outWᵉ (suc m) sl d) (dWᵉ (suc m) sl d)) pw))
+            (n≤1+n W)
+  where
+  split₁ = ∧-true (sizeᵉ d ≤ᵇ B)
+             ((pWᵉ (suc m) sl d ≤ᵇ W) ∧ (innWᵉ (suc m) sl d ≤ᵇ W)) sd
+  split₂ = ∧-true (pWᵉ (suc m) sl d ≤ᵇ W) (innWᵉ (suc m) sl d ≤ᵇ W)
+             (proj₂ split₁)
+  pw : pWᵉ (suc m) sl d ≤ W
+  pw = ≤ᵇ⇒≤ (pWᵉ (suc m) sl d) W (T-to (proj₁ split₂))
+  iw : innWᵉ (suc m) sl d ≤ W
+  iw = ≤ᵇ⇒≤ (innWᵉ (suc m) sl d) W (T-to (proj₂ split₂))
 
 -- THE VALUE FACE of the width lemma.  A value's obs components ARE
 -- expressions, and sizeᵛ reports exactly their sizeᵉ, so the same count
@@ -4361,22 +4660,6 @@ resolve-wid-data W sl ok []             = refl
 resolve-wid-data {n = n} {u = u} W sl ok ((tk , v) ∷ ps) =
   ∧-intro (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (pWᵛ-data n sl u ok v)) refl)
           (resolve-wid-data W sl ok ps)
-
--- one slot's condition, read out of the telescope's
-slotsGo?-tab : ∀ {n m} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ)
-  (f : Fin m → Fin n) (i : Fin m) →
-  slotsGo? B W sl (tabulate f) ≡ true → slotCaps? B W sl (sl (f i)) ≡ true
-slotsGo?-tab B W sl f Fin.zero h =
-  proj₁ (∧-true (slotCaps? B W sl (sl (f Fin.zero)))
-                (slotsGo? B W sl (tabulate (λ k → f (Fin.suc k)))) h)
-slotsGo?-tab B W sl f (Fin.suc i) h =
-  slotsGo?-tab B W sl (λ k → f (Fin.suc k)) i
-    (proj₂ (∧-true (slotCaps? B W sl (sl (f Fin.zero)))
-                   (slotsGo? B W sl (tabulate (λ k → f (Fin.suc k)))) h))
-
-slotsCaps?-lookup : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) (i : Fin n) →
-  slotsCaps? B W sl ≡ true → slotCaps? B W sl (sl i) ≡ true
-slotsCaps?-lookup B W sl i h = slotsGo?-tab B W sl (λ k → k) i h
 
 -- a fresh cold's live entry, bounded on both halves
 capsOK?-addLive : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

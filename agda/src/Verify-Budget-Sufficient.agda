@@ -82,17 +82,17 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- SIX POSTULATES REMAIN, and the assembly knot is not among them.
+-- FIVE POSTULATES REMAIN, and the assembly knot is not among them.
 -- They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
--- subscribeE-walk), the two pieces the BUDGET CLAIM is assembled from
--- (cascadeGo-charge and cascadeGo-deliveries), and ONE slot-telescope
--- lemma the eval cluster's width half consumes (slotsCaps?-slotWid).
--- 3 + 2 + 1 = 6, and that is the whole ledger.
+-- subscribeE-walk) and the two pieces the BUDGET CLAIM is assembled
+-- from (cascadeGo-charge and cascadeGo-deliveries).  3 + 2 = 5, and
+-- that is the whole ledger — THE CAPS FACE IS DOWN TO THE TWO
+-- DESIGN-OWNED COUNTS and nothing else.
 -- frameBlowup is fully defined, and cascadeGo-caps, the cascade
 -- bookends and the chain snapshot are all ground.
 --
 -- THE FIVE EVALUATION OBLIGATIONS ARE GROUND (2026-08-01), which is
--- what the count 10 → 6 is.  mapFrame-caps, scanFrame-caps,
+-- what the count 10 → 5 is.  mapFrame-caps, scanFrame-caps,
 -- evalTms-caps, evalSeed-caps and unfoldμ-caps all had the same
 -- difficulty and it had the same answer: an evaluated value is FRESH
 -- SYNTAX, so its WIDTH has to come out of its SIZE, and that is
@@ -123,18 +123,26 @@
 -- Tb is ≥ 4 at every internal node because one fold off a leaf bound of
 -- at least 1 is already S ^ 2.
 --
--- WHAT IS LEFT OF THEM IS ONE SLOT-TELESCOPE LEMMA:
+-- AND SO IS THE LEAF.  `input i` has `sizeᵉ = 1` and width measures
+-- that descend into the slot telescope, so the side condition has to
+-- supply them — which is why slotCaps? gained an innW conjunct
+-- (Eval-Growth-Probe §8: a def with pW 0 and innW 3, so pW cannot be
+-- made to bound it).  The step that was owed is FUEL: `innWᵉ n sl
+-- (input i)` is `innWᵉ (n-1) sl d`, one CONNECT below what the conjunct
+-- states, so the leaf wants the measures' monotonicity in the slot
+-- fuel — which is `monoᵉ` / `monoᴰᵉ`, proven by the same lexicographic
+-- (fuel, syntax) recursion the measures are defined by: only the
+-- `input` clauses read the fuel, and there more fuel means a deeper
+-- descent, while every other clause is a ⊔, a sum, a product or an
+-- exponential of the children, all monotone.
 --
---   slotsCaps?-slotWid  the LEAF.  `input i` has `sizeᵉ = 1` and width
---                       measures that descend into the slot telescope,
---                       so the side condition has to supply them —
---                       which is why slotCaps? gained an innW conjunct
---                       (Eval-Growth-Probe §8: a def with pW 0 and innW
---                       3, so pW cannot be made to bound it).  The one
---                       step still owed is FUEL: `innWᵉ n sl (input i)`
---                       is `innWᵉ (n-1) sl d`, one connect below what
---                       the conjunct states, so the piece wants the
---                       measures' monotonicity in the slot fuel.
+-- THE FUEL COLUMN ALSO COST A REDUCTION MODULE.  outWᵉ and innWᵉ take
+-- their `input` clauses FIRST, so their case trees split on the fuel at
+-- the root and every other clause is STUCK at the variable fuel a
+-- structural induction has (dWᵉ takes `input` last for exactly this
+-- reason and says so).  Rather than reorder a measure the whole design
+-- reads, `Red` unsticks each constructor once — twenty-four two-line
+-- equations — and both inductions read them off.
 --
 -- THE CHAIN-HALF LEMMA IS GONE, REFUTED (2026-08-01).
 -- regsSz?-subscribeE asked a FIXED cap C to survive a subscribe, and
