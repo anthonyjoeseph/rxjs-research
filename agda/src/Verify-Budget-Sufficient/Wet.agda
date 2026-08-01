@@ -4050,47 +4050,6 @@ postulate
                   (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- GAP 3's NAMED COMPANION, consumed by drain-dry at exactly the
-  -- joint that owed it.  The head-KEEPING schedGo inversion:
-  -- schedHeadOf-bounded and pop-bounded both keep the TAIL and drop
-  -- the popped element on the floor, so neither yields this.  The
-  -- content is that the popped arrival was a PENDING of a live source,
-  -- so stBounded?'s pendings half (and fnCapBounded?'s live half)
-  -- bounds it — one induction over schedGo, keeping the head instead
-  -- of the tail.  STATED, not proven, 2026-08-01.
-  pop-head-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (Ψ B : ℕ) (sched : Sched Γ) (st : EvalSt e)
-    {a : Arrival Γ} {sched′ : Sched Γ} →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    INV? Ψ B sched st ≡ true →
-    valB? B Ψ (arrTy a) (arrVal a) ≡ true
-
-  -- the TAIL half of the same inversion, on the six-conjunct face.
-  -- pop-bounded is its stBounded? projection and is PROVEN; what is
-  -- owed is the fnCapBounded? live half (a transcription of
-  -- schedGo-bounded / schedHeadOf-bounded at fnCapLive) plus the
-  -- transport of the two slot conjuncts along pop-slots.  The clean
-  -- discharge is to make schedGo-bounded generic in the pending
-  -- predicate, which would retire pop-bounded into it.
-  pop-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (Ψ B : ℕ) (sched : Sched Γ) (st : EvalSt e)
-    {a : Arrival Γ} {sched′ : Sched Γ} →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    INV? Ψ B sched st ≡ true → INV? Ψ B sched′ st ≡ true
-
-  -- THE SEED, on the six-conjunct face at the caps level.  init-bounded
-  -- is its stBounded? projection and is PROVEN, but at sizeBudgetAt;
-  -- what is owed is (i) the same mkHot argument at
-  -- `Caps.cSize (capsAt …)`, which capsAt-base-size supplies, (ii) the
-  -- fnCapLive mirror of mkHot-bounded, (iii) the registry conjuncts,
-  -- which are trivial at st-init (the registry is []), and (iv) the
-  -- two slot conjuncts, again from capsAt-base-size and from ΨAt's own
-  -- definition.
-  init-INV : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-    (id : Id) →
-    INV? (ΨAt e ins) (sizeCapAt e ins id)
-         (sched-init e ins) (st-init e) ≡ true
-
   -- THE ROOT'S FUEL, at the moved anchor.  The old discharge
   -- (dBound-bound + seed-covers + budget-hasAtLeast) measured the
   -- demand at sizeBudgetAt, and does not apply now that the reset caps
@@ -4109,6 +4068,167 @@ postulate
       suc (dBound (sizeCapAt e ins 1) (hopR (sizeCapAt e ins 1))
                   (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) e)
                   (syncSizeᵉ e))
+
+------------------------------------------------------------------
+-- THE POP RING ON THE SIX-CONJUNCT FACE — PROVEN.  .Measures has the
+-- stBounded? projections (schedHeadOf-bounded / schedGo-bounded /
+-- pop-bounded); what the wet predicate needs on top is the SAME
+-- induction at fnCapLive, and the head-KEEPING variant, which nothing
+-- had: every existing inversion keeps the TAIL and drops the popped
+-- element on the floor, so none of them bounds the arrival drain-dry
+-- hands to cascade-dry.
+--
+-- The fnCap mirrors sit here rather than in .Measures for the reason
+-- sweepLive-fnCap does: they exist for the wet face only, and the size
+-- face has no use for them.
+------------------------------------------------------------------
+
+schedHeadOf-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  fnCapLive Ψ l ≡ true → fnCapLive Ψ l′ ≡ true
+schedHeadOf-fnCap Ψ l eq bnd with LiveSource.pending l | eq | bnd
+... | (t , v) ∷ ps | refl | bnd′ = proj₂ (∧-true _ _ bnd′)
+
+schedGo-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  schedGo ls ≡ inj₂ (a , ls′) →
+  all (fnCapLive Ψ) ls ≡ true → all (fnCapLive Ψ) ls′ ≡ true
+schedGo-fnCap Ψ (l ∷ ls) eq bnd
+  with ∧-true (fnCapLive Ψ l) (all (fnCapLive Ψ) ls) bnd
+... | bl , bls with schedHeadOf l in eqH | schedGo ls in eqR
+schedGo-fnCap Ψ (l ∷ ls) refl bnd | bl , bls | inj₁ _ | inj₂ (a′ , ls″) =
+  ∧-intro bl (schedGo-fnCap Ψ ls eqR bls)
+schedGo-fnCap Ψ (l ∷ ls) refl bnd | bl , bls | inj₂ (a″ , l′) | inj₁ _ =
+  ∧-intro (schedHeadOf-fnCap Ψ l eqH bl) bls
+schedGo-fnCap Ψ (l ∷ ls) eq bnd | bl , bls | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with schedEarlier a″ a′ | eq
+... | true  | refl = ∧-intro (schedHeadOf-fnCap Ψ l eqH bl) bls
+... | false | refl = ∧-intro bl (schedGo-fnCap Ψ ls eqR bls)
+
+pop-fnCap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ : ℕ) (sched : Sched Γ) (st : EvalSt e)
+  {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  fnCapBounded? Ψ sched st ≡ true → fnCapBounded? Ψ sched′ st ≡ true
+pop-fnCap Ψ sched st eq bnd
+  with ∧-true (all (fnCapLive Ψ) (Sched.live sched)) _ bnd
+... | bls , bns with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+      ∧-intro (schedGo-fnCap Ψ (Sched.live sched) eqL bls) bns
+
+-- the TAIL half, whole: the two store faces by their own inversions,
+-- the two registry conjuncts untouched (the pop writes only `live`),
+-- and the two slot conjuncts transported along pop-slots
+pop-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ B : ℕ) (sched : Sched Γ) (st : EvalSt e)
+  {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  INV? Ψ B sched st ≡ true → INV? Ψ B sched′ st ≡ true
+pop-INV Ψ B sched st eq inv with INV-parts Ψ B sched st inv
+... | sb , fc , rl , rb , ss , sf =
+  ∧-intro (pop-bounded B sched st eq sb)
+  (∧-intro (pop-fnCap Ψ sched st eq fc)
+  (∧-intro rl
+  (∧-intro rb
+  (∧-intro (subst (λ sl → (slotsSize sl ≤ᵇ B) ≡ true)
+                  (sym (pop-slots sched eq)) ss)
+           (subst (λ sl → (slotsFnCap sl ≤ᵇ Ψ) ≡ true)
+                  (sym (pop-slots sched eq)) sf)))))
+
+-- GAP 3's NAMED COMPANION, PROVEN.  The popped arrival IS the head of
+-- some live source's pending list, so stBounded?'s pendings half and
+-- fnCapBounded?'s live half bound it between them — one induction over
+-- schedGo carrying BOTH faces at once, since valB? is their conjunction
+-- and a second pass would repeat the same case tree
+schedHeadOf-head : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  boundedLive B l ≡ true → fnCapLive Ψ l ≡ true →
+  valB? B Ψ (arrTy a) (arrVal a) ≡ true
+schedHeadOf-head B Ψ l eq bs bf with LiveSource.pending l | eq | bs | bf
+... | (t , v) ∷ ps | refl | bs′ | bf′ =
+  ∧-intro (proj₁ (∧-true (sizeᵛ (LiveSource.elemTy l) v ≤ᵇ B) _ bs′))
+          (proj₁ (∧-true (fnCapᵛ (LiveSource.elemTy l) v ≤ᵇ Ψ) _ bf′))
+
+schedGo-head : ∀ {n} {Γ : Ctx n} (B Ψ : ℕ) (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  schedGo ls ≡ inj₂ (a , ls′) →
+  all (boundedLive B) ls ≡ true → all (fnCapLive Ψ) ls ≡ true →
+  valB? B Ψ (arrTy a) (arrVal a) ≡ true
+schedGo-head B Ψ (l ∷ ls) eq bs bf
+  with ∧-true (boundedLive B l) (all (boundedLive B) ls) bs
+     | ∧-true (fnCapLive Ψ l) (all (fnCapLive Ψ) ls) bf
+... | bl , bls | fl , fls with schedHeadOf l in eqH | schedGo ls in eqR
+schedGo-head B Ψ (l ∷ ls) refl bs bf
+  | bl , bls | fl , fls | inj₁ _ | inj₂ (a′ , ls″) =
+  schedGo-head B Ψ ls eqR bls fls
+schedGo-head B Ψ (l ∷ ls) refl bs bf
+  | bl , bls | fl , fls | inj₂ (a″ , l′) | inj₁ _ =
+  schedHeadOf-head B Ψ l eqH bl fl
+schedGo-head B Ψ (l ∷ ls) eq bs bf
+  | bl , bls | fl , fls | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with schedEarlier a″ a′ | eq
+... | true  | refl = schedHeadOf-head B Ψ l eqH bl fl
+... | false | refl = schedGo-head B Ψ ls eqR bls fls
+
+pop-head-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ B : ℕ) (sched : Sched Γ) (st : EvalSt e)
+  {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  INV? Ψ B sched st ≡ true →
+  valB? B Ψ (arrTy a) (arrVal a) ≡ true
+pop-head-bounded Ψ B sched st eq inv with INV-parts Ψ B sched st inv
+... | sb , fc , _ with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+      schedGo-head B Ψ (Sched.live sched) eqL
+        (stB-live B sched st sb) (fcB-live Ψ sched st fc)
+
+------------------------------------------------------------------
+-- THE SEED ON THE SIX-CONJUNCT FACE AT THE CAPS LEVEL — PROVEN.
+-- init-bounded is its stBounded? projection but reads sizeBudgetAt;
+-- capsAt-base-size relocates the same mkHot argument to
+-- `Caps.cSize (capsAt …)`, the registry conjuncts are refl at st-init
+-- (the registry is []), and the two slot conjuncts come from
+-- capsAt-base-size and from ΨAt's own definition (`fnCapᵉ e + slotsFnCap`
+-- dominates its second summand).
+------------------------------------------------------------------
+
+-- the fnCap face of one hot slot's initial pendings, off resolve-measure
+-- at fnCapᵛ.  No `n≤1+n` here: inputFnCap has no `suc` to pay for,
+-- because a script's own syntax carries no fn weight of its own
+mkHot-fnCap : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (Ψ : ℕ) (i : Fin n) →
+  slotFnCap (ins i) ≤ Ψ → all (fnCapLive Ψ) (mkHot ins i) ≡ true
+mkHot-fnCap {Γ = Γ} ins Ψ i h with ins i | h
+... | scripted (hot async) | h′ =
+      ∧-intro (resolve-measure (fnCapᵛ (lookup Γ i)) Ψ 0 async h′) refl
+... | scripted (cold _ _)  | _ = refl
+... | shared _             | _ = refl
+
+init-INV : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (id : Id) →
+  INV? (ΨAt e ins) (sizeCapAt e ins id)
+       (sched-init e ins) (st-init e) ≡ true
+init-INV {n = n} e ins id =
+  ∧-intro (∧-intro (all-concat-tab (boundedLive B) (mkHot ins) perSlotSz) refl)
+  (∧-intro (∧-intro (all-concat-tab (fnCapLive Ψ) (mkHot ins) perSlotFc) refl)
+  (∧-intro refl
+  (∧-intro refl
+  (∧-intro (T⇒≡true _ (≤⇒≤ᵇ slotsOK))
+           (T⇒≡true _ (≤⇒≤ᵇ (m≤n+m (slotsFnCap ins) (fnCapᵉ e))))))))
+  where
+  B = sizeCapAt e ins id
+  Ψ = ΨAt e ins
+  slotsOK : slotsSize ins ≤ B
+  slotsOK = ≤-trans (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
+                    (capsAt-base-size e ins id)
+  perSlotSz : ∀ i → all (boundedLive B) (mkHot ins i) ≡ true
+  perSlotSz i = mkHot-bounded ins B i
+                  (≤-trans (fᵢ≤sum-tab (λ j → slotSize (ins j)) i) slotsOK)
+  perSlotFc : ∀ i → all (fnCapLive Ψ) (mkHot ins i) ≡ true
+  perSlotFc i = mkHot-fnCap ins Ψ i
+                  (≤-trans (fᵢ≤sum-tab (λ j → slotFnCap (ins j)) i)
+                           (m≤n+m (slotsFnCap ins) (fnCapᵉ e)))
 
 ------------------------------------------------------------------
 -- the burst cores — the contract instantiated at the root.  The root

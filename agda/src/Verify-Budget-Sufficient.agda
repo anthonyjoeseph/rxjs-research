@@ -20,10 +20,13 @@
 --   drain-dry (PROVEN)    — the fuel loop composes cascades
 --   budget-sufficient     — (PROVEN from the above) the whole run
 --
--- PROVEN: pop-slots/pop-bounded (inverting schedGo, hoisted for
--- exactly this), the cascade's structural ring (latch/sweep/finish/
--- mono), sync-linearity (plugs-len/occs/inner-len-subΘ), the seed
--- inequality (prod≤3pow/seed-covers — the tower dominance
+-- PROVEN: the pop ring WHOLE (pop-slots/pop-bounded invert schedGo on
+-- the store face; pop-fnCap mirrors them at fnCapLive, pop-INV closes
+-- the six-conjunct face, and pop-head-bounded is the head-KEEPING
+-- inversion that bounds the popped arrival itself), the seed at the
+-- caps level (init-INV), the cascade's structural ring (latch/sweep/
+-- finish/mono), sync-linearity (plugs-len/occs/inner-len-subΘ), the
+-- seed inequality (prod≤3pow/seed-covers — the tower dominance
 -- arithmetic at instant 0, discharging the burst cores from the
 -- contract), cascade-dry, drain-dry, and the theorem.
 --
@@ -82,19 +85,16 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- NINE POSTULATES REMAIN after the 2026-08-01 wet restatement (the
--- wet stack now anchors at capsAt; see the memo above the wet cores in
--- .Wet).  They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
+-- SIX POSTULATES REMAIN (2026-08-01, after the seed/pop cluster).  They
+-- are: the three walk faces (subscribeE-wet, cascadeGo-wet,
 -- subscribeE-walk), the two pieces the BUDGET CLAIM is assembled from
 -- (cascadeGo-charge and cascadeGo-deliveries, design-owned and frozen),
--- and the four companions the restatement NAMED rather than left
--- implicit — pop-head-bounded (GAP 3's head-keeping schedGo inversion),
--- pop-INV and init-INV (the same two structural facts pop-bounded and
--- init-bounded already give on the stBounded? projection, owed on the
--- six-conjunct face) and caps-fuel-root (the root's fuel at the moved
--- anchor, a tower-height comparison).  3 + 2 + 4 = 9.  The count ROSE
--- because three statement-level gaps were closed: the previous 5 was a
--- ledger over faces that did not compose.
+-- and caps-fuel-root (the root's fuel at the moved anchor — a
+-- tower-height comparison, and the only one of the four companions the
+-- wet restatement named that is not now discharged).  3 + 2 + 1 = 6.
+-- The count went 5 → 9 when the restatement closed three statement-level
+-- gaps by NAMING what had been implicit, and 9 → 6 as three of those
+-- four names were ground: pop-INV, init-INV and pop-head-bounded.
 -- frameBlowup is fully defined, and cascadeGo-caps, the cascade
 -- bookends and the chain snapshot are all ground.
 --
