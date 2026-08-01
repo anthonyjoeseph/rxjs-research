@@ -3580,6 +3580,196 @@ stepFrame-caps c j g id now (thru-outer op nid) κ vals fin sl sched st
          (proj₁ (proj₂ TW)) (proj₁ (proj₂ (proj₂ TW))) (proj₂ (proj₂ (proj₂ TW)))
 
 ------------------------------------------------------------------
+-- THE TWO SUBSCRIBE-SIDE COMPANIONS f1a03c4'S SURVEY FOUND MISSING.
+--
+-- pushBurst is foldPath's `↠` clause once per EMIT rather than once per
+-- frame: split the emit, step it through the one frame just built, and
+-- reassemble under the same envelope.  So it runs on exactly the same
+-- three pieces — splitEvents' two halves, the ground stepFrame-caps, and
+-- the additive receipt — and the only new leaf is that a RETAGGED event
+-- list carries no values, hence no bound.
+--
+-- subscribeAll is then mintNode + installNode + subscribeE at
+-- `thru-outer op nid ↠ κ` + pushBurst.  It is the same one-j-per-hop
+-- absorption subscribeInner-caps runs on: the chain gains one frame and
+-- the recursion pays one j for it (frameStep-chain-suc), so the
+-- extension fits under the stepped cap with room.  The initial node
+-- state's two bounds are hypotheses rather than derivations — the four
+-- *All heads supply them by `refl`, since every one of merge-st,
+-- concat-st [], switch-st and exhaust-st is trivially bounded on both
+-- axes.
+------------------------------------------------------------------
+
+-- a retagged event list is value-free by construction, so every caps
+-- conjunct on it is `refl`
+retagEvents-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (sl : Slots Γ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventCaps? {u = u} c sl) (retagEvents {B = Val Γ u} es) ≡ true
+retagEvents-caps c sl []                  = refl
+retagEvents-caps {u = u} c sl (value _   ∷ es) = retagEvents-caps {u = u} c sl es
+retagEvents-caps {u = u} c sl (init _    ∷ es) =
+  ∧-intro refl (retagEvents-caps {u = u} c sl es)
+retagEvents-caps {u = u} c sl (close _ _ ∷ es) =
+  ∧-intro refl (retagEvents-caps {u = u} c sl es)
+retagEvents-caps {u = u} c sl (handoff _ ∷ es) =
+  ∧-intro refl (retagEvents-caps {u = u} c sl es)
+retagEvents-caps {u = u} c sl (complete  ∷ es) =
+  ∧-intro refl (retagEvents-caps {u = u} c sl es)
+
+pushBurst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t) (str : Stream Γ s)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  frameSz? (Caps.cSize (frameStep j c)) f ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  burstCaps? (frameStep j c) sl str ≡ true →
+  let r = pushBurst g id now f κ str sched st
+  in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
+                          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+pushBurst-caps {u = u} c j g id now f κ [] sl sched st
+               2≤S 1≤R slEq slC inv fS pS lC bC =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
+            (sym (+-identityʳ j)) inv
+    , subst (λ x → burstCaps? {u = u} (frameStep x c) sl [] ≡ true)
+            (sym (+-identityʳ j)) refl
+pushBurst-caps {Γ = Γ} {s = s} {u = u} c j g id now f κ (em ∷ ems) sl sched st
+               2≤S 1≤R slEq slC inv fS pS lC bC =
+  j₁ + j₂
+    , frameStep-+assoc-caps c j j₁ j₂ (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST))
+        (proj₁ (proj₂ IH))
+    , frameStep-+assoc-burst c j j₁ j₂ sl
+        (((proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+             ++ map value (proj₁ step)
+             ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+           at InstEmit.instant em from InstEmit.source em as InstEmit.kind em)
+          ∷ proj₁ REST)
+        (∧-intro EMIT (proj₂ (proj₂ IH)))
+  where
+  E    = InstEmit.events em
+  sp   = splitEvents {A = Val Γ u} E
+  eC   = proj₁ (∧-true _ _ bC)
+  SF   = stepFrame-caps c j g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
+           2≤S 1≤R slEq slC inv fS pS lC
+           (splitEvents-vals-caps {u = u} (frameStep j c) sl E eC)
+  j₁   = proj₁ SF
+  step = stepFrame g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ step)))
+  ⊑₁   = frameStep-⊑-+ c 2≤S j j₁
+  IH   = pushBurst-caps c (j + j₁) g id now f κ ems sl sd₁ st₁ 2≤S 1≤R
+           (trans (KeepsC.slotsEq
+                    (stepFrame-keeps g id now f κ (proj₁ sp)
+                       (proj₂ (proj₂ sp)) sched st))
+                  slEq)
+           slC
+           (proj₁ (proj₂ SF))
+           (frameSz?-widen f (proj₁ ⊑₁) fS)
+           (pathSz?-⊑ κ ⊑₁ pS)
+           (≤-trans lC (proj₁ ⊑₁))
+           (burstCaps?-widen sl ems ⊑₁ (proj₂ (∧-true _ _ bC)))
+  j₂   = proj₁ IH
+  REST = pushBurst g id now f κ ems sd₁ st₁
+  ⊑₂   = frameStep-⊑-+ c 2≤S (j + j₁) j₂
+  EMIT : all (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+             (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                ++ map value (proj₁ step)
+                ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+           ≡ true
+  EMIT = all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+           (proj₁ (proj₂ sp)) _
+           (splitEvents-bk-caps {u = u} (frameStep ((j + j₁) + j₂) c) sl E)
+           (all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+              (retagEvents (proj₁ (proj₂ step))) _
+              (retagEvents-caps {u = u} (frameStep ((j + j₁) + j₂) c) sl
+                 (proj₁ (proj₂ step)))
+              (all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+                 (map value (proj₁ step)) _
+                 (mapValue-caps (frameStep ((j + j₁) + j₂) c) sl u (proj₁ step)
+                    (valsCaps?-widen sl u (proj₁ step) ⊑₂
+                       (proj₁ (proj₂ (proj₂ SF)))))
+                 (finList-caps (frameStep ((j + j₁) + j₂) c) sl
+                    (proj₁ (proj₂ (proj₂ step))))))
+
+-- THE *All HEAD.  One j for the thru-outer frame the chain gains, then
+-- the burst is pushed back through that same frame
+subscribeAll-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  boundedNode (Caps.cSize (frameStep (suc j) c)) ns ≡ true →
+  widNode (Caps.cWid (frameStep (suc j) c)) sl ns ≡ true →
+  sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+  dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  let r = subscribeAll g op ns b κ id now sched st
+  in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
+                          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
+                  2≤S 1≤R slEq slC inv bn wn szb wdb pC lC =
+  suc (j₁ + j₂)
+    , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
+            (sym (+-suc j (j₁ + j₂)))
+            (frameStep-+assoc-caps c (suc j) j₁ j₂
+               (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) (proj₁ (proj₂ PBc)))
+    , subst (λ x → burstCaps? (frameStep x c) sl (proj₁ PB) ≡ true)
+            (sym (+-suc j (j₁ + j₂)))
+            (frameStep-+assoc-burst c (suc j) j₁ j₂ sl (proj₁ PB)
+               (proj₂ (proj₂ PBc)))
+  where
+  nid    = Sched.nextNode sched
+  sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid ns st
+  κ′     = thru-outer op nid ↠ κ
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n j)
+  B′     = Caps.cSize (frameStep (suc j) c)
+  pC′ : pathSz? B′ κ′ ≡ true
+  pC′ = ∧-intro refl
+          (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                     (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
+                   (pathSz?-⊑ κ step⊑ pC))
+  inv₀ : capsOK? (frameStep (suc j) c) sched₀ st₀ ≡ true
+  inv₀ = capsOK?-setNode (frameStep (suc j) c) nid ns sched₀ st bn
+           (subst (λ y → widNode (Caps.cWid (frameStep (suc j) c)) y ns ≡ true)
+                  (sym slEq) wn)
+           (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
+              (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
+                                sched st inv))
+  SUB = subscribeE-caps c (suc j) g b κ′ id now sl sched₀ st₀ 2≤S 1≤R slEq slC inv₀
+          (≤-trans szb (proj₁ step⊑))
+          (≤-trans wdb (proj₁ (proj₂ step⊑)))
+          pC′
+          (frameStep-chain-suc c j (pathLen κ) 2≤S lC)
+  j₁  = proj₁ SUB
+  res = subscribeE g b κ′ id now sched₀ st₀
+  PBc = pushBurst-caps c (suc j + j₁) g id now (thru-outer op nid) κ (proj₁ res)
+          sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
+          (trans (KeepsC.slotsEq (subscribeE-keeps g b κ′ id now sched₀ st₀)) slEq)
+          slC (proj₁ (proj₂ SUB)) refl
+          (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S (suc j) j₁)
+             (pathSz?-⊑ κ step⊑ pC))
+          (≤-trans (≤-trans lC (proj₁ step⊑))
+                   (proj₁ (frameStep-⊑-+ c 2≤S (suc j) j₁)))
+          (proj₂ (proj₂ SUB))
+  j₂  = proj₁ PBc
+  PB  = pushBurst g id now (thru-outer op nid) κ (proj₁ res)
+          (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+------------------------------------------------------------------
 -- THE DELIVERY CLIQUE, GROUND.  foldPath / dispatchShare / shareGo,
 -- mutually recursive on the evaluator's own measure, plus chainStep as
 -- the arrival's entry point.
