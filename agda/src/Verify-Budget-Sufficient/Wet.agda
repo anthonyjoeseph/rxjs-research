@@ -4050,25 +4050,6 @@ postulate
                   (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- THE ROOT'S FUEL, at the moved anchor.  The old discharge
-  -- (dBound-bound + seed-covers + budget-hasAtLeast) measured the
-  -- demand at sizeBudgetAt, and does not apply now that the reset caps
-  -- are capsAt's own tower.  What is owed is a TOWER-HEIGHT
-  -- comparison, and the counts say it holds with room: budgetAt's gas
-  -- tower has height (7 + sz)·(id + 2) ≥ 16 at the root, while
-  -- sizeCapAt e ins 1 is a tower of height ≈ 6 in sz (capsAt's base is
-  -- two exponentials above the syntax and each frameBlowup adds about
-  -- one story) and hopR adds two more — so the demand sits around
-  -- height 8 against a budget at 16.  Proving it means bounding
-  -- Caps.cSize (capsAt e sl id) by towerℕ of a linear function of id,
-  -- which is the recurrence's own induction and belongs with the caps
-  -- face, not here.
-  caps-fuel-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    budgetAt e ins 0 hasAtLeast
-      suc (dBound (sizeCapAt e ins 1) (hopR (sizeCapAt e ins 1))
-                  (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) e)
-                  (syncSizeᵉ e))
-
 ------------------------------------------------------------------
 -- THE POP RING ON THE SIX-CONJUNCT FACE — PROVEN.  .Measures has the
 -- stBounded? projections (schedHeadOf-bounded / schedGo-bounded /
@@ -4229,6 +4210,69 @@ init-INV {n = n} e ins id =
   perSlotFc i = mkHot-fnCap ins Ψ i
                   (≤-trans (fᵢ≤sum-tab (λ j → slotFnCap (ins j)) i)
                            (m≤n+m (slotsFnCap ins) (fnCapᵉ e)))
+
+------------------------------------------------------------------
+-- THE ROOT'S FUEL, at the moved anchor — PROVEN, and it is a
+-- TOWER-HEIGHT comparison, nothing more.  The old discharge
+-- (dBound-bound + seed-covers + budget-hasAtLeast) measured the demand
+-- at sizeBudgetAt and does not apply now that the reset caps are
+-- capsAt's own recurrence; what replaces seed-covers is capsAt-tower
+-- (.Caps), which lands `sizeCapAt e ins 1` at tower height
+-- capsH e ins 1 = 11 + sz.  prod≤3pow then costs THREE more stories
+-- (the (1+V)(1+R)(1+U) product with R = hopR V), for 14 + sz — against
+-- budgetAt's own gas tower at height (7 + sz)·2 = 14 + 2·sz.  The
+-- margin is sz stories, and every story is an exponential.
+------------------------------------------------------------------
+
+-- ABSTRACT, and deliberately: this is the ONE member of the burst
+-- chain that went from postulate to definition, and an unfoldable
+-- body here is a body Verify-Well-Formed's `with` on
+-- budget-sufficient can be asked to reduce.  Nothing needs to see
+-- through it — every consumer wants the hasAtLeast, never its proof.
+abstract
+  caps-fuel-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    budgetAt e ins 0 hasAtLeast
+      suc (dBound (sizeCapAt e ins 1) (hopR (sizeCapAt e ins 1))
+                  (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) e)
+                  (syncSizeᵉ e))
+  caps-fuel-root e ins =
+    hasAtLeast-mono demand (budget-hasAtLeast sz 0)
+    where
+    sz : ℕ
+    sz = sizeᵉ e + slotsSize ins
+    V  : ℕ
+    V  = sizeCapAt e ins 1
+    U  : ℕ
+    U  = unconn ins []
+    6≤V : 6 ≤ V
+    6≤V = 6≤capsAt-size e ins 0
+    sz≤V : sizeᵉ e ≤ V
+    sz≤V = size≤sizeCapAt e ins 1
+    U≤V : U ≤ V
+    U≤V = ≤-trans (unconn≤slots ins [])
+                  (≤-trans (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
+                           (capsAt-base-size e ins 1))
+    s≤V : syncSizeᵉ e ≤ V
+    s≤V = ≤-trans (syncSize≤sizeᵉ e) sz≤V
+    r≤R : hopDᵉ V e ≤ hopR V
+    r≤R = hopD-cap V e (≤-trans (≤ᵇ⇒≤ 2 6 _) 6≤V) sz≤V
+    heights : 3 + capsH e ins 1 ≤ (7 + sz) * 2
+    heights = ≤-trans (≤-reflexive eqL)
+              (≤-trans (+-monoʳ-≤ 14 (m≤m+n sz sz)) (≤-reflexive (sym eqR)))
+      where
+      eqL : 3 + ((7 + sz) + 4 * 1) ≡ 14 + sz
+      eqL = solve 1 (λ v → con 3 :+ ((con 7 :+ v) :+ con 4 :* con 1)
+                             := con 14 :+ v) refl sz
+      eqR : (7 + sz) * 2 ≡ 14 + (sz + sz)
+      eqR = solve 1 (λ v → (con 7 :+ v) :* con 2 := con 14 :+ (v :+ v)) refl sz
+    demand : suc (dBound V (hopR V) U (hopDᵉ V e) (syncSizeᵉ e))
+               ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
+    demand =
+      ≤-trans (s≤s (dBound-bound s≤V r≤R))
+      (≤-trans (prod≤3pow V U 6≤V U≤V)
+      (≤-trans (tower-3 (capsH e ins 1) V (proj₁ (capsAt-tower e ins 1)))
+      (≤-trans (towerℕ-mono heights)
+               (m≤n+m (towerℕ ((7 + sz) * 2)) (2 ^ (sz * 1 * 1))))))
 
 ------------------------------------------------------------------
 -- the burst cores — the contract instantiated at the root.  The root

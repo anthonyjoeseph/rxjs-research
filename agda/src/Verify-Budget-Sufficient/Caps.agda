@@ -4,7 +4,9 @@
 -- their iterates), frameStep, frameBlowup, the recurrence capsAt, the
 -- j-monotonicity toolkit, and the supply lemmas that read a level off
 -- the recurrence (2≤capsAt-size, 1≤capsAt-reg, cSize≤frameBlowup,
--- capsAt-base-size, cWid≤frameBlowup, capsAt-base-wid).
+-- capsAt-base-size, cWid≤frameBlowup, capsAt-base-wid) — and the TOWER
+-- BOUND capsAt-tower, which says how fast the recurrence can climb: four
+-- tower levels per instant, no more.
 --
 -- WHY IT IS ITS OWN MODULE — the .Keeps-Ring precedent, applied a second
 -- time.  .Wet reads the caps recurrence (its store bound and its reset
@@ -25,16 +27,20 @@ module Verify-Budget-Sufficient.Caps where
 
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_;
                                 _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
-                                       +-assoc; +-comm; *-suc;
-                                       *-monoˡ-≤; *-monoʳ-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive;
+                                       +-assoc; +-comm; *-suc; *-assoc;
+                                       *-monoˡ-≤; *-monoʳ-≤; *-mono-≤;
+                                       +-monoˡ-≤; +-monoʳ-≤; +-identityʳ;
                                        m≤m+n; m≤n+m; n≤1+n; m≤m*n;
                                        ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤;
+                                       ^-*-assoc; ^-distribˡ-+-*; *-comm;
                                        *-distribˡ-+; *-identityʳ;
                                        *-identityˡ; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_×_; _,_)
+open import Data.Nat.Solver     using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; cong; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; cong; subst; module ≡-Reasoning)
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Frame-Width using (pWᵉ; slotsPW; slotsIW)
@@ -496,3 +502,256 @@ capsAt-base-wid {n = n} e sl zero =
 capsAt-base-wid e sl (suc id) =
   ≤-trans (capsAt-base-wid e sl id)
           (cWid≤frameBlowup (capsAt e sl id) (2≤capsAt-size e sl id))
+
+------------------------------------------------------------------
+-- THE RECURRENCE UNDER A TOWER — the last supply lemma, and the one
+-- the ROOT'S FUEL needs.  capsAt is Ackermann-flavoured in `id`, but
+-- only barely: every level sits under a tower of 2s whose HEIGHT is
+-- LINEAR in the instant, slope four, and the whole seed inequality is
+-- then a height comparison against budgetAt's own (7+sz)(id+2).
+--
+-- THE LEVEL-COST ACCOUNTING, per instant (one frameBlowup), against a
+-- level T = towerℕ m with cSize, cReg ≤ T and m ≥ 3 (so T ≥ 16):
+--
+--   THE COUNT      J = 2^cReg · 2^cReg · cSize ≤ 2^T · 2^T · 2^T
+--                    = 2^(3T) ≤ 2^(2^T)                    TWO stories
+--                  (three linear factors collapse into ONE exponential;
+--                   the second story is 3T ≤ 2^T, the T² gate)
+--   THE ITERATION  iterSize cSize J cSize ≤ (3T)^J · T ≤ 2^(T·(J+1))
+--                  and T·(J+1) ≤ (2T)·J ≤ towerℕ (3+m)     TWO stories
+--                  (one for the product T·J landing above the count,
+--                   one for the outer exponential)
+--   THE REGISTRY   cReg · suc (J · cSize) ≤ (2T) · towerℕ (3+m)
+--                                        ≤ towerℕ (4+m)    rides along
+--
+-- so FOUR, and that is the slope.  It is a fixed constant — no
+-- dependence on the program, the slot telescope, or the instant — which
+-- is exactly what a linear-slope tower needs to dominate; had the count
+-- itself needed a story per fold there would be no such bound and
+-- budgetAt's slope would be the design session's problem, not this
+-- module's.
+------------------------------------------------------------------
+
+-- one iteration is available once the count is nonzero
+iterSize-step≤ : ∀ (S s j : ℕ) → 1 ≤ S → 1 ≤ j →
+  sizeStep S s ≤ iterSize S j s
+iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
+
+3≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  3 ≤ Caps.cSize (capsAt e sl id)
+3≤capsAt-size e sl id =
+  ≤-trans (≤-trans (+-monoʳ-≤ 2 (sizeᵉ-pos e))
+                   (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+          (capsAt-base-size e sl id)
+
+6≤frameBlowup-size : ∀ (c : Caps) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
+  6 ≤ Caps.cSize (frameBlowup c)
+6≤frameBlowup-size c 1≤R 3≤S =
+  ≤-trans (*-mono-≤ 3≤S 2≤suc2S)
+          (iterSize-step≤ S S J (≤-trans (s≤s z≤n) 3≤S) 1≤J)
+  where
+  S = Caps.cSize c
+  R = Caps.cReg c
+  J = 2 ^ R * 2 ^ R * S
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 3≤S
+  2≤suc2S : 2 ≤ suc (2 * S)
+  2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
+  1≤J : 1 ≤ J
+  1≤J = *-mono-≤ (*-mono-≤ (1≤2^ R) (1≤2^ R)) 1≤S
+
+6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  6 ≤ Caps.cSize (capsAt e sl (suc id))
+6≤capsAt-size e sl id =
+  6≤frameBlowup-size (capsAt e sl id) (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
+
+------------------------------------------------------------------
+-- THE TOWER BOUND ON THE RECURRENCE.  Every level of capsAt sits under
+-- a tower of 2s whose HEIGHT is linear in the instant — slope FOUR,
+-- which is what one frameBlowup costs, counted below.
+------------------------------------------------------------------
+
+-- two quantities under one tower level multiply within the NEXT level:
+-- T² ≤ (2+T)² ≤ 2^T for T ≥ 6, and a tower level from 3 up is ≥ 16
+tower-mul : ∀ (m a b : ℕ) → 3 ≤ m → a ≤ towerℕ m → b ≤ towerℕ m →
+  a * b ≤ towerℕ (suc m)
+tower-mul m a b 3≤m ha hb =
+  ≤-trans (*-mono-≤ (≤-trans ha (m≤n+m (towerℕ m) 2))
+                    (≤-trans hb (m≤n+m (towerℕ m) 2)))
+          (sq≤2^ (towerℕ m) 6≤T)
+  where
+  6≤T : 6 ≤ towerℕ m
+  6≤T = ≤-trans (≤ᵇ⇒≤ 6 16 _) (towerℕ-mono {3} {m} 3≤m)
+
+k≤tower : ∀ (m k : ℕ) → 3 ≤ m → k ≤ 6 → k ≤ towerℕ m
+k≤tower m k 3≤m k≤6 =
+  ≤-trans k≤6 (≤-trans (≤ᵇ⇒≤ 6 16 _) (towerℕ-mono {3} {m} 3≤m))
+
+-- the two linear multiples the count needs, each within one level
+2T≤ : ∀ (m : ℕ) → 3 ≤ m → 2 * towerℕ m ≤ towerℕ (suc m)
+2T≤ m 3≤m = tower-mul m 2 (towerℕ m) 3≤m (k≤tower m 2 3≤m (≤ᵇ⇒≤ 2 6 _)) ≤-refl
+
+3T≤ : ∀ (m : ℕ) → 3 ≤ m → 3 * towerℕ m ≤ towerℕ (suc m)
+3T≤ m 3≤m = tower-mul m 3 (towerℕ m) 3≤m (k≤tower m 3 3≤m (≤ᵇ⇒≤ 3 6 _)) ≤-refl
+
+-- 1 ≤ x^k for 1 ≤ x
+1≤pow≤ : ∀ (x k : ℕ) → 1 ≤ x → 1 ≤ x ^ k
+1≤pow≤ x zero    h = ≤-refl
+1≤pow≤ x (suc k) h = *-mono-≤ h (1≤pow≤ x k h)
+
+-- ONE FOLD's SIZE STEP, iterated: j steps under a uniform cap M cost a
+-- FACTOR (3M) each — sizeStep S s = S(1+2s) ≤ M·3s once s ≥ 1
+iterSize-pow : ∀ (S M j s : ℕ) → 1 ≤ M → S ≤ M → s ≤ M →
+  iterSize S j s ≤ (3 * M) ^ j * M
+iterSize-pow S M zero    s 1≤M hS hsz = ≤-trans hsz (m≤m+n M 0)
+iterSize-pow S M (suc j) s 1≤M hS hsz =
+  ≤-trans (≤-reflexive (iterSize-suc S j s))
+  (≤-trans (*-mono-≤ hS (s≤s (*-monoʳ-≤ 2 ih)))
+  (≤-trans (*-monoʳ-≤ M sucY)
+           (≤-reflexive shape)))
+  where
+  Y = (3 * M) ^ j * M
+  ih : iterSize S j s ≤ Y
+  ih = iterSize-pow S M j s 1≤M hS hsz
+  1≤Y : 1 ≤ Y
+  1≤Y = *-mono-≤ (1≤pow≤ (3 * M) j (*-mono-≤ (≤ᵇ⇒≤ 1 3 _) 1≤M)) 1≤M
+  sucY : suc (2 * Y) ≤ 3 * Y
+  sucY = ≤-trans (+-monoˡ-≤ (2 * Y) 1≤Y) (≤-reflexive (solve 1 idY refl Y))
+    where idY = λ y → y :+ (y :+ (y :+ con 0)) := con 3 :* y
+  shape : M * (3 * Y) ≡ (3 * M) ^ suc j * M
+  shape = trans (solve 2 (λ m y → m :* (con 3 :* y) := (con 3 :* m) :* y)
+                       refl M Y)
+                (sym (*-assoc (3 * M) ((3 * M) ^ j) M))
+
+-- ONE INSTANT COSTS FOUR STORIES.  The count J = 2^R·2^R·S is two
+-- (three linear factors under one exponential, then 3T ≤ 2^T); the
+-- ITERATION is two more (a factor (3T) per fold, J folds, and T·J
+-- lands one level above the count).  cReg's linear-in-J growth is
+-- cheaper and rides along.
+blowup-tower : ∀ (m : ℕ) (c : Caps) → 3 ≤ m →
+  1 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cSize c ≤ towerℕ m → Caps.cReg c ≤ towerℕ m →
+  (Caps.cSize (frameBlowup c) ≤ towerℕ (4 + m))
+  × (Caps.cReg  (frameBlowup c) ≤ towerℕ (4 + m))
+blowup-tower m c 3≤m 1≤S 1≤R hS hR = sizeGoal , regGoal
+  where
+  S = Caps.cSize c
+  R = Caps.cReg c
+  Tw = towerℕ m
+  J = 2 ^ R * 2 ^ R * S
+
+  1≤Tw : 1 ≤ Tw
+  1≤Tw = ≤-trans 1≤S hS
+
+  1≤J : 1 ≤ J
+  1≤J = *-mono-≤ (*-mono-≤ (1≤2^ R) (1≤2^ R)) 1≤S
+
+  Tw≤2^Tw : Tw ≤ 2 ^ Tw
+  Tw≤2^Tw = <⇒≤ (n<2^n Tw)
+
+  -- the count sits two stories up
+  J≤P : J ≤ towerℕ (2 + m)
+  J≤P =
+    ≤-trans (*-mono-≤ (*-mono-≤ (^-monoʳ-≤ 2 hR) (^-monoʳ-≤ 2 hR))
+                      (≤-trans hS Tw≤2^Tw))
+    (≤-trans (≤-reflexive (sym split))
+             (^-monoʳ-≤ 2 (≤-trans (≤-reflexive (solve 1 id3 refl Tw)) (3T≤ m 3≤m))))
+    where
+    id3 = λ x → x :+ x :+ x := con 3 :* x
+    split : 2 ^ (Tw + Tw + Tw) ≡ 2 ^ Tw * 2 ^ Tw * 2 ^ Tw
+    split = trans (^-distribˡ-+-* 2 (Tw + Tw) Tw)
+                  (cong (_* 2 ^ Tw) (^-distribˡ-+-* 2 Tw Tw))
+
+  2T≤P : 2 * Tw ≤ towerℕ (2 + m)
+  2T≤P = ≤-trans (2T≤ m 3≤m) (towerℕ-mono (n≤1+n (suc m)))
+
+  2T≤Z : 2 * Tw ≤ towerℕ (3 + m)
+  2T≤Z = ≤-trans (2T≤ m 3≤m)
+                 (towerℕ-mono (≤-trans (n≤1+n (suc m)) (n≤1+n (2 + m))))
+
+  -- SIZE: (3T) per fold, J folds, and one story to land the product
+  sizeGoal : Caps.cSize (frameBlowup c) ≤ towerℕ (4 + m)
+  sizeGoal =
+    ≤-trans (iterSize-pow S Tw J S 1≤Tw hS hS)
+    (≤-trans (*-monoʳ-≤ ((3 * Tw) ^ J) (m≤m+n Tw (Tw + (Tw + 0))))
+    (≤-trans (≤-reflexive (*-comm ((3 * Tw) ^ J) (3 * Tw)))
+    (≤-trans (^-monoˡ-≤ (suc J) (3T≤ m 3≤m))
+    (≤-trans (≤-reflexive (^-*-assoc 2 Tw (suc J)))
+             (^-monoʳ-≤ 2 expo)))))
+    where
+    Tw≤TJ : Tw ≤ Tw * J
+    Tw≤TJ = ≤-trans (≤-reflexive (sym (*-identityʳ Tw))) (*-monoʳ-≤ Tw 1≤J)
+    expo : Tw * suc J ≤ towerℕ (3 + m)
+    expo =
+      ≤-trans (≤-reflexive (*-suc Tw J))
+      (≤-trans (+-monoˡ-≤ (Tw * J) Tw≤TJ)
+      (≤-trans (≤-reflexive (solve 2 (λ x y → x :* y :+ x :* y
+                                               := (con 2 :* x) :* y) refl Tw J))
+               (tower-mul (2 + m) (2 * Tw) J (≤-trans 3≤m (m≤n+m m 2)) 2T≤P J≤P)))
+
+  -- REGISTRATIONS: linear in the count, so one story below the size
+  regGoal : Caps.cReg (frameBlowup c) ≤ towerℕ (4 + m)
+  regGoal =
+    ≤-trans (*-mono-≤ hR (≤-trans sucJS (*-monoʳ-≤ 2 JS≤Z)))
+    (≤-trans (≤-reflexive (solve 2 (λ x y → x :* (con 2 :* y)
+                                             := (con 2 :* x) :* y) refl Tw
+                                 (towerℕ (3 + m))))
+             (tower-mul (3 + m) (2 * Tw) (towerℕ (3 + m))
+                        (≤-trans 3≤m (m≤n+m m 3)) 2T≤Z ≤-refl))
+    where
+    JS≤Z : J * S ≤ towerℕ (3 + m)
+    JS≤Z = tower-mul (2 + m) J S (≤-trans 3≤m (m≤n+m m 2)) J≤P
+             (≤-trans hS (≤-trans (towerℕ-mono (n≤1+n m))
+                                  (towerℕ-mono (n≤1+n (suc m)))))
+    1≤JS : 1 ≤ J * S
+    1≤JS = *-mono-≤ 1≤J 1≤S
+    sucJS : suc (J * S) ≤ 2 * (J * S)
+    sucJS = ≤-trans (+-monoˡ-≤ (J * S) 1≤JS)
+                    (≤-reflexive (solve 1 (λ y → y :+ y := con 2 :* y) refl (J * S)))
+
+-- THE TOWER HEIGHT of a caps level: linear in id, sized by the program
+-- and its slot telescope.  The base pays 3 + sz (the entry caps sit
+-- under towerℕ (3 + sz), and 3 keeps every level at ≥ towerℕ 3 = 16,
+-- tower-mul's side condition) plus the four stories of capsAt's own
+-- base frameBlowup; each further instant is four more
+capsH : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
+capsH e sl id = (7 + (sizeᵉ e + slotsSize sl)) + 4 * id
+
+capsAt-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  (Caps.cSize (capsAt e sl id) ≤ towerℕ (capsH e sl id))
+  × (Caps.cReg  (capsAt e sl id) ≤ towerℕ (capsH e sl id))
+capsAt-tower {n = n} e sl zero =
+  subst (λ k → (Caps.cSize (capsAt e sl 0) ≤ towerℕ k)
+             × (Caps.cReg  (capsAt e sl 0) ≤ towerℕ k))
+        (sym (+-identityʳ (7 + sz)))
+        (blowup-tower (3 + sz)
+          (caps (2 + sizeᵉ e + slotsSize sl)
+                (suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl))
+                (suc sz))
+          (m≤m+n 3 sz) (s≤s z≤n) (s≤s z≤n)
+          (≤-trans (n≤1+n (2 + sz)) (k≤towerℕ (3 + sz)))
+          (≤-trans (≤-trans (n≤1+n (suc sz)) (n≤1+n (2 + sz)))
+                   (k≤towerℕ (3 + sz))))
+  where sz = sizeᵉ e + slotsSize sl
+capsAt-tower e sl (suc id) =
+  subst (λ k → (Caps.cSize (capsAt e sl (suc id)) ≤ towerℕ k)
+             × (Caps.cReg  (capsAt e sl (suc id)) ≤ towerℕ k))
+        (sym step)
+        (blowup-tower (capsH e sl id) (capsAt e sl id)
+          3≤H
+          (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+          (1≤capsAt-reg e sl id)
+          (proj₁ (capsAt-tower e sl id))
+          (proj₂ (capsAt-tower e sl id)))
+  where
+  sz = sizeᵉ e + slotsSize sl
+  3≤H : 3 ≤ capsH e sl id
+  3≤H = ≤-trans (≤ᵇ⇒≤ 3 7 _)
+                (≤-trans (m≤m+n 7 sz) (m≤m+n (7 + sz) (4 * id)))
+  step : capsH e sl (suc id) ≡ 4 + capsH e sl id
+  step = solve 2 (λ a i → a :+ con 4 :* (con 1 :+ i) := con 4 :+ (a :+ con 4 :* i))
+                 refl (7 + sz) id
+
+-- three stories on top of a tower height is three more levels
+tower-3 : ∀ (h x : ℕ) → x ≤ towerℕ h → 2 ^ (2 ^ (2 ^ x)) ≤ towerℕ (3 + h)
+tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
