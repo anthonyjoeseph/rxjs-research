@@ -98,7 +98,8 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ; innWᵉ;
+open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
+                                outWᵉ; innWᵉ;
                                 slotPW; slotsPW; slotsPWgo;
                                 slotIW; slotsIW; slotsIWgo)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
@@ -1146,6 +1147,190 @@ slotsCaps?-bound {n = n} B W sl h hw hi =
              (⊔-lub (≤-trans (slotsPW-lb n sl i) hw)
                     (≤-trans (slotsIW-lb n sl i) hi))
              (slotCaps?-self sl (sl i)))
+
+------------------------------------------------------------------
+-- THE WIDTH HALF OF THE EVAL CLUSTER — ONE foldStep PER SYNTAX NODE.
+--
+-- Every one of the five evaluation obligations concludes `valCaps?`,
+-- whose second conjunct is a WIDTH, and none of them carries a width
+-- hypothesis that reaches it: an evaluated value is FRESH SYNTAX, so
+-- its width has to come out of its SIZE.  That is affordable exactly
+-- because the two recurrences are different heights — `sizeStep` is
+-- multiplicative and `foldStep S w = S ^ suc w` is exponential — so the
+-- folds a size receipt already buys pay for the width outright.  Three
+-- pieces:
+--
+--   wid-iterFold        the width lemma: every width measure of an
+--                       expression is bounded by ONE foldStep per
+--                       syntax node, off a leaf bound M for the slot
+--                       telescope.  Eval-Growth-Probe §7 reads the
+--                       recurrence clause by clause — mapᵉ and the
+--                       *All family fit in one fold, `scanᵉ` needs two,
+--                       and its three children guarantee three.
+--   pWᵛ-iterFold        the same on a runtime VALUE, whose obs
+--                       components ARE expressions of exactly the size
+--                       sizeᵛ reports.
+--   valCaps?-fromSize   the bridge: a value bounded on the size axis at
+--                       level `j + a` is bounded on BOTH at
+--                       `j + (a + suc K)`, K the size cap there.
+--
+-- AND THE LEAF IS WHERE THE TELESCOPE COMES IN.  `input i` is a leaf of
+-- the syntax (`sizeᵉ (input i) = 1`) whose width measures descend into
+-- the slot instead, so the induction stops dead there unless the slot
+-- side condition supplies them — which is why slotCaps? carries an innW
+-- conjunct beside its pW one (Eval-Growth-Probe §8: a def with pW 0 and
+-- innW 3, so no W read off pW alone bounds it).
+------------------------------------------------------------------
+
+-- iterFold COMPOSES, exactly as iterSize does: a folds then b more is
+-- a + b folds
+iterFold-+ : ∀ (S a b w : ℕ) →
+  iterFold S (a + b) w ≡ iterFold S b (iterFold S a w)
+iterFold-+ S zero    b w = refl
+iterFold-+ S (suc a) b w = iterFold-+ S a b (foldStep S w)
+
+-- ONE FOLD ABSORBS A `suc` ON THE SEED, which is the whole reason the
+-- leaf bound may be read one above the width cap
+suc≤foldStep : ∀ (S w : ℕ) → 2 ≤ S → suc w ≤ foldStep S w
+suc≤foldStep S w hS = ≤-trans (<⇒≤ (n<2^n (suc w))) (^-monoˡ-≤ (suc w) hS)
+
+-- and iterFold is monotone in the SEED as well as in the count
+foldStep-mono-w : ∀ (S : ℕ) {w w′ : ℕ} → 2 ≤ S → w ≤ w′ →
+  foldStep S w ≤ foldStep S w′
+foldStep-mono-w (suc (suc S)) (s≤s (s≤s _)) le = ^-monoʳ-≤ (suc (suc S)) (s≤s le)
+
+iterFold-mono-w : ∀ (S k : ℕ) → 2 ≤ S → {w w′ : ℕ} → w ≤ w′ →
+  iterFold S k w ≤ iterFold S k w′
+iterFold-mono-w S zero    hS le = le
+iterFold-mono-w S (suc k) hS le = iterFold-mono-w S k hS (foldStep-mono-w S hS le)
+
+-- THE LIFT.  A width read at the seed `suc W` — the leaf bound the slot
+-- telescope supplies — is a width read at the cap `suc q` folds on.
+-- This is the one arithmetic step the five members' width halves are
+iterFold-lift : ∀ (S W K q : ℕ) → 2 ≤ S →
+  iterFold S K (suc W) ≤ iterFold S (suc q + K) W
+iterFold-lift S W K q hS =
+  ≤-trans (iterFold-mono-w S K hS
+             (≤-trans (suc≤foldStep S W hS)
+                      (iterFold-infl S hS q (foldStep S W))))
+          (≤-reflexive (sym (iterFold-+ S (suc q) K W)))
+
+-- the index arithmetic the bridge lands on
++-shuffle : ∀ (j a K : ℕ) → j + (a + suc K) ≡ suc (j + a) + K
++-shuffle j a K =
+  trans (cong (j +_) (+-suc a K))
+        (trans (+-suc j (a + K)) (cong suc (sym (+-assoc j a K))))
+
+-- WHAT AN `input` LEAF PRESENTS TO THE WIDTH INDUCTION.  Context
+-- polymorphic because the induction crosses a `deferᵉ`, which moves Δᵍ
+-- into Δ, and a `μᵉ`, which extends it
+SlotWid : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → Set
+SlotWid {n = n} {Γ = Γ} sl M =
+  ∀ {Δᵍ Δ Θ : List Ty} (i : Fin n) →
+    (outWᵉ n sl (input {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i) ≤ M)
+    × (innWᵉ n sl (input {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i) ≤ M)
+    × (dWᵉ n sl (input {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i) ≤ M)
+
+postulate
+  -- THE WIDTH LEMMA, in the shape Eval-Growth-Probe §7's clause
+  -- analysis forces: the induction is organised at the MAX of a node's
+  -- children rather than at their running sum, so every non-scanᵉ node
+  -- spends ONE foldStep and `scanᵉ` spends TWO — funded by the three
+  -- children a scanᵉ node carries, each at least one syntax node
+  -- (3 ≤ sizeᵉ (scanᵉ f z e)).  The receipt is still j′ = sizeᵉ,
+  -- syntax-linear
+  wid-iterFold : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (S M : ℕ) → 2 ≤ S →
+    (sl : Slots Γ) → SlotWid sl M → (e : Exp Γ Δᵍ Δ Θ t) →
+    (outWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+    × (innWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+    × (dWᵉ n sl e ≤ iterFold S (sizeᵉ e) M)
+
+  -- AND THE TELESCOPE SUPPLIES THE LEAF, at ONE above the width cap.
+  -- The shared branch is slotCaps?'s pW and innW conjuncts read one
+  -- CONNECT down — `outWᵉ (suc j) sl (input i)` is `outWᵉ j sl d`, one
+  -- fuel below what the conjunct states — and the scripted branch is the
+  -- constant 1 that outWᵉ / innWᵉ hand back for a data payload, which is
+  -- what the `suc` pays for
+  slotsCaps?-slotWid : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) →
+    slotsCaps? B W sl ≡ true → SlotWid sl (suc W)
+
+-- THE VALUE FACE of the width lemma.  A value's obs components ARE
+-- expressions, and sizeᵛ reports exactly their sizeᵉ, so the same count
+-- of folds covers a value
+pWᵛ-iterFold : ∀ {n} {Γ : Ctx n} (S M : ℕ) → 2 ≤ S →
+  (sl : Slots Γ) → SlotWid sl M → (u : Ty) (v : Val Γ u) →
+  pWᵛ n sl u v ≤ iterFold S (sizeᵛ u v) M
+pWᵛ-iterFold S M hS sl hI unitᵗ v = z≤n
+pWᵛ-iterFold S M hS sl hI boolᵗ v = z≤n
+pWᵛ-iterFold S M hS sl hI natᵗ  v = z≤n
+pWᵛ-iterFold {n = n} S M hS sl hI (s ×ᵗ u) (a , b) =
+  ⊔-lub (⊔-lub (≤-trans (m≤m⊔n (outWᵛ n sl s a) (dWᵛ n sl s a)) hA)
+               (≤-trans (m≤m⊔n (outWᵛ n sl u b) (dWᵛ n sl u b)) hB))
+        (⊔-lub (≤-trans (m≤n⊔m (outWᵛ n sl s a) (dWᵛ n sl s a)) hA)
+               (≤-trans (m≤n⊔m (outWᵛ n sl u b) (dWᵛ n sl u b)) hB))
+  where
+  hA = ≤-trans (pWᵛ-iterFold S M hS sl hI s a)
+               (iterFold-mono-count S M hS
+                  (≤-trans (m≤m+n (sizeᵛ s a) (sizeᵛ u b)) (n≤1+n _)))
+  hB = ≤-trans (pWᵛ-iterFold S M hS sl hI u b)
+               (iterFold-mono-count S M hS
+                  (≤-trans (m≤n+m (sizeᵛ u b) (sizeᵛ s a)) (n≤1+n _)))
+pWᵛ-iterFold S M hS sl hI (s +ᵗ u) (inj₁ a) =
+  ≤-trans (pWᵛ-iterFold S M hS sl hI s a)
+          (iterFold-mono-count S M hS (n≤1+n (sizeᵛ s a)))
+pWᵛ-iterFold S M hS sl hI (s +ᵗ u) (inj₂ b) =
+  ≤-trans (pWᵛ-iterFold S M hS sl hI u b)
+          (iterFold-mono-count S M hS (n≤1+n (sizeᵛ u b)))
+pWᵛ-iterFold S M hS sl hI (obs u) e =
+  ⊔-lub (proj₁ (wid-iterFold S M hS sl hI e))
+        (proj₂ (proj₂ (wid-iterFold S M hS sl hI e)))
+
+-- THE BRIDGE, and it is the whole content of the five members' width
+-- halves: a value bounded on the SIZE axis at level `j + a` is bounded
+-- on BOTH at `j + (a + suc K)`, K the size cap at that level
+valCaps?-fromSize : ∀ {n} {Γ : Ctx n} (c : Caps) (j a : ℕ) (sl : Slots Γ) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  (u : Ty) (v : Val Γ u) →
+  sizeᵛ u v ≤ Caps.cSize (frameStep (j + a) c) →
+  valCaps? (frameStep (j + (a + suc (Caps.cSize (frameStep (j + a) c)))) c)
+           sl u v ≡ true
+valCaps?-fromSize {n = n} c j a sl 2≤S slC u v hsz =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ SZ)) (T⇒≡true _ (≤⇒≤ᵇ WD))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  K = Caps.cSize (frameStep (j + a) c)
+  SZ : sizeᵛ u v ≤ Caps.cSize (frameStep (j + (a + suc K)) c)
+  SZ = ≤-trans hsz (iterSize-mono-count S S (≤-trans (s≤s z≤n) 2≤S)
+                      (+-monoʳ-≤ j (m≤m+n a (suc K))))
+  WD : pWᵛ n sl u v ≤ Caps.cWid (frameStep (j + (a + suc K)) c)
+  WD = subst (λ x → pWᵛ n sl u v ≤ iterFold S x W) (sym (+-shuffle j a K))
+         (≤-trans (≤-trans (pWᵛ-iterFold S (suc W) 2≤S sl
+                              (slotsCaps?-slotWid S W sl slC) u v)
+                           (iterFold-mono-count S (suc W) 2≤S hsz))
+                  (iterFold-lift S W K (j + a) 2≤S))
+
+-- the same bridge on an EXPRESSION, for the μ edge — whose conclusion
+-- is a raw dWᵉ rather than a valCaps?
+expWid-fromSize : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps) (j a : ℕ)
+  (sl : Slots Γ) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  (e : Exp Γ Δᵍ Δ Θ t) →
+  sizeᵉ e ≤ Caps.cSize (frameStep (j + a) c) →
+  dWᵉ n sl e
+    ≤ Caps.cWid (frameStep (j + (a + suc (Caps.cSize (frameStep (j + a) c)))) c)
+expWid-fromSize {n = n} c j a sl 2≤S slC e hsz =
+  subst (λ x → dWᵉ n sl e ≤ iterFold S x W) (sym (+-shuffle j a K))
+    (≤-trans (≤-trans (proj₂ (proj₂ (wid-iterFold S (suc W) 2≤S sl
+                                       (slotsCaps?-slotWid S W sl slC) e)))
+                      (iterFold-mono-count S (suc W) 2≤S hsz))
+             (iterFold-lift S W K (j + a) 2≤S))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  K = Caps.cSize (frameStep (j + a) c)
 
 ------------------------------------------------------------------
 -- THE WIDENING TOOLKIT, stated here rather than inlined per clause.
@@ -3644,8 +3829,8 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
                 2≤S 1≤R slEq slC inv pS lC vC
 
 ------------------------------------------------------------------
--- AND THE TWO CLAUSES THAT DO BUILD VALUES, POSTULATED — with what the
--- grind found out about what they can cost.
+-- AND THE TWO CLAUSES THAT DO BUILD VALUES, GROUND — over the size
+-- receipt and the width bridge above.
 --
 -- map-f and scan-f are the only clauses of stepFrame that call
 -- `applyFn`, and `applyFn fn v` is `evalWith fn (v ∷ [])`: not a
@@ -3672,11 +3857,11 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
 -- a tower, and evalWith-sharp only moves the exponent to
 -- `3 ^ caseWᵗ fn`.
 --
--- THE STATEMENTS ARE STILL TRUE, because j′ is EXISTENTIAL and
--- iterSize runs away faster than the clause does: sizeStep S s ≥ 2 + 4s
--- for S ≥ 2, so iterSize S j′ s ≥ 4 ^ j′ * s and a j′ of order
--- 3 ^ cSize covers the tower.  What is NOT true is that the receipt is
--- one fold per frame.
+-- AND THAT IS WHAT applyFn-iterSize PAYS, PROVEN: the receipt is one
+-- fold per node of the STEP FUNCTION, `sizeᵗ fn`, with the payload's
+-- own size as the seed — Eval-Growth-Probe §6 gates it at the worst
+-- admissible base S = 1 on the very family above.  What is NOT true is
+-- that the receipt is one fold per FRAME.
 --
 -- SO THE COST MOVES, IT DOES NOT VANISH, AND IT LANDS ON
 -- cascadeGo-charge — `j ≤ D * cSize`, one delivery's frames times a
@@ -3690,30 +3875,124 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
 -- applyFn — instead of being buried in the hub clause
 ------------------------------------------------------------------
 
-postulate
-  -- ONE map-f FRAME.  Every payload is mapped independently, so nothing
-  -- composes and the whole list costs one clause's worth of folds
-  mapFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-    (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
-    2 ≤ Caps.cSize c →
-    (sizeᵗ fn ≤ᵇ Caps.cSize (frameStep j c)) ≡ true →
-    all (valCaps? (frameStep j c) sl s) vals ≡ true →
-    Σ ℕ λ j′ →
-      all (valCaps? (frameStep (j + j′) c) sl u) (map (applyFn fn) vals) ≡ true
+-- ONE map-f FRAME, GROUND.  Every payload is mapped independently, so
+-- nothing composes and the whole list costs one clause's worth of folds:
+-- applyFn-iterSize reads the receipt off the STEP FUNCTION's syntax with
+-- the payload's own size as the seed, and valCaps?-fromSize turns that
+-- one size bound into both halves.  The receipt is `sizeᵗ fn` folds for
+-- the size and the size cap itself for the width
+mapFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  (sizeᵗ fn ≤ᵇ Caps.cSize (frameStep j c)) ≡ true →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  Σ ℕ λ j′ →
+    all (valCaps? (frameStep (j + j′) c) sl u) (map (applyFn fn) vals) ≡ true
+mapFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC fS vC =
+  (a + suc K) , go vals vC
+  where
+  S   = Caps.cSize c
+  B   = Caps.cSize (frameStep j c)
+  a   = sizeᵗ fn
+  K   = Caps.cSize (frameStep (j + a) c)
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  one : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
+        sizeᵛ u (applyFn fn v) ≤ Caps.cSize (frameStep (j + a) c)
+  one v hv =
+    ≤-trans (applyFn-iterSize S B 1≤S fn v
+               (≤ᵇ⇒≤ (sizeᵛ s v) B
+                  (T-to (valCaps?-size (frameStep j c) sl s v hv))))
+            (≤-reflexive (sym (iterSize-+ S j a S)))
+  go : (vs : List (Val Γ s)) → all (valCaps? (frameStep j c) sl s) vs ≡ true →
+       all (valCaps? (frameStep (j + (a + suc K)) c) sl u)
+           (map (applyFn fn) vs) ≡ true
+  go []       h = refl
+  go (v ∷ vs) h
+    with ∧-true (valCaps? (frameStep j c) sl s v)
+                (all (valCaps? (frameStep j c) sl s) vs) h
+  ... | hd , tl =
+    ∧-intro (valCaps?-fromSize c j a sl 2≤S slC u (applyFn fn v) (one v hd))
+            (go vs tl)
 
-  -- ONE scan-f FRAME.  Here the folds DO compose — scanVals threads the
-  -- accumulator, so payload i is `applyFn` applied i times — and the
-  -- accumulator has to come back bounded too, because it is reinstalled
-  scanFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u) (vals : List (Val Γ s)) →
-    2 ≤ Caps.cSize c →
-    (sizeᵗ fn ≤ᵇ Caps.cSize (frameStep j c)) ≡ true →
-    valCaps? (frameStep j c) sl u acc ≡ true →
-    all (valCaps? (frameStep j c) sl s) vals ≡ true →
-    Σ ℕ λ j′ →
-      (all (valCaps? (frameStep (j + j′) c) sl u)
-           (proj₁ (scanVals fn acc vals)) ≡ true)
-      × (valCaps? (frameStep (j + j′) c) sl u (proj₂ (scanVals fn acc vals)) ≡ true)
+-- ONE scan-f FRAME'S SIZE LADDER.  Here the folds DO compose — scanVals
+-- threads the accumulator, so payload i is `applyFn` applied i times —
+-- and each rung costs one PAIRING plus one step function: the arriving
+-- payload is paired with the stored accumulator before the step runs,
+-- which is exactly one sizeStep, so a rung is `suc (sizeᵗ fn)` folds and
+-- the whole list is `length vals` of them
+scanVals-size : ∀ {n} {Γ : Ctx n} {s u} (S B : ℕ) → 2 ≤ S →
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac0 : Val Γ u) (vals : List (Val Γ s)) →
+  sizeᵛ u ac0 ≤ B →
+  all (λ v → sizeᵛ s v ≤ᵇ B) vals ≡ true →
+  (all (λ w → sizeᵛ u w ≤ᵇ iterSize S (length vals * suc (sizeᵗ fn)) B)
+       (proj₁ (scanVals fn ac0 vals)) ≡ true)
+  × (sizeᵛ u (proj₂ (scanVals fn ac0 vals))
+       ≤ iterSize S (length vals * suc (sizeᵗ fn)) B)
+scanVals-size S B hS fn ac0 []       hac0 h = refl , hac0
+scanVals-size {s = s} {u = u} S B hS fn ac0 (v ∷ vs) hac0 h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ HEAD)) (proj₁ IH′) , proj₂ IH′
+  where
+  F    = sizeᵗ fn
+  B₁   = iterSize S (suc F) B
+  1≤S  = ≤-trans (s≤s z≤n) hS
+  split = ∧-true (sizeᵛ s v ≤ᵇ B) (all (λ x → sizeᵛ s x ≤ᵇ B) vs) h
+  hv   : sizeᵛ s v ≤ B
+  hv   = ≤ᵇ⇒≤ (sizeᵛ s v) B (T-to (proj₁ split))
+  hac0′ : sizeᵛ u (applyFn fn (ac0 , v)) ≤ B₁
+  hac0′ = applyFn-iterSize S (sizeStep S B) 1≤S fn (ac0 , v)
+            (≤-trans (s≤s (+-mono-≤ hac0 hv)) (pair≤sizeStep S B 1≤S))
+  hvs  = all-impl (λ x → sizeᵛ s x ≤ᵇ B) (λ x → sizeᵛ s x ≤ᵇ B₁)
+           (λ x → ≤ᵇ-widen (sizeᵛ s x) (iterSize-infl S 1≤S (suc F) B))
+           vs (proj₂ split)
+  IH   = scanVals-size S B₁ hS fn (applyFn fn (ac0 , v)) vs hac0′ hvs
+  eq   : iterSize S (length vs * suc F) B₁
+           ≡ iterSize S (suc F + length vs * suc F) B
+  eq   = sym (iterSize-+ S (suc F) (length vs * suc F) B)
+  IH′  = subst (λ X →
+                  (all (λ w → sizeᵛ u w ≤ᵇ X)
+                       (proj₁ (scanVals fn (applyFn fn (ac0 , v)) vs)) ≡ true)
+                  × (sizeᵛ u (proj₂ (scanVals fn (applyFn fn (ac0 , v)) vs)) ≤ X))
+               eq IH
+  HEAD : sizeᵛ u (applyFn fn (ac0 , v))
+           ≤ iterSize S (suc F + length vs * suc F) B
+  HEAD = ≤-trans hac0′
+           (subst (B₁ ≤_) eq (iterSize-infl S 1≤S (length vs * suc F) B₁))
+
+-- ONE scan-f FRAME, GROUND.  The accumulator has to come back bounded
+-- too, because it is reinstalled
+scanFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac0 : Val Γ u) (vals : List (Val Γ s)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  (sizeᵗ fn ≤ᵇ Caps.cSize (frameStep j c)) ≡ true →
+  valCaps? (frameStep j c) sl u ac0 ≡ true →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  Σ ℕ λ j′ →
+    (all (valCaps? (frameStep (j + j′) c) sl u)
+         (proj₁ (scanVals fn ac0 vals)) ≡ true)
+    × (valCaps? (frameStep (j + j′) c) sl u (proj₂ (scanVals fn ac0 vals)) ≡ true)
+scanFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC fS aC vC =
+  (a + suc K)
+    , all-impl (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
+               (valCaps? (frameStep (j + (a + suc K)) c) sl u)
+               (λ w hw → valCaps?-fromSize c j a sl 2≤S slC u w
+                           (conv (≤ᵇ⇒≤ (sizeᵛ u w) (iterSize S a B) (T-to hw))))
+               (proj₁ (scanVals fn ac0 vals)) (proj₁ SV)
+    , valCaps?-fromSize c j a sl 2≤S slC u (proj₂ (scanVals fn ac0 vals))
+        (conv (proj₂ SV))
+  where
+  S = Caps.cSize c
+  B = Caps.cSize (frameStep j c)
+  a = length vals * suc (sizeᵗ fn)
+  K = Caps.cSize (frameStep (j + a) c)
+  conv : ∀ {x} → x ≤ iterSize S a B → x ≤ Caps.cSize (frameStep (j + a) c)
+  conv h = ≤-trans h (≤-reflexive (sym (iterSize-+ S j a S)))
+  SV = scanVals-size S B 2≤S fn ac0 vals
+         (≤ᵇ⇒≤ (sizeᵛ u ac0) B
+            (T-to (valCaps?-size (frameStep j c) sl u ac0 aC)))
+         (all-impl (valCaps? (frameStep j c) sl s) (λ v → sizeᵛ s v ≤ᵇ B)
+            (λ v → valCaps?-size (frameStep j c) sl s v) vals vC)
 
 ------------------------------------------------------------------
 -- stepFrame-caps, GROUND.  Five clauses over the four leaves above and
@@ -3749,6 +4028,7 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (vals : List (Val Γ s)) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   Sched.slots sched ≡ sl →
   capsOK? (frameStep j c) sched st ≡ true →
   frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid) ≡ true →
@@ -3764,7 +4044,7 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
      × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ r)) ≡ true)
 stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
-                    2≤S slEq inv fS pS vC
+                    2≤S slC slEq inv fS pS vC
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
@@ -3792,7 +4072,7 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
      , refl
   where
   run = scanVals fn ac vals
-  SC  = scanFrame-caps c j sl fn ac vals 2≤S fS
+  SC  = scanFrame-caps c j sl fn ac vals 2≤S slC fS
           (∧-intro (proj₁ nb)
                    (subst (λ x → (pWᵛ _ x u ac ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                           slEq (proj₂ nb)))
@@ -3830,7 +4110,7 @@ stepFrame-caps c j g id now (map-f fn) κ vals fin sl sched st 2≤S 1≤R slEq 
      , proj₂ MP
      , refl
   where
-  MP = mapFrame-caps c j sl fn vals 2≤S fS vC
+  MP = mapFrame-caps c j sl fn vals 2≤S slC fS vC
   j′ = proj₁ MP
 
 -- SCAN: its own top-level lemma, as in the wet family — the nested
@@ -3838,7 +4118,7 @@ stepFrame-caps c j g id now (map-f fn) κ vals fin sl sched st 2≤S 1≤R slEq 
 -- clause of the general frame case
 stepFrame-caps c j g id now (scan-f fn nid) κ vals fin sl sched st
                2≤S 1≤R slEq slC inv fS pS lC vC =
-  stepFrame-scan-caps c j g id now fn nid κ vals fin sl sched st 2≤S slEq inv fS pS vC
+  stepFrame-scan-caps c j g id now fn nid κ vals fin sl sched st 2≤S slC slEq inv fS pS vC
 
 -- TAKE: a prefix and a cut, no folds
 stepFrame-caps c j g id now (take-f nid) κ vals fin sl sched st 2≤S 1≤R slEq slC inv fS pS lC vC =
@@ -4063,7 +4343,8 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
 ------------------------------------------------------------------
--- THE THREE OBLIGATIONS subscribeE-caps CANNOT DISCHARGE, NAMED.
+-- THE THREE CLAUSES subscribeE-caps CANNOT DISCHARGE IN PLACE, GROUND
+-- BESIDE IT.
 --
 -- Two of subscribeE's clauses BUILD VALUES BY EVALUATION and one
 -- REBUILDS ITS OWN SYNTAX, and all three land exactly where
@@ -4073,7 +4354,7 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
 -- only moves the exponent to `3 ^ caseWᵗ`).  So none of the three is
 -- `sizeᵛ ≤ sizeᵗ` and each wants an existential j′ of its own — which
 -- is affordable, because iterSize runs away faster than the clause
--- does, and is the same reason the two frame postulates are true.
+-- does, and is the same reason the two frame members are true.
 --
 -- Stated as tightly as the clauses consume them, so the difficulty has
 -- a NAME and a boundary — no state, no recursion, no chain, just the
@@ -4083,63 +4364,123 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
 -- that cost a refuted draft.  `unfoldμ body` is LARGER than `μᵉ body`
 -- on the size axis, and the width axis was assumed stable and is not:
 -- see the note on unfoldμ-caps below, and Hop-Descent-Probe's μwide,
--- which measures 0 ↦ 6.
+-- which measures 0 ↦ 6.  Both halves now come off ONE size receipt:
+-- size-unfoldμ (the μ's size squared) for the size, and the width
+-- bridge above for the width.
 ------------------------------------------------------------------
 
-postulate
-  -- `ofᵉ ts` bursts `map evalTm ts`.  Both halves of valCaps? are owed,
-  -- and the two hypotheses are exactly what `sizeᵉ (ofᵉ ts)` and
-  -- `dWᵉ (ofᵉ ts)` give — the latter DEFINITIONALLY, since
-  -- `dWᵉ j sl (ofᵉ ts) = dWᵗˢ j sl ts`
-  evalTms-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-    (ts : List (Tm Γ [] [] [] u)) →
-    2 ≤ Caps.cSize c →
-    sizeᵗˢ ts ≤ Caps.cSize (frameStep j c) →
-    dWᵗˢ n sl ts ≤ Caps.cWid (frameStep j c) →
-    Σ ℕ λ j′ → all (valCaps? (frameStep (j + j′) c) sl u)
-                   (map (λ tm → evalTm tm) ts) ≡ true
+-- `ofᵉ ts` bursts `map evalTm ts`, GROUND.  Both halves of valCaps? are
+-- owed and BOTH come off the size receipt: evalTm-iterSize spends one
+-- fold per syntax node from an EMPTY environment, and valCaps?-fromSize
+-- turns the size bound into the width one
+evalTms-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (ts : List (Tm Γ [] [] [] u)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  sizeᵗˢ ts ≤ Caps.cSize (frameStep j c) →
+  dWᵗˢ n sl ts ≤ Caps.cWid (frameStep j c) →
+  Σ ℕ λ j′ → all (valCaps? (frameStep (j + j′) c) sl u)
+                 (map (λ tm → evalTm tm) ts) ≡ true
+evalTms-caps {Γ = Γ} {u = u} c j sl ts 2≤S slC szb wdb =
+  (a + suc K) , go ts ≤-refl
+  where
+  S   = Caps.cSize c
+  a   = sizeᵗˢ ts
+  K   = Caps.cSize (frameStep (j + a) c)
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  one : (tm : Tm Γ [] [] [] u) → sizeᵗ tm ≤ a →
+        sizeᵛ u (evalTm tm) ≤ Caps.cSize (frameStep (j + a) c)
+  one tm h =
+    ≤-trans (≤-trans (evalTm-iterSize S 1≤S tm)
+                     (≤-trans (iterSize-mono-count S 0 1≤S h)
+                              (iterSize-mono-s S a z≤n)))
+            (≤-reflexive (sym (iterSize-+ S j a S)))
+  go : (vs : List (Tm Γ [] [] [] u)) → sizeᵗˢ vs ≤ a →
+       all (valCaps? (frameStep (j + (a + suc K)) c) sl u)
+           (map (λ tm → evalTm tm) vs) ≡ true
+  go []       h = refl
+  go (y ∷ ys) h =
+    ∧-intro (valCaps?-fromSize c j a sl 2≤S slC u (evalTm y)
+               (one y (≤-trans (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)) h)))
+            (go ys (≤-trans (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)) h))
 
-  -- `scanᵉ f seed b` installs `scan-st (evalTm seed)`: the same
-  -- statement for one term, and the accumulator has to come back
-  -- bounded on both axes because capsOK? reads it on both
-  evalSeed-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-    (z : Tm Γ [] [] [] u) →
-    2 ≤ Caps.cSize c →
-    sizeᵗ z ≤ Caps.cSize (frameStep j c) →
-    dWᵗ n sl z ≤ Caps.cWid (frameStep j c) →
-    Σ ℕ λ j′ → valCaps? (frameStep (j + j′) c) sl u (evalTm z) ≡ true
+-- `scanᵉ f seed b` installs `scan-st (evalTm seed)`: the same statement
+-- for one term, and the accumulator has to come back bounded on both
+-- axes because capsOK? reads it on both
+evalSeed-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (z : Tm Γ [] [] [] u) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  sizeᵗ z ≤ Caps.cSize (frameStep j c) →
+  dWᵗ n sl z ≤ Caps.cWid (frameStep j c) →
+  Σ ℕ λ j′ → valCaps? (frameStep (j + j′) c) sl u (evalTm z) ≡ true
+evalSeed-caps {u = u} c j sl z 2≤S slC szz wdz =
+  (a + suc K) , valCaps?-fromSize c j a sl 2≤S slC u (evalTm z) SZ
+  where
+  S   = Caps.cSize c
+  a   = sizeᵗ z
+  K   = Caps.cSize (frameStep (j + a) c)
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  SZ : sizeᵛ u (evalTm z) ≤ Caps.cSize (frameStep (j + a) c)
+  SZ = ≤-trans (≤-trans (evalTm-iterSize S 1≤S z) (iterSize-mono-s S a z≤n))
+               (≤-reflexive (sym (iterSize-+ S j a S)))
 
-  -- `μᵉ body` subscribes `unfoldμ body`, and BOTH AXES MOVE.  The size
-  -- axis was always going to: the unfolding is larger than the μ (only
-  -- syncSizeᵉ is preserved — syncSize-unfoldμ) by an amount no syntactic
-  -- measure in the file bounds.
-  --
-  -- THE WIDTH AXIS MOVES TOO, and the first draft of this said it did
-  -- not.  `dWᵉ (unfoldμ body) ≤ dWᵉ (μᵉ body)` reads plausible — the
-  -- plug lands at `varᵉ` positions and dWᵉ is 0 there — and it is
-  -- FALSE, refuted by Hop-Descent-Probe's μwide (0 ↦ 6).  hopD survives
-  -- an unfold because Δᵍ variables are reachable only under deferᵉ and
-  -- hopD CUTS a defer to 0; dW's whole reason to exist is that it does
-  -- NOT cut there, so the plug lands exactly where dW is looking and
-  -- exposes the μ's own outW — which dW does not bound.  Nor is it off
-  -- by a constant: k copies of the var in the template multiply through
-  -- innW's slope, so any true bound is affine in the plug's width with
-  -- the pmO/pmI coefficients, i.e. the hopD-subΘ machinery.
-  --
-  -- So the two axes are stated TOGETHER, at ONE existential j′ (which
-  -- is what the recursive call needs — both hypotheses at the same
-  -- level), and the width half is derived from the SIZE hypothesis the
-  -- telescope already carries rather than from the width one.  That is
-  -- affordable for the same reason the two frame postulates are:
-  -- iterFold is a tower in the cap and outW of an expression is a tower
-  -- in its size, so a large enough j′ covers it
-  unfoldμ-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ) (sl : Slots Γ)
-    (body : Exp Γ (t ∷ []) [] [] t) →
-    2 ≤ Caps.cSize c →
-    sizeᵉ (μᵉ body) ≤ Caps.cSize (frameStep j c) →
-    dWᵉ n sl (μᵉ body) ≤ Caps.cWid (frameStep j c) →
-    Σ ℕ λ j′ → (sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + j′) c))
-             × (dWᵉ n sl (unfoldμ body) ≤ Caps.cWid (frameStep (j + j′) c))
+-- `μᵉ body` subscribes `unfoldμ body`, and BOTH AXES MOVE.  The size
+-- axis was always going to: the unfolding is larger than the μ (only
+-- syncSizeᵉ is preserved — syncSize-unfoldμ) by an amount no syntactic
+-- measure in the file bounds.
+--
+-- THE WIDTH AXIS MOVES TOO, and the first draft of this said it did
+-- not.  `dWᵉ (unfoldμ body) ≤ dWᵉ (μᵉ body)` reads plausible — the
+-- plug lands at `varᵉ` positions and dWᵉ is 0 there — and it is
+-- FALSE, refuted by Hop-Descent-Probe's μwide (0 ↦ 6).  hopD survives
+-- an unfold because Δᵍ variables are reachable only under deferᵉ and
+-- hopD CUTS a defer to 0; dW's whole reason to exist is that it does
+-- NOT cut there, so the plug lands exactly where dW is looking and
+-- exposes the μ's own outW — which dW does not bound.  Nor is it off
+-- by a constant: k copies of the var in the template multiply through
+-- innW's slope, so any true bound is affine in the plug's width with
+-- the pmO/pmI coefficients, i.e. the hopD-subΘ machinery.
+--
+-- So the two axes are stated TOGETHER, at ONE existential j′ (which
+-- is what the recursive call needs — both hypotheses at the same
+-- level), and the width half is derived from the SIZE hypothesis the
+-- telescope already carries rather than from the width one.  That is
+-- affordable for the same reason the two frame postulates are:
+-- iterFold is a tower in the cap and outW of an expression is a tower
+-- in its size, so a large enough j′ covers it
+unfoldμ-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  sizeᵉ (μᵉ body) ≤ Caps.cSize (frameStep j c) →
+  dWᵉ n sl (μᵉ body) ≤ Caps.cWid (frameStep j c) →
+  Σ ℕ λ j′ → (sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + j′) c))
+           × (dWᵉ n sl (unfoldμ body) ≤ Caps.cWid (frameStep (j + j′) c))
+unfoldμ-caps c j sl body 2≤S slC szb wdb =
+  (a + suc K)
+    , ≤-trans SZ (iterSize-mono-count S S 1≤S
+                    (+-monoʳ-≤ j (m≤m+n a (suc K))))
+    , expWid-fromSize c j a sl 2≤S slC (unfoldμ body) SZ
+  where
+  S   = Caps.cSize c
+  B   = Caps.cSize (frameStep j c)
+  a   = suc B
+  K   = Caps.cSize (frameStep (j + a) c)
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  -- QUADRATIC, AND ONE ROUND OF DOUBLING PER NODE CLEARS IT: unfolding
+  -- plants the whole μ at each of the body's global-var positions
+  -- (size-unfoldμ, the shared prerequisite in .Keeps-Ring), so the
+  -- growth is the μ's size SQUARED — and iterSize at least doubles per
+  -- fold (iterSize-2^), so `suc B` folds cover a factor of B
+  quad : sizeᵉ (μᵉ body) * sizeᵉ (μᵉ body) ≤ iterSize S a B
+  quad = ≤-trans (*-mono-≤ szb szb)
+          (≤-trans (*-monoˡ-≤ B (n≤1+n B))
+            (≤-trans (*-monoˡ-≤ B (<⇒≤ (n<2^n (suc B))))
+                     (iterSize-2^ S a B 1≤S)))
+  SZ : sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + a) c)
+  SZ = ≤-trans (≤-trans (size-unfoldμ body) quad)
+               (≤-reflexive (sym (iterSize-+ S j a S)))
 
 ------------------------------------------------------------------
 -- subscribeE-caps, GROUND — the assembly knot, closed.
@@ -4183,7 +4524,7 @@ subscribeE-caps {n = n} {u = u} c j g (ofᵉ ts) κ bid now sl sched st
                      refl))
                refl
   where
-  EV = evalTms-caps c j sl ts 2≤S (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
+  EV = evalTms-caps c j sl ts 2≤S slC (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
   j₀ = proj₁ EV
 
 subscribeE-caps {u = u} c j g emptyᵉ κ bid now sl sched st
@@ -4335,7 +4676,7 @@ subscribeE-caps {n = n} {u = u} c j g (scanᵉ f z b) κ bid now sl sched st
   szf   = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) szfz
   szz   = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) szfz
   szb′  = ≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f + sizeᵗ z)) szsum
-  SD = evalSeed-caps c j sl z 2≤S szz
+  SD = evalSeed-caps c j sl z 2≤S slC szz
          (≤-trans (m≤n⊔m (dWᵗ n sl f) (dWᵗ n sl z))
            (≤-trans (m≤m⊔n (dWᵗ n sl f ⊔ dWᵗ n sl z) (dWᵉ n sl b)) wdb))
   j₀    = proj₁ SD
@@ -4427,7 +4768,7 @@ subscribeE-caps {n = n} c j (gs fuel) (μᵉ body) κ bid now sl sched st
         (proj₁ (proj₂ IH))
     , frameStep-+assoc-burst c j j₀ j₁ sl (proj₁ res) (proj₂ (proj₂ IH))
   where
-  US = unfoldμ-caps c j sl body 2≤S szb wdb
+  US = unfoldμ-caps c j sl body 2≤S slC szb wdb
   j₀ = proj₁ US
   ⊑₀ = frameStep-⊑-+ c 2≤S j j₀
   IH = subscribeE-caps c (j + j₀) fuel (unfoldμ body) κ bid now sl sched st

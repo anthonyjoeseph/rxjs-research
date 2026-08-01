@@ -63,7 +63,12 @@
 --                   cap does not carry: `innWᵉ` of a slot def.
 --                   slotCaps? bounds `sizeᵉ d` and `pWᵉ d` and nothing
 --                   else, and pW cannot be made to bound innW — here is
---                   a def with pW 0 and innW 3.
+--                   a def with pW 0 and innW 3.  REPAIRED: the shared
+--                   clause now carries the innW conjunct too.
+--   §9  THE FIVE MEMBERS, LANDED.  All five are ground in Caps-Face,
+--                   and these are the receipts they carry — the lift
+--                   that IS the width half, the μ edge's two halves on
+--                   §4's ladder, and the scan rung's composition.
 --
 -- Standalone (hand-built syntax only, no evaluator state), so
 -- src/Main.agda never reaches it: it needs its own make target.
@@ -614,6 +619,71 @@ iw-escapes-pW : (pWᵉ 1 ins1 iwDef <ᵇ innWᵉ 1 ins1 iwDef) ≡ true
 iw-escapes-pW = refl
 
 ------------------------------------------------------------------
+-- §9  THE FIVE MEMBERS, LANDED — the receipts they actually carry,
+-- gated.  All five are now GROUND in Caps-Face over three pieces:
+-- `wid-iterFold` (one foldStep per syntax node, §7's shape),
+-- `slotsCaps?-slotWid` (§8's leaf), and the size receipts §6 already
+-- gates.  What is new here is the ARITHMETIC each member's j′ is:
+--
+--     evalTms / evalSeed   j′ = sizeᵗ + suc K
+--     mapFrame             j′ = sizeᵗ fn + suc K
+--     scanFrame            j′ = length vals * suc (sizeᵗ fn) + suc K
+--     unfoldμ              j′ = suc B + suc K
+--
+-- with B the entry size cap and K the size cap at `j + a` — the width
+-- half is ALWAYS `suc K` more folds than the size half, because the
+-- width is read off the RESULT's size and iterFold outruns iterSize.
+------------------------------------------------------------------
+
+-- THE LIFT, which is the whole of the width half: a width read at the
+-- seed `suc W` — the leaf bound the slot telescope supplies — is a
+-- width read at the cap ONE fold on, so the bound slides up by the
+-- folds the size receipt already bought
+lift-gate-1 : (iterFold 2 1 1 ≤ᵇ iterFold 2 2 0) ≡ true   -- 4 against 8
+lift-gate-1 = refl
+lift-gate-2 : (iterFold 2 1 2 ≤ᵇ iterFold 2 2 1) ≡ true   -- 8 against 32
+lift-gate-2 = refl
+lift-gate-3 : (iterFold 2 2 1 ≤ᵇ iterFold 2 3 0) ≡ true   -- 32 against 512
+lift-gate-3 = refl
+
+-- unfoldμ-caps, THE SIZE HALF.  size-unfoldμ (now a shared prerequisite
+-- in .Keeps-Ring rather than a wet-side lemma) bounds the unfolding by
+-- the μ's size SQUARED, and `suc B` folds of iterSize cover a factor of
+-- B because each fold at least doubles (iterSize-2^)
+μ-size-receipt-4 : (sizeᵉ (unfoldμ μbody4)
+                      ≤ᵇ sizeᵉ (μᵉ μbody4) * sizeᵉ (μᵉ μbody4)) ≡ true
+μ-size-receipt-4 = refl                        -- 50 against 676
+
+μ-size-fits-4 : (sizeᵉ (μᵉ μbody4) * sizeᵉ (μᵉ μbody4)
+                   ≤ᵇ 2 ^ suc (sizeᵉ (μᵉ μbody4)) * sizeᵉ (μᵉ μbody4)) ≡ true
+μ-size-fits-4 = refl                           -- 676 against 26 * 2 ^ 27
+
+-- unfoldμ-caps, THE WIDTH HALF, on §4's ladder — the family that
+-- refuted every affine reading.  The landed bound is
+-- `dWᵉ (unfoldμ body) ≤ iterFold S (sizeᵉ (unfoldμ body)) (suc W)` read
+-- at the worst admissible S = 2 and W = 0, so the receipt buys FIFTY
+-- folds on μbody4.  Three already cover the ladder's whole measured
+-- range, (m+1) * 2 ^ (m+1) — which is what "the width half does not
+-- want an affine form" means once it is a theorem rather than a table
+μ-width-receipt-4 : (dWᵉ 1 ins1 (unfoldμ μbody4) ≤ᵇ iterFold 2 3 1) ≡ true
+μ-width-receipt-4 = refl                       -- 160 against 2 ^ 33
+
+μ-width-receipt-6 : (dWᵉ 1 ins1 (unfoldμ μbody6) ≤ᵇ iterFold 2 3 1) ≡ true
+μ-width-receipt-6 = refl                       -- 896 against 2 ^ 33
+
+-- scanFrame-caps, THE RUNG.  scanVals threads the accumulator, and each
+-- rung costs one PAIRING (the arriving payload is paired with the
+-- stored accumulator, exactly one sizeStep) plus one fold per node of
+-- the step function — so `suc (sizeᵗ fn)` per payload, `length vals` of
+-- them.  Gated as the composition it is: one rung off §2's k = 6 step
+-- function beats the value that refuted a single j
+scan-one-rung-6 : (dblV 6 ≤ᵇ iterSize 1 (1 * suc (sizeᵗ (fnDbl 6))) 1) ≡ true
+scan-one-rung-6 = refl
+
+scan-three-rungs-6 : (dblV 6 ≤ᵇ iterSize 1 (3 * suc (sizeᵗ (fnDbl 6))) 1) ≡ true
+scan-three-rungs-6 = refl
+
+------------------------------------------------------------------
 -- THE READING (2026-08-01).
 --
 -- AFFINE IS REFUTED ON ALL THREE AXES the ruling named, and none of
@@ -648,6 +718,14 @@ iw-escapes-pW = refl
 -- S = Caps.cSize c.  THE WIDTH HALF IS NOT THE SAME SHAPE: §7 reads the
 -- width recurrence clause by clause and finds exactly one constructor,
 -- `scanᵉ`, that one fold cannot dominate.
+--
+-- AND THE CLUSTER IS NOW LANDED (2026-08-01).  mapFrame-caps,
+-- scanFrame-caps, evalTms-caps, evalSeed-caps and unfoldμ-caps are all
+-- GROUND, over three pieces: the width lemma `wid-iterFold` (one
+-- foldStep per syntax node, §7's shape — the induction organised at the
+-- MAX of a node's children, one fold per non-scanᵉ node and two per
+-- scanᵉ, funded by its three children), the leaf `slotsCaps?-slotWid`
+-- (§8's repair), and the size receipts §6 gates.  §9 has the rows.
 --
 -- NOT MEASURED HERE, and flagged: whether a family exists whose
 -- required j′ exceeds sizeᵗ.  The scan clause's exponent base is
