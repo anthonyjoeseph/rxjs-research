@@ -3651,7 +3651,7 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- conses one `rid` onto `delivered`.  Then
 --
 --   (i)  cascadeGo-charge      j ≤ D * cSize
---   (ii) cascadeGo-deliveries  D ≤ 2 ^ cReg * 2 ^ cReg
+--   (ii) cascadeGo-deliveries  D ≤ D̂ c = 2 ^ (2 ^ cReg)
 --
 -- and `cascadeGo-caps` below is their product, by arithmetic and nothing
 -- else.  (i) is the per-delivery charge: every fold is a frame on some
@@ -3660,81 +3660,81 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- the shape `foldPath-caps` reports it.  (ii) is the delivery bound, and
 -- it is where all the difficulty is.
 --
--- (ii) WAS SPLIT AND THE SPLIT DIED, twice, in one session — which is
--- what stating it as an assembly was for.  The split sent a delivery to
--- the PAIR (which pre-state registrations its path visits, an index for
--- which minted ones it went through), with `preClasses ≤ 2 ^ cReg` on the
--- first coordinate and a DAMPER on the second.  Mint-Loop-Probe gave both
--- coordinates definitions and measured them:
+-- (ii) HAS NOW BEEN WRONG THREE TIMES, and the third correction is the
+-- only one that was PREDICTED before it was measured.  The history:
 --
---   · `fibreCap ≤ cSize` — the reasoning was that a mint happens inside
---     ONE frame and a frame's step function names no more sources than
---     its syntax holds.  Measured 4 against a cSize of 3 on the lean
---     two-level ladder.  Refuted.
---   · `fibreCap ≤ 2 ^ cReg` — the reasoning was that every mint happens
---     during some delivery and every delivery bottoms out at a pre-state
---     chain, so the second coordinate is pre-state data too.  It ATTAINS
---     128 against 128 on the three-level ladder and then reaches 576
---     against a cap of 512 on the four-level one.  Refuted.
+--   · `2 ^ cReg` — refuted, because `shareAdmit` reads the registry as
+--     of the dispatch, so the DAG the paths run through is the END
+--     registry.  Mint-Loop-Probe's three-level lean ladder at k = 2
+--     delivers 176 out of an entry registry of 7.
+--   · `2 ^ cReg * 2 ^ cReg` — the pair story (pre-state registrations
+--     visited × an index for the minted ones gone through).  Both
+--     decompositions of the second coordinate were measured false
+--     (fibreCap ≤ cSize: 4 against 3; fibreCap ≤ 2 ^ cReg: 576 against
+--     512), so the conjunct was stated whole and gated on
+--     Mint-Loop-Probe's rows and nothing else.
+--   · AND THE WHOLE SQUARE IS FALSE.  Delivery-Law-Prediction.md
+--     derived the delivery recurrence from the evaluator's structure
+--     and committed the L = 5 rows BEFORE measuring them; every
+--     checkable row then matched EXACTLY (3 D values, 2 increments, 3
+--     fire vectors, 3 delivery splits, 6 generation counts, 3 cReg, 3
+--     cSize, 2 mPre).  The law puts D(5,5) at 4514934 against
+--     `4 ^ cReg = 4194304`.
 --
--- AND THE FIRST COORDINATE IS FINE, which is what makes the split
--- pointless rather than merely unlucky.  `preClasses` measures 4, 10, 22,
--- 46 for entry registries of 3, 5, 7, 9 — about `2 ^ (cReg / 2)`, and
--- invariant in the nesting depth, because the pre-state classes really
--- are fixed by the pre-state DAG.  So D is (something small) times
--- (something the size of D): the split renames the problem instead of
--- decomposing it, and the second factor inherits every difficulty the
--- first was supposed to remove.  The delivery bound is therefore stated
--- WHOLE, and it is the single place the mint loop has to be beaten.
+-- SO THE BOUND IS A 2-TOWER, `D̂ c = 2 ^ (2 ^ cReg c)`, and the height
+-- is fixed at two on purpose: capsAt-tower's per-instant cost has to
+-- be a CONSTANT number of stories, and 2 ^ (2 ^ T) is exactly
+-- towerℕ (2 + level) — the level the old squared count already sat at,
+-- so the slope stays FOUR (Width-Count-Probe's `D̂-tower`, and .Caps's
+-- `sum-fits` for the cSize factor beside it).
 --
--- WHAT THE EVIDENCE FOR (ii) IS — AND IT IS WEAKER THAN THIS COMMENT
--- USED TO SAY.  The bound HOLDS on every row Mint-Loop-Probe and
--- Mint-Loop-Frames measure; no measurement refutes it.  That is all it
--- holds by.
+-- THE PROOF ROUTE, named because the shape of the law names it.  The
+-- measured law is binomial: mint generation g holds exactly
+-- `C(2 ^ L, g)` registrations, and slot-0 deliveries at nesting depth k
+-- are `Σ_{g=1}^{k+2} C(2 ^ L, g)`.  Binomial counts ARE subset counts,
+-- so the injection is: a minted registration's ANCESTRY — the chain of
+-- mint-edges back to the entry registry — is a SUBSET of the slot-0
+-- FIRE SCHEDULE, generation g ↦ g-subsets.  The fires are then bounded
+-- by the PRE-STATE DAG, which is where the inverted-pair argument
+-- belongs (it never worked applied to the deliveries directly, because
+-- mints track deliveries — 254 mints on a 269-delivery cascade — so
+-- `D ≤ 2 ^ R_end` is unusable).  The gate is the L ≤ 5 binomial law
+-- itself: the route must reproduce `ΔD(L, k→k+1) = C(2 ^ L, k+3)`.
 --
--- The claim that stood here — that the margin GROWS as the ladder
--- deepens, citing D / (2 ^ cReg * 2 ^ cReg) at 0.078, 0.026, 0.016,
--- 0.0097 — is FALSE, and it is instance 4 of Mint-Loop-Probe's STANDING
--- WARNING — DO NOT EXTRAPOLATE FROM SHALLOW ROWS, at that file's head.
--- Those four numbers compared each ladder at whatever k it had then been
--- swept to, and the four-level ladder had only been swept to k = 2.
--- Swept to k = 5 it spends 0.10056 — the WORST ratio in either file,
--- worse than the ONE-level ladder's 0.078 — so the sequence is
--- 0.078, 0.026, 0.016, 0.10056 and there is no trend in it at all.
--- `D * 10 ≤ 2 ^ cReg * 2 ^ cReg` is false at L = 4.
+-- WHAT IS STILL OPEN IN IT: the amplifier family.  "Fires never move"
+-- is a property of the measured ladders — their minting scan sits in
+-- the root program, so minted chains end at `root`.  A minting scan
+-- INSIDE a shared def would make minted registrations one-shot FIRES of
+-- that share, and fires would beget registrations beget fires.  Either
+-- that family is bounded (plausibly a tower of height ≤ the slot count,
+-- which dispatch gas already caps at n) or it is structurally tame; it
+-- is the next measurement target and it is NOT covered by any row this
+-- bound currently stands on.
 --
--- AND THE DEEPEST AFFORDABLE ROW IS NOT SATURATED.  L = 3 has flattened
--- by k = 5 (under 1 % per rung), but L = 4's per-rung growth runs 4.37,
--- 3.51, 2.72, 2.16, 1.77 — decelerating, and still buying 77 % at the
--- last rung either harness can compute.  k = 6 was killed at 40 minutes
--- and 12.4 GB.  So the spend is at a tenth of budget while still
--- climbing, and the per-level trend (L = 3 saturated at 0.016, L = 4
--- unsaturated at ≥ 0.10) points the wrong way: a breach at L = 5 or
--- L = 6 is expected rather than excluded.
+-- THE FEEDBACK LOOP BEHIND ALL OF THIS IS MEASURED AND DOES NOT TOWER
+-- IN THE NESTING DEPTH.  Mint-Loop-Probe: deliveries SATURATE in k (5
+-- flat at one shared level; 20, 26, 27, 27 at two; 50 … 269 at three)
+-- because a minted registration is only reachable by dispatches that
+-- come after it and how many remain is fixed by the PRE-STATE DAG.  j
+-- saturates too, but LATER — 58, 226, 548, 912, 1164, 1268, 1291 —
+-- because nesting keeps lengthening the chains after it has stopped
+-- widening them.  The mid-cascade subscription that drives the loop is
+-- real rxjs, not an evaluator artifact: a subscriber added mid-cascade
+-- misses the in-flight emission and receives the cascade's later ones,
+-- checked against rxjs 7.8 at the probe's head.
 --
--- STATUS: (ii) IS UNPROVEN AND SUSPECT, and the grind on it is FROZEN by
--- design ruling — this conjunct, `preClasses`-style splits, and fibre
--- caps are not to be attacked, and L = 5 is not to be measured, until
--- the delivery recurrence has been DERIVED from the evaluator's
--- structure and used to PREDICT the L = 5 rows.  Measuring them first
--- would spend the only out-of-sample test the derivation has.
---
--- THE FEEDBACK LOOP BEHIND ALL OF THIS IS MEASURED AND DOES NOT TOWER.
--- Read naively the recursion is vicious — D ≤ 2 ^ R_end with R_end ≤ R₀ +
--- D * mints has no closed bound — and family G only sampled its base
--- rung.  Mint-Loop-Probe closes it: a scan under a share whose step
--- re-subscribes that share, nested k deep, so a minted chain itself
--- mints.  Deliveries SATURATE in k (5 flat at one shared level; 20, 26,
--- 27, 27 at two; 50 … 269 at three) because a minted registration is
--- only reachable by dispatches that come after it and how many remain is
--- fixed by the PRE-STATE DAG.  j saturates too, but LATER — 58, 226,
--- 548, 912, 1164, 1268, 1291 — because nesting keeps lengthening the
--- chains after it has stopped widening them, so the count/budget ratio
--- has an interior peak at k = 3 rather than falling monotonically.  The
--- mid-cascade subscription that drives the loop is real rxjs, not an
--- evaluator artifact: a subscriber added mid-cascade misses the
--- in-flight emission and receives the cascade's later ones, checked
--- against rxjs 7.8 at the probe's head.
+-- AND (i) IS THE FACE THAT IS NOW SUSPECT, not (ii).  `j ≤ D * cSize`
+-- charges cSize per delivery, but the receipt scanFrame-caps actually
+-- pays is `suc (length vals * suc (sizeᵗ fn))` — one fold per node of
+-- the step function PER PAYLOAD — and `length vals` is a BURST WIDTH,
+-- which nothing entry-readable bounds.  It cannot be paid by cWid:
+-- Width-Count-Probe proves a count reading cWid iterates the tower
+-- function once per instant, which destroys capsAt-tower's linear
+-- height and caps-fuel-root with it.  Nor by an entry width:
+-- Frame-Work-Probe measures a frame's payload count climbing the width
+-- ladder across arrivals (2 ↦ 8).  Where the width factor is paid for
+-- is the open question this face carries, and it is a design ruling
+-- rather than a clause grind.
 --
 -- caps-tick is then a COROLLARY rather than a sibling face: widen the
 -- reported level to the endpoint by frameStep-mono-j, and the endpoint
@@ -3764,25 +3764,28 @@ postulate
     in Σ ℕ λ j → (j ≤ delivN st (proj₂ (proj₂ r)) * Caps.cSize c)
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- (ii) THE DELIVERY BOUND, WHOLE.  One cascade's deliveries against
-  -- subsets of the entry registry, squared.  This is the mint loop's
-  -- one remaining hiding place: `shareAdmit` reads the registry as of
-  -- the dispatch, so the DAG the paths run through is the END registry,
-  -- and nothing here bounds that by cReg.  Two decompositions of this
-  -- statement have been measured false; it stands on Mint-Loop-Probe's
-  -- gate and on nothing else.
+  -- (ii) THE DELIVERY BOUND, WHOLE, AND AS A 2-TOWER.  One cascade's
+  -- deliveries against `D̂ c = 2 ^ (2 ^ cReg c)`.  The squared-subset
+  -- form it replaces is FALSE — the delivery law, committed before the
+  -- L = 5 rows were measured and then matching every checkable one
+  -- exactly, puts D(5,5) at 4514934 against 4 ^ 11 = 4194304.
   --
-  -- AND THE ROUTE TO IT IS NOT AN INJECTION.  Mint-Loop-Shapes measures
-  -- R_end and the answer is that MINTS TRACK DELIVERIES — 254 mints on a
-  -- 269-delivery cascade, leaving a registry of 261 against an entry cReg
-  -- of 7.  The inverted-pair argument still proves `D ≤ 2 ^ R_end`, but
-  -- at R_end = 261 against a budget of 2 ^ 18 that is not a usable
-  -- bound, and no subset injection can be, whether or not this statement
-  -- is true.  What is left is what the damper natively is: an ORDERING
-  -- fact.  A minted registration is reachable only by dispatches that
-  -- come after it, so the proof wants a schedule-indexed induction on a
-  -- decreasing remaining-dispatch potential — different machinery from
-  -- every route tried on this conjunct so far
+  -- ROUTE: the generation-ancestry injection.  Mint generation g holds
+  -- C(2 ^ L, g) registrations and slot-0 deliveries are the partial
+  -- sums of those, so a minted registration's mint-edge ancestry is a
+  -- SUBSET of the slot-0 fire schedule, and the fires are bounded by
+  -- the pre-state DAG (the inverted-pair leg, applied to fires rather
+  -- than to deliveries — applied to deliveries it is unusable, since
+  -- MINTS TRACK DELIVERIES: 254 mints on a 269-delivery cascade leaves
+  -- R_end = 261 against an entry cReg of 7).  The gate is the binomial
+  -- law itself: `ΔD(L, k→k+1) = C(2 ^ L, k+3)`, exact on every measured
+  -- rung at L ≤ 5.
+  --
+  -- NOT COVERED BY ANY MEASURED ROW: the amplifier family, a minting
+  -- scan INSIDE a shared def, where fires would beget registrations
+  -- beget fires.  Every ladder measured so far mints from the root
+  -- program, so minted chains end at `root` and the fire counts are
+  -- invariant in k
   cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
@@ -3790,7 +3793,7 @@ postulate
     capsOK? c sched st ≡ true →
     length chains ≤ Caps.cReg c →
     delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-      ≤ 2 ^ Caps.cReg c * 2 ^ Caps.cReg c
+      ≤ D̂ c
 
 -- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -3804,7 +3807,7 @@ cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   length chains ≤ Caps.cReg c →
   let r = cascadeGo a id chains sched st
-  in Σ ℕ λ j → (j ≤ 2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c)
+  in Σ ℕ λ j → (j ≤ D̂ c * Caps.cSize c)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
   proj₁ CH

@@ -30,7 +30,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_;
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive;
                                        +-assoc; +-comm; *-suc; *-assoc;
                                        *-monoˡ-≤; *-monoʳ-≤; *-mono-≤;
-                                       +-monoˡ-≤; +-monoʳ-≤; +-identityʳ;
+                                       +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ;
                                        m≤m+n; m≤n+m; n≤1+n; m≤m*n;
                                        ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤;
                                        ^-*-assoc; ^-distribˡ-+-*; *-comm;
@@ -208,40 +208,36 @@ frameStep j c =
 -- The lean families exist for exactly this: they keep the delivery
 -- structure and shrink the syntax the cap is read off.
 --
--- SO BOTH COORDINATES RANGE OVER SUBSETS OF THE ENTRY REGISTRY.  A
--- delivery is determined by the pre-state registrations it visits
--- together with the pre-state registrations whose dispatches minted the
--- ones it visits — every mint happens during some delivery and every
--- delivery bottoms out at a pre-state chain, so the second coordinate is
--- pre-state data too.  That is a story and not yet a proof: it does not
--- on its own show the recursion bottoms out.  It gives
+-- AND THAT SQUARE IS FALSE TOO — the third correction, and the first
+-- one predicted before it was measured.  The pair story gave
 --
 --     deliveries ≤ 2 ^ cReg * 2 ^ cReg    frames per delivery ≤ cSize
 --
--- and the count is their product: `2 ^ cReg * 2 ^ cReg * cSize`.
--- MEASUREMENT 6 gates both coordinates (22 against 128, 13 against 32)
--- and MEASUREMENT 5 gates the product against j itself.
+-- and the L = 5 mint ladder breaks it.  Delivery-Law-Prediction.md
+-- committed the delivery law BEFORE any L = 5 row existed — fires of
+-- shared slot i are 2 ^ (L ∸ i), mint generation g holds C(2 ^ L, g)
+-- registrations, so the per-rung increment is C(2 ^ L, k + 3) — and the
+-- measurement matched every checkable row exactly (3 D values, 2
+-- increments, 3 fire vectors, 6 generation counts).  The law then puts
+-- D(5,5) at 4514934 against `4 ^ cReg = 4 ^ 11 = 4194304`.  The true
+-- growth is `2 ^ (2 ^ L)`-shaped — DOUBLY exponential in the ladder
+-- depth, hence a 2-TOWER over cReg, not any single exponential and not
+-- a square of one.
 --
--- The bound is over SUBSETS of registrations, not over branchings, so
--- m-ary fan-in does not beat it: extra fan-in only adds edges, and the
--- transitive tournament already has them all.
+-- SO THE DELIVERY BOUND IS A TOWER OF FIXED HEIGHT TWO, `D̂`.  The
+-- height is fixed at two deliberately: capsAt-tower's per-instant story
+-- cost has to stay a CONSTANT, and `2 ^ (2 ^ T)` is exactly
+-- towerℕ (2 + level) — the very level blowup-tower's `J≤P` already put
+-- the old squared-subset count at.  Swapping the delivery bound for a
+-- 2-tower therefore costs ZERO stories (Width-Count-Probe's `D̂-tower`),
+-- and the slope stays four.
 --
--- WHEN THE FIRST COORDINATE IS PROVEN RATHER THAN GATED, the lemma to
--- reach for is the INVERTED PAIR, not "one per subset" — the latter is
--- the corollary.  The injection is `paths ↪ subsets`, sending a path to
--- the SET of registrations it visits, and what has to be shown is that
--- the map is injective: two distinct traversals of the SAME set would
--- have to disagree on the order of some pair, and a pair inverted between
--- two reachability-respecting orders is a cycle, which the DAG forbids.
--- Note the nodes are the REGISTRATIONS, not the slots — `merge(s1, s1)`
--- registers twice on one slot and so contributes two nodes — which is
--- why parallel fan-in never collapses into a shared node and the
--- one-per-subset count survives it.
---
--- The SECOND coordinate is the damper, and it is the one without a
--- formal counterpart, and splitting it off as its own coordinate was
--- tried and abandoned: see `cascadeGo-deliveries` below, which now
--- states the delivery bound whole.
+-- WHAT THE PROOF ROUTE IS, per the law's own structure: each minted
+-- registration's ancestry is a SUBSET of the slot-0 fire schedule
+-- (generation g ↦ g-subsets, which is what the binomial counts ARE), so
+-- the injection lands in subsets of fires, and the fires are bounded by
+-- the PRE-STATE DAG — the inverted-pair leg, applied where it belongs
+-- rather than to the deliveries directly.
 --
 -- cWid IS GONE, and it was never a factor of this count — it bounds how
 -- WIDE one emitted observable is, not how many times a cascade iterates.
@@ -252,6 +248,18 @@ frameStep j c =
 -- `foldStep` / `sizeStep` gates, which is where State-Blowup-Probe
 -- checks it.
 --
+-- AND cWid MAY NEVER COME BACK INTO THE COUNT.  Width-Count-Probe
+-- proves the reason: `iterFold` EXPONENTIATES per fold, so j folds put
+-- the width above towerℕ j, and a count that reads cWid would iterate
+-- the tower function once per instant — capsAt-tower's linear height,
+-- and with it caps-fuel-root, would be gone (17 stories demanded
+-- against 13 available at the smallest program there is).  That is why
+-- the charge below is `D * cSize` and not `D * (a polynomial in cWid)`,
+-- even though the frame receipt scanFrame-caps actually pays is
+-- `suc (length vals * suc (sizeᵗ fn))` and `length vals` is a burst
+-- width.  Where that width is paid for is the open question the charge
+-- face carries.
+--
 -- The cSize factor still reads cSize because that is where the length
 -- conjunct puts it, not because a length is a size: `pathLen p ≤ᵇ cSize`
 -- is a separate conjunct of the same field, and at pM 6 the two
@@ -260,8 +268,12 @@ frameStep j c =
 --
 -- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
 -- nothing else, so round3b-ledger-reset-absurd stays unavailable
+-- ONE CASCADE's DELIVERY BOUND: a 2-tower over the entry registry
+D̂ : Caps → ℕ
+D̂ c = 2 ^ (2 ^ Caps.cReg c)
+
 frameBlowup : Caps → Caps
-frameBlowup c = frameStep (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) c
+frameBlowup c = frameStep (D̂ c * Caps.cSize c) c
 
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
@@ -404,14 +416,13 @@ frameStep-mono-j c hS le =
 -- what makes caps-tick the j = full case of (a) rather than a
 -- separate claim
 frameStep-full : ∀ (c : Caps) →
-  frameStep (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) c ≡ frameBlowup c
+  frameStep (D̂ c * Caps.cSize c) c ≡ frameBlowup c
 frameStep-full c = refl
 
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
-    ≡ frameStep (2 ^ Caps.cReg (capsAt e sl id) * 2 ^ Caps.cReg (capsAt e sl id)
-                   * Caps.cSize (capsAt e sl id))
+    ≡ frameStep (D̂ (capsAt e sl id) * Caps.cSize (capsAt e sl id))
                 (capsAt e sl id)
 capsAt-suc-full e sl id = refl
 
@@ -425,7 +436,7 @@ capsAt-suc-full e sl id = refl
 2≤frameBlowup-size : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 2 ≤ Caps.cSize (frameBlowup c)
 2≤frameBlowup-size c h =
   ≤-trans h (iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h)
-               (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) (Caps.cSize c))
+               (D̂ c * Caps.cSize c) (Caps.cSize c))
 
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)
@@ -463,7 +474,7 @@ cSize≤frameBlowup : ∀ (c : Caps) → 1 ≤ Caps.cSize c →
   Caps.cSize c ≤ Caps.cSize (frameBlowup c)
 cSize≤frameBlowup c h =
   iterSize-infl (Caps.cSize c) h
-    (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) (Caps.cSize c)
+    (D̂ c * Caps.cSize c) (Caps.cSize c)
 
 capsAt-base-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
@@ -490,7 +501,7 @@ cWid≤frameBlowup : ∀ (c : Caps) → 2 ≤ Caps.cSize c →
   Caps.cWid c ≤ Caps.cWid (frameBlowup c)
 cWid≤frameBlowup c h =
   iterFold-infl (Caps.cSize c) h
-    (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) (Caps.cWid c)
+    (D̂ c * Caps.cSize c) (Caps.cWid c)
 
 capsAt-base-wid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl) ≤ Caps.cWid (capsAt e sl id)
@@ -513,10 +524,12 @@ capsAt-base-wid e sl (suc id) =
 -- THE LEVEL-COST ACCOUNTING, per instant (one frameBlowup), against a
 -- level T = towerℕ m with cSize, cReg ≤ T and m ≥ 3 (so T ≥ 16):
 --
---   THE COUNT      J = 2^cReg · 2^cReg · cSize ≤ 2^T · 2^T · 2^T
---                    = 2^(3T) ≤ 2^(2^T)                    TWO stories
---                  (three linear factors collapse into ONE exponential;
---                   the second story is 3T ≤ 2^T, the T² gate)
+--   THE COUNT      J = D̂ · cSize = 2^(2^cReg) · cSize ≤ 2^(2^R + S)
+--                    ≤ 2^(2^T) = towerℕ (2+m)              TWO stories
+--                  (the delivery bound IS the two stories; the cSize
+--                   factor rides beside it in the exponent, which is
+--                   what the STRICT registry hypothesis buys — see
+--                   `sum-fits`)
 --   THE ITERATION  iterSize cSize J cSize ≤ (3T)^J · T ≤ 2^(T·(J+1))
 --                  and T·(J+1) ≤ (2T)·J ≤ towerℕ (3+m)     TWO stories
 --                  (one for the product T·J landing above the count,
@@ -552,13 +565,13 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
   where
   S = Caps.cSize c
   R = Caps.cReg c
-  J = 2 ^ R * 2 ^ R * S
+  J = 2 ^ (2 ^ R) * S
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 3≤S
   2≤suc2S : 2 ≤ suc (2 * S)
   2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
   1≤J : 1 ≤ J
-  1≤J = *-mono-≤ (*-mono-≤ (1≤2^ R) (1≤2^ R)) 1≤S
+  1≤J = *-mono-≤ (1≤2^ (2 ^ R)) 1≤S
 
 6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   6 ≤ Caps.cSize (capsAt e sl (suc id))
@@ -623,44 +636,78 @@ iterSize-pow S M (suc j) s 1≤M hS hsz =
                        refl M Y)
                 (sym (*-assoc (3 * M) ((3 * M) ^ j) M))
 
--- ONE INSTANT COSTS FOUR STORIES.  The count J = 2^R·2^R·S is two
--- (three linear factors under one exponential, then 3T ≤ 2^T); the
--- ITERATION is two more (a factor (3T) per fold, J folds, and T·J
--- lands one level above the count).  cReg's linear-in-J growth is
--- cheaper and rides along.
+-- suc (a * b) STILL FITS, and it is tower-mul's own slack that pays:
+-- the bound goes through (2+T)·(2+T), which exceeds T·T by 4T+4.  The
+-- strict form is what the REGISTRY axis now has to report, because the
+-- count's arithmetic below consumes a strict registry bound
+tower-mul-suc : ∀ (m a b : ℕ) → 3 ≤ m → a ≤ towerℕ m → b ≤ towerℕ m →
+  suc (a * b) ≤ towerℕ (suc m)
+tower-mul-suc m a b 3≤m ha hb =
+  ≤-trans (≤-trans (s≤s (*-mono-≤ ha hb)) grow) (sq≤2^ (towerℕ m) 6≤T)
+  where
+  Tw = towerℕ m
+  6≤T : 6 ≤ Tw
+  6≤T = ≤-trans (≤ᵇ⇒≤ 6 16 _) (towerℕ-mono {3} {m} 3≤m)
+  grow : suc (Tw * Tw) ≤ (2 + Tw) * (2 + Tw)
+  grow =
+    ≤-trans (≤-reflexive (solve 1 (λ x → con 1 :+ x :* x := x :* x :+ con 1)
+                                refl Tw))
+    (≤-trans (+-monoʳ-≤ (Tw * Tw) (s≤s (z≤n {3 + 4 * Tw})))
+             (≤-reflexive (solve 1 (λ x → x :* x :+ (con 4 :+ con 4 :* x)
+                                            := (con 2 :+ x) :* (con 2 :+ x))
+                                 refl Tw)))
+
+-- THE COUNT'S ARITHMETIC, AND THE ONE PLACE THE REGISTRY BOUND MUST BE
+-- STRICT.  D̂ · S ≤ 2^(2^R) · 2^S = 2^(2^R + S), so the whole count is
+-- ONE exponential and the question is whether its exponent fits under
+-- 2^T.  It does, with nothing to spare and for a reason worth naming:
+-- `suc R ≤ T` makes 2^R at most HALF of 2^T, and S ≤ T ≤ 2^(T∸1) fills
+-- the other half.  With the non-strict `R ≤ T` this is false at R = T,
+-- and the count would cost a fifth story — which Width-Count-Probe's
+-- `slope-fits` prices at `2σ ≤ 8 + sz`, i.e. a broken root fuel on
+-- every program of size 1
+sum-fits : ∀ (R S T : ℕ) → suc R ≤ T → S ≤ T → 2 ^ R + S ≤ 2 ^ T
+sum-fits R S zero      ()       hS
+sum-fits R S (suc T′) (s≤s hR) hS =
+  ≤-trans (+-mono-≤ (^-monoʳ-≤ 2 hR) (≤-trans hS (n<2^n T′)))
+          (≤-reflexive (cong (2 ^ T′ +_) (sym (+-identityʳ (2 ^ T′)))))
+
+-- ONE INSTANT COSTS FOUR STORIES.  The count J = D̂·S is two (the
+-- delivery tower, with the size factor riding beside it in the
+-- exponent); the ITERATION is two more (a factor (3T) per fold, J
+-- folds, and T·J lands one level above the count).  cReg's
+-- linear-in-J growth is cheaper and rides along.
+--
+-- THE REGISTRY AXIS REPORTS STRICTLY, in and out: `suc cReg ≤ towerℕ m`
+-- is consumed by `sum-fits` and re-established by `tower-mul-suc`, so
+-- capsAt-tower's induction still feeds itself.
 blowup-tower : ∀ (m : ℕ) (c : Caps) → 3 ≤ m →
-  1 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  Caps.cSize c ≤ towerℕ m → Caps.cReg c ≤ towerℕ m →
+  1 ≤ Caps.cSize c →
+  Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
   (Caps.cSize (frameBlowup c) ≤ towerℕ (4 + m))
-  × (Caps.cReg  (frameBlowup c) ≤ towerℕ (4 + m))
-blowup-tower m c 3≤m 1≤S 1≤R hS hR = sizeGoal , regGoal
+  × (suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (4 + m))
+blowup-tower m c 3≤m 1≤S hS hR = sizeGoal , regGoal
   where
   S = Caps.cSize c
   R = Caps.cReg c
   Tw = towerℕ m
-  J = 2 ^ R * 2 ^ R * S
+  J = 2 ^ (2 ^ R) * S
+
+  hR′ : R ≤ Tw
+  hR′ = ≤-trans (n≤1+n R) hR
 
   1≤Tw : 1 ≤ Tw
   1≤Tw = ≤-trans 1≤S hS
 
   1≤J : 1 ≤ J
-  1≤J = *-mono-≤ (*-mono-≤ (1≤2^ R) (1≤2^ R)) 1≤S
+  1≤J = *-mono-≤ (1≤2^ (2 ^ R)) 1≤S
 
-  Tw≤2^Tw : Tw ≤ 2 ^ Tw
-  Tw≤2^Tw = <⇒≤ (n<2^n Tw)
-
-  -- the count sits two stories up
+  -- the count sits two stories up — the delivery tower IS those two
   J≤P : J ≤ towerℕ (2 + m)
   J≤P =
-    ≤-trans (*-mono-≤ (*-mono-≤ (^-monoʳ-≤ 2 hR) (^-monoʳ-≤ 2 hR))
-                      (≤-trans hS Tw≤2^Tw))
-    (≤-trans (≤-reflexive (sym split))
-             (^-monoʳ-≤ 2 (≤-trans (≤-reflexive (solve 1 id3 refl Tw)) (3T≤ m 3≤m))))
-    where
-    id3 = λ x → x :+ x :+ x := con 3 :* x
-    split : 2 ^ (Tw + Tw + Tw) ≡ 2 ^ Tw * 2 ^ Tw * 2 ^ Tw
-    split = trans (^-distribˡ-+-* 2 (Tw + Tw) Tw)
-                  (cong (_* 2 ^ Tw) (^-distribˡ-+-* 2 Tw Tw))
+    ≤-trans (*-monoʳ-≤ (2 ^ (2 ^ R)) (<⇒≤ (n<2^n S)))
+    (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 (2 ^ R) S)))
+             (^-monoʳ-≤ 2 (sum-fits R S Tw hR hS)))
 
   2T≤P : 2 * Tw ≤ towerℕ (2 + m)
   2T≤P = ≤-trans (2T≤ m 3≤m) (towerℕ-mono (n≤1+n (suc m)))
@@ -689,15 +736,17 @@ blowup-tower m c 3≤m 1≤S 1≤R hS hR = sizeGoal , regGoal
                                                := (con 2 :* x) :* y) refl Tw J))
                (tower-mul (2 + m) (2 * Tw) J (≤-trans 3≤m (m≤n+m m 2)) 2T≤P J≤P)))
 
-  -- REGISTRATIONS: linear in the count, so one story below the size
-  regGoal : Caps.cReg (frameBlowup c) ≤ towerℕ (4 + m)
+  -- REGISTRATIONS: linear in the count, so one story below the size —
+  -- and reported STRICTLY, which is what the next level's sum-fits
+  -- consumes
+  regGoal : suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (4 + m)
   regGoal =
-    ≤-trans (*-mono-≤ hR (≤-trans sucJS (*-monoʳ-≤ 2 JS≤Z)))
-    (≤-trans (≤-reflexive (solve 2 (λ x y → x :* (con 2 :* y)
-                                             := (con 2 :* x) :* y) refl Tw
-                                 (towerℕ (3 + m))))
-             (tower-mul (3 + m) (2 * Tw) (towerℕ (3 + m))
-                        (≤-trans 3≤m (m≤n+m m 3)) 2T≤Z ≤-refl))
+    ≤-trans (s≤s (≤-trans (*-mono-≤ hR′ (≤-trans sucJS (*-monoʳ-≤ 2 JS≤Z)))
+                          (≤-reflexive (solve 2 (λ x y → x :* (con 2 :* y)
+                                                          := (con 2 :* x) :* y)
+                                              refl Tw (towerℕ (3 + m))))))
+            (tower-mul-suc (3 + m) (2 * Tw) (towerℕ (3 + m))
+                           (≤-trans 3≤m (m≤n+m m 3)) 2T≤Z ≤-refl)
     where
     JS≤Z : J * S ≤ towerℕ (3 + m)
     JS≤Z = tower-mul (2 + m) J S (≤-trans 3≤m (m≤n+m m 2)) J≤P
@@ -719,28 +768,26 @@ capsH e sl id = (7 + (sizeᵉ e + slotsSize sl)) + 4 * id
 
 capsAt-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   (Caps.cSize (capsAt e sl id) ≤ towerℕ (capsH e sl id))
-  × (Caps.cReg  (capsAt e sl id) ≤ towerℕ (capsH e sl id))
+  × (suc (Caps.cReg (capsAt e sl id)) ≤ towerℕ (capsH e sl id))
 capsAt-tower {n = n} e sl zero =
   subst (λ k → (Caps.cSize (capsAt e sl 0) ≤ towerℕ k)
-             × (Caps.cReg  (capsAt e sl 0) ≤ towerℕ k))
+             × (suc (Caps.cReg (capsAt e sl 0)) ≤ towerℕ k))
         (sym (+-identityʳ (7 + sz)))
         (blowup-tower (3 + sz)
           (caps (2 + sizeᵉ e + slotsSize sl)
                 (suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl))
                 (suc sz))
-          (m≤m+n 3 sz) (s≤s z≤n) (s≤s z≤n)
+          (m≤m+n 3 sz) (s≤s z≤n)
           (≤-trans (n≤1+n (2 + sz)) (k≤towerℕ (3 + sz)))
-          (≤-trans (≤-trans (n≤1+n (suc sz)) (n≤1+n (2 + sz)))
-                   (k≤towerℕ (3 + sz))))
+          (≤-trans (n≤1+n (2 + sz)) (k≤towerℕ (3 + sz))))
   where sz = sizeᵉ e + slotsSize sl
 capsAt-tower e sl (suc id) =
   subst (λ k → (Caps.cSize (capsAt e sl (suc id)) ≤ towerℕ k)
-             × (Caps.cReg  (capsAt e sl (suc id)) ≤ towerℕ k))
+             × (suc (Caps.cReg (capsAt e sl (suc id))) ≤ towerℕ k))
         (sym step)
         (blowup-tower (capsH e sl id) (capsAt e sl id)
           3≤H
           (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
-          (1≤capsAt-reg e sl id)
           (proj₁ (capsAt-tower e sl id))
           (proj₂ (capsAt-tower e sl id)))
   where
