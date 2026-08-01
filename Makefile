@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -75,6 +75,14 @@ help:
 	@echo "                  width doubles per rung.  Then measures what DOES"
 	@echo "                  pay: two or three j (see agda/probe/"
 	@echo "                  Eval-Growth-Probe.agda).  Fast, ~1 min"
+	@echo "  width-count-probe  the refutation that the COUNT may read cWid:"
+	@echo "                  one fold exponentiates a width, so j folds put it"
+	@echo "                  under a tower of height j — a count with a cWid"
+	@echo "                  summand iterates the tower per instant and"
+	@echo "                  capsAt-tower's linear height is gone.  Also gates"
+	@echo "                  the 2-tower delivery bound against every measured"
+	@echo "                  ladder and prices the root margin against the"
+	@echo "                  slope (see agda/probe/Width-Count-Probe.agda)"
 	@echo "  chain-half-probe  the counterexample that a FIXED cap cannot"
 	@echo "                  survive a subscribe: at C = 5, a tight chain and a"
 	@echo "                  two-shell expression register a chain of length"
@@ -196,6 +204,17 @@ joint-probe:
 # it is the evidence behind whatever shape those five end up with.
 eval-growth-probe:
 	cd agda && agda -i src -i probe probe/Eval-Growth-Probe.agda
+
+# The refutation of a count that READS cWid.  One fold exponentiates a
+# width, so j folds put the width under a TOWER OF HEIGHT j — hence a
+# count with a cWid summand iterates the tower function once per
+# instant and capsAt-tower's linear height is gone, taking
+# caps-fuel-root with it.  Also gates the 2-tower delivery bound
+# `2 ^ (2 ^ cReg)` against every measured ladder, and prices the root
+# margin as a function of the per-instant slope.  Arithmetic on the
+# recurrence alone, so src/Main.agda never reaches it.  Fast, ~10 s
+width-count-probe:
+	cd agda && agda -i src -i probe probe/Width-Count-Probe.agda
 
 # The counterexample that killed regsSz?-subscribeE: a FIXED cap cannot
 # survive a subscribe, because subscribeE pushes one frame per shell of
