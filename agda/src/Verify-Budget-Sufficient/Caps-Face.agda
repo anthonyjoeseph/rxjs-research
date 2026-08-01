@@ -3794,16 +3794,11 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
 -- a NAME and a boundary — no state, no recursion, no chain, just the
 -- evaluator's own arithmetic — instead of being buried in the hub.
 --
--- THE μ CLAUSE IS THE ONE THAT IS NOT ABOUT evalTm.  `unfoldμ body` is
--- LARGER than `μᵉ body` (only syncSizeᵉ is preserved — syncSize-unfoldμ;
--- sizeᵉ is not), so the recursive call has no size hypothesis until one
--- is stated.  Its WIDTH half, by contrast, is not an obligation of that
--- kind at all: unfoldμ plugs `μᵉ body` at defer-gated `varᵉ` positions,
--- dWᵉ is 0 at a `varᵉ` and a plain ⊔-collect everywhere else, so the
--- unfolding collects nothing the μ did not already carry.  That is
--- dW-unfoldμ — the ruling's dW-subΘ, at the one substitution the face
--- actually performs — and it is the one lemma here that is a grind
--- rather than a tower.
+-- THE μ CLAUSE IS THE ONE THAT IS NOT ABOUT evalTm — and it is the one
+-- that cost a refuted draft.  `unfoldμ body` is LARGER than `μᵉ body`
+-- on the size axis, and the width axis was assumed stable and is not:
+-- see the note on unfoldμ-caps below, and Hop-Descent-Probe's μwide,
+-- which measures 0 ↦ 6.
 ------------------------------------------------------------------
 
 postulate
@@ -3829,20 +3824,37 @@ postulate
     dWᵗ n sl z ≤ Caps.cWid (frameStep j c) →
     Σ ℕ λ j′ → valCaps? (frameStep (j + j′) c) sl u (evalTm z) ≡ true
 
-  -- `μᵉ body` subscribes `unfoldμ body`, and the SIZE axis is the whole
-  -- of the obligation: the unfolding is larger than the μ by an amount
-  -- no syntactic measure in the file bounds
-  unfoldμ-size : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ)
+  -- `μᵉ body` subscribes `unfoldμ body`, and BOTH AXES MOVE.  The size
+  -- axis was always going to: the unfolding is larger than the μ (only
+  -- syncSizeᵉ is preserved — syncSize-unfoldμ) by an amount no syntactic
+  -- measure in the file bounds.
+  --
+  -- THE WIDTH AXIS MOVES TOO, and the first draft of this said it did
+  -- not.  `dWᵉ (unfoldμ body) ≤ dWᵉ (μᵉ body)` reads plausible — the
+  -- plug lands at `varᵉ` positions and dWᵉ is 0 there — and it is
+  -- FALSE, refuted by Hop-Descent-Probe's μwide (0 ↦ 6).  hopD survives
+  -- an unfold because Δᵍ variables are reachable only under deferᵉ and
+  -- hopD CUTS a defer to 0; dW's whole reason to exist is that it does
+  -- NOT cut there, so the plug lands exactly where dW is looking and
+  -- exposes the μ's own outW — which dW does not bound.  Nor is it off
+  -- by a constant: k copies of the var in the template multiply through
+  -- innW's slope, so any true bound is affine in the plug's width with
+  -- the pmO/pmI coefficients, i.e. the hopD-subΘ machinery.
+  --
+  -- So the two axes are stated TOGETHER, at ONE existential j′ (which
+  -- is what the recursive call needs — both hypotheses at the same
+  -- level), and the width half is derived from the SIZE hypothesis the
+  -- telescope already carries rather than from the width one.  That is
+  -- affordable for the same reason the two frame postulates are:
+  -- iterFold is a tower in the cap and outW of an expression is a tower
+  -- in its size, so a large enough j′ covers it
+  unfoldμ-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ) (sl : Slots Γ)
     (body : Exp Γ (t ∷ []) [] [] t) →
     2 ≤ Caps.cSize c →
     sizeᵉ (μᵉ body) ≤ Caps.cSize (frameStep j c) →
-    Σ ℕ λ j′ → sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + j′) c)
-
-  -- and the WIDTH axis of the same unfolding, which is not a tower:
-  -- the plug lands at `varᵉ` positions, where dWᵉ is 0
-  dW-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (j : ℕ) (sl : Slots Γ)
-    (body : Exp Γ (t ∷ []) [] [] t) →
-    dWᵉ j sl (unfoldμ body) ≤ dWᵉ j sl (μᵉ body)
+    dWᵉ n sl (μᵉ body) ≤ Caps.cWid (frameStep j c) →
+    Σ ℕ λ j′ → (sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + j′) c))
+             × (dWᵉ n sl (unfoldμ body) ≤ Caps.cWid (frameStep (j + j′) c))
 
 ------------------------------------------------------------------
 -- subscribeE-caps, GROUND — the assembly knot, closed.
@@ -4130,14 +4142,14 @@ subscribeE-caps {n = n} c j (gs fuel) (μᵉ body) κ bid now sl sched st
         (proj₁ (proj₂ IH))
     , frameStep-+assoc-burst c j j₀ j₁ sl (proj₁ res) (proj₂ (proj₂ IH))
   where
-  US = unfoldμ-size c j body 2≤S szb
+  US = unfoldμ-caps c j sl body 2≤S szb wdb
   j₀ = proj₁ US
   ⊑₀ = frameStep-⊑-+ c 2≤S j j₀
   IH = subscribeE-caps c (j + j₀) fuel (unfoldμ body) κ bid now sl sched st
          2≤S 1≤R slEq slC
          (capsOK?-mono (frameStep j c) (frameStep (j + j₀) c) sched st ⊑₀ inv)
-         (proj₂ US)
-         (≤-trans (dW-unfoldμ n sl body) (≤-trans wdb (proj₁ (proj₂ ⊑₀))))
+         (proj₁ (proj₂ US))
+         (proj₂ (proj₂ US))
          (pathSz?-⊑ κ ⊑₀ pC)
          (≤-trans lC (proj₁ ⊑₀))
   j₁ = proj₁ IH

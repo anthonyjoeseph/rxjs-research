@@ -48,10 +48,17 @@ open import Rx.Exp
 open import Data.Bool using (true)
 open import Verify-Budget-Sufficient using (measureE; counts; _≺ᵛ_; ≺-here; ≺-there)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵉ; pmᵗ)
+open import Rx.Frame-Width using (outWᵉ; dWᵉ)
+open import Rx.Evaluator using (Slots; shared)
 open import Data.Product using (_,_)
 
 Γ : Ctx 1
 Γ = natᵗ ∷ᵛ []ᵛ
+
+-- a slot telescope for the width measures, which read one (the μ
+-- refutation below uses no input, so any shared def will do)
+ins1 : Slots Γ
+ins1 i = shared emptyᵉ
 
 -- a fat leaf: shellSizeᵉ big ≡ 4, innerᵉ big ≡ []
 idFn : Fn Γ [] [] [] natᵗ natᵗ
@@ -345,6 +352,53 @@ _ = refl
 -- stated as the edge the walk will consume
 μ-hopD-stable : hopDᵉ 4 (unfoldμ μbody) ≡ hopDᵉ 4 (μᵉ μbody)
 μ-hopD-stable = refl
+
+------------------------------------------------------------------
+-- AND THE SAME QUESTION FOR THE PARKED WIDTH, ANSWERED THE OTHER WAY.
+-- REFUTED 2026-08-01, before the postulate that assumed it was built on.
+--
+-- hopD survives an unfold because Δᵍ variables are reachable only under
+-- deferᵉ and hopD CUTS a defer to 0.  dW does the opposite: its whole
+-- reason to exist is that it does NOT cut there —
+-- `dWᵉ (deferᵉ e) = outWᵉ e ⊔ dWᵉ e`.  So the unfolding's plug lands at
+-- exactly the positions dW is looking at, and what it exposes is the
+-- μ's own outW, which dW does not bound.
+--
+-- The shape below.  `body` merges two literals: a defer whose body is
+-- `mergeAllᵉ (ofᵉ [strmᵗ (varᵉ …)])` — a template that reads the μ-var
+-- as an INNER observable — and a three-element literal that gives the μ
+-- an outW of 6 while parking nothing.  Before the unfold the defer's
+-- body has outW 0 (the var is a 0-width leaf) so dW is 0; after it, the
+-- var has become the whole μ and the defer's body has outW 6.
+--
+-- 0 ↦ 6.  `dWᵉ (unfoldμ body) ≤ dWᵉ (μᵉ body)` is FALSE, and it is not
+-- false by a constant: put k copies in the `ofᵉ` and the template's
+-- innW slope multiplies, so any bound must be affine in the plug's
+-- width with the pmO/pmI slopes — the hopD-subΘ machinery, not a
+-- ⊔-monotonicity.  Hence Caps-Face states the μ edge's two axes
+-- TOGETHER, existentially in j′, off the SIZE hypothesis it already has
+------------------------------------------------------------------
+
+μdefer : Exp Γ [] (natᵗ ∷ []) [] natᵗ
+μdefer = mergeAllᵉ (ofᵉ (strmᵗ (varᵉ (here refl)) ∷ []))
+
+μwide : Exp Γ (natᵗ ∷ []) [] [] natᵗ
+μwide = mergeAllᵉ (ofᵉ (strmᵗ (deferᵉ μdefer)
+                     ∷ strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ [])) ∷ []))
+
+_ : outWᵉ 1 ins1 (μᵉ μwide) ≡ 6
+_ = refl
+
+_ : dWᵉ 1 ins1 (μᵉ μwide) ≡ 0
+_ = refl
+
+_ : dWᵉ 1 ins1 (unfoldμ μwide) ≡ 6
+_ = refl
+
+-- the standing guard: if anyone re-states the μ edge as ⊔-monotone in
+-- dW, this stops typechecking
+μ-dW-not-stable : dWᵉ 1 ins1 (unfoldμ μwide) ≡ 6
+μ-dW-not-stable = refl
 
 ------------------------------------------------------------------
 -- REFUTATION 1 OF A COUNT: IT OVER-PRICES A PHANTOM.
