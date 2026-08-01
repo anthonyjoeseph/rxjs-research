@@ -57,7 +57,7 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; LiveSource;
                                 concat-st; switch-st; exhaust-st;
                                 sched-init; sched-next; st-init; budgetAt;
                                 subscribeE; cascade; slotsSize; root)
-open import Rx.Frame-Width using (outWᵉ; outWᵛ)
+open import Rx.Frame-Width using (outWᵉ; pWᵉ; pWᵛ)
 open import Verify-Budget-Sufficient using (foldStep; sizeStep; iterSize;
                                             iterSize-mono-count;
                                             Caps; capsAt; stBounded?;
@@ -102,8 +102,8 @@ nodeSize (switch-st _ _)   = 0
 nodeSize (exhaust-st _ _)  = 0
 
 nodeWid : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → ℕ
-nodeWid j sl (scan-st {t} v)   = outWᵛ j sl t v
-nodeWid j sl (concat-st q _ _) = foldr (λ o m → outWᵉ j sl o ⊔ m) 0 q
+nodeWid j sl (scan-st {t} v)   = pWᵛ j sl t v
+nodeWid j sl (concat-st q _ _) = foldr (λ o m → pWᵉ j sl o ⊔ m) 0 q
 nodeWid j sl (take-st _)       = 0
 nodeWid j sl (merge-st _ _)    = 0
 nodeWid j sl (switch-st _ _)   = 0
@@ -114,7 +114,7 @@ liveSize l = foldr (λ tv m → sizeᵛ (LiveSource.elemTy l) (proj₂ tv) ⊔ m
                    (LiveSource.pending l)
 
 liveWid : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → LiveSource Γ → ℕ
-liveWid j sl l = foldr (λ tv m → outWᵛ j sl (LiveSource.elemTy l) (proj₂ tv) ⊔ m) 0
+liveWid j sl l = foldr (λ tv m → pWᵛ j sl (LiveSource.elemTy l) (proj₂ tv) ⊔ m) 0
                        (LiveSource.pending l)
 
 -- max stored size after `fuel` cascades
@@ -519,7 +519,7 @@ _ = refl
 -- why the width gates above are per-fold.
 --
 -- THE cSIZE HALF IS NO LONGER A `refl`, and the reason is Fold-Count-
--- Probe: the iteration count is now `2 ^ cReg * cSize`, and pRs enters
+-- Probe: the iteration count is now `2 ^ cReg * 2 ^ cReg * cSize`, and pRs enters
 -- at cSize 25 / cReg 24, so the endpoint is `iterSize 25 (2 ^ 24 * 25)
 -- 25` — four hundred million iterations, each squaring, which no
 -- machine unfolds.  So it is checked the way the k = 7 crossover is:
@@ -536,7 +536,8 @@ _ = refl
 -- checkable: `e` and `sl` are variables, so `Caps.cSize (capsAt e sl 0)`
 -- gets stuck at `iterSize A ⟨count⟩ A` instead of unfolding it
 capsAt0-one-fold : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
-  1 ≤ 2 ^ suc (sizeᵉ e + slotsSize sl) * (2 + sizeᵉ e + slotsSize sl) →
+  1 ≤ 2 ^ suc (sizeᵉ e + slotsSize sl) * 2 ^ suc (sizeᵉ e + slotsSize sl)
+        * (2 + sizeᵉ e + slotsSize sl) →
   iterSize (2 + sizeᵉ e + slotsSize sl) 1 (2 + sizeᵉ e + slotsSize sl)
     ≤ Caps.cSize (capsAt e sl 0)
 capsAt0-one-fold e sl h = iterSize-mono-count _ _ (s≤s z≤n) h

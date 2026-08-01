@@ -59,7 +59,8 @@ module Rx.Frame-Width where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≡ᵇ_)
 open import Data.Bool using (if_then_else_)
-open import Data.List using (List; []; _∷_; length)
+open import Data.Fin  using (Fin)
+open import Data.List using (List; []; _∷_; length; tabulate)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 
@@ -220,3 +221,121 @@ outWᵛ j sl (s ×ᵗ t) (a , b)  = outWᵛ j sl s a ⊔ outWᵛ j sl t b
 outWᵛ j sl (s +ᵗ t) (inj₁ a) = outWᵛ j sl s a
 outWᵛ j sl (s +ᵗ t) (inj₂ b) = outWᵛ j sl t b
 outWᵛ j sl (obs t)  e        = outWᵉ j sl e
+
+------------------------------------------------------------------
+-- THE PARKED WIDTH — the supply side of the deferᵉ gap.
+--
+-- `outWᵉ (deferᵉ e) = 0` is correct and load-bearing: a defer delivers
+-- NOTHING this instant, and every wet-side width bound depends on it.
+-- But the evaluator PARKS that body — subscribeE's deferᵉ clause adds a
+-- LiveSource whose pending is `(suc now , body)` at `elemTy = obs u` —
+-- and the caps predicate's widLive conjunct then demands the BODY's
+-- width.  Under outW alone no entry measure supplies it: the body's
+-- width has vanished from the program's outWᵉ and from every value
+-- measure derived from it.
+--
+-- dW is the missing quantity, and it is SUPPLY-SIDE ONLY: nothing wet
+-- reads it.  It ⊔-collects, over every deferᵉ subterm, that body's own
+-- outW together with the body's own parked widths:
+--
+--     dWᵉ (deferᵉ e) = outWᵉ e ⊔ dWᵉ e
+--
+-- It COLLECTS rather than multiplies.  A parked body is not entered at
+-- park time — the *All above it sees a pending, not a payload — so a
+-- `mergeAllᵉ` over a defer does not compound the parked width the way it
+-- compounds a delivered one.  Every other constructor is therefore a
+-- plain ⊔ over its subterms, uniformly, including the ones outW/innW
+-- may drop (a prim's argument, an `ifᵗ` scrutinee): dW is an upper
+-- bound with no multiplicative structure, so collecting more is free and
+-- makes the descent lemmas hold clause for clause.
+--
+-- Same fuel discipline as outW: `j` is spent one per connect, on the
+-- shared-slot descent, and is 0 elsewhere.
+--
+-- AND THE JOIN IS WHAT THE CAPS SIDE READS.  `pW = outW ⊔ dW` is the
+-- width a value or an expression can be made to demand, delivered now or
+-- parked for later; capsOK?'s widLive/widNode and valCaps?'s width half
+-- are stated at pW, and capsAt's base pays for it.
+------------------------------------------------------------------
+
+mutual
+  dWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+  -- a share is a connect: descend into the def, on slot fuel
+  dWᵉ zero    sl (input i) = 0
+  dWᵉ (suc j) sl (input i) with sl i
+  -- a scripted slot's payloads are DATA, so nothing is parked there
+  ... | scripted _ = 0
+  ... | shared d   = dWᵉ j sl d
+  dWᵉ j sl (ofᵉ ts)        = dWᵗˢ j sl ts
+  dWᵉ j sl emptyᵉ          = 0
+  dWᵉ j sl (mapᵉ f e)      = dWᵗ j sl f ⊔ dWᵉ j sl e
+  dWᵉ j sl (takeᵉ c e)     = dWᵗ j sl c ⊔ dWᵉ j sl e
+  dWᵉ j sl (scanᵉ f z e)   = dWᵗ j sl f ⊔ dWᵗ j sl z ⊔ dWᵉ j sl e
+  dWᵉ j sl (mergeAllᵉ e)   = dWᵉ j sl e
+  dWᵉ j sl (concatAllᵉ e)  = dWᵉ j sl e
+  dWᵉ j sl (switchAllᵉ e)  = dWᵉ j sl e
+  dWᵉ j sl (exhaustAllᵉ e) = dWᵉ j sl e
+  dWᵉ j sl (μᵉ e)          = dWᵉ j sl e
+  dWᵉ j sl (varᵉ x)        = 0
+  -- THE CLAUSE THE WHOLE FAMILY EXISTS FOR
+  dWᵉ j sl (deferᵉ e)      = outWᵉ j sl e ⊔ dWᵉ j sl e
+
+  dWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
+  dWᵗ j sl (varᵗ x)      = 0
+  dWᵗ j sl unit̂          = 0
+  dWᵗ j sl (bool̂ _)      = 0
+  dWᵗ j sl (nat̂ _)       = 0
+  dWᵗ j sl (pairᵗ a b)   = dWᵗ j sl a ⊔ dWᵗ j sl b
+  dWᵗ j sl (fstᵗ p)      = dWᵗ j sl p
+  dWᵗ j sl (sndᵗ p)      = dWᵗ j sl p
+  dWᵗ j sl (inlᵗ a)      = dWᵗ j sl a
+  dWᵗ j sl (inrᵗ a)      = dWᵗ j sl a
+  dWᵗ j sl (caseᵗ s l r) = dWᵗ j sl s ⊔ dWᵗ j sl l ⊔ dWᵗ j sl r
+  dWᵗ j sl (ifᵗ c a b)   = dWᵗ j sl c ⊔ dWᵗ j sl a ⊔ dWᵗ j sl b
+  dWᵗ j sl (primᵗ _ a)   = dWᵗ j sl a
+  dWᵗ j sl (strmᵗ e)     = dWᵉ j sl e
+
+  dWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  dWᵗˢ j sl []       = 0
+  dWᵗˢ j sl (y ∷ ys) = dWᵗ j sl y ⊔ dWᵗˢ j sl ys
+
+-- the parked width of a runtime VALUE, mirroring outWᵛ clause for clause
+dWᵛ : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty) → Val Γ t → ℕ
+dWᵛ j sl unitᵗ    _        = 0
+dWᵛ j sl boolᵗ    _        = 0
+dWᵛ j sl natᵗ     _        = 0
+dWᵛ j sl (s ×ᵗ t) (a , b)  = dWᵛ j sl s a ⊔ dWᵛ j sl t b
+dWᵛ j sl (s +ᵗ t) (inj₁ a) = dWᵛ j sl s a
+dWᵛ j sl (s +ᵗ t) (inj₂ b) = dWᵛ j sl t b
+dWᵛ j sl (obs t)  e        = dWᵉ j sl e
+
+-- THE JOIN.  Delivered now, or parked for later — the caps side bounds
+-- both with one number
+pWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+pWᵉ j sl e = outWᵉ j sl e ⊔ dWᵉ j sl e
+
+pWᵛ : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty) → Val Γ t → ℕ
+pWᵛ j sl t v = outWᵛ j sl t v ⊔ dWᵛ j sl t v
+
+------------------------------------------------------------------
+-- AND THE SLOT TELESCOPE'S OWN PARKED WIDTH.  A shared slot's def is
+-- subscribed WHOLE at a connect, so its parked bodies are entry data
+-- exactly as its size is — and slotsSize's counterpart on the width axis
+-- is what capsAt's base has to pay.  Scripted slots contribute nothing:
+-- their element type is data, so both halves of pW are zero there.
+--
+-- Written as a recursive walk over the index list (as slotsGo? is, and
+-- for the same reason): a non-matching definition unfolds on a NEUTRAL
+-- telescope and grows every type that mentions it.
+------------------------------------------------------------------
+
+slotPW : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) → Slot Γ u → ℕ
+slotPW j sl (scripted _) = 0
+slotPW j sl (shared d)   = pWᵉ j sl d
+
+slotsPWgo : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) → List (Fin n) → ℕ
+slotsPWgo j sl []       = 0
+slotsPWgo j sl (i ∷ is) = slotPW j sl (sl i) ⊔ slotsPWgo j sl is
+
+slotsPW : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) → ℕ
+slotsPW {n = n} j sl = slotsPWgo j sl (tabulate {n = n} (λ i → i))

@@ -98,7 +98,8 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (outWᵉ; outWᵛ)
+open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵛ; outWᵛ;
+                                slotPW; slotsPW; slotsPWgo)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
@@ -216,12 +217,12 @@ record Caps : Set where
 -- counterexample to conflating the two
 widLive : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → LiveSource Γ → Bool
 widLive {n = n} W sl l =
-  all (λ tv → outWᵛ n sl (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ W)
+  all (λ tv → pWᵛ n sl (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ W)
       (LiveSource.pending l)
 
 widNode : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
-widNode {n = n} W sl (scan-st {t} v)   = outWᵛ n sl t v ≤ᵇ W
-widNode {n = n} W sl (concat-st q _ _) = all (λ o → outWᵉ n sl o ≤ᵇ W) q
+widNode {n = n} W sl (scan-st {t} v)   = pWᵛ n sl t v ≤ᵇ W
+widNode {n = n} W sl (concat-st q _ _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
 widNode W sl (take-st _)               = true
 widNode W sl (merge-st _ _)            = true
 widNode W sl (switch-st _ _)           = true
@@ -530,7 +531,7 @@ frameStep-reg-suc (caps s w r) j =
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
   frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
-                    (suc (outWᵉ n sl e))
+                    (suc (pWᵉ n sl e ⊔ slotsPW n sl))
                     (suc (sizeᵉ e + slotsSize sl)))
 capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
 
@@ -582,14 +583,14 @@ regsSz?-widen rs le =
 widLive-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (l : LiveSource Γ) {W W′ : ℕ} →
   W ≤ W′ → widLive W sl l ≡ true → widLive W′ sl l ≡ true
 widLive-widen {n = n} sl l le =
-  all-impl _ _ (λ tv → ≤ᵇ-widen (outWᵛ n sl (LiveSource.elemTy l) (proj₂ tv)) le)
+  all-impl _ _ (λ tv → ≤ᵇ-widen (pWᵛ n sl (LiveSource.elemTy l) (proj₂ tv)) le)
            (LiveSource.pending l)
 
 widNode-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (ns : NodeState Γ) {W W′ : ℕ} →
   W ≤ W′ → widNode W sl ns ≡ true → widNode W′ sl ns ≡ true
-widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (outWᵛ n sl t v) le h
+widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (pWᵛ n sl t v) le h
 widNode-widen {n = n} sl (concat-st q _ _) le h =
-  all-impl _ _ (λ o → ≤ᵇ-widen (outWᵉ n sl o) le) q h
+  all-impl _ _ (λ o → ≤ᵇ-widen (pWᵉ n sl o) le) q h
 widNode-widen sl (take-st _)     le h = refl
 widNode-widen sl (merge-st _ _)  le h = refl
 widNode-widen sl (switch-st _ _) le h = refl
@@ -722,7 +723,7 @@ frameStep-mono-j c hS le =
 -- are proven below
 valCaps? : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
 valCaps? {n = n} c sl u v =
-  (sizeᵛ u v ≤ᵇ Caps.cSize c) ∧ (outWᵛ n sl u v ≤ᵇ Caps.cWid c)
+  (sizeᵛ u v ≤ᵇ Caps.cSize c) ∧ (pWᵛ n sl u v ≤ᵇ Caps.cWid c)
 
 eventCaps? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ u) → Bool
 eventCaps? {u = u} c sl (value v) = valCaps? c sl u v
@@ -738,7 +739,7 @@ burstCaps? c sl = all (λ em → all (eventCaps? c sl) (InstEmit.events em))
 -- `all (λ o → sizeᵉ o ≤ᵇ …)` pair
 obsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → Closed Γ s → Bool
 obsCaps? {n = n} c sl o =
-  (sizeᵉ o ≤ᵇ Caps.cSize c) ∧ (outWᵉ n sl o ≤ᵇ Caps.cWid c)
+  (sizeᵉ o ≤ᵇ Caps.cSize c) ∧ (pWᵉ n sl o ≤ᵇ Caps.cWid c)
 
 ------------------------------------------------------------------
 -- THE SLOT TELESCOPE, INSIDE THE CAP — the side condition that ties
@@ -765,42 +766,51 @@ obsCaps? {n = n} c sl o =
 -- its body instead of staying stuck, and that is what OOMs
 ------------------------------------------------------------------
 
-slotCaps? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Slot Γ u → Bool
-slotCaps? {u = u} B (scripted (hot async)) =
+-- BOTH AXES, since the deferᵉ repair.  The size half is unchanged; the
+-- width half exists because a shared slot's DEF is subscribed whole at a
+-- connect, and a def may bury a defer — whose parked body capsOK? then
+-- demands a width for.  Scripted slots still need nothing on this axis:
+-- their element type is data, so pWᵛ is identically zero there
+slotCaps? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Slots Γ → Slot Γ u → Bool
+slotCaps? {u = u} B W sl (scripted (hot async)) =
   all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
-slotCaps? {u = u} B (scripted (cold sync async)) =
+slotCaps? {u = u} B W sl (scripted (cold sync async)) =
   all (λ v → sizeᵛ u v ≤ᵇ B) sync
   ∧ all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
-slotCaps? B (shared d) = sizeᵉ d ≤ᵇ B
+slotCaps? {n = n} B W sl (shared d) = (sizeᵉ d ≤ᵇ B) ∧ (pWᵉ n sl d ≤ᵇ W)
 
-slotsGo? : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → List (Fin n) → Bool
-slotsGo? B sl []       = true
-slotsGo? B sl (i ∷ is) = slotCaps? B (sl i) ∧ slotsGo? B sl is
+slotsGo? : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Slots Γ → List (Fin n) → Bool
+slotsGo? B W sl []       = true
+slotsGo? B W sl (i ∷ is) = slotCaps? B W sl (sl i) ∧ slotsGo? B W sl is
 
-slotsCaps? : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → Bool
-slotsCaps? {n = n} B sl = slotsGo? B sl (tabulate {n = n} (λ i → i))
+slotsCaps? : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Slots Γ → Bool
+slotsCaps? {n = n} B W sl = slotsGo? B W sl (tabulate {n = n} (λ i → i))
 
-slotCaps?-widen : ∀ {n} {Γ : Ctx n} {u} (s : Slot Γ u) {B B′ : ℕ} →
-  B ≤ B′ → slotCaps? B s ≡ true → slotCaps? B′ s ≡ true
-slotCaps?-widen {u = u} (scripted (hot async)) le h =
+slotCaps?-widen : ∀ {n} {Γ : Ctx n} {u} (sl : Slots Γ) (s : Slot Γ u)
+  {B B′ W W′ : ℕ} →
+  B ≤ B′ → W ≤ W′ → slotCaps? B W sl s ≡ true → slotCaps? B′ W′ sl s ≡ true
+slotCaps?-widen {u = u} sl (scripted (hot async)) le lw h =
   all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ u (Timed.val tv)) le) async h
-slotCaps?-widen {u = u} (scripted (cold sync async)) le h =
+slotCaps?-widen {u = u} sl (scripted (cold sync async)) le lw h =
   ∧-intro (all-impl _ _ (λ v → ≤ᵇ-widen (sizeᵛ u v) le) sync
              (proj₁ (∧-true _ _ h)))
           (all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ u (Timed.val tv)) le) async
              (proj₂ (∧-true _ _ h)))
-slotCaps?-widen (shared d) le h = ≤ᵇ-widen (sizeᵉ d) le h
+slotCaps?-widen {n = n} sl (shared d) le lw h =
+  ∧-intro (≤ᵇ-widen (sizeᵉ d) le (proj₁ (∧-true _ _ h)))
+          (≤ᵇ-widen (pWᵉ n sl d) lw (proj₂ (∧-true _ _ h)))
 
-slotsGo?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (is : List (Fin n)) {B B′ : ℕ} →
-  B ≤ B′ → slotsGo? B sl is ≡ true → slotsGo? B′ sl is ≡ true
-slotsGo?-widen sl []       le h = refl
-slotsGo?-widen sl (i ∷ is) le h =
-  ∧-intro (slotCaps?-widen (sl i) le (proj₁ (∧-true _ _ h)))
-          (slotsGo?-widen sl is le (proj₂ (∧-true _ _ h)))
+slotsGo?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (is : List (Fin n))
+  {B B′ W W′ : ℕ} →
+  B ≤ B′ → W ≤ W′ → slotsGo? B W sl is ≡ true → slotsGo? B′ W′ sl is ≡ true
+slotsGo?-widen sl []       le lw h = refl
+slotsGo?-widen sl (i ∷ is) le lw h =
+  ∧-intro (slotCaps?-widen sl (sl i) le lw (proj₁ (∧-true _ _ h)))
+          (slotsGo?-widen sl is le lw (proj₂ (∧-true _ _ h)))
 
-slotsCaps?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) {B B′ : ℕ} →
-  B ≤ B′ → slotsCaps? B sl ≡ true → slotsCaps? B′ sl ≡ true
-slotsCaps?-widen {n = n} sl le = slotsGo?-widen sl (tabulate {n = n} (λ i → i)) le
+slotsCaps?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) {B B′ W W′ : ℕ} →
+  B ≤ B′ → W ≤ W′ → slotsCaps? B W sl ≡ true → slotsCaps? B′ W′ sl ≡ true
+slotsCaps?-widen {n = n} sl le lw = slotsGo?-widen sl (tabulate {n = n} (λ i → i)) le lw
 
 ------------------------------------------------------------------
 -- AND WHY IT HOLDS AT capsAt: every payload a slot carries is a
@@ -822,32 +832,49 @@ all-≤-sum f (x ∷ xs) B h =
   ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (f x) (sum (map f xs))) h)))
           (all-≤-sum f xs B (≤-trans (m≤n+m (sum (map f xs)) (f x)) h))
 
--- ONE SLOT, AT ITS OWN MEASURE: slotSize is by construction big enough
--- for everything the slot holds
-slotCaps?-self : ∀ {n} {Γ : Ctx n} {u} (s : Slot Γ u) → slotCaps? (slotSize s) s ≡ true
-slotCaps?-self {u = u} (scripted (hot async)) =
+-- the width axis's counterpart of sum-tabulate-lb: a summand never
+-- exceeds the ⊔-collect, over the same tabulated index
+slotsPWgo-tab : ∀ {n m} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ)
+  (f : Fin m → Fin n) (i : Fin m) →
+  slotPW j sl (sl (f i)) ≤ slotsPWgo j sl (tabulate f)
+slotsPWgo-tab j sl f Fin.zero    = m≤m⊔n _ _
+slotsPWgo-tab j sl f (Fin.suc i) =
+  ≤-trans (slotsPWgo-tab j sl (λ k → f (Fin.suc k)) i) (m≤n⊔m _ _)
+
+slotsPW-lb : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (i : Fin n) →
+  slotPW j sl (sl i) ≤ slotsPW j sl
+slotsPW-lb j sl i = slotsPWgo-tab j sl (λ k → k) i
+
+-- ONE SLOT, AT ITS OWN MEASURE: slotSize and slotPW are by construction
+-- big enough for everything the slot holds, on their own axis
+slotCaps?-self : ∀ {n} {Γ : Ctx n} {u} (sl : Slots Γ) (s : Slot Γ u) →
+  slotCaps? (slotSize s) (slotPW n sl s) sl s ≡ true
+slotCaps?-self {u = u} sl (scripted (hot async)) =
   all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _ (n≤1+n _)
-slotCaps?-self {u = u} (scripted (cold sync async)) =
+slotCaps?-self {u = u} sl (scripted (cold sync async)) =
   ∧-intro (all-≤-sum (sizeᵛ u) sync _
              (≤-trans (m≤m+n _ _) (n≤1+n _)))
           (all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _
              (≤-trans (m≤n+m _ _) (n≤1+n _)))
-slotCaps?-self (shared d) = T⇒≡true (sizeᵉ d ≤ᵇ sizeᵉ d) (≤⇒≤ᵇ (≤-refl {sizeᵉ d}))
+slotCaps?-self {n = n} sl (shared d) =
+  ∧-intro (T⇒≡true (sizeᵉ d ≤ᵇ sizeᵉ d) (≤⇒≤ᵇ (≤-refl {sizeᵉ d})))
+          (T⇒≡true (pWᵉ n sl d ≤ᵇ pWᵉ n sl d) (≤⇒≤ᵇ (≤-refl {pWᵉ n sl d})))
 
-slotsGo?-bound : ∀ {n} {Γ : Ctx n} (B : ℕ) (sl : Slots Γ) (is : List (Fin n)) →
-  (∀ (i : Fin n) → slotCaps? B (sl i) ≡ true) → slotsGo? B sl is ≡ true
-slotsGo?-bound B sl []       h = refl
-slotsGo?-bound B sl (i ∷ is) h = ∧-intro (h i) (slotsGo?-bound B sl is h)
+slotsGo?-bound : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) (is : List (Fin n)) →
+  (∀ (i : Fin n) → slotCaps? B W sl (sl i) ≡ true) → slotsGo? B W sl is ≡ true
+slotsGo?-bound B W sl []       h = refl
+slotsGo?-bound B W sl (i ∷ is) h = ∧-intro (h i) (slotsGo?-bound B W sl is h)
 
--- THE WHOLE TELESCOPE, from the one number capsAt's base already
+-- THE WHOLE TELESCOPE, from the two numbers capsAt's base already
 -- contains
-slotsCaps?-bound : ∀ {n} {Γ : Ctx n} (B : ℕ) (sl : Slots Γ) →
-  slotsSize sl ≤ B → slotsCaps? B sl ≡ true
-slotsCaps?-bound {n = n} B sl h =
-  slotsGo?-bound B sl (tabulate {n = n} (λ i → i))
-    (λ i → slotCaps?-widen (sl i)
+slotsCaps?-bound : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) →
+  slotsSize sl ≤ B → slotsPW n sl ≤ W → slotsCaps? B W sl ≡ true
+slotsCaps?-bound {n = n} B W sl h hw =
+  slotsGo?-bound B W sl (tabulate {n = n} (λ i → i))
+    (λ i → slotCaps?-widen sl (sl i)
              (≤-trans (sum-tabulate-lb (λ k → slotSize (sl k)) i) h)
-             (slotCaps?-self (sl i)))
+             (≤-trans (slotsPW-lb n sl i) hw)
+             (slotCaps?-self sl (sl i)))
 
 ------------------------------------------------------------------
 -- THE WIDENING TOOLKIT, stated here rather than inlined per clause.
@@ -949,21 +976,21 @@ valCaps?-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sl : Slots Γ)
   (u : Ty) (v : Val Γ u) →
   c ⊑ᶜ c′ → valCaps? c sl u v ≡ true → valCaps? c′ sl u v ≡ true
 valCaps?-widen {n = n} {c = c} sl u v (sz≤ , wd≤ , _) h
-  with ∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (outWᵛ n sl u v ≤ᵇ Caps.cWid c) h
+  with ∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (pWᵛ n sl u v ≤ᵇ Caps.cWid c) h
 ... | hsz , hwd = ∧-intro (≤ᵇ-widen (sizeᵛ u v) sz≤ hsz)
-                          (≤ᵇ-widen (outWᵛ n sl u v) wd≤ hwd)
+                          (≤ᵇ-widen (pWᵛ n sl u v) wd≤ hwd)
 
 -- the two halves of valCaps?, which are literally boundedNode's and
 -- widNode's scan-st clauses, so a stored accumulator reads either way
 valCaps?-size : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
   valCaps? c sl u v ≡ true → (sizeᵛ u v ≤ᵇ Caps.cSize c) ≡ true
 valCaps?-size {n = n} c sl u v h =
-  proj₁ (∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (outWᵛ n sl u v ≤ᵇ Caps.cWid c) h)
+  proj₁ (∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (pWᵛ n sl u v ≤ᵇ Caps.cWid c) h)
 
 valCaps?-wid : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
-  valCaps? c sl u v ≡ true → (outWᵛ n sl u v ≤ᵇ Caps.cWid c) ≡ true
+  valCaps? c sl u v ≡ true → (pWᵛ n sl u v ≤ᵇ Caps.cWid c) ≡ true
 valCaps?-wid {n = n} c sl u v h =
-  proj₂ (∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (outWᵛ n sl u v ≤ᵇ Caps.cWid c) h)
+  proj₂ (∧-true (sizeᵛ u v ≤ᵇ Caps.cSize c) (pWᵛ n sl u v ≤ᵇ Caps.cWid c) h)
 
 valsCaps?-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sl : Slots Γ)
   (u : Ty) (vs : List (Val Γ u)) →
@@ -998,9 +1025,9 @@ obsCaps?-widen : ∀ {n} {Γ : Ctx n} {s} {c c′ : Caps} (sl : Slots Γ)
   (o : Closed Γ s) →
   c ⊑ᶜ c′ → obsCaps? c sl o ≡ true → obsCaps? c′ sl o ≡ true
 obsCaps?-widen {n = n} {c = c} sl o (sz≤ , wd≤ , _) h
-  with ∧-true (sizeᵉ o ≤ᵇ Caps.cSize c) (outWᵉ n sl o ≤ᵇ Caps.cWid c) h
+  with ∧-true (sizeᵉ o ≤ᵇ Caps.cSize c) (pWᵉ n sl o ≤ᵇ Caps.cWid c) h
 ... | hsz , hwd = ∧-intro (≤ᵇ-widen (sizeᵉ o) sz≤ hsz)
-                          (≤ᵇ-widen (outWᵉ n sl o) wd≤ hwd)
+                          (≤ᵇ-widen (pWᵉ n sl o) wd≤ hwd)
 
 obsListCaps?-widen : ∀ {n} {Γ : Ctx n} {s} {c c′ : Caps} (sl : Slots Γ)
   (q : List (Closed Γ s)) →
@@ -1242,38 +1269,46 @@ postulate
   --      preserved, syncSize-unfoldμ; sizeᵉ is not) — so its recursive
   --      call has no size hypothesis until one is stated.
   --
-  -- (iii) AND THE ONE THAT IS A STATEMENT-LEVEL GAP: `deferᵉ body`
-  --      PARKS AN OBSERVABLE ON THE SCHEDULE.  Its clause adds a
-  --      LiveSource at `elemTy = obs u` with `pending = (suc now , body)`,
-  --      so capsOK?'s widLive conjunct demands
-  --      `outWᵉ n sl body ≤ Caps.cWid (frameStep j c)` — a WIDTH bound on
-  --      the subscribed expression.  This face's telescope has no width
-  --      hypothesis at all, and the obvious source is not there either:
-  --      `outWᵉ j sl (deferᵉ e) = 0` BY DEFINITION (Rx.Frame-Width — a
-  --      defer crosses a tick), so the enclosing expression's width says
-  --      nothing about the parked body's.  The scripted-slot branch of
-  --      subscribeE-input-caps escaped the width question because a
-  --      scripted element type is DATA and outWᵛ is identically zero
-  --      there; a defer's payload is `obs`, and it does not escape.
+  -- (iii) THE ONE THAT WAS A STATEMENT-LEVEL GAP, NOW REPAIRED (the
+  --      parked-width ruling, 2026-07-31).  `deferᵉ body` PARKS AN
+  --      OBSERVABLE ON THE SCHEDULE: its clause adds a LiveSource at
+  --      `elemTy = obs u` with `pending = (suc now , body)`, so
+  --      capsOK?'s widLive conjunct demands a WIDTH for the body — and
+  --      `outWᵉ (deferᵉ e) = 0` by definition (a defer crosses a tick,
+  --      and that semantics is load-bearing on the wet side), so no
+  --      outW-derived entry measure supplied it.
   --
-  --      So subscribeE-caps needs a third conjunct,
-  --      `outWᵉ n sl b ≤ Caps.cWid (frameStep j c)`, and that is a
-  --      telescope change to the assembly knot: it threads back through
-  --      every caller (subscribeInner-caps and thruWalk-caps can supply
-  --      it from valCaps?'s own width half, which they already carry),
-  --      and it REOPENS the slot side condition on the width axis —
-  --      sharedConnect subscribes a slot DEF, and slotsCaps? is
-  --      size-only precisely because nothing needed widths until now.
-  --      Recorded, not made: it is one ruling, not a clause grind
+  --      THE REPAIR IS SUPPLY-SIDE AND CAPS-SIDE ONLY.  Rx.Frame-Width
+  --      gains dW — the PARKED width, ⊔-collecting every deferᵉ
+  --      subterm's `outWᵉ body ⊔ dWᵉ body` — and pW = outW ⊔ dW.  The
+  --      caps side reads pW (widLive, widNode, valCaps?, obsCaps?), the
+  --      wet side keeps outW untouched, and capsAt's base pays
+  --      `suc (pWᵉ n sl e ⊔ slotsPW n sl)`.
+  --
+  --      AND THE TELESCOPE CONJUNCT IS dW, NOT pW, which is the one
+  --      place the ruling's shape had to be sharpened in the making.
+  --      `dWᵉ n sl (deferᵉ body) = pWᵉ n sl body` EXACTLY, so a dW
+  --      hypothesis serves the defer clause with nothing to spare — and
+  --      it DESCENDS, which pW does not: `outWᵉ (mergeAllᵉ e)` is
+  --      `outWᵉ e * innWᵉ e`, which is 0 at `innWᵉ e = 0` (take
+  --      `e = ofᵉ (strmᵗ emptyᵉ ∷ [])`: outW 1, innW 0), so a pW
+  --      hypothesis at `mergeAllᵉ e` says nothing about `e` and the
+  --      *All clause could not recurse.  dW is a plain ⊔-collect through
+  --      every constructor, so every structural descent is m≤m⊔n.  Every
+  --      supplier still works, because all three supply pW ≥ dW: payload
+  --      paths from valCaps?'s width half, the root from the base, and
+  --      sharedConnect from slotsCaps?, which gains a width half at pW
+  --      on its shared branch
   subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
     Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) sl ≡ true →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
     capsOK? (frameStep j c) sched st ≡ true →
     sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     let r = subscribeE g b κ bid now sched st
@@ -1514,7 +1549,7 @@ capsAt-suc-full e sl id = refl
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)
 2≤capsAt-size {n = n} e sl zero =
-  2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl) (suc (outWᵉ n sl e))
+  2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl) (suc (pWᵉ n sl e ⊔ slotsPW n sl))
                            (suc (sizeᵉ e + slotsSize sl)))
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 2≤capsAt-size e sl (suc id) =
@@ -1530,7 +1565,7 @@ capsAt-suc-full e sl id = refl
 1≤capsAt-reg : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   1 ≤ Caps.cReg (capsAt e sl id)
 1≤capsAt-reg {n = n} e sl zero =
-  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (outWᵉ n sl e))
+  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (pWᵉ n sl e ⊔ slotsPW n sl))
                           (suc (sizeᵉ e + slotsSize sl)))
     (s≤s z≤n)
 1≤capsAt-reg e sl (suc id) =
@@ -1552,7 +1587,7 @@ cSize≤frameBlowup c h =
 capsAt-base-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
 capsAt-base-size {n = n} e sl zero =
-  cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl) (suc (outWᵉ n sl e))
+  cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl) (suc (pWᵉ n sl e ⊔ slotsPW n sl))
                           (suc (sizeᵉ e + slotsSize sl)))
     (≤-trans (s≤s z≤n) (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl))))
 capsAt-base-size e sl (suc id) =
@@ -1564,11 +1599,35 @@ capsAt-base-size e sl (suc id) =
 -- 1≤capsAt-reg.  It is what the cascade face hands the tree once
 -- cascadeGo-charge carries the side condition too; the companions below
 -- thread it from there down to subscribeE-input-caps unchanged
+-- THE WIDTH AXIS OF THE SAME SUPPLY, and the reason capsAt's base pays
+-- for `slotsPW` at all: a shared slot's def is entry syntax that a
+-- connect subscribes whole, so its parked bodies are as much a base
+-- quantity as its size is.  iterFold only grows a width (for S ≥ 2), so
+-- every level inherits the base's
+cWid≤frameBlowup : ∀ (c : Caps) → 2 ≤ Caps.cSize c →
+  Caps.cWid c ≤ Caps.cWid (frameBlowup c)
+cWid≤frameBlowup c h =
+  iterFold-infl (Caps.cSize c) h
+    (2 ^ Caps.cReg c * 2 ^ Caps.cReg c * Caps.cSize c) (Caps.cWid c)
+
+capsAt-base-wid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (pWᵉ n sl e ⊔ slotsPW n sl) ≤ Caps.cWid (capsAt e sl id)
+capsAt-base-wid {n = n} e sl zero =
+  cWid≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
+                         (suc (pWᵉ n sl e ⊔ slotsPW n sl))
+                         (suc (sizeᵉ e + slotsSize sl)))
+    (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+capsAt-base-wid e sl (suc id) =
+  ≤-trans (capsAt-base-wid e sl id)
+          (cWid≤frameBlowup (capsAt e sl id) (2≤capsAt-size e sl id))
+
 slotsCaps?-capsAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  slotsCaps? (Caps.cSize (capsAt e sl id)) sl ≡ true
-slotsCaps?-capsAt e sl id =
-  slotsCaps?-bound (Caps.cSize (capsAt e sl id)) sl
+  slotsCaps? (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl ≡ true
+slotsCaps?-capsAt {n = n} e sl id =
+  slotsCaps?-bound (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
     (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id))
+    (≤-trans (≤-trans (m≤n⊔m (pWᵉ n sl e) (slotsPW n sl)) (n≤1+n _))
+             (capsAt-base-wid e sl id))
 
 ------------------------------------------------------------------
 -- caps-tick, DERIVED.  This is the joint the whole round was about, and
@@ -1790,7 +1849,7 @@ subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   valCaps? (frameStep j c) sl (obs u) o ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
@@ -1816,7 +1875,7 @@ subscribeInner-caps c j g0 op allNid κ id now o sl sched st 2≤S 1≤R slEq sl
 -- instant, and at ONE MORE j.  Its size hypothesis is valCaps?'s cSize
 -- half (sizeᵛ (obs u) IS sizeᵉ), widened by the step; its chain
 -- hypothesis is κ's, one frame longer, which is frameStep-chain-suc
-subscribeInner-caps {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ id now o
+subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ id now o
                     sl sched st 2≤S 1≤R slEq slC inv vC pC lC =
   suc j₂ , R1 , R2 , R3
   where
@@ -1827,6 +1886,13 @@ subscribeInner-caps {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ id now 
   κ′     = from-inner op allNid (Sched.nextNode sched) ↠ κ
   szo    : sizeᵉ o ≤ B
   szo    = ≤ᵇ⇒≤ (sizeᵛ (obs u) o) B (T-to (proj₁ (∧-true _ _ vC)))
+  -- THE PARKED-WIDTH HALF, and it is already in hand: valCaps?'s width
+  -- half is `pWᵛ n sl (obs u) o ≤ cWid`, which IS `outWᵉ o ⊔ dWᵉ o`, so
+  -- the dW conjunct subscribeE-caps asks for is the right disjunct
+  wdo    : dWᵉ n sl o ≤ Caps.cWid (frameStep j c)
+  wdo    = ≤-trans (m≤n⊔m _ (dWᵉ n sl o))
+                   (≤ᵇ⇒≤ (pWᵛ n sl (obs u) o) (Caps.cWid (frameStep j c))
+                         (T-to (valCaps?-wid (frameStep j c) sl (obs u) o vC)))
   pC′    : pathSz? B′ κ′ ≡ true
   pC′    = ∧-intro refl
              (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
@@ -1836,7 +1902,8 @@ subscribeInner-caps {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ id now 
              (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
                 (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                   sched st inv))
-             (≤-trans szo (proj₁ step⊑)) pC′
+             (≤-trans szo (proj₁ step⊑))
+             (≤-trans wdo (proj₁ (proj₂ step⊑))) pC′
              (frameStep-chain-suc c j (pathLen κ) 2≤S lC)
   j₂     = proj₁ IH
   SUB    = proj₁ (proj₂ IH)
@@ -1965,9 +2032,10 @@ sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  dWᵉ n sl d ≤ Caps.cWid (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   let r = sharedConnect g i d κ id now sched st
@@ -1975,13 +2043,13 @@ sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 -- OUT OF GAS: a dry close and nothing else
-sharedConnect-caps {Γ = Γ} c j g0 i d κ id now sl sched st 2≤S 1≤R slEq slC inv szd pC lC =
+sharedConnect-caps {Γ = Γ} c j g0 i d κ id now sl sched st 2≤S 1≤R slEq slC inv szd wdd pC lC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
                      (dryBurst {A = Val Γ (lookup Γ i)} id) ≡ true)
             (sym (+-identityʳ j)) refl
 sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
-                   2≤S 1≤R slEq slC inv szd pC lC
+                   2≤S 1≤R slEq slC inv szd wdd pC lC
   with burstCompleted (proj₁ (subscribeE fuel′ d (share-sink i) id now sched
                                (register (toℕ i) κ
                                  (record st { connectedShares =
@@ -2004,6 +2072,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
           2≤S 1≤R slEq slC
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+          (≤-trans wdd (proj₁ (proj₂ (frameStep-mono-j c 2≤S (n≤1+n j)))))
           refl
           (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S))
   j₂  = proj₁ IH
@@ -2029,6 +2098,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
           2≤S 1≤R slEq slC
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
+          (≤-trans wdd (proj₁ (proj₂ (frameStep-mono-j c 2≤S (n≤1+n j)))))
           refl
           (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S))
   j₂  = proj₁ IH
@@ -2048,16 +2118,17 @@ sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   sizeᵉ d ≤ Caps.cSize (frameStep j c) →
+  dWᵉ n sl d ≤ Caps.cWid (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   let r = subscribeSharedSlot g i d κ id now sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-sharedSlot-caps {Γ = Γ} c j g i d κ id now sl sched st 2≤S 1≤R slEq slC inv szd pC lC
+sharedSlot-caps {Γ = Γ} c j g i d κ id now sl sched st 2≤S 1≤R slEq slC inv szd wdd pC lC
   with memberSource (toℕ i) (EvalSt.completedSources st)
 ... | true  =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -2073,7 +2144,7 @@ sharedSlot-caps {Γ = Γ} c j g i d κ id now sl sched st 2≤S 1≤R slEq slC i
                      (((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []) ≡ true)
             (sym (j+1 j)) refl
 ...   | false = sharedConnect-caps c j g i d κ id now sl sched st
-                  2≤S 1≤R slEq slC inv szd pC lC
+                  2≤S 1≤R slEq slC inv szd wdd pC lC
 
 ------------------------------------------------------------------
 -- GRINDING stepFrame-caps, THE CLAUSE THAT PAYS A j.
@@ -2430,7 +2501,7 @@ thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   valCaps? (frameStep j c) sl (obs u) o ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
@@ -2513,9 +2584,9 @@ thruConsume-caps {n = n} {u = u} c j g concatᵒ nid κ id now o sl sched st
   where
   BN = all-++-intro (λ x → sizeᵉ x ≤ᵇ Caps.cSize (frameStep j c)) q (o ∷ [])
          bn (∧-intro (valCaps?-size (frameStep j c) sl (obs u) o vC) refl)
-  WN = all-++-intro (λ x → outWᵉ n (Sched.slots sched) x ≤ᵇ Caps.cWid (frameStep j c))
+  WN = all-++-intro (λ x → pWᵉ n (Sched.slots sched) x ≤ᵇ Caps.cWid (frameStep j c))
          q (o ∷ []) wn
-         (∧-intro (subst (λ y → (outWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
+         (∧-intro (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                          (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
                   refl)
 
@@ -2609,7 +2680,7 @@ thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   all (valCaps? (frameStep j c) sl (obs u)) vals ≡ true →
@@ -2682,33 +2753,33 @@ obsList-nodeSz {n = n} c sl (o ∷ q) h
   with ∧-true (obsCaps? c sl o) (all (obsCaps? c sl) q) h
 ... | h1 , h2 =
   ∧-intro (proj₁ (∧-true (sizeᵉ o ≤ᵇ Caps.cSize c)
-                         (outWᵉ n sl o ≤ᵇ Caps.cWid c) h1))
+                         (pWᵉ n sl o ≤ᵇ Caps.cWid c) h1))
           (obsList-nodeSz c sl q h2)
 
 -- and back again, which is how the drained residue re-enters the node
 obsList-intro : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ)
   (q : List (Closed Γ s)) →
   all (λ o → sizeᵉ o ≤ᵇ Caps.cSize c) q ≡ true →
-  all (λ o → outWᵉ n sl o ≤ᵇ Caps.cWid c) q ≡ true →
+  all (λ o → pWᵉ n sl o ≤ᵇ Caps.cWid c) q ≡ true →
   all (obsCaps? c sl) q ≡ true
 obsList-intro c sl []      hsz hwd = refl
 obsList-intro {n = n} c sl (x ∷ q) hsz hwd
   with ∧-true (sizeᵉ x ≤ᵇ Caps.cSize c)
               (all (λ o → sizeᵉ o ≤ᵇ Caps.cSize c) q) hsz
-     | ∧-true (outWᵉ n sl x ≤ᵇ Caps.cWid c)
-              (all (λ o → outWᵉ n sl o ≤ᵇ Caps.cWid c) q) hwd
+     | ∧-true (pWᵉ n sl x ≤ᵇ Caps.cWid c)
+              (all (λ o → pWᵉ n sl o ≤ᵇ Caps.cWid c) q) hwd
 ... | s1 , s2 | w1 , w2 = ∧-intro (∧-intro s1 w1) (obsList-intro c sl q s2 w2)
 
 obsList-nodeWid : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ)
   (q : List (Closed Γ s)) →
   all (obsCaps? c sl) q ≡ true →
-  all (λ o → outWᵉ n sl o ≤ᵇ Caps.cWid c) q ≡ true
+  all (λ o → pWᵉ n sl o ≤ᵇ Caps.cWid c) q ≡ true
 obsList-nodeWid c sl []      h = refl
 obsList-nodeWid {n = n} c sl (o ∷ q) h
   with ∧-true (obsCaps? c sl o) (all (obsCaps? c sl) q) h
 ... | h1 , h2 =
   ∧-intro (proj₂ (∧-true (sizeᵉ o ≤ᵇ Caps.cSize c)
-                         (outWᵉ n sl o ≤ᵇ Caps.cWid c) h1))
+                         (pWᵉ n sl o ≤ᵇ Caps.cWid c) h1))
           (obsList-nodeWid c sl q h2)
 
 concatDrain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -2718,7 +2789,7 @@ concatDrain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
@@ -2805,7 +2876,7 @@ innerFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
@@ -2864,7 +2935,7 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
          sd₁ st₁
          (obsList-nodeSz (frameStep (j + j′) c) sl
             (proj₁ (proj₂ (proj₂ (proj₂ DR)))) RES)
-         (subst (λ y → all (λ x → outWᵉ n y x ≤ᵇ Caps.cWid (frameStep (j + j′) c))
+         (subst (λ y → all (λ x → pWᵉ n y x ≤ᵇ Caps.cWid (frameStep (j + j′) c))
                          (proj₁ (proj₂ (proj₂ (proj₂ DR)))) ≡ true)
                 (sym (trans (KeepsC.slotsEq
                               (concatDrain-keeps g allNid κ id now q sched st)) slEq))
@@ -2879,7 +2950,7 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
   CD  = concatDrain-caps c j g allNid κ id now q sl sched st
           2≤S 1≤R slEq slC inv pC lC
           (obsList-intro (frameStep j c) sl q bn
-             (subst (λ y → all (λ o → outWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
+             (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
                              ≡ true)
                     slEq wn))
   j′  = proj₁ CD
@@ -2983,7 +3054,7 @@ innerFinish-caps c j g exhaustᵒ allNid inst κ id now vals sl sched st
 --
 -- AND THE WIDTH HALF IS FREE, which is why slotsCaps? carries sizes
 -- only.  A scripted slot's element type is DATA — the `ok` proof the
--- `scripted` constructor carries is exactly `T (isData t)` — and outWᵛ
+-- `scripted` constructor carries is exactly `T (isData t)` — and pWᵛ
 -- is identically zero on a data type, since only its `obs` clause reads
 -- a width at all.  So a scripted value's width bound is refl and the
 -- side condition never has to mention cWid.  A shared slot's def is
@@ -2996,8 +3067,11 @@ innerFinish-caps c j g exhaustᵒ allNid inst κ id now vals sl sched st
 -- thruWalk-caps, concatDrain-caps and innerFinish-caps are all ground
 -- below, once the joint bound stopped blocking them.
 
--- a data type has no observable inside it, so it has no frame width —
--- which is what makes the slot side condition a size-only predicate
+-- a data type has no observable inside it, so it has neither a
+-- delivered nor a parked frame width — which is what still makes the
+-- scripted half of the slot side condition a size-only predicate.  Both
+-- axes need their own induction: pWᵛ is a join of two structural
+-- recursions, and at a pair the joins interleave
 outWᵛ-data : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (u : Ty) → T (isData u) →
   (v : Val Γ u) → outWᵛ k sl u v ≡ 0
 outWᵛ-data k sl unitᵗ ok v = refl
@@ -3015,11 +3089,33 @@ outWᵛ-data k sl (s +ᵗ u) ok (inj₂ b) with isData s
 ... | false = ⊥-elim ok
 outWᵛ-data k sl (obs u) ok v = ⊥-elim ok
 
+dWᵛ-data : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (u : Ty) → T (isData u) →
+  (v : Val Γ u) → dWᵛ k sl u v ≡ 0
+dWᵛ-data k sl unitᵗ ok v = refl
+dWᵛ-data k sl boolᵗ ok v = refl
+dWᵛ-data k sl natᵗ  ok v = refl
+dWᵛ-data k sl (s ×ᵗ u) ok (a , b) with isData s in eqs
+... | true  = cong₂ _⊔_ (dWᵛ-data k sl s (subst T (sym eqs) tt) a)
+                        (dWᵛ-data k sl u ok b)
+... | false = ⊥-elim ok
+dWᵛ-data k sl (s +ᵗ u) ok (inj₁ a) with isData s in eqs
+... | true  = dWᵛ-data k sl s (subst T (sym eqs) tt) a
+... | false = ⊥-elim ok
+dWᵛ-data k sl (s +ᵗ u) ok (inj₂ b) with isData s
+... | true  = dWᵛ-data k sl u ok b
+... | false = ⊥-elim ok
+dWᵛ-data k sl (obs u) ok v = ⊥-elim ok
+
+pWᵛ-data : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (u : Ty) → T (isData u) →
+  (v : Val Γ u) → pWᵛ k sl u v ≡ 0
+pWᵛ-data k sl u ok v =
+  cong₂ _⊔_ (outWᵛ-data k sl u ok v) (dWᵛ-data k sl u ok v)
+
 valCaps?-data : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) → T (isData u) →
   (v : Val Γ u) → (sizeᵛ u v ≤ᵇ Caps.cSize c) ≡ true → valCaps? c sl u v ≡ true
 valCaps?-data {n = n} c sl u ok v h =
   ∧-intro h (subst (λ x → (x ≤ᵇ Caps.cWid c) ≡ true)
-                   (sym (outWᵛ-data n sl u ok v)) refl)
+                   (sym (pWᵛ-data n sl u ok v)) refl)
 
 valsCaps?-data : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) → T (isData u) →
   (vs : List (Val Γ u)) → all (λ v → sizeᵛ u v ≤ᵇ Caps.cSize c) vs ≡ true →
@@ -3045,27 +3141,27 @@ resolve-caps {u = u} B anchor ((after w , v) ∷ r) h
 
 resolve-wid-data : ∀ {n} {Γ : Ctx n} {u} (W : ℕ) (sl : Slots Γ) → T (isData u) →
   (ps : List (Tick × Val Γ u)) →
-  all (λ tv → outWᵛ n sl u (proj₂ tv) ≤ᵇ W) ps ≡ true
+  all (λ tv → pWᵛ n sl u (proj₂ tv) ≤ᵇ W) ps ≡ true
 resolve-wid-data W sl ok []             = refl
 resolve-wid-data {n = n} {u = u} W sl ok ((tk , v) ∷ ps) =
-  ∧-intro (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (outWᵛ-data n sl u ok v)) refl)
+  ∧-intro (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (pWᵛ-data n sl u ok v)) refl)
           (resolve-wid-data W sl ok ps)
 
 -- one slot's condition, read out of the telescope's
-slotsGo?-tab : ∀ {n m} {Γ : Ctx n} (B : ℕ) (sl : Slots Γ)
+slotsGo?-tab : ∀ {n m} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ)
   (f : Fin m → Fin n) (i : Fin m) →
-  slotsGo? B sl (tabulate f) ≡ true → slotCaps? B (sl (f i)) ≡ true
-slotsGo?-tab B sl f Fin.zero h =
-  proj₁ (∧-true (slotCaps? B (sl (f Fin.zero)))
-                (slotsGo? B sl (tabulate (λ k → f (Fin.suc k)))) h)
-slotsGo?-tab B sl f (Fin.suc i) h =
-  slotsGo?-tab B sl (λ k → f (Fin.suc k)) i
-    (proj₂ (∧-true (slotCaps? B (sl (f Fin.zero)))
-                   (slotsGo? B sl (tabulate (λ k → f (Fin.suc k)))) h))
+  slotsGo? B W sl (tabulate f) ≡ true → slotCaps? B W sl (sl (f i)) ≡ true
+slotsGo?-tab B W sl f Fin.zero h =
+  proj₁ (∧-true (slotCaps? B W sl (sl (f Fin.zero)))
+                (slotsGo? B W sl (tabulate (λ k → f (Fin.suc k)))) h)
+slotsGo?-tab B W sl f (Fin.suc i) h =
+  slotsGo?-tab B W sl (λ k → f (Fin.suc k)) i
+    (proj₂ (∧-true (slotCaps? B W sl (sl (f Fin.zero)))
+                   (slotsGo? B W sl (tabulate (λ k → f (Fin.suc k)))) h))
 
-slotsCaps?-lookup : ∀ {n} {Γ : Ctx n} (B : ℕ) (sl : Slots Γ) (i : Fin n) →
-  slotsCaps? B sl ≡ true → slotCaps? B (sl i) ≡ true
-slotsCaps?-lookup B sl i h = slotsGo?-tab B sl (λ k → k) i h
+slotsCaps?-lookup : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) (i : Fin n) →
+  slotsCaps? B W sl ≡ true → slotCaps? B W sl (sl i) ≡ true
+slotsCaps?-lookup B W sl i h = slotsGo?-tab B W sl (λ k → k) i h
 
 -- a fresh cold's live entry, bounded on both halves
 capsOK?-addLive : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -3097,13 +3193,19 @@ cSize≤frameStep : ∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c →
 cSize≤frameStep c j h =
   iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h) j (Caps.cSize c)
 
+-- and the width axis of the same, which is what widens the slot
+-- telescope's parked-width half to the level a clause reports at
+cWid≤frameStep : ∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c →
+  Caps.cWid c ≤ Caps.cWid (frameStep j c)
+cWid≤frameStep c j h = iterFold-infl (Caps.cSize c) h j (Caps.cWid c)
+
 subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
@@ -3111,15 +3213,21 @@ subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-subscribeE-input-caps {Γ = Γ} c j g i κ id now sl sched st
+subscribeE-input-caps {n = n} {Γ = Γ} c j g i κ id now sl sched st
                       2≤S 1≤R slEq slC inv pC lC
   with Sched.slots sched i
-     | subst (λ y → slotCaps? (Caps.cSize c) (y i) ≡ true) (sym slEq)
-             (slotsCaps?-lookup (Caps.cSize c) sl i slC)
--- SHARED: the def's size is the one thing sharedSlot-caps asks for
+     | subst (λ y → slotCaps? (Caps.cSize c) (Caps.cWid c) sl (y i) ≡ true) (sym slEq)
+             (slotsCaps?-lookup (Caps.cSize c) (Caps.cWid c) sl i slC)
+-- SHARED: the def's size, and — since the parked-width repair — its
+-- parked width, are the two things sharedSlot-caps asks for.  Both come
+-- straight out of the slot telescope's own side condition
 ... | shared d | sd =
   sharedSlot-caps c j g i d κ id now sl sched st 2≤S 1≤R slEq slC inv
-    (≤-trans (≤ᵇ⇒≤ (sizeᵉ d) (Caps.cSize c) (T-to sd)) (cSize≤frameStep c j 2≤S))
+    (≤-trans (≤ᵇ⇒≤ (sizeᵉ d) (Caps.cSize c) (T-to (proj₁ (∧-true _ _ sd))))
+             (cSize≤frameStep c j 2≤S))
+    (≤-trans (m≤n⊔m _ (dWᵉ n sl d))
+      (≤-trans (≤ᵇ⇒≤ (pWᵉ n sl d) (Caps.cWid c) (T-to (proj₂ (∧-true _ _ sd))))
+               (cWid≤frameStep c j 2≤S)))
     pC lC
 -- HOT SCRIPT: spent, or one more registration
 ... | scripted (hot async) | sd
@@ -3213,7 +3321,7 @@ innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
@@ -3393,7 +3501,7 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
   run = scanVals fn ac vals
   SC  = scanFrame-caps c j sl fn ac vals 2≤S fS
           (∧-intro (proj₁ nb)
-                   (subst (λ x → (outWᵛ _ x u ac ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
+                   (subst (λ x → (pWᵛ _ x u ac ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                           slEq (proj₂ nb)))
           vC
   j′  = proj₁ SC
@@ -3406,7 +3514,7 @@ stepFrame-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   frameSz? (Caps.cSize (frameStep j c)) f ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
@@ -3501,7 +3609,7 @@ foldPath-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) path ≡ true →
   all (valCaps? (frameStep j c) sl u) vals ≡ true →
@@ -3518,7 +3626,7 @@ dispatchShare-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   all (valCaps? (frameStep j c) sl (lookup Γ i)) vals ≡ true →
   let r = dispatchShare {t = t} sf gas id now i vals fin sched st
@@ -3534,7 +3642,7 @@ shareGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   all (λ rp → pathSz? (Caps.cSize (frameStep j c)) (proj₂ rp)) ps ≡ true →
   all (valCaps? (frameStep j c) sl (lookup Γ i)) vals ≡ true →
@@ -3690,7 +3798,7 @@ chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
   Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) sl ≡ true →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) path ≡ true →
   valCaps? (frameStep j c) sl (arrTy a) (arrVal a) ≡ true →
@@ -3910,8 +4018,8 @@ postulate
 -- collapses them.  The tempting move is to carry size only and derive
 -- width from it — the way hopD-sizeᵉ derives hop depth from szB of size,
 -- which is exactly why cHop is NOT a field.  THAT ROUTE IS CIRCULAR for
--- width.  outW is not polynomial in size: outWᵉ (mergeAllᵉ e)
--- is outWᵉ e * innWᵉ e and innWᵉ towers at a scanᵉ, so any size-to-width
+-- width.  outW is not polynomial in size: pWᵉ (mergeAllᵉ e)
+-- is pWᵉ e * innWᵉ e and innWᵉ towers at a scanᵉ, so any size-to-width
 -- bound is at least exponential, and the cap would have to dominate an
 -- exponential of itself.
 --
