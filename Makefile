@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache slot-fuel-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache slot-fuel-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -99,6 +99,14 @@ help:
 	@echo "                  and the slope in sz is unbounded - the base height"
 	@echo "                  is quadratic, not 3 + 2*sz"
 	@echo "                  (see agda/probe/Slot-Fuel-Probe.agda).  Fast"
+	@echo "  visited-width-probe  the ruling off slot-fuel-probe, measured:"
+	@echo "                  the slot descent drops VISITED slots instead of"
+	@echo "                  spending fuel, so a revisit contributes zero."
+	@echo "                  The 2-cycle's four tower stories collapse to a"
+	@echo "                  fixed point; acyclic telescopes agree by refl;"
+	@echo "                  the base height fits 3 + 2*sz (16 against 689"
+	@echo "                  where the fuel form demanded 792)"
+	@echo "                  (see agda/probe/Visited-Width-Probe.agda).  Fast"
 	@echo "  charge-probe  does one cascade's j fit D * cSize?  NO - the"
 	@echo "                  receipt-weighted j breaches it on the deepening"
 	@echo "                  scan, and twice over when a second scan sits"
@@ -268,6 +276,19 @@ mult-width-probe:
 # Standalone, so src/Main.agda never reaches it.  Fast.
 slot-fuel-probe:
 	cd agda && agda -i src -i probe probe/Slot-Fuel-Probe.agda
+
+# The ruling Slot-Fuel-Probe prices out, measured before it is ground in:
+# the slot descent stops spending generic fuel and starts DROPPING
+# VISITED SLOTS, so a revisit contributes ZERO (share-connect-no-replay).
+# On that probe's own 2-cycle the fuel measure's four tower stories
+# collapse to a FIXED POINT after two shared entries, and on any ACYCLIC
+# telescope the two descents are equal by refl — which confines the
+# soundness question to telescopes with a slot cycle.  The base-height
+# row that refuted `3 + 2 * sz` is re-run and fits: 16 against 689 where
+# the fuel form demanded 792.  Standalone, so src/Main.agda never
+# reaches it.  Fast.
+visited-width-probe:
+	cd agda && agda -i src -i probe probe/Visited-Width-Probe.agda
 
 # The counterexample that killed regsSz?-subscribeE: a FIXED cap cannot
 # survive a subscribe, because subscribeE pushes one frame per shell of
