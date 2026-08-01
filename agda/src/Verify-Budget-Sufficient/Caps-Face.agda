@@ -98,7 +98,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵛ; outWᵛ;
+open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
                                 slotPW; slotsPW; slotsPWgo)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
@@ -1211,114 +1211,122 @@ shareGo-slots sf gas id now i vals fin ((rid , p) ∷ ps) sched st
   FP  = foldPath sf gas id now (toℕ i) p vals
           (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
 
-postulate
-  -- AND EVERY COMPANION NAMES ITS TELESCOPE.  `sl` with
-  -- `Sched.slots sched ≡ sl` rather than reading Sched.slots off each
-  -- Sched in sight: the in-flight predicates are stated at one fixed
-  -- telescope, so a sub-call's outputs and the caller's conclusion are
-  -- already at the same index and the whole composition costs ONE
-  -- `trans` against the sub-call's slots corollary, instead of a
-  -- transport per carried bound.  caps-tick was already written this
-  -- way; the tree now matches it.
+------------------------------------------------------------------
+-- THE FRAME FACE, FORWARD-DECLARED.
+--
+-- AND EVERY COMPANION NAMES ITS TELESCOPE.  `sl` with
+-- `Sched.slots sched ≡ sl` rather than reading Sched.slots off each
+-- Sched in sight: the in-flight predicates are stated at one fixed
+-- telescope, so a sub-call's outputs and the caller's conclusion are
+-- already at the same index and the whole composition costs ONE
+-- `trans` against the sub-call's slots corollary, instead of a
+-- transport per carried bound.  caps-tick was already written this
+-- way; the tree now matches it.
 
-  -- EVERY COMPANION CARRIES `2 ≤ Caps.cSize c`, and it is not decoration.
-  -- The tree's only arithmetic is widening a sub-result from frameStep j
-  -- to frameStep (j + j′), which is frameStep-mono-j — and that has a
-  -- side condition, because foldStep S is inflationary only for S ≥ 2
-  -- (w ≤ S ^ suc w fails at S = 1).  S is cSize c, so the condition is
-  -- `2 ≤ Caps.cSize c`.  It is threaded UNCHANGED (c never moves inside
-  -- a frame, only j does) and supplied once at the top by
-  -- 2≤capsAt-size, which the recurrence proves rather than assumes.
-  -- THE CHAIN HYPOTHESIS IS SEPARATE FROM THE SIZE ONE, and that is the
-  -- joint-bound repair (Joint-Probe, 2026-07-31).  What stood here was
-  -- `pathLen κ + sizeᵉ b ≤ cSize` — a JOINT bound the delivery side
-  -- cannot supply, since it carries the two separately and their sum can
-  -- be twice the cap.  Joint-Probe measured the joint form false at the
-  -- tight admissible cSize on all seventeen families, and adm + 1
-  -- EXACTLY on every scan family: the payload being subscribed IS the
-  -- stored accumulator, so it alone attains the cap and any chain at all
-  -- overshoots.  No slackening survives that.  The pair below is what
-  -- foldPath-caps already splits out of pathSz?, and the +1 each *All
-  -- hop adds is absorbed by the j that hop pays — frameStep-chain-suc.
-  -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
-  -- folds and reports how many.  j′ folds spent means the caps advance
-  -- from frameStep j to frameStep (j + j′), never staying put.
-  --
-  -- SURVEYED, NOT ATTEMPTED (2026-07-31), now that every COMPANION is
-  -- ground and this is the only caps face left.  Three things it needs
-  -- that are not clause work, recorded so the next leg starts from a
-  -- statement rather than from a grind:
-  --
-  -- (i)  TWO COMPANIONS DO NOT EXIST YET.  Seven of the thirteen clauses
-  --      end in `pushBurst fuel id now f κ burst …` (mapᵉ, takeᵉ, scanᵉ)
-  --      or in `subscribeAll` (the four *All heads), and neither has a
-  --      caps companion.  Both look like ordinary grinds — pushBurst is
-  --      foldPath's `↠` clause per emit, over the now-ground
-  --      stepFrame-caps, and subscribeAll is mintNode + installNode +
-  --      this face at `thru-outer op nid ↠ κ` + pushBurst, one more
-  --      instance of the same one-j-per-hop absorption
-  --      (frameStep-chain-suc) subscribeInner-caps runs on.
-  --
-  -- (ii) TWO CLAUSES BUILD VALUES BY EVALUATION, and land where
-  --      mapFrame-caps / scanFrame-caps already are.  `ofᵉ ts` bursts
-  --      `map evalTm ts` and `scanᵉ f seed b` installs
-  --      `scan-st (evalTm seed)`; evalWith-size is a TOWER in the term's
-  --      syntax, so neither is `sizeᵛ ≤ sizeᵗ` and both want an
-  --      existential j′ of their own.  `μᵉ body` is the same shape once
-  --      more — unfoldμ is LARGER than the μ (only syncSizeᵉ is
-  --      preserved, syncSize-unfoldμ; sizeᵉ is not) — so its recursive
-  --      call has no size hypothesis until one is stated.
-  --
-  -- (iii) THE ONE THAT WAS A STATEMENT-LEVEL GAP, NOW REPAIRED (the
-  --      parked-width ruling, 2026-07-31).  `deferᵉ body` PARKS AN
-  --      OBSERVABLE ON THE SCHEDULE: its clause adds a LiveSource at
-  --      `elemTy = obs u` with `pending = (suc now , body)`, so
-  --      capsOK?'s widLive conjunct demands a WIDTH for the body — and
-  --      `outWᵉ (deferᵉ e) = 0` by definition (a defer crosses a tick,
-  --      and that semantics is load-bearing on the wet side), so no
-  --      outW-derived entry measure supplied it.
-  --
-  --      THE REPAIR IS SUPPLY-SIDE AND CAPS-SIDE ONLY.  Rx.Frame-Width
-  --      gains dW — the PARKED width, ⊔-collecting every deferᵉ
-  --      subterm's `outWᵉ body ⊔ dWᵉ body` — and pW = outW ⊔ dW.  The
-  --      caps side reads pW (widLive, widNode, valCaps?, obsCaps?), the
-  --      wet side keeps outW untouched, and capsAt's base pays
-  --      `suc (pWᵉ n sl e ⊔ slotsPW n sl)`.
-  --
-  --      AND THE TELESCOPE CONJUNCT IS dW, NOT pW, which is the one
-  --      place the ruling's shape had to be sharpened in the making.
-  --      `dWᵉ n sl (deferᵉ body) = pWᵉ n sl body` EXACTLY, so a dW
-  --      hypothesis serves the defer clause with nothing to spare — and
-  --      it DESCENDS, which pW does not: `outWᵉ (mergeAllᵉ e)` is
-  --      `outWᵉ e * innWᵉ e`, which is 0 at `innWᵉ e = 0` (take
-  --      `e = ofᵉ (strmᵗ emptyᵉ ∷ [])`: outW 1, innW 0), so a pW
-  --      hypothesis at `mergeAllᵉ e` says nothing about `e` and the
-  --      *All clause could not recurse.  dW is a plain ⊔-collect through
-  --      every constructor, so every structural descent is m≤m⊔n.  Every
-  --      supplier still works, because all three supply pW ≥ dW: payload
-  --      paths from valCaps?'s width half, the root from the base, and
-  --      sharedConnect from slotsCaps?, which gains a width half at pW
-  --      on its shared branch
-  subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    let r = subscribeE g b κ bid now sched st
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+-- EVERY COMPANION CARRIES `2 ≤ Caps.cSize c`, and it is not decoration.
+-- The tree's only arithmetic is widening a sub-result from frameStep j
+-- to frameStep (j + j′), which is frameStep-mono-j — and that has a
+-- side condition, because foldStep S is inflationary only for S ≥ 2
+-- (w ≤ S ^ suc w fails at S = 1).  S is cSize c, so the condition is
+-- `2 ≤ Caps.cSize c`.  It is threaded UNCHANGED (c never moves inside
+-- a frame, only j does) and supplied once at the top by
+-- 2≤capsAt-size, which the recurrence proves rather than assumes.
+-- THE CHAIN HYPOTHESIS IS SEPARATE FROM THE SIZE ONE, and that is the
+-- joint-bound repair (Joint-Probe, 2026-07-31).  What stood here was
+-- `pathLen κ + sizeᵉ b ≤ cSize` — a JOINT bound the delivery side
+-- cannot supply, since it carries the two separately and their sum can
+-- be twice the cap.  Joint-Probe measured the joint form false at the
+-- tight admissible cSize on all seventeen families, and adm + 1
+-- EXACTLY on every scan family: the payload being subscribed IS the
+-- stored accumulator, so it alone attains the cap and any chain at all
+-- overshoots.  No slackening survives that.  The pair below is what
+-- foldPath-caps already splits out of pathSz?, and the +1 each *All
+-- hop adds is absorbed by the j that hop pays — frameStep-chain-suc.
+-- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
+-- folds and reports how many.  j′ folds spent means the caps advance
+-- from frameStep j to frameStep (j + j′), never staying put.
+--
+-- SURVEYED, NOT ATTEMPTED (2026-07-31), now that every COMPANION is
+-- ground and this is the only caps face left.  Three things it needs
+-- that are not clause work, recorded so the next leg starts from a
+-- statement rather than from a grind:
+--
+-- (i)  TWO COMPANIONS DO NOT EXIST YET.  Seven of the thirteen clauses
+--      end in `pushBurst fuel id now f κ burst …` (mapᵉ, takeᵉ, scanᵉ)
+--      or in `subscribeAll` (the four *All heads), and neither has a
+--      caps companion.  Both look like ordinary grinds — pushBurst is
+--      foldPath's `↠` clause per emit, over the now-ground
+--      stepFrame-caps, and subscribeAll is mintNode + installNode +
+--      this face at `thru-outer op nid ↠ κ` + pushBurst, one more
+--      instance of the same one-j-per-hop absorption
+--      (frameStep-chain-suc) subscribeInner-caps runs on.
+--
+-- (ii) TWO CLAUSES BUILD VALUES BY EVALUATION, and land where
+--      mapFrame-caps / scanFrame-caps already are.  `ofᵉ ts` bursts
+--      `map evalTm ts` and `scanᵉ f seed b` installs
+--      `scan-st (evalTm seed)`; evalWith-size is a TOWER in the term's
+--      syntax, so neither is `sizeᵛ ≤ sizeᵗ` and both want an
+--      existential j′ of their own.  `μᵉ body` is the same shape once
+--      more — unfoldμ is LARGER than the μ (only syncSizeᵉ is
+--      preserved, syncSize-unfoldμ; sizeᵉ is not) — so its recursive
+--      call has no size hypothesis until one is stated.
+--
+-- (iii) THE ONE THAT WAS A STATEMENT-LEVEL GAP, NOW REPAIRED (the
+--      parked-width ruling, 2026-07-31).  `deferᵉ body` PARKS AN
+--      OBSERVABLE ON THE SCHEDULE: its clause adds a LiveSource at
+--      `elemTy = obs u` with `pending = (suc now , body)`, so
+--      capsOK?'s widLive conjunct demands a WIDTH for the body — and
+--      `outWᵉ (deferᵉ e) = 0` by definition (a defer crosses a tick,
+--      and that semantics is load-bearing on the wet side), so no
+--      outW-derived entry measure supplied it.
+--
+--      THE REPAIR IS SUPPLY-SIDE AND CAPS-SIDE ONLY.  Rx.Frame-Width
+--      gains dW — the PARKED width, ⊔-collecting every deferᵉ
+--      subterm's `outWᵉ body ⊔ dWᵉ body` — and pW = outW ⊔ dW.  The
+--      caps side reads pW (widLive, widNode, valCaps?, obsCaps?), the
+--      wet side keeps outW untouched, and capsAt's base pays
+--      `suc (pWᵉ n sl e ⊔ slotsPW n sl)`.
+--
+--      AND THE TELESCOPE CONJUNCT IS dW, NOT pW, which is the one
+--      place the ruling's shape had to be sharpened in the making.
+--      `dWᵉ n sl (deferᵉ body) = pWᵉ n sl body` EXACTLY, so a dW
+--      hypothesis serves the defer clause with nothing to spare — and
+--      it DESCENDS, which pW does not: `outWᵉ (mergeAllᵉ e)` is
+--      `outWᵉ e * innWᵉ e`, which is 0 at `innWᵉ e = 0` (take
+--      `e = ofᵉ (strmᵗ emptyᵉ ∷ [])`: outW 1, innW 0), so a pW
+--      hypothesis at `mergeAllᵉ e` says nothing about `e` and the
+--      *All clause could not recurse.  dW is a plain ⊔-collect through
+--      every constructor, so every structural descent is m≤m⊔n.  Every
+--      supplier still works, because all three supply pW ≥ dW: payload
+--      paths from valCaps?'s width half, the root from the base, and
+--      sharedConnect from slotsCaps?, which gains a width half at pW
+--      on its shared branch
+--
+-- AND IT IS NO LONGER A POSTULATE: it is FORWARD-DECLARED here (so the
+-- companion tree below can call it, exactly as foldPath-caps and its
+-- clique are declared before they are defined) and GROUND at the end
+-- of the file, on pushBurst-caps, subscribeAll-caps and the three
+-- evaluation obligations named there
+-- the two bookends of `cascade` and the chain snapshot are no longer
+-- postulated either: they are GROUND below, on the same two filter
+-- lemmas the share leaves use.
 
-  -- the two bookends of `cascade` and the chain snapshot are no longer
-  -- postulated either: they are GROUND below, on the same two filter
-  -- lemmas the share leaves use.
+subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+  dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  let r = subscribeE g b κ bid now sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
 ------------------------------------------------------------------
 -- (b) THE CASCADE COMPANION, AND THE BUDGET CLAIM, AS AN ASSEMBLY.
@@ -3768,6 +3776,425 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
   j₂  = proj₁ PBc
   PB  = pushBurst g id now (thru-outer op nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+------------------------------------------------------------------
+-- THE THREE OBLIGATIONS subscribeE-caps CANNOT DISCHARGE, NAMED.
+--
+-- Two of subscribeE's clauses BUILD VALUES BY EVALUATION and one
+-- REBUILDS ITS OWN SYNTAX, and all three land exactly where
+-- mapFrame-caps / scanFrame-caps already are: `evalTm` is `evalWith`
+-- with an empty environment, an EVALUATION rather than a substitution,
+-- and evalWith-size is a TOWER in the term's syntax (evalWith-sharp
+-- only moves the exponent to `3 ^ caseWᵗ`).  So none of the three is
+-- `sizeᵛ ≤ sizeᵗ` and each wants an existential j′ of its own — which
+-- is affordable, because iterSize runs away faster than the clause
+-- does, and is the same reason the two frame postulates are true.
+--
+-- Stated as tightly as the clauses consume them, so the difficulty has
+-- a NAME and a boundary — no state, no recursion, no chain, just the
+-- evaluator's own arithmetic — instead of being buried in the hub.
+--
+-- THE μ CLAUSE IS THE ONE THAT IS NOT ABOUT evalTm.  `unfoldμ body` is
+-- LARGER than `μᵉ body` (only syncSizeᵉ is preserved — syncSize-unfoldμ;
+-- sizeᵉ is not), so the recursive call has no size hypothesis until one
+-- is stated.  Its WIDTH half, by contrast, is not an obligation of that
+-- kind at all: unfoldμ plugs `μᵉ body` at defer-gated `varᵉ` positions,
+-- dWᵉ is 0 at a `varᵉ` and a plain ⊔-collect everywhere else, so the
+-- unfolding collects nothing the μ did not already carry.  That is
+-- dW-unfoldμ — the ruling's dW-subΘ, at the one substitution the face
+-- actually performs — and it is the one lemma here that is a grind
+-- rather than a tower.
+------------------------------------------------------------------
+
+postulate
+  -- `ofᵉ ts` bursts `map evalTm ts`.  Both halves of valCaps? are owed,
+  -- and the two hypotheses are exactly what `sizeᵉ (ofᵉ ts)` and
+  -- `dWᵉ (ofᵉ ts)` give — the latter DEFINITIONALLY, since
+  -- `dWᵉ j sl (ofᵉ ts) = dWᵗˢ j sl ts`
+  evalTms-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+    (ts : List (Tm Γ [] [] [] u)) →
+    2 ≤ Caps.cSize c →
+    sizeᵗˢ ts ≤ Caps.cSize (frameStep j c) →
+    dWᵗˢ n sl ts ≤ Caps.cWid (frameStep j c) →
+    Σ ℕ λ j′ → all (valCaps? (frameStep (j + j′) c) sl u)
+                   (map (λ tm → evalTm tm) ts) ≡ true
+
+  -- `scanᵉ f seed b` installs `scan-st (evalTm seed)`: the same
+  -- statement for one term, and the accumulator has to come back
+  -- bounded on both axes because capsOK? reads it on both
+  evalSeed-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+    (z : Tm Γ [] [] [] u) →
+    2 ≤ Caps.cSize c →
+    sizeᵗ z ≤ Caps.cSize (frameStep j c) →
+    dWᵗ n sl z ≤ Caps.cWid (frameStep j c) →
+    Σ ℕ λ j′ → valCaps? (frameStep (j + j′) c) sl u (evalTm z) ≡ true
+
+  -- `μᵉ body` subscribes `unfoldμ body`, and the SIZE axis is the whole
+  -- of the obligation: the unfolding is larger than the μ by an amount
+  -- no syntactic measure in the file bounds
+  unfoldμ-size : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ)
+    (body : Exp Γ (t ∷ []) [] [] t) →
+    2 ≤ Caps.cSize c →
+    sizeᵉ (μᵉ body) ≤ Caps.cSize (frameStep j c) →
+    Σ ℕ λ j′ → sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + j′) c)
+
+  -- and the WIDTH axis of the same unfolding, which is not a tower:
+  -- the plug lands at `varᵉ` positions, where dWᵉ is 0
+  dW-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (j : ℕ) (sl : Slots Γ)
+    (body : Exp Γ (t ∷ []) [] [] t) →
+    dWᵉ j sl (unfoldμ body) ≤ dWᵉ j sl (μᵉ body)
+
+------------------------------------------------------------------
+-- subscribeE-caps, GROUND — the assembly knot, closed.
+--
+-- Thirteen clauses, and with the defer gap repaired they are all
+-- instances of machinery that already exists:
+--
+--   input i          subscribeE-input-caps, whole
+--   ofᵉ / emptyᵉ     a one-shot burst; the values off evalTms-caps
+--   mapᵉ / takeᵉ /   subscribe the source under ONE more frame, then
+--   scanᵉ            pushBurst — one j for the frame
+--                    (frameStep-chain-suc), the receipts add
+--   the four *All    subscribeAll-caps, whole; the initial node states
+--                    are bounded by refl on both axes
+--   μᵉ               one fuel, one unfolding, the two obligations above
+--   varᵉ             impossible in a closed expression
+--   deferᵉ           the clause the parked width exists for: install,
+--                    mint, PARK, register.  One j for the registration,
+--                    and the LiveSource's width bound IS the telescope's
+--                    dW conjunct, since `dWᵉ (deferᵉ body)` is
+--                    `pWᵉ body` exactly
+------------------------------------------------------------------
+
+-- SLOT: delegated whole
+subscribeE-caps c j g (input i) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  subscribeE-input-caps c j g i κ bid now sl sched st 2≤S 1≤R slEq slC inv pC lC
+
+-- LITERALS: one shot, and the payloads come off evalTms-caps.  The
+-- state is untouched; only the source counter moves, which capsOK?
+-- does not read
+subscribeE-caps {n = n} {u = u} c j g (ofᵉ ts) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  j₀ , capsOK?-mono (frameStep j c) (frameStep (j + j₀) c) sched st
+         (frameStep-⊑-+ c 2≤S j j₀) inv
+     , ∧-intro (∧-intro refl
+                  (all-++-intro (eventCaps? (frameStep (j + j₀) c) sl)
+                     (map value (map (λ tm → evalTm tm) ts)) _
+                     (mapValue-caps (frameStep (j + j₀) c) sl u
+                        (map (λ tm → evalTm tm) ts) (proj₂ EV))
+                     refl))
+               refl
+  where
+  EV = evalTms-caps c j sl ts 2≤S (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
+  j₀ = proj₁ EV
+
+subscribeE-caps {u = u} c j g emptyᵉ κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
+            (sym (+-identityʳ j)) inv
+    , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
+                     (proj₁ (oneShotBurst {u = u} [] bid sched)) ≡ true)
+            (sym (+-identityʳ j)) refl
+
+-- MAP: one more frame on the chain, so one j, then the burst comes back
+-- through that same frame
+subscribeE-caps {n = n} {t = t} {u = u} c j g (mapᵉ f b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  suc (j₁ + j₂)
+    , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
+            (sym (+-suc j (j₁ + j₂)))
+            (frameStep-+assoc-caps c (suc j) j₁ j₂
+               (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) (proj₁ (proj₂ PBc)))
+    , subst (λ x → burstCaps? (frameStep x c) sl (proj₁ PB) ≡ true)
+            (sym (+-suc j (j₁ + j₂)))
+            (frameStep-+assoc-burst c (suc j) j₁ j₂ sl (proj₁ PB)
+               (proj₂ (proj₂ PBc)))
+  where
+  step⊑ = frameStep-mono-j c 2≤S (n≤1+n j)
+  B′    = Caps.cSize (frameStep (suc j) c)
+  szsum : sizeᵗ f + sizeᵉ b ≤ Caps.cSize (frameStep j c)
+  szsum = ≤-trans (n≤1+n (sizeᵗ f + sizeᵉ b)) szb
+  szf   = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵉ b)) szsum
+  szb′  = ≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f)) szsum
+  fS′ : frameSz? B′ (map-f f) ≡ true
+  fS′ = T⇒≡true (sizeᵗ f ≤ᵇ B′) (≤⇒≤ᵇ (≤-trans szf (proj₁ step⊑)))
+  pC′ : pathSz? B′ (map-f f ↠ κ) ≡ true
+  pC′ = ∧-intro fS′
+          (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                     (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
+                   (pathSz?-⊑ κ step⊑ pC))
+  SUB = subscribeE-caps c (suc j) g b (map-f f ↠ κ) bid now sl sched st
+          2≤S 1≤R slEq slC
+          (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st step⊑ inv)
+          (≤-trans szb′ (proj₁ step⊑))
+          (≤-trans (m≤n⊔m (dWᵗ n sl f) (dWᵉ n sl b)) (≤-trans wdb (proj₁ (proj₂ step⊑))))
+          pC′
+          (frameStep-chain-suc c j (pathLen κ) 2≤S lC)
+  j₁  = proj₁ SUB
+  res = subscribeE g b (map-f f ↠ κ) bid now sched st
+  ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
+  PBc = pushBurst-caps c (suc j + j₁) g bid now (map-f f) κ (proj₁ res)
+          sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
+          (trans (KeepsC.slotsEq
+                   (subscribeE-keeps g b (map-f f ↠ κ) bid now sched st)) slEq)
+          slC (proj₁ (proj₂ SUB))
+          (frameSz?-widen (map-f f) (proj₁ ⊑₁) fS′)
+          (pathSz?-⊑ κ ⊑₁ (pathSz?-⊑ κ step⊑ pC))
+          (≤-trans (≤-trans lC (proj₁ step⊑)) (proj₁ ⊑₁))
+          (proj₂ (proj₂ SUB))
+  j₂  = proj₁ PBc
+  PB  = pushBurst g bid now (map-f f) κ (proj₁ res)
+          (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+-- TAKE: `take 0` never subscribes its source — a spent one-shot, exactly
+-- emptyᵉ.  Otherwise a node is installed (trivially bounded on both
+-- axes) and the source runs under one more frame
+subscribeE-caps {n = n} {u = u} c j g (takeᵉ cnt b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC
+  with evalTm cnt
+... | zero =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
+            (sym (+-identityʳ j)) inv
+    , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
+                     (proj₁ (oneShotBurst {u = u} [] bid sched)) ≡ true)
+            (sym (+-identityʳ j)) refl
+... | suc k =
+  suc (j₁ + j₂)
+    , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
+            (sym (+-suc j (j₁ + j₂)))
+            (frameStep-+assoc-caps c (suc j) j₁ j₂
+               (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) (proj₁ (proj₂ PBc)))
+    , subst (λ x → burstCaps? (frameStep x c) sl (proj₁ PB) ≡ true)
+            (sym (+-suc j (j₁ + j₂)))
+            (frameStep-+assoc-burst c (suc j) j₁ j₂ sl (proj₁ PB)
+               (proj₂ (proj₂ PBc)))
+  where
+  nid    = Sched.nextNode sched
+  sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid (take-st (suc k)) st
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n j)
+  B′     = Caps.cSize (frameStep (suc j) c)
+  szsum : sizeᵗ cnt + sizeᵉ b ≤ Caps.cSize (frameStep j c)
+  szsum = ≤-trans (n≤1+n (sizeᵗ cnt + sizeᵉ b)) szb
+  szb′  = ≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ cnt)) szsum
+  pC′ : pathSz? B′ (take-f nid ↠ κ) ≡ true
+  pC′ = ∧-intro refl
+          (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                     (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
+                   (pathSz?-⊑ κ step⊑ pC))
+  inv₀ : capsOK? (frameStep (suc j) c) sched₀ st₀ ≡ true
+  inv₀ = capsOK?-setNode (frameStep (suc j) c) nid (take-st (suc k)) sched₀ st
+           refl refl
+           (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
+              (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
+                                sched st inv))
+  SUB = subscribeE-caps c (suc j) g b (take-f nid ↠ κ) bid now sl sched₀ st₀
+          2≤S 1≤R slEq slC inv₀
+          (≤-trans szb′ (proj₁ step⊑))
+          (≤-trans (m≤n⊔m (dWᵗ n sl cnt) (dWᵉ n sl b))
+                   (≤-trans wdb (proj₁ (proj₂ step⊑))))
+          pC′
+          (frameStep-chain-suc c j (pathLen κ) 2≤S lC)
+  j₁  = proj₁ SUB
+  res = subscribeE g b (take-f nid ↠ κ) bid now sched₀ st₀
+  ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
+  PBc = pushBurst-caps c (suc j + j₁) g bid now (take-f nid) κ (proj₁ res)
+          sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
+          (trans (KeepsC.slotsEq
+                   (subscribeE-keeps g b (take-f nid ↠ κ) bid now sched₀ st₀)) slEq)
+          slC (proj₁ (proj₂ SUB)) refl
+          (pathSz?-⊑ κ ⊑₁ (pathSz?-⊑ κ step⊑ pC))
+          (≤-trans (≤-trans lC (proj₁ step⊑)) (proj₁ ⊑₁))
+          (proj₂ (proj₂ SUB))
+  j₂  = proj₁ PBc
+  PB  = pushBurst g bid now (take-f nid) κ (proj₁ res)
+          (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+-- SCAN: the accumulator is BUILT, by evalTm, so the node's two bounds
+-- come off evalSeed-caps and cost a receipt of their own before the
+-- source is even subscribed
+subscribeE-caps {n = n} {u = u} c j g (scanᵉ f z b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  j₀ + suc (j₁ + j₂)
+    , frameStep-+assoc-caps c j j₀ (suc (j₁ + j₂))
+        (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB))
+        (subst (λ x → capsOK? (frameStep x c)
+                        (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
+               (sym (+-suc (j + j₀) (j₁ + j₂)))
+               (frameStep-+assoc-caps c (suc (j + j₀)) j₁ j₂
+                  (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) (proj₁ (proj₂ PBc))))
+    , frameStep-+assoc-burst c j j₀ (suc (j₁ + j₂)) sl (proj₁ PB)
+        (subst (λ x → burstCaps? (frameStep x c) sl (proj₁ PB) ≡ true)
+               (sym (+-suc (j + j₀) (j₁ + j₂)))
+               (frameStep-+assoc-burst c (suc (j + j₀)) j₁ j₂ sl (proj₁ PB)
+                  (proj₂ (proj₂ PBc))))
+  where
+  szsum : sizeᵗ f + sizeᵗ z + sizeᵉ b ≤ Caps.cSize (frameStep j c)
+  szsum = ≤-trans (n≤1+n (sizeᵗ f + sizeᵗ z + sizeᵉ b)) szb
+  szfz  = ≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b)) szsum
+  szf   = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) szfz
+  szz   = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) szfz
+  szb′  = ≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f + sizeᵗ z)) szsum
+  SD = evalSeed-caps c j sl z 2≤S szz
+         (≤-trans (m≤n⊔m (dWᵗ n sl f) (dWᵗ n sl z))
+           (≤-trans (m≤m⊔n (dWᵗ n sl f ⊔ dWᵗ n sl z) (dWᵉ n sl b)) wdb))
+  j₀    = proj₁ SD
+  ⊑₀    = frameStep-⊑-+ c 2≤S j j₀
+  nid    = Sched.nextNode sched
+  sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid (scan-st (evalTm z)) st
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n (j + j₀))
+  B′     = Caps.cSize (frameStep (suc (j + j₀)) c)
+  VW = valCaps?-widen sl _ (evalTm z) step⊑ (proj₂ SD)
+  pC′ : pathSz? B′ (scan-f f nid ↠ κ) ≡ true
+  pC′ = ∧-intro (T⇒≡true (sizeᵗ f ≤ᵇ B′)
+                  (≤⇒≤ᵇ (≤-trans szf (≤-trans (proj₁ ⊑₀) (proj₁ step⊑)))))
+          (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                     (≤⇒≤ᵇ (≤-trans lC (≤-trans (proj₁ ⊑₀) (proj₁ step⊑)))))
+                   (pathSz?-⊑ κ step⊑ (pathSz?-⊑ κ ⊑₀ pC)))
+  inv₀ : capsOK? (frameStep (suc (j + j₀)) c) sched₀ st₀ ≡ true
+  inv₀ = capsOK?-setNode (frameStep (suc (j + j₀)) c) nid (scan-st (evalTm z))
+           sched₀ st
+           (valCaps?-size (frameStep (suc (j + j₀)) c) sl _ (evalTm z) VW)
+           (subst (λ y → widNode (Caps.cWid (frameStep (suc (j + j₀)) c)) y
+                           (scan-st (evalTm z)) ≡ true)
+                  (sym slEq)
+                  (valCaps?-wid (frameStep (suc (j + j₀)) c) sl _ (evalTm z) VW))
+           (capsOK?-mono (frameStep j c) (frameStep (suc (j + j₀)) c) sched₀ st
+              (⊑ᶜ-trans ⊑₀ step⊑)
+              (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
+                                sched st inv))
+  SUB = subscribeE-caps c (suc (j + j₀)) g b (scan-f f nid ↠ κ) bid now sl
+          sched₀ st₀ 2≤S 1≤R slEq slC inv₀
+          (≤-trans szb′ (≤-trans (proj₁ ⊑₀) (proj₁ step⊑)))
+          (≤-trans (m≤n⊔m (dWᵗ n sl f ⊔ dWᵗ n sl z) (dWᵉ n sl b))
+             (≤-trans wdb (≤-trans (proj₁ (proj₂ ⊑₀)) (proj₁ (proj₂ step⊑)))))
+          pC′
+          (frameStep-chain-suc c (j + j₀) (pathLen κ) 2≤S
+             (≤-trans lC (proj₁ ⊑₀)))
+  j₁  = proj₁ SUB
+  res = subscribeE g b (scan-f f nid ↠ κ) bid now sched₀ st₀
+  ⊑₁  = frameStep-⊑-+ c 2≤S (suc (j + j₀)) j₁
+  PBc = pushBurst-caps c (suc (j + j₀) + j₁) g bid now (scan-f f nid) κ
+          (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
+          (trans (KeepsC.slotsEq
+                   (subscribeE-keeps g b (scan-f f nid ↠ κ) bid now sched₀ st₀))
+                 slEq)
+          slC (proj₁ (proj₂ SUB))
+          (frameSz?-widen (scan-f f nid) (proj₁ ⊑₁)
+             (proj₁ (∧-true _ _ pC′)))
+          (pathSz?-⊑ κ ⊑₁ (pathSz?-⊑ κ step⊑ (pathSz?-⊑ κ ⊑₀ pC)))
+          (≤-trans (≤-trans lC (≤-trans (proj₁ ⊑₀) (proj₁ step⊑))) (proj₁ ⊑₁))
+          (proj₂ (proj₂ SUB))
+  j₂  = proj₁ PBc
+  PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)
+          (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+-- THE FOUR *All HEADS: subscribeAll-caps, whole.  Every initial node
+-- state is bounded on both axes by refl
+subscribeE-caps {n = n} c j g (mergeAllᵉ b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  subscribeAll-caps c j g mergeᵒ (merge-st 0 false) b κ bid now sl sched st
+    2≤S 1≤R slEq slC inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+subscribeE-caps {n = n} {u = u} c j g (concatAllᵉ b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  subscribeAll-caps c j g concatᵒ (concat-st {t = u} [] false false) b κ bid now
+    sl sched st 2≤S 1≤R slEq slC inv refl refl
+    (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+subscribeE-caps {n = n} c j g (switchAllᵉ b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  subscribeAll-caps c j g switchᵒ (switch-st nothing false) b κ bid now sl sched st
+    2≤S 1≤R slEq slC inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+subscribeE-caps {n = n} c j g (exhaustAllᵉ b) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  subscribeAll-caps c j g exhaustᵒ (exhaust-st false false) b κ bid now sl sched st
+    2≤S 1≤R slEq slC inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+
+-- μ: out of gas is a dry close; with gas, ONE unfolding — larger than
+-- the μ on the size axis (unfoldμ-size buys the room) and no larger on
+-- the width axis (dW-unfoldμ)
+subscribeE-caps {u = u} c j g0 (μᵉ body) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
+            (sym (+-identityʳ j)) inv
+    , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
+                     (dryBurst {A = Val _ u} bid) ≡ true)
+            (sym (+-identityʳ j)) refl
+subscribeE-caps {n = n} c j (gs fuel) (μᵉ body) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  j₀ + j₁
+    , frameStep-+assoc-caps c j j₀ j₁ (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+        (proj₁ (proj₂ IH))
+    , frameStep-+assoc-burst c j j₀ j₁ sl (proj₁ res) (proj₂ (proj₂ IH))
+  where
+  US = unfoldμ-size c j body 2≤S szb
+  j₀ = proj₁ US
+  ⊑₀ = frameStep-⊑-+ c 2≤S j j₀
+  IH = subscribeE-caps c (j + j₀) fuel (unfoldμ body) κ bid now sl sched st
+         2≤S 1≤R slEq slC
+         (capsOK?-mono (frameStep j c) (frameStep (j + j₀) c) sched st ⊑₀ inv)
+         (proj₂ US)
+         (≤-trans (dW-unfoldμ n sl body) (≤-trans wdb (proj₁ (proj₂ ⊑₀))))
+         (pathSz?-⊑ κ ⊑₀ pC)
+         (≤-trans lC (proj₁ ⊑₀))
+  j₁ = proj₁ IH
+  res = subscribeE fuel (unfoldμ body) κ bid now sched st
+
+subscribeE-caps c j g (varᵉ ()) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC
+
+-- DEFER: the clause the parked width exists for.  Install the merge
+-- node, mint the source and ordinal, PARK the body as a one-element
+-- pending, and register the thru-outer chain — one j, for the
+-- registration.  The LiveSource's width bound IS the telescope's dW
+-- conjunct: `dWᵉ (deferᵉ body)` is `pWᵉ body`, definitionally
+subscribeE-caps {n = n} {Γ = Γ} {u = u} c j g (deferᵉ body) κ bid now sl sched st
+                2≤S 1≤R slEq slC inv szb wdb pC lC =
+  1 , subst (λ x → capsOK? (frameStep x c) SCHED₄
+                     (register SRC (thru-outer mergeᵒ nid ↠ κ) st₀) ≡ true)
+            (sym (j+1 j))
+            (capsOK?-addLive (frameStep (suc j) c) NEW SCHED₃
+               (register SRC (thru-outer mergeᵒ nid ↠ κ) st₀) BL WL REG)
+    , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
+                     (((init SRC ∷ []) at bid from SRC as subscribe) ∷ []) ≡ true)
+            (sym (j+1 j)) refl
+  where
+  nid    = Sched.nextNode sched
+  SRC    = Sched.nextSource sched
+  st₀    = installNode nid (merge-st 0 false) st
+  SCHED₃ = record (record (record sched { nextNode = suc (Sched.nextNode sched) })
+                          { nextSource = suc (Sched.nextSource sched) })
+                  { nextOrdinal = suc (Sched.nextOrdinal sched) }
+  NEW    = record { source = SRC ; ordinal = Sched.nextOrdinal sched
+                  ; elemTy = obs u ; pending = (suc now , body) ∷ [] }
+  SCHED₄ = record SCHED₃ { live = NEW ∷ Sched.live SCHED₃ }
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n j)
+  B      = Caps.cSize (frameStep j c)
+  pC′ : pathSz? B (thru-outer mergeᵒ nid ↠ κ) ≡ true
+  pC′ = ∧-intro refl
+          (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B) (≤⇒≤ᵇ lC)) pC)
+  inv₀ : capsOK? (frameStep j c) SCHED₃ st₀ ≡ true
+  inv₀ = capsOK?-setNode (frameStep j c) nid (merge-st 0 false) SCHED₃ st
+           refl refl inv
+  REG : capsOK? (frameStep (suc j) c) SCHED₃
+          (register SRC (thru-outer mergeᵒ nid ↠ κ) st₀) ≡ true
+  REG = register-caps c j SRC (thru-outer mergeᵒ nid ↠ κ) SCHED₃ st₀
+          2≤S 1≤R inv₀ pC′
+  BL : boundedLive (Caps.cSize (frameStep (suc j) c)) NEW ≡ true
+  BL = ∧-intro (T⇒≡true (sizeᵉ body ≤ᵇ Caps.cSize (frameStep (suc j) c))
+                 (≤⇒≤ᵇ (≤-trans (≤-trans (n≤1+n (sizeᵉ body)) szb) (proj₁ step⊑))))
+               refl
+  WL : widLive (Caps.cWid (frameStep (suc j) c)) (Sched.slots SCHED₃) NEW ≡ true
+  WL = ∧-intro (subst (λ y → (pWᵛ n y (obs u) body
+                                ≤ᵇ Caps.cWid (frameStep (suc j) c)) ≡ true)
+                      (sym slEq)
+                      (T⇒≡true (pWᵛ n sl (obs u) body
+                                  ≤ᵇ Caps.cWid (frameStep (suc j) c))
+                        (≤⇒≤ᵇ (≤-trans wdb (proj₁ (proj₂ step⊑))))))
+               refl
 
 ------------------------------------------------------------------
 -- THE DELIVERY CLIQUE, GROUND.  foldPath / dispatchShare / shareGo,

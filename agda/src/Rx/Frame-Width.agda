@@ -259,13 +259,13 @@ outWᵛ j sl (obs t)  e        = outWᵉ j sl e
 ------------------------------------------------------------------
 
 mutual
+  -- CLAUSE ORDER IS LOAD-BEARING: the `input` pair splits on the FUEL,
+  -- and if it came first Agda would build a case tree that splits on
+  -- `j` at the root — leaving `dWᵉ j sl (ofᵉ ts)` STUCK for a variable
+  -- j, which is exactly the shape every caller has (the fuel is the
+  -- slot count `n`, never a literal).  With `input` last, the tree
+  -- splits on the expression first and every other clause reduces
   dWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  -- a share is a connect: descend into the def, on slot fuel
-  dWᵉ zero    sl (input i) = 0
-  dWᵉ (suc j) sl (input i) with sl i
-  -- a scripted slot's payloads are DATA, so nothing is parked there
-  ... | scripted _ = 0
-  ... | shared d   = dWᵉ j sl d
   dWᵉ j sl (ofᵉ ts)        = dWᵗˢ j sl ts
   dWᵉ j sl emptyᵉ          = 0
   dWᵉ j sl (mapᵉ f e)      = dWᵗ j sl f ⊔ dWᵉ j sl e
@@ -279,6 +279,12 @@ mutual
   dWᵉ j sl (varᵉ x)        = 0
   -- THE CLAUSE THE WHOLE FAMILY EXISTS FOR
   dWᵉ j sl (deferᵉ e)      = outWᵉ j sl e ⊔ dWᵉ j sl e
+  -- a share is a connect: descend into the def, on slot fuel
+  dWᵉ zero    sl (input i) = 0
+  dWᵉ (suc j) sl (input i) with sl i
+  -- a scripted slot's payloads are DATA, so nothing is parked there
+  ... | scripted _ = 0
+  ... | shared d   = dWᵉ j sl d
 
   dWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
   dWᵗ j sl (varᵗ x)      = 0
