@@ -65,10 +65,11 @@
 --                   else, and pW cannot be made to bound innW — here is
 --                   a def with pW 0 and innW 3.  REPAIRED: the shared
 --                   clause now carries the innW conjunct too.
---   §9  THE FIVE MEMBERS, LANDED.  All five are ground in Caps-Face,
---                   and these are the receipts they carry — the lift
---                   that IS the width half, the μ edge's two halves on
---                   §4's ladder, and the scan rung's composition.
+--   §9  THE FIVE MEMBERS, LANDED AND SYNTAX-COUNTED.  All five are
+--                   ground in Caps-Face, and these are the receipts
+--                   they carry — the SEED lift that IS the width half,
+--                   the μ edge's two halves on §4's ladder, and the
+--                   scan rung's composition.  No receipt reads a cap.
 --
 -- Standalone (hand-built syntax only, no evaluator state), so
 -- src/Main.agda never reaches it: it needs its own make target.
@@ -620,25 +621,39 @@ iw-escapes-pW = refl
 
 ------------------------------------------------------------------
 -- §9  THE FIVE MEMBERS, LANDED — the receipts they actually carry,
--- gated.  All five are now GROUND in Caps-Face over three pieces:
+-- gated.  All five are GROUND in Caps-Face over four pieces:
 -- `wid-iterFold` (one foldStep per syntax node, §7's shape),
--- `slotsCaps?-slotWid` (§8's leaf), and the size receipts §6 already
--- gates.  What is new here is the ARITHMETIC each member's j′ is:
+-- `slotsCaps?-slotWid` (§8's leaf), the size receipts §6 already gates,
+-- and `evalWith-iterFold` — the WIDTH face of the evaluator, at the
+-- same count as the size face.  What is new here is the ARITHMETIC each
+-- member's j′ is:
 --
---     evalTms / evalSeed   j′ = sizeᵗ + suc K
---     mapFrame             j′ = sizeᵗ fn + suc K
---     scanFrame            j′ = length vals * suc (sizeᵗ fn) + suc K
---     unfoldμ              j′ = suc B + suc K
+--     evalTms / evalSeed   j′ = suc (sizeᵗ)
+--     mapFrame             j′ = suc (sizeᵗ fn)
+--     scanFrame            j′ = suc (length vals * suc (sizeᵗ fn))
+--     unfoldμ              j′ = m + suc (m * m),  m = sizeᵉ (μᵉ body)
 --
--- with B the entry size cap and K the size cap at `j + a` — the width
--- half is ALWAYS `suc K` more folds than the size half, because the
--- width is read off the RESULT's size and iterFold outruns iterSize.
+-- EVERY ONE IS SYNTAX.  No receipt reads the running cap, so an
+-- instant's total j is a function of the program and not of itself —
+-- which is what the earlier `+ suc K` (K the size cap at `j + a`) made
+-- impossible.  The `suc` in each is the SEED lift below, and the rest
+-- is one fold per node.
 ------------------------------------------------------------------
 
--- THE LIFT, which is the whole of the width half: a width read at the
--- seed `suc W` — the leaf bound the slot telescope supplies — is a
--- width read at the cap ONE fold on, so the bound slides up by the
--- folds the size receipt already bought
+-- THE SEED LIFT, which is the whole of the width half: a width read at
+-- the seed `suc (cWid at level j)` — one above the RUNNING width cap,
+-- which is what both the slot telescope's leaf bound and an arriving
+-- payload's own width fit under — is a width at level `j + suc a` once
+-- the syntax's own `a` folds are spent.  ONE fold absorbs the `suc`
+seed-lift-1 : (iterFold 2 1 (suc (iterFold 2 1 0)) ≤ᵇ iterFold 2 (1 + suc 1) 0)
+                ≡ true                                  -- 16 against 512
+seed-lift-1 = refl
+seed-lift-2 : (iterFold 2 2 (suc (iterFold 2 1 0)) ≤ᵇ iterFold 2 (1 + suc 2) 0)
+                ≡ true                            -- 2 ^ 16 against 2 ^ 512
+seed-lift-2 = refl
+
+-- and the OLD lift, still what the μ edge's width half runs on: a
+-- width read at the seed `suc W` is a width at the cap one fold on
 lift-gate-1 : (iterFold 2 1 1 ≤ᵇ iterFold 2 2 0) ≡ true   -- 4 against 8
 lift-gate-1 = refl
 lift-gate-2 : (iterFold 2 1 2 ≤ᵇ iterFold 2 2 1) ≡ true   -- 8 against 32
@@ -646,17 +661,18 @@ lift-gate-2 = refl
 lift-gate-3 : (iterFold 2 2 1 ≤ᵇ iterFold 2 3 0) ≡ true   -- 32 against 512
 lift-gate-3 = refl
 
--- unfoldμ-caps, THE SIZE HALF.  size-unfoldμ (now a shared prerequisite
--- in .Keeps-Ring rather than a wet-side lemma) bounds the unfolding by
--- the μ's size SQUARED, and `suc B` folds of iterSize cover a factor of
--- B because each fold at least doubles (iterSize-2^)
+-- unfoldμ-caps, THE SIZE HALF.  size-unfoldμ (a shared prerequisite in
+-- .Keeps-Ring) bounds the unfolding by the μ's size SQUARED, and the
+-- μ's OWN SIZE many folds of iterSize cover the factor of m that
+-- squaring costs, because each fold at least doubles (iterSize-2^) and
+-- m ≤ 2 ^ m.  The receipt is m, not the cap
 μ-size-receipt-4 : (sizeᵉ (unfoldμ μbody4)
                       ≤ᵇ sizeᵉ (μᵉ μbody4) * sizeᵉ (μᵉ μbody4)) ≡ true
 μ-size-receipt-4 = refl                        -- 50 against 676
 
 μ-size-fits-4 : (sizeᵉ (μᵉ μbody4) * sizeᵉ (μᵉ μbody4)
-                   ≤ᵇ 2 ^ suc (sizeᵉ (μᵉ μbody4)) * sizeᵉ (μᵉ μbody4)) ≡ true
-μ-size-fits-4 = refl                           -- 676 against 26 * 2 ^ 27
+                   ≤ᵇ 2 ^ sizeᵉ (μᵉ μbody4) * sizeᵉ (μᵉ μbody4)) ≡ true
+μ-size-fits-4 = refl                           -- 676 against 26 * 2 ^ 26
 
 -- unfoldμ-caps, THE WIDTH HALF, on §4's ladder — the family that
 -- refuted every affine reading.  The landed bound is
@@ -718,6 +734,17 @@ scan-three-rungs-6 = refl
 -- S = Caps.cSize c.  THE WIDTH HALF IS NOT THE SAME SHAPE: §7 reads the
 -- width recurrence clause by clause and finds exactly one constructor,
 -- `scanᵉ`, that one fold cannot dominate.
+--
+-- AND THE WIDTH HALF IS NOW COUNTED IN SYNTAX TOO (2026-08-01).  The
+-- first landing read every evaluated value's width off its SIZE, which
+-- costs a fold count equal to that size — iterFold is a tower in its
+-- count, so nothing smaller dominates — and the only bound on an
+-- evaluated value's size is the RUNNING cap.  That is where `+ suc K`
+-- came from.  `evalWith-iterFold` reads the width off the WIDTH
+-- instead: an evaluated value's obs components are the term's own obs
+-- subterms with the environment plugged in, so the count is the TERM's
+-- syntax and the plugged widths enter as the SEED.  Every receipt in
+-- the cluster is now a function of the program alone.
 --
 -- AND THE CLUSTER IS NOW LANDED (2026-08-01).  mapFrame-caps,
 -- scanFrame-caps, evalTms-caps, evalSeed-caps and unfoldμ-caps are all

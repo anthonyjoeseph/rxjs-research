@@ -1960,83 +1960,243 @@ slotsCaps?-slotWid {n = suc m} B W sl h i
   iw : innWᵉ (suc m) sl d ≤ W
   iw = ≤ᵇ⇒≤ (innWᵉ (suc m) sl d) W (T-to (proj₂ split₂))
 
--- THE VALUE FACE of the width lemma.  A value's obs components ARE
--- expressions, and sizeᵛ reports exactly their sizeᵉ, so the same count
--- of folds covers a value
-pWᵛ-iterFold : ∀ {n} {Γ : Ctx n} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
-  (sl : Slots Γ) → SlotWid sl M → (u : Ty) (v : Val Γ u) →
-  pWᵛ n sl u v ≤ iterFold S (sizeᵛ u v) M
-pWᵛ-iterFold S M hS hM sl hI unitᵗ v = z≤n
-pWᵛ-iterFold S M hS hM sl hI boolᵗ v = z≤n
-pWᵛ-iterFold S M hS hM sl hI natᵗ  v = z≤n
-pWᵛ-iterFold {n = n} S M hS hM sl hI (s ×ᵗ u) (a , b) =
-  ⊔-lub (⊔-lub (≤-trans (m≤m⊔n (outWᵛ n sl s a) (dWᵛ n sl s a)) hA)
-               (≤-trans (m≤m⊔n (outWᵛ n sl u b) (dWᵛ n sl u b)) hB))
-        (⊔-lub (≤-trans (m≤n⊔m (outWᵛ n sl s a) (dWᵛ n sl s a)) hA)
-               (≤-trans (m≤n⊔m (outWᵛ n sl u b) (dWᵛ n sl u b)) hB))
-  where
-  hA = ≤-trans (pWᵛ-iterFold S M hS hM sl hI s a)
-               (iterFold-mono-count S M hS
-                  (≤-trans (m≤m+n (sizeᵛ s a) (sizeᵛ u b)) (n≤1+n _)))
-  hB = ≤-trans (pWᵛ-iterFold S M hS hM sl hI u b)
-               (iterFold-mono-count S M hS
-                  (≤-trans (m≤n+m (sizeᵛ u b) (sizeᵛ s a)) (n≤1+n _)))
-pWᵛ-iterFold S M hS hM sl hI (s +ᵗ u) (inj₁ a) =
-  ≤-trans (pWᵛ-iterFold S M hS hM sl hI s a)
-          (iterFold-mono-count S M hS (n≤1+n (sizeᵛ s a)))
-pWᵛ-iterFold S M hS hM sl hI (s +ᵗ u) (inj₂ b) =
-  ≤-trans (pWᵛ-iterFold S M hS hM sl hI u b)
-          (iterFold-mono-count S M hS (n≤1+n (sizeᵛ u b)))
-pWᵛ-iterFold S M hS hM sl hI (obs u) e =
-  ⊔-lub (proj₁ (wid-iterFold S M hS hM sl hI e))
-        (proj₂ (proj₂ (wid-iterFold S M hS hM sl hI e)))
+------------------------------------------------------------------
+-- THE WIDTH FACE OF THE EVALUATOR — the piece that makes every
+-- receipt in the cluster SYNTAX-COUNTED.
+--
+-- The five members all have to bound the width of a value the
+-- evaluator just built.  Reading that width off the value's SIZE
+-- (which is what the first landing did) costs a fold count equal to
+-- that size — iterFold is a TOWER in its count, so nothing smaller
+-- dominates it — and the only bound on an evaluated value's size is
+-- the RUNNING size cap.  That is where the old `+ suc K` came from,
+-- and it made an instant's total j self-referential.
+--
+-- The route that is syntax-counted reads the width off the WIDTH: an
+-- evaluated value's obs components are the term's own obs subterms
+-- with the environment plugged in, so their widths come from the
+-- term's syntax with the plugged widths as the SEED — one foldStep
+-- per syntax node of the TERM, exactly wid-iterFold's count, with the
+-- environment entering the seed and never the count.
+------------------------------------------------------------------
 
--- THE BRIDGE, and it is the whole content of the five members' width
--- halves: a value bounded on the SIZE axis at level `j + a` is bounded
--- on BOTH at `j + (a + suc K)`, K the size cap at that level
-valCaps?-fromSize : ∀ {n} {Γ : Ctx n} (c : Caps) (j a : ℕ) (sl : Slots Γ) →
-  2 ≤ Caps.cSize c →
-  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  (u : Ty) (v : Val Γ u) →
-  sizeᵛ u v ≤ Caps.cSize (frameStep (j + a) c) →
-  valCaps? (frameStep (j + (a + suc (Caps.cSize (frameStep (j + a) c)))) c)
-           sl u v ≡ true
-valCaps?-fromSize {n = n} c j a sl 2≤S slC u v hsz =
-  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ SZ)) (T⇒≡true _ (≤⇒≤ᵇ WD))
+-- what an environment presents to the induction: every plugged value
+-- is under the same leaf bound the slot telescope is under
+EnvW : ∀ {n} {Γ : Ctx n} {Θ} → Slots Γ → ℕ → All (Val Γ) Θ → Set
+EnvW sl M []ᵃ                        = ⊤
+EnvW {n = n} sl M (_∷ᵃ_ {x = t} v σ) = (pWᵛ n sl t v ≤ M) × EnvW sl M σ
+
+envW-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (M : ℕ) (sl : Slots Γ)
+  (σ : All (Val Γ) Θ) → EnvW sl M σ → (z : t ∈ Θ) →
+  pWᵛ n sl t (lookupEnv σ z) ≤ M
+envW-lookup M sl (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
+envW-lookup M sl (v ∷ᵃ σ) (hv , hσ) (there z)   = envW-lookup M sl σ hσ z
+
+envW-mono : ∀ {n} {Γ : Ctx n} {Θ} {M M′ : ℕ} (sl : Slots Γ)
+  (σ : All (Val Γ) Θ) → M ≤ M′ → EnvW sl M σ → EnvW sl M′ σ
+envW-mono sl []ᵃ      le hσ         = tt
+envW-mono sl (v ∷ᵃ σ) le (hv , hσ) = ≤-trans hv le , envW-mono sl σ le hσ
+
+-- the leaf bound only ever needs widening, which is all the seed
+-- juggling below does
+SlotWid-mono : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) {M M′ : ℕ} → M ≤ M′ →
+  SlotWid sl M → SlotWid sl M′
+SlotWid-mono sl le hI i = ≤-trans (proj₁ (hI i)) le
+                        , ≤-trans (proj₁ (proj₂ (hI i))) le
+                        , ≤-trans (proj₂ (proj₂ (hI i))) le
+
+-- a pair's parked width is its components', which is what a scan rung
+-- hands the step function and what the projections read back
+pWᵛ-pair : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (s u : Ty)
+  (a : Val Γ s) (b : Val Γ u) →
+  pWᵛ n sl (s ×ᵗ u) (a , b) ≤ pWᵛ n sl s a ⊔ pWᵛ n sl u b
+pWᵛ-pair {n = n} sl s u a b =
+  ⊔-lub (⊔-lub (≤-trans (m≤m⊔n (outWᵛ n sl s a) (dWᵛ n sl s a)) (m≤m⊔n P Q))
+               (≤-trans (m≤m⊔n (outWᵛ n sl u b) (dWᵛ n sl u b)) (m≤n⊔m P Q)))
+        (⊔-lub (≤-trans (m≤n⊔m (outWᵛ n sl s a) (dWᵛ n sl s a)) (m≤m⊔n P Q))
+               (≤-trans (m≤n⊔m (outWᵛ n sl u b) (dWᵛ n sl u b)) (m≤n⊔m P Q)))
+  where
+  P = pWᵛ n sl s a
+  Q = pWᵛ n sl u b
+
+pWᵛ-fst : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (s u : Ty)
+  (a : Val Γ s) (b : Val Γ u) → pWᵛ n sl s a ≤ pWᵛ n sl (s ×ᵗ u) (a , b)
+pWᵛ-fst {n = n} sl s u a b =
+  ⊔-lub (≤-trans (m≤m⊔n (outWᵛ n sl s a) (outWᵛ n sl u b))
+                 (m≤m⊔n (outWᵛ n sl s a ⊔ outWᵛ n sl u b) _))
+        (≤-trans (m≤m⊔n (dWᵛ n sl s a) (dWᵛ n sl u b))
+                 (m≤n⊔m (outWᵛ n sl s a ⊔ outWᵛ n sl u b) _))
+
+pWᵛ-snd : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (s u : Ty)
+  (a : Val Γ s) (b : Val Γ u) → pWᵛ n sl u b ≤ pWᵛ n sl (s ×ᵗ u) (a , b)
+pWᵛ-snd {n = n} sl s u a b =
+  ⊔-lub (≤-trans (m≤n⊔m (outWᵛ n sl s a) (outWᵛ n sl u b))
+                 (m≤m⊔n (outWᵛ n sl s a ⊔ outWᵛ n sl u b) _))
+        (≤-trans (m≤n⊔m (dWᵛ n sl s a) (dWᵛ n sl u b))
+                 (m≤n⊔m (outWᵛ n sl s a ⊔ outWᵛ n sl u b) _))
+
+postulate
+  -- THE ONE PIECE THE ROUTE RESTS ON, and it is wid-iterFold's own
+  -- induction run on a SUBSTITUTION INSTANCE: plugging an M-bounded
+  -- environment leaves both width faces under one foldStep per node of
+  -- the ORIGINAL syntax.  subΘExp commutes with every constructor, so
+  -- every clause's arithmetic is the one already proven above; the two
+  -- leaves that move are `varᵗ`, where a plug lands and the induction's
+  -- leaf bound is already M, and the plug itself, whose measures are
+  -- the plugged value's (reify) and whose slopes vanish (it is
+  -- Θ-closed).  Stated here, ahead of its proof, because the whole
+  -- cluster's receipt shape is what it decides
+  wid-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
+    (sl : Slots Γ) → SlotWid sl M →
+    (Θloc : List Ty) (σ : All (Val Γ) Θsub) → EnvW sl M σ →
+    (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    (outWᵉ n sl (subΘExp Θloc σ e) ≤ iterFold S (sizeᵉ e) M)
+    × (dWᵉ n sl (subΘExp Θloc σ e) ≤ iterFold S (sizeᵉ e) M)
+
+-- AND THE EVALUATOR, one foldStep per syntax node of the term.  The
+-- caseᵗ clause is the one that moves the seed: the scrutinee's value is
+-- pushed on the environment, so the branch runs at the seed the
+-- scrutinee's own receipt bought, and the two counts ADD — which is
+-- exactly what `sizeᵗ (caseᵗ s l r)` already pays for
+evalWith-iterFold : ∀ {n} {Γ : Ctx n} {Θ u} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
+  (sl : Slots Γ) → SlotWid sl M →
+  (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) → EnvW sl M env →
+  pWᵛ n sl u (evalWith tm env) ≤ iterFold S (sizeᵗ tm) M
+evalWith-iterFold S M hS hM sl hI (varᵗ x) env hσ =
+  ≤-trans (envW-lookup M sl env hσ x) (iterFold-infl S hS 1 M)
+evalWith-iterFold S M hS hM sl hI unit̂     env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (bool̂ b) env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (nat̂ k)  env hσ = z≤n
+evalWith-iterFold {n = n} S M hS hM sl hI (pairᵗ {s = s} {t = u} a b) env hσ =
+  ≤-trans (pWᵛ-pair sl s u (evalWith a env) (evalWith b env))
+          (⊔-lub (≤-trans (evalWith-iterFold S M hS hM sl hI a env hσ)
+                    (iterFold-mono-count S M hS
+                       (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b)) (n≤1+n _))))
+                 (≤-trans (evalWith-iterFold S M hS hM sl hI b env hσ)
+                    (iterFold-mono-count S M hS
+                       (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a)) (n≤1+n _)))))
+evalWith-iterFold {n = n} S M hS hM sl hI (fstᵗ {s = s} {t = u} p) env hσ
+  with evalWith p env | evalWith-iterFold S M hS hM sl hI p env hσ
+... | (a , b) | ih =
+  ≤-trans (≤-trans (pWᵛ-fst sl s u a b) ih)
+          (iterFold-mono-count S M hS (n≤1+n (sizeᵗ p)))
+evalWith-iterFold {n = n} S M hS hM sl hI (sndᵗ {s = s} {t = u} p) env hσ
+  with evalWith p env | evalWith-iterFold S M hS hM sl hI p env hσ
+... | (a , b) | ih =
+  ≤-trans (≤-trans (pWᵛ-snd sl s u a b) ih)
+          (iterFold-mono-count S M hS (n≤1+n (sizeᵗ p)))
+evalWith-iterFold S M hS hM sl hI (inlᵗ a) env hσ =
+  ≤-trans (evalWith-iterFold S M hS hM sl hI a env hσ)
+          (iterFold-mono-count S M hS (n≤1+n (sizeᵗ a)))
+evalWith-iterFold S M hS hM sl hI (inrᵗ a) env hσ =
+  ≤-trans (evalWith-iterFold S M hS hM sl hI a env hσ)
+          (iterFold-mono-count S M hS (n≤1+n (sizeᵗ a)))
+evalWith-iterFold S M hS hM sl hI (primᵗ add  a) env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (primᵗ sub  a) env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (primᵗ mul  a) env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (primᵗ eqᵖ  a) env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (primᵗ ltᵖ  a) env hσ = z≤n
+evalWith-iterFold S M hS hM sl hI (primᵗ notᵖ a) env hσ = z≤n
+evalWith-iterFold {n = n} S M hS hM sl hI (strmᵗ e) []ᵃ hσ =
+  ⊔-lub (≤-trans (proj₁ (wid-iterFold S M hS hM sl hI e))
+                 (iterFold-mono-count S M hS (n≤1+n (sizeᵉ e))))
+        (≤-trans (proj₂ (proj₂ (wid-iterFold S M hS hM sl hI e)))
+                 (iterFold-mono-count S M hS (n≤1+n (sizeᵉ e))))
+evalWith-iterFold {n = n} S M hS hM sl hI (strmᵗ e) (v ∷ᵃ vs) hσ =
+  ⊔-lub (≤-trans (proj₁ SUB) (iterFold-mono-count S M hS (n≤1+n (sizeᵉ e))))
+        (≤-trans (proj₂ SUB) (iterFold-mono-count S M hS (n≤1+n (sizeᵉ e))))
+  where SUB = wid-subΘ S M hS hM sl hI [] (v ∷ᵃ vs) hσ e
+evalWith-iterFold S M hS hM sl hI (ifᵗ c a b) env hσ
+  with evalWith c env
+... | true  = ≤-trans (evalWith-iterFold S M hS hM sl hI a env hσ)
+                (iterFold-mono-count S M hS
+                   (≤-trans (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                     (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))
+                            (n≤1+n _)))
+... | false = ≤-trans (evalWith-iterFold S M hS hM sl hI b env hσ)
+                (iterFold-mono-count S M hS
+                   (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))
+                            (n≤1+n _)))
+evalWith-iterFold {n = n} S M hS hM sl hI (caseᵗ {s = s} {t = u} sc l r) env hσ
+  with evalWith sc env | evalWith-iterFold S M hS hM sl hI sc env hσ
+... | inj₁ x | ih =
+  ≤-trans (evalWith-iterFold S M₁ hS
+             (≤-trans hM (iterFold-infl S hS (sizeᵗ sc) M)) sl
+             (SlotWid-mono sl (iterFold-infl S hS (sizeᵗ sc) M) hI)
+             l (x ∷ᵃ env)
+             (ih , envW-mono sl env (iterFold-infl S hS (sizeᵗ sc) M) hσ))
+          (≤-trans (≤-reflexive (sym (iterFold-+ S (sizeᵗ sc) (sizeᵗ l) M)))
+                   (iterFold-mono-count S M hS
+                      (≤-trans (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
+                               (n≤1+n _))))
+  where M₁ = iterFold S (sizeᵗ sc) M
+... | inj₂ y | ih =
+  ≤-trans (evalWith-iterFold S M₁ hS
+             (≤-trans hM (iterFold-infl S hS (sizeᵗ sc) M)) sl
+             (SlotWid-mono sl (iterFold-infl S hS (sizeᵗ sc) M) hI)
+             r (y ∷ᵃ env)
+             (ih , envW-mono sl env (iterFold-infl S hS (sizeᵗ sc) M) hσ))
+          (≤-trans (≤-reflexive (sym (iterFold-+ S (sizeᵗ sc) (sizeᵗ r) M)))
+                   (iterFold-mono-count S M hS
+                      (≤-trans (+-monoˡ-≤ (sizeᵗ r) (m≤m+n (sizeᵗ sc) (sizeᵗ l)))
+                               (n≤1+n _))))
+  where M₁ = iterFold S (sizeᵗ sc) M
+
+-- THE TWO FACES THE CLUSTER CONSUMES, the width mirrors of
+-- applyFn-iterSize / evalTm-iterSize: a closed term evaluates under the
+-- telescope's own leaf bound, and a step function under that bound
+-- raised to cover its payload
+evalTm-iterFold : ∀ {n} {Γ : Ctx n} {u} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
+  (sl : Slots Γ) → SlotWid sl M → (z : Tm Γ [] [] [] u) →
+  pWᵛ n sl u (evalTm z) ≤ iterFold S (sizeᵗ z) M
+evalTm-iterFold S M hS hM sl hI z = evalWith-iterFold S M hS hM sl hI z []ᵃ tt
+
+applyFn-iterFold : ∀ {n} {Γ : Ctx n} {s u} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
+  (sl : Slots Γ) → SlotWid sl M →
+  (fn : Fn Γ [] [] [] s u) (v : Val Γ s) → pWᵛ n sl s v ≤ M →
+  pWᵛ n sl u (applyFn fn v) ≤ iterFold S (sizeᵗ fn) M
+applyFn-iterFold S M hS hM sl hI fn v hv =
+  evalWith-iterFold S M hS hM sl hI fn (v ∷ᵃ []ᵃ) (hv , tt)
+
+-- THE SEED LIFT, and it is the whole of the syntax-counted width half:
+-- a width read `a` folds above the RUNNING width cap is a width at
+-- `suc a` levels on.  One fold absorbs the seed's `suc`; the other `a`
+-- are the syntax's own
+wid-lift : ∀ (c : Caps) (j a : ℕ) → 2 ≤ Caps.cSize c → ∀ {x} →
+  x ≤ iterFold (Caps.cSize c) a (suc (Caps.cWid (frameStep j c))) →
+  x ≤ Caps.cWid (frameStep (j + suc a) c)
+wid-lift c j a 2≤S {x} h =
+  ≤-trans h
+    (≤-trans (iterFold-mono-w S a 2≤S
+                (≤-trans (suc≤foldStep S (iterFold S j W) 2≤S)
+                         (≤-reflexive (sym (iterFold-suc S j W)))))
+      (≤-reflexive (trans (sym (iterFold-+ S (suc j) a W))
+                          (cong (λ y → iterFold S y W) (shuffle j a)))))
   where
   S = Caps.cSize c
   W = Caps.cWid c
-  K = Caps.cSize (frameStep (j + a) c)
-  SZ : sizeᵛ u v ≤ Caps.cSize (frameStep (j + (a + suc K)) c)
-  SZ = ≤-trans hsz (iterSize-mono-count S S (≤-trans (s≤s z≤n) 2≤S)
-                      (+-monoʳ-≤ j (m≤m+n a (suc K))))
-  WD : pWᵛ n sl u v ≤ Caps.cWid (frameStep (j + (a + suc K)) c)
-  WD = subst (λ x → pWᵛ n sl u v ≤ iterFold S x W) (sym (+-shuffle j a K))
-         (≤-trans (≤-trans (pWᵛ-iterFold S (suc W) 2≤S (s≤s z≤n) sl
-                              (slotsCaps?-slotWid S W sl slC) u v)
-                           (iterFold-mono-count S (suc W) 2≤S hsz))
-                  (iterFold-lift S W K (j + a) 2≤S))
+  shuffle : ∀ (j a : ℕ) → suc j + a ≡ j + suc a
+  shuffle j a = trans (cong suc (+-comm j a))
+                      (trans (cong suc (+-comm a j)) (sym (+-suc j a)))
 
--- the same bridge on an EXPRESSION, for the μ edge — whose conclusion
--- is a raw dWᵉ rather than a valCaps?
-expWid-fromSize : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps) (j a : ℕ)
+-- the width bridge the μ edge still runs on: its conclusion is a raw
+-- dWᵉ on SYNTAX (the unfolding is a syntactic transform of the
+-- program), so the count is syntactic and the cap is never read
+expWid-fromSize : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps) (j a k : ℕ)
   (sl : Slots Γ) →
   2 ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  (e : Exp Γ Δᵍ Δ Θ t) →
-  sizeᵉ e ≤ Caps.cSize (frameStep (j + a) c) →
-  dWᵉ n sl e
-    ≤ Caps.cWid (frameStep (j + (a + suc (Caps.cSize (frameStep (j + a) c)))) c)
-expWid-fromSize {n = n} c j a sl 2≤S slC e hsz =
-  subst (λ x → dWᵉ n sl e ≤ iterFold S x W) (sym (+-shuffle j a K))
+  (e : Exp Γ Δᵍ Δ Θ t) → sizeᵉ e ≤ k →
+  dWᵉ n sl e ≤ Caps.cWid (frameStep (j + (a + suc k)) c)
+expWid-fromSize {n = n} c j a k sl 2≤S slC e hk =
+  subst (λ x → dWᵉ n sl e ≤ iterFold S x W) (sym (+-shuffle j a k))
     (≤-trans (≤-trans (proj₂ (proj₂ (wid-iterFold S (suc W) 2≤S (s≤s z≤n) sl
                                        (slotsCaps?-slotWid S W sl slC) e)))
-                      (iterFold-mono-count S (suc W) 2≤S hsz))
-             (iterFold-lift S W K (j + a) 2≤S))
+                      (iterFold-mono-count S (suc W) 2≤S hk))
+             (iterFold-lift S W k (j + a) 2≤S))
   where
   S = Caps.cSize c
   W = Caps.cWid c
-  K = Caps.cSize (frameStep (j + a) c)
 
 ------------------------------------------------------------------
 -- THE WIDENING TOOLKIT, stated here rather than inlined per clause.
@@ -4462,12 +4622,13 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
 -- applyFn — instead of being buried in the hub clause
 ------------------------------------------------------------------
 
--- ONE map-f FRAME, GROUND.  Every payload is mapped independently, so
--- nothing composes and the whole list costs one clause's worth of folds:
--- applyFn-iterSize reads the receipt off the STEP FUNCTION's syntax with
--- the payload's own size as the seed, and valCaps?-fromSize turns that
--- one size bound into both halves.  The receipt is `sizeᵗ fn` folds for
--- the size and the size cap itself for the width
+-- ONE map-f FRAME, GROUND AND SYNTAX-COUNTED.  Every payload is mapped
+-- independently, so nothing composes and the whole list costs one
+-- clause's worth of folds: applyFn-iterSize reads the SIZE receipt off
+-- the step function's syntax with the payload's own size as the seed,
+-- and applyFn-iterFold reads the WIDTH receipt off the same syntax with
+-- the payload's own WIDTH as the seed.  j′ = suc (sizeᵗ fn) — one fold
+-- per node of the step function, and ONE more that absorbs the seed
 mapFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
   2 ≤ Caps.cSize c →
@@ -4477,29 +4638,43 @@ mapFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   Σ ℕ λ j′ →
     all (valCaps? (frameStep (j + j′) c) sl u) (map (applyFn fn) vals) ≡ true
 mapFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC fS vC =
-  (a + suc K) , go vals vC
+  suc a , go vals vC
   where
   S   = Caps.cSize c
+  W   = Caps.cWid c
   B   = Caps.cSize (frameStep j c)
+  V   = Caps.cWid (frameStep j c)
   a   = sizeᵗ fn
-  K   = Caps.cSize (frameStep (j + a) c)
+  M   = suc V
   1≤S = ≤-trans (s≤s z≤n) 2≤S
-  one : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
-        sizeᵛ u (applyFn fn v) ≤ Caps.cSize (frameStep (j + a) c)
-  one v hv =
-    ≤-trans (applyFn-iterSize S B 1≤S fn v
-               (≤ᵇ⇒≤ (sizeᵛ s v) B
-                  (T-to (valCaps?-size (frameStep j c) sl s v hv))))
-            (≤-reflexive (sym (iterSize-+ S j a S)))
+  slW : SlotWid sl M
+  slW = SlotWid-mono sl (s≤s (iterFold-infl S 2≤S j W))
+                     (slotsCaps?-slotWid S W sl slC)
+  sz : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
+       sizeᵛ u (applyFn fn v) ≤ Caps.cSize (frameStep (j + suc a) c)
+  sz v hv =
+    ≤-trans (≤-trans (applyFn-iterSize S B 1≤S fn v
+                        (≤ᵇ⇒≤ (sizeᵛ s v) B
+                           (T-to (valCaps?-size (frameStep j c) sl s v hv))))
+                     (≤-reflexive (sym (iterSize-+ S j a S))))
+            (iterSize-mono-count S S 1≤S (+-monoʳ-≤ j (n≤1+n a)))
+  wd : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
+       pWᵛ _ sl u (applyFn fn v) ≤ Caps.cWid (frameStep (j + suc a) c)
+  wd v hv =
+    wid-lift c j a 2≤S
+      (applyFn-iterFold S M 2≤S (s≤s z≤n) sl slW fn v
+        (≤-trans (≤ᵇ⇒≤ (pWᵛ _ sl s v) V
+                   (T-to (valCaps?-wid (frameStep j c) sl s v hv)))
+                 (n≤1+n V)))
   go : (vs : List (Val Γ s)) → all (valCaps? (frameStep j c) sl s) vs ≡ true →
-       all (valCaps? (frameStep (j + (a + suc K)) c) sl u)
+       all (valCaps? (frameStep (j + suc a) c) sl u)
            (map (applyFn fn) vs) ≡ true
   go []       h = refl
   go (v ∷ vs) h
     with ∧-true (valCaps? (frameStep j c) sl s v)
                 (all (valCaps? (frameStep j c) sl s) vs) h
   ... | hd , tl =
-    ∧-intro (valCaps?-fromSize c j a sl 2≤S slC u (applyFn fn v) (one v hd))
+    ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (sz v hd))) (T⇒≡true _ (≤⇒≤ᵇ (wd v hd))))
             (go vs tl)
 
 -- ONE scan-f FRAME'S SIZE LADDER.  Here the folds DO compose — scanVals
@@ -4546,8 +4721,66 @@ scanVals-size {s = s} {u = u} S B hS fn ac0 (v ∷ vs) hac0 h =
   HEAD = ≤-trans hac0′
            (subst (B₁ ≤_) eq (iterSize-infl S 1≤S (length vs * suc F) B₁))
 
--- ONE scan-f FRAME, GROUND.  The accumulator has to come back bounded
--- too, because it is reinstalled
+-- the same ladder ON THE WIDTH AXIS, and at the SAME count: a rung
+-- pairs the arriving payload with the stored accumulator (one fold)
+-- and steps it (one per node of the step function), with the widths
+-- entering as SEEDS
+scanVals-wid : ∀ {n} {Γ : Ctx n} {s u} (S M : ℕ) → 2 ≤ S → 1 ≤ M →
+  (sl : Slots Γ) → SlotWid sl M →
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac0 : Val Γ u) (vals : List (Val Γ s)) →
+  pWᵛ n sl u ac0 ≤ M →
+  all (λ v → pWᵛ n sl s v ≤ᵇ M) vals ≡ true →
+  (all (λ w → pWᵛ n sl u w ≤ᵇ iterFold S (length vals * suc (sizeᵗ fn)) M)
+       (proj₁ (scanVals fn ac0 vals)) ≡ true)
+  × (pWᵛ n sl u (proj₂ (scanVals fn ac0 vals))
+       ≤ iterFold S (length vals * suc (sizeᵗ fn)) M)
+scanVals-wid S M hS hM sl hI fn ac0 []       hac0 h = refl , hac0
+scanVals-wid {n = n} {s = s} {u = u} S M hS hM sl hI fn ac0 (v ∷ vs) hac0 h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ HEAD)) (proj₁ IH′) , proj₂ IH′
+  where
+  F    = sizeᵗ fn
+  M₁   = iterFold S (suc F) M
+  split = ∧-true (pWᵛ n sl s v ≤ᵇ M) (all (λ x → pWᵛ n sl s x ≤ᵇ M) vs) h
+  hv   : pWᵛ n sl s v ≤ M
+  hv   = ≤ᵇ⇒≤ (pWᵛ n sl s v) M (T-to (proj₁ split))
+  hac0′ : pWᵛ n sl u (applyFn fn (ac0 , v)) ≤ M₁
+  hac0′ = ≤-trans (applyFn-iterFold S M hS hM sl hI fn (ac0 , v)
+                     (≤-trans (pWᵛ-pair sl u s ac0 v) (⊔-lub hac0 hv)))
+                  (iterFold-mono-count S M hS (n≤1+n F))
+  hI₁ : SlotWid sl M₁
+  hI₁ = SlotWid-mono sl (iterFold-infl S hS (suc F) M) hI
+  hvs  = all-impl (λ x → pWᵛ n sl s x ≤ᵇ M) (λ x → pWᵛ n sl s x ≤ᵇ M₁)
+           (λ x → ≤ᵇ-widen (pWᵛ n sl s x) (iterFold-infl S hS (suc F) M))
+           vs (proj₂ split)
+  IH   = scanVals-wid S M₁ hS (≤-trans hM (iterFold-infl S hS (suc F) M))
+           sl hI₁ fn (applyFn fn (ac0 , v)) vs hac0′ hvs
+  eq   : iterFold S (length vs * suc F) M₁
+           ≡ iterFold S (suc F + length vs * suc F) M
+  eq   = sym (iterFold-+ S (suc F) (length vs * suc F) M)
+  IH′  = subst (λ X →
+                  (all (λ w → pWᵛ n sl u w ≤ᵇ X)
+                       (proj₁ (scanVals fn (applyFn fn (ac0 , v)) vs)) ≡ true)
+                  × (pWᵛ n sl u (proj₂ (scanVals fn (applyFn fn (ac0 , v)) vs)) ≤ X))
+               eq IH
+  HEAD : pWᵛ n sl u (applyFn fn (ac0 , v))
+           ≤ iterFold S (suc F + length vs * suc F) M
+  HEAD = ≤-trans hac0′
+           (subst (M₁ ≤_) eq (iterFold-infl S hS (length vs * suc F) M₁))
+
+-- the two ladders' conclusions are read off one list, so they are
+-- joined before the widening
+all-∧ : ∀ {A : Set} (p q : A → Bool) (xs : List A) →
+  all p xs ≡ true → all q xs ≡ true → all (λ x → p x ∧ q x) xs ≡ true
+all-∧ p q []       hp hq = refl
+all-∧ p q (x ∷ xs) hp hq =
+  ∧-intro (∧-intro (proj₁ (∧-true (p x) (all p xs) hp))
+                   (proj₁ (∧-true (q x) (all q xs) hq)))
+          (all-∧ p q xs (proj₂ (∧-true (p x) (all p xs) hp))
+                        (proj₂ (∧-true (q x) (all q xs) hq)))
+
+-- ONE scan-f FRAME, GROUND AND SYNTAX-COUNTED.  The accumulator has to
+-- come back bounded too, because it is reinstalled.
+-- j′ = suc (length vals * suc (sizeᵗ fn))
 scanFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac0 : Val Γ u) (vals : List (Val Γ s)) →
   2 ≤ Caps.cSize c →
@@ -4559,27 +4792,55 @@ scanFrame-caps : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
     (all (valCaps? (frameStep (j + j′) c) sl u)
          (proj₁ (scanVals fn ac0 vals)) ≡ true)
     × (valCaps? (frameStep (j + j′) c) sl u (proj₂ (scanVals fn ac0 vals)) ≡ true)
-scanFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC fS aC vC =
-  (a + suc K)
-    , all-impl (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
-               (valCaps? (frameStep (j + (a + suc K)) c) sl u)
-               (λ w hw → valCaps?-fromSize c j a sl 2≤S slC u w
-                           (conv (≤ᵇ⇒≤ (sizeᵛ u w) (iterSize S a B) (T-to hw))))
-               (proj₁ (scanVals fn ac0 vals)) (proj₁ SV)
-    , valCaps?-fromSize c j a sl 2≤S slC u (proj₂ (scanVals fn ac0 vals))
-        (conv (proj₂ SV))
+scanFrame-caps {n = n} {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC fS aC vC =
+  suc a
+    , all-impl (λ w → (sizeᵛ u w ≤ᵇ iterSize S a B) ∧ (pWᵛ n sl u w ≤ᵇ iterFold S a M))
+               (valCaps? (frameStep (j + suc a) c) sl u)
+               (λ w hw → mk w (proj₁ (∧-true (sizeᵛ u w ≤ᵇ iterSize S a B)
+                                             (pWᵛ n sl u w ≤ᵇ iterFold S a M) hw))
+                              (proj₂ (∧-true (sizeᵛ u w ≤ᵇ iterSize S a B)
+                                             (pWᵛ n sl u w ≤ᵇ iterFold S a M) hw)))
+               (proj₁ (scanVals fn ac0 vals))
+               (all-∧ (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
+                      (λ w → pWᵛ n sl u w ≤ᵇ iterFold S a M)
+                      (proj₁ (scanVals fn ac0 vals)) (proj₁ SV) (proj₁ SW))
+    , mk (proj₂ (scanVals fn ac0 vals))
+         (T⇒≡true _ (≤⇒≤ᵇ (proj₂ SV))) (T⇒≡true _ (≤⇒≤ᵇ (proj₂ SW)))
   where
-  S = Caps.cSize c
-  B = Caps.cSize (frameStep j c)
-  a = length vals * suc (sizeᵗ fn)
-  K = Caps.cSize (frameStep (j + a) c)
-  conv : ∀ {x} → x ≤ iterSize S a B → x ≤ Caps.cSize (frameStep (j + a) c)
-  conv h = ≤-trans h (≤-reflexive (sym (iterSize-+ S j a S)))
+  S   = Caps.cSize c
+  W   = Caps.cWid c
+  B   = Caps.cSize (frameStep j c)
+  V   = Caps.cWid (frameStep j c)
+  a   = length vals * suc (sizeᵗ fn)
+  M   = suc V
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  slW : SlotWid sl M
+  slW = SlotWid-mono sl (s≤s (iterFold-infl S 2≤S j W))
+                     (slotsCaps?-slotWid S W sl slC)
+  mk : (w : Val Γ u) → (sizeᵛ u w ≤ᵇ iterSize S a B) ≡ true →
+       (pWᵛ n sl u w ≤ᵇ iterFold S a M) ≡ true →
+       valCaps? (frameStep (j + suc a) c) sl u w ≡ true
+  mk w h1 h2 =
+    ∧-intro
+      (T⇒≡true _ (≤⇒≤ᵇ
+        (≤-trans (≤-trans (≤ᵇ⇒≤ (sizeᵛ u w) (iterSize S a B) (T-to h1))
+                          (≤-reflexive (sym (iterSize-+ S j a S))))
+                 (iterSize-mono-count S S 1≤S (+-monoʳ-≤ j (n≤1+n a))))))
+      (T⇒≡true _ (≤⇒≤ᵇ
+        (wid-lift c j a 2≤S (≤ᵇ⇒≤ (pWᵛ n sl u w) (iterFold S a M) (T-to h2)))))
   SV = scanVals-size S B 2≤S fn ac0 vals
          (≤ᵇ⇒≤ (sizeᵛ u ac0) B
             (T-to (valCaps?-size (frameStep j c) sl u ac0 aC)))
          (all-impl (valCaps? (frameStep j c) sl s) (λ v → sizeᵛ s v ≤ᵇ B)
             (λ v → valCaps?-size (frameStep j c) sl s v) vals vC)
+  SW = scanVals-wid S M 2≤S (s≤s z≤n) sl slW fn ac0 vals
+         (≤-trans (≤ᵇ⇒≤ (pWᵛ n sl u ac0) V
+                    (T-to (valCaps?-wid (frameStep j c) sl u ac0 aC)))
+                  (n≤1+n V))
+         (all-impl (valCaps? (frameStep j c) sl s) (λ v → pWᵛ n sl s v ≤ᵇ M)
+            (λ v hv → ≤ᵇ-widen (pWᵛ n sl s v) (n≤1+n V)
+                        (valCaps?-wid (frameStep j c) sl s v hv))
+            vals vC)
 
 ------------------------------------------------------------------
 -- stepFrame-caps, GROUND.  Five clauses over the four leaves above and
@@ -4956,10 +5217,11 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
 -- bridge above for the width.
 ------------------------------------------------------------------
 
--- `ofᵉ ts` bursts `map evalTm ts`, GROUND.  Both halves of valCaps? are
--- owed and BOTH come off the size receipt: evalTm-iterSize spends one
--- fold per syntax node from an EMPTY environment, and valCaps?-fromSize
--- turns the size bound into the width one
+-- `ofᵉ ts` bursts `map evalTm ts`, GROUND AND SYNTAX-COUNTED.  Both
+-- halves of valCaps? are owed and each comes off its OWN receipt at the
+-- same count: evalTm-iterSize spends one iterSize fold per syntax node
+-- from an empty environment, evalTm-iterFold one foldStep per syntax
+-- node from the telescope's leaf bound.  j′ = suc (sizeᵗˢ ts)
 evalTms-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (ts : List (Tm Γ [] [] [] u)) →
   2 ≤ Caps.cSize c →
@@ -4968,32 +5230,43 @@ evalTms-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   dWᵗˢ n sl ts ≤ Caps.cWid (frameStep j c) →
   Σ ℕ λ j′ → all (valCaps? (frameStep (j + j′) c) sl u)
                  (map (λ tm → evalTm tm) ts) ≡ true
-evalTms-caps {Γ = Γ} {u = u} c j sl ts 2≤S slC szb wdb =
-  (a + suc K) , go ts ≤-refl
+evalTms-caps {n = n} {Γ = Γ} {u = u} c j sl ts 2≤S slC szb wdb =
+  suc a , go ts ≤-refl
   where
   S   = Caps.cSize c
+  W   = Caps.cWid c
+  V   = Caps.cWid (frameStep j c)
   a   = sizeᵗˢ ts
-  K   = Caps.cSize (frameStep (j + a) c)
+  M   = suc V
   1≤S = ≤-trans (s≤s z≤n) 2≤S
+  slW : SlotWid sl M
+  slW = SlotWid-mono sl (s≤s (iterFold-infl S 2≤S j W))
+                     (slotsCaps?-slotWid S W sl slC)
   one : (tm : Tm Γ [] [] [] u) → sizeᵗ tm ≤ a →
-        sizeᵛ u (evalTm tm) ≤ Caps.cSize (frameStep (j + a) c)
+        valCaps? (frameStep (j + suc a) c) sl u (evalTm tm) ≡ true
   one tm h =
-    ≤-trans (≤-trans (evalTm-iterSize S 1≤S tm)
-                     (≤-trans (iterSize-mono-count S 0 1≤S h)
-                              (iterSize-mono-s S a z≤n)))
-            (≤-reflexive (sym (iterSize-+ S j a S)))
+    ∧-intro
+      (T⇒≡true _ (≤⇒≤ᵇ
+        (≤-trans (≤-trans (≤-trans (evalTm-iterSize S 1≤S tm)
+                            (≤-trans (iterSize-mono-count S 0 1≤S h)
+                                     (iterSize-mono-s S a z≤n)))
+                          (≤-reflexive (sym (iterSize-+ S j a S))))
+                 (iterSize-mono-count S S 1≤S (+-monoʳ-≤ j (n≤1+n a))))))
+      (T⇒≡true _ (≤⇒≤ᵇ
+        (wid-lift c j a 2≤S
+          (≤-trans (evalTm-iterFold S M 2≤S (s≤s z≤n) sl slW tm)
+                   (iterFold-mono-count S M 2≤S h)))))
   go : (vs : List (Tm Γ [] [] [] u)) → sizeᵗˢ vs ≤ a →
-       all (valCaps? (frameStep (j + (a + suc K)) c) sl u)
+       all (valCaps? (frameStep (j + suc a) c) sl u)
            (map (λ tm → evalTm tm) vs) ≡ true
   go []       h = refl
   go (y ∷ ys) h =
-    ∧-intro (valCaps?-fromSize c j a sl 2≤S slC u (evalTm y)
-               (one y (≤-trans (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)) h)))
+    ∧-intro (one y (≤-trans (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)) h))
             (go ys (≤-trans (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)) h))
 
 -- `scanᵉ f seed b` installs `scan-st (evalTm seed)`: the same statement
 -- for one term, and the accumulator has to come back bounded on both
--- axes because capsOK? reads it on both
+-- axes because capsOK? reads it on both.  j′ = suc (sizeᵗ z)
 evalSeed-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (z : Tm Γ [] [] [] u) →
   2 ≤ Caps.cSize c →
@@ -5001,16 +5274,26 @@ evalSeed-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   sizeᵗ z ≤ Caps.cSize (frameStep j c) →
   dWᵗ n sl z ≤ Caps.cWid (frameStep j c) →
   Σ ℕ λ j′ → valCaps? (frameStep (j + j′) c) sl u (evalTm z) ≡ true
-evalSeed-caps {u = u} c j sl z 2≤S slC szz wdz =
-  (a + suc K) , valCaps?-fromSize c j a sl 2≤S slC u (evalTm z) SZ
+evalSeed-caps {n = n} {u = u} c j sl z 2≤S slC szz wdz =
+  suc a
+    , ∧-intro
+        (T⇒≡true _ (≤⇒≤ᵇ
+          (≤-trans (≤-trans (≤-trans (evalTm-iterSize S 1≤S z)
+                              (iterSize-mono-s S a z≤n))
+                            (≤-reflexive (sym (iterSize-+ S j a S))))
+                   (iterSize-mono-count S S 1≤S (+-monoʳ-≤ j (n≤1+n a))))))
+        (T⇒≡true _ (≤⇒≤ᵇ
+          (wid-lift c j a 2≤S (evalTm-iterFold S M 2≤S (s≤s z≤n) sl slW z))))
   where
   S   = Caps.cSize c
+  W   = Caps.cWid c
+  V   = Caps.cWid (frameStep j c)
   a   = sizeᵗ z
-  K   = Caps.cSize (frameStep (j + a) c)
+  M   = suc V
   1≤S = ≤-trans (s≤s z≤n) 2≤S
-  SZ : sizeᵛ u (evalTm z) ≤ Caps.cSize (frameStep (j + a) c)
-  SZ = ≤-trans (≤-trans (evalTm-iterSize S 1≤S z) (iterSize-mono-s S a z≤n))
-               (≤-reflexive (sym (iterSize-+ S j a S)))
+  slW : SlotWid sl M
+  slW = SlotWid-mono sl (s≤s (iterFold-infl S 2≤S j W))
+                     (slotsCaps?-slotWid S W sl slC)
 
 -- `μᵉ body` subscribes `unfoldμ body`, and BOTH AXES MOVE.  The size
 -- axis was always going to: the unfolding is larger than the μ (only
@@ -5045,29 +5328,28 @@ unfoldμ-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ) (sl : Slots Γ)
   Σ ℕ λ j′ → (sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + j′) c))
            × (dWᵉ n sl (unfoldμ body) ≤ Caps.cWid (frameStep (j + j′) c))
 unfoldμ-caps c j sl body 2≤S slC szb wdb =
-  (a + suc K)
+  (m + suc (m * m))
     , ≤-trans SZ (iterSize-mono-count S S 1≤S
-                    (+-monoʳ-≤ j (m≤m+n a (suc K))))
-    , expWid-fromSize c j a sl 2≤S slC (unfoldμ body) SZ
+                    (+-monoʳ-≤ j (m≤m+n m (suc (m * m)))))
+    , expWid-fromSize c j m (m * m) sl 2≤S slC (unfoldμ body)
+        (size-unfoldμ body)
   where
   S   = Caps.cSize c
   B   = Caps.cSize (frameStep j c)
-  a   = suc B
-  K   = Caps.cSize (frameStep (j + a) c)
+  m   = sizeᵉ (μᵉ body)
   1≤S = ≤-trans (s≤s z≤n) 2≤S
   -- QUADRATIC, AND ONE ROUND OF DOUBLING PER NODE CLEARS IT: unfolding
   -- plants the whole μ at each of the body's global-var positions
   -- (size-unfoldμ, the shared prerequisite in .Keeps-Ring), so the
   -- growth is the μ's size SQUARED — and iterSize at least doubles per
-  -- fold (iterSize-2^), so `suc B` folds cover a factor of B
-  quad : sizeᵉ (μᵉ body) * sizeᵉ (μᵉ body) ≤ iterSize S a B
-  quad = ≤-trans (*-mono-≤ szb szb)
-          (≤-trans (*-monoˡ-≤ B (n≤1+n B))
-            (≤-trans (*-monoˡ-≤ B (<⇒≤ (n<2^n (suc B))))
-                     (iterSize-2^ S a B 1≤S)))
-  SZ : sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + a) c)
+  -- fold (iterSize-2^), so the μ's OWN SIZE many folds cover the factor
+  -- of m the squaring costs.  Both halves are counted in syntax: the
+  -- unfolding IS syntax, so its width needs no cap read either
+  quad : m * m ≤ iterSize S m B
+  quad = ≤-trans (*-mono-≤ (<⇒≤ (n<2^n m)) szb) (iterSize-2^ S m B 1≤S)
+  SZ : sizeᵉ (unfoldμ body) ≤ Caps.cSize (frameStep (j + m) c)
   SZ = ≤-trans (≤-trans (size-unfoldμ body) quad)
-               (≤-reflexive (sym (iterSize-+ S j a S)))
+               (≤-reflexive (sym (iterSize-+ S j m S)))
 
 ------------------------------------------------------------------
 -- subscribeE-caps, GROUND — the assembly knot, closed.
