@@ -673,6 +673,241 @@ frameStep-mono-j c hS le =
   , iterFold-mono-count (Caps.cSize c) (Caps.cWid c) hS le
   , frameStep-reg-mono c le
 
+------------------------------------------------------------------
+-- THE SYNTAX-LINEAR EVAL RECEIPT — ONE iterSize FOLD PER SYNTAX NODE.
+--
+-- Eval-Growth-Probe refutes the AFFINE reading of the five evaluation
+-- obligations on every axis it names, and none of the refutations is by
+-- a constant: §1's `seedDbl` doubles a VALUE every six syntax nodes, so
+-- one j (`sizeStep S S`, the cap read at the term's own size) is beaten
+-- at k = 13 and a 4× slackened cap only survives to k = 16; §2's
+-- `fnDbl` beats `sizeStep S s` at k = 6, on a value of size 127.
+--
+-- What the same probe MEASURES as the replacement is §3: `iterSize`
+-- runs away much faster than the ladder does — j′ ≤ 3 closes a value of
+-- 33 million out of a term of size 145 — so the receipt the cluster
+-- carries is ONE FOLD PER SYNTAX NODE, `j′ = sizeᵗ tm`.
+--
+-- This is that bound, proven.  `sizeStep S` dominates the growth of ONE
+-- constructor's evaluation for every constructor, so its j-fold iterate
+-- dominates a term of j nodes.  Clause by clause:
+--
+--   varᵗ / literals   a lookup or a constant; inflationary is enough
+--   pairᵗ             `suc (s + s) ≤ S * suc (2 s)` — the one clause
+--                     that genuinely doubles, and the one `sizeStep`'s
+--                     `2 *` is shaped for
+--   fstᵗ / sndᵗ       a projection SHRINKS, an injection adds one
+--   inlᵗ / inrᵗ
+--   caseᵗ             the branch runs over an environment extended with
+--                     the SCRUTINEE's value, so the caps compound — and
+--                     the compounding is exactly iterSize's own
+--                     composition law, iterSize-+.  This is the clause
+--                     the naive linear bound dies on, and the reason the
+--                     receipt counts NODES rather than depth
+--   ifᵗ               both branches see the UNextended environment
+--   primᵗ             a nat or a bool: size 1
+--   strmᵗ             the substitution clause, and the only one that
+--                     needs the multiplier at all — size-subΘᵉ bounds it
+--                     by `sizeᵉ e * suc (2 V)`.  The FACTOR IS PAID FOR
+--                     BY THE BODY'S OWN NODES rather than by the cap:
+--                     `suc (sizeᵉ e)` folds are available here and each
+--                     at least doubles (iterSize-2^), so `sizeᵉ e` of
+--                     them cover a factor of `sizeᵉ e`.
+--
+-- THAT LAST POINT IS WHAT MAKES THE LEMMA USABLE.  It needs NO
+-- hypothesis relating the term's size to S, so it instantiates at
+-- S = Caps.cSize c — the base frameStep actually iterates at — while
+-- each clause's own size hypothesis reads the STEPPED cap
+-- `Caps.cSize (frameStep j c)`, which is far larger.  A lemma stated
+-- with `sizeᵗ tm ≤ S` would be unusable there: iterating at the stepped
+-- base outruns iterating at cSize c, so the receipt would not join the
+-- frameStep sum.
+------------------------------------------------------------------
+
+-- iterSize COMPOSES: a folds then b more is a + b folds.  The caseᵗ
+-- clause is this law and nothing else
+iterSize-+ : ∀ (S a b s : ℕ) →
+  iterSize S (a + b) s ≡ iterSize S b (iterSize S a s)
+iterSize-+ S zero    b s = refl
+iterSize-+ S (suc a) b s = iterSize-+ S a b (sizeStep S s)
+
+-- and is monotone in the SEED as well as in the count
+sizeStep-mono-s : ∀ (S : ℕ) {s s′ : ℕ} → s ≤ s′ → sizeStep S s ≤ sizeStep S s′
+sizeStep-mono-s S le = *-monoʳ-≤ S (s≤s (*-monoʳ-≤ 2 le))
+
+iterSize-mono-s : ∀ (S k : ℕ) {s s′ : ℕ} → s ≤ s′ →
+  iterSize S k s ≤ iterSize S k s′
+iterSize-mono-s S zero    le = le
+iterSize-mono-s S (suc k) le = iterSize-mono-s S k (sizeStep-mono-s S le)
+
+-- EACH FOLD AT LEAST DOUBLES.  This is the whole of what the strmᵗ
+-- clause needs: a body of k nodes buys a factor of 2 ^ k, which covers
+-- the `sizeᵉ e` multiplier size-subΘᵉ charges for substituting into it
+iterSize-2^ : ∀ (S k s : ℕ) → 1 ≤ S → 2 ^ k * s ≤ iterSize S k s
+iterSize-2^ S zero    s hS = ≤-reflexive (*-identityˡ s)
+iterSize-2^ S (suc k) s hS =
+  ≤-trans (≤-reflexive shape)
+          (≤-trans (*-monoʳ-≤ (2 ^ k) 2s≤step)
+                   (iterSize-2^ S k (sizeStep S s) hS))
+  where
+  shape : 2 ^ suc k * s ≡ 2 ^ k * (2 * s)
+  shape = solve 2 (λ a b → (con 2 :* a) :* b := a :* (con 2 :* b))
+                refl (2 ^ k) s
+  2s≤step : 2 * s ≤ sizeStep S s
+  2s≤step = ≤-trans (n≤1+n (2 * s))
+                    (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                             (*-monoˡ-≤ (suc (2 * s)) hS))
+
+-- so k folds off a nonzero seed reach k
+k≤iterSize : ∀ (S k s : ℕ) → 1 ≤ S → 1 ≤ s → k ≤ iterSize S k s
+k≤iterSize S k s hS 1≤s =
+  ≤-trans (<⇒≤ (n<2^n k))
+  (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ k))))
+  (≤-trans (*-monoʳ-≤ (2 ^ k) 1≤s) (iterSize-2^ S k s hS)))
+
+-- the three one-fold facts the clauses consume
+one≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → 1 ≤ sizeStep S s
+one≤sizeStep S s hS =
+  ≤-trans (m≤m*n 1 (suc (2 * s))) (*-monoˡ-≤ (suc (2 * s)) hS)
+
+S≤sizeStep : ∀ (S s : ℕ) → S ≤ sizeStep S s
+S≤sizeStep S s = m≤m*n S (suc (2 * s))
+
+pair≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → suc (s + s) ≤ sizeStep S s
+pair≤sizeStep S s hS =
+  ≤-trans (s≤s (≤-reflexive (cong (s +_) (sym (+-identityʳ s)))))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                   (*-monoˡ-≤ (suc (2 * s)) hS))
+
+-- SPENDING THE NODE: a bound at `sizeStep S (iterSize S k s)` is a
+-- bound at `iterSize S (suc k) s`.  Every clause below ends here
+step-node : ∀ (S k s x : ℕ) →
+  x ≤ sizeStep S (iterSize S k s) → x ≤ iterSize S (suc k) s
+step-node S k s x h = subst (x ≤_) (sym (iterSize-suc S k s)) h
+
+-- THE BOUND.  Structural induction on the term; every constructor
+-- spends exactly one fold, and caseᵗ re-enters at the grown seed
+evalWith-iterSize : ∀ {n} {Γ : Ctx n} {Θ t} (S V : ℕ) → 1 ≤ S →
+  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) → EnvSize V env →
+  sizeᵛ t (evalWith tm env) ≤ iterSize S (sizeᵗ tm) V
+evalWith-iterSize S V hS (varᵗ x) env hσ =
+  ≤-trans (envSize-lookup V env hσ x) (sizeStep-infl S V hS)
+evalWith-iterSize S V hS unit̂     env hσ = one≤sizeStep S V hS
+evalWith-iterSize S V hS (bool̂ _) env hσ = one≤sizeStep S V hS
+evalWith-iterSize S V hS (nat̂ _)  env hσ = one≤sizeStep S V hS
+evalWith-iterSize S V hS (pairᵗ a b) env hσ =
+  step-node S (sizeᵗ a + sizeᵗ b) V _
+    (≤-trans (s≤s (+-mono-≤ ihA ihB)) (pair≤sizeStep S M hS))
+  where
+  M   = iterSize S (sizeᵗ a + sizeᵗ b) V
+  ihA = ≤-trans (evalWith-iterSize S V hS a env hσ)
+                (iterSize-mono-count S V hS (m≤m+n (sizeᵗ a) (sizeᵗ b)))
+  ihB = ≤-trans (evalWith-iterSize S V hS b env hσ)
+                (iterSize-mono-count S V hS (m≤n+m (sizeᵗ b) (sizeᵗ a)))
+evalWith-iterSize S V hS (fstᵗ p) env hσ
+  with evalWith p env | evalWith-iterSize S V hS p env hσ
+... | (a , b) | ihp =
+  step-node S (sizeᵗ p) V _
+    (≤-trans (≤-trans (≤-trans (m≤m+n (sizeᵛ _ a) (sizeᵛ _ b)) (n≤1+n _)) ihp)
+             (sizeStep-infl S (iterSize S (sizeᵗ p) V) hS))
+evalWith-iterSize S V hS (sndᵗ p) env hσ
+  with evalWith p env | evalWith-iterSize S V hS p env hσ
+... | (a , b) | ihp =
+  step-node S (sizeᵗ p) V _
+    (≤-trans (≤-trans (≤-trans (m≤n+m (sizeᵛ _ b) (sizeᵛ _ a)) (n≤1+n _)) ihp)
+             (sizeStep-infl S (iterSize S (sizeᵗ p) V) hS))
+evalWith-iterSize S V hS (inlᵗ a) env hσ =
+  step-node S (sizeᵗ a) V _
+    (≤-trans (s≤s (≤-trans (evalWith-iterSize S V hS a env hσ)
+                           (m≤m+n M M)))
+             (pair≤sizeStep S M hS))
+  where M = iterSize S (sizeᵗ a) V
+evalWith-iterSize S V hS (inrᵗ a) env hσ =
+  step-node S (sizeᵗ a) V _
+    (≤-trans (s≤s (≤-trans (evalWith-iterSize S V hS a env hσ)
+                           (m≤m+n M M)))
+             (pair≤sizeStep S M hS))
+  where M = iterSize S (sizeᵗ a) V
+evalWith-iterSize S V hS (caseᵗ {s = s} sc l r) env hσ
+  with evalWith sc env | evalWith-iterSize S V hS sc env hσ
+... | inj₁ a | ihsc =
+  step-node S (sizeᵗ sc + sizeᵗ l + sizeᵗ r) V _
+    (≤-trans (≤-trans BR (iterSize-mono-count S V hS
+                            (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))))
+             (sizeStep-infl S _ hS))
+  where
+  Msc : ℕ
+  Msc = iterSize S (sizeᵗ sc) V
+  ha : sizeᵛ s a ≤ Msc
+  ha = ≤-trans (n≤1+n (sizeᵛ s a)) ihsc
+  BR = subst (sizeᵛ _ (evalWith l (a ∷ᵃ env)) ≤_)
+             (sym (iterSize-+ S (sizeᵗ sc) (sizeᵗ l) V))
+             (evalWith-iterSize S Msc hS l (a ∷ᵃ env)
+                (ha , envSize-widen (iterSize-infl S hS (sizeᵗ sc) V) env hσ))
+... | inj₂ b | ihsc =
+  step-node S (sizeᵗ sc + sizeᵗ l + sizeᵗ r) V _
+    (≤-trans (≤-trans BR (iterSize-mono-count S V hS
+                            (+-monoˡ-≤ (sizeᵗ r) (m≤m+n (sizeᵗ sc) (sizeᵗ l)))))
+             (sizeStep-infl S _ hS))
+  where
+  Msc : ℕ
+  Msc = iterSize S (sizeᵗ sc) V
+  hb : sizeᵛ _ b ≤ Msc
+  hb = ≤-trans (n≤1+n (sizeᵛ _ b)) ihsc
+  BR = subst (sizeᵛ _ (evalWith r (b ∷ᵃ env)) ≤_)
+             (sym (iterSize-+ S (sizeᵗ sc) (sizeᵗ r) V))
+             (evalWith-iterSize S Msc hS r (b ∷ᵃ env)
+                (hb , envSize-widen (iterSize-infl S hS (sizeᵗ sc) V) env hσ))
+evalWith-iterSize S V hS (ifᵗ c a b) env hσ with evalWith c env
+... | true  =
+  step-node S (sizeᵗ c + sizeᵗ a + sizeᵗ b) V _
+    (≤-trans (≤-trans (evalWith-iterSize S V hS a env hσ)
+                      (iterSize-mono-count S V hS
+                        (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                 (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))))
+             (sizeStep-infl S _ hS))
+... | false =
+  step-node S (sizeᵗ c + sizeᵗ a + sizeᵗ b) V _
+    (≤-trans (≤-trans (evalWith-iterSize S V hS b env hσ)
+                      (iterSize-mono-count S V hS
+                        (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))))
+             (sizeStep-infl S _ hS))
+evalWith-iterSize S V hS (primᵗ add arg)  env hσ =
+  step-node S (sizeᵗ arg) V _ (one≤sizeStep S (iterSize S (sizeᵗ arg) V) hS)
+evalWith-iterSize S V hS (primᵗ sub arg)  env hσ =
+  step-node S (sizeᵗ arg) V _ (one≤sizeStep S (iterSize S (sizeᵗ arg) V) hS)
+evalWith-iterSize S V hS (primᵗ mul arg)  env hσ =
+  step-node S (sizeᵗ arg) V _ (one≤sizeStep S (iterSize S (sizeᵗ arg) V) hS)
+evalWith-iterSize S V hS (primᵗ eqᵖ arg)  env hσ =
+  step-node S (sizeᵗ arg) V _ (one≤sizeStep S (iterSize S (sizeᵗ arg) V) hS)
+evalWith-iterSize S V hS (primᵗ ltᵖ arg)  env hσ =
+  step-node S (sizeᵗ arg) V _ (one≤sizeStep S (iterSize S (sizeᵗ arg) V) hS)
+evalWith-iterSize S V hS (primᵗ notᵖ arg) env hσ =
+  step-node S (sizeᵗ arg) V _ (one≤sizeStep S (iterSize S (sizeᵗ arg) V) hS)
+evalWith-iterSize S V hS (strmᵗ e) []ᵃ hσ =
+  k≤iterSize S (sizeᵉ e) (sizeStep S V) hS (one≤sizeStep S V hS)
+evalWith-iterSize S V hS (strmᵗ e) (v ∷ᵃ vs) hσ =
+  ≤-trans (size-subΘᵉ V [] (v ∷ᵃ vs) e hσ)
+          (≤-trans (*-mono-≤ (<⇒≤ (n<2^n (sizeᵉ e))) X≤step)
+                   (iterSize-2^ S (sizeᵉ e) (sizeStep S V) hS))
+  where
+  X≤step : suc (2 * V) ≤ sizeStep S V
+  X≤step = ≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * V)))))
+                   (*-monoˡ-≤ (suc (2 * V)) hS)
+
+-- THE TWO FACES THE CLUSTER CONSUMES.  `applyFn` reads the receipt off
+-- the STEP FUNCTION's syntax with the payload's size as the seed;
+-- `evalTm` reads it off a closed term with an empty seed
+applyFn-iterSize : ∀ {n} {Γ : Ctx n} {s u} (S V : ℕ) → 1 ≤ S →
+  (fn : Fn Γ [] [] [] s u) (v : Val Γ s) → sizeᵛ s v ≤ V →
+  sizeᵛ u (applyFn fn v) ≤ iterSize S (sizeᵗ fn) V
+applyFn-iterSize S V hS fn v hv =
+  evalWith-iterSize S V hS fn (v ∷ᵃ []ᵃ) (hv , tt)
+
+evalTm-iterSize : ∀ {n} {Γ : Ctx n} {u} (S : ℕ) → 1 ≤ S →
+  (z : Tm Γ [] [] [] u) → sizeᵛ u (evalTm z) ≤ iterSize S (sizeᵗ z) 0
+evalTm-iterSize S hS z = evalWith-iterSize S 0 hS z []ᵃ tt
+
 -- WHAT REPLACES caps-frame, AND WHY IT LIVES ON THE WALK FACE'S RECEIPT
 -- RATHER THAN BESIDE IT.
 --

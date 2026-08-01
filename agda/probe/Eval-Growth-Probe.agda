@@ -441,6 +441,59 @@ _ = refl
 μ-one-j-covers-size = refl
 
 ------------------------------------------------------------------
+-- §6  THE RECEIPT THAT LANDED, GATED.  `j′ = sizeᵗ` — one iterSize
+-- fold per syntax node — against every row §1 and §2 measure.
+--
+-- These are the regression set for `evalWith-iterSize` /
+-- `applyFn-iterSize` / `evalTm-iterSize` (Caps-Face): the proven bound
+-- is `sizeᵛ (evalWith tm env) ≤ iterSize S (sizeᵗ tm) V` for ANY S ≥ 1
+-- and any V bounding the environment, so the gates below are read at
+-- the WORST admissible base, S = 1, where one fold is only
+-- `s ↦ suc (2 s)`.  Every real instantiation has S = Caps.cSize c ≥ 2
+-- and is therefore slacker still.
+--
+-- Two shapes of row: the first pair EVALUATES, so it gates the lemma's
+-- own left-hand side; the rest read `dblV`, which seed-val-rec and
+-- fn-val-rec prove IS that left-hand side for all k
+------------------------------------------------------------------
+
+-- evaluated, both sides: a closed term of size 49 whose value has size
+-- 511, against 49 folds from an empty environment
+_ : (sizeᵛ {Γ = Γ} (Tw 8) (evalTm (seedDbl 8))
+       ≤ᵇ iterSize 1 (sizeᵗ (seedDbl 8)) 0)
+      ≡ true
+_ = refl
+
+-- and the step-function face at the same rung, seeded at the payload's
+-- own size (a nat, so 1)
+_ : (sizeᵛ {Γ = Γ} (Tw 6) (applyFn (fnDbl 6) 0)
+       ≤ᵇ iterSize 1 (sizeᵗ (fnDbl 6)) 1)
+      ≡ true
+_ = refl
+
+-- §1's REFUTING row, k = 13 — the one that beat a single j — closed by
+-- the syntax-linear receipt with 79 folds
+seed-syntax-receipt-13 : (dblV 13 ≤ᵇ iterSize 1 (sizeᵗ (seedDbl 13)) 0) ≡ true
+seed-syntax-receipt-13 = refl
+
+-- §1's worst row, k = 20: 2097151 against 121 folds
+seed-syntax-receipt-20 : (dblV 20 ≤ᵇ iterSize 1 (sizeᵗ (seedDbl 20)) 0) ≡ true
+seed-syntax-receipt-20 = refl
+
+-- and the row past where the value is computable, k = 24: 33554431
+-- against 145 folds
+seed-syntax-receipt-24 : (dblV 24 ≤ᵇ iterSize 1 (sizeᵗ (seedDbl 24)) 0) ≡ true
+seed-syntax-receipt-24 = refl
+
+-- §2's REFUTING row, k = 6, on a value of size 127 out of 37 nodes
+fn-syntax-receipt-6 : (dblV 6 ≤ᵇ iterSize 1 (sizeᵗ (fnDbl 6)) 1) ≡ true
+fn-syntax-receipt-6 = refl
+
+-- §2's worst row, k = 14, at the slackened payload the §2 table uses
+fn-syntax-receipt-14 : (dblV 14 ≤ᵇ iterSize 1 (sizeᵗ (fnDbl 14)) 10) ≡ true
+fn-syntax-receipt-14 = refl
+
+------------------------------------------------------------------
 -- THE READING (2026-08-01).
 --
 -- AFFINE IS REFUTED ON ALL THREE AXES the ruling named, and none of
