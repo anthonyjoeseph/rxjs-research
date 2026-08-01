@@ -82,18 +82,25 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- NINE POSTULATES REMAIN.  They are: the three walk faces
--- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the caps face
--- subscribeE-caps with its chain-half lemma regsSz?-subscribeE, the two
--- pieces the BUDGET CLAIM is assembled from (cascadeGo-charge and
--- cascadeGo-deliveries), and the two VALUE clauses mapFrame-caps /
--- scanFrame-caps that stepFrame-caps was traded for.  frameBlowup is
--- fully defined, and cascadeGo-caps, the cascade bookends and the chain
--- snapshot are all ground.
+-- TWELVE POSTULATES REMAIN, and the assembly knot is not among them.
+-- They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
+-- subscribeE-walk), the caps face's chain-half lemma
+-- regsSz?-subscribeE, the two pieces the BUDGET CLAIM is assembled from
+-- (cascadeGo-charge and cascadeGo-deliveries), and SIX EVALUATION
+-- OBLIGATIONS — mapFrame-caps and scanFrame-caps, which stepFrame-caps
+-- was traded for, and evalTms-caps, evalSeed-caps and unfoldμ-caps,
+-- which subscribeE-caps was.  frameBlowup is fully defined, and
+-- cascadeGo-caps, the cascade bookends and the chain snapshot are all
+-- ground.
 --
--- EVERY COMPANION OF THE CAPS TREE IS NOW GROUND — subscribeE-caps
--- itself is the only face left, and it is the assembly knot rather than
--- a companion.  That is what the two repairs of 2026-07-31 bought:
+-- THE COUNT WENT UP AND THE TREE GOT SMALLER, which is the trade worth
+-- making: one opaque face of the whole subscribe machine became five
+-- statements about `evalTm` and `unfoldμ` alone — no state, no
+-- recursion, no chain — each of which is the SAME tower difficulty the
+-- two frame postulates already stand on.
+--
+-- EVERY COMPANION OF THE CAPS TREE IS GROUND, AND SO IS THE FACE.
+-- That is what the repairs of 2026-07-31/08-01 bought:
 -- thruConsume-caps, thruWalk-caps, concatDrain-caps, innerFinish-caps
 -- and subscribeE-input-caps join subscribeInner-caps, and five
 -- postulates leave the tree in one leg.  thruConsume was always
@@ -113,13 +120,14 @@
 -- is what sharedSlot-caps asks for, the hot script either answers with a
 -- one-shot close or registers (one j), and the cold slot's sync values
 -- and resolved async pendings are the two conjuncts slotCaps? carries.
--- THE WIDTH HALF IS FREE, which is why slotsCaps? is a size-only
--- predicate: a scripted slot's element type is DATA — the `ok` proof the
--- `scripted` constructor carries IS `T (isData t)` — and outWᵛ is
--- identically zero on a data type, since only its `obs` clause reads a
--- width at all.  So the side condition never has to mention cWid, and
--- capsAt's cWid (which bounds the PROGRAM's width, not the slots')
--- is never asked to cover slot data.
+-- THE WIDTH HALF IS FREE ON THE SCRIPTED BRANCHES, and only there: a
+-- scripted slot's element type is DATA — the `ok` proof the `scripted`
+-- constructor carries IS `T (isData t)` — and both halves of pWᵛ are
+-- identically zero on a data type, since only their `obs` clauses read
+-- a width at all.  The SHARED branch is not free, since the parked-width
+-- repair: a slot def is subscribed whole at a connect and may bury a
+-- defer, so slotCaps? carries `pWᵉ n sl d ≤ cWid` there, and capsAt's
+-- base pays for it with `slotsPW`.
 --
 -- subscribeInner-caps is PROVEN — the caps grind's first clause, taken
 -- first because it was the most uncertain: the *All edge
