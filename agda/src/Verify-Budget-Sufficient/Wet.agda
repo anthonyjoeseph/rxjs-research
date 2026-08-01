@@ -7,11 +7,16 @@
 -- results that compose them: burst-wet, cascade-dry, drain-dry, and
 -- budget-sufficient.
 --
--- budget-sufficient IS the export Verify-Well-Formed consumes, and it
--- lives here rather than at the top so that grinding the caps face does
--- not re-check Verify-Well-Formed.
+-- budget-sufficient IS the export Verify-Well-Formed consumes.
 --
--- This module is a SIBLING of .Caps-Face: it never mentions Caps.
+-- This module is a LAYER OVER .Caps-Face as of 2026-08-01: the wet
+-- cores' reset caps and per-instant store bound are read off `capsAt`,
+-- the caps recurrence, which is the only entry-computable reach bound
+-- in the machine (round3b-ledger-reset-absurd rules out the ledger).
+-- The cost is that grinding the caps face now re-checks this module and
+-- thence Verify-Well-Formed; the lean fix is the Keeps-Ring precedent —
+-- extract Caps / frameStep / frameBlowup / capsAt and their four supply
+-- lemmas into a `.Caps` prerequisite both faces import.
 module Verify-Budget-Sufficient.Wet where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
@@ -109,7 +114,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 schedHeadOf; schedGo; schedEarlier;
                                 cascadeLatch; cascadeFinish; sweepLive;
                                 takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; cascadeGo;
+                                dropSource; arrSource; chainsOf; chainsGo;
+                                cascadeGo;
                                 Path; arrTy;
                                 subscribeE; stepFrame; pushBurst;
                                 subscribeInner; chainStep; subscribeAll;
@@ -128,7 +134,11 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
 
-open import Verify-Budget-Sufficient.Keeps-Ring public
+-- .Caps-Face re-exports .Keeps-Ring (which re-exports .Measures), so
+-- this one import carries the whole stratum below.  It is here for
+-- `Caps` / `capsAt` / the supply lemmas / `reach-resets` only — every
+-- clause proof in this module is untouched by the caps face.
+open import Verify-Budget-Sufficient.Caps-Face public
 
 ------------------------------------------------------------------
 -- the Keeps ring and the share-boundary facts moved to
@@ -3659,11 +3669,12 @@ cascadeGo-width Ω a id ((rid , c) ∷ chains) sched st inv vΩ pΩ
           (proj₂ (∧-true (pathΩ? Ω c) _ pΩ))
 
 ------------------------------------------------------------------
--- THE WET CORES — THE ASSEMBLY, TRANSCRIBED (2026-08-01), AND THREE
--- STATEMENT-LEVEL GAPS.  Outside-in, at this joint: the companion
--- tree the wet induction would walk is written down BEFORE any clause
--- is ground — and writing it down is what found the gaps.  Both cores
--- are STOPPED on a design ruling; nothing below them is touched.
+-- THE WET CORES — THE ASSEMBLY, TRANSCRIBED (2026-08-01), AND THE
+-- THREE STATEMENT-LEVEL GAPS IT FOUND.  Outside-in, at this joint:
+-- the companion tree the wet induction would walk was written down
+-- BEFORE any clause was ground — and writing it down is what found
+-- the gaps.  They are cured below, in one pass, against the caps
+-- recurrence.
 --
 -- THE COMPANION TREE.  The wet induction needs no new tree.  It is
 -- subscribeE-walkS's, clause for clause, with the wet payload (hasDry
@@ -3711,79 +3722,146 @@ cascadeGo-width Ω a id ((rid , c) ∷ chains) sched st inv vΩ pΩ
 --   leaves subscribeE through a FRAME and is never re-entered through
 --   a path (the Keeps memo's clique boundary, same reason).
 --
--- So the structural half transcribes exactly.  What does NOT
--- transcribe is the two cores' own faces.
+-- So the structural half transcribes exactly.  What did NOT transcribe
+-- was the two cores' own faces — and that is what is repaired here.
 --
--- GAP 1 — THE INVARIANT IS THE WRONG ONE, IN AND OUT.  Both cores
--- carry `stBounded? B`: two conjuncts, live pendings and node stores.
--- Every member of the tree above, and the only face anywhere that
--- produces `hasDry ≡ false` (subscribeE-walk), carries `INV? Ψ B` —
--- SIX conjuncts: stBounded?, fnCapBounded?, registry cardinality,
--- regsB?, slotsSize, slotsFnCap — and the walk face carries widthOK? Ω
--- / ofWᵉ b ≤ Ω / pathΩ? Ω κ and the length ledger `pathLen κ + G ≤ ℓ`
--- / regsLen? ℓ on top.  Neither direction closes:
+-- ================================================================
+-- THE RESTATEMENT (2026-08-01): THE WET STACK ANCHORS AT capsAt
+-- ================================================================
 --
---   · IN.  `stBounded? V` does not yield `INV? Ψ B` at any (Ψ, B) the
---     landing arithmetic can afford.  It says nothing about a stored
---     value's fn weight, the registry's cardinality, or a registered
---     chain's frames.  Some (Ψ, B) always exists for a FIXED finite
---     state — that is not the point; the point is that the bound has
---     to BE the instant's budget.  And subscribeE-wet's κ is
---     completely unconstrained, where every member above needs
---     `pathB? (capᴱ W E) Ψ κ` (register-INV consumes it to keep
---     regsB?).
---   · OUT.  drain-dry threads instant to instant exactly what
---     cascade-dry returns.  If the fold's proof consumes INV?, then
---     cascadeGo-wet has to RETURN INV?, or instant (suc id) cannot be
---     entered.  A stBounded?-only conclusion cannot re-seed an
---     INV?-shaped hypothesis, so drain-dry → cascade-dry →
---     cascadeGo-wet does not close at the stated faces.
+-- This is the convergence the caps campaign existed for.  Round 3b's
+-- Ŝ / R̂ / F were always waiting for an ENTRY-COMPUTABLE reach bound —
+-- round3b-ledger-reset-absurd is the proof that nothing ledger-shaped
+-- can serve — and capsAt is it: a recurrence on the program syntax and
+-- the slot telescope alone, with no reference to E, to capᴱ, or to any
+-- quantity the walk's own work moves.
 --
--- This is the class the caps face hit three times (the joint bound,
--- `c` untied from `sl`, the chain half): a face stated against less
--- than its own tree threads.
+-- GAP 1 — THE INVARIANT WAS THE WRONG ONE, IN AND OUT.  Both cores
+-- carried `stBounded? B`: two conjuncts, live pendings and node
+-- stores.  Every member of the companion tree above, and the only face
+-- anywhere that produces `hasDry ≡ false` (subscribeE-walk), carries
+-- `INV? Ψ B` — SIX conjuncts: stBounded?, fnCapBounded?, registry
+-- cardinality, regsB?, slotsSize, slotsFnCap.  Neither direction
+-- closed: `stBounded? V` says nothing about a stored value's fn
+-- weight, the registry's cardinality, or a registered chain's frames
+-- (IN), and a stBounded?-only conclusion cannot re-seed an INV?-shaped
+-- hypothesis (OUT), so drain-dry → cascade-dry → cascadeGo-wet did not
+-- compose.  And subscribeE-wet's κ was completely unconstrained, where
+-- every member needs `pathB? B Ψ κ` (register-INV consumes it to keep
+-- regsB?).
 --
--- GAP 2 — THE DEMAND'S RESET CAPS ARE THE LEDGER.  subscribeE-wet
--- measures its demand at V = sizeBudgetAt e slots id — the instant's
+--   CURED.  Both cores now carry INV? Ψ B in AND out, at
+--   (Ψ, B) = (ΨAt e sl, sizeCapAt e sl ·) — a fn-cap seed that never
+--   grows and a size cap that rides the caps recurrence per instant —
+--   plus `pathB? B Ψ κ` on subscribeE-wet's continuation.
+--   cascade-dry's conclusion is now LITERALLY drain-dry's next-instant
+--   hypothesis, with no residue.
+--
+-- GAP 2 — THE DEMAND'S RESET CAPS WERE THE LEDGER.  subscribeE-wet
+-- measured its demand at V = sizeBudgetAt e slots id — the instant's
 -- STORE bound — in every cap role at once: dBound's V, R as hopR V,
--- hopD's index, and (through `sizeᵉ b ≤ V`) the entry size.  The hop
--- edge then owes exactly
+-- hopD's index, and (through `sizeᵉ b ≤ V`) the entry size.  But the
+-- hop child is drawn from a MID-walk burst, and mid-walk values
+-- outgrow V (a scan frame folds every value with no fuel peel), so the
+-- only stated bound on such a value was the walk's own ledger ceiling
+-- capᴱ W E′ — whose permitted range grows with the walk's work, which
+-- grows with the demand, which is ≥ suc V by sucV≤d.  That is exactly
+-- the shape round3b-ledger-reset-absurd refutes.
 --
---     suc (syncSize of the inner) ≤ syncSizeᵉ b + suc V
+--   CURED.  Ŝ is read off capsAt — `Caps.cSize (capsAt e sl ·)`,
+--   abbreviated sizeCapAt below — and R̂ = hopR Ŝ, F = Ŝ.  The wiring
+--   is reach-resets (.Caps-Face, PROVEN): from `sizeᵉ o ≤ C` at
+--   `2 ≤ C` it yields BOTH `syncSizeᵉ o ≤ C` and `hopDᵉ C o ≤ hopR C`,
+--   which is why F needs no separate justification — it IS Ŝ, and why
+--   hop rank is not a Caps field (it is derivable from cSize; carrying
+--   it would be a synonym).  The mid-walk growth objection dissolves
+--   the same way it did on the caps side: the walk carries its own
+--   progress index (the walk face's G, the caps face's j) while the
+--   ANCHORS stay entry-fixed.
 --
--- and not one unit more — hop-step-needs below is that, machine-
--- checked, with hop-step-gives its converse.  The r drop at a *All is
--- exactly one (hopDᵉ (mergeAllᵉ c) is definitionally suc (hopDᵉ c) and
--- burstHopD? bounds the inner by hopDᵉ c), so r′ ≡ r ∸ 1 is the case
--- that must be covered and no larger drop can be relied on.
+--   WHICH LEVEL, AND WHY — the hop edge picks it.  The entry
+--   hypotheses (INV?, pathB?, sizeᵉ b) read level `id`; the reset caps
+--   Ŝ / R̂ / F and the landing invariant read level `suc id`.
+--   hop-step-needs (below, machine-checked) says an r-drop of one buys
+--   EXACTLY `s + suc Ŝ` of syncSize headroom, so a hop child `o` owes
 --
--- But the inner is drawn from a MID-WALK burst, and mid-walk values
--- outgrow V: a scan frame folds every value with NO fuel peel, one
--- applyFn per fold, and THE WALK INVARIANT memo above already records
--- it — "no fixed (V, R) survives the walk".  The only stated bound on
--- such a value is the walk's own ledger ceiling capᴱ W E′, whose
--- permitted range grows with the walk's work, which grows with the
--- demand, which is ≥ suc V by sucV≤d.  That is round 3's whole
--- remaining debt, already named: round3b-ledger-reset-absurd says the
--- reset caps Ŝ and R̂ may NOT be the ledger, they have to come from
--- reachability.  subscribeE-wet's V is the ledger.
+--       suc (syncSizeᵉ o) ≤ syncSizeᵉ b + suc Ŝ
 --
--- GAP 3 — THE ARRIVAL IS UNBOUNDED, AND THE POP RING CANNOT BOUND IT.
--- cascadeGo-wet quantifies over `chains` and over `a` with no bound on
--- either.  cascadeGo-walk needs `all (λ rc → pathB? …) chains` (which
--- is INV?'s regsB? conjunct — GAP 1) and, separately,
--- `valB? … (arrTy a) (arrVal a)`.  Nothing anywhere bounds a POPPED
--- arrival's value: schedHeadOf-bounded and pop-bounded both keep the
--- TAIL and drop the popped element on the floor.  The companion that
--- would supply it — the same schedGo inversion, keeping the HEAD — does
--- not exist, and any INV?-shaped restatement owes it.
+--   and not one unit more.  `o` is drawn from a MID-instant burst, and
+--   a mid-instant value is bounded by the instant's ENDPOINT caps
+--   level, not by its entry level — caps-tick is exactly that shape
+--   (capsAt id in, capsAt (suc id) out, every mid-cascade state at an
+--   intermediate `frameStep j` between them).  So Ŝ := sizeCapAt e sl
+--   (suc id), whence `sizeᵉ o ≤ Ŝ` gives `syncSizeᵉ o ≤ Ŝ` by
+--   reach-resets and `suc Ŝ ≤ syncSizeᵉ b + suc Ŝ` closes the owed
+--   inequality with the whole of syncSizeᵉ b as slack.  Reading Ŝ at
+--   level `id` would NOT close it: the mid-instant inner is not
+--   bounded there.  No pre-blowup base and no partial frameStep level
+--   is needed — the two endpoints of one instant suffice.
+--
+-- GAP 3 — THE ARRIVAL WAS UNBOUNDED, AND THE POP RING COULD NOT BOUND
+-- IT.  cascadeGo-wet quantified over `chains` and over `a` with no
+-- bound on either.  cascadeGo-walk needs `all (λ rc → pathB? …)
+-- chains` (which is INV?'s regsB? conjunct, so GAP 1 supplies it
+-- through chainsOf-B below) and, separately, `valB? … (arrTy a)
+-- (arrVal a)`.  Nothing bounded a POPPED arrival's value:
+-- schedHeadOf-bounded and pop-bounded both keep the TAIL and drop the
+-- popped element on the floor.
+--
+--   CURED at the statement.  cascadeGo-wet gains the arrival
+--   hypothesis, and the companion that supplies it is NAMED:
+--   pop-head-bounded, the head-KEEPING schedGo inversion (the popped
+--   arrival was a pending of a live source, so stBounded?'s pendings
+--   half bounds it).  Stated here, consumed by drain-dry; NOT proven
+--   this leg.
+--
+-- WHAT THE WALK FACE'S PARAMETERS BECOME.  subscribeE-walk
+-- (.Measures) is NOT restated: its eight caps are universally
+-- quantified ℕs, so the capsAt instantiation is a choice of arguments
+-- and nothing about the face resists it.  The map, recorded here so it
+-- is not re-derived:
+--
+--   Ŝ  ←  Caps.cSize (capsAt e sl (suc id))            (= sizeCapAt)
+--   R̂  ←  hopR Ŝ         — DERIVED from cSize by reach-resets, not a
+--                          Caps field; hop rank is derivable, which is
+--                          why there is no cHop
+--   F  ←  Ŝ              — same object; reach-resets' second component
+--                          is stated at index C = Ŝ
+--   ℓ  ←  Caps.cSize (capsAt e sl (suc id))  — the caps face already
+--                          reads path LENGTH at cSize: pathSz?'s
+--                          `suc (pathLen p) ≤ᵇ B` conjunct is the ℓ
+--                          ledger at ℓ := cSize (its own memo says so)
+--   Ω  ←  NOT a Caps field.  ΩAt e sl.  cWid is the FRAME width
+--                          (widLive / widNode); Ω is the per-NODE ofW
+--                          width (widthOK?), and om-is-not-a-frame-
+--                          budget is the counterexample to conflating
+--                          them.  Ω needs no recurrence: the one width
+--                          mint in the machine is ofᵉ and ΩAt already
+--                          dominates it, which is why the width walk
+--                          is proven with no running position.
+--   Ψ  ←  NOT a Caps field.  ΨAt e sl.  Ψ never grows (caseW is
+--                          substitution-invariant), so no recurrence.
+--   W, E ← the walk's OWN ledger, untouched.  The one joint left open
+--                          between the two accounting mechanisms is
+--                          arithmetic, not statement-level:
+--                            capᴱ W (E · 3^(suc Ψ · walkCap Ω ℓ G))
+--                              ≤ sizeCapAt e sl (suc id)
+--                          i.e. the walk's receipt ceiling lands under
+--                          the next caps level.  This is the "two
+--                          parallel accounting mechanisms for one
+--                          growth is a smell" note at the end of
+--                          .Caps-Face, now with both sides written
+--                          down; collapsing E into j is the follow-up.
+--
+-- cascadeGo-charge and cascadeGo-deliveries (.Caps-Face) are FROZEN
+-- and design-owned.  Nothing restated here consumes either of them.
 ------------------------------------------------------------------
 
--- THE EXACT SLACK AT A ONE-STEP HOP, so GAP 2 is a number and not a
--- worry.  At a FIXED anchor V an r-drop of one buys exactly `s + V` of
--- syncSize headroom — necessary and sufficient, both directions.  The
--- whole content is *-suc: dBound's second summand grows by exactly
--- suc V per unit of r.
+-- THE EXACT SLACK AT A ONE-STEP HOP, so GAP 2's level choice is a
+-- number and not a worry.  At a FIXED anchor Ŝ an r-drop of one buys
+-- exactly `s + Ŝ` of syncSize headroom — necessary and sufficient,
+-- both directions.  The whole content is *-suc: dBound's second
+-- summand grows by exactly suc Ŝ per unit of r.
 dBound-suc-r : ∀ (V R U r s : ℕ) →
   dBound V R U (suc r) s ≡ (s + suc V) + suc V * (r + suc R * U)
 dBound-suc-r V R U r s =
@@ -3802,117 +3880,258 @@ hop-step-needs V R U r s s′ h =
   +-cancelʳ-≤ (suc V * (r + suc R * U)) (suc s′) (s + suc V)
     (≤-trans h (≤-reflexive (dBound-suc-r V R U r s)))
 
+------------------------------------------------------------------
+-- THE ONE ANCHOR.  Every cap the wet stack measures with is this
+-- number at one of two instant levels: the store invariant's B, the
+-- demand's s′ reset Ŝ, the r reset's base (R̂ = hopR Ŝ) and the hop
+-- index F.  Entry-computable by construction — capsAt is a recurrence
+-- on the syntax and the slot telescope alone.
+------------------------------------------------------------------
+
+sizeCapAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → ℕ
+sizeCapAt e sl id = Caps.cSize (capsAt e sl id)
+
+2≤sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → 2 ≤ sizeCapAt e sl id
+2≤sizeCapAt = 2≤capsAt-size
+
+-- one instant is one frameBlowup, and a blowup never shrinks the size
+-- cap: the two levels a core reads are ordered
+sizeCapAt-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → sizeCapAt e sl id ≤ sizeCapAt e sl (suc id)
+sizeCapAt-mono e sl id =
+  cSize≤frameBlowup (capsAt e sl id)
+    (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+
+-- the program's own size sits under the cap at every instant (capsAt's
+-- base is `2 + sizeᵉ e + slotsSize sl`, one frameBlowup down)
+size≤sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → sizeᵉ e ≤ sizeCapAt e sl id
+size≤sizeCapAt e sl id =
+  ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+          (capsAt-base-size e sl id)
+
+------------------------------------------------------------------
+-- THE CASCADE BOOKENDS ON THE INV? FACE — the caps face's
+-- cascadeLatch-caps / cascadeFinish-caps, at the wet predicate.  The
+-- latch touches only per-cascade scratch no conjunct reads; the finish
+-- is the same drop-and-sweep shareFinish-INV already runs.
+------------------------------------------------------------------
+
+cascadeLatch-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true → INV? Ψ B sched (cascadeLatch a st) ≡ true
+cascadeLatch-INV Ψ B a sched st inv with Arrival.isLast a
+... | true  = inv
+... | false = inv
+
+cascadeFinish-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B (proj₁ (cascadeFinish a sched st))
+           (proj₂ (cascadeFinish a sched st)) ≡ true
+cascadeFinish-INV Ψ B a sched st inv with Arrival.isLast a
+... | false = inv
+... | true  =
+  ∧-intro (∧-intro (sweepLive-bounded B kept (Sched.live sched)
+                     (stB-live B sched st sb))
+                   (stB-nodes B sched st sb))
+  (∧-intro (∧-intro (sweepLive-fnCap Ψ kept (Sched.live sched)
+                      (fcB-live Ψ sched st fc))
+                    (fcB-nodes Ψ sched st fc))
+  (∧-intro (T⇒≡true _ (≤⇒≤ᵇ
+              (≤-trans (dropSource-len (arrSource a) (EvalSt.registry st))
+                       (≤ᵇ⇒≤ _ _ (T-to rl)))))
+  (∧-intro (dropSource-regs B Ψ (arrSource a) (EvalSt.registry st) rb)
+  (∧-intro ss sf))))
+  where
+  kept = dropSource (arrSource a) (EvalSt.registry st)
+  P    = INV-parts Ψ B sched st inv
+  sb   = proj₁ P
+  fc   = proj₁ (proj₂ P)
+  rl   = proj₁ (proj₂ (proj₂ P))
+  rb   = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  ss   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  sf   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+
+-- the chain snapshot inherits its bounds from the registry — GAP 3's
+-- FIRST half, discharged from INV?'s regsB? conjunct rather than
+-- postulated (the caps face's chainsGo-caps, at pathB?)
+chainsGo-B : ∀ {n} {Γ : Ctx n} {t} (B Ψ : ℕ) (a : Arrival Γ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regsB? B Ψ rs ≡ true →
+  all (λ rc → pathB? B Ψ (proj₂ rc)) (chainsGo a rs) ≡ true
+chainsGo-B B Ψ a [] h = refl
+chainsGo-B B Ψ a ((rid , s , (u , p)) ∷ r) h
+  with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+... | false | _        = chainsGo-B B Ψ a r (proj₂ (∧-true _ _ h))
+... | true  | no  _    = chainsGo-B B Ψ a r (proj₂ (∧-true _ _ h))
+... | true  | yes refl = ∧-intro (proj₁ (∧-true _ _ h))
+                                 (chainsGo-B B Ψ a r (proj₂ (∧-true _ _ h)))
+
+chainsOf-B : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B Ψ : ℕ)
+  (a : Arrival Γ) (st : EvalSt e) →
+  regsB? B Ψ (EvalSt.registry st) ≡ true →
+  all (λ rc → pathB? B Ψ (proj₂ rc)) (chainsOf a st) ≡ true
+chainsOf-B B Ψ a st = chainsGo-B B Ψ a (EvalSt.registry st)
+
 postulate
-  -- STOPPED 2026-08-01 on GAP 1 and GAP 2 above: the face carries
-  -- stBounded? where its own companion tree carries INV? (and κ
-  -- unconstrained where every member wants pathB?), and its demand's
-  -- reset caps are the instant's store bound, which
-  -- round3b-ledger-reset-absurd rules out.  Not restated here — the
-  -- restatement moves burst-wet's fuel-ok and the whole
-  -- drain-dry/cascade-dry thread with it, and that is a design call.
+  -- THE WET CONTRACT, restated 2026-08-01 against the caps recurrence
+  -- (GAP 1 + GAP 2 above).  From a machine within instant `id`'s caps
+  -- level, subscribing a cap-sized value under a cap-bounded
+  -- continuation with fuel for its demand — the demand measured at the
+  -- ENTRY-COMPUTABLE reset caps Ŝ = sizeCapAt e sl (suc id),
+  -- R̂ = hopR Ŝ, F = Ŝ, never at the ledger — neither dries nor escapes
+  -- instant (suc id)'s caps level.
   --
-  -- THE WET CONTRACT, stated at the mutual block's entry point:
-  -- from a store-bounded machine, subscribing any store-sized value
-  -- with fuel for its demand neither dries nor escapes the next
-  -- instant's budget.  This is the strengthened induction of the
-  -- proof design above, to be ground clause by clause through the
-  -- block (subscribeE / stepFrame / pushBurst / subscribeAll /
+  -- To be ground clause by clause through the mutual block
+  -- (subscribeE / stepFrame / pushBurst / subscribeAll /
   -- subscribeInner / subscribeSharedSlot), each decrement edge
-  -- consuming one hasAtLeast-peel against dBound-μ / dBound-hop /
-  -- dBound-connect.  The internal walk threads a stronger invariant
-  -- (mid-walk states at the SAME instant); only this outer face is
-  -- fixed here.
+  -- consuming one hasAtLeast peel against dBound-μ / dBound-hop /
+  -- dBound-connect, with hop-step-gives supplying the hop edge's
+  -- syncSize headroom from reach-resets at Ŝ.  The internal walk
+  -- threads the stronger mid-instant invariant (subscribeE-walk, at
+  -- the parameter map recorded above); only this outer face is fixed
+  -- here.
   subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    let V = sizeBudgetAt e (Sched.slots sched) id in
-    stBounded? V sched st ≡ true →
-    sizeᵉ b ≤ V →
-    g hasAtLeast
-      suc (dBound V (hopR V)
-                  (unconn (Sched.slots sched) (EvalSt.connectedShares st))
-                  (hopDᵉ V b) (syncSizeᵉ b)) →
-    let r = subscribeE g b κ id now sched st
-    in (hasDry (proj₁ r) ≡ false)
-       × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+    let sl = Sched.slots sched
+        Ψ  = ΨAt e sl
+        B  = sizeCapAt e sl id
+        Ŝ  = sizeCapAt e sl (suc id)
+    in INV? Ψ B sched st ≡ true →
+       pathB? B Ψ κ ≡ true →
+       sizeᵉ b ≤ B →
+       fnCapᵉ b ≤ Ψ →
+       g hasAtLeast
+         suc (dBound Ŝ (hopR Ŝ)
+                     (unconn sl (EvalSt.connectedShares st))
+                     (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
+       let r = subscribeE g b κ id now sched st
+       in (hasDry (proj₁ r) ≡ false)
+          × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+                  (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- STOPPED 2026-08-01 on GAP 1 and GAP 3 above: the fold's own
-  -- decomposition (cascadeGo-walk, PROVEN) consumes INV? in and out
-  -- plus a bound on the arrival's value, and this face supplies
-  -- neither — nor can drain-dry re-seed INV? from a stBounded?-only
-  -- conclusion.  The fold-threading note below still stands and is
-  -- orthogonal to both.
+  -- the chain fold at instant id, restated on the same two faces
+  -- (GAP 1) and with GAP 3's arrival hypothesis.  Its decomposition
+  -- (cascadeGo-walk, PROVEN) consumes exactly these three: INV? in and
+  -- out, a bound on the arrival's value, and a bound on every snapshot
+  -- chain — the last of which chainsOf-B above now supplies from
+  -- INV?'s own regsB? conjunct.
   --
-  -- the chain fold at instant id, from a latched state within id's
-  -- size budget, stays wet and lands within suc id's.
-  --
-  -- FOLD-THREADING (2026-07-20, the ledger finding): this core does
-  -- NOT decompose into an end-to-end per-chainStep contract at the
-  -- two fixed bounds.  After chain k lands, chain k+1 starts from a
-  -- mid-cascade state that only suc id's budget bounds — and a
-  -- fixed-bound "start @ suc id → land @ suc id" step statement is
-  -- FALSE over its full quantification (a store value near the
-  -- bound grows past it under one more applyFn), so stating it
-  -- would be a forbidden false postulate.  The honest decomposition
-  -- threads per-cascade growth through the fold, and its exponent
-  -- budget is |chains| · demand — but |chains| (the registry's
-  -- cardinality at instant id) has NO syntactic bound: it needs its
-  -- own cumulative invariant (registrations accrue ≤ demand per
-  -- instant) formulated and proven BEFORE a chainStep-wet can be
-  -- shaped truthfully.  Until then this stays one postulate (the
-  -- FoldOut precedent: no half-stated leaf).  What IS proven of the
-  -- ledger: connect-anchor (share crossings re-anchor against the
-  -- global syntactic multiset {program} ⊎ {slots}), and the
-  -- per-cascade delivered/cancelled ledger caps deliveries at one
-  -- per registration (Verify-Well-Formed's cascadeGo-skip ring).
+  -- FOLD-THREADING (2026-07-20, the ledger finding) — still standing,
+  -- and orthogonal to all three gaps: this core does NOT decompose
+  -- into an end-to-end per-chainStep contract at two fixed bounds.
+  -- After chain k lands, chain k+1 starts from a mid-cascade state,
+  -- and a fixed-bound "start @ level L → land @ level L" step
+  -- statement is FALSE over its full quantification (a store value
+  -- near the bound grows past it under one more applyFn) — that is
+  -- caps-frame-boundary-absurd, uniform in the cap.  The honest
+  -- decomposition threads per-cascade growth through the fold, which
+  -- is what the caps face's `j` index does and what an eventual
+  -- chainStep-wet must mirror.  Until the two accounting mechanisms
+  -- are collapsed this stays one postulate (the FoldOut precedent: no
+  -- half-stated leaf).
   cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
-    stBounded? (sizeBudgetAt e (Sched.slots sched) id) sched st ≡ true →
-    let r = cascadeGo a id chains sched st
-    in (hasDry (proj₁ r) ≡ false)
-       × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+    let sl = Sched.slots sched
+        Ψ  = ΨAt e sl
+        B  = sizeCapAt e sl id
+    in INV? Ψ B sched st ≡ true →
+       valB? B Ψ (arrTy a) (arrVal a) ≡ true →
+       all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
+       let r = cascadeGo a id chains sched st
+       in (hasDry (proj₁ r) ≡ false)
+          × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+                  (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
+  -- GAP 3's NAMED COMPANION, consumed by drain-dry at exactly the
+  -- joint that owed it.  The head-KEEPING schedGo inversion:
+  -- schedHeadOf-bounded and pop-bounded both keep the TAIL and drop
+  -- the popped element on the floor, so neither yields this.  The
+  -- content is that the popped arrival was a PENDING of a live source,
+  -- so stBounded?'s pendings half (and fnCapBounded?'s live half)
+  -- bounds it — one induction over schedGo, keeping the head instead
+  -- of the tail.  STATED, not proven, 2026-08-01.
+  pop-head-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (Ψ B : ℕ) (sched : Sched Γ) (st : EvalSt e)
+    {a : Arrival Γ} {sched′ : Sched Γ} →
+    sched-next sched ≡ inj₂ (a , sched′) →
+    INV? Ψ B sched st ≡ true →
+    valB? B Ψ (arrTy a) (arrVal a) ≡ true
+
+  -- the TAIL half of the same inversion, on the six-conjunct face.
+  -- pop-bounded is its stBounded? projection and is PROVEN; what is
+  -- owed is the fnCapBounded? live half (a transcription of
+  -- schedGo-bounded / schedHeadOf-bounded at fnCapLive) plus the
+  -- transport of the two slot conjuncts along pop-slots.  The clean
+  -- discharge is to make schedGo-bounded generic in the pending
+  -- predicate, which would retire pop-bounded into it.
+  pop-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (Ψ B : ℕ) (sched : Sched Γ) (st : EvalSt e)
+    {a : Arrival Γ} {sched′ : Sched Γ} →
+    sched-next sched ≡ inj₂ (a , sched′) →
+    INV? Ψ B sched st ≡ true → INV? Ψ B sched′ st ≡ true
+
+  -- THE SEED, on the six-conjunct face at the caps level.  init-bounded
+  -- is its stBounded? projection and is PROVEN, but at sizeBudgetAt;
+  -- what is owed is (i) the same mkHot argument at
+  -- `Caps.cSize (capsAt …)`, which capsAt-base-size supplies, (ii) the
+  -- fnCapLive mirror of mkHot-bounded, (iii) the registry conjuncts,
+  -- which are trivial at st-init (the registry is []), and (iv) the
+  -- two slot conjuncts, again from capsAt-base-size and from ΨAt's own
+  -- definition.
+  init-INV : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    (id : Id) →
+    INV? (ΨAt e ins) (sizeCapAt e ins id)
+         (sched-init e ins) (st-init e) ≡ true
+
+  -- THE ROOT'S FUEL, at the moved anchor.  The old discharge
+  -- (dBound-bound + seed-covers + budget-hasAtLeast) measured the
+  -- demand at sizeBudgetAt, and does not apply now that the reset caps
+  -- are capsAt's own tower.  What is owed is a TOWER-HEIGHT
+  -- comparison, and the counts say it holds with room: budgetAt's gas
+  -- tower has height (7 + sz)·(id + 2) ≥ 16 at the root, while
+  -- sizeCapAt e ins 1 is a tower of height ≈ 6 in sz (capsAt's base is
+  -- two exponentials above the syntax and each frameBlowup adds about
+  -- one story) and hopR adds two more — so the demand sits around
+  -- height 8 against a budget at 16.  Proving it means bounding
+  -- Caps.cSize (capsAt e sl id) by towerℕ of a linear function of id,
+  -- which is the recurrence's own induction and belongs with the caps
+  -- face, not here.
+  caps-fuel-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    budgetAt e ins 0 hasAtLeast
+      suc (dBound (sizeCapAt e ins 1) (hopR (sizeCapAt e ins 1))
+                  (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) e)
+                  (syncSizeᵉ e))
 
 ------------------------------------------------------------------
--- the burst cores — PROVEN: the contract instantiated at the root.
--- The root subscribes the program itself from the initial machine:
--- init-bounded seeds the store invariant, the program is its own
--- size witness, and the seeded budget covers the demand by
--- dBound-bound + seed-covers (U ≤ sz through the slot content,
--- r ≤ R through measureE-rank).
+-- the burst cores — the contract instantiated at the root.  The root
+-- subscribes the program itself from the initial machine: init-INV
+-- seeds the six-conjunct invariant at the caps level, root is a
+-- bounded continuation for free, the program is its own size witness
+-- through capsAt's base, and caps-fuel-root covers the demand.
 ------------------------------------------------------------------
 
 burst-wet : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   let r = subscribeE (budgetAt e ins 0) e root 0 0
                      (sched-init e ins) (st-init e)
   in (hasDry (proj₁ r) ≡ false)
-     × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
-                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+             (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) 1)
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 burst-wet e ins =
   subscribeE-wet (budgetAt e ins 0) e root 0 0
                  (sched-init e ins) (st-init e)
-                 (init-bounded e ins 0) size≤V fuel-ok
-  where
-  sz = sizeᵉ e + slotsSize ins
-  V  = sizeBudgetAt e ins 0
-
-  size≤V : sizeᵉ e ≤ V
-  size≤V = size≤budget e ins 0
-
-  U≤sz : unconn ins [] ≤ sz
-  U≤sz = ≤-trans (unconn≤slots ins []) (m≤n+m (slotsSize ins) (sizeᵉ e))
-
-  fuel-ok : budgetAt e ins 0 hasAtLeast
-    suc (dBound V (hopR V) (unconn ins [])
-                (hopDᵉ V e) (syncSizeᵉ e))
-  fuel-ok = hasAtLeast-mono
-    (≤-trans (s≤s (dBound-bound (≤-trans (syncSize≤sizeᵉ e) size≤V)
-                                (hopD-cap V e (2≤sizeBudget e ins 0) size≤V)))
-             (seed-covers sz (unconn ins []) U≤sz))
-    (budget-hasAtLeast sz 0)
+                 (init-INV e ins 0) refl
+                 (size≤sizeCapAt e ins 0)
+                 (m≤m+n (fnCapᵉ e) (slotsFnCap ins))
+                 (caps-fuel-root e ins)
 
 burst-dry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
@@ -3922,72 +4141,101 @@ burst-dry e ins = proj₁ (burst-wet e ins)
 burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   let r = subscribeE (budgetAt e ins 0) e root 0 0
                      (sched-init e ins) (st-init e)
-  in stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) 1)
-                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+  in INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+          (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) 1)
+          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 burst-bounded e ins = proj₂ (burst-wet e ins)
 
 
 ------------------------------------------------------------------
--- one cascade — PROVEN: latch, the postulated fold core, finish
+-- one cascade — PROVEN: latch, the postulated fold core, finish, all
+-- three on the six-conjunct face.  GAP 1's OUT direction closes here:
+-- what this returns IS what drain-dry hands the next instant.
 ------------------------------------------------------------------
 
 cascade-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-  stBounded? (sizeBudgetAt e (Sched.slots sched) id) sched st ≡ true →
+  INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
+       sched st ≡ true →
+  valB? (sizeCapAt e (Sched.slots sched) id) (ΨAt e (Sched.slots sched))
+        (arrTy a) (arrVal a) ≡ true →
   let r = cascade a id sched st
   in (hasDry (proj₁ r) ≡ false)
-     × (stBounded? (sizeBudgetAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascade-dry {e = e} a id sched st bnd
+     × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+             (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+cascade-dry {e = e} a id sched st inv val
   with cascadeGo-wet a id (chainsOf a st) sched (cascadeLatch a st)
-         (latch-bounded (sizeBudgetAt e (Sched.slots sched) id) sched a st bnd)
-... | dry , bnd' = dry , final
+         (cascadeLatch-INV (ΨAt e (Sched.slots sched))
+                           (sizeCapAt e (Sched.slots sched) id) a sched st inv)
+         val
+         (chainsOf-B (sizeCapAt e (Sched.slots sched) id)
+                     (ΨAt e (Sched.slots sched)) a st
+           (proj₁ (proj₂ (proj₂ (proj₂
+             (INV-parts (ΨAt e (Sched.slots sched))
+                        (sizeCapAt e (Sched.slots sched) id) sched st inv))))))
+... | dry , inv′ = dry , final
   where
-  sched' = proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched
+  sched′ = proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched
                                    (cascadeLatch a st)))
-  st'    = proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
+  st′    = proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
                                    (cascadeLatch a st)))
-  final : stBounded?
-            (sizeBudgetAt e (Sched.slots (proj₁ (cascadeFinish a sched' st')))
-                      (suc id))
-            (proj₁ (cascadeFinish a sched' st'))
-            (proj₂ (cascadeFinish a sched' st')) ≡ true
+  final : INV? (ΨAt e (Sched.slots (proj₁ (cascadeFinish a sched′ st′))))
+               (sizeCapAt e (Sched.slots (proj₁ (cascadeFinish a sched′ st′)))
+                          (suc id))
+               (proj₁ (cascadeFinish a sched′ st′))
+               (proj₂ (cascadeFinish a sched′ st′)) ≡ true
   final = subst
-            (λ sl → stBounded? (sizeBudgetAt e sl (suc id))
-                      (proj₁ (cascadeFinish a sched' st'))
-                      (proj₂ (cascadeFinish a sched' st')) ≡ true)
-            (sym (finish-slots a sched' st'))
-            (finish-bounded (sizeBudgetAt e (Sched.slots sched') (suc id))
-                            a sched' st' bnd')
+            (λ sl → INV? (ΨAt e sl) (sizeCapAt e sl (suc id))
+                      (proj₁ (cascadeFinish a sched′ st′))
+                      (proj₂ (cascadeFinish a sched′ st′)) ≡ true)
+            (sym (finish-slots a sched′ st′))
+            (cascadeFinish-INV (ΨAt e (Sched.slots sched′))
+                               (sizeCapAt e (Sched.slots sched′) (suc id))
+                               a sched′ st′ inv′)
 
 ------------------------------------------------------------------
--- the fuel loop composes cascades — PROVEN
+-- the fuel loop composes cascades — PROVEN.  The pop is the only new
+-- joint: pop-INV carries the invariant past it and pop-head-bounded
+-- (GAP 3) supplies the arrival cascade-dry now demands.
 ------------------------------------------------------------------
 
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-  stBounded? (sizeBudgetAt e (Sched.slots sched) id) sched st ≡ true →
+  INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
+       sched st ≡ true →
   hasDry (drain {e = e} fuel id sched st) ≡ false
-drain-dry zero    id sched st bnd = refl
-drain-dry (suc k) id sched st bnd with sched-next sched in eq
+drain-dry zero    id sched st inv = refl
+drain-dry (suc k) id sched st inv with sched-next sched in eq
 ... | inj₁ _            = refl
-drain-dry {e = e} (suc k) id sched st bnd | inj₂ (a , sched′) =
-  let bnd′ : stBounded? (sizeBudgetAt e (Sched.slots sched′) id) sched′ st ≡ true
-      bnd′ = subst
-               (λ sl → stBounded? (sizeBudgetAt e sl id) sched′ st ≡ true)
+drain-dry {e = e} (suc k) id sched st inv | inj₂ (a , sched′) =
+  let Ψ    = ΨAt e (Sched.slots sched)
+      B    = sizeCapAt e (Sched.slots sched) id
+      inv′ : INV? (ΨAt e (Sched.slots sched′))
+                  (sizeCapAt e (Sched.slots sched′) id) sched′ st ≡ true
+      inv′ = subst
+               (λ sl → INV? (ΨAt e sl) (sizeCapAt e sl id) sched′ st ≡ true)
                (sym (pop-slots sched eq))
-               (pop-bounded (sizeBudgetAt e (Sched.slots sched) id) sched st eq bnd)
-      (dry₁ , bnd″) = cascade-dry a id sched′ st bnd′
+               (pop-INV Ψ B sched st eq inv)
+      val′ : valB? (sizeCapAt e (Sched.slots sched′) id)
+                   (ΨAt e (Sched.slots sched′)) (arrTy a) (arrVal a) ≡ true
+      val′ = subst
+               (λ sl → valB? (sizeCapAt e sl id) (ΨAt e sl)
+                             (arrTy a) (arrVal a) ≡ true)
+               (sym (pop-slots sched eq))
+               (pop-head-bounded Ψ B sched st eq inv)
+      (dry₁ , inv″) = cascade-dry a id sched′ st inv′ val′
   in hasDry-append (proj₁ (cascade a id sched′ st)) _
        dry₁
        (drain-dry k (suc id)
          (proj₁ (proj₂ (cascade a id sched′ st)))
          (proj₂ (proj₂ (cascade a id sched′ st)))
-         bnd″)
+         inv″)
 
 ------------------------------------------------------------------
 -- the theorem: same statement as Verify-Well-Formed's postulate;
--- the splice (coordinated, later) replaces that postulate with this
+-- the splice (coordinated, later) replaces that postulate with this.
+-- ITS FACE IS FIXED and did not move in the restatement.
 ------------------------------------------------------------------
 
 budget-sufficient :

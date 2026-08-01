@@ -82,12 +82,19 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FIVE POSTULATES REMAIN, and the assembly knot is not among them.
--- They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
--- subscribeE-walk) and the two pieces the BUDGET CLAIM is assembled
--- from (cascadeGo-charge and cascadeGo-deliveries).  3 + 2 = 5, and
--- that is the whole ledger — THE CAPS FACE IS DOWN TO THE TWO
--- DESIGN-OWNED COUNTS and nothing else.
+-- NINE POSTULATES REMAIN after the 2026-08-01 wet restatement (the
+-- wet stack now anchors at capsAt; see the memo above the wet cores in
+-- .Wet).  They are: the three walk faces (subscribeE-wet, cascadeGo-wet,
+-- subscribeE-walk), the two pieces the BUDGET CLAIM is assembled from
+-- (cascadeGo-charge and cascadeGo-deliveries, design-owned and frozen),
+-- and the four companions the restatement NAMED rather than left
+-- implicit — pop-head-bounded (GAP 3's head-keeping schedGo inversion),
+-- pop-INV and init-INV (the same two structural facts pop-bounded and
+-- init-bounded already give on the stBounded? projection, owed on the
+-- six-conjunct face) and caps-fuel-root (the root's fuel at the moved
+-- anchor, a tower-height comparison).  3 + 2 + 4 = 9.  The count ROSE
+-- because three statement-level gaps were closed: the previous 5 was a
+-- ledger over faces that did not compose.
 -- frameBlowup is fully defined, and cascadeGo-caps, the cascade
 -- bookends and the chain snapshot are all ground.
 --
@@ -368,9 +375,13 @@
 --   .Wet         the wet family, the width family, and the theorem
 --                (burst-wet, cascade-dry, drain-dry, budget-sufficient)
 --
--- .Caps-Face and .Wet are SIBLINGS over .Keeps-Ring, not a stack: the wet
--- family never mentions Caps, so grinding the caps face leaves it (and
--- Verify-Well-Formed, which imports budget-sufficient from .Wet) alone.
+-- .Wet is a LAYER OVER .Caps-Face as of 2026-08-01: the wet cores'
+-- reset caps and per-instant store bound are read off capsAt, the only
+-- entry-computable reach bound in the machine.  So grinding the caps
+-- face now re-checks .Wet and thence Verify-Well-Formed.  The lean fix
+-- is the .Keeps-Ring precedent — extract Caps / frameStep /
+-- frameBlowup / capsAt and their four supply lemmas into a .Caps
+-- prerequisite both faces import — and it is the next structural task.
 --
 -- This file is the ACTIVE GRIND, and re-exports all three so every
 -- existing importer and probe sees the same names it always did.
