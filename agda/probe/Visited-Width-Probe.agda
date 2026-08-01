@@ -38,10 +38,12 @@
 --       one per shared slot, and more fuel buys nothing.  The fuel axis
 --       is gone as a source of growth.
 --
---       AND THE FORM THE COLLECTORS MUST TAKE, which is a finding: a
---       def read with an EMPTY visited set goes round the cycle ONE MORE
---       TIME than any connect does, because its own slot is not yet
---       marked.  `slotPW` / `slotIW` must mark first.
+--       AND WHAT THE COLLECTORS COST.  A def read with an EMPTY visited
+--       set goes round the cycle ONE MORE TIME than any connect does,
+--       because its own slot is not yet marked.  Marking removes the
+--       turn — but `capsOK?` reads a STORED value at the entry form and
+--       cannot supply a marked one, so the collectors STAY at `[]` and
+--       the base pays that one turn.  One, not `n`: still linear.
 --
 --   §3  AGREEMENT OFF THE CYCLE.  On an ACYCLIC telescope the two
 --       descents are equal, refl, at every fuel level from n up: the
@@ -84,7 +86,7 @@ open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤�
 open import Data.Nat.Properties
   using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; *-identityˡ; *-identityʳ;
          *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤;
-         ^-monoʳ-≤; m≤m⊔n; m≤n⊔m; m≤m*n; m≤n+m; m≤m+n)
+         ^-monoʳ-≤; m≤m⊔n; m≤n⊔m; m≤m*n; m≤n+m; m≤m+n; ⊔-lub)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List using (List; []; _∷_; length)
@@ -382,23 +384,41 @@ _ = refl
 _ : outWⱽ 20 [] insC in1 ≡ outWⱽ 2 [] insC in1
 _ = refl
 
--- AND THE FORM `slotPW` / `slotIW` MUST TAKE — a finding, not a
--- detail, and the first thing the port has to get right.  Today those
--- collectors read the DEF: `slotPW j sl (shared d) = pWᵉ j sl d`.  Read
--- with an EMPTY visited set that is WRONG under this descent, and wrong
--- in the unsafe direction: it lets the cycle go round ONE MORE TIME
--- than any connect does, since the slot the def belongs to is not yet
--- marked.  On `insC` that is a third `wrap` layer, i.e. a THIRD tower
--- story — `2 ^ (258 · 2 ^ 521)`, which is why it is not computed here.
+-- AND WHAT `slotPW` / `slotIW` COST — measured, because it decides the
+-- collectors' form and the port turns on it.  Those collectors read the
+-- DEF: `slotPW j sl (shared d) = pWᵉ j sl d`, i.e. at an EMPTY visited
+-- set.  The def's own slot is then not yet marked, so the descent comes
+-- back round to it ONE MORE TIME than a connect does — on `insC` a third
+-- `wrap` layer, i.e. a THIRD tower story, `2 ^ (258 · 2 ^ 521)`, which
+-- is why it is not computed here.
 --
--- The right form marks the slot first, which is exactly what
--- `outWⱽ (suc j) [] sl (input i)` already does.  Then the def and the
--- reference agree, and the fixed point is the same one:
+-- MARKING FIRST REMOVES THAT TURN, and the def then agrees with the
+-- reference on the nose:
 _ : outWⱽ 3 (fz ∷ []) insC d0 ≡ outWⱽ 20 (fz ∷ []) insC d0
 _ = refl
 
 _ : outWⱽ 20 (fz ∷ []) insC d0 ≡ outWⱽ 4 [] insC in0
 _ = refl
+
+-- BUT THE COLLECTORS MUST STAY UNMARKED ANYWAY, and this is the ruling
+-- the port ran into rather than a preference.  `capsOK?` bounds a STORED
+-- value, and a stored value carries no record of which connect put it
+-- there — its width is read at the ENTRY form.  So `subscribeE`'s shared
+-- branch needs the def at `[]`, and a slot side condition stated at
+-- `i ∷ []` cannot supply it: the two differ by exactly the turn above,
+-- and no monotonicity closes a gap in that direction.
+--
+-- The cost of staying at `[]` is ONE turn, not `n`: the descent marks
+-- slot i on the way back in, so a path meets at most one shared def
+-- twice and none three times.  The base height is therefore
+-- `Σkᵢ + max kᵢ` rather than `Σkᵢ` — still LINEAR, which is all Leg A
+-- needs (§4's `visited-height-fits-unmarked`).
+--
+-- WHAT THE PORT OWES, then, is visited-set ANTITONICITY beside the fuel
+-- monotonicity Caps-Face already has: `[] ⊆ i ∷ []`, so the measure at
+-- the bigger set is smaller, and the leaf lemma closes.  That is a
+-- second `monoᵉ`-shaped mutual block, and it is the one piece of Leg A
+-- that is not mechanical.
 
 -- THE MAGNITUDE, in CLOSED FORM rather than as a wall of digits — and
 -- as an EQUALITY rather than a `≤ᵇ` bracket, because `_≤ᵇ_` and `_≤_`
@@ -568,3 +588,24 @@ visited-height-fits a b =
 -- same fact, and the general inequality is a clause-by-clause induction
 -- that belongs in Caps-Face beside `monoᵉ`, not in a probe.
 ------------------------------------------------------------------
+
+-- AND THE SAME WITH THE UNMARKED TURN PAID FOR.  Reading defs at `[]`
+-- lets ONE of them be met twice, so the demand is `Σkᵢ + max kᵢ` rather
+-- than `Σkᵢ`.  Still linear, and still with room: the max is under the
+-- sum, and the sum is under the syntax twice over
+visited-height-fits-unmarked : ∀ (a b : ℕ) →
+  (a + b) + (a ⊔ b) ≤ 3 + 2 * ((10 + 14 * a) + (10 + 14 * b))
+visited-height-fits-unmarked a b =
+  ≤-trans (≤-trans (+-monoʳ-≤ (a + b) (⊔-lub (m≤m+n a b) (m≤n+m b a)))
+                   (≤-reflexive (dbl (a + b))))
+          (≤-trans (*-monoʳ-≤ 2 sum≤) (m≤n+m (2 * ((10 + 14 * a) + (10 + 14 * b))) 3))
+  where
+  dbl : ∀ (x : ℕ) → x + x ≡ 2 * x
+  dbl = solve 1 (λ x → x :+ x := con 2 :* x) refl
+  m14 : ∀ (x : ℕ) → x + 13 * x ≡ 14 * x
+  m14 = solve 1 (λ x → x :+ con 13 :* x := con 14 :* x) refl
+  sum≤ : a + b ≤ (10 + 14 * a) + (10 + 14 * b)
+  sum≤ = +-mono-≤ (≤-trans (m≤m+n a (13 * a))
+                           (≤-trans (≤-reflexive (m14 a)) (m≤n+m (14 * a) 10)))
+                  (≤-trans (m≤m+n b (13 * b))
+                           (≤-trans (≤-reflexive (m14 b)) (m≤n+m (14 * b) 10)))
