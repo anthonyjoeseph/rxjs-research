@@ -625,7 +625,8 @@ iw-escapes-pW = refl
 -- `wid-iterFold` (one foldStep per syntax node, §7's shape),
 -- `slotsCaps?-slotWid` (§8's leaf), the size receipts §6 already gates,
 -- and `evalWith-iterFold` — the WIDTH face of the evaluator, at the
--- same count as the size face.  What is new here is the ARITHMETIC each
+-- same count as the size face, itself ground over wid-subΘ (the same
+-- induction on a substitution instance) and the plug's measures.  What is new here is the ARITHMETIC each
 -- member's j′ is:
 --
 --     evalTms / evalSeed   j′ = suc (sizeᵗ)
