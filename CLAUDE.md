@@ -74,9 +74,13 @@ protocol, per Anthony:
   session's turn ends — observed directly on 2026-07-31: a worker sat frozen for 45
   minutes until a scheduled check-in woke the container, and `uptime` showed a fresh boot.
   So after launching a worker, the design session must hold the container awake with
-  repeated foreground Bash loops (~10 min each: `for i in $(seq 1 58); do ...; sleep 10;
-  done`) until the worker goes quiet, and re-arm a `send_later` check-in before ever
-  ending a turn. Worker-side keep-awake loops protect its own builds the same way.
+  a SERIES of SHORT foreground Bash keep-alives — ~110 seconds each (`for i in $(seq 1
+  11); do sleep 10; done` plus a status check), issued back-to-back — NOT long loops:
+  foreground calls get cut at ~2 minutes regardless of requested timeout, so a 10-minute
+  loop silently holds for 2 and sleeps for 8 (Anthony caught this on 2026-08-01 after a
+  day of it). Re-arm a `send_later` check-in every ~20 minutes so the loop survives
+  even if the design session's turn dies. Worker-side keep-awake loops must be ≤110s
+  for the same reason, with long builds setsid-detached and polled.
 - **Directives carry the law.** Every worker prompt restates the standing rules it needs:
   spec is gospel; probe-before-grind; the keep-awake loop for long builds; report numbers
   plainly including failures; never extrapolate from shallow probe rows; the
