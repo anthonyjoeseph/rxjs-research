@@ -3796,10 +3796,22 @@ delivN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → EvalSt e �
 delivN st st′ = length (EvalSt.delivered st′) ∸ length (EvalSt.delivered st)
 
 postulate
-  -- (i) THE PER-DELIVERY CHARGE.  The receipt the induction actually
-  -- builds, charged to the cascade's own delivery ledger rather than to
-  -- a count: every fold is a frame on some delivery's chain, and
-  -- pathSz?'s length conjunct caps a chain at cSize
+  -- (i) THE PER-DELIVERY CHARGE, IN THE NEW CURRENCY.  The receipt the
+  -- induction actually builds, charged to the cascade's own delivery
+  -- ledger rather than to a count: every fold is a frame on some
+  -- delivery's chain, and pathSz?'s length conjunct caps a chain at
+  -- cSize.
+  --
+  -- AND THE WIDTH FACTOR IS REAL, which is what changed.  `j ≤ D * cSize`
+  -- was measured FALSE by Charge-Probe — progW breaches at 47 against 40
+  -- — because `scanFrame-caps`'s receipt is
+  -- `suc (length vals * suc (sizeᵗ fn))`, one fold per node of the step
+  -- function PER PAYLOAD, and `length vals` is a burst width.  The form
+  -- below is the one that fits all 21 Instant-Height rows, worst ratio
+  -- 0.16, with cWid standing in for the arrival's payload width.
+  -- Reading cWid used to be forbidden (it would have destroyed
+  -- capsAt-tower's LINEAR height); the height is a recurrence now, so
+  -- the prohibition is gone with the closed form
   cascadeGo-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
@@ -3811,7 +3823,8 @@ postulate
     all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
     length chains ≤ Caps.cReg c →
     let r = cascadeGo a id chains sched st
-    in Σ ℕ λ j → (j ≤ delivN st (proj₂ (proj₂ r)) * Caps.cSize c)
+    in Σ ℕ λ j → (j ≤ delivN st (proj₂ (proj₂ r)) * Caps.cSize c
+                        * suc (suc (Caps.cWid c) * suc (Caps.cSize c)))
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
   -- (ii) THE DELIVERY BOUND, WHOLE, AND AS A 2-TOWER.  One cascade's
@@ -3857,13 +3870,14 @@ cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   length chains ≤ Caps.cReg c →
   let r = cascadeGo a id chains sched st
-  in Σ ℕ λ j → (j ≤ D̂ c * Caps.cSize c)
+  in Σ ℕ λ j → (j ≤ sizeCount c)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
   proj₁ CH
     , ≤-trans (proj₁ (proj₂ CH))
-              (*-monoˡ-≤ (Caps.cSize c)
-                 (cascadeGo-deliveries c a id chains sched st inv lenB))
+              (*-monoˡ-≤ (suc (suc (Caps.cWid c) * suc (Caps.cSize c)))
+                 (*-monoˡ-≤ (Caps.cSize c)
+                    (cascadeGo-deliveries c a id chains sched st inv lenB)))
     , proj₂ (proj₂ CH)
   where
   CH = cascadeGo-charge c a id chains sl sched st 2≤S slEq inv vC pS lenB

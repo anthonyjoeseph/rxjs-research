@@ -13,7 +13,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
-                           Gas; g0; gs; gasTower; gasPad;
+                           Gas; g0; gs; gasTower; gasPad; towerℕ;
                            Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; cutPending; exhausted; dried;
@@ -418,12 +418,61 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- height (4+size)·(id+2)) and is polynomial in that bound with a
 -- syntax-sized exponent (rank of the shell multiset); a tower
 -- absorbs any polynomial fudge within two stories — the rest is
--- margin ((7+sz)(id+2) − (4+sz)(id+2) = 3(id+2) ≥ 6).  The extra
--- stories are free: the tower tail is lazy and never forced on a
--- feasible run
+-- margin.  The extra stories are free: the tower tail is lazy and
+-- never forced on a feasible run.
+--
+-- AND THE HEIGHT IS NO LONGER LINEAR IN THE INSTANT.  It was, while the
+-- caps recurrence's per-instant fold count was `D̂ · cSize`: four tower
+-- stories an instant, height (7+sz)(id+2), and `capsAt-tower` bracketed
+-- the whole recurrence by that closed form.  Charge-Probe and
+-- Instant-Height then priced the frame receipt the induction actually
+-- builds — `suc (length vals · suc (sizeᵗ fn))` per frame, a PAYLOAD
+-- WIDTH — and the count that fits every measured row reads cWid:
+--
+--     sizeCount c = D̂ c · cSize c · suc (suc (cWid c) · suc (cSize c))
+--
+-- A count reading cWid iterates the tower FUNCTION once per instant
+-- (Width-Count-Probe), so no towerℕ-of-linear-height bracket exists and
+-- no closed form does either.  What replaces it is the same move the
+-- caps themselves made: a RECURRENCE.  `capsHt sz id` is the tower
+-- height of `capsAt e sl id`, one `blowH` per instant, and `blowH` is
+-- exactly what one frameBlowup's inequalities demand plus visible
+-- margin — so domination is by construction rather than by arithmetic.
+--
+-- THE PER-INSTANT COST, at a pooled level m (cSize, cWid, suc cReg all
+-- ≤ towerℕ m, m ≥ 3):
+--
+--   THE COUNT     D̂ · cSize ≤ 2 ^ (2 ^ m)          TWO stories
+--                 suc (suc cWid · suc cSize)       TWO more
+--                 so sizeCount ≤ towerℕ (3 + m)    THREE
+--   THE SIZE      a factor (3T) per fold, sizeCount folds
+--                                                  TWO more, → 5 + m
+--   THE REGISTRY  linear in the count              → 6 + m
+--   THE WIDTH     TWO stories PER FOLD (foldStep squares into the
+--                 next-but-one level), sizeCount folds
+--                                                  → m + 2 · sizeCount
+--
+-- and the width term dominates everything else by an exponential, which
+-- is why the height is now tower-VALUED rather than linear.  It costs
+-- nothing: Gas is lazy, `capsHt` is never normalised, and the gasPad
+-- literal head in front of it is the same fast path it always was
+blowH : ℕ → ℕ
+blowH m = 6 + m + 2 * towerℕ (3 + m)
+
+capsHgo : ℕ → Id → ℕ
+capsHgo m zero    = blowH m
+capsHgo m (suc id) = blowH (capsHgo m id)
+
+-- the BASE level: cSize's base is 2 + sz and cReg's is suc sz, both
+-- under towerℕ (2 + sz) by k≤towerℕ; cWid's base is the ENTRY CEILING,
+-- whose five width measures tower in the syntax at two stories a node
+-- (Rx.Frame-Width), hence the doubling
+capsHt : ℕ → Id → ℕ
+capsHt sz id = capsHgo (3 + 2 * sz) id
+
 syncBudget : ℕ → Id → Gas
 syncBudget sz id =
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((7 + sz) * suc (suc id)))
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHt sz (suc id)))
 
 -- the size that seeds the budget is the WHOLE program's: root
 -- expression, every shared slot def (connect subscribes defs, and

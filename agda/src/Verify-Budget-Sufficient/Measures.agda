@@ -73,6 +73,10 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 complete; exhausted;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
+-- towerℕ is gasTower's ℕ shadow and lives beside it now that budgetAt's
+-- own height is a recurrence reading it; re-exported here because the
+-- whole budget stratum reads it through this module
+open import Rx.Prim      using (towerℕ) public
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
@@ -128,7 +132,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize)
+                                budgetAt; slotsSize; blowH; capsHgo; capsHt)
 
 ------------------------------------------------------------------
 -- dry-freeness composes over ++ (the other direction from
@@ -163,10 +167,6 @@ n<2^n (suc n) = ≤-trans step (≤-reflexive shape)
                  (+-mono-≤ (n<2^n n) (n<2^n n))
   shape : 2 ^ n + 2 ^ n ≡ 2 ^ suc n
   shape = cong (2 ^ n +_) (sym (+-identityʳ (2 ^ n)))
-
-towerℕ : ℕ → ℕ
-towerℕ zero    = 1
-towerℕ (suc h) = 2 ^ towerℕ h
 
 -- height (4+sz)·(1+id): the per-instant story gain (4+sz) ≥ 5 covers
 -- the walk ledger's worst-case ~4-story spend against the ENTRY cap
@@ -254,16 +254,17 @@ hasAtLeast-tower : ∀ (h : ℕ) → gasTower h hasAtLeast towerℕ h
 hasAtLeast-tower zero    = hs hz
 hasAtLeast-tower (suc h) = hasAtLeast-pow2 (hasAtLeast-tower h)
 
--- what the seeded budget guarantees: the full head plus the tower
--- (height (7+sz)·(id+2) — three-plus stories above sizeBudgetAt's
--- LANDING instant, the headroom the wet contract's rank demand,
--- anchored at the landing budget, consumes)
+-- what the seeded budget guarantees: the full head plus the tower, at
+-- the RECURRENCE-DEFINED height `3 + capsHt sz (suc id)` — three stories
+-- above the caps level the wet contract's rank demand anchors at (the
+-- LANDING instant's cSize, which `capsHt sz (suc id)` brackets), which
+-- is exactly what `prod≤3pow` costs
 budget-hasAtLeast : ∀ (sz : ℕ) (id : Id) →
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower ((7 + sz) * suc (suc id)))
-    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id)))
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHt sz (suc id)))
+    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ (3 + capsHt sz (suc id)))
 budget-hasAtLeast sz id =
   hasAtLeast-pad-plus (2 ^ (sz * suc id * suc id))
-                      (hasAtLeast-tower ((7 + sz) * suc (suc id)))
+                      (hasAtLeast-tower (3 + capsHt sz (suc id)))
 
 -- the peel every decrement-edge clause performs: enough fuel means
 -- the machine's gs-match succeeds and the tail still has enough

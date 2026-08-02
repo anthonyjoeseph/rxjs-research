@@ -1,6 +1,6 @@
 module Rx.Prim where
 
-open import Data.Nat     using (ℕ; zero; suc)
+open import Data.Nat     using (ℕ; zero; suc; _^_)
 open import Data.List    using (List)
 
 ------------------------------------------------------------------
@@ -33,6 +33,16 @@ gasPow2 (gs g) = gasDouble (gasPow2 g)
 gasTower : ℕ → Gas                  -- tower of 2s of height h (tower 0 = 1)
 gasTower zero    = gs g0
 gasTower (suc h) = gasPow2 (gasTower h)
+
+-- gasTower's ℕ SHADOW, and it lives here rather than beside the budget
+-- lemmas because the BUDGET'S OWN HEIGHT is now defined by a recurrence
+-- that reads it (`capsHt` in Rx.Evaluator).  `gasTower h hasAtLeast
+-- towerℕ h` is the bridge, proven where hasAtLeast is.  NEVER let a
+-- numeral of this escape into a `refl`: towerℕ 5 already exceeds the
+-- machine
+towerℕ : ℕ → ℕ
+towerℕ zero    = 1
+towerℕ (suc h) = 2 ^ towerℕ h
 
 -- n literal-backed units in front of g.  The ℕ stays a GMP literal
 -- (typechecker) / strict Integer (compiled), so each peel is an O(1)
