@@ -28,7 +28,10 @@
 -- source.  The `↠` line is the one that needed the grind: it is an
 -- equality and not an inequality precisely because the whole stepFrame
 -- clique preserves the field, and that clique is fifteen mutually
--- recursive functions.
+-- recursive functions.  § E closes the level above: `cascadeLatch`
+-- CLEARS the ledger (the one write that is not a cons), which is why
+-- every count here is read between a latch and the next one, and why
+-- one cascade's D is a plain length rather than a difference.
 --
 -- It imports Rx.Evaluator and the standard library and NOTHING else —
 -- no Caps, no measure, no invariant — so it sits under every stratum
@@ -79,7 +82,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Slot;
                                 sharedConnect; subscribeSharedSlot;
                                 shareLatch; shareAdmit; shareFinish;
                                 foldPath; dispatchShare; shareGo;
-                                chainStep; cascadeGo; budgetAt;
+                                chainStep; cascadeGo; cascadeLatch;
+                                cascadeFinish; cascade; chainsOf; budgetAt;
                                 arrTy; arrTick; arrSource; arrVal)
 
 ------------------------------------------------------------------
@@ -894,3 +898,42 @@ abstract
                     (proj₁ (proj₂ cs)) (proj₂ (proj₂ cs)) in
         trans (delivN-cons rid st _ (⊑ᵈ-trans CS GO))
               (cong suc (delivN-split CS GO))
+
+------------------------------------------------------------------
+-- § E.  THE CASCADE LEVEL, AND WHY delivN IS PER-CASCADE.
+--
+-- `cascadeLatch` opens a cascade by CLEARING the ledger — the one write
+-- to `delivered` that is not a cons, and the reason every count above
+-- is read between a latch and the next one rather than across a run.
+-- `cascadeFinish` closes it by dropping the spent source's registry
+-- entries and touches nothing.  So one cascade's deliveries are just
+-- the ledger's LENGTH when it ends, with no subtraction to carry.
+------------------------------------------------------------------
+
+abstract
+
+  cascadeLatch-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (st : EvalSt e) → EvalSt.delivered (cascadeLatch a st) ≡ []
+  cascadeLatch-deliv a st = refl
+
+  cascadeFinish-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    EvalSt.delivered (proj₂ (cascadeFinish a sched st)) ≡ EvalSt.delivered st
+  cascadeFinish-deliv a sched st with Arrival.isLast a
+  ... | true  = refl
+  ... | false = refl
+
+  -- ONE CASCADE'S DELIVERIES ARE ITS FINAL LEDGER, counted flat.  The
+  -- entry ledger is [] by the latch, so the ∸ in delivN is inert and
+  -- the cascade conjuncts' D is a plain length
+  cascade-delivN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+    length (EvalSt.delivered (proj₂ (proj₂ (cascade a id sched st))))
+      ≡ delivN (cascadeLatch a st)
+               (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
+                               (cascadeLatch a st))))
+  cascade-delivN a id sched st =
+    cong length
+      (cascadeFinish-deliv a
+        (proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st))))
+        (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st)))))
