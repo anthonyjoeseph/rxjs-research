@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -66,6 +66,13 @@ help:
 	@echo "                  cap it was charged at, so cascadeGo-deliveries is"
 	@echo "                  not a theorem.  Carries the Leg-0 width lemma too"
 	@echo "                  (see agda/probe/Entry-Caps-Refuted.agda).  seconds"
+	@echo "  level-walk-probe  the EVOLVING-CAPS delivery walk, before it is"
+	@echo "                  landed: the walk carries the level and reads the"
+	@echo "                  registry off it, so nothing is charged at the"
+	@echo "                  refuted entry caps.  Termination, the front"
+	@echo "                  decomposition, monotonicity, and the gate — the"
+	@echo "                  level walk is POINTWISE ABOVE the registry walk it"
+	@echo "                  replaces (see agda/probe/Level-Walk-Probe.agda)"
 	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
 	@echo "                  burst it is handed?  the per-FRAME maxima the two"
 	@echo "                  entry axioms bound.  Mints are 1 on every row of the"
@@ -241,11 +248,22 @@ mint-loop-probe:
 entry-caps-refuted:
 	cd agda && agda -i src -i probe probe/Entry-Caps-Refuted.agda
 
-# The gate on the two frame-local axioms cascadeGo-deliveries is proven
+# The EVOLVING-CAPS delivery walk, probed before it is landed: the walk
+# carries the caps record and grows it per delivery, so the registry a
+# dispatch sees is read off the LEVEL (capsOK?'s own fifth conjunct)
+# rather than off a per-delivery mint budget charged at the refuted
+# entry caps.  Termination, the front decomposition, monotonicity, and
+# the GATE — the level walk is POINTWISE ABOVE the registry walk it
+# replaces, so no measured D row has to be re-run.  Self-contained
+# arithmetic, so src/Main.agda never reaches it.  Seconds.
+level-walk-probe:
+	cd agda && agda -i src -i probe probe/Level-Walk-Probe.agda
+
+# The gate on the two frame-local axioms cascadeGo-deliveries WAS proven
 # from.  Mint-Loop-Frames reports mints and frames per CASCADE; these are
 # the per-FRAME MAXIMA, which is what stepFrame-entry-mint and
-# stepFrame-entry-caps actually bound.  Same mirror walk, same real
-# stepFrame, ~4 min.
+# stepFrame-entry-caps bounded before Entry-Caps-Refuted killed them.
+# Same mirror walk, same real stepFrame, ~4 min.
 frame-mint-probe:
 	cd agda && agda -i src -i probe probe/Frame-Mint-Probe.agda
 
