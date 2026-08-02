@@ -234,12 +234,14 @@ frameStep j c =
 -- 2-tower therefore costs ZERO stories (Width-Count-Probe's `D̂-tower`),
 -- and the slope stays four.
 --
--- WHAT THE PROOF ROUTE IS, per the law's own structure: each minted
--- registration's ancestry is a SUBSET of the slot-0 fire schedule
--- (generation g ↦ g-subsets, which is what the binomial counts ARE), so
--- the injection lands in subsets of fires, and the fires are bounded by
--- the PRE-STATE DAG — the inverted-pair leg, applied where it belongs
--- rather than to the deliveries directly.
+-- WHAT THE PROOF ROUTE IS: STILL OPEN.  The one the law's shape
+-- suggested — each minted registration's ancestry as a SUBSET of the
+-- fire schedule, with the fires bounded by the PRE-STATE DAG — is
+-- refuted: mints beget fires on the amplifier family (Mint-Loop-Shapes
+-- MEASUREMENT 9), so fires are not entry-computable, and every subset
+-- injection is dead by MEASUREMENT 8(d).  cascadeGo-deliveries in
+-- .Caps-Face carries the refutation and the delivery recurrence that
+-- survives it.
 --
 -- cWid IS GONE, and it was never a factor of this count — it bounds how
 -- WIDE one emitted observable is, not how many times a cascade iterates.

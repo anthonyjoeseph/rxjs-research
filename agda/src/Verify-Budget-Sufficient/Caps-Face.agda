@@ -3738,28 +3738,19 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- so the slope stays FOUR (Width-Count-Probe's `D̂-tower`, and .Caps's
 -- `sum-fits` for the cSize factor beside it).
 --
--- THE PROOF ROUTE, named because the shape of the law names it.  The
--- measured law is binomial: mint generation g holds exactly
--- `C(2 ^ L, g)` registrations, and slot-0 deliveries at nesting depth k
--- are `Σ_{g=1}^{k+2} C(2 ^ L, g)`.  Binomial counts ARE subset counts,
--- so the injection is: a minted registration's ANCESTRY — the chain of
--- mint-edges back to the entry registry — is a SUBSET of the slot-0
--- FIRE SCHEDULE, generation g ↦ g-subsets.  The fires are then bounded
--- by the PRE-STATE DAG, which is where the inverted-pair argument
--- belongs (it never worked applied to the deliveries directly, because
--- mints track deliveries — 254 mints on a 269-delivery cascade — so
--- `D ≤ 2 ^ R_end` is unusable).  The gate is the L ≤ 5 binomial law
--- itself: the route must reproduce `ΔD(L, k→k+1) = C(2 ^ L, k+3)`.
---
--- WHAT IS STILL OPEN IN IT: the amplifier family.  "Fires never move"
--- is a property of the measured ladders — their minting scan sits in
--- the root program, so minted chains end at `root`.  A minting scan
--- INSIDE a shared def would make minted registrations one-shot FIRES of
--- that share, and fires would beget registrations beget fires.  Either
--- that family is bounded (plausibly a tower of height ≤ the slot count,
--- which dispatch gas already caps at n) or it is structurally tame; it
--- is the next measurement target and it is NOT covered by any row this
--- bound currently stands on.
+-- THE PROOF ROUTE IS THE HOLE, and the one that was named here — the
+-- generation-ancestry injection into subsets of the fire schedule — is
+-- REFUTED, by rows that are now in the repo rather than by a failed
+-- grind.  The amplifier family it was gated on has since been measured
+-- (Mint-Loop-Shapes MEASUREMENT 9): a minting scan INSIDE a shared def
+-- makes mints beget FIRES, and pB's slot 0 fires 3 / 7 / 11 / 12 times
+-- where the pure share DAG dispatches it 2.  Fires are not
+-- entry-computable, so they cannot carry the exponent, and the subset
+-- half is dead for the reason MEASUREMENT 8(d) already gives for every
+-- subset injection.  The full refutation, the closed delivery
+-- recurrence that survives it, and the two closed forms that DO follow
+-- from that recurrence (neither of which closes against a bound reading
+-- cReg alone) are written at the postulate itself, below.
 --
 -- THE FEEDBACK LOOP BEHIND ALL OF THIS IS MEASURED AND DOES NOT TOWER
 -- IN THE NESTING DEPTH.  Mint-Loop-Probe: deliveries SATURATE in k (5
@@ -3833,22 +3824,75 @@ postulate
   -- L = 5 rows were measured and then matching every checkable one
   -- exactly, puts D(5,5) at 4514934 against 4 ^ 11 = 4194304.
   --
-  -- ROUTE: the generation-ancestry injection.  Mint generation g holds
-  -- C(2 ^ L, g) registrations and slot-0 deliveries are the partial
-  -- sums of those, so a minted registration's mint-edge ancestry is a
-  -- SUBSET of the slot-0 fire schedule, and the fires are bounded by
-  -- the pre-state DAG (the inverted-pair leg, applied to fires rather
-  -- than to deliveries — applied to deliveries it is unusable, since
-  -- MINTS TRACK DELIVERIES: 254 mints on a 269-delivery cascade leaves
-  -- R_end = 261 against an entry cReg of 7).  The gate is the binomial
-  -- law itself: `ΔD(L, k→k+1) = C(2 ^ L, k+3)`, exact on every measured
-  -- rung at L ≤ 5.
+  -- THE ROUTE THAT WAS NAMED HERE IS REFUTED BY ROWS ALREADY IN THE
+  -- REPO, and it is refuted before any clause of it was ground.  It
+  -- read: a minted registration's mint-edge ancestry is a SUBSET of the
+  -- fire schedule (generation g ↦ g-subsets, which is what the binomial
+  -- counts are), and the fires are bounded by the PRE-STATE DAG.  Both
+  -- halves fail:
   --
-  -- NOT COVERED BY ANY MEASURED ROW: the amplifier family, a minting
-  -- scan INSIDE a shared def, where fires would beget registrations
-  -- beget fires.  Every ladder measured so far mints from the root
-  -- program, so minted chains end at `root` and the fire counts are
-  -- invariant in k
+  --   · THE SUBSET HALF.  Mint-Loop-Shapes' MEASUREMENT 8(d) ruling —
+  --     "every subset-injection route is dead for the delivery bound,
+  --     whether or not the bound is true" — applies to this injection
+  --     too, since it is one.  The surviving inverted-pair leg proves
+  --     `D ≤ 2 ^ R_end`, and R_end is 261 against an entry cReg of 7
+  --     (254 mints on a 269-delivery cascade), so it proves 2 ^ 261
+  --     against a demand of 2 ^ 128.
+  --   · THE FIRES HALF.  "Fires are bounded by the pre-state DAG" was
+  --     the lean ladders' property, and MEASUREMENT 9 — the amplifier
+  --     family, `pB` / `insB`, a minting scan INSIDE a shared def — is
+  --     the family where it stops holding.  pB's slot 0 fires 3 times
+  --     at cascade 0 and 7, 11, 12 times at cascade 1 for k = 0, 1, 2,
+  --     where the share DAG alone dispatches it 2 times.  Mints beget
+  --     fires; the fire count is not entry-computable, so it cannot
+  --     carry the exponent.
+  --
+  -- WHAT IS ESTABLISHED, AND IS ROUTE-INDEPENDENT: the delivery ledger
+  -- obeys a CLOSED RECURSION with exactly one unbounded input.
+  -- `EvalSt.delivered` is consed at exactly two sites in the evaluator
+  -- — shareGo's uncancelled clause and cascadeGo's — and dispatchShare
+  -- is called from exactly one, foldPath's `share-sink` clause.  So,
+  -- writing Dfp for one foldPath's deliveries at dispatch gas g,
+  --
+  --     D(cascadeGo)     = Σ over uncancelled chains of (1 + Dfp n)
+  --     Dfp g root       = 0
+  --     Dfp g (f ↠ p)    = Dfp g p            -- stepFrame delivers nothing
+  --     Dfp g (sink i)   = Dds g
+  --     Dds 0            = 0
+  --     Dds (suc g)      = Σ over shareAdmit i (registry AS OF NOW)
+  --                          of (1 + Dfp g)
+  --
+  -- (the mirror walk fpFolds / dsFolds / sgFolds / csFolds in
+  -- Mint-Loop-Shapes is this recursion with the emit stream deleted,
+  -- and it calls the REAL stepFrame; its ledger `mJdel` is refl-pinned
+  -- equal to the evaluator's `mFolds` at 5, 20 and 50 in
+  -- Mint-Loop-Frames, which is the evidence that the `↠` line above is
+  -- an equality and not an inequality).  Two closed forms follow, and
+  -- NEITHER closes against a bound that reads cReg alone:
+  --
+  --   (α) the depth form.  The share telescope orders the shares along
+  --       any fire path strictly, and dispatch gas caps the depth at n,
+  --       so D ≤ cReg * (1 + Rmax) ^ n with Rmax the registry length at
+  --       its peak.  Needs n * log Rmax ≤ 2 ^ cReg.
+  --   (β) the subset form.  D ≤ 2 ^ Rmax.  Needs Rmax ≤ 2 ^ cReg, which
+  --       is the 261-against-128 row above.
+  --
+  -- and Rmax ≤ cReg + (mints), mints ≈ D, so (α) is the self-referential
+  -- `D ≤ cReg * (1 + cReg + D) ^ n` and bounds nothing.  Both n (the
+  -- SLOT COUNT, `Γ : Ctx n`) and Rmax are governed by cSize and the
+  -- program's syntax, and `capsOK? c` constrains neither in terms of
+  -- cReg — it bounds the ENTRY registry, the sizes and the widths, and
+  -- D̂ reads cReg only.
+  --
+  -- SO THE OPEN PIECE IS THE ONE Mint-Loop-Shapes NAMES: the damper is
+  -- an ORDERING fact, not a statement about sets — a minted
+  -- registration is reachable only by dispatches that come AFTER it, so
+  -- what is wanted is a schedule-indexed induction on a decreasing
+  -- potential (the remaining-dispatch count, fixed at each point by the
+  -- DAG-so-far).  That is different machinery from every route tried,
+  -- and no measured row breaches D̂ — pB is D = 11 / 38 at cReg = 5, and
+  -- the deepest lean rung is D = 41510 at cReg = 11 — so the statement
+  -- stands and only its proof is missing
   cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
