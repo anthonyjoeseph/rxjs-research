@@ -4097,6 +4097,35 @@ postulate
   -- and a burst inside `valsCaps? c sl`, whose post-state breaches
   -- `capsOK? c` (for the first) or adds more than `cSize * suc cWid`
   -- registrations (for the second)
+  --
+  -- ══ REFUTED, 2026-08-02, by exactly that witness ══════════════════
+  -- `agda/probe/Entry-Caps-Refuted.agda` (make entry-caps-refuted,
+  -- seconds) is a machine-checked `Entry-Caps → ⊥`.  The second conjunct
+  -- falls on the cheapest frame there is — a `map-f`, which touches no
+  -- state at all.  A map frame's output is `map (applyFn fn) vals`, and
+  -- `applyFn` GROWS a value: `pairᵗ x x` has size 3 and takes a payload
+  -- of size 3 to one of size 7, so at `c = caps 3 1 1` every hypothesis
+  -- holds by `refl` and the conclusion computes to `false`.  This is
+  -- `frameStep`'s own header ("same-level preservation is false, so the
+  -- face must report growth"), `caps-frame-boundary-absurd`, and
+  -- cascadeGo-wet's fold-threading note, all saying one thing: a frame
+  -- may not be charged at the level it started from.  The first conjunct
+  -- goes the same way — `capsOK? c`'s fifth conjunct is
+  -- `length registry ≤ᵇ cReg c`, and the mint axiom below grants each
+  -- frame up to `cSize * suc cWid` new registrations, while `dWalk`'s
+  -- own recursion runs its later summands at registry `R + Q · suc d`,
+  -- i.e. past the entry `R = cReg`.
+  --
+  -- SO cascadeGo-deliveries BELOW IS NOT A THEOREM, and the ruling of
+  -- 2026-08-02 needs re-taking.  .Delivery-Walk is untouched by this: it
+  -- is a proof RELATIVE to `Walk-Hyps`, with no postulate of its own,
+  -- and it is the assembly a repaired frame axiom plugs into unchanged.
+  -- The repair shape and the obstruction it re-opens are written up at
+  -- the head of the probe.  The WIDTH conjunct, the one flagged as open
+  -- below, is NOT the problem: `wid-dominates-120` (same probe) proves
+  -- cWid at cascade (suc id)'s entry is at least a two-rung tower,
+  -- ≥ 4 ^ 5 = 1024, against the measured 120.
+  -- ══════════════════════════════════════════════════════════════════
   stepFrame-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (c : Caps) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
     (f : Frame Γ s u) (κ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
@@ -4132,6 +4161,14 @@ postulate
 -- share bookkeeping below (the latch, the delivered cons, the finish
 -- filter) — it is GROUND at the end of that section, on .Delivery-Walk
 -- and the two frame axioms above and nothing else.
+--
+-- ══ AND THOSE TWO FRAME AXIOMS ARE REFUTED (2026-08-02) ════════════
+-- so this is a theorem on a false hypothesis, which is to say it is
+-- not one.  See the block above and
+-- `agda/probe/Entry-Caps-Refuted.agda`.  Nothing here is deleted
+-- pending the re-ruling: the walk is sound and the assembly is right;
+-- what is wrong is the level the frame facts are charged at.
+-- ══════════════════════════════════════════════════════════════════
 --
 -- WHAT THE RULING BOUGHT, IN LEDGER TERMS.  The chain's axioms were
 -- five — cascadeGo-charge, cascadeGo-deliveries, subscribeE-walk
