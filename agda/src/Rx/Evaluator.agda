@@ -464,29 +464,147 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- bounds nothing whatever the constants.  A bigger closed form does not
 -- help; the fix is to stop asking for one.
 --
--- `dCap` IS THE SEQUENTIAL READING OF THE SAME TWO FACTS.  The walk
--- happens one chain at a time, and the registry a chain sees is the
--- entry registry plus the mints of the deliveries ALREADY MADE — which
--- is exactly the ordering fact the mint loop obeys (a minted
--- registration is reachable only by dispatches that come AFTER it,
--- Mint-Loop-Shapes' reading of R_end).  Written that way the recursion
--- is on the dispatch gas outside and the walk position inside, and it
--- is well-founded precisely where the closed form was circular.
+-- `dCapᶜ` IS THE SEQUENTIAL READING OF THE SAME TWO FACTS.  The walk
+-- happens one chain at a time, and what a later chain sees is what the
+-- deliveries ALREADY MADE left behind — which is exactly the ordering
+-- fact the mint loop obeys (a minted registration is reachable only by
+-- dispatches that come AFTER it, Mint-Loop-Shapes' reading of R_end).
+-- Written that way the recursion is on the dispatch gas outside and the
+-- walk position inside, and it is well-founded precisely where the
+-- closed form was circular.
+--
+-- AND WHAT IT THREADS IS THE CAPS LEVEL, NOT A REGISTRY.  The first
+-- version threaded `R + Q · suc d` with `Q` a per-delivery mint budget
+-- read once at the cascade's ENTRY caps, and charging anything
+-- per-frame at the entry caps is machine-refuted
+-- (agda/probe/Entry-Caps-Refuted.agda: one `map-f` frame's output
+-- breaches the very cap it was charged at, because `applyFn` grows a
+-- value).  The honest per-frame face REPORTS its growth as an index j′
+-- and lands at `frameStep (j + j′) c`, so the walk carries that index:
+--
+--   · a FRAME costs `fCharge S W J`, the receipt `scanFrame-caps` pays
+--     (`suc (length vals * suc (sizeᵗ fn))`) read at the level the frame
+--     RUNS at — its factors are the burst ledger's width conjunct and
+--     the size cap, both at `frameStep J c`;
+--   · a DELIVERY is a chain of frames, each at the level the one before
+--     it LEFT, so `dLvl` ITERATES that receipt over the chain (capped at
+--     `suc (sizeAt S J)`, pathSz?'s own length conjunct) instead of
+--     multiplying by it — a product would repeat the refuted error one
+--     level down;
+--   · and the REGISTRY needs no accounting at all: `capsOK?`'s fifth
+--     conjunct is `length registry ≤ cReg (frameStep J c)`, so the walk
+--     a dispatch fans out over is `regAt S R J` long.
+--
+-- It is POINTWISE ABOVE the registry walk it replaces
+-- (agda/probe/Level-Walk-Probe.agda, `old-cDel≤new-cDel`), so every
+-- measured delivery row the old bound cleared this one clears too.
 --
 -- IT IS ACKERMANN-FLAVOURED IN THE GAS, and that costs nothing here:
 -- `blowH` READS it, so the per-instant story increment stays true by
 -- construction rather than by arithmetic.  The price of a lazy Gas
 -- tower's height being large is nothing at all
-dCap  : ℕ → ℕ → ℕ → ℕ        -- Q, dispatch gas, entry registry
-dWalk : ℕ → ℕ → ℕ → ℕ → ℕ    -- Q, gas, entry registry, chains left
+-- ONE FOLD's worst case on a width — AND WHY IT READS THE SIZE.
+--
+-- The earlier `2 ^ suc w` was gated against deepScan's PAYLOAD count and
+-- is refuted against the quantity capsOK? actually bounds: one fold
+-- takes deepScan's stored width 1 ↦ 6 where it allowed 4
+-- (State-Blowup-Probe).  The reason is structural — `innWᵉ (scanᵉ f z e)`
+-- puts the source's width in an EXPONENT whose base is read off the step
+-- function's syntax — so the per-fold multiplier is a property of `f`,
+-- and cSize is the only thing in Caps that bounds a step function.
+--
+-- Note this is a strict GENERALISATION: at S = 2 it is exactly the old
+-- step, so Frame-Work-Probe's 2 / 6 / 126 gates still read as before
+foldStep : ℕ → ℕ → ℕ
+foldStep S w = S ^ suc w
 
-dCap Q zero    R = 0
-dCap Q (suc g) R = dWalk Q g R R
+iterFold : ℕ → ℕ → ℕ → ℕ
+iterFold S zero    w = w
+iterFold S (suc k) w = iterFold S k (foldStep S w)
 
-dWalk Q g R zero    = 0
-dWalk Q g R (suc i) =
-  let d = dWalk Q g R i
-  in d + suc (dCap Q g (R + Q * suc d))
+-- ONE FOLD's worst case on a SIZE, straight off size-subΘᵉ: a fold
+-- substitutes the accumulator into the step function, and
+-- size-subΘᵉ bounds that by `sizeᵉ f * suc (2 * V)` with V the env cap.
+-- Both `sizeᵉ f` and V are ≤ cSize, hence S in both positions
+sizeStep : ℕ → ℕ → ℕ
+sizeStep S s = S * suc (2 * s)
+
+iterSize : ℕ → ℕ → ℕ → ℕ
+iterSize S zero    s = s
+iterSize S (suc k) s = iterSize S k (sizeStep S s)
+
+
+------------------------------------------------------------------
+-- THE LEVEL READING, AND THE WALK THAT CARRIES IT.
+--
+-- `dCap` above threads a REGISTRY and charges each delivery a fixed `Q`
+-- read once at the cascade's ENTRY caps.  That charging is REFUTED
+-- (agda/probe/Entry-Caps-Refuted.agda: one `map-f` frame's output
+-- breaches the entry cap it was charged at, because `applyFn` grows a
+-- value), and the honest per-frame face — the PROVEN `stepFrame-caps`
+-- — reports a growth index j′ and lands its post-state at
+-- `frameStep (j + j′) c`.  So the walk carries the LEVEL instead:
+--
+--   · a FRAME costs `fCharge`, the receipt `scanFrame-caps` pays
+--     (`suc (length vals * suc (sizeᵗ fn))`) read at the level the frame
+--     RUNS at — its two factors are the burst ledger's width conjunct
+--     `suc (widAt S W J)` and the size cap `sizeAt S J`;
+--   · a DELIVERY is a CHAIN of frames, each running at the level the one
+--     before it left, so its cost is `iterL` — an ITERATION, not a
+--     product.  (A product would charge a delivery's later frames at the
+--     level it entered at, which is the same error one level down that
+--     the refuted entry axioms made one level up.)  The chain is capped
+--     at `suc (sizeAt S J)` by pathSz?'s own length conjunct, read at
+--     the delivery's entry level;
+--   · and the REGISTRY a later dispatch fans out over needs no separate
+--     mint accounting at all: it is `capsOK?`'s own fifth conjunct read
+--     at the current level, `regAt S R J = R * suc (J * S)`.
+--
+-- The recursion is the same lexicographic (dispatch gas, walk position)
+-- descent `dCap` runs on — only the threaded quantity changed — and it
+-- is POINTWISE ABOVE `dCap` at the same entry caps
+-- (`old-cDel≤new-cDel`, agda/probe/Level-Walk-Probe.agda), so every
+-- measured D row the old bound cleared this one clears too, with no
+-- re-measurement
+------------------------------------------------------------------
+
+sizeAt : ℕ → ℕ → ℕ
+sizeAt S J = iterSize S J S
+
+widAt : ℕ → ℕ → ℕ → ℕ
+widAt S W J = iterFold S J W
+
+regAt : ℕ → ℕ → ℕ → ℕ
+regAt S R J = R * suc (J * S)
+
+fCharge : ℕ → ℕ → ℕ → ℕ
+fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))
+
+fLvl : ℕ → ℕ → ℕ → ℕ
+fLvl S W J = J + fCharge S W J
+
+iterL : ℕ → ℕ → ℕ → ℕ → ℕ
+iterL S W zero    J = J
+iterL S W (suc k) J = iterL S W k (fLvl S W J)
+
+dLvl : ℕ → ℕ → ℕ → ℕ
+dLvl S W J = iterL S W (suc (sizeAt S J)) J
+
+lvls : ℕ → ℕ → ℕ → ℕ → ℕ
+lvls S W J zero    = J
+lvls S W J (suc d) = dLvl S W (lvls S W J d)
+
+dCapᶜ  : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ       -- S W R gas level
+dWalkᶜ : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W R gas level position
+
+dCapᶜ S W R zero    J = 0
+dCapᶜ S W R (suc g) J = dWalkᶜ S W R g J (regAt S R J)
+
+dWalkᶜ S W R g J zero    = 0
+dWalkᶜ S W R g J (suc i) =
+  let d = dWalkᶜ S W R g J i
+  in d + suc (dCapᶜ S W R g (lvls S W J (suc d)))
+
 
 -- THE POOLED COUNT: `sizeCount` with every Caps field replaced by one
 -- bound M.  `blowH` reads it, which is what makes "one instant costs
@@ -501,7 +619,7 @@ dWalk Q g R (suc i) =
 -- .Wet's caps-fuel-root, which normalises `blowH (blowH (capsBase …))`,
 -- ran past an hour on it and finished in minutes with the match in
 poolBody : ℕ → ℕ
-poolBody M = dCap (M * suc (suc M * suc M)) (suc M) M
+poolBody M = dCapᶜ M M M (suc M) 0
                * M * suc (suc M * suc M)
 
 poolCount : ℕ → ℕ

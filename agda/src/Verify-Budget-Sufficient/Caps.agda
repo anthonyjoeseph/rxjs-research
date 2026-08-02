@@ -48,7 +48,10 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Frame-Width using (entryCeil)
 open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase;
-                                dCap; dWalk; poolBody; poolCount; blowH-body)
+                                foldStep; iterFold; sizeStep; iterSize;
+                                sizeAt; widAt; regAt; fCharge; fLvl; iterL;
+                                dLvl; lvls; dCapᶜ; dWalkᶜ;
+                                poolBody; poolCount; blowH-body)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
@@ -101,36 +104,6 @@ record Caps : Set where
     cWid  : ℕ      -- every reachable observable's FRAME width
     cReg  : ℕ      -- live registrations, hence cascades, in one instant
 
-
--- ONE FOLD's worst case on a width — AND WHY IT READS THE SIZE.
---
--- The earlier `2 ^ suc w` was gated against deepScan's PAYLOAD count and
--- is refuted against the quantity capsOK? actually bounds: one fold
--- takes deepScan's stored width 1 ↦ 6 where it allowed 4
--- (State-Blowup-Probe).  The reason is structural — `innWᵉ (scanᵉ f z e)`
--- puts the source's width in an EXPONENT whose base is read off the step
--- function's syntax — so the per-fold multiplier is a property of `f`,
--- and cSize is the only thing in Caps that bounds a step function.
---
--- Note this is a strict GENERALISATION: at S = 2 it is exactly the old
--- step, so Frame-Work-Probe's 2 / 6 / 126 gates still read as before
-foldStep : ℕ → ℕ → ℕ
-foldStep S w = S ^ suc w
-
-iterFold : ℕ → ℕ → ℕ → ℕ
-iterFold S zero    w = w
-iterFold S (suc k) w = iterFold S k (foldStep S w)
-
--- ONE FOLD's worst case on a SIZE, straight off size-subΘᵉ: a fold
--- substitutes the accumulator into the step function, and
--- size-subΘᵉ bounds that by `sizeᵉ f * suc (2 * V)` with V the env cap.
--- Both `sizeᵉ f` and V are ≤ cSize, hence S in both positions
-sizeStep : ℕ → ℕ → ℕ
-sizeStep S s = S * suc (2 * s)
-
-iterSize : ℕ → ℕ → ℕ → ℕ
-iterSize S zero    s = s
-iterSize S (suc k) s = iterSize S k (sizeStep S s)
 
 -- THE WORST ONE INSTANT CAN DO, and a function of Caps ALONE — the
 -- signature is the round-5 gate, not a comment about one.
@@ -296,75 +269,49 @@ frameStep j c =
 -- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
 -- nothing else, so round3b-ledger-reset-absurd stays unavailable
 
--- ONE DELIVERY'S WORK, and the `Q` of the recursion below: the frame
--- receipt `scanFrame-caps` pays is `suc (length vals * suc (sizeᵗ fn))`,
--- one fold per node of the step function PER PAYLOAD, and a chain is
--- capped at cSize by pathSz?'s length conjunct.  Every mint is one of
--- those folds, so the same number caps the mints a single delivery adds
--- to the registry
-chargeW : Caps → ℕ
-chargeW c = Caps.cSize c * suc (suc (Caps.cWid c) * suc (Caps.cSize c))
-
 -- ONE CASCADE's DELIVERY BOUND, BY RECURRENCE.  The dispatch gas is the
 -- decreasing potential (it caps the depth at the slot count, hence at
--- cSize), the entry registry is the top walk's length, and chargeW is
--- the per-delivery mint budget the walk threads forward
+-- cSize), the walk starts at LEVEL 0 — the entry caps themselves,
+-- `frameStep 0 c ≡ c` — and every registry length, chain cap and
+-- per-frame receipt the walk reads is read off the level it has climbed
+-- to.  Nothing is charged at the entry caps, which is the 2026-08-02
+-- repair (agda/probe/Entry-Caps-Refuted.agda).
 --
 -- ABSTRACT, and it is a NORMALISATION contract rather than an
 -- abstraction one.  `iterSize` and `iterFold` pattern-match on the
 -- COUNT, so `capsAt`'s own cSize is `iterSize S (sizeCount c) S` — and
 -- whether that reduces is decided by whether sizeCount does.  The
 -- 2-tower it replaces never did (`2 ^ (2 ^ suc X)` is stuck at a
--- variable X), but `dCap` peels a suc off the ENTRY REGISTRY, which at
--- capsAt's base is `suc (sizeᵉ e + slotsSize sl)` — so the walk unfolds
--- one rung, re-enters at a larger registry, and every consumer of
--- `sizeCapAt` pays for it.  .Wet ran past an hour on that (measured
--- twice) and finishes in minutes with the count opaque
+-- variable X), but the walk peels a suc off its GAS and re-enters at a
+-- larger level, so every consumer of `sizeCapAt` pays for it.  .Wet ran
+-- past an hour on that (measured twice) and finishes in minutes with the
+-- count opaque
 abstract
   cDel : Caps → ℕ
-  cDel c = dCap (chargeW c) (suc (Caps.cSize c)) (Caps.cReg c)
+  cDel c = dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
+                 (suc (Caps.cSize c)) 0
 
   cDel-body : ∀ (c : Caps) →
-    cDel c ≡ dCap (chargeW c) (suc (Caps.cSize c)) (Caps.cReg c)
+    cDel c ≡ dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
+                   (suc (Caps.cSize c)) 0
   cDel-body c = refl
 
-------------------------------------------------------------------
--- THE RECURSION IS MONOTONE IN ALL THREE ARGUMENTS, which is the whole
--- toolkit the count needs: `blowH` reads the POOLED count and every
--- inequality below is then "each field is under the pool".  Proven by
--- the same lexicographic descent the definition uses — the gas outside,
--- the walk position inside — so the two lemmas are as mutual as the two
--- functions are.
-------------------------------------------------------------------
-
-dCap-mono : ∀ (Q Q′ g g′ R R′ : ℕ) → Q ≤ Q′ → g ≤ g′ → R ≤ R′ →
-  dCap Q g R ≤ dCap Q′ g′ R′
-dWalk-mono : ∀ (Q Q′ g g′ R R′ i i′ : ℕ) →
-  Q ≤ Q′ → g ≤ g′ → R ≤ R′ → i ≤ i′ →
-  dWalk Q g R i ≤ dWalk Q′ g′ R′ i′
-
-dCap-mono Q Q′ zero    g′       R R′ hQ hg        hR = z≤n
-dCap-mono Q Q′ (suc g) zero     R R′ hQ ()        hR
-dCap-mono Q Q′ (suc g) (suc g′) R R′ hQ (s≤s hg) hR =
-  dWalk-mono Q Q′ g g′ R R′ R R′ hQ hg hR hR
-
-dWalk-mono Q Q′ g g′ R R′ zero    i′       hQ hg hR hi       = z≤n
-dWalk-mono Q Q′ g g′ R R′ (suc i) zero     hQ hg hR ()
-dWalk-mono Q Q′ g g′ R R′ (suc i) (suc i′) hQ hg hR (s≤s hi) =
-  +-mono-≤ ih
-    (s≤s (dCap-mono Q Q′ g g′ _ _ hQ hg
-            (+-mono-≤ hR (*-mono-≤ hQ (s≤s ih)))))
-  where
-  ih : dWalk Q g R i ≤ dWalk Q′ g′ R′ i′
-  ih = dWalk-mono Q Q′ g g′ R R′ i i′ hQ hg hR hi
-
 -- and it is POSITIVE once there is a chain to walk, which is what the
--- count's own `1 ≤ J` side conditions read
-1≤dCap : ∀ (Q g R : ℕ) → 1 ≤ R → 1 ≤ dCap Q (suc g) R
-1≤dCap Q g (suc R) hR =
+-- count's own `1 ≤ J` side conditions read: the walk's first position
+-- is the entry registry, and `regAt S R 0` is `R`
+1≤dWalkᶜ : ∀ (S W R g J i : ℕ) → 1 ≤ i → 1 ≤ dWalkᶜ S W R g J i
+1≤dWalkᶜ S W R g J (suc i) hi =
   ≤-trans (s≤s z≤n)
-          (m≤n+m (suc (dCap Q g (suc R + Q * suc (dWalk Q g (suc R) R))))
-                 (dWalk Q g (suc R) R))
+          (m≤n+m (suc (dCapᶜ S W R g (lvls S W J (suc (dWalkᶜ S W R g J i)))))
+                 (dWalkᶜ S W R g J i))
+
+1≤regAt : ∀ (S R J : ℕ) → 1 ≤ R → 1 ≤ regAt S R J
+1≤regAt S R J hR =
+  ≤-trans hR (≤-trans (≤-reflexive (sym (*-identityʳ R)))
+                      (*-monoʳ-≤ R (s≤s z≤n)))
+
+1≤dCapᶜ : ∀ (S W R g J : ℕ) → 1 ≤ R → 1 ≤ dCapᶜ S W R (suc g) J
+1≤dCapᶜ S W R g J hR = 1≤dWalkᶜ S W R g J (regAt S R J) (1≤regAt S R J hR)
 
 -- and `poolCount` IS `poolBody` wherever there is anything to count:
 -- the match in front of it (Rx.Evaluator) is a normalisation guard, not
@@ -527,75 +474,11 @@ iterFold-mono-count S w hS           (s≤s le)  = iterFold-mono-count S (foldSt
 
 
 ------------------------------------------------------------------
--- THE LEVEL READING, AND THE WALK THAT CARRIES IT.
---
--- `dCap` above threads a REGISTRY and charges each delivery a fixed `Q`
--- read once at the cascade's ENTRY caps.  That charging is REFUTED
--- (agda/probe/Entry-Caps-Refuted.agda: one `map-f` frame's output
--- breaches the entry cap it was charged at, because `applyFn` grows a
--- value), and the honest per-frame face — the PROVEN `stepFrame-caps`
--- — reports a growth index j′ and lands its post-state at
--- `frameStep (j + j′) c`.  So the walk carries the LEVEL instead:
---
---   · a FRAME costs `fCharge`, the receipt `scanFrame-caps` pays
---     (`suc (length vals * suc (sizeᵗ fn))`) read at the level the frame
---     RUNS at — its two factors are the burst ledger's width conjunct
---     `suc (widAt S W J)` and the size cap `sizeAt S J`;
---   · a DELIVERY is a CHAIN of frames, each running at the level the one
---     before it left, so its cost is `iterL` — an ITERATION, not a
---     product.  (A product would charge a delivery's later frames at the
---     level it entered at, which is the same error one level down that
---     the refuted entry axioms made one level up.)  The chain is capped
---     at `suc (sizeAt S J)` by pathSz?'s own length conjunct, read at
---     the delivery's entry level;
---   · and the REGISTRY a later dispatch fans out over needs no separate
---     mint accounting at all: it is `capsOK?`'s own fifth conjunct read
---     at the current level, `regAt S R J = R * suc (J * S)`.
---
--- The recursion is the same lexicographic (dispatch gas, walk position)
--- descent `dCap` runs on — only the threaded quantity changed — and it
--- is POINTWISE ABOVE `dCap` at the same entry caps
--- (`old-cDel≤new-cDel`, agda/probe/Level-Walk-Probe.agda), so every
--- measured D row the old bound cleared this one clears too, with no
--- re-measurement
+-- THE LEVEL WALK'S OWN ARITHMETIC.  The recursion itself is in
+-- Rx.Evaluator (the pooled count `poolBody` reads it, and that is where
+-- the budget's height function lives); everything it needs proven about
+-- itself is here.
 ------------------------------------------------------------------
-
-sizeAt : ℕ → ℕ → ℕ
-sizeAt S J = iterSize S J S
-
-widAt : ℕ → ℕ → ℕ → ℕ
-widAt S W J = iterFold S J W
-
-regAt : ℕ → ℕ → ℕ → ℕ
-regAt S R J = R * suc (J * S)
-
-fCharge : ℕ → ℕ → ℕ → ℕ
-fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))
-
-fLvl : ℕ → ℕ → ℕ → ℕ
-fLvl S W J = J + fCharge S W J
-
-iterL : ℕ → ℕ → ℕ → ℕ → ℕ
-iterL S W zero    J = J
-iterL S W (suc k) J = iterL S W k (fLvl S W J)
-
-dLvl : ℕ → ℕ → ℕ → ℕ
-dLvl S W J = iterL S W (suc (sizeAt S J)) J
-
-lvls : ℕ → ℕ → ℕ → ℕ → ℕ
-lvls S W J zero    = J
-lvls S W J (suc d) = dLvl S W (lvls S W J d)
-
-dCapᶜ  : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ       -- S W R gas level
-dWalkᶜ : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W R gas level position
-
-dCapᶜ S W R zero    J = 0
-dCapᶜ S W R (suc g) J = dWalkᶜ S W R g J (regAt S R J)
-
-dWalkᶜ S W R g J zero    = 0
-dWalkᶜ S W R g J (suc i) =
-  let d = dWalkᶜ S W R g J i
-  in d + suc (dCapᶜ S W R g (lvls S W J (suc d)))
 
 -- THE LEVEL COMPOSES, which is what makes the walk decompose from the
 -- FRONT — an equality, so the change of direction the head-first
@@ -902,7 +785,7 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
   2≤suc2S : 2 ≤ suc (2 * S)
   2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
   1≤J : 1 ≤ J
-  1≤J = *-mono-≤ (*-mono-≤ (≤-trans (1≤dCap (chargeW c) S R 1≤R)
+  1≤J = *-mono-≤ (*-mono-≤ (≤-trans (1≤dCapᶜ S (Caps.cWid c) R S 0 1≤R)
                                     (≤-reflexive (sym (cDel-body c))))
                            1≤S)
                  (s≤s z≤n)
@@ -1064,14 +947,16 @@ iterFold-tower k S w (suc j) 3≤k hS hw =
 -- itself, and `capsAt`'s base has to pay the ENTRY CEILING under a
 -- tower — which `capsBase` does by reading it, not by bracketing it
 blowup-tower : ∀ (m : ℕ) (c : Caps) → 3 ≤ m →
-  1 ≤ Caps.cSize c →
+  2 ≤ Caps.cSize c →
   Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
   Caps.cWid c ≤ towerℕ m →
   (Caps.cSize (frameBlowup c) ≤ towerℕ (blowH m))
   × (suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (blowH m))
   × (Caps.cWid (frameBlowup c) ≤ towerℕ (blowH m))
-blowup-tower m c 3≤m 1≤S hS hR hW = sizeGoal , regGoal , widGoal
+blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
   where
+  1≤S : 1 ≤ Caps.cSize c
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
   S = Caps.cSize c
   R = Caps.cReg c
   W = Caps.cWid c
@@ -1097,10 +982,9 @@ blowup-tower m c 3≤m 1≤S hS hR hW = sizeGoal , regGoal , widGoal
 
   J≤P : J ≤ P
   J≤P = ≤-trans (*-mono-≤ (*-mono-≤ (≤-trans (≤-reflexive (cDel-body c))
-                                       (dCap-mono (chargeW c)
-                                          (Tw * suc (suc Tw * suc Tw))
-                                          (suc S) (suc Tw) R Tw
-                                          (*-mono-≤ hS wid≤) (s≤s hS) hR′))
+                                       (dCapᶜ-mono (suc S) (suc Tw)
+                                          2≤S hS (≤-trans hW ≤-refl) hR′
+                                          (s≤s hS) ≤-refl))
                                     hS)
                           wid≤)
                 (poolBody≤poolCount Tw 1≤Tw)
@@ -1186,7 +1070,7 @@ capsAt-tower {n = n} e sl zero =
     (caps (2 + sizeᵉ e + slotsSize sl)
           (suc (entryCeil n sl e))
           (suc sz))
-    (m≤m+n 3 _) (s≤s z≤n)
+    (m≤m+n 3 _) (s≤s (s≤s z≤n))
     (≤-trans base≤ K)
     (≤-trans suc≤ K)
     (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + sz)) K)
@@ -1201,7 +1085,7 @@ capsAt-tower {n = n} e sl zero =
 capsAt-tower e sl (suc id) =
   blowup-tower (capsH e sl id) (capsAt e sl id)
     (3≤capsH e sl id)
-    (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+    (2≤capsAt-size e sl id)
     (proj₁ (capsAt-tower e sl id))
     (proj₁ (proj₂ (capsAt-tower e sl id)))
     (proj₂ (proj₂ (capsAt-tower e sl id)))

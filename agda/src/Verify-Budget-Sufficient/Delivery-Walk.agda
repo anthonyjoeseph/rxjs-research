@@ -86,7 +86,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain;
                                 shareAdmit; shareLatch; shareFinish;
                                 chainStep; cascadeGo; dropSource; sameSource;
                                 arrTy; arrTick; arrSource; arrVal;
-                                budgetAt)
+                                budgetAt;
+                                sizeAt; regAt; fCharge; iterL; lvls;
+                                dCapᶜ; dWalkᶜ)
 
 -- .Caps for the level walk and its monotonicity toolkit (dCapᶜ-mono /
 -- dWalkᶜ-mono / lvls-mono) and, under it, .Measures for pathLen and the

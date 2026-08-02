@@ -20,38 +20,40 @@
 -- level L step statement is FALSE over its full quantification").  The
 -- entry axiom asserts same-level preservation.
 --
--- WHAT IT COST.  `cascadeGo-deliveries` was ground on this axiom and on
--- `stepFrame-entry-mint`, via `walkH` — so it was not a theorem, and the
--- 2026-08-02 entry-charging ruling was refuted rather than unproven.
--- Both axioms and that instantiation are now GONE from .Caps-Face and
--- the delivery bound is an honest postulate again; this module is the
--- reason, and it is what keeps them from coming back.
--- .Delivery-Walk itself is untouched: it is a proof RELATIVE to
--- `Walk-Hyps`, with no postulate of its own, and it is the assembly a
--- repaired frame axiom plugs into unchanged.
+-- WHAT IT COST, AND WHAT REPLACED IT.  `cascadeGo-deliveries` was
+-- ground on this axiom and on `stepFrame-entry-mint`, via `walkH` — so
+-- it was not a theorem, and the 2026-08-02 entry-charging ruling was
+-- refuted rather than unproven.  Both axioms and that instantiation are
+-- GONE from .Caps-Face; this module is the reason, and it is what keeps
+-- them from coming back.
 --
--- AND THE FIRST CONJUNCT CANNOT STAND EITHER, though the witness below
--- does not exhibit it: `capsOK? c`'s fifth conjunct is
+-- THE REPAIR IS LANDED, and it is the one this refutation dictates: the
+-- walk now carries the LEVEL (`dCapᶜ` / `dWalkᶜ`, .Caps), `Walk-Hyps` is
+-- level-indexed, and the frame face it asks for — `stepFrame-face` — is
+-- the shape the PROVEN `stepFrame-caps` already reports in, `Σ j′ →
+-- j′ ≤ fCharge × capsOK? (frameStep (j + j′) c) …`.  The witness below
+-- satisfies THAT face with room: the map-f frame's receipt is
+-- `suc (sizeᵗ dup) = 4` inside `fCharge 3 1 0 = 9`, and its size-7
+-- output sits inside `cSize (frameStep 4 c₀) = 4665`.  Growth reported
+-- is growth paid for; growth denied is what falls below.
+--
+-- AND THE CIRCLE THE OLD REPAIR-SHAPE FEARED DOES NOT BITE.  The worry
+-- was that at a ledger read at `frameStep j c` the per-frame receipt's
+-- two factors both grow with j, while `sizeCount` (which DEFINES the
+-- growth) is what the sum of the j′s must fit inside.  It does not bite
+-- because the walk is a RECURSION rather than a closed form: `dLvl`
+-- iterates the receipt at the level each frame actually runs at, and
+-- `sizeCount` reads the walk instead of bounding it.
+--
+-- AND THE FIRST CONJUNCT COULD NOT STAND EITHER, though the witness
+-- below does not exhibit it: `capsOK? c`'s fifth conjunct is
 -- `length registry ≤ᵇ cReg c`, and `stepFrame-entry-mint` — the axiom
--- beside it — grants each frame up to `cSize * suc cWid` NEW
+-- beside it — granted each frame up to `cSize * suc cWid` NEW
 -- registrations.  The two are jointly satisfiable only where no frame
 -- ever mints, and Frame-Mint-Probe measured frames minting 1 on every
--- row of the amplifier family.  `dWalk`'s own recursion says the same
--- thing out loud: its (i+1)-st summand runs at registry `R + Q · suc d`,
--- i.e. PAST the entry `R = cReg`, which is exactly what `sf-ok` forbids.
---
--- THE SHAPE OF A REPAIR, for the re-ruling.  The honest per-frame face
--- is the one .Caps-Face already PROVES — `stepFrame-caps`, which reports
--- a growth index j′ and lands at `frameStep (j + j′) c` — so `Walk-Hyps`
--- would need an INDEXED `OK`/`Vb` and an `sf-ok` returning
--- `Σ j′ → j′ ≤ Jf × OK (j + j′) …`.  The obstruction that entry-charging
--- was invented to dodge is then back, unmoved: the per-frame budget
--- `scanFrame-caps` actually pays is `suc (length vals * suc (sizeᵗ fn))`,
--- and at a ledger read at `frameStep j c` its two factors are
--- `suc cWid (frameStep j c)` and `cSize (frameStep j c)` — both of which
--- grow with j, while `sizeCount` (which DEFINES the growth) is what the
--- sum of the j′s has to fit inside.  That circle is the open design
--- question; charging at entry does not close it, it only asserts it away.
+-- row of the amplifier family.  The registry is read off the LEVEL now
+-- (`regAt S R J`, capsOK?'s own conjunct), so there is nothing left to
+-- charge at entry.
 ------------------------------------------------------------------
 module Entry-Caps-Refuted where
 
@@ -190,9 +192,10 @@ open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
                                        ^-monoˡ-≤; ≤ᵇ⇒≤)
 open import Relation.Binary.PropositionalEquality using (sym)
 open import Data.Unit using (tt)
+open import Rx.Evaluator using (iterFold; foldStep)
 open import Verify-Budget-Sufficient.Caps
-  using (frameBlowup; frameStep; sizeCount; cDel; cDel-body; chargeW;
-         iterFold; foldStep; iterFold-mono-count; 1≤dCap)
+  using (frameBlowup; frameStep; sizeCount; cDel; cDel-body;
+         iterFold-mono-count; 1≤dCapᶜ)
 open import Verify-Budget-Sufficient.Caps-Face using (powʳ1)
 
 -- one registration is one delivery, so the fold count is never below 2
@@ -201,7 +204,8 @@ open import Verify-Budget-Sufficient.Caps-Face using (powʳ1)
 2≤sizeCount c 4≤S 1≤R = ≤-trans (≤-trans (s≤s (s≤s z≤n)) 4≤S) step
   where
   1≤cDel : 1 ≤ cDel c
-  1≤cDel = ≤-trans (1≤dCap (chargeW c) (Caps.cSize c) (Caps.cReg c) 1≤R)
+  1≤cDel = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
+                            (Caps.cSize c) 0 1≤R)
                    (≤-reflexive (sym (cDel-body c)))
   step : Caps.cSize c ≤ sizeCount c
   step =
