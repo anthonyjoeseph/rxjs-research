@@ -24,37 +24,22 @@ open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; isD
                            input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                            mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                            μᵉ; varᵉ; deferᵉ)
+-- for `entryCeil`: the caps recurrence's BASE width, which `budgetAt`
+-- must know because it must dominate the recurrence
+open import Rx.Frame-Width using (entryCeil)
 
 
 ------------------------------------------------------------------
 -- Inputs, canonical stream, traces
 ------------------------------------------------------------------
 
--- slot i of Γ is either an external SCRIPTED input (hot/cold) or a
--- SHARED observable: an exp tree with an implicit all-resets-false
--- share() at its root.  Share identity is the de Bruijn index — the
--- binding, not the expression, exactly as a JS `const`.  Defs must
--- reference only strictly earlier slots (a const telescope) — checked
--- by the generator/decoder, not by these types; a forward reference
--- would diverge at connect time
---
--- SCRIPTED SLOTS CARRY DATA ONLY (`T (isData t)`, discharged by unification
--- at every data type, so ordinary scripts are written unchanged).  An
--- observable-typed slot would be a hole in the walk's descent order:
--- `Val Γ (obs u) = Closed Γ u`, so its script could emit the very program
--- being walked, and the *All hop off it would be asked for
--- `measureE V e ≺ᵛ measureE V e`.  The regress is real, not merely
--- undescending — such a program re-enters itself at every finite gas — so
--- no edge can pay for it and the restriction is by construction.
--- Higher-order pipelines are unaffected: an observable-typed slot is a
--- `shared` def, which IS walked, so its emissions are syntactically inside
--- it and the crossing is the connect edge (anchored by connect-anchor).
-data Slot {n} (Γ : Ctx n) (t : Ty) : Set where
-  scripted : {ok : T (isData t)} → ObservableInput (Val Γ t) → Slot Γ t
-  shared   : Closed Γ t → Slot Γ t
-
-Slots : ∀ {n} → Ctx n → Set
-Slots Γ = ∀ i → Slot Γ (lookup Γ i)
+-- THE SLOT TELESCOPE lives in Rx.Slots and is re-exported here: the
+-- width measures need it too, and `budgetAt` below reads THEIR entry
+-- ceiling, so the telescope has to sit under both.  Defs must reference
+-- only strictly earlier slots (a const telescope) — checked by the
+-- generator/decoder, not by these types; a forward reference is
+-- rejected there.
+open import Rx.Slots public
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -463,39 +448,22 @@ capsHgo : ℕ → Id → ℕ
 capsHgo m zero    = blowH m
 capsHgo m (suc id) = blowH (capsHgo m id)
 
--- the BASE level: cSize's base is 2 + sz and cReg's is suc sz, both
--- under towerℕ (2 + sz) by k≤towerℕ; cWid's base is the ENTRY CEILING,
--- whose five width measures tower in the syntax at two stories a node
--- (Rx.Frame-Width), hence the doubling
-capsHt : ℕ → Id → ℕ
-capsHt sz id = capsHgo (3 + 2 * sz) id
+syncBudget : ℕ → ℕ → Id → Gas
+syncBudget sz m id =
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHgo m (suc id)))
 
-syncBudget : ℕ → Id → Gas
-syncBudget sz id =
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHt sz (suc id)))
-
--- the size that seeds the budget is the WHOLE program's: root
--- expression, every shared slot def (connect subscribes defs, and
--- their μ/inner structure spends fuel just like the root's), AND
--- every scripted value — a scripted obs value is delivered and
--- subscribed like any other inner, so its syntax demands fuel the
--- root's size knows nothing about
-inputSize : ∀ {n} {Γ : Ctx n} {t} → ObservableInput (Val Γ t) → ℕ
-inputSize {t = t} (hot async)       =
-  suc (sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
-inputSize {t = t} (cold sync async) =
-  suc (sum (map (sizeᵛ t) sync)
-       + sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
-
-slotSize : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
-slotSize (scripted i) = inputSize i
-slotSize (shared d)   = sizeᵉ d
-
-slotsSize : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsSize sl = sum (tabulate λ i → slotSize (sl i))
+-- THE BASE LEVEL of the caps recurrence: everything `capsAt`'s base
+-- carries, under one `towerℕ` by `k≤towerℕ` and nothing else.  cSize's
+-- base is `2 + sz` and cReg's is `suc sz`; cWid's is the ENTRY CEILING,
+-- and the ceiling is read HERE rather than bounded by some function of
+-- sz because the five static width measures TOWER in the syntax and no
+-- closed bracket on them exists that is worth proving.  Reading it costs
+-- nothing: the height is never normalised
+capsBase : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ
+capsBase {n = n} e sl = 3 + (sizeᵉ e + slotsSize sl) + suc (entryCeil n sl e)
 
 budgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → Gas
-budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) id
+budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) (capsBase e sl) id
 
 -- the subscription machine: walk the target expression, minting
 -- NodeIds for its operator nodes and installing their states (evalTm

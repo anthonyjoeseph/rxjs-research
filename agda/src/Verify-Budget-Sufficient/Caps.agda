@@ -5,8 +5,10 @@
 -- j-monotonicity toolkit, and the supply lemmas that read a level off
 -- the recurrence (2≤capsAt-size, 1≤capsAt-reg, cSize≤frameBlowup,
 -- capsAt-base-size, cWid≤frameBlowup, capsAt-base-wid) — and the TOWER
--- BOUND capsAt-tower, which says how fast the recurrence can climb: four
--- tower levels per instant, no more.
+-- BOUND capsAt-tower, which says how fast the recurrence can climb.  It
+-- is no longer a CLOSED height: the count reads cWid and the width axis
+-- pays two tower stories per fold, so the height is `blowH` iterated per
+-- instant, the very function `budgetAt` is defined from.
 --
 -- WHY IT IS ITS OWN MODULE — the .Keeps-Ring precedent, applied a second
 -- time.  .Wet reads the caps recurrence (its store bound and its reset
@@ -44,7 +46,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Frame-Width using (entryCeil)
-open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsHt)
+open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
@@ -288,9 +290,10 @@ D̂ c = 2 ^ (2 ^ Caps.cReg c)
 -- READING cWid WAS FORBIDDEN AND IS NO LONGER.  Width-Count-Probe's
 -- objection was that a count reading cWid iterates the tower function
 -- once per instant, which destroys a `towerℕ`-of-LINEAR-height bracket.
--- That bracket is gone by construction now — `capsHt` (Rx.Evaluator) is
--- a recurrence, not a closed form, and it climbs by exactly what the
--- inequalities below demand.  The price is that the height is
+-- That bracket is gone by construction now — the budget's own height
+-- (`capsHgo` over `capsBase`, Rx.Evaluator) is a recurrence, not a
+-- closed form, and it climbs by exactly what the inequalities below
+-- demand.  The price is that the height is
 -- tower-VALUED; the price of a lazy Gas tower's height being large is
 -- nothing at all
 sizeCount : Caps → ℕ
@@ -758,7 +761,7 @@ iterFold-tower k S w (suc j) 3≤k hS hw =
 -- old bound carried only (cSize, cReg) because the count could not see
 -- a width.  It now can, so the induction has to feed the width back to
 -- itself, and `capsAt`'s base has to pay the ENTRY CEILING under a
--- tower — `entryCeil-tower` below
+-- tower — which `capsBase` does by reading it, not by bracketing it
 blowup-tower : ∀ (m : ℕ) (c : Caps) → 3 ≤ m →
   1 ≤ Caps.cSize c →
   Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
@@ -873,32 +876,18 @@ blowup-tower m c 3≤m 1≤S hS hR hW = sizeGoal , regGoal , widGoal
     climb = ≤-trans (+-monoˡ-≤ (2 * J) (m≤n+m m 6))
                     (+-monoʳ-≤ (6 + m) (*-monoʳ-≤ 2 J≤Z))
 
-------------------------------------------------------------------
--- THE BASE'S WIDTH, UNDER A TOWER.  The only new gap the width axis
--- opens, and it is a statement about SYNTAX alone: `entryCeil` is the
--- ⊔-collect of the five static width measures over every subterm, and
--- those measures tower in the syntax — `innWᵉ (scanᵉ f z e)` puts
--- `outWᵉ e` in an exponent and `outWᵉ (mergeAllᵉ e)` multiplies it
--- straight back out, so nesting the two exponentiates once per level.
--- The RATE is two stories a node (Mult-Width-Probe §3, and Frame-Width's
--- own memo), hence the doubled height.
---
--- ROUTE: one induction over the five mutual measures at the entry form
--- `vs = []`, each clause bounded by `towerℕ (2 · nodes)` of its
--- subterms' bounds — ⊔ and + cost nothing, * costs one story
--- (tower-mul), and the scanᵉ exponent costs one more.
-postulate
-  entryCeil-tower : ∀ {n} {Γ : Ctx n} {t} (sl : Slots Γ) (e : Closed Γ t) →
-    suc (entryCeil n sl e) ≤ towerℕ (3 + 2 * (sizeᵉ e + slotsSize sl))
-
 -- THE TOWER HEIGHT of a caps level — BY RECURRENCE, exactly as the caps
--- themselves are.  There is no closed form and there cannot be one: the
--- width axis climbs 2·sizeCount stories an instant and sizeCount reads
--- the width, so the height iterates the tower FUNCTION.  `capsHt` lives
--- in Rx.Evaluator because `budgetAt` is defined from it — the budget's
--- gas height is this height plus the three stories `prod≤3pow` costs
+-- themselves are, and IT IS THE SAME FUNCTION `budgetAt` IS DEFINED
+-- FROM.  There is no closed form and there cannot be one: the width axis
+-- climbs 2·sizeCount stories an instant and sizeCount reads the width,
+-- so the height iterates the tower FUNCTION.  The base is `capsBase`,
+-- which reads the ENTRY CEILING directly rather than bracketing it by
+-- some function of the syntax size — the five static width measures
+-- tower in the syntax, and `k ≤ towerℕ k` is a complete and free answer
+-- to "under what tower does this number sit".  That is why the width
+-- conjunct below costs no new postulate.
 capsH : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
-capsH e sl id = capsHt (sizeᵉ e + slotsSize sl) id
+capsH e sl id = capsHgo (capsBase e sl) id
 
 3≤blowH : ∀ (m : ℕ) → 3 ≤ blowH m
 3≤blowH m =
@@ -907,7 +896,7 @@ capsH e sl id = capsHt (sizeᵉ e + slotsSize sl) id
 
 3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   3 ≤ capsH e sl id
-3≤capsH e sl zero    = 3≤blowH (3 + 2 * (sizeᵉ e + slotsSize sl))
+3≤capsH e sl zero    = 3≤blowH (capsBase e sl)
 3≤capsH e sl (suc id) = 3≤blowH (capsH e sl id)
 
 capsAt-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
@@ -915,19 +904,21 @@ capsAt-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : 
   × (suc (Caps.cReg (capsAt e sl id)) ≤ towerℕ (capsH e sl id))
   × (Caps.cWid (capsAt e sl id) ≤ towerℕ (capsH e sl id))
 capsAt-tower {n = n} e sl zero =
-  blowup-tower (3 + 2 * sz)
+  blowup-tower (capsBase e sl)
     (caps (2 + sizeᵉ e + slotsSize sl)
           (suc (entryCeil n sl e))
           (suc sz))
-    (m≤m+n 3 (2 * sz)) (s≤s z≤n)
-    (≤-trans base≤ (k≤towerℕ (3 + 2 * sz)))
-    (≤-trans suc≤ (k≤towerℕ (3 + 2 * sz)))
-    (entryCeil-tower sl e)
+    (m≤m+n 3 _) (s≤s z≤n)
+    (≤-trans base≤ K)
+    (≤-trans suc≤ K)
+    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + sz)) K)
   where
   sz = sizeᵉ e + slotsSize sl
-  suc≤ : 2 + sz ≤ 3 + 2 * sz
-  suc≤ = ≤-trans (n≤1+n (2 + sz)) (+-monoʳ-≤ 3 (m≤m+n sz (sz + 0)))
-  base≤ : 2 + sizeᵉ e + slotsSize sl ≤ 3 + 2 * sz
+  K : capsBase e sl ≤ towerℕ (capsBase e sl)
+  K = k≤towerℕ (capsBase e sl)
+  suc≤ : 2 + sz ≤ capsBase e sl
+  suc≤ = ≤-trans (n≤1+n (2 + sz)) (m≤m+n (3 + sz) (suc (entryCeil n sl e)))
+  base≤ : 2 + sizeᵉ e + slotsSize sl ≤ capsBase e sl
   base≤ = ≤-trans (≤-reflexive (+-assoc 2 (sizeᵉ e) (slotsSize sl))) suc≤
 capsAt-tower e sl (suc id) =
   blowup-tower (capsH e sl id) (capsAt e sl id)

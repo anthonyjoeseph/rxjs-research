@@ -94,7 +94,7 @@ open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 
 open import Rx.Exp
-open import Rx.Evaluator using (Slots; Slot; scripted; shared)
+open import Rx.Slots using (Slots; Slot; scripted; shared)
 
 -- membership on the visited set, decidable by the index's ℕ view
 _∈ᵇ_ : ∀ {n} → Fin n → List (Fin n) → Bool
@@ -486,11 +486,13 @@ slotsIW {n = n} j sl = slotsIWgo j sl (tabulate {n = n} (λ i → i))
 -- `vs = []`.  One recursive pass over the syntax, so it is
 -- entry-computable exactly as `sizeᵉ` is.
 --
--- AND IT COSTS NO STORIES.  A subterm's measures are bounded by the
--- same two-per-node rate the whole program's are, and a ⊔ of things
--- each under `towerℕ h` is under `towerℕ h` — so the ceiling sits at
--- the SAME height as the old three-term base, `3 + 2 · sz`, and
--- `budgetAt` does not move.
+-- AND `budgetAt` READS IT DIRECTLY.  The caps recurrence's base cWid IS
+-- this number, and a budget that must dominate the recurrence has to
+-- know where the recurrence starts — so `Rx.Evaluator.capsBase` puts
+-- `suc (entryCeil n sl e)` in the base height and `k ≤ towerℕ k` does
+-- the rest.  That is why the telescope moved to `Rx.Slots`: this module
+-- now sits UNDER the evaluator.  Nothing is normalised — the height is
+-- a lazy Gas tower's index and never forced.
 --
 -- THE k-FREE SLOPES ARE WHAT MAKES IT A NUMBER.  `pmOᵉ` and `pmIᵉ` are
 -- indexed by the variable position `k` they measure the slope at, and

@@ -519,7 +519,8 @@ _ = refl
 -- why the width gates above are per-fold.
 --
 -- THE cSIZE HALF IS NO LONGER A `refl`, and the reason is the delivery
--- bound: the iteration count is now `D̂ * cSize` = `2 ^ (2 ^ cReg) * cSize`,
+-- bound: the iteration count is now `sizeCount`, whose leading factor is
+-- `D̂ * cSize` = `2 ^ (2 ^ cReg) * cSize`,
 -- and pRs enters at cSize 25 / cReg 24, so the endpoint is
 -- `iterSize 25 (2 ^ (2 ^ 24) * 25) 25` — a count with five million
 -- digits, each iteration squaring, which no machine unfolds.  So it is checked the way the k = 7 crossover is:
@@ -549,7 +550,8 @@ capsAt0-one-fold : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) �
     ≤ Caps.cSize (capsAt e sl 0)
 capsAt0-one-fold e sl =
   iterSize-mono-count _ _ (s≤s z≤n)
-    (*-mono-≤ (1≤2^ (2 ^ suc (sizeᵉ e + slotsSize sl))) (s≤s z≤n))
+    (*-mono-≤ (*-mono-≤ (1≤2^ (2 ^ suc (sizeᵉ e + slotsSize sl))) (s≤s z≤n))
+              (s≤s z≤n))
 
 -- pRs enters at 25, one fold takes it to 1275, and 1275 covers the 30
 capsAt0-size-pRs : 30 ≤ Caps.cSize (capsAt pRs ins3 0)

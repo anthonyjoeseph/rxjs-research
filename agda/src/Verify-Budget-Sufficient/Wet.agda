@@ -132,7 +132,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize; capsHt)
+                                budgetAt; slotsSize; capsHgo; capsBase)
 
 -- .Caps re-exports .Keeps-Ring (which re-exports .Measures), so this one
 -- import carries the whole stratum below.  It is here for `Caps` /
@@ -4516,7 +4516,7 @@ abstract
                   (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) e)
                   (syncSizeᵉ e))
   caps-fuel-root e ins =
-    hasAtLeast-mono demand (budget-hasAtLeast sz 0)
+    hasAtLeast-mono demand (budget-hasAtLeast sz (capsBase e ins) 0)
     where
     sz : ℕ
     sz = sizeᵉ e + slotsSize ins
@@ -4537,12 +4537,12 @@ abstract
     r≤R : hopDᵉ V e ≤ hopR V
     r≤R = hopD-cap V e (≤-trans (≤ᵇ⇒≤ 2 6 _) 6≤V) sz≤V
     demand : suc (dBound V (hopR V) U (hopDᵉ V e) (syncSizeᵉ e))
-               ≤ 2 ^ (sz * 1 * 1) + towerℕ (3 + capsHt sz 1)
+               ≤ 2 ^ (sz * 1 * 1) + towerℕ (3 + capsHgo (capsBase e ins) 1)
     demand =
       ≤-trans (s≤s (dBound-bound s≤V r≤R))
       (≤-trans (prod≤3pow V U 6≤V U≤V)
       (≤-trans (tower-3 (capsH e ins 1) V (proj₁ (capsAt-tower e ins 1)))
-               (m≤n+m (towerℕ (3 + capsHt sz 1)) (2 ^ (sz * 1 * 1)))))
+               (m≤n+m (towerℕ (3 + capsHgo (capsBase e ins) 1)) (2 ^ (sz * 1 * 1)))))
 
 ------------------------------------------------------------------
 -- the burst cores — the contract instantiated at the root.  The root

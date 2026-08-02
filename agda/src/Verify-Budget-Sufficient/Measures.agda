@@ -132,7 +132,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 aliveThroughᶠ;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize; blowH; capsHgo; capsHt)
+                                budgetAt; slotsSize; blowH; capsHgo; capsBase)
 
 ------------------------------------------------------------------
 -- dry-freeness composes over ++ (the other direction from
@@ -255,16 +255,16 @@ hasAtLeast-tower zero    = hs hz
 hasAtLeast-tower (suc h) = hasAtLeast-pow2 (hasAtLeast-tower h)
 
 -- what the seeded budget guarantees: the full head plus the tower, at
--- the RECURRENCE-DEFINED height `3 + capsHt sz (suc id)` — three stories
+-- the RECURRENCE-DEFINED height `3 + capsHgo m (suc id)` — three stories
 -- above the caps level the wet contract's rank demand anchors at (the
 -- LANDING instant's cSize, which `capsHt sz (suc id)` brackets), which
 -- is exactly what `prod≤3pow` costs
-budget-hasAtLeast : ∀ (sz : ℕ) (id : Id) →
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHt sz (suc id)))
-    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ (3 + capsHt sz (suc id)))
-budget-hasAtLeast sz id =
+budget-hasAtLeast : ∀ (sz m : ℕ) (id : Id) →
+  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHgo m (suc id)))
+    hasAtLeast (2 ^ (sz * suc id * suc id) + towerℕ (3 + capsHgo m (suc id)))
+budget-hasAtLeast sz m id =
   hasAtLeast-pad-plus (2 ^ (sz * suc id * suc id))
-                      (hasAtLeast-tower (3 + capsHt sz (suc id)))
+                      (hasAtLeast-tower (3 + capsHgo m (suc id)))
 
 -- the peel every decrement-edge clause performs: enough fuel means
 -- the machine's gs-match succeeds and the tail still has enough
