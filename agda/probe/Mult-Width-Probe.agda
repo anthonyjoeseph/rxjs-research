@@ -491,9 +491,9 @@ _ = refl
 open import Data.List using (List; []; _∷_)
 open import Data.Vec  using () renaming ([] to []ᵛ)
 open import Data.List.Relation.Unary.Any using (here)
-open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
+open import Rx.Exp using (Ctx; Closed; Exp; Tm; Fn; Val; natᵗ; obs; _×ᵗ_;
                           ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; nat̂; fstᵗ; varᵗ;
-                          sizeᵉ)
+                          applyFn; sizeᵉ; sizeᵗ; sizeᵛ)
 open import Rx.Evaluator using (Slots)
 open import Rx.Frame-Width using (outWᵉ; innWᵉ; entryCeil)
 
@@ -511,10 +511,10 @@ seedO = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
 
 -- the doubling step: two occurrences of the accumulator, so the plug
 -- slope `pmIᵗ 0` is 2 and the scanᵉ clause's base is 2
-W2 : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+W2 : ∀ {Θ} → Fn Γ₀ [] [] Θ (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
 W2 = strmᵗ (mergeAllᵉ (ofᵉ (accV ∷ accV ∷ [])))
 
-wrap : Closed Γ₀ natᵗ → Closed Γ₀ natᵗ
+wrap : ∀ {Θ} → Exp Γ₀ [] [] Θ natᵗ → Exp Γ₀ [] [] Θ natᵗ
 wrap e = mergeAllᵉ (scanᵉ W2 seedO e)
 
 lvl : ℕ → Closed Γ₀ natᵗ
@@ -647,3 +647,150 @@ _ = refl
 
 _ : (3 ≤ᵇ 67) ≡ true
 _ = refl
+
+------------------------------------------------------------------
+-- §7  THE OBLIGATION THAT IS NEITHER — the restructure's own stop
+--     rule, fired.
+--
+-- The width split says every width obligation is one of two things: a
+-- ⊔-INJECTION into the entry ceiling (the thing bounded is a SUBTERM
+-- of the program, hence entry-computable), or a per-payload
+-- MULTIPLICATIVE RECEIPT (delivery-time growth).  The five eval
+-- members' width halves have to land in one of the two.
+--
+-- `mapFrame-caps` / `scanFrame-caps` land in NEITHER.  What they bound
+-- is `pWᵛ (applyFn fn v)` — FRESH SYNTAX, the step function's body
+-- with the stored accumulator plugged in.
+--
+--   · NOT A SUBTERM.  Its width moves with the RUNTIME plug, so no
+--     entry-computable number bounds it: the same `fn` takes width 2
+--     to 32 and width 8 to 20480 below.  The ceiling bounds `fn`'s own
+--     measures, which are small and fixed; it says nothing about the
+--     instance.
+--   · NOT RECEIPT-PAID.  One `applyFn` through a step function with
+--     TWO NESTED scanᵉ NODES over the plug is DOUBLY exponential in
+--     the plug's width, while `suc (cWid * suc cSize)` multiplicative
+--     folds buy a SINGLE exponential whose exponent is a polynomial in
+--     the caps.
+--
+-- THE FAMILY.  `accSrc` lifts the scan's own accumulator into an Exp
+-- SOURCE position — `mergeAllᵉ (ofᵉ (accV ∷ []))`, the only route the
+-- grammar has from a Tm of obs type to an Exp — and `fnₖ` wraps it in
+-- k copies of §5's deepScan wrap.  Every `fnₖ` is a legal step
+-- function of a legal `scanᵉ`, and `applyFn` is the evaluator's own.
+--
+-- UNDER THE EXPONENTIAL STEP THIS WAS NEVER A PROBLEM: a fold is
+-- `S ^ suc w`, so `suc (sizeᵗ fn)` folds buy a TOWER of height
+-- `sizeᵗ fn` over the seed and two scanᵉ nodes cost exactly TWO
+-- stories — which is what `two-folds` / `node2` inside `wid-iterFold`
+-- already pay.  The gap below is the whole distance between the two
+-- engines, measured on one application.
+------------------------------------------------------------------
+
+accSrc : Exp Γ₀ [] [] (obs natᵗ ×ᵗ natᵗ ∷ []) natᵗ
+accSrc = mergeAllᵉ (ofᵉ (accV ∷ []))
+
+fn0 fn1 fn2 : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+fn0 = strmᵗ accSrc
+fn1 = strmᵗ (wrap accSrc)
+fn2 = strmᵗ (wrap (wrap accSrc))
+
+-- payloads: (the stored accumulator , the arriving datum), at
+-- accumulator widths 2, 4 and 8
+p2 p4 p8 : Val Γ₀ (obs natᵗ ×ᵗ natᵗ)
+p2 = ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ []) , 0
+p4 = ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ nat̂ 4 ∷ []) , 0
+p8 = ofᵉ (nat̂ 1 ∷ nat̂ 1 ∷ nat̂ 1 ∷ nat̂ 1 ∷ nat̂ 1 ∷ nat̂ 1 ∷ nat̂ 1 ∷ nat̂ 1 ∷ []) , 0
+
+-- THE STEP FUNCTIONS ARE SMALL, and fixed
+_ : sizeᵗ fn0 ≡ 6
+_ = refl
+
+_ : sizeᵗ fn1 ≡ 20
+_ = refl
+
+_ : sizeᵗ fn2 ≡ 34
+_ = refl
+
+-- THE PLUG ALONE IS THE IDENTITY ON WIDTH
+_ : outWᵉ 0 ins₀ (applyFn fn0 p2) ≡ 2
+_ = refl
+
+_ : outWᵉ 0 ins₀ (applyFn fn0 p8) ≡ 8
+_ = refl
+
+-- ONE scanᵉ NODE EXPONENTIATES IT — and the growth is in the PLUG,
+-- not in the syntax: the same 20-node `fn1` takes 2 to 32, 4 to 384
+-- and 8 to 20480
+_ : outWᵉ 0 ins₀ (applyFn fn1 p2) ≡ 32
+_ = refl
+
+_ : outWᵉ 0 ins₀ (applyFn fn1 p4) ≡ 384
+_ = refl
+
+_ : outWᵉ 0 ins₀ (applyFn fn1 p8) ≡ 20480
+_ = refl
+
+-- TWO NODES DOUBLE-EXPONENTIATE: two and a half TRILLION off a stored
+-- accumulator of width 2, at a result size of 39
+_ : outWᵉ 0 ins₀ (applyFn fn2 p2) ≡ 2473901162496
+_ = refl
+
+_ : sizeᵛ (obs natᵗ) (applyFn fn2 p2) ≡ 39
+_ = refl
+
+-- and the substitution IS the wrap, so §5's `levelStep` applies to the
+-- APPLIED step function exactly as it applies to the program
+_ : applyFn fn1 p8 ≡ wrap (applyFn fn0 p8)
+_ = refl
+
+_ : applyFn fn2 p8 ≡ wrap (applyFn fn1 p8)
+_ = refl
+
+------------------------------------------------------------------
+-- WHAT ONE FRAME CAN BUY, in the exponent.  Charge-Probe §(g)'s form
+-- allows one frame `suc (cWid * suc cSize)` folds, and under the
+-- multiplicative engine a fold multiplies by cSize — so the frame
+-- buys `cWid * cSize ^ suc (cWid * suc cSize)`.  With `cWid ≤ 2 ^ p`
+-- and `cSize ≤ 2 ^ q` that is ONE exponential whose exponent is a
+-- POLYNOMIAL in the caps.
+------------------------------------------------------------------
+
+budget≤ : ∀ (W S p q : ℕ) → W ≤ 2 ^ p → S ≤ 2 ^ q →
+  W * S ^ suc (W * suc S) ≤ 2 ^ (p + q * suc (W * suc S))
+budget≤ W S p q hW hS =
+  ≤-trans (*-mono-≤ hW (≤-trans (^-monoˡ-≤ (suc (W * suc S)) hS)
+                                (≤-reflexive (^-*-assoc 2 q (suc (W * suc S))))))
+          (≤-reflexive (sym (^-distribˡ-+-* 2 p (q * suc (W * suc S)))))
+
+------------------------------------------------------------------
+-- THE REFUTATION, at the TIGHT admissible caps of the pre-state, and
+-- structural in exactly §5's sense — the comparison happens in the
+-- EXPONENT, where every number is small.  The frame applies `fn2` to
+-- a payload whose accumulator has width 8; the pre-state therefore
+-- admits
+--
+--     cWid = 8 ≤ 2 ^ 3        cSize = 34 ≤ 2 ^ 6
+--
+-- (cSize has to cover `sizeᵗ fn2 = 34`, which dominates every other
+-- size in sight), so the whole frame's multiplicative budget is
+--
+--     8 * 34 ^ suc (8 * 35) ≤ 2 ^ (3 + 6 * 281) = 2 ^ 1689
+--
+-- and one `applyFn` demands `2 ^ 20480` — the width `fn1` alone
+-- already reached, put in an exponent by the second node.  1690
+-- against 20480 IN THE EXPONENT, and the gap is not a constant: the
+-- demand's exponent is `2 ^ cWid`-shaped while the budget's is a
+-- polynomial in the caps, so it grows without bound in the program.
+------------------------------------------------------------------
+
+mult-frame-budget-fails :
+  suc (8 * 34 ^ suc (8 * suc 34)) ≤ outWᵉ 0 ins₀ (applyFn fn2 p8)
+mult-frame-budget-fails =
+  ≤-trans (s≤s (budget≤ 8 34 3 6 (≤ᵇ⇒≤ 8 8 _) (≤ᵇ⇒≤ 34 64 _)))
+  (≤-trans (+-monoˡ-≤ (2 ^ (3 + 6 * suc (8 * suc 34)))
+                      (1≤2^ (3 + 6 * suc (8 * suc 34))))
+  (≤-trans (≤-reflexive (solve 1 (λ x → x :+ x := con 2 :* x)
+                               refl (2 ^ (3 + 6 * suc (8 * suc 34)))))
+  (≤-trans (^-monoʳ-≤ 2 (≤ᵇ⇒≤ 1690 20480 _))
+           (levelStep (applyFn fn1 p8) (≤ᵇ⇒≤ 1 20480 _)))))
