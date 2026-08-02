@@ -162,11 +162,12 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition
 --     laws.  delivN is the currency the cascade conjuncts are stated in.
---   · .Delivery-Walk maps the delivery clique onto dCap / dWalk —
---     foldPath ↦ dCap, dispatchShare ↦ dCap, shareGo ↦ dWalk,
---     cascadeGo ↦ dWalk — RELATIVE to one frame's mint budget, which it
---     takes as a record of hypotheses rather than postulating.  See
---     cascadeGo-deliveries below for what instantiating it still needs.
+--   · .Delivery-Walk maps the delivery clique onto the LEVEL walk —
+--     foldPath ↦ dCapᶜ, dispatchShare ↦ dCapᶜ, shareGo ↦ dWalkᶜ,
+--     cascadeGo ↦ dWalkᶜ — RELATIVE to one frame's face at the level it
+--     RUNS at, which it takes as a record of hypotheses rather than
+--     postulating.  `walkH` below instantiates that record and
+--     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Delivery-Walk public
 
 ------------------------------------------------------------------
@@ -3905,7 +3906,7 @@ postulate
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
 -- (ii) THE DELIVERY BOUND, WHOLE, AND AS A RECURSION.  One cascade's
--- deliveries against `cDel c = dCap (chargeW c) (suc cSize) cReg` —
+-- deliveries against `cDel c = dCapᶜ cSize cWid cReg (suc cSize) 0` —
 -- the gas-indexed walk of .Caps, not a closed form.  Both closed
 -- forms it replaces are dead: the squared-subset `4 ^ cReg` is FALSE
 -- (the delivery law, committed before the L = 5 rows were measured
@@ -3982,12 +3983,14 @@ postulate
 -- reachable only by dispatches that come AFTER it — so the bound is
 -- written as the walk that fact describes rather than as a number the
 -- walk is compared against.  `cDel c` is (α) done SEQUENTIALLY: the
--- top walk has cReg chains, each subtree runs at one dispatch gas
--- less, and the registry a chain sees is the entry registry plus
--- `chargeW c` mints for each delivery ALREADY MADE.  The proof is
--- then a schedule-indexed induction on the same two indices the
--- definition recurses on, with .Deliveries' § D equations supplying
--- the delivery counting.
+-- top walk is as long as the registry, each subtree runs at one
+-- dispatch gas less, and what a later chain sees is what the deliveries
+-- ALREADY MADE left behind — carried as the caps LEVEL, so the registry
+-- is `regAt S R J` and the per-frame receipt is `fCharge S W J`, both
+-- read where the walk has climbed to.  The proof is then a
+-- schedule-indexed induction on the same two indices the definition
+-- recurses on, with .Deliveries' § D equations supplying the delivery
+-- counting.
 --
 -- THE ROWS ALL FIT WITH ENORMOUS MARGIN, which is the least
 -- interesting thing about it: `cDel` at pL⁴'s entry caps
@@ -3995,23 +3998,22 @@ postulate
 -- the deepest lean rung is D = 41510 at cReg = 11.  The margin was
 -- never the problem; the self-reference was
 --
--- AND THE WALK IS NOW PROVEN — the whole of it except ONE fact, which
--- is a design question rather than a grind.  .Delivery-Walk maps the
--- clique onto the recursion, with no postulate of its own:
+-- AND THE WALK IS NOW PROVEN — the whole of it except ONE FRAME.
+-- .Delivery-Walk maps the clique onto the recursion, with no postulate
+-- of its own:
 --
---   foldPath      ↦ dCap  Q gas R      (dCap's gas IS the dispatch gas)
---   dispatchShare ↦ dCap  Q gas R
---   shareGo       ↦ dWalk Q gas R (length ps)
---   cascadeGo     ↦ dWalk Q n   R (length chains)
+--   foldPath      ↦ dCapᶜ  S W R gas J   (the gas IS the dispatch gas)
+--   dispatchShare ↦ dCapᶜ  S W R gas J
+--   shareGo       ↦ dWalkᶜ S W R gas J (length ps)
+--   cascadeGo     ↦ dWalkᶜ S W R n   J (length chains)
 --
--- over .Deliveries' § D equations, `dWalk-front` (the walk decomposes
+-- over .Deliveries' § D equations, `dWalkᶜ-front` (the walk decomposes
 -- from the FRONT exactly as it does from the back — an equality, so
 -- the change of direction the head-first evaluator forces costs
--- nothing), and a per-frame mint budget.  Instantiated at
--- Qf = cSize * suc cWid and B = cSize it gives exactly this
--- conjunct, since `chargeW c = cSize * suc (suc cWid * suc cSize)`
--- dominates `Qf * suc B` and `n ≤ cSize` (the hypothesis above)
--- lifts the evaluator's dispatch gas to cDel's index.
+-- nothing), and one frame's face at the level it runs at.  Started at
+-- level 0 — `frameStep 0 c ≡ c` — it gives exactly this conjunct, since
+-- `n ≤ cSize` (the hypothesis above) lifts the evaluator's dispatch gas
+-- to cDel's index and `length chains ≤ cReg` is `regAt S R 0`.
 --
 -- AND THE ONE FACT IT IS STILL RELATIVE TO IS A PER-FRAME FACE — at a
 -- level the frame can honestly be charged at.  That fact is

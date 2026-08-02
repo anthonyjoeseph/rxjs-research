@@ -86,19 +86,24 @@
 -- shaped like `3 + Ω`.
 --
 -- FIVE POSTULATES REMAIN (2026-08-02, after the entry-charging
--- refutation).  They are: the three walk faces (subscribeE-wet,
--- cascadeGo-wet, subscribeE-walk) and the two pieces the BUDGET CLAIM
--- is assembled from (cascadeGo-charge and cascadeGo-deliveries,
--- design-owned and frozen).  3 + 2 = 5, and NONE of the five is known
--- false.  caps-fuel-root, the sixth, is ground (.Wet, abstract).
--- The count went 5 → 9 when the wet restatement closed three
--- statement-level gaps by NAMING what had been implicit, 9 → 6 as
--- pop-INV, init-INV and pop-head-bounded were ground, and 6 → 5 with
--- caps-fuel-root.  It briefly read 6 again on 2026-08-02, when
--- cascadeGo-deliveries was discharged onto two frame-local entry
--- axioms; those axioms are REFUTED (agda/probe/Entry-Caps-Refuted.agda,
--- a machine-checked `Entry-Caps → ⊥` off one map-f frame), so the trade
--- is reversed and the delivery bound is a postulate again.
+-- refutation and the level-walk repair).  They are: the three walk faces
+-- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the per-delivery
+-- charge (cascadeGo-charge, design-owned and frozen), and ONE PER-FRAME
+-- FACE, stepFrame-face.  3 + 1 + 1 = 5, and NONE of the five is known
+-- false.  caps-fuel-root, once the sixth, is ground (.Wet, abstract).
+--
+-- THE SHAPE OF THE FIFTH IS THE NEWS.  It used to be
+-- cascadeGo-deliveries — a statement about a WHOLE CASCADE, quantified
+-- over every registry an unbounded walk can reach — and it is now a
+-- theorem: .Delivery-Walk maps the delivery clique onto the level walk
+-- `dCapᶜ` (.Caps) and .Caps-Face instantiates it.  What is left is one
+-- `stepFrame` call, and it is the GROUND `stepFrame-caps` plus two
+-- conjuncts (a bound on the growth index it already builds, and the
+-- burst ledger's width conjunct on its output).  An intermediate ruling
+-- charged the frame at the cascade's ENTRY caps instead; that is
+-- REFUTED, machine-checked, by one map-f frame whose output breaches the
+-- cap it was charged at (agda/probe/Entry-Caps-Refuted.agda), and the
+-- repair is that the walk carries the level rather than a fixed budget.
 -- frameBlowup is fully defined, and cascadeGo-caps, the cascade
 -- bookends and the chain snapshot are all ground.
 --
