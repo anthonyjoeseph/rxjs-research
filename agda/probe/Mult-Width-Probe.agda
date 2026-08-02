@@ -495,7 +495,7 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
                           ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; nat̂; fstᵗ; varᵗ;
                           sizeᵉ)
 open import Rx.Evaluator using (Slots)
-open import Rx.Frame-Width using (outWᵉ; innWᵉ)
+open import Rx.Frame-Width using (outWᵉ; innWᵉ; entryCeil)
 
 Γ₀ : Ctx 0
 Γ₀ = []ᵛ
@@ -606,3 +606,44 @@ mult-bound-fails-cubic =
 -- frame's receipt is `length vals * suc (sizeᵗ fn)` ≈ W · size folds,
 -- which buys S ^ (W · size) ≥ 2 ^ W.  Exponent and receipt count are
 -- the same number (§1) — on the DELIVERY side only
+
+------------------------------------------------------------------
+-- §6  THE ENTRY CEILING, ON THE FAMILY THAT REFUTED THE RECEIPT.
+--
+-- §5's refutation is what forces the base to carry a CEILING rather
+-- than the program's own width: the static measure towers in the
+-- syntax, and no syntax-counted receipt buys a tower.  The ceiling
+-- (Rx.Frame-Width.entryCeil) is the ⊔-collect of all five measures
+-- over every SUBTERM — so the question §3's accounting has to survive
+-- is whether collecting subterms costs STORIES over collecting the
+-- root alone.
+--
+-- IT DOES NOT, and the measure says so directly: on this family the
+-- ceiling is the root's own width at the first two levels and exactly
+-- TWICE it at the third.  A factor of two is not a story — the base
+-- height is still `3 + 2 * sz`, and `budgetAt`'s (7 + sz)(id + 2)
+-- does not move.
+------------------------------------------------------------------
+
+_ : outWᵉ 0 ins₀ (lvl 0) ≡ 2
+_ = refl
+
+_ : entryCeil 0 ins₀ (lvl 0) ≡ 2
+_ = refl
+
+_ : entryCeil 0 ins₀ (lvl 1) ≡ 16
+_ = refl
+
+_ : sizeᵉ (lvl 2) ≡ 32
+_ = refl
+
+_ : entryCeil 0 ins₀ (lvl 2) ≡ 20971520
+_ = refl
+
+-- 20971520 sits under towerℕ 3 = 2 ^ 65536, i.e. THREE stories against
+-- the 3 + 2 * 32 = 67 the base is allowed on a program of this size
+_ : 3 + 2 * 32 ≡ 67
+_ = refl
+
+_ : (3 ≤ᵇ 67) ≡ true
+_ = refl

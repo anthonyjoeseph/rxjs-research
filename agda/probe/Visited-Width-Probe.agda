@@ -86,7 +86,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 open import Rx.Prim using (hot)
 open import Rx.Exp
 open import Rx.Evaluator using (Slots; Slot; scripted; shared; slotsSize)
-open import Rx.Frame-Width using (outWⱽ; innWⱽ; dWⱽ)
+open import Rx.Frame-Width using (outWⱽ; innWⱽ; dWⱽ; outWᵉ; entryCeil; slotsCeil)
 
 ------------------------------------------------------------------
 -- §1  THE TELESCOPE WITH THE CYCLE.
@@ -401,3 +401,50 @@ visited-height-fits-unmarked a b =
                            (≤-trans (≤-reflexive (m14 a)) (m≤n+m (14 * a) 10)))
                   (≤-trans (m≤m+n b (13 * b))
                            (≤-trans (≤-reflexive (m14 b)) (m≤n+m (14 * b) 10)))
+
+------------------------------------------------------------------
+-- §6  THE ENTRY CEILING, ON THE SAME CYCLE.
+--
+-- `capsAt`'s base cWid is no longer the program's own three-term ⊔ but
+-- the CEILING — the ⊔-collect of all five measures over every SUBTERM
+-- of the program and of every shared def (Rx.Frame-Width.entryCeil).
+-- The question §4's arithmetic has to survive is whether collecting
+-- SUBTERMS costs tower stories, and it does not: a subterm of a def
+-- with kᵢ wraps demands at most kᵢ stories, exactly as the def itself
+-- does, so the demand along a descent path is the SAME `Σkᵢ + max kᵢ`
+-- that `visited-height-fits-unmarked` already gates.  A ⊔ of numbers
+-- each under `towerℕ h` is under `towerℕ h`; that is the whole content.
+--
+-- MEASURED on a 2-cycle small enough to compute (two shared defs
+-- referencing each other through `mix`, no wraps, so no tower).  The
+-- ceiling comes out at exactly TWICE the entry measure — the one
+-- unmarked turn §2 already prices, a factor and not a story.
+------------------------------------------------------------------
+
+insM : Slots Γ₄
+insM fz                = shared (mix (input (fs fz)))
+insM (fs fz)           = shared (mix (input fz))
+insM (fs (fs fz))      = scripted (hot [])
+insM (fs (fs (fs fz))) = scripted (hot [])
+
+_ : slotsSize insM ≡ 22
+_ = refl
+
+_ : outWᵉ 4 insM in0 ≡ 8
+_ = refl
+
+-- the collector agrees with the telescope's own, and both are one
+-- unmarked turn above the entry measure
+_ : slotsCeil 4 insM ≡ 16
+_ = refl
+
+_ : entryCeil 4 insM in0 ≡ 16
+_ = refl
+
+-- and 16 is towerℕ 3, against the `3 + 2 * sz` this base is allowed:
+-- sz = 1 + 22 = 23, so 3 + 46 = 49 stories available for 3 demanded
+_ : 3 + 2 * (1 + 22) ≡ 49
+_ = refl
+
+_ : (3 ≤ᵇ 3 + 2 * (1 + 22)) ≡ true
+_ = refl

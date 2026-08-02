@@ -112,7 +112,8 @@ open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; ou
                                 pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
                                 dWⱽ; dWᵗⱽ; dWᵗˢⱽ; pWⱽ;
                                 slotPW; slotsPW; slotsPWgo;
-                                slotIW; slotsIW; slotsIWgo)
+                                slotIW; slotsIW; slotsIWgo;
+                                slotsPW≤entryCeil; slotsIW≤entryCeil)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
@@ -3637,8 +3638,8 @@ shareGo-slots sf gas id now i vals fin ((rid , p) ∷ ps) sched st
 --      gains dW — the PARKED width, ⊔-collecting every deferᵉ
 --      subterm's `outWᵉ body ⊔ dWᵉ body` — and pW = outW ⊔ dW.  The
 --      caps side reads pW (widLive, widNode, valCaps?, obsCaps?), the
---      wet side keeps outW untouched, and capsAt's base pays
---      `suc (pWᵉ n sl e ⊔ slotsPW n sl)`.
+--      wet side keeps outW untouched, and capsAt's base pays for both
+--      through the ENTRY CEILING it now carries.
 --
 --      AND THE TELESCOPE CONJUNCT IS dW, NOT pW, which is the one
 --      place the ruling's shape had to be sharpened in the making.
@@ -3888,12 +3889,9 @@ slotsCaps?-capsAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (
 slotsCaps?-capsAt {n = n} e sl id =
   slotsCaps?-bound (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
     (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id))
-    (≤-trans (≤-trans (≤-trans (m≤n⊔m (pWᵉ n sl e) (slotsPW n sl))
-                               (m≤m⊔n _ (slotsIW n sl)))
-                      (n≤1+n _))
+    (≤-trans (≤-trans (slotsPW≤entryCeil n sl e) (n≤1+n _))
              (capsAt-base-wid e sl id))
-    (≤-trans (≤-trans (m≤n⊔m (pWᵉ n sl e ⊔ slotsPW n sl) (slotsIW n sl))
-                      (n≤1+n _))
+    (≤-trans (≤-trans (slotsIW≤entryCeil n sl e) (n≤1+n _))
              (capsAt-base-wid e sl id))
 
 ------------------------------------------------------------------

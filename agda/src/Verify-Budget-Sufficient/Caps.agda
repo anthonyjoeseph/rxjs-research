@@ -43,7 +43,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst; module ≡-Reasoning)
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
-open import Rx.Frame-Width using (pWᵉ; slotsPW; slotsIW)
+open import Rx.Frame-Width using (entryCeil)
 open import Rx.Evaluator using (Slots; slotsSize)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
@@ -342,7 +342,7 @@ frameStep-reg-suc (caps s w r) j =
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
   frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
-                    (suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl))
+                    (suc (entryCeil n sl e))
                     (suc (sizeᵉ e + slotsSize sl)))
 capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
 
@@ -441,7 +441,7 @@ capsAt-suc-full e sl id = refl
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)
 2≤capsAt-size {n = n} e sl zero =
-  2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl) (suc (pWᵉ n sl e ⊔ slotsPW n sl))
+  2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
                            (suc (sizeᵉ e + slotsSize sl)))
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 2≤capsAt-size e sl (suc id) =
@@ -457,7 +457,7 @@ capsAt-suc-full e sl id = refl
 1≤capsAt-reg : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   1 ≤ Caps.cReg (capsAt e sl id)
 1≤capsAt-reg {n = n} e sl zero =
-  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (pWᵉ n sl e ⊔ slotsPW n sl))
+  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
                           (suc (sizeᵉ e + slotsSize sl)))
     (s≤s z≤n)
 1≤capsAt-reg e sl (suc id) =
@@ -480,7 +480,7 @@ capsAt-base-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (i
   2 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
 capsAt-base-size {n = n} e sl zero =
   cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
-                          (suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl))
+                          (suc (entryCeil n sl e))
                           (suc (sizeᵉ e + slotsSize sl)))
     (≤-trans (s≤s z≤n) (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl))))
 capsAt-base-size e sl (suc id) =
@@ -493,10 +493,14 @@ capsAt-base-size e sl (suc id) =
 -- cascadeGo-charge carries the side condition too; the companions below
 -- thread it from there down to subscribeE-input-caps unchanged
 -- THE WIDTH AXIS OF THE SAME SUPPLY, and the reason capsAt's base pays
--- for `slotsPW` at all: a shared slot's def is entry syntax that a
--- connect subscribes whole, so its parked bodies are as much a base
--- quantity as its size is.  iterFold only grows a width (for S ≥ 2), so
--- every level inherits the base's
+-- for the WHOLE ENTRY CEILING rather than for the program's own width:
+-- the static width measures TOWER in the syntax, and no per-frame
+-- receipt buys a tower, so every SUBTERM's five measures — the
+-- program's and every shared slot def's alike, a connect subscribes a
+-- def whole — are paid for once, here.  The ⊔-collect costs no tower
+-- stories over the old three-term base (same two-per-node rate,
+-- Mult-Width-Probe §3), so `budgetAt` does not move.  iterFold only
+-- grows a width (for S ≥ 2), so every level inherits the base's
 cWid≤frameBlowup : ∀ (c : Caps) → 2 ≤ Caps.cSize c →
   Caps.cWid c ≤ Caps.cWid (frameBlowup c)
 cWid≤frameBlowup c h =
@@ -504,10 +508,10 @@ cWid≤frameBlowup c h =
     (D̂ c * Caps.cSize c) (Caps.cWid c)
 
 capsAt-base-wid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl) ≤ Caps.cWid (capsAt e sl id)
+  suc (entryCeil n sl e) ≤ Caps.cWid (capsAt e sl id)
 capsAt-base-wid {n = n} e sl zero =
   cWid≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
-                         (suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl))
+                         (suc (entryCeil n sl e))
                          (suc (sizeᵉ e + slotsSize sl)))
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 capsAt-base-wid e sl (suc id) =
@@ -775,7 +779,7 @@ capsAt-tower {n = n} e sl zero =
         (sym (+-identityʳ (7 + sz)))
         (blowup-tower (3 + sz)
           (caps (2 + sizeᵉ e + slotsSize sl)
-                (suc (pWᵉ n sl e ⊔ slotsPW n sl ⊔ slotsIW n sl))
+                (suc (entryCeil n sl e))
                 (suc sz))
           (m≤m+n 3 sz) (s≤s z≤n)
           (≤-trans (n≤1+n (2 + sz)) (k≤towerℕ (3 + sz)))
