@@ -480,13 +480,45 @@ _ = refl
 -- story count is `deliveries × nesting` and the delivery count is the
 -- quantity `frameBlowup` already pays `D̂ c = 2 ^ (2 ^ cReg c)` for.
 --
--- It is measured at the TIGHT admissible caps (`mS`), which is the
--- honest denominator for a breach in the same sense Charge-Probe's is —
--- but with one asymmetry worth naming for the width axis alone, since
--- cSize is `foldStep`'s BASE: a LARGER cSize makes each pass cover more
--- real folds (`S ^ suc w` at S = towerℕ h is roughly h real
--- exponentiations), and `capsAt`'s own cSize is enormous.  So the rows
--- above refute the count at the tight caps; whether the recurrence's
--- own cSize buys back the difference is arithmetic on `capsAt`, not a
--- measurement, and it is not settled here
+-- IT IS MEASURED AT THE TIGHT ADMISSIBLE CAPS (`mS`), and for the WIDTH
+-- axis alone that denominator has an asymmetry the other probes' does
+-- not, because cSize is `foldStep`'s BASE: a LARGER cSize makes each
+-- pass cover MORE real folds, and `capsAt`'s own cSize is enormous.  So
+-- the rows above refute the count at the tight caps, and the question
+-- the design session has to answer is whether the recurrence's own
+-- cSize buys the difference back.  What follows is arithmetic on
+-- `capsAt` rather than a measurement — NOT machine-checked, and stated
+-- so the ruling can be made on it rather than around it.
+--
+-- IN TOWER HEIGHTS.  Write H_S(id) and H_W(id) for the heights of
+-- `cSize (capsAt e sl id)` and `cWid (capsAt e sl id)`.  `capsAt-tower`
+-- already fixes the size axis at H_S(id) = (7 + sz) + 4·id — slope
+-- FOUR.  Under the split ruling the width axis becomes
+--
+--     H_W(id+1)  =  max (H_W(id)) (H_S(id))  +  widthCount
+--
+-- because `iterFold S j w` is j stories over a base of height H_S and a
+-- seed of height H_W.  So H_W tracks H_S and inherits ITS slope: the
+-- width cap climbs FOUR stories an instant however small widthCount is,
+-- and `widthCount` only sets the constant offset.  That is real
+-- headroom, and it moves the breach: at `pFan`'s own caps the three
+-- passes cover FOUR real folds rather than three, because base 44
+-- multiplies an exponent by 1.64 where base 2 does not.
+--
+-- BUT THE SLOPE IS WHAT THE DEMAND HAS TO BEAT, AND IT IS A CONSTANT.
+-- The real width's height climbs by `deliveries × nesting` per instant,
+-- measured above, and that number is bounded by nothing in the caps —
+-- `pFan n` has it at n for every n at a fixed program shape.  Whenever
+-- it exceeds the cap's own slope the cap is overtaken, whatever head
+-- start the base gave it: with the slope at four, `pFan 5` (ΔN = 5,
+-- measured) climbs faster than `capsAt` can and no constant widthCount
+-- repairs it, since raising widthCount raises the OFFSET and the slope
+-- only once it passes four.
+--
+-- SO THE SHAPE OF THE REPAIR IS NOT A CONSTANT.  Either the width count
+-- reads the same delivery bound the size count does (`D̂ c`, which
+-- Width-Count-Probe prices at zero extra stories on its own — it is the
+-- chargePoly FACTOR that cost the fifth story, not `D̂`), or the width
+-- axis stops exponentiating per pass.  Both are the design session's
+-- call, and neither is this probe's to make
 ------------------------------------------------------------------
