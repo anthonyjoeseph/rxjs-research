@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -75,7 +75,14 @@ help:
 	@echo "                  width doubles per rung.  Then measures what DOES"
 	@echo "                  pay: two or three j (see agda/probe/"
 	@echo "                  Eval-Growth-Probe.agda).  Fast, ~1 min"
-	@echo "  width-count-probe  the refutation that the COUNT may read cWid:"
+	@echo "  nest-count-probe  is the WIDTH count a SYNTACTIC constant?  per"
+	@echo "                  APPLICATION yes, exactly — per INSTANT no: the"
+	@echo "                  same node folds once per DELIVERY and each fold"
+	@echo "                  pays the nesting again, so the stories are"
+	@echo "                  deliveries x nesting and the fan-out family"
+	@echo "                  breaches at four deliveries"
+	@echo "                  (see agda/probe/Nest-Count-Probe.agda).  Fast"
+	@echo "  width-count-probe  the refutation that the COUNT may read cWid:""
 	@echo "                  one fold exponentiates a width, so j folds put it"
 	@echo "                  under a tower of height j — a count with a cWid"
 	@echo "                  summand iterates the tower per instant and"
@@ -248,6 +255,17 @@ eval-growth-probe:
 # recurrence alone, so src/Main.agda never reaches it.  Fast, ~10 s
 width-count-probe:
 	cd agda && agda -i src -i probe probe/Width-Count-Probe.agda
+
+# Is the WIDTH count a SYNTACTIC constant?  The split-count ruling gives the
+# width axis `suc (nestᵉ + slotsNest)` foldStep passes per instant, on
+# Mult-Width-Probe §7's price for ONE applyFn.  Per APPLICATION that holds
+# exactly (the fn2 ticker climbs two stories an instant, four instants).  Per
+# INSTANT it fails: the same node folds once per DELIVERY and each fold pays
+# the nesting again, so the stories are deliveries × nesting and the fan-out
+# family breaches at four deliveries.  Standalone, so src/Main.agda never
+# reaches it
+nest-count-probe:
+	cd agda && agda -i src -i probe probe/Nest-Count-Probe.agda
 
 # The refutation of `cascadeGo-charge` as stated.  It mirrors foldPath /
 # dispatchShare / shareGo / cascadeGo with the RECEIPT stepFrame-caps
