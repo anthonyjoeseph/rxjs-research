@@ -17,6 +17,16 @@
 -- registry bound is a FUNCTION OF THE LEVEL and needs no separate mint
 -- accounting at all.
 --
+-- AND THE BUMP IS PER FRAME, NOT PER DELIVERY.  A delivery's chain is
+-- frames, and each frame runs at the level the one before it LEFT, so a
+-- delivery's charge is an ITERATION (`iterL`, `suc (sizeAt S J)` of
+-- them — `pathSz?`'s length conjunct read at the delivery's entry
+-- level) and not a product.  Charging a delivery's frames at the level
+-- the DELIVERY started from would be the same error one level down that
+-- charging a cascade's frames at its ENTRY caps is, and that error is
+-- machine-refuted.  The old per-delivery product survives only as
+-- `chargeAt`, which is what the gate below is stated against.
+--
 -- WHAT IS PROVEN HERE, on self-contained copies of the repo's
 -- arithmetic (so the probe costs no rebuild of the tree):
 --
@@ -93,15 +103,43 @@ widAt S W J = iterFold S J W
 regAt : ℕ → ℕ → ℕ → ℕ
 regAt S R J = R * suc (J * S)
 
--- ONE DELIVERY'S CHARGE, READ AT THE LEVEL IT RUNS AT: `chargeW` of the
--- caps at level J
-chargeAt : ℕ → ℕ → ℕ → ℕ
-chargeAt S W J = sizeAt S J * suc (suc (widAt S W J) * suc (sizeAt S J))
+-- ONE FRAME'S RECEIPT, READ AT THE LEVEL THE FRAME RUNS AT.  The
+-- receipt `scanFrame-caps` pays is `suc (length vals * suc (sizeᵗ fn))`
+-- — one fold per node of the step function PER PAYLOAD — and at level J
+-- its two factors are the width cap `suc (cWid (frameStep J c))` (the
+-- burst ledger's own conjunct) and the size cap `cSize (frameStep J c)`
+fCharge : ℕ → ℕ → ℕ → ℕ
+fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))
 
--- the level after d deliveries, each charged at the level it runs at
+-- and ONE FRAME advances the level by exactly that
+fLvl : ℕ → ℕ → ℕ → ℕ
+fLvl S W J = J + fCharge S W J
+
+-- A CHAIN IS FRAMES, AND EACH FRAME RUNS AT THE LEVEL THE ONE BEFORE IT
+-- LEFT — this is the whole point, and it is why a delivery's charge is
+-- an ITERATION rather than a product.  Charging a delivery's frames at
+-- the level the DELIVERY started from is the same error one level down
+-- that charging a cascade's frames at the cascade's entry caps is, and
+-- that error is machine-refuted (Entry-Caps-Refuted)
+iterL : ℕ → ℕ → ℕ → ℕ → ℕ
+iterL S W zero    J = J
+iterL S W (suc k) J = iterL S W k (fLvl S W J)
+
+-- ONE DELIVERY: its chain, which `pathSz?`'s length conjunct caps at
+-- `cSize` READ AT ITS ENTRY LEVEL, plus the dispatch frame
+dLvl : ℕ → ℕ → ℕ → ℕ
+dLvl S W J = iterL S W (suc (sizeAt S J)) J
+
+-- the level after d deliveries
 lvls : ℕ → ℕ → ℕ → ℕ → ℕ
 lvls S W J zero    = J
-lvls S W J (suc d) = let J′ = lvls S W J d in J′ + chargeAt S W J′
+lvls S W J (suc d) = dLvl S W (lvls S W J d)
+
+-- the OLD per-delivery charge, kept only to state the gate: it is
+-- `chargeW` of the caps at level J, i.e. a whole chain charged at the
+-- level the chain STARTED at
+chargeAt : ℕ → ℕ → ℕ → ℕ
+chargeAt S W J = sizeAt S J * fCharge S W J
 
 ------------------------------------------------------------------
 -- THE WALK, CARRYING THE LEVEL INSTEAD OF THE REGISTRY
@@ -127,7 +165,7 @@ lvls-add : ∀ (S W J a b : ℕ) →
 lvls-add S W J a zero    = cong (lvls S W J) (+-identityʳ a)
 lvls-add S W J a (suc b) =
   trans (cong (lvls S W J) (+-suc a b))
-        (cong (λ x → x + chargeAt S W x) (lvls-add S W J a b))
+        (cong (dLvl S W) (lvls-add S W J a b))
 
 dWalkᶜ-front : ∀ (S W R g J i : ℕ) →
   dWalkᶜ S W R g J (suc i)
@@ -233,16 +271,45 @@ regAt-mono : ∀ {S S′ R R′ J J′} → S ≤ S′ → R ≤ R′ → J ≤ 
   regAt S R J ≤ regAt S′ R′ J′
 regAt-mono hS hR hJ = *-mono-≤ hR (s≤s (*-mono-≤ hJ hS))
 
+fCharge-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  fCharge S W J ≤ fCharge S′ W′ J′
+fCharge-mono 2≤S hS hW hJ =
+  s≤s (*-mono-≤ (s≤s (widAt-mono 2≤S hS hW hJ))
+                (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ)))
+
 chargeAt-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
   chargeAt S W J ≤ chargeAt S′ W′ J′
 chargeAt-mono 2≤S hS hW hJ =
-  *-mono-≤ (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ)
-           (s≤s (*-mono-≤ (s≤s (widAt-mono 2≤S hS hW hJ))
-                          (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
+  *-mono-≤ (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ) (fCharge-mono 2≤S hS hW hJ)
+
+fLvl-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  fLvl S W J ≤ fLvl S′ W′ J′
+fLvl-mono 2≤S hS hW hJ = +-mono-≤ hJ (fCharge-mono 2≤S hS hW hJ)
+
+iterL-infl : ∀ (S W k J : ℕ) → J ≤ iterL S W k J
+iterL-infl S W zero    J = ≤-refl
+iterL-infl S W (suc k) J = ≤-trans (m≤m+n J _) (iterL-infl S W k (fLvl S W J))
+
+iterL-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  k ≤ k′ → iterL S W k J ≤ iterL S′ W′ k′ J′
+iterL-mono {S′ = S′} {W′ = W′} {J′ = J′} zero k′ 2≤S hS hW hJ hk =
+  ≤-trans hJ (iterL-infl S′ W′ k′ J′)
+iterL-mono (suc k) zero    2≤S hS hW hJ ()
+iterL-mono (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
+  iterL-mono k k′ 2≤S hS hW (fLvl-mono 2≤S hS hW hJ) hk
+
+dLvl-infl : ∀ (S W J : ℕ) → J ≤ dLvl S W J
+dLvl-infl S W J = iterL-infl S W (suc (sizeAt S J)) J
+
+dLvl-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  dLvl S W J ≤ dLvl S′ W′ J′
+dLvl-mono {S} {S′} {W} {W′} {J} {J′} 2≤S hS hW hJ =
+  iterL-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) 2≤S hS hW hJ
+             (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
 
 lvls-infl : ∀ (S W J d : ℕ) → J ≤ lvls S W J d
 lvls-infl S W J zero    = ≤-refl
-lvls-infl S W J (suc d) = ≤-trans (lvls-infl S W J d) (m≤m+n _ _)
+lvls-infl S W J (suc d) = ≤-trans (lvls-infl S W J d) (dLvl-infl S W (lvls S W J d))
 
 lvls-mono : ∀ {S S′ W W′ J J′} (d d′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
   d ≤ d′ → lvls S W J d ≤ lvls S′ W′ J′ d′
@@ -250,9 +317,7 @@ lvls-mono {S′ = S′} {W′ = W′} {J′ = J′} zero d′ 2≤S hS hW hJ hd 
   ≤-trans hJ (lvls-infl S′ W′ J′ d′)
 lvls-mono (suc d) zero    2≤S hS hW hJ ()
 lvls-mono (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
-  +-mono-≤ ih (chargeAt-mono 2≤S hS hW ih)
-  where
-  ih = lvls-mono d d′ 2≤S hS hW hJ hd
+  dLvl-mono 2≤S hS hW (lvls-mono d d′ 2≤S hS hW hJ hd)
 
 dCapᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ : ℕ) →
   2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ →
@@ -281,12 +346,37 @@ dWalkᶜ-mono g g′ (suc i) (suc i′) 2≤S hS hW hR hg hJ (s≤s hi) =
 ------------------------------------------------------------------
 
 -- the level after d deliveries is at least d entry-charges up
+-- k frames each add at least one frame-charge read at the entry level
+iterL-lin : ∀ (S W k J : ℕ) → 2 ≤ S → J + k * fCharge S W J ≤ iterL S W k J
+iterL-lin S W zero    J 2≤S = ≤-reflexive (+-identityʳ J)
+iterL-lin S W (suc k) J 2≤S =
+  ≤-trans (≤-reflexive (re J (fCharge S W J) k))
+          (≤-trans (+-monoʳ-≤ (fLvl S W J)
+                      (*-monoʳ-≤ k (fCharge-mono 2≤S ≤-refl ≤-refl
+                                      (m≤m+n J (fCharge S W J)))))
+                   (iterL-lin S W k (fLvl S W J) 2≤S))
+  where
+  re : ∀ (j q k : ℕ) → j + (q + k * q) ≡ (j + q) + k * q
+  re = solve 3 (λ j q k → j :+ (q :+ k :* q) := (j :+ q) :+ k :* q) refl
+
+-- so ONE delivery is at least ONE old per-delivery charge up: its chain
+-- has `suc (sizeAt S J) ≥ sizeAt S 0` frames and each is charged at a
+-- level at or above the entry one
+dLvl-lin : ∀ (S W J : ℕ) → 2 ≤ S → J + chargeAt S W 0 ≤ dLvl S W J
+dLvl-lin S W J 2≤S =
+  ≤-trans (+-monoʳ-≤ J (*-mono-≤ sz≤ (fCharge-mono 2≤S ≤-refl ≤-refl (z≤n {J}))))
+          (iterL-lin S W (suc (sizeAt S J)) J 2≤S)
+  where
+  sz≤ : sizeAt S 0 ≤ suc (sizeAt S J)
+  sz≤ = ≤-trans (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl (z≤n {J}))
+                (n≤1+n (sizeAt S J))
+
 lvls-lin : ∀ (S W J d : ℕ) → 2 ≤ S → J + d * chargeAt S W 0 ≤ lvls S W J d
 lvls-lin S W J zero    2≤S = ≤-reflexive (+-identityʳ J)
 lvls-lin S W J (suc d) 2≤S =
   ≤-trans (≤-reflexive (re J (chargeAt S W 0) d))
-          (+-mono-≤ (lvls-lin S W J d 2≤S)
-                    (chargeAt-mono 2≤S ≤-refl ≤-refl (z≤n {lvls S W J d})))
+          (≤-trans (+-monoˡ-≤ (chargeAt S W 0) (lvls-lin S W J d 2≤S))
+                   (dLvl-lin S W (lvls S W J d) 2≤S))
   where
   re : ∀ (j q d : ℕ) → j + (q + d * q) ≡ (j + d * q) + q
   re = solve 3 (λ j q d → j :+ (q :+ d :* q) := (j :+ d :* q) :+ q) refl
