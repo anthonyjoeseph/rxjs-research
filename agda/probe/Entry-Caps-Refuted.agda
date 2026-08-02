@@ -20,9 +20,12 @@
 -- level L step statement is FALSE over its full quantification").  The
 -- entry axiom asserts same-level preservation.
 --
--- WHAT IT COSTS.  `cascadeGo-deliveries` is ground on this axiom and on
--- `stepFrame-entry-mint`, via `walkH` — so it is not a theorem, and the
--- 2026-08-02 entry-charging ruling is refuted rather than unproven.
+-- WHAT IT COST.  `cascadeGo-deliveries` was ground on this axiom and on
+-- `stepFrame-entry-mint`, via `walkH` — so it was not a theorem, and the
+-- 2026-08-02 entry-charging ruling was refuted rather than unproven.
+-- Both axioms and that instantiation are now GONE from .Caps-Face and
+-- the delivery bound is an honest postulate again; this module is the
+-- reason, and it is what keeps them from coming back.
 -- .Delivery-Walk itself is untouched: it is a proof RELATIVE to
 -- `Walk-Hyps`, with no postulate of its own, and it is the assembly a
 -- repaired frame axiom plugs into unchanged.

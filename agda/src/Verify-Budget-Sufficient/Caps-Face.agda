@@ -4023,188 +4023,76 @@ postulate
   -- dominates `Qf * suc B` and `n ≤ cSize` (the hypothesis above)
   -- lifts the evaluator's dispatch gas to cDel's index.
   --
-  -- AND THE WHOLE OF IT IS NOW GROUND, on TWO FRAME-LOCAL AXIOMS.  The
-  -- walk needs, per stepFrame: the state predicate carries across
-  -- (sf-ok), the payloads handed to the next frame stay in the ledger
-  -- (sf-vals), minted chains stay in the registry's ledger (sf-len),
-  -- and the frame mints at most Qf (sf-mint).  The first three are
-  -- stepFrame-caps' own content read at the ENTRY level, and sf-len is
-  -- then free (the registry ledger IS capsOK?'s regsSz? conjunct), so
-  -- they collapse to ONE axiom, `stepFrame-entry-caps`; the mint budget
-  -- is the other, `stepFrame-entry-mint`.
+  -- AND THE ONE FACT IT IS STILL RELATIVE TO IS A PER-FRAME FACE — at a
+  -- level the frame can honestly be charged at.  The walk needs, per
+  -- stepFrame: the state predicate carries across (sf-ok), the payloads
+  -- handed to the next frame stay in the ledger (sf-vals), minted chains
+  -- stay in the registry's ledger (sf-len), and the frame mints at most
+  -- Qf (sf-mint).
   --
-  -- WHY THEY ARE CHARGED AT ENTRY.  A frame's mints are its subscribed
-  -- values' shared-input leaves, and those values are bounded by the
-  -- level the frame runs AT (frameStep j c), not by the cascade's ENTRY
-  -- level c — while `cDel c` reads `chargeW c`, the entry level, and
-  -- cannot read the ceiling (frameBlowup c is defined FROM sizeCount c,
-  -- which reads cDel c: the ceiling is circular here).  So the budget
-  -- is charged at the ENTRY caps — exactly the convention
-  -- cascadeGo-charge above already asserts for FOLDS (`j ≤ D * cSize *
-  -- suc (…)`, all three fields read at c), and a mint IS a fold.  That
-  -- is the ruling of 2026-08-02, and this is it applied.
-  --
-  -- AND THEY ARE CONDITIONAL, WHICH IS NOT COSMETIC.  Both read the
-  -- frame's chain (`pathSz?`) and its payload list (`valsCaps?`).
-  -- Unconditionally quantified over `f` and `vals` they would be FALSE,
-  -- not merely unproven: `scan-f BIG` stores an accumulator over any
-  -- cap, and `thru-outer` subscribes once per payload, so a frame's
-  -- mints scale with a burst width no fixed budget bounds.  The walk
-  -- therefore threads both ledgers (.Delivery-Walk § B–C) and hands
-  -- them back here, which is why the width conjunct of `valsCaps?`
-  -- exists at all — it is cascadeGo-charge's own width factor, in the
-  -- one place the mint budget needs it.
-  --
-  -- AND NEITHER IS A COROLLARY OF THE GROUND `stepFrame-caps` BELOW —
-  -- checked, not assumed.  That companion is proven, and it reports
-  -- `capsOK? (frameStep (j + j′) c)`: a level the frame's own folds
-  -- GREW.  capsOK? widens along ⊑ᶜ (capsOK?-mono) and `c ⊑ᶜ frameStep
-  -- j c`, so the ground conclusion is the WEAKER of the two and the
-  -- implication runs the wrong way — there is no route from
-  -- `capsOK? (frameStep (j + j′) c)` back to `capsOK? c`, and there
-  -- cannot be one, since the grown level is exactly what pays for the
-  -- fold the frame just did.  The same reading disposes of the mint
-  -- budget: nothing anywhere in the tree counts registry GROWTH against
-  -- an entry-level cap, so `stepFrame-entry-mint` is new content and
-  -- not a repackaging.  What entry-charging asserts is that the growth
-  -- a frame's own folds cause is already paid for at `c` — the ruling,
-  -- not a lemma
-  --
-  -- AND THE PER-FRAME MAXIMA ARE NOW MEASURED, which they were not when
-  -- the ruling was made — Mint-Loop-Frames reports mints and frames per
-  -- CASCADE (9948 against 162666 at its deepest rung), and an average is
-  -- not a maximum.  Frame-Mint-Probe re-runs the mirror walk carrying
-  -- the two maxima instead of the fold count, off the REAL `stepFrame`:
-  --
-  --   · THE MINT BUDGET IS NOT CLOSE TO TIGHT.  On every row of the
-  --     amplifier family — Mint-Loop-Shapes' `pA` / `pB`, where a
-  --     minting scan sits inside a shared def so mints beget fires —
-  --     ONE frame mints exactly 1 registration, at k = 0, 1, 2 and at
-  --     cascades 0 and 1, against a cSize FLOOR of 3 / 10 / 18.  The
-  --     budget is `cSize * suc cWid`.
-  --   · THE WIDTH CONJUNCT IS THE LOAD-BEARING ONE.  On the deepening
-  --     scan the per-frame payload count is 6 at cascade 0 and 120 at
-  --     cascade 1 — Frame-Work-Probe's ladder, read per frame.  That is
-  --     not a breach (each cascade reads ITS OWN entry caps, and within
-  --     one cascade the number does not move), but it is what says the
-  --     conjunct can only hold because `outW` takes the PRODUCT at each
-  --     *All.  Whether `capsAt`'s cWid dominates 120 at cascade 1 is
-  --     still open: capsAt is a tower and does not normalise at these
-  --     indices.
-  --
-  -- WHAT WOULD REFUTE THEM, so the next reader knows what to measure:
-  -- ONE frame, run under `capsOK? c` with a chain inside `pathSz? cSize`
-  -- and a burst inside `valsCaps? c sl`, whose post-state breaches
-  -- `capsOK? c` (for the first) or adds more than `cSize * suc cWid`
-  -- registrations (for the second)
-  --
-  -- ══ REFUTED, 2026-08-02, by exactly that witness ══════════════════
+  -- CHARGING THAT FACE AT THE ENTRY CAPS IS REFUTED (2026-08-02).  Two
+  -- axioms — `stepFrame-entry-caps` and `stepFrame-entry-mint` — used to
+  -- stand here and to make this conjunct a theorem; both asserted
+  -- SAME-LEVEL preservation (post-state and output burst back under the
+  -- entry `c` the frame started from), and
   -- `agda/probe/Entry-Caps-Refuted.agda` (make entry-caps-refuted,
-  -- seconds) is a machine-checked `Entry-Caps → ⊥`.  The second conjunct
-  -- falls on the cheapest frame there is — a `map-f`, which touches no
-  -- state at all.  A map frame's output is `map (applyFn fn) vals`, and
-  -- `applyFn` GROWS a value: `pairᵗ x x` has size 3 and takes a payload
-  -- of size 3 to one of size 7, so at `c = caps 3 1 1` every hypothesis
-  -- holds by `refl` and the conclusion computes to `false`.  This is
-  -- `frameStep`'s own header ("same-level preservation is false, so the
-  -- face must report growth"), `caps-frame-boundary-absurd`, and
-  -- cascadeGo-wet's fold-threading note, all saying one thing: a frame
-  -- may not be charged at the level it started from.  The first conjunct
-  -- goes the same way — `capsOK? c`'s fifth conjunct is
-  -- `length registry ≤ᵇ cReg c`, and the mint axiom below grants each
-  -- frame up to `cSize * suc cWid` new registrations, while `dWalk`'s
-  -- own recursion runs its later summands at registry `R + Q · suc d`,
-  -- i.e. past the entry `R = cReg`.
+  -- seconds) is a machine-checked `Entry-Caps → ⊥`.  It falls on the
+  -- cheapest frame there is, a `map-f`, which touches no state at all: a
+  -- map frame's output is `map (applyFn fn) vals` and `applyFn` GROWS a
+  -- value — `pairᵗ x x` has size 3 and takes a payload of size 3 to one
+  -- of size 7 — so at `c = caps 3 1 1` every hypothesis holds by `refl`
+  -- and the conclusion computes to `false`.  The mint axiom went with
+  -- it: `capsOK? c`'s fifth conjunct is `length registry ≤ᵇ cReg c`,
+  -- while the axiom granted each frame up to `cSize * suc cWid` NEW
+  -- registrations, so the two are jointly satisfiable only where no
+  -- frame ever mints — and Frame-Mint-Probe measures frames minting 1 on
+  -- every row of the amplifier family, while `dWalk`'s own recursion
+  -- runs its later summands at registry `R + Q · suc d`, i.e. PAST the
+  -- entry `R = cReg`.
   --
-  -- SO cascadeGo-deliveries BELOW IS NOT A THEOREM, and the ruling of
-  -- 2026-08-02 needs re-taking.  .Delivery-Walk is untouched by this: it
-  -- is a proof RELATIVE to `Walk-Hyps`, with no postulate of its own,
-  -- and it is the assembly a repaired frame axiom plugs into unchanged.
-  -- The repair shape and the obstruction it re-opens are written up at
-  -- the head of the probe.  The WIDTH conjunct, the one flagged as open
-  -- below, is NOT the problem: `wid-dominates-120` (same probe) proves
-  -- cWid at cascade (suc id)'s entry is at least a two-rung tower,
-  -- ≥ 4 ^ 5 = 1024, against the measured 120.
-  -- ══════════════════════════════════════════════════════════════════
-  stepFrame-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
+  -- That is `frameStep`'s own header ("same-level preservation is false,
+  -- so the face must report growth"), `caps-frame-boundary-absurd`, and
+  -- cascadeGo-wet's fold-threading note, all saying one thing: a frame
+  -- may not be charged at the level it started from.  The honest face is
+  -- the PROVEN `stepFrame-caps` below, which reports a growth index j′
+  -- and lands at `frameStep (j + j′) c` — growth REPORTED, not denied.
+  -- The WIDTH conjunct, once flagged as the open one, is NOT the
+  -- problem: `wid-dominates-120` (same probe) proves that cWid at
+  -- cascade (suc id)'s entry is at least a two-rung tower, ≥ 4 ^ 5 =
+  -- 1024, against the measured per-frame payload count of 120.
+  --
+  -- SO THE DELIVERY BOUND IS A POSTULATE AGAIN, and it is stated WHOLE
+  -- rather than in terms of a frame face, because the repair is a design
+  -- question and not a grind: `Walk-Hyps` has to become LEVEL-INDEXED to
+  -- match stepFrame-caps' shape (an `sf-ok` returning
+  -- `Σ j′ → j′ ≤ Jf × OK (j + j′) …`), and the walk's own `dCap` has to
+  -- GROW its caps per delivery rather than read a fixed Q at entry.
+  -- Nothing about the statement below is known false — it is exactly
+  -- what .Delivery-Walk proves from a per-frame face, and only that
+  -- face's level is in question.
+  --
+  -- IT CARRIES `n ≤ cSize c`, the ruling of 2026-08-02.  `cDel`'s gas
+  -- index is `suc (cSize c)`; the evaluator's dispatch gas is the LITERAL
+  -- slot count `n`, which chainStep seeds.  Nothing in capsOK? relates
+  -- the two — the relation is a fact about the slot telescope
+  -- (`n≤capsAt-size`, above: every slotSize is a suc and capsAt's base
+  -- contains slotsSize) — so it is supplied as a hypothesis rather than
+  -- read off the state, and caps-tick, the only consumer, discharges it
+  -- at every level.  The arrival's own bounds (slEq, vC, pS) are the
+  -- same three cascadeGo-charge already takes, so cascadeGo-caps
+  -- supplies them without gaining a hypothesis of its own
+  cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (a : Arrival Γ) (id : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? c sched st ≡ true →
-    pathSz? (Caps.cSize c) (f ↠ κ) ≡ true →
-    valsCaps? c sl vals ≡ true →
-    let r = stepFrame g id now f κ vals fin sched st
-    in (capsOK? c (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                  (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-       × (valsCaps? c sl (proj₁ r) ≡ true)
-
-  -- ONE FRAME'S MINTS: at most one subscribe per payload of a
-  -- width-capped burst, each minting at most one registration per
-  -- source reference of a cap-sized term.  This is `Qf`, and
-  -- `Qf * suc cSize ≤ chargeW c` (chargeW-fits) is why one delivery's
-  -- whole chain fits inside the walk's per-delivery budget
-  stepFrame-entry-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? c sched st ≡ true →
-    pathSz? (Caps.cSize c) (f ↠ κ) ≡ true →
-    valsCaps? c sl vals ≡ true →
-    let r = stepFrame g id now f κ vals fin sched st
-    in length (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
-         ≤ length (EvalSt.registry st) + Caps.cSize c * suc (Caps.cWid c)
-
--- (ii) THE DELIVERY BOUND, NO LONGER A POSTULATE.  Forward-declared
--- here, exactly as subscribeE-caps is, because its proof runs on the
--- share bookkeeping below (the latch, the delivered cons, the finish
--- filter) — it is GROUND at the end of that section, on .Delivery-Walk
--- and the two frame axioms above and nothing else.
---
--- ══ AND THOSE TWO FRAME AXIOMS ARE REFUTED (2026-08-02) ════════════
--- so this is a theorem on a false hypothesis, which is to say it is
--- not one.  See the block above and
--- `agda/probe/Entry-Caps-Refuted.agda`.  Nothing here is deleted
--- pending the re-ruling: the walk is sound and the assembly is right;
--- what is wrong is the level the frame facts are charged at.
--- ══════════════════════════════════════════════════════════════════
---
--- WHAT THE RULING BOUGHT, IN LEDGER TERMS.  The chain's axioms were
--- five — cascadeGo-charge, cascadeGo-deliveries, subscribeE-walk
--- (.Measures), subscribeE-wet and cascadeGo-wet (.Wet) — and they are
--- now six, because this one is discharged and two frame-local ones
--- replace it.  That is the trade the ruling names and it is worth
--- making in this direction: what left was a statement about a WHOLE
--- CASCADE — a recursion over an unbounded walk, quantified over every
--- registry the walk can reach — and what arrived is two statements
--- about ONE `stepFrame` call, each with its hypotheses written down and
--- each refutable by a single frame.  A count of axioms is the wrong
--- meter; what matters is that no remaining hole quantifies over the
--- walk.
---
--- IT CARRIES `n ≤ cSize c`, the ruling of 2026-08-02.  `cDel`'s gas
--- index is `suc (cSize c)`; the evaluator's dispatch gas is the LITERAL
--- slot count `n`, which chainStep seeds.  Nothing in capsOK? relates
--- the two — the relation is a fact about the slot telescope
--- (`n≤capsAt-size`, above: every slotSize is a suc and capsAt's base
--- contains slotsSize) — so it is supplied as a hypothesis rather than
--- read off the state, and caps-tick, the only consumer, discharges it
--- at every level.  The arrival's own bounds (slEq, vC, pS) are the same
--- three cascadeGo-charge already takes, so cascadeGo-caps supplies them
--- without gaining a hypothesis of its own
-cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (a : Arrival Γ) (id : Id)
-  (chains : List (RegId × Path Γ (arrTy a) t))
-  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? c sched st ≡ true →
-  valCaps? c sl (arrTy a) (arrVal a) ≡ true →
-  all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
-  n ≤ Caps.cSize c →
-  length chains ≤ Caps.cReg c →
-  delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-    ≤ cDel c
+    valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+    all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+    n ≤ Caps.cSize c →
+    length chains ≤ Caps.cReg c →
+    delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
+      ≤ cDel c
 
 -- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -4394,93 +4282,33 @@ shareFinish-caps c i true sl (emits , sched′ , st′) inv bc =
   dropSweep-caps c (toℕ i) sched′ st′ inv , bc
 
 ------------------------------------------------------------------
--- THE DELIVERY BOUND, GROUND.  .Delivery-Walk proved the whole mapping
--- of the delivery clique onto `dCap` / `dWalk` relative to a record of
--- hypotheses; this is that record, instantiated, plus four lines of
--- arithmetic.
+-- WHAT AN INSTANTIATION OF THE WALK WOULD NEED, AND WHY THERE IS NONE
+-- HERE.  .Delivery-Walk proves the whole mapping of the delivery
+-- clique onto `dCap` / `dWalk` relative to `Walk-Hyps`, and the record
+-- was instantiated here until 2026-08-02 at
 --
 --   OK  = the slot telescope is fixed, and capsOK? at the ENTRY level
 --   Pb  = pathSz? cSize — whose registry ledger IS capsOK?'s regsSz?
---         conjunct, so the walk's ledger costs the caller nothing, and
---         whose length conjunct (pathSz?-len) is the walk's `B`
+--         conjunct, and whose length conjunct (pathSz?-len) is `B`
 --   Vb  = valsCaps? c sl, the burst ledger the mint budget reads
 --   Qf  = cSize * suc cWid,  B = cSize,  Q = chargeW c
 --
--- The three closure facts are the share bookkeeping just above (the
--- delivered cons and the latch are refl-level, the finish is
--- dropSweep-caps); the four frame facts are the two entry axioms, with
--- sf-len falling out of sf-ok because the ledger is a capsOK? conjunct,
--- and the slots half of sf-ok proven outright by .Keeps-Ring rather
--- than assumed.
+-- and the three closure facts (the delivered cons, the share latch, the
+-- share finish) are all still ground, just above.  What the
+-- instantiation cannot supply is the FOUR FRAME FACTS at that entry
+-- level: `Walk-Hyps` reads them at the caps the frame STARTED from, and
+-- Entry-Caps-Refuted shows one `map-f` breaking exactly that.  So
+-- cascadeGo-deliveries is a postulate again, and the repair is to index
+-- `Walk-Hyps` by the level — matching the PROVEN `stepFrame-caps`,
+-- which reports its growth — and to let the walk's own recursion carry
+-- the caps record rather than a fixed Q.
+--
+-- The pieces the re-instantiation reads — `valsCaps?`, `pathSz?-len`,
+-- `pathSz?-tail`, `chargeW-fits`, and the three closure lemmas
+-- (`capsOK?-delivered`, `shareLatch-caps`, `shareFinish-caps`) — are
+-- kept above: they are level-independent, so the level repair does not
+-- touch them.  The record itself is not, since every field of it moves.
 ------------------------------------------------------------------
-
--- the OK predicate the walk threads: capsOK? at the entry level, plus
--- the slot telescope the burst ledger is written against
-walkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sl : Slots Γ) → Sched Γ → EvalSt e → Set
-walkOK c sl sched st = (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
-
--- the one closure fact with content: the finish drops a source's
--- registrations and sweeps its live entry, and neither touches slots
-walkOK-finish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sl : Slots Γ) (i : Fin n) (fin : Bool)
-  (out : Stream Γ t × Sched Γ × EvalSt e) →
-  walkOK c sl (proj₁ (proj₂ out)) (proj₂ (proj₂ out)) →
-  walkOK c sl (proj₁ (proj₂ (shareFinish i fin out)))
-              (proj₂ (proj₂ (shareFinish i fin out)))
-walkOK-finish c sl i false out                    h = h
-walkOK-finish c sl i true  (emits , sched′ , st′) h =
-  proj₁ h , dropSweep-caps c (toℕ i) sched′ st′ (proj₂ h)
-
-walkH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (sl : Slots Γ) →
-  Walk-Hyps e (Caps.cSize c * suc (Caps.cWid c)) (Caps.cSize c)
-walkH c sl = record
-  { OK        = walkOK c sl
-  ; Pb        = pathSz? (Caps.cSize c)
-  ; Vb        = λ {s} vs → valsCaps? {s = s} c sl vs
-  ; p-len     = λ p h → pathSz?-len (Caps.cSize c) p h
-  ; p-tail    = λ f p h → pathSz?-tail (Caps.cSize c) f p h
-  ; ok-cons   = λ rid sched st ok →
-                  proj₁ ok , capsOK?-delivered c rid sched st (proj₂ ok)
-  ; ok-latch  = λ i fin sched st ok →
-                  proj₁ ok , shareLatch-caps c i fin sched st (proj₂ ok)
-  ; ok-finish = λ i fin out ok → walkOK-finish c sl i fin out ok
-  ; sf-ok     = λ sf id now f path′ vals fin sched st ok hP hV →
-                  trans (KeepsC.slotsEq
-                           (stepFrame-keeps sf id now f path′ vals fin sched st))
-                        (proj₁ ok)
-                  , proj₁ (stepFrame-entry-caps c sl sf id now f path′ vals fin
-                             sched st (proj₁ ok) (proj₂ ok) hP hV)
-  ; sf-vals   = λ sf id now f path′ vals fin sched st ok hP hV →
-                  proj₂ (stepFrame-entry-caps c sl sf id now f path′ vals fin
-                           sched st (proj₁ ok) (proj₂ ok) hP hV)
-  ; sf-mint   = λ sf id now f path′ vals fin sched st ok hP hV →
-                  stepFrame-entry-mint c sl sf id now f path′ vals fin
-                    sched st (proj₁ ok) (proj₂ ok) hP hV
-  ; sf-len    = λ sf id now f path′ vals fin sched st ok hP hV len →
-                  let r = stepFrame sf id now f path′ vals fin sched st in
-                  capsOK?-regs c (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                                 (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                    (proj₁ (stepFrame-entry-caps c sl sf id now f path′ vals fin
-                              sched st (proj₁ ok) (proj₂ ok) hP hV))
-  }
-
--- and the bound itself: the walk at the entry registry, then three
--- widenings — the dispatch gas to cDel's index (n ≤ cSize), the walk
--- length to the registry cap (length chains ≤ cReg), and dCap's own
--- unfolding, which is what `cDel` abbreviates
-cascadeGo-deliveries {e = e} c a id chains sl sched st slEq inv vC pS n≤S lenB =
-  ≤-trans (W.cascadeGo-walk (Caps.cReg c) a id chains sched st
-             ((slEq , inv) , capsOK?-regs c sched st inv)
-             pS (∧-intro (∧-intro vC refl) refl)
-             (capsOK?-count c sched st inv))
-    (≤-trans (dWalk-mono (chargeW c) (chargeW c) _ (Caps.cSize c)
-                (Caps.cReg c) (Caps.cReg c) (length chains) (Caps.cReg c)
-                ≤-refl n≤S ≤-refl lenB)
-             (≤-reflexive (sym (cDel-body c))))
-  where
-  module W = Walk {e = e} (Caps.cSize c * suc (Caps.cWid c)) (chargeW c)
-                  (Caps.cSize c) (chargeW-fits c) (walkH c sl)
 
 ------------------------------------------------------------------
 -- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the
