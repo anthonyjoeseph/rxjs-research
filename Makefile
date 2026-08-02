@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -106,6 +106,16 @@ help:
 	@echo "                  mint ladders all fit: the corner that breaks it"
 	@echo "                  has FEW deliveries and WIDE payloads"
 	@echo "                  (see agda/probe/Charge-Probe.agda).  ~2 min"
+	@echo "  instant-height-probe  how fast do the STORE's two axes climb"
+	@echo "                  ACROSS INSTANTS, and does the receipt's payload"
+	@echo "                  width V stay under what the PREVIOUS instant"
+	@echo "                  stored?  Nine families, four instants each where"
+	@echo "                  the container reaches them.  REAL WIDTH CLIMBS"
+	@echo "                  MORE THAN ONE STORY PER INSTANT (932 digits"
+	@echo "                  against 926 on the deepening scan), and V exceeds"
+	@echo "                  the stored width once (2 against 1).  The"
+	@echo "                  receipt-dictated charge fits every measured row"
+	@echo "                  (see agda/probe/Instant-Height-Probe.agda).  ~2.5 min"
 	@echo "  chain-half-probe  the counterexample that a FIXED cap cannot"
 	@echo "                  survive a subscribe: at C = 5, a tight chain and a"
 	@echo "                  two-shell expression register a chain of length"
@@ -270,6 +280,16 @@ mult-width-probe:
 # reaches it.  Fast.
 visited-width-probe:
 	cd agda && agda -i src -i probe probe/Visited-Width-Probe.agda
+
+# The instant sweep the charge form's V-coverage turns on: VMAX, WSTORE,
+# SSTORE and the receipt-weighted j at instants 0 … 3 on nine families.
+# It re-runs the evaluator once per instant per column, so the DEEP cells
+# are read off the compiled harness (probe/Instant-Height-Main.agda) and
+# recorded in the tables as measured-not-rechecked; this target checks the
+# `refl` pins and the numeral gates written on them.  Standalone, so
+# src/Main.agda never reaches it.  ~2.5 min
+instant-height-probe:
+	cd agda && agda -i src -i probe probe/Instant-Height-Probe.agda
 
 # The counterexample that killed regsSz?-subscribeE: a FIXED cap cannot
 # survive a subscribe, because subscribeE pushes one frame per shell of
