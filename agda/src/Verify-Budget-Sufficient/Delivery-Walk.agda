@@ -26,25 +26,35 @@
 -- lives two strata up (.Caps-Face).  Rather than postulate a
 -- caps-flavoured statement in a module that cannot see caps — which
 -- would be either false (unconditional) or unstateable (conditional) —
--- the walk is proven RELATIVE to an abstract state predicate `OK` and
--- three facts about one frame under it.  .Caps-Face is where those
--- three get instantiated — and the third one, `sf-mint`, is where the
--- remaining question lives: a frame's mints are bounded by the level it
--- RUNS at (frameStep j c) while `cDel` reads the cascade's ENTRY level,
--- so instantiating it is the entry-charging ruling cascadeGo-charge
--- already makes for folds, not a grind.  Recorded in full at
--- cascadeGo-deliveries (.Caps-Face).
+-- the walk is proven RELATIVE to an abstract state predicate `OK`, two
+-- abstract SYNTACTIC ledgers (`Pb` on chains, `Vb` on payload lists),
+-- and four facts about one frame under them.  .Caps-Face is where they
+-- are instantiated, at `capsOK? c`, `pathSz? (cSize c)` and
+-- `valsCaps? c sl` respectively.
+--
+-- AND THE TWO SYNTACTIC LEDGERS ARE NOT OPTIONAL: without them the
+-- frame facts are FALSE, not merely unproven.  `sf-mint` quantified
+-- over an arbitrary `vals` is refuted by one `thru-outer` frame, which
+-- subscribes once per payload and so mints in proportion to a burst
+-- width no fixed `Qf` bounds; `sf-ok` quantified over an arbitrary `f`
+-- is refuted by `scan-f BIG`, which stores an accumulator over any cap.
+-- So each frame fact reads `Pb (f ↠ path′)` and `Vb vals`, and the walk
+-- THREADS both: `Pb` down a chain by `p-tail` and across a dispatch by
+-- the registry's own ledger (`regP?`, which shareAdmit filters and
+-- shareFinish shrinks), `Vb` through a frame by `sf-vals`.  This is the
+-- same discipline the caps companion tree runs on, in the two places
+-- the walk actually needs it.
 --
 -- THE PER-FRAME SHAPE, and why it is per FRAME rather than per
 -- delivery.  A delivery's processing is a chain walk: `pathLen` frames,
 -- each of which may subscribe (hence mint), then one dispatch.  So the
 -- budget is stated per frame — `Qf` — and a chain is capped at `B` by
--- pathSz?'s own length conjunct, which makes the per-DELIVERY budget
--- `Qf * suc B`.  At .Caps-Face's instantiation Qf = cSize * suc cWid
--- (one subscribe per payload, each minting at most one registration per
--- source reference of a cap-sized term) and B = cSize, so
--- `Qf * suc B ≤ chargeW c` with room to spare — which is exactly the
--- factorisation chargeW was written in.
+-- `p-len`, `Pb`'s own length reading, which makes the per-DELIVERY
+-- budget `Qf * suc B`.  At .Caps-Face's instantiation Qf = cSize *
+-- suc cWid (one subscribe per payload of a width-capped burst, each
+-- minting at most one registration per source reference of a cap-sized
+-- term) and B = cSize, so `Qf * suc B ≤ chargeW c` with room to spare —
+-- which is exactly the factorisation chargeW was written in.
 module Verify-Budget-Sufficient.Delivery-Walk where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
@@ -125,22 +135,24 @@ dWalk-front Q g R (suc i) =
 ------------------------------------------------------------------
 -- § B.  THE REGISTRY LEDGER THE WALK READS.
 --
--- Two things about a registration matter to the walk: that it is there
--- (a length) and that its chain is short (the per-delivery budget is
--- per FRAME, so a delivery's total is the chain's length).  `regLen?`
--- is the second, and it is pathSz?'s length conjunct with the step
--- functions forgotten — .Caps-Face supplies it from regsSz?.
+-- A registration carries a chain, and the walk needs two things of it:
+-- that the chain is SAFE TO FOLD (what the frame facts of § C read),
+-- and that it is SHORT (the per-delivery budget is per FRAME, so a
+-- delivery's total is the chain's length).  Both come out of ONE
+-- abstract Bool `Pb` on paths — the length by `p-len` — because at
+-- .Caps-Face's instantiation they are one predicate: `pathSz?` carries
+-- the length as its own conjunct, and its ledger over the registry IS
+-- capsOK?'s `regsSz?` conjunct, so the walk's ledger costs the caller
+-- nothing.
 ------------------------------------------------------------------
 
--- the ≤ᵇ conjuncts the caps face states its ledgers in, read as ≤
-≤ᵇ-≤ : ∀ {a b : ℕ} → (a ≤ᵇ b) ≡ true → a ≤ b
-≤ᵇ-≤ {a} {b} h = ≤ᵇ⇒≤ a b (T-to h)
+regP? : ∀ {n} {Γ : Ctx n} {t} → (∀ {u} → Path Γ u t → Bool) →
+        List (RegId × Source × Chain Γ t) → Bool
+regP? Pb = all (λ en → Pb (proj₂ (proj₂ (proj₂ en))))
 
-regLen? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
-regLen? B = all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ B)
-
-chLen? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → List (RegId × Path Γ s t) → Bool
-chLen? B = all (λ rc → pathLen (proj₂ rc) ≤ᵇ B)
+chP? : ∀ {n} {Γ : Ctx n} {s t} → (∀ {u} → Path Γ u t → Bool) →
+       List (RegId × Path Γ s t) → Bool
+chP? Pb = all (λ rc → Pb (proj₂ rc))
 
 -- the two share-boundary bookkeeping steps, on the REGISTRY axis (the
 -- ledger axis is .Deliveries' shareLatch-deliv / shareFinish-deliv)
@@ -157,17 +169,18 @@ shareFinish-len : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 shareFinish-len i false out                = ≤-refl
 shareFinish-len i true  (emits , sd , st′) = dropSource-len (toℕ i) (EvalSt.registry st′)
 
-shareFinish-regLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (B : ℕ) (i : Fin n) (fin : Bool) (out : Stream Γ t × Sched Γ × EvalSt e) →
-  regLen? B (EvalSt.registry (proj₂ (proj₂ out))) ≡ true →
-  regLen? B (EvalSt.registry (proj₂ (proj₂ (shareFinish i fin out)))) ≡ true
-shareFinish-regLen B i false out                h = h
-shareFinish-regLen B i true  (emits , sd , st′) h =
-  dropSource-all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ B)
+shareFinish-regP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Pb : ∀ {u} → Path Γ u t → Bool)
+  (i : Fin n) (fin : Bool) (out : Stream Γ t × Sched Γ × EvalSt e) →
+  regP? Pb (EvalSt.registry (proj₂ (proj₂ out))) ≡ true →
+  regP? Pb (EvalSt.registry (proj₂ (proj₂ (shareFinish i fin out)))) ≡ true
+shareFinish-regP Pb i false out                h = h
+shareFinish-regP Pb i true  (emits , sd , st′) h =
+  dropSource-all (λ en → Pb (proj₂ (proj₂ (proj₂ en))))
                  (toℕ i) (EvalSt.registry st′) h
 
 -- the admitted sublist: shorter than the registry, and inheriting its
--- length ledger.  Same filter shape as chainsGo's
+-- ledger.  Same filter shape as chainsGo's
 shareAdmit-len : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
   (rs : List (RegId × Source × Chain Γ t)) →
   length (shareAdmit {t = t} i rs) ≤ length rs
@@ -178,32 +191,45 @@ shareAdmit-len {Γ = Γ} i ((rid , s , (u , p)) ∷ r)
 ... | true  | no  _    = ≤-trans (shareAdmit-len i r) (n≤1+n _)
 ... | true  | yes refl = s≤s (shareAdmit-len i r)
 
-shareAdmit-chLen : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (i : Fin n)
-  (rs : List (RegId × Source × Chain Γ t)) →
-  regLen? B rs ≡ true → chLen? B (shareAdmit {t = t} i rs) ≡ true
-shareAdmit-chLen B i [] h = refl
-shareAdmit-chLen {Γ = Γ} B i ((rid , s , (u , p)) ∷ r) h
+shareAdmit-chP : ∀ {n} {Γ : Ctx n} {t} (Pb : ∀ {u} → Path Γ u t → Bool)
+  (i : Fin n) (rs : List (RegId × Source × Chain Γ t)) →
+  regP? Pb rs ≡ true → chP? Pb (shareAdmit {t = t} i rs) ≡ true
+shareAdmit-chP Pb i [] h = refl
+shareAdmit-chP {Γ = Γ} Pb i ((rid , s , (u , p)) ∷ r) h
   with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
-... | false | _        = shareAdmit-chLen B i r (proj₂ (∧-true _ _ h))
-... | true  | no  _    = shareAdmit-chLen B i r (proj₂ (∧-true _ _ h))
+... | false | _        = shareAdmit-chP Pb i r (proj₂ (∧-true _ _ h))
+... | true  | no  _    = shareAdmit-chP Pb i r (proj₂ (∧-true _ _ h))
 ... | true  | yes refl = ∧-intro (proj₁ (∧-true _ _ h))
-                                 (shareAdmit-chLen B i r (proj₂ (∧-true _ _ h)))
+                                 (shareAdmit-chP Pb i r (proj₂ (∧-true _ _ h)))
 
 ------------------------------------------------------------------
 -- § C.  THE HYPOTHESES: ONE FRAME'S MINT BUDGET.
 --
--- Everything below is proven from these three facts about ONE
--- `stepFrame` under an abstract state predicate `OK`, plus the three
--- closure facts the walk's own bookkeeping needs (the ledger cons, the
--- share latch, the share finish — none of which is a frame).  A frame
--- is where the evaluator subscribes, so a frame is where the registry
--- can grow: `sf-mint` is the budget, `sf-len` says minted chains are
--- short too, and `sf-ok` carries the predicate across.
+-- Everything below is proven from these four facts about ONE
+-- `stepFrame` under an abstract state predicate `OK` and the two
+-- syntactic ledgers, plus the three closure facts the walk's own
+-- bookkeeping needs (the ledger cons, the share latch, the share
+-- finish — none of which is a frame).  A frame is where the evaluator
+-- subscribes, so a frame is where the registry can grow: `sf-mint` is
+-- the budget, `sf-len` says minted chains stay in the ledger,
+-- `sf-vals` says the payloads it hands the next frame stay in theirs,
+-- and `sf-ok` carries the state predicate across.
 ------------------------------------------------------------------
 
 record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (Qf B : ℕ) : Set₁ where
   field
     OK : Sched Γ → EvalSt e → Set
+
+    -- the two syntactic side conditions.  Bool rather than Set because
+    -- both are LEDGERS: the registry carries `Pb` for every entry it
+    -- holds, and that ledger is what a dispatch reads its chains out of
+    Pb : ∀ {u} → Path Γ u t → Bool
+    Vb : ∀ {s} → List (Val Γ s) → Bool
+
+    -- `Pb`'s length reading, and its descent along a chain
+    p-len  : ∀ {u} (p : Path Γ u t) → Pb p ≡ true → pathLen p ≤ B
+    p-tail : ∀ {s u} (f : Frame Γ s u) (p : Path Γ u t) →
+             Pb (f ↠ p) ≡ true → Pb p ≡ true
 
     ok-cons : (rid : RegId) (sched : Sched Γ) (st : EvalSt e) →
       OK sched st → OK sched (consᵈ rid st)
@@ -219,12 +245,20 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (Qf B : ℕ) : Set₁ wh
     sf-ok : ∀ {s u} (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u)
       (path′ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
       (sched : Sched Γ) (st : EvalSt e) → OK sched st →
+      Pb (f ↠ path′) ≡ true → Vb vals ≡ true →
       OK (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
          (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
+
+    sf-vals : ∀ {s u} (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u)
+      (path′ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+      (sched : Sched Γ) (st : EvalSt e) → OK sched st →
+      Pb (f ↠ path′) ≡ true → Vb vals ≡ true →
+      Vb (proj₁ (stepFrame sf id now f path′ vals fin sched st)) ≡ true
 
     sf-mint : ∀ {s u} (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u)
       (path′ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
       (sched : Sched Γ) (st : EvalSt e) → OK sched st →
+      Pb (f ↠ path′) ≡ true → Vb vals ≡ true →
       length (EvalSt.registry
         (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st))))))
         ≤ length (EvalSt.registry st) + Qf
@@ -232,8 +266,9 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (Qf B : ℕ) : Set₁ wh
     sf-len : ∀ {s u} (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u)
       (path′ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
       (sched : Sched Γ) (st : EvalSt e) → OK sched st →
-      regLen? B (EvalSt.registry st) ≡ true →
-      regLen? B (EvalSt.registry
+      Pb (f ↠ path′) ≡ true → Vb vals ≡ true →
+      regP? Pb (EvalSt.registry st) ≡ true →
+      regP? Pb (EvalSt.registry
         (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st))))))
         ≡ true
 
@@ -248,9 +283,9 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   open Walk-Hyps H
 
   -- the state predicate the walk actually threads: the caller's, plus
-  -- the registry's own length ledger
+  -- the registry's own ledger
   Good : Sched Γ → EvalSt e → Set
-  Good sched st = OK sched st × (regLen? B (EvalSt.registry st) ≡ true)
+  Good sched st = OK sched st × (regP? Pb (EvalSt.registry st) ≡ true)
 
   ∣_∣ : EvalSt e → ℕ
   ∣ st ∣ = length (EvalSt.registry st)
@@ -263,12 +298,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {u} (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    Pb path ≡ true → Vb vals ≡ true →
     Good (proj₁ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
          (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
 
   dispatchShare-good : ∀ (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    (sched : Sched Γ) (st : EvalSt e) → Good sched st → Vb vals ≡ true →
     Good (proj₁ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
          (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
 
@@ -276,46 +312,52 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    chP? Pb ps ≡ true → Vb vals ≡ true →
     Good (proj₁ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
          (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
 
-  foldPath-good sf gas id now envSrc root vals evs fin sched st g = g
-  foldPath-good sf gas id now envSrc (share-sink i) vals evs fin sched st g =
-    dispatchShare-good sf gas id now i vals fin sched st g
-  foldPath-good sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) =
+  foldPath-good sf gas id now envSrc root vals evs fin sched st g hP hV = g
+  foldPath-good sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV =
+    dispatchShare-good sf gas id now i vals fin sched st g hV
+  foldPath-good sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV =
     let r = stepFrame sf id now f path′ vals fin sched st in
     foldPath-good sf gas id now envSrc path′ (proj₁ r)
       (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r)))
       (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-      ( sf-ok  sf id now f path′ vals fin sched st ok
-      , sf-len sf id now f path′ vals fin sched st ok len )
+      ( sf-ok  sf id now f path′ vals fin sched st ok hP hV
+      , sf-len sf id now f path′ vals fin sched st ok hP hV len )
+      (p-tail f path′ hP)
+      (sf-vals sf id now f path′ vals fin sched st ok hP hV)
 
-  dispatchShare-good sf zero id now i vals fin sched st g = g
-  dispatchShare-good sf (suc gas) id now i vals fin sched st (ok , len) =
+  dispatchShare-good sf zero id now i vals fin sched st g hV = g
+  dispatchShare-good sf (suc gas) id now i vals fin sched st (ok , len) hV =
     let stL = shareLatch i fin st
         GO  = shareGo-good sf gas id now i vals fin
                 (shareAdmit i (EvalSt.registry st)) sched stL
                 ( ok-latch i fin sched st ok
-                , subst (λ rs → regLen? B rs ≡ true)
+                , subst (λ rs → regP? Pb rs ≡ true)
                         (sym (shareLatch-reg i fin st)) len )
+                (shareAdmit-chP Pb i (EvalSt.registry st) len) hV
         out = shareGo sf gas id now i vals fin
                 (shareAdmit i (EvalSt.registry st)) sched stL in
     ( ok-finish i fin out (proj₁ GO)
-    , shareFinish-regLen B i fin out (proj₂ GO) )
+    , shareFinish-regP Pb i fin out (proj₂ GO) )
 
-  shareGo-good sf gas id now i vals fin []               sched st g = g
-  shareGo-good sf gas id now i vals fin ((rid , p) ∷ ps) sched st g
+  shareGo-good sf gas id now i vals fin []               sched st g hp hV = g
+  shareGo-good sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  = shareGo-good sf gas id now i vals fin ps sched st g
+                  (proj₂ (∧-true _ _ hp)) hV
   ... | false =
         let st₀ = consᵈ rid st
             FP  = foldPath-good sf gas id now (toℕ i) p vals
                     (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
                     ( ok-cons rid sched st (proj₁ g) , proj₂ g )
+                    (proj₁ (∧-true _ _ hp)) hV
             fp  = foldPath sf gas id now (toℕ i) p vals
                     (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀ in
         shareGo-good sf gas id now i vals fin ps
-          (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp)) FP
+          (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp)) FP (proj₂ (∧-true _ _ hp)) hV
 
   ----------------------------------------------------------------
   -- (ii) THE MINT BUDGET, LIFTED FROM ONE FRAME TO THE WHOLE WALK.
@@ -330,32 +372,34 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {u} (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    Pb path ≡ true → Vb vals ≡ true →
     let st′ = proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)) in
     ∣ st′ ∣ ≤ ∣ st ∣ + Qf * pathLen path + Q * delivN st st′
 
   dispatchShare-mint : ∀ (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    (sched : Sched Γ) (st : EvalSt e) → Good sched st → Vb vals ≡ true →
     let st′ = proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)) in
     ∣ st′ ∣ ≤ ∣ st ∣ + Q * delivN st st′
 
   shareGo-mint : ∀ (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
-    (sched : Sched Γ) (st : EvalSt e) → Good sched st → chLen? B ps ≡ true →
+    (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    chP? Pb ps ≡ true → Vb vals ≡ true →
     let st′ = proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)) in
     ∣ st′ ∣ ≤ ∣ st ∣ + Q * delivN st st′
 
-  foldPath-mint sf gas id now envSrc root vals evs fin sched st g =
+  foldPath-mint sf gas id now envSrc root vals evs fin sched st g hP hV =
     ≤-trans (m≤m+n ∣ st ∣ _) (m≤m+n _ _)
-  foldPath-mint sf gas id now envSrc (share-sink i) vals evs fin sched st g =
-    ≤-trans (dispatchShare-mint sf gas id now i vals fin sched st g)
+  foldPath-mint sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV =
+    ≤-trans (dispatchShare-mint sf gas id now i vals fin sched st g hV)
             (+-monoˡ-≤ _ (m≤m+n ∣ st ∣ (Qf * 0)))
-  foldPath-mint sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) =
+  foldPath-mint sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV =
     ≤-trans ih
       (≤-trans (+-monoˡ-≤ (Q * D₁)
                   (+-monoˡ-≤ (Qf * pathLen path′)
-                     (sf-mint sf id now f path′ vals fin sched st ok)))
+                     (sf-mint sf id now f path′ vals fin sched st ok hP hV)))
         (≤-trans (≤-reflexive (cong (_+ Q * D₁) (shift ∣ st ∣ Qf (pathLen path′))))
                  (+-monoʳ-≤ (∣ st ∣ + Qf * suc (pathLen path′))
                     (*-monoʳ-≤ Q (≤-reflexive (sym eqD))))))
@@ -372,11 +416,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ih : ∣ proj₂ (proj₂ fp) ∣ ≤ ∣ st₁ ∣ + Qf * pathLen path′ + Q * D₁
     ih = foldPath-mint sf gas id now envSrc path′ (proj₁ r)
            (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
-           ( sf-ok  sf id now f path′ vals fin sched st ok
-           , sf-len sf id now f path′ vals fin sched st ok len )
+           ( sf-ok  sf id now f path′ vals fin sched st ok hP hV
+           , sf-len sf id now f path′ vals fin sched st ok hP hV len )
+           (p-tail f path′ hP)
+           (sf-vals sf id now f path′ vals fin sched st ok hP hV)
 
-  dispatchShare-mint sf zero id now i vals fin sched st g = m≤m+n ∣ st ∣ _
-  dispatchShare-mint sf (suc gas) id now i vals fin sched st (ok , len) =
+  dispatchShare-mint sf zero id now i vals fin sched st g hV = m≤m+n ∣ st ∣ _
+  dispatchShare-mint sf (suc gas) id now i vals fin sched st (ok , len) hV =
     ≤-trans (shareFinish-len i fin out)
       (≤-trans GO
         (≤-trans (+-monoˡ-≤ (Q * delivN stL (proj₂ (proj₂ out)))
@@ -393,13 +439,14 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     GO = shareGo-mint sf gas id now i vals fin
            (shareAdmit i (EvalSt.registry st)) sched stL
            ( ok-latch i fin sched st ok
-           , subst (λ rs → regLen? B rs ≡ true) (sym (shareLatch-reg i fin st)) len )
-           (shareAdmit-chLen B i (EvalSt.registry st) len)
+           , subst (λ rs → regP? Pb rs ≡ true) (sym (shareLatch-reg i fin st)) len )
+           (shareAdmit-chP Pb i (EvalSt.registry st) len) hV
 
-  shareGo-mint sf gas id now i vals fin []               sched st g hp = m≤m+n ∣ st ∣ _
-  shareGo-mint sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp
+  shareGo-mint sf gas id now i vals fin []               sched st g hp hV = m≤m+n ∣ st ∣ _
+  shareGo-mint sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
-  ... | true  = shareGo-mint sf gas id now i vals fin ps sched st g (proj₂ (∧-true _ _ hp))
+  ... | true  = shareGo-mint sf gas id now i vals fin ps sched st g
+                  (proj₂ (∧-true _ _ hp)) hV
   ... | false =
         ≤-trans ih
           (≤-trans (+-monoˡ-≤ (Q * D₂) step₁)
@@ -429,12 +476,14 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     g₀ = ( ok-cons rid sched st (proj₁ g) , proj₂ g )
     g₁ : Good (proj₁ (proj₂ fp)) st₁
     g₁ = foldPath-good sf gas id now (toℕ i) p vals evs₀ fin sched st₀ g₀
+           (proj₁ (∧-true _ _ hp)) hV
     FPm : ∣ st₁ ∣ ≤ ∣ st₀ ∣ + Qf * pathLen p + Q * D₁
     FPm = foldPath-mint sf gas id now (toℕ i) p vals evs₀ fin sched st₀ g₀
+            (proj₁ (∧-true _ _ hp)) hV
     -- one chain's frames cost Qf each and there are at most B of them,
     -- so the whole chain is inside ONE delivery's budget
     chainQ : Qf * pathLen p ≤ Q
-    chainQ = ≤-trans (*-monoʳ-≤ Qf (≤-trans (≤ᵇ-≤ (proj₁ (∧-true _ _ hp)))
+    chainQ = ≤-trans (*-monoʳ-≤ Qf (≤-trans (p-len p (proj₁ (∧-true _ _ hp)))
                                             (n≤1+n B)))
                      fits
     step₁ : ∣ st₁ ∣ ≤ ∣ st ∣ + Q * suc D₁
@@ -443,7 +492,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                        (≤-reflexive (shift ∣ st ∣ Q D₁)))
     ih : ∣ st₂ ∣ ≤ ∣ st₁ ∣ + Q * D₂
     ih = shareGo-mint sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁ g₁
-           (proj₂ (∧-true _ _ hp))
+           (proj₂ (∧-true _ _ hp)) hV
 
   ----------------------------------------------------------------
   -- (iii) AND THE WALK ITSELF.  Each clause is the corresponding line
@@ -455,47 +504,52 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {u} (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    Pb path ≡ true → Vb vals ≡ true →
     ∣ st ∣ + Qf * pathLen path ≤ R →
     delivN st (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
       ≤ dCap Q gas R
 
   dispatchShare-walk : ∀ (R : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) → Good sched st → ∣ st ∣ ≤ R →
+    (sched : Sched Γ) (st : EvalSt e) → Good sched st → Vb vals ≡ true →
+    ∣ st ∣ ≤ R →
     delivN st (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
       ≤ dCap Q gas R
 
   shareGo-walk : ∀ (R : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
-    (sched : Sched Γ) (st : EvalSt e) → Good sched st → chLen? B ps ≡ true →
+    (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    chP? Pb ps ≡ true → Vb vals ≡ true →
     ∣ st ∣ ≤ R →
     delivN st (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
       ≤ dWalk Q gas R (length ps)
 
-  foldPath-walk R sf gas id now envSrc root vals evs fin sched st g h =
+  foldPath-walk R sf gas id now envSrc root vals evs fin sched st g hP hV h =
     ≤-trans (≤-reflexive (foldPath-root-N sf gas id now envSrc vals evs fin sched st))
             z≤n
-  foldPath-walk R sf gas id now envSrc (share-sink i) vals evs fin sched st g h =
-    dispatchShare-walk R sf gas id now i vals fin sched st g
+  foldPath-walk R sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV h =
+    dispatchShare-walk R sf gas id now i vals fin sched st g hV
       (≤-trans (m≤m+n ∣ st ∣ (Qf * 0)) h)
-  foldPath-walk R sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) h =
+  foldPath-walk R sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV h =
     ≤-trans (≤-reflexive (foldPath-frame-N sf gas id now envSrc f path′ vals evs fin sched st))
       (foldPath-walk R sf gas id now envSrc path′ (proj₁ r)
          (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
-         ( sf-ok  sf id now f path′ vals fin sched st ok
-         , sf-len sf id now f path′ vals fin sched st ok len )
+         ( sf-ok  sf id now f path′ vals fin sched st ok hP hV
+         , sf-len sf id now f path′ vals fin sched st ok hP hV len )
+         (p-tail f path′ hP)
+         (sf-vals sf id now f path′ vals fin sched st ok hP hV)
          (≤-trans (+-monoˡ-≤ (Qf * pathLen path′)
-                     (sf-mint sf id now f path′ vals fin sched st ok))
+                     (sf-mint sf id now f path′ vals fin sched st ok hP hV))
                   (≤-trans (≤-reflexive (shift ∣ st ∣ Qf (pathLen path′))) h)))
     where
     r   = stepFrame sf id now f path′ vals fin sched st
     st₁ = proj₂ (proj₂ (proj₂ (proj₂ r)))
     sd₁ = proj₁ (proj₂ (proj₂ (proj₂ r)))
 
-  dispatchShare-walk R sf zero id now i vals fin sched st g h =
+  dispatchShare-walk R sf zero id now i vals fin sched st g hV h =
     ≤-reflexive (dispatchShare-zero-N sf id now i vals fin sched st)
-  dispatchShare-walk R sf (suc gas) id now i vals fin sched st (ok , len) h =
+  dispatchShare-walk R sf (suc gas) id now i vals fin sched st (ok , len) hV h =
     ≤-trans (≤-reflexive (dispatchShare-suc-N sf gas id now i vals fin sched st))
       (≤-trans GO (dWalk-mono Q Q gas gas R R (length (shareAdmit i (EvalSt.registry st))) R
                      ≤-refl ≤-refl ≤-refl
@@ -508,17 +562,17 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     GO = shareGo-walk R sf gas id now i vals fin
            (shareAdmit i (EvalSt.registry st)) sched stL
            ( ok-latch i fin sched st ok
-           , subst (λ rs → regLen? B rs ≡ true) (sym (shareLatch-reg i fin st)) len )
-           (shareAdmit-chLen B i (EvalSt.registry st) len)
+           , subst (λ rs → regP? Pb rs ≡ true) (sym (shareLatch-reg i fin st)) len )
+           (shareAdmit-chP Pb i (EvalSt.registry st) len) hV
            (≤-trans (≤-reflexive (cong length (shareLatch-reg i fin st))) h)
 
-  shareGo-walk R sf gas id now i vals fin []               sched st g hp h =
+  shareGo-walk R sf gas id now i vals fin []               sched st g hp hV h =
     ≤-reflexive (delivN-≡ st st refl)
-  shareGo-walk R sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp h
+  shareGo-walk R sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV h
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
         ≤-trans (shareGo-walk R sf gas id now i vals fin ps sched st g
-                   (proj₂ (∧-true _ _ hp)) h)
+                   (proj₂ (∧-true _ _ hp)) hV h)
                 (dWalk-mono Q Q gas gas R R (length ps) (suc (length ps))
                    ≤-refl ≤-refl ≤-refl (n≤1+n (length ps)))
   ... | false =
@@ -539,8 +593,9 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     g₀ = ( ok-cons rid sched st (proj₁ g) , proj₂ g )
     g₁ : Good (proj₁ (proj₂ fp)) st₁
     g₁ = foldPath-good sf gas id now (toℕ i) p vals evs₀ fin sched st₀ g₀
+           (proj₁ (∧-true _ _ hp)) hV
     chainQ : Qf * pathLen p ≤ Q
-    chainQ = ≤-trans (*-monoʳ-≤ Qf (≤-trans (≤ᵇ-≤ (proj₁ (∧-true _ _ hp)))
+    chainQ = ≤-trans (*-monoʳ-≤ Qf (≤-trans (p-len p (proj₁ (∧-true _ _ hp)))
                                             (n≤1+n B)))
                      fits
     -- the ledger: one cons, this chain's fold, then the rest of the walk
@@ -555,16 +610,16 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                                 (proj₁ (proj₂ fp)) st₁)))
     h₁ : D₁ ≤ A
     h₁ = foldPath-walk (R + Q) sf gas id now (toℕ i) p vals evs₀ fin sched st₀ g₀
-           (+-mono-≤ h chainQ)
+           (proj₁ (∧-true _ _ hp)) hV (+-mono-≤ h chainQ)
     -- and the rest runs at the registry this delivery leaves, which is
     -- the entry registry plus ONE delivery's mints per delivery made
     h₂ : D₂ ≤ dWalk Q gas (R + Q * suc A) (length ps)
     h₂ = ≤-trans (shareGo-walk ∣ st₁ ∣ sf gas id now i vals fin ps
-                    (proj₁ (proj₂ fp)) st₁ g₁ (proj₂ (∧-true _ _ hp)) ≤-refl)
+                    (proj₁ (proj₂ fp)) st₁ g₁ (proj₂ (∧-true _ _ hp)) hV ≤-refl)
                  (dWalk-mono Q Q gas gas ∣ st₁ ∣ (R + Q * suc A)
                     (length ps) (length ps) ≤-refl ≤-refl
                     (≤-trans (≤-trans (foldPath-mint sf gas id now (toℕ i) p vals evs₀
-                                         fin sched st₀ g₀)
+                                         fin sched st₀ g₀ (proj₁ (∧-true _ _ hp)) hV)
                                (≤-trans (+-monoˡ-≤ (Q * D₁) (+-monoʳ-≤ ∣ st ∣ chainQ))
                                         (≤-reflexive (shift ∣ st ∣ Q D₁))))
                              (+-mono-≤ h (*-monoʳ-≤ Q (s≤s h₁))))
@@ -577,16 +632,17 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
   cascadeGo-walk : ∀ (R : ℕ) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) → Good sched st → chLen? B chains ≡ true →
+    (sched : Sched Γ) (st : EvalSt e) → Good sched st →
+    chP? Pb chains ≡ true → Vb (arrVal a ∷ []) ≡ true →
     ∣ st ∣ ≤ R →
     delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
       ≤ dWalk Q n R (length chains)
-  cascadeGo-walk R a id []                   sched st g hp h =
+  cascadeGo-walk R a id []                   sched st g hp hV h =
     ≤-reflexive (delivN-≡ st st refl)
-  cascadeGo-walk R a id ((rid , c) ∷ chains) sched st g hp h
+  cascadeGo-walk R a id ((rid , c) ∷ chains) sched st g hp hV h
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
-        ≤-trans (cascadeGo-walk R a id chains sched st g (proj₂ (∧-true _ _ hp)) h)
+        ≤-trans (cascadeGo-walk R a id chains sched st g (proj₂ (∧-true _ _ hp)) hV h)
                 (dWalk-mono Q Q n n R R (length chains) (suc (length chains))
                    ≤-refl ≤-refl ≤-refl (n≤1+n (length chains)))
   ... | false =
@@ -608,9 +664,9 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     g₀ = ( ok-cons rid sched st (proj₁ g) , proj₂ g )
     g₁ : Good (proj₁ (proj₂ cs)) st₁
     g₁ = foldPath-good sf₀ n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
-           evs₀ (Arrival.isLast a) sched st₀ g₀
+           evs₀ (Arrival.isLast a) sched st₀ g₀ (proj₁ (∧-true _ _ hp)) hV
     chainQ : Qf * pathLen c ≤ Q
-    chainQ = ≤-trans (*-monoʳ-≤ Qf (≤-trans (≤ᵇ-≤ (proj₁ (∧-true _ _ hp)))
+    chainQ = ≤-trans (*-monoʳ-≤ Qf (≤-trans (p-len c (proj₁ (∧-true _ _ hp)))
                                             (n≤1+n B)))
                      fits
     eqN : delivN st st₂ ≡ suc (D₁ + D₂)
@@ -621,14 +677,16 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                              (cascadeGo-deliv a id chains (proj₁ (proj₂ cs)) st₁)))
     h₁ : D₁ ≤ A
     h₁ = foldPath-walk (R + Q) sf₀ n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
-           evs₀ (Arrival.isLast a) sched st₀ g₀ (+-mono-≤ h chainQ)
+           evs₀ (Arrival.isLast a) sched st₀ g₀ (proj₁ (∧-true _ _ hp)) hV
+           (+-mono-≤ h chainQ)
     h₂ : D₂ ≤ dWalk Q n (R + Q * suc A) (length chains)
     h₂ = ≤-trans (cascadeGo-walk ∣ st₁ ∣ a id chains (proj₁ (proj₂ cs)) st₁ g₁
-                    (proj₂ (∧-true _ _ hp)) ≤-refl)
+                    (proj₂ (∧-true _ _ hp)) hV ≤-refl)
                  (dWalk-mono Q Q n n ∣ st₁ ∣ (R + Q * suc A)
                     (length chains) (length chains) ≤-refl ≤-refl
                     (≤-trans (≤-trans (foldPath-mint sf₀ n id (arrTick a) (arrSource a) c
-                                         (arrVal a ∷ []) evs₀ (Arrival.isLast a) sched st₀ g₀)
+                                         (arrVal a ∷ []) evs₀ (Arrival.isLast a) sched st₀ g₀
+                                         (proj₁ (∧-true _ _ hp)) hV)
                                (≤-trans (+-monoˡ-≤ (Q * D₁) (+-monoʳ-≤ ∣ st ∣ chainQ))
                                         (≤-reflexive (shift ∣ st ∣ Q D₁))))
                              (+-mono-≤ h (*-monoʳ-≤ Q (s≤s h₁))))
