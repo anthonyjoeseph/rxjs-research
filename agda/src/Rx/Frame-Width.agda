@@ -41,12 +41,38 @@
 -- SOURCE's payload count.  Syntax in, syntax out: no store quantity
 -- appears anywhere in these definitions.  That is the whole point.
 --
--- SLOT FUEL.  A share is reached by a connect, not by descending into
--- syntax, and a slot def may reference other slots — so `input` is not
--- structural and the recursion carries an explicit budget `j`, spent
--- one per connect.  The lexicographic order is (j, the expression), and
--- j is instantiated at the slot count because the connect descent
--- strictly drops `unconn`.
+-- THE SLOT DESCENT DROPS VISITED SLOTS.  A share is reached by a
+-- connect, not by descending into syntax, and a slot def may reference
+-- other slots — so `input` is not structural.  The descent carries the
+-- set `vs` of shared slots already entered on this path: entering
+-- `input i` at an unvisited `shared d` descends into `d` with `i`
+-- marked, and A REVISIT CONTRIBUTES ZERO.
+--
+-- WHY ZERO IS THE FAITHFUL NUMBER.  A share is reached by a CONNECT,
+-- and share-connect-no-replay says the second arrival at slot i inside
+-- one cascade gets no replay of the burst — it hands back the existing
+-- subject.  What that slot emits LATER flows through registrations,
+-- which the cascade side counts; the static measure must not count it
+-- twice.  Scripted slots are not marked (they cannot cycle, and the `1`
+-- for a data payload is load-bearing — State-Blowup-Probe refutes 0).
+--
+-- THE FUEL `j` STAYS, FOR TERMINATION ONLY: the visited check fires
+-- first, so `j` no longer carries any semantics.  The lexicographic
+-- order is still (j, the expression), and j is instantiated at the slot
+-- count because the connect descent strictly drops `unconn`.
+--
+-- AND THE COLLECTORS STAY AT `[]`.  `capsOK?` bounds a STORED value,
+-- and a stored value carries no record of which connect put it there —
+-- its width is read at the ENTRY form — so `subscribeE`'s shared branch
+-- needs the def at `[]`.  Reading a def unmarked lets the descent come
+-- back round to that def's own slot ONCE (it marks the slot on the way
+-- in), so the base height is `Σkᵢ + max kᵢ` rather than `Σkᵢ`: still
+-- linear, which is what `visited-height-fits-unmarked` gates.  Against
+-- the fuel form's `(Σkᵢ)·n` that is the whole point.
+--
+-- The exported names are the measures AT `[]`; `outWⱽ` and friends are
+-- the descent itself, and only lemmas that reduce through the `input`
+-- clause ever mention them.
 --
 -- GATED, NOT GUESSED.  agda/probe/Frame-Work-Probe.agda measures nine
 -- runs of the real evaluator, and the gate there checks these measures
@@ -58,8 +84,8 @@
 module Rx.Frame-Width where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≡ᵇ_)
-open import Data.Bool using (if_then_else_)
-open import Data.Fin  using (Fin)
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Fin  using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; length; tabulate)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
@@ -67,149 +93,197 @@ open import Data.Sum using (inj₁; inj₂)
 open import Rx.Exp
 open import Rx.Evaluator using (Slots; Slot; scripted; shared)
 
+-- membership on the visited set, decidable by the index's ℕ view
+_∈ᵇ_ : ∀ {n} → Fin n → List (Fin n) → Bool
+i ∈ᵇ []       = false
+i ∈ᵇ (k ∷ ks) = if toℕ i ≡ᵇ toℕ k then true else i ∈ᵇ ks
+
 mutual
   -- slope of outW in the width of the value plugged at index k
-  pmOᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  pmOᵉ j sl k (input i)       = 0
-  pmOᵉ j sl k (ofᵉ ts)        = 0          -- outW of an ofᵉ is its LENGTH
-  pmOᵉ j sl k emptyᵉ          = 0
-  pmOᵉ j sl k (mapᵉ f e)      = pmOᵉ j sl k e
-  pmOᵉ j sl k (takeᵉ c e)     = pmOᵉ j sl k e
-  pmOᵉ j sl k (scanᵉ f z e)   = pmOᵉ j sl k e
+  pmOⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) (k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
+  pmOⱽ j vs sl k (input i)       = 0
+  pmOⱽ j vs sl k (ofᵉ ts)        = 0          -- outW of an ofᵉ is its LENGTH
+  pmOⱽ j vs sl k emptyᵉ          = 0
+  pmOⱽ j vs sl k (mapᵉ f e)      = pmOⱽ j vs sl k e
+  pmOⱽ j vs sl k (takeᵉ c e)     = pmOⱽ j vs sl k e
+  pmOⱽ j vs sl k (scanᵉ f z e)   = pmOⱽ j vs sl k e
   -- product rule: outW (mergeAll e) = outW e * innW e
-  pmOᵉ j sl k (mergeAllᵉ e)   = outWᵉ j sl e * pmIᵉ j sl k e + pmOᵉ j sl k e * innWᵉ j sl e
-  pmOᵉ j sl k (concatAllᵉ e)  = outWᵉ j sl e * pmIᵉ j sl k e + pmOᵉ j sl k e * innWᵉ j sl e
-  pmOᵉ j sl k (switchAllᵉ e)  = outWᵉ j sl e * pmIᵉ j sl k e + pmOᵉ j sl k e * innWᵉ j sl e
-  pmOᵉ j sl k (exhaustAllᵉ e) = outWᵉ j sl e * pmIᵉ j sl k e + pmOᵉ j sl k e * innWᵉ j sl e
-  pmOᵉ j sl k (μᵉ e)          = pmOᵉ j sl k e
-  pmOᵉ j sl k (varᵉ x)        = 0
-  pmOᵉ j sl k (deferᵉ e)      = 0
+  pmOⱽ j vs sl k (mergeAllᵉ e)   = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
+  pmOⱽ j vs sl k (concatAllᵉ e)  = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
+  pmOⱽ j vs sl k (switchAllᵉ e)  = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
+  pmOⱽ j vs sl k (exhaustAllᵉ e) = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
+  pmOⱽ j vs sl k (μᵉ e)          = pmOⱽ j vs sl k e
+  pmOⱽ j vs sl k (varᵉ x)        = 0
+  pmOⱽ j vs sl k (deferᵉ e)      = 0
 
-  pmOᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  pmOᵗ j sl k (varᵗ x)      = 0
-  pmOᵗ j sl k unit̂          = 0
-  pmOᵗ j sl k (bool̂ _)      = 0
-  pmOᵗ j sl k (nat̂ _)       = 0
-  pmOᵗ j sl k (pairᵗ a b)   = pmOᵗ j sl k a ⊔ pmOᵗ j sl k b
-  pmOᵗ j sl k (fstᵗ p)      = pmOᵗ j sl k p
-  pmOᵗ j sl k (sndᵗ p)      = pmOᵗ j sl k p
-  pmOᵗ j sl k (inlᵗ a)      = pmOᵗ j sl k a
-  pmOᵗ j sl k (inrᵗ a)      = pmOᵗ j sl k a
-  pmOᵗ j sl k (caseᵗ s l r) = pmOᵗ j sl (suc k) l ⊔ pmOᵗ j sl (suc k) r
-                       ⊔ (pmIᵗ j sl 0 l ⊔ pmIᵗ j sl 0 r ⊔ 1) * pmOᵗ j sl k s
-  pmOᵗ j sl k (ifᵗ c a b)   = pmOᵗ j sl k a ⊔ pmOᵗ j sl k b
-  pmOᵗ j sl k (primᵗ _ a)   = 0
-  pmOᵗ j sl k (strmᵗ e)     = pmOᵉ j sl k e
+  pmOᵗⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) (k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
+  pmOᵗⱽ j vs sl k (varᵗ x)      = 0
+  pmOᵗⱽ j vs sl k unit̂          = 0
+  pmOᵗⱽ j vs sl k (bool̂ _)      = 0
+  pmOᵗⱽ j vs sl k (nat̂ _)       = 0
+  pmOᵗⱽ j vs sl k (pairᵗ a b)   = pmOᵗⱽ j vs sl k a ⊔ pmOᵗⱽ j vs sl k b
+  pmOᵗⱽ j vs sl k (fstᵗ p)      = pmOᵗⱽ j vs sl k p
+  pmOᵗⱽ j vs sl k (sndᵗ p)      = pmOᵗⱽ j vs sl k p
+  pmOᵗⱽ j vs sl k (inlᵗ a)      = pmOᵗⱽ j vs sl k a
+  pmOᵗⱽ j vs sl k (inrᵗ a)      = pmOᵗⱽ j vs sl k a
+  pmOᵗⱽ j vs sl k (caseᵗ s l r) = pmOᵗⱽ j vs sl (suc k) l ⊔ pmOᵗⱽ j vs sl (suc k) r
+                       ⊔ (pmIᵗⱽ j vs sl 0 l ⊔ pmIᵗⱽ j vs sl 0 r ⊔ 1) * pmOᵗⱽ j vs sl k s
+  pmOᵗⱽ j vs sl k (ifᵗ c a b)   = pmOᵗⱽ j vs sl k a ⊔ pmOᵗⱽ j vs sl k b
+  pmOᵗⱽ j vs sl k (primᵗ _ a)   = 0
+  pmOᵗⱽ j vs sl k (strmᵗ e)     = pmOⱽ j vs sl k e
 
   -- slope of innW in the same
-  pmIᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  pmIᵉ j sl k (input i)       = 0
-  pmIᵉ j sl k (ofᵉ ts)        = pmIᵗˢ j sl k ts
-  pmIᵉ j sl k emptyᵉ          = 0
-  pmIᵉ j sl k (mapᵉ f e)      = pmIᵗ j sl (suc k) f + (pmIᵗ j sl 0 f ⊔ 1) * pmIᵉ j sl k e
-  pmIᵉ j sl k (takeᵉ c e)     = pmIᵉ j sl k e
+  pmIⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) (k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
+  pmIⱽ j vs sl k (input i)       = 0
+  pmIⱽ j vs sl k (ofᵉ ts)        = pmIᵗˢⱽ j vs sl k ts
+  pmIⱽ j vs sl k emptyᵉ          = 0
+  pmIⱽ j vs sl k (mapᵉ f e)      = pmIᵗⱽ j vs sl (suc k) f + (pmIᵗⱽ j vs sl 0 f ⊔ 1) * pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (takeᵉ c e)     = pmIⱽ j vs sl k e
   -- the refold: the slope compounds once per fold
-  pmIᵉ j sl k (scanᵉ f z e)   = (pmIᵗ j sl 0 f ⊔ 1) ^ (outWᵉ j sl e)
-                         * (pmIᵗ j sl (suc k) f + pmIᵗ j sl k z + pmIᵉ j sl k e)
-  pmIᵉ j sl k (mergeAllᵉ e)   = pmIᵉ j sl k e
-  pmIᵉ j sl k (concatAllᵉ e)  = pmIᵉ j sl k e
-  pmIᵉ j sl k (switchAllᵉ e)  = pmIᵉ j sl k e
-  pmIᵉ j sl k (exhaustAllᵉ e) = pmIᵉ j sl k e
-  pmIᵉ j sl k (μᵉ e)          = pmIᵉ j sl k e
-  pmIᵉ j sl k (varᵉ x)        = 0
-  pmIᵉ j sl k (deferᵉ e)      = 0
+  pmIⱽ j vs sl k (scanᵉ f z e)   = (pmIᵗⱽ j vs sl 0 f ⊔ 1) ^ (outWⱽ j vs sl e)
+                         * (pmIᵗⱽ j vs sl (suc k) f + pmIᵗⱽ j vs sl k z + pmIⱽ j vs sl k e)
+  pmIⱽ j vs sl k (mergeAllᵉ e)   = pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (concatAllᵉ e)  = pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (switchAllᵉ e)  = pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (exhaustAllᵉ e) = pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (μᵉ e)          = pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (varᵉ x)        = 0
+  pmIⱽ j vs sl k (deferᵉ e)      = 0
 
-  pmIᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  pmIᵗ j sl k (varᵗ x)      = if varIx x ≡ᵇ k then 1 else 0
-  pmIᵗ j sl k unit̂          = 0
-  pmIᵗ j sl k (bool̂ _)      = 0
-  pmIᵗ j sl k (nat̂ _)       = 0
-  pmIᵗ j sl k (pairᵗ a b)   = pmIᵗ j sl k a ⊔ pmIᵗ j sl k b
-  pmIᵗ j sl k (fstᵗ p)      = pmIᵗ j sl k p
-  pmIᵗ j sl k (sndᵗ p)      = pmIᵗ j sl k p
-  pmIᵗ j sl k (inlᵗ a)      = pmIᵗ j sl k a
-  pmIᵗ j sl k (inrᵗ a)      = pmIᵗ j sl k a
-  pmIᵗ j sl k (caseᵗ s l r) = (pmIᵗ j sl (suc k) l ⊔ pmIᵗ j sl (suc k) r)
-                       + (pmIᵗ j sl 0 l ⊔ pmIᵗ j sl 0 r ⊔ 1) * pmIᵗ j sl k s
-  pmIᵗ j sl k (ifᵗ c a b)   = pmIᵗ j sl k a ⊔ pmIᵗ j sl k b
-  pmIᵗ j sl k (primᵗ _ a)   = 0
-  pmIᵗ j sl k (strmᵗ e)     = pmOᵉ j sl k e
+  pmIᵗⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) (k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
+  pmIᵗⱽ j vs sl k (varᵗ x)      = if varIx x ≡ᵇ k then 1 else 0
+  pmIᵗⱽ j vs sl k unit̂          = 0
+  pmIᵗⱽ j vs sl k (bool̂ _)      = 0
+  pmIᵗⱽ j vs sl k (nat̂ _)       = 0
+  pmIᵗⱽ j vs sl k (pairᵗ a b)   = pmIᵗⱽ j vs sl k a ⊔ pmIᵗⱽ j vs sl k b
+  pmIᵗⱽ j vs sl k (fstᵗ p)      = pmIᵗⱽ j vs sl k p
+  pmIᵗⱽ j vs sl k (sndᵗ p)      = pmIᵗⱽ j vs sl k p
+  pmIᵗⱽ j vs sl k (inlᵗ a)      = pmIᵗⱽ j vs sl k a
+  pmIᵗⱽ j vs sl k (inrᵗ a)      = pmIᵗⱽ j vs sl k a
+  pmIᵗⱽ j vs sl k (caseᵗ s l r) = (pmIᵗⱽ j vs sl (suc k) l ⊔ pmIᵗⱽ j vs sl (suc k) r)
+                       + (pmIᵗⱽ j vs sl 0 l ⊔ pmIᵗⱽ j vs sl 0 r ⊔ 1) * pmIᵗⱽ j vs sl k s
+  pmIᵗⱽ j vs sl k (ifᵗ c a b)   = pmIᵗⱽ j vs sl k a ⊔ pmIᵗⱽ j vs sl k b
+  pmIᵗⱽ j vs sl k (primᵗ _ a)   = 0
+  pmIᵗⱽ j vs sl k (strmᵗ e)     = pmOⱽ j vs sl k e
 
-  pmIᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  pmIᵗˢ j sl k []       = 0
-  pmIᵗˢ j sl k (y ∷ ys) = pmIᵗ j sl k y ⊔ pmIᵗˢ j sl k ys
+  pmIᵗˢⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) (k : ℕ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  pmIᵗˢⱽ j vs sl k []       = 0
+  pmIᵗˢⱽ j vs sl k (y ∷ ys) = pmIᵗⱽ j vs sl k y ⊔ pmIᵗˢⱽ j vs sl k ys
 
-  outWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+  outWⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
   -- a slot is reached by a CONNECT; the connect edge pays, not this
   -- A SHARE IS A CONNECT: descend into the slot's def, on slot fuel.
   -- Slot defs may reference slots, so this is not structural — j is the
   -- lexicographic outer measure and every connect spends one
-  outWᵉ zero    sl (input i) = 0
-  outWᵉ (suc j) sl (input i) with sl i
+  outWⱽ zero    vs sl (input i) = 0
+  outWⱽ (suc j) vs sl (input i) with i ∈ᵇ vs
+  -- A REVISIT DELIVERS NOTHING: the connect hands back the existing
+  -- subject, and what the slot emits later the cascade side counts
+  ... | true  = 0
+  ... | false with sl i
   -- ONE PAYLOAD PER ARRIVAL.  A scripted source delivers a single data
   -- value per instant; 0 here made every clause above it — all of which
   -- are multiplicative — collapse the whole program to 0, which
   -- State-Blowup-Probe refutes as a width cap
-  ... | scripted _ = 1
-  ... | shared d   = outWᵉ j sl d
-  outWᵉ j sl (ofᵉ ts)        = length ts
-  outWᵉ j sl emptyᵉ          = 0
-  outWᵉ j sl (mapᵉ f e)      = outWᵉ j sl e
-  outWᵉ j sl (takeᵉ c e)     = outWᵉ j sl e
-  outWᵉ j sl (scanᵉ f z e)   = outWᵉ j sl e
+  ...   | scripted _ = 1
+  ...   | shared d   = outWⱽ j (i ∷ vs) sl d
+  outWⱽ j vs sl (ofᵉ ts)        = length ts
+  outWⱽ j vs sl emptyᵉ          = 0
+  outWⱽ j vs sl (mapᵉ f e)      = outWⱽ j vs sl e
+  outWⱽ j vs sl (takeᵉ c e)     = outWⱽ j vs sl e
+  outWⱽ j vs sl (scanᵉ f z e)   = outWⱽ j vs sl e
   -- THE *All EDGE: every payload's inner is entered
-  outWᵉ j sl (mergeAllᵉ e)   = outWᵉ j sl e * innWᵉ j sl e
-  outWᵉ j sl (concatAllᵉ e)  = outWᵉ j sl e * innWᵉ j sl e
-  outWᵉ j sl (switchAllᵉ e)  = outWᵉ j sl e * innWᵉ j sl e
-  outWᵉ j sl (exhaustAllᵉ e) = outWᵉ j sl e * innWᵉ j sl e
-  outWᵉ j sl (μᵉ e)          = outWᵉ j sl e
-  outWᵉ j sl (varᵉ x)        = 0
-  outWᵉ j sl (deferᵉ e)      = 0          -- crosses a tick
+  outWⱽ j vs sl (mergeAllᵉ e)   = outWⱽ j vs sl e * innWⱽ j vs sl e
+  outWⱽ j vs sl (concatAllᵉ e)  = outWⱽ j vs sl e * innWⱽ j vs sl e
+  outWⱽ j vs sl (switchAllᵉ e)  = outWⱽ j vs sl e * innWⱽ j vs sl e
+  outWⱽ j vs sl (exhaustAllᵉ e) = outWⱽ j vs sl e * innWⱽ j vs sl e
+  outWⱽ j vs sl (μᵉ e)          = outWⱽ j vs sl e
+  outWⱽ j vs sl (varᵉ x)        = 0
+  outWⱽ j vs sl (deferᵉ e)      = 0          -- crosses a tick
 
-  innWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  innWᵉ zero    sl (input i) = 0
-  innWᵉ (suc j) sl (input i) with sl i
+  innWⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+  innWⱽ zero    vs sl (input i) = 0
+  innWⱽ (suc j) vs sl (input i) with i ∈ᵇ vs
+  ... | true  = 0                       -- likewise: no inner is entered
+  ... | false with sl i
   -- a scripted payload is DATA, so it carries no inner observable — but
   -- 1 rather than 0 keeps innW usable as a multiplier and an exponent
   -- base, which is how the scanᵉ clause below consumes it
-  ... | scripted _ = 1
-  ... | shared d   = innWᵉ j sl d
-  innWᵉ j sl (ofᵉ ts)        = innWᵗˢ j sl ts
-  innWᵉ j sl emptyᵉ          = 0
-  innWᵉ j sl (mapᵉ f e)      = innWᵗ j sl f + (pmIᵗ j sl 0 f ⊔ 1) * innWᵉ j sl e
-  innWᵉ j sl (takeᵉ c e)     = innWᵉ j sl e
+  ...   | scripted _ = 1
+  ...   | shared d   = innWⱽ j (i ∷ vs) sl d
+  innWⱽ j vs sl (ofᵉ ts)        = innWᵗˢⱽ j vs sl ts
+  innWⱽ j vs sl emptyᵉ          = 0
+  innWⱽ j vs sl (mapᵉ f e)      = innWᵗⱽ j vs sl f + (pmIᵗⱽ j vs sl 0 f ⊔ 1) * innWⱽ j vs sl e
+  innWⱽ j vs sl (takeᵉ c e)     = innWⱽ j vs sl e
   -- THE REFOLD, and the tower: the accumulator's width compounds once
   -- per fold, and the fold count is the SOURCE's payload count
-  innWᵉ j sl (scanᵉ f z e)   = (pmIᵗ j sl 0 f ⊔ 1) ^ (outWᵉ j sl e)
-                        * (innWᵗ j sl f + innWᵗ j sl z + innWᵉ j sl e + 1)
-  innWᵉ j sl (mergeAllᵉ e)   = innWᵉ j sl e
-  innWᵉ j sl (concatAllᵉ e)  = innWᵉ j sl e
-  innWᵉ j sl (switchAllᵉ e)  = innWᵉ j sl e
-  innWᵉ j sl (exhaustAllᵉ e) = innWᵉ j sl e
-  innWᵉ j sl (μᵉ e)          = innWᵉ j sl e
-  innWᵉ j sl (varᵉ x)        = 0
-  innWᵉ j sl (deferᵉ e)      = 0
+  innWⱽ j vs sl (scanᵉ f z e)   = (pmIᵗⱽ j vs sl 0 f ⊔ 1) ^ (outWⱽ j vs sl e)
+                        * (innWᵗⱽ j vs sl f + innWᵗⱽ j vs sl z + innWⱽ j vs sl e + 1)
+  innWⱽ j vs sl (mergeAllᵉ e)   = innWⱽ j vs sl e
+  innWⱽ j vs sl (concatAllᵉ e)  = innWⱽ j vs sl e
+  innWⱽ j vs sl (switchAllᵉ e)  = innWⱽ j vs sl e
+  innWⱽ j vs sl (exhaustAllᵉ e) = innWⱽ j vs sl e
+  innWⱽ j vs sl (μᵉ e)          = innWⱽ j vs sl e
+  innWⱽ j vs sl (varᵉ x)        = 0
+  innWⱽ j vs sl (deferᵉ e)      = 0
 
-  innWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  innWᵗ j sl (varᵗ x)      = 0
-  innWᵗ j sl unit̂          = 0
-  innWᵗ j sl (bool̂ _)      = 0
-  innWᵗ j sl (nat̂ _)       = 0
-  innWᵗ j sl (pairᵗ a b)   = innWᵗ j sl a ⊔ innWᵗ j sl b
-  innWᵗ j sl (fstᵗ p)      = innWᵗ j sl p
-  innWᵗ j sl (sndᵗ p)      = innWᵗ j sl p
-  innWᵗ j sl (inlᵗ a)      = innWᵗ j sl a
-  innWᵗ j sl (inrᵗ a)      = innWᵗ j sl a
-  innWᵗ j sl (caseᵗ s l r) = (innWᵗ j sl l ⊔ innWᵗ j sl r) + (pmIᵗ j sl 0 l ⊔ pmIᵗ j sl 0 r ⊔ 1) * innWᵗ j sl s
-  innWᵗ j sl (ifᵗ c a b)   = innWᵗ j sl a ⊔ innWᵗ j sl b
-  innWᵗ j sl (primᵗ _ a)   = 0
+  innWᵗⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
+  innWᵗⱽ j vs sl (varᵗ x)      = 0
+  innWᵗⱽ j vs sl unit̂          = 0
+  innWᵗⱽ j vs sl (bool̂ _)      = 0
+  innWᵗⱽ j vs sl (nat̂ _)       = 0
+  innWᵗⱽ j vs sl (pairᵗ a b)   = innWᵗⱽ j vs sl a ⊔ innWᵗⱽ j vs sl b
+  innWᵗⱽ j vs sl (fstᵗ p)      = innWᵗⱽ j vs sl p
+  innWᵗⱽ j vs sl (sndᵗ p)      = innWᵗⱽ j vs sl p
+  innWᵗⱽ j vs sl (inlᵗ a)      = innWᵗⱽ j vs sl a
+  innWᵗⱽ j vs sl (inrᵗ a)      = innWᵗⱽ j vs sl a
+  innWᵗⱽ j vs sl (caseᵗ s l r) = (innWᵗⱽ j vs sl l ⊔ innWᵗⱽ j vs sl r) + (pmIᵗⱽ j vs sl 0 l ⊔ pmIᵗⱽ j vs sl 0 r ⊔ 1) * innWᵗⱽ j vs sl s
+  innWᵗⱽ j vs sl (ifᵗ c a b)   = innWᵗⱽ j vs sl a ⊔ innWᵗⱽ j vs sl b
+  innWᵗⱽ j vs sl (primᵗ _ a)   = 0
   -- an obs-typed term denotes an observable; its width is that
   -- observable's frame width
-  innWᵗ j sl (strmᵗ e)     = outWᵉ j sl e
+  innWᵗⱽ j vs sl (strmᵗ e)     = outWⱽ j vs sl e
 
-  innWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  innWᵗˢ j sl []       = 0
-  innWᵗˢ j sl (y ∷ ys) = innWᵗ j sl y ⊔ innWᵗˢ j sl ys
+  innWᵗˢⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  innWᵗˢⱽ j vs sl []       = 0
+  innWᵗˢⱽ j vs sl (y ∷ ys) = innWᵗⱽ j vs sl y ⊔ innWᵗˢⱽ j vs sl ys
+
+------------------------------------------------------------------
+-- THE EXPORTED MEASURES: the descent AT THE ENTRY FORM, `vs = []`.
+--
+-- Every reading site outside this module is a wrapper application and
+-- unfolds definitionally, so only lemmas that reduce THROUGH the
+-- `input` clause ever see the visited set — and those are the ones the
+-- collectors' `[]` costs one turn.
+------------------------------------------------------------------
+
+pmOᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
+pmOᵉ j sl k e = pmOⱽ j [] sl k e
+
+pmOᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
+pmOᵗ j sl k tm = pmOᵗⱽ j [] sl k tm
+
+pmIᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
+pmIᵉ j sl k e = pmIⱽ j [] sl k e
+
+pmIᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
+pmIᵗ j sl k tm = pmIᵗⱽ j [] sl k tm
+
+pmIᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+pmIᵗˢ j sl k ts = pmIᵗˢⱽ j [] sl k ts
+
+outWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+outWᵉ j sl e = outWⱽ j [] sl e
+
+innWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+innWᵉ j sl e = innWⱽ j [] sl e
+
+innWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
+innWᵗ j sl tm = innWᵗⱽ j [] sl tm
+
+innWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+innWᵗˢ j sl ts = innWᵗˢⱽ j [] sl ts
+
 
 -- the frame width of a runtime VALUE: an embedded observable carries its
 -- expression's, a ground payload carries none.  Mirrors ofWᵛ/hopDᵛ
@@ -261,49 +335,67 @@ outWᵛ j sl (obs t)  e        = outWᵉ j sl e
 mutual
   -- CLAUSE ORDER IS LOAD-BEARING: the `input` pair splits on the FUEL,
   -- and if it came first Agda would build a case tree that splits on
-  -- `j` at the root — leaving `dWᵉ j sl (ofᵉ ts)` STUCK for a variable
+  -- `j` at the root — leaving `dWⱽ j vs sl (ofᵉ ts)` STUCK for a variable
   -- j, which is exactly the shape every caller has (the fuel is the
   -- slot count `n`, never a literal).  With `input` last, the tree
   -- splits on the expression first and every other clause reduces
-  dWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  dWᵉ j sl (ofᵉ ts)        = dWᵗˢ j sl ts
-  dWᵉ j sl emptyᵉ          = 0
-  dWᵉ j sl (mapᵉ f e)      = dWᵗ j sl f ⊔ dWᵉ j sl e
-  dWᵉ j sl (takeᵉ c e)     = dWᵗ j sl c ⊔ dWᵉ j sl e
-  dWᵉ j sl (scanᵉ f z e)   = dWᵗ j sl f ⊔ dWᵗ j sl z ⊔ dWᵉ j sl e
-  dWᵉ j sl (mergeAllᵉ e)   = dWᵉ j sl e
-  dWᵉ j sl (concatAllᵉ e)  = dWᵉ j sl e
-  dWᵉ j sl (switchAllᵉ e)  = dWᵉ j sl e
-  dWᵉ j sl (exhaustAllᵉ e) = dWᵉ j sl e
-  dWᵉ j sl (μᵉ e)          = dWᵉ j sl e
-  dWᵉ j sl (varᵉ x)        = 0
+  dWⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+  dWⱽ j vs sl (ofᵉ ts)        = dWᵗˢⱽ j vs sl ts
+  dWⱽ j vs sl emptyᵉ          = 0
+  dWⱽ j vs sl (mapᵉ f e)      = dWᵗⱽ j vs sl f ⊔ dWⱽ j vs sl e
+  dWⱽ j vs sl (takeᵉ c e)     = dWᵗⱽ j vs sl c ⊔ dWⱽ j vs sl e
+  dWⱽ j vs sl (scanᵉ f z e)   = dWᵗⱽ j vs sl f ⊔ dWᵗⱽ j vs sl z ⊔ dWⱽ j vs sl e
+  dWⱽ j vs sl (mergeAllᵉ e)   = dWⱽ j vs sl e
+  dWⱽ j vs sl (concatAllᵉ e)  = dWⱽ j vs sl e
+  dWⱽ j vs sl (switchAllᵉ e)  = dWⱽ j vs sl e
+  dWⱽ j vs sl (exhaustAllᵉ e) = dWⱽ j vs sl e
+  dWⱽ j vs sl (μᵉ e)          = dWⱽ j vs sl e
+  dWⱽ j vs sl (varᵉ x)        = 0
   -- THE CLAUSE THE WHOLE FAMILY EXISTS FOR
-  dWᵉ j sl (deferᵉ e)      = outWᵉ j sl e ⊔ dWᵉ j sl e
+  dWⱽ j vs sl (deferᵉ e)      = outWⱽ j vs sl e ⊔ dWⱽ j vs sl e
   -- a share is a connect: descend into the def, on slot fuel
-  dWᵉ zero    sl (input i) = 0
-  dWᵉ (suc j) sl (input i) with sl i
+  dWⱽ zero    vs sl (input i) = 0
+  dWⱽ (suc j) vs sl (input i) with i ∈ᵇ vs
+  ... | true  = 0
+  ... | false with sl i
   -- a scripted slot's payloads are DATA, so nothing is parked there
-  ... | scripted _ = 0
-  ... | shared d   = dWᵉ j sl d
+  ...   | scripted _ = 0
+  ...   | shared d   = dWⱽ j (i ∷ vs) sl d
 
-  dWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  dWᵗ j sl (varᵗ x)      = 0
-  dWᵗ j sl unit̂          = 0
-  dWᵗ j sl (bool̂ _)      = 0
-  dWᵗ j sl (nat̂ _)       = 0
-  dWᵗ j sl (pairᵗ a b)   = dWᵗ j sl a ⊔ dWᵗ j sl b
-  dWᵗ j sl (fstᵗ p)      = dWᵗ j sl p
-  dWᵗ j sl (sndᵗ p)      = dWᵗ j sl p
-  dWᵗ j sl (inlᵗ a)      = dWᵗ j sl a
-  dWᵗ j sl (inrᵗ a)      = dWᵗ j sl a
-  dWᵗ j sl (caseᵗ s l r) = dWᵗ j sl s ⊔ dWᵗ j sl l ⊔ dWᵗ j sl r
-  dWᵗ j sl (ifᵗ c a b)   = dWᵗ j sl c ⊔ dWᵗ j sl a ⊔ dWᵗ j sl b
-  dWᵗ j sl (primᵗ _ a)   = dWᵗ j sl a
-  dWᵗ j sl (strmᵗ e)     = dWᵉ j sl e
+  dWᵗⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
+  dWᵗⱽ j vs sl (varᵗ x)      = 0
+  dWᵗⱽ j vs sl unit̂          = 0
+  dWᵗⱽ j vs sl (bool̂ _)      = 0
+  dWᵗⱽ j vs sl (nat̂ _)       = 0
+  dWᵗⱽ j vs sl (pairᵗ a b)   = dWᵗⱽ j vs sl a ⊔ dWᵗⱽ j vs sl b
+  dWᵗⱽ j vs sl (fstᵗ p)      = dWᵗⱽ j vs sl p
+  dWᵗⱽ j vs sl (sndᵗ p)      = dWᵗⱽ j vs sl p
+  dWᵗⱽ j vs sl (inlᵗ a)      = dWᵗⱽ j vs sl a
+  dWᵗⱽ j vs sl (inrᵗ a)      = dWᵗⱽ j vs sl a
+  dWᵗⱽ j vs sl (caseᵗ s l r) = dWᵗⱽ j vs sl s ⊔ dWᵗⱽ j vs sl l ⊔ dWᵗⱽ j vs sl r
+  dWᵗⱽ j vs sl (ifᵗ c a b)   = dWᵗⱽ j vs sl c ⊔ dWᵗⱽ j vs sl a ⊔ dWᵗⱽ j vs sl b
+  dWᵗⱽ j vs sl (primᵗ _ a)   = dWᵗⱽ j vs sl a
+  dWᵗⱽ j vs sl (strmᵗ e)     = dWⱽ j vs sl e
 
-  dWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  dWᵗˢ j sl []       = 0
-  dWᵗˢ j sl (y ∷ ys) = dWᵗ j sl y ⊔ dWᵗˢ j sl ys
+  dWᵗˢⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  dWᵗˢⱽ j vs sl []       = 0
+  dWᵗˢⱽ j vs sl (y ∷ ys) = dWᵗⱽ j vs sl y ⊔ dWᵗˢⱽ j vs sl ys
+
+
+-- the parked half's exported names, likewise at the entry form
+dWᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+dWᵉ j sl e = dWⱽ j [] sl e
+
+dWᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
+dWᵗ j sl tm = dWᵗⱽ j [] sl tm
+
+dWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+dWᵗˢ j sl ts = dWᵗˢⱽ j [] sl ts
+
+-- and the join, on the descent itself: the caps side reads it at `[]`
+pWⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n))
+    (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
+pWⱽ j vs sl e = outWⱽ j vs sl e ⊔ dWⱽ j vs sl e
 
 -- the parked width of a runtime VALUE, mirroring outWᵛ clause for clause
 dWᵛ : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty) → Val Γ t → ℕ

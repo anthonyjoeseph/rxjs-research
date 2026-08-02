@@ -108,6 +108,9 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
                                 outWᵉ; innWᵉ; innWᵗ; innWᵗˢ;
                                 pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
+                                _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ;
+                                pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
+                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ; pWⱽ;
                                 slotPW; slotsPW; slotsPWgo;
                                 slotIW; slotsIW; slotsIWgo)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
@@ -1116,126 +1119,153 @@ max3-suc a b c ha hb hc =
 -- unsticks each constructor once, here.
 ------------------------------------------------------------------
 
-module Red {n} {Γ : Ctx n} where
+module Red {n} {Γ : Ctx n} {vs : List (Fin n)} where
   oW-of : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-    outWᵉ q sl (ofᵉ ts) ≡ length ts
+    outWⱽ q vs sl (ofᵉ ts) ≡ length ts
   oW-of zero    sl ts = refl
   oW-of (suc _) sl ts = refl
 
   oW-empty : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} →
-    outWᵉ q sl (emptyᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t}) ≡ 0
+    outWⱽ q vs sl (emptyᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t}) ≡ 0
   oW-empty zero    sl  = refl
   oW-empty (suc _) sl  = refl
 
   oW-map : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ s t) (e : Exp Γ Δᵍ Δ Θ s) →
-    outWᵉ q sl (mapᵉ f e) ≡ outWᵉ q sl e
+    outWⱽ q vs sl (mapᵉ f e) ≡ outWⱽ q vs sl e
   oW-map zero    sl f e = refl
   oW-map (suc _) sl f e = refl
 
   oW-take : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (c : Tm Γ Δᵍ Δ Θ natᵗ) (e : Exp Γ Δᵍ Δ Θ t) →
-    outWᵉ q sl (takeᵉ c e) ≡ outWᵉ q sl e
+    outWⱽ q vs sl (takeᵉ c e) ≡ outWⱽ q vs sl e
   oW-take zero    sl c e = refl
   oW-take (suc _) sl c e = refl
 
   oW-scan : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t) (z : Tm Γ Δᵍ Δ Θ t) (e : Exp Γ Δᵍ Δ Θ s) →
-    outWᵉ q sl (scanᵉ f z e) ≡ outWᵉ q sl e
+    outWⱽ q vs sl (scanᵉ f z e) ≡ outWⱽ q vs sl e
   oW-scan zero    sl f z e = refl
   oW-scan (suc _) sl f z e = refl
 
   oW-merge : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWᵉ q sl (mergeAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+    outWⱽ q vs sl (mergeAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
   oW-merge zero    sl e = refl
   oW-merge (suc _) sl e = refl
 
   oW-concat : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWᵉ q sl (concatAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+    outWⱽ q vs sl (concatAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
   oW-concat zero    sl e = refl
   oW-concat (suc _) sl e = refl
 
   oW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWᵉ q sl (switchAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+    outWⱽ q vs sl (switchAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
   oW-switch zero    sl e = refl
   oW-switch (suc _) sl e = refl
 
   oW-exhaust : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWᵉ q sl (exhaustAllᵉ e) ≡ outWᵉ q sl e * innWᵉ q sl e
+    outWⱽ q vs sl (exhaustAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
   oW-exhaust zero    sl e = refl
   oW-exhaust (suc _) sl e = refl
 
   oW-μ : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ (t ∷ Δᵍ) Δ Θ t) →
-    outWᵉ q sl (μᵉ e) ≡ outWᵉ q sl e
+    outWⱽ q vs sl (μᵉ e) ≡ outWⱽ q vs sl e
   oW-μ zero    sl e = refl
   oW-μ (suc _) sl e = refl
 
   oW-var : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (x : t ∈ Δ) →
-    outWᵉ q sl (varᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Θ = Θ} x) ≡ 0
+    outWⱽ q vs sl (varᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Θ = Θ} x) ≡ 0
   oW-var zero    sl x = refl
   oW-var (suc _) sl x = refl
 
   oW-defer : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ [] (Δᵍ ++ Δ) Θ t) →
-    outWᵉ q sl (deferᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} e) ≡ 0
+    outWⱽ q vs sl (deferᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} e) ≡ 0
   oW-defer zero    sl e = refl
   oW-defer (suc _) sl e = refl
 
   iW-of : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-    innWᵉ q sl (ofᵉ ts) ≡ innWᵗˢ q sl ts
+    innWⱽ q vs sl (ofᵉ ts) ≡ innWᵗˢⱽ q vs sl ts
   iW-of zero    sl ts = refl
   iW-of (suc _) sl ts = refl
 
   iW-empty : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} →
-    innWᵉ q sl (emptyᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t}) ≡ 0
+    innWⱽ q vs sl (emptyᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t}) ≡ 0
   iW-empty zero    sl  = refl
   iW-empty (suc _) sl  = refl
 
   iW-map : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ s t) (e : Exp Γ Δᵍ Δ Θ s) →
-    innWᵉ q sl (mapᵉ f e) ≡ innWᵗ q sl f + (pmIᵗ q sl 0 f ⊔ 1) * innWᵉ q sl e
+    innWⱽ q vs sl (mapᵉ f e) ≡ innWᵗⱽ q vs sl f + (pmIᵗⱽ q vs sl 0 f ⊔ 1) * innWⱽ q vs sl e
   iW-map zero    sl f e = refl
   iW-map (suc _) sl f e = refl
 
   iW-take : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (c : Tm Γ Δᵍ Δ Θ natᵗ) (e : Exp Γ Δᵍ Δ Θ t) →
-    innWᵉ q sl (takeᵉ c e) ≡ innWᵉ q sl e
+    innWⱽ q vs sl (takeᵉ c e) ≡ innWⱽ q vs sl e
   iW-take zero    sl c e = refl
   iW-take (suc _) sl c e = refl
 
   iW-scan : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t) (z : Tm Γ Δᵍ Δ Θ t) (e : Exp Γ Δᵍ Δ Θ s) →
-    innWᵉ q sl (scanᵉ f z e) ≡ (pmIᵗ q sl 0 f ⊔ 1) ^ outWᵉ q sl e * (innWᵗ q sl f + innWᵗ q sl z + innWᵉ q sl e + 1)
+    innWⱽ q vs sl (scanᵉ f z e) ≡ (pmIᵗⱽ q vs sl 0 f ⊔ 1) ^ outWⱽ q vs sl e * (innWᵗⱽ q vs sl f + innWᵗⱽ q vs sl z + innWⱽ q vs sl e + 1)
   iW-scan zero    sl f z e = refl
   iW-scan (suc _) sl f z e = refl
 
   iW-merge : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWᵉ q sl (mergeAllᵉ e) ≡ innWᵉ q sl e
+    innWⱽ q vs sl (mergeAllᵉ e) ≡ innWⱽ q vs sl e
   iW-merge zero    sl e = refl
   iW-merge (suc _) sl e = refl
 
   iW-concat : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWᵉ q sl (concatAllᵉ e) ≡ innWᵉ q sl e
+    innWⱽ q vs sl (concatAllᵉ e) ≡ innWⱽ q vs sl e
   iW-concat zero    sl e = refl
   iW-concat (suc _) sl e = refl
 
   iW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWᵉ q sl (switchAllᵉ e) ≡ innWᵉ q sl e
+    innWⱽ q vs sl (switchAllᵉ e) ≡ innWⱽ q vs sl e
   iW-switch zero    sl e = refl
   iW-switch (suc _) sl e = refl
 
   iW-exhaust : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWᵉ q sl (exhaustAllᵉ e) ≡ innWᵉ q sl e
+    innWⱽ q vs sl (exhaustAllᵉ e) ≡ innWⱽ q vs sl e
   iW-exhaust zero    sl e = refl
   iW-exhaust (suc _) sl e = refl
 
   iW-μ : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ (t ∷ Δᵍ) Δ Θ t) →
-    innWᵉ q sl (μᵉ e) ≡ innWᵉ q sl e
+    innWⱽ q vs sl (μᵉ e) ≡ innWⱽ q vs sl e
   iW-μ zero    sl e = refl
   iW-μ (suc _) sl e = refl
 
   iW-var : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (x : t ∈ Δ) →
-    innWᵉ q sl (varᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Θ = Θ} x) ≡ 0
+    innWⱽ q vs sl (varᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Θ = Θ} x) ≡ 0
   iW-var zero    sl x = refl
   iW-var (suc _) sl x = refl
 
   iW-defer : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ [] (Δᵍ ++ Δ) Θ t) →
-    innWᵉ q sl (deferᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} e) ≡ 0
+    innWⱽ q vs sl (deferᵉ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} e) ≡ 0
   iW-defer zero    sl e = refl
   iW-defer (suc _) sl e = refl
+
+------------------------------------------------------------------
+-- AND THE VISITED-SET ORDER, the second axis the same induction walks.
+-- A bigger visited set is a SHORTER descent, so it is ANTITONE: the
+-- measure at `i ∷ vs` sits under the measure at `vs`, because the
+-- revisit clause hands back 0 where the unmarked one descends.  `Sub`
+-- is the ⊆ the induction threads, and the only two instances the tree
+-- ever needs are `Sub [] vs` (vacuous) and its closure under a shared
+-- slot's own index.
+------------------------------------------------------------------
+
+Sub : ∀ {n} → List (Fin n) → List (Fin n) → Set
+Sub {n} vs vs′ = (k : Fin n) → k ∈ᵇ vs ≡ true → k ∈ᵇ vs′ ≡ true
+
+-- stated UNFOLDED, both of them: `Sub` is a Π under a definition, and
+-- the LHS checker will not split past a pattern whose type is one
+Sub-[] : ∀ {n} {vs : List (Fin n)} (k : Fin n) → k ∈ᵇ [] ≡ true → k ∈ᵇ vs ≡ true
+Sub-[] k ()
+
+Sub-∷ : ∀ {n} (i : Fin n) {vs vs′ : List (Fin n)} → Sub vs vs′ →
+  (k : Fin n) → k ∈ᵇ (i ∷ vs) ≡ true → k ∈ᵇ (i ∷ vs′) ≡ true
+Sub-∷ i {vs} {vs′} hv k = go (toℕ k ≡ᵇ toℕ i)
+  where
+  go : ∀ (b : Bool) → (if b then true else k ∈ᵇ vs) ≡ true
+                    → (if b then true else k ∈ᵇ vs′) ≡ true
+  go true  _  = refl
+  go false h  = hv k h
 
 ------------------------------------------------------------------
 -- ONE foldStep PER SYNTAX NODE, TWO AT scanᵉ.
@@ -1677,53 +1707,60 @@ wid-iterFold S M hS hM sl hI e =
 -- what the `suc` pays for.
 ------------------------------------------------------------------
 
--- THE MEASURES ARE MONOTONE IN THE SLOT FUEL.  Only the `input` clauses
--- read the fuel, and there more fuel means a deeper descent into the
--- slot telescope; every other clause is a ⊔, a sum, a product or an
--- exponential of the children, all monotone.  This is what bridges the
--- slot side condition (stated at the telescope's own fuel `n`) to what
--- the width induction meets at an `input` leaf, which is one CONNECT
--- below it.
+-- THE MEASURES ARE MONOTONE IN THE SLOT FUEL AND ANTITONE IN THE
+-- VISITED SET, and it is ONE induction because only the `input` clauses
+-- read either.  More fuel means a deeper descent into the slot
+-- telescope; a bigger visited set means a shorter one, since a revisit
+-- hands back 0.  Every other clause is a ⊔, a sum, a product or an
+-- exponential of the children, all monotone in all of them.
+--
+-- BOTH AXES AT ONCE is what the leaf needs.  The slot side condition is
+-- stated at the ENTRY form (`vs = []`, since capsOK? bounds a STORED
+-- value and a stored value carries no record of which connect put it
+-- there), while the width induction meets an `input` leaf one CONNECT
+-- below it AND with that slot's own index already marked.  The bridge
+-- is therefore `q ≤ q′` together with `Sub vs′ vs`, and `Sub [] _` is
+-- vacuous — which is exactly the instance slotsCaps?-slotWid uses.
 module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
 
-  MonoE : ∀ {Δᵍ Δ Θ t} → ℕ → ℕ → Exp Γ Δᵍ Δ Θ t → Set
-  MonoE q q′ e = (outWᵉ q sl e ≤ outWᵉ q′ sl e)
-               × (innWᵉ q sl e ≤ innWᵉ q′ sl e)
-               × ((k : ℕ) → pmOᵉ q sl k e ≤ pmOᵉ q′ sl k e)
-               × ((k : ℕ) → pmIᵉ q sl k e ≤ pmIᵉ q′ sl k e)
+  MonoE : ∀ {Δᵍ Δ Θ t} → ℕ → List (Fin n) → ℕ → List (Fin n) → Exp Γ Δᵍ Δ Θ t → Set
+  MonoE q vs q′ vs′ e = (outWⱽ q vs sl e ≤ outWⱽ q′ vs′ sl e)
+               × (innWⱽ q vs sl e ≤ innWⱽ q′ vs′ sl e)
+               × ((k : ℕ) → pmOⱽ q vs sl k e ≤ pmOⱽ q′ vs′ sl k e)
+               × ((k : ℕ) → pmIⱽ q vs sl k e ≤ pmIⱽ q′ vs′ sl k e)
 
-  MonoT : ∀ {Δᵍ Δ Θ t} → ℕ → ℕ → Tm Γ Δᵍ Δ Θ t → Set
-  MonoT q q′ tm = (innWᵗ q sl tm ≤ innWᵗ q′ sl tm)
-                × ((k : ℕ) → pmOᵗ q sl k tm ≤ pmOᵗ q′ sl k tm)
-                × ((k : ℕ) → pmIᵗ q sl k tm ≤ pmIᵗ q′ sl k tm)
+  MonoT : ∀ {Δᵍ Δ Θ t} → ℕ → List (Fin n) → ℕ → List (Fin n) → Tm Γ Δᵍ Δ Θ t → Set
+  MonoT q vs q′ vs′ tm = (innWᵗⱽ q vs sl tm ≤ innWᵗⱽ q′ vs′ sl tm)
+                × ((k : ℕ) → pmOᵗⱽ q vs sl k tm ≤ pmOᵗⱽ q′ vs′ sl k tm)
+                × ((k : ℕ) → pmIᵗⱽ q vs sl k tm ≤ pmIᵗⱽ q′ vs′ sl k tm)
 
-  MonoL : ∀ {Δᵍ Δ Θ t} → ℕ → ℕ → List (Tm Γ Δᵍ Δ Θ t) → Set
-  MonoL q q′ ts = (innWᵗˢ q sl ts ≤ innWᵗˢ q′ sl ts)
-                × ((k : ℕ) → pmIᵗˢ q sl k ts ≤ pmIᵗˢ q′ sl k ts)
+  MonoL : ∀ {Δᵍ Δ Θ t} → ℕ → List (Fin n) → ℕ → List (Fin n) → List (Tm Γ Δᵍ Δ Θ t) → Set
+  MonoL q vs q′ vs′ ts = (innWᵗˢⱽ q vs sl ts ≤ innWᵗˢⱽ q′ vs′ sl ts)
+                × ((k : ℕ) → pmIᵗˢⱽ q vs sl k ts ≤ pmIᵗˢⱽ q′ vs′ sl k ts)
 
   mutual
-    monoᵉ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
-      MonoE q q′ e
-    monoᵉ q {q′} le (ofᵉ ts) =
+    monoᵉ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {vs vs′ : List (Fin n)} → Sub vs′ vs →
+      ∀ {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → MonoE q vs q′ vs′ e
+    monoᵉ q {q′} le hv (ofᵉ ts) =
       ≤-reflexive (trans (Red.oW-of q sl ts) (sym (Red.oW-of q′ sl ts)))
       , ≤-trans (≤-reflexive (Red.iW-of q sl ts))
-                (≤-trans (proj₁ (monoᵗˢ q le ts))
+                (≤-trans (proj₁ (monoᵗˢ q le hv ts))
                          (≤-reflexive (sym (Red.iW-of q′ sl ts))))
       , (λ k → z≤n)
-      , (λ k → proj₂ (monoᵗˢ q le ts) k)
-    monoᵉ q {q′} le emptyᵉ =
+      , (λ k → proj₂ (monoᵗˢ q le hv ts) k)
+    monoᵉ q {q′} le hv emptyᵉ =
       ≤-trans (≤-reflexive (Red.oW-empty q sl)) z≤n
       , ≤-trans (≤-reflexive (Red.iW-empty q sl)) z≤n
       , (λ k → z≤n) , (λ k → z≤n)
-    monoᵉ q {q′} le (varᵉ x) =
+    monoᵉ q {q′} le hv (varᵉ x) =
       ≤-trans (≤-reflexive (Red.oW-var q sl x)) z≤n
       , ≤-trans (≤-reflexive (Red.iW-var q sl x)) z≤n
       , (λ k → z≤n) , (λ k → z≤n)
-    monoᵉ q {q′} le {Δᵍ} {Δ} {Θ} (deferᵉ e) =
+    monoᵉ q {q′} le hv {Δᵍ} {Δ} {Θ} (deferᵉ e) =
       ≤-trans (≤-reflexive (Red.oW-defer q sl {Δᵍ} {Δ} {Θ} e)) z≤n
       , ≤-trans (≤-reflexive (Red.iW-defer q sl {Δᵍ} {Δ} {Θ} e)) z≤n
       , (λ k → z≤n) , (λ k → z≤n)
-    monoᵉ q {q′} le (mapᵉ f e) =
+    monoᵉ q {q′} le hv (mapᵉ f e) =
       ≤-trans (≤-reflexive (Red.oW-map q sl f e))
               (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-map q′ sl f e))))
       , ≤-trans (≤-reflexive (Red.iW-map q sl f e))
@@ -1736,9 +1773,9 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                  (*-mono-≤ (⊔-mono-≤ (proj₂ (proj₂ IHf) 0) ≤-refl)
                            (proj₂ (proj₂ (proj₂ IHe)) k)))
       where
-      IHf = monoᵗ q le f
-      IHe = monoᵉ q le e
-    monoᵉ q {q′} le (takeᵉ c e) =
+      IHf = monoᵗ q le hv f
+      IHe = monoᵉ q le hv e
+    monoᵉ q {q′} le hv (takeᵉ c e) =
       ≤-trans (≤-reflexive (Red.oW-take q sl c e))
               (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-take q′ sl c e))))
       , ≤-trans (≤-reflexive (Red.iW-take q sl c e))
@@ -1746,8 +1783,8 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                          (≤-reflexive (sym (Red.iW-take q′ sl c e))))
       , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
       , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
-    monoᵉ q {q′} le (scanᵉ f z e) =
+      where IHe = monoᵉ q le hv e
+    monoᵉ q {q′} le {vs} {vs′} hv (scanᵉ f z e) =
       ≤-trans (≤-reflexive (Red.oW-scan q sl f z e))
               (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-scan q′ sl f z e))))
       , ≤-trans (≤-reflexive (Red.iW-scan q sl f z e))
@@ -1762,15 +1799,16 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                                      (proj₂ (proj₂ IHz) k))
                            (proj₂ (proj₂ (proj₂ IHe)) k)))
       where
-      IHf = monoᵗ q le f
-      IHz = monoᵗ q le z
-      IHe = monoᵉ q le e
-      POW : (pmIᵗ q sl 0 f ⊔ 1) ^ outWᵉ q sl e
-              ≤ (pmIᵗ q′ sl 0 f ⊔ 1) ^ outWᵉ q′ sl e
-      POW = ≤-trans (^-monoˡ-≤ (outWᵉ q sl e)
+      IHf = monoᵗ q le hv f
+      IHz = monoᵗ q le hv z
+      IHe = monoᵉ q le hv e
+      POW : (pmIᵗⱽ q vs sl 0 f ⊔ 1) ^ outWⱽ q vs sl e
+              ≤ (pmIᵗⱽ q′ vs′ sl 0 f ⊔ 1) ^ outWⱽ q′ vs′ sl e
+      POW = ≤-trans (^-monoˡ-≤ (outWⱽ q vs sl e)
                       (⊔-mono-≤ (proj₂ (proj₂ IHf) 0) ≤-refl))
-                    (powʳ1 (pmIᵗ q′ sl 0 f ⊔ 1) (m≤n⊔m (pmIᵗ q′ sl 0 f) 1) (proj₁ IHe))
-    monoᵉ q {q′} le (mergeAllᵉ e) =
+                    (powʳ1 (pmIᵗⱽ q′ vs′ sl 0 f ⊔ 1)
+                           (m≤n⊔m (pmIᵗⱽ q′ vs′ sl 0 f) 1) (proj₁ IHe))
+    monoᵉ q {q′} le hv (mergeAllᵉ e) =
       ≤-trans (≤-reflexive (Red.oW-merge q sl e))
               (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
                        (≤-reflexive (sym (Red.oW-merge q′ sl e))))
@@ -1781,8 +1819,8 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                         (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
                                   (proj₁ (proj₂ IHe))))
       , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
-    monoᵉ q {q′} le (concatAllᵉ e) =
+      where IHe = monoᵉ q le hv e
+    monoᵉ q {q′} le hv (concatAllᵉ e) =
       ≤-trans (≤-reflexive (Red.oW-concat q sl e))
               (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
                        (≤-reflexive (sym (Red.oW-concat q′ sl e))))
@@ -1793,8 +1831,8 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                         (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
                                   (proj₁ (proj₂ IHe))))
       , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
-    monoᵉ q {q′} le (switchAllᵉ e) =
+      where IHe = monoᵉ q le hv e
+    monoᵉ q {q′} le hv (switchAllᵉ e) =
       ≤-trans (≤-reflexive (Red.oW-switch q sl e))
               (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
                        (≤-reflexive (sym (Red.oW-switch q′ sl e))))
@@ -1805,8 +1843,8 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                         (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
                                   (proj₁ (proj₂ IHe))))
       , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
-    monoᵉ q {q′} le (exhaustAllᵉ e) =
+      where IHe = monoᵉ q le hv e
+    monoᵉ q {q′} le hv (exhaustAllᵉ e) =
       ≤-trans (≤-reflexive (Red.oW-exhaust q sl e))
               (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
                        (≤-reflexive (sym (Red.oW-exhaust q′ sl e))))
@@ -1817,53 +1855,59 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                         (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
                                   (proj₁ (proj₂ IHe))))
       , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
-    monoᵉ q {q′} le (μᵉ e) =
+      where IHe = monoᵉ q le hv e
+    monoᵉ q {q′} le hv (μᵉ e) =
       ≤-trans (≤-reflexive (Red.oW-μ q sl e))
               (≤-trans (proj₁ IHe) (≤-reflexive (sym (Red.oW-μ q′ sl e))))
       , ≤-trans (≤-reflexive (Red.iW-μ q sl e))
                 (≤-trans (proj₁ (proj₂ IHe)) (≤-reflexive (sym (Red.iW-μ q′ sl e))))
       , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
       , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
+      where IHe = monoᵉ q le hv e
     -- THE ONLY CLAUSE THAT READS THE FUEL, and the only place the
     -- induction descends on it rather than on the syntax
-    monoᵉ zero {q′} le (input i) = z≤n , z≤n , (λ k → z≤n) , (λ k → z≤n)
-    monoᵉ (suc q) {suc q′} (s≤s le) (input i) with sl i
-    ... | scripted _ = ≤-refl , ≤-refl , (λ k → z≤n) , (λ k → z≤n)
-    ... | shared d   = proj₁ IH , proj₁ (proj₂ IH) , (λ k → z≤n) , (λ k → z≤n)
-      where IH = monoᵉ q le d
+    monoᵉ zero {q′} le hv (input i) = z≤n , z≤n , (λ k → z≤n) , (λ k → z≤n)
+    monoᵉ (suc q) {suc q′} (s≤s le) {vs} {vs′} hv (input i) with i ∈ᵇ vs′ in eq′
+    -- the RIGHT side has already entered this slot, so the left has too
+    ... | true rewrite hv i eq′ = z≤n , z≤n , (λ k → z≤n) , (λ k → z≤n)
+    ... | false with i ∈ᵇ vs
+    -- only the LEFT has: a revisit delivers nothing, and 0 bounds all
+    ...   | true  = z≤n , z≤n , (λ k → z≤n) , (λ k → z≤n)
+    ...   | false with sl i
+    ...     | scripted _ = ≤-refl , ≤-refl , (λ k → z≤n) , (λ k → z≤n)
+    ...     | shared d   = proj₁ IH , proj₁ (proj₂ IH) , (λ k → z≤n) , (λ k → z≤n)
+      where IH = monoᵉ q le {i ∷ vs} {i ∷ vs′} (Sub-∷ i {vs′} {vs} hv) d
 
-    monoᵗ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
-      MonoT q q′ tm
-    monoᵗ q {q′} le (varᵗ x)   = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
-    monoᵗ q {q′} le unit̂       = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
-    monoᵗ q {q′} le (bool̂ _)   = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
-    monoᵗ q {q′} le (nat̂ _)    = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
-    monoᵗ q {q′} le (primᵗ _ a) = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
-    monoᵗ q {q′} le (pairᵗ a b) =
+    monoᵗ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {vs vs′ : List (Fin n)} → Sub vs′ vs →
+      ∀ {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → MonoT q vs q′ vs′ tm
+    monoᵗ q {q′} le hv (varᵗ x)   = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le hv unit̂       = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le hv (bool̂ _)   = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le hv (nat̂ _)    = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le hv (primᵗ _ a) = ≤-refl , (λ k → ≤-refl) , (λ k → ≤-refl)
+    monoᵗ q {q′} le hv (pairᵗ a b) =
       ⊔-mono-≤ (proj₁ IHa) (proj₁ IHb)
       , (λ k → ⊔-mono-≤ (proj₁ (proj₂ IHa) k) (proj₁ (proj₂ IHb) k))
       , (λ k → ⊔-mono-≤ (proj₂ (proj₂ IHa) k) (proj₂ (proj₂ IHb) k))
       where
-      IHa = monoᵗ q le a
-      IHb = monoᵗ q le b
-    monoᵗ q {q′} le (fstᵗ p) = monoᵗ q le p
-    monoᵗ q {q′} le (sndᵗ p) = monoᵗ q le p
-    monoᵗ q {q′} le (inlᵗ p) = monoᵗ q le p
-    monoᵗ q {q′} le (inrᵗ p) = monoᵗ q le p
-    monoᵗ q {q′} le (ifᵗ c a b) =
+      IHa = monoᵗ q le hv a
+      IHb = monoᵗ q le hv b
+    monoᵗ q {q′} le hv (fstᵗ p) = monoᵗ q le hv p
+    monoᵗ q {q′} le hv (sndᵗ p) = monoᵗ q le hv p
+    monoᵗ q {q′} le hv (inlᵗ p) = monoᵗ q le hv p
+    monoᵗ q {q′} le hv (inrᵗ p) = monoᵗ q le hv p
+    monoᵗ q {q′} le hv (ifᵗ c a b) =
       ⊔-mono-≤ (proj₁ IHa) (proj₁ IHb)
       , (λ k → ⊔-mono-≤ (proj₁ (proj₂ IHa) k) (proj₁ (proj₂ IHb) k))
       , (λ k → ⊔-mono-≤ (proj₂ (proj₂ IHa) k) (proj₂ (proj₂ IHb) k))
       where
-      IHa = monoᵗ q le a
-      IHb = monoᵗ q le b
-    monoᵗ q {q′} le (strmᵗ e) =
+      IHa = monoᵗ q le hv a
+      IHb = monoᵗ q le hv b
+    monoᵗ q {q′} le hv (strmᵗ e) =
       proj₁ IHe , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
       , (λ k → proj₁ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le e
-    monoᵗ q {q′} le (caseᵗ s l r) =
+      where IHe = monoᵉ q le hv e
+    monoᵗ q {q′} le hv (caseᵗ s l r) =
       +-mono-≤ (⊔-mono-≤ (proj₁ IHl) (proj₁ IHr)) (*-mono-≤ C≤ (proj₁ IHs))
       , (λ k → ⊔-mono-≤ (⊔-mono-≤ (proj₁ (proj₂ IHl) (suc k))
                                   (proj₁ (proj₂ IHr) (suc k)))
@@ -1872,66 +1916,70 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                                   (proj₂ (proj₂ IHr) (suc k)))
                         (*-mono-≤ C≤ (proj₂ (proj₂ IHs) k)))
       where
-      IHs = monoᵗ q le s
-      IHl = monoᵗ q le l
-      IHr = monoᵗ q le r
+      IHs = monoᵗ q le hv s
+      IHl = monoᵗ q le hv l
+      IHr = monoᵗ q le hv r
       C≤ = ⊔-mono-≤ (⊔-mono-≤ (proj₂ (proj₂ IHl) 0) (proj₂ (proj₂ IHr) 0)) ≤-refl
 
-    monoᵗˢ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ →
-      ∀ {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → MonoL q q′ ts
-    monoᵗˢ q {q′} le []       = ≤-refl , (λ k → ≤-refl)
-    monoᵗˢ q {q′} le (y ∷ ys) =
+    monoᵗˢ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {vs vs′ : List (Fin n)} → Sub vs′ vs →
+      ∀ {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → MonoL q vs q′ vs′ ts
+    monoᵗˢ q {q′} le hv []       = ≤-refl , (λ k → ≤-refl)
+    monoᵗˢ q {q′} le hv (y ∷ ys) =
       ⊔-mono-≤ (proj₁ IHy) (proj₁ IHys)
       , (λ k → ⊔-mono-≤ (proj₂ (proj₂ IHy) k) (proj₂ IHys k))
       where
-      IHy  = monoᵗ q le y
-      IHys = monoᵗˢ q le ys
+      IHy  = monoᵗ q le hv y
+      IHys = monoᵗˢ q le hv ys
 
   -- and the parked half, which reads the delivered one at a defer
   mutual
-    monoᴰᵉ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
-      dWᵉ q sl e ≤ dWᵉ q′ sl e
-    monoᴰᵉ q le (ofᵉ ts)        = monoᴰᵗˢ q le ts
-    monoᴰᵉ q le emptyᵉ          = z≤n
-    monoᴰᵉ q le (varᵉ x)        = z≤n
-    monoᴰᵉ q le (mapᵉ f e)      = ⊔-mono-≤ (monoᴰᵗ q le f) (monoᴰᵉ q le e)
-    monoᴰᵉ q le (takeᵉ c e)     = ⊔-mono-≤ (monoᴰᵗ q le c) (monoᴰᵉ q le e)
-    monoᴰᵉ q le (scanᵉ f z e)   =
-      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le f) (monoᴰᵗ q le z)) (monoᴰᵉ q le e)
-    monoᴰᵉ q le (mergeAllᵉ e)   = monoᴰᵉ q le e
-    monoᴰᵉ q le (concatAllᵉ e)  = monoᴰᵉ q le e
-    monoᴰᵉ q le (switchAllᵉ e)  = monoᴰᵉ q le e
-    monoᴰᵉ q le (exhaustAllᵉ e) = monoᴰᵉ q le e
-    monoᴰᵉ q le (μᵉ e)          = monoᴰᵉ q le e
-    monoᴰᵉ q le (deferᵉ e)      =
-      ⊔-mono-≤ (proj₁ (monoᵉ q le e)) (monoᴰᵉ q le e)
-    monoᴰᵉ zero    le (input i) = z≤n
-    monoᴰᵉ (suc q) (s≤s le) (input i) with sl i
-    ... | scripted _ = z≤n
-    ... | shared d   = monoᴰᵉ q le d
+    monoᴰᵉ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {vs vs′ : List (Fin n)} → Sub vs′ vs →
+      ∀ {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → dWⱽ q vs sl e ≤ dWⱽ q′ vs′ sl e
+    monoᴰᵉ q le hv (ofᵉ ts)        = monoᴰᵗˢ q le hv ts
+    monoᴰᵉ q le hv emptyᵉ          = z≤n
+    monoᴰᵉ q le hv (varᵉ x)        = z≤n
+    monoᴰᵉ q le hv (mapᵉ f e)      = ⊔-mono-≤ (monoᴰᵗ q le hv f) (monoᴰᵉ q le hv e)
+    monoᴰᵉ q le hv (takeᵉ c e)     = ⊔-mono-≤ (monoᴰᵗ q le hv c) (monoᴰᵉ q le hv e)
+    monoᴰᵉ q le hv (scanᵉ f z e)   =
+      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le hv f) (monoᴰᵗ q le hv z)) (monoᴰᵉ q le hv e)
+    monoᴰᵉ q le hv (mergeAllᵉ e)   = monoᴰᵉ q le hv e
+    monoᴰᵉ q le hv (concatAllᵉ e)  = monoᴰᵉ q le hv e
+    monoᴰᵉ q le hv (switchAllᵉ e)  = monoᴰᵉ q le hv e
+    monoᴰᵉ q le hv (exhaustAllᵉ e) = monoᴰᵉ q le hv e
+    monoᴰᵉ q le hv (μᵉ e)          = monoᴰᵉ q le hv e
+    monoᴰᵉ q le hv (deferᵉ e)      =
+      ⊔-mono-≤ (proj₁ (monoᵉ q le hv e)) (monoᴰᵉ q le hv e)
+    monoᴰᵉ zero    le hv (input i) = z≤n
+    monoᴰᵉ (suc q) (s≤s le) {vs} {vs′} hv (input i) with i ∈ᵇ vs′ in eq′
+    ... | true rewrite hv i eq′ = z≤n
+    ... | false with i ∈ᵇ vs
+    ...   | true  = z≤n
+    ...   | false with sl i
+    ...     | scripted _ = z≤n
+    ...     | shared d   = monoᴰᵉ q le {i ∷ vs} {i ∷ vs′} (Sub-∷ i {vs′} {vs} hv) d
 
-    monoᴰᵗ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
-      dWᵗ q sl tm ≤ dWᵗ q′ sl tm
-    monoᴰᵗ q le (varᵗ x)     = z≤n
-    monoᴰᵗ q le unit̂         = z≤n
-    monoᴰᵗ q le (bool̂ _)     = z≤n
-    monoᴰᵗ q le (nat̂ _)      = z≤n
-    monoᴰᵗ q le (pairᵗ a b)  = ⊔-mono-≤ (monoᴰᵗ q le a) (monoᴰᵗ q le b)
-    monoᴰᵗ q le (fstᵗ p)     = monoᴰᵗ q le p
-    monoᴰᵗ q le (sndᵗ p)     = monoᴰᵗ q le p
-    monoᴰᵗ q le (inlᵗ p)     = monoᴰᵗ q le p
-    monoᴰᵗ q le (inrᵗ p)     = monoᴰᵗ q le p
-    monoᴰᵗ q le (primᵗ _ a)  = monoᴰᵗ q le a
-    monoᴰᵗ q le (strmᵗ e)    = monoᴰᵉ q le e
-    monoᴰᵗ q le (caseᵗ s l r) =
-      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le s) (monoᴰᵗ q le l)) (monoᴰᵗ q le r)
-    monoᴰᵗ q le (ifᵗ c a b) =
-      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le c) (monoᴰᵗ q le a)) (monoᴰᵗ q le b)
+    monoᴰᵗ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {vs vs′ : List (Fin n)} → Sub vs′ vs →
+      ∀ {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → dWᵗⱽ q vs sl tm ≤ dWᵗⱽ q′ vs′ sl tm
+    monoᴰᵗ q le hv (varᵗ x)     = z≤n
+    monoᴰᵗ q le hv unit̂         = z≤n
+    monoᴰᵗ q le hv (bool̂ _)     = z≤n
+    monoᴰᵗ q le hv (nat̂ _)      = z≤n
+    monoᴰᵗ q le hv (pairᵗ a b)  = ⊔-mono-≤ (monoᴰᵗ q le hv a) (monoᴰᵗ q le hv b)
+    monoᴰᵗ q le hv (fstᵗ p)     = monoᴰᵗ q le hv p
+    monoᴰᵗ q le hv (sndᵗ p)     = monoᴰᵗ q le hv p
+    monoᴰᵗ q le hv (inlᵗ p)     = monoᴰᵗ q le hv p
+    monoᴰᵗ q le hv (inrᵗ p)     = monoᴰᵗ q le hv p
+    monoᴰᵗ q le hv (primᵗ _ a)  = monoᴰᵗ q le hv a
+    monoᴰᵗ q le hv (strmᵗ e)    = monoᴰᵉ q le hv e
+    monoᴰᵗ q le hv (caseᵗ s l r) =
+      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le hv s) (monoᴰᵗ q le hv l)) (monoᴰᵗ q le hv r)
+    monoᴰᵗ q le hv (ifᵗ c a b) =
+      ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le hv c) (monoᴰᵗ q le hv a)) (monoᴰᵗ q le hv b)
 
-    monoᴰᵗˢ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ →
-      ∀ {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → dWᵗˢ q sl ts ≤ dWᵗˢ q′ sl ts
-    monoᴰᵗˢ q le []       = z≤n
-    monoᴰᵗˢ q le (y ∷ ys) = ⊔-mono-≤ (monoᴰᵗ q le y) (monoᴰᵗˢ q le ys)
+    monoᴰᵗˢ : ∀ (q : ℕ) {q′ : ℕ} → q ≤ q′ → ∀ {vs vs′ : List (Fin n)} → Sub vs′ vs →
+      ∀ {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → dWᵗˢⱽ q vs sl ts ≤ dWᵗˢⱽ q′ vs′ sl ts
+    monoᴰᵗˢ q le hv []       = z≤n
+    monoᴰᵗˢ q le hv (y ∷ ys) = ⊔-mono-≤ (monoᴰᵗ q le hv y) (monoᴰᵗˢ q le hv ys)
 
 ------------------------------------------------------------------
 -- THE LEAF, off the slot side condition.
@@ -1943,11 +1991,12 @@ slotsCaps?-slotWid {n = suc m} B W sl h i
   with sl i | slotsCaps?-lookup B W sl i h
 ... | scripted _ | _  = s≤s z≤n , s≤s z≤n , z≤n
 ... | shared d   | sd =
-  ≤-trans (≤-trans (proj₁ (monoᵉ sl m (n≤1+n m) d))
+  ≤-trans (≤-trans (proj₁ (monoᵉ sl m (n≤1+n m) {i ∷ []} {[]} (Sub-[] {vs = i ∷ []}) d))
                    (≤-trans (m≤m⊔n (outWᵉ (suc m) sl d) (dWᵉ (suc m) sl d)) pw))
           (n≤1+n W)
-  , ≤-trans (≤-trans (proj₁ (proj₂ (monoᵉ sl m (n≤1+n m) d))) iw) (n≤1+n W)
-  , ≤-trans (≤-trans (monoᴰᵉ sl m (n≤1+n m) d)
+  , ≤-trans (≤-trans (proj₁ (proj₂ (monoᵉ sl m (n≤1+n m) {i ∷ []} {[]} (Sub-[] {vs = i ∷ []}) d))) iw)
+            (n≤1+n W)
+  , ≤-trans (≤-trans (monoᴰᵉ sl m (n≤1+n m) {i ∷ []} {[]} (Sub-[] {vs = i ∷ []}) d)
                      (≤-trans (m≤n⊔m (outWᵉ (suc m) sl d) (dWᵉ (suc m) sl d)) pw))
             (n≤1+n W)
   where

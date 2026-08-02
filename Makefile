@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache slot-fuel-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -91,14 +91,6 @@ help:
 	@echo "                  ones), and the BASE, where the whole root-fuel"
 	@echo "                  margin goes (see agda/probe/Mult-Width-Probe.agda)"
 	@echo "                  Fast, ~15 s"
-	@echo "  slot-fuel-probe  the entry width ceiling is NOT two stories per"
-	@echo "                  syntax node: the width measures reach a shared"
-	@echo "                  slot by spending FUEL, and the fuel is the slot"
-	@echo "                  count, so a def in a slot CYCLE exponentiates once"
-	@echo "                  per level.  Four stories off a 50-node telescope,"
-	@echo "                  and the slope in sz is unbounded - the base height"
-	@echo "                  is quadratic, not 3 + 2*sz"
-	@echo "                  (see agda/probe/Slot-Fuel-Probe.agda).  Fast"
 	@echo "  visited-width-probe  the ruling off slot-fuel-probe, measured:"
 	@echo "                  the slot descent drops VISITED slots instead of"
 	@echo "                  spending fuel, so a revisit contributes zero."
@@ -265,17 +257,6 @@ charge-probe:
 # it.  Fast, ~15 s
 mult-width-probe:
 	cd agda && agda -i src -i probe probe/Mult-Width-Probe.agda
-
-# The width measures reach a shared slot by SPENDING FUEL, and every
-# consumer instantiates that fuel at the slot count n — so a def in a slot
-# cycle is re-entered once per level and exponentiates again each time.
-# Measured on a two-slot cycle with two dummy scripted slots: four tower
-# stories off fifty nodes of telescope, which is capsAt's base cWid today
-# (slotsPW reads exactly this).  The rate is one story per wrap per level,
-# so the slope in sz is unbounded and the base height is a PRODUCT.
-# Standalone, so src/Main.agda never reaches it.  Fast.
-slot-fuel-probe:
-	cd agda && agda -i src -i probe probe/Slot-Fuel-Probe.agda
 
 # The ruling Slot-Fuel-Probe prices out, measured before it is ground in:
 # the slot descent stops spending generic fuel and starts DROPPING
