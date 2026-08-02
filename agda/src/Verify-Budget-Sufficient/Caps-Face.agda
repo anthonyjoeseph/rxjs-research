@@ -151,18 +151,22 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize)
 
--- .Caps holds the recurrence itself (Caps / frameStep / frameBlowup /
--- capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
--- .Measures.  Extracted 2026-08-01 so that a grind here no longer
--- re-checks .Wet — see that module's head.
-open import Verify-Budget-Sufficient.Caps public
-
--- .Deliveries is the ledger stratum: where EvalSt.delivered moves and
--- where it provably does not, plus delivN and its composition laws.  It
--- reads Rx.Evaluator and nothing else, so it is a sibling of the whole
--- Caps tower rather than a layer in it; re-exported here because delivN
--- is the currency the cascade conjuncts below are stated in.
-open import Verify-Budget-Sufficient.Deliveries public
+-- .Delivery-Walk re-exports BOTH prerequisites of the cascade
+-- conjuncts and adds the walk itself:
+--
+--   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
+--     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
+--     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     re-checks .Wet — see that module's head.
+--   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
+--     and where it provably does not, plus delivN and its composition
+--     laws.  delivN is the currency the cascade conjuncts are stated in.
+--   · .Delivery-Walk maps the delivery clique onto dCap / dWalk —
+--     foldPath ↦ dCap, dispatchShare ↦ dCap, shareGo ↦ dWalk,
+--     cascadeGo ↦ dWalk — RELATIVE to one frame's mint budget, which it
+--     takes as a record of hypotheses rather than postulating.  See
+--     cascadeGo-deliveries below for what instantiating it still needs.
+open import Verify-Budget-Sufficient.Delivery-Walk public
 
 ------------------------------------------------------------------
 -- THE REACHABILITY CLUSTER — round 3's remaining debt, and the answer
@@ -770,6 +774,33 @@ sum-tabulate-lb : ∀ {n} (f : Fin n → ℕ) (i : Fin n) → f i ≤ sum (tabul
 sum-tabulate-lb {suc n} f Fin.zero    = m≤m+n (f Fin.zero) _
 sum-tabulate-lb {suc n} f (Fin.suc i) =
   ≤-trans (sum-tabulate-lb (λ k → f (Fin.suc k)) i) (m≤n+m _ _)
+
+-- EVERY SLOT COSTS AT LEAST ONE, so the slot COUNT is under the caps'
+-- own size — the supply behind the `n ≤ cSize` hypothesis the delivery
+-- bound now carries.  `cDel`'s gas index is `suc (cSize c)` while the
+-- evaluator's dispatch gas is the literal `n` (chainStep seeds it), and
+-- nothing in capsOK? relates the two: the relation is a fact about the
+-- SLOT TELESCOPE, and it is true at every level because capsAt's base
+-- contains slotsSize as a summand and iterSize only grows it
+1≤slotSize : ∀ {n} {Γ : Ctx n} {t} (s : Slot Γ t) → 1 ≤ slotSize s
+1≤slotSize (scripted (hot _))    = s≤s z≤n
+1≤slotSize (scripted (cold _ _)) = s≤s z≤n
+1≤slotSize (shared d)            = sizeᵉ-pos d
+
+n≤sum-tab : ∀ {n} (f : Fin n → ℕ) → (∀ (i : Fin n) → 1 ≤ f i) →
+  n ≤ sum (tabulate f)
+n≤sum-tab {zero}  f h = z≤n
+n≤sum-tab {suc n} f h =
+  +-mono-≤ (h Fin.zero) (n≤sum-tab (λ k → f (Fin.suc k)) (λ k → h (Fin.suc k)))
+
+n≤slotsSize : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) → n ≤ slotsSize sl
+n≤slotsSize sl = n≤sum-tab (λ i → slotSize (sl i)) (λ i → 1≤slotSize (sl i))
+
+n≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  n ≤ Caps.cSize (capsAt e sl id)
+n≤capsAt-size e sl id =
+  ≤-trans (≤-trans (n≤slotsSize sl) (m≤n+m (slotsSize sl) (2 + sizeᵉ e)))
+          (capsAt-base-size e sl id)
 
 -- and over a mapped list, which is the shape inputSize sums in
 all-≤-sum : ∀ {A : Set} (f : A → ℕ) (xs : List A) (B : ℕ) →
@@ -3923,11 +3954,55 @@ postulate
   -- (cReg 9, cSize 3, gas 6) already exceeds every D in the repo, and
   -- the deepest lean rung is D = 41510 at cReg = 11.  The margin was
   -- never the problem; the self-reference was
+  --
+  -- AND THE WALK IS NOW PROVEN — the whole of it except ONE fact, which
+  -- is a design question rather than a grind.  .Delivery-Walk maps the
+  -- clique onto the recursion, with no postulate of its own:
+  --
+  --   foldPath      ↦ dCap  Q gas R      (dCap's gas IS the dispatch gas)
+  --   dispatchShare ↦ dCap  Q gas R
+  --   shareGo       ↦ dWalk Q gas R (length ps)
+  --   cascadeGo     ↦ dWalk Q n   R (length chains)
+  --
+  -- over .Deliveries' § D equations, `dWalk-front` (the walk decomposes
+  -- from the FRONT exactly as it does from the back — an equality, so
+  -- the change of direction the head-first evaluator forces costs
+  -- nothing), and a per-frame mint budget.  Instantiated at
+  -- Qf = cSize * suc cWid and B = cSize it gives exactly this
+  -- conjunct, since `chargeW c = cSize * suc (suc cWid * suc cSize)`
+  -- dominates `Qf * suc B` and `n ≤ cSize` (the hypothesis above)
+  -- lifts the evaluator's dispatch gas to cDel's index.
+  --
+  -- WHAT IS LEFT IS `Walk-Hyps`, AND IT IS THE ENTRY-CHARGING RULING.
+  -- The walk needs, per stepFrame: the state predicate carries across
+  -- (sf-ok), minted chains stay short (sf-len), and the frame mints at
+  -- most Qf (sf-mint).  The first two are stepFrame-caps' own content.
+  -- The THIRD cannot be read off a level-indexed caps invariant: a
+  -- frame's mints are its subscribed values' shared-input leaves, and
+  -- those values are bounded by the level the frame runs AT
+  -- (frameStep j c), not by the cascade's ENTRY level c — while `cDel
+  -- c` reads `chargeW c`, the entry level, and cannot read the ceiling
+  -- (frameBlowup c is defined FROM sizeCount c, which reads cDel c:
+  -- the ceiling is circular here).  So the mint budget must be charged
+  -- at the ENTRY caps — which is exactly the convention cascadeGo-charge
+  -- above already asserts for FOLDS (`j ≤ D * cSize * suc (…)`, all
+  -- three fields read at c), and a mint IS a fold.  Adopting it for
+  -- mints too turns this conjunct into three frame-local axioms; that
+  -- is a design ruling, so the axiom stays whole until it is made.
+  -- AND IT CARRIES `n ≤ cSize c`, the ruling of 2026-08-02.  `cDel`'s
+  -- gas index is `suc (cSize c)`; the evaluator's dispatch gas is the
+  -- LITERAL slot count `n`, which chainStep seeds.  Nothing in capsOK?
+  -- relates the two — the relation is a fact about the slot telescope
+  -- (`n≤capsAt-size`, above: every slotSize is a suc and capsAt's base
+  -- contains slotsSize) — so it is supplied as a hypothesis rather than
+  -- read off the state.  A hypothesis WEAKENS an axiom, and caps-tick,
+  -- the only consumer, discharges it at every level
   cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     capsOK? c sched st ≡ true →
+    n ≤ Caps.cSize c →
     length chains ≤ Caps.cReg c →
     delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
       ≤ cDel c
@@ -3942,16 +4017,17 @@ cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched st ≡ true →
   valCaps? c sl (arrTy a) (arrVal a) ≡ true →
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+  n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j → (j ≤ sizeCount c)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS lenB =
+cascadeGo-caps c a id chains sl sched st 2≤S slEq inv vC pS n≤S lenB =
   proj₁ CH
     , ≤-trans (proj₁ (proj₂ CH))
               (*-monoˡ-≤ (suc (suc (Caps.cWid c) * suc (Caps.cSize c)))
                  (*-monoˡ-≤ (Caps.cSize c)
-                    (cascadeGo-deliveries c a id chains sched st inv lenB)))
+                    (cascadeGo-deliveries c a id chains sched st inv n≤S lenB)))
     , proj₂ (proj₂ CH)
   where
   CH = cascadeGo-charge c a id chains sl sched st 2≤S slEq inv vC pS lenB
@@ -7140,6 +7216,7 @@ caps-tick {e = e} sl id a nextId sched st slEq pre val =
            (2≤capsAt-size e sl id) slEq
            (cascadeLatch-caps c a sched st pre) val
            (chainsOf-caps (Caps.cSize c) a st (capsOK?-regs c sched st pre))
+           (n≤capsAt-size e sl id)
            (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
   GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
   j     = proj₁ GO
