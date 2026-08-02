@@ -3708,7 +3708,7 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- conses one `rid` onto `delivered`.  Then
 --
 --   (i)  cascadeGo-charge      j ≤ D * cSize
---   (ii) cascadeGo-deliveries  D ≤ D̂ c = 2 ^ (2 ^ cReg)
+--   (ii) cascadeGo-deliveries  D ≤ cDel c, the delivery RECURSION
 --
 -- and `cascadeGo-caps` below is their product, by arithmetic and nothing
 -- else.  (i) is the per-delivery charge: every fold is a frame on some
@@ -3738,12 +3738,24 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --     cSize, 2 mPre).  The law puts D(5,5) at 4514934 against
 --     `4 ^ cReg = 4194304`.
 --
--- SO THE BOUND IS A 2-TOWER, `D̂ c = 2 ^ (2 ^ cReg c)`, and the height
--- is fixed at two on purpose: capsAt-tower's per-instant cost has to
--- be a CONSTANT number of stories, and 2 ^ (2 ^ T) is exactly
--- towerℕ (2 + level) — the level the old squared count already sat at,
--- so the slope stays FOUR (Width-Count-Probe's `D̂-tower`, and .Caps's
--- `sum-fits` for the cSize factor beside it).
+-- AND THE 2-TOWER `2 ^ (2 ^ cReg)` IS GONE TOO, not because a row
+-- breached it — none does — but because NOTHING CAN PROVE IT, and the
+-- reason is arithmetic rather than route-finding.  Every route to a
+-- bound reading cReg alone rests on the same two facts,
+--
+--     R ≤ cReg + Q · D          D ≤ (1 + R) ^ (1 + n)
+--
+-- i.e. `D ≤ (1 + cReg + Q · D) ^ (1 + n)`, whose right-hand side
+-- outgrows its left at EVERY D.  The pair bounds nothing, and no
+-- CLOSED F repairs it: F would have to satisfy
+-- `F ≥ (1 + cReg + Q · F) ^ (1 + n)`, and no natural number does.  So
+-- the delivery bound stops being a formula and becomes a RECURSION,
+-- `cDel` (.Caps), read off the same two facts SEQUENTIALLY — the walk
+-- is one chain at a time, and the registry a chain sees is the entry
+-- registry plus the mints of the deliveries ALREADY MADE.  That is the
+-- ordering fact the mint loop natively obeys, and recursion on
+-- (dispatch gas, walk position) is well-founded exactly where the
+-- closed form was circular.
 --
 -- THE PROOF ROUTE IS THE HOLE, and the one that was named here — the
 -- generation-ancestry injection into subsets of the fire schedule — is
@@ -3821,11 +3833,16 @@ postulate
                         * suc (suc (Caps.cWid c) * suc (Caps.cSize c)))
        × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- (ii) THE DELIVERY BOUND, WHOLE, AND AS A 2-TOWER.  One cascade's
-  -- deliveries against `D̂ c = 2 ^ (2 ^ cReg c)`.  The squared-subset
-  -- form it replaces is FALSE — the delivery law, committed before the
-  -- L = 5 rows were measured and then matching every checkable one
-  -- exactly, puts D(5,5) at 4514934 against 4 ^ 11 = 4194304.
+  -- (ii) THE DELIVERY BOUND, WHOLE, AND AS A RECURSION.  One cascade's
+  -- deliveries against `cDel c = dCap (chargeW c) (suc cSize) cReg` —
+  -- the gas-indexed walk of .Caps, not a closed form.  Both closed
+  -- forms it replaces are dead: the squared-subset `4 ^ cReg` is FALSE
+  -- (the delivery law, committed before the L = 5 rows were measured
+  -- and then matching every checkable one exactly, puts D(5,5) at
+  -- 4514934 against 4 ^ 11 = 4194304), and the 2-tower
+  -- `2 ^ (2 ^ cReg)` that replaced it is UNPROVABLE — see the
+  -- self-reference above, which is a property of the two facts and not
+  -- of any route through them.
   --
   -- THE ROUTE THAT WAS NAMED HERE IS REFUTED BY ROWS ALREADY IN THE
   -- REPO, and it is refuted before any clause of it was ground.  It
@@ -3885,22 +3902,27 @@ postulate
   --   (β) the subset form.  D ≤ 2 ^ Rmax.  Needs Rmax ≤ 2 ^ cReg, which
   --       is the 261-against-128 row above.
   --
-  -- and Rmax ≤ cReg + (mints), mints ≈ D, so (α) is the self-referential
-  -- `D ≤ cReg * (1 + cReg + D) ^ n` and bounds nothing.  Both n (the
-  -- SLOT COUNT, `Γ : Ctx n`) and Rmax are governed by cSize and the
-  -- program's syntax, and `capsOK? c` constrains neither in terms of
-  -- cReg — it bounds the ENTRY registry, the sizes and the widths, and
-  -- D̂ reads cReg only.
+  -- and Rmax ≤ cReg + (mints), mints ≈ D, so (α) READ AS A CLOSED FORM
+  -- is the self-referential `D ≤ cReg * (1 + cReg + Q · D) ^ n` and
+  -- bounds nothing — for any Q, any n, and any bound in its place.
   --
-  -- SO THE OPEN PIECE IS THE ONE Mint-Loop-Shapes NAMES: the damper is
-  -- an ORDERING fact, not a statement about sets — a minted
-  -- registration is reachable only by dispatches that come AFTER it, so
-  -- what is wanted is a schedule-indexed induction on a decreasing
-  -- potential (the remaining-dispatch count, fixed at each point by the
-  -- DAG-so-far).  That is different machinery from every route tried,
-  -- and no measured row breaches D̂ — pB is D = 11 / 38 at cReg = 5, and
-  -- the deepest lean rung is D = 41510 at cReg = 11 — so the statement
-  -- stands and only its proof is missing
+  -- AND THAT IS WHY THE STATEMENT ITSELF MOVED.  The damper is the
+  -- ORDERING fact Mint-Loop-Shapes names — a minted registration is
+  -- reachable only by dispatches that come AFTER it — so the bound is
+  -- written as the walk that fact describes rather than as a number the
+  -- walk is compared against.  `cDel c` is (α) done SEQUENTIALLY: the
+  -- top walk has cReg chains, each subtree runs at one dispatch gas
+  -- less, and the registry a chain sees is the entry registry plus
+  -- `chargeW c` mints for each delivery ALREADY MADE.  The proof is
+  -- then a schedule-indexed induction on the same two indices the
+  -- definition recurses on, with .Deliveries' § D equations supplying
+  -- the delivery counting.
+  --
+  -- THE ROWS ALL FIT WITH ENORMOUS MARGIN, which is the least
+  -- interesting thing about it: `cDel` at pL⁴'s entry caps
+  -- (cReg 9, cSize 3, gas 6) already exceeds every D in the repo, and
+  -- the deepest lean rung is D = 41510 at cReg = 11.  The margin was
+  -- never the problem; the self-reference was
   cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
@@ -3908,7 +3930,7 @@ postulate
     capsOK? c sched st ≡ true →
     length chains ≤ Caps.cReg c →
     delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-      ≤ D̂ c
+      ≤ cDel c
 
 -- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

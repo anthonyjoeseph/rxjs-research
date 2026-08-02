@@ -10,7 +10,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
                            Gas; g0; gs; gasTower; gasPad; towerℕ;
@@ -424,15 +424,14 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- exactly what one frameBlowup's inequalities demand plus visible
 -- margin — so domination is by construction rather than by arithmetic.
 --
--- THE PER-INSTANT COST, at a pooled level m (cSize, cWid, suc cReg all
--- ≤ towerℕ m, m ≥ 3):
+-- THE PER-INSTANT COST, at a pooled level M (every Caps field ≤ M):
 --
---   THE COUNT     D̂ · cSize ≤ 2 ^ (2 ^ m)          TWO stories
---                 suc (suc cWid · suc cSize)       TWO more
---                 so sizeCount ≤ towerℕ (3 + m)    THREE
+--   THE COUNT     sizeCount ≤ poolCount M           (by monotonicity —
+--                 poolCount IS sizeCount with every field pooled, so
+--                 this costs no arithmetic at all)
 --   THE SIZE      a factor (3T) per fold, sizeCount folds
---                                                  TWO more, → 5 + m
---   THE REGISTRY  linear in the count              → 6 + m
+--                                                  TWO stories
+--   THE REGISTRY  linear in the count               ONE more
 --   THE WIDTH     TWO stories PER FOLD (foldStep squares into the
 --                 next-but-one level), sizeCount folds
 --                                                  → m + 2 · sizeCount
@@ -441,8 +440,87 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- is why the height is now tower-VALUED rather than linear.  It costs
 -- nothing: Gas is lazy, `capsHt` is never normalised, and the gasPad
 -- literal head in front of it is the same fast path it always was
-blowH : ℕ → ℕ
-blowH m = 6 + m + 2 * towerℕ (3 + m)
+
+------------------------------------------------------------------
+-- THE DELIVERY BUDGET, AND WHY IT IS A RECURSION AND NOT A FORMULA.
+--
+-- One cascade's deliveries are a TREE: `cascadeGo` walks the chains
+-- (at most cReg of them), a delivery's `foldPath` bottoms out at one
+-- `share-sink`, and `dispatchShare` fans out over `shareAdmit`'s
+-- SNAPSHOT of the registry, one dispatch gas cheaper.  So the depth is
+-- capped by the dispatch gas and the branching by the registry AS OF
+-- THAT DISPATCH — and the registry GROWS mid-cascade, by at most `Q`
+-- mints per delivery (a mint is a subscribe, hence a charged step, so Q
+-- is the per-delivery charge).
+--
+-- EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT.  Each closed attempt
+-- bounded the registry through the deliveries and the deliveries
+-- through the registry:
+--
+--     R ≤ cReg + Q · D          D ≤ (1 + R) ^ (1 + n)
+--
+-- i.e. `D ≤ (1 + cReg + Q · D) ^ (1 + n)`, which has NO solution — the
+-- right-hand side outgrows the left at every D, so the pair of facts
+-- bounds nothing whatever the constants.  A bigger closed form does not
+-- help; the fix is to stop asking for one.
+--
+-- `dCap` IS THE SEQUENTIAL READING OF THE SAME TWO FACTS.  The walk
+-- happens one chain at a time, and the registry a chain sees is the
+-- entry registry plus the mints of the deliveries ALREADY MADE — which
+-- is exactly the ordering fact the mint loop obeys (a minted
+-- registration is reachable only by dispatches that come AFTER it,
+-- Mint-Loop-Shapes' reading of R_end).  Written that way the recursion
+-- is on the dispatch gas outside and the walk position inside, and it
+-- is well-founded precisely where the closed form was circular.
+--
+-- IT IS ACKERMANN-FLAVOURED IN THE GAS, and that costs nothing here:
+-- `blowH` READS it, so the per-instant story increment stays true by
+-- construction rather than by arithmetic.  The price of a lazy Gas
+-- tower's height being large is nothing at all
+dCap  : ℕ → ℕ → ℕ → ℕ        -- Q, dispatch gas, entry registry
+dWalk : ℕ → ℕ → ℕ → ℕ → ℕ    -- Q, gas, entry registry, chains left
+
+dCap Q zero    R = 0
+dCap Q (suc g) R = dWalk Q g R R
+
+dWalk Q g R zero    = 0
+dWalk Q g R (suc i) =
+  let d = dWalk Q g R i
+  in d + suc (dCap Q g (R + Q * suc d))
+
+-- THE POOLED COUNT: `sizeCount` with every Caps field replaced by one
+-- bound M.  `blowH` reads it, which is what makes "one instant costs
+-- this much height" a monotonicity fact instead of a tower estimate.
+--
+-- AND IT PATTERN-MATCHES ON ITS ARGUMENT ON PURPOSE.  `blowH` applies
+-- it to `towerℕ m`, which is STUCK for a variable m — so with a
+-- match in front the whole count stays one opaque symbol, and
+-- `capsHgo`'s nested `blowH (blowH m)` stays the size the old closed
+-- increment was.  Written without the match the body inlines on every
+-- whnf and mentions its argument SIX times, which squares per instant:
+-- .Wet's caps-fuel-root, which normalises `blowH (blowH (capsBase …))`,
+-- ran past an hour on it and finished in minutes with the match in
+poolBody : ℕ → ℕ
+poolBody M = dCap (M * suc (suc M * suc M)) (suc M) M
+               * M * suc (suc M * suc M)
+
+poolCount : ℕ → ℕ
+poolCount zero    = 0
+poolCount (suc M) = poolBody (suc M)
+
+-- ABSTRACT, and it is a PERFORMANCE contract rather than an abstraction
+-- one.  `capsHgo` nests this per instant, so `blowH (blowH m)` is what
+-- .Wet's caps-fuel-root normalises — and with the body visible the
+-- delivery count is inlined twice, squared, and that module ran past an
+-- hour without finishing (measured twice).  Opaque, the height is one
+-- symbol everywhere except where the recurrence's own arithmetic needs
+-- it, and `blowH-body` hands that back on demand
+abstract
+  blowH : ℕ → ℕ
+  blowH m = 6 + m + 2 * poolCount (towerℕ m)
+
+  blowH-body : ∀ (m : ℕ) → blowH m ≡ 6 + m + 2 * poolCount (towerℕ m)
+  blowH-body m = refl
 
 capsHgo : ℕ → Id → ℕ
 capsHgo m zero    = blowH m

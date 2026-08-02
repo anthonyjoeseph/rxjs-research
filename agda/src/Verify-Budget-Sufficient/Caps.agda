@@ -46,7 +46,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Frame-Width using (entryCeil)
-open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase)
+open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase;
+                                dCap; dWalk; poolBody; poolCount; blowH-body)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
@@ -226,22 +227,43 @@ frameStep j c =
 -- depth, hence a 2-TOWER over cReg, not any single exponential and not
 -- a square of one.
 --
--- SO THE DELIVERY BOUND IS A TOWER OF FIXED HEIGHT TWO, `D̂`.  The
--- height is fixed at two deliberately: capsAt-tower's per-instant story
--- cost has to stay a CONSTANT, and `2 ^ (2 ^ T)` is exactly
--- towerℕ (2 + level) — the very level blowup-tower's `J≤P` already put
--- the old squared-subset count at.  Swapping the delivery bound for a
--- 2-tower therefore costs ZERO stories (Width-Count-Probe's `D̂-tower`),
--- and the slope stays four.
+-- AND THE 2-TOWER `2 ^ (2 ^ cReg)` IS GONE TOO — not because a row
+-- breached it (none does) but because NOTHING CAN PROVE IT.  Every
+-- route to a bound that reads cReg alone needs two facts, and the two
+-- together are vacuous:
 --
--- WHAT THE PROOF ROUTE IS: STILL OPEN.  The one the law's shape
--- suggested — each minted registration's ancestry as a SUBSET of the
--- fire schedule, with the fires bounded by the PRE-STATE DAG — is
--- refuted: mints beget fires on the amplifier family (Mint-Loop-Shapes
--- MEASUREMENT 9), so fires are not entry-computable, and every subset
--- injection is dead by MEASUREMENT 8(d).  cascadeGo-deliveries in
--- .Caps-Face carries the refutation and the delivery recurrence that
--- survives it.
+--     R ≤ cReg + Q · D          (the registry grows only by mints, and
+--                                a mint is a charged step, so the mints
+--                                are at most Q per delivery)
+--     D ≤ (1 + R) ^ (1 + n)     (a delivery is named by its path through
+--                                the registration DAG; the dispatch gas
+--                                caps the depth at n and the share
+--                                telescope orders the shares strictly)
+--
+-- which is `D ≤ (1 + cReg + Q · D) ^ (1 + n)` — the right-hand side
+-- outgrows the left at EVERY D, so the pair bounds nothing whatever the
+-- constants are.  That is Worker 24's self-reference, and it is not
+-- repaired by making the bound bigger: any closed form F would have to
+-- satisfy `F ≥ (1 + cReg + Q · F) ^ (1 + n)`, and no natural number
+-- does.
+--
+-- SO THE BOUND STOPS BEING A FORMULA AND BECOMES A RECURSION, `cDel`,
+-- exactly as the caps themselves did.  `dCap` (Rx.Evaluator) is the
+-- SEQUENTIAL reading of the very same two facts: the walk is done one
+-- chain at a time, and the registry a chain sees is the entry registry
+-- plus the mints of the deliveries ALREADY MADE.  That is the ordering
+-- fact the mint loop natively obeys — a minted registration is
+-- reachable only by dispatches that come AFTER it — and recursion on
+-- (dispatch gas, walk position) is well-founded where the closed form
+-- was circular.  The refuted routes are recorded at
+-- cascadeGo-deliveries in .Caps-Face; this is what replaces them.
+--
+-- IT IS ACKERMANN-FLAVOURED IN THE GAS, and the height pays for that by
+-- READING it: `blowH` is `6 + m + 2 · poolCount (towerℕ m)`, and
+-- poolCount IS this count with every field pooled.  The per-instant
+-- story increment is then a MONOTONICITY fact rather than a tower
+-- estimate — which is strictly cheaper than the old four-story
+-- accounting it replaces.
 --
 -- cWid IS GONE, and it was never a factor of this count — it bounds how
 -- WIDE one emitted observable is, not how many times a cascade iterates.
@@ -272,9 +294,82 @@ frameStep j c =
 --
 -- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
 -- nothing else, so round3b-ledger-reset-absurd stays unavailable
--- ONE CASCADE's DELIVERY BOUND: a 2-tower over the entry registry
-D̂ : Caps → ℕ
-D̂ c = 2 ^ (2 ^ Caps.cReg c)
+
+-- ONE DELIVERY'S WORK, and the `Q` of the recursion below: the frame
+-- receipt `scanFrame-caps` pays is `suc (length vals * suc (sizeᵗ fn))`,
+-- one fold per node of the step function PER PAYLOAD, and a chain is
+-- capped at cSize by pathSz?'s length conjunct.  Every mint is one of
+-- those folds, so the same number caps the mints a single delivery adds
+-- to the registry
+chargeW : Caps → ℕ
+chargeW c = Caps.cSize c * suc (suc (Caps.cWid c) * suc (Caps.cSize c))
+
+-- ONE CASCADE's DELIVERY BOUND, BY RECURRENCE.  The dispatch gas is the
+-- decreasing potential (it caps the depth at the slot count, hence at
+-- cSize), the entry registry is the top walk's length, and chargeW is
+-- the per-delivery mint budget the walk threads forward
+--
+-- ABSTRACT, and it is a NORMALISATION contract rather than an
+-- abstraction one.  `iterSize` and `iterFold` pattern-match on the
+-- COUNT, so `capsAt`'s own cSize is `iterSize S (sizeCount c) S` — and
+-- whether that reduces is decided by whether sizeCount does.  The
+-- 2-tower it replaces never did (`2 ^ (2 ^ suc X)` is stuck at a
+-- variable X), but `dCap` peels a suc off the ENTRY REGISTRY, which at
+-- capsAt's base is `suc (sizeᵉ e + slotsSize sl)` — so the walk unfolds
+-- one rung, re-enters at a larger registry, and every consumer of
+-- `sizeCapAt` pays for it.  .Wet ran past an hour on that (measured
+-- twice) and finishes in minutes with the count opaque
+abstract
+  cDel : Caps → ℕ
+  cDel c = dCap (chargeW c) (suc (Caps.cSize c)) (Caps.cReg c)
+
+  cDel-body : ∀ (c : Caps) →
+    cDel c ≡ dCap (chargeW c) (suc (Caps.cSize c)) (Caps.cReg c)
+  cDel-body c = refl
+
+------------------------------------------------------------------
+-- THE RECURSION IS MONOTONE IN ALL THREE ARGUMENTS, which is the whole
+-- toolkit the count needs: `blowH` reads the POOLED count and every
+-- inequality below is then "each field is under the pool".  Proven by
+-- the same lexicographic descent the definition uses — the gas outside,
+-- the walk position inside — so the two lemmas are as mutual as the two
+-- functions are.
+------------------------------------------------------------------
+
+dCap-mono : ∀ (Q Q′ g g′ R R′ : ℕ) → Q ≤ Q′ → g ≤ g′ → R ≤ R′ →
+  dCap Q g R ≤ dCap Q′ g′ R′
+dWalk-mono : ∀ (Q Q′ g g′ R R′ i i′ : ℕ) →
+  Q ≤ Q′ → g ≤ g′ → R ≤ R′ → i ≤ i′ →
+  dWalk Q g R i ≤ dWalk Q′ g′ R′ i′
+
+dCap-mono Q Q′ zero    g′       R R′ hQ hg        hR = z≤n
+dCap-mono Q Q′ (suc g) zero     R R′ hQ ()        hR
+dCap-mono Q Q′ (suc g) (suc g′) R R′ hQ (s≤s hg) hR =
+  dWalk-mono Q Q′ g g′ R R′ R R′ hQ hg hR hR
+
+dWalk-mono Q Q′ g g′ R R′ zero    i′       hQ hg hR hi       = z≤n
+dWalk-mono Q Q′ g g′ R R′ (suc i) zero     hQ hg hR ()
+dWalk-mono Q Q′ g g′ R R′ (suc i) (suc i′) hQ hg hR (s≤s hi) =
+  +-mono-≤ ih
+    (s≤s (dCap-mono Q Q′ g g′ _ _ hQ hg
+            (+-mono-≤ hR (*-mono-≤ hQ (s≤s ih)))))
+  where
+  ih : dWalk Q g R i ≤ dWalk Q′ g′ R′ i′
+  ih = dWalk-mono Q Q′ g g′ R R′ i i′ hQ hg hR hi
+
+-- and it is POSITIVE once there is a chain to walk, which is what the
+-- count's own `1 ≤ J` side conditions read
+1≤dCap : ∀ (Q g R : ℕ) → 1 ≤ R → 1 ≤ dCap Q (suc g) R
+1≤dCap Q g (suc R) hR =
+  ≤-trans (s≤s z≤n)
+          (m≤n+m (suc (dCap Q g (suc R + Q * suc (dWalk Q g (suc R) R))))
+                 (dWalk Q g (suc R) R))
+
+-- and `poolCount` IS `poolBody` wherever there is anything to count:
+-- the match in front of it (Rx.Evaluator) is a normalisation guard, not
+-- a definition by cases
+poolBody≤poolCount : ∀ (M : ℕ) → 1 ≤ M → poolBody M ≤ poolCount M
+poolBody≤poolCount (suc M) _ = ≤-refl
 
 -- ONE INSTANT's FOLD COUNT, and it READS cWid.  The receipt
 -- `scanFrame-caps` actually pays is `suc (length vals * suc (sizeᵗ fn))`
@@ -299,7 +394,7 @@ D̂ c = 2 ^ (2 ^ Caps.cReg c)
 -- tower-VALUED; the price of a lazy Gas tower's height being large is
 -- nothing at all
 sizeCount : Caps → ℕ
-sizeCount c = D̂ c * Caps.cSize c
+sizeCount c = cDel c * Caps.cSize c
                 * suc (suc (Caps.cWid c) * suc (Caps.cSize c))
 
 frameBlowup : Caps → Caps
@@ -602,7 +697,10 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
   2≤suc2S : 2 ≤ suc (2 * S)
   2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
   1≤J : 1 ≤ J
-  1≤J = *-mono-≤ (*-mono-≤ (1≤2^ (2 ^ R)) 1≤S) (s≤s z≤n)
+  1≤J = *-mono-≤ (*-mono-≤ (≤-trans (1≤dCap (chargeW c) S R 1≤R)
+                                    (≤-reflexive (sym (cDel-body c))))
+                           1≤S)
+                 (s≤s z≤n)
 
 6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   6 ≤ Caps.cSize (capsAt e sl (suc id))
@@ -631,10 +729,7 @@ k≤tower : ∀ (m k : ℕ) → 3 ≤ m → k ≤ 6 → k ≤ towerℕ m
 k≤tower m k 3≤m k≤6 =
   ≤-trans k≤6 (≤-trans (≤ᵇ⇒≤ 6 16 _) (towerℕ-mono {3} {m} 3≤m))
 
--- the two linear multiples the count needs, each within one level
-2T≤ : ∀ (m : ℕ) → 3 ≤ m → 2 * towerℕ m ≤ towerℕ (suc m)
-2T≤ m 3≤m = tower-mul m 2 (towerℕ m) 3≤m (k≤tower m 2 3≤m (≤ᵇ⇒≤ 2 6 _)) ≤-refl
-
+-- the linear multiple the size axis needs, within one level
 3T≤ : ∀ (m : ℕ) → 3 ≤ m → 3 * towerℕ m ≤ towerℕ (suc m)
 3T≤ m 3≤m = tower-mul m 3 (towerℕ m) 3≤m (k≤tower m 3 3≤m (≤ᵇ⇒≤ 3 6 _)) ≤-refl
 
@@ -688,20 +783,12 @@ tower-mul-suc m a b 3≤m ha hb =
                                             := (con 2 :+ x) :* (con 2 :+ x))
                                  refl Tw)))
 
--- THE COUNT'S ARITHMETIC, AND THE ONE PLACE THE REGISTRY BOUND MUST BE
--- STRICT.  D̂ · S ≤ 2^(2^R) · 2^S = 2^(2^R + S), so the whole count is
--- ONE exponential and the question is whether its exponent fits under
--- 2^T.  It does, with nothing to spare and for a reason worth naming:
--- `suc R ≤ T` makes 2^R at most HALF of 2^T, and S ≤ T ≤ 2^(T∸1) fills
--- the other half.  With the non-strict `R ≤ T` this is false at R = T,
--- and the count would cost a fifth story — which Width-Count-Probe's
--- `slope-fits` prices at `2σ ≤ 8 + sz`, i.e. a broken root fuel on
--- every program of size 1
-sum-fits : ∀ (R S T : ℕ) → suc R ≤ T → S ≤ T → 2 ^ R + S ≤ 2 ^ T
-sum-fits R S zero      ()       hS
-sum-fits R S (suc T′) (s≤s hR) hS =
-  ≤-trans (+-mono-≤ (^-monoʳ-≤ 2 hR) (≤-trans hS (n<2^n T′)))
-          (≤-reflexive (cong (2 ^ T′ +_) (sym (+-identityʳ (2 ^ T′)))))
+-- THE COUNT'S ARITHMETIC IS GONE, and its absence is the point: the
+-- count no longer has any.  `sum-fits` used to land `2^(2^R)·S` under
+-- `2^(2^T)` — the one place a STRICT registry bound was consumed — and
+-- with the delivery bound a recursion rather than a 2-tower, the count
+-- fits under the POOLED count by monotonicity in each field
+-- (`J≤P` inside blowup-tower) and nothing is exponentiated at all.
 
 -- ONE FOLD's WIDTH STEP, UNDER A TOWER: TWO stories.  `foldStep S w`
 -- is S ^ suc w with both S and w under towerℕ k, so it is at most
@@ -744,20 +831,27 @@ iterFold-tower k S w (suc j) 3≤k hS hw =
 -- rather than by arithmetic: the height function was WRITTEN to be what
 -- these inequalities demand plus visible margin.
 --
---   THE COUNT      D̂·S is two stories (the delivery tower, with the
---                  size factor riding beside it in the exponent, which
---                  is what the STRICT registry hypothesis buys — see
---                  `sum-fits`); the width factor
---                  `suc (suc cWid · suc cSize)` is two more; so
---                  sizeCount ≤ towerℕ (3 + m).
+--   THE COUNT      sizeCount c ≤ poolCount Tw, by MONOTONICITY in each
+--                  field and nothing else — `poolCount` IS this count
+--                  with every field replaced by the pooled bound.  The
+--                  old two-stories-for-the-delivery-tower accounting
+--                  (and with it `sum-fits`, the one consumer of a
+--                  STRICT registry bound) is gone: the delivery bound
+--                  is a recursion now, so there is no exponent to fit.
 --   THE SIZE       a factor (3T) per fold, sizeCount folds, and one
---                  story to land the product: towerℕ (5 + m).
---   THE REGISTRY   linear in the count: towerℕ (6 + m), reported
---                  STRICTLY, which is what the next level's `sum-fits`
---                  consumes.
+--                  story to land the product: two stories over the
+--                  meeting level L = 4 + m + 2·P.
+--   THE REGISTRY   linear in the count, and reported STRICTLY, which is
+--                  what the next level's `hR` consumes.
 --   THE WIDTH      TWO stories PER FOLD: m + 2 · sizeCount, which
 --                  dominates the other three by an exponential and is
 --                  the whole reason a closed-form height is gone.
+--
+-- EVERYTHING MEETS AT ONE LEVEL, `L = 4 + m + 2 · P` with
+-- P = poolCount (towerℕ m), and `blowH m` is `suc (suc L)`.  That is
+-- the whole accounting: two stories above L is where the size and the
+-- registry land, and the width's `m + 2 · J` is under `6 + m + 2 · P`
+-- as soon as J ≤ P.
 --
 -- THE WIDTH HYPOTHESIS IS NEW, and it is what reading cWid costs: the
 -- old bound carried only (cSize, cReg) because the count could not see
@@ -778,6 +872,13 @@ blowup-tower m c 3≤m 1≤S hS hR hW = sizeGoal , regGoal , widGoal
   W = Caps.cWid c
   Tw = towerℕ m
   J = sizeCount c
+  P = poolCount Tw
+  L = 4 + m + 2 * P          -- the level the three axes meet at
+
+  -- `blowH` is opaque (a normalisation guard, Rx.Evaluator); this is
+  -- the one place its body is needed, and it is needed three times
+  hgt : towerℕ (suc (suc L)) ≤ towerℕ (blowH m)
+  hgt = ≤-reflexive (cong towerℕ (sym (blowH-body m)))
 
   hR′ : R ≤ Tw
   hR′ = ≤-trans (n≤1+n R) hR
@@ -785,98 +886,67 @@ blowup-tower m c 3≤m 1≤S hS hR hW = sizeGoal , regGoal , widGoal
   1≤Tw : 1 ≤ Tw
   1≤Tw = ≤-trans 1≤S hS
 
-  1≤J : 1 ≤ J
-  1≤J = *-mono-≤ (*-mono-≤ (1≤2^ (2 ^ R)) 1≤S) (s≤s z≤n)
+  -- THE COUNT, and it is monotonicity in each field and nothing else
+  wid≤ : suc (suc W * suc S) ≤ suc (suc Tw * suc Tw)
+  wid≤ = s≤s (*-mono-≤ (s≤s hW) (s≤s hS))
 
-  -- the DELIVERY half of the count, two stories up
-  A≤P : 2 ^ (2 ^ R) * S ≤ towerℕ (2 + m)
-  A≤P =
-    ≤-trans (*-monoʳ-≤ (2 ^ (2 ^ R)) (<⇒≤ (n<2^n S)))
-    (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 (2 ^ R) S)))
-             (^-monoʳ-≤ 2 (sum-fits R S Tw hR hS)))
+  J≤P : J ≤ P
+  J≤P = ≤-trans (*-mono-≤ (*-mono-≤ (≤-trans (≤-reflexive (cDel-body c))
+                                       (dCap-mono (chargeW c)
+                                          (Tw * suc (suc Tw * suc Tw))
+                                          (suc S) (suc Tw) R Tw
+                                          (*-mono-≤ hS wid≤) (s≤s hS) hR′))
+                                    hS)
+                          wid≤)
+                (poolBody≤poolCount Tw 1≤Tw)
 
-  2T≤Y : 2 * Tw ≤ towerℕ (suc m)
-  2T≤Y = 2T≤ m 3≤m
+  3≤L : 3 ≤ L
+  3≤L = ≤-trans (≤-trans (≤ᵇ⇒≤ 3 4 _) (m≤m+n 4 m)) (m≤m+n (4 + m) (2 * P))
 
-  -- the WIDTH half, two more: both factors sit one level up, and
-  -- tower-mul-suc lands the product at the next
-  sucT≤2T : suc Tw ≤ 2 * Tw
-  sucT≤2T = ≤-trans (+-monoˡ-≤ Tw 1≤Tw)
-                    (≤-reflexive (solve 1 (λ x → x :+ x := con 2 :* x) refl Tw))
+  m≤L : m ≤ L
+  m≤L = ≤-trans (m≤n+m m 4) (m≤m+n (4 + m) (2 * P))
 
-  B≤P : suc (suc W * suc S) ≤ towerℕ (2 + m)
-  B≤P = tower-mul-suc (suc m) (suc W) (suc S) (≤-trans 3≤m (n≤1+n m))
-          (≤-trans (s≤s hW) (≤-trans sucT≤2T 2T≤Y))
-          (≤-trans (s≤s hS) (≤-trans sucT≤2T 2T≤Y))
+  Tw≤L : Tw ≤ towerℕ L
+  Tw≤L = towerℕ-mono m≤L
 
-  J≤Z : J ≤ towerℕ (3 + m)
-  J≤Z = tower-mul (2 + m) (2 ^ (2 ^ R) * S) (suc (suc W * suc S))
-          (≤-trans 3≤m (m≤n+m m 2)) A≤P B≤P
+  sucP≤L : suc P ≤ L
+  sucP≤L = ≤-trans (s≤s (m≤m+n P (P + 0)))
+                   (+-monoˡ-≤ (2 * P) (s≤s (z≤n {3 + m})))
 
-  2T≤Z : 2 * Tw ≤ towerℕ (3 + m)
-  2T≤Z = ≤-trans 2T≤Y
-                 (towerℕ-mono (≤-trans (n≤1+n (suc m)) (n≤1+n (2 + m))))
+  sucJ≤ : suc J ≤ towerℕ L
+  sucJ≤ = ≤-trans (≤-trans (s≤s J≤P) sucP≤L) (k≤towerℕ L)
+
+  J≤L : J ≤ towerℕ L
+  J≤L = ≤-trans (n≤1+n J) sucJ≤
 
   -- SIZE: (3T) per fold, J folds, and one story to land the product
-  size≤ : Caps.cSize (frameBlowup c) ≤ towerℕ (5 + m)
-  size≤ =
+  sizeGoal : Caps.cSize (frameBlowup c) ≤ towerℕ (blowH m)
+  sizeGoal =
     ≤-trans (iterSize-pow S Tw J S 1≤Tw hS hS)
     (≤-trans (*-monoʳ-≤ ((3 * Tw) ^ J) (m≤m+n Tw (Tw + (Tw + 0))))
     (≤-trans (≤-reflexive (*-comm ((3 * Tw) ^ J) (3 * Tw)))
     (≤-trans (^-monoˡ-≤ (suc J) (3T≤ m 3≤m))
     (≤-trans (≤-reflexive (^-*-assoc 2 Tw (suc J)))
-             (^-monoʳ-≤ 2 expo)))))
-    where
-    Tw≤TJ : Tw ≤ Tw * J
-    Tw≤TJ = ≤-trans (≤-reflexive (sym (*-identityʳ Tw))) (*-monoʳ-≤ Tw 1≤J)
-    expo : Tw * suc J ≤ towerℕ (4 + m)
-    expo =
-      ≤-trans (≤-reflexive (*-suc Tw J))
-      (≤-trans (+-monoˡ-≤ (Tw * J) Tw≤TJ)
-      (≤-trans (≤-reflexive (solve 2 (λ x y → x :* y :+ x :* y
-                                               := (con 2 :* x) :* y) refl Tw J))
-               (tower-mul (3 + m) (2 * Tw) J (≤-trans 3≤m (m≤n+m m 3)) 2T≤Z J≤Z)))
+    (≤-trans (^-monoʳ-≤ 2 (tower-mul L Tw (suc J) 3≤L Tw≤L sucJ≤))
+             hgt)))))
 
-  5+m≤ : 5 + m ≤ blowH m
-  5+m≤ = ≤-trans (+-monoˡ-≤ m (≤ᵇ⇒≤ 5 6 _))
-                 (m≤m+n (6 + m) (2 * towerℕ (3 + m)))
-
-  sizeGoal : Caps.cSize (frameBlowup c) ≤ towerℕ (blowH m)
-  sizeGoal = ≤-trans size≤ (towerℕ-mono 5+m≤)
-
-  -- REGISTRATIONS: linear in the count, one story below the size, and
-  -- reported STRICTLY
-  reg≤ : suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (5 + m)
-  reg≤ =
-    ≤-trans (s≤s (≤-trans (*-mono-≤ hR′ (≤-trans sucJS (*-monoʳ-≤ 2 JS≤Y)))
-                          (≤-reflexive (solve 2 (λ x y → x :* (con 2 :* y)
-                                                          := (con 2 :* x) :* y)
-                                              refl Tw (towerℕ (4 + m))))))
-            (tower-mul-suc (4 + m) (2 * Tw) (towerℕ (4 + m))
-                           (≤-trans 3≤m (m≤n+m m 4))
-                           (≤-trans 2T≤Z (towerℕ-mono (n≤1+n (3 + m)))) ≤-refl)
-    where
-    JS≤Y : J * S ≤ towerℕ (4 + m)
-    JS≤Y = tower-mul (3 + m) J S (≤-trans 3≤m (m≤n+m m 3)) J≤Z
-             (≤-trans hS (towerℕ-mono (≤-trans (n≤1+n m)
-                            (≤-trans (n≤1+n (suc m)) (n≤1+n (2 + m))))))
-    1≤JS : 1 ≤ J * S
-    1≤JS = *-mono-≤ 1≤J 1≤S
-    sucJS : suc (J * S) ≤ 2 * (J * S)
-    sucJS = ≤-trans (+-monoˡ-≤ (J * S) 1≤JS)
-                    (≤-reflexive (solve 1 (λ y → y :+ y := con 2 :* y) refl (J * S)))
-
+  -- REGISTRATIONS: linear in the count, and reported STRICTLY
   regGoal : suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (blowH m)
-  regGoal = ≤-trans reg≤ (towerℕ-mono 5+m≤)
+  regGoal =
+    ≤-trans (tower-mul-suc (suc L) R (suc (J * S)) (≤-trans 3≤L (n≤1+n L))
+               (≤-trans hR′ (≤-trans Tw≤L (towerℕ-mono (n≤1+n L))))
+               (tower-mul-suc L J S 3≤L J≤L (≤-trans hS Tw≤L)))
+            hgt
 
   -- WIDTH: two stories a fold, and the fold count is J
   widGoal : Caps.cWid (frameBlowup c) ≤ towerℕ (blowH m)
   widGoal =
-    ≤-trans (iterFold-tower m S W J 3≤m hS hW) (towerℕ-mono climb)
+    ≤-trans (≤-trans (iterFold-tower m S W J 3≤m hS hW) (towerℕ-mono climb))
+            hgt
     where
-    climb : m + 2 * J ≤ blowH m
+    climb : m + 2 * J ≤ suc (suc L)
     climb = ≤-trans (+-monoˡ-≤ (2 * J) (m≤n+m m 6))
-                    (+-monoʳ-≤ (6 + m) (*-monoʳ-≤ 2 J≤Z))
+                    (+-monoʳ-≤ (6 + m) (*-monoʳ-≤ 2 J≤P))
 
 -- THE TOWER HEIGHT of a caps level — BY RECURRENCE, exactly as the caps
 -- themselves are, and IT IS THE SAME FUNCTION `budgetAt` IS DEFINED
@@ -893,8 +963,9 @@ capsH e sl id = capsHgo (capsBase e sl) id
 
 3≤blowH : ∀ (m : ℕ) → 3 ≤ blowH m
 3≤blowH m =
-  ≤-trans (≤-trans (≤ᵇ⇒≤ 3 6 _) (m≤m+n 6 m))
-          (m≤m+n (6 + m) (2 * towerℕ (3 + m)))
+  ≤-trans (≤-trans (≤-trans (≤ᵇ⇒≤ 3 6 _) (m≤m+n 6 m))
+                   (m≤m+n (6 + m) (2 * poolCount (towerℕ m))))
+          (≤-reflexive (sym (blowH-body m)))
 
 3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   3 ≤ capsH e sl id
