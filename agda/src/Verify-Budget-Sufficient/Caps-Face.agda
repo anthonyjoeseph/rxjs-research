@@ -4070,18 +4070,33 @@ postulate
   -- a frame's own folds cause is already paid for at `c` — the ruling,
   -- not a lemma
   --
+  -- AND THE PER-FRAME MAXIMA ARE NOW MEASURED, which they were not when
+  -- the ruling was made — Mint-Loop-Frames reports mints and frames per
+  -- CASCADE (9948 against 162666 at its deepest rung), and an average is
+  -- not a maximum.  Frame-Mint-Probe re-runs the mirror walk carrying
+  -- the two maxima instead of the fold count, off the REAL `stepFrame`:
+  --
+  --   · THE MINT BUDGET IS NOT CLOSE TO TIGHT.  On every row of the
+  --     amplifier family — Mint-Loop-Shapes' `pA` / `pB`, where a
+  --     minting scan sits inside a shared def so mints beget fires —
+  --     ONE frame mints exactly 1 registration, at k = 0, 1, 2 and at
+  --     cascades 0 and 1, against a cSize FLOOR of 3 / 10 / 18.  The
+  --     budget is `cSize * suc cWid`.
+  --   · THE WIDTH CONJUNCT IS THE LOAD-BEARING ONE.  On the deepening
+  --     scan the per-frame payload count is 6 at cascade 0 and 120 at
+  --     cascade 1 — Frame-Work-Probe's ladder, read per frame.  That is
+  --     not a breach (each cascade reads ITS OWN entry caps, and within
+  --     one cascade the number does not move), but it is what says the
+  --     conjunct can only hold because `outW` takes the PRODUCT at each
+  --     *All.  Whether `capsAt`'s cWid dominates 120 at cascade 1 is
+  --     still open: capsAt is a tower and does not normalise at these
+  --     indices.
+  --
   -- WHAT WOULD REFUTE THEM, so the next reader knows what to measure:
   -- ONE frame, run under `capsOK? c` with a chain inside `pathSz? cSize`
   -- and a burst inside `valsCaps? c sl`, whose post-state breaches
   -- `capsOK? c` (for the first) or adds more than `cSize * suc cWid`
-  -- registrations (for the second).  The amplifier family to point at
-  -- is Mint-Loop-Shapes' `pB`, whose late cascades are where mints
-  -- beget fires.  NOT MEASURED THIS LEG: the per-FRAME mint count is
-  -- not an instrument the probe corpus currently has — Mint-Loop-Frames
-  -- MEASUREMENT 7 reports mints and frames per CASCADE (9948 mints
-  -- against j = 162666 frames at its deepest measurable rung, an
-  -- average of 0.06 per frame), and an average is not a maximum.
-  -- Recorded as an open measurement, not as evidence
+  -- registrations (for the second)
   stepFrame-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (c : Caps) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
     (f : Frame Γ s u) (κ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)

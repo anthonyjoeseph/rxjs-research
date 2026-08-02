@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -61,6 +61,12 @@ help:
 	@echo "                  deliveries saturate in k on three ladders of four,"
 	@echo "                  while 2 ^ cReg * cSize grows.  The fourth is still"
 	@echo "                  climbing where it stops computing.  ~18 min, two files"
+	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
+	@echo "                  burst it is handed?  the per-FRAME maxima the two"
+	@echo "                  entry axioms bound.  Mints are 1 on every row of the"
+	@echo "                  amplifier family (against a cSize floor of 3-18); the"
+	@echo "                  frame WIDTH climbs across arrivals, 6 to 120"
+	@echo "                  (see agda/probe/Frame-Mint-Probe.agda).  ~4 min"
 	@echo "  joint-probe   is subscribeE-caps's joint hypothesis, pathLen + size"
 	@echo "                  <= cSize, true at the TIGHT admissible cSize?  NO — it"
 	@echo "                  fails on every one of seventeen families, and the"
@@ -222,6 +228,14 @@ mint-loop-probe:
 	cd agda && agda -i src -i probe probe/Mint-Loop-Shapes.agda
 	cd agda && agda -i src -i probe probe/Mint-Loop-Probe.agda
 	cd agda && agda -i src -i probe probe/Mint-Loop-Frames.agda
+
+# The gate on the two frame-local axioms cascadeGo-deliveries is proven
+# from.  Mint-Loop-Frames reports mints and frames per CASCADE; these are
+# the per-FRAME MAXIMA, which is what stepFrame-entry-mint and
+# stepFrame-entry-caps actually bound.  Same mirror walk, same real
+# stepFrame, ~4 min.
+frame-mint-probe:
+	cd agda && agda -i src -i probe probe/Frame-Mint-Probe.agda
 
 # The gate on repairing the caps tree's two blocked companions.
 # subscribeE-caps hypothesises `pathLen κ + sizeᵉ b ≤ cSize` and the
