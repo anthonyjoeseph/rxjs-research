@@ -364,6 +364,11 @@
 -- that were already stable.  Agda caches each module's interface, so a
 -- clause committed here re-checks only this file.
 --
+--   .Deliveries  the delivery ledger: EvalSt.delivered is preserved by
+--                the whole stepFrame clique and extended by the two
+--                consing walks, so delivN composes and the delivery
+--                recurrence is a set of proven equations.  Reads
+--                Rx.Evaluator alone; imported by .Caps-Face
 --   .Measures    the measures — gas, dBound, hopD, seed arithmetic,
 --                size/fnCap/ofW, INV?/widthOK?, the walk face and its
 --                four absurdity records

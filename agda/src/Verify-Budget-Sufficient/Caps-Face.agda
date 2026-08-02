@@ -157,6 +157,13 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
 -- re-checks .Wet — see that module's head.
 open import Verify-Budget-Sufficient.Caps public
 
+-- .Deliveries is the ledger stratum: where EvalSt.delivered moves and
+-- where it provably does not, plus delivN and its composition laws.  It
+-- reads Rx.Evaluator and nothing else, so it is a sibling of the whole
+-- Caps tower rather than a layer in it; re-exported here because delivN
+-- is the currency the cascade conjuncts below are stated in.
+open import Verify-Budget-Sufficient.Deliveries public
+
 ------------------------------------------------------------------
 -- THE REACHABILITY CLUSTER — round 3's remaining debt, and the answer
 -- round3b-ledger-reset-absurd demands.
@@ -3782,10 +3789,6 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- IS capsAt (suc id) by capsAt-suc-full
 ------------------------------------------------------------------
 
--- the deliveries a cascade makes, off the evaluator's own ledger
-delivN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → EvalSt e → ℕ
-delivN st st′ = length (EvalSt.delivered st′) ∸ length (EvalSt.delivered st)
-
 postulate
   -- (i) THE PER-DELIVERY CHARGE, IN THE NEW CURRENCY.  The receipt the
   -- induction actually builds, charged to the cascade's own delivery
@@ -3862,12 +3865,17 @@ postulate
   --     Dds (suc g)      = Σ over shareAdmit i (registry AS OF NOW)
   --                          of (1 + Dfp g)
   --
-  -- (the mirror walk fpFolds / dsFolds / sgFolds / csFolds in
-  -- Mint-Loop-Shapes is this recursion with the emit stream deleted,
-  -- and it calls the REAL stepFrame; its ledger `mJdel` is refl-pinned
-  -- equal to the evaluator's `mFolds` at 5, 20 and 50 in
-  -- Mint-Loop-Frames, which is the evidence that the `↠` line above is
-  -- an equality and not an inequality).  Two closed forms follow, and
+  -- THAT RECURSION IS NO LONGER A READING OF THE SOURCE: it is proven,
+  -- line for line, in .Deliveries § D — foldPath-root-N / foldPath-frame-N
+  -- / foldPath-sink-N / dispatchShare-zero-N / dispatchShare-suc-N /
+  -- shareGo-skip-N / shareGo-cons-N / cascadeGo-skip-N /
+  -- cascadeGo-cons-N, over the ledger order `_⊑ᵈ_` and its composition
+  -- laws (delivN-split, delivN-cons).  The `↠` line is an equality and
+  -- not an inequality because the WHOLE stepFrame clique preserves
+  -- `EvalSt.delivered` (.Deliveries § B, fifteen mutually recursive
+  -- functions, no postulate); Mint-Loop-Frames' refl pins of `mJdel`
+  -- against `mFolds` at 5, 20 and 50 were the measured evidence for that
+  -- and are now a redundant cross-check.  Two closed forms follow, and
   -- NEITHER closes against a bound that reads cReg alone:
   --
   --   (α) the depth form.  The share telescope orders the shares along
