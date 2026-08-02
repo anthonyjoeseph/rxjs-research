@@ -33,6 +33,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-re
                                        +-assoc; +-comm; *-suc; *-assoc;
                                        *-monoˡ-≤; *-monoʳ-≤; *-mono-≤;
                                        +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ;
+                                       +-suc;
                                        m≤m+n; m≤n+m; n≤1+n; m≤m*n;
                                        ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤;
                                        ^-*-assoc; ^-distribˡ-+-*; *-comm;
@@ -523,6 +524,210 @@ iterFold-mono-count : ∀ (S w : ℕ) → 2 ≤ S → ∀ {j j′ : ℕ} → j �
   iterFold S j w ≤ iterFold S j′ w
 iterFold-mono-count S w hS {j′ = j′} z≤n      = iterFold-infl S hS j′ w
 iterFold-mono-count S w hS           (s≤s le)  = iterFold-mono-count S (foldStep S w) hS le
+
+
+------------------------------------------------------------------
+-- THE LEVEL READING, AND THE WALK THAT CARRIES IT.
+--
+-- `dCap` above threads a REGISTRY and charges each delivery a fixed `Q`
+-- read once at the cascade's ENTRY caps.  That charging is REFUTED
+-- (agda/probe/Entry-Caps-Refuted.agda: one `map-f` frame's output
+-- breaches the entry cap it was charged at, because `applyFn` grows a
+-- value), and the honest per-frame face — the PROVEN `stepFrame-caps`
+-- — reports a growth index j′ and lands its post-state at
+-- `frameStep (j + j′) c`.  So the walk carries the LEVEL instead:
+--
+--   · a FRAME costs `fCharge`, the receipt `scanFrame-caps` pays
+--     (`suc (length vals * suc (sizeᵗ fn))`) read at the level the frame
+--     RUNS at — its two factors are the burst ledger's width conjunct
+--     `suc (widAt S W J)` and the size cap `sizeAt S J`;
+--   · a DELIVERY is a CHAIN of frames, each running at the level the one
+--     before it left, so its cost is `iterL` — an ITERATION, not a
+--     product.  (A product would charge a delivery's later frames at the
+--     level it entered at, which is the same error one level down that
+--     the refuted entry axioms made one level up.)  The chain is capped
+--     at `suc (sizeAt S J)` by pathSz?'s own length conjunct, read at
+--     the delivery's entry level;
+--   · and the REGISTRY a later dispatch fans out over needs no separate
+--     mint accounting at all: it is `capsOK?`'s own fifth conjunct read
+--     at the current level, `regAt S R J = R * suc (J * S)`.
+--
+-- The recursion is the same lexicographic (dispatch gas, walk position)
+-- descent `dCap` runs on — only the threaded quantity changed — and it
+-- is POINTWISE ABOVE `dCap` at the same entry caps
+-- (`old-cDel≤new-cDel`, agda/probe/Level-Walk-Probe.agda), so every
+-- measured D row the old bound cleared this one clears too, with no
+-- re-measurement
+------------------------------------------------------------------
+
+sizeAt : ℕ → ℕ → ℕ
+sizeAt S J = iterSize S J S
+
+widAt : ℕ → ℕ → ℕ → ℕ
+widAt S W J = iterFold S J W
+
+regAt : ℕ → ℕ → ℕ → ℕ
+regAt S R J = R * suc (J * S)
+
+fCharge : ℕ → ℕ → ℕ → ℕ
+fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))
+
+fLvl : ℕ → ℕ → ℕ → ℕ
+fLvl S W J = J + fCharge S W J
+
+iterL : ℕ → ℕ → ℕ → ℕ → ℕ
+iterL S W zero    J = J
+iterL S W (suc k) J = iterL S W k (fLvl S W J)
+
+dLvl : ℕ → ℕ → ℕ → ℕ
+dLvl S W J = iterL S W (suc (sizeAt S J)) J
+
+lvls : ℕ → ℕ → ℕ → ℕ → ℕ
+lvls S W J zero    = J
+lvls S W J (suc d) = dLvl S W (lvls S W J d)
+
+dCapᶜ  : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ       -- S W R gas level
+dWalkᶜ : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W R gas level position
+
+dCapᶜ S W R zero    J = 0
+dCapᶜ S W R (suc g) J = dWalkᶜ S W R g J (regAt S R J)
+
+dWalkᶜ S W R g J zero    = 0
+dWalkᶜ S W R g J (suc i) =
+  let d = dWalkᶜ S W R g J i
+  in d + suc (dCapᶜ S W R g (lvls S W J (suc d)))
+
+-- THE LEVEL COMPOSES, which is what makes the walk decompose from the
+-- FRONT — an equality, so the change of direction the head-first
+-- evaluator forces costs nothing
+lvls-add : ∀ (S W J a b : ℕ) →
+  lvls S W J (a + b) ≡ lvls S W (lvls S W J a) b
+lvls-add S W J a zero    = cong (lvls S W J) (+-identityʳ a)
+lvls-add S W J a (suc b) =
+  trans (cong (lvls S W J) (+-suc a b))
+        (cong (dLvl S W) (lvls-add S W J a b))
+
+dWalkᶜ-front : ∀ (S W R g J i : ℕ) →
+  dWalkᶜ S W R g J (suc i)
+    ≡ suc (dCapᶜ S W R g (lvls S W J 1))
+      + dWalkᶜ S W R g (lvls S W J (suc (dCapᶜ S W R g (lvls S W J 1)))) i
+dWalkᶜ-front S W R g J zero =
+  sym (+-identityʳ (suc (dCapᶜ S W R g (lvls S W J 1))))
+dWalkᶜ-front S W R g J (suc i) =
+  trans (cong (λ x → x + suc (dCapᶜ S W R g (lvls S W J (suc x))))
+              (dWalkᶜ-front S W R g J i))
+    (trans (+-assoc (suc A) W′ (suc (dCapᶜ S W R g (lvls S W J (suc (suc A + W′))))))
+           (cong (λ x → suc A + (W′ + suc (dCapᶜ S W R g x))) (sym re)))
+  where
+  A  = dCapᶜ S W R g (lvls S W J 1)
+  J′ = lvls S W J (suc A)
+  W′ = dWalkᶜ S W R g J′ i
+  re : lvls S W J′ (suc W′) ≡ lvls S W J (suc (suc A + W′))
+  re = trans (sym (lvls-add S W J (suc A) (suc W′)))
+             (cong (lvls S W J) (+-suc (suc A) W′))
+
+------------------------------------------------------------------
+-- AND IT IS MONOTONE IN EVERY ARGUMENT, THE LEVEL INCLUDED — the same
+-- toolkit `dCap-mono` is, plus the two base monotonicities the level
+-- reading needs (the old walk never varied S or W inside itself)
+------------------------------------------------------------------
+
+sizeStep-mono : ∀ {S S′ s s′} → S ≤ S′ → s ≤ s′ → sizeStep S s ≤ sizeStep S′ s′
+sizeStep-mono hS hb = *-mono-≤ hS (s≤s (*-monoʳ-≤ 2 hb))
+
+foldStep-mono : ∀ {S S′ w w′} → 2 ≤ S → S ≤ S′ → w ≤ w′ →
+  foldStep S w ≤ foldStep S′ w′
+foldStep-mono {zero}        ()
+foldStep-mono {suc zero}    (s≤s ())
+foldStep-mono {suc (suc n)} {w′ = w′} 2≤S hS hw =
+  ≤-trans (^-monoʳ-≤ (suc (suc n)) (s≤s hw)) (^-monoˡ-≤ (suc w′) hS)
+
+iterSize-mono-base : ∀ (k : ℕ) {S S′ s s′} → S ≤ S′ → s ≤ s′ →
+  iterSize S k s ≤ iterSize S′ k s′
+iterSize-mono-base zero    hS hb = hb
+iterSize-mono-base (suc k) hS hb = iterSize-mono-base k hS (sizeStep-mono hS hb)
+
+iterFold-mono-base : ∀ (k : ℕ) {S S′ w w′} → 2 ≤ S → S ≤ S′ → w ≤ w′ →
+  iterFold S k w ≤ iterFold S′ k w′
+iterFold-mono-base zero    2≤S hS hw = hw
+iterFold-mono-base (suc k) 2≤S hS hw =
+  iterFold-mono-base k 2≤S hS (foldStep-mono 2≤S hS hw)
+
+sizeAt-mono : ∀ {S S′ J J′} → 1 ≤ S → S ≤ S′ → J ≤ J′ → sizeAt S J ≤ sizeAt S′ J′
+sizeAt-mono {S} {S′} {J} 1≤S hS hJ =
+  ≤-trans (iterSize-mono-base J hS hS) (iterSize-mono-count S′ S′ (≤-trans 1≤S hS) hJ)
+
+widAt-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  widAt S W J ≤ widAt S′ W′ J′
+widAt-mono {S} {S′} {W} {W′} {J} 2≤S hS hW hJ =
+  ≤-trans (iterFold-mono-base J 2≤S hS hW) (iterFold-mono-count S′ W′ (≤-trans 2≤S hS) hJ)
+
+regAt-mono : ∀ {S S′ R R′ J J′} → S ≤ S′ → R ≤ R′ → J ≤ J′ →
+  regAt S R J ≤ regAt S′ R′ J′
+regAt-mono hS hR hJ = *-mono-≤ hR (s≤s (*-mono-≤ hJ hS))
+
+fCharge-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  fCharge S W J ≤ fCharge S′ W′ J′
+fCharge-mono 2≤S hS hW hJ =
+  s≤s (*-mono-≤ (s≤s (widAt-mono 2≤S hS hW hJ))
+                (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ)))
+
+fLvl-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  fLvl S W J ≤ fLvl S′ W′ J′
+fLvl-mono 2≤S hS hW hJ = +-mono-≤ hJ (fCharge-mono 2≤S hS hW hJ)
+
+iterL-infl : ∀ (S W k J : ℕ) → J ≤ iterL S W k J
+iterL-infl S W zero    J = ≤-refl
+iterL-infl S W (suc k) J = ≤-trans (m≤m+n J _) (iterL-infl S W k (fLvl S W J))
+
+iterL-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  k ≤ k′ → iterL S W k J ≤ iterL S′ W′ k′ J′
+iterL-mono {S′ = S′} {W′ = W′} {J′ = J′} zero k′ 2≤S hS hW hJ hk =
+  ≤-trans hJ (iterL-infl S′ W′ k′ J′)
+iterL-mono (suc k) zero     2≤S hS hW hJ ()
+iterL-mono (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
+  iterL-mono k k′ 2≤S hS hW (fLvl-mono 2≤S hS hW hJ) hk
+
+dLvl-infl : ∀ (S W J : ℕ) → J ≤ dLvl S W J
+dLvl-infl S W J = iterL-infl S W (suc (sizeAt S J)) J
+
+dLvl-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  dLvl S W J ≤ dLvl S′ W′ J′
+dLvl-mono {S} {S′} {J = J} {J′ = J′} 2≤S hS hW hJ =
+  iterL-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) 2≤S hS hW hJ
+             (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
+
+lvls-infl : ∀ (S W J d : ℕ) → J ≤ lvls S W J d
+lvls-infl S W J zero    = ≤-refl
+lvls-infl S W J (suc d) = ≤-trans (lvls-infl S W J d) (dLvl-infl S W (lvls S W J d))
+
+lvls-mono : ∀ {S S′ W W′ J J′} (d d′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  d ≤ d′ → lvls S W J d ≤ lvls S′ W′ J′ d′
+lvls-mono {S′ = S′} {W′ = W′} {J′ = J′} zero d′ 2≤S hS hW hJ hd =
+  ≤-trans hJ (lvls-infl S′ W′ J′ d′)
+lvls-mono (suc d) zero     2≤S hS hW hJ ()
+lvls-mono (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
+  dLvl-mono 2≤S hS hW (lvls-mono d d′ 2≤S hS hW hJ hd)
+
+dCapᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ →
+  dCapᶜ S W R g J ≤ dCapᶜ S′ W′ R′ g′ J′
+dWalkᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ i i′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ → i ≤ i′ →
+  dWalkᶜ S W R g J i ≤ dWalkᶜ S′ W′ R′ g′ J′ i′
+
+dCapᶜ-mono zero    g′       2≤S hS hW hR hg       hJ = z≤n
+dCapᶜ-mono (suc g) zero     2≤S hS hW hR ()       hJ
+dCapᶜ-mono (suc g) (suc g′) 2≤S hS hW hR (s≤s hg) hJ =
+  dWalkᶜ-mono g g′ _ _ 2≤S hS hW hR hg hJ (regAt-mono hS hR hJ)
+
+dWalkᶜ-mono g g′ zero    i′       2≤S hS hW hR hg hJ hi       = z≤n
+dWalkᶜ-mono g g′ (suc i) zero     2≤S hS hW hR hg hJ ()
+dWalkᶜ-mono g g′ (suc i) (suc i′) 2≤S hS hW hR hg hJ (s≤s hi) =
+  +-mono-≤ ih (s≤s (dCapᶜ-mono g g′ 2≤S hS hW hR hg
+                      (lvls-mono (suc _) (suc _) 2≤S hS hW hJ (s≤s ih))))
+  where
+  ih = dWalkᶜ-mono g g′ i i′ 2≤S hS hW hR hg hJ hi
 
 -- REG: linear, monotone in j always
 frameStep-reg-mono : ∀ (c : Caps) {j j′ : ℕ} → j ≤ j′ →
