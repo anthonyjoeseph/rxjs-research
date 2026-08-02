@@ -467,6 +467,118 @@ _ : (3 ^ 8 ≤ᵇ iterFold 10 2 1) ≡ true
 _ = refl
 
 ------------------------------------------------------------------
+-- (9) THE RULED COUNT, AND IT PASSES EVERY ROW.  The design session's
+-- reading of §7/§8 is that the per-instant story count is
+-- DELIVERIES × NESTING and the deliveries are already paid for, so the
+-- count becomes
+--
+--     widthCount c = D̂ c * suc (cNest c)      D̂ c = 2 ^ (2 ^ cReg c)
+--
+-- with `cNest` a new Caps field carrying `nestᵉ e + slotsNest sl` from
+-- the entry syntax — i.e. `suc cNest` is exactly the refuted count of §4,
+-- now a FACTOR rather than the whole thing.
+--
+-- THE GATE IS RUN AT THE MEASURED REGISTRY, not at capsAt's.  `mReg id`
+-- is the registrations the pre-cascade state actually holds, and
+-- `capsAt`'s own cReg dominates it (the base is `suc (sizeᵉ + slotsSize)`
+-- and frameBlowup only grows it), so a row that fits at the measured R
+-- fits at the cap.  `mFolds id` is the cascade's real delivery count,
+-- reported beside it so the TIGHT law `demand ≤ D * suc cNest` — the one
+-- §7/§8 actually measured — can be read off the same table.
+--
+--   family / id     R    D     S    suc cNest  demand  D*suc  D̂ R
+--   progDT 0        1    1    20        3        1       3      4
+--   progDT 1        1    1    24        3        1       3      4
+--   progDT 2        0    1    45        3        1       3      2
+--   progW  0        1    1    20        4        1       4      4
+--   pF1    0        3    4    10        2        1       8    256
+--   pF1    1        3    4    87        2        1       8    256
+--   pF1    2        3    4   843        2        1       8    256
+--   pF2    0        5   10    10        2        1      20   2^32
+--   pmu2   0        1    1    24        2        1       2      4
+--   pmu2   1        1    1    87        2        1       2      4
+--   pmu2   2        1    1   276        2        1       2      4
+--   pmu2   3        1    1   843        2        1       2      4
+--   pmuD   0        1    1    24        3        1       3      4
+--   pmuD   1        1    1    45        3        1       3      4
+--   pL² 2  0        5   21    18        4        1      84   2^32
+--   pL² 2  1       19  153    18        4        0     612   ⟨tower⟩
+--   pL³ 0  0        7   50     3        2        1     100  2^128
+--   pL³ 0  1       15  114     2        2        0     228   ⟨tower⟩
+--   progD  0        0    0    45        3        0       0      2
+--   pFan 1 0        1    1    20        3        1       3      4
+--   pFan 2 0        2    2    20        3        2       6     16
+--   pFan 3 0        3    3    20        3        3       9    256
+--   pFan 4 0        4    4    20        3        4      12  65536
+--   pFan 5 0        5    5    20        3        5      15   2^32
+--   pFan 3 1        3    3    66        3        3       9    256
+--   pFan2 1 0       1    1    34        4        2       4      4
+--   pFan2 2 0       2    2    34        4        4       8     16
+--   pFan2 3 0       3    3    34        4        6      12    256
+--   pmuD2M 0        1    1    38        4        2       4      4
+--   pmuD2M 1        1    1    73        4        2       4      4
+--   pmuD2M 2        1    1   108        4        2       4      4
+--   pmuD2M 3        1    1   143        4        2       4      4
+--   pTupM 8 0       8    8    10        2        0      16  2^256
+--
+-- (R, D, S: compiled, probe/Nest-Count-Main.agda.  The demand column is
+-- §5's `wNeed` on the Instant-Height rows and §7/§8's ΔN on the fan-out
+-- families, both already measured.)
+--
+-- NO ROW BREACHES, on EITHER form.  The tight `D * suc cNest` is worst
+-- at ratio 1/2 — `pFan2 n` demands 2n against 4n, and `pmuD2M` demands 2
+-- against 4 — and the ruled `D̂ * suc cNest` has the whole delivery tower
+-- on top of that.  `progD 0` is the only row where the tight form is
+-- TIGHT rather than slack, and only because it delivers zero times and
+-- demands zero stories; the ruled form gives it 6.
+------------------------------------------------------------------
+
+D̂ᶜ : ℕ → ℕ
+D̂ᶜ R = 2 ^ (2 ^ R)
+
+-- the gate: does the measured demand fit the ruled count at registry R?
+gate : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → ℕ → Exp Γ Δᵍ Δ Θ t → Slots Γ → Bool
+gate R demand e sl = demand ≤ᵇ D̂ᶜ R * widthCount e sl
+
+-- the Instant-Height rows, at their own R and their own wNeed
+_ : gate 1 1 progDT insD₂ ∷ gate 1 1 progDT insD₂ ∷ gate 0 1 progDT insD₂
+  ∷ gate 1 1 progW insD₂
+  ∷ gate 3 1 pF1 insG ∷ gate 3 1 pF1 insG ∷ gate 3 1 pF1 insG
+  ∷ gate 5 1 pF2 insG²
+  ∷ gate 1 1 pμ2 ins₀ ∷ gate 1 1 pμ2 ins₀ ∷ gate 1 1 pμ2 ins₀ ∷ gate 1 1 pμ2 ins₀
+  ∷ gate 1 1 pμD ins₀ ∷ gate 1 1 pμD ins₀
+  ∷ gate 5 1 (pL² 2) insG² ∷ gate 19 0 (pL² 2) insG²
+  ∷ gate 7 1 (pL³ 0) insG³ ∷ gate 15 0 (pL³ 0) insG³
+  ∷ gate 0 0 progD ins₀ ∷ []
+  ≡ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true
+  ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ []
+_ = refl
+
+-- the fan-out family, whose demand is n and whose registry is n
+_ : gate 1 1 (pFan 1) insD₂ ∷ gate 2 2 (pFan 2) insD₂
+  ∷ gate 3 3 (pFan 3) insD₂ ∷ gate 4 4 (pFan 4) insD₂
+  ∷ gate 5 5 (pFan 5) insD₂ ∷ gate 3 3 (pFan 3) insD₂ ∷ []
+  ≡ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ []
+_ = refl
+
+-- deliveries × nesting, the family that broke the syntactic count
+_ : gate 1 2 (pFan2 1) insD₂ ∷ gate 2 4 (pFan2 2) insD₂
+  ∷ gate 3 6 (pFan2 3) insD₂
+  ∷ gate 1 2 pμD2M ins₀ ∷ gate 1 2 pμD2M ins₀
+  ∷ gate 1 2 pμD2M ins₀ ∷ gate 1 2 pμD2M ins₀
+  ∷ gate 8 0 (pTupM 8) insD₂ ∷ []
+  ≡ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ []
+_ = refl
+
+-- AND THE TIGHT FORM TOO, where the ruled one has the delivery tower to
+-- spare: `demand ≤ D * suc cNest` on every row whose D is nonzero.  The
+-- two worst are pinned — pFan2 3 (6 against 12) and pmuD2M (2 against 4)
+_ : (6 ≤ᵇ 3 * widthCount (pFan2 3) insD₂) ∷ (2 ≤ᵇ 1 * widthCount pμD2M ins₀)
+  ∷ (5 ≤ᵇ 5 * widthCount (pFan 5) insD₂) ∷ []
+  ≡ true ∷ true ∷ true ∷ []
+_ = refl
+
+------------------------------------------------------------------
 -- WHAT THIS DOES AND DOES NOT SAY.
 --
 -- It does NOT touch the SIZE count: `sizeCount` reads cWid and drives

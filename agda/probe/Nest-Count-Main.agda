@@ -20,9 +20,13 @@ open import Data.String using (String; _++_; lines)
 open import Data.List using (List; []; _∷_)
 
 open import CLI.IO
-open import Charge-Probe using (ins₀; insD₂; progDT; progW; pF1; pF2)
-open import Instant-Height-Probe using (pμD; wStore; wNeed)
-open import Mint-Loop-Shapes using (mS; insG; insG²)
+open import Rx.Exp using (Ctx; Closed)
+open import Rx.Prim using (Fuel)
+open import Rx.Evaluator using (Slots)
+open import Charge-Probe using (ins₀; insD₂; progD; progDT; progW; pF1; pF2)
+open import Instant-Height-Probe using (pμ2; pμD; wStore; wNeed)
+open import Mint-Loop-Shapes using (mS; mReg; mFolds; insG; insG²; insG³;
+                                    pL²; pL³)
 open import Verify-Budget-Sufficient.Caps using (iterFold)
 open import Nest-Count-Probe
 
@@ -33,6 +37,11 @@ showL (x ∷ xs) = show x ++ " " ++ showL xs
 
 rowS : String → List ℕ → String
 rowS nm vs = nm ++ " = " ++ showL vs ++ "\n"
+
+-- §9's gate row: R (the registrations the pre-cascade state holds) ;
+-- D (the cascade's real deliveries) ; S (the tightest admissible cSize)
+grow : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ → List ℕ
+grow id e ins = mReg id e ins ∷ mFolds id e ins ∷ mS id e ins ∷ []
 
 -- every row is S ; N(id) ; N(id+1) ; acc(id) ; acc(id+1)
 rows : List String
@@ -72,6 +81,42 @@ rows =
   -- the contrast: a multiplicative step climbs no stories at all
   ∷ rowS "TUP pTupM8 id0" (nrow 0 (pTupM 8) insD₂)
   ∷ rowS "TUP pTupM8 W+"  (wStore 0 (pTupM 8) insD₂ ∷ [])
+  -- §9's GATE ROWS: R ; D ; S, on the 19 Instant-Height rows and on
+  -- every family above, so the ruled count can be checked at the
+  -- MEASURED registry rather than at capsAt's
+  ∷ rowS "G progDT 0" (grow 0 progDT insD₂)
+  ∷ rowS "G progDT 1" (grow 1 progDT insD₂)
+  ∷ rowS "G progDT 2" (grow 2 progDT insD₂)
+  ∷ rowS "G progW 0"  (grow 0 progW  insD₂)
+  ∷ rowS "G pF1 0"    (grow 0 pF1    insG)
+  ∷ rowS "G pF1 1"    (grow 1 pF1    insG)
+  ∷ rowS "G pF1 2"    (grow 2 pF1    insG)
+  ∷ rowS "G pF2 0"    (grow 0 pF2    insG²)
+  ∷ rowS "G pmu2 0"   (grow 0 pμ2    ins₀)
+  ∷ rowS "G pmu2 1"   (grow 1 pμ2    ins₀)
+  ∷ rowS "G pmu2 2"   (grow 2 pμ2    ins₀)
+  ∷ rowS "G pmu2 3"   (grow 3 pμ2    ins₀)
+  ∷ rowS "G pmuD 0"   (grow 0 pμD    ins₀)
+  ∷ rowS "G pmuD 1"   (grow 1 pμD    ins₀)
+  ∷ rowS "G pL2 0"    (grow 0 (pL² 2) insG²)
+  ∷ rowS "G pL2 1"    (grow 1 (pL² 2) insG²)
+  ∷ rowS "G pL3 0"    (grow 0 (pL³ 0) insG³)
+  ∷ rowS "G pL3 1"    (grow 1 (pL³ 0) insG³)
+  ∷ rowS "G progD 0"  (grow 0 progD  ins₀)
+  ∷ rowS "G pFan1 0"  (grow 0 (pFan 1) insD₂)
+  ∷ rowS "G pFan2 0"  (grow 0 (pFan 2) insD₂)
+  ∷ rowS "G pFan3 0"  (grow 0 (pFan 3) insD₂)
+  ∷ rowS "G pFan4 0"  (grow 0 (pFan 4) insD₂)
+  ∷ rowS "G pFan5 0"  (grow 0 (pFan 5) insD₂)
+  ∷ rowS "G pFan3 1"  (grow 1 (pFan 3) insD₂)
+  ∷ rowS "G pFan2-1 0" (grow 0 (pFan2 1) insD₂)
+  ∷ rowS "G pFan2-2 0" (grow 0 (pFan2 2) insD₂)
+  ∷ rowS "G pFan2-3 0" (grow 0 (pFan2 3) insD₂)
+  ∷ rowS "G pmuD2M 0" (grow 0 pμD2M ins₀)
+  ∷ rowS "G pmuD2M 1" (grow 1 pμD2M ins₀)
+  ∷ rowS "G pmuD2M 2" (grow 2 pμD2M ins₀)
+  ∷ rowS "G pmuD2M 3" (grow 3 pμD2M ins₀)
+  ∷ rowS "G pTupM8 0" (grow 0 (pTupM 8) insD₂)
   ∷ []
 
 idx : ℕ → List String → String
