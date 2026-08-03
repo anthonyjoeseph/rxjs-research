@@ -167,6 +167,18 @@ share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
 share-step sl cs i k eqi fresh (s≤s h) =
   ≤-trans (resid-connect sl cs i eqi fresh) h
 
+-- the same step in the shape the clique actually holds it.  A subscribe
+-- at `input i` has `nest (input i) sl cs ≤ bud`, and `input i` has
+-- syncSize 1, so what the clause is really carrying down to the slot is
+-- `resid sl cs ≤ bud − 1` — the residue alone.  Stated that way the
+-- share edge needs no `input` term to be reconstructed at three heads
+share-step-resid : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (i : Fin n) {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false →
+  resid sl cs ≤ k → nest d sl (toℕ i ∷ cs) ≤ k
+share-step-resid sl cs i k eqi fresh h =
+  ≤-trans (resid-connect sl cs i eqi fresh) h
+
 ------------------------------------------------------------------
 -- § 4.  THE REMAINING EDGES.  `subscribeE` walks an operator chain and
 -- re-enters itself at a μ; the μ edge is the ONE that spends a unit of
