@@ -83,9 +83,10 @@ module Rung-Count-Probe where
 open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; _<_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ;
-         +-mono-≤; +-monoʳ-≤; *-mono-≤; n≤1+n)
-open import Data.List using (List; []; _∷_; all; length)
+  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ; +-comm;
+         +-mono-≤; +-monoʳ-≤; *-mono-≤; n≤1+n; m≤m+n; ≤ᵇ⇒≤)
+open import Data.List using (List; []; _∷_; _++_; all; length)
+open import Data.List.Properties using (length-++)
 open import Data.Empty using (⊥)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
@@ -100,13 +101,16 @@ open import Rx.Evaluator
          fLvlD-0; fLvlD-suc; sIterD-0; sIterD-suc; sLvlD-0; sLvlD-suc;
          opIterD-0; opIterD-suc; fIterD-0; fIterD-suc)
 
+open import Verify-Budget-Sufficient.Measures
+  using (∧-true; ∧-intro; all-impl; ≤ᵇ-widen; T-to)
+open import Verify-Well-Formed using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; caps; frameStep;
+  using (Caps; caps; frameStep; frameStep-wid-suc;
          sizeAt-mono; widAt-mono; fCharge-mono;
          sLvlD-infl;
          sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
 open import Verify-Budget-Sufficient.Caps-Face
-  using (widNode; obsCaps?; valsCaps?)
+  using (widNode; obsCaps?; valsCaps?; suc≤foldStep)
 open import Verify-Budget-Sufficient.Subscribe-Face using (valsLen)
 
 ------------------------------------------------------------------
@@ -353,4 +357,138 @@ _ : (suc (widAt 2 1 1) * suc (widAt 2 1 1) ≤ᵇ suc (widAt 2 1 3)) ≡ true
 _ = refl
 
 _ : (suc (widAt 9 1 1) * suc (widAt 9 1 1) ≤ᵇ suc (widAt 9 1 2)) ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 5.  THE THREE LIFECYCLE ROWS of the queue-length invariant § 2b
+-- calls for.  `qOK` below is the concat clause `widNode` is to be
+-- changed to; the rows are the three ways a concat node's queue is ever
+-- written, read off the evaluator:
+--
+--   BIRTH   .Evaluator:1433 — `concat-st [] false false`, the ONLY site
+--           that installs a fresh concat node.  Empty.
+--   PUSH    .Evaluator:1107 — `concat-st (q ++ o ∷ []) true od`, the
+--           inner-busy branch of `thruConsume`.  The one growing write.
+--   RE-PARK .Evaluator:1114 — `concat-st [] (not done) od`, the
+--           inner-idle branch.  Empty again, so it is BIRTH's row.
+--   MARK    .Evaluator:1161 — `concat-st q act true`, `thruWrap`'s
+--           outer-done flag.  q untouched, so widening alone.
+--   DRAIN   .Evaluator:1207 — `concat-st q′ act′ od`, where `q′` is what
+--           `concatDrain` returns: `[]`, or the tail after one cons.
+--
+-- So exactly one row does arithmetic, and it is the push.
+------------------------------------------------------------------
+
+allB-++ : ∀ {A : Set} (p : A → Bool) (xs ys : List A) →
+  all p xs ≡ true → all p ys ≡ true → all p (xs ++ ys) ≡ true
+allB-++ p []       ys hx hy = hy
+allB-++ p (x ∷ xs) ys hx hy with ∧-true (p x) (all p xs) hx
+... | h₁ , h₂ = ∧-intro h₁ (allB-++ p xs ys h₂ hy)
+
+-- THE PROPOSED CLAUSE.  The pointwise bound `widNode` already carries,
+-- and the cardinality § 2 proved is not derivable from it
+qOK : ∀ {n} {Γ : Ctx n} {t} → ℕ → Slots Γ → List (Closed Γ t) → Bool
+qOK {n = n} W sl q = all (λ o → pWᵉ n sl o ≤ᵇ W) q ∧ (length q ≤ᵇ W)
+
+-- ROW 1 — ESTABLISHMENT.  The birth queue is `[]` at every install
+-- site, so the row holds at EVERY width, with no side condition and no
+-- appeal to `capsAt`'s cSize construction at all.  Not structural
+birth-row : ∀ {n} {Γ : Ctx n} {t} (W : ℕ) (sl : Slots Γ) →
+  qOK {Γ = Γ} {t = t} W sl [] ≡ true
+birth-row W sl = refl
+
+-- one level of width dominates one more queue item, with the same
+-- `suc w ≤ foldStep S w` margin the count receipts already use
+wid-suc-step : ∀ (c : Caps) (L : ℕ) → 2 ≤ Caps.cSize c →
+  suc (Caps.cWid (frameStep L c)) ≤ Caps.cWid (frameStep (suc L) c)
+wid-suc-step c L hS =
+  subst (λ x → suc (Caps.cWid (frameStep L c)) ≤ x)
+        (sym (frameStep-wid-suc c L))
+        (suc≤foldStep (Caps.cSize c) (Caps.cWid (frameStep L c)) hS)
+
+-- ROW 2 — PUSH PRESERVATION, at the witness `1` § 2b demands.  The
+-- pushed observable arrives admissible at the READ level j (that is
+-- `thruConsume-caps`'s own hypothesis), and one level pays for the cons
+push-row : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (q : List (Closed Γ t)) (o : Closed Γ t) → 2 ≤ Caps.cSize c →
+  qOK (Caps.cWid (frameStep j c)) sl q ≡ true →
+  (pWᵉ n sl o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true →
+  qOK (Caps.cWid (frameStep (suc j) c)) sl (q ++ o ∷ []) ≡ true
+push-row {n = n} c j sl q o hS hq ho
+  with ∧-true (all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep j c)) q)
+              (length q ≤ᵇ Caps.cWid (frameStep j c)) hq
+... | hall , hlen = ∧-intro pw card
+  where
+  W  = Caps.cWid (frameStep j c)
+  W′ = Caps.cWid (frameStep (suc j) c)
+
+  wide : W ≤ W′
+  wide = ≤-trans (n≤1+n W) (wid-suc-step c j hS)
+
+  pw : all (λ x → pWᵉ n sl x ≤ᵇ W′) (q ++ o ∷ []) ≡ true
+  pw = allB-++ (λ x → pWᵉ n sl x ≤ᵇ W′) q (o ∷ [])
+         (all-impl _ _ (λ x → ≤ᵇ-widen (pWᵉ n sl x) wide) q hall)
+         (∧-intro (≤ᵇ-widen (pWᵉ n sl o) wide ho) refl)
+
+  card : (length (q ++ o ∷ []) ≤ᵇ W′) ≡ true
+  card = ≤ᵇ-true (length (q ++ o ∷ [])) W′
+           (≤-trans (≤-reflexive (trans (length-++ q) (+-comm (length q) 1)))
+                    (≤-trans (s≤s (≤ᵇ⇒≤ (length q) W (T-to hlen)))
+                             (wid-suc-step c j hS)))
+
+-- ROW 3 — DRAIN PRESERVATION.  `concatDrain` only ever SHORTENS: its
+-- drain-on branch returns the tail after one cons, its exhausted branch
+-- returns `[]` (ROW 1).  So the row is one cons off the front plus the
+-- widening every clause of the clique performs anyway
+drain-row : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j j′ : ℕ) (sl : Slots Γ)
+  (o : Closed Γ t) (q : List (Closed Γ t)) → 2 ≤ Caps.cSize c →
+  qOK (Caps.cWid (frameStep j c)) sl (o ∷ q) ≡ true →
+  qOK (Caps.cWid (frameStep (j + j′) c)) sl q ≡ true
+drain-row {n = n} c j j′ sl o q hS hq
+  with ∧-true ((pWᵉ n sl o ≤ᵇ Caps.cWid (frameStep j c))
+                 ∧ all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep j c)) q)
+              (suc (length q) ≤ᵇ Caps.cWid (frameStep j c)) hq
+... | hall , hlen
+  with ∧-true (pWᵉ n sl o ≤ᵇ Caps.cWid (frameStep j c))
+              (all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep j c)) q) hall
+... | _ , hq′ = ∧-intro pw card
+  where
+  W  = Caps.cWid (frameStep j c)
+  W′ = Caps.cWid (frameStep (j + j′) c)
+
+  wide : W ≤ W′
+  wide = widAt-mono hS ≤-refl ≤-refl (m≤m+n j j′)
+
+  pw : all (λ x → pWᵉ n sl x ≤ᵇ W′) q ≡ true
+  pw = all-impl _ _ (λ x → ≤ᵇ-widen (pWᵉ n sl x) wide) q hq′
+
+  card : (length q ≤ᵇ W′) ≡ true
+  card = ≤ᵇ-true (length q) W′
+           (≤-trans (≤-trans (n≤1+n (length q))
+                             (≤ᵇ⇒≤ (suc (length q)) W (T-to hlen)))
+                    wide)
+
+-- ROW 4 — MARK, and the RE-PARK that is ROW 1 again.  Both are pure
+-- widenings of a queue already admitted, so they need nothing new; the
+-- statement is here so the four writes are all accounted for
+mark-row : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j j′ : ℕ) (sl : Slots Γ)
+  (q : List (Closed Γ t)) → 2 ≤ Caps.cSize c →
+  qOK (Caps.cWid (frameStep j c)) sl q ≡ true →
+  qOK (Caps.cWid (frameStep (j + j′) c)) sl q ≡ true
+mark-row {n = n} c j j′ sl q hS hq
+  with ∧-true (all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep j c)) q)
+              (length q ≤ᵇ Caps.cWid (frameStep j c)) hq
+... | hall , hlen = ∧-intro
+  (all-impl _ _ (λ x → ≤ᵇ-widen (pWᵉ n sl x) wide) q hall)
+  (≤ᵇ-widen (length q) wide hlen)
+  where
+  wide : Caps.cWid (frameStep j c) ≤ Caps.cWid (frameStep (j + j′) c)
+  wide = widAt-mono hS ≤-refl ≤-refl (m≤m+n j j′)
+
+-- and the margin, computed: a push at the smallest caps the face admits
+-- takes the queue budget 1 ↦ 4 ↦ 32, so the invariant is nowhere tight
+_ : (suc 1 ≤ᵇ widAt 2 1 1) ≡ true
+_ = refl
+
+_ : (suc 4 ≤ᵇ widAt 2 1 2) ≡ true
 _ = refl
