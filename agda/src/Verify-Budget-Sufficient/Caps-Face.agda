@@ -213,9 +213,18 @@ widLive {n = n} W sl l =
   all (λ tv → pWᵛ n sl (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ W)
       (LiveSource.pending l)
 
+-- THE CONCAT CLAUSE CARRIES A CARDINALITY as well as the pointwise
+-- bound, and it has to: `concatDrain` subscribes one inner per queued
+-- observable, so the drain's receipt is a sum over the queue, and
+-- NOTHING else in the tree bounds how long that queue is — the
+-- hypothesis concatDrain-caps is given admits a queue of any length at
+-- all, and so does an `all` (Rung-Count-Probe § 2, both rows).  One
+-- level of width pays for one cons, with the same `suc w ≤ foldStep S w`
+-- margin the count receipts already spend
 widNode : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
 widNode {n = n} W sl (scan-st {t} v)   = pWᵛ n sl t v ≤ᵇ W
-widNode {n = n} W sl (concat-st q _ _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
+widNode {n = n} W sl (concat-st q _ _) =
+  all (λ o → pWᵉ n sl o ≤ᵇ W) q ∧ (length q ≤ᵇ W)
 widNode W sl (take-st _)               = true
 widNode W sl (merge-st _ _)            = true
 widNode W sl (switch-st _ _)           = true
@@ -340,8 +349,11 @@ widLive-widen {n = n} sl l le =
 widNode-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (ns : NodeState Γ) {W W′ : ℕ} →
   W ≤ W′ → widNode W sl ns ≡ true → widNode W′ sl ns ≡ true
 widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (pWᵛ n sl t v) le h
-widNode-widen {n = n} sl (concat-st q _ _) le h =
-  all-impl _ _ (λ o → ≤ᵇ-widen (pWᵉ n sl o) le) q h
+widNode-widen {n = n} sl (concat-st q _ _) {W} {W′} le h
+  with ∧-true (all (λ o → pWᵉ n sl o ≤ᵇ W) q) (length q ≤ᵇ W) h
+... | hall , hlen =
+  ∧-intro (all-impl _ _ (λ o → ≤ᵇ-widen (pWᵉ n sl o) le) q hall)
+          (≤ᵇ-widen (length q) le hlen)
 widNode-widen sl (take-st _)     le h = refl
 widNode-widen sl (merge-st _ _)  le h = refl
 widNode-widen sl (switch-st _ _) le h = refl
@@ -968,6 +980,66 @@ iterFold-+ S (suc a) b w = iterFold-+ S a b (foldStep S w)
 -- leaf bound may be read one above the width cap
 suc≤foldStep : ∀ (S w : ℕ) → 2 ≤ S → suc w ≤ foldStep S w
 suc≤foldStep S w hS = ≤-trans (<⇒≤ (n<2^n (suc w))) (^-monoˡ-≤ (suc w) hS)
+
+-- ONE LEVEL OF WIDTH DOMINATES ONE MORE QUEUE ITEM, with the same
+-- `suc w ≤ foldStep S w` margin the count receipts spend.  This is what
+-- makes the cardinality conjunct affordable: the push is the ONLY write
+-- to a concat queue that grows it (Rung-Count-Probe § 5 reads all four
+-- off the evaluator — birth and re-park install `[]`, the outer-done
+-- mark leaves q alone, the drain only shortens), so exactly one row
+-- does arithmetic and one level pays for it
+wid-suc-step : ∀ (c : Caps) (L : ℕ) → 2 ≤ Caps.cSize c →
+  suc (Caps.cWid (frameStep L c)) ≤ Caps.cWid (frameStep (suc L) c)
+wid-suc-step c L hS =
+  subst (λ x → suc (Caps.cWid (frameStep L c)) ≤ x)
+        (sym (frameStep-wid-suc c L))
+        (suc≤foldStep (Caps.cSize c) (Caps.cWid (frameStep L c)) hS)
+
+widNode-push : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (L : ℕ) (sl : Slots Γ)
+  (q : List (Closed Γ s)) (o : Closed Γ s) (act od : Bool) →
+  2 ≤ Caps.cSize c →
+  widNode (Caps.cWid (frameStep L c)) sl (concat-st q act od) ≡ true →
+  (pWᵉ n sl o ≤ᵇ Caps.cWid (frameStep L c)) ≡ true →
+  widNode (Caps.cWid (frameStep (suc L) c)) sl (concat-st (q ++ o ∷ []) act od)
+    ≡ true
+widNode-push {n = n} c L sl q o act od hS hq ho
+  with ∧-true (all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep L c)) q)
+              (length q ≤ᵇ Caps.cWid (frameStep L c)) hq
+... | hall , hlen = ∧-intro pw card
+  where
+  W  = Caps.cWid (frameStep L c)
+  W′ = Caps.cWid (frameStep (suc L) c)
+
+  wide : W ≤ W′
+  wide = ≤-trans (n≤1+n W) (wid-suc-step c L hS)
+
+  pw : all (λ x → pWᵉ n sl x ≤ᵇ W′) (q ++ o ∷ []) ≡ true
+  pw = all-++-intro (λ x → pWᵉ n sl x ≤ᵇ W′) q (o ∷ [])
+         (all-impl _ _ (λ x → ≤ᵇ-widen (pWᵉ n sl x) wide) q hall)
+         (∧-intro (≤ᵇ-widen (pWᵉ n sl o) wide ho) refl)
+
+  card : (length (q ++ o ∷ []) ≤ᵇ W′) ≡ true
+  card = T⇒≡true (length (q ++ o ∷ []) ≤ᵇ W′)
+           (≤⇒≤ᵇ (≤-trans (≤-reflexive (trans (length-++ q) (+-comm (length q) 1)))
+                          (≤-trans (s≤s (≤ᵇ⇒≤ (length q) W (T-to hlen)))
+                                   (wid-suc-step c L hS))))
+
+-- AND THE DRAIN ONLY EVER SHORTENS, which is the row that reinstalls
+-- the residue.  `concatDrain` returns `[]` when it runs the queue out,
+-- the recursive residue when the head completed, and the TAIL when it
+-- did not — never anything longer than what it was given, so the
+-- cardinality conjunct survives the reinstall by widening alone
+concatDrain-qlen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+  length (proj₁ (proj₂ (proj₂ (proj₂ (concatDrain g allNid κ id now q sched st)))))
+    ≤ length q
+concatDrain-qlen g allNid κ id now []      sched st = z≤n
+concatDrain-qlen g allNid κ id now (o ∷ q) sched st
+  with subscribeInner g concatᵒ allNid κ id now o sched st
+... | _ , vs , bs , false , sched₁ , st₁ = n≤1+n (length q)
+... | _ , vs , bs , true  , sched₁ , st₁ =
+  ≤-trans (concatDrain-qlen g allNid κ id now q sched₁ st₁) (n≤1+n (length q))
 
 -- and iterFold is monotone in the SEED as well as in the count
 foldStep-mono-w : ∀ (S : ℕ) {w w′ : ℕ} → 2 ≤ S → w ≤ w′ →

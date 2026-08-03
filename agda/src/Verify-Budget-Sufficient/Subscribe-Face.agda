@@ -1258,22 +1258,38 @@ thruConsume-caps {n = n} {u = u} c j g concatᵒ nid κ id now o sl sched st
 ...   | no _ = 0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
                          (sym (+-identityʳ j)) inv
              , refl , refl
+-- THE ONE WRITE THAT GROWS A CONCAT QUEUE, and therefore the one
+-- clause of the clique that reports a witness for no other reason than
+-- the cardinality conjunct.  `widNode` bounds the queue's LENGTH by the
+-- level's width as well as its contents pointwise, so the cons has to be
+-- paid for: one level takes cWid to `foldStep`, which dominates
+-- `suc cWid` with room, and the witness goes 0 ↦ 1.  Nothing else in the
+-- clause needs the extra level — both value and event lists are empty
+-- here, so their conjuncts are `refl` at any caps
 ...   | yes refl =
-  0 , subst (λ x → capsOK? (frameStep x c) sched
+  1 , subst (λ x → capsOK? (frameStep x c) sched
                      (record st { nodes = setNode nid (concat-st (q ++ o ∷ []) true od)
                                             (EvalSt.nodes st) }) ≡ true)
-            (sym (+-identityʳ j))
-            (capsOK?-setNode (frameStep j c) nid (concat-st (q ++ o ∷ []) true od)
-               sched st BN WN inv)
+            (sym lvl)
+            (capsOK?-setNode (frameStep (suc j) c)
+               nid (concat-st (q ++ o ∷ []) true od)
+               sched st BN WN
+               (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
+                  (frameStep-mono-j c 2≤S (n≤1+n j)) inv))
     , refl , refl
   where
-  BN = all-++-intro (λ x → sizeᵉ x ≤ᵇ Caps.cSize (frameStep j c)) q (o ∷ [])
-         bn (∧-intro (valCaps?-size (frameStep j c) sl (obs u) o vC) refl)
-  WN = all-++-intro (λ x → pWᵉ n (Sched.slots sched) x ≤ᵇ Caps.cWid (frameStep j c))
-         q (o ∷ []) wn
-         (∧-intro (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
-                         (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
+  lvl : j + 1 ≡ suc j
+  lvl = +-comm j 1
+
+  BN = all-++-intro (λ x → sizeᵉ x ≤ᵇ Caps.cSize (frameStep (suc j) c)) q (o ∷ [])
+         (all-impl _ _ (λ x → ≤ᵇ-widen (sizeᵉ x)
+                                (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j)))) q bn)
+         (∧-intro (≤ᵇ-widen (sizeᵉ o) (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j)))
+                    (valCaps?-size (frameStep j c) sl (obs u) o vC))
                   refl)
+  WN = widNode-push c j (Sched.slots sched) q o true od 2≤S wn
+         (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
+                (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
 
 -- SWITCH: cut the outgoing inner, subscribe the new one, record it
 thruConsume-caps c j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC
@@ -1616,12 +1632,15 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
             sd₁ st₁
             (obsList-nodeSz (frameStep (j + j′) c) sl
                (proj₁ (proj₂ (proj₂ (proj₂ DR)))) RES)
-            (subst (λ y → all (λ x → pWᵉ n y x ≤ᵇ Caps.cWid (frameStep (j + j′) c))
-                            (proj₁ (proj₂ (proj₂ (proj₂ DR)))) ≡ true)
-                   (sym (trans (KeepsC.slotsEq
-                                 (concatDrain-keeps g allNid κ id now q sched st)) slEq))
-                   (obsList-nodeWid (frameStep (j + j′) c) sl
-                      (proj₁ (proj₂ (proj₂ (proj₂ DR)))) RES))
+            (∧-intro
+               (subst (λ y → all (λ x → pWᵉ n y x ≤ᵇ Caps.cWid (frameStep (j + j′) c))
+                               (proj₁ (proj₂ (proj₂ (proj₂ DR)))) ≡ true)
+                      (sym (trans (KeepsC.slotsEq
+                                    (concatDrain-keeps g allNid κ id now q sched st))
+                                  slEq))
+                      (obsList-nodeWid (frameStep (j + j′) c) sl
+                         (proj₁ (proj₂ (proj₂ (proj₂ DR)))) RES))
+               qCard)
             (proj₁ (proj₂ CD)))
      , valsIn (frameStep (j + suc j′) c) sl (vals ++ proj₁ DR)
          (valsCaps?-widen sl s (vals ++ proj₁ DR) ⊑ˢ
@@ -1641,12 +1660,18 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
      , eventsCaps?-widen sl (proj₁ (proj₂ DR)) ⊑ˢ
          (proj₁ (proj₂ (proj₂ (proj₂ CD))))
   where
+  wnAll = proj₁ (∧-true (all (λ o → pWᵉ n (Sched.slots sched) o
+                                      ≤ᵇ Caps.cWid (frameStep j c)) q)
+                        (length q ≤ᵇ Caps.cWid (frameStep j c)) wn)
+  wnLen = proj₂ (∧-true (all (λ o → pWᵉ n (Sched.slots sched) o
+                                      ≤ᵇ Caps.cWid (frameStep j c)) q)
+                        (length q ≤ᵇ Caps.cWid (frameStep j c)) wn)
   CD  = concatDrain-caps c j g allNid κ id now q sl sched st
           2≤S 1≤R slEq slC slSz inv pC lC
           (obsList-intro (frameStep j c) sl q bn
              (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
                              ≡ true)
-                    slEq wn))
+                    slEq wnAll))
   j′  = proj₁ CD
   ⊑ˢ  = frameStep-mono-j c 2≤S
           (≤-trans (n≤1+n (j + j′)) (≤-reflexive (sym (+-suc j j′))))
@@ -1659,6 +1684,14 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
                       (concat-st (proj₁ (proj₂ (proj₂ (proj₂ DR))))
                                  (proj₁ (proj₂ (proj₂ DR))) od)
                       (EvalSt.nodes st₁) }
+  -- THE DRAIN'S RESIDUE IS SHORTER THAN THE QUEUE IT CAME FROM, so the
+  -- cardinality conjunct the reinstall owes is the entry one, widened
+  qCard : (length (proj₁ (proj₂ (proj₂ (proj₂ DR))))
+             ≤ᵇ Caps.cWid (frameStep (j + j′) c)) ≡ true
+  qCard = T⇒≡true _ (≤⇒≤ᵇ
+    (≤-trans (concatDrain-qlen g allNid κ id now q sched st)
+             (≤-trans (≤ᵇ⇒≤ (length q) (Caps.cWid (frameStep j c)) (T-to wnLen))
+                      (proj₁ (proj₂ (frameStep-⊑-+ c 2≤S j j′))))))
 
 -- SWITCH: clear the current-inner slot if this was it
 innerFinish-caps c j g switchᵒ allNid inst κ id now vals sl sched st

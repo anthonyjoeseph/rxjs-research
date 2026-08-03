@@ -160,13 +160,17 @@ no-queue-bound c sl o ho B =
   , rep-all (obsCaps? c sl) (suc B) o ho
   , subst (λ x → B < x) (sym (rep-len (suc B) o)) ≤-refl
 
--- (b) AND THE STATE INVARIANT DOES NOT SUPPLY ONE EITHER: capsOK?'s only
--- node conjunct is widNode, and widNode on a concat node is an `all`
+-- (b) AND THE STATE INVARIANT DID NOT SUPPLY ONE EITHER, which is why
+-- `widNode`'s concat clause GAINED a cardinality conjunct.  The row
+-- below is the old clause — a bare pointwise `all` — and it admits a
+-- queue of any length whatever, so it could never have bounded the
+-- drain.  Stated about the `all` itself rather than about `widNode`,
+-- because widNode has since moved past it
 no-node-bound : ∀ {n} {Γ : Ctx n} {s} (W : ℕ) (sl : Slots Γ)
-  (o : Closed Γ s) (act od : Bool) → (pWᵉ n sl o ≤ᵇ W) ≡ true → (B : ℕ) →
+  (o : Closed Γ s) → (pWᵉ n sl o ≤ᵇ W) ≡ true → (B : ℕ) →
   Σ (List (Closed Γ s)) λ q →
-    (widNode W sl (concat-st q act od) ≡ true) × (B < length q)
-no-node-bound {n = n} W sl o act od ho B =
+    (all (λ x → pWᵉ n sl x ≤ᵇ W) q ≡ true) × (B < length q)
+no-node-bound {n = n} W sl o ho B =
   rep-list (suc B) o
   , rep-all (λ x → pWᵉ n sl x ≤ᵇ W) (suc B) o ho
   , subst (λ x → B < x) (sym (rep-len (suc B) o)) ≤-refl
@@ -299,7 +303,12 @@ wid-suc-step c L hS =
 
 -- ROW 2 — PUSH PRESERVATION, at the witness `1` § 2b demands.  The
 -- pushed observable arrives admissible at the READ level j (that is
--- `thruConsume-caps`'s own hypothesis), and one level pays for the cons
+-- `thruConsume-caps`'s own hypothesis), and one level pays for the cons.
+-- LANDED as .Caps-Face's `widNode-push` (on `wid-suc-step`), with the
+-- witness bumped 0 ↦ 1 at thruConsume-caps's concat-push clause; the
+-- drain row landed as `concatDrain-qlen`, read off the evaluator's three
+-- returns rather than off `qOK`.  Kept here because these are the rows
+-- the shape was CHOSEN from, and § 2 above is why it had to change
 push-row : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (q : List (Closed Γ t)) (o : Closed Γ t) → 2 ≤ Caps.cSize c →
   qOK (Caps.cWid (frameStep j c)) sl q ≡ true →
