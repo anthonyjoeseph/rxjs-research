@@ -69,20 +69,18 @@ protocol, per Anthony:
 
 - **One worker at a time.** Concurrent Agda checks OOM the container (13GB+ single-check
   peaks observed). Sequential workers, each run to completion and reviewed before the next.
-- **Babysit every worker with foreground keep-awake loops.** A background subagent only
-  advances while the container is awake, and the container suspends when the design
-  session's turn ends — observed directly on 2026-07-31: a worker sat frozen for 45
-  minutes until a scheduled check-in woke the container, and `uptime` showed a fresh boot.
-  So after launching a worker, the design session must hold the container awake with
-  a SERIES of SHORT foreground Bash keep-alives — ~110 seconds each (`for i in $(seq 1
-  11); do sleep 10; done` plus a status check), issued back-to-back — NOT long loops:
-  foreground calls get cut at ~2 minutes regardless of requested timeout, so a 10-minute
-  loop silently holds for 2 and sleeps for 8 (Anthony caught this on 2026-08-01 after a
-  day of it). Re-arm a `send_later` check-in every ~20 minutes so the loop survives
-  even if the design session's turn dies. Worker-side keep-awake loops must be ≤110s
-  for the same reason, with long builds setsid-detached and polled.
+- **Keep-alives RETIRED (2026-08-03).** The session now runs on a persistent laptop
+  (Anthony: "no need for the keep-alives anymore"), so the container no longer suspends
+  between tool calls — background workers and detached builds advance on their own, and
+  worker completion notifications wake the design session. The old protocol (110-second
+  serial foreground keep-alive chains + 20-minute `send_later` re-arms) is retired; keep
+  only a SPARSE fallback check-in (~60 min) to catch workers wedged by harness restarts
+  (a restart still kills a worker's in-flight turn — diagnose via transcript mtime + ps,
+  revive via SendMessage with re-verify instructions; "queued" = alive, "resumed from
+  transcript" = was dead). Long builds still get setsid-detached with EXIT=$? logs and
+  polled, since the Bash tool's ~600s foreground ceiling per call still applies.
 - **Directives carry the law.** Every worker prompt restates the standing rules it needs:
-  spec is gospel; probe-before-grind; the keep-awake loop for long builds; report numbers
+  spec is gospel; probe-before-grind; detached builds with EXIT= logs; report numbers
   plainly including failures; never extrapolate from shallow probe rows; the
   impossibility-pair stop rule (report, don't act).
 - **Workers commit and push per green task** to the working branch, in the repo's commit
@@ -97,23 +95,15 @@ protocol, per Anthony:
   to end: when a worker leg finishes, review it, merge it, launch the next. The only full
   stops are the standing ones: a spec question, or the impossibility pair.
 
-## Running long Agda builds: keep the container awake
+## Running long Agda builds
 
-`make agda` takes ~10-25 minutes; the Bash tool's ceiling is 600s, after which it moves the
-command to the background. **Background processes barely advance** — the container suspends
-between tool calls, so a backgrounded build can sit at the same module for an hour. Only a
-**foreground** tool call holds the container awake.
-
-So: kick the build off (it will background itself at 600s), then keep issuing foreground
-calls that block until it finishes — e.g.
-
-```
-for i in $(seq 1 55); do grep -q 'EXIT=' log && break; sleep 10; done
-```
-
-as a foreground `Bash` call, repeated until the build reports. Each such call holds the
-container awake for its duration, so the background build actually runs. Do **not** end the
-turn expecting a backgrounded build to finish on its own.
+`make agda` takes ~35-40 minutes (Caps-Face ~17-19, Wet ~14-18); the Bash tool's ceiling is
+600s per foreground call. Detach long builds (`nohup setsid bash -c '… ; echo EXIT=$? >>
+log' &`) and poll the log for its EXIT= line with short foreground calls. Since 2026-08-03
+the session runs on a persistent machine, so detached builds advance on their own — the
+polling is for pacing and verification, not for keeping anything awake. Never pipe agda
+through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and read
+indentation (an importer prints as the last line for its importee's whole leg).
 
 ## Agda: work from the outside in
 

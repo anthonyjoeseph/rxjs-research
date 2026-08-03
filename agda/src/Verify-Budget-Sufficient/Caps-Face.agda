@@ -4364,18 +4364,30 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 -- the tuple the face reports, named once so the assembly and its five
 -- clause pieces read the same four conjuncts
 FrameFace : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (sl : Slots Γ) →
+  (c : Caps) (d j : ℕ) (sl : Slots Γ) →
   List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e → Set
-FrameFace c j sl r =
+FrameFace c d j sl r =
   Σ ℕ λ j′ →
-     (j′ ≤ fCharge (Caps.cSize c) (Caps.cWid c) j)
+     (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) d j)
      × (capsOK? (frameStep (j + j′) c)
                 (proj₁ (proj₂ (proj₂ (proj₂ r))))
                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
      × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
+-- EVERY GROUND CLAUSE STILL PAYS `fCharge`, and this is the one lift
+-- that carries it to the landing form.  `fLvl S W j` IS `j + fCharge
+-- S W j` by refl, so a receipt inside fCharge lands inside `fLvlD`'s
+-- zeroth story and every story above it (`fLvl≤fLvlD`, .Caps).  No
+-- assembly composes two faces additively, so each construction site
+-- takes exactly one of these
+face-lift : ∀ (c : Caps) (d j j′ : ℕ) →
+  j′ ≤ fCharge (Caps.cSize c) (Caps.cWid c) j →
+  j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) d j
+face-lift c d j j′ h =
+  ≤-trans (+-monoʳ-≤ j h) (fLvl≤fLvlD (Caps.cSize c) (Caps.cWid c) d j)
+
 stepFrame-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (j : ℕ) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
+  (c : Caps) (d j : ℕ) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (κ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -4385,7 +4397,7 @@ stepFrame-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) (f ↠ κ) ≡ true →
   valsCaps? (frameStep j c) sl vals ≡ true →
-  FrameFace c j sl (stepFrame g id now f κ vals fin sched st)
+  FrameFace c d j sl (stepFrame g id now f κ vals fin sched st)
 
 walkH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (d : ℕ) (sl : Slots Γ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
@@ -4407,11 +4419,10 @@ walkH c d sl 2≤S 1≤R slC = record
   ; ok-finish = λ J i fin out ok → walkOK-finish c sl J i fin out ok
   ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL →
                   let r  = stepFrame sf id now f path′ vals fin sched st
-                      FC = stepFrame-face c J sl sf id now f path′ vals fin sched st
+                      FC = stepFrame-face c d J sl sf id now f path′ vals fin sched st
                              2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV in
                   proj₁ FC
-                  , ≤-trans (+-monoʳ-≤ J (proj₁ (proj₂ FC)))
-                            (fLvl≤fLvlD (Caps.cSize c) (Caps.cWid c) d J)
+                  , proj₁ (proj₂ FC)
                   , ( trans (KeepsC.slotsEq
                                (stepFrame-keeps sf id now f path′ vals fin sched st))
                             (proj₁ ok)
@@ -6604,12 +6615,12 @@ face-charge1 c j a ha =
 -- the clauses that emit nothing and touch nothing: j′ = 0, and the
 -- empty burst is inside every width there is
 stepFrame-face-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (u : Ty) (sl : Slots Γ) (fin : Bool)
+  (c : Caps) (d j : ℕ) (u : Ty) (sl : Slots Γ) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (frameStep j c) sched st ≡ true →
-  FrameFace {u = u} c j sl ([] , [] , fin , sched , st)
-stepFrame-face-zero c j u sl fin sched st inv =
-  0 , z≤n
+  FrameFace {u = u} c d j sl ([] , [] , fin , sched , st)
+stepFrame-face-zero c d j u sl fin sched st inv =
+  0 , face-lift c d j 0 z≤n
     , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? {s = u} (frameStep x c) sl [] ≡ true)
@@ -6756,7 +6767,7 @@ postulate
   -- is the drain's one subscribe per queued inner, and that is the
   -- second number, the one nothing in the tree reports
   innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (j : ℕ) (g : Gas) (allNid inst : NodeId)
+    (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
     (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     2 ≤ Caps.cSize c →
@@ -6767,8 +6778,8 @@ postulate
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
-    FrameFace c j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
-                        (lookupNode allNid (EvalSt.nodes st)))
+    FrameFace c d j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
+                          (lookupNode allNid (EvalSt.nodes st)))
 
   -- THE thru-outer EDGE, and the harder half of the same gap.
   -- `thruWrap` reshapes no values, so this is `thruWalk`: one
@@ -6786,7 +6797,7 @@ postulate
   -- its j′ by nothing whatever.  See the block above the postulate
   -- block for both, and for why (a) may not fit `fCharge` as stated
   thruOuter-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+    (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick)
     (vals : List (Val Γ (obs u))) (fin : Bool)
     (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -6798,7 +6809,7 @@ postulate
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
-    FrameFace c j sl
+    FrameFace c d j sl
       (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
 
 -- innerFinish's clauses that hand the payload straight back — merge's
@@ -6807,13 +6818,13 @@ postulate
 -- of them touches a value, so j′ = 0 and both conjuncts are the
 -- hypotheses with `j + 0` massaged to `j`
 innerFinish-face-keep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (j : ℕ) (sl : Slots Γ) (vals : List (Val Γ s)) (b : Bool)
+  (c : Caps) (d j : ℕ) (sl : Slots Γ) (vals : List (Val Γ s)) (b : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (frameStep j c) sched st ≡ true →
   valsCaps? (frameStep j c) sl vals ≡ true →
-  FrameFace {t = t} c j sl (vals , [] , b , sched , st)
-innerFinish-face-keep c j sl vals b sched st inv vC =
-  0 , z≤n
+  FrameFace {t = t} c d j sl (vals , [] , b , sched , st)
+innerFinish-face-keep c d j sl vals b sched st inv vC =
+  0 , face-lift c d j 0 z≤n
     , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
@@ -6823,7 +6834,7 @@ innerFinish-face-keep c j sl vals b sched st inv vC =
 -- above under one node write; concatAll's is the drain, and that is
 -- the postulate
 innerFinish-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -6834,65 +6845,65 @@ innerFinish-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
-  FrameFace c j sl (innerFinish g op allNid inst κ id now vals sched st
-                      (lookupNode allNid (EvalSt.nodes st)))
+  FrameFace c d j sl (innerFinish g op allNid inst κ id now vals sched st
+                        (lookupNode allNid (EvalSt.nodes st)))
 
 -- MERGE: decrement the active-inner counter, which carries no payload
-innerFinish-face c j g mergeᵒ allNid inst κ id now vals sl sched st
+innerFinish-face c d j g mergeᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
 ... | just (merge-st k od) =
-  innerFinish-face-keep c j sl vals (od ∧ (pred k ≡ᵇ 0)) sched
+  innerFinish-face-keep c d j sl vals (od ∧ (pred k ≡ᵇ 0)) sched
     (record st { nodes = setNode allNid (merge-st (pred k) od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (merge-st (pred k) od)
        sched st refl refl inv)
     vC
-... | nothing                = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (scan-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (take-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (concat-st _ _ _) = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (switch-st _ _)   = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (exhaust-st _ _)  = innerFinish-face-keep c j sl vals false sched st inv vC
+... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (concat-st _ _ _) = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (switch-st _ _)   = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (exhaust-st _ _)  = innerFinish-face-keep c d j sl vals false sched st inv vC
 
 -- CONCAT: the queue drain, and the one clause of the whole *All face
 -- that appends a burst it did not already have
-innerFinish-face c j g concatᵒ allNid inst κ id now vals sl sched st
+innerFinish-face c d j g concatᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC inv pC lC vC =
-  innerFinish-concat-face c j g allNid inst κ id now vals sl sched st
+  innerFinish-concat-face c d j g allNid inst κ id now vals sl sched st
     2≤S 1≤R slEq slC inv pC lC vC
 
 -- SWITCH: clear the current-inner slot if this was it
-innerFinish-face c j g switchᵒ allNid inst κ id now vals sl sched st
+innerFinish-face c d j g switchᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
-... | nothing                = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (scan-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (take-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (merge-st _ _)    = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (concat-st _ _ _) = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (exhaust-st _ _)  = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (switch-st nothing od) = innerFinish-face-keep c j sl vals false sched st inv vC
+... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (merge-st _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (concat-st _ _ _) = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (exhaust-st _ _)  = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (switch-st nothing od) = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st (just cur) od) with cur ≡ᵇ inst
-...   | false = innerFinish-face-keep c j sl vals false sched st inv vC
+...   | false = innerFinish-face-keep c d j sl vals false sched st inv vC
 ...   | true  =
-  innerFinish-face-keep c j sl vals od sched
+  innerFinish-face-keep c d j sl vals od sched
     (record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (switch-st nothing od)
        sched st refl refl inv)
     vC
 
 -- EXHAUST: clear the busy flag
-innerFinish-face c j g exhaustᵒ allNid inst κ id now vals sl sched st
+innerFinish-face c d j g exhaustᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
-... | nothing                = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (scan-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (take-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (merge-st _ _)    = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (concat-st _ _ _) = innerFinish-face-keep c j sl vals false sched st inv vC
-... | just (switch-st _ _)   = innerFinish-face-keep c j sl vals false sched st inv vC
+... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (merge-st _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (concat-st _ _ _) = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (switch-st _ _)   = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (exhaust-st act od) =
-  innerFinish-face-keep c j sl vals od sched
+  innerFinish-face-keep c d j sl vals od sched
     (record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (exhaust-st false od)
        sched st refl refl inv)
@@ -6901,7 +6912,7 @@ innerFinish-face c j g exhaustᵒ allNid inst κ id now vals sl sched st
 -- and the from-inner FRAME: a fin that nothing absorbs finishes the
 -- inner, everything else forwards the payload untouched
 innerReact-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick)
   (vals : List (Val Γ s)) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -6913,15 +6924,15 @@ innerReact-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
-  FrameFace c j sl (innerReact g op allNid inst κ id now vals sched st fin)
-innerReact-face c j g op allNid inst κ id now vals false sl sched st
+  FrameFace c d j sl (innerReact g op allNid inst κ id now vals sched st fin)
+innerReact-face c d j g op allNid inst κ id now vals false sl sched st
                 2≤S 1≤R slEq slC inv pC lC vC =
-  innerFinish-face-keep c j sl vals false sched st inv vC
-innerReact-face c j g op allNid inst κ id now vals true sl sched st
+  innerFinish-face-keep c d j sl vals false sched st inv vC
+innerReact-face c d j g op allNid inst κ id now vals true sl sched st
                 2≤S 1≤R slEq slC inv pC lC vC
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
-... | true  = innerFinish-face-keep c j sl vals false sched st inv vC
-... | false = innerFinish-face c j g op allNid inst κ id now vals sl sched st
+... | true  = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | false = innerFinish-face c d j g op allNid inst κ id now vals sl sched st
                 2≤S 1≤R slEq slC inv pC lC vC
 
 -- SCAN, its own top-level piece as in the companion: the nested `with`
@@ -6929,7 +6940,7 @@ innerReact-face c j g op allNid inst κ id now vals true sl sched st
 -- clause of the general frame case.  The receipt is EXACT — the width
 -- factor is valsCaps?'s own conjunct, the size factor frameSz?'s
 stepFrame-face-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (c : Caps) (d j : ℕ) (g : Gas) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -6939,24 +6950,25 @@ stepFrame-face-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   capsOK? (frameStep j c) sched st ≡ true →
   frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid) ≡ true →
   valsCaps? (frameStep j c) sl vals ≡ true →
-  FrameFace c j sl (stepFrame g id now (scan-f fn nid) κ vals fin sched st)
-stepFrame-face-scan {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
+  FrameFace c d j sl (stepFrame g id now (scan-f fn nid) κ vals fin sched st)
+stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched st
                     2≤S slC slEq inv fS vC
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
-... | nothing                | _ = stepFrame-face-zero c j u sl fin sched st inv
-... | just (take-st _)       | _ = stepFrame-face-zero c j u sl fin sched st inv
-... | just (merge-st _ _)    | _ = stepFrame-face-zero c j u sl fin sched st inv
-... | just (concat-st _ _ _) | _ = stepFrame-face-zero c j u sl fin sched st inv
-... | just (switch-st _ _)   | _ = stepFrame-face-zero c j u sl fin sched st inv
-... | just (exhaust-st _ _)  | _ = stepFrame-face-zero c j u sl fin sched st inv
+... | nothing                | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (take-st _)       | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (merge-st _ _)    | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (concat-st _ _ _) | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (switch-st _ _)   | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (exhaust-st _ _)  | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
-...   | no _    = stepFrame-face-zero c j u sl fin sched st inv
+...   | no _    = stepFrame-face-zero c d j u sl fin sched st inv
 ...   | yes refl =
-  j′ , face-charge c j (length vals) (sizeᵗ fn) (proj₂ VP)
-         (≤ᵇ⇒≤ (sizeᵗ fn) (Caps.cSize (frameStep j c)) (T-to fS))
+  j′ , face-lift c d j j′
+           (face-charge c j (length vals) (sizeᵗ fn) (proj₂ VP)
+              (≤ᵇ⇒≤ (sizeᵗ fn) (Caps.cSize (frameStep j c)) (T-to fS)))
      , capsOK?-setNode (frameStep (j + j′) c) nid
          (scan-st (proj₂ run)) sched st
          (valCaps?-size (frameStep (j + j′) c) sl _ (proj₂ run) (proj₂ (proj₂ SC)))
@@ -6981,10 +6993,10 @@ stepFrame-face-scan {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
 
 -- MAP: nothing touches the state, the receipt is one fold per node of
 -- the step function, and the output is the input mapped
-stepFrame-face {s = s} {u = u} c j sl g id now (map-f fn) κ vals fin sched st
+stepFrame-face {s = s} {u = u} c d j sl g id now (map-f fn) κ vals fin sched st
                2≤S 1≤R slEq slC inv pS vC =
-  j′ , face-charge1 c j (sizeᵗ fn)
-         (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS))
+  j′ , face-lift c d j j′
+           (face-charge1 c j (sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS)))
      , capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
          (frameStep-⊑-+ c 2≤S j j′) inv
      , face-vals c j j′ sl (map (applyFn fn) vals) 2≤S (proj₂ MP)
@@ -6997,9 +7009,9 @@ stepFrame-face {s = s} {u = u} c j sl g id now (map-f fn) κ vals fin sched st
   MP  = mapFrame-caps c j sl fn vals 2≤S slC fS (proj₁ VP)
   j′  = proj₁ MP
 
-stepFrame-face c j sl g id now (scan-f fn nid) κ vals fin sched st
+stepFrame-face c d j sl g id now (scan-f fn nid) κ vals fin sched st
                2≤S 1≤R slEq slC inv pS vC =
-  stepFrame-face-scan c j g id now fn nid κ vals fin sl sched st
+  stepFrame-face-scan c d j g id now fn nid κ vals fin sl sched st
     2≤S slC slEq inv
     (proj₁ (∧-true (frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid))
                    ((suc (pathLen κ) ≤ᵇ Caps.cSize (frameStep j c))
@@ -7007,9 +7019,9 @@ stepFrame-face c j sl g id now (scan-f fn nid) κ vals fin sched st
     vC
 
 -- TAKE: a prefix and a cut, no folds — j′ = 0 either way
-stepFrame-face {s = s} c j sl g id now (take-f nid) κ vals fin sched st
+stepFrame-face {s = s} c d j sl g id now (take-f nid) κ vals fin sched st
                2≤S 1≤R slEq slC inv pS vC =
-  0 , z≤n
+  0 , face-lift c d j 0 z≤n
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ (proj₂ (proj₂ TD))))
                      (proj₂ (proj₂ (proj₂ (proj₂ TD)))) ≡ true)
@@ -7029,9 +7041,9 @@ stepFrame-face {s = s} c j sl g id now (take-f nid) κ vals fin sched st
 
 -- FROM-INNER and THRU-OUTER: the two *All edges, delegated whole to
 -- the two pieces above
-stepFrame-face c j sl g id now (from-inner op allNid inst) κ vals fin sched st
+stepFrame-face c d j sl g id now (from-inner op allNid inst) κ vals fin sched st
                2≤S 1≤R slEq slC inv pS vC =
-  innerReact-face c j g op allNid inst κ id now vals fin sl sched st
+  innerReact-face c d j g op allNid inst κ id now vals fin sl sched st
     2≤S 1≤R slEq slC inv (proj₂ pS2)
     (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC
   where
@@ -7041,9 +7053,9 @@ stepFrame-face c j sl g id now (from-inner op allNid inst) κ vals fin sched st
   pS1 = ∧-true true ((suc (pathLen κ) ≤ᵇ B) ∧ pathSz? B κ) pS
   pS2 = ∧-true (suc (pathLen κ) ≤ᵇ B) (pathSz? B κ) (proj₂ pS1)
 
-stepFrame-face c j sl g id now (thru-outer op nid) κ vals fin sched st
+stepFrame-face c d j sl g id now (thru-outer op nid) κ vals fin sched st
                2≤S 1≤R slEq slC inv pS vC =
-  thruOuter-face c j g op nid κ id now vals fin sl sched st
+  thruOuter-face c d j g op nid κ id now vals fin sl sched st
     2≤S 1≤R slEq slC inv (proj₂ pS2)
     (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC
   where
