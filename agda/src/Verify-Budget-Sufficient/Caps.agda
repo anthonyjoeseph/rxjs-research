@@ -748,7 +748,7 @@ capsAt-base-size e sl (suc id) =
 
 -- THE TOP-LEVEL SUPPLY, the counterpart of 2≤capsAt-size and
 -- 1≤capsAt-reg.  It is what the cascade face hands the tree once
--- cascadeGo-charge carries the side condition too; the companions below
+-- cascadeGo-level carries the side condition too; the companions below
 -- thread it from there down to subscribeE-input-caps unchanged
 -- THE WIDTH AXIS OF THE SAME SUPPLY, and the reason capsAt's base pays
 -- for the WHOLE ENTRY CEILING rather than for the program's own width:

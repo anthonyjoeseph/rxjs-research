@@ -11,7 +11,7 @@
 --
 -- WHY IT EXISTS.  `delivN st st′ = length (delivered st′) ∸ length
 -- (delivered st)` is the currency both cascade conjuncts are stated in
--- (cascadeGo-charge's D and cascadeGo-deliveries' bound).  A subtraction
+-- (cascadeGo-level's D and cascadeGo-deliveries' bound).  A subtraction
 -- of lengths composes only if the ledger GROWS — otherwise
 -- `delivN st st″` and `delivN st st′ + delivN st′ st″` are unrelated
 -- numbers.  Growth is exactly what is established here, so the delivery

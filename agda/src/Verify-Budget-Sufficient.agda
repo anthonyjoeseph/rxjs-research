@@ -85,13 +85,22 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- SIX POSTULATES REMAIN (2026-08-03), and the count went UP because
--- the fifth was SPLIT rather than because anything failed.  They are:
--- the three walk faces (subscribeE-wet, cascadeGo-wet, subscribeE-walk),
--- the per-delivery charge (cascadeGo-charge, design-owned and frozen),
--- and TWO PER-FRAME PIECES — innerFinish-concat-face and
--- thruOuter-face.  3 + 1 + 2 = 6, and NONE of the six is known false.
--- caps-fuel-root, once among them, is ground (.Wet, abstract).
+-- FIVE POSTULATES REMAIN (2026-08-03), and the count came DOWN because
+-- the per-delivery charge became a theorem.  They are: the three walk
+-- faces (subscribeE-wet, cascadeGo-wet, subscribeE-walk) and TWO
+-- PER-FRAME PIECES — innerFinish-concat-face and thruOuter-face.
+-- 3 + 2 = 5, and NONE of the five is known false.  caps-fuel-root, once
+-- among them, is ground (.Wet, abstract).
+--
+-- cascadeGo-charge IS GONE, and by a restatement rather than a grind:
+-- the count `frameBlowup` spends is now the level the walk LANDS at,
+-- `sizeCount c = lvls (cSize c) (cWid c) 0 (cDel c)` (.Caps), so the
+-- charge conjunct is `cascadeGo-level` composed with
+-- `cascadeGo-deliveries` and one `lvls-mono`.  The product it replaces
+-- charged a whole cascade's frames at the level the CASCADE entered at,
+-- which is the entry-charging error `Entry-Caps-Refuted` machine-refutes
+-- one stratum down; the level dominates it pointwise (`count-gate`,
+-- Level-Walk-Probe), so no measured row was re-run.
 --
 -- THE SHAPE OF THE PER-FRAME HOLE IS THE NEWS, and it has now shrunk
 -- twice.  It used to be cascadeGo-deliveries — a statement about a
@@ -320,8 +329,9 @@
 -- `E * 3 ^ (suc (caseWᵗ fn) * length vals)` — and the caps face has to
 -- pay it in j.  The two statements stay TRUE because j′ is existential
 -- and iterSize outruns the clause, but the receipt is NOT one fold per
--- frame, and that lands on cascadeGo-charge's `j ≤ D * cSize`.  Flagged,
--- not patched: that is the other half of the budget claim.
+-- frame, and that lands on the per-frame receipt `fCharge` the level
+-- walk reads.  Flagged, not patched: the count is a walk now, so a
+-- bigger per-frame receipt is a change to `fLvl` and nothing else.
 --
 -- The whole tree is STATED BEFORE ANY CLAUSE IS GROUND, which is the
 -- outside-in rule applied at this joint: a change to the shape then
@@ -338,17 +348,16 @@
 -- beat it exponentially), and `2 ^ cReg * cSize`, whose middle step
 -- Mint-Loop-Probe measured false — a mid-cascade mint puts the path
 -- count's R above cReg, and 176 deliveries came out of a 7-registration
--- entry state.  The count is now `2 ^ cReg * 2 ^ cReg * cSize`, and the
--- delivery bound behind it is stated WHOLE — the two-coordinate split
--- was tried and died twice the same session, once at `≤ cSize` (fibre 4
--- against a cSize of 3) and once at `≤ 2 ^ cReg` (fibre 576 against a cap
--- of 512, on a four-level ladder built to test exactly that).  The first
--- coordinate measured fine throughout, which is what makes the split
--- pointless rather than unlucky: D is (something small) times (something
--- the size of D).  cascadeGo-caps itself is no longer postulated — it is
--- the product of the per-delivery charge and the delivery bound — and
--- all three refutations landed on a stated assembly with no clause proof
--- underneath it to lose.  That is what the outside-in rule bought.
+-- entry state.  Every closed form after those died too, for a reason
+-- that is arithmetic rather than route-finding (the self-reference at
+-- cascadeGo-deliveries), so the count is not a formula at all now: it is
+-- `lvls (cSize c) (cWid c) 0 (cDel c)`, the level one instant's
+-- deliveries CLIMB to, each charged where the one before it left.
+-- cascadeGo-caps itself is no longer postulated — it is the landing
+-- level (cascadeGo-level) with the delivery count widened to its own
+-- recursion (cascadeGo-deliveries) — and all those refutations landed on
+-- a stated assembly with no clause proof underneath it to lose.  That is
+-- what the outside-in rule bought.
 --
 -- caps-frame, likewise, was refuted as uninstantiable (same-level
 -- preservation is false: the subscribe frame itself folds) and split

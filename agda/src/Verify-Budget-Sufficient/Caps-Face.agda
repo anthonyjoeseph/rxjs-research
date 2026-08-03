@@ -3741,15 +3741,17 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- counts, since every delivering clause of `cascadeGo` and `shareGo`
 -- conses one `rid` onto `delivered`.  Then
 --
---   (i)  cascadeGo-charge      j ≤ D * cSize
+--   (i)  cascadeGo-level       j ≤ lvls cSize cWid 0 D
 --   (ii) cascadeGo-deliveries  D ≤ cDel c, the delivery RECURSION
 --
--- and `cascadeGo-caps` below is their product, by arithmetic and nothing
--- else.  (i) is the per-delivery charge: every fold is a frame on some
--- delivery's chain, and a chain is shorter than cSize by pathSz?'s own
--- length conjunct — this is the half the induction already carries, in
--- the shape `foldPath-caps` reports it.  (ii) is the delivery bound, and
--- it is where all the difficulty is.
+-- and `cascadeGo-caps` below is (i) with (ii) widened into it by one
+-- `lvls-mono` — the count `sizeCount` spends IS `lvls cSize cWid 0
+-- (cDel c)`, so no arithmetic joins them.  (i) is the per-delivery
+-- charge as the walk actually proves it: every fold is a frame on some
+-- delivery's chain, a chain is shorter than cSize by pathSz?'s own
+-- length conjunct, and each frame is charged at the level the one
+-- before it LEFT.  Both are theorems; (ii) is where all the difficulty
+-- was.
 --
 -- (ii) HAS NOW BEEN WRONG THREE TIMES, and the third correction is the
 -- only one that was PREDICTED before it was measured.  The history:
@@ -3817,18 +3819,21 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- misses the in-flight emission and receives the cascade's later ones,
 -- checked against rxjs 7.8 at the probe's head.
 --
--- AND (i) IS THE FACE THAT IS NOW SUSPECT, not (ii).  `j ≤ D * cSize`
--- charges cSize per delivery, but the receipt scanFrame-caps actually
--- pays is `suc (length vals * suc (sizeᵗ fn))` — one fold per node of
--- the step function PER PAYLOAD — and `length vals` is a BURST WIDTH,
--- which nothing entry-readable bounds.  It cannot be paid by cWid:
--- Width-Count-Probe proves a count reading cWid iterates the tower
--- function once per instant, which destroys capsAt-tower's linear
--- height and caps-fuel-root with it.  Nor by an entry width:
--- Frame-Work-Probe measures a frame's payload count climbing the width
--- ladder across arrivals (2 ↦ 8).  Where the width factor is paid for
--- is the open question this face carries, and it is a design ruling
--- rather than a clause grind.
+-- AND (i) WAS THE SUSPECT ONE, not (ii) — until it stopped being a
+-- product.  `j ≤ D * cSize` charged cSize per delivery, but the receipt
+-- scanFrame-caps actually pays is `suc (length vals * suc (sizeᵗ fn))`
+-- — one fold per node of the step function PER PAYLOAD — and
+-- `length vals` is a BURST WIDTH, which nothing entry-readable bounds
+-- (Charge-Probe: progW breaches at 47 against 40).  Widening the
+-- product to `D * cSize * suc (suc cWid * suc cSize)` fitted every
+-- measured row but had no ROUTE: the walk proves an iteration, each
+-- frame charged where it runs, and a product charges them all at the
+-- cascade's entry — the entry-charging error Entry-Caps-Refuted kills
+-- one stratum down.  So the count became the iteration itself
+-- (`sizeCount`, .Caps) and (i) is `cascadeGo-level`, a theorem.  The
+-- width factor is paid inside `fCharge`, at the level the frame runs
+-- at, which is where Width-Count-Probe's objection to reading cWid
+-- stops applying: the height is a recurrence, not a closed form.
 --
 -- caps-tick is then a COROLLARY rather than a sibling face: widen the
 -- reported level to the endpoint by frameStep-mono-j, and the endpoint
@@ -3846,8 +3851,8 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- per payload (thruWalk) and so mints in proportion to its burst
 -- width.  Without it the frame budget is false rather than unproven,
 -- for any fixed budget whatsoever.  It is the same width factor
--- cascadeGo-charge pays per delivery, charged in the same place: at
--- the ENTRY caps.
+-- `fCharge` pays per frame, read in the same place: at the level the
+-- frame RUNS at, `widAt S W J` being `cWid (frameStep J c)` by refl.
 ------------------------------------------------------------------
 
 valsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → List (Val Γ s) → Bool
@@ -4323,13 +4328,17 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 -- same S), so `suc (length vals * suc (sizeᵗ fn)) ≤ fCharge` is ONE
 -- `*-mono-≤` over valsCaps?'s width conjunct and frameSz?'s size one.
 --
--- WHAT IS LEFT IS (b) ON THE TWO *All EDGES, and it is (b) that blocks
--- them rather than (a): `concatDrain` and `thruWalk` CONCATENATE the
--- bursts of the inners they subscribe, so the output width is a SUM
--- over payloads of one subscribeE burst's VALUE COUNT — and no
--- caps-side companion reports a burst's value count at all
--- (`burstCaps?` bounds each event, never how many there are).  The two
--- are named `innerReact-face` and `thruOuter-face` at the definition.
+-- WHAT IS LEFT IS BOTH CONJUNCTS ON THE TWO *All EDGES, and (a) is the
+-- harder one, which is the opposite of what was written here before.
+-- `concatDrain` and `thruWalk` CONCATENATE the bursts of the inners
+-- they subscribe, so (b), the output width, is a SUM over payloads of
+-- one subscribeE burst's VALUE COUNT — no caps-side companion reports
+-- one (`burstCaps?` bounds each event, never how many there are),
+-- though `valCaps?`'s own `pWᵛ` conjunct already bounds each payload's
+-- `outWᵛ`, which is that count's entry measure.  (a), the RECEIPT, is
+-- the sum of the SUBSCRIBES' growth indices, and `subscribeE-caps`
+-- bounds its j′ by nothing at all — the same hole .Wet's GAP note
+-- names from the wet side.  Both are written out at the postulates.
 --
 -- WHY IT IS NOT THE REFUTED AXIOM.  `stepFrame-entry-caps` asserted
 -- the post-state and the output burst were back under the caps the
@@ -6114,13 +6123,16 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
 -- admissible base S = 1 on the very family above.  What is NOT true is
 -- that the receipt is one fold per FRAME.
 --
--- SO THE COST MOVES, IT DOES NOT VANISH, AND IT LANDS ON
--- cascadeGo-charge — `j ≤ D * cSize`, one delivery's frames times a
--- per-frame charge of cSize.  A single map-f frame over a case-nested
--- step function needs a j′ exponential in cSize, so `D * cSize` is
--- short by an exponential on that program.  This is flagged rather than
--- patched: cascadeGo-charge is the OTHER half of the budget claim and
--- changing it is a design ruling, not a clause grind.  The two
+-- SO THE COST MOVES, IT DOES NOT VANISH, AND IT LANDS ON THE PER-FRAME
+-- RECEIPT `fCharge` the level walk reads.  A single map-f frame over a
+-- case-nested step function needs a j′ exponential in cSize, and
+-- `fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))` is
+-- polynomial in the level's own fields — so on that program the receipt
+-- is short by an exponential.  This is flagged rather than patched, but
+-- it is no longer a design ruling about a closed count: the count is a
+-- WALK now, so a bigger per-frame receipt is a change to `fLvl`
+-- (Rx.Evaluator) and everything above it follows by the same
+-- monotonicity lemmas.  The two
 -- statements below are stated so that the difficulty has a NAME and a
 -- boundary — no state, no recursion, no mutual induction, just
 -- applyFn — instead of being buried in the hub clause
@@ -6602,6 +6614,58 @@ stepFrame-face-zero c j u sl fin sched st inv =
     , subst (λ x → valsCaps? {s = u} (frameStep x c) sl [] ≡ true)
             (sym (+-identityʳ j)) refl
 
+------------------------------------------------------------------
+-- THE TWO *All FACES WAIT ON **TWO** NUMBERS, NOT ONE (2026-08-03).
+--
+-- Both postulates below were flagged as waiting on the burst VALUE
+-- COUNT — the (b) conjunct — and that reading is right about (b) and
+-- incomplete about (a).  Enumerating what the tree reports:
+--
+--   (b) THE COUNT.  `subscribeE-caps` returns `burstCaps?`, which is
+--       `all (all (eventCaps? …))` — every EVENT under the caps and no
+--       cardinality at all.  The number that IS wanted is exactly the
+--       entry measure `outWᵉ` (Rx.Frame-Width) already computes:
+--       `ofᵉ ts ↦ length ts`, a scripted slot ↦ 1, map/take/scan ↦ the
+--       source's, `deferᵉ ↦ 0`, and — the clause that matters — an *All
+--       edge ↦ `outWⱽ e * innWⱽ e`, which is precisely "one subscribe
+--       per payload, each contributing its own outW".  And `valCaps?`
+--       ALREADY bounds it for a payload observable: `pWᵛ = outWᵛ ⊔ dWᵛ`
+--       under `cWid`.  So (b) is a standalone induction over the
+--       subscribe clique, `count ≤ outWᵉ n sl b`, needing no new
+--       hypothesis on `subscribeE-caps` beyond the one it already
+--       carries in `dWᵉ` form.
+--
+--   (a) THE RECEIPT, AND IT HAS NO SUPPLIER AT ALL.  `FrameFace`
+--       demands `j′ ≤ fCharge (cSize c) (cWid c) j` — ONE frame's
+--       receipt — and `thruWalk-caps` / `concatDrain-caps` produce their
+--       j′ by SUMMING `subscribeInner-caps`'s, which comes from
+--       `subscribeE-caps`, whose j′ is existential and BOUNDED BY
+--       NOTHING.  .Wet's own GAP note says the same thing from the wet
+--       side ("NO SUBSCRIBE-LEVEL CHARGE … the missing companion is a
+--       subscribeE-level analogue"), so this is one hole seen twice, not
+--       two.  The count conjunct does not touch it: knowing how many
+--       VALUES a subscribe emits says nothing about how many LEVELS it
+--       climbed to emit them.
+--
+-- AND THE ARITHMETIC IS TIGHT ENOUGH THAT (a) MAY NOT FIT `fCharge` AS
+-- STATED.  One subscribe of an inner `o` walks o's own operator chain,
+-- paying a frame receipt per operator; the frames do not grow
+-- (State-Blowup-Probe), and `sizeᵉ o ≤ cSize`, so the sum over one
+-- subscribe is ~2·cSize.  A `thru-outer` frame does that once per
+-- payload, `≤ suc cWid` of them, for ~2·cWid·cSize — against
+-- `fCharge = suc (suc widAt * suc sizeAt)` ≈ cWid·cSize at the same
+-- level.  That is a CONSTANT factor over, on the crudest reading, and a
+-- scan-f frame inside the inner makes it worse (its receipt reads the
+-- burst width, which is what (b) bounds).  So the honest next step is
+-- not a grind on these two clauses: it is a subscribe-level charge —
+-- `fLvl`'s analogue for a subscribe — and, if the sum genuinely
+-- breaches, a bigger `fLvl`.  Both are cheap now in a way they were not
+-- a week ago: the count `frameBlowup` spends is a WALK (`sizeCount =
+-- lvls …`), so enlarging the per-frame receipt changes `fLvl`
+-- (Rx.Evaluator) and everything above it follows by the monotonicity
+-- lemmas already proven — no closed form to re-derive.
+------------------------------------------------------------------
+
 postulate
   -- THE ONE from-inner CLAUSE THAT IS NOT j′ = 0.  Every other clause
   -- of innerReact / innerFinish hands `vals` straight back — merge
@@ -6611,10 +6675,9 @@ postulate
   -- `innerFinish` returns `vals ++ concatDrain …`, and concatDrain
   -- subscribes each parked inner and CONCATENATES the bursts, so its
   -- output width is a sum over the queue of one subscribeE burst's
-  -- value count.  That count is what no caps-side companion reports:
-  -- `burstCaps?` bounds every EVENT in a burst and says nothing about
-  -- how many there are.  The receipt (a) rides on the same missing
-  -- number, since the drain pays one subscribe per queued inner
+  -- value count — conjunct (b) of the two named above.  Its receipt (a)
+  -- is the drain's one subscribe per queued inner, and that is the
+  -- second number, the one nothing in the tree reports
   innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (j : ℕ) (g : Gas) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -6635,15 +6698,16 @@ postulate
   -- `thruConsume` per payload, each of which subscribes an inner and
   -- returns `splitBurst`'s value list, and the walk APPENDS them.  So
   -- (b) here is `Σ over ≤ suc cWid payloads of one subscribeE burst's
-  -- value count ≤ suc (cWid (frameStep (j + j′) c))`, and (a) is the
-  -- same sum charged against fCharge.  Both wait on the same missing
-  -- report — a caps-currency bound on how many VALUES a subscription
-  -- burst carries — which would be a `subscribeE-caps` conjunct, i.e.
-  -- a second pass over that whole companion tree.  The headroom is
-  -- there (one j at least doubles cSize and takes cWid to `S ^ suc
-  -- cWid`, frameStep-size-suc / frameStep-wid-suc, against a payload
-  -- count Frame-Work-Probe measures at 6 ↦ 120), but headroom is not
-  -- a proof and this is stated, not assumed away
+  -- value count ≤ suc (cWid (frameStep (j + j′) c))`, and it is the
+  -- affordable half: `valCaps?` already bounds each payload's own
+  -- `outWᵛ` by cWid, so the sum is `suc cWid * cWid`, and ONE j takes
+  -- cWid to `S ^ suc cWid` (frameStep-wid-suc), which dominates it —
+  -- the same headroom Frame-Work-Probe's 6 ↦ 120 payload count sits
+  -- inside (`wid-dominates-120` puts cWid ≥ 1024 one cascade in).
+  -- (a) is the SECOND number: the same sum of the SUBSCRIBES' growth
+  -- indices, charged against `fCharge`, and `subscribeE-caps` bounds
+  -- its j′ by nothing whatever.  See the block above the postulate
+  -- block for both, and for why (a) may not fit `fCharge` as stated
   thruOuter-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick)

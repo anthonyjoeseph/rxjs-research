@@ -3854,8 +3854,9 @@ cascadeGo-width Ω a id ((rid , c) ∷ chains) sched st inv vΩ pΩ
 --                          obstruction, and collapsing E into j is not
 --                          a follow-up but the only surviving route.
 --
--- cascadeGo-charge and cascadeGo-deliveries (.Caps-Face) are FROZEN
--- and design-owned.  Nothing restated here consumes either of them.
+-- cascadeGo-level and cascadeGo-deliveries (.Caps-Face) are both
+-- THEOREMS as of 2026-08-03, and design-owned.  Nothing restated here
+-- consumes either of them.
 ------------------------------------------------------------------
 
 -- THE EXACT SLACK AT A ONE-STEP HOP, so GAP 2's level choice is a
@@ -4167,11 +4168,14 @@ size≤sizeCapAt e sl id =
 --
 --   (a) NO SUBSCRIBE-LEVEL CHARGE.  subscribeE-caps reports at
 --       `frameStep (j + j′) c` with j′ existentially produced and
---       UNBOUNDED.  cascadeGo-charge budgets a cascade's j; nothing
---       budgets a bare subscribe's, so burst-wet's own landing (root
---       subscribe, capsAt 0 → capsAt 1) has no supplier either.  The
---       missing companion is a subscribeE-level analogue of
---       cascadeGo-charge, and it is NAMED here rather than assumed.
+--       UNBOUNDED.  cascadeGo-level budgets a cascade's j (`lvls`, one
+--       dLvl per delivery); nothing budgets a bare subscribe's, so
+--       burst-wet's own landing (root subscribe, capsAt 0 → capsAt 1)
+--       has no supplier either.  The missing companion is a
+--       subscribeE-level analogue of `fLvl`, and it is NAMED here
+--       rather than assumed.  It is the SAME hole the two *All frame
+--       faces wait on (.Caps-Face, conjunct (a) there), seen from the
+--       wet side — one companion would close both.
 --   (b) capsOK? IS NOT INV?.  They share stBounded? and nothing else:
 --       INV? adds fnCapBounded?, regsB?, slotsFnCap and reads registry
 --       cardinality at cSize where capsOK? reads it at cReg.  Four
