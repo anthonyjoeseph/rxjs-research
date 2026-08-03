@@ -51,7 +51,35 @@
 --     frame's own level, against exactly the k the refresh installs,
 --     with no premise beyond the `slSz` every head already carries.
 --
--- That is the shape the signature pass should be written to.
+-- § 4  AND THE CONCAT QUEUE DERIVES TOO, which is the row that decides
+--   whether any of this needs a change to the STATE invariant.  A
+--   queued observable is not an argument anyone passed — it was pushed
+--   during an earlier frame and read back out of the node — so if its
+--   nesting bound had to be premised, it would have to be carried by
+--   `widNode`, and the invariant would gain an M conjunct depending on
+--   both the budget and the connected set.  It does not.
+--
+--   The reason is the level `innerFinish` runs at, read off the clique
+--   rather than assumed.  `stepFrame-caps`'s from-inner clause calls
+--   `innerReact-caps` at its OWN j, and innerReact's non-drain paths
+--   report witness 0 and call `innerFinish-caps` at that same j.  So the
+--   level at which the queue's receipt is read IS the frame's own, which
+--   is exactly the level the frame's budget was installed against — and
+--   § 2 turns that receipt into the bound with nothing else needed.
+--
+--   The drain's own recursion is a different matter: `concatDrain-caps`
+--   recurses at `j + j₁` with the budget fixed, so INSIDE the drain the
+--   levels drift and the queue's bounds travel as § 3's fixed-budget
+--   predicate, derived once at innerFinish.  Same shape as the payload
+--   walk, one level up.
+--
+-- SO THE PREMISE MAP IS: term shape on the five term-subscribing heads;
+-- fixed-budget list shape on the three walk carriers and on the drain;
+-- and DERIVED, premised nowhere, at every head that reads its payloads
+-- at the frame's own level.  No conjunct is added to widNode or capsOK?,
+-- and the budget is RE-INSTALLED at each frame rather than inherited —
+-- which is what the refresh means and why no head needs to be handed one
+-- from above.
 ------------------------------------------------------------------
 module Nest-Supply-Probe where
 
