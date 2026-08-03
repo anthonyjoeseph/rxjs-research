@@ -427,6 +427,12 @@
 --                as finished facts and is mutual with nothing, so it is
 --                its own unit: the clique imports it to pay for the fold
 --                each concatenating clause charges per cons
+--   .Caps-Nest   the nesting measure `M` the subscribe budget k really
+--                counts: a term's syncSize PLUS the residue owed by the
+--                shares not yet connected, because the share edge hands
+--                its callee a stored def the caller's term says nothing
+--                about.  Also the frame row that supplies it, one size
+--                level up — the entry level provably cannot
 --   .Caps-Face   round 4's per-instant cap recurrence: the in-flight
 --                predicates, the frame face, the cascade companions,
 --                caps-tick, reach-resets
@@ -573,6 +579,7 @@ open import Verify-Budget-Sufficient.Measures   public
 open import Verify-Budget-Sufficient.Keeps-Ring public
 open import Verify-Budget-Sufficient.Caps       public
 open import Verify-Budget-Sufficient.Caps-Sadd  public
+open import Verify-Budget-Sufficient.Caps-Nest  public
 open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Subscribe-Face public
 open import Verify-Budget-Sufficient.Wet        public

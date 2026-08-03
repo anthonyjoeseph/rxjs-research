@@ -5826,9 +5826,22 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- since the first draft of the hierarchy admitted none of the four (it
 -- ran the frames before the rest of the operator chain, it charged a
 -- payload's subscribe at J rather than at `suc J`, and its eval receipt
--- was linear where `unfoldμ-caps` pays `m + suc (m * m)`).  The one
--- non-arithmetic piece the pass still owes is `nestᵛ ≤ sizeᵛ`, proven in
--- Nest-Budget-Probe beside the other value measures.
+-- was linear where `unfoldμ-caps` pays `m + suc (m * m)`).
+--
+-- THE NESTING HYPOTHESIS IS SETTLED (2026-08-03) and is not `nestᵉ`.
+-- The measure k really counts is `syncSizeᵉ` — the one that stops at
+-- `deferᵉ`, the sole gate moving Δᵍ into Δ, and so drops by exactly one
+-- across the μ edge, matching k's single descent at
+-- `sLvlD S W d (suc k) J ↦ opIterD S W d k …` (Mu-Nest-Probe).
+-- Nest-Count-Probe's `nestᵉ` counts scan-nesting and holds `nestᵉ (μᵉ e)
+-- ≡ nestᵉ e`, so it is the WRONG measure here — nobody should re-derive
+-- it.  The `nest ≤ size` leg the pass was recorded as owing is therefore
+-- already in tree, as `syncSize≤sizeᵉ` (.Measures).  What the term
+-- measure alone cannot do is the SHARE edge, whose callee is a stored
+-- def unrelated to the caller's `input i`; the hypothesis the signatures
+-- carry is .Caps-Nest's `M` — syncSize plus the residue owed by the
+-- unconnected shares — and the frame supplies it one size level up
+-- (`refresh-supplies-M`; the entry level is refuted outright).
 --
 -- THE COMPANION SIDE'S OWN FUEL is the gas it is handed: subscribe depth
 -- ≤ gas height, by induction on the evaluator's recursion, which is the

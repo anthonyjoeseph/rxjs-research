@@ -58,6 +58,13 @@
 -- § 5  M assembled, plus `M≤` — the one inequality the frame refresh
 --   spends, `M e sl cs ≤ sizeᵉ e + slotsSize sl`, which is exactly the
 --   `x + y` § 2 supplies.
+--
+-- § 6  AND THE SHARE EDGE'S OWN STEP, which is the whole point: the
+--   caller holds `M (input i) sl cs ≤ suc k`, the callee needs
+--   `M d sl (toℕ i ∷ cs) ≤ k`, and `share-step` closes it — slot i's
+--   weight comes OUT of the residue exactly when it is connected.  That
+--   is `unconn-insert`'s strict drop reweighted, and it is the row the
+--   term-only hypothesis could not supply at all.
 ------------------------------------------------------------------
 module Share-Residue-Probe where
 
@@ -66,16 +73,17 @@ open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; +-monoʳ-≤; *-mono-≤;
-         *-identityˡ; *-identityʳ; +-identityʳ; *-distribˡ-+;
+         *-identityˡ; *-identityʳ; +-identityʳ; +-assoc; *-distribˡ-+;
          +-comm; m≤m+n; n≤1+n; ≡⇒≡ᵇ)
 open import Data.Empty using (⊥)
-open import Data.Fin  using (Fin; toℕ)
-open import Data.List using (List; _∷_; sum; tabulate)
+open import Data.Fin  using (Fin; toℕ) renaming (zero to fzero; suc to fsuc)
+open import Data.List using (List; []; _∷_; sum; tabulate)
+open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim  using (Source)
-open import Rx.Exp   using (Ctx; Exp; Closed; syncSizeᵉ; sizeᵉ)
+open import Rx.Exp   using (Ctx; Exp; Closed; input; syncSizeᵉ; sizeᵉ)
 open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; sizeStep; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps using (iterSize-suc; sizeAt-mono)
@@ -216,3 +224,57 @@ M e sl cs = syncSizeᵉ e + resid sl cs
 M≤ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (cs : List Source) →
   M e sl cs ≤ sizeᵉ e + slotsSize sl
 M≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
+
+------------------------------------------------------------------
+-- § 6.  THE SHARE EDGE'S OWN STEP — the row Option 1 exists for.
+-- `sharedConnect` recurses on the slot's stored def with `toℕ i` ALREADY
+-- consed onto `connectedShares`, so the callee's measure is
+-- `syncSizeᵉ d + resid sl (toℕ i ∷ cs)` while the caller holds
+-- `M (input i) sl cs ≤ suc k`, i.e. `resid sl cs ≤ k`.  The step is
+-- therefore exactly "slot i's own weight comes OUT of the residue when
+-- it is connected", which is `unconn-insert`'s strict drop reweighted.
+------------------------------------------------------------------
+
+swap₃ : ∀ (a b c : ℕ) → a + (b + c) ≡ b + (a + c)
+swap₃ a b c =
+  trans (sym (+-assoc a b c))
+        (trans (cong (_+ c) (+-comm a b)) (+-assoc b a c))
+
+sum-tab-slack : ∀ {m} (f g : Fin m → ℕ) (w : ℕ) → (∀ j → f j ≤ g j) →
+  (i : Fin m) → w + f i ≤ g i → w + sum (tabulate f) ≤ sum (tabulate g)
+sum-tab-slack {suc m} f g w h fzero hi =
+  ≤-trans (≤-reflexive (sym (+-assoc w (f fzero) (sum (tabulate (λ j → f (fsuc j)))))))
+          (+-mono-≤ hi (sum-tab-mono _ _ (λ j → h (fsuc j))))
+sum-tab-slack {suc m} f g w h (fsuc i) hi =
+  ≤-trans (≤-reflexive (swap₃ w (f fzero) (sum (tabulate (λ j → f (fsuc j))))))
+          (+-mono-≤ (h fzero)
+                    (sum-tab-slack (λ j → f (fsuc j)) (λ j → g (fsuc j)) w
+                                   (λ j → h (fsuc j)) i hi))
+
+resid-connect : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false →
+  syncSizeᵉ d + resid sl (toℕ i ∷ cs) ≤ resid sl cs
+resid-connect sl cs i {d} eqi fresh =
+  sum-tab-slack _ _ (syncSizeᵉ d) (residAt-cons-≤ sl cs (toℕ i)) i slack
+  where
+  slack : syncSizeᵉ d + residAt sl (toℕ i ∷ cs) i ≤ residAt sl cs i
+  slack rewrite eqi | fresh
+              | T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl)
+              = ≤-reflexive (+-identityʳ (syncSizeᵉ d))
+
+-- and the caller's side: `input i` has syncSize 1, so `M (input i) sl cs
+-- ≤ suc k` is `resid sl cs ≤ k` on the nose
+share-caller : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (i : Fin n) (k : ℕ) →
+  M (input {Γ = Γ} {Δᵍ = []} {Δ = []} {Θ = []} i) sl cs ≤ suc k →
+  resid sl cs ≤ k
+share-caller sl cs i k (s≤s h) = h
+
+share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false →
+  M (input {Γ = Γ} {Δᵍ = []} {Δ = []} {Θ = []} i) sl cs ≤ suc k →
+  M d sl (toℕ i ∷ cs) ≤ k
+share-step sl cs i {d} k eqi fresh h =
+  ≤-trans (resid-connect sl cs i eqi fresh) (share-caller sl cs i k h)
