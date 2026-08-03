@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -190,6 +190,15 @@ help:
 	@echo "                  hypothesis stays fixed.  The count has to ride"
 	@echo "                  subscribeE-caps's EXISTENTIAL, at the exit level"
 	@echo "                  (see agda/probe/Share-Count-Probe.agda).  ~10 s"
+	@echo "  count-level-probe  what the COUNT FACE actually says: nothing."
+	@echo "                  Its own existential is free (cWid (frameStep k c)"
+	@echo "                  ≥ k, so a stream's own ceiling discharges it), and"
+	@echo "                  so is the three-conjunct fold-back, since every"
+	@echo "                  conjunct widens.  Level-locked to the caps witness"
+	@echo "                  it is FALSE: the input leaf reports j′ = 0 and"
+	@echo "                  hands back a cold script's whole sync list in one"
+	@echo "                  emit.  Repaired by a SIZE hypothesis and one fold"
+	@echo "                  (see agda/probe/Count-Level-Probe.agda).  ~9 s"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -463,6 +472,21 @@ chain-half-probe:
 # fold PER CONNECT, so the count belongs in subscribeE-caps's existential.
 share-count-probe:
 	cd agda && agda -i src -i probe probe/Share-Count-Probe.agda
+
+# WHAT DOES THE COUNT FACE SAY?  Nothing, as stated.  `cWid (frameStep k c)`
+# is `iterFold` and one fold clears a successor for S ≥ 2, so the width at
+# level k dominates k and a burst's own emit/value ceiling discharges the
+# face's existential without ever looking at subscribeE.  The fold-back into
+# subscribeE-caps's Σ is free for the same reason — all three conjuncts
+# widen along ⊑ᶜ.  The content is the WITNESS: op-step spends one frame per
+# emit at exactly the level the SOURCE's caps receipt reports.  LEVEL-LOCKED
+# THERE THE COUNT IS FALSE — subscribeE-input-caps reports j′ = 0 while its
+# cold-no-tail branch hands back `length sync` values in one emit, and
+# slotCaps? reads that list pointwise while slotCeil gives it width 0.  The
+# repair is a SIZE hypothesis (`slotsSize sl ≤ cSize c`, true at every
+# capsAt) and one fold, since `cWid (frameStep 1 c) = S ^ suc W ≥ S`.
+count-level-probe:
+	cd agda && agda -i src -i probe probe/Count-Level-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
