@@ -579,7 +579,6 @@ open import Verify-Budget-Sufficient.Measures   public
 open import Verify-Budget-Sufficient.Keeps-Ring public
 open import Verify-Budget-Sufficient.Caps       public
 open import Verify-Budget-Sufficient.Caps-Sadd  public
-open import Verify-Budget-Sufficient.Caps-Nest  public
 open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Subscribe-Face public
 open import Verify-Budget-Sufficient.Wet        public

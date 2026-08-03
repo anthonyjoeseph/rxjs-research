@@ -4,22 +4,22 @@
 --
 -- Mu-Nest-Probe fixed the measure: a subscribe is bounded by
 --
---     M b U = syncSizeᵉ b + Σ_{i ∈ U} syncSizeᵉ (def i)
+--     nest b U = syncSizeᵉ b + Σ_{i ∈ U} syncSizeᵉ (def i)
 --
 -- with U the slots not yet in `connectedShares`.  What that probe did
 -- NOT check — and what this one did, first, because it was the most
 -- uncertain piece and the one that decided the whole approach — is
--- whether a frame's refreshed `k` dominates M for the payloads that
+-- whether a frame's refreshed `k` dominates nest for the payloads that
 -- frame subscribes.  The receipts a frame has are
 --
 --     sizeᵉ o      ≤ Caps.cSize (frameStep j c)  ≡  sizeAt S j   (valsCaps?)
 --     slotsSize sl ≤ Caps.cSize c                ≡  S            (the clique's slSz)
 --
--- so M is bounded by `sizeAt S j + S` and NOT by `sizeAt S j` alone.
+-- so nest is bounded by `sizeAt S j + S` and NOT by `sizeAt S j` alone.
 --
 -- THE ANSWER IS YES, ONE SIZE LEVEL UP, and the positive half has
--- LANDED: `M`, the residue and its lifecycle lemmas, the share edge's
--- step, and the frame row `refresh-supplies-M` are all in
+-- LANDED: `nest`, the residue and its lifecycle lemmas, the share edge's
+-- step, and the frame row `refresh-supplies-nest` are all in
 -- .Verify-Budget-Sufficient.Caps-Nest, and `fLvlD`'s `suc d` clause now
 -- reads its k at `suc (sizeAt S (suc J))`.  What stays here is the
 -- NEGATIVE row, which nothing in src can hold: the entry level cannot

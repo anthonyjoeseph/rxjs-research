@@ -2,8 +2,8 @@
 -- THE NEST-SUPPLY PROBE: can every member of the subscribe clique be
 -- HANDED the nesting hypothesis it is about to carry?
 --
--- .Caps-Nest settled the measure `M` and its steps.  The signature pass
--- now threads `M … ≤ k` through seventeen heads, and before sixty-odd
+-- .Caps-Nest settled the measure `nest` and its steps.  The signature pass
+-- now threads `nest … ≤ k` through seventeen heads, and before sixty-odd
 -- clause bodies are rewritten it is worth checking the thing that
 -- decides whether the interface is even statable: the FRAME-SIDE
 -- members do not subscribe a term the caller named.  They subscribe
@@ -15,8 +15,8 @@
 -- § 1  IT IS.  `valCaps?` bounds a payload's `sizeᵛ (obs u) o`, which is
 --   `sizeᵉ o` definitionally, by `Caps.cSize (frameStep j c)`, which is
 --   `sizeAt S j` definitionally — exactly the left summand of
---   `refresh-supplies-M`.  The right summand is the clique's own `slSz`.
---   So a payload admitted at the frame's level j has M under the k the
+--   `refresh-supplies-nest`.  The right summand is the clique's own `slSz`.
+--   So a payload admitted at the frame's level j has nest under the k the
 --   refresh installs, `suc (sizeAt S (suc j))`, with no new premise.
 --
 -- § 2  THE QUEUE IS THE SAME ROW through `obsCaps?`, which is
@@ -42,7 +42,7 @@
 -- which head gets which is not a matter of taste:
 --
 --   · the FOUR term-subscribing heads — subscribeE, subscribeE-input,
---     sharedSlot, sharedConnect — take `M b sl cs ≤ k` on the term they
+--     sharedSlot, sharedConnect — take `nest b sl cs ≤ k` on the term they
 --     were handed, and step it with .Caps-Nest's edge lemmas;
 --   · the WALK-CARRYING heads take `mvals?` (or its queue twin) at the
 --     same fixed k and thread it unchanged;
@@ -56,7 +56,7 @@
 --   queued observable is not an argument anyone passed — it was pushed
 --   during an earlier frame and read back out of the node — so if its
 --   nesting bound had to be premised, it would have to be carried by
---   `widNode`, and the invariant would gain an M conjunct depending on
+--   `widNode`, and the invariant would gain an nest conjunct depending on
 --   both the budget and the connected set.  It does not.
 --
 --   The reason is the level `innerFinish` runs at, read off the clique
@@ -100,10 +100,10 @@ open import Verify-Budget-Sufficient.Caps using (Caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Face
   using (valCaps?; valsCaps?; obsCaps?; valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (M; refresh-supplies-M; M-cons)
+  using (nest; refresh-supplies-nest; nest-cons)
 
 ------------------------------------------------------------------
--- § 1.  A PAYLOAD VALUE, ADMITTED AT THE FRAME'S LEVEL, HAS M UNDER
+-- § 1.  A PAYLOAD VALUE, ADMITTED AT THE FRAME'S LEVEL, HAS nest UNDER
 -- THE REFRESH'S k.  Note both reductions are definitional:
 -- `sizeᵛ (obs u) o ≡ sizeᵉ o` and
 -- `Caps.cSize (frameStep j c) ≡ sizeAt (Caps.cSize c) j`
@@ -116,14 +116,14 @@ frameStep-size : ∀ (c : Caps) (j : ℕ) →
   Caps.cSize (frameStep j c) ≡ sizeAt (Caps.cSize c) j
 frameStep-size c j = refl
 
-valCaps→M : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+valCaps→nest : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (cs : List Source) (o : Val Γ (obs u)) →
   1 ≤ Caps.cSize c →
   slotsSize sl ≤ Caps.cSize c →
   valCaps? (frameStep j c) sl (obs u) o ≡ true →
-  M o sl cs ≤ suc (sizeAt (Caps.cSize c) (suc j))
-valCaps→M {u = u} c j sl cs o 1≤S hsl hv =
-  refresh-supplies-M (Caps.cSize c) j o sl cs 1≤S
+  nest o sl cs ≤ suc (sizeAt (Caps.cSize c) (suc j))
+valCaps→nest {u = u} c j sl cs o 1≤S hsl hv =
+  refresh-supplies-nest (Caps.cSize c) j o sl cs 1≤S
     (≤ᵇ⇒≤ (sizeᵉ o) (sizeAt (Caps.cSize c) j)
           (T-to (valCaps?-size (frameStep j c) sl (obs u) o hv)))
     hsl
@@ -132,14 +132,14 @@ valCaps→M {u = u} c j sl cs o 1≤S hsl hv =
 -- § 2.  A QUEUED OBSERVABLE, through the predicate concatDrain reads
 ------------------------------------------------------------------
 
-obsCaps→M : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (j : ℕ) (sl : Slots Γ)
+obsCaps→nest : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (cs : List Source) (o : Closed Γ s) →
   1 ≤ Caps.cSize c →
   slotsSize sl ≤ Caps.cSize c →
   obsCaps? (frameStep j c) sl o ≡ true →
-  M o sl cs ≤ suc (sizeAt (Caps.cSize c) (suc j))
-obsCaps→M {n = n} c j sl cs o 1≤S hsl ho =
-  refresh-supplies-M (Caps.cSize c) j o sl cs 1≤S
+  nest o sl cs ≤ suc (sizeAt (Caps.cSize c) (suc j))
+obsCaps→nest {n = n} c j sl cs o 1≤S hsl ho =
+  refresh-supplies-nest (Caps.cSize c) j o sl cs 1≤S
     (≤ᵇ⇒≤ (sizeᵉ o) (sizeAt (Caps.cSize c) j)
           (T-to (proj₁ (∧-true (sizeᵉ o ≤ᵇ Caps.cSize (frameStep j c)) _ ho))))
     hsl
@@ -152,7 +152,7 @@ obsCaps→M {n = n} c j sl cs o 1≤S hsl ho =
 ------------------------------------------------------------------
 
 mOK? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Slots Γ → List Source → Val Γ (obs u) → Bool
-mOK? k sl cs o = M o sl cs ≤ᵇ k
+mOK? k sl cs o = nest o sl cs ≤ᵇ k
 
 mvals? : ∀ {n} {Γ : Ctx n} {u} →
   ℕ → Slots Γ → List Source → List (Val Γ (obs u)) → Bool
@@ -166,6 +166,6 @@ mvals?-cons : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (sl : Slots Γ) (cs : List Sour
 mvals?-cons k sl cs s []       h = refl
 mvals?-cons k sl cs s (o ∷ vs) h with ∧-true (mOK? k sl cs o) (mvals? k sl cs vs) h
 ... | h₁ , h₂ =
-  ∧-intro (≤ᵇ-true (M o sl (s ∷ cs)) k
-            (M-cons o sl cs s k (≤ᵇ⇒≤ (M o sl cs) k (T-to h₁))))
+  ∧-intro (≤ᵇ-true (nest o sl (s ∷ cs)) k
+            (nest-cons o sl cs s k (≤ᵇ⇒≤ (nest o sl cs) k (T-to h₁))))
           (mvals?-cons k sl cs s vs h₂)

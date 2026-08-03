@@ -149,6 +149,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 mergeBump; switchKill;
                                 thruConsume; thruWalk; thruWrap;
                                 concatDrain; innerFinish; innerReact;
+                                sizeAt;
                                 sharedPlumb; sharedConnect; subscribeSharedSlot;
                                 burstCompleted;
                                 shareLatch; shareAdmit; shareFinish; shareGo;
@@ -178,6 +179,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Delivery-Walk public
+-- the nesting measure the subscribe budget descends on, and the frame
+-- row that supplies it.  Re-exported, so the clique names one module
+open import Verify-Budget-Sufficient.Caps-Nest public
 
 ------------------------------------------------------------------
 -- THE REACHABILITY CLUSTER — round 3's remaining debt, and the answer
@@ -1040,6 +1044,7 @@ concatDrain-qlen g allNid κ id now (o ∷ q) sched st
 ... | _ , vs , bs , false , sched₁ , st₁ = n≤1+n (length q)
 ... | _ , vs , bs , true  , sched₁ , st₁ =
   ≤-trans (concatDrain-qlen g allNid κ id now q sched₁ st₁) (n≤1+n (length q))
+
 
 -- and iterFold is monotone in the SEED as well as in the count
 foldStep-mono-w : ∀ (S : ℕ) {w w′ : ℕ} → 2 ≤ S → w ≤ w′ →
@@ -3863,6 +3868,117 @@ shareGo-slots sf gas id now i vals fin ((rid , p) ∷ ps) sched st
 valsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → List (Val Γ s) → Bool
 valsCaps? {s = s} c sl vs =
   all (valCaps? c sl s) vs ∧ (length vs ≤ᵇ suc (Caps.cWid c))
+
+------------------------------------------------------------------
+-- THE NESTING HYPOTHESIS, AS THE CLIQUE CARRIES IT.
+--
+-- A frame installs its own budget — that is what the refresh means, and
+-- `fLvlD`'s `suc d` clause is where it is read — so the number every
+-- head under one frame descends on is this one, named once:
+------------------------------------------------------------------
+
+frameBud : Caps → ℕ → ℕ
+frameBud c j = suc (sizeAt (Caps.cSize c) (suc j))
+
+-- ONE payload, and one LIST of them.  `Val Γ (obs u)` is `Closed Γ u`
+-- definitionally, so a single predicate serves both the payload walk and
+-- the concat queue
+mOK? : ∀ {n} {Γ : Ctx n} {s} → ℕ → Slots Γ → List Source → Closed Γ s → Bool
+mOK? bud sl cs o = nest o sl cs ≤ᵇ bud
+
+mList? : ∀ {n} {Γ : Ctx n} {s} →
+  ℕ → Slots Γ → List Source → List (Closed Γ s) → Bool
+mList? bud sl cs os = all (mOK? bud sl cs) os
+
+-- DERIVED, NOT PREMISED: a payload admitted at a frame's own level has
+-- its nesting under the budget that frame installs, because `valCaps?`
+-- bounds `sizeᵛ (obs u) o` — which IS `sizeᵉ o` — by
+-- `Caps.cSize (frameStep j c)`, which IS `sizeAt S j`, and that is
+-- exactly the left summand `refresh-supplies-nest` consumes.  The right
+-- summand is the `slotsSize sl ≤ Caps.cSize c` every head already carries
+valCaps→nest : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (o : Val Γ (obs u)) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  valCaps? (frameStep j c) sl (obs u) o ≡ true →
+  nest o sl cs ≤ frameBud c j
+valCaps→nest {u = u} c j sl cs o 1≤S hsl hv =
+  refresh-supplies-nest (Caps.cSize c) j o sl cs 1≤S
+    (≤ᵇ⇒≤ (sizeᵉ o) (sizeAt (Caps.cSize c) j)
+          (T-to (valCaps?-size (frameStep j c) sl (obs u) o hv)))
+    hsl
+
+obsCaps→nest : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (o : Closed Γ s) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  obsCaps? (frameStep j c) sl o ≡ true →
+  nest o sl cs ≤ frameBud c j
+obsCaps→nest {n = n} c j sl cs o 1≤S hsl ho =
+  refresh-supplies-nest (Caps.cSize c) j o sl cs 1≤S
+    (≤ᵇ⇒≤ (sizeᵉ o) (sizeAt (Caps.cSize c) j)
+          (T-to (proj₁ (∧-true (sizeᵉ o ≤ᵇ Caps.cSize (frameStep j c)) _ ho))))
+    hsl
+
+-- the same, over a whole payload list / queue
+valsCaps→mList : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (vs : List (Val Γ (obs u))) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  all (valCaps? (frameStep j c) sl (obs u)) vs ≡ true →
+  mList? (frameBud c j) sl cs vs ≡ true
+valsCaps→mList c j sl cs []       1≤S hsl h = refl
+valsCaps→mList {u = u} c j sl cs (o ∷ vs) 1≤S hsl h
+  with ∧-true (valCaps? (frameStep j c) sl (obs u) o)
+              (all (valCaps? (frameStep j c) sl (obs u)) vs) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl cs ≤ᵇ frameBud c j)
+            (≤⇒≤ᵇ (valCaps→nest c j sl cs o 1≤S hsl h₁)))
+          (valsCaps→mList c j sl cs vs 1≤S hsl h₂)
+
+obsList→mList : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (q : List (Closed Γ s)) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  all (obsCaps? (frameStep j c) sl) q ≡ true →
+  mList? (frameBud c j) sl cs q ≡ true
+obsList→mList c j sl cs []      1≤S hsl h = refl
+obsList→mList c j sl cs (o ∷ q) 1≤S hsl h
+  with ∧-true (obsCaps? (frameStep j c) sl o)
+              (all (obsCaps? (frameStep j c) sl) q) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl cs ≤ᵇ frameBud c j)
+            (≤⇒≤ᵇ (obsCaps→nest c j sl cs o 1≤S hsl h₁)))
+          (obsList→mList c j sl cs q 1≤S hsl h₂)
+
+-- AND CARRIED, not re-derived: the walk widens its tail's caps receipt,
+-- so re-deriving per payload would hand each one a LARGER budget while
+-- the walk transformer has exactly one.  The bound at a fixed budget
+-- travels untouched; the only thing that drifts under it is the
+-- connected set, and it drifts the harmless way
+mList?-cons : ∀ {n} {Γ : Ctx n} {s} (bud : ℕ) (sl : Slots Γ) (cs : List Source)
+  (src : Source) (os : List (Closed Γ s)) →
+  mList? bud sl cs os ≡ true → mList? bud sl (src ∷ cs) os ≡ true
+mList?-cons bud sl cs src []       h = refl
+mList?-cons bud sl cs src (o ∷ os) h
+  with ∧-true (mOK? bud sl cs o) (mList? bud sl cs os) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl (src ∷ cs) ≤ᵇ bud)
+            (≤⇒≤ᵇ (nest-cons o sl cs src bud (≤ᵇ⇒≤ (nest o sl cs) bud (T-to h₁)))))
+          (mList?-cons bud sl cs src os h₂)
+
+-- one head off the front, which is what a walk hands its own recursion
+mList?-tail : ∀ {n} {Γ : Ctx n} {s} (bud : ℕ) (sl : Slots Γ) (cs : List Source)
+  (o : Closed Γ s) (os : List (Closed Γ s)) →
+  mList? bud sl cs (o ∷ os) ≡ true → mList? bud sl cs os ≡ true
+mList?-tail bud sl cs o os h = proj₂ (∧-true (mOK? bud sl cs o) (mList? bud sl cs os) h)
+
+mList?-head : ∀ {n} {Γ : Ctx n} {s} (bud : ℕ) (sl : Slots Γ) (cs : List Source)
+  (o : Closed Γ s) (os : List (Closed Γ s)) →
+  mList? bud sl cs (o ∷ os) ≡ true → nest o sl cs ≤ bud
+mList?-head bud sl cs o os h =
+  ≤ᵇ⇒≤ (nest o sl cs) bud
+    (T-to (proj₁ (∧-true (mOK? bud sl cs o) (mList? bud sl cs os) h)))
 
 -- pathSz?'s length conjunct, read back out: the OUTERMOST one bounds
 -- the whole chain, and root / share-sink have no length at all

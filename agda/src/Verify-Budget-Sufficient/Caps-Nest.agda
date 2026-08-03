@@ -1,5 +1,5 @@
 ------------------------------------------------------------------
--- THE NESTING MEASURE `M`, and the frame row that supplies it.
+-- THE NESTING MEASURE `nest`, and the frame row that supplies it.
 --
 -- The budget `k` the subscribe clique descends on counts nesting, and
 -- Mu-Nest-Probe pinned which nesting: `syncSizeᵉ`, the measure that
@@ -15,7 +15,7 @@
 -- measure carries a RESIDUE: the nesting still owed by every share that
 -- has not been connected yet.
 --
---     M e sl cs = syncSizeᵉ e + resid sl cs
+--     nest e sl cs = syncSizeᵉ e + resid sl cs
 --
 -- `resid` is .Measures' `unconn` reweighted — the same
 -- `memberSource … connectedShares` mask the evaluator already keeps,
@@ -111,21 +111,21 @@ residAt-connected sl cs i with sl i
   rewrite T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl) = refl
 
 ------------------------------------------------------------------
--- § 2.  M, and the ONE inequality the frame refresh spends.
+-- § 2.  nest, and the ONE inequality the frame refresh spends.
 ------------------------------------------------------------------
 
-M : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Slots Γ → List Source → ℕ
-M e sl cs = syncSizeᵉ e + resid sl cs
+nest : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Slots Γ → List Source → ℕ
+nest e sl cs = syncSizeᵉ e + resid sl cs
 
-M≤ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
-  (sl : Slots Γ) (cs : List Source) → M e sl cs ≤ sizeᵉ e + slotsSize sl
-M≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
+nest≤ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
+  (sl : Slots Γ) (cs : List Source) → nest e sl cs ≤ sizeᵉ e + slotsSize sl
+nest≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
 
 -- THE SHARE EDGE'S STEP, which is the row the residue exists for.
 -- `sharedConnect` recurses on the slot's stored def with `toℕ i`
 -- ALREADY consed onto `connectedShares`, so the callee's measure is
 -- `syncSizeᵉ d + resid sl (toℕ i ∷ cs)` while the caller holds
--- `M (input i) sl cs ≤ suc k` — and `input i` has syncSize 1, so that
+-- `nest (input i) sl cs ≤ suc k` — and `input i` has syncSize 1, so that
 -- premise IS `resid sl cs ≤ k`.  The two differ by exactly slot i's own
 -- weight, which leaves the residue precisely when the slot is connected
 
@@ -162,8 +162,8 @@ resid-connect sl cs i {d} eqi fresh =
 share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
   {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
   memberSource (toℕ i) cs ≡ false →
-  M (input {Γ = Γ} {Δᵍ = []} {Δ = []} {Θ = []} i) sl cs ≤ suc k →
-  M d sl (toℕ i ∷ cs) ≤ k
+  nest (input {Γ = Γ} {Δᵍ = []} {Δ = []} {Θ = []} i) sl cs ≤ suc k →
+  nest d sl (toℕ i ∷ cs) ≤ k
 share-step sl cs i k eqi fresh (s≤s h) =
   ≤-trans (resid-connect sl cs i eqi fresh) h
 
@@ -182,13 +182,13 @@ share-step sl cs i k eqi fresh (s≤s h) =
 
 mu-step : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (μᵉ body) sl cs ≤ suc k → M (unfoldμ body) sl cs ≤ k
+  nest (μᵉ body) sl cs ≤ suc k → nest (unfoldμ body) sl cs ≤ k
 mu-step body sl cs k (s≤s h) =
   subst (λ x → x + resid sl cs ≤ k) (sym (syncSize-unfoldμ body)) h
 
 -- and the side condition the clause unfolds on comes free
 mu-1≤k : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
-  (sl : Slots Γ) (cs : List Source) (k : ℕ) → M (μᵉ body) sl cs ≤ k → 1 ≤ k
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) → nest (μᵉ body) sl cs ≤ k → 1 ≤ k
 mu-1≤k body sl cs (suc k) h = s≤s z≤n
 
 -- ONE CHAIN EDGE.  Every operator's head is a strict subterm whose
@@ -202,17 +202,17 @@ chain-step sl cs h b k =
 
 map-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ s t)
   (b : Exp Γ Δᵍ Δ Θ s) (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (mapᵉ f b) sl cs ≤ k → M b sl cs ≤ k
+  nest (mapᵉ f b) sl cs ≤ k → nest b sl cs ≤ k
 map-step f b sl cs k = chain-step sl cs (syncSizeᵗ f) (syncSizeᵉ b) k
 
 take-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Tm Γ Δᵍ Δ Θ _)
   (b : Exp Γ Δᵍ Δ Θ t) (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (takeᵉ c b) sl cs ≤ k → M b sl cs ≤ k
+  nest (takeᵉ c b) sl cs ≤ k → nest b sl cs ≤ k
 take-step c b sl cs k = chain-step sl cs (syncSizeᵗ c) (syncSizeᵉ b) k
 
 scan-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ _ t)
   (z : Tm Γ Δᵍ Δ Θ t) (b : Exp Γ Δᵍ Δ Θ s) (sl : Slots Γ) (cs : List Source)
-  (k : ℕ) → M (scanᵉ f z b) sl cs ≤ k → M b sl cs ≤ k
+  (k : ℕ) → nest (scanᵉ f z b) sl cs ≤ k → nest b sl cs ≤ k
 scan-step f z b sl cs k =
   chain-step sl cs (syncSizeᵗ f + syncSizeᵗ z) (syncSizeᵉ b) k
 
@@ -224,36 +224,36 @@ all-step sl cs b k =
 
 merge-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (mergeAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+  nest (mergeAllᵉ b) sl cs ≤ k → nest b sl cs ≤ k
 merge-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
 
 concat-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (concatAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+  nest (concatAllᵉ b) sl cs ≤ k → nest b sl cs ≤ k
 concat-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
 
 switch-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (switchAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+  nest (switchAllᵉ b) sl cs ≤ k → nest b sl cs ≤ k
 switch-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
 
 exhaust-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  M (exhaustAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+  nest (exhaustAllᵉ b) sl cs ≤ k → nest b sl cs ≤ k
 exhaust-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
 
 -- AND THE STATE EDGE.  `sharedConnect` is the only writer of
 -- `connectedShares`, and it only ever conses, so every OTHER call that
 -- carries the hypothesis across a state step reads a residue that has
 -- not risen
-M-cons : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
+nest-cons : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
   (sl : Slots Γ) (cs : List Source) (s : Source) (k : ℕ) →
-  M e sl cs ≤ k → M e sl (s ∷ cs) ≤ k
-M-cons e sl cs s k = ≤-trans (+-monoʳ-≤ (syncSizeᵉ e) (resid-cons-≤ sl cs s))
+  nest e sl cs ≤ k → nest e sl (s ∷ cs) ≤ k
+nest-cons e sl cs s k = ≤-trans (+-monoʳ-≤ (syncSizeᵉ e) (resid-cons-≤ sl cs s))
 
 ------------------------------------------------------------------
 -- § 3.  THE FRAME ROW.  A frame holds `sizeᵉ o ≤ sizeAt S j` for its
--- payload and `slotsSize sl ≤ S` for the telescope, so M is bounded by
+-- payload and `slotsSize sl ≤ S` for the telescope, so nest is bounded by
 -- `sizeAt S j + S` — one summand MORE than the entry level.  The entry
 -- level cannot pay for it: `sizeAt S j + S ≤ suc (sizeAt S j)` wants
 -- `S ≤ 1`, against the clique's own `2 ≤ S` (Share-Residue-Probe § 1
@@ -291,11 +291,11 @@ one-level-supply S j x y 1≤S hx hy =
           (≤-trans (≤-reflexive (sym (sizeAt-suc S j))) (n≤1+n (sizeAt S (suc j))))
 
 -- the row in the shape the frame clause states it
-refresh-supplies-M : ∀ {n} {Γ : Ctx n} (S j : ℕ) {Δᵍ Δ Θ t}
+refresh-supplies-nest : ∀ {n} {Γ : Ctx n} (S j : ℕ) {Δᵍ Δ Θ t}
   (o : Exp Γ Δᵍ Δ Θ t) (sl : Slots Γ) (cs : List Source) →
   1 ≤ S → sizeᵉ o ≤ sizeAt S j → slotsSize sl ≤ S →
-  M o sl cs ≤ suc (sizeAt S (suc j))
-refresh-supplies-M S j o sl cs 1≤S hsz hsl =
+  nest o sl cs ≤ suc (sizeAt S (suc j))
+refresh-supplies-nest S j o sl cs 1≤S hsz hsl =
   one-level-supply S j (syncSizeᵉ o) (resid sl cs) 1≤S
     (≤-trans (syncSize≤sizeᵉ o) hsz)
     (≤-trans (resid≤slots sl cs) hsl)
