@@ -6679,25 +6679,36 @@ stepFrame-face-zero c j u sl fin sched st inv =
 -- them — the μ clause's `j₀ = m + suc (m * m)` is a per-operator cost
 -- like any other.
 --
--- THE REPLACEMENT IS PROBED AND GATED, NOT YET LANDED.  Sub-Charge-Probe
--- carries the nesting-indexed hierarchy (`fLvlK` / `sIterK` / `sLvlK` /
--- `opIterK` / `fIterK`): it terminates, every transformer is
--- inflationary, all five are monotone in S, W, J and the nesting budget,
--- it is EXACTLY the old `fLvl` at budget 0 and dominates it pointwise at
--- every budget.  That last is what keeps the rewiring cheap — `iterL`,
--- `dLvl`, `lvls`, `sizeCount` and the count gate are built from
--- `fLvl-mono` and nothing else, so a bigger frame level moves all of
--- them with no arithmetic re-derived and no measured row re-run.
+-- THE REPLACEMENT IS LANDED (2026-08-03).  The nesting-indexed
+-- hierarchy — `fLvlK` / `sIterK` / `sLvlK` / `opIterK` / `fIterK`, with
+-- `fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J` — now sits beside
+-- `fLvl` in Rx.Evaluator, `abstract` for the normalisation reason
+-- written there, and `iterL` spends `fLvl′` per frame where it spent
+-- `fLvl`.  The budget's INSTANTIATION is the design ruling of the same
+-- date: `suc (sizeAt S J)` READ AT EACH DELIVERY'S OWN LEVEL, on three
+-- facts — within one delivery the recursion descends the pushed VALUE
+-- structurally, a delivery's arriving value has nesting ≤ size ≤
+-- `sizeAt S J` by valCaps? at that level, and values grown by folds
+-- are delivered LATER at a higher J.
 --
--- WHAT IS OPEN, and it is the design ruling this waits on: the budget's
--- INSTANTIATION.  Nesting depth is bounded by the *All-nesting of the
--- values in play, every one under `valCaps?`'s size half, so
--- `suc (sizeAt S J)` is the natural reading — exactly as `cDel` reads
--- `suc (cSize c)` for the dispatch depth.  But `cDel`'s gas is read ONCE
--- AT THE ENTRY CAPS while the levels are read at the current level, and
--- a value emitted at level J′ > J is bounded by `sizeAt S J′`, not by
--- `sizeAt S J` — so "depth ≤ the entry size cap" is a claim about which
--- values a run can BUILD, not an inequality between two level reads.
+-- Nothing above the frame had to move: `fLvl ≤ fLvl′` pointwise
+-- (.Caps), and `iterL`, `dLvl`, `lvls`, `sizeCount` and the count gate
+-- are built from the per-frame monotonicity and nothing else.
+--
+-- WHAT IS LEFT IS THE PASS THAT SURFACES THE RECEIPTS INTO THE
+-- SIGNATURES: `subscribeE-caps`'s Σ gains `j + j′ ≤ sLvlK S W k j`
+-- under a nesting hypothesis on `b`, and the six companions it calls
+-- gain the matching conjunct.  The arithmetic each clause SHAPE needs
+-- is proven ahead of the grind (agda/probe/Sub-Charge-Probe.agda § 5:
+-- `walk-step`, `op-step`, `op-step-eval`, `op-step-mu`), against the
+-- receipts as abstract numbers under exactly the bound the ground
+-- clauses hand back — which is also what fixed the shape, since the
+-- first draft of the hierarchy admitted none of the four (it ran the
+-- frames before the rest of the operator chain, it charged a payload's
+-- subscribe at J rather than at `suc J`, and its eval receipt was
+-- linear where `unfoldμ-caps` pays `m + suc (m * m)`).  The one
+-- non-arithmetic piece the pass still owes is `nestᵛ ≤ sizeᵛ`, a
+-- structural lemma beside the other value measures
 ------------------------------------------------------------------
 
 postulate

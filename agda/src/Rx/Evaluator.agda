@@ -625,6 +625,22 @@ fLvl S W J = J + fCharge S W J
 -- self-reference is reachable only across a TICK.  One subscribe
 -- unfolds a μ at most as many times as the syntax nests them.
 --
+-- AND THE FAMILY IS WRITTEN IN THE ORDER THE CLAUSES RUN, which is not
+-- a cosmetic choice: the receipts compose as a CHAIN of inflationary
+-- maps, and two of them applied in the wrong order bound nothing.  A
+-- map / take / *All clause spends one j on the frame its chain gains,
+-- then subscribes its SOURCE (the rest of the operator chain), and only
+-- then pushes the source's burst back through that frame — so `opIterK`
+-- runs `opIterK` on the rest and `fIterK` on the result, never the
+-- other way round.  Two further receipts the shape has to admit, both
+-- read off the ground clauses: a payload's subscribe runs at `suc J`
+-- (`subscribeInner` adds a from-inner frame before it subscribes), and
+-- the per-operator EVAL receipt is QUADRATIC in the size cap, not
+-- linear — `unfoldμ-caps` pays `m + suc (m * m)`, which `suc B` does
+-- not cover and `suc B * suc B` does.  Each of the four clause shapes
+-- then lands in one monotonicity step (gated:
+-- agda/probe/Sub-Charge-Probe.agda § 5).
+--
 -- THE BUDGET IS READ AT EACH DELIVERY'S OWN LEVEL — `fLvl′ S W J`
 -- instantiates k at `suc (sizeAt S J)`, the size cap at the level the
 -- frame runs at, and NOT at the cascade's entry.  Three facts license
@@ -652,31 +668,36 @@ abstract
   -- ONE FRAME that ran at J: its own receipt, then one inner subscribe
   -- per payload — at most `suc (widAt S W J)` of them
   fLvlK : ℕ → ℕ → ℕ → ℕ → ℕ           -- S W k J
-  -- m subscribes in sequence, each at the level the one before it LEFT
+  -- m payloads in sequence, each at the level the one before it LEFT.
+  -- ONE PAYLOAD costs the `from-inner` frame its chain gains (the `suc
+  -- J`, which is `subscribeInner-caps`'s own `suc j`) and then the
+  -- inner's subscribe at the level that frame left
   sIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ      -- S W k m J
   -- ONE SUBSCRIBE at J: it walks the target's operator chain, and the
   -- chain is no longer than the size cap (`sizeᵉ b ≤ cSize`, the
   -- telescope's own hypothesis)
   sLvlK : ℕ → ℕ → ℕ → ℕ → ℕ           -- S W k J
-  -- ONE OPERATOR of that chain: one j for the frame the chain gains
-  -- (frameStep-chain-suc), one EVAL receipt (`ofᵉ`'s literal list,
-  -- `scanᵉ`'s seed, `μᵉ`'s unfolding — all under `suc (sizeAt S J)` by
-  -- their own clauses), and then `pushBurst`, one frame per emit
+  -- ONE OPERATOR, IN THE ORDER THE CLAUSE RUNS IT: the frame the chain
+  -- gains (frameStep-chain-suc) and the operator's own EVAL receipt,
+  -- then a μ's re-entry at one less nesting, then the REST of the
+  -- chain, and only then `pushBurst` — the source's burst back through
+  -- that frame, one frame per emit, at the level the chain left
   opIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ     -- S W k m J
   fIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ      -- S W k m J
 
   fLvlK S W k J = sIterK S W k (suc (widAt S W J)) (fLvl S W J)
 
   sIterK S W k zero    J = J
-  sIterK S W k (suc m) J = sIterK S W k m (sLvlK S W k J)
+  sIterK S W k (suc m) J = sIterK S W k m (sLvlK S W k (suc J))
 
   sLvlK S W zero    J = J
   sLvlK S W (suc k) J = opIterK S W k (suc (sizeAt S J)) J
 
   opIterK S W k zero    J = J
   opIterK S W k (suc m) J =
-    opIterK S W k m
-      (fIterK S W k (suc (widAt S W J)) (suc (J + suc (sizeAt S J))))
+    let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
+        J₂ = opIterK S W k m (sLvlK S W k J₀)
+    in fIterK S W k (suc (widAt S W J₂)) J₂
 
   fIterK S W k zero    J = J
   fIterK S W k (suc m) J = fIterK S W k m (fLvlK S W k J)
@@ -695,7 +716,7 @@ abstract
   sIterK-0 _ _ _ _ = refl
 
   sIterK-suc : ∀ (S W k m J : ℕ) →
-    sIterK S W k (suc m) J ≡ sIterK S W k m (sLvlK S W k J)
+    sIterK S W k (suc m) J ≡ sIterK S W k m (sLvlK S W k (suc J))
   sIterK-suc _ _ _ _ _ = refl
 
   sLvlK-0 : ∀ (S W J : ℕ) → sLvlK S W 0 J ≡ J
@@ -710,8 +731,11 @@ abstract
 
   opIterK-suc : ∀ (S W k m J : ℕ) →
     opIterK S W k (suc m) J
-      ≡ opIterK S W k m
-          (fIterK S W k (suc (widAt S W J)) (suc (J + suc (sizeAt S J))))
+      ≡ fIterK S W k
+          (suc (widAt S W (opIterK S W k m
+                  (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))))
+          (opIterK S W k m
+             (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))
   opIterK-suc _ _ _ _ _ = refl
 
   fIterK-0 : ∀ (S W k J : ℕ) → fIterK S W k 0 J ≡ J

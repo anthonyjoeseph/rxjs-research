@@ -610,8 +610,8 @@ fLvlK-infl S W k J =
 
 sIterK-infl S W k zero    J = ≤-reflexive (sym (sIterK-0 S W k J))
 sIterK-infl S W k (suc m) J =
-  ≤-trans (≤-trans (sLvlK-infl S W k J)
-                   (sIterK-infl S W k m (sLvlK S W k J)))
+  ≤-trans (≤-trans (≤-trans (n≤1+n J) (sLvlK-infl S W k (suc J)))
+                   (sIterK-infl S W k m (sLvlK S W k (suc J))))
           (≤-reflexive (sym (sIterK-suc S W k m J)))
 
 sLvlK-infl S W zero    J = ≤-reflexive (sym (sLvlK-0 S W J))
@@ -621,13 +621,14 @@ sLvlK-infl S W (suc k) J =
 
 opIterK-infl S W k zero    J = ≤-reflexive (sym (opIterK-0 S W k J))
 opIterK-infl S W k (suc m) J =
-  ≤-trans (≤-trans (≤-trans (≤-trans (n≤1+n J) (s≤s (m≤m+n J (suc (sizeAt S J)))))
-                            (fIterK-infl S W k (suc (widAt S W J))
-                                         (suc (J + suc (sizeAt S J)))))
-                   (opIterK-infl S W k m
-                      (fIterK S W k (suc (widAt S W J))
-                              (suc (J + suc (sizeAt S J))))))
-          (≤-reflexive (sym (opIterK-suc S W k m J)))
+  let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
+      J₂ = opIterK S W k m (sLvlK S W k J₀)
+  in ≤-trans (≤-trans (≤-trans (≤-trans (n≤1+n J)
+                                 (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J)))))
+                               (≤-trans (sLvlK-infl S W k J₀)
+                                        (opIterK-infl S W k m (sLvlK S W k J₀))))
+                      (fIterK-infl S W k (suc (widAt S W J₂)) J₂))
+             (≤-reflexive (sym (opIterK-suc S W k m J)))
 
 fIterK-infl S W k zero    J = ≤-reflexive (sym (fIterK-0 S W k J))
 fIterK-infl S W k (suc m) J =
@@ -672,7 +673,7 @@ sIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
             2≤S hS hW hJ hk (s≤s hm) =
   ≤-trans (≤-trans (≤-reflexive (sIterK-suc S W k m J))
                    (sIterK-mono m m′ k k′ 2≤S hS hW
-                      (sLvlK-mono k k′ 2≤S hS hW hJ hk) hk hm))
+                      (sLvlK-mono k k′ 2≤S hS hW (s≤s hJ) hk) hk hm))
           (≤-reflexive (sym (sIterK-suc S′ W′ k′ m′ J′)))
 
 sLvlK-mono {S} {S′} {W} {W′} {J} {J′} zero k′ 2≤S hS hW hJ hk =
@@ -691,15 +692,20 @@ opIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk
 opIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
 opIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
              2≤S hS hW hJ hk (s≤s hm) =
-  ≤-trans (≤-trans (≤-reflexive (opIterK-suc S W k m J))
-                   (opIterK-mono m m′ k k′ 2≤S hS hW
-                      (fIterK-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) k k′
-                         2≤S hS hW
-                         (s≤s (+-mono-≤ hJ
-                                 (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
-                         hk (s≤s (widAt-mono 2≤S hS hW hJ)))
-                      hk hm))
-          (≤-reflexive (sym (opIterK-suc S′ W′ k′ m′ J′)))
+  let sz≤ = sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ
+      J₀≤ = s≤s (+-mono-≤ hJ (*-mono-≤ (s≤s sz≤) (s≤s sz≤)))
+      X   = opIterK S W k m
+              (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))
+      X′  = opIterK S′ W′ k′ m′
+              (sLvlK S′ W′ k′ (suc (J′ + suc (sizeAt S′ J′) * suc (sizeAt S′ J′))))
+      inner : X ≤ X′
+      inner = opIterK-mono m m′ k k′ 2≤S hS hW
+                (sLvlK-mono k k′ 2≤S hS hW J₀≤ hk) hk hm
+  in ≤-trans (≤-trans (≤-reflexive (opIterK-suc S W k m J))
+                      (fIterK-mono (suc (widAt S W X)) (suc (widAt S′ W′ X′)) k k′
+                         2≤S hS hW inner hk
+                         (s≤s (widAt-mono 2≤S hS hW inner))))
+             (≤-reflexive (sym (opIterK-suc S′ W′ k′ m′ J′)))
 
 fIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
   ≤-trans (≤-trans (≤-reflexive (fIterK-0 S W k J)) hJ)

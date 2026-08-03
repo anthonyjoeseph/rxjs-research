@@ -78,10 +78,12 @@ help:
 	@echo "                  subscribe charge is MUTUALLY RECURSIVE with the frame"
 	@echo "                  charge (a frame subscribes one inner per payload; that"
 	@echo "                  subscribe runs frames of its own), so no closed form in"
-	@echo "                  (S,W,J) closes it.  Lands the nesting-indexed hierarchy,"
-	@echo "                  proves it terminates, is inflationary and monotone in"
-	@echo "                  all five arguments, and DOMINATES the old fLvl pointwise"
-	@echo "                  with equality at nesting 0"
+	@echo "                  (S,W,J) closes it.  Carries the nesting-indexed hierarchy"
+	@echo "                  Rx.Evaluator now runs on: termination, inflation,"
+	@echo "                  monotonicity in all five arguments, domination of the old"
+	@echo "                  fLvl — and the COMPOSITION GATE, one lemma per clause"
+	@echo "                  shape, which is what fixed the shape (the first draft"
+	@echo "                  admitted none of the four)"
 	@echo "                  (see agda/probe/Sub-Charge-Probe.agda).  Seconds"
 	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
 	@echo "                  burst it is handed?  the per-FRAME maxima the two"
@@ -275,11 +277,15 @@ level-walk-probe:
 # finds the shape the receipts compose in: the subscribe charge is MUTUALLY
 # RECURSIVE with the frame charge, so the ruled candidate (~2·sizeAt, one
 # receipt per operator) is too small and no closed form in (S,W,J) closes the
-# loop.  Lands the nesting-indexed hierarchy in its place — termination,
-# inflation, monotonicity in all five arguments, and the gate that it dominates
-# the old `fLvl` pointwise at every nesting budget, which is what makes the
-# rewiring cost no re-derivation above the frame.  Self-contained arithmetic on
-# top of Level-Walk-Probe's copies, so src/Main.agda never reaches it.  Seconds.
+# loop.  Carries the nesting-indexed hierarchy Rx.Evaluator now runs on —
+# termination, inflation, monotonicity in all five arguments, and the gate that
+# it dominates the old `fLvl` pointwise at every nesting budget, which is what
+# makes the rewiring cost no re-derivation above the frame — plus the
+# COMPOSITION GATE (§ 5), one lemma per clause SHAPE of the ground tree, proven
+# against the receipts as abstract numbers.  That gate is what fixed the shape:
+# the first draft terminated and was monotone and admitted none of the four.
+# Self-contained arithmetic on top of Level-Walk-Probe's copies, so
+# src/Main.agda never reaches it.  Seconds.
 sub-charge-probe:
 	cd agda && agda -i src -i probe probe/Sub-Charge-Probe.agda
 
