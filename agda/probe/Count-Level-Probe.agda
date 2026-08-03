@@ -75,7 +75,7 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt; Path; root; Stre
                                 subscribeE; sched-init; st-init; slotsSize;
                                 foldStep; iterFold)
 
-open import Verify-Budget-Sufficient.Subscribe-Count
+open import Verify-Budget-Sufficient.Subscribe-Face
 
 ------------------------------------------------------------------
 -- § 1.  ONE FOLD CLEARS A SUCCESSOR.  foldStep-infl proves `w ≤
