@@ -97,13 +97,33 @@ protocol, per Anthony:
 
 ## Running long Agda builds
 
-`make agda` takes ~35-40 minutes (Caps-Face ~17-19, Wet ~14-18); the Bash tool's ceiling is
-600s per foreground call. Detach long builds (`nohup setsid bash -c '… ; echo EXIT=$? >>
-log' &`) and poll the log for its EXIT= line with short foreground calls. Since 2026-08-03
-the session runs on a persistent machine, so detached builds advance on their own — the
-polling is for pacing and verification, not for keeping anything awake. Never pipe agda
-through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and read
-indentation (an importer prints as the last line for its importee's whole leg).
+`make agda` takes ~35-40 minutes (Subscribe-Face ~7 min, Caps-Face ~80 s, Wet ~14-18 min);
+the Bash tool's ceiling is 600s per foreground call. Detach long builds (`nohup setsid bash
+-c '… ; echo EXIT=$? >> log' &`) and poll the log for its EXIT= line with short foreground
+calls. Since 2026-08-03 the session runs on a persistent machine, so detached builds advance
+on their own — the polling is for pacing and verification, not for keeping anything awake.
+Never pipe agda through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and
+read indentation (an importer prints as the last line for its importee's whole leg).
+
+## Module granularity: keep typechecks short
+
+Agda rechecks a whole module on any edit, so module size IS iteration speed. Rules
+(Anthony, 2026-08-03):
+
+- **Cut at mutual-SCC boundaries.** A mutual block is an indivisible checking unit and
+  cannot be split across modules; everything else can and should be. A module holds at most
+  one heavyweight SCC and as little else as possible. Never restructure genuine mutuality
+  (indirection layers, WF recursion) just to shrink a module — proof shape wins over
+  check time.
+- **A new lemma family that is not mutual with an existing SCC gets its own module**, even
+  when it is "about" that SCC — consuming another family's results as finished facts is an
+  import, not mutuality. "Related" is not a reason to co-locate: `open import X public`
+  chains keep the namespace flat, so consumers never notice where a lemma physically lives.
+- **Target ≤20 s solo recheck for every non-SCC module.** Past that, split at the next
+  natural seam. SCC modules pay their SCC's price (Subscribe-Face ~7 min) — that cost is
+  irreducible, so keep it from being paid per-mistake: iterate in `agda/probe/` with
+  minimal imports (<20 s loops), land bodies in verified batches, and detach the big
+  module's recheck while writing the next batch.
 
 ## Agda: work from the outside in
 
