@@ -53,11 +53,12 @@
 --      and NO closed form in (S, W, J) closes that loop — the same
 --      failure `dCapᶜ` already took on the delivery side ("EVERY CLOSED
 --      FORM FAILS, AND NOT BY A CONSTANT", Rx.Evaluator).  The repair is
---      the same one: a RECURSION whose depth is a budget read at the
---      entry caps, with every level quantity read at the level the walk
---      has climbed to.  `k` below is that budget — the SUBSCRIBE-NESTING
---      depth — and it is what `dCapᶜ`'s `suc (cSize c)` gas is for
---      deliveries.
+--      the same one: a RECURSION whose every level quantity is read at
+--      the level the walk has CLIMBED TO, re-read at each frame entry.
+--      `k` is that budget — the SUBSCRIBE-NESTING depth, what `dCapᶜ`'s
+--      `suc (cSize c)` gas is for deliveries — and `d`, the DEPTH FUEL,
+--      is what pays for re-reading it (the re-read returns k LARGER, so
+--      k cannot also be the descending argument).
 --
 -- § 2  AND THE LOOP IS NOT GAS-ESCAPING, which had to be checked before
 --      any of this was worth writing.  The obvious way to breach any
@@ -72,22 +73,28 @@
 --      `μᵉ body` only under a `deferᵉ`, and one subscribe unfolds a μ at
 --      most as many times as the syntax nests them.  The μ clause's own
 --      `j₀ = m + suc (m * m)` is then a per-operator cost like any
---      other, and § 3's `opIterK` pays it.
+--      other, and `opIterD` (Rx.Evaluator) pays it.
 --
--- § 3  THE HIERARCHY, and it is stated as LEVELS rather than as charges
---      — `fLvl S W J = J + fCharge S W J` already is one, and a level
---      transformer composes where a charge would have to be re-added at
---      the wrong level (the Entry-Caps-Refuted error, one stratum down).
---      The family below MIRRORS Rx.Evaluator's landed one (which is
---      `abstract` there, for the normalisation reason written at it);
---      here it is transparent so the properties can be proven at all.
+-- § 3  THE HIERARCHY IS NO LONGER MIRRORED HERE — IT IS LANDED, and
+--      this probe now gates the REAL one.  `fLvlD` / `sIterD` / `sLvlD`
+--      / `opIterD` / `fIterD` live in Rx.Evaluator (abstract, for the
+--      normalisation reason written at them) with their clause
+--      equations, and .Caps proves every transformer inflationary and
+--      monotone in all five arguments.  The draft mirror that used to
+--      sit here — the INHERITED `K` family, whose budget descended
+--      instead of being re-read — is gone: it is refuted
+--      (agda/probe/Nest-Budget-Probe.agda § 3) and superseded, and a
+--      second copy of a landed family is exactly the fat the repo does
+--      not keep.  So § 5 below is stated against the definitions the
+--      grind will actually consume, not against a look-alike.
 --
--- § 4  THE GATE.  `fLvl≤fLvlK`: the new per-frame level DOMINATES the
---      old one pointwise at every nesting budget, including k = 0.  So
---      every consumer above `fLvl` — `iterL`, `dLvl`, `lvls`,
---      `sizeCount`, `count-gate`, the whole Level-Walk-Probe ladder —
---      follows by the monotonicity lemmas already proven, with no
---      arithmetic re-derived and no measured row re-run.
+-- § 4  THE GATE is likewise landed: `fLvl≤fLvlD` (.Caps) says the new
+--      per-frame level dominates the old one pointwise at EVERY depth
+--      fuel, including d = 0, so every consumer above `fLvl` — `iterL`,
+--      `dLvl`, `lvls`, `sizeCount`, the count gate, the whole
+--      Level-Walk-Probe ladder — follows by the monotonicity lemmas
+--      already proven, with no arithmetic re-derived and no measured row
+--      re-run.  `Caps-Face.face-lift` is that gate's first consumer.
 --
 -- § 5  THE COMPOSITION GATE, and it is what the first draft of this
 --      probe got WRONG.  A shape that terminates and is monotone is not
@@ -117,6 +124,14 @@
 --      grind consumes, proven here against the receipts as abstract
 --      numbers under exactly the bound each sub-companion reports.
 --
+--      EVERY ONE OF THEM HOLDS AT A FIXED DEPTH FUEL `d`, which is the
+--      other half of what the port re-checked.  One subscribe's whole
+--      operator walk — its payloads, its nested subscribes, its
+--      pushBurst frames — runs at the SAME d; the fuel is spent only by
+--      `fIterD`'s step into `fLvlD S W d`, i.e. only when a frame
+--      re-reads the budget at its own level.  So the four steps below
+--      quantify d and never touch it, exactly as they quantify S and W.
+--
 -- WHAT IS NOT HERE.  `k`'s INSTANTIATION is now ruled (the design
 -- session, 2026-08-03): the budget is `suc (sizeAt S J)` READ AT EACH
 -- DELIVERY'S OWN LEVEL, on three facts — the recursion descends the
@@ -136,210 +151,22 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 ------------------------------------------------------------------
--- the repo's arithmetic, off the walk probe that already carries it —
--- `foldStep` / `iterFold` / `sizeStep` / `iterSize` / `sizeAt` /
--- `widAt` / `fCharge` / `fLvl` and their monotonicity, all copies of
--- Rx.Evaluator's, so this probe costs no rebuild of the tree either
+-- THE REAL DEFINITIONS, off the tree rather than off a copy.  The
+-- budgeted per-frame hierarchy is landed in Rx.Evaluator and its three
+-- properties are proven in .Caps, so this probe adds arithmetic ON TOP
+-- of them instead of re-deriving a look-alike.  The tree is already
+-- built by the time a probe runs, so this costs interface loads only
 ------------------------------------------------------------------
 
-open import Level-Walk-Probe
-  using (foldStep; iterFold; sizeStep; iterSize; sizeAt; widAt;
-         fCharge; fLvl; iterL; dLvl; lvls; chargeAt;
-         sizeAt-mono; widAt-mono; fCharge-mono; fLvl-mono;
-         iterL-mono; lvls-mono; lvls-lin)
+open import Rx.Evaluator
+  using (foldStep; sizeAt; widAt; fCharge;
+         fLvlD; sIterD; sLvlD; opIterD; fIterD;
+         fLvlD-suc; sIterD-suc; opIterD-suc)
 
-------------------------------------------------------------------
--- § 3  THE NESTING-INDEXED HIERARCHY.
---
--- `k` is the SUBSCRIBE-NESTING budget: how many times a frame's payload
--- may be an observable whose own subscribe runs frames.
---
--- Every level quantity is read at the level the walk HAS CLIMBED TO,
--- never at the entry — `opIterK` re-reads `widAt` at the level the
--- operator chain LEFT, and `sIterK` re-enters `sLvlK` at the level the
--- previous payload left.  Charging any of them once at the entry is the
--- refuted error (agda/probe/Entry-Caps-Refuted.agda) one stratum down.
-------------------------------------------------------------------
-
-mutual
-
-  -- ONE FRAME that ran at J: its own receipt, then one inner subscribe
-  -- per payload — at most `suc (widAt S W J)` of them, which is
-  -- `valsCaps?`'s own length conjunct
-  fLvlK : ℕ → ℕ → ℕ → ℕ → ℕ
-  fLvlK S W k J = sIterK S W k (suc (widAt S W J)) (fLvl S W J)
-
-  -- m payloads in sequence, each at the level the one before it LEFT.
-  -- ONE PAYLOAD costs the from-inner frame its chain gains (the `suc J`
-  -- — § 5 (ii)) and then the inner's subscribe at the level that frame
-  -- left
-  sIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-  sIterK S W k zero    J = J
-  sIterK S W k (suc m) J = sIterK S W k m (sLvlK S W k (suc J))
-
-  -- ONE SUBSCRIBE at J.  It walks the target's operator chain, and the
-  -- chain is no longer than the size cap (`sizeᵉ b ≤ cSize`, the
-  -- telescope's own hypothesis)
-  sLvlK : ℕ → ℕ → ℕ → ℕ → ℕ
-  sLvlK S W zero    J = J
-  sLvlK S W (suc k) J = opIterK S W k (suc (sizeAt S J)) J
-
-  -- ONE OPERATOR, IN THE ORDER THE CLAUSE RUNS IT (§ 5 (i)): the frame
-  -- the chain gains and the operator's own EVAL receipt (quadratic, §
-  -- 5 (iii)), then a μ's re-entry at one less nesting, then the REST of
-  -- the chain, and only then `pushBurst` — one frame per emit, at the
-  -- level the chain left
-  opIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-  opIterK S W k zero    J = J
-  opIterK S W k (suc m) J =
-    let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
-        J₂ = opIterK S W k m (sLvlK S W k J₀)
-    in fIterK S W k (suc (widAt S W J₂)) J₂
-
-  fIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-  fIterK S W k zero    J = J
-  fIterK S W k (suc m) J = fIterK S W k m (fLvlK S W k J)
-
--- and the per-frame level the walk reads, with the budget instantiated
--- at the size cap READ AT THE FRAME'S OWN LEVEL (the ruling)
-fLvl′ : ℕ → ℕ → ℕ → ℕ
-fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J
-
-------------------------------------------------------------------
--- § 3a  EVERY TRANSFORMER IS INFLATIONARY.  This is the whole content
--- of the gate: a level never goes down, so the old receipt survives
--- inside the new one as its first step
-------------------------------------------------------------------
-
-mutual
-
-  fLvlK-infl : ∀ (S W k J : ℕ) → J ≤ fLvlK S W k J
-  fLvlK-infl S W k J =
-    ≤-trans (m≤m+n J (fCharge S W J))
-            (sIterK-infl S W k (suc (widAt S W J)) (fLvl S W J))
-
-  sIterK-infl : ∀ (S W k m J : ℕ) → J ≤ sIterK S W k m J
-  sIterK-infl S W k zero    J = ≤-refl
-  sIterK-infl S W k (suc m) J =
-    ≤-trans (≤-trans (n≤1+n J) (sLvlK-infl S W k (suc J)))
-            (sIterK-infl S W k m (sLvlK S W k (suc J)))
-
-  sLvlK-infl : ∀ (S W k J : ℕ) → J ≤ sLvlK S W k J
-  sLvlK-infl S W zero    J = ≤-refl
-  sLvlK-infl S W (suc k) J = opIterK-infl S W k (suc (sizeAt S J)) J
-
-  opIterK-infl : ∀ (S W k m J : ℕ) → J ≤ opIterK S W k m J
-  opIterK-infl S W k zero    J = ≤-refl
-  opIterK-infl S W k (suc m) J =
-    ≤-trans (≤-trans (≤-trans (n≤1+n J)
-                              (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J)))))
-                     (≤-trans (sLvlK-infl S W k
-                                 (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))
-                              (opIterK-infl S W k m
-                                 (sLvlK S W k
-                                    (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))))
-            (fIterK-infl S W k
-               (suc (widAt S W (opIterK S W k m
-                       (sLvlK S W k
-                          (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))))
-               (opIterK S W k m
-                  (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))))
-
-  fIterK-infl : ∀ (S W k m J : ℕ) → J ≤ fIterK S W k m J
-  fIterK-infl S W k zero    J = ≤-refl
-  fIterK-infl S W k (suc m) J =
-    ≤-trans (fLvlK-infl S W k J) (fIterK-infl S W k m (fLvlK S W k J))
-
-------------------------------------------------------------------
--- § 3b  AND MONOTONE IN EVERY ARGUMENT, the nesting budget included.
--- This is what makes the rewiring `fLvl := fLvl′` cheap: `iterL-mono`,
--- `dLvl-mono`, `lvls-mono` and `dCapᶜ-mono` are all built from
--- `fLvl-mono` and nothing else, so the whole ladder above the frame
--- moves up with this one lemma and no re-derivation
-------------------------------------------------------------------
-
-mutual
-
-  fLvlK-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-    k ≤ k′ → fLvlK S W k J ≤ fLvlK S′ W′ k′ J′
-  fLvlK-mono {S} {S′} {W} {W′} {J} {J′} k k′ 2≤S hS hW hJ hk =
-    sIterK-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) k k′ 2≤S hS hW
-      (fLvl-mono 2≤S hS hW hJ) hk (s≤s (widAt-mono 2≤S hS hW hJ))
-
-  sIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
-    2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
-    sIterK S W k m J ≤ sIterK S′ W′ k′ m′ J′
-  sIterK-mono {S′ = S′} {W′ = W′} {J′ = J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
-    ≤-trans hJ (sIterK-infl S′ W′ k′ m′ J′)
-  sIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
-  sIterK-mono (suc m) (suc m′) k k′ 2≤S hS hW hJ hk (s≤s hm) =
-    sIterK-mono m m′ k k′ 2≤S hS hW (sLvlK-mono k k′ 2≤S hS hW (s≤s hJ) hk) hk hm
-
-  sLvlK-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-    k ≤ k′ → sLvlK S W k J ≤ sLvlK S′ W′ k′ J′
-  sLvlK-mono {S′ = S′} {W′ = W′} {J′ = J′} zero k′ 2≤S hS hW hJ hk =
-    ≤-trans hJ (sLvlK-infl S′ W′ k′ J′)
-  sLvlK-mono (suc k) zero    2≤S hS hW hJ ()
-  sLvlK-mono {S} {S′} {J = J} {J′ = J′} (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
-    opIterK-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) k k′ 2≤S hS hW hJ hk
-      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
-
-  opIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
-    2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
-    opIterK S W k m J ≤ opIterK S′ W′ k′ m′ J′
-  opIterK-mono {S′ = S′} {W′ = W′} {J′ = J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
-    ≤-trans hJ (opIterK-infl S′ W′ k′ m′ J′)
-  opIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
-  opIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
-               2≤S hS hW hJ hk (s≤s hm) =
-    fIterK-mono (suc (widAt S W X)) (suc (widAt S′ W′ X′)) k k′ 2≤S hS hW
-      inner hk (s≤s (widAt-mono 2≤S hS hW inner))
-    where
-    sz≤ = sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ
-    J₀≤ : suc (J + suc (sizeAt S J) * suc (sizeAt S J))
-            ≤ suc (J′ + suc (sizeAt S′ J′) * suc (sizeAt S′ J′))
-    J₀≤ = s≤s (+-mono-≤ hJ (*-mono-≤ (s≤s sz≤) (s≤s sz≤)))
-    X  = opIterK S W k m
-           (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))
-    X′ = opIterK S′ W′ k′ m′
-           (sLvlK S′ W′ k′ (suc (J′ + suc (sizeAt S′ J′) * suc (sizeAt S′ J′))))
-    inner : X ≤ X′
-    inner = opIterK-mono m m′ k k′ 2≤S hS hW (sLvlK-mono k k′ 2≤S hS hW J₀≤ hk) hk hm
-
-  fIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
-    2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
-    fIterK S W k m J ≤ fIterK S′ W′ k′ m′ J′
-  fIterK-mono {S′ = S′} {W′ = W′} {J′ = J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
-    ≤-trans hJ (fIterK-infl S′ W′ k′ m′ J′)
-  fIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
-  fIterK-mono (suc m) (suc m′) k k′ 2≤S hS hW hJ hk (s≤s hm) =
-    fIterK-mono m m′ k k′ 2≤S hS hW (fLvlK-mono k k′ 2≤S hS hW hJ hk) hk hm
-
--- and the budget's own instantiation is monotone too, since `sizeAt`
--- is: the per-frame level with the budget read off the size cap
-fLvl′-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  fLvl′ S W J ≤ fLvl′ S′ W′ J′
-fLvl′-mono {S} {S′} {J = J} {J′ = J′} 2≤S hS hW hJ =
-  fLvlK-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) 2≤S hS hW hJ
-    (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
-
-------------------------------------------------------------------
--- § 4  THE GATE.  The new per-frame level dominates the old one
--- POINTWISE, at EVERY nesting budget — the old receipt is literally the
--- seed of the new iteration, so this needs no arithmetic at all.
---
--- That is the whole Step-2 requirement: everything above `fLvl` in the
--- walk (`iterL`, `dLvl`, `lvls`, `sizeCount`, and the count gate) is
--- built out of `fLvl` by monotone combinators already proven
--- (Level-Walk-Probe § B/§ C), so a bigger `fLvl` moves every one of
--- them up and no measured row is re-run
-------------------------------------------------------------------
-
-fLvl≤fLvlK : ∀ (S W k J : ℕ) → fLvl S W J ≤ fLvlK S W k J
-fLvl≤fLvlK S W k J = sIterK-infl S W k (suc (widAt S W J)) (fLvl S W J)
-
-fLvl≤fLvl′ : ∀ (S W J : ℕ) → fLvl S W J ≤ fLvl′ S W J
-fLvl≤fLvl′ S W J = fLvl≤fLvlK S W (suc (sizeAt S J)) J
+open import Verify-Budget-Sufficient.Caps
+  using (widAt-mono;
+         sLvlD-infl; opIterD-infl; fIterD-infl;
+         sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
 
 ------------------------------------------------------------------
 -- § 5  THE COMPOSITION GATE — one lemma per clause SHAPE of the ground
@@ -349,65 +176,93 @@ fLvl≤fLvl′ S W J = fLvl≤fLvlK S W (suc (sizeAt S J)) J
 -- grind consumes; the shape is right precisely because they go through
 -- with the pieces the clauses already hand back, and the first draft's
 -- shape admitted none of them.
+--
+-- The functions being abstract costs one `≤-reflexive` per lemma: the
+-- goal's `suc`-argument has to be opened by hand through the clause
+-- equation (`sIterD-suc`, `opIterD-suc`) rather than by reduction.
 ------------------------------------------------------------------
 
 -- ONE PAYLOAD of a thruWalk / concatDrain: the head subscribes an inner
 -- under one more frame (`subscribeInner-caps` recurses at `suc j`), and
 -- the tail is the walk's own IH at the level the head left
-walk-step : ∀ (S W k m j j₁ j₂ : ℕ) → 2 ≤ S →
-  j + j₁ ≤ sLvlK S W k (suc j) →
-  (j + j₁) + j₂ ≤ sIterK S W k m (j + j₁) →
-  j + (j₁ + j₂) ≤ sIterK S W k (suc m) j
-walk-step S W k m j j₁ j₂ 2≤S hd tl =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₁ j₂))) tl)
-          (sIterK-mono m m k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl)
+walk-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
+  j + j₁ ≤ sLvlD S W d k (suc j) →
+  (j + j₁) + j₂ ≤ sIterD S W d k m (j + j₁) →
+  j + (j₁ + j₂) ≤ sIterD S W d k (suc m) j
+walk-step S W d k m j j₁ j₂ 2≤S hd tl =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₁ j₂))) tl)
+                   (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl))
+          (≤-reflexive (sym (sIterD-suc S W d k m j)))
+
+-- ONE FRAME, and this is the step the REFRESH buys: the frame's own
+-- receipt (`fCharge`, what the ground frame clauses pay) and then its
+-- payload walk under the budget READ HERE, at this frame's own level.
+-- No inherited `k` appears anywhere in it — that is the whole content
+-- of the refresh, and one unit of depth fuel is its price
+frame-step : ∀ (S W d j j₀ j₁ : ℕ) → 2 ≤ S →
+  j₀ ≤ fCharge S W j →
+  (j + j₀) + j₁ ≤ sIterD S W d (suc (sizeAt S j)) (suc (widAt S W j)) (j + j₀) →
+  j + (j₀ + j₁) ≤ fLvlD S W (suc d) j
+frame-step S W d j j₀ j₁ 2≤S rcpt walk =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₀ j₁))) walk)
+                   (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d
+                      (suc (sizeAt S j)) (suc (sizeAt S j)) 2≤S ≤-refl ≤-refl
+                      (+-monoʳ-≤ j rcpt) ≤-refl ≤-refl ≤-refl))
+          (≤-reflexive (sym (fLvlD-suc S W d j)))
 
 -- ONE OPERATOR, map / take / *All shape: one j for the frame the chain
 -- gains, the SOURCE's subscribe at `suc j`, then pushBurst's frames at
 -- the level that subscribe left
-op-step : ∀ (S W k m j j₁ j₂ : ℕ) → 2 ≤ S →
-  suc j + j₁ ≤ opIterK S W k m (suc j) →
-  (suc j + j₁) + j₂ ≤ fIterK S W k (suc (widAt S W (suc j + j₁))) (suc j + j₁) →
-  j + suc (j₁ + j₂) ≤ opIterK S W k (suc m) j
-op-step S W k m j j₁ j₂ 2≤S src pb =
-  ≤-trans (≤-trans (≤-reflexive (trans (+-suc j (j₁ + j₂))
-                                       (cong suc (sym (+-assoc j j₁ j₂)))))
-                   pb)
-          (fIterK-mono (suc (widAt S W (suc j + j₁))) (suc (widAt S W X)) k k
-             2≤S ≤-refl ≤-refl A≤X ≤-refl (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X)))
+op-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
+  suc j + j₁ ≤ opIterD S W d k m (suc j) →
+  (suc j + j₁) + j₂ ≤ fIterD S W d k (suc (widAt S W (suc j + j₁))) (suc j + j₁) →
+  j + suc (j₁ + j₂) ≤ opIterD S W d k (suc m) j
+op-step S W d k m j j₁ j₂ 2≤S src pb =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (trans (+-suc j (j₁ + j₂))
+                                                (cong suc (sym (+-assoc j j₁ j₂)))))
+                            pb)
+                   (fIterD-mono (suc (widAt S W (suc j + j₁))) (suc (widAt S W X))
+                      d d k k 2≤S ≤-refl ≤-refl A≤X ≤-refl ≤-refl
+                      (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X))))
+          (≤-reflexive (sym (opIterD-suc S W d k m j)))
   where
   J₀ = suc (j + suc (sizeAt S j) * suc (sizeAt S j))
-  X  = opIterK S W k m (sLvlK S W k J₀)
-  sucj≤J₁ : suc j ≤ sLvlK S W k J₀
+  X  = opIterD S W d k m (sLvlD S W d k J₀)
+  sucj≤J₁ : suc j ≤ sLvlD S W d k J₀
   sucj≤J₁ = ≤-trans (s≤s (m≤m+n j (suc (sizeAt S j) * suc (sizeAt S j))))
-                    (sLvlK-infl S W k J₀)
+                    (sLvlD-infl S W d k J₀)
   A≤X : suc j + j₁ ≤ X
-  A≤X = ≤-trans src (opIterK-mono m m k k 2≤S ≤-refl ≤-refl sucj≤J₁ ≤-refl ≤-refl)
+  A≤X = ≤-trans src (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl sucj≤J₁
+                       ≤-refl ≤-refl ≤-refl)
 
 -- ONE OPERATOR, scan shape: an EVAL receipt first (`evalSeed-caps`,
 -- `suc (sizeᵗ z)`, so at most `suc (sizeAt S j)`), then the same three
-op-step-eval : ∀ (S W k m j j₀ j₁ j₂ : ℕ) → 2 ≤ S →
+op-step-eval : ∀ (S W d k m j j₀ j₁ j₂ : ℕ) → 2 ≤ S →
   j₀ ≤ suc (sizeAt S j) →
-  suc (j + j₀) + j₁ ≤ opIterK S W k m (suc (j + j₀)) →
+  suc (j + j₀) + j₁ ≤ opIterD S W d k m (suc (j + j₀)) →
   (suc (j + j₀) + j₁) + j₂
-    ≤ fIterK S W k (suc (widAt S W (suc (j + j₀) + j₁))) (suc (j + j₀) + j₁) →
-  j + (j₀ + suc (j₁ + j₂)) ≤ opIterK S W k (suc m) j
-op-step-eval S W k m j j₀ j₁ j₂ 2≤S hj₀ src pb =
-  ≤-trans (≤-trans (≤-reflexive (trans (sym (+-assoc j j₀ (suc (j₁ + j₂))))
-                                  (trans (+-suc (j + j₀) (j₁ + j₂))
-                                         (cong suc (sym (+-assoc (j + j₀) j₁ j₂))))))
-                   pb)
-          (fIterK-mono (suc (widAt S W (suc (j + j₀) + j₁))) (suc (widAt S W X)) k k
-             2≤S ≤-refl ≤-refl A≤X ≤-refl (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X)))
+    ≤ fIterD S W d k (suc (widAt S W (suc (j + j₀) + j₁))) (suc (j + j₀) + j₁) →
+  j + (j₀ + suc (j₁ + j₂)) ≤ opIterD S W d k (suc m) j
+op-step-eval S W d k m j j₀ j₁ j₂ 2≤S hj₀ src pb =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive
+                              (trans (sym (+-assoc j j₀ (suc (j₁ + j₂))))
+                                (trans (+-suc (j + j₀) (j₁ + j₂))
+                                       (cong suc (sym (+-assoc (j + j₀) j₁ j₂))))))
+                            pb)
+                   (fIterD-mono (suc (widAt S W (suc (j + j₀) + j₁)))
+                      (suc (widAt S W X)) d d k k 2≤S ≤-refl ≤-refl A≤X ≤-refl ≤-refl
+                      (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X))))
+          (≤-reflexive (sym (opIterD-suc S W d k m j)))
   where
   J₀ = suc (j + suc (sizeAt S j) * suc (sizeAt S j))
-  X  = opIterK S W k m (sLvlK S W k J₀)
-  seed≤ : suc (j + j₀) ≤ sLvlK S W k J₀
+  X  = opIterD S W d k m (sLvlD S W d k J₀)
+  seed≤ : suc (j + j₀) ≤ sLvlD S W d k J₀
   seed≤ = ≤-trans (s≤s (+-monoʳ-≤ j
                     (≤-trans hj₀ (m≤m*n (suc (sizeAt S j)) (suc (sizeAt S j))))))
-                  (sLvlK-infl S W k J₀)
+                  (sLvlD-infl S W d k J₀)
   A≤X : suc (j + j₀) + j₁ ≤ X
-  A≤X = ≤-trans src (opIterK-mono m m k k 2≤S ≤-refl ≤-refl seed≤ ≤-refl ≤-refl)
+  A≤X = ≤-trans src (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl seed≤
+                       ≤-refl ≤-refl ≤-refl)
 
 -- B + suc (B · B) ≤ suc B · suc B — the arithmetic the μ receipt needs,
 -- and the reason the per-operator eval receipt is a SQUARE
@@ -421,24 +276,25 @@ quad-arith B =
 -- FRESH subscribe on a LARGER term — which is why it is charged as one
 -- NESTING level rather than as a continuation of the same chain, and
 -- why the budget k has to count μ-nesting as well as *All-nesting
-op-step-mu : ∀ (S W k m j m₀ j₁ : ℕ) → 2 ≤ S →
+op-step-mu : ∀ (S W d k m j m₀ j₁ : ℕ) → 2 ≤ S →
   m₀ ≤ sizeAt S j →
-  (j + (m₀ + suc (m₀ * m₀))) + j₁ ≤ sLvlK S W k (j + (m₀ + suc (m₀ * m₀))) →
-  j + ((m₀ + suc (m₀ * m₀)) + j₁) ≤ opIterK S W k (suc m) j
-op-step-mu S W k m j m₀ j₁ 2≤S hm₀ sub =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-assoc j (m₀ + suc (m₀ * m₀)) j₁))) sub)
-          (≤-trans (sLvlK-mono k k 2≤S ≤-refl ≤-refl quad ≤-refl)
-                   (≤-trans (opIterK-infl S W k m (sLvlK S W k J₀))
-                            (fIterK-infl S W k (suc (widAt S W X)) X)))
+  (j + (m₀ + suc (m₀ * m₀))) + j₁ ≤ sLvlD S W d k (j + (m₀ + suc (m₀ * m₀))) →
+  j + ((m₀ + suc (m₀ * m₀)) + j₁) ≤ opIterD S W d k (suc m) j
+op-step-mu S W d k m j m₀ j₁ 2≤S hm₀ sub =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j (m₀ + suc (m₀ * m₀)) j₁)))
+                            sub)
+                   (≤-trans (sLvlD-mono d d k k 2≤S ≤-refl ≤-refl quad ≤-refl ≤-refl)
+                            (≤-trans (opIterD-infl S W d k m (sLvlD S W d k J₀))
+                                     (fIterD-infl S W d k (suc (widAt S W X)) X))))
+          (≤-reflexive (sym (opIterD-suc S W d k m j)))
   where
   B  = sizeAt S j
   J₀ = suc (j + suc B * suc B)
-  X  = opIterK S W k m (sLvlK S W k J₀)
+  X  = opIterD S W d k m (sLvlD S W d k J₀)
   quad : j + (m₀ + suc (m₀ * m₀)) ≤ J₀
   quad = ≤-trans (+-monoʳ-≤ j (≤-trans (+-mono-≤ hm₀ (s≤s (*-mono-≤ hm₀ hm₀)))
                                        (quad-arith B)))
                  (n≤1+n (j + suc B * suc B))
-
 ------------------------------------------------------------------
 -- § 6  THE (b) CONJUNCT of the two faces, at the tight rung and its
 -- neighbours: the square of the entry width against ONE fold of it, at

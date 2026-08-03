@@ -47,9 +47,11 @@
 --      is re-read at each frame from that frame's own level (the ruling)
 --      and `d` is what descends (termination).  § 3 is the family, § 4
 --      its inflation, § 5 its monotonicity in all five arguments, § 6
---      the gate `fLvl ≤ fLvlD` and the DOMINATION `fLvlK ≤ fLvlD`, § 7
---      the four composition-gate steps of Sub-Charge-Probe § 5 re-proven
---      against it.  All of it typechecks with no pragmas.
+--      the gate `fLvl ≤ fLvlD` and the DOMINATION `fLvlK ≤ fLvlD`.  § 7
+--      showed the composition-gate steps survive the reshape; now that
+--      the reshape is LANDED it points at them where they live once,
+--      against the real definitions (Sub-Charge-Probe § 5).  All of it
+--      typechecks with no pragmas.
 --
 -- § 8  AND NAMES WHAT IS STILL OPEN, WHICH IS ONE NUMBER: what `d` is
 --      instantiated at.  It cannot be read off (S, W, J) at the
@@ -623,115 +625,23 @@ fLvl′≤fLvlD : ∀ (S W d J : ℕ) → 2 ≤ S → suc (sizeAt S J) ≤ d →
 fLvl′≤fLvlD S W d J 2≤S hd = fLvlK≤fLvlD S W (suc (sizeAt S J)) d J 2≤S ≤-refl hd
 
 ------------------------------------------------------------------
--- § 7  THE COMPOSITION GATE, RE-PROVEN.  Sub-Charge-Probe § 5's four
--- steps are the per-clause arithmetic the signature pass consumes; each
--- one goes through against the reshaped family with the depth fuel
--- carried unchanged, because none of them touches the budget's
--- instantiation — they compose receipts in the order the clauses run
--- them, and that order did not move.
+-- § 7  THE COMPOSITION GATE WENT WITH THE RESHAPE, and it is not
+-- restated here.  This probe's job was to show that the four per-clause
+-- steps survive the refresh — that reshaping the family does not break
+-- the order the receipts compose in — and they do.  Now that the
+-- reshaped family is LANDED (Rx.Evaluator's `fLvlD` / `sIterD` /
+-- `sLvlD` / `opIterD` / `fIterD`, with .Caps proving them inflationary
+-- and monotone), the steps live once, against the real definitions the
+-- grind consumes: agda/probe/Sub-Charge-Probe.agda § 5 — `walk-step`,
+-- `frame-step`, `op-step`, `op-step-eval`, `op-step-mu`.
 --
--- ONE STEP IS NEW, and it is the one the refresh is FOR: `frame-step`.
--- A frame's payload walk no longer needs a nesting hypothesis handed
--- down from the subscribe that installed it — the frame reads its own
+-- `frame-step` is the one the refresh BOUGHT, and it is worth naming
+-- here even though it is proven there: a frame's payload walk stops
+-- taking its nesting hypothesis from the subscribe that installed the
+-- frame and reads its own, at the frame's own level, for one unit of
+-- depth fuel.  That is the step the inherited family admitted no
+-- version of, and it is why `k` stopped being the descending argument
 ------------------------------------------------------------------
-
--- ONE PAYLOAD of a thruWalk / concatDrain
-walk-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
-  j + j₁ ≤ sLvlD S W d k (suc j) →
-  (j + j₁) + j₂ ≤ sIterD S W d k m (j + j₁) →
-  j + (j₁ + j₂) ≤ sIterD S W d k (suc m) j
-walk-step S W d k m j j₁ j₂ 2≤S hd tl =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₁ j₂))) tl)
-          (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl)
-
--- ONE FRAME, and this is the step the refresh buys: the frame's own
--- receipt (`fCharge`, what `scanFrame-caps` pays) and then its payload
--- walk under the budget READ HERE — no inherited k appears
-frame-step : ∀ (S W d j j₀ j₁ : ℕ) → 2 ≤ S →
-  j₀ ≤ fCharge S W j →
-  (j + j₀) + j₁ ≤ sIterD S W d (suc (sizeAt S j)) (suc (widAt S W j)) (j + j₀) →
-  j + (j₀ + j₁) ≤ fLvlD S W (suc d) j
-frame-step S W d j j₀ j₁ 2≤S rcpt walk =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₀ j₁))) walk)
-          (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d
-             (suc (sizeAt S j)) (suc (sizeAt S j)) 2≤S ≤-refl ≤-refl
-             (+-monoʳ-≤ j rcpt) ≤-refl ≤-refl ≤-refl)
-
--- ONE OPERATOR, map / take / *All shape
-op-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
-  suc j + j₁ ≤ opIterD S W d k m (suc j) →
-  (suc j + j₁) + j₂ ≤ fIterD S W d k (suc (widAt S W (suc j + j₁))) (suc j + j₁) →
-  j + suc (j₁ + j₂) ≤ opIterD S W d k (suc m) j
-op-step S W d k m j j₁ j₂ 2≤S src pb =
-  ≤-trans (≤-trans (≤-reflexive (trans (+-suc j (j₁ + j₂))
-                                       (cong suc (sym (+-assoc j j₁ j₂)))))
-                   pb)
-          (fIterD-mono (suc (widAt S W (suc j + j₁))) (suc (widAt S W X)) d d k k
-             2≤S ≤-refl ≤-refl A≤X ≤-refl ≤-refl
-             (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X)))
-  where
-  J₀ = suc (j + suc (sizeAt S j) * suc (sizeAt S j))
-  X  = opIterD S W d k m (sLvlD S W d k J₀)
-  sucj≤J₁ : suc j ≤ sLvlD S W d k J₀
-  sucj≤J₁ = ≤-trans (s≤s (m≤m+n j (suc (sizeAt S j) * suc (sizeAt S j))))
-                    (sLvlD-infl S W d k J₀)
-  A≤X : suc j + j₁ ≤ X
-  A≤X = ≤-trans src
-          (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl sucj≤J₁ ≤-refl ≤-refl ≤-refl)
-
--- ONE OPERATOR, scan shape: an EVAL receipt first, then the same three
-op-step-eval : ∀ (S W d k m j j₀ j₁ j₂ : ℕ) → 2 ≤ S →
-  j₀ ≤ suc (sizeAt S j) →
-  suc (j + j₀) + j₁ ≤ opIterD S W d k m (suc (j + j₀)) →
-  (suc (j + j₀) + j₁) + j₂
-    ≤ fIterD S W d k (suc (widAt S W (suc (j + j₀) + j₁))) (suc (j + j₀) + j₁) →
-  j + (j₀ + suc (j₁ + j₂)) ≤ opIterD S W d k (suc m) j
-op-step-eval S W d k m j j₀ j₁ j₂ 2≤S hj₀ src pb =
-  ≤-trans (≤-trans (≤-reflexive (trans (sym (+-assoc j j₀ (suc (j₁ + j₂))))
-                                  (trans (+-suc (j + j₀) (j₁ + j₂))
-                                         (cong suc (sym (+-assoc (j + j₀) j₁ j₂))))))
-                   pb)
-          (fIterD-mono (suc (widAt S W (suc (j + j₀) + j₁))) (suc (widAt S W X)) d d k k
-             2≤S ≤-refl ≤-refl A≤X ≤-refl ≤-refl
-             (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X)))
-  where
-  J₀ = suc (j + suc (sizeAt S j) * suc (sizeAt S j))
-  X  = opIterD S W d k m (sLvlD S W d k J₀)
-  seed≤ : suc (j + j₀) ≤ sLvlD S W d k J₀
-  seed≤ = ≤-trans (s≤s (+-monoʳ-≤ j
-                    (≤-trans hj₀ (m≤m*n (suc (sizeAt S j)) (suc (sizeAt S j))))))
-                  (sLvlD-infl S W d k J₀)
-  A≤X : suc (j + j₀) + j₁ ≤ X
-  A≤X = ≤-trans src
-          (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl seed≤ ≤-refl ≤-refl ≤-refl)
-
--- B + suc (B · B) ≤ suc B · suc B — why the per-operator eval receipt is
--- a SQUARE
-quad-arith : ∀ (B : ℕ) → B + suc (B * B) ≤ suc B * suc B
-quad-arith B =
-  ≤-trans (≤-reflexive (+-suc B (B * B)))
-          (≤-trans (s≤s (+-monoʳ-≤ B (m≤n+m (B * B) B)))
-                   (≤-reflexive (sym (cong (λ x → suc (B + x)) (*-suc B B)))))
-
--- THE μ OPERATOR: the unfolding receipt and then a FRESH subscribe on a
--- LARGER term, charged as one nesting level
-op-step-mu : ∀ (S W d k m j m₀ j₁ : ℕ) → 2 ≤ S →
-  m₀ ≤ sizeAt S j →
-  (j + (m₀ + suc (m₀ * m₀))) + j₁ ≤ sLvlD S W d k (j + (m₀ + suc (m₀ * m₀))) →
-  j + ((m₀ + suc (m₀ * m₀)) + j₁) ≤ opIterD S W d k (suc m) j
-op-step-mu S W d k m j m₀ j₁ 2≤S hm₀ sub =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-assoc j (m₀ + suc (m₀ * m₀)) j₁))) sub)
-          (≤-trans (sLvlD-mono d d k k 2≤S ≤-refl ≤-refl quad ≤-refl ≤-refl)
-                   (≤-trans (opIterD-infl S W d k m (sLvlD S W d k J₀))
-                            (fIterD-infl S W d k (suc (widAt S W X)) X)))
-  where
-  B  = sizeAt S j
-  J₀ = suc (j + suc B * suc B)
-  X  = opIterD S W d k m (sLvlD S W d k J₀)
-  quad : j + (m₀ + suc (m₀ * m₀)) ≤ J₀
-  quad = ≤-trans (+-monoʳ-≤ j (≤-trans (+-mono-≤ hm₀ (s≤s (*-mono-≤ hm₀ hm₀)))
-                                       (quad-arith B)))
-                 (n≤1+n (j + suc B * suc B))
 
 ------------------------------------------------------------------
 -- § 8  WHAT IS STILL OPEN: the one number `d`.
