@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -97,6 +97,19 @@ help:
 	@echo "                  frame's ENTRY level while its payloads are bounded at"
 	@echo "                  the level it CLIMBED TO (3 against 43690)"
 	@echo "                  (see agda/probe/Nest-Budget-Probe.agda).  Seconds"
+	@echo "  refresh-probe   does the PER-FRAME BUDGET REFRESH close it?  HALF."
+	@echo "                  The soundness side passes as a THEOREM (a frame"
+	@echo "                  subscribes only its own arriving values and a concat"
+	@echo "                  queue filled at a LOWER level, so nest <= size <= what"
+	@echo "                  that frame itself admits — no row can breach it).  The"
+	@echo "                  TERMINATION side fails: the refresh regenerates the"
+	@echo "                  one descending argument LARGER and Agda"
+	@echo "                  rejects the block.  Carries the repair — the refresh"
+	@echo "                  with a DEPTH FUEL the frame entry spends — inflation,"
+	@echo "                  monotonicity, fLvl <= it, the old family <= it, and"
+	@echo "                  the four composition-gate steps re-proven; then names"
+	@echo "                  the one number still unruled: what the fuel is set to"
+	@echo "                  (see agda/probe/Refresh-Probe.agda).  Seconds"
 	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
 	@echo "                  burst it is handed?  the per-FRAME maxima the two"
 	@echo "                  entry axioms bound.  Mints are 1 on every row of the"
@@ -314,6 +327,20 @@ sub-charge-probe:
 # Standalone, so src/Main.agda never reaches it.  Seconds
 nest-budget-probe:
 	cd agda && agda -i src -i probe probe/Nest-Budget-Probe.agda
+
+# Does the PER-FRAME BUDGET REFRESH close the hole Nest-Budget-Probe opened?
+# HALF.  The SOUNDNESS side passes as a theorem — a frame subscribes only its
+# own arriving values and the values a concat frame queued at a LOWER level, so
+# nestᵛ ≤ sizeᵛ ≤ the frame's own size admission, no row can breach it.  The
+# TERMINATION side fails: taken literally the refresh regenerates the family's
+# only descending argument LARGER, and Agda rejects the whole mutual block.  So
+# the probe carries the repair — the refresh with an explicit DEPTH FUEL the
+# frame entry spends — proven inflationary, monotone in all five arguments,
+# above `fLvl` and above the family it replaces, with the four composition-gate
+# steps re-proven, and names the one number still unruled: what that fuel is
+# instantiated at.  Standalone, so src/Main.agda never reaches it.  Seconds
+refresh-probe:
+	cd agda && agda -i src -i probe probe/Refresh-Probe.agda
 
 # The gate on the two frame-local axioms cascadeGo-deliveries WAS proven
 # from.  Mint-Loop-Frames reports mints and frames per CASCADE; these are
