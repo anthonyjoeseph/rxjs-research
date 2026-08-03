@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -73,6 +73,16 @@ help:
 	@echo "                  decomposition, monotonicity, and the gate — the"
 	@echo "                  level walk is POINTWISE ABOVE the registry walk it"
 	@echo "                  replaces (see agda/probe/Level-Walk-Probe.agda)"
+	@echo "  sub-charge-probe  what does ONE SUBSCRIBE cost?  the clause table off"
+	@echo "                  the ground companion tree, and the finding that the"
+	@echo "                  subscribe charge is MUTUALLY RECURSIVE with the frame"
+	@echo "                  charge (a frame subscribes one inner per payload; that"
+	@echo "                  subscribe runs frames of its own), so no closed form in"
+	@echo "                  (S,W,J) closes it.  Lands the nesting-indexed hierarchy,"
+	@echo "                  proves it terminates, is inflationary and monotone in"
+	@echo "                  all five arguments, and DOMINATES the old fLvl pointwise"
+	@echo "                  with equality at nesting 0"
+	@echo "                  (see agda/probe/Sub-Charge-Probe.agda).  Seconds"
 	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
 	@echo "                  burst it is handed?  the per-FRAME maxima the two"
 	@echo "                  entry axioms bound.  Mints are 1 on every row of the"
@@ -258,6 +268,20 @@ entry-caps-refuted:
 # arithmetic, so src/Main.agda never reaches it.  Seconds.
 level-walk-probe:
 	cd agda && agda -i src -i probe probe/Level-Walk-Probe.agda
+
+# What does ONE SUBSCRIBE cost?  The two remaining *All frame faces and
+# .Wet's GAP (a) all wait on `subscribeE-caps`'s j′, which is an unbounded
+# existential.  This reads the clause table off the ground companion tree and
+# finds the shape the receipts compose in: the subscribe charge is MUTUALLY
+# RECURSIVE with the frame charge, so the ruled candidate (~2·sizeAt, one
+# receipt per operator) is too small and no closed form in (S,W,J) closes the
+# loop.  Lands the nesting-indexed hierarchy in its place — termination,
+# inflation, monotonicity in all five arguments, and the gate that it dominates
+# the old `fLvl` pointwise at every nesting budget, which is what makes the
+# rewiring cost no re-derivation above the frame.  Self-contained arithmetic on
+# top of Level-Walk-Probe's copies, so src/Main.agda never reaches it.  Seconds.
+sub-charge-probe:
+	cd agda && agda -i src -i probe probe/Sub-Charge-Probe.agda
 
 # The gate on the two frame-local axioms cascadeGo-deliveries WAS proven
 # from.  Mint-Loop-Frames reports mints and frames per CASCADE; these are
