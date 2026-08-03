@@ -6647,23 +6647,57 @@ stepFrame-face-zero c j u sl fin sched st inv =
 --       VALUES a subscribe emits says nothing about how many LEVELS it
 --       climbed to emit them.
 --
--- AND THE ARITHMETIC IS TIGHT ENOUGH THAT (a) MAY NOT FIT `fCharge` AS
--- STATED.  One subscribe of an inner `o` walks o's own operator chain,
--- paying a frame receipt per operator; the frames do not grow
--- (State-Blowup-Probe), and `sizeᵉ o ≤ cSize`, so the sum over one
--- subscribe is ~2·cSize.  A `thru-outer` frame does that once per
--- payload, `≤ suc cWid` of them, for ~2·cWid·cSize — against
--- `fCharge = suc (suc widAt * suc sizeAt)` ≈ cWid·cSize at the same
--- level.  That is a CONSTANT factor over, on the crudest reading, and a
--- scan-f frame inside the inner makes it worse (its receipt reads the
--- burst width, which is what (b) bounds).  So the honest next step is
--- not a grind on these two clauses: it is a subscribe-level charge —
--- `fLvl`'s analogue for a subscribe — and, if the sum genuinely
--- breaches, a bigger `fLvl`.  Both are cheap now in a way they were not
--- a week ago: the count `frameBlowup` spends is a WALK (`sizeCount =
--- lvls …`), so enlarging the per-frame receipt changes `fLvl`
--- (Rx.Evaluator) and everything above it follows by the monotonicity
--- lemmas already proven — no closed form to re-derive.
+-- AND (a) DOES NOT FIT `fCharge`, NOR ANY CLOSED FORM IN (S, W, J) —
+-- measured, agda/probe/Sub-Charge-Probe.agda, which reads the receipt
+-- table off this file's own GROUND clauses.  The crude reading said one
+-- subscribe walks the inner's operator chain paying a frame receipt per
+-- operator, `sizeᵉ o ≤ cSize` of them, so ~2·cSize per subscribe and
+-- ~2·cWid·cSize per thru-outer frame — a CONSTANT factor over `fCharge
+-- = suc (suc widAt * suc sizeAt)`.  That reading is wrong, and not by a
+-- constant: a subscribe of `mergeAllᵉ b` INSTALLS A thru-outer FRAME and
+-- pushes b's burst back through it, `thruWalk` subscribes one inner per
+-- payload, and that inner's subscribe runs frames of its own.  So
+--
+--     one FRAME     ⟶ ≤ suc widAt subscribes  (valsCaps?'s length half)
+--     one SUBSCRIBE ⟶ ≤ suc sizeAt operators, each ⟶ ≤ suc widAt frames
+--
+-- and the two charges are MUTUALLY RECURSIVE.  It is the same failure
+-- `dCapᶜ` already took one stratum up ("EVERY CLOSED FORM FAILS, AND
+-- NOT BY A CONSTANT", Rx.Evaluator), and it takes the same repair: a
+-- RECURSION on a nesting budget, every level quantity read at the level
+-- the walk has climbed to.
+--
+-- THE GAS ESCAPE IS CLOSED BY TYPING, which had to be checked first.  A
+-- synchronous fixpoint `μ x. mergeAll (of x)` would re-enter subscribeE
+-- once per unfolding, bounded by the GAS and nothing else — and
+-- `budgetAt` is a tower THREE STORIES ABOVE `capsAt`, so no reading of
+-- the Caps triple could ever pay for it.  It is not writable: `μᵉ` binds
+-- into Δᵍ, `varᵉ` reads Δ, and `deferᵉ` is the sole gate moving Δᵍ into
+-- scope (Rx.Exp), so a μ's self-reference is reachable only across a
+-- TICK.  `unfoldμ body` mentions `μᵉ body` only under a `deferᵉ`, and
+-- one subscribe unfolds a μ at most as many times as the syntax nests
+-- them — the μ clause's `j₀ = m + suc (m * m)` is a per-operator cost
+-- like any other.
+--
+-- THE REPLACEMENT IS PROBED AND GATED, NOT YET LANDED.  Sub-Charge-Probe
+-- carries the nesting-indexed hierarchy (`fLvlK` / `sIterK` / `sLvlK` /
+-- `opIterK` / `fIterK`): it terminates, every transformer is
+-- inflationary, all five are monotone in S, W, J and the nesting budget,
+-- it is EXACTLY the old `fLvl` at budget 0 and dominates it pointwise at
+-- every budget.  That last is what keeps the rewiring cheap — `iterL`,
+-- `dLvl`, `lvls`, `sizeCount` and the count gate are built from
+-- `fLvl-mono` and nothing else, so a bigger frame level moves all of
+-- them with no arithmetic re-derived and no measured row re-run.
+--
+-- WHAT IS OPEN, and it is the design ruling this waits on: the budget's
+-- INSTANTIATION.  Nesting depth is bounded by the *All-nesting of the
+-- values in play, every one under `valCaps?`'s size half, so
+-- `suc (sizeAt S J)` is the natural reading — exactly as `cDel` reads
+-- `suc (cSize c)` for the dispatch depth.  But `cDel`'s gas is read ONCE
+-- AT THE ENTRY CAPS while the levels are read at the current level, and
+-- a value emitted at level J′ > J is bounded by `sizeAt S J′`, not by
+-- `sizeAt S J` — so "depth ≤ the entry size cap" is a claim about which
+-- values a run can BUILD, not an inequality between two level reads.
 ------------------------------------------------------------------
 
 postulate

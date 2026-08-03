@@ -4176,6 +4176,19 @@ size≤sizeCapAt e sl id =
 --       rather than assumed.  It is the SAME hole the two *All frame
 --       faces wait on (.Caps-Face, conjunct (a) there), seen from the
 --       wet side — one companion would close both.
+--       AND THE COMPANION IS NOT A CLOSED FORM (measured,
+--       agda/probe/Sub-Charge-Probe.agda): a subscribe installs frames
+--       and a frame subscribes one inner per payload, so the subscribe
+--       charge and the frame charge are MUTUALLY RECURSIVE and no
+--       function of (S, W, J) closes the loop — the same failure
+--       `dCapᶜ` took on the delivery side, and the same repair, a
+--       recursion on a nesting budget.  The gas escape that would have
+--       killed any level reading (a synchronous μ fixpoint, re-entering
+--       subscribeE once per unfolding against a `budgetAt` three tower
+--       stories above `capsAt`) is closed BY TYPING: `deferᵉ` is the
+--       sole gate moving Δᵍ into scope, so a μ's self-reference costs a
+--       TICK.  The hierarchy is probed and gated; what it waits on is
+--       the nesting budget's instantiation, which is a ruling.
 --   (b) capsOK? IS NOT INV?.  They share stBounded? and nothing else:
 --       INV? adds fnCapBounded?, regsB?, slotsFnCap and reads registry
 --       cardinality at cSize where capsOK? reads it at cReg.  Four
