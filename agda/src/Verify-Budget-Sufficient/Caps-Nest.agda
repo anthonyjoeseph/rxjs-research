@@ -40,20 +40,25 @@ open import Data.Nat  using (ℕ; suc; _+_; _*_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; +-monoʳ-≤; *-mono-≤;
          *-identityˡ; *-identityʳ; +-identityʳ; +-assoc; *-distribˡ-+;
-         +-comm; m≤m+n; n≤1+n; ≡⇒≡ᵇ)
+         +-comm; m≤m+n; m≤n+m; +-monoˡ-≤; n≤1+n; ≡⇒≡ᵇ)
 open import Data.Fin  using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.List using (List; []; _∷_; sum; tabulate)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim  using (Source)
-open import Rx.Exp   using (Ctx; Exp; Closed; input; syncSizeᵉ; sizeᵉ)
+open import Rx.Exp
+  using (Ctx; Exp; Tm; Fn; Closed; obs;
+         input; mapᵉ; takeᵉ; scanᵉ;
+         mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+         syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ)
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
-  using (iterSize-suc; sizeAt-mono; syncSize≤sizeᵉ; sum-tab-mono; T⇒≡true)
+  using (iterSize-suc; sizeAt-mono; syncSize≤sizeᵉ; sum-tab-mono; T⇒≡true;
+         syncSize-unfoldμ)
 
 ------------------------------------------------------------------
 -- § 1.  THE RESIDUE — `unconn`, reweighted.
@@ -161,6 +166,90 @@ share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
   M d sl (toℕ i ∷ cs) ≤ k
 share-step sl cs i k eqi fresh (s≤s h) =
   ≤-trans (resid-connect sl cs i eqi fresh) h
+
+------------------------------------------------------------------
+-- § 4.  THE REMAINING EDGES.  `subscribeE` walks an operator chain and
+-- re-enters itself at a μ; the μ edge is the ONE that spends a unit of
+-- k, and every chain edge descends to a strict subterm at the SAME k.
+-- Together with § 2's share step and § 3's frame row, that is every way
+-- the clique reaches a deeper subscribe, so the hypothesis is
+-- maintainable at every call site.
+--
+-- (`1 ≤ k` on its own is NOT maintainable — k descends only here, so a
+-- bare side condition has nothing to hand the μ call.  Mu-Nest-Probe
+-- refutes it.  This is why the hypothesis is a measure and not a bound.)
+------------------------------------------------------------------
+
+mu-step : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (μᵉ body) sl cs ≤ suc k → M (unfoldμ body) sl cs ≤ k
+mu-step body sl cs k (s≤s h) =
+  subst (λ x → x + resid sl cs ≤ k) (sym (syncSize-unfoldμ body)) h
+
+-- and the side condition the clause unfolds on comes free
+mu-1≤k : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) → M (μᵉ body) sl cs ≤ k → 1 ≤ k
+mu-1≤k body sl cs (suc k) h = s≤s z≤n
+
+-- ONE CHAIN EDGE.  Every operator's head is a strict subterm whose
+-- syncSize the constructor's own `suc` dominates, so one lemma with the
+-- head's syncSize abstracted covers map / take / scan and all four *All
+chain-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (h b k : ℕ) → suc (h + b) + resid sl cs ≤ k → b + resid sl cs ≤ k
+chain-step sl cs h b k =
+  ≤-trans (+-monoˡ-≤ (resid sl cs)
+            (≤-trans (m≤n+m b h) (n≤1+n (h + b))))
+
+map-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ s t)
+  (b : Exp Γ Δᵍ Δ Θ s) (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (mapᵉ f b) sl cs ≤ k → M b sl cs ≤ k
+map-step f b sl cs k = chain-step sl cs (syncSizeᵗ f) (syncSizeᵉ b) k
+
+take-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Tm Γ Δᵍ Δ Θ _)
+  (b : Exp Γ Δᵍ Δ Θ t) (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (takeᵉ c b) sl cs ≤ k → M b sl cs ≤ k
+take-step c b sl cs k = chain-step sl cs (syncSizeᵗ c) (syncSizeᵉ b) k
+
+scan-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (f : Fn Γ Δᵍ Δ Θ _ t)
+  (z : Tm Γ Δᵍ Δ Θ t) (b : Exp Γ Δᵍ Δ Θ s) (sl : Slots Γ) (cs : List Source)
+  (k : ℕ) → M (scanᵉ f z b) sl cs ≤ k → M b sl cs ≤ k
+scan-step f z b sl cs k =
+  chain-step sl cs (syncSizeᵗ f + syncSizeᵗ z) (syncSizeᵉ b) k
+
+-- the four *All heads carry no term, so their `h` is 0
+all-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (b k : ℕ) →
+  suc b + resid sl cs ≤ k → b + resid sl cs ≤ k
+all-step sl cs b k =
+  ≤-trans (+-monoˡ-≤ (resid sl cs) (n≤1+n b))
+
+merge-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (mergeAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+merge-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
+
+concat-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (concatAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+concat-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
+
+switch-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (switchAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+switch-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
+
+exhaust-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  M (exhaustAllᵉ b) sl cs ≤ k → M b sl cs ≤ k
+exhaust-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
+
+-- AND THE STATE EDGE.  `sharedConnect` is the only writer of
+-- `connectedShares`, and it only ever conses, so every OTHER call that
+-- carries the hypothesis across a state step reads a residue that has
+-- not risen
+M-cons : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
+  (sl : Slots Γ) (cs : List Source) (s : Source) (k : ℕ) →
+  M e sl cs ≤ k → M e sl (s ∷ cs) ≤ k
+M-cons e sl cs s k = ≤-trans (+-monoʳ-≤ (syncSizeᵉ e) (resid-cons-≤ sl cs s))
 
 ------------------------------------------------------------------
 -- § 3.  THE FRAME ROW.  A frame holds `sizeᵉ o ≤ sizeAt S j` for its
