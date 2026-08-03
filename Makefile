@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -199,6 +199,15 @@ help:
 	@echo "                  hands back a cold script's whole sync list in one"
 	@echo "                  emit.  Repaired by a SIZE hypothesis and one fold"
 	@echo "                  (see agda/probe/Count-Level-Probe.agda).  ~9 s"
+	@echo "  concat-sum-probe  does a CONCATENATING clause's count fit the"
+	@echo "                  witness its caps receipt reports?  NO: the tail's"
+	@echo "                  receipt is read AT the reported level and spends"
+	@echo "                  the whole budget, so any head at all overshoots,"
+	@echo "                  however many folds sit between.  ONE more fold"
+	@echo "                  clears it unconditionally (2 * suc w ≤ S ^ suc w"
+	@echo "                  for S ≥ 2), so the three concat clauses report"
+	@echo "                  suc (j₁ + j₂) — a WITNESS move, not a conjunct"
+	@echo "                  (see agda/probe/Concat-Sum-Probe.agda).  ~8 s"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -487,6 +496,19 @@ share-count-probe:
 # capsAt) and one fold, since `cWid (frameStep 1 c) = S ^ suc W ≥ S`.
 count-level-probe:
 	cd agda && agda -i src -i probe probe/Count-Level-Probe.agda
+
+# DOES A CONCATENATING CLAUSE'S COUNT FIT THE WITNESS ITS CAPS RECEIPT
+# REPORTS?  NO.  thruWalk's cons, concatDrain's drain-on branch and
+# innerFinish's concat clause all output `head ++ tail` at the witness
+# `j₁ + j₂`, and the TAIL's receipt is read at that same reported level —
+# so the tail alone spends `suc (cWid …)` and any nonempty head overshoots,
+# however many folds j₂ contains.  ONE more fold clears it unconditionally:
+# `suc w ≤ 2 ^ w` gives `2 * suc w ≤ S ^ suc w = foldStep S w` for S ≥ 2.
+# So the repair is a WITNESS MOVE — `suc (j₁ + j₂)`, both sub-receipts read
+# at `(j + j₁) + j₂` and widened — which touches clause bodies only, since
+# the Σ is existential and the caps conjuncts are upward closed in the level.
+concat-sum-probe:
+	cd agda && agda -i src -i probe probe/Concat-Sum-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
