@@ -6557,23 +6557,21 @@ stepFrame-face-zero c j u sl fin sched st inv =
             (sym (+-identityʳ j)) refl
 
 postulate
-  -- THE from-inner EDGE.  Every clause of innerReact / innerFinish but
-  -- ONE hands `vals` straight back at j′ = 0 — merge decrements a
-  -- counter, switch clears a slot, exhaust clears a flag, and the
-  -- absorb path and every catch-all return the payload untouched — so
-  -- both new conjuncts are immediate there.  The exception is
-  -- concatAll's DRAIN: `innerFinish` returns `vals ++ concatDrain …`,
-  -- and concatDrain subscribes each parked inner and CONCATENATES the
-  -- bursts, so its output width is a sum over the queue of one
-  -- subscribeE burst's value count.  That count is what no caps-side
-  -- companion reports: `burstCaps?` bounds every EVENT in a burst and
-  -- says nothing about how many there are.  So this postulate is
-  -- really `concatDrain-face` wearing the enumeration of the other
-  -- twenty-odd clauses, and splitting it further is the next leg
-  innerReact-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick)
-    (vals : List (Val Γ s)) (fin : Bool)
+  -- THE ONE from-inner CLAUSE THAT IS NOT j′ = 0.  Every other clause
+  -- of innerReact / innerFinish hands `vals` straight back — merge
+  -- decrements a counter, switch clears a slot, exhaust clears a flag,
+  -- the absorb path and every catch-all return the payload untouched —
+  -- and all of those are ground below.  concatAll's is the exception:
+  -- `innerFinish` returns `vals ++ concatDrain …`, and concatDrain
+  -- subscribes each parked inner and CONCATENATES the bursts, so its
+  -- output width is a sum over the queue of one subscribeE burst's
+  -- value count.  That count is what no caps-side companion reports:
+  -- `burstCaps?` bounds every EVENT in a burst and says nothing about
+  -- how many there are.  The receipt (a) rides on the same missing
+  -- number, since the drain pays one subscribe per queued inner
+  innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (j : ℕ) (g : Gas) (allNid inst : NodeId)
+    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
     (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
@@ -6583,7 +6581,8 @@ postulate
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
-    FrameFace c j sl (innerReact g op allNid inst κ id now vals sched st fin)
+    FrameFace c j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
+                        (lookupNode allNid (EvalSt.nodes st)))
 
   -- THE thru-outer EDGE, and the harder half of the same gap.
   -- `thruWrap` reshapes no values, so this is `thruWalk`: one
@@ -6614,6 +6613,129 @@ postulate
     valsCaps? (frameStep j c) sl vals ≡ true →
     FrameFace c j sl
       (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
+
+-- innerFinish's clauses that hand the payload straight back — merge's
+-- counter, switch's cleared slot, exhaust's cleared flag, the absorb
+-- path, and every op/node pair the evaluator's catch-all covers.  None
+-- of them touches a value, so j′ = 0 and both conjuncts are the
+-- hypotheses with `j + 0` massaged to `j`
+innerFinish-face-keep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (j : ℕ) (sl : Slots Γ) (vals : List (Val Γ s)) (b : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? (frameStep j c) sched st ≡ true →
+  valsCaps? (frameStep j c) sl vals ≡ true →
+  FrameFace {t = t} c j sl (vals , [] , b , sched , st)
+innerFinish-face-keep c j sl vals b sched st inv vC =
+  0 , z≤n
+    , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
+            (sym (+-identityʳ j)) inv
+    , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
+            (sym (+-identityʳ j)) vC
+
+-- the *All FINISH, face side.  Three of the four ops are the keep
+-- above under one node write; concatAll's is the drain, and that is
+-- the postulate
+innerFinish-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  valsCaps? (frameStep j c) sl vals ≡ true →
+  FrameFace c j sl (innerFinish g op allNid inst κ id now vals sched st
+                      (lookupNode allNid (EvalSt.nodes st)))
+
+-- MERGE: decrement the active-inner counter, which carries no payload
+innerFinish-face c j g mergeᵒ allNid inst κ id now vals sl sched st
+                 2≤S 1≤R slEq slC inv pC lC vC
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (merge-st k od) =
+  innerFinish-face-keep c j sl vals (od ∧ (pred k ≡ᵇ 0)) sched
+    (record st { nodes = setNode allNid (merge-st (pred k) od) (EvalSt.nodes st) })
+    (capsOK?-setNode (frameStep j c) allNid (merge-st (pred k) od)
+       sched st refl refl inv)
+    vC
+... | nothing                = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (scan-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (take-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (concat-st _ _ _) = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (switch-st _ _)   = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (exhaust-st _ _)  = innerFinish-face-keep c j sl vals false sched st inv vC
+
+-- CONCAT: the queue drain, and the one clause of the whole *All face
+-- that appends a burst it did not already have
+innerFinish-face c j g concatᵒ allNid inst κ id now vals sl sched st
+                 2≤S 1≤R slEq slC inv pC lC vC =
+  innerFinish-concat-face c j g allNid inst κ id now vals sl sched st
+    2≤S 1≤R slEq slC inv pC lC vC
+
+-- SWITCH: clear the current-inner slot if this was it
+innerFinish-face c j g switchᵒ allNid inst κ id now vals sl sched st
+                 2≤S 1≤R slEq slC inv pC lC vC
+  with lookupNode allNid (EvalSt.nodes st)
+... | nothing                = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (scan-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (take-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (merge-st _ _)    = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (concat-st _ _ _) = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (exhaust-st _ _)  = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (switch-st nothing od) = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (switch-st (just cur) od) with cur ≡ᵇ inst
+...   | false = innerFinish-face-keep c j sl vals false sched st inv vC
+...   | true  =
+  innerFinish-face-keep c j sl vals od sched
+    (record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
+    (capsOK?-setNode (frameStep j c) allNid (switch-st nothing od)
+       sched st refl refl inv)
+    vC
+
+-- EXHAUST: clear the busy flag
+innerFinish-face c j g exhaustᵒ allNid inst κ id now vals sl sched st
+                 2≤S 1≤R slEq slC inv pC lC vC
+  with lookupNode allNid (EvalSt.nodes st)
+... | nothing                = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (scan-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (take-st _)       = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (merge-st _ _)    = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (concat-st _ _ _) = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (switch-st _ _)   = innerFinish-face-keep c j sl vals false sched st inv vC
+... | just (exhaust-st act od) =
+  innerFinish-face-keep c j sl vals od sched
+    (record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) })
+    (capsOK?-setNode (frameStep j c) allNid (exhaust-st false od)
+       sched st refl refl inv)
+    vC
+
+-- and the from-inner FRAME: a fin that nothing absorbs finishes the
+-- inner, everything else forwards the payload untouched
+innerReact-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  valsCaps? (frameStep j c) sl vals ≡ true →
+  FrameFace c j sl (innerReact g op allNid inst κ id now vals sched st fin)
+innerReact-face c j g op allNid inst κ id now vals false sl sched st
+                2≤S 1≤R slEq slC inv pC lC vC =
+  innerFinish-face-keep c j sl vals false sched st inv vC
+innerReact-face c j g op allNid inst κ id now vals true sl sched st
+                2≤S 1≤R slEq slC inv pC lC vC
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  = innerFinish-face-keep c j sl vals false sched st inv vC
+... | false = innerFinish-face c j g op allNid inst κ id now vals sl sched st
+                2≤S 1≤R slEq slC inv pC lC vC
 
 -- SCAN, its own top-level piece as in the companion: the nested `with`
 -- on the stored accumulator's type cannot be elaborated inside a
