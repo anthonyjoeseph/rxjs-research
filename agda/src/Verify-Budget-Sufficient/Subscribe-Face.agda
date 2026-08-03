@@ -282,6 +282,64 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
+------------------------------------------------------------------
+-- (b) THE COUNT FACE — the assembly, stated before its pieces.
+--
+-- Sub-Charge-Probe § 5's two composition steps are counted in units the
+-- caps tree does not report.  `op-step`'s pushBurst premise iterates
+-- fIterD over `suc (widAt S W A)` FRAMES and pushBurst-caps spends one
+-- per emit of the burst it is pushing; `frame-step`'s walk premise
+-- iterates sIterD over `suc (widAt S W j)` PAYLOADS and pushBurst-caps
+-- hands stepFrame-caps one payload per `value` event inside the emit.
+-- Both indices are cardinalities of ONE object — the burst subscribeE
+-- hands back — so both are this one statement.
+--
+-- WHY IT IS A SIBLING OF subscribeE-caps AND NOT A THIRD CONJUNCT OF ITS
+-- Σ.  The count is wanted at the level the subscribe LEFT, `j + j′`, and
+-- a conjunct there would have to share subscribeE-caps's existential and
+-- so would drag all thirteen clique signatures.  It does not have to:
+-- `Caps.cWid (frameStep j c)` is `widAt (Caps.cSize c) (Caps.cWid c) j`
+-- by refl and widAt is monotone in j (widAt-mono, .Caps), so the bound
+-- at the ENTRY level is the stronger statement and implies the exit one
+-- for free.  The count face is therefore its own clause induction over
+-- exactly the same thirteen shapes, provable independently.
+--
+-- WHAT ITS DISCHARGE WILL LOOK LIKE, read off the ground bodies rather
+-- than guessed (2026-08-03):
+--
+--   · THE EMIT COUNT IS PRESERVED, not grown.  `pushBurst` is
+--     emit-for-emit — `pushBurst … (em ∷ ems)` conses exactly one
+--     envelope onto the recursive result, at `InstEmit.instant em from
+--     InstEmit.source em as InstEmit.kind em` — so every operator clause
+--     inherits its source's count unchanged.  Only the leaves mint
+--     emits, and `ofᵉ ts` mints ONE.
+--   · THE PAYLOAD COUNT IS stepFrame's OUTPUT LENGTH.  A pushed emit's
+--     values are `map value vals′` for `vals′` the frame's output, so
+--     the count descends to one question per Frame constructor: `map-f`
+--     is `map (applyFn fn) vals` (length preserved), `scan-f` is
+--     `scanVals` (one out per in, or `[]` at a node-type mismatch),
+--     `take-f` is takeDispatch (a prefix), and the two *All frames —
+--     `from-inner` (innerReact) and `thru-outer` (thruWrap ∘ thruWalk) —
+--     are the two that are NOT structural and are where the real work is.
+--
+-- POSTULATED HERE so the (a) receipt pass has the count to consume; the
+-- clause induction is the leg after it
+postulate
+  subscribeE-count : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    burstCount? (frameStep j c) (proj₁ (subscribeE g b κ bid now sched st))
+      ≡ true
+
 subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))

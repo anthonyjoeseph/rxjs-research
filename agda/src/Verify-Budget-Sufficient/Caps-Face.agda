@@ -661,6 +661,48 @@ eventCaps? c sl complete    = true
 burstCaps? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Stream Γ u → Bool
 burstCaps? c sl = all (λ em → all (eventCaps? c sl) (InstEmit.events em))
 
+-- (b) THE BURST'S CARDINALITY — how many emits, and how many payloads
+-- inside each — and it is a SECOND predicate rather than two more
+-- conjuncts of burstCaps?, because the two sides of the machine want
+-- different things from a burst.
+--
+-- THE DELIVERY SIDE CONCATENATES and so cannot carry a count at all:
+-- shareGo-caps runs burstCaps?-++ over one registration's output and the
+-- rest of the ring, and no cardinality survives `++` — `length xs ≤ n`
+-- and `length ys ≤ n` say nothing whatever about `length (xs ++ ys)`.
+-- Putting the count inside burstCaps? would therefore break the share
+-- leaves, and it would be breaking them for nothing: nothing on the
+-- delivery side iterates per emit.
+--
+-- THE SUBSCRIBE SIDE NEVER CONCATENATES — pushBurst maps a burst
+-- emit-for-emit — so it can carry a count, and it MUST, because both of
+-- Sub-Charge-Probe § 5's iteration counts are cardinalities of exactly
+-- this burst.  `op-step`'s pushBurst premise iterates fIterD over
+-- `suc (widAt S W A)` frames and pushBurst-caps spends one frame per
+-- EMIT; `frame-step`'s walk premise iterates sIterD over
+-- `suc (widAt S W j)` payloads and pushBurst-caps hands stepFrame-caps
+-- one payload per `value` event INSIDE the emit.  Those are the two
+-- counts (b1) and (b2), and this is the one predicate that states both.
+--
+-- IT IS STATED AT THE PRE-LEVEL, which is what makes it a lemma parallel
+-- to subscribeE-caps rather than a third conjunct of its Σ.  The count
+-- is wanted at `suc (widAt S W A)` for A the level the subscribe LEFT,
+-- and `Caps.cWid (frameStep j c)` is `widAt (Caps.cSize c) (Caps.cWid c) j`
+-- by refl, so a bound at the entry level implies the one at the exit
+-- level by widAt-mono alone.  No existential has to be shared.
+valCountᵉ : ∀ {A : Set} → List (InstEvent A) → ℕ
+valCountᵉ []              = 0
+valCountᵉ (value _   ∷ es) = suc (valCountᵉ es)
+valCountᵉ (init _    ∷ es) = valCountᵉ es
+valCountᵉ (close _ _ ∷ es) = valCountᵉ es
+valCountᵉ (handoff _ ∷ es) = valCountᵉ es
+valCountᵉ (complete  ∷ es) = valCountᵉ es
+
+burstCount? : ∀ {n} {Γ : Ctx n} {u} → Caps → Stream Γ u → Bool
+burstCount? c str =
+  (length str ≤ᵇ suc (Caps.cWid c))
+  ∧ all (λ em → valCountᵉ (InstEmit.events em) ≤ᵇ suc (Caps.cWid c)) str
+
 -- observables in a concat queue: the caps side of concatDrain's
 -- `all (λ o → sizeᵉ o ≤ᵇ …)` pair
 obsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → Closed Γ s → Bool
@@ -4472,6 +4514,36 @@ splitEvents-vals-caps c sl (handoff _ ∷ es) h =
   splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
 splitEvents-vals-caps c sl (complete  ∷ es) h =
   splitEvents-vals-caps c sl es (proj₂ (∧-true _ _ h))
+
+-- (b2) THE PAYLOAD COUNT, and the enumeration that makes it free.
+-- `splitEvents` is a partition and nothing else: `value v ∷ es` conses v
+-- onto the payloads, init / close / handoff cons themselves onto the
+-- bookkeeping, `complete` sets the flag, and NO clause grows either
+-- list.  So the payload list's length is `valCountᵉ` on the nose — the
+-- count is a property of the EMIT, not of the split, and the split can
+-- only be told it.
+splitEvents-len : ∀ {n} {Γ : Ctx n} {u : Ty} {A : Set}
+  (es : List (InstEvent (Val Γ u))) →
+  length (proj₁ (splitEvents {A = A} es)) ≡ valCountᵉ es
+splitEvents-len []              = refl
+splitEvents-len {A = A} (value _   ∷ es) = cong suc (splitEvents-len {A = A} es)
+splitEvents-len {A = A} (init _    ∷ es) = splitEvents-len {A = A} es
+splitEvents-len {A = A} (close _ _ ∷ es) = splitEvents-len {A = A} es
+splitEvents-len {A = A} (handoff _ ∷ es) = splitEvents-len {A = A} es
+splitEvents-len {A = A} (complete  ∷ es) = splitEvents-len {A = A} es
+
+-- and the (b2) STATEMENT: the same split, landing in valsCaps? — the
+-- LENGTH conjunct alongside the caps — under the emit's own count.  This
+-- is the form stepFrame-caps's payload premise wants; it asks for
+-- `all (valCaps? …)` today, which is exactly the cardinality-free half
+splitEvents-valsCaps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (eventCaps? c sl) es ≡ true →
+  valCountᵉ es ≤ suc (Caps.cWid c) →
+  valsCaps? c sl (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+splitEvents-valsCaps {Γ = Γ} {s = s} {u = u} c sl es h hc =
+  ∧-intro (splitEvents-vals-caps {u = u} c sl es h)
+          (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (≤-reflexive (splitEvents-len {A = Val Γ u} es)) hc)))
 
 splitEvents-bk-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
   (es : List (InstEvent (Val Γ s))) →
