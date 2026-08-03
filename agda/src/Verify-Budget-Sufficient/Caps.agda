@@ -23,7 +23,7 @@
 -- Nothing in here mentions the evaluator's dynamics: capsAt is a
 -- recurrence on the syntax and the slot telescope alone, which is what
 -- makes it entry-computable.  The ROUND-5 GATE lives here too — frameStep
--- and frameBlowup take a Caps and nothing else, so they cannot read the
+-- and frameBlowup take a Caps and a depth fuel, so they cannot read the
 -- ledger, and round3b-ledger-reset-absurd stays unavailable.
 module Verify-Budget-Sufficient.Caps where
 
@@ -68,7 +68,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring public
 -- replaces it is NOT a bigger closed formula — it is a recurrence:
 --
 --     Caps 0        = the entry measure (program + slot telescope)
---     Caps (suc id) = frameBlowup (Caps id)
+--     Caps (suc id) = frameBlowup (Caps id) (capsH id)
 --
 -- with frameBlowup the worst one instant's cascades can do to a state
 -- already inside a given cap.  deepScan itself says what that has to
@@ -88,7 +88,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring public
 -- exactly where the top-level per-instant induction hands over anyway.
 -- That is why the face below has TWO halves and only one of them moves.
 --
--- THE ROUND-5 GATE IS THE TYPE.  `frameBlowup : Caps → Caps` cannot read
+-- THE ROUND-5 GATE IS THE TYPE.  `frameBlowup : Caps → ℕ → Caps` cannot read
 -- the ledger, the receipt, or E, because they are not arguments.  If any
 -- within-frame quantity turns out to be boundable ONLY by the ledger,
 -- round3b-ledger-reset-absurd fires again and that is a stop-and-report,
@@ -283,7 +283,7 @@ frameStep j c =
 --
 -- ABSTRACT, and it is a NORMALISATION contract rather than an
 -- abstraction one.  `iterSize` and `iterFold` pattern-match on the
--- COUNT, so `capsAt`'s own cSize is `iterSize S (sizeCount c) S` — and
+-- COUNT, so `capsAt`'s own cSize is `iterSize S (sizeCount c d) S` — and
 -- whether that reduces is decided by whether sizeCount does.  The
 -- 2-tower it replaces never did (`2 ^ (2 ^ suc X)` is stuck at a
 -- variable X), but the walk peels a suc off its GAS and re-enters at a

@@ -94,8 +94,8 @@
 --
 -- cascadeGo-charge IS GONE, and by a restatement rather than a grind:
 -- the count `frameBlowup` spends is now the level the walk LANDS at,
--- `sizeCount c = lvls (cSize c) (cWid c) 0 (cDel c)` (.Caps), so the
--- charge conjunct is `cascadeGo-level` composed with
+-- `sizeCount c d = lvls (cSize c) (cWid c) d 0 (cDel c d)` (.Caps), so
+-- the charge conjunct is `cascadeGo-level` composed with
 -- `cascadeGo-deliveries` and one `lvls-mono`.  The product it replaces
 -- charged a whole cascade's frames at the level the CASCADE entered at,
 -- which is the entry-charging error `Entry-Caps-Refuted` machine-refutes
@@ -331,7 +331,7 @@
 -- and iterSize outruns the clause, but the receipt is NOT one fold per
 -- frame, and that lands on the per-frame receipt `fCharge` the level
 -- walk reads.  Flagged, not patched: the count is a walk now, so a
--- bigger per-frame receipt is a change to `fLvl` and nothing else.
+-- bigger per-frame receipt is a change to `fLvlD` and nothing else.
 --
 -- The whole tree is STATED BEFORE ANY CLAUSE IS GROUND, which is the
 -- outside-in rule applied at this joint: a change to the shape then
@@ -351,8 +351,9 @@
 -- entry state.  Every closed form after those died too, for a reason
 -- that is arithmetic rather than route-finding (the self-reference at
 -- cascadeGo-deliveries), so the count is not a formula at all now: it is
--- `lvls (cSize c) (cWid c) 0 (cDel c)`, the level one instant's
--- deliveries CLIMB to, each charged where the one before it left.
+-- `lvls (cSize c) (cWid c) d 0 (cDel c d)`, the level one instant's
+-- deliveries CLIMB to, each charged where the one before it left, under
+-- the depth fuel d the budget recurrence hands it (`capsH`, .Caps).
 -- cascadeGo-caps itself is no longer postulated — it is the landing
 -- level (cascadeGo-level) with the delivery count widened to its own
 -- recursion (cascadeGo-deliveries) — and all those refutations landed on

@@ -3741,12 +3741,12 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- counts, since every delivering clause of `cascadeGo` and `shareGo`
 -- conses one `rid` onto `delivered`.  Then
 --
---   (i)  cascadeGo-level       j ≤ lvls cSize cWid 0 D
---   (ii) cascadeGo-deliveries  D ≤ cDel c, the delivery RECURSION
+--   (i)  cascadeGo-level       j ≤ lvls cSize cWid d 0 D
+--   (ii) cascadeGo-deliveries  D ≤ cDel c d, the delivery RECURSION
 --
 -- and `cascadeGo-caps` below is (i) with (ii) widened into it by one
--- `lvls-mono` — the count `sizeCount` spends IS `lvls cSize cWid 0
--- (cDel c)`, so no arithmetic joins them.  (i) is the per-delivery
+-- `lvls-mono` — the count `sizeCount` spends IS `lvls cSize cWid d 0
+-- (cDel c d)`, so no arithmetic joins them.  (i) is the per-delivery
 -- charge as the walk actually proves it: every fold is a frame on some
 -- delivery's chain, a chain is shorter than cSize by pathSz?'s own
 -- length conjunct, and each frame is charged at the level the one
@@ -6680,92 +6680,67 @@ stepFrame-face-zero c j u sl fin sched st inv =
 -- them — the μ clause's `j₀ = m + suc (m * m)` is a per-operator cost
 -- like any other.
 --
--- THE REPLACEMENT IS LANDED (2026-08-03).  The nesting-indexed
--- hierarchy — `fLvlK` / `sIterK` / `sLvlK` / `opIterK` / `fIterK`, with
--- `fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J` — now sits beside
--- `fLvl` in Rx.Evaluator, `abstract` for the normalisation reason
--- written there, and `iterL` spends `fLvl′` per frame where it spent
--- `fLvl`.  The budget's INSTANTIATION is the design ruling of the same
--- date: `suc (sizeAt S J)` READ AT EACH DELIVERY'S OWN LEVEL, on three
--- facts — within one delivery the recursion descends the pushed VALUE
--- structurally, a delivery's arriving value has nesting ≤ size ≤
--- `sizeAt S J` by valCaps? at that level, and values grown by folds
--- are delivered LATER at a higher J.
+-- THE REPLACEMENT IS LANDED (2026-08-03), AND SO IS THE RE-RULING ON
+-- TOP OF IT.  The per-frame level in Rx.Evaluator is now the REFRESHED
+-- hierarchy — `fLvlD` / `sIterD` / `sLvlD` / `opIterD` / `fIterD`, with
+-- `k := suc (sizeAt S J)` re-read AT EVERY FRAME ENTRY rather than
+-- inherited down the subscribe tree — and `iterL` spends `fLvlD S W d`
+-- per frame where it spent `fLvl`.  The inherited family it replaces is
+-- gone.  Reading the budget once, where a subscribe BEGAN, is refuted
+-- (agda/probe/Nest-Budget-Probe.agda § 3: a `scanᵉ` under an *All mints
+-- a payload per fold, the k-th mint nests k deep, the carrier's own
+-- nesting stands still — 2 against 43690 at S = 2, W = 1, J = 0).  The
+-- refresh's soundness is a theorem (Refresh-Probe § 1: `stepFrame`
+-- reaches `subscribeInner` from two clauses only, and both suppliers are
+-- bounded at the frame's own entry); its cost is the DEPTH FUEL `d`,
+-- which descends where `k` used to.
 --
--- Nothing above the frame had to move: `fLvl ≤ fLvl′` pointwise
--- (.Caps), and `iterL`, `dLvl`, `lvls`, `sizeCount` and the count gate
--- are built from the per-frame monotonicity and nothing else.
+-- Nothing above the frame had to move: `fLvl ≤ fLvlD` pointwise at every
+-- fuel (.Caps), and `iterL`, `dLvl`, `lvls`, `sizeCount` and the count
+-- gate are built from the per-frame monotonicity and nothing else.
+--
+-- AND THE FUEL IS RULED: it is the budget recurrence's OWN STORY INDEX,
+-- threaded explicitly.  `blowH m` hands the pooled count its own m
+-- (`poolCount (towerℕ m) m`) and `capsAt` runs instant id's blowup at
+-- `capsH e sl id`, so `blowup-tower` compares the two counts at one
+-- fuel and the budgetAt ↔ poolCount cycle (Refresh-Probe § 8) is broken
+-- by the index rather than by an estimate.  What licenses reading a
+-- fuel off the evaluator at all is the gas discipline written out at the
+-- family in Rx.Evaluator: a subscribe with no gas installs nothing, the
+-- three edges that reach a deeper subscribe each peel one `gs`, and
+-- every other route keeps the gas fixed because it stays at ONE nesting
+-- level.  What the placement still owes — the story index dominating the
+-- depth an instant reaches, where the gas bound sits one blowH story
+-- above it — is recorded there as owed.
 --
 -- WHAT IS LEFT IS THE PASS THAT SURFACES THE RECEIPTS INTO THE
--- SIGNATURES: `subscribeE-caps`'s Σ gains `j + j′ ≤ sLvlK S W k j`
+-- SIGNATURES: `subscribeE-caps`'s Σ gains `j + j′ ≤ sLvlD S W d k j`
 -- under a nesting hypothesis on `b`, and the six companions it calls
 -- gain the matching conjunct.  The arithmetic each clause SHAPE needs
 -- is proven ahead of the grind (agda/probe/Sub-Charge-Probe.agda § 5:
--- `walk-step`, `op-step`, `op-step-eval`, `op-step-mu`), against the
--- receipts as abstract numbers under exactly the bound the ground
--- clauses hand back — which is also what fixed the shape, since the
--- first draft of the hierarchy admitted none of the four (it ran the
--- frames before the rest of the operator chain, it charged a payload's
--- subscribe at J rather than at `suc J`, and its eval receipt was
--- linear where `unfoldμ-caps` pays `m + suc (m * m)`).  The one
--- non-arithmetic piece the pass still owes is `nestᵛ ≤ sizeᵛ`, a
--- structural lemma beside the other value measures.
+-- `walk-step`, `op-step`, `op-step-eval`, `op-step-mu`, unchanged in
+-- content under the fuel; plus Refresh-Probe § 7's `frame-step`, which
+-- IS the refresh — a frame's payload walk stops taking its nesting
+-- hypothesis from the subscribe that installed it and reads its own),
+-- against the receipts as abstract numbers under exactly the bound the
+-- ground clauses hand back.  That gate is also what fixed the shape,
+-- since the first draft of the hierarchy admitted none of the four (it
+-- ran the frames before the rest of the operator chain, it charged a
+-- payload's subscribe at J rather than at `suc J`, and its eval receipt
+-- was linear where `unfoldμ-caps` pays `m + suc (m * m)`).  The one
+-- non-arithmetic piece the pass still owes is `nestᵛ ≤ sizeᵛ`, proven in
+-- Nest-Budget-Probe beside the other value measures.
 --
--- AND THAT PASS IS BLOCKED ON THE BUDGET, not on the receipts
--- (2026-08-03, agda/probe/Nest-Budget-Probe.agda).  `nestᵛ ≤ sizeᵛ` is
--- proven there, and so is the (b) conjunct's arithmetic — `n² ≤ 2ⁿ + 1`,
--- tight at n = 3, hence `suc w * suc w ≤ suc (foldStep S w)` for the
--- appended bursts.  What the probe refutes is the DESCENT the nesting
--- hypothesis was ruled on: a `scanᵉ` under an *All mints a payload per
--- fold, the k-th mint nests k deep, and the carrier's own nesting stands
--- still — so the payload subscribed one level in is not inside the
--- pushed value.  A frame's OWN payloads are still paid for (they are its
--- input values, bounded at its entry level, and `iterL` re-reads the
--- budget per frame); one nesting level in, `k` is fixed at the size cap
--- where that subscribe began while the values are bounded only at the
--- levels it climbed to — 2 against 43690 at S = 2, W = 1, J = 0.
---
--- So this block's plan stands as written EXCEPT for the hypothesis
--- `subscribeE-caps` would carry, and the family's shape is the design
--- session's to re-rule.  Do not grind the pass onto `suc (sizeAt S J)`
---
--- AND THE RE-RULING IS PROBED, AND CLOSES HALF (2026-08-03,
--- agda/probe/Refresh-Probe.agda).  The design session ruled a PER-FRAME
--- BUDGET REFRESH: `k` is not inherited down the subscribe tree, every
--- FRAME ENTRY re-reads `suc (sizeAt S J)` at its own level.
---
--- THE SOUNDNESS HALF IS A THEOREM rather than a table, and it is the
--- half this block waits on.  `stepFrame` reaches `subscribeInner` from
--- exactly two clauses — `thru-outer`, whose payloads are its OWN
--- arriving `vals` one for one, and a concat frame draining a queue
--- filled at an EARLIER arrival, hence at a level the walk has climbed
--- past.  `valsCaps?` at the frame's entry bounds the first, `sizeAt-mono`
--- carries the second there, and `nestᵛ ≤ sizeᵛ` turns both into the
--- nesting hypothesis.  No row can breach it.
---
--- THE TERMINATION HALF FAILS, and Agda rejects the ruled family
--- verbatim.  `k` was the ONE descending argument — every cycle passes
--- `sLvlK`, whose clause is `suc k ↦ k` — and a refresh at a level the
--- walk has climbed to returns it LARGER, so the descent is reversed
--- rather than weakened; the iteration counts do not replace it, being
--- re-read at the climbed level too.  The probe carries the shape that
--- does close: the refresh with an explicit DEPTH FUEL the frame entry
--- spends, proven inflationary, monotone in all five arguments, above
--- `fLvl`, and above the landed family at every budget it could read.
--- All four composition-gate steps go through against it unchanged, and
--- a fifth appears — `frame-step`, which IS the refresh: a frame's
--- payload walk stops taking a nesting hypothesis from the subscribe
--- that installed it, and reads its own.
---
--- WHAT IS STILL UNRULED IS ONE NUMBER, the fuel's instantiation.  Read
--- off (S, W, J) at the delivery's entry it falls to the same mint one
--- stratum up (a mint at a climbed frame contributes ITS nesting to the
--- remaining depth); the evaluator's own `Gas` is the one supplier owing
--- no new invariant — `subscribeInner g0` returns a dry burst — but
--- `budgetAt`'s tower height runs through `poolCount`, hence `lvls`,
--- hence the very level the fuel would feed.  The probe's § 8 states that
--- cycle exactly.  The shape is neutral between the ways out, so nothing
--- here is foreclosed by waiting
+-- THE COMPANION SIDE'S OWN FUEL is the gas it is handed: subscribe depth
+-- ≤ gas height, by induction on the evaluator's recursion, which is the
+-- same bridge the level side reads.  And the two faces below are the
+-- first consumers that pass will pay for — `Walk-Hyps.sf-step` already
+-- reports the level a frame LEAVES (`J + j′ ≤ fLvlD S W d J`) rather
+-- than the receipt alone, so what these two owe is a receipt inside ONE
+-- refreshed frame level rather than inside `fCharge`.  `FrameFace` is
+-- still stated at `fCharge` — every ground clause below pays it and
+-- `walkH` lifts it by `fLvl≤fLvlD` — so relaxing it to the landing form
+-- is a one-file change these two are waiting on, not a new design
 ------------------------------------------------------------------
 
 postulate

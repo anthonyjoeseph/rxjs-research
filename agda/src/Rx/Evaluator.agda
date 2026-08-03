@@ -415,7 +415,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- WIDTH — and the count that fits every measured row reads cWid.  It is
 -- now the WALK'S OWN LANDING LEVEL rather than a product of it:
 --
---     sizeCount c = lvls (cSize c) (cWid c) 0 (cDel c)
+--     sizeCount c d = lvls (cSize c) (cWid c) d 0 (cDel c d)
 --
 -- i.e. the level one instant's deliveries climb to, each delivery
 -- charged at the level the one before it LEFT.  The product it replaces
@@ -435,9 +435,9 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 --
 -- THE PER-INSTANT COST, at a pooled level M (every Caps field ≤ M):
 --
---   THE COUNT     sizeCount ≤ poolCount M           (by monotonicity —
---                 poolCount IS sizeCount with every field pooled, so
---                 this costs no arithmetic at all)
+--   THE COUNT     sizeCount c m ≤ poolCount M m     (by monotonicity —
+--                 poolCount IS sizeCount with every field pooled and
+--                 the SAME fuel, so this costs no arithmetic at all)
 --   THE SIZE      a factor (3T) per fold, sizeCount folds
 --                                                  TWO stories
 --   THE REGISTRY  linear in the count               ONE more
