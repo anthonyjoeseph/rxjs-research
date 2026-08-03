@@ -133,6 +133,13 @@ and the top-line results fully stated and typechecking _in terms of postulates_.
 start chipping the postulates away, one at a time, until everything is defined and there are
 no gaps.
 
+**A Σ-receipt has content only through its witness.** If every conjunct of a Σ-statement is
+upward-closed in the witness (each survives enlarging it), the statement is vacuously
+satisfiable and proves nothing — check this BEFORE grinding clauses. Pin the witness to the
+one the consumers actually bound (share the Σ with the statement whose witness is spent), or
+put the bound itself in as a conjunct. (Learned 2026-08-03: the exit-level count face was
+machine-refuted as vacuous — `count-vacuous` in `agda/probe/Count-Level-Probe.agda`.)
+
 **This rule applies recursively, and violating it inside a subproblem is an anti-pattern:
 never prove pieces before their assembly exists.** For any lemma cluster, first state the
 assembly — the statement that *consumes* the pieces — with the pieces as postulates, and
