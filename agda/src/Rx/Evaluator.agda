@@ -592,9 +592,149 @@ fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))
 fLvl : ℕ → ℕ → ℕ → ℕ
 fLvl S W J = J + fCharge S W J
 
+------------------------------------------------------------------
+-- AND ONE FRAME COSTS MORE THAN ITS OWN RECEIPT, BECAUSE IT
+-- SUBSCRIBES.  `fCharge` is what `scanFrame-caps` pays for the folds a
+-- frame runs; it is NOT what a frame COSTS.  A `thru-outer` frame
+-- subscribes one inner per payload, and that subscribe walks the
+-- inner's operator chain installing frames of its own — so
+--
+--     one FRAME     ⟶ ≤ suc (widAt S W J) subscribes  (valsCaps?'s
+--                                                      length conjunct)
+--     one SUBSCRIBE ⟶ ≤ suc (sizeAt S J) operators, each ⟶
+--                     ≤ suc (widAt S W J) frames      (pushBurst, one
+--                                                      frame per emit)
+--
+-- and the two charges are MUTUALLY RECURSIVE (measured, clause by
+-- clause, off the ground companion tree —
+-- agda/probe/Sub-Charge-Probe.agda § 0).  NO CLOSED FORM IN (S, W, J)
+-- CLOSES THAT LOOP; it is the same failure `dCapᶜ` takes one stratum up
+-- ("EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT", below), and it
+-- takes the same repair: a RECURSION on a budget, with every level
+-- quantity read at the level the walk has CLIMBED TO rather than at the
+-- entry (charging at the entry is machine-refuted,
+-- agda/probe/Entry-Caps-Refuted.agda).
+--
+-- THE BUDGET IS THE SUBSCRIBE-NESTING DEPTH `k`, and the loop is not
+-- gas-escaping.  The obvious breach is a synchronous fixpoint
+-- `μ x. mergeAll (of x)`, which would re-enter `subscribeE` once per
+-- unfolding and be bounded by the GAS alone — and `budgetAt` is a tower
+-- three stories above `capsAt`, so no reading of the Caps triple could
+-- pay for it.  It is a TYPE ERROR: `μᵉ` binds into Δᵍ, `varᵉ` reads Δ,
+-- and `deferᵉ` is the sole gate moving Δᵍ into scope (Rx.Exp), so a μ's
+-- self-reference is reachable only across a TICK.  One subscribe
+-- unfolds a μ at most as many times as the syntax nests them.
+--
+-- THE BUDGET IS READ AT EACH DELIVERY'S OWN LEVEL — `fLvl′ S W J`
+-- instantiates k at `suc (sizeAt S J)`, the size cap at the level the
+-- frame runs at, and NOT at the cascade's entry.  Three facts license
+-- it: (i) WITHIN one delivery the recursion descends the VALUE
+-- structurally — each `thru` layer subscribes payload observables
+-- sitting strictly deeper in the pushed value, so the k threaded
+-- downward strictly decreases, which is exactly how `sLvlK` recurses;
+-- (ii) the k instantiated at a delivery's top is the ARRIVING VALUE's
+-- nesting, and nesting ≤ size ≤ `sizeAt S J` by `valCaps?` read at that
+-- delivery's own level J; (iii) values grown by folds are delivered
+-- LATER, at a higher J where `sizeAt S J` has already climbed — so
+-- per-level reads suffice and no global claim is made.
+--
+-- ABSTRACT, and for the same PERFORMANCE reason `blowH` and `sizeCount`
+-- are.  Every one of these clauses matches on an argument that is a
+-- literal `suc` even at a variable J (`suc (widAt S W J)`,
+-- `suc (sizeAt S J)`), so with the bodies visible one whnf unfolds the
+-- whole family one turn of the loop and mentions its arguments many
+-- times over.  Opaque, a frame's level is one symbol everywhere above
+-- it, and the `-body` equations hand the clauses back where the
+-- arithmetic needs them (.Caps)
+------------------------------------------------------------------
+
+abstract
+  -- ONE FRAME that ran at J: its own receipt, then one inner subscribe
+  -- per payload — at most `suc (widAt S W J)` of them
+  fLvlK : ℕ → ℕ → ℕ → ℕ → ℕ           -- S W k J
+  -- m subscribes in sequence, each at the level the one before it LEFT
+  sIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ      -- S W k m J
+  -- ONE SUBSCRIBE at J: it walks the target's operator chain, and the
+  -- chain is no longer than the size cap (`sizeᵉ b ≤ cSize`, the
+  -- telescope's own hypothesis)
+  sLvlK : ℕ → ℕ → ℕ → ℕ → ℕ           -- S W k J
+  -- ONE OPERATOR of that chain: one j for the frame the chain gains
+  -- (frameStep-chain-suc), one EVAL receipt (`ofᵉ`'s literal list,
+  -- `scanᵉ`'s seed, `μᵉ`'s unfolding — all under `suc (sizeAt S J)` by
+  -- their own clauses), and then `pushBurst`, one frame per emit
+  opIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ     -- S W k m J
+  fIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ      -- S W k m J
+
+  fLvlK S W k J = sIterK S W k (suc (widAt S W J)) (fLvl S W J)
+
+  sIterK S W k zero    J = J
+  sIterK S W k (suc m) J = sIterK S W k m (sLvlK S W k J)
+
+  sLvlK S W zero    J = J
+  sLvlK S W (suc k) J = opIterK S W k (suc (sizeAt S J)) J
+
+  opIterK S W k zero    J = J
+  opIterK S W k (suc m) J =
+    opIterK S W k m
+      (fIterK S W k (suc (widAt S W J)) (suc (J + suc (sizeAt S J))))
+
+  fIterK S W k zero    J = J
+  fIterK S W k (suc m) J = fIterK S W k m (fLvlK S W k J)
+
+  -- the per-frame level the walk reads, with the budget instantiated at
+  -- the size cap READ AT THE FRAME'S OWN LEVEL (the ruling above)
+  fLvl′ : ℕ → ℕ → ℕ → ℕ
+  fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J
+
+  -- the clauses, handed back one at a time for .Caps's arithmetic
+  fLvlK-body : ∀ (S W k J : ℕ) →
+    fLvlK S W k J ≡ sIterK S W k (suc (widAt S W J)) (fLvl S W J)
+  fLvlK-body _ _ _ _ = refl
+
+  sIterK-0 : ∀ (S W k J : ℕ) → sIterK S W k 0 J ≡ J
+  sIterK-0 _ _ _ _ = refl
+
+  sIterK-suc : ∀ (S W k m J : ℕ) →
+    sIterK S W k (suc m) J ≡ sIterK S W k m (sLvlK S W k J)
+  sIterK-suc _ _ _ _ _ = refl
+
+  sLvlK-0 : ∀ (S W J : ℕ) → sLvlK S W 0 J ≡ J
+  sLvlK-0 _ _ _ = refl
+
+  sLvlK-suc : ∀ (S W k J : ℕ) →
+    sLvlK S W (suc k) J ≡ opIterK S W k (suc (sizeAt S J)) J
+  sLvlK-suc _ _ _ _ = refl
+
+  opIterK-0 : ∀ (S W k J : ℕ) → opIterK S W k 0 J ≡ J
+  opIterK-0 _ _ _ _ = refl
+
+  opIterK-suc : ∀ (S W k m J : ℕ) →
+    opIterK S W k (suc m) J
+      ≡ opIterK S W k m
+          (fIterK S W k (suc (widAt S W J)) (suc (J + suc (sizeAt S J))))
+  opIterK-suc _ _ _ _ _ = refl
+
+  fIterK-0 : ∀ (S W k J : ℕ) → fIterK S W k 0 J ≡ J
+  fIterK-0 _ _ _ _ = refl
+
+  fIterK-suc : ∀ (S W k m J : ℕ) →
+    fIterK S W k (suc m) J ≡ fIterK S W k m (fLvlK S W k J)
+  fIterK-suc _ _ _ _ _ = refl
+
+  fLvl′-body : ∀ (S W J : ℕ) → fLvl′ S W J ≡ fLvlK S W (suc (sizeAt S J)) J
+  fLvl′-body _ _ _ = refl
+
+-- A CHAIN IS FRAMES, each running at the level the one before it LEFT,
+-- and each costing `fLvl′` — its own receipt PLUS the subscribes it
+-- runs.  It was `fLvl` (the receipt alone) until the subscribe charge
+-- was priced; `fLvl ≤ fLvl′` pointwise (.Caps), so every consumer above
+-- this — `dLvl`, `lvls`, `sizeCount`, the pooled count and the gate
+-- against the product it replaces — moves up with it by the
+-- monotonicity lemmas already proven, with no arithmetic re-derived and
+-- no measured row re-run
 iterL : ℕ → ℕ → ℕ → ℕ → ℕ
 iterL S W zero    J = J
-iterL S W (suc k) J = iterL S W k (fLvl S W J)
+iterL S W (suc k) J = iterL S W k (fLvl′ S W J)
 
 dLvl : ℕ → ℕ → ℕ → ℕ
 dLvl S W J = iterL S W (suc (sizeAt S J)) J

@@ -354,10 +354,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     sd₁ = proj₁ (proj₂ (proj₂ (proj₂ r)))
     fp  = foldPath sf gas id now envSrc path′ (proj₁ r)
             (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
-    -- the tail runs at `J + j′`, and one frame of budget covers it
+    -- the tail runs at `J + j′`, and one frame of budget covers it —
+    -- the receipt lands inside `fLvl`, and `fLvl ≤ fLvl′` is what one
+    -- step of `iterL` now spends (.Caps, the nesting-budgeted level)
     step : iterL S W (pathLen path′) (J + j′) ≤ iterL S W (suc (pathLen path′)) J
     step = iterL-mono (pathLen path′) (pathLen path′) 2≤S ≤-refl ≤-refl
-             (+-monoʳ-≤ J (proj₁ (proj₂ SF))) ≤-refl
+             (≤-trans (+-monoʳ-≤ J (proj₁ (proj₂ SF))) (fLvl≤fLvl′ S W J)) ≤-refl
     IH = foldPath-go (J + j′) sf gas id now envSrc path′ (proj₁ r)
            (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
            ( proj₁ (proj₂ (proj₂ SF))

@@ -51,7 +51,11 @@ open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase;
                                 foldStep; iterFold; sizeStep; iterSize;
                                 sizeAt; widAt; regAt; fCharge; fLvl; iterL;
                                 dLvl; lvls; dCapᶜ; dWalkᶜ;
-                                poolBody; poolCount; blowH-body)
+                                poolBody; poolCount; blowH-body;
+                                fLvlK; sIterK; sLvlK; opIterK; fIterK; fLvl′;
+                                fLvlK-body; sIterK-0; sIterK-suc;
+                                sLvlK-0; sLvlK-suc; opIterK-0; opIterK-suc;
+                                fIterK-0; fIterK-suc; fLvl′-body)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
@@ -581,9 +585,170 @@ fLvl-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′
   fLvl S W J ≤ fLvl S′ W′ J′
 fLvl-mono 2≤S hS hW hJ = +-mono-≤ hJ (fCharge-mono 2≤S hS hW hJ)
 
+------------------------------------------------------------------
+-- THE NESTING-BUDGETED FRAME LEVEL, and everything the walk needs of
+-- it.  The family itself is in Rx.Evaluator (opaque, for the
+-- normalisation reason written there); this reads its clauses back
+-- through the `-body` equations and proves the three properties every
+-- consumer above `fLvl′` is built out of.
+--
+-- EVERY TRANSFORMER IS INFLATIONARY, which is the whole content of the
+-- gate below: a level never goes down, so the old per-frame receipt
+-- survives inside the new one as its own first step.
+------------------------------------------------------------------
+
+fLvlK-infl  : ∀ (S W k J : ℕ) → J ≤ fLvlK S W k J
+sIterK-infl : ∀ (S W k m J : ℕ) → J ≤ sIterK S W k m J
+sLvlK-infl  : ∀ (S W k J : ℕ) → J ≤ sLvlK S W k J
+opIterK-infl : ∀ (S W k m J : ℕ) → J ≤ opIterK S W k m J
+fIterK-infl : ∀ (S W k m J : ℕ) → J ≤ fIterK S W k m J
+
+fLvlK-infl S W k J =
+  ≤-trans (≤-trans (m≤m+n J (fCharge S W J))
+                   (sIterK-infl S W k (suc (widAt S W J)) (fLvl S W J)))
+          (≤-reflexive (sym (fLvlK-body S W k J)))
+
+sIterK-infl S W k zero    J = ≤-reflexive (sym (sIterK-0 S W k J))
+sIterK-infl S W k (suc m) J =
+  ≤-trans (≤-trans (sLvlK-infl S W k J)
+                   (sIterK-infl S W k m (sLvlK S W k J)))
+          (≤-reflexive (sym (sIterK-suc S W k m J)))
+
+sLvlK-infl S W zero    J = ≤-reflexive (sym (sLvlK-0 S W J))
+sLvlK-infl S W (suc k) J =
+  ≤-trans (opIterK-infl S W k (suc (sizeAt S J)) J)
+          (≤-reflexive (sym (sLvlK-suc S W k J)))
+
+opIterK-infl S W k zero    J = ≤-reflexive (sym (opIterK-0 S W k J))
+opIterK-infl S W k (suc m) J =
+  ≤-trans (≤-trans (≤-trans (≤-trans (n≤1+n J) (s≤s (m≤m+n J (suc (sizeAt S J)))))
+                            (fIterK-infl S W k (suc (widAt S W J))
+                                         (suc (J + suc (sizeAt S J)))))
+                   (opIterK-infl S W k m
+                      (fIterK S W k (suc (widAt S W J))
+                              (suc (J + suc (sizeAt S J))))))
+          (≤-reflexive (sym (opIterK-suc S W k m J)))
+
+fIterK-infl S W k zero    J = ≤-reflexive (sym (fIterK-0 S W k J))
+fIterK-infl S W k (suc m) J =
+  ≤-trans (≤-trans (fLvlK-infl S W k J)
+                   (fIterK-infl S W k m (fLvlK S W k J)))
+          (≤-reflexive (sym (fIterK-suc S W k m J)))
+
+------------------------------------------------------------------
+-- AND MONOTONE IN EVERY ARGUMENT, THE NESTING BUDGET INCLUDED.  This
+-- is what makes the rewiring `fLvl := fLvl′` cheap: `iterL-mono`,
+-- `dLvl-mono` and `lvls-mono` are built from the per-frame
+-- monotonicity and nothing else, so the whole ladder above the frame
+-- moves up with this one lemma and no re-derivation.
+------------------------------------------------------------------
+
+fLvlK-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  k ≤ k′ → fLvlK S W k J ≤ fLvlK S′ W′ k′ J′
+sIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
+  sIterK S W k m J ≤ sIterK S′ W′ k′ m′ J′
+sLvlK-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  k ≤ k′ → sLvlK S W k J ≤ sLvlK S′ W′ k′ J′
+opIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
+  opIterK S W k m J ≤ opIterK S′ W′ k′ m′ J′
+fIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
+  fIterK S W k m J ≤ fIterK S′ W′ k′ m′ J′
+
+fLvlK-mono {S} {S′} {W} {W′} {J} {J′} k k′ 2≤S hS hW hJ hk =
+  ≤-trans (≤-trans (≤-reflexive (fLvlK-body S W k J))
+                   (sIterK-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) k k′
+                      2≤S hS hW (fLvl-mono 2≤S hS hW hJ) hk
+                      (s≤s (widAt-mono 2≤S hS hW hJ))))
+          (≤-reflexive (sym (fLvlK-body S′ W′ k′ J′)))
+
+sIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
+  ≤-trans (≤-trans (≤-reflexive (sIterK-0 S W k J)) hJ)
+          (sIterK-infl S′ W′ k′ m′ J′)
+sIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
+sIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
+            2≤S hS hW hJ hk (s≤s hm) =
+  ≤-trans (≤-trans (≤-reflexive (sIterK-suc S W k m J))
+                   (sIterK-mono m m′ k k′ 2≤S hS hW
+                      (sLvlK-mono k k′ 2≤S hS hW hJ hk) hk hm))
+          (≤-reflexive (sym (sIterK-suc S′ W′ k′ m′ J′)))
+
+sLvlK-mono {S} {S′} {W} {W′} {J} {J′} zero k′ 2≤S hS hW hJ hk =
+  ≤-trans (≤-trans (≤-reflexive (sLvlK-0 S W J)) hJ) (sLvlK-infl S′ W′ k′ J′)
+sLvlK-mono (suc k) zero    2≤S hS hW hJ ()
+sLvlK-mono {S} {S′} {W} {W′} {J} {J′} (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
+  ≤-trans (≤-trans (≤-reflexive (sLvlK-suc S W k J))
+                   (opIterK-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) k k′
+                      2≤S hS hW hJ hk
+                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
+          (≤-reflexive (sym (sLvlK-suc S′ W′ k′ J′)))
+
+opIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
+  ≤-trans (≤-trans (≤-reflexive (opIterK-0 S W k J)) hJ)
+          (opIterK-infl S′ W′ k′ m′ J′)
+opIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
+opIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
+             2≤S hS hW hJ hk (s≤s hm) =
+  ≤-trans (≤-trans (≤-reflexive (opIterK-suc S W k m J))
+                   (opIterK-mono m m′ k k′ 2≤S hS hW
+                      (fIterK-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) k k′
+                         2≤S hS hW
+                         (s≤s (+-mono-≤ hJ
+                                 (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
+                         hk (s≤s (widAt-mono 2≤S hS hW hJ)))
+                      hk hm))
+          (≤-reflexive (sym (opIterK-suc S′ W′ k′ m′ J′)))
+
+fIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
+  ≤-trans (≤-trans (≤-reflexive (fIterK-0 S W k J)) hJ)
+          (fIterK-infl S′ W′ k′ m′ J′)
+fIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
+fIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
+            2≤S hS hW hJ hk (s≤s hm) =
+  ≤-trans (≤-trans (≤-reflexive (fIterK-suc S W k m J))
+                   (fIterK-mono m m′ k k′ 2≤S hS hW
+                      (fLvlK-mono k k′ 2≤S hS hW hJ hk) hk hm))
+          (≤-reflexive (sym (fIterK-suc S′ W′ k′ m′ J′)))
+
+-- the budget's own instantiation, `suc (sizeAt S J)` read at the
+-- frame's own level (the ruling in Rx.Evaluator), and it is monotone
+-- because `sizeAt` is
+fLvl′-infl : ∀ (S W J : ℕ) → J ≤ fLvl′ S W J
+fLvl′-infl S W J =
+  ≤-trans (fLvlK-infl S W (suc (sizeAt S J)) J)
+          (≤-reflexive (sym (fLvl′-body S W J)))
+
+fLvl′-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  fLvl′ S W J ≤ fLvl′ S′ W′ J′
+fLvl′-mono {S} {S′} {W} {W′} {J} {J′} 2≤S hS hW hJ =
+  ≤-trans (≤-trans (≤-reflexive (fLvl′-body S W J))
+                   (fLvlK-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′))
+                      2≤S hS hW hJ
+                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
+          (≤-reflexive (sym (fLvl′-body S′ W′ J′)))
+
+-- THE GATE: the new per-frame level DOMINATES the old receipt
+-- pointwise, at every nesting budget — the old receipt is literally the
+-- seed of the new iteration, so this needs no arithmetic at all.  It is
+-- what keeps every consumer above the frame (`iterL`, `dLvl`, `lvls`,
+-- `sizeCount`, the pooled count, and the gate against the product the
+-- count replaced) true with no row re-measured
+fLvl≤fLvlK : ∀ (S W k J : ℕ) → fLvl S W J ≤ fLvlK S W k J
+fLvl≤fLvlK S W k J =
+  ≤-trans (sIterK-infl S W k (suc (widAt S W J)) (fLvl S W J))
+          (≤-reflexive (sym (fLvlK-body S W k J)))
+
+fLvl≤fLvl′ : ∀ (S W J : ℕ) → fLvl S W J ≤ fLvl′ S W J
+fLvl≤fLvl′ S W J =
+  ≤-trans (fLvl≤fLvlK S W (suc (sizeAt S J)) J)
+          (≤-reflexive (sym (fLvl′-body S W J)))
+
 iterL-infl : ∀ (S W k J : ℕ) → J ≤ iterL S W k J
 iterL-infl S W zero    J = ≤-refl
-iterL-infl S W (suc k) J = ≤-trans (m≤m+n J _) (iterL-infl S W k (fLvl S W J))
+iterL-infl S W (suc k) J =
+  ≤-trans (fLvl′-infl S W J) (iterL-infl S W k (fLvl′ S W J))
 
 iterL-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
   k ≤ k′ → iterL S W k J ≤ iterL S′ W′ k′ J′
@@ -591,7 +756,7 @@ iterL-mono {S′ = S′} {W′ = W′} {J′ = J′} zero k′ 2≤S hS hW hJ hk
   ≤-trans hJ (iterL-infl S′ W′ k′ J′)
 iterL-mono (suc k) zero     2≤S hS hW hJ ()
 iterL-mono (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
-  iterL-mono k k′ 2≤S hS hW (fLvl-mono 2≤S hS hW hJ) hk
+  iterL-mono k k′ 2≤S hS hW (fLvl′-mono 2≤S hS hW hJ) hk
 
 dLvl-infl : ∀ (S W J : ℕ) → J ≤ dLvl S W J
 dLvl-infl S W J = iterL-infl S W (suc (sizeAt S J)) J
@@ -621,9 +786,11 @@ lvls-mono (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
 -- a product with a visible factor to read it off of
 2≤dLvl : ∀ (S W J : ℕ) → 2 ≤ dLvl S W J
 2≤dLvl S W J =
-  ≤-trans (≤-trans (s≤s (≤-trans (s≤s z≤n) (m≤m*n (suc (widAt S W J)) (suc (sizeAt S J)))))
-                   (m≤n+m (fCharge S W J) J))
-          (iterL-infl S W (sizeAt S J) (fLvl S W J))
+  ≤-trans (≤-trans (≤-trans (s≤s (≤-trans (s≤s z≤n)
+                                          (m≤m*n (suc (widAt S W J)) (suc (sizeAt S J)))))
+                            (m≤n+m (fCharge S W J) J))
+                   (fLvl≤fLvl′ S W J))
+          (iterL-infl S W (sizeAt S J) (fLvl′ S W J))
 
 dCapᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ : ℕ) →
   2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ →
