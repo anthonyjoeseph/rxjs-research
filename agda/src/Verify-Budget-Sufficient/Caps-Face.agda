@@ -150,7 +150,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 cascade; drain; evaluate;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize; fCharge; regAt;
-                                sizeStep; iterSize; foldStep; iterFold)
+                                sizeStep; iterSize; foldStep; iterFold;
+                                fLvl; iterL; dLvl; lvls)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -4454,6 +4455,67 @@ cascadeGo-deliveries {n = n} {e = e} c a id chains sl sched st 2≤S 1≤R slC s
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
   module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) 2≤S
                   (walkH c sl 2≤S 1≤R slC)
+
+------------------------------------------------------------------
+-- THE CHARGE, IN THE CURRENCY THE WALK ACTUALLY PROVES — the assembly
+-- half of cascadeGo-charge, stated and GROUND, with the arithmetic
+-- that would close it left named rather than assumed.
+--
+-- `cascadeGo-charge` bounds one cascade's j by
+-- `D * cSize * suc (suc cWid * suc cSize)`, and the right-hand factor
+-- is `fCharge S W 0` — ONE FRAME'S RECEIPT READ AT LEVEL 0.  The walk
+-- proves something of a different shape, and it is not a weaker
+-- version of the same thing: `Res.hi` says the level a cascade lands
+-- at is at most `lvls S W 0 D`, which ITERATES `dLvl` once per
+-- delivery, and `dLvl` in turn iterates `fLvl` once per frame.  A
+-- product charges every delivery's frames at the level the CASCADE
+-- entered at; the iteration charges each at the level the one before
+-- it LEFT.  That is the same distinction entry-charging was refuted on
+-- one stratum down (agda/probe/Entry-Caps-Refuted.agda: a frame's own
+-- output breaches the cap it was charged at), which is why the walk was
+-- rebuilt around levels in the first place.
+--
+-- SO THIS IS NOT A CLAIM THAT cascadeGo-charge IS FALSE.  Its form fits
+-- all 21 Instant-Height rows at worst ratio 0.16 and no row breaches
+-- it; what is established here is only that the machinery now proves
+-- the ITERATED bound and not the product one, so the product one has no
+-- route through this walk.  Closing the gap is a DESIGN ruling, not a
+-- grind: `sizeCount` (.Caps) — the only consumer, through
+-- `frameBlowup c = frameStep (sizeCount c) c` — would be restated as
+-- `lvls (cSize c) (cWid c) 0 (cDel c)`, at which point cascadeGo-charge
+-- is this lemma composed with cascadeGo-deliveries and stops being a
+-- postulate.  The price is that `poolBody` / `poolCount` / `blowH`
+-- move with it, and .Wet's caps-fuel-root normalises those — the
+-- module that already ran past an hour once, which is why `blowH` is
+-- abstract.  Flagged, costed, not done here
+------------------------------------------------------------------
+
+cascadeGo-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (a : Arrival Γ) (id : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  Sched.slots sched ≡ sl →
+  capsOK? c sched st ≡ true →
+  valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+  let r = cascadeGo a id chains sched st
+  in Σ ℕ λ j →
+     (j ≤ lvls (Caps.cSize c) (Caps.cWid c) 0
+             (delivN st (proj₂ (proj₂ r))))
+     × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+cascadeGo-level {e = e} c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS =
+  W.Res.lvl GO , W.Res.hi GO , proj₂ (proj₁ (W.Res.good GO))
+  where
+  invʲ : capsOK? (frameStep 0 c) sched st ≡ true
+  invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
+  module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) 2≤S
+                  (walkH c sl 2≤S 1≤R slC)
+  GO = W.cascadeGo-go 0 a id chains sched st
+         ((slEq , invʲ) , capsOK?-regs c sched st inv)
+         pS (∧-intro (∧-intro vC refl) refl)
 
 ------------------------------------------------------------------
 -- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the
