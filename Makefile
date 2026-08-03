@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -85,6 +85,18 @@ help:
 	@echo "                  shape, which is what fixed the shape (the first draft"
 	@echo "                  admitted none of the four)"
 	@echo "                  (see agda/probe/Sub-Charge-Probe.agda).  Seconds"
+	@echo "  nest-budget-probe  may the SUBSCRIBE-NESTING budget k be read off"
+	@echo "                  the SIZE CAP?  NO.  Carries the lemma the signature"
+	@echo "                  pass owes (nest <= size, proven, on values and both"
+	@echo "                  syntactic halves) and the (b)-conjunct arithmetic the"
+	@echo "                  two *All faces wait on (n^2 <= 2^n + 1, tight at 3)."
+	@echo "                  Then refutes the descent the budget was ruled on: a"
+	@echo "                  scan under an *All MINTS a payload per fold and the"
+	@echo "                  k-th mint nests k deep, from syntax whose own nesting"
+	@echo "                  stands still at 2 — so the budget is charged at the"
+	@echo "                  frame's ENTRY level while its payloads are bounded at"
+	@echo "                  the level it CLIMBED TO (3 against 43690)"
+	@echo "                  (see agda/probe/Nest-Budget-Probe.agda).  Seconds"
 	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
 	@echo "                  burst it is handed?  the per-FRAME maxima the two"
 	@echo "                  entry axioms bound.  Mints are 1 on every row of the"
@@ -288,6 +300,20 @@ level-walk-probe:
 # src/Main.agda never reaches it.  Seconds.
 sub-charge-probe:
 	cd agda && agda -i src -i probe probe/Sub-Charge-Probe.agda
+
+# May the SUBSCRIBE-NESTING budget `k` be read off the SIZE CAP, as the
+# standing ruling instantiates it (fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J)?
+# NO.  The probe carries the one non-arithmetic lemma the signature pass owes —
+# nestᵛ ≤ sizeᵛ, proven, beside the other value measures — and the (b)-conjunct
+# arithmetic the two *All faces wait on, and then refutes the DESCENT the budget
+# was ruled on: a `scanᵉ` under an *All mints a payload per fold, the k-th mint
+# nests k deep (real `applyFn`, refl-checked), and the carrier's own nesting
+# stands still at 2.  So the budget is charged at the frame's ENTRY level while
+# the values its payload subscribes are handed are bounded only at the level the
+# frame has CLIMBED TO — the Entry-Caps-Refuted distinction, one stratum in.
+# Standalone, so src/Main.agda never reaches it.  Seconds
+nest-budget-probe:
+	cd agda && agda -i src -i probe probe/Nest-Budget-Probe.agda
 
 # The gate on the two frame-local axioms cascadeGo-deliveries WAS proven
 # from.  Mint-Loop-Frames reports mints and frames per CASCADE; these are
