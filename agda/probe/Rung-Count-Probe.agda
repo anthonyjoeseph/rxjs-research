@@ -61,12 +61,11 @@
 --   `suc (j₁ + j₂)`.  The missing unit is NOT free — `weak-walk-step-absurd`
 --   refutes the naive form at k = 0, where `sIterD S W d 0 m J = J + m`
 --   exactly (`sIterD-k0`).  What buys it is +1-SUPERADDITIVITY of the
---   whole family, `suc (f J) ≤ f (suc J)`, proven below for all five
---   transformers (`fLvlD-sadd`, `sIterD-sadd`, `sLvlD-sadd`,
---   `opIterD-sadd`, `fIterD-sadd`) by the same recursion and argument
---   order as .Caps's `-mono` block.  `walk-step-suc` is then the
---   concat-clause form of `walk-step`, and `walk-step-lift` says the
---   head premise may be stated at `j` or at `suc j` interchangeably.
+--   whole family, `suc (f J) ≤ f (suc J)`, which is .Caps-Sadd:
+--   `walk-step-suc` there is the concat-clause form of `walk-step`, and
+--   `walk-step-lift` says the head premise may be stated at `j` or at
+--   `suc j` interchangeably.  What stays HERE is the refutation that
+--   makes them necessary.
 --
 -- § 4  subscribeInner's THREE RUNGS are not a separate problem.  The
 --   clause reports `suc (suc (suc j₂))` and `walk-step`'s head premise
@@ -83,8 +82,8 @@ module Rung-Count-Probe where
 open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; _<_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ; +-comm;
-         +-mono-≤; +-monoʳ-≤; *-mono-≤; n≤1+n; m≤m+n; ≤ᵇ⇒≤)
+  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-identityʳ; +-comm;
+         n≤1+n; m≤m+n; ≤ᵇ⇒≤)
 open import Data.List using (List; []; _∷_; _++_; all; length)
 open import Data.List.Properties using (length-++)
 open import Data.Empty using (⊥)
@@ -95,20 +94,14 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Frame-Width using (pWᵉ)
 open import Rx.Evaluator
-  using (Slots; NodeState; concat-st;
-         sizeAt; widAt; fCharge; fLvl;
-         fLvlD; sIterD; sLvlD; opIterD; fIterD;
-         fLvlD-0; fLvlD-suc; sIterD-0; sIterD-suc; sLvlD-0; sLvlD-suc;
-         opIterD-0; opIterD-suc; fIterD-0; fIterD-suc)
+  using (Slots; concat-st; widAt; sIterD; sLvlD;
+         sIterD-0; sIterD-suc; sLvlD-0)
 
 open import Verify-Budget-Sufficient.Measures
   using (∧-true; ∧-intro; all-impl; ≤ᵇ-widen; T-to)
 open import Verify-Well-Formed using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; caps; frameStep; frameStep-wid-suc;
-         sizeAt-mono; widAt-mono; fCharge-mono;
-         sLvlD-infl;
-         sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
+  using (Caps; frameStep; frameStep-wid-suc; widAt-mono; sLvlD-infl)
 open import Verify-Budget-Sufficient.Caps-Face
   using (widNode; obsCaps?; valsCaps?; suc≤foldStep)
 open import Verify-Budget-Sufficient.Subscribe-Face using (valsLen)
@@ -185,95 +178,9 @@ no-node-bound {n = n} W sl o act od ho B =
 -- which is what makes the termination check go through unchanged
 ------------------------------------------------------------------
 
--- the seed: the per-frame charge is strictly monotone in the level
-fLvl-sadd : ∀ (S W J : ℕ) → 2 ≤ S → suc (fLvl S W J) ≤ fLvl S W (suc J)
-fLvl-sadd S W J 2≤S =
-  +-monoʳ-≤ (suc J) (fCharge-mono 2≤S ≤-refl ≤-refl (n≤1+n J))
-
-fLvlD-sadd  : ∀ {S W J : ℕ} (d : ℕ) → 2 ≤ S →
-  suc (fLvlD S W d J) ≤ fLvlD S W d (suc J)
-sIterD-sadd : ∀ {S W J : ℕ} (m d k : ℕ) → 2 ≤ S →
-  suc (sIterD S W d k m J) ≤ sIterD S W d k m (suc J)
-sLvlD-sadd  : ∀ {S W J : ℕ} (d k : ℕ) → 2 ≤ S →
-  suc (sLvlD S W d k J) ≤ sLvlD S W d k (suc J)
-opIterD-sadd : ∀ {S W J : ℕ} (m d k : ℕ) → 2 ≤ S →
-  suc (opIterD S W d k m J) ≤ opIterD S W d k m (suc J)
-fIterD-sadd : ∀ {S W J : ℕ} (m d k : ℕ) → 2 ≤ S →
-  suc (fIterD S W d k m J) ≤ fIterD S W d k m (suc J)
-
-fLvlD-sadd {S} {W} {J} zero 2≤S =
-  ≤-trans (≤-trans (≤-reflexive (cong suc (fLvlD-0 S W J)))
-                   (+-mono-≤ (fLvl-sadd S W J 2≤S)
-                             (s≤s (widAt-mono 2≤S ≤-refl ≤-refl (n≤1+n J)))))
-          (≤-reflexive (sym (fLvlD-0 S W (suc J))))
-fLvlD-sadd {S} {W} {J} (suc d) 2≤S =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (cong suc (fLvlD-suc S W d J)))
-                            (sIterD-sadd {S} {W} {fLvl S W J}
-                               (suc (widAt S W J)) d (suc (sizeAt S J)) 2≤S))
-                   (sIterD-mono (suc (widAt S W J)) (suc (widAt S W (suc J))) d d
-                      (suc (sizeAt S J)) (suc (sizeAt S (suc J))) 2≤S ≤-refl ≤-refl
-                      (fLvl-sadd S W J 2≤S) ≤-refl
-                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl (n≤1+n J)))
-                      (s≤s (widAt-mono 2≤S ≤-refl ≤-refl (n≤1+n J)))))
-          (≤-reflexive (sym (fLvlD-suc S W d (suc J))))
-
-sIterD-sadd {S} {W} {J} zero d k 2≤S =
-  ≤-reflexive (trans (cong suc (sIterD-0 S W d k J))
-                     (sym (sIterD-0 S W d k (suc J))))
-sIterD-sadd {S} {W} {J} (suc m) d k 2≤S =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (cong suc (sIterD-suc S W d k m J)))
-                            (sIterD-sadd {S} {W} {sLvlD S W d k (suc J)} m d k 2≤S))
-                   (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl
-                      (sLvlD-sadd {S} {W} {suc J} d k 2≤S) ≤-refl ≤-refl ≤-refl))
-          (≤-reflexive (sym (sIterD-suc S W d k m (suc J))))
-
-sLvlD-sadd {S} {W} {J} d zero 2≤S =
-  ≤-reflexive (trans (cong suc (sLvlD-0 S W d J))
-                     (sym (sLvlD-0 S W d (suc J))))
-sLvlD-sadd {S} {W} {J} d (suc k) 2≤S =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (cong suc (sLvlD-suc S W d k J)))
-                            (opIterD-sadd {S} {W} {J} (suc (sizeAt S J)) d k 2≤S))
-                   (opIterD-mono (suc (sizeAt S J)) (suc (sizeAt S (suc J))) d d k k
-                      2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
-                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl (n≤1+n J)))))
-          (≤-reflexive (sym (sLvlD-suc S W d k (suc J))))
-
-opIterD-sadd {S} {W} {J} zero d k 2≤S =
-  ≤-reflexive (trans (cong suc (opIterD-0 S W d k J))
-                     (sym (opIterD-0 S W d k (suc J))))
-opIterD-sadd {S} {W} {J} (suc m) d k 2≤S =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (cong suc (opIterD-suc S W d k m J)))
-                            (fIterD-sadd {S} {W} {X} (suc (widAt S W X)) d k 2≤S))
-                   (fIterD-mono (suc (widAt S W X)) (suc (widAt S W X′)) d d k k
-                      2≤S ≤-refl ≤-refl X≤ ≤-refl ≤-refl
-                      (s≤s (widAt-mono 2≤S ≤-refl ≤-refl
-                              (≤-trans (n≤1+n X) X≤)))))
-          (≤-reflexive (sym (opIterD-suc S W d k m (suc J))))
-  where
-  J₀  = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
-  J₀′ = suc (suc J + suc (sizeAt S (suc J)) * suc (sizeAt S (suc J)))
-  X   = opIterD S W d k m (sLvlD S W d k J₀)
-  X′  = opIterD S W d k m (sLvlD S W d k J₀′)
-  sz≤ : sizeAt S J ≤ sizeAt S (suc J)
-  sz≤ = sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl (n≤1+n J)
-  J₀≤ : suc J₀ ≤ J₀′
-  J₀≤ = s≤s (s≤s (+-monoʳ-≤ J (*-mono-≤ (s≤s sz≤) (s≤s sz≤))))
-  X≤ : suc X ≤ X′
-  X≤ = ≤-trans (opIterD-sadd {S} {W} {sLvlD S W d k J₀} m d k 2≤S)
-               (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl
-                  (≤-trans (sLvlD-sadd {S} {W} {J₀} d k 2≤S)
-                           (sLvlD-mono d d k k 2≤S ≤-refl ≤-refl J₀≤ ≤-refl ≤-refl))
-                  ≤-refl ≤-refl ≤-refl)
-
-fIterD-sadd {S} {W} {J} zero d k 2≤S =
-  ≤-reflexive (trans (cong suc (fIterD-0 S W d k J))
-                     (sym (fIterD-0 S W d k (suc J))))
-fIterD-sadd {S} {W} {J} (suc m) d k 2≤S =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (cong suc (fIterD-suc S W d k m J)))
-                            (fIterD-sadd {S} {W} {fLvlD S W d J} m d k 2≤S))
-                   (fIterD-mono m m d d k k 2≤S ≤-refl ≤-refl
-                      (fLvlD-sadd {S} {W} {J} d 2≤S) ≤-refl ≤-refl ≤-refl))
-          (≤-reflexive (sym (fIterD-suc S W d k m (suc J))))
+-- All five are proven in .Caps-Sadd, which this probe imports: the
+-- statement is arithmetic about the transformer family, consumed as a
+-- finished fact, so it is a compilation unit of its own.
 
 ------------------------------------------------------------------
 -- AND THE UNIT IS NOT FREE.  At k = 0 the subscribe budget is empty and
@@ -312,23 +219,7 @@ weak-walk-step-absurd H = bad (H 2 0 0 0 0 0 1 0 (s≤s (s≤s z≤n)) p₁ p₂
 -- at the walk's OWN level j gives — one application of `sLvlD-sadd`
 ------------------------------------------------------------------
 
-walk-step-lift : ∀ (S W d k j j₁ : ℕ) → 2 ≤ S →
-  j + j₁ ≤ sLvlD S W d k j → suc (j + j₁) ≤ sLvlD S W d k (suc j)
-walk-step-lift S W d k j j₁ 2≤S h =
-  ≤-trans (s≤s h) (sLvlD-sadd {S} {W} {j} d k 2≤S)
-
-walk-step-suc : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
-  suc (j + j₁) ≤ sLvlD S W d k (suc j) →
-  (j + j₁) + j₂ ≤ sIterD S W d k m (j + j₁) →
-  j + suc (j₁ + j₂) ≤ sIterD S W d k (suc m) j
-walk-step-suc S W d k m j j₁ j₂ 2≤S hd tl =
-  ≤-trans (≤-trans (≤-trans (≤-trans (≤-reflexive lvlW) (s≤s tl))
-                            (sIterD-sadd {S} {W} {j + j₁} m d k 2≤S))
-                   (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl))
-          (≤-reflexive (sym (sIterD-suc S W d k m j)))
-  where
-  lvlW : j + suc (j₁ + j₂) ≡ suc ((j + j₁) + j₂)
-  lvlW = trans (+-suc j (j₁ + j₂)) (cong suc (sym (+-assoc j j₁ j₂)))
+-- `walk-step-lift` and `walk-step-suc` are in .Caps-Sadd § 2.
 
 ------------------------------------------------------------------
 -- § 4.  subscribeInner's THREE RUNGS, and the SQUARE.  The witness the

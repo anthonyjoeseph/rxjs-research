@@ -421,6 +421,12 @@
 --   .Keeps-Ring  the shared structural prerequisite: stepping the
 --                evaluator keeps the slot telescope and the connected
 --                shares (KeepsC), plus the share-boundary facts
+--   .Caps-Sadd   +1-superadditivity of the budget family,
+--                `suc (f J) ≤ f (suc J)` for all five transformers, and
+--                the walk step it buys.  Consumes .Caps's `-mono` block
+--                as finished facts and is mutual with nothing, so it is
+--                its own unit: the clique imports it to pay for the fold
+--                each concatenating clause charges per cons
 --   .Caps-Face   round 4's per-instant cap recurrence: the in-flight
 --                predicates, the frame face, the cascade companions,
 --                caps-tick, reach-resets
@@ -566,6 +572,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
 open import Verify-Budget-Sufficient.Measures   public
 open import Verify-Budget-Sufficient.Keeps-Ring public
 open import Verify-Budget-Sufficient.Caps       public
+open import Verify-Budget-Sufficient.Caps-Sadd  public
 open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Subscribe-Face public
 open import Verify-Budget-Sufficient.Wet        public
