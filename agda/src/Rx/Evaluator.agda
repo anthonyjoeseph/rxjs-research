@@ -412,9 +412,18 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- the whole recurrence by that closed form.  Charge-Probe and
 -- Instant-Height then priced the frame receipt the induction actually
 -- builds — `suc (length vals · suc (sizeᵗ fn))` per frame, a PAYLOAD
--- WIDTH — and the count that fits every measured row reads cWid:
+-- WIDTH — and the count that fits every measured row reads cWid.  It is
+-- now the WALK'S OWN LANDING LEVEL rather than a product of it:
 --
---     sizeCount c = D̂ c · cSize c · suc (suc (cWid c) · suc (cSize c))
+--     sizeCount c = lvls (cSize c) (cWid c) 0 (cDel c)
+--
+-- i.e. the level one instant's deliveries climb to, each delivery
+-- charged at the level the one before it LEFT.  The product it replaces
+-- (`cDel c · cSize c · suc (suc cWid · suc cSize)`, a whole cascade
+-- charged at its ENTRY level) is DOMINATED by it — `lvls-lin` at J = 0,
+-- Level-Walk-Probe's `count-gate` — so nothing the old count covered is
+-- lost, and the iterated form is what `cascadeGo-level` actually proves,
+-- which is what makes the per-instant charge a theorem.
 --
 -- A count reading cWid iterates the tower FUNCTION once per instant
 -- (Width-Count-Probe), so no towerℕ-of-linear-height bracket exists and
@@ -617,10 +626,12 @@ dWalkᶜ S W R g J (suc i) =
 -- increment was.  Written without the match the body inlines on every
 -- whnf and mentions its argument SIX times, which squares per instant:
 -- .Wet's caps-fuel-root, which normalises `blowH (blowH (capsBase …))`,
--- ran past an hour on it and finished in minutes with the match in
+-- ran past an hour on it and finished in minutes with the match in.
+-- The level form keeps that property for the same reason it keeps it
+-- at `sizeCount`: `lvls` matches on its DELIVERY COUNT, which is a
+-- `dCapᶜ` stuck at a variable, so the whole body is stuck at whnf
 poolBody : ℕ → ℕ
-poolBody M = dCapᶜ M M M (suc M) 0
-               * M * suc (suc M * suc M)
+poolBody M = lvls M M 0 (dCapᶜ M M M (suc M) 0)
 
 poolCount : ℕ → ℕ
 poolCount zero    = 0

@@ -3874,37 +3874,20 @@ pathSz?-tail B f p h =
           (proj₂ (∧-true (frameSz? B f)
                          ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h)))
 
-postulate
-  -- (i) THE PER-DELIVERY CHARGE, IN THE NEW CURRENCY.  The receipt the
-  -- induction actually builds, charged to the cascade's own delivery
-  -- ledger rather than to a count: every fold is a frame on some
-  -- delivery's chain, and pathSz?'s length conjunct caps a chain at
-  -- cSize.
-  --
-  -- AND THE WIDTH FACTOR IS REAL, which is what changed.  `j ≤ D * cSize`
-  -- was measured FALSE by Charge-Probe — progW breaches at 47 against 40
-  -- — because `scanFrame-caps`'s receipt is
-  -- `suc (length vals * suc (sizeᵗ fn))`, one fold per node of the step
-  -- function PER PAYLOAD, and `length vals` is a burst width.  The form
-  -- below is the one that fits all 21 Instant-Height rows, worst ratio
-  -- 0.16, with cWid standing in for the arrival's payload width.
-  -- Reading cWid used to be forbidden (it would have destroyed
-  -- capsAt-tower's LINEAR height); the height is a recurrence now, so
-  -- the prohibition is gone with the closed form
-  cascadeGo-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (a : Arrival Γ) (id : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    Sched.slots sched ≡ sl →
-    capsOK? c sched st ≡ true →
-    valCaps? c sl (arrTy a) (arrVal a) ≡ true →
-    all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
-    length chains ≤ Caps.cReg c →
-    let r = cascadeGo a id chains sched st
-    in Σ ℕ λ j → (j ≤ delivN st (proj₂ (proj₂ r)) * Caps.cSize c
-                        * suc (suc (Caps.cWid c) * suc (Caps.cSize c)))
-       × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+-- (i) IS NO LONGER A POSTULATE, AND IT IS NOT A PRODUCT EITHER.  The
+-- per-delivery charge used to be stated as
+-- `j ≤ D * cSize * suc (suc cWid * suc cSize)` — a whole cascade's
+-- frames charged at the level the CASCADE entered at — and the walk
+-- proves something of a different shape: `cascadeGo-level` (below) says
+-- one cascade LANDS at `lvls cSize cWid 0 D`, which iterates `dLvl` once
+-- per delivery and `fLvl` once per frame, each read at the level the one
+-- before it LEFT.  Entry-charging is machine-refuted one stratum down
+-- (Entry-Caps-Refuted), so the iteration is the honest currency and the
+-- product had no route through this walk.  `sizeCount` (.Caps) is
+-- therefore the LANDING LEVEL — it dominates the product it replaces
+-- (`lvls-lin` at J = 0, Level-Walk-Probe's `count-gate`), so no measured
+-- row moves — and this conjunct is `cascadeGo-level` composed with
+-- `cascadeGo-deliveries`, at the end of the section below.
 
 -- (ii) THE DELIVERY BOUND, WHOLE, AND AS A RECURSION.  One cascade's
 -- deliveries against `cDel c = dCapᶜ cSize cWid cReg (suc cSize) 0` —
@@ -4061,7 +4044,10 @@ cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
     ≤ cDel c
 
--- THE ASSEMBLY, ground: the conjunct is the three pieces multiplied out
+-- THE ASSEMBLY, ground: the level the walk lands at, with the delivery
+-- count widened to its own recursion.  Both pieces are theorems, so
+-- this one is (the body is at the end of the next section, where
+-- cascadeGo-level is)
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -4078,16 +4064,6 @@ cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j → (j ≤ sizeCount c)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-caps c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
-  proj₁ CH
-    , ≤-trans (proj₁ (proj₂ CH))
-              (*-monoˡ-≤ (suc (suc (Caps.cWid c) * suc (Caps.cSize c)))
-                 (*-monoˡ-≤ (Caps.cSize c)
-                    (cascadeGo-deliveries c a id chains sl sched st
-                       2≤S 1≤R slC slEq inv vC pS n≤S lenB)))
-    , proj₂ (proj₂ CH)
-  where
-  CH = cascadeGo-charge c a id chains sl sched st 2≤S slEq inv vC pS lenB
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE-SIDE COMPANION TREE, transcribed from subscribeE-walkS's
@@ -4457,37 +4433,31 @@ cascadeGo-deliveries {n = n} {e = e} c a id chains sl sched st 2≤S 1≤R slC s
                   (walkH c sl 2≤S 1≤R slC)
 
 ------------------------------------------------------------------
--- THE CHARGE, IN THE CURRENCY THE WALK ACTUALLY PROVES — the assembly
--- half of cascadeGo-charge, stated and GROUND, with the arithmetic
--- that would close it left named rather than assumed.
+-- THE CHARGE, IN THE CURRENCY THE WALK ACTUALLY PROVES — and the
+-- currency the caps recurrence now SPENDS, so the charge is a theorem.
 --
--- `cascadeGo-charge` bounds one cascade's j by
--- `D * cSize * suc (suc cWid * suc cSize)`, and the right-hand factor
--- is `fCharge S W 0` — ONE FRAME'S RECEIPT READ AT LEVEL 0.  The walk
--- proves something of a different shape, and it is not a weaker
--- version of the same thing: `Res.hi` says the level a cascade lands
--- at is at most `lvls S W 0 D`, which ITERATES `dLvl` once per
--- delivery, and `dLvl` in turn iterates `fLvl` once per frame.  A
--- product charges every delivery's frames at the level the CASCADE
--- entered at; the iteration charges each at the level the one before
--- it LEFT.  That is the same distinction entry-charging was refuted on
--- one stratum down (agda/probe/Entry-Caps-Refuted.agda: a frame's own
--- output breaches the cap it was charged at), which is why the walk was
--- rebuilt around levels in the first place.
+-- `Res.hi` says the level a cascade lands at is at most `lvls S W 0 D`,
+-- which ITERATES `dLvl` once per delivery, and `dLvl` in turn iterates
+-- `fLvl` once per frame.  The product this replaces
+-- (`D * cSize * suc (suc cWid * suc cSize)`, whose right-hand factor is
+-- `fCharge S W 0`, ONE FRAME'S RECEIPT READ AT LEVEL 0) charges every
+-- delivery's frames at the level the CASCADE entered at; the iteration
+-- charges each at the level the one before it LEFT.  That is the same
+-- distinction entry-charging was refuted on one stratum down
+-- (agda/probe/Entry-Caps-Refuted.agda: a frame's own output breaches
+-- the cap it was charged at), which is why the walk was rebuilt around
+-- levels in the first place — and why the count the recurrence spends
+-- was rebuilt around them too.
 --
--- SO THIS IS NOT A CLAIM THAT cascadeGo-charge IS FALSE.  Its form fits
--- all 21 Instant-Height rows at worst ratio 0.16 and no row breaches
--- it; what is established here is only that the machinery now proves
--- the ITERATED bound and not the product one, so the product one has no
--- route through this walk.  Closing the gap is a DESIGN ruling, not a
--- grind: `sizeCount` (.Caps) — the only consumer, through
--- `frameBlowup c = frameStep (sizeCount c) c` — would be restated as
--- `lvls (cSize c) (cWid c) 0 (cDel c)`, at which point cascadeGo-charge
--- is this lemma composed with cascadeGo-deliveries and stops being a
--- postulate.  The price is that `poolBody` / `poolCount` / `blowH`
--- move with it, and .Wet's caps-fuel-root normalises those — the
--- module that already ran past an hour once, which is why `blowH` is
--- abstract.  Flagged, costed, not done here
+-- NOTHING IS LOST BY THE MOVE.  The product is DOMINATED by the
+-- iteration — `lvls-lin` at J = 0 gives `D * chargeAt S W 0` under
+-- `lvls S W 0 D`, and `chargeAt S W 0` IS `cSize * fCharge S W 0`
+-- (Level-Walk-Probe's `count-gate`) — so every Instant-Height row the
+-- product cleared this clears, with the same margin or more, and no
+-- measurement is re-run.  `sizeCount` (.Caps) is now this level, its
+-- pooled twin `poolBody` (Rx.Evaluator) the same level with every field
+-- pooled, and `blowup-tower`'s count axis is `lvls-mono` where it was a
+-- product of monotonicities
 ------------------------------------------------------------------
 
 cascadeGo-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -4516,6 +4486,20 @@ cascadeGo-level {e = e} c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS
   GO = W.cascadeGo-go 0 a id chains sched st
          ((slEq , invʲ) , capsOK?-regs c sched st inv)
          pS (∧-intro (∧-intro vC refl) refl)
+
+-- and the assembly declared above: the landing level with the delivery
+-- count widened to its own recursion, which is `sizeCount` by definition
+cascadeGo-caps c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
+  proj₁ LV
+    , ≤-trans (≤-trans (proj₁ (proj₂ LV))
+                       (lvls-mono D (cDel c) 2≤S ≤-refl ≤-refl ≤-refl
+                          (cascadeGo-deliveries c a id chains sl sched st
+                             2≤S 1≤R slC slEq inv vC pS n≤S lenB)))
+              (≤-reflexive (sym (sizeCount-body c)))
+    , proj₂ (proj₂ LV)
+  where
+  D  = delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
+  LV = cascadeGo-level c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS
 
 ------------------------------------------------------------------
 -- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the

@@ -49,7 +49,10 @@
 --        level after d deliveries is at least `d · chargeW` up
 --        (`lvls-lin`), and one level costs the registry a FACTOR
 --        (`regAt S R J = R · suc (J · S)`) where the old walk paid a
---        summand.
+--        summand.  `count-gate` is that same fact read at the CAPS
+--        RECURRENCE's instant: `sizeCount` is now `lvls S W 0 D` where
+--        it was `D · S · fCharge S W 0`, and the level dominates the
+--        product, so no Instant-Height row is re-measured either.
 ------------------------------------------------------------------
 module Level-Walk-Probe where
 
@@ -380,6 +383,18 @@ lvls-lin S W J (suc d) 2≤S =
   where
   re : ∀ (j q d : ℕ) → j + (q + d * q) ≡ (j + d * q) + q
   re = solve 3 (λ j q d → j :+ (q :+ d :* q) := (j :+ d :* q) :+ q) refl
+
+-- THE COUNT GATE, and it is the same fact read at the caps recurrence's
+-- own instant.  `sizeCount` (Verify-Budget-Sufficient.Caps) is now
+-- `lvls S W 0 D` where it was `D * S * fCharge S W 0` — a whole cascade
+-- charged at its ENTRY level.  `chargeAt S W 0` IS `S * fCharge S W 0`
+-- (sizeAt S 0 = S), so the restatement is `lvls-lin` at J = 0 and the
+-- new count dominates the old one pointwise: every Instant-Height row
+-- the product cleared, the level clears
+count-gate : ∀ (S W D : ℕ) → 2 ≤ S →
+  D * S * fCharge S W 0 ≤ lvls S W 0 D
+count-gate S W D 2≤S =
+  ≤-trans (≤-reflexive (*-assoc D S (fCharge S W 0))) (lvls-lin S W 0 D 2≤S)
 
 -- and the registry the level reads dominates the old walk's threading
 key : ∀ (S W R J d d̂ R′ : ℕ) → 2 ≤ S → 1 ≤ R →

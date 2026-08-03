@@ -319,18 +319,29 @@ abstract
 poolBody≤poolCount : ∀ (M : ℕ) → 1 ≤ M → poolBody M ≤ poolCount M
 poolBody≤poolCount (suc M) _ = ≤-refl
 
--- ONE INSTANT's FOLD COUNT, and it READS cWid.  The receipt
--- `scanFrame-caps` actually pays is `suc (length vals * suc (sizeᵗ fn))`
--- — one fold per node of the step function PER PAYLOAD — and
--- Charge-Probe measured `j ≤ D * cSize` false on exactly that width
--- factor (progW: 47 against 40).  The form that fits all 21
--- Instant-Height rows, worst ratio 0.16, is
+-- ONE INSTANT's FOLD COUNT, AND IT IS THE WALK'S OWN LANDING LEVEL.
+-- The receipt `scanFrame-caps` actually pays is
+-- `suc (length vals * suc (sizeᵗ fn))` — one fold per node of the step
+-- function PER PAYLOAD — so the count reads cWid; that much was already
+-- measured (Charge-Probe: `j ≤ D * cSize` breaches at 47 against 40).
+-- What changed is the SHAPE.  The product
 --
---     j ≤ D * cSize * suc (cWid * suc cSize)
+--     cDel c * cSize c * suc (suc cWid * suc cSize)
 --
--- with the arrival's own payload width in place of cWid; `sizeCount`
--- is that with the delivery bound multiplied in and a `suc` on the
--- width factor, so the arrival's payload rides inside it.
+-- charges every delivery's frames at the level the CASCADE entered at,
+-- and that is the same entry-charging one stratum down that
+-- Entry-Caps-Refuted machine-refutes: what the walk proves
+-- (`cascadeGo-level`, .Caps-Face) is that a cascade LANDS at
+-- `lvls S W 0 D`, an ITERATION — each delivery charged at the level the
+-- one before it LEFT, each frame at the level the one before IT left.
+-- So the count is that landing level, and the per-instant charge stops
+-- being a postulate: `cascadeGo-caps` is `cascadeGo-level` composed with
+-- `cascadeGo-deliveries` and nothing else.
+--
+-- IT DOMINATES THE PRODUCT IT REPLACES, so no measured row moves:
+-- `lvls-lin` at J = 0 gives `D * chargeAt S W 0 ≤ lvls S W 0 D`, and
+-- `chargeAt S W 0` IS `cSize * suc (suc cWid * suc cSize)`
+-- (Level-Walk-Probe's `count-gate`).
 --
 -- READING cWid WAS FORBIDDEN AND IS NO LONGER.  Width-Count-Probe's
 -- objection was that a count reading cWid iterates the tower function
@@ -341,9 +352,20 @@ poolBody≤poolCount (suc M) _ = ≤-refl
 -- demand.  The price is that the height is
 -- tower-VALUED; the price of a lazy Gas tower's height being large is
 -- nothing at all
-sizeCount : Caps → ℕ
-sizeCount c = cDel c * Caps.cSize c
-                * suc (suc (Caps.cWid c) * suc (Caps.cSize c))
+--
+-- ABSTRACT, for `cDel`'s reason and with `cDel`'s discipline: `lvls`
+-- matches on the delivery count, `iterSize` and `iterFold` match on
+-- this one, and `capsAt`'s own fields are those iterates — so whether
+-- .Wet normalises or runs for an hour is decided by whether this symbol
+-- stays stuck.  `sizeCount-body` hands the body back where the
+-- recurrence's own arithmetic needs it, which is three places
+abstract
+  sizeCount : Caps → ℕ
+  sizeCount c = lvls (Caps.cSize c) (Caps.cWid c) 0 (cDel c)
+
+  sizeCount-body : ∀ (c : Caps) →
+    sizeCount c ≡ lvls (Caps.cSize c) (Caps.cWid c) 0 (cDel c)
+  sizeCount-body c = refl
 
 frameBlowup : Caps → Caps
 frameBlowup c = frameStep (sizeCount c) c
@@ -592,6 +614,17 @@ lvls-mono (suc d) zero     2≤S hS hW hJ ()
 lvls-mono (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
   dLvl-mono 2≤S hS hW (lvls-mono d d′ 2≤S hS hW hJ hd)
 
+-- AND ONE DELIVERY ALWAYS COSTS TWO: a chain has at least one frame,
+-- a frame's receipt `fCharge` is a `suc` of a product of two `suc`s,
+-- and `dLvl` iterates that at least once.  This is what `sizeCount`'s
+-- own positivity is read off, now that the count is a LEVEL rather than
+-- a product with a visible factor to read it off of
+2≤dLvl : ∀ (S W J : ℕ) → 2 ≤ dLvl S W J
+2≤dLvl S W J =
+  ≤-trans (≤-trans (s≤s (≤-trans (s≤s z≤n) (m≤m*n (suc (widAt S W J)) (suc (sizeAt S J)))))
+                   (m≤n+m (fCharge S W J) J))
+          (iterL-infl S W (sizeAt S J) (fLvl S W J))
+
 dCapᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ : ℕ) →
   2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ →
   dCapᶜ S W R g J ≤ dCapᶜ S′ W′ R′ g′ J′
@@ -611,6 +644,20 @@ dWalkᶜ-mono g g′ (suc i) (suc i′) 2≤S hS hW hR hg hJ (s≤s hi) =
                       (lvls-mono (suc _) (suc _) 2≤S hS hW hJ (s≤s ih))))
   where
   ih = dWalkᶜ-mono g g′ i i′ 2≤S hS hW hR hg hJ hi
+
+-- SO THE COUNT IS POSITIVE, once there is one registration to walk:
+-- one delivery is one `dLvl`, and `lvls S W 0 1` IS `dLvl S W 0`
+2≤sizeCount : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  2 ≤ sizeCount c
+2≤sizeCount c 2≤S 1≤R =
+  ≤-trans (≤-trans (2≤dLvl (Caps.cSize c) (Caps.cWid c) 0)
+                   (lvls-mono 1 (cDel c) 2≤S ≤-refl ≤-refl ≤-refl 1≤D))
+          (≤-reflexive (sym (sizeCount-body c)))
+  where
+  1≤D : 1 ≤ cDel c
+  1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
+                         (Caps.cSize c) 0 1≤R)
+                (≤-reflexive (sym (cDel-body c)))
 
 -- REG: linear, monotone in j always
 frameStep-reg-mono : ∀ (c : Caps) {j j′ : ℕ} → j ≤ j′ →
@@ -785,10 +832,8 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
   2≤suc2S : 2 ≤ suc (2 * S)
   2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
   1≤J : 1 ≤ J
-  1≤J = *-mono-≤ (*-mono-≤ (≤-trans (1≤dCapᶜ S (Caps.cWid c) R S 0 1≤R)
-                                    (≤-reflexive (sym (cDel-body c))))
-                           1≤S)
-                 (s≤s z≤n)
+  1≤J = ≤-trans (s≤s z≤n)
+                (2≤sizeCount c (≤-trans (s≤s (s≤s z≤n)) 3≤S) 1≤R)
 
 6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   6 ≤ Caps.cSize (capsAt e sl (suc id))
@@ -976,17 +1021,15 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
   1≤Tw : 1 ≤ Tw
   1≤Tw = ≤-trans 1≤S hS
 
-  -- THE COUNT, and it is monotonicity in each field and nothing else
-  wid≤ : suc (suc W * suc S) ≤ suc (suc Tw * suc Tw)
-  wid≤ = s≤s (*-mono-≤ (s≤s hW) (s≤s hS))
-
+  -- THE COUNT, and it is monotonicity in each field and nothing else —
+  -- `poolBody` IS this count with every field pooled, level walk and all
   J≤P : J ≤ P
-  J≤P = ≤-trans (*-mono-≤ (*-mono-≤ (≤-trans (≤-reflexive (cDel-body c))
-                                       (dCapᶜ-mono (suc S) (suc Tw)
-                                          2≤S hS (≤-trans hW ≤-refl) hR′
-                                          (s≤s hS) ≤-refl))
-                                    hS)
-                          wid≤)
+  J≤P = ≤-trans (≤-trans (≤-reflexive (sizeCount-body c))
+                   (lvls-mono (cDel c) (dCapᶜ Tw Tw Tw (suc Tw) 0)
+                      2≤S hS hW ≤-refl
+                      (≤-trans (≤-reflexive (cDel-body c))
+                         (dCapᶜ-mono (suc S) (suc Tw)
+                            2≤S hS hW hR′ (s≤s hS) ≤-refl))))
                 (poolBody≤poolCount Tw 1≤Tw)
 
   3≤L : 3 ≤ L

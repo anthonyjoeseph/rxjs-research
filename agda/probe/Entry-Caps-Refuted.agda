@@ -194,25 +194,9 @@ open import Relation.Binary.PropositionalEquality using (sym)
 open import Data.Unit using (tt)
 open import Rx.Evaluator using (iterFold; foldStep)
 open import Verify-Budget-Sufficient.Caps
-  using (frameBlowup; frameStep; sizeCount; cDel; cDel-body;
-         iterFold-mono-count; 1≤dCapᶜ)
+  using (frameBlowup; frameStep; sizeCount; 2≤sizeCount;
+         iterFold-mono-count)
 open import Verify-Budget-Sufficient.Caps-Face using (powʳ1)
-
--- one registration is one delivery, so the fold count is never below 2
-2≤sizeCount : ∀ (c : Caps) → 4 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  2 ≤ sizeCount c
-2≤sizeCount c 4≤S 1≤R = ≤-trans (≤-trans (s≤s (s≤s z≤n)) 4≤S) step
-  where
-  1≤cDel : 1 ≤ cDel c
-  1≤cDel = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
-                            (Caps.cSize c) 0 1≤R)
-                   (≤-reflexive (sym (cDel-body c)))
-  step : Caps.cSize c ≤ sizeCount c
-  step =
-    ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (Caps.cSize c))))
-                     (*-monoˡ-≤ (Caps.cSize c) 1≤cDel))
-            (≤-trans (≤-reflexive (sym (*-identityʳ (cDel c * Caps.cSize c))))
-                     (*-monoʳ-≤ (cDel c * Caps.cSize c) (s≤s z≤n)))
 
 -- TWO RUNGS ARE ALREADY 1024
 wid-dominates-120 : ∀ (c : Caps) → 4 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
@@ -220,7 +204,7 @@ wid-dominates-120 : ∀ (c : Caps) → 4 ≤ Caps.cSize c → 1 ≤ Caps.cReg c 
 wid-dominates-120 c 4≤S 1≤R =
   ≤-trans two-rungs
           (iterFold-mono-count (Caps.cSize c) (Caps.cWid c) 2≤S
-             (2≤sizeCount c 4≤S 1≤R))
+             (2≤sizeCount c 2≤S 1≤R))
   where
   Sz = Caps.cSize c
   Wd = Caps.cWid c
