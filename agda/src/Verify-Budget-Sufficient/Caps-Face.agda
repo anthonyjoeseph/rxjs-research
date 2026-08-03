@@ -6708,7 +6708,25 @@ stepFrame-face-zero c j u sl fin sched st inv =
 -- subscribe at J rather than at `suc J`, and its eval receipt was
 -- linear where `unfoldμ-caps` pays `m + suc (m * m)`).  The one
 -- non-arithmetic piece the pass still owes is `nestᵛ ≤ sizeᵛ`, a
--- structural lemma beside the other value measures
+-- structural lemma beside the other value measures.
+--
+-- AND THAT PASS IS BLOCKED ON THE BUDGET, not on the receipts
+-- (2026-08-03, agda/probe/Nest-Budget-Probe.agda).  `nestᵛ ≤ sizeᵛ` is
+-- proven there, and so is the (b) conjunct's arithmetic — `n² ≤ 2ⁿ + 1`,
+-- tight at n = 3, hence `suc w * suc w ≤ suc (foldStep S w)` for the
+-- appended bursts.  What the probe refutes is the DESCENT the nesting
+-- hypothesis was ruled on: a `scanᵉ` under an *All mints a payload per
+-- fold, the k-th mint nests k deep, and the carrier's own nesting stands
+-- still — so the payload subscribed one level in is not inside the
+-- pushed value.  A frame's OWN payloads are still paid for (they are its
+-- input values, bounded at its entry level, and `iterL` re-reads the
+-- budget per frame); one nesting level in, `k` is fixed at the size cap
+-- where that subscribe began while the values are bounded only at the
+-- levels it climbed to — 2 against 43690 at S = 2, W = 1, J = 0.
+--
+-- So this block's plan stands as written EXCEPT for the hypothesis
+-- `subscribeE-caps` would carry, and the family's shape is the design
+-- session's to re-rule.  Do not grind the pass onto `suc (sizeAt S J)`
 ------------------------------------------------------------------
 
 postulate

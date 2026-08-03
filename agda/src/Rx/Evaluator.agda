@@ -654,6 +654,28 @@ fLvl S W J = J + fCharge S W J
 -- LATER, at a higher J where `sizeAt S J` has already climbed — so
 -- per-level reads suffice and no global claim is made.
 --
+-- (i) AND (iii) ARE REFUTED (2026-08-03, agda/probe/Nest-Budget-Probe.
+-- agda), and the family's SHAPE is what waits on the re-ruling; nothing
+-- below this block moves.  A `scanᵉ` under an *All MINTS a payload per
+-- fold, and the k-th mint nests k deep while the carrier's own nesting
+-- stands still — the mint is not inside the pushed value, it is built,
+-- and it is subscribed in the SAME delivery, so (iii) does not defer
+-- it.  (ii) survives, with `nestᵛ ≤ sizeᵛ` proven in the probe.
+--
+-- WHAT STILL HOLDS IS ONE FRAME.  Its payloads are its INPUT values,
+-- which `FrameFace` bounds at the frame's ENTRY level, and `iterL`
+-- re-reads the budget at each frame of the chain — so `suc (sizeAt S J)`
+-- pays for a frame's own subscribes.  What fails is ONE NESTING LEVEL
+-- IN: `k` is inherited, fixed at the size cap where that subscribe
+-- BEGAN, while the frames of the payload's chain are handed values
+-- bounded (by `burstCaps?` / `valsCaps?`, the only suppliers) at the
+-- levels that subscribe has CLIMBED TO.  At S = 2, W = 1, J = 0 that is
+-- 2 against 43690, and the room is used rather than merely allowed: the
+-- mint depth is the fold count, the fold count is the burst length, and
+-- `widAt` outruns `sizeAt` by an exponential per level.  It is the
+-- Entry-Caps-Refuted distinction moved from the caps to the budget —
+-- read at an entry, spent after a climb.
+--
 -- ABSTRACT, and for the same PERFORMANCE reason `blowH` and `sizeCount`
 -- are.  Every one of these clauses matches on an argument that is a
 -- literal `suc` even at a variable J (`suc (widAt S W J)`,
