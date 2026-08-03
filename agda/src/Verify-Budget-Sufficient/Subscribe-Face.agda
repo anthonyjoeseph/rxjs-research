@@ -836,7 +836,7 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- lemmas the share leaves use.
 
 subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
@@ -874,7 +874,7 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- count has to be an argument of this clique, not a consumer of it
 
 subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -896,7 +896,7 @@ subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
             (proj₁ (proj₂ (proj₂ r))) ≡ true)
 -- OUT OF GAS: a dry close and nothing else.  The only state change is
 -- the instance counter, which capsOK? does not read
-subscribeInner-caps c j g0 op allNid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC =
+subscribeInner-caps c dep bud j g0 op allNid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC =
   0 , subst (λ x → capsOK? (frameStep x c)
                      (record sched { nextNode = suc (Sched.nextNode sched) }) st ≡ true)
             (sym (+-identityʳ j))
@@ -906,7 +906,7 @@ subscribeInner-caps c j g0 op allNid κ id now o sl sched st 2≤S 1≤R slEq sl
 -- instant, and at ONE MORE j.  Its size hypothesis is valCaps?'s cSize
 -- half (sizeᵛ (obs u) IS sizeᵉ), widened by the step; its chain
 -- hypothesis is κ's, one frame longer, which is frameStep-chain-suc
-subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ id now o
+subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c dep bud j (gs fuel) op allNid κ id now o
                     sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC =
   suc (suc (suc j₂)) , R1 , R2 , R3
   where
@@ -929,7 +929,7 @@ subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ
              (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
                         (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
                       (pathSz?-⊑ κ step⊑ pC))
-  IH     = subscribeE-caps c (suc j) fuel o κ′ id now sl sched₀ st 2≤S 1≤R slEq slC slSz
+  IH     = subscribeE-caps c dep bud (suc j) fuel o κ′ id now sl sched₀ st 2≤S 1≤R slEq slC slSz
              (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
                 (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                   sched st inv))
@@ -987,7 +987,7 @@ subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c j (gs fuel) op allNid κ
 -- found for it.  That is why this edge composed even under the old
 -- joint bound, and it composes unchanged under the separate pair
 sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
   (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1006,13 +1006,13 @@ sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
 -- OUT OF GAS: a dry close and nothing else
-sharedConnect-caps {Γ = Γ} c j g0 i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC =
+sharedConnect-caps {Γ = Γ} c dep bud j g0 i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
                      (dryBurst {A = Val Γ (lookup Γ i)} id) ≡ true)
             (sym (+-identityʳ j)) refl
     , refl
-sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
+sharedConnect-caps {Γ = Γ} c dep bud j (gs fuel′) i d κ id now sl sched st
                    2≤S 1≤R slEq slC slSz inv szd wdd pC lC
   with burstCompleted (proj₁ (subscribeE fuel′ d (share-sink i) id now sched
                                (register (toℕ i) κ
@@ -1040,7 +1040,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
   where
   st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
   st₁ = register (toℕ i) κ st₀
-  IH  = subscribeE-caps c (suc j) fuel′ d (share-sink i) id now sl sched st₁
+  IH  = subscribeE-caps c dep bud (suc j) fuel′ d (share-sink i) id now sl sched st₁
           2≤S 1≤R slEq slC slSz
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
@@ -1099,7 +1099,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
   where
   st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
   st₁ = register (toℕ i) κ st₀
-  IH  = subscribeE-caps c (suc j) fuel′ d (share-sink i) id now sl sched st₁
+  IH  = subscribeE-caps c dep bud (suc j) fuel′ d (share-sink i) id now sl sched st₁
           2≤S 1≤R slEq slC slSz
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
@@ -1141,7 +1141,7 @@ sharedConnect-caps {Γ = Γ} c j (gs fuel′) i d κ id now sl sched st
 -- THE JOIN.  A spent share answers with a one-shot close, a live one
 -- registers (one j), and an unconnected one connects
 sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
   (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1159,7 +1159,7 @@ sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-sharedSlot-caps {Γ = Γ} c j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC
+sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC
   with memberSource (toℕ i) (EvalSt.completedSources st)
 ... | true  =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -1176,11 +1176,11 @@ sharedSlot-caps {Γ = Γ} c j g i d κ id now sl sched st 2≤S 1≤R slEq slC s
                      (((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []) ≡ true)
             (sym (j+1 j)) refl
     , refl
-...   | false = sharedConnect-caps c j g i d κ id now sl sched st
+...   | false = sharedConnect-caps c dep bud j g i d κ id now sl sched st
                   2≤S 1≤R slEq slC slSz inv szd wdd pC lC
 
 thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1201,7 +1201,7 @@ thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
             (proj₁ (proj₂ r)) ≡ true)
 
 -- MERGE: subscribe, then bump the active-inner counter
-thruConsume-caps c j g mergeᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC =
+thruConsume-caps c dep bud j g mergeᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC =
   j′ , capsOK?-mergeBump (frameStep (j + j′) c) nid
          (proj₁ (proj₂ (proj₂ (proj₂ R))))
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
@@ -1210,14 +1210,14 @@ thruConsume-caps c j g mergeᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC
      , proj₁ (proj₂ (proj₂ SI))
      , proj₂ (proj₂ (proj₂ SI))
   where
-  SI = subscribeInner-caps c j g mergeᵒ nid κ id now o sl sched st
+  SI = subscribeInner-caps c dep bud j g mergeᵒ nid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv vC pC lC
   j′ = proj₁ SI
   R  = subscribeInner g mergeᵒ nid κ id now o sched st
 
 -- CONCAT: park the payload if an inner is running, otherwise subscribe
 -- it and reinstall an empty queue
-thruConsume-caps {n = n} {u = u} c j g concatᵒ nid κ id now o sl sched st
+thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sched st
                  2≤S 1≤R slEq slC slSz inv vC pC lC
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
@@ -1249,7 +1249,7 @@ thruConsume-caps {n = n} {u = u} c j g concatᵒ nid κ id now o sl sched st
      , proj₁ (proj₂ (proj₂ SI))
      , proj₂ (proj₂ (proj₂ SI))
   where
-  SI = subscribeInner-caps c j g concatᵒ nid κ id now o sl sched st
+  SI = subscribeInner-caps c dep bud j g concatᵒ nid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv vC pC lC
   j′ = proj₁ SI
   R  = subscribeInner g concatᵒ nid κ id now o sched st
@@ -1292,7 +1292,7 @@ thruConsume-caps {n = n} {u = u} c j g concatᵒ nid κ id now o sl sched st
                 (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
 
 -- SWITCH: cut the outgoing inner, subscribe the new one, record it
-thruConsume-caps c j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC
+thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = 0 , ZI , refl , refl
   where
@@ -1328,14 +1328,14 @@ thruConsume-caps c j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R slEq sl
   KILL = switchKill cur sched st
   sched₁ = proj₁ (proj₂ KILL)
   st₁    = proj₂ (proj₂ KILL)
-  SI = subscribeInner-caps c j g switchᵒ nid κ id now o sl sched₁ st₁
+  SI = subscribeInner-caps c dep bud j g switchᵒ nid κ id now o sl sched₁ st₁
          2≤S 1≤R (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) slEq) slC slSz
          (switchKill-caps (frameStep j c) cur sched st inv) vC pC lC
   j′ = proj₁ SI
   R  = subscribeInner g switchᵒ nid κ id now o sched₁ st₁
 
 -- EXHAUST: drop while busy, otherwise subscribe and latch
-thruConsume-caps c j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC
+thruConsume-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = 0 , ZI , refl , refl
   where
@@ -1367,7 +1367,7 @@ thruConsume-caps c j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤R slEq s
      , proj₁ (proj₂ (proj₂ SI))
      , proj₂ (proj₂ (proj₂ SI))
   where
-  SI = subscribeInner-caps c j g exhaustᵒ nid κ id now o sl sched st
+  SI = subscribeInner-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv vC pC lC
   j′ = proj₁ SI
   R  = subscribeInner g exhaustᵒ nid κ id now o sched st
@@ -1375,7 +1375,7 @@ thruConsume-caps c j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤R slEq s
 -- THE WALK: one payload at a time, receipts adding exactly as the
 -- delivery clique's do
 thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1394,7 +1394,7 @@ thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ r)) ≡ true)
-thruWalk-caps c j g op nid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz inv pC vC lC =
+thruWalk-caps c dep bud j g op nid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz inv pC vC lC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , refl , refl
 -- ONE MORE FOLD THAN THE ADDITIVE CLAUSES, and Concat-Sum-Probe is why:
@@ -1402,7 +1402,7 @@ thruWalk-caps c j g op nid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz in
 -- does not fit the width its two summands came in under.  `suc (j₁ + j₂)`
 -- buys the extra rung, charged per cons so no cardinality hypothesis on
 -- `os` is needed
-thruWalk-caps {u = u} c j g op nid κ id now (o ∷ os) sl sched st
+thruWalk-caps {u = u} c dep bud j g op nid κ id now (o ∷ os) sl sched st
               2≤S 1≤R slEq slC slSz inv pC vC lC =
   suc (j₁ + j₂)
     , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
@@ -1434,13 +1434,13 @@ thruWalk-caps {u = u} c j g op nid κ id now (o ∷ os) sl sched st
            (proj₂ (proj₂ (proj₂ IH))))
   where
   vCa = valsOf (frameStep j c) sl (o ∷ os) vC
-  HD  = thruConsume-caps c j g op nid κ id now o sl sched st
+  HD  = thruConsume-caps c dep bud j g op nid κ id now o sl sched st
           2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ vCa)) pC lC
   j₁  = proj₁ HD
   TC  = thruConsume g op nid κ id now o sched st
   sd₁ = proj₁ (proj₂ (proj₂ TC))
   st₁ = proj₂ (proj₂ (proj₂ TC))
-  IH  = thruWalk-caps c (j + j₁) g op nid κ id now os sl sd₁ st₁
+  IH  = thruWalk-caps c dep bud (j + j₁) g op nid κ id now os sl sd₁ st₁
           2≤S 1≤R
           (trans (KeepsC.slotsEq (thruConsume-keeps g op nid κ id now o sched st))
                  slEq)
@@ -1460,7 +1460,7 @@ thruWalk-caps {u = u} c j g op nid κ id now (o ∷ os) sl sched st
   lvlW = trans (+-suc j (j₁ + j₂)) (cong suc (sym (+-assoc j j₁ j₂)))
 
 concatDrain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (j : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (q : List (Closed Γ s))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1482,13 +1482,13 @@ concatDrain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
             (proj₁ (proj₂ r)) ≡ true)
      × (all (obsCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-concatDrain-caps c j g allNid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz inv pC lC qC =
+concatDrain-caps c dep bud j g allNid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz inv pC lC qC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , refl , refl , refl
-concatDrain-caps {s = s} c j g allNid κ id now (o ∷ q) sl sched st
+concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC qC
   with subscribeInner g concatᵒ allNid κ id now o sched st
-     | subscribeInner-caps c j g concatᵒ allNid κ id now o sl sched st
+     | subscribeInner-caps c dep bud j g concatᵒ allNid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ qC)) pC lC
      | KeepsC.slotsEq (subscribeInner-keeps g concatᵒ allNid κ id now o sched st)
 -- the inner stays open: it becomes the active one and the rest of the
@@ -1528,7 +1528,7 @@ concatDrain-caps {s = s} c j g allNid κ id now (o ∷ q) sl sched st
     , obsListCaps?-widen sl (proj₁ (proj₂ (proj₂ (proj₂ REST)))) ⊑ˢ
         (proj₂ (proj₂ (proj₂ (proj₂ IH))))
   where
-  IH   = concatDrain-caps c (j + j₁) g allNid κ id now q sl sched₁ st₁
+  IH   = concatDrain-caps c dep bud (j + j₁) g allNid κ id now q sl sched₁ st₁
            2≤S 1≤R (trans sEq slEq) slC slSz SUB
            (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S j j₁) pC)
            (≤-trans lC (proj₁ (frameStep-⊑-+ c 2≤S j j₁)))
@@ -1564,7 +1564,7 @@ innerFinish-zero′ {t = t} c j sl vals sched st 2≤S inv vC =
         (valsOf (frameStep j c) sl vals vC)
 
 innerFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1587,7 +1587,7 @@ innerFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
             (proj₁ (proj₂ r)) ≡ true)
 
 -- MERGE: decrement the active-inner counter, which carries no payload
-innerFinish-caps c j g mergeᵒ allNid inst κ id now vals sl sched st
+innerFinish-caps c dep bud j g mergeᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
 ... | just (merge-st k od) =
@@ -1609,7 +1609,7 @@ innerFinish-caps c j g mergeᵒ allNid inst κ id now vals sl sched st
 
 -- CONCAT: drain the queue and reinstall the residue, which comes back
 -- from concatDrain-caps with the very bound the node needs
-innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl sched st
+innerFinish-caps {n = n} {s = s} c dep bud j g concatᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) allNid (EvalSt.nodes st)
@@ -1666,7 +1666,7 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
   wnLen = proj₂ (∧-true (all (λ o → pWᵉ n (Sched.slots sched) o
                                       ≤ᵇ Caps.cWid (frameStep j c)) q)
                         (length q ≤ᵇ Caps.cWid (frameStep j c)) wn)
-  CD  = concatDrain-caps c j g allNid κ id now q sl sched st
+  CD  = concatDrain-caps c dep bud j g allNid κ id now q sl sched st
           2≤S 1≤R slEq slC slSz inv pC lC
           (obsList-intro (frameStep j c) sl q bn
              (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
@@ -1694,7 +1694,7 @@ innerFinish-caps {n = n} {s = s} c j g concatᵒ allNid inst κ id now vals sl s
                       (proj₁ (proj₂ (frameStep-⊑-+ c 2≤S j j′))))))
 
 -- SWITCH: clear the current-inner slot if this was it
-innerFinish-caps c j g switchᵒ allNid inst κ id now vals sl sched st
+innerFinish-caps c dep bud j g switchᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                = innerFinish-zero′ c j sl vals sched st 2≤S inv vC
@@ -1718,7 +1718,7 @@ innerFinish-caps c j g switchᵒ allNid inst κ id now vals sl sched st
     , refl
 
 -- EXHAUST: clear the busy flag
-innerFinish-caps c j g exhaustᵒ allNid inst κ id now vals sl sched st
+innerFinish-caps c dep bud j g exhaustᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC vC
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                = innerFinish-zero′ c j sl vals sched st 2≤S inv vC
@@ -1739,7 +1739,7 @@ innerFinish-caps c j g exhaustᵒ allNid inst κ id now vals sl sched st
     , refl
 
 subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
@@ -1754,7 +1754,7 @@ subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-subscribeE-input-caps {n = n} {Γ = Γ} c j g i κ id now sl sched st
+subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
                       2≤S 1≤R slEq slC slSz inv pC lC
   with Sched.slots sched i
      | subst (λ y → slotCaps? (Caps.cSize c) (Caps.cWid c) sl (y i) ≡ true) (sym slEq)
@@ -1770,7 +1770,7 @@ subscribeE-input-caps {n = n} {Γ = Γ} c j g i κ id now sl sched st
 -- parked width, are the two things sharedSlot-caps asks for.  Both come
 -- straight out of the slot telescope's own side condition
 ... | shared d | sd | sz =
-  sharedSlot-caps c j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv
+  sharedSlot-caps c dep bud j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv
     (≤-trans (≤ᵇ⇒≤ (sizeᵉ d) (Caps.cSize c)
                 (T-to (proj₁ (∧-true (sizeᵉ d ≤ᵇ Caps.cSize c)
                                      ((pWᵉ n sl d ≤ᵇ Caps.cWid c)
@@ -1805,7 +1805,7 @@ subscribeE-input-caps {n = n} {Γ = Γ} c j g i κ id now sl sched st
     , refl
 -- COLD, NO TAIL: a one-shot burst of the slot's own sync values, and
 -- nothing goes into the state but a source counter capsOK? does not read
-subscribeE-input-caps {Γ = Γ} c j g i κ id now sl sched st
+subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                       2≤S 1≤R slEq slC slSz inv pC lC
   | scripted {ok} (cold sync []) | sd | sz =
   1 , subst (λ x → capsOK? (frameStep x c)
@@ -1858,7 +1858,7 @@ subscribeE-input-caps {Γ = Γ} c j g i κ id now sl sched st
               refl)
 -- COLD WITH A TAIL: a fresh source, a live entry for the async pendings,
 -- and one registration
-subscribeE-input-caps {Γ = Γ} c j g i κ id now sl sched st
+subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                       2≤S 1≤R slEq slC slSz inv pC lC
   | scripted {ok} (cold sync (dd ∷ ds)) | sd | sz =
   1 , subst (λ x → capsOK? (frameStep x c) SCHED₃ (register SRC κ st) ≡ true)
@@ -1928,7 +1928,7 @@ subscribeE-input-caps {Γ = Γ} c j g i κ id now sl sched st
 -- the absorbed branch are the identity on the state; only the finish
 -- delegates, and it delegates to innerFinish-caps verbatim
 innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s)) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1947,13 +1947,13 @@ innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                 ≡ true)
      × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (all (eventCaps? (frameStep (j + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
-innerReact-caps c j g op allNid inst κ id now vals false sl sched st
+innerReact-caps c dep bud j g op allNid inst κ id now vals false sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
     , refl
-innerReact-caps c j g op allNid inst κ id now vals true sl sched st
+innerReact-caps c dep bud j g op allNid inst κ id now vals true sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  =
@@ -1961,11 +1961,11 @@ innerReact-caps c j g op allNid inst κ id now vals true sl sched st
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
     , refl
-... | false = innerFinish-caps c j g op allNid inst κ id now vals sl sched st
+... | false = innerFinish-caps c dep bud j g op allNid inst κ id now vals sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC
 
 stepFrame-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (κ : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -1989,7 +1989,7 @@ stepFrame-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
             (proj₁ (proj₂ r)) ≡ true)
 
 -- MAP: nothing touches the state, so the invariant is only widened
-stepFrame-caps {u = u} c j g id now (map-f fn) κ vals fin sl sched st
+stepFrame-caps {u = u} c dep bud j g id now (map-f fn) κ vals fin sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC vC =
   j′ , capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
          (frameStep-⊑-+ c 2≤S j j′) inv
@@ -2005,7 +2005,7 @@ stepFrame-caps {u = u} c j g id now (map-f fn) κ vals fin sl sched st
 -- SCAN: its own top-level lemma, as in the wet family — the nested
 -- `with` on the stored accumulator's type cannot be elaborated inside a
 -- clause of the general frame case
-stepFrame-caps c j g id now (scan-f fn nid) κ vals fin sl sched st
+stepFrame-caps c dep bud j g id now (scan-f fn nid) κ vals fin sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC vC =
   proj₁ SC , proj₁ (proj₂ SC)
     , face-vals c j (proj₁ SC) sl
@@ -2019,7 +2019,7 @@ stepFrame-caps c j g id now (scan-f fn nid) κ vals fin sl sched st
          2≤S slC slEq inv fS pS (valsOf (frameStep j c) sl vals vC)
 
 -- TAKE: a prefix and a cut, no folds
-stepFrame-caps c j g id now (take-f nid) κ vals fin sl sched st 2≤S 1≤R slEq slC slSz inv fS pS lC vC =
+stepFrame-caps c dep bud j g id now (take-f nid) κ vals fin sl sched st 2≤S 1≤R slEq slC slSz inv fS pS lC vC =
   0 , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ (proj₂ (proj₂ TD))))
                      (proj₂ (proj₂ (proj₂ (proj₂ TD)))) ≡ true)
@@ -2039,12 +2039,12 @@ stepFrame-caps c j g id now (take-f nid) κ vals fin sl sched st 2≤S 1≤R slE
           (valsOf (frameStep j c) sl vals vC)
 
 -- FROM-INNER and THRU-OUTER: the two *All edges, delegated whole
-stepFrame-caps c j g id now (from-inner op allNid inst) κ vals fin sl sched st
+stepFrame-caps c dep bud j g id now (from-inner op allNid inst) κ vals fin sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC vC =
-  innerReact-caps c j g op allNid inst κ id now vals fin sl sched st
+  innerReact-caps c dep bud j g op allNid inst κ id now vals fin sl sched st
     2≤S 1≤R slEq slC slSz inv pS lC vC
 
-stepFrame-caps c j g id now (thru-outer op nid) κ vals fin sl sched st
+stepFrame-caps c dep bud j g id now (thru-outer op nid) κ vals fin sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC vC =
   j′ , proj₁ WR
      , valsIn (frameStep (j + j′) c) sl (proj₁ (thruWrap op nid fin WK))
@@ -2055,7 +2055,7 @@ stepFrame-caps c j g id now (thru-outer op nid) κ vals fin sl sched st
                    (proj₁ (proj₂ (proj₂ TW)))))
      , proj₂ (proj₂ WR)
   where
-  TW = thruWalk-caps c j g op nid κ id now vals sl sched st
+  TW = thruWalk-caps c dep bud j g op nid κ id now vals sl sched st
          2≤S 1≤R slEq slC slSz inv pS vC lC
   j′ = proj₁ TW
   WK = thruWalk g op nid κ id now vals sched st
@@ -2103,7 +2103,7 @@ retagEvents-caps {u = u} c sl (complete  ∷ es) =
   ∧-intro refl (retagEvents-caps {u = u} c sl es)
 
 pushBurst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (κ : Path Γ u t) (str : Stream Γ s)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -2122,14 +2122,14 @@ pushBurst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-pushBurst-caps {u = u} c j g id now f κ [] sl sched st
+pushBurst-caps {u = u} c dep bud j g id now f κ [] sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC bC cC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = u} (frameStep x c) sl [] ≡ true)
             (sym (+-identityʳ j)) refl
     , refl
-pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c j g id now f κ (em ∷ ems) sl sched st
+pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c dep bud j g id now f κ (em ∷ ems) sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC bC cC =
   j₁ + j₂
     , frameStep-+assoc-caps c j j₁ j₂ (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST))
@@ -2158,7 +2158,7 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c j g id now f κ (em ∷ ems) 
   cCv  = proj₂ (∧-true (length (em ∷ ems) ≤ᵇ cntW) (all cntP (em ∷ ems)) cC)
   cntE = ≤ᵇ⇒≤ (valCountᵉ E) cntW
            (T-to (proj₁ (∧-true (cntP em) (all cntP ems) cCv)))
-  SF   = stepFrame-caps c j g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
+  SF   = stepFrame-caps c dep bud j g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
            2≤S 1≤R slEq slC slSz inv fS pS lC
            (splitEvents-valsCaps {u = u} (frameStep j c) sl E eC cntE)
   j₁   = proj₁ SF
@@ -2166,7 +2166,7 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c j g id now f κ (em ∷ ems) 
   sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))
   st₁  = proj₂ (proj₂ (proj₂ (proj₂ step)))
   ⊑₁   = frameStep-⊑-+ c 2≤S j j₁
-  IH   = pushBurst-caps c (j + j₁) g id now f κ ems sl sd₁ st₁ 2≤S 1≤R
+  IH   = pushBurst-caps c dep bud (j + j₁) g id now f κ ems sl sd₁ st₁ 2≤S 1≤R
            (trans (KeepsC.slotsEq
                     (stepFrame-keeps g id now f κ (proj₁ sp)
                        (proj₂ (proj₂ sp)) sched st))
@@ -2257,7 +2257,7 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c j g id now f κ (em ∷ ems) 
 -- THE *All HEAD.  One j for the thru-outer frame the chain gains, then
 -- the burst is pushed back through that same frame
 subscribeAll-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
   (b : Closed Γ (obs u)) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -2277,7 +2277,7 @@ subscribeAll-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
+subscribeAll-caps {Γ = Γ} {t = t} {u = u} c dep bud j g op ns b κ id now sl sched st
                   2≤S 1≤R slEq slC slSz inv bn wn szb wdb pC lC =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
@@ -2312,14 +2312,14 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                 sched st inv))
-  SUB = subscribeE-caps c (suc j) g b κ′ id now sl sched₀ st₀ 2≤S 1≤R slEq slC slSz inv₀
+  SUB = subscribeE-caps c dep bud (suc j) g b κ′ id now sl sched₀ st₀ 2≤S 1≤R slEq slC slSz inv₀
           (≤-trans szb (proj₁ step⊑))
           (≤-trans wdb (proj₁ (proj₂ step⊑)))
           pC′
           (frameStep-chain-suc c j (pathLen κ) 2≤S lC)
   j₁  = proj₁ SUB
   res = subscribeE g b κ′ id now sched₀ st₀
-  PBc = pushBurst-caps c (suc j + j₁) g id now (thru-outer op nid) κ (proj₁ res)
+  PBc = pushBurst-caps c dep bud (suc j + j₁) g id now (thru-outer op nid) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq (subscribeE-keeps g b κ′ id now sched₀ st₀)) slEq)
           slC slSz (proj₁ (proj₂ SUB)) refl
@@ -2356,14 +2356,14 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c j g op ns b κ id now sl sched st
 ------------------------------------------------------------------
 
 -- SLOT: delegated whole
-subscribeE-caps c j g (input i) κ bid now sl sched st
+subscribeE-caps c dep bud j g (input i) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
-  subscribeE-input-caps c j g i κ bid now sl sched st 2≤S 1≤R slEq slC slSz inv pC lC
+  subscribeE-input-caps c dep bud j g i κ bid now sl sched st 2≤S 1≤R slEq slC slSz inv pC lC
 
 -- LITERALS: one shot, and the payloads come off evalTms-caps.  The
 -- state is untouched; only the source counter moves, which capsOK?
 -- does not read
-subscribeE-caps {n = n} {u = u} c j g (ofᵉ ts) κ bid now sl sched st
+subscribeE-caps {n = n} {u = u} c dep bud j g (ofᵉ ts) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   j₀ + 3 , capsOK?-mono (frameStep j c) (frameStep (j + (j₀ + 3)) c) sched st
              (frameStep-⊑-+ c 2≤S j (j₀ + 3)) inv
@@ -2411,7 +2411,7 @@ subscribeE-caps {n = n} {u = u} c j g (ofᵉ ts) κ bid now sl sched st
                               (≤⇒≤ᵇ LENB)))
               refl)
 
-subscribeE-caps {u = u} c j g emptyᵉ κ bid now sl sched st
+subscribeE-caps {u = u} c dep bud j g emptyᵉ κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -2422,7 +2422,7 @@ subscribeE-caps {u = u} c j g emptyᵉ κ bid now sl sched st
 
 -- MAP: one more frame on the chain, so one j, then the burst comes back
 -- through that same frame
-subscribeE-caps {n = n} {t = t} {u = u} c j g (mapᵉ f b) κ bid now sl sched st
+subscribeE-caps {n = n} {t = t} {u = u} c dep bud j g (mapᵉ f b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
@@ -2452,7 +2452,7 @@ subscribeE-caps {n = n} {t = t} {u = u} c j g (mapᵉ f b) κ bid now sl sched s
           (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
                      (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
                    (pathSz?-⊑ κ step⊑ pC))
-  SUB = subscribeE-caps c (suc j) g b (map-f f ↠ κ) bid now sl sched st
+  SUB = subscribeE-caps c dep bud (suc j) g b (map-f f ↠ κ) bid now sl sched st
           2≤S 1≤R slEq slC slSz
           (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st step⊑ inv)
           (≤-trans szb′ (proj₁ step⊑))
@@ -2462,7 +2462,7 @@ subscribeE-caps {n = n} {t = t} {u = u} c j g (mapᵉ f b) κ bid now sl sched s
   j₁  = proj₁ SUB
   res = subscribeE g b (map-f f ↠ κ) bid now sched st
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
-  PBc = pushBurst-caps c (suc j + j₁) g bid now (map-f f) κ (proj₁ res)
+  PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (map-f f) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
                    (subscribeE-keeps g b (map-f f ↠ κ) bid now sched st)) slEq)
@@ -2479,7 +2479,7 @@ subscribeE-caps {n = n} {t = t} {u = u} c j g (mapᵉ f b) κ bid now sl sched s
 -- TAKE: `take 0` never subscribes its source — a spent one-shot, exactly
 -- emptyᵉ.  Otherwise a node is installed (trivially bounded on both
 -- axes) and the source runs under one more frame
-subscribeE-caps {n = n} {u = u} c j g (takeᵉ cnt b) κ bid now sl sched st
+subscribeE-caps {n = n} {u = u} c dep bud j g (takeᵉ cnt b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC
   with evalTm cnt
 ... | zero =
@@ -2524,7 +2524,7 @@ subscribeE-caps {n = n} {u = u} c j g (takeᵉ cnt b) κ bid now sl sched st
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                 sched st inv))
-  SUB = subscribeE-caps c (suc j) g b (take-f nid ↠ κ) bid now sl sched₀ st₀
+  SUB = subscribeE-caps c dep bud (suc j) g b (take-f nid ↠ κ) bid now sl sched₀ st₀
           2≤S 1≤R slEq slC slSz inv₀
           (≤-trans szb′ (proj₁ step⊑))
           (≤-trans (m≤n⊔m (dWᵗ n sl cnt) (dWᵉ n sl b))
@@ -2534,7 +2534,7 @@ subscribeE-caps {n = n} {u = u} c j g (takeᵉ cnt b) κ bid now sl sched st
   j₁  = proj₁ SUB
   res = subscribeE g b (take-f nid ↠ κ) bid now sched₀ st₀
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
-  PBc = pushBurst-caps c (suc j + j₁) g bid now (take-f nid) κ (proj₁ res)
+  PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (take-f nid) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
                    (subscribeE-keeps g b (take-f nid ↠ κ) bid now sched₀ st₀)) slEq)
@@ -2550,7 +2550,7 @@ subscribeE-caps {n = n} {u = u} c j g (takeᵉ cnt b) κ bid now sl sched st
 -- SCAN: the accumulator is BUILT, by evalTm, so the node's two bounds
 -- come off evalSeed-caps and cost a receipt of their own before the
 -- source is even subscribed
-subscribeE-caps {n = n} {u = u} c j g (scanᵉ f z b) κ bid now sl sched st
+subscribeE-caps {n = n} {u = u} c dep bud j g (scanᵉ f z b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   j₀ + suc (j₁ + j₂)
     , frameStep-+assoc-caps c j j₀ (suc (j₁ + j₂))
@@ -2606,7 +2606,7 @@ subscribeE-caps {n = n} {u = u} c j g (scanᵉ f z b) κ bid now sl sched st
               (⊑ᶜ-trans ⊑₀ step⊑)
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                 sched st inv))
-  SUB = subscribeE-caps c (suc (j + j₀)) g b (scan-f f nid ↠ κ) bid now sl
+  SUB = subscribeE-caps c dep bud (suc (j + j₀)) g b (scan-f f nid ↠ κ) bid now sl
           sched₀ st₀ 2≤S 1≤R slEq slC slSz inv₀
           (≤-trans szb′ (≤-trans (proj₁ ⊑₀) (proj₁ step⊑)))
           (≤-trans (m≤n⊔m (dWᵗ n sl f ⊔ dWᵗ n sl z) (dWᵉ n sl b))
@@ -2617,7 +2617,7 @@ subscribeE-caps {n = n} {u = u} c j g (scanᵉ f z b) κ bid now sl sched st
   j₁  = proj₁ SUB
   res = subscribeE g b (scan-f f nid ↠ κ) bid now sched₀ st₀
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc (j + j₀)) j₁
-  PBc = pushBurst-caps c (suc (j + j₀) + j₁) g bid now (scan-f f nid) κ
+  PBc = pushBurst-caps c dep bud (suc (j + j₀) + j₁) g bid now (scan-f f nid) κ
           (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
                    (subscribeE-keeps g b (scan-f f nid ↠ κ) bid now sched₀ st₀))
@@ -2635,28 +2635,28 @@ subscribeE-caps {n = n} {u = u} c j g (scanᵉ f z b) κ bid now sl sched st
 
 -- THE FOUR *All HEADS: subscribeAll-caps, whole.  Every initial node
 -- state is bounded on both axes by refl
-subscribeE-caps {n = n} c j g (mergeAllᵉ b) κ bid now sl sched st
+subscribeE-caps {n = n} c dep bud j g (mergeAllᵉ b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
-  subscribeAll-caps c j g mergeᵒ (merge-st 0 false) b κ bid now sl sched st
+  subscribeAll-caps c dep bud j g mergeᵒ (merge-st 0 false) b κ bid now sl sched st
     2≤S 1≤R slEq slC slSz inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
-subscribeE-caps {n = n} {u = u} c j g (concatAllᵉ b) κ bid now sl sched st
+subscribeE-caps {n = n} {u = u} c dep bud j g (concatAllᵉ b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
-  subscribeAll-caps c j g concatᵒ (concat-st {t = u} [] false false) b κ bid now
+  subscribeAll-caps c dep bud j g concatᵒ (concat-st {t = u} [] false false) b κ bid now
     sl sched st 2≤S 1≤R slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
-subscribeE-caps {n = n} c j g (switchAllᵉ b) κ bid now sl sched st
+subscribeE-caps {n = n} c dep bud j g (switchAllᵉ b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
-  subscribeAll-caps c j g switchᵒ (switch-st nothing false) b κ bid now sl sched st
+  subscribeAll-caps c dep bud j g switchᵒ (switch-st nothing false) b κ bid now sl sched st
     2≤S 1≤R slEq slC slSz inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
-subscribeE-caps {n = n} c j g (exhaustAllᵉ b) κ bid now sl sched st
+subscribeE-caps {n = n} c dep bud j g (exhaustAllᵉ b) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
-  subscribeAll-caps c j g exhaustᵒ (exhaust-st false false) b κ bid now sl sched st
+  subscribeAll-caps c dep bud j g exhaustᵒ (exhaust-st false false) b κ bid now sl sched st
     2≤S 1≤R slEq slC slSz inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
 
 -- μ: out of gas is a dry close; with gas, ONE unfolding — larger than
 -- the μ on the size axis (unfoldμ-size buys the room) and no larger on
 -- the width axis (dW-unfoldμ)
-subscribeE-caps {u = u} c j g0 (μᵉ body) κ bid now sl sched st
+subscribeE-caps {u = u} c dep bud j g0 (μᵉ body) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -2664,7 +2664,7 @@ subscribeE-caps {u = u} c j g0 (μᵉ body) κ bid now sl sched st
                      (dryBurst {A = Val _ u} bid) ≡ true)
             (sym (+-identityʳ j)) refl
     , refl
-subscribeE-caps {n = n} c j (gs fuel) (μᵉ body) κ bid now sl sched st
+subscribeE-caps {n = n} c dep bud j (gs fuel) (μᵉ body) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   j₀ + j₁
     , frameStep-+assoc-caps c j j₀ j₁ (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -2677,7 +2677,7 @@ subscribeE-caps {n = n} c j (gs fuel) (μᵉ body) κ bid now sl sched st
   US = unfoldμ-caps c j sl body 2≤S slC szb wdb
   j₀ = proj₁ US
   ⊑₀ = frameStep-⊑-+ c 2≤S j j₀
-  IH = subscribeE-caps c (j + j₀) fuel (unfoldμ body) κ bid now sl sched st
+  IH = subscribeE-caps c dep bud (j + j₀) fuel (unfoldμ body) κ bid now sl sched st
          2≤S 1≤R slEq slC slSz
          (capsOK?-mono (frameStep j c) (frameStep (j + j₀) c) sched st ⊑₀ inv)
          (proj₁ (proj₂ US))
@@ -2687,7 +2687,7 @@ subscribeE-caps {n = n} c j (gs fuel) (μᵉ body) κ bid now sl sched st
   j₁ = proj₁ IH
   res = subscribeE fuel (unfoldμ body) κ bid now sched st
 
-subscribeE-caps c j g (varᵉ ()) κ bid now sl sched st
+subscribeE-caps c dep bud j g (varᵉ ()) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC
 
 -- DEFER: the clause the parked width exists for.  Install the merge
@@ -2695,7 +2695,7 @@ subscribeE-caps c j g (varᵉ ()) κ bid now sl sched st
 -- pending, and register the thru-outer chain — one j, for the
 -- registration.  The LiveSource's width bound IS the telescope's dW
 -- conjunct: `dWᵉ (deferᵉ body)` is `pWᵉ body`, definitionally
-subscribeE-caps {n = n} {Γ = Γ} {u = u} c j g (deferᵉ body) κ bid now sl sched st
+subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud j g (deferᵉ body) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC =
   1 , subst (λ x → capsOK? (frameStep x c) SCHED₄
                      (register SRC (thru-outer mergeᵒ nid ↠ κ) st₀) ≡ true)
@@ -2764,7 +2764,7 @@ subscribeE-caps {n = n} {Γ = Γ} {u = u} c j g (deferᵉ body) κ bid now sl sc
 ------------------------------------------------------------------
 
 foldPath-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (j : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick)
+  (c : Caps) (dep bud j : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick)
   (envSrc : Source) (path : Path Γ u t) (vals : List (Val Γ u))
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -2783,7 +2783,7 @@ foldPath-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
 dispatchShare-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (c : Caps) (dep bud j : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -2799,7 +2799,7 @@ dispatchShare-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
 shareGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (c : Caps) (dep bud j : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (ps : List (RegId × Path Γ (lookup Γ i) t))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -2818,7 +2818,7 @@ shareGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
 -- ROOT: the chain's sink.  Nothing steps, so j′ = 0 and the only work
 -- is assembling one emit out of bounds already in hand
-foldPath-caps c j sf gas id now envSrc root vals evs fin sl sched st
+foldPath-caps c dep bud j sf gas id now envSrc root vals evs fin sl sched st
               2≤S 1≤R slEq slC slSz inv pS vC eC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -2838,7 +2838,7 @@ foldPath-caps c j sf gas id now envSrc root vals evs fin sl sched st
 -- SHARE SINK: the chain emits its own (valueless) handoff and the share
 -- fans out.  The handoff emit is built at the entry level and widened
 -- to the fan-out's exit level exactly once
-foldPath-caps c j sf gas id now envSrc (share-sink i) vals evs fin sl sched st
+foldPath-caps c dep bud j sf gas id now envSrc (share-sink i) vals evs fin sl sched st
               2≤S 1≤R slEq slC slSz inv pS vC eC =
   j₁ , proj₁ (proj₂ DS)
      , ∧-intro (all-++-intro (eventCaps? (frameStep (j + j₁) c) sl) evs _
@@ -2846,14 +2846,14 @@ foldPath-caps c j sf gas id now envSrc (share-sink i) vals evs fin sl sched st
                   refl)
                (proj₂ (proj₂ DS))
   where
-  DS = dispatchShare-caps c j sf gas id now i vals fin sl sched st
+  DS = dispatchShare-caps c dep bud j sf gas id now i vals fin sl sched st
          2≤S 1≤R slEq slC slSz inv vC
   j₁ = proj₁ DS
 
 -- ONE FRAME, THEN THE REST OF THE CHAIN.  j₁ pays the frame, j₂ the
 -- tail, and the clause reports j₁ + j₂ — the additive composition,
 -- rebracketed by +-assoc and nothing else
-foldPath-caps c j sf gas id now envSrc (f ↠ p) vals evs fin sl sched st
+foldPath-caps c dep bud j sf gas id now envSrc (f ↠ p) vals evs fin sl sched st
               2≤S 1≤R slEq slC slSz inv pS vC eC =
   j₁ + j₂
     , frameStep-+assoc-caps c j j₁ j₂ (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST))
@@ -2863,14 +2863,14 @@ foldPath-caps c j sf gas id now envSrc (f ↠ p) vals evs fin sl sched st
   B    = Caps.cSize (frameStep j c)
   pS1  = ∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) pS
   pS2  = ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) (proj₂ pS1)
-  SF   = stepFrame-caps c j sf id now f p vals fin sl sched st
+  SF   = stepFrame-caps c dep bud j sf id now f p vals fin sl sched st
            2≤S 1≤R slEq slC slSz inv (proj₁ pS1) (proj₂ pS2)
            (≤ᵇ⇒≤ _ _ (T-to (proj₁ pS2))) vC
   j₁   = proj₁ SF
   step = stepFrame sf id now f p vals fin sched st
   sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))
   st₁  = proj₂ (proj₂ (proj₂ (proj₂ step)))
-  IH   = foldPath-caps c (j + j₁) sf gas id now envSrc p
+  IH   = foldPath-caps c dep bud (j + j₁) sf gas id now envSrc p
            (proj₁ step) (evs ++ proj₁ (proj₂ step))
            (proj₁ (proj₂ (proj₂ step))) sl sd₁ st₁
            2≤S 1≤R
@@ -2891,17 +2891,17 @@ foldPath-caps c j sf gas id now envSrc (f ↠ p) vals evs fin sl sched st
 -- fan out, then finish.  The dispatch gas is the telescope bound and
 -- never runs out on a real run, so the zero clause is the evaluator's
 -- own unreachable branch
-dispatchShare-caps {t = t} c j sf zero id now i vals fin sl sched st
+dispatchShare-caps {t = t} c dep bud j sf zero id now i vals fin sl sched st
                    2≤S 1≤R slEq slC slSz inv vC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = t} (frameStep x c) sl [] ≡ true)
             (sym (+-identityʳ j)) refl
-dispatchShare-caps c j sf (suc gas) id now i vals fin sl sched st 2≤S 1≤R slEq slC slSz inv vC =
+dispatchShare-caps c dep bud j sf (suc gas) id now i vals fin sl sched st 2≤S 1≤R slEq slC slSz inv vC =
   j₁ , proj₁ FIN , proj₂ FIN
   where
   st₀ = shareLatch i fin st
-  GO  = shareGo-caps c j sf gas id now i vals fin
+  GO  = shareGo-caps c dep bud j sf gas id now i vals fin
           (shareAdmit i (EvalSt.registry st)) sl sched st₀
           2≤S 1≤R slEq slC slSz (shareLatch-caps (frameStep j c) i fin sched st inv)
           (shareAdmit-caps (Caps.cSize (frameStep j c)) i (EvalSt.registry st)
@@ -2915,16 +2915,16 @@ dispatchShare-caps c j sf (suc gas) id now i vals fin sl sched st 2≤S 1≤R sl
 
 -- FAN-OUT: one registration at a time.  A cancelled chain delivers
 -- nothing and costs nothing; a survivor folds, and the two receipts add
-shareGo-caps {t = t} c j sf gas id now i vals fin [] sl sched st
+shareGo-caps {t = t} c dep bud j sf gas id now i vals fin [] sl sched st
              2≤S 1≤R slEq slC slSz inv pS vC =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = t} (frameStep x c) sl [] ≡ true)
             (sym (+-identityʳ j)) refl
-shareGo-caps {Γ = Γ} c j sf gas id now i vals fin ((rid , p) ∷ ps) sl sched st
+shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) sl sched st
              2≤S 1≤R slEq slC slSz inv pS vC
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true  = shareGo-caps c j sf gas id now i vals fin ps sl sched st
+... | true  = shareGo-caps c dep bud j sf gas id now i vals fin ps sl sched st
                 2≤S 1≤R slEq slC slSz inv (proj₂ (∧-true _ _ pS)) vC
 ... | false =
   j₁ + j₂
@@ -2938,13 +2938,13 @@ shareGo-caps {Γ = Γ} c j sf gas id now i vals fin ((rid , p) ∷ ps) sl sched 
   where
   st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
   cl  = if fin then close (toℕ i) exhausted ∷ [] else []
-  HD  = foldPath-caps c j sf gas id now (toℕ i) p vals cl fin sl sched st₀
+  HD  = foldPath-caps c dep bud j sf gas id now (toℕ i) p vals cl fin sl sched st₀
           2≤S 1≤R slEq slC slSz (capsOK?-delivered (frameStep j c) rid sched st inv)
           (proj₁ (∧-true _ _ pS)) vC
           (closeList-caps (frameStep j c) sl (toℕ i) fin)
   j₁  = proj₁ HD
   FP  = foldPath sf gas id now (toℕ i) p vals cl fin sched st₀
-  IH  = shareGo-caps c (j + j₁) sf gas id now i vals fin ps sl
+  IH  = shareGo-caps c dep bud (j + j₁) sf gas id now i vals fin ps sl
           (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
           2≤S 1≤R
           (trans (foldPath-slots sf gas id now (toℕ i) p vals cl fin sched st₀)
@@ -2960,7 +2960,7 @@ shareGo-caps {Γ = Γ} c j sf gas id now i vals fin ((rid , p) ∷ ps) sl sched 
 -- one arrival into one chain: foldPath seeded with the payload, the
 -- source's close if it is spent, and the completion flag
 chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (j : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (c : Caps) (dep bud j : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
@@ -2974,8 +2974,8 @@ chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-chainStep-caps {n = n} {e = e} c j id a path sl sched st 2≤S 1≤R slEq slC slSz inv pS vC =
-  foldPath-caps c j (budgetAt e (Sched.slots sched) id) n id (arrTick a)
+chainStep-caps {n = n} {e = e} c dep bud j id a path sl sched st 2≤S 1≤R slEq slC slSz inv pS vC =
+  foldPath-caps c dep bud j (budgetAt e (Sched.slots sched) id) n id (arrTick a)
     (arrSource a) path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sl sched st
