@@ -85,27 +85,54 @@
 -- nesting depth, so it is a tower and must not be written as anything
 -- shaped like `3 + Ω`.
 --
--- FIVE POSTULATES REMAIN (2026-08-02, after the entry-charging
--- refutation and the level-walk repair).  They are: the three walk faces
--- (subscribeE-wet, cascadeGo-wet, subscribeE-walk), the per-delivery
--- charge (cascadeGo-charge, design-owned and frozen), and ONE PER-FRAME
--- FACE, stepFrame-face.  3 + 1 + 1 = 5, and NONE of the five is known
--- false.  caps-fuel-root, once the sixth, is ground (.Wet, abstract).
+-- SIX POSTULATES REMAIN (2026-08-03), and the count went UP because
+-- the fifth was SPLIT rather than because anything failed.  They are:
+-- the three walk faces (subscribeE-wet, cascadeGo-wet, subscribeE-walk),
+-- the per-delivery charge (cascadeGo-charge, design-owned and frozen),
+-- and TWO PER-FRAME PIECES — innerFinish-concat-face and
+-- thruOuter-face.  3 + 1 + 2 = 6, and NONE of the six is known false.
+-- caps-fuel-root, once among them, is ground (.Wet, abstract).
 --
--- THE SHAPE OF THE FIFTH IS THE NEWS.  It used to be
--- cascadeGo-deliveries — a statement about a WHOLE CASCADE, quantified
--- over every registry an unbounded walk can reach — and it is now a
--- theorem: .Delivery-Walk maps the delivery clique onto the level walk
--- `dCapᶜ` (.Caps) and .Caps-Face instantiates it.  What is left is one
--- `stepFrame` call, and it is the GROUND `stepFrame-caps` plus two
--- conjuncts (a bound on the growth index it already builds, and the
--- burst ledger's width conjunct on its output).  An intermediate ruling
--- charged the frame at the cascade's ENTRY caps instead; that is
--- REFUTED, machine-checked, by one map-f frame whose output breaches the
--- cap it was charged at (agda/probe/Entry-Caps-Refuted.agda), and the
--- repair is that the walk carries the level rather than a fixed budget.
--- frameBlowup is fully defined, and cascadeGo-caps, the cascade
--- bookends and the chain snapshot are all ground.
+-- THE SHAPE OF THE PER-FRAME HOLE IS THE NEWS, and it has now shrunk
+-- twice.  It used to be cascadeGo-deliveries — a statement about a
+-- WHOLE CASCADE, quantified over every registry an unbounded walk can
+-- reach — and that is now a theorem: .Delivery-Walk maps the delivery
+-- clique onto the level walk `dCapᶜ` (.Caps) and .Caps-Face
+-- instantiates it.  What was left was ONE `stepFrame` call
+-- (stepFrame-face): the GROUND `stepFrame-caps` plus two conjuncts, a
+-- bound on the growth index it already builds and the burst ledger's
+-- WIDTH conjunct on its output.  That is now ground too, on five clause
+-- pieces, three of them proven:
+--
+--   map-f       j′ = suc (sizeᵗ fn)                       PROVEN
+--   scan-f      j′ = suc (length vals * suc (sizeᵗ fn))   PROVEN
+--   take-f      j′ = 0                                    PROVEN
+--   from-inner  0 on every clause but concatAll's drain   PROVEN but
+--                                                         for the drain
+--   thru-outer  one subscribe per payload                 postulated
+--
+-- The receipt bound is one `*-mono-≤`, because fCharge's two factors
+-- ARE the caps at the level by refl (frameStep's fields are iterFold /
+-- iterSize at the same S), and the scan row lands EXACTLY: valsCaps?'s
+-- own width conjunct pays the first factor and frameSz?'s size conjunct
+-- the second.  The output width on those three is the INPUT width —
+-- map emits one payload per input, scan one per input, take a prefix.
+--
+-- AND BOTH REMAINING PIECES WAIT ON ONE MISSING NUMBER: how many VALUES
+-- a subscription burst carries, in the caps currency.  concatDrain and
+-- thruWalk both CONCATENATE the bursts of the inners they subscribe, so
+-- their output width is a sum over payloads of that count — and
+-- `burstCaps?` bounds every EVENT in a burst while saying nothing about
+-- how many there are.  Supplying it is a new conjunct on
+-- `subscribeE-caps`, i.e. a second pass over that companion tree.
+--
+-- An intermediate ruling charged the frame at the cascade's ENTRY caps
+-- instead; that is REFUTED, machine-checked, by one map-f frame whose
+-- output breaches the cap it was charged at
+-- (agda/probe/Entry-Caps-Refuted.agda), and the repair is that the walk
+-- carries the level rather than a fixed budget.  frameBlowup is fully
+-- defined, and cascadeGo-caps, the cascade bookends and the chain
+-- snapshot are all ground.
 --
 -- THE FIVE EVALUATION OBLIGATIONS ARE GROUND (2026-08-01), which is
 -- what the count 10 → 5 is.  mapFrame-caps, scanFrame-caps,
