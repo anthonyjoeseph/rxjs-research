@@ -226,6 +226,18 @@ mu-1≤k : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
   (sl : Slots Γ) (cs : List Source) (k : ℕ) → nest (μᵉ body) sl cs ≤ k → 1 ≤ k
 mu-1≤k body sl cs (suc k) h = s≤s z≤n
 
+-- and the WEAKER μ step, which is all the premise itself needs: an
+-- unfolding is one smaller on this measure, so the same budget still
+-- covers it.  The budget only has to DESCEND where the level conjunct is
+-- reported; carrying the hypothesis across the edge does not spend one
+mu-step-le : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
+  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+  nest (μᵉ body) sl cs ≤ k → nest (unfoldμ body) sl cs ≤ k
+mu-step-le body sl cs k =
+  ≤-trans (+-monoˡ-≤ (resid sl cs)
+            (≤-trans (≤-reflexive (syncSize-unfoldμ body))
+                     (n≤1+n (syncSizeᵉ body))))
+
 -- ONE CHAIN EDGE.  Every operator's head is a strict subterm whose
 -- syncSize the constructor's own `suc` dominates, so one lemma with the
 -- head's syncSize abstracted covers map / take / scan and all four *All

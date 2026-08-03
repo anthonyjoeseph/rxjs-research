@@ -1485,7 +1485,10 @@ thruWalk-caps {u = u} c dep bud j g op nid κ id now (o ∷ os) sl sched st
              (lenWiden os (frameStep-⊑-+ c 2≤S j j₁)
                 (≤-trans (n≤1+n (length os))
                          (valsLen (frameStep j c) sl (o ∷ os) vC))))
-          (≤-trans lC (proj₁ (frameStep-⊑-+ c 2≤S j j₁))) TEMP-≡
+          (≤-trans lC (proj₁ (frameStep-⊑-+ c 2≤S j j₁)))
+          (mList?-keeps bud sl _ _ os
+             (KeepsC.connMono (thruConsume-keeps g op nid κ id now o sched st))
+             (mList?-tail bud sl _ o os nst))
   j₂   = proj₁ IH
   REST = thruWalk g op nid κ id now os sd₁ st₁
   ⊑ˢ   = frameStep-+suc c j j₁ j₂ 2≤S
@@ -1526,15 +1529,16 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
          2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ qC)) pC lC
          (mList?-head bud sl _ o q nst)
      | KeepsC.slotsEq (subscribeInner-keeps g concatᵒ allNid κ id now o sched st)
+     | KeepsC.connMono (subscribeInner-keeps g concatᵒ allNid κ id now o sched st)
 -- the inner stays open: it becomes the active one and the rest of the
 -- queue is parked, still bounded
-... | (inst , vs , bs , false , sched₁ , st₁) | (j₁ , SUB , VC , EC) | sEq =
+... | (inst , vs , bs , false , sched₁ , st₁) | (j₁ , SUB , VC , EC) | sEq | cMono =
   j₁ , SUB , VC , EC
      , obsListCaps?-widen sl q (frameStep-⊑-+ c 2≤S j j₁) (proj₂ (∧-true _ _ qC))
 -- the inner completed synchronously: drain on, and the two receipts add
 -- PLUS ONE — `vs ++ proj₁ REST` is a SUM of two counts, so this clause
 -- pays the extra fold Concat-Sum-Probe showed the sum needs
-... | (inst , vs , bs , true , sched₁ , st₁) | (j₁ , SUB , VC , EC) | sEq =
+... | (inst , vs , bs , true , sched₁ , st₁) | (j₁ , SUB , VC , EC) | sEq | cMono =
   suc (j₁ + j₂)
     , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ REST)))))
@@ -1568,7 +1572,8 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
            (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S j j₁) pC)
            (≤-trans lC (proj₁ (frameStep-⊑-+ c 2≤S j j₁)))
            (obsListCaps?-widen sl q (frameStep-⊑-+ c 2≤S j j₁)
-              (proj₂ (∧-true _ _ qC))) TEMP-≡
+              (proj₂ (∧-true _ _ qC)))
+           (mList?-keeps bud sl _ _ q cMono (mList?-tail bud sl _ o q nst))
   j₂   = proj₁ IH
   REST = concatDrain g allNid κ id now q sched₁ st₁
   ⊑ˢ   = frameStep-+suc c j j₁ j₂ 2≤S
@@ -1707,7 +1712,13 @@ innerFinish-caps {n = n} {s = s} c dep bud j g concatᵒ allNid inst κ id now v
           (obsList-intro (frameStep j c) sl q bn
              (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
                              ≡ true)
-                    slEq wnAll)) TEMP-≡
+                    slEq wnAll))
+          (mList?-widen sl _ q fb
+             (obsList→mList c j sl _ q (≤-trans (s≤s z≤n) 2≤S) slSz
+                (obsList-intro (frameStep j c) sl q bn
+                   (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
+                                   ≡ true)
+                          slEq wnAll))))
   j′  = proj₁ CD
   ⊑ˢ  = frameStep-mono-j c 2≤S
           (≤-trans (n≤1+n (j + j′)) (≤-reflexive (sym (+-suc j j′))))
@@ -2095,7 +2106,10 @@ stepFrame-caps c dep bud j g id now (thru-outer op nid) κ vals fin sl sched st
      , proj₂ (proj₂ WR)
   where
   TW = thruWalk-caps c dep bud j g op nid κ id now vals sl sched st
-         2≤S 1≤R slEq slC slSz inv pS vC lC TEMP-≡
+         2≤S 1≤R slEq slC slSz inv pS vC lC
+         (mList?-widen sl _ vals fb
+            (valsCaps→mList c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
+               (valsOf (frameStep j c) sl vals vC)))
   j′ = proj₁ TW
   WK = thruWalk g op nid κ id now vals sched st
   WR = thruWrap-caps (frameStep (j + j′) c) op nid fin sl WK
@@ -2197,9 +2211,9 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c dep bud j g id now f κ (em �
   cCv  = proj₂ (∧-true (length (em ∷ ems) ≤ᵇ cntW) (all cntP (em ∷ ems)) cC)
   cntE = ≤ᵇ⇒≤ (valCountᵉ E) cntW
            (T-to (proj₁ (∧-true (cntP em) (all cntP ems) cCv)))
-  SF   = stepFrame-caps c dep bud j g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
+  SF   = stepFrame-caps c dep (frameBud c j) j g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
            2≤S 1≤R slEq slC slSz inv fS pS lC
-           (splitEvents-valsCaps {u = u} (frameStep j c) sl E eC cntE) TEMP-≤
+           (splitEvents-valsCaps {u = u} (frameStep j c) sl E eC cntE) ≤-refl
   j₁   = proj₁ SF
   step = stepFrame g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
   sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))
@@ -2726,7 +2740,7 @@ subscribeE-caps {n = n} c dep bud j (gs fuel) (μᵉ body) κ bid now sl sched s
          (proj₁ (proj₂ US))
          (proj₂ (proj₂ US))
          (pathSz?-⊑ κ ⊑₀ pC)
-         (≤-trans lC (proj₁ ⊑₀)) TEMP-≤
+         (≤-trans lC (proj₁ ⊑₀)) (mu-step-le body sl _ bud nst)
   j₁ = proj₁ IH
   res = subscribeE fuel (unfoldμ body) κ bid now sched st
 
@@ -2906,9 +2920,9 @@ foldPath-caps c dep bud j sf gas id now envSrc (f ↠ p) vals evs fin sl sched s
   B    = Caps.cSize (frameStep j c)
   pS1  = ∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) pS
   pS2  = ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) (proj₂ pS1)
-  SF   = stepFrame-caps c dep bud j sf id now f p vals fin sl sched st
+  SF   = stepFrame-caps c dep (frameBud c j) j sf id now f p vals fin sl sched st
            2≤S 1≤R slEq slC slSz inv (proj₁ pS1) (proj₂ pS2)
-           (≤ᵇ⇒≤ _ _ (T-to (proj₁ pS2))) vC TEMP-≤
+           (≤ᵇ⇒≤ _ _ (T-to (proj₁ pS2))) vC ≤-refl
   j₁   = proj₁ SF
   step = stepFrame sf id now f p vals fin sched st
   sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))

@@ -3980,6 +3980,34 @@ mList?-head bud sl cs o os h =
   ≤ᵇ⇒≤ (nest o sl cs) bud
     (T-to (proj₁ (∧-true (mOK? bud sl cs o) (mList? bud sl cs os) h)))
 
+-- a bigger budget still covers it, which is how a frame's own bound
+-- reaches a callee that was handed a larger one
+mList?-widen : ∀ {n} {Γ : Ctx n} {s} {bud bud′ : ℕ} (sl : Slots Γ)
+  (cs : List Source) (os : List (Closed Γ s)) → bud ≤ bud′ →
+  mList? bud sl cs os ≡ true → mList? bud′ sl cs os ≡ true
+mList?-widen sl cs []       le h = refl
+mList?-widen {bud = bud} {bud′ = bud′} sl cs (o ∷ os) le h
+  with ∧-true (mOK? bud sl cs o) (mList? bud sl cs os) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl cs ≤ᵇ bud′)
+            (≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ (nest o sl cs) bud (T-to h₁)) le)))
+          (mList?-widen sl cs os le h₂)
+
+-- and it survives a whole evaluator step, on the same KeepsC hypothesis
+-- the single-payload version spends
+mList?-keeps : ∀ {n} {Γ : Ctx n} {s} (bud : ℕ) (sl : Slots Γ)
+  (cs cs′ : List Source) (os : List (Closed Γ s)) →
+  (∀ src → memberSource src cs ≡ true → memberSource src cs′ ≡ true) →
+  mList? bud sl cs os ≡ true → mList? bud sl cs′ os ≡ true
+mList?-keeps bud sl cs cs′ []       mono h = refl
+mList?-keeps bud sl cs cs′ (o ∷ os) mono h
+  with ∧-true (mOK? bud sl cs o) (mList? bud sl cs os) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl cs′ ≤ᵇ bud)
+            (≤⇒≤ᵇ (nest-keeps o sl cs cs′ bud mono
+                     (≤ᵇ⇒≤ (nest o sl cs) bud (T-to h₁)))))
+          (mList?-keeps bud sl cs cs′ os mono h₂)
+
 -- pathSz?'s length conjunct, read back out: the OUTERMOST one bounds
 -- the whole chain, and root / share-sink have no length at all
 pathSz?-len : ∀ {n} {Γ : Ctx n} {u t} (B : ℕ) (p : Path Γ u t) →
