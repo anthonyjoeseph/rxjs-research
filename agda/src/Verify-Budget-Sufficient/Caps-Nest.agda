@@ -58,7 +58,7 @@ open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
   using (iterSize-suc; sizeAt-mono; syncSize≤sizeᵉ; sum-tab-mono; T⇒≡true;
-         syncSize-unfoldμ)
+         syncSize-unfoldμ; f≡t-absurd)
 
 ------------------------------------------------------------------
 -- § 1.  THE RESIDUE — `unconn`, reweighted.
@@ -100,6 +100,29 @@ residAt-cons-≤ sl cs s i with sl i
 resid-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (s : Source) →
   resid sl (s ∷ cs) ≤ resid sl cs
 resid-cons-≤ sl cs s = sum-tab-mono _ _ (residAt-cons-≤ sl cs s)
+
+-- ANTITONE IN THE CONNECTED SET, which is the general form the walks
+-- need: an evaluator step may connect any number of shares, not one, and
+-- what `KeepsC` hands back about a step is exactly this hypothesis —
+-- every source connected before is connected after.  Same proof as
+-- .Measures' `unconn-antitone`, with the weight on it
+residAt-antitone : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs cs′ : List Source)
+  (i : Fin n) →
+  (memberSource (toℕ i) cs ≡ true → memberSource (toℕ i) cs′ ≡ true) →
+  residAt sl cs′ i ≤ residAt sl cs i
+residAt-antitone sl cs cs′ i h with sl i
+... | scripted _ = z≤n
+... | shared d with memberSource (toℕ i) cs′ | memberSource (toℕ i) cs | h
+...   | true  | _     | _  = z≤n
+...   | false | false | _  = ≤-refl
+...   | false | true  | h′ = f≡t-absurd (h′ refl)
+
+resid-antitone : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs cs′ : List Source) →
+  (∀ s → memberSource s cs ≡ true → memberSource s cs′ ≡ true) →
+  resid sl cs′ ≤ resid sl cs
+resid-antitone sl cs cs′ mono =
+  sum-tab-mono (residAt sl cs′) (residAt sl cs)
+    (λ i → residAt-antitone sl cs cs′ i (mono (toℕ i)))
 
 -- … and connecting slot i zeroes i's own contribution outright, which
 -- is the unit the share edge hands its callee
@@ -262,6 +285,15 @@ nest-cons : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
   (sl : Slots Γ) (cs : List Source) (s : Source) (k : ℕ) →
   nest e sl cs ≤ k → nest e sl (s ∷ cs) ≤ k
 nest-cons e sl cs s k = ≤-trans (+-monoʳ-≤ (syncSizeᵉ e) (resid-cons-≤ sl cs s))
+
+-- and the same across a whole evaluator step, which is what a walk
+-- crosses between two payloads
+nest-keeps : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
+  (sl : Slots Γ) (cs cs′ : List Source) (k : ℕ) →
+  (∀ s → memberSource s cs ≡ true → memberSource s cs′ ≡ true) →
+  nest e sl cs ≤ k → nest e sl cs′ ≤ k
+nest-keeps e sl cs cs′ k mono =
+  ≤-trans (+-monoʳ-≤ (syncSizeᵉ e) (resid-antitone sl cs cs′ mono))
 
 ------------------------------------------------------------------
 -- § 3.  THE FRAME ROW.  A frame holds `sizeᵉ o ≤ sizeAt S j` for its

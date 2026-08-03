@@ -961,7 +961,7 @@ subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c dep bud j (gs fuel) op a
                                   sched st inv))
              (≤-trans szo (proj₁ step⊑))
              (≤-trans wdo (proj₁ (proj₂ step⊑))) pC′
-             (frameStep-chain-suc c j (pathLen κ) 2≤S lC) TEMP-≤
+             (frameStep-chain-suc c j (pathLen κ) 2≤S lC) nst
   j₂     = proj₁ IH
   SUB    = proj₁ (proj₂ IH)
   BC     = proj₁ (proj₂ (proj₂ IH))
@@ -1240,7 +1240,7 @@ thruConsume-caps c dep bud j g mergeᵒ nid κ id now o sl sched st 2≤S 1≤R 
      , proj₂ (proj₂ (proj₂ SI))
   where
   SI = subscribeInner-caps c dep bud j g mergeᵒ nid κ id now o sl sched st
-         2≤S 1≤R slEq slC slSz inv vC pC lC TEMP-≤
+         2≤S 1≤R slEq slC slSz inv vC pC lC nst
   j′ = proj₁ SI
   R  = subscribeInner g mergeᵒ nid κ id now o sched st
 
@@ -1279,7 +1279,7 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
      , proj₂ (proj₂ (proj₂ SI))
   where
   SI = subscribeInner-caps c dep bud j g concatᵒ nid κ id now o sl sched st
-         2≤S 1≤R slEq slC slSz inv vC pC lC TEMP-≤
+         2≤S 1≤R slEq slC slSz inv vC pC lC nst
   j′ = proj₁ SI
   R  = subscribeInner g concatᵒ nid κ id now o sched st
   done = proj₁ (proj₂ (proj₂ (proj₂ R)))
@@ -1359,7 +1359,9 @@ thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R
   st₁    = proj₂ (proj₂ KILL)
   SI = subscribeInner-caps c dep bud j g switchᵒ nid κ id now o sl sched₁ st₁
          2≤S 1≤R (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) slEq) slC slSz
-         (switchKill-caps (frameStep j c) cur sched st inv) vC pC lC TEMP-≤
+         (switchKill-caps (frameStep j c) cur sched st inv) vC pC lC
+         (nest-keeps o sl _ _ bud
+            (KeepsC.connMono (switchKill-keeps cur sched st)) nst)
   j′ = proj₁ SI
   R  = subscribeInner g switchᵒ nid κ id now o sched₁ st₁
 
@@ -1397,7 +1399,7 @@ thruConsume-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤
      , proj₂ (proj₂ (proj₂ SI))
   where
   SI = subscribeInner-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st
-         2≤S 1≤R slEq slC slSz inv vC pC lC TEMP-≤
+         2≤S 1≤R slEq slC slSz inv vC pC lC nst
   j′ = proj₁ SI
   R  = subscribeInner g exhaustᵒ nid κ id now o sched st
 
@@ -1465,7 +1467,8 @@ thruWalk-caps {u = u} c dep bud j g op nid κ id now (o ∷ os) sl sched st
   where
   vCa = valsOf (frameStep j c) sl (o ∷ os) vC
   HD  = thruConsume-caps c dep bud j g op nid κ id now o sl sched st
-          2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ vCa)) pC lC TEMP-≤
+          2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ vCa)) pC lC
+          (mList?-head bud sl _ o os nst)
   j₁  = proj₁ HD
   TC  = thruConsume g op nid κ id now o sched st
   sd₁ = proj₁ (proj₂ (proj₂ TC))
@@ -1520,7 +1523,8 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC qC nst
   with subscribeInner g concatᵒ allNid κ id now o sched st
      | subscribeInner-caps c dep bud j g concatᵒ allNid κ id now o sl sched st
-         2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ qC)) pC lC TEMP-≤
+         2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ qC)) pC lC
+         (mList?-head bud sl _ o q nst)
      | KeepsC.slotsEq (subscribeInner-keeps g concatᵒ allNid κ id now o sched st)
 -- the inner stays open: it becomes the active one and the rest of the
 -- queue is parked, still bounded
