@@ -4110,7 +4110,7 @@ sizeCapAt e sl id = Caps.cSize (capsAt e sl id)
 sizeCapAt-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) → sizeCapAt e sl id ≤ sizeCapAt e sl (suc id)
 sizeCapAt-mono e sl id =
-  cSize≤frameBlowup (capsAt e sl id)
+  cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
     (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
 
 -- the program's own size sits under the cap at every instant (capsAt's

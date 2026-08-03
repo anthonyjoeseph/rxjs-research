@@ -641,60 +641,81 @@ fLvl S W J = J + fCharge S W J
 -- then lands in one monotonicity step (gated:
 -- agda/probe/Sub-Charge-Probe.agda § 5).
 --
--- THE BUDGET IS READ AT EACH DELIVERY'S OWN LEVEL — `fLvl′ S W J`
--- instantiates k at `suc (sizeAt S J)`, the size cap at the level the
--- frame runs at, and NOT at the cascade's entry.  Three facts license
--- it: (i) WITHIN one delivery the recursion descends the VALUE
--- structurally — each `thru` layer subscribes payload observables
--- sitting strictly deeper in the pushed value, so the k threaded
--- downward strictly decreases, which is exactly how `sLvlK` recurses;
--- (ii) the k instantiated at a delivery's top is the ARRIVING VALUE's
--- nesting, and nesting ≤ size ≤ `sizeAt S J` by `valCaps?` read at that
--- delivery's own level J; (iii) values grown by folds are delivered
--- LATER, at a higher J where `sizeAt S J` has already climbed — so
--- per-level reads suffice and no global claim is made.
+-- THE BUDGET IS RE-READ AT EVERY FRAME ENTRY, AND THE DEPTH FUEL `d` IS
+-- WHAT PAYS FOR THE RE-READING.  `fLvlD S W (suc d) J` spends one unit
+-- and instantiates k at `suc (sizeAt S J)`, the size cap at the level
+-- THAT frame runs at — not at the level the subscribe that reached it
+-- began at.  Inheriting the budget instead is REFUTED (2026-08-03,
+-- agda/probe/Nest-Budget-Probe.agda § 3): a `scanᵉ` under an *All mints
+-- a payload per fold, the k-th mint nests k deep and is subscribed in
+-- the SAME delivery, and the carrier's own nesting stands still — so a
+-- k read where the subscribe BEGAN (2, at S = 2, W = 1, J = 0) is spent
+-- where the walk has CLIMBED TO (43690).  It is the Entry-Caps-Refuted
+-- distinction moved from the caps to the budget.
 --
--- (i) AND (iii) ARE REFUTED (2026-08-03, agda/probe/Nest-Budget-Probe.
--- agda), and the family's SHAPE is what waits on the re-ruling; nothing
--- below this block moves.  A `scanᵉ` under an *All MINTS a payload per
--- fold, and the k-th mint nests k deep while the carrier's own nesting
--- stands still — the mint is not inside the pushed value, it is built,
--- and it is subscribed in the SAME delivery, so (iii) does not defer
--- it.  (ii) survives, with `nestᵛ ≤ sizeᵛ` proven in the probe.
---
--- WHAT STILL HOLDS IS ONE FRAME.  Its payloads are its INPUT values,
--- which `FrameFace` bounds at the frame's ENTRY level, and `iterL`
--- re-reads the budget at each frame of the chain — so `suc (sizeAt S J)`
--- pays for a frame's own subscribes.  What fails is ONE NESTING LEVEL
--- IN: `k` is inherited, fixed at the size cap where that subscribe
--- BEGAN, while the frames of the payload's chain are handed values
--- bounded (by `burstCaps?` / `valsCaps?`, the only suppliers) at the
--- levels that subscribe has CLIMBED TO.  At S = 2, W = 1, J = 0 that is
--- 2 against 43690, and the room is used rather than merely allowed: the
--- mint depth is the fold count, the fold count is the burst length, and
--- `widAt` outruns `sizeAt` by an exponential per level.  It is the
--- Entry-Caps-Refuted distinction moved from the caps to the budget —
--- read at an entry, spent after a climb.
---
--- THE RE-RULING — a PER-FRAME BUDGET REFRESH, `k` re-read at every frame
--- entry instead of inherited — IS PROBED AND CLOSES HALF (2026-08-03,
--- agda/probe/Refresh-Probe.agda).  Its SOUNDNESS is a theorem:
+-- THE REFRESH IS SOUND AS A THEOREM (agda/probe/Refresh-Probe.agda § 1):
 -- `stepFrame` reaches `subscribeInner` from two clauses only —
 -- `thru-outer`, whose payloads are its own arriving values, and a concat
 -- drain, whose queue was filled at a LOWER level — so `valsCaps?` at the
 -- frame's entry plus `sizeAt-mono` plus `nestᵛ ≤ sizeᵛ` bound every
--- payload a frame subscribes, and no row can breach it.  Its TERMINATION
--- fails, and Agda rejects the family verbatim: `k` is the ONE argument
--- that descends here (every cycle passes `sLvlK`), and a refresh at a
--- climbed level returns it LARGER.  The probe carries the shape that
--- does close — the same refresh with an explicit DEPTH FUEL the frame
--- entry spends — with inflation, monotonicity, `fLvl ≤` it, THIS family
--- ≤ it, and the composition-gate steps re-proven, so the clauses below
--- are unaffected either way.  What is unruled is that fuel's
--- instantiation: off (S, W, J) at the entry it falls to the same mint
--- one stratum up, and the evaluator's own `Gas` — the one supplier
--- owing nothing new — runs through `poolCount`, hence `lvls`, hence
--- this level.  Nothing here moves until that is ruled.
+-- payload a frame subscribes, and no row can breach it.  What it costs
+-- is TERMINATION: `k` was the one descending argument (every cycle
+-- passes `sLvlD`) and a refresh at a climbed level returns it LARGER, so
+-- the fuel `d` is threaded as the argument that descends and the d = 0
+-- clause is the old family's own k = 0 answer, `J + m`.
+--
+-- AND `d` IS THE BUDGET RECURRENCE'S OWN HEIGHT, THREADED EXPLICITLY
+-- (the ruling, 2026-08-03).  It is NOT read off (S, W, J): a fuel read
+-- at a level is spent after a climb, which is the same refutation one
+-- stratum up.  The one supplier that owes no new invariant is the
+-- evaluator's OWN `Gas`, and the gas discipline that licenses it is
+-- read off the clauses below:
+--
+--   · `subscribeInner g0 … = close drySource dried ∷ []` — a subscribe
+--     with no gas installs NOTHING, so a nesting level costs a peel;
+--   · the only three edges that reach a deeper subscribe all peel one:
+--     `subscribeInner (gs fuel) → subscribeE fuel`,
+--     `sharedConnect (gs fuel′) → subscribeE fuel′`, and
+--     `subscribeE (gs fuel) (μᵉ body) → subscribeE fuel (unfoldμ body)`;
+--   · and EVERY other route through the pipeline keeps the gas fixed
+--     because it stays at ONE nesting level — `subscribeE fuel` walking
+--     its own operator chain (map / take / scan / the four *All), the
+--     `pushBurst fuel → stepFrame fuel → thruWalk fuel → thruConsume
+--     fuel` re-entry of a burst, `concatDrain fuel` off `innerFinish`,
+--     and `foldPath sf → dispatchShare sf → shareGo sf → stepFrame sf`,
+--     which threads the SYNC fuel unchanged through a delivery.
+--
+--   So no path reaches `subscribeInner` at the gas it was called with:
+--   the four `thruConsume` sites and the one `concatDrain` site are
+--   reached from a `stepFrame` running at the caller's gas, and the peel
+--   happens INSIDE `subscribeInner` before control reaches `subscribeE`.
+--   `deferᵉ` is not a nesting edge at all — it parks the body for
+--   `suc now`, a later instant with a budget of its own.  Hence
+--   subscribe-nesting depth ≤ the gas the instant runs under, by
+--   induction on the evaluator's own recursion.
+--
+-- THE INSTANTIATION IS THEREFORE AT THE TOP, TWICE, AND THE CYCLE IS
+-- BROKEN BY THE STORY INDEX.  `budgetAt`'s height runs through
+-- `capsHgo`, hence `blowH`, hence `poolCount`, hence `lvls` — so a `d`
+-- taken from the gas at the level would make `poolCount` depend on
+-- `budgetAt` and `budgetAt` on `poolCount` (agda/probe/Refresh-Probe
+-- .agda § 8 states the cycle exactly).  `blowH` breaks it by handing the
+-- count ITS OWN story index `m`: `blowH m = 6 + m + 2 · poolCount
+-- (towerℕ m) m`, where m is blowH's own argument and the recurrence
+-- builds it incrementally.  `capsAt` (.Caps) makes the same reading one
+-- level up — instant id's blowup runs at `d := capsH e sl id` — so the
+-- two agree by construction and `blowup-tower`'s count axis compares
+-- `sizeCount c m` against `poolCount (towerℕ m) m` at the SAME fuel.
+--
+-- WHAT IS STILL OWED, AND IT IS OWED BY THE SIGNATURE PASS RATHER THAN
+-- BY THIS DEFINITION: that the story index dominates the depth the
+-- instant actually reaches.  The bridge above bounds that depth by the
+-- gas, and the gas at instant id is `gasTower (3 + capsHgo m (suc id))`
+-- — one blowH story ABOVE the m this count is instantiated at.  So the
+-- placement is a stratification, not a domination: it is what breaks the
+-- cycle, and the inequality it needs (nesting depth ≤ m, rather than ≤
+-- the gas height) is a smaller claim than the gas bound supplies.
+-- Reported, not assumed
 --
 -- ABSTRACT, and for the same PERFORMANCE reason `blowH` and `sizeCount`
 -- are.  Every one of these clauses matches on an argument that is a
@@ -708,117 +729,131 @@ fLvl S W J = J + fCharge S W J
 
 abstract
   -- ONE FRAME that ran at J: its own receipt, then one inner subscribe
-  -- per payload — at most `suc (widAt S W J)` of them
-  fLvlK : ℕ → ℕ → ℕ → ℕ → ℕ           -- S W k J
+  -- per payload — at most `suc (widAt S W J)` of them.  The budget its
+  -- payloads are walked under is read HERE, at this frame's own level,
+  -- and one unit of DEPTH FUEL is what pays for the re-reading
+  fLvlD : ℕ → ℕ → ℕ → ℕ → ℕ            -- S W d J
   -- m payloads in sequence, each at the level the one before it LEFT.
   -- ONE PAYLOAD costs the `from-inner` frame its chain gains (the `suc
   -- J`, which is `subscribeInner-caps`'s own `suc j`) and then the
   -- inner's subscribe at the level that frame left
-  sIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ      -- S W k m J
+  sIterD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W d k m J
   -- ONE SUBSCRIBE at J: it walks the target's operator chain, and the
   -- chain is no longer than the size cap (`sizeᵉ b ≤ cSize`, the
   -- telescope's own hypothesis)
-  sLvlK : ℕ → ℕ → ℕ → ℕ → ℕ           -- S W k J
+  sLvlD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ        -- S W d k J
   -- ONE OPERATOR, IN THE ORDER THE CLAUSE RUNS IT: the frame the chain
   -- gains (frameStep-chain-suc) and the operator's own EVAL receipt,
   -- then a μ's re-entry at one less nesting, then the REST of the
   -- chain, and only then `pushBurst` — the source's burst back through
   -- that frame, one frame per emit, at the level the chain left
-  opIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ     -- S W k m J
-  fIterK : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ      -- S W k m J
+  opIterD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ  -- S W d k m J
+  fIterD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W d k m J
 
-  fLvlK S W k J = sIterK S W k (suc (widAt S W J)) (fLvl S W J)
+  -- THE FUEL-EXHAUSTED CLAUSE is not a hole: it is exactly what the
+  -- inherited-budget family did at k = 0 (`J + m`), so the refresh
+  -- dominates it at every budget including the empty one.  It also
+  -- carries the termination — it makes no recursive call, so every
+  -- cycle passes the `suc d` clause, where d descends
+  fLvlD S W zero    J = fLvl S W J + suc (widAt S W J)
+  fLvlD S W (suc d) J =
+    sIterD S W d (suc (sizeAt S J)) (suc (widAt S W J)) (fLvl S W J)
 
-  sIterK S W k zero    J = J
-  sIterK S W k (suc m) J = sIterK S W k m (sLvlK S W k (suc J))
+  sIterD S W d k zero    J = J
+  sIterD S W d k (suc m) J = sIterD S W d k m (sLvlD S W d k (suc J))
 
-  sLvlK S W zero    J = J
-  sLvlK S W (suc k) J = opIterK S W k (suc (sizeAt S J)) J
+  sLvlD S W d zero    J = J
+  sLvlD S W d (suc k) J = opIterD S W d k (suc (sizeAt S J)) J
 
-  opIterK S W k zero    J = J
-  opIterK S W k (suc m) J =
+  opIterD S W d k zero    J = J
+  opIterD S W d k (suc m) J =
     let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
-        J₂ = opIterK S W k m (sLvlK S W k J₀)
-    in fIterK S W k (suc (widAt S W J₂)) J₂
+        J₂ = opIterD S W d k m (sLvlD S W d k J₀)
+    in fIterD S W d k (suc (widAt S W J₂)) J₂
 
-  fIterK S W k zero    J = J
-  fIterK S W k (suc m) J = fIterK S W k m (fLvlK S W k J)
-
-  -- the per-frame level the walk reads, with the budget instantiated at
-  -- the size cap READ AT THE FRAME'S OWN LEVEL (the ruling above)
-  fLvl′ : ℕ → ℕ → ℕ → ℕ
-  fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J
+  fIterD S W d k zero    J = J
+  fIterD S W d k (suc m) J = fIterD S W d k m (fLvlD S W d J)
 
   -- the clauses, handed back one at a time for .Caps's arithmetic
-  fLvlK-body : ∀ (S W k J : ℕ) →
-    fLvlK S W k J ≡ sIterK S W k (suc (widAt S W J)) (fLvl S W J)
-  fLvlK-body _ _ _ _ = refl
+  fLvlD-0 : ∀ (S W J : ℕ) → fLvlD S W 0 J ≡ fLvl S W J + suc (widAt S W J)
+  fLvlD-0 _ _ _ = refl
 
-  sIterK-0 : ∀ (S W k J : ℕ) → sIterK S W k 0 J ≡ J
-  sIterK-0 _ _ _ _ = refl
+  fLvlD-suc : ∀ (S W d J : ℕ) →
+    fLvlD S W (suc d) J
+      ≡ sIterD S W d (suc (sizeAt S J)) (suc (widAt S W J)) (fLvl S W J)
+  fLvlD-suc _ _ _ _ = refl
 
-  sIterK-suc : ∀ (S W k m J : ℕ) →
-    sIterK S W k (suc m) J ≡ sIterK S W k m (sLvlK S W k (suc J))
-  sIterK-suc _ _ _ _ _ = refl
+  sIterD-0 : ∀ (S W d k J : ℕ) → sIterD S W d k 0 J ≡ J
+  sIterD-0 _ _ _ _ _ = refl
 
-  sLvlK-0 : ∀ (S W J : ℕ) → sLvlK S W 0 J ≡ J
-  sLvlK-0 _ _ _ = refl
+  sIterD-suc : ∀ (S W d k m J : ℕ) →
+    sIterD S W d k (suc m) J ≡ sIterD S W d k m (sLvlD S W d k (suc J))
+  sIterD-suc _ _ _ _ _ _ = refl
 
-  sLvlK-suc : ∀ (S W k J : ℕ) →
-    sLvlK S W (suc k) J ≡ opIterK S W k (suc (sizeAt S J)) J
-  sLvlK-suc _ _ _ _ = refl
+  sLvlD-0 : ∀ (S W d J : ℕ) → sLvlD S W d 0 J ≡ J
+  sLvlD-0 _ _ _ _ = refl
 
-  opIterK-0 : ∀ (S W k J : ℕ) → opIterK S W k 0 J ≡ J
-  opIterK-0 _ _ _ _ = refl
+  sLvlD-suc : ∀ (S W d k J : ℕ) →
+    sLvlD S W d (suc k) J ≡ opIterD S W d k (suc (sizeAt S J)) J
+  sLvlD-suc _ _ _ _ _ = refl
 
-  opIterK-suc : ∀ (S W k m J : ℕ) →
-    opIterK S W k (suc m) J
-      ≡ fIterK S W k
-          (suc (widAt S W (opIterK S W k m
-                  (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))))
-          (opIterK S W k m
-             (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))
-  opIterK-suc _ _ _ _ _ = refl
+  opIterD-0 : ∀ (S W d k J : ℕ) → opIterD S W d k 0 J ≡ J
+  opIterD-0 _ _ _ _ _ = refl
 
-  fIterK-0 : ∀ (S W k J : ℕ) → fIterK S W k 0 J ≡ J
-  fIterK-0 _ _ _ _ = refl
+  opIterD-suc : ∀ (S W d k m J : ℕ) →
+    opIterD S W d k (suc m) J
+      ≡ fIterD S W d k
+          (suc (widAt S W (opIterD S W d k m
+                  (sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))))
+          (opIterD S W d k m
+             (sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))
+  opIterD-suc _ _ _ _ _ _ = refl
 
-  fIterK-suc : ∀ (S W k m J : ℕ) →
-    fIterK S W k (suc m) J ≡ fIterK S W k m (fLvlK S W k J)
-  fIterK-suc _ _ _ _ _ = refl
+  fIterD-0 : ∀ (S W d k J : ℕ) → fIterD S W d k 0 J ≡ J
+  fIterD-0 _ _ _ _ _ = refl
 
-  fLvl′-body : ∀ (S W J : ℕ) → fLvl′ S W J ≡ fLvlK S W (suc (sizeAt S J)) J
-  fLvl′-body _ _ _ = refl
+  fIterD-suc : ∀ (S W d k m J : ℕ) →
+    fIterD S W d k (suc m) J ≡ fIterD S W d k m (fLvlD S W d J)
+  fIterD-suc _ _ _ _ _ _ = refl
 
 -- A CHAIN IS FRAMES, each running at the level the one before it LEFT,
--- and each costing `fLvl′` — its own receipt PLUS the subscribes it
+-- and each costing `fLvlD` — its own receipt PLUS the subscribes it
 -- runs.  It was `fLvl` (the receipt alone) until the subscribe charge
--- was priced; `fLvl ≤ fLvl′` pointwise (.Caps), so every consumer above
--- this — `dLvl`, `lvls`, `sizeCount`, the pooled count and the gate
--- against the product it replaces — moves up with it by the
--- monotonicity lemmas already proven, with no arithmetic re-derived and
--- no measured row re-run
-iterL : ℕ → ℕ → ℕ → ℕ → ℕ
-iterL S W zero    J = J
-iterL S W (suc k) J = iterL S W k (fLvl′ S W J)
+-- was priced; `fLvl ≤ fLvlD` pointwise at every depth (.Caps), so every
+-- consumer above this — `dLvl`, `lvls`, `sizeCount`, the pooled count
+-- and the gate against the product it replaces — moves up with it by
+-- the monotonicity lemmas already proven, with no arithmetic re-derived
+-- and no measured row re-run.
+--
+-- AND EVERY ONE OF THEM CARRIES THE DEPTH FUEL `d`, threaded down to
+-- the frame unchanged.  It is not read off (S, W, J) anywhere on this
+-- ladder, and that is the ruling: a fuel read at a level is spent after
+-- a climb, which is what Nest-Budget-Probe refuted one stratum down.
+-- The instantiation happens exactly twice, both at the top — `poolBody`
+-- (below, from `blowH`'s own story index) and `capsAt` (.Caps, from the
+-- same recurrence's height `capsH`) — so the level ladder itself never
+-- chooses it
+iterL : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ        -- S W d k J
+iterL S W d zero    J = J
+iterL S W d (suc k) J = iterL S W d k (fLvlD S W d J)
 
-dLvl : ℕ → ℕ → ℕ → ℕ
-dLvl S W J = iterL S W (suc (sizeAt S J)) J
+dLvl : ℕ → ℕ → ℕ → ℕ → ℕ             -- S W d J
+dLvl S W d J = iterL S W d (suc (sizeAt S J)) J
 
-lvls : ℕ → ℕ → ℕ → ℕ → ℕ
-lvls S W J zero    = J
-lvls S W J (suc d) = dLvl S W (lvls S W J d)
+lvls : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ         -- S W d J count
+lvls S W d J zero    = J
+lvls S W d J (suc n) = dLvl S W d (lvls S W d J n)
 
-dCapᶜ  : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ       -- S W R gas level
-dWalkᶜ : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W R gas level position
+dCapᶜ  : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ       -- S W R d gas level
+dWalkᶜ : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W R d gas level position
 
-dCapᶜ S W R zero    J = 0
-dCapᶜ S W R (suc g) J = dWalkᶜ S W R g J (regAt S R J)
+dCapᶜ S W R d zero    J = 0
+dCapᶜ S W R d (suc g) J = dWalkᶜ S W R d g J (regAt S R J)
 
-dWalkᶜ S W R g J zero    = 0
-dWalkᶜ S W R g J (suc i) =
-  let d = dWalkᶜ S W R g J i
-  in d + suc (dCapᶜ S W R g (lvls S W J (suc d)))
+dWalkᶜ S W R d g J zero    = 0
+dWalkᶜ S W R d g J (suc i) =
+  let w = dWalkᶜ S W R d g J i
+  in w + suc (dCapᶜ S W R d g (lvls S W d J (suc w)))
 
 
 -- THE POOLED COUNT: `sizeCount` with every Caps field replaced by one
@@ -836,12 +871,12 @@ dWalkᶜ S W R g J (suc i) =
 -- The level form keeps that property for the same reason it keeps it
 -- at `sizeCount`: `lvls` matches on its DELIVERY COUNT, which is a
 -- `dCapᶜ` stuck at a variable, so the whole body is stuck at whnf
-poolBody : ℕ → ℕ
-poolBody M = lvls M M 0 (dCapᶜ M M M (suc M) 0)
+poolBody : ℕ → ℕ → ℕ                 -- pooled bound, depth fuel
+poolBody M d = lvls M M d 0 (dCapᶜ M M M d (suc M) 0)
 
-poolCount : ℕ → ℕ
-poolCount zero    = 0
-poolCount (suc M) = poolBody (suc M)
+poolCount : ℕ → ℕ → ℕ
+poolCount zero    d = 0
+poolCount (suc M) d = poolBody (suc M) d
 
 -- ABSTRACT, and it is a PERFORMANCE contract rather than an abstraction
 -- one.  `capsHgo` nests this per instant, so `blowH (blowH m)` is what
@@ -852,9 +887,9 @@ poolCount (suc M) = poolBody (suc M)
 -- it, and `blowH-body` hands that back on demand
 abstract
   blowH : ℕ → ℕ
-  blowH m = 6 + m + 2 * poolCount (towerℕ m)
+  blowH m = 6 + m + 2 * poolCount (towerℕ m) m
 
-  blowH-body : ∀ (m : ℕ) → blowH m ≡ 6 + m + 2 * poolCount (towerℕ m)
+  blowH-body : ∀ (m : ℕ) → blowH m ≡ 6 + m + 2 * poolCount (towerℕ m) m
   blowH-body m = refl
 
 capsHgo : ℕ → Id → ℕ

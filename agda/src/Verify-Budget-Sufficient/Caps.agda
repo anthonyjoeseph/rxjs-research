@@ -52,10 +52,10 @@ open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase;
                                 sizeAt; widAt; regAt; fCharge; fLvl; iterL;
                                 dLvl; lvls; dCapᶜ; dWalkᶜ;
                                 poolBody; poolCount; blowH-body;
-                                fLvlK; sIterK; sLvlK; opIterK; fIterK; fLvl′;
-                                fLvlK-body; sIterK-0; sIterK-suc;
-                                sLvlK-0; sLvlK-suc; opIterK-0; opIterK-suc;
-                                fIterK-0; fIterK-suc; fLvl′-body)
+                                fLvlD; sIterD; sLvlD; opIterD; fIterD;
+                                fLvlD-0; fLvlD-suc; sIterD-0; sIterD-suc;
+                                sLvlD-0; sLvlD-suc; opIterD-0; opIterD-suc;
+                                fIterD-0; fIterD-suc)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
@@ -291,37 +291,39 @@ frameStep j c =
 -- past an hour on that (measured twice) and finishes in minutes with the
 -- count opaque
 abstract
-  cDel : Caps → ℕ
-  cDel c = dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
-                 (suc (Caps.cSize c)) 0
-
-  cDel-body : ∀ (c : Caps) →
-    cDel c ≡ dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
+  cDel : Caps → ℕ → ℕ
+  cDel c d = dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
                    (suc (Caps.cSize c)) 0
-  cDel-body c = refl
+
+  cDel-body : ∀ (c : Caps) (d : ℕ) →
+    cDel c d ≡ dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
+                     (suc (Caps.cSize c)) 0
+  cDel-body c d = refl
 
 -- and it is POSITIVE once there is a chain to walk, which is what the
 -- count's own `1 ≤ J` side conditions read: the walk's first position
 -- is the entry registry, and `regAt S R 0` is `R`
-1≤dWalkᶜ : ∀ (S W R g J i : ℕ) → 1 ≤ i → 1 ≤ dWalkᶜ S W R g J i
-1≤dWalkᶜ S W R g J (suc i) hi =
+1≤dWalkᶜ : ∀ (S W R d g J i : ℕ) → 1 ≤ i → 1 ≤ dWalkᶜ S W R d g J i
+1≤dWalkᶜ S W R d g J (suc i) hi =
   ≤-trans (s≤s z≤n)
-          (m≤n+m (suc (dCapᶜ S W R g (lvls S W J (suc (dWalkᶜ S W R g J i)))))
-                 (dWalkᶜ S W R g J i))
+          (m≤n+m (suc (dCapᶜ S W R d g
+                        (lvls S W d J (suc (dWalkᶜ S W R d g J i)))))
+                 (dWalkᶜ S W R d g J i))
 
 1≤regAt : ∀ (S R J : ℕ) → 1 ≤ R → 1 ≤ regAt S R J
 1≤regAt S R J hR =
   ≤-trans hR (≤-trans (≤-reflexive (sym (*-identityʳ R)))
                       (*-monoʳ-≤ R (s≤s z≤n)))
 
-1≤dCapᶜ : ∀ (S W R g J : ℕ) → 1 ≤ R → 1 ≤ dCapᶜ S W R (suc g) J
-1≤dCapᶜ S W R g J hR = 1≤dWalkᶜ S W R g J (regAt S R J) (1≤regAt S R J hR)
+1≤dCapᶜ : ∀ (S W R d g J : ℕ) → 1 ≤ R → 1 ≤ dCapᶜ S W R d (suc g) J
+1≤dCapᶜ S W R d g J hR =
+  1≤dWalkᶜ S W R d g J (regAt S R J) (1≤regAt S R J hR)
 
 -- and `poolCount` IS `poolBody` wherever there is anything to count:
 -- the match in front of it (Rx.Evaluator) is a normalisation guard, not
 -- a definition by cases
-poolBody≤poolCount : ∀ (M : ℕ) → 1 ≤ M → poolBody M ≤ poolCount M
-poolBody≤poolCount (suc M) _ = ≤-refl
+poolBody≤poolCount : ∀ (M d : ℕ) → 1 ≤ M → poolBody M d ≤ poolCount M d
+poolBody≤poolCount (suc M) d _ = ≤-refl
 
 -- ONE INSTANT's FOLD COUNT, AND IT IS THE WALK'S OWN LANDING LEVEL.
 -- The receipt `scanFrame-caps` actually pays is
@@ -364,15 +366,15 @@ poolBody≤poolCount (suc M) _ = ≤-refl
 -- stays stuck.  `sizeCount-body` hands the body back where the
 -- recurrence's own arithmetic needs it, which is three places
 abstract
-  sizeCount : Caps → ℕ
-  sizeCount c = lvls (Caps.cSize c) (Caps.cWid c) 0 (cDel c)
+  sizeCount : Caps → ℕ → ℕ
+  sizeCount c d = lvls (Caps.cSize c) (Caps.cWid c) d 0 (cDel c d)
 
-  sizeCount-body : ∀ (c : Caps) →
-    sizeCount c ≡ lvls (Caps.cSize c) (Caps.cWid c) 0 (cDel c)
-  sizeCount-body c = refl
+  sizeCount-body : ∀ (c : Caps) (d : ℕ) →
+    sizeCount c d ≡ lvls (Caps.cSize c) (Caps.cWid c) d 0 (cDel c d)
+  sizeCount-body c d = refl
 
-frameBlowup : Caps → Caps
-frameBlowup c = frameStep (sizeCount c) c
+frameBlowup : Caps → ℕ → Caps
+frameBlowup c d = frameStep (sizeCount c d) c
 
 -- the entry endpoint, by computation
 frameStep-0 : ∀ (c : Caps) → frameStep 0 c ≡ c
@@ -438,12 +440,22 @@ frameStep-reg-suc (caps s w r) j =
 -- syntactic measure allows 25 (State-Blowup-Probe), so the base is one
 -- frameBlowup above the syntax — exactly what caps-frame already says
 -- about every other frame
+-- THE HEIGHT OF THE RECURRENCE, and it is read BEFORE `capsAt` because
+-- `capsAt` spends it: instant id's blowup runs at the depth fuel
+-- `capsH e sl id`, the story index the SAME recurrence has reached
+-- there.  `blowH` makes the identical reading one level down
+-- (`poolCount (towerℕ m) m`, Rx.Evaluator), which is what lets
+-- `blowup-tower` compare the two counts at one fuel
+capsH : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
+capsH e sl id = capsHgo (capsBase e sl) id
+
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
   frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
                     (suc (entryCeil n sl e))
                     (suc (sizeᵉ e + slotsSize sl)))
-capsAt e sl (suc id) = frameBlowup (capsAt e sl id)
+              (capsBase e sl)
+capsAt e sl (suc id) = frameBlowup (capsAt e sl id) (capsH e sl id)
 
 -- caps ordering: pointwise on the three fields
 _⊑ᶜ_ : Caps → Caps → Set
@@ -509,31 +521,31 @@ iterFold-mono-count S w hS           (s≤s le)  = iterFold-mono-count S (foldSt
 -- THE LEVEL COMPOSES, which is what makes the walk decompose from the
 -- FRONT — an equality, so the change of direction the head-first
 -- evaluator forces costs nothing
-lvls-add : ∀ (S W J a b : ℕ) →
-  lvls S W J (a + b) ≡ lvls S W (lvls S W J a) b
-lvls-add S W J a zero    = cong (lvls S W J) (+-identityʳ a)
-lvls-add S W J a (suc b) =
-  trans (cong (lvls S W J) (+-suc a b))
-        (cong (dLvl S W) (lvls-add S W J a b))
+lvls-add : ∀ (S W d J a b : ℕ) →
+  lvls S W d J (a + b) ≡ lvls S W d (lvls S W d J a) b
+lvls-add S W d J a zero    = cong (lvls S W d J) (+-identityʳ a)
+lvls-add S W d J a (suc b) =
+  trans (cong (lvls S W d J) (+-suc a b))
+        (cong (dLvl S W d) (lvls-add S W d J a b))
 
-dWalkᶜ-front : ∀ (S W R g J i : ℕ) →
-  dWalkᶜ S W R g J (suc i)
-    ≡ suc (dCapᶜ S W R g (lvls S W J 1))
-      + dWalkᶜ S W R g (lvls S W J (suc (dCapᶜ S W R g (lvls S W J 1)))) i
-dWalkᶜ-front S W R g J zero =
-  sym (+-identityʳ (suc (dCapᶜ S W R g (lvls S W J 1))))
-dWalkᶜ-front S W R g J (suc i) =
-  trans (cong (λ x → x + suc (dCapᶜ S W R g (lvls S W J (suc x))))
-              (dWalkᶜ-front S W R g J i))
-    (trans (+-assoc (suc A) W′ (suc (dCapᶜ S W R g (lvls S W J (suc (suc A + W′))))))
-           (cong (λ x → suc A + (W′ + suc (dCapᶜ S W R g x))) (sym re)))
+dWalkᶜ-front : ∀ (S W R d g J i : ℕ) →
+  dWalkᶜ S W R d g J (suc i)
+    ≡ suc (dCapᶜ S W R d g (lvls S W d J 1))
+      + dWalkᶜ S W R d g (lvls S W d J (suc (dCapᶜ S W R d g (lvls S W d J 1)))) i
+dWalkᶜ-front S W R d g J zero =
+  sym (+-identityʳ (suc (dCapᶜ S W R d g (lvls S W d J 1))))
+dWalkᶜ-front S W R d g J (suc i) =
+  trans (cong (λ x → x + suc (dCapᶜ S W R d g (lvls S W d J (suc x))))
+              (dWalkᶜ-front S W R d g J i))
+    (trans (+-assoc (suc A) W′ (suc (dCapᶜ S W R d g (lvls S W d J (suc (suc A + W′))))))
+           (cong (λ x → suc A + (W′ + suc (dCapᶜ S W R d g x))) (sym re)))
   where
-  A  = dCapᶜ S W R g (lvls S W J 1)
-  J′ = lvls S W J (suc A)
-  W′ = dWalkᶜ S W R g J′ i
-  re : lvls S W J′ (suc W′) ≡ lvls S W J (suc (suc A + W′))
-  re = trans (sym (lvls-add S W J (suc A) (suc W′)))
-             (cong (lvls S W J) (+-suc (suc A) W′))
+  A  = dCapᶜ S W R d g (lvls S W d J 1)
+  J′ = lvls S W d J (suc A)
+  W′ = dWalkᶜ S W R d g J′ i
+  re : lvls S W d J′ (suc W′) ≡ lvls S W d J (suc (suc A + W′))
+  re = trans (sym (lvls-add S W d J (suc A) (suc W′)))
+             (cong (lvls S W d J) (+-suc (suc A) W′))
 
 ------------------------------------------------------------------
 -- AND IT IS MONOTONE IN EVERY ARGUMENT, THE LEVEL INCLUDED — the same
@@ -590,220 +602,245 @@ fLvl-mono 2≤S hS hW hJ = +-mono-≤ hJ (fCharge-mono 2≤S hS hW hJ)
 -- it.  The family itself is in Rx.Evaluator (opaque, for the
 -- normalisation reason written there); this reads its clauses back
 -- through the `-body` equations and proves the three properties every
--- consumer above `fLvl′` is built out of.
+-- consumer above `fLvlD` is built out of.
 --
 -- EVERY TRANSFORMER IS INFLATIONARY, which is the whole content of the
 -- gate below: a level never goes down, so the old per-frame receipt
 -- survives inside the new one as its own first step.
 ------------------------------------------------------------------
 
-fLvlK-infl  : ∀ (S W k J : ℕ) → J ≤ fLvlK S W k J
-sIterK-infl : ∀ (S W k m J : ℕ) → J ≤ sIterK S W k m J
-sLvlK-infl  : ∀ (S W k J : ℕ) → J ≤ sLvlK S W k J
-opIterK-infl : ∀ (S W k m J : ℕ) → J ≤ opIterK S W k m J
-fIterK-infl : ∀ (S W k m J : ℕ) → J ≤ fIterK S W k m J
+fLvlD-infl  : ∀ (S W d J : ℕ) → J ≤ fLvlD S W d J
+sIterD-infl : ∀ (S W d k m J : ℕ) → J ≤ sIterD S W d k m J
+sLvlD-infl  : ∀ (S W d k J : ℕ) → J ≤ sLvlD S W d k J
+opIterD-infl : ∀ (S W d k m J : ℕ) → J ≤ opIterD S W d k m J
+fIterD-infl : ∀ (S W d k m J : ℕ) → J ≤ fIterD S W d k m J
 
-fLvlK-infl S W k J =
+fLvlD-infl S W zero    J =
   ≤-trans (≤-trans (m≤m+n J (fCharge S W J))
-                   (sIterK-infl S W k (suc (widAt S W J)) (fLvl S W J)))
-          (≤-reflexive (sym (fLvlK-body S W k J)))
+                   (m≤m+n (fLvl S W J) (suc (widAt S W J))))
+          (≤-reflexive (sym (fLvlD-0 S W J)))
+fLvlD-infl S W (suc d) J =
+  ≤-trans (≤-trans (m≤m+n J (fCharge S W J))
+                   (sIterD-infl S W d (suc (sizeAt S J)) (suc (widAt S W J))
+                                (fLvl S W J)))
+          (≤-reflexive (sym (fLvlD-suc S W d J)))
 
-sIterK-infl S W k zero    J = ≤-reflexive (sym (sIterK-0 S W k J))
-sIterK-infl S W k (suc m) J =
-  ≤-trans (≤-trans (≤-trans (n≤1+n J) (sLvlK-infl S W k (suc J)))
-                   (sIterK-infl S W k m (sLvlK S W k (suc J))))
-          (≤-reflexive (sym (sIterK-suc S W k m J)))
+sIterD-infl S W d k zero    J = ≤-reflexive (sym (sIterD-0 S W d k J))
+sIterD-infl S W d k (suc m) J =
+  ≤-trans (≤-trans (≤-trans (n≤1+n J) (sLvlD-infl S W d k (suc J)))
+                   (sIterD-infl S W d k m (sLvlD S W d k (suc J))))
+          (≤-reflexive (sym (sIterD-suc S W d k m J)))
 
-sLvlK-infl S W zero    J = ≤-reflexive (sym (sLvlK-0 S W J))
-sLvlK-infl S W (suc k) J =
-  ≤-trans (opIterK-infl S W k (suc (sizeAt S J)) J)
-          (≤-reflexive (sym (sLvlK-suc S W k J)))
+sLvlD-infl S W d zero    J = ≤-reflexive (sym (sLvlD-0 S W d J))
+sLvlD-infl S W d (suc k) J =
+  ≤-trans (opIterD-infl S W d k (suc (sizeAt S J)) J)
+          (≤-reflexive (sym (sLvlD-suc S W d k J)))
 
-opIterK-infl S W k zero    J = ≤-reflexive (sym (opIterK-0 S W k J))
-opIterK-infl S W k (suc m) J =
+opIterD-infl S W d k zero    J = ≤-reflexive (sym (opIterD-0 S W d k J))
+opIterD-infl S W d k (suc m) J =
   let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
-      J₂ = opIterK S W k m (sLvlK S W k J₀)
+      J₂ = opIterD S W d k m (sLvlD S W d k J₀)
   in ≤-trans (≤-trans (≤-trans (≤-trans (n≤1+n J)
                                  (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J)))))
-                               (≤-trans (sLvlK-infl S W k J₀)
-                                        (opIterK-infl S W k m (sLvlK S W k J₀))))
-                      (fIterK-infl S W k (suc (widAt S W J₂)) J₂))
-             (≤-reflexive (sym (opIterK-suc S W k m J)))
+                               (≤-trans (sLvlD-infl S W d k J₀)
+                                        (opIterD-infl S W d k m (sLvlD S W d k J₀))))
+                      (fIterD-infl S W d k (suc (widAt S W J₂)) J₂))
+             (≤-reflexive (sym (opIterD-suc S W d k m J)))
 
-fIterK-infl S W k zero    J = ≤-reflexive (sym (fIterK-0 S W k J))
-fIterK-infl S W k (suc m) J =
-  ≤-trans (≤-trans (fLvlK-infl S W k J)
-                   (fIterK-infl S W k m (fLvlK S W k J)))
-          (≤-reflexive (sym (fIterK-suc S W k m J)))
+fIterD-infl S W d k zero    J = ≤-reflexive (sym (fIterD-0 S W d k J))
+fIterD-infl S W d k (suc m) J =
+  ≤-trans (≤-trans (fLvlD-infl S W d J)
+                   (fIterD-infl S W d k m (fLvlD S W d J)))
+          (≤-reflexive (sym (fIterD-suc S W d k m J)))
+
+-- the d = 0 clause is UNDER the general one: `J + m` is what `sIterD`
+-- does when its budget is empty, and its budget is never emptier than
+-- that.  This is what makes the fuel-exhausted clause a BOUND rather
+-- than a hole — the refresh dominates the inherited family at every
+-- budget including the empty one
+sIterD-zero≤ : ∀ (S W d k m J : ℕ) → J + m ≤ sIterD S W d k m J
+sIterD-zero≤ S W d k zero    J =
+  ≤-trans (≤-reflexive (+-identityʳ J)) (≤-reflexive (sym (sIterD-0 S W d k J)))
+sIterD-zero≤ S W d k (suc m) J =
+  ≤-trans (≤-trans (≤-reflexive (+-suc J m))
+                   (≤-trans (+-monoˡ-≤ m (sLvlD-infl S W d k (suc J)))
+                            (sIterD-zero≤ S W d k m (sLvlD S W d k (suc J)))))
+          (≤-reflexive (sym (sIterD-suc S W d k m J)))
 
 ------------------------------------------------------------------
--- AND MONOTONE IN EVERY ARGUMENT, THE NESTING BUDGET INCLUDED.  This
--- is what makes the rewiring `fLvl := fLvl′` cheap: `iterL-mono`,
+-- AND MONOTONE IN ALL FIVE ARGUMENTS, THE DEPTH FUEL INCLUDED.  This
+-- is what makes the rewiring `fLvl := fLvlD` cheap: `iterL-mono`,
 -- `dLvl-mono` and `lvls-mono` are built from the per-frame
 -- monotonicity and nothing else, so the whole ladder above the frame
 -- moves up with this one lemma and no re-derivation.
 ------------------------------------------------------------------
 
-fLvlK-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  k ≤ k′ → fLvlK S W k J ≤ fLvlK S′ W′ k′ J′
-sIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
-  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
-  sIterK S W k m J ≤ sIterK S′ W′ k′ m′ J′
-sLvlK-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  k ≤ k′ → sLvlK S W k J ≤ sLvlK S′ W′ k′ J′
-opIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
-  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
-  opIterK S W k m J ≤ opIterK S′ W′ k′ m′ J′
-fIterK-mono : ∀ {S S′ W W′ J J′} (m m′ k k′ : ℕ) →
-  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → k ≤ k′ → m ≤ m′ →
-  fIterK S W k m J ≤ fIterK S′ W′ k′ m′ J′
+fLvlD-mono : ∀ {S S′ W W′ J J′} (d d′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  d ≤ d′ → fLvlD S W d J ≤ fLvlD S′ W′ d′ J′
+sIterD-mono : ∀ {S S′ W W′ J J′} (m m′ d d′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → d ≤ d′ → k ≤ k′ → m ≤ m′ →
+  sIterD S W d k m J ≤ sIterD S′ W′ d′ k′ m′ J′
+sLvlD-mono : ∀ {S S′ W W′ J J′} (d d′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → d ≤ d′ → k ≤ k′ →
+  sLvlD S W d k J ≤ sLvlD S′ W′ d′ k′ J′
+opIterD-mono : ∀ {S S′ W W′ J J′} (m m′ d d′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → d ≤ d′ → k ≤ k′ → m ≤ m′ →
+  opIterD S W d k m J ≤ opIterD S′ W′ d′ k′ m′ J′
+fIterD-mono : ∀ {S S′ W W′ J J′} (m m′ d d′ k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ → d ≤ d′ → k ≤ k′ → m ≤ m′ →
+  fIterD S W d k m J ≤ fIterD S′ W′ d′ k′ m′ J′
 
-fLvlK-mono {S} {S′} {W} {W′} {J} {J′} k k′ 2≤S hS hW hJ hk =
-  ≤-trans (≤-trans (≤-reflexive (fLvlK-body S W k J))
-                   (sIterK-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) k k′
-                      2≤S hS hW (fLvl-mono 2≤S hS hW hJ) hk
+fLvlD-mono {S} {S′} {W} {W′} {J} {J′} zero zero 2≤S hS hW hJ hd =
+  ≤-trans (≤-trans (≤-reflexive (fLvlD-0 S W J))
+                   (+-mono-≤ (fLvl-mono 2≤S hS hW hJ)
+                             (s≤s (widAt-mono 2≤S hS hW hJ))))
+          (≤-reflexive (sym (fLvlD-0 S′ W′ J′)))
+fLvlD-mono {S} {S′} {W} {W′} {J} {J′} zero (suc d′) 2≤S hS hW hJ hd =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (fLvlD-0 S W J))
+                            (+-mono-≤ (fLvl-mono 2≤S hS hW hJ)
+                                      (s≤s (widAt-mono 2≤S hS hW hJ))))
+                   (sIterD-zero≤ S′ W′ d′ (suc (sizeAt S′ J′))
+                                 (suc (widAt S′ W′ J′)) (fLvl S′ W′ J′)))
+          (≤-reflexive (sym (fLvlD-suc S′ W′ d′ J′)))
+fLvlD-mono (suc d) zero 2≤S hS hW hJ ()
+fLvlD-mono {S} {S′} {W} {W′} {J} {J′} (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
+  ≤-trans (≤-trans (≤-reflexive (fLvlD-suc S W d J))
+                   (sIterD-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) d d′
+                      (suc (sizeAt S J)) (suc (sizeAt S′ J′)) 2≤S hS hW
+                      (fLvl-mono 2≤S hS hW hJ) hd
+                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
                       (s≤s (widAt-mono 2≤S hS hW hJ))))
-          (≤-reflexive (sym (fLvlK-body S′ W′ k′ J′)))
+          (≤-reflexive (sym (fLvlD-suc S′ W′ d′ J′)))
 
-sIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
-  ≤-trans (≤-trans (≤-reflexive (sIterK-0 S W k J)) hJ)
-          (sIterK-infl S′ W′ k′ m′ J′)
-sIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
-sIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
-            2≤S hS hW hJ hk (s≤s hm) =
-  ≤-trans (≤-trans (≤-reflexive (sIterK-suc S W k m J))
-                   (sIterK-mono m m′ k k′ 2≤S hS hW
-                      (sLvlK-mono k k′ 2≤S hS hW (s≤s hJ) hk) hk hm))
-          (≤-reflexive (sym (sIterK-suc S′ W′ k′ m′ J′)))
+sIterD-mono {S} {S′} {W} {W′} {J} {J′} zero m′ d d′ k k′ 2≤S hS hW hJ hd hk hm =
+  ≤-trans (≤-trans (≤-reflexive (sIterD-0 S W d k J)) hJ)
+          (sIterD-infl S′ W′ d′ k′ m′ J′)
+sIterD-mono (suc m) zero    d d′ k k′ 2≤S hS hW hJ hd hk ()
+sIterD-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) d d′ k k′
+            2≤S hS hW hJ hd hk (s≤s hm) =
+  ≤-trans (≤-trans (≤-reflexive (sIterD-suc S W d k m J))
+                   (sIterD-mono m m′ d d′ k k′ 2≤S hS hW
+                      (sLvlD-mono d d′ k k′ 2≤S hS hW (s≤s hJ) hd hk) hd hk hm))
+          (≤-reflexive (sym (sIterD-suc S′ W′ d′ k′ m′ J′)))
 
-sLvlK-mono {S} {S′} {W} {W′} {J} {J′} zero k′ 2≤S hS hW hJ hk =
-  ≤-trans (≤-trans (≤-reflexive (sLvlK-0 S W J)) hJ) (sLvlK-infl S′ W′ k′ J′)
-sLvlK-mono (suc k) zero    2≤S hS hW hJ ()
-sLvlK-mono {S} {S′} {W} {W′} {J} {J′} (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
-  ≤-trans (≤-trans (≤-reflexive (sLvlK-suc S W k J))
-                   (opIterK-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) k k′
-                      2≤S hS hW hJ hk
+sLvlD-mono {S} {S′} {W} {W′} {J} {J′} d d′ zero k′ 2≤S hS hW hJ hd hk =
+  ≤-trans (≤-trans (≤-reflexive (sLvlD-0 S W d J)) hJ)
+          (sLvlD-infl S′ W′ d′ k′ J′)
+sLvlD-mono d d′ (suc k) zero 2≤S hS hW hJ hd ()
+sLvlD-mono {S} {S′} {W} {W′} {J} {J′} d d′ (suc k) (suc k′)
+           2≤S hS hW hJ hd (s≤s hk) =
+  ≤-trans (≤-trans (≤-reflexive (sLvlD-suc S W d k J))
+                   (opIterD-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) d d′ k k′
+                      2≤S hS hW hJ hd hk
                       (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
-          (≤-reflexive (sym (sLvlK-suc S′ W′ k′ J′)))
+          (≤-reflexive (sym (sLvlD-suc S′ W′ d′ k′ J′)))
 
-opIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
-  ≤-trans (≤-trans (≤-reflexive (opIterK-0 S W k J)) hJ)
-          (opIterK-infl S′ W′ k′ m′ J′)
-opIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
-opIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
-             2≤S hS hW hJ hk (s≤s hm) =
+opIterD-mono {S} {S′} {W} {W′} {J} {J′} zero m′ d d′ k k′ 2≤S hS hW hJ hd hk hm =
+  ≤-trans (≤-trans (≤-reflexive (opIterD-0 S W d k J)) hJ)
+          (opIterD-infl S′ W′ d′ k′ m′ J′)
+opIterD-mono (suc m) zero    d d′ k k′ 2≤S hS hW hJ hd hk ()
+opIterD-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) d d′ k k′
+             2≤S hS hW hJ hd hk (s≤s hm) =
   let sz≤ = sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ
       J₀≤ = s≤s (+-mono-≤ hJ (*-mono-≤ (s≤s sz≤) (s≤s sz≤)))
-      X   = opIterK S W k m
-              (sLvlK S W k (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))
-      X′  = opIterK S′ W′ k′ m′
-              (sLvlK S′ W′ k′ (suc (J′ + suc (sizeAt S′ J′) * suc (sizeAt S′ J′))))
+      X   = opIterD S W d k m
+              (sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))
+      X′  = opIterD S′ W′ d′ k′ m′
+              (sLvlD S′ W′ d′ k′ (suc (J′ + suc (sizeAt S′ J′) * suc (sizeAt S′ J′))))
       inner : X ≤ X′
-      inner = opIterK-mono m m′ k k′ 2≤S hS hW
-                (sLvlK-mono k k′ 2≤S hS hW J₀≤ hk) hk hm
-  in ≤-trans (≤-trans (≤-reflexive (opIterK-suc S W k m J))
-                      (fIterK-mono (suc (widAt S W X)) (suc (widAt S′ W′ X′)) k k′
-                         2≤S hS hW inner hk
+      inner = opIterD-mono m m′ d d′ k k′ 2≤S hS hW
+                (sLvlD-mono d d′ k k′ 2≤S hS hW J₀≤ hd hk) hd hk hm
+  in ≤-trans (≤-trans (≤-reflexive (opIterD-suc S W d k m J))
+                      (fIterD-mono (suc (widAt S W X)) (suc (widAt S′ W′ X′)) d d′ k k′
+                         2≤S hS hW inner hd hk
                          (s≤s (widAt-mono 2≤S hS hW inner))))
-             (≤-reflexive (sym (opIterK-suc S′ W′ k′ m′ J′)))
+             (≤-reflexive (sym (opIterD-suc S′ W′ d′ k′ m′ J′)))
 
-fIterK-mono {S} {S′} {W} {W′} {J} {J′} zero m′ k k′ 2≤S hS hW hJ hk hm =
-  ≤-trans (≤-trans (≤-reflexive (fIterK-0 S W k J)) hJ)
-          (fIterK-infl S′ W′ k′ m′ J′)
-fIterK-mono (suc m) zero    k k′ 2≤S hS hW hJ hk ()
-fIterK-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) k k′
-            2≤S hS hW hJ hk (s≤s hm) =
-  ≤-trans (≤-trans (≤-reflexive (fIterK-suc S W k m J))
-                   (fIterK-mono m m′ k k′ 2≤S hS hW
-                      (fLvlK-mono k k′ 2≤S hS hW hJ hk) hk hm))
-          (≤-reflexive (sym (fIterK-suc S′ W′ k′ m′ J′)))
-
--- the budget's own instantiation, `suc (sizeAt S J)` read at the
--- frame's own level (the ruling in Rx.Evaluator), and it is monotone
--- because `sizeAt` is
-fLvl′-infl : ∀ (S W J : ℕ) → J ≤ fLvl′ S W J
-fLvl′-infl S W J =
-  ≤-trans (fLvlK-infl S W (suc (sizeAt S J)) J)
-          (≤-reflexive (sym (fLvl′-body S W J)))
-
-fLvl′-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  fLvl′ S W J ≤ fLvl′ S′ W′ J′
-fLvl′-mono {S} {S′} {W} {W′} {J} {J′} 2≤S hS hW hJ =
-  ≤-trans (≤-trans (≤-reflexive (fLvl′-body S W J))
-                   (fLvlK-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′))
-                      2≤S hS hW hJ
-                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))))
-          (≤-reflexive (sym (fLvl′-body S′ W′ J′)))
+fIterD-mono {S} {S′} {W} {W′} {J} {J′} zero m′ d d′ k k′ 2≤S hS hW hJ hd hk hm =
+  ≤-trans (≤-trans (≤-reflexive (fIterD-0 S W d k J)) hJ)
+          (fIterD-infl S′ W′ d′ k′ m′ J′)
+fIterD-mono (suc m) zero    d d′ k k′ 2≤S hS hW hJ hd hk ()
+fIterD-mono {S} {S′} {W} {W′} {J} {J′} (suc m) (suc m′) d d′ k k′
+            2≤S hS hW hJ hd hk (s≤s hm) =
+  ≤-trans (≤-trans (≤-reflexive (fIterD-suc S W d k m J))
+                   (fIterD-mono m m′ d d′ k k′ 2≤S hS hW
+                      (fLvlD-mono d d′ 2≤S hS hW hJ hd) hd hk hm))
+          (≤-reflexive (sym (fIterD-suc S′ W′ d′ k′ m′ J′)))
 
 -- THE GATE: the new per-frame level DOMINATES the old receipt
--- pointwise, at every nesting budget — the old receipt is literally the
+-- pointwise, AT EVERY DEPTH FUEL — the old receipt is literally the
 -- seed of the new iteration, so this needs no arithmetic at all.  It is
 -- what keeps every consumer above the frame (`iterL`, `dLvl`, `lvls`,
 -- `sizeCount`, the pooled count, and the gate against the product the
 -- count replaced) true with no row re-measured
-fLvl≤fLvlK : ∀ (S W k J : ℕ) → fLvl S W J ≤ fLvlK S W k J
-fLvl≤fLvlK S W k J =
-  ≤-trans (sIterK-infl S W k (suc (widAt S W J)) (fLvl S W J))
-          (≤-reflexive (sym (fLvlK-body S W k J)))
+fLvl≤fLvlD : ∀ (S W d J : ℕ) → fLvl S W J ≤ fLvlD S W d J
+fLvl≤fLvlD S W zero    J =
+  ≤-trans (m≤m+n (fLvl S W J) (suc (widAt S W J)))
+          (≤-reflexive (sym (fLvlD-0 S W J)))
+fLvl≤fLvlD S W (suc d) J =
+  ≤-trans (sIterD-infl S W d (suc (sizeAt S J)) (suc (widAt S W J)) (fLvl S W J))
+          (≤-reflexive (sym (fLvlD-suc S W d J)))
 
-fLvl≤fLvl′ : ∀ (S W J : ℕ) → fLvl S W J ≤ fLvl′ S W J
-fLvl≤fLvl′ S W J =
-  ≤-trans (fLvl≤fLvlK S W (suc (sizeAt S J)) J)
-          (≤-reflexive (sym (fLvl′-body S W J)))
+iterL-infl : ∀ (S W d k J : ℕ) → J ≤ iterL S W d k J
+iterL-infl S W d zero    J = ≤-refl
+iterL-infl S W d (suc k) J =
+  ≤-trans (fLvlD-infl S W d J) (iterL-infl S W d k (fLvlD S W d J))
 
-iterL-infl : ∀ (S W k J : ℕ) → J ≤ iterL S W k J
-iterL-infl S W zero    J = ≤-refl
-iterL-infl S W (suc k) J =
-  ≤-trans (fLvl′-infl S W J) (iterL-infl S W k (fLvl′ S W J))
-
-iterL-mono : ∀ {S S′ W W′ J J′} (k k′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  k ≤ k′ → iterL S W k J ≤ iterL S′ W′ k′ J′
-iterL-mono {S′ = S′} {W′ = W′} {J′ = J′} zero k′ 2≤S hS hW hJ hk =
-  ≤-trans hJ (iterL-infl S′ W′ k′ J′)
+-- MONOTONE AT A FIXED DEPTH FUEL, and the fuel is implicit for exactly
+-- that reason: nothing on this ladder ever varies it — it is threaded
+-- from the one instantiation at the top (`capsAt`, `poolBody`) down to
+-- the frame unchanged, so every consumer compares two levels at the
+-- SAME d and no call site mentions it
+iterL-mono : ∀ {S S′ W W′ J J′ d} (k k′ : ℕ) →
+  2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  k ≤ k′ → iterL S W d k J ≤ iterL S′ W′ d k′ J′
+iterL-mono {S′ = S′} {W′ = W′} {J′ = J′} {d = d} zero k′ 2≤S hS hW hJ hk =
+  ≤-trans hJ (iterL-infl S′ W′ d k′ J′)
 iterL-mono (suc k) zero     2≤S hS hW hJ ()
 iterL-mono (suc k) (suc k′) 2≤S hS hW hJ (s≤s hk) =
-  iterL-mono k k′ 2≤S hS hW (fLvl′-mono 2≤S hS hW hJ) hk
+  iterL-mono k k′ 2≤S hS hW (fLvlD-mono _ _ 2≤S hS hW hJ ≤-refl) hk
 
-dLvl-infl : ∀ (S W J : ℕ) → J ≤ dLvl S W J
-dLvl-infl S W J = iterL-infl S W (suc (sizeAt S J)) J
+dLvl-infl : ∀ (S W d J : ℕ) → J ≤ dLvl S W d J
+dLvl-infl S W d J = iterL-infl S W d (suc (sizeAt S J)) J
 
-dLvl-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  dLvl S W J ≤ dLvl S′ W′ J′
+dLvl-mono : ∀ {S S′ W W′ J J′ d} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  dLvl S W d J ≤ dLvl S′ W′ d J′
 dLvl-mono {S} {S′} {J = J} {J′ = J′} 2≤S hS hW hJ =
   iterL-mono (suc (sizeAt S J)) (suc (sizeAt S′ J′)) 2≤S hS hW hJ
              (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
 
-lvls-infl : ∀ (S W J d : ℕ) → J ≤ lvls S W J d
-lvls-infl S W J zero    = ≤-refl
-lvls-infl S W J (suc d) = ≤-trans (lvls-infl S W J d) (dLvl-infl S W (lvls S W J d))
+lvls-infl : ∀ (S W d J n : ℕ) → J ≤ lvls S W d J n
+lvls-infl S W d J zero    = ≤-refl
+lvls-infl S W d J (suc n) =
+  ≤-trans (lvls-infl S W d J n) (dLvl-infl S W d (lvls S W d J n))
 
-lvls-mono : ∀ {S S′ W W′ J J′} (d d′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
-  d ≤ d′ → lvls S W J d ≤ lvls S′ W′ J′ d′
-lvls-mono {S′ = S′} {W′ = W′} {J′ = J′} zero d′ 2≤S hS hW hJ hd =
-  ≤-trans hJ (lvls-infl S′ W′ J′ d′)
-lvls-mono (suc d) zero     2≤S hS hW hJ ()
-lvls-mono (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
-  dLvl-mono 2≤S hS hW (lvls-mono d d′ 2≤S hS hW hJ hd)
+lvls-mono : ∀ {S S′ W W′ J J′ d} (n n′ : ℕ) → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
+  n ≤ n′ → lvls S W d J n ≤ lvls S′ W′ d J′ n′
+lvls-mono {S′ = S′} {W′ = W′} {J′ = J′} {d = d} zero n′ 2≤S hS hW hJ hn =
+  ≤-trans hJ (lvls-infl S′ W′ d J′ n′)
+lvls-mono (suc n) zero     2≤S hS hW hJ ()
+lvls-mono (suc n) (suc n′) 2≤S hS hW hJ (s≤s hn) =
+  dLvl-mono 2≤S hS hW (lvls-mono n n′ 2≤S hS hW hJ hn)
 
 -- AND ONE DELIVERY ALWAYS COSTS TWO: a chain has at least one frame,
 -- a frame's receipt `fCharge` is a `suc` of a product of two `suc`s,
 -- and `dLvl` iterates that at least once.  This is what `sizeCount`'s
 -- own positivity is read off, now that the count is a LEVEL rather than
 -- a product with a visible factor to read it off of
-2≤dLvl : ∀ (S W J : ℕ) → 2 ≤ dLvl S W J
-2≤dLvl S W J =
+2≤dLvl : ∀ (S W d J : ℕ) → 2 ≤ dLvl S W d J
+2≤dLvl S W d J =
   ≤-trans (≤-trans (≤-trans (s≤s (≤-trans (s≤s z≤n)
                                           (m≤m*n (suc (widAt S W J)) (suc (sizeAt S J)))))
                             (m≤n+m (fCharge S W J) J))
-                   (fLvl≤fLvl′ S W J))
-          (iterL-infl S W (sizeAt S J) (fLvl′ S W J))
+                   (fLvl≤fLvlD S W d J))
+          (iterL-infl S W d (sizeAt S J) (fLvlD S W d J))
 
-dCapᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ : ℕ) →
+dCapᶜ-mono : ∀ {S S′ W W′ R R′ J J′ d} (g g′ : ℕ) →
   2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ →
-  dCapᶜ S W R g J ≤ dCapᶜ S′ W′ R′ g′ J′
-dWalkᶜ-mono : ∀ {S S′ W W′ R R′ J J′} (g g′ i i′ : ℕ) →
+  dCapᶜ S W R d g J ≤ dCapᶜ S′ W′ R′ d g′ J′
+dWalkᶜ-mono : ∀ {S S′ W W′ R R′ J J′ d} (g g′ i i′ : ℕ) →
   2 ≤ S → S ≤ S′ → W ≤ W′ → R ≤ R′ → g ≤ g′ → J ≤ J′ → i ≤ i′ →
-  dWalkᶜ S W R g J i ≤ dWalkᶜ S′ W′ R′ g′ J′ i′
+  dWalkᶜ S W R d g J i ≤ dWalkᶜ S′ W′ R′ d g′ J′ i′
 
 dCapᶜ-mono zero    g′       2≤S hS hW hR hg       hJ = z≤n
 dCapᶜ-mono (suc g) zero     2≤S hS hW hR ()       hJ
@@ -819,18 +856,18 @@ dWalkᶜ-mono g g′ (suc i) (suc i′) 2≤S hS hW hR hg hJ (s≤s hi) =
   ih = dWalkᶜ-mono g g′ i i′ 2≤S hS hW hR hg hJ hi
 
 -- SO THE COUNT IS POSITIVE, once there is one registration to walk:
--- one delivery is one `dLvl`, and `lvls S W 0 1` IS `dLvl S W 0`
-2≤sizeCount : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  2 ≤ sizeCount c
-2≤sizeCount c 2≤S 1≤R =
-  ≤-trans (≤-trans (2≤dLvl (Caps.cSize c) (Caps.cWid c) 0)
-                   (lvls-mono 1 (cDel c) 2≤S ≤-refl ≤-refl ≤-refl 1≤D))
-          (≤-reflexive (sym (sizeCount-body c)))
+-- one delivery is one `dLvl`, and `lvls S W d 0 1` IS `dLvl S W d 0`
+2≤sizeCount : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  2 ≤ sizeCount c d
+2≤sizeCount c d 2≤S 1≤R =
+  ≤-trans (≤-trans (2≤dLvl (Caps.cSize c) (Caps.cWid c) d 0)
+                   (lvls-mono 1 (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl 1≤D))
+          (≤-reflexive (sym (sizeCount-body c d)))
   where
-  1≤D : 1 ≤ cDel c
-  1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
+  1≤D : 1 ≤ cDel c d
+  1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
                          (Caps.cSize c) 0 1≤R)
-                (≤-reflexive (sym (cDel-body c)))
+                (≤-reflexive (sym (cDel-body c d)))
 
 -- REG: linear, monotone in j always
 frameStep-reg-mono : ∀ (c : Caps) {j j′ : ℕ} → j ≤ j′ →
@@ -848,14 +885,14 @@ frameStep-mono-j c hS le =
 -- the tick endpoint, by definition rather than by arithmetic: this is
 -- what makes caps-tick the j = full case of (a) rather than a
 -- separate claim
-frameStep-full : ∀ (c : Caps) →
-  frameStep (sizeCount c) c ≡ frameBlowup c
-frameStep-full c = refl
+frameStep-full : ∀ (c : Caps) (d : ℕ) →
+  frameStep (sizeCount c d) c ≡ frameBlowup c d
+frameStep-full c d = refl
 
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
-    ≡ frameStep (sizeCount (capsAt e sl id)) (capsAt e sl id)
+    ≡ frameStep (sizeCount (capsAt e sl id) (capsH e sl id)) (capsAt e sl id)
 capsAt-suc-full e sl id = refl
 
 ------------------------------------------------------------------
@@ -865,35 +902,39 @@ capsAt-suc-full e sl id = refl
 -- property is inherited by every frameBlowup
 ------------------------------------------------------------------
 
-2≤frameBlowup-size : ∀ (c : Caps) → 2 ≤ Caps.cSize c → 2 ≤ Caps.cSize (frameBlowup c)
-2≤frameBlowup-size c h =
+2≤frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c →
+  2 ≤ Caps.cSize (frameBlowup c d)
+2≤frameBlowup-size c d h =
   ≤-trans h (iterSize-infl (Caps.cSize c) (≤-trans (s≤s z≤n) h)
-               (sizeCount c) (Caps.cSize c))
+               (sizeCount c d) (Caps.cSize c))
 
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)
 2≤capsAt-size {n = n} e sl zero =
   2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
                            (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 2≤capsAt-size e sl (suc id) =
-  2≤frameBlowup-size (capsAt e sl id) (2≤capsAt-size e sl id)
+  2≤frameBlowup-size (capsAt e sl id) (capsH e sl id) (2≤capsAt-size e sl id)
 
 -- 1 ≤ cReg AT EVERY LEVEL, the registering companions' side condition,
 -- and the recurrence proves it the same way: the base's cReg is a `suc`,
 -- and frameBlowup's cReg is `cReg c * suc (…)`, which never drops below
 -- cReg c
-1≤frameBlowup-reg : ∀ (c : Caps) → 1 ≤ Caps.cReg c → 1 ≤ Caps.cReg (frameBlowup c)
-1≤frameBlowup-reg c h = ≤-trans h (m≤m*n (Caps.cReg c) _)
+1≤frameBlowup-reg : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c →
+  1 ≤ Caps.cReg (frameBlowup c d)
+1≤frameBlowup-reg c d h = ≤-trans h (m≤m*n (Caps.cReg c) _)
 
 1≤capsAt-reg : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   1 ≤ Caps.cReg (capsAt e sl id)
 1≤capsAt-reg {n = n} e sl zero =
   1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
                           (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
     (s≤s z≤n)
 1≤capsAt-reg e sl (suc id) =
-  1≤frameBlowup-reg (capsAt e sl id) (1≤capsAt-reg e sl id)
+  1≤frameBlowup-reg (capsAt e sl id) (capsH e sl id) (1≤capsAt-reg e sl id)
 
 ------------------------------------------------------------------
 -- AND THE SLOT SIDE CONDITION AT EVERY LEVEL, supplied by the
@@ -902,10 +943,10 @@ capsAt-suc-full e sl id = refl
 -- so every slot's payloads sit under every level's cSize.
 ------------------------------------------------------------------
 
-cSize≤frameBlowup : ∀ (c : Caps) → 1 ≤ Caps.cSize c →
-  Caps.cSize c ≤ Caps.cSize (frameBlowup c)
-cSize≤frameBlowup c h =
-  iterSize-infl (Caps.cSize c) h (sizeCount c) (Caps.cSize c)
+cSize≤frameBlowup : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cSize c →
+  Caps.cSize c ≤ Caps.cSize (frameBlowup c d)
+cSize≤frameBlowup c d h =
+  iterSize-infl (Caps.cSize c) h (sizeCount c d) (Caps.cSize c)
 
 capsAt-base-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
@@ -913,10 +954,11 @@ capsAt-base-size {n = n} e sl zero =
   cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
                           (suc (entryCeil n sl e))
                           (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
     (≤-trans (s≤s z≤n) (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl))))
 capsAt-base-size e sl (suc id) =
   ≤-trans (capsAt-base-size e sl id)
-          (cSize≤frameBlowup (capsAt e sl id)
+          (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
              (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
 
 -- THE TOP-LEVEL SUPPLY, the counterpart of 2≤capsAt-size and
@@ -932,10 +974,10 @@ capsAt-base-size e sl (suc id) =
 -- stories over the old three-term base (same two-per-node rate,
 -- Mult-Width-Probe §3), so `budgetAt` does not move.  iterFold only
 -- grows a width (for S ≥ 2), so every level inherits the base's
-cWid≤frameBlowup : ∀ (c : Caps) → 2 ≤ Caps.cSize c →
-  Caps.cWid c ≤ Caps.cWid (frameBlowup c)
-cWid≤frameBlowup c h =
-  iterFold-infl (Caps.cSize c) h (sizeCount c) (Caps.cWid c)
+cWid≤frameBlowup : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c →
+  Caps.cWid c ≤ Caps.cWid (frameBlowup c d)
+cWid≤frameBlowup c d h =
+  iterFold-infl (Caps.cSize c) h (sizeCount c d) (Caps.cWid c)
 
 capsAt-base-wid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   suc (entryCeil n sl e) ≤ Caps.cWid (capsAt e sl id)
@@ -943,10 +985,12 @@ capsAt-base-wid {n = n} e sl zero =
   cWid≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
                          (suc (entryCeil n sl e))
                          (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 capsAt-base-wid e sl (suc id) =
   ≤-trans (capsAt-base-wid e sl id)
-          (cWid≤frameBlowup (capsAt e sl id) (2≤capsAt-size e sl id))
+          (cWid≤frameBlowup (capsAt e sl id) (capsH e sl id)
+             (2≤capsAt-size e sl id))
 
 ------------------------------------------------------------------
 -- THE RECURRENCE UNDER A TOWER — the last supply lemma, and the one
@@ -991,27 +1035,28 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
                    (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
 
-6≤frameBlowup-size : ∀ (c : Caps) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
-  6 ≤ Caps.cSize (frameBlowup c)
-6≤frameBlowup-size c 1≤R 3≤S =
+6≤frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
+  6 ≤ Caps.cSize (frameBlowup c d)
+6≤frameBlowup-size c d 1≤R 3≤S =
   ≤-trans (*-mono-≤ 3≤S 2≤suc2S)
           (iterSize-step≤ S S J (≤-trans (s≤s z≤n) 3≤S) 1≤J)
   where
   S = Caps.cSize c
   R = Caps.cReg c
-  J = sizeCount c
+  J = sizeCount c d
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 3≤S
   2≤suc2S : 2 ≤ suc (2 * S)
   2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
   1≤J : 1 ≤ J
   1≤J = ≤-trans (s≤s z≤n)
-                (2≤sizeCount c (≤-trans (s≤s (s≤s z≤n)) 3≤S) 1≤R)
+                (2≤sizeCount c d (≤-trans (s≤s (s≤s z≤n)) 3≤S) 1≤R)
 
 6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   6 ≤ Caps.cSize (capsAt e sl (suc id))
 6≤capsAt-size e sl id =
-  6≤frameBlowup-size (capsAt e sl id) (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
+  6≤frameBlowup-size (capsAt e sl id) (capsH e sl id)
+    (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
 
 ------------------------------------------------------------------
 -- THE TOWER BOUND ON THE RECURRENCE.  Every level of capsAt sits under
@@ -1168,9 +1213,9 @@ blowup-tower : ∀ (m : ℕ) (c : Caps) → 3 ≤ m →
   2 ≤ Caps.cSize c →
   Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
   Caps.cWid c ≤ towerℕ m →
-  (Caps.cSize (frameBlowup c) ≤ towerℕ (blowH m))
-  × (suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (blowH m))
-  × (Caps.cWid (frameBlowup c) ≤ towerℕ (blowH m))
+  (Caps.cSize (frameBlowup c m) ≤ towerℕ (blowH m))
+  × (suc (Caps.cReg (frameBlowup c m)) ≤ towerℕ (blowH m))
+  × (Caps.cWid (frameBlowup c m) ≤ towerℕ (blowH m))
 blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
   where
   1≤S : 1 ≤ Caps.cSize c
@@ -1179,8 +1224,8 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
   R = Caps.cReg c
   W = Caps.cWid c
   Tw = towerℕ m
-  J = sizeCount c
-  P = poolCount Tw
+  J = sizeCount c m
+  P = poolCount Tw m
   L = 4 + m + 2 * P          -- the level the three axes meet at
 
   -- `blowH` is opaque (a normalisation guard, Rx.Evaluator); this is
@@ -1197,13 +1242,13 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
   -- THE COUNT, and it is monotonicity in each field and nothing else —
   -- `poolBody` IS this count with every field pooled, level walk and all
   J≤P : J ≤ P
-  J≤P = ≤-trans (≤-trans (≤-reflexive (sizeCount-body c))
-                   (lvls-mono (cDel c) (dCapᶜ Tw Tw Tw (suc Tw) 0)
+  J≤P = ≤-trans (≤-trans (≤-reflexive (sizeCount-body c m))
+                   (lvls-mono (cDel c m) (dCapᶜ Tw Tw Tw m (suc Tw) 0)
                       2≤S hS hW ≤-refl
-                      (≤-trans (≤-reflexive (cDel-body c))
+                      (≤-trans (≤-reflexive (cDel-body c m))
                          (dCapᶜ-mono (suc S) (suc Tw)
                             2≤S hS hW hR′ (s≤s hS) ≤-refl))))
-                (poolBody≤poolCount Tw 1≤Tw)
+                (poolBody≤poolCount Tw m 1≤Tw)
 
   3≤L : 3 ≤ L
   3≤L = ≤-trans (≤-trans (≤ᵇ⇒≤ 3 4 _) (m≤m+n 4 m)) (m≤m+n (4 + m) (2 * P))
@@ -1225,7 +1270,7 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
   J≤L = ≤-trans (n≤1+n J) sucJ≤
 
   -- SIZE: (3T) per fold, J folds, and one story to land the product
-  sizeGoal : Caps.cSize (frameBlowup c) ≤ towerℕ (blowH m)
+  sizeGoal : Caps.cSize (frameBlowup c m) ≤ towerℕ (blowH m)
   sizeGoal =
     ≤-trans (iterSize-pow S Tw J S 1≤Tw hS hS)
     (≤-trans (*-monoʳ-≤ ((3 * Tw) ^ J) (m≤m+n Tw (Tw + (Tw + 0))))
@@ -1236,7 +1281,7 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
              hgt)))))
 
   -- REGISTRATIONS: linear in the count, and reported STRICTLY
-  regGoal : suc (Caps.cReg (frameBlowup c)) ≤ towerℕ (blowH m)
+  regGoal : suc (Caps.cReg (frameBlowup c m)) ≤ towerℕ (blowH m)
   regGoal =
     ≤-trans (tower-mul-suc (suc L) R (suc (J * S)) (≤-trans 3≤L (n≤1+n L))
                (≤-trans hR′ (≤-trans Tw≤L (towerℕ-mono (n≤1+n L))))
@@ -1244,7 +1289,7 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
             hgt
 
   -- WIDTH: two stories a fold, and the fold count is J
-  widGoal : Caps.cWid (frameBlowup c) ≤ towerℕ (blowH m)
+  widGoal : Caps.cWid (frameBlowup c m) ≤ towerℕ (blowH m)
   widGoal =
     ≤-trans (≤-trans (iterFold-tower m S W J 3≤m hS hW) (towerℕ-mono climb))
             hgt
@@ -1263,13 +1308,10 @@ blowup-tower m c 3≤m 2≤S hS hR hW = sizeGoal , regGoal , widGoal
 -- tower in the syntax, and `k ≤ towerℕ k` is a complete and free answer
 -- to "under what tower does this number sit".  That is why the width
 -- conjunct below costs no new postulate.
-capsH : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
-capsH e sl id = capsHgo (capsBase e sl) id
-
 3≤blowH : ∀ (m : ℕ) → 3 ≤ blowH m
 3≤blowH m =
   ≤-trans (≤-trans (≤-trans (≤ᵇ⇒≤ 3 6 _) (m≤m+n 6 m))
-                   (m≤m+n (6 + m) (2 * poolCount (towerℕ m))))
+                   (m≤m+n (6 + m) (2 * poolCount (towerℕ m) m)))
           (≤-reflexive (sym (blowH-body m)))
 
 3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →

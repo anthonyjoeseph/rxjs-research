@@ -151,7 +151,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 hasDry; dryEvent; sameSource;
                                 budgetAt; slotsSize; fCharge; regAt;
                                 sizeStep; iterSize; foldStep; iterFold;
-                                fLvl; iterL; dLvl; lvls)
+                                fLvl; fLvlD; iterL; dLvl; lvls)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -4034,7 +4034,7 @@ pathSz?-tail B f p h =
 -- ground `stepFrame-caps` already reports in
 
 cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (a : Arrival Γ) (id : Id)
+  (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -4047,14 +4047,14 @@ cascadeGo-deliveries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
   delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-    ≤ cDel c
+    ≤ cDel c d
 
 -- THE ASSEMBLY, ground: the level the walk lands at, with the delivery
 -- count widened to its own recursion.  Both pieces are theorems, so
 -- this one is (the body is at the end of the next section, where
 -- cascadeGo-level is)
 cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (a : Arrival Γ) (id : Id)
+  (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -4067,7 +4067,7 @@ cascadeGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
   let r = cascadeGo a id chains sched st
-  in Σ ℕ λ j → (j ≤ sizeCount c)
+  in Σ ℕ λ j → (j ≤ sizeCount c d)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
 ------------------------------------------------------------------
@@ -4387,11 +4387,11 @@ stepFrame-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   valsCaps? (frameStep j c) sl vals ≡ true →
   FrameFace c j sl (stepFrame g id now f κ vals fin sched st)
 
-walkH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (sl : Slots Γ) →
+walkH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (d : ℕ) (sl : Slots Γ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  Walk-Hyps e (Caps.cSize c) (Caps.cWid c) (Caps.cReg c)
-walkH c sl 2≤S 1≤R slC = record
+  Walk-Hyps e (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
+walkH c d sl 2≤S 1≤R slC = record
   { OK        = walkOK c sl
   ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p
   ; Vb        = λ J vs → valsCaps? (frameStep J c) sl vs
@@ -4410,7 +4410,8 @@ walkH c sl 2≤S 1≤R slC = record
                       FC = stepFrame-face c J sl sf id now f path′ vals fin sched st
                              2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV in
                   proj₁ FC
-                  , proj₁ (proj₂ FC)
+                  , ≤-trans (+-monoʳ-≤ J (proj₁ (proj₂ FC)))
+                            (fLvl≤fLvlD (Caps.cSize c) (Caps.cWid c) d J)
                   , ( trans (KeepsC.slotsEq
                                (stepFrame-keeps sf id now f path′ vals fin sched st))
                             (proj₁ ok)
@@ -4426,7 +4427,7 @@ walkH c sl 2≤S 1≤R slC = record
 -- dispatch gas to cDel's index (n ≤ cSize), the walk length to the
 -- registry cap (length chains ≤ cReg), and dCapᶜ's own unfolding, which
 -- is what `cDel` abbreviates
-cascadeGo-deliveries {n = n} {e = e} c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
+cascadeGo-deliveries {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
   ≤-trans (W.Res.cnt (W.cascadeGo-go 0 a id chains sched st
              ((slEq , invʲ) , capsOK?-regs c sched st inv)
              pS (∧-intro (∧-intro vC refl) refl)))
@@ -4434,12 +4435,12 @@ cascadeGo-deliveries {n = n} {e = e} c a id chains sl sched st 2≤S 1≤R slC s
                 (regAt (Caps.cSize c) (Caps.cReg c) 0)
                 2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
                 (≤-trans lenB (≤-reflexive (sym (*-identityʳ (Caps.cReg c))))))
-             (≤-reflexive (sym (cDel-body c))))
+             (≤-reflexive (sym (cDel-body c d))))
   where
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
-  module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) 2≤S
-                  (walkH c sl 2≤S 1≤R slC)
+  module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d 2≤S
+                  (walkH c d sl 2≤S 1≤R slC)
 
 ------------------------------------------------------------------
 -- THE CHARGE, IN THE CURRENCY THE WALK ACTUALLY PROVES — and the
@@ -4470,7 +4471,7 @@ cascadeGo-deliveries {n = n} {e = e} c a id chains sl sched st 2≤S 1≤R slC s
 ------------------------------------------------------------------
 
 cascadeGo-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (a : Arrival Γ) (id : Id)
+  (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -4482,33 +4483,33 @@ cascadeGo-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j →
-     (j ≤ lvls (Caps.cSize c) (Caps.cWid c) 0
+     (j ≤ lvls (Caps.cSize c) (Caps.cWid c) d 0
              (delivN st (proj₂ (proj₂ r))))
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-level {e = e} c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS =
+cascadeGo-level {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS =
   W.Res.lvl GO , W.Res.hi GO , proj₂ (proj₁ (W.Res.good GO))
   where
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
-  module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) 2≤S
-                  (walkH c sl 2≤S 1≤R slC)
+  module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d 2≤S
+                  (walkH c d sl 2≤S 1≤R slC)
   GO = W.cascadeGo-go 0 a id chains sched st
          ((slEq , invʲ) , capsOK?-regs c sched st inv)
          pS (∧-intro (∧-intro vC refl) refl)
 
 -- and the assembly declared above: the landing level with the delivery
 -- count widened to its own recursion, which is `sizeCount` by definition
-cascadeGo-caps c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
+cascadeGo-caps c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
   proj₁ LV
     , ≤-trans (≤-trans (proj₁ (proj₂ LV))
-                       (lvls-mono D (cDel c) 2≤S ≤-refl ≤-refl ≤-refl
-                          (cascadeGo-deliveries c a id chains sl sched st
+                       (lvls-mono D (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl
+                          (cascadeGo-deliveries c d a id chains sl sched st
                              2≤S 1≤R slC slEq inv vC pS n≤S lenB)))
-              (≤-reflexive (sym (sizeCount-body c)))
+              (≤-reflexive (sym (sizeCount-body c d)))
     , proj₂ (proj₂ LV)
   where
   D  = delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-  LV = cascadeGo-level c a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS
+  LV = cascadeGo-level c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS
 
 ------------------------------------------------------------------
 -- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the
@@ -8091,7 +8092,7 @@ caps-tick {e = e} sl id a nextId sched st slEq pre val =
   where
   c    = capsAt e sl id
   st₀  = cascadeLatch a st
-  GO   = cascadeGo-caps c a nextId (chainsOf a st) sl sched st₀
+  GO   = cascadeGo-caps c (capsH e sl id) a nextId (chainsOf a st) sl sched st₀
            (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
            (slotsCaps?-capsAt e sl id) slEq
            (cascadeLatch-caps c a sched st pre) val

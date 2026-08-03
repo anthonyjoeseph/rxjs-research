@@ -7,8 +7,8 @@
 --
 --     foldPath      sf gas … path …  ↦  dCapᶜ  S W R gas J
 --     dispatchShare sf gas … i …     ↦  dCapᶜ  S W R gas J
---     shareGo       sf gas … ps …    ↦  dWalkᶜ S W R gas J (length ps)
---     cascadeGo     a id chains …    ↦  dWalkᶜ S W R n   J (length chains)
+--     shareGo       sf gas … ps …    ↦  dWalkᶜ S W R d gas J (length ps)
+--     cascadeGo     a id chains …    ↦  dWalkᶜ S W R d n   J (length chains)
 --
 -- with J the CAPS LEVEL at the call's entry state.  That is the
 -- 2026-08-02 repair, and it is forced: the walk used to thread a
@@ -87,7 +87,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain;
                                 chainStep; cascadeGo; dropSource; sameSource;
                                 arrTy; arrTick; arrSource; arrVal;
                                 budgetAt;
-                                sizeAt; regAt; fCharge; iterL; lvls;
+                                sizeAt; regAt; fLvlD; iterL; lvls;
                                 dCapᶜ; dWalkᶜ)
 
 -- .Caps for the level walk and its monotonicity toolkit (dCapᶜ-mono /
@@ -170,9 +170,9 @@ shareAdmit-chP {Γ = Γ} Pb i ((rid , s , (u , p)) ∷ r) h
 -- § C.  THE HYPOTHESES: ONE FRAME, AT THE LEVEL IT RUNS AT.
 --
 -- Everything below is proven from ONE fact about `stepFrame` — it
--- reports a growth index j′ inside the per-frame receipt `fCharge S W J`
--- and lands its post-state, its output burst and the registry's ledger
--- at level `J + j′` — plus the three closure facts the walk's own
+-- reports a growth index j′ whose LANDING LEVEL `J + j′` sits under one
+-- refreshed per-frame level `fLvlD S W d J`, and lands its post-state,
+-- its output burst and the registry's ledger at level `J + j′` — plus the three closure facts the walk's own
 -- bookkeeping needs (the delivered cons, the share latch, the share
 -- finish, none of which is a frame) and the two LEDGER readings the
 -- level supplies: a chain is shorter than `sizeAt S J` and the registry
@@ -196,7 +196,7 @@ shareAdmit-chP {Γ = Γ} Pb i ((rid , s , (u , p)) ∷ r) h
 -- `frameStep` is monotone in its index and `capsOK?` widens along ⊑ᶜ.
 ------------------------------------------------------------------
 
-record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R : ℕ) : Set₁ where
+record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁ where
   field
     OK : ℕ → Sched Γ → EvalSt e → Set
 
@@ -238,7 +238,7 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R : ℕ) : Set₁ w
       Pb J (f ↠ path′) ≡ true → Vb J vals ≡ true →
       regP? (Pb J) (EvalSt.registry st) ≡ true →
       let r = stepFrame sf id now f path′ vals fin sched st in
-      Σ ℕ λ j′ → (j′ ≤ fCharge S W J)
+      Σ ℕ λ j′ → (J + j′ ≤ fLvlD S W d J)
         × OK (J + j′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
                       (proj₂ (proj₂ (proj₂ (proj₂ r))))
         × (Vb (J + j′) (proj₁ r) ≡ true)
@@ -257,7 +257,7 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R : ℕ) : Set₁ w
 ------------------------------------------------------------------
 
 module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-            (S W R : ℕ) (2≤S : 2 ≤ S) (H : Walk-Hyps e S W R) where
+            (S W R d : ℕ) (2≤S : 2 ≤ S) (H : Walk-Hyps e S W R d) where
 
   open Walk-Hyps H
 
@@ -283,7 +283,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     field
       lvl  : ℕ
       lo   : J ≤ lvl
-      hi   : lvl ≤ lvls S W base (delivN st st′)
+      hi   : lvl ≤ lvls S W d base (delivN st st′)
       good : Good lvl sched′ st′
       cnt  : delivN st st′ ≤ cap
 
@@ -298,15 +298,15 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     Pb J path ≡ true → Vb J vals ≡ true →
     let fp = foldPath sf gas id now envSrc path vals evs fin sched st in
-    Res J (iterL S W (pathLen path) J)
-          (dCapᶜ S W R gas (iterL S W (pathLen path) J))
+    Res J (iterL S W d (pathLen path) J)
+          (dCapᶜ S W R d gas (iterL S W d (pathLen path) J))
           (proj₁ (proj₂ fp)) st (proj₂ (proj₂ fp))
 
   dispatchShare-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st → Vb J vals ≡ true →
     let ds = dispatchShare {t = t} sf gas id now i vals fin sched st in
-    Res J J (dCapᶜ S W R gas J) (proj₁ (proj₂ ds)) st (proj₂ (proj₂ ds))
+    Res J J (dCapᶜ S W R d gas J) (proj₁ (proj₂ ds)) st (proj₂ (proj₂ ds))
 
   shareGo-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
@@ -314,7 +314,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     chP? (Pb J) ps ≡ true → Vb J vals ≡ true →
     let sg = shareGo sf gas id now i vals fin ps sched st in
-    Res J J (dWalkᶜ S W R gas J (length ps))
+    Res J J (dWalkᶜ S W R d gas J (length ps))
           (proj₁ (proj₂ sg)) st (proj₂ (proj₂ sg))
 
   ----------------------------------------------------------------
@@ -326,7 +326,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV =
     res J ≤-refl
         (≤-trans (≤-reflexive refl)
-                 (lvls-infl S W J (delivN st st)))
+                 (lvls-infl S W d J (delivN st st)))
         g
         (≤-trans (≤-reflexive (foldPath-root-N sf gas id now envSrc vals evs fin sched st))
                  z≤n)
@@ -340,7 +340,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (≤-trans (lvls-mono (delivN st₁ (proj₂ (proj₂ fp)))
                              (delivN st₁ (proj₂ (proj₂ fp)))
                              2≤S ≤-refl ≤-refl step ≤-refl)
-                          (≤-reflexive (cong (lvls S W (iterL S W (suc (pathLen path′)) J))
+                          (≤-reflexive (cong (lvls S W d (iterL S W d (suc (pathLen path′)) J))
                                              (sym eqD)))))
         (Res.good IH)
         (≤-trans (≤-reflexive eqD)
@@ -355,11 +355,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     fp  = foldPath sf gas id now envSrc path′ (proj₁ r)
             (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
     -- the tail runs at `J + j′`, and one frame of budget covers it —
-    -- the receipt lands inside `fLvl`, and `fLvl ≤ fLvl′` is what one
-    -- step of `iterL` now spends (.Caps, the nesting-budgeted level)
-    step : iterL S W (pathLen path′) (J + j′) ≤ iterL S W (suc (pathLen path′)) J
+    -- the frame LEAVES its level under one `fLvlD`, which is exactly
+    -- what one step of `iterL` spends (.Caps, the refreshed level).  The
+    -- face reports the landing level rather than the receipt alone,
+    -- because a frame that SUBSCRIBES costs more than `fCharge`
+    step : iterL S W d (pathLen path′) (J + j′) ≤ iterL S W d (suc (pathLen path′)) J
     step = iterL-mono (pathLen path′) (pathLen path′) 2≤S ≤-refl ≤-refl
-             (≤-trans (+-monoʳ-≤ J (proj₁ (proj₂ SF))) (fLvl≤fLvl′ S W J)) ≤-refl
+             (proj₁ (proj₂ SF)) ≤-refl
     IH = foldPath-go (J + j′) sf gas id now envSrc path′ (proj₁ r)
            (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
            ( proj₁ (proj₂ (proj₂ SF))
@@ -376,13 +378,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   ----------------------------------------------------------------
 
   dispatchShare-go J sf zero id now i vals fin sched st g hV =
-    res J ≤-refl (lvls-infl S W J (delivN st st)) g
+    res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (dispatchShare-zero-N sf id now i vals fin sched st))
 
   dispatchShare-go J sf (suc gas) id now i vals fin sched st (ok , len) hV =
     res (Res.lvl GO) (Res.lo GO)
         (≤-trans (Res.hi GO)
-                 (≤-reflexive (cong (lvls S W J) (sym eqD))))
+                 (≤-reflexive (cong (lvls S W d J) (sym eqD))))
         ( ok-finish (Res.lvl GO) i fin out (proj₁ (Res.good GO))
         , shareFinish-regP (Pb (Res.lvl GO)) i fin out (proj₂ (Res.good GO)) )
         (≤-trans (≤-reflexive eqD)
@@ -398,7 +400,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     eqD : delivN st (proj₂ (proj₂ (dispatchShare {t = t} sf (suc gas) id now i vals fin sched st)))
             ≡ delivN stL (proj₂ (proj₂ out))
     eqD = dispatchShare-suc-N sf gas id now i vals fin sched st
-    GO : Res J J (dWalkᶜ S W R gas J (length (shareAdmit i (EvalSt.registry st))))
+    GO : Res J J (dWalkᶜ S W R d gas J (length (shareAdmit i (EvalSt.registry st))))
                  (proj₁ (proj₂ out)) stL (proj₂ (proj₂ out))
     GO = shareGo-go J sf gas id now i vals fin
            (shareAdmit i (EvalSt.registry st)) sched stL
@@ -414,7 +416,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   ----------------------------------------------------------------
 
   shareGo-go J sf gas id now i vals fin [] sched st g hp hV =
-    res J ≤-refl (lvls-infl S W J (delivN st st)) g
+    res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
 
   shareGo-go J sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV
@@ -431,12 +433,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         res (Res.lvl REST) (≤-trans (Res.lo FP) (Res.lo REST))
             (≤-trans (Res.hi REST)
                (≤-trans (lvls-mono D₂ D₂ 2≤S ≤-refl ≤-refl J₁≤ ≤-refl)
-                  (≤-trans (≤-reflexive (sym (lvls-add S W J (suc D₁) D₂)))
-                           (≤-reflexive (cong (lvls S W J) (sym eqN))))))
+                  (≤-trans (≤-reflexive (sym (lvls-add S W d J (suc D₁) D₂)))
+                           (≤-reflexive (cong (lvls S W d J) (sym eqN))))))
             (Res.good REST)
             (≤-trans (≤-reflexive eqN)
                (≤-trans (s≤s (+-mono-≤ D₁≤A restCnt))
-                        (≤-reflexive (sym (dWalkᶜ-front S W R gas J (length ps))))))
+                        (≤-reflexive (sym (dWalkᶜ-front S W R d gas J (length ps))))))
         where
         st₀ = consᵈ rid st
         evs₀ = if fin then close (toℕ i) exhausted ∷ [] else []
@@ -450,16 +452,16 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         st₂ = proj₂ (proj₂ rest)
         D₁  = delivN st₀ st₁
         D₂  = delivN st₁ st₂
-        A   = dCapᶜ S W R gas (lvls S W J 1)
+        A   = dCapᶜ S W R d gas (lvls S W d J 1)
         -- one chain is at most `suc (sizeAt S J)` frames, so its frames
         -- fit inside ONE delivery's level charge
-        chain≤ : iterL S W (pathLen p) J ≤ lvls S W J 1
+        chain≤ : iterL S W d (pathLen p) J ≤ lvls S W d J 1
         chain≤ = iterL-mono (pathLen p) (suc (sizeAt S J)) 2≤S ≤-refl ≤-refl ≤-refl
                    (≤-trans (p-len J p (proj₁ (∧-true _ _ hp))) (n≤1+n (sizeAt S J)))
-        J₁≤ : J₁ ≤ lvls S W J (suc D₁)
+        J₁≤ : J₁ ≤ lvls S W d J (suc D₁)
         J₁≤ = ≤-trans (Res.hi FP)
                 (≤-trans (lvls-mono D₁ D₁ 2≤S ≤-refl ≤-refl chain≤ ≤-refl)
-                         (≤-reflexive (sym (lvls-add S W J 1 D₁))))
+                         (≤-reflexive (sym (lvls-add S W d J 1 D₁))))
         D₁≤A : D₁ ≤ A
         D₁≤A = ≤-trans (Res.cnt FP)
                  (dCapᶜ-mono gas gas 2≤S ≤-refl ≤-refl ≤-refl ≤-refl chain≤)
@@ -467,7 +469,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) ps (proj₂ (∧-true _ _ hp)))
                  (v-widen (Res.lo FP) vals hV)
-        restCnt : D₂ ≤ dWalkᶜ S W R gas (lvls S W J (suc A)) (length ps)
+        restCnt : D₂ ≤ dWalkᶜ S W R d gas (lvls S W d J (suc A)) (length ps)
         restCnt = ≤-trans (Res.cnt REST)
                     (dWalkᶜ-mono gas gas (length ps) (length ps) 2≤S ≤-refl ≤-refl ≤-refl
                        ≤-refl (≤-trans J₁≤ (lvls-mono (suc D₁) (suc A) 2≤S ≤-refl ≤-refl
@@ -492,11 +494,11 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     chP? (Pb J) chains ≡ true → Vb J (arrVal a ∷ []) ≡ true →
     let cg = cascadeGo a id chains sched st in
-    Res J J (dWalkᶜ S W R n J (length chains))
+    Res J J (dWalkᶜ S W R d n J (length chains))
           (proj₁ (proj₂ cg)) st (proj₂ (proj₂ cg))
 
   cascadeGo-go J a id [] sched st g hp hV =
-    res J ≤-refl (lvls-infl S W J (delivN st st)) g
+    res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
 
   cascadeGo-go J a id ((rid , c) ∷ chains) sched st g hp hV
@@ -512,12 +514,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         res (Res.lvl REST) (≤-trans (Res.lo FP) (Res.lo REST))
             (≤-trans (Res.hi REST)
                (≤-trans (lvls-mono D₂ D₂ 2≤S ≤-refl ≤-refl J₁≤ ≤-refl)
-                  (≤-trans (≤-reflexive (sym (lvls-add S W J (suc D₁) D₂)))
-                           (≤-reflexive (cong (lvls S W J) (sym eqN))))))
+                  (≤-trans (≤-reflexive (sym (lvls-add S W d J (suc D₁) D₂)))
+                           (≤-reflexive (cong (lvls S W d J) (sym eqN))))))
             (Res.good REST)
             (≤-trans (≤-reflexive eqN)
                (≤-trans (s≤s (+-mono-≤ D₁≤A restCnt))
-                        (≤-reflexive (sym (dWalkᶜ-front S W R n J (length chains))))))
+                        (≤-reflexive (sym (dWalkᶜ-front S W R d n J (length chains))))))
         where
         st₀  = consᵈ rid st
         sf₀  = budgetAt e (Sched.slots sched) id
@@ -533,14 +535,14 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         st₂  = proj₂ (proj₂ rest)
         D₁   = delivN st₀ st₁
         D₂   = delivN st₁ st₂
-        A    = dCapᶜ S W R n (lvls S W J 1)
-        chain≤ : iterL S W (pathLen c) J ≤ lvls S W J 1
+        A    = dCapᶜ S W R d n (lvls S W d J 1)
+        chain≤ : iterL S W d (pathLen c) J ≤ lvls S W d J 1
         chain≤ = iterL-mono (pathLen c) (suc (sizeAt S J)) 2≤S ≤-refl ≤-refl ≤-refl
                    (≤-trans (p-len J c (proj₁ (∧-true _ _ hp))) (n≤1+n (sizeAt S J)))
-        J₁≤ : J₁ ≤ lvls S W J (suc D₁)
+        J₁≤ : J₁ ≤ lvls S W d J (suc D₁)
         J₁≤ = ≤-trans (Res.hi FP)
                 (≤-trans (lvls-mono D₁ D₁ 2≤S ≤-refl ≤-refl chain≤ ≤-refl)
-                         (≤-reflexive (sym (lvls-add S W J 1 D₁))))
+                         (≤-reflexive (sym (lvls-add S W d J 1 D₁))))
         D₁≤A : D₁ ≤ A
         D₁≤A = ≤-trans (Res.cnt FP)
                  (dCapᶜ-mono n n 2≤S ≤-refl ≤-refl ≤-refl ≤-refl chain≤)
@@ -548,7 +550,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) chains (proj₂ (∧-true _ _ hp)))
                  (v-widen (Res.lo FP) (arrVal a ∷ []) hV)
-        restCnt : D₂ ≤ dWalkᶜ S W R n (lvls S W J (suc A)) (length chains)
+        restCnt : D₂ ≤ dWalkᶜ S W R d n (lvls S W d J (suc A)) (length chains)
         restCnt = ≤-trans (Res.cnt REST)
                     (dWalkᶜ-mono n n (length chains) (length chains) 2≤S ≤-refl ≤-refl ≤-refl
                        ≤-refl (≤-trans J₁≤ (lvls-mono (suc D₁) (suc A) 2≤S ≤-refl ≤-refl
