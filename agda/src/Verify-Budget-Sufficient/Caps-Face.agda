@@ -6727,6 +6727,44 @@ stepFrame-face-zero c j u sl fin sched st inv =
 -- So this block's plan stands as written EXCEPT for the hypothesis
 -- `subscribeE-caps` would carry, and the family's shape is the design
 -- session's to re-rule.  Do not grind the pass onto `suc (sizeAt S J)`
+--
+-- AND THE RE-RULING IS PROBED, AND CLOSES HALF (2026-08-03,
+-- agda/probe/Refresh-Probe.agda).  The design session ruled a PER-FRAME
+-- BUDGET REFRESH: `k` is not inherited down the subscribe tree, every
+-- FRAME ENTRY re-reads `suc (sizeAt S J)` at its own level.
+--
+-- THE SOUNDNESS HALF IS A THEOREM rather than a table, and it is the
+-- half this block waits on.  `stepFrame` reaches `subscribeInner` from
+-- exactly two clauses — `thru-outer`, whose payloads are its OWN
+-- arriving `vals` one for one, and a concat frame draining a queue
+-- filled at an EARLIER arrival, hence at a level the walk has climbed
+-- past.  `valsCaps?` at the frame's entry bounds the first, `sizeAt-mono`
+-- carries the second there, and `nestᵛ ≤ sizeᵛ` turns both into the
+-- nesting hypothesis.  No row can breach it.
+--
+-- THE TERMINATION HALF FAILS, and Agda rejects the ruled family
+-- verbatim.  `k` was the ONE descending argument — every cycle passes
+-- `sLvlK`, whose clause is `suc k ↦ k` — and a refresh at a level the
+-- walk has climbed to returns it LARGER, so the descent is reversed
+-- rather than weakened; the iteration counts do not replace it, being
+-- re-read at the climbed level too.  The probe carries the shape that
+-- does close: the refresh with an explicit DEPTH FUEL the frame entry
+-- spends, proven inflationary, monotone in all five arguments, above
+-- `fLvl`, and above the landed family at every budget it could read.
+-- All four composition-gate steps go through against it unchanged, and
+-- a fifth appears — `frame-step`, which IS the refresh: a frame's
+-- payload walk stops taking a nesting hypothesis from the subscribe
+-- that installed it, and reads its own.
+--
+-- WHAT IS STILL UNRULED IS ONE NUMBER, the fuel's instantiation.  Read
+-- off (S, W, J) at the delivery's entry it falls to the same mint one
+-- stratum up (a mint at a climbed frame contributes ITS nesting to the
+-- remaining depth); the evaluator's own `Gas` is the one supplier owing
+-- no new invariant — `subscribeInner g0` returns a dry burst — but
+-- `budgetAt`'s tower height runs through `poolCount`, hence `lvls`,
+-- hence the very level the fuel would feed.  The probe's § 8 states that
+-- cycle exactly.  The shape is neutral between the ways out, so nothing
+-- here is foreclosed by waiting
 ------------------------------------------------------------------
 
 postulate

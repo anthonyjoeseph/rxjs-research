@@ -676,6 +676,26 @@ fLvl S W J = J + fCharge S W J
 -- Entry-Caps-Refuted distinction moved from the caps to the budget —
 -- read at an entry, spent after a climb.
 --
+-- THE RE-RULING — a PER-FRAME BUDGET REFRESH, `k` re-read at every frame
+-- entry instead of inherited — IS PROBED AND CLOSES HALF (2026-08-03,
+-- agda/probe/Refresh-Probe.agda).  Its SOUNDNESS is a theorem:
+-- `stepFrame` reaches `subscribeInner` from two clauses only —
+-- `thru-outer`, whose payloads are its own arriving values, and a concat
+-- drain, whose queue was filled at a LOWER level — so `valsCaps?` at the
+-- frame's entry plus `sizeAt-mono` plus `nestᵛ ≤ sizeᵛ` bound every
+-- payload a frame subscribes, and no row can breach it.  Its TERMINATION
+-- fails, and Agda rejects the family verbatim: `k` is the ONE argument
+-- that descends here (every cycle passes `sLvlK`), and a refresh at a
+-- climbed level returns it LARGER.  The probe carries the shape that
+-- does close — the same refresh with an explicit DEPTH FUEL the frame
+-- entry spends — with inflation, monotonicity, `fLvl ≤` it, THIS family
+-- ≤ it, and the composition-gate steps re-proven, so the clauses below
+-- are unaffected either way.  What is unruled is that fuel's
+-- instantiation: off (S, W, J) at the entry it falls to the same mint
+-- one stratum up, and the evaluator's own `Gas` — the one supplier
+-- owing nothing new — runs through `poolCount`, hence `lvls`, hence
+-- this level.  Nothing here moves until that is ruled.
+--
 -- ABSTRACT, and for the same PERFORMANCE reason `blowH` and `sizeCount`
 -- are.  Every one of these clauses matches on an argument that is a
 -- literal `suc` even at a variable J (`suc (widAt S W J)`,
