@@ -39,15 +39,17 @@ open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Nat  using (ℕ; suc; _+_; _*_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; +-monoʳ-≤; *-mono-≤;
-         *-identityˡ; *-identityʳ; +-identityʳ; *-distribˡ-+;
+         *-identityˡ; *-identityʳ; +-identityʳ; +-assoc; *-distribˡ-+;
          +-comm; m≤m+n; n≤1+n; ≡⇒≡ᵇ)
 open import Data.Fin  using (Fin; toℕ)
-open import Data.List using (List; _∷_; sum; tabulate)
+import Data.Fin as Fin
+open import Data.List using (List; []; _∷_; sum; tabulate)
+open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
 open import Rx.Prim  using (Source)
-open import Rx.Exp   using (Ctx; Exp; Closed; syncSizeᵉ; sizeᵉ)
+open import Rx.Exp   using (Ctx; Exp; Closed; input; syncSizeᵉ; sizeᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
@@ -113,6 +115,52 @@ M e sl cs = syncSizeᵉ e + resid sl cs
 M≤ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
   (sl : Slots Γ) (cs : List Source) → M e sl cs ≤ sizeᵉ e + slotsSize sl
 M≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
+
+-- THE SHARE EDGE'S STEP, which is the row the residue exists for.
+-- `sharedConnect` recurses on the slot's stored def with `toℕ i`
+-- ALREADY consed onto `connectedShares`, so the callee's measure is
+-- `syncSizeᵉ d + resid sl (toℕ i ∷ cs)` while the caller holds
+-- `M (input i) sl cs ≤ suc k` — and `input i` has syncSize 1, so that
+-- premise IS `resid sl cs ≤ k`.  The two differ by exactly slot i's own
+-- weight, which leaves the residue precisely when the slot is connected
+
+swap₃ : ∀ (a b c : ℕ) → a + (b + c) ≡ b + (a + c)
+swap₃ a b c =
+  trans (sym (+-assoc a b c))
+        (trans (cong (_+ c) (+-comm a b)) (+-assoc b a c))
+
+sum-tab-slack : ∀ {m} (f g : Fin m → ℕ) (w : ℕ) → (∀ j → f j ≤ g j) →
+  (i : Fin m) → w + f i ≤ g i → w + sum (tabulate f) ≤ sum (tabulate g)
+sum-tab-slack {suc m} f g w h Fin.zero hi =
+  ≤-trans (≤-reflexive
+            (sym (+-assoc w (f Fin.zero) (sum (tabulate (λ j → f (Fin.suc j)))))))
+          (+-mono-≤ hi (sum-tab-mono _ _ (λ j → h (Fin.suc j))))
+sum-tab-slack {suc m} f g w h (Fin.suc i) hi =
+  ≤-trans (≤-reflexive
+            (swap₃ w (f Fin.zero) (sum (tabulate (λ j → f (Fin.suc j))))))
+          (+-mono-≤ (h Fin.zero)
+                    (sum-tab-slack (λ j → f (Fin.suc j)) (λ j → g (Fin.suc j)) w
+                                   (λ j → h (Fin.suc j)) i hi))
+
+resid-connect : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false →
+  syncSizeᵉ d + resid sl (toℕ i ∷ cs) ≤ resid sl cs
+resid-connect sl cs i {d} eqi fresh =
+  sum-tab-slack _ _ (syncSizeᵉ d) (residAt-cons-≤ sl cs (toℕ i)) i slack
+  where
+  slack : syncSizeᵉ d + residAt sl (toℕ i ∷ cs) i ≤ residAt sl cs i
+  slack rewrite eqi | fresh
+              | T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl)
+              = ≤-reflexive (+-identityʳ (syncSizeᵉ d))
+
+share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
+  memberSource (toℕ i) cs ≡ false →
+  M (input {Γ = Γ} {Δᵍ = []} {Δ = []} {Θ = []} i) sl cs ≤ suc k →
+  M d sl (toℕ i ∷ cs) ≤ k
+share-step sl cs i k eqi fresh (s≤s h) =
+  ≤-trans (resid-connect sl cs i eqi fresh) h
 
 ------------------------------------------------------------------
 -- § 3.  THE FRAME ROW.  A frame holds `sizeᵉ o ≤ sizeAt S j` for its

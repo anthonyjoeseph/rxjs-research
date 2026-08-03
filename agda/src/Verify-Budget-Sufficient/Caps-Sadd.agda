@@ -64,11 +64,13 @@ fLvlD-sadd {S} {W} {J} zero 2≤S =
 fLvlD-sadd {S} {W} {J} (suc d) 2≤S =
   ≤-trans (≤-trans (≤-trans (≤-reflexive (cong suc (fLvlD-suc S W d J)))
                             (sIterD-sadd {S} {W} {fLvl S W J}
-                               (suc (widAt S W J)) d (suc (sizeAt S J)) 2≤S))
+                               (suc (widAt S W J)) d (suc (sizeAt S (suc J))) 2≤S))
                    (sIterD-mono (suc (widAt S W J)) (suc (widAt S W (suc J))) d d
-                      (suc (sizeAt S J)) (suc (sizeAt S (suc J))) 2≤S ≤-refl ≤-refl
+                      (suc (sizeAt S (suc J))) (suc (sizeAt S (suc (suc J))))
+                      2≤S ≤-refl ≤-refl
                       (fLvl-sadd S W J 2≤S) ≤-refl
-                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl (n≤1+n J)))
+                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl
+                              (s≤s (n≤1+n J))))
                       (s≤s (widAt-mono 2≤S ≤-refl ≤-refl (n≤1+n J)))))
           (≤-reflexive (sym (fLvlD-suc S W d (suc J))))
 

@@ -215,12 +215,14 @@ walk-step S W d k m j j₁ j₂ 2≤S hd tl =
 -- of the refresh, and one unit of depth fuel is its price
 frame-step : ∀ (S W d j j₀ j₁ : ℕ) → 2 ≤ S →
   j₀ ≤ fCharge S W j →
-  (j + j₀) + j₁ ≤ sIterD S W d (suc (sizeAt S j)) (suc (widAt S W j)) (j + j₀) →
+  (j + j₀) + j₁
+    ≤ sIterD S W d (suc (sizeAt S (suc j))) (suc (widAt S W j)) (j + j₀) →
   j + (j₀ + j₁) ≤ fLvlD S W (suc d) j
 frame-step S W d j j₀ j₁ 2≤S rcpt walk =
   ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₀ j₁))) walk)
                    (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d
-                      (suc (sizeAt S j)) (suc (sizeAt S j)) 2≤S ≤-refl ≤-refl
+                      (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j)))
+                      2≤S ≤-refl ≤-refl
                       (+-monoʳ-≤ j rcpt) ≤-refl ≤-refl ≤-refl))
           (≤-reflexive (sym (fLvlD-suc S W d j)))
 

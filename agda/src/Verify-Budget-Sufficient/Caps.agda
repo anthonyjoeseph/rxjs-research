@@ -621,7 +621,7 @@ fLvlD-infl S W zero    J =
           (≤-reflexive (sym (fLvlD-0 S W J)))
 fLvlD-infl S W (suc d) J =
   ≤-trans (≤-trans (m≤m+n J (fCharge S W J))
-                   (sIterD-infl S W d (suc (sizeAt S J)) (suc (widAt S W J))
+                   (sIterD-infl S W d (suc (sizeAt S (suc J))) (suc (widAt S W J))
                                 (fLvl S W J)))
           (≤-reflexive (sym (fLvlD-suc S W d J)))
 
@@ -699,16 +699,16 @@ fLvlD-mono {S} {S′} {W} {W′} {J} {J′} zero (suc d′) 2≤S hS hW hJ hd =
   ≤-trans (≤-trans (≤-trans (≤-reflexive (fLvlD-0 S W J))
                             (+-mono-≤ (fLvl-mono 2≤S hS hW hJ)
                                       (s≤s (widAt-mono 2≤S hS hW hJ))))
-                   (sIterD-zero≤ S′ W′ d′ (suc (sizeAt S′ J′))
+                   (sIterD-zero≤ S′ W′ d′ (suc (sizeAt S′ (suc J′)))
                                  (suc (widAt S′ W′ J′)) (fLvl S′ W′ J′)))
           (≤-reflexive (sym (fLvlD-suc S′ W′ d′ J′)))
 fLvlD-mono (suc d) zero 2≤S hS hW hJ ()
 fLvlD-mono {S} {S′} {W} {W′} {J} {J′} (suc d) (suc d′) 2≤S hS hW hJ (s≤s hd) =
   ≤-trans (≤-trans (≤-reflexive (fLvlD-suc S W d J))
                    (sIterD-mono (suc (widAt S W J)) (suc (widAt S′ W′ J′)) d d′
-                      (suc (sizeAt S J)) (suc (sizeAt S′ J′)) 2≤S hS hW
+                      (suc (sizeAt S (suc J))) (suc (sizeAt S′ (suc J′))) 2≤S hS hW
                       (fLvl-mono 2≤S hS hW hJ) hd
-                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS hJ))
+                      (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) hS (s≤s hJ)))
                       (s≤s (widAt-mono 2≤S hS hW hJ))))
           (≤-reflexive (sym (fLvlD-suc S′ W′ d′ J′)))
 
@@ -778,7 +778,7 @@ fLvl≤fLvlD S W zero    J =
   ≤-trans (m≤m+n (fLvl S W J) (suc (widAt S W J)))
           (≤-reflexive (sym (fLvlD-0 S W J)))
 fLvl≤fLvlD S W (suc d) J =
-  ≤-trans (sIterD-infl S W d (suc (sizeAt S J)) (suc (widAt S W J)) (fLvl S W J))
+  ≤-trans (sIterD-infl S W d (suc (sizeAt S (suc J))) (suc (widAt S W J)) (fLvl S W J))
           (≤-reflexive (sym (fLvlD-suc S W d J)))
 
 iterL-infl : ∀ (S W d k J : ℕ) → J ≤ iterL S W d k J

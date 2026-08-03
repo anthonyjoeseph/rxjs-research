@@ -731,7 +731,19 @@ abstract
   -- ONE FRAME that ran at J: its own receipt, then one inner subscribe
   -- per payload — at most `suc (widAt S W J)` of them.  The budget its
   -- payloads are walked under is read HERE, at this frame's own level,
-  -- and one unit of DEPTH FUEL is what pays for the re-reading
+  -- and one unit of DEPTH FUEL is what pays for the re-reading.
+  --
+  -- AND IT IS READ ONE SIZE LEVEL UP, at `suc (sizeAt S (suc J))`.  The
+  -- nesting a subscribe descends on is not the payload's alone: the
+  -- share edge hands its callee the slot's STORED def, so the measure
+  -- carries the shares not yet connected too (.Caps-Nest's `M`).  A
+  -- frame's receipts bound that by `sizeAt S J + S` — its payload's
+  -- size plus the whole telescope's — which the entry level provably
+  -- cannot cover (it would need `S ≤ 1`, against `2 ≤ S`), and which
+  -- one more size level covers with room, since `sizeAt S (suc J)` is
+  -- `S * suc (2 * sizeAt S J)`.  Levels are the cheap currency here and
+  -- reading one more of them is a RAISE, so every consumer moves up
+  -- under the monotonicity already proven and nothing is re-derived
   fLvlD : ℕ → ℕ → ℕ → ℕ → ℕ            -- S W d J
   -- m payloads in sequence, each at the level the one before it LEFT.
   -- ONE PAYLOAD costs the `from-inner` frame its chain gains (the `suc
@@ -757,7 +769,7 @@ abstract
   -- cycle passes the `suc d` clause, where d descends
   fLvlD S W zero    J = fLvl S W J + suc (widAt S W J)
   fLvlD S W (suc d) J =
-    sIterD S W d (suc (sizeAt S J)) (suc (widAt S W J)) (fLvl S W J)
+    sIterD S W d (suc (sizeAt S (suc J))) (suc (widAt S W J)) (fLvl S W J)
 
   sIterD S W d k zero    J = J
   sIterD S W d k (suc m) J = sIterD S W d k m (sLvlD S W d k (suc J))
@@ -780,7 +792,7 @@ abstract
 
   fLvlD-suc : ∀ (S W d J : ℕ) →
     fLvlD S W (suc d) J
-      ≡ sIterD S W d (suc (sizeAt S J)) (suc (widAt S W J)) (fLvl S W J)
+      ≡ sIterD S W d (suc (sizeAt S (suc J))) (suc (widAt S W J)) (fLvl S W J)
   fLvlD-suc _ _ _ _ = refl
 
   sIterD-0 : ∀ (S W d k J : ℕ) → sIterD S W d k 0 J ≡ J
