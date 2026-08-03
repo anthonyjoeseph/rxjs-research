@@ -6742,13 +6742,14 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- SIGNATURES: `subscribeE-caps`'s Σ gains `j + j′ ≤ sLvlD S W d k j`
 -- under a nesting hypothesis on `b`, and the six companions it calls
 -- gain the matching conjunct.  The arithmetic each clause SHAPE needs
--- is proven ahead of the grind (agda/probe/Sub-Charge-Probe.agda § 5:
--- `walk-step`, `op-step`, `op-step-eval`, `op-step-mu`, unchanged in
--- content under the fuel; plus Refresh-Probe § 7's `frame-step`, which
--- IS the refresh — a frame's payload walk stops taking its nesting
--- hypothesis from the subscribe that installed it and reads its own),
--- against the receipts as abstract numbers under exactly the bound the
--- ground clauses hand back.  That gate is also what fixed the shape,
+-- is proven ahead of the grind, and now against the LANDED family
+-- rather than a mirror of it (agda/probe/Sub-Charge-Probe.agda § 5, five
+-- steps: `walk-step` a payload of thruWalk / concatDrain, `frame-step`
+-- the refresh itself — a frame's payload walk stops taking its nesting
+-- hypothesis from the subscribe that installed it and reads its own —
+-- `op-step` map / take / the four *All, `op-step-eval` scan, and
+-- `op-step-mu`), against the receipts as abstract numbers under exactly
+-- the bound the ground clauses hand back.  That gate is also what fixed the shape,
 -- since the first draft of the hierarchy admitted none of the four (it
 -- ran the frames before the rest of the operator chain, it charged a
 -- payload's subscribe at J rather than at `suc J`, and its eval receipt
@@ -6775,7 +6776,42 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- that gives `subscribeE-caps`'s j′ a bound at all.  With it, (a) is a
 -- sum of subscribe receipts inside `sIterD` — which is what `fLvlD S W
 -- (suc d) J` spends, one payload at a time, at the level the last one
--- left — and (b) is the width sum the block above prices
+-- left — and (b) is the width sum the block above prices.
+--
+-- BUT (a) IS DOWNSTREAM OF (b), NOT PARALLEL TO IT (2026-08-03, read off
+-- the two ground clauses below rather than argued).  The block above
+-- calls (b) "a standalone induction" and (a) the receipt with no
+-- supplier, as if either could be done first.  It cannot: (a)'s own
+-- TARGET is counted in units only (b) supplies, at two sites, and both
+-- are on the path from `subscribeE-caps` to the faces.
+--
+--   · ONE FRAME PER EMIT.  `pushBurst-caps` recurses on `em ∷ ems`,
+--     summing one `stepFrame-caps` receipt per EMIT.  `op-step`'s
+--     pushBurst premise is `… ≤ fIterD S W d k (suc (widAt S W A)) A` —
+--     `suc (widAt S W A)` frames — so the clause needs
+--     `length str ≤ suc (widAt S W A)`.  Its ONLY hypothesis about the
+--     burst is `burstCaps?`, which is `all (all (eventCaps? …))`: every
+--     event under the caps and NO cardinality, exactly as the block above
+--     says of (b).  So the emit count is not a downstream nicety; it is
+--     the index of the iteration that pays (a).
+--
+--   · AND ONE PAYLOAD PER VALUE INSIDE THE EMIT.  That same clause hands
+--     `stepFrame-caps` its values through `splitEvents-vals-caps`, whose
+--     conclusion is `all (valCaps? …)` and nothing more.  `frame-step`'s
+--     walk premise counts payloads in `suc (widAt S W j)` — which is
+--     `valsCaps?`'s length conjunct, i.e. what `FrameFace` carries and
+--     what `stepFrame-caps` does not.  This is the same asymmetry the
+--     face was SPLIT for (see the FrameFace block: "(a) needs the INPUT
+--     width, and the companion's two callers have none to give"), now
+--     read from the other end: the split is why the face can be charged
+--     at one `fLvlD` and the companion cannot.
+--
+-- So the pass is (b) THEN (a), and (b) is two counts rather than one —
+-- emits per burst and values per emit.  Both have the same entry
+-- measure, `outWᵉ` (Rx.Frame-Width), and the same supplier for a payload
+-- observable, `valCaps?`'s `pWᵛ = outWᵛ ⊔ dWᵛ` under `cWid`; what does
+-- not exist yet is the predicate that carries them along the subscribe
+-- clique the way `burstCaps?` carries the per-event bound
 ------------------------------------------------------------------
 
 postulate

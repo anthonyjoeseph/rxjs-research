@@ -132,6 +132,20 @@
 --      re-reads the budget at its own level.  So the four steps below
 --      quantify d and never touch it, exactly as they quantify S and W.
 --
+--      AND EVERY ONE OF THEM IS COUNTED IN UNITS THE TREE DOES NOT YET
+--      REPORT — measured 2026-08-03, off the two ground clauses rather
+--      than argued.  `op-step`'s pushBurst premise iterates `fIterD` over
+--      `suc (widAt S W A)` frames and `pushBurst-caps` spends one frame
+--      per EMIT; `frame-step`'s walk premise iterates `sIterD` over
+--      `suc (widAt S W j)` payloads and `pushBurst-caps` hands
+--      `stepFrame-caps` its payloads through `splitEvents-vals-caps`.
+--      Neither count exists: `burstCaps?` is `all (all (eventCaps? …))`
+--      and `splitEvents-vals-caps` concludes `all (valCaps? …)`, both
+--      cardinality-free.  So the two faces' conjunct (b) is not parallel
+--      to their conjunct (a) — it is the INDEX of the iteration that pays
+--      (a), and the signature pass runs (b) first.  Written out at the
+--      two postulates in .Caps-Face.
+--
 -- WHAT IS NOT HERE.  `k`'s INSTANTIATION is now ruled (the design
 -- session, 2026-08-03): the budget is `suc (sizeAt S J)` READ AT EACH
 -- DELIVERY'S OWN LEVEL, on three facts — the recursion descends the
