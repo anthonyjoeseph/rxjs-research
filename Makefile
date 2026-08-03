@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -208,6 +208,17 @@ help:
 	@echo "                  for S ≥ 2), so the three concat clauses report"
 	@echo "                  suc (j₁ + j₂) — a WITNESS move, not a conjunct"
 	@echo "                  (see agda/probe/Concat-Sum-Probe.agda).  ~8 s"
+	@echo "  rung-count-probe  does the PER-CONS fold charge fit the rung"
+	@echo "                  count fLvlD supplies?  For thruWalk yes, exactly"
+	@echo "                  (valsCaps?'s length conjunct IS suc (widAt S W j))."
+	@echo "                  For concatDrain NO: the queue arrives under an"
+	@echo "                  `all`, and widNode on a concat node is an `all`"
+	@echo "                  too, so no cardinality is derivable from either."
+	@echo "                  Also proves +1-superadditivity of the whole"
+	@echo "                  fLvlD/sIterD/sLvlD/opIterD/fIterD family, which"
+	@echo "                  the concat clauses' suc (j₁ + j₂) needs, and"
+	@echo "                  refutes the naive form at k = 0"
+	@echo "                  (see agda/probe/Rung-Count-Probe.agda).  ~9 s"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -509,6 +520,19 @@ count-level-probe:
 # the Σ is existential and the caps conjuncts are upward closed in the level.
 concat-sum-probe:
 	cd agda && agda -i src -i probe probe/Concat-Sum-Probe.agda
+
+# THE RUNG-COUNT PROBE — does the per-cons fold charge fit the rung count
+# the frame supplies?  `frame-step` budgets `suc (widAt S W j)` rungs per
+# frame and the walk spends one per cons.  thruWalk's payload list arrives
+# under `valsCaps?`, whose length conjunct IS that number, so it fits on
+# the nose.  concatDrain's QUEUE arrives under `all (obsCaps? …)` and the
+# state invariant's only node conjunct, `widNode`, is likewise an `all` —
+# neither carries a cardinality, and the probe exhibits arbitrarily long
+# admissible queues to prove no bound is derivable.  Also lands
+# +1-superadditivity for the whole budget family (what the concat
+# clauses' `suc (j₁ + j₂)` needs) and refutes the naive form at k = 0.
+rung-count-probe:
+	cd agda && agda -i src -i probe probe/Rung-Count-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck
