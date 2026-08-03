@@ -421,8 +421,15 @@
 --   .Keeps-Ring  the shared structural prerequisite: stepping the
 --                evaluator keeps the slot telescope and the connected
 --                shares (KeepsC), plus the share-boundary facts
---   .Caps-Face   round 4's per-instant cap recurrence, the caps face
---                and its companion tree, caps-tick, reach-resets
+--   .Caps-Face   round 4's per-instant cap recurrence: the in-flight
+--                predicates, the frame face, the cascade companions,
+--                caps-tick, reach-resets
+--   .Subscribe-Face  the subscribe clique carved off the BACK of
+--                .Caps-Face (2026-08-03) — subscribeE-caps and its
+--                twelve mutual companions, plus the four delivery
+--                leaves that call it.  Nothing in .Caps-Face reads it,
+--                so the subscribe grind re-checks 1.9k lines instead
+--                of 8.3k
 --   .Wet         the wet family, the width family, and the theorem
 --                (burst-wet, cascade-dry, drain-dry, budget-sufficient)
 --
@@ -556,6 +563,7 @@ open import Verify-Budget-Sufficient.Measures   public
 open import Verify-Budget-Sufficient.Keeps-Ring public
 open import Verify-Budget-Sufficient.Caps       public
 open import Verify-Budget-Sufficient.Caps-Face  public
+open import Verify-Budget-Sufficient.Subscribe-Face public
 open import Verify-Budget-Sufficient.Wet        public
 
 ------------------------------------------------------------------
