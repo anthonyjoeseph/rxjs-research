@@ -93,6 +93,25 @@ burstCount?-widen {c = c} str (_ , wd≤ , _) h
 --     this very statement, so the two *All clauses are where the width
 --     arithmetic is paid.
 --
+-- THE TWO CONJUNCTS ARE NOT EQUALLY HARD, so the grind order is fixed.
+-- The EMIT half — `length str ≤ᵇ suc (cWid c)` — is structural: pushBurst
+-- is 1:1, the leaves mint one, sharedConnect adds one and pays a fold for
+-- it, and no other clause touches the count.  The PER-EMIT half is where
+-- the two *All frames land, because stepFrame's output is a CONCATENATION
+-- there and its length is a sum of this very statement.  Land the emit
+-- half first; if the per-emit half stalls, the predicate splits — nothing
+-- reads `burstCount?` as an atom.
+--
+-- AND HOW THE SEPARATE MODULE ACTUALLY RECURSES.  Each clause needs the
+-- caps invariant at the level its sub-subscribe LEFT before it can invoke
+-- itself on the continuation, and that level is subscribeE-caps's own
+-- existential.  So a count clause CALLS `subscribeE-caps` for the
+-- intermediate `j₁`, recurses at `j + j₁`, and reports a receipt built
+-- from the same j₁'s.  The arithmetic is duplicated between the two
+-- families; the alternative — one Σ with three conjuncts — pays that once
+-- but makes every clique signature move on a count edit.  Duplicated
+-- arithmetic is the cheaper of the two, which is why the split stands.
+--
 -- AND WHAT CONSUMES IT BESIDES (a).  Raising stepFrame-caps's payload
 -- premise from `all (valCaps? …)` to `valsCaps?` — the length conjunct
 -- `FrameFace` carries and the companion does not — needs
