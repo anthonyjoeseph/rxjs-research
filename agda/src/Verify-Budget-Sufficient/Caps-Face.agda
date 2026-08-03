@@ -4297,8 +4297,20 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 -- at `all (valCaps? (frameStep (j + j′) c) sl u)`.  The face adds the
 -- two conjuncts the LEVEL WALK reads and the companion does not report:
 --
---   (a) THE RECEIPT BOUND `j′ ≤ fCharge (cSize c) (cWid c) j`, where
---       `fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))`.
+--   (a) THE RECEIPT BOUND, AND IT IS NOW STATED IN THE LANDING FORM
+--       (2026-08-03): `j + j′ ≤ fLvlD (cSize c) (cWid c) d j`, the level
+--       the frame LEAVES, rather than `j′ ≤ fCharge (cSize c) (cWid c) j`,
+--       one frame's receipt.  The face gains the depth fuel `d` for it.
+--       Every GROUND clause below still pays `fCharge` — `fLvl S W j` IS
+--       `j + fCharge S W j` by refl, so `face-lift` (below the face)
+--       carries each of the five receipts into the landing form in one
+--       `fLvl≤fLvlD`, and no assembly composes two faces additively, so
+--       each construction site takes exactly one lift.  What the
+--       relaxation BUYS is the two *All edges: their receipt is a sum of
+--       `subscribeE-caps`'s growth indices, which does NOT fit inside one
+--       `fCharge` (agda/probe/Sub-Charge-Probe.agda § 0/§ 1, measured) and
+--       does fit inside one refreshed frame level, which is what `fLvlD`
+--       spends and what `Walk-Hyps.sf-step` already consumes.
 --   (b) THE OUTPUT WIDTH — `valsCaps?` rather than `all valCaps?`, i.e.
 --       `length out ≤ suc (cWid (frameStep (j + j′) c))`.  The walk's
 --       Vb is valsCaps? because the NEXT frame's receipt reads it: a
@@ -4335,10 +4347,11 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 -- one subscribeE burst's VALUE COUNT — no caps-side companion reports
 -- one (`burstCaps?` bounds each event, never how many there are),
 -- though `valCaps?`'s own `pWᵛ` conjunct already bounds each payload's
--- `outWᵛ`, which is that count's entry measure.  (a), the RECEIPT, is
--- the sum of the SUBSCRIBES' growth indices, and `subscribeE-caps`
--- bounds its j′ by nothing at all — the same hole .Wet's GAP note
--- names from the wet side.  Both are written out at the postulates.
+-- `outWᵛ`, which is that count's entry measure.  (a), the RECEIPT, now
+-- HAS a target it can hit — the landing form above — but no SUPPLIER
+-- yet: `subscribeE-caps` still bounds its own j′ by nothing at all, the
+-- same hole .Wet's GAP note names from the wet side, and the signature
+-- pass that surfaces it is what the two postulates now wait on alone.
 --
 -- WHY IT IS NOT THE REFUTED AXIOM.  `stepFrame-entry-caps` asserted
 -- the post-state and the output burst were back under the caps the
@@ -4353,7 +4366,8 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 -- WHAT WOULD REFUTE IT: one frame, run under `capsOK? (frameStep j c)`
 -- with a chain inside `pathSz? (cSize (frameStep j c))` and a burst
 -- inside `valsCaps? (frameStep j c) sl`, whose smallest admissible
--- growth index exceeds `fCharge`, or whose output burst is wider than
+-- growth index leaves the frame above `fLvlD S W d j`, or whose output
+-- burst is wider than
 -- `suc (cWid (frameStep (j + j′) c))` for every admissible j′.  The
 -- corner to aim at is `thru-outer`, which subscribes once per payload:
 -- Frame-Work-Probe measures its per-frame payload count climbing 6 ↦
@@ -6748,10 +6762,20 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- first consumers that pass will pay for — `Walk-Hyps.sf-step` already
 -- reports the level a frame LEAVES (`J + j′ ≤ fLvlD S W d J`) rather
 -- than the receipt alone, so what these two owe is a receipt inside ONE
--- refreshed frame level rather than inside `fCharge`.  `FrameFace` is
--- still stated at `fCharge` — every ground clause below pays it and
--- `walkH` lifts it by `fLvl≤fLvlD` — so relaxing it to the landing form
--- is a one-file change these two are waiting on, not a new design
+-- refreshed frame level rather than inside `fCharge`.
+--
+-- AND `FrameFace` IS NOW STATED THERE (2026-08-03).  It carries the
+-- depth fuel `d` and its receipt conjunct IS the landing form, `j + j′ ≤
+-- fLvlD (cSize c) (cWid c) d j`.  The five ground construction sites
+-- still pay `fCharge` and are lifted one at a time by `face-lift` (which
+-- is exactly the composition `walkH.sf-step` used to do at its call
+-- site, moved inside the face), so the relaxation cost nothing anywhere
+-- else and `sf-step` now just forwards the conjunct.  What these two
+-- postulates wait on is therefore ONE thing, not two: the signature pass
+-- that gives `subscribeE-caps`'s j′ a bound at all.  With it, (a) is a
+-- sum of subscribe receipts inside `sIterD` — which is what `fLvlD S W
+-- (suc d) J` spends, one payload at a time, at the level the last one
+-- left — and (b) is the width sum the block above prices
 ------------------------------------------------------------------
 
 postulate
