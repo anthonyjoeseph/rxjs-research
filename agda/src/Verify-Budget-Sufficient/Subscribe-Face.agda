@@ -283,62 +283,35 @@ subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
 
 ------------------------------------------------------------------
--- (b) THE COUNT FACE — the assembly, stated before its pieces.
+-- (b), THE COUNT, IS NOT HERE.  It moved to .Subscribe-Count the day it
+-- was written (2026-08-03), for two reasons.
 --
--- Sub-Charge-Probe § 5's two composition steps are counted in units the
--- caps tree does not report.  `op-step`'s pushBurst premise iterates
--- fIterD over `suc (widAt S W A)` FRAMES and pushBurst-caps spends one
--- per emit of the burst it is pushing; `frame-step`'s walk premise
--- iterates sIterD over `suc (widAt S W j)` PAYLOADS and pushBurst-caps
--- hands stepFrame-caps one payload per `value` event inside the emit.
--- Both indices are cardinalities of ONE object — the burst subscribeE
--- hands back — so both are this one statement.
+--   · IT IS NOT MUTUAL WITH THIS CLIQUE.  The count siblings recurse on
+--     each other over the same thirteen clause shapes but consume the
+--     -caps results as finished facts, and nothing in this module reads
+--     a count.  Separate SCC, separate module, so a count grind does not
+--     pay this file's seven minutes.
+--   · AND IT COULD NOT STAY AT THE ENTRY LEVEL ANYWAY.  It was first
+--     stated here as an entry-level sibling — `burstCount? (frameStep j
+--     c)` with no existential — on the reasoning that widAt is monotone
+--     in j.  Share-Count-Probe refutes that: `sharedConnect` PREPENDS
+--     its own `init` envelope onto the def's whole burst (.Rx.Evaluator,
+--     both non-dry branches), so a ladder of k nested shares hands back
+--     k+1 emits, and NOTHING in the entry hypotheses bounds k —
+--     `slotsCaps?` reads each shared def POINTWISE (sizeᵉ, pWᵉ, innWᵉ)
+--     and a ladder of `input` holds every one of them at 1 however long
+--     it gets.  Two rows, three shares and four, every hypothesis by
+--     refl at `caps 2 1 1`, both yielding ⊥.  The face reports its own
+--     j′, exactly as subscribeE-caps does.
 --
--- WHY IT IS A SIBLING OF subscribeE-caps AND NOT A THIRD CONJUNCT OF ITS
--- Σ.  The count is wanted at the level the subscribe LEFT, `j + j′`, and
--- a conjunct there would have to share subscribeE-caps's existential and
--- so would drag all thirteen clique signatures.  It does not have to:
--- `Caps.cWid (frameStep j c)` is `widAt (Caps.cSize c) (Caps.cWid c) j`
--- by refl and widAt is monotone in j (widAt-mono, .Caps), so the bound
--- at the ENTRY level is the stronger statement and implies the exit one
--- for free.  The count face is therefore its own clause induction over
--- exactly the same thirteen shapes, provable independently.
---
--- WHAT ITS DISCHARGE WILL LOOK LIKE, read off the ground bodies rather
--- than guessed (2026-08-03):
---
---   · THE EMIT COUNT IS PRESERVED, not grown.  `pushBurst` is
---     emit-for-emit — `pushBurst … (em ∷ ems)` conses exactly one
---     envelope onto the recursive result, at `InstEmit.instant em from
---     InstEmit.source em as InstEmit.kind em` — so every operator clause
---     inherits its source's count unchanged.  Only the leaves mint
---     emits, and `ofᵉ ts` mints ONE.
---   · THE PAYLOAD COUNT IS stepFrame's OUTPUT LENGTH.  A pushed emit's
---     values are `map value vals′` for `vals′` the frame's output, so
---     the count descends to one question per Frame constructor: `map-f`
---     is `map (applyFn fn) vals` (length preserved), `scan-f` is
---     `scanVals` (one out per in, or `[]` at a node-type mismatch),
---     `take-f` is takeDispatch (a prefix), and the two *All frames —
---     `from-inner` (innerReact) and `thru-outer` (thruWrap ∘ thruWalk) —
---     are the two that are NOT structural and are where the real work is.
---
--- POSTULATED HERE so the (a) receipt pass has the count to consume; the
--- clause induction is the leg after it
-postulate
-  subscribeE-count : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    burstCount? (frameStep j c) (proj₁ (subscribeE g b κ bid now sched st))
-      ≡ true
+-- WHAT THAT COSTS THIS MODULE: stepFrame-caps's payload premise stays
+-- `all (valCaps? …)` for now.  Raising it to `valsCaps?` — the length
+-- conjunct `FrameFace` carries and this companion does not — needs
+-- `splitEvents-valsCaps` (.Caps-Face), whose second hypothesis is
+-- `valCountᵉ es ≤ suc (Caps.cWid c)`; pushBurst-caps, its only caller,
+-- has `burstCaps?` and nothing else, and `burstCaps?` carries no
+-- cardinality.  So the premise strengthening is downstream of the count
+-- face, not parallel to it
 
 subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)

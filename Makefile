@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -183,6 +183,13 @@ help:
 	@echo "                  two-shell expression register a chain of length"
 	@echo "                  six.  This is why regsSz?-subscribeE is not in the"
 	@echo "                  tree (see agda/probe/Chain-Half-Probe.agda)"
+	@echo "  share-count-probe  the refutation of an ENTRY-LEVEL bound on a"
+	@echo "                  subscribe burst's EMIT COUNT: sharedConnect"
+	@echo "                  prepends one envelope per connect, so a k-deep"
+	@echo "                  share ladder is k+1 emits while every entry"
+	@echo "                  hypothesis stays fixed.  The count has to ride"
+	@echo "                  subscribeE-caps's EXISTENTIAL, at the exit level"
+	@echo "                  (see agda/probe/Share-Count-Probe.agda).  ~10 s"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -444,6 +451,18 @@ instant-height-probe:
 # the whole reason that postulate is not in the tree.
 chain-half-probe:
 	cd agda && agda -i src -i probe probe/Chain-Half-Probe.agda
+
+# At WHICH LEVEL is a subscribe burst's EMIT COUNT bounded?  Not the entry
+# level: every subscribeE clause is emit-for-emit except sharedConnect,
+# which PREPENDS its own init envelope onto the def's whole burst, so a
+# ladder of k shares hands back k+1 emits — and nothing in the entry
+# hypotheses bounds k, since slotsCaps? reads each def POINTWISE and a
+# ladder keeps every pointwise number at 1.  Two rows, three shares and
+# four, every hypothesis by refl at the same caps 2 1 1, both yielding ⊥.
+# The exit level is fine and is the repair: sharedConnect-caps reports one
+# fold PER CONNECT, so the count belongs in subscribeE-caps's existential.
+share-count-probe:
+	cd agda && agda -i src -i probe probe/Share-Count-Probe.agda
 
 ts-check:
 	cd typescript && npm run typecheck

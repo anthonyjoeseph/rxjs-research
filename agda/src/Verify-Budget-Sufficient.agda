@@ -430,6 +430,11 @@
 --                leaves that call it.  Nothing in .Caps-Face reads it,
 --                so the subscribe grind re-checks 1.9k lines instead
 --                of 8.3k
+--   .Subscribe-Count  the count face: how many emits a subscribe burst
+--                has and how many values sit in each.  Its own SCC —
+--                the count siblings recurse on each other but read the
+--                -caps results as finished facts — so it is its own
+--                module and a count grind pays neither of the two above
 --   .Wet         the wet family, the width family, and the theorem
 --                (burst-wet, cascade-dry, drain-dry, budget-sufficient)
 --
@@ -564,6 +569,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring public
 open import Verify-Budget-Sufficient.Caps       public
 open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Subscribe-Face public
+open import Verify-Budget-Sufficient.Subscribe-Count public
 open import Verify-Budget-Sufficient.Wet        public
 
 ------------------------------------------------------------------
