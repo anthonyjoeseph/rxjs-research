@@ -835,30 +835,6 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- postulated either: they are GROUND below, on the same two filter
 -- lemmas the share leaves use.
 
-------------------------------------------------------------------
--- TEMPORARY, AND FALSE AS STATED (take bud = 0).  These are the
--- waypoint holes for the nesting hypothesis: the twelve heads below now
--- CARRY the premise, and every call site supplies it by naming one of
--- these.  Stated at their plainest — a bare `x ≤ y` and a bare
--- `b ≡ true` — because a hole whose conclusion mentions `nest` or
--- `frameBud` cannot have its implicits solved: both unfold, and a sum
--- is not invertible.  They exist so the signature change and the
--- arithmetic that
--- discharges it can land as two units rather than one unverifiable one —
--- the block is mutual, so there is no partial state in which some heads
--- carry the premise and the file still typechecks.
---
--- INVARIANT WHILE THEY EXIST: their use-count only ever falls.  Each is
--- replaced, head by head and leaves first, by the real supplier —
--- .Caps-Nest's edge steps at a nesting edge, .Caps-Face's valCaps→nest /
--- obsList→mList at a frame — and all four are DELETED in the same commit
--- as the last replacement.  Nothing may be built on them.
-------------------------------------------------------------------
-
-postulate
-  TEMP-≤ : ∀ {x y : ℕ} → x ≤ y
-  TEMP-≡ : ∀ {b : Bool} → b ≡ true
-
 subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (dep bud j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -1026,7 +1002,7 @@ sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dWᵉ n sl d ≤ Caps.cWid (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-  suc (resid sl (EvalSt.connectedShares st)) ≤ bud →
+  nest d sl (toℕ i ∷ EvalSt.connectedShares st) ≤ bud →
   let r = sharedConnect g i d κ id now sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -1073,7 +1049,7 @@ sharedConnect-caps {Γ = Γ} c dep bud j (gs fuel′) i d κ id now sl sched st
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
           (≤-trans wdd (proj₁ (proj₂ (frameStep-mono-j c 2≤S (n≤1+n j)))))
           refl
-          (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S)) TEMP-≤
+          (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S)) nst
   j₂  = proj₁ IH
   SUB = proj₁ (proj₂ IH)
   BC  = proj₁ (proj₂ (proj₂ IH))
@@ -1132,7 +1108,7 @@ sharedConnect-caps {Γ = Γ} c dep bud j (gs fuel′) i d κ id now sl sched st
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
           (≤-trans wdd (proj₁ (proj₂ (frameStep-mono-j c 2≤S (n≤1+n j)))))
           refl
-          (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S)) TEMP-≤
+          (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S)) nst
   j₂  = proj₁ IH
   SUB = proj₁ (proj₂ IH)
   BC  = proj₁ (proj₂ (proj₂ IH))
@@ -1181,13 +1157,14 @@ sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dWᵉ n sl d ≤ Caps.cWid (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  sl i ≡ shared d →
   suc (resid sl (EvalSt.connectedShares st)) ≤ bud →
   let r = subscribeSharedSlot g i d κ id now sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC nst
+sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC seq nst
   with memberSource (toℕ i) (EvalSt.completedSources st)
 ... | true  =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -1196,7 +1173,7 @@ sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R sl
                         at id from toℕ i as subscribe) ∷ []) ≡ true)
             (sym (+-identityʳ j)) refl
     , refl
-... | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+... | false with memberSource (toℕ i) (EvalSt.connectedShares st) in freshEq
 ...   | true  =
   1 , subst (λ x → capsOK? (frameStep x c) sched (register (toℕ i) κ st) ≡ true)
             (sym (j+1 j)) (register-caps c j (toℕ i) κ sched st 2≤S 1≤R inv pC)
@@ -1205,7 +1182,12 @@ sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R sl
             (sym (j+1 j)) refl
     , refl
 ...   | false = sharedConnect-caps c dep bud j g i d κ id now sl sched st
-                  2≤S 1≤R slEq slC slSz inv szd wdd pC lC nst
+                  2≤S 1≤R slEq slC slSz inv szd wdd pC lC
+                  (share-step-resid sl (EvalSt.connectedShares st) i bud seq freshEq
+                     (unsuc nst))
+  where
+  unsuc : ∀ {a b} → suc a ≤ b → a ≤ b
+  unsuc h = ≤-trans (n≤1+n _) h
 
 thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
@@ -1804,7 +1786,7 @@ subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
 subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
                       2≤S 1≤R slEq slC slSz inv pC lC nst
-  with Sched.slots sched i
+  with Sched.slots sched i in slotEq
      | subst (λ y → slotCaps? (Caps.cSize c) (Caps.cWid c) sl (y i) ≡ true) (sym slEq)
              (slotsCaps?-lookup (Caps.cSize c) (Caps.cWid c) sl i slC)
      -- the slot's OWN size, abstracted alongside the slot: a cold leaf
@@ -1832,7 +1814,12 @@ subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
                                          ((pWᵉ n sl d ≤ᵇ Caps.cWid c)
                                             ∧ (innWᵉ n sl d ≤ᵇ Caps.cWid c)) sd))))))
                (cWid≤frameStep c j 2≤S)))
-    pC lC nst
+    pC lC
+    -- the slot equation, taken AT the `with` that consumes the scrutinee:
+    -- after abstraction the connection between `sl i` and `shared d` is
+    -- gone, and it is the one fact `resid-connect` cannot do without
+    (trans (sym (cong (λ y → y i) slEq)) slotEq)
+    nst
 -- HOT SCRIPT: spent, or one more registration
 ... | scripted (hot async) | sd | sz
   with memberSource (toℕ i) (EvalSt.completedSources st)
