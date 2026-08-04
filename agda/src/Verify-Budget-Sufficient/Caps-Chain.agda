@@ -50,7 +50,7 @@ module Verify-Budget-Sufficient.Caps-Chain where
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ; +-comm;
-         +-mono-≤; +-monoʳ-≤; *-mono-≤; *-suc; n≤1+n;
+         +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; *-suc; n≤1+n;
          m≤m+n; m≤n+m; m≤m*n)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
@@ -504,3 +504,58 @@ walk-last S W d k m j j₁ 2≤S hd =
           (walk-step S W d k m j j₁ 0 2≤S hd
             (≤-trans (≤-reflexive (+-identityʳ (j + j₁)))
                      (sIterD-infl S W d k m (j + j₁))))
+
+------------------------------------------------------------------
+-- § 7.  THE TWO ENTRIES THAT SUBSCRIBE NOTHING.
+--
+-- A literal burst and a parked body are both ENTRIES with a receipt and
+-- no continuation: neither runs a source, so neither has the `suc (j₁ +
+-- j₂)` tail that `op-step` and `op-step-eval` consume, and their
+-- witnesses are FLAT.  `op-step-entry` at `j₁ := 0` is the gate for
+-- both, with `sLvlD-infl` for its subscribe premise and the `+ 0` its
+-- conclusion carries absorbed here rather than at the clause.
+--
+-- `ofᵉ` is the one that needed new arithmetic: `op-step-entry`'s room is
+-- quadratic in the size cap and its receipt is linear, but the fit is
+-- not free — it needs the cap to be at least 2, exactly as the payload
+-- edge's three rungs did.  `2≤sizeAt` pays for it.  `deferᵉ` needs
+-- nothing new: its receipt is 1 and `share-fits` already covers that.
+------------------------------------------------------------------
+
+-- the literal burst's receipt fits the entry's room, with room to spare
+of-fits : ∀ (S j j₀ : ℕ) → 2 ≤ S → j₀ ≤ sizeAt S j →
+  j + (j₀ + 3) ≤ suc (j + suc (sizeAt S j) * suc (sizeAt S j))
+of-fits S j j₀ 2≤S hj₀ =
+  ≤-trans (+-monoʳ-≤ j room) (≤-reflexive (+-suc j (B′ * B′)))
+  where
+  B  = sizeAt S j
+  B′ = suc B
+
+  widen : B + 3 ≤ B + B′
+  widen = +-monoʳ-≤ B (s≤s (2≤sizeAt S j 2≤S))
+
+  square : B + B′ ≤ B′ * B′
+  square = ≤-trans (≤-reflexive (+-suc B B))
+                   (+-monoʳ-≤ B′ (m≤m*n B B′))
+
+  room : j₀ + 3 ≤ suc (B′ * B′)
+  room = ≤-trans (≤-trans (≤-trans (+-monoˡ-≤ 3 hj₀) widen) square)
+                 (n≤1+n (B′ * B′))
+
+-- ONE LITERAL BURST: the eval receipt, and nothing after it
+of-step : ∀ (S W d k m j j₀ : ℕ) → 2 ≤ S → j₀ ≤ sizeAt S j →
+  j + (j₀ + 3) ≤ opIterD S W d k (suc m) j
+of-step S W d k m j j₀ 2≤S hj₀ =
+  ≤-trans (≤-reflexive (cong (j +_) (sym (+-identityʳ (j₀ + 3)))))
+          (op-step-entry S W d k m j (j₀ + 3) 0 2≤S
+            (of-fits S j j₀ 2≤S hj₀)
+            (≤-trans (≤-reflexive (+-identityʳ (j + (j₀ + 3))))
+                     (sLvlD-infl S W d k (j + (j₀ + 3)))))
+
+-- ONE PARKED BODY: the registration, whose room `share-fits` pays free
+defer-step : ∀ (S W d k m j : ℕ) → 2 ≤ S →
+  j + 1 ≤ opIterD S W d k (suc m) j
+defer-step S W d k m j 2≤S =
+  op-step-share S W d k m j 0 2≤S
+    (≤-trans (≤-reflexive (+-identityʳ (suc j)))
+             (sLvlD-infl S W d k (suc j)))

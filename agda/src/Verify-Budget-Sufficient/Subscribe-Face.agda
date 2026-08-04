@@ -1601,14 +1601,18 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
      | KeepsC.connMono (subscribeInner-keeps g concatᵒ allNid κ id now o sched st)
 -- the inner stays open: it becomes the active one and the rest of the
 -- queue is parked, still bounded
-... | (inst , vs , bs , false , sched₁ , st₁) | (j₁ , SUB , VC , EC , _) | sEq | cMono =
+... | (inst , vs , bs , false , sched₁ , st₁) | (j₁ , SUB , VC , EC , LV) | sEq | cMono =
   j₁ , SUB , VC , EC
      , obsListCaps?-widen sl q (frameStep-⊑-+ c 2≤S j j₁) (proj₂ (∧-true _ _ qC))
-     , level-TEMP
+     -- ONE PAYLOAD, and the queue behind it bounded by inflation rather
+     -- than by a report: the inner's own conjunct is STRICT, so it is
+     -- weakened once here and `walk-last` absorbs the empty tail
+     , walk-last (Caps.cSize c) (Caps.cWid c) dep bud (length q) j j₁ 2≤S
+         (≤-trans (n≤1+n (j + j₁)) LV)
 -- the inner completed synchronously: drain on, and the two receipts add
 -- PLUS ONE — `vs ++ proj₁ REST` is a SUM of two counts, so this clause
 -- pays the extra fold Concat-Sum-Probe showed the sum needs
-... | (inst , vs , bs , true , sched₁ , st₁) | (j₁ , SUB , VC , EC , _) | sEq | cMono =
+... | (inst , vs , bs , true , sched₁ , st₁) | (j₁ , SUB , VC , EC , LV) | sEq | cMono =
   suc (j₁ + j₂)
     , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ REST)))))
@@ -1636,7 +1640,12 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
            (proj₁ (proj₂ (proj₂ (proj₂ IH)))))
     , obsListCaps?-widen sl (proj₁ (proj₂ (proj₂ (proj₂ REST)))) ⊑ˢ
         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
-    , level-TEMP
+    -- ONE PAYLOAD AND THE DRAIN BEHIND IT.  The witness is `suc (j₁ +
+    -- j₂)` because the sum of the two counts pays one extra fold, and
+    -- `walk-step-suc` is the step that spends the inner's STRICT report
+    -- verbatim — no weakening here, unlike the branch above
+    , walk-step-suc (Caps.cSize c) (Caps.cWid c) dep bud (length q) j j₁ j₂ 2≤S
+        LV (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
   where
   IH   = concatDrain-caps c dep bud (j + j₁) g allNid κ id now q sl sched₁ st₁
            2≤S 1≤R (trans sEq slEq) slC slSz SUB
@@ -2500,7 +2509,16 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c dep bud (suc ops′) j g op ns b �
             (sym (+-suc j (j₁ + j₂)))
             (frameStep-+assoc-count c (suc j) j₁ j₂ (proj₁ PB)
                (proj₁ (proj₂ (proj₂ (proj₂ PBc)))))
-    , level-TEMP
+    -- ONE OPERATOR, and the *All edge spends it exactly as a chain edge
+    -- does: the source's conjunct verbatim at the predecessor index the
+    -- split bought, and pushBurst's converted once by `burst-index`
+    , op-step (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₁ j₂ 2≤S
+        (proj₂ (proj₂ (proj₂ (proj₂ SUB))))
+        (≤-trans (proj₂ (proj₂ (proj₂ (proj₂ PBc))))
+                 (burst-index (Caps.cSize c) (Caps.cWid c) dep bud
+                    (length (proj₁ res)) (suc j + j₁) (suc j + j₁) 2≤S
+                    (countLen (frameStep (suc j + j₁) c) (proj₁ res)
+                       (proj₁ (proj₂ (proj₂ (proj₂ SUB)))))))
   where
   nid    = Sched.nextNode sched
   sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
@@ -2585,7 +2603,13 @@ subscribeE-caps c dep bud ops j g (input i) κ bid now sl sched st
 -- LITERALS: one shot, and the payloads come off evalTms-caps.  The
 -- state is untouched; only the source counter moves, which capsOK?
 -- does not read
-subscribeE-caps {n = n} {u = u} c dep bud ops j g (ofᵉ ts) κ bid now sl sched st
+-- and it SPLITS the index, like every clause with a positive witness:
+-- `op-step-entry` concludes at a successor, and at `ops = zero` the
+-- conjunct is false outright, so `hidx` is the absurdity that rules the
+-- empty index out
+subscribeE-caps {n = n} {u = u} c dep bud zero j g (ofᵉ ts) κ bid now sl sched st
+                2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst ()
+subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (ofᵉ ts) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx =
   j₀ + 3 , capsOK?-mono (frameStep j c) (frameStep (j + (j₀ + 3)) c) sched st
              (frameStep-⊑-+ c 2≤S j (j₀ + 3)) inv
@@ -2599,7 +2623,10 @@ subscribeE-caps {n = n} {u = u} c dep bud ops j g (ofᵉ ts) κ bid now sl sched
                          refl))
                    refl
          , COUNT
-         , level-TEMP
+         -- A LITERAL BURST subscribes nothing, so this is an ENTRY with a
+         -- receipt and no tail — not an `op-step` shape at all.  `szb` is
+         -- its room premise on the nose, since `sizeᵉ (ofᵉ ts)` IS `j₀`
+         , of-step (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₀ 2≤S szb
   where
   EV = evalTms-caps c j sl ts 2≤S slC (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
   j₀ = proj₁ EV
@@ -2746,7 +2773,13 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (takeᵉ cnt b) κ bi
             (sym (+-suc j (j₁ + j₂)))
             (frameStep-+assoc-count c (suc j) j₁ j₂ (proj₁ PB)
                (proj₁ (proj₂ (proj₂ (proj₂ PBc)))))
-    , level-TEMP
+    , op-step (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₁ j₂ 2≤S
+        (proj₂ (proj₂ (proj₂ (proj₂ SUB))))
+        (≤-trans (proj₂ (proj₂ (proj₂ (proj₂ PBc))))
+                 (burst-index (Caps.cSize c) (Caps.cWid c) dep bud
+                    (length (proj₁ res)) (suc j + j₁) (suc j + j₁) 2≤S
+                    (countLen (frameStep (suc j + j₁) c) (proj₁ res)
+                       (proj₁ (proj₂ (proj₂ (proj₂ SUB)))))))
   where
   nid    = Sched.nextNode sched
   sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
@@ -2816,7 +2849,16 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (scanᵉ f z b) κ bi
                (sym (+-suc (j + j₀) (j₁ + j₂)))
                (frameStep-+assoc-count c (suc (j + j₀)) j₁ j₂ (proj₁ PB)
                   (proj₁ (proj₂ (proj₂ (proj₂ PBc))))))
-    , level-TEMP
+    -- SCAN is the eval-receipt shape: the seed's own receipt first, then
+    -- the source and its burst exactly as `mapᵉ` spends them
+    , op-step-eval (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₀ j₁ j₂ 2≤S
+        (s≤s szz)
+        (proj₂ (proj₂ (proj₂ (proj₂ SUB))))
+        (≤-trans (proj₂ (proj₂ (proj₂ (proj₂ PBc))))
+                 (burst-index (Caps.cSize c) (Caps.cWid c) dep bud
+                    (length (proj₁ res)) (suc (j + j₀) + j₁) (suc (j + j₀) + j₁) 2≤S
+                    (countLen (frameStep (suc (j + j₀) + j₁) c) (proj₁ res)
+                       (proj₁ (proj₂ (proj₂ (proj₂ SUB)))))))
   where
   szsum : sizeᵗ f + sizeᵗ z + sizeᵉ b ≤ Caps.cSize (frameStep j c)
   szsum = ≤-trans (n≤1+n (sizeᵗ f + sizeᵗ z + sizeᵉ b)) szb
@@ -2979,7 +3021,9 @@ subscribeE-caps c dep bud ops j g (varᵉ ()) κ bid now sl sched st
 -- pending, and register the thru-outer chain — one j, for the
 -- registration.  The LiveSource's width bound IS the telescope's dW
 -- conjunct: `dWᵉ (deferᵉ body)` is `pWᵉ body`, definitionally
-subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud ops j g (deferᵉ body) κ bid now sl sched st
+subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud zero j g (deferᵉ body) κ bid now sl sched st
+                2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst ()
+subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud (suc ops′) j g (deferᵉ body) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx =
   1 , subst (λ x → capsOK? (frameStep x c) SCHED₄
                      (register SRC (thru-outer mergeᵒ nid ↠ κ) st₀) ≡ true)
@@ -2989,7 +3033,10 @@ subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud ops j g (deferᵉ body) κ b
     , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
                      (((init SRC ∷ []) at bid from SRC as subscribe) ∷ []) ≡ true)
             (sym (j+1 j)) refl
-    , refl , level-TEMP
+    -- THE PARKED BODY is an entry whose receipt is the registration, and
+    -- `share-fits` already pays its room — one registration sits inside
+    -- the quadratic excursion at every cap
+    , refl , defer-step (Caps.cSize c) (Caps.cWid c) dep bud ops′ j 2≤S
   where
   nid    = Sched.nextNode sched
   SRC    = Sched.nextSource sched

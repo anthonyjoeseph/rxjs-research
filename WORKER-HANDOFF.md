@@ -316,7 +316,23 @@ Proven three times now (2026-08-04):
 ## Files of Interest
 
 ### Core Working Files (Tier 1, Item 4)
-- **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** (18 `-caps` heads; the big mutual clique; this is the ~7 min SCC — iterate in probes, land in batches, detach rechecks)
+- **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** — 3314 lines, **~44 min and ~6.9 GB
+  per check** (measured 2026-08-04; the "~7 min" in older memos is wrong). Iterate in probes,
+  land in verified batches, never guess a projection path.
+  - **It holds 18 `-caps` definitions but the true SCC is THIRTEEN** — the module's own header
+    (lines 3-9) said so all along, and the call graph re-derived from the clause bodies and
+    `where` blocks confirms it. Any memo claiming an "18-head clique" is wrong. The other five
+    stratify: `retagEvents-caps` is a self-recursive leaf UPSTREAM (`pushBurst-caps` calls it,
+    it calls nothing back); `foldPath-caps`/`dispatchShare-caps`/`shareGo-caps` are their own
+    3-cycle strictly DOWNSTREAM (they call `stepFrame-caps`, nothing in the 13 calls them);
+    `chainStep-caps` is the entry point, downstream of those and with no in-file caller.
+  - **Splittable mass, verified with no blockers** (no `private`, no explicit `mutual` block, no
+    `where` or `with` straddling two top-level names): lines 258-889 are ~632 lines of pure
+    arithmetic/list lemmas that CANNOT reference the clique (they precede its first forward
+    declaration), plus `retagEvents-caps` (14) and `innerFinish-zero′` (21) — ~667 lines hoist
+    upstream; the downstream 3-cycle plus `chainStep-caps` is ~215 more. That leaves the true
+    SCC at ~2122 lines, ~64% of the file, and that floor is irreducible: shrinking it further
+    would mean restructuring genuine mutuality, which CLAUDE.md forbids.
   - Current state: the two operator-shaped heads carry `(c : Caps) (dep bud ops j : ℕ)` + the
     `nest … ≤ bud` and `suc (sizeᵉ b) ≤ ops` hypotheses, and four clauses split `ops`. **The
     level conjunct IS in the Σ** on nine heads (the five families tabulated in the census);
