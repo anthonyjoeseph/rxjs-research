@@ -5764,15 +5764,38 @@ scanFrame-caps {n = n} {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC fS
 
 -- the six clauses where the node lookup misses or mismatches: the
 -- evaluator emits nothing and touches nothing
+-- THE RECEIPT ARITHMETIC, and it is one `*-mono-≤`: fCharge's two
+-- factors ARE `suc (cWid (frameStep j c))` and `suc (cSize (frameStep
+-- j c))` by refl, so the scan row lands exactly and the map row lands
+-- with the width factor spare.  It sits HERE, ahead of the frame
+-- clauses, because they now report their own receipts and the face
+-- below spends the same two lemmas afterwards
+face-charge : ∀ (c : Caps) (j w a : ℕ) →
+  w ≤ suc (Caps.cWid (frameStep j c)) →
+  a ≤ Caps.cSize (frameStep j c) →
+  suc (w * suc a) ≤ fCharge (Caps.cSize c) (Caps.cWid c) j
+face-charge c j w a hw ha = s≤s (*-mono-≤ hw (s≤s ha))
+
+face-charge1 : ∀ (c : Caps) (j a : ℕ) →
+  a ≤ Caps.cSize (frameStep j c) →
+  suc a ≤ fCharge (Caps.cSize c) (Caps.cWid c) j
+face-charge1 c j a ha =
+  ≤-trans (s≤s (≤-trans (n≤1+n a) (m≤m+n (suc a) 0)))
+          (face-charge c j 1 a (s≤s z≤n) ha)
+
 stepFrame-zero-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (j : ℕ) (u : Ty) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (frameStep j c) sched st ≡ true →
   Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c) sched st ≡ true)
      × (all (valCaps? (frameStep (j + j′) c) sl u) [] ≡ true)
      × (all (eventCaps? {n = n} {Γ = Γ} {u = t} (frameStep (j + j′) c) sl) [] ≡ true)
+     -- and it charges NOTHING, which the frame face needs stated rather
+     -- than re-derived: its consumer reports in `fLvlD` at an abstract
+     -- depth, where only a receipt-shaped bound goes through
+     × (j′ ≤ fCharge (Caps.cSize c) (Caps.cWid c) j)
 stepFrame-zero-caps c j u sl sched st inv =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-    , refl , refl
+    , refl , refl , z≤n
 
 stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
@@ -5785,6 +5808,13 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   capsOK? (frameStep j c) sched st ≡ true →
   frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid) ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  -- THE PAYLOAD'S CARDINALITY, and it has to be an argument.  A scan's
+  -- receipt is a PRODUCT — one fold per payload per node of the step
+  -- function — so `fCharge`'s width factor is what pays for the payload
+  -- count, and nothing in `all (valCaps? …)` bounds it.  The caller
+  -- already computes this fact for its own payload ledger and used to
+  -- drop it here
+  length vals ≤ suc (Caps.cWid (frameStep j c)) →
   all (valCaps? (frameStep j c) sl s) vals ≡ true →
   let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
   in Σ ℕ λ j′ →
@@ -5795,8 +5825,12 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
             (proj₁ r) ≡ true)
      × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ r)) ≡ true)
+     -- the receipt, which the eight clauses cannot leave to reduction:
+     -- seven of them charge nothing and one charges the product, so the
+     -- bound is invisible at the call site unless it is reported
+     × (j′ ≤ fCharge (Caps.cSize c) (Caps.cWid c) j)
 stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
-                    2≤S slC slEq inv fS pS vC
+                    2≤S slC slEq inv fS pS vL vC
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
@@ -5822,6 +5856,11 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
             (frameStep-⊑-+ c 2≤S j j′) inv)
      , proj₁ (proj₂ SC)
      , refl
+     -- ONE FOLD PER PAYLOAD PER NODE of the step function, and that is
+     -- exactly `fCharge`'s product: `vL` pays the width factor and
+     -- `frameSz?`'s own size conjunct pays the other
+     , face-charge c j (length vals) (sizeᵗ fn) vL
+         (≤ᵇ⇒≤ (sizeᵗ fn) (Caps.cSize (frameStep j c)) (T-to fS))
   where
   run = scanVals fn ac vals
   SC  = scanFrame-caps c j sl fn ac vals 2≤S slC fS
@@ -5897,23 +5936,6 @@ face-vals : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j k : ℕ) (sl : Slots Γ)
 face-vals c j k sl vs 2≤S hA hl =
   ∧-intro hA (T⇒≡true _ (≤⇒≤ᵇ
     (≤-trans hl (s≤s (proj₁ (proj₂ (frameStep-⊑-+ c 2≤S j k)))))))
-
--- THE RECEIPT ARITHMETIC, and it is one `*-mono-≤`: fCharge's two
--- factors ARE `suc (cWid (frameStep j c))` and `suc (cSize (frameStep
--- j c))` by refl, so the scan row lands exactly and the map row lands
--- with the width factor spare
-face-charge : ∀ (c : Caps) (j w a : ℕ) →
-  w ≤ suc (Caps.cWid (frameStep j c)) →
-  a ≤ Caps.cSize (frameStep j c) →
-  suc (w * suc a) ≤ fCharge (Caps.cSize c) (Caps.cWid c) j
-face-charge c j w a hw ha = s≤s (*-mono-≤ hw (s≤s ha))
-
-face-charge1 : ∀ (c : Caps) (j a : ℕ) →
-  a ≤ Caps.cSize (frameStep j c) →
-  suc a ≤ fCharge (Caps.cSize c) (Caps.cWid c) j
-face-charge1 c j a ha =
-  ≤-trans (s≤s (≤-trans (n≤1+n a) (m≤m+n (suc a) 0)))
-          (face-charge c j 1 a (s≤s z≤n) ha)
 
 -- the clauses that emit nothing and touch nothing: j′ = 0, and the
 -- empty burst is inside every width there is

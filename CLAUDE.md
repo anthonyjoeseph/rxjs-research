@@ -128,6 +128,16 @@ on their own — the polling is for pacing and verification, not for keeping any
 Never pipe agda through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and
 read indentation (an importer prints as the last line for its importee's whole leg).
 
+**Always `cd` into `agda/` explicitly in the same command as the `agda` invocation, and read
+the log's first lines, not just its exit code.** The shell's working directory drifts between
+tool calls, and a run launched from the repo root fails instantly with `Cannot read file
+…/src/…` — which looks like a fast green result if you only check that a log exists, and looks
+like a *proof failure* if you only count error-ish lines. Two separate incidents on
+2026-08-04. The tell is `Total 0ms` or a missing `Checking <Module>` line: agda never started.
+Same class of trap as trusting a pipe's exit code — verify the run actually ran before
+believing anything it says. `agda --profile=definitions` gives per-definition cost; note
+`--profile` takes ONE type, and combining `definitions` with `modules` is rejected outright.
+
 ## Module granularity: keep typechecks short
 
 Agda rechecks a whole module on any edit, so module size IS iteration speed. Rules

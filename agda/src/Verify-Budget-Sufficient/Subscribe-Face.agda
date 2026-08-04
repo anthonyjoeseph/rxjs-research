@@ -2142,7 +2142,13 @@ stepFrame-caps {u = u} c dep bud j g id now (map-f fn) κ vals fin sl sched st
      , face-vals c j j′ sl (map (applyFn fn) vals) 2≤S (proj₂ MP)
          (≤-trans (≤-reflexive (length-map (applyFn fn) vals))
                   (valsLen (frameStep j c) sl vals vC))
-     , refl , level-TEMP
+     , refl
+     -- ONE FOLD PER NODE of the step function, and `mapFrame-caps`'s
+     -- witness reduces to exactly that, so the receipt is read off `fS`
+     -- here rather than reported through the callee's Σ
+     , frame-recv (Caps.cSize c) (Caps.cWid c) dep j j′
+         (face-charge1 c j (sizeᵗ fn)
+            (≤ᵇ⇒≤ (sizeᵗ fn) (Caps.cSize (frameStep j c)) (T-to fS)))
   where
   MP = mapFrame-caps c j sl fn vals 2≤S slC fS
          (valsOf (frameStep j c) sl vals vC)
@@ -2159,10 +2165,19 @@ stepFrame-caps c dep bud j g id now (scan-f fn nid) κ vals fin sl sched st
         2≤S (proj₁ (proj₂ (proj₂ SC)))
         (≤-trans (stepFrame-scan-len g id now fn nid κ vals fin sched st)
                  (valsLen (frameStep j c) sl vals vC))
-    , proj₂ (proj₂ (proj₂ SC)) , level-TEMP
+    -- NOTE the shift: `SC` grew a fourth conjunct, so what used to be
+    -- the bare events fact is now the head of a PAIR
+    , proj₁ (proj₂ (proj₂ (proj₂ SC)))
+    -- a scan's receipt is a PRODUCT and cannot be read off the call
+    -- site — seven of the callee's eight clauses charge nothing and one
+    -- charges the folds — so it is reported, and spent here
+    , frame-recv (Caps.cSize c) (Caps.cWid c) dep j (proj₁ SC)
+        (proj₂ (proj₂ (proj₂ (proj₂ SC))))
   where
   SC = stepFrame-scan-caps c j g id now fn nid κ vals fin sl sched st
-         2≤S slC slEq inv fS pS (valsOf (frameStep j c) sl vals vC)
+         2≤S slC slEq inv fS pS
+         (valsLen (frameStep j c) sl vals vC)
+         (valsOf (frameStep j c) sl vals vC)
 
 -- TAKE: a prefix and a cut, no folds
 stepFrame-caps c dep bud j g id now (take-f nid) κ vals fin sl sched st 2≤S 1≤R slEq slC slSz inv fS pS lC vC fb =
