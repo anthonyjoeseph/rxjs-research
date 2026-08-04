@@ -49,7 +49,7 @@ module Verify-Budget-Sufficient.Caps-Chain where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc;
+  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ;
          +-mono-≤; +-monoʳ-≤; *-mono-≤; *-suc; n≤1+n;
          m≤m+n; m≤n+m; m≤m*n)
 open import Relation.Binary.PropositionalEquality
@@ -58,10 +58,11 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Evaluator
   using (sizeAt; widAt; fCharge;
          fLvlD; sIterD; sLvlD; opIterD; fIterD;
-         fLvlD-suc; sIterD-suc; sLvlD-suc; opIterD-suc)
+         fLvlD-suc; sIterD-suc; sLvlD-suc; opIterD-suc;
+         fIterD-suc; fIterD-0; sIterD-0)
 open import Verify-Budget-Sufficient.Caps
   using (widAt-mono;
-         sLvlD-infl; opIterD-infl; fIterD-infl;
+         sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl;
          sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
 
 ------------------------------------------------------------------
@@ -79,6 +80,43 @@ walk-step S W d k m j j₁ j₂ 2≤S hd tl =
   ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₁ j₂))) tl)
                    (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl))
           (≤-reflexive (sym (sIterD-suc S W d k m j)))
+
+-- and an empty payload list leaves the level where it found it
+walk-nil : ∀ (S W d k j : ℕ) → j + 0 ≤ sIterD S W d k 0 j
+walk-nil S W d k j =
+  ≤-trans (≤-reflexive (+-identityʳ j)) (≤-reflexive (sym (sIterD-0 S W d k j)))
+
+-- a dry payload subscribe, which does not move the level either
+inner-nil : ∀ (S W d k j : ℕ) → suc (j + 0) ≤ sLvlD S W d k (suc j)
+inner-nil S W d k j =
+  ≤-trans (≤-reflexive (cong suc (+-identityʳ j))) (sLvlD-infl S W d k (suc j))
+
+-- and a leaf subscribe: no operator is entered, so the sweep is
+-- inflationary and nothing else is owed
+leaf-lvl : ∀ (S W d k m j : ℕ) → j + 0 ≤ opIterD S W d k m j
+leaf-lvl S W d k m j =
+  ≤-trans (≤-reflexive (+-identityʳ j)) (opIterD-infl S W d k m j)
+
+-- ONE EMIT of a pushBurst, and it is the fIterD twin of `walk-step`:
+-- the emit is stepped through the ONE frame just built (`stepFrame-caps`,
+-- which reports the level that frame LEAVES) and the rest of the burst
+-- runs from there.  The gate had no fIterD row at all — .Caps-Face's pass
+-- memo (~6090) names both this and `burst-index` below as what the
+-- signature pass would need, and `pushBurst-caps` is the head that needs
+-- them: it recurses on `em ∷ ems`, so its index is the EMIT COUNT
+burst-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
+  j + j₁ ≤ fLvlD S W d j →
+  (j + j₁) + j₂ ≤ fIterD S W d k m (j + j₁) →
+  j + (j₁ + j₂) ≤ fIterD S W d k (suc m) j
+burst-step S W d k m j j₁ j₂ 2≤S hd tl =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₁ j₂))) tl)
+                   (fIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl))
+          (≤-reflexive (sym (fIterD-suc S W d k m j)))
+
+-- and the empty burst leaves the level where it found it
+burst-nil : ∀ (S W d k j : ℕ) → j + 0 ≤ fIterD S W d k 0 j
+burst-nil S W d k j =
+  ≤-trans (≤-reflexive (+-identityʳ j)) (≤-reflexive (sym (fIterD-0 S W d k j)))
 
 -- ONE FRAME, and this is the step the REFRESH buys: the frame's own
 -- receipt (`fCharge`, what the ground frame clauses pay) and then its
@@ -227,6 +265,15 @@ walk-index : ∀ (S W d k m j J : ℕ) → 2 ≤ S → m ≤ suc (widAt S W j) �
   sIterD S W d k m J ≤ sIterD S W d k (suc (widAt S W j)) J
 walk-index S W d k m j J 2≤S hm =
   sIterD-mono m (suc (widAt S W j)) d d k k 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hm
+
+-- AND THE BURST'S OWN INDEX IS THE EMIT COUNT, met the same way: on the
+-- length `burstCount?` already carries (`countLen`), whose cap
+-- `Caps.cWid (frameStep j c)` IS `widAt (cSize c) (cWid c) j`
+-- definitionally, so nothing sits between the receipt and the index
+burst-index : ∀ (S W d k m j J : ℕ) → 2 ≤ S → m ≤ suc (widAt S W j) →
+  fIterD S W d k m J ≤ fIterD S W d k (suc (widAt S W j)) J
+burst-index S W d k m j J 2≤S hm =
+  fIterD-mono m (suc (widAt S W j)) d d k k 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hm
 
 ------------------------------------------------------------------
 -- § 3.  AND THE INDEX DESCENDS ACROSS A CHAIN EDGE.

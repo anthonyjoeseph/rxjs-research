@@ -217,7 +217,8 @@ Before pausing for the design session to transfer authority to another account:
 
 - [ ] All work is pushed to `claude/agda-install-build-g6t144` (not main)
 - [ ] Last commit is green (`make agda && make bug-cache` both exit 0)
-- [ ] `grep -r "TEMP-" agda/src/` returns zero
+- [ ] `grep -rn "TEMP" agda/src/` returns zero — note the bare word, NOT `"TEMP-"`: the
+      hyphenated pattern misses suffix names like `level-TEMP` and reported a false all-clear once.
 - [ ] No uncommitted changes (`git status --short` is empty)
 - [ ] Fallback triggers are deleted (check `mcp__claude_code_remote__list_triggers` or let design session clean up)
 - [ ] New worker receives: this document, current git branch tip SHA, postulate ledger summary
