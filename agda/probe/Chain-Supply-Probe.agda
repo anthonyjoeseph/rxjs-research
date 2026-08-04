@@ -86,3 +86,49 @@ op-clause-shape : ∀ (S W d k m′ j j₁ j₂ : ℕ) → 2 ≤ S →
   (suc j + j₁) + j₂ ≤ fIterD S W d k (suc (widAt S W (suc j + j₁))) (suc j + j₁) →
   j + suc (j₁ + j₂) ≤ opIterD S W d k (suc m′) j
 op-clause-shape = op-step
+
+------------------------------------------------------------------
+-- § 4.  WHICH TRANSFORMER EACH HEAD REPORTS IN, and it is FORCED rather
+-- than chosen.  Step C was scoped as "one conjunct, one index", which
+-- reads as though every head reports in the same shape.  They do not,
+-- and the assignment is not a design decision: the family's own clause
+-- equations (Rx.Evaluator) close into a CYCLE, and each head sits at
+-- exactly one arc of it.
+--
+--     fLvlD S W (suc d) J ≡ sIterD S W d (suc (sizeAt S (suc J)))
+--                                        (suc (widAt S W J)) (fLvl S W J)
+--     sIterD S W d k (suc m) J ≡ sIterD S W d k m (sLvlD S W d k (suc J))
+--     sLvlD S W d (suc k) J    ≡ opIterD S W d k (suc (sizeAt S J)) J
+--     opIterD S W d k (suc m) J ≡ fIterD S W d k (suc (widAt S W X)) X
+--     fIterD S W d k (suc m) J ≡ fIterD S W d k m (fLvlD S W d J)
+--
+--   A FRAME's payload walk runs at the REFRESHED budget
+--   `suc (sizeAt S (suc J))` — which is `frameBud c j` on the nose, and
+--   the one arc that spends a unit of DEPTH FUEL.  A WALK subscribes each
+--   payload at `suc J`.  A FRESH SUBSCRIBE on budget `suc k` opens an
+--   operator sweep at k, indexed by the size cap.  An OPERATOR pushes
+--   frames.  And a frame pushes one `fLvlD` per emit, closing the ring.
+--
+--   So, per head:
+--
+--     subscribeE-caps        opIterD S W dep bud m j      m = operators LEFT
+--     subscribeAll-caps      opIterD S W dep bud m j      (it IS an operator)
+--     subscribeInner-caps    sLvlD  S W dep bud (suc j)   a payload's own entry
+--     thruWalk-caps          sIterD S W dep bud (length vals) j
+--     concatDrain-caps       sIterD S W dep bud (length q) j
+--     stepFrame-caps         fLvlD  S W dep j             one frame, no index
+--     pushBurst-caps         fIterD S W dep bud (length ems) j
+--
+--   The three frame-internal heads (thruConsume / innerFinish /
+--   innerReact) report in their caller's shape, since they are the
+--   inside of one `stepFrame`; the three share heads (sharedSlot /
+--   sharedConnect / subscribeE-input) report as FRESH ENTRIES, because a
+--   stored def is unrelated to the caller's term; and retagEvents-caps
+--   subscribes nothing, so it gains no conjunct at all.
+--
+--   ONLY the two `opIterD` rows need an index PARAMETER.  Every other
+--   index is a function of arguments the head already has — a payload
+--   list's length, a queue's length, an emit list's length — so the
+--   conjunct reads it off directly and no plumbing is added.  That is
+--   why § 1's hypothesis is needed at two heads rather than fourteen.
+------------------------------------------------------------------
