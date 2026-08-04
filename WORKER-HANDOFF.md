@@ -2,7 +2,39 @@
 
 **Current session:** Fable 5 design-authority running on main account. **Next worker:** Opus 5 or Haiku on secondary account.
 
-**Status:** Tier 1 item 4 (Step C) — **Unit 0 and Unit 1 both done and green**; what remains of Step C is the CONJUNCT itself (see The Current Leg below). Postulate ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2), zero TEMP scaffolding — Unit 1 needed none, see the descent finding below.
+**Status:** Tier 1 item 4 (Step C) — Units 0 and 1 done and green; the level conjunct's SHAPES
+are landed on ten heads with twelve clauses proven, and the rest of its clauses are the current
+work. Postulate ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2).
+
+## ⚠ RESUME HERE (session closed 2026-08-04, mid-leg)
+
+**`origin/main` = `add44f4` — the last END-TO-END VERIFIED commit.** Everything on main is
+`make agda && make bug-cache` green.
+
+**`origin/claude/step-c-conjunct-wip` = `bdb9ac9` — one commit of UNVERIFIED work.** It landed
+`op-step-entry` / `op-step-share` / the two strict measures and deleted `walk-step-lift`. Each of
+the three touched modules solo-checks green (`Caps-Chain`, `Caps-Nest`, `Caps-Sadd`) and
+`Payload-Share-Probe` is green, **but the full-tree `make agda` was still inside its
+Subscribe-Face leg when the session closed, so its result is UNKNOWN.**
+
+**First action on resume:** check out the WIP branch and run the full build to completion.
+```
+git fetch origin && git checkout -B claude/step-c-conjunct-wip origin/claude/step-c-conjunct-wip
+cd agda && (make -C .. agda > /tmp/v.log 2>&1; echo "MAKE_AGDA_EXIT=$?" >> /tmp/v.log; \
+  make -C .. bug-cache >> /tmp/v.log 2>&1; echo "BUG_CACHE_EXIT=$?" >> /tmp/v.log)
+```
+Then `grep -E "MAKE_AGDA_EXIT|BUG_CACHE_EXIT" /tmp/v.log`. If both are 0, merge to main. If not,
+the likely culprit is the `walk-step-lift` deletion (it was believed to have no users — verify
+with grep before re-deleting) or a signature the new lemmas changed.
+
+**Then continue Deliverable 2**, steps 2-5 of the directive recorded in "What remains" below:
+the three structurally-wrong call sites first (`innerFinish-caps`'s concat clause needs `dep′` +
+`frameBud c j`; `subscribeInner-caps` needs the `suc bud′` split, now supplied by
+`refresh-supplies-nest-strict`; the `input` clause is now closed by `op-step-share`), then the
+bulk of the remaining `level-TEMP` clauses in batches, then delete the postulate.
+
+**`grep -rn "TEMP" agda/src` must return zero before Step C is done** — the BARE word, not
+`"TEMP-"`; the placeholder is named `level-TEMP` and the hyphenated pattern misses it.
 
 **Where this document errs, the tree wins.** It was written under duress; its repo-state claims have been corrected once already (2026-08-04, design session) after verification against `7c56612`. Re-verify anything load-bearing with grep before spending on it.
 
