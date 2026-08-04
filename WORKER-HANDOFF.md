@@ -6,43 +6,101 @@
 are landed on ten heads with twelve clauses proven, and the rest of its clauses are the current
 work. Postulate ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2).
 
-## ⚠ RESUME HERE (session closed 2026-08-04, mid-leg)
+## ⚠ RESUME HERE — the conjunct SHAPES are landed; 20 clause sites remain
 
-**`origin/main` = `add44f4` — the last END-TO-END VERIFIED commit.** Everything on main is
-`make agda && make bug-cache` green.
+**`origin/main` = `aded321`, verified green** (`MAKE_AGDA_EXIT=0`, `BUG_CACHE_EXIT=0`). The
+level conjunct is IN the Σ on nine heads, and the composition gate in `Caps-Chain` is built.
+What remains of Step C is discharging **20 `level-TEMP` clause sites** — and they have been
+surveyed, so this is a worklist, not an exploration. Take the buckets in the order given.
 
-**`origin/claude/step-c-conjunct-wip` = `bdb9ac9` — one commit of UNVERIFIED work.** It landed
-`op-step-entry` / `op-step-share` / the two strict measures and deleted `walk-step-lift`. Each of
-the three touched modules solo-checks green (`Caps-Chain`, `Caps-Nest`, `Caps-Sadd`) and
-`Payload-Share-Probe` is green, **but the full-tree `make agda` was still inside its
-Subscribe-Face leg when the session closed, so its result is UNKNOWN.**
+**`grep -c "level-TEMP" agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda` = 23**: 20 real
+proof sites, the postulate declaration, and two prose mentions. `grep -rn "TEMP" agda/src` must
+return zero before Step C is done — the BARE word, not `"TEMP-"`, which misses `level-TEMP`
+and reported a false all-clear once.
 
-**First action on resume:** check out the WIP branch and run the full build to completion.
-```
-git fetch origin && git checkout -B claude/step-c-conjunct-wip origin/claude/step-c-conjunct-wip
-cd agda && (make -C .. agda > /tmp/v.log 2>&1; echo "MAKE_AGDA_EXIT=$?" >> /tmp/v.log; \
-  make -C .. bug-cache >> /tmp/v.log 2>&1; echo "BUG_CACHE_EXIT=$?" >> /tmp/v.log)
-```
-Then `grep -E "MAKE_AGDA_EXIT|BUG_CACHE_EXIT" /tmp/v.log`. If both are 0, merge to main. If not,
-the likely culprit is the `walk-step-lift` deletion (it was believed to have no users — verify
-with grep before re-deleting) or a signature the new lemmas changed.
+**Where this document errs, the tree wins** — it has been wrong about repo state twice. One
+correction already: an earlier revision claimed "the `input` clause is now closed by
+`op-step-share`". It is NOT (bucket E below); the comment in the clause itself says so.
 
-**Do NOT chase an OOM here.** The last build on that branch died with `Killed: 9` and the worker
-recorded it as an OOM in the Subscribe-Face leg. It was not: the design session `kill -9`'d it
-while shutting the session down. There is no evidence of a memory problem on this branch —
-Subscribe-Face's observed peak was ~3.2 GB, far from the 13 GB single-check peaks that have
-actually OOM'd. Re-run the build and read its real `MAKE_AGDA_EXIT` before diagnosing anything.
+---
 
-**Then continue Deliverable 2**, steps 2-5 of the directive recorded in "What remains" below:
-the three structurally-wrong call sites first (`innerFinish-caps`'s concat clause needs `dep′` +
-`frameBud c j`; `subscribeInner-caps` needs the `suc bud′` split, now supplied by
-`refresh-supplies-nest-strict`; the `input` clause is now closed by `op-step-share`), then the
-bulk of the remaining `level-TEMP` clauses in batches, then delete the postulate.
+## THE STEP C SITE CENSUS (2026-08-04) — all 20 sites, classified
 
-**`grep -rn "TEMP" agda/src` must return zero before Step C is done** — the BARE word, not
-`"TEMP-"`; the placeholder is named `level-TEMP` and the hyphenated pattern misses it.
+Read off the head signatures and the clause witnesses; no build needed, because each head's
+Σ *declares* its conjunct's transformer and index, so the goal is the witness substituted in.
+Five transformer families are in play, one per head group:
 
-**Where this document errs, the tree wins.** It was written under duress; its repo-state claims have been corrected once already (2026-08-04, design session) after verification against `7c56612`. Re-verify anything load-bearing with grep before spending on it.
+| head group | conjunct it reports |
+|---|---|
+| `subscribeE` / `subscribeAll` | `j + j′ ≤ opIterD S W dep bud ops j` |
+| `subscribeInner` / `thruConsume` | `suc (j + j′) ≤ sLvlD S W dep bud (suc j)` |
+| `thruWalk` / `concatDrain` | `j + j′ ≤ sIterD S W dep bud (length …) j` |
+| `innerFinish` / `innerReact` / `stepFrame` | `j + j′ ≤ fLvlD S W dep j` |
+| `pushBurst` | `j + j′ ≤ fIterD S W dep bud (length str) j` |
+
+**Bucket A — ONE new trivial lemma closes SIX sites.** Lines 1718, 1841, 1862, 2087, 2095,
+2171 (innerFinish merge/switch/exhaust, both innerReact clauses, stepFrame take-f). Every
+witness is `0`, so every goal is `j + 0 ≤ fLvlD S W dep j`. Add to `Caps-Chain`:
+`frame-nil S W d j = ≤-trans (≤-reflexive (+-identityʳ j)) (fLvlD-infl S W d j)`.
+Start here: it is a third of the remaining sites for one line.
+
+**Bucket B — an EXISTING `Caps-Chain` lemma applies, FIVE sites.** No new math.
+- 1607 concatDrain (inner stays open, witness `j₁`) — `walk-step` at `j₂ := 0`; the head
+  premise is `subscribeInner`'s report weakened by `n≤1+n`, the tail is `sIterD-infl`.
+  Wants a one-line `walk-last` wrapper to absorb `j₁ + 0 ≡ j₁`.
+- 1639 concatDrain (inner completed, recurses, witness `j₁ + j₂`) — `walk-step` verbatim.
+- 2503 subscribeAll `suc ops′` (witness `suc (j₁ + j₂)`) — `op-step` verbatim; its
+  conclusion is this goal on the nose.
+- 2749 subscribeE `takeᵉ`/`suc ops′` (witness `suc (j₁ + j₂)`) — `op-step`.
+- 2819 subscribeE `scanᵉ` (witness `j₀ + suc (j₁ + j₂)`) — `op-step-eval`.
+
+**Bucket C — split `ops` using the `hidx` the head ALREADY carries, TWO sites.** Both
+conjuncts are FALSE at `ops = 0` (the transformer does not move and the witness is positive),
+so both clauses must case on `ops`; `hidx : suc (sizeᵉ b) ≤ ops` supplies `1 ≤ ops` outright.
+This is the `queue-push` pattern, already proven once.
+- 2602 subscribeE `ofᵉ` (witness `j₀ + 3`, `j₀` from `evalTms-caps`) — `op-step-eval`.
+- 2992 subscribeE `*All`/`mergeᵒ` (witness `1`) — `op-step-share` at `j₁ := 0`.
+
+**Bucket D — one new EASY lemma plus a receipt conjunct on three non-clique helpers, THREE
+sites.** These report a positive witness into `fLvlD S W dep j` at a GENERIC `dep`, and
+`frame-step` only concludes at `suc d`. But `fLvlD` at zero is NOT the identity — it is
+`fLvl S W J + suc (widAt S W J)` with `fLvl S W J = J + fCharge S W J` — so a dep-generic
+receipt lemma goes through by inflation in both branches:
+`frame-recv : ∀ S W d j j₀ → j₀ ≤ fCharge S W j → j + j₀ ≤ fLvlD S W d j`
+(at `0`, monotonicity into `j + fCharge + suc widAt`; at `suc d`, `sIterD-infl` off `fLvl`).
+Then each site needs its helper to report `j′ ≤ fCharge S W j` — a signature addition on three
+helpers OUTSIDE the SCC, so each is a cheap solo check:
+- 1674 `innerFinish-zero′` ← `innerFinish-zero`
+- 2136 stepFrame `map-f` ← `mapFrame-caps`
+- 2153 stepFrame `scan-f` ← `stepFrame-scan-caps`
+
+**Bucket E — DESIGN, FOUR sites. These are the schedule; do them FIRST if you have design
+authority, because each can change a signature the other buckets rest on.**
+- **979 `subscribeInner-caps` — the keystone, and the math is DONE.** `inner-step` is proven
+  and landed in `Caps-Chain` § 5. Two supplies remain, both signature-level: the IH must be
+  called at index `sizeAt S (suc j)` (NOT its successor — at the successor the IH lands flush
+  with nothing over, which is why this site resisted), and it needs `bud ≡ suc bud′` (a
+  payload subscribe is a nesting level and spends one, as the μ edge does). Gap is THREE
+  rungs, not two, and needs `2 ≤ S` via `2≤sizeAt`.
+- **1778 `innerFinish-caps` concat — a wrong call-site argument.** It hands `concatDrain-caps`
+  its own `dep` and `bud`. A drain is a WALK: the depth must descend as it does in
+  `stepFrame-caps`'s thru-outer clause, and the budget must be the REFRESHED `frameBud c j`.
+- **2203 `stepFrame-caps` thru-outer at `dep = zero` — UNCERTAIN, probe before grinding.**
+  `dep` is literally `zero` in the clause pattern, so the goal is
+  `j + j′ ≤ fLvl S W j + suc (widAt S W j)` while `j′` is a whole `thruWalk` reported in
+  `sIterD S W zero (frameBud c j) (length vals) j`. Whether a walk at exhausted depth fits
+  inside one frame's receipt plus its width is exactly the open question. Write the probe
+  first; if it refutes, the depth accounting needs `1 ≤ dep` threaded so this clause is absurd.
+- **2574 `subscribeE-caps (input i)` — THE LANDMINE, and it is a MEASURE question.** The slot
+  edge runs through `subscribeE-input` / `sharedSlot` / `sharedConnect`, none of which carry
+  the conjunct or even an `ops` parameter. The clause's own comment records why this is not a
+  grind: a fresh entry's index is the level's WHOLE size cap, and **`ops` does not dominate
+  it**. So either those three heads gain a conjunct in a different currency, or the entry gets
+  re-measured. **Consult the design session before spending here** — this is the one Step C
+  site that can force a re-measure, and it is the analogue of the Wet item's gate.
+
+**Order:** E (get the signatures right) → A (six sites, one line) → B → C → D. Green
+`make agda && make bug-cache` per batch, push per batch, then delete `level-TEMP`.
 
 ---
 
@@ -129,16 +187,9 @@ one `s≤s`); and `μᵉ`-out-of-gas, `deferᵉ` (it PARKS its body as a pending
    PARAMETER; every other index is already a function of what the head holds (a payload list's
    length, a queue's length, an emit count).
 
-**What remains of Step C — the conjunct itself:**
-- Add `j + j′ ≤ <transformer> … j` to each clique head per the per-head map (Chain-Supply-Probe
-  § 4). This must land on SEVERAL heads at once — they are one SCC, and `op-step` consumes
-  `pushBurst`'s receipt in `fIterD` shape, so `pushBurst-caps` needs its conjunct in the same
-  pass as `subscribeE-caps`.
-- Close each clause with the gate: `op-step` for map/take/scan/subscribeAll, `op-step-mu` for
-  the μ unfolding, `walk-step`/`frame-step` for the walk and frame heads, and the `-infl`
-  family for the leaves that consume nothing (`j + 0 ≤ opIterD … j`).
-- Green commit per batch. If a site resists two distinct attempts → STOP with the goal type
-  verbatim.
+**What remains of Step C:** the shapes are landed on nine heads; the 20 open clause sites are
+enumerated and classified in the census at the top of this document. Green commit per batch. If
+a site resists two distinct attempts → STOP with the goal type verbatim.
 
 **After the conjunct lands green (ledger still 5):**
 - Proceed to item 3 (the two Caps-Face faces, 5 → 3)
@@ -216,10 +267,12 @@ Proven three times now (2026-08-04):
 ### Core Working Files (Tier 1, Item 4)
 - **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** (18 `-caps` heads; the big mutual clique; this is the ~7 min SCC — iterate in probes, land in batches, detach rechecks)
   - Current state: the two operator-shaped heads carry `(c : Caps) (dep bud ops j : ℕ)` + the
-    `nest … ≤ bud` and `suc (sizeᵉ b) ≤ ops` hypotheses, and four clauses split `ops`; Σ still
-    reports `capsOK?` × `burstCaps?`/`valsCaps?` × `burstCount?`. **The level conjunct is not in
-    the Σ yet** — that is what remains of Step C.
-  - The clique's signature block starts at `subscribeE-caps` (~line 850); the pass memo sits above it.
+    `nest … ≤ bud` and `suc (sizeᵉ b) ≤ ops` hypotheses, and four clauses split `ops`. **The
+    level conjunct IS in the Σ** on nine heads (the five families tabulated in the census);
+    what remains is its 20 open clause sites.
+  - The clique's signature block starts at `subscribeE-caps` (~line 890); the `level-TEMP`
+    postulate and its pass memo sit just above at ~855-888 — that memo is where a known-wrong
+    call-site argument gets recorded the moment it is noticed.
 
 - **`agda/src/Verify-Budget-Sufficient/Caps-Chain.agda`** (the composition gate, landed by Unit 0)
   - § 1 the five clause shapes + `quad-arith`; § 2 the index conversions
@@ -253,7 +306,8 @@ Proven three times now (2026-08-04):
 
 Before pausing for the design session to transfer authority to another account:
 
-- [ ] All work is pushed to `claude/agda-install-build-g6t144` (not main)
+- [ ] All work is pushed (green legs go to `main` — merging verified-green work to main is
+      standing authorization from Anthony, 2026-07-31)
 - [ ] Last commit is green (`make agda && make bug-cache` both exit 0)
 - [ ] `grep -rn "TEMP" agda/src/` returns zero — note the bare word, NOT `"TEMP-"`: the
       hyphenated pattern misses suffix names like `level-TEMP` and reported a false all-clear once.

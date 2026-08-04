@@ -150,6 +150,41 @@ speculative inventory: they may get thrown out wholesale, and worse, their sunk 
 the design toward keeping them. Better to have a wrong assembly you can amend than proven
 pieces with no assembly at all.
 
+## Survey the whole hole-set before discharging any of it
+
+Outside-in applies to the HOLES too, not just the statements. When a batch of deferred sites
+(a shared `-TEMP` postulate, a wall of `?`) has to be discharged, **census every site's goal
+first, then classify, then prove — never site-by-site.** Depth-first grinding through a hole
+set is the standard way this campaign has lost time: each design blocker is discovered only
+when its turn comes, and every blocker found late can invalidate proofs already finished
+above it. The census is one pass and it converts an unknown-length grind into a worklist.
+
+- **You usually do NOT need a typecheck to read a goal.** When the obligation is *declared*
+  rather than inferred — a Σ-returning family where each head's signature fixes the conjunct's
+  transformer and index, and the clause supplies the witness — the goal is `substitute the
+  witness into the head's conjunct`. Read the signature, read the tuple, done. Free, and no
+  20-minute SCC recheck. Batch-mode Agda will not hand you goal types anyway: holes report
+  only source positions, and forcing the type into an error message aborts the module at the
+  FIRST error, so the "just ask Agda" route costs one full build per site.
+- **Classify into four buckets, and do the LAST one first.** (a) trivial/inflationary — one
+  lemma usually closes many; (b) an existing lemma applies as-is; (c) needs a new lemma;
+  (d) BLOCKED — the site cannot close until a signature, a call-site argument, or a measure
+  changes. Bucket (d) is the schedule. Buckets (a) and (b) are safe, batchable, and the right
+  work to delegate; grinding them first only buys the illusion of progress.
+- **Check every conjunct at zero before grinding it.** These bounds routinely go FALSE at
+  `bud = 0`, `ops = 0`, `dep = 0` — the transformer is the identity there and a positive
+  witness cannot fit. A one-screen refutation probe (`agda/probe/Queue-Push-Probe.agda` § 1)
+  tells you the site needs a positivity hypothesis threaded rather than a cleverer proof.
+- **Count the sites by grepping the BARE postulate name.** A hyphenated guess
+  (`grep TEMP-`) misses `level-TEMP` and reports a false all-clear; comment mentions of the
+  name inflate the count the other way. Grep the bare word, then subtract the declaration
+  and the prose.
+- **A shared deferral postulate hides call-site ARGUMENTS, not shapes.** Indices and
+  transformers are pinned by the Σ above, so a wrong index is a type error at the reporting
+  clause. What it absorbs is a callee handed the wrong `dep`/`bud`. Record each one in the
+  postulate's header comment the moment you notice it, so the census inherits it instead of
+  rediscovering it.
+
 ## Keep the repo lean — no fat
 
 This repo always represents the **most present, up-to-date code**. Every definition must be
