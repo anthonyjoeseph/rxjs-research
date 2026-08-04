@@ -85,12 +85,15 @@ authority, because each can change a signature the other buckets rest on.**
 - **1778 `innerFinish-caps` concat — a wrong call-site argument.** It hands `concatDrain-caps`
   its own `dep` and `bud`. A drain is a WALK: the depth must descend as it does in
   `stepFrame-caps`'s thru-outer clause, and the budget must be the REFRESHED `frameBud c j`.
-- **2203 `stepFrame-caps` thru-outer at `dep = zero` — UNCERTAIN, probe before grinding.**
-  `dep` is literally `zero` in the clause pattern, so the goal is
-  `j + j′ ≤ fLvl S W j + suc (widAt S W j)` while `j′` is a whole `thruWalk` reported in
-  `sIterD S W zero (frameBud c j) (length vals) j`. Whether a walk at exhausted depth fits
-  inside one frame's receipt plus its width is exactly the open question. Write the probe
-  first; if it refutes, the depth accounting needs `1 ≤ dep` threaded so this clause is absurd.
+- **2203 `stepFrame-caps` thru-outer at `dep = zero` — MACHINE-REFUTED. Do not grind it.**
+  `agda/probe/Dep0-Walk-Probe.agda` proves
+  `suc (fLvlD S W 0 j) ≤ sIterD S W 0 (suc k) (suc m) j` for every cap with `2 ≤ S` — the walk
+  at exhausted depth STRICTLY OVERSHOOTS the exhausted frame. Since `thruWalk-caps`'s report is
+  the only bound the clause holds on its witness, the transitivity it would use runs the wrong
+  way and no rearrangement recovers it. The cause is structural: `fLvlD S W zero` is a closed
+  formula (it makes no recursive call — that is what carries the family's termination), while a
+  depth-zero walk still re-enters the family through `sLvlD`/`opIterD`. **The fix is a
+  signature — depth sufficiency has to reach this head — and it is scoped as Unit 3 below.**
 - **2574 `subscribeE-caps (input i)` — THE LANDMINE, and it is a MEASURE question.** The slot
   edge runs through `subscribeE-input` / `sharedSlot` / `sharedConnect`, none of which carry
   the conjunct or even an `ops` parameter. The clause's own comment records why this is not a
@@ -101,6 +104,32 @@ authority, because each can change a signature the other buckets rest on.**
 
 **Order:** E (get the signatures right) → A (six sites, one line) → B → C → D. Green
 `make agda && make bug-cache` per batch, push per batch, then delete `level-TEMP`.
+
+### UNIT 3 — DEPTH SUFFICIENCY (discovered 2026-08-04; ASK BEFORE GRINDING)
+
+Step C was scoped as two units. The refutation at site 2203 says there is a third, and it is
+the mirror of Unit 1: the clique carries a sufficiency hypothesis for the budget
+(`nest o sl cs ≤ bud`) and for the operator count (`suc (sizeᵉ b) ≤ ops`), but **nothing bounds
+`dep` from below**, and one arc of the cycle spends it.
+
+What the tree says, verified:
+- `stepFrame-caps`'s own conjunct comment already names the intent — a frame "is the ONE arc
+  that spends a unit of depth fuel — its payload walk runs at `dep` minus one, on the REFRESHED
+  budget". The `suc dep′` clause does exactly that (`thruWalk-caps c dep′ (frameBud c j) …`).
+  The `zero` clause has nothing to descend into.
+- Both callers (`Subscribe-Face:2351`, `:3150`) pass `dep` straight through unchanged, so `dep`
+  is inherited from the top and never re-established anywhere in the clique.
+- **No depth measure exists yet** — `grep depthᵉ/allDepth/nestDepth` in `Rx/` is empty. So Unit 3
+  needs a currency invented, not just threaded.
+
+Why this needs a ruling rather than a grind: the natural currency is not syntactic. `sizeᵉ`
+would descend at the thru-outer edge (the inner is a strict subterm), but `stepFrame-caps` does
+not hold the inner expression — a `thru-outer` frame carries a `NodeId`, and the inner lives in
+the state/registry. So the bound has to come from a **state**-level invariant, which is the same
+shape of object as the **registry-cardinality invariant that Tier 1 item 1 (Wet) is already
+gated on**. These may be one design problem serving two items, and choosing the currency once
+for both is worth more than closing 2203 quickly. CLAUDE.md's rule for the Wet invariant applies
+here verbatim: consult before grinding.
 
 ---
 
