@@ -2,7 +2,9 @@
 
 **Current session:** Fable 5 design-authority running on main account. **Next worker:** Opus 5 or Haiku on secondary account.
 
-**Status:** Tier 1 item 4 (Step C) in progress. Working branch: `claude/agda-install-build-g6t144`, tip: `cafdaaf` (all pushed). Postulate ledger: **5 real postulates**, zero TEMP scaffolding. No uncommitted changes.
+**Status:** Tier 1 item 4 (Step C) — probes landed, **Unit 1 not yet started** (see The Current Leg below). `main` and `claude/agda-install-build-g6t144` are in sync at `7c56612` (all pushed). Postulate ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2), zero TEMP scaffolding. No uncommitted changes.
+
+**Where this document errs, the tree wins.** It was written under duress; its repo-state claims have been corrected once already (2026-08-04, design session) after verification against `7c56612`. Re-verify anything load-bearing with grep before spending on it.
 
 ---
 
@@ -30,9 +32,25 @@ Readme, Time, Evaluator, Provenance. All depend on both Tier 1 and Tier 2. Lowes
 
 ---
 
-## The Current Leg: Step C Unit 1 (In Progress)
+## The Current Leg: Step C Unit 1 (NOT STARTED — verified against the tree 2026-08-04)
 
-**What it is:** Threading the operator count (`m`) through the 13 mutual chain members alongside existing `dep`/`bud` parameters, then adding the indexed level conjunct `… ≤ opIterD S W dep k m j` per the Chain-Index-Probe findings.
+**Tree state at `7c56612` (main == working branch, both pushed, clean):** the clique in
+`Subscribe-Face.agda` still reads `(c : Caps) (dep bud j : ℕ)` — **no `m` parameter, no level
+conjunct, zero TEMP postulates anywhere in `agda/src`** (`grep -rn "TEMP-" agda/src` is empty).
+An earlier draft of this document claimed the 42 LHSs already carry `m` with ~29 TEMP holes;
+that state was in-flight edits that died UNPUSHED with the old worker (see the usage-limits
+note below). The last pushed Step C work is the probe alone (`cafdaaf`). Start Unit 1 from
+scratch; trust the tree, not this document's history.
+
+**What it is:** Threading the operator count (`m`) through the mutual chain members alongside existing `dep`/`bud` parameters, then adding the indexed level conjunct `… ≤ opIterD S W dep k m j` per the Chain-Index-Probe findings.
+
+**Unit 0 (prerequisite, small):** the arithmetic the conjuncts spend currently lives in
+PROBES, which `agda/src` modules cannot import. Land in a small non-SCC src module (≤20 s solo
+recheck, e.g. extend `Caps-Sadd` or a new `Caps-Chain.agda`):
+- `index-mono`, `entry-is-sweep`, `entry-to-index` (from `agda/probe/Chain-Index-Probe.agda` § 2)
+- `walk-step`, `frame-step`, `op-step`, `op-step-eval`, `op-step-mu` (from `agda/probe/Sub-Charge-Probe.agda` § 5)
+- `walk-index` (from `agda/probe/Level-Shape-Probe.agda` § 2)
+These are already proven in the probes — this is a copy + import-fix pass, one green commit.
 
 **Design facts (probed and settled):**
 1. The level conjunct **cannot be reported in entry shape** (`sLvlD S W d bud J`). A recursive call inside an operator clause is not a fresh subscribe — it's the same sweep, one shorter. The entry-sweep-in-operator-remaining absurdity is machine-refuted at zero-operators-left (see `agda/probe/Chain-Index-Probe.agda`).
@@ -46,7 +64,7 @@ Readme, Time, Evaluator, Provenance. All depend on both Tier 1 and Tier 2. Lowes
 - One green commit with TEMPs and conjuncts in place
 
 **Unit 2 scope (after Unit 1 commits green):**
-- Discharge conjuncts leaves-first in batches against the §5 gate (composition gate, already proven in `Caps-Sadd`)
+- Discharge conjuncts leaves-first in batches against the §5 gate (composition gate — proven in `agda/probe/Sub-Charge-Probe.agda` § 5, landed in src by Unit 0; `Caps-Sadd` holds the superadditivity family + `walk-step-lift`/`walk-step-suc`)
 - Green commit per batch
 - Delete TEMP postulates with the last replacement
 - If a site resists two distinct attempts → STOP with the goal type verbatim (caution rule, now standing since Unit 2)
@@ -113,29 +131,31 @@ Proven three times now (2026-08-04):
 - **Impossibility pair discovered → STOP, report immediately to Fable. Do not act on it.**
 
 ### Container & Fallback Management
-- **Foreground wait-loops hold the container awake.** Long Agda checks (>600s) move to background; a backgrounded build can freeze if the design session ends its turn. Keep-alive: `for i in $(seq 1 55); do grep -q 'EXIT=' log && break; sleep 10; done` repeated until complete.
-- **30-min fallback check cadence** (per Anthony 2026-08-03). Detect if wedged >15 min with no agda; if so, revive via SendMessage. If working fine, silently re-arm.
-- **Fallback resolution:** After ANY check (fallback firing OR work completion), DELETE the old trigger and arm a new one +30 min from that check. Exactly one fallback pending at all times.
+- **On the persistent laptop (current setup), keep-alives are RETIRED** (CLAUDE.md, 2026-08-03): detached builds advance on their own; poll their `EXIT=` log with short foreground calls for pacing/verification only. Keep only a sparse (~60 min) fallback check-in for wedged workers.
+- **The container-era rules below apply ONLY if running in a suspendable cloud container** (the environment this document was written in): foreground wait-loops (`for i in $(seq 1 55); do grep -q 'EXIT=' log && break; sleep 10; done`) to hold the container awake, 30-min fallback cadence, delete-and-re-arm trigger discipline.
+- Long Agda checks (>600s) are always detached (`nohup setsid bash -c '… ; echo EXIT=$? >> log' &`) regardless of environment — the Bash tool's per-call ceiling is the constraint, not the container.
 
 ---
 
 ## Files of Interest
 
 ### Core Working Files (Tier 1, Item 4)
-- **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** (17 heads, 42 clauses, 13-member mutual clique)
-  - Currently: all 42 LHSs carry operator count `m` + indexed conjunct holes, ~29 call sites with TEMP holes (last state before Unit 1 interruption)
-  - Next: discharge per-member conjuncts in Unit 2 batches
+- **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** (18 `-caps` heads; the big mutual clique; this is the ~7 min SCC — iterate in probes, land in batches, detach rechecks)
+  - Current state: heads carry `(c : Caps) (dep bud j : ℕ)` + the `nest … ≤ bud` hypothesis; Σ reports `capsOK?` × `burstCaps?`/`valsCaps?` × `burstCount?`. **No `m`, no level conjunct yet** — that is Unit 1.
+  - The clique's signature block starts at `subscribeE-caps` (~line 838); the pass memo sits above it.
 
-- **`agda/src/Verify-Budget-Sufficient/Caps-Nest.agda`** (new, post-probe)
-  - Nesting measure, walk index supply, `walk-index`, `index-mono`, `entry-to-index`, descent-point lemmas
-  - Re-exported through Caps-Face for use in conjunct discharge
+- **`agda/src/Verify-Budget-Sufficient/Caps-Nest.agda`**
+  - Nesting measure `nest e sl cs = syncSizeᵉ e + resid sl cs`, per-constructor steps (`share-step`, `mu-step`, `chain-step`, `map/take/scan/all/merge/concat/switch/exhaust-step`), `refresh-supplies-nest`, `k-raise`.
+  - NOTE: `walk-index`, `index-mono`, `entry-to-index` are **NOT here** — they live in probes and must be landed in src by Unit 0.
+
+- **`agda/src/Verify-Budget-Sufficient/Caps-Sadd.agda`** (superadditivity family `fLvl/sIterD/opIterD/fIterD-sadd`, `walk-step-lift`, `walk-step-suc`)
 
 - **`agda/src/Verify-Budget-Sufficient/Caps-Face.agda`**
-  - Two ledger postulates at lines 5902, 5932 (item 3, after Step C)
-  - Widened receipts with level conjuncts
+  - Two ledger postulates `innerFinish-concat-face` + `thruOuter-face` in the single `postulate` block at ~line 6119 (item 3, after Step C); the pass memo (why (b) precedes (a), what the faces wait on) sits directly above it.
 
-- **`agda/probe/Chain-Index-Probe.agda`** (settled the conjunct shape)
-- **`agda/probe/Level-Shape-Probe.agda`** (discharged Σ-vacuity)
+- **`agda/probe/Chain-Index-Probe.agda`** (settled the conjunct shape; § 2 has `index-mono`/`entry-is-sweep`/`entry-to-index`)
+- **`agda/probe/Level-Shape-Probe.agda`** (discharged Σ-vacuity; § 2 has `walk-index`; § 3 the descent-point fact)
+- **`agda/probe/Sub-Charge-Probe.agda`** (§ 5: `walk-step`, `frame-step`, `op-step`, `op-step-eval`, `op-step-mu` — the five clause-shape arithmetic steps, proven)
 
 ### Build & Test
 - **`Makefile`:** `make agda` (full Agda check), `make bug-cache` (type-level unit tests), `make test` (other suites)
