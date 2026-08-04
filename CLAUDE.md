@@ -45,8 +45,10 @@ immediately; do not act on it — we decide next steps together.**
 ## The goal: nothing short of a proof
 
 The ultimate and only goal is a **complete machine-checked proof** that the implementation
-equals the spec — `Formal-Verification` fully discharged, **no postulates, everything
-typechecks**, on *every* canonical program. Partial results, "passes almost all QuickCheck
+equals the spec — **`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` fully discharged**, **no
+postulates, everything typechecks**, on *every* canonical program. (That file is the artifact
+once called `Formal-Verification`; the old name survives nowhere but in memories and stale
+memos, so read any reference to it as pointing here.) Partial results, "passes almost all QuickCheck
 seeds", "fixes the common case" — none of these are the finish line. They are waypoints.
 A remaining counterexample (even 1 in 500, even a pathological nested program) means the
 theorem is false and there is no proof. Keep going until it is airtight.
@@ -60,15 +62,34 @@ process: try approaches, keep what passes QuickCheck/oracle, revert what doesn't
 wins. Only pause to ask when a change would touch the **spec** (`Spec/`, the root README's
 semantics), or when the spec is genuinely ambiguous (then follow the ambiguity rule below).
 
-## Division of labor: Fable directs, Opus grinds (2026-07-31)
+## Division of labor: the design session directs, Sonnet workers grind
 
-The design-authority session runs on Fable 5 and delegates the bulk of the work — clause
-grinds, probe sweeps, build babysitting — to **Opus 5 subagents** (Agent tool, `model:
-"opus"`), to keep Fable spend confined to rulings, directives, and report review. Standing
-protocol, per Anthony:
+The design-authority session delegates the bulk of the work — clause grinds, probe sweeps,
+build babysitting — to subagents, keeping design spend confined to rulings, directives, and
+report review. Standing protocol, per Anthony:
 
-- **One worker at a time.** Concurrent Agda checks OOM the container (13GB+ single-check
-  peaks observed). Sequential workers, each run to completion and reviewed before the next.
+- **Workers run on Sonnet 4.6** (Agent tool, `model: "sonnet"`) as of 2026-08-04, replacing
+  Opus 5. The cheaper worker buys parallelism (below); Anthony: "we'll give this a shot for a
+  while, and we'll re-assess later." If worker output quality visibly degrades — wrong goal
+  types reported, weakened statements, silent postulate reintroduction — say so and re-assess
+  rather than absorbing the cost quietly.
+- **Parallel workers are AUTHORIZED (2026-08-04), and the hardware now allows parallel Agda
+  too — up to a measured ceiling.** The old one-worker-at-a-time rule was a memory constraint,
+  not a credits one, and Anthony moved the session to stronger hardware on 2026-08-04 ("no
+  need to worry"). Measured on that machine: **24 GB RAM, 14 cores**, ~12 GB free at rest,
+  and **Subscribe-Face peaks ~5.2 GB** as a single check. So:
+  - **At most TWO heavyweight checks at once** (Subscribe-Face / Wet class, multi-GB). Two fit
+    the headroom; three do not, and an OOM costs more than the wait. Re-measure with
+    `ps -eo rss` before assuming otherwise — the 13 GB peaks in the campaign's history were
+    real, just on the old container.
+  - **Cheap modules parallelize freely** (probes and non-SCC modules solo-check in seconds and
+    cost well under a GB).
+  - **Never let two workers edit the same module.** This is a correctness constraint that
+    hardware does not relax: a shared file is a write conflict, not a parallel task. When
+    several edits land in ONE file (Subscribe-Face is the usual case), have workers return
+    replacement text and let the design session apply it and own the single recheck.
+  - **Read-only fan-out is unconditionally safe** — analysis, goal-type census, locating
+    definitions, tracing call sites. Split as wide as the task allows.
 - **Keep-alives RETIRED (2026-08-03).** The session now runs on a persistent laptop
   (Anthony: "no need for the keep-alives anymore"), so the container no longer suspends
   between tool calls — background workers and detached builds advance on their own, and
@@ -217,8 +238,8 @@ Follow these phases in order for any change to the implementation or spec:
    example that **avoids the `*All()` higher-order operators where possible** and follows
    the style of the README's edge-case examples.
 
-3. **Ignore `Formal-Verification/` for now.** It may have errors during this phase — that's
-   fine. Leave it until the end.
+3. **Ignore `Verify-Batch-Simultaneous/The-Proof.agda` for now.** It may have errors during this
+   phase — that's fine. Leave it until the end.
 4. **Port to TypeScript** — but only once QuickCheck passes.
 5. **Oracle.** Make the fast-check/Agda-alignment oracle (`npm run oracle`, TS-impl vs
    Agda-impl via the CLI) pass.
@@ -237,7 +258,7 @@ fails the typechecker instantly instead of surfacing only in a random seed.
 
 Keep them dead simple — no fancy names, no abstraction, just a wall of little `_ : … ≡ …`
 entries. They exist only to accelerate finding the implementation; they are **not** meant to
-survive past the proof. Delete the module once `Formal-Verification` is discharged.
+survive past the proof. Delete the module once `The-Proof.agda` is discharged.
 
 The cache is **append-only**: `scripts/gen-unit-tests.sh [FIRST] [LAST] [RUNS] [DEPTH]`
 appends each new counterexample (deduped by program text) and never deletes or overwrites. A
