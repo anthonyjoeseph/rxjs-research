@@ -227,3 +227,27 @@ walk-index : ∀ (S W d k m j J : ℕ) → 2 ≤ S → m ≤ suc (widAt S W j) �
   sIterD S W d k m J ≤ sIterD S W d k (suc (widAt S W j)) J
 walk-index S W d k m j J 2≤S hm =
   sIterD-mono m (suc (widAt S W j)) d d k k 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hm
+
+------------------------------------------------------------------
+-- § 3.  AND THE INDEX DESCENDS ACROSS A CHAIN EDGE.
+--
+-- `op-step` concludes at `suc m`, so an operator clause can only report
+-- if its own index is a SUCCESSOR — which means every clause that
+-- recurses splits its index, and hands the source the predecessor.
+-- `chain-desc` is what the source's hypothesis costs at that handoff.
+--
+-- The clause holds `suc (sizeᵉ TERM) ≤ suc m′` and owes
+-- `suc (sizeᵉ SOURCE) ≤ m′`, and every chain constructor's size is
+-- `suc (head + source)` (Rx.Exp:466-475), so ONE lemma covers the whole
+-- family: `hd := sizeᵗ f` for map and take, `hd := sizeᵗ f + sizeᵗ z`
+-- for scan (`+` associates left, so its head being a sum costs no
+-- rewrite), and `hd := 0` for the headless six (mergeAll, concatAll,
+-- switchAll, exhaustAll, μ, defer), where `0 + src` reduces to `src`
+-- definitionally and the lemma degenerates to `≤-pred`.
+--
+-- The zero case needs nothing at all: `suc x ≤ zero` is uninhabited by
+-- CONSTRUCTOR — neither `z≤n` nor `s≤s` can build it — so the split's
+-- other half is an absurd pattern whatever the stuck head term is, and
+-- costs one line per clause rather than a proof.
+chain-desc : ∀ (hd src m′ : ℕ) → suc (suc (hd + src)) ≤ suc m′ → suc src ≤ m′
+chain-desc hd src m′ (s≤s h) = ≤-trans (s≤s (m≤n+m src hd)) h
