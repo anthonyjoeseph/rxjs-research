@@ -3478,6 +3478,21 @@ frameStep-chain-suc c j k 2≤S h =
              (sucB≤sizeStep (Caps.cSize c) (Caps.cSize (frameStep j c))
                 (≤-trans (s≤s z≤n) 2≤S)))
 
+-- THE SAME HOP AT AN ARBITRARY x, which is what a payload subscribe needs
+-- rather than a chain: its operator index must be the level's size cap
+-- ITSELF and not the cap's successor, so its own `suc (sizeᵉ o) ≤ …`
+-- hypothesis has to be got STRICTLY across one frame.  `frameStep-chain
+-- -suc` above is the instance `x := suc k`; the strictness in both comes
+-- from the same place, that one hop multiplies the cap while the thing
+-- being bounded grows by one
+frameStep-size-strict-suc : ∀ (c : Caps) (j x : ℕ) → 1 ≤ Caps.cSize c →
+  x ≤ Caps.cSize (frameStep j c) →
+  suc x ≤ Caps.cSize (frameStep (suc j) c)
+frameStep-size-strict-suc c j x 1≤S hx =
+  subst (suc x ≤_) (sym (frameStep-size-suc c j))
+    (≤-trans (s≤s hx)
+             (sucB≤sizeStep (Caps.cSize c) (Caps.cSize (frameStep j c)) 1≤S))
+
 -- and `2 ≤ cSize` survives every level, which the degenerate chains
 -- (root, share-sink — both of length zero) need to discharge their own
 -- `1 ≤ cSize`
@@ -3950,6 +3965,40 @@ obsList→mList c j sl cs (o ∷ q) 1≤S hsl h
   ∧-intro (T⇒≡true (nest o sl cs ≤ᵇ frameBud c j)
             (≤⇒≤ᵇ (obsCaps→nest c j sl cs o 1≤S hsl h₁)))
           (obsList→mList c j sl cs q 1≤S hsl h₂)
+
+-- THE STRICT ROW, and it is the whole content of the refresh.  A payload
+-- subscribe IS a nesting level and spends one, so the walk is handed the
+-- PREDECESSOR of the budget it reports at — `frameBud c j` is
+-- `suc (sizeAt (cSize c) (suc j))` by plain definition, so that
+-- predecessor is `sizeAt (cSize c) (suc j)` and the two meet by refl
+-- wherever the walk's conjunct is consumed.  `refresh-supplies-nest
+-- -strict` is what makes the row land there rather than one above
+valCaps→nest-strict : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (o : Val Γ (obs u)) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  valCaps? (frameStep j c) sl (obs u) o ≡ true →
+  nest o sl cs ≤ sizeAt (Caps.cSize c) (suc j)
+valCaps→nest-strict {u = u} c j sl cs o 1≤S hsl hv =
+  refresh-supplies-nest-strict (Caps.cSize c) j o sl cs 1≤S
+    (≤ᵇ⇒≤ (sizeᵉ o) (sizeAt (Caps.cSize c) j)
+          (T-to (valCaps?-size (frameStep j c) sl (obs u) o hv)))
+    hsl
+
+valsCaps→mList-strict : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (vs : List (Val Γ (obs u))) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  all (valCaps? (frameStep j c) sl (obs u)) vs ≡ true →
+  mList? (sizeAt (Caps.cSize c) (suc j)) sl cs vs ≡ true
+valsCaps→mList-strict c j sl cs []       1≤S hsl h = refl
+valsCaps→mList-strict {u = u} c j sl cs (o ∷ vs) 1≤S hsl h
+  with ∧-true (valCaps? (frameStep j c) sl (obs u) o)
+              (all (valCaps? (frameStep j c) sl (obs u)) vs) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl cs ≤ᵇ sizeAt (Caps.cSize c) (suc j))
+            (≤⇒≤ᵇ (valCaps→nest-strict c j sl cs o 1≤S hsl h₁)))
+          (valsCaps→mList-strict c j sl cs vs 1≤S hsl h₂)
 
 -- AND CARRIED, not re-derived: the walk widens its tail's caps receipt,
 -- so re-deriving per payload would hand each one a LARGER budget while
