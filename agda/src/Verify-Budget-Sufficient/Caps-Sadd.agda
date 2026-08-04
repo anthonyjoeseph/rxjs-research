@@ -134,17 +134,16 @@ fIterD-sadd {S} {W} {J} (suc m) d k 2≤S =
 
 
 ------------------------------------------------------------------
--- § 2.  THE WALK STEP THE CONCATENATING CLAUSES NEED.  `walk-step-lift`
--- says a head receipt read at the walk's OWN level j gives the strict
--- form at `suc j` — one application of `sLvlD-sadd` — and
--- `walk-step-suc` is then `walk-step` with the `suc` the per-cons fold
--- charge puts on the reported witness
+-- § 2.  THE WALK STEP THE CONCATENATING CLAUSES NEED: `walk-step` with
+-- the `suc` the per-cons fold charge puts on the reported witness.  Its
+-- head premise is STRICT, and that is not a choice — a payload head
+-- subscribes at `suc j`, so `sLvlD S W d k (suc j)` is the only level it
+-- can report in, and the walk's own witness is one fold beyond what the
+-- head handed back.  (A companion that read the head receipt at the
+-- walk's own level `j` and lifted it here was carried for a while and
+-- deleted: no clause can supply it, since a bound at `j` is the wrong
+-- direction for a subscribe that begins at `suc j`.)
 ------------------------------------------------------------------
-
-walk-step-lift : ∀ (S W d k j j₁ : ℕ) → 2 ≤ S →
-  j + j₁ ≤ sLvlD S W d k j → suc (j + j₁) ≤ sLvlD S W d k (suc j)
-walk-step-lift S W d k j j₁ 2≤S h =
-  ≤-trans (s≤s h) (sLvlD-sadd {S} {W} {j} d k 2≤S)
 
 walk-step-suc : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
   suc (j + j₁) ≤ sLvlD S W d k (suc j) →
