@@ -1291,7 +1291,7 @@ thruConsume-caps c dep bud j g mergeᵒ nid κ id now o sl sched st 2≤S 1≤R 
          (proj₁ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
-     , level-TEMP
+     , proj₂ (proj₂ (proj₂ (proj₂ SI)))
   where
   SI = subscribeInner-caps c dep bud j g mergeᵒ nid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv vC pC lC nst
@@ -1306,22 +1306,22 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
-... | nothing                | _ = 0 , ZI , refl , refl , level-TEMP
+... | nothing                | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (scan-st _)       | _ = 0 , ZI , refl , refl , level-TEMP
+... | just (scan-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (take-st _)       | _ = 0 , ZI , refl , refl , level-TEMP
+... | just (take-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (merge-st _ _)    | _ = 0 , ZI , refl , refl , level-TEMP
+... | just (merge-st _ _)    | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (switch-st _ _)   | _ = 0 , ZI , refl , refl , level-TEMP
+... | just (switch-st _ _)   | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (exhaust-st _ _)  | _ = 0 , ZI , refl , refl , level-TEMP
+... | just (exhaust-st _ _)  | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
 ... | just (concat-st {w} q false od) | (bn , wn) =
@@ -1331,7 +1331,7 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
          refl refl (proj₁ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
-     , level-TEMP
+     , proj₂ (proj₂ (proj₂ (proj₂ SI)))
   where
   SI = subscribeInner-caps c dep bud j g concatᵒ nid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv vC pC lC nst
@@ -1341,7 +1341,7 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
 ... | just (concat-st {w} q true od) | (bn , wn) with w ≟ᵗ u
 ...   | no _ = 0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
                          (sym (+-identityʳ j)) inv
-             , refl , refl , level-TEMP
+             , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
 -- THE ONE WRITE THAT GROWS A CONCAT QUEUE, and therefore the one
 -- clause of the clique that reports a witness for no other reason than
 -- the cardinality conjunct.  `widNode` bounds the queue's LENGTH by the
@@ -1360,7 +1360,9 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
                sched st BN WN
                (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv))
-    , refl , refl , level-TEMP
+    , refl , refl
+    , queue-push (Caps.cSize c) (Caps.cWid c) dep bud j
+        (≤-trans (1≤nest o sl (EvalSt.connectedShares st)) nst)
   where
   lvl : j + 1 ≡ suc j
   lvl = +-comm j 1
@@ -1378,22 +1380,22 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
 -- SWITCH: cut the outgoing inner, subscribe the new one, record it
 thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst
   with lookupNode nid (EvalSt.nodes st)
-... | nothing                = 0 , ZI , refl , refl , level-TEMP
+... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (scan-st _)       = 0 , ZI , refl , refl , level-TEMP
+... | just (scan-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (take-st _)       = 0 , ZI , refl , refl , level-TEMP
+... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (merge-st _ _)    = 0 , ZI , refl , refl , level-TEMP
+... | just (merge-st _ _)    = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (concat-st _ _ _) = 0 , ZI , refl , refl , level-TEMP
+... | just (concat-st _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (exhaust-st _ _)  = 0 , ZI , refl , refl , level-TEMP
+... | just (exhaust-st _ _)  = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
 ... | just (switch-st cur od) =
@@ -1408,7 +1410,7 @@ thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R
          (proj₁ KILL) _
          (switchKill-closes-caps (frameStep (j + j′) c) sl cur sched st)
          (proj₁ (proj₂ (proj₂ (proj₂ SI))))
-     , level-TEMP
+     , proj₂ (proj₂ (proj₂ (proj₂ SI)))
   where
   KILL = switchKill cur sched st
   sched₁ = proj₁ (proj₂ KILL)
@@ -1424,25 +1426,25 @@ thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R
 -- EXHAUST: drop while busy, otherwise subscribe and latch
 thruConsume-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst
   with lookupNode nid (EvalSt.nodes st)
-... | nothing                = 0 , ZI , refl , refl , level-TEMP
+... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (scan-st _)       = 0 , ZI , refl , refl , level-TEMP
+... | just (scan-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (take-st _)       = 0 , ZI , refl , refl , level-TEMP
+... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (merge-st _ _)    = 0 , ZI , refl , refl , level-TEMP
+... | just (merge-st _ _)    = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (concat-st _ _ _) = 0 , ZI , refl , refl , level-TEMP
+... | just (concat-st _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (switch-st _ _)   = 0 , ZI , refl , refl , level-TEMP
+... | just (switch-st _ _)   = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (exhaust-st true od)  = 0 , ZI , refl , refl , level-TEMP
+... | just (exhaust-st true od)  = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
 ... | just (exhaust-st false od) =
@@ -1453,7 +1455,7 @@ thruConsume-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤
          refl refl (proj₁ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
-     , level-TEMP
+     , proj₂ (proj₂ (proj₂ (proj₂ SI)))
   where
   SI = subscribeInner-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st
          2≤S 1≤R slEq slC slSz inv vC pC lC nst

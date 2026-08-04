@@ -335,3 +335,40 @@ burst-index S W d k m j J 2≤S hm =
 -- costs one line per clause rather than a proof.
 chain-desc : ∀ (hd src m′ : ℕ) → suc (suc (hd + src)) ≤ suc m′ → suc src ≤ m′
 chain-desc hd src m′ (s≤s h) = ≤-trans (s≤s (m≤n+m src hd)) h
+
+------------------------------------------------------------------
+-- § 4.  THE STRICT PAYLOAD BOUND, for the one clause that reports a
+-- witness for its CARDINALITY rather than for anything it subscribed.
+--
+-- `thruConsume-caps`'s concat-queue push grows a queue whose LENGTH
+-- `widNode` bounds, so the cons has to be paid for with a level, and its
+-- conjunct lands at `suc (j + 1)` where every other clause of that head
+-- lands at `suc (j + 0)`.  `inner-nil` cannot serve it: the nil lemma
+-- reaches `suc j` exactly, and this needs room STRICTLY above it.
+--
+-- AND THE STATEMENT IS FALSE AT A ZERO BUDGET — `sLvlD S W d 0 J` is `J`
+-- on the nose, so the goal would ask `suc (suc j) ≤ suc j`
+-- (machine-refuted, agda/probe/Queue-Push-Probe.agda § 1).  So the level
+-- is bought with the budget's POSITIVITY, which every clique head
+-- already carries: its `nest … ≤ bud` hypothesis composed with
+-- `1≤nest` (.Caps-Nest) is `1 ≤ bud`, and the clause never looks at what
+-- the budget is beyond that.
+opIterD-strict : ∀ (S W d k m J : ℕ) → suc J ≤ opIterD S W d k (suc m) J
+opIterD-strict S W d k m J =
+  let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
+      J₂ = opIterD S W d k m (sLvlD S W d k J₀)
+  in ≤-trans (≤-trans (≤-trans (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J))))
+                               (≤-trans (sLvlD-infl S W d k J₀)
+                                        (opIterD-infl S W d k m (sLvlD S W d k J₀))))
+                      (fIterD-infl S W d k (suc (widAt S W J₂)) J₂))
+             (≤-reflexive (sym (opIterD-suc S W d k m J)))
+
+-- and the clause's goal, assembled: the positive-budget equation opens
+-- into an `opIterD` whose index is `suc (sizeAt S (suc j))`, already a
+-- successor, so the strict step applies with no side condition
+queue-push : ∀ (S W d bud j : ℕ) → 1 ≤ bud →
+  suc (j + 1) ≤ sLvlD S W d bud (suc j)
+queue-push S W d (suc b) j _ =
+  subst (λ y → suc y ≤ sLvlD S W d (suc b) (suc j)) (sym (+-comm j 1))
+        (≤-trans (opIterD-strict S W d b (sizeAt S (suc j)) (suc j))
+                 (≤-reflexive (sym (sLvlD-suc S W d b (suc j)))))
