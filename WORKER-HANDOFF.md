@@ -27,6 +27,12 @@ Then `grep -E "MAKE_AGDA_EXIT|BUG_CACHE_EXIT" /tmp/v.log`. If both are 0, merge 
 the likely culprit is the `walk-step-lift` deletion (it was believed to have no users — verify
 with grep before re-deleting) or a signature the new lemmas changed.
 
+**Do NOT chase an OOM here.** The last build on that branch died with `Killed: 9` and the worker
+recorded it as an OOM in the Subscribe-Face leg. It was not: the design session `kill -9`'d it
+while shutting the session down. There is no evidence of a memory problem on this branch —
+Subscribe-Face's observed peak was ~3.2 GB, far from the 13 GB single-check peaks that have
+actually OOM'd. Re-run the build and read its real `MAKE_AGDA_EXIT` before diagnosing anything.
+
 **Then continue Deliverable 2**, steps 2-5 of the directive recorded in "What remains" below:
 the three structurally-wrong call sites first (`innerFinish-caps`'s concat clause needs `dep′` +
 `frameBud c j`; `subscribeInner-caps` needs the `suc bud′` split, now supplied by
