@@ -61,9 +61,13 @@ open import Rx.Evaluator
          fLvlD-suc; sIterD-suc; sLvlD-suc; opIterD-suc;
          fIterD-suc; fIterD-0; sIterD-0)
 open import Verify-Budget-Sufficient.Caps
-  using (widAt-mono;
+  using (widAt-mono; iterSize-infl;
          sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl;
          sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
+-- the payload edge's three rungs are lifted with +1-superadditivity, the
+-- only place outside `walk-step-suc` that needs to move a report to a
+-- HIGHER entry level rather than to a wider transformer
+open import Verify-Budget-Sufficient.Caps-Sadd using (opIterD-sadd)
 
 ------------------------------------------------------------------
 -- § 1.  THE FIVE CLAUSE SHAPES.
@@ -372,3 +376,81 @@ queue-push S W d (suc b) j _ =
   subst (λ y → suc y ≤ sLvlD S W d (suc b) (suc j)) (sym (+-comm j 1))
         (≤-trans (opIterD-strict S W d b (sizeAt S (suc j)) (suc j))
                  (≤-reflexive (sym (sLvlD-suc S W d b (suc j)))))
+
+------------------------------------------------------------------
+-- § 5.  THE PAYLOAD EDGE, and the three rungs it has to clear.
+--
+-- `subscribeInner-caps`'s conjunct is the one every clause of
+-- `thruConsume-caps` projects, so it stands under that whole head.  Its
+-- shape is forced from both sides: its CONSUMER is `walk-step-suc`,
+-- whose first premise is `suc (j + j₁) ≤ sLvlD S W d k (suc j)`, and its
+-- own witness is `suc (suc (suc j₂))` because the clause's caps live at
+-- `frameStep (j + suc (suc (suc j₂)))` — the `splitBurst` square costs
+-- TWO levels on top of the inner subscribe's own `suc j + j₂`.
+--
+-- So the conjunct's left side sits FOUR above `j + j₂` while the IH
+-- delivers ONE, and the IH's bound is tight where it lands.  The slack
+-- is not in the IH but in `opIterD`'s interior, and `-sadd` is what
+-- reaches it: three steps of `suc (F J) ≤ F (suc J)` turn the IH's
+-- report into one three levels higher, and `opIterD`'s own `J₀`
+-- excursion clears `suc j` by three for free.
+--
+-- THE INDEX MATTERS.  The IH must be called at `sizeAt S (suc j)`, NOT
+-- at its successor: `sLvlD S W d (suc k) (suc j)` opens into `opIterD …
+-- (suc (sizeAt S (suc j))) (suc j)`, and it is the step from that index
+-- down to its predecessor that exposes the excursion.  Called at the
+-- successor the IH lands flush against the target with nothing over,
+-- which is exactly why this site resisted closing.
+------------------------------------------------------------------
+
+-- the size cap is at least 2 at every level, which the three-rung
+-- version needs and the two-rung version would not have: at `B = 0` the
+-- square below is 1 and the room is short by one
+2≤sizeAt : ∀ (S J : ℕ) → 2 ≤ S → 2 ≤ sizeAt S J
+2≤sizeAt S J 2≤S = ≤-trans 2≤S (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S) J S)
+
+-- `J₀ = suc (suc j + suc B * suc B)` clears `suc j` by three.  Stated
+-- with the successors on the OUTSIDE because `_+_` recurses on its first
+-- argument, which leaves a literal `j + 3` stuck on a variable
+J₀-room : ∀ (S j : ℕ) → 2 ≤ S →
+  suc (suc (suc (suc j)))
+    ≤ suc (suc j + suc (sizeAt S (suc j)) * suc (sizeAt S (suc j)))
+J₀-room S j 2≤S =
+  s≤s (s≤s (≤-trans (≤-reflexive (sym (+-comm j 2))) (+-monoʳ-≤ j sq)))
+  where
+  sq : 2 ≤ suc (sizeAt S (suc j)) * suc (sizeAt S (suc j))
+  sq = ≤-trans (≤-trans (2≤sizeAt S (suc j) 2≤S) (n≤1+n (sizeAt S (suc j))))
+               (m≤m+n (suc (sizeAt S (suc j)))
+                      (sizeAt S (suc j) * suc (sizeAt S (suc j))))
+
+inner-step : ∀ (S W d k j j₂ : ℕ) → 2 ≤ S →
+  suc j + j₂ ≤ opIterD S W d k (sizeAt S (suc j)) (suc j) →
+  suc (j + suc (suc (suc j₂))) ≤ sLvlD S W d (suc k) (suc j)
+inner-step S W d k j j₂ 2≤S ih =
+  ≤-trans (≤-trans (≤-reflexive shape) climb)
+          (≤-reflexive (sym (trans (sLvlD-suc S W d k (suc j))
+                                   (opIterD-suc S W d k B (suc j)))))
+  where
+  B  = sizeAt S (suc j)
+  J₀ = suc (suc j + suc B * suc B)
+  L  = sLvlD S W d k J₀
+  J₂ = opIterD S W d k B L
+
+  shape : suc (j + suc (suc (suc j₂))) ≡ suc (suc (suc (suc (j + j₂))))
+  shape = cong suc (trans (+-suc j (suc (suc j₂)))
+                          (cong suc (trans (+-suc j (suc j₂))
+                                           (cong suc (+-suc j j₂)))))
+
+  lift3 : suc (suc (suc (opIterD S W d k B (suc j))))
+            ≤ opIterD S W d k B (suc (suc (suc (suc j))))
+  lift3 = ≤-trans (s≤s (≤-trans (s≤s (opIterD-sadd {S} {W} {suc j} B d k 2≤S))
+                                (opIterD-sadd {S} {W} {suc (suc j)} B d k 2≤S)))
+                  (opIterD-sadd {S} {W} {suc (suc (suc j))} B d k 2≤S)
+
+  climb : suc (suc (suc (suc (j + j₂)))) ≤ fIterD S W d k (suc (widAt S W J₂)) J₂
+  climb =
+    ≤-trans (≤-trans (≤-trans (s≤s (s≤s (s≤s ih))) lift3)
+                     (opIterD-mono B B d d k k 2≤S ≤-refl ≤-refl
+                        (≤-trans (J₀-room S j 2≤S) (sLvlD-infl S W d k J₀))
+                        ≤-refl ≤-refl ≤-refl))
+            (fIterD-infl S W d k (suc (widAt S W J₂)) J₂)
