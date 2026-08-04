@@ -82,9 +82,11 @@ authority, because each can change a signature the other buckets rest on.**
   with nothing over, which is why this site resisted), and it needs `bud ≡ suc bud′` (a
   payload subscribe is a nesting level and spends one, as the μ edge does). Gap is THREE
   rungs, not two, and needs `2 ≤ S` via `2≤sizeAt`.
-- **1778 `innerFinish-caps` concat — a wrong call-site argument.** It hands `concatDrain-caps`
-  its own `dep` and `bud`. A drain is a WALK: the depth must descend as it does in
-  `stepFrame-caps`'s thru-outer clause, and the budget must be the REFRESHED `frameBud c j`.
+- **1778 `innerFinish-caps` concat — a wrong call-site argument, and it is COUPLED TO UNIT 3.**
+  It hands `concatDrain-caps` its own `dep` and `bud`. A drain is a WALK: the depth must descend
+  as it does in `stepFrame-caps`'s thru-outer clause, and the budget must be the REFRESHED
+  `frameBud c j`. Descending needs a positive `dep`, which is exactly what Unit 3 supplies — so
+  this site and 2203 wait on the same ruling and should be closed in one pass.
 - **2203 `stepFrame-caps` thru-outer at `dep = zero` — MACHINE-REFUTED. Do not grind it.**
   `agda/probe/Dep0-Walk-Probe.agda` proves
   `suc (fLvlD S W 0 j) ≤ sIterD S W 0 (suc k) (suc m) j` for every cap with `2 ≤ S` — the walk
@@ -105,31 +107,51 @@ authority, because each can change a signature the other buckets rest on.**
 **Order:** E (get the signatures right) → A (six sites, one line) → B → C → D. Green
 `make agda && make bug-cache` per batch, push per batch, then delete `level-TEMP`.
 
-### UNIT 3 — DEPTH SUFFICIENCY (discovered 2026-08-04; ASK BEFORE GRINDING)
+### UNIT 3 — DEPTH SUFFICIENCY. The currency is ALREADY CHOSEN; thread it.
 
 Step C was scoped as two units. The refutation at site 2203 says there is a third, and it is
 the mirror of Unit 1: the clique carries a sufficiency hypothesis for the budget
 (`nest o sl cs ≤ bud`) and for the operator count (`suc (sizeᵉ b) ≤ ops`), but **nothing bounds
 `dep` from below**, and one arc of the cycle spends it.
 
-What the tree says, verified:
-- `stepFrame-caps`'s own conjunct comment already names the intent — a frame "is the ONE arc
-  that spends a unit of depth fuel — its payload walk runs at `dep` minus one, on the REFRESHED
-  budget". The `suc dep′` clause does exactly that (`thruWalk-caps c dep′ (frameBud c j) …`).
-  The `zero` clause has nothing to descend into.
-- Both callers (`Subscribe-Face:2351`, `:3150`) pass `dep` straight through unchanged, so `dep`
-  is inherited from the top and never re-established anywhere in the clique.
-- **No depth measure exists yet** — `grep depthᵉ/allDepth/nestDepth` in `Rx/` is empty. So Unit 3
-  needs a currency invented, not just threaded.
+**DO NOT invent a currency. The repo already recorded this exact debt.**
+`agda/src/Rx/Evaluator.agda:711-718`, verbatim: *"WHAT IS STILL OWED, AND IT IS OWED BY THE
+SIGNATURE PASS RATHER THAN BY THIS DEFINITION: that the story index dominates the depth the
+instant actually reaches. … the inequality it needs (nesting depth ≤ m, rather than ≤ the gas
+height) is a smaller claim than the gas bound supplies. Reported, not assumed."* So `dep` is
+meant to be read as the story index — `capsAt` takes `d := capsH e sl id`
+(`Verify-Budget-Sufficient/Caps.agda:444-458`) — and Unit 3 is that owed inequality surfacing at
+the first site that needs it. "Owed by the signature pass" IS Step C.
 
-Why this needs a ruling rather than a grind: the natural currency is not syntactic. `sizeᵉ`
-would descend at the thru-outer edge (the inner is a strict subterm), but `stepFrame-caps` does
-not hold the inner expression — a `thru-outer` frame carries a `NodeId`, and the inner lives in
-the state/registry. So the bound has to come from a **state**-level invariant, which is the same
-shape of object as the **registry-cardinality invariant that Tier 1 item 1 (Wet) is already
-gated on**. These may be one design problem serving two items, and choosing the currency once
-for both is worth more than closing 2203 quickly. CLAUDE.md's rule for the Wet invariant applies
-here verbatim: consult before grinding.
+What the tree says, verified:
+- `stepFrame-caps`'s conjunct comment names the intent — a frame "is the ONE arc that spends a
+  unit of depth fuel — its payload walk runs at `dep` minus one, on the REFRESHED budget". The
+  `suc dep′` clause does exactly that (`thruWalk-caps c dep′ (frameBud c j) …`); the `zero`
+  clause has nothing to descend into.
+- Both callers (`Subscribe-Face:2351`, `:3150`) pass `dep` straight through unchanged.
+- **`dep` is instantiated NOWHERE.** It is universally quantified through the whole clique;
+  `capsH`/`capsAt` are never called from `Subscribe-Face`. There is no top-level consumer to
+  satisfy yet.
+
+**Therefore the work is: add depth sufficiency as a HYPOTHESIS on the clique, exactly as
+`nest … ≤ bud` and `suc (sizeᵉ b) ≤ ops` already sit there, thread it, and close 2203 and 1778.**
+Discharge lands later at the top-level instantiation, beside the `capsH` reading already
+designed. Stating an obligation and discharging it at the top is this repo's outside-in rule,
+and it is non-spec, so it needs no ruling.
+
+**THE RISK IS ON THE DISCHARGE, NOT THE THREADING — record it, do not forget it.** Nesting depth
+is dominated by registration count only if every path to a deeper `thru-outer` registers before
+recursing. Two reasons to doubt it: `concat-st` queues inner expressions that are *not yet
+subscribed*, and `Nest-Budget-Probe.agda` § 3 (the refuted budget-inheritance scheme, cited at
+`Evaluator.agda:648-654`) mints a `scanᵉ` value nesting `k` deep that is subscribed only later.
+If latent depth can sit in unregistered value structure, registration count does not dominate it.
+Nothing in the tree connects value-nesting depth to registration count. The registry-cardinality
+machinery that would be involved is `INV?`'s length conjunct
+(`Verify-Budget-Sufficient/Measures.agda:5324-5332`), maintained by the PROVEN `register-INV`
+(`Wet.agda:317-334`) — but in the WET family's doubling currency, not the CAPS family's, and the
+two are not wired together. **This is the same object Tier 1 item 1 is gated on**; settle it once.
+Suggested first probe: attempt `thru-outer` depth ≤ `length (EvalSt.registry st)` against the
+`Nest-Budget-Probe` § 3 witness.
 
 ---
 

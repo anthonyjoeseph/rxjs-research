@@ -56,13 +56,13 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Evaluator
-  using (sizeAt; widAt; fCharge;
+  using (sizeAt; widAt; fCharge; fLvl;
          fLvlD; sIterD; sLvlD; opIterD; fIterD;
-         fLvlD-suc; sIterD-suc; sLvlD-suc; opIterD-suc;
+         fLvlD-0; fLvlD-suc; sIterD-suc; sLvlD-suc; opIterD-suc;
          fIterD-suc; fIterD-0; sIterD-0)
 open import Verify-Budget-Sufficient.Caps
   using (widAt-mono; iterSize-infl;
-         sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl;
+         fLvlD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl;
          sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
 -- the payload edge's three rungs are lifted with +1-superadditivity, the
 -- only place outside `walk-step-suc` that needs to move a report to a
@@ -454,3 +454,53 @@ inner-step S W d k j j₂ 2≤S ih =
                         (≤-trans (J₀-room S j 2≤S) (sLvlD-infl S W d k J₀))
                         ≤-refl ≤-refl ≤-refl))
             (fIterD-infl S W d k (suc (widAt S W J₂)) J₂)
+
+------------------------------------------------------------------
+-- § 6.  THE FRAME HEADS' OWN SUPPLIES, which are DEPTH-GENERIC.
+--
+-- `innerFinish` / `innerReact` / `stepFrame` all report in `fLvlD S W dep
+-- j` at an ABSTRACT `dep`, so neither of `fLvlD`'s clauses may be assumed
+-- — and `frame-step` above concludes only at `suc d`.  What makes a
+-- generic supply possible anyway is that `fLvlD` at zero is NOT the
+-- identity the other transformers degenerate to: it is `fLvl S W J + suc
+-- (widAt S W J)`, and `fLvl S W J` is `J + fCharge S W J`.  So one
+-- frame's own receipt fits under BOTH clauses by inflation alone, with no
+-- depth hypothesis anywhere.
+--
+-- This is the whole reason buckets A and D of the site census do not wait
+-- on the depth ruling that site 2203 forced (`Dep0-Walk-Probe`): a
+-- RECEIPT fits at depth zero, and only a WALK does not.
+------------------------------------------------------------------
+
+-- a frame that moves nothing: every clause whose witness is 0
+frame-nil : ∀ (S W d j : ℕ) → j + 0 ≤ fLvlD S W d j
+frame-nil S W d j = ≤-trans (≤-reflexive (+-identityʳ j)) (fLvlD-infl S W d j)
+
+-- and a frame that pays only its own receipt.  At zero the receipt sits
+-- in `fLvl`'s summand with the width still to spare; at `suc d` it sits
+-- in the `fLvl` the walk STARTS from, so `sIterD-infl` finishes.  Both
+-- branches are inflation — the receipt never needs the walk
+frame-recv : ∀ (S W d j j₀ : ℕ) → j₀ ≤ fCharge S W j →
+  j + j₀ ≤ fLvlD S W d j
+frame-recv S W zero j j₀ h =
+  ≤-trans (≤-trans (+-monoʳ-≤ j h)
+                   (m≤m+n (j + fCharge S W j) (suc (widAt S W j))))
+          (≤-reflexive (sym (fLvlD-0 S W j)))
+frame-recv S W (suc d) j j₀ h =
+  ≤-trans (≤-trans (+-monoʳ-≤ j h)
+                   (sIterD-infl S W d (suc (sizeAt S (suc j)))
+                                (suc (widAt S W j)) (fLvl S W j)))
+          (≤-reflexive (sym (fLvlD-suc S W d j)))
+
+-- THE LAST PAYLOAD of a walk, where the queue behind it is bounded by
+-- inflation rather than by a recursive report.  `walk-step` at `j₂ := 0`,
+-- with the `j₁ + 0` its conclusion carries absorbed here once instead of
+-- at the clause
+walk-last : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S →
+  j + j₁ ≤ sLvlD S W d k (suc j) →
+  j + j₁ ≤ sIterD S W d k (suc m) j
+walk-last S W d k m j j₁ 2≤S hd =
+  ≤-trans (≤-reflexive (cong (j +_) (sym (+-identityʳ j₁))))
+          (walk-step S W d k m j j₁ 0 2≤S hd
+            (≤-trans (≤-reflexive (+-identityʳ (j + j₁)))
+                     (sIterD-infl S W d k m (j + j₁))))

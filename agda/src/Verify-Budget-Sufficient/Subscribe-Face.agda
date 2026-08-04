@@ -1671,7 +1671,7 @@ innerFinish-zero′ {t = t} c dep j sl vals sched st 2≤S inv vC =
     , face-vals c j (proj₁ Z) sl vals 2≤S (proj₁ (proj₂ (proj₂ Z)))
         (valsLen (frameStep j c) sl vals vC)
     , proj₂ (proj₂ (proj₂ Z))
-    , level-TEMP
+    , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
   where
   Z = innerFinish-zero {t = t} c j sl vals sched st inv
         (valsOf (frameStep j c) sl vals vC)
@@ -1715,7 +1715,7 @@ innerFinish-caps c dep bud j g mergeᵒ allNid inst κ id now vals sl sched st
                sched st refl refl inv)
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , level-TEMP
+    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
 ... | nothing                = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (scan-st _)       = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (take-st _)       = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
@@ -1838,7 +1838,7 @@ innerFinish-caps c dep bud j g switchᵒ allNid inst κ id now vals sl sched st
                sched st refl refl inv)
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , level-TEMP
+    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
 
 -- EXHAUST: clear the busy flag
 innerFinish-caps c dep bud j g exhaustᵒ allNid inst κ id now vals sl sched st
@@ -1859,7 +1859,7 @@ innerFinish-caps c dep bud j g exhaustᵒ allNid inst κ id now vals sl sched st
                sched st refl refl inv)
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , level-TEMP
+    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
 
 subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (dep bud j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
@@ -2084,7 +2084,7 @@ innerReact-caps c dep bud j g op allNid inst κ id now vals false sl sched st
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , level-TEMP
+    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
 innerReact-caps c dep bud j g op allNid inst κ id now vals true sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC fb
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
@@ -2092,7 +2092,7 @@ innerReact-caps c dep bud j g op allNid inst κ id now vals true sl sched st
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , level-TEMP
+    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
 ... | false = innerFinish-caps c dep bud j g op allNid inst κ id now vals sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC fb
 
@@ -2168,7 +2168,7 @@ stepFrame-caps c dep bud j g id now (take-f nid) κ vals fin sl sched st 2≤S 1
                            (lookupNode nid (EvalSt.nodes st)))
                         (valsLen (frameStep j c) sl vals vC)))
     , subst (λ x → all (eventCaps? (frameStep x c) sl) (proj₁ (proj₂ TD)) ≡ true)
-            (sym (+-identityʳ j)) (proj₂ (proj₂ TDc)) , level-TEMP
+            (sym (+-identityʳ j)) (proj₂ (proj₂ TDc)) , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
   where
   TD  = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   TDc = takeDispatch-caps (frameStep j c) nid vals fin sl sched st

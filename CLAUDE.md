@@ -118,7 +118,9 @@ report review. Standing protocol, per Anthony:
 
 ## Running long Agda builds
 
-`make agda` takes ~35-40 minutes (Subscribe-Face ~7 min, Caps-Face ~80 s, Wet ~14-18 min);
+`make agda` takes ~35-40 minutes (Caps-Face ~80 s, Wet ~14-18 min, and **Subscribe-Face ~44 min
+peaking ~6.9 GB when dirty** — measured 2026-08-04; the older "~7 min" figure in memos predates
+the clique's growth and will mislead your planning, so budget the real number);
 the Bash tool's ceiling is 600s per foreground call. Detach long builds (`nohup setsid bash
 -c '… ; echo EXIT=$? >> log' &`) and poll the log for its EXIT= line with short foreground
 calls. Since 2026-08-03 the session runs on a persistent machine, so detached builds advance
