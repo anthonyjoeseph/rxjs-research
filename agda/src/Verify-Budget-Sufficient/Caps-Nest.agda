@@ -204,15 +204,22 @@ share-step-resid sl cs i k eqi fresh h =
 
 ------------------------------------------------------------------
 -- § 4.  THE REMAINING EDGES.  `subscribeE` walks an operator chain and
--- re-enters itself at a μ; the μ edge is the ONE that spends a unit of
--- k, and every chain edge descends to a strict subterm at the SAME k.
--- Together with § 2's share step and § 3's frame row, that is every way
--- the clique reaches a deeper subscribe, so the hypothesis is
--- maintainable at every call site.
+-- re-enters itself at a μ; every chain edge descends to a strict subterm
+-- at the SAME k, and the μ edge SPENDS a unit of it.  Together with § 2's
+-- share step and § 3's frame row, that is every way the clique reaches a
+-- deeper subscribe, so the hypothesis is maintainable at every call site.
 --
--- (`1 ≤ k` on its own is NOT maintainable — k descends only here, so a
--- bare side condition has nothing to hand the μ call.  Mu-Nest-Probe
--- refutes it.  This is why the hypothesis is a measure and not a bound.)
+-- THE μ EDGE IS NOT THE ONLY SPENDER, which is what this block used to
+-- claim.  It is the only one among the edges enumerated HERE — a walk
+-- reaches a payload through a FRAME, and the frame refreshes, so the
+-- payload edge spends a unit of the REFRESHED budget instead.  § 3's
+-- strict row is what pays for it: `frameBud c j` is
+-- `suc (sizeAt S (suc j))` by construction, and the payload's nest is
+-- bounded by its predecessor.
+--
+-- (`1 ≤ k` on its own is NOT maintainable — nothing hands a bare side
+-- condition to the μ call.  Mu-Nest-Probe refutes it.  This is why the
+-- hypothesis is a measure and not a bound.)
 ------------------------------------------------------------------
 
 mu-step : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
@@ -340,11 +347,23 @@ core S x 1≤S =
   step = trans (cong (_+ S * (2 * x)) (sym (*-identityʳ S)))
                (sym (*-distribˡ-+ S 1 (2 * x)))
 
+-- THE CHAIN REACHES THE PREDECESSOR ON THE NOSE, and that is the whole
+-- content of the payload edge's budget split: `core` lands exactly on
+-- `sizeAt S (suc j)`, and only the weak row below gives the last step
+-- away.  The refreshed budget a frame reads is `suc (sizeAt S (suc j))` —
+-- a SUCCESSOR by construction — so the payload it hands a subscribe is
+-- bounded by that budget's PREDECESSOR, and the subscribe can spend the
+-- unit a fresh entry costs
+one-level-supply-strict : ∀ (S j x y : ℕ) →
+  1 ≤ S → x ≤ sizeAt S j → y ≤ S → x + y ≤ sizeAt S (suc j)
+one-level-supply-strict S j x y 1≤S hx hy =
+  ≤-trans (≤-trans (+-mono-≤ hx hy) (core S (sizeAt S j) 1≤S))
+          (≤-reflexive (sym (sizeAt-suc S j)))
+
 one-level-supply : ∀ (S j x y : ℕ) →
   1 ≤ S → x ≤ sizeAt S j → y ≤ S → x + y ≤ suc (sizeAt S (suc j))
 one-level-supply S j x y 1≤S hx hy =
-  ≤-trans (≤-trans (+-mono-≤ hx hy) (core S (sizeAt S j) 1≤S))
-          (≤-trans (≤-reflexive (sym (sizeAt-suc S j))) (n≤1+n (sizeAt S (suc j))))
+  ≤-trans (one-level-supply-strict S j x y 1≤S hx hy) (n≤1+n (sizeAt S (suc j)))
 
 -- the row in the shape the frame clause states it
 refresh-supplies-nest : ∀ {n} {Γ : Ctx n} (S j : ℕ) {Δᵍ Δ Θ t}
@@ -353,6 +372,17 @@ refresh-supplies-nest : ∀ {n} {Γ : Ctx n} (S j : ℕ) {Δᵍ Δ Θ t}
   nest o sl cs ≤ suc (sizeAt S (suc j))
 refresh-supplies-nest S j o sl cs 1≤S hsz hsl =
   one-level-supply S j (syncSizeᵉ o) (resid sl cs) 1≤S
+    (≤-trans (syncSize≤sizeᵉ o) hsz)
+    (≤-trans (resid≤slots sl cs) hsl)
+
+-- and the strict row in the same shape: what a payload's subscribe is
+-- handed once the frame's refresh has paid for the nesting level
+refresh-supplies-nest-strict : ∀ {n} {Γ : Ctx n} (S j : ℕ) {Δᵍ Δ Θ t}
+  (o : Exp Γ Δᵍ Δ Θ t) (sl : Slots Γ) (cs : List Source) →
+  1 ≤ S → sizeᵉ o ≤ sizeAt S j → slotsSize sl ≤ S →
+  nest o sl cs ≤ sizeAt S (suc j)
+refresh-supplies-nest-strict S j o sl cs 1≤S hsz hsl =
+  one-level-supply-strict S j (syncSizeᵉ o) (resid sl cs) 1≤S
     (≤-trans (syncSize≤sizeᵉ o) hsz)
     (≤-trans (resid≤slots sl cs) hsl)
 

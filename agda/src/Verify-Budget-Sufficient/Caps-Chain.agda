@@ -49,11 +49,11 @@ module Verify-Budget-Sufficient.Caps-Chain where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ;
+  using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc; +-identityʳ; +-comm;
          +-mono-≤; +-monoʳ-≤; *-mono-≤; *-suc; n≤1+n;
          m≤m+n; m≤n+m; m≤m*n)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Evaluator
   using (sizeAt; widAt; fCharge;
@@ -198,18 +198,22 @@ quad-arith B =
           (≤-trans (s≤s (+-monoʳ-≤ B (m≤n+m (B * B) B)))
                    (≤-reflexive (sym (cong (λ x → suc (B + x)) (*-suc B B)))))
 
--- THE μ OPERATOR: the unfolding receipt `m₀ + suc (m₀ * m₀)`, and then a
--- FRESH subscribe on a LARGER term — which is why it is charged as one
--- NESTING level rather than as a continuation of the same chain, and
--- why the budget k has to count μ-nesting as well as *All-nesting
-op-step-mu : ∀ (S W d k m j m₀ j₁ : ℕ) → 2 ≤ S →
-  m₀ ≤ sizeAt S j →
-  (j + (m₀ + suc (m₀ * m₀))) + j₁ ≤ sLvlD S W d k (j + (m₀ + suc (m₀ * m₀))) →
-  j + ((m₀ + suc (m₀ * m₀)) + j₁) ≤ opIterD S W d k (suc m) j
-op-step-mu S W d k m j m₀ j₁ 2≤S hm₀ sub =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j (m₀ + suc (m₀ * m₀)) j₁)))
-                            sub)
-                   (≤-trans (sLvlD-mono d d k k 2≤S ≤-refl ≤-refl quad ≤-refl ≤-refl)
+-- ANY EDGE THAT ENTERS A FRESH SUBSCRIBE, with its receipt abstracted.
+-- This is the shape the μ step was first written in, and it is not about
+-- μ: the proof spends the premise, then `sLvlD-mono` under a bound
+-- showing the receipt FITS the room `opIterD … (suc m) j` opens, then two
+-- `-infl` steps, then the clause equation.  Only that bound mentions the
+-- edge at all, so it becomes a hypothesis and the μ unfolding, the share
+-- connect and any other fresh entry are instances rather than copies.
+-- The room is QUADRATIC in the level's size cap, which is why any receipt
+-- a clause can actually pay fits inside it
+op-step-entry : ∀ (S W d k m j r j₁ : ℕ) → 2 ≤ S →
+  j + r ≤ suc (j + suc (sizeAt S j) * suc (sizeAt S j)) →
+  (j + r) + j₁ ≤ sLvlD S W d k (j + r) →
+  j + (r + j₁) ≤ opIterD S W d k (suc m) j
+op-step-entry S W d k m j r j₁ 2≤S fits sub =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j r j₁))) sub)
+                   (≤-trans (sLvlD-mono d d k k 2≤S ≤-refl ≤-refl fits ≤-refl ≤-refl)
                             (≤-trans (opIterD-infl S W d k m (sLvlD S W d k J₀))
                                      (fIterD-infl S W d k (suc (widAt S W X)) X))))
           (≤-reflexive (sym (opIterD-suc S W d k m j)))
@@ -217,10 +221,43 @@ op-step-mu S W d k m j m₀ j₁ 2≤S hm₀ sub =
   B  = sizeAt S j
   J₀ = suc (j + suc B * suc B)
   X  = opIterD S W d k m (sLvlD S W d k J₀)
-  quad : j + (m₀ + suc (m₀ * m₀)) ≤ J₀
+
+-- THE μ OPERATOR: the unfolding receipt `m₀ + suc (m₀ * m₀)`, and then a
+-- FRESH subscribe on a LARGER term — which is why it is charged as one
+-- NESTING level rather than as a continuation of the same chain, and
+-- why the budget k has to count μ-nesting as well as *All-nesting.  Its
+-- whole content is now the `fits` argument: the quadratic receipt inside
+-- the quadratic room
+op-step-mu : ∀ (S W d k m j m₀ j₁ : ℕ) → 2 ≤ S →
+  m₀ ≤ sizeAt S j →
+  (j + (m₀ + suc (m₀ * m₀))) + j₁ ≤ sLvlD S W d k (j + (m₀ + suc (m₀ * m₀))) →
+  j + ((m₀ + suc (m₀ * m₀)) + j₁) ≤ opIterD S W d k (suc m) j
+op-step-mu S W d k m j m₀ j₁ 2≤S hm₀ =
+  op-step-entry S W d k m j (m₀ + suc (m₀ * m₀)) j₁ 2≤S quad
+  where
+  B  = sizeAt S j
+  quad : j + (m₀ + suc (m₀ * m₀)) ≤ suc (j + suc B * suc B)
   quad = ≤-trans (+-monoʳ-≤ j (≤-trans (+-mono-≤ hm₀ (s≤s (*-mono-≤ hm₀ hm₀)))
                                        (quad-arith B)))
                  (n≤1+n (j + suc B * suc B))
+
+-- THE SHARE CONNECT: the receipt is 1, the registration for the joining
+-- subscriber, and its `fits` is free — one registration sits inside the
+-- quadratic room at every cap.  Stated at `suc j` rather than at `j + 1`
+-- because that is the shape a clause presents, and `_+_` recursing on its
+-- FIRST argument leaves `j + 1` stuck: the conversion belongs here once
+-- rather than at every call site
+share-fits : ∀ (S j : ℕ) → j + 1 ≤ suc (j + suc (sizeAt S j) * suc (sizeAt S j))
+share-fits S j =
+  ≤-trans (≤-reflexive (+-comm j 1))
+          (s≤s (m≤m+n j (suc (sizeAt S j) * suc (sizeAt S j))))
+
+op-step-share : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S →
+  suc j + j₁ ≤ sLvlD S W d k (suc j) →
+  j + suc j₁ ≤ opIterD S W d k (suc m) j
+op-step-share S W d k m j j₁ 2≤S sub =
+  op-step-entry S W d k m j 1 j₁ 2≤S (share-fits S j)
+    (subst (λ x → x + j₁ ≤ sLvlD S W d k x) (sym (+-comm j 1)) sub)
 
 ------------------------------------------------------------------
 -- § 2.  THE INDEX, and the two directions it travels.

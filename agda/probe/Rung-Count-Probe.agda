@@ -63,9 +63,11 @@
 --   exactly (`sIterD-k0`).  What buys it is +1-SUPERADDITIVITY of the
 --   whole family, `suc (f J) ≤ f (suc J)`, which is .Caps-Sadd:
 --   `walk-step-suc` there is the concat-clause form of `walk-step`, and
---   `walk-step-lift` says the head premise may be stated at `j` or at
---   `suc j` interchangeably.  What stays HERE is the refutation that
---   makes them necessary.
+--   its head premise is STRICT.  That is forced, not chosen — a payload
+--   head subscribes at `suc j`, so it can only report in
+--   `sLvlD S W d k (suc j)`, and the walk's witness is one fold beyond
+--   what the head handed back.  What stays HERE is the refutation that
+--   makes the superadditivity necessary.
 --
 -- § 4  subscribeInner's THREE RUNGS are not a separate problem.  The
 --   clause reports `suc (suc (suc j₂))` and `walk-step`'s head premise
@@ -219,11 +221,10 @@ weak-walk-step-absurd H = bad (H 2 0 0 0 0 0 1 0 (s≤s (s≤s z≤n)) p₁ p₂
 
 ------------------------------------------------------------------
 -- SO THE CONCAT CLAUSE'S STEP IS `walk-step` WITH A STRICT HEAD PREMISE,
--- and `walk-step-lift` says the strict form is what a head receipt read
--- at the walk's OWN level j gives — one application of `sLvlD-sadd`
+-- which is also the only form a payload head can supply
 ------------------------------------------------------------------
 
--- `walk-step-lift` and `walk-step-suc` are in .Caps-Sadd § 2.
+-- `walk-step-suc` is in .Caps-Sadd § 2.
 
 ------------------------------------------------------------------
 -- § 4.  subscribeInner's THREE RUNGS, and the SQUARE.  The witness the
