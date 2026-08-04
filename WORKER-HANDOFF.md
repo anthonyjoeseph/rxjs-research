@@ -6,7 +6,57 @@
 are landed on ten heads with twelve clauses proven, and the rest of its clauses are the current
 work. Postulate ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2).
 
-## ⚠ RESUME HERE — the conjunct SHAPES are landed; 20 clause sites remain
+## ⚠ RESUME HERE (session paused 2026-08-04, mid-check)
+
+**`origin/main` is GREEN and holds buckets A–D of the census: Step C went 20 sites → 4.**
+Every commit on main was gated on `make agda && make bug-cache` both exiting 0, read from the
+log's own `EXIT=` lines.
+
+**`origin/claude/step-c-keystone-wip` holds ONE UNVERIFIED commit — the keystone pass.** It
+closes site 979, the obligation all 25 `thruConsume` clauses project onto. `Caps-Face`
+solo-checks green (`AGDA_EXIT=0`) with its three new lemmas; **the full `Subscribe-Face` check
+was still running when the session paused, so its result is UNKNOWN.**
+
+**FIRST ACTION ON RESUME** — re-run it to completion; do not assume either outcome:
+```
+git fetch origin && git checkout -B claude/step-c-keystone-wip origin/claude/step-c-keystone-wip
+cd agda && (agda --profile=internal src/Verify-Budget-Sufficient/Subscribe-Face.agda > /tmp/k.log 2>&1; echo "AGDA_EXIT=$?" >> /tmp/k.log)
+```
+Then `grep AGDA_EXIT /tmp/k.log`, and **confirm it actually ran** (`grep -c Checking /tmp/k.log`
+≥ 1, and no `Total 0ms`) before believing the code. `--profile=internal` is attached
+deliberately: it costs nothing extra and yields the one measurement still missing (below). If
+green: `make agda && make bug-cache`, then merge to main.
+
+**If it fails, the three suspects, in order:** (1) `inner-step`'s application at `:979` needing
+`cong`/`subst` scaffolding the shapes don't reveal on paper; (2)
+`frameStep-size-strict-suc`'s one-line proof not elaborating at that instantiation; (3) one of
+the 30 mechanical `suc bud` substitutions colliding with a `with`-clause pattern. A backup of
+the pre-pass file is at `/tmp/sf.bak2` if that survives; otherwise `git diff` against main.
+
+**Then, in order:**
+1. **Delete `1≤nest` (and `1≤syncSizeᵉ` if it has no other user) from `Caps-Nest.agda`.** The
+   keystone pass made it dead: reporting at `suc bud` turns `queue-push`'s positivity premise
+   into a literal `s≤s z≤n`. It is unused outside comments — verified by grep. The no-fat rule
+   says it goes; it was kept out of the keystone commit only to avoid mixing changes.
+2. **The two walk sites (`~1805`, `~2245`) are ONE problem, not two** — see Unit 3 below.
+3. **Site `~2625` (`subscribeE input`) is the measure question** — still wants Anthony's call.
+
+**THE COST MEASUREMENT, and why the module split was CANCELLED.** `--profile=definitions` on
+Subscribe-Face: total 2,136,727 ms, of which **"Miscellaneous" is 2,120,924 ms — 99.3%**. Every
+definition in the file together, all 13 clique members and their `where` bindings, costs **~15.8
+SECONDS**. A content-free module with Subscribe-Face's exact import block checks in **5.3 s**
+(`agda/probe/Import-Cost-Probe.agda`), so it is not the import graph either. **Splitting the
+module therefore cannot help and could hurt** — you cannot divide a cost the definitions are not
+paying, and per-module overhead would be paid again by each new module. The remaining suspect is
+whole-module analysis over the 13-member SCC (termination/coverage). `--no-termination-check`
+cannot test it: the build is `--safe`, which rejects the flag outright. `--profile=internal` on a
+genuinely dirty module is the way in — hence its attachment above. Note **`touch` does NOT dirty
+an Agda module** (invalidation is by content), so a "recheck" of an unchanged file measures only
+deserialization and reports zero `Checking` lines.
+
+---
+
+## The census: 20 sites, and what buckets A–D closed
 
 **`origin/main` = `aded321`, verified green** (`MAKE_AGDA_EXIT=0`, `BUG_CACHE_EXIT=0`). The
 level conjunct is IN the Σ on nine heads, and the composition gate in `Caps-Chain` is built.

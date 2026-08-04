@@ -138,6 +138,17 @@ Same class of trap as trusting a pipe's exit code — verify the run actually ra
 believing anything it says. `agda --profile=definitions` gives per-definition cost; note
 `--profile` takes ONE type, and combining `definitions` with `modules` is rejected outright.
 
+**`touch` does NOT dirty an Agda module — invalidation is by CONTENT, not mtime.** A touched
+file with unchanged content reuses its interface, so a "recheck" of it measures only
+deserialization (6.4 s for Subscribe-Face, of which 5.1 s IS deserialization) and reports zero
+`Checking` lines. Two consequences: you cannot force a remeasurement without a real edit, and
+an experiment run with weakened flags cannot silently poison the cache this way either.
+
+**The build is `--safe`.** So `--no-termination-check` and friends are rejected outright
+(the stdlib's own `OPTIONS` pragma trips first). Good for soundness — no pragma can quietly
+weaken this proof — but it means whole-module analyses cannot be switched off to time them;
+attribute them with `--profile=internal` on a genuinely dirty module instead.
+
 ## Module granularity: keep typechecks short
 
 Agda rechecks a whole module on any edit, so module size IS iteration speed. Rules
