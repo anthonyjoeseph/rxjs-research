@@ -427,6 +427,15 @@
 --                as finished facts and is mutual with nothing, so it is
 --                its own unit: the clique imports it to pay for the fold
 --                each concatenating clause charges per cons
+--   .Caps-Chain  the composition gate: one lemma per clause SHAPE of the
+--                subscribe clique (a payload of a walk, a frame refresh,
+--                the three operator shapes) and the two directions the
+--                OPERATOR COUNT travels — a callee reporting at m into a
+--                caller holding `suc m`, and a fresh entry converting its
+--                priced sweep into the index.  Also consumes .Caps's
+--                `-mono`/`-infl` blocks as finished facts, mutual with
+--                nothing; Step C's clause proofs apply these and do no
+--                arithmetic of their own
 --   .Caps-Nest   the nesting measure `M` the subscribe budget k really
 --                counts: a term's syncSize PLUS the residue owed by the
 --                shares not yet connected, because the share edge hands
@@ -579,6 +588,7 @@ open import Verify-Budget-Sufficient.Measures   public
 open import Verify-Budget-Sufficient.Keeps-Ring public
 open import Verify-Budget-Sufficient.Caps       public
 open import Verify-Budget-Sufficient.Caps-Sadd  public
+open import Verify-Budget-Sufficient.Caps-Chain public
 open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Subscribe-Face public
 open import Verify-Budget-Sufficient.Wet        public

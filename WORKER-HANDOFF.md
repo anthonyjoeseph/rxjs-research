@@ -133,7 +133,8 @@ Proven three times now (2026-08-04):
 ### Container & Fallback Management
 - **On the persistent laptop (current setup), keep-alives are RETIRED** (CLAUDE.md, 2026-08-03): detached builds advance on their own; poll their `EXIT=` log with short foreground calls for pacing/verification only. Keep only a sparse (~60 min) fallback check-in for wedged workers.
 - **The container-era rules below apply ONLY if running in a suspendable cloud container** (the environment this document was written in): foreground wait-loops (`for i in $(seq 1 55); do grep -q 'EXIT=' log && break; sleep 10; done`) to hold the container awake, 30-min fallback cadence, delete-and-re-arm trigger discipline.
-- Long Agda checks (>600s) are always detached (`nohup setsid bash -c '… ; echo EXIT=$? >> log' &`) regardless of environment — the Bash tool's per-call ceiling is the constraint, not the container.
+- Long Agda checks (>600s) must outlive the Bash tool's ~600 s per-call ceiling. **On the laptop `setsid` DOES NOT EXIST** (verified 2026-08-04: `nohup setsid …` dies silently writing no log, and the sandbox additionally denies detached writes under `/private/tmp`). Use the Bash tool's own **`run_in_background: true`** instead — it survives across turns, writes to a task output file you can `Read`, and re-invokes the session when it exits, which is strictly better than polling for an `EXIT=` line. The `nohup setsid` recipe in older memos is container-era; do not copy it.
+- **Interfaces are cached per module**, so a green tree plus one new leaf module is a ~1 min `make agda`, not 35–40 min. The full 35–40 min figure applies when Subscribe-Face (~7 min) or Wet (~14–18 min) is dirty. Never pipe agda through `head` (it hides OOM kills); read the exit code.
 
 ---
 
