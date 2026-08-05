@@ -67,7 +67,7 @@ open import Verify-Budget-Sufficient.Caps
 -- the payload edge's three rungs are lifted with +1-superadditivity, the
 -- only place outside `walk-step-suc` that needs to move a report to a
 -- HIGHER entry level rather than to a wider transformer
-open import Verify-Budget-Sufficient.Caps-Sadd using (opIterD-sadd)
+open import Verify-Budget-Sufficient.Caps-Sadd using (opIterD-sadd; sIterD-sadd)
 
 ------------------------------------------------------------------
 -- § 1.  THE FIVE CLAUSE SHAPES.
@@ -504,6 +504,34 @@ walk-last S W d k m j j₁ 2≤S hd =
           (walk-step S W d k m j j₁ 0 2≤S hd
             (≤-trans (≤-reflexive (+-identityʳ (j + j₁)))
                      (sIterD-infl S W d k m (j + j₁))))
+
+-- AND A WALK THAT HAS NOT SPENT ITS WHOLE PAYLOAD ALLOWANCE HAS ONE
+-- LEVEL IN HAND — which is what the concat FINISH needs and the
+-- thru-outer frame does not.  Both frames report through `frame-step`,
+-- whose walk premise is indexed at the full `suc (widAt S W j)`; a
+-- thru-outer's witness is the walk's own j′ and meets it by `walk-index`
+-- alone, but `innerFinish-caps`'s concat clause reinstalls the drained
+-- node and so reports `suc j′` — one MORE than `concatDrain-caps` hands
+-- back.  The room is real, and it is the unused payload slot: the queue
+-- is bounded by `widAt S W j` (`widNode`'s length conjunct) while the
+-- premise admits `suc (widAt S W j)` payloads, and one payload of a walk
+-- is worth at least one level (`sIterD-sadd`, then the entry the next
+-- payload starts from, `sLvlD-infl`).  So the drain's report rises by one
+-- and the index widens in the same step
+walk-room : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S → m ≤ widAt S W j →
+  j + j₁ ≤ sIterD S W d k m j →
+  j + suc j₁ ≤ sIterD S W d k (suc (widAt S W j)) j
+walk-room S W d k m j j₁ 2≤S hm h =
+  ≤-trans (≤-reflexive (+-suc j j₁))
+    (≤-trans (≤-trans (s≤s h) (sIterD-sadd {S} {W} {j} m d k 2≤S))
+      (≤-trans
+        -- one payload's own entry, so the m-fold walk restarts above `suc j`
+        (≤-trans (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl
+                    (sLvlD-infl S W d k (suc j)) ≤-refl ≤-refl ≤-refl)
+                 (≤-reflexive (sym (sIterD-suc S W d k m j))))
+        -- and the slot it used was one the premise had spare
+        (sIterD-mono (suc m) (suc (widAt S W j)) d d k k 2≤S
+                     ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (s≤s hm))))
 
 ------------------------------------------------------------------
 -- § 7.  THE TWO ENTRIES THAT SUBSCRIBE NOTHING.

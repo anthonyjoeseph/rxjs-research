@@ -1,395 +1,392 @@
-# Formal Verification Campaign — Worker Handoff (2026-08-04)
+# Formal Verification Campaign — Worker Handoff (updated 2026-08-05)
 
-**Current session:** Fable 5 design-authority running on main account. **Next worker:** Opus 5 or Haiku on secondary account.
+**Status:** Tier 1 item 4 (Step C) — Units 0–2 DONE and merged green to main. The level
+conjunct is threaded across the clique and 18 of the 20 census sites are closed;
+`level-TEMP` has TWO remaining sites (Subscribe-Face **1834**, **2280**), and both are the
+SAME question — depth sufficiency, now scoped and **RULED** as Unit 3 below. Postulate
+ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2) — unchanged by Step C,
+which was TEMP-scaffolding work.
 
-**Status:** Tier 1 item 4 (Step C) — Units 0 and 1 done and green; the level conjunct's SHAPES
-are landed on ten heads with twelve clauses proven, and the rest of its clauses are the current
-work. Postulate ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2).
+## ⚠ RESUME HERE
 
-## ⚠ RESUME HERE (session paused 2026-08-04, mid-check)
+`origin/main` is GREEN through the input-edge commit ("the slot edge was never a ruling,
+and the strict step it needed was already written"). Every commit was gated on
+`make agda && make bug-cache` both exiting 0, read from the log's own `EXIT=` lines.
 
-**`origin/main` is GREEN and holds buckets A–D of the census: Step C went 20 sites → 4.**
-Every commit on main was gated on `make agda && make bug-cache` both exiting 0, read from the
-log's own `EXIT=` lines.
+**The current work is: EXECUTE UNIT 3** (the ruling below). It closes the last two
+`level-TEMP` sites, finishes Step C, and unblocks item 3 (the two Caps-Face faces).
 
-**`origin/claude/step-c-keystone-wip` holds ONE UNVERIFIED commit — the keystone pass.** It
-closes site 979, the obligation all 25 `thruConsume` clauses project onto. `Caps-Face`
-solo-checks green (`AGDA_EXIT=0`) with its three new lemmas; **the full `Subscribe-Face` check
-was still running when the session paused, so its result is UNKNOWN.**
-
-**FIRST ACTION ON RESUME** — re-run it to completion; do not assume either outcome:
-```
-git fetch origin && git checkout -B claude/step-c-keystone-wip origin/claude/step-c-keystone-wip
-cd agda && (agda --profile=internal src/Verify-Budget-Sufficient/Subscribe-Face.agda > /tmp/k.log 2>&1; echo "AGDA_EXIT=$?" >> /tmp/k.log)
-```
-Then `grep AGDA_EXIT /tmp/k.log`, and **confirm it actually ran** (`grep -c Checking /tmp/k.log`
-≥ 1, and no `Total 0ms`) before believing the code. `--profile=internal` is attached
-deliberately: it costs nothing extra and yields the one measurement still missing (below). If
-green: `make agda && make bug-cache`, then merge to main.
-
-**If it fails, the three suspects, in order:** (1) `inner-step`'s application at `:979` needing
-`cong`/`subst` scaffolding the shapes don't reveal on paper; (2)
-`frameStep-size-strict-suc`'s one-line proof not elaborating at that instantiation; (3) one of
-the 30 mechanical `suc bud` substitutions colliding with a `with`-clause pattern. A backup of
-the pre-pass file is at `/tmp/sf.bak2` if that survives; otherwise `git diff` against main.
-
-**Then, in order:**
-1. **Delete `1≤nest` (and `1≤syncSizeᵉ` if it has no other user) from `Caps-Nest.agda`.** The
-   keystone pass made it dead: reporting at `suc bud` turns `queue-push`'s positivity premise
-   into a literal `s≤s z≤n`. It is unused outside comments — verified by grep. The no-fat rule
-   says it goes; it was kept out of the keystone commit only to avoid mixing changes.
-2. **The two walk sites (`~1805`, `~2245`) are ONE problem, not two** — see Unit 3 below.
-3. **Site `~2625` (`subscribeE input`) is the measure question** — still wants Anthony's call.
-
-**THE COST IS POSITIVITY CHECKING — 78.5% of it — AND THAT REVIVES THE SPLIT.**
-`agda --profile=internal` on a genuinely dirty Subscribe-Face, 2026-08-04:
-
-```
-Total            970,988 ms
-Positivity       762,327 ms   78.5%
-Termination      179,726 ms   18.5%   (Termination.Graph 179,288)
-Typing            15,487 ms    1.6%
-Deserialization    6,192 ms
-```
-
-**Both dominant phases are whole-MUTUAL-BLOCK graph analyses — together 97%.** So the earlier
-conclusion below ("splitting cannot help, the definitions only cost 16 s") was WRONG, and the
-reasoning error is worth keeping: `--profile=definitions` reported 99.3% as "Miscellaneous", and I
-read that as "the cost is not in the module's content." It actually means "not attributable to any
-INDIVIDUAL definition" — which is exactly what a whole-block analysis looks like. A block analysis
-is still a function of the content's structure, just not of any one definition.
-
-**The lever this exposes:** the mutual block is SYNTACTIC (fixed by the forward declarations),
-while the true SCC is 13 of the 18 `-caps` definitions. If Agda's block spans all 18, then moving
-the five non-SCC members out — `retagEvents-caps` upstream, and
-`foldPath`/`dispatchShare`/`shareGo`/`chainStep` downstream — shrinks the block 18 → 13 and cuts
-both graph analyses. That is a small, contained, *testable* change: extract, remeasure, keep only
-if Positivity actually drops.
-
-**MEASURED, AND THE LEVER IS SMALL — DEPRIORITIZED.** The block was checked, not assumed:
-`subscribeE-caps`'s signature is at ~890 and its definition does not begin until **2631**, so the
-block spans that range. `retagEvents-caps` (sig 2322) falls INSIDE it, but `foldPath-caps` (3139),
-`dispatchShare`, `shareGo` and `chainStep-caps` (3335) all begin BELOW subscribeE-caps's last
-clause and are therefore **already outside the block**. So the block is **~14 definitions, not
-18**; four of the five candidates are already extracted in effect; and moving `retagEvents-caps`
-buys 14 → 13, about 7% of the definition count, for a 16-36 minute measurement per experiment.
-**Not worth prioritizing over proof progress.** If someone wants it later, the real question is
-whether Positivity scales with definition COUNT (then ~7%) or with total clause/type SIZE in the
-block (then moving plumbing bodies out — result-parameterization — is the lever, and is worth much
-more). One extraction plus one remeasure answers that. The 640-line arithmetic preamble is NOT in
-the block, so extracting it would not touch this cost at all — though it would still make edits to
-those lemmas cheap.
-
-**SUPERSEDED — the earlier reasoning, kept because its error is instructive:** `--profile=definitions` on
-Subscribe-Face: total 2,136,727 ms, of which **"Miscellaneous" is 2,120,924 ms — 99.3%**. Every
-definition in the file together, all 13 clique members and their `where` bindings, costs **~15.8
-SECONDS**. A content-free module with Subscribe-Face's exact import block checks in **5.3 s**
-(`agda/probe/Import-Cost-Probe.agda`), so it is not the import graph either. **Splitting the
-module therefore cannot help and could hurt** — you cannot divide a cost the definitions are not
-paying, and per-module overhead would be paid again by each new module. The remaining suspect is
-whole-module analysis over the 13-member SCC (termination/coverage). `--no-termination-check`
-cannot test it: the build is `--safe`, which rejects the flag outright. `--profile=internal` on a
-genuinely dirty module is the way in — hence its attachment above. Note **`touch` does NOT dirty
-an Agda module** (invalidation is by content), so a "recheck" of an unchanged file measures only
-deserialization and reports zero `Checking` lines.
+History that used to fill this file — the 20-site census and its buckets, the keystone
+pass, the budget rethreading, the profiling findings (Positivity is 78.5% of
+Subscribe-Face's check, a whole-mutual-block cost; the module split was measured at ~7%
+and deprioritized) — is in this file's git history. Where any memo and the tree disagree,
+**the tree wins**.
 
 ---
 
-## The census: 20 sites, and what buckets A–D closed
+## UNIT 3 — DEPTH SUFFICIENCY: THE RULING (2026-08-05, design session)
 
-**`origin/main` = `aded321`, verified green** (`MAKE_AGDA_EXIT=0`, `BUG_CACHE_EXIT=0`). The
-level conjunct is IN the Σ on nine heads, and the composition gate in `Caps-Chain` is built.
-What remains of Step C is discharging **20 `level-TEMP` clause sites** — and they have been
-surveyed, so this is a worklist, not an exploration. Take the buckets in the order given.
+### The decision in one line
 
-**`grep -c "level-TEMP" agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda` = 23**: 20 real
-proof sites, the postulate declaration, and two prose mentions. `grep -rn "TEMP" agda/src` must
-return zero before Step C is done — the BARE word, not `"TEMP-"`, which misses `level-TEMP`
-and reported a false all-clear once.
+Add a depth-sufficiency hypothesis to the clique, exactly as `nest … ≤ bud` and
+`suc (sizeᵉ b) ≤ ops` already sit there — and its currency is a **DEPTH MIRROR**: a family
+of ℕ-valued functions, one per evaluator head on the subscribe path, defined
+clause-for-clause on the evaluator's own recursion, returning the `⊔` (max) of its
+callees' mirrors, with a `suc` at EXACTLY the two arcs where the caps proof spends `dep`.
+Head X's hypothesis is `depthX ⟨X's own evaluator arguments⟩ ≤ dep`, argument name `dpt`.
 
-**Where this document errs, the tree wins** — it has been wrong about repo state twice. One
-correction already: an earlier revision claimed "the `input` clause is now closed by
-`op-step-share`". It is NOT (bucket E below); the comment in the clause itself says so.
+The mirror is a function of the RUN, not of any syntax — it recomputes the evaluator's own
+intermediates. That is what dissolves both historical refutations: the share edge reads
+the same stored def the evaluator reads (no residue needed, unlike `bud`'s measure), and
+scan-minted payloads are recomputed rather than approximated. It is also the WEAKEST
+hypothesis that can close the clique — it is literally "the depth this very run reaches" —
+so every future top-level discharge argument factors through it automatically.
 
----
+### Why nothing simpler works — all three alternatives are dead, two by machine
 
-## THE STEP C SITE CENSUS (2026-08-04) — all 20 sites, classified
+1. **Bare positivity** (`1 ≤ dep`, descend-and-maintain) — machine-refuted,
+   `Mu-Nest-Probe` § 1: the maintenance step at `dep = 1` demands `1 ≤ 0`.
+2. **Any syntactic or value-derived measure** — machine-refuted twice. `Mu-Nest-Probe`
+   § 2: the share edge's callee is a stored def structurally unrelated to the subscribed
+   term. `Nest-Budget-Probe` § 3: a `scanᵉ` under an `*All` mints payloads whose nesting
+   is the FOLD COUNT — the payload's walk descends deeper than any function of the payload
+   or of the carrier's syntax. Depth demand is dynamic; no static measure dominates it.
+   (Caps-derived measures fail separately: caps GROW down the walk, so nothing derived
+   from them descends.)
+3. **The gas** (`suc (gasHt g) ≤ dep`, offset by cycle position) — threads perfectly (the
+   peel discipline, `Rx/Evaluator.agda:672-695`, was designed as this bridge) but is
+   **FALSE at the intended instantiation**: `capsAt` runs at `d := capsH e sl id`, and the
+   instant's gas sits one blowH story ABOVE that (`Rx/Evaluator.agda:710-717`, "a
+   stratification, not a domination"). Threading a hypothesis known false at its only
+   planned supply site is the proven-pieces-without-an-assembly anti-pattern. Do not
+   re-propose it.
 
-Read off the head signatures and the clause witnesses; no build needed, because each head's
-Σ *declares* its conjunct's transformer and index, so the goal is the witness substituted in.
-Five transformer families are in play, one per head group:
+### The mirror, precisely
 
-| head group | conjunct it reports |
+New module **`agda/src/Verify-Budget-Sufficient/Caps-Depth.agda`** — its own mutual block,
+importing `Rx.Evaluator`; nothing imports it except `Subscribe-Face` (and later the face
+chain). Definition rules:
+
+- **R1 — one mirror head per evaluator head on the subscribe path**, taking the SAME
+  argument list as the evaluator head, including value-style scrutinee arguments
+  (`innerFinish`'s trailing `Maybe (NodeState Γ)` is the model).
+- **R2 — each clause returns the `⊔` of the mirrors of every callee** the evaluator's
+  clause invokes on the subscribe path, applied to the SAME expressions — recompute
+  intermediate bursts and states by calling the real evaluator, exactly as the clause's
+  own `let` does. Clauses with no subscribe-path callee return `0`.
+- **R3 — `suc` in exactly two places**: `stepFrame`'s thru-outer clause
+  (`suc (depthWalk fuel op nid κ id now vals sched st)`) and `innerFinish`'s
+  concat/`yes refl` branch (`suc (depthDrain fuel allNid κ id now q sched st)`).
+  **NOT** at `subscribeInner`'s gas peel, NOT at μ, NOT at `sharedConnect` — the mirror
+  mirrors where the CAPS PROOF spends `dep` (the two arcs that fit a walk under
+  `fLvlD S W (suc d) j`), not where the evaluator peels gas.
+- **R4 — NO `with` anywhere in the mirror.** Where the evaluator dispatches by `with`,
+  either (a) OVERAPPROXIMATE — ignore the test and return the spending branch's value or
+  the max over branches, whenever the types allow (`innerReact`'s `aliveThroughᶠ` test,
+  `concatDrain`'s `if done`); a too-big mirror is harmless, it only demands more depth.
+  Or (b), when the dispatch is TYPE-FORCING (`innerFinish`'s `w ≟ᵗ s`, `subscribeE`'s
+  `take` on `evalTm count`, the `input` clause on `Sched.slots sched i`), delegate to a
+  helper head taking the scrutinee as a real argument and matching it as a pattern
+  (`depthFinConcat … (w ≟ᵗ s)` with `yes refl` / `no _` clauses).
+- **R5 — heads that never reach a subscribe have mirror 0** (map-f/scan-f/take-f frames;
+  `ofᵉ`, `emptyᵉ`, `deferᵉ` — it PARKS, `varᵉ`, out-of-gas clauses); `retagEvents` and
+  `evalTms` get no mirror head at all.
+- **R6 — NOT `abstract`, at first**: the caps clauses need the clause equations to reduce
+  definitionally in their pattern contexts. If Caps-Depth's or Subscribe-Face's check cost
+  explodes, fall back to the transformer family's own pattern — `abstract` plus exported
+  per-clause `≡`-equations (`Rx/Evaluator.agda:789-829` style) — and pay the rewrites.
+- **R7 — termination is the evaluator's own**: the mirror's call graph is a subgraph of
+  the evaluator's with identical argument shapes (gas descends at the same three edges;
+  lists and expressions descend structurally; `dispatchShare`'s ℕ gas descends as there).
+  If the checker balks, align the argument order with the evaluator's exactly.
+
+Clause table — a TRANSCRIPTION GUIDE, not a substitute for reading the tree
+(`Rx/Evaluator.agda:939-1600`); where they disagree, the tree wins:
+
+| mirror head | of evaluator | shape |
+|---|---|---|
+| `depthE` | `subscribeE` | `input i` ↦ `depthSlot … (Sched.slots sched i)`; `of/empty/defer/var`, `μ` at `g0` ↦ 0; `mapᵉ` ↦ `depthE fuel b (map-f f ↠ κ) … ⊔ depthBurst fuel id now (map-f f) κ burst sched₁ st₁` with the clause's own lets (:1418-1420); `takeᵉ` ↦ `depthTake … (evalTm count)` (R4b; `zero` ↦ 0, `suc k` ↦ the map shape with `take-f nid`/`installNode` exactly as :1428-1433); `scanᵉ` ↦ same shape (:1435-1440); the four `*All` ↦ `depthAll …`; `μᵉ` at `gs fuel` ↦ `depthE fuel (unfoldμ body) …` |
+| `depthSlot` | the `input` dispatch | `shared d` ↦ mirror of `subscribeSharedSlot`; `scripted` hot/cold ↦ 0 |
+| `depthShSlot` | `subscribeSharedSlot` | mirrors its dispatch down to `sharedConnect` |
+| `depthConn` | `sharedConnect` | `g0` ↦ 0; `gs fuel′` ↦ `depthE fuel′ d …` ⊔ the clause's burst-push mirrors (:1348+) |
+| `depthAll` | `subscribeAll` | `depthE fuel b (thru-outer op nid ↠ κ) … ⊔ depthBurst … (thru-outer op nid) …` with the mint/install lets (:1314+) |
+| `depthInner` | `subscribeInner` | `g0` ↦ 0; `gs fuel` ↦ `depthE fuel …` per :1009+ (the retag/split plumbing adds nothing) |
+| `depthWalk` | `thruWalk` | `[]` ↦ 0; `o ∷ os` ↦ `depthConsume … o sched₀ st₀ ⊔ depthWalk … os sched₁ st₁` (post-state via the same let, :1153+) |
+| `depthConsume` | `thruConsume` | each clause: the subscribing branch ↦ `depthInner …`, a parking branch ↦ 0 (R4b where its concat clauses dispatch) |
+| `depthDrain` | `concatDrain` | `[]` ↦ 0; `o ∷ q` ↦ `depthInner fuel concatᵒ allNid κ id now o sched₀ st₀ ⊔ depthDrain … q sched₁ st₁` — overapproximate the `if done` (R4a) |
+| `depthFin` | `innerFinish` | merge/switch/exhaust/catch-all ↦ 0; concat with `just (concat-st {w} q act od)` ↦ `depthFinConcat … (w ≟ᵗ s)` (R4b): `yes refl` ↦ **`suc (depthDrain fuel allNid κ id now q sched st)`**, `no _` ↦ 0 |
+| `depthReact` | `innerReact` | `false` ↦ 0; `true` ↦ `depthFin … (lookupNode allNid (EvalSt.nodes st))` — ignore the `aliveThroughᶠ` test (R4a) |
+| `depthFrame` | `stepFrame` | map-f/scan-f/take-f ↦ 0; from-inner ↦ `depthReact …`; thru-outer ↦ **`suc (depthWalk fuel op nid κ id now vals sched st)`** |
+| `depthBurst` | `pushBurst` | `[]` ↦ 0; `em ∷ ems` ↦ `depthFrame … (proj₁ sp) (proj₂ (proj₂ sp)) sched st ⊔ depthBurst … ems sched₁ st₁` (the lets of :1298-1306) |
+| `depthFold` / `depthDispatch` / `depthShareGo` / `depthChain` | `foldPath` / `dispatchShare` / `shareGo` / `chainStep` | mirror their bodies down to `depthFrame` (:1521-1600) — needed so the downstream caps heads can supply `stepFrame-caps` |
+
+### The threading
+
+Every caps head that transitively calls `stepFrame-caps` gains ONE hypothesis, placed
+beside `nest … ≤ bud`: **`depthX ⟨its evaluator args⟩ ≤ dep`**, argument name `dpt`.
+That is the 13-member clique (`subscribeE`, `subscribeAll`, `subscribeInner`, `thruWalk`,
+`thruConsume`, `concatDrain`, `stepFrame`, `pushBurst`, `innerFinish`, `innerReact`,
+`subscribeE-input`, `sharedSlot`, `sharedConnect`) plus the downstream four (`foldPath`,
+`dispatchShare`, `shareGo`, `chainStep`). `retagEvents-caps` and `evalTms-caps` gain
+nothing.
+
+Supply mechanics — every call site is one of exactly three moves:
+
+- **(a) PROJECTION** (nearly every site): the caller's `dpt` reduces definitionally (the
+  mirror clause equation, in the caps clause's own pattern context) to a `⊔` of callee
+  mirrors; project with `≤-trans (m≤m⊔n …) dpt` / `≤-trans (n≤m⊔n …) dpt`.
+- **(b) THE TWO SPENDS**: `stepFrame-caps` thru-outer and `innerFinish-caps` concat case
+  on `dep`. At `zero`, `dpt` is `suc … ≤ 0` — absurd; close the clause with it. At
+  `suc dep′`, peel one `s≤s` off `dpt` and hand the callee `dep′` with the peeled proof.
+- **(c) THROUGH A WITH**: when the caps clause `with`s a scrutinee the mirror
+  value-dispatches on (the `w ≟ᵗ s`, take's count, input's slot), **add `dpt` to the
+  `with` line** so its type refines along with the goal. This is the design's one
+  elaboration risk — Probe A settles it before anything is ground.
+
+### Closing the two sites — in the SAME pass as the threading; do not split it
+
+- **2280** (`stepFrame-caps` thru-outer, `dep = zero`): becomes absurd by (b). DELETE the
+  clause's body. The `suc dep′` clause at :2293-2309 is already green and untouched.
+- **1834** (`innerFinish-caps` concat, `yes refl`): case `dep` by (b). In the `suc dep′`
+  branch, call `concatDrain-caps` at `dep′` and the REFRESHED budget — the strict level
+  `sizeAt (Caps.cSize c) (suc j)`, exactly as the thru-outer `suc` clause hands
+  `thruWalk-caps`. The queue's mList bound needs a strict analog of `obsList→mList` —
+  new lemma **`obsList→mList-strict`** in Caps-Face, same mechanism as
+  `valsCaps→mList-strict`. Land the level conjunct by the same `frame-step` + `walk-index`
+  dance as :2303-2309, with the queue's length conjunct (`wnLen`, already extracted at
+  :1839) feeding `walk-index`. If `frame-step`'s premise shape does not meet the drain's
+  report the way the thru-outer clause's met the walk's, **STOP and report the goal
+  verbatim** — do not invent arithmetic.
+- Then DELETE `level-TEMP` (the declaration AND its pass memo at ~855-896);
+  `grep -rn "TEMP" agda/src` must return zero (the BARE word). **Step C is then done.**
+
+### The faces (item 3 — the NEXT leg, not this one)
+
+`innerFinish-concat-face` and `thruOuter-face` (Caps-Face ~6190) gain the same hypothesis
+(`depthFin … ≤ d` resp. the thru-outer form `suc (depthWalk …) ≤ d`). They are postulates,
+so amending their statements is free; their ground consumers (`innerFinish-face`,
+`stepFrame-face`, `Walk-Hyps.sf-step`) thread it upward. The chain terminates at the
+machinery feeding the postulated `subscribeE-walk` (Measures:6204, **zero use sites**) —
+amend its statement too and stop there. With the hypothesis in place, the faces discharge
+from the now-complete clique lemmas; that is item 3's brief.
+
+### What the top will owe, later — record it, do not pay it now
+
+`dep` remains instantiated NOWHERE after this unit. The hypothesis SURFACES the debt the
+tree already recorded (`Rx/Evaluator.agda:710-718`: "the story index dominates the depth
+the instant actually reaches … owed by the signature pass. Reported, not assumed"). When
+items 2/1 wire an instantiation (`capsAt` reads `d := capsH e sl id`,
+`Verify-Budget-Sufficient/Caps.agda:449-458`), the obligation lands as ONE named
+statement, shaped
+
+    depthE gas e κ id now sched st ≤ capsH e sl id     -- at the instant's actual entry args
+
+State it as a postulate FIRST when that day comes (outside-in), then attack it. Two known
+facts about it: (i) the gas bridge — `depthE … ≤ gas height`, provable by the peel
+discipline (`Rx/Evaluator.agda:672-695`) — is NOT sufficient, because the gas sits one
+blowH story above `capsH` (:710-717); (ii) any real proof must account for DELIVERIES, not
+just static nesting (Nest-Count-Probe: stories per instant = deliveries × nesting).
+**THE RISK OF THE WHOLE DESIGN LIVES HERE**: if `depthE ≤ capsH` is ever refuted, then
+`capsAt`'s `d`-instantiation is wrong and the measure family's top wiring changes. That is
+a STOP-AND-DISCUSS event, same severity as a spec question.
+
+### Steps 1-4 are DONE and green (2026-08-05). Only the Subscribe-Face pass remains.
+
+- **Probe A — `agda/probe/Depth-Mirror-Probe.agda`, green first try.** A mini-evaluator
+  with a `Dec` dispatch and a `Maybe` scrutinee, its mirror per R1-R5, and a fake caps
+  family exercising every supply move. Settles all four elaboration questions, including
+  that the mirror's termination needs NO pragma and that `with scrutinee | dpt` refines
+  `dpt`'s type in the branch.
+- **`Verify-Budget-Sufficient/Caps-Depth.agda` — WRITTEN, green, 5.2 s cold.** 20 mirror
+  heads, termination accepted with no pragma. Read its head comment before touching it.
+- **`walk-room` in `Caps-Chain` — PROVEN.** This was the design's one open risk (the
+  1834 closure needed one level MORE than `concatDrain-caps` reports). The room is the
+  unused payload slot: the queue is bounded by `widAt S W j` while `frame-step`'s premise
+  admits `suc (widAt S W j)` payloads, and one walk payload is worth ≥ one level
+  (`sIterD-sadd` + `sLvlD-infl`). **The stop condition is cleared.**
+- **`obsCaps→nest-strict` / `obsList→mList-strict` in `Caps-Face` — PROVEN** (the queue
+  mirror of `valsCaps→mList-strict`). Caps-Face green.
+- **Supply census — DONE**, and it found **no call-graph or call-argument mismatch**
+  between the caps clique and the evaluator, and that all 17 heads reach
+  `stepFrame-caps`. Every local `where` name a supply depends on was checked term-by-term
+  against the mirror (`sp`, `sd₁`/`st₁`, `st₀`/`st₁`, `res`, `step`, `TC`): all match.
+
+**WHY `dep` MUST STAY A UNIVERSALLY QUANTIFIED PARAMETER — do not "simplify" this.**
+The tempting alternative is to delete the `dep` parameter and write each head's conjunct
+at the computed `depthX <args>` directly; then the thru-outer clause's transformer is
+literally `fLvlD S W (suc (depthWalk …)) j` and site 2280 vanishes with no case split at
+all. It is worse. With a uniform opaque `dep` the transformer NEVER changes across a call,
+so a supply is exactly one `⊔`-projection. With `dep` computed, the caller's transformer
+sits at `depthX <caller args>` and the callee reports at `depthX <callee args>`, so every
+one of the ~37 sites needs a `d`-monotonicity lift ON TOP OF the same projection. Strictly
+more work, in the most expensive module. Recorded because the idea looks like a
+simplification and is not.
+
+### THE REMAINING WORK: the Subscribe-Face pass, in TWO stages
+
+Staged deliberately. Stage A is ~100 mechanical edits with no new mathematics; stage B is
+two clauses. If they go in together, a failure in either is debugged against a 44-minute
+build with the other's diff in the way. Stage A leaves `level-TEMP` in place at its two
+sites, which is safe here because the threading contains no descent for a weak hole to
+hide — every supply below is an exact projection.
+
+#### Stage A — thread `dpt`. Three mechanical parts.
+
+**A1. Add ONE hypothesis to each of the 17 signatures**, as the LAST hypothesis,
+immediately before the `let r = … in Σ …`. Argument name `dpt`. The hypothesis is
+`depthX <the evaluator arguments that head's own `let r = …` passes> ≤ dep`:
+
+| head | new hypothesis |
 |---|---|
-| `subscribeE` / `subscribeAll` | `j + j′ ≤ opIterD S W dep bud ops j` |
-| `subscribeInner` / `thruConsume` | `suc (j + j′) ≤ sLvlD S W dep bud (suc j)` |
-| `thruWalk` / `concatDrain` | `j + j′ ≤ sIterD S W dep bud (length …) j` |
-| `innerFinish` / `innerReact` / `stepFrame` | `j + j′ ≤ fLvlD S W dep j` |
-| `pushBurst` | `j + j′ ≤ fIterD S W dep bud (length str) j` |
+| `subscribeE-caps` | `depthE g b κ bid now sched st ≤ dep` |
+| `subscribeAll-caps` | `depthAll g op ns b κ id now sched st ≤ dep` |
+| `subscribeInner-caps` | `depthInner g op allNid κ id now o sched st ≤ dep` |
+| `thruWalk-caps` | `depthWalk g op nid κ id now vals sched st ≤ dep` |
+| `thruConsume-caps` | `depthConsume g op nid κ id now o sched st ≤ dep` |
+| `concatDrain-caps` | `depthDrain g allNid κ id now q sched st ≤ dep` |
+| `stepFrame-caps` | `depthFrame g id now f κ vals fin sched st ≤ dep` |
+| `pushBurst-caps` | `depthBurst g id now f κ str sched st ≤ dep` |
+| `innerFinish-caps` | `depthFin g op allNid inst κ id now vals sched st (lookupNode allNid (EvalSt.nodes st)) ≤ dep` |
+| `innerReact-caps` | `depthReact g op allNid inst κ id now vals sched st fin ≤ dep` |
+| `subscribeE-input-caps` | `depthE g (input i) κ id now sched st ≤ dep` |
+| `sharedSlot-caps` | `depthShSlot g i d κ id now sched st ≤ dep` |
+| `sharedConnect-caps` | `depthConn g i d κ id now sched st ≤ dep` |
+| `foldPath-caps` | `depthFold sf gas id now envSrc path vals evs fin sched st ≤ dep` |
+| `dispatchShare-caps` | `depthDisp sf gas id now i vals fin sched st ≤ dep` |
+| `shareGo-caps` | `depthShareGo sf gas id now i vals fin ps sched st ≤ dep` |
+| `chainStep-caps` | `depthChain id a path sched st ≤ dep` |
 
-**Bucket A — ONE new trivial lemma closes SIX sites.** Lines 1718, 1841, 1862, 2087, 2095,
-2171 (innerFinish merge/switch/exhaust, both innerReact clauses, stepFrame take-f). Every
-witness is `0`, so every goal is `j + 0 ≤ fLvlD S W dep j`. Add to `Caps-Chain`:
-`frame-nil S W d j = ≤-trans (≤-reflexive (+-identityʳ j)) (fLvlD-infl S W d j)`.
-Start here: it is a third of the remaining sites for one line.
+Import them: add `open import Verify-Budget-Sufficient.Caps-Depth` with those 17 names
+plus nothing else (`Caps-Depth` imports `Rx.Evaluator` only, so there is no cycle).
 
-**Bucket B — an EXISTING `Caps-Chain` lemma applies, FIVE sites.** No new math.
-- 1607 concatDrain (inner stays open, witness `j₁`) — `walk-step` at `j₂ := 0`; the head
-  premise is `subscribeInner`'s report weakened by `n≤1+n`, the tail is `sIterD-infl`.
-  Wants a one-line `walk-last` wrapper to absorb `j₁ + 0 ≡ j₁`.
-- 1639 concatDrain (inner completed, recurses, witness `j₁ + j₂`) — `walk-step` verbatim.
-- 2503 subscribeAll `suc ops′` (witness `suc (j₁ + j₂)`) — `op-step` verbatim; its
-  conclusion is this goal on the nose.
-- 2749 subscribeE `takeᵉ`/`suc ops′` (witness `suc (j₁ + j₂)`) — `op-step`.
-- 2819 subscribeE `scanᵉ` (witness `j₀ + suc (j₁ + j₂)`) — `op-step-eval`.
+**A2. Add a `dpt` binder to each of the 60 top-level clause LHSs.** `with`-continuation
+clauses (`... | pat = ...`) take NO new binder — the binder comes from the parent LHS.
+Put `dpt` last, in the same position as in the signature. The 60 lines are exactly the
+output of
 
-**Bucket C — split `ops` using the `hidx` the head ALREADY carries, TWO sites.** Both
-conjuncts are FALSE at `ops = 0` (the transformer does not move and the witness is positive),
-so both clauses must case on `ops`; `hidx : suc (sizeᵉ b) ≤ ops` supplies `1 ≤ ops` outright.
-This is the `queue-push` pattern, already proven once.
-- 2602 subscribeE `ofᵉ` (witness `j₀ + 3`, `j₀` from `evalTms-caps`) — `op-step-eval`.
-- 2992 subscribeE `*All`/`mergeᵒ` (witness `1`) — `op-step-share` at `j₁ := 0`.
+```bash
+grep -n "^subscribeE-caps \|^subscribeAll-caps \|^subscribeInner-caps \|^thruWalk-caps \|^thruConsume-caps \|^concatDrain-caps \|^stepFrame-caps \|^pushBurst-caps \|^innerFinish-caps \|^innerReact-caps \|^subscribeE-input-caps \|^sharedSlot-caps \|^sharedConnect-caps \|^foldPath-caps \|^dispatchShare-caps \|^shareGo-caps \|^chainStep-caps " agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda | grep -v " : ∀"
+```
 
-**Bucket D — one new EASY lemma plus a receipt conjunct on three non-clique helpers, THREE
-sites.** These report a positive witness into `fLvlD S W dep j` at a GENERIC `dep`, and
-`frame-step` only concludes at `suc d`. But `fLvlD` at zero is NOT the identity — it is
-`fLvl S W J + suc (widAt S W J)` with `fLvl S W J = J + fCharge S W J` — so a dep-generic
-receipt lemma goes through by inflation in both branches:
-`frame-recv : ∀ S W d j j₀ → j₀ ≤ fCharge S W j → j + j₀ ≤ fLvlD S W d j`
-(at `0`, monotonicity into `j + fCharge + suc widAt`; at `suc d`, `sIterD-infl` off `fLvl`).
-Then each site needs its helper to report `j′ ≤ fCharge S W j` — a signature addition on three
-helpers OUTSIDE the SCC, so each is a cheap solo check:
-- 1674 `innerFinish-zero′` ← `innerFinish-zero`
-- 2136 stepFrame `map-f` ← `mapFrame-caps`
-- 2153 stepFrame `scan-f` ← `stepFrame-scan-caps`
+Note `sharedSlot-caps`'s zero clause already ends in an absurd pattern `()` — its `dpt`
+goes BEFORE that `()`.
 
-**Bucket E — DESIGN, FOUR sites. These are the schedule; do them FIRST if you have design
-authority, because each can change a signature the other buckets rest on.**
-- **979 `subscribeInner-caps` — the keystone, and the math is DONE.** `inner-step` is proven
-  and landed in `Caps-Chain` § 5. Two supplies remain, both signature-level: the IH must be
-  called at index `sizeAt S (suc j)` (NOT its successor — at the successor the IH lands flush
-  with nothing over, which is why this site resisted), and it needs `bud ≡ suc bud′` (a
-  payload subscribe is a nesting level and spends one, as the μ edge does). Gap is THREE
-  rungs, not two, and needs `2 ≤ S` via `2≤sizeAt`.
-- **1778 `innerFinish-caps` concat — a wrong call-site argument, and it is COUPLED TO UNIT 3.**
-  It hands `concatDrain-caps` its own `dep` and `bud`. A drain is a WALK: the depth must descend
-  as it does in `stepFrame-caps`'s thru-outer clause, and the budget must be the REFRESHED
-  `frameBud c j`. Descending needs a positive `dep`, which is exactly what Unit 3 supplies — so
-  this site and 2203 wait on the same ruling and should be closed in one pass.
-- **2203 `stepFrame-caps` thru-outer at `dep = zero` — MACHINE-REFUTED. Do not grind it.**
-  `agda/probe/Dep0-Walk-Probe.agda` proves
-  `suc (fLvlD S W 0 j) ≤ sIterD S W 0 (suc k) (suc m) j` for every cap with `2 ≤ S` — the walk
-  at exhausted depth STRICTLY OVERSHOOTS the exhausted frame. Since `thruWalk-caps`'s report is
-  the only bound the clause holds on its witness, the transitivity it would use runs the wrong
-  way and no rearrangement recovers it. The cause is structural: `fLvlD S W zero` is a closed
-  formula (it makes no recursive call — that is what carries the family's termination), while a
-  depth-zero walk still re-enters the family through `sLvlD`/`opIterD`. **The fix is a
-  signature — depth sufficiency has to reach this head — and it is scoped as Unit 3 below.**
-- **2574 `subscribeE-caps (input i)` — THE LANDMINE, and it is a MEASURE question.** The slot
-  edge runs through `subscribeE-input` / `sharedSlot` / `sharedConnect`, none of which carry
-  the conjunct or even an `ops` parameter. The clause's own comment records why this is not a
-  grind: a fresh entry's index is the level's WHOLE size cap, and **`ops` does not dominate
-  it**. So either those three heads gain a conjunct in a different currency, or the entry gets
-  re-measured. **Consult the design session before spending here** — this is the one Step C
-  site that can force a re-measure, and it is the analogue of the Wet item's gate.
+**A3. Supply `dpt` at the 37 call sites.** Verbatim `dpt` at 20 of them, one projection at
+13, and four need the scrutinee refined. `PL = ≤-trans (m≤m⊔n _ _) dpt` (left of a `⊔`),
+`PR = ≤-trans (m≤n⊔m _ _) dpt` (right). Note the stdlib name is `m≤n⊔m`, NOT `n≤m⊔n`.
 
-**Order:** E (get the signatures right) → A (six sites, one line) → B → C → D. Green
-`make agda && make bug-cache` per batch, push per batch, then delete `level-TEMP`.
+| line | callee | supply |
+|---|---|---|
+| 1023 | `subscribeE-caps` | `dpt` |
+| 1147, 1209 | `subscribeE-caps` | `dpt` |
+| 1302 | `sharedConnect-caps` | `dpt` |
+| 1341, 1381, 1507 | `subscribeInner-caps` | `dpt` (merge/concat/exhaust — the mirror ignores those node reads, R4a) |
+| 1465 | `subscribeInner-caps` | **(c)** add `dpt` to the clause's existing `with lookupNode nid (EvalSt.nodes st)` line; in the `just (switch-st cur od)` branch the refined `dpt′` is verbatim |
+| 1583 | `thruConsume-caps` | `PL` |
+| 1590 | `thruWalk-caps` | `PR` |
+| 1644 | `subscribeInner-caps` | `PL` |
+| 1697 | `concatDrain-caps` | `PR` |
+| 1842 | `concatDrain-caps` | **(c)** `dpt` onto the existing `with … | w ≟ᵗ s` line; then in `yes refl`, supply `≤-trans (n≤1+n _) dpt′` (stage A only — stage B replaces this) |
+| 1956 | `sharedSlot-caps` | **(c)** `dpt` onto the existing `with Sched.slots sched i`; in the `shared d` branch `dpt′` is verbatim |
+| 2158 | `innerFinish-caps` | `dpt` (the liveness `with` is overapproximated, R4a) |
+| 2258 | `innerReact-caps` | `dpt` |
+| 2282, 2313 | `thruWalk-caps` | `≤-trans (n≤1+n _) dpt` — the mirror's thru-outer arm is `suc (depthWalk …)`, so dropping the `suc` is the whole supply in stage A |
+| 2428 | `stepFrame-caps` | `PL` |
+| 2436 | `pushBurst-caps` | `PR` |
+| 2612 | `subscribeE-caps` | `PL` |
+| 2620 | `pushBurst-caps` | `PR` |
+| 2689 | `subscribeE-input-caps` | `dpt` |
+| 2812 | `subscribeE-caps` | `PL` |
+| 2823 | `pushBurst-caps` | `PR` |
+| 2895, 2906 | `subscribeE-caps`, `pushBurst-caps` | **(c)** `dpt` onto the existing `with evalTm cnt`; then `PL` / `PR` off the refined `dpt′` in the `suc k` branch |
+| 2990 | `subscribeE-caps` | `PL` |
+| 3002 | `pushBurst-caps` | `PR` |
+| 3028, 3033, 3038, 3043 | `subscribeAll-caps` | `dpt` |
+| 3096 | `subscribeE-caps` | `dpt` |
+| 3272 | `dispatchShare-caps` | `dpt` |
+| 3289 | `stepFrame-caps` | `PL` |
+| 3296 | `foldPath-caps` | `PR` |
+| 3327 | `shareGo-caps` | `dpt` |
+| 3350 | `shareGo-caps` | `PL` (the mirror reports the cancelled tail as the FIRST of three, so this needs no `with`) |
+| 3364 | `foldPath-caps` | `≤-trans (m≤m⊔n _ _) (≤-trans (m≤n⊔m _ _) dpt)` |
+| 3370 | `shareGo-caps` | `≤-trans (m≤n⊔m _ _) (≤-trans (m≤n⊔m _ _) dpt)` |
+| 3401 | `foldPath-caps` | `dpt` |
 
-### UNIT 3 — DEPTH SUFFICIENCY. The currency is ALREADY CHOSEN; thread it.
+Then: detached `make agda && make bug-cache` (~44 min dirty), green, commit, push.
 
-Step C was scoped as two units. The refutation at site 2203 says there is a third, and it is
-the mirror of Unit 1: the clique carries a sufficiency hypothesis for the budget
-(`nest o sl cs ≤ bud`) and for the operator count (`suc (sizeᵉ b) ≤ ops`), but **nothing bounds
-`dep` from below**, and one arc of the cycle spends it.
+#### Stage B — close the two sites and delete `level-TEMP`.
 
-**DO NOT invent a currency. The repo already recorded this exact debt.**
-`agda/src/Rx/Evaluator.agda:711-718`, verbatim: *"WHAT IS STILL OWED, AND IT IS OWED BY THE
-SIGNATURE PASS RATHER THAN BY THIS DEFINITION: that the story index dominates the depth the
-instant actually reaches. … the inequality it needs (nesting depth ≤ m, rather than ≤ the gas
-height) is a smaller claim than the gas bound supplies. Reported, not assumed."* So `dep` is
-meant to be read as the story index — `capsAt` takes `d := capsH e sl id`
-(`Verify-Budget-Sufficient/Caps.agda:444-458`) — and Unit 3 is that owed inequality surfacing at
-the first site that needs it. "Owed by the signature pass" IS Step C.
+- **2280** (`stepFrame-caps`, `dep = zero`, thru-outer): DELETE THE WHOLE CLAUSE. Its
+  `dpt` is `suc (depthWalk …) ≤ zero`, uninhabited, so the clause is absurd — replace the
+  `c zero bud j …` clause with nothing and let the (renamed) `suc dep′` clause be the only
+  thru-outer clause, matching `c (suc dep′) …`. Coverage then requires the absurd clause
+  to remain as `stepFrame-caps c zero bud j g id now (thru-outer op nid) κ vals fin sl
+  sched st 2≤S 1≤R slEq slC slSz inv fS pS lC vC fb ()` — one line, no body.
+- **1834** (`innerFinish-caps`, concat `yes refl`): case `dep`. **The mechanism is a
+  NESTED with, verified in `Depth-Mirror-Probe` § 4** — the clause reaches `yes refl`
+  through a `with` it already had, and `CD` (whose depth must descend) is bound in that
+  branch's own `where`, so the split cannot be delegated to a helper head that matches
+  `dep` in its LHS. Write `... | yes refl | dpt′ with dep | dpt′` and then
+  `... | zero | ()` / `... | suc dp | s≤s dpt″ = …`; both scrutinees must be re-listed so
+  the tail hypothesis refines. At `zero`, `dpt′` is `suc (depthDrain …) ≤ zero` — absurd,
+  one line. At `suc dp`, call `concatDrain-caps`
+  at `dep′` and at the REFRESHED budget `sizeAt (Caps.cSize c) (suc j)` (it reports at
+  `suc bud`, and `frameBud c j` IS `suc (sizeAt (cSize c) (suc j))` definitionally, which
+  is the budget `frame-step` demands), with the queue's mList bound from the new
+  `obsList→mList-strict` in place of `mList?-widen … (obsList→mList …)`, and peel `dpt′`
+  with `s≤s`. Then the level conjunct is
 
-What the tree says, verified:
-- `stepFrame-caps`'s conjunct comment names the intent — a frame "is the ONE arc that spends a
-  unit of depth fuel — its payload walk runs at `dep` minus one, on the REFRESHED budget". The
-  `suc dep′` clause does exactly that (`thruWalk-caps c dep′ (frameBud c j) …`); the `zero`
-  clause has nothing to descend into.
-- Both callers (`Subscribe-Face:2351`, `:3150`) pass `dep` straight through unchanged.
-- **`dep` is instantiated NOWHERE.** It is universally quantified through the whole clique;
-  `capsH`/`capsAt` are never called from `Subscribe-Face`. There is no top-level consumer to
-  satisfy yet.
+  ```agda
+  frame-step (Caps.cSize c) (Caps.cWid c) dep′ j 0 (suc j′) 2≤S z≤n
+    (subst (λ x → x + suc j′
+                    ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep′
+                        (frameBud c j) (suc (Caps.cWid (frameStep j c))) x)
+           (sym (+-identityʳ j))
+           (walk-room (Caps.cSize c) (Caps.cWid c) dep′ (frameBud c j)
+                      (length q) j j′ 2≤S
+                      (≤ᵇ⇒≤ (length q) (Caps.cWid (frameStep j c)) (T-to wnLen))
+                      (proj₂ (proj₂ (proj₂ (proj₂ CD))))))
+  ```
 
-**Therefore the work is: add depth sufficiency as a HYPOTHESIS on the clique, exactly as
-`nest … ≤ bud` and `suc (sizeᵉ b) ≤ ops` already sit there, thread it, and close 2203 and 1778.**
-Discharge lands later at the top-level instantiation, beside the `capsH` reading already
-designed. Stating an obligation and discharging it at the top is this repo's outside-in rule,
-and it is non-spec, so it needs no ruling.
+  `wnLen` is already extracted in that clause's `where` (the queue's length conjunct off
+  `widNode`). `frame-step`'s conclusion is `j + (0 + suc j′)`, and `0 + suc j′` reduces to
+  the reported witness `suc j′`.
+- Then DELETE `level-TEMP` (declaration at ~896 AND its pass memo above it);
+  `grep -rn "TEMP" agda/src` must return zero — the BARE word.
+- `make agda && make bug-cache` green → commit → push → merge to main → **Step C DONE**,
+  ledger still 5, item 3 next (its brief is the faces paragraph above).
 
-**THE RISK IS ON THE DISCHARGE, NOT THE THREADING — record it, do not forget it.** Nesting depth
-is dominated by registration count only if every path to a deeper `thru-outer` registers before
-recursing. Two reasons to doubt it: `concat-st` queues inner expressions that are *not yet
-subscribed*, and `Nest-Budget-Probe.agda` § 3 (the refuted budget-inheritance scheme, cited at
-`Evaluator.agda:648-654`) mints a `scanᵉ` value nesting `k` deep that is subscribed only later.
-If latent depth can sit in unregistered value structure, registration count does not dominate it.
-Nothing in the tree connects value-nesting depth to registration count. The registry-cardinality
-machinery that exists is `INV?`'s length conjunct (`Measures.agda:5324-5332`, literally
-`length (EvalSt.registry st) ≤ᵇ B`), maintained by the PROVEN `register-INV` (`Wet.agda:317-334`)
-— but in the WET family's doubling currency, not the CAPS family's, and the two are not wired
-together. Suggested first probe: attempt `thru-outer` depth ≤ `length (EvalSt.registry st)`
-against the `Nest-Budget-Probe` § 3 witness.
+### Refuted candidates — do not re-propose
 
-**RAW MATERIAL FOR THE DESIGN SESSION, gathered 2026-08-04 and source-verified. Four of these
-overturn what this file previously implied — read them before proposing anything.**
-
-1. **The CAPS family ALREADY bounds registry cardinality.** `capsOK?` (`Caps-Face.agda:298-306`)
-   has five conjuncts and the fifth is literally `length (EvalSt.registry st) ≤ᵇ Caps.cReg c`. So
-   a registration-count bound is not missing from the caps world — it is already a hypothesis
-   every clique member carries.
-2. **But `EvalSt.nodes` has NO count bound, anywhere, and is never pruned.** No
-   `length (EvalSt.nodes …)` conjunct exists in `capsOK?` or `INV?` (grepped for `nodesLen`,
-   `nodesSz`, `cNode`; zero hits), and `installNode`/`setNode` only insert-or-update — no
-   node-removal function exists in the tree. Registry entries DO get dropped (`cutThrough`,
-   `dropSource`). Node state grows monotonically within an instant.
-3. **Parked-but-unsubscribed inners ARE already bounded, both ways.** This weakens the worry
-   recorded above: `widNode` (`Caps-Face.agda:228-235`) gives `concat-st`'s queue
-   `length q ≤ᵇ W`, and `boundedNode` (`Measures.agda:~288`) gives `sizeᵉ o ≤ᵇ B` per queued
-   element. So the `concat-st` queue is count-bounded AND size-bounded already.
-4. **Nesting is NOT unbounded — that was never the problem.** `nest≤sizeᵛ`
-   (`Nest-Budget-Probe.agda` § 1) bounds nesting by size, and size is capped. The real failure is
-   a LEVEL MISMATCH: the cap where a value is SPENT (43690 at `S = 2, W = 1`) vastly exceeds the
-   budget read where its subscribe BEGAN (2). That is precisely why `dep` exists — it pays for
-   RE-READING the budget at each frame entry instead of inheriting it
-   (`Rx/Evaluator.agda:644-654`).
-5. **Three candidates are already machine-refuted. Do not re-propose them.** (a) instantiate the
-   budget off the size cap read at subscribe entry and inherit it downward — `Nest-Budget-Probe`
-   § 3, via a `scanᵉ` under an `*All` whose k-th mint nests k deep while the carrier's nesting
-   stands still; (b) a bare "descends by one, `1 ≤ k` maintained" hypothesis — `Mu-Nest-Probe`
-   § 1, which needs `1 ≤ 0` at `k = 1`; (c) a term-syntax-only nesting measure with no share
-   residue — `Mu-Nest-Probe` § 2, refuted at the `sharedConnect` edge.
-6. **THE TEMPLATE THAT WORKED ON THE SIBLING PROBLEM.** `bud` had the same shape of difficulty
-   and `Caps-Nest.agda` solved it: `nest e sl cs = syncSizeᵉ e + resid sl cs` — a term measure
-   PLUS a residue for obligations not yet discharged (shares not yet connected). Fully proven.
-   Keep `bud` and `dep` strictly separate (`bud` bounds operator weight within one walk, `dep`
-   bounds `*All` nesting across walks) — but the *shape* "measure + residue for pending
-   obligations" is the precedent worth trying first.
-7. **THE MOST PROMISING LEAD.** `Rx/Evaluator.agda:711-718` says the gas ALREADY bounds the depth
-   the instant reaches, and that the inequality actually needed (`nesting depth ≤ m`, the story
-   index) is **"a smaller claim than the gas bound supplies."** So this may be a matter of
-   extracting an existing bound rather than inventing a new invariant. Start there.
-8. **A count-side warning if the design goes that way.** `Nest-Count-Probe.agda`: *"STORIES PER
-   INSTANT = DELIVERIES × NESTING, not nesting"* — delivery count is independently
-   doubly-exponential in the shared-slot count, so any count-based invariant must account for
-   deliveries, not just static nesting.
-
-Not yet read (further refuted-candidate history for the count axis, if the design needs it):
-`Rung-Count-Probe`, `Fold-Count-Probe`, `Width-Count-Probe`, `Share-Count-Probe`,
-`Count-Grind-Probe`, `Nest-Supply-Probe`, `Nest-Count-Main`.
-
-**CORRECTION (2026-08-04), and it was MY error in this file, verified against source:** an earlier
-revision of this section claimed the depth invariant is "the same object Tier 1 item 1 is gated
-on — settle it once." **That is not supported by `Wet.agda`.** `subscribeE-wet`'s own comment
-(`Wet.agda:4276-4293`) says it is blocked on completing `subscribeE-walk` and grinding the mutual
-block clause by clause; `cascadeGo-wet`'s (`Wet.agda:4315-4334`) says a fixed-two-bound per-chain
-contract is FALSE over its full quantification and the fix is to thread per-cascade growth
-through the fold. Both are proof-ASSEMBLY problems against machinery that already exists and is
-proven — neither local comment names a missing cardinality invariant. So **exactly one thing needs
-the undesigned invariant: the two walk sites here.** Do not let the "one object, two items"
-framing justify designing it earlier than it is needed.
+Budget inheritance from entry size (`Nest-Budget-Probe` § 3); bare positivity
+(`Mu-Nest-Probe` § 1); term-syntax measure without residue (`Mu-Nest-Probe` § 2);
+gas-height hypothesis (undischargeable at `capsAt`'s `d` — `Rx/Evaluator.agda:710-717`,
+this ruling); closing 2280 from the walk's report (`Dep0-Walk-Probe` § 1 — strict
+overshoot, structural).
 
 ---
 
 ## The Goal & Structure
 
-**Ultimate goal:** Fully machine-checked proof, `Formal-Verification` discharged, **no postulates, everything typechecks**. The work is decomposed into three tiers:
+**Ultimate goal:** Fully machine-checked proof, `agda/src/Verify-Batch-Simultaneous/The-Proof.agda` discharged, **no postulates, everything typechecks**. The work is decomposed into three tiers:
 
 ### Tier 1: Postulate Ledger Discharge (5 remaining, originally ~50)
-**Done:** cascadeGo-charge framework, full receipt/queue-length quantification apparatus, supply proofs, Unit 2 (all TEMP scaffolding deleted).
+**Done:** cascadeGo-charge framework, full receipt/queue-length quantification apparatus, supply proofs, Unit 2 (all TEMP scaffolding deleted), Step C Units 0–2.
 
-**Current (item 4):** Step C — add level conjuncts to the nesting receipt across the 13-member mutual clique in `Subscribe-Face.agda`.
+**Current (item 4):** Step C — Unit 3 (the depth ruling above) is the remaining work.
 
 **Remaining after Step C:**
-- **Item 3** — discharge the two Caps-Face faces (`innerFinish-concat-face`, `thruOuter-face`; the single `postulate` block is at ~line 6119), taking the ledger from 5 to 3.
-- **Item 2** — discharge subscribeE-walk postulate.
-- **Item 1** — discharge subscribeE-wet + cascadeGo-wet + Wet.agda's remaining postulates.
+- **Item 3** — discharge the two Caps-Face faces (`innerFinish-concat-face`, `thruOuter-face`), taking the ledger from 5 to 3. Brief: the faces paragraph in Unit 3 above.
+- **Item 2** — discharge subscribeE-walk postulate (Measures:6204; its own comment says it is blocked on a "reachability" bridging lemma, not a state invariant).
+- **Item 1** — discharge subscribeE-wet + cascadeGo-wet + Wet.agda's remaining postulates. Both are proof-ASSEMBLY problems against machinery that already exists and is proven (`register-INV`, Wet:317-334); neither is blocked on the depth invariant (verified against their own comments, Wet:4276-4334).
 
-**Tier 1 is the authorization boundary:** once ledger reaches 0, the design session (~Fable) has standing permission to delegate Tier 2 work to another agent pool with full autonomy (no more ruling/stop conditions, purely mechanical grinding).
+**Tier 1 is the authorization boundary:** once ledger reaches 0, the design session has standing permission to delegate Tier 2 work with full autonomy (no more ruling/stop conditions, purely mechanical grinding).
 
 ### Tier 2: Verify-Well-Formed (8 postulates)
-The second main module holding 8 postulates that depend on Tier 1 being complete. Batch-online also sits here. Lower priority; begins after Tier 1 closes.
+Depends on Tier 1. Batch-online also sits here. Begins after Tier 1 closes.
 
-### Tier 3: Theorem Ring (30 postulates spread across 4 modules)
-Readme, Time, Evaluator, Provenance. All depend on both Tier 1 and Tier 2. Lowest priority.
-
----
-
-## The Current Leg: Step C — Units 0 and 1 DONE, the CONJUNCT remains
-
-**Unit 0 — DONE.** The composition gate now lives in
-`agda/src/Verify-Budget-Sufficient/Caps-Chain.agda` (a new non-SCC module, ~6 s solo): the five
-clause-shape steps `walk-step`/`frame-step`/`op-step`/`op-step-eval`/`op-step-mu`, the quadratic
-`quad-arith`, the index conversions `index-mono`/`entry-is-sweep`/`entry-to-index`/`walk-index`,
-and `chain-desc` (§ 3, added by Unit 1). `Subscribe-Face` imports it directly — note the
-top-level `Verify-Budget-Sufficient.agda` also opens it, which is downstream and does NOT put it
-in scope for the clique.
-
-**Unit 1 — DONE, and it needed no scaffolding.** Both operator-shaped heads
-(`subscribeE-caps`, `subscribeAll-caps`) now carry an `ops` parameter and the hypothesis
-`suc (sizeᵉ b) ≤ ops`, every call site supplies it outright, and **no TEMP postulate was left
-behind** (`grep -rn "TEMP-" agda/src` is empty). `make agda && make bug-cache` green.
-
-**THE DESCENT FINDING — read this before touching the conjunct.** Unit 1 was scoped as
-"thread the parameter, park the hypothesis behind a weak hole, discharge in Unit 2." That plan
-is WRONG, and the hole is what hides the error:
-
-- `op-step` concludes at `suc ops`, so a clause can only report if its own index is a
-  SUCCESSOR. Every recursing clause must therefore **split** its index and hand the source the
-  predecessor. A clause that does not split has no predecessor to hand over — and a weak
-  `∀ {x y : ℕ} → x ≤ y` hole accepts the mismatch silently, so the module goes green with a
-  descent that cannot ever close. **The split belongs in the same pass that threads the
-  parameter.**
-- The supply is then free, and one lemma covers the family. `chain-desc hd src m′` turns
-  `suc (suc (hd + src)) ≤ suc m′` into `suc src ≤ m′`; every chain constructor's size is
-  `suc (head + source)` (`Rx.Exp:463-475`), so `hd := sizeᵗ f` for map/take, `hd := sizeᵗ f +
-  sizeᵗ z` for scan (`+` associates left, so its head being a sum costs no rewrite), and
-  `hd := 0` for the headless ones, where it degenerates to `≤-pred`. The zero half of each
-  split is absurd **by constructor** (`suc x ≤ zero` is uninhabited whatever `x` is, stuck or
-  not), so it costs one line, not a proof.
-
-**WHICH CLAUSES SPLIT — count off the clause BODIES, not the constructor list.** The two
-disagree, and reading the constructor list is how the first probe got this wrong (it claimed
-nine). **Four** split:
-- `mapᵉ`, `takeᵉ`, `scanᵉ` — chain edges, `chain-desc` as above.
-- `subscribeAll-caps` — the four `*All` clauses delegate their WHOLE body to it, so they share
-  its conclusion and therefore its index; the `op-step` that consumes the source and the pushed
-  frames sits inside IT, and so does the split. Its hypothesis is stated about the `*All` TERM
-  (`suc (suc (sizeᵉ b)) ≤ ops`) and is inherited from its callers verbatim.
-
-The rest owe nothing: the four `*All` clauses pass index and hypothesis straight through;
-`μᵉ`-with-gas is a **FRESH ENTRY, not a chain edge** — it subscribes `unfoldμ body`, which is
-LARGER than `body`, so no descent exists, which is exactly why `op-step-mu` consumes it at
-`sLvlD` and charges it as one nesting level (it mints the index at the level's size cap and pays
-one `s≤s`); and `μᵉ`-out-of-gas, `deferᵉ` (it PARKS its body as a pending live source), `input`,
-`ofᵉ`, `emptyᵉ`, `varᵉ` never recurse, so `ops` stays abstract and unused.
-
-**Design facts (probed and settled):**
-1. The level conjunct **cannot be reported in entry shape** (`sLvlD S W d bud J`). A recursive call inside an operator clause is not a fresh subscribe — it's the same sweep, one shorter. The entry-sweep-in-operator-remaining absurdity is machine-refuted at zero-operators-left (`agda/probe/Chain-Index-Probe.agda`).
-2. **The index meets the conjunct via `opIterD-mono`**, consuming exactly one step. At the entry site, `index-mono` and `entry-to-index` discharge the conversion.
-3. **The descent split belongs only at the reporting clause.** `sIterD`, `opIterD`, `fIterD` all pass the budget `k` through untouched — that's a family-level property, not clause-specific.
-4. **Which transformer each head reports in is FORCED, not chosen** — the family's clause
-   equations close into a cycle and each head sits at exactly one arc
-   (`agda/probe/Chain-Supply-Probe.agda` § 4). Only the two `opIterD` heads need an index
-   PARAMETER; every other index is already a function of what the head holds (a payload list's
-   length, a queue's length, an emit count).
-
-**What remains of Step C:** the shapes are landed on nine heads; the 20 open clause sites are
-enumerated and classified in the census at the top of this document. Green commit per batch. If
-a site resists two distinct attempts → STOP with the goal type verbatim.
-
-**After the conjunct lands green (ledger still 5):**
-- Proceed to item 3 (the two Caps-Face faces, 5 → 3)
+### Tier 3: Theorem Ring (30 postulates across 4 modules)
+Readme, Time, Evaluator, Provenance. Depends on Tiers 1 and 2. Lowest priority.
 
 ---
 
@@ -399,141 +396,101 @@ a site resists two distinct attempts → STOP with the goal type verbatim.
 
 1. **Container snapshot rollback (twice):** The execution environment rolled back to an August 1 snapshot mid-work, wiping the local repo and running processes. Recovery: immediate re-sync from GitHub (`git fetch origin; git checkout -B branch origin/branch`). **All work was safe on origin** — nothing was lost that had been pushed.
 
-2. **Usage limits (twice):**
-   - Weekly limit hit mid-work at ~02:05 UTC (resets Aug 7, 1pm UTC)
-   - Session limit hit earlier (resets 3:20am UTC, quoted in API error)
-   - Worker died with in-flight edits lost (never pushed)
+2. **Usage limits (twice):** weekly and session limits hit mid-work; a worker died with in-flight edits lost (never pushed).
 
-**Standing practice for the next worker:**
-- **Push per green batch, not per commit.** Bundling 2-3 commits into a green batch and pushing the batch as a unit is correct. Pushing every commit is fine too. **Leaving multiple green commits unpushed is the risk:** if the container rolls back or kills, only pushed work survives.
-- **Detect rollback via commit dates:** Before any edit, run `git log -1 --format=%ci`. If it's days old but the transcript claims recently-pushed commits, re-sync immediately.
-- **Handle usage limits gracefully:** The error message quotes a reset time (e.g., "resets Aug 7, 1pm UTC"). On that error, **note the reset time and schedule a self-check-in 5 minutes after the reset** rather than reviving immediately. Usage limits are hard walls; reviving before the reset fires only burns tokens.
+**Standing practice:**
+- **Push per green batch.** Unpushed work is at risk (rollback, usage limits).
+- **Detect rollback via commit dates:** before any edit, `git log -1 --format=%ci`. If it's days old but the transcript claims recently-pushed commits, re-sync immediately.
+- **Handle usage limits gracefully:** the error quotes a reset time; schedule a self-check-in 5 minutes after it rather than reviving immediately.
 
 ---
 
 ## The Probe-Before-Grind Law
 
-Proven three times now (2026-08-04):
-
-1. **`with … in` syntax (Subscribe-Face):** The unifier was not binding the equation as expected. A 10-line probe in `agda/probe/` settled it in seconds instead of two 14-minute Subscribe-Face rechecks.
-
-2. **Unifier-shaped holes (Unit 2):** Precise hole shapes like `nest e sl cs ≤ bud` fail to unify if the term unfolds to a sum. Weak holes (`∀ {x y} → x ≤ y`) unify against any goal. Probe: `agda/probe/Hole-Shape-Probe.agda` (fictional name for the pattern).
-
-3. **Chain index (Chain-Index-Probe):** Reporting in entry shape was the natural guess; the probe refuted it at the zero-operators-left instance and identified the operator count as the real currency.
-
-**Standing rule for all future work:**
-- Any syntax/elaboration question you haven't used in THIS file → write a ≤10-line probe in `agda/probe/` BEFORE incorporating it into the big module. Probes are ephemeral (deleted after proof, not shipped in the final artifact), but they save hours of big-module rechecks.
+Any syntax/elaboration question you haven't used in THIS file → write a ≤10-line probe in
+`agda/probe/` BEFORE incorporating it into the big module. Probes are ephemeral (deleted
+after the proof, not shipped), but they save hours of big-module rechecks. Proven
+repeatedly: `with … in` binding, weak-vs-precise hole shapes, the chain-index currency,
+and the Dep0 walk refutation — each settled in seconds what a Subscribe-Face recheck would
+have charged 44 minutes for.
 
 ---
 
 ## Standing Rules (Carry These Forward)
 
 ### Design & Proof Structure
-- **Spec is gospel.** Impl ≠ spec → impl is wrong. Only touch spec after asking (Fable authority).
-- **Outside-in assembly:** State full signatures and end goals first with postulate bodies, then prove leaves-first. Never prove pieces before their assembly exists.
-- **Σ-witness law:** Before adding a conjunct, check if it's upward-closed in the witness. If yes, it's vacuous — state why it's needed before grinding. (`agda/probe/Level-Shape-Probe.agda` discharged this for Step C.)
+- **Spec is gospel.** Impl ≠ spec → impl is wrong. Only touch spec after asking.
+- **Outside-in assembly:** state full signatures and end goals first with postulate bodies, then prove leaves-first. Never prove pieces before their assembly exists.
+- **Σ-witness law:** before adding a conjunct, check it is not upward-closed in the witness — if it is, it's vacuous.
+- **Survey the whole hole-set before discharging any of it** (census → classify → prove; blocked bucket first).
 
 ### Editing Discipline
-- **Hand-edit, no scripts.** Agda clause-LHS syntax cannot be parsed line-by-line (with-continuations, absurd clauses don't fit the `=`-terminated pattern). Per-head count check before invoking Agda.
-- **Weak TEMP holes:** Not precise shapes. Shape `∀ {x y} → x ≤ y` works; `sizeAt S j + k ≤ n` does not.
-- **Walk-index/index-mono/entry-to-index spent as-is.** If a call site needs more arithmetic, that's a smell — probe before grinding.
-- **Descent split only at the reporting clause.** Carrying edges forward untouched (`sIterD`/`opIterD`/`fIterD` pass `k` through — family property).
+- **Hand-edit, no scripts.** Agda clause-LHS syntax cannot be parsed line-by-line.
+- **Weak TEMP holes** (`∀ {x y} → x ≤ y`) unify; precise shapes may not.
+- **Descent split only at the reporting clause** — the transformer families pass `k` through (family property).
 
 ### Commit & Push Protocol
-- **Green `make agda && make bug-cache` before each commit.** No exceptions; type-level unit tests (`Implementation/Unit-Test.agda`, run via `make bug-cache`) must pass.
-- **Push per green batch.** Batches are 2-3 related commits grouped by "green" builds. Unpushed work is at risk (rollback, usage limits).
-- **Commit messages in repo voice.** No "Worker 44", no model IDs, no meta-commentary. Focus on the theorem state and what changed.
+- **Green `make agda && make bug-cache` before each commit.** No exceptions.
+- **Push per green batch.**
+- **Commit messages in repo voice.** No worker IDs, no meta-commentary.
 
 ### Stop Conditions
-- **Two failed distinct attempts on one site → STOP with goal type verbatim.** Report the goal to Fable before proceeding.
-- **Spec ambiguity → surface with a TypeScript rxjs example, defer to naive plain rxjs semantics.**
-- **Impossibility pair discovered → STOP, report immediately to Fable. Do not act on it.**
+- **Two failed distinct attempts on one site → STOP with the goal type verbatim.**
+- **Spec ambiguity → surface with a TypeScript rxjs example**, defer to naive plain rxjs semantics.
+- **Impossibility pair discovered → STOP, report immediately. Do not act on it.**
+- **`depthE ≤ capsH` refuted (Unit 3's deferred obligation) → STOP-AND-DISCUSS**, same severity as a spec question.
 
-### Container & Fallback Management
-- **On the persistent laptop (current setup), keep-alives are RETIRED** (CLAUDE.md, 2026-08-03): detached builds advance on their own; poll their `EXIT=` log with short foreground calls for pacing/verification only. Keep only a sparse (~60 min) fallback check-in for wedged workers.
-- **The container-era rules below apply ONLY if running in a suspendable cloud container** (the environment this document was written in): foreground wait-loops (`for i in $(seq 1 55); do grep -q 'EXIT=' log && break; sleep 10; done`) to hold the container awake, 30-min fallback cadence, delete-and-re-arm trigger discipline.
-- Long Agda checks (>600s) must outlive the Bash tool's ~600 s per-call ceiling. **On the laptop `setsid` DOES NOT EXIST** (verified 2026-08-04: `nohup setsid …` dies silently writing no log, and the sandbox additionally denies detached writes under `/private/tmp`). Use the Bash tool's own **`run_in_background: true`** instead — it survives across turns, writes to a task output file you can `Read`, and re-invokes the session when it exits, which is strictly better than polling for an `EXIT=` line. The `nohup setsid` recipe in older memos is container-era; do not copy it.
-- **Interfaces are cached per module**, so a green tree plus one new leaf module is a ~1 min `make agda`, not 35–40 min. The full 35–40 min figure applies when Subscribe-Face (~7 min) or Wet (~14–18 min) is dirty.
-- **NEVER trust a reported exit code that came through a pipe or a trailing command — write agda's own `$?` into the log and read THAT.** This bit twice for real on 2026-08-04. (a) `agda … 2>&1 | tail -25` was notified as "exit code 0" while the output held a `Not in scope` error — the shell reports the PIPE's code. (b) A wrapper of the form `agda … ; echo "EXIT=$?"; tail -20 log` was notified as "exit code 0" for a run that had been SIGTERMed — the harness summarises the wrapper's last command (`tail`), not agda's. The log itself said `AGDA_EXIT=143`. Correct form, and the only one to use:
-  `agda … > /tmp/x.log 2>&1; echo "AGDA_EXIT=$?" >> /tmp/x.log` — then `grep AGDA_EXIT` the file. Piping also hides OOM kills, the original reason for the rule.
+### Build & Environment
+- Long Agda checks (>600 s) use the Bash tool's **`run_in_background: true`** (on this laptop `setsid` does not exist and detached writes under `/private/tmp` are denied). Write agda's own `$?` into the log (`agda … > log 2>&1; echo "AGDA_EXIT=$?" >> log`) and grep THAT — never trust a pipe's or wrapper's exit code.
+- **Pin the working directory in every build command** — `cd agda/` for raw `agda`, repo root for `make`; guard with `ls Makefile &&` or `ls src/… &&`. Verify the run actually ran (`grep -c Checking` ≥ 1, no `Total 0ms`) before believing anything it says.
+- **Interfaces are cached per module**: a green tree plus one new leaf module is ~1 min of `make agda`. The full 35–40 min applies when Subscribe-Face (~44 min dirty, ~6.9 GB) or Wet (~14–18 min) is dirty. At most TWO heavyweight checks at once.
+- **`touch` does not dirty a module** (invalidation is by content); the build is `--safe`, so no check-disabling pragmas exist.
 
 ---
 
 ## Files of Interest
 
-### Core Working Files (Tier 1, Item 4)
-- **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** — 3314 lines, **~44 min and ~6.9 GB
-  per check** (measured 2026-08-04; the "~7 min" in older memos is wrong). Iterate in probes,
-  land in verified batches, never guess a projection path.
-  - **It holds 18 `-caps` definitions but the true SCC is THIRTEEN** — the module's own header
-    (lines 3-9) said so all along, and the call graph re-derived from the clause bodies and
-    `where` blocks confirms it. Any memo claiming an "18-head clique" is wrong. The other five
-    stratify: `retagEvents-caps` is a self-recursive leaf UPSTREAM (`pushBurst-caps` calls it,
-    it calls nothing back); `foldPath-caps`/`dispatchShare-caps`/`shareGo-caps` are their own
-    3-cycle strictly DOWNSTREAM (they call `stepFrame-caps`, nothing in the 13 calls them);
-    `chainStep-caps` is the entry point, downstream of those and with no in-file caller.
-  - **Splittable mass, verified with no blockers** (no `private`, no explicit `mutual` block, no
-    `where` or `with` straddling two top-level names): lines 258-889 are ~632 lines of pure
-    arithmetic/list lemmas that CANNOT reference the clique (they precede its first forward
-    declaration), plus `retagEvents-caps` (14) and `innerFinish-zero′` (21) — ~667 lines hoist
-    upstream; the downstream 3-cycle plus `chainStep-caps` is ~215 more. That leaves the true
-    SCC at ~2122 lines, ~64% of the file, and that floor is irreducible: shrinking it further
-    would mean restructuring genuine mutuality, which CLAUDE.md forbids.
-  - Current state: the two operator-shaped heads carry `(c : Caps) (dep bud ops j : ℕ)` + the
-    `nest … ≤ bud` and `suc (sizeᵉ b) ≤ ops` hypotheses, and four clauses split `ops`. **The
-    level conjunct IS in the Σ** on nine heads (the five families tabulated in the census);
-    what remains is its 20 open clause sites.
-  - The clique's signature block starts at `subscribeE-caps` (~line 890); the `level-TEMP`
-    postulate and its pass memo sit just above at ~855-888 — that memo is where a known-wrong
-    call-site argument gets recorded the moment it is noticed.
+### Core Working Files (Tier 1, item 4 — Unit 3)
+- **`agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda`** — ~3305 lines, **~44 min and
+  ~6.9 GB per dirty check**. Iterate in probes, land in verified batches, never guess a
+  projection path. Holds 18 `-caps` definitions; the true SCC is THIRTEEN (the other five
+  stratify out). The clique's signature block starts at `subscribeE-caps` (~899); the
+  `level-TEMP` postulate and its pass memo sit at ~855-896. **Two `level-TEMP` sites
+  remain: 1834 (innerFinish concat) and 2280 (stepFrame thru-outer at `dep = zero`)** —
+  Unit 3's targets. The thru-outer `suc dep′` clause (:2293-2309) is the model for both
+  closures.
+- **`agda/src/Verify-Budget-Sufficient/Caps-Depth.agda`** — TO BE CREATED by Unit 3: the
+  depth mirror (rules R1-R7 above).
+- **`agda/src/Verify-Budget-Sufficient/Caps-Chain.agda`** — the composition gate: clause
+  shapes (`walk-step`/`frame-step`/`op-step`/`op-step-eval`/`op-step-mu`, `inner-step`,
+  `connect-step`, …), index conversions (`walk-index`, `index-mono`, …), `chain-desc`.
+  Non-SCC, ~6 s solo — new non-mutual arithmetic goes here.
+- **`agda/src/Verify-Budget-Sufficient/Caps-Nest.agda`** — the budget measure
+  `nest e sl cs = syncSizeᵉ e + resid sl cs` and its per-constructor steps.
+- **`agda/src/Verify-Budget-Sufficient/Caps-Sadd.agda`** — superadditivity family,
+  `walk-step-lift`, `walk-step-suc`.
+- **`agda/src/Verify-Budget-Sufficient/Caps-Face.agda`** — the two ledger postulates
+  (`innerFinish-concat-face`, `thruOuter-face`, `postulate` block at ~6190) and the face
+  machinery (`FrameFace` at 4578); `valsCaps→mList-strict` lives here and is the model for
+  Unit 3's `obsList→mList-strict`.
 
-- **`agda/src/Verify-Budget-Sufficient/Caps-Chain.agda`** (the composition gate, landed by Unit 0)
-  - § 1 the five clause shapes + `quad-arith`; § 2 the index conversions
-    (`index-mono`, `entry-is-sweep`, `entry-to-index`, `walk-index`); § 3 `chain-desc`, the
-    descent supply. Non-SCC, ~6 s solo — put new non-mutual arithmetic here.
-
-- **`agda/src/Verify-Budget-Sufficient/Caps-Nest.agda`**
-  - Nesting measure `nest e sl cs = syncSizeᵉ e + resid sl cs`, per-constructor steps (`share-step`, `mu-step`, `chain-step`, `map/take/scan/all/merge/concat/switch/exhaust-step`), `refresh-supplies-nest`, `k-raise`.
-
-- **`agda/src/Verify-Budget-Sufficient/Caps-Sadd.agda`** (superadditivity family `fLvl/sIterD/opIterD/fIterD-sadd`, `walk-step-lift`, `walk-step-suc`)
-
-- **`agda/src/Verify-Budget-Sufficient/Caps-Face.agda`**
-  - Two ledger postulates `innerFinish-concat-face` + `thruOuter-face` in the single `postulate` block at ~line 6119 (item 3, after Step C); the pass memo (why (b) precedes (a), what the faces wait on) sits directly above it.
-
-- **`agda/probe/Chain-Index-Probe.agda`** (settled the conjunct shape; refuted entry-shape reporting)
-- **`agda/probe/Level-Shape-Probe.agda`** (discharged Σ-vacuity; § 3 the descent-point fact)
-- **`agda/probe/Sub-Charge-Probe.agda`** (§ 5: the five clause-shape arithmetic steps, proven)
-- **`agda/probe/Chain-Supply-Probe.agda`** (§ 1-2 the index hypothesis and that it is free at
-  every supplier; § 4 the per-head transformer map, and why it is forced)
-- **`agda/probe/Chain-Descent-Probe.agda`** (the split: why it cannot be deferred, the one
-  descent lemma for the whole family, and § 3 the corrected count of which clauses split)
+### Key probes (all in `agda/probe/`)
+- `Dep0-Walk-Probe.agda` — the machine refutation that forced Unit 3's ruling.
+- `Mu-Nest-Probe.agda`, `Nest-Budget-Probe.agda` § 3, `Nest-Count-Probe.agda` — the
+  refuted-candidate record cited by the ruling.
+- `Chain-Index-Probe`, `Chain-Supply-Probe`, `Chain-Descent-Probe`, `Sub-Charge-Probe` § 5
+  — Step C's settled shape decisions.
 
 ### Build & Test
-- **`Makefile`:** `make agda` (full Agda check), `make bug-cache` (type-level unit tests), `make test` (other suites)
-- **`agda/src/Implementation/Unit-Test.agda`:** Type-level unit test cache, run via `make bug-cache`
-- **`scripts/gen-unit-tests.sh`:** Append new counterexamples to the cache
-
----
-
-## Next Handoff Checklist
-
-Before pausing for the design session to transfer authority to another account:
-
-- [ ] All work is pushed (green legs go to `main` — merging verified-green work to main is
-      standing authorization from Anthony, 2026-07-31)
-- [ ] Last commit is green (`make agda && make bug-cache` both exit 0)
-- [ ] `grep -rn "TEMP" agda/src/` returns zero — note the bare word, NOT `"TEMP-"`: the
-      hyphenated pattern misses suffix names like `level-TEMP` and reported a false all-clear once.
-- [ ] No uncommitted changes (`git status --short` is empty)
-- [ ] Fallback triggers are deleted (check `mcp__claude_code_remote__list_triggers` or let design session clean up)
-- [ ] New worker receives: this document, current git branch tip SHA, postulate ledger summary
+- **`Makefile`:** `make agda` (full check), `make bug-cache` (type-level unit tests), `make test`.
+- **`agda/src/Implementation/Unit-Test.agda`** via `make bug-cache`; append with `scripts/gen-unit-tests.sh`.
 
 ---
 
 ## Contact & Authority
 
-**Design session (Fable 5):** Reviews worker reports, merges green work to main, makes spec rulings, launches next worker. Anthony supervises the entire campaign.
-
-**Worker (Opus 5 / Haiku):** Executes the assigned leg (e.g., "Step C Unit 1, then Unit 2"), commits+pushes per green batch, reports completion or stops on a caution condition.
-
-**Tier 1 completion** is the threshold for **full worker autonomy on Tier 2:** Once the ledger reaches zero, Tier 2's 8 postulates are fully available and can be discharged by any competent worker without design-session rulings (all shape decisions are settled, all stop conditions are specification-hard).
+**Design session:** reviews worker reports, merges green work to main, makes rulings,
+launches the next leg. Anthony supervises the campaign. **Workers (Sonnet 4.6):** execute
+the assigned leg, commit+push per green batch, report plainly (numbers including
+failures), stop on the standing conditions. **Tier 1 completion** is the threshold for
+full worker autonomy on Tier 2.
