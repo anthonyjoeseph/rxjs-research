@@ -46,12 +46,11 @@ these become the ledger):
 
 | Name | Where | Content |
 |---|---|---|
-| B2 | Caps-Bridge.agda | `cReg ≤ cSize` survives the caps iteration (joint induction) |
-| S1 `fn-tick` | Caps-Bridge.agda | fn face + Ψ-half of regsB? preserved across a cascade |
-| S2 `slots-tick` | Caps-Bridge.agda | raw `Sched.slots` equality across a cascade |
 | S3 `dry-tick` | Caps-Bridge.agda | P2's dry half (the gas-peel axis, unchanged) |
-| `depth-compositional` | Depth-Bound.agda | `depthE ≤ sizeᵉ b + pathLen κ + storeNestMax` (structural induction over the mirror) |
-| `storeNest-capped` | Depth-Bound.agda | `capsOK?` + `slotsSize ≤ cSize` → `storeNestMax ≤ cSize` (stBounded? inversion) |
+| `depth-compositional` | Depth-Bound.agda | `depthE ≤ sizeᵉ b + pathLen κ + storeNestMax` (structural induction over the mirror). CENSUSED 2026-08-05: scope is 16 heads, not 19 (the delivery family — depthFold/depthDisp/depthShareGo/depthChain — is out of scope). The real remaining work is a state-growth conjunct, not a lemma about the mirror itself — every clause feeds `depthBurst` the state from the REAL `subscribeE` run, while the bound's RHS reads the entry state, so the induction needs `storeNestMax` at the evolved state dominated by the entry's bound. Details, including the ruling to prove this as a second conjunct of the same induction rather than a separate family, are in Depth-Bound.agda's header. |
+
+(B2, S1 `fn-tick`, S2 `slots-tick`, and `storeNest-capped` are PROVEN — landed
+in Caps-Bridge.agda and Depth-Bound.agda respectively, no longer postulates.)
 
 ## Named gaps and rulings (the full deck)
 

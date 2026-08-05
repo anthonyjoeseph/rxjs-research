@@ -22,23 +22,31 @@
 -- so that statement is the natural next task, not a blocked one.
 module Verify-Budget-Sufficient.Caps-Bridge where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _⊔_)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_;
+                                z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; m≤n+m)
-open import Data.List    using (List; []; _∷_; all; length)
+                                       ≤-reflexive; m≤n+m; n≤1+n;
+                                       *-mono-≤; *-monoʳ-≤; +-mono-≤; *-comm;
+                                       *-distribˡ-+; *-identityʳ; +-identityʳ)
+open import Data.Nat.Solver using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
+open import Data.List    using (List; []; _∷_; all; any; length)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂; module ≡-Reasoning)
 
-open import Rx.Prim      using (Gas; Tick; Id; Source)
+open import Rx.Prim      using (Gas; Tick; Id; Source; close; exhausted)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; sizeᵉ)
-open import Rx.Frame-Width using (dWᵉ)
+open import Rx.Frame-Width using (dWᵉ; entryCeil)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; RegId; Chain;
                                 Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer;
-                                arrTy; arrVal; cascade; hasDry;
-                                subscribeE; budgetAt; slotsSize; opIterD)
+                                arrTy; arrVal; arrTick; arrSource; cascade;
+                                cascadeGo; cascadeLatch; cascadeFinish;
+                                chainStep; chainsOf; hasDry;
+                                subscribeE; budgetAt; slotsSize; opIterD;
+                                sizeStep; capsBase)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
 -- fnCapBounded?, regsB?, slotsFnCap, INV-parts, pathLen, the Bool
@@ -68,19 +76,93 @@ B1-cSize≡sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ
   (id : ℕ) → Caps.cSize (capsAt e sl id) ≡ sizeCapAt e sl id
 B1-cSize≡sizeCapAt e sl id = refl
 
--- B2 : the registration count never outruns the size cap.  TRUE at the
--- base (capsAt e sl zero's pre-blowup triple has cReg = suc (sizeᵉ e +
--- slotsSize sl) = cSize - 1, strictly under cSize), and cSize's growth
--- (iterSize, exponential-shaped per fold) plausibly dominates cReg's
--- (a single multiplicative factor `suc (j * cSize)` per frameStep) at
--- every later level too — but nobody has proven that domination
--- through frameBlowup's iteration, and doing so is a joint induction
--- over frameStep/frameBlowup in the shape of `2≤capsAt-size` /
--- `1≤capsAt-reg` (Caps.agda), not a one-liner.  POSTULATED; the route
--- is that joint induction, bootstrapped from the base-case fact above.
-postulate
-  B2-cReg≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) → Caps.cReg (capsAt e sl id) ≤ Caps.cSize (capsAt e sl id)
+-- B2 : the registration count never outruns the size cap.  PROVEN — the
+-- domination guessed at above is real: one `sizeStep` unfolds to a sum
+-- containing `2 * (S * X)`, which already dominates both the
+-- registration increment `Rc * S` (via `Rc ≤ S` and `S ≤ X`) and the
+-- carried registration count `R` (via `R ≤ X` and `X ≤ S * X`, `S ≥ 1`
+-- always holding).  `frameStep-reg≤size` is that joint induction over
+-- frameStep's own recurrence, bootstrapped from the base triple's own
+-- `cReg₀ = suc k ≤ suc (suc k) = cSize₀` (`capsAt`'s zero clause hard-
+-- codes a "2 +"/"suc" floor on both fields, so the base is never the
+-- vacuous (0,0,0) case) and carried through every later frameBlowup.
+2X≡X+X : ∀ (X : ℕ) → 2 * X ≡ X + X
+2X≡X+X X = cong (X +_) (+-identityʳ X)
+
+sizeStep-eqn : ∀ (S X : ℕ) → sizeStep S X ≡ S + (S * X + S * X)
+sizeStep-eqn S X =
+  begin
+    S * suc (2 * X)
+  ≡⟨ *-distribˡ-+ S 1 (2 * X) ⟩
+    S * 1 + S * (2 * X)
+  ≡⟨ cong (_+ S * (2 * X)) (*-identityʳ S) ⟩
+    S + S * (2 * X)
+  ≡⟨ cong (λ y → S + S * y) (2X≡X+X X) ⟩
+    S + S * (X + X)
+  ≡⟨ cong (S +_) (*-distribˡ-+ S X X) ⟩
+    S + (S * X + S * X)
+  ∎
+  where open ≡-Reasoning
+
+frameStep-reg≤size : ∀ (c : Caps) (j : ℕ) → 1 ≤ Caps.cSize c →
+  Caps.cReg c ≤ Caps.cSize c →
+  Caps.cReg (frameStep j c) ≤ Caps.cSize (frameStep j c)
+frameStep-reg≤size c zero hS h =
+  subst (λ x → Caps.cReg x ≤ Caps.cSize x) (sym (frameStep-0 c)) h
+frameStep-reg≤size c (suc j) hS h = final
+  where
+  S  = Caps.cSize c
+  X  = Caps.cSize (frameStep j c)
+  R  = Caps.cReg (frameStep j c)
+  Rc = Caps.cReg c
+
+  IH : R ≤ X
+  IH = frameStep-reg≤size c j hS h
+
+  S≤X : S ≤ X
+  S≤X = iterSize-infl S hS j S
+
+  Rc*S≤S*X : Rc * S ≤ S * X
+  Rc*S≤S*X = ≤-trans (*-mono-≤ h ≤-refl) (*-monoʳ-≤ S S≤X)
+
+  step1 : R + Rc * S ≤ X + S * X
+  step1 = +-mono-≤ IH Rc*S≤S*X
+
+  X≤S*X : X ≤ S * X
+  X≤S*X =
+    ≤-trans (≤-reflexive (sym (*-identityʳ X)))
+            (≤-trans (*-monoʳ-≤ X hS) (≤-reflexive (*-comm X S)))
+
+  step2 : X + S * X ≤ S * X + S * X
+  step2 = +-mono-≤ X≤S*X ≤-refl
+
+  step3 : S * X + S * X ≤ S + (S * X + S * X)
+  step3 = m≤n+m (S * X + S * X) S
+
+  chain : R + Rc * S ≤ S + (S * X + S * X)
+  chain = ≤-trans step1 (≤-trans step2 step3)
+
+  result : R + Rc * S ≤ sizeStep S X
+  result = subst (λ y → R + Rc * S ≤ y) (sym (sizeStep-eqn S X)) chain
+
+  final : Caps.cReg (frameStep (suc j) c) ≤ Caps.cSize (frameStep (suc j) c)
+  final = subst₂ _≤_ (frameStep-reg-suc c j) (sym (frameStep-size-suc c j)) result
+
+B2-cReg≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) → Caps.cReg (capsAt e sl id) ≤ Caps.cSize (capsAt e sl id)
+B2-cReg≤cSize {n = n} e sl zero =
+  frameStep-reg≤size c₀ (sizeCount c₀ (capsBase e sl)) 1≤S₀ hReg₀
+  where
+  c₀ = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+            (suc (sizeᵉ e + slotsSize sl))
+  1≤S₀ : 1 ≤ Caps.cSize c₀
+  1≤S₀ = ≤-trans (s≤s z≤n) (s≤s (s≤s z≤n))
+  hReg₀ : Caps.cReg c₀ ≤ Caps.cSize c₀
+  hReg₀ = s≤s (n≤1+n (sizeᵉ e + slotsSize sl))
+B2-cReg≤cSize e sl (suc id) =
+  frameStep-reg≤size (capsAt e sl id) (sizeCount (capsAt e sl id) (capsH e sl id))
+                     (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+                     (B2-cReg≤cSize e sl id)
 
 ------------------------------------------------------------------
 -- (B3, EARLY) THE Ψ-ONLY HALVES, defined before the suppliers that
@@ -111,63 +193,203 @@ regsBΨ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
 regsBΨ? Ψ = all (λ en → pathBΨ? Ψ (proj₂ (proj₂ (proj₂ en))))
 
 ------------------------------------------------------------------
--- (B) POSTULATED SUPPLIERS.
+-- (B) THE SUPPLIERS.  S2 lands first: S1's proof calls it.
 ------------------------------------------------------------------
 
--- S1 `fn-tick` : the fn face is preserved across a cascade.  Ψ never
--- grows (caseW is substitution-invariant, per INV?'s own header at
--- Measures.agda:5316-5323), so this is PRESERVATION, not accounting —
--- but proving it means walking fnCapBounded?'s own two conjuncts
--- (fnCapLive over Sched.live, fnCapNode over EvalSt.nodes) through the
--- whole delivery clique (stepFrame/pushBurst/subscribeInner/...), the
--- same shape latch-bounded/finish-bounded/sweepLive-bounded already
--- did for stBounded? in .Measures and .Wet.  Not yet done; postulated.
--- The "fn half of regsB?" is stated as `regsBΨ?` below (part (B3)) —
--- the Ψ-only conjunct regsB? bundles with the size-only one capsOK?'s
--- `regsSz?` already supplies.
-postulate
-  fn-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-    let sl = Sched.slots sched
-        Ψ  = ΨAt e sl
-        B  = sizeCapAt e sl id
-    in INV? Ψ B sched st ≡ true →
-       valB? B Ψ (arrTy a) (arrVal a) ≡ true →
-       let r   = cascade a id sched st
-           sl′ = Sched.slots (proj₁ (proj₂ r))
-           Ψ′  = ΨAt e sl′
-       in (fnCapBounded? Ψ′ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-          × (regsBΨ? Ψ′ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
-
--- S2 `slots-tick` : STRONGER than what was asked (the two slots
--- conjuncts at the output slots) and stated as the raw fact underneath
--- them instead, because the two conjuncts alone cannot bridge
+-- S2 `slots-tick` : the raw `Sched.slots` equality across a cascade.
+-- PROVEN.  STRONGER than the two-conjunct version first asked for,
+-- and deliberately so — the two conjuncts alone cannot bridge
 -- `caps-tick`'s fixed entry-time `sl` to the wet family's own
 -- convention of re-reading `Sched.slots` off whatever the current
--- schedule is — and that bridge is load-bearing below (`capsOut`).
+-- schedule is, and that bridge is load-bearing below (`capsOut`).
 --
--- The raw equality is also, unlike the two-conjunct version, a
--- genuinely STRUCTURAL fact: grepping Rx.Evaluator.agda for `slots =`
--- finds exactly ONE occurrence in the whole file — `sched-init`'s own
--- construction.  No `record sched { ... }` update anywhere in the
--- mutual delivery clique (chainStep/foldPath/dispatchShare/shareGo/
--- stepFrame/pushBurst/subscribeInner/subscribeAll/
--- subscribeSharedSlot/sharedConnect/thruConsume/thruWalk/concatDrain/
--- innerFinish/innerReact) ever touches the `slots` field; every one of
--- them only ever writes nextOrdinal/nextSource/nextNode/live.  Measures
--- already proves the two BOUNDARY special cases this fact generalises
--- (`pop-slots` for the schedule pop, `finish-slots` for
--- cascadeFinish); what is missing is the INTERIOR (cascadeGo's fold
--- over chains), and closing it is a mechanical induction over that
--- whole mutual block — clause `refl` or a trivial recursive call
--- throughout, since none of them constructs a `slots`-updating record
--- — but it is real work belonging to .Measures/.Wet, not this thin
--- module, so it stays postulated here.
-postulate
-  slots-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots (proj₁ (proj₂ (cascade a id sched st))) ≡ Sched.slots sched
+-- The raw equality is a genuinely STRUCTURAL fact: grepping
+-- Rx.Evaluator.agda for `slots =` finds exactly ONE occurrence in the
+-- whole file — `sched-init`'s own construction.  No `record sched
+-- { ... }` update anywhere in the mutual delivery clique ever touches
+-- the `slots` field.  Most of the clique's own slots-invariance is
+-- ALREADY PROVEN one layer down and reachable via the public chain:
+-- `Keeps-Ring.agda:952` (`subscribeE-slots`) carries it through the
+-- whole subscribe clique via the `Keeps` invariant, `Caps-Face.agda:
+-- 3690+` (`foldPath-slots`/`dispatchShare-slots`/`shareGo-slots`) has
+-- the delivery side, and `Measures.agda:493` (`finish-slots`) covers
+-- `cascadeFinish`.  Only two thin wrappers were missing — `chainStep`
+-- (one call into `foldPath`) and `cascadeGo`'s own fold over chains —
+-- and both are direct compositions of what already exists.
+chainStep-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (chainStep id a path sched st))) ≡ Sched.slots sched
+chainStep-slots {n = n} {e = e} id a path sched st =
+  foldPath-slots (budgetAt e (Sched.slots sched) id) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+                 (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+                 (Arrival.isLast a) sched st
 
+cascadeGo-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (cascadeGo a id chains sched₀ st₀))) ≡ Sched.slots sched₀
+cascadeGo-slots a id [] sched₀ st₀ = refl
+cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
+  with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+... | true = cascadeGo-slots a id chains sched₀ st₀
+... | false =
+      let (emits , sched₁ , st₁) =
+            chainStep id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+      in trans (cascadeGo-slots a id chains sched₁ st₁)
+               (chainStep-slots id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ }))
+
+slots-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (cascade a id sched st))) ≡ Sched.slots sched
+slots-tick a id sched st =
+  let (emits , sched′ , st′) = cascadeGo a id (chainsOf a st) sched (cascadeLatch a st)
+  in trans (finish-slots a sched′ st′)
+           (cascadeGo-slots a id (chainsOf a st) sched (cascadeLatch a st))
+
+------------------------------------------------------------------
+-- S1 `fn-tick` : the fn face is preserved across a cascade.  PROVEN,
+-- and NOT by the from-scratch walk over stepFrame/pushBurst/
+-- subscribeInner/... this module's header once anticipated.  Ψ never
+-- needs to grow (caseW is substitution-invariant, per INV?'s own
+-- header at Measures.agda:5316-5323), so `fn-tick`'s conclusion —
+-- Ψ-indexed only, no numeric B/E reading — is satisfied by ANY witness
+-- INV? holds at, regardless of the size-axis bound reached.  That
+-- means the already-proven `cascadeGo-walk` (Wet.agda:2145, folding
+-- the WHOLE six-conjunct INV? over the chains list at a GROWING
+-- ledger bound) is directly usable here: embed the caps-level input
+-- bound `B` into `capᴱ B 3` (via `pow1`), widen the input facts across
+-- that embedding, run cascadeLatch-INV → cascadeGo-walk →
+-- cascadeFinish-INV, then project `fnCapBounded?` and the Ψ half of
+-- `regsB?` out of the landed INV? at whatever bound the walk reached.
+-- GAP 4's refuted size-axis composition (why P2/`cascadeGo-wet` is
+-- still stuck) never enters, because nothing here needs to land back
+-- at the fixed `sizeCapAt e sl (suc id)`.  The one remaining seam —
+-- the conclusion is stated at `Ψ′ = ΨAt e sl′` (output slots), the
+-- walk runs at `Ψ = ΨAt e sl` (input slots) — closes by S2 above.
+------------------------------------------------------------------
+
+-- reverse projections: pulling the Ψ-only half back OUT of an already
+-- landed frameB?/pathB?/regsB? (Measures.agda) — the other direction
+-- of frameB?-of-parts/pathB?-of-parts/regsB?-of-parts below.
+frameBΨ?-of : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) {B Ψ : ℕ} →
+  frameB? B Ψ f ≡ true → frameBΨ? Ψ f ≡ true
+frameBΨ?-of (map-f fn)         h = proj₂ (∧-true _ _ h)
+frameBΨ?-of (scan-f fn _)      h = proj₂ (∧-true _ _ h)
+frameBΨ?-of (take-f _)         h = refl
+frameBΨ?-of (from-inner _ _ _) h = refl
+frameBΨ?-of (thru-outer _ _)   h = refl
+
+pathBΨ?-of : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B Ψ : ℕ} →
+  pathB? B Ψ p ≡ true → pathBΨ? Ψ p ≡ true
+pathBΨ?-of root           h = refl
+pathBΨ?-of (share-sink i) h = refl
+pathBΨ?-of (f ↠ p) {B} {Ψ} h
+  with ∧-true (frameB? B Ψ f) (pathB? B Ψ p) h
+... | hf , hp = ∧-intro (frameBΨ?-of f hf) (pathBΨ?-of p hp)
+
+regsBΨ?-of : ∀ {n} {Γ : Ctx n} {t}
+  (rs : List (RegId × Source × Chain Γ t)) {B Ψ : ℕ} →
+  regsB? B Ψ rs ≡ true → regsBΨ? Ψ rs ≡ true
+regsBΨ?-of rs h =
+  all-impl _ _ (λ en → pathBΨ?-of (proj₂ (proj₂ (proj₂ en)))) rs h
+
+-- embedding a fixed bound B into capᴱ form: B ≤ 2 + 2·B ≤ capᴱ B 3,
+-- the second step by `pow1` (Measures.agda, already proven).
+2+b+b≡2+2b : ∀ b → (2 + b) + b ≡ 2 + 2 * b
+2+b+b≡2+2b = solve 1 (λ b → (con 2 :+ b) :+ b := con 2 :+ (con 2 :* b)) refl
+
+b≤2+2b : ∀ b → b ≤ 2 + 2 * b
+b≤2+2b b = ≤-trans (m≤n+m b (2 + b)) (≤-reflexive (2+b+b≡2+2b b))
+
+b≤capᴱ-b-3 : ∀ b → b ≤ capᴱ b 3
+b≤capᴱ-b-3 b = ≤-trans (b≤2+2b b) (pow1 b {3} (s≤s z≤n))
+
+fn-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      B  = sizeCapAt e sl id
+  in INV? Ψ B sched st ≡ true →
+     valB? B Ψ (arrTy a) (arrVal a) ≡ true →
+     let r   = cascade a id sched st
+         sl′ = Sched.slots (proj₁ (proj₂ r))
+         Ψ′  = ΨAt e sl′
+     in (fnCapBounded? Ψ′ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+        × (regsBΨ? Ψ′ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+fn-tick {e = e} a id sched st inv val =
+  subst (λ ψ → fnCapBounded? ψ sched″ st″ ≡ true) (sym Ψ′≡Ψ) fcΨ ,
+  subst (λ ψ → regsBΨ? ψ (EvalSt.registry st″) ≡ true) (sym Ψ′≡Ψ) regsBΨF
+  where
+  sl  = Sched.slots sched
+  Ψ   = ΨAt e sl
+  B   = sizeCapAt e sl id
+  W   = B
+  E₀  = 3
+
+  3≤E₀ : 3 ≤ E₀
+  3≤E₀ = ≤-refl
+
+  B≤ : B ≤ capᴱ W E₀
+  B≤ = b≤capᴱ-b-3 B
+
+  inv-caps : INV? Ψ (capᴱ W E₀) sched st ≡ true
+  inv-caps = INV?-widen sched st B≤ inv
+
+  val-caps : valB? (capᴱ W E₀) Ψ (arrTy a) (arrVal a) ≡ true
+  val-caps = valB?-widen (arrTy a) (arrVal a) B≤ val
+
+  parts0 = INV-parts Ψ B sched st inv
+  regsB0 : regsB? B Ψ (EvalSt.registry st) ≡ true
+  regsB0 = proj₁ (proj₂ (proj₂ (proj₂ parts0)))
+
+  chains = chainsOf a st
+
+  chainsB : all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true
+  chainsB = chainsOf-B B Ψ a st regsB0
+
+  chainsB-caps : all (λ rc → pathB? (capᴱ W E₀) Ψ (proj₂ rc)) chains ≡ true
+  chainsB-caps = chainsB?-widen chains B≤ chainsB
+
+  latched = cascadeLatch a st
+
+  inv-latch : INV? Ψ (capᴱ W E₀) sched latched ≡ true
+  inv-latch = cascadeLatch-INV Ψ (capᴱ W E₀) a sched st inv-caps
+
+  GO = cascadeGo-walk Ψ W a id chains sched latched E₀ 3≤E₀
+                      inv-latch chainsB-caps val-caps
+
+  E′ = proj₁ GO
+
+  sched′ = proj₁ (proj₂ (cascadeGo a id chains sched latched))
+  st′    = proj₂ (proj₂ (cascadeGo a id chains sched latched))
+
+  invGo : INV? Ψ (capᴱ W E′) sched′ st′ ≡ true
+  invGo = proj₁ (proj₂ (proj₂ GO))
+
+  sched″ = proj₁ (cascadeFinish a sched′ st′)
+  st″    = proj₂ (cascadeFinish a sched′ st′)
+
+  invFinish : INV? Ψ (capᴱ W E′) sched″ st″ ≡ true
+  invFinish = cascadeFinish-INV Ψ (capᴱ W E′) a sched′ st′ invGo
+
+  partsF = INV-parts Ψ (capᴱ W E′) sched″ st″ invFinish
+
+  fcΨ : fnCapBounded? Ψ sched″ st″ ≡ true
+  fcΨ = proj₁ (proj₂ partsF)
+
+  regsBF : regsB? (capᴱ W E′) Ψ (EvalSt.registry st″) ≡ true
+  regsBF = proj₁ (proj₂ (proj₂ (proj₂ partsF)))
+
+  regsBΨF : regsBΨ? Ψ (EvalSt.registry st″) ≡ true
+  regsBΨF = regsBΨ?-of (EvalSt.registry st″) regsBF
+
+  slotsEq : Sched.slots sched″ ≡ Sched.slots sched
+  slotsEq = slots-tick a id sched st
+
+  Ψ′≡Ψ : ΨAt e (Sched.slots sched″) ≡ Ψ
+  Ψ′≡Ψ = cong (ΨAt e) slotsEq
+
+------------------------------------------------------------------
 -- S3 `dry-tick` : P2 (`cascadeGo-wet`, Wet.agda:4335)'s dry half,
 -- unchanged — the gas-peel axis (dBound-μ/hop/connect).  Interim
 -- postulate; not touched by the caps/INV? bridging problem at all.
