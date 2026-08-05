@@ -1,13 +1,18 @@
--- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY, and the theorem.
+-- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY.
 --
 -- The half that steps the evaluator.  The Keeps ring (slot/share
 -- monotonicity), the size-elim laws, the ledger arithmetic, the wet
 -- lemmas for every evaluator entry point, subscribeE-walkS and
--- subscribeAll-wet, cascadeGo-walk, the width family, and then the four
--- results that compose them: burst-wet, cascade-dry, drain-dry, and
--- budget-sufficient.
+-- subscribeAll-wet, cascadeGo-walk, the width family, and the burst
+-- cores (burst-wet/burst-dry/burst-bounded) and pop ring (pop-INV/
+-- pop-head-bounded) that compose them.
 --
--- budget-sufficient IS the export Verify-Well-Formed consumes.
+-- `cascade-dry`, `drain-dry`, and `budget-sufficient` — the theorem
+-- Verify-Well-Formed consumes — MOVED to `.Caps-Bridge`
+-- (PROOF-STATE.md § "RULING: Caps-Bridge was built UPSIDE DOWN"): a
+-- module above `.Wet` can consume `.Caps-Bridge`'s `cascade-wet-via-caps`
+-- in place of the postulated `cascadeGo-wet` below; `.Wet` itself
+-- cannot, since `.Caps-Bridge` imports `.Wet`.
 --
 -- This module is a LAYER OVER .Caps as of 2026-08-01: the wet cores'
 -- reset caps and per-instant store bound are read off `capsAt`, the caps
@@ -4597,110 +4602,10 @@ burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 burst-bounded e ins = proj₂ (burst-wet e ins)
 
-
-------------------------------------------------------------------
--- one cascade — PROVEN: latch, the postulated fold core, finish, all
--- three on the six-conjunct face.  GAP 1's OUT direction closes here:
--- what this returns IS what drain-dry hands the next instant.
-------------------------------------------------------------------
-
-cascade-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-  INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
-       sched st ≡ true →
-  valB? (sizeCapAt e (Sched.slots sched) id) (ΨAt e (Sched.slots sched))
-        (arrTy a) (arrVal a) ≡ true →
-  let r = cascade a id sched st
-  in (hasDry (proj₁ r) ≡ false)
-     × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
-             (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascade-dry {e = e} a id sched st inv val
-  with cascadeGo-wet a id (chainsOf a st) sched (cascadeLatch a st)
-         (cascadeLatch-INV (ΨAt e (Sched.slots sched))
-                           (sizeCapAt e (Sched.slots sched) id) a sched st inv)
-         val
-         (chainsOf-B (sizeCapAt e (Sched.slots sched) id)
-                     (ΨAt e (Sched.slots sched)) a st
-           (proj₁ (proj₂ (proj₂ (proj₂
-             (INV-parts (ΨAt e (Sched.slots sched))
-                        (sizeCapAt e (Sched.slots sched) id) sched st inv))))))
-... | dry , inv′ = dry , final
-  where
-  sched′ = proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched
-                                   (cascadeLatch a st)))
-  st′    = proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
-                                   (cascadeLatch a st)))
-  final : INV? (ΨAt e (Sched.slots (proj₁ (cascadeFinish a sched′ st′))))
-               (sizeCapAt e (Sched.slots (proj₁ (cascadeFinish a sched′ st′)))
-                          (suc id))
-               (proj₁ (cascadeFinish a sched′ st′))
-               (proj₂ (cascadeFinish a sched′ st′)) ≡ true
-  final = subst
-            (λ sl → INV? (ΨAt e sl) (sizeCapAt e sl (suc id))
-                      (proj₁ (cascadeFinish a sched′ st′))
-                      (proj₂ (cascadeFinish a sched′ st′)) ≡ true)
-            (sym (finish-slots a sched′ st′))
-            (cascadeFinish-INV (ΨAt e (Sched.slots sched′))
-                               (sizeCapAt e (Sched.slots sched′) (suc id))
-                               a sched′ st′ inv′)
-
-------------------------------------------------------------------
--- the fuel loop composes cascades — PROVEN.  The pop is the only new
--- joint: pop-INV carries the invariant past it and pop-head-bounded
--- (GAP 3) supplies the arrival cascade-dry now demands.
-------------------------------------------------------------------
-
-drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-  INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
-       sched st ≡ true →
-  hasDry (drain {e = e} fuel id sched st) ≡ false
-drain-dry zero    id sched st inv = refl
-drain-dry (suc k) id sched st inv with sched-next sched in eq
-... | inj₁ _            = refl
-drain-dry {e = e} (suc k) id sched st inv | inj₂ (a , sched′) =
-  let Ψ    = ΨAt e (Sched.slots sched)
-      B    = sizeCapAt e (Sched.slots sched) id
-      inv′ : INV? (ΨAt e (Sched.slots sched′))
-                  (sizeCapAt e (Sched.slots sched′) id) sched′ st ≡ true
-      inv′ = subst
-               (λ sl → INV? (ΨAt e sl) (sizeCapAt e sl id) sched′ st ≡ true)
-               (sym (pop-slots sched eq))
-               (pop-INV Ψ B sched st eq inv)
-      val′ : valB? (sizeCapAt e (Sched.slots sched′) id)
-                   (ΨAt e (Sched.slots sched′)) (arrTy a) (arrVal a) ≡ true
-      val′ = subst
-               (λ sl → valB? (sizeCapAt e sl id) (ΨAt e sl)
-                             (arrTy a) (arrVal a) ≡ true)
-               (sym (pop-slots sched eq))
-               (pop-head-bounded Ψ B sched st eq inv)
-      (dry₁ , inv″) = cascade-dry a id sched′ st inv′ val′
-  in hasDry-append (proj₁ (cascade a id sched′ st)) _
-       dry₁
-       (drain-dry k (suc id)
-         (proj₁ (proj₂ (cascade a id sched′ st)))
-         (proj₂ (proj₂ (cascade a id sched′ st)))
-         inv″)
-
-------------------------------------------------------------------
--- the theorem: same statement as Verify-Well-Formed's postulate;
--- the splice (coordinated, later) replaces that postulate with this.
--- ITS FACE IS FIXED and did not move in the restatement.
-------------------------------------------------------------------
-
-budget-sufficient :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  hasDry (evaluate fuel e ins) ≡ false
-budget-sufficient fuel e ins =
-  hasDry-append
-    (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
-                       (sched-init e ins) (st-init e)))
-    _
-    (burst-dry e ins)
-    (drain-dry fuel 1
-      (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                (sched-init e ins) (st-init e))))
-      (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                (sched-init e ins) (st-init e))))
-      (burst-bounded e ins))
+-- `cascade-dry`, `drain-dry`, `budget-sufficient` MOVED to
+-- `.Caps-Bridge` (PROOF-STATE.md § "RULING: Caps-Bridge was built
+-- UPSIDE DOWN") — caps-threaded there, consuming `cascade-wet-via-caps`
+-- in place of `cascadeGo-wet` below.  `burst-wet`/`burst-dry`/
+-- `burst-bounded`/`pop-INV`/`pop-head-bounded` stay here: `.Caps-Bridge`
+-- consumes all five unchanged as the INV?-only half of its own burst
+-- and pop.

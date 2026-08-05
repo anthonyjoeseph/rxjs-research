@@ -38,9 +38,13 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (Dec; yes; no)
 
--- from .Wet, not from the top module: the top module is the active caps
--- grind, and importing it here would put this file on that clock
-open import Verify-Budget-Sufficient.Wet using (budget-sufficient)
+-- from .Caps-Bridge, not from the top module: the top module is the
+-- active caps grind, and importing it here would put this file on that
+-- clock.  MOVED 2026-08-05 from .Wet (PROOF-STATE.md § "RULING:
+-- Caps-Bridge was built UPSIDE DOWN") — `budget-sufficient`'s TYPE did
+-- not change, only which module proves it, so nothing else here needed
+-- to move with it.
+open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Gas; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;

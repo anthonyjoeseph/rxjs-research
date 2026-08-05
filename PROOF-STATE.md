@@ -30,12 +30,17 @@ news. Every one of those was already written down. This index is the fix.
 formal-verification-batchSimultaneous          The-Proof.agda:1098 — REAL, module postulate-free
  ├─ batch-agreement                            proven
  └─ evaluate-well-formed                       Verify-Well-Formed.agda:5328
-     ├─ budget-sufficient                      Wet.agda — PROVEN from:
-     │   ├─ burst-wet    ← subscribeE-wet      [P1]
-     │   ├─ cascade-dry  ← cascadeGo-wet       [P2]
-     │   └─ drain-dry                          proven
+     ├─ budget-sufficient                      Caps-Bridge.agda — PROVEN from:
+     │   ├─ burst-wet    ← subscribeE-wet      [P1]  (.Wet, unchanged)
+     │   ├─ burst-caps   ← (postulated — see the RULING's EXECUTED note)
+     │   └─ drain-dry    ← cascade-wet-via-caps       proven
      └─ THE WELL-FORMEDNESS BRANCH             its OWN 5 postulates — see [W1-W5]
 ```
+
+MOVED 2026-08-05 (see the RULING below, now EXECUTED): `budget-sufficient` lives
+in `Caps-Bridge.agda`, not `Wet.agda`; `cascadeGo-wet` [P2] is RETIRED BY
+DELETION (orphaned, zero consumers) rather than by proof, since
+`cascade-wet-via-caps` now supplies dryness+INV? instead.
 
 **THERE ARE TWO BRANCHES, NOT ONE.** An earlier version of this file said "the
 entire campaign reduces to the postulate ledger below; nothing else stands
@@ -289,8 +294,12 @@ four bad worker verdicts on exactly these calls (see the cautions below):
    interchangeable, and the machine-level one is exactly what wiring the connect
    edge to the evaluator will need.
 4. **MISSING WIRE — the Caps-Bridge/Depth-Bound tower.** `sub-charge`,
-   `depth-capped`, `cascade-wet-via-caps`, `B1-cSize≡sizeCapAt`. The named next
-   step (wire `cascade-wet-via-caps` into `cascade-dry`).
+   `depth-capped`, `B1-cSize≡sizeCapAt`. **`cascade-wet-via-caps` is WIRED**
+   (2026-08-05, phase 2 — see the RULING's EXECUTED note): it is `drain-dry`'s
+   direct supplier now, `cascade-dry` having been retired rather than
+   restated. `sub-charge` stays unwired for a recorded reason (see
+   `burst-caps`'s header, `Caps-Bridge.agda`) — it is not the same open
+   item this bullet originally named.
 5. **MISSING WIRE, and a CHEAP WIN — the proof is written TWICE.**
    `frameSz?-⊑`, `residAt-connected`, `prepend-fits`, `entry-to-index`,
    `shareGo-cons-N`, `cascadeGo-cons-N`, `foldPath-sink-N`, `shareGo-skip-N`,
@@ -378,6 +387,44 @@ proven modulo `dry-tick`. Routing `budget-sufficient` through it **retires P2
 makes P2 an orphan, i.e. retired *by deletion* rather than by proof. Phase 1's
 `burst-caps` postulate should likewise be re-examined against `sub-charge`
 (GAP 4(a), proven), which may discharge it outright rather than assume it.
+
+**EXECUTED 2026-08-05 (phase 2).** The move landed: `cascade-dry`/`drain-dry`/
+`budget-sufficient` are OUT of `.Wet` and IN `.Caps-Bridge`, caps-threaded,
+consuming `cascade-wet-via-caps` (not a `cascade-dry` restatement — that name
+is retired, its job absorbed directly into `drain-dry`'s loop body).
+`Verify-Well-Formed.agda:47` now imports `budget-sufficient` from
+`.Caps-Bridge`; its TYPE did not change so nothing else in that 5348-line
+module needed editing (recheck cost, measured for the first time: ~21s
+total via `make agda`'s first dirty pass, once `.Wet`/`.Caps-Bridge`
+themselves were already fresh — trivial next to Subscribe-Face's ~44 min).
+
+- **`burst-caps` was checked against `sub-charge` and NOT discharged** — see
+  `burst-caps`'s own header comment in `Caps-Bridge.agda` for the two
+  independent reasons (the base case `capsOK?` at the initial state is a
+  `sub-charge` HYPOTHESIS, not something it supplies — no `capsOK?` analogue
+  of `init-INV` exists yet; and `sub-charge`'s witness bound is `opIterD`,
+  the subscribe clique's own measure, not the `sizeCount`/`capsH` recurrence
+  `capsAt` is actually defined by — unlike `caps-tick` on the cascade side,
+  nothing ties the two together for subscribe). Landed as a postulate with
+  that reason recorded; **`sub-charge` itself is consequently still an
+  orphan** (zero consumers) — pre-existing, not new.
+- **`cascadeGo-wet` [P2] IS NOW ORPHANED** — confirmed by `make wiring`
+  (zero consumers) — retired by deletion exactly as predicted. Left in place
+  per standing instruction (deleting a postulate is Anthony's call).
+- **Nine of the ten previously-unreachable V-B-S modules are now reachable**
+  from `Main` via `Caps-Bridge → {Wet, Subscribe-Face → Caps-Face →
+  {Delivery-Walk → Deliveries, Caps-Nest}, Subscribe-Face → Caps-Chain →
+  Caps-Sadd}, Caps-Bridge → Caps-Depth` (verified by reading the import
+  graph, not by assuming it): Subscribe-Face, Caps-Face, Caps-Chain,
+  Caps-Sadd, Caps-Depth, Delivery-Walk, Caps-Nest, Deliveries, and
+  Caps-Bridge itself. **`Depth-Bound.agda` is the one still unreached** —
+  nothing anywhere in `agda/src` imports it; `depth-compositional`'s only
+  "consumer" is inside its own module.
+- **Wiring ledger, before → after this move:** total postulates 54→55 (+1,
+  `burst-caps`), orphaned postulates 4→5 (+1, `cascadeGo-wet`), orphaned
+  proven definitions 87→86 (−1). All four gates green: `make agda` (22s),
+  `make agda-all` (2:48, all 39 modules), `make bug-cache` (3.9s),
+  `make wiring` (report, not a gate).
 
 **Generalised lesson for every future wiring pass: check the import graph BEFORE
 designing the edge.** Two of this campaign's wiring errors are now the same

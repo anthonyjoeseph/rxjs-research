@@ -14,14 +14,28 @@ decomposition postulates: **6** (see PROOF-STATE).
 
 ## ⚠ RESUME HERE
 
+**UPDATE 2026-08-05 (phase 2 — see PROOF-STATE.md's RULING "Caps-Bridge was built
+UPSIDE DOWN", now EXECUTED).** The last bullet below — wire `cascade-wet-via-caps`
+in as `cascade-dry`/`burst-wet`'s supplier — is DONE, but not the way it reads: the
+edge that header asked for was a cycle Agda rejects (`.Caps-Bridge` imports `.Wet`).
+The actual fix moved `cascade-dry`/`drain-dry`/`budget-sufficient` OUT of `.Wet` and
+INTO `.Caps-Bridge`; `cascadeGo-wet` [P2] is now an ORPHAN (zero consumers — retired
+by deletion, not proof); `Verify-Well-Formed.agda` now imports `budget-sufficient`
+from `.Caps-Bridge`. `burst-caps` (the phase-1 postulate for GAP 4's subscribe-side
+caps landing) was checked against `sub-charge` and is NOT discharged by it — see its
+header comment in `Caps-Bridge.agda` for the precise reason (a missing `capsOK?`
+base-case fact and a missing `opIterD`-vs-`capsH` bridge, both new content, not a
+`sub-charge` byproduct). All four gates green (`make agda`, `make agda-all`,
+`make bug-cache`, `make wiring`).
+
 `origin/main` is GREEN through "the depth obligation is stated, and its cap is three
-copies of one number". Every commit was gated on `make agda && make bug-cache` both
-exiting 0, read from the log's own `EXIT=` lines.
+copies of one number", plus this phase-2 move. Every commit was gated on
+`make agda && make bug-cache` both exiting 0, read from the log's own `EXIT=` lines.
 
 **The current work is: prove the decomposition pieces.** Cheapest first: `storeNest-capped`
 and `depth-compositional` (Depth-Bound.agda), then S1/S2/B2 (Caps-Bridge.agda). Then state
-`subscribeE-wet-via-caps` (P1's analogue, now unblocked). Then wire `cascade-wet-via-caps`
-in as `cascade-dry`/`burst-wet`'s supplier in place of `cascadeGo-wet`.
+`subscribeE-wet-via-caps` (P1's analogue) — its caps-side landing (`burst-caps`) is now
+the concrete blocker, per the header above.
 
 ### ⚠ `setsid` DOES NOT EXIST ON THIS MACHINE (measured 2026-08-05)
 
