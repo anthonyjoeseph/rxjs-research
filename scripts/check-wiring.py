@@ -60,6 +60,29 @@ ALLOWLIST = {
         "process — its consumer is the shell, not other Agda source, so "
         "textual search will never find one."
     ),
+    # --- design-session rulings, 2026-08-05 (see PROOF-STATE.md "Wiring
+    # --- rulings"). Two FAMILIES are exempt, matched by pattern below rather
+    # --- than listed name by name.
+    #
+    # (1) `*-absurd` REFUTATION WITNESSES.  A machine-checked `… → ⊥` is the
+    # only durable form of "this route is dead, do not retry it", and it is
+    # load-bearing for the DESIGN process rather than for another term.
+    # Tested twice on 2026-08-05: `caps-frame-boundary-absurd` and
+    # `round3b-ledger-reset-absurd` are exactly what proved the anchor problem
+    # real rather than a wiring gap, saving a long wasted grind. A worker
+    # classified them "archive, not live infrastructure" and was overruled.
+    # Deleting one costs a future session the whole refutation.
+    #
+    # (2) THE TOP-LINE SEMANTIC POSTULATES in `*-Theorems.agda`
+    # (`readme-*`, `fuel-coherent`, `causality`, `μ-unfold`, `μ-guarded`,
+    # `defer-shift`, `id-inheritance`, `locality`, `non-interference`,
+    # `timing-invariance`, `batch-online`, `_≈ˢ_`, `_≈ᵍ_`).  These are
+    # deliberately-stated outward-facing claims, imported by Main.agda; nothing
+    # consumes them because they ARE the claims.  They are NOT dead weight —
+    # but they ARE unproven, so they form a SECOND ledger, distinct from the
+    # critical path to formal-verification-batchSimultaneous.  Exempt from the
+    # orphan report; still counted as postulates.
+    #
     # "anything Main.agda invokes": Main.agda (agda/src/Main.agda) has no
     # body beyond a wall of `open import` statements — no function
     # application, no `main = ...` term.  There is therefore nothing else
@@ -544,6 +567,7 @@ def main():
     allowlisted_unused = []
     ledger_with = []  # postulates with >=1 consumer
     ledger_without = []  # postulates with 0 consumers
+    toplines = []  # top-line semantic postulates in *-Theorems.agda
 
     results = {}
     for name in order:
@@ -560,11 +584,18 @@ def main():
         if is_postulate:
             if count > 0:
                 ledger_with.append((name, d, count, locs))
+            elif d.file.endswith("-Theorems.agda"):
+                # Exempt family (2): a top-line semantic claim, not dead
+                # weight. Unproven, so still counted as a postulate — but it
+                # belongs to the SECOND ledger, off the critical path.
+                toplines.append((name, d))
             else:
                 ledger_without.append((name, d, count, locs))
         else:
             if count == 0:
-                if name in ALLOWLIST:
+                if name in ALLOWLIST or name.endswith("-absurd"):
+                    # Exempt family (1): refutation witnesses. Their consumer
+                    # is the design record, not another term.
                     allowlisted_unused.append((name, d))
                 else:
                     orphans.append((name, d))
@@ -577,7 +608,10 @@ def main():
     # is worth a nudge:
     stale_allowlist = [n for n in ALLOWLIST if n not in defs]
 
-    total_postulates = len(ledger_with) + len(ledger_without)
+    # Top-line claims are EXEMPT from the orphan report but are still
+    # unproven assumptions, so they count here. Excluding them would make the
+    # headline number lie in the reassuring direction.
+    total_postulates = len(ledger_with) + len(ledger_without) + len(toplines)
 
     # ------------------------------------------------------------------
     # REPORT
@@ -618,6 +652,17 @@ def main():
     for name, d, _count, _locs in sorted(
         ledger_without, key=lambda x: (x[1].file, x[1].line)
     ):
+        print(f"    {name}")
+        print(f"        {d.file}:{d.line}")
+    print()
+
+    print(
+        f"  -- TOP-LINE semantic claims ({len(toplines)}) — the SECOND ledger, "
+        "off the critical path --"
+    )
+    if not toplines:
+        print("    (none)")
+    for name, d in sorted(toplines, key=lambda x: (x[1].file, x[1].line)):
         print(f"    {name}")
         print(f"        {d.file}:{d.line}")
     print()

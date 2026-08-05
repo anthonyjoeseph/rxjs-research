@@ -135,6 +135,86 @@ these become the ledger):
 (B2, S1 `fn-tick`, S2 `slots-tick`, and `storeNest-capped` are PROVEN — landed
 in Caps-Bridge.agda and Depth-Bound.agda respectively, no longer postulates.)
 
+## Wiring rulings (2026-08-05) — run `make wiring` for the live list
+
+**PRIORITY (Anthony, 2026-08-05): deletion matters, but NOT ignoring usable work
+matters more.** Read the clusters below as a RECOVERABLE-ASSETS list first and a
+cleanup list second. 87 proven definitions sitting unused is 87 pieces of work
+already paid for; the question to ask of each is "what would it take to spend
+this, and what does spending it unblock" — not "should this go."
+
+`scripts/check-wiring.py` mechanises CLAUDE.md's wiring law. Current numbers:
+**55 postulates** (31 with consumers, 22 top-line claims, **2 truly orphaned**)
+and **87 orphaned proven definitions**. Do not re-derive this list by hand or by
+memory — run the target. Rulings by cluster, made by the design session after
+four bad worker verdicts on exactly these calls (see the cautions below):
+
+1. **EXEMPT — `*-absurd` refutation witnesses (7).** A machine-checked `… → ⊥`
+   is the durable form of "this route is dead"; its consumer is the design
+   process. Allowlisted by pattern in the script. **A worker classified these
+   "archive, not live infrastructure" and was OVERRULED**: two of them
+   (`caps-frame-boundary-absurd`, `round3b-ledger-reset-absurd`) are what proved
+   the anchor problem real on 2026-08-05, saving a wasted grind.
+2. **EXEMPT — top-line semantic claims (22)**, the `readme-*` family plus
+   `Evaluator-/Provenance-/Time-/Batch-Theorems`. Nothing consumes them because
+   they ARE the claims. **They are a SECOND LEDGER — unproven, off the critical
+   path — not dead weight.** Still counted in the postulate total on purpose:
+   excluding them made the headline number lie in the reassuring direction.
+3. **MISSING WIRE — the anchor cluster.** `mu-edge`, `hop-edge`,
+   `connect-edge`, `unconn-keeps`, `hop-step-gives/-needs`,
+   `sharedConnect-unconn`, `obs-slot-shared`, `share-live-novals`,
+   `share-spent-novals`. **KEEP ALL.** A worker called the Keeps-Ring half dead
+   weight, reasoning "P5 is orphaned, so machinery targeting P5 is dead" —
+   that conflates a dead ROUTE with dead CONTENT. Note
+   `sharedConnect-unconn` is machine-level (quantifies over `Gas`/`Sched`/
+   `EvalSt`) where `unconn-insert` is abstract list arithmetic; they are not
+   interchangeable, and the machine-level one is exactly what wiring the connect
+   edge to the evaluator will need.
+4. **MISSING WIRE — the Caps-Bridge/Depth-Bound tower.** `sub-charge`,
+   `depth-capped`, `cascade-wet-via-caps`, `B1-cSize≡sizeCapAt`. The named next
+   step (wire `cascade-wet-via-caps` into `cascade-dry`).
+5. **MISSING WIRE, and a CHEAP WIN — the proof is written TWICE.**
+   `frameSz?-⊑`, `residAt-connected`, `prepend-fits`, `entry-to-index`,
+   `shareGo-cons-N`, `cascadeGo-cons-N`, `foldPath-sink-N`, `shareGo-skip-N`,
+   `cascadeGo-skip-N`. Each exists as a named lemma AND is re-derived inline at
+   the site that needs it. Replacing the inline copy with a call *reduces* total
+   proof text — the wiring law's cost made concrete and reversible.
+6. **MISSING WIRE, sanctioned — WF pieces ahead of their assembly.**
+   `oneShotBurst-wf`, `initReg-wf`, `subscribeE-map-/scan-/take-wf`,
+   `foldPath-root-out`, `mid-seed`. The assembly was stated first as a
+   postulate, per outside-in; these land under it. ~half of W1 is already done.
+7. **DELETE — pending Anthony's confirmation (6).** `returnIO` (CLI/IO.agda:14,
+   both entry points end in `putStr`), `subscribeE-walk` (Measures.agda:6204,
+   P5 — the refuted ledger route's receipt), `share-step-resid` (superseded by
+   `share-step`, comment says so), `mu-step-le` (its own comment says it no
+   longer suffices; `mu-step` replaced it), `mu-1≤k` (superseded by a direct
+   absurd pattern), `mid-enters` (superseded by `seed-enter-pay`). **Not
+   executed. Verify the superseding lemma is genuinely called before removing
+   any of these.**
+8. **A REAL BUG — vacuous postulates.** `id-inheritance`
+   (Provenance-Theorems.agda:20) and `defer-shift` (Evaluator-Theorems.agda:56)
+   are typed `⊤`, with the actual claim only in a trailing comment. They
+   typecheck trivially and assert NOTHING — worse than an honest postulate,
+   because they look discharged. State their real types.
+9. **LEAVE, revisit when the area is next touched.** The `refl`-facts relied on
+   via silent unification (`frameStep-full`, `capsAt-suc-full`), and the genuine
+   UNCLEARs (`⊑ᶜ-refl`, `k-raise`, `nest≤`, `enterInstant-idle/-held`,
+   `paidUp-held`, `shareFinish-len`, `chainStep-caps`, `wkᵍ`, `Grouped`).
+   Low cost either way; `Grouped` has a concrete fix (use it in the spec/impl
+   signatures that spell out `List (InstEmit (List A))` by hand).
+
+**Two more lying comments found, worth fixing on next touch:** Caps-Face:4175
+claims a recursion "is proven, line for line, in .Deliveries § D" naming lemmas
+the live code never calls; Subscribe-Face's header lists `chainStep-caps` as one
+of four callers into the clique when nothing calls it.
+
+**Process ruling: classification is the design session's, not a worker's.**
+Fan out for the mechanical sweep and for evidence-gathering — that part was
+excellent, and the script found four real bugs in its own first approach. But
+verdicts depend on campaign context that lives in no source comment, and
+delegating them produced four errors in two hours, in both directions (one
+"we've solved it", three "delete it"). Workers gather; the design session rules.
+
 ## Named gaps and rulings (the full deck)
 
 **GAP 4** — Wet.agda:4125–4199. THE central design fact. The ledger-receipt
