@@ -862,33 +862,32 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- consumes it at `sLvlD` rather than at `opIterD`.
 
 ------------------------------------------------------------------
--- THE LEVEL CONJUNCT, AND WHERE ITS PROOF IS STILL DEFERRED.
+-- THE LEVEL CONJUNCT, AND HOW THE DEPTH FUEL CLOSED IT.
 --
--- Every head below now reports the LEVEL it leaves, in the one
--- transformer its arc of the family's clause cycle forces
+-- Every head below reports the LEVEL it leaves, in the one transformer
+-- its arc of the family's clause cycle forces
 -- (agda/probe/Chain-Supply-Probe.agda § 4).  The heads are
--- forward-declared, so the conjunct cannot land head by head: the
--- SHAPES all land at once and the PROOFS land per clause.  Five clause
--- shapes are ground — a leaf (`emptyᵉ`, `takeᵉ 0`, the dry closes), a
--- chain edge (`mapᵉ`), the μ unfolding, one payload of `thruWalk`, one
--- emit of `pushBurst`, and one frame of `stepFrame`'s thru-outer — and
--- every other clause supplies its conjunct from `level-TEMP`.
+-- forward-declared, so the conjunct could not land head by head: the
+-- SHAPES all landed at once and the PROOFS landed per clause.  They are
+-- all in now — a leaf (`emptyᵉ`, `takeᵉ 0`, the dry closes), a chain edge
+-- (`mapᵉ`), the μ unfolding, one payload of `thruWalk`, one emit of
+-- `pushBurst`, one frame of `stepFrame`'s thru-outer, and one drain of
+-- `innerFinish`'s concat.  No deferred level placeholder survives, and
+-- there is no postulate in this module.
 --
--- `level-TEMP` defers a PROOF and cannot hide a shape: the index and the
--- transformer of every conjunct are pinned by the Σ declarations above
--- it, so a wrong index is a type error at the reporting clause rather
--- than something a weak hole absorbs.  What it DOES still hide is a call
--- site's ARGUMENTS, and two of those are known to be wrong for the
--- eventual proof and recorded here rather than left to be rediscovered:
---
---   · `innerFinish-caps`'s concat clause hands `concatDrain-caps` its own
---     `dep`.  A drain is a WALK, so the depth has to descend into it
---     exactly as it does in `stepFrame-caps`'s thru-outer clause below —
---     and THAT is the unresolved part, not the budget: `innerFinish-caps`
---     and `innerReact-caps` are both generic in `dep`, while `fLvlD` at
---     zero and at a successor are unrelated formulas, so a walk result
---     cannot discharge a generic-depth frame conjunct at all.  Both
---     remaining walk sites are the SAME zero-depth question.
+-- WHAT THE LAST TWO SITES NEEDED, since it was diagnosed as a budget
+-- problem for a while and was not one.  Both were the SAME question:
+-- `innerFinish-caps` and `innerReact-caps` are generic in `dep`, while
+-- `fLvlD` at zero and at a successor are unrelated formulas, so a walk
+-- result cannot discharge a generic-depth frame conjunct at all.  The
+-- answer is the DEPTH MIRROR (.Caps-Depth): a hypothesis
+-- `depthX … ≤ dep` that reduces, in each clause's own pattern context,
+-- to a `⊔` of its callees' mirrors.  Two arcs carry a `suc` — this
+-- module's `stepFrame-caps` thru-outer and `innerFinish-caps` concat —
+-- and at those two the clause SPLITS `dep`: `zero` is absurd because the
+-- mirror put a `suc` there, and `suc dep′` runs the callee one level
+-- lower.  Every other clause projects its hypothesis through the lattice
+-- and spends nothing.
 --
 -- THE PAYLOAD EDGE'S SPLIT IS NOW PAID, and how is worth keeping.  The
 -- four walk heads take the PREDECESSOR of the budget they report at:
@@ -900,9 +899,8 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- than a weakening of every hypothesis.  The strictness lands in exactly
 -- one place: `stepFrame-caps`'s thru-outer hands the walk `sizeAt S (suc
 -- j)`, whose successor IS `frameBud c j` by plain definition, and
--- `valsCaps→mList-strict` supplies the payload bound there.
-postulate
-  level-TEMP : ∀ {x y : ℕ} → x ≤ y
+-- `valsCaps→mList-strict` supplies the payload bound there, and
+-- `obsList→mList-strict` does the same for the concat drain's queue.
 ------------------------------------------------------------------
 
 subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1831,8 +1829,17 @@ innerFinish-caps {n = n} {s = s} c dep bud j g concatᵒ allNid inst κ id now v
 ... | just (concat-st {w} q act od) | (bn , wn) with w ≟ᵗ s | dpt
 ...   | no _     | dpt′ = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 -- `vals ++ proj₁ DR` is the third SUM, so this clause too reports one
--- fold beyond what concatDrain handed back
-...   | yes refl | dpt′ =
+-- fold beyond what concatDrain handed back.
+--
+-- AND THIS IS THE SECOND ARC THAT SPENDS DEPTH FUEL — the only one
+-- outside `stepFrame-caps`'s thru-outer.  `depthFinC`'s `yes refl` arm is
+-- `suc (depthDrain …)` (.Caps-Depth), so `dpt′` reads `suc _ ≤ dep`: at
+-- `zero` this branch is unreachable, and at `suc dep′` the drain runs one
+-- level lower.  The split has to sit BELOW the type dispatch, because the
+-- `no` arm spends nothing and must stay reachable at `dep = zero`
+...   | yes refl | dpt′ with dep | dpt′
+...     | zero     | ()
+...     | suc dep′ | s≤s dpt″ =
   suc j′ , capsOK?-mono (frameStep (j + j′) c) (frameStep (j + suc j′) c) sd₁ ST₁ ⊑ˢ
          (capsOK?-setNode (frameStep (j + j′) c) allNid
             (concat-st (proj₁ (proj₂ (proj₂ (proj₂ DR)))) (proj₁ (proj₂ (proj₂ DR))) od)
@@ -1866,7 +1873,15 @@ innerFinish-caps {n = n} {s = s} c dep bud j g concatᵒ allNid inst κ id now v
                       (proj₁ (proj₂ (proj₂ CD))))))
      , eventsCaps?-widen sl (proj₁ (proj₂ DR)) ⊑ˢ
          (proj₁ (proj₂ (proj₂ (proj₂ CD))))
-     , level-TEMP
+     -- the drain reported in `sIterD` at the budget this frame RE-READ, so
+     -- its `k` is `frameBud c j` on the nose and `concat-frame`'s own `hk`
+     -- is `≤-refl`.  The `suc` on `j′` is the frame's slot, and
+     -- `concat-frame` pays for it out of the room the queue did not use
+     , concat-frame (Caps.cSize c) (Caps.cWid c) dep′
+         (suc (sizeAt (Caps.cSize c) (suc j))) (length q) j j′ 2≤S
+         (≤ᵇ⇒≤ (length q) (Caps.cWid (frameStep j c)) (T-to wnLen))
+         ≤-refl
+         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ CD)))))
   where
   wnAll = proj₁ (∧-true (all (λ o → pWᵉ n (Sched.slots sched) o
                                       ≤ᵇ Caps.cWid (frameStep j c)) q)
@@ -1874,19 +1889,21 @@ innerFinish-caps {n = n} {s = s} c dep bud j g concatᵒ allNid inst κ id now v
   wnLen = proj₂ (∧-true (all (λ o → pWᵉ n (Sched.slots sched) o
                                       ≤ᵇ Caps.cWid (frameStep j c)) q)
                         (length q ≤ᵇ Caps.cWid (frameStep j c)) wn)
-  CD  = concatDrain-caps c dep bud j g allNid κ id now q sl sched st
-          2≤S 1≤R slEq slC slSz inv pC lC
-          (obsList-intro (frameStep j c) sl q bn
-             (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
-                             ≡ true)
-                    slEq wnAll))
-          (mList?-widen sl _ q fb
-             (obsList→mList c j sl _ q (≤-trans (s≤s z≤n) 2≤S) slSz
-                (obsList-intro (frameStep j c) sl q bn
-                   (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
-                                   ≡ true)
-                          slEq wnAll))))
-          (≤-trans (n≤1+n _) dpt′)
+  qObs = obsList-intro (frameStep j c) sl q bn
+           (subst (λ y → all (λ o → pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) q
+                           ≡ true)
+                  slEq wnAll)
+  -- THE DRAIN RUNS AT THE REFRESHED BUDGET, exactly as `stepFrame-caps`'s
+  -- thru-outer clause hands `thruWalk-caps` `sizeAt S (suc j)`.  That is
+  -- what the spent unit of depth fuel buys, and it is why the queue's
+  -- `mList?` comes from `obsList→mList-strict` — which is STATED at this
+  -- budget — rather than from the inherited `bud` via `mList?-widen`: a
+  -- bound in the larger transformer would not meet `frameBud c j`
+  CD  = concatDrain-caps c dep′ (sizeAt (Caps.cSize c) (suc j)) j g allNid κ
+          id now q sl sched st
+          2≤S 1≤R slEq slC slSz inv pC lC qObs
+          (obsList→mList-strict c j sl _ q (≤-trans (s≤s z≤n) 2≤S) slSz qObs)
+          dpt″
   j′  = proj₁ CD
   ⊑ˢ  = frameStep-mono-j c 2≤S
           (≤-trans (n≤1+n (j + j′)) (≤-reflexive (sym (+-suc j j′))))
@@ -2299,38 +2316,27 @@ stepFrame-caps c dep bud j g id now (from-inner op allNid inst) κ vals fin sl s
     2≤S 1≤R slEq slC slSz inv pS lC vC fb dpt
 
 -- and THIS is where the DEPTH FUEL splits, and the only place it does.
--- `fLvlD S W (suc d) J` unfolds to the payload walk at `d` — a frame is
--- the one arc of the cycle that re-reads the budget, and that re-read is
--- what the fuel pays for.  So the walk is handed `dep` minus one AND the
--- REFRESHED budget `frameBud c j`, which is what `valsCaps→mList`
--- supplies on the nose (the `mList?-widen` that used to slacken it to the
--- inherited `bud` is gone: a bound in the LARGER transformer is no use
--- here).  Its payload count meets `frame-step`'s `suc (widAt S W j)` by
--- `walk-index` on `valsCaps?`'s own length conjunct
+--
+-- At `dep = zero` the clause is UNREACHABLE, which is the entire reason
+-- the mirror exists.  `depthFrame`'s thru-outer arm is `suc (depthWalk …)`
+-- (.Caps-Depth), so the hypothesis here reads `suc _ ≤ zero`.  It has to
+-- be unreachable rather than merely hard: `fLvlD S W zero J` is a closed
+-- formula making no recursive call — that is what carries the family's
+-- termination — and a depth-zero walk STRICTLY overshoots it, so no
+-- rearrangement closes this clause and only a hypothesis can retire it
+-- (`Dep0-Walk-Probe` § 1)
 stepFrame-caps c zero bud j g id now (thru-outer op nid) κ vals fin sl sched st
-               2≤S 1≤R slEq slC slSz inv fS pS lC vC fb dpt =
-  j′ , proj₁ WR
-     , valsIn (frameStep (j + j′) c) sl (proj₁ (thruWrap op nid fin WK))
-         (proj₁ (proj₂ WR))
-         (subst (λ x → length x ≤ suc (Caps.cWid (frameStep (j + j′) c)))
-                (sym (thruWrap-vals op nid fin WK))
-                (valsLen (frameStep (j + j′) c) sl (proj₁ WK)
-                   (proj₁ (proj₂ (proj₂ TW)))))
-     , proj₂ (proj₂ WR)
-     , level-TEMP
-  where
-  TW = thruWalk-caps c zero (sizeAt (Caps.cSize c) (suc j)) j g op nid κ id now vals sl sched st
-         2≤S 1≤R slEq slC slSz inv pS vC lC
-         (valsCaps→mList-strict c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
-            (valsOf (frameStep j c) sl vals vC))
-         (≤-trans (n≤1+n _) dpt)
-  j′ = proj₁ TW
-  WK = thruWalk g op nid κ id now vals sched st
-  WR = thruWrap-caps (frameStep (j + j′) c) op nid fin sl WK
-         (proj₁ (proj₂ TW))
-         (valsOf (frameStep (j + j′) c) sl (proj₁ WK)
-            (proj₁ (proj₂ (proj₂ TW))))
-         (proj₁ (proj₂ (proj₂ (proj₂ TW))))
+               2≤S 1≤R slEq slC slSz inv fS pS lC vC fb ()
+
+-- and at `suc dep′` the fuel is spent: `fLvlD S W (suc d) J` unfolds to
+-- the payload walk at `d` — a frame is the one arc of the cycle that
+-- re-reads the budget, and that re-read is what the fuel pays for.  So the
+-- walk is handed `dep` minus one AND the REFRESHED budget `frameBud c j`,
+-- which is what `valsCaps→mList` supplies on the nose (the `mList?-widen`
+-- that used to slacken it to the inherited `bud` is gone: a bound in the
+-- LARGER transformer is no use here).  Its payload count meets
+-- `frame-step`'s `suc (widAt S W j)` by `walk-index` on `valsCaps?`'s own
+-- length conjunct
 stepFrame-caps c (suc dep′) bud j g id now (thru-outer op nid) κ vals fin sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC vC fb dpt =
   j′ , proj₁ WR

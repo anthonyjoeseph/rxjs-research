@@ -533,6 +533,47 @@ walk-room S W d k m j j₁ 2≤S hm h =
         (sIterD-mono (suc m) (suc (widAt S W j)) d d k k 2≤S
                      ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (s≤s hm))))
 
+-- j ≤ fLvl S W j, since fLvl S W J = J + fCharge S W J.  The frame's own
+-- receipt, absorbed by inflation rather than spent
+j≤fLvl : ∀ (S W j : ℕ) → j ≤ fLvl S W j
+j≤fLvl S W j = m≤m+n j (fCharge S W j)
+
+-- A DRAIN INSIDE A FRAME, which is `walk-room` carried the rest of the
+-- way home.  `concatDrain-caps` reports its walk in `sIterD` currency at
+-- the budget the frame RE-READ; the enclosing `innerFinish-caps` has to
+-- report in `fLvlD` at one higher depth, and this is that conversion.
+--
+-- Note what does NOT appear: `frame-step`, and any explicit `fCharge`
+-- receipt.  The `suc j₁` is already what `walk-room` buys — one spare
+-- payload slot is worth one level — and `fLvlD`'s own base point
+-- `fLvl S W j` absorbs the frame's charge by plain inflation.  So the
+-- frame pays for itself out of the room the queue did not use.
+--
+-- `hk` is FREE at the call site rather than an extra burden: a frame
+-- hands its drain the REFRESHED budget `sizeAt S (suc j)`, exactly as
+-- `stepFrame-caps`'s thru-outer clause hands `thruWalk-caps` the same
+-- thing, so the reported `k` IS `frameBud c j = suc (sizeAt S (suc j))`
+-- and `hk` is `≤-refl`
+concat-frame : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S →
+  m ≤ widAt S W j →
+  k ≤ suc (sizeAt S (suc j)) →
+  j + j₁ ≤ sIterD S W d k m j →
+  j + suc j₁ ≤ fLvlD S W (suc d) j
+concat-frame S W d k m j j₁ 2≤S hm hk h =
+  ≤-trans
+    (≤-trans
+      -- the queue-length index up to the full `suc (widAt S W j)`
+      (walk-room S W d k m j j₁ 2≤S hm h)
+      -- `k` up to the budget `fLvlD`'s `suc d` clause reads
+      (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d k
+         (suc (sizeAt S (suc j))) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl hk ≤-refl))
+    (≤-trans
+      -- and the entry level from `j` up to `fLvl S W j`
+      (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d
+         (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j))) 2≤S ≤-refl ≤-refl
+         (j≤fLvl S W j) ≤-refl ≤-refl ≤-refl)
+      (≤-reflexive (sym (fLvlD-suc S W d j))))
+
 ------------------------------------------------------------------
 -- § 7.  THE TWO ENTRIES THAT SUBSCRIBE NOTHING.
 --
