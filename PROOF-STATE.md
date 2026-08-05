@@ -36,18 +36,60 @@ this file preaches; the author of the claim was the one who broke it.
 
 ## The well-formedness branch (critical path, never assessed)
 
-| # | Name | Where | Notes |
-|---|------|-------|-------|
-| W1 | `subscribeE-wf` | Verify-Well-Formed.agda:1093 | the subscribe clique's well-formedness face |
-| W2 | `root-done-plumbed` | Verify-Well-Formed.agda:1166 | root's protocol-state plumbing |
-| W3 | `cut-owed` | Verify-Well-Formed.agda:3652 | the cut's `Owed` accounting |
-| W4 | `stepFrame-wf-inner-concat` | Verify-Well-Formed.agda:~3660 | concat's inner frame, wf side |
-| W5 | `mid-step` | Verify-Well-Formed.agda:4541 | mid-instant step |
+There are **EIGHT**, not five. (The design session's first count grepped only the
+first declaration in each `postulate` block and missed three. Censused properly
+2026-08-05.) Each has exactly one consumer — no orphaned postulates here.
 
-All five verified genuinely consumed (exactly one use site each — no orphans
-here, unlike the budget branch). **Nobody has censused this branch.** Its size,
-difficulty, and whether it has its own GAP-4-shaped design blockers are all
-UNKNOWN. Treat any "how close are we" answer that omits it as invalid.
+| # | Name | Line | Bucket |
+|---|------|------|--------|
+| W1 | `subscribeE-wf` | 1093 | (d) partly — base/map/scan/take clauses ALREADY PROVEN (see below); `*All` wrap clauses blocked on `merge-cert`; `pushBurst-wf`/`stepFrame-burst` don't exist yet |
+| W2 | `root-done-plumbed` | 1166 | (d) blocked on `merge-cert` |
+| W3 | `root-caches` | 1181 | (d) blocked on `merge-cert` |
+| W4 | `cut-owed` | 3656 | **(c) — the easiest thing in this branch.** Self-contained `Owed`-table algebra, independent of every blocker |
+| W5 | `stepFrame-wf-inner-concat` | 3676 | (c) concat's drain grows the registry; re-establish `FoldInv`. Independent of `merge-cert` |
+| W6 | `stepFrame-wf-outer` | 3685 | (d) blocked on `merge-cert` |
+| W7 | `dispatchShare-wf` | 3697 | (c) share fan-out mutual recursion — but must be RE-STATED with a `FoldOut` conclusion before it can feed `mid-step` |
+| W8 | `mid-step` | 4541 | (d) blocked on the `FoldOut` refactor below |
+
+**BLOCKER A — `merge-cert` (a GAP-4-shaped dead end with NO existing rescue).**
+Blocks W1's wrap clauses, W2, W3, W6. A first candidate invariant
+(`merge-st k at nid ⇒ k ≡ countRegsUnder nid registry`) is **machine-refuted by
+three independent counterexamples** (Verify-Well-Formed.agda:3410-3429); a second
+route ("derive from `Inv.done-plumbed`") is marked **STRUCTURALLY DEAD** (3498) —
+its premise is vacuous exactly when the obligation is needed. The corrected route
+is identified but explicitly OPEN (3459-3497): a one-directional, liveness-aware
+`merge-cert` whose *exact statement is the remaining design point*. Grepped for
+`merge-cert`/`countRegsUnder`/`aliveThrough` repo-wide: **zero hits outside this
+file.** Unlike the budget branch's rescues, this one is genuinely unsolved.
+
+**BLOCKER B — the `FoldOut` refactor, and a LYING COMMENT.** Blocks W8.
+`mid-step`'s header says `FoldOut` is "deliberately NOT yet stated" — **it IS
+stated**, a full 6-field record at 3527-3597, and `foldPath-root-out` (4138) is a
+real proof of it for the `root` path. But `foldPath-wf`'s actual signature
+(3874-3882) still returns only `Σ ProtocolSt …` with **no `FoldOut`**, so the
+plan to thread it lives only in prose. Consequences: `foldPath-root-out` is an
+ORPHAN (instance 5 of the wiring-law failure), and W8 cannot be assembled until
+`foldPath-wf`'s signature CHANGES — which cascades into re-*stating* W5, W6, W7.
+Textbook case of the wiring law: change the signature first.
+
+**Already proven but unwired here (instance 6):** `subscribeE-map-wf` (1916),
+`subscribeE-scan-wf` (1999), `subscribeE-take-wf` (3056) — roughly half of W1's
+case split is DONE. This one is *sanctioned* (the assembly was stated first, as a
+postulate, per outside-in) but scope W1 knowing it.
+
+**Cost:** the module is 5348 lines with no explicit `mutual` blocks — but that is
+NOT a safety signal: Subscribe-Face also has none and costs ~44 min. Most of this
+file's heavy obligations are still postulates, so today's cheap recheck is
+**not** representative; expect a Subscribe-Face-shaped cost increase as they get
+real bodies. It imports `budget-sufficient` one-way, so editing it does not
+force a Wet/Subscribe-Face recheck.
+
+**Cheapest de-risking experiment:** probe the corrected `merge-cert` statement
+(3483-3486) against the three adversarial shapes that killed candidate one —
+multi-source inner, inner-completes-before-outer, cut-through on an inner — in
+the style of `agda/probe/Cut-Caches-Probe.agda`. If it survives those, it is
+very likely the right statement; if not, this branch needs a design ruling
+before W1/W2/W3/W6 can be attempted at all.
 
 ## Postulate ledger (critical path: 4, plus 1 orphan)
 
@@ -87,7 +129,7 @@ these become the ledger):
 
 | Name | Where | Content |
 |---|---|---|
-| S3 `dry-tick` | Caps-Bridge.agda | P2's dry half. **Its arithmetic is ALREADY PROVEN** — see "The gas axis" below. Expected to be a wiring job, the cheapest remaining win. |
+| S3 `dry-tick` | Caps-Bridge.agda | P2's dry half. **BLOCKED on THE ANCHOR PROBLEM** (below) — NOT a wiring job. Its own header comment claiming independence from GAP 4 is WRONG; fix it when next editing that file. |
 | `depth-compositional` | Depth-Bound.agda | `depthE ≤ sizeᵉ b + pathLen κ + storeNestMax` (structural induction over the mirror). CENSUSED 2026-08-05: scope is 16 heads, not 19 (the delivery family — depthFold/depthDisp/depthShareGo/depthChain — is out of scope). The real remaining work is a state-growth conjunct, not a lemma about the mirror itself — every clause feeds `depthBurst` the state from the REAL `subscribeE` run, while the bound's RHS reads the entry state, so the induction needs `storeNestMax` at the evolved state dominated by the entry's bound. Details, including the ruling to prove this as a second conjunct of the same induction rather than a separate family, are in Depth-Bound.agda's header. |
 
 (B2, S1 `fn-tick`, S2 `slots-tick`, and `storeNest-capped` are PROVEN — landed
@@ -150,13 +192,47 @@ planning:
   obligation disappears with the edge. Already named and dismissed at
   `Wet.agda:4152-4155`.
 - **But the whole package has ZERO consumers** — grep finds only the
-  definitions. `dry-tick`'s own comment says why: it is "not touched by the
-  caps/INV? bridging problem at all". So the gas axis is solved and merely
-  unwired.
+  definitions.
 
-**Consequence for the risk ranking:** fuel sufficiency is NOT the risk. The
-remaining risk is concentrated in GAP 4 (b) — the `capsOK?` ↔ `INV?` bridge on
-the SUBSCRIBE side — and in `depth-compositional`'s state-growth conjunct.
+**AND IT CANNOT BE WIRED YET. Attempting it (2026-08-05) produced the session's
+most important structural finding — see THE ANCHOR PROBLEM.** An earlier version
+of this section said the gas axis was "solved and merely unwired" and called
+`dry-tick` the cheapest remaining win, quoting `dry-tick`'s own comment that it
+is "not touched by the caps/INV? bridging problem at all". **Both that comment
+and this file were wrong.** The edge ARITHMETIC is proven; SPENDING it is not.
+
+## THE ANCHOR PROBLEM — the campaign's one central open question
+
+`hop-edge` (and `connect-edge`) reset their demand to an anchor `Ŝ`, and
+discharging one requires `sizeᵛ o ≤ Ŝ` for a value `o` arising **mid-walk /
+mid-cascade**. There are exactly two ways to source `Ŝ`, and **the repo has
+already proven both impossible**:
+
+- **A fixed, entry-computable cap** — refuted by `caps-frame-boundary-absurd`
+  (`Caps-Face.agda:6836`, proven): for any cap `C ≥ 1`, `sizeStep C C ≤ C → ⊥`.
+  One more frame-crossing always escapes the cap, *uniformly in the cap*.
+- **A ledger/walk-position-tied ceiling** — refuted by
+  `round3b-ledger-reset-absurd` (`Measures.agda:6550`, proven): tying the anchor
+  to the walk's own growing ceiling is circular.
+
+The one surviving option is the repo's own stated plan — source `Ŝ`, `R̂`, `F`
+from **reachability** (`Measures.agda:6199-6203`) — and it **is not established
+anywhere.** Verified: no `chainStep-dry`/`foldPath-dry`/`subscribeInner-dry`
+family exists, and every proven `-wet` delivery lemma (`chainStep-wet`,
+`foldPath-wet`, `dispatchShare-wet`, `shareGo-wet`, `cascadeGo-walk`) is
+**size-axis only** — none carries a `Gas` hypothesis or concludes `hasDry ≡ false`.
+
+**This unifies what looked like separate problems.** GAP 4 (b), `dry-tick`, and
+P1's subscribe-side bridge are all the SAME question on different axes: *can a
+mid-walk value's size be bounded from reachability, rather than from a fixed cap
+or from the ledger?* Answer it and several postulates fall together; leave it and
+none of them move. **This is where design attention belongs.** A separate but
+analogous anchor-shaped blocker (`merge-cert`, node↔live-instance coherence)
+independently blocks the well-formedness branch — see that section.
+
+**Consequence for the risk ranking:** the risk is NOT spread across the ledger.
+It is one problem, named above, plus `depth-compositional`'s state-growth
+conjunct and the well-formedness branch's `merge-cert`.
 
 **One caution flagged during the census, unresolved:** `walk-hyps-round3b`
 (`Measures.agda:6510`) is a proven Σ-receipt showing the edge constraints are
