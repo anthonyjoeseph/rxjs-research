@@ -593,6 +593,7 @@ open import Verify-Budget-Sufficient.Caps-Face  public
 open import Verify-Budget-Sufficient.Subscribe-Face public
 open import Verify-Budget-Sufficient.Wet        public
 open import Verify-Budget-Sufficient.Caps-Bridge public
+open import Verify-Budget-Sufficient.Depth-Bound public
 
 ------------------------------------------------------------------
 -- THE ACTIVE GRIND.  Clause work happens here — this module re-checks

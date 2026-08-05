@@ -40,6 +40,19 @@ stands between the repo and the finish line.
 Off the critical path: `batch-online` (Batch-Theorems.agda:9) — extrinsic
 no-lookahead property, reachable from Main.agda but not consumed by The-Proof.
 
+**Decomposition postulates** (the named small pieces the monoliths reduce to —
+these are progress, but they count; discharging one of P1–P5 by assembly means
+these become the ledger):
+
+| Name | Where | Content |
+|---|---|---|
+| B2 | Caps-Bridge.agda | `cReg ≤ cSize` survives the caps iteration (joint induction) |
+| S1 `fn-tick` | Caps-Bridge.agda | fn face + Ψ-half of regsB? preserved across a cascade |
+| S2 `slots-tick` | Caps-Bridge.agda | raw `Sched.slots` equality across a cascade |
+| S3 `dry-tick` | Caps-Bridge.agda | P2's dry half (the gas-peel axis, unchanged) |
+| `depth-compositional` | Depth-Bound.agda | `depthE ≤ sizeᵉ b + pathLen κ + storeNestMax` (structural induction over the mirror) |
+| `storeNest-capped` | Depth-Bound.agda | `capsOK?` + `slotsSize ≤ cSize` → `storeNestMax ≤ cSize` (stBounded? inversion) |
+
 ## Named gaps and rulings (the full deck)
 
 **GAP 4** — Wet.agda:4125–4199. THE central design fact. The ledger-receipt
@@ -111,18 +124,25 @@ A proven fact with no consumer here is speculative inventory — flag it.
   real, then state `subscribeE-wet-via-caps` (P1's analogue) now that S4 is
   clear, then wire `cascade-wet-via-caps` as `cascade-dry`/`burst-wet`'s
   supplier in place of `cascadeGo-wet`.
-- Task #13 (depth obligation statement) → GAP 4 (a)'s nesting budget, stated
-  conditionally on `capsOK?`. Compositional-bound conjecture (`depthE ≤ sizeᵉ b
-  + pathLen κ + storeNestMax sched st + C`, consumer `sub-charge`) — VALIDATED
-  with C = 0 on every family reached (`agda/probe/Depth-Compositional-Probe.agda`):
-  k = 1, 2 at N ≤ 10 (past `capsBase`'s own comfort zone), k = 3, 4 at N ≤ 5,
-  plus three targeted refutation attempts (large static shared def, 30-deep κ,
-  a concat-st queue of nested observables) — all hold, slack comfortably
-  positive and non-shrinking everywhere. NOT reached: k ≥ 6 or N ≥ 13-22, the
-  literal old-breach/`poolCount` zone — a measured computability wall (real-run
-  extraction costs ~×1.5 per unit k, geometric in N; k = 1 at N = 25 alone
-  didn't finish in 90s), reported as a probe-infrastructure limit, not a
-  finding about the conjecture either way.
+- Task #13 (depth obligation) → STATED:
+  `agda/src/Verify-Budget-Sufficient/Depth-Bound.agda`. The probe-validated
+  measure (`storeNestMax` = slot shared defs ⊔ boundedNode's two live clauses)
+  is now a src definition; two postulates with their consumer written first:
+  `depth-compositional` (`depthE ≤ sizeᵉ b + pathLen κ + storeNestMax`, C = 0
+  per the probe; proof route = structural induction over the depth mirror's
+  clauses, one channel each) and `storeNest-capped` (`capsOK?` +
+  `slotsSize ≤ cSize` → `storeNestMax ≤ cSize`; an inversion of stBounded? +
+  the slots chain). The assembly `depth-capped` is a REAL definition:
+  `depthE ≤ 3·cSize c` under exactly `sub-charge`'s hypothesis list — the
+  entry-computable cap that makes `opIterD … depthE …` spendable, tower-free.
+  Probe evidence (`agda/probe/Depth-Compositional-Probe.agda`): VALIDATED
+  C = 0, k = 1-4, N ≤ 10, plus three targeted refutation attempts (large
+  static shared def, 30-deep κ, concat-st queue of nested observables) — all
+  hold, slack positive and non-shrinking. NOT reached: k ≥ 6 / N ≥ 13-22
+  (measured computability wall in the probe's real-run extraction, ~×1.5 per
+  unit k — an infrastructure limit, not a finding either way); that zone is
+  covered by the structural shape of `depth-compositional`'s eventual proof,
+  not by rows.
 - Task #4 (P3 + P4) → GAP 4 (a). Do not start before the charge companion is
   stated.
 - Task #5 (P5) → independent of GAP 4; safe parallel work.
