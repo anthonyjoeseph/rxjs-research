@@ -873,16 +873,25 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- eventual proof and recorded here rather than left to be rediscovered:
 --
 --   · `innerFinish-caps`'s concat clause hands `concatDrain-caps` its own
---     `dep` and `bud`.  A drain is a WALK, so the depth has to descend
---     into it exactly as it does in `stepFrame-caps`'s thru-outer clause
---     below, and its budget has to be the REFRESHED `frameBud c j`.
---   · `subscribeInner-caps` hands `subscribeE-caps` its own `bud`.  Its
---     conjunct is at `sLvlD S W dep bud (suc j)` and the callee reports
---     at `opIterD S W dep bud′ (suc (sizeAt S (suc j))) (suc j)`, so the
---     two meet by `sLvlD-suc` only when `bud ≡ suc bud′` — a payload
---     subscribe is a NESTING LEVEL and spends one, the same way the μ
---     unfolding below does.  The measure that supplies the split at the
---     μ edge is `mu-step`; the payload edge's is not yet stated.
+--     `dep`.  A drain is a WALK, so the depth has to descend into it
+--     exactly as it does in `stepFrame-caps`'s thru-outer clause below —
+--     and THAT is the unresolved part, not the budget: `innerFinish-caps`
+--     and `innerReact-caps` are both generic in `dep`, while `fLvlD` at
+--     zero and at a successor are unrelated formulas, so a walk result
+--     cannot discharge a generic-depth frame conjunct at all.  Both
+--     remaining walk sites are the SAME zero-depth question.
+--
+-- THE PAYLOAD EDGE'S SPLIT IS NOW PAID, and how is worth keeping.  The
+-- four walk heads take the PREDECESSOR of the budget they report at:
+-- each holds `bud` and reports at `suc bud`, so `subscribeInner-caps`
+-- can hand `subscribeE-caps` its own `bud` unchanged and the two meet
+-- where `inner-step` needs them.  Nothing had to be renamed or matched —
+-- `inner-step` is proven for an abstract `k` and concludes at `suc k`,
+-- which is why the nesting level costs a `suc` on the CONJUNCT rather
+-- than a weakening of every hypothesis.  The strictness lands in exactly
+-- one place: `stepFrame-caps`'s thru-outer hands the walk `sizeAt S (suc
+-- j)`, whose successor IS `frameBud c j` by plain definition, and
+-- `valsCaps→mList-strict` supplies the payload bound there.
 postulate
   level-TEMP : ∀ {x y : ℕ} → x ≤ y
 ------------------------------------------------------------------
@@ -961,7 +970,7 @@ subscribeInner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      -- A PAYLOAD'S OWN ENTRY, and it is reported STRICTLY: the inner is
      -- subscribed under one more frame, at `suc j`, and the walk that
      -- consumes it charges one fold per cons (`walk-step-suc`)
-     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep bud (suc j))
+     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
 -- OUT OF GAS: a dry close and nothing else.  The only state change is
 -- the instance counter, which capsOK? does not read
 subscribeInner-caps c dep bud j g0 op allNid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst =
@@ -969,14 +978,23 @@ subscribeInner-caps c dep bud j g0 op allNid κ id now o sl sched st 2≤S 1≤R
                      (record sched { nextNode = suc (Sched.nextNode sched) }) st ≡ true)
             (sym (+-identityʳ j))
             (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched)) sched st inv)
-    , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+    , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
 -- WITH GAS: the inner is subscribed under one more frame, at the same
 -- instant, and at ONE MORE j.  Its size hypothesis is valCaps?'s cSize
 -- half (sizeᵛ (obs u) IS sizeᵉ), widened by the step; its chain
 -- hypothesis is κ's, one frame longer, which is frameStep-chain-suc
 subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c dep bud j (gs fuel) op allNid κ id now o
                     sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst =
-  suc (suc (suc j₂)) , R1 , R2 , R3 , level-TEMP
+  suc (suc (suc j₂)) , R1 , R2 , R3
+    -- THE KEYSTONE.  Twenty-five clauses of `thruConsume-caps` project
+    -- this one, and its witness is forced from both sides: the caps
+    -- components live at `frameStep (j + suc (suc (suc j₂)))` because the
+    -- `splitBurst` square costs two levels, and the consumer wants a
+    -- STRICT report at `suc j`.  So the goal sits four above the IH's one,
+    -- and a payload subscribe spends the nesting level that makes `suc
+    -- bud` meet the IH's `bud`
+    , inner-step (Caps.cSize c) (Caps.cWid c) dep bud j j₂ 2≤S
+        (proj₂ (proj₂ (proj₂ (proj₂ IH))))
   where
   B      = Caps.cSize (frameStep j c)
   B′     = Caps.cSize (frameStep (suc j) c)
@@ -997,14 +1015,21 @@ subscribeInner-caps {n = n} {Γ = Γ} {t = t} {u = u} c dep bud j (gs fuel) op a
              (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
                         (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
                       (pathSz?-⊑ κ step⊑ pC))
-  IH     = subscribeE-caps c dep bud (suc (Caps.cSize (frameStep (suc j) c))) (suc j) fuel o κ′ id now sl sched₀ st 2≤S 1≤R slEq slC slSz
+  -- THE INDEX IS THE CAP ITSELF, not its successor.  Called at the
+  -- successor the IH lands flush against the target with nothing over,
+  -- which is exactly why this site could not be closed; one index lower
+  -- exposes `opIterD`'s own `J₀` excursion, which is where the payload
+  -- edge's three rungs are paid from (.Caps-Chain § 5)
+  IH     = subscribeE-caps c dep bud (Caps.cSize (frameStep (suc j) c)) (suc j) fuel o κ′ id now sl sched₀ st 2≤S 1≤R slEq slC slSz
              (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
                 (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                   sched st inv))
              (≤-trans szo (proj₁ step⊑))
              (≤-trans wdo (proj₁ (proj₂ step⊑))) pC′
              (frameStep-chain-suc c j (pathLen κ) 2≤S lC) nst
-             (s≤s (≤-trans szo (proj₁ step⊑)))
+             -- and the lower index costs STRICTNESS here: `s≤s` on the
+             -- widened `szo` would only reach the cap's successor
+             (frameStep-size-strict-suc c j (sizeᵉ o) (≤-trans (s≤s z≤n) 2≤S) szo)
   j₂     = proj₁ IH
   SUB    = proj₁ (proj₂ IH)
   BC     = proj₁ (proj₂ (proj₂ IH))
@@ -1280,7 +1305,7 @@ thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ r)) ≡ true)
      -- the inside of one payload, so it reports in subscribeInner's shape
-     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep bud (suc j))
+     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
 
 -- MERGE: subscribe, then bump the active-inner counter
 thruConsume-caps c dep bud j g mergeᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst =
@@ -1306,22 +1331,22 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
-... | nothing                | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | nothing                | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (scan-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (scan-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (take-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (take-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (merge-st _ _)    | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (merge-st _ _)    | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (switch-st _ _)   | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (switch-st _ _)   | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (exhaust-st _ _)  | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (exhaust-st _ _)  | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
 ... | just (concat-st {w} q false od) | (bn , wn) =
@@ -1341,7 +1366,7 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
 ... | just (concat-st {w} q true od) | (bn , wn) with w ≟ᵗ u
 ...   | no _ = 0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
                          (sym (+-identityʳ j)) inv
-             , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+             , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
 -- THE ONE WRITE THAT GROWS A CONCAT QUEUE, and therefore the one
 -- clause of the clique that reports a witness for no other reason than
 -- the cardinality conjunct.  `widNode` bounds the queue's LENGTH by the
@@ -1361,8 +1386,10 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
                (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv))
     , refl , refl
-    , queue-push (Caps.cSize c) (Caps.cWid c) dep bud j
-        (≤-trans (1≤nest o sl (EvalSt.connectedShares st)) nst)
+    -- and its positivity is now FREE: the head reports at `suc bud`, so
+    -- the budget this needs to be positive is a literal successor and the
+    -- `1≤nest` route it used to take is dead
+    , queue-push (Caps.cSize c) (Caps.cWid c) dep (suc bud) j (s≤s z≤n)
   where
   lvl : j + 1 ≡ suc j
   lvl = +-comm j 1
@@ -1380,22 +1407,22 @@ thruConsume-caps {n = n} {u = u} c dep bud j g concatᵒ nid κ id now o sl sche
 -- SWITCH: cut the outgoing inner, subscribe the new one, record it
 thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst
   with lookupNode nid (EvalSt.nodes st)
-... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (scan-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (scan-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (merge-st _ _)    = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (merge-st _ _)    = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (concat-st _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (concat-st _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (exhaust-st _ _)  = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (exhaust-st _ _)  = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
 ... | just (switch-st cur od) =
@@ -1426,25 +1453,25 @@ thruConsume-caps c dep bud j g switchᵒ nid κ id now o sl sched st 2≤S 1≤R
 -- EXHAUST: drop while busy, otherwise subscribe and latch
 thruConsume-caps c dep bud j g exhaustᵒ nid κ id now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst
   with lookupNode nid (EvalSt.nodes st)
-... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (scan-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (scan-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (merge-st _ _)    = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (merge-st _ _)    = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (concat-st _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (concat-st _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (switch-st _ _)   = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (switch-st _ _)   = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-... | just (exhaust-st true od)  = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+... | just (exhaust-st true od)  = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   where
   ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
 ... | just (exhaust-st false od) =
@@ -1486,10 +1513,10 @@ thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ r)) ≡ true)
      -- ONE PAYLOAD AT A TIME, so the walk's index is the payload count
-     × (j + j′ ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep bud (length vals) j)
+     × (j + j′ ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length vals) j)
 thruWalk-caps c dep bud j g op nid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz inv pC vC lC nst =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-    , refl , refl , walk-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+    , refl , refl , walk-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
 -- ONE MORE FOLD THAN THE ADDITIVE CLAUSES, and Concat-Sum-Probe is why:
 -- the output is `proj₁ TC ++ proj₁ REST`, a SUM of two counts, and a sum
 -- does not fit the width its two summands came in under.  `suc (j₁ + j₂)`
@@ -1528,7 +1555,7 @@ thruWalk-caps {u = u} c dep bud j g op nid κ id now (o ∷ os) sl sched st
     -- ONE PAYLOAD, and the head is spent in the STRICT form: that is what
     -- thruConsume-caps reports, and `walk-step-suc` is `walk-step` with
     -- the `suc` this clause's per-cons fold charge puts on the witness
-    , walk-step-suc (Caps.cSize c) (Caps.cWid c) dep bud (length os) j j₁ j₂ 2≤S
+    , walk-step-suc (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length os) j j₁ j₂ 2≤S
         (proj₂ (proj₂ (proj₂ (proj₂ HD))))
         (proj₂ (proj₂ (proj₂ (proj₂ IH))))
   where
@@ -1587,10 +1614,10 @@ concatDrain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      × (all (obsCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
      -- a drain is a WALK over the parked queue, indexed by its length
-     × (j + j′ ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep bud (length q) j)
+     × (j + j′ ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length q) j)
 concatDrain-caps c dep bud j g allNid κ id now [] sl sched st 2≤S 1≤R slEq slC slSz inv pC lC qC nst =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-    , refl , refl , refl , walk-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+    , refl , refl , refl , walk-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
 concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC qC nst
   with subscribeInner g concatᵒ allNid κ id now o sched st
@@ -1607,7 +1634,7 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
      -- ONE PAYLOAD, and the queue behind it bounded by inflation rather
      -- than by a report: the inner's own conjunct is STRICT, so it is
      -- weakened once here and `walk-last` absorbs the empty tail
-     , walk-last (Caps.cSize c) (Caps.cWid c) dep bud (length q) j j₁ 2≤S
+     , walk-last (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length q) j j₁ 2≤S
          (≤-trans (n≤1+n (j + j₁)) LV)
 -- the inner completed synchronously: drain on, and the two receipts add
 -- PLUS ONE — `vs ++ proj₁ REST` is a SUM of two counts, so this clause
@@ -1644,7 +1671,7 @@ concatDrain-caps {s = s} c dep bud j g allNid κ id now (o ∷ q) sl sched st
     -- j₂)` because the sum of the two counts pays one extra fold, and
     -- `walk-step-suc` is the step that spends the inner's STRICT report
     -- verbatim — no weakening here, unlike the branch above
-    , walk-step-suc (Caps.cSize c) (Caps.cWid c) dep bud (length q) j j₁ j₂ 2≤S
+    , walk-step-suc (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length q) j j₁ j₂ 2≤S
         LV (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
   where
   IH   = concatDrain-caps c dep bud (j + j₁) g allNid κ id now q sl sched₁ st₁
@@ -2226,9 +2253,9 @@ stepFrame-caps c zero bud j g id now (thru-outer op nid) κ vals fin sl sched st
      , proj₂ (proj₂ WR)
      , level-TEMP
   where
-  TW = thruWalk-caps c zero (frameBud c j) j g op nid κ id now vals sl sched st
+  TW = thruWalk-caps c zero (sizeAt (Caps.cSize c) (suc j)) j g op nid κ id now vals sl sched st
          2≤S 1≤R slEq slC slSz inv pS vC lC
-         (valsCaps→mList c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
+         (valsCaps→mList-strict c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
             (valsOf (frameStep j c) sl vals vC))
   j′ = proj₁ TW
   WK = thruWalk g op nid κ id now vals sched st
@@ -2257,9 +2284,9 @@ stepFrame-caps c (suc dep′) bud j g id now (thru-outer op nid) κ vals fin sl 
                       (length vals) j j 2≤S
                       (valsLen (frameStep j c) sl vals vC))))
   where
-  TW = thruWalk-caps c dep′ (frameBud c j) j g op nid κ id now vals sl sched st
+  TW = thruWalk-caps c dep′ (sizeAt (Caps.cSize c) (suc j)) j g op nid κ id now vals sl sched st
          2≤S 1≤R slEq slC slSz inv pS vC lC
-         (valsCaps→mList c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
+         (valsCaps→mList-strict c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
             (valsOf (frameStep j c) sl vals vC))
   j′ = proj₁ TW
   WK = thruWalk g op nid κ id now vals sched st
