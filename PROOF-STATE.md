@@ -202,6 +202,68 @@ relations that module exists to state things up to, and `locality`,
 than "close to vacuous" — two of its own helpers are not wired into its own
 claims.
 
+### THE ORPHAN CENSUS (2026-08-05) — 87 items, 17 families, evidence not verdicts
+
+A read-only sweep grouped all 87 and checked every family's import direction
+with `grep '^open import'` before claiming any consumer. **Six findings that
+were NOT already known.** (Cost ~276k tokens; the follow-up census should run
+against the post-landing list, which is smaller.)
+
+1. **THE MASTER STRUCTURAL FACT.** `Verify-Well-Formed.agda:43` imports
+   **exactly one name** — `budget-sufficient` — from the entire
+   Verify-Budget-Sufficient tower. That single edge is why a whole stratum of
+   proven work can never reach a claim. Every "missing wire" below is
+   downstream of it.
+2. **A TENTH DUPLICATED PROOF, and its cause.**
+   `Verify-Well-Formed.agda:4564–4573` states its own `cascadeGo-skip` with the
+   identical case-split shape as `Deliveries.agda:868`'s `cascadeGo-skip-N` —
+   **because Verify-Well-Formed cannot reach Deliveries.** The duplication is
+   not carelessness; it is the import graph forcing a re-derivation. Fix the
+   edge and the duplicate becomes deletable.
+3. **THE RESET PAIR IS STATED THREE TIMES, and only the inline copy is ever
+   called.** `connect-edge`'s body (Wet.agda:4066–4071) inlines exactly what
+   `reach-resets` (Caps-Face:6917) bundles and what `connect-anchor`
+   (Measures:1977) *also* bundles. Wet's own comments admit it — "reach-resets'
+   first component, inlined" (4043) and "reach-resets' two components, again
+   inlined" (4058). Three statements, one fact, zero of the named ones spent.
+4. **A WHOLE SUPERSEDED WELL-FOUNDEDNESS TOWER (7 items, Measures).** `≺ᵛ-wf`
+   :536, `≺-embed`:2085, `unfoldμ-≺`:2151, `shells-unfoldμ-cap`:2165,
+   `shells-drop`:2209, `rank-drop`:2224, `dBound-struct`:2237 — a
+   Dershowitz–Manna multiset order over syntax, including its nontrivial
+   well-foundedness proof. **Evidence it is superseded rather than merely
+   unwired:** the measure actually wired, `dBound V R U r s = s + suc V * (r +
+   suc R * U)` (Measures:2003), is closed-form ℕ arithmetic that never mentions
+   `rank`, `shells`, or `≺ᵛ` at all. Two encodings of one termination
+   argument; only the cheap one is spent. **Anthony's ruling needed** — this is
+   the single largest block of recoverable-or-deletable work in the census.
+5. **THREE LEMMAS UNWIRED PURELY BY A MISSING `using` CLAUSE** — the cheapest
+   fix in the repo. `pmO≤ceil`:782, `pmI≤ceil`:787, `pWᵉ≤entryCeil`:831
+   (Rx/Frame-Width.agda) are absent from the `using` lists that import
+   Frame-Width into Caps-Face (:116–124) and Subscribe-Face (:102–110), while
+   their siblings `slotsPW≤entryCeil`/`slotsIW≤entryCeil` ARE imported and ARE
+   consumed (Caps-Face:4323,4325). The wired siblings bound the *slot
+   telescope's* width; these three bound the *expression's own*. No cycle, no
+   design question — one import line each.
+6. **WRAPPERS BYPASSED BY THEIR OWN CALLER.** `enterInstant-fresh-aux`
+   (Verify-Well-Formed:4010–4021) calls the field-unpacked `…-aux` internals
+   directly, skipping `enterInstant-idle`:3965 / `enterInstant-held`:3982 /
+   `paidUp-held`:4000 — wrappers written precisely to repack those calls. The
+   wrapper came first, then the call site was written against the primitive
+   form.
+
+Also: **`Depth-Bound.agda:67–69` has the identical upside-down shape as
+Caps-Bridge** (imports Wet AND Subscribe-Face), so the ruling above applies to
+it too. And `sub-charge`/`cascade-wet-via-caps` were re-verified as
+non-vacuous, taking concrete hypotheses rather than assuming the hard part —
+checked by reading the signatures, not by trusting the memos.
+
+**Priority order from the census, and it matches the ruling above:** delivery-
+count tower (cheapest real win) → Caps-Bridge/Depth-Bound (biggest payoff,
+retires P2) → Frame-Width/Rx one-liners → Verify-Well-Formed's `subscribeE-wf`
+body → Caps-Face/Caps-Nest odds and ends → **the anchor cluster LAST (26 items,
+the largest mass of proven work, genuinely blocked on the one open design
+question — no further worker time there until it resolves).**
+
 Rulings by cluster, made by the design session after
 four bad worker verdicts on exactly these calls (see the cautions below):
 
