@@ -18,6 +18,7 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val; Ctx)
+open import Rx.Evaluator using (Grouped)
 open import Data.Vec using (Vec)
 
 private
@@ -108,9 +109,9 @@ private
       mapEvents []       = []
       mapEvents (e ∷ es) = encEventB t e ∷ mapEvents es
 
-encodeBatched : ∀ {n} {Γ : Ctx n} (t : Ty) → List (InstEmit (List (Val Γ t))) → String
+encodeBatched : ∀ {n} {Γ : Ctx n} (t : Ty) → Grouped Γ t → String
 encodeBatched t ems = arr (go ems)
   where
-    go : List (InstEmit (List (Val _ t))) → List String
+    go : Grouped _ t → List String
     go []       = []
     go (e ∷ es) = encEmitB t e ∷ go es

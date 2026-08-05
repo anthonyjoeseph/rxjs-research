@@ -231,6 +231,27 @@ against the post-landing list, which is smaller.)
    (Measures:1977) *also* bundles. Wet's own comments admit it — "reach-resets'
    first component, inlined" (4043) and "reach-resets' two components, again
    inlined" (4058). Three statements, one fact, zero of the named ones spent.
+
+   **CORRECTION (design session, on inspecting all three): the three are NOT
+   interchangeable, so "just call the existing one" is a wall, not a fix.**
+   - `connect-edge`/`hop-edge` (Wet) are **generic in `Ŝ`** and take
+     `sizeᵉ d ≤ Ŝ` as a hypothesis.
+   - `reach-resets` (Caps-Face:6917) is the matching generic form —
+     `2 ≤ C → sizeᵉ o ≤ C → (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)` — but
+     **Caps-Face is Wet's SIBLING** (Wet → Caps; Caps-Face → Delivery-Walk →
+     Caps), so Wet can never import it.
+   - `connect-anchor` (Measures:1977) is **specialised** to
+     `V = sizeBudgetAt e sl id` and derives the size bound internally from
+     `slotDef-size`/`slots≤budget`. Calling it from `connect-edge` would force
+     `Ŝ = sizeBudgetAt e sl id` and destroy the genericity.
+
+   **THE ACTUAL FIX:** state the generic pair ONCE in `.Measures` — the lowest
+   common point — since its two ingredients (`hopD-cap`, `syncSize≤sizeᵉ`) are
+   already reachable from both Wet and Caps-Face. Then `connect-edge`,
+   `hop-edge`, `reach-resets`, AND `connect-anchor` all delegate to it, and
+   `reach-resets` becomes a one-line re-export (or goes). Four consumers for one
+   three-line lemma. This is the general lesson again: **when the same fact is
+   proven N times, the fix is usually to move it DOWN, not to pick a winner.**
 4. **A WHOLE SUPERSEDED WELL-FOUNDEDNESS TOWER (7 items, Measures).** `≺ᵛ-wf`
    :536, `≺-embed`:2085, `unfoldμ-≺`:2151, `shells-unfoldμ-cap`:2165,
    `shells-drop`:2209, `rank-drop`:2224, `dBound-struct`:2237 — a
