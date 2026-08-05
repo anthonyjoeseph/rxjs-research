@@ -227,6 +227,58 @@ verdicts depend on campaign context that lives in no source comment, and
 delegating them produced four errors in two hours, in both directions (one
 "we've solved it", three "delete it"). Workers gather; the design session rules.
 
+### RULING: Caps-Bridge was built UPSIDE DOWN (2026-08-05, phase 1)
+
+**The module sits ABOVE `.Wet` and its header names `.Wet` as its consumer. That
+can never happen** — `Caps-Bridge.agda:55` is `open import …Wet`, so a `.Wet →
+.Caps-Bridge` edge is a cycle Agda rejects outright. The header's "CONSUMERS.
+`cascade-dry` and `burst-wet` (.Wet) migrate to consume `cascade-wet-via-caps`
+here" is a **lying comment** of exactly the forbidden kind: it describes a wiring
+the import graph forbids. The design session wrote that header AND wrote the
+phase-1 brief that inherited its error, sending a worker to build an impossible
+edge. The worker was right to route around it and right to flag the cost.
+
+**Why `open … public` hid this.** `Verify-Budget-Sufficient.agda:595` re-exports
+Caps-Bridge `public`, so `make agda` typechecks it forever and it never rots —
+but a re-export is not a consumer. Nothing downstream *needs* one line of it.
+This is the loophole the wiring law closes, and it is why `make wiring` flagged
+these while the build stayed green. **Re-export ≠ consumption; only `make wiring`
+sees the difference.**
+
+**The fix is to move the TOP of the tower UP, not the bridge DOWN.** Measured,
+not guessed:
+- Caps-Bridge needs exactly **7** Wet-resident names (`sizeCapAt`,
+  `sizeCapAt-mono`, `INV?-widen`, `cascadeLatch-INV`, `cascadeFinish-INV`,
+  `chainsOf-B`, `cascadeGo-walk`); everything else its header credits to `.Wet`
+  actually originates in `.Measures` and already arrives independently via
+  `Subscribe-Face → Caps-Face → Delivery-Walk → Caps → Keeps-Ring → Measures`.
+- None of the 7 sit inside Wet's mutual blocks (3920/3977), so extraction is
+  *possible* — but their natural home is `.Caps`, and editing `.Caps` dirties
+  Delivery-Walk → Caps-Face → **Subscribe-Face (~44 min)** → Wet → everything.
+  Rejected on cost.
+- So instead **`cascade-dry`/`drain-dry`/`budget-sufficient` MOVE from `.Wet` to
+  `.Caps-Bridge`**, caps-threaded, where `cascade-wet-via-caps`, `sub-charge`,
+  `slots-tick`, `chainStep-slots`, `cascadeGo-slots`, `fn-tick`, B1/B2 are all
+  already proven and local. MOVE, not copy — a second fuel-loop induction beside
+  the first is the same duplication in a new place.
+- `Verify-Well-Formed.agda:43` imports `budget-sufficient` from `.Wet` **by
+  name**, so the tower's top is pinned by one import line. That line changes;
+  the theorem's face does not. Verify-Well-Formed gets rechecked either way (it
+  imports Wet), so this costs nothing extra.
+
+**THE PRIZE, and it is bigger than the tidiness.** `cascade-wet-via-caps` is
+proven modulo `dry-tick`. Routing `budget-sufficient` through it **retires P2
+(`cascadeGo-wet`)** — trading a postulate for one already on the ledger — and
+makes P2 an orphan, i.e. retired *by deletion* rather than by proof. Phase 1's
+`burst-caps` postulate should likewise be re-examined against `sub-charge`
+(GAP 4(a), proven), which may discharge it outright rather than assume it.
+
+**Generalised lesson for every future wiring pass: check the import graph BEFORE
+designing the edge.** Two of this campaign's wiring errors are now the same
+error — a header asserting a consumer relationship that the module's own imports
+make impossible. A one-line `grep '^open import' <module>` would have caught
+both. Do it first, every time.
+
 ## Named gaps and rulings (the full deck)
 
 **GAP 4** — Wet.agda:4125–4199. THE central design fact. The ledger-receipt
