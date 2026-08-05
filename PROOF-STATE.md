@@ -6,6 +6,18 @@ closed. Detailed records stay in source comments — this file is pointers, not
 copies. If a pointer and its source comment disagree, the source comment wins;
 fix the pointer.
 
+> **THE WIRING LAW GOVERNS EVERYTHING BELOW — see CLAUDE.md § "The wiring law:
+> NEVER LEAVE A PROOF HANGING".** Never prove something and leave it unwired.
+> Extend the consuming assembly first (postulating its other gaps), land both in
+> one commit, and change a signature rather than leaving a piece that will not
+> plug in. Every gap is a typed postulate; every definition and postulate is
+> consumed, transitively, by a top-level theorem. No invisible debt, no dead
+> code, no gap that lives only in prose. `make wiring` is the acceptance test —
+> zero orphans outside its two documented exempt families. This document's own
+> history is the argument for the law: it has been wrong four times in one day,
+> in the reassuring direction every time, and each error was a status claim no
+> typechecker was enforcing.
+
 Why this file exists: the design state used to live only in scattered
 mega-comments (Wet.agda's GAP 4 block, Caps-Face:6087, probe headers). Sessions
 that didn't re-read them paid a rediscovery tax — re-refuting the sync-μ

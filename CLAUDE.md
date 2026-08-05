@@ -240,40 +240,52 @@ used somewhere — the only exceptions are the top-level, most-important exports
 backwards-compatibility shims, nothing "stored for reference", no legacy, no deprecated.
 **Do not be afraid to throw out code or documentation.** Git history is the archive.
 
-### The wiring law: a comment is not a wire (Anthony, 2026-08-05)
+### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
-The rule above is not self-enforcing, and its failure is this campaign's **dominant cost** —
-larger than every refutation combined. The mechanism is always the same: a proof gets written,
-its intended consumer is described **in a comment**, and the comment cannot be typechecked. The
-proof then drifts, the consumer never materialises, and a later session either rediscovers the
-proof or re-proves it. Six instances so far: `caps-tick`, `subscribeE-walk`, the entire
-three-edge gas package, the `Caps-Bridge`/`Depth-Bound` tower, `foldPath-root-out`, and
-`subscribeE-wf`'s map/scan/take clauses.
+**THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level
+theorem.** No invisible debt, no dead code, no gap that lives only in prose. Two corollaries,
+and both are *checkable* rather than aspirational:
 
-So, two obligations, and they are checkable rather than aspirational:
+- **Every GAP is a postulate with a real signature** — never a comment, never a merely-missing
+  statement. "This still needs X" in prose is invisible to the compiler and to `grep`. State X.
+  Then `grep -rn '^postulate' agda/src` **is** the complete remaining-work ledger and no branch
+  of the proof can hide. (A hidden branch is exactly how the eight well-formedness postulates
+  went uncounted for months while the index claimed the campaign reduced to two.)
+- **Every DEFINITION and every POSTULATE is consumed, in code, transitively by a top-level
+  theorem.** Then "did we forget something?" is answered by the typechecker instead of by
+  memory — if a piece is not needed, `The-Proof.agda` does not compile.
 
-- **Every gap is a POSTULATE, never a comment.** "This still needs X" in prose is invisible to
-  the compiler and to `grep`. State X as a postulate with its real signature. Then
-  `grep -rn '^postulate' agda/src` **is** the complete remaining-work ledger, and no branch of
-  the proof can hide (a hidden branch is exactly how the well-formedness postulates went
-  uncounted for months).
-- **Every definition and every postulate has a real consumer, in code, transitively reaching a
-  top-level theorem.** Write the ASSEMBLY first — the term that consumes the piece — with its
-  own gaps as postulates. If the assembly needs a different signature to accept the piece,
-  **change the signature first**; a piece that cannot be plugged in is not progress.
+**THE WORKFLOW that keeps it true.** Before proving a lemma, extend the assembly that will
+consume it — postulating whatever else that assembly needs — and land both in the SAME commit.
+Never finish a proof and leave its wiring "for later": later is where every instance below came
+from. If the assembly needs a different signature to accept the piece, **change the signature
+first.** A piece that cannot be plugged in is not progress, and its shape is not yet known to be
+right.
 
-The two failure states this forbids, both of which the tree has right now:
+**A POSTULATE MUST ASSERT SOMETHING.** Wiring an orphan with a vacuous bridge is worse than
+leaving it orphaned, because it looks discharged. Two traps, both live in this repo:
+`⊤`-typed postulates whose real claim sits in a trailing comment (`id-inheritance`,
+`defer-shift` — fix on sight), and Σ-statements that are upward-closed in their witness (see
+"A Σ-receipt has content only through its witness" above). Check every new postulate for both
+BEFORE landing it.
 
-- **An orphan**: a proven definition nothing consumes. Either a missing wire or dead weight —
-  both are findings, and one of them is a deletion. Never leave it undecided.
-- **A lying comment**: prose describing an intent the code does not encode. `FoldOut`'s header
-  said it was "deliberately NOT yet stated" while the record was in fact stated 60 lines below,
-  and the plan to thread it through `foldPath-wf` lived only in that comment — so
-  `foldPath-root-out` was proven against an assembly that never existed.
+**FORBIDDEN STATES.** An **orphan** — a proven definition nothing consumes; it is either a
+missing wire or dead weight, both are findings, and leaving it undecided is not an option. A
+**lying comment** — prose describing an intent the code does not encode; `FoldOut`'s header said
+it was "deliberately NOT yet stated" while the record sat stated 60 lines below, so
+`foldPath-root-out` was proven against an assembly that never existed.
 
-**When in doubt, grep for a fact before planning its proof, and grep for a definition's
-consumers before believing any status claimed for it.** Run `make wiring` (see below) rather
-than trusting a memo — including this one.
+**ACCEPTANCE TEST: `make wiring` reports zero orphans** outside its two documented exempt
+families (`*-absurd` refutation witnesses, whose consumer is the design record; and the
+top-line semantic claims in `*-Theorems.agda`, which ARE the claims). Run it rather than
+trusting a memo — including this one. Also: grep for a fact before planning its proof, and grep
+for a definition's consumers before believing any status claimed for it.
+
+**WHY THIS IS LAW.** Unwired proven work has cost this campaign more than every refutation
+combined: `caps-tick`, `subscribeE-walk`, the whole three-edge gas package, the
+`Caps-Bridge`/`Depth-Bound` tower, `foldPath-root-out`, `subscribeE-wf`'s map/scan/take clauses,
+a stranded delivery-count tower, and nine places where the same proof was written **twice** —
+once as a lemma nobody calls, once re-derived inline at the site that needed it.
 
 ## TypeScript implementation style
 
