@@ -82,7 +82,8 @@
 module Verify-Budget-Sufficient.Caps-Depth where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≡ᵇ_; _≤_)
+open import Data.Nat.Properties using (≤-trans; m≤m⊔n; m≤n⊔m)
 open import Data.List    using (List; []; _∷_; _++_; any)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Fin     using (Fin; toℕ)
@@ -431,3 +432,32 @@ depthChain {n = n} {e = e} id a path sched st =
             path (arrVal a ∷ [])
             (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
             (Arrival.isLast a) sched st
+
+------------------------------------------------------------------
+-- PROJECTING A THREE-CALLEE CLAUSE.  `depthShareGo`'s cons clause is the
+-- only one above with three callees, `a ⊔ (b ⊔ c)`, and a consumer needs
+-- each summand separately.
+--
+-- THE BOUNDS ARE EXPLICIT AND MUST STAY SO.  `_⊔_` is a DEFINED RECURSIVE
+-- function on ℕ, not a constructor, so `_a ⊔ (b ⊔ c) ≟ A ⊔ (B ⊔ C)` is
+-- not a first-order match: Agda reports `blocked on _a` and gives up.  An
+-- implicit-bound version typechecks fine as a DEFINITION — its bounds are
+-- variables — and then fails at every CALL.  That is the whole of the
+-- 2026-08-05 Stage-A build failure, and `Lub3-Probe` records it.
+--
+-- Naming the bounds turns the INVERSION into a CHECK, which just unfolds
+-- both sides.  The one-level projections elsewhere in the clique get away
+-- with `m≤m⊔n _ _` only because both ends of their `≤-trans` are already
+-- pinned, leaving no `⊔` to invert; that is not licence to omit bounds
+-- here.  Call these with the summands bound by name in the consuming
+-- clause's own `where`.
+------------------------------------------------------------------
+
+lub3-l : ∀ a b c {d} → a ⊔ (b ⊔ c) ≤ d → a ≤ d
+lub3-l a b c h = ≤-trans (m≤m⊔n a (b ⊔ c)) h
+
+lub3-m : ∀ a b c {d} → a ⊔ (b ⊔ c) ≤ d → b ≤ d
+lub3-m a b c h = ≤-trans (m≤m⊔n b c) (≤-trans (m≤n⊔m a (b ⊔ c)) h)
+
+lub3-r : ∀ a b c {d} → a ⊔ (b ⊔ c) ≤ d → c ≤ d
+lub3-r a b c h = ≤-trans (m≤n⊔m b c) (≤-trans (m≤n⊔m a (b ⊔ c)) h)

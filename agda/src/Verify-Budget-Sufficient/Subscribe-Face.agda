@@ -177,7 +177,10 @@ open import Verify-Budget-Sufficient.Caps-Sadd using (walk-step-suc)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthInner; depthWalk; depthConsume; depthDrain;
          depthFrame; depthBurst; depthFin; depthReact; depthShSlot; depthConn;
-         depthFold; depthDisp; depthShareGo; depthChain)
+         depthFold; depthDisp; depthShareGo; depthChain;
+         -- the three-callee projections; their bounds are explicit on
+         -- purpose — see Caps-Depth's note, and Lub3-Probe
+         lub3-l; lub3-m; lub3-r)
 
 ------------------------------------------------------------------
 -- THE COUNT, FOLDED IN (2026-08-03) — and now DISCHARGED, so the
@@ -3418,13 +3421,25 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
   where
   st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
   cl  = if fin then close (toℕ i) exhausted ∷ [] else []
+  -- hoisted above the depth bounds, which read it: an unsignatured
+  -- `where` definition has to precede its uses
+  FP  = foldPath sf gas id now (toℕ i) p vals cl fin sched st₀
+  -- `depthShareGo`'s cons clause is the mirror's only THREE-callee clause,
+  -- `dA ⊔ (dB ⊔ dC)`, and each of the two recursive consumers below needs
+  -- one summand.  The bounds are bound HERE by name because `lub3-*`
+  -- cannot infer them — `_⊔_` is a defined function, so there is nothing
+  -- to invert.  These three transcribe that clause verbatim (its `st₁` is
+  -- our `st₀`, its `closes` our `cl`, its `r` our `FP`)
+  dA  = depthShareGo sf gas id now i vals fin ps sched st
+  dB  = depthFold sf gas id now (toℕ i) p vals cl fin sched st₀
+  dC  = depthShareGo sf gas id now i vals fin ps
+          (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
   HD  = foldPath-caps c dep bud j sf gas id now (toℕ i) p vals cl fin sl sched st₀
           2≤S 1≤R slEq slC slSz (capsOK?-delivered (frameStep j c) rid sched st inv)
           (proj₁ (∧-true _ _ pS)) vC
           (closeList-caps (frameStep j c) sl (toℕ i) fin)
-          (≤-trans (m≤m⊔n _ _) (≤-trans (m≤n⊔m _ _) dpt))
+          (lub3-m dA dB dC dpt)
   j₁  = proj₁ HD
-  FP  = foldPath sf gas id now (toℕ i) p vals cl fin sched st₀
   IH  = shareGo-caps c dep bud (j + j₁) sf gas id now i vals fin ps sl
           (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
           2≤S 1≤R
@@ -3435,7 +3450,7 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
           (pathsSz?-⊑ ps (frameStep-⊑-+ c 2≤S j j₁) (proj₂ (∧-true _ _ pS)))
           (valsCaps?-lvl (frameStep j c) (frameStep (j + j₁) c) sl vals
              (frameStep-⊑-+ c 2≤S j j₁) vC)
-          (≤-trans (m≤n⊔m _ _) (≤-trans (m≤n⊔m _ _) dpt))
+          (lub3-r dA dB dC dpt)
   j₂  = proj₁ IH
   REST = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
 

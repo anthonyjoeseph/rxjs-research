@@ -414,6 +414,26 @@ repeatedly: `with … in` binding, weak-vs-precise hole shapes, the chain-index 
 and the Dep0 walk refutation — each settled in seconds what a Subscribe-Face recheck would
 have charged 44 minutes for.
 
+### Two cheap gates BEFORE you spend a real build slot
+
+Both learned the expensive way on 2026-08-05, when Stage A's first build burned time on a
+scope error and then on an inference failure:
+
+1. **`agda --only-scope-checking <module>` — 11 s on Subscribe-Face.** Catches the entire
+   scope class: not-in-scope, multiple-definitions, a missing `using` entry, and the trap
+   that an **unsignatured `where` definition must textually PRECEDE its uses** (Agda has no
+   forward reference for them). A `make agda` finds these too — 40 s in if you are lucky,
+   or after the whole SCC if you are not. Run the gate first, every time.
+   Afterwards **delete the module's `.agdai`** (`_build/…/<Module>.agdai`) before the real
+   build, so a scope-only interface cannot be mistaken for a checked one.
+2. **Solo-check the cheap module you just edited.** Caps-Depth is 5.4 s. If a lemma you are
+   about to depend on does not compile alone, nothing downstream is worth starting.
+
+And a reporting trap, not a gate: **the background-task notification reports the WRAPPER's
+exit code, not the build's.** On 2026-08-05 a notification said "exit code 0" for a build
+whose log read `MAKE_AGDA_EXIT=2`. Never believe a notification, a green-looking tail, or a
+zero error-line count. Read the `EXIT=` line out of the log, every time.
+
 ---
 
 ## Standing Rules (Carry These Forward)
