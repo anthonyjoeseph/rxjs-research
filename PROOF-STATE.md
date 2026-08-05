@@ -32,7 +32,7 @@ stands between the repo and the finish line.
 | # | Name | Where | Blocked by |
 |---|------|-------|-----------|
 | P1 | `subscribeE-wet` | Wet.agda:4294 | GAP 4 (a) + (b) |
-| P2 | `cascadeGo-wet` | Wet.agda:4335 | GAP 4 (b); delivery side supplied by `caps-tick` |
+| P2 | `cascadeGo-wet` | Wet.agda:4335 | GAP 4 (b); decomposed into S1-S4 + bridge lemmas, `Caps-Bridge.agda` — `cascade-wet-via-caps` is the real replacement, not yet wired as P2's consumer |
 | P3 | `innerFinish-concat-face` | Caps-Face.agda:6233 | GAP 4 (a) — same hole, seen from the caps side |
 | P4 | `thruOuter-face` | Caps-Face.agda:6248 | GAP 4 (a) — same hole |
 | P5 | `subscribeE-walk` | Measures.agda:6173 | none named; internal mid-instant walk. Its receipt CANNOT supply P1's landing (that composition is refuted — see GAP 4) |
@@ -83,8 +83,8 @@ index does.
 
 | Supplier (proven) | Feeds | Status |
 |---|---|---|
-| `caps-tick` (Caps-Face:6752) | P2's delivery half, via the (b) bridge | awaiting assembly |
-| Caps-Depth mirror + Subscribe-Face `dpt` threading | GAP 4 (a)'s nesting budget | awaiting the charge companion's statement |
+| `caps-tick` (Caps-Face:6752) | `cascade-wet-via-caps` (Caps-Bridge.agda) | assembled; INV? closed conjunct-by-conjunct |
+| Caps-Depth mirror + Subscribe-Face `dpt` threading | `sub-charge` (Caps-Bridge.agda), GAP 4 (a)'s nesting budget | PROVEN — no misalignment, no postulate needed |
 | `subscribeE-walkS` family (Wet:1367) | the internal walk under P1's grind | ground |
 | `chainsOf-B` (Wet:4270) | P2's chain-bound hypothesis | done, wired |
 
@@ -92,8 +92,25 @@ A proven fact with no consumer here is speculative inventory — flag it.
 
 ## Active tasks → gaps
 
-- Task #16 (assembly skeleton) → converts GAP 4's prose plan into typechecking
-  postulates in a new module; FIRST, per outside-in.
+- Task #16 (assembly skeleton) → DONE: `agda/src/Verify-Budget-Sufficient/Caps-Bridge.agda`.
+  Bridge lemmas B1 (`Caps.cSize (capsAt e sl id) ≡ sizeCapAt e sl id`, PROVEN by
+  refl) and B2 (`cReg ≤ cSize` at a level, postulated — base case holds, the
+  frameBlowup-iteration case needs a joint induction nobody has done). Four
+  postulated suppliers stated: S1 `fn-tick` (fn face + Ψ-half of regsB?
+  preserved across a cascade), S2 `slots-tick` (stated as the STRONGER raw
+  `Sched.slots` equality across a cascade — structurally true, no `slots =`
+  update anywhere in Rx.Evaluator's mutual delivery clique, but unproven at
+  this layer), S3 `dry-tick` (P2's unchanged dry half). S4 `sub-charge` needed
+  NO postulate and NO misalignment: `subscribeE-caps` already carries
+  `depthE ≤ dep` and concludes `j+j′ ≤ opIterD(...)`, and `depthE`'s argument
+  list already matches subscribeE-caps' call site exactly. The real assembly
+  `cascade-wet-via-caps` closes INV? conjunct-by-conjunct (no `inv-assemble`
+  fallback needed) via B1/B2 + S1 + S2 + `caps-tick`, plus a new Ψ-only
+  predicate family (`frameBΨ?`/`pathBΨ?`/`regsBΨ?`) and its recombination
+  with capsOK?'s `regsSz?` into the real `regsB?`. NEXT: prove S1/S2/B2 for
+  real, then state `subscribeE-wet-via-caps` (P1's analogue) now that S4 is
+  clear, then wire `cascade-wet-via-caps` as `cascade-dry`/`burst-wet`'s
+  supplier in place of `cascadeGo-wet`.
 - Task #13 (depth obligation statement) → GAP 4 (a)'s nesting budget, stated
   conditionally on `capsOK?`.
 - Task #4 (P3 + P4) → GAP 4 (a). Do not start before the charge companion is
