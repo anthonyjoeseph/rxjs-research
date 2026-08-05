@@ -24,17 +24,18 @@
 -- consuming `cascade-wet-via-caps` directly (§ D below). `.Wet` keeps
 -- `burst-wet`/`burst-dry`/`burst-bounded`/`pop-INV`/`pop-head-bounded`,
 -- which this module consumes unchanged. P1's analogue
--- (`subscribeE-wet-via-caps`) is still not stated — the SUBSCRIBE
--- side's own base case (`capsOK?` at the initial state) and its
--- opIterD-vs-capsH bridge are both still open (see `burst-caps`'s
--- header, § D below).
+-- (`subscribeE-wet-via-caps`) is NOW STATED as a postulate (§ D below),
+-- with its two sub-postulates (`init-capsOK?` and `opIterD≤capsH-root`)
+-- also stated.  `burst-caps` is proved as a corollary of it.
+-- Open: discharging the three postulates (the next task on the caps side).
 module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_;
                                 z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; m≤n+m; n≤1+n;
+                                       ≤-reflexive; m≤n+m; m≤m+n; n≤1+n;
+                                       m≤m⊔n;
                                        *-mono-≤; *-monoʳ-≤; +-mono-≤; *-comm;
                                        *-distribˡ-+; *-identityʳ; +-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
@@ -46,8 +47,9 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂; module ≡-Reasoning)
 
 open import Rx.Prim      using (Gas; Tick; Id; Fuel; Source; close; exhausted)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; sizeᵉ)
-open import Rx.Frame-Width using (dWᵉ; entryCeil; pWᵛ)
+open import Rx.Exp       using (Ty; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ)
+open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ)
+open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
                                 Path; root; share-sink; _↠_; Frame;
@@ -74,6 +76,11 @@ open import Verify-Budget-Sufficient.Subscribe-Face
 
 -- the depth mirror (S4's currency)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
+-- depth-capped (proven in Depth-Bound): depthE ≤ 3·cSize when capsOK?.
+-- Consumed by opIterD≤capsH-root's proof (and by subscribeE-wet-via-caps
+-- once proved).  Acyclic: Depth-Bound imports Wet and Subscribe-Face,
+-- NOT Caps-Bridge.
+open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
 
 ------------------------------------------------------------------
 -- (A) BRIDGE LEMMAS.  What `capsAt`'s two numeric fields ARE, related
@@ -786,61 +793,117 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- trades P2 (`cascadeGo-wet`) for.
 ------------------------------------------------------------------
 
+-- Historical note: burst-caps was previously a postulate in this block.
+-- The two open problems that blocked it — (i) `capsOK?` at the initial
+-- state (no analogue of init-INV existed) and (ii) opIterD vs. the
+-- sizeCount/capsH recurrence — are now stated as sub-postulates below,
+-- and burst-caps is proved as a corollary of subscribeE-wet-via-caps.
+-- The original reasoning is preserved here for traceability.
+
 postulate
-  -- GAP 4's CAPS-SIDE LANDING FOR P1, typed rather than left in prose:
-  -- the root subscribe's own burst lands `capsOK?` at instant 1, exactly
-  -- as `burst-wet` already lands `INV?` there.  NOT VACUOUS: a plain
-  -- `≡ true` equation, no Σ and no witness to enlarge, and capsOK?'s
-  -- conjuncts are real constraints on the post-burst state.
-  --
-  -- CHECKED AGAINST `sub-charge` (above, GAP 4(a), PROVEN) before
-  -- landing, per the ruling.  `sub-charge` does NOT discharge this, for
-  -- TWO independent reasons, both about what `sub-charge`/
-  -- `subscribeE-caps` assumes rather than proves:
-  --
-  -- (i) THE BASE CASE IS A HYPOTHESIS, NOT A CONCLUSION.
-  -- `sub-charge`'s `capsOK? (frameStep j c) sched st ≡ true` is an
-  -- ENTRY hypothesis — at the root, `j = 0`, `sched = sched-init e ins`,
-  -- `st = st-init e`, so instantiating it demands `capsOK? (capsAt e
-  -- ins 0) (sched-init e ins) (st-init e) ≡ true` be supplied from
-  -- OUTSIDE.  `.Wet` has exactly this fact for `INV?` (`init-INV`,
-  -- Wet.agda:4487, PROVEN by unfolding `mkHot` over the initial slots)
-  -- but no `capsOK?` analogue exists anywhere in the caps face — it
-  -- would need its own `mkHot`-style per-slot proof for `widLive`'s
-  -- conjunct (the others project off `init-INV`'s structure), and
-  -- `sub-charge` does not supply it; it only carries the hypothesis
-  -- forward.
-  --
-  -- (ii) THE WITNESS'S BOUND IS THE WRONG RECURRENCE.  `sub-charge`
-  -- reports `capsOK?` at an EXISTENTIAL `frameStep (j + j′) c`, with
-  -- `j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) (depthE …) bud ops j` —
-  -- `opIterD` is the SUBSCRIBE clique's own operator-sweep measure,
-  -- generic in `dep`/`bud`/`ops`.  `burst-caps` needs the CONCRETE
-  -- recurrence value `capsAt e ins 1`, which by `capsAt-suc-full`
-  -- (Caps.agda:893) is `frameStep (sizeCount (capsAt e ins 0) (capsH e
-  -- ins 0)) (capsAt e ins 0)` — a DIFFERENT height, defined by the
-  -- `capsH`/`sizeCount` tower, not by `opIterD`.  `caps-tick` bridges
-  -- exactly this gap on the CASCADE side (`capsOK?-mono` +
-  -- `frameStep-mono-j`, widening `frameStep j c` up to `capsAt e sl (suc
-  -- id)`) but only because `cascadeGo-caps` — its supplier — is stated
-  -- DIRECTLY in terms of `sizeCount`/`capsH` (the cascade fold IS the
-  -- recurrence the caps ledger counts).  `subscribeE-caps` has no such
-  -- tie: nothing in `.Subscribe-Face`/`.Caps-Bridge` relates its
-  -- `opIterD` bound back to `sizeCount`/`capsH` at the root's own `bud`/
-  -- `ops` (the `nest`/`suc (sizeᵉ b)` values a root call would use).
-  -- That bridging lemma — call it `opIterD≤capsH-root` — does not exist
-  -- and is not a byproduct of `sub-charge`.
-  --
-  -- Both (i) and (ii) are NEW proof content on the caps ledger's own
-  -- book, symmetric to `init-INV`/`caps-fuel-root` on the wet side, and
-  -- out of scope for a wiring pass (PROOF-STATE.md's "MOVE, not copy"
-  -- ruling) — they are the honest next task, not a discharge available
-  -- here.  Left as a postulate, unlike `id-inheritance`/`defer-shift`,
-  -- this one is a plain `≡ true` fact with no vacuous Σ.
-  burst-caps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    let r = subscribeE (budgetAt e ins 0) e root 0 0
-                       (sched-init e ins) (st-init e)
-    in capsOK? (capsAt e ins 1) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+  -- (1) INIT-CAPSOK? — capsOK? seed (twin of init-INV, Wet.agda:~4496).
+  -- NOT vacuous: five real ≡ true conjuncts on the initial state.
+  -- Needed as an entry hypothesis for subscribeE-wet-via-caps at the root.
+  init-capsOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    (id : ℕ) →
+    capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
+
+  -- (2) OPITERD≤CAPSH-ROOT — subscribe-side measure bridge.
+  -- Relates opIterD (sub-charge's bound, GAP 4(a) PROVEN) to the
+  -- height sizeCount (capsAt e ins 0) (capsH e ins 0) that capsAt-suc-full
+  -- says capsAt e ins 1 sits at.
+  -- Proof will use: depth-capped to bound depthE ≤ 3·cSize, then
+  -- sub-charge to get j′ ≤ opIterD(…), then capsAt-suc-full + opIterD's
+  -- own recurrence to close j′ ≤ sizeCount(capsAt e ins 0)(capsH e ins 0).
+  opIterD≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
+            (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
+            (nest e ins []) (suc (sizeᵉ e)) 0
+      ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
+
+-- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
+-- Mirrors cascade-wet-via-caps (~line 526) structurally.
+-- Wet hypotheses: those of subscribeE-wet (Wet.agda:~4303).
+-- Caps additions: capsOK? at the entry level + dWᵉ ≤ cWid.
+-- burst-caps (below) is a closed corollary at the root call.
+-- WIRING NOTE: sub-charge (above, GAP 4(a)) and depth-capped
+-- (Depth-Bound) are the key ingredients for this postulate's proof.
+-- They cannot be directly wired as code consumers while this remains
+-- a postulate; they become genuine consumers when it is proved.
+postulate
+  subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    let sl = Sched.slots sched
+        Ψ  = ΨAt e sl
+        B  = sizeCapAt e sl id
+        Ŝ  = sizeCapAt e sl (suc id)
+    in INV? Ψ B sched st ≡ true →
+       pathB? B Ψ κ ≡ true →
+       sizeᵉ b ≤ B →
+       fnCapᵉ b ≤ Ψ →
+       g hasAtLeast
+         suc (dBound Ŝ (hopR Ŝ)
+                     (unconn sl (EvalSt.connectedShares st))
+                     (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
+       capsOK? (capsAt e sl id) sched st ≡ true →
+       dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
+       let r   = subscribeE g b κ id now sched st
+           sl′ = Sched.slots (proj₁ (proj₂ r))
+       in (hasDry (proj₁ r) ≡ false)
+          × (INV? (ΨAt e sl′) (sizeCapAt e sl′ (suc id))
+                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+          × (capsOK? (capsAt e sl′ (suc id))
+                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
+-- helpers for burst-caps corollary
+
+-- dWᵉ n ins e ≤ Caps.cWid (capsAt e ins 0)
+-- Route: dW≤ceil → m≤m⊔n (ceilᵉ ≤ entryCeil) → n≤1+n → capsAt-base-wid
+dWe≤cWid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  dWᵉ n ins e ≤ Caps.cWid (capsAt e ins 0)
+dWe≤cWid {n = n} e ins =
+  ≤-trans (dW≤ceil n ins e)
+  (≤-trans (m≤m⊔n (ceilᵉ n ins e) _)
+  (≤-trans (n≤1+n _)
+           (capsAt-base-wid e ins 0)))
+
+-- sizeᵉ e ≤ sizeCapAt e ins 0
+-- Route: sizeᵉ e ≤ 2+sizeᵉ+slotsSize ≤ cSize (capsAt-base-size)
+sizeE≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  sizeᵉ e ≤ sizeCapAt e ins 0
+sizeE≤cap e ins =
+  ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
+          (capsAt-base-size e ins 0)
+
+-- burst-caps: proven corollary of subscribeE-wet-via-caps.
+-- pathLen root = 0, so suc (pathLen root) = 1 ≤ B (option 3 from the
+-- design brief: moot at the root call).
+burst-caps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in capsOK? (capsAt e ins 1) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+burst-caps {n = n} e ins =
+  let r      = subscribeE (budgetAt e ins 0) e root 0 0
+                           (sched-init e ins) (st-init e)
+      sched₁ = proj₁ (proj₂ r)
+      st₁    = proj₂ (proj₂ r)
+      sl′    = Sched.slots sched₁
+      slEq   : sl′ ≡ ins
+      slEq   = subscribeE-slots (budgetAt e ins 0) e root 0 0
+                                (sched-init e ins) (st-init e)
+      result = subscribeE-wet-via-caps
+                 (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+                 (init-INV e ins 0)
+                 refl
+                 (sizeE≤cap e ins)
+                 (m≤m+n (fnCapᵉ e) _)
+                 (caps-fuel-root e ins)
+                 (init-capsOK? e ins 0)
+                 (dWe≤cWid e ins)
+      capsOK-out : capsOK? (capsAt e sl′ 1) sched₁ st₁ ≡ true
+      capsOK-out = proj₂ (proj₂ result)
+  in subst (λ s → capsOK? (capsAt e s 1) sched₁ st₁ ≡ true) slEq capsOK-out
 
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →

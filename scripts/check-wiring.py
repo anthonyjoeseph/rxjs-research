@@ -523,9 +523,51 @@ def extract_definitions(src_dir, files):
     return defs, def_lines, postulate_names, order
 
 
+def import_span_lines(visible):
+    """1-based line numbers occupied by `open import` / `import` statements,
+    INCLUDING the continuation lines of a multi-line `using (...)` clause.
+
+    Why this exists: a name mentioned in another module's `using` clause is
+    IMPORTED, not CONSUMED, and the whole point of this script is that those
+    are different.  Counting them let an unused import launder an orphan into
+    looking wired — `depth-capped` (Depth-Bound.agda) vanished from the orphan
+    report on 2026-08-05 the moment Caps-Bridge added
+    `open import ... using (depth-capped)` without calling it even once.  That
+    is exactly the "compiled, not needed" loophole the wiring law exists to
+    close, reproduced inside the law's own acceptance test.
+
+    A statement runs from its `import` head until the first later line whose
+    indentation returns to column 0 with a non-continuation token, so the
+    hanging-indent `using (a; b;\n  c; d)` style used throughout this repo is
+    absorbed correctly."""
+    spans = set()
+    i = 0
+    n = len(visible)
+    while i < n:
+        stripped = visible[i].lstrip()
+        if stripped.startswith("open import") or stripped.startswith("import "):
+            spans.add(i + 1)
+            j = i + 1
+            while j < n:
+                nxt = visible[j]
+                if nxt.strip() == "":
+                    break
+                # a continuation line is INDENTED; a new column-0 statement ends the span
+                if len(nxt) - len(nxt.lstrip(" ")) == 0:
+                    break
+                spans.add(j + 1)
+                j += 1
+            i = j
+            continue
+        i += 1
+    return spans
+
+
 def build_corpus(src_dir, files):
     """Per-file (joined visible text, sorted line-start-offsets) for fast
-    substring search + offset -> line-number lookup."""
+    substring search + offset -> line-number lookup, plus the set of line
+    numbers belonging to import statements (never consumers — see
+    `import_span_lines`)."""
     corpus = {}
     for relpath in files:
         _raw, visible = load_file(src_dir, relpath)
@@ -535,7 +577,7 @@ def build_corpus(src_dir, files):
             offsets.append(pos)
             pos += len(line)
         text = "".join(visible)
-        corpus[relpath] = (text, offsets)
+        corpus[relpath] = (text, offsets, import_span_lines(visible))
     return corpus
 
 
@@ -576,7 +618,7 @@ def count_consumers(name, files, corpus, def_lines, extra_terms=()):
         # `endswith("/Main.agda")` here orphaned all six.
         if relpath == "Main.agda":
             continue
-        text, offsets = corpus[relpath]
+        text, offsets, import_lines = corpus[relpath]
         if not text:
             continue
         for term in terms:
@@ -591,7 +633,9 @@ def count_consumers(name, files, corpus, def_lines, extra_terms=()):
                 after = text[end] if end < len(text) else None
                 if is_boundary(before) and is_boundary(after):
                     lineno = bisect_right(offsets, idx)
-                    if (relpath, lineno) not in own_lines:
+                    # an `import ... using (name)` mention is IMPORTED, not
+                    # CONSUMED — see import_span_lines
+                    if (relpath, lineno) not in own_lines and lineno not in import_lines:
                         total += 1
                         if len(locations) < 3:
                             locations.append((relpath, lineno))
