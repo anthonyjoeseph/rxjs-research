@@ -353,10 +353,10 @@ chain-desc hd src m′ (s≤s h) = ≤-trans (s≤s (m≤n+m src hd)) h
 -- AND THE STATEMENT IS FALSE AT A ZERO BUDGET — `sLvlD S W d 0 J` is `J`
 -- on the nose, so the goal would ask `suc (suc j) ≤ suc j`
 -- (machine-refuted, agda/probe/Queue-Push-Probe.agda § 1).  So the level
--- is bought with the budget's POSITIVITY, which every clique head
--- already carries: its `nest … ≤ bud` hypothesis composed with
--- `1≤nest` (.Caps-Nest) is `1 ≤ bud`, and the clause never looks at what
--- the budget is beyond that.
+-- is bought with the budget's POSITIVITY — and since the walk heads now
+-- report at `suc bud`, that positivity is a literal `s≤s z≤n` at the
+-- clause.  It used to be earned from a head's `nest … ≤ bud` hypothesis
+-- through a `1≤nest` lemma; reporting at the successor retired both.
 opIterD-strict : ∀ (S W d k m J : ℕ) → suc J ≤ opIterD S W d k (suc m) J
 opIterD-strict S W d k m J =
   let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))

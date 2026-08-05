@@ -64,10 +64,21 @@ while the true SCC is 13 of the 18 `-caps` definitions. If Agda's block spans al
 the five non-SCC members out — `retagEvents-caps` upstream, and
 `foldPath`/`dispatchShare`/`shareGo`/`chainStep` downstream — shrinks the block 18 → 13 and cuts
 both graph analyses. That is a small, contained, *testable* change: extract, remeasure, keep only
-if Positivity actually drops. **VERIFY FIRST that the block really spans all 18** — if Agda has
-already inferred a smaller block, there is nothing to win and the experiment stops there. Note the
-640-line arithmetic preamble is NOT in the block and extracting it would not help this cost at
-all (though it still makes edits to those lemmas cheap).
+if Positivity actually drops.
+
+**MEASURED, AND THE LEVER IS SMALL — DEPRIORITIZED.** The block was checked, not assumed:
+`subscribeE-caps`'s signature is at ~890 and its definition does not begin until **2631**, so the
+block spans that range. `retagEvents-caps` (sig 2322) falls INSIDE it, but `foldPath-caps` (3139),
+`dispatchShare`, `shareGo` and `chainStep-caps` (3335) all begin BELOW subscribeE-caps's last
+clause and are therefore **already outside the block**. So the block is **~14 definitions, not
+18**; four of the five candidates are already extracted in effect; and moving `retagEvents-caps`
+buys 14 → 13, about 7% of the definition count, for a 16-36 minute measurement per experiment.
+**Not worth prioritizing over proof progress.** If someone wants it later, the real question is
+whether Positivity scales with definition COUNT (then ~7%) or with total clause/type SIZE in the
+block (then moving plumbing bodies out — result-parameterization — is the lever, and is worth much
+more). One extraction plus one remeasure answers that. The 640-line arithmetic preamble is NOT in
+the block, so extracting it would not touch this cost at all — though it would still make edits to
+those lemmas cheap.
 
 **SUPERSEDED — the earlier reasoning, kept because its error is instructive:** `--profile=definitions` on
 Subscribe-Face: total 2,136,727 ms, of which **"Miscellaneous" is 2,120,924 ms — 99.3%**. Every

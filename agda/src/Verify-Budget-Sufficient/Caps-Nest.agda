@@ -144,32 +144,6 @@ nest≤ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
   (sl : Slots Γ) (cs : List Source) → nest e sl cs ≤ sizeᵉ e + slotsSize sl
 nest≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
 
--- AND THE MEASURE IS POSITIVE, which is what buys the one clause of the
--- clique whose conjunct needs room STRICTLY above the level it entered
--- at (`thruConsume-caps`'s concat-queue push, closed by .Caps-Chain's
--- `queue-push`).  Every `syncSizeᵉ` clause is either `1` or a `suc`, so
--- this is a flat case split with nothing recursive in it — and composed
--- with a head's own `nest … ≤ bud` hypothesis it says `1 ≤ bud`, which
--- is the whole of what that clause needs from the budget
-1≤syncSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → 1 ≤ syncSizeᵉ e
-1≤syncSizeᵉ (input i)       = ≤-refl
-1≤syncSizeᵉ (ofᵉ ts)        = s≤s z≤n
-1≤syncSizeᵉ emptyᵉ          = ≤-refl
-1≤syncSizeᵉ (mapᵉ f e)      = s≤s z≤n
-1≤syncSizeᵉ (takeᵉ c e)     = s≤s z≤n
-1≤syncSizeᵉ (scanᵉ f z e)   = s≤s z≤n
-1≤syncSizeᵉ (mergeAllᵉ e)   = s≤s z≤n
-1≤syncSizeᵉ (concatAllᵉ e)  = s≤s z≤n
-1≤syncSizeᵉ (switchAllᵉ e)  = s≤s z≤n
-1≤syncSizeᵉ (exhaustAllᵉ e) = s≤s z≤n
-1≤syncSizeᵉ (μᵉ e)          = s≤s z≤n
-1≤syncSizeᵉ (varᵉ x)        = ≤-refl
-1≤syncSizeᵉ (deferᵉ e)      = ≤-refl
-
-1≤nest : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
-  (sl : Slots Γ) (cs : List Source) → 1 ≤ nest e sl cs
-1≤nest e sl cs = ≤-trans (1≤syncSizeᵉ e) (m≤m+n (syncSizeᵉ e) (resid sl cs))
-
 -- THE SHARE EDGE'S STEP, which is the row the residue exists for.
 -- `sharedConnect` recurses on the slot's stored def with `toℕ i`
 -- ALREADY consed onto `connectedShares`, so the callee's measure is
