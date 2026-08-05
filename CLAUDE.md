@@ -68,11 +68,32 @@ The design-authority session delegates the bulk of the work — clause grinds, p
 build babysitting — to subagents, keeping design spend confined to rulings, directives, and
 report review. Standing protocol, per Anthony:
 
-- **Workers run on Sonnet 4.6** (Agent tool, `model: "sonnet"`) as of 2026-08-04, replacing
-  Opus 5. The cheaper worker buys parallelism (below); Anthony: "we'll give this a shot for a
-  while, and we'll re-assess later." If worker output quality visibly degrades — wrong goal
-  types reported, weakened statements, silent postulate reintroduction — say so and re-assess
-  rather than absorbing the cost quietly.
+- **Workers run on Sonnet 4.6 — but `model: "sonnet"` NO LONGER MEANS 4.6.** As of 2026-08-05
+  the Agent tool's `model` parameter is a hard enum (`sonnet | opus | haiku | fable`) and
+  `sonnet` resolves to **Sonnet 5** on this provider; full model IDs are rejected outright
+  with an InputValidationError. Two levers actually pin a version, and **both apply only at
+  session start**:
+  - `export CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-4-6` — highest precedence, overrides
+    whatever the Agent call passes. This is the one to use.
+  - `.claude/agents/worker-s46.md` (already written) carries `model: claude-sonnet-4-6` in its
+    frontmatter plus the standing worker rules. Spawn with `subagent_type: "worker-s46"`.
+    A definition created mid-session does NOT register — the registry loads at startup.
+  So a running session cannot change or verify its workers' model. If Anthony asks for 4.6,
+  say plainly that it needs one of the two above and cannot be done from inside the session.
+  If worker output quality visibly degrades — wrong goal types reported, weakened statements,
+  silent postulate reintroduction — say so and re-assess rather than absorbing the cost quietly.
+
+- **WORKERS MUST NOT BABYSIT LONG BUILDS — the design session owns the gate.** Measured
+  2026-08-05: THREE of four workers died mid-task polling a build they had launched, burning
+  their turn budget on "still waiting" and losing all their context; one had already written
+  263 good lines that then needed rediscovering. A worker's job ends when its edits are made
+  and cheaply verified. Give workers this shape instead:
+  1. iterate in `agda/probe/` with minimal imports — an UNCHANGED heavy module is a cached
+     interface, so a probe importing Wet deserializes in ~6 s instead of rechecking for 9 min
+     (see `agda/probe/Caps-Thread-Probe.agda`'s header; this is a ~90× loop speedup);
+  2. land only probe-green bodies;
+  3. hand the long `make agda && make agda-all && make bug-cache` gate BACK to the design
+     session, which can poll across turns without dying.
 - **Parallel workers are AUTHORIZED (2026-08-04), and the hardware now allows parallel Agda
   too — up to a measured ceiling.** The old one-worker-at-a-time rule was a memory constraint,
   not a credits one, and Anthony moved the session to stronger hardware on 2026-08-04 ("no
