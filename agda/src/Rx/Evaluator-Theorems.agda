@@ -52,8 +52,29 @@ postulate
       (e : Exp Γ (t ∷ []) [] [] t) (ins : Slots Γ) →
     evaluate k (μᵉ e) ins ≡ evaluate k (unfoldμ e) ins
 
-  -- deferᵉ's temporal law (≈ because the body's ids are re-minted)
+  -- deferᵉ's temporal law — NOT YET STATABLE, honestly.  The intent
+  -- ("stream of (deferᵉ e) ≈ stream of e with ticks +1") needs two
+  -- pieces that do not exist as DEFINITIONS today, only as postulated
+  -- abstractions or nowhere at all:
+  --   (1) a tick per emission.  InstEmit's fields are events, instant,
+  --       source, kind (Rx.Prim:118-123) — no Tick.  The arrival's
+  --       tick is threaded through subscribeE/foldPath internally
+  --       (Arrival.tick, Rx.Evaluator:69; consumed at foldPath's call
+  --       site, Rx.Evaluator:1599) and discarded before it reaches
+  --       Stream.  So there is no way, today, to read "the tick of
+  --       this emit" back off `evaluate`'s result — the same gap
+  --       `causality`'s `emittedBefore` runs into below.
+  --   (2) the "≈" itself.  The comment's hedge ("because the body's
+  --       ids are re-minted") wants an equivalence up to id renaming,
+  --       but the one relation of that shape in the codebase,
+  --       `Rx.Time-Theorems._≈ˢ_` (Rx.Time-Theorems:72), is ITSELF a
+  --       postulated abstract Set — borrowing it would relocate the
+  --       vacuity, not fix it.
+  -- Stating this for real needs new machinery (a defined tick-trace or
+  -- ticked-emit variant, plus a defined — not postulated — renaming
+  -- equivalence), which is a design call, not a leaf-module fix. Left
+  -- as ⊤ on purpose: an honest gap, not a claim.
   defer-shift :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    ⊤   -- state as: stream of (deferᵉ e) ≈ stream of e with ticks +1
+    ⊤
 
