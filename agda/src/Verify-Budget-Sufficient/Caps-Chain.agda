@@ -559,3 +559,17 @@ defer-step S W d k m j 2≤S =
   op-step-share S W d k m j 0 2≤S
     (≤-trans (≤-reflexive (+-identityʳ (suc j)))
              (sLvlD-infl S W d k (suc j)))
+
+-- THE SHARE CONNECT'S OWN EDGE, which is the payload edge minus one rung.
+-- `sharedConnect-caps` prepends ONE emit to the burst its recursive
+-- subscribe returned, where a payload subscribe's `splitBurst` square
+-- costs two — so its witness is `suc (suc j₂)` against the payload's
+-- `suc (suc (suc j₂))`, off the SAME IH.  A smaller left side under the
+-- same bound is just monotonicity, so this costs one step and no new
+-- excursion: `inner-step` already bought the room
+connect-step : ∀ (S W d k j j₂ : ℕ) → 2 ≤ S →
+  suc j + j₂ ≤ opIterD S W d k (sizeAt S (suc j)) (suc j) →
+  suc (j + suc (suc j₂)) ≤ sLvlD S W d (suc k) (suc j)
+connect-step S W d k j j₂ 2≤S ih =
+  ≤-trans (s≤s (+-monoʳ-≤ j (n≤1+n (suc (suc j₂)))))
+          (inner-step S W d k j j₂ 2≤S ih)

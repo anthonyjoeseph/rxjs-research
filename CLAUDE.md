@@ -128,8 +128,12 @@ on their own — the polling is for pacing and verification, not for keeping any
 Never pipe agda through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and
 read indentation (an importer prints as the last line for its importee's whole leg).
 
-**Always `cd` into `agda/` explicitly in the same command as the `agda` invocation, and read
-the log's first lines, not just its exit code.** The shell's working directory drifts between
+**Pin the working directory in EVERY build command — `cd agda/` for a raw `agda` call, repo
+root for `make` — and read the log's first lines, not just its exit code.** `make agda` from a
+subdirectory dies with `No rule to make target 'agda'` and `EXIT=2`, which greps as zero
+error-ish lines and looks like a clean build to anything that only checks for the word "error".
+Guard the command with `ls Makefile &&` (or `ls src/…agda &&`) so the chain aborts instead of
+mis-resolving. The shell's working directory drifts between
 tool calls, and a run launched from the repo root fails instantly with `Cannot read file
 …/src/…` — which looks like a fast green result if you only check that a log exists, and looks
 like a *proof failure* if you only count error-ish lines. Two separate incidents on

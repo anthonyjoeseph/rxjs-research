@@ -1100,13 +1100,18 @@ sharedConnect-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+     -- AND THE LEVEL: a share connect is a FRESH ENTRY, so it reports the
+     -- whole level sweep rather than an operator index — and at `suc bud`,
+     -- because connecting a slot SPENDS a nesting level exactly as the μ
+     -- unfolding and the payload subscribe do
+     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
 -- OUT OF GAS: a dry close and nothing else
 sharedConnect-caps {Γ = Γ} c dep bud j g0 i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC nst =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
                      (dryBurst {A = Val Γ (lookup Γ i)} id) ≡ true)
             (sym (+-identityʳ j)) refl
-    , refl
+    , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
 sharedConnect-caps {Γ = Γ} c dep bud j (gs fuel′) i d κ id now sl sched st
                    2≤S 1≤R slEq slC slSz inv szd wdd pC lC nst
   with burstCompleted (proj₁ (subscribeE fuel′ d (share-sink i) id now sched
@@ -1132,17 +1137,21 @@ sharedConnect-caps {Γ = Γ} c dep bud j (gs fuel′) i d κ id now sl sched st
                         at id from toℕ i as subscribe) ∷ sharedPlumb burst)
                        ≡ true)
             (sym lvl) COUNT
+    -- ONE PREPENDED EMIT above the sweep the IH reports, which is the
+    -- payload edge's square minus a rung
+    , connect-step (Caps.cSize c) (Caps.cWid c) dep bud j j₂ 2≤S
+        (proj₂ (proj₂ (proj₂ (proj₂ IH))))
   where
   st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
   st₁ = register (toℕ i) κ st₀
-  IH  = subscribeE-caps c dep bud (suc (Caps.cSize (frameStep (suc j) c))) (suc j) fuel′ d (share-sink i) id now sl sched st₁
+  IH  = subscribeE-caps c dep bud (Caps.cSize (frameStep (suc j) c)) (suc j) fuel′ d (share-sink i) id now sl sched st₁
           2≤S 1≤R slEq slC slSz
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
           (≤-trans wdd (proj₁ (proj₂ (frameStep-mono-j c 2≤S (n≤1+n j)))))
           refl
           (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S)) nst
-          (s≤s (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j)))))
+          (frameStep-size-strict-suc c j (sizeᵉ d) (≤-trans (s≤s z≤n) 2≤S) szd)
   j₂  = proj₁ IH
   SUB = proj₁ (proj₂ IH)
   BC  = proj₁ (proj₂ (proj₂ IH))
@@ -1192,17 +1201,19 @@ sharedConnect-caps {Γ = Γ} c dep bud j (gs fuel′) i d κ id now sl sched st
                      (((init (toℕ i) ∷ []) at id from toℕ i as subscribe)
                         ∷ sharedPlumb burst) ≡ true)
             (sym lvl) COUNT
+    , connect-step (Caps.cSize c) (Caps.cWid c) dep bud j j₂ 2≤S
+        (proj₂ (proj₂ (proj₂ (proj₂ IH))))
   where
   st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
   st₁ = register (toℕ i) κ st₀
-  IH  = subscribeE-caps c dep bud (suc (Caps.cSize (frameStep (suc j) c))) (suc j) fuel′ d (share-sink i) id now sl sched st₁
+  IH  = subscribeE-caps c dep bud (Caps.cSize (frameStep (suc j) c)) (suc j) fuel′ d (share-sink i) id now sl sched st₁
           2≤S 1≤R slEq slC slSz
           (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R inv pC)
           (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))))
           (≤-trans wdd (proj₁ (proj₂ (frameStep-mono-j c 2≤S (n≤1+n j)))))
           refl
           (≤-trans (s≤s z≤n) (2≤frameStep-size c (suc j) 2≤S)) nst
-          (s≤s (≤-trans szd (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j)))))
+          (frameStep-size-strict-suc c j (sizeᵉ d) (≤-trans (s≤s z≤n) 2≤S) szd)
   j₂  = proj₁ IH
   SUB = proj₁ (proj₂ IH)
   BC  = proj₁ (proj₂ (proj₂ IH))
@@ -1258,7 +1269,14 @@ sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC seq nst
+     -- AND THE LEVEL, at the budget the SLOT holds rather than one above:
+     -- connecting spends the level, so this head hands the connect its
+     -- predecessor and gets the sweep back at its own `bud`
+     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep bud (suc j))
+-- the empty budget is ruled out by the residue hypothesis itself: a
+-- subscribe at `input i` carries `suc (resid …) ≤ bud` unconditionally
+sharedSlot-caps c dep zero j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC seq ()
+sharedSlot-caps {Γ = Γ} c dep (suc bud′) j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv szd wdd pC lC seq nst
   with memberSource (toℕ i) (EvalSt.completedSources st)
 ... | true  =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -1266,7 +1284,7 @@ sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R sl
                      (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
                         at id from toℕ i as subscribe) ∷ []) ≡ true)
             (sym (+-identityʳ j)) refl
-    , refl
+    , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud′) j
 ... | false with memberSource (toℕ i) (EvalSt.connectedShares st) in freshEq
 ...   | true  =
   1 , subst (λ x → capsOK? (frameStep x c) sched (register (toℕ i) κ st) ≡ true)
@@ -1274,14 +1292,16 @@ sharedSlot-caps {Γ = Γ} c dep bud j g i d κ id now sl sched st 2≤S 1≤R sl
     , subst (λ x → burstCaps? {u = lookup Γ i} (frameStep x c) sl
                      (((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []) ≡ true)
             (sym (j+1 j)) refl
-    , refl
-...   | false = sharedConnect-caps c dep bud j g i d κ id now sl sched st
+    -- the registration is a level, and the budget's positivity is now
+    -- free rather than earned: the head matched it as a successor
+    , refl , queue-push (Caps.cSize c) (Caps.cWid c) dep (suc bud′) j (s≤s z≤n)
+-- THE CONNECT SPENDS THE LEVEL, so the callee runs at the PREDECESSOR and
+-- hands its sweep back at `suc bud′` — this head's own budget.  That is
+-- what `share-step` is for; the weaker `share-step-resid` route threw the
+-- strictness away before the callee could use it
+...   | false = sharedConnect-caps c dep bud′ j g i d κ id now sl sched st
                   2≤S 1≤R slEq slC slSz inv szd wdd pC lC
-                  (share-step-resid sl (EvalSt.connectedShares st) i bud seq freshEq
-                     (unsuc nst))
-  where
-  unsuc : ∀ {a b} → suc a ≤ b → a ≤ b
-  unsuc h = ≤-trans (n≤1+n _) h
+                  (share-step sl (EvalSt.connectedShares st) i bud′ seq freshEq nst)
 
 thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
@@ -1914,6 +1934,9 @@ subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
      × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+     -- the same sweep the slot edge reports, forwarded: every clause here
+     -- either delegates to it or moves the level by at most one
+     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep bud (suc j))
 subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
                       2≤S 1≤R slEq slC slSz inv pC lC nst
   with Sched.slots sched i in slotEq
@@ -1959,7 +1982,7 @@ subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
                      (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
                         at id from toℕ i as subscribe) ∷ []) ≡ true)
             (sym (+-identityʳ j)) refl
-    , refl
+    , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep bud j
 ...   | false =
   1 , subst (λ x → capsOK? (frameStep x c) sched (register (toℕ i) κ st) ≡ true)
             (sym (j+1 j)) (register-caps c j (toℕ i) κ sched st 2≤S 1≤R inv pC)
@@ -1967,7 +1990,8 @@ subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
                      (((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ [])
                        ≡ true)
             (sym (j+1 j)) refl
-    , refl
+    , refl , queue-push (Caps.cSize c) (Caps.cWid c) dep bud j
+               (≤-trans (s≤s z≤n) nst)
 -- COLD, NO TAIL: a one-shot burst of the slot's own sync values, and
 -- nothing goes into the state but a source counter capsOK? does not read
 subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
@@ -1991,6 +2015,7 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
     , subst (λ x → burstCount? (frameStep x c)
                      (proj₁ (oneShotBurst sync id sched)) ≡ true)
             (sym (j+1 j)) COUNT
+    , queue-push (Caps.cSize c) (Caps.cWid c) dep bud j (≤-trans (s≤s z≤n) nst)
   where
   step⊑ = frameStep-mono-j c 2≤S (n≤1+n j)
   SY = valsCaps?-data (frameStep j c) sl (lookup Γ i) ok sync
@@ -2041,6 +2066,7 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                      (((init SRC ∷ map value sync) at id from SRC as subscribe) ∷ [])
                        ≡ true)
             (sym (j+1 j)) COUNT
+    , queue-push (Caps.cSize c) (Caps.cWid c) dep bud j (≤-trans (s≤s z≤n) nst)
   where
   SRC    = Sched.nextSource sched
   SCHED₂ = record (record sched { nextSource = suc (Sched.nextSource sched) })
@@ -2628,19 +2654,43 @@ subscribeAll-caps {Γ = Γ} {t = t} {u = u} c dep bud (suc ops′) j g op ns b �
 ------------------------------------------------------------------
 
 -- SLOT: delegated whole
-subscribeE-caps c dep bud ops j g (input i) κ bid now sl sched st
+-- THE SLOT EDGE, and it was never a ruling.  A fresh entry reports the
+-- whole level SWEEP rather than an operator index, and `op-step-share`
+-- converts exactly that into this clause's `opIterD … ops j` — needing
+-- nothing of `ops` but that it be a successor, which `hidx` gives.  The
+-- old comment here claimed the sweep "cannot be converted" because a
+-- fresh entry's index is the level's whole size cap; that is precisely the
+-- obstruction `op-step-entry`'s quadratic room dissolves, and it already
+-- dissolves it for the structurally identical μ edge below.
+--
+-- The witness gains a `suc` because the sweep is spent through the share
+-- gate, so the three carried receipts move up one level with it
+subscribeE-caps c dep bud zero j g (input i) κ bid now sl sched st
+                2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst ()
+subscribeE-caps c dep bud (suc ops′) j g (input i) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx =
-  proj₁ IN , proj₁ (proj₂ IN) , proj₁ (proj₂ (proj₂ IN))
-    , proj₂ (proj₂ (proj₂ IN)) , level-TEMP
+  suc (proj₁ IN)
+    , subst (λ y → capsOK? (frameStep y c)
+                     (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+            (sym lvl)
+            (capsOK?-mono (frameStep (j + proj₁ IN) c)
+                          (frameStep (suc (j + proj₁ IN)) c)
+                          (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ⊑₁
+                          (proj₁ (proj₂ IN)))
+    , subst (λ y → burstCaps? (frameStep y c) sl (proj₁ res) ≡ true)
+            (sym lvl)
+            (burstCaps?-widen sl (proj₁ res) ⊑₁ (proj₁ (proj₂ (proj₂ IN))))
+    , subst (λ y → burstCount? (frameStep y c) (proj₁ res) ≡ true)
+            (sym lvl)
+            (burstCount?-widen (proj₁ res) ⊑₁ (proj₁ (proj₂ (proj₂ (proj₂ IN)))))
+    , op-step-share (Caps.cSize c) (Caps.cWid c) dep bud ops′ j (proj₁ IN) 2≤S
+        (proj₂ (proj₂ (proj₂ (proj₂ IN))))
   where
-  -- the slot edge does not carry the conjunct yet: the three share heads
-  -- it runs through (subscribeE-input / sharedSlot / sharedConnect) have no
-  -- `ops`, and Chain-Supply-Probe § 4's "fresh entry" reading cannot be
-  -- converted to THIS clause's `opIterD … ops j` — a fresh entry's index is
-  -- the level's whole size cap, which `ops` does not dominate.  Whether
-  -- they thread `ops` and report in this shape, or something else, is a
-  -- ruling and not a grind
-  IN = subscribeE-input-caps c dep bud j g i κ bid now sl sched st 2≤S 1≤R slEq slC slSz inv pC lC nst
+  IN  = subscribeE-input-caps c dep bud j g i κ bid now sl sched st 2≤S 1≤R slEq slC slSz inv pC lC nst
+  res = subscribeE g (input i) κ bid now sched st
+  ⊑₁  = frameStep-mono-j c 2≤S (n≤1+n (j + proj₁ IN))
+  lvl : j + suc (proj₁ IN) ≡ suc (j + proj₁ IN)
+  lvl = +-suc j (proj₁ IN)
 
 -- LITERALS: one shot, and the payloads come off evalTms-caps.  The
 -- state is untouched; only the source counter moves, which capsOK?
