@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -22,6 +22,12 @@ help:
 	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
 	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
 	@echo "                  green here <=> no known counterexample remains)"
+	@echo "  wiring        the wiring-law report ('a comment is not a wire'):"
+	@echo "                  every top-level definition/postulate in agda/src,"
+	@echo "                  its consumer count, and the ledger of postulates"
+	@echo "                  with vs without a real consumer.  A report for a"
+	@echo "                  human to rule on, not a build gate — always exits"
+	@echo "                  0 and deletes nothing (see scripts/check-wiring.py)"
 	@echo "  burst-probe   measure the subscription bursts the evaluator mints:"
 	@echo "                  frameFresh? on every burst, cross-emit opens, and"
 	@echo "                  acc-matched closes (see agda/probe/Burst-Probe.agda)"
@@ -240,6 +246,12 @@ agda:
 # what makes its invariant enforceable rather than remembered.
 bug-cache:
 	cd agda && agda src/Implementation/Unit-Test.agda
+
+# The wiring law's mechanised check (see CLAUDE.md, "the wiring law: a
+# comment is not a wire").  Pure textual analysis of agda/src, no Agda
+# invocation — always exits 0, this is a report for a human to rule on.
+wiring:
+	scripts/check-wiring.py
 
 # The probe needs an evaluator that records every subscription burst, and
 # Verify-Well-Formed reduces the evaluator's clauses — so instrumenting it in
