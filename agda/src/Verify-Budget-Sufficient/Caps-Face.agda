@@ -4000,6 +4000,37 @@ valsCaps→mList-strict {u = u} c j sl cs (o ∷ vs) 1≤S hsl h
             (≤⇒≤ᵇ (valCaps→nest-strict c j sl cs o 1≤S hsl h₁)))
           (valsCaps→mList-strict c j sl cs vs 1≤S hsl h₂)
 
+-- and THE SAME ROW OVER A PARKED QUEUE, for the concat FINISH.  A drain
+-- is a walk exactly as a thru-outer's payload sweep is, so it too is
+-- handed the predecessor of the budget it reports at, and its queue's
+-- bound has to land there rather than one above
+obsCaps→nest-strict : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (o : Closed Γ s) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  obsCaps? (frameStep j c) sl o ≡ true →
+  nest o sl cs ≤ sizeAt (Caps.cSize c) (suc j)
+obsCaps→nest-strict {n = n} c j sl cs o 1≤S hsl ho =
+  refresh-supplies-nest-strict (Caps.cSize c) j o sl cs 1≤S
+    (≤ᵇ⇒≤ (sizeᵉ o) (sizeAt (Caps.cSize c) j)
+          (T-to (proj₁ (∧-true (sizeᵉ o ≤ᵇ Caps.cSize (frameStep j c)) _ ho))))
+    hsl
+
+obsList→mList-strict : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (cs : List Source) (q : List (Closed Γ s)) →
+  1 ≤ Caps.cSize c →
+  slotsSize sl ≤ Caps.cSize c →
+  all (obsCaps? (frameStep j c) sl) q ≡ true →
+  mList? (sizeAt (Caps.cSize c) (suc j)) sl cs q ≡ true
+obsList→mList-strict c j sl cs []      1≤S hsl h = refl
+obsList→mList-strict c j sl cs (o ∷ q) 1≤S hsl h
+  with ∧-true (obsCaps? (frameStep j c) sl o)
+              (all (obsCaps? (frameStep j c) sl) q) h
+... | h₁ , h₂ =
+  ∧-intro (T⇒≡true (nest o sl cs ≤ᵇ sizeAt (Caps.cSize c) (suc j))
+            (≤⇒≤ᵇ (obsCaps→nest-strict c j sl cs o 1≤S hsl h₁)))
+          (obsList→mList-strict c j sl cs q 1≤S hsl h₂)
+
 -- AND CARRIED, not re-derived: the walk widens its tail's caps receipt,
 -- so re-deriving per payload would hand each one a LARGER budget while
 -- the walk transformer has exactly one.  The bound at a fixed budget
