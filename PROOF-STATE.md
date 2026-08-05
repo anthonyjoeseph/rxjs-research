@@ -112,7 +112,17 @@ A proven fact with no consumer here is speculative inventory — flag it.
   clear, then wire `cascade-wet-via-caps` as `cascade-dry`/`burst-wet`'s
   supplier in place of `cascadeGo-wet`.
 - Task #13 (depth obligation statement) → GAP 4 (a)'s nesting budget, stated
-  conditionally on `capsOK?`.
+  conditionally on `capsOK?`. Compositional-bound conjecture (`depthE ≤ sizeᵉ b
+  + pathLen κ + storeNestMax sched st + C`, consumer `sub-charge`) — VALIDATED
+  with C = 0 on every family reached (`agda/probe/Depth-Compositional-Probe.agda`):
+  k = 1, 2 at N ≤ 10 (past `capsBase`'s own comfort zone), k = 3, 4 at N ≤ 5,
+  plus three targeted refutation attempts (large static shared def, 30-deep κ,
+  a concat-st queue of nested observables) — all hold, slack comfortably
+  positive and non-shrinking everywhere. NOT reached: k ≥ 6 or N ≥ 13-22, the
+  literal old-breach/`poolCount` zone — a measured computability wall (real-run
+  extraction costs ~×1.5 per unit k, geometric in N; k = 1 at N = 25 alone
+  didn't finish in 90s), reported as a probe-infrastructure limit, not a
+  finding about the conjecture either way.
 - Task #4 (P3 + P4) → GAP 4 (a). Do not start before the charge companion is
   stated.
 - Task #5 (P5) → independent of GAP 4; safe parallel work.
