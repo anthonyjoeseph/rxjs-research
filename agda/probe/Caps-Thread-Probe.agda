@@ -24,12 +24,14 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst; cong)
 
-open import Rx.Prim using (Id)
+open import Rx.Prim using (Id; Fuel)
 open import Rx.Exp  using (Ty; Ctx; Closed)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 arrTy; arrVal; sched-next; schedGo;
-                                schedHeadOf; schedEarlier)
+                                schedHeadOf; schedEarlier;
+                                cascade; drain; hasDry; subscribeE; budgetAt;
+                                root; sched-init; st-init; evaluate)
 
 -- the wet family: INV?, ΨAt, sizeCapAt, capsAt, valB?, INV-parts,
 -- pop-bounded, pop-slots, pop-head-bounded, the Bool toolkit
@@ -43,6 +45,14 @@ open import Verify-Budget-Sufficient.Wet
 -- would make every shared name ambiguous.
 open import Verify-Budget-Sufficient.Caps-Face
   using (capsOK?; valCaps?; caps-tick; capsOK?-parts; widLive; widNode)
+
+-- THE PIECE THE WHOLE RULING TURNS ON.  .Caps-Bridge already proves the
+-- joint one-cascade step; .Wet cannot consume it (.Caps-Bridge imports
+-- .Wet), but a module ABOVE .Wet can — which is what the real landing
+-- site will be.  Named explicitly so this probe records exactly what it
+-- spends.
+open import Verify-Budget-Sufficient.Caps-Bridge
+  using (cascade-wet-via-caps; slots-tick)
 
 ------------------------------------------------------------------
 -- § 1  THE HEAD, WIDTH HALF.  capsOK?'s `widLive` conjunct, extracted
@@ -176,3 +186,104 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
   (∧-intro (subst (λ sl → all (λ kv → widNode (Caps.cWid c) sl (proj₂ kv)) (EvalSt.nodes st) ≡ true)
                   (sym (pop-slots sched eq)) wn)
            rl)))
+
+------------------------------------------------------------------
+-- § 3  STAGE 2 — THE ASSEMBLY.  The fuel loop and the theorem, with
+-- `capsOK?` travelling beside `INV?`.
+--
+-- NOTE what is NOT restated here: the one-cascade step.  `cascade-dry`
+-- threaded with a caps face has EXACTLY `cascade-wet-via-caps`'s
+-- conclusion, character for character (Caps-Bridge.agda:527-530), so
+-- that step is a relocation and not a proof.  Its dryness half rests on
+-- `dry-tick`, which is where the ANCHOR PROBLEM sits — the postulate
+-- this route trades P2 (`cascadeGo-wet`) for.
+------------------------------------------------------------------
+
+postulate
+  -- GAP 4's CAPS-SIDE LANDING FOR P1, typed rather than left in prose:
+  -- the root subscribe's own burst lands `capsOK?` at instant 1, exactly
+  -- as `burst-wet` already lands `INV?` there.  NOT VACUOUS: a plain
+  -- `≡ true` equation, no Σ and no witness to enlarge, and capsOK?'s
+  -- conjuncts are real constraints on the post-burst state.
+  --
+  -- TO CHECK BEFORE LANDING: `sub-charge` (Caps-Bridge.agda:420, PROVEN,
+  -- GAP 4(a)) is the subscribe-level charge.  If it discharges this,
+  -- this postulate must NOT be landed — an assumption beside its own
+  -- proof is the worst outcome available here.
+  burst-caps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    let r = subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)
+    in capsOK? (capsAt e ins 1) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+drain-dry-threaded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+  INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
+       sched st ≡ true →
+  capsOK? (capsAt e (Sched.slots sched) id) sched st ≡ true →
+  hasDry (drain {e = e} fuel id sched st) ≡ false
+drain-dry-threaded zero    id sched st inv cOK = refl
+drain-dry-threaded (suc k) id sched st inv cOK with sched-next sched in eq
+... | inj₁ _            = refl
+drain-dry-threaded {e = e} (suc k) id sched st inv cOK | inj₂ (a , sched′) =
+  let Ψ = ΨAt e (Sched.slots sched)
+      B = sizeCapAt e (Sched.slots sched) id
+      C = capsAt e (Sched.slots sched) id
+      inv′ : INV? (ΨAt e (Sched.slots sched′))
+                  (sizeCapAt e (Sched.slots sched′) id) sched′ st ≡ true
+      inv′ = subst
+               (λ sl → INV? (ΨAt e sl) (sizeCapAt e sl id) sched′ st ≡ true)
+               (sym (pop-slots sched eq))
+               (pop-INV Ψ B sched st eq inv)
+      val′ : valB? (sizeCapAt e (Sched.slots sched′) id)
+                   (ΨAt e (Sched.slots sched′)) (arrTy a) (arrVal a) ≡ true
+      val′ = subst
+               (λ sl → valB? (sizeCapAt e sl id) (ΨAt e sl)
+                             (arrTy a) (arrVal a) ≡ true)
+               (sym (pop-slots sched eq))
+               (pop-head-bounded Ψ B sched st eq inv)
+      caps′ : capsOK? (capsAt e (Sched.slots sched′) id) sched′ st ≡ true
+      caps′ = subst
+               (λ sl → capsOK? (capsAt e sl id) sched′ st ≡ true)
+               (sym (pop-slots sched eq))
+               (pop-caps C sched st eq cOK)
+      valC′ : valCaps? (capsAt e (Sched.slots sched′) id) (Sched.slots sched′)
+                       (arrTy a) (arrVal a) ≡ true
+      valC′ = subst
+               (λ sl → valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true)
+               (sym (pop-slots sched eq))
+               (pop-head-valCaps id sched st eq inv cOK)
+      (dry₁ , inv″ , caps″) = cascade-wet-via-caps a id sched′ st inv′ val′ caps′ valC′
+  in hasDry-append (proj₁ (cascade a id sched′ st)) _
+       dry₁
+       (drain-dry-threaded k (suc id)
+         (proj₁ (proj₂ (cascade a id sched′ st)))
+         (proj₂ (proj₂ (cascade a id sched′ st)))
+         inv″
+         caps″)
+
+-- THE THEOREM.  Same face as .Wet's `budget-sufficient` — it does not
+-- move.  Only the interior changes: it now also seeds and carries
+-- capsOK?, transported from `ins` to the post-burst sched's own slots by
+-- subscribeE-slots.
+budget-sufficient-threaded :
+  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+  hasDry (evaluate fuel e ins) ≡ false
+budget-sufficient-threaded fuel e ins =
+  hasDry-append
+    (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)))
+    _
+    (burst-dry e ins)
+    (drain-dry-threaded fuel 1 sched₁ st₁ (burst-bounded e ins) caps₁)
+  where
+  sched₁ = proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                    (sched-init e ins) (st-init e)))
+  st₁    = proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                    (sched-init e ins) (st-init e)))
+  slEq : Sched.slots sched₁ ≡ ins
+  slEq = subscribeE-slots (budgetAt e ins 0) e root 0 0
+                          (sched-init e ins) (st-init e)
+  caps₁ : capsOK? (capsAt e (Sched.slots sched₁) 1) sched₁ st₁ ≡ true
+  caps₁ = subst (λ s → capsOK? (capsAt e s 1) sched₁ st₁ ≡ true)
+                (sym slEq)
+                (burst-caps e ins)
