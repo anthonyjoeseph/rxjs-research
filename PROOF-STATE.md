@@ -18,14 +18,36 @@ news. Every one of those was already written down. This index is the fix.
 formal-verification-batchSimultaneous          The-Proof.agda:1098 — REAL, module postulate-free
  ├─ batch-agreement                            proven
  └─ evaluate-well-formed                       Verify-Well-Formed.agda:5328
-     └─ budget-sufficient                      Wet.agda — PROVEN from:
-         ├─ burst-wet    ← subscribeE-wet      [P1]
-         ├─ cascade-dry  ← cascadeGo-wet       [P2]
-         └─ drain-dry                          proven
+     ├─ budget-sufficient                      Wet.agda — PROVEN from:
+     │   ├─ burst-wet    ← subscribeE-wet      [P1]
+     │   ├─ cascade-dry  ← cascadeGo-wet       [P2]
+     │   └─ drain-dry                          proven
+     └─ THE WELL-FORMEDNESS BRANCH             its OWN 5 postulates — see [W1-W5]
 ```
 
-So the entire campaign reduces to the postulate ledger below. Nothing else
-stands between the repo and the finish line.
+**THERE ARE TWO BRANCHES, NOT ONE.** An earlier version of this file said "the
+entire campaign reduces to the postulate ledger below; nothing else stands
+between the repo and the finish line", listing only the budget-sufficiency
+postulates. **That was wrong.** `evaluate-well-formed` has its own postulate set
+in `Verify-Well-Formed.agda`, every one of which is as load-bearing as P1/P2 —
+they were simply never traced, because the chain diagram stopped at
+`budget-sufficient`. Corrected 2026-08-05, by the same grep-for-consumers habit
+this file preaches; the author of the claim was the one who broke it.
+
+## The well-formedness branch (critical path, never assessed)
+
+| # | Name | Where | Notes |
+|---|------|-------|-------|
+| W1 | `subscribeE-wf` | Verify-Well-Formed.agda:1093 | the subscribe clique's well-formedness face |
+| W2 | `root-done-plumbed` | Verify-Well-Formed.agda:1166 | root's protocol-state plumbing |
+| W3 | `cut-owed` | Verify-Well-Formed.agda:3652 | the cut's `Owed` accounting |
+| W4 | `stepFrame-wf-inner-concat` | Verify-Well-Formed.agda:~3660 | concat's inner frame, wf side |
+| W5 | `mid-step` | Verify-Well-Formed.agda:4541 | mid-instant step |
+
+All five verified genuinely consumed (exactly one use site each — no orphans
+here, unlike the budget branch). **Nobody has censused this branch.** Its size,
+difficulty, and whether it has its own GAP-4-shaped design blockers are all
+UNKNOWN. Treat any "how close are we" answer that omits it as invalid.
 
 ## Postulate ledger (critical path: 4, plus 1 orphan)
 
@@ -189,6 +211,24 @@ index does.
 
 A proven fact with no consumer here is speculative inventory — flag it. (This
 is how `caps-tick`'s orphaning and P5's were both caught.)
+
+**THE WHOLE CAPS-BRIDGE / DEPTH-BOUND TOWER IS CURRENTLY UNWIRED (verified
+2026-08-05 by grep).** `sub-charge`, `depth-capped`, and `cascade-wet-via-caps`
+each have ZERO consumers outside their own defining module. The work is real and
+green, but nothing above it spends it yet. Two consequences worth holding:
+
+- **`cascade-wet-via-caps` must be wired into `cascade-dry`/`burst-wet` in place
+  of `cascadeGo-wet`.** That is a Wet.agda edit (~14-18 min recheck) and is the
+  step that actually retires P2. Until it happens, P2's "decomposed" status is
+  potential, not realised.
+- **`depth-compositional`'s urgency is currently UNKNOWN, and that is a finding.**
+  It is needed by `depth-capped`, which is needed by nothing yet. Note
+  `cascadeGo-caps` and `caps-tick` carry NO depth hypothesis (checked their
+  signatures) — the delivery side is already depth-complete. So the depth tower
+  exists for P1's subscribe-side route, which is still unstated. **State P1's
+  analogue BEFORE grinding the 16-head induction**, or the induction may be
+  proven against a consumer that never materialises — exactly the "pieces before
+  their assembly" anti-pattern CLAUDE.md forbids.
 
 ## Active tasks → gaps
 
