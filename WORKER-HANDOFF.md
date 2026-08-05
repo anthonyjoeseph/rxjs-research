@@ -1,20 +1,40 @@
 # Formal Verification Campaign — Worker Handoff (updated 2026-08-05)
 
-**Status:** Tier 1 item 4 (Step C) — Units 0–2 DONE and merged green to main. The level
-conjunct is threaded across the clique and 18 of the 20 census sites are closed;
-`level-TEMP` has TWO remaining sites (Subscribe-Face **1834**, **2280**), and both are the
-SAME question — depth sufficiency, now scoped and **RULED** as Unit 3 below. Postulate
-ledger: **5 real postulates** (Caps-Face 2, Measures 1, Wet 2) — unchanged by Step C,
-which was TEMP-scaffolding work.
+> **READ [`PROOF-STATE.md`](PROOF-STATE.md) FIRST.** It is the canonical index of the
+> theorem chain, the postulate ledger, every named gap with file:line, and which gap each
+> task serves. This file is HOW to work; that file is WHAT is true. Where they disagree,
+> PROOF-STATE wins — and where PROOF-STATE and the tree disagree, the tree wins.
+
+**Status:** Unit 3 (depth sufficiency) DONE and merged. Subscribe-Face is postulate-free;
+`level-TEMP` is deleted. GAP 4's assembly landed (`Caps-Bridge.agda`) and GAP 4 **(a) is
+closed** — the subscribe-level charge needed no postulate, because Unit 3's depth
+threading had already put the hypothesis in `subscribeE-caps`. The depth obligation is
+now STATED (`Depth-Bound.agda`, `depth-capped`). Critical-path ledger: **5** (unchanged);
+decomposition postulates: **6** (see PROOF-STATE).
 
 ## ⚠ RESUME HERE
 
-`origin/main` is GREEN through the input-edge commit ("the slot edge was never a ruling,
-and the strict step it needed was already written"). Every commit was gated on
-`make agda && make bug-cache` both exiting 0, read from the log's own `EXIT=` lines.
+`origin/main` is GREEN through "the depth obligation is stated, and its cap is three
+copies of one number". Every commit was gated on `make agda && make bug-cache` both
+exiting 0, read from the log's own `EXIT=` lines.
 
-**The current work is: EXECUTE UNIT 3** (the ruling below). It closes the last two
-`level-TEMP` sites, finishes Step C, and unblocks item 3 (the two Caps-Face faces).
+**The current work is: prove the decomposition pieces.** Cheapest first: `storeNest-capped`
+and `depth-compositional` (Depth-Bound.agda), then S1/S2/B2 (Caps-Bridge.agda). Then state
+`subscribeE-wet-via-caps` (P1's analogue, now unblocked). Then wire `cascade-wet-via-caps`
+in as `cascade-dry`/`burst-wet`'s supplier in place of `cascadeGo-wet`.
+
+### ⚠ `setsid` DOES NOT EXIST ON THIS MACHINE (measured 2026-08-05)
+
+The session moved to a macOS laptop; `setsid` is a Linux utility. `nohup setsid bash -c
+'…'` fails instantly with `setsid: No such file or directory` and **runs nothing**. If the
+wrapper's own output is discarded (`> /dev/null 2>&1 &`), the failure is SILENT and the log
+file is never created — a 15-minute "build" that never started. Two fixes, both required:
+
+- **Use the Bash tool's `run_in_background: true`** instead of `nohup setsid`. The harness
+  tracks the process and notifies on exit; no detaching trick needed.
+- **Write logs into the session scratchpad**, and **`ls -l` the log plus `head -4` it
+  before believing any result.** A missing file or a missing `Checking <Module>` line means
+  agda never ran. Checking only for `EXIT=` cannot distinguish "green" from "never started".
 
 History that used to fill this file — the 20-site census and its buckets, the keystone
 pass, the budget rethreading, the profiling findings (Positivity is 78.5% of
