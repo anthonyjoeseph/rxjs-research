@@ -275,6 +275,23 @@ missing wire or dead weight, both are findings, and leaving it undecided is not 
 it was "deliberately NOT yet stated" while the record sat stated 60 lines below, so
 `foldPath-root-out` was proven against an assembly that never existed.
 
+**MAIN IS THE TOP-LINE PROOF (Anthony, 2026-08-05).** `agda/src/Main.agda` is the
+root of the consumption graph and the deletion exemption. Three rules:
+**(1) whatever Main imports sticks around**; **(2) Main names individual
+definitions — NEVER a bare `open import`**, so that "imported" means "claimed"
+and not merely "compiled"; **(3) Main is never touched without Anthony's
+explicit approval** — draft the change and ask. `make wiring` reads Main's
+`using` clauses to get its exempt set, so a filename never earns an exemption
+and a claim cannot self-certify.
+
+Because Agda compiles exactly what is transitively imported, Main also defines
+the build's COVERAGE. **`make agda` is the claim graph; `make agda-all`
+compiles every module under `src/` regardless of reachability** — the rot-guard
+for proven work not yet wired to a claim. The DIFFERENCE between the two is the
+unwired debt (today: ten V-B-S modules, 14,439 lines), and `agda-all` is
+self-retiring — when the two cover the same set, delete it. Never close that
+gap by re-adding a bulk import to Main: that is the loophole, not the repair.
+
 **ACCEPTANCE TEST: `make wiring` reports zero orphans** outside its two documented exempt
 families (`*-absurd` refutation witnesses, whose consumer is the design record; and the
 top-line semantic claims in `*-Theorems.agda`, which ARE the claims). Run it rather than

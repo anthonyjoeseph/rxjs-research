@@ -51,9 +51,15 @@ open import Verify-Budget-Sufficient.Caps-Face
 --
 -- NOTE ON `cOK`: the first attempt named this hypothesis `caps` and
 -- Agda rejected the LHS with "caps is not a constructor of the
--- datatype _≡_" — the name resolves as a pattern head rather than a
--- fresh binding.  Renamed throughout; if the probe is green the
--- capture was the whole of that error.
+-- datatype _≡_".  CAUSE, confirmed: `caps` IS a constructor in scope —
+-- it is the `Caps` record's own constructor (Caps.agda:105,
+-- `constructor caps`) — so in a pattern the name resolves to that
+-- constructor instead of binding fresh.  Same family as the
+-- PatternShadowsConstructor warning `make agda-all` prints for
+-- CLI/Encode.agda's `dried`, except fatal here because the argument's
+-- type is `_≡_` and `caps` belongs to a different datatype.  Any
+-- lowercase record-constructor name is a landmine as a variable:
+-- `caps`, `slots`, `sched` are all worth checking before use.
 ------------------------------------------------------------------
 
 schedHeadOf-widHead : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) (l : LiveSource Γ)

@@ -155,10 +155,54 @@ cleanup list second. 87 proven definitions sitting unused is 87 pieces of work
 already paid for; the question to ask of each is "what would it take to spend
 this, and what does spending it unblock" — not "should this go."
 
-`scripts/check-wiring.py` mechanises CLAUDE.md's wiring law. Current numbers:
-**55 postulates** (31 with consumers, 22 top-line claims, **2 truly orphaned**)
-and **87 orphaned proven definitions**. Do not re-derive this list by hand or by
-memory — run the target. Rulings by cluster, made by the design session after
+### MAIN IS THE TOP-LINE PROOF — three rules (Anthony, 2026-08-05)
+
+1. **Whatever Main imports STICKS AROUND.** `agda/src/Main.agda` is the
+   deletion exemption, not a build convenience.
+2. **Main names individual definitions — never a bare `open import`.** This is
+   what makes rule 1 precise: the exempt set is exactly the names Main lists,
+   and everything else must be transitively required by one of them.
+3. **Main is NEVER touched without Anthony's explicit approval.**
+
+**Two targets, and the gap between them is the debt.** Naming claims shrinks
+what Agda compiles, because Agda compiles exactly what is transitively
+imported. So:
+
+| target | what it covers | meaning |
+|---|---|---|
+| `make agda` | the claim graph from Main | every claim's support compiles |
+| `make agda-all` | every module under `src/`, reachable or not | rot-guard for unwired work |
+| `make wiring` | the gap, itemised | the remaining work |
+
+Ten V-B-S modules — **14,439 lines**, Caps-Face (6,923) and Subscribe-Face
+(3,488) among them — are currently reachable from NO claim. `make agda-all`
+exists only so they cannot rot while the wiring pass runs, and it is
+**self-retiring**: when both targets cover the same set, the wiring law holds
+by construction and the target is deleted. Do not "fix" the gap by re-adding a
+bulk import to Main; that is the loophole, not the repair.
+
+`scripts/check-wiring.py` mechanises CLAUDE.md's wiring law, rooting its
+exempt set in Main's `using` clauses. Current numbers: **54 postulates** (30
+with consumers, 20 top-line claims, **4 truly orphaned**) and **87 orphaned
+proven definitions**. Do not re-derive this list by hand or by memory — run the
+target. Two corrections landed with the Main change, both in the direction of
+strictness:
+
+- The exempt set was previously "any postulate in a `*-Theorems.agda` file" — a
+  filename heuristic that exempted internal helpers (`truncateIn`,
+  `emittedBefore`, `Node`, `δ`, `_≈ˢ_`, `_≈ᵍ_`) along with real claims. **A
+  filename is not a claim; being named in Main is.** Orphaned postulates 2 → 4.
+- Main is excluded as a **consumer**, so a claim cannot self-certify by being
+  named. Without this the two ledgers collapse into one (30/20 → 50/0).
+
+**NEW FINDING from the stricter check: `_≈ˢ_` and `_≈ᵍ_`
+(Rx/Time-Theorems.agda:72–73) have ZERO consumers.** They are the equivalence
+relations that module exists to state things up to, and `locality`,
+`non-interference`, `timing-invariance` do not use them. That module is weaker
+than "close to vacuous" — two of its own helpers are not wired into its own
+claims.
+
+Rulings by cluster, made by the design session after
 four bad worker verdicts on exactly these calls (see the cautions below):
 
 1. **EXEMPT — `*-absurd` refutation witnesses (7).** A machine-checked `… → ⊥`
