@@ -41,7 +41,35 @@ the pre-pass file is at `/tmp/sf.bak2` if that survives; otherwise `git diff` ag
 2. **The two walk sites (`~1805`, `~2245`) are ONE problem, not two** — see Unit 3 below.
 3. **Site `~2625` (`subscribeE input`) is the measure question** — still wants Anthony's call.
 
-**THE COST MEASUREMENT, and why the module split was CANCELLED.** `--profile=definitions` on
+**THE COST IS POSITIVITY CHECKING — 78.5% of it — AND THAT REVIVES THE SPLIT.**
+`agda --profile=internal` on a genuinely dirty Subscribe-Face, 2026-08-04:
+
+```
+Total            970,988 ms
+Positivity       762,327 ms   78.5%
+Termination      179,726 ms   18.5%   (Termination.Graph 179,288)
+Typing            15,487 ms    1.6%
+Deserialization    6,192 ms
+```
+
+**Both dominant phases are whole-MUTUAL-BLOCK graph analyses — together 97%.** So the earlier
+conclusion below ("splitting cannot help, the definitions only cost 16 s") was WRONG, and the
+reasoning error is worth keeping: `--profile=definitions` reported 99.3% as "Miscellaneous", and I
+read that as "the cost is not in the module's content." It actually means "not attributable to any
+INDIVIDUAL definition" — which is exactly what a whole-block analysis looks like. A block analysis
+is still a function of the content's structure, just not of any one definition.
+
+**The lever this exposes:** the mutual block is SYNTACTIC (fixed by the forward declarations),
+while the true SCC is 13 of the 18 `-caps` definitions. If Agda's block spans all 18, then moving
+the five non-SCC members out — `retagEvents-caps` upstream, and
+`foldPath`/`dispatchShare`/`shareGo`/`chainStep` downstream — shrinks the block 18 → 13 and cuts
+both graph analyses. That is a small, contained, *testable* change: extract, remeasure, keep only
+if Positivity actually drops. **VERIFY FIRST that the block really spans all 18** — if Agda has
+already inferred a smaller block, there is nothing to win and the experiment stops there. Note the
+640-line arithmetic preamble is NOT in the block and extracting it would not help this cost at
+all (though it still makes edits to those lemmas cheap).
+
+**SUPERSEDED — the earlier reasoning, kept because its error is instructive:** `--profile=definitions` on
 Subscribe-Face: total 2,136,727 ms, of which **"Miscellaneous" is 2,120,924 ms — 99.3%**. Every
 definition in the file together, all 13 clique members and their `where` bindings, costs **~15.8
 SECONDS**. A content-free module with Subscribe-Face's exact import block checks in **5.3 s**
@@ -196,12 +224,69 @@ subscribed*, and `Nest-Budget-Probe.agda` § 3 (the refuted budget-inheritance s
 `Evaluator.agda:648-654`) mints a `scanᵉ` value nesting `k` deep that is subscribed only later.
 If latent depth can sit in unregistered value structure, registration count does not dominate it.
 Nothing in the tree connects value-nesting depth to registration count. The registry-cardinality
-machinery that would be involved is `INV?`'s length conjunct
-(`Verify-Budget-Sufficient/Measures.agda:5324-5332`), maintained by the PROVEN `register-INV`
-(`Wet.agda:317-334`) — but in the WET family's doubling currency, not the CAPS family's, and the
-two are not wired together. **This is the same object Tier 1 item 1 is gated on**; settle it once.
-Suggested first probe: attempt `thru-outer` depth ≤ `length (EvalSt.registry st)` against the
-`Nest-Budget-Probe` § 3 witness.
+machinery that exists is `INV?`'s length conjunct (`Measures.agda:5324-5332`, literally
+`length (EvalSt.registry st) ≤ᵇ B`), maintained by the PROVEN `register-INV` (`Wet.agda:317-334`)
+— but in the WET family's doubling currency, not the CAPS family's, and the two are not wired
+together. Suggested first probe: attempt `thru-outer` depth ≤ `length (EvalSt.registry st)`
+against the `Nest-Budget-Probe` § 3 witness.
+
+**RAW MATERIAL FOR THE DESIGN SESSION, gathered 2026-08-04 and source-verified. Four of these
+overturn what this file previously implied — read them before proposing anything.**
+
+1. **The CAPS family ALREADY bounds registry cardinality.** `capsOK?` (`Caps-Face.agda:298-306`)
+   has five conjuncts and the fifth is literally `length (EvalSt.registry st) ≤ᵇ Caps.cReg c`. So
+   a registration-count bound is not missing from the caps world — it is already a hypothesis
+   every clique member carries.
+2. **But `EvalSt.nodes` has NO count bound, anywhere, and is never pruned.** No
+   `length (EvalSt.nodes …)` conjunct exists in `capsOK?` or `INV?` (grepped for `nodesLen`,
+   `nodesSz`, `cNode`; zero hits), and `installNode`/`setNode` only insert-or-update — no
+   node-removal function exists in the tree. Registry entries DO get dropped (`cutThrough`,
+   `dropSource`). Node state grows monotonically within an instant.
+3. **Parked-but-unsubscribed inners ARE already bounded, both ways.** This weakens the worry
+   recorded above: `widNode` (`Caps-Face.agda:228-235`) gives `concat-st`'s queue
+   `length q ≤ᵇ W`, and `boundedNode` (`Measures.agda:~288`) gives `sizeᵉ o ≤ᵇ B` per queued
+   element. So the `concat-st` queue is count-bounded AND size-bounded already.
+4. **Nesting is NOT unbounded — that was never the problem.** `nest≤sizeᵛ`
+   (`Nest-Budget-Probe.agda` § 1) bounds nesting by size, and size is capped. The real failure is
+   a LEVEL MISMATCH: the cap where a value is SPENT (43690 at `S = 2, W = 1`) vastly exceeds the
+   budget read where its subscribe BEGAN (2). That is precisely why `dep` exists — it pays for
+   RE-READING the budget at each frame entry instead of inheriting it
+   (`Rx/Evaluator.agda:644-654`).
+5. **Three candidates are already machine-refuted. Do not re-propose them.** (a) instantiate the
+   budget off the size cap read at subscribe entry and inherit it downward — `Nest-Budget-Probe`
+   § 3, via a `scanᵉ` under an `*All` whose k-th mint nests k deep while the carrier's nesting
+   stands still; (b) a bare "descends by one, `1 ≤ k` maintained" hypothesis — `Mu-Nest-Probe`
+   § 1, which needs `1 ≤ 0` at `k = 1`; (c) a term-syntax-only nesting measure with no share
+   residue — `Mu-Nest-Probe` § 2, refuted at the `sharedConnect` edge.
+6. **THE TEMPLATE THAT WORKED ON THE SIBLING PROBLEM.** `bud` had the same shape of difficulty
+   and `Caps-Nest.agda` solved it: `nest e sl cs = syncSizeᵉ e + resid sl cs` — a term measure
+   PLUS a residue for obligations not yet discharged (shares not yet connected). Fully proven.
+   Keep `bud` and `dep` strictly separate (`bud` bounds operator weight within one walk, `dep`
+   bounds `*All` nesting across walks) — but the *shape* "measure + residue for pending
+   obligations" is the precedent worth trying first.
+7. **THE MOST PROMISING LEAD.** `Rx/Evaluator.agda:711-718` says the gas ALREADY bounds the depth
+   the instant reaches, and that the inequality actually needed (`nesting depth ≤ m`, the story
+   index) is **"a smaller claim than the gas bound supplies."** So this may be a matter of
+   extracting an existing bound rather than inventing a new invariant. Start there.
+8. **A count-side warning if the design goes that way.** `Nest-Count-Probe.agda`: *"STORIES PER
+   INSTANT = DELIVERIES × NESTING, not nesting"* — delivery count is independently
+   doubly-exponential in the shared-slot count, so any count-based invariant must account for
+   deliveries, not just static nesting.
+
+Not yet read (further refuted-candidate history for the count axis, if the design needs it):
+`Rung-Count-Probe`, `Fold-Count-Probe`, `Width-Count-Probe`, `Share-Count-Probe`,
+`Count-Grind-Probe`, `Nest-Supply-Probe`, `Nest-Count-Main`.
+
+**CORRECTION (2026-08-04), and it was MY error in this file, verified against source:** an earlier
+revision of this section claimed the depth invariant is "the same object Tier 1 item 1 is gated
+on — settle it once." **That is not supported by `Wet.agda`.** `subscribeE-wet`'s own comment
+(`Wet.agda:4276-4293`) says it is blocked on completing `subscribeE-walk` and grinding the mutual
+block clause by clause; `cascadeGo-wet`'s (`Wet.agda:4315-4334`) says a fixed-two-bound per-chain
+contract is FALSE over its full quantification and the fix is to thread per-cascade growth
+through the fold. Both are proof-ASSEMBLY problems against machinery that already exists and is
+proven — neither local comment names a missing cardinality invariant. So **exactly one thing needs
+the undesigned invariant: the two walk sites here.** Do not let the "one object, two items"
+framing justify designing it earlier than it is needed.
 
 ---
 
