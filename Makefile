@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda agda-all bug-cache wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -18,7 +18,12 @@ all: help
 
 help:
 	@echo "Available targets:"
-	@echo "  agda          typecheck the Agda source (src/Main.agda)"
+	@echo "  agda          typecheck the Agda source (src/Main.agda) — this is"
+	@echo "                  the CLAIM GRAPH: Main names individual claims, so"
+	@echo "                  green here means every claim's support compiles"
+	@echo "  agda-all      typecheck EVERY module under agda/src, reachable or"
+	@echo "                  not — the rot-guard for work not yet wired to a"
+	@echo "                  claim.  The gap vs 'make agda' IS the unwired debt"
 	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
 	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
 	@echo "                  green here <=> no known counterexample remains)"
@@ -239,6 +244,23 @@ help:
 
 agda:
 	cd agda && agda src/Main.agda
+
+# `make agda` checks exactly what Main.agda transitively imports, and since
+# 2026-08-05 Main names individual CLAIMS instead of bulk-opening modules — so
+# its coverage is the claim graph, not the repo.  Ten Verify-Budget-Sufficient
+# modules (14,439 lines, Caps-Face and Subscribe-Face among them) are not yet
+# reachable from any claim, and without this target they would rot unnoticed
+# while the wiring pass proceeds.  This compiles EVERY module under agda/src
+# regardless of reachability.
+#
+# The DIFFERENCE between `make agda` and `make agda-all` is the unwired debt:
+# when the two cover the same set, the wiring law holds by construction and
+# this target can go.  `make wiring` itemises the gap in the meantime.
+# SLOW — this is the full tower (Subscribe-Face alone is ~44 min when dirty).
+agda-all:
+	cd agda && for f in $$(find src -name '*.agda' | sort); do \
+	  echo "=== $$f" && agda $$f || exit 1; \
+	done
 
 # Implementation/Unit-Test.agda is deliberately not imported by Main (it is a
 # throwaway performance cache, deleted once Formal-Verification is discharged),

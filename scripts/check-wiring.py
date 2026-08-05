@@ -22,6 +22,7 @@ build gate.
 
 import argparse
 import os
+import re
 import sys
 from bisect import bisect_right
 from collections import defaultdict
@@ -107,6 +108,52 @@ ALLOWLIST = {
 # character right after a "capsOK?" match inside "capsOK?-parts" is '-',
 # which is NOT a boundary character, so the match is rejected.
 BOUNDARY_CHARS = set(" \t\n\r\f\v(){}[];.,@\"'`=:\\|")
+
+
+def read_main_claims(src_dir):
+    """The names Main.agda lists in its `using (...)` clauses.
+
+    MAIN IS THE TOP-LINE PROOF (Anthony, 2026-08-05): whatever Main imports
+    sticks around, Main names individual definitions rather than bulk-opening
+    modules, and Main is never edited without his approval.  So the exempt set
+    is not a heuristic this script gets to invent — it is read from Main.
+
+    This replaces an earlier guess, `d.file.endswith("-Theorems.agda")`, which
+    was wrong in both directions: it exempted every postulate in a Theorems
+    file including internal helpers (`truncateIn`, `emittedBefore`, `Node`,
+    `δ`, `_≈ˢ_`), and it would have missed a claim stated anywhere else.  A
+    filename is not a claim; being named in Main is.
+
+    Returns (claims, ok).  `ok` is False when Main could not be parsed or has
+    a bare `open import` with no `using` clause — a violation of rule 2, and
+    the caller must say so loudly rather than silently reporting fewer claims.
+    """
+    path = os.path.join(src_dir, "Main.agda")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read().split("\n")
+    except OSError:
+        return set(), False
+
+    visible = [l for l in raw if not l.lstrip().startswith("--")]
+    text = "\n".join(visible)
+
+    claims = set()
+    bare = []
+    # Each `open import M` optionally followed by `using ( a ; b ; c )`, where
+    # the clause may span lines (this file wraps them one name per line).
+    for m in re.finditer(r"open\s+import\s+(\S+)([^\n]*(?:\n(?!\s*(?:open|module)\b)[^\n]*)*)",
+                         text):
+        module, tail = m.group(1), m.group(2)
+        u = re.search(r"using\s*\((.*?)\)", tail, re.DOTALL)
+        if not u:
+            bare.append(module)
+            continue
+        for piece in u.group(1).replace("\n", " ").split(";"):
+            nm = piece.strip()
+            if nm:
+                claims.add(nm)
+    return claims, (not bare)
 
 
 def is_boundary(ch):
@@ -509,12 +556,26 @@ def mixfix_core_of(name):
 def count_consumers(name, files, corpus, def_lines, extra_terms=()):
     """Count boundary-matched occurrences of `name` (and any `extra_terms`
     — e.g. a mixfix operator's bare core) across all files, excluding
-    name's own defining lines in its home file(s)."""
+    name's own defining lines in its home file(s).
+
+    Main.agda is EXCLUDED as a consumer.  It is the ROOT of the consumption
+    graph, not a participant in it: since it names individual claims (rule 2),
+    every claim would otherwise score a consumer purely from its own
+    `using (...)` mention and land in the critical-path ledger.  That would
+    erase the distinction between "postulate some other proof depends on" and
+    "top-line claim we assert", which is the whole point of the two ledgers.
+    """
     own_lines = def_lines.get(name, ())
     total = 0
     locations = []
     terms = [name] + [t for t in extra_terms if t]
     for relpath in files:
+        # EXACTLY src/Main.agda — NOT CLI/Main.agda, which is an unrelated
+        # compiled entry point whose six helpers (process, nl, splitLines,
+        # nonEmpty, parseJSON, decodeCase) really are consumed, by it. An
+        # `endswith("/Main.agda")` here orphaned all six.
+        if relpath == "Main.agda":
+            continue
         text, offsets = corpus[relpath]
         if not text:
             continue
@@ -562,6 +623,7 @@ def main():
     files = find_agda_files(src_dir)
     defs, def_lines, postulate_names, order = extract_definitions(src_dir, files)
     corpus = build_corpus(src_dir, files)
+    main_claims, main_ok = read_main_claims(src_dir)
 
     orphans = []  # proven defs / data-record, zero consumers, not allowlisted
     allowlisted_unused = []
@@ -584,16 +646,16 @@ def main():
         if is_postulate:
             if count > 0:
                 ledger_with.append((name, d, count, locs))
-            elif d.file.endswith("-Theorems.agda"):
-                # Exempt family (2): a top-line semantic claim, not dead
-                # weight. Unproven, so still counted as a postulate — but it
+            elif name in main_claims:
+                # Exempt family (2): a top-line semantic claim, because MAIN
+                # NAMES IT. Unproven, so still counted as a postulate — but it
                 # belongs to the SECOND ledger, off the critical path.
                 toplines.append((name, d))
             else:
                 ledger_without.append((name, d, count, locs))
         else:
             if count == 0:
-                if name in ALLOWLIST or name.endswith("-absurd"):
+                if name in main_claims or name in ALLOWLIST or name.endswith("-absurd"):
                     # Exempt family (1): refutation witnesses. Their consumer
                     # is the design record, not another term.
                     allowlisted_unused.append((name, d))
@@ -608,6 +670,11 @@ def main():
     # is worth a nudge:
     stale_allowlist = [n for n in ALLOWLIST if n not in defs]
 
+    # A name Main claims that no longer exists in src is a BROKEN CLAIM — Main
+    # would not compile, so this should be impossible; report it rather than
+    # skip it, because a silent skip is how a claim goes missing.
+    missing_claims = sorted(n for n in main_claims if n not in defs)
+
     # Top-line claims are EXEMPT from the orphan report but are still
     # unproven assumptions, so they count here. Excluding them would make the
     # headline number lie in the reassuring direction.
@@ -620,6 +687,20 @@ def main():
     print("WIRING CHECK — agda/src")
     print("=" * 78)
     print(f"files scanned: {len(files)}    top-level names found: {len(order)}")
+    print(f"Main.agda claims: {len(main_claims)}  (the exempt set — Main IS the top-line proof)")
+    if not main_ok:
+        print()
+        print("  !! RULE 2 VIOLATION: Main.agda has a bare `open import` with no")
+        print("     `using (...)` clause. Main must name individual definitions, so")
+        print("     that 'imported' means 'claimed' and not merely 'compiled'.")
+        print("     Until it does, the exempt set below is INCOMPLETE and every")
+        print("     number in this report is unreliable.")
+    if missing_claims:
+        print()
+        print("  !! BROKEN CLAIMS: Main.agda names these, but no definition was")
+        print("     found in agda/src. Main could not compile in this state:")
+        for n in missing_claims:
+            print(f"       {n}")
     print()
 
     print("-" * 78)

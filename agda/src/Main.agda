@@ -1,10 +1,84 @@
+-- MAIN IS THE TOP-LINE PROOF (Anthony, 2026-08-05).  Three rules:
+--
+--   1. WHATEVER MAIN IMPORTS STICKS AROUND.  This list is the deletion
+--      exemption — it is not a build convenience.  Everything else in
+--      the repo exists only to serve one of these names, transitively,
+--      and `make wiring` roots its reachability check right here.
+--   2. NO BARE `open import`.  Individual definitions only, so that the
+--      claim set is explicit and machine-readable rather than implied
+--      by whatever a module happens to re-export.
+--   3. MAIN IS NEVER TOUCHED WITHOUT ANTHONY'S EXPLICIT APPROVAL.
+--
+-- Note what is NOT here: `Verify-Well-Formed` and
+-- `Verify-Budget-Sufficient`.  They are machinery, not claims, and they
+-- are reached the honest way — `formal-verification-batchSimultaneous`
+-- consumes `evaluate-well-formed`, which consumes `budget-sufficient`.
+-- If any part of those towers is NOT reachable from a name below, that
+-- is a finding to wire, not a reason to re-add a bulk import.
+--
+-- COVERAGE, and read this before trusting a green `make agda`: Agda
+-- compiles exactly what is transitively imported, so this file defines
+-- the build's coverage as well as its claim set.  Ten V-B-S modules
+-- (14,439 lines, Caps-Face and Subscribe-Face among them) are currently
+-- NOT reachable from any name below.  **`make agda-all` is what keeps
+-- them from rotting** — it compiles every module under src/ regardless
+-- of reachability.  The DIFFERENCE between the two targets is the
+-- unwired debt, and `make wiring` itemises it.
 module Main where
 
-open import Readme-Theorems
-open import Verify-Well-Formed
-open import Verify-Budget-Sufficient
-open import Rx.Evaluator-Theorems
-open import Rx.Provenance-Theorems
-open import Rx.Time-Theorems
-open import Verify-Batch-Simultaneous.Batch-Theorems
+------------------------------------------------------------------
+-- THE THEOREM.  The verified object, end to end: for every program,
+-- batching its rendered stream is spec-correct.
+------------------------------------------------------------------
 open import Verify-Batch-Simultaneous.The-Proof
+  using (formal-verification-batchSimultaneous; batch-agreement)
+
+open import Verify-Batch-Simultaneous.Batch-Theorems
+  using (batch-online)
+
+------------------------------------------------------------------
+-- THE README'S SEMANTICS.  Each is a claim about a canonical program
+-- named in the root README; the programs themselves are consumed by
+-- these claims and so need no separate mention.
+------------------------------------------------------------------
+open import Readme-Theorems
+  using (readme-batch-order-is-delivery-order
+        ; readme-take-counts-values
+        ; readme-one-subscribe-one-batch
+        ; readme-diamond
+        ; readme-each-next-own-instant
+        ; readme-cascades-inherit
+        ; readme-completion-cascades
+        ; readme-share-connect-no-replay
+        ; readme-late-join-growth
+        ; readme-serial-joins-mirror-rxjs)
+
+------------------------------------------------------------------
+-- THE EVALUATOR-LEVEL CLAIMS.
+--
+-- CAUTION, recorded here because Main is where it will be read:
+-- `causality` is stated over `truncateIn`/`emittedBefore`, which are
+-- POSTULATED functions, so it is currently satisfiable by instantiating
+-- `emittedBefore k = []`.  `defer-shift` is still `⊤`-typed — an emit
+-- carries `instant : Id` but no `Tick`, so its claim is not statable
+-- without new machinery (see that module's header).  `μ-guarded`'s type
+-- is syntactically IDENTICAL to `μ-unfold`'s despite its comment
+-- claiming a distinct bound.  All three are listed anyway: they are
+-- claims we intend to make, and hiding them would shrink the ledger
+-- without shrinking the debt.
+------------------------------------------------------------------
+open import Rx.Evaluator-Theorems
+  using (fuel-coherent; causality; μ-unfold; μ-guarded; defer-shift)
+
+open import Rx.Provenance-Theorems
+  using (id-inheritance)
+
+------------------------------------------------------------------
+-- THE TIMING CLAIMS.  CAUTION: all three are stated over eleven
+-- postulated abstract helpers in the same module (`Node`, `NodeSt`,
+-- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`,
+-- `_≈ˢ_`, `_≈ᵍ_`), so as written they are close to vacuous — those
+-- helpers must become definitions before these assert anything.
+------------------------------------------------------------------
+open import Rx.Time-Theorems
+  using (locality; non-interference; timing-invariance)
