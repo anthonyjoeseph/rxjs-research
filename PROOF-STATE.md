@@ -453,6 +453,63 @@ error — a header asserting a consumer relationship that the module's own impor
 make impossible. A one-line `grep '^open import' <module>` would have caught
 both. Do it first, every time.
 
+### RULING: 17 orphans have NO honest consumer — they are dead, not unwired (2026-08-05)
+
+Three families were investigated on the explicit instruction that **"no consumer
+exists" was an acceptable answer** and that inventing an assembly to justify its
+own lemmas is a FAKE WIRE — worse than an orphan, because it looks discharged.
+All three came back negative, and two prior census claims were **refuted** in the
+process. Verified by the design session by reading the code, not by trusting the
+report.
+
+- **Frame-Width ceilings (3)** — `pmO≤ceil`:782, `pmI≤ceil`:787,
+  `pWᵉ≤entryCeil`:831 (Rx/Frame-Width.agda). Zero call sites. The *consumed*
+  siblings do not route through them: `slotPW≤slotCeil` calls `pW≤ceil`
+  DIRECTLY, so `pWᵉ≤entryCeil` is a standalone composition nothing needs. And
+  the obligation they would answer — an expression-level pm* width bound at
+  `entryCeil` — exists nowhere: not as a postulate, not inlined, not as an open
+  goal. `capsOK?`'s `widNode` is VALUE-level width, a different quantity.
+- **The delivery-count tower (7)** — `Deliveries.agda:787–929`. Short-circuited
+  by the `Walk` module in `.Delivery-Walk` (lines ~477, ~558), which derives the
+  recursion inline from the `delivN-cons`/`delivN-split` primitives and never
+  calls the named lemmas. `cascadeGo-deliveries` (Caps-Face:~4684) goes through
+  `W.cascadeGo-go`/`dWalkᶜ-mono` instead.
+- **The state-boundedness trio** — `latch-bounded`:411, `finish-bounded`:478,
+  `init-bounded`:1234 (Measures). Superseded one level up: the caps side uses
+  `cascadeLatch-caps`/`cascadeFinish-caps` (Caps-Face:~6700/6708, both called by
+  `caps-tick`), the wet side uses `cascadeLatch-INV`/`cascadeFinish-INV` (Wet),
+  and `cascadeFinish-INV` builds its stBounded? half INLINE rather than calling
+  `finish-bounded`.
+
+**TWO CENSUS CLAIMS REFUTED — do not act on the originals:**
+
+1. **The "tenth duplicate" IS NOT A DUPLICATE.** The census said
+   `Verify-Well-Formed.agda:4568`'s `cascadeGo-skip` re-derives
+   `Deliveries.agda:868`'s `cascadeGo-skip-N`. Read both: VWF's concludes
+   `cascadeGo a nextId ((rid , p) ∷ ps) sched st ≡ cascadeGo a nextId ps sched st`
+   (full triple equality); Deliveries' concludes
+   `delivN st (…) ≡ delivN st (…)` (the count projection only). Same case-split
+   shape, DIFFERENT theorems — and VWF's is the stronger one.
+2. **The "cannot reach Deliveries" explanation is FALSE.** VWF →
+   `.Caps-Bridge` → `.Subscribe-Face` → `.Caps-Face` → `.Delivery-Walk` →
+   `.Deliveries`, every edge confirmed by grep. VWF reaches Deliveries fine; the
+   re-derivation happened because the statement needed is genuinely different.
+
+**REFUTED HYPOTHESIS (the design session's own):** `init-bounded` is NOT an
+ingredient of a future `capsOK?`-seed lemma. Wrong bound (`sizeBudgetAt` vs
+`sizeCapAt` — Wet:~4477 notes the mismatch explicitly) and wrong predicate
+(`boundedLive`, a SIZE bound, vs `capsOK?`'s `widLive`, a WIDTH bound). The
+stBounded? component a `capsOK?-init` would want already sits inside `init-INV`
+(Caps-Face:~4496).
+
+**CONSEQUENCE FOR THE ENDGAME ESTIMATE.** The orphan set is NOT mostly missing
+wires. It splits three ways: some genuinely wire, a substantial block is dead and
+wants deleting, and the anchor cluster (26) parks behind the central design
+question. The wiring law's real yield here was not "find the missing wires" but
+"discover which proven work was never going to be used" — which is why the
+postulate count and the orphan count move in opposite directions from what a
+naive reading expects.
+
 ## Named gaps and rulings (the full deck)
 
 **GAP 4** — Wet.agda:4125–4199. THE central design fact. The ledger-receipt

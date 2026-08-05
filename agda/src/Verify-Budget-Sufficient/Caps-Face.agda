@@ -6914,10 +6914,13 @@ reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
 -- discharges BOTH of the walk's reset obligations at once.  This is what
 -- makes the cluster one object instead of three coincidences, and it is
 -- why F needs no separate justification — it is Ŝ
+-- DELEGATES to `reach-reset` (.Measures), which is where this pair is
+-- now stated once.  Kept as a name because the caps face's prose refers
+-- to "the reset cluster" by it; it is a re-export, not a second proof.
 reach-resets : ∀ (C : ℕ) → 2 ≤ C →
   ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
   (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
-reach-resets C hC o h = ≤-trans (syncSize≤sizeᵉ o) h , hopD-cap C o hC h
+reach-resets = reach-reset
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.

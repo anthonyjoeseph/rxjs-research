@@ -1944,6 +1944,23 @@ opaque
     (≤-trans (^-monoˡ-≤ (suc V ^ sizeᵉ e) (+-monoʳ-≤ 2 h))
              (^-monoʳ-≤ (2 + V) (^-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
 
+-- THE RESET PAIR, STATED ONCE.  A value inside the cap discharges BOTH
+-- of the walk's reset obligations at the same time.  It lives HERE, at
+-- the lowest point where its two ingredients do, because the fact used
+-- to be written THREE times with none of the named copies callable:
+-- `connect-edge`/`hop-edge` (.Wet) are generic in the cap and inlined
+-- it; `reach-resets` (.Caps-Face) had the right shape but sits in
+-- .Wet's SIBLING module (.Wet → .Caps, .Caps-Face → .Delivery-Walk →
+-- .Caps), so .Wet can never import it; and `connect-anchor` just below
+-- is SPECIALISED to `sizeBudgetAt`, so it cannot serve a generic
+-- caller.  Four consumers, one three-line lemma.  The general lesson,
+-- since this is the tenth duplicated proof found: when a fact is proven
+-- N times, move it DOWN — do not pick a winner among the copies.
+reach-reset : ∀ (C : ℕ) → 2 ≤ C →
+  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+  (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
+reach-reset C hC o h = ≤-trans (syncSize≤sizeᵉ o) h , hopD-cap C o hC h
+
 -- a shared slot's def is an element of the global syntactic
 -- multiset {program} ⊎ {slots}: its size sits inside the budget's
 -- slot summand
@@ -1978,13 +1995,17 @@ connect-anchor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
   let V = sizeBudgetAt e sl id in
   (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
+-- the SPECIALISED reader: same pair as `reach-reset` above, but with the
+-- cap pinned to the budget and the size bound DERIVED rather than
+-- assumed.  Its tuple is the other way round from reach-reset's, so the
+-- delegation swaps.
 connect-anchor e sl id i {d} eq =
-  hopD-cap V d (2≤sizeBudget e sl id) size≤V
-  , ≤-trans (syncSize≤sizeᵉ d) size≤V
+  proj₂ pair , proj₁ pair
   where
   V = sizeBudgetAt e sl id
   size≤V : sizeᵉ d ≤ V
   size≤V = ≤-trans (slotDef-size sl i eq) (slots≤budget e sl id)
+  pair = reach-reset V (2≤sizeBudget e sl id) d size≤V
 
 ------------------------------------------------------------------
 -- THE DEMAND FUNCTION.  Fuel is depth-consumed, so the wet contract

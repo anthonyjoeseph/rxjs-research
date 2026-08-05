@@ -4045,23 +4045,25 @@ mu-edge Ŝ R̂ U body
 
 -- (2) THE HOP EDGE, at the entry-fixed anchor.  The r-drop is the
 -- emitted-value invariant (burstHopD?) against the *All frame's
--- DEFINITIONAL `suc`; the s reset is reach-resets' first component,
--- inlined off syncSize≤sizeᵉ so this module still reads nothing from
--- the caps FACE.  hop-step-needs says the slack is exact: an r-drop of
--- one buys `s + suc Ŝ`, and `suc Ŝ` alone already covers it.
+-- DEFINITIONAL `suc`; the s reset is `reach-reset`'s first component —
+-- CALLED now, not inlined (.Measures, where the pair is stated once), so
+-- this module still reads nothing from the caps FACE.  hop-step-needs
+-- says the slack is exact: an r-drop of one buys `s + suc Ŝ`, and
+-- `suc Ŝ` alone already covers it.
 hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) → 2 ≤ Ŝ →
   (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r →
   suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ (obs u) o) (syncSizeᵉ o))
     ≤ dBound Ŝ (hopR Ŝ) U r s
 hop-edge Ŝ U r s 2≤Ŝ o szo r′<r =
   dBound-hop {Ŝ} {hopR Ŝ} {U} {hopDᵉ Ŝ o} {r} {syncSizeᵉ o} {s}
-             r′<r (≤-trans (syncSize≤sizeᵉ o) szo)
+             r′<r (proj₁ (reach-reset Ŝ 2≤Ŝ o szo))
 
 -- (3) THE CONNECT EDGE.  U strictly drops (unconn-insert, behind the
 -- machine's own `memberSource … ≡ false` guard), and BOTH of the
 -- child's measures reset at the anchor, because a shared slot's def is
--- cap-sized entry syntax — reach-resets' two components, again
--- inlined.
+-- cap-sized entry syntax — `reach-reset`'s two components, CALLED now
+-- rather than inlined.  Its tuple is (sync , hop) and dBound-connect
+-- wants hop first, hence the swap.
 connect-edge : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
   (sl : Slots Γ) (cs : List Source) (i : Fin n)
   {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
@@ -4072,8 +4074,10 @@ connect-edge Ŝ r s 2≤Ŝ sl cs i {d} eqi fresh szd =
   dBound-connect {Ŝ} {hopR Ŝ} {unconn sl (toℕ i ∷ cs)} {unconn sl cs}
                  {hopDᵉ Ŝ d} {r} {syncSizeᵉ d} {s}
                  (unconn-insert sl cs i eqi fresh)
-                 (hopD-cap Ŝ d 2≤Ŝ szd)
-                 (≤-trans (syncSize≤sizeᵉ d) szd)
+                 (proj₂ pair)
+                 (proj₁ pair)
+  where
+  pair = reach-reset Ŝ 2≤Ŝ d szd
 
 -- AND U NEVER RISES BETWEEN THE EDGES.  Every structural companion of
 -- the subscribe clique threads the demand's U component past arbitrary
