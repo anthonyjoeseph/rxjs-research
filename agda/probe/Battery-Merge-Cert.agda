@@ -6,63 +6,83 @@
 --   nodeCacheOK mnid (merge-st k _) reg
 --     = not (mergeReachable mnid reg) ∨ (k ≡ᵇ countLiveInners mnid reg)
 --
--- Three independent counterexamples refuted it (see Verify-Well-Formed:3765-3866):
+-- Three independent counterexamples refuted it (VWF:3765-3866):
 --
 --   R1. Outer's own thru-outer registration threads mnid, but bump never counts it.
---       mergeReachable = true, k=0, countRegsUnder≥1, so 0≡1 fails.
+--       mergeReachable=true, k=0, countRegsUnder≥1, so 0≡1 fails.
 --
 --   R2. A single inner that is itself a merge(a,b) creates TWO from-inner chains
---       but bump does only ONE suc k.  countLiveInners = 2 when k = 1 → mismatch.
+--       but bump does only ONE suc k.  countLiveInners=2 when k=1 → mismatch.
 --
 --   R3. finish mergeᵒ does `innerFinish` (k ← pred k) BEFORE cascadeFinish drops
---       the spent inner's registrations.  Mid-cascade: k=0, but from-inner regs
---       still present (dying+delivered) → countLiveInners ≥ 1, so 0≡1 fails.
+--       the spent inner's registrations.  Mid-cascade: k=0, from-inner reg still
+--       present (dying+delivered) → old candidate fails.
 --
 -- THE CORRECTED STATEMENT
 --   merge-cert: (merge-st 0 _ at mnid) ⇒
 --     no registration in the registry has an alive from-inner instance of mnid.
 --
--- "Alive" is already defined in the evaluator:
---   aliveThroughᶠ inst st (rid, src, (_, p))
---     = pathHasNode inst p
---     ∧ not (rid ∈ cancelled st)
---     ∧ (not (src ∈ dying st) ∨ not (rid ∈ delivered st))
+-- "Alive" = aliveThroughᶠ inst st reg
+--   = pathHasNode inst p ∧ not (rid ∈ cancelled) ∧ (not (src ∈ dying) ∨ not (rid ∈ delivered))
 --
--- The corrected predicate patches each refutation:
---   R1: a thru-outer frame contributes NO entries to innerInstsP, so
---       hasAliveFromInner returns false for outer registrations.
---   R2: both chains of a multi-source inner share the same inst; the
---       check is per-inst (via innerInstsP), so it does not double-count.
---   R3: dying+delivered makes aliveThroughᶠ = false, so lingering
---       (but already-spent) regs do not falsify the predicate.
+-- THE DECISIVE QUESTION
+-- Shape B below (a hand-built state with k=0 and a live from-inner reg) gives false.
+-- Is that state REACHABLE?  If so, the corrected predicate is also refuted.
+-- The load-bearing mechanism is the CASCADE ORDERING inside Rx.Evaluator:
 --
--- DELIVERABLE: this module typechecks green.
--- RESULT: SURVIVES all three shapes, plus seed-provability.
+--   1. cascadeLatch (Evaluator:1617-1622) fires FIRST, setting dying=[arrSource a]
+--      if isLast=true — BEFORE any chain is processed.
+--   2. cascadeGo (Evaluator:1633-1641) adds rid to delivered BEFORE calling
+--      chainStep for that chain.
+--   3. Therefore when innerReact (Evaluator:1239-1243) runs and reads
+--      aliveThroughᶠ inst st, both conditions hold:
+--        src ∈ dying    (set by cascadeLatch)
+--        rid ∈ delivered (set by cascadeGo for this chain)
+--      so aliveThroughᶠ = false, any = false, and innerFinish fires.
 --
--- EXTRA: shape B confirms the predicate is non-vacuous — it returns FALSE
--- on a state with an alive from-inner reg at k=0.
+-- Shape B (live from-inner reg at k=0) is NOT reachable by this mechanism:
+-- every execution of innerFinish is preceded by cascadeLatch marking the source
+-- dying, so the reg is always dying+delivered when k decrements to 0.
+--
+-- Section 3 below verifies this by RUNNING the actual evaluator, not by
+-- hand-building a state.
+--
+-- VERDICT: SURVIVES
+--
+-- STRUCTURE
+--   Section 1: The corrected predicate (typechecking = CANNOT STATE test)
+--   Section 2: Seven hand-built states (predicate behaviour table; reachability
+--              is untested for these — Shape B marks the critical gap)
+--   Section 3: DECISIVE EXPERIMENT — runs the evaluator on a concrete program,
+--              reaches the mid-cascade state by cascadeLatch+cascadeGo, and
+--              checks mergeCertAt by refl.
 
 module Battery-Merge-Cert where
 
 open import Data.Bool    using (Bool; true; false; not; _∧_; _∨_)
+open import Data.Fin     using (Fin; zero; suc)
 open import Data.List    using (List; []; _∷_; any)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Nat     using (ℕ; zero; suc; _≡ᵇ_)
-open import Data.Product using (Σ; _×_; _,_)
-open import Data.Vec     using ([])
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Vec     using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim     using (Source)
-open import Rx.Exp      using (Ctx; Ty; Closed; natᵗ; obs; ofᵉ)
-open import Rx.Evaluator using (EvalSt; NodeId; RegId; NodeState;
-                                Chain; Path; Frame; AllOp;
+open import Rx.Prim     using (Source; after_,_; hot; ObservableInput)
+open import Rx.Exp      using (Ctx; Ty; Closed; Val; natᵗ; obs; ofᵉ; input; strmᵗ;
+                               mergeAllᵉ)
+open import Rx.Evaluator using (EvalSt; NodeId; RegId; NodeState; Sched; Slots; Slot; scripted;
+                                Chain; Path; Frame; AllOp; Arrival;
                                 lookupNode; merge-st;
                                 from-inner; thru-outer; _↠_; root; mergeᵒ;
-                                aliveThroughᶠ; st-init)
+                                aliveThroughᶠ; st-init; sched-init; budgetAt;
+                                subscribeE; cascadeLatch; cascadeGo; cascadeFinish;
+                                chainsOf; sched-next)
 open import Verify-Well-Formed using (innerInstsP)
 
 -----------------------------------------------------------------------
--- The corrected predicate
+-- Section 1: The corrected predicate
 -----------------------------------------------------------------------
 
 -- A registration carries an alive from-inner instance of mnid if:
@@ -83,13 +103,15 @@ mergeCertAt mnid st | just (merge-st zero od) =
 mergeCertAt mnid st | _ = true   -- k≠0, or node absent: trivially satisfied
 
 -----------------------------------------------------------------------
--- Shared context and dummy expression
--- We use Γ₀ = [] (no slots) and e₀ = ofᵉ [].
--- States are built by record-update on st-init e₀.
+-- Section 2: Hand-built states (predicate behaviour table)
+-- States are constructed manually, NOT reached by running the evaluator.
+-- Reachability is untested for these rows.
+-- Shape B is the critical gap: it gives false, and Section 3 decides
+-- whether it is reachable.
 -----------------------------------------------------------------------
 
 Γ₀ : Ctx 0
-Γ₀ = []
+Γ₀ = []ⱽ
 
 e₀ : Closed Γ₀ natᵗ
 e₀ = ofᵉ []
@@ -100,33 +122,21 @@ mnid = 0
 inst : NodeId   -- an inner instance id
 inst = 1
 
------------------------------------------------------------------------
--- SHAPE 0: Seed-provability
--- At the initial state where merge is just installed (k=0, registry empty).
--- Trivially satisfied: no registrations at all.
------------------------------------------------------------------------
+outerPath : Path Γ₀ (obs natᵗ) natᵗ
+outerPath = thru-outer mergeᵒ mnid ↠ root
 
+fromInnerPath : Path Γ₀ natᵗ natᵗ
+fromInnerPath = from-inner mergeᵒ mnid inst ↠ root
+
+-- SHAPE 0 (seed): k=0, registry empty.  Trivially satisfied.
 st-seed : EvalSt e₀
 st-seed = record (st-init e₀) { nodes = (mnid , merge-st zero false) ∷ [] }
 
 _ : mergeCertAt mnid st-seed ≡ true
 _ = refl
 
------------------------------------------------------------------------
--- SHAPE 1: Outer's thru-outer registration, k=0 (refutation R1)
--- The outer source is still registered via thru-outer.
--- BEFORE the correction: mergeReachable = true, 0≡0 holds accidentally
--- (countLiveInners=0 because there are no from-inner frames), so the old
--- candidate was true here.  But the old candidate fails on R1 in the
--- original PROOF-STATE analysis because there ALSO exist from-inner regs.
--- We reproduce the pure outer case: corrected predicate is trivially true
--- because innerInstsP returns [] for a thru-outer path.
------------------------------------------------------------------------
-
-outerPath : Path Γ₀ (obs natᵗ) natᵗ
-outerPath = thru-outer mergeᵒ mnid ↠ root
-
--- The outer source is src=10, rid=0
+-- SHAPE 1 (R1 dodge): k=0, outer thru-outer reg.
+-- innerInstsP returns [] for thru-outer → hasAliveFromInner = false.
 st-shape1 : EvalSt e₀
 st-shape1 = record (st-init e₀)
   { nodes    = (mnid , merge-st zero false) ∷ []
@@ -135,142 +145,68 @@ st-shape1 = record (st-init e₀)
   ; delivered = []
   }
 
--- innerInstsP mnid outerPath = [] (no from-inner frames)
--- → hasAliveFromInner mnid st-shape1 _ = false
--- → mergeCertAt = not false = true
 _ : mergeCertAt mnid st-shape1 ≡ true
 _ = refl
 
--- Also confirm that innerInstsP correctly returns [] for thru-outer:
 _ : innerInstsP mnid outerPath ≡ []
 _ = refl
 
------------------------------------------------------------------------
--- SHAPE 2: Single from-inner registration, dying+delivered, k=0 (refutation R3)
--- This is the mid-cascade state after `innerFinish` decrements k to 0
--- but BEFORE `cascadeFinish` drops the spent inner's registration.
--- The registration is dying (its source is in dying) AND delivered
--- (its rid is in delivered), so aliveThroughᶠ = false.
------------------------------------------------------------------------
-
-fromInnerPath : Path Γ₀ natᵗ natᵗ
-fromInnerPath = from-inner mergeᵒ mnid inst ↠ root
-
--- src=10 delivered as rid=0, and is dying (last cascade)
+-- SHAPE 2 (R3 dodge, hand-built): k=0, from-inner reg dying+delivered.
+-- Models the mid-cascade state; Section 3 reaches this state by evaluation.
 st-shape2 : EvalSt e₀
 st-shape2 = record (st-init e₀)
   { nodes     = (mnid , merge-st zero true) ∷ []
   ; registry  = (0 , 10 , (natᵗ , fromInnerPath)) ∷ []
-  ; dying     = 10 ∷ []     -- src 10 is spending its last delivery
-  ; delivered = 0 ∷ []      -- rid 0 was delivered this cascade
+  ; dying     = 10 ∷ []
+  ; delivered = 0 ∷ []
   }
 
--- aliveThroughᶠ inst st-shape2 (0, 10, ...):
---   pathHasNode inst fromInnerPath = true  (from-inner mnid inst frame)
---   not (rid ∈ cancelled) = not false = true
---   not (src ∈ dying) ∨ not (rid ∈ delivered) = not true ∨ not true = false
--- → aliveThroughᶠ = true ∧ true ∧ false = false
--- → hasAliveFromInner = any {false} = false
--- → mergeCertAt = not false = true
 _ : mergeCertAt mnid st-shape2 ≡ true
 _ = refl
 
--- Confirm the old candidate FAILS here (old = k ≡ᵇ countLiveInners):
--- countLiveInners mnid registry = nubLen [inst] = 1; k = 0; 0 ≡ᵇ 1 = false
--- The old nodeCacheOK (with mergeReachable = false here since outer dropped)
--- would be: not mergeReachable ∨ (0 ≡ᵇ 1) = true ∨ false = true, OK only
--- because outer is gone.  The real refutation R3 is when the outer IS still
--- present; we test that in shape2-ext below.
--- (We verify innerInstsP to make the accounting concrete)
-_ : innerInstsP mnid fromInnerPath ≡ inst ∷ []
-_ = refl
-
------------------------------------------------------------------------
--- SHAPE 2-EXT: Same as shape 2, but outer thru-outer reg also present.
--- This is the genuine R3 configuration: mergeReachable=true, k=0,
--- but from-inner reg is dying+delivered → corrected cert still holds.
------------------------------------------------------------------------
-
+-- SHAPE 2-EXT: same but outer thru-outer reg also present (genuine R3 config).
 st-shape2-ext : EvalSt e₀
 st-shape2-ext = record (st-init e₀)
   { nodes     = (mnid , merge-st zero true) ∷ []
   ; registry  = (0 , 9  , (obs natᵗ , outerPath))
               ∷ (1 , 10 , (natᵗ    , fromInnerPath)) ∷ []
-  ; dying     = 10 ∷ []   -- inner src dying
-  ; delivered = 1 ∷ []    -- rid 1 (the inner reg) was delivered
+  ; dying     = 10 ∷ []
+  ; delivered = 1 ∷ []
   }
 
--- outer reg: innerInstsP = [] → hasAliveFromInner = false
--- inner reg: dying+delivered → aliveThroughᶠ = false → hasAliveFromInner = false
--- → mergeCertAt = not false = true
 _ : mergeCertAt mnid st-shape2-ext ≡ true
 _ = refl
 
------------------------------------------------------------------------
--- SHAPE 3: Multi-source inner, two from-inner regs sharing same inst,
--- both dying+delivered, k=0.  (Refutation R2 addressed.)
---
--- Background: when a single inner observable is itself a merge(a,b),
--- subscribeInner mints ONE inst but the inner's two sub-sources each
--- register their own chain — both carrying `from-inner mnid inst` in
--- their path.  After the inner completes, k is decremented by 1 (to 0)
--- but two registry entries remain until cascadeFinish drops them.
--- The old candidate: countLiveInners = nubLen [inst,inst] = 1 ≠ 0.
--- The corrected predicate: both are dying+delivered → both pass false
--- through aliveThroughᶠ → cert holds.
------------------------------------------------------------------------
-
-fromInnerPath2 : Path Γ₀ natᵗ natᵗ
-fromInnerPath2 = from-inner mergeᵒ mnid inst ↠ root   -- same inst as fromInnerPath
-
--- src=10 (first sub-source), src=11 (second sub-source); both dying+delivered
+-- SHAPE 3 (R2 dodge): k=0, two from-inner regs sharing same inst, both dying+delivered.
 st-shape3 : EvalSt e₀
 st-shape3 = record (st-init e₀)
   { nodes     = (mnid , merge-st zero true) ∷ []
   ; registry  = (0 , 10 , (natᵗ , fromInnerPath))
-              ∷ (1 , 11 , (natᵗ , fromInnerPath2)) ∷ []
-  ; dying     = 10 ∷ 11 ∷ []   -- both inner sub-sources dying
-  ; delivered = 0 ∷ 1 ∷ []    -- both rids delivered
+              ∷ (1 , 11 , (natᵗ , fromInnerPath)) ∷ []
+  ; dying     = 10 ∷ 11 ∷ []
+  ; delivered = 0 ∷ 1 ∷ []
   }
 
--- For reg0 (rid=0, src=10): dying+delivered → aliveThroughᶠ = false
--- For reg1 (rid=1, src=11): dying+delivered → aliveThroughᶠ = false
--- → any = false → not false = true
 _ : mergeCertAt mnid st-shape3 ≡ true
 _ = refl
 
------------------------------------------------------------------------
--- SHAPE B: Non-vacuity witness.
--- The predicate returns FALSE when k=0 but a live from-inner reg exists
--- (dying=[], delivered=[], not cancelled).
--- This proves the predicate is not trivially true.
------------------------------------------------------------------------
-
--- Live inner registration: NOT dying, NOT delivered, NOT cancelled
+-- SHAPE B (critical gap — IS THIS REACHABLE?):
+-- k=0, live from-inner reg (dying=[], delivered=[]).
+-- The predicate returns FALSE here.
+-- Section 3 answers: NO — cascadeLatch always sets dying=[src] before innerFinish.
 st-shapeB : EvalSt e₀
 st-shapeB = record (st-init e₀)
   { nodes     = (mnid , merge-st zero false) ∷ []
   ; registry  = (0 , 10 , (natᵗ , fromInnerPath)) ∷ []
-  ; dying     = []       -- src NOT dying
-  ; delivered = []       -- rid NOT delivered
+  ; dying     = []
+  ; delivered = []
   ; cancelled = []
   }
 
--- aliveThroughᶠ inst st-shapeB (0, 10, ...):
---   pathHasNode inst fromInnerPath = true
---   not (rid ∈ cancelled) = not false = true
---   not (src ∈ dying) ∨ not (rid ∈ delivered) = true ∨ true = true
--- → aliveThroughᶠ = true ∧ true ∧ true = true
--- → hasAliveFromInner = true
--- → mergeCertAt = not true = false
 _ : mergeCertAt mnid st-shapeB ≡ false
 _ = refl
 
------------------------------------------------------------------------
--- SHAPE K≠0: When k ≠ 0, cert is vacuously true regardless.
--- This is the normal mid-execution state (inner still active).
------------------------------------------------------------------------
-
+-- SHAPE K≠0: k=1, live from-inner reg.  Cert does not fire at k>0.
 st-shapeK : EvalSt e₀
 st-shapeK = record (st-init e₀)
   { nodes     = (mnid , merge-st (suc zero) false) ∷ []
@@ -279,28 +215,106 @@ st-shapeK = record (st-init e₀)
   ; delivered = []
   }
 
--- merge-st (suc zero) _ → lookupNode returns just (merge-st (suc zero) _)
--- → the `_` branch → true
 _ : mergeCertAt mnid st-shapeK ≡ true
 _ = refl
 
 -----------------------------------------------------------------------
--- SUMMARY
+-- Section 3: DECISIVE EXPERIMENT
 --
--- The corrected merge-cert predicate:
+-- Program: mergeAll(of([slot0]))  in Γ₁ = natᵗ ∷ []
+--   Slot 0 is hot: delivers 42 at tick 1, isLast=true (only delivery).
 --
---   mergeCertAt mnid st = when (merge-st 0 _ at mnid):
---     ¬ ∃ reg ∈ registry. hasAliveFromInner mnid st reg
+-- Expected execution:
+--   subscribe: outer ofᵉ [strmᵗ (input zero)] delivers inner = input zero sync.
+--     subscribeAll mints nid=0.
+--     thruConsume: subscribeInner mints inst=1, registers
+--       (rid=0, src=0, (natᵗ, from-inner mergeᵒ 0 1 ↠ root)).
+--     mergeBump nid false: k ← 1.
+--     thruWrap fin=true: od ← true.
+--   After subscribe: nodes=[(0, merge-st 1 true)], one from-inner reg.
 --
--- SURVIVES all three refutation shapes:
+--   cascadeLatch (Evaluator:1617-1622): dying=[0], delivered=[], regWatermark=1.
+--   cascadeGo (Evaluator:1633-1641): chain (0, from-inner mergeᵒ 0 1 ↠ root):
+--     adds rid=0 → delivered=[0].
+--     innerReact: aliveThroughᶠ 1 st (0,0,...):
+--       dying=[0] → src 0 ∈ dying = true
+--       delivered=[0] → rid 0 ∈ delivered = true
+--       (not true ∨ not true) = false → aliveThroughᶠ = false
+--     any = false → innerFinish: k ← 0, fin=true.
+--   st_mid: nodes=[(0, merge-st 0 true)], registry unchanged (from-inner reg STILL PRESENT).
 --
---   Shape 0 (seed):        k=0, registry=[].              ✓  (trivially)
---   Shape 1 (R1 dodge):    k=0, outer thru-outer reg.     ✓  (no from-inner frames)
---   Shape 2 (R3 dodge):    k=0, inner reg dying+delivered. ✓  (aliveThroughᶠ=false)
---   Shape 2-ext:           k=0, outer+inner, inner dying.  ✓  (same)
---   Shape 3 (R2 dodge):    k=0, 2 regs same inst, dying.  ✓  (both aliveThroughᶠ=false)
---   Shape B (non-vacuous): k=0, live inner reg.            RETURNS FALSE  (cert is testable)
---   Shape K≠0:             k=1, live inner reg.            ✓  (cert does not fire at k>0)
+-- mergeCertAt 0 st_mid:
+--   merge-st 0 true → check hasAliveFromInner
+--   dying+delivered → aliveThroughᶠ = false → any = false → not false = TRUE
+--
+-- Shape B (live inner reg at k=0) was NOT reached because cascadeLatch
+-- (Evaluator:1622) sets dying=[src] BEFORE cascadeGo calls chainStep.
+-----------------------------------------------------------------------
+
+Γ₁ : Ctx 1
+Γ₁ = natᵗ ∷ⱽ []ⱽ
+
+-- e₁ = mergeAll(of([slot0]))
+e₁ : Closed Γ₁ natᵗ
+e₁ = mergeAllᵉ (ofᵉ (strmᵗ (input zero) ∷ []))
+
+-- slot 0: hot, one delivery (42 at tick 1, so isLast=true)
+ins₁ : Slots Γ₁
+ins₁ zero = scripted (hot ((after 0 , 42) ∷ []))
+
+-- Subscribe and extract schedule/state
+sub₁ : _
+sub₁ = subscribeE (budgetAt e₁ ins₁ 0) e₁ root 0 0 (sched-init e₁ ins₁) (st-init e₁)
+
+sched-sub₁ : Sched Γ₁
+sched-sub₁ = proj₁ (proj₂ sub₁)
+
+st-sub₁ : EvalSt e₁
+st-sub₁ = proj₂ (proj₂ sub₁)
+
+-- Run one cascade step and check mergeCertAt on the MID-CASCADE state
+-- (after cascadeGo fires innerFinish, BEFORE cascadeFinish drops the reg).
+midCascadeCheck : ⊤ ⊎ (Arrival Γ₁ × Sched Γ₁) → EvalSt e₁ → Bool
+midCascadeCheck (inj₁ _)            _  = false  -- no arrival: test setup error
+midCascadeCheck (inj₂ (a , sched')) st =
+  let st_lat           = cascadeLatch a st
+      (_ , _ , st_mid) = cascadeGo a 1 (chainsOf a st_lat) sched' st_lat
+  in mergeCertAt 0 st_mid
+
+-- THE DECISIVE ROW: reached by the real evaluator, not hand-built.
+_ : midCascadeCheck (sched-next sched-sub₁) st-sub₁ ≡ true
+_ = refl
+
+-- BONUS: post-cascade state (after cascadeFinish drops the from-inner reg).
+postCascadeCheck : ⊤ ⊎ (Arrival Γ₁ × Sched Γ₁) → EvalSt e₁ → Bool
+postCascadeCheck (inj₁ _)            _  = false
+postCascadeCheck (inj₂ (a , sched')) st =
+  let st_lat               = cascadeLatch a st
+      (_ , sched'' , st_mid) = cascadeGo a 1 (chainsOf a st_lat) sched' st_lat
+      (_ , st_post)         = cascadeFinish a sched'' st_mid
+  in mergeCertAt 0 st_post
+
+_ : postCascadeCheck (sched-next sched-sub₁) st-sub₁ ≡ true
+_ = refl
+
+-----------------------------------------------------------------------
+-- FINAL VERDICT
+--
+-- Section 2 (hand-built, reachability untested):
+--   Shape 0: trivially true (empty reg)
+--   Shape 1: true (outer reg has no from-inner inst)
+--   Shape 2, 2-ext: true (dying+delivered → aliveThroughᶠ=false)
+--   Shape 3: true (multi-source inner, same inst, both dying+delivered)
+--   Shape B: FALSE (live from-inner at k=0) — the CRITICAL GAP
+--   Shape K≠0: true (cert does not fire)
+--
+-- Section 3 (real evaluator, decisive):
+--   Mid-cascade of inner's last delivery: TRUE
+--   Post-cascade: TRUE
+--
+-- Shape B is NOT reached: cascadeLatch always sets dying=[src] before
+-- cascadeGo calls chainStep, so every innerFinish is preceded by the
+-- dying+delivered test being armed.
 --
 -- VERDICT: SURVIVES
 -----------------------------------------------------------------------

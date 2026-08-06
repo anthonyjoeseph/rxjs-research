@@ -67,6 +67,10 @@ open import Rx.Evaluator using (
   sched-init; st-init;
   scan-st; hasDry; dryEvent)
 open import Rx.Protocol using (ProtocolSt; Owed; countIn; valsLast?; hasValue)
+-- Ctx n = Vec Ty n.  Vec.[] is the empty-Ctx constructor,
+-- distinct from Data.List.[] which is also named [].
+-- import (not open) to keep qualified access only.
+import Data.Vec as Vec
 
 ----------------------------------------------------------------------
 -- § 1  LOCAL COPIES OF VWF.agda PREDICATES
@@ -179,15 +183,25 @@ scan-binv-adapt-gen id sched st S binv nid ns = record
 -- sched₀ᵐ / st₀ᵐ are indexed by the outer mapᵉ expression.
 
 private
-  -- mapᵉ (nat̂ 42) (ofᵉ [5]): type annotations omitted to avoid Vec/List []
-  -- ambiguity; Agda infers Ctx 0 = [] from the expression shapes.
+  -- Type annotations use Vec.[] (Data.Vec.[]) as Ctx 0 to disambiguate
+  -- from Data.List.[] which Agda would otherwise resolve for [].
+  e-map    : Closed Vec.[] natᵗ
   e-map    = mapᵉ (nat̂ 42) (ofᵉ (nat̂ 5 ∷ []))
+
+  sched₀ᵐ : Sched Vec.[]
   sched₀ᵐ = sched-init e-map (λ ())
+
+  st₀ᵐ    : EvalSt e-map
   st₀ᵐ    = st-init e-map
 
   -- ofᵉ [5] used as the inner expression b in the scan subscribeE call.
+  e-scan   : Closed Vec.[] natᵗ
   e-scan   = ofᵉ (nat̂ 5 ∷ [])
+
+  sched₀ˢ : Sched Vec.[]
   sched₀ˢ = sched-init e-scan (λ ())
+
+  st₀ˢ    : EvalSt e-scan
   st₀ˢ    = st-init e-scan
 
 ----------------------------------------------------------------------
@@ -219,23 +233,34 @@ map-inner-nodry = refl
 -- For the inner call, use a fresh nid and an installNode-extended st:
 
 private
-  nid-test  = proj₁ (mintNode sched₀ˢ)
+  nid-test : NodeId
+  nid-test = proj₁ (mintNode sched₀ˢ)
+
+  sched₁ˢ  : Sched Vec.[]
   sched₁ˢ  = proj₂ (mintNode sched₀ˢ)
-  st₁ˢ     = installNode nid-test (scan-st (evalTm (nat̂ 0))) st₀ˢ
+
+  st₁ˢ     : EvalSt e-scan
+  -- Use 0 directly (Val Vec.[] natᵗ = ℕ by reduction; avoids
+  -- evalTm (nat̂ 0) meta on nat̂'s Δᵍ/Δ/Θ context lists).
+  st₁ˢ     = installNode nid-test (scan-st 0) st₀ˢ
+
+  -- OUTER scan test: expression indexed by scanᵉ, not just ofᵉ
+  e-scan-outer : Closed (Vec.[]) natᵗ
+  e-scan-outer = scanᵉ (nat̂ 7) (nat̂ 0) (ofᵉ (nat̂ 5 ∷ []))
+  sched₀ˢᵒ    : Sched (Vec.[])
+  sched₀ˢᵒ    = sched-init e-scan-outer (λ ())
+  st₀ˢᵒ       : EvalSt e-scan-outer
+  st₀ˢᵒ       = st-init e-scan-outer
 
 scan-inner-nodry : hasDry (proj₁ (subscribeE (gs g0) e-scan
                    (scan-f (nat̂ 7) nid-test ↠ root) 0 0 sched₁ˢ st₁ˢ))
                ≡ false
 scan-inner-nodry = refl
 
--- For the OUTER scan, we need e-scan indexed by the scanᵉ expression.
--- Use a local self-contained helper rather than a global definition to
--- avoid polluting the private block.
+-- OUTER scan (subscribeE on the full scanᵉ expression):
 scan-outer-nodry :
-  let e = scanᵉ (nat̂ 7) (nat̂ 0) (ofᵉ (nat̂ 5 ∷ []))
-  in hasDry (proj₁ (subscribeE (gs g0) e root 0 0
-               (sched-init e (λ ())) (st-init e)))
-   ≡ false
+  hasDry (proj₁ (subscribeE (gs g0) e-scan-outer root 0 0 sched₀ˢᵒ st₀ˢᵒ))
+  ≡ false
 scan-outer-nodry = refl
 
 ----------------------------------------------------------------------
@@ -268,10 +293,8 @@ scan-inner-valsLast : valsLast? (proj₁ (subscribeE (gs g0) e-scan
 scan-inner-valsLast = refl
 
 scan-outer-valsLast :
-  let e = scanᵉ (nat̂ 7) (nat̂ 0) (ofᵉ (nat̂ 5 ∷ []))
-  in valsLast? (proj₁ (subscribeE (gs g0) e root 0 0
-                  (sched-init e (λ ())) (st-init e)))
-   ≡ true
+  valsLast? (proj₁ (subscribeE (gs g0) e-scan-outer root 0 0 sched₀ˢᵒ st₀ˢᵒ))
+  ≡ true
 scan-outer-valsLast = refl
 
 ----------------------------------------------------------------------

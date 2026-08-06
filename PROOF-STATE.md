@@ -100,9 +100,10 @@ blind spot the roadmap's Phase 0 closes.
 | 8 | `stepFrame-wf-outer` | VWF:4046 | SHAPE | The thru-outer wrap; same cluster, plus it inherits the FoldOut question. |
 | 9 | `dispatchShare-wf` | VWF:4058 | **SHAPE — known too weak** | Its conclusion is only `Σ S′ → runProtocol … ≡ just S′` — no FoldInv/FoldOut carried out, so it CANNOT feed `mid-step` as stated (old W7 finding, still true). A guaranteed restatement, cascading into the stepFrame family. Wired, consumed, and wrong-shaped. |
 | 10 | `mid-step-core` | VWF:4907 | FALSITY, moderate | Rests on `FoldOut` — a genuinely new 6-field invariant validated at exactly ONE clause (`foldPath-root-out`). If FoldOut's shape is wrong, this and the root proof both move. |
-| 11 | `batch-online` | Batch-Theorems:12 | **SHAPE — self-flagged imprecise** | Its own `nb:` says to "state precisely as pre-flush" — as literally written (comparing full outputs, flushed open tail included) it is likely FALSE. Off the critical path, trivially probeable, and the restatement is already prescribed by its own comment. |
+| 11 | `batch-online` | Batch-Theorems:12 | **REFUTED 2026-08-06 — FALSE** | Machine-refuted, `agda/probe/Battery-Batch-Online.agda` (`batch-online-refuted`, a proven `¬`). `impl-batchSimultaneous [em1,em2]` flushes an OPEN batch to `value [1]`, while on `[em1,em2,em3]` that batch closes as `value [1,2]` — the first elements differ, so no prefix relation holds. Exactly the failure its own `nb:` predicted. **Restatement drafted, NEEDS ANTHONY'S RULING** — see below. |
 | 12 | `map-valsLast-push`, `scan-valsLast-push` | VWF:1124/1154 | SHAPE | Each papers over a recorded "REAL SHAPE MISMATCH" (the proven sub-lemmas don't return `valsLast?`). Plausible truths standing in for a missing conjunct in the proven work. |
-| 13 | `map-nodry-push`, `scan-nodry-push`, `scan-nodeP`, `scan-binv-adapt` | VWF:1115–1174 | DIFFICULTY — probeable | Computational propagation/survival facts about specific subscribeE clauses; `scan-binv-adapt`'s comment even says "provable inline as record { … }". Concrete instances compute. |
+| 13 | `map-nodry-push`, `scan-nodry-push`, `scan-nodeP` | VWF:1115–1141 | DIFFICULTY — **PROBED 2026-08-06** | `agda/probe/Battery-VWF-Prop.agda`: all three hold at concrete instances, non-vacuously (premise AND conclusion both live, not an empty-premise pass). `scan-nodeP`'s mechanism is that `ofᵉ` ignores its path argument and returns state unchanged, so the installed node survives at its seed. Coverage is ONE program each — thin, but the class is low-risk. |
+| — | **`scan-binv-adapt`** | VWF:1168 | **DISCHARGEABLE — proof in hand** | Its comment was right: the proof is `record { live-matches = BurstInv.live-matches binv ; … }`, four fields passed straight through, verified in `agda/probe/Battery-VWF-Prop.agda`. It works because `installNode` touches only `nodes` and `mintNode` only `nextNode`, so `registry` and `live` are unchanged and record eta closes it with no rewrites. **Land it BUNDLED with the `burst-done-false` repair** — both edit VWF, and one ~40-min gate should carry both. |
 | 14 | `subscribeE-input-wf-core`, `subscribeE-defer-wf`, `subscribeE-takeᵉ-wf-core` | VWF:1195/1218/1294 | DIFFICULTY | Per-clause receipts of the pattern already PROVEN three times over (map/scan/take clause proofs exist). Low statement risk. |
 | 15 | `cut-owed` | VWF:4017 | DIFFICULTY, low | Self-contained Owed-table algebra, independent of every blocker. The easiest real proof in the branch. |
 | 16 | `stepFrame-wf-inner-concat` | VWF:4037 | DIFFICULTY | concat's drain grows the registry; re-establish FoldInv. Independent of merge-cert. |
@@ -231,6 +232,20 @@ against them before believing a PROBED-GREEN.**
 
 Every known-wrong-shape statement gets restated BEFORE work lands on top of it:
 
+- **`batch-online` → pre-flush form. NEEDS ANTHONY'S RULING BEFORE LANDING.**
+  REFUTED 2026-08-06 (above). The restatement is prescribed by the postulate's
+  own `nb:` and is drafted + concretely checked in
+  `agda/probe/Battery-Batch-Online.agda`: compare `foldBatch-no-flush` (the same
+  fold with `[] ↦ []` instead of `[] ↦ flushBatch st`) against the full
+  `impl-batchSimultaneous` of the extension. **Why it is not landed under the
+  standing autonomy grant:** `batch-online` is one of Main's named claims, so
+  changing what it ASSERTS changes Main's claim set — while leaving Main.agda
+  byte-identical. That is precisely the silent change Main's rule 3 exists to
+  prevent, so it gets drafted and asked rather than assumed. Cost note: the edit
+  is cheap (Batch-Theorems + Main recheck; The-Proof does not import it).
+  Second point for the ruling: `foldBatch-no-flush` differs from `foldBatch`
+  (Implementation:119) in ONE clause, so it is a near-duplicate — acceptable as
+  the honest online projection, but worth a nod given the no-fat rule.
 - `dispatchShare-wf` → FoldOut-carrying conclusion (cascades into the
   stepFrame family signatures — change the signatures first, per the law).
 - `sub-charge-capsOK-lift-core` → general mid-state `opIterD` hypothesis

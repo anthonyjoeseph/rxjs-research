@@ -118,16 +118,19 @@ storeNestMax sched st =
 --       postulate sees at each program.
 ------------------------------------------------------------------
 
-_ : (capsBase (pushD 0) (insN 0) , sizeᵉ (pushD 0) , slotsSize (insN 0) , nest (pushD 0) (insN 0) [])
-  ≡ (18 , 8 , 1 , 3)
+-- pushD 0 / insN 0
+_ : capsBase (pushD 0) (insN 0) ∷ sizeᵉ (pushD 0) ∷ slotsSize (insN 0) ∷ nest (pushD 0) (insN 0) [] ∷ []
+  ≡ 18 ∷ 8 ∷ 1 ∷ 3 ∷ []
 _ = refl
 
-_ : (capsBase (pushD 1) (insN 0) , sizeᵉ (pushD 1) , slotsSize (insN 0) , nest (pushD 1) (insN 0) [])
-  ≡ (22 , 12 , 1 , 4)
+-- pushD 1 / insN 0
+_ : capsBase (pushD 1) (insN 0) ∷ sizeᵉ (pushD 1) ∷ slotsSize (insN 0) ∷ nest (pushD 1) (insN 0) [] ∷ []
+  ≡ 22 ∷ 12 ∷ 1 ∷ 4 ∷ []
 _ = refl
 
-_ : (capsBase (pushD 0) (insN 3) , slotsSize (insN 3) , nest (pushD 0) (insN 3) [])
-  ≡ (21 , 4 , 3)
+-- pushD 0 / insN 3
+_ : capsBase (pushD 0) (insN 3) ∷ slotsSize (insN 3) ∷ nest (pushD 0) (insN 3) [] ∷ []
+  ≡ 21 ∷ 4 ∷ 3 ∷ []
 _ = refl
 
 ------------------------------------------------------------------
@@ -153,8 +156,10 @@ _ = refl   -- 3 ≤ 12
 --       walk monotonicity that the algebraic proof will rely on.
 ------------------------------------------------------------------
 
-_ : sizeAt 3 1 ≡ 21   ;  _ = refl
-_ : widAt  3 2 1 ≡ 27  ;  _ = refl
+_ : sizeAt 3 1 ≡ 21
+_ = refl
+_ : widAt  3 2 1 ≡ 27
+_ = refl
 _ : (sizeAt 3 1 ≤ᵇ widAt 3 2 1) ≡ true
 _ = refl   -- 21 ≤ 27
 
