@@ -442,12 +442,42 @@ a `Gas` hypothesis or concludes `hasDry ≡ false`.
 >
 > **4. HOP-EDGE'S THIRD PREMISE discharges from an existing walk conjunct** (below).
 >
-> **WHAT REMAINS — the whole anchor problem, now isolated:** prove
-> `sizeᵛ o ≤ Ŝ` for every observable `o` REACHABLE at `subscribeInner`. Not the
-> ceilings, not the descent, not the emission count — those are settled or
-> satisfiable. Just the size bound, which is the dry family. **The floor it must
-> clear is measured:** a 17-symbol program reaches an inner of size 85, so any
-> `Ŝ` linear in `sizeᵉ e` is already refuted (below).
+> **5. THE GROWTH RATE IS CAPPED AT EXPONENTIAL — the shape of `Ŝ` is settled**
+> (`agda/probe/Battery-Reached-Sizes.agda`). Sizes REACHED through the evaluator's
+> real `scanVals` path (Evaluator:1052–1056), which is what `thruWalk` hands to
+> `subscribeInner`:
+>
+> | k | `sizeᵉ progₖ` | max `sizeᵛ` at `subscribeInner` |
+> |---|---|---|
+> | 1 | 15 | 13 |
+> | 2 | 16 | 37 |
+> | 3 | 17 | 85 |
+> | 4 | 18 | 181 |
+>
+> Program size grows LINEARLY (+1 per source element); the observable grows
+> EXPONENTIALLY. **A linear anchor is refuted by this table.** A tripling step was
+> also built (`Aₖ₊₁ = 3·Aₖ + 15`, giving `1, 18, 69, 222`) — so the base is
+> tunable. **But super-exponential is IMPOSSIBLE for a fixed step function:** an
+> `Fn` of size `S` with branching factor `n` (occurrences of the accumulator in
+> its output) yields `sizeᵛ accₖ = O(nᵏ)`, and `n ≤ S ≤ sizeᵉ e`. Growing `n` with
+> `k` would take a non-fixed `Fn`, which is not writable. **So `Ŝ` is exponential
+> with an entry-bounded base AND an entry-bounded exponent** (`k ≤ syncSizeᵉ e`
+> per §1) — comfortably under `capsH`'s tower.
+>
+> **6. `connect-edge`'s BOUND IS FREE — only `hop-edge` is hard.** `slotSize
+> (shared d) ≡ sizeᵉ d` (Slots.agda:61), so `sizeᵉ d ≤ slotsSize ins < capsBase
+> e ins ≤ Ŝ`. Shared defs are fixed at program entry and cannot grow at runtime.
+> That retires one of the two anchor edges outright.
+>
+> **WHAT REMAINS — one lemma, and it now looks PROVABLE.** Prove `sizeᵛ o ≤ Ŝ` for
+> every observable `o` REACHABLE at `subscribeInner`. Everything around it is
+> settled: the ceilings fit, `Ŝ := capsH` works, the descent premise discharges,
+> `connect-edge` is free, emissions are entry-bounded, and growth is at most
+> `O(nᵏ)` with both `n` and `k` entry-bounded. **The remaining content is the
+> REACHABILITY INDUCTION** — that every `o` arriving at `subscribeInner` is
+> produced by at most `k` applications of a fixed step function to entry syntax.
+> That is what the dry family (`chainStep-dry` / `foldPath-dry` /
+> `subscribeInner-dry`) has to say.
 
 **WHAT THE DELIVERABLE ACTUALLY IS — it is CODE, not an argument.** `hop-edge`
 and `connect-edge` are already PROVEN and already wired in as hypotheses of
