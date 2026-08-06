@@ -94,7 +94,7 @@ blind spot the roadmap's Phase 0 closes.
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
 | 1 | `burst-done-false` | VWF:1109 | **FALSITY — own SUSPECT marker** | The repo's single most-likely-false statement: its own comment says "true only at the right walk position, not from BurstInv alone." The cheapest high-value refutation target anywhere in the ledger — one adversarial BurstInv inhabitant kills it, and the fix (a walk-position hypothesis) is known in advance. |
-| 2 | `root-done-plumbed` | VWF:1423 | FALSITY, blocked on merge-cert | The merge-coherence content. Candidate invariant #1 was machine-refuted by THREE counterexamples (VWF:3410–3429); route #2 is marked STRUCTURALLY DEAD (:3498); the corrected statement is OPEN (:3459–3497). Stated at the settled root exit — the one case the refutations do not touch — so plausibly true, but nobody knows the invariant that proves it. |
+| 2 | `root-done-plumbed` | VWF:1423 | FALSITY, blocked on merge-cert | The merge-coherence content. Candidate invariant #1 was machine-refuted by THREE counterexamples (VWF:3771–3800); route #2 is marked STRUCTURALLY DEAD (:3859); the corrected statement is OPEN (:3820–3858). Stated at the settled root exit — the one case the refutations do not touch — so plausibly true, but nobody knows the invariant that proves it. |
 | 3 | `root-caches` | VWF:1438 | FALSITY, blocked on merge-cert | Same content, same blocker, same settled-state plausibility. Discharges together with #2. |
 | 4–7 | `subscribeE-{merge,concat,switch,exhaust}All-wf` | VWF:1235–1268 | SHAPE | The four wrap-clause receipts, written against a merge-cert whose correct statement is UNKNOWN. Until it exists, the `valsLast?`/BurstInv conjuncts through a merge are conjecture — the statements may need hypotheses nobody has named yet. |
 | 8 | `stepFrame-wf-outer` | VWF:4046 | SHAPE | The thru-outer wrap; same cluster, plus it inherits the FoldOut question. |
@@ -190,9 +190,9 @@ confidence receipt (note it in the postulate's header: `-- PROBED 2026-08-…`).
 
 - **1a. MERGE-CERT first — it is the cheaper experiment and already scoped:**
   probe the corrected one-directional, liveness-aware statement
-  (VWF:3483–3486) against the three adversarial shapes that killed candidate
-  one (multi-source inner; inner-completes-before-outer; cut-through on an
-  inner), in the style of `agda/probe/Cut-Caches-Probe.agda`. Survives → state
+  (VWF:3844–3847) against the three adversarial shapes that killed candidate
+  one (multi-source inner; inner-completes-before-outer; lingering regs after
+  `finish mergeᵒ`), in the style of `agda/probe/Cut-Caches-Probe.agda`. Survives → state
   it as the postulate the four `*All` wraps and the two root-exit postulates
   are rewritten over. Dies → this branch needs a design ruling before tier 2's
   top eight can move at all.
@@ -277,12 +277,23 @@ its own comment says so. Do not read it as "the walk is basically done."
 Blocks the `*All` wrap receipts, `root-done-plumbed`, `root-caches`,
 `stepFrame-wf-outer`. Candidate invariant #1
 (`merge-st k at nid ⇒ k ≡ countRegsUnder nid registry`) is **machine-refuted by
-three independent counterexamples** (VWF:3410–3429); the "derive from
-`Inv.done-plumbed`" route is **STRUCTURALLY DEAD** (VWF:3498 — its premise is
-vacuous exactly when the obligation is needed). The corrected route — a
-one-directional, liveness-aware statement — is identified but OPEN
-(VWF:3459–3497); its exact statement is the remaining design point, and
-Phase 1a is its experiment.
+three independent counterexamples** (VWF:3771–3800 — the outer's own
+`thru-outer` threads nid; a multi-source inner registers two chains under one
+`bump`; `finish mergeᵒ` decrements `k` without dropping the registry). The
+"derive from `Inv.done-plumbed`" route is **STRUCTURALLY DEAD** (VWF:3859 — its
+premise is vacuous exactly when the obligation is needed). The corrected route
+is identified but OPEN (VWF:3820–3858): one-directional and liveness-aware,
+
+```
+merge-cert : (merge-st k _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough inner
+             INSTANCE under nid survives
+```
+
+keyed on the `from-inner allNid ≡ nid` frame only (dodges refutation 1), deduped
+by `inst` (dodges 2), and excluding spent registrations (dodges 3). Its exact
+statement — and whether `k ≡ 0 ⇒ none` is seed-provable — is the remaining
+design point, and Phase 1a is its experiment. **Do not generalise it to a
+global node↔registry theory, and not onto `dispatchShare`** (standing, VWF:3800).
 
 **FoldOut, the second statement-level debt in this branch:** a genuinely new
 invariant (what a PARTIAL chain fold preserves of the live↔registry shadow),
