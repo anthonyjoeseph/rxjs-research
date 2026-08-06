@@ -329,8 +329,14 @@ design session, not worker grind.
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
      place, before any proof is ground over it.
-  4. **THE UN-DEFERRING, ENFORCED IN `make wiring`** (Anthony, 2026-08-06 — see
-     below).
+  4. **THE UN-DEFERRING, ENFORCED IN `make wiring`** (Anthony, 2026-08-06) —
+     ✅ **DONE, `bfa6b6e`.** `agda/DEFERRED.txt` holds 55 ledgered entries
+     (≤152 →-slots); `make wiring-gate` ratchets against it. Verified by the
+     design session, not merely reported: gate green at exit 0, and deleting
+     `hop-edge`'s line fails it with the exact line to restore. `hop-edge`'s
+     entry names the anchor premise as the worked example that motivated the
+     ledger — so the debt this phase is about is now greppable from a file
+     under version control. Design notes below are retained for the rationale.
 
   A third refutation here is still STOP-grade: it would mean tier 1's top three
   postulates have no surviving proof route.
