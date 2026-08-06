@@ -93,7 +93,7 @@ blind spot the roadmap's Phase 0 closes.
 
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
-| 1 | `burst-done-false` | VWF:1109 | **FALSITY — own SUSPECT marker** | The repo's single most-likely-false statement: its own comment says "true only at the right walk position, not from BurstInv alone." The cheapest high-value refutation target anywhere in the ledger — one adversarial BurstInv inhabitant kills it, and the fix (a walk-position hypothesis) is known in advance. |
+| 1 | `burst-done-false` | VWF:1109 | **REFUTED 2026-08-06 — FALSE** | **Machine-refuted**, `agda/probe/Battery-Burst-Done.agda` (`burst-done-false-absurd`, a proven `→ ⊥`). `BurstInv`'s four fields never mention `done`, so `S = record { live = [] ; horizon = 0 ; current = nothing ; done = true }` inhabits it at `st-init`/`sched-init` and forces `true ≡ false`. Structural, hence shape-invariant over all `n`/`Γ`/`e`. **The source already knew**: VWF:876–882 says `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it must come from the walk order" — the postulate asserted what its own neighbour calls impossible. Repair is a SIGNATURE change, not a restatement — see Phase 2. |
 | 2 | `root-done-plumbed` | VWF:1423 | FALSITY, blocked on merge-cert | The merge-coherence content. Candidate invariant #1 was machine-refuted by THREE counterexamples (VWF:3771–3800); route #2 is marked STRUCTURALLY DEAD (:3859); the corrected statement is OPEN (:3820–3858). Stated at the settled root exit — the one case the refutations do not touch — so plausibly true, but nobody knows the invariant that proves it. |
 | 3 | `root-caches` | VWF:1438 | FALSITY, blocked on merge-cert | Same content, same blocker, same settled-state plausibility. Discharges together with #2. |
 | 4–7 | `subscribeE-{merge,concat,switch,exhaust}All-wf` | VWF:1235–1268 | SHAPE | The four wrap-clause receipts, written against a merge-cert whose correct statement is UNKNOWN. Until it exists, the `valsLast?`/BurstInv conjuncts through a merge are conjecture — the statements may need hypotheses nobody has named yet. |
@@ -212,8 +212,21 @@ Every known-wrong-shape statement gets restated BEFORE work lands on top of it:
   stepFrame family signatures — change the signatures first, per the law).
 - `sub-charge-capsOK-lift-core` → general mid-state `opIterD` hypothesis
   (or a recorded ruling for why root-only suffices at its one consumer).
-- `burst-done-false` → walk-position hypothesis (shape known; do it even if
-  Phase 0a somehow fails to refute).
+- **`burst-done-false` → DELETE IT; give `subscribeE-wf` the premise instead.**
+  REFUTED 2026-08-06 (above), so this one is no longer optional. Two plausible
+  cheap fixes are both FALSE and each costs a build to rediscover: the
+  consumers do NOT already supply `done ≡ false` (they are the ofᵉ/emptyᵉ
+  clauses, and the postulate exists precisely because they have nothing to hand
+  `oneShotBurst-wf`'s `deq`), and `nodry` does NOT supply it (`hasDry ≡ false`
+  is a different proposition — the dry-burst flag, not the completion latch).
+  The repair: `subscribeE-wf` TAKES `ProtocolSt.done S ≡ false` and threads it.
+  **Soundness rests on the SPINE ARGUMENT** — mapᵉ/scanᵉ/takeᵉ/deferᵉ/μᵉ each
+  recurse into ONE child with `S` unchanged, and there is no binary static merge
+  (VWF:3823), so `S` is untouched from walk entry to the single base burst. This
+  matters because `oneShotBurst-run` LATCHES `done ≡ true`: if one walk could
+  subscribe two bases in sequence, the threaded premise would itself be false.
+  **The open question moves to `subscribeE-wf`'s CALLERS** — does each have
+  `done ≡ false` in scope? Answer that before landing the signature change.
 - P4 `thruOuter-face-core` → resolve the "(a) may not fit fCharge" doubt at
   the statement level.
 - Phase 0's refutation fallout, whatever it is.
