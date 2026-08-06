@@ -808,18 +808,127 @@ postulate
     (id : ℕ) →
     capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
 
-  -- (2) OPITERD≤CAPSH-ROOT — subscribe-side measure bridge.
-  -- Relates opIterD (sub-charge's bound, GAP 4(a) PROVEN) to the
-  -- height sizeCount (capsAt e ins 0) (capsH e ins 0) that capsAt-suc-full
-  -- says capsAt e ins 1 sits at.
-  -- Proof will use: depth-capped to bound depthE ≤ 3·cSize, then
-  -- sub-charge to get j′ ≤ opIterD(…), then capsAt-suc-full + opIterD's
-  -- own recurrence to close j′ ≤ sizeCount(capsAt e ins 0)(capsH e ins 0).
-  opIterD≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+------------------------------------------------------------------
+-- (2) THE SUBSCRIBE-SIDE MEASURE BRIDGE, and it is now an ASSEMBLY
+-- rather than a postulate — which is what gives `depth-capped`
+-- (Depth-Bound) its first real consumer.
+--
+-- SPEND `depth-capped` AT THE PRE-BLOWUP BASE CAPS, NOT AT
+-- `capsAt e ins 0`.  This is the whole content of the arrangement and
+-- it is not visible from the goal, so it is written here as well as in
+-- PROOF-STATE.md § "RULING: `depth-capped` must be spent at the SMALL
+-- caps".  `capsAt e sl zero` is ITSELF a `frameBlowup` (Caps.agda:452;
+-- `baseCaps-is-inner` below pins that by `refl`), so its `cSize` is
+-- `sizeStep` iterated `sizeCount`-many times.  Routing the depth bound
+-- through THAT number demands `3 · cSize (capsAt e ins 0) ≤ capsH`,
+-- i.e. that `poolCount` at `M = towerℕ capsBase` dominate an
+-- EXPONENTIAL of `sizeCount` at `M = S₀` — a cross-`M` growth-rate
+-- argument that exists nowhere in this repo.  The one chain relating
+-- the two, `capsAt-tower` (Caps.agda:1322), points the WRONG WAY: it
+-- gives `cSize ≤ towerℕ capsH`, and `towerℕ h ≫ h`, so it makes the
+-- goal harder.  `depth-capped` quantifies over ANY caps satisfying
+-- `capsOK?`; nothing forces the blown-up one.
+--
+-- AND THE SMALL CAPS IS THE HONEST PLACE TO STAND, because at the ROOT
+-- the state is `st-init`/`sched-init`: three of `capsOK?`'s five
+-- conjuncts (Caps-Face.agda:299) are then VACUOUS — empty registry
+-- kills `regsSz?` and the `length … ≤ᵇ cReg` bound, empty
+-- `EvalSt.nodes` kills the `widNode` sweep — and the two that survive
+-- (`stBounded?`, the `widLive` sweep) are bounded by SYNTAX-level
+-- ceilings, which is exactly what `baseCaps`'s fields ARE.
+------------------------------------------------------------------
+
+-- the caps `capsAt e sl zero` blows up from, named so the depth bound
+-- can be taken at it
+baseCaps : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Caps
+baseCaps {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl)
+                             (suc (entryCeil n sl e))
+                             (suc (sizeᵉ e + slotsSize sl))
+
+-- …and that it IS the inner argument is definitional, not a comment
+baseCaps-is-inner : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  capsAt e sl 0 ≡ frameBlowup (baseCaps e sl) (capsBase e sl)
+baseCaps-is-inner e sl = refl
+
+postulate
+  -- capsOK? at the SMALL caps at the initial state.  NOT vacuous: five
+  -- real ≡ true conjuncts, three of them discharged by the emptiness of
+  -- `st-init` once someone grinds it.  `init-capsOK?` above is the same
+  -- fact at the blown-up caps and should eventually be DERIVED from
+  -- this one through `capsOK?-mono` (Caps-Face.agda:365) plus
+  -- `cSize≤frameBlowup` (Caps.agda:946), retiring one of the two.
+  init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
+
+  -- the arithmetic half: three base-caps sizes fit under the story
+  -- index.  Reduces (Evaluator.agda:901 `blowH m = 6 + m + 2 · poolCount
+  -- (towerℕ m) m`, and `capsBase e ins` is `3 + X + suc E` for
+  -- X = sizeᵉ e + slotsSize ins) to a LOWER bound on `poolCount`,
+  -- `m ≤ poolCount (towerℕ m) m` — elementary, not a growth-rate
+  -- argument.  Rehearsal: agda/probe/Pool-Lower-Probe.agda.
+  three-size≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
+      + Caps.cSize (baseCaps e ins)
+      ≤ capsH e ins 0
+
+-- THE DEPTH THE ROOT SUBSCRIBE REACHES FITS UNDER THE STORY INDEX.
+-- Note this is the CONDITIONED form and must stay conditioned: an
+-- UNCONDITIONAL `depthE ≤ capsH` is FALSE (Depth-Bound.agda:11 — it
+-- dies against an adversarial stored state).  What makes it true here
+-- is `capsOK?` at the entry, carried by `init-capsOK?-base`.
+depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+    ≤ capsH e ins 0
+depthE≤capsH-root e ins =
+  ≤-trans
+    (depth-capped (baseCaps e ins) (budgetAt e ins 0) e root 0 0
+       (sched-init e ins) (st-init e)
+       (init-capsOK?-base e ins)
+       -- `Sched.slots (sched-init e ins)` reduces to `ins` (Evaluator:121)
+       (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
+       (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
+       (s≤s z≤n))                      -- pathLen root ≡ 0
+    (three-size≤capsH e ins)
+
+postulate
+  -- the sweep/cascade domination at EQUAL depth fuel.  THE GENUINELY
+  -- NEW MATHEMATICS on this ladder, and the direction is the reason:
+  -- everything Caps-Chain proves about `opIterD` is a LOWER bound
+  -- (these transformers are BUDGETS there, so clauses show real costs
+  -- fit UNDER them).  This wants an UPPER bound on the budget itself,
+  -- plus a lower bound on `sizeCount` stronger than `2≤sizeCount`.
+  -- Two structural notes for whoever takes it: `lvls`/`dLvl` are PURE
+  -- iterates of `fLvlD` whereas `opIterD`'s suc clause jumps to
+  -- `suc (J + suc (sizeAt S J)²)`, which one `fLvlD` step dominates iff
+  -- `sizeAt S J ≤ widAt S W J` (compare `fLvl`'s own
+  -- `J + suc (suc (widAt S W J) * suc (sizeAt S J))`); and `sizeStep`
+  -- grows exponentially while `foldStep S w = S ^ suc w` grows like a
+  -- TOWER, so that gap is wide.  The counting is comfortable — `cDel`
+  -- is a gas-`cSize` recursion while `k`/`m` here are `nest e ins []`
+  -- and `suc (sizeᵉ e)`.
+  opIterD≤sizeCount-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
-            (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
-            (nest e ins []) (suc (sizeᵉ e)) 0
+            (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
       ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
+
+-- and the bridge itself: raise the observed depth to the budgeted
+-- height, then dominate.  `opIterD-mono` (Caps.agda:686) already
+-- carries `d ≤ d′` jointly with S/W/k/m/J, so the raise is one call
+-- with every other axis at `≤-refl` — no mutual induction needed.
+opIterD≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
+          (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
+          (nest e ins []) (suc (sizeᵉ e)) 0
+    ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
+opIterD≤capsH-root e ins =
+  ≤-trans
+    (opIterD-mono (suc (sizeᵉ e)) (suc (sizeᵉ e))
+                  (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
+                  (capsH e ins 0)
+                  (nest e ins []) (nest e ins [])
+                  (2≤capsAt-size e ins 0) ≤-refl ≤-refl ≤-refl
+                  (depthE≤capsH-root e ins) ≤-refl ≤-refl)
+    (opIterD≤sizeCount-root e ins)
 
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
 -- Mirrors cascade-wet-via-caps (~line 526) structurally.

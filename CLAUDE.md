@@ -46,9 +46,7 @@ immediately; do not act on it — we decide next steps together.**
 
 The ultimate and only goal is a **complete machine-checked proof** that the implementation
 equals the spec — **`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` fully discharged**, **no
-postulates, everything typechecks**, on *every* canonical program. (That file is the artifact
-once called `Formal-Verification`; the old name survives nowhere but in memories and stale
-memos, so read any reference to it as pointing here.) Partial results, "passes almost all QuickCheck
+postulates, everything typechecks**, on *every* canonical program. Partial results, "passes almost all QuickCheck
 seeds", "fixes the common case" — none of these are the finish line. They are waypoints.
 A remaining counterexample (even 1 in 500, even a pathological nested program) means the
 theorem is false and there is no proof. Keep going until it is airtight.
@@ -68,8 +66,8 @@ The design-authority session delegates the bulk of the work — clause grinds, p
 build babysitting — to subagents, keeping design spend confined to rulings, directives, and
 report review. Standing protocol, per Anthony:
 
-- **Workers run on Sonnet 4.6 — but `model: "sonnet"` NO LONGER MEANS 4.6.** As of 2026-08-05
-  the Agent tool's `model` parameter is a hard enum (`sonnet | opus | haiku | fable`) and
+- **Workers run on Sonnet 4.6, and `model: "sonnet"` does NOT get you there.** The Agent
+  tool's `model` parameter is a hard enum (`sonnet | opus | haiku | fable`) and
   `sonnet` resolves to **Sonnet 5** on this provider; full model IDs are rejected outright
   with an InputValidationError. Two levers actually pin a version, and **both apply only at
   session start**:
@@ -94,15 +92,12 @@ report review. Standing protocol, per Anthony:
   2. land only probe-green bodies;
   3. hand the long `make agda && make agda-all && make bug-cache` gate BACK to the design
      session, which can poll across turns without dying.
-- **Parallel workers are AUTHORIZED (2026-08-04), and the hardware now allows parallel Agda
-  too — up to a measured ceiling.** The old one-worker-at-a-time rule was a memory constraint,
-  not a credits one, and Anthony moved the session to stronger hardware on 2026-08-04 ("no
-  need to worry"). Measured on that machine: **24 GB RAM, 14 cores**, ~12 GB free at rest,
+- **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling.**
+  Measured on this machine: **24 GB RAM, 14 cores**, ~12 GB free at rest,
   and **Subscribe-Face peaks ~5.2 GB** as a single check. So:
   - **At most TWO heavyweight checks at once** (Subscribe-Face / Wet class, multi-GB). Two fit
     the headroom; three do not, and an OOM costs more than the wait. Re-measure with
-    `ps -eo rss` before assuming otherwise — the 13 GB peaks in the campaign's history were
-    real, just on the old container.
+    `ps -eo rss` before assuming otherwise.
   - **Cheap modules parallelize freely** (probes and non-SCC modules solo-check in seconds and
     cost well under a GB).
   - **Never let two workers edit the same module.** This is a correctness constraint that
@@ -111,16 +106,15 @@ report review. Standing protocol, per Anthony:
     replacement text and let the design session apply it and own the single recheck.
   - **Read-only fan-out is unconditionally safe** — analysis, goal-type census, locating
     definitions, tracing call sites. Split as wide as the task allows.
-- **Keep-alives RETIRED (2026-08-03).** The session now runs on a persistent laptop
-  (Anthony: "no need for the keep-alives anymore"), so the container no longer suspends
-  between tool calls — background workers and detached builds advance on their own, and
-  worker completion notifications wake the design session. The old protocol (110-second
-  serial foreground keep-alive chains + 20-minute `send_later` re-arms) is retired; keep
-  only a SPARSE fallback check-in (~60 min) to catch workers wedged by harness restarts
-  (a restart still kills a worker's in-flight turn — diagnose via transcript mtime + ps,
-  revive via SendMessage with re-verify instructions; "queued" = alive, "resumed from
-  transcript" = was dead). Long builds still get setsid-detached with EXIT=$? logs and
-  polled, since the Bash tool's ~600s foreground ceiling per call still applies.
+- **No keep-alives.** The session runs on a persistent laptop, so the container does not
+  suspend between tool calls — background workers and detached builds advance on their own,
+  and worker completion notifications wake the design session. Keep only a SPARSE fallback
+  check-in (~60 min) to catch workers wedged by harness restarts (a restart kills a worker's
+  in-flight turn — diagnose via transcript mtime + ps, revive via SendMessage with re-verify
+  instructions; **"queued" = alive, "resumed from transcript" = was dead**). Long builds
+  still get detached with EXIT=$? logs and polled, since the Bash tool's ~600s foreground
+  ceiling per call applies. **`setsid` does not exist on macOS** — use the Bash tool's
+  `run_in_background`, not `nohup setsid`.
 - **Directives carry the law.** Every worker prompt restates the standing rules it needs:
   spec is gospel; probe-before-grind; detached builds with EXIT= logs; report numbers
   plainly including failures; never extrapolate from shallow probe rows; the
@@ -140,9 +134,7 @@ report review. Standing protocol, per Anthony:
 ## Running long Agda builds
 
 `make agda` takes ~35-40 minutes (Caps-Face ~80 s, Wet ~14-18 min, and **Subscribe-Face ~44 min
-peaking ~6.9 GB when dirty** — measured 2026-08-04; the older "~7 min" figure in memos predates
-the clique's growth and will mislead your planning, so budget the real number);
-the Bash tool's ceiling is 600s per foreground call. Detach long builds (`nohup setsid bash
+peaking ~6.9 GB when dirty**); the Bash tool's ceiling is 600s per foreground call. Detach long builds (`nohup setsid bash
 -c '… ; echo EXIT=$? >> log' &`) and poll the log for its EXIT= line with short foreground
 calls. Since 2026-08-03 the session runs on a persistent machine, so detached builds advance
 on their own — the polling is for pacing and verification, not for keeping anything awake.
@@ -269,29 +261,22 @@ rule, because deletion and wiring interfere in one direction only:
 - **Wiring only ADDS consumers.** It never creates an orphan, so its signal is
   monotone and safe to act on.
 - **Deletion CREATES orphans**, by stranding whatever fed only into the deleted
-  cluster. Measured the day this rule was written: removing the retired multiset
-  measure orphaned six further definitions (`EnvLen`, `envLen-lookup`, the three
-  `plugs-len*`, `envSize→envLen`) whose consumer chain terminated at `rank-drop`.
+  cluster. Measured: one cluster's removal orphaned six further definitions whose
+  consumer chain terminated inside it.
 
 So deleting before wiring is complete **corrupts the very measurement used to
 decide what to delete.** Wire first; the orphan set that survives a finished
 wiring pass is the only one whose emptiness means anything.
 
-**The evidence this rule is not paranoia** — both of these were on the deletion
-list and both were wrong, in one afternoon:
-- `pWᵉ≤entryCeil` (Rx/Frame-Width.agda:831) — a sweep found "no consumer exists"
-  (true, that day). It is needed by `init-capsOK?`, i.e. by work not yet written.
-  **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS**, and
-  only building the consumer answers the second.
-- `dBound-struct` (Measures) — looked like retired-measure cruft. It is the
-  strict GENERALISATION of `dBound-μ`, one of the file's most-used lemmas,
-  orphaned purely because it was stated AFTER its own specialisation. It wired
-  in one line and deleted a duplicated derivation.
+**"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS**, and only
+building the consumer answers the second. A sweep answers the first. Two traps
+that make the difference concrete: a definition needed by work not yet written
+reads as dead; and a lemma stated AFTER its own specialisation is orphaned by
+placement alone, and wires in one line.
 
-**The one standing exemption** is code the SOURCE ITSELF retires in writing (the
-Dershowitz–Manna multiset measure, which the hopD section header calls "the
-retired measure"). Even then: record the commit SHA in PROOF-STATE.md, because
-git history is the archive only if someone can find the entry.
+**The one standing exemption** is code the SOURCE ITSELF retires in writing.
+Even then: record the commit SHA in PROOF-STATE.md, because git history is the
+archive only if someone can find the entry.
 
 ### SHORTCUT MANDATE: postulate freely until the wiring pass is done (Anthony, 2026-08-05)
 
@@ -381,9 +366,9 @@ Because Agda compiles exactly what is transitively imported, Main also defines
 the build's COVERAGE. **`make agda` is the claim graph; `make agda-all`
 compiles every module under `src/` regardless of reachability** — the rot-guard
 for proven work not yet wired to a claim. The DIFFERENCE between the two is the
-unwired debt (today: ten V-B-S modules, 14,439 lines), and `agda-all` is
-self-retiring — when the two cover the same set, delete it. Never close that
-gap by re-adding a bulk import to Main: that is the loophole, not the repair.
+unwired debt, and `agda-all` is self-retiring — when the two cover the same set,
+delete it. Never close that gap by re-adding a bulk import to Main: that is the
+loophole, not the repair.
 
 **ACCEPTANCE TEST: `make wiring` reports zero orphans** outside its two documented exempt
 families (`*-absurd` refutation witnesses, whose consumer is the design record; and the
@@ -391,11 +376,10 @@ top-line semantic claims in `*-Theorems.agda`, which ARE the claims). Run it rat
 trusting a memo — including this one. Also: grep for a fact before planning its proof, and grep
 for a definition's consumers before believing any status claimed for it.
 
-**WHY THIS IS LAW.** Unwired proven work has cost this campaign more than every refutation
-combined: `caps-tick`, `subscribeE-walk`, the whole three-edge gas package, the
-`Caps-Bridge`/`Depth-Bound` tower, `foldPath-root-out`, `subscribeE-wf`'s map/scan/take clauses,
-a stranded delivery-count tower, and nine places where the same proof was written **twice** —
-once as a lemma nobody calls, once re-derived inline at the site that needed it.
+**WHY THIS IS LAW.** Unwired proven work costs this campaign more than refutations do. Its
+two failure modes: a proof nobody calls sits inert while the work it would have done gets
+re-derived inline at the site that needed it, so the same thing is proven **twice**; and a
+tower built without its consumer is a tower whose shape was never checked against anything.
 
 ## TypeScript implementation style
 
