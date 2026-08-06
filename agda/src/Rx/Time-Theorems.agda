@@ -4,7 +4,7 @@ open import Data.List    using (List)
 open import Data.Product using (_×_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim      using (Fuel; InstEmit)
+open import Rx.Prim      using (Fuel)
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Sched; Arrival; EvalSt; Slots; Stream; evaluate)
 
@@ -63,11 +63,3 @@ postulate
     -- themselves — the recommendation this comment used to make is
     -- now the implementation
 
-
-------------------------------------------------------------------
--- Trace equivalence up to id renaming (the harness's relation)
-------------------------------------------------------------------
-
-postulate
-  _≈ˢ_ : ∀ {A} → List (InstEmit A) → List (InstEmit A) → Set
-  _≈ᵍ_ : ∀ {A} → List (InstEmit (List A)) → List (InstEmit (List A)) → Set

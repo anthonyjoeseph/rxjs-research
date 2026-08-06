@@ -6217,6 +6217,21 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- clique the way `burstCaps?` carries the per-event bound
 ------------------------------------------------------------------
 
+-- THE WIRING, proven rather than postulated: a value inside the cap
+-- discharges BOTH of the walk's reset obligations at once.  This is what
+-- makes the cluster one object instead of three coincidences, and it is
+-- why F needs no separate justification — it is Ŝ
+-- DELEGATES to `reach-reset` (.Measures), which is where this pair is
+-- now stated once.  Kept as a name because the caps face's prose refers
+-- to "the reset cluster" by it; it is a re-export, not a second proof.
+-- DECLARED HERE, above the faces, because `thruOuter-face` consumes it
+-- and that face is itself consumed further down the file than the hop
+-- section this used to sit in.
+reach-resets : ∀ (C : ℕ) → 2 ≤ C →
+  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+  (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
+reach-resets = reach-reset
+
 postulate
   -- THE ONE from-inner CLAUSE THAT IS NOT j′ = 0.  Every other clause
   -- of innerReact / innerFinish hands `vals` straight back — merge
@@ -6229,7 +6244,41 @@ postulate
   -- value count — conjunct (b) of the two named above.  Its receipt (a)
   -- is the drain's one subscribe per queued inner, and that is the
   -- second number, the one nothing in the tree reports
-  innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over the burst-construction and
+  -- slot-transport toolkit stated at ~3608-3645, which is exactly the
+  -- kit the drain's output needs — one `∷` per queued inner's burst,
+  -- and the four `*-slots` substitutions that move a bound from the
+  -- entry telescope to the drain's.
+  innerFinish-concat-face-core :
+    -- burstCaps?-∷  (Verify-Budget-Sufficient/Caps-Face.agda:3608)
+    (∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+      (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
+      all (eventCaps? c sl) (InstEmit.events em) ≡ true →
+      burstCaps? c sl str ≡ true →
+      burstCaps? c sl (em ∷ str) ≡ true
+     ) →
+    -- valsCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3625)
+    (∀ {n} {Γ : Ctx n} {c : Caps} {sl sl′ : Slots Γ}
+      (u : Ty) (vs : List (Val Γ u)) → sl′ ≡ sl →
+      all (valCaps? c sl u) vs ≡ true → all (valCaps? c sl′ u) vs ≡ true
+     ) →
+    -- eventsCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3630)
+    (∀ {n} {Γ : Ctx n} {u} {c : Caps} {sl sl′ : Slots Γ}
+      (evs : List (InstEvent (Val Γ u))) → sl′ ≡ sl →
+      all (eventCaps? c sl) evs ≡ true → all (eventCaps? c sl′) evs ≡ true
+     ) →
+    -- burstCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3635)
+    (∀ {n} {Γ : Ctx n} {u} {c : Caps} {sl sl′ : Slots Γ}
+      (str : Stream Γ u) → sl′ ≡ sl →
+      burstCaps? c sl str ≡ true → burstCaps? c sl′ str ≡ true
+     ) →
+    -- obsListCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3640)
+    (∀ {n} {Γ : Ctx n} {s} {c : Caps} {sl sl′ : Slots Γ}
+      (q : List (Closed Γ s)) → sl′ ≡ sl →
+      all (obsCaps? c sl) q ≡ true → all (obsCaps? c sl′) q ≡ true
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
     (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -6259,7 +6308,60 @@ postulate
   -- indices, charged against `fCharge`, and `subscribeE-caps` bounds
   -- its j′ by nothing whatever.  See the block above the postulate
   -- block for both, and for why (a) may not fit `fCharge` as stated
-  thruOuter-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over the reset cluster (the hop
+  -- descent this walk spends) and the share-walk's delivery counts —
+  -- the sink readoff, the walk's two lines, and the finish's registry
+  -- bound, which together account for what one thru-outer payload
+  -- delivers.
+  thruOuter-face-core :
+    -- reach-resets  (Verify-Budget-Sufficient/Caps-Face.agda, above)
+    (∀ (C : ℕ) → 2 ≤ C →
+      ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+      (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
+     ) →
+    -- foldPath-sink-N  (Verify-Budget-Sufficient/Deliveries.agda:787)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+        (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
+        (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+        delivN st (proj₂ (proj₂ (foldPath sf gas id now envSrc (share-sink i)
+                                   vals evs fin sched st)))
+          ≡ delivN st (proj₂ (proj₂ (dispatchShare sf gas id now i vals fin sched st)))
+     ) →
+    -- shareGo-skip-N  (Verify-Budget-Sufficient/Deliveries.agda:824)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+        (vals : List (Val Γ (lookup Γ i))) (fin : Bool) (rid : RegId)
+        (p : Path Γ (lookup Γ i) t) (ps : List (RegId × Path Γ (lookup Γ i) t))
+        (sched : Sched Γ) (st : EvalSt e) →
+        any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
+        delivN st (proj₂ (proj₂ (shareGo sf gas id now i vals fin ((rid , p) ∷ ps) sched st)))
+          ≡ delivN st (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
+     ) →
+    -- shareGo-cons-N  (Verify-Budget-Sufficient/Deliveries.agda:840)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+        (vals : List (Val Γ (lookup Γ i))) (fin : Bool) (rid : RegId)
+        (p : Path Γ (lookup Γ i) t) (ps : List (RegId × Path Γ (lookup Γ i) t))
+        (sched : Sched Γ) (st : EvalSt e) →
+        any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+        let st₀ = consᵈ rid st
+            fp  = foldPath sf gas id now (toℕ i) p vals
+                    (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
+            st₁ = proj₂ (proj₂ fp) in
+        delivN st (proj₂ (proj₂ (shareGo sf gas id now i vals fin ((rid , p) ∷ ps) sched st)))
+          ≡ suc (delivN st₀ st₁
+                 + delivN st₁ (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps
+                                              (proj₁ (proj₂ fp)) st₁))))
+     ) →
+    -- shareFinish-len  (Verify-Budget-Sufficient/Delivery-Walk.agda:129)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (i : Fin n) (fin : Bool) (out : Stream Γ t × Sched Γ × EvalSt e) →
+      length (EvalSt.registry (proj₂ (proj₂ (shareFinish i fin out))))
+        ≤ length (EvalSt.registry (proj₂ (proj₂ out)))
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick)
     (vals : List (Val Γ (obs u))) (fin : Bool)
@@ -6274,6 +6376,52 @@ postulate
     valsCaps? (frameStep j c) sl vals ≡ true →
     FrameFace c d j sl
       (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
+
+-- the two faces, assembled over their cores
+innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  valsCaps? (frameStep j c) sl vals ≡ true →
+  FrameFace c d j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
+                        (lookupNode allNid (EvalSt.nodes st)))
+innerFinish-concat-face =
+  innerFinish-concat-face-core
+    (λ {n} {Γ} {u} → burstCaps?-∷ {n} {Γ} {u})
+    (λ {n} {Γ} {c} {sl} {sl′} → valsCaps?-slots {n} {Γ} {c} {sl} {sl′})
+    (λ {n} {Γ} {u} {c} {sl} {sl′} → eventsCaps?-slots {n} {Γ} {u} {c} {sl} {sl′})
+    (λ {n} {Γ} {u} {c} {sl} {sl′} → burstCaps?-slots {n} {Γ} {u} {c} {sl} {sl′})
+    (λ {n} {Γ} {s} {c} {sl} {sl′} → obsListCaps?-slots {n} {Γ} {s} {c} {sl} {sl′})
+
+thruOuter-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick)
+  (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  valsCaps? (frameStep j c) sl vals ≡ true →
+  FrameFace c d j sl
+    (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
+thruOuter-face =
+  thruOuter-face-core
+    reach-resets
+    (λ {n} {Γ} {t} {e} → foldPath-sink-N {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → shareGo-skip-N {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → shareGo-cons-N {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → shareFinish-len {n} {Γ} {t} {e})
 
 -- innerFinish's clauses that hand the payload straight back — merge's
 -- counter, switch's cleared slot, exhaust's cleared flag, the absorb
@@ -6909,17 +7057,9 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 reach-via-size-absurd : ∀ (C : ℕ) → 2 ^ C ≤ C → ⊥
 reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
 
--- THE WIRING, proven rather than postulated: a value inside the cap
--- discharges BOTH of the walk's reset obligations at once.  This is what
--- makes the cluster one object instead of three coincidences, and it is
--- why F needs no separate justification — it is Ŝ
--- DELEGATES to `reach-reset` (.Measures), which is where this pair is
--- now stated once.  Kept as a name because the caps face's prose refers
--- to "the reset cluster" by it; it is a re-export, not a second proof.
-reach-resets : ∀ (C : ℕ) → 2 ≤ C →
-  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
-  (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
-reach-resets = reach-reset
+-- (`reach-resets`, the reset cluster this section's prose names, is
+-- declared ABOVE the face postulate block — `thruOuter-face` consumes
+-- it and is itself consumed before this point in the file.)
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.

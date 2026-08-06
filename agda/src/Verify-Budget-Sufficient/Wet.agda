@@ -4299,7 +4299,158 @@ postulate
   -- threads the stronger mid-instant invariant (subscribeE-walk, at
   -- the parameter map recorded above); only this outer face is fixed
   -- here.
-  subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over exactly the facts this
+  -- postulate's own header says it is to be ground from — the three
+  -- packaged gas edges, the hasAtLeast peel, hop-step-gives' syncSize
+  -- headroom, and the internal walk (subscribeE-walk) the header names
+  -- as threading the mid-instant invariant — plus the Keeps-Ring share
+  -- boundary facts and the .Measures budget/size faces the clause grind
+  -- consumes.  Every hypothesis is already proven, so this is neither
+  -- stronger nor weaker than the postulate it replaces.
+  subscribeE-wet-core :
+    -- subscribeE-walk  (Verify-Budget-Sufficient/Measures.agda:6125)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+      (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+      (id : Id) (now : Tick)
+      (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+      3 ≤ E →
+      INV? Ψ (capᴱ W E) sched st ≡ true →
+      sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+      pathB? (capᴱ W E) Ψ κ ≡ true →
+      widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+      dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+             (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+      g hasAtLeast suc G →
+      pathLen κ + G ≤ ℓ →
+      regsLen? ℓ (EvalSt.registry st) ≡ true →
+      let r = subscribeE g b κ id now sched st
+      in Σ ℕ λ E′ → (E ≤ E′)
+         × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+         × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+         × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+         × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
+         × (hasDry (proj₁ r) ≡ false)
+         × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+              ≤ mintCount sched st + walkCap Ω ℓ G)
+         × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+         × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+     ) →
+    -- mu-edge  (Verify-Budget-Sufficient/Wet.agda:4036)
+    (∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
+      suc (dBound Ŝ R̂ U (hopDᵉ Ŝ (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
+        ≤ dBound Ŝ R̂ U (hopDᵉ Ŝ (μᵉ body)) (syncSizeᵉ (μᵉ body))
+     ) →
+    -- hop-edge  (Verify-Budget-Sufficient/Wet.agda:4052)
+    (∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) → 2 ≤ Ŝ →
+      (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r →
+      suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ (obs u) o) (syncSizeᵉ o))
+        ≤ dBound Ŝ (hopR Ŝ) U r s
+     ) →
+    -- connect-edge  (Verify-Budget-Sufficient/Wet.agda:4066)
+    (∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
+      (sl : Slots Γ) (cs : List Source) (i : Fin n)
+      {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+      memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
+      suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
+        ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s
+     ) →
+    -- hop-step-gives  (Verify-Budget-Sufficient/Wet.agda:3877)
+    (∀ (V R U r s s′ : ℕ) → suc s′ ≤ s + suc V →
+      suc (dBound V R U r s′) ≤ dBound V R U (suc r) s
+     ) →
+    -- hop-step-needs  (Verify-Budget-Sufficient/Wet.agda:3883)
+    (∀ (V R U r s s′ : ℕ) →
+      suc (dBound V R U r s′) ≤ dBound V R U (suc r) s → suc s′ ≤ s + suc V
+     ) →
+    -- unconn-keeps  (Verify-Budget-Sufficient/Wet.agda:4087)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (sched : Sched Γ) (st : EvalSt e) (sched′ : Sched Γ) (st′ : EvalSt e) →
+      Keeps sched st sched′ st′ →
+      unconn (Sched.slots sched′) (EvalSt.connectedShares st′)
+        ≤ unconn (Sched.slots sched) (EvalSt.connectedShares st)
+     ) →
+    -- sharedConnect-unconn  (Verify-Budget-Sufficient/Keeps-Ring.agda:1016)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+      (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+      (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
+      Sched.slots sched i ≡ shared dd →
+      memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
+      unconn (Sched.slots (proj₁ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
+             (EvalSt.connectedShares
+               (proj₂ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
+      < unconn (Sched.slots sched) (EvalSt.connectedShares st)
+     ) →
+    -- obs-slot-shared  (Verify-Budget-Sufficient/Keeps-Ring.agda:464)
+    (∀ {n} {Γ : Ctx n} {u} (s : Slot Γ (obs u)) →
+      Σ (Closed Γ (obs u)) λ d → s ≡ shared d
+     ) →
+    -- share-live-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda:473)
+    (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
+      proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
+              (((init s ∷ []) at id from s as subscribe) ∷ [])) ≡ []
+     ) →
+    -- share-spent-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda:478)
+    (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
+      proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
+              (((init s ∷ close s exhausted ∷ complete ∷ []) at id from s as subscribe) ∷ []))
+        ≡ []
+     ) →
+    -- hasAtLeast-pad  (Verify-Budget-Sufficient/Measures.agda:222)
+    (∀ (m : ℕ) (g : Gas) {n} → n ≤ m → gasPad m g hasAtLeast n
+     ) →
+    -- hasAtLeast-peel  (Verify-Budget-Sufficient/Measures.agda:268)
+    (∀ {g : Gas} {m : ℕ} → g hasAtLeast suc m →
+      Σ Gas (λ g′ → (g ≡ gs g′) × (g′ hasAtLeast m))
+     ) →
+    -- seed-covers  (Verify-Budget-Sufficient/Measures.agda:3113)
+    (∀ (sz U : ℕ) → U ≤ sz →
+      let V = towerℕ ((4 + sz) * 1) in
+      suc (suc V * suc (hopR V) * suc U)
+        ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
+     ) →
+    -- budget-covers  (Verify-Budget-Sufficient/Measures.agda:3400)
+    (∀ (sz U id : ℕ) → U ≤ sz →
+      let V = towerℕ ((4 + sz) * suc (suc id)) in
+      suc (suc V * suc (hopR V) * suc U)
+        ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
+     ) →
+    -- oneShot-tail-dry  (Verify-Budget-Sufficient/Measures.agda:3367)
+    (∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (src : Source) →
+      any dryEvent (map value vals ++ close src exhausted ∷ complete ∷ []) ≡ false
+     ) →
+    -- connect-anchor  (Verify-Budget-Sufficient/Measures.agda:1847)
+    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+      (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+      let V = sizeBudgetAt e sl id in
+      (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
+     ) →
+    -- hopD-map-emit  (Verify-Budget-Sufficient/Measures.agda:2780)
+    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ)
+      (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) (v : Val Γ s) →
+      (f₀ : Fn Γ [] [] [] s u) → hopDᵗ V f₀ ≤ hopDᵗ V f → pmᵗ V 0 f₀ ≤ pmᵗ V 0 f →
+      hopDᵛ V s v ≤ hopDᵉ V b →
+      hopDᵛ V u (applyFn f₀ v) ≤ hopDᵉ V (mapᵉ f b)
+     ) →
+    -- applyFn-size  (Verify-Budget-Sufficient/Measures.agda:3647)
+    (∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
+      (fn : Fn Γ [] [] [] s t) (v : Val Γ s) → sizeᵛ s v ≤ V →
+      sizeᵛ t (applyFn fn v) ≤ (2 + 2 * V) ^ (3 ^ sizeᵗ fn)
+     ) →
+    -- unconn-cons-≤  (Verify-Budget-Sufficient/Measures.agda:1217)
+    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+      (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
+     ) →
+    -- shellSize-unfoldμ  (Verify-Budget-Sufficient/Measures.agda:1100)
+    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+      shellSizeᵉ (unfoldμ body) ≡ shellSizeᵉ body
+     ) →
+    -- inner-unfoldμ  (Verify-Budget-Sufficient/Measures.agda:1104)
+    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+      innerᵉ (unfoldμ body) ≡ innerᵉ body
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     let sl = Sched.slots sched
@@ -4340,7 +4491,26 @@ postulate
   -- chainStep-wet must mirror.  Until the two accounting mechanisms
   -- are collapsed this stays one postulate (the FoldOut precedent: no
   -- half-stated leaf).
-  cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over the two state-bound facts a
+  -- cascade's own bookkeeping steps need — the latch touches only the
+  -- per-cascade ledger fields and the finish only drops registry
+  -- entries, so neither disturbs stBounded?.
+  cascadeGo-wet-core :
+    -- latch-bounded  (Verify-Budget-Sufficient/Measures.agda:408)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (B : ℕ) (sched : Sched Γ) (a : Arrival Γ) (st : EvalSt e) →
+      stBounded? B sched st ≡ true →
+      stBounded? B sched (cascadeLatch a st) ≡ true
+     ) →
+    -- finish-bounded  (Verify-Budget-Sufficient/Measures.agda:475)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (B : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+      stBounded? B sched st ≡ true →
+      stBounded? B (proj₁ (cascadeFinish a sched st))
+                   (proj₂ (cascadeFinish a sched st)) ≡ true
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
@@ -4355,6 +4525,57 @@ postulate
           × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
                   (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
+-- the two wet faces, assembled over their cores
+subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      B  = sizeCapAt e sl id
+      Ŝ  = sizeCapAt e sl (suc id)
+  in INV? Ψ B sched st ≡ true →
+     pathB? B Ψ κ ≡ true →
+     sizeᵉ b ≤ B →
+     fnCapᵉ b ≤ Ψ →
+     g hasAtLeast
+       suc (dBound Ŝ (hopR Ŝ)
+                   (unconn sl (EvalSt.connectedShares st))
+                   (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
+     let r = subscribeE g b κ id now sched st
+     in (hasDry (proj₁ r) ≡ false)
+        × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+                (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+subscribeE-wet =
+  subscribeE-wet-core subscribeE-walk
+    mu-edge hop-edge connect-edge hop-step-gives hop-step-needs unconn-keeps
+    sharedConnect-unconn obs-slot-shared
+    -- these two must be instantiated EXPLICITLY: `splitBurst` computes on
+    -- the literal event list, so the reduced statement no longer mentions
+    -- Γ or u and Agda cannot solve those implicits from the expected type.
+    (λ {n} {Γ} {u} {A} → share-live-novals {n} {Γ} {u} {A})
+    (λ {n} {Γ} {u} {A} → share-spent-novals {n} {Γ} {u} {A})
+    hasAtLeast-pad hasAtLeast-peel seed-covers budget-covers oneShot-tail-dry
+    connect-anchor hopD-map-emit applyFn-size unconn-cons-≤
+    shellSize-unfoldμ inner-unfoldμ
+
+cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      B  = sizeCapAt e sl id
+  in INV? Ψ B sched st ≡ true →
+     valB? B Ψ (arrTy a) (arrVal a) ≡ true →
+     all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
+     let r = cascadeGo a id chains sched st
+     in (hasDry (proj₁ r) ≡ false)
+        × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+                (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+cascadeGo-wet = cascadeGo-wet-core latch-bounded finish-bounded
 
 ------------------------------------------------------------------
 -- THE POP RING ON THE SIX-CONJUNCT FACE — PROVEN.  .Measures has the

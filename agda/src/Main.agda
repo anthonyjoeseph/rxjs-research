@@ -74,11 +74,11 @@ open import Rx.Provenance-Theorems
   using (id-inheritance)
 
 ------------------------------------------------------------------
--- THE TIMING CLAIMS.  CAUTION: all three are stated over eleven
+-- THE TIMING CLAIMS.  CAUTION: all three are stated over nine
 -- postulated abstract helpers in the same module (`Node`, `NodeSt`,
--- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`,
--- `_≈ˢ_`, `_≈ᵍ_`), so as written they are close to vacuous — those
--- helpers must become definitions before these assert anything.
+-- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`),
+-- so as written they are close to vacuous — those helpers must become
+-- definitions before these assert anything.
 ------------------------------------------------------------------
 open import Rx.Time-Theorems
   using (locality; non-interference; timing-invariance)

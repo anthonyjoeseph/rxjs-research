@@ -14,13 +14,17 @@ This is a TEXTUAL heuristic, not a semantic one — see the "limitations"
 footer this script prints, and read it before trusting a borderline case.
 
 Usage:
-    scripts/check-wiring.py [--src DIR]
+    scripts/check-wiring.py [--src DIR] [--gate]
 
-Exit code is always 0: this is a report for a human to rule on, not a
-build gate.
+Without --gate the exit code is always 0: a report for a human to rule
+on.  With --gate it exits 1 on a wiring-law violation (an orphan outside
+the exempt families, or a postulate that asserts nothing), which is what
+makes the law enforceable next to the typechecker instead of merely
+documented.
 """
 
 import argparse
+import io
 import os
 import re
 import sys
@@ -77,7 +81,7 @@ ALLOWLIST = {
     # (2) THE TOP-LINE SEMANTIC POSTULATES in `*-Theorems.agda`
     # (`readme-*`, `fuel-coherent`, `causality`, `μ-unfold`, `μ-guarded`,
     # `defer-shift`, `id-inheritance`, `locality`, `non-interference`,
-    # `timing-invariance`, `batch-online`, `_≈ˢ_`, `_≈ᵍ_`).  These are
+    # `timing-invariance`, `batch-online`).  These are
     # deliberately-stated outward-facing claims, imported by Main.agda; nothing
     # consumes them because they ARE the claims.  They are NOT dead weight —
     # but they ARE unproven, so they form a SECOND ledger, distinct from the
@@ -201,16 +205,37 @@ def strip_block_comments(raw_lines):
 
 
 def mask_full_comment_lines(visible_lines):
-    """A line whose first non-space characters are `--` is excluded
-    entirely (both from definition-scanning and consumer-counting).
-    Inline trailing `-- ...` on an otherwise-code line is left alone —
-    that is a textual-honesty limitation, documented in the footer."""
+    """Remove comment text so that "a comment is not a wire" holds.
+
+    Two cases, and the second one used to be a hole:
+      * a line whose first non-space characters are `--` is dropped whole;
+      * an INLINE trailing ` -- ...` on an otherwise-code line is now cut
+        at the comment marker.  It used to be left alone, which meant a
+        name mentioned only in a trailing comment counted as a real
+        consumer — i.e. a genuinely orphaned definition could read as
+        WIRED.  That is a false negative in the safety-critical
+        direction, so it is closed here rather than documented.
+
+    The marker is ` -- ` (or ` --` at end of line): leading space required,
+    so a mixfix operator whose name embeds `--` is never cut.  Column
+    positions are not preserved, but nothing downstream reads columns —
+    only line numbers.
+    """
     out = []
     for line in visible_lines:
         if line.lstrip().startswith("--"):
             out.append("")
-        else:
-            out.append(line)
+            continue
+        idx = line.find(" --")
+        if idx >= 0:
+            rest = line[idx + 3 :]
+            # ` --` starts a comment unless it continues into an operator
+            # character (Agda's own rule); `-` continues it (`---` is still
+            # a comment), so only a symbol like `>` in ` -->` protects it.
+            if rest == "" or rest[0] in " -\t":
+                out.append(line[:idx])
+                continue
+        out.append(line)
     return out
 
 
@@ -643,6 +668,174 @@ def count_consumers(name, files, corpus, def_lines, extra_terms=()):
     return total, locations
 
 
+def signature_text(src_dir, relpath, name, line):
+    """The declared TYPE of `name`, as source text: everything after
+    `name :` on its declaration line, plus every following line indented
+    strictly deeper.  Returns None if the line does not declare `name`."""
+    path = os.path.join(src_dir, relpath)
+    try:
+        with io.open(path, encoding="utf-8") as fh:
+            src = fh.read().split("\n")
+    except OSError:
+        return None
+    if line - 1 >= len(src):
+        return None
+    head = src[line - 1]
+    m = re.match(r"^(\s*)" + re.escape(name) + r"\s*:(.*)$", head)
+    if not m:
+        return None
+    indent, rest = m.group(1), m.group(2)
+    out = [rest.strip()]
+    j = line
+    while j < len(src):
+        cur = src[j]
+        if cur.strip() == "":
+            break
+        if len(cur) - len(cur.lstrip()) <= len(indent):
+            break
+        out.append(cur.strip())
+        j += 1
+    return "\n".join(out)
+
+
+def final_conclusion(sig):
+    """The conclusion of a (possibly dependent) function type: the text
+    after the LAST top-level `→`.  Parens/braces are tracked so that an
+    arrow inside a hypothesis does not split the type."""
+    flat = []
+    for ln in sig.split("\n"):
+        i = ln.find("--")
+        flat.append(ln[:i] if i >= 0 else ln)
+    s = " ".join(x.strip() for x in flat)
+    depth, last = 0, -1
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c in "({":
+            depth += 1
+        elif c in ")}":
+            depth -= 1
+        elif depth == 0 and (c == "→" or s[i : i + 2] == "->"):
+            last = i + (1 if c == "→" else 2)
+        i += 1
+    return s[last:].strip() if last >= 0 else s.strip()
+
+
+# ---------------------------------------------------------------------------
+# VACUITY EXEMPTIONS.  A `⊤`-typed postulate normally means the real claim is
+# hiding in a comment (CLAUDE.md: "fix on sight").  The exception is a gap
+# that is DELIBERATELY and VISIBLY not a claim — where the source itself says
+# so, rather than implying content it does not have.  Same discipline as
+# ALLOWLIST above: short, specific, and a reviewable diff to extend.
+# ---------------------------------------------------------------------------
+VACUOUS_ALLOWLIST = {
+    "defer-shift": (
+        "Rx/Evaluator-Theorems.agda states this ⊤ on purpose and says so in "
+        "the declaration's own comment: 'Left as ⊤ on purpose: an honest gap, "
+        "not a claim.'  Stating it for real needs a defined tick-trace and a "
+        "defined (not postulated) renaming equivalence — borrowing the one "
+        "relation of that shape, Rx.Time-Theorems._≈ˢ_, would relocate the "
+        "vacuity rather than fix it.  That is a design call on a top-line "
+        "semantic claim, not a leaf-module repair, so it is exempted "
+        "EXPLICITLY here instead of being silently fabricated or silently "
+        "ignored.  A NEW ⊤ postulate still fails the gate."
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# MODULE ROOTS.  Reachability is computed from Main plus these — each is a
+# SEPARATE compiled entry point with its own make target, so it is legitimately
+# unreachable from Main but is NOT dead.  Listing ROOTS rather than individual
+# modules means anything they import is covered automatically; only a module
+# nothing reaches at all is reported.
+# ---------------------------------------------------------------------------
+MODULE_ROOTS = {
+    "CLI.Main": "the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
+    "QuickCheck": "the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
+    "Implementation.Unit-Test": "the type-level bug cache — `make bug-cache`",
+}
+
+_IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
+
+
+def find_unreachable_modules(src_dir, files):
+    """Modules under src/ that NOTHING reaches — not Main, not any entry point.
+
+    THE BLIND SPOT THIS CLOSES: the orphan report scans DEFINITIONS for
+    consumers, so a module holding only `open import … public` re-exports has
+    nothing to orphan and reads as clean no matter how dead it is.  A module can
+    therefore be entirely unused while every report above says zero.  Module
+    reachability is a different question from definition reachability, and it
+    needs asking separately.
+    """
+    mods = {}
+    for rel in files:
+        mods[rel[:-5].replace(os.sep, ".")] = rel
+
+    seen = set()
+    stack = ["Main"] + [m for m in MODULE_ROOTS if m in mods]
+    while stack:
+        m = stack.pop()
+        if m in seen or m not in mods:
+            continue
+        seen.add(m)
+        try:
+            with io.open(os.path.join(src_dir, mods[m]), encoding="utf-8") as fh:
+                body = fh.read().split("\n")
+        except OSError:
+            continue
+        for line in body:
+            if line.lstrip().startswith("--"):
+                continue
+            g = _IMPORT_RE.match(line)
+            if g and g.group(1) in mods:
+                stack.append(g.group(1))
+
+    return sorted((m, mods[m]) for m in set(mods) - seen)
+
+
+def find_vacuous(src_dir, defs, postulate_names):
+    """Postulates whose CONCLUSION is `⊤`.  CLAUDE.md names this as a live
+    trap: such a postulate asserts nothing, its real claim sitting in a
+    trailing comment, yet it reads as discharged work.  Cheap to detect,
+    so it is detected rather than merely documented."""
+    bad = []
+    for name in sorted(postulate_names):
+        d = defs.get(name)
+        if d is None:
+            continue
+        sig = signature_text(src_dir, d.file, name, d.line)
+        if sig is None:
+            continue
+        if final_conclusion(sig) in ("⊤", "Unit"):
+            bad.append((name, d, name in VACUOUS_ALLOWLIST))
+    return sorted(bad, key=lambda x: (x[1].file, x[1].line))
+
+
+def unreachable_parents(orphans, defs, postulate_names):
+    """Orphans that NO postulate in their own file could ever consume,
+    because every such postulate is declared ABOVE them.
+
+    This is the ordering hazard that costs the most time in practice: a
+    parent postulate cannot reference a definition that follows it, so an
+    orphan sitting below its intended parent cannot be wired where it
+    stands — either the definition moves up, or the assembly's body moves
+    down.  Discovering that from a failed 40-minute typecheck is the
+    expensive way; it is decidable from line numbers alone."""
+    by_file = {}
+    for name in postulate_names:
+        d = defs.get(name)
+        if d is not None:
+            by_file.setdefault(d.file, []).append(d.line)
+    out = []
+    for name, d in orphans:
+        later = [ln for ln in by_file.get(d.file, []) if ln > d.line]
+        if by_file.get(d.file) and not later:
+            out.append((name, d, len(by_file[d.file])))
+    return sorted(out, key=lambda x: (x[1].file, x[1].line))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -650,6 +843,13 @@ def main():
         default=None,
         help="path to agda/src (default: <repo-root>/agda/src, inferred from "
         "this script's own location)",
+    )
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="exit 1 when the wiring law is violated (orphans outside the "
+        "exempt families, or a ⊤-typed postulate). Without this the script "
+        "is a report and always exits 0.",
     )
     args = parser.parse_args()
 
@@ -807,11 +1007,67 @@ def main():
     print()
 
     print("-" * 78)
+    vacuous = find_vacuous(src_dir, defs, postulate_names)
+    dead_modules = find_unreachable_modules(src_dir, files)
+    stranded = unreachable_parents(orphans, defs, postulate_names)
+
+    print("-" * 78)
+    print("(A2) UNREACHABLE MODULES — dead files, invisible to the orphan report")
+    print("-" * 78)
+    if not dead_modules:
+        print("  (none)")
+    else:
+        print("  Nothing reaches these — not Main, not any compiled entry point.")
+        print("  A module of pure `open import … public` re-exports has NO")
+        print("  definitions to orphan, so section (A) cannot see it however")
+        print("  dead it is.  Module reachability is a separate question from")
+        print("  definition reachability; this is where it gets asked.")
+    for mod, rel in dead_modules:
+        print(f"    {mod}")
+        print(f"        {rel}")
+    print()
+
+    print("-" * 78)
+    print("(B2) VACUOUS POSTULATES — assert nothing, but read as discharged")
+    print("-" * 78)
+    if not vacuous:
+        print("  (none)")
+    else:
+        print("  A `⊤`-typed postulate is inhabited by `tt`, so it carries no")
+        print("  content at all — its real claim is sitting in a comment, where")
+        print("  neither the typechecker nor grep can see it.  State the claim.")
+    for name, d, exempt in vacuous:
+        tag = "  [EXEMPT — deliberate, see VACUOUS_ALLOWLIST]" if exempt else ""
+        print(f"    {name}{tag}")
+        print(f"        {d.file}:{d.line}")
+    print()
+
+    print("-" * 78)
+    print("(B3) ORDERING HAZARD — orphans no same-file postulate can consume")
+    print("-" * 78)
+    if not stranded:
+        print("  (none)")
+    else:
+        print("  A postulate cannot reference a definition declared BELOW it.")
+        print("  For each of these, every postulate in its own file precedes")
+        print("  it, so its parent must live in an IMPORTING module — or the")
+        print("  definition has to move up / the assembly body move down.")
+        print("  Decidable from line numbers; do not learn it from a failed")
+        print("  40-minute typecheck.")
+    for name, d, n_post in stranded:
+        print(f"    {name}")
+        print(f"        {d.file}:{d.line}  (all {n_post} postulate(s) in this file are above it)")
+    print()
+
+    print("-" * 78)
     print("(C) SUMMARY")
     print("-" * 78)
     print(f"  total postulates:              {total_postulates}")
     print(f"  orphaned postulates:            {len(ledger_without)}")
     print(f"  orphaned proven definitions:    {len(orphans)}")
+    print(f"  unreachable modules:            {len(dead_modules)}")
+    print(f"  vacuous (⊤-typed) postulates:   {len(vacuous)}"
+          f"  ({sum(1 for v in vacuous if v[2])} exempt)")
     print()
 
     print("-" * 78)
@@ -845,9 +1101,37 @@ def main():
         "    `=`/`with`/`rewrite`) is checked when deciding whether a line\n"
         "    DEFINES that operator, so a line whose RHS merely USES the\n"
         "    operator is never mistaken for one of its clauses.\n"
-        "  * This is a report for a human to rule on, not a build gate — it\n"
-        "    always exits 0, and it deletes nothing."
+        "  * Without --gate this is a report for a human to rule on rather\n"
+        "    than a build gate; it deletes nothing either way."
     )
+
+    if args.gate:
+        problems = []
+        if orphans:
+            problems.append(f"{len(orphans)} orphaned proven definition(s)")
+        if dead_modules:
+            problems.append(f"{len(dead_modules)} unreachable module(s)")
+        # The law is "every DEFINITION *and every POSTULATE* is consumed".
+        # Enforcing only the definition half let three unconsumed postulates
+        # sit green indefinitely, so the postulate half gates too.
+        if ledger_without:
+            problems.append(f"{len(ledger_without)} unconsumed postulate(s)")
+        unexcused = [v for v in vacuous if not v[2]]
+        if unexcused:
+            problems.append(f"{len(unexcused)} vacuous (⊤-typed) postulate(s)")
+        if not main_ok:
+            problems.append("Main.agda has a bare `open import`")
+        if problems:
+            print()
+            print("=" * 78)
+            print("WIRING GATE: FAIL — " + "; ".join(problems))
+            print("=" * 78)
+            sys.exit(1)
+        print()
+        print("=" * 78)
+        print("WIRING GATE: PASS — every definition AND every postulate")
+        print("traces to a top-level claim, and every module is reached")
+        print("=" * 78)
 
 
 if __name__ == "__main__":

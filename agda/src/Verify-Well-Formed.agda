@@ -1185,7 +1185,23 @@ postulate
 postulate
   -- ALL input clauses (hot/cold/shared).
   -- The shared/new subcase recurses on the def stored in the slot (gas-decrement edge).
-  subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over `initReg-wf`, the registering
+  -- base clause every input subcase ends in — the init balances the new
+  -- registration and the registered chain is well-typed against the live
+  -- schedule.
+  subscribeE-input-wf-core :
+    -- initReg-wf  (Verify-Well-Formed.agda:950)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+      (src : Source) (κ : Path Γ u t) (id : Id)
+      (st : EvalSt e) (sched : Sched Γ) (S : ProtocolSt) →
+      BurstInv id sched st S →
+      liveTypeOK? src u (Sched.live sched) ≡ true →
+      Σ ProtocolSt λ S′ →
+        runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ []) ≡ just S′
+        × BurstInv id sched (register src κ st) S′
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
@@ -1267,7 +1283,38 @@ postulate
   -- separate non-with arguments; suc case calls subscribeE-wf fuel b (take-f nid ↠ κ).
   -- subscribeE-take-wf (~line 3060) shape verified to match; recursion termination:
   -- b is a structural subterm of takeᵉ count b.
-  subscribeE-takeᵉ-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over `subscribeE-take-wf`, the
+  -- positive-count clause this postulate's own header points at.  That
+  -- clause is declared FURTHER DOWN the file, so only the core lives
+  -- here; the definition sits just after it and before this name's one
+  -- consumer.
+  subscribeE-takeᵉ-wf-core :
+    -- subscribeE-take-wf  (Verify-Well-Formed.agda:3277)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+      (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
+      (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) (k : ℕ) →
+      evalTm count ≡ suc k →
+      BurstInv id sched st S →
+      (let nid = proj₁ (mintNode sched)
+           r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+                   (installNode nid (take-st (suc k)) st)
+       in Σ ProtocolSt λ S′ →
+            (runProtocol S (proj₁ r₀) ≡ just S′)
+            × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
+            × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
+            × (valsLast? (proj₁ r₀) ≡ true)
+            -- the cut's live/registry balance is off a dying source only; subscribeE
+            -- never writes `dying` (cascadeLatch alone does), so this rides in from
+            -- the enclosing cascade — free at a root subscribe, where st-init has it []
+            × (∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂ r₀))) ≡ false)) →
+      Σ ProtocolSt λ S″ →
+        (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
+        × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
+                   (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
+        × (valsLast? (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ true)
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
@@ -1277,6 +1324,21 @@ postulate
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
+
+-- the input clause, assembled over its core
+subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
+  Σ ProtocolSt λ S′ →
+    let r = subscribeE fuel (input i) κ id now sched st
+    in (runProtocol S (proj₁ r) ≡ just S′)
+       × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+       × (valsLast? (proj₁ r) ≡ true)
+subscribeE-input-wf =
+  subscribeE-input-wf-core
+    (λ {n} {Γ} {t} {e} {u} → initReg-wf {n} {Γ} {t} {e} {u})
 
 -- ════════════════════════════════════════════════════════════════
 -- ONE subscription's burst preserves the frame relation (see the blueprint
@@ -3284,6 +3346,26 @@ subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
   sched₂ = proj₁ (proj₂ r₀)
   st₁    = proj₂ (proj₂ r₀)
 
+-- the takeᵉ clause, assembled over its core.  Declared HERE rather than
+-- with the other per-clause postulates because the positive-count clause
+-- it consumes (`subscribeE-take-wf`, just above) is defined further down
+-- the file than that block, and a postulate cannot reference a definition
+-- that follows it.  Its one consumer is the takeᵉ clause of subscribeE-wf,
+-- below.
+subscribeE-takeᵉ-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
+  Σ ProtocolSt λ S′ →
+    let r = subscribeE fuel (takeᵉ count b) κ id now sched st
+    in (runProtocol S (proj₁ r) ≡ just S′)
+       × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+       × (valsLast? (proj₁ r) ≡ true)
+subscribeE-takeᵉ-wf =
+  subscribeE-takeᵉ-wf-core
+    (λ {n} {Γ} {t} {e} {s} → subscribeE-take-wf {n} {Γ} {t} {e} {s})
+
 -- ════════════════════════════════════════════════════════════════
 -- subscribeE-wf BODY
 -- Forward type declaration is at the start of this section (~line 1097).
@@ -4815,7 +4897,64 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- (a completion emitted while something could still deliver — an evaluator
 -- bug); STOP and surface the trace, do not patch around it.
 postulate
-  mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over the Mid-ledger facts this step
+  -- was written to consume — the automaton's three entry readings, the
+  -- seed that turns Mid into the chainStep FoldInv, and the root clause's
+  -- FoldOut readoff that the fold ends in.
+  mid-step-core :
+    -- mid-enters  (Verify-Well-Formed.agda:4362)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+      {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+      {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+      {S : ProtocolSt} →
+      Mid a nextId ((rid , p) ∷ ps) sched st S →
+      any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+      Σ Owed λ ob → Σ Id λ hz → enterInstant S nextId ≡ just (ob , hz)
+     ) →
+    -- mid-seed  (Verify-Well-Formed.agda:4730)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+      {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+      {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+      {S : ProtocolSt} →
+      Mid a nextId ((rid , p) ∷ ps) sched st S →
+      any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+      FoldInv nextId (arrSource a)
+        (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+        (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S
+     ) →
+    -- enterInstant-idle  (Verify-Well-Formed.agda:4289)
+    (∀ (S : ProtocolSt) (i : Id) →
+      ProtocolSt.current S ≡ nothing → (ProtocolSt.horizon S ≤ᵇ i) ≡ true →
+      enterInstant S i ≡ just ([] , ProtocolSt.horizon S)
+     ) →
+    -- enterInstant-held  (Verify-Well-Formed.agda:4306)
+    (∀ (S : ProtocolSt) (i j : Id) (ow : Owed) →
+      ProtocolSt.current S ≡ just (j , ow) → (i ≡ᵇ j) ≡ false →
+      allZero ow ≡ true → (suc j ≤ᵇ i) ≡ true →
+      enterInstant S i ≡ just ([] , suc j)
+     ) →
+    -- paidUp-held  (Verify-Well-Formed.agda:4324)
+    (∀ (S : ProtocolSt) (j : Id) (ow : Owed) →
+      ProtocolSt.current S ≡ just (j , ow) → paidUp S ≡ true → allZero ow ≡ true
+     ) →
+    -- foldPath-root-out  (Verify-Well-Formed.agda:4462)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+      (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
+      (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+      (fi : FoldInv id envSrc evs fin sched st S) →
+      -- FLIP certificate: completion reached root (done S′ ≡ true) from not-yet-done
+      ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
+         allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
+      -- STEADY: an already-done registry is fully plumbed
+      (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
+      FoldOut sf gas id now envSrc root vals evs fin sched st (FoldInv.ob′ fi) S
+        (record { live = FoldInv.Lv fi ; horizon = FoldInv.hz fi
+                ; current = just (id , FoldInv.Ov fi)
+                ; done = if fin then true else ProtocolSt.done S })
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {a : Arrival Γ} {nextId : Id} {rid : RegId}
     {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
     {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
@@ -4826,6 +4965,29 @@ postulate
                 (record st { delivered = rid ∷ EvalSt.delivered st })
       in (runProtocol S (proj₁ r) ≡ just S′)
          × Mid a nextId ps (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+
+-- the Mid transition, assembled over its core
+mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {nextId : Id} {rid : RegId}
+  {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
+  {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
+  Mid a nextId ((rid , p) ∷ ps) sched st S →
+  any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+  Σ ProtocolSt λ S′ →
+    let r = chainStep nextId a p sched
+              (record st { delivered = rid ∷ EvalSt.delivered st })
+    in (runProtocol S (proj₁ r) ≡ just S′)
+       × Mid a nextId ps (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+mid-step =
+  mid-step-core
+    (λ {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S} →
+       mid-enters {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S})
+    (λ {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S} →
+       mid-seed {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S})
+    enterInstant-idle
+    enterInstant-held
+    paidUp-held
+    (λ {n} {Γ} {t} {e} → foldPath-root-out {n} {Γ} {t} {e})
 
 -- a cancelled head contributes nothing to countRemaining (the `if`
 -- takes the then-branch)

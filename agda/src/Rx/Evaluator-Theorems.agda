@@ -66,10 +66,10 @@ postulate
   --       `causality`'s `emittedBefore` runs into below.
   --   (2) the "≈" itself.  The comment's hedge ("because the body's
   --       ids are re-minted") wants an equivalence up to id renaming,
-  --       but the one relation of that shape in the codebase,
-  --       `Rx.Time-Theorems._≈ˢ_` (Rx.Time-Theorems:72), is ITSELF a
-  --       postulated abstract Set — borrowing it would relocate the
-  --       vacuity, not fix it.
+  --       but no relation of that shape exists in the codebase.  One
+  --       was postulated once (`Rx.Time-Theorems._≈ˢ_`) and deleted as
+  --       an unconsumed abstract Set: borrowing such a thing relocates
+  --       the vacuity rather than fixing it, so it has to be DEFINED.
   -- Stating this for real needs new machinery (a defined tick-trace or
   -- ticked-emit variant, plus a defined — not postulated — renaming
   -- equivalence), which is a design call, not a leaf-module fix. Left

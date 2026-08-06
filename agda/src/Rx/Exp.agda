@@ -225,10 +225,6 @@ mutual
 wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ [] [] [] t → Tm Γ Δᵍ Δ Θ t
 wkTm = renTm (λ ()) (λ ()) (λ ())
 
--- the postulated Δᵍ-weakening, now a definition
-wkᵍ : ∀ {n} {Γ : Ctx n} {g Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Exp Γ (g ∷ Δᵍ) Δ Θ t
-wkᵍ = renExp there (λ x → x) (λ x → x)
-
 ------------------------------------------------------------------
 -- reify: a value → the closed Tm literal denoting it (an obs value is
 -- already a closed Exp, so no substitution)

@@ -11,13 +11,11 @@ data Unit : Set where unit : Unit
 {-# COMPILE GHC Unit = data () (()) #-}
 
 postulate
-  returnIO : {A : Set} → A → IO A
   _>>=_    : {A B : Set} → IO A → (A → IO B) → IO B
   getContents : IO String
   putStr      : String → IO Unit
 {-# FOREIGN GHC import qualified Data.Text.IO as TIO #-}
 {-# FOREIGN GHC import qualified System.IO #-}
-{-# COMPILE GHC returnIO = \_ x -> return x #-}
 {-# COMPILE GHC _>>=_ = \_ _ m k -> m >>= k #-}
 {-# COMPILE GHC getContents = TIO.getContents #-}
 {-# COMPILE GHC putStr = \s -> TIO.putStr s >> System.IO.hFlush System.IO.stdout >> return () #-}

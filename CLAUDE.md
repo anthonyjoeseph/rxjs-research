@@ -90,8 +90,8 @@ report review. Standing protocol, per Anthony:
      interface, so a probe importing Wet deserializes in ~6 s instead of rechecking for 9 min
      (see `agda/probe/Caps-Thread-Probe.agda`'s header; this is a ~90× loop speedup);
   2. land only probe-green bodies;
-  3. hand the long `make agda && make agda-all && make bug-cache` gate BACK to the design
-     session, which can poll across turns without dying.
+  3. hand the long `make gate` BACK to the design session, which can poll across
+     turns without dying.
 - **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling.**
   Measured on this machine: **24 GB RAM, 14 cores**, ~12 GB free at rest,
   and **Subscribe-Face peaks ~5.2 GB** as a single check. So:
@@ -393,18 +393,40 @@ explicit approval** — draft the change and ask. `make wiring` reads Main's
 and a claim cannot self-certify.
 
 Because Agda compiles exactly what is transitively imported, Main also defines
-the build's COVERAGE. **`make agda` is the claim graph; `make agda-all`
-compiles every module under `src/` regardless of reachability** — the rot-guard
-for proven work not yet wired to a claim. The DIFFERENCE between the two is the
-unwired debt, and `agda-all` is self-retiring — when the two cover the same set,
-delete it. Never close that gap by re-adding a bulk import to Main: that is the
-loophole, not the repair.
+the build's COVERAGE — **`make agda` IS the claim graph**, and anything outside
+it is not being checked at all. `make wiring` guards that boundary directly: a
+module nothing reaches fails the gate (section A2) in seconds, rather than
+needing a second full compile of the tower to notice. **Never close a coverage
+gap by re-adding a bulk import to Main — that is the loophole, not the repair.**
 
-**ACCEPTANCE TEST: `make wiring` reports zero orphans** outside its two documented exempt
-families (`*-absurd` refutation witnesses, whose consumer is the design record; and the
-top-line semantic claims in `*-Theorems.agda`, which ARE the claims). Run it rather than
-trusting a memo — including this one. Also: grep for a fact before planning its proof, and grep
-for a definition's consumers before believing any status claimed for it.
+**ACCEPTANCE TEST: `make gate`** — `wiring-gate`, `unsafe-check`, `agda`,
+`bug-cache`, in that order. **Cheap checks run FIRST, deliberately:** an orphan or an
+unsafe pragma is decidable in seconds by grep while `agda` costs ~40 minutes, so there
+is no reason to spend the 40 minutes only to fail on something a textual pass already
+knew. `make wiring-gate` is the report-turned-gate — it EXITS 1 (rather than always 0)
+on an orphan outside the exempt families, on a `⊤`-typed postulate that asserts nothing,
+or on a bare `open import` in Main. Run it rather than trusting a memo — including this
+one. Also: grep for a fact before planning its proof, and grep for a definition's
+consumers before believing any status claimed for it.
+
+Four things the checker now enforces that it previously only documented:
+- **UNREACHABLE MODULES fail the gate** (section A2). This closes a blind spot that
+  hid a dead file for most of the campaign: the orphan report scans DEFINITIONS for
+  consumers, so a module holding only `open import … public` re-exports has nothing
+  to orphan and reads as clean however dead it is. **A module can be entirely unused
+  while every other number says zero** — module reachability is a different question
+  from definition reachability. Reachability is computed from Main plus the
+  `MODULE_ROOTS` entry points (each a separately compiled binary with its own make
+  target), so anything those import is covered automatically.
+- **Inline trailing comments are stripped before consumer counting.** A name mentioned
+  only in a `-- …` tail used to count as a real consumer, so a genuinely orphaned
+  definition could read as WIRED — a false negative in the dangerous direction.
+- **`⊤`-typed postulates are reported and gated** (`VACUOUS_ALLOWLIST` carries the one
+  deliberate exception, `defer-shift`, whose own comment says it is "an honest gap, not
+  a claim"). A NEW one fails the gate.
+- **The ordering hazard is reported** (section B3): an orphan that no postulate in its
+  own file can consume, because they all precede it. Decidable from line numbers — do
+  not learn it from a failed typecheck.
 
 **WHY THIS IS LAW.** Unwired proven work costs this campaign more than refutations do. Its
 two failure modes: a proof nobody calls sits inert while the work it would have done gets

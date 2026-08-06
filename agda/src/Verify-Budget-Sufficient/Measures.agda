@@ -5740,7 +5740,47 @@ postulate
   -- round3b-ledger-reset-absurd names as the price — is that Ŝ, R̂ and F
   -- can be sourced from REACHABILITY rather than from the ledger.
   -- Frame-Work-Probe is the evidence, not a proof.
-  subscribeE-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  --
+  -- ASSEMBLY (2026-08-06): narrowed over the facts named directly above
+  -- — `walk-hyps-round3b` (which discharges every edge of this shape)
+  -- and `walk-hyps-splitAnchor` (the satisfiability contrast) — plus
+  -- the receipt's composition law and the flat width measure the Ω
+  -- hypotheses are read against.  The definition itself sits BELOW
+  -- `walk-hyps-round3b`, which is declared after this block.
+  subscribeE-walk-core :
+    -- walk-hyps-splitAnchor  (Verify-Budget-Sufficient/Measures.agda:5876)
+    (∀ (Ψ W Ω ℓ E B₀ R U r s : ℕ) →
+      Σ ℕ λ V → Σ ℕ λ d →
+        (dBound B₀ R U r s ≤ d)
+        × (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)) ≤ V)
+     ) →
+    -- walk-hyps-round3b  (Verify-Budget-Sufficient/Measures.agda:6053)
+    (∀ (Ψ W Ω E p Ŝ R̂ U r s : ℕ) →
+      Σ ℕ λ G →
+          (dBound Ŝ R̂ U r s ≤ G)
+        × (p + G ≤ p + G)
+        × (anchorᴬ Ψ W Ω (p + G) G E
+             ≡ capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)))
+        × (∀ r″ s″ → r″ < r → s″ ≤ Ŝ → suc (dBound Ŝ R̂ U r″ s″) ≤ G)
+        × (∀ U″ r″ s″ → U″ < U → r″ ≤ R̂ → s″ ≤ Ŝ →
+             suc (dBound Ŝ R̂ U″ r″ s″) ≤ G)
+        × (∀ s″ → s″ < s → suc (dBound Ŝ R̂ U r s″) ≤ G)
+        × (∀ q G′ → q + suc G′ ≤ p + G → suc q + G′ ≤ p + G)
+     ) →
+    -- spendᴱ-compose  (Verify-Budget-Sufficient/Measures.agda:4647)
+    (∀ (Ψ r₁ s₁ r₂ s₂ : ℕ) →
+      spendᴱ Ψ r₁ s₁ * spendᴱ Ψ r₂ s₂ ≡ spendᴱ Ψ (r₁ + r₂) (s₁ + s₂)
+     ) →
+    -- ΩAt (Verify-Budget-Sufficient/Measures.agda:5550) is a FUNCTION,
+    -- not a proof, so it is wired by its DEFINING EQUATION.  Passing it
+    -- as `(f : <its type>) → …` would quantify over every inhabitant of
+    -- that type and make this core strictly STRONGER than the postulate
+    -- it replaces; an equation is a proposition and keeps the two
+    -- equivalent.  See PROOF-STATE.md § the orphan accounting.
+    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+       ΩAt e sl ≡ ofWᵉ e + slotsOfW sl
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
@@ -6077,6 +6117,39 @@ walk-hyps-round3b Ψ W Ω E p Ŝ R̂ U r s =
        dBound-connect {Ŝ} {R̂} {U″} {U} {r″} {r} {s″} {s} U″<U r″≤R̂ s″≤Ŝ)
   , (λ s″ s″<s → dBound-μ {Ŝ} {R̂} {U} {r} {s″} {s} s″<s)
   , (λ q G′ h → ≤-trans (≤-reflexive (sym (+-suc q G′))) h)
+
+-- THE WALK FACE, assembled over its core.  Declared here rather than at
+-- the postulate block because `walk-hyps-round3b` — the fact the block's
+-- own header says discharges every edge of this shape — is stated just
+-- above, and a postulate cannot reference a definition that follows it.
+subscribeE-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+  dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+         (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g b κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+          ≤ mintCount sched st + walkCap Ω ℓ G)
+     × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+subscribeE-walk =
+  subscribeE-walk-core walk-hyps-splitAnchor walk-hyps-round3b spendᴱ-compose
+                       (λ _ _ → refl)
 
 -- (c) AND THE PRICE OF THE COLLAPSE, which is the round's whole
 -- remaining debt: the reset caps may not be the LEDGER.  If the only

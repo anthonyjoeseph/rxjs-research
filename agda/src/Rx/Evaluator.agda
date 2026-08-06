@@ -76,9 +76,6 @@ record Arrival {n} (Γ : Ctx n) : Set where
 arrTick : ∀ {n} {Γ : Ctx n} → Arrival Γ → Tick
 arrTick = Arrival.tick
 
-arrOrd : ∀ {n} {Γ : Ctx n} → Arrival Γ → Ordinal
-arrOrd = Arrival.ordinal
-
 arrSource : ∀ {n} {Γ : Ctx n} → Arrival Γ → Source
 arrSource = Arrival.source
 

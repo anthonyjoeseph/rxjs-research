@@ -41,38 +41,58 @@ CLUSTER instead clears a whole family per assembly written.
 
 **Get the live list from `make wiring`.** Do not trust a list written here.
 
-**THE ORPHAN CLUSTERS ARE PILES, NOT TOWERS MISSING A ROOF — and that is the
-key diagnostic.** If `Deliveries`' seven lemmas formed a tower, the lower ones
-would be consumed by the top one and only the top would be orphaned. All seven
-are orphaned simultaneously, so they do not consume each other either: the
-module was never assembled INTERNALLY. Same shape in `Caps-Nest`. So the work
-per cluster is *write the assembly that consumes the family* — one new
-definition, postulating whatever else it needs, clearing 6-7 orphans at once.
-Apply this test to any cluster before planning it: if every member is orphaned,
-there is no internal assembly either, and one consumer is not enough.
+**PILE-VS-TOWER, the diagnostic to run before planning any cluster.** If a
+module's lemmas formed a tower, the lower ones would be consumed by the top one
+and only the top would be orphaned. When EVERY member is orphaned at once they
+do not consume each other either — the module was never assembled internally, so
+one consumer is not enough. The work is then *write the assembly that consumes
+the family*: one definition, postulating whatever else it needs, clearing the
+whole family at once.
 
-Rough cluster sizes when this was written (re-derive with
-`make wiring`, and group by module):
+**Ask which EXISTING postulate each orphan was written FOR.** An orphan was
+written with a parent in mind, so the question is not "what could consume this?"
+but "what was this for?" — and answering it for the whole list at once collapses
+the list into a handful of assemblies. Group by PARENT, not by module: one
+module's orphans routinely belong to several different parents.
 
-| module | character of the cluster |
-|---|---|
-| `Measures.agda` | the largest, but SEVERAL families — gas (`hasAtLeast-*`), state (`*-bounded`), anchor (`walk-hyps-*`). Split before planning; do not treat as one. |
-| `Verify-Well-Formed.agda` | the `subscribeE-wf` clauses — see task #18, in progress |
-| `Caps-Face.agda` | includes a self-contained `*-slots` family |
-| `Deliveries.agda` | ONE delivery-count family, entirely unassembled |
-| `Caps-Nest.agda` | ONE nesting-bound family, entirely unassembled |
-| `Wet.agda`, `Keeps-Ring.agda`, `Rx/*` | scattered; lowest priority |
+### WRITING AN ASSEMBLY — the postulate-to-assembly conversion
 
-**NEVER WRITE A NEW ORPHAN.** Orphans should only ever be *discovered* lying
-around, never created. Two ways this rule gets broken, both observed:
-- Landing a machine-checked note in `src/` that nothing consumes (a `refl`
-  sanity check, for instance). Those belong in `agda/probe/`, which the wiring
-  check does not scan.
-- Converting a postulate into a definition whose OWN consumer is still a
-  postulate — the result is a definition that is still an orphan, and the count
-  does not move. Check the consumer exists before converting.
-Run `make wiring` after every landing and diff the orphan list, not the count:
-a conversion can wire one orphan and strand another for a net zero.
+The move that wires orphans. For a parent postulate `P` with orphans `o₁…oₖ`,
+`P`'s type `T` is unchanged; it becomes
+
+```agda
+postulate P-core : <type of o₁> → … → <type of oₖ> → T
+P : T
+P = P-core (λ {a} {b} → o₁ {a} {b}) … oₖ
+```
+
+`P-core` is neither stronger nor weaker than `P`: each hypothesis is an
+already-proven proposition, so it is inhabited and the implication is an
+equivalence. **That is exactly why the hypotheses must be PROOFS.** A
+*function*-valued orphan cannot be passed this way — `(f : <function type>) → T`
+quantifies over every inhabitant and is strictly STRONGER than `T`. Wire such an
+orphan by its DEFINING EQUATION instead (a proposition, `refl`); `ΩAt` in
+`.Measures` is the worked example.
+
+**Four rules, each of which otherwise costs a full build to rediscover:**
+
+1. **EXTRACT the hypothesis types from source; never retype them.** Unicode-dense
+   Agda is where hand-transcription fails silently. `scripts/check-wiring.py`
+   carries a signature reader (`signature_text`) that does it exactly.
+2. **Pass every lemma ETA-EXPANDED with explicit implicits** —
+   `(λ {n} {Γ} → f {n} {Γ})`, not bare `f`. When a lemma's statement *reduces*
+   away one of its own implicits, Agda cannot solve it at the application site
+   and reports `Unsolved metas`. `share-live-novals` is the case in point: it
+   computes on a literal event list, so its reduced statement no longer mentions
+   `Γ` or `u`. Bare arguments work only by luck; the eta form always works.
+3. **Copied signatures drag in VOCABULARY the parent module does not import**, and
+   Agda stops at the FIRST scope error — so each missing name is its own aborted
+   build. Read the types and collect the names in one pass instead of iterating
+   the compiler.
+4. **ORDERING: a postulate cannot reference a definition below it.** Put the
+   `-core` where the postulate was and the definition after the last orphan it
+   consumes. `make wiring` reports this as section (B3); do not learn it from a
+   failed typecheck.
 
 ## The theorem chain (top → leaves)
 
@@ -98,9 +118,9 @@ caps work retires it. Scope the endgame accordingly — the source header used t
 call this "P1's subscribe-side mirror", which reads as a replacement.
 
 **`budget-sufficient` lives in `Caps-Bridge.agda`, not `Wet.agda`** (see the
-RULING below); `cascadeGo-wet` [P2] is RETIRED BY DELETION (orphaned, zero
-consumers) rather than by proof, since `cascade-wet-via-caps` now supplies
-dryness+INV? instead.
+RULING below). `cascadeGo-wet` [P2] is NOT retired: it is the cascade walk's own
+dry+INV? half, and `dry-tick` is assembled over it, so it sits on the drain side
+of the chain and still needs a proof.
 
 **THERE ARE TWO BRANCHES, NOT ONE.** `evaluate-well-formed` has its own postulate
 set in `Verify-Well-Formed.agda`, every one of which is as load-bearing as P1/P2.
