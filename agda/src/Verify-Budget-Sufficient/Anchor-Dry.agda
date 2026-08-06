@@ -11,9 +11,22 @@
 --
 --   demand (POSTULATE): one instant's outputs are valB?/burstB?-good
 --     at Dm = (2·B + 12) · towerℕ (suc sz), given INV?/capsOK?-good
---     state and B-bounded inputs.  This is the measured-not-proven
---     content (Battery-Obs-Growth's a′ ≤ 2a + v + 11 recurrence,
---     Battery-Nesting-Escalation's per-instant count tower).
+--     state, B-bounded inputs, AND the new occurrence hypothesis
+--     pathOccs? sz path ≡ true (sz = sizeᵉ e + slotsSize sl).
+--
+--     WHY THE OCCURRENCE HYPOTHESIS (Exp.agda:254-257, 266-270):
+--     subΘExp for mapᵉ/scanᵉ pushes the input type into Θloc before
+--     descending; subΘTm on varᵗ x leaves it (inj₁) or replaces it
+--     with a closed term of occsᵗ = 0 (inj₂).  Without this bound,
+--     the demand proof's copy-fanout factor could reach B (growing
+--     each tick) rather than staying ≤ sz; pathOccs? sz path pins
+--     it to the static program size so the tower formula holds.
+--     Consumer of pathOccs? is the caller (Caps-Bridge.agda) via the
+--     structural argument that registered functions are subterms of e.
+--
+--     This is the measured-not-proven content (Battery-Obs-Growth's
+--     a′ ≤ 2a + v + 11 recurrence, Battery-Nesting-Escalation's
+--     per-instant count tower).
 --   supply (PROVEN): Dm ≤ Ŝ = sizeCapAt e sl (suc id), by
 --     tick-covers-instant — one caps tick multiplies by ≥ 2^count and
 --     the count is tower-sized (count-covers-tower).
@@ -60,6 +73,9 @@ open import Verify-Budget-Sufficient.Caps-Face using (capsOK?)
 open import Verify-Budget-Sufficient.Tick-Headroom
   using (tick-covers-instant)
 
+open import Verify-Budget-Sufficient.Occurrences
+  using (pathOccs?)
+
 ------------------------------------------------------------------
 -- § 1  THE THREE DEMAND POSTULATES — the anchor's open surface.
 ------------------------------------------------------------------
@@ -71,11 +87,13 @@ postulate
     let sl = Sched.slots sched
         Ψ  = ΨAt e sl
         B  = sizeCapAt e sl id
-        Dm = (2 * B + 12) * towerℕ (suc (sizeᵉ e + slotsSize sl))
+        sz = sizeᵉ e + slotsSize sl
+        Dm = (2 * B + 12) * towerℕ (suc sz)
     in INV? Ψ B sched st ≡ true →
        capsOK? (capsAt e sl id) sched st ≡ true →
        valB? B Ψ (arrTy a) (arrVal a) ≡ true →
        pathB? B Ψ path ≡ true →
+       pathOccs? sz path ≡ true →
        burstB? Dm Ψ (proj₁ (chainStep id a path sched st)) ≡ true
 
   foldPath-demand : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -86,10 +104,12 @@ postulate
     let sl = Sched.slots sched
         Ψ  = ΨAt e sl
         B  = sizeCapAt e sl id
-        Dm = (2 * B + 12) * towerℕ (suc (sizeᵉ e + slotsSize sl))
+        sz = sizeᵉ e + slotsSize sl
+        Dm = (2 * B + 12) * towerℕ (suc sz)
     in INV? Ψ B sched st ≡ true →
        capsOK? (capsAt e sl id) sched st ≡ true →
        pathB? B Ψ path ≡ true →
+       pathOccs? sz path ≡ true →
        all (valB? B Ψ u) vals ≡ true →
        all (eventB? B Ψ) evs ≡ true →
        burstB? Dm Ψ (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st)) ≡ true
@@ -101,11 +121,13 @@ postulate
     let sl = Sched.slots sched
         Ψ  = ΨAt e sl
         B  = sizeCapAt e sl id
-        Dm = (2 * B + 12) * towerℕ (suc (sizeᵉ e + slotsSize sl))
+        sz = sizeᵉ e + slotsSize sl
+        Dm = (2 * B + 12) * towerℕ (suc sz)
     in INV? Ψ B sched st ≡ true →
        capsOK? (capsAt e sl id) sched st ≡ true →
        valB? B Ψ (obs u) o ≡ true →
        pathB? B Ψ κ ≡ true →
+       pathOccs? sz κ ≡ true →
        all (valB? Dm Ψ u)
            (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
 
@@ -122,17 +144,19 @@ chainStep-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   let sl = Sched.slots sched
       Ψ  = ΨAt e sl
       B  = sizeCapAt e sl id
+      sz = sizeᵉ e + slotsSize sl
       Ŝ  = sizeCapAt e sl (suc id)
   in INV? Ψ B sched st ≡ true →
      capsOK? (capsAt e sl id) sched st ≡ true →
      valB? B Ψ (arrTy a) (arrVal a) ≡ true →
      pathB? B Ψ path ≡ true →
+     pathOccs? sz path ≡ true →
      burstB? Ŝ Ψ (proj₁ (chainStep id a path sched st)) ≡ true
-chainStep-dry {e = e} id a path sched st hI hC hV hP =
+chainStep-dry {e = e} id a path sched st hI hC hV hP hPO =
   burstB?-widen {Ψ = ΨAt e (Sched.slots sched)}
     (proj₁ (chainStep id a path sched st))
     (tick-covers-instant e (Sched.slots sched) id)
-    (chainStep-demand id a path sched st hI hC hV hP)
+    (chainStep-demand id a path sched st hI hC hV hP hPO)
 
 foldPath-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -142,18 +166,20 @@ foldPath-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   let sl = Sched.slots sched
       Ψ  = ΨAt e sl
       B  = sizeCapAt e sl id
+      sz = sizeᵉ e + slotsSize sl
       Ŝ  = sizeCapAt e sl (suc id)
   in INV? Ψ B sched st ≡ true →
      capsOK? (capsAt e sl id) sched st ≡ true →
      pathB? B Ψ path ≡ true →
+     pathOccs? sz path ≡ true →
      all (valB? B Ψ u) vals ≡ true →
      all (eventB? B Ψ) evs ≡ true →
      burstB? Ŝ Ψ (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st)) ≡ true
-foldPath-dry {e = e} sf gas id now envSrc path vals evs fin sched st hI hC hP hV hE =
+foldPath-dry {e = e} sf gas id now envSrc path vals evs fin sched st hI hC hP hPO hV hE =
   burstB?-widen {Ψ = ΨAt e (Sched.slots sched)}
     (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
     (tick-covers-instant e (Sched.slots sched) id)
-    (foldPath-demand sf gas id now envSrc path vals evs fin sched st hI hC hP hV hE)
+    (foldPath-demand sf gas id now envSrc path vals evs fin sched st hI hC hP hPO hV hE)
 
 subscribeInner-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
@@ -162,18 +188,20 @@ subscribeInner-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   let sl = Sched.slots sched
       Ψ  = ΨAt e sl
       B  = sizeCapAt e sl id
+      sz = sizeᵉ e + slotsSize sl
       Ŝ  = sizeCapAt e sl (suc id)
   in INV? Ψ B sched st ≡ true →
      capsOK? (capsAt e sl id) sched st ≡ true →
      valB? B Ψ (obs u) o ≡ true →
      pathB? B Ψ κ ≡ true →
+     pathOccs? sz κ ≡ true →
      all (valB? Ŝ Ψ u)
          (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
-subscribeInner-dry {e = e} {u = u} g op allNid κ id now o sched st hI hC hV hP =
+subscribeInner-dry {e = e} {u = u} g op allNid κ id now o sched st hI hC hV hP hPO =
   valsB?-widen {Ψ = ΨAt e (Sched.slots sched)} u
     (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st)))
     (tick-covers-instant e (Sched.slots sched) id)
-    (subscribeInner-demand g op allNid κ id now o sched st hI hC hV hP)
+    (subscribeInner-demand g op allNid κ id now o sched st hI hC hV hP hPO)
 
 ------------------------------------------------------------------
 -- § 3  THE DISCHARGE LEMMA — closes hop-edge's second premise
