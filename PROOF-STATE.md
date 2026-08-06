@@ -325,6 +325,32 @@ design session, not worker grind.
      the anchor through `capᴱ W E′` is exactly the composition GAP 4 REFUTES
      (`walk-hyps-absurd`). The family sources from the CAPS face (`capsAt`,
      `caps-tick`), never from the receipt.
+
+     ✅ **STATED AND GREEN, `02ffddc`** — `agda/probe/Anchor-Dry-Probe.agda`,
+     three postulates plus `dry-hop`, the REAL (non-postulate) lemma closing
+     `hop-edge`'s second premise from `valB?` and `sizeCapAt-mono`:
+     `dry-hop B Ŝ Ψ o B≤Ŝ h = ≤-trans (valB-sz B Ψ _ o h) B≤Ŝ`. Telescopes
+     match `Evaluator.agda:1592` / `:1542` / the `thruConsume` call sites
+     (`:1109, 1121, 1130, 1140, 1196`). No `capᴱ` in any statement. Every
+     hypothesis is caps-face (`INV?`, `capsOK?`, `valB?`, `pathB?`); every
+     conclusion bounds the site's output at the FIXED `Ŝ = sizeCapAt e sl
+     (suc id)` — fixed, so there is no Σ-witness to be upward-closed in.
+
+     ⚠️ **THE RISK MOVED, IT DID NOT VANISH — AND THIS IS THE NEXT PROBE.**
+     Each statement carries the growth of ONE INSTANT: inputs bounded at
+     `B = sizeCapAt e sl id`, outputs at `Ŝ = sizeCapAt e sl (suc id)`, i.e.
+     exactly one `frameBlowup` of headroom. But the adversarial doubling
+     `scanᵉ` grows the accumulator by a FACTOR of ~2 per emission, and
+     `syncSizeᵉ e` emissions can land in a single instant. So the headroom
+     actually demanded is about `2^(syncSizeᵉ e)` — multiplicative in the
+     emission count, not additive. `frameBlowup` is tower-shaped and very
+     likely covers it, **but that is UNPROBED, and it is now the load-bearing
+     arithmetic of the whole anchor.** If it fails, the three statements are
+     FALSE as written and the repair is an anchor indexed by emission count
+     within the instant rather than by instant alone. **Probe this BEFORE
+     wiring the family into `subscribeE-wet-core`** — the wiring edit dirties
+     `Wet.agda` (~14-18 min, plus everything above it), and grinding it over a
+     false statement is the expensive mistake de-risk mode exists to prevent.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
