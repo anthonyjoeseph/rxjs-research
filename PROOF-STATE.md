@@ -408,6 +408,31 @@ anywhere.** No `chainStep-dry`/`foldPath-dry`/`subscribeInner-dry` family
 exists, and every proven `-wet` delivery lemma is size-axis only — none carries
 a `Gas` hypothesis or concludes `hasDry ≡ false`.
 
+**WHAT THE DELIVERABLE ACTUALLY IS — it is CODE, not an argument.** `hop-edge`
+and `connect-edge` are already PROVEN and already wired in as hypotheses of
+`subscribeE-wet-core` (Wet.agda:4344, :4350). Nothing is missing from the descent
+machinery. What is missing is the ability to discharge their PREMISES at the call
+site, and that takes exactly two artifacts: **(1) a DEFINITION of `Ŝ`** as a
+concrete entry-computable function of `e`/`ins` (like `baseCaps`/`capsH`, not a
+postulate), and **(2) the dry lemma family** (`chainStep-dry` / `foldPath-dry` /
+`subscribeInner-dry`) proving the premises for every `o` that actually reaches
+`subscribeInner`. Discharging them unblocks tier 1 ranks 1, 2, 3 and 11 together.
+Per the outside-in rule, (1) lands as a real definition and (2) as postulates
+FIRST, with `subscribeE-wet-core`'s proof typechecking against them — so a wrong
+`Ŝ` changes in one place instead of invalidating finished work.
+
+**HOP-EDGE HAS THREE PREMISES AND ONLY TWO ARE ACCOUNTED FOR (found 2026-08-06).**
+The campaign's entire anchor discussion is about `sizeᵛ o ≤ Ŝ`. But the signature
+is `2 ≤ Ŝ → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r → …`, and that third
+premise — **the DESCENT condition, the child's hop-demand strictly below the
+parent's `r`** — appears nowhere in this file's history and has never been
+examined. It is a separate obligation: solving the anchor problem would NOT by
+itself let the proof through if `hopDᵛ Ŝ (obs u) o < r` cannot also be discharged,
+and a growing `o` is precisely where a strict `<` is most likely to fail. Three
+outcomes matter and are being probed: AUTOMATIC (follows from the size bound plus
+how `r` is carried), CONDITIONAL (needs its own threaded invariant — which would
+be a SECOND unstated deliverable of Phase 1b), or FALSE at a reachable shape.
+
 **NEW CONSTRAINT ON `Ŝ`'s SHAPE (2026-08-06, machine-checked):
 `Ŝ` CANNOT BE LINEAR IN `sizeᵉ e`.** `agda/probe/Battery-Obs-Growth.agda`
 establishes, by `refl`:
