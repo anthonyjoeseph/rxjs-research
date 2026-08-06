@@ -95,3 +95,4 @@ Wf-Aux-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next to
 Wf-Fold-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Width-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 OpIterD-Budget-Probe.agda | EVIDENCE | REFUTATION of opIterD-budget at R=0: missing hypothesis 1≤R, symbolic proof in §1
+Depth-Compositional-Assembly.agda | LANDING: Verify-Budget-Sufficient/Depth-Compositional.agda | symbolic assembly for depth-compositional over 3 BUCKET(d) postulates; all 16 subscribe-side heads typechecked 2026-08-06
