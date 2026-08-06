@@ -408,6 +408,47 @@ anywhere.** No `chainStep-dry`/`foldPath-dry`/`subscribeInner-dry` family
 exists, and every proven `-wet` delivery lemma is size-axis only — none carries
 a `Gas` hypothesis or concludes `hasDry ≡ false`.
 
+**NEW CONSTRAINT ON `Ŝ`'s SHAPE (2026-08-06, machine-checked):
+`Ŝ` CANNOT BE LINEAR IN `sizeᵉ e`.** `agda/probe/Battery-Obs-Growth.agda`
+establishes, by `refl`:
+
+- **`scanᵉ` carries NO `isData` restriction on its accumulator type** (Exp.agda:67;
+  the guard exists only on `scripted` slots, Slots.agda:40, and
+  `isData (obs _) ≡ false`). So the accumulator may be `obs u`-typed, and
+  `strmᵗ` (Exp.agda:96) lets the step function return an observable built from
+  its own input. The doubling step
+  `strmᵗ (mergeAllᵉ (ofᵉ (acc ∷ acc ∷ [])))` typechecks with nothing to stop it.
+- **Inner observable sizes then grow exponentially in the emission count**, on
+  the recurrence `sizeᵛ accₖ = 11 + 2 · sizeᵛ accₖ₋₁`, closed form `12·2ᵏ − 11`:
+  measured `1, 13, 37, 85` at `k = 0…3`.
+- **The killer number: `sizeᵉ prog₃ ≡ 17` while its own max inner is `85`.** A
+  17-symbol program reaches an inner observable 5× its own size, so any anchor
+  derived LINEARLY from program size is refuted outright. `Ŝ` must be at least
+  exponential in entry data.
+
+**WHAT THIS DOES NOT ESTABLISH — the route is NOT dead.** The probe's source is
+`ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])`, i.e. `k ≡ 3` is SYNTAX. A scripted slot's
+values live in `ins`, which is entry data too, so `k ≤ slotsSize ins` and
+`Ŝ ≈ 12·2ᵏ` stays entry-computable — merely exponential, not unbounded. And
+`capsH = blowH (capsBase e ins)` is a TOWER in `m`, which dominates `12·2ᵐ`
+comfortably. A first pass claimed the route dies for scripted sources via
+`Ŝ > capsH`; that ASSUMED `Ŝ > capsH` rather than deriving it, and the refuting
+program was never built.
+
+**SO THE ANCHOR QUESTION IS NOW SHARPER, AND THIS IS ITS DECIDING FORM:**
+
+> Can the number of emissions into a doubling `scanᵉ` within ONE anchor scope
+> (one subscribe walk, or one cascade) exceed anything computable from `e` and
+> `ins`?
+
+The only generator that could do it is `μᵉ` — and **the standing sync-μ ruling is
+what likely saves the route**: `deferᵉ` is the sole gate moving `Δᵍ` into `Δ`, so
+a μ's self-reference costs a TICK and synchronous self-subscription is not
+writable (see the ruling below). If that holds, per-instant emissions are
+syntax-bounded, `Ŝ` is entry-computable-exponential, and it fits under the tower.
+**Then the sync-μ ruling is not a side note — it is the load-bearing fact of the
+anchor proof**, and should be cited as such wherever `Ŝ` is sourced.
+
 **This unifies what looked like separate problems.** GAP 4(b), `dry-tick`, and
 P1's subscribe side are the SAME question on different axes: *can a mid-walk
 value's size be bounded from reachability, rather than from a fixed cap or from
