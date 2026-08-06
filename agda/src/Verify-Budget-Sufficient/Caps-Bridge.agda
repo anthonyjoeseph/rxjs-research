@@ -98,7 +98,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
 open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
 open import Verify-Budget-Sufficient.Op-Dominance using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Caps
-  using (2≤capsAt-size; capsAt-base-size; sizeCount-body)
+  using (2≤capsAt-size; capsAt-base-size; sizeCount-body; three-size-le-blowH)
 open import Verify-Budget-Sufficient.Anchor-Dry
   using (chainStep-dry; foldPath-dry; subscribeInner-dry; dry-hop)
 open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
@@ -1081,21 +1081,6 @@ postulate
     ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
 
-  -- the arithmetic half: three base-caps sizes fit under the story
-  -- index.  Reduces (Evaluator.agda:901 `blowH m = 6 + m + 2 · poolCount
-  -- (towerℕ m) m`, and `capsBase e ins` is `3 + X + suc E` for
-  -- X = sizeᵉ e + slotsSize ins) to a LOWER bound on `poolCount`,
-  -- `m ≤ poolCount (towerℕ m) m` — elementary, not a growth-rate
-  -- argument.  Rehearsal: agda/probe/Pool-Lower-Probe.agda.
-  three-size≤capsH-core :
-    -- S≤sizeStep  (Verify-Budget-Sufficient/Caps-Face.agda:479)
-    (∀ (S s : ℕ) → S ≤ sizeStep S s
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
-      + Caps.cSize (baseCaps e ins)
-      ≤ capsH e ins 0
-
 init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
 init-capsOK?-base =
@@ -1113,7 +1098,7 @@ three-size≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
     + Caps.cSize (baseCaps e ins)
     ≤ capsH e ins 0
-three-size≤capsH = three-size≤capsH-core S≤sizeStep
+three-size≤capsH e ins = three-size-le-blowH _ _ (s≤s (s≤s z≤n))
 
 -- THE DEPTH THE ROOT SUBSCRIBE REACHES FITS UNDER THE STORY INDEX.
 -- Note this is the CONDITIONED form and must stay conditioned: an

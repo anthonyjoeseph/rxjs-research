@@ -39,7 +39,6 @@
 #
 1≤sizeᵗˢ | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
 B1-cSize≡sizeCapAt | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
-S≤sizeStep | three-size≤capsH-core | ≤1 | REASON: three-size≤capsH-core must be proven
 burstCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-concat-face-core must be proven
 capsAt-suc-full | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
 cascade-delivN | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven

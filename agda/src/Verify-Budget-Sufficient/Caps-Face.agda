@@ -476,9 +476,6 @@ one≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → 1 ≤ sizeStep S s
 one≤sizeStep S s hS =
   ≤-trans (m≤m*n 1 (suc (2 * s))) (*-monoˡ-≤ (suc (2 * s)) hS)
 
-S≤sizeStep : ∀ (S s : ℕ) → S ≤ sizeStep S s
-S≤sizeStep S s = m≤m*n S (suc (2 * s))
-
 pair≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → suc (s + s) ≤ sizeStep S s
 pair≤sizeStep S s hS =
   ≤-trans (s≤s (≤-reflexive (cong (s +_) (sym (+-identityʳ s)))))
