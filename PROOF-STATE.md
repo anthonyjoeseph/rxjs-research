@@ -29,6 +29,51 @@ fix the pointer.
 > CLAUDE.md § "SHORTCUT MANDATE" for the two live traps. **When quoting the
 > ledger below, quote it as a worklist, never as a score.**
 
+## THE WIRING WORKLIST — the only priority. Nothing below outranks it.
+
+**Work the ORPHAN LIST, not the postulate ledger.** This is the correction that
+matters most (Anthony, 2026-08-05): *"I imagined we'd reduce them in big groups
+by assembling them, rather than incorporating them one by one."* Right — and
+picking targets off the postulate ledger is exactly what produces one-at-a-time.
+A postulate-to-assembly conversion consumes only the one or two orphans that
+particular assembly happens to need, so it clears ~1 per conversion. Choosing by
+CLUSTER instead clears a whole family per assembly written.
+
+**Get the live list from `make wiring`.** Do not trust a list written here.
+
+**THE ORPHAN CLUSTERS ARE PILES, NOT TOWERS MISSING A ROOF — and that is the
+key diagnostic.** If `Deliveries`' seven lemmas formed a tower, the lower ones
+would be consumed by the top one and only the top would be orphaned. All seven
+are orphaned simultaneously, so they do not consume each other either: the
+module was never assembled INTERNALLY. Same shape in `Caps-Nest`. So the work
+per cluster is *write the assembly that consumes the family* — one new
+definition, postulating whatever else it needs, clearing 6-7 orphans at once.
+Apply this test to any cluster before planning it: if every member is orphaned,
+there is no internal assembly either, and one consumer is not enough.
+
+Rough cluster sizes when this was written (re-derive with
+`make wiring`, and group by module):
+
+| module | character of the cluster |
+|---|---|
+| `Measures.agda` | the largest, but SEVERAL families — gas (`hasAtLeast-*`), state (`*-bounded`), anchor (`walk-hyps-*`). Split before planning; do not treat as one. |
+| `Verify-Well-Formed.agda` | the `subscribeE-wf` clauses — see task #18, in progress |
+| `Caps-Face.agda` | includes a self-contained `*-slots` family |
+| `Deliveries.agda` | ONE delivery-count family, entirely unassembled |
+| `Caps-Nest.agda` | ONE nesting-bound family, entirely unassembled |
+| `Wet.agda`, `Keeps-Ring.agda`, `Rx/*` | scattered; lowest priority |
+
+**NEVER WRITE A NEW ORPHAN.** Orphans should only ever be *discovered* lying
+around, never created. Two ways this rule gets broken, both observed:
+- Landing a machine-checked note in `src/` that nothing consumes (a `refl`
+  sanity check, for instance). Those belong in `agda/probe/`, which the wiring
+  check does not scan.
+- Converting a postulate into a definition whose OWN consumer is still a
+  postulate — the result is a definition that is still an orphan, and the count
+  does not move. Check the consumer exists before converting.
+Run `make wiring` after every landing and diff the orphan list, not the count:
+a conversion can wire one orphan and strand another for a net zero.
+
 ## The theorem chain (top → leaves)
 
 ```
@@ -786,9 +831,10 @@ definition over narrower ones that calls `sub-charge`.
 
 ## Active tasks → gaps
 
-Live task list is in the session's task tool; this maps the standing ones onto
-the gaps above. Everything each task has already ESTABLISHED is recorded in the
-rulings sections — do not re-derive it from here.
+**These are SECOND to the wiring worklist at the top of this file.** A task
+below that is proof work rather than wiring does not get picked up until the
+orphan clusters are assembled. Live task list is in the session's task tool;
+this maps the standing ones onto the gaps above.
 
 - **#4 — P3 `innerFinish-concat-face` + P4 `thruOuter-face`** (Caps-Face:6233,
   :6248). Both genuinely consumed (Caps-Face:6336, :6522). GAP 4 (a) is CLOSED
