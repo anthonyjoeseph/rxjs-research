@@ -106,6 +106,22 @@ report review. Standing protocol, per Anthony:
     replacement text and let the design session apply it and own the single recheck.
   - **Read-only fan-out is unconditionally safe** — analysis, goal-type census, locating
     definitions, tracing call sites. Split as wide as the task allows.
+  - **THE GATE MEASURES THE TREE, NOT THE WORKER.** Parallel workers share ONE working
+    directory, so `make wiring-gate` reports on everyone's uncommitted edits at once. A
+    worker running it while another has `src/` edits in flight gets a verdict about work
+    that is not its own — observed twice on 2026-08-06, once as a spurious FAIL (11
+    "orphans" that were really a concurrent mid-edit) and once as a spurious PASS (a
+    ledger line removed AFTER the gate was run, leaving an unledgered probe file
+    committed — precisely the C1 condition the ratchet exists to catch). Consequences:
+    **a worker's gate result is only meaningful for the files it committed**; the design
+    session owns the authoritative post-merge gate; and **a worker must re-run the gate
+    as its LAST act before committing**, never before its final edit. A red gate whose
+    cause is another worker's tree is not a licence to commit — it is a signal to
+    identify the cause explicitly, confirm your own staged files are clean, and say so.
+  - **NEVER reach into another worker's lane to tidy a shared file.** `PROBES.txt`,
+    `DEFERRED.txt`, and `PROOF-STATE.md` are shared ledgers, and "helpfully" removing a
+    line for a file another worker is mid-landing is how the ratchet got bypassed above.
+    Workers report the ledger lines they need; the design session applies them.
 - **No keep-alives.** The session runs on a persistent laptop, so the container does not
   suspend between tool calls — background workers and detached builds advance on their own,
   and worker completion notifications wake the design session. Keep only a SPARSE fallback
