@@ -421,17 +421,45 @@ Per the outside-in rule, (1) lands as a real definition and (2) as postulates
 FIRST, with `subscribeE-wet-core`'s proof typechecking against them — so a wrong
 `Ŝ` changes in one place instead of invalidating finished work.
 
-**HOP-EDGE HAS THREE PREMISES AND ONLY TWO ARE ACCOUNTED FOR (found 2026-08-06).**
-The campaign's entire anchor discussion is about `sizeᵛ o ≤ Ŝ`. But the signature
-is `2 ≤ Ŝ → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r → …`, and that third
-premise — **the DESCENT condition, the child's hop-demand strictly below the
-parent's `r`** — appears nowhere in this file's history and has never been
-examined. It is a separate obligation: solving the anchor problem would NOT by
-itself let the proof through if `hopDᵛ Ŝ (obs u) o < r` cannot also be discharged,
-and a growing `o` is precisely where a strict `<` is most likely to fail. Three
-outcomes matter and are being probed: AUTOMATIC (follows from the size bound plus
-how `r` is carried), CONDITIONAL (needs its own threaded invariant — which would
-be a SECOND unstated deliverable of Phase 1b), or FALSE at a reachable shape.
+**HOP-EDGE'S THIRD PREMISE — RESOLVED 2026-08-06, and it is NOT a second design
+blocker.** `hop-edge`'s signature is `2 ≤ Ŝ → sizeᵛ (obs u) o ≤ Ŝ →
+hopDᵛ Ŝ (obs u) o < r → …`. The campaign's anchor discussion is entirely about
+the second premise, so the third — the DESCENT condition — was checked
+(`agda/probe/Battery-Hop-Premise.agda`, green). It discharges in two lines from
+material that already exists:
+
+- at the `*All` frame, `r` IS `hopDᵉ Ŝ (mergeAllᵉ b) = suc (hopDᵉ Ŝ b)` —
+  definitional, `Rx/Hop-Depth.agda:191`;
+- `subscribeE-walk-core`'s conclusion already carries the conjunct
+  `burstHopD? F (hopDᵉ F b) burst ≡ true` (Measures.agda:5810), labelled in
+  source as "the hop edge's feed, at the index the child also reads", giving
+  `hopDᵛ Ŝ u v ≤ hopDᵉ Ŝ b`;
+- so `hopDᵛ Ŝ u v ≤ hopDᵉ Ŝ b < suc (hopDᵉ Ŝ b) = r`. Wet.agda:4046 said as much
+  all along ("the r-drop is the emitted-value invariant (burstHopD?)").
+
+**It is not free, though — it is ABSORBED into `subscribeE-walk-core`.** The
+`burstHopD?` conjunct is part of that postulate's conclusion, so proving the walk
+must prove it too. Classed DIFFICULTY, not FALSITY: its engine is proven
+(`hopD-applyFn`, Measures:2765) as is its mapᵉ consumer (`hopD-map-emit`, :2780).
+
+**The two premises share a failure mode**, which is the useful reduction: on the
+adversarial doubling scan, `hopDᵉ V accₖ ≡ k` (LINEAR) while the parent
+`hopDᵉ V (mergeAllᵉ (scanᵉ …)) ≡ suc (3^V)` (exponential in `V`) — at `V ≡ 4`,
+`3` against `82`. So (iii) can only fail where (ii) already fails. **The anchor
+problem remains the single design gate.**
+
+**`connect-edge` has NO analog** — its descent energy comes from `U` dropping
+strictly via `unconn-insert`, while `r`/`s` merely RESET (`reach-reset`), needing
+no strictness. Its sole open obligation is the same anchor question,
+`sizeᵉ d ≤ Ŝ` for a slot def.
+
+**CORRECTION, and the standing lesson landing on this file itself:** the note this
+replaces said the third premise "appears nowhere and has never been examined."
+That was true of PROOF-STATE and FALSE of the repo —
+`agda/probe/Hop-Descent-Probe.agda:202–230` was built for exactly this obligation
+and measured it on three shapes. What today added is the adversarial `scanᵉ`
+shape, which that probe explicitly did not cover ("no scanᵉ in any witness"). Grep
+the repo before declaring a gap, including when the gap looks new.
 
 **NEW CONSTRAINT ON `Ŝ`'s SHAPE (2026-08-06, machine-checked):
 `Ŝ` CANNOT BE LINEAR IN `sizeᵉ e`.** `agda/probe/Battery-Obs-Growth.agda`
