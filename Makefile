@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-all bug-cache wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda agda-all bug-cache unsafe-check wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -27,6 +27,11 @@ help:
 	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
 	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
 	@echo "                  green here <=> no known counterexample remains)"
+	@echo "  unsafe-check  SOUNDNESS GUARD: the build is NOT --safe (it cannot be,"
+	@echo "                  while postulates exist), so nothing stops an unsafe"
+	@echo "                  pragma reaching the proof path.  This greps for them."
+	@echo "                  Retires at the finish line, when 'agda --safe"
+	@echo "                  src/Main.agda' checks postulates and pragmas at once"
 	@echo "  wiring        the wiring-law report ('a comment is not a wire'):"
 	@echo "                  every top-level definition/postulate in agda/src,"
 	@echo "                  its consumer count, and the ledger of postulates"
@@ -268,6 +273,27 @@ agda-all:
 # what makes its invariant enforceable rather than remembered.
 bug-cache:
 	cd agda && agda src/Implementation/Unit-Test.agda
+
+# SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
+# `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
+# .agda-lib — so nothing mechanically stops an unsafe pragma landing on the
+# proof path.  `--safe` cannot be switched on while postulates exist (it rejects
+# `postulate` as well as the pragmas), so until the endgame this grep IS the
+# guard.  EXEMPT: src/QuickCheck.agda, a test harness Main does not import.
+#
+# At the finish line this target retires: once The-Proof.agda carries no
+# postulates, `agda --safe src/Main.agda` checks both halves at once.
+unsafe-check:
+	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ \
+	    --include='*.agda' | grep -v '^src/QuickCheck.agda:' || true); \
+	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ \
+	    --include='*.agda' || true); \
+	  if [ -n "$$hits$$opts" ]; then \
+	    echo "UNSAFE PRAGMA ON THE PROOF PATH — this is a soundness hole, not a shortcut:"; \
+	    echo "$$hits"; echo "$$opts"; exit 1; \
+	  else \
+	    echo "unsafe-check: clean (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
+	  fi
 
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: a
 # comment is not a wire").  Pure textual analysis of agda/src, no Agda

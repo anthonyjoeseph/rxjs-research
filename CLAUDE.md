@@ -162,10 +162,27 @@ deserialization (6.4 s for Subscribe-Face, of which 5.1 s IS deserialization) an
 `Checking` lines. Two consequences: you cannot force a remeasurement without a real edit, and
 an experiment run with weakened flags cannot silently poison the cache this way either.
 
-**The build is `--safe`.** So `--no-termination-check` and friends are rejected outright
-(the stdlib's own `OPTIONS` pragma trips first). Good for soundness — no pragma can quietly
-weaken this proof — but it means whole-module analyses cannot be switched off to time them;
-attribute them with `--profile=internal` on a genuinely dirty module instead.
+**THE BUILD IS NOT `--safe`, AND NOTHING MECHANICALLY STOPS AN UNSAFE PRAGMA.** `make agda`
+runs a plain `agda src/Main.agda`; there is no `--safe` on the command line, no `OPTIONS`
+pragma anywhere in `src/`, and no flags in `rxjs-research.agda-lib`. Verified, along with the
+fact that a live `{-# TERMINATING #-}` already sits at `src/QuickCheck.agda:170` — off the
+proof path (Main does not import QuickCheck), but proof that the guard does not exist. So:
+
+- **Police unsafe pragmas by grep, not by faith.** `make unsafe-check` greps the proof path
+  for `TERMINATING`/`NON_TERMINATING`/`NO_POSITIVITY_CHECK`/`NO_UNIVERSE_CHECK`/`REWRITE`/
+  `--type-in-type`. Anything one of those turns up on the proof path is a soundness hole,
+  not a shortcut, and no mandate in this file authorises it.
+- **`--safe` CANNOT be turned on today, because it rejects `postulate` too** ("Cannot
+  postulate X with safe flag") — and we have dozens by design. Do not try to add it.
+- **`--safe` IS THE FINISH-LINE CERTIFICATE, and this is the useful part.** The day
+  `The-Proof.agda` is discharged with no postulates, `agda --safe src/Main.agda` should pass —
+  and that ONE command mechanically verifies both halves of the goal at once: no postulates
+  AND no unsafe pragma. It is a better acceptance test than any grep, so aim the endgame at it.
+- Beware that changing a flag (e.g. experimenting with `--safe`) invalidates interfaces and
+  forces rechecks — it is not a free query.
+
+Whole-module analyses cannot be switched off to time them; attribute them with
+`--profile=internal` on a genuinely dirty module instead.
 
 ## Module granularity: keep typechecks short
 
