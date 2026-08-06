@@ -295,13 +295,80 @@ design session, not worker grind.
   its header, citing the line numbers. DO NOT: rewrite the six consumers or
   prove anything over it — that is tier 2 and it is parked.**
 - **1b. THE ANCHOR PROBLEM — the campaign's center, and now the critical path.**
-  State the reachability-sourced dry family (`chainStep-dry` / `foldPath-dry` /
-  `subscribeInner-dry`) that sources Ŝ/R̂/F from reachability — the ONE route
-  the two absurd proofs leave alive. Deliverable is a STATEMENT that typechecks
-  against the walk's actual call sites, probed on Frame-Work-Probe's shapes — or
-  a third refutation, which is STOP-grade: it would mean tier 1's top three
-  postulates have no surviving proof route. Full statement of the problem in its
-  own section below.
+  The 2026-08-06 probe round settled everything AROUND the anchor (see the
+  section below), so this phase is no longer exploratory. It is four edits, in
+  this order, and the order is the outside-in rule:
+
+  1. **`Ŝ` ALREADY EXISTS — step 1 is FREE (found 2026-08-06, correcting this
+     file).** The anchor is `sizeCapAt e sl (suc id)` (`Wet.agda:4109`,
+     `= Caps.cSize (capsAt e sl id)`), a real definition, already threaded at
+     the call site (`Caps-Bridge.agda:656`, `Ŝ = sizeCapAt e sl′ (suc id)`).
+     `capsH e ins 0` was a PROBE CANDIDATE for a fresh anchor and is not
+     needed — do not add a second one. Two facts already in hand come with it:
+     `2≤sizeCapAt` (:4112) discharges `hop-edge`'s FIRST premise outright, and
+     `sizeCapAt-mono` (:4118) lifts any bound at `id` to `suc id`.
+  2. **STATE the dry family as POSTULATES** — `chainStep-dry` / `foldPath-dry` /
+     `subscribeInner-dry`, each concluding that the observable reaching that
+     site is `valB?`-bounded at the instant's own `B`. **The reachability source
+     is `INV?`, and this is the round's second finding:** `INV? Ψ B sched st`
+     already bounds every value the state holds by `B = sizeCapAt e sl id`
+     (`valB? B Ψ u v = (sizeᵛ u v ≤ᵇ B) ∧ (fnCapᵛ u v ≤ᵇ Ψ)`,
+     `Measures.agda:4875`). So `sizeᵛ o ≤ Ŝ` is NOT a fresh mystery — it is
+     `valB?` at `id` composed with `sizeCapAt-mono`. **The whole remaining
+     content is therefore ONE question: does the value ARRIVING at
+     `subscribeInner` carry `valB?`, or is it freshly computed and outside
+     `INV?`'s coverage?** That is what the three postulates assert, one per
+     site, and it is the reachability induction in its smallest honest form.
+
+     **DO NOT source it from the ledger.** `subscribeE-walk-core` concludes
+     `burstB? (capᴱ W E′) Ψ …`, which looks like the bound wanted — but routing
+     the anchor through `capᴱ W E′` is exactly the composition GAP 4 REFUTES
+     (`walk-hyps-absurd`). The family sources from the CAPS face (`capsAt`,
+     `caps-tick`), never from the receipt.
+  3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
+     and `connect-edge`'s premises at the call site from the family. This is the
+     step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
+     place, before any proof is ground over it.
+  4. **THE UN-DEFERRING, ENFORCED IN `make wiring`** (Anthony, 2026-08-06 — see
+     below).
+
+  A third refutation here is still STOP-grade: it would mean tier 1's top three
+  postulates have no surviving proof route.
+
+  **THE UN-DEFERRING, AND WHY IT IS PART OF THIS PHASE.** Hoisting `sizeᵛ o ≤ Ŝ`
+  out of `hop-edge`'s hypothesis position and into a named top-level postulate
+  IS step 2 — the dry family and the un-deferring are the same edit seen from two
+  sides. That makes this the right moment to close the hole that let the debt
+  hide, because the fix and its first test case land together.
+
+  **THE HOLE.** `make wiring` tracks NAMES, not OBLIGATIONS INSIDE TYPES. A
+  proven lemma with unpaid premises, handed to a postulate as an argument, reads
+  as fully wired: the name has a consumer, so no orphan, no gate failure — while
+  its premises are never discharged by anything. That is how `hop-edge`'s size
+  premise sat unexamined; the wiring law says every gap is a postulate with a
+  real signature, and a premise buried in a hypothesis position is precisely a
+  gap that is not.
+
+  **THE FIX — promote (B4) from report to RATCHETED GATE.** (B4) already finds
+  the passed-only lemmas (55 lemmas, ≤152 deferred →-slots at baseline). Make it
+  bite:
+
+  - **A checked-in ledger** (`agda/DEFERRED.txt` or equivalent) listing each
+    passed-only lemma with the postulate that defers it. `make wiring-gate`
+    EXITS 1 when the measured set is not the ledger's set.
+  - **The ratchet runs one way.** A NEW passed-only lemma fails the gate until
+    it is added to the ledger deliberately — so deferral becomes an explicit,
+    reviewed act rather than a silent side effect of writing an assembly. A
+    lemma LEAVING the set (its premises now discharged) requires deleting its
+    ledger line, which is how the numbers come down and stay down.
+  - **Ledger lines carry the reason**, one line each, naming what would have to
+    exist to un-defer. Then "what debt is hidden in hypothesis positions?" is
+    answered by a file under version control instead of by re-reading signatures.
+
+  Baseline note for whoever lands it: (B4)'s →-slot count is an UPPER BOUND (it
+  counts arrows, not distinct obligations), and it is textual — a lemma used only
+  inside a `where` block can be misreported. The ledger inherits both caveats;
+  record them in its header so the number is never read as exact.
 
 ### Phase 2 — TIER 1 STATEMENT REPAIRS + THE SYMBOLIC ATTACK
 
@@ -483,14 +550,21 @@ a `Gas` hypothesis or concludes `hasDry ≡ false`.
 and `connect-edge` are already PROVEN and already wired in as hypotheses of
 `subscribeE-wet-core` (Wet.agda:4344, :4350). Nothing is missing from the descent
 machinery. What is missing is the ability to discharge their PREMISES at the call
-site, and that takes exactly two artifacts: **(1) a DEFINITION of `Ŝ`** as a
-concrete entry-computable function of `e`/`ins` (like `baseCaps`/`capsH`, not a
-postulate), and **(2) the dry lemma family** (`chainStep-dry` / `foldPath-dry` /
-`subscribeInner-dry`) proving the premises for every `o` that actually reaches
-`subscribeInner`. Discharging them unblocks tier 1 ranks 1, 2, 3 and 11 together.
+site, and that takes exactly ONE artifact — **the dry lemma family**
+(`chainStep-dry` / `foldPath-dry` / `subscribeInner-dry`) proving the premises
+for every `o` that actually reaches `subscribeInner`. **`Ŝ` itself is NOT
+missing** (corrected 2026-08-06): it is `sizeCapAt e sl (suc id)`, defined at
+`Wet.agda:4109` and already threaded at `Caps-Bridge.agda:656`. An earlier
+reading of this file called for defining it; that would have added a second,
+competing anchor. Discharging them unblocks tier 1 ranks 1, 2, 3 and 11 together.
 Per the outside-in rule, (1) lands as a real definition and (2) as postulates
 FIRST, with `subscribeE-wet-core`'s proof typechecking against them — so a wrong
 `Ŝ` changes in one place instead of invalidating finished work.
+
+**And (2) IS the un-deferring.** Stating the family hoists `sizeᵛ o ≤ Ŝ` out of
+`hop-edge`'s hypothesis position — where `make wiring` cannot see it — into a
+named postulate it can. Phase 1b step 4 makes that permanent by ratcheting (B4);
+see the phase entry above.
 
 **HOP-EDGE'S THIRD PREMISE — RESOLVED 2026-08-06, and it is NOT a second design
 blocker.** `hop-edge`'s signature is `2 ≤ Ŝ → sizeᵛ (obs u) o ≤ Ŝ →
