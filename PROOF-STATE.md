@@ -351,6 +351,37 @@ design session, not worker grind.
      wiring the family into `subscribeE-wet-core`** — the wiring edit dirties
      `Wet.agda` (~14-18 min, plus everything above it), and grinding it over a
      false statement is the expensive mistake de-risk mode exists to prevent.
+
+     ⚖️ **PROBED `f83186c` — HALF ESTABLISHED, AND THE OTHER HALF IS THE HALF
+     THAT CARRIES THE RISK.** `agda/probe/Battery-Instant-Headroom.agda`
+     (green) proves the CAPS side: `capsAt-covers-12pow`, i.e.
+     `12 · 2^(sizeᵉ e + slotsSize sl) ≤ Caps.cSize (capsAt e sl id)` for any
+     instant, over a proven chain (`capsAt-zero-size` by `refl`, `regAt-zero`
+     via `*-identityʳ`, `i≤dWalkᶜ`, `J+n≤lvls`, `iterSize-le-capsAt`) plus two
+     honestly-flagged postulates — `12·2^sz≤iterSize` (the real gap, verified
+     by `refl` at sz = 1,2,3: `iterSize` = 129, 2340, 55555 against 24, 48, 96)
+     and a trivial helper. Route 2 (numeric tables) is CONFIRMED DEAD:
+     `sizeCount`, `cDel` and `blowH` are all `abstract`, so no numeral emerges
+     from `sizeCapAt` — symbolic lower bounds are the only route, as the caps
+     axis's `abstract` design already implied.
+
+     **BUT THE COMPOSITION IS NOT PROVEN.** The growth is `12·2^k − 11` in the
+     EMISSION COUNT `k`; the theorem bounds `12·2^sz` in the PROGRAM SIZE `sz`.
+     Composing them needs **`k ≤ sz`**, and that step appears in the file only
+     as prose (§6's "since max sizeᵛ ≤ 12·2^sz … see Battery-Obs-Growth"). It
+     is exactly the repo's own lying-comment pattern: a qualification carrying
+     the claim's weight, living where neither the typechecker nor `grep` can
+     reach it. **It is also precisely the question the probe was sent to
+     answer** — how many emissions land in ONE instant — so the receipt
+     asserts its own open question as a premise.
+     - **Half of the link is already proven and was not used**:
+       `syncSize≤sizeᵉ` (`Measures.agda:698`), giving `syncSizeᵉ e ≤ sizeᵉ e`.
+     - **The other half is measured but unstated**: `k ≤ syncSizeᵉ e`, i.e.
+       emissions-per-instant is bounded by the sync measure. That is
+       `Battery-Mu-Emissions`'s content, and it exists as measurements, not as
+       a lemma. **State it, then the composition closes.**
+     Until then this is a PARTIAL receipt: the caps ceiling is high enough for
+     `12·2^sz`, and whether the growth stays under `12·2^sz` is still open.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
