@@ -66,6 +66,7 @@ open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Nat     using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Unit    using (⊤)
 open import Data.Vec     using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 

@@ -7,24 +7,49 @@
 --
 -- VERDICTS (derived below):
 --
---   #7  PROBED-GREEN.  `capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true`
---       reduces to `true ≡ true` by refl at every concrete program: no abstract
---       function is touched.  Also: `init-capsOK?-base` (line 1030) already
---       unconditionally proves this by calling the postulate with all proven
---       hypotheses.
+--   #7  PROBED-GREEN — PARTIAL COVERAGE, STRUCTURAL ANALYSIS COMPLETES IT.
+--       `capsOK?` is five conjuncts (Caps-Face.agda:297-305):
+--         (1) stBounded? cSize sched st
+--         (2) regsSz? cSize (registry st)
+--         (3) all (widLive cWid slots) live
+--         (4) all (widNode cWid slots) nodes
+--         (5) length registry ≤ᵇ cReg
+--       Conjuncts (2), (4), (5) are STRUCTURALLY VACUOUS at st-init
+--       (registry=[], nodes=[]) and are confirmed trivially by refl
+--       at Programs A and B (pending=[]).  The two substantive conjuncts:
+--       (3) widLive: CONFIRMED-HOLD-BY-STRUCTURE.  For scripted slots
+--           T(isData t) is enforced, and for every data type
+--           Frame-Width.agda:294-299 gives pWᵛ = 0, so 0 ≤ᵇ cWid = true
+--           unconditionally.  A refutation is IMPOSSIBLE regardless of
+--           value count, slot count, or value content.
+--       (1) stBounded?: CONFIRMED-HOLD-BY-PROBE (Programs C and D).
+--           cSize = 2 + sizeᵉ e + slotsSize ins; each pending value v
+--           satisfies sizeᵛ t v ≤ slotSize-1 ≤ slotsSize-1 < cSize, so
+--           the check is always true and a refutation is IMPOSSIBLE.
+--       Programs C (one nat pending) and D (three nat pending) exercise
+--       stBounded? and widLive non-vacuously.  All four rows are green;
+--       no refutation was found.
+--       CORRECTION OF PRIOR CLAIM: `init-capsOK?-base` (line 1030) CALLS
+--       the postulate `init-capsOK?-base-core` as an assembly — it does
+--       NOT prove the postulate.  The POSTULATE IS STILL THE GAP.
 --
 --   #8  BLOCKED / DERIVABLE.  `capsAt e ins id` involves `sizeCount`
---       (Caps.agda:369, abstract), so the term does not reduce and refl is
---       impossible.  The postulate is DERIVABLE from #7 via `capsOK?-mono` once
---       `capsAt-base-reg` is proved; the size and wid directions already exist
---       (`capsAt-base-size`, `capsAt-base-wid` in Caps.agda) and `capsAt-base-reg`
---       is the sole missing piece for `baseCaps ⊑ᶜ capsAt e ins id`.
+--       (Caps.agda:369, abstract), so the term does not reduce and refl
+--       checks are not possible.  DERIVABLE from #7 via `capsOK?-mono`
+--       once `capsAt-base-reg` is proved — the only missing sub-lemma.
+--       (`capsAt-base-size` and `capsAt-base-wid` already exist in Caps.agda.)
 --
---   #12 PROBED-GREEN.  `capsH e ins 0 = blowH (capsBase e ins)` (capsHgo is
---       not abstract), and `three-size-le-blowH X E _` from Pool-Lower-Probe
---       proves `(2+X)+(2+X)+(2+X) ≤ blowH (3+X+suc E)` which is exactly what
---       `three-size≤capsH-core` needs (X = sizeᵉ e + slotsSize ins,
---       E = entryCeil n ins e, cSize = 2+X, capsBase = 3+X+suc E).
+--   #12 PROBED-GREEN AND PROMOTABLE.  `three-size-le-blowH X E (s≤s (s≤s z≤n))`
+--       from Pool-Lower-Probe discharges `three-size≤capsH-core` in full
+--       generality for arbitrary e and ins.  § 3 confirms this typechecks
+--       for a symbolic general statement.  The unused first argument
+--       (S≤sizeStep) can be discarded with _.
+--       Discharge text for src/:
+--         three-size≤capsH-core _ e ins =
+--           three-size-le-blowH _ _ (s≤s (s≤s z≤n))
+--       Home in src/: Verify-Budget-Sufficient/Caps.agda (all deps present
+--       there: blowH, poolCount, towerℕ via Measures→Keeps-Ring→Caps,
+--       capsHgo, capsBase; Pool-Lower-Probe helpers move verbatim).
 
 module Battery-Caps-Init where
 
@@ -35,7 +60,7 @@ open import Data.Fin  using (Fin) renaming (zero to fzero)
 open import Data.Vec  using (Vec) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim  using (hot)
+open import Rx.Prim  using (hot; after_,_)
 open import Rx.Slots using (scripted; Slots)
 open import Rx.Exp   using (Ty; Ctx; natᵗ; Closed; emptyᵉ; input)
 open import Rx.Evaluator using (sched-init; st-init)
@@ -56,10 +81,11 @@ open import Pool-Lower-Probe
   using (three-size-le-blowH)
 
 ----------------------------------------------------------------------
--- Concrete program A: empty context, no slots.
+-- Concrete programs
 ----------------------------------------------------------------------
 
 private
+  -- Program A: empty context, no slots.
   Γ₀ : Ctx 0
   Γ₀ = []ᵛ
 
@@ -69,12 +95,8 @@ private
   e₀ : Closed Γ₀ natᵗ
   e₀ = emptyᵉ
 
-----------------------------------------------------------------------
--- Concrete program B: one-nat-input context, scripted hot slot with
--- no async values.
-----------------------------------------------------------------------
-
-private
+  -- Program B: one-nat-input context, scripted hot slot, pending = [].
+  -- widLive and stBounded? both vacuous (nothing to check).
   Γ₁ : Ctx 1
   Γ₁ = natᵗ ∷ᵛ []ᵛ
 
@@ -84,76 +106,113 @@ private
   e₁ : Closed Γ₁ natᵗ
   e₁ = input fzero
 
-----------------------------------------------------------------------
--- § 1  PROBE: #7 init-capsOK?-base-core  (PROBED-GREEN)
-----------------------------------------------------------------------
---
--- Every branch of capsOK? terminates with `all _ []` at the initial state:
---   · stBounded?  loops over Sched.live and EvalSt.nodes — both []
---   · regsSz?     loops over EvalSt.registry — []
---   · widLive / widNode  loop over Sched.live / EvalSt.nodes — both []
---   · length [] ≤ᵇ cReg = true
---
--- Program A: live = [] (Fin 0 ctx has no hot inputs), registry = [], nodes = []
---   baseCaps e₀ ins₀ = caps 3 1 2
---   capsOK? (caps 3 1 2) sched st = true ∧ true ∧ true ∧ true ∧ true ✓
+  -- Program C (NON-VACUOUS): scripted hot slot, pending = [(0,1)].
+  -- stBounded? checks sizeᵛ natᵗ 1 = 1 ≤ᵇ cSize.
+  -- widLive   checks pWᵛ n ins₂ natᵗ 1 = 0 ≤ᵇ cWid.
+  ins₂ : Slots Γ₁
+  ins₂ fzero = scripted (hot (after 0 , 1 ∷ []))
 
+  -- Program D (NON-VACUOUS): scripted hot slot, pending = [(0,5),(0,7),(0,11)].
+  -- stBounded? checks 1 ≤ᵇ cSize three times.
+  -- widLive   checks 0 ≤ᵇ cWid three times.
+  -- Maximum pressure obtainable with natᵗ (sizeᵛ natᵗ _ = 1 always).
+  ins₃ : Slots Γ₁
+  ins₃ fzero = scripted (hot (after 0 , 5 ∷ after 0 , 7 ∷ after 0 , 11 ∷ []))
+
+----------------------------------------------------------------------
+-- § 1  PROBE: #7 init-capsOK?-base-core
+----------------------------------------------------------------------
+--
+-- Four rows; the two non-vacuous rows (C, D) exercise conjuncts (1) and (3).
+--
+-- At st-init: registry = [], nodes = [] → conjuncts (2)(4)(5) are vacuous.
+--
+-- Conjunct (3) widLive for scripted natᵗ: Frame-Width.agda:294 gives
+-- outWᵛ j sl natᵗ _ = 0, and dWᵛ j sl natᵗ _ = 0 similarly, so pWᵛ = 0.
+-- Hence 0 ≤ᵇ cWid = true for every value regardless of cWid.
+-- STRUCTURAL IMPOSSIBILITY: cannot be refuted at any concrete natᵗ program.
+--
+-- Conjunct (1) stBounded? for scripted natᵗ: sizeᵛ natᵗ n = 1 always, and
+-- cSize = 2 + sizeᵉ e + slotsSize ins ≥ 2 > 1, so 1 ≤ᵇ cSize = true always.
+-- STRUCTURAL IMPOSSIBILITY: cannot be refuted.
+--
+-- Programs A and B: pending = [] → all of (1)(2)(3)(4)(5) trivially vacuous.
+-- Programs C and D: pending ≠ [] → (1) and (3) computed non-vacuously.
+-- NO REFUTATION FOUND.
+
+-- A: capsOK? (caps 3 1 2) sched₀ st₀ — all vacuous
 _ : capsOK? (baseCaps e₀ ins₀) (sched-init e₀ ins₀) (st-init e₀) ≡ true
 _ = refl
 
--- Program B: live = [{ pending = [] }] (one scripted hot source, empty pending)
---   baseCaps e₁ ins₁ = caps 4 2 3
---   widLive loops over pending = [] → true; stBounded? over that source → true
---   registry = [], nodes = []  → all other conjuncts vacuous ✓
-
+-- B: capsOK? (caps 4 2 3) sched₁ st₀ — live present but pending=[]
 _ : capsOK? (baseCaps e₁ ins₁) (sched-init e₁ ins₁) (st-init e₁) ≡ true
 _ = refl
+
+-- C (NON-VACUOUS): pending = [(0,1)]; stBounded? checks 1 ≤ᵇ cSize, widLive checks 0 ≤ᵇ cWid
+_ : capsOK? (baseCaps e₁ ins₂) (sched-init e₁ ins₂) (st-init e₁) ≡ true
+_ = refl
+
+-- D (NON-VACUOUS): pending = [(0,5),(0,7),(0,11)]; three checks each
+_ : capsOK? (baseCaps e₁ ins₃) (sched-init e₁ ins₃) (st-init e₁) ≡ true
+_ = refl
+
+-- VERDICT: PROBED-GREEN on four rows (two non-vacuous).
+-- Structural analysis shows neither conjunct (1) nor (3) can be refuted
+-- at baseCaps.  The postulate init-capsOK?-base-core is STILL THE GAP.
 
 ----------------------------------------------------------------------
 -- § 2  NOTE: #8 init-capsOK?  (BLOCKED / DERIVABLE)
 ----------------------------------------------------------------------
 --
--- No refl check is possible: capsAt e ins id involves sizeCount
--- (Caps.agda:369, abstract), so the term does not reduce to a numeral.
---
--- Path to proof once capsAt-base-reg is stated:
+-- No refl check possible: capsAt e ins id involves sizeCount
+-- (Caps.agda:369, abstract).  Path to proof:
 --   capsAt-base-size : 2 + sizeᵉ e + slotsSize ins ≤ Caps.cSize (capsAt e ins id)
 --   capsAt-base-wid  : suc (entryCeil n ins e)      ≤ Caps.cWid  (capsAt e ins id)
 --   capsAt-base-reg  : suc (sizeᵉ e + slotsSize ins) ≤ Caps.cReg (capsAt e ins id)
---                      ← THIS IS MISSING
--- Together these give baseCaps e ins ⊑ᶜ capsAt e ins id, and
--- capsOK?-mono lifts init-capsOK?-base (#7) to the blown-up caps.
+--                      ← THIS IS THE ONLY MISSING PIECE
+-- These give baseCaps e ins ⊑ᶜ capsAt e ins id; capsOK?-mono
+-- (Caps-Face.agda:365) lifts the §1 result to the blown-up caps.
 
 ----------------------------------------------------------------------
--- § 3  PROBE: #12 three-size≤capsH-core  (PROBED-GREEN)
+-- § 3  PROBE: #12 three-size≤capsH-core  (PROBED-GREEN, PROMOTABLE)
 ----------------------------------------------------------------------
 --
--- Reductions (no abstract function involved):
---   capsH e ins 0 = capsHgo (capsBase e ins) 0   (Caps.agda:450)
---                 = blowH (capsBase e ins)        (Evaluator.agda:905)
+-- Reductions (capsHgo and capsBase are NOT abstract):
+--   capsH e ins 0 = blowH (capsBase e ins)
 -- where capsBase e ins = 3 + X + suc E,
 --   X = sizeᵉ e + slotsSize ins,  E = entryCeil n ins e.
+-- cSize (baseCaps e ins) = 2 + X.
 --
--- Caps.cSize (baseCaps e ins) = 2 + X.
+-- three-size-le-blowH X E h : (2+X)+(2+X)+(2+X) ≤ blowH (3+X+suc E)
+-- is exactly the conclusion of three-size≤capsH-core after reductions.
 --
--- three-size-le-blowH X E h :
---   (2+X)+(2+X)+(2+X) ≤ blowH (3+X+suc E)
--- is exactly the conclusion of three-size≤capsH-core.
+-- Side condition 2 ≤ 3+X+suc E: holds for all X,E since
+--   3+X+suc E = suc(suc(1+X+suc E)), so s≤s(s≤s z≤n) always works.
 --
--- PROGRAM A: X = sizeᵉ e₀ + slotsSize ins₀ = 1 + 0 = 1, E = 0, m = 5
---   cSize = 3, capsH e₀ ins₀ 0 = blowH 5
---   three-size-le-blowH 1 0 (s≤s (s≤s z≤n)) : 3+3+3 ≤ blowH 5  ✓
+-- GENERAL STATEMENT (symbolic e and ins — not a concrete instance):
+
+three-size≤capsH-general : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
+    + Caps.cSize (baseCaps e ins)
+  ≤ capsH e ins 0
+three-size≤capsH-general e ins = three-size-le-blowH _ _ (s≤s (s≤s z≤n))
+
+-- VERDICT: PROMOTABLE.  The body `three-size-le-blowH _ _ (s≤s (s≤s z≤n))`
+-- discharges the postulate in full generality.  The first argument of
+-- three-size≤capsH-core (the S≤sizeStep hypothesis) is unused and goes to _.
+-- Exact discharge text:
+--   three-size≤capsH-core _ e ins =
+--     three-size-le-blowH _ _ (s≤s (s≤s z≤n))
+-- Home: Verify-Budget-Sufficient/Caps.agda (all deps already present there).
+
+-- Concrete instances also pass (blowH is abstract so no numeral, but the
+-- generalized arithmetic lemma fires):
 
 three-size≤capsH-A :
   Caps.cSize (baseCaps e₀ ins₀) + Caps.cSize (baseCaps e₀ ins₀)
     + Caps.cSize (baseCaps e₀ ins₀)
   ≤ capsH e₀ ins₀ 0
 three-size≤capsH-A = three-size-le-blowH 1 0 (s≤s (s≤s z≤n))
-
--- PROGRAM B: X = sizeᵉ e₁ + slotsSize ins₁ = 1 + 1 = 2, E = 1, m = 7
---   (outWⱽ 1 [] ins₁ (input zero) = 1 since scripted slot → entryCeil = 1)
---   cSize = 4, capsH e₁ ins₁ 0 = blowH 7
---   three-size-le-blowH 2 1 (s≤s (s≤s z≤n)) : 4+4+4 ≤ blowH 7  ✓
 
 three-size≤capsH-B :
   Caps.cSize (baseCaps e₁ ins₁) + Caps.cSize (baseCaps e₁ ins₁)

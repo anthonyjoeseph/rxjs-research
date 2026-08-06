@@ -365,28 +365,40 @@ by `inst` (dodges 2), and excluding spent registrations (dodges 3). **Do not
 generalise it to a global node↔registry theory, and not onto `dispatchShare`**
 (standing, VWF:3800).
 
-**PHASE 1a STATUS (2026-08-06): STATABLE AND NON-VACUOUS; REACHABILITY UNTESTED;
-ONE REFUTATION CANDIDATE OUTSTANDING.** `agda/probe/Battery-Merge-Cert.agda`
-gives it a computable form (`mergeCertAt`, over `innerInstsP` + `aliveThroughᶠ`)
-and checks 7 states green, **and `k ≡ 0 ⇒ none` IS seed-provable** (`merge-st 0`
-with empty registry, by `refl`). That much is real progress. But:
+**PHASE 1a RESULT (2026-08-06): SURVIVES THE DECISIVE TEST — STATE IT AND
+UNBLOCK THE SIX.** `agda/probe/Battery-Merge-Cert.agda` gives merge-cert a
+computable form (`mergeCertAt`, over `innerInstsP` + `aliveThroughᶠ`), and
+`k ≡ 0 ⇒ none` **IS seed-provable** (`merge-st 0`, empty registry, by `refl`).
 
-- **Every state was hand-authored** (`record (st-init e₀) {…}`), by the same
-  pass that wrote the predicate. No `subscribe`/`cascade`/`evaluate` was run, so
-  the three dodges are verified at CONSTRUCTED states, not reached ones. Per
-  CLAUDE.md's probe rule that is a behaviour table, not evidence about the
-  invariant.
-- **The probe's own "non-vacuity witness" (Shape B) is a state where merge-cert
-  is FALSE**: `merge-st 0` plus a from-inner registration with `dying`,
-  `delivered`, `cancelled` all empty. It was labelled a feature. **Whether that
-  state is REACHABLE is now the whole question** — and it is exactly where
-  refutation R3 always pointed.
-- **THE DECIDING QUESTION:** at the moment `innerFinish` decrements `k` to 0, is
-  the spent inner's registration already BOTH `dying` and `delivered`? The
-  "both" is load-bearing — `aliveThroughᶠ` stays TRUE if only one holds. Shape 2
-  dodges R3 by ASSUMING both. If `innerFinish` lands `k ← 0` while the
-  registration is still live by that test, the reached state IS Shape B and the
-  corrected statement is refuted too — the fourth refutation on this face.
+**THE MECHANISM — this is the real deliverable, more than any row.** The probe's
+own Shape B (`merge-st 0` with a from-inner registration where `dying`,
+`delivered`, `cancelled` are all empty) is a state where merge-cert is FALSE, so
+the whole question was its REACHABILITY — exactly where refutation R3 pointed.
+The cascade ordering answers it:
+
+- `cascadeLatch` (Evaluator:1617–1622) fires FIRST, setting `dying = [arrSource a]`
+  **before any chain is processed**;
+- `cascadeGo` (Evaluator:1633–1641) adds `rid` to `delivered` **before** calling
+  `chainStep`;
+- so by the time `innerFinish` decrements `k` to 0, `src ∈ dying` AND
+  `rid ∈ delivered` both hold, making `aliveThroughᶠ ≡ false` for the spent
+  registration.
+
+The "both" is load-bearing — `aliveThroughᶠ` stays TRUE if only one holds — and
+the ordering supplies both. **Shape B is unreachable by this path.**
+
+**REACHED rows** (not constructed — the earlier pass's rows were all hand-built
+and are retained only as a behaviour table): `mergeAll(of([slot0]))`, slot 0 hot
+at tick 1, driven through `subscribeE` → `cascadeLatch` → `cascadeGo`. Mid-cascade
+(`merge-st 0`, reg still in the registry, `dying=[0]`, `delivered=[0]`) → `true`;
+post-`cascadeFinish` → `true`. The mid-cascade row is the decisive one.
+
+**STILL UNCOVERED, and worth stating before anyone over-reads this:** ONE program
+was reached, the R1/R3 shape. **R2 (multi-source inner) is covered only at
+hand-built states**, as are concat/switch/exhaust and nested `*All`. And the
+ordering argument covers the *cascade* route to `k ≡ 0` — **the CUT route is
+untested**, though R3's own note says registrations are dropped "only at
+cut/cascadeFinish", so a take-cut reaching `k ≡ 0` is a distinct path.
 
 **FoldOut, the second statement-level debt in this branch:** a genuinely new
 invariant (what a PARTIAL chain fold preserves of the live↔registry shadow),
