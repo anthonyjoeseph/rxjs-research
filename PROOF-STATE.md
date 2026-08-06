@@ -408,6 +408,32 @@ design session, not worker grind.
        `burstLen (proj₁ (subscribeE …)) ≤ syncSizeᵉ e` at the right shape —
        and it becomes falsifiable, probeable by `refl` at concrete programs,
        and inhabitable at every call site. Delete `SyncCount` when it lands.
+
+     ❌ **`2daa05b` — THAT REPAIR SHAPE IS REFUTED, AND THE ERROR WAS IN THE
+     DIRECTIVE, NOT THE WORK.** `agda/probe/BurstLen-SyncSize-Probe.agda`
+     (green, 7 `refl` checks) kills `burstLen (proj₁ (subscribeE …)) ≤
+     syncSizeᵉ e` outright: at `deferᵉ emptyᵉ`, `burstLen ≡ 2` while
+     `syncSizeᵉ ≡ 1`. `emptyᵉ` alone is worse (4 vs 1). Scan rows pass
+     comfortably (5/6/7 against 14/15/16), so the failure is specific, not
+     general.
+     - **WHY IT FAILS — `burstLen` IS THE WRONG MEASURE.** It computes
+       `sum (map (λ em → suc (length (InstEmit.events em))) b)`: one `suc` per
+       `InstEmit` plus EVERY event, and `InstEvent` (`Rx/Prim.agda:107`) has
+       `init`, `close`, `handoff` and `complete` beside `value`. The refuting
+       burst carries one `init` and **zero `value` events** — so the number
+       refuted is protocol bookkeeping, which a syntactic value-emission
+       measure was never meant to bound. The mistake was naming `burstLen` in
+       the directive; the probe did exactly the right thing with it.
+     - **THE ANCHOR CLAIM IS UNTOUCHED.** Only `value` events feed a scan
+       accumulator, so only they drive `12·2^k`. The measure needed is a
+       VALUE-ONLY count over the same real stream — not yet defined anywhere,
+       and a few lines to define.
+     - **`SyncCount` correctly LEFT IN PLACE** for now: vacuous but not false,
+       and deleting it before a correct replacement exists would strand
+       `obs-fits-headroom`. Retire it when the value-count bound lands.
+     - **STANDING LESSON, and it cost a round: name the measure by what it
+       COUNTS, not by what it is called.** `burstLen` reads like "how many
+       things did this burst emit" and is not that.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
