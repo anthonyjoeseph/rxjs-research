@@ -602,9 +602,44 @@ a `Gas` hypothesis or concludes `hasDry ≡ false`.
 > `μᵉ (varᵉ (here refl))` is a TYPE ERROR and synchronous self-subscription is not
 > writable. Measured contrast across an unfold: `sizeᵉ` DOUBLES (10 → 20) while
 > **`syncSizeᵉ` is STABLE (9 → 9)**. The load-bearing fact, now named:
-> `syncSize-μ-invariant : syncSizeᵉ (unfoldμ body) ≡ syncSizeᵉ body`. Per tick,
-> emissions ≤ `syncSizeᵉ e`; per cascade, ≤ `capsH e ins × syncSizeᵉ e`. **Both
-> entry-computable — so the sync-μ ruling is promoted from side note to cornerstone.**
+> `syncSize-μ-invariant : syncSizeᵉ (unfoldμ body) ≡ syncSizeᵉ body`.
+>
+> > ❌ **REFUTED 2026-08-06 — "per tick, emissions ≤ `syncSizeᵉ e`" IS FALSE, and
+> > it was the cornerstone claim of this section.** `agda/probe/Battery-Value-Count.agda`
+> > (green, every row by `refl`) measures VALUE emissions in ONE instant against
+> > `syncSizeᵉ`, on a doubling `scanᵉ` over a **live** seed:
+> >
+> > | K | valueCount | `syncSizeᵉ` | holds? |
+> > |---|---|---|---|
+> > | 1 | 2  | 17 | ✓ |
+> > | 2 | 6  | 18 | ✓ |
+> > | 3 | 14 | 19 | ✓ |
+> > | 4 | **30** | **20** | **✗ REFUTES** |
+> >
+> > `valueCount = 2^(K+1) − 2` (exponential in source length) against
+> > `syncSizeᵉ = 16 + K` (linear); they cross at K = 4 and the gap widens.
+> > `maxInstant ≡ 0` on the refuting burst, so this is genuinely PER-INSTANT.
+> > **The mechanism:** `syncSizeᵉ (mergeAllᵉ e) = suc (syncSizeᵉ e)`
+> > (`Exp.agda:509`) charges a bare `suc` for a merge, while a merge over a
+> > doubling accumulator subscribes an exponentially large tree of live leaves
+> > inside the one instant. A syntactic measure charging additively cannot bound
+> > a multiplicative runtime effect.
+> > **Why it was believed:** `Battery-Obs-Growth`'s scan uses `seed = strmᵗ emptyᵉ`,
+> > so every accumulator is a tree of merges over EMPTY leaves — it grows in SIZE
+> > while emitting nothing. Changing one token (`emptyᵉ` → `ofᵉ [0]`) makes the
+> > leaves live and the counts explode. **A near-miss shape can look like a
+> > covering shape; this one hid the refutation for four probe rounds.**
+> > **What it kills:** every anchor route through emissions-bounded-by-syntax,
+> > including `sync-count-bounded` in `Battery-Instant-Headroom.agda` (FALSE the
+> > moment its abstract `SyncCount` is instantiated to the real count) and the
+> > chain `sizeᵛ o ≤ 12·2^k ≤ 12·2^(syncSizeᵉ e)` built on it. Since `k` is
+> > itself exponential in program size, **`sizeᵛ o` is DOUBLY exponential in
+> > entry data — not `12·2^sz`** — so `capsAt-covers-12pow` is the wrong ceiling.
+> > **What it does NOT kill:** the three dry postulates bound `sizeᵛ` at
+> > `sizeCapAt e sl (suc id)`, which is tower-shaped and may still dominate a
+> > doubly-exponential value. **That is the open question now, and it is a
+> > different one.** The μ typing fact itself (`deferᵉ` gates `Δᵍ`→`Δ`) stands;
+> > what falls is the inference from it to a syntactic emission bound.
 >
 > **2. BOTH CEILINGS FIT** (`agda/probe/Battery-Anchor-Fit.agda`), against the
 > candidate `Ŝ-cand e ins = 12 · 2^(sizeᵉ e + slotsSize ins)`:
