@@ -18,6 +18,20 @@ fix the pointer.
 > in the reassuring direction every time, and each error was a status claim no
 > typechecker was enforcing.
 
+> **CURRENT OPERATING MODE (Anthony, 2026-08-05): WIRING, WITH MAXIMUM
+> SHORTCUTS.** We are not proving right now. Whatever we do not yet know, we
+> POSTULATE — get the repo settled first; decisions about what to actually prove
+> come after. **A rising postulate count is the mechanism working, not a
+> regression** ("the relentless mindset of reducing those numbers is very
+> harmful"). Never grind a hard proof when a postulate will do; never weaken a
+> statement to make it typecheck. The move that does the work is
+> **postulate-to-assembly conversion**: most orphans are orphaned because their
+> only would-be consumer is itself a monolithic postulate, so turn that postulate
+> into a real DEFINITION over smaller postulates that CALLS the orphans. The one
+> constraint is that a postulate must assert something TRUE and non-vacuous — see
+> CLAUDE.md § "SHORTCUT MANDATE" for the two live traps. **When quoting the
+> ledger below, quote it as a worklist, never as a score.**
+
 Why this file exists: the design state used to live only in scattered
 mega-comments (Wet.agda's GAP 4 block, Caps-Face:6087, probe headers). Sessions
 that didn't re-read them paid a rediscovery tax — re-refuting the sync-μ
@@ -108,7 +122,17 @@ the style of `agda/probe/Cut-Caches-Probe.agda`. If it survives those, it is
 very likely the right statement; if not, this branch needs a design ruling
 before W1/W2/W3/W6 can be attempted at all.
 
-## Postulate ledger (critical path: 4, plus 1 orphan)
+## Postulate ledger — a WORKLIST, not a score
+
+**Do not read the row count as a health metric, and do not try to shrink it.**
+See the operating-mode note at the top of this file: during the wiring pass a
+rising count is the mechanism working. The named `P` rows below are the ones on
+the critical path; splitting any of them into several narrower postulates is
+PROGRESS and should be recorded as such, not flagged as a regression.
+
+Live totals come from `make wiring` (2026-08-05: **57 postulates, 6 of them
+orphaned, 78 orphaned proven definitions**), not from this table — the table
+names the critical path, the script counts everything.
 
 | # | Name | Where | Blocked by |
 |---|------|-------|-----------|
@@ -619,6 +643,70 @@ of this section said the gas axis was "solved and merely unwired" and called
 `dry-tick` the cheapest remaining win, quoting `dry-tick`'s own comment that it
 is "not touched by the caps/INV? bridging problem at all". **Both that comment
 and this file were wrong.** The edge ARITHMETIC is proven; SPENDING it is not.
+
+## RULING (2026-08-05): `depth-capped` must be spent at the SMALL caps
+
+`opIterD≤capsH-root` (Caps-Bridge.agda:~818) needs `depthE … ≤ capsH e ins 0`.
+The obvious route — take `depth-capped` at `c := capsAt e ins 0` and then prove
+`3 · cSize (capsAt e ins 0) ≤ capsH e ins 0` — is a **dead end, and knowing why
+is the point of this entry.**
+
+`capsAt e sl zero` is already a `frameBlowup` (Caps.agda:452):
+
+    capsAt e sl zero = frameBlowup (caps (2 + sizeᵉ e + slotsSize sl) …) (capsBase e sl)
+
+so its `cSize` is `iterSize S₀ (sizeCount c₀ (capsBase e sl)) S₀` — `sizeStep`
+iterated `sizeCount`-many times, i.e. exponential in a number that is itself a
+level count. Meanwhile `capsH e ins 0 = blowH (capsBase e ins)` is
+`6 + capsBase + 2 · poolCount (towerℕ capsBase) capsBase`. Closing the gap
+between them means proving that `poolCount` at `M = towerℕ capsBase` dominates
+an *exponential* of `sizeCount` at `M = S₀` — a cross-`M` growth-rate argument
+that exists nowhere in the repo. The only chain that relates the two,
+`capsAt-tower` (Caps.agda:1322), points the WRONG WAY: it gives
+`cSize ≤ towerℕ (capsH)`, and `towerℕ h ≫ h`, so it makes the goal harder.
+
+**THE RULING: apply `depth-capped` at the PRE-BLOWUP base caps `c₀`, not at
+`capsAt e ins 0`.** `depth-capped` (Depth-Bound.agda:244) quantifies over *any*
+`c` satisfying `capsOK? c sched st ≡ true`; nothing forces the blown-up one.
+And at the root the state is `st-init`/`sched-init`, where **three of
+`capsOK?`'s five conjuncts are trivially true** (Caps-Face.agda:299): the
+registry is empty (so `regsSz?` and the `length … ≤ᵇ cReg` bound hold on
+nothing), and `EvalSt.nodes` is empty (so the `widNode` sweep is vacuous). The
+two live conjuncts — `stBounded?` and the `widLive` sweep over `Sched.live` —
+are bounded by **syntax-level ceilings** (`slotsSize`, `entryCeil`), which is
+exactly what `c₀`'s fields ARE.
+
+So `init-capsOK?` should be stated at `c₀`, and `capsOK?-mono`
+(Caps-Face.agda:365, already proven) weakens it up to `capsAt e ins 0` for the
+consumer that needs it there (`subscribeE-wet-via-caps`). The depth bound then
+reads `depthE ≤ 3 · (2 + sizeᵉ e + slotsSize ins)` and the remaining arithmetic
+is elementary, needing only a LOWER bound on `poolCount`:
+
+    capsBase-le-pool : ∀ m → 2 ≤ m → m ≤ poolCount (towerℕ m) m
+
+whose chain is (i) `suc J ≤ fLvlD S W d J` from `fLvl≤fLvlD` (Caps.agda:776)
+plus `fLvl`'s own `J + suc (…)` shape; (ii) the same for `dLvl` via
+`iterL-infl`; (iii) `J + n ≤ lvls S W d J n` by induction; (iv)
+`towerℕ m ≤ dCapᶜ (towerℕ m) … (suc (towerℕ m)) 0`, since `regAt M M 0 = M` and
+each `dWalkᶜ` step adds at least one; (v) `k≤towerℕ` (already used inside
+`blowup-tower`). None of these is a growth-rate argument.
+
+**WHY THIS IS RECORDED AS A RULING RATHER THAN A FIX.** The dead-end route is
+the one a reader reconstructs by default, because `capsAt e ins 0` is the caps
+every *other* consumer at that site uses. The reason it fails is not visible
+from the goal — it lives in `capsAt`'s base clause being a blowup. Anyone who
+re-derives this without the entry will re-derive the cross-`M` obligation too.
+
+**STATUS.** Route identified, arithmetic chain specified, NOT yet proven —
+`agda/probe/Pool-Lower-Probe.agda` is the rehearsal site. Nothing has been
+landed in `src/` on the strength of this ruling.
+
+**UNVERIFIED PREMISE, and it is the one that would sink this:** that
+`stBounded? (2 + sizeᵉ e + slotsSize ins) (sched-init e ins) (st-init e)` and
+the `widLive` sweep actually hold at `c₀`'s fields. Three conjuncts being
+vacuous is checked; these two are inferred from what `c₀`'s fields *mean*, not
+from a proof. If either fails, `c₀` must grow, and the arithmetic above has to
+be re-run at whatever it grows to.
 
 ## THE ANCHOR PROBLEM — the campaign's one central open question
 

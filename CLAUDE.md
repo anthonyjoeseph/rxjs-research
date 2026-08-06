@@ -293,6 +293,46 @@ Dershowitz–Manna multiset measure, which the hopD section header calls "the
 retired measure"). Even then: record the commit SHA in PROOF-STATE.md, because
 git history is the archive only if someone can find the entry.
 
+### SHORTCUT MANDATE: postulate freely until the wiring pass is done (Anthony, 2026-08-05)
+
+**The current pass is WIRING, not proving. Take as many shortcuts as possible until it
+is finished.** What we do not yet know, we POSTULATE. Get the repo settled first;
+decisions about what to actually prove come after.
+
+**A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs
+saying because every instinct — and every subagent's default — runs the other way.
+Anthony, in the session that set this rule: *"the relentless mindset of reducing those
+numbers is very harmful."* The ledger is not a scoreboard. One vague postulate split
+into six specific ones is PROGRESS: each is separately attackable and none can hide.
+The only number that matters is whether `The-Proof.agda` is discharged.
+
+So, in worker directives and in your own work:
+
+- **Do NOT minimise the postulate count. Do NOT apologise for it.** Do not describe an
+  increase as a cost, a regression, or a trade — it is the intended outcome.
+- **Do NOT weaken a statement to make it typecheck.** Weakening is the one move that
+  looks like a shortcut and is not: it silently makes a claim smaller. Postulate the
+  full-strength statement instead, and report the obstacle.
+- **Never grind a hard proof when a postulate will do.** If a lemma is real
+  mathematics, state it and move on. Note it in the ledger and keep wiring.
+
+**THE PATTERN THAT DOES THE WORK — postulate-to-assembly conversion.** Most orphans are
+orphaned because *their only would-be consumer is itself a monolithic postulate*. So:
+take that postulate, convert it into a REAL DEFINITION over several smaller postulates,
+and have the definition CALL the orphans it was always meant to consume. This wires
+proven work, makes each remaining gap greppable, and proves nothing hard. Applied
+2026-08-05 to `opIterD≤capsH-root` (wires `depth-capped`); the same move is open for
+`subscribeE-wet-via-caps` (wires `sub-charge`) and `subscribeE-wf` (wires its five
+proven clauses).
+
+**THE ONE CONSTRAINT, and it is the only way a shortcut can actually hurt: A POSTULATE
+MUST ASSERT SOMETHING TRUE.** Postulating a known-FALSE statement looks like progress
+and poisons everything above it. Two live examples: `depthE ≤ capsH` is FALSE
+unconditionally (`Depth-Bound.agda:11` — it dies against an adversarial stored state),
+so only the `capsOK?`-conditioned version may be postulated; and see "A Σ-receipt has
+content only through its witness" above for the vacuity trap. Check both before landing
+a postulate. That check is cheap — it is reading the statement, not proving it.
+
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
 **THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level
