@@ -408,6 +408,47 @@ anywhere.** No `chainStep-dry`/`foldPath-dry`/`subscribeInner-dry` family
 exists, and every proven `-wet` delivery lemma is size-axis only — none carries
 a `Gas` hypothesis or concludes `hasDry ≡ false`.
 
+> ### ANCHOR STATUS AFTER 2026-08-06's PROBE ROUND — THE ROUTE IS ALIVE AND NARROWED TO ONE LEMMA
+>
+> Four probes ran against the surviving reachability route. **None refuted it, three
+> retired a way it could have died, and the surrounding constraints are now verified
+> satisfiable.** What remains is a single obligation.
+>
+> **1. The μ ESCAPE IS BLOCKED BY TYPING — so the emission count is entry-bounded.**
+> (`agda/probe/Battery-Mu-Emissions.agda`.) `μᵉ` binds into the GUARDED context `Δᵍ`
+> while `varᵉ` reads from `Δ`, and `deferᵉ` is the sole gate between them — so
+> `μᵉ (varᵉ (here refl))` is a TYPE ERROR and synchronous self-subscription is not
+> writable. Measured contrast across an unfold: `sizeᵉ` DOUBLES (10 → 20) while
+> **`syncSizeᵉ` is STABLE (9 → 9)**. The load-bearing fact, now named:
+> `syncSize-μ-invariant : syncSizeᵉ (unfoldμ body) ≡ syncSizeᵉ body`. Per tick,
+> emissions ≤ `syncSizeᵉ e`; per cascade, ≤ `capsH e ins × syncSizeᵉ e`. **Both
+> entry-computable — so the sync-μ ruling is promoted from side note to cornerstone.**
+>
+> **2. BOTH CEILINGS FIT** (`agda/probe/Battery-Anchor-Fit.agda`), against the
+> candidate `Ŝ-cand e ins = 12 · 2^(sizeᵉ e + slotsSize ins)`:
+> - `Ŝ ≤ capsH e ins 0` — FITS, with one arithmetic gap `exp12≤blowH` (route:
+>   `blowH m ≥ 2·poolCount (towerℕ m) m ≥ 2·towerℕ m ≥ 12·2^X` when `m ≥ 4 + X`,
+>   via Pool-Lower-Probe's `capsBase-le-pool`).
+> - **`dBound` at that `Ŝ` fits under `budgetAt e ins 0` — FULLY DERIVABLE, no new
+>   postulates.** This was the failure mode most worth fearing: an anchor big enough
+>   to bound the values could have blown the walk's own budget, killing the route
+>   *even if the size bound were true*. It does not. The chain mirrors
+>   `caps-fuel-root` in Wet.agda exactly.
+>
+> **3. THE LARGEST WORKABLE ANCHOR IS `capsH e ins 0` ITSELF** — ceiling 1 holds at
+> equality and ceiling 2 by the same chain. **So `Ŝ` need not be a bespoke
+> exponential; take `Ŝ := capsH e ins 0`** and both ceilings come for free. That is
+> the design ruling this round buys.
+>
+> **4. HOP-EDGE'S THIRD PREMISE discharges from an existing walk conjunct** (below).
+>
+> **WHAT REMAINS — the whole anchor problem, now isolated:** prove
+> `sizeᵛ o ≤ Ŝ` for every observable `o` REACHABLE at `subscribeInner`. Not the
+> ceilings, not the descent, not the emission count — those are settled or
+> satisfiable. Just the size bound, which is the dry family. **The floor it must
+> clear is measured:** a 17-symbol program reaches an inner of size 85, so any
+> `Ŝ` linear in `sizeᵉ e` is already refuted (below).
+
 **WHAT THE DELIVERABLE ACTUALLY IS — it is CODE, not an argument.** `hop-edge`
 and `connect-edge` are already PROVEN and already wired in as hypotheses of
 `subscribeE-wet-core` (Wet.agda:4344, :4350). Nothing is missing from the descent

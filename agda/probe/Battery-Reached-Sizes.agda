@@ -121,7 +121,7 @@ scan₁ = scanᵉ step seed (ofᵉ (nat̂ 0 ∷ []))
 -- LOAD-BEARING (k=1): one inner obs of sizeᵛ = 13.
 -- Degenerate failure: sizeᵛ ≡ 1 (identity step) or list empty.
 _ : map (sizeᵛ (obs natᵗ))
-      (proj₁ (splitBurst
+      (proj₁ (splitBurst {A = ℕ}
         (proj₁ (subscribeE smallGas scan₁ root 0 0
                   (sched-init scan₁ ins₀) (st-init scan₁)))))
     ≡ 13 ∷ []
@@ -132,7 +132,7 @@ scan₂ = scanᵉ step seed (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ []))
 
 -- LOAD-BEARING (k=2): two inner obs, max sizeᵛ = 37.
 _ : map (sizeᵛ (obs natᵗ))
-      (proj₁ (splitBurst
+      (proj₁ (splitBurst {A = ℕ}
         (proj₁ (subscribeE smallGas scan₂ root 0 0
                   (sched-init scan₂ ins₀) (st-init scan₂)))))
     ≡ 13 ∷ 37 ∷ []
@@ -144,7 +144,7 @@ scan₃ = scanᵉ step seed (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ []))
 -- LOAD-BEARING (k=3): the Battery-Obs-Growth program's scan.
 -- max sizeᵛ = 85 against sizeᵉ prog₃ = 17 (5× the program size).
 _ : map (sizeᵛ (obs natᵗ))
-      (proj₁ (splitBurst
+      (proj₁ (splitBurst {A = ℕ}
         (proj₁ (subscribeE smallGas scan₃ root 0 0
                   (sched-init scan₃ ins₀) (st-init scan₃)))))
     ≡ 13 ∷ 37 ∷ 85 ∷ []
@@ -155,7 +155,7 @@ scan₄ = scanᵉ step seed (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 
 
 -- LOAD-BEARING (k=4): max sizeᵛ = 181 against sizeᵉ prog₄ = 18 (10×).
 _ : map (sizeᵛ (obs natᵗ))
-      (proj₁ (splitBurst
+      (proj₁ (splitBurst {A = ℕ}
         (proj₁ (subscribeE smallGas scan₄ root 0 0
                   (sched-init scan₄ ins₀) (st-init scan₄)))))
     ≡ 13 ∷ 37 ∷ 85 ∷ 181 ∷ []
@@ -263,7 +263,7 @@ scan₃₃ = scanᵉ step₃ seed (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ []
 -- the scan evaluator path (scanVals → thruWalk → subscribeInner) produces
 -- the tripling-step values.
 _ : map (sizeᵛ (obs natᵗ))
-      (proj₁ (splitBurst
+      (proj₁ (splitBurst {A = ℕ}
         (proj₁ (subscribeE smallGas scan₃₃ root 0 0
                   (sched-init scan₃₃ ins₀) (st-init scan₃₃)))))
     ≡ 18 ∷ 69 ∷ 222 ∷ []
