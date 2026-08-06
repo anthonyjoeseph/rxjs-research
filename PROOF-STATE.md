@@ -149,15 +149,36 @@ Rx/Evaluator.agda lines — that is the checker's known same-name merge
 (Evaluator's REAL definitions colliding with Time-Theorems' abstractions), not
 a postulate inside the evaluator.
 
-**(b) REAL AND PROBEABLE — genuine claims about computable functions, zero
-probe coverage today.** The 10 `readme-*` theorems (the spec's public
-personality; 7 are closed-form equalities on concrete programs — bug-cache
-shaped), `μ-unfold` (strict `≡` across a μ-unfolding — MODERATE suspicion,
-since defer-shift's own comment records that unfolding re-mints ids;
-if ids differ the strict equality dies), `fuel-coherent` (prefix property),
-`id-inheritance` (ids ⊆ horizon — real-typed now, testable). A refutation of
-`μ-unfold` or a readme claim would be a SPEC-level finding: surface to Anthony,
-do not patch.
+**(b) REAL AND PROBEABLE — ALL PROBED 2026-08-06, no refutation found.**
+`agda/probe/Battery-Eval-Laws.agda` and `agda/probe/Battery-Readme.agda`. The
+first pass on both was DEGENERATE throughout and was rejected; the second pass
+carries an explicit **LOAD-BEARING / DEGENERATE label on every row plus a
+"what would make this fail" line** — that labelling is the reusable part, and
+new rows here should keep it.
+
+- **`μ-unfold`** — the one under real suspicion (`defer-shift`'s comment says
+  unfolding re-mints ids, which would kill a strict `≡`). Now has genuinely
+  self-referential rows: `μbody₁ = deferᵉ (varᵉ (here refl))` at fuel 1 and 2,
+  where drain steps actually fire and the compared output lists carry the
+  `init`/`close` events **with their instants**, so ids ARE part of the
+  comparison. The suspected asymmetry — LHS budgeted at `budgetAt (μᵉ e)` vs RHS
+  at `budgetAt (unfoldμ e)`, which could make one side hit `g0`/dryBurst while
+  the other unfolds — is addressed directly: both sizes are ≥ 3, so both budgets
+  carry ≥ 8 `gs` levels and the difference cannot decide either site.
+  **RESIDUAL:** that last step is an ARGUMENT, not a proof, and coverage is
+  `noSlots` with fuel ≤ 2. A program sized near the `gs`-level boundary is where
+  it would break if it breaks.
+- **`fuel-coherent`, `id-inheritance`** — probed; first-pass rows were
+  degenerate (fuel that changed nothing; singleton ⊆ singleton) and were
+  relabelled/extended.
+- **The 10 `readme-*` claims** — every row classified. Two were DEGENERATE and
+  are now backed by load-bearing siblings (`emptyᵉ` rows where `concat [] ≡ []`
+  or `0 ≤ 1` passes regardless; `cascades-inherit` at `ws ≡ []` fired no cascade
+  at all, so a new `ws ≡ [varᵗ (here refl)]` row was added). Each load-bearing
+  row now names its failure mode — e.g. `readme-diamond` would fail with
+  `(3∷[])∷(3∷[])∷[]` if the two paths fired at different instants, which is
+  exactly the property the README is about. A refutation here is SPEC-level:
+  surface to Anthony, do not patch.
 
 **(c) FFI, zero proof risk.** `_>>=_`, `getContents`, `putStr` (CLI/IO),
 `randFold`, `natMod` (QuickCheck) — GHC bindings for the two extracted
