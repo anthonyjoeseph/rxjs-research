@@ -134,10 +134,11 @@ report review. Standing protocol, per Anthony:
 ## Running long Agda builds
 
 `make agda` takes ~35-40 minutes (Caps-Face ~80 s, Wet ~14-18 min, and **Subscribe-Face ~44 min
-peaking ~6.9 GB when dirty**); the Bash tool's ceiling is 600s per foreground call. Detach long builds (`nohup setsid bash
--c '… ; echo EXIT=$? >> log' &`) and poll the log for its EXIT= line with short foreground
-calls. Since 2026-08-03 the session runs on a persistent machine, so detached builds advance
-on their own — the polling is for pacing and verification, not for keeping anything awake.
+peaking ~6.9 GB when dirty**); the Bash tool's ceiling is 600s per foreground call. Run long
+builds with the Bash tool's `run_in_background` (**NOT `nohup setsid` — `setsid` does not
+exist on macOS and the command silently does nothing**), appending `echo EXIT=$? >> log`, and
+poll the log for its EXIT= line with short foreground calls. Detached builds advance on their
+own — the polling is for pacing and verification, not for keeping anything awake.
 Never pipe agda through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and
 read indentation (an importer prints as the last line for its importee's whole leg).
 
