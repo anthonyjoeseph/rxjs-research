@@ -510,6 +510,22 @@ question. The wiring law's real yield here was not "find the missing wires" but
 postulate count and the orphan count move in opposite directions from what a
 naive reading expects.
 
+### RECOVERY SHA: the retired multiset measure — `11a34db` (2026-08-05)
+
+`git show 11a34db` / `git revert 11a34db` restores the whole
+Dershowitz–Manna apparatus: `_≺ᵛ_`, `≺ᵛ-wf` (the well-foundedness proof),
+`accHead`, `rank`, `counts`, `totᵛ`, `oneAt`, `zerosᵛ`, the `⊕ᵛ` family,
+`measureE`, and the shells/rank descent lemmas — 524 lines. Deleted under the
+freeze's one exemption (the source calls it "the retired measure" itself).
+
+**THE SCENARIO THAT BRINGS IT BACK, recorded because it is not far-fetched:**
+the ANCHOR PROBLEM is unsolved, and a well-founded multiset order is the
+classical instrument for exactly that class of descent argument. This measure
+was retired because the *hop* argument became a plain COUNT (`r` a
+remaining-hop count rather than a shell multiset) — which is **not** the same as
+it being useless for the *anchor* obstruction. If the anchor resolution wants a
+multiset order, restore from this SHA rather than re-deriving `≺ᵛ-wf`.
+
 ### DEBT: prose that outlived its code (2026-08-05, from the retired-measure deletion)
 
 The multiset measure's definitions are gone, but **eight comment references to
