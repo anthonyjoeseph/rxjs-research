@@ -759,6 +759,115 @@ MODULE_ROOTS = {
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
 
 
+def arrow_slots(sig):
+    """Count `→` at brace/paren depth 0 in a signature — an UPPER BOUND on
+    the number of premises (it also counts the binder arrow of a leading
+    `∀ … →` telescope).  Used only to size the deferred-obligation ledger,
+    never to gate."""
+    if not sig:
+        return 0
+    depth = 0
+    n = 0
+    for ch in sig:
+        if ch in "({[":
+            depth += 1
+        elif ch in ")}]":
+            depth -= 1
+        elif ch in "→" and depth == 0:
+            n += 1
+    return n
+
+
+def find_deferred_obligations(src_dir, defs, def_lines, postulate_names,
+                              files, corpus):
+    """Section B4 — PASSED-ONLY LEMMAS, i.e. DEFERRED OBLIGATIONS.
+
+    THE BLIND SPOT THIS CLOSES.  The wiring law tracks NAMES: every
+    definition must have a consumer.  It does not track OBLIGATIONS INSIDE
+    TYPES.  A PROVEN lemma with its own premises can be handed as a bare
+    value into a POSTULATE's hypothesis slot — `subscribeE-wet-core` takes
+    22 such lemmas — and that counts as a consumer, so the lemma reads as
+    fully wired and the gate stays green.  But a postulate never runs, so
+    it never APPLIES what it was given: nobody has supplied that lemma's
+    premises, and nobody will until the postulate is proven.
+
+    Those premises are real remaining work that appears NOWHERE in the
+    postulate ledger.  `hop-edge` (Wet.agda:4052) is the worked example:
+    proven, wired, consumed — and all three of its premises unpaid, one of
+    which (`hopDᵛ Ŝ o < r`) went unexamined for the whole campaign because
+    nothing in the repo forced anyone to look at it.
+
+    So: report every proven definition whose consumers are ONLY assembly
+    argument positions — passed, never applied.  This is a LEDGER, not a
+    gate: being passed-only is normal and expected while the parent is
+    still postulated.  The point is that the set and its size are visible.
+    """
+    # 1. Assembly spans: for each `-core` postulate, the expression(s) that
+    #    feed it.  An assembly is `Parent = Parent-core arg₁ … argₖ`, whose
+    #    RHS may continue across more-indented lines.
+    assemblies = []          # (parent, core, relpath, first_line, [arg tokens])
+    arg_sites = {}           # (relpath, lineno) -> core name
+    cores = sorted(n for n in postulate_names if n.endswith("-core"))
+    for core in cores:
+        for relpath in files:
+            text, offsets, _imports = corpus[relpath]
+            _raw, visible = load_file(src_dir, relpath)
+            for i, line in enumerate(visible, start=1):
+                if (relpath, i) in def_lines.get(core, ()):
+                    continue
+                if re.search(r"(?<![\w'-])" + re.escape(core) + r"(?![\w'-])", line) is None:
+                    continue
+                if line.lstrip().startswith("--"):
+                    continue
+                # collect this line plus its more-indented continuations
+                span = [(i, line)]
+                base = len(line) - len(line.lstrip())
+                j = i + 1
+                while j <= len(visible):
+                    nxt = visible[j - 1]
+                    if not nxt.strip():
+                        break
+                    ind = len(nxt) - len(nxt.lstrip())
+                    if ind <= base:
+                        break
+                    span.append((j, nxt))
+                    j += 1
+                toks = set()
+                for ln, txt in span:
+                    body = txt.split("--", 1)[0]
+                    for t in re.findall(r"[A-Za-z_][\w'ᵉᵛᶜᵍᵗˢ≤≡?′-]*|[^\s()\\{}]+", body):
+                        toks.add(t)
+                    arg_sites[(relpath, ln)] = core
+                parent = visible[i - 1].split("=", 1)[0].strip().split()
+                parent = parent[0] if parent else "?"
+                passed = sorted(
+                    t for t in toks
+                    if t in defs and t != core and t not in postulate_names
+                    and defs[t].kind == "def"
+                )
+                if passed:
+                    assemblies.append((parent, core, relpath, i, passed))
+
+    # 2. A lemma is PASSED-ONLY when every consumer site of it is an
+    #    assembly argument position.
+    passed_lemmas = {}
+    for _parent, core, _rp, _ln, passed in assemblies:
+        for lem in passed:
+            passed_lemmas.setdefault(lem, set()).add(core)
+
+    rows = []
+    for lem, parents in sorted(passed_lemmas.items()):
+        _n, locs = count_consumers(lem, files, corpus, def_lines,
+                                   extra_terms=(mixfix_core_of(lem),))
+        elsewhere = [(f, l) for (f, l) in locs if (f, l) not in arg_sites]
+        if elsewhere:
+            continue                      # genuinely applied somewhere
+        d = defs[lem]
+        sig = signature_text(src_dir, d.file, lem, d.line)
+        rows.append((lem, d, sorted(parents), arrow_slots(sig)))
+    return rows, assemblies
+
+
 def find_unreachable_modules(src_dir, files):
     """Modules under src/ that NOTHING reaches — not Main, not any entry point.
 
@@ -1043,6 +1152,9 @@ def main():
     print()
 
     print("-" * 78)
+    deferred_rows, assemblies = find_deferred_obligations(
+        src_dir, defs, def_lines, postulate_names, files, corpus)
+
     print("(B3) ORDERING HAZARD — orphans no same-file postulate can consume")
     print("-" * 78)
     if not stranded:
@@ -1060,12 +1172,41 @@ def main():
     print()
 
     print("-" * 78)
+    print("(B4) DEFERRED OBLIGATIONS — proven lemmas PASSED to a postulate,")
+    print("     never APPLIED, so their own premises are unpaid")
+    print("-" * 78)
+    print("  The wiring law tracks NAMES, not OBLIGATIONS INSIDE TYPES.  A")
+    print("  proven lemma handed as a bare value into a postulate's hypothesis")
+    print("  slot HAS a consumer, so it reads as fully wired and the gate stays")
+    print("  green — but a postulate never runs, so it never APPLIES what it was")
+    print("  given.  Nobody has supplied these lemmas' premises, and nobody will")
+    print("  until the parent postulate is proven.  That is real remaining work")
+    print("  appearing NOWHERE in the postulate ledger.")
+    print("  NOT A DELETION LIST.  These lemmas are proven and load-bearing;")
+    print("  passed-only is EXPECTED while the parent is still a postulate.")
+    print("  This is a ledger, and its point is that the set stays VISIBLE.")
+    print()
+    if not deferred_rows:
+        print("  (none)")
+    else:
+        for name, d, parents, slots in deferred_rows:
+            print(f"    {name}   (≤{slots} →-slots deferred)")
+            print(f"        {d.file}:{d.line}")
+            print(f"        passed to: {', '.join(parents)}")
+    print()
+    print(f"  assemblies feeding a -core postulate: {len(assemblies)}")
+    print(f"  passed-only lemmas:                   {len(deferred_rows)}")
+    print(f"  →-slots deferred (upper bound):       {sum(r[3] for r in deferred_rows)}")
+    print()
+
+    print("-" * 78)
     print("(C) SUMMARY")
     print("-" * 78)
     print(f"  total postulates:              {total_postulates}")
     print(f"  orphaned postulates:            {len(ledger_without)}")
     print(f"  orphaned proven definitions:    {len(orphans)}")
     print(f"  unreachable modules:            {len(dead_modules)}")
+    print(f"  passed-only lemmas (B4):        {len(deferred_rows)}")
     print(f"  vacuous (⊤-typed) postulates:   {len(vacuous)}"
           f"  ({sum(1 for v in vacuous if v[2])} exempt)")
     print()
@@ -1101,6 +1242,11 @@ def main():
         "    `=`/`with`/`rewrite`) is checked when deciding whether a line\n"
         "    DEFINES that operator, so a line whose RHS merely USES the\n"
         "    operator is never mistaken for one of its clauses.\n"
+        "  * (B4)'s →-slot count is an UPPER BOUND on premises: it counts\n"
+        "    every depth-0 `→`, including the binder arrow of a leading\n"
+        "    `∀ … →` telescope.  It sizes the ledger, it is not an exact\n"
+        "    obligation count.  (B4) is TEXTUAL too — a lemma used only\n"
+        "    inside a `where` block can be misreported as passed-only.\n"
         "  * Without --gate this is a report for a human to rule on rather\n"
         "    than a build gate; it deletes nothing either way."
     )
