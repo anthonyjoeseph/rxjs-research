@@ -111,6 +111,12 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 
 ### Tier 2 — the main proof branch (Verify-Well-Formed, 21; plus batch-online)
 
+> **PARKED behind tier 1** — see THE TIER ORDERING LAW in the roadmap below.
+> Tier 2 is built ON `budget-sufficient`, so proving anything here while tier 1's
+> anchor question is open bets on ground a tier-1 design failure would move. The
+> ranking is kept current; the WORK waits. Sole carve-out: merge-cert's
+> STATEMENT (a design deliverable, not a proof).
+
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
 | 1 | `burst-done-false` | VWF:1109 | **REFUTED 2026-08-06 — FALSE** | **Machine-refuted**, `agda/probe/Battery-Burst-Done.agda` (`burst-done-false-absurd`, a proven `→ ⊥`). `BurstInv`'s four fields never mention `done`, so `S = record { live = [] ; horizon = 0 ; current = nothing ; done = true }` inhabits it at `st-init`/`sched-init` and forces `true ≡ false`. Structural, hence shape-invariant over all `n`/`Γ`/`e`. **The source already knew**: VWF:876–882 says `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it must come from the walk order" — the postulate asserted what its own neighbour calls impossible. Repair is a SIGNATURE change, not a restatement — see Phase 2. |
@@ -129,6 +135,10 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | 16 | `stepFrame-wf-inner-concat` | VWF:4037 | DIFFICULTY | concat's drain grows the registry; re-establish FoldInv. Independent of merge-cert. |
 
 ### Tier 3 — all the other theorems (~25)
+
+> **PARKED behind tier 2** — see THE TIER ORDERING LAW. Bucket (b) is already
+> probed, so there is nothing cheap left here anyway; bucket (a) needs Anthony to
+> author definitions before it asserts anything at all.
 
 Three buckets, in risk order:
 
@@ -198,35 +208,50 @@ binaries, off every proof path. Carried, not counted.
 
 ---
 
-## THE ROADMAP — reduce uncertainty first, grind last
+## THE ROADMAP
 
-Ordered so that each phase's findings can still cheaply change the phases after
-it. Do not reorder: grinding before probing risks proving towers over false
-ground, which is this campaign's most expensive possible mistake.
+> ## THE TIER ORDERING LAW (Anthony, 2026-08-06)
+>
+> **TIER 1 IS FINISHED BEFORE ANY TIER 2 OR TIER 3 WORK RESUMES. STRICTLY.**
+> Not "mostly", not "while we wait on a build" — tier 2 and tier 3 work
+> *follows* tier 1 and does not interleave with it.
+>
+> **Why this is the right order, so nobody relaxes it for a plausible-sounding
+> reason:** tier 1 (`Verify-Budget-Sufficient`) is what `budget-sufficient`
+> rests on, and `evaluate-well-formed` — the whole of tier 2 — consumes
+> `budget-sufficient`. So **tier 2 is built ON tier 1**. Every hour spent
+> proving a tier-2 statement while tier 1's anchor question is open is an hour
+> bet on ground that a tier-1 design failure would move. That is this
+> campaign's most expensive class of mistake, and it has already been paid for
+> once.
+>
+> **The one carve-out, and it is a DESIGN carve-out, not a grinding one:**
+> answering a *design question* is cheap, is not the grind, and prevents the
+> grind from being aimed wrongly. So MERGE-CERT's **statement** may land now
+> even though its consumers are tier 2 — a statement is a one-line postulate
+> plus a header, and having it settled costs nothing later. **What must NOT
+> happen is the six rewrites and any tier-2 proof work built on it.** Those are
+> parked behind tier 1 with everything else.
+>
+> **Practical test before starting any task:** if the postulate you are about
+> to touch is NOT in the tier-1 table above, and the work is not one of the two
+> design questions, it is parked. Say so and pick a tier-1 item instead.
 
-### Phase 0 — THE FALSIFICATION SWEEP (workers, parallel, days not weeks)
+Within tier 1, ordered so that each phase's findings can still cheaply change
+the phases after it. Do not reorder: grinding before probing risks proving
+towers over false ground.
 
-Build the **postulate probe battery**: `agda/probe/Battery-*.agda` modules of
-bug-cache-style `refl` checks instantiating each probeable postulate at
-concrete programs (reuse the canonical/README programs; adversarial shapes
-where a comment names one). Every probe ends in exactly one of two states —
-a refutation (STOP-grade for that statement: record, restate, re-rank) or a
-confidence receipt (note it in the postulate's header: `-- PROBED 2026-08-…`).
+### Phase 0 — THE FALSIFICATION SWEEP — ✅ COMPLETE (2026-08-06)
 
-- **0a. `burst-done-false` refutation attempt** — the SUSPECT. Aim the probe at
-  a wrong-walk-position BurstInv inhabitant, per its own comment.
-- **0b. `batch-online` restatement + probe** — apply its own `nb:` (pre-flush
-  prefix), then probe the corrected form.
-- **0c. Caps arithmetic battery** — `init-capsOK?-base` (+ `init-capsOK?`;
-  this IS task #19), `opIterD≤sizeCount-root`, `depth-compositional`,
-  `three-size≤capsH`. All decidable on concrete `e`/`ins`; sweep the canonical
-  program set, nested/adversarial shapes included.
-- **0d. Evaluator-law battery** — `μ-unfold` (ids across the unfold — the
-  suspicious one), `fuel-coherent`, `id-inheritance`.
-- **0e. README battery** — the 10 `readme-*` claims at concrete instances.
-  Spec-level: a failure here is a STOP, not a fix.
-- **0f. VWF propagation battery** — `map/scan-nodry-push`, `scan-nodeP`,
-  the two `valsLast-push` mismatch postulates.
+All seven targets resolved in one parallel sweep. Two REFUTED
+(`burst-done-false`, `batch-online` — both had flagged themselves in comments),
+two DISCHARGED (`scan-binv-adapt` landed; `three-size≤capsH-core` proven in one
+line, landing pending), merge-cert SURVIVED its decisive reachability test,
+`init-capsOK?-base` + `depth-compositional` probed with residuals recorded, and
+`init-capsOK?` BLOCKED with its cause named. Detail per postulate is in the
+ledger tables above. **The sweep's most valuable output was not a verdict but
+the boxed CORRECTION on the caps axis: it is `abstract`-sealed and cannot be
+probed at all**, which is why Phase 2 below is symbolic rather than numeric.
 
 **THREE WAYS A PROBE LIES GREEN — all three observed on 2026-08-06's first
 sweep, all three in the direction of false comfort. Check every probe report
@@ -251,105 +276,98 @@ against them before believing a PROBED-GREEN.**
    HYPOTHESES. Mistaking this makes every `-core` in the repo look discharged —
    and every remaining tier-1 gap is a `-core`.
 
-### Phase 1 — THE TWO DESIGN QUESTIONS (design session; the real risk mass)
+A fourth, from the same sweep: **a row that could not have failed is not a
+row.** Label every probe row LOAD-BEARING or DEGENERATE and state what would
+make it fail; the README and evaluator batteries carry the worked example.
 
-- **1a. MERGE-CERT first — it is the cheaper experiment and already scoped:**
-  probe the corrected one-directional, liveness-aware statement
-  (VWF:3844–3847) against the three adversarial shapes that killed candidate
-  one (multi-source inner; inner-completes-before-outer; lingering regs after
-  `finish mergeᵒ`), in the style of `agda/probe/Cut-Caches-Probe.agda`. Survives → state
-  it as the postulate the four `*All` wraps and the two root-exit postulates
-  are rewritten over. Dies → this branch needs a design ruling before tier 2's
-  top eight can move at all.
-- **1b. THE ANCHOR PROBLEM (below, unchanged and still the campaign's center):**
-  state the reachability-sourced dry family (`chainStep-dry` /
-  `foldPath-dry` / `subscribeInner-dry`) that sources Ŝ/R̂/F from reachability —
-  the ONE route the two absurd proofs leave alive. Deliverable is a STATEMENT
-  that typechecks against the walk's actual call sites, probed on
-  Frame-Work-Probe's shapes — or a third refutation, which is STOP-grade:
-  it would mean tier 1's top three postulates have no surviving proof route.
+### Phase 1 — THE TWO DESIGN QUESTIONS ← **YOU ARE HERE**
 
-### Phase 2 — STATEMENT REPAIRS (design session; before any grind above them)
+These are the campaign's real risk mass, and both are design work for the
+design session, not worker grind.
 
-Every known-wrong-shape statement gets restated BEFORE work lands on top of it:
+- **1a. MERGE-CERT — SURVIVED (2026-08-06); land the STATEMENT only.**
+  The corrected form has a computable shape, is seed-provable, and its
+  reachability question is answered by the cascade ordering
+  (`cascadeLatch` sets `dying` before any chain is processed; `cascadeGo` adds
+  `rid` to `delivered` before `chainStep`; so `aliveThroughᶠ` is already false
+  when `innerFinish` drops `k` to 0). Full detail and the uncovered residue are
+  in the MERGE-CERT section below. **DO: state it in VWF with that mechanism in
+  its header, citing the line numbers. DO NOT: rewrite the six consumers or
+  prove anything over it — that is tier 2 and it is parked.**
+- **1b. THE ANCHOR PROBLEM — the campaign's center, and now the critical path.**
+  State the reachability-sourced dry family (`chainStep-dry` / `foldPath-dry` /
+  `subscribeInner-dry`) that sources Ŝ/R̂/F from reachability — the ONE route
+  the two absurd proofs leave alive. Deliverable is a STATEMENT that typechecks
+  against the walk's actual call sites, probed on Frame-Work-Probe's shapes — or
+  a third refutation, which is STOP-grade: it would mean tier 1's top three
+  postulates have no surviving proof route. Full statement of the problem in its
+  own section below.
 
-- **`batch-online` → pre-flush form. NEEDS ANTHONY'S RULING BEFORE LANDING.**
-  REFUTED 2026-08-06 (above). The restatement is prescribed by the postulate's
-  own `nb:` and is drafted + concretely checked in
-  `agda/probe/Battery-Batch-Online.agda`: compare `foldBatch-no-flush` (the same
-  fold with `[] ↦ []` instead of `[] ↦ flushBatch st`) against the full
-  `impl-batchSimultaneous` of the extension. **Why it is not landed under the
-  standing autonomy grant:** `batch-online` is one of Main's named claims, so
-  changing what it ASSERTS changes Main's claim set — while leaving Main.agda
-  byte-identical. That is precisely the silent change Main's rule 3 exists to
-  prevent, so it gets drafted and asked rather than assumed. Cost note: the edit
-  is cheap (Batch-Theorems + Main recheck; The-Proof does not import it).
-  Second point for the ruling: `foldBatch-no-flush` differs from `foldBatch`
-  (Implementation:119) in ONE clause, so it is a near-duplicate — acceptable as
-  the honest online projection, but worth a nod given the no-fat rule.
-- `dispatchShare-wf` → FoldOut-carrying conclusion (cascades into the
-  stepFrame family signatures — change the signatures first, per the law).
-- `sub-charge-capsOK-lift-core` → general mid-state `opIterD` hypothesis
-  (or a recorded ruling for why root-only suffices at its one consumer).
-- **`burst-done-false` → DELETE IT; give `subscribeE-wf` the premise instead.**
-  REFUTED 2026-08-06 (above), so this one is no longer optional. Two plausible
-  cheap fixes are both FALSE and each costs a build to rediscover: the
-  consumers do NOT already supply `done ≡ false` (they are the ofᵉ/emptyᵉ
-  clauses, and the postulate exists precisely because they have nothing to hand
-  `oneShotBurst-wf`'s `deq`), and `nodry` does NOT supply it (`hasDry ≡ false`
-  is a different proposition — the dry-burst flag, not the completion latch).
-  The repair: `subscribeE-wf` TAKES `ProtocolSt.done S ≡ false` and threads it.
-  **Soundness rests on the SPINE ARGUMENT** — mapᵉ/scanᵉ/takeᵉ/deferᵉ/μᵉ each
-  recurse into ONE child with `S` unchanged, and there is no binary static merge
-  (VWF:3823), so `S` is untouched from walk entry to the single base burst. This
-  matters because `oneShotBurst-run` LATCHES `done ≡ true`: if one walk could
-  subscribe two bases in sequence, the threaded premise would itself be false.
-  **CALLERS: ANSWERED — the repair is sound.** There is exactly ONE external
-  caller, `subscribe-wf` (VWF:1457), and it passes `S = protocol-init` whose
-  `done` field is literally `false` (Rx/Protocol.agda:75), so `refl` discharges
-  the premise. Every other call site is internal recursion carrying `S`
-  unchanged. **Rehearsed green** in `agda/probe/Battery-Done-Thread.agda`: all
-  12 clauses with the amended signature, calling the REAL `oneShotBurst-wf`, so
-  `deq` is checked against the actual lemma rather than a stub.
-  **PATCH IS WRITTEN AND READY TO LAND — 13 hunks**, listed in that probe's
-  header: 7 postulate signatures (`input-wf-core`, `defer-wf`, four `*All-wf`,
-  `takeᵉ-wf-core` outer), 3 declared signatures (`input-wf`, `subscribeE-wf`,
-  `takeᵉ-wf`), all 12 body clauses gain `deq`, `subscribe-wf` gains `refl`, and
-  `burst-done-false` is deleted. The two pointfree definitions eta-expand
-  unchanged; `takeᵉ-wf-core`'s INNER receipt does not change.
-  **SCOPE CAVEAT, do not overstate the result:** the spine is verified only
-  where recursion is VISIBLE CODE (mapᵉ/scanᵉ/takeᵉ/μᵉ + the two bases). The
-  four `*All` clauses and `input`/`deferᵉ` delegate to postulates, so threading
-  `deq` RELOCATES the obligation into them rather than proving it — and four are
-  also blocked on merge-cert. Whoever proves an `*All` receipt must honour it.
-  **HELD, not blocked:** landing it edits VWF, which invalidates the cached
-  interface that concurrently-running probe workers import. Land it when no
-  VWF-importing worker is live — the design session owns that gate (~40 min:
-  VWF + The-Proof + Main; the V-B-S tower is upstream and stays cached).
-- P4 `thruOuter-face-core` → resolve the "(a) may not fit fCharge" doubt at
-  the statement level.
-- Phase 0's refutation fallout, whatever it is.
+### Phase 2 — TIER 1 STATEMENT REPAIRS + THE SYMBOLIC ATTACK
 
-### Phase 3 — THE GRIND (workers; only over probed or repaired ground)
+Tier-1 statements known to be wrong-shaped, and the caps axis's substitute for
+probing. All of this is tier 1, so all of it precedes tier 2.
 
-Conditional-risk order: cheapest-and-safest first, anchor-dependent mass last.
+- `sub-charge-capsOK-lift-core` → general mid-state `opIterD` hypothesis (or a
+  recorded ruling for why root-only suffices at its one consumer). Its own route
+  comment calls for a general form that is unstated and unknown.
+- P4 `thruOuter-face-core` → resolve the "(a) may not fit `fCharge`" doubt at
+  the statement level, per its own header.
+- **`opIterD≤sizeCount-root-core` → SYMBOLIC rehearsal.** Numeric probing is
+  impossible (see the boxed correction above); the route is to state the full
+  type at symbolic `e`/`ins` and close it without forcing a sealed symbol, which
+  is exactly how `three-size≤capsH-core` became a one-line proof. Read the three
+  `sizeCount-body` call sites first — they are the worked examples of reasoning
+  through the seal, and they are reusable for the whole axis.
+- **Land `three-size≤capsH-core`'s discharge**, moving `three-size-le-blowH` and
+  its helper chain from `Pool-Lower-Probe` into `Caps.agda`. **Decide the
+  `S≤sizeStep` orphan in the SAME commit** — the discharge strands it (its only
+  consumer is the assembly being replaced).
+- **State `capsAt-base-reg`**, the one missing sub-lemma that lets proven
+  `capsOK?-mono` lift `init-capsOK?-base` to `init-capsOK?` and retire the
+  latter.
 
-1. `cut-owed`, `three-size≤capsH-core`, `scan-binv-adapt`, and the Phase-0f
-   propagation lemmas — no blockers, low statement risk.
-2. The per-clause WF receipts (`input-core`, `defer`, `takeᵉ-core`) — pattern
-   proven three times already.
-3. `stepFrame-wf-inner-concat`, P3 — real grind, no design blocker.
-4. `init-capsOK?-base-core` + `opIterD≤sizeCount-root-core` — after 0c
-   confirms the numbers.
-5. The merge-cert cluster — after 1a lands its statement.
-6. The anchor cluster (`subscribeE-walk-core` → `subscribeE-wet-core` →
-   `cascadeGo-wet-core` → `dry-tick-core`, then `mid-step-core`'s FoldOut
-   threading) — after 1b. This is the endgame, and it stays LAST because it
-   is where a design failure costs the most reground work.
+### Phase 3 — THE TIER 1 GRIND (workers; only over probed or repaired ground)
 
-**Tier 3 policy:** bucket (b) is Phase 0e/0d worker fodder. Bucket (a) is
-parked until Anthony authors the abstractions' definitions — flag, don't grind.
-Bucket (c) is permanent trusted FFI.
+Cheapest-and-safest first, anchor-dependent mass last.
+
+1. `three-size≤capsH-core` (proof in hand), `init-capsOK?-base-core` (proof
+   sketch in hand from the two structural arguments) — the two tier-1 items
+   closest to done.
+2. `dry-tick-core`'s own bookkeeping, to whatever depth `cascadeGo-wet` allows.
+3. P3 `innerFinish-concat-face-core` — real grind, no design blocker.
+4. `depth-compositional` — probed green including evolved states; the
+   `storeNestMax` strengthening is the remaining work.
+5. The anchor cluster (`subscribeE-walk-core` → `subscribeE-wet-core` →
+   `cascadeGo-wet-core` → `dry-tick-core`) — after 1b. This is the endgame and
+   it stays LAST, because it is where a design failure costs the most reground
+   work.
+
+**TIER 1 IS FINISHED when every postulate in the tier-1 table is discharged or
+deleted.** That is the gate. Only then does the parked work below resume.
+
+### Phase 4 — TIER 2, PARKED BEHIND TIER 1
+
+Ready-to-go work deliberately NOT being done, so it is not lost:
+
+- The six merge-cert consumers rewritten over 1a's statement
+  (`subscribeE-{merge,concat,switch,exhaust}All-wf`, `root-done-plumbed`,
+  `root-caches`, `stepFrame-wf-outer`).
+- `dispatchShare-wf` → FoldOut-carrying conclusion (cascades into the stepFrame
+  family signatures — change the signatures first, per the wiring law).
+- `cut-owed`, `stepFrame-wf-inner-concat`, the per-clause WF receipts
+  (`input-core`, `defer`, `takeᵉ-core`), `mid-step-core`'s FoldOut threading,
+  and the two `valsLast-push` shape postulates.
+
+### Phase 5 — TIER 3, PARKED BEHIND TIER 2
+
+- Bucket (a) VACUOUS-BY-ABSTRACTION (all of `Rx.Time-Theorems`, `causality`,
+  `μ-guarded`, `defer-shift`): de-risking these means **defining** the nine
+  postulated abstractions, which is claim-authoring and needs Anthony. Flag,
+  do not grind.
+- Bucket (b) is PROBED (2026-08-06) with residuals recorded; proofs are Phase 5.
+- Bucket (c) FFI is permanently trusted, not counted.
+
 
 ---
 
@@ -564,8 +582,22 @@ Four rules, each of which otherwise costs a full build to rediscover:
 
 ## Active tasks → phases
 
-Live list is the session task tool; this maps the standing ones onto the
-roadmap: **#19** (capsOK? at c₀) IS Phase 0c's core probe. **#17**
-(opIterD≤sizeCount-root + sub-charge-capsOK-lift) is Phase 0c + Phase 2's
-generalization repair, THEN Phase 3.4. **#4** (P3+P4) is Phase 2 (P4's
-statement doubt) + Phase 3.3 (P3's grind).
+Live list is the session task tool. Under THE TIER ORDERING LAW the standing
+tasks split cleanly into ACTIVE (tier 1 + the two design questions) and PARKED
+(everything tier 2 / tier 3), and the split is the schedule:
+
+**ACTIVE — tier 1 and design:**
+- **#30** THE ANCHOR PROBLEM — Phase 1b. The critical path; nothing in tier 1's
+  top block moves until it is answered.
+- **#17** `opIterD≤sizeCount-root` + `sub-charge-capsOK-lift` — Phase 2's
+  symbolic attack and generalization repair, then Phase 3.
+- **#4** P3 + P4 — Phase 2 for P4's statement doubt, Phase 3.3 for P3's grind.
+- **#33 (PARTIAL)** merge-cert — the STATEMENT half only, as Phase 1a's design
+  carve-out. Its six consumer rewrites are PARKED.
+
+**PARKED behind tier 1 — recorded so it is not lost, not so it is picked up:**
+- **#31** tier-2 statement repairs (`dispatchShare-wf`), and #33's six rewrites.
+- Everything in roadmap Phase 4 and Phase 5.
+
+**#19** and **#26** are COMPLETE (Phase 0). Note #19's answer — the two
+structural arguments — doubles as `init-capsOK?-base-core`'s proof sketch.

@@ -318,6 +318,20 @@ picking up any postulate.
   the cheapest unmanaged risk in the repo.**
 - **Never extrapolate a probe past its shapes.** Green on three canonical programs is
   a receipt, not a theorem; say which shapes were covered and which were not.
+- **A row that could not have failed is not a row.** Label every probe row
+  LOAD-BEARING or DEGENERATE and state what would make it fail. Three ways a probe
+  lies green — vacuous rows, hand-built (unreachable) states, and reading an assembly
+  backwards — are itemised in PROOF-STATE's roadmap; all three were observed in one
+  day, and all three erred toward false comfort.
+
+**TIER ORDER IS LAW: TIER 1 FINISHES BEFORE TIER 2 OR 3 RESUMES (Anthony,
+2026-08-06).** Strictly — not "mostly", not "while a build runs". Tier 2
+(`evaluate-well-formed`) is built ON tier 1's `budget-sufficient`, so proving a
+tier-2 statement while tier 1's anchor question is open bets on ground a tier-1
+design failure would move. The one carve-out is answering a *design question*
+(cheap, and it aims the grind) — never grinding over one. **Before starting any
+task: if the postulate is not in PROOF-STATE's tier-1 table, and the work is not
+one of the two design questions, it is parked — say so and take a tier-1 item.**
 
 **These still hold, unchanged from the wiring pass:**
 
