@@ -149,9 +149,17 @@ it. That is consistent with what it IS — the ledger receipt whose composition 
 P1's landing GAP 4 *refuted* — so it looks like weight left behind when that
 route died. Note it is distinct from `subscribeE-walkS` (Wet:1367), the PROVEN
 family that is genuinely used. Deleting an unused postulate is strictly sound:
-it removes an assumption and cannot break a proof. **Ruling needed:** confirm no
-future consumer is intended, then delete for a free 4 → 3 on the ledger. Do not
-spend proof effort on it before that ruling.
+it removes an assumption and cannot break a proof.
+
+**BUT IT IS FROZEN, AND THE OLD INSTRUCTION HERE WAS WRONG TWICE.** This
+paragraph used to say "confirm no future consumer is intended, then delete for a
+free 4 → 3 on the ledger." Both halves are now overruled: **(i)** the DELETION
+FREEZE (CLAUDE.md § "DELETION FREEZE", and below) bars deleting any orphan until
+the wiring pass finishes — "no consumer today" and "no consumer ever" are
+different questions, and only building the consumer answers the second;
+**(ii)** "a free 4 → 3 on the ledger" is scoreboard framing, which the operating
+mode at the top of this file rejects outright. A smaller count is not the goal.
+Do not spend proof effort on P5, and do not delete it either — park it.
 
 **THE CAPS CHAIN DEPENDS ON P3 + P4.** `caps-tick` is described as "ground", and
 it is — *modulo* the two faces above, which are real call sites inside the caps
@@ -178,11 +186,26 @@ in Caps-Bridge.agda and Depth-Bound.agda respectively, no longer postulates.)
 
 ## Wiring rulings (2026-08-05) — run `make wiring` for the live list
 
+> **DELETION FREEZE IS IN FORCE (Anthony, 2026-08-05) — full statement in
+> CLAUDE.md § "DELETION FREEZE: wire everything BEFORE deleting anything".
+> NOTHING in the clusters below gets deleted until the wiring pass is
+> finished**, whatever this file or a source comment says about it being dead.
+> The reason is mechanical, not cautious: **wiring only ADDS consumers, so its
+> signal is monotone and safe to act on; deletion CREATES orphans** by stranding
+> whatever fed only into the deleted cluster. Measured the day the rule was
+> written — removing the retired multiset measure orphaned six further
+> definitions. So deleting before wiring is complete **corrupts the very
+> measurement used to decide what to delete.** Two entries on that day's
+> deletion list were wrong (`pWᵉ≤entryCeil`, needed by work not yet written;
+> `dBound-struct`, orphaned only because it sat below its own specialisation).
+> The single exemption is code the SOURCE ITSELF retires in writing.
+
 **PRIORITY (Anthony, 2026-08-05): deletion matters, but NOT ignoring usable work
 matters more.** Read the clusters below as a RECOVERABLE-ASSETS list first and a
-cleanup list second. 87 proven definitions sitting unused is 87 pieces of work
-already paid for; the question to ask of each is "what would it take to spend
-this, and what does spending it unblock" — not "should this go."
+cleanup list second. Every proven definition sitting unused is work already paid
+for; the question to ask of each is "what would it take to spend this, and what
+does spending it unblock" — not "should this go." (The count was 87 when this
+was written and is 78 today; take it from `make wiring`, not from here.)
 
 ### MAIN IS THE TOP-LINE PROOF — three rules (Anthony, 2026-08-05)
 
@@ -527,12 +550,19 @@ stBounded? component a `capsOK?-init` would want already sits inside `init-INV`
 (Caps-Face:~4496).
 
 **CONSEQUENCE FOR THE ENDGAME ESTIMATE.** The orphan set is NOT mostly missing
-wires. It splits three ways: some genuinely wire, a substantial block is dead and
-wants deleting, and the anchor cluster (26) parks behind the central design
-question. The wiring law's real yield here was not "find the missing wires" but
-"discover which proven work was never going to be used" — which is why the
-postulate count and the orphan count move in opposite directions from what a
-naive reading expects.
+wires. It splits three ways: some genuinely wire, a substantial block *looks*
+dead, and the anchor cluster (26) parks behind the central design question. The
+wiring law's real yield here was not "find the missing wires" but "discover which
+proven work was never going to be used."
+
+**READ "LOOKS DEAD" STRICTLY — this paragraph used to say "is dead and wants
+deleting", and that phrasing is exactly what the DELETION FREEZE above exists to
+stop.** An orphan is a FINDING, not a verdict. Nothing here is known dead until
+its would-be consumer has been written and still does not want it; until then
+"no consumer today" is all that has been established. Note also that postulate
+count and orphan count moving in opposite directions is the mechanism working —
+not, as an earlier draft of this paragraph implied, a surprise to be explained
+away.
 
 ### RECOVERY SHA: the retired multiset measure — `11a34db` (2026-08-05)
 
