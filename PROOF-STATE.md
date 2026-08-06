@@ -455,16 +455,30 @@ design session, not worker grind.
        predicted 126, exceeded a 10-min typecheck and are left uncertified in
        the file; coverage is honest there.)
      - **WHAT DECIDES THE DRY FAMILY NOW — step 3, the symbolic caps step.**
-       One instant of caps headroom is one `blowH` application
-       (`capsHgo m (suc id) = blowH (capsHgo m id)`, Evaluator.agda:905), and
-       `blowH m = 6 + m + 2·poolCount (towerℕ m) m` is itself tower-shaped. So
-       the question is a TOWER-vs-TOWER height comparison: does one `blowH`
-       step at argument ≥ `capsBase e sl` dominate the runtime tower of height
-       ≤ nesting-depth ≤ `sizeᵉ e`? Plausible (blowH's tower height is its
-       ARGUMENT, ≥ capsBase > sizeᵉ; the runtime tower's height is nesting
-       depth < sizeᵉ) — but heights must be compared symbolically through the
-       `lvls`/`poolCount` lower-bound kit, not asserted. UNPROBED; do it
-       before the Wet wiring, same rule as before.
+       (An earlier draft of this bullet said the cSize step "is one blowH
+       application" — WRONG, that is the GAS height `capsHgo`. The real step,
+       read off `capsAt-suc-full`: `Ŝ = iterSize B j B` with
+       `j = sizeCount (capsAt e sl id) (capsH e sl id)`.)
+
+     ⚖️ **STEP 3 DONE — THE RACE RESOLVES TO ONE NAMED INEQUALITY**
+     (`agda/probe/Battery-Tick-Headroom.agda`, green). Proven, no postulates:
+     `iterSize-doubles` (`sizeStep S s = S·(1+2s) ≥ 2s`, so one tick
+     multiplies cSize by ≥ 2^j) and `headroom-arith` (`2^j·B` beats the
+     instant's demand form `(2B+12)·towerℕ(suc sz)` as soon as
+     `j ≥ 3 + towerℕ sz`, `sz = sizeᵉ e + slotsSize sl`). The assembly
+     `tick-covers-instant` is a REAL definition typechecking against the
+     actual `capsAt` recurrence. **The single residual is the postulate
+     `count-covers-tower : 3 + towerℕ sz ≤ sizeCount (capsAt e sl id)
+     (capsH e sl id)`** — abstract-locked against numeric probing (same
+     three-seal lock as tier-1 #6), symbolic route recorded in its header
+     (each `dLvl` step climbs past `sizeAt S J ≥ 2^J`, so n steps tower to
+     height n; `cDel ≥ height` is the new part). It joins `opIterD-dominated`
+     as the second member of the "pure ℕ arithmetic over the sealed count
+     machinery" class. If it is FALSE the dry family is false as written and
+     the anchor re-indexes; if it holds, the family's headroom arithmetic is
+     CLOSED. The demand MODEL (`a′ ≤ 2a + v + 11`, count ≤ towerℕ sz) remains
+       the dry family's own measured-not-proven content — that is what the
+       three dry postulates assert.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
