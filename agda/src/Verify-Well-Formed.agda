@@ -1012,15 +1012,17 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --   · FRAME (subscribeE b (f ↠ κ) then pushBurst f κ burst): mapᵉ (f=map-f),
 --     takeᵉ-suc (mintNode+installNode, f=take-f), scanᵉ (mintNode+installNode,
 --     f=scan-f).  Obligation: IH (subscribeE-wf on b, structural) gives BurstInv+run
---     for b's burst; then `pushBurst-wf` folds stepFrame over each emit, preserving
+--     for b's burst; the clause must then fold stepFrame over each emit, preserving
 --     BurstInv+run.  NOTE pushBurst runs stepFrame under BurstInv, NOT FoldInv — so
---     it needs a `stepFrame-burst` preservation, the burst-side twin of stepFrame-wf
---     (same map/scan/take/wrap case split, but re-establishing live-matches equality
---     rather than SHADOW).  installNode adds a fresh scan/take node — caches-neutral.
+--     that fold needs the burst-side twin of stepFrame-wf (same map/scan/take/wrap
+--     case split, but re-establishing live-matches equality rather than SHADOW).
+--     NO such helper is stated, and cannot usefully be: see the NOTE at the *All
+--     gap postulates.  installNode adds a fresh scan/take node — caches-neutral.
 --   · WRAP (subscribeAll = mintNode + subscribeE b (thru-outer op nid ↠ κ) + pushBurst
 --     (thru-outer op nid)): mergeAllᵉ/concatAllᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
 --     as FRAME with f = thru-outer op nid and a minted *All node installed at its
---     initial state — so it reuses pushBurst-wf's thru-outer case.  This is where the
+--     initial state — so it reuses the FRAME obligation above at f = thru-outer
+--     op nid.  This is where the
 --     merge coherence (root-caches) actually gets exercised (walk subscribes
 --     inners) — and where the SECOND fork below says the counter cannot be kept
 --     coherent emit-by-emit, only re-established at the exit.
@@ -1031,7 +1033,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- subscribeE-scan-wf, subscribeE-take-wf (frame clauses).  pushBurst-wf and
 -- stepFrame-burst were dropped (both had `→ Set` return types — asserting nothing
 -- checkable by the typechecker).  The gap postulates below cover blocked clauses
--- (burst-done-false, map-*/scan-*/take-* shape gaps, subscribeAll-wf for *All wrap,
+-- (burst-done-false, map-*/scan-*/take-* shape gaps, the four *All wrap clauses,
 -- subscribeE-input-wf/defer-wf/takeᵉ-wf).  dispatchShare-wf and the
 -- stepFrame-wf-inner-concat/outer residues remain blocked on merge-cert.
 -- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other recursion
@@ -1067,7 +1069,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --   RESOLVED (2026-07-20): done-plumbed DROPPED from BurstInv.  It is now
 --   re-established once, at burst-final, from the `root-done-plumbed` postulate
 --   (root-returned stream's done ≡ true ⟹ registry share-sunk — the merge-
---   coherence content, to be proven with pushBurst-wf/subscribeAll-wf).  This
+--   coherence content, to be proven when the *All wrap clauses are).  This
 --   also DELETED the `allShareSunk` premise the base clause used to owe.  Fully
 --   proof-side (BurstInv is not the spec); makes subscribeE-wf TRUE for inners
 --   (only done-plumbed was false there).  Note kept as the rationale of record.
@@ -1094,7 +1096,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --   premise and cachesValid-setNode-ok (both existed only to feed the field), and
 --   reduced pushBurst-scan-caches to pushBurst-scan-fixed.  root-caches is the
 --   same merge-coherence content root-done-plumbed is waiting on, so the two
---   discharge together with pushBurst-wf/subscribeAll-wf.
+--   discharge together, once the *All wrap clauses acquire real proofs.
 -- ════════════════════════════════════════════════════════════════════════
 -- ════════════════════════════════════════════════════════════════
 -- GAP POSTULATES — real gaps against the actual lemma types
@@ -1416,7 +1418,7 @@ burst-final sched st S binv dp cv = inv , paid (BurstInv.current-frame binv)
 -- genuine full completion — which leaves only share sinks registered.  (On the
 -- inner-recursion path this is false, but done-plumbed is never read there; it
 -- is consumed ONLY here, at the root frame-0 exit.)  Postulated for now — its
--- proof is the merge-coherence content, landed with pushBurst-wf/subscribeAll-wf.
+-- proof is the merge-coherence content, landed when the *All wrap clauses are.
 postulate
   root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
@@ -1802,8 +1804,8 @@ applyEvents-done-mono (close s dried ∷ es) lv o d hyp dt
 -- are transparent, so removing/reordering them past bookkeeping is invisible),
 -- the frame's own values are equally transparent, and a `complete` anywhere
 -- collapses to one trailing `complete` (done is idempotent, and success rules
--- out any value behind it).  This is the pure core of pushBurst-wf / stepFrame-
--- burst; the frame's transformed values `vals′` are arbitrary here precisely
+-- out any value behind it).  This is the pure core of the burst-side frame fold;
+-- the frame's transformed values `vals′` are arbitrary here precisely
 -- because the protocol never inspects a value payload.
 
 -- companion, done-side: a successful applyEvents-under-done carries NO values
