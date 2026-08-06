@@ -1336,6 +1336,48 @@ def main():
                     "(premises discharged or lemma deleted — remove from agda/DEFERRED.txt)"
                 )
 
+        # (C1) PROBE LEDGER — agda/probe is outside the claim graph by
+        # design (it is the fast-iteration space), which makes it the one
+        # place proven work can park invisibly (hit 2026-08-06: a zero-
+        # postulate theorem file sat in probe/ consumed by nothing).  The
+        # ratchet: every probe file carries a ledgered classification in
+        # agda/PROBES.txt — EVIDENCE (refutations/measurements, never
+        # lands) or LANDING: <target> (tracked inventory that must move).
+        # A new probe file fails the gate until classified; a line whose
+        # file is gone fails until removed (deleting the file IS the
+        # normal end of a LANDING line — git is the archive).
+        unledgered = []
+        ghost_lines = []
+        probe_dir = os.path.abspath(os.path.join(src_dir, "..", "probe"))
+        probes_path = os.path.join(os.path.dirname(ledger_path), "PROBES.txt")
+        if os.path.isdir(probe_dir):
+            probe_files = sorted(
+                f for f in os.listdir(probe_dir) if f.endswith(".agda")
+            )
+            if not os.path.isfile(probes_path):
+                problems.append(
+                    f"agda/PROBES.txt not found at {probes_path} — every "
+                    "probe file must carry a ledgered classification"
+                )
+            else:
+                probe_ledger = set()
+                with open(probes_path, encoding="utf-8") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        probe_ledger.add(line.split("|")[0].strip())
+                unledgered = sorted(set(probe_files) - probe_ledger)
+                ghost_lines = sorted(probe_ledger - set(probe_files))
+                if unledgered:
+                    problems.append(
+                        f"{len(unledgered)} probe file(s) not in agda/PROBES.txt"
+                    )
+                if ghost_lines:
+                    problems.append(
+                        f"{len(ghost_lines)} PROBES.txt line(s) whose file is gone"
+                    )
+
         if problems:
             print()
             print("=" * 78)
@@ -1366,6 +1408,18 @@ def main():
                 )
                 print("This is a WIN; the gate fails only until the ledger is tidied:")
                 for name in stale_entries:
+                    print(f"  {name}")
+            if unledgered:
+                print()
+                print("UNLEDGERED PROBES — classify each in agda/PROBES.txt:")
+                print("  <file> | EVIDENCE | <what it measured>          (or)")
+                print("  <file> | LANDING: <src target> | <what must move>")
+                for name in unledgered:
+                    print(f"  {name}")
+            if ghost_lines:
+                print()
+                print("GHOST LEDGER LINES — file deleted; remove the line:")
+                for name in ghost_lines:
                     print(f"  {name}")
             sys.exit(1)
         print()

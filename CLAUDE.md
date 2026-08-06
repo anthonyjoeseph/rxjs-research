@@ -373,6 +373,28 @@ available at the call site, adding it and deleting the postulate is less work th
 carrying it. (`depthE ≤ capsH` unconditionally is FALSE, `Depth-Bound.agda:11`; the
 `capsOK?`-conditioned form costs nothing extra, so it is the one that is stated.)
 
+### The probe ledger: probes are three species, and the gate tracks all of them (Anthony, 2026-08-06)
+
+`agda/probe/` is outside the claim graph BY DESIGN (that is what makes iteration
+cheap), which makes it the one place proven work can park invisibly — hit
+2026-08-06, when a zero-postulate theorem file sat there consumed by nothing.
+Three species actually live in the directory, and the failure mode is treating
+them as one:
+
+- **EVIDENCE** — refutations, measurements, reached-state receipts. Consumer is
+  a PROOF-STATE ruling, not a theorem. Never lands in src.
+- **REHEARSAL** — assemblies over postulated gaps, typechecked symbolically to
+  validate a proof's SHAPE before paying the src recheck. Destined for src.
+- **FINISHED PROOF** — real theorems born in probe/ because the fast loop is
+  there. These are src material, full stop, and MUST land.
+
+**The ratchet: `agda/PROBES.txt`, gated by `make wiring-gate` (section C1).**
+Every probe file carries a ledger line — `EVIDENCE | <note>` or
+`LANDING: <src target> | <note>`. A new probe fails the gate until classified;
+when a LANDING file lands, DELETE the file and its line in the same commit (git
+is the archive). **Never end a session with a new zero-postulate theorem in
+probe/ and no LANDING line naming its destination.**
+
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
 **THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level

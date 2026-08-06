@@ -96,6 +96,9 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
 -- once proved).  Acyclic: Depth-Bound imports Wet and Subscribe-Face,
 -- NOT Caps-Bridge.
 open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
+open import Verify-Budget-Sufficient.Op-Dominance using (opIterD-dominated)
+open import Verify-Budget-Sufficient.Caps
+  using (2≤capsAt-size; capsAt-base-size; sizeCount-body)
 
 ------------------------------------------------------------------
 -- (A) BRIDGE LEMMAS.  What `capsAt`'s two numeric fields ARE, related
@@ -1065,8 +1068,7 @@ depthE≤capsH-root e ins =
        (s≤s z≤n))                      -- pathLen root ≡ 0
     (three-size≤capsH e ins)
 
-postulate
-  -- the sweep/cascade domination at EQUAL depth fuel.  THE GENUINELY
+-- the sweep/cascade domination at EQUAL depth fuel.  THE GENUINELY
   -- NEW MATHEMATICS on this ladder, and the direction is the reason:
   -- everything Caps-Chain proves about `opIterD` is a LOWER bound
   -- (these transformers are BUDGETS there, so clauses show real costs
@@ -1087,7 +1089,7 @@ postulate
   -- whole family — the ceiling `nest≤`, the share edge, the two μ steps
   -- and the level raise — plus .Caps-Chain's entry conversion are the
   -- facts this bound is built from.
-  opIterD≤sizeCount-root-core :
+opIterD≤sizeCount-root-core :
     -- entry-to-index  (Verify-Budget-Sufficient/Caps-Chain.agda:292)
     (∀ (S W d k J m : ℕ) → 2 ≤ S → suc (sizeAt S J) ≤ m →
       sLvlD S W d (suc k) J ≤ opIterD S W d k m J
@@ -1122,6 +1124,30 @@ postulate
     opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
             (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
       ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
+-- REAL since 2026-08-06 (was the block's postulate): the arithmetic
+-- core is Op-Dominance's `opIterD-dominated`; the counting bounds are
+-- nest≤ (hypothesis 2, APPLIED below) + capsAt-base-size.  The six
+-- other hypotheses stay in the signature: they are the kit the
+-- residual `opIterD-budget` postulate's structural proof consumes.
+opIterD≤sizeCount-root-core _ nest-le _ _ _ _ _ e ins =
+  ≤-trans
+    (opIterD-dominated (Caps.cSize c) (Caps.cWid c) dep
+       (nest e ins []) (suc (sizeᵉ e)) (Caps.cReg c) 2≤S k≤S m≤S)
+    (≤-reflexive (sym (sizeCount-body c dep)))
+  where
+  c   = capsAt e ins 0
+  dep = capsH e ins 0
+  2≤S : 2 ≤ Caps.cSize c
+  2≤S = 2≤capsAt-size e ins 0
+  k≤S : nest e ins [] ≤ Caps.cSize c
+  k≤S = ≤-trans (nest-le e ins [])
+          (≤-trans (≤-trans (n≤1+n (sizeᵉ e + slotsSize ins))
+                            (s≤s (n≤1+n (sizeᵉ e + slotsSize ins))))
+                   (capsAt-base-size e ins 0))
+  m≤S : suc (sizeᵉ e) ≤ Caps.cSize c
+  m≤S = ≤-trans (s≤s (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
+                              (n≤1+n (sizeᵉ e + slotsSize ins))))
+                (capsAt-base-size e ins 0)
 
 opIterD≤sizeCount-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
