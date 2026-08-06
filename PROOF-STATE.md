@@ -487,10 +487,24 @@ design session, not worker grind.
      (`a′ ≤ 2a + v + 11`, count ≤ towerℕ sz) — the dry family's own
        measured-not-proven content — that is what the
        three dry postulates assert.
-  3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
-     and `connect-edge`'s premises at the call site from the family. This is the
-     step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
-     place, before any proof is ground over it.
+  3. **TYPECHECK THE CONSUMER AGAINST THEM — ✅ DONE (2026-08-06), with one
+     correction to this step's own wording.** The consumer is NOT
+     `subscribeE-wet-core`: the dry family is `capsOK?`-conditioned and Wet
+     deliberately reads NOTHING from the caps face (its own import comment),
+     so the right layer is the caps↔wet bridge. Landed as:
+     - `src/Verify-Budget-Sufficient/Tick-Headroom.agda` — the whole headroom
+       chain, verbatim from the probe (deleted).
+     - `src/Verify-Budget-Sufficient/Anchor-Dry.agda` — the dry family,
+       FACTORED on landing: each dry statement is a real DEFINITION =
+       demand postulate widened to `Ŝ` by `tick-covers-instant` (via
+       `burstB?-widen`/`valsB?-widen`). The three `*-demand` postulates at
+       the explicit form `(2·B + 12) · towerℕ (suc sz)` are now THE anchor's
+       entire open surface, greppable.
+     - `dry-tick-core` (Caps-Bridge) threads the family + `dry-hop` as four
+       new hypotheses, supplied at `dry-tick` — the shape typechecks against
+       the real recurrence; all four ledgered in DEFERRED.txt.
+     If the demand form is wrong it now changes in one file, before any
+     proof is ground over it.
   4. **THE UN-DEFERRING, ENFORCED IN `make wiring`** (Anthony, 2026-08-06) —
      ✅ **DONE, `bfa6b6e`.** `agda/DEFERRED.txt` holds 55 ledgered entries
      (≤152 →-slots); `make wiring-gate` ratchets against it. Verified by the

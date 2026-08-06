@@ -85,3 +85,7 @@ valsCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-conc
 walk-hyps-round3b | subscribeE-walk-core | ≤2 | REASON: subscribeE-walk-core must be proven
 walk-hyps-splitAnchor | subscribeE-walk-core | ≤3 | REASON: subscribeE-walk-core must be proven
 ⊑ᶜ-refl | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
+chainStep-dry | dry-tick-core | ≤5 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; its own demand postulate is the anchor's open surface (Anchor-Dry.agda)
+dry-hop | dry-tick-core | ≤3 | REASON: hop-edge's size-premise discharger; applied when the walk grind reaches hop-edge's call sites
+foldPath-dry | dry-tick-core | ≤6 | REASON: consumed by the fold clause grind once dry-tick-core is proven; demand half postulated (Anchor-Dry.agda)
+subscribeInner-dry | dry-tick-core | ≤5 | REASON: the key hop-edge enabler at thruConsume sites; consumed by the walk grind once dry-tick-core is proven

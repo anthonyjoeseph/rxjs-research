@@ -99,6 +99,11 @@ open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
 open import Verify-Budget-Sufficient.Op-Dominance using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; sizeCount-body)
+open import Verify-Budget-Sufficient.Anchor-Dry
+  using (chainStep-dry; foldPath-dry; subscribeInner-dry; dry-hop)
+open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
+open import Rx.Prim using (InstEvent)
+open import Rx.Exp using (obs; sizeᵛ)
 
 ------------------------------------------------------------------
 -- (A) BRIDGE LEMMAS.  What `capsAt`'s two numeric fields ARE, related
@@ -510,6 +515,63 @@ postulate
                    (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
                                    (cascadeLatch a st))))
      ) →
+    -- THE DRY FAMILY (Verify-Budget-Sufficient/Anchor-Dry.agda) — the
+    -- reachability-sourced anchor facts (Phase 1b step 3).  Threaded
+    -- here so the eventual clause grind consumes them where the
+    -- cascade meets chainStep/foldPath/subscribeInner; their premises
+    -- are exactly the INV?/capsOK? conjuncts this core's own driver
+    -- carries.  dry-hop closes hop-edge's size premise from valB?.
+    -- chainStep-dry  (Anchor-Dry.agda)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+      (sched : Sched Γ) (st : EvalSt e) →
+      let sl = Sched.slots sched
+          Ψ  = ΨAt e sl
+          B  = sizeCapAt e sl id
+          Ŝ  = sizeCapAt e sl (suc id)
+      in INV? Ψ B sched st ≡ true →
+         capsOK? (capsAt e sl id) sched st ≡ true →
+         valB? B Ψ (arrTy a) (arrVal a) ≡ true →
+         pathB? B Ψ path ≡ true →
+         burstB? Ŝ Ψ (proj₁ (chainStep id a path sched st)) ≡ true
+     ) →
+    -- foldPath-dry  (Anchor-Dry.agda)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+      (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+      (path : Path Γ u t) (vals : List (Val Γ u))
+      (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+      (sched : Sched Γ) (st : EvalSt e) →
+      let sl = Sched.slots sched
+          Ψ  = ΨAt e sl
+          B  = sizeCapAt e sl id
+          Ŝ  = sizeCapAt e sl (suc id)
+      in INV? Ψ B sched st ≡ true →
+         capsOK? (capsAt e sl id) sched st ≡ true →
+         pathB? B Ψ path ≡ true →
+         all (valB? B Ψ u) vals ≡ true →
+         all (eventB? B Ψ) evs ≡ true →
+         burstB? Ŝ Ψ (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st)) ≡ true
+     ) →
+    -- subscribeInner-dry  (Anchor-Dry.agda)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+      (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+      (id : Id) (now : Tick) (o : Val Γ (obs u))
+      (sched : Sched Γ) (st : EvalSt e) →
+      let sl = Sched.slots sched
+          Ψ  = ΨAt e sl
+          B  = sizeCapAt e sl id
+          Ŝ  = sizeCapAt e sl (suc id)
+      in INV? Ψ B sched st ≡ true →
+         capsOK? (capsAt e sl id) sched st ≡ true →
+         valB? B Ψ (obs u) o ≡ true →
+         pathB? B Ψ κ ≡ true →
+         all (valB? Ŝ Ψ u)
+             (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
+     ) →
+    -- dry-hop  (Anchor-Dry.agda)
+    (∀ {n} {Γ : Ctx n} {u : Ty} (B Ŝ Ψ : ℕ) (o : Val Γ (obs u)) →
+      B ≤ Ŝ → valB? B Ψ (obs u) o ≡ true → sizeᵛ (obs u) o ≤ Ŝ
+     ) →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
     let sl = Sched.slots sched
@@ -535,6 +597,10 @@ dry-tick =
     (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeLatch-deliv {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascade-delivN {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → chainStep-dry {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} {u} → foldPath-dry {n} {Γ} {t} {e} {u})
+    (λ {n} {Γ} {t} {e} {u} → subscribeInner-dry {n} {Γ} {t} {e} {u})
+    (λ {n} {Γ} {u} → dry-hop {n} {Γ} {u})
 
 ------------------------------------------------------------------
 -- S4 `sub-charge` : GAP 4 (a)'s missing subscribe-level charge.  NO

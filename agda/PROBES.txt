@@ -17,7 +17,6 @@
 #                       commit — git is the archive.
 #
 # Format: <filename> | <CLASS> | <one-line note>
-Anchor-Dry-Probe.agda | LANDING: Verify-Budget-Sufficient/Wet.agda (Phase 1b step 3) | dry-family statements + dry-hop discharge lemma
 Battery-Anchor-Fit.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Batch-Online.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Burst-Done.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -33,7 +32,6 @@ Battery-Nesting-Escalation.agda | EVIDENCE | bulk-classified 2026-08-06; reclass
 Battery-Obs-Growth.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Reached-Sizes.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Readme.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Tick-Headroom.agda | LANDING: Wet step 3 (headroom chain) + Caps.agda (capsAt-reg, tier-1 #8) | zero-postulate anchor-headroom theorems
 Battery-VWF-Prop.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Value-Count.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Burst-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch

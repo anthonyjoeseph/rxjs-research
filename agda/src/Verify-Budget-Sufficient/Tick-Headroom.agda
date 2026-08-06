@@ -1,4 +1,4 @@
--- BATTERY: TICK HEADROOM — the tower-vs-tower comparison  (2026-08-06)
+-- TICK HEADROOM — the tower-vs-tower comparison  (landed 2026-08-06)
 --
 -- Phase 1b step 3.  Battery-Nesting-Escalation established that ONE instant
 -- can grow value sizes by a TOWER in nesting depth (≤ sizeᵉ e).  The dry
@@ -33,11 +33,9 @@
 -- arithmetic is CLOSED by tick-covers-instant, against the real recurrence,
 -- with zero postulates in this file.
 --
--- BUILD:
---   cd /Users/flipside-anthony/Developer/personal/rxjs-research/agda &&
---   ls probe/Battery-Tick-Headroom.agda &&
---   agda -i src -i probe probe/Battery-Tick-Headroom.agda
-module Battery-Tick-Headroom where
+-- Landed from probe/Battery-Tick-Headroom.agda (Phase 1b step 3);
+-- consumed by Anchor-Dry's dry-family assemblies via tick-covers-instant.
+module Verify-Budget-Sufficient.Tick-Headroom where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
