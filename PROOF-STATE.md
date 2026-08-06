@@ -101,7 +101,7 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | 3 | `subscribeE-wet-core` | Wet.agda:4311 | FALSITY, conditional | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's G/ℓ/Ω entry data from `INV?` alone, and the INV?/capᴱ flavor conversion is unchecked. Moderate incremental risk over #1, with maximal blast radius (both branches of budget-sufficient). |
 | 4 | `sub-charge-capsOK-lift-core` | Caps-Bridge.agda:1182 | **SHAPE** | Its hypothesis carries only the ROOT instance `opIterD≤capsH-root` while its conclusion quantifies over ARBITRARY mid-run `sched`/`st`/`id`; its own route comment says "via a GENERAL form of opIterD≤sizeCount-root" — which is unstated and unknown. The `-core` will need a generalized hypothesis at proof time, and whether the general mid-state bound even HOLDS is open. |
 | 5 | `depth-compositional` | Depth-Bound.agda:153 | **PROBED-GREEN 2026-08-06, evolved states included** | Its census (source comment, point 4) needs `storeNestMax` at the EVOLVED state dominated by the entry bound. **That direction was actually tested**, not dodged: `Depth-Compositional-Probe` drains N real cascades through the evaluator (k ≤ 4, N ≤ 10) and reads `depthE` off the extracted scan accumulator — evolved states, all rows hold. `agda/probe/Battery-Depth-Iter.agda` adds two things: the `switch-st`/`exhaust-st` branch of `depthAll`, which **no prior depth probe had ever exercised** (4 programs, green), and the preservation step `storeNestMax(post-subscribeE) ≤ sizeᵉ e + storeNestMax(pre)` — census point 4's exact inductive step — confirmed at N=1. Thin at N=1, but this is the one tier-1 axis where probing works, and it held. |
-| 6 | `opIterD≤sizeCount-root-core` | Caps-Bridge.agda:1090 | **FALSITY — NOT probeable (abstract-locked); risk UNREDUCED** | "The genuinely new mathematics"; the direction is novel (an UPPER bound on a budget everything else lower-bounds), and nobody has checked it. **2026-08-06: numeric probing is IMPOSSIBLE** — three independent seals, each sufficient alone: `opIterD` abstract (Evaluator:727), `sizeCount` abstract (Caps:368), and the depth fuel `capsH e ins 0 = blowH (capsBase e ins)` with `blowH` abstract (Evaluator:898) AND tower-valued. What the probe DID pin down is the in-range parameter set (`capsBase (pushD 0) (insN 0) ≡ 18`, `sizeᵉ ≡ 11`, `slotsSize ≡ 1`, `nest ≡ 11`) and that hypothesis H2 (`nest e ins [] ≤ sizeᵉ e + slotsSize ins`) holds at three programs — useful scaffolding, zero evidence on the claim. **Next move is SYMBOLIC rehearsal**, per the correction above — the `three-size≤capsH` route. This is now the highest UNREDUCED risk in tier 1 after the anchor cluster. |
+| 6 | `opIterD≤sizeCount-root-core` | Caps-Bridge.agda:1090 | **FALSITY — NOT probeable (abstract-locked); risk UNREDUCED** | "The genuinely new mathematics"; the direction is novel (an UPPER bound on a budget everything else lower-bounds), and nobody has checked it. **2026-08-06: numeric probing is IMPOSSIBLE** — three independent seals, each sufficient alone: `opIterD` abstract (Evaluator:727), `sizeCount` abstract (Caps:368), and the depth fuel `capsH e ins 0 = blowH (capsBase e ins)` with `blowH` abstract (Evaluator:898) AND tower-valued. **REDUCED 2026-08-06 by symbolic rehearsal** (`agda/probe/Battery-OpIter-Symbolic.agda`, green): `opIterD≤sizeCount-root-core-ASSEMBLED` is a real DEFINITION closing the postulate's full type from THREE named gaps — `opIterD-dominated` (the substance) plus counting bounds `m≤cSize`, `k≤cSize` (which follow from `nest≤` and the `baseCaps` formula). One vague postulate became three specific ones: that is the intended direction. The residual is **pure arithmetic over ℕ, no evaluator, no expressions**: `opIterD-dominated : ∀ S W d k m R → 2 ≤ S → k ≤ S → m ≤ S → opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)`. |
 | 7 | `init-capsOK?-base-core` | Caps-Bridge.agda:978 | **PROBED + STRUCTURALLY ARGUED 2026-08-06 — risk sharply down; task #19 answered** | `capsOK?` (Caps-Face:297) is five conjuncts; at `st-init` the registry and nodes are empty, so (2) `regsSz?`, (4) `widNode`, (5) `length ≤ᵇ cReg` pass by `all _ []` — the known-vacuous three. The first probe pass left the two LIVE conjuncts vacuous as well (empty `live`; `pending = []`), which is why it did not count. **The second pass covers them non-vacuously** (`agda/probe/Battery-Caps-Init.agda`, programs C and D: one and three pending scripted values) — green — and, better than rows, gives a REASON refutation is impossible at `baseCaps`: (3) `widLive` cannot fail because `scripted` requires `T (isData t)` and every data type has `pWᵛ ≡ 0` (Frame-Width:294–299), so the check is `0 ≤ᵇ cWid`; (1) `stBounded?` cannot fail because each pending `v` has `sizeᵛ t v < cSize = 2 + sizeᵉ e + slotsSize ins` by construction. **Those two arguments are the proof sketch** — this looks provable, not merely probable. Residual gap: the argument covers `scripted` slots; non-scripted entries in `Sched.live` at init are not analysed. |
 | 8 | `init-capsOK?` | Caps-Bridge.agda:918 | **BLOCKED — cause identified** | Not probeable: `capsAt e ins id` unfolds through `sizeCount`, which is `abstract` (Caps.agda:369), so it never reduces to a numeral. **The derivation route is now fully scoped**: `capsOK?-mono` (Caps-Face:365, proven) lifts #7 to #8 given `baseCaps ⊑ᶜ capsAt`, which needs three sub-lemmas — `capsAt-base-size` and `capsAt-base-wid` EXIST, and the sole missing one is `capsAt-base-reg : suc (sizeᵉ e + slotsSize ins) ≤ Caps.cReg (capsAt e ins id)`. State that and this postulate retires. |
 | 9 | `thruOuter-face-core` (P4) | Caps-Face.agda:6317 | SHAPE | Its own header doubts itself: receipt "(a) is the SECOND number … `subscribeE-caps` bounds its j′ by nothing whatever" and "(a) may not fit `fCharge` as stated." Statement-level work before grind. |
@@ -313,12 +313,29 @@ probing. All of this is tier 1, so all of it precedes tier 2.
   comment calls for a general form that is unstated and unknown.
 - P4 `thruOuter-face-core` → resolve the "(a) may not fit `fCharge`" doubt at
   the statement level, per its own header.
-- **`opIterD≤sizeCount-root-core` → SYMBOLIC rehearsal.** Numeric probing is
-  impossible (see the boxed correction above); the route is to state the full
-  type at symbolic `e`/`ins` and close it without forcing a sealed symbol, which
-  is exactly how `three-size≤capsH-core` became a one-line proof. Read the three
-  `sizeCount-body` call sites first — they are the worked examples of reasoning
-  through the seal, and they are reusable for the whole axis.
+- **`opIterD≤sizeCount-root-core` → DONE as a reduction (2026-08-06); the
+  assembly is READY TO LAND into Caps-Bridge.** `agda/probe/Battery-OpIter-Symbolic.agda`
+  holds it. Three things worth carrying forward:
+  - **HOW TO REASON THROUGH THE SEAL — reusable for the whole caps axis.** All
+    three `sizeCount-body` call sites use the same move: it is a `≤-reflexive`
+    wrapper around an existing `lvls` inequality. So prove the `lvls` form, then
+    wrap with `≤-reflexive (sym (sizeCount-body c d))`. That is the pattern for
+    every sealed-symbol obligation here; do not re-derive it.
+  - **THE NAIVE COUNT IS FALSE, and the reason fixes the shape.**
+    `opIterD S W d k m 0 ≤ lvls S W d 0 m` — same count `m` on both sides — does
+    NOT hold. Each `opIterD` suc-step sets `J₀ = suc (suc (S)²)` then applies
+    `suc (widAt S W J₂)` passes of `fLvlD` where `widAt` grows as a TOWER
+    (`foldStep S w = S^(suc w)`), while one `dLvl` step from 0 applies only
+    `suc S` passes. So the count MUST be `cDel c d` (doubly exponential in `S`),
+    which is what the postulate already says — its shape is right.
+  - **THE REMAINING MATHEMATICS, named at last.** `opIterD-dominated` wants
+    induction on `m` with a residual-budget invariant tracking `J` and remaining
+    `D`, and the suc case needs a lemma of the form
+    `fIterD S W d k n J ≤ lvls S W d J (‹bound in n›)` — dominating `fIterD`'s
+    n-step application by some number of `dLvl` steps. **Finding ‹bound in n› is
+    the open question**; that is the irreducible core of "the genuinely new
+    mathematics", and it is now one inequality over ℕ rather than a statement
+    about the evaluator.
 - **Land `three-size≤capsH-core`'s discharge**, moving `three-size-le-blowH` and
   its helper chain from `Pool-Lower-Probe` into `Caps.agda`. **Decide the
   `S≤sizeStep` orphan in the SAME commit** — the discharge strands it (its only

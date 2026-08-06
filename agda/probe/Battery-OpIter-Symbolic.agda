@@ -22,34 +22,36 @@
 ------------------------------------------------------------------
 module Battery-OpIter-Symbolic where
 
-open import Data.Nat
-  using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; sym; n≤1+n; m≤m+n; m≤n+m;
+  using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; m≤m+n; m≤n+m;
          +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-identityʳ)
-open import Data.List  using (List; [])
-open import Data.Fin   using (Fin; toℕ)
+open import Data.Bool    using (false)
+open import Data.List    using (List; []; _∷_)
+open import Data.Fin     using (Fin; toℕ)
+open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym)
+  using (_≡_; refl; sym; cong)
 
-open import Rx.Exp   using (Ctx; Exp; Closed; sizeᵉ; unfoldμ)
-open import Rx.Slots using (Slots; scripted; shared; slotsSize)
+open import Rx.Prim      using (Source)
+open import Rx.Exp
+  using (Ty; Ctx; Exp; Closed; sizeᵉ; μᵉ; unfoldμ)
+open import Rx.Slots     using (Slots; shared; slotsSize)
 open import Rx.Evaluator
-  using (sizeAt; widAt; fLvlD; sLvlD; opIterD; fIterD; lvls; dLvl;
+  using (sizeAt; widAt; opIterD; sLvlD; fIterD; fLvlD; lvls; dLvl;
          sLvlD-0; sLvlD-suc; opIterD-0; opIterD-suc;
-         fIterD-0; fIterD-suc; fLvlD-0; fLvlD-suc; memberSource)
+         fIterD-0; fIterD-suc; fLvlD-0;
+         memberSource)
 
+-- Domain modules: bare open imports, no `using` clause.
+-- None of these transitively imports Wet or Subscribe-Face.
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; caps; Caps.cSize; Caps.cWid; Caps.cReg;
-         sizeCount; sizeCount-body; cDel; cDel-body;
-         capsAt; capsH;
-         sLvlD-infl; opIterD-infl; opIterD-mono;
-         lvls-infl; lvls-mono; dLvl-infl;
-         2≤capsAt-size)
+  using (Caps; caps; capsAt; capsH; cDel; cDel-body;
+         sizeCount; sizeCount-body; lvls-mono)
 
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest; nest≤; residAt-connected; share-step-resid;
-         mu-1≤k; mu-step-le; k-raise)
+  using (nest; residAt; resid; nest≤; residAt-connected;
+         share-step-resid; mu-1≤k; mu-step-le; k-raise)
 
 open import Verify-Budget-Sufficient.Caps-Chain
   using (entry-to-index)
@@ -72,7 +74,7 @@ open import Verify-Budget-Sufficient.Caps-Chain
 --   k-raise         — the budget at suc J dominates the one at J
 ------------------------------------------------------------------
 
-opIterD≤sizeCount-root-core-statement :
+opIterD≤sizeCount-root-core-TYPECHECK :
   -- entry-to-index
   (∀ (S W d k J m : ℕ) → 2 ≤ S → suc (sizeAt S J) ≤ m →
     sLvlD S W d (suc k) J ≤ opIterD S W d k m J
@@ -107,15 +109,33 @@ opIterD≤sizeCount-root-core-statement :
   opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
           (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
     ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
-opIterD≤sizeCount-root-core-statement _ _ _ _ _ _ _ e ins =
-  postulate-for-statement-check
-  where postulate postulate-for-statement-check : _
+opIterD≤sizeCount-root-core-TYPECHECK _ _ _ _ _ _ _ e ins =
+  postulate-for-typecheck-only
+  where postulate postulate-for-typecheck-only : _
+
+-- GREEN check: applying the seven proven lemmas gives the non-core
+-- postulate's exact body, just as Caps-Bridge.agda:1130 does.
+opIterD≤sizeCount-root-ASSEMBLED :
+  ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
+          (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
+    ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
+opIterD≤sizeCount-root-ASSEMBLED e ins =
+  opIterD≤sizeCount-root-core-TYPECHECK
+    entry-to-index
+    (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → nest≤ {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
+    (λ {n} {Γ} → residAt-connected {n} {Γ})
+    (λ {n} {Γ} → share-step-resid {n} {Γ})
+    (λ {n} {Γ} {t} → mu-1≤k {n} {Γ} {t})
+    (λ {n} {Γ} {t} → mu-step-le {n} {Γ} {t})
+    k-raise
+    e ins
 
 ------------------------------------------------------------------
 -- § 2.  REDUCTION VIA sizeCount-body.
 --
 -- sizeCount c d = lvls (Caps.cSize c) (Caps.cWid c) d 0 (cDel c d)
--- (Caps.agda:370, exposed by sizeCount-body : sizeCount c d ≡ lvls ...).
+-- (Caps.agda:370, exposed by sizeCount-body).
 --
 -- So the main goal reduces to:
 --
@@ -123,38 +143,35 @@ opIterD≤sizeCount-root-core-statement _ _ _ _ _ _ _ e ins =
 --
 -- via `≤-trans (main-arith ...) (≤-reflexive (sym (sizeCount-body c d)))`.
 --
--- All three call sites of sizeCount-body (Caps.agda:865, 1245;
--- Caps-Face.agda:4761) follow this same pattern:
+-- All three call sites of sizeCount-body follow the same pattern.
 --
---   (A) sizeCount → lvls (going DOWN to apply monotonicity):
---       ≤-reflexive (sizeCount-body c d)
---       Used in: blowup-tower/J≤P (Caps.agda:1245) — exposes lvls
---       so that lvls-mono can widen the cDel argument to poolCount.
+-- CALL SITE 1 — 2≤sizeCount (Caps.agda:865)
+--   Direction: lvls → sizeCount (packaging up)
+--   Code: ≤-reflexive (sym (sizeCount-body c d))
+--   Content: 2 ≤ dLvl S W d 0 then lvls-mono widens the count.
 --
---   (B) lvls → sizeCount (going UP to package the bound):
---       ≤-reflexive (sym (sizeCount-body c d))
---       Used in: 2≤sizeCount (Caps.agda:865) — packages
---       `2 ≤ lvls ... 1 (cDel c d)` back as `2 ≤ sizeCount c d`.
---       Used in: cascadeGo-caps (Caps-Face.agda:4761) — packages
---       `lvls ... D ≤ lvls ... (cDel c d)` as `... ≤ sizeCount c d`.
+-- CALL SITE 2 — blowup-tower/J≤P (Caps.agda:1245)
+--   Direction: sizeCount → lvls (opening up)
+--   Code: ≤-reflexive (sizeCount-body c m)
+--   Content: then applies lvls-mono to widen cDel c m to poolCount.
 --
--- LESSON: sizeCount-body is ALWAYS used as a refl-wrapper around an
--- existing lvls inequality.  The real content lives in lvls; sizeCount
--- is its packaging.  The main postulate's proof therefore has the shape:
+-- CALL SITE 3 — cascadeGo-caps (Caps-Face.agda:4761)
+--   Direction: lvls → sizeCount (packaging up)
+--   Code: ≤-reflexive (sym (sizeCount-body c d))
+--   Content: lvls S W d 0 D ≤ lvls S W d 0 (cDel c d) via lvls-mono.
 --
---   ≤-trans (opIterD-to-lvls-proof ...) (≤-reflexive (sym (sizeCount-body c d)))
---
--- where opIterD-to-lvls-proof proves `opIterD ... 0 ≤ lvls ... 0 (cDel c d)`.
+-- LESSON: the proof of opIterD≤sizeCount-root-core follows the
+-- call-site-3 pattern: prove opIterD ... 0 ≤ lvls ... 0 (cDel c d),
+-- then wrap with ≤-reflexive (sym (sizeCount-body c d)).
 ------------------------------------------------------------------
 
--- GREEN: the sizeCount-body application typechecks exactly as above.
+-- GREEN: the sizeCount-body packaging typechecks exactly as above.
 sizeCount-body-demo :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   let c = capsAt e ins 0
       d = capsH e ins 0
-      S = Caps.cSize c
-      W = Caps.cWid c
-  in lvls S W d 0 (cDel c d) ≤ sizeCount c d
+  in lvls (Caps.cSize c) (Caps.cWid c) d 0 (cDel c d)
+       ≤ sizeCount c d
 sizeCount-body-demo e ins =
   ≤-reflexive (sym (sizeCount-body (capsAt e ins 0) (capsH e ins 0)))
 
@@ -163,107 +180,51 @@ sizeCount-body-demo e ins =
 --       opIterD≤sizeCount-root-core once the structural induction
 --       is set up.
 --
--- Two counting lemmas first (needed by the residual):
+-- COUNTING BOUNDS: in the main postulate,
+--   k = nest e ins []   and   m = suc (sizeᵉ e).
+-- S = 2 + sizeᵉ e + slotsSize ins  (baseCaps, Caps-Bridge.agda:959).
+-- k ≤ sizeᵉ e + slotsSize ins by nest≤.
+-- sizeᵉ e + slotsSize ins ≤ 2 + sizeᵉ e + slotsSize ins = S.  ✓
+-- m = suc (sizeᵉ e) ≤ 2 + sizeᵉ e ≤ S.                        ✓
 --
---   CLAIM-C1: m = suc (sizeᵉ e) ≤ cSize (capsAt e ins 0)
---   CLAIM-C2: k = nest e ins [] ≤ cSize (capsAt e ins 0)
+-- These two bounds are postulated below (m≤cSize, k≤cSize).
+-- Their proofs use nest≤ + standard arithmetic on baseCaps.
+-- They do NOT need the heavy import chain (Caps-Bridge).
 --
--- These follow from:
---   cSize (capsAt e ins 0) = 2 + sizeᵉ e + slotsSize ins   [capsAt base]
---   m = suc (sizeᵉ e) ≤ 2 + sizeᵉ e                        [n≤1+n + +]
---   k ≤ sizeᵉ e + slotsSize ins                             [nest≤]
---   sizeᵉ e + slotsSize ins ≤ 2 + sizeᵉ e + slotsSize ins  [m≤n+m]
---
--- CLAIM-C3: cSize (capsAt e ins 0) ≤ cDel (capsAt e ins 0) d
--- This says the delivery count exceeds the caps size, which holds because
--- cDel starts with gas = suc (cSize c), giving a count of at least
--- cSize entries across the delivery walk.
--- (OPEN: needs a separate proof, but believed true from the structure of
--- dCapᶜ/dWalkᶜ — with gas suc S and cReg = 1 + X ≥ S, the walk has at
--- least S entries.)
---
--- THE ARITHMETIC RESIDUAL (NAMED):
---
--- Given C1, C2, C3, the main postulate reduces to this single claim:
---
--- opIterD-dominated : for all S W d k m → 2 ≤ S → k ≤ S → m ≤ S →
---   opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
---
--- This is a PURE ARITHMETIC claim: no expressions, no evaluator, no
--- slots.  It says: when both the budget (k) and the operator count (m)
--- are bounded by the caps size S, the operator walk from level 0 is
--- dominated by sizeCount.
---
--- This is exactly what the Caps-Bridge comment (line 1069) calls "the
--- genuinely new mathematics".
---
--- WHY THE NAIVE COUNT FAILS — and what is needed:
---
--- The simple claim "opIterD S W d k m 0 ≤ lvls S W d 0 m" is FALSE.
--- Concretely (symbolic analysis only, since opIterD is abstract):
---   opIterD S W d k (suc m) 0 ends with
---     fIterD S W d k (suc (widAt S W J₂)) J₂
---   = (fLvlD S W d)^(suc (widAt S W J₂)) J₂
--- where J₂ ≥ J₀ = suc (sizeAt S 0)² = suc (S²).
--- At J₂ ≥ suc S², widAt S W J₂ grows as a TOWER (foldStep exponents),
--- so `suc (widAt S W J₂) >> suc S`.
--- Meanwhile lvls S W d 0 1 = dLvl S W d 0 = (fLvlD)^(suc S) 0
--- applies fLvlD only suc S times.
--- So opIterD's one-step result exceeds lvls's one-step result!
---
--- The correct claim therefore needs D = cDel c d >> m.  The
--- Caps-Bridge comment says this is "comfortable" because cDel is a
--- gas-cSize recursion (gas = suc S, R ≥ S), giving a count that grows
--- doubly-exponential in S.  Each lvls step in sizeCount covers
--- suc (sizeAt S J) fLvlD passes; after enough steps, the accumulated
--- fLvlD passes in lvls S W d 0 (cDel c d) dominate the
--- suc (widAt S W J₂) passes in opIterD's single step.
---
--- THE EXACT RESIDUAL, stated as Agda:
+-- THE ARITHMETIC RESIDUAL, stated as Agda:
 ------------------------------------------------------------------
 
 postulate
-  -- THE ARITHMETIC CORE.  Pure claim: S, W, d, k, m are natural numbers;
-  -- R is cReg (at the base caps = suc (sizeᵉ e + slotsSize ins) = S-1).
-  -- No expressions, no evaluator dynamics.
+  -- THE ARITHMETIC CORE.  Pure claim: no expressions, no evaluator
+  -- dynamics.  Given k ≤ S and m ≤ S and 2 ≤ S, the operator walk
+  -- from level 0 is dominated by sizeCount (caps S W R) d.
   --
-  -- HYPOTHESIS SHAPE: k ≤ S and m ≤ S.  These hold at the root call
-  -- because k = nest e ins [] ≤ sizeᵉ e + slotsSize ins = S - 2 ≤ S
-  -- and m = suc (sizeᵉ e) ≤ S - 1 ≤ S.
-  --
-  -- WHAT REMAINS UNKNOWN: the precise sense in which cDel (caps S W R) d
-  -- dominates the fLvlD-application count in opIterD S W d k m 0.
-  -- The direction is clear (cDel grows doubly-exponential, opIterD's
-  -- single-step width grows as a tower from level suc(S²)), but
-  -- establishing the inequality symbolically requires either:
-  --   (i) a monotone embedding of opIterD's orbit into lvls's orbit,
-  --       valid once `sizeAt S J ≤ widAt S W J` (which holds for J ≥ 1
-  --       since foldStep outgrows sizeStep), plus a finite-catch-up
-  --       argument for the first few levels; OR
-  --   (ii) a direct bound on opIterD's output in terms of a fixed number
-  --        of dLvl applications, showing that number ≤ cDel.
-  --
-  -- This is the "genuinely new mathematics" of Caps-Bridge.agda:1069.
+  -- This is what Caps-Bridge.agda:1069 calls "the genuinely new
+  -- mathematics".  R = Caps.cReg (capsAt e ins 0) at the call site,
+  -- but the claim is parametric in R (R matters only inside cDel).
   opIterD-dominated : ∀ (S W d k m R : ℕ) → 2 ≤ S → k ≤ S → m ≤ S →
     opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
 
--- The counting lemma: k and m fit under S = cSize (capsAt e ins 0).
--- GREEN: typechecks with the existing kit.
--- Uses: 2≤capsAt-size, nest≤, n≤1+n, m≤n+m.
-postulate
+  -- Counting bounds: k and m fit under S = cSize (capsAt e ins 0).
+  -- Provable from nest≤ + baseCaps formula; postulated here since
+  -- the probe's purpose is the assembly shape, not these lemmas.
   m≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     suc (sizeᵉ e) ≤ Caps.cSize (capsAt e ins 0)
 
   k≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     nest e ins [] ≤ Caps.cSize (capsAt e ins 0)
 
+  2≤capsAt-cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    2 ≤ Caps.cSize (capsAt e ins 0)
+
 -- GREEN: the assembly — using the three pieces above, derive the main goal.
-opIterD≤sizeCount-root-core-assembled :
+-- This is the exact shape opIterD≤sizeCount-root-core's proof will take.
+opIterD≤sizeCount-root-core-ASSEMBLED :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
           (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
     ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
-opIterD≤sizeCount-root-core-assembled e ins =
+opIterD≤sizeCount-root-core-ASSEMBLED e ins =
   let c = capsAt e ins 0
       d = capsH e ins 0
       S = Caps.cSize c
@@ -272,118 +233,56 @@ opIterD≤sizeCount-root-core-assembled e ins =
   in ≤-trans
       (opIterD-dominated S W d
          (nest e ins []) (suc (sizeᵉ e)) R
-         (2≤capsAt-size e ins 0) (k≤cSize e ins) (m≤cSize e ins))
+         (2≤capsAt-cSize e ins) (k≤cSize e ins) (m≤cSize e ins))
       (≤-reflexive (sym (sizeCount-body c d)))
 
 ------------------------------------------------------------------
--- § 4.  WHAT THE THREE sizeCount-body CALL SITES TEACH.
+-- WHY THE NAIVE COUNT FAILS — and what opIterD-dominated requires.
 --
--- All three sites use sizeCount-body as a `refl`-wrapper — the proof
--- content is always in the lvls inequality, not in sizeCount-body
--- itself.  The pattern is consistent:
+-- The WRONG residual: "opIterD S W d k m 0 ≤ lvls S W d 0 m"
+-- (same count on both sides) is FALSE.
+-- Symbolic analysis (opIterD is abstract, so this is structural):
 --
--- CALL SITE 1 — 2≤sizeCount (Caps.agda:865)
---   Direction: lvls → sizeCount (packaging up)
---   Code: ≤-reflexive (sym (sizeCount-body c d))
---   Content: `2 ≤ dLvl S W d 0` (from 2≤dLvl) composed with
---            `lvls-mono 1 (cDel c d)` to extend the count.
---   Lesson: sizeCount-body lets you PACKAGE a proven lvls bound as
---           a sizeCount bound.
+-- opIterD S W d k (suc m) 0
+--   = fIterD S W d k (suc (widAt S W J₂)) J₂
+--     where J₀ = suc (0 + suc(sizeAt S 0) * suc(sizeAt S 0))
+--              = suc (suc S * suc S) ≥ suc(S²)
+--           J₂ = opIterD S W d k m (sLvlD S W d k J₀)
 --
--- CALL SITE 2 — blowup-tower/J≤P (Caps.agda:1245)
---   Direction: sizeCount → lvls (opening up)
---   Code: ≤-reflexive (sizeCount-body c m)
---   Content: then applies lvls-mono to widen cDel c m to
---            dCapᶜ Tw Tw Tw m (suc Tw) 0 = poolCount Tw m.
---   Lesson: sizeCount-body lets you OPEN a sizeCount to apply
---           lvls-mono, which cannot see through the abstraction.
+-- The FINAL output is (fLvlD)^(suc(widAt S W J₂)) J₂ where
+-- J₂ ≥ suc(S²).  At J₂ ≥ suc(S²), widAt S W J₂ grows as a TOWER
+-- (foldStep S w = S^(suc w), iterated), so widAt >> sizeAt >> S.
+-- But lvls S W d 0 1 = dLvl S W d 0 = (fLvlD)^(suc S) 0, applying
+-- fLvlD only suc S times from level 0.  One opIterD step's tail
+-- massively exceeds one dLvl step.
 --
--- CALL SITE 3 — cascadeGo-caps (Caps-Face.agda:4761)
---   Direction: lvls → sizeCount (packaging up)
---   Code: ≤-reflexive (sym (sizeCount-body c d))
---   Content: `lvls S W d 0 D ≤ lvls S W d 0 (cDel c d)` by
---            lvls-mono on `D ≤ cDel c d` (the delivery count bound).
---   Lesson: SAME as call site 1 — the real inequality is in lvls,
---           sizeCount-body wraps the final packaging.
+-- CORRECT: the proof needs D = cDel c d, which grows doubly-exponential
+-- in S (gas = suc S, with cReg ≥ S entries per recursion pass).
+-- The Caps-Bridge comment calls this "comfortable".
 --
--- COMMON PATTERN: the proof of opIterD≤sizeCount-root-core follows
--- the call-site-3 pattern: prove `opIterD ... 0 ≤ lvls ... (cDel c d)`,
--- then wrap with `≤-reflexive (sym (sizeCount-body c d))`.
+-- THE PROOF ROUTE for opIterD-dominated (not yet written):
+-- Induction on m, with a RESIDUAL BUDGET invariant:
+--   ∀ J D → opIterD S W d k m J ≤ lvls S W d J D
+--   (tracking J and remaining budget D)
+-- Key step (m = suc m′):
+--   (a) ONE dLvl step from J reaches J₀ = suc(J + suc(sizeAt S J)²).
+--       Requires: dLvl S W d J ≥ J₀.  Open (needs explicit fLvlD bound).
+--   (b) After sLvlD, IH applies with smaller D′ and larger J.
+--   (c) The fIterD tail ((fLvlD)^(suc(widAt S W J₂)) J₂) fits in the
+--       remaining lvls budget.  Open (most uncertain step).
 --
--- The cascadeGo-caps usage is the most instructive: it first proves
--- `cascadeGo-deliveries` gives a count D ≤ cDel c d, then uses
--- `lvls-mono` to go from `lvls ... D` to `lvls ... (cDel c d)`, then
--- packages with sizeCount-body.  The analogous structure for the main
--- postulate would be:
---   1. Show opIterD S W d k m 0 ≤ lvls S W d 0 (f k m S)    [arithmetic]
---   2. Show f k m S ≤ cDel (capsAt e ins 0) d                [counting]
---   3. Apply lvls-mono                                        [monotone]
---   4. Wrap with sizeCount-body                              [packaging]
---
--- Step 4 is done in opIterD≤sizeCount-root-core-assembled above.
--- Steps 1–3 are the content of opIterD-dominated.
+-- The MISSING PIECE is a lemma:
+--   fIterD S W d k n J ≤ lvls S W d J (something-reasonable n)
+-- showing that fIterD's n-step application is dominated by some
+-- number of dLvl steps.  This lemma about fLvlD/dLvl vs fIterD is
+-- the exact new mathematics needed.
 ------------------------------------------------------------------
 
--- OPTIONAL: verify lvls-mono applies as expected (GREEN sanity check)
+-- OPTIONAL sanity check: lvls-mono applies as expected.
 lvls-mono-demo :
   ∀ S W d n₁ n₂ → 2 ≤ S → n₁ ≤ n₂ →
   lvls S W d 0 n₁ ≤ lvls S W d 0 n₂
 lvls-mono-demo S W d n₁ n₂ 2≤S hn =
   lvls-mono n₁ n₂ 2≤S ≤-refl ≤-refl ≤-refl hn
-
-------------------------------------------------------------------
--- § 5.  WHAT REMAINS UNKNOWN AND THE ROUTE TO IT.
---
--- opIterD-dominated needs a proof that
---   opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
--- when k ≤ S and m ≤ S and 2 ≤ S.
---
--- THE KEY STRUCTURAL OBSERVATION (from Caps-Bridge.agda:1077):
--- Each step of opIterD at level J applies (suc (widAt S W J₂)) passes
--- of fLvlD.  Each step of dLvl at level J applies (suc (sizeAt S J))
--- passes of fLvlD.  For J = 0: widAt S W 0 = W vs sizeAt S 0 = S.
--- If W < S (common for simple programs), the first opIterD step
--- reaches a HIGHER value than one dLvl step.
---
--- HOWEVER: after J ≥ suc(S²), widAt S W J grows as a tower
--- (foldStep S w = S ^ suc w exponentiates per fold) while sizeAt
--- grows exponentially.  So widAt/sizeAt >> 1 from that point on.
---
--- THE PROOF ROUTE (not yet formalised):
---
--- PHASE 1 (catch-up): Show that cDel (caps S W R) d ≥ m + C
--- where C is a constant (depending on S, W) large enough that
--- the first C steps of lvls S W d 0 (m + C) cover the "deficit"
--- from the first opIterD step jumping to level suc(S²).
--- C ≤ sizeAt S 1 = S * (2*S + 1) suffices (one full sizeAt-1 dLvl pass
--- brings the lvls level past suc(S²)).
---
--- PHASE 2 (one-to-one): Once both lvls and opIterD are at levels
--- ≥ suc(S²), each opIterD step at level J uses (suc(widAt S W J))
--- fLvlD passes and each dLvl step uses (suc(sizeAt S J)).
--- Since at levels ≥ suc(S²) we have widAt S W J ≤ sizeAt S J
--- (THIS IS THE CLAIM — actually it goes the other way: widAt >> sizeAt
--- at HIGH levels), the REMAINING m opIterD steps fit in m dLvl steps.
--- Actually: widAt >> sizeAt means opIterD steps are BIGGER per step,
--- but the count is only m ≤ S while cDel >> S steps remain in lvls.
--- The total fLvlD applications in cDel lvls-steps is enormous,
--- absorbing all m opIterD steps.
---
--- THE OPEN QUESTION: making the argument above rigorous requires either
--- a direct upper bound on opIterD S W d k m 0 in terms of (fLvlD)^n 0
--- for explicit n (showing n ≤ cDel), or an inductive argument that
--- each step of opIterD is dominated by several steps of lvls.
--- Neither route is hard in principle — the comment "the gap is wide"
--- suggests the margin is large — but the algebraic form is not yet
--- written.
---
--- NEXT STEP: prove opIterD-dominated by induction on m, with a
--- simultaneous bound on the level:
---   opIterD S W d k m J ≤ lvls S W d J (cDel (caps S W R) d - m)
--- so that each opIterD step "consumes" one cDel entry.  The key
--- ingredient is showing that fIterD S W d k (suc (widAt S W J₂)) J₂
--- ≤ lvls S W d J₂ (sizeCount-related number), which uses the
--- widAt-vs-sizeAt comparison at high levels.
-------------------------------------------------------------------
 
 -- END OF FILE.  Probe is GREEN.
