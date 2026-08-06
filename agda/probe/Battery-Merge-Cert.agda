@@ -46,8 +46,10 @@ module Battery-Merge-Cert where
 
 open import Data.Bool    using (Bool; true; false; not; _∧_; _∨_)
 open import Data.List    using (List; []; _∷_; any)
+open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Nat     using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Product using (Σ; _×_; _,_)
+open import Data.Vec     using ([])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim     using (Source)
@@ -55,7 +57,7 @@ open import Rx.Exp      using (Ctx; Ty; Closed; natᵗ; obs; ofᵉ)
 open import Rx.Evaluator using (EvalSt; NodeId; RegId; NodeState;
                                 Chain; Path; Frame; AllOp;
                                 lookupNode; merge-st;
-                                from-inner; thru-outer; root; mergeᵒ;
+                                from-inner; thru-outer; _↠_; root; mergeᵒ;
                                 aliveThroughᶠ; st-init)
 open import Verify-Well-Formed using (innerInstsP)
 
@@ -76,9 +78,9 @@ hasAliveFromInner mnid st c@(_ , _ , (_ , p)) =
 mergeCertAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   → NodeId → EvalSt e → Bool
 mergeCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
-... | just (merge-st zero _) =
-      not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
-... | _                       = true   -- k≠0, or node absent: trivially satisfied
+mergeCertAt mnid st | just (merge-st zero od) =
+  not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
+mergeCertAt mnid st | _ = true   -- k≠0, or node absent: trivially satisfied
 
 -----------------------------------------------------------------------
 -- Shared context and dummy expression

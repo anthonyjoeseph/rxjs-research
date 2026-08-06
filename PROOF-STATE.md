@@ -82,12 +82,12 @@ blind spot the roadmap's Phase 0 closes.
 | 4 | `sub-charge-capsOK-lift-core` | Caps-Bridge.agda:1182 | **SHAPE** | Its hypothesis carries only the ROOT instance `opIterD≤capsH-root` while its conclusion quantifies over ARBITRARY mid-run `sched`/`st`/`id`; its own route comment says "via a GENERAL form of opIterD≤sizeCount-root" — which is unstated and unknown. The `-core` will need a generalized hypothesis at proof time, and whether the general mid-state bound even HOLDS is open. |
 | 5 | `depth-compositional` | Depth-Bound.agda:153 | FALSITY — **probeable** | Its own census (source comment, point 4) says the induction needs `storeNestMax` at the EVOLVED state dominated by the entry bound — an unproven strengthening. If an evolved state can escape it, the statement is false. Both sides compute: probe it. |
 | 6 | `opIterD≤sizeCount-root-core` | Caps-Bridge.agda:1090 | FALSITY — **probeable** | "The genuinely new mathematics"; the direction is novel (an UPPER bound on a budget everything else lower-bounds). Nobody has checked the numbers. Both sides compute at concrete `e`/`ins`: probe before grinding. |
-| 7 | `init-capsOK?-base-core` | Caps-Bridge.agda:978 | FALSITY — **probeable** | The unverified premise under the depth-capped RULING (below): `stBounded?` and the `widLive` sweep at the small caps c₀ are INFERRED from what the fields mean, never checked. `capsOK?` is a boolean on concrete states — decidable outright. If it fails, c₀ grows and the #17 arithmetic re-runs. This is task #19. |
-| 8 | `init-capsOK?` | Caps-Bridge.agda:918 | FALSITY — **probeable** | Same fact at the blown-up caps; should eventually be DERIVED from #7 via `capsOK?-mono` + `cSize≤frameBlowup`, retiring one of the two. Probe alongside #7. |
+| 7 | `init-capsOK?-base-core` | Caps-Bridge.agda:978 | FALSITY — **probeable, STILL UNCOVERED** | The unverified premise under the depth-capped RULING (below): `stBounded?` and the `widLive` sweep at c₀ are INFERRED from what the fields mean, never checked. Task #19. **2026-08-06: first probe pass FAILED TO COVER IT.** `capsOK?` (Caps-Face:297) is five conjuncts; at `st-init` the registry and nodes are empty so (2) `regsSz?`, (4) `widNode`, (5) `length ≤ᵇ cReg` are true by `all _ []`. Those are the known-vacuous three. The probe's two programs left the two LIVE conjuncts vacuous too — `emptyᵉ` has empty `live`, and the `input` row had `pending = []` so `widLive` returned true vacuously. **A non-vacuous row needs slots carrying real, WIDE scripted values**, since `baseCaps` is a syntax-derived ceiling and the inputs are where it can be outrun. |
+| 8 | `init-capsOK?` | Caps-Bridge.agda:918 | **BLOCKED — cause identified** | Not probeable: `capsAt e ins id` unfolds through `sizeCount`, which is `abstract` (Caps.agda:369), so it never reduces to a numeral. **The derivation route is now fully scoped**: `capsOK?-mono` (Caps-Face:365, proven) lifts #7 to #8 given `baseCaps ⊑ᶜ capsAt`, which needs three sub-lemmas — `capsAt-base-size` and `capsAt-base-wid` EXIST, and the sole missing one is `capsAt-base-reg : suc (sizeᵉ e + slotsSize ins) ≤ Caps.cReg (capsAt e ins id)`. State that and this postulate retires. |
 | 9 | `thruOuter-face-core` (P4) | Caps-Face.agda:6317 | SHAPE | Its own header doubts itself: receipt "(a) is the SECOND number … `subscribeE-caps` bounds its j′ by nothing whatever" and "(a) may not fit `fCharge` as stated." Statement-level work before grind. |
 | 10 | `innerFinish-concat-face-core` (P3) | Caps-Face.agda:6253 | DIFFICULTY | The one from-inner clause that is not j′=0 (concatDrain's width sum). Expect grind, not design; the toolkit hypotheses are the right kit. |
 | 11 | `dry-tick-core` | Caps-Bridge.agda:439 | DIFFICULTY | Given `cascadeGo-wet` (its first hypothesis) it is latch/finish bookkeeping plus the Deliveries counts. Nearly all its risk is inherited from #2, not its own. |
-| 12 | `three-size≤capsH-core` | Caps-Bridge.agda:1021 | DIFFICULTY, low | The `poolCount` lower-bound chain is already rehearsed step-by-step in `agda/probe/Pool-Lower-Probe.agda`. Upgrade to proof when convenient. |
+| 12 | `three-size≤capsH-core` | Caps-Bridge.agda:1021 | DIFFICULTY, low — **likely PROMOTABLE** | The `poolCount` chain is rehearsed in `agda/probe/Pool-Lower-Probe.agda`, and 2026-08-06's probe found `three-size-le-blowH` (:77) unifies with the goal DIRECTLY at concrete instances, with the reduction `capsH e ins 0 = capsHgo (capsBase e ins) 0 = blowH (capsBase e ins)` definitional (neither is `abstract`). So this likely wants PROMOTING, not probing: move that lemma into `src` and discharge. Its side condition `2 ≤ 3 + X + suc E` looks free. |
 
 ### Tier 2 — the main proof branch (Verify-Well-Formed, 21; plus batch-online)
 
@@ -185,6 +185,29 @@ confidence receipt (note it in the postulate's header: `-- PROBED 2026-08-…`).
   Spec-level: a failure here is a STOP, not a fix.
 - **0f. VWF propagation battery** — `map/scan-nodry-push`, `scan-nodeP`,
   the two `valsLast-push` mismatch postulates.
+
+**THREE WAYS A PROBE LIES GREEN — all three observed on 2026-08-06's first
+sweep, all three in the direction of false comfort. Check every probe report
+against them before believing a PROBED-GREEN.**
+
+1. **VACUOUS ROWS.** The rows pass because the quantifier is empty, not because
+   the bound holds — `all _ [] = true`, `0 ≤ᵇ _`, a sweep over an empty list.
+   `capsOK?` at `st-init` has THREE of five conjuncts vacuous by construction,
+   so a green row there is evidence about nothing unless the shape was built to
+   make the LIVE conjuncts do work. **Name the covered conjuncts, not the
+   covered programs.**
+2. **HAND-BUILT STATES.** A state written as `record (st-init e) { … }` is not
+   a state the evaluator can reach, and a predicate checked only against states
+   its own author invented is confirmation with the inputs chosen by the thing
+   under test. **Reach states by RUNNING** (`evaluate` / subscribe / cascade);
+   one reached row outweighs a table of constructed ones. Corollary: a
+   constructed state where the predicate FAILS is not a "non-vacuity witness"
+   to be noted and passed over — it is a refutation candidate, and its
+   reachability is the finding.
+3. **READING AN ASSEMBLY BACKWARDS.** `P = P-core o₁ … oₖ` proves **P from the
+   postulated core**; it does NOT prove the core. The `oᵢ` are the core's
+   HYPOTHESES. Mistaking this makes every `-core` in the repo look discharged —
+   and every remaining tier-1 gap is a `-core`.
 
 ### Phase 1 — THE TWO DESIGN QUESTIONS (design session; the real risk mass)
 
