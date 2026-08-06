@@ -467,17 +467,25 @@ design session, not worker grind.
      instant's demand form `(2B+12)·towerℕ(suc sz)` as soon as
      `j ≥ 3 + towerℕ sz`, `sz = sizeᵉ e + slotsSize sl`). The assembly
      `tick-covers-instant` is a REAL definition typechecking against the
-     actual `capsAt` recurrence. **The single residual is the postulate
-     `count-covers-tower : 3 + towerℕ sz ≤ sizeCount (capsAt e sl id)
-     (capsH e sl id)`** — abstract-locked against numeric probing (same
-     three-seal lock as tier-1 #6), symbolic route recorded in its header
-     (each `dLvl` step climbs past `sizeAt S J ≥ 2^J`, so n steps tower to
-     height n; `cDel ≥ height` is the new part). It joins `opIterD-dominated`
-     as the second member of the "pure ℕ arithmetic over the sealed count
-     machinery" class. If it is FALSE the dry family is false as written and
-     the anchor re-indexes; if it holds, the family's headroom arithmetic is
-     CLOSED. The demand MODEL (`a′ ≤ 2a + v + 11`, count ≤ towerℕ sz) remains
-       the dry family's own measured-not-proven content — that is what the
+     actual `capsAt` recurrence.
+
+     ✅ **`count-covers-tower` IS NOW PROVEN TOO — the headroom arithmetic
+     is CLOSED, zero postulates in the file.** The recorded route executed
+     as written: `fLvlD` is STRICTLY inflationary (`fLvl-pad` — both clauses
+     factor through `fLvl + suc widAt`; the suc-d clause seeds `sIterD` with
+     it via the existing `sIterD-zero≤`), so `iterL` advances by its budget
+     (`iterL-plus`), `dLvl` climbs past `suc (sizeAt S J) + J` with
+     `sizeAt S J ≥ 2^J`, hence `lvls 0 n` towers (`lvls-tower`, by induction
+     with `pow2-mono`); and the count's budget `cDel ≥ cReg (capsAt) ≥
+     2 + sz` (`dWalkᶜ-ge` — the walk visits `regAt S R 0 = R` positions,
+     each adding ≥ 1 — plus `capsAt-reg`, cReg's base `suc sz` only ever
+     multiplied up). Total: `sizeCount ≥ lvls 0 (2+sz) ≥ 3 + towerℕ sz`.
+     **WIRING NOTE: `capsAt-reg` is the `capsAt-base-reg`-shaped sub-lemma
+     tier-1 #8 names as its sole missing piece** (proven here at the
+     stronger `2 + sz`); lift it into `Caps.agda` when #8 is picked up.
+     **What remains open on the anchor is ONLY the demand model**
+     (`a′ ≤ 2a + v + 11`, count ≤ towerℕ sz) — the dry family's own
+       measured-not-proven content — that is what the
        three dry postulates assert.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the

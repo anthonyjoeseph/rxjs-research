@@ -25,11 +25,13 @@
 --
 -- THE VERDICT: the race resolves in favour of the caps — 2^j · B beats
 -- (2B+12) · 2^(towerℕ sz) as soon as j ≥ 3 + towerℕ sz (§ 2, proven,
--- pure arithmetic).  So the ENTIRE remaining question is the count bound
+-- pure arithmetic), AND the count bound
 --   count-covers-tower : 3 + towerℕ sz ≤ sizeCount (capsAt e sl id) (capsH …)
--- (§ 3, POSTULATE).  Route and status in its header.  If it is FALSE, the
--- dry family is false as written and the anchor must be re-indexed; if it
--- holds, the family's headroom arithmetic is closed by tick-covers-instant.
+-- is PROVEN (§ 3, no postulates): lvls towers one exponential per step
+-- (fLvlD is strictly inflationary, dLvl climbs past sizeAt ≥ 2^J) and its
+-- budget cDel ≥ cReg (capsAt) ≥ 2 + sz.  So the dry family's headroom
+-- arithmetic is CLOSED by tick-covers-instant, against the real recurrence,
+-- with zero postulates in this file.
 --
 -- BUILD:
 --   cd /Users/flipside-anthony/Developer/personal/rxjs-research/agda &&
@@ -40,18 +42,25 @@ module Battery-Tick-Headroom where
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-refl; ≤-reflexive; ≤-trans;
-         *-monoˡ-≤; *-monoʳ-≤; +-mono-≤;
-         *-assoc; *-comm; *-identityˡ; *-distribʳ-+;
-         n≤1+n; m≤m+n)
+         *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; +-mono-≤; +-monoʳ-≤;
+         *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribʳ-+;
+         +-suc; +-comm; +-identityʳ;
+         n≤1+n; m≤m+n; <⇒≤)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
 open import Rx.Prim using (towerℕ)
 open import Rx.Exp  using (Ctx; Closed; sizeᵉ)
 open import Rx.Slots using (Slots; slotsSize)
-open import Rx.Evaluator using (sizeStep; iterSize)
+open import Rx.Frame-Width using (entryCeil)
+open import Rx.Evaluator
+  using (sizeStep; iterSize; sizeAt; regAt; widAt; fCharge; fLvl;
+         fLvlD; sIterD; iterL; dLvl; lvls; dCapᶜ; dWalkᶜ;
+         fLvlD-0; fLvlD-suc; capsBase)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; capsAt; capsH; sizeCount; 2≤capsAt-size)
+  using (Caps; caps; capsAt; capsH; sizeCount; sizeCount-body;
+         cDel; cDel-body; frameBlowup;
+         2≤capsAt-size; 2≤sizeCount; 2≤dLvl; lvls-mono; sIterD-zero≤; n<2^n)
 
 ----------------------------------------------------------------------
 -- § 0  pow2 kit (local, to avoid stdlib name roulette)
@@ -125,27 +134,137 @@ headroom-arith B t j hB hj =
                  (cong (_* B) (sym (eight (2 ^ t))))))
 
 ----------------------------------------------------------------------
--- § 3  THE ONE NAMED GAP — the count is tower-sized.
+-- § 3  THE COUNT IS TOWER-SIZED — proven, no postulates.
 --
--- STATUS: POSTULATE, and NOT numerically probeable: `sizeCount` and `cDel`
--- are abstract, and even via their -body lemmas the value at any concrete
--- program is gated behind `capsH` = iterated `blowH`, which is abstract
--- AND tower-valued — the same three-seal lock as tier-1 #6.  Symbolic route
--- (recorded, unattempted):
---   sizeCount c d = lvls S W d 0 (cDel c d)          [sizeCount-body]
---   each dLvl step from level J climbs past sizeAt S J = iterSize S J S
---   ≥ 2^J (§ 1), so n dLvl steps from 0 climb a tower of height n;
---   cDel c d ≥ height needed follows from 1≤dCapᶜ-style positivity plus
---   the walk's regAt fan-out — the genuinely new part, same class as
---   opIterD-dominated (pure ℕ arithmetic, no evaluator).
--- If FALSE, the dry family is false as written (anchor re-index needed).
+-- The route the postulate's header recorded, executed:
+--   sizeCount c d = lvls S W d 0 (cDel c d)            [sizeCount-body]
+--   each lvls step applies dLvl, and dLvl S W d J ≥ suc (sizeAt S J) + J
+--   with sizeAt S J ≥ 2^J (§ 1) — so n lvls steps from 0 climb a tower of
+--   height n (lvls-tower below);
+--   and cDel c d ≥ cReg c ≥ 2 + sz  (dWalkᶜ walks at least regAt S R 0 = R
+--   positions, each adding ≥ 1; cReg's base is suc sz and frameStep only
+--   multiplies it up — capsAt-reg below is the `capsAt-base-reg`-shaped
+--   fact tier-1 #8's route note asked for, at ≥ 2 + sz).
+-- Combining: sizeCount ≥ lvls 0 (2 + sz) ≥ 3 + towerℕ sz.
 ----------------------------------------------------------------------
 
-postulate
-  count-covers-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    3 + towerℕ (sizeᵉ e + slotsSize sl)
-      ≤ sizeCount (capsAt e sl id) (capsH e sl id)
+-- (a) strictness: one fLvlD frame climbs by at least one.  Both clauses
+-- factor through `fLvl S W J + suc (widAt S W J)` — d = 0 IS that value,
+-- and the suc-d clause seeds sIterD with it via sIterD-zero≤.
+fLvl-pad : ∀ S W J → suc J ≤ fLvl S W J + suc (widAt S W J)
+fLvl-pad S W J =
+  ≤-trans (s≤s (≤-trans (m≤m+n J (fCharge S W J))
+                        (m≤m+n (fLvl S W J) (widAt S W J))))
+          (≤-reflexive (sym (+-suc (fLvl S W J) (widAt S W J))))
+
+fLvlD-strict : ∀ S W d J → suc J ≤ fLvlD S W d J
+fLvlD-strict S W zero    J =
+  ≤-trans (fLvl-pad S W J) (≤-reflexive (sym (fLvlD-0 S W J)))
+fLvlD-strict S W (suc d) J =
+  ≤-trans (≤-trans (fLvl-pad S W J)
+                   (sIterD-zero≤ S W d (suc (sizeAt S (suc J)))
+                                 (suc (widAt S W J)) (fLvl S W J)))
+          (≤-reflexive (sym (fLvlD-suc S W d J)))
+
+-- (b) so iterL advances by at least its budget, and dLvl by suc (sizeAt).
+iterL-plus : ∀ S W d k J → k + J ≤ iterL S W d k J
+iterL-plus S W d zero    J = ≤-refl
+iterL-plus S W d (suc k) J =
+  ≤-trans (≤-reflexive (sym (+-suc k J)))
+    (≤-trans (+-monoʳ-≤ k (fLvlD-strict S W d J))
+             (iterL-plus S W d k (fLvlD S W d J)))
+
+dLvl-plus : ∀ S W d J → suc (sizeAt S J) + J ≤ dLvl S W d J
+dLvl-plus S W d J = iterL-plus S W d (suc (sizeAt S J)) J
+
+-- (c) each lvls step exponentiates: 2^J ≤ sizeAt S J, so n steps tower.
+pow≤sizeAt : ∀ S J → 1 ≤ S → 2 ^ J ≤ sizeAt S J
+pow≤sizeAt S J 1≤S =
+  ≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ J))))
+    (≤-trans (*-monoʳ-≤ (2 ^ J) 1≤S) (iterSize-doubles S J S 1≤S))
+
+lvls-tower : ∀ S W d n → 1 ≤ S → towerℕ n ≤ lvls S W d 0 (suc n)
+lvls-tower S W d zero    1≤S = ≤-trans (s≤s z≤n) (2≤dLvl S W d 0)
+lvls-tower S W d (suc n) 1≤S =
+  ≤-trans (pow2-mono (lvls-tower S W d n 1≤S))
+    (≤-trans (pow≤sizeAt S J 1≤S)
+      (≤-trans (≤-trans (n≤1+n (sizeAt S J)) (m≤m+n (suc (sizeAt S J)) J))
+               (dLvl-plus S W d J)))
+  where J = lvls S W d 0 (suc n)
+
+three-tower≤lvls : ∀ S W d sz → 1 ≤ S →
+  3 + towerℕ sz ≤ lvls S W d 0 (suc (suc sz))
+three-tower≤lvls S W d sz 1≤S =
+  ≤-trans (s≤s step) (dLvl-plus S W d J)
+  where
+  J = lvls S W d 0 (suc sz)
+  step : 2 + towerℕ sz ≤ sizeAt S J + J
+  step = ≤-trans (≤-reflexive (+-comm 2 (towerℕ sz)))
+    (+-mono-≤ (≤-trans (lvls-tower S W d sz 1≤S)
+                       (≤-trans (<⇒≤ (n<2^n J)) (pow≤sizeAt S J 1≤S)))
+              (2≤dLvl S W d (lvls S W d 0 sz)))
+
+-- (d) the count's budget: cDel ≥ cReg (the walk visits regAt S R 0 = R
+-- positions, each adding at least one), and cReg (capsAt) ≥ 2 + sz.
+dWalkᶜ-ge : ∀ S W R d g J i → i ≤ dWalkᶜ S W R d g J i
+dWalkᶜ-ge S W R d g J zero    = z≤n
+dWalkᶜ-ge S W R d g J (suc i) =
+  ≤-trans (≤-reflexive (sym (+-comm i 1)))
+          (+-mono-≤ (dWalkᶜ-ge S W R d g J i) (s≤s z≤n))
+
+cDel-ge-reg : ∀ (c : Caps) (d : ℕ) → Caps.cReg c ≤ cDel c d
+cDel-ge-reg c d =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (Caps.cReg c))))
+                   (dWalkᶜ-ge (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
+                              (Caps.cSize c) 0
+                              (regAt (Caps.cSize c) (Caps.cReg c) 0)))
+          (≤-reflexive (sym (cDel-body c d)))
+
+m≤m*2 : ∀ m → m ≤ m * 2
+m≤m*2 m = ≤-trans (m≤m+n m m)
+  (≤-reflexive (trans (cong (m +_) (sym (+-identityʳ m))) (*-comm 2 m)))
+
+blow-reg-ge : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c * 2 ≤ Caps.cReg (frameBlowup c d)
+blow-reg-ge c d 2≤S 1≤R =
+  *-monoʳ-≤ (Caps.cReg c)
+    (s≤s (*-mono-≤ (≤-trans (s≤s z≤n) (2≤sizeCount c d 2≤S 1≤R))
+                   (≤-trans (s≤s z≤n) 2≤S)))
+
+capsAt-reg : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 + (sizeᵉ e + slotsSize sl) ≤ Caps.cReg (capsAt e sl id)
+capsAt-reg {n = n} e sl zero =
+  ≤-trans (+-monoʳ-≤ 2 (m≤m*2 (sizeᵉ e + slotsSize sl)))
+          (blow-reg-ge c₀ (capsBase e sl) (s≤s (s≤s z≤n)) (s≤s z≤n))
+  where
+  c₀ : Caps
+  c₀ = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+            (suc (sizeᵉ e + slotsSize sl))
+capsAt-reg e sl (suc id) =
+  ≤-trans (capsAt-reg e sl id)
+    (≤-trans (≤-reflexive (sym (*-identityʳ (Caps.cReg (capsAt e sl id)))))
+             (*-monoʳ-≤ (Caps.cReg (capsAt e sl id)) (s≤s z≤n)))
+
+-- (e) THE COUNT BOUND — a real definition, closing § 3.
+count-covers-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  3 + towerℕ (sizeᵉ e + slotsSize sl)
+    ≤ sizeCount (capsAt e sl id) (capsH e sl id)
+count-covers-tower e sl id =
+  ≤-trans (≤-trans (three-tower≤lvls S W d sz 1≤S)
+                   (lvls-mono (suc (suc sz)) (cDel c d)
+                              (2≤capsAt-size e sl id) ≤-refl ≤-refl ≤-refl
+                              (≤-trans (capsAt-reg e sl id)
+                                       (cDel-ge-reg c d))))
+          (≤-reflexive (sym (sizeCount-body c d)))
+  where
+  c  = capsAt e sl id
+  d  = capsH e sl id
+  S  = Caps.cSize c
+  W  = Caps.cWid c
+  sz = sizeᵉ e + slotsSize sl
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
 
 ----------------------------------------------------------------------
 -- § 4  THE ASSEMBLY — a real definition; the race closes from §§ 1-3.
@@ -177,24 +296,21 @@ tick-covers-instant e sl id =
 --
 -- (1) SUPPLY SHAPE PROVEN: one caps tick multiplies cSize by ≥ 2^j (§ 1),
 --     and 2^j·B dominates the instant's tower demand once j ≥ 3 + towerℕ sz
---     (§ 2).  Both are real proofs over the actual recurrence, and the
---     assembly (§ 4) typechecks against the actual capsAt — so the dry
---     family's headroom question is now EXACTLY ONE inequality about the
---     count, not a design unknown.
--- (2) THE RESIDUAL, honestly labelled: count-covers-tower is a postulate,
---     abstract-locked against numeric probing, with its symbolic route
---     recorded in § 3.  It joins opIterD-dominated as the second member of
---     the "pure ℕ arithmetic over the sealed count machinery" class.
--- (3) DIRECTION OF THE EVIDENCE: j = sizeCount c d where each of the
---     count's own dLvl steps climbs through sizeAt S J ≥ 2^J — the count
---     machinery is BUILT from the same tower-climbing iterates as the
---     supply, with S = B ≥ 2 + sz.  The claim needs the count to reach
---     height ~towerℕ sz while its ingredients tower in S > sz; it leans
---     the right way, but that is an argument, and § 3 is where the proof
---     obligation now lives, greppable.
+--     (§ 2).  Both are real proofs over the actual recurrence.
+-- (2) COUNT BOUND PROVEN (§ 3): sizeCount ≥ lvls 0 (2+sz) ≥ 3 + towerℕ sz,
+--     from fLvlD's strict inflation (fLvl-pad through both clauses),
+--     iterL/dLvl budget advancement, 2^J ≤ sizeAt S J, and
+--     cDel ≥ cReg (capsAt) ≥ 2 + sz.  What the earlier draft postulated is
+--     now a definition; this file carries ZERO postulates.
+-- (3) BONUS WIRING NOTE: capsAt-reg is the `capsAt-base-reg`-shaped lemma
+--     tier-1 #8's route note names as its sole missing sub-lemma (there
+--     stated as `suc (sizeᵉ e + slotsSize sl) ≤ cReg (capsAt …)`; here
+--     proven at the STRONGER 2 + sz).  When #8 is picked up, lift this
+--     into Caps.agda rather than re-deriving it.
 --
--- SHAPES COVERED: the statement level — supply chain proven for ALL e, sl,
--- id, symbolically.  NOT COVERED: the § 3 count bound (postulated), and the
--- demand MODEL (a′ ≤ 2a + v + 11, N ≤ towerℕ sz), which is the dry family's
--- own measured-not-proven content.
+-- SHAPES COVERED: the statement level — supply chain AND count bound proven
+-- for ALL e, sl, id, symbolically, zero postulates.  NOT COVERED: the demand
+-- MODEL (a′ ≤ 2a + v + 11, N ≤ towerℕ sz), which is the dry family's own
+-- measured-not-proven content — that is what the three dry postulates
+-- assert, and it is the anchor's remaining open surface.
 ----------------------------------------------------------------------
