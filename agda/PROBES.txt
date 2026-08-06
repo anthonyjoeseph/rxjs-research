@@ -82,7 +82,6 @@ Nest-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on nex
 Nest-Supply-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Of-Fits-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Payload-Share-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Pool-Lower-Probe.agda | LANDING: Verify-Budget-Sufficient/Caps.agda (three-size-le-blowH chain, tier-1 #12) | proven chain, landing plan in PROOF-STATE
 Queue-Push-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Refresh-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Rung-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -95,3 +94,4 @@ Visited-Width-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on 
 Wf-Aux-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Wf-Fold-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Width-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
+OpIterD-Budget-Probe.agda | EVIDENCE | REFUTATION of opIterD-budget at R=0: missing hypothesis 1≤R, symbolic proof in §1
