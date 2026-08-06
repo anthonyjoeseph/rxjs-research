@@ -271,36 +271,52 @@ used somewhere — the only exceptions are the top-level, most-important exports
 backwards-compatibility shims, nothing "stored for reference", no legacy, no deprecated.
 **Do not be afraid to throw out code or documentation.** Git history is the archive.
 
-### DELETION FREEZE: wire everything BEFORE deleting anything (Anthony, 2026-08-05)
+### DELETION: the wiring pass is COMPLETE, so the freeze is lifted (2026-08-06)
 
-**No orphan gets deleted until the wiring pass is finished.** Not a mood — a
-rule, because deletion and wiring interfere in one direction only:
+The freeze that ran through 2026-08-05 existed because deletion and wiring interfere
+in one direction only: **wiring only ADDS consumers** (monotone, safe to act on),
+while **deletion CREATES orphans** by stranding whatever fed only into the deleted
+cluster — measured once at six further definitions. Deleting mid-pass corrupts the
+very measurement used to decide what to delete.
 
-- **Wiring only ADDS consumers.** It never creates an orphan, so its signal is
-  monotone and safe to act on.
-- **Deletion CREATES orphans**, by stranding whatever fed only into the deleted
-  cluster. Measured: one cluster's removal orphaned six further definitions whose
-  consumer chain terminated inside it.
+The pass is now done (zero orphans, zero unreachable modules, every postulate
+consumed), so `make wiring`'s orphan set is trustworthy again and an orphan may be
+deleted on its merits. Two rules survive the freeze, permanently:
 
-So deleting before wiring is complete **corrupts the very measurement used to
-decide what to delete.** Wire first; the orphan set that survives a finished
-wiring pass is the only one whose emptiness means anything.
+- **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS.** A sweep
+  answers the first; only building the consumer answers the second. A definition
+  needed by work not yet written reads as dead, and a lemma stated AFTER its own
+  specialisation is orphaned by placement alone and wires in one line. Prefer
+  wiring to deleting whenever a plausible consumer is nameable.
+- **Record the commit SHA in PROOF-STATE.md** for anything substantial removed.
+  Git history is the archive only if someone can find the entry.
 
-**"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS**, and only
-building the consumer answers the second. A sweep answers the first. Two traps
-that make the difference concrete: a definition needed by work not yet written
-reads as dead; and a lemma stated AFTER its own specialisation is orphaned by
-placement alone, and wires in one line.
+### DE-RISK MODE: probe for falsity first, grind last (Anthony, 2026-08-06)
 
-**The one standing exemption** is code the SOURCE ITSELF retires in writing.
-Even then: record the commit SHA in PROOF-STATE.md, because git history is the
-archive only if someone can find the entry.
+**The wiring pass is over; the current pass is DE-RISKING.** Every postulate carries
+a probability of being FALSE or EMPTY, and the proof's total risk is the SUM over the
+ledger — so work is ordered by *risk reduced per unit effort*, not by proof-progress
+optics. The ranked ledger and the phase order live in PROOF-STATE.md; read it before
+picking up any postulate.
 
-### SHORTCUT MANDATE: postulate freely until the wiring pass is done (Anthony, 2026-08-05)
+- **A machine refutation is worth as much as a proof — usually more, since it is
+  cheaper.** A false statement found now costs a restatement; found after the towers
+  above it are ground, it costs the towers.
+- **THE TRUTH-AUDIT PROHIBITION IS LIFTED.** It was scoped "during the wiring pass"
+  and the pass is done. Auditing statements for truth — especially by machine probe —
+  is now the priority, not a distraction. A `-- SUSPECT:` note is no longer the
+  correct response to a doubt you can test: test it.
+- **PROBE BEFORE GRINDING.** If a postulate's sides are computable (`evaluate`,
+  `capsOK?`, `opIterD`, `depthE`, `spec-batchSimultaneous` …), instantiate it at
+  concrete programs in `agda/probe/` and check by `refl` — bug-cache shaped, seconds
+  per loop. Every probe ends in exactly one of two states: a refutation (record,
+  restate, re-rank) or a confidence receipt (`-- PROBED <date>:` in the postulate's
+  own header, saying what shapes were covered). **An unprobed probeable postulate is
+  the cheapest unmanaged risk in the repo.**
+- **Never extrapolate a probe past its shapes.** Green on three canonical programs is
+  a receipt, not a theorem; say which shapes were covered and which were not.
 
-**The current pass is WIRING, not proving. Take as many shortcuts as possible until it
-is finished.** What we do not yet know, we POSTULATE. Get the repo settled first;
-decisions about what to actually prove come after.
+**These still hold, unchanged from the wiring pass:**
 
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs
 saying because every instinct — and every subagent's default — runs the other way.
@@ -323,30 +339,22 @@ So, in worker directives and in your own work:
 orphaned because *their only would-be consumer is itself a monolithic postulate*. So:
 take that postulate, convert it into a REAL DEFINITION over several smaller postulates,
 and have the definition CALL the orphans it was always meant to consume. This wires
-proven work, makes each remaining gap greppable, and proves nothing hard. Applied
-2026-08-05 to `opIterD≤capsH-root` (wires `depth-capped`); the same move is open for
-`subscribeE-wet-via-caps` (wires `sub-charge`) and `subscribeE-wf` (wires its five
-proven clauses).
+proven work, makes each remaining gap greppable, and proves nothing hard. It is what
+retired the last orphan in the repo, and it remains the move whenever a new proof has
+nowhere to plug in. The mechanics — hypothesis extraction, eta-expanded implicits,
+ordering — are written up in PROOF-STATE.md § "WRITING AN ASSEMBLY".
 
-**DO NOT AUDIT POSTULATES FOR TRUTH DURING THE WIRING PASS (Anthony, 2026-08-05):
-"we can catch false postulates later, wiring is most important right now."** Do not
-block a wiring step, do not run a truth-check pass, and do not go looking. A false
-postulate is discoverable later — the day someone tries to prove it, it fails.
+**TWO SHAPES THAT ARE ALMOST ALWAYS WRONG — check every new postulate for both.** A
+statement whose conclusion needs information appearing in NONE of its hypotheses (e.g.
+deriving a path-LENGTH bound from `pathB?`, which carries no length conjunct), and a
+Σ-statement upward-closed in its witness (see "A Σ-receipt has content only through its
+witness" above). Under de-risk mode these are refutation targets, not `SUSPECT:` notes:
+build the counterexample.
 
-**But when you DO notice one in passing, write it down instead of chasing it.** Put a
-`-- SUSPECT:` line in the postulate's own comment saying what you doubt and why, and
-move on. That is free, it keeps the finding, and it costs no wiring time. Two shapes
-worth a `SUSPECT:` note if they catch your eye — a statement whose conclusion needs
-information that appears in NONE of its hypotheses (e.g. deriving a path-LENGTH bound
-from `pathB?`, which carries no length conjunct), and a Σ-statement upward-closed in
-its witness (see "A Σ-receipt has content only through its witness" above).
-
-**The one case still worth acting on immediately** is when the fix is CHEAPER than the
-postulate: if a missing hypothesis is free at the call site, adding it and deleting the
-postulate is less work than carrying it. That is a wiring win, not a truth audit —
-take it for that reason. (`depthE ≤ capsH` unconditionally is FALSE,
-`Depth-Bound.agda:11`; the `capsOK?`-conditioned form costs nothing extra, so it is the
-one that is stated.)
+**Prefer a free hypothesis to a carried postulate.** If a missing hypothesis is
+available at the call site, adding it and deleting the postulate is less work than
+carrying it. (`depthE ≤ capsH` unconditionally is FALSE, `Depth-Bound.agda:11`; the
+`capsOK?`-conditioned form costs nothing extra, so it is the one that is stated.)
 
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
