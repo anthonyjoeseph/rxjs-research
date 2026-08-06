@@ -939,30 +939,138 @@ opIterD≤capsH-root e ins =
 -- They cannot be directly wired as code consumers while this remains
 -- a postulate; they become genuine consumers when it is proved.
 postulate
-  subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  -- THE ONE REMAINING GAP on the subscribe side: `capsOK?` at the growth
+  -- index `frameStep j′ c` lifts to `capsAt e sl (suc id)`.
+  -- ROUTE (not yet walked): `j′ ≤ opIterD ≤ sizeCount c (capsH e sl id)`
+  -- via a general form of `opIterD≤sizeCount-root`; then
+  -- `frameStep-mono-j` gives `frameStep j′ c ⊑ᶜ frameStep (sizeCount c h) c`,
+  -- `capsAt-suc-full` (Caps.agda:893, refl) identifies THAT with
+  -- `capsAt e sl (suc id)`, and `capsOK?-mono` closes it.
+  sub-charge-capsOK-lift : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
+    (sched : Sched Γ) (st : EvalSt e) (j′ : ℕ) →
     let sl = Sched.slots sched
-        Ψ  = ΨAt e sl
-        B  = sizeCapAt e sl id
-        Ŝ  = sizeCapAt e sl (suc id)
-    in INV? Ψ B sched st ≡ true →
-       pathB? B Ψ κ ≡ true →
-       sizeᵉ b ≤ B →
-       fnCapᵉ b ≤ Ψ →
-       g hasAtLeast
-         suc (dBound Ŝ (hopR Ŝ)
-                     (unconn sl (EvalSt.connectedShares st))
-                     (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
-       capsOK? (capsAt e sl id) sched st ≡ true →
-       dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
-       let r   = subscribeE g b κ id now sched st
-           sl′ = Sched.slots (proj₁ (proj₂ r))
-       in (hasDry (proj₁ r) ≡ false)
-          × (INV? (ΨAt e sl′) (sizeCapAt e sl′ (suc id))
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-          × (capsOK? (capsAt e sl′ (suc id))
-                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+        c  = capsAt e sl id
+        r  = subscribeE g b κ id now sched st
+    in capsOK? (frameStep j′ c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c)
+                    (depthE g b κ id now sched st)
+                    (nest b sl (EvalSt.connectedShares st))
+                    (suc (sizeᵉ b)) 0 →
+       capsOK? (capsAt e sl (suc id))
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+-- THE SUBSCRIBE-SIDE ASSEMBLY.  A real definition, and the reason
+-- `sub-charge` (above, PROVEN) is no longer an orphan.
+--
+-- IT DOES NOT REPLACE P1 — IT RESTS ON IT.  `hasDry` and `INV?` come
+-- straight out of `subscribeE-wet` (Wet.agda, P1); this adds only the
+-- third conjunct, `capsOK?` at `suc id`.  So read the caps route's
+-- subscribe side as "P1 PLUS a caps conclusion", not as an alternative
+-- to P1.  An earlier plan had this mirroring P1 rather than consuming
+-- it; that would need `hasDry`/`INV?` re-derived from the caps face,
+-- which nothing here does.
+--
+-- THE TWO PATH HYPOTHESES ARE NEW, and they are load-bearing.
+-- `pathB?` carries NO length conjunct
+-- (`pathB? B Ψ (f ↠ p) = frameB? B Ψ f ∧ pathB? B Ψ p`) while `pathSz?`
+-- requires `suc (pathLen p) ≤ᵇ B` at every suffix — so deriving the
+-- latter from the former is not merely unproven, it is FALSE: take a
+-- tiny `e` (small `B`), a tiny `b`, and a long chain of `map-f` frames
+-- with small step functions, and every hypothesis holds while the
+-- conclusion fails.  The information has to be supplied, and it is free
+-- at the only call site (`κ := root`, below).
+subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      B  = sizeCapAt e sl id
+      Ŝ  = sizeCapAt e sl (suc id)
+  in INV? Ψ B sched st ≡ true →
+     pathB? B Ψ κ ≡ true →
+     pathSz? B κ ≡ true →
+     suc (pathLen κ) ≤ B →
+     sizeᵉ b ≤ B →
+     fnCapᵉ b ≤ Ψ →
+     g hasAtLeast
+       suc (dBound Ŝ (hopR Ŝ)
+                   (unconn sl (EvalSt.connectedShares st))
+                   (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
+     capsOK? (capsAt e sl id) sched st ≡ true →
+     dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
+     let r   = subscribeE g b κ id now sched st
+         sl′ = Sched.slots (proj₁ (proj₂ r))
+     in (hasDry (proj₁ r) ≡ false)
+        × (INV? (ΨAt e sl′) (sizeCapAt e sl′ (suc id))
+                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+        × (capsOK? (capsAt e sl′ (suc id))
+                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
+                        inv pathB pathSzκ lenκ szB fnB gas cOK dW =
+  dry , invOut , capsOut
+  where
+  sl      = Sched.slots sched
+  Ψ       = ΨAt e sl
+  B       = sizeCapAt e sl id
+  c       = capsAt e sl id
+  r       = subscribeE g b κ id now sched st
+  sched′  = proj₁ (proj₂ r)
+  st′     = proj₂ (proj₂ r)
+
+  sl′Eq : Sched.slots sched′ ≡ sl
+  sl′Eq = subscribeE-slots g b κ id now sched st
+
+  invP    = INV-parts Ψ B sched st inv
+  ss-in   : (slotsSize sl ≤ᵇ B) ≡ true
+  ss-in   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ invP))))
+  slotsOK : slotsSize sl ≤ Caps.cSize c
+  slotsOK = ≤ᵇ⇒≤ (slotsSize sl) B (T-to ss-in)
+
+  wet     = subscribeE-wet g b κ id now sched st inv pathB szB fnB gas
+  dry     : hasDry (proj₁ r) ≡ false
+  dry     = proj₁ wet
+  invOut  : INV? (ΨAt e (Sched.slots sched′))
+                 (sizeCapAt e (Sched.slots sched′) (suc id))
+                 sched′ st′ ≡ true
+  invOut  = proj₂ wet
+
+  f0 = frameStep-0 c
+
+  pκSz  : pathSz? (Caps.cSize (frameStep 0 c)) κ ≡ true
+  pκSz  = subst (λ x → pathSz? (Caps.cSize x) κ ≡ true) (sym f0) pathSzκ
+
+  pκLen : suc (pathLen κ) ≤ Caps.cSize (frameStep 0 c)
+  pκLen = subst (λ x → suc (pathLen κ) ≤ Caps.cSize x) (sym f0) lenκ
+
+  IH = sub-charge c
+                  (nest b sl (EvalSt.connectedShares st))
+                  (suc (sizeᵉ b))
+                  0
+                  g b κ id now sl sched st
+                  (2≤capsAt-size e sl id)
+                  (1≤capsAt-reg e sl id)
+                  refl
+                  (slotsCaps?-capsAt e sl id)
+                  slotsOK
+                  (subst (λ x → capsOK? x sched st ≡ true) (sym f0) cOK)
+                  (subst (λ x → sizeᵉ b ≤ Caps.cSize x) (sym f0) szB)
+                  (subst (λ x → dWᵉ n sl b ≤ Caps.cWid x) (sym f0) dW)
+                  pκSz
+                  pκLen
+                  ≤-refl
+                  ≤-refl
+
+  j′      = proj₁ IH
+  capOut  = proj₁ (proj₂ IH)
+  jBound  = proj₂ (proj₂ (proj₂ (proj₂ IH)))
+
+  capsOut₀ : capsOK? (capsAt e sl (suc id)) sched′ st′ ≡ true
+  capsOut₀ = sub-charge-capsOK-lift g b κ id now sched st j′ capOut jBound
+
+  capsOut : capsOK? (capsAt e (Sched.slots sched′) (suc id)) sched′ st′ ≡ true
+  capsOut = subst (λ x → capsOK? (capsAt e x (suc id)) sched′ st′ ≡ true)
+                  (sym sl′Eq) capsOut₀
 
 -- helpers for burst-caps corollary
 
@@ -1004,6 +1112,8 @@ burst-caps {n = n} e ins =
                  (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
                  (init-INV e ins 0)
                  refl
+                 refl                                    -- pathSz? B root
+                 (≤-trans (s≤s z≤n) (2≤capsAt-size e ins 0))  -- 1 ≤ B
                  (sizeE≤cap e ins)
                  (m≤m+n (fnCapᵉ e) _)
                  (caps-fuel-root e ins)
