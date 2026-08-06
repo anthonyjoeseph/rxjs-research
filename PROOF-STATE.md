@@ -37,10 +37,20 @@ formal-verification-batchSimultaneous          The-Proof.agda:1098 — REAL, mod
  └─ evaluate-well-formed                       Verify-Well-Formed.agda:5328
      ├─ budget-sufficient                      Caps-Bridge.agda — PROVEN from:
      │   ├─ burst-wet    ← subscribeE-wet      [P1]  (.Wet, unchanged)
-     │   ├─ burst-caps   ← (postulated — see the RULING's EXECUTED note)
+     │   ├─ burst-caps   ← subscribeE-wet-via-caps    proven, and it
+     │   │                 rests on [P1] + sub-charge (proven)
+     │   │                 + sub-charge-capsOK-lift (postulated)
      │   └─ drain-dry    ← cascade-wet-via-caps       proven
-     └─ THE WELL-FORMEDNESS BRANCH             its OWN 5 postulates — see [W1-W5]
+     └─ THE WELL-FORMEDNESS BRANCH             its OWN 8 postulates — see [W1-W8]
 ```
+
+**THE CAPS ROUTE DOES NOT REPLACE P1 — IT RESTS ON IT.** Both branches of
+`budget-sufficient` route through `subscribeE-wet`: `burst-wet` directly, and
+`burst-caps` because `subscribeE-wet-via-caps` takes its `hasDry` and `INV?`
+conjuncts straight out of P1 and contributes only the third (`capsOK?` at
+`suc id`). So P1 is load-bearing for the whole subscribe side, and no amount of
+caps work retires it. Scope the endgame accordingly — the source header used to
+call this "P1's subscribe-side mirror", which reads as a replacement.
 
 **`budget-sufficient` lives in `Caps-Bridge.agda`, not `Wet.agda`** (see the
 RULING below); `cascadeGo-wet` [P2] is RETIRED BY DELETION (orphaned, zero
