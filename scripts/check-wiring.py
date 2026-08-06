@@ -945,6 +945,35 @@ def unreachable_parents(orphans, defs, postulate_names):
     return sorted(out, key=lambda x: (x[1].file, x[1].line))
 
 
+def read_deferred_ledger(path):
+    """Read agda/DEFERRED.txt and return (names, missing).
+
+    `names` is a frozenset of lemma names recorded as passed-only.
+    `missing` is True when the file does not exist (the gate treats a missing
+    ledger the same as an empty one: every measured lemma becomes a NEW
+    DEFERRAL).
+
+    Format: each non-comment, non-blank line is:
+        LEMMA | DEFERRED-BY | ≤SLOTS | REASON: ...
+    Only field 0 (the lemma name, before the first ' | ') is used for the
+    ratchet comparison.  The rest is informational and not parsed.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return frozenset(), True
+    names = set()
+    for line in lines:
+        line = line.rstrip("\n")
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        name = line.split(" | ")[0].strip()
+        if name:
+            names.add(name)
+    return frozenset(names), False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -957,8 +986,14 @@ def main():
         "--gate",
         action="store_true",
         help="exit 1 when the wiring law is violated (orphans outside the "
-        "exempt families, or a ⊤-typed postulate). Without this the script "
-        "is a report and always exits 0.",
+        "exempt families, a ⊤-typed postulate, or a B4 ratchet mismatch). "
+        "Without this the script is a report and always exits 0.",
+    )
+    parser.add_argument(
+        "--ledger",
+        default=None,
+        help="path to agda/DEFERRED.txt (default: <repo-root>/agda/DEFERRED.txt, "
+        "inferred from this script's own location)",
     )
     args = parser.parse_args()
 
@@ -968,6 +1003,13 @@ def main():
         script_dir = os.path.dirname(os.path.abspath(__file__))
         src_dir = os.path.join(script_dir, "..", "agda", "src")
     src_dir = os.path.abspath(src_dir)
+
+    if args.ledger:
+        ledger_path = args.ledger
+    else:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ledger_path = os.path.join(script_dir, "..", "agda", "DEFERRED.txt")
+    ledger_path = os.path.abspath(ledger_path)
 
     if not os.path.isdir(src_dir):
         print(f"error: no such directory: {src_dir}", file=sys.stderr)
@@ -1267,16 +1309,70 @@ def main():
             problems.append(f"{len(unexcused)} vacuous (⊤-typed) postulate(s)")
         if not main_ok:
             problems.append("Main.agda has a bare `open import`")
+
+        # B4 RATCHET — the passed-only set must equal agda/DEFERRED.txt.
+        # A new passed-only lemma (measured but not in the ledger) is a NEW
+        # DEFERRAL: deferral must be an explicit, reviewed act.  A lemma in
+        # the ledger but not measured means its premises are discharged or it
+        # was deleted — the win case, but the ledger line must be removed so
+        # the numbers stay honest.
+        measured_names = frozenset(r[0] for r in deferred_rows)
+        ledger_names, ledger_missing = read_deferred_ledger(ledger_path)
+        new_deferrals = sorted(measured_names - ledger_names)
+        stale_entries = sorted(ledger_names - measured_names)
+        if ledger_missing:
+            problems.append(
+                f"agda/DEFERRED.txt not found at {ledger_path} — "
+                "create it (run `make wiring` and add all (B4) entries)"
+            )
+        else:
+            if new_deferrals:
+                problems.append(
+                    f"{len(new_deferrals)} NEW DEFERRAL(s) not in agda/DEFERRED.txt"
+                )
+            if stale_entries:
+                problems.append(
+                    f"{len(stale_entries)} ledger entry/entries no longer measured "
+                    "(premises discharged or lemma deleted — remove from agda/DEFERRED.txt)"
+                )
+
         if problems:
             print()
             print("=" * 78)
             print("WIRING GATE: FAIL — " + "; ".join(problems))
             print("=" * 78)
+            if new_deferrals:
+                print()
+                print("NEW DEFERRALS — add these lines to agda/DEFERRED.txt:")
+                # Build a lookup from deferred_rows for slot counts and parents
+                row_map = {r[0]: r for r in deferred_rows}
+                for name in new_deferrals:
+                    row = row_map.get(name)
+                    if row:
+                        _lem, _d, parents, slots = row
+                        print(
+                            f"  {name} | {', '.join(parents)} | "
+                            f"≤{slots} | REASON: TODO"
+                        )
+                    else:
+                        print(f"  {name} | (unknown) | ≤? | REASON: TODO")
+            if stale_entries:
+                print()
+                print(
+                    "STALE ENTRIES — remove these lines from agda/DEFERRED.txt."
+                )
+                print(
+                    "Their premises are now discharged (or the lemma was deleted)."
+                )
+                print("This is a WIN; the gate fails only until the ledger is tidied:")
+                for name in stale_entries:
+                    print(f"  {name}")
             sys.exit(1)
         print()
         print("=" * 78)
         print("WIRING GATE: PASS — every definition AND every postulate")
-        print("traces to a top-level claim, and every module is reached")
+        print("traces to a top-level claim, every module is reached,")
+        print("and the (B4) passed-only set matches agda/DEFERRED.txt")
         print("=" * 78)
 
 

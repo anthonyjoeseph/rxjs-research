@@ -1,0 +1,94 @@
+# DEFERRED.txt — passed-only lemma ledger
+# Generated 2026-08-06 from the (B4) report of scripts/check-wiring.py.
+# Maintained by the ratchet in `make wiring-gate` (see scripts/check-wiring.py).
+#
+# WHAT THIS FILE IS.  The wiring law tracks NAMES, not OBLIGATIONS INSIDE
+# TYPES.  A proven lemma whose only consumers are assembly argument positions
+# (i.e. it is PASSED into a postulate but never APPLIED) reads as fully wired
+# — no orphan, no gate failure — while its own premises sit permanently unpaid
+# as long as the parent postulate stands.  These 55 lemmas are in that state.
+# They are LOAD-BEARING and PROVEN; this is not a deletion list.
+# Passed-only is expected and normal while the parent is still a postulate.
+# The ratchet exists to make deferral an explicit, reviewed act, not a silent
+# side effect of writing an assembly.
+#
+# HOW THE RATCHET WORKS.
+# `make wiring-gate` compares the measured passed-only set against this file:
+#   - a lemma measured but NOT in this file = NEW DEFERRAL — fails the gate
+#     until deliberately added here;
+#   - a lemma in this file but NOT measured = its premises are now discharged
+#     (or the lemma was deleted) — the ledger line must be removed.  This is
+#     the win case; the gate message says so.
+#
+# TWO CAVEATS INHERITED FROM (B4) — the numbers in this file are never exact.
+#
+#   UPPER BOUND.  The ≤SLOTS column counts every depth-0 `→` in the
+#   signature, including the binder arrow of a leading `∀ … →` telescope.
+#   It sizes the deferred obligation set; it is not a count of distinct proof
+#   obligations.
+#
+#   TEXTUAL ANALYSIS.  A lemma used only inside a `where` block can be
+#   misreported as passed-only by the textual checker (it will not appear in
+#   the boundary-matched consumer set even though it has a real consumer in the
+#   block body).  If a line here turns out to be a false positive, remove it
+#   and note in the commit why it was wrong.
+#
+# FORMAT: one entry per non-comment line.
+# LEMMA | DEFERRED-BY | ≤SLOTS | REASON
+# (the ratchet reads only field 1; the rest is informational)
+#
+1≤sizeᵗˢ | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
+B1-cSize≡sizeCapAt | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
+S≤sizeStep | three-size≤capsH-core | ≤1 | REASON: three-size≤capsH-core must be proven
+burstCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-concat-face-core must be proven
+capsAt-suc-full | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
+cascade-delivN | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
+cascadeGo-cons-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
+cascadeGo-skip-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
+cascadeGo-wet | cascadeGo-wet-core, dry-tick-core | ≤4 | REASON: cascadeGo-wet-core and dry-tick-core must be proven
+cascadeLatch-deliv | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
+chainStep-caps | dry-tick-core | ≤11 | REASON: dry-tick-core must be proven
+connect-edge | subscribeE-wet-core | ≤6 | REASON: subscribeE-wet-core must be proven
+enterInstant-held | mid-step-core | ≤5 | REASON: mid-step-core must be proven
+enterInstant-idle | mid-step-core | ≤3 | REASON: mid-step-core must be proven
+entry-to-index | opIterD≤sizeCount-root-core | ≤3 | REASON: opIterD≤sizeCount-root-core must be proven
+eventsCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-concat-face-core must be proven
+finish-bounded | cascadeGo-wet-core | ≤2 | REASON: cascadeGo-wet-core must be proven
+foldPath-root-out | mid-step-core | ≤3 | REASON: mid-step-core must be proven
+foldPath-sink-N | thruOuter-face-core | ≤1 | REASON: thruOuter-face-core must be proven
+frameStep-full | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
+hop-edge | subscribeE-wet-core | ≤5 | REASON: subscribeE-wet-core must be proven; its premise sizeᵛ (obs u) o ≤ Ŝ is the worked example that motivated this ledger
+hop-step-gives | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
+hop-step-needs | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
+init-bounded | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
+initReg-wf | subscribeE-input-wf-core | ≤4 | REASON: subscribeE-input-wf-core must be proven
+k-raise | opIterD≤sizeCount-root-core | ≤2 | REASON: opIterD≤sizeCount-root-core must be proven
+latch-bounded | cascadeGo-wet-core | ≤2 | REASON: cascadeGo-wet-core must be proven
+mid-enters | mid-step-core | ≤5 | REASON: mid-step-core must be proven
+mid-seed | mid-step-core | ≤3 | REASON: mid-step-core must be proven
+mu-1≤k | opIterD≤sizeCount-root-core | ≤2 | REASON: opIterD≤sizeCount-root-core must be proven
+mu-edge | subscribeE-wet-core | ≤1 | REASON: subscribeE-wet-core must be proven
+mu-step-le | opIterD≤sizeCount-root-core | ≤2 | REASON: opIterD≤sizeCount-root-core must be proven
+nest≤ | opIterD≤sizeCount-root-core | ≤1 | REASON: opIterD≤sizeCount-root-core must be proven
+obs-slot-shared | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
+obsListCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-concat-face-core must be proven
+opIterD≤capsH-root | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
+paidUp-held | mid-step-core | ≤3 | REASON: mid-step-core must be proven
+prepend-fits | sub-charge-capsOK-lift-core | ≤3 | REASON: sub-charge-capsOK-lift-core must be proven
+reach-resets | thruOuter-face-core | ≤4 | REASON: thruOuter-face-core must be proven
+residAt-connected | opIterD≤sizeCount-root-core | ≤1 | REASON: opIterD≤sizeCount-root-core must be proven
+share-step-resid | opIterD≤sizeCount-root-core | ≤4 | REASON: opIterD≤sizeCount-root-core must be proven
+shareFinish-len | thruOuter-face-core | ≤1 | REASON: thruOuter-face-core must be proven
+shareGo-cons-N | thruOuter-face-core | ≤2 | REASON: thruOuter-face-core must be proven
+shareGo-skip-N | thruOuter-face-core | ≤2 | REASON: thruOuter-face-core must be proven
+sharedConnect-unconn | subscribeE-wet-core | ≤3 | REASON: subscribeE-wet-core must be proven
+size≤budget | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
+slotsCaps?-widen | init-capsOK?-base-core | ≤4 | REASON: init-capsOK?-base-core must be proven
+spendᴱ-compose | subscribeE-walk-core | ≤1 | REASON: subscribeE-walk-core must be proven
+subscribeE-take-wf | subscribeE-takeᵉ-wf-core | ≤5 | REASON: subscribeE-takeᵉ-wf-core must be proven
+subscribeE-walk | subscribeE-wet-core | ≤14 | REASON: subscribeE-wet-core must be proven
+unconn-keeps | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
+valsCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-concat-face-core must be proven
+walk-hyps-round3b | subscribeE-walk-core | ≤2 | REASON: subscribeE-walk-core must be proven
+walk-hyps-splitAnchor | subscribeE-walk-core | ≤3 | REASON: subscribeE-walk-core must be proven
+⊑ᶜ-refl | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
