@@ -225,8 +225,28 @@ Every known-wrong-shape statement gets restated BEFORE work lands on top of it:
   (VWF:3823), so `S` is untouched from walk entry to the single base burst. This
   matters because `oneShotBurst-run` LATCHES `done ≡ true`: if one walk could
   subscribe two bases in sequence, the threaded premise would itself be false.
-  **The open question moves to `subscribeE-wf`'s CALLERS** — does each have
-  `done ≡ false` in scope? Answer that before landing the signature change.
+  **CALLERS: ANSWERED — the repair is sound.** There is exactly ONE external
+  caller, `subscribe-wf` (VWF:1457), and it passes `S = protocol-init` whose
+  `done` field is literally `false` (Rx/Protocol.agda:75), so `refl` discharges
+  the premise. Every other call site is internal recursion carrying `S`
+  unchanged. **Rehearsed green** in `agda/probe/Battery-Done-Thread.agda`: all
+  12 clauses with the amended signature, calling the REAL `oneShotBurst-wf`, so
+  `deq` is checked against the actual lemma rather than a stub.
+  **PATCH IS WRITTEN AND READY TO LAND — 13 hunks**, listed in that probe's
+  header: 7 postulate signatures (`input-wf-core`, `defer-wf`, four `*All-wf`,
+  `takeᵉ-wf-core` outer), 3 declared signatures (`input-wf`, `subscribeE-wf`,
+  `takeᵉ-wf`), all 12 body clauses gain `deq`, `subscribe-wf` gains `refl`, and
+  `burst-done-false` is deleted. The two pointfree definitions eta-expand
+  unchanged; `takeᵉ-wf-core`'s INNER receipt does not change.
+  **SCOPE CAVEAT, do not overstate the result:** the spine is verified only
+  where recursion is VISIBLE CODE (mapᵉ/scanᵉ/takeᵉ/μᵉ + the two bases). The
+  four `*All` clauses and `input`/`deferᵉ` delegate to postulates, so threading
+  `deq` RELOCATES the obligation into them rather than proving it — and four are
+  also blocked on merge-cert. Whoever proves an `*All` receipt must honour it.
+  **HELD, not blocked:** landing it edits VWF, which invalidates the cached
+  interface that concurrently-running probe workers import. Land it when no
+  VWF-importing worker is live — the design session owns that gate (~40 min:
+  VWF + The-Proof + Main; the V-B-S tower is upstream and stays cached).
 - P4 `thruOuter-face-core` → resolve the "(a) may not fit fCharge" doubt at
   the statement level.
 - Phase 0's refutation fallout, whatever it is.
