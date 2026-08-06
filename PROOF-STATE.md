@@ -434,6 +434,37 @@ design session, not worker grind.
      - **STANDING LESSON, and it cost a round: name the measure by what it
        COUNTS, not by what it is called.** `burstLen` reads like "how many
        things did this burst emit" and is not that.
+
+     🗼 **NESTING ESCALATES ONE EXPONENTIAL PER LEVEL — the per-instant
+     headroom demanded is TOWER-shaped** (`agda/probe/Battery-Nesting-Escalation.agda`,
+     green, all by `refl`). Two findings close steps 1–2 of the post-refutation
+     plan:
+     - **GAS IS NOT A COUNT BOUND, no run needed:** Battery-Value-Count's 30
+       values ran on fuel of DEPTH 10. `subscribeInner` peels one `gs` per
+       subscription and hands the same decremented fuel to every sibling —
+       gas limits subscription DEPTH; breadth is free. The gas-sourced repair
+       route is dead.
+     - **THE ESCALATION LAW:** `nest src = mergeAllᵉ (scanᵉ step liveSeed src)`
+       applies `v ↦ 2^(v+1) − 2` to the incoming per-instant count v — certified
+       at v = 1..4 over `ofᵉ` sources and, the new fact, UNCHANGED at v = 2 when
+       the source is itself a nested level (`nest²ᵃ ≡ 6`, instant 0). Composing
+       from v = 1: 2, 6, 126, 2^127 − 2, … — a tower in nesting depth. Each level
+       adds a CONSTANT to `sizeᵉ` while exponentiating the count, so **no fixed
+       exponential in entry data bounds the per-instant count** — `12·2^sz`-class
+       ceilings are dead for good, not just via `syncSizeᵉ`. (The v = 6 rows,
+       predicted 126, exceeded a 10-min typecheck and are left uncertified in
+       the file; coverage is honest there.)
+     - **WHAT DECIDES THE DRY FAMILY NOW — step 3, the symbolic caps step.**
+       One instant of caps headroom is one `blowH` application
+       (`capsHgo m (suc id) = blowH (capsHgo m id)`, Evaluator.agda:905), and
+       `blowH m = 6 + m + 2·poolCount (towerℕ m) m` is itself tower-shaped. So
+       the question is a TOWER-vs-TOWER height comparison: does one `blowH`
+       step at argument ≥ `capsBase e sl` dominate the runtime tower of height
+       ≤ nesting-depth ≤ `sizeᵉ e`? Plausible (blowH's tower height is its
+       ARGUMENT, ≥ capsBase > sizeᵉ; the runtime tower's height is nesting
+       depth < sizeᵉ) — but heights must be compared symbolically through the
+       `lvls`/`poolCount` lower-bound kit, not asserted. UNPROBED; do it
+       before the Wet wiring, same rule as before.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
