@@ -328,13 +328,25 @@ proven work, makes each remaining gap greppable, and proves nothing hard. Applie
 `subscribeE-wet-via-caps` (wires `sub-charge`) and `subscribeE-wf` (wires its five
 proven clauses).
 
-**THE ONE CONSTRAINT, and it is the only way a shortcut can actually hurt: A POSTULATE
-MUST ASSERT SOMETHING TRUE.** Postulating a known-FALSE statement looks like progress
-and poisons everything above it. Two live examples: `depthE ≤ capsH` is FALSE
-unconditionally (`Depth-Bound.agda:11` — it dies against an adversarial stored state),
-so only the `capsOK?`-conditioned version may be postulated; and see "A Σ-receipt has
-content only through its witness" above for the vacuity trap. Check both before landing
-a postulate. That check is cheap — it is reading the statement, not proving it.
+**DO NOT AUDIT POSTULATES FOR TRUTH DURING THE WIRING PASS (Anthony, 2026-08-05):
+"we can catch false postulates later, wiring is most important right now."** Do not
+block a wiring step, do not run a truth-check pass, and do not go looking. A false
+postulate is discoverable later — the day someone tries to prove it, it fails.
+
+**But when you DO notice one in passing, write it down instead of chasing it.** Put a
+`-- SUSPECT:` line in the postulate's own comment saying what you doubt and why, and
+move on. That is free, it keeps the finding, and it costs no wiring time. Two shapes
+worth a `SUSPECT:` note if they catch your eye — a statement whose conclusion needs
+information that appears in NONE of its hypotheses (e.g. deriving a path-LENGTH bound
+from `pathB?`, which carries no length conjunct), and a Σ-statement upward-closed in
+its witness (see "A Σ-receipt has content only through its witness" above).
+
+**The one case still worth acting on immediately** is when the fix is CHEAPER than the
+postulate: if a missing hypothesis is free at the call site, adding it and deleting the
+postulate is less work than carrying it. That is a wiring win, not a truth audit —
+take it for that reason. (`depthE ≤ capsH` unconditionally is FALSE,
+`Depth-Bound.agda:11`; the `capsOK?`-conditioned form costs nothing extra, so it is the
+one that is stated.)
 
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
