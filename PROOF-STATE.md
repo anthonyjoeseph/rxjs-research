@@ -66,11 +66,31 @@ risk classes, worst first:
   the proof is hard. The cheapest class to carry.
 
 **PROBEABLE means machine-checkable today**: the statement is an equation or
-decidable bound over COMPUTABLE functions (`evaluate`, `capsOK?`, `opIterD`,
-`depthE`, `spec-batchSimultaneous` …), so concrete instances check by `refl`
-exactly like the bug cache. QuickCheck/oracle only ever tested impl≡spec —
-**no postulate in this ledger has ever been probed**; that is the standing
-blind spot the roadmap's Phase 0 closes.
+decidable bound over COMPUTABLE functions (`evaluate`, `capsOK?`, `depthE`,
+`storeNestMax`, `spec-batchSimultaneous` …), so concrete instances check by
+`refl` exactly like the bug cache.
+
+> **CORRECTION (2026-08-06) — THE CAPS AXIS IS NOT PROBEABLE, BY DESIGN.** This
+> ledger's first draft listed `opIterD` and the caps arithmetic as probeable.
+> That was WRONG. Four symbols on that axis sit in `abstract` blocks —
+> `opIterD` (Evaluator:727), `blowH` (Evaluator:898), `sizeCount` (Caps:368),
+> and `capsAt` through `sizeCount` — so they never reduce to numerals and no
+> `refl` row can ever be written about them. The opacity is DELIBERATE and
+> load-bearing: Caps.agda:365 says outright that "whether `.Wet` normalises or
+> runs for an hour is decided by whether this symbol stays stuck." On top of
+> that, `blowH m = 6 + m + 2 * poolCount (towerℕ m) m` is a tower-of-towers, so
+> even unsealed it would not terminate.
+>
+> **The consequence for the roadmap: Phase 0 cannot reduce the caps axis's risk
+> at all.** Those postulates are reachable only by PROOF. But there is a working
+> substitute, and it is proven, not speculative: attack them **SYMBOLICALLY** —
+> state the full type at symbolic `e`/`ins` in a probe and close it with a lemma
+> that never reduces the sealed symbol. That is exactly how
+> `three-size≤capsH-core` went from "unprobed postulate" to "one-line proof"
+> (#12 below). **Symbolic rehearsal is the caps axis's Phase 0.**
+
+QuickCheck/oracle only ever tested impl≡spec — before 2026-08-06 **no postulate
+in this ledger had ever been probed**; closing that blind spot is Phase 0.
 
 ### Tier 1 — Verify-Budget-Sufficient (12 postulates)
 
@@ -80,8 +100,8 @@ blind spot the roadmap's Phase 0 closes.
 | 2 | `cascadeGo-wet-core` | Wet.agda:4499 | **FALSITY, critical** | P2's entire content (its only hypotheses are two stBounded? preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`), so the fold-threaded statement's truth is genuinely open, not merely unproven. |
 | 3 | `subscribeE-wet-core` | Wet.agda:4311 | FALSITY, conditional | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's G/ℓ/Ω entry data from `INV?` alone, and the INV?/capᴱ flavor conversion is unchecked. Moderate incremental risk over #1, with maximal blast radius (both branches of budget-sufficient). |
 | 4 | `sub-charge-capsOK-lift-core` | Caps-Bridge.agda:1182 | **SHAPE** | Its hypothesis carries only the ROOT instance `opIterD≤capsH-root` while its conclusion quantifies over ARBITRARY mid-run `sched`/`st`/`id`; its own route comment says "via a GENERAL form of opIterD≤sizeCount-root" — which is unstated and unknown. The `-core` will need a generalized hypothesis at proof time, and whether the general mid-state bound even HOLDS is open. |
-| 5 | `depth-compositional` | Depth-Bound.agda:153 | FALSITY — **probeable** | Its own census (source comment, point 4) says the induction needs `storeNestMax` at the EVOLVED state dominated by the entry bound — an unproven strengthening. If an evolved state can escape it, the statement is false. Both sides compute: probe it. |
-| 6 | `opIterD≤sizeCount-root-core` | Caps-Bridge.agda:1090 | FALSITY — **probeable** | "The genuinely new mathematics"; the direction is novel (an UPPER bound on a budget everything else lower-bounds). Nobody has checked the numbers. Both sides compute at concrete `e`/`ins`: probe before grinding. |
+| 5 | `depth-compositional` | Depth-Bound.agda:153 | **PROBED-GREEN 2026-08-06, evolved states included** | Its census (source comment, point 4) needs `storeNestMax` at the EVOLVED state dominated by the entry bound. **That direction was actually tested**, not dodged: `Depth-Compositional-Probe` drains N real cascades through the evaluator (k ≤ 4, N ≤ 10) and reads `depthE` off the extracted scan accumulator — evolved states, all rows hold. `agda/probe/Battery-Depth-Iter.agda` adds two things: the `switch-st`/`exhaust-st` branch of `depthAll`, which **no prior depth probe had ever exercised** (4 programs, green), and the preservation step `storeNestMax(post-subscribeE) ≤ sizeᵉ e + storeNestMax(pre)` — census point 4's exact inductive step — confirmed at N=1. Thin at N=1, but this is the one tier-1 axis where probing works, and it held. |
+| 6 | `opIterD≤sizeCount-root-core` | Caps-Bridge.agda:1090 | **FALSITY — NOT probeable (abstract-locked); risk UNREDUCED** | "The genuinely new mathematics"; the direction is novel (an UPPER bound on a budget everything else lower-bounds), and nobody has checked it. **2026-08-06: numeric probing is IMPOSSIBLE** — three independent seals, each sufficient alone: `opIterD` abstract (Evaluator:727), `sizeCount` abstract (Caps:368), and the depth fuel `capsH e ins 0 = blowH (capsBase e ins)` with `blowH` abstract (Evaluator:898) AND tower-valued. What the probe DID pin down is the in-range parameter set (`capsBase (pushD 0) (insN 0) ≡ 18`, `sizeᵉ ≡ 11`, `slotsSize ≡ 1`, `nest ≡ 11`) and that hypothesis H2 (`nest e ins [] ≤ sizeᵉ e + slotsSize ins`) holds at three programs — useful scaffolding, zero evidence on the claim. **Next move is SYMBOLIC rehearsal**, per the correction above — the `three-size≤capsH` route. This is now the highest UNREDUCED risk in tier 1 after the anchor cluster. |
 | 7 | `init-capsOK?-base-core` | Caps-Bridge.agda:978 | **PROBED + STRUCTURALLY ARGUED 2026-08-06 — risk sharply down; task #19 answered** | `capsOK?` (Caps-Face:297) is five conjuncts; at `st-init` the registry and nodes are empty, so (2) `regsSz?`, (4) `widNode`, (5) `length ≤ᵇ cReg` pass by `all _ []` — the known-vacuous three. The first probe pass left the two LIVE conjuncts vacuous as well (empty `live`; `pending = []`), which is why it did not count. **The second pass covers them non-vacuously** (`agda/probe/Battery-Caps-Init.agda`, programs C and D: one and three pending scripted values) — green — and, better than rows, gives a REASON refutation is impossible at `baseCaps`: (3) `widLive` cannot fail because `scripted` requires `T (isData t)` and every data type has `pWᵛ ≡ 0` (Frame-Width:294–299), so the check is `0 ≤ᵇ cWid`; (1) `stBounded?` cannot fail because each pending `v` has `sizeᵛ t v < cSize = 2 + sizeᵉ e + slotsSize ins` by construction. **Those two arguments are the proof sketch** — this looks provable, not merely probable. Residual gap: the argument covers `scripted` slots; non-scripted entries in `Sched.live` at init are not analysed. |
 | 8 | `init-capsOK?` | Caps-Bridge.agda:918 | **BLOCKED — cause identified** | Not probeable: `capsAt e ins id` unfolds through `sizeCount`, which is `abstract` (Caps.agda:369), so it never reduces to a numeral. **The derivation route is now fully scoped**: `capsOK?-mono` (Caps-Face:365, proven) lifts #7 to #8 given `baseCaps ⊑ᶜ capsAt`, which needs three sub-lemmas — `capsAt-base-size` and `capsAt-base-wid` EXIST, and the sole missing one is `capsAt-base-reg : suc (sizeᵉ e + slotsSize ins) ≤ Caps.cReg (capsAt e ins id)`. State that and this postulate retires. |
 | 9 | `thruOuter-face-core` (P4) | Caps-Face.agda:6317 | SHAPE | Its own header doubts itself: receipt "(a) is the SECOND number … `subscribeE-caps` bounds its j′ by nothing whatever" and "(a) may not fit `fCharge` as stated." Statement-level work before grind. |

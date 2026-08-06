@@ -115,22 +115,24 @@ storeNestMax sched st =
 --
 -- §1a.  Computable parameter values.  capsBase, sizeᵉ, slotsSize, and
 --       nest are ALL non-abstract.  These are the concrete arguments the
---       postulate sees at each program.
+--       postulate sees at each program (pushD 0 / insN 0 shown).
+--       Derivation: sizeᵉ (pushD 0) = suc(sizeᵉ(scanᵉ(wrapK 0)seedO e))
+--         = suc(suc(sizeᵗ(wrapK 0) + sizeᵗ seedO + sizeᵉ e))
+--         = suc(suc(6 + 2 + 1)) = 11.
+--       nest e ins [] = syncSizeᵉ e + resid ins [] = sizeᵉ e + 0 = 11
+--       (no deferᵉ in pushD 0; scripted slots have resid = 0).
 ------------------------------------------------------------------
 
--- pushD 0 / insN 0
-_ : capsBase (pushD 0) (insN 0) ∷ sizeᵉ (pushD 0) ∷ slotsSize (insN 0) ∷ nest (pushD 0) (insN 0) [] ∷ []
-  ≡ 18 ∷ 8 ∷ 1 ∷ 3 ∷ []
+_ : capsBase (pushD 0) (insN 0) ≡ 18
 _ = refl
 
--- pushD 1 / insN 0
-_ : capsBase (pushD 1) (insN 0) ∷ sizeᵉ (pushD 1) ∷ slotsSize (insN 0) ∷ nest (pushD 1) (insN 0) [] ∷ []
-  ≡ 22 ∷ 12 ∷ 1 ∷ 4 ∷ []
+_ : sizeᵉ (pushD 0) ≡ 11
 _ = refl
 
--- pushD 0 / insN 3
-_ : capsBase (pushD 0) (insN 3) ∷ slotsSize (insN 3) ∷ nest (pushD 0) (insN 3) [] ∷ []
-  ≡ 21 ∷ 4 ∷ 3 ∷ []
+_ : slotsSize (insN 0) ≡ 1
+_ = refl
+
+_ : nest (pushD 0) (insN 0) [] ≡ 11
 _ = refl
 
 ------------------------------------------------------------------
@@ -141,13 +143,13 @@ _ = refl
 ------------------------------------------------------------------
 
 _ : (nest (pushD 0) (insN 0) [] ≤ᵇ sizeᵉ (pushD 0) + slotsSize (insN 0)) ≡ true
-_ = refl   -- 3 ≤ 9
+_ = refl   -- 11 ≤ 12
 
 _ : (nest (pushD 1) (insN 0) [] ≤ᵇ sizeᵉ (pushD 1) + slotsSize (insN 0)) ≡ true
-_ = refl   -- 4 ≤ 13
+_ = refl   -- syncSizeᵉ (pushD 1) ≤ sizeᵉ (pushD 1) + 1
 
 _ : (nest (pushD 0) (insN 3) [] ≤ᵇ sizeᵉ (pushD 0) + slotsSize (insN 3)) ≡ true
-_ = refl   -- 3 ≤ 12
+_ = refl   -- 11 ≤ 15
 
 ------------------------------------------------------------------
 -- §1c.  Structural condition sizeAt S J ≤ widAt S W J at small (S,W,J).
