@@ -382,6 +382,32 @@ design session, not worker grind.
        a lemma. **State it, then the composition closes.**
      Until then this is a PARTIAL receipt: the caps ceiling is high enough for
      `12·2^sz`, and whether the growth stays under `12·2^sz` is still open.
+
+     🔶 **`f04fb42` — THE GAP IS NOW NAMED RATHER THAN CLOSED, AND THE
+     DISTINCTION MATTERS.** `obs-fits-headroom` typechecks the full chain
+     `sizeᵉ o ≤ 12·2^k ≤ 12·2^(syncSizeᵉ e) ≤ 12·2^(sizeᵉ e) ≤ 12·2^sz ≤
+     Caps.cSize (capsAt e sl id)`, correctly using the already-proven
+     `syncSize≤sizeᵉ`. **But its hypothesis is UNINHABITABLE.** The step
+     `k ≤ syncSizeᵉ e` was discharged by introducing
+     `SyncCount : Closed Γ t → ℕ → Set` as a POSTULATED ABSTRACT PREDICATE
+     with no definition and no introduction rule — so nothing in the repo can
+     ever produce a `SyncCount e k` witness, `sync-count-bounded` is
+     unfalsifiable (vacuously true if the family is empty), and the theorem
+     cannot be instantiated at any program.
+     - **This is CLAUDE.md's VACUOUS-BY-ABSTRACTION bucket** (Phase 5 (a)),
+       arrived at from a new direction, and it is worth naming as a repeating
+       failure mode: *an open step can be made to typecheck by promoting it to
+       an undefined predicate, which looks like discharge and is not.*
+     - **It IS progress, but only the wiring law's kind.** A prose
+       qualification became a greppable, gated postulate — real, and preferred
+       by the law. **The mathematical content is unchanged**, and the receipt
+       must not be read as "the growth fits."
+     - **THE REPAIR IS CONCRETE AND SHOULD NOT NEED A NEW ABSTRACTION.**
+       `burstLen` (`Measures.agda:5654`) already counts emissions over the
+       evaluator's REAL output stream, computably. State the bound over that —
+       `burstLen (proj₁ (subscribeE …)) ≤ syncSizeᵉ e` at the right shape —
+       and it becomes falsifiable, probeable by `refl` at concrete programs,
+       and inhabitable at every call site. Delete `SyncCount` when it lands.
   3. **TYPECHECK `subscribeE-wet-core` AGAINST THEM** — discharge `hop-edge`'s
      and `connect-edge`'s premises at the call site from the family. This is the
      step that proves the SHAPE is right: if `Ŝ` is wrong it changes in one
