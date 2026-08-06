@@ -510,6 +510,34 @@ question. The wiring law's real yield here was not "find the missing wires" but
 postulate count and the orphan count move in opposite directions from what a
 naive reading expects.
 
+### DEBT: prose that outlived its code (2026-08-05, from the retired-measure deletion)
+
+The multiset measure's definitions are gone, but **eight comment references to
+`measureE` and two to `rank-lt-pow` survive** in modules the deletion did not
+otherwise touch: `Keeps-Ring.agda:149, 179, 267, 332, 404`, `Wet.agda:2211`,
+`Rx/Slots.agda:32`, `Rx/Hop-Depth.agda:4`, plus `rank-lt-pow` at `Wet.agda:2273`
+and `Measures.agda:1866`.
+
+They are NOT dead weight — each explains WHY `rank ∘ measureE` was refuted as
+the hop-descending quantity, which is exactly the kind of record that stops a
+later session re-attempting a dead route (the same justification the `*-absurd`
+family gets). But they now name definitions that do not exist, so a future
+`grep measureE` returns eight hits and no definition. That is the lying-comment
+failure mode INVERTED: prose that outlived its code rather than code that never
+matched its prose.
+
+**Not fixed on the spot deliberately**: every one of those files is a heavy
+tower module, and a comment-only edit still dirties it by CONTENT, so fixing
+them alone would cost a full ~45-minute rebuild for zero proof value. **Fold
+into the next pass that dirties Keeps-Ring/Wet anyway** — and when doing so,
+keep the reasoning and mark the names as retired rather than deleting the
+explanation.
+
+Also newly orphaned by the deletion, reported not removed: `EnvLen`,
+`envLen-lookup`, `plugs-lenᵉ`, `plugs-lenᵗ`, `plugs-lenᵗˢ`, `envSize→envLen` —
+they use no retired definition, but their consumer chain terminated at
+`rank-drop`.
+
 ## Named gaps and rulings (the full deck)
 
 **GAP 4** — Wet.agda:4125–4199. THE central design fact. The ledger-receipt

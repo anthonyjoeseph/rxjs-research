@@ -83,7 +83,6 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                shellsᵉ; shellsᵛ;
                                 subΘExp; subΘTm; subΘTms;
                                 plugsᵉ; plugsᵗ; plugsᵗˢ;
                                 occsᵉ; occsᵗ; occsᵗˢ; varIx;

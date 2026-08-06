@@ -1,12 +1,11 @@
 -- STRATUM 1 of Verify-Budget-Sufficient: THE MEASURES.
 --
 -- Everything the proof counts with, and nothing that counts a RUN.  Gas
--- and towerℕ, the store predicate stBounded?, the subscription measure
--- (measureE / counts / _≺ᵛ_ / rank) and its descent order dBound, the
--- hop measure hopD in full, the seed arithmetic (prod≤3pow, seed-covers,
--- budget-covers), the size/fnCap/ofW analytics with their ren/subΘ/elim
--- laws, the state predicates INV? and widthOK?, and the walk face
--- (walkCap, anchorᴬ, subscribeE-walk) together with the four
+-- and towerℕ, the store predicate stBounded?, the descent order dBound,
+-- the hop measure hopD in full, the seed arithmetic (prod≤3pow,
+-- seed-covers, budget-covers), the size/fnCap/ofW analytics with their
+-- ren/subΘ/elim laws, the state predicates INV? and widthOK?, and the
+-- walk face (walkCap, anchorᴬ, subscribeE-walk) together with the four
 -- machine-checked absurdity records that shaped it.
 --
 -- Nothing here mentions Caps, and nothing here steps the evaluator.
@@ -39,7 +38,6 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
                                        suc-injective; <-irrefl; ≡ᵇ⇒≡)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; all; any; length;
@@ -59,11 +57,10 @@ open import Data.List.Membership.Propositional.Properties
   using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe   using (Maybe; nothing; just)
 open import Relation.Nullary using (yes; no)
-open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
+open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
-open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 
@@ -498,70 +495,6 @@ finish-slots a sched st with Arrival.isLast a
 ... | true  = refl
 
 ------------------------------------------------------------------
--- THE MEASURE — edge 3's Dershowitz–Manna multiset, SYNTACTICALLY
--- (the shell reading, Rx.Exp).  A runtime obs value is a closed
--- expression; its measure is the multiset of its shells — the
--- operator-skeleton sizes of the value and of every sync-reachable
--- embedded observable (shellsᵉ).  Shells count Exp constructors
--- only: Tm material is weightless and subΘ rewrites only Tm
--- material, so INSTANTIATION PRESERVES EVERY SHELL EXACTLY
--- (shellSize-subΘ below) — an evaluated template's multiset is a
--- class-preserved copy of the template's, plus the plugged obs
--- values' own shells.  The order is count-vector lex with the HIGH
--- size class first (counts B); ≺ᵛ-wf is the semantic justification
--- and rank (below) the ℕ collapse the contract actually inducts
--- on.  Both side conditions ride on stBounded? for free: every
--- shell of e is ≤ sizeᵉ e (shells-≤) and there are ≤ sizeᵉ e of
--- them (shells-len), so a sizeᵛ cap bounds classes AND entry sum.
-------------------------------------------------------------------
-
--- count-vector lex, high class first
-data _≺ᵛ_ : ∀ {m} → Vec ℕ m → Vec ℕ m → Set where
-  ≺-here  : ∀ {m x y} {xs ys : Vec ℕ m} → x < y → (x ∷ᵛ xs) ≺ᵛ (y ∷ᵛ ys)
-  ≺-there : ∀ {m x} {xs ys : Vec ℕ m} → xs ≺ᵛ ys → (x ∷ᵛ xs) ≺ᵛ (x ∷ᵛ ys)
-
--- well-foundedness: nested induction — vector length outside, then
--- (Acc of the head, Acc of the tail) lexicographically.  accHead is
--- handed the tail relation's full well-foundedness (wfm) so a head
--- decrease can restart the tail at ANY vector.
-accHead : ∀ {m} (wfm : WellFounded (_≺ᵛ_ {m})) (x : ℕ) → Acc _<_ x →
-  (xs : Vec ℕ m) → Acc (_≺ᵛ_ {m}) xs → Acc _≺ᵛ_ (x ∷ᵛ xs)
-accHead wfm x (acc rx) = go
-  where
-  go : ∀ xs → Acc _≺ᵛ_ xs → Acc _≺ᵛ_ (x ∷ᵛ xs)
-  go xs (acc rxs) = acc λ where
-    (≺-here  y<x) → accHead wfm _ (rx y<x) _ (wfm _)
-    (≺-there ys≺) → go _ (rxs ys≺)
-
-≺ᵛ-wf : ∀ {m} → WellFounded (_≺ᵛ_ {m})
-≺ᵛ-wf {zero}  []ᵛ       = acc λ ()
-≺ᵛ-wf {suc m} (x ∷ᵛ xs) = accHead ≺ᵛ-wf x (<-wellFounded x) xs (≺ᵛ-wf xs)
-
--- counts: the multiset → count-vector reading.  Index 0 is size
--- class B (high first); oversized elements clamp into class B — the
--- contract only ever reads it with all elements ≤ B.
-zerosᵛ : ∀ {m} → Vec ℕ m
-zerosᵛ {zero}  = []ᵛ
-zerosᵛ {suc m} = 0 ∷ᵛ zerosᵛ
-
-oneAt : (B x : ℕ) → Vec ℕ (suc B)     -- a single element of size x
-oneAt zero    x = 1 ∷ᵛ []ᵛ
-oneAt (suc B) x = if suc B ≤ᵇ x then 1 ∷ᵛ zerosᵛ else 0 ∷ᵛ oneAt B x
-
-_⊕ᵛ_ : ∀ {m} → Vec ℕ m → Vec ℕ m → Vec ℕ m
-[]ᵛ       ⊕ᵛ []ᵛ       = []ᵛ
-(x ∷ᵛ xs) ⊕ᵛ (y ∷ᵛ ys) = x + y ∷ᵛ (xs ⊕ᵛ ys)
-
-counts : (B : ℕ) → List ℕ → Vec ℕ (suc B)
-counts B []      = zerosᵛ
-counts B (x ∷ M) = oneAt B x ⊕ᵛ counts B M
-
--- the wet contract's measure of a subscribed value, end to end —
--- a pure function of the value's syntax
-measureE : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) → Closed Γ t → Vec ℕ (suc B)
-measureE B e = counts B (shellsᵉ e)
-
-------------------------------------------------------------------
 -- the free side conditions: shells are pointwise ≤ the syntax size
 -- and no more numerous than it, at every level (expression, term,
 -- runtime value) — so stBounded?'s sizeᵛ cap bounds the measure's
@@ -744,13 +677,9 @@ mutual
   inner-lenᵗˢ (y ∷ ys) rewrite length-++ (innerᵗ y) {innerᵗˢ ys} =
     +-mono-≤ (inner-lenᵗ y) (inner-lenᵗˢ ys)
 
-shells-len : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
-  length (shellsᵉ e) ≤ sizeᵉ e
-shells-len e = inner-lenᵉ e
-
--- the value-level shadow of shells-len: a runtime value carries no
--- more shells than its size — so a sizeᵛ cap bounds the entry sum
--- of any environment entry's contribution to a plug multiset
+-- a runtime value carries no more shells than its size — so a
+-- sizeᵛ cap bounds the entry sum of any environment entry's
+-- contribution to a plug multiset
 shellsᵛ-len : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
   length (shellsᵛ t v) ≤ sizeᵛ t v
 shellsᵛ-len unitᵗ    v        = z≤n
@@ -1362,82 +1291,6 @@ unconn≤slots : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) →
 unconn≤slots sl cs = sum-tab-mono _ _ (unconnAt≤slot sl cs)
 
 
-------------------------------------------------------------------
--- RANK — the ≺ᵛ order collapsed to ℕ.  Sync fuel is DEPTH-consumed
--- (siblings share the remaining gas; only nested decrement edges
--- stack), so the contract needs to bound the deepest decrement
--- chain, and with the entry sum bounded by V a count vector IS a
--- base-(suc V) numeral (high class = high digit): any ≺ᵛ step
--- strictly decreases its numeric value (rank-mono-≺).  The wet
--- contract therefore inducts on this plain ℕ — no Acc plumbing —
--- converting hop decreases (≺-embed/≺-replace) via rank-mono-≺,
--- and discharging the entry-sum side condition via totᵛ-counts
--- (the sum is the shell count, ≤ sizeᵉ by shells-len — free on
--- stBounded?).
-------------------------------------------------------------------
-
-totᵛ : ∀ {m} → Vec ℕ m → ℕ
-totᵛ []ᵛ       = 0
-totᵛ (x ∷ᵛ xs) = x + totᵛ xs
-
-rank : ∀ {m} (V : ℕ) → Vec ℕ m → ℕ
-rank           V []ᵛ       = 0
-rank {suc m}   V (x ∷ᵛ xs) = x * (suc V) ^ m + rank V xs
-
--- a bounded-sum vector reads below the next power (the carry bound)
-rank-lt-pow : ∀ {m} (V : ℕ) (c : Vec ℕ m) →
-  totᵛ c ≤ V → rank V c < (suc V) ^ m
-rank-lt-pow {zero}  V []ᵛ       h = s≤s z≤n
-rank-lt-pow {suc m} V (x ∷ᵛ xs) h =
-  <-≤-trans (subst (x * (suc V) ^ m + rank V xs <_)
-                   (+-comm (x * (suc V) ^ m) ((suc V) ^ m))
-                   (+-monoʳ-< (x * (suc V) ^ m)
-                      (rank-lt-pow V xs (≤-trans (m≤n+m (totᵛ xs) x) h))))
-            (*-monoˡ-≤ ((suc V) ^ m)
-               (s≤s (≤-trans (m≤m+n x (totᵛ xs)) h)))
-
--- THE BRIDGE: a ≺ᵛ step on a bounded-sum vector is a numeral decrease
-rank-mono-≺ : ∀ {m} (V : ℕ) {c′ c : Vec ℕ m} →
-  c′ ≺ᵛ c → totᵛ c′ ≤ V → rank V c′ < rank V c
-rank-mono-≺ V (≺-here {m} {x} {y} {xs} {ys} x<y) tot≤V =
-  <-≤-trans (subst (x * (suc V) ^ m + rank V xs <_)
-                   (+-comm (x * (suc V) ^ m) ((suc V) ^ m))
-                   (+-monoʳ-< (x * (suc V) ^ m)
-                      (rank-lt-pow V xs (≤-trans (m≤n+m (totᵛ xs) x) tot≤V))))
-            (≤-trans (*-monoˡ-≤ ((suc V) ^ m) x<y)
-                     (m≤m+n (y * (suc V) ^ m) (rank V ys)))
-rank-mono-≺ V (≺-there {m} {x} {xs} {ys} xs≺ys) tot≤V =
-  +-monoʳ-< (x * (suc V) ^ m)
-            (rank-mono-≺ V xs≺ys (≤-trans (m≤n+m (totᵛ xs) x) tot≤V))
-
--- the entry-sum of a count vector is the multiset's cardinality
-totᵛ-⊕ᵛ : ∀ {m} (a b : Vec ℕ m) → totᵛ (a ⊕ᵛ b) ≡ totᵛ a + totᵛ b
-totᵛ-⊕ᵛ []ᵛ       []ᵛ       = refl
-totᵛ-⊕ᵛ (x ∷ᵛ xs) (y ∷ᵛ ys)
-  rewrite totᵛ-⊕ᵛ xs ys
-        | +-assoc x y (totᵛ xs + totᵛ ys)
-        | sym (+-assoc y (totᵛ xs) (totᵛ ys))
-        | +-comm y (totᵛ xs)
-        | +-assoc (totᵛ xs) y (totᵛ ys)
-        | sym (+-assoc x (totᵛ xs) (y + totᵛ ys)) = refl
-
-totᵛ-zeros : ∀ {m} → totᵛ (zerosᵛ {m}) ≡ 0
-totᵛ-zeros {zero}  = refl
-totᵛ-zeros {suc m} = totᵛ-zeros {m}
-
-totᵛ-oneAt : ∀ B x → totᵛ (oneAt B x) ≡ 1
-totᵛ-oneAt zero    x = refl
-totᵛ-oneAt (suc B) x with suc B ≤ᵇ x
-... | true  = cong suc (totᵛ-zeros {suc B})
-... | false = totᵛ-oneAt B x
-
-totᵛ-counts : ∀ B (M : List ℕ) → totᵛ (counts B M) ≡ length M
-totᵛ-counts B []      = totᵛ-zeros {suc B}
-totᵛ-counts B (x ∷ M)
-  rewrite totᵛ-⊕ᵛ (oneAt B x) (counts B M)
-        | totᵛ-oneAt B x
-        | totᵛ-counts B M = refl
-
 -- a factor of at least one never shrinks
 1*≤ : ∀ (x k : ℕ) → 1 ≤ k → x ≤ k * x
 1*≤ x k h = ≤-trans (≤-reflexive (sym (+-identityʳ x))) (*-monoˡ-≤ x h)
@@ -2023,10 +1876,28 @@ connect-anchor e sl id i {d} eq =
 dBound : (V R U r s : ℕ) → ℕ
 dBound V R U r s = s + suc V * (r + suc R * U)
 
--- edge 2 (μ-unfold): syncSize drops at fixed (U, r)
+-- BOTH dBound arguments move at once: rank weakly, syncSize strictly.
+-- V R U are EXPLICIT: dBound unfolds through _*_, which matches on its
+-- first argument, so implicits here are stuck in the same way
+-- ⊔-elim-help's were.  MOVED UP 2026-08-05 from below the hopD section
+-- so that dBound-μ can delegate to it — it had been sitting orphaned
+-- purely because it was stated AFTER its own specialisation.
+dBound-struct : ∀ (V R U : ℕ) {r′ r s′ s} → r′ ≤ r → s′ < s →
+  dBound V R U r′ s′ < dBound V R U r s
+dBound-struct V R U r′≤r s′<s =
+  +-mono-<-≤ s′<s (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′≤r))
+
+-- edge 2 (μ-unfold): syncSize drops at fixed (U, r).  THE SPECIALISATION
+-- of dBound-struct (below) at r′ = r — every real μ-edge call site holds
+-- r fixed, which is the only reason the general form looked orphaned.
+-- Stated as its own name because the clause proofs read better for it,
+-- but proven by delegation rather than by a second derivation.
 dBound-μ : ∀ {V R U r s′ s} → s′ < s →
   dBound V R U r s′ < dBound V R U r s
-dBound-μ {V} {R} {U} {r} s′<s = +-monoˡ-≤ (suc V * (r + suc R * U)) s′<s
+-- r′ is given EXPLICITLY: from `≤-refl` alone Agda must solve
+-- `_r′ + suc R * U = r + suc R * U`, and it refuses to invert `_+_`
+-- (inversion depth 50), so the meta stays blocked
+dBound-μ {V} {R} {U} {r} s′<s = dBound-struct V R U {r} {r} ≤-refl s′<s
 
 -- edge 3 (inner hop): rank drops, syncSize resets within the store
 dBound-hop : ∀ {V R U r′ r s′ s} → r′ < r → s′ ≤ V →
@@ -2071,194 +1942,6 @@ dBound-bound {V} {R} {U} {r} {s} s≤V r≤R =
   shuffle : suc (R + suc R * U) ≡ suc R * suc U
   shuffle = sym (*-suc (suc R) U)
 
--- the two decrease lemmas the hop analysis needs (proof-design memo
--- below), PROVEN: ≺-embed (embedded-value hop — a value reified
--- into the carrier measures strictly below it, regardless of
--- relative template sizes) and ≺-replace (scan-produced hop —
--- replacing the carrier top with elements strictly below it
--- decreases; t must be a real size class).
-
-⊕ᵛ-identityˡ : ∀ {m} (v : Vec ℕ m) → zerosᵛ ⊕ᵛ v ≡ v
-⊕ᵛ-identityˡ []ᵛ       = refl
-⊕ᵛ-identityˡ (x ∷ᵛ v) = cong (x ∷ᵛ_) (⊕ᵛ-identityˡ v)
-
-⊕ᵛ-assoc : ∀ {m} (a b c : Vec ℕ m) → (a ⊕ᵛ b) ⊕ᵛ c ≡ a ⊕ᵛ (b ⊕ᵛ c)
-⊕ᵛ-assoc []ᵛ       []ᵛ       []ᵛ       = refl
-⊕ᵛ-assoc (x ∷ᵛ a) (y ∷ᵛ b) (z ∷ᵛ c) =
-  cong₂ _∷ᵛ_ (+-assoc x y z) (⊕ᵛ-assoc a b c)
-
-⊕ᵛ-comm : ∀ {m} (a b : Vec ℕ m) → a ⊕ᵛ b ≡ b ⊕ᵛ a
-⊕ᵛ-comm []ᵛ       []ᵛ       = refl
-⊕ᵛ-comm (x ∷ᵛ a) (y ∷ᵛ b) = cong₂ _∷ᵛ_ (+-comm x y) (⊕ᵛ-comm a b)
-
-counts-++ : ∀ B (xs ys : List ℕ) →
-  counts B (xs ++ ys) ≡ counts B xs ⊕ᵛ counts B ys
-counts-++ B []       ys = sym (⊕ᵛ-identityˡ (counts B ys))
-counts-++ B (x ∷ xs) ys rewrite counts-++ B xs ys =
-  sym (⊕ᵛ-assoc (oneAt B x) (counts B xs) (counts B ys))
-
--- adding any vector with mass strictly grows the lex reading
-≺ᵛ-grow : ∀ {m} (w v : Vec ℕ m) → 1 ≤ totᵛ w → v ≺ᵛ (w ⊕ᵛ v)
-≺ᵛ-grow []ᵛ           []ᵛ       ()
-≺ᵛ-grow (zero  ∷ᵛ w) (y ∷ᵛ v) h = ≺-there (≺ᵛ-grow w v h)
-≺ᵛ-grow (suc x ∷ᵛ w) (y ∷ᵛ v) h = ≺-here (s≤s (m≤n+m y x))
-
-≺-embed : ∀ B t (xs ys M : List ℕ) →
-  counts B M ≺ᵛ counts B (t ∷ xs ++ M ++ ys)
-≺-embed B t xs ys M =
-  subst (counts B M ≺ᵛ_) (sym eq) (≺ᵛ-grow W (counts B M) tot1)
-  where
-  W = oneAt B t ⊕ᵛ (counts B xs ⊕ᵛ counts B ys)
-  eq : counts B (t ∷ xs ++ M ++ ys) ≡ W ⊕ᵛ counts B M
-  eq = trans (cong (oneAt B t ⊕ᵛ_)
-               (trans (counts-++ B xs (M ++ ys))
-                      (cong (counts B xs ⊕ᵛ_) (counts-++ B M ys))))
-       (trans (cong (λ z → oneAt B t ⊕ᵛ (counts B xs ⊕ᵛ z))
-                    (⊕ᵛ-comm (counts B M) (counts B ys)))
-       (trans (cong (oneAt B t ⊕ᵛ_)
-                    (sym (⊕ᵛ-assoc (counts B xs) (counts B ys) (counts B M))))
-              (sym (⊕ᵛ-assoc (oneAt B t)
-                             (counts B xs ⊕ᵛ counts B ys) (counts B M)))))
-  tot1 : 1 ≤ totᵛ W
-  tot1 = subst (1 ≤_)
-           (sym (trans (totᵛ-⊕ᵛ (oneAt B t) (counts B xs ⊕ᵛ counts B ys))
-                       (cong (_+ totᵛ (counts B xs ⊕ᵛ counts B ys))
-                             (totᵛ-oneAt B t))))
-           (s≤s z≤n)
-
--- lex is compatible with adding a common vector
-≺ᵛ-⊕ʳ : ∀ {m} {u v : Vec ℕ m} (w : Vec ℕ m) → u ≺ᵛ v → (u ⊕ᵛ w) ≺ᵛ (v ⊕ᵛ w)
-≺ᵛ-⊕ʳ (z ∷ᵛ w) (≺-here  x<y) = ≺-here (+-monoˡ-< z x<y)
-≺ᵛ-⊕ʳ (z ∷ᵛ w) (≺-there u≺v) = ≺-there (≺ᵛ-⊕ʳ w u≺v)
-
--- (suc B ≤ᵇ y) unfolds to (B <ᵇ y), so state the false case there
-≤⇒<ᵇ-false : ∀ y B → y ≤ B → (B <ᵇ y) ≡ false
-≤⇒<ᵇ-false zero    B       z≤n       = refl
-≤⇒<ᵇ-false (suc y) (suc B) (s≤s y≤B) = ≤⇒<ᵇ-false y B y≤B
-
--- every element strictly below suc B ⇒ the top class stays empty
-counts-tail : ∀ B (Y : List ℕ) → All (_< suc B) Y →
-  counts (suc B) Y ≡ 0 ∷ᵛ counts B Y
-counts-tail B []      []ᵃ        = refl
-counts-tail B (y ∷ Y) (py ∷ᵃ pY)
-  rewrite ≤⇒<ᵇ-false y B (≤-pred py) | counts-tail B Y pY = refl
-
--- a multiset entirely below class t sits under a single t element
-counts-below : ∀ B t (Y : List ℕ) → All (_< t) Y → t ≤ B →
-  counts B Y ≺ᵛ oneAt B t
-counts-below zero    zero    []      []ᵃ        h = ≺-here (s≤s z≤n)
-counts-below zero    zero    (y ∷ Y) (() ∷ᵃ _)  h
-counts-below zero    (suc t) Y       aY         ()
-counts-below (suc B) t       Y       aY         t≤
-  with m≤n⇒m<n∨m≡n t≤
-... | inj₂ refl
-  rewrite counts-tail B Y aY
-        | T⇒≡true (suc B ≤ᵇ suc B) (≤⇒≤ᵇ (≤-refl {suc B})) = ≺-here (s≤s z≤n)
-... | inj₁ t<sB
-  rewrite counts-tail B Y
-            (mapᴬ (λ py → ≤-trans py (≤-trans (≤-pred t<sB) (n≤1+n B))) aY)
-        | ≤⇒<ᵇ-false t B (≤-pred t<sB)
-  = ≺-there (counts-below B t Y aY (≤-pred t<sB))
-
-≺-replace : ∀ B t (Y Z : List ℕ) → All (_< t) Y → t ≤ B →
-  counts B (Y ++ Z) ≺ᵛ counts B (t ∷ Z)
-≺-replace B t Y Z aY t≤B rewrite counts-++ B Y Z =
-  ≺ᵛ-⊕ʳ (counts B Z) (counts-below B t Y aY t≤B)
-
--- the μ edge at the measure level: unfolding strictly DROPS the
--- walked expression's multiset — the μ node's host class steps
--- down by one and the inner multiset rides along (shell mirrors
--- of elimG above) — so hop anchors never wobble across unfolds
-unfoldμ-≺ : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
-  (body : Exp Γ (t ∷ []) [] [] t) →
-  shellSizeᵉ (μᵉ body) ≤ B →
-  measureE B (unfoldμ body) ≺ᵛ measureE B (μᵉ body)
-unfoldμ-≺ B body h
-  rewrite shellSize-unfoldμ body | inner-unfoldμ body =
-  ≺-replace B (suc (shellSizeᵉ body)) (shellSizeᵉ body ∷ []) (innerᵉ body)
-    (≤-refl ∷ᵃ []ᵃ) h
-
--- the μ clause threads SHELL caps, not sizeᵉ (unfoldμ copies the
--- closed μ, so sizeᵉ grows — but every shell is preserved or
--- stepped down, and the shell COUNT is exactly preserved).  These
--- two transfers are what keep the contract's side conditions alive
--- across the μ decrement edge
-shells-unfoldμ-cap : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
-  (body : Exp Γ (t ∷ []) [] [] t) →
-  All (_≤ B) (shellsᵉ (μᵉ body)) → All (_≤ B) (shellsᵉ (unfoldμ body))
-shells-unfoldμ-cap B body (hd ∷ᵃ tl)
-  rewrite shellSize-unfoldμ body | inner-unfoldμ body =
-  ≤-trans (n≤1+n _) hd ∷ᵃ tl
-
-------------------------------------------------------------------
--- (W12-A) THE STRUCTURAL DESCENT.  The three FUEL edges (μ, inner
--- hop, connect) each have their dBound lemma above.  A STRUCTURAL
--- edge — mapᵉ/takeᵉ/scanᵉ/the four *Alls/μ, the operator walking
--- into its own source — peels no gas, so the fuel accounting is
--- indifferent to it; but the LENGTH ledger is not, because such an
--- edge adds one frame to the path.  It pays for that frame out of
--- the descent: both dBound arguments drop at once.
---
---   syncSize  drops because every structural constructor is
---             `suc (… + syncSizeᵉ e)` — a strict drop, the s side.
---   rank      drops because shellSizeᵉ steps DOWN by exactly one
---             (the operator's own node) and the child's inner
---             multiset is a sub-multiset of the parent's — so the
---             child's count vector loses a high digit and gains
---             nothing, the r side.
---
--- descent-of below is the single interface: it takes exactly the
--- two syntactic facts that distinguish the seven constructors (host
--- shell steps down one; inner multiset grows by some N) and returns
--- the strict dBound drop.  Instantiating it per clause is then just
--- naming N — [] for the *Alls and μ, innerᵗ f for map/take,
--- innerᵗ f ++ innerᵗ z for scan.
-------------------------------------------------------------------
-
--- lex is compatible with GROWING the larger side (the mirror of
--- ≺ᵛ-⊕ʳ, which grows both): a zero digit passes the step through,
--- a positive one settles it right there
-≺ᵛ-⊕ᵇ : ∀ {m} {u v : Vec ℕ m} (w : Vec ℕ m) → u ≺ᵛ v → u ≺ᵛ (v ⊕ᵛ w)
-≺ᵛ-⊕ᵇ (z ∷ᵛ w) (≺-here {y = y} x<y) = ≺-here (<-≤-trans x<y (m≤m+n y z))
-≺ᵛ-⊕ᵇ {u = x ∷ᵛ _} (zero ∷ᵛ w) (≺-there u≺v)
-  rewrite +-identityʳ x = ≺-there (≺ᵛ-⊕ᵇ w u≺v)
-≺ᵛ-⊕ᵇ {u = x ∷ᵛ _} (suc z ∷ᵛ w) (≺-there u≺v) =
-  ≺-here (subst (x <_) (sym (+-suc x z)) (s≤s (m≤m+n x z)))
-
--- ONE class-s element under ONE class-(suc s) element, with any
--- extra multiset N riding on the larger side
-shells-drop : ∀ B s (N M : List ℕ) → suc s ≤ B →
-  counts B (s ∷ M) ≺ᵛ counts B (suc s ∷ (N ++ M))
-shells-drop B s N M h =
-  subst (counts B (s ∷ M) ≺ᵛ_) (sym eq)
-    (≺ᵛ-⊕ᵇ (counts B N)
-      (≺-replace B (suc s) (s ∷ []) M (≤-refl ∷ᵃ []ᵃ) h))
-  where
-  eq : counts B (suc s ∷ (N ++ M)) ≡ counts B (suc s ∷ M) ⊕ᵛ counts B N
-  eq = trans (cong (oneAt B (suc s) ⊕ᵛ_)
-               (trans (counts-++ B N M)
-                      (⊕ᵛ-comm (counts B N) (counts B M))))
-             (sym (⊕ᵛ-assoc (oneAt B (suc s)) (counts B M) (counts B N)))
-
--- the ≺ᵛ step read as a numeral drop, with the entry-sum side
--- condition discharged off sizeᵉ exactly as measureE-rank does
-rank-drop : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
-  (b : Closed Γ s) (c : Closed Γ u) →
-  measureE V b ≺ᵛ measureE V c → sizeᵉ b ≤ V →
-  rank V (measureE V b) < rank V (measureE V c)
-rank-drop V b c step h =
-  rank-mono-≺ V step
-    (subst (_≤ V) (sym (totᵛ-counts V (shellsᵉ b)))
-           (≤-trans (shells-len b) h))
-
--- both dBound arguments move at once: rank weakly, syncSize
--- strictly.  V R U are EXPLICIT: dBound unfolds through _*_, which
--- matches on its first argument, so implicits here are stuck in the
--- same way ⊔-elim-help's were
-dBound-struct : ∀ (V R U : ℕ) {r′ r s′ s} → r′ ≤ r → s′ < s →
-  dBound V R U r′ s′ < dBound V R U r s
-dBound-struct V R U r′≤r s′<s =
-  +-mono-<-≤ s′<s (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′≤r))
 
 ------------------------------------------------------------------
 -- THE STRUCTURAL EDGE's r side, in hopD.  With `r` a remaining-hop
@@ -3103,144 +2786,6 @@ hopD-map-emit V f b v f₀ hf hp hv =
   ≤-trans (hopD-applyFn V f₀ v)
           (+-mono-≤ hf (*-mono-≤ (⊔-mono-≤ hp ≤-refl) hv))
 
-------------------------------------------------------------------
--- THE LEDGER'S INPUT — the subΘ multiset equation, exact: the
--- instantiated inner multiset is the template's plus the plug
--- shells, class for class.  With shellSize-subΘ (host preserved)
--- this fully characterizes instantiation at the measure level.
-------------------------------------------------------------------
-
-⊕ᵛ-medial : ∀ {m} (a b c d : Vec ℕ m) →
-  (a ⊕ᵛ b) ⊕ᵛ (c ⊕ᵛ d) ≡ (a ⊕ᵛ c) ⊕ᵛ (b ⊕ᵛ d)
-⊕ᵛ-medial a b c d =
-  trans (⊕ᵛ-assoc a b (c ⊕ᵛ d))
-  (trans (cong (a ⊕ᵛ_) (trans (sym (⊕ᵛ-assoc b c d))
-                       (trans (cong (_⊕ᵛ d) (⊕ᵛ-comm b c))
-                              (⊕ᵛ-assoc c b d))))
-         (sym (⊕ᵛ-assoc a c (b ⊕ᵛ d))))
-
--- the 2-way composition step, shared by every two-child clause:
--- counts (X′ ++ Y′) from recursive equations for X′ and Y′
-counts-2way : ∀ B (X′ Y′ X Y P Q : List ℕ) →
-  counts B X′ ≡ counts B X ⊕ᵛ counts B P →
-  counts B Y′ ≡ counts B Y ⊕ᵛ counts B Q →
-  counts B (X′ ++ Y′) ≡ counts B (X ++ Y) ⊕ᵛ counts B (P ++ Q)
-counts-2way B X′ Y′ X Y P Q ex ey =
-  trans (counts-++ B X′ Y′)
-  (trans (cong₂ _⊕ᵛ_ ex ey)
-  (trans (⊕ᵛ-medial (counts B X) (counts B P) (counts B Y) (counts B Q))
-         (sym (cong₂ _⊕ᵛ_ (counts-++ B X Y) (counts-++ B P Q)))))
-
--- the 3-way step: fold the right two children first, then medial
-counts-3way : ∀ B (X′ Y′ Z′ X Y Z P Q R : List ℕ) →
-  counts B X′ ≡ counts B X ⊕ᵛ counts B P →
-  counts B Y′ ≡ counts B Y ⊕ᵛ counts B Q →
-  counts B Z′ ≡ counts B Z ⊕ᵛ counts B R →
-  counts B (X′ ++ Y′ ++ Z′) ≡
-    counts B (X ++ Y ++ Z) ⊕ᵛ counts B (P ++ Q ++ R)
-counts-3way B X′ Y′ Z′ X Y Z P Q R ex ey ez =
-  counts-2way B X′ (Y′ ++ Z′) X (Y ++ Z) P (Q ++ R) ex
-    (counts-2way B Y′ Z′ Y Z Q R ey ez)
-
-mutual
-  subΘ-countsᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    counts B (innerᵉ (subΘExp Θloc σ e)) ≡
-      counts B (innerᵉ e) ⊕ᵛ counts B (plugsᵉ Θloc σ e)
-  subΘ-countsᵉ B Θloc σ (input i)       = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵉ B Θloc σ (ofᵉ ts)        = subΘ-countsᵗˢ B Θloc σ ts
-  subΘ-countsᵉ B Θloc σ emptyᵉ          = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵉ B Θloc σ (mapᵉ {s = s} f e) =
-    counts-2way B (innerᵗ (subΘTm (s ∷ Θloc) σ f))
-                  (innerᵉ (subΘExp Θloc σ e))
-                  (innerᵗ f) (innerᵉ e)
-                  (plugsᵗ (s ∷ Θloc) σ f) (plugsᵉ Θloc σ e)
-      (subΘ-countsᵗ B (s ∷ Θloc) σ f) (subΘ-countsᵉ B Θloc σ e)
-  subΘ-countsᵉ B Θloc σ (takeᵉ c e)     =
-    counts-2way B (innerᵗ (subΘTm Θloc σ c))
-                  (innerᵉ (subΘExp Θloc σ e))
-                  (innerᵗ c) (innerᵉ e)
-                  (plugsᵗ Θloc σ c) (plugsᵉ Θloc σ e)
-      (subΘ-countsᵗ B Θloc σ c) (subΘ-countsᵉ B Θloc σ e)
-  subΘ-countsᵉ B Θloc σ (scanᵉ {s = s} {t = t} f z e) =
-    counts-3way B (innerᵗ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f))
-                  (innerᵗ (subΘTm Θloc σ z))
-                  (innerᵉ (subΘExp Θloc σ e))
-                  (innerᵗ f) (innerᵗ z) (innerᵉ e)
-                  (plugsᵗ ((t ×ᵗ s) ∷ Θloc) σ f)
-                  (plugsᵗ Θloc σ z) (plugsᵉ Θloc σ e)
-      (subΘ-countsᵗ B ((t ×ᵗ s) ∷ Θloc) σ f)
-      (subΘ-countsᵗ B Θloc σ z) (subΘ-countsᵉ B Θloc σ e)
-  subΘ-countsᵉ B Θloc σ (mergeAllᵉ e)   = subΘ-countsᵉ B Θloc σ e
-  subΘ-countsᵉ B Θloc σ (concatAllᵉ e)  = subΘ-countsᵉ B Θloc σ e
-  subΘ-countsᵉ B Θloc σ (switchAllᵉ e)  = subΘ-countsᵉ B Θloc σ e
-  subΘ-countsᵉ B Θloc σ (exhaustAllᵉ e) = subΘ-countsᵉ B Θloc σ e
-  subΘ-countsᵉ B Θloc σ (μᵉ e)          = subΘ-countsᵉ B Θloc σ e
-  subΘ-countsᵉ B Θloc σ (varᵉ x)        = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵉ B Θloc σ (deferᵉ e)      = sym (⊕ᵛ-identityˡ zerosᵛ)
-
-  subΘ-countsᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    counts B (innerᵗ (subΘTm Θloc σ tm)) ≡
-      counts B (innerᵗ tm) ⊕ᵛ counts B (plugsᵗ Θloc σ tm)
-  subΘ-countsᵗ B Θloc σ (varᵗ x) with ∈-++⁻ Θloc x
-  ... | inj₁ y = sym (⊕ᵛ-identityˡ zerosᵛ)
-  ... | inj₂ z =
-    trans (cong (counts B)
-            (trans (inner-renᵗ (λ ()) (λ ()) (λ ())
-                               (reify (lookupEnv σ z)))
-                   (reify-inner _ (lookupEnv σ z))))
-          (sym (⊕ᵛ-identityˡ (counts B (shellsᵛ _ (lookupEnv σ z)))))
-  subΘ-countsᵗ B Θloc σ unit̂          = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵗ B Θloc σ (bool̂ _)      = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵗ B Θloc σ (nat̂ _)       = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵗ B Θloc σ (pairᵗ a b)   =
-    counts-2way B (innerᵗ (subΘTm Θloc σ a))
-                  (innerᵗ (subΘTm Θloc σ b))
-                  (innerᵗ a) (innerᵗ b)
-                  (plugsᵗ Θloc σ a) (plugsᵗ Θloc σ b)
-      (subΘ-countsᵗ B Θloc σ a) (subΘ-countsᵗ B Θloc σ b)
-  subΘ-countsᵗ B Θloc σ (fstᵗ p)      = subΘ-countsᵗ B Θloc σ p
-  subΘ-countsᵗ B Θloc σ (sndᵗ p)      = subΘ-countsᵗ B Θloc σ p
-  subΘ-countsᵗ B Θloc σ (inlᵗ a)      = subΘ-countsᵗ B Θloc σ a
-  subΘ-countsᵗ B Θloc σ (inrᵗ a)      = subΘ-countsᵗ B Θloc σ a
-  subΘ-countsᵗ B Θloc σ (caseᵗ {s = s} {t = t} sc l r) =
-    counts-3way B (innerᵗ (subΘTm Θloc σ sc))
-                  (innerᵗ (subΘTm (s ∷ Θloc) σ l))
-                  (innerᵗ (subΘTm (t ∷ Θloc) σ r))
-                  (innerᵗ sc) (innerᵗ l) (innerᵗ r)
-                  (plugsᵗ Θloc σ sc) (plugsᵗ (s ∷ Θloc) σ l)
-                  (plugsᵗ (t ∷ Θloc) σ r)
-      (subΘ-countsᵗ B Θloc σ sc)
-      (subΘ-countsᵗ B (s ∷ Θloc) σ l) (subΘ-countsᵗ B (t ∷ Θloc) σ r)
-  subΘ-countsᵗ B Θloc σ (ifᵗ c a b)   =
-    counts-3way B (innerᵗ (subΘTm Θloc σ c))
-                  (innerᵗ (subΘTm Θloc σ a))
-                  (innerᵗ (subΘTm Θloc σ b))
-                  (innerᵗ c) (innerᵗ a) (innerᵗ b)
-                  (plugsᵗ Θloc σ c) (plugsᵗ Θloc σ a)
-                  (plugsᵗ Θloc σ b)
-      (subΘ-countsᵗ B Θloc σ c)
-      (subΘ-countsᵗ B Θloc σ a) (subΘ-countsᵗ B Θloc σ b)
-  subΘ-countsᵗ B Θloc σ (primᵗ _ a)   = subΘ-countsᵗ B Θloc σ a
-  subΘ-countsᵗ B Θloc σ (strmᵗ e)     =
-    trans (cong₂ _⊕ᵛ_ (cong (oneAt B) (shellSize-subΘ Θloc σ e))
-                      (subΘ-countsᵉ B Θloc σ e))
-          (sym (⊕ᵛ-assoc (oneAt B (shellSizeᵉ e))
-                         (counts B (innerᵉ e))
-                         (counts B (plugsᵉ Θloc σ e))))
-
-  subΘ-countsᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (B : ℕ) (Θloc : List Ty)
-    (σ : All (Val Γ) Θsub) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
-    counts B (innerᵗˢ (subΘTms Θloc σ ts)) ≡
-      counts B (innerᵗˢ ts) ⊕ᵛ counts B (plugsᵗˢ Θloc σ ts)
-  subΘ-countsᵗˢ B Θloc σ []       = sym (⊕ᵛ-identityˡ zerosᵛ)
-  subΘ-countsᵗˢ B Θloc σ (y ∷ ys) =
-    counts-2way B (innerᵗ (subΘTm Θloc σ y))
-                  (innerᵗˢ (subΘTms Θloc σ ys))
-                  (innerᵗ y) (innerᵗˢ ys)
-                  (plugsᵗ Θloc σ y) (plugsᵗˢ Θloc σ ys)
-      (subΘ-countsᵗ B Θloc σ y) (subΘ-countsᵗˢ B Θloc σ ys)
 
 ------------------------------------------------------------------
 -- SYNC-LINEARITY, PROVEN: deliveries ≤ syntactic occurrences.
@@ -3248,11 +2793,10 @@ mutual
 -- occurrence — so an instantiation can multiply a stored value's
 -- shells only by the occurrence count of the template, which is
 -- itself capped by the template's sync-reachable syntax
--- (occs≤syncᵉ).  With the exact cardinality bookkeeping
--- (inner-len-subΘ, the length shadow of the subΘ multiset
--- equation), this bounds an instantiated value's entry sum BEFORE
--- the store re-caps it: length shells ≤ template size + occs · V —
--- the ledger's cardinality half at every applyFn/evalWith hop.
+-- (occs≤syncᵉ).  The infrastructure below (EnvLen, plugs-lenᵉ)
+-- bounds the plugged-shell count per entry; these are currently
+-- orphaned pending a new assembly that does not rely on the retired
+-- multiset measure.
 ------------------------------------------------------------------
 
 -- per-entry cardinality cap on an environment: each plugged value
@@ -3403,32 +2947,6 @@ mutual
     occsᵗˢ ts ≤ syncSizeᵗˢ ts
   occs≤syncᵗˢ []       = z≤n
   occs≤syncᵗˢ (y ∷ ys) = +-mono-≤ (occs≤syncᵗ y) (occs≤syncᵗˢ ys)
-
--- the length shadow of the subΘ multiset equation, EXACT:
--- instantiation adds precisely the plugged shells to the inner
--- multiset's cardinality (read the equation through totᵛ at B = 0)
-inner-len-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
-  (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-  length (innerᵉ (subΘExp Θloc σ e)) ≡
-    length (innerᵉ e) + length (plugsᵉ Θloc σ e)
-inner-len-subΘ Θloc σ e =
-  trans (sym (totᵛ-counts 0 (innerᵉ (subΘExp Θloc σ e))))
-  (trans (cong totᵛ (subΘ-countsᵉ 0 Θloc σ e))
-  (trans (totᵛ-⊕ᵛ (counts 0 (innerᵉ e)) (counts 0 (plugsᵉ Θloc σ e)))
-         (cong₂ _+_ (totᵛ-counts 0 (innerᵉ e))
-                    (totᵛ-counts 0 (plugsᵉ Θloc σ e)))))
-
--- sync-linearity, packaged for the hop: an instantiated template's
--- shell count — its entry sum, the rank bridge's side condition —
--- is the template's syntax plus occurrences · per-value cap, before
--- any store re-cap
-subΘ-shells-len : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Θloc : List Ty)
-  (σ : All (Val Γ) Θsub) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-  EnvLen V σ →
-  length (shellsᵉ (subΘExp Θloc σ e)) ≤ sizeᵉ e + occsᵉ e * V
-subΘ-shells-len V Θloc σ e hσ =
-  ≤-trans (≤-reflexive (cong suc (inner-len-subΘ Θloc σ e)))
-          (+-mono-≤ (inner-lenᵉ e) (plugs-lenᵉ V Θloc σ e hσ))
 
 ------------------------------------------------------------------
 -- THE SEED INEQUALITY, PROVEN: the contract's whole demand — under

@@ -558,10 +558,11 @@ sizeᵛ (obs t)  e        = sizeᵉ e
 -- every shell size EXACTLY — runtime instantiation neither
 -- inflates nor deflates a shell.  shellsᵉ is the multiset of shell
 -- sizes of e and of every sync-reachable embedded observable,
--- transitively; a runtime obs value IS a closed expression, so its
--- subscription measure (Verify-Budget-Sufficient's Dershowitz–
--- Manna multiset) is counts B ∘ shellsᵉ — a pure function of the
--- value, no derivation bookkeeping.
+-- transitively.  The Dershowitz–Manna multiset order
+-- (counts B ∘ shellsᵉ) was the original subscription measure;
+-- it was retired in favour of the closed-form dBound measure in
+-- Verify-Budget-Sufficient.  shellsᵉ/shellsᵛ currently have no
+-- consumer.
 ------------------------------------------------------------------
 
 shellSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ

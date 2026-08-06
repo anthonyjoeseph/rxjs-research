@@ -261,6 +261,38 @@ used somewhere — the only exceptions are the top-level, most-important exports
 backwards-compatibility shims, nothing "stored for reference", no legacy, no deprecated.
 **Do not be afraid to throw out code or documentation.** Git history is the archive.
 
+### DELETION FREEZE: wire everything BEFORE deleting anything (Anthony, 2026-08-05)
+
+**No orphan gets deleted until the wiring pass is finished.** Not a mood — a
+rule, because deletion and wiring interfere in one direction only:
+
+- **Wiring only ADDS consumers.** It never creates an orphan, so its signal is
+  monotone and safe to act on.
+- **Deletion CREATES orphans**, by stranding whatever fed only into the deleted
+  cluster. Measured the day this rule was written: removing the retired multiset
+  measure orphaned six further definitions (`EnvLen`, `envLen-lookup`, the three
+  `plugs-len*`, `envSize→envLen`) whose consumer chain terminated at `rank-drop`.
+
+So deleting before wiring is complete **corrupts the very measurement used to
+decide what to delete.** Wire first; the orphan set that survives a finished
+wiring pass is the only one whose emptiness means anything.
+
+**The evidence this rule is not paranoia** — both of these were on the deletion
+list and both were wrong, in one afternoon:
+- `pWᵉ≤entryCeil` (Rx/Frame-Width.agda:831) — a sweep found "no consumer exists"
+  (true, that day). It is needed by `init-capsOK?`, i.e. by work not yet written.
+  **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS**, and
+  only building the consumer answers the second.
+- `dBound-struct` (Measures) — looked like retired-measure cruft. It is the
+  strict GENERALISATION of `dBound-μ`, one of the file's most-used lemmas,
+  orphaned purely because it was stated AFTER its own specialisation. It wired
+  in one line and deleted a duplicated derivation.
+
+**The one standing exemption** is code the SOURCE ITSELF retires in writing (the
+Dershowitz–Manna multiset measure, which the hopD section header calls "the
+retired measure"). Even then: record the commit SHA in PROOF-STATE.md, because
+git history is the archive only if someone can find the entry.
+
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
 **THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level
