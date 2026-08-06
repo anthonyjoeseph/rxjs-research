@@ -7,746 +7,239 @@ copies. If a pointer and its source comment disagree, the source comment wins;
 fix the pointer.
 
 > **THE WIRING LAW GOVERNS EVERYTHING BELOW — see CLAUDE.md § "The wiring law:
-> NEVER LEAVE A PROOF HANGING".** Never prove something and leave it unwired.
-> Extend the consuming assembly first (postulating its other gaps), land both in
-> one commit, and change a signature rather than leaving a piece that will not
-> plug in. Every gap is a typed postulate; every definition and postulate is
-> consumed, transitively, by a top-level theorem. No invisible debt, no dead
-> code, no gap that lives only in prose. `make wiring` is the acceptance test —
-> zero orphans outside its two documented exempt families.
+> NEVER LEAVE A PROOF HANGING".** Every gap is a typed postulate; every
+> definition and postulate is consumed, transitively, by a top-level theorem.
+> `make wiring` is the acceptance test. **The wiring pass is COMPLETE**
+> (zero orphans, zero unreachable modules, every postulate consumed) — which is
+> what makes the risk accounting below meaningful: the postulate ledger now IS
+> the total remaining uncertainty, with nothing hiding outside it.
 
-> **CURRENT OPERATING MODE (Anthony, 2026-08-05): WIRING, WITH MAXIMUM
-> SHORTCUTS.** We are not proving right now. Whatever we do not yet know, we
-> POSTULATE — get the repo settled first; decisions about what to actually prove
-> come after. **A rising postulate count is the mechanism working, not a
-> regression** ("the relentless mindset of reducing those numbers is very
-> harmful"). Never grind a hard proof when a postulate will do; never weaken a
-> statement to make it typecheck. The move that does the work is
-> **postulate-to-assembly conversion**: most orphans are orphaned because their
-> only would-be consumer is itself a monolithic postulate, so turn that postulate
-> into a real DEFINITION over smaller postulates that CALLS the orphans. The one
-> constraint is that a postulate must assert something TRUE and non-vacuous — see
-> CLAUDE.md § "SHORTCUT MANDATE" for the two live traps. **When quoting the
-> ledger below, quote it as a worklist, never as a score.**
-
-## THE WIRING WORKLIST — the only priority. Nothing below outranks it.
-
-**Work the ORPHAN LIST, not the postulate ledger.** This is the correction that
-matters most (Anthony, 2026-08-05): *"I imagined we'd reduce them in big groups
-by assembling them, rather than incorporating them one by one."* Right — and
-picking targets off the postulate ledger is exactly what produces one-at-a-time.
-A postulate-to-assembly conversion consumes only the one or two orphans that
-particular assembly happens to need, so it clears ~1 per conversion. Choosing by
-CLUSTER instead clears a whole family per assembly written.
-
-**Get the live list from `make wiring`.** Do not trust a list written here.
-
-**PILE-VS-TOWER, the diagnostic to run before planning any cluster.** If a
-module's lemmas formed a tower, the lower ones would be consumed by the top one
-and only the top would be orphaned. When EVERY member is orphaned at once they
-do not consume each other either — the module was never assembled internally, so
-one consumer is not enough. The work is then *write the assembly that consumes
-the family*: one definition, postulating whatever else it needs, clearing the
-whole family at once.
-
-**Ask which EXISTING postulate each orphan was written FOR.** An orphan was
-written with a parent in mind, so the question is not "what could consume this?"
-but "what was this for?" — and answering it for the whole list at once collapses
-the list into a handful of assemblies. Group by PARENT, not by module: one
-module's orphans routinely belong to several different parents.
-
-### WRITING AN ASSEMBLY — the postulate-to-assembly conversion
-
-The move that wires orphans. For a parent postulate `P` with orphans `o₁…oₖ`,
-`P`'s type `T` is unchanged; it becomes
-
-```agda
-postulate P-core : <type of o₁> → … → <type of oₖ> → T
-P : T
-P = P-core (λ {a} {b} → o₁ {a} {b}) … oₖ
-```
-
-`P-core` is neither stronger nor weaker than `P`: each hypothesis is an
-already-proven proposition, so it is inhabited and the implication is an
-equivalence. **That is exactly why the hypotheses must be PROOFS.** A
-*function*-valued orphan cannot be passed this way — `(f : <function type>) → T`
-quantifies over every inhabitant and is strictly STRONGER than `T`. Wire such an
-orphan by its DEFINING EQUATION instead (a proposition, `refl`); `ΩAt` in
-`.Measures` is the worked example.
-
-**Four rules, each of which otherwise costs a full build to rediscover:**
-
-1. **EXTRACT the hypothesis types from source; never retype them.** Unicode-dense
-   Agda is where hand-transcription fails silently. `scripts/check-wiring.py`
-   carries a signature reader (`signature_text`) that does it exactly.
-2. **Pass every lemma ETA-EXPANDED with explicit implicits** —
-   `(λ {n} {Γ} → f {n} {Γ})`, not bare `f`. When a lemma's statement *reduces*
-   away one of its own implicits, Agda cannot solve it at the application site
-   and reports `Unsolved metas`. `share-live-novals` is the case in point: it
-   computes on a literal event list, so its reduced statement no longer mentions
-   `Γ` or `u`. Bare arguments work only by luck; the eta form always works.
-3. **Copied signatures drag in VOCABULARY the parent module does not import**, and
-   Agda stops at the FIRST scope error — so each missing name is its own aborted
-   build. Read the types and collect the names in one pass instead of iterating
-   the compiler.
-4. **ORDERING: a postulate cannot reference a definition below it.** Put the
-   `-core` where the postulate was and the definition after the last orphan it
-   consumes. `make wiring` reports this as section (B3); do not learn it from a
-   failed typecheck.
+> **CURRENT OPERATING MODE (Anthony, 2026-08-06): DE-RISK FIRST.** Every
+> postulate carries a probability of being FALSE or EMPTY, and the proof's total
+> risk is the SUM over the ledger — so the work is ordered by risk reduced per
+> unit effort, not by proof-progress optics. Two consequences:
+>
+> - **A machine refutation of a postulate is as valuable as a proof of one.**
+>   Cheaper, usually. A false postulate found NOW costs a restatement; found
+>   after the towers above it are ground, it costs the towers.
+> - **The truth-audit prohibition from the wiring pass is LIFTED** (it was
+>   scoped "during the wiring pass" and the pass is done). Auditing statements
+>   for truth — especially by machine probe — is now the priority, not a
+>   distraction. The SHORTCUT MANDATE's other half stands: never weaken a
+>   statement to make it typecheck, and postulate rather than grind when a gap
+>   is real mathematics.
 
 ## The theorem chain (top → leaves)
 
 ```
-formal-verification-batchSimultaneous          The-Proof.agda:1098 — REAL, module postulate-free
- ├─ batch-agreement                            proven
- └─ evaluate-well-formed                       Verify-Well-Formed.agda:5328
-     ├─ budget-sufficient                      Caps-Bridge.agda — PROVEN from:
-     │   ├─ burst-wet    ← subscribeE-wet      [P1]  (.Wet, unchanged)
-     │   ├─ burst-caps   ← subscribeE-wet-via-caps    proven, and it
-     │   │                 rests on [P1] + sub-charge (proven)
-     │   │                 + sub-charge-capsOK-lift (postulated)
-     │   └─ drain-dry    ← cascade-wet-via-caps       proven
-     └─ THE WELL-FORMEDNESS BRANCH             its OWN 8 postulates — see [W1-W8]
+formal-verification-batchSimultaneous       The-Proof.agda:1098 — REAL, module postulate-free
+ ├─ batch-agreement                         proven
+ └─ evaluate-well-formed                    Verify-Well-Formed.agda
+     ├─ budget-sufficient                   Caps-Bridge.agda — PROVEN from:
+     │   ├─ burst-wet   ← subscribeE-wet            [T1 risk: walk-core, wet-core]
+     │   ├─ burst-caps  ← subscribeE-wet-via-caps   [T1 risk: lift-core, opIterD-core, init-capsOK?]
+     │   └─ drain-dry   ← cascade-wet-via-caps      [T1 risk: dry-tick-core, cascadeGo-wet-core, P3, P4]
+     └─ THE WELL-FORMEDNESS BRANCH          its own 21 postulates    [T2]
 ```
 
 **THE CAPS ROUTE DOES NOT REPLACE P1 — IT RESTS ON IT.** Both branches of
 `budget-sufficient` route through `subscribeE-wet`: `burst-wet` directly, and
 `burst-caps` because `subscribeE-wet-via-caps` takes its `hasDry` and `INV?`
-conjuncts straight out of P1 and contributes only the third (`capsOK?` at
-`suc id`). So P1 is load-bearing for the whole subscribe side, and no amount of
-caps work retires it. Scope the endgame accordingly — the source header used to
-call this "P1's subscribe-side mirror", which reads as a replacement.
-
-**`budget-sufficient` lives in `Caps-Bridge.agda`, not `Wet.agda`** (see the
-RULING below). `cascadeGo-wet` [P2] is NOT retired: it is the cascade walk's own
-dry+INV? half, and `dry-tick` is assembled over it, so it sits on the drain side
-of the chain and still needs a proof.
-
-**THERE ARE TWO BRANCHES, NOT ONE.** `evaluate-well-formed` has its own postulate
-set in `Verify-Well-Formed.agda`, every one of which is as load-bearing as P1/P2.
-Do not stop the chain diagram at `budget-sufficient` — the well-formedness branch
-is equally on the critical path.
-
-## The well-formedness branch (critical path, never assessed)
-
-There are **EIGHT** postulates. Each has exactly one consumer — no orphaned postulates here.
-
-| # | Name | Line | Bucket |
-|---|------|------|--------|
-| W1 | `subscribeE-wf` | 1093 | (d) partly — base/map/scan/take clauses ALREADY PROVEN (see below); `*All` wrap clauses blocked on `merge-cert`; `pushBurst-wf`/`stepFrame-burst` don't exist yet |
-| W2 | `root-done-plumbed` | 1166 | (d) blocked on `merge-cert` |
-| W3 | `root-caches` | 1181 | (d) blocked on `merge-cert` |
-| W4 | `cut-owed` | 3656 | **(c) — the easiest thing in this branch.** Self-contained `Owed`-table algebra, independent of every blocker |
-| W5 | `stepFrame-wf-inner-concat` | 3676 | (c) concat's drain grows the registry; re-establish `FoldInv`. Independent of `merge-cert` |
-| W6 | `stepFrame-wf-outer` | 3685 | (d) blocked on `merge-cert` |
-| W7 | `dispatchShare-wf` | 3697 | (c) share fan-out mutual recursion — but must be RE-STATED with a `FoldOut` conclusion before it can feed `mid-step` |
-| W8 | `mid-step` | 4541 | (d) blocked on the `FoldOut` refactor below |
-
-**BLOCKER A — `merge-cert` (a GAP-4-shaped dead end with NO existing rescue).**
-Blocks W1's wrap clauses, W2, W3, W6. A first candidate invariant
-(`merge-st k at nid ⇒ k ≡ countRegsUnder nid registry`) is **machine-refuted by
-three independent counterexamples** (Verify-Well-Formed.agda:3410-3429); a second
-route ("derive from `Inv.done-plumbed`") is marked **STRUCTURALLY DEAD** (3498) —
-its premise is vacuous exactly when the obligation is needed. The corrected route
-is identified but explicitly OPEN (3459-3497): a one-directional, liveness-aware
-`merge-cert` whose *exact statement is the remaining design point*. Grepped for
-`merge-cert`/`countRegsUnder`/`aliveThrough` repo-wide: **zero hits outside this
-file.** Unlike the budget branch's rescues, this one is genuinely unsolved.
-
-**BLOCKER B — the `FoldOut` refactor, and a LYING COMMENT.** Blocks W8.
-`mid-step`'s header says `FoldOut` is "deliberately NOT yet stated" — **it IS
-stated**, a full 6-field record at 3527-3597, and `foldPath-root-out` (4138) is a
-real proof of it for the `root` path. But `foldPath-wf`'s actual signature
-(3874-3882) still returns only `Σ ProtocolSt …` with **no `FoldOut`**, so the
-plan to thread it lives only in prose. Consequences: `foldPath-root-out` is an
-an ORPHAN, and W8 cannot be assembled until
-`foldPath-wf`'s signature CHANGES — which cascades into re-*stating* W5, W6, W7.
-Textbook case of the wiring law: change the signature first.
-
-**Already proven but unwired here:** `subscribeE-map-wf` (1916),
-`subscribeE-scan-wf` (1999), `subscribeE-take-wf` (3056) — roughly half of W1's
-case split is DONE. This one is *sanctioned* (the assembly was stated first, as a
-postulate, per outside-in) but scope W1 knowing it.
-
-**Cost:** the module is 5348 lines with no explicit `mutual` blocks — but that is
-NOT a safety signal: Subscribe-Face also has none and costs ~44 min. Most of this
-file's heavy obligations are still postulates, so today's cheap recheck is
-**not** representative; expect a Subscribe-Face-shaped cost increase as they get
-real bodies. It imports `budget-sufficient` one-way, so editing it does not
-force a Wet/Subscribe-Face recheck.
-
-**Cheapest de-risking experiment:** probe the corrected `merge-cert` statement
-(3483-3486) against the three adversarial shapes that killed candidate one —
-multi-source inner, inner-completes-before-outer, cut-through on an inner — in
-the style of `agda/probe/Cut-Caches-Probe.agda`. If it survives those, it is
-very likely the right statement; if not, this branch needs a design ruling
-before W1/W2/W3/W6 can be attempted at all.
-
-## Postulate ledger — a WORKLIST, not a score
-
-**Do not read the row count as a health metric, and do not try to shrink it.**
-See the operating-mode note at the top of this file: during the wiring pass a
-rising count is the mechanism working. The named `P` rows below are the ones on
-the critical path; splitting any of them into several narrower postulates is
-PROGRESS and should be recorded as such, not flagged as a regression.
-
-Live totals come from `make wiring`, not from this table — the table names the
-critical path, the script counts everything.
-
-| # | Name | Where | Blocked by |
-|---|------|-------|-----------|
-| P1 | `subscribeE-wet` | Wet.agda:4294 | the SUBSCRIBE-side bridge (unstated) + its dry half (gas axis). GAP 4 (a) is CLOSED. |
-| P2 | `cascadeGo-wet` | Wet.agda:4335 | `dry-tick` only. `cascade-wet-via-caps` (Caps-Bridge) is the real replacement and its other three suppliers are now PROVEN; not yet wired as P2's consumer |
-| P3 | `innerFinish-concat-face` | Caps-Face.agda:6233 | nothing named — GAP 4 (a)'s companion is PROVEN (`sub-charge`). Expect grind, not design. **Genuinely consumed** at Caps-Face:6336 |
-| P4 | `thruOuter-face` | Caps-Face.agda:6248 | same as P3. **Genuinely consumed** at Caps-Face:6522 |
-| P5 | `subscribeE-walk` | Measures.agda:6204 | **ORPHANED — ZERO CONSUMERS.** See below. |
-
-**P5 IS NOT ON THE CRITICAL PATH, and is a deletion candidate.** Its only
-occurrence in all of `agda/src` is its own declaration (one prose mention in
-Wet's GAP 4 comment aside). Nothing consumes it. That is consistent with what it IS — the ledger receipt whose composition to
-P1's landing GAP 4 *refuted* — so it looks like weight left behind when that
-route died. Note it is distinct from `subscribeE-walkS` (Wet:1367), the PROVEN
-family that is genuinely used.
-
-**PARK IT: do not prove it, do not delete it.** The DELETION FREEZE (CLAUDE.md
-§ "DELETION FREEZE", and below) bars deleting any orphan until the wiring pass
-finishes — "no consumer today" and "no consumer ever" are different questions,
-and only building the consumer answers the second.
-
-**THE CAPS CHAIN DEPENDS ON P3 + P4.** `caps-tick` is described as "ground", and
-it is — *modulo* the two faces above, which are real call sites inside the caps
-clique, not decoration. Since `cascade-wet-via-caps` rests on `caps-tick`, P2's
-replacement transitively needs P3 and P4 too. **When in doubt, grep for
-consumers before believing a status here.**
-
-Off the critical path: `batch-online` (Batch-Theorems.agda:9) — extrinsic
-no-lookahead property, reachable from Main.agda but not consumed by The-Proof.
-
-**Decomposition postulates** (the named small pieces the monoliths reduce to —
-these are progress, but they count; discharging one of P1–P5 by assembly means
-these become the ledger):
-
-| Name | Where | Content |
-|---|---|---|
-| S3 `dry-tick` | Caps-Bridge.agda | P2's dry half. **BLOCKED on THE ANCHOR PROBLEM** (below) — NOT a wiring job. Its own header comment claiming independence from GAP 4 is WRONG; fix it when next editing that file. |
-| `depth-compositional` | Depth-Bound.agda | `depthE ≤ sizeᵉ b + pathLen κ + storeNestMax` (structural induction over the mirror). CENSUSED 2026-08-05: scope is 16 heads, not 19 (the delivery family — depthFold/depthDisp/depthShareGo/depthChain — is out of scope). The real remaining work is a state-growth conjunct, not a lemma about the mirror itself — every clause feeds `depthBurst` the state from the REAL `subscribeE` run, while the bound's RHS reads the entry state, so the induction needs `storeNestMax` at the evolved state dominated by the entry's bound. Details, including the ruling to prove this as a second conjunct of the same induction rather than a separate family, are in Depth-Bound.agda's header. |
-
-(B2, S1 `fn-tick`, S2 `slots-tick`, and `storeNest-capped` are PROVEN — landed
-in Caps-Bridge.agda and Depth-Bound.agda respectively, no longer postulates.)
-
-## Wiring rulings — run `make wiring` for the live list
-
-> **DELETION FREEZE IS IN FORCE (Anthony, 2026-08-05) — full statement in
-> CLAUDE.md § "DELETION FREEZE: wire everything BEFORE deleting anything".
-> NOTHING in the clusters below gets deleted until the wiring pass is
-> finished**, whatever this file or a source comment says about it being dead.
-> The reason is mechanical, not cautious: **wiring only ADDS consumers, so its
-> signal is monotone and safe to act on; deletion CREATES orphans** by stranding
-> whatever fed only into the deleted cluster. Deleting before wiring is complete
-> **corrupts the very measurement used to decide what to delete.**
-> The single exemption is code the SOURCE ITSELF retires in writing.
-
-**PRIORITY (Anthony, 2026-08-05): deletion matters, but NOT ignoring usable work
-matters more.** Read the clusters below as a RECOVERABLE-ASSETS list first and a
-cleanup list second. Every proven definition sitting unused is work already paid
-for; the question to ask of each is "what would it take to spend this, and what
-does spending it unblock" — not "should this go." Take the live count from
-`make wiring`, never from a number written here.
-
-### MAIN IS THE TOP-LINE PROOF — three rules (Anthony)
-
-1. **Whatever Main imports STICKS AROUND.** `agda/src/Main.agda` is the
-   deletion exemption, not a build convenience.
-2. **Main names individual definitions — never a bare `open import`.** This is
-   what makes rule 1 precise: the exempt set is exactly the names Main lists,
-   and everything else must be transitively required by one of them.
-3. **Main is NEVER touched without Anthony's explicit approval.**
-
-**Two targets, and the gap between them is the debt.** Naming claims shrinks
-what Agda compiles, because Agda compiles exactly what is transitively
-imported. So:
-
-| target | what it covers | meaning |
-|---|---|---|
-| `make agda` | the claim graph from Main | every claim's support compiles |
-| `make agda-all` | every module under `src/`, reachable or not | rot-guard for unwired work |
-| `make wiring` | the gap, itemised | the remaining work |
-
-V-B-S modules unreachable from Main are rot-guarded by `make agda-all`. The gap
-is itemised by `make wiring`. `make agda-all` is **self-retiring**: when both
-targets cover the same set, the wiring law holds by construction and the target
-is deleted. Do not "fix" the gap by re-adding a bulk import to Main; that is the
-loophole, not the repair.
-
-`scripts/check-wiring.py` mechanises CLAUDE.md's wiring law, rooting its exempt
-set in Main's `using` clauses. Do not re-derive this list by hand or by memory —
-run the target. The exempt set is based on Main's `using` clauses, not filenames;
-Main is excluded as a consumer so a claim cannot self-certify by being named.
-
-**`_≈ˢ_` and `_≈ᵍ_` (Rx/Time-Theorems.agda:72–73) have ZERO consumers.** They are the equivalence
-relations that module exists to state things up to, and `locality`,
-`non-interference`, `timing-invariance` do not use them. That module is weaker
-than "close to vacuous" — two of its own helpers are not wired into its own
-claims.
-
-### THE ORPHAN CENSUS — evidence not verdicts
-
-A read-only sweep grouped orphans and checked every family's import direction
-with `grep '^open import'` before claiming any consumer. The follow-up census
-should run against the post-landing list, which is smaller.
-
-1. **THE MASTER STRUCTURAL FACT.** `Verify-Well-Formed.agda:43` imports
-   **exactly one name** — `budget-sufficient` — from the entire
-   Verify-Budget-Sufficient tower. That single edge is why a whole stratum of
-   proven work can never reach a claim. Every "missing wire" below is
-   downstream of it.
-2. **A DUPLICATED PROOF, and its cause.**
-   `Verify-Well-Formed.agda:4564–4573` states its own `cascadeGo-skip` with the
-   identical case-split shape as `Deliveries.agda:868`'s `cascadeGo-skip-N` —
-   **because Verify-Well-Formed cannot reach Deliveries.** The duplication is
-   not carelessness; it is the import graph forcing a re-derivation. Fix the
-   edge and the duplicate becomes deletable.
-3. **THE RESET PAIR IS STATED THREE TIMES, and only the inline copy is ever
-   called.** `connect-edge`'s body (Wet.agda:4066–4071) inlines exactly what
-   `reach-resets` (Caps-Face:6917) bundles and what `connect-anchor`
-   (Measures:1977) *also* bundles. Wet's own comments admit it — "reach-resets'
-   first component, inlined" (4043) and "reach-resets' two components, again
-   inlined" (4058). Three statements, one fact, zero of the named ones spent.
-
-   **CORRECTION (design session, on inspecting all three): the three are NOT
-   interchangeable, so "just call the existing one" is a wall, not a fix.**
-   - `connect-edge`/`hop-edge` (Wet) are **generic in `Ŝ`** and take
-     `sizeᵉ d ≤ Ŝ` as a hypothesis.
-   - `reach-resets` (Caps-Face:6917) is the matching generic form —
-     `2 ≤ C → sizeᵉ o ≤ C → (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)` — but
-     **Caps-Face is Wet's SIBLING** (Wet → Caps; Caps-Face → Delivery-Walk →
-     Caps), so Wet can never import it.
-   - `connect-anchor` (Measures:1977) is **specialised** to
-     `V = sizeBudgetAt e sl id` and derives the size bound internally from
-     `slotDef-size`/`slots≤budget`. Calling it from `connect-edge` would force
-     `Ŝ = sizeBudgetAt e sl id` and destroy the genericity.
-
-   **THE ACTUAL FIX:** state the generic pair ONCE in `.Measures` — the lowest
-   common point — since its two ingredients (`hopD-cap`, `syncSize≤sizeᵉ`) are
-   already reachable from both Wet and Caps-Face. Then `connect-edge`,
-   `hop-edge`, `reach-resets`, AND `connect-anchor` all delegate to it, and
-   `reach-resets` becomes a one-line re-export (or goes). Four consumers for one
-   three-line lemma. This is the general lesson again: **when the same fact is
-   proven N times, the fix is usually to move it DOWN, not to pick a winner.**
-4. **A WHOLE SUPERSEDED WELL-FOUNDEDNESS TOWER (7 items, Measures).** `≺ᵛ-wf`
-   :536, `≺-embed`:2085, `unfoldμ-≺`:2151, `shells-unfoldμ-cap`:2165,
-   `shells-drop`:2209, `rank-drop`:2224, `dBound-struct`:2237 — a
-   Dershowitz–Manna multiset order over syntax, including its nontrivial
-   well-foundedness proof. **Evidence it is superseded rather than merely
-   unwired:** the measure actually wired, `dBound V R U r s = s + suc V * (r +
-   suc R * U)` (Measures:2003), is closed-form ℕ arithmetic that never mentions
-   `rank`, `shells`, or `≺ᵛ` at all. Two encodings of one termination
-   argument; only the cheap one is spent. **Anthony's ruling needed** — this is
-   the single largest block of recoverable-or-deletable work in the census.
-5. **THREE LEMMAS UNWIRED PURELY BY A MISSING `using` CLAUSE** — the cheapest
-   fix in the repo. `pmO≤ceil`:782, `pmI≤ceil`:787, `pWᵉ≤entryCeil`:831
-   (Rx/Frame-Width.agda) are absent from the `using` lists that import
-   Frame-Width into Caps-Face (:116–124) and Subscribe-Face (:102–110), while
-   their siblings `slotsPW≤entryCeil`/`slotsIW≤entryCeil` ARE imported and ARE
-   consumed (Caps-Face:4323,4325). The wired siblings bound the *slot
-   telescope's* width; these three bound the *expression's own*. No cycle, no
-   design question — one import line each.
-6. **WRAPPERS BYPASSED BY THEIR OWN CALLER.** `enterInstant-fresh-aux`
-   (Verify-Well-Formed:4010–4021) calls the field-unpacked `…-aux` internals
-   directly, skipping `enterInstant-idle`:3965 / `enterInstant-held`:3982 /
-   `paidUp-held`:4000 — wrappers written precisely to repack those calls. The
-   wrapper came first, then the call site was written against the primitive
-   form.
-
-Also: **`Depth-Bound.agda:67–69` has the identical upside-down shape as
-Caps-Bridge** (imports Wet AND Subscribe-Face), so the ruling above applies to
-it too. And `sub-charge`/`cascade-wet-via-caps` were re-verified as
-non-vacuous, taking concrete hypotheses rather than assuming the hard part —
-checked by reading the signatures, not by trusting the memos.
-
-**Priority order from the census, and it matches the ruling above:** delivery-
-count tower (cheapest real win) → Caps-Bridge/Depth-Bound (biggest payoff,
-retires P2) → Frame-Width/Rx one-liners → Verify-Well-Formed's `subscribeE-wf`
-body → Caps-Face/Caps-Nest odds and ends → **the anchor cluster LAST (the largest mass of proven work, genuinely blocked
-on the one open design question — no further worker time there until it
-resolves).**
-
-Rulings by cluster:
-
-1. **EXEMPT — `*-absurd` refutation witnesses (7).** A machine-checked `… → ⊥`
-   is the durable form of "this route is dead"; its consumer is the design
-   process. Allowlisted by pattern in the script. **These are NOT archive** —
-   two of them (`caps-frame-boundary-absurd`, `round3b-ledger-reset-absurd`) are
-   what proved the anchor problem real; without them a grind on the dead route
-   remains tempting.
-2. **EXEMPT — top-line semantic claims (22)**, the `readme-*` family plus
-   `Evaluator-/Provenance-/Time-/Batch-Theorems`. Nothing consumes them because
-   they ARE the claims. **They are a SECOND LEDGER — unproven, off the critical
-   path — not dead weight.** Still counted in the postulate total on purpose:
-   excluding them made the headline number lie in the reassuring direction.
-3. **MISSING WIRE — the anchor cluster.** `mu-edge`, `hop-edge`,
-   `connect-edge`, `unconn-keeps`, `hop-step-gives/-needs`,
-   `sharedConnect-unconn`, `obs-slot-shared`, `share-live-novals`,
-   `share-spent-novals`. **KEEP ALL.** A worker called the Keeps-Ring half dead
-   weight, reasoning "P5 is orphaned, so machinery targeting P5 is dead" —
-   that conflates a dead ROUTE with dead CONTENT. Note
-   `sharedConnect-unconn` is machine-level (quantifies over `Gas`/`Sched`/
-   `EvalSt`) where `unconn-insert` is abstract list arithmetic; they are not
-   interchangeable, and the machine-level one is exactly what wiring the connect
-   edge to the evaluator will need.
-4. **MISSING WIRE — the Caps-Bridge/Depth-Bound tower.** `sub-charge`,
-   `depth-capped`, `B1-cSize≡sizeCapAt`. **`cascade-wet-via-caps` is WIRED**
-   (2026-08-05, phase 2 — see the RULING's EXECUTED note): it is `drain-dry`'s
-   direct supplier now, `cascade-dry` having been retired rather than
-   restated. `sub-charge` stays unwired for a recorded reason (see
-   `burst-caps`'s header, `Caps-Bridge.agda`) — it is not the same open
-   item this bullet originally named.
-5. **MISSING WIRE, and a CHEAP WIN — the proof is written TWICE.**
-   `frameSz?-⊑`, `residAt-connected`, `prepend-fits`, `entry-to-index`,
-   `shareGo-cons-N`, `cascadeGo-cons-N`, `foldPath-sink-N`, `shareGo-skip-N`,
-   `cascadeGo-skip-N`. Each exists as a named lemma AND is re-derived inline at
-   the site that needs it. Replacing the inline copy with a call *reduces* total
-   proof text — the wiring law's cost made concrete and reversible.
-6. **MISSING WIRE, sanctioned — WF pieces ahead of their assembly.**
-   `oneShotBurst-wf`, `initReg-wf`, `subscribeE-map-/scan-/take-wf`,
-   `foldPath-root-out`, `mid-seed`. The assembly was stated first as a
-   postulate, per outside-in; these land under it. ~half of W1 is already done.
-7. **DELETE — pending Anthony's confirmation (6).** `returnIO` (CLI/IO.agda:14,
-   both entry points end in `putStr`), `subscribeE-walk` (Measures.agda:6204,
-   P5 — the refuted ledger route's receipt), `share-step-resid` (superseded by
-   `share-step`, comment says so), `mu-step-le` (its own comment says it no
-   longer suffices; `mu-step` replaced it), `mu-1≤k` (superseded by a direct
-   absurd pattern), `mid-enters` (superseded by `seed-enter-pay`). **Not
-   executed. Verify the superseding lemma is genuinely called before removing
-   any of these.**
-8. **A REAL BUG — vacuous postulates.** `id-inheritance`
-   (Provenance-Theorems.agda:20) and `defer-shift` (Evaluator-Theorems.agda:56)
-   are typed `⊤`, with the actual claim only in a trailing comment. They
-   typecheck trivially and assert NOTHING — worse than an honest postulate,
-   because they look discharged. State their real types.
-9. **LEAVE, revisit when the area is next touched.** The `refl`-facts relied on
-   via silent unification (`frameStep-full`, `capsAt-suc-full`), and the genuine
-   UNCLEARs (`⊑ᶜ-refl`, `k-raise`, `nest≤`, `enterInstant-idle/-held`,
-   `paidUp-held`, `shareFinish-len`, `chainStep-caps`, `wkᵍ`, `Grouped`).
-   Low cost either way; `Grouped` has a concrete fix (use it in the spec/impl
-   signatures that spell out `List (InstEmit (List A))` by hand).
-
-**Two more lying comments found, worth fixing on next touch:** Caps-Face:4175
-claims a recursion "is proven, line for line, in .Deliveries § D" naming lemmas
-the live code never calls; Subscribe-Face's header lists `chainStep-caps` as one
-of four callers into the clique when nothing calls it.
-
-**Process ruling: classification is the design session's, not a worker's.**
-Fan out for the mechanical sweep and for evidence-gathering. Verdicts depend on
-campaign context that lives in no source comment. Workers gather; the design
-session rules.
-
-### RULING: Caps-Bridge was built UPSIDE DOWN (phase 1)
-
-**The module sits ABOVE `.Wet` and its header names `.Wet` as its consumer. That
-can never happen** — `Caps-Bridge.agda:55` is `open import …Wet`, so a `.Wet →
-.Caps-Bridge` edge is a cycle Agda rejects outright. The header's "CONSUMERS.
-`cascade-dry` and `burst-wet` (.Wet) migrate to consume `cascade-wet-via-caps`
-here" is a **lying comment** of exactly the forbidden kind: it describes a wiring
-the import graph forbids.
-
-**Why `open … public` hid this.** `Verify-Budget-Sufficient.agda:595` re-exports
-Caps-Bridge `public`, so `make agda` typechecks it forever and it never rots —
-but a re-export is not a consumer. Nothing downstream *needs* one line of it.
-This is the loophole the wiring law closes, and it is why `make wiring` flagged
-these while the build stayed green. **Re-export ≠ consumption; only `make wiring`
-sees the difference.**
-
-**The fix is to move the TOP of the tower UP, not the bridge DOWN.** Measured,
-not guessed:
-- Caps-Bridge needs exactly **7** Wet-resident names (`sizeCapAt`,
-  `sizeCapAt-mono`, `INV?-widen`, `cascadeLatch-INV`, `cascadeFinish-INV`,
-  `chainsOf-B`, `cascadeGo-walk`); everything else its header credits to `.Wet`
-  actually originates in `.Measures` and already arrives independently via
-  `Subscribe-Face → Caps-Face → Delivery-Walk → Caps → Keeps-Ring → Measures`.
-- None of the 7 sit inside Wet's mutual blocks (3920/3977), so extraction is
-  *possible* — but their natural home is `.Caps`, and editing `.Caps` dirties
-  Delivery-Walk → Caps-Face → **Subscribe-Face (~44 min)** → Wet → everything.
-  Rejected on cost.
-- So instead **`cascade-dry`/`drain-dry`/`budget-sufficient` MOVE from `.Wet` to
-  `.Caps-Bridge`**, caps-threaded, where `cascade-wet-via-caps`, `sub-charge`,
-  `slots-tick`, `chainStep-slots`, `cascadeGo-slots`, `fn-tick`, B1/B2 are all
-  already proven and local. MOVE, not copy — a second fuel-loop induction beside
-  the first is the same duplication in a new place.
-- `Verify-Well-Formed.agda:43` imports `budget-sufficient` from `.Wet` **by
-  name**, so the tower's top is pinned by one import line. That line changes;
-  the theorem's face does not. Verify-Well-Formed gets rechecked either way (it
-  imports Wet), so this costs nothing extra.
-
-**THE PRIZE, and it is bigger than the tidiness.** `cascade-wet-via-caps` is
-proven modulo `dry-tick`. Routing `budget-sufficient` through it **retires P2
-(`cascadeGo-wet`)** — trading a postulate for one already on the ledger — and
-makes P2 an orphan, i.e. retired *by deletion* rather than by proof. Phase 1's
-`burst-caps` postulate should likewise be re-examined against `sub-charge`
-(GAP 4(a), proven), which may discharge it outright rather than assume it.
-
-**EXECUTED (phase 2).** The move landed: `cascade-dry`/`drain-dry`/
-`budget-sufficient` are OUT of `.Wet` and IN `.Caps-Bridge`, caps-threaded,
-consuming `cascade-wet-via-caps` (not a `cascade-dry` restatement — that name
-is retired, its job absorbed directly into `drain-dry`'s loop body).
-`Verify-Well-Formed.agda:47` now imports `budget-sufficient` from
-`.Caps-Bridge`; its TYPE did not change so nothing else in that 5348-line
-module needed editing (recheck cost, measured for the first time: ~21s
-total via `make agda`'s first dirty pass, once `.Wet`/`.Caps-Bridge`
-themselves were already fresh — trivial next to Subscribe-Face's ~44 min).
-
-- **`burst-caps` was checked against `sub-charge` and NOT discharged** — see
-  `burst-caps`'s own header comment in `Caps-Bridge.agda` for the two
-  independent reasons (the base case `capsOK?` at the initial state is a
-  `sub-charge` HYPOTHESIS, not something it supplies — no `capsOK?` analogue
-  of `init-INV` exists yet; and `sub-charge`'s witness bound is `opIterD`,
-  the subscribe clique's own measure, not the `sizeCount`/`capsH` recurrence
-  `capsAt` is actually defined by — unlike `caps-tick` on the cascade side,
-  nothing ties the two together for subscribe). Landed as a postulate with
-  that reason recorded; **`sub-charge` itself is consequently still an
-  orphan** (zero consumers) — pre-existing, not new.
-- **`cascadeGo-wet` [P2] IS NOW ORPHANED** — confirmed by `make wiring`
-  (zero consumers) — retired by deletion exactly as predicted. Left in place
-  per standing instruction (deleting a postulate is Anthony's call).
-- **Nearly all previously-unreachable V-B-S modules are now reachable** (take the current set from `make wiring`)
-  from `Main` via `Caps-Bridge → {Wet, Subscribe-Face → Caps-Face →
-  {Delivery-Walk → Deliveries, Caps-Nest}, Subscribe-Face → Caps-Chain →
-  Caps-Sadd}, Caps-Bridge → Caps-Depth` (verified by reading the import
-  graph, not by assuming it): Subscribe-Face, Caps-Face, Caps-Chain,
-  Caps-Sadd, Caps-Depth, Delivery-Walk, Caps-Nest, Deliveries, and
-  Caps-Bridge itself. **`Depth-Bound.agda` is the one still unreached** —
-  nothing anywhere in `agda/src` imports it; `depth-compositional`'s only
-  "consumer" is inside its own module.
-- **All four gates were verified green** after the move: `make agda` (~22s for
-  the dirty Caps-Bridge/Wet pass), `make agda-all`, `make bug-cache`,
-  `make wiring`.
-
-**For every future wiring pass: check the import graph BEFORE designing the
-edge.** The failure mode — a header asserting a consumer relationship that the
-module's own imports make impossible — is caught by a one-line
-`grep '^open import' <module>`. Do it first, every time.
-
-### RULING: Three families have NO honest consumer — they are dead, not unwired
-
-Inventing an assembly to justify its own lemmas is a FAKE WIRE — worse than an
-orphan, because it looks discharged. Three families have zero consumers, verified
-by reading the code:
-
-- **Frame-Width ceilings (3)** — `pmO≤ceil`:782, `pmI≤ceil`:787,
-  `pWᵉ≤entryCeil`:831 (Rx/Frame-Width.agda). Zero call sites. The *consumed*
-  siblings do not route through them: `slotPW≤slotCeil` calls `pW≤ceil`
-  DIRECTLY, so `pWᵉ≤entryCeil` is a standalone composition nothing needs. And
-  the obligation they would answer — an expression-level pm* width bound at
-  `entryCeil` — exists nowhere: not as a postulate, not inlined, not as an open
-  goal. `capsOK?`'s `widNode` is VALUE-level width, a different quantity.
-- **The delivery-count tower (7)** — `Deliveries.agda:787–929`. Short-circuited
-  by the `Walk` module in `.Delivery-Walk` (lines ~477, ~558), which derives the
-  recursion inline from the `delivN-cons`/`delivN-split` primitives and never
-  calls the named lemmas. `cascadeGo-deliveries` (Caps-Face:~4684) goes through
-  `W.cascadeGo-go`/`dWalkᶜ-mono` instead.
-- **The state-boundedness trio** — `latch-bounded`:411, `finish-bounded`:478,
-  `init-bounded`:1234 (Measures). Superseded one level up: the caps side uses
-  `cascadeLatch-caps`/`cascadeFinish-caps` (Caps-Face:~6700/6708, both called by
-  `caps-tick`), the wet side uses `cascadeLatch-INV`/`cascadeFinish-INV` (Wet),
-  and `cascadeFinish-INV` builds its stBounded? half INLINE rather than calling
-  `finish-bounded`.
-
-**TWO CENSUS CLAIMS REFUTED — do not act on the originals:**
-
-1. **The "tenth duplicate" IS NOT A DUPLICATE.** The census said
-   `Verify-Well-Formed.agda:4568`'s `cascadeGo-skip` re-derives
-   `Deliveries.agda:868`'s `cascadeGo-skip-N`. Read both: VWF's concludes
-   `cascadeGo a nextId ((rid , p) ∷ ps) sched st ≡ cascadeGo a nextId ps sched st`
-   (full triple equality); Deliveries' concludes
-   `delivN st (…) ≡ delivN st (…)` (the count projection only). Same case-split
-   shape, DIFFERENT theorems — and VWF's is the stronger one.
-2. **The "cannot reach Deliveries" explanation is FALSE.** VWF →
-   `.Caps-Bridge` → `.Subscribe-Face` → `.Caps-Face` → `.Delivery-Walk` →
-   `.Deliveries`, every edge confirmed by grep. VWF reaches Deliveries fine; the
-   re-derivation happened because the statement needed is genuinely different.
-
-**REFUTED HYPOTHESIS (the design session's own):** `init-bounded` is NOT an
-ingredient of a future `capsOK?`-seed lemma. Wrong bound (`sizeBudgetAt` vs
-`sizeCapAt` — Wet:~4477 notes the mismatch explicitly) and wrong predicate
-(`boundedLive`, a SIZE bound, vs `capsOK?`'s `widLive`, a WIDTH bound). The
-stBounded? component a `capsOK?-init` would want already sits inside `init-INV`
-(Caps-Face:~4496).
-
-**CONSEQUENCE FOR THE ENDGAME ESTIMATE.** The orphan set is NOT mostly missing
-wires. It splits three ways: some genuinely wire, a substantial block *looks*
-dead, and the anchor cluster parks behind the central design question (run
-`make wiring` for current counts).
-
-**READ "LOOKS DEAD" STRICTLY.** An orphan is a FINDING, not a verdict. Nothing
-here is known dead until its would-be consumer has been written and still does
-not want it; until then "no consumer today" is all that has been established.
-
-### RECOVERY SHA: the retired multiset measure — `11a34db`
-
-`git show 11a34db` / `git revert 11a34db` restores the whole
-Dershowitz–Manna apparatus: `_≺ᵛ_`, `≺ᵛ-wf` (the well-foundedness proof),
-`accHead`, `rank`, `counts`, `totᵛ`, `oneAt`, `zerosᵛ`, the `⊕ᵛ` family,
-`measureE`, and the shells/rank descent lemmas — 524 lines. Deleted under the
-freeze's one exemption (the source calls it "the retired measure" itself).
-
-**THE SCENARIO THAT BRINGS IT BACK, recorded because it is not far-fetched:**
-the ANCHOR PROBLEM is unsolved, and a well-founded multiset order is the
-classical instrument for exactly that class of descent argument. This measure
-was retired because the *hop* argument became a plain COUNT (`r` a
-remaining-hop count rather than a shell multiset) — which is **not** the same as
-it being useless for the *anchor* obstruction. If the anchor resolution wants a
-multiset order, restore from this SHA rather than re-deriving `≺ᵛ-wf`.
-
-### DEBT: prose that outlived its code
-
-The multiset measure's definitions are gone, but **eight comment references to
-`measureE` and two to `rank-lt-pow` survive** in modules the deletion did not
-otherwise touch: `Keeps-Ring.agda:149, 179, 267, 332, 404`, `Wet.agda:2211`,
-`Rx/Slots.agda:32`, `Rx/Hop-Depth.agda:4`, plus `rank-lt-pow` at `Wet.agda:2273`
-and `Measures.agda:1866`.
-
-They are NOT dead weight — each explains WHY `rank ∘ measureE` was refuted as
-the hop-descending quantity, which is exactly the kind of record that stops a
-later session re-attempting a dead route (the same justification the `*-absurd`
-family gets). But they now name definitions that do not exist, so a future
-`grep measureE` returns eight hits and no definition. That is the lying-comment
-failure mode INVERTED: prose that outlived its code rather than code that never
-matched its prose.
-
-**Not fixed on the spot deliberately**: every one of those files is a heavy
-tower module, and a comment-only edit still dirties it by CONTENT, so fixing
-them alone would cost a full ~45-minute rebuild for zero proof value. **Fold
-into the next pass that dirties Keeps-Ring/Wet anyway** — and when doing so,
-keep the reasoning and mark the names as retired rather than deleting the
-explanation.
-
-Also newly orphaned by the deletion, reported not removed: `EnvLen`,
-`envLen-lookup`, `plugs-lenᵉ`, `plugs-lenᵗ`, `plugs-lenᵗˢ`, `envSize→envLen` —
-they use no retired definition, but their consumer chain terminated at
-`rank-drop`.
-
-## Named gaps and rulings (the full deck)
-
-**GAP 4** — Wet.agda:4125–4199. THE central design fact. The ledger-receipt
-route from P5's conclusion to P1's landing is **REFUTED** (wet-ceiling-absurd —
-a route, NOT the theorem: "It does not refute subscribeE-wet"). The one
-surviving route is the **caps face**, whose delivery half is already ground
-(`caps-tick`, Caps-Face:6752, PROVEN: `capsOK?` at `id` → `capsOK?` at `suc id`
-across a whole cascade). Two blockers stand, both statement-level:
-
-- **(a) No subscribe-level charge — CLOSED.** The companion is
-  `sub-charge` (Caps-Bridge.agda), and it needed no postulate: Unit 3's `dpt`
-  threading had already put `depthE … ≤ dep` into `subscribeE-caps`, whose
-  conclusion already bounds `j + j′`. The debt did not vanish, it MOVED — the
-  bound is stated in terms of `depthE`, so it is now `depth-compositional`'s
-  (Depth-Bound.agda). P3/P4 no longer wait on a design question.
-- **(b) `capsOK?` is not `INV?`.** They share `stBounded?` and nothing else;
-  `INV?` adds `fnCapBounded?`, `regsB?`, `slotsFnCap`, and reads registry
-  cardinality at `cSize` where `capsOK?` reads `cReg`. Four wet conjuncts have
-  no caps-side counterpart. **The DELIVERY side is now bridged** —
-  `cascade-wet-via-caps` assembles all six conjuncts, no fallback postulate.
-  The SUBSCRIBE side (P1's analogue) is still unstated and is the untested half.
-
-**GAP 4's obstruction does NOT apply to Ψ-only faces (from `fn-tick`'s proof).** `fn-tick` is proven by reusing `cascadeGo-walk` — the very
-interior fold P2 is stuck on. P2 is stuck only on relating that fold's final
-ledger bound back to a fixed cap, which is the refuted composition; but a
-conclusion that is Ψ-indexed only does not read the numeric bound, so *any*
-bound the fold lands at suffices. **Template: face by face, whatever does not
-read the numeric bound can cross the ledger gap today.** Worth trying on other
-faces before assuming GAP 4 blocks them.
-
-**THE GAS AXIS IS PROVEN, AND ORPHANED.** The correction matters for planning:
-
-- **Exactly three decrement edges**, confirmed by enumerating every clause of
-  the subscribe clique (`Rx/Evaluator.agda:939-1477`), and stated by the
-  machine's own comment at `Evaluator.agda:340-344`: the μ unfold
-  (`Evaluator.agda:1456`), the share connect (`sharedConnect`, 1348), and the
-  inner-value subscribe (`subscribeInner`, 1009). Every other recursion threads
-  gas UNCHANGED — the decrement is internal to those three functions, never at
-  a caller's call site. No fourth edge exists.
-- **All three edges' arithmetic is PROVEN**, in `Wet.agda:3867-4091` under its
-  own heading ("THE THREE GAS EDGES, PACKAGED"): `mu-edge` (4032), `hop-edge`
-  (4047), `connect-edge` (4060), plus `unconn-keeps` (4079) for U between
-  edges, and `hop-step-gives`/`hop-step-needs` (3873/3879) which characterise a
-  hop's slack in BOTH directions — the bound is tight, not merely sufficient.
-  Verified as real proof bodies with no postulate block in range.
-- **`caps-fuel-root`** (`Wet.agda:4530`) is proven AND wired, as `burst-wet`'s
-  fuel witness. It also confirms the tower relationship as a theorem rather than
-  folklore: gas sits exactly three tower stories above the caps level.
-- **Zero corners are vacuous, not holes.** At `r = 0` / `U = 0` / `s = 0` the
-  corresponding edge cannot fire (its `_<_` hypothesis is uninhabited), so the
-  obligation disappears with the edge. Already named and dismissed at
-  `Wet.agda:4152-4155`.
-- **But the whole package has ZERO consumers** — grep finds only the
-  definitions.
-
-**AND IT CANNOT BE WIRED YET — see THE ANCHOR PROBLEM.** The edge ARITHMETIC is
-proven; SPENDING it is not. `dry-tick`'s own comment that it is "not touched by
-the caps/INV? bridging problem at all" is a **LYING COMMENT**.
-
-## RULING: `depth-capped` must be spent at the SMALL caps
-
-`opIterD≤capsH-root` (Caps-Bridge.agda:~818) needs `depthE … ≤ capsH e ins 0`.
-The obvious route — take `depth-capped` at `c := capsAt e ins 0` and then prove
-`3 · cSize (capsAt e ins 0) ≤ capsH e ins 0` — is a **dead end, and knowing why
-is the point of this entry.**
-
-`capsAt e sl zero` is already a `frameBlowup` (Caps.agda:452):
-
-    capsAt e sl zero = frameBlowup (caps (2 + sizeᵉ e + slotsSize sl) …) (capsBase e sl)
-
-so its `cSize` is `iterSize S₀ (sizeCount c₀ (capsBase e sl)) S₀` — `sizeStep`
-iterated `sizeCount`-many times, i.e. exponential in a number that is itself a
-level count. Meanwhile `capsH e ins 0 = blowH (capsBase e ins)` is
-`6 + capsBase + 2 · poolCount (towerℕ capsBase) capsBase`. Closing the gap
-between them means proving that `poolCount` at `M = towerℕ capsBase` dominates
-an *exponential* of `sizeCount` at `M = S₀` — a cross-`M` growth-rate argument
-that exists nowhere in the repo. The only chain that relates the two,
-`capsAt-tower` (Caps.agda:1322), points the WRONG WAY: it gives
-`cSize ≤ towerℕ (capsH)`, and `towerℕ h ≫ h`, so it makes the goal harder.
-
-**THE RULING: apply `depth-capped` at the PRE-BLOWUP base caps `c₀`, not at
-`capsAt e ins 0`.** `depth-capped` (Depth-Bound.agda:244) quantifies over *any*
-`c` satisfying `capsOK? c sched st ≡ true`; nothing forces the blown-up one.
-And at the root the state is `st-init`/`sched-init`, where **three of
-`capsOK?`'s five conjuncts are trivially true** (Caps-Face.agda:299): the
-registry is empty (so `regsSz?` and the `length … ≤ᵇ cReg` bound hold on
-nothing), and `EvalSt.nodes` is empty (so the `widNode` sweep is vacuous). The
-two live conjuncts — `stBounded?` and the `widLive` sweep over `Sched.live` —
-are bounded by **syntax-level ceilings** (`slotsSize`, `entryCeil`), which is
-exactly what `c₀`'s fields ARE.
-
-So `init-capsOK?` should be stated at `c₀`, and `capsOK?-mono`
-(Caps-Face.agda:365, already proven) weakens it up to `capsAt e ins 0` for the
-consumer that needs it there (`subscribeE-wet-via-caps`). The depth bound then
-reads `depthE ≤ 3 · (2 + sizeᵉ e + slotsSize ins)` and the remaining arithmetic
-is elementary, needing only a LOWER bound on `poolCount`:
-
-    capsBase-le-pool : ∀ m → 2 ≤ m → m ≤ poolCount (towerℕ m) m
-
-whose chain is (i) `suc J ≤ fLvlD S W d J` from `fLvl≤fLvlD` (Caps.agda:776)
-plus `fLvl`'s own `J + suc (…)` shape; (ii) the same for `dLvl` via
-`iterL-infl`; (iii) `J + n ≤ lvls S W d J n` by induction; (iv)
-`towerℕ m ≤ dCapᶜ (towerℕ m) … (suc (towerℕ m)) 0`, since `regAt M M 0 = M` and
-each `dWalkᶜ` step adds at least one; (v) `k≤towerℕ` (already used inside
-`blowup-tower`). None of these is a growth-rate argument.
-
-**WHY THIS IS RECORDED AS A RULING RATHER THAN A FIX.** The dead-end route is
-the one a reader reconstructs by default, because `capsAt e ins 0` is the caps
-every *other* consumer at that site uses. The reason it fails is not visible
-from the goal — it lives in `capsAt`'s base clause being a blowup. Anyone who
-re-derives this without the entry will re-derive the cross-`M` obligation too.
-
-**STATUS.** Route identified, arithmetic chain specified, NOT yet proven —
-`agda/probe/Pool-Lower-Probe.agda` is the rehearsal site. Nothing has been
-landed in `src/` on the strength of this ruling.
-
-**UNVERIFIED PREMISE, and it is the one that would sink this:** that
-`stBounded? (2 + sizeᵉ e + slotsSize ins) (sched-init e ins) (st-init e)` and
-the `widLive` sweep actually hold at `c₀`'s fields. Three conjuncts being
-vacuous is checked; these two are inferred from what `c₀`'s fields *mean*, not
-from a proof. If either fails, `c₀` must grow, and the arithmetic above has to
-be re-run at whatever it grows to.
+conjuncts straight out of it. No amount of caps work retires the wet contract.
+
+---
+
+## THE RISK LEDGER — every postulate, ranked (2026-08-06 accounting)
+
+Live names and counts come from `make wiring`; this section ranks them. Four
+risk classes, worst first:
+
+- **FALSITY** — the statement may simply be false. The worst class: everything
+  ground above a false statement is wasted, and the restatement cascades.
+- **SHAPE** — the statement is probably true of the right thing but is known or
+  suspected to be the WRONG STATEMENT (too weak to consume, wrong hypothesis
+  set, imprecise) — a guaranteed future restatement, i.e. deferred falsity.
+- **VACUITY** — the statement typechecks but asserts nothing (abstract-helper
+  quantification, duplicate types, `⊤`). Zero falsity risk, zero content; the
+  risk is REPORTING — it reads as a claim and is not one.
+- **DIFFICULTY** — believed true and correctly stated; the risk is only that
+  the proof is hard. The cheapest class to carry.
+
+**PROBEABLE means machine-checkable today**: the statement is an equation or
+decidable bound over COMPUTABLE functions (`evaluate`, `capsOK?`, `opIterD`,
+`depthE`, `spec-batchSimultaneous` …), so concrete instances check by `refl`
+exactly like the bug cache. QuickCheck/oracle only ever tested impl≡spec —
+**no postulate in this ledger has ever been probed**; that is the standing
+blind spot the roadmap's Phase 0 closes.
+
+### Tier 1 — Verify-Budget-Sufficient (12 postulates)
+
+| # | Postulate | Where | Class | Why it ranks here |
+|---|-----------|-------|-------|-------------------|
+| 1 | `subscribeE-walk-core` | Measures.agda:5750 | **FALSITY, critical** | The single riskiest statement in the repo. Nine conjuncts over the whole subscribeE mutual clique; its three predecessor statements were each MACHINE-REFUTED (`walk-hyps-absurd`, `hop-anchor-absurd`, `round3-old-ell-absurd`, `round3-anchor-indexed-absurd` — the base rate on this face is bad); its hypotheses (a one-entry-point Σ-receipt + arithmetic) contain NO induction; and it assumes exactly what THE ANCHOR PROBLEM (below) says is unestablished — that Ŝ/R̂/F can be sourced from reachability. Its own comment concedes: "Frame-Work-Probe is the evidence, not a proof." |
+| 2 | `cascadeGo-wet-core` | Wet.agda:4499 | **FALSITY, critical** | P2's entire content (its only hypotheses are two stBounded? preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`), so the fold-threaded statement's truth is genuinely open, not merely unproven. |
+| 3 | `subscribeE-wet-core` | Wet.agda:4311 | FALSITY, conditional | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's G/ℓ/Ω entry data from `INV?` alone, and the INV?/capᴱ flavor conversion is unchecked. Moderate incremental risk over #1, with maximal blast radius (both branches of budget-sufficient). |
+| 4 | `sub-charge-capsOK-lift-core` | Caps-Bridge.agda:1182 | **SHAPE** | Its hypothesis carries only the ROOT instance `opIterD≤capsH-root` while its conclusion quantifies over ARBITRARY mid-run `sched`/`st`/`id`; its own route comment says "via a GENERAL form of opIterD≤sizeCount-root" — which is unstated and unknown. The `-core` will need a generalized hypothesis at proof time, and whether the general mid-state bound even HOLDS is open. |
+| 5 | `depth-compositional` | Depth-Bound.agda:153 | FALSITY — **probeable** | Its own census (source comment, point 4) says the induction needs `storeNestMax` at the EVOLVED state dominated by the entry bound — an unproven strengthening. If an evolved state can escape it, the statement is false. Both sides compute: probe it. |
+| 6 | `opIterD≤sizeCount-root-core` | Caps-Bridge.agda:1090 | FALSITY — **probeable** | "The genuinely new mathematics"; the direction is novel (an UPPER bound on a budget everything else lower-bounds). Nobody has checked the numbers. Both sides compute at concrete `e`/`ins`: probe before grinding. |
+| 7 | `init-capsOK?-base-core` | Caps-Bridge.agda:978 | FALSITY — **probeable** | The unverified premise under the depth-capped RULING (below): `stBounded?` and the `widLive` sweep at the small caps c₀ are INFERRED from what the fields mean, never checked. `capsOK?` is a boolean on concrete states — decidable outright. If it fails, c₀ grows and the #17 arithmetic re-runs. This is task #19. |
+| 8 | `init-capsOK?` | Caps-Bridge.agda:918 | FALSITY — **probeable** | Same fact at the blown-up caps; should eventually be DERIVED from #7 via `capsOK?-mono` + `cSize≤frameBlowup`, retiring one of the two. Probe alongside #7. |
+| 9 | `thruOuter-face-core` (P4) | Caps-Face.agda:6317 | SHAPE | Its own header doubts itself: receipt "(a) is the SECOND number … `subscribeE-caps` bounds its j′ by nothing whatever" and "(a) may not fit `fCharge` as stated." Statement-level work before grind. |
+| 10 | `innerFinish-concat-face-core` (P3) | Caps-Face.agda:6253 | DIFFICULTY | The one from-inner clause that is not j′=0 (concatDrain's width sum). Expect grind, not design; the toolkit hypotheses are the right kit. |
+| 11 | `dry-tick-core` | Caps-Bridge.agda:439 | DIFFICULTY | Given `cascadeGo-wet` (its first hypothesis) it is latch/finish bookkeeping plus the Deliveries counts. Nearly all its risk is inherited from #2, not its own. |
+| 12 | `three-size≤capsH-core` | Caps-Bridge.agda:1021 | DIFFICULTY, low | The `poolCount` lower-bound chain is already rehearsed step-by-step in `agda/probe/Pool-Lower-Probe.agda`. Upgrade to proof when convenient. |
+
+### Tier 2 — the main proof branch (Verify-Well-Formed, 21; plus batch-online)
+
+| # | Postulate | Where | Class | Why it ranks here |
+|---|-----------|-------|-------|-------------------|
+| 1 | `burst-done-false` | VWF:1109 | **FALSITY — own SUSPECT marker** | The repo's single most-likely-false statement: its own comment says "true only at the right walk position, not from BurstInv alone." The cheapest high-value refutation target anywhere in the ledger — one adversarial BurstInv inhabitant kills it, and the fix (a walk-position hypothesis) is known in advance. |
+| 2 | `root-done-plumbed` | VWF:1423 | FALSITY, blocked on merge-cert | The merge-coherence content. Candidate invariant #1 was machine-refuted by THREE counterexamples (VWF:3410–3429); route #2 is marked STRUCTURALLY DEAD (:3498); the corrected statement is OPEN (:3459–3497). Stated at the settled root exit — the one case the refutations do not touch — so plausibly true, but nobody knows the invariant that proves it. |
+| 3 | `root-caches` | VWF:1438 | FALSITY, blocked on merge-cert | Same content, same blocker, same settled-state plausibility. Discharges together with #2. |
+| 4–7 | `subscribeE-{merge,concat,switch,exhaust}All-wf` | VWF:1235–1268 | SHAPE | The four wrap-clause receipts, written against a merge-cert whose correct statement is UNKNOWN. Until it exists, the `valsLast?`/BurstInv conjuncts through a merge are conjecture — the statements may need hypotheses nobody has named yet. |
+| 8 | `stepFrame-wf-outer` | VWF:4046 | SHAPE | The thru-outer wrap; same cluster, plus it inherits the FoldOut question. |
+| 9 | `dispatchShare-wf` | VWF:4058 | **SHAPE — known too weak** | Its conclusion is only `Σ S′ → runProtocol … ≡ just S′` — no FoldInv/FoldOut carried out, so it CANNOT feed `mid-step` as stated (old W7 finding, still true). A guaranteed restatement, cascading into the stepFrame family. Wired, consumed, and wrong-shaped. |
+| 10 | `mid-step-core` | VWF:4907 | FALSITY, moderate | Rests on `FoldOut` — a genuinely new 6-field invariant validated at exactly ONE clause (`foldPath-root-out`). If FoldOut's shape is wrong, this and the root proof both move. |
+| 11 | `batch-online` | Batch-Theorems:12 | **SHAPE — self-flagged imprecise** | Its own `nb:` says to "state precisely as pre-flush" — as literally written (comparing full outputs, flushed open tail included) it is likely FALSE. Off the critical path, trivially probeable, and the restatement is already prescribed by its own comment. |
+| 12 | `map-valsLast-push`, `scan-valsLast-push` | VWF:1124/1154 | SHAPE | Each papers over a recorded "REAL SHAPE MISMATCH" (the proven sub-lemmas don't return `valsLast?`). Plausible truths standing in for a missing conjunct in the proven work. |
+| 13 | `map-nodry-push`, `scan-nodry-push`, `scan-nodeP`, `scan-binv-adapt` | VWF:1115–1174 | DIFFICULTY — probeable | Computational propagation/survival facts about specific subscribeE clauses; `scan-binv-adapt`'s comment even says "provable inline as record { … }". Concrete instances compute. |
+| 14 | `subscribeE-input-wf-core`, `subscribeE-defer-wf`, `subscribeE-takeᵉ-wf-core` | VWF:1195/1218/1294 | DIFFICULTY | Per-clause receipts of the pattern already PROVEN three times over (map/scan/take clause proofs exist). Low statement risk. |
+| 15 | `cut-owed` | VWF:4017 | DIFFICULTY, low | Self-contained Owed-table algebra, independent of every blocker. The easiest real proof in the branch. |
+| 16 | `stepFrame-wf-inner-concat` | VWF:4037 | DIFFICULTY | concat's drain grows the registry; re-establish FoldInv. Independent of merge-cert. |
+
+### Tier 3 — all the other theorems (~25)
+
+Three buckets, in risk order:
+
+**(a) VACUOUS BY ABSTRACTION — asserts ~nothing today; risk is reporting, not
+falsity.** `Rx.Time-Theorems` entire: 9 abstract helpers (`Node`, `NodeSt`,
+`Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`) under
+`locality` / `non-interference` / `timing-invariance` — each claim is
+satisfiable by trivial instantiation (`retime ρ = id` makes timing-invariance
+free), so as stated they are close to vacuous, exactly as Main's CAUTION
+records. Same class: `causality` (its `truncateIn`/`emittedBefore` are
+postulated functions; `emittedBefore k = []` satisfies it), `μ-guarded` (its
+type is IDENTICAL to `μ-unfold`'s — a duplicate asserting nothing new), and
+`defer-shift` (`⊤` on purpose; the honest-gap exemption). **De-risking these
+means DEFINING the abstractions — claim-authoring work that needs Anthony, not
+a grind.** Until then they are parked, with the Main caution as the label.
+NOTE for ledger readers: the wiring report shows `NodeSt`/`cascade` at
+Rx/Evaluator.agda lines — that is the checker's known same-name merge
+(Evaluator's REAL definitions colliding with Time-Theorems' abstractions), not
+a postulate inside the evaluator.
+
+**(b) REAL AND PROBEABLE — genuine claims about computable functions, zero
+probe coverage today.** The 10 `readme-*` theorems (the spec's public
+personality; 7 are closed-form equalities on concrete programs — bug-cache
+shaped), `μ-unfold` (strict `≡` across a μ-unfolding — MODERATE suspicion,
+since defer-shift's own comment records that unfolding re-mints ids;
+if ids differ the strict equality dies), `fuel-coherent` (prefix property),
+`id-inheritance` (ids ⊆ horizon — real-typed now, testable). A refutation of
+`μ-unfold` or a readme claim would be a SPEC-level finding: surface to Anthony,
+do not patch.
+
+**(c) FFI, zero proof risk.** `_>>=_`, `getContents`, `putStr` (CLI/IO),
+`randFold`, `natMod` (QuickCheck) — GHC bindings for the two extracted
+binaries, off every proof path. Carried, not counted.
+
+### Where the risk actually is — the concentration facts
+
+1. **Two design questions carry most of tiers 1–2:** THE ANCHOR PROBLEM
+   (tier 1 ranks 1–3, 11) and MERGE-CERT (tier 2 ranks 2–8). Solving either
+   moves a whole block; grinding around them moves nothing.
+2. **Three postulates are suspected wrong by their own comments:**
+   `burst-done-false` (SUSPECT: false as stated), `batch-online` (imprecise as
+   stated), `dispatchShare-wf` (too weak as stated). Cheapest wins in the repo.
+3. **A third of the ledger is machine-probeable today** and none of it has
+   ever been probed. The QuickCheck/oracle harness only ever compared impl to
+   spec; every postulate ABOUT the spec/evaluator is untested territory.
+
+---
+
+## THE ROADMAP — reduce uncertainty first, grind last
+
+Ordered so that each phase's findings can still cheaply change the phases after
+it. Do not reorder: grinding before probing risks proving towers over false
+ground, which is this campaign's most expensive possible mistake.
+
+### Phase 0 — THE FALSIFICATION SWEEP (workers, parallel, days not weeks)
+
+Build the **postulate probe battery**: `agda/probe/Battery-*.agda` modules of
+bug-cache-style `refl` checks instantiating each probeable postulate at
+concrete programs (reuse the canonical/README programs; adversarial shapes
+where a comment names one). Every probe ends in exactly one of two states —
+a refutation (STOP-grade for that statement: record, restate, re-rank) or a
+confidence receipt (note it in the postulate's header: `-- PROBED 2026-08-…`).
+
+- **0a. `burst-done-false` refutation attempt** — the SUSPECT. Aim the probe at
+  a wrong-walk-position BurstInv inhabitant, per its own comment.
+- **0b. `batch-online` restatement + probe** — apply its own `nb:` (pre-flush
+  prefix), then probe the corrected form.
+- **0c. Caps arithmetic battery** — `init-capsOK?-base` (+ `init-capsOK?`;
+  this IS task #19), `opIterD≤sizeCount-root`, `depth-compositional`,
+  `three-size≤capsH`. All decidable on concrete `e`/`ins`; sweep the canonical
+  program set, nested/adversarial shapes included.
+- **0d. Evaluator-law battery** — `μ-unfold` (ids across the unfold — the
+  suspicious one), `fuel-coherent`, `id-inheritance`.
+- **0e. README battery** — the 10 `readme-*` claims at concrete instances.
+  Spec-level: a failure here is a STOP, not a fix.
+- **0f. VWF propagation battery** — `map/scan-nodry-push`, `scan-nodeP`,
+  the two `valsLast-push` mismatch postulates.
+
+### Phase 1 — THE TWO DESIGN QUESTIONS (design session; the real risk mass)
+
+- **1a. MERGE-CERT first — it is the cheaper experiment and already scoped:**
+  probe the corrected one-directional, liveness-aware statement
+  (VWF:3483–3486) against the three adversarial shapes that killed candidate
+  one (multi-source inner; inner-completes-before-outer; cut-through on an
+  inner), in the style of `agda/probe/Cut-Caches-Probe.agda`. Survives → state
+  it as the postulate the four `*All` wraps and the two root-exit postulates
+  are rewritten over. Dies → this branch needs a design ruling before tier 2's
+  top eight can move at all.
+- **1b. THE ANCHOR PROBLEM (below, unchanged and still the campaign's center):**
+  state the reachability-sourced dry family (`chainStep-dry` /
+  `foldPath-dry` / `subscribeInner-dry`) that sources Ŝ/R̂/F from reachability —
+  the ONE route the two absurd proofs leave alive. Deliverable is a STATEMENT
+  that typechecks against the walk's actual call sites, probed on
+  Frame-Work-Probe's shapes — or a third refutation, which is STOP-grade:
+  it would mean tier 1's top three postulates have no surviving proof route.
+
+### Phase 2 — STATEMENT REPAIRS (design session; before any grind above them)
+
+Every known-wrong-shape statement gets restated BEFORE work lands on top of it:
+
+- `dispatchShare-wf` → FoldOut-carrying conclusion (cascades into the
+  stepFrame family signatures — change the signatures first, per the law).
+- `sub-charge-capsOK-lift-core` → general mid-state `opIterD` hypothesis
+  (or a recorded ruling for why root-only suffices at its one consumer).
+- `burst-done-false` → walk-position hypothesis (shape known; do it even if
+  Phase 0a somehow fails to refute).
+- P4 `thruOuter-face-core` → resolve the "(a) may not fit fCharge" doubt at
+  the statement level.
+- Phase 0's refutation fallout, whatever it is.
+
+### Phase 3 — THE GRIND (workers; only over probed or repaired ground)
+
+Conditional-risk order: cheapest-and-safest first, anchor-dependent mass last.
+
+1. `cut-owed`, `three-size≤capsH-core`, `scan-binv-adapt`, and the Phase-0f
+   propagation lemmas — no blockers, low statement risk.
+2. The per-clause WF receipts (`input-core`, `defer`, `takeᵉ-core`) — pattern
+   proven three times already.
+3. `stepFrame-wf-inner-concat`, P3 — real grind, no design blocker.
+4. `init-capsOK?-base-core` + `opIterD≤sizeCount-root-core` — after 0c
+   confirms the numbers.
+5. The merge-cert cluster — after 1a lands its statement.
+6. The anchor cluster (`subscribeE-walk-core` → `subscribeE-wet-core` →
+   `cascadeGo-wet-core` → `dry-tick-core`, then `mid-step-core`'s FoldOut
+   threading) — after 1b. This is the endgame, and it stays LAST because it
+   is where a design failure costs the most reground work.
+
+**Tier 3 policy:** bucket (b) is Phase 0e/0d worker fodder. Bucket (a) is
+parked until Anthony authors the abstractions' definitions — flag, don't grind.
+Bucket (c) is permanent trusted FFI.
+
+---
 
 ## THE ANCHOR PROBLEM — the campaign's one central open question
 
@@ -756,125 +249,166 @@ mid-cascade**. There are exactly two ways to source `Ŝ`, and **the repo has
 already proven both impossible**:
 
 - **A fixed, entry-computable cap** — refuted by `caps-frame-boundary-absurd`
-  (`Caps-Face.agda:6836`, proven): for any cap `C ≥ 1`, `sizeStep C C ≤ C → ⊥`.
+  (`Caps-Face.agda`, proven): for any cap `C ≥ 1`, `sizeStep C C ≤ C → ⊥`.
   One more frame-crossing always escapes the cap, *uniformly in the cap*.
 - **A ledger/walk-position-tied ceiling** — refuted by
-  `round3b-ledger-reset-absurd` (`Measures.agda:6550`, proven): tying the anchor
+  `round3b-ledger-reset-absurd` (`Measures.agda`, proven): tying the anchor
   to the walk's own growing ceiling is circular.
 
 The one surviving option is the repo's own stated plan — source `Ŝ`, `R̂`, `F`
 from **reachability** (`Measures.agda:6199-6203`) — and it **is not established
-anywhere.** Verified: no `chainStep-dry`/`foldPath-dry`/`subscribeInner-dry`
-family exists, and every proven `-wet` delivery lemma (`chainStep-wet`,
-`foldPath-wet`, `dispatchShare-wet`, `shareGo-wet`, `cascadeGo-walk`) is
-**size-axis only** — none carries a `Gas` hypothesis or concludes `hasDry ≡ false`.
+anywhere.** No `chainStep-dry`/`foldPath-dry`/`subscribeInner-dry` family
+exists, and every proven `-wet` delivery lemma is size-axis only — none carries
+a `Gas` hypothesis or concludes `hasDry ≡ false`.
 
-**This unifies what looked like separate problems.** GAP 4 (b), `dry-tick`, and
-P1's subscribe-side bridge are all the SAME question on different axes: *can a
-mid-walk value's size be bounded from reachability, rather than from a fixed cap
-or from the ledger?* Answer it and several postulates fall together; leave it and
-none of them move. **This is where design attention belongs.** A separate but
-analogous anchor-shaped blocker (`merge-cert`, node↔live-instance coherence)
-independently blocks the well-formedness branch — see that section.
+**This unifies what looked like separate problems.** GAP 4(b), `dry-tick`, and
+P1's subscribe side are the SAME question on different axes: *can a mid-walk
+value's size be bounded from reachability, rather than from a fixed cap or from
+the ledger?* Answer it and tier 1's top block falls together; leave it and none
+of it moves.
 
-**Consequence for the risk ranking:** the risk is NOT spread across the ledger.
-It is one problem, named above, plus `depth-compositional`'s state-growth
-conjunct and the well-formedness branch's `merge-cert`.
+**Σ-receipt caution, standing:** `walk-hyps-round3b` (Measures) is a proven
+receipt showing the edge constraints are jointly satisfiable at ONE entry
+point. Per CLAUDE.md's Σ-receipt rule that is not an end-to-end induction, and
+its own comment says so. Do not read it as "the walk is basically done."
 
-**One caution flagged during the census, unresolved:** `walk-hyps-round3b`
-(`Measures.agda:6510`) is a proven Σ-receipt showing the edge constraints are
-jointly satisfiable at ONE entry point. Per CLAUDE.md's Σ-receipt rule, that is
-not the same as an end-to-end induction, and its own comment (6199) says so. Do
-not read it as "the walk is basically done."
+## MERGE-CERT — the well-formedness branch's own anchor-shaped blocker
 
-**Look one layer down before writing anything.** Four facts that were already
-proven when sought: `sub-charge`'s hypothesis (in `subscribeE-caps`),
-`slots-tick` (in `Keeps-Ring:952` + `Caps-Face:3690+` + `Measures:493`),
-`fn-tick`'s fold (`cascadeGo-walk`), and the entire gas axis (above). Grep for
-the fact before planning its proof.
+Blocks the `*All` wrap receipts, `root-done-plumbed`, `root-caches`,
+`stepFrame-wf-outer`. Candidate invariant #1
+(`merge-st k at nid ⇒ k ≡ countRegsUnder nid registry`) is **machine-refuted by
+three independent counterexamples** (VWF:3410–3429); the "derive from
+`Inv.done-plumbed`" route is **STRUCTURALLY DEAD** (VWF:3498 — its premise is
+vacuous exactly when the obligation is needed). The corrected route — a
+one-directional, liveness-aware statement — is identified but OPEN
+(VWF:3459–3497); its exact statement is the remaining design point, and
+Phase 1a is its experiment.
 
-**THE STANDING LESSON.** This campaign's dominant failure mode is not wrong
-proofs — it is *not knowing what it already has*. Two habits follow, and they
-are cheap: **grep for a fact before planning its proof**, and **grep for a
-proven lemma's consumers before believing its status here**. A proven lemma with
-no consumer is either a missing wire or dead weight; both are findings.
+**FoldOut, the second statement-level debt in this branch:** a genuinely new
+invariant (what a PARTIAL chain fold preserves of the live↔registry shadow),
+stated as a 6-field record and validated at exactly one clause
+(`foldPath-root-out`). `mid-step-core` consumes it; `foldPath-wf`'s signature
+does not yet thread it, and restating W5/W6/W7 over it is Phase 2 work.
+
+---
+
+## Standing rulings (each one prevents a specific dead route — keep)
+
+**RULING: `depth-capped` must be spent at the SMALL caps `c₀`
+(`baseCaps e ins`), never at `capsAt e ins 0`.** The blown-up caps' `cSize` is
+`sizeStep` iterated `sizeCount`-many times, and closing the gap to `capsH`
+demands a cross-`M` growth-rate argument that exists nowhere in the repo;
+`capsAt-tower` points the wrong way. At the root, three of `capsOK?`'s five
+conjuncts are vacuous on the empty initial state and the two live ones are
+syntax-ceiling-shaped — which is what `c₀`'s fields ARE. Full reasoning in
+`Caps-Bridge.agda` above `init-capsOK?-base-core`; arithmetic chain rehearsed
+in `agda/probe/Pool-Lower-Probe.agda`. **The unverified premise — the two live
+conjuncts actually holding at c₀ — is Phase 0c / task #19.** If either fails,
+c₀ grows and the arithmetic re-runs at whatever it grows to.
+
+**Depth obligation must be conditioned.** Unconditional `depthE ≤ capsBase` is
+FALSE (machine-refuted, `agda/probe/Depth-Blowup-Probe.agda`), and
+unconditional `depthE ≤ capsH` is indefensible against adversarial stored
+state. The honest statement conditions on `capsOK?` — already in scope at every
+consumer.
+
+**Fold-threading (standing).** P2 does not decompose into a per-chainStep
+contract at fixed bounds (`caps-frame-boundary-absurd`). The honest
+decomposition threads per-cascade growth, which the caps face's `j` index does
+and any eventual `chainStep-wet` must mirror.
 
 **Sync-μ escape: CLOSED BY TYPING.** `deferᵉ` is the sole gate moving `Δᵍ`
 into `Δ`, so a μ's self-reference costs a tick; synchronous self-subscription
 is not writable. Recorded at Wet.agda:4186 and Caps-Face:6087. Do not
 re-refute this.
 
-**Depth obligation must be conditioned.** `depthE ≤ capsBase` is FALSE
-(machine-refuted, `agda/probe/Depth-Blowup-Probe.agda`: scan accumulators
-deepen per fold while capsBase gains +1 per arrival). Unconditionally,
-`depthE ≤ capsH` is also indefensible (an adversarial stored state defeats
-any entry-computable bound). The honest statement conditions on `capsOK?` —
-which bounds stored value sizes via `stBounded?` and is already in scope at
-`caps-tick`, the only site that spends the fuel.
+**THE GAS AXIS IS PROVEN AND WIRED.** Exactly three decrement edges (μ unfold,
+share connect, inner-value subscribe — enumerated against every clause of the
+subscribe clique), all three packaged and proven in Wet ("THE THREE GAS EDGES,
+PACKAGED"), now consumed as `subscribeE-wet-core` hypotheses. Zero corners are
+vacuous, not holes. What is NOT proven is SPENDING the edges mid-walk — that is
+the anchor problem, not a gas gap.
 
-**Fold-threading (2026-07-20, standing).** P2 does not decompose into a
-per-chainStep contract at fixed bounds (caps-frame-boundary-absurd). The
-honest decomposition threads per-cascade growth, which the caps face's `j`
-index does.
+**Ψ-only faces cross the ledger gap today** (`fn-tick`'s template): a
+conclusion that does not read the numeric bound can reuse `cascadeGo-walk`
+directly. Worth trying face-by-face before assuming the anchor blocks one.
 
-## Supplier → consumer map
+**MAIN IS THE TOP-LINE PROOF.** Whatever Main imports sticks around; Main
+names individual definitions, never a bare `open import`; Main is never touched
+without Anthony's explicit approval. `make wiring` roots its exempt set there.
 
-| Supplier (proven) | Feeds | Status |
-|---|---|---|
-| `caps-tick` (Caps-Face:6752) | `cascade-wet-via-caps` (Caps-Bridge.agda) | assembled; INV? closed conjunct-by-conjunct. Rests on P3 + P4 |
-| Caps-Depth mirror + Subscribe-Face `dpt` threading | `sub-charge` (Caps-Bridge.agda), GAP 4 (a)'s nesting budget | PROVEN — no misalignment, no postulate needed |
-| `sub-charge` (Caps-Bridge.agda) | `depth-capped` (Depth-Bound.agda) | PROVEN; spends `depthE`, so it is what makes `depth-compositional` load-bearing |
-| `storeNest-capped`, `B2`, `fn-tick`, `slots-tick` | `cascade-wet-via-caps` / `depth-capped` | PROVEN, all four wired |
-| `cascadeGo-walk` (Wet:2145) | `fn-tick` | PROVEN; the Ψ-only crossing of GAP 4's gap |
-| `chainsOf-B` (Wet:4270) | P2's chain-bound hypothesis | done, wired |
-| `subscribeE-walkS` family (Wet:1367) | the internal walk under P1's grind | ground |
+**The standing lesson.** This campaign's dominant failure mode is not wrong
+proofs — it is not knowing what it already has. Grep for a fact before planning
+its proof; grep for a lemma's consumers before believing any status written
+here — including in this file.
 
-A proven fact with no consumer here is speculative inventory — flag it. (This
-is how `caps-tick`'s orphaning and P5's were both caught.)
+## Debts on next touch (cheap, fold into a pass that dirties the file anyway)
 
-**THE CAPS-BRIDGE / DEPTH-BOUND TOWER IS ONLY PARTLY WIRED — confirm the current
-state with `make wiring`, never from this paragraph.** `depth-capped` IS now
-consumed, through `opIterD≤capsH-root`'s assembly in Caps-Bridge. `sub-charge`
-still has zero consumers outside its defining module: the thing that would call
-it, `subscribeE-wet-via-caps`, is still a postulate. That is the same shape
-`depth-capped` was in, so the same fix applies — convert that postulate into a
-definition over narrower ones that calls `sub-charge`.
+- **Prose that outlived its code:** eight comment references to `measureE` and
+  two to `rank-lt-pow` survive in Keeps-Ring (:149,179,267,332,404),
+  Wet (:2211,:2273), Rx/Slots (:32), Rx/Hop-Depth (:4), Measures (:1866).
+  Keep the reasoning, mark the names retired. Not worth a solo ~45-min rebuild.
+- **Two lying comments:** Caps-Face:4175 credits a recursion to Deliveries § D
+  lemmas the live code never calls; Subscribe-Face's header lists
+  `chainStep-caps` as a caller into the clique when nothing calls it.
+- **`dry-tick-core`'s header** still claims independence from the caps/INV?
+  bridging problem — WRONG (the anchor problem is exactly where it sits); fix
+  when next editing Caps-Bridge.
 
-- **`depth-compositional` is now on the critical path.** It is needed by
-  `depth-capped`, which is now genuinely spent. Note
-  `cascadeGo-caps` and `caps-tick` carry NO depth hypothesis (checked their
-  signatures) — the delivery side is already depth-complete. So the depth tower
-  exists for P1's subscribe-side route, which is still unstated. **State P1's
-  analogue BEFORE grinding the 16-head induction**, or the induction may be
-  proven against a consumer that never materialises — exactly the "pieces before
-  their assembly" anti-pattern CLAUDE.md forbids.
+## RECOVERY SHA: the retired multiset measure — `11a34db`
 
-## Active tasks → gaps
+`git show 11a34db` restores the Dershowitz–Manna apparatus (524 lines: `_≺ᵛ_`,
+`≺ᵛ-wf`, `rank`, `shells`, descent lemmas), deleted under the freeze's
+source-retires-it exemption. **The scenario that brings it back:** the ANCHOR
+PROBLEM resolution wants a well-founded multiset order — the classical
+instrument for exactly that descent class. Restore from the SHA rather than
+re-deriving `≺ᵛ-wf`.
 
-**These are SECOND to the wiring worklist at the top of this file.** A task
-below that is proof work rather than wiring does not get picked up until the
-orphan clusters are assembled. Live task list is in the session's task tool;
-this maps the standing ones onto the gaps above.
+## WRITING AN ASSEMBLY — the postulate-to-assembly conversion (the method)
 
-- **#4 — P3 `innerFinish-concat-face` + P4 `thruOuter-face`** (Caps-Face:6233,
-  :6248). Both genuinely consumed (Caps-Face:6336, :6522). GAP 4 (a) is CLOSED
-  and `sub-charge` is PROVEN, so the old "wait for the charge companion"
-  instruction no longer binds. Expect grind, not design.
-- **#17 — `opIterD≤capsH-root`** (Caps-Bridge). ASSEMBLY LANDED: it is a real
-  definition, and `depth-capped` is wired through it. Remaining pieces are
-  `init-capsOK?-base`, `three-size≤capsH` (chain PROVEN in
-  `agda/probe/Pool-Lower-Probe.agda` — upgradeable from postulate to proof) and
-  `opIterD≤sizeCount-root` (the genuinely new mathematics; see its comment for
-  why the direction is novel on this ladder).
-- **#18 — fold `subscribeE-wf`'s five proven clauses into a real body.** Wires
-  five orphans. Needs three auxiliaries first (`pushBurst-map-valsLast`, a
-  fresh-node-persistence lemma, a dying-stability lemma). The `*All` clauses are
-  blocked behind #20 and ultimately `merge-cert`.
-- **#19 — verify `capsOK?` at the small base caps at `st-init`.** The unverified
-  premise under the `depth-capped` ruling. Three of five conjuncts are vacuous
-  there; the two survivors are inferred, not proven. If either fails, the caps
-  must grow and #17's arithmetic re-runs.
-- **#20 — state `pushBurst-wf` / `stepFrame-burst` / `subscribeAll-wf` as
-  postulates.** They are named as required pieces in a build-order comment
-  (Verify-Well-Formed.agda:~1026) but exist nowhere, so `grep -rn '^postulate'`
-  undercounts the ledger by three. Blocked by #18 (they need a consumer).
+For a parent postulate `P` with proven pieces `o₁…oₖ`, `P`'s type `T` is
+unchanged; it becomes
+
+```agda
+postulate P-core : <type of o₁> → … → <type of oₖ> → T
+P : T
+P = P-core (λ {a} {b} → o₁ {a} {b}) … oₖ
+```
+
+`P-core` is equivalent to `P` exactly when every hypothesis is a PROOF. A
+*function*-valued piece must be wired by its DEFINING EQUATION instead (`ΩAt`
+in `.Measures` is the worked example) — passing the function type quantifies
+over every inhabitant and makes the core strictly STRONGER.
+
+Four rules, each of which otherwise costs a full build to rediscover:
+
+1. **EXTRACT hypothesis types from source; never retype them.**
+   `scripts/check-wiring.py`'s `signature_text` does it exactly.
+2. **Pass every lemma ETA-EXPANDED with explicit implicits** —
+   `(λ {n} {Γ} → f {n} {Γ})`. When a statement reduces away its own implicit
+   (`share-live-novals` computes on a literal list), bare arguments give
+   `Unsolved metas`; the eta form always works.
+3. **Copied signatures drag in VOCABULARY the parent module does not import.**
+   Collect the names in one pass; Agda stops at the FIRST scope error.
+4. **ORDERING: a postulate cannot reference a definition below it.** `-core`
+   sits where the postulate was; the definition sits after the last piece it
+   consumes. `make wiring` section B3 reports violations — do not learn this
+   from a failed typecheck.
+
+## Build-cost rules (unchanged)
+
+- Iterate in `agda/probe/` with minimal imports (~6 s loops against cached
+  interfaces); land probe-green bodies in batches.
+- At most TWO heavyweight checks at once (Subscribe-Face/Wet class, multi-GB).
+- Never let two workers edit the same module.
+- Detach long builds with `EXIT=$?` logs; pin the working directory in every
+  build command; verify the run actually ran (`Checking` lines, not just exit
+  codes).
+
+## Active tasks → phases
+
+Live list is the session task tool; this maps the standing ones onto the
+roadmap: **#19** (capsOK? at c₀) IS Phase 0c's core probe. **#17**
+(opIterD≤sizeCount-root + sub-charge-capsOK-lift) is Phase 0c + Phase 2's
+generalization repair, THEN Phase 3.4. **#4** (P3+P4) is Phase 2 (P4's
+statement doubt) + Phase 3.3 (P3's grind).
