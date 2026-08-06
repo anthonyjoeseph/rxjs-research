@@ -839,16 +839,15 @@ postulate
 ------------------------------------------------------------------
 
 -- the caps `capsAt e sl zero` blows up from, named so the depth bound
--- can be taken at it
+-- can be taken at it.  That it IS that blowup's inner argument holds by
+-- `refl` — checked as `baseCaps-is-inner` in
+-- agda/probe/Depth-Wire-Probe.agda, which is where it lives because
+-- nothing in the claim graph consumes it and the wiring law admits no
+-- orphans here.
 baseCaps : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Caps
 baseCaps {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl)
                              (suc (entryCeil n sl e))
                              (suc (sizeᵉ e + slotsSize sl))
-
--- …and that it IS the inner argument is definitional, not a comment
-baseCaps-is-inner : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
-  capsAt e sl 0 ≡ frameBlowup (baseCaps e sl) (capsBase e sl)
-baseCaps-is-inner e sl = refl
 
 postulate
   -- capsOK? at the SMALL caps at the initial state.  NOT vacuous: five
