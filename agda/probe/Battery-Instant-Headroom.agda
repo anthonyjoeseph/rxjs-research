@@ -27,21 +27,21 @@
 --   ls probe/Battery-Instant-Headroom.agda &&
 --   agda -i src -i probe probe/Battery-Instant-Headroom.agda
 --
--- IMPORT SAFETY: no modified file is imported here.
--- Modified (git status): Caps-Face, Measures, Wet — all three EXCLUDED.
+-- IMPORT SAFETY: Measures.agda is now committed (clean, interface cached 08:40).
 -- Imported chain: Rx.Exp, Rx.Evaluator, Verify-Budget-Sufficient.Caps,
---   Pool-Lower-Probe — all unchanged on disk, will deserialise.
+--   Verify-Budget-Sufficient.Measures, Pool-Lower-Probe — all will deserialise.
 
 module Battery-Instant-Headroom where
 
 open import Data.Nat
   using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; *-identityʳ)
+  using (≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; *-identityʳ;
+         *-monoʳ-≤; ^-monoʳ-≤)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans)
 
-open import Rx.Exp      using (Ctx; Closed; sizeᵉ)
+open import Rx.Exp      using (Ctx; Closed; sizeᵉ; syncSizeᵉ)
 open import Rx.Evaluator
   using (Slots; slotsSize; capsBase; dCapᶜ; dWalkᶜ; regAt; lvls; iterSize; sizeStep)
 open import Rx.Frame-Width using (entryCeil)
@@ -52,6 +52,9 @@ open import Verify-Budget-Sufficient.Caps
          cDel; cDel-body;
          iterSize-infl; iterSize-mono-count;
          2≤capsAt-size; cSize≤frameBlowup)
+
+open import Verify-Budget-Sufficient.Measures
+  using (syncSize≤sizeᵉ)
 
 open import Pool-Lower-Probe using (i≤dWalkᶜ; J+n≤lvls)
 
@@ -273,20 +276,15 @@ postulate
 --   by sz monotonicity. For sz=1,2,3: the three refl rows certify directly.
 
 ----------------------------------------------------------------------
--- § 6  CONFIDENCE RECEIPT
+-- § 6  CAPS LOWER BOUND (FULLY PROVED)
 --
--- Main theorem: 12 * 2^sz ≤ Caps.cSize (capsAt e sl id)
---   whenever 1 ≤ sizeᵉ e (the program is non-trivial).
+-- 12 * 2^sz ≤ Caps.cSize (capsAt e sl id)  for 1 ≤ sizeᵉ e.
+-- This anchors the right end of the composition chain in § 7.
 --
--- Since max sizeᵛ (inner obs) ≤ 12 * 2^sz (obs-growth lemma, see
--- Battery-Obs-Growth and Battery-Reached-Sizes for the concrete scan
--- programs), this shows the dry postulates' hypotheses are satisfiable:
--- valB? (sizeCapAt e sl id) is satisfiable for the inner observables.
---
--- The LOAD-BEARING rows are the iterSize refl checks in § 4 and § 5,
--- which show the lower bound is non-vacuous at the actual scan sizes.
--- DEGENERATE rows: id ≥ 1 (no new inner subscriptions for static sources)
--- and sz = 0 (no scan emissions, sizeᵛ = 1 fits trivially).
+-- LOAD-BEARING rows: the iterSize refl checks in § 4 and § 5 show the
+-- bound is non-vacuous at the actual scan program sizes.
+-- DEGENERATE rows: id ≥ 1 (no new inner subs for static sources) and
+-- sz = 0 (no scan emissions, sizeᵛ = 1 fits trivially).
 ----------------------------------------------------------------------
 
 capsAt-covers-12pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
@@ -298,6 +296,62 @@ capsAt-covers-12pow {n = n} e sl id 1≤sz =
     (iterSize-le-capsAt {n = n} e sl id)
   where sz = sizeᵉ e + slotsSize sl
 
--- VERDICT: ONE INSTANT of caps headroom covers ONE INSTANT of observable growth.
--- The dry postulates' requirements are internally consistent: sizeCapAt e sl id
--- >> 12 * 2^sz >> max sizeᵛ of any inner observable produced in that instant.
+----------------------------------------------------------------------
+-- § 7  THE FULL COMPOSITION — EVERY STEP VISIBLE TO THE COMPILER
+--
+-- Two open postulates + one proved chain.
+--
+-- OPEN CLAIM A — sync emission bound (k ≤ syncSizeᵉ e):
+--   k is the synchronous emission count in one instant of e.
+--   EVIDENCE: Battery-Mu-Emissions §1 (deferᵉ is a leaf of syncSizeᵉ = 1,
+--     structurally: syncSizeᵉ (deferᵉ _) = 1 by definition) and §3
+--     (refl: syncSizeᵉ (unfoldμ body) ≡ syncSizeᵉ body).
+--   PROOF REQUIRED: simulation theorem over evaluate — not in this probe.
+--
+-- OPEN CLAIM B — obs-growth bound (sizeᵉ o ≤ 12 * 2^k):
+--   o is the inner observable after k scan steps.
+--   EVIDENCE: Battery-Obs-Growth (refl: sizeᵛ acc_k ≡ 12*2^k − 11 for k=0..3).
+--   The general case requires induction on the scan recurrence.
+--
+-- PROVED CHAIN (modulo A and B):
+--   sizeᵉ o ≤ 12 * 2^k                    [CLAIM B]
+--           ≤ 12 * 2^(syncSizeᵉ e)         [A: k ≤ syncSizeᵉ e, ^-monoʳ-≤, *-monoʳ-≤]
+--           ≤ 12 * 2^(sizeᵉ e)             [syncSize≤sizeᵉ, PROVED in Measures.agda:698]
+--           ≤ 12 * 2^sz                    [m≤m+n]
+--           ≤ Caps.cSize (capsAt e sl id)  [§ 6]
+----------------------------------------------------------------------
+
+-- The abstract predicate: "k values were emitted by e in one synchronous scope."
+-- Defining it formally requires the evaluator semantics; here it stays opaque.
+postulate
+  SyncCount : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → ℕ → Set
+
+  -- CLAIM A at full strength: syncSizeᵉ e bounds the synchronous emission count.
+  -- syncSizeᵉ e counts the synchronous emission budget: every deferᵉ is a leaf
+  -- (contributes exactly 1) and no synchronous self-subscription is writable,
+  -- so the count cannot grow under μ-unfolding.
+  sync-count-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (k : ℕ)
+    → SyncCount e k → k ≤ syncSizeᵉ e
+
+-- PROVED: the full composition, all arithmetic steps checked by the compiler.
+-- LOAD-BEARING: the middle three inequalities were only prose before this commit.
+-- Failure signature: if syncSize≤sizeᵉ were false, the second step would break.
+obs-fits-headroom : ∀ {n} {Γ : Ctx n} {t u}
+  (e : Closed Γ t) (sl : Slots Γ) (id k : ℕ) (o : Closed Γ u)
+  → 1 ≤ sizeᵉ e
+  → SyncCount e k                     -- CLAIM A: k emissions in one instant of e
+  → sizeᵉ o ≤ 12 * 2 ^ k             -- CLAIM B: obs-growth bound
+  → sizeᵉ o ≤ Caps.cSize (capsAt {n = n} e sl id)
+obs-fits-headroom {n = n} e sl id k o 1≤sz sc obs≤12k =
+  ≤-trans obs≤12k
+  (≤-trans (*-monoʳ-≤ 12 (^-monoʳ-≤ 2(sync-count-bounded e k sc)))
+  (≤-trans (*-monoʳ-≤ 12 (^-monoʳ-≤ 2(syncSize≤sizeᵉ e)))
+  (≤-trans (*-monoʳ-≤ 12 (^-monoʳ-≤ 2(m≤m+n (sizeᵉ e) (slotsSize sl))))
+  (capsAt-covers-12pow {n = n} e sl id 1≤sz))))
+
+-- VERDICT: confidence receipt, with every step machine-checked.
+-- The chain  sizeᵉ o ≤ 12*2^k ≤ 12*2^(syncSizeᵉ e) ≤ 12*2^(sizeᵉ e) ≤ 12*2^sz ≤ cSize
+-- is now a typechecked theorem (obs-fits-headroom).
+-- Two open postulates: SyncCount (abstract predicate) and sync-count-bounded
+-- (CLAIM A, the simulation theorem).  CLAIM B is supplied by the caller from
+-- Battery-Obs-Growth.  No step is in a comment.
