@@ -1183,13 +1183,17 @@ opIterD≤sizeCount-root-core :
 opIterD≤sizeCount-root-core _ nest-le _ _ _ _ _ e ins =
   ≤-trans
     (opIterD-dominated (Caps.cSize c) (Caps.cWid c) dep
-       (nest e ins []) (suc (sizeᵉ e)) (Caps.cReg c) 2≤S k≤S m≤S)
+       (nest e ins []) (suc (sizeᵉ e)) (Caps.cReg c) 2≤S k≤S m≤S 1≤R)
     (≤-reflexive (sym (sizeCount-body c dep)))
   where
   c   = capsAt e ins 0
   dep = capsH e ins 0
   2≤S : 2 ≤ Caps.cSize c
   2≤S = 2≤capsAt-size e ins 0
+  -- opIterD-budget is FALSE at R = 0 (probe/OpIterD-Budget-Probe.agda);
+  -- the registry is the budget, and the recurrence keeps it positive.
+  1≤R : 1 ≤ Caps.cReg c
+  1≤R = 1≤capsAt-reg e ins 0
   k≤S : nest e ins [] ≤ Caps.cSize c
   k≤S = ≤-trans (nest-le e ins [])
           (≤-trans (≤-trans (n≤1+n (sizeᵉ e + slotsSize ins))

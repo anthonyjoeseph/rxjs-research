@@ -78,7 +78,15 @@ postulate
   -- The eventual proof is the residual-budget induction on m (mutual
   -- with sLvlD's k-descent), consuming the seven expression-level
   -- hypotheses threaded through opIterD≤sizeCount-root-core.
-  opIterD-budget : ∀ S W d k m R → 2 ≤ S → k ≤ S → suc m ≤ S →
+  --
+  -- `1 ≤ R` IS LOAD-BEARING, and the statement without it is FALSE —
+  -- machine-refuted 2026-08-06, probe/OpIterD-Budget-Probe.agda §1
+  -- (`opIterD-budget-R0-false`, a proven → ⊥).  At R = 0 the registry
+  -- walk is empty (`regAt S 0 J = 0 * suc (J * S) = 0`), so
+  -- `cDel (caps S W 0) d = 0` and the RHS collapses to
+  -- `lvls S W d 0 0 = 0`; but the LHS is a `dLvl` application and
+  -- `2≤dLvl` holds unconditionally, so the claim read `2 ≤ 0`.
+  opIterD-budget : ∀ S W d k m R → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
     lvls S W d (climb S W d k m) (suc (widAt S W (climb S W d k m)))
       ≤ lvls S W d 0 (cDel (caps S W R) d)
 
@@ -86,12 +94,18 @@ postulate
 -- previously the monolithic postulate `opIterD-dominated` (probe
 -- Battery-OpIter-Symbolic).  m = 0 is real; m = suc _ is the proven
 -- fIterD tail (fIterD-lvls) over the postulated climb budget.
-opIterD-dominated : ∀ S W d k m R → 2 ≤ S → k ≤ S → m ≤ S →
+--
+-- `1 ≤ R` is inherited from opIterD-budget, and only the suc case
+-- spends it: at m = 0 the LHS is 0 by opIterD-0, so the R = 0
+-- collapse is harmless there.  It is carried in the signature
+-- regardless, because the suc case needs it and a hypothesis that
+-- appears in one clause belongs to the statement.
+opIterD-dominated : ∀ S W d k m R → 2 ≤ S → k ≤ S → m ≤ S → 1 ≤ R →
   opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
-opIterD-dominated S W d k zero    R 2≤S hk hm =
+opIterD-dominated S W d k zero    R 2≤S hk hm hR =
   ≤-trans (≤-reflexive (opIterD-0 S W d k 0)) z≤n
-opIterD-dominated S W d k (suc m) R 2≤S hk hm =
+opIterD-dominated S W d k (suc m) R 2≤S hk hm hR =
   ≤-trans (≤-reflexive (opIterD-suc S W d k m 0))
     (≤-trans (fIterD-lvls S W d k
                 (suc (widAt S W (climb S W d k m))) (climb S W d k m) 2≤S)
-             (opIterD-budget S W d k m R 2≤S hk hm))
+             (opIterD-budget S W d k m R 2≤S hk hm hR))
