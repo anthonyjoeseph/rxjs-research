@@ -323,10 +323,32 @@ merge-cert : (merge-st k _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough inner
 ```
 
 keyed on the `from-inner allNid ≡ nid` frame only (dodges refutation 1), deduped
-by `inst` (dodges 2), and excluding spent registrations (dodges 3). Its exact
-statement — and whether `k ≡ 0 ⇒ none` is seed-provable — is the remaining
-design point, and Phase 1a is its experiment. **Do not generalise it to a
-global node↔registry theory, and not onto `dispatchShare`** (standing, VWF:3800).
+by `inst` (dodges 2), and excluding spent registrations (dodges 3). **Do not
+generalise it to a global node↔registry theory, and not onto `dispatchShare`**
+(standing, VWF:3800).
+
+**PHASE 1a STATUS (2026-08-06): STATABLE AND NON-VACUOUS; REACHABILITY UNTESTED;
+ONE REFUTATION CANDIDATE OUTSTANDING.** `agda/probe/Battery-Merge-Cert.agda`
+gives it a computable form (`mergeCertAt`, over `innerInstsP` + `aliveThroughᶠ`)
+and checks 7 states green, **and `k ≡ 0 ⇒ none` IS seed-provable** (`merge-st 0`
+with empty registry, by `refl`). That much is real progress. But:
+
+- **Every state was hand-authored** (`record (st-init e₀) {…}`), by the same
+  pass that wrote the predicate. No `subscribe`/`cascade`/`evaluate` was run, so
+  the three dodges are verified at CONSTRUCTED states, not reached ones. Per
+  CLAUDE.md's probe rule that is a behaviour table, not evidence about the
+  invariant.
+- **The probe's own "non-vacuity witness" (Shape B) is a state where merge-cert
+  is FALSE**: `merge-st 0` plus a from-inner registration with `dying`,
+  `delivered`, `cancelled` all empty. It was labelled a feature. **Whether that
+  state is REACHABLE is now the whole question** — and it is exactly where
+  refutation R3 always pointed.
+- **THE DECIDING QUESTION:** at the moment `innerFinish` decrements `k` to 0, is
+  the spent inner's registration already BOTH `dying` and `delivered`? The
+  "both" is load-bearing — `aliveThroughᶠ` stays TRUE if only one holds. Shape 2
+  dodges R3 by ASSUMING both. If `innerFinish` lands `k ← 0` while the
+  registration is still live by that test, the reached state IS Shape B and the
+  corrected statement is refuted too — the fourth refutation on this face.
 
 **FoldOut, the second statement-level debt in this branch:** a genuinely new
 invariant (what a PARTIAL chain fold preserves of the live↔registry shadow),
