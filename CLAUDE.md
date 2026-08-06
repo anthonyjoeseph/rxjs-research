@@ -139,6 +139,9 @@ builds with the Bash tool's `run_in_background` (**NOT `nohup setsid` — `setsi
 exist on macOS and the command silently does nothing**), appending `echo EXIT=$? >> log`, and
 poll the log for its EXIT= line with short foreground calls. Detached builds advance on their
 own — the polling is for pacing and verification, not for keeping anything awake.
+**`timeout` DOES NOT EXIST ON macOS EITHER** (same class as `setsid`). `timeout 580 make …`
+fails with `command not found`, so make never runs — and if you piped it to `tail`, the
+`$?` you read is `tail`'s zero. That looks exactly like a green build. Hit 2026-08-06.
 Never pipe agda through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and
 read indentation (an importer prints as the last line for its importee's whole leg).
 

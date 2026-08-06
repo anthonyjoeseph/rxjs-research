@@ -1033,7 +1033,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- subscribeE-scan-wf, subscribeE-take-wf (frame clauses).  pushBurst-wf and
 -- stepFrame-burst were dropped (both had `→ Set` return types — asserting nothing
 -- checkable by the typechecker).  The gap postulates below cover blocked clauses
--- (burst-done-false, map-*/scan-*/take-* shape gaps, the four *All wrap clauses,
+-- (map-*/scan-*/take-* shape gaps, the four *All wrap clauses,
 -- subscribeE-input-wf/defer-wf/takeᵉ-wf).  dispatchShare-wf and the
 -- stepFrame-wf-inner-concat/outer residues remain blocked on merge-cert.
 -- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other recursion
@@ -1102,15 +1102,18 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- GAP POSTULATES — real gaps against the actual lemma types
 -- ════════════════════════════════════════════════════════════════
 
+-- REFUTED AND DELETED (2026-08-06): `burst-done-false` claimed
+-- `BurstInv id sched st S → done S ≡ false`.  It is FALSE — BurstInv's four
+-- fields never mention `done`, so the empty state with `done = true` inhabits
+-- it and forces `true ≡ false`.  Machine refutation:
+-- `agda/probe/Battery-Burst-Done.agda` (`burst-done-false-absurd`, a proven ⊥).
+-- oneShotBurst-wf's own header (below, ~line 876) had said so all along:
+-- `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it
+-- must come from the walk order."  So it now comes from the walk order —
+-- `subscribeE-wf` and every per-clause receipt TAKE it as the premise `deq`,
+-- threaded unchanged down the spine, and `subscribe-wf` supplies `refl` at
+-- `protocol-init`.  Rehearsed in `agda/probe/Battery-Done-Thread.agda`.
 postulate
-  -- SHARED GAP: BurstInv does not carry done ≡ false (walk-order fact).
-  -- Needed by oneShotBurst-wf at ofᵉ / emptyᵉ.
-  -- SUSPECT: true only at the right walk position, not from BurstInv alone.
-  burst-done-false : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : Id) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    BurstInv id sched st S →
-    ProtocolSt.done S ≡ false
-
   -- mapᵉ GAP 1: hasDry propagates inward through the map push.
   map-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
@@ -1164,14 +1167,7 @@ postulate
   -- Sched.live, so all four BurstInv fields are preserved at the FIELD TYPE level.
   -- But Agda does NOT fire this at the record-type INDEX level — it compares whole
   -- sched / st objects, not their projections.
-  -- Provable inline as: record { live-matches = BurstInv.live-matches binv; ... }
-  scan-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
-    (b : Closed Γ s) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    BurstInv id sched st S →
-    BurstInv id (proj₂ (mintNode sched))
-               (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st) S
+  -- DISCHARGED 2026-08-06 — see `scan-binv-adapt` (a real definition) below.
 
   -- NOTE: the takeᵉ helper obligations (BurstInv adaptation, fresh-node
   -- survival, dying-stability) are deliberately NOT stated here.  The takeᵉ
@@ -1179,6 +1175,26 @@ postulate
   -- helper for it would have NO CONSUMER — and an unconsumed postulate is
   -- exactly the debt-without-a-wire this file's own law forbids.  They
   -- belong inside that postulate's eventual proof, where they get one.
+
+-- scan-binv-adapt: DISCHARGED (2026-08-06).  Was a postulate; its own comment
+-- said "provable inline as record { … }" and that was right.  A scanᵉ clause
+-- mints a node and installs it, and BurstInv reads NEITHER: `installNode`
+-- touches only `nodes`, `mintNode` only `nextNode`, so `EvalSt.registry` and
+-- `Sched.live` are unchanged and all four fields transport by record eta with
+-- no rewrites.  Verified in `agda/probe/Battery-VWF-Prop.agda`.
+scan-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  BurstInv id (proj₂ (mintNode sched))
+             (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st) S
+scan-binv-adapt fuel f seed b κ id now sched st S binv = record
+  { live-matches  = BurstInv.live-matches  binv
+  ; reg-typed     = BurstInv.reg-typed     binv
+  ; horizon-low   = BurstInv.horizon-low   binv
+  ; current-frame = BurstInv.current-frame binv
+  }
 
 -- ════════════════════════════════════════════════════════════════
 -- PER-CLAUSE POSTULATES FOR BLOCKED CLAUSES
@@ -1207,6 +1223,7 @@ postulate
     (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (input i) κ id now sched st
@@ -1219,6 +1236,7 @@ postulate
     (fuel : Gas) (body : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (deferᵉ body) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (deferᵉ body) κ id now sched st
@@ -1236,6 +1254,7 @@ postulate
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (mergeAllᵉ b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (mergeAllᵉ b) κ id now sched st
@@ -1247,6 +1266,7 @@ postulate
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (concatAllᵉ b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (concatAllᵉ b) κ id now sched st
@@ -1258,6 +1278,7 @@ postulate
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (switchAllᵉ b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (switchAllᵉ b) κ id now sched st
@@ -1269,6 +1290,7 @@ postulate
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (exhaustAllᵉ b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (exhaustAllᵉ b) κ id now sched st
@@ -1320,6 +1342,7 @@ postulate
     (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
     hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
       let r = subscribeE fuel (takeᵉ count b) κ id now sched st
@@ -1332,6 +1355,7 @@ subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
+  ProtocolSt.done S ≡ false →
   hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
   Σ ProtocolSt λ S′ →
     let r = subscribeE fuel (input i) κ id now sched st
@@ -1351,6 +1375,7 @@ subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
+  ProtocolSt.done S ≡ false →
   hasDry (proj₁ (subscribeE fuel b κ id now sched st)) ≡ false →
   Σ ProtocolSt λ S′ →
     let r = subscribeE fuel b κ id now sched st
@@ -1456,7 +1481,7 @@ subscribe-wf :
 subscribe-wf e ins nodry
   with subscribeE-wf (budgetAt e ins 0) e root 0 0
                      (sched-init e ins) (st-init e)
-                     protocol-init (burst-init e ins) nodry
+                     protocol-init (burst-init e ins) refl nodry
 ... | S , run , binv , _
   with burst-final _ _ S binv (root-done-plumbed e ins S run) (root-caches e ins)
 ... | inv , paid = S , run , inv , paid
@@ -3358,6 +3383,7 @@ subscribeE-takeᵉ-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
+  ProtocolSt.done S ≡ false →
   hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
   Σ ProtocolSt λ S′ →
     let r = subscribeE fuel (takeᵉ count b) κ id now sched st
@@ -3378,47 +3404,46 @@ subscribeE-takeᵉ-wf =
 -- ════════════════════════════════════════════════════════════════
 
 -- ── input ────────────────────────────────────────────────────────────────────
-subscribeE-wf fuel (input i) κ id now sched st S binv nodry =
-  subscribeE-input-wf fuel i κ id now sched st S binv nodry
+subscribeE-wf fuel (input i) κ id now sched st S binv deq nodry =
+  subscribeE-input-wf fuel i κ id now sched st S binv deq nodry
 
 -- ── ofᵉ: REAL oneShotBurst-wf called here ────────────────────────────────────
 -- oneShotBurst-wf returns (S′, run, binv′) with no valsLast?.
 -- valsLast? (proj₁ (oneShotBurst vals id sched)) = true by computation (refl).
-subscribeE-wf fuel (ofᵉ ts) κ id now sched st S binv nodry =
+subscribeE-wf fuel (ofᵉ ts) κ id now sched st S binv deq nodry =
   let vals = map evalTm ts
-      (S′ , run , binv′) = oneShotBurst-wf vals id sched st S binv
-                             (burst-done-false id sched st S binv)
+      (S′ , run , binv′) = oneShotBurst-wf vals id sched st S binv deq
   in S′ , run , binv′ , refl
 
 -- ── emptyᵉ: same shape as ofᵉ ────────────────────────────────────────────────
-subscribeE-wf fuel emptyᵉ κ id now sched st S binv nodry =
-  let (S′ , run , binv′) = oneShotBurst-wf [] id sched st S binv
-                             (burst-done-false id sched st S binv)
+subscribeE-wf fuel emptyᵉ κ id now sched st S binv deq nodry =
+  let (S′ , run , binv′) = oneShotBurst-wf [] id sched st S binv deq
   in S′ , run , binv′ , refl
 
 -- ── mapᵉ: REAL subscribeE-map-wf called here ─────────────────────────────────
 -- Gap: map-valsLast-push bridges inner valsLast? to outer (~line 1920 has no valsLast?).
-subscribeE-wf fuel (mapᵉ f b) κ id now sched st S binv nodry =
+subscribeE-wf fuel (mapᵉ f b) κ id now sched st S binv deq nodry =
   let (S′ , run₀ , binv₀ , vl₀) =
-        subscribeE-wf fuel b (map-f f ↠ κ) id now sched st S binv
+        subscribeE-wf fuel b (map-f f ↠ κ) id now sched st S binv deq
           (map-nodry-push fuel f b κ id now sched st nodry)
       (S″ , run , binv″) =
         subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀)
   in S″ , run , binv″ , map-valsLast-push fuel f b κ id now sched st vl₀
 
 -- ── takeᵉ: postulated (WITH-ABSTRACTION; see per-clause postulates above) ────
-subscribeE-wf fuel (takeᵉ count b) κ id now sched st S binv nodry =
-  subscribeE-takeᵉ-wf fuel count b κ id now sched st S binv nodry
+subscribeE-wf fuel (takeᵉ count b) κ id now sched st S binv deq nodry =
+  subscribeE-takeᵉ-wf fuel count b κ id now sched st S binv deq nodry
 
 -- ── scanᵉ: REAL subscribeE-scan-wf called here ───────────────────────────────
 -- Gap: scan-valsLast-push bridges inner valsLast? to outer (~line 2003 has no valsLast?).
-subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv nodry =
+subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv deq nodry =
   let nid    = proj₁ (mintNode sched)
       sched₁ = proj₂ (mintNode sched)
       st₁    = installNode nid (scan-st (evalTm seed)) st
       (S′ , run₀ , binv₀ , vl₀) =
         subscribeE-wf fuel b (scan-f f nid ↠ κ) id now sched₁ st₁ S
           (scan-binv-adapt fuel f seed b κ id now sched st S binv)
+          deq
           (scan-nodry-push fuel f seed b κ id now sched st nodry)
       (S″ , run , binv″) =
         subscribeE-scan-wf fuel f seed b κ id now sched st S binv
@@ -3426,31 +3451,31 @@ subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv nodry =
   in S″ , run , binv″ , scan-valsLast-push fuel f seed b κ id now sched st vl₀
 
 -- ── *All ─────────────────────────────────────────────────────────────────────
-subscribeE-wf fuel (mergeAllᵉ b)   κ id now sched st S binv nodry =
-  subscribeE-mergeAll-wf  fuel b κ id now sched st S binv nodry
-subscribeE-wf fuel (concatAllᵉ b)  κ id now sched st S binv nodry =
-  subscribeE-concatAll-wf fuel b κ id now sched st S binv nodry
-subscribeE-wf fuel (switchAllᵉ b)  κ id now sched st S binv nodry =
-  subscribeE-switchAll-wf fuel b κ id now sched st S binv nodry
-subscribeE-wf fuel (exhaustAllᵉ b) κ id now sched st S binv nodry =
-  subscribeE-exhaustAll-wf fuel b κ id now sched st S binv nodry
+subscribeE-wf fuel (mergeAllᵉ b)   κ id now sched st S binv deq nodry =
+  subscribeE-mergeAll-wf  fuel b κ id now sched st S binv deq nodry
+subscribeE-wf fuel (concatAllᵉ b)  κ id now sched st S binv deq nodry =
+  subscribeE-concatAll-wf fuel b κ id now sched st S binv deq nodry
+subscribeE-wf fuel (switchAllᵉ b)  κ id now sched st S binv deq nodry =
+  subscribeE-switchAll-wf fuel b κ id now sched st S binv deq nodry
+subscribeE-wf fuel (exhaustAllᵉ b) κ id now sched st S binv deq nodry =
+  subscribeE-exhaustAll-wf fuel b κ id now sched st S binv deq nodry
 
 -- ── μᵉ g0: dryBurst → hasDry = true → ⊥ ─────────────────────────────────────
-subscribeE-wf g0 (μᵉ body) κ id now sched st S binv nodry =
+subscribeE-wf g0 (μᵉ body) κ id now sched st S binv deq nodry =
   ⊥-elim (true≢false nodry)
 
 -- ── μᵉ (gs fuel): RECURSIVE CALL, Gas decreases ──────────────────────────────
 -- subscribeE (gs fuel) (μᵉ body) κ ... reduces definitionally to
 -- subscribeE fuel (unfoldμ body) κ ..., so nodry and output type pass through.
-subscribeE-wf (gs fuel) (μᵉ body) κ id now sched st S binv nodry =
-  subscribeE-wf fuel (unfoldμ body) κ id now sched st S binv nodry
+subscribeE-wf (gs fuel) (μᵉ body) κ id now sched st S binv deq nodry =
+  subscribeE-wf fuel (unfoldμ body) κ id now sched st S binv deq nodry
 
 -- ── varᵉ (): absurd ───────────────────────────────────────────────────────────
-subscribeE-wf fuel (varᵉ ()) κ id now sched st S binv nodry
+subscribeE-wf fuel (varᵉ ()) κ id now sched st S binv deq nodry
 
 -- ── deferᵉ ───────────────────────────────────────────────────────────────────
-subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv nodry =
-  subscribeE-defer-wf fuel body κ id now sched st S binv nodry
+subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv deq nodry =
+  subscribeE-defer-wf fuel body κ id now sched st S binv deq nodry
 
 -- foldPath-wf, ROOT clause (PROVEN): a chain that reaches the root emits
 -- its ONE delivery — accumulated bookkeeping evs, then the (possibly
