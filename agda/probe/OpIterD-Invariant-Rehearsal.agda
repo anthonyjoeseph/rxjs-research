@@ -313,11 +313,36 @@ walk-spend-many S W R d g J (suc p) q =
 
 postulate
   -- (a) ONE ROUND'S ENTRY: from a level J dominating the climb-so-far,
-  -- four positions of the gas-g walk pay the jump (jump-2step over two
-  -- positions' dLvl-steps, monotone slack), the sub-climb (the
-  -- (g−1, k−1) recursion inside one position's sub-budget, its
-  -- m′-guard restored at the boosted level by dLvl-gain-sizeAt), and
-  -- land the entry's G-closure below the fourth restart.
+  -- a fixed number of positions pay the jump and the sub-climb and
+  -- land the entry's G-closure below the next restart.
+  --
+  -- EXECUTION PLAN (2026-08-07, from formalizing walk-paid — the
+  -- position count here should be FOUR, and walk-paid's per-round
+  -- constant then becomes 5m; constants are rehearsal-internal):
+  --   pos 1-2 : the jump.  P₂ ≥ dLvl (dLvl J) via lvls-infl +
+  --             dLvl-mono; J₀(X) ≤ dLvl (dLvl J) is jump-2step.
+  --   pos 3   : absorb G (J₀ X) — the sub-call's hypothesis is
+  --             G-closed, so the closure is paid BEFORE the sub-climb,
+  --             GV≤one-style (tail-fits at dLvl P₂ + monotonicity).
+  --             A position's sub-budget is spent as RAW LENGTH here,
+  --             so it cannot double as the sub-climb's walk — hence
+  --             the fourth position.
+  --   pos 4   : the sub-climb.  k = 0: sLvlD-0, nothing to pay.
+  --             k = suc k′: sLvlD-suc exposes
+  --             opIterD k′ (suc (sizeAt S (J₀ X))) (J₀ X); pay by the
+  --             MUTUAL walk-paid instance at gas g−1 inside this
+  --             position's sub-budget (dCapᶜ g = dWalkᶜ (g−1); guard
+  --             suc k′ ≤ g−1 ⟺ suc k ≤ g, exact), connect its
+  --             4m′-position value under the full regAt by
+  --             dWalkᶜ-mono-i — the boost guard
+  --             4 · suc (sizeAt S (J₀X)) ≤ regAt S R (dLvl P₃) is a
+  --             new elementary lemma (boost-4x: the fLvl receipt's
+  --             width factor ≥ 3 at levels ≥ 2, times S ≥ 2), and
+  --             restart-dominates glues the result under P₄.
+  -- Termination of the mutual block: lexicographic (g, m) — this
+  -- function recurses into walk-paid at g−1; walk-paid recurses into
+  -- itself at (g, m−1) and into this at (g, ·) — g must be pattern-
+  -- matched (suc g′) here to expose the sub-budget.
   round-entry-glue : ∀ S W R d g k X J → 2 ≤ S → 1 ≤ R →
     suc k ≤ g → 2 ≤ g →
     G S W d X ≤ J →
