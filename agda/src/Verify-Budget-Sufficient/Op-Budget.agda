@@ -213,10 +213,9 @@ tail-fits S W d R J g 2≤S 1≤R 2≤g =
 -- § THE GLUE — the identities the payment induction sequences with.
 -- All PROVEN.  The load-bearing discovery: THE WALK VALUE AT p
 -- POSITIONS IS THE p-TH RESTART LEVEL (walk-spend below composes
--- lvls-add over dWalkᶜ-front), and ONE POSITION'S SUB-BUDGET REACH IS
--- DOMINATED BY THE NEXT RESTART (restart-dominates) — so a recursive
--- payment's conclusion glues directly into the next round's `G X ≤ J`
--- hypothesis with no residual bookkeeping.
+-- lvls-add over dWalkᶜ-front) — so a recursive payment's conclusion
+-- glues directly into the next round's `G X ≤ J` hypothesis with no
+-- residual bookkeeping.
 ------------------------------------------------------------------
 
 -- spending never descends
@@ -252,19 +251,6 @@ walk-spend S W R d g J i =
           (suc (dCapᶜ S W R d g (dLvl S W d J)))
           (dWalkᶜ S W R d g
             (lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J)))) i))
-
--- ONE POSITION'S SUB-BUDGET REACH ≤ THE NEXT RESTART LEVEL: whatever
--- lvls P (dCapᶜ g P) reaches, the walk's own restart
--- lvls P (suc (dCapᶜ g (dLvl P))) exceeds it — dCapᶜ is monotone in
--- its level (P ≤ dLvl P) and the count gains a suc.
-restart-dominates : ∀ S W R d g P → 2 ≤ S →
-  lvls S W d P (dCapᶜ S W R d g P)
-    ≤ lvls S W d P (suc (dCapᶜ S W R d g (dLvl S W d P)))
-restart-dominates S W R d g P 2≤S =
-  lvls-mono _ _ 2≤S ≤-refl ≤-refl ≤-refl
-    (≤-trans (dCapᶜ-mono g g 2≤S ≤-refl ≤-refl ≤-refl ≤-refl
-                (iterL-infl S W d (suc (sizeAt S P)) P))
-             (n≤1+n _))
 
 -- the iterated sequencing frame: p + q positions from J = q positions
 -- from the p-th restart level
