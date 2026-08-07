@@ -83,7 +83,14 @@ valsCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-conc
 walk-hyps-round3b | subscribeE-walk-core | ≤2 | REASON: subscribeE-walk-core must be proven
 walk-hyps-splitAnchor | subscribeE-walk-core | ≤3 | REASON: subscribeE-walk-core must be proven
 ⊑ᶜ-refl | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
-chainStep-dry | dry-tick-core | ≤5 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; its own demand postulate is the anchor's open surface (Anchor-Dry.agda)
+chainStep-dry | dry-tick-core | ≤6 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; its own demand postulate is the anchor's open surface (Anchor-Dry.agda); ≤6 since pathOccs? premise added 2026-08-06
 dry-hop | dry-tick-core | ≤3 | REASON: hop-edge's size-premise discharger; applied when the walk grind reaches hop-edge's call sites
-foldPath-dry | dry-tick-core | ≤6 | REASON: consumed by the fold clause grind once dry-tick-core is proven; demand half postulated (Anchor-Dry.agda)
-subscribeInner-dry | dry-tick-core | ≤5 | REASON: the key hop-edge enabler at thruConsume sites; consumed by the walk grind once dry-tick-core is proven
+foldPath-dry | dry-tick-core | ≤7 | REASON: consumed by the fold clause grind once dry-tick-core is proven; demand half postulated (Anchor-Dry.agda); ≤7 since pathOccs? premise added 2026-08-06
+subscribeInner-dry | dry-tick-core | ≤6 | REASON: the key hop-edge enabler at thruConsume sites; consumed by the walk grind once dry-tick-core is proven; ≤6 since pathOccs? premise added 2026-08-06
+entry-to-index | opIterD-budget-core | ≤3 | REASON: expression-level kit for opIterD-budget-core's structural proof; Caps-Chain.agda:292; wired 2026-08-06
+k-raise | opIterD-budget-core | ≤2 | REASON: expression-level kit for opIterD-budget-core's structural proof; Caps-Nest.agda:390; wired 2026-08-06
+mu-1≤k | opIterD-budget-core | ≤2 | REASON: expression-level kit for opIterD-budget-core's structural proof; Caps-Nest.agda:232; wired 2026-08-06
+mu-step-le | opIterD-budget-core | ≤2 | REASON: expression-level kit for opIterD-budget-core's structural proof; Caps-Nest.agda:240; wired 2026-08-06
+opIterD-dominated | sub-charge-capsOK-lift-core | ≤5 | REASON: arithmetic backbone of sub-charge-capsOK-lift-core; Op-Dominance.agda:165; wired 2026-08-06
+residAt-connected | opIterD-budget-core | ≤1 | REASON: expression-level kit for opIterD-budget-core's structural proof; Caps-Nest.agda:129; wired 2026-08-06
+share-step-resid | opIterD-budget-core | ≤4 | REASON: expression-level kit for opIterD-budget-core's structural proof; Caps-Nest.agda:198; wired 2026-08-06

@@ -25,16 +25,28 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Op-Dominance where
 
+open import Data.Bool using (false)
+open import Data.Fin  using (Fin; toℕ)
+open import Data.List using (List; []; _∷_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans)
+open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans)
 
+open import Rx.Exp   using (Ctx; Exp; Closed; sizeᵉ; μᵉ; unfoldμ)
+open import Rx.Prim  using (Source)
+open import Rx.Slots using (Slots; shared; slotsSize)
 open import Rx.Evaluator
   using (sizeAt; widAt; fLvlD; sLvlD; opIterD; fIterD; iterL; dLvl; lvls;
-         opIterD-0; opIterD-suc; fIterD-0; fIterD-suc)
+         opIterD-0; opIterD-suc; fIterD-0; fIterD-suc; memberSource)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; caps; cDel; lvls-mono; lvls-add; iterL-infl)
+open import Verify-Budget-Sufficient.Caps-Nest
+  using (nest; residAt; resid; nest≤;
+         residAt-connected; share-step-resid; mu-1≤k; mu-step-le; k-raise)
+open import Verify-Budget-Sufficient.Caps-Chain
+  using (entry-to-index)
 
 -- One dLvl step contains a leading fLvlD step: definitionally,
 -- dLvl S W d J = iterL S W d (suc (sizeAt S J)) J
@@ -76,8 +88,12 @@ postulate
   -- `climb S W d k m`, spending `suc (widAt _ climb)` dLvl-steps
   -- stays within the full budget `cDel (caps S W R) d` spent from 0.
   -- The eventual proof is the residual-budget induction on m (mutual
-  -- with sLvlD's k-descent), consuming the seven expression-level
-  -- hypotheses threaded through opIterD≤sizeCount-root-core.
+  -- with sLvlD's k-descent).  The seven leading hypotheses are the
+  -- expression-level kit that structural induction consumes —
+  -- they were the hypotheses of the deleted `opIterD≤sizeCount-root-core`
+  -- in Caps-Bridge.agda, now promoted here so `opIterD-budget-core` is
+  -- the single assembly that wires the whole kit.  `opIterD-budget`
+  -- below applies them.
   --
   -- `1 ≤ R` IS LOAD-BEARING, and the statement without it is FALSE —
   -- machine-refuted 2026-08-06, probe/OpIterD-Budget-Probe.agda §1
@@ -86,9 +102,55 @@ postulate
   -- `cDel (caps S W 0) d = 0` and the RHS collapses to
   -- `lvls S W d 0 0 = 0`; but the LHS is a `dLvl` application and
   -- `2≤dLvl` holds unconditionally, so the claim read `2 ≤ 0`.
-  opIterD-budget : ∀ S W d k m R → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
+  opIterD-budget-core :
+    -- entry-to-index  (Verify-Budget-Sufficient/Caps-Chain.agda:292)
+    (∀ (S W d k J m : ℕ) → 2 ≤ S → suc (sizeAt S J) ≤ m →
+      sLvlD S W d (suc k) J ≤ opIterD S W d k m J
+     ) →
+    -- nest≤  (Verify-Budget-Sufficient/Caps-Nest.agda:143)
+    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
+      (sl : Slots Γ) (cs : List Source) → nest e sl cs ≤ sizeᵉ e + slotsSize sl
+     ) →
+    -- residAt-connected  (Verify-Budget-Sufficient/Caps-Nest.agda:129)
+    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n) →
+      residAt sl (toℕ i ∷ cs) i ≡ 0
+     ) →
+    -- share-step-resid  (Verify-Budget-Sufficient/Caps-Nest.agda:198)
+    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+      (i : Fin n) {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
+      memberSource (toℕ i) cs ≡ false →
+      resid sl cs ≤ k → nest d sl (toℕ i ∷ cs) ≤ k
+     ) →
+    -- mu-1≤k  (Verify-Budget-Sufficient/Caps-Nest.agda:232)
+    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
+      (sl : Slots Γ) (cs : List Source) (k : ℕ) → nest (μᵉ body) sl cs ≤ k → 1 ≤ k
+     ) →
+    -- mu-step-le  (Verify-Budget-Sufficient/Caps-Nest.agda:240)
+    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
+      (sl : Slots Γ) (cs : List Source) (k : ℕ) →
+      nest (μᵉ body) sl cs ≤ k → nest (unfoldμ body) sl cs ≤ k
+     ) →
+    -- k-raise  (Verify-Budget-Sufficient/Caps-Nest.agda:390)
+    (∀ (S J : ℕ) → 1 ≤ S → suc (sizeAt S J) ≤ suc (sizeAt S (suc J))
+     ) →
+    ∀ S W d k m R → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
     lvls S W d (climb S W d k m) (suc (widAt S W (climb S W d k m)))
       ≤ lvls S W d 0 (cDel (caps S W R) d)
+
+-- Applies the seven expression-level lemmas to `opIterD-budget-core`,
+-- wiring entry-to-index, nest≤, residAt-connected, share-step-resid,
+-- mu-1≤k, mu-step-le, k-raise as code consumers.
+opIterD-budget : ∀ S W d k m R → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
+  lvls S W d (climb S W d k m) (suc (widAt S W (climb S W d k m)))
+    ≤ lvls S W d 0 (cDel (caps S W R) d)
+opIterD-budget = opIterD-budget-core
+  entry-to-index
+  (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → nest≤ {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
+  (λ {n} {Γ} → residAt-connected {n} {Γ})
+  (λ {n} {Γ} → share-step-resid {n} {Γ})
+  (λ {n} {Γ} {t} → mu-1≤k {n} {Γ} {t})
+  (λ {n} {Γ} {t} → mu-step-le {n} {Γ} {t})
+  k-raise
 
 -- THE ASSEMBLY — the arithmetic core of opIterD≤sizeCount-root-core,
 -- previously the monolithic postulate `opIterD-dominated` (probe

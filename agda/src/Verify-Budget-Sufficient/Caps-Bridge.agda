@@ -25,7 +25,7 @@
 -- `burst-wet`/`burst-dry`/`burst-bounded`/`pop-INV`/`pop-head-bounded`,
 -- which this module consumes unchanged. P1's analogue
 -- (`subscribeE-wet-via-caps`) is NOW STATED as a postulate (§ D below),
--- with its two sub-postulates (`init-capsOK?` and `opIterD≤capsH-root`)
+-- with its sub-postulate `init-capsOK?`
 -- also stated.  `burst-caps` is proved as a corollary of it.
 -- Open: discharging the three postulates (the next task on the caps side).
 module Verify-Budget-Sufficient.Caps-Bridge where
@@ -35,7 +35,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡�
                                 z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
                                        ≤-reflexive; m≤n+m; m≤m+n; n≤1+n;
-                                       m≤m⊔n;
+                                       m≤m⊔n; m≤m*n;
                                        *-mono-≤; *-monoʳ-≤; +-mono-≤; *-comm;
                                        *-distribˡ-+; *-identityʳ; +-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
@@ -73,7 +73,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 drain; evaluate; sched-init; st-init;
                                 -- named by the assembled cores' hypothesis types
                                 shared; memberSource; foldStep;
-                                sLvlD; sizeAt)
+                                sLvlD; sizeAt; lvls)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
 -- fnCapBounded?, regsB?, slotsFnCap, INV-parts, pathLen, the Bool
@@ -92,15 +92,16 @@ open import Verify-Budget-Sufficient.Subscribe-Face
 -- `chainStep-caps`, whose statement is stated at the chain depth measure.
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
 -- depth-capped (proven in Depth-Bound): depthE ≤ 3·cSize when capsOK?.
--- Consumed by opIterD≤capsH-root's proof (and by subscribeE-wet-via-caps
--- once proved).  Acyclic: Depth-Bound imports Wet and Subscribe-Face,
--- NOT Caps-Bridge.
+-- Consumed by subscribeE-wet-via-caps once proved (via depth-capped
+-- supplying dep ≤ capsH, then sizeCount-body closing the sizeCount gap).
+-- Acyclic: Depth-Bound imports Wet and Subscribe-Face, NOT Caps-Bridge.
 open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
 open import Verify-Budget-Sufficient.Op-Dominance using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Caps
-  using (2≤capsAt-size; capsAt-base-size; sizeCount-body; three-size-le-blowH)
+  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH)
 open import Verify-Budget-Sufficient.Anchor-Dry
   using (chainStep-dry; foldPath-dry; subscribeInner-dry; dry-hop)
+open import Verify-Budget-Sufficient.Occurrences using (pathOccs?)
 open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
 open import Rx.Prim using (InstEvent)
 open import Rx.Exp using (obs; sizeᵛ)
@@ -528,11 +529,13 @@ postulate
       let sl = Sched.slots sched
           Ψ  = ΨAt e sl
           B  = sizeCapAt e sl id
+          sz = sizeᵉ e + slotsSize sl
           Ŝ  = sizeCapAt e sl (suc id)
       in INV? Ψ B sched st ≡ true →
          capsOK? (capsAt e sl id) sched st ≡ true →
          valB? B Ψ (arrTy a) (arrVal a) ≡ true →
          pathB? B Ψ path ≡ true →
+         pathOccs? sz path ≡ true →
          burstB? Ŝ Ψ (proj₁ (chainStep id a path sched st)) ≡ true
      ) →
     -- foldPath-dry  (Anchor-Dry.agda)
@@ -544,10 +547,12 @@ postulate
       let sl = Sched.slots sched
           Ψ  = ΨAt e sl
           B  = sizeCapAt e sl id
+          sz = sizeᵉ e + slotsSize sl
           Ŝ  = sizeCapAt e sl (suc id)
       in INV? Ψ B sched st ≡ true →
          capsOK? (capsAt e sl id) sched st ≡ true →
          pathB? B Ψ path ≡ true →
+         pathOccs? sz path ≡ true →
          all (valB? B Ψ u) vals ≡ true →
          all (eventB? B Ψ) evs ≡ true →
          burstB? Ŝ Ψ (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st)) ≡ true
@@ -560,11 +565,13 @@ postulate
       let sl = Sched.slots sched
           Ψ  = ΨAt e sl
           B  = sizeCapAt e sl id
+          sz = sizeᵉ e + slotsSize sl
           Ŝ  = sizeCapAt e sl (suc id)
       in INV? Ψ B sched st ≡ true →
          capsOK? (capsAt e sl id) sched st ≡ true →
          valB? B Ψ (obs u) o ≡ true →
          pathB? B Ψ κ ≡ true →
+         pathOccs? sz κ ≡ true →
          all (valB? Ŝ Ψ u)
              (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
      ) →
@@ -981,12 +988,14 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- The original reasoning is preserved here for traceability.
 
 postulate
-  -- (1) INIT-CAPSOK? — capsOK? seed (twin of init-INV, Wet.agda:~4496).
-  -- NOT vacuous: five real ≡ true conjuncts on the initial state.
-  -- Needed as an entry hypothesis for subscribeE-wet-via-caps at the root.
-  init-capsOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  -- (1) INIT-CAPSOK?-SUC — the general id ≥ 1 case.  The id = 0 case is
+  -- proved as `init-capsOK?-0` (real definition below), which lifts
+  -- `init-capsOK?-base` via `capsOK?-mono`.  `init-capsOK?` (below) is
+  -- the assembly dispatching both cases, kept at its original type so
+  -- call sites need not change.
+  init-capsOK?-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (id : ℕ) →
-    capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
+    capsOK? (capsAt e ins (suc id)) (sched-init e ins) (st-init e) ≡ true
 
 ------------------------------------------------------------------
 -- (2) THE SUBSCRIBE-SIDE MEASURE BRIDGE, and it is now an ASSEMBLY
@@ -1094,148 +1103,35 @@ init-capsOK?-base =
     (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → 1≤sizeᵗˢ {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
     (λ {n} {Γ} {t} → B1-cSize≡sizeCapAt {n} {Γ} {t})
 
-three-size≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
-    + Caps.cSize (baseCaps e ins)
-    ≤ capsH e ins 0
-three-size≤capsH e ins = three-size-le-blowH _ _ (s≤s (s≤s z≤n))
+-- Lifts init-capsOK?-base from the small caps (baseCaps) to the actual
+-- initial caps (capsAt e ins 0 = frameBlowup (baseCaps e ins) (capsBase e ins))
+-- via capsOK?-mono at the ⊑ᶜ witnessed by:
+--   cSize: capsAt-base-size e ins 0
+--   cWid:  capsAt-base-wid e ins 0
+--   cReg:  m≤m*n — frameBlowup multiplies cReg by suc (sizeCount * cSize) ≥ 1
+-- This wires init-capsOK?-base to burst-caps as a real code consumer,
+-- retiring the monolithic `init-capsOK?` postulate at that call site.
+init-capsOK?-0 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  capsOK? (capsAt e ins 0) (sched-init e ins) (st-init e) ≡ true
+init-capsOK?-0 {n = n} e ins =
+  capsOK?-mono
+    (baseCaps e ins) (capsAt e ins 0)
+    (sched-init e ins) (st-init e)
+    ( capsAt-base-size e ins 0
+    , capsAt-base-wid  e ins 0
+    , m≤m*n (Caps.cReg (baseCaps e ins)) _
+    )
+    (init-capsOK?-base e ins)
 
--- THE DEPTH THE ROOT SUBSCRIBE REACHES FITS UNDER THE STORY INDEX.
--- Note this is the CONDITIONED form and must stay conditioned: an
--- UNCONDITIONAL `depthE ≤ capsH` is FALSE (Depth-Bound.agda:11 — it
--- dies against an adversarial stored state).  What makes it true here
--- is `capsOK?` at the entry, carried by `init-capsOK?-base`.
-depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-    ≤ capsH e ins 0
-depthE≤capsH-root e ins =
-  ≤-trans
-    (depth-capped (baseCaps e ins) (budgetAt e ins 0) e root 0 0
-       (sched-init e ins) (st-init e)
-       (init-capsOK?-base e ins)
-       -- `Sched.slots (sched-init e ins)` reduces to `ins` (Evaluator:121)
-       (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
-       (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
-       (s≤s z≤n))                      -- pathLen root ≡ 0
-    (three-size≤capsH e ins)
-
--- the sweep/cascade domination at EQUAL depth fuel.  THE GENUINELY
-  -- NEW MATHEMATICS on this ladder, and the direction is the reason:
-  -- everything Caps-Chain proves about `opIterD` is a LOWER bound
-  -- (these transformers are BUDGETS there, so clauses show real costs
-  -- fit UNDER them).  This wants an UPPER bound on the budget itself,
-  -- plus a lower bound on `sizeCount` stronger than `2≤sizeCount`.
-  -- Two structural notes for whoever takes it: `lvls`/`dLvl` are PURE
-  -- iterates of `fLvlD` whereas `opIterD`'s suc clause jumps to
-  -- `suc (J + suc (sizeAt S J)²)`, which one `fLvlD` step dominates iff
-  -- `sizeAt S J ≤ widAt S W J` (compare `fLvl`'s own
-  -- `J + suc (suc (widAt S W J) * suc (sizeAt S J))`); and `sizeStep`
-  -- grows exponentially while `foldStep S w = S ^ suc w` grows like a
-  -- TOWER, so that gap is wide.  The counting is comfortable — `cDel`
-  -- is a gas-`cSize` recursion while `k`/`m` here are `nest e ins []`
-  -- and `suc (sizeᵉ e)`.
-  --
-  -- ASSEMBLY (2026-08-06): narrowed over the `nest` machinery it was
-  -- written to consume.  `k` here IS `nest e ins []`, so .Caps-Nest's
-  -- whole family — the ceiling `nest≤`, the share edge, the two μ steps
-  -- and the level raise — plus .Caps-Chain's entry conversion are the
-  -- facts this bound is built from.
-opIterD≤sizeCount-root-core :
-    -- entry-to-index  (Verify-Budget-Sufficient/Caps-Chain.agda:292)
-    (∀ (S W d k J m : ℕ) → 2 ≤ S → suc (sizeAt S J) ≤ m →
-      sLvlD S W d (suc k) J ≤ opIterD S W d k m J
-     ) →
-    -- nest≤  (Verify-Budget-Sufficient/Caps-Nest.agda:143)
-    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
-      (sl : Slots Γ) (cs : List Source) → nest e sl cs ≤ sizeᵉ e + slotsSize sl
-     ) →
-    -- residAt-connected  (Verify-Budget-Sufficient/Caps-Nest.agda:129)
-    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n) →
-      residAt sl (toℕ i ∷ cs) i ≡ 0
-     ) →
-    -- share-step-resid  (Verify-Budget-Sufficient/Caps-Nest.agda:198)
-    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-      (i : Fin n) {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
-      memberSource (toℕ i) cs ≡ false →
-      resid sl cs ≤ k → nest d sl (toℕ i ∷ cs) ≤ k
-     ) →
-    -- mu-1≤k  (Verify-Budget-Sufficient/Caps-Nest.agda:232)
-    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
-      (sl : Slots Γ) (cs : List Source) (k : ℕ) → nest (μᵉ body) sl cs ≤ k → 1 ≤ k
-     ) →
-    -- mu-step-le  (Verify-Budget-Sufficient/Caps-Nest.agda:240)
-    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
-      (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-      nest (μᵉ body) sl cs ≤ k → nest (unfoldμ body) sl cs ≤ k
-     ) →
-    -- k-raise  (Verify-Budget-Sufficient/Caps-Nest.agda:390)
-    (∀ (S J : ℕ) → 1 ≤ S → suc (sizeAt S J) ≤ suc (sizeAt S (suc J))
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
-            (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
-      ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
--- REAL since 2026-08-06 (was the block's postulate): the arithmetic
--- core is Op-Dominance's `opIterD-dominated`; the counting bounds are
--- nest≤ (hypothesis 2, APPLIED below) + capsAt-base-size.  The six
--- other hypotheses stay in the signature: they are the kit the
--- residual `opIterD-budget` postulate's structural proof consumes.
-opIterD≤sizeCount-root-core _ nest-le _ _ _ _ _ e ins =
-  ≤-trans
-    (opIterD-dominated (Caps.cSize c) (Caps.cWid c) dep
-       (nest e ins []) (suc (sizeᵉ e)) (Caps.cReg c) 2≤S k≤S m≤S 1≤R)
-    (≤-reflexive (sym (sizeCount-body c dep)))
-  where
-  c   = capsAt e ins 0
-  dep = capsH e ins 0
-  2≤S : 2 ≤ Caps.cSize c
-  2≤S = 2≤capsAt-size e ins 0
-  -- opIterD-budget is FALSE at R = 0 (probe/OpIterD-Budget-Probe.agda);
-  -- the registry is the budget, and the recurrence keeps it positive.
-  1≤R : 1 ≤ Caps.cReg c
-  1≤R = 1≤capsAt-reg e ins 0
-  k≤S : nest e ins [] ≤ Caps.cSize c
-  k≤S = ≤-trans (nest-le e ins [])
-          (≤-trans (≤-trans (n≤1+n (sizeᵉ e + slotsSize ins))
-                            (s≤s (n≤1+n (sizeᵉ e + slotsSize ins))))
-                   (capsAt-base-size e ins 0))
-  m≤S : suc (sizeᵉ e) ≤ Caps.cSize c
-  m≤S = ≤-trans (s≤s (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
-                              (n≤1+n (sizeᵉ e + slotsSize ins))))
-                (capsAt-base-size e ins 0)
-
-opIterD≤sizeCount-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
-          (capsH e ins 0) (nest e ins []) (suc (sizeᵉ e)) 0
-    ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
-opIterD≤sizeCount-root =
-  opIterD≤sizeCount-root-core
-    entry-to-index
-    (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → nest≤ {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
-    (λ {n} {Γ} → residAt-connected {n} {Γ})
-    (λ {n} {Γ} → share-step-resid {n} {Γ})
-    (λ {n} {Γ} {t} → mu-1≤k {n} {Γ} {t})
-    (λ {n} {Γ} {t} → mu-step-le {n} {Γ} {t})
-    k-raise
-
--- and the bridge itself: raise the observed depth to the budgeted
--- height, then dominate.  `opIterD-mono` (Caps.agda:686) already
--- carries `d ≤ d′` jointly with S/W/k/m/J, so the raise is one call
--- with every other axis at `≤-refl` — no mutual induction needed.
-opIterD≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
-          (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
-          (nest e ins []) (suc (sizeᵉ e)) 0
-    ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
-opIterD≤capsH-root e ins =
-  ≤-trans
-    (opIterD-mono (suc (sizeᵉ e)) (suc (sizeᵉ e))
-                  (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
-                  (capsH e ins 0)
-                  (nest e ins []) (nest e ins [])
-                  (2≤capsAt-size e ins 0) ≤-refl ≤-refl ≤-refl
-                  (depthE≤capsH-root e ins) ≤-refl ≤-refl)
-    (opIterD≤sizeCount-root e ins)
+-- Assembly: dispatches to init-capsOK?-0 (proven) at id = 0 and to
+-- init-capsOK?-suc (postulate) for id ≥ 1.  Keeps the original type so
+-- call sites (burst-caps below) need not change.  This wires
+-- init-capsOK?-0 (and transitively init-capsOK?-base) into the proof.
+init-capsOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (id : ℕ) →
+  capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
+init-capsOK? e ins zero    = init-capsOK?-0 e ins
+init-capsOK? e ins (suc n) = init-capsOK?-suc e ins n
 
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
 -- Mirrors cascade-wet-via-caps (~line 526) structurally.
@@ -1249,17 +1145,17 @@ opIterD≤capsH-root e ins =
 postulate
   -- THE ONE REMAINING GAP on the subscribe side: `capsOK?` at the growth
   -- index `frameStep j′ c` lifts to `capsAt e sl (suc id)`.
-  -- ROUTE (not yet walked): `j′ ≤ opIterD ≤ sizeCount c (capsH e sl id)`
-  -- via a general form of `opIterD≤sizeCount-root`; then
-  -- `frameStep-mono-j` gives `frameStep j′ c ⊑ᶜ frameStep (sizeCount c h) c`,
-  -- `capsAt-suc-full` (Caps.agda:893, refl) identifies THAT with
-  -- `capsAt e sl (suc id)`, and `capsOK?-mono` closes it.
+  -- ROUTE (2026-08-06): `opIterD-dominated` (hypothesis 5) at general id,
+  -- with 2 ≤ S from `2≤capsAt-size` and 1 ≤ R from `1≤capsAt-reg` (both
+  -- free).  `nestOK`/`opsOK` (the new trailing premises) supply k≤S/m≤S;
+  -- `sizeCount-body` identifies the lvls output with `sizeCount c dep`;
+  -- `frameStep-mono-j` + `capsAt-suc-full` + `capsOK?-mono` close the lift.
   --
   -- ASSEMBLY (2026-08-06): narrowed over exactly the facts that route
   -- names — the two refl endpoints identifying `capsAt (suc id)` with
   -- the full `frameStep`, the ⊑ᶜ reflexivity and frame-size widening
-  -- the `capsOK?-mono` step runs on, the root depth bound, and the
-  -- one-more-item fold headroom.
+  -- the `capsOK?-mono` step runs on, `opIterD-dominated` at general id
+  -- (the replaced root-only bound), and the one-more-item fold headroom.
   sub-charge-capsOK-lift-core :
     -- frameStep-full  (Verify-Budget-Sufficient/Caps.agda:888)
     (∀ (c : Caps) (d : ℕ) →
@@ -1277,12 +1173,9 @@ postulate
     (∀ {n} {Γ : Ctx n} {s u} {c c′ : Caps} (f : Frame Γ s u) →
       c ⊑ᶜ c′ → frameSz? (Caps.cSize c) f ≡ true → frameSz? (Caps.cSize c′) f ≡ true
      ) →
-    -- opIterD≤capsH-root  (Verify-Budget-Sufficient/Caps-Bridge.agda:917)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-      opIterD (Caps.cSize (capsAt e ins 0)) (Caps.cWid (capsAt e ins 0))
-              (depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e))
-              (nest e ins []) (suc (sizeᵉ e)) 0
-        ≤ sizeCount (capsAt e ins 0) (capsH e ins 0)
+    -- opIterD-dominated  (Verify-Budget-Sufficient/Op-Dominance.agda:103)
+    (∀ (S W d k m R : ℕ) → 2 ≤ S → k ≤ S → m ≤ S → 1 ≤ R →
+      opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
      ) →
     -- prepend-fits  (Verify-Budget-Sufficient/Subscribe-Face.agda:553)
     (∀ (S W L : ℕ) → 2 ≤ S → L ≤ suc W → suc L ≤ suc (foldStep S W)
@@ -1298,6 +1191,8 @@ postulate
                     (depthE g b κ id now sched st)
                     (nest b sl (EvalSt.connectedShares st))
                     (suc (sizeᵉ b)) 0 →
+       nest b sl (EvalSt.connectedShares st) ≤ Caps.cSize c →    -- nestOK
+       suc (sizeᵉ b) ≤ Caps.cSize c →                            -- opsOK
        capsOK? (capsAt e sl (suc id))
                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
@@ -1312,6 +1207,8 @@ sub-charge-capsOK-lift : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (depthE g b κ id now sched st)
                   (nest b sl (EvalSt.connectedShares st))
                   (suc (sizeᵉ b)) 0 →
+     nest b sl (EvalSt.connectedShares st) ≤ Caps.cSize c →    -- nestOK
+     suc (sizeᵉ b) ≤ Caps.cSize c →                            -- opsOK
      capsOK? (capsAt e sl (suc id))
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 sub-charge-capsOK-lift =
@@ -1320,7 +1217,7 @@ sub-charge-capsOK-lift =
     (λ {n} {Γ} {t} → capsAt-suc-full {n} {Γ} {t})
     ⊑ᶜ-refl
     (λ {n} {Γ} {s} {u} {c} {c′} → frameSz?-⊑ {n} {Γ} {s} {u} {c} {c′})
-    (λ {n} {Γ} {t} → opIterD≤capsH-root {n} {Γ} {t})
+    opIterD-dominated
     prepend-fits
 
 -- THE SUBSCRIBE-SIDE ASSEMBLY.  A real definition, and the reason
@@ -1362,6 +1259,8 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                    (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
      capsOK? (capsAt e sl id) sched st ≡ true →
      dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
+     nest b sl (EvalSt.connectedShares st) ≤ B →    -- nestOK
+     suc (sizeᵉ b) ≤ B →                            -- opsOK
      let r   = subscribeE g b κ id now sched st
          sl′ = Sched.slots (proj₁ (proj₂ r))
      in (hasDry (proj₁ r) ≡ false)
@@ -1370,7 +1269,7 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         × (capsOK? (capsAt e sl′ (suc id))
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
-                        inv pathB pathSzκ lenκ szB fnB gas cOK dW =
+                        inv pathB pathSzκ lenκ szB fnB gas cOK dW nestOK opsOK =
   dry , invOut , capsOut
   where
   sl      = Sched.slots sched
@@ -1429,7 +1328,7 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
   jBound  = proj₂ (proj₂ (proj₂ (proj₂ IH)))
 
   capsOut₀ : capsOK? (capsAt e sl (suc id)) sched′ st′ ≡ true
-  capsOut₀ = sub-charge-capsOK-lift g b κ id now sched st j′ capOut jBound
+  capsOut₀ = sub-charge-capsOK-lift g b κ id now sched st j′ capOut jBound nestOK opsOK
 
   capsOut : capsOK? (capsAt e (Sched.slots sched′) (suc id)) sched′ st′ ≡ true
   capsOut = subst (λ x → capsOK? (capsAt e x (suc id)) sched′ st′ ≡ true)
@@ -1471,6 +1370,18 @@ burst-caps {n = n} e ins =
       slEq   : sl′ ≡ ins
       slEq   = subscribeE-slots (budgetAt e ins 0) e root 0 0
                                 (sched-init e ins) (st-init e)
+      -- `EvalSt.connectedShares (st-init e) = []` (Evaluator:943)
+      -- `Sched.slots (sched-init e ins) = ins` (Evaluator:118)
+      -- so the premises reduce to the root bounds at (capsAt e ins 0).
+      nestOK : nest e ins [] ≤ Caps.cSize (capsAt e ins 0)
+      nestOK = ≤-trans (nest≤ e ins [])
+                 (≤-trans (≤-trans (n≤1+n (sizeᵉ e + slotsSize ins))
+                                   (s≤s (n≤1+n (sizeᵉ e + slotsSize ins))))
+                          (capsAt-base-size e ins 0))
+      opsOK  : suc (sizeᵉ e) ≤ Caps.cSize (capsAt e ins 0)
+      opsOK  = ≤-trans (s≤s (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
+                                     (n≤1+n (sizeᵉ e + slotsSize ins))))
+                       (capsAt-base-size e ins 0)
       result = subscribeE-wet-via-caps
                  (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
                  (init-INV e ins 0)
@@ -1482,6 +1393,8 @@ burst-caps {n = n} e ins =
                  (caps-fuel-root e ins)
                  (init-capsOK? e ins 0)
                  (dWe≤cWid e ins)
+                 nestOK
+                 opsOK
       capsOK-out : capsOK? (capsAt e sl′ 1) sched₁ st₁ ≡ true
       capsOK-out = proj₂ (proj₂ result)
   in subst (λ s → capsOK? (capsAt e s 1) sched₁ st₁ ≡ true) slEq capsOK-out
