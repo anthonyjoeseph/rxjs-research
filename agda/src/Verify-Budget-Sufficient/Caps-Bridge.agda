@@ -95,6 +95,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
 -- Acyclic: Depth-Bound imports Wet and Subscribe-Face, NOT Caps-Bridge.
 open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
+open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
@@ -1025,75 +1026,14 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- agda/probe/Depth-Wire-Probe.agda, which is where it lives because
 -- nothing in the claim graph consumes it and the wiring law admits no
 -- orphans here.
-baseCaps : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Caps
-baseCaps {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl)
-                             (suc (entryCeil n sl e))
-                             (suc (sizeᵉ e + slotsSize sl))
-
-postulate
-  -- capsOK? at the SMALL caps at the initial state.  NOT vacuous: five
-  -- real ≡ true conjuncts, three of them discharged by the emptiness of
-  -- `st-init` once someone grinds it.  `init-capsOK?` above is the same
-  -- fact at the blown-up caps and should eventually be DERIVED from
-  -- this one through `capsOK?-mono` (Caps-Face.agda:365) plus
-  -- `cSize≤frameBlowup` (Caps.agda:946), retiring one of the two.
-  --
-  -- ASSEMBLY (2026-08-06): narrowed to `-core` over the eight proven
-  -- facts this was written to be built from — the three Frame-Width
-  -- ceiling injections that put the base caps' width field under
-  -- `entryCeil`, the slot-condition widening, the init state's
-  -- boundedness, and the two size ceilings.  Each hypothesis is an
-  -- already-proven proposition, so `-core` is equivalent to the
-  -- original, not stronger and not weaker.
-  init-capsOK?-base-core :
-    -- pmO≤ceil  (Rx/Frame-Width.agda:782)
-    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ)
-      (e : Exp Γ Δᵍ Δ Θ t) → pmOⱽ j [] sl k e ≤ ceilᵉ j sl e
-     ) →
-    -- pmI≤ceil  (Rx/Frame-Width.agda:787)
-    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ)
-      (e : Exp Γ Δᵍ Δ Θ t) → pmIⱽ j [] sl k e ≤ ceilᵉ j sl e
-     ) →
-    -- pWᵉ≤entryCeil  (Rx/Frame-Width.agda:831)
-    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
-      (e : Exp Γ Δᵍ Δ Θ t) → pWⱽ j [] sl e ≤ entryCeil j sl e
-     ) →
-    -- slotsCaps?-widen  (Verify-Budget-Sufficient/Caps-Face.agda:813)
-    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) {B B′ W W′ : ℕ} →
-      B ≤ B′ → W ≤ W′ → slotsCaps? B W sl ≡ true → slotsCaps? B′ W′ sl ≡ true
-     ) →
-    -- init-bounded  (Verify-Budget-Sufficient/Measures.agda:1163)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-      (id : Id) → stBounded? (sizeBudgetAt e ins id) (sched-init e ins)
-                             (st-init e) ≡ true
-     ) →
-    -- size≤budget  (Verify-Budget-Sufficient/Measures.agda:195)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-      (id : Id) → sizeᵉ e ≤ sizeBudgetAt e sl id
-     ) →
-    -- 1≤sizeᵗˢ  (Verify-Budget-Sufficient/Measures.agda:1419)
-    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-      1 ≤ sizeᵗˢ ts
-     ) →
-    -- B1-cSize≡sizeCapAt  (Verify-Budget-Sufficient/Caps-Bridge.agda:94)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-      (id : ℕ) → Caps.cSize (capsAt e sl id) ≡ sizeCapAt e sl id
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
-
-init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
-init-capsOK?-base =
-  init-capsOK?-base-core
-    (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → pmO≤ceil {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
-    (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → pmI≤ceil {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
-    (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → pWᵉ≤entryCeil {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
-    (λ {n} {Γ} → slotsCaps?-widen {n} {Γ})
-    (λ {n} {Γ} {t} → init-bounded {n} {Γ} {t})
-    (λ {n} {Γ} {t} → size≤budget {n} {Γ} {t})
-    (λ {n} {Γ} {Δᵍ} {Δ} {Θ} {t} → 1≤sizeᵗˢ {n} {Γ} {Δᵍ} {Δ} {Θ} {t})
-    (λ {n} {Γ} {t} → B1-cSize≡sizeCapAt {n} {Γ} {t})
+-- `baseCaps` and `init-capsOK?-base` MOVED OUT 2026-08-07 to
+-- `Verify-Budget-Sufficient.Init-Caps`, where the postulate
+-- `init-capsOK?-base-core` is DISCHARGED (tier-1 ledger #7).  The five
+-- capsOK? conjuncts are proven directly, including the one that was
+-- open: `scripted`'s own `{ok : T (isData t)}` index forces `pWᵛ ≡ 0`
+-- on every pending value, so the width check reads `0 ≤ᵇ cWid`.
+-- The -core's eight scaffold hypotheses were kit for a route the
+-- direct proof does not take, and went with it.
 
 -- Lifts init-capsOK?-base from the small caps (baseCaps) to the actual
 -- initial caps (capsAt e ins 0 = frameBlowup (baseCaps e ins) (capsBase e ins))

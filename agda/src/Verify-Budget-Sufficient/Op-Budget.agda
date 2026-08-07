@@ -681,12 +681,25 @@ opIterD-budget S W d k m R 2≤S hk hm hR =
 -- collapse is harmless there.  It is carried in the signature
 -- regardless, because the suc case needs it and a hypothesis that
 -- appears in one clause belongs to the statement.
-opIterD-dominated : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
-  opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
-opIterD-dominated S W d k zero    R 2≤S hk hm hR =
-  ≤-trans (≤-reflexive (opIterD-0 S W d k 0)) z≤n
-opIterD-dominated S W d k (suc m) R 2≤S hk hm hR =
-  ≤-trans (≤-reflexive (opIterD-suc S W d k m 0))
-    (≤-trans (fIterD-lvls S W d k
-                (suc (widAt S W (climb S W d k m))) (climb S W d k m) 2≤S)
-             (opIterD-budget S W d k m R 2≤S hk hm hR))
+--
+-- SEALED, and this is not optional: `opIterD-dominated` is the ONLY
+-- name this module exports to the spine, and an UNSEALED body hands
+-- Verify-Well-Formed's conversion checker the whole tower above —
+-- measured 2026-08-07 as a `Killed: 9` OOM in VWF.  Private impl plus
+-- abstract alias, the caps axis's normalisation contract: no consumer
+-- ever needs more than the type.
+private
+  opIterD-dominated-go : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
+    opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
+  opIterD-dominated-go S W d k zero    R 2≤S hk hm hR =
+    ≤-trans (≤-reflexive (opIterD-0 S W d k 0)) z≤n
+  opIterD-dominated-go S W d k (suc m) R 2≤S hk hm hR =
+    ≤-trans (≤-reflexive (opIterD-suc S W d k m 0))
+      (≤-trans (fIterD-lvls S W d k
+                  (suc (widAt S W (climb S W d k m))) (climb S W d k m) 2≤S)
+               (opIterD-budget S W d k m R 2≤S hk hm hR))
+
+abstract
+  opIterD-dominated : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
+    opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
+  opIterD-dominated = opIterD-dominated-go
