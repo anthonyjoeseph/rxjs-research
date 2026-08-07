@@ -55,17 +55,19 @@
 module Verify-Budget-Sufficient.Depth-Compositional where
 
 open import Data.Nat
-  using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s)
+  using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub)
+  using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub;
+         m≤m⊔n; m≤n⊔m; n≤1+n; +-suc; +-assoc; +-comm; ≤-reflexive)
 open import Data.Fin   using (Fin)
 open import Data.Vec   using (lookup)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
 open import Data.Bool  using (Bool; false; true)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; trans; sym; cong)
 
-open import Rx.Prim using (Gas; g0; gs; Id; Tick)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
   using (Ty; natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ;
          sizeᵉ; sizeᵗ; sizeᵛ;
@@ -79,7 +81,8 @@ open import Rx.Evaluator
          mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
          root; share-sink; _↠_;
          map-f; scan-f; take-f; thru-outer;
-         mintNode; installNode; subscribeE)
+         mintNode; installNode; subscribeE;
+         splitEvents; stepFrame; setNode)
 
 -- pathLen via the wet family's public chain (Wet → … → Measures) — the
 -- SAME pathLen `depth-capped`'s statement reads, so the landing plugs
@@ -157,24 +160,49 @@ postulate
 -- Caps-Depth:361-363 returns 0 definitionally)
 ------------------------------------------------------------------
 
-postulate
-  burst-mapf-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (bid : Id) (now : Tick)
-    (f : Fn Γ [] [] [] s u) (κ : Path Γ u t)
-    (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    depthBurst fuel bid now (map-f f) κ stream sched st ≤ 0
+-- depthFrame returns 0 definitionally for map-f/scan-f/take-f (Caps-Depth:361-363),
+-- so depthBurst over these frames is a fold of (0 ⊔ IH) — provable by list induction.
+burst-mapf-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (bid : Id) (now : Tick)
+  (f : Fn Γ [] [] [] s u) (κ : Path Γ u t)
+  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst fuel bid now (map-f f) κ stream sched st ≤ 0
+burst-mapf-zero fuel bid now f κ [] sched st = z≤n
+burst-mapf-zero {Γ = Γ} {u = u} fuel bid now f κ (em ∷ ems) sched st =
+  ⊔-lub z≤n (burst-mapf-zero fuel bid now f κ ems sched' st')
+  where
+  sp     = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r      = stepFrame fuel bid now (map-f f) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
-  burst-scf-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (bid : Id) (now : Tick)
-    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
-    (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    depthBurst fuel bid now (scan-f f nid) κ stream sched st ≤ 0
+burst-scf-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (bid : Id) (now : Tick)
+  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst fuel bid now (scan-f f nid) κ stream sched st ≤ 0
+burst-scf-zero fuel bid now f nid κ [] sched st = z≤n
+burst-scf-zero {Γ = Γ} {u = u} fuel bid now f nid κ (em ∷ ems) sched st =
+  ⊔-lub z≤n (burst-scf-zero fuel bid now f nid κ ems sched' st')
+  where
+  sp     = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r      = stepFrame fuel bid now (scan-f f nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
-  burst-takef-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (bid : Id) (now : Tick)
-    (nid : NodeId) (κ : Path Γ s t)
-    (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    depthBurst fuel bid now (take-f nid) κ stream sched st ≤ 0
+burst-takef-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (bid : Id) (now : Tick)
+  (nid : NodeId) (κ : Path Γ s t)
+  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst fuel bid now (take-f nid) κ stream sched st ≤ 0
+burst-takef-zero fuel bid now nid κ [] sched st = z≤n
+burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
+  ⊔-lub z≤n (burst-takef-zero fuel bid now nid κ ems sched' st')
+  where
+  sp     = splitEvents {A = Val Γ s} (InstEmit.events em)
+  r      = stepFrame fuel bid now (take-f nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
 -- After mintNode + installNode(scan-st(evalTm seed)), storeNestMax
 -- grows by at most sizeᵗ seed: nodeNestMax(scan-st v) = sizeᵛ t v
@@ -187,41 +215,86 @@ postulate
                  (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)
       ≤ storeNestMax sched st + sizeᵗ seed
 
+-- setNode with take-st never increases nodesNestMax: nodeNestMax(take-st _) = 0.
+private
+  setNode-take-nodesNestMax : ∀ {n} {Γ : Ctx n}
+    (nid : NodeId) (k : ℕ)
+    (nodes : List (NodeId × NodeState Γ)) →
+    nodesNestMax (setNode nid (take-st k) nodes) ≤ nodesNestMax nodes
+  setNode-take-nodesNestMax nid k [] = z≤n
+  setNode-take-nodesNestMax nid k ((j , ns) ∷ rest) with j ≡ᵇ nid
+  ... | true  = ⊔-lub z≤n (m≤n⊔m _ _)
+  ... | false = ⊔-lub (m≤m⊔n _ _)
+                      (≤-trans (setNode-take-nodesNestMax nid k rest) (m≤n⊔m _ _))
+
 -- After mintNode + installNode(take-st(suc k)), storeNestMax is
--- unchanged: nodeNestMax(take-st _) = 0.
-postulate
-  storeNestMax-installTake : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sched : Sched Γ) (st : EvalSt e) (k : ℕ) →
-    storeNestMax (proj₂ (mintNode sched))
-                 (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)
-      ≤ storeNestMax sched st
+-- unchanged: nodeNestMax(take-st _) = 0, and mintNode preserves slots.
+storeNestMax-installTake : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) (k : ℕ) →
+  storeNestMax (proj₂ (mintNode sched))
+               (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)
+    ≤ storeNestMax sched st
+storeNestMax-installTake sched st k =
+  ⊔-lub (m≤m⊔n _ _)
+        (≤-trans (setNode-take-nodesNestMax (Sched.nextNode sched) (suc k)
+                   (EvalSt.nodes st))
+                 (m≤n⊔m _ _))
 
 ------------------------------------------------------------------
--- ARITHMETIC HELPERS — each an immediate consequence of
--- +-assoc/+-suc/m≤n+m, postulated to keep the assembly readable.
+-- ARITHMETIC HELPERS — proved here.
 ------------------------------------------------------------------
 
-postulate
-  -- sizeᵉ b + 1 ≤ 1 + sizeᵗ f + sizeᵉ b = sizeᵉ (mapᵉ f b)
-  map-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
-    (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-    sizeᵉ b + suc (pathLen κ) + storeNestMax sched st
-      ≤ sizeᵉ (mapᵉ f b) + pathLen κ + storeNestMax sched st
+-- Core step: a + suc p ≤ suc (c + a) + p.
+-- Used by map-size-arith and take-size-arith.
+private
+  arith-step : ∀ (a p c : ℕ) → a + suc p ≤ suc (c + a) + p
+  arith-step a p c =
+    ≤-trans (≤-reflexive (+-suc a p))
+            (s≤s (+-mono-≤ (m≤n+m a c) ≤-refl))
 
-  -- same shape as map-size-arith
-  take-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
-    (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-    sizeᵉ b + suc (pathLen κ) + storeNestMax sched st
-      ≤ sizeᵉ (takeᵉ c b) + pathLen κ + storeNestMax sched st
+-- sizeᵉ b + 1 ≤ 1 + sizeᵗ f + sizeᵉ b = sizeᵉ (mapᵉ f b)
+map-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
+  (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+  sizeᵉ b + suc (pathLen κ) + storeNestMax sched st
+    ≤ sizeᵉ (mapᵉ f b) + pathLen κ + storeNestMax sched st
+map-size-arith f b κ sched st =
+  +-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ f)) ≤-refl
 
-  -- sizeᵉ b + sizeᵗ seed ≤ sizeᵗ f + sizeᵗ seed + sizeᵉ b
-  scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
-    (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-    sizeᵉ b + suc (pathLen κ) + (storeNestMax sched st + sizeᵗ seed)
-      ≤ sizeᵉ (scanᵉ f seed b) + pathLen κ + storeNestMax sched st
+-- same shape as map-size-arith
+take-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
+  (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+  sizeᵉ b + suc (pathLen κ) + storeNestMax sched st
+    ≤ sizeᵉ (takeᵉ c b) + pathLen κ + storeNestMax sched st
+take-size-arith c b κ sched st =
+  +-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ c)) ≤-refl
+
+-- scan: a + suc p + (S + z) ≤ suc (c + z + a) + p + S.
+-- The extra z in the LHS is absorbed into sizeᵗ seed + sizeᵉ b on the RHS.
+private
+  -- rearranges a + p + (S + z) ≡ z + a + p + S using +-assoc/+-comm
+  scan-rearrange : ∀ (a p S z : ℕ) → a + p + (S + z) ≡ z + a + p + S
+  scan-rearrange a p S z =
+    trans (sym (+-assoc (a + p) S z))
+    (trans (+-comm ((a + p) + S) z)
+    (trans (sym (+-assoc z (a + p) S))
+    (cong (_+ S) (sym (+-assoc z a p)))))
+
+  -- a + suc p + (S + z) ≤ suc (c + z + a) + p + S, by induction on c
+  scan-size-go : ∀ (a p S z c : ℕ) → a + suc p + (S + z) ≤ suc (c + z + a) + p + S
+  scan-size-go a p S z zero    =
+    ≤-trans (≤-reflexive (cong (_+ (S + z)) (+-suc a p)))
+            (s≤s (≤-reflexive (scan-rearrange a p S z)))
+  scan-size-go a p S z (suc c) = ≤-trans (scan-size-go a p S z c) (n≤1+n _)
+
+scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
+  (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+  sizeᵉ b + suc (pathLen κ) + (storeNestMax sched st + sizeᵗ seed)
+    ≤ sizeᵉ (scanᵉ f seed b) + pathLen κ + storeNestMax sched st
+scan-size-arith f seed b κ sched st =
+  scan-size-go (sizeᵉ b) (pathLen κ) (storeNestMax sched st) (sizeᵗ seed) (sizeᵗ f)
 
 ------------------------------------------------------------------
 -- THE ASSEMBLY — structurally recursive on `b`; dispatch order follows
