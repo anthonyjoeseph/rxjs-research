@@ -4,13 +4,17 @@
 --
 -- LEDGER CLASS: LANDING: Verify-Budget-Sufficient/Op-Dominance.agda
 --
--- This file is the OUTSIDE-IN deliverable: the invariant is STATED,
--- its three step-estimates are PROVEN (dLvl-gain-sizeAt, jump-2step,
--- tail-fits — all three fell to the fLvl receipt, which carries
--- suc (widAt) * suc (sizeAt) per single step), and the assembly from
--- the invariant to the -core's exact conclusion TYPECHECKS.  The two
--- remaining postulates are the payment inductions themselves
--- (rounds-paid, climb-paid).
+-- STATUS 2026-08-07: **ZERO POSTULATES.**  The whole invariant is
+-- proven — the three step-estimates (dLvl-gain-sizeAt, jump-2step,
+-- tail-fits, all off the fLvl receipt), the glue, the mutual
+-- position-form induction (walk-paid / round-entry-paid), the top
+-- unrolling (climb-paid), and the assembly `core-from-climb-paid`,
+-- which IS `opIterD-budget-core`'s conclusion.
+--
+-- ONE STATEMENT REPAIR IS OWED, and it is exact rather than estimated:
+-- the guard is **`3 + k ≤ S`**, not `k ≤ S`.  The three units are
+-- itemised at § THE TOP FORM below (dCapᶜ→walk, level-0→a level with
+-- positions, and walk-paid's own irreducible `2 + k`).
 --
 -- ══════════════════════════════════════════════════════════════
 -- § THE TWO NORMAL FORMS the design rests on
@@ -101,7 +105,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Evaluator
   using (sizeAt; widAt; opIterD; sLvlD; dLvl; lvls; dCapᶜ; dWalkᶜ; regAt;
          fLvl; iterFold; foldStep; fIterD; opIterD-0; opIterD-suc;
-         sLvlD-0; sLvlD-suc; fLvlD-0; fLvlD-suc; fIterD-0; fIterD-suc)
+         sLvlD-0; sLvlD-suc; fLvlD; fLvlD-0; fLvlD-suc; fIterD-0; fIterD-suc)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD;
          iterL-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front;
@@ -396,7 +400,8 @@ mutual
     P₄  = lvls S W d J (dWalkᶜ S W R d g J 4)
 
     entry : G S W d X₁ ≤ P₄
-    entry = round-entry-paid S W R d g k X J 2≤S 1≤R hkg hX
+    entry = round-entry-paid S W R d g k X J 2≤S 1≤R hkg
+              (≤-trans (lvls-infl S W d X (suc (widAt S W X))) hX)
 
     rec : G S W d Z ≤ lvls S W d P₄ (dWalkᶜ S W R d g P₄ (5 * m))
     rec = walk-paid S W R d g k m X₁ P₄ 2≤S 1≤R hkg entry
@@ -421,9 +426,14 @@ mutual
   -- (g−1, k−1) sub-climb, its 5m′ positions fitting under the full
   -- regAt at the boosted level by boost-5x; the position-4 restart
   -- P₄ ≡ lvls (dLvl P₃) (dCapᶜ g (dLvl P₃)) receives it exactly.
+  -- NOTE the hypothesis is the BARE `X ≤ J`, not the G-closed form:
+  -- formalizing showed the entry never spends the closure (it only
+  -- needs X under the anchor, then jumps through two restarts).  That
+  -- matters at the TOP, where X ≡ 0 and `G S W d 0 ≤ J` is NOT free
+  -- while `0 ≤ J` is — see climb-paid below.
   round-entry-paid : ∀ S W R d g k X J → 2 ≤ S → 1 ≤ R →
     2 + k ≤ g →
-    G S W d X ≤ J →
+    X ≤ J →
     G S W d (sLvlD S W d k
               (suc (X + suc (sizeAt S X) * suc (sizeAt S X))))
       ≤ lvls S W d J (dWalkᶜ S W R d g J 4)
@@ -441,7 +451,7 @@ mutual
     P₃ = lvls S W d J (dWalkᶜ S W R d g J 3)
 
     X≤J : X ≤ J
-    X≤J = ≤-trans (lvls-infl S W d X (suc (widAt S W X))) hX
+    X≤J = hX
 
     dd≤P₂ : dLvl S W d (dLvl S W d J) ≤ P₂
     dd≤P₂ = ≤-trans (dLvl-mono 2≤S ≤-refl ≤-refl
@@ -472,7 +482,7 @@ mutual
     Pw = dLvl S W d P₃
 
     X≤J : X ≤ J
-    X≤J = ≤-trans (lvls-infl S W d X (suc (widAt S W X))) hX
+    X≤J = hX
 
     2≤g : 2 ≤ g
     2≤g = ≤-trans (m≤m+n 2 k) hkg
@@ -527,49 +537,162 @@ mutual
                 (lvls-add S W d P₃ 1 (dCapᶜ S W R d g Pw))
 
 ------------------------------------------------------------------
--- § THE TOP FORM, and THE k = S GAS CORNER (found 2026-08-07 by
--- formalizing walk-paid — this is the kind of finding the rehearsal
--- exists to surface BEFORE the src grind).
+-- § THE TOP FORM — PROVEN 2026-08-07, and the formalization PINS THE
+-- GAS CORNER EXACTLY: the guard the proof needs is `3 + k ≤ S`, not
+-- `k ≤ S`.  This is the finding the rehearsal exists to produce, and
+-- it is now a number rather than an estimate.
 --
--- walk-paid above covers a k-climb from a walk of gas-index g with
--- suc k ≤ g, tails charged at the SAME level (round-tail-glue).  The
--- top budget cDel = dWalkᶜ S 0 (regAt S R 0 = R), and R may be 1, so
--- everything must fit inside ONE position's dCapᶜ S sub-budget — a
--- gas-(S−1)-INDEXED walk.  walk-paid there needs suc k ≤ S − 1, i.e.
--- the scheme as built covers k ≤ S − 2 outright, and k ≤ S − 1 when
--- R ≥ the position count (rare).  The statement's guard is k ≤ S:
--- the corner k ∈ {S−1, S} needs ONE of:
---   (i)  a pending-tail accumulator in walk-paid — charge each level's
---        tails TWO ancestor walk levels up (ancestors' later positions
---        are plentiful at boosted levels); recovers the exact k ≤ S
---        at the cost of visibly heavier bookkeeping; or
---   (ii) ONE unit of guard slack threaded from the consumers —
---        `suc (suc k) ≤ suc S`, i.e. nest + 1 < cSize.  Likely FREE:
---        cSize (capsAt e sl id) carries the base caps' `2 +` floor
---        above sizeᵉ e + slotsSize, and nest ≤ sizeᵉ + slotsSize
---        (nest≤), so nest + 2 ≤ cSize at the root and by monotonicity
---        above it.  This is the repo-preferred move (a free hypothesis
---        beats carried bookkeeping) but it touches the -core's guard
---        and its consumers' discharge sites — a statement repair to
---        rule on, not to improvise at night.
--- climb-paid is stated at the ORIGINAL guard (k ≤ S) so the assembly
--- below keeps validating the exact target; its proof from walk-paid
--- will need (i) or (ii).
+-- THE ARITHMETIC, all four gas units accounted:
+--   cDel's gas is `suc S` (dCapᶜ S W R d (suc S) 0).  One unit is spent
+--   unfolding dCapᶜ into the top WALK (gas index S, level 0).  That
+--   walk has regAt S R 0 = R positions and R MAY BE 1, so the climb
+--   cannot be sequenced there; it must descend into one position's
+--   sub-budget — a SECOND unit — landing on a walk of gas index S−1 at
+--   level A₁ = dLvl S W d 0, where positions are plentiful
+--   (regAt S R A₁ ≥ suc (A₁·S) ≥ 5·S, since 5 ≤ A₁ — `5≤dLvl0`).
+--   walk-paid on that walk needs `2 + k ≤ S − 1`.  Hence 3 + k ≤ S.
+--
+-- The `2` inside walk-paid's own guard is irreducible: at k = 0 the
+-- entry still spends G-absorb, and G-absorb rests on tail-fits, which
+-- PROVABLY cannot be paid by a gas-1 sub-budget.  The two descents are
+-- likewise forced (dCapᶜ → walk, and level-0 → a level with positions).
+-- So `3 + k ≤ S` is not slack this scheme happens to want; it is what
+-- the recurrence costs.
+--
+-- CONSEQUENCE FOR SRC — a statement repair on `opIterD-budget-core`
+-- and `opIterD-dominated`, whose guard `k ≤ S` becomes `3 + k ≤ S`,
+-- and thence on `sub-charge-capsOK-lift-core`'s nestOK premise
+-- (`nest b sl cs ≤ cSize c` becomes `3 + nest b sl cs ≤ cSize c`).
+-- That premise is threaded, not derived, so the obligation lands on
+-- nestOK's suppliers, where it is PLAUSIBLY FREE: cSize (capsAt e sl
+-- id) is `frameBlowup` applied to `caps (2 + sizeᵉ e + slotsSize sl)
+-- …`, i.e. an iterSize tower ABOVE 2 + sizeᵉ e + slotsSize sl, while
+-- nest≤ bounds nest by sizeᵉ + slotsSize.  It is a repair to make
+-- deliberately and to discharge as a NAMED obligation, never to
+-- absorb silently.
 ------------------------------------------------------------------
 
-postulate
-  climb-paid : ∀ S W d k m R g → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
-    suc S ≤ g →
-    G S W d (climb S W d k m) ≤ lvls S W d 0 (dCapᶜ S W R d g 0)
+-- The first descent needs a level with room.  `2≤dLvl` is not enough
+-- (5·S positions are wanted against suc (A₁·S) available), so unroll
+-- iterL TWICE: dLvl S W d 0 = iterL S W d (suc (sizeAt S 0)) 0 and
+-- sizeAt S 0 = S ≥ 2, so at least two fLvlD-steps run, the first
+-- clearing 4 (fLvl S W 0 = suc (suc W * suc S) ≥ 4) and the second
+-- adding its own fCharge ≥ 2.
+5≤dLvl0 : ∀ S W d → 2 ≤ S → 5 ≤ dLvl S W d 0
+5≤dLvl0 zero          W d ()
+5≤dLvl0 (suc zero)    W d (s≤s ())
+5≤dLvl0 (suc (suc s)) W d 2≤S =
+  ≤-trans 5≤6 (≤-trans 6≤F₁ (iterL-infl S W d (suc s) F₁))
+  where
+  S = suc (suc s)
+  F₀ = fLvlD S W d 0
+  F₁ = fLvlD S W d F₀
+
+  5≤6 : 5 ≤ 6
+  5≤6 = s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))
+
+  -- fLvl S W 0 = suc (suc W * suc S), and suc W * suc S ≥ 1 * 3
+  4≤F₀ : 4 ≤ F₀
+  4≤F₀ = ≤-trans (s≤s (≤-trans (≤-reflexive (sym (*-identityˡ 3)))
+                               (*-mono-≤ (s≤s (z≤n {W}))
+                                         (s≤s (s≤s (s≤s (z≤n {s})))))))
+                 (fLvl≤fLvlD S W d 0)
+
+  -- one more step costs its own fCharge, which is ≥ suc (1 * 1)
+  2≤charge : 2 ≤ suc (suc (widAt S W F₀) * suc (sizeAt S F₀))
+  2≤charge = s≤s (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
+                          (*-mono-≤ (s≤s (z≤n {widAt S W F₀}))
+                                    (s≤s (z≤n {sizeAt S F₀}))))
+
+  6≤F₁ : 6 ≤ F₁
+  6≤F₁ = ≤-trans (+-mono-≤ 4≤F₀ 2≤charge) (fLvl≤fLvlD S W d F₀)
+
+-- the descended walk has room for the entry's 4 positions and the
+-- m rounds' 5m
+top-positions : ∀ S W R d m → 2 ≤ S → 1 ≤ R → suc m ≤ S →
+  4 + 5 * m ≤ regAt S R (dLvl S W d 0)
+top-positions S W R d m 2≤S 1≤R hm =
+  ≤-trans (n≤1+n (4 + 5 * m))
+  (≤-trans (≤-reflexive (sym (*-suc 5 m)))
+  (≤-trans (*-monoʳ-≤ 5 hm)
+  (≤-trans (*-monoˡ-≤ S (5≤dLvl0 S W d 2≤S))
+  (≤-trans (n≤1+n (dLvl S W d 0 * S))
+  (≤-trans (≤-reflexive (sym (*-identityˡ (suc (dLvl S W d 0 * S)))))
+           (*-monoˡ-≤ (suc (dLvl S W d 0 * S)) 1≤R))))))
+
+-- THE TOP UNROLLING, at cDel's own gas.
+climb-paid-at : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
+  G S W d (climb S W d k m) ≤ lvls S W d 0 (dCapᶜ S W R d (suc S) 0)
+climb-paid-at zero      W d k m R ()  hk hm hR
+climb-paid-at (suc S′)  W d k m R 2≤S hk hm hR = ≤-trans step2 step1
+  where
+  S  = suc S′
+  A₁ = dLvl S W d 0
+  X₁ = sLvlD S W d k (suc (suc (sizeAt S 0) * suc (sizeAt S 0)))
+  Q₁ = lvls S W d A₁ (dCapᶜ S W R d S A₁)
+  P₄ = lvls S W d A₁ (dWalkᶜ S W R d S′ A₁ 4)
+
+  -- ONE top position lands exactly on Q₁ (walk-spend at i = 0, then
+  -- lvls-add splitting the leading dLvl-step off the restart count)
+  one-pos : lvls S W d 0 (dWalkᶜ S W R d S 0 1) ≡ Q₁
+  one-pos = trans (walk-spend S W R d S 0 0)
+                  (lvls-add S W d 0 1 (dCapᶜ S W R d S A₁))
+
+  step1 : Q₁ ≤ lvls S W d 0 (dCapᶜ S W R d (suc S) 0)
+  step1 =
+    ≤-trans (≤-reflexive (sym one-pos))
+            (lvls-mono (dWalkᶜ S W R d S 0 1) (dWalkᶜ S W R d S 0 (regAt S R 0))
+               2≤S ≤-refl ≤-refl ≤-refl
+               (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {0} {0} {d}
+                  S S 1 (regAt S R 0) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
+                  (1≤regAt S R 0 hR)))
+
+  hkg : 2 + k ≤ S′
+  hkg = ≤-pred hk
+
+  -- at the top X ≡ 0, so the entry's hypothesis is `z≤n` — this is the
+  -- one place the bare-X form of round-entry-paid earns its keep
+  entry : G S W d X₁ ≤ P₄
+  entry = round-entry-paid S W R d S′ k 0 A₁ 2≤S hR hkg z≤n
+
+  rounds : G S W d (opIterD S W d k m X₁)
+             ≤ lvls S W d P₄ (dWalkᶜ S W R d S′ P₄ (5 * m))
+  rounds = walk-paid S W R d S′ k m X₁ P₄ 2≤S hR hkg entry
+
+  rounds′ : G S W d (opIterD S W d k m X₁)
+              ≤ lvls S W d A₁ (dWalkᶜ S W R d S′ A₁ (4 + 5 * m))
+  rounds′ = ≤-trans rounds
+              (≤-reflexive (sym (walk-spend-many S W R d S′ A₁ 4 (5 * m))))
+
+  step2 : G S W d (climb S W d k m) ≤ Q₁
+  step2 =
+    ≤-trans rounds′
+            (lvls-mono (dWalkᶜ S W R d S′ A₁ (4 + 5 * m))
+                       (dWalkᶜ S W R d S′ A₁ (regAt S R A₁))
+               2≤S ≤-refl ≤-refl ≤-refl
+               (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {A₁} {A₁} {d}
+                  S′ S′ (4 + 5 * m) (regAt S R A₁)
+                  2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
+                  (top-positions S W R d m 2≤S hR hm)))
+
+climb-paid : ∀ S W d k m R g → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
+  suc S ≤ g →
+  G S W d (climb S W d k m) ≤ lvls S W d 0 (dCapᶜ S W R d g 0)
+climb-paid S W d k m R g 2≤S hk hm hR hg =
+  ≤-trans (climb-paid-at S W d k m R 2≤S hk hm hR)
+          (lvls-mono (dCapᶜ S W R d (suc S) 0) (dCapᶜ S W R d g 0)
+             2≤S ≤-refl ≤-refl ≤-refl
+             (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {0} {0} {d}
+                (suc S) g 2≤S ≤-refl ≤-refl ≤-refl hg ≤-refl))
 
 ------------------------------------------------------------------
--- § THE ASSEMBLY — the -core's exact conclusion from climb-paid.
--- This typechecking is the design's machine-checked receipt: the
--- invariant's statement FITS the postulate it is meant to replace
--- (cDel-body pins gas = suc S; record eta pins caps S W R's fields).
+-- § THE ASSEMBLY — the -core's exact conclusion, now from a PROVEN
+-- climb-paid.  cDel-body pins gas = suc S; record eta pins
+-- caps S W R's fields.  The ONLY difference from the -core as it
+-- stands in src is the guard `3 + k ≤ S`.
 ------------------------------------------------------------------
 
-core-from-climb-paid : ∀ S W d k m R → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
+core-from-climb-paid : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
   lvls S W d (climb S W d k m) (suc (widAt S W (climb S W d k m)))
     ≤ lvls S W d 0 (cDel (caps S W R) d)
 core-from-climb-paid S W d k m R 2≤S hk hm hR =
