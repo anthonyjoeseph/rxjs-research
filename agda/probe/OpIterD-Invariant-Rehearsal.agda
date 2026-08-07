@@ -94,16 +94,18 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_; z≤n; s�
 open import Data.Nat.Properties
   using (≤-refl; ≤-reflexive; ≤-trans; n≤1+n; m≤n+m; m≤m+n;
          *-identityˡ; *-identityʳ; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; *-suc;
+         *-assoc; *-comm; ≤-pred; m≤m*n; +-assoc; +-comm;
          +-suc; +-identityʳ; +-mono-≤; +-monoʳ-≤; <⇒≤; ^-monoˡ-≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
 open import Rx.Evaluator
   using (sizeAt; widAt; opIterD; sLvlD; dLvl; lvls; dCapᶜ; dWalkᶜ; regAt;
-         fLvl; iterFold; foldStep; fIterD; opIterD-0; opIterD-suc)
+         fLvl; iterFold; foldStep; fIterD; opIterD-0; opIterD-suc;
+         sLvlD-0; sLvlD-suc; fLvlD-0; fLvlD-suc; fIterD-0; fIterD-suc)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD;
          iterL-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front;
-         lvls-mono; lvls-add; n<2^n)
+         lvls-mono; lvls-add; n<2^n; dLvl-mono; sLvlD-mono; 2≤dLvl)
 open import Verify-Budget-Sufficient.Op-Dominance
   using (climb; fLvlD-le-dLvl; fIterD-lvls)
 
@@ -298,65 +300,37 @@ walk-spend-many S W R d g J (suc p) q =
 
 
 ------------------------------------------------------------------
--- § THE POSITION-FORM INDUCTION (walk-paid) — the skeleton, with the
--- two PER-ROUND obligations scoped as narrow postulates.  The base
--- case is PROVEN (the conclusion at m = 0 is literally the hypothesis:
--- dWalkᶜ g J 0 = 0 and lvls J 0 = J).  Recursion structure for the suc
--- case, validated by the glue above: lexicographic on (g, m) — the
--- round's sub-climb sLvlD k (J₀ X) = opIterD (k−1) … recurses at
--- (g−1, ·) inside ONE position's dCapᶜ-g sub-budget (a (g−1)-walk),
--- guard suc(k−1) ≤ g−1 ⟸ suc k ≤ g exactly; the remaining rounds
--- recurse at (g, m−1) from the restart level walk-spend hands back;
--- restart-dominates glues the sub-budget's reach into the next
--- hypothesis with no residue.
+-- § THE POSITION-FORM INDUCTION — REAL, MUTUAL, and the per-round
+-- obligations are now PROVEN.  Uniform gas guard: 2 + k ≤ g (the
+-- formalization sharpened the earlier {suc k ≤ g, 2 ≤ g} pair — the
+-- tail headroom rides the k-descent, so the guard is one addition and
+-- is preserved EXACTLY by the (g−1, k−1) sub-call).  Constants: one
+-- round = 4 entry positions + 1 tail position, so m rounds cost 5m.
 ------------------------------------------------------------------
 
-postulate
-  -- (a) ONE ROUND'S ENTRY: from a level J dominating the climb-so-far,
-  -- a fixed number of positions pay the jump and the sub-climb and
-  -- land the entry's G-closure below the next restart.
-  --
-  -- EXECUTION PLAN (2026-08-07, from formalizing walk-paid — the
-  -- position count here should be FOUR, and walk-paid's per-round
-  -- constant then becomes 5m; constants are rehearsal-internal):
-  --   pos 1-2 : the jump.  P₂ ≥ dLvl (dLvl J) via lvls-infl +
-  --             dLvl-mono; J₀(X) ≤ dLvl (dLvl J) is jump-2step.
-  --   pos 3   : absorb G (J₀ X) — the sub-call's hypothesis is
-  --             G-closed, so the closure is paid BEFORE the sub-climb,
-  --             GV≤one-style (tail-fits at dLvl P₂ + monotonicity).
-  --             A position's sub-budget is spent as RAW LENGTH here,
-  --             so it cannot double as the sub-climb's walk — hence
-  --             the fourth position.
-  --   pos 4   : the sub-climb.  k = 0: sLvlD-0, nothing to pay.
-  --             k = suc k′: sLvlD-suc exposes
-  --             opIterD k′ (suc (sizeAt S (J₀ X))) (J₀ X); pay by the
-  --             MUTUAL walk-paid instance at gas g−1 inside this
-  --             position's sub-budget (dCapᶜ g = dWalkᶜ (g−1); guard
-  --             suc k′ ≤ g−1 ⟺ suc k ≤ g, exact), connect its
-  --             4m′-position value under the full regAt by
-  --             dWalkᶜ-mono-i — the boost guard
-  --             4 · suc (sizeAt S (J₀X)) ≤ regAt S R (dLvl P₃) is a
-  --             new elementary lemma (boost-4x: the fLvl receipt's
-  --             width factor ≥ 3 at levels ≥ 2, times S ≥ 2), and
-  --             restart-dominates glues the result under P₄.
-  -- Termination of the mutual block: lexicographic (g, m) — this
-  -- function recurses into walk-paid at g−1; walk-paid recurses into
-  -- itself at (g, m−1) and into this at (g, ·) — g must be pattern-
-  -- matched (suc g′) here to expose the sub-budget.
-  round-entry-glue : ∀ S W R d g k X J → 2 ≤ S → 1 ≤ R →
-    suc k ≤ g → 2 ≤ g →
-    G S W d X ≤ J →
-    G S W d (sLvlD S W d k
-              (suc (X + suc (sizeAt S X) * suc (sizeAt S X))))
-      ≤ lvls S W d J (dWalkᶜ S W R d g J 3)
+-- the first position's restart clears one dLvl-step
+restart-ge-dLvl : ∀ S W R d g J →
+  dLvl S W d J ≤ lvls S W d J (dWalkᶜ S W R d g J 1)
+restart-ge-dLvl S W R d g J =
+  ≤-trans (lvls-infl S W d (dLvl S W d J) (dCapᶜ S W R d g (dLvl S W d J)))
+          (≤-reflexive (sym (lvls-add S W d J 1
+                              (dCapᶜ S W R d g (dLvl S W d J)))))
+
+-- the G-closure of a level is absorbed by one position's sub-budget
+-- length (this is what forces 2 ≤ g — a gas-1 sub-budget cannot pay
+-- a widAt-sized count)
+G-absorb : ∀ S W R d g V → 2 ≤ S → 1 ≤ R → 2 ≤ g →
+  G S W d V ≤ lvls S W d V (dWalkᶜ S W R d g V 1)
+G-absorb S W R d g V 2≤S 1≤R 2≤g =
+  lvls-mono _ _ 2≤S ≤-refl ≤-refl ≤-refl
+    (s≤s (≤-trans (widAt-mono 2≤S ≤-refl ≤-refl
+                    (iterL-infl S W d (suc (sizeAt S V)) V))
+         (≤-trans (n≤1+n (widAt S W (dLvl S W d V)))
+                  (tail-fits S W d R (dLvl S W d V) g 2≤S 1≤R 2≤g))))
 
 -- (c) ONE TAIL — PROVEN: given the recursive payment's conclusion at
 -- the i-th restart level V, one more position absorbs the round's
--- TAIL.  G-tail turns the tail into one more G-closure; G-mono moves
--- it to V; the (i+1)-th position's sub-budget length pays suc (widAt V)
--- via tail-fits at the boosted level dLvl V; walk-spend-many stitches
--- the position back onto the front walk.  This is the step that
--- FORCES 2 ≤ g (a gas-1 sub-budget cannot pay a tail).
+-- TAIL (G-tail, G-mono, G-absorb, walk-spend-many).
 round-tail-glue : ∀ S W R d g k Z J i → 2 ≤ S → 1 ≤ R → 2 ≤ g →
   G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J i) →
   G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
@@ -364,64 +338,193 @@ round-tail-glue : ∀ S W R d g k Z J i → 2 ≤ S → 1 ≤ R → 2 ≤ g →
 round-tail-glue S W R d g k Z J i 2≤S 1≤R 2≤g hZ =
   ≤-trans (G-tail S W d k Z 2≤S)
   (≤-trans (G-mono S W d 2≤S hZ)
-  (≤-trans GV≤one
+  (≤-trans (G-absorb S W R d g (lvls S W d J (dWalkᶜ S W R d g J i))
+              2≤S 1≤R 2≤g)
   (≤-trans (≤-reflexive (sym (walk-spend-many S W R d g J i 1)))
            (≤-reflexive (cong (λ p → lvls S W d J (dWalkᶜ S W R d g J p))
                               (trans (+-suc i 0) (cong suc (+-identityʳ i))))))))
+
+-- the boost: five sub-rounds' worth of positions exist at one
+-- dLvl-boosted level — the fLvl receipt's width factor is ≥ 3 once the
+-- level clears 2, so dLvl Q ≥ 3·suc (sizeAt S Y), and regAt multiplies
+-- by S ≥ 2 and R ≥ 1 on top
+boost-5x : ∀ S W R d Y Q → 2 ≤ S → 1 ≤ R → 2 ≤ Q → Y ≤ Q →
+  5 * suc (sizeAt S Y) ≤ regAt S R (dLvl S W d Q)
+boost-5x S W R d Y Q 2≤S 1≤R 2≤Q hY =
+  ≤-trans (*-monoˡ-≤ (suc (sizeAt S Y)) 5≤6)
+  (≤-trans (≤-reflexive (*-assoc 2 3 (suc (sizeAt S Y))))
+  (≤-trans (*-monoʳ-≤ 2 three-x≤dLvl)
+  (≤-trans (*-monoˡ-≤ (dLvl S W d Q) 2≤S)
+  (≤-trans (≤-reflexive (*-comm S (dLvl S W d Q)))
+  (≤-trans (n≤1+n (dLvl S W d Q * S))
+  (≤-trans (≤-reflexive (sym (*-identityˡ (suc (dLvl S W d Q * S)))))
+           (*-monoˡ-≤ (suc (dLvl S W d Q * S)) 1≤R)))))))
   where
-  V : ℕ
-  V = lvls S W d J (dWalkᶜ S W R d g J i)
+  5≤6 : 5 ≤ 6
+  5≤6 = s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))
+  3≤sw : 3 ≤ suc (widAt S W Q)
+  3≤sw = s≤s (≤-trans 2≤Q
+               (≤-trans (m≤m+n Q W) (iterFold-gain S Q W 2≤S)))
+  three-x≤dLvl : 3 * suc (sizeAt S Y) ≤ dLvl S W d Q
+  three-x≤dLvl =
+    ≤-trans (*-mono-≤ 3≤sw
+              (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl hY)))
+    (≤-trans (n≤1+n _)
+    (≤-trans (m≤n+m (suc (suc (widAt S W Q) * suc (sizeAt S Q))) Q)
+    (≤-trans (fLvl≤fLvlD S W d Q) (fLvlD-le-dLvl S W d Q))))
 
-  -- suc (widAt V) fits inside the next position's sub-budget length
-  wV≤sub : suc (widAt S W V) ≤ suc (dCapᶜ S W R d g (dLvl S W d V))
-  wV≤sub = s≤s (≤-trans (widAt-mono 2≤S ≤-refl ≤-refl
-                          (iterL-infl S W d (suc (sizeAt S V)) V))
-               (≤-trans (n≤1+n (widAt S W (dLvl S W d V)))
-                        (tail-fits S W d R (dLvl S W d V) g 2≤S 1≤R 2≤g)))
+mutual
+  -- THE POSITION-FORM INVARIANT: m rounds cost 5m positions; the walk
+  -- value at p positions IS the p-th restart level (walk-spend), so
+  -- each conclusion is the next call's hypothesis verbatim.
+  walk-paid : ∀ S W R d g k m X J → 2 ≤ S → 1 ≤ R →
+    2 + k ≤ g →
+    G S W d X ≤ J →
+    G S W d (opIterD S W d k m X)
+      ≤ lvls S W d J (dWalkᶜ S W R d g J (5 * m))
+  walk-paid S W R d g k zero X J 2≤S 1≤R hkg hX =
+    ≤-trans (G-mono S W d 2≤S (≤-reflexive (opIterD-0 S W d k X))) hX
+  walk-paid S W R d g k (suc m) X J 2≤S 1≤R hkg hX =
+    ≤-trans (G-mono S W d 2≤S (≤-reflexive (opIterD-suc S W d k m X)))
+    (≤-trans tail-step
+             (≤-reflexive
+               (cong (λ i → lvls S W d J (dWalkᶜ S W R d g J i)) count-eq)))
+    where
+    J₀X = suc (X + suc (sizeAt S X) * suc (sizeAt S X))
+    X₁  = sLvlD S W d k J₀X
+    Z   = opIterD S W d k m X₁
+    P₄  = lvls S W d J (dWalkᶜ S W R d g J 4)
 
-  GV≤one : G S W d V ≤ lvls S W d V (dWalkᶜ S W R d g V 1)
-  GV≤one = lvls-mono _ _ 2≤S ≤-refl ≤-refl ≤-refl wV≤sub
+    entry : G S W d X₁ ≤ P₄
+    entry = round-entry-paid S W R d g k X J 2≤S 1≤R hkg hX
 
--- THE POSITION-FORM INVARIANT, a real definition recursing on m: m
--- rounds cost 4m positions, and the walk value at p positions IS the
--- p-th restart level (walk-spend), so each conclusion is the next
--- call's hypothesis verbatim.
-walk-paid : ∀ S W R d g k m X J → 2 ≤ S → 1 ≤ R →
-  suc k ≤ g → 2 ≤ g →
-  G S W d X ≤ J →
-  G S W d (opIterD S W d k m X)
-    ≤ lvls S W d J (dWalkᶜ S W R d g J (4 * m))
-walk-paid S W R d g k zero X J 2≤S 1≤R hk 2≤g hX =
-  ≤-trans (G-mono S W d 2≤S
-            (≤-reflexive (opIterD-0 S W d k X)))
-          hX
-walk-paid S W R d g k (suc m) X J 2≤S 1≤R hk 2≤g hX =
-  ≤-trans (G-mono S W d 2≤S (≤-reflexive (opIterD-suc S W d k m X)))
-  (≤-trans tail-step
-           (≤-reflexive
-             (cong (λ i → lvls S W d J (dWalkᶜ S W R d g J i)) count-eq)))
-  where
-  J₀X = suc (X + suc (sizeAt S X) * suc (sizeAt S X))
-  X₁  = sLvlD S W d k J₀X
-  Z   = opIterD S W d k m X₁
-  P₃  = lvls S W d J (dWalkᶜ S W R d g J 3)
+    rec : G S W d Z ≤ lvls S W d P₄ (dWalkᶜ S W R d g P₄ (5 * m))
+    rec = walk-paid S W R d g k m X₁ P₄ 2≤S 1≤R hkg entry
 
-  entry : G S W d X₁ ≤ P₃
-  entry = round-entry-glue S W R d g k X J 2≤S 1≤R hk 2≤g hX
+    rec′ : G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J (4 + 5 * m))
+    rec′ = ≤-trans rec
+             (≤-reflexive (sym (walk-spend-many S W R d g J 4 (5 * m))))
 
-  rec : G S W d Z ≤ lvls S W d P₃ (dWalkᶜ S W R d g P₃ (4 * m))
-  rec = walk-paid S W R d g k m X₁ P₃ 2≤S 1≤R hk 2≤g entry
+    tail-step : G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
+                  ≤ lvls S W d J (dWalkᶜ S W R d g J (suc (4 + 5 * m)))
+    tail-step = round-tail-glue S W R d g k Z J (4 + 5 * m) 2≤S 1≤R
+                  (≤-trans (m≤m+n 2 k) hkg) rec′
 
-  rec′ : G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J (3 + 4 * m))
-  rec′ = ≤-trans rec
-           (≤-reflexive (sym (walk-spend-many S W R d g J 3 (4 * m))))
+    count-eq : suc (4 + 5 * m) ≡ 5 * suc m
+    count-eq = sym (*-suc 5 m)
 
-  tail-step : G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
-                ≤ lvls S W d J (dWalkᶜ S W R d g J (suc (3 + 4 * m)))
-  tail-step = round-tail-glue S W R d g k Z J (3 + 4 * m) 2≤S 1≤R 2≤g rec′
+  -- (a) ONE ROUND'S ENTRY — PROVEN, mutual with walk-paid: positions
+  -- 1-2 clear the jump (jump-2step through two restarts), position 3
+  -- absorbs G (J₀ X) (G-absorb — the sub-call's hypothesis is
+  -- G-closed, and a position spent as raw length cannot double as the
+  -- sub-climb's walk), and position 4's sub-budget hosts the
+  -- (g−1, k−1) sub-climb, its 5m′ positions fitting under the full
+  -- regAt at the boosted level by boost-5x; the position-4 restart
+  -- P₄ ≡ lvls (dLvl P₃) (dCapᶜ g (dLvl P₃)) receives it exactly.
+  round-entry-paid : ∀ S W R d g k X J → 2 ≤ S → 1 ≤ R →
+    2 + k ≤ g →
+    G S W d X ≤ J →
+    G S W d (sLvlD S W d k
+              (suc (X + suc (sizeAt S X) * suc (sizeAt S X))))
+      ≤ lvls S W d J (dWalkᶜ S W R d g J 4)
+  round-entry-paid S W R d zero    k X J 2≤S 1≤R () hX
+  round-entry-paid S W R d (suc g′) zero X J 2≤S 1≤R hkg hX =
+    ≤-trans (G-mono S W d 2≤S (≤-reflexive (sLvlD-0 S W d J₀X)))
+    (≤-trans GJ₀≤P₃
+    (≤-trans (lvls-infl S W d P₃ (dWalkᶜ S W R d (suc g′) P₃ 1))
+             (≤-reflexive (sym (walk-spend-many S W R d (suc g′) J 3 1)))))
+    where
+    g = suc g′
+    J₀X = suc (X + suc (sizeAt S X) * suc (sizeAt S X))
+    P₁ = lvls S W d J (dWalkᶜ S W R d g J 1)
+    P₂ = lvls S W d J (dWalkᶜ S W R d g J 2)
+    P₃ = lvls S W d J (dWalkᶜ S W R d g J 3)
 
-  count-eq : suc (3 + 4 * m) ≡ 4 * suc m
-  count-eq = sym (*-suc 4 m)
+    X≤J : X ≤ J
+    X≤J = ≤-trans (lvls-infl S W d X (suc (widAt S W X))) hX
+
+    dd≤P₂ : dLvl S W d (dLvl S W d J) ≤ P₂
+    dd≤P₂ = ≤-trans (dLvl-mono 2≤S ≤-refl ≤-refl
+                      (restart-ge-dLvl S W R d g J))
+            (≤-trans (restart-ge-dLvl S W R d g P₁)
+                     (≤-reflexive (sym (walk-spend-many S W R d g J 1 1))))
+
+    jump : J₀X ≤ P₂
+    jump = ≤-trans (jump-2step S W d X J 2≤S X≤J) dd≤P₂
+
+    GJ₀≤P₃ : G S W d J₀X ≤ P₃
+    GJ₀≤P₃ = ≤-trans (G-mono S W d 2≤S jump)
+             (≤-trans (G-absorb S W R d g P₂ 2≤S 1≤R
+                         (≤-trans (m≤m+n 2 zero) hkg))
+                      (≤-reflexive (sym (walk-spend-many S W R d g J 2 1))))
+  round-entry-paid S W R d (suc g′) (suc k′) X J 2≤S 1≤R hkg hX =
+    ≤-trans (G-mono S W d 2≤S (≤-reflexive (sLvlD-suc S W d k′ J₀X)))
+    (≤-trans sub-paid (≤-reflexive (sym P₄≡)))
+    where
+    g = suc g′
+    k = suc k′
+    J₀X = suc (X + suc (sizeAt S X) * suc (sizeAt S X))
+    m′ = suc (sizeAt S J₀X)
+    P₁ = lvls S W d J (dWalkᶜ S W R d g J 1)
+    P₂ = lvls S W d J (dWalkᶜ S W R d g J 2)
+    P₃ = lvls S W d J (dWalkᶜ S W R d g J 3)
+    P₄ = lvls S W d J (dWalkᶜ S W R d g J 4)
+    Pw = dLvl S W d P₃
+
+    X≤J : X ≤ J
+    X≤J = ≤-trans (lvls-infl S W d X (suc (widAt S W X))) hX
+
+    2≤g : 2 ≤ g
+    2≤g = ≤-trans (m≤m+n 2 k) hkg
+
+    dd≤P₂ : dLvl S W d (dLvl S W d J) ≤ P₂
+    dd≤P₂ = ≤-trans (dLvl-mono 2≤S ≤-refl ≤-refl
+                      (restart-ge-dLvl S W R d g J))
+            (≤-trans (restart-ge-dLvl S W R d g P₁)
+                     (≤-reflexive (sym (walk-spend-many S W R d g J 1 1))))
+
+    jump : J₀X ≤ P₂
+    jump = ≤-trans (jump-2step S W d X J 2≤S X≤J) dd≤P₂
+
+    P₂≤P₃ : P₂ ≤ P₃
+    P₂≤P₃ = lvls-mono (dWalkᶜ S W R d g J 2) (dWalkᶜ S W R d g J 3)
+              2≤S ≤-refl ≤-refl ≤-refl
+              (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {J} {J} {d}
+                g g 2 3 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
+                (s≤s (s≤s z≤n)))
+
+    GJ₀≤P₃ : G S W d J₀X ≤ P₃
+    GJ₀≤P₃ = ≤-trans (G-mono S W d 2≤S jump)
+             (≤-trans (G-absorb S W R d g P₂ 2≤S 1≤R 2≤g)
+                      (≤-reflexive (sym (walk-spend-many S W R d g J 2 1))))
+
+    2≤P₃ : 2 ≤ P₃
+    2≤P₃ = ≤-trans (2≤dLvl S W d (dLvl S W d J))
+                   (≤-trans dd≤P₂ P₂≤P₃)
+
+    -- hkg : suc (suc (suc k′)) ≤ suc g′, so one s≤s peel IS 2 + k′ ≤ g′
+    hkg′ : 2 + k′ ≤ g′
+    hkg′ = ≤-pred hkg
+
+    rec-sub : G S W d (opIterD S W d k′ m′ J₀X)
+                ≤ lvls S W d Pw (dWalkᶜ S W R d g′ Pw (5 * m′))
+    rec-sub = walk-paid S W R d g′ k′ m′ J₀X Pw 2≤S 1≤R hkg′
+                (≤-trans GJ₀≤P₃ (iterL-infl S W d (suc (sizeAt S P₃)) P₃))
+
+    fit : dWalkᶜ S W R d g′ Pw (5 * m′) ≤ dWalkᶜ S W R d g′ Pw (regAt S R Pw)
+    fit = dWalkᶜ-mono g′ g′ (5 * m′) (regAt S R Pw) 2≤S ≤-refl ≤-refl ≤-refl
+            ≤-refl ≤-refl
+            (boost-5x S W R d J₀X P₃ 2≤S 1≤R 2≤P₃
+              (≤-trans jump P₂≤P₃))
+
+    sub-paid : G S W d (opIterD S W d k′ m′ J₀X)
+                 ≤ lvls S W d Pw (dCapᶜ S W R d g Pw)
+    sub-paid = ≤-trans rec-sub
+                 (lvls-mono _ _ 2≤S ≤-refl ≤-refl ≤-refl fit)
+
+    P₄≡ : P₄ ≡ lvls S W d Pw (dCapᶜ S W R d g Pw)
+    P₄≡ = trans (walk-spend-many S W R d g J 3 1)
+                (lvls-add S W d P₃ 1 (dCapᶜ S W R d g Pw))
 
 ------------------------------------------------------------------
 -- § THE TOP FORM, and THE k = S GAS CORNER (found 2026-08-07 by
