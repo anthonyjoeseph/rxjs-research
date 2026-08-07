@@ -771,7 +771,9 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
   capsOut : capsOK? (capsAt e sl′ (suc id)) sched′ st′ ≡ true
   capsOut =
     subst (λ s → capsOK? (capsAt e s (suc id)) sched′ st′ ≡ true) (sym slEq)
-          (caps-tick sl id a id sched st refl pre valC)
+          (caps-tick (λ {n′} {Γ′} {t′} {e′} {u′} →
+                        subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
+                     sl id a id sched st refl pre valC)
 
   capsParts = capsOK?-parts (capsAt e sl′ (suc id)) sched′ st′ capsOut
 
