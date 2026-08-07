@@ -124,14 +124,6 @@ resid-antitone sl cs cs′ mono =
   sum-tab-mono (residAt sl cs′) (residAt sl cs)
     (λ i → residAt-antitone sl cs cs′ i (mono (toℕ i)))
 
--- … and connecting slot i zeroes i's own contribution outright, which
--- is the unit the share edge hands its callee
-residAt-connected : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n) →
-  residAt sl (toℕ i ∷ cs) i ≡ 0
-residAt-connected sl cs i with sl i
-... | scripted _ = refl
-... | shared d
-  rewrite T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl) = refl
 
 ------------------------------------------------------------------
 -- § 2.  nest, and the ONE inequality the frame refresh spends.
@@ -190,17 +182,6 @@ share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
 share-step sl cs i k eqi fresh (s≤s h) =
   ≤-trans (resid-connect sl cs i eqi fresh) h
 
--- the same step in the shape the clique actually holds it.  A subscribe
--- at `input i` has `nest (input i) sl cs ≤ bud`, and `input i` has
--- syncSize 1, so what the clause is really carrying down to the slot is
--- `resid sl cs ≤ bud − 1` — the residue alone.  Stated that way the
--- share edge needs no `input` term to be reconstructed at three heads
-share-step-resid : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-  (i : Fin n) {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
-  memberSource (toℕ i) cs ≡ false →
-  resid sl cs ≤ k → nest d sl (toℕ i ∷ cs) ≤ k
-share-step-resid sl cs i k eqi fresh h =
-  ≤-trans (resid-connect sl cs i eqi fresh) h
 
 ------------------------------------------------------------------
 -- § 4.  THE REMAINING EDGES.  `subscribeE` walks an operator chain and
@@ -228,22 +209,6 @@ mu-step : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
 mu-step body sl cs k (s≤s h) =
   subst (λ x → x + resid sl cs ≤ k) (sym (syncSize-unfoldμ body)) h
 
--- and the side condition the clause unfolds on comes free
-mu-1≤k : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
-  (sl : Slots Γ) (cs : List Source) (k : ℕ) → nest (μᵉ body) sl cs ≤ k → 1 ≤ k
-mu-1≤k body sl cs (suc k) h = s≤s z≤n
-
--- and the WEAKER μ step, which is all the premise itself needs: an
--- unfolding is one smaller on this measure, so the same budget still
--- covers it.  The budget only has to DESCEND where the level conjunct is
--- reported; carrying the hypothesis across the edge does not spend one
-mu-step-le : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
-  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  nest (μᵉ body) sl cs ≤ k → nest (unfoldμ body) sl cs ≤ k
-mu-step-le body sl cs k =
-  ≤-trans (+-monoˡ-≤ (resid sl cs)
-            (≤-trans (≤-reflexive (syncSize-unfoldμ body))
-                     (n≤1+n (syncSizeᵉ body))))
 
 -- ONE CHAIN EDGE.  Every operator's head is a strict subterm whose
 -- syncSize the constructor's own `suc` dominates, so one lemma with the
@@ -385,7 +350,3 @@ refresh-supplies-nest-strict S j o sl cs 1≤S hsz hsl =
   one-level-supply-strict S j (syncSizeᵉ o) (resid sl cs) 1≤S
     (≤-trans (syncSize≤sizeᵉ o) hsz)
     (≤-trans (resid≤slots sl cs) hsl)
-
--- the raise IS a raise: whatever the old k bought, the new one buys
-k-raise : ∀ (S J : ℕ) → 1 ≤ S → suc (sizeAt S J) ≤ suc (sizeAt S (suc J))
-k-raise S J 1≤S = s≤s (sizeAt-mono 1≤S ≤-refl (n≤1+n J))

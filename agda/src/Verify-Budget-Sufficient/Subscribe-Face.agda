@@ -1306,8 +1306,7 @@ sharedSlot-caps {Γ = Γ} c dep (suc bud′) j g i d κ id now sl sched st 2≤S
     , refl , queue-push (Caps.cSize c) (Caps.cWid c) dep (suc bud′) j (s≤s z≤n)
 -- THE CONNECT SPENDS THE LEVEL, so the callee runs at the PREDECESSOR and
 -- hands its sweep back at `suc bud′` — this head's own budget.  That is
--- what `share-step` is for; the weaker `share-step-resid` route threw the
--- strictness away before the callee could use it
+-- what `share-step` is for
 ...   | false = sharedConnect-caps c dep bud′ j g i d κ id now sl sched st
                   2≤S 1≤R slEq slC slSz inv szd wdd pC lC
                   (share-step sl (EvalSt.connectedShares st) i bud′ seq freshEq nst)
@@ -3116,8 +3115,7 @@ subscribeE-caps {u = u} c dep bud ops j g0 (μᵉ body) κ bid now sl sched st
 -- `opIterD S W dep bud′ (suc (sizeAt S …)) …`, and `sLvlD-suc` identifies
 -- the two only when `bud ≡ suc bud′`: a μ unfolding SPENDS a nesting
 -- level.  `mu-step` is that spend (syncSizeᵉ drops by one across the μ
--- edge); `mu-step-le`, which carried the hypothesis over for free, no
--- longer suffices — its own comment said as much.  Both zero clauses are
+-- edge).  Both zero clauses are
 -- absurd by CONSTRUCTOR: at `ops = 0` the index hypothesis reads
 -- `suc (sizeᵉ (μᵉ body)) ≤ 0`, and at `bud = 0` the nesting hypothesis
 -- reads `nest (μᵉ body) sl cs ≤ 0` with a μ's nest a successor

@@ -264,36 +264,8 @@ op-step-share S W d k m j j₁ 2≤S sub =
     (subst (λ x → x + j₁ ≤ sLvlD S W d k x) (sym (+-comm j 1)) sub)
 
 ------------------------------------------------------------------
--- § 2.  THE INDEX, and the two directions it travels.
+-- § 2.  THE INDEX.
 ------------------------------------------------------------------
-
--- THE WALK DIRECTION: fewer operators left is a smaller sweep, so a
--- callee that reports at m feeds a caller that holds `suc m` — which is
--- the gate's own step above, needing no lemma of its own
-index-mono : ∀ (S W d k m m′ J : ℕ) → 2 ≤ S → m ≤ m′ →
-  opIterD S W d k m J ≤ opIterD S W d k m′ J
-index-mono S W d k m m′ J 2≤S hm =
-  opIterD-mono m m′ d d k k 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hm
-
--- THE ENTRY DIRECTION: a fresh subscribe IS the sweep at the index the
--- size cap licenses, by the clause equation alone.  This is the ONE
--- place a unit of budget is spent, and it is an equation rather than a
--- choice: `sIterD`, `opIterD` and `fIterD` all pass k through untouched,
--- so a CARRYING edge — a chain step, a μ step — cannot spend one even if
--- it wanted to, and no clause needs a case split on the budget to thread
--- the hypothesis
-entry-is-sweep : ∀ (S W d k J : ℕ) →
-  sLvlD S W d (suc k) J ≡ opIterD S W d k (suc (sizeAt S J)) J
-entry-is-sweep = sLvlD-suc
-
--- so a chain member's conjunct is `opIterD S W dep bud m j` with m the
--- operators it has left, and the member that is ENTERED fresh converts
--- once, at the site that also spends the budget descent
-entry-to-index : ∀ (S W d k J m : ℕ) → 2 ≤ S → suc (sizeAt S J) ≤ m →
-  sLvlD S W d (suc k) J ≤ opIterD S W d k m J
-entry-to-index S W d k J m 2≤S hm =
-  ≤-trans (≤-reflexive (entry-is-sweep S W d k J))
-          (index-mono S W d k (suc (sizeAt S J)) m J 2≤S hm)
 
 -- AND THE WALK'S OWN INDEX IS THE PAYLOAD COUNT.  `sIterD S W d k m J`
 -- prices m payloads in sequence, so a walk's conjunct reads

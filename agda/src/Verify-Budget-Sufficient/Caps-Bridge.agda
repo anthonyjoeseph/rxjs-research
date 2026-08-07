@@ -44,10 +44,6 @@ open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; all; any; length)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
--- Fin/Vec vocabulary: the assembled cores' hypothesis types quantify over
--- slot indices (`residAt-connected`, `share-step-resid`).
-open import Data.Fin     using (Fin; toℕ)
-open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂; module ≡-Reasoning)
 
@@ -1432,10 +1428,14 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
 -- `iterSize (cSize c₀) (sizeCount c₀ _) (cSize c₀)`, and 2≤sizeCount
 -- says at least TWO sizeSteps run.  ONE is enough, because
 -- sizeStep S S = S * suc (2 * S) ≥ S + S ≥ suc S.
-sucSize≤frameBlowup : ∀ (c : Caps) (d : ℕ) →
+-- SEALED (private impl + abstract alias): burst-caps is on the
+-- budget-sufficient spine, and an unfoldable body here is what OOM'd
+-- VWF on 2026-08-07.
+private
+ sucSize≤frameBlowup-go : ∀ (c : Caps) (d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   suc (Caps.cSize c) ≤ Caps.cSize (frameBlowup c d)
-sucSize≤frameBlowup c d 2≤S 1≤R =
+ sucSize≤frameBlowup-go c d 2≤S 1≤R =
   ≤-trans sucS≤step
           (iterSize-mono-count S S 1≤S
             (≤-trans (s≤s z≤n) (2≤sizeCount c d 2≤S 1≤R)))
@@ -1459,20 +1459,27 @@ sucSize≤frameBlowup c d 2≤S 1≤R =
               (≤-trans (+-monoʳ-≤ S S≤S2S)
                        (≤-reflexive (sym (*-suc S (2 * S)))))
 
-capsAt-base-size⁺ : ∀ {n} {Γ : Ctx n} {t}
+private
+ capsAt-base-size⁺-go : ∀ {n} {Γ : Ctx n} {t}
   (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   3 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
-capsAt-base-size⁺ {n = n} e sl zero =
-  sucSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
-                            (suc (entryCeil n sl e))
-                            (suc (sizeᵉ e + slotsSize sl)))
+ capsAt-base-size⁺-go {n = n} e sl zero =
+  sucSize≤frameBlowup-go (caps (2 + sizeᵉ e + slotsSize sl)
+                               (suc (entryCeil n sl e))
+                               (suc (sizeᵉ e + slotsSize sl)))
     (capsBase e sl)
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
     (s≤s z≤n)
-capsAt-base-size⁺ e sl (suc id) =
-  ≤-trans (capsAt-base-size⁺ e sl id)
+ capsAt-base-size⁺-go e sl (suc id) =
+  ≤-trans (capsAt-base-size⁺-go e sl id)
           (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
              (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
+
+abstract
+  capsAt-base-size⁺ : ∀ {n} {Γ : Ctx n} {t}
+    (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+    3 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
+  capsAt-base-size⁺ = capsAt-base-size⁺-go
 
 -- helpers for burst-caps corollary
 
