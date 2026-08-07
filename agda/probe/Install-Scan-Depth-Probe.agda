@@ -7,7 +7,7 @@
 --     value exceeds storeNestMax(entry) + sizeᵗ(seed), confirming the
 --     old postulate was false as stated.
 --     MECHANISM: caseᵗ binds `here` to `evalTm (inlᵗ bigObs)` and the
---     left arm `pairᵗ (varᵗ here) (varᵗ here)` duplicates it, giving
+--     left arm `pairᵗ (varᵗ (here refl)) (varᵗ (here refl))` duplicates it, giving
 --     sizeᵛ = suc(2·N) while sizeᵗ(seed) = N+11.  For N=12: 25 > 23.
 --
 -- §2: VALIDATION of new postulate `installScan-depth-bound`.
@@ -40,6 +40,7 @@ module Install-Scan-Depth-Probe where
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_)
 open import Data.Bool using (Bool; false; true)
 open import Data.List using (List; []; _∷_)
+open import Data.Vec  using (Vec) renaming ([] to []ᵛ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -48,7 +49,7 @@ open import Rx.Prim using (Gas; g0)
 open import Rx.Exp
   using (Ty; natᵗ; obs; _×ᵗ_; _+ᵗ_; Ctx; Closed; Exp; Tm; Fn;
          evalTm; emptyᵉ; scanᵉ; strmᵗ; inlᵗ; caseᵗ; pairᵗ; varᵗ;
-         mergeAllᵉ; sizeᵉ; sizeᵗ)
+         mergeAllᵉ; sizeᵉ; sizeᵗ; sizeᵛ)
 open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; NodeId;
          scan-st; mintNode; installNode;
@@ -58,17 +59,20 @@ open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax)
 
 ------------------------------------------------------------------
 -- SHARED SETUP
--- Γ = [] (empty context), sched₀/sched₁/nid₀ shared across §1 and §2.
+-- Γ₀ = []ᵛ (empty context), sched₀/sched₁/nid₀ shared across §1 and §2.
 -- The phantom `e` in EvalSt differs per section.
 ------------------------------------------------------------------
 
-sched₀ : Sched []
+Γ₀ : Ctx 0
+Γ₀ = []ᵛ
+
+sched₀ : Sched Γ₀
 sched₀ = sched-init (emptyᵉ {t = natᵗ}) (λ ())
 
 nid₀ : NodeId
 nid₀ = proj₁ (mintNode sched₀)
 
-sched₁ : Sched []
+sched₁ : Sched Γ₀
 sched₁ = proj₂ (mintNode sched₀)
 
 ------------------------------------------------------------------
@@ -83,20 +87,20 @@ sched₁ = proj₂ (mintNode sched₀)
 ------------------------------------------------------------------
 
 private
-  e₁ : Closed [] natᵗ
+  e₁ : Closed Γ₀ natᵗ
   e₁ = emptyᵉ
 
   -- 11 mergeAllᵉ wrappers, each requiring the inner to be obs(_).
   -- emptyᵉ is polymorphic in t, so Agda infers the type chain.
-  bigObs : Exp [] [] [] [] (obs natᵗ)
+  bigObs : Exp Γ₀ [] [] [] (obs natᵗ)
   bigObs = mergeAllᵉ (mergeAllᵉ (mergeAllᵉ (mergeAllᵉ (mergeAllᵉ
              (mergeAllᵉ (mergeAllᵉ (mergeAllᵉ (mergeAllᵉ (mergeAllᵉ
              (mergeAllᵉ emptyᵉ))))))))))
   -- sizeᵉ bigObs = 12 (11 wrappers + 1 for emptyᵉ)
 
-  bigSeed : Tm [] [] [] [] (obs (obs natᵗ) ×ᵗ obs (obs natᵗ))
+  bigSeed : Tm Γ₀ [] [] [] (obs (obs natᵗ) ×ᵗ obs (obs natᵗ))
   bigSeed = caseᵗ (inlᵗ {t = obs (obs natᵗ)} (strmᵗ bigObs))
-                  (pairᵗ (varᵗ here) (varᵗ here))
+                  (pairᵗ (varᵗ (here refl)) (varᵗ (here refl)))
                   (pairᵗ (strmᵗ emptyᵉ) (strmᵗ emptyᵉ))
   -- evalTm bigSeed = (bigObs, bigObs)
   -- sizeᵛ = suc(sizeᵉ bigObs + sizeᵉ bigObs) = suc(12+12) = 25
@@ -138,21 +142,21 @@ _ = refl
 
 private
   -- Phantom program type matching the depthE call's root type.
-  e-prog : Closed [] (obs (obs natᵗ))
+  e-prog : Closed Γ₀ (obs (obs natᵗ))
   e-prog = emptyᵉ
 
   -- bigVal: 4 mergeAllᵉ wrappers, type = obs natᵗ, sizeᵉ = 5.
-  -- As a VALUE: bigVal : Val [] (obs (obs natᵗ)) = Exp [] [] [] [] (obs natᵗ).
+  -- As a VALUE: bigVal : Val Γ₀ (obs (obs natᵗ)) = Exp Γ₀ [] [] [] (obs natᵗ).
   -- sizeᵛ(obs (obs natᵗ)) bigVal = sizeᵉ bigVal = 5.
-  bigVal : Exp [] [] [] [] (obs natᵗ)
+  bigVal : Exp Γ₀ [] [] [] (obs natᵗ)
   bigVal = mergeAllᵉ (mergeAllᵉ (mergeAllᵉ (mergeAllᵉ emptyᵉ)))
 
-  largeSeed : Tm [] [] [] [] (obs (obs natᵗ))
+  largeSeed : Tm Γ₀ [] [] [] (obs (obs natᵗ))
   largeSeed = strmᵗ bigVal
   -- evalTm largeSeed = bigVal, sizeᵉ bigVal = 5
 
   -- trivial scan function: always returns emptyᵉ regardless of input
-  f₀ : Fn [] [] [] [] (obs (obs natᵗ) ×ᵗ obs natᵗ) (obs (obs natᵗ))
+  f₀ : Fn Γ₀ [] [] [] (obs (obs natᵗ) ×ᵗ obs natᵗ) (obs (obs natᵗ))
   f₀ = strmᵗ emptyᵉ
 
   st₂-new : EvalSt e-prog
@@ -164,11 +168,10 @@ _ : storeNestMax sched₁ st₂-new ≡ 5
 _ = refl
 
 -- ROW 2: RHS of new bound at b=emptyᵉ, κ=root, storeNestMax entry = 0
--- sizeᵉ emptyᵉ + suc(pathLen root) + storeNestMax sched₀ (st-init e-prog)
--- = 1 + 1 + 0 = 2
+-- sizeᵉ b + suc(pathLen root) + storeNestMax sched₀ (st-init e-prog)
+-- = sizeᵉ e-prog + 1 + 0 = 1 + 1 + 0 = 2
 -- storeNestMax post-install (5) > RHS (2): LOAD-BEARING.
-_ : sizeᵉ (emptyᵉ {t = obs natᵗ}) + suc 0 +
-      storeNestMax sched₀ (st-init e-prog) ≡ 2
+_ : sizeᵉ e-prog + suc 0 + storeNestMax sched₀ (st-init e-prog) ≡ 2
 _ = refl
 
 -- ROW 3: LOAD-BEARING validation: depthE = 0 despite large scan value.

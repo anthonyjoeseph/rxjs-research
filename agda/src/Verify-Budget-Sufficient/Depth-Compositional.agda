@@ -58,15 +58,13 @@ open import Data.Nat
   using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub;
-         m≤m⊔n; m≤n⊔m; n≤1+n; +-suc; +-assoc; +-comm; ≤-reflexive)
+         m≤m⊔n; m≤n⊔m; +-suc; ≤-reflexive)
 open import Data.Fin   using (Fin)
 open import Data.Vec   using (lookup)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
 open import Data.Bool  using (Bool; false; true)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; trans; sym; cong)
-
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
   using (Ty; natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ;
@@ -204,30 +202,6 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
   sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
   st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
--- ⚠ FALSE AS STATED — REFUTED 2026-08-07 (worker grind): `caseᵗ`
--- duplication makes `sizeᵛ t (evalTm seed)` exceed `sizeᵗ seed`
--- (e.g. `pairᵗ (varᵗ here) (varᵗ here)` over an observable value:
--- sizeᵛ = 2·sizeᵉ + 1 against sizeᵗ = sizeᵉ + 1), and evalTm's blowup
--- is generally TOWER-shaped (evalWith-size, Caps-Face's own comment).
--- No additive constant repairs it, and no linear RHS can absorb it in
--- `scan-size-arith`.  THE ROUTE IS DEAD, NOT THE THEOREM: the actual
--- `depthE` VALUE plausibly never reads a freshly-installed scan node
--- on the subscribe side (scan accumulators are read at DELIVERY —
--- the depthFold family, out of this statement's scope per census
--- finding (2)), so the honest repair is an INSTALL-INVARIANCE lemma —
--- `depthE g b κ bid now sched' (installNode nid (scan-st v) st)`
--- bounded independently of `sizeᵛ v` — replacing this postulate and
--- rerouting the scanᵉ clause through the ENTRY store, not the
--- installed one.  Kept compiling as a postulate so the refutation is
--- greppable at the exact site it poisons; see PROOF-STATE row 5 and
--- task #49.
-postulate
-  storeNestMax-installScan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sched : Sched Γ) (st : EvalSt e) (seed : Tm Γ [] [] [] u) →
-    storeNestMax (proj₂ (mintNode sched))
-                 (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)
-      ≤ storeNestMax sched st + sizeᵗ seed
-
 -- setNode with take-st never increases nodesNestMax: nodeNestMax(take-st _) = 0.
 private
   setNode-take-nodesNestMax : ∀ {n} {Γ : Ctx n}
@@ -252,6 +226,30 @@ storeNestMax-installTake sched st k =
         (≤-trans (setNode-take-nodesNestMax (Sched.nextNode sched) (suc k)
                    (EvalSt.nodes st))
                  (m≤n⊔m _ _))
+
+-- INSTALL-INVARIANCE for scan: installing a scan node does not increase
+-- the subscribe-side depth beyond the ENTRY store bound.
+--
+-- depthFrame(scan-f fn nid) = 0 definitionally (Caps-Depth:362), so
+-- the scan accumulator's value is never read during subscribe.  The IH
+-- on b runs against (sched₁, installNode nid (scan-st v) st), but the
+-- storeNestMax bound refers to the ENTRY (sched, st) — no size of v
+-- appears on the RHS.
+--
+-- PROBED 2026-08-07: Install-Scan-Depth-Probe.agda §2 confirms
+-- depthE = 0 at b=emptyᵉ with storeNestMax(post-install)=5 > 2=RHS,
+-- ruling out any hidden dependence of depthE on the scan accumulator.
+-- Shapes NOT covered: shared-slot inner b, post-cascade state.
+postulate
+  installScan-depth-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (b : Closed Γ s)
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (κ : Path Γ u t) (bid : Id) (now : Tick)
+    (v : Val Γ u) (sched : Sched Γ) (st : EvalSt e) →
+    depthE g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
+               (proj₂ (mintNode sched))
+               (installNode (proj₁ (mintNode sched)) (scan-st v) st)
+      ≤ sizeᵉ b + suc (pathLen κ) + storeNestMax sched st
 
 ------------------------------------------------------------------
 -- ARITHMETIC HELPERS — proved here.
@@ -283,31 +281,16 @@ take-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 take-size-arith c b κ sched st =
   +-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ c)) ≤-refl
 
--- scan: a + suc p + (S + z) ≤ suc (c + z + a) + p + S.
--- The extra z in the LHS is absorbed into sizeᵗ seed + sizeᵉ b on the RHS.
-private
-  -- rearranges a + p + (S + z) ≡ z + a + p + S using +-assoc/+-comm
-  scan-rearrange : ∀ (a p S z : ℕ) → a + p + (S + z) ≡ z + a + p + S
-  scan-rearrange a p S z =
-    trans (sym (+-assoc (a + p) S z))
-    (trans (+-comm ((a + p) + S) z)
-    (trans (sym (+-assoc z (a + p) S))
-    (cong (_+ S) (sym (+-assoc z a p)))))
-
-  -- a + suc p + (S + z) ≤ suc (c + z + a) + p + S, by induction on c
-  scan-size-go : ∀ (a p S z c : ℕ) → a + suc p + (S + z) ≤ suc (c + z + a) + p + S
-  scan-size-go a p S z zero    =
-    ≤-trans (≤-reflexive (cong (_+ (S + z)) (+-suc a p)))
-            (s≤s (≤-reflexive (scan-rearrange a p S z)))
-  scan-size-go a p S z (suc c) = ≤-trans (scan-size-go a p S z c) (n≤1+n _)
-
+-- scan: same shape as map-size-arith (no sizeᵗ seed on LHS)
+-- because installScan-depth-bound routes the IH through the ENTRY
+-- store (storeNestMax sched st), bypassing the installed scan value.
 scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
   (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-  sizeᵉ b + suc (pathLen κ) + (storeNestMax sched st + sizeᵗ seed)
+  sizeᵉ b + suc (pathLen κ) + storeNestMax sched st
     ≤ sizeᵉ (scanᵉ f seed b) + pathLen κ + storeNestMax sched st
 scan-size-arith f seed b κ sched st =
-  scan-size-go (sizeᵉ b) (pathLen κ) (storeNestMax sched st) (sizeᵗ seed) (sizeᵗ f)
+  +-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ f + sizeᵗ seed)) ≤-refl
 
 ------------------------------------------------------------------
 -- THE ASSEMBLY — structurally recursive on `b`; dispatch order follows
@@ -380,13 +363,13 @@ private
     st₀    = installNode nid (take-st (suc k)) st
     r      = subscribeE fuel b (take-f nid ↠ κ) bid now sched₁ st₀
 
-  -- BUCKET (b): scanᵉ — burst(scan-f) = 0; storeNestMax grows by sizeᵗ seed
+  -- BUCKET (b): scanᵉ — burst(scan-f) = 0; IH routed through ENTRY store
+  -- via installScan-depth-bound (install-invariance: depthE never reads
+  -- the freshly-installed scan accumulator on the subscribe side).
   depth-compositional-go fuel (scanᵉ f seed b) κ bid now sched st =
     ≤-trans
       (⊔-lub
-        (≤-trans
-          (depth-compositional-go fuel b (scan-f f nid ↠ κ) bid now sched₁ st₀)
-          (+-mono-≤ ≤-refl (storeNestMax-installScan sched st seed)))
+        (installScan-depth-bound fuel b f κ bid now (evalTm seed) sched st)
         (≤-trans (burst-scf-zero fuel bid now f nid κ
                     (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
                  z≤n))
