@@ -93,17 +93,19 @@ module OpIterD-Invariant-Rehearsal where
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-refl; ≤-reflexive; ≤-trans; n≤1+n; m≤n+m; m≤m+n;
-         *-identityˡ; *-identityʳ; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤;
+         *-identityˡ; *-identityʳ; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; *-suc;
          +-suc; +-identityʳ; +-mono-≤; +-monoʳ-≤; <⇒≤; ^-monoˡ-≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
 open import Rx.Evaluator
   using (sizeAt; widAt; opIterD; sLvlD; dLvl; lvls; dCapᶜ; dWalkᶜ; regAt;
-         fLvl; iterFold; foldStep)
+         fLvl; iterFold; foldStep; fIterD; opIterD-0; opIterD-suc)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; caps; cDel; cDel-body; sizeAt-mono; fLvl≤fLvlD;
-         iterL-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; n<2^n)
-open import Verify-Budget-Sufficient.Op-Dominance using (climb; fLvlD-le-dLvl)
+  using (Caps; caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD;
+         iterL-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front;
+         lvls-mono; lvls-add; n<2^n)
+open import Verify-Budget-Sufficient.Op-Dominance
+  using (climb; fLvlD-le-dLvl; fIterD-lvls)
 
 -- the tail-closure: Y together with its burst tail, in lvls-currency.
 -- fIterD-lvls (PROVEN, Op-Dominance) says every TAIL lands under G.
@@ -223,48 +225,188 @@ tail-fits S W d R J g 2≤S 1≤R 2≤g =
                           ≤-refl ≤-refl (1≤regAt S R J 1≤R)))
 
 ------------------------------------------------------------------
--- § THE INVARIANT (the recursive payment claim)
+-- § THE GLUE — the identities the payment induction sequences with.
+-- All PROVEN.  The load-bearing discovery: THE WALK VALUE AT p
+-- POSITIONS IS THE p-TH RESTART LEVEL (walk-spend below composes
+-- lvls-add over dWalkᶜ-front), and ONE POSITION'S SUB-BUDGET REACH IS
+-- DOMINATED BY THE NEXT RESTART (restart-dominates) — so a recursive
+-- payment's conclusion glues directly into the next round's `G X ≤ J`
+-- hypothesis with no residual bookkeeping.
+------------------------------------------------------------------
+
+-- spending never descends
+lvls-infl : ∀ S W d J n → J ≤ lvls S W d J n
+lvls-infl S W d J zero    = ≤-refl
+lvls-infl S W d J (suc n) =
+  ≤-trans (lvls-infl S W d J n)
+          (iterL-infl S W d (suc (sizeAt S (lvls S W d J n))) (lvls S W d J n))
+
+-- the tail-closure is monotone
+G-mono : ∀ S W d {X Y} → 2 ≤ S → X ≤ Y → G S W d X ≤ G S W d Y
+G-mono S W d 2≤S hXY =
+  lvls-mono _ _ 2≤S ≤-refl ≤-refl hXY
+    (s≤s (widAt-mono 2≤S ≤-refl ≤-refl hXY))
+
+-- one TAIL costs at most one more G-closure
+G-tail : ∀ S W d k Z → 2 ≤ S →
+  G S W d (fIterD S W d k (suc (widAt S W Z)) Z) ≤ G S W d (G S W d Z)
+G-tail S W d k Z 2≤S =
+  G-mono S W d 2≤S (fIterD-lvls S W d k (suc (widAt S W Z)) Z 2≤S)
+
+-- THE SEQUENCING FRAME: one position = one dLvl-step + a full gas-g
+-- sub-budget, and the walk RESTARTS from the level reached.
+-- (lvls S W d J 1 is definitionally dLvl S W d J.)
+walk-spend : ∀ S W R d g J i →
+  lvls S W d J (dWalkᶜ S W R d g J (suc i))
+    ≡ lvls S W d (lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J))))
+                 (dWalkᶜ S W R d g
+                   (lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J)))) i)
+walk-spend S W R d g J i =
+  trans (cong (lvls S W d J) (dWalkᶜ-front S W R d g J i))
+        (lvls-add S W d J
+          (suc (dCapᶜ S W R d g (dLvl S W d J)))
+          (dWalkᶜ S W R d g
+            (lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J)))) i))
+
+-- ONE POSITION'S SUB-BUDGET REACH ≤ THE NEXT RESTART LEVEL: whatever
+-- lvls P (dCapᶜ g P) reaches, the walk's own restart
+-- lvls P (suc (dCapᶜ g (dLvl P))) exceeds it — dCapᶜ is monotone in
+-- its level (P ≤ dLvl P) and the count gains a suc.
+restart-dominates : ∀ S W R d g P → 2 ≤ S →
+  lvls S W d P (dCapᶜ S W R d g P)
+    ≤ lvls S W d P (suc (dCapᶜ S W R d g (dLvl S W d P)))
+restart-dominates S W R d g P 2≤S =
+  lvls-mono _ _ 2≤S ≤-refl ≤-refl ≤-refl
+    (≤-trans (dCapᶜ-mono g g 2≤S ≤-refl ≤-refl ≤-refl ≤-refl
+                (iterL-infl S W d (suc (sizeAt S P)) P))
+             (n≤1+n _))
+
+------------------------------------------------------------------
+-- § THE POSITION-FORM INDUCTION (walk-paid) — the skeleton, with the
+-- two PER-ROUND obligations scoped as narrow postulates.  The base
+-- case is PROVEN (the conclusion at m = 0 is literally the hypothesis:
+-- dWalkᶜ g J 0 = 0 and lvls J 0 = J).  Recursion structure for the suc
+-- case, validated by the glue above: lexicographic on (g, m) — the
+-- round's sub-climb sLvlD k (J₀ X) = opIterD (k−1) … recurses at
+-- (g−1, ·) inside ONE position's dCapᶜ-g sub-budget (a (g−1)-walk),
+-- guard suc(k−1) ≤ g−1 ⟸ suc k ≤ g exactly; the remaining rounds
+-- recurse at (g, m−1) from the restart level walk-spend hands back;
+-- restart-dominates glues the sub-budget's reach into the next
+-- hypothesis with no residue.
 ------------------------------------------------------------------
 
 postulate
-  -- Pay a k-climb of m rounds from the gas-g walk at level J, given:
-  -- the gas covers the k-descent (suc k ≤ g), THIS level's positions
-  -- cover the round count (m ≤ suc (J · S) ≤ regAt S R J via 1 ≤ R),
-  -- and the climb-so-far — tail-closure included — sits below the
-  -- walk's level (G X ≤ J).
-  --
-  -- PROOF PLAN (refined 2026-08-07): the induction is really over the
-  -- POSITION index, via the sequencing frame that falls out of
-  -- dWalkᶜ-front + lvls-add:
-  --   walk-spend : lvls J (dWalkᶜ g J (suc i))
-  --                  ≡ lvls J₁ (dWalkᶜ g J₁ i)
-  --                where J₁ = lvls J (suc (dCapᶜ g (dLvl J)))
-  -- — "one position = one dLvl-step plus a full gas-g sub-budget,
-  -- then the walk RESTARTS from the level reached".  Chronological
-  -- payment order per round is jump (2 positions, jump-2step with
-  -- monotone slack), sub-climb (ONE position's gas-g sub-budget,
-  -- recursively at (k−1); the m′-guard is restored at the sub-budget's
-  -- boosted level by dLvl-gain-sizeAt), and the m TAILs cascade at the
-  -- end, one position's sub-budget LENGTH each (tail-fits, needing the
-  -- sub-budget gas ≥ 2).  Tail closure composes because
-  -- G (TAIL Z) ≤ G (G Z) (fIterD-lvls + widAt-mono + lvls-mono), and
-  -- G at a covered walk point is one more tail-fits application.
-  -- ~4 positions per round; the position-form statement should carry
-  -- `4 * m ≤ i` and be specialized to this level form at
-  -- i = regAt S R J (whose guard bookkeeping vs 1 ≤ R is settled when
-  -- proving, not here).
-  rounds-paid : ∀ S W d R g k m X J → 2 ≤ S → 1 ≤ R →
-    suc k ≤ g → m ≤ suc (J * S) → G S W d X ≤ J →
-    G S W d (opIterD S W d k m X) ≤ lvls S W d J (dCapᶜ S W R d g J)
+  -- (a) ONE ROUND'S ENTRY: from a level J dominating the climb-so-far,
+  -- four positions of the gas-g walk pay the jump (jump-2step over two
+  -- positions' dLvl-steps, monotone slack), the sub-climb (the
+  -- (g−1, k−1) recursion inside one position's sub-budget, its
+  -- m′-guard restored at the boosted level by dLvl-gain-sizeAt), and
+  -- land the entry's G-closure below the fourth restart.
+  round-entry-glue : ∀ S W R d g k X J → 2 ≤ S → 1 ≤ R →
+    suc k ≤ g → 2 ≤ g →
+    G S W d X ≤ J →
+    G S W d (sLvlD S W d k
+              (suc (X + suc (sizeAt S X) * suc (sizeAt S X))))
+      ≤ lvls S W d J (dWalkᶜ S W R d g J 3)
 
-  -- The TOP form: entry (sLvlD k J₀′, a (k−1)-sub-climb from a level
-  -- the walk has not yet reached) PLUS the m rounds, paid inside ONE
-  -- budget — unsplittable because regAt S R 0 = R may be 1, so entry
-  -- and rounds share the single top position's gas-S sub-budget.  Its
-  -- eventual proof is one unrolling of the same scheme: dWalkᶜ-front
-  -- once at level 0, then the entry as sub-climb #0 and `rounds-paid`
-  -- for the rest.  Gas is generalized (suc S ≤ g) so the assembly
-  -- below pins cDel's exact gas by cDel-body rather than by hand.
+  -- (c) ONE TAIL: given the recursive payment's conclusion at a walk
+  -- point, one more position absorbs the round's TAIL — G-tail turns
+  -- the tail into one more G-closure, tail-fits (at gas g ≥ 2, via
+  -- widAt-mono at the dominating restart) pays it from the next
+  -- position's sub-budget length.
+  round-tail-glue : ∀ S W R d g k Z J i → 2 ≤ S → 1 ≤ R → 2 ≤ g →
+    G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J i) →
+    G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
+      ≤ lvls S W d J (dWalkᶜ S W R d g J (suc i))
+
+-- the iterated sequencing frame: p + q positions from J = q positions
+-- from the p-th restart level
+walk-spend-many : ∀ S W R d g J p q →
+  lvls S W d J (dWalkᶜ S W R d g J (p + q))
+    ≡ lvls S W d (lvls S W d J (dWalkᶜ S W R d g J p))
+                 (dWalkᶜ S W R d g (lvls S W d J (dWalkᶜ S W R d g J p)) q)
+walk-spend-many S W R d g J zero    q = refl
+walk-spend-many S W R d g J (suc p) q =
+  trans (walk-spend S W R d g J (p + q))
+  (trans (walk-spend-many S W R d g J₁ p q)
+         (sym (cong (λ L → lvls S W d L (dWalkᶜ S W R d g L q))
+                    (walk-spend S W R d g J p))))
+  where
+  J₁ = lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J)))
+
+-- THE POSITION-FORM INVARIANT, a real definition recursing on m: m
+-- rounds cost 4m positions, and the walk value at p positions IS the
+-- p-th restart level (walk-spend), so each conclusion is the next
+-- call's hypothesis verbatim.
+walk-paid : ∀ S W R d g k m X J → 2 ≤ S → 1 ≤ R →
+  suc k ≤ g → 2 ≤ g →
+  G S W d X ≤ J →
+  G S W d (opIterD S W d k m X)
+    ≤ lvls S W d J (dWalkᶜ S W R d g J (4 * m))
+walk-paid S W R d g k zero X J 2≤S 1≤R hk 2≤g hX =
+  ≤-trans (G-mono S W d 2≤S
+            (≤-reflexive (opIterD-0 S W d k X)))
+          hX
+walk-paid S W R d g k (suc m) X J 2≤S 1≤R hk 2≤g hX =
+  ≤-trans (G-mono S W d 2≤S (≤-reflexive (opIterD-suc S W d k m X)))
+  (≤-trans tail-step
+           (≤-reflexive
+             (cong (λ i → lvls S W d J (dWalkᶜ S W R d g J i)) count-eq)))
+  where
+  J₀X = suc (X + suc (sizeAt S X) * suc (sizeAt S X))
+  X₁  = sLvlD S W d k J₀X
+  Z   = opIterD S W d k m X₁
+  P₃  = lvls S W d J (dWalkᶜ S W R d g J 3)
+
+  entry : G S W d X₁ ≤ P₃
+  entry = round-entry-glue S W R d g k X J 2≤S 1≤R hk 2≤g hX
+
+  rec : G S W d Z ≤ lvls S W d P₃ (dWalkᶜ S W R d g P₃ (4 * m))
+  rec = walk-paid S W R d g k m X₁ P₃ 2≤S 1≤R hk 2≤g entry
+
+  rec′ : G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J (3 + 4 * m))
+  rec′ = ≤-trans rec
+           (≤-reflexive (sym (walk-spend-many S W R d g J 3 (4 * m))))
+
+  tail-step : G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
+                ≤ lvls S W d J (dWalkᶜ S W R d g J (suc (3 + 4 * m)))
+  tail-step = round-tail-glue S W R d g k Z J (3 + 4 * m) 2≤S 1≤R 2≤g rec′
+
+  count-eq : suc (3 + 4 * m) ≡ 4 * suc m
+  count-eq = sym (*-suc 4 m)
+
+------------------------------------------------------------------
+-- § THE TOP FORM, and THE k = S GAS CORNER (found 2026-08-07 by
+-- formalizing walk-paid — this is the kind of finding the rehearsal
+-- exists to surface BEFORE the src grind).
+--
+-- walk-paid above covers a k-climb from a walk of gas-index g with
+-- suc k ≤ g, tails charged at the SAME level (round-tail-glue).  The
+-- top budget cDel = dWalkᶜ S 0 (regAt S R 0 = R), and R may be 1, so
+-- everything must fit inside ONE position's dCapᶜ S sub-budget — a
+-- gas-(S−1)-INDEXED walk.  walk-paid there needs suc k ≤ S − 1, i.e.
+-- the scheme as built covers k ≤ S − 2 outright, and k ≤ S − 1 when
+-- R ≥ the position count (rare).  The statement's guard is k ≤ S:
+-- the corner k ∈ {S−1, S} needs ONE of:
+--   (i)  a pending-tail accumulator in walk-paid — charge each level's
+--        tails TWO ancestor walk levels up (ancestors' later positions
+--        are plentiful at boosted levels); recovers the exact k ≤ S
+--        at the cost of visibly heavier bookkeeping; or
+--   (ii) ONE unit of guard slack threaded from the consumers —
+--        `suc (suc k) ≤ suc S`, i.e. nest + 1 < cSize.  Likely FREE:
+--        cSize (capsAt e sl id) carries the base caps' `2 +` floor
+--        above sizeᵉ e + slotsSize, and nest ≤ sizeᵉ + slotsSize
+--        (nest≤), so nest + 2 ≤ cSize at the root and by monotonicity
+--        above it.  This is the repo-preferred move (a free hypothesis
+--        beats carried bookkeeping) but it touches the -core's guard
+--        and its consumers' discharge sites — a statement repair to
+--        rule on, not to improvise at night.
+-- climb-paid is stated at the ORIGINAL guard (k ≤ S) so the assembly
+-- below keeps validating the exact target; its proof from walk-paid
+-- will need (i) or (ii).
+------------------------------------------------------------------
+
+postulate
   climb-paid : ∀ S W d k m R g → 2 ≤ S → k ≤ S → suc m ≤ S → 1 ≤ R →
     suc S ≤ g →
     G S W d (climb S W d k m) ≤ lvls S W d 0 (dCapᶜ S W R d g 0)
