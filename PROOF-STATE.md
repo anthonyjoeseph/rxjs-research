@@ -112,6 +112,16 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | 13 | `sizeCount-mono-d` | Caps-Bridge.agda | **NEW 2026-08-06 — the single postulate tier-1 #4's discharge rests on** | `sizeCount c` is monotone in its depth-fuel argument (`2 ≤ cSize c`, `d ≤ d′` → `sizeCount c d ≤ sizeCount c d′`). **Why it is true:** `d` occurs only positively — `sizeCount c d = lvls S W d 0 (cDel c d)`, `d` feeds `lvls` through `fLvlD`'s fuel and `cDel` through `dCapᶜ`/`dWalkᶜ` (whose own `d`-occurrence is again `lvls`); the crux 0-vs-suc clause comparison is the Evaluator's own documented design intent (Rx/Evaluator.agda:762, "the refresh dominates it at every budget including the empty one": suc's sIterD takes `suc (widAt)` steps each mapping `J ↦ sLvlD … (suc J) ≥ suc J`, dominating `fLvl + suc (widAt)` pointwise). **Eventual proof:** the mutual monotonicity grind over the fLvlD SCC through its exported clause equations (`fLvlD-0`/`fLvlD-suc`/`fIterD-0`/…, since the SCC is `abstract`) — the same family as the proven `lvls-mono`, extended to vary `d`. **NOT cheaply probeable** (any instance at `d ≥ 1` walks `widAt`, a 2^-tower in the level), same class as #6; confidence rests on positivity, not rows. Lives in Caps-Bridge for recheck economics (Caps.agda is upstream of Wet/Subscribe-Face); move it home next time Caps.agda is dirty anyway. |
 | 12 | ~~`three-size≤capsH-core`~~ | — | **DISCHARGED 2026-08-06 (`559780a`), then re-shaped (`2d4b899`)** | `three-size-le-blowH` + a 7-lemma support chain landed in `Caps.agda`; the postulate is gone and `three-size≤capsH` is a real definition. `S≤sizeStep` was deleted with it (its sole consumer was the replaced hypothesis slot). **Then it nearly died twice by accident** — a worker deleting the superseded root chain stranded `three-size-le-blowH`, and a second worker proposed deleting THAT. Both times the orphan report was right and the ruling was wrong: it is one half of the depth composition (`depth-capped` gives `depthE ≤ 3·cSize`, this gives `3·cSize(base) ≤ blowH`), and the two chain to `depthE ≤ capsH e ins 0`. Now wired root-first: `three-size≤capsH` → `depthE≤capsH-root` → hypothesis of `sub-charge-capsOK-lift-core`. **The lesson is general: a consumer-count sweep cannot tell a dead lemma from an unconnected half of a composition. Read what an orphan SAYS before ruling on it.** |
 
+> **DELETION RECORD (2026-08-07, `1ef9b3d`).** `opIterD-budget-core`'s discharge
+> orphaned its seven expression-level hypotheses' kit, and the sweep removed eight
+> definitions: `entry-to-index`, `index-mono`, `entry-is-sweep` (Caps-Chain) and
+> `residAt-connected`, `share-step-resid`, `mu-1≤k`, `mu-step-le`, `k-raise`
+> (Caps-Nest). All were structural-route kit superseded by the pure level-arithmetic
+> proof; `mu-step-le` was already recorded as superseded by `mu-step` at
+> Subscribe-Face:3118. The predicted cascade to `resid-connect` / `resid-antitone`
+> did NOT happen — both are still consumed (`share-step`, `nest-keeps`). Git is the
+> archive.
+
 ### Tier 2 — the main proof branch (Verify-Well-Formed, 21; plus batch-online)
 
 > **PARKED behind tier 1** — see THE TIER ORDERING LAW in the roadmap below.
