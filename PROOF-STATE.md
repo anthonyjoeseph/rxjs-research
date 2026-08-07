@@ -92,7 +92,28 @@ decidable bound over COMPUTABLE functions (`evaluate`, `capsOK?`, `depthE`,
 QuickCheck/oracle only ever tested impl≡spec — before 2026-08-06 **no postulate
 in this ledger had ever been probed**; closing that blind spot is Phase 0.
 
-### Tier 1 — Verify-Budget-Sufficient (originally 12; #4, #8, #12 discharged, #13 added — 10 live)
+### Tier 1 — Verify-Budget-Sufficient (originally 12; #4, #6, #7, #8, #12, #13 discharged — 6 live)
+
+> **STATE, 2026-08-07 morning.** Six of the original ledger are gone. What is
+> LEFT splits cleanly in two, and the split is the schedule:
+>
+> - **The anchor problem — #1, #2, #3, and #11 by inheritance.** All four reduce
+>   to the three demand postulates in `Anchor-Dry.agda` (`chainStep-demand`,
+>   `foldPath-demand`, `subscribeInner-demand`). Discharging those discharges the
+>   block. This is real mathematics — the reachability induction — and it is the
+>   critical path.
+> - **Two grinds and one refuted kit lemma — #5, #9, #10.** `depth-compositional`
+>   is assembled with `storeNestMax-installScan` refuted and being rerouted; the
+>   two Caps-Face faces are grinds over kit that already exists.
+>
+> The discharges of #6 and #7 have a common shape worth naming: **both postulates
+> carried a pile of leading hypotheses that the eventual proof did not use.**
+> #6 shed seven expression-level lemmas (its proof is pure level arithmetic);
+> #7 shed eight scaffolding facts (`scripted`'s own type index closed the branch).
+> Sixteen definitions were swept as superseded across the two. When a `-core`'s
+> hypothesis list looks like a route, treat it as a HYPOTHESIS about the route,
+> not as a specification — and check whether the direct proof needs it at all
+> before grinding through it.
 
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
