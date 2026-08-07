@@ -204,10 +204,23 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
   sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
   st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
--- After mintNode + installNode(scan-st(evalTm seed)), storeNestMax
--- grows by at most sizeᵗ seed: nodeNestMax(scan-st v) = sizeᵛ t v
--- ≤ sizeᵗ seed (evalTm-sizeᵛ sub-lemma), and mintNode only bumps
--- nextNode, not slots.
+-- ⚠ FALSE AS STATED — REFUTED 2026-08-07 (worker grind): `caseᵗ`
+-- duplication makes `sizeᵛ t (evalTm seed)` exceed `sizeᵗ seed`
+-- (e.g. `pairᵗ (varᵗ here) (varᵗ here)` over an observable value:
+-- sizeᵛ = 2·sizeᵉ + 1 against sizeᵗ = sizeᵉ + 1), and evalTm's blowup
+-- is generally TOWER-shaped (evalWith-size, Caps-Face's own comment).
+-- No additive constant repairs it, and no linear RHS can absorb it in
+-- `scan-size-arith`.  THE ROUTE IS DEAD, NOT THE THEOREM: the actual
+-- `depthE` VALUE plausibly never reads a freshly-installed scan node
+-- on the subscribe side (scan accumulators are read at DELIVERY —
+-- the depthFold family, out of this statement's scope per census
+-- finding (2)), so the honest repair is an INSTALL-INVARIANCE lemma —
+-- `depthE g b κ bid now sched' (installNode nid (scan-st v) st)`
+-- bounded independently of `sizeᵛ v` — replacing this postulate and
+-- rerouting the scanᵉ clause through the ENTRY store, not the
+-- installed one.  Kept compiling as a postulate so the refutation is
+-- greppable at the exact site it poisons; see PROOF-STATE row 5 and
+-- task #49.
 postulate
   storeNestMax-installScan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sched : Sched Γ) (st : EvalSt e) (seed : Tm Γ [] [] [] u) →
