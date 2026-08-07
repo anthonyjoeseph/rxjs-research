@@ -182,7 +182,11 @@ deserialization (6.4 s for Subscribe-Face, of which 5.1 s IS deserialization) an
 an experiment run with weakened flags cannot silently poison the cache this way either.
 
 **A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF DIES.**
-Measured 2026-08-07, twice, as `Killed: 9` OOMs (>15 GB, 30-50 min in VWF before death):
+Measured 2026-08-07, THREE times now — the third was `opIterD-budget`'s discharge, whose
+unsealed body handed VWF the whole Op-Budget tower and OOM'd it again. **The rule is
+cheap and the failure costs 40 minutes: whenever a postulate on this spine becomes a real
+definition, seal it IN THE SAME EDIT, before running anything.** The first two were
+`Killed: 9` OOMs (>15 GB, 30-50 min in VWF before death):
 converting the `sub-charge-capsOK-lift` / `init-capsOK?` / `depth-compositional` postulates
 into REAL definitions handed VWF's conversion their unfoldable bodies, which reach the
 `opIterD-dominated`/`lvls-mono` proof towers. With the same proofs sealed, VWF checks in
