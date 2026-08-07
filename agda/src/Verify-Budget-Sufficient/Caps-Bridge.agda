@@ -98,6 +98,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
 -- Acyclic: Depth-Bound imports Wet and Subscribe-Face, NOT Caps-Bridge.
 open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
 open import Verify-Budget-Sufficient.Op-Dominance using (opIterD-dominated)
+open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH)
 open import Verify-Budget-Sufficient.Anchor-Dry
@@ -1210,41 +1211,8 @@ depthE≤capsH-root e ins =
 -- depthE≤capsH-root (above), whose consumer is burst-caps: it
 -- discharges the root instance of the depOK premise threaded below.
 
-postulate
-  -- THE ONE GAP the subscribe-side lift now rests on: `sizeCount` is
-  -- monotone in its depth-fuel argument.  This is what lets the walk
-  -- receipt, priced at the call's own `depthE`, climb to the story
-  -- index `capsH e sl id` that `capsAt`'s recurrence actually spends
-  -- (`capsAt-suc-full`'s j-argument) — the depOK premise supplies
-  -- `dep ≤ capsH` and this postulate turns it into
-  -- `sizeCount c dep ≤ sizeCount c (capsH e sl id)`.
-  --
-  -- WHY IT IS TRUE (route for the eventual proof): d occurs only
-  -- positively.  `sizeCount c d = lvls S W d 0 (cDel c d)`
-  -- (sizeCount-body); d feeds lvls through `fLvlD`'s depth fuel and
-  -- feeds `cDel` through `dCapᶜ`/`dWalkᶜ`, whose own d-occurrence is
-  -- again `lvls`.  The crux is fLvlD's 0-vs-suc clause comparison —
-  -- Rx/Evaluator.agda:762 records the design intent ("the refresh
-  -- dominates it at every budget including the empty one"): the suc
-  -- clause's sIterD takes `suc (widAt S W J)` steps each mapping
-  -- J ↦ sLvlD … (suc J) ≥ suc J, so it dominates the 0-clause's
-  -- `fLvl + suc (widAt)` pointwise.  The inductive d-step is the
-  -- mutual monotonicity grind over the fLvlD SCC, worked through the
-  -- exported clause equations (fLvlD-0/fLvlD-suc/fIterD-0/…) since the
-  -- SCC itself is abstract — the same family as the proven lvls-mono.
-  --
-  -- NOT CHEAPLY PROBEABLE, same class as opIterD-budget-core: any
-  -- concrete instance at d ≥ 1 walks `widAt`, whose iterFold is a
-  -- 2^-tower in the level, so evaluation explodes below the smallest
-  -- meaningful caps.  Confidence rests on the positivity argument
-  -- above, not on rows.
-  --
-  -- Lives here rather than in Caps.agda (its natural home, next to
-  -- sizeCount) purely for recheck economics: Caps.agda is upstream of
-  -- Wet and Subscribe-Face, and this file is downstream of both.  Move
-  -- it home the next time Caps.agda is dirty anyway.
-  sizeCount-mono-d : ∀ (c : Caps) {d d′ : ℕ} → 2 ≤ Caps.cSize c →
-    d ≤ d′ → sizeCount c d ≤ sizeCount c d′
+-- sizeCount-mono-d is now a real proof in Verify-Budget-Sufficient.Level-Mono
+-- (imported above, tier-1 #13 discharged 2026-08-07).
 
 -- THE SUBSCRIBE-SIDE CAPS LIFT, and it is PROVEN (2026-08-06) — the
 -- `sub-charge-capsOK-lift-core` postulate this replaces was tier-1 #4.
