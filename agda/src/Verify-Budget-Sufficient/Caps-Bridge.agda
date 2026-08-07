@@ -37,6 +37,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        ≤-reflexive; m≤n+m; m≤m+n; n≤1+n;
                                        m≤m⊔n; m≤m*n;
                                        *-mono-≤; *-monoʳ-≤; +-mono-≤; *-comm;
+                                       +-monoˡ-≤; +-monoʳ-≤; *-suc;
                                        *-distribˡ-+; *-identityʳ; +-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -97,10 +98,11 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
 -- premise on sub-charge-capsOK-lift).
 -- Acyclic: Depth-Bound imports Wet and Subscribe-Face, NOT Caps-Bridge.
 open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
-open import Verify-Budget-Sufficient.Op-Dominance using (opIterD-dominated)
+open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
-  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH)
+  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
+         frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup)
 open import Verify-Budget-Sufficient.Anchor-Dry
   using (chainStep-dry; foldPath-dry; subscribeInner-dry; dry-hop)
 open import Verify-Budget-Sufficient.Occurrences using (pathOccs?)
@@ -1255,7 +1257,7 @@ private
                     (depthE g b κ id now sched st)
                     (nest b sl (EvalSt.connectedShares st))
                     (suc (sizeᵉ b)) 0 →
-       nest b sl (EvalSt.connectedShares st) ≤ Caps.cSize c →     -- nestOK
+       3 + nest b sl (EvalSt.connectedShares st) ≤ Caps.cSize c → -- nestOK
        suc (sizeᵉ b) ≤ Caps.cSize c →                             -- opsOK
        depthE g b κ id now sched st ≤ capsH e sl id →             -- depOK
        capsOK? (capsAt e sl (suc id))
@@ -1300,7 +1302,7 @@ abstract
                     (depthE g b κ id now sched st)
                     (nest b sl (EvalSt.connectedShares st))
                     (suc (sizeᵉ b)) 0 →
-       nest b sl (EvalSt.connectedShares st) ≤ Caps.cSize c →     -- nestOK
+       3 + nest b sl (EvalSt.connectedShares st) ≤ Caps.cSize c → -- nestOK
        suc (sizeᵉ b) ≤ Caps.cSize c →                             -- opsOK
        depthE g b κ id now sched st ≤ capsH e sl id →             -- depOK
        capsOK? (capsAt e sl (suc id))
@@ -1346,7 +1348,7 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                    (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
      capsOK? (capsAt e sl id) sched st ≡ true →
      dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
-     nest b sl (EvalSt.connectedShares st) ≤ B →           -- nestOK
+     3 + nest b sl (EvalSt.connectedShares st) ≤ B →       -- nestOK
      suc (sizeᵉ b) ≤ B →                                   -- opsOK
      depthE g b κ id now sched st ≤ capsH e sl id →        -- depOK
      let r   = subscribeE g b κ id now sched st
@@ -1424,6 +1426,54 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
   capsOut = subst (λ x → capsOK? (capsAt e x (suc id)) sched′ st′ ≡ true)
                   (sym sl′Eq) capsOut₀
 
+-- ONE MORE UNIT OF SIZE SLACK AT EVERY BASE, and `opIterD-dominated`'s
+-- repaired guard (`3 + k ≤ S`, Op-Budget) is what wants it.  Free:
+-- capsAt's base is `frameBlowup c₀ _`, whose cSize is
+-- `iterSize (cSize c₀) (sizeCount c₀ _) (cSize c₀)`, and 2≤sizeCount
+-- says at least TWO sizeSteps run.  ONE is enough, because
+-- sizeStep S S = S * suc (2 * S) ≥ S + S ≥ suc S.
+sucSize≤frameBlowup : ∀ (c : Caps) (d : ℕ) →
+  2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  suc (Caps.cSize c) ≤ Caps.cSize (frameBlowup c d)
+sucSize≤frameBlowup c d 2≤S 1≤R =
+  ≤-trans sucS≤step
+          (iterSize-mono-count S S 1≤S
+            (≤-trans (s≤s z≤n) (2≤sizeCount c d 2≤S 1≤R)))
+  where
+  S = Caps.cSize c
+
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+
+  1≤2S : 1 ≤ 2 * S
+  1≤2S = ≤-trans (s≤s z≤n)
+                 (≤-trans (≤-reflexive (sym (*-identityʳ 2)))
+                          (*-monoʳ-≤ 2 1≤S))
+
+  S≤S2S : S ≤ S * (2 * S)
+  S≤S2S = ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-monoʳ-≤ S 1≤2S)
+
+  -- suc S = 1 + S ≤ S + S ≤ S + S * (2 * S) = S * suc (2 * S)
+  sucS≤step : suc S ≤ sizeStep S S
+  sucS≤step = ≤-trans (+-monoˡ-≤ S 1≤S)
+              (≤-trans (+-monoʳ-≤ S S≤S2S)
+                       (≤-reflexive (sym (*-suc S (2 * S)))))
+
+capsAt-base-size⁺ : ∀ {n} {Γ : Ctx n} {t}
+  (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  3 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
+capsAt-base-size⁺ {n = n} e sl zero =
+  sucSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
+                            (suc (entryCeil n sl e))
+                            (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
+    (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+    (s≤s z≤n)
+capsAt-base-size⁺ e sl (suc id) =
+  ≤-trans (capsAt-base-size⁺ e sl id)
+          (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
+             (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
+
 -- helpers for burst-caps corollary
 
 -- dWᵉ n ins e ≤ Caps.cWid (capsAt e ins 0)
@@ -1463,11 +1513,11 @@ burst-caps {n = n} e ins =
       -- `EvalSt.connectedShares (st-init e) = []` (Evaluator:943)
       -- `Sched.slots (sched-init e ins) = ins` (Evaluator:118)
       -- so the premises reduce to the root bounds at (capsAt e ins 0).
-      nestOK : nest e ins [] ≤ Caps.cSize (capsAt e ins 0)
-      nestOK = ≤-trans (nest≤ e ins [])
-                 (≤-trans (≤-trans (n≤1+n (sizeᵉ e + slotsSize ins))
-                                   (s≤s (n≤1+n (sizeᵉ e + slotsSize ins))))
-                          (capsAt-base-size e ins 0))
+      -- the guard repair (`3 + k ≤ S`, Op-Budget) asks for ONE unit
+      -- more than capsAt-base-size gives; capsAt-base-size⁺ supplies it
+      nestOK : 3 + nest e ins [] ≤ Caps.cSize (capsAt e ins 0)
+      nestOK = ≤-trans (+-monoʳ-≤ 3 (nest≤ e ins []))
+                       (capsAt-base-size⁺ e ins 0)
       opsOK  : suc (sizeᵉ e) ≤ Caps.cSize (capsAt e ins 0)
       opsOK  = ≤-trans (s≤s (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
                                      (n≤1+n (sizeᵉ e + slotsSize ins))))
