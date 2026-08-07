@@ -281,6 +281,22 @@ restart-dominates S W R d g P 2≤S =
                 (iterL-infl S W d (suc (sizeAt S P)) P))
              (n≤1+n _))
 
+-- the iterated sequencing frame: p + q positions from J = q positions
+-- from the p-th restart level
+walk-spend-many : ∀ S W R d g J p q →
+  lvls S W d J (dWalkᶜ S W R d g J (p + q))
+    ≡ lvls S W d (lvls S W d J (dWalkᶜ S W R d g J p))
+                 (dWalkᶜ S W R d g (lvls S W d J (dWalkᶜ S W R d g J p)) q)
+walk-spend-many S W R d g J zero    q = refl
+walk-spend-many S W R d g J (suc p) q =
+  trans (walk-spend S W R d g J (p + q))
+  (trans (walk-spend-many S W R d g J₁ p q)
+         (sym (cong (λ L → lvls S W d L (dWalkᶜ S W R d g L q))
+                    (walk-spend S W R d g J p))))
+  where
+  J₁ = lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J)))
+
+
 ------------------------------------------------------------------
 -- § THE POSITION-FORM INDUCTION (walk-paid) — the skeleton, with the
 -- two PER-ROUND obligations scoped as narrow postulates.  The base
@@ -309,30 +325,37 @@ postulate
               (suc (X + suc (sizeAt S X) * suc (sizeAt S X))))
       ≤ lvls S W d J (dWalkᶜ S W R d g J 3)
 
-  -- (c) ONE TAIL: given the recursive payment's conclusion at a walk
-  -- point, one more position absorbs the round's TAIL — G-tail turns
-  -- the tail into one more G-closure, tail-fits (at gas g ≥ 2, via
-  -- widAt-mono at the dominating restart) pays it from the next
-  -- position's sub-budget length.
-  round-tail-glue : ∀ S W R d g k Z J i → 2 ≤ S → 1 ≤ R → 2 ≤ g →
-    G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J i) →
-    G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
-      ≤ lvls S W d J (dWalkᶜ S W R d g J (suc i))
-
--- the iterated sequencing frame: p + q positions from J = q positions
--- from the p-th restart level
-walk-spend-many : ∀ S W R d g J p q →
-  lvls S W d J (dWalkᶜ S W R d g J (p + q))
-    ≡ lvls S W d (lvls S W d J (dWalkᶜ S W R d g J p))
-                 (dWalkᶜ S W R d g (lvls S W d J (dWalkᶜ S W R d g J p)) q)
-walk-spend-many S W R d g J zero    q = refl
-walk-spend-many S W R d g J (suc p) q =
-  trans (walk-spend S W R d g J (p + q))
-  (trans (walk-spend-many S W R d g J₁ p q)
-         (sym (cong (λ L → lvls S W d L (dWalkᶜ S W R d g L q))
-                    (walk-spend S W R d g J p))))
+-- (c) ONE TAIL — PROVEN: given the recursive payment's conclusion at
+-- the i-th restart level V, one more position absorbs the round's
+-- TAIL.  G-tail turns the tail into one more G-closure; G-mono moves
+-- it to V; the (i+1)-th position's sub-budget length pays suc (widAt V)
+-- via tail-fits at the boosted level dLvl V; walk-spend-many stitches
+-- the position back onto the front walk.  This is the step that
+-- FORCES 2 ≤ g (a gas-1 sub-budget cannot pay a tail).
+round-tail-glue : ∀ S W R d g k Z J i → 2 ≤ S → 1 ≤ R → 2 ≤ g →
+  G S W d Z ≤ lvls S W d J (dWalkᶜ S W R d g J i) →
+  G S W d (fIterD S W d k (suc (widAt S W Z)) Z)
+    ≤ lvls S W d J (dWalkᶜ S W R d g J (suc i))
+round-tail-glue S W R d g k Z J i 2≤S 1≤R 2≤g hZ =
+  ≤-trans (G-tail S W d k Z 2≤S)
+  (≤-trans (G-mono S W d 2≤S hZ)
+  (≤-trans GV≤one
+  (≤-trans (≤-reflexive (sym (walk-spend-many S W R d g J i 1)))
+           (≤-reflexive (cong (λ p → lvls S W d J (dWalkᶜ S W R d g J p))
+                              (trans (+-suc i 0) (cong suc (+-identityʳ i))))))))
   where
-  J₁ = lvls S W d J (suc (dCapᶜ S W R d g (dLvl S W d J)))
+  V : ℕ
+  V = lvls S W d J (dWalkᶜ S W R d g J i)
+
+  -- suc (widAt V) fits inside the next position's sub-budget length
+  wV≤sub : suc (widAt S W V) ≤ suc (dCapᶜ S W R d g (dLvl S W d V))
+  wV≤sub = s≤s (≤-trans (widAt-mono 2≤S ≤-refl ≤-refl
+                          (iterL-infl S W d (suc (sizeAt S V)) V))
+               (≤-trans (n≤1+n (widAt S W (dLvl S W d V)))
+                        (tail-fits S W d R (dLvl S W d V) g 2≤S 1≤R 2≤g)))
+
+  GV≤one : G S W d V ≤ lvls S W d V (dWalkᶜ S W R d g V 1)
+  GV≤one = lvls-mono _ _ 2≤S ≤-refl ≤-refl ≤-refl wV≤sub
 
 -- THE POSITION-FORM INVARIANT, a real definition recursing on m: m
 -- rounds cost 4m positions, and the walk value at p positions IS the
