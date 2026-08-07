@@ -181,6 +181,19 @@ deserialization (6.4 s for Subscribe-Face, of which 5.1 s IS deserialization) an
 `Checking` lines. Two consequences: you cannot force a remeasurement without a real edit, and
 an experiment run with weakened flags cannot silently poison the cache this way either.
 
+**A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF DIES.**
+Measured 2026-08-07, twice, as `Killed: 9` OOMs (>15 GB, 30-50 min in VWF before death):
+converting the `sub-charge-capsOK-lift` / `init-capsOK?` / `depth-compositional` postulates
+into REAL definitions handed VWF's conversion their unfoldable bodies, which reach the
+`opIterD-dominated`/`lvls-mono` proof towers. With the same proofs sealed, VWF checks in
+~1 min at <2 GB. So: **whenever a postulate consumed (transitively) by `budget-sufficient`
+becomes a real definition, seal it** — no consumer ever needs more than the type. Two
+mechanics: a plain `abstract` block REJECTS untyped `where`-bindings and with-abstractions
+("types of abstract definitions are never inferred"), so bodies that use them get the
+**private-impl + abstract-alias** pattern instead (`private f-go : T; f-go = …` then
+`abstract f : T; f = f-go`). This is the caps axis's existing normalisation contract
+(`sizeCount`'s header) extended from counting functions to proof bodies.
+
 **THE BUILD IS NOT `--safe`, AND NOTHING MECHANICALLY STOPS AN UNSAFE PRAGMA.** `make agda`
 runs a plain `agda src/Main.agda`; there is no `--safe` on the command line, no `OPTIONS`
 pragma anywhere in `src/`, and no flags in `rxjs-research.agda-lib`. Verified, along with the

@@ -549,10 +549,6 @@ sharedPlumb-count N (em ∷ ems) h =
              (proj₂ (∧-true (valCountᵉ (InstEmit.events em) ≤ᵇ N)
                             (all (λ em′ → valCountᵉ (InstEmit.events em′) ≤ᵇ N) ems) h)))
 
--- ONE MORE ITEM COSTS ONE FOLD, with room: `suc w ≤ foldStep S w`
-prepend-fits : ∀ (S W L : ℕ) → 2 ≤ S → L ≤ suc W → suc L ≤ suc (foldStep S W)
-prepend-fits S W L 2≤S h = s≤s (≤-trans h (suc≤foldStep S W 2≤S))
-
 -- § 4.  A LIST IS NO LONGER THAN THE SIZE THAT COUNTS IT.
 -- (`len≤sizeᵗˢ`, the term-list form, is already in .Caps-Face:1122.)
 

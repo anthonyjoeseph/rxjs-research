@@ -3419,9 +3419,6 @@ expWid-fromSize {n = n} c j a k sl 2≤S slC e hk =
 -- frameStep-mono-j.
 ------------------------------------------------------------------
 
-⊑ᶜ-refl : ∀ (c : Caps) → c ⊑ᶜ c
-⊑ᶜ-refl c = ≤-refl , ≤-refl , ≤-refl
-
 ⊑ᶜ-trans : ∀ {a b c : Caps} → a ⊑ᶜ b → b ⊑ᶜ c → a ⊑ᶜ c
 ⊑ᶜ-trans (s₁ , w₁ , r₁) (s₂ , w₂ , r₂) =
   ≤-trans s₁ s₂ , ≤-trans w₁ w₂ , ≤-trans r₁ r₂
@@ -3596,10 +3593,6 @@ pathsSz?-⊑ : ∀ {n} {Γ : Ctx n} {s t} {A : Set} {c c′ : Caps}
   c ⊑ᶜ c′ → all (λ rp → pathSz? (Caps.cSize c) (proj₂ rp)) ps ≡ true
           → all (λ rp → pathSz? (Caps.cSize c′) (proj₂ rp)) ps ≡ true
 pathsSz?-⊑ ps le = all-impl _ _ (λ rp → pathSz?-⊑ (proj₂ rp) le) ps
-
-frameSz?-⊑ : ∀ {n} {Γ : Ctx n} {s u} {c c′ : Caps} (f : Frame Γ s u) →
-  c ⊑ᶜ c′ → frameSz? (Caps.cSize c) f ≡ true → frameSz? (Caps.cSize c′) f ≡ true
-frameSz?-⊑ f (sz≤ , _ , _) = frameSz?-widen f sz≤
 
 -- the burst constructors the delivery clique assembles its emits from
 burstCaps?-∷ : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)

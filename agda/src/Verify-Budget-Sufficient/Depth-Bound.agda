@@ -27,21 +27,19 @@
 -- is covered by the STRUCTURE of the eventual proof (each mirror
 -- clause bounded by the matching size sum), not by rows.
 --
--- Outside-in: `depth-capped` below is the ASSEMBLY — a real definition
--- consuming the two postulated pieces — so the pieces' shapes are
--- pinned by their consumer before either is ground.
+-- Outside-in: `depth-capped` below is the ASSEMBLY over two pieces
+-- whose shapes were pinned by this consumer before either was ground.
 --
---   · `depth-compositional` — structural induction over the mirror's
---     clauses (Caps-Depth.agda), mirroring the probe's channel trace:
---     `depthSlot` charges the shared def to `slotsNestMax`,
---     `depthFin`'s concat queue and `depthBurst`'s stepFrame read
---     charge to `nodesNestMax`, every other clause is covered by the
---     syntax/path summands.
---   · `storeNest-capped` — an inversion of `capsOK?`'s conjuncts:
---     `stBounded?`'s boundedNode clauses ARE `nodeNestMax ≤ᵇ cSize`
---     read as a test, and the slot half is `slotsNestMax ≤ slotsSize`
---     (a shared slot's def is one summand of its size) chained with
---     the consumer-supplied `slotsSize ≤ cSize`.
+--   · `depth-compositional` — LIVES IN Depth-Compositional.agda (with
+--     the `storeNestMax` measure it is stated over): an assembly over
+--     the census's three BUCKET-(d) postulates, structurally recursive
+--     on the expression.
+--   · `storeNest-capped` — PROVEN below: an inversion of `capsOK?`'s
+--     conjuncts — `stBounded?`'s boundedNode clauses ARE
+--     `nodeNestMax ≤ᵇ cSize` read as a test, and the slot half is
+--     `slotsNestMax ≤ slotsSize` (a shared slot's def is one summand
+--     of its size) chained with the consumer-supplied
+--     `slotsSize ≤ cSize`.
 ------------------------------------------------------------------
 
 module Verify-Budget-Sufficient.Depth-Bound where
@@ -68,93 +66,15 @@ open import Verify-Budget-Sufficient.Wet
 open import Verify-Budget-Sufficient.Subscribe-Face
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 
-------------------------------------------------------------------
--- `storeNestMax` — the state's contribution to subscribe-time depth,
--- ported from Depth-Compositional-Probe § A (the validated measure).
--- The node half is `boundedNode`'s own two live clauses (Measures.agda)
--- turned from a `≤ᵇ B` test into a `⊔`; the slot half charges shared
--- defs, the one channel `stBounded?` deliberately excludes (slot defs
--- are fixed syntax within one run, but `depthSlot` reads them).
-------------------------------------------------------------------
-
-nodeNestMax : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
-nodeNestMax (scan-st {t} v)       = sizeᵛ t v
-nodeNestMax (concat-st {t} q _ _) = foldr (λ o acc → sizeᵉ o ⊔ acc) 0 q
-nodeNestMax (take-st _)           = 0
-nodeNestMax (merge-st _ _)        = 0
-nodeNestMax (switch-st _ _)       = 0
-nodeNestMax (exhaust-st _ _)      = 0
-
-nodesNestMax : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
-nodesNestMax = foldr (λ kv acc → nodeNestMax (proj₂ kv) ⊔ acc) 0
-
-slotNest : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
-slotNest (shared d)   = sizeᵉ d
-slotNest (scripted _) = 0
-
-slotsNestMax : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsNestMax {n} sl = foldr _⊔_ 0 (tabulate {n = n} (λ i → slotNest (sl i)))
-
-storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
-storeNestMax sched st =
-  slotsNestMax (Sched.slots sched) ⊔ nodesNestMax (EvalSt.nodes st)
-
-------------------------------------------------------------------
--- the two pieces, postulated with their consumer already written below
-------------------------------------------------------------------
-
-postulate
-  -- Structural induction over the depth mirror; C = 0 per the probe.
-  -- CENSUSED 2026-08-05 (worker sweep + design-session verification).
-  -- Findings, all four load-bearing for whoever grinds this:
-  --
-  -- (1) SCOPE IS 16 HEADS, NOT 19.  `depthFold`/`depthDisp`/
-  --     `depthShareGo`/`depthChain` are the DELIVERY family and are
-  --     never called from `depthE`'s clique.
-  --
-  -- (2) THE SECOND `suc` ARC IS OUT OF SCOPE.  `depthFinC`'s `yes refl`
-  --     arm is reached only through a `from-inner` Frame, and
-  --     `from-inner` reaches `depthFrame` at exactly ONE call site —
-  --     Caps-Depth:393, inside `depthFold`.  Every `depthBurst` call in
-  --     `depthE`'s clique passes `map-f`/`scan-f`/`take-f`/`thru-outer`
-  --     (Caps-Depth:226, 232, 260, 282) and `depthBurst` forwards its
-  --     frame unchanged.  VERIFIED by call-site grep, not assumed.  So
-  --     ARC 2 is paid by a future DELIVERY-side theorem
-  --     (`depthChain ≤ …`, which will also need an `arrVal a` summand),
-  --     not here.  Corollary worth knowing: taken in isolation
-  --     `depthFinC` at `q = []` computes `suc 0 = 1` against a
-  --     zero-able right-hand side, so it is FALSE as a standalone
-  --     obligation — another reason it must not be given this
-  --     statement's shape.
-  --
-  -- (3) THE ONLY ARC 1 SUBTLETY.  `depthBurst` calls `depthFrame` at
-  --     the SAME `κ`, so `thru-outer`'s `suc` is NOT paid by `pathLen`
-  --     as first supposed — it is paid by the `*All` constructor's own
-  --     `sizeᵉ (mergeAllᵉ b) ≡ suc (sizeᵉ b)`, one level up in
-  --     `depthAll`.
-  --
-  -- (4) THE REAL WORK, and it is not a lemma about the mirror.  Every
-  --     clause that calls `depthBurst` feeds it the state produced by
-  --     running the REAL `subscribeE`, while this bound's right-hand
-  --     side reads the ENTRY state.  So the induction needs
-  --     `storeNestMax` at the evolved state dominated by the entry's
-  --     `sizeᵉ b + storeNestMax`.  Two rulings on that:
-  --       · PROVE IT AS A SECOND CONJUNCT OF THIS SAME INDUCTION, not
-  --         as a separate family — the clause structure is identical,
-  --         and splitting it doubles a 16-head mutual block.
-  --       · DO NOT try to ride `subscribeE-caps` for it.  That face
-  --         already takes `depthE … ≤ dep` as a HYPOTHESIS, so using
-  --         it to bound `depthE` is circular.
-  --
-  -- Placement: its own module (own mutual SCC, ~16 lemmas) —
-  -- `Depth-Compositional.agda`, consuming Caps-Depth as finished facts.
-  -- No edit to Caps-Depth.agda is needed; it is an import, not new
-  -- mutuality.
-  depth-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    depthE g b κ bid now sched st
-      ≤ sizeᵉ b + pathLen κ + storeNestMax sched st
+-- `storeNestMax` and `depth-compositional` LANDED 2026-08-06: the
+-- measure and the compositional bound moved to their own module
+-- (Depth-Compositional — an assembly over the census's three named
+-- BUCKET-(d) postulates plus the burst-zero/installNode kit), because
+-- that module defines what this one consumes and the reverse import
+-- would be a cycle.  The 2026-08-05 census findings travelled with it.
+open import Verify-Budget-Sufficient.Depth-Compositional
+  using (nodeNestMax; nodesNestMax; slotNest; slotsNestMax; storeNestMax;
+         depth-compositional)
 
 ------------------------------------------------------------------
 -- `storeNest-capped` — PROVEN.  The `⊔` splits, and each half is an
