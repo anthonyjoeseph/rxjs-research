@@ -1,0 +1,196 @@
+-- PROBE: Init-CapsOK-Core (2026-08-07).  Proves the body that will
+-- discharge the `init-capsOK?-base-core` postulate in
+-- Verify-Budget-Sufficient/Caps-Bridge.agda (lines 1048-1083).
+--
+-- STATUS: LANDING: Verify-Budget-Sufficient/Caps-Bridge.agda
+--
+-- The postulate concludes:
+--   capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
+--
+-- Five conjuncts of capsOK? (Caps-Face.agda:301-309):
+--   (1) stBounded? cSize sched st        — proven via all-concat-tab + mkHot-bounded
+--   (2) regsSz? cSize (registry st)      — refl, registry = []
+--   (3) all (widLive cWid slots) live    — proven via all-concat-tab + new lemma pWᵛ-data-zero
+--   (4) all (widNode cWid slots) nodes   — refl, nodes = []
+--   (5) length registry ≤ᵇ cReg         — refl, 0 ≤ᵇ suc _ = true
+--
+-- NEW LEMMA (this file):
+--   outWᵛ-data-zero / dWᵛ-data-zero / pWᵛ-data-zero
+--     T (isData t) → pWᵛ j sl t v ≡ 0
+--   Proof: structural induction on t; ×ᵗ/+ᵗ use isData-fst/isData-snd to
+--   project sub-proofs; obs case is vacuous since T (isData (obs t)) = T false = ⊥.
+--
+-- LOCAL baseCaps: same definition as Caps-Bridge.baseCaps (non-abstract),
+-- so by definitional equality the proof translates unchanged to src/.
+module Init-CapsOK-Core-Probe where
+
+open import Data.Bool    using (Bool; true; false; T; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; z≤n)
+open import Data.Nat.Properties using (≤-trans; m≤n+m)
+open import Data.List    using (List; []; _∷_; all; concat; tabulate)
+open import Data.Fin     using (Fin)
+open import Data.Vec     using (lookup)
+open import Data.Unit    using (⊤; tt)
+open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum     using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; sym; cong₂; subst)
+
+open import Rx.Exp    using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
+                             Ctx; Closed; Val; sizeᵉ; isData)
+open import Rx.Slots  using (Slot; scripted; shared; slotSize; slotsSize; Slots)
+open import Rx.Prim   using (ObservableInput; hot; cold)
+open import Rx.Frame-Width  using (outWᵛ; dWᵛ; pWᵛ; entryCeil)
+open import Rx.Evaluator    using (LiveSource; mkHot; sched-init; st-init; resolve)
+
+-- Boolean and bound toolkit from Measures (the lightest path; avoids
+-- pulling in the full Wet/Caps/Keeps-Ring chain)
+open import Verify-Budget-Sufficient.Measures
+  using (stBounded?; boundedLive; ∧-intro; all-concat-tab; mkHot-bounded;
+         fᵢ≤sum-tab)
+
+-- capsOK? and widLive live in Caps-Face
+open import Verify-Budget-Sufficient.Caps-Face
+  using (capsOK?; widLive)
+
+-- Caps record type and constructor
+open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+
+-- local copy of baseCaps — identical to Caps-Bridge.baseCaps (non-abstract),
+-- so the proof translates directly.  Avoids importing Subscribe-Face.
+baseCaps : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Caps
+baseCaps {n = n} e sl =
+  caps (2 + sizeᵉ e + slotsSize sl)
+       (suc (entryCeil n sl e))
+       (suc (sizeᵉ e + slotsSize sl))
+
+----------------------------------------------------------------------
+-- STEP 1.  Decompose the T (isData _) proof for product and sum types.
+----------------------------------------------------------------------
+
+-- When T (isData (s ×ᵗ t)) holds, extract T (isData s).
+-- Works equally for s +ᵗ t since isData (s ×ᵗ t) = isData (s +ᵗ t) definitionally.
+isData-fst : ∀ (s t : Ty) → T (isData (s ×ᵗ t)) → T (isData s)
+isData-fst s t ok with isData s
+... | false = ⊥-elim ok   -- ok : T false = ⊥
+... | true  = tt            -- T (isData s) = T true = ⊤
+
+isData-snd : ∀ (s t : Ty) → T (isData (s ×ᵗ t)) → T (isData t)
+isData-snd s t ok with isData s
+... | false = ⊥-elim ok   -- ok : T false = ⊥
+... | true  = ok            -- T (isData (s ×ᵗ t)) = T (isData t) after subst
+
+----------------------------------------------------------------------
+-- STEP 2.  outWᵛ = 0 and dWᵛ = 0 for data types; hence pWᵛ = 0.
+----------------------------------------------------------------------
+
+outWᵛ-data-zero : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty)
+  → T (isData t) → (v : Val Γ t) → outWᵛ j sl t v ≡ 0
+outWᵛ-data-zero j sl unitᵗ      ok _        = refl
+outWᵛ-data-zero j sl boolᵗ      ok _        = refl
+outWᵛ-data-zero j sl natᵗ       ok _        = refl
+outWᵛ-data-zero j sl (s ×ᵗ t)   ok (a , b)  =
+  cong₂ _⊔_ (outWᵛ-data-zero j sl s (isData-fst s t ok) a)
+             (outWᵛ-data-zero j sl t (isData-snd s t ok) b)
+outWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₁ a) =
+  outWᵛ-data-zero j sl s (isData-fst s t ok) a
+outWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₂ b) =
+  outWᵛ-data-zero j sl t (isData-snd s t ok) b
+outWᵛ-data-zero j sl (obs t)     ok _        = ⊥-elim ok  -- isData (obs t) = false
+
+dWᵛ-data-zero : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty)
+  → T (isData t) → (v : Val Γ t) → dWᵛ j sl t v ≡ 0
+dWᵛ-data-zero j sl unitᵗ      ok _        = refl
+dWᵛ-data-zero j sl boolᵗ      ok _        = refl
+dWᵛ-data-zero j sl natᵗ       ok _        = refl
+dWᵛ-data-zero j sl (s ×ᵗ t)   ok (a , b)  =
+  cong₂ _⊔_ (dWᵛ-data-zero j sl s (isData-fst s t ok) a)
+             (dWᵛ-data-zero j sl t (isData-snd s t ok) b)
+dWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₁ a) =
+  dWᵛ-data-zero j sl s (isData-fst s t ok) a
+dWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₂ b) =
+  dWᵛ-data-zero j sl t (isData-snd s t ok) b
+dWᵛ-data-zero j sl (obs t)     ok _        = ⊥-elim ok
+
+-- pWᵛ j sl t v = outWᵛ j sl t v ⊔ dWᵛ j sl t v (Frame-Width.agda:418-419)
+-- cong₂ _⊔_ p q : outWᵛ ⊔ dWᵛ ≡ 0 ⊔ 0; and 0 ⊔ 0 = 0 definitionally
+pWᵛ-data-zero : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty)
+  → T (isData t) → (v : Val Γ t) → pWᵛ j sl t v ≡ 0
+pWᵛ-data-zero j sl t ok v =
+  cong₂ _⊔_ (outWᵛ-data-zero j sl t ok v) (dWᵛ-data-zero j sl t ok v)
+
+----------------------------------------------------------------------
+-- STEP 3.  The widLive predicate holds on any list of pending values
+--           when T (isData t).  pWᵛ = 0 and 0 ≤ᵇ W = true for all W.
+----------------------------------------------------------------------
+
+all-pWᵛ-data : ∀ {n} {Γ : Ctx n} {A : Set} (j W : ℕ) (sl : Slots Γ) (t : Ty)
+  → T (isData t) → (ps : List (A × Val Γ t))
+  → all (λ tv → pWᵛ j sl t (proj₂ tv) ≤ᵇ W) ps ≡ true
+all-pWᵛ-data j W sl t ok [] = refl
+all-pWᵛ-data j W sl t ok ((tk , v) ∷ ps) =
+  ∧-intro
+    -- pWᵛ-data-zero gives pWᵛ = 0; subst replaces it; 0 ≤ᵇ W = refl
+    (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (pWᵛ-data-zero j sl t ok v)) refl)
+    (all-pWᵛ-data j W sl t ok ps)
+
+----------------------------------------------------------------------
+-- STEP 4.  widLive W ins holds for every live source produced by
+--           mkHot ins i.  Only hot scripted slots produce a live
+--           source; cold and shared yield [], trivially true.
+----------------------------------------------------------------------
+
+widLive-mkHot : ∀ {n} {Γ : Ctx n} (W : ℕ) (ins : Slots Γ) (i : Fin n)
+  → all (widLive W ins) (mkHot ins i) ≡ true
+widLive-mkHot {n = n} {Γ = Γ} W ins i with ins i
+... | scripted {ok = ok} (hot async) =
+      -- mkHot ins i = [l] with l.elemTy = lookup Γ i, l.pending = resolve 0 async
+      -- all (widLive W ins) [l] = widLive W ins l ∧ true
+      -- widLive W ins l = all (λ tv → pWᵛ n ins (lookup Γ i) (proj₂ tv) ≤ᵇ W) (resolve 0 async)
+      ∧-intro (all-pWᵛ-data n W ins (lookup Γ i) ok (resolve 0 async)) refl
+... | scripted (cold _ _) = refl   -- mkHot returns []
+... | shared _            = refl   -- mkHot returns []
+
+----------------------------------------------------------------------
+-- STEP 5.  The main proof.
+--
+-- capsOK? (right-assoc ∧):
+--   stBounded? B sched st
+--   ∧ regsSz? B (registry st)
+--   ∧ all (widLive W slots) live
+--   ∧ all (widNode W slots) nodes
+--   ∧ (length registry ≤ᵇ cReg)
+--
+-- At init: registry = [], nodes = [], live = concat (tabulate (mkHot ins))
+-- So conjuncts (2),(4),(5) are trivially refl; (1) and (3) use concat-tab.
+----------------------------------------------------------------------
+
+init-capsOK?-base-go : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  → capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
+init-capsOK?-base-go {n = n} e ins =
+  let B = 2 + sizeᵉ e + slotsSize ins
+      W = suc (entryCeil n ins e)
+      -- (1) stBounded? = all (boundedLive B) live ∧ all _ nodes
+      --     nodes = [] → all _ [] = refl
+      --     live = concat (tabulate (mkHot ins)):
+      C1 = all-concat-tab (boundedLive B) (mkHot ins)
+             (λ i → mkHot-bounded ins B i
+                      (≤-trans
+                        (fᵢ≤sum-tab (λ j → slotSize (ins j)) i)
+                        -- slotsSize ins ≤ (2 + sizeᵉ e) + slotsSize ins = B
+                        (m≤n+m (slotsSize ins) (2 + sizeᵉ e))))
+      -- (3) all (widLive W ins) live
+      C3 = all-concat-tab (widLive W ins) (mkHot ins)
+             (λ i → widLive-mkHot W ins i)
+  in
+  -- capsOK? (baseCaps e ins) ... = (1) ∧ ((2) ∧ ((3) ∧ ((4) ∧ (5))))
+  ∧-intro (∧-intro C1 refl)          -- (1) ∧-true  stBounded? ∧ []
+    (∧-intro refl                     -- (2) regsSz? [] = refl
+      (∧-intro C3                     -- (3) widLive live
+        (∧-intro refl refl)))         -- (4) widNode [] = refl; (5) 0 ≤ᵇ suc _ = refl
+
+abstract
+  init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    → capsOK? (baseCaps e ins) (sched-init e ins) (st-init e) ≡ true
+  init-capsOK?-base = init-capsOK?-base-go
