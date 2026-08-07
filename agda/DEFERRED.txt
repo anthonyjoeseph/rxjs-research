@@ -41,6 +41,7 @@
 B1-cSize≡sizeCapAt | init-capsOK?-base-core | ≤1 | REASON: init-capsOK?-base-core must be proven
 burstCaps?-slots | innerFinish-concat-face-core | ≤3 | REASON: innerFinish-concat-face-core must be proven
 capsAt-suc-full | sub-charge-capsOK-lift-core | ≤1 | REASON: sub-charge-capsOK-lift-core must be proven
+depthE≤capsH-root | sub-charge-capsOK-lift-core | ≤1 | REASON: root depth bound (depth-capped + three-size≤capsH) for id=0 branch of sub-charge-capsOK-lift-core
 cascade-delivN | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
 cascadeGo-cons-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
 cascadeGo-skip-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven

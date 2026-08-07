@@ -1133,15 +1133,48 @@ init-capsOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
 init-capsOK? e ins zero    = init-capsOK?-0 e ins
 init-capsOK? e ins (suc n) = init-capsOK?-suc e ins n
 
+-- Wires three-size-le-blowH (Caps.agda:1413): three pre-blowup sizes ≤ capsH e ins 0.
+-- cSize(baseCaps e ins) = 2 + sizeᵉ e + slotsSize ins = 2 + X definitionally
+-- (both sides reduce to suc(suc(sizeᵉ e + slotsSize ins))), so
+-- three-size-le-blowH X E (s≤s (s≤s z≤n)) with X = sizeᵉ e + slotsSize ins and
+-- E = entryCeil n ins e applies directly.
+three-size≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
+    + Caps.cSize (baseCaps e ins)
+    ≤ capsH e ins 0
+three-size≤capsH {n = n} e ins =
+  three-size-le-blowH (sizeᵉ e + slotsSize ins) (entryCeil n ins e) (s≤s (s≤s z≤n))
+
+-- Wires depth-capped (Depth-Bound.agda:244): root depth bound via the base caps.
+-- Applies depth-capped at c := baseCaps e ins (the PRE-BLOWUP inner argument of
+-- capsAt e ins 0's frameBlowup), then chains with three-size≤capsH.
+-- Four side-conditions at baseCaps / sched-init / st-init / root:
+--   (i)   init-capsOK?-base e ins
+--   (ii)  slotsSize ins ≤ cSize(baseCaps e ins):  m≤n+m (slotsSize ins) (2 + sizeᵉ e)
+--   (iii) sizeᵉ e ≤ cSize(baseCaps e ins):  ≤-trans (m≤n+m sizeᵉ e 2) (m≤m+n ...)
+--   (iv)  suc(pathLen root) = 1 ≤ cSize(baseCaps e ins):  s≤s z≤n
+depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+    ≤ capsH e ins 0
+depthE≤capsH-root e ins =
+  ≤-trans
+    (depth-capped (baseCaps e ins) (budgetAt e ins 0) e root 0 0
+       (sched-init e ins) (st-init e)
+       (init-capsOK?-base e ins)
+       (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
+       (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
+       (s≤s z≤n))
+    (three-size≤capsH e ins)
+
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
 -- Mirrors cascade-wet-via-caps (~line 526) structurally.
 -- Wet hypotheses: those of subscribeE-wet (Wet.agda:~4303).
 -- Caps additions: capsOK? at the entry level + dWᵉ ≤ cWid.
 -- burst-caps (below) is a closed corollary at the root call.
--- WIRING NOTE: sub-charge (above, GAP 4(a)) and depth-capped
--- (Depth-Bound) are the key ingredients for this postulate's proof.
--- They cannot be directly wired as code consumers while this remains
--- a postulate; they become genuine consumers when it is proved.
+-- WIRING NOTE: depth-capped and three-size-le-blowH are now wired:
+-- depth-capped feeds depthE≤capsH-root (above) via three-size≤capsH;
+-- depthE≤capsH-root is passed as depth-bound-root to sub-charge-capsOK-lift-core
+-- and supplied at sub-charge-capsOK-lift below.
 postulate
   -- THE ONE REMAINING GAP on the subscribe side: `capsOK?` at the growth
   -- index `frameStep j′ c` lifts to `capsAt e sl (suc id)`.
@@ -1179,6 +1212,13 @@ postulate
      ) →
     -- prepend-fits  (Verify-Budget-Sufficient/Subscribe-Face.agda:553)
     (∀ (S W L : ℕ) → 2 ≤ S → L ≤ suc W → suc L ≤ suc (foldStep S W)
+     ) →
+    -- depth-bound-root  (Caps-Bridge.agda:depthE≤capsH-root)
+    -- Root depth bound; used in the id=0 branch of the eventual lift proof.
+    -- Proved by depth-capped (at baseCaps) composed with three-size≤capsH.
+    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+      depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+        ≤ capsH e ins 0
      ) →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
@@ -1219,6 +1259,7 @@ sub-charge-capsOK-lift =
     (λ {n} {Γ} {s} {u} {c} {c′} → frameSz?-⊑ {n} {Γ} {s} {u} {c} {c′})
     opIterD-dominated
     prepend-fits
+    depthE≤capsH-root
 
 -- THE SUBSCRIBE-SIDE ASSEMBLY.  A real definition, and the reason
 -- `sub-charge` (above, PROVEN) is no longer an orphan.
