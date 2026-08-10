@@ -82,6 +82,7 @@ open import Rx.Evaluator
          arrTy; arrVal; fLvlD; regAt; subscribeInner; sLvlD;
          AllOp; NodeId; NodeState; takeDispatch; takeVals; cutThrough;
          lookupNode; setNode; sweepLive; pathHasNode; memberSource; scanVals;
+         innerFinish; aliveThroughᶠ;
          scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st)
 
 -- re-exports .Caps (frameStep, capsAt, sizeCount, the mono kit) and
@@ -252,34 +253,57 @@ WetFace c sl Ψ J j′ r =
    × (all (eventCaps? (frameStep (J + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
    × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
 
--- § 2.3  THE TWO LEAVES STILL OPEN, and they are the two that were
+-- § 2.3  THE TWO OBLIGATIONS STILL OPEN, and they are the two that were
 -- always going to be the work.  The three STATE-LOCAL frames are proven
--- — map-f (§ 2.4), take-f (§ 2.4b), scan-f (§ 2.4c) — leaving only the
--- two *All edges, which carry the real content: the same family as
+-- — map-f (§ 2.4), take-f (§ 2.4b), scan-f (§ 2.4c) — leaving the two
+-- *All edges, which carry the real content: the same family as
 -- `subscribeInner-demand` (.Anchor-Dry), so whichever is discharged
--- first should absorb the other.
+-- first should absorb the other.  `wet-inner` itself is gone: § 2.4d
+-- proves its two INERT paths and it reduces to `wet-innerFinish`.
 --
 -- CALL-SITE ARGUMENTS THESE ABSORB: none — every index is pinned by
 -- WetFace above, and the two caps receipts are passed in verbatim from
 -- the assembly's own `stepFrame-face` call.
 postulate
-  wet-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  -- FROM-INNER reduces to its COMPLETION path alone (§ 2.4d proves the
+  -- other two): `fin` is pinned to `true` here, and the absorb test has
+  -- already gone the other way
+  wet-innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
     (sf : Gas) (id : Id) (now : Tick)
     (op : AllOp) (allNid instNid : NodeId)
     (path′ : Path Γ s t) (vals : List (Val Γ s))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
     PbB c Ψ J (from-inner op allNid instNid ↠ path′) ≡ true →
     VbB c sl Ψ J vals ≡ true →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    let r = stepFrame sf id now (from-inner op allNid instNid) path′ vals fin sched st in
+    let r = innerFinish sf op allNid instNid path′ id now vals sched st
+              (lookupNode allNid (EvalSt.nodes st)) in
     capsOK? (frameStep (J + j′) c)
             (proj₁ (proj₂ (proj₂ (proj₂ r))))
             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
     valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
     WetFace c sl Ψ J j′ r
 
+  -- THRU-OUTER is `thruWrap op nid fin (thruWalk …)`, and the two
+  -- halves are nothing alike: `thruWalk` subscribes once per payload
+  -- (the real content), while `thruWrap` only sets the node's `done`
+  -- FLAG.  SPLITTING THEM WAS TRIED 2026-08-10 AND REJECTED, and the
+  -- finding is worth more than the split would have been:
+  --   * THE WRAP IS fnCap-TRANSPARENT, so whoever proves this can
+  --     dispose of it in one step.  Payloads, events and schedule pass
+  --     through untouched; of the four nodes it rewrites, three have
+  --     `fnCapNode` ≡ `true` outright and `concat-st`'s measure reads
+  --     the queue `q`, which the rewrite does not touch.  Combine
+  --     `lookupNode-fnCap` (§ 2.4c) with `setNode-fnCap`.
+  --   * WHY NOT SPLIT: the assembly states its two caps receipts at the
+  --     WRAPPED result, and `proj₁ (thruWrap …) ≡ proj₁ (thruWalk …)`
+  --     is NOT definitional — it needs the same 26-branch case split
+  --     the transparency proof does.  So a `wet-thruWalk` leaf would
+  --     either carry hypotheses about a tuple it is not about, or pay
+  --     for a transport that buys no risk reduction.  Split it only if
+  --     the eventual proof wants the walk isolated for its own reasons.
   wet-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
     (sf : Gas) (id : Id) (now : Tick)
@@ -567,6 +591,59 @@ wet-scan {s = s} {u = u} c sl Ψ J j′ sf id now fn nid path′ vals fin sched 
   vΨ    = proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
   fcRun = scanVals-fnCap Ψ fn ac vals capfn
             (≤ᵇ⇒≤ _ _ (T-to nb)) (allΨ-to Ψ vals vΨ)
+
+------------------------------------------------------------------
+-- § 2.4d  THE FROM-INNER LEAF — an assembly over ONE postulate.
+--
+-- `innerReact` (Evaluator:1233) passes its payloads through UNTOUCHED
+-- on two of its three paths: the not-finished path (`fin = false`), and
+-- the ABSORBED path (`fin = true`, but some registration under this
+-- inner instance is still live, so the completion is swallowed).  Only
+-- the completion moves state.  Same move as the § 5b split, one level
+-- down.
+
+-- the INERT result generalised: payloads pass through, state and events
+-- untouched.  `wet-nil` is this at `[]`
+wet-pass : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (vs : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  valsΨ? Ψ vs ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  WetFace {e = e} {u = u} c sl Ψ J j′ (vs , [] , fin , sched , st)
+wet-pass c sl Ψ J j′ vs fin sched st ok hv rg =
+    proj₁ (proj₁ ok) , proj₂ ok , hv
+  , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl , refl
+
+wet-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (sf : Gas) (id : Id) (now : Tick)
+  (op : AllOp) (allNid instNid : NodeId)
+  (path′ : Path Γ s t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (from-inner op allNid instNid ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  let r = stepFrame sf id now (from-inner op allNid instNid) path′ vals fin sched st in
+  capsOK? (frameStep (J + j′) c)
+          (proj₁ (proj₂ (proj₂ (proj₂ r))))
+          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+  WetFace c sl Ψ J j′ r
+-- NOT FINISHED: nothing happens at all
+wet-inner c sl Ψ J j′ sf id now op a i path′ vals false sched st ok pb vb rg hC hV =
+  wet-pass c sl Ψ J j′ vals false sched st ok
+    (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)) rg
+wet-inner c sl Ψ J j′ sf id now op a i path′ vals true sched st ok pb vb rg hC hV
+  with any (aliveThroughᶠ i st) (EvalSt.registry st)
+-- ABSORBED: a registration under this inner is still live, so the
+-- completion is swallowed and the payloads pass through
+... | true  = wet-pass c sl Ψ J j′ vals false sched st ok
+                (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                               (valsΨ? Ψ vals) vb)) rg
+... | false = wet-innerFinish c sl Ψ J j′ sf id now op a i path′ vals sched st
+                ok pb vb rg hC hV
 
 ------------------------------------------------------------------
 -- § 2.5  THE DISPATCHER — one clause per frame constructor, so the

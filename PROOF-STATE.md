@@ -411,10 +411,34 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 >   move**; carrying the other half would have forced caps facts down into a
 >   leaf that has no business holding them.
 >
-> **Open surface now: `wet-inner` and `wet-thru`** — the two *All edges, the
-> real content, same family as `subscribeInner-demand` — plus
-> `subscribeInner-demand` itself.  Three postulates, and the two wet ones
-> should absorb the third.
+> **Then the two *All edges were split too, and one of the two splits was
+> REJECTED — the rejection is the more useful result.**
+>
+> - **from-inner SPLIT (kept).**  `innerReact` passes its payloads through
+>   UNTOUCHED on two of its three paths — not-finished (`fin = false`) and
+>   ABSORBED (`fin = true` but a registration under this inner is still live,
+>   so the completion is swallowed).  Both are proven; the leaf reduces to
+>   `wet-innerFinish`, with `fin` pinned to `true` and the absorb test already
+>   resolved.  `wet-pass` generalises `wet-nil` to carry a payload list.
+> - **thru-outer SPLIT (rejected, and here is why).**  `thruWrap op nid fin
+>   (thruWalk …)` looks like the same shape — the walk subscribes per payload
+>   (real content), the wrap only sets a node's `done` FLAG — and **the wrap is
+>   indeed fnCap-TRANSPARENT**: payloads/events/schedule pass through, three of
+>   the four rewritten nodes have `fnCapNode ≡ true` outright, and
+>   `concat-st`'s measure reads the queue `q`, which the rewrite does not
+>   touch.  But the assembly states its two caps receipts at the WRAPPED
+>   result, and `proj₁ (thruWrap …) ≡ proj₁ (thruWalk …)` is NOT definitional —
+>   recovering it needs the same 26-branch case split the transparency proof
+>   does.  A `wet-thruWalk` leaf would therefore either carry hypotheses about
+>   a tuple it is not about, or pay for a transport buying no risk reduction.
+>   **The transparency finding is recorded as a receipt in `wet-thru`'s own
+>   header** so the eventual proof disposes of the wrap in one step instead of
+>   rediscovering it.  This is the receipt route working as intended: the
+>   knowledge lands, the file does not.
+>
+> **Open surface now: `wet-innerFinish`, `wet-thru`, `subscribeInner-demand`.**
+> All three are the same *All-edge family, and whichever is discharged first
+> should absorb the others.
 >
 > **The postulate count went UP by one, net, and this is the mechanism
 > working:** one monolith that hid five unrelated obligations became two named
@@ -1534,7 +1558,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | id | DELETE the tied probes WHEN … |
 |---|---|
-| **T1** | the two wet leaves (`wet-inner`/`wet-thru`, .Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface after the 2026-08-10 walk landing, its same-day split (`stepFrame-burst-face` is an assembly, not a postulate) and the three state-local leaves that split let through |
+| **T1** | the two wet leaves (`wet-innerFinish`/`wet-thru`, .Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface after the 2026-08-10 walk landing, its same-day split (`stepFrame-burst-face` is an assembly, not a postulate) and the three state-local leaves that split let through |
 | **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
 | **T3** | tier-1 #5's remaining depth postulates are discharged |
 | **T4** | `merge-cert` is stated in src AND discharged (task #33) |
