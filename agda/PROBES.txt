@@ -35,7 +35,6 @@ Caps-Thread-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on ne
 Chain-Half-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Concat-Frame-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Concat-Sum-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Count-Grind-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Count-Level-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Depth-Compositional-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Depth-Wire-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -44,7 +43,6 @@ Eval-Growth-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on ne
 Fold-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Frame-Work-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Hop-Descent-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Inner-Step-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Instant-Height-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Instant-Height-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 J-Budget-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -59,7 +57,6 @@ Nest-Budget-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on ne
 Nest-Count-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Nest-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Nest-Supply-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Of-Fits-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Queue-Push-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Refresh-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Rung-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -70,6 +67,5 @@ Sub-Wire-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next 
 Wf-Aux-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Wf-Fold-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Width-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Occurrences-Probe.agda | LANDING: Verify-Budget-Sufficient/Occurrences.agda | frameOccs?/pathOccs? predicates + subΘTm-occs-le/occsᵗ≤sizeᵗ postulates for threading pathOccs? into Anchor-Dry demand postulates
 SubInner-Demand-Probe.agda | EVIDENCE | first coverage for subscribeInner-demand (Anchor-Dry:117): 20 LOAD-BEARING rows over merge/exhaust programs A/B at evaluator-reached init states; second valB? conjunct FULLY covered, first covered symbolically via Dm≥16 (2≤sizeCapAt · 1≤towerℕ); NOT covered: sizeᵛ>16 inners, the stuck sizeᵛ≤ᵇB conjunct of Hyp 3, post-step states
 Install-Scan-Depth-Probe.agda | EVIDENCE | §1 refutes old storeNestMax-installScan (LOAD-BEARING: caseᵗ duplication gives storeNestMax=25 > sizeᵗ-bound=23); §2 validates new installScan-depth-bound at b=emptyᵉ (LOAD-BEARING: storeNestMax post-install=5 > RHS=2, yet depthE=0)
