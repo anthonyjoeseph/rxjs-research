@@ -27,7 +27,9 @@ open import Charge-Probe using (ins₀; insD₂; progD; progDT; progW; pF1; pF2)
 open import Instant-Height-Probe using (pμ2; pμD; wStore; wNeed)
 open import Mint-Loop-Shapes using (mS; mReg; mFolds; insG; insG²; insG³;
                                     pL²; pL³)
-open import Verify-Budget-Sufficient.Caps using (iterFold)
+-- moved to Rx.Evaluator when the Verify-Budget-Sufficient umbrella was
+-- split (a8508d6)
+open import Rx.Evaluator using (iterFold)
 open import Nest-Count-Probe
 
 showL : List ℕ → String

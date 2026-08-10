@@ -2463,7 +2463,8 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
               (proj₁ (proj₂ (proj₂ (proj₂ fr)))) (proj₂ (proj₂ (proj₂ (proj₂ fr)))))
 
 -- ── valsLast: the burst payload discipline ───────────────────────────────
--- Defined in Rx.Protocol (shared with the Burst-Probe measurement harness);
+-- Defined in Rx.Protocol (once shared with a measurement harness, retired
+-- 2026-08-09);
 -- see the design note there.  What lives here is the peeling, the fact that a
 -- take cut needs a payload — which together EMPTY the cut's tail — and the
 -- preservation lemma that carries the discipline through a pushBurst.
@@ -2632,7 +2633,7 @@ pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
 -- state, and TailRel's `acc-le` field — "the accumulator's still-open sources
 -- survive on the transformed side" — turned out not to be constructible at the
 -- cut: the cut closes PRECISELY the sources acc-le asserts stay live, so the two
--- sides wanted opposite things.  Measurement (make burst-probe) confirmed the
+-- sides wanted opposite things.  Measurement (2026-07-26) confirmed the
 -- design note behind acc-le was simply false — cross-emit opens are NOT closed by
 -- a later frame, the take cut closes them in the same burst — while also
 -- reporting `cut with a tail` ≡ 0 across every corpus.
@@ -2647,7 +2648,7 @@ pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
 -- (takeVals-cut-cons), so under valsLast? the cutting emit is the last one and
 -- THERE IS NO TAIL.  cut-tail-nil is that argument in three lines.
 --
--- MEASURED, as counter 0 of `make burst-probe` — with Rx.Protocol's valsLast?
+-- MEASURED 2026-07-26 as counter 0 of the burst harness — with Rx.Protocol's valsLast?
 -- itself, on every burst any subscribeE mints.  Depth 3 / depth 4, per corpus
 -- (A: the plain generator; B: A with shared slots; C: 19 directed 2-slot
 -- programs; C₃: 36 directed 3-slot ones — the original 26 plus 10 adversarial

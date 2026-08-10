@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe burst-probe joint-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -39,16 +39,6 @@ help:
 	@echo "  gate          the acceptance test: wiring-gate + unsafe-check +"
 	@echo "                  agda + bug-cache, cheap checks first so"
 	@echo "                  a 2-second failure never waits on a 40-minute one"
-	@echo "  burst-probe   measure the subscription bursts the evaluator mints:"
-	@echo "                  frameFresh? on every burst, cross-emit opens, and"
-	@echo "                  acc-matched closes (see agda/probe/Burst-Probe.agda)"
-	@echo "                  make burst-probe                      (seed 1, 200, depth 4)"
-	@echo "                  make burst-probe ARGS='1 25 200 4'    (seeds 1..25)"
-	@echo "                  make burst-probe ARGS='1 1 20 4 4'    (corpus C₃ only)"
-	@echo "                  NOTE: corpus B depth ≤ 4 only.  Depth 5 corpus B draws gas"
-	@echo "                  proportional to def sizes (budgetAt = syncBudget sizeᵉ),"
-	@echo "                  making each program ≫ 90 min per seed.  Corpora A, C,"
-	@echo "                  and C₃ can be run at depth 5 without issue."
 	@echo "  level-walk-probe  the EVOLVING-CAPS delivery walk, before it is"
 	@echo "                  landed: the walk carries the level and reads the"
 	@echo "                  registry off it, so nothing is charged at the"
@@ -156,13 +146,6 @@ gate:
 	@$(MAKE) --no-print-directory bug-cache
 	@echo "gate: ALL GREEN"
 
-# The probe needs an evaluator that records every subscription burst, and
-# Verify-Well-Formed reduces the evaluator's clauses — so instrumenting it in
-# place would break the proofs.  burst-probe.sh therefore instruments a COPY in
-# a scratch project; agda/src is never written.  Not part of `make agda`: this
-# measures the evaluator, it does not check it.
-burst-probe:
-	scripts/burst-probe.sh $(ARGS)
 
 
 

@@ -105,8 +105,9 @@ open import Rx.Evaluator using (Slots; scripted; Sched; EvalSt;
                                 stepFrame; shareAdmit; shareLatch; shareFinish;
                                 chainsOf; cascadeLatch)
 
-open import Verify-Budget-Sufficient.Caps using (sizeStep; foldStep;
-                                                 iterSize; iterFold)
+-- the four caps-arithmetic functions moved to Rx.Evaluator when the
+-- Verify-Budget-Sufficient umbrella was split (a8508d6)
+open import Rx.Evaluator using (sizeStep; foldStep; iterSize; iterFold)
 
 open import Mint-Loop-Shapes
   using (runSt; stAt; mS; mReg; mFolds; mJ;

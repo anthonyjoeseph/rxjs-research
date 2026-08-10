@@ -144,7 +144,7 @@ genSlots = genInput >>=G λ i0 → genInput >>=G λ i1 →
 -- The tree generators are parameterized by the SOURCE LEAF they may reach for.
 -- `genExp` passes the default (either slot), so its random consumption — and
 -- hence every seed's corpus — is exactly what it always was.  The parameter
--- exists for Burst-Probe, which must build shared slot defs: a def may only
+-- exists for the burst harness, which had to build shared slot defs: a def may only
 -- reference STRICTLY EARLIER slots (the const telescope), so slot 0's def gets
 -- a source-free leaf and slot 1's gets `input zero`.
 SrcLeaf : Set
@@ -158,7 +158,7 @@ anySlot = genFin2 >>=G λ i → pureG (inputNat i)
 -- observables in `ofᵉ (strmᵗ e ∷ …)` with `e` Θ-CLOSED, so no generated
 -- program ever substitutes an observable into a template — which left the
 -- burst probe's hop-depth corpora structurally unable to see the one mechanism
--- both 2026-07-27 refutations live in (Burst-Probe's corpus D is what closes
+-- both 2026-07-27 refutations live in (the harness's corpus D is what closes
 -- that).  `noWrap` draws no randomness, so `genExp` consumes exactly the bits
 -- it always did and every existing seed's corpus is unchanged.
 ObsWrap : Set

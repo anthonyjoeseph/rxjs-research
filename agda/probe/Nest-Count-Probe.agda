@@ -84,7 +84,9 @@ open import Rx.Exp
 open import Rx.Evaluator using (Slots; Slot; scripted; shared; Sched; EvalSt;
                                 LiveSource; NodeState; scan-st; take-st;
                                 merge-st; concat-st; switch-st; exhaust-st)
-open import Verify-Budget-Sufficient.Caps using (foldStep; iterFold)
+-- moved to Rx.Evaluator when the Verify-Budget-Sufficient umbrella was
+-- split (a8508d6)
+open import Rx.Evaluator using (foldStep; iterFold)
 
 open import Mint-Loop-Shapes using (accV; seedO; pL²; pL³;
                                     insG; insG²; insG³; mS; stAt)

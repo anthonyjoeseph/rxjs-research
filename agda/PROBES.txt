@@ -26,7 +26,6 @@ Battery-Obs-Growth.agda | EVIDENCE | sizeᵛ acc_k = 12·2^k − 11 (k=0..3: 1,1
 Battery-Reached-Sizes.agda | EVIDENCE | runs real subscribeE+splitBurst to measure sizes actually reaching subscribeInner; establishes Ŝ := capsH e ins 0 as the workable anchor (ceilings 1 and 2 hold)
 Battery-VWF-Prop.agda | EVIDENCE | PROBED-TRUE (non-vacuous) for 5 live VWF postulates (map/scan nodry+valsLast push, scan-nodeP). scan-binv-adapt half is SPENT — real proof landed VWF:1191
 Battery-Value-Count.agda | EVIDENCE | REFUTES 'emissions per instant ≤ syncSizeᵉ e': K=4 gives valueCount 30 > syncSizeᵉ 20 (K=1..3 hold: 2≤17, 6≤18, 14≤19). Kills sync-count-bounded
-Burst-Probe.agda | EVIDENCE | live `make burst-probe` harness: 0 valsLast failures across ~14k bursts (corpora A/B/C/C₃, d3-d5), settling that TailRel's acc-le premise never held
 Depth-Wire-Probe.agda | EVIDENCE | baseCaps-is-inner lives here BY DESIGN — Caps-Bridge:1018 says nothing in the claim graph consumes it and the wiring law admits no orphans there
 Instant-Height-Main.agda | EVIDENCE | GHC-compiled driver for Instant-Height-Probe's rows (one row per process via stdin index); no proof content of its own, referenced from the Makefile
 Instant-Height-Probe.agda | EVIDENCE | store growth across instants (V vs W, S+ vs S); CAL iJ rows reproduce Charge-Probe's pinned 23/47 by refl

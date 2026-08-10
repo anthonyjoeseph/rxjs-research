@@ -237,7 +237,7 @@ open import Verify-Budget-Sufficient.Measures public
 -- about hopD.
 --
 -- Corpus-wide, via the burst probe's numeric hopLog (make
--- burst-probe), testing the emitted-value invariant hopD v ≤ hopD b
+-- the burst harness), testing the emitted-value invariant hopD v ≤ hopD b
 -- that the hop edge consumes — with hopD (mergeAllᵉ c) ≡ suc (hopD c),
 -- that inequality is exactly what makes a hop strict:
 --

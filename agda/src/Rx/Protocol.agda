@@ -260,7 +260,7 @@ wellFormed? xs = accepts? (checkFinal (runProtocol protocol-init xs))
 -- `acc`.  `handoff` is foldPath-only and a `delivery`-kind emit never
 -- appears in a burst, so either makes the predicate false.
 --
--- Measured by Burst-Probe (with acc ≡ []) on every burst the evaluator
+-- Measured 2026-07-26 (with acc ≡ []) on every burst the evaluator
 -- mints, and never violated.  It has no consumer in the proof: the
 -- take-cut residue it was introduced for is now discharged by valsLast?
 -- below, which empties the cut's tail outright instead of constraining
@@ -306,8 +306,8 @@ frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
 -- It is the invariant that collapses the take cut: a cut happens on an
 -- emit that ADMITTED values, so under valsLast? that emit is the last
 -- one and the burst tail pushBurst would re-run at the post-cut state
--- is empty.  Asserted on every burst the evaluator mints by
--- Burst-Probe.
+-- is empty.  Asserted on every burst the evaluator mints, measured
+-- 2026-07-26.
 ------------------------------------------------------------------
 
 hasValue : ∀ {A : Set} → List (InstEvent A) → Bool
