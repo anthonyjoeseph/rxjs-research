@@ -55,7 +55,7 @@ fix the pointer.
 >   vacuous bridge, which is worse than an orphan because it looks discharged.
 
 > **THE SWEEP OF 2026-08-09: 82 → 56 probe files.** Deleted in `8250241`
-> (Visited-Width), `109757a` (5), `432a8ad` (10) and `a708b38` (10). Recover any
+> (Visited-Width), `109757a` (5), `432a8ad` (10) and `79bec14` (10). Recover any
 > of them with `git show <sha>^:agda/probe/<File>.agda`; each commit message
 > carries the per-file finding, so `git log` answers "what did that probe
 > establish" without restoring it.
