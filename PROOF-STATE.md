@@ -375,6 +375,45 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > level bound — v1's `fold-level-fits` repaired with `suc plen ≤ S` and a gas
 > guard.
 >
+> **THEN SPLIT, same day (2026-08-10) — `stepFrame-burst-face` is no longer a
+> postulate.**  It is a REAL ASSEMBLY (`Burst-Walk` § 5b) over the PROVEN
+> `stepFrame-face` (Caps-Face:4678) plus five per-frame WET leaves, of which
+> `map-f` is proven.  Four of the assembly's six obligations come off ONE
+> `stepFrame-face` call: the level bound and `capsOK?` verbatim, `valsCaps?`
+> verbatim, and `regP? (pathSz? …)` via `capsOK?-regs` on that same `capsOK?`.
+>
+> **The decomposition rule that made it work, and the trap it avoided.**  The
+> Ψ conjuncts are FRAME-INVARIANT, so `j′` does not appear in them — they can
+> be stated once, level-free.  The emitted-EVENTS caps half is NOT: a step can
+> build values that only fit the grown level, so stating it at `J` would have
+> been the FOURTH mis-stated bridge on this route.  So `WetFace` takes `j′` and
+> the two caps receipts as HYPOTHESES, passed in verbatim from the assembly's
+> own `stepFrame-face` call.  Nothing is re-derived and nothing is guessed.
+>
+> **Open surface after the split:** `wet-scan` and `wet-take` (state-local — a
+> node write, and for take a registry filter plus a live sweep; grinds, not
+> design), `wet-inner` and `wet-thru` (the two *All edges, the real content —
+> same family as `subscribeInner-demand`), and `subscribeInner-demand` itself.
+> **The postulate count went UP by three and this is the mechanism working:**
+> one monolith that hid five unrelated obligations became four named leaves
+> plus a real proof, each separately attackable and none able to hide.
+>
+> **`siC` is a PARAMETER, not an import.**  `stepFrame-face`'s own first
+> argument is the subscribeInner caps face; its supplier
+> (`subscribeInner-caps`, Subscribe-Face:951, PROVEN) lives in the 44-minute
+> module, so importing it into Burst-Walk would cost that module its fast loop.
+> `Caps-Bridge` imports both sides and applies it at the `dry-tick` call site.
+> The hand-retyped `SiCFace` was machine-checked against the real supplier by a
+> coercion line before landing — the one thing that could have silently broken
+> the landing.
+>
+> **One gate lesson, recorded because it cost a red gate.**  `make
+> wiring-gate`'s (B4) span collector blanks comment lines and stops at the
+> first empty one, so **a comment inside an assembly's argument list silently
+> truncates its argument set** and reports everything below it as a stale
+> ledger entry.  Keep `dry-tick`'s argument list contiguous; the explanation
+> goes above the definition.
+>
 > The discharges of #6 and #7 have a common shape worth naming: **both postulates
 > carried a pile of leading hypotheses that the eventual proof did not use.**
 > #6 shed seven expression-level lemmas (its proof is pure level arithmetic);
@@ -1472,7 +1511,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | id | DELETE the tied probes WHEN … |
 |---|---|
-| **T1** | `stepFrame-burst-face` (.Burst-Walk) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface since the 2026-08-10 walk landing |
+| **T1** | the four wet leaves (`wet-scan`/`wet-take`/`wet-inner`/`wet-thru`, .Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface since the 2026-08-10 walk landing and its same-day split (`stepFrame-burst-face` is now an assembly, not a postulate) |
 | **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
 | **T3** | tier-1 #5's remaining depth postulates are discharged |
 | **T4** | `merge-cert` is stated in src AND discharged (task #33) |

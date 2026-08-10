@@ -572,6 +572,16 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   in INV? Ψ B sched st ≡ true →
      valB? B Ψ (arrTy a) (arrVal a) ≡ true →
      hasDry (proj₁ (cascade a id sched st)) ≡ false
+-- NO BLANK OR COMMENT LINE INSIDE THE ARGUMENT LIST BELOW.  `make
+-- wiring-gate`'s (B4) span collector blanks comment lines and stops at
+-- the first empty one, so a comment mid-list silently truncates the
+-- assembly's argument set and reports the arguments below it as stale
+-- ledger entries.  Cost one red gate, 2026-08-10.
+--
+-- `cascadeGo-burst-dry` is applied to `subscribeInner-caps` here: its
+-- frame face is an ASSEMBLY over `stepFrame-face` (.Burst-Walk § 5b),
+-- which needs that face's own siC argument, and this is the first
+-- module importing both sides.
 dry-tick =
   dry-tick-core
     (λ {n} {Γ} {t} {e} → cascadeGo-wet {n} {Γ} {t} {e})
@@ -580,7 +590,7 @@ dry-tick =
     (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeLatch-deliv {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascade-delivN {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascadeGo-burst-dry {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → cascadeGo-burst-dry subscribeInner-caps {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} {u} → subscribeInner-dry {n} {Γ} {t} {e} {u})
     (λ {n} {Γ} {u} → dry-hop {n} {Γ} {u})
 

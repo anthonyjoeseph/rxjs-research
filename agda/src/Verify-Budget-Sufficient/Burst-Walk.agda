@@ -54,9 +54,10 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Burst-Walk where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_)
 open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≤ᵇ_; _⊔_)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ)
+open import Data.Nat.Properties
+  using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.List    using (List; []; _∷_; _++_; all; map; length)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -65,13 +66,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent;
                            value; init; close; handoff; complete;
                            InstEmit)
-open import Rx.Exp  using (Ty; Ctx; Closed; Val)
+open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_)
 open import Rx.Evaluator
   using (Sched; EvalSt; Slots; Arrival; RegId; Chain; Path; Frame;
          _↠_; root; share-sink;
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
-         arrTy; arrVal; fLvlD; regAt)
+         arrTy; arrVal; fLvlD; regAt; subscribeInner; sLvlD;
+         AllOp; NodeId)
 
 -- re-exports .Caps (frameStep, capsAt, sizeCount, the mono kit) and
 -- .Deliveries (delivN) public
@@ -83,7 +85,9 @@ open import Verify-Budget-Sufficient.Delivery-Walk
          ∧-intro; ∧-true; all-++-intro)
 
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthFrame; depthCascade)
+  using (depthFrame; depthCascade; depthInner)
+
+open import Verify-Budget-Sufficient.Caps-Nest using (nest)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face
@@ -92,12 +96,12 @@ open import Verify-Budget-Sufficient.Caps-Face
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
-         frameStep-mono-j; frameStep-0)
+         frameStep-mono-j; frameStep-0; stepFrame-face)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
-         fnCapᵛ; caseWᵗ; fnCapᵗ)
+         fnCapᵛ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true)
 
 ------------------------------------------------------------------
 -- § 0  THE Ψ LEDGER — the fnCap halves of valB?/eventB?/burstB? and
@@ -169,43 +173,232 @@ OKB c sl Ψ J sched st =
   walkOK c sl J sched st × (fnCapBounded? Ψ sched st ≡ true)
 
 ------------------------------------------------------------------
--- § 2  THE ONE OPEN OBLIGATION: one frame preserves both flavours.
+-- § 2  ONE FRAME PRESERVES BOTH FLAVOURS — no longer one postulate.
 --
--- The walkOK / valsCaps? / pathSz? / level conjuncts ARE `FrameFace`
--- (Caps-Face:4655) at the same witness — the PROVEN `stepFrame-face`.
--- Genuinely new content: the emitted-EVENTS caps half (FrameFace
--- bounds output VALUES, `proj₁ r`, and says nothing about
--- `proj₁ (proj₂ r)`), and the Ψ halves — the wet face of one frame.
--- Its map-f case is `fnCapᵛ (applyFn fn v) ≤ Ψ` from
--- `frameBΨ?`'s `caseWᵗ ⊔ fnCapᵗ ≤ Ψ` (substitution-invariance);
--- its from-inner/thru-outer cases are the same family as
--- `subscribeInner-demand` (.Anchor-Dry).
+-- 2026-08-10: `stepFrame-burst-face` was a MONOLITH; it is now a REAL
+-- ASSEMBLY (§ 5b) over the already-proven caps face plus five per-frame
+-- WET leaves, of which map-f is proven here and four remain.
 --
--- CALL-SITE ARGUMENTS THIS ABSORBS: none yet.
+-- WHAT THE CAPS SIDE ALREADY GIVES.  `stepFrame-face` (Caps-Face:4678)
+-- picks a j′ and reports the level bound, `capsOK?` at J+j′ and
+-- `valsCaps?` at J+j′.  One more conjunct falls straight out of that
+-- `capsOK?`: `regP? (pathSz? …)` IS `capsOK?-regs`.  So four of the
+-- assembly's six obligations are discharged by machinery that exists.
+--
+-- WHAT IS LEFT is the WET face of one frame (`WetFace`, § 2.2): four
+-- Ψ-only conjuncts — frame-invariant, so j′ never appears in them —
+-- plus the emitted-EVENTS caps half, which DOES ride j′.  That last is
+-- why the leaves take j′ and the two caps receipts as HYPOTHESES: the
+-- events face is false at J (a step can build values needing the grown
+-- level), and stating it there would have been the fourth mis-stated
+-- bridge on this route.
 ------------------------------------------------------------------
 
+-- § 2.1  THE siC HYPOTHESIS, named once: `stepFrame-face`'s own first
+-- argument.  It is a PARAMETER rather than an import because the
+-- supplier (`subscribeInner-caps`, Subscribe-Face:951, PROVEN) lives in
+-- the 44-minute module and importing it here would cost this module its
+-- fast loop.  Caps-Bridge, which imports both, applies it.
+SiCFace : Set
+SiCFace =
+  ∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
+    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
+    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
+    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
+    2 ≤ Caps.cSize c′ →
+    1 ≤ Caps.cReg c′ →
+    Sched.slots sched′ ≡ sl′ →
+    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
+    slotsSize sl′ ≤ Caps.cSize c′ →
+    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
+    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
+    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
+    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
+    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
+    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
+    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
+    in Σ ℕ λ j₂ →
+       (capsOK? (frameStep (j′ + j₂) c′)
+                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
+                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
+       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
+       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
+              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
+       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
+
+-- § 2.2  THE WET FACE — exactly what `stepFrame-face` does NOT say.
+WetFace : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ) →
+  List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e → Set
+WetFace c sl Ψ J j′ r =
+  let sched′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+      st′    = proj₂ (proj₂ (proj₂ (proj₂ r)))
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (valsΨ? Ψ (proj₁ r) ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (all (eventCaps? (frameStep (J + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+
+-- § 2.3  THE FOUR LEAVES STILL OPEN.  scan/take are state-local (a node
+-- write, and for take a registry filter plus a live sweep) — grinds,
+-- not design.  from-inner and thru-outer are the two *All edges and
+-- carry the real content: the same family as `subscribeInner-demand`
+-- (.Anchor-Dry), so whichever is discharged first should absorb it.
+--
+-- CALL-SITE ARGUMENTS THESE ABSORB: none — every index is pinned by
+-- WetFace above, and the two caps receipts are passed in verbatim from
+-- the assembly's own `stepFrame-face` call.
 postulate
-  stepFrame-burst-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
-    2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+  wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+    (sf : Gas) (id : Id) (now : Tick)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+    (path′ : Path Γ u t) (vals : List (Val Γ s))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (f ↠ path′) ≡ true →
+    PbB c Ψ J (scan-f fn nid ↠ path′) ≡ true →
     VbB c sl Ψ J vals ≡ true →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    depthFrame sf id now f path′ vals fin sched st ≤ d →
-    let r  = stepFrame sf id now f path′ vals fin sched st
-        s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
-        t′ = proj₂ (proj₂ (proj₂ (proj₂ r)))
-    in Σ ℕ λ j′ → (J + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) d J)
-      × OKB {e = e} c sl Ψ (J + j′) s′ t′
-      × (VbB c sl Ψ (J + j′) (proj₁ r) ≡ true)
-      × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
-      × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
+    let r = stepFrame sf id now (scan-f fn nid) path′ vals fin sched st in
+    capsOK? (frameStep (J + j′) c)
+            (proj₁ (proj₂ (proj₂ (proj₂ r))))
+            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+    WetFace c sl Ψ J j′ r
+
+  wet-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+    (sf : Gas) (id : Id) (now : Tick)
+    (nid : NodeId) (path′ : Path Γ s t) (vals : List (Val Γ s))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    PbB c Ψ J (take-f nid ↠ path′) ≡ true →
+    VbB c sl Ψ J vals ≡ true →
+    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+    let r = stepFrame sf id now (take-f nid) path′ vals fin sched st in
+    capsOK? (frameStep (J + j′) c)
+            (proj₁ (proj₂ (proj₂ (proj₂ r))))
+            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+    WetFace c sl Ψ J j′ r
+
+  wet-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+    (sf : Gas) (id : Id) (now : Tick)
+    (op : AllOp) (allNid instNid : NodeId)
+    (path′ : Path Γ s t) (vals : List (Val Γ s))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    PbB c Ψ J (from-inner op allNid instNid ↠ path′) ≡ true →
+    VbB c sl Ψ J vals ≡ true →
+    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+    let r = stepFrame sf id now (from-inner op allNid instNid) path′ vals fin sched st in
+    capsOK? (frameStep (J + j′) c)
+            (proj₁ (proj₂ (proj₂ (proj₂ r))))
+            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+    WetFace c sl Ψ J j′ r
+
+  wet-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+    (sf : Gas) (id : Id) (now : Tick)
+    (op : AllOp) (nid : NodeId)
+    (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    PbB c Ψ J (thru-outer op nid ↠ path′) ≡ true →
+    VbB c sl Ψ J vals ≡ true →
+    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+    let r = stepFrame sf id now (thru-outer op nid) path′ vals fin sched st in
+    capsOK? (frameStep (J + j′) c)
+            (proj₁ (proj₂ (proj₂ (proj₂ r))))
+            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+    WetFace c sl Ψ J j′ r
+
+-- § 2.4  THE MAP LEAF — a REAL PROOF.  `stepFrame` on a map-f touches
+-- no state and emits no events, so five of the six conjuncts pass
+-- straight through; the sixth is `applyFn-fnCap` (Wet:232) pointwise
+-- against the chain's own `caseWᵗ ⊔ fnCapᵗ ≤ Ψ`.
+
+regP?-Ψ : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (Ψ J : ℕ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regP? (PbB c Ψ J) rs ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) rs ≡ true
+regP?-Ψ c Ψ J []       h = refl
+regP?-Ψ c Ψ J (r ∷ rs) h
+  with ∧-true (PbB c Ψ J (proj₂ (proj₂ (proj₂ r)))) (regP? (PbB c Ψ J) rs) h
+... | hd , tl =
+  ∧-intro (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c))
+                                  (proj₂ (proj₂ (proj₂ r))))
+                         (pathBΨ? Ψ (proj₂ (proj₂ (proj₂ r)))) hd))
+          (regP?-Ψ c Ψ J rs tl)
+
+map-Ψ : ∀ {n} {Γ : Ctx n} {s u} (Ψ : ℕ) (fn : Fn Γ [] [] [] s u)
+  (vs : List (Val Γ s)) →
+  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ →
+  valsΨ? Ψ vs ≡ true →
+  valsΨ? Ψ (map (applyFn fn) vs) ≡ true
+map-Ψ Ψ fn []       hfn h = refl
+map-Ψ {s = s} Ψ fn (v ∷ vs) hfn h
+  with ∧-true (valΨ? Ψ s v) (valsΨ? Ψ vs) h
+... | hv , hvs =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (applyFn-fnCap Ψ fn v
+             (≤ᵇ⇒≤ (fnCapᵛ s v) Ψ (T-to hv)) hfn)))
+          (map-Ψ Ψ fn vs hfn hvs)
+
+wet-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (sf : Gas) (id : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (map-f fn ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  WetFace c sl Ψ J j′ (stepFrame sf id now (map-f fn) path′ vals fin sched st)
+wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg =
+    proj₁ (proj₁ ok)
+  , proj₂ ok
+  , map-Ψ Ψ fn vals
+      (≤ᵇ⇒≤ (caseWᵗ fn ⊔ fnCapᵗ fn) Ψ
+        (T-to (proj₁ (∧-true (frameBΨ? Ψ (map-f fn)) (pathBΨ? Ψ path′)
+                 (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c))
+                                         (map-f fn ↠ path′))
+                                (pathBΨ? Ψ (map-f fn ↠ path′)) pb))))))
+      (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb))
+  , regP?-Ψ c Ψ J (EvalSt.registry st) rg
+  , refl
+  , refl
+
+-- § 2.5  THE DISPATCHER — one clause per frame constructor, so the
+-- assembly below never case-splits and the five leaves stay separable.
+wet-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  {s u} (sf : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (f ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  let r = stepFrame sf id now f path′ vals fin sched st in
+  capsOK? (frameStep (J + j′) c)
+          (proj₁ (proj₂ (proj₂ (proj₂ r))))
+          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+  WetFace c sl Ψ J j′ r
+wet-face c sl Ψ J j′ sf id now (map-f fn) path′ vals fin sched st ok pb vb rg _ _ =
+  wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg
+wet-face c sl Ψ J j′ sf id now (scan-f fn nid) path′ vals fin sched st ok pb vb rg hC hV =
+  wet-scan c sl Ψ J j′ sf id now fn nid path′ vals fin sched st ok pb vb rg hC hV
+wet-face c sl Ψ J j′ sf id now (take-f nid) path′ vals fin sched st ok pb vb rg hC hV =
+  wet-take c sl Ψ J j′ sf id now nid path′ vals fin sched st ok pb vb rg hC hV
+wet-face c sl Ψ J j′ sf id now (from-inner op a i) path′ vals fin sched st ok pb vb rg hC hV =
+  wet-inner c sl Ψ J j′ sf id now op a i path′ vals fin sched st ok pb vb rg hC hV
+wet-face c sl Ψ J j′ sf id now (thru-outer op nid) path′ vals fin sched st ok pb vb rg hC hV =
+  wet-thru c sl Ψ J j′ sf id now op nid path′ vals fin sched st ok pb vb rg hC hV
 
 ------------------------------------------------------------------
 -- § 3  THE Ψ-STATE FACTS the walk's OK closure needs — all REAL.
@@ -298,11 +491,77 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 ... | a₁ , b₁ | a₂ , b₂ = ∧-intro (∧-intro a₁ a₂) (chP?-∧ P Q rs b₁ b₂)
 
 ------------------------------------------------------------------
+-- § 5b  THE FRAME FACE, ASSEMBLED — ex-postulate, now a definition.
+--
+-- Six obligations, four of them off `stepFrame-face`'s single call:
+-- the level bound and `capsOK?` verbatim, `valsCaps?` verbatim, and
+-- `regP? (pathSz? …)` via `capsOK?-regs` on that same `capsOK?`.  The
+-- other two conjuncts of the Σ recombine caps and Ψ halves pointwise —
+-- `regP?-∧` for the registry, `∧-intro` for values and events.  All the
+-- Ψ content, and the events caps half, comes from `wet-face`.
+------------------------------------------------------------------
+
+stepFrame-burst-face : SiCFace →
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
+  2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (f ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  depthFrame sf id now f path′ vals fin sched st ≤ d →
+  let r  = stepFrame sf id now f path′ vals fin sched st
+      s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+      t′ = proj₂ (proj₂ (proj₂ (proj₂ r)))
+  in Σ ℕ λ j′ → (J + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) d J)
+    × OKB {e = e} c sl Ψ (J + j′) s′ t′
+    × (VbB c sl Ψ (J + j′) (proj₁ r) ≡ true)
+    × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
+    × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
+stepFrame-burst-face siC c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
+                     ok pb vb rg hD =
+    j′
+  , proj₁ (proj₂ FC)
+  , ((proj₁ WF , wCaps) , proj₁ (proj₂ WF))
+  , ∧-intro capsVals (proj₁ (proj₂ (proj₂ WF)))
+  , regP?-∧ (pathSz? (Caps.cSize (frameStep (J + j′) c))) (pathBΨ? Ψ)
+      (EvalSt.registry t′)
+      (capsOK?-regs (frameStep (J + j′) c) s′ t′ wCaps)
+      (proj₁ (proj₂ (proj₂ (proj₂ WF))))
+  , ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ WF)))))
+            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ WF)))))
+  where
+  r  = stepFrame sf id now f path′ vals fin sched st
+  s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  t′ = proj₂ (proj₂ (proj₂ (proj₂ r)))
+
+  FC = stepFrame-face siC c d J sl sf id now f path′ vals fin sched st
+         2≤S 1≤R (proj₁ (proj₁ ok)) slC (proj₂ (proj₁ ok))
+         (proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (f ↠ path′))
+                        (pathBΨ? Ψ (f ↠ path′)) pb))
+         (proj₁ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb))
+         slSz hD
+
+  j′       = proj₁ FC
+  wCaps    = proj₁ (proj₂ (proj₂ FC))
+  capsVals = proj₂ (proj₂ (proj₂ FC))
+
+  WF : WetFace c sl Ψ J j′ r
+  WF = wet-face c sl Ψ J j′ sf id now f path′ vals fin sched st
+         ok pb vb rg wCaps capsVals
+
+------------------------------------------------------------------
 -- § 6  THE INSTANTIATION — every closure fact a real proof.
 ------------------------------------------------------------------
 
 module BurstWalk
   {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (siC : SiCFace)
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ)
   (2≤S : 2 ≤ Caps.cSize c) (1≤R : 1 ≤ Caps.cReg c)
   (slC : slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true)
@@ -447,7 +706,7 @@ module BurstWalk
     ; ok-finish = λ J i fin out ok →
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
-    ; sf-step   = stepFrame-burst-face {e = e} c sl Ψ d 2≤S 1≤R slC slSz
+    ; sf-step   = stepFrame-burst-face siC {e = e} c sl Ψ d 2≤S 1≤R slC slSz
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
@@ -466,7 +725,8 @@ module BurstWalk
 -- cascade-depth-capsH.
 ------------------------------------------------------------------
 
-cascadeGo-burst-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+cascadeGo-burst-dry : SiCFace →
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (a : Arrival Γ)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
@@ -488,7 +748,7 @@ cascadeGo-burst-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthCascade a id chains sched st ≤ capsH e sl id →
   burstB? (sizeCapAt e sl (suc id)) Ψ
           (proj₁ (cascadeGo a id chains sched st)) ≡ true
-cascadeGo-burst-dry {n = n} {e = e} id a chains sched st
+cascadeGo-burst-dry siC {n = n} {e = e} id a chains sched st
                     slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
   burstB?-halves (capsAt e sl (suc id)) sl Ψ (proj₁ cg)
     (subst (λ x → burstCaps? x sl (proj₁ cg) ≡ true)
@@ -506,7 +766,7 @@ cascadeGo-burst-dry {n = n} {e = e} id a chains sched st
   1≤R = 1≤capsAt-reg e sl id
   cg  = cascadeGo a id chains sched st
 
-  module BW = BurstWalk {e = e} c sl Ψ d 2≤S 1≤R slC slSz
+  module BW = BurstWalk {e = e} siC c sl Ψ d 2≤S 1≤R slC slSz
 
   inv0 : capsOK? (frameStep 0 c) sched st ≡ true
   inv0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
