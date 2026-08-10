@@ -88,7 +88,8 @@ report review. Standing protocol, per Anthony:
   and cheaply verified. Give workers this shape instead:
   1. iterate in `agda/probe/` with minimal imports — an UNCHANGED heavy module is a cached
      interface, so a probe importing Wet deserializes in ~6 s instead of rechecking for 9 min
-     (see `agda/probe/Caps-Thread-Probe.agda`'s header; this is a ~90× loop speedup);
+     (measured 2026-08-05: a ~90× loop speedup, and the reason probe-first is the standing
+     shape rather than a preference);
   2. land only probe-green bodies;
   3. hand the long `make gate` BACK to the design session, which can poll across
      turns without dying.

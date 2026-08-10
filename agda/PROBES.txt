@@ -17,55 +17,28 @@
 #                       commit — git is the archive.
 #
 # Format: <filename> | <CLASS> | <one-line note>
-Battery-Batch-Online.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Burst-Done.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Depth-Iter.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Eval-Laws.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Hop-Premise.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Merge-Cert.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Mu-Emissions.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Nesting-Escalation.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Obs-Growth.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Reached-Sizes.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-VWF-Prop.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Value-Count.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Burst-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-BurstLen-SyncSize-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Caps-Thread-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Chain-Half-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Concat-Frame-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Concat-Sum-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Count-Level-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Depth-Compositional-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Depth-Wire-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Entry-Caps-Refuted.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Eval-Growth-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Fold-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Frame-Work-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Hop-Descent-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Instant-Height-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Instant-Height-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-J-Budget-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Joint-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Level-Shape-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Level-Walk-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Lub3-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Measure-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
+Battery-Eval-Laws.agda | EVIDENCE | PROBED-GREEN, no refutation, for three LIVE postulates (μ-unfold, fuel-coherent, id-inheritance); id-inheritance-fuel3 checks (0∷1∷2∷3∷[]) ⊆ᵢ horizon 3
+Battery-Hop-Premise.agda | EVIDENCE | hop-edge premise (iii) discharges in one step from subscribeE-walk-core's burstHopD? conjunct: hopDᵛ ≤ hopDᵉ b < suc (hopDᵉ b) = r. Grind not yet done in src
+Battery-Merge-Cert.agda | EVIDENCE | merge-st 0 at mnid is seed-provable by refl; false-witness Shape B unreachable (cascadeLatch fires before innerFinish). merge-cert still unstated in src (task #33)
+Battery-Mu-Emissions.agda | EVIDENCE | μ self-subscription is a TYPE ERROR (Δᵍ/Δ gate via deferᵉ); sizeᵉ doubles 10→20 across unfold while syncSizeᵉ holds 9→9
+Battery-Nesting-Escalation.agda | EVIDENCE | refutes gas-as-count-bound (30 values on gas depth 10 fuel); nested doubling-scan headroom is a TOWER in nesting depth, not a fixed exponential. Feeds Anchor-Dry demand
+Battery-Obs-Growth.agda | EVIDENCE | sizeᵛ acc_k = 12·2^k − 11 (k=0..3: 1,13,37,85 by refl) — kills the linear-in-sizeᵉ route for scripted sources. Source of Anchor-Dry:27's a′ ≤ 2a+v+11
+Battery-Reached-Sizes.agda | EVIDENCE | runs real subscribeE+splitBurst to measure sizes actually reaching subscribeInner; establishes Ŝ := capsH e ins 0 as the workable anchor (ceilings 1 and 2 hold)
+Battery-VWF-Prop.agda | EVIDENCE | PROBED-TRUE (non-vacuous) for 5 live VWF postulates (map/scan nodry+valsLast push, scan-nodeP). scan-binv-adapt half is SPENT — real proof landed VWF:1191
+Battery-Value-Count.agda | EVIDENCE | REFUTES 'emissions per instant ≤ syncSizeᵉ e': K=4 gives valueCount 30 > syncSizeᵉ 20 (K=1..3 hold: 2≤17, 6≤18, 14≤19). Kills sync-count-bounded
+Burst-Probe.agda | EVIDENCE | live `make burst-probe` harness: 0 valsLast failures across ~14k bursts (corpora A/B/C/C₃, d3-d5), settling that TailRel's acc-le premise never held
+Count-Level-Probe.agda | EVIDENCE | refutes count-as-a-sibling-Σ (count-vacuous: upward-closed ⇒ vacuous) and finds it FALSE level-locked at the scripted-input leaf (j′=0 vs count 1,2 needed)
+Depth-Wire-Probe.agda | EVIDENCE | baseCaps-is-inner lives here BY DESIGN — Caps-Bridge:1018 says nothing in the claim graph consumes it and the wiring law admits no orphans there
+Entry-Caps-Refuted.agda | EVIDENCE | REFUTES stepFrame-entry-caps: one bare map-f frame grows payload size 3→7 at cSize=3, breaching the entry cap by refl. Cited 12x incl. core Rx/Evaluator
+Instant-Height-Main.agda | EVIDENCE | GHC-compiled driver for Instant-Height-Probe's rows (one row per process via stdin index); no proof content of its own, referenced from the Makefile
+Instant-Height-Probe.agda | EVIDENCE | store growth across instants (V vs W, S+ vs S); CAL iJ rows reproduce Charge-Probe's pinned 23/47 by refl
+Joint-Probe.agda | EVIDENCE | pathLen+sizeᵉ joint bound measured FALSE on all 17 families (worst 9.0x over adm). CAVEAT: builds ONLY in the scripts/joint-probe.sh scratch project, NOT against agda/src
+Level-Walk-Probe.agda | EVIDENCE | old-cDel≤new-cDel (a real proof, 0 postulates): the new level walk dominates the retired registry walk pointwise, so no measured row needs re-measurement. Cited Evaluator:505,572
+Measure-Main.agda | EVIDENCE | GHC-compiled driver for Mint-Loop-Shapes' measurements (mFolds/mFib/mS/mMints); calibration rows reproduce the refl-pinned 2546/576
 Mint-Loop-Shapes.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Mult-Width-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Nest-Budget-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Nest-Count-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Nest-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Nest-Supply-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Queue-Push-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Refresh-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Rung-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Share-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-State-Blowup-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Sub-Charge-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Sub-Wire-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Wf-Aux-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Wf-Fold-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Width-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 SubInner-Demand-Probe.agda | EVIDENCE | first coverage for subscribeInner-demand (Anchor-Dry:117): 20 LOAD-BEARING rows over merge/exhaust programs A/B at evaluator-reached init states; second valB? conjunct FULLY covered, first covered symbolically via Dm≥16 (2≤sizeCapAt · 1≤towerℕ); NOT covered: sizeᵛ>16 inners, the stuck sizeᵛ≤ᵇB conjunct of Hyp 3, post-step states
 Install-Scan-Depth-Probe.agda | EVIDENCE | §1 refutes old storeNestMax-installScan (LOAD-BEARING: caseᵗ duplication gives storeNestMax=25 > sizeᵗ-bound=23); §2 validates new installScan-depth-bound at b=emptyᵉ (LOAD-BEARING: storeNestMax post-install=5 > RHS=2, yet depthE=0)
+Charge-Probe.agda | EVIDENCE | INFRASTRUCTURE: supplies the progD/progDT/progW/pF1/pF2/deepScan program families to 4 sibling probes. Also: j <= D*cSize breaches at 47 against 40

@@ -1404,6 +1404,48 @@ def main():
                     "deleted probe file"
                 )
 
+        # (C3) BROKEN PROBE-TO-PROBE IMPORTS — the THIRD end of a deletion.
+        # Probes import each other: Charge-Probe supplies the program families
+        # (progD/progW/pF1/…) that four other probes measure against, and
+        # Mint-Loop-Shapes is imported by five.  Deleting such a file breaks
+        # every importer silently, because `make agda` never compiles probe/
+        # and the ledger only tracks existence.  Hit 2026-08-09: Charge-Probe
+        # was deleted as a "receipt probe" while four live probes imported it.
+        # A probe is EVIDENCE and INFRASTRUCTURE independently — classify both
+        # before deleting.
+        broken_imports = []
+        if os.path.isdir(probe_dir):
+            probe_mods = {
+                f[:-5] for f in os.listdir(probe_dir) if f.endswith(".agda")
+            }
+            for f in sorted(os.listdir(probe_dir)):
+                if not f.endswith(".agda"):
+                    continue
+                with io.open(
+                    os.path.join(probe_dir, f), encoding="utf-8", errors="replace"
+                ) as fh:
+                    for lineno, line in enumerate(fh, 1):
+                        if line.lstrip().startswith("--"):
+                            continue
+                        g = _IMPORT_RE.match(line)
+                        if not g:
+                            continue
+                        mod = g.group(1)
+                        # only probe-local modules matter; src and stdlib
+                        # resolve through the normal include path
+                        if "." in mod or mod in probe_mods:
+                            continue
+                        src_hit = os.path.join(
+                            src_dir, mod.replace(".", os.sep) + ".agda"
+                        )
+                        if not os.path.isfile(src_hit):
+                            broken_imports.append(f"{f}:{lineno}: imports {mod}")
+            if broken_imports:
+                problems.append(
+                    f"{len(broken_imports)} probe file(s) importing a module "
+                    "that no longer exists"
+                )
+
         if problems:
             print()
             print("=" * 78)
@@ -1452,6 +1494,12 @@ def main():
                 print("DANGLING MAKE RECIPES — probe file deleted; remove the")
                 print("target, its .PHONY entry, and its `make help` blurb:")
                 for name in dangling_targets:
+                    print(f"  {name}")
+            if broken_imports:
+                print()
+                print("BROKEN PROBE IMPORTS — a deleted probe was shared")
+                print("INFRASTRUCTURE.  Restore it, or delete its importers too:")
+                for name in broken_imports:
                     print(f"  {name}")
             sys.exit(1)
         print()
