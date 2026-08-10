@@ -254,8 +254,21 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > derived from may well be true** — Dm's tower is sized to absorb a whole
 > instant, not to be idempotent under one frame. The general lesson:
 > `Walk`'s `*-widen` fields are not decoration, they are the walk telling
-> you the ledger must GROW WITH THE LEVEL. (Refutation probe commissioned;
-> the reasoning above is not yet machine-checked.)
+> you the ledger must GROW WITH THE LEVEL.
+>
+> **MACHINE-REFUTED, same day** (`agda/probe/Demand-SfStep-Absurd.agda`,
+> `make demand-sfstep-absurd`). `fn = pairᵗ (varᵗ x) (varᵗ x)`, `Dm = 1`,
+> `Ψ = 0`, one payload `0 : natᵗ`: `sizeᵛ natᵗ 0 = 1` fits the bound,
+> `sizeᵛ (applyFn fn 0) = 3` does not — both by `refl` — so the `Vb` OUTPUT
+> conjunct reduces to `false` and the claim closes by `()`. **NOT VACUOUS:**
+> all five hypotheses are discharged at `st-init` of a concrete program —
+> `walkOK` from `init-capsOK?-base`, the path ledger by `refl`
+> (`sizeᵗ fn = 3 ≤ 3`, `occsᵗ fn = 2 ≤ 2`), the payload ledger by `refl`,
+> the registry by `refl`, the depth by `z≤n`. Four rows LOAD-BEARING; the
+> registry row is DEGENERATE (empty registry at init). **NOT COVERED:** the
+> statement at the REAL `Dm = (2·B + 12) · towerℕ (suc sz)`, which is not an
+> evaluable numeral — that this Dm is likewise no fixed point of a doubling
+> map is reasoning, not a row.
 >
 > **(2) THE RECURSION WAS NEVER THE OPEN PART — it is already proven, on
 > the caps axis.** `foldPath-caps`, `dispatchShare-caps`, `shareGo-caps` and
