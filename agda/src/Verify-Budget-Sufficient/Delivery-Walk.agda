@@ -155,6 +155,18 @@ shareFinish-regP Pb i true  (emits , sd , st′) h =
   dropSource-all (λ en → Pb (proj₂ (proj₂ (proj₂ en))))
                  (toℕ i) (EvalSt.registry st′) h
 
+-- the EMITS projection, on the same axis as the two above.  shareFinish
+-- touches only the registry and the live set — the stream rides through
+-- both branches untouched — but that is not usable DEFINITIONALLY: with
+-- `fin` a variable neither clause fires, so `proj₁ (shareFinish i fin out)`
+-- is stuck rather than equal to `proj₁ out`.  Hence the case split, exactly
+-- as `shareFinish-len` and `shareFinish-regP` need one
+shareFinish-emits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (i : Fin n) (fin : Bool) (out : Stream Γ t × Sched Γ × EvalSt e) →
+  proj₁ (shareFinish i fin out) ≡ proj₁ out
+shareFinish-emits i false out                = refl
+shareFinish-emits i true  (emits , sd , st′) = refl
+
 -- the admitted sublist: shorter than the registry, and inheriting its
 -- ledger.  Same filter shape as chainsGo's
 shareAdmit-len : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
@@ -329,6 +341,18 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ∧-intro (p-widen le p (proj₁ (∧-true _ _ h)))
             (chP?-widen le ps (proj₂ (∧-true _ _ h)))
 
+  -- THE SEED EVENTS a delivery starts from: a spent source contributes its
+  -- own exhausted close, an unspent one contributes nothing.  Both callers
+  -- (shareGo-go, cascadeGo-go) need this, and neither can inline it as a
+  -- `with`: their clauses already `with` on the cancellation test, and Agda
+  -- refuses to `with` on a variable bound by a parent clause's pattern.
+  -- Taking the Bool as an explicit argument moves the split somewhere it is
+  -- allowed to happen
+  eb-seed : ∀ (J : ℕ) (src : Source) (fin : Bool) →
+            Eb J (if fin then close src exhausted ∷ [] else []) ≡ true
+  eb-seed J src true  = e-close J src exhausted
+  eb-seed J src false = e-nil J
+
   -- WHAT ONE RUN REPORTS.  `lvl` is where it landed, `lo` that it only
   -- climbed, `hi` that it climbed by at most one delivery-charge per
   -- delivery from the level `base` its frames left it at, `cnt` that
@@ -458,7 +482,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- IH's Eb premise: widen hE to J+j′, then append the frame's own
     -- events using sf-step's new last conjunct
     hE-IH : Eb (J + j′) (evs ++ proj₁ (proj₂ r)) ≡ true
-    hE-IH = e-app (J + j′)
+    hE-IH = e-app (J + j′) evs (proj₁ (proj₂ r))
                   (e-widen (m≤m+n J j′) evs hE)
                   (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF)))))
     IH = foldPath-go (J + j′) sf gas id now envSrc path′ (proj₁ r)
@@ -500,7 +524,9 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                              (regAt S R J) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
                              (≤-trans (shareAdmit-len i (EvalSt.registry st))
                                       (ok-reg J sched st ok)))))
-        (Res.burst GO)
+        (subst (λ s → Bb (Res.lvl GO) s ≡ true)
+               (sym (shareFinish-emits i fin out))
+               (Res.burst GO))
     where
     stL = shareLatch i fin st
     out = shareGo sf gas id now i vals fin
@@ -576,9 +602,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         evs₀ = if fin then close (toℕ i) exhausted ∷ [] else []
         -- Eb premise for foldPath-go: case on fin to pick e-close or e-nil
         hE₀ : Eb J evs₀ ≡ true
-        hE₀ with fin
-        hE₀ | true  = e-close J (toℕ i) exhausted
-        hE₀ | false = e-nil J
+        hE₀ = eb-seed J (toℕ i) fin
         fp  = foldPath sf gas id now (toℕ i) p vals evs₀ fin sched st₀
         st₁ = proj₂ (proj₂ fp)
         dSK   = depthShareGo sf gas id now i vals fin ps sched st
@@ -685,9 +709,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         evs₀ = if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else []
         -- Eb premise for foldPath-go: case on isLast for e-close or e-nil
         hE₀ : Eb J evs₀ ≡ true
-        hE₀ with Arrival.isLast a
-        hE₀ | true  = e-close J (arrSource a) exhausted
-        hE₀ | false = e-nil J
+        hE₀ = eb-seed J (arrSource a) (Arrival.isLast a)
         cs   = chainStep id a c sched st₀
         st₁  = proj₂ (proj₂ cs)
         rest = cascadeGo a id chains (proj₁ (proj₂ cs)) st₁
