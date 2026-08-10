@@ -233,6 +233,68 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > inheritance) is now the whole of tier 1's risk**, and it is where the
 > remaining work is.
 >
+> **UPDATE 2026-08-10 — A DESIGN RULING ON THE ANCHOR, from one abandoned
+> landing.** An attempt to discharge `chainStep-demand` / `foldPath-demand`
+> by instantiating the proven `Walk` (`.Delivery-Walk`) at the demand
+> ledgers was BUILT, TYPECHECKED, AND THEN REVERTED. It typechecked and
+> passed `make gate`; it was still wrong. Both reasons are worth keeping,
+> because each one closes off a route someone will otherwise re-attempt.
+>
+> **(1) A CONSTANT DEMAND LEDGER CANNOT BE WALKED.** The instantiation set
+> `Vb _ vs = all (valB? Dm Ψ _) vs`, `Bb _ str = burstB? Dm Ψ str` —
+> constant in the walk level J, which is what makes `Res.burst` land
+> directly on `foldPath-demand`'s conclusion with no widening step. But the
+> walk THREADS its ledger through every frame: `sf-step`'s output feeds the
+> next frame's input, so a level-constant `Vb` demands that EVERY SINGLE
+> FRAME preserve a fixed size bound. It does not. `stepFrame` on `map-f fn`
+> is `map (applyFn fn) vals` (Evaluator:1250), and a duplicating `fn`
+> (`occsᵗ fn = 2`) roughly doubles `sizeᵛ`; a value admitted at `sizeᵛ = Dm`
+> comes out above it. **Dm is not a fixed point of the growth map, so the
+> per-frame statement is false even though the per-FOLD statement it was
+> derived from may well be true** — Dm's tower is sized to absorb a whole
+> instant, not to be idempotent under one frame. The general lesson:
+> `Walk`'s `*-widen` fields are not decoration, they are the walk telling
+> you the ledger must GROW WITH THE LEVEL. (Refutation probe commissioned;
+> the reasoning above is not yet machine-checked.)
+>
+> **(2) THE RECURSION WAS NEVER THE OPEN PART — it is already proven, on
+> the caps axis.** `foldPath-caps`, `dispatchShare-caps`, `shareGo-caps` and
+> `chainStep-caps` (`.Subscribe-Face:3243-3489`) are REAL DEFINITIONS, a
+> mutual clique over exactly the same four evaluator functions, each
+> concluding `burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true`. So
+> re-deriving the fold by a second walk instantiation buys nothing.
+>
+> **WHAT THIS LEAVES — and it re-aims the anchor.** The real content of
+> `chainStep-demand` / `foldPath-demand` is NOT the induction. It is:
+>
+>   (a) **the caps→wet FLAVOUR BRIDGE.** `valCaps?` bounds `sizeᵛ` against
+>       `cSize`; `valB? B Ψ` bounds `sizeᵛ ≤ B` **and** `fnCapᵛ ≤ Ψ`
+>       (Measures:4853). The second conjunct is wet-only and has to come
+>       from Ψ-invariance (INV?'s `fnCapBounded?`; "Ψ never grows — caseW is
+>       substitution-invariant"), not from the caps face at all. This is the
+>       same shape as the existing `pathSz? → pathBΨ? → pathB?` bridge
+>       (Caps-Bridge:673).
+>   (b) **the level arithmetic**, `Caps.cSize (frameStep (j + j′) c) ≤ Dm`.
+>
+> **AND (b) HAS A WITNESS PROBLEM that decides the shape of the fix.**
+> `foldPath-caps`'s Σ reports `j′` with NO bound on it — both its conjuncts
+> are monotone in `j′` (`capsOK?-mono`, `burstCaps?-widen` under
+> `frameStep-mono-j`), so the receipt is upward-closed in its witness and
+> carries no quantitative content on the level. The level bound lives in a
+> DIFFERENT Σ, the walk's `Res.hi`. Two receipts, two witnesses — they
+> cannot be intersected (this is the same trap recorded for `walkH`'s
+> `sf-step` below). **So the fix is one walk instantiation whose ledger is
+> CAPS-INDEXED** — `Bb J = burstCaps? (frameStep J c) sl`,
+> `Eb J = all (eventCaps? (frameStep J c) sl)`, with `Vb`/`Pb`/`OK` left
+> exactly as `walkH` has them — which returns the burst and the level bound
+> at ONE witness. Every closure fact it needs already exists
+> (`burstCaps?-widen`, `eventsCaps?-widen`, `burstCaps?-∷`), and its
+> `sf-step` is `stepFrame-face` (PROVEN) plus ONE new conjunct: **`FrameFace`
+> (Caps-Face:4655) bounds the output VALUES and not the emitted EVENTS**
+> (`proj₁ (proj₂ r)`), so the events half is the one genuinely missing
+> frame-local fact. That is the postulate to state next, and it is the same
+> shape the `subscribeInner` face (`siC`) already carries.
+>
 > The discharges of #6 and #7 have a common shape worth naming: **both postulates
 > carried a pile of leading hypotheses that the eventual proof did not use.**
 > #6 shed seven expression-level lemmas (its proof is pure level arithmetic);
