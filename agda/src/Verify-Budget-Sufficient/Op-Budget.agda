@@ -656,8 +656,8 @@ climb-paid S W d k m R g 2≤S hk hm hR hg =
 -- suc S; record eta pins `caps S W R`'s fields.
 --
 -- `1 ≤ R` IS LOAD-BEARING, and the statement without it is FALSE —
--- machine-refuted 2026-08-06, probe/OpIterD-Budget-Probe.agda §1
--- (`opIterD-budget-R0-false`, a proven → ⊥).  At R = 0 the registry
+-- machine-refuted 2026-08-06 as `opIterD-budget-R0-false`, a proven
+-- → ⊥ (probe retired 2026-08-09).  At R = 0 the registry
 -- walk is empty (`regAt S 0 J = 0 * suc (J * S) = 0`), so
 -- `cDel (caps S W 0) d = 0` and the RHS collapses to
 -- `lvls S W d 0 0 = 0`; but the LHS is a `dLvl` application and

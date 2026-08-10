@@ -54,6 +54,42 @@ fix the pointer.
 >   Caps-Face:1418. **Deleted 2026-08-09** — wiring it in would have required a
 >   vacuous bridge, which is worse than an orphan because it looks discharged.
 
+> **THE SWEEP OF 2026-08-09: 82 → 56 probe files.** Deleted in `8250241`
+> (Visited-Width), `109757a` (5), `432a8ad` (10) and `a708b38` (10). Recover any
+> of them with `git show <sha>^:agda/probe/<File>.agda`; each commit message
+> carries the per-file finding, so `git log` answers "what did that probe
+> establish" without restoring it.
+>
+> The last ten were **receipt probes**: refutations and measurement batteries
+> whose conclusion was ALREADY transcribed into a src comment, in full, with the
+> numbers. `Depth-Blowup` (`depthE ≤ capsBase` is false), `OpIterD-Budget`
+> (`opIterD-budget` at R=0 reads `2 ≤ 0`), `Share-Residue` (refutes the entry
+> level at S=2, j=0), `Dep0-Walk` (the depth-zero walk overshoots structurally),
+> `Cut-Caches` (the count both TRAILS and LEADS the registry), `Mu-Nest` (the
+> measure is `syncSizeᵉ`, not `nestᵉ`), `Charge` (`j ≤ D * cSize` breaches 47
+> against 40), `Mint-Loop-Probe` (the false middle step), `Mint-Loop-Frames`
+> (103 refl pins that Caps-Face:4172 itself calls "a redundant cross-check"),
+> and `Battery-Done-Thread` (a rehearsal whose threading has landed).
+>
+> **Two process findings from the sweep, both about checks that could not fail:**
+>
+> - **A probe deletion has TWO ends, and only one was gated.** C1 gates
+>   PROBES.txt against the directory; nothing gated the Makefile, so
+>   `make visited-width-probe` and `make frame-mint-probe` sat broken (agda exit
+>   42) after their files went. Now gated as **(C2)** — any Makefile recipe
+>   naming a probe file that does not exist fails the gate, verified by planting
+>   one. Also fixed: `make help` had been broken since `bb88f16` by a stray
+>   quote in the `width-count-probe` blurb — the documentation surface for every
+>   probe target, dead for days, because nothing runs `make help`.
+> - **The consumer census had a degenerate row class of its own.** Its
+>   name-extraction regex reads top-level `name :` signatures, so a file of
+>   ANONYMOUS `_ : … ≡ n` refl pins yields zero names and therefore zero
+>   consumers — sorting it to the top of the "nothing uses this" list on a row
+>   that could not have failed. Both Mint-Loop files were exactly that shape.
+>   The verdict survived on other grounds (no named theorem to land, numbers
+>   already in src), but **a census row for a file with zero extracted
+>   definitions carries no information — check the extraction before the count.**
+
 ## The theorem chain (top → leaves)
 
 ```

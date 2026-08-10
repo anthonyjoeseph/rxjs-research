@@ -6,8 +6,8 @@
 -- the depth mirror at the call's own arguments.  For the receipt to be
 -- SPENDABLE the depth must be bounded by something entry-computable,
 -- and the naive candidates are dead: `depthE ≤ capsBase` is FALSE
--- (machine-refuted, agda/probe/Depth-Blowup-Probe.agda — scan
--- accumulators deepen per fold while capsBase gains +1 per arrival),
+-- (machine-refuted 2026-08-09 — scan accumulators deepen per fold
+-- while capsBase gains +1 per arrival),
 -- and any UNCONDITIONAL `depthE ≤ capsH` dies the same way against an
 -- adversarial stored state.  The honest statement conditions on the
 -- state being bounded — which is exactly the hypothesis every consumer

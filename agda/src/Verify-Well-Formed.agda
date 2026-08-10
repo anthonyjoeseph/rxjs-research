@@ -775,8 +775,8 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- been incremented (the count TRAILS the registry); and a take-cut strips
     -- registrations without touching activeInners (the count LEADS it).  No
     -- relation between the two survives both, so no weakening of the field
-    -- would work — it has to leave.  agda/probe/Cut-Caches-Probe.agda checks
-    -- all of this by computation (`make cut-caches-probe`).  Like done-plumbed
+    -- would work — it has to leave.  Both directions were checked by
+    -- computation before the field was dropped (2026-08-09).  Like done-plumbed
     -- it is re-established once, at the root exit, from `root-caches`.
     -- NB: no done-plumbed here.  A base burst always latches done ≡ true, but
     -- an INNER base completing amid a live async sibling makes the full-registry
@@ -1086,8 +1086,8 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --     so the counter LEADS it.
 -- nodeCacheOK's merge clause demands equality while the outer is registered, and
 -- the outer IS registered across both (subscribeAll registers it before pushBurst).
--- agda/probe/Cut-Caches-Probe.agda checks all of this by computation; the two
--- halves are `make cut-caches-probe`.
+-- Both halves were checked by computation before the field was dropped;
+-- the probe that checked them is retired (2026-08-09).
 --   CONSUMER: exactly as with done-plumbed — BurstInv.caches was read ONLY by
 --   burst-final (root frame-0 exit → Inv.caches).
 --   RESOLVED (2026-07-27): caches DROPPED from BurstInv, re-established once at
@@ -1112,7 +1112,8 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- must come from the walk order."  So it now comes from the walk order —
 -- `subscribeE-wf` and every per-clause receipt TAKE it as the premise `deq`,
 -- threaded unchanged down the spine, and `subscribe-wf` supplies `refl` at
--- `protocol-init`.  Rehearsed in `agda/probe/Battery-Done-Thread.agda`.
+-- `protocol-init`.  The threading was rehearsed in a probe first; that
+-- rehearsal is spent and the probe is retired (2026-08-09).
 postulate
   -- mapᵉ GAP 1: hasDry propagates inward through the map push.
   map-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}

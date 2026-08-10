@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe nest-count-probe instant-height-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache unsafe-check wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe nest-count-probe instant-height-probe mult-width-probe burst-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe joint-probe eval-growth-probe width-count-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -49,9 +49,6 @@ help:
 	@echo "                  proportional to def sizes (budgetAt = syncBudget sizeᵉ),"
 	@echo "                  making each program ≫ 90 min per seed.  Corpora A, C,"
 	@echo "                  and C₃ can be run at depth 5 without issue."
-	@echo "  cut-caches-probe  the counterexample that cachesValid is not a burst"
-	@echo "                  invariant: it fails BOTH ways across a merge inner's"
-	@echo "                  subscribe (see agda/probe/Cut-Caches-Probe.agda)"
 	@echo "  hop-descent-probe  the refutation that a burst's observable value"
 	@echo "                  measures below its carrier — false at all three"
 	@echo "                  sites (see agda/probe/Hop-Descent-Probe.agda)"
@@ -72,12 +69,6 @@ help:
 	@echo "                  2 ^ cReg * cSize, over four share shapes plus the"
 	@echo "                  standing regression suite"
 	@echo "                  (see agda/probe/Fold-Count-Probe.agda)"
-	@echo "  mint-loop-probe  does the MINTING FEEDBACK LOOP close?  a scan under"
-	@echo "                  a share whose step re-subscribes that share, nested"
-	@echo "                  k deep, so a minted chain can itself mint.  NO — the"
-	@echo "                  deliveries saturate in k on three ladders of four,"
-	@echo "                  while 2 ^ cReg * cSize grows.  The fourth is still"
-	@echo "                  climbing where it stops computing.  ~18 min, two files"
 	@echo "  entry-caps-refuted  the refutation of stepFrame-entry-caps: one"
 	@echo "                  map-f frame whose OUTPUT payload breaches the entry"
 	@echo "                  cap it was charged at, so cascadeGo-deliveries is"
@@ -148,7 +139,7 @@ help:
 	@echo "                  deliveries x nesting and the fan-out family"
 	@echo "                  breaches at four deliveries"
 	@echo "                  (see agda/probe/Nest-Count-Probe.agda).  Fast"
-	@echo "  width-count-probe  the refutation that the COUNT may read cWid:""
+	@echo "  width-count-probe  the refutation that the COUNT may read cWid:"
 	@echo "                  one fold exponentiates a width, so j folds put it"
 	@echo "                  under a tower of height j — a count with a cWid"
 	@echo "                  summand iterates the tower per instant and"
@@ -164,13 +155,6 @@ help:
 	@echo "                  ones), and the BASE, where the whole root-fuel"
 	@echo "                  margin goes (see agda/probe/Mult-Width-Probe.agda)"
 	@echo "                  Fast, ~15 s"
-	@echo "  charge-probe  does one cascade's j fit D * cSize?  NO - the"
-	@echo "                  receipt-weighted j breaches it on the deepening"
-	@echo "                  scan, and twice over when a second scan sits"
-	@echo "                  DOWNSTREAM of the amplifier (47 against 20).  The"
-	@echo "                  mint ladders all fit: the corner that breaks it"
-	@echo "                  has FEW deliveries and WIDE payloads"
-	@echo "                  (see agda/probe/Charge-Probe.agda).  ~2 min"
 	@echo "  instant-height-probe  how fast do the STORE's two axes climb"
 	@echo "                  ACROSS INSTANTS, and does the receipt's payload"
 	@echo "                  width V stay under what the PREVIOUS instant"
@@ -295,11 +279,6 @@ gate:
 burst-probe:
 	scripts/burst-probe.sh $(ARGS)
 
-# Four refl-checked computations pinning down why BurstInv cannot carry
-# cachesValid.  Standalone (it only computes on hand-built configurations), so
-# it is not reached by src/Main.agda and needs its own target to stay honest.
-cut-caches-probe:
-	cd agda && agda -i src -i probe probe/Cut-Caches-Probe.agda
 
 # The three absurd-pattern refutations of hop descent: an observable value
 # carried by a burst does NOT measure below its carrier, because a template
@@ -346,19 +325,6 @@ j-budget-probe:
 fold-count-probe:
 	cd agda && agda -i src -i probe probe/Fold-Count-Probe.agda
 
-# The gate for the one crude spot in `2 ^ cReg * cSize`: shareAdmit reads the
-# registry as of the dispatch, so a mid-cascade mint widens the branching of
-# the cascade that minted it.  Fold-Count-Probe's family G sampled one rung of
-# that loop; this closes it, and finds the deliveries SATURATE in the nesting
-# depth while the budget keeps growing through cSize — on three ladders of
-# four.  Standalone, so src/Main.agda never reaches it.  SLOW — every fold
-# count re-runs the evaluator through a real cascade — and split in two
-# because ONE wall over these families does not finish: it ran past fifty
-# minutes and was killed.  Split, it is ~10 min plus ~8 min.
-mint-loop-probe:
-	cd agda && agda -i src -i probe probe/Mint-Loop-Shapes.agda
-	cd agda && agda -i src -i probe probe/Mint-Loop-Probe.agda
-	cd agda && agda -i src -i probe probe/Mint-Loop-Frames.agda
 
 # The REFUTATION of those two frame-local axioms: a machine-checked
 # Entry-Caps -> bottom on one map-f frame, plus the Leg-0 width lemma
@@ -468,14 +434,6 @@ width-count-probe:
 nest-count-probe:
 	cd agda && agda -i src -i probe probe/Nest-Count-Probe.agda
 
-# The refutation of `cascadeGo-charge` as stated.  It mirrors foldPath /
-# dispatchShare / shareGo / cascadeGo with the RECEIPT stepFrame-caps
-# reports at each frame threaded in place of the emit stream, so the
-# number it returns is a LOWER BOUND on the conjunct's own j — and it
-# breaks `j <= D * cSize` on the deepening scan.  Standalone, so
-# src/Main.agda never reaches it.  ~2 min
-charge-probe:
-	cd agda && agda -i src -i probe probe/Charge-Probe.agda
 
 # The price of the MULTIPLICATIVE width engine, paid before the engine is
 # built.  Arithmetic on the recurrence alone: the joint tower slope with a
