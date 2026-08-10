@@ -114,6 +114,16 @@ postulate
        all (eventB? B Ψ) evs ≡ true →
        burstB? Dm Ψ (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st)) ≡ true
 
+  -- PROBED 2026-08-08 (agda/probe/SubInner-Demand-Probe.agda): 20
+  -- LOAD-BEARING rows over merge/exhaust programs A/B at
+  -- EVALUATOR-REACHED init states — no refutation.  The second valB?
+  -- conjunct is FULLY covered; the first only SYMBOLICALLY, via
+  -- Dm ≥ 16 (from 2 ≤ sizeCapAt and 1 ≤ towerℕ), because
+  -- towerℕ (suc sz) is not an evaluable numeral past sz = 4.
+  -- NOT COVERED, and each is a real gap rather than an oversight:
+  -- inners with sizeᵛ > 16, the stuck sizeᵛ ≤ᵇ B conjunct of Hyp 3,
+  -- and ALL post-step states.  Its two siblings above are the
+  -- unprobed ones; do not read this receipt as covering them.
   subscribeInner-demand : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
