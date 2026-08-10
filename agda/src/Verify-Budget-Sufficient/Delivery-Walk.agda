@@ -78,8 +78,9 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
-open import Rx.Prim      using (Tick; Id; Source; InstEvent; close; exhausted;
-                                Gas)
+open import Rx.Prim      using (Tick; Id; Source; InstEvent; CloseReason;
+                                close; exhausted; value; handoff; complete;
+                                _at_from_as_; delivery; Gas)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain;
                                 Path; Frame; root; share-sink; _↠_; Stream;
@@ -215,6 +216,38 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     Pb : ℕ → ∀ {u} → Path Γ u t → Bool
     Vb : ℕ → ∀ {s} → List (Val Γ s) → Bool
 
+    -- BURST LEDGERS: an abstract Bool over the accumulated protocol events
+    -- in one emit (Eb) and over a whole stream (Bb).  Threaded through the
+    -- walk so that the anchor can recover a burst bound from the walk
+    -- rather than having to state it as a separate postulate.
+    Eb : ℕ → List (InstEvent (Val Γ t)) → Bool
+    Bb : ℕ → Stream Γ t → Bool
+
+    -- closure facts for Eb
+    e-nil   : ∀ J → Eb J [] ≡ true
+    e-close : ∀ J (src : Source) (r : CloseReason) → Eb J (close src r ∷ []) ≡ true
+    e-app   : ∀ J evs₁ evs₂ → Eb J evs₁ ≡ true → Eb J evs₂ ≡ true →
+              Eb J (evs₁ ++ evs₂) ≡ true
+    e-widen : ∀ {J J′} → J ≤ J′ → ∀ evs → Eb J evs ≡ true → Eb J′ evs ≡ true
+
+    -- closure facts for Bb
+    b-nil   : ∀ J → Bb J [] ≡ true
+    b-app   : ∀ J (s₁ s₂ : Stream Γ t) → Bb J s₁ ≡ true → Bb J s₂ ≡ true →
+              Bb J (s₁ ++ s₂) ≡ true
+    b-widen : ∀ {J J′} → J ≤ J′ → ∀ (str : Stream Γ t) → Bb J str ≡ true →
+              Bb J′ str ≡ true
+    -- foldPath's root envelope: events + mapped values + optional complete
+    b-deliv : ∀ J (id : Id) (src : Source)
+              (evs : List (InstEvent (Val Γ t))) (vals : List (Val Γ t)) (fin : Bool) →
+              Eb J evs ≡ true → Vb J vals ≡ true →
+              Bb J (((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
+                      at id from src as delivery) ∷ []) ≡ true
+    -- foldPath's share-sink envelope: events + handoff (valueless)
+    b-handoff : ∀ J (id : Id) (src : Source)
+                (evs : List (InstEvent (Val Γ t))) (i : Fin n) →
+                Eb J evs ≡ true →
+                Bb J (((evs ++ handoff (toℕ i) ∷ []) at id from src as delivery) ∷ []) ≡ true
+
     -- the level's two ledger readings: a chain is shorter than the size
     -- cap, and the registry is shorter than the registration cap
     p-len : ∀ (J : ℕ) {u} (p : Path Γ u t) → Pb J p ≡ true → pathLen p ≤ sizeAt S J
@@ -261,6 +294,11 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
         × (Vb (J + j′) (proj₁ r) ≡ true)
         × (regP? (Pb (J + j′))
                  (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+        -- NEW: the frame's protocol events are covered by Eb at the
+        -- landing level.  `proj₁ (proj₂ r)` is the events list stepFrame
+        -- emits; the walk threads this so the anchor can recover a burst
+        -- bound on the accumulated evs without a separate postulate
+        × (Eb (J + j′) (proj₁ (proj₂ r)) ≡ true)
 
 ------------------------------------------------------------------
 -- § D.  THE WALK, RELATIVE TO THOSE HYPOTHESES.
@@ -293,16 +331,21 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
   -- WHAT ONE RUN REPORTS.  `lvl` is where it landed, `lo` that it only
   -- climbed, `hi` that it climbed by at most one delivery-charge per
-  -- delivery from the level `base` its frames left it at, and `cnt`
-  -- that its deliveries fit the walk
-  record Res (J base cap : ℕ) (sched′ : Sched Γ) (st st′ : EvalSt e) : Set where
+  -- delivery from the level `base` its frames left it at, `cnt` that
+  -- its deliveries fit the walk, and `burst` that the emitted stream
+  -- fits Bb at the landing level.  `str` is a type parameter so that
+  -- the CALLER names the exact stream — `proj₁ fp`, `proj₁ ds`, etc. —
+  -- and `burst` is a field that depends on the earlier field `lvl`
+  record Res (J base cap : ℕ) (str : Stream Γ t)
+             (sched′ : Sched Γ) (st st′ : EvalSt e) : Set where
     constructor res
     field
-      lvl  : ℕ
-      lo   : J ≤ lvl
-      hi   : lvl ≤ lvls S W d base (delivN st st′)
-      good : Good lvl sched′ st′
-      cnt  : delivN st st′ ≤ cap
+      lvl   : ℕ
+      lo    : J ≤ lvl
+      hi    : lvl ≤ lvls S W d base (delivN st st′)
+      good  : Good lvl sched′ st′
+      cnt   : delivN st st′ ≤ cap
+      burst : Bb lvl str ≡ true
 
   ----------------------------------------------------------------
   -- (i) THE FOUR WALKS, FUSED: predicate, level and delivery count in
@@ -314,18 +357,19 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     Pb J path ≡ true → Vb J vals ≡ true →
+    Eb J evs ≡ true →
     depthFold sf gas id now envSrc path vals evs fin sched st ≤ d →
     let fp = foldPath sf gas id now envSrc path vals evs fin sched st in
     Res J (iterL S W d (pathLen path) J)
           (dCapᶜ S W R d gas (iterL S W d (pathLen path) J))
-          (proj₁ (proj₂ fp)) st (proj₂ (proj₂ fp))
+          (proj₁ fp) (proj₁ (proj₂ fp)) st (proj₂ (proj₂ fp))
 
   dispatchShare-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st → Vb J vals ≡ true →
     depthDisp sf gas id now i vals fin sched st ≤ d →
     let ds = dispatchShare {t = t} sf gas id now i vals fin sched st in
-    Res J J (dCapᶜ S W R d gas J) (proj₁ (proj₂ ds)) st (proj₂ (proj₂ ds))
+    Res J J (dCapᶜ S W R d gas J) (proj₁ ds) (proj₁ (proj₂ ds)) st (proj₂ (proj₂ ds))
 
   shareGo-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
@@ -335,7 +379,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     depthShareGo sf gas id now i vals fin ps sched st ≤ d →
     let sg = shareGo sf gas id now i vals fin ps sched st in
     Res J J (dWalkᶜ S W R d gas J (length ps))
-          (proj₁ (proj₂ sg)) st (proj₂ (proj₂ sg))
+          (proj₁ sg) (proj₁ (proj₂ sg)) st (proj₂ (proj₂ sg))
 
   ----------------------------------------------------------------
   -- foldPath: root is a stop, a sink is a dispatch, and a frame is one
@@ -343,20 +387,33 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- LEFT — which is the whole repair, in one line.
   ----------------------------------------------------------------
 
-  foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV _ =
+  foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV hE _ =
     res J ≤-refl
         (≤-trans (≤-reflexive refl)
                  (lvls-infl S W d J (delivN st st)))
         g
         (≤-trans (≤-reflexive (foldPath-root-N sf gas id now envSrc vals evs fin sched st))
                  z≤n)
+        (b-deliv J id envSrc evs vals fin hE hV)
 
   -- `depthFold … (share-sink i) … = depthDisp …` definitionally, so the
-  -- premise passes through unchanged
-  foldPath-go J sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV hD =
-    dispatchShare-go J sf gas id now i vals fin sched st g hV hD
+  -- depth premise passes through unchanged.  The stream of
+  -- `foldPath … (share-sink i) …` is `envelope ∷ proj₁ ds` where
+  -- envelope is the handoff-carrying header and `proj₁ ds` is
+  -- dispatchShare's stream, so the burst is `b-app` of the envelope
+  -- (from `b-handoff`) and `Res.burst DS`.
+  foldPath-go J sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV hE hD =
+    res (Res.lvl DS) (Res.lo DS) (Res.hi DS) (Res.good DS) (Res.cnt DS)
+      (b-app (Res.lvl DS) (envelope ∷ []) (proj₁ ds)
+        (b-widen (Res.lo DS) (envelope ∷ [])
+                 (b-handoff J id envSrc evs i hE))
+        (Res.burst DS))
+    where
+    ds       = dispatchShare {t = t} sf gas id now i vals fin sched st
+    DS       = dispatchShare-go J sf gas id now i vals fin sched st g hV hD
+    envelope = (evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery
 
-  foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV hD =
+  foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV hE hD =
     res (Res.lvl IH) (≤-trans (m≤m+n J j′) (Res.lo IH))
         (≤-trans (Res.hi IH)
                  (≤-trans (lvls-mono (delivN st₁ (proj₂ (proj₂ fp)))
@@ -368,6 +425,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (≤-trans (≤-reflexive eqD)
                  (≤-trans (Res.cnt IH)
                           (dCapᶜ-mono gas gas 2≤S ≤-refl ≤-refl ≤-refl ≤-refl step)))
+        (Res.burst IH)
     where
     r   = stepFrame sf id now f path′ vals fin sched st
     -- `depthFold … (f ↠ path′) … = dF ⊔ dR`, and the tail's arguments
@@ -397,12 +455,19 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     step : iterL S W d (pathLen path′) (J + j′) ≤ iterL S W d (suc (pathLen path′)) J
     step = iterL-mono (pathLen path′) (pathLen path′) 2≤S ≤-refl ≤-refl
              (proj₁ (proj₂ SF)) ≤-refl
+    -- IH's Eb premise: widen hE to J+j′, then append the frame's own
+    -- events using sf-step's new last conjunct
+    hE-IH : Eb (J + j′) (evs ++ proj₁ (proj₂ r)) ≡ true
+    hE-IH = e-app (J + j′)
+                  (e-widen (m≤m+n J j′) evs hE)
+                  (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF)))))
     IH = foldPath-go (J + j′) sf gas id now envSrc path′ (proj₁ r)
            (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) sd₁ st₁
            ( proj₁ (proj₂ (proj₂ SF))
-           , proj₂ (proj₂ (proj₂ (proj₂ SF))) )
+           , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SF)))) )
            (p-widen (m≤m+n J j′) path′ (p-tail J f path′ hP))
            (proj₁ (proj₂ (proj₂ (proj₂ SF))))
+           hE-IH
            (≤-trans (m≤n⊔m dF dR) hD)
     eqD : delivN st (proj₂ (proj₂ fp)) ≡ delivN st₁ (proj₂ (proj₂ fp))
     eqD = foldPath-frame-N sf gas id now envSrc f path′ vals evs fin sched st
@@ -416,9 +481,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchShare-go J sf zero id now i vals fin sched st g hV _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (dispatchShare-zero-N sf id now i vals fin sched st))
+        (b-nil J)
 
   -- `depthDisp sf (suc gas) … = depthShareGo sf gas … (shareAdmit …)
-  -- sched (shareLatch i fin st)`, which is exactly `GO`'s argument list
+  -- sched (shareLatch i fin st)`, which is exactly `GO`'s argument list.
+  -- shareFinish returns the emits stream UNCHANGED in both branches, so
+  -- `proj₁ (dispatchShare … (suc gas) …) = proj₁ out = proj₁ GO_stream`,
+  -- and `Res.burst GO` is exactly the burst for the outer Res
   dispatchShare-go J sf (suc gas) id now i vals fin sched st (ok , len) hV hD =
     res (Res.lvl GO) (Res.lo GO)
         (≤-trans (Res.hi GO)
@@ -431,6 +500,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                              (regAt S R J) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
                              (≤-trans (shareAdmit-len i (EvalSt.registry st))
                                       (ok-reg J sched st ok)))))
+        (Res.burst GO)
     where
     stL = shareLatch i fin st
     out = shareGo sf gas id now i vals fin
@@ -439,7 +509,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             ≡ delivN stL (proj₂ (proj₂ out))
     eqD = dispatchShare-suc-N sf gas id now i vals fin sched st
     GO : Res J J (dWalkᶜ S W R d gas J (length (shareAdmit i (EvalSt.registry st))))
-                 (proj₁ (proj₂ out)) stL (proj₂ (proj₂ out))
+                 (proj₁ out) (proj₁ (proj₂ out)) stL (proj₂ (proj₂ out))
     GO = shareGo-go J sf gas id now i vals fin
            (shareAdmit i (EvalSt.registry st)) sched stL
            ( ok-latch J i fin sched st ok
@@ -456,6 +526,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   shareGo-go J sf gas id now i vals fin [] sched st g hp hV _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
+        (b-nil J)
 
   -- THE THREE-CALLEE CLAUSE.  `depthShareGo`'s cons clause is branch-free
   -- `dSK ⊔ (dFP ⊔ dREST)` precisely so this `with` cannot strand the
@@ -465,10 +536,14 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   shareGo-go J sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV hD
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
+        -- when cancelled, shareGo recurses on ps with the same state —
+        -- definitionally `proj₁ (shareGo … ((rid,p)∷ps) … | true)
+        --   = proj₁ (shareGo … ps …)`, so `Res.burst SK` is the burst
         res (Res.lvl SK) (Res.lo SK) (Res.hi SK) (Res.good SK)
             (≤-trans (Res.cnt SK)
                      (dWalkᶜ-mono gas gas (length ps) (suc (length ps))
                         2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (n≤1+n (length ps))))
+            (Res.burst SK)
         where
         -- spelled out only to NAME the three ⊔ bounds; the skip branch
         -- reaches none of the other two
@@ -482,6 +557,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         SK = shareGo-go J sf gas id now i vals fin ps sched st g
                (proj₂ (∧-true _ _ hp)) hV (lub3-l dSK dFP dREST hD)
   ... | false =
+        -- output is `proj₁ fp ++ proj₁ rest`; burst is b-app of
+        -- b-widen (Res.lo REST) applied to Res.burst FP, and Res.burst REST
         res (Res.lvl REST) (≤-trans (Res.lo FP) (Res.lo REST))
             (≤-trans (Res.hi REST)
                (≤-trans (lvls-mono D₂ D₂ 2≤S ≤-refl ≤-refl J₁≤ ≤-refl)
@@ -491,9 +568,17 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             (≤-trans (≤-reflexive eqN)
                (≤-trans (s≤s (+-mono-≤ D₁≤A restCnt))
                         (≤-reflexive (sym (dWalkᶜ-front S W R d gas J (length ps))))))
+            (b-app (Res.lvl REST) (proj₁ fp) (proj₁ rest)
+              (b-widen (Res.lo REST) (proj₁ fp) (Res.burst FP))
+              (Res.burst REST))
         where
         st₀ = consᵈ rid st
         evs₀ = if fin then close (toℕ i) exhausted ∷ [] else []
+        -- Eb premise for foldPath-go: case on fin to pick e-close or e-nil
+        hE₀ : Eb J evs₀ ≡ true
+        hE₀ with fin
+        hE₀ | true  = e-close J (toℕ i) exhausted
+        hE₀ | false = e-nil J
         fp  = foldPath sf gas id now (toℕ i) p vals evs₀ fin sched st₀
         st₁ = proj₂ (proj₂ fp)
         dSK   = depthShareGo sf gas id now i vals fin ps sched st
@@ -501,7 +586,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         dREST = depthShareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         FP  = foldPath-go J sf gas id now (toℕ i) p vals evs₀ fin sched st₀
                 ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                (proj₁ (∧-true _ _ hp)) hV (lub3-m dSK dFP dREST hD)
+                (proj₁ (∧-true _ _ hp)) hV hE₀ (lub3-m dSK dFP dREST hD)
         J₁  = Res.lvl FP
         rest = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         st₂ = proj₂ (proj₂ rest)
@@ -552,11 +637,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     depthCascade a id chains sched st ≤ d →
     let cg = cascadeGo a id chains sched st in
     Res J J (dWalkᶜ S W R d n J (length chains))
-          (proj₁ (proj₂ cg)) st (proj₂ (proj₂ cg))
+          (proj₁ cg) (proj₁ (proj₂ cg)) st (proj₂ (proj₂ cg))
 
   cascadeGo-go J a id [] sched st g hp hV _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
+        (b-nil J)
 
   -- same three-callee shape as `shareGo-go`, and `depthCascade` is
   -- branch-free for the same reason: this `with` would otherwise strand
@@ -564,10 +650,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   cascadeGo-go J a id ((rid , c) ∷ chains) sched st g hp hV hD
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
+        -- cancelled: output = proj₁ (cascadeGo … chains …) = proj₁ SK_stream
         res (Res.lvl SK) (Res.lo SK) (Res.hi SK) (Res.good SK)
             (≤-trans (Res.cnt SK)
                      (dWalkᶜ-mono n n (length chains) (suc (length chains))
                         2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (n≤1+n (length chains))))
+            (Res.burst SK)
         where
         st₀   = consᵈ rid st
         cs    = chainStep id a c sched st₀
@@ -577,6 +665,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         SK = cascadeGo-go J a id chains sched st g (proj₂ (∧-true _ _ hp)) hV
                (lub3-l dSK dFP dREST hD)
   ... | false =
+        -- output is `proj₁ cs ++ proj₁ rest`; burst is b-app of
+        -- b-widen (Res.lo REST) applied to Res.burst FP, and Res.burst REST
         res (Res.lvl REST) (≤-trans (Res.lo FP) (Res.lo REST))
             (≤-trans (Res.hi REST)
                (≤-trans (lvls-mono D₂ D₂ 2≤S ≤-refl ≤-refl J₁≤ ≤-refl)
@@ -586,12 +676,21 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             (≤-trans (≤-reflexive eqN)
                (≤-trans (s≤s (+-mono-≤ D₁≤A restCnt))
                         (≤-reflexive (sym (dWalkᶜ-front S W R d n J (length chains))))))
+            (b-app (Res.lvl REST) (proj₁ cs) (proj₁ rest)
+              (b-widen (Res.lo REST) (proj₁ cs) (Res.burst FP))
+              (Res.burst REST))
         where
         st₀  = consᵈ rid st
         sf₀  = budgetAt e (Sched.slots sched) id
         evs₀ = if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else []
+        -- Eb premise for foldPath-go: case on isLast for e-close or e-nil
+        hE₀ : Eb J evs₀ ≡ true
+        hE₀ with Arrival.isLast a
+        hE₀ | true  = e-close J (arrSource a) exhausted
+        hE₀ | false = e-nil J
         cs   = chainStep id a c sched st₀
         st₁  = proj₂ (proj₂ cs)
+        rest = cascadeGo a id chains (proj₁ (proj₂ cs)) st₁
         -- `depthChain` IS this `depthFold` — same `sf₀`, same `evs₀` —
         -- so the middle projection lands on `FP`'s premise definitionally
         dSK   = depthCascade a id chains sched st
@@ -600,9 +699,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         FP   = foldPath-go J sf₀ n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
                  evs₀ (Arrival.isLast a) sched st₀
                  ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                 (proj₁ (∧-true _ _ hp)) hV (lub3-m dSK dFP dREST hD)
+                 (proj₁ (∧-true _ _ hp)) hV hE₀ (lub3-m dSK dFP dREST hD)
         J₁   = Res.lvl FP
-        rest = cascadeGo a id chains (proj₁ (proj₂ cs)) st₁
         st₂  = proj₂ (proj₂ rest)
         D₁   = delivN st₀ st₁
         D₂   = delivN st₁ st₂

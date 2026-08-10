@@ -4753,6 +4753,19 @@ walkH siC c d sl 2≤S 1≤R slC slSz = record
   { OK        = walkOK c sl
   ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p
   ; Vb        = λ J vs → valsCaps? (frameStep J c) sl vs
+  -- TRIVIAL BURST INSTANTIATION: Eb and Bb are always true, so every
+  -- closure fact is refl and Res.burst is never projected by callers
+  ; Eb        = λ _ _ → true
+  ; Bb        = λ _ _ → true
+  ; e-nil     = λ _ → refl
+  ; e-close   = λ _ _ _ → refl
+  ; e-app     = λ _ _ _ _ _ → refl
+  ; e-widen   = λ _ _ _ → refl
+  ; b-nil     = λ _ → refl
+  ; b-app     = λ _ _ _ _ _ → refl
+  ; b-widen   = λ _ _ _ → refl
+  ; b-deliv   = λ _ _ _ _ _ _ _ _ → refl
+  ; b-handoff = λ _ _ _ _ _ _ → refl
   ; p-len     = λ J p h → pathSz?-len (Caps.cSize (frameStep J c)) p h
   ; p-tail    = λ J f p h → pathSz?-tail (Caps.cSize (frameStep J c)) f p h
   ; p-widen   = λ le p h → pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le)) h
@@ -4778,6 +4791,7 @@ walkH siC c d sl 2≤S 1≤R slC slSz = record
                       (proj₁ (proj₂ (proj₂ (proj₂ r))))
                       (proj₂ (proj₂ (proj₂ (proj₂ r))))
                       (proj₁ (proj₂ (proj₂ FC)))
+                  , refl
   }
 
 -- and the bound itself: the walk at level 0, then three widenings — the
