@@ -256,8 +256,8 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > `Walk`'s `*-widen` fields are not decoration, they are the walk telling
 > you the ledger must GROW WITH THE LEVEL.
 >
-> **MACHINE-REFUTED, same day** (`agda/probe/Demand-SfStep-Absurd.agda`,
-> `make demand-sfstep-absurd`). `fn = pairᵗ (varᵗ x) (varᵗ x)`, `Dm = 1`,
+> **MACHINE-REFUTED, same day** (probe deleted at `83b29c1` once this
+> receipt was written; recover it from git if it ever needs re-running). `fn = pairᵗ (varᵗ x) (varᵗ x)`, `Dm = 1`,
 > `Ψ = 0`, one payload `0 : natᵗ`: `sizeᵛ natᵗ 0 = 1` fits the bound,
 > `sizeᵛ (applyFn fn 0) = 3` does not — both by `refl` — so the `Vb` OUTPUT
 > conjunct reduces to `false` and the claim closes by `()`. **NOT VACUOUS:**
