@@ -57,7 +57,7 @@
 module Verify-Budget-Sufficient.Burst-Walk where
 
 open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.List    using (List; []; _∷_; _++_; all; any; map; length)
@@ -80,9 +80,10 @@ open import Rx.Evaluator
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
          arrTy; arrVal; fLvlD; regAt; subscribeInner; sLvlD;
-         AllOp; NodeId; NodeState; takeDispatch; takeVals; cutThrough;
+         AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+         NodeId; NodeState; takeDispatch; takeVals; cutThrough;
          lookupNode; setNode; sweepLive; pathHasNode; memberSource; scanVals;
-         innerFinish; aliveThroughᶠ;
+         innerFinish; concatDrain; aliveThroughᶠ;
          scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st)
 
 -- re-exports .Caps (frameStep, capsAt, sizeCount, the mono kit) and
@@ -106,13 +107,12 @@ open import Verify-Budget-Sufficient.Caps-Face
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
-         frameStep-mono-j; frameStep-0; stepFrame-face;
-         cutThrough-closes-caps)
+         frameStep-mono-j; frameStep-0; stepFrame-face)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
-         fnCapᵛ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
+         fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap)
 
 ------------------------------------------------------------------
@@ -193,18 +193,27 @@ OKB c sl Ψ J sched st =
 -- the two *All edges remain.
 --
 -- WHAT THE CAPS SIDE ALREADY GIVES.  `stepFrame-face` (Caps-Face:4678)
--- picks a j′ and reports the level bound, `capsOK?` at J+j′ and
--- `valsCaps?` at J+j′.  One more conjunct falls straight out of that
--- `capsOK?`: `regP? (pathSz? …)` IS `capsOK?-regs`.  So four of the
--- assembly's six obligations are discharged by machinery that exists.
+-- picks a j′ and reports the level bound, `capsOK?`, `valsCaps?` and
+-- the emitted-events caps half, all at J+j′.  One more conjunct falls
+-- straight out of that `capsOK?`: `regP? (pathSz? …)` IS
+-- `capsOK?-regs`.  So five of the assembly's six obligations are
+-- discharged by machinery that exists.
 --
--- WHAT IS LEFT is the WET face of one frame (`WetFace`, § 2.2): four
--- Ψ-only conjuncts — frame-invariant, so j′ never appears in them —
--- plus the emitted-EVENTS caps half, which DOES ride j′.  That last is
--- why the leaves take j′ and the two caps receipts as HYPOTHESES: the
--- events face is false at J (a step can build values needing the grown
--- level), and stating it there would have been the fourth mis-stated
--- bridge on this route.
+-- WHAT IS LEFT is the WET face of one frame (`WetFace`, § 2.2): five
+-- Ψ-only conjuncts, all frame-invariant — no level index anywhere.
+--
+-- THE EVENTS CAPS HALF MOVED TO `FrameFace` (2026-08-10).  It sat here
+-- first, at the assembly's j′ with the two caps receipts as hypotheses
+-- — and in that form the two *All leaves were UNPROVABLE: an emitted
+-- root delivery is pinned by no state or vals receipt, so a program
+-- whose inner delivers one large root value while its post-state stays
+-- small meets every hypothesis at j′ = 0 and fails the conclusion.
+-- The conjunct's actual suppliers (`innerFinish-caps`,
+-- `subscribeInner-caps` — Subscribe-Face, PROVEN) mint it at the SAME
+-- j′ as the state receipts, and `stepFrame-face` is the only route
+-- that witness travels — so the conjunct now rides FrameFace and the
+-- wet face is Ψ-pure.  This was the fourth mis-stated bridge on this
+-- route, caught by census rather than by a dead grind.
 ------------------------------------------------------------------
 
 -- § 2.1  THE siC HYPOTHESIS, named once: `stepFrame-face`'s own first
@@ -240,72 +249,78 @@ SiCFace =
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
 
 -- § 2.2  THE WET FACE — exactly what `stepFrame-face` does NOT say.
+-- Ψ-pure: no caps, no level index, no growth witness.
 WetFace : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ) →
+  (sl : Slots Γ) (Ψ : ℕ) →
   List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e → Set
-WetFace c sl Ψ J j′ r =
+WetFace sl Ψ r =
   let sched′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
       st′    = proj₂ (proj₂ (proj₂ (proj₂ r)))
   in (Sched.slots sched′ ≡ sl)
    × (fnCapBounded? Ψ sched′ st′ ≡ true)
    × (valsΨ? Ψ (proj₁ r) ≡ true)
    × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
-   × (all (eventCaps? (frameStep (J + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
    × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
 
--- § 2.3  THE TWO OBLIGATIONS STILL OPEN, and they are the two that were
--- always going to be the work.  The three STATE-LOCAL frames are proven
--- — map-f (§ 2.4), take-f (§ 2.4b), scan-f (§ 2.4c) — leaving the two
--- *All edges, which carry the real content: the same family as
--- `subscribeInner-demand` (.Anchor-Dry), so whichever is discharged
--- first should absorb the other.  `wet-inner` itself is gone: § 2.4d
--- proves its two INERT paths and it reduces to `wet-innerFinish`.
+-- § 2.3  THE OBLIGATIONS STILL OPEN.  The three STATE-LOCAL frames are
+-- proven — map-f (§ 2.4), take-f (§ 2.4b), scan-f (§ 2.4c) — and the
+-- from-inner edge is now a REAL DEFINITION all the way down to ONE
+-- postulate: `wet-inner` (§ 2.4d) proves the two inert paths,
+-- `wet-innerFinish` (§ 2.4e) proves merge/switch/exhaust/mismatch and
+-- reduces concat+yes through the PROVEN `concatDrain-Ψ` walk to
+-- `subscribeInner-Ψ` below — the Ψ face of the one function all three
+-- *All-edge postulates bottom out in (`wet-thru` and
+-- `subscribeInner-demand` (.Anchor-Dry) are the other two).
+--
+-- Ψ-PURE SINCE 2026-08-10 (the FrameFace move, § 2 header): no level
+-- index, no caps receipts.  What remains says only that a subscribe
+-- PRESERVES the Ψ ledger — the same invariant `INV?`'s Ψ half claims
+-- for whole subscribes (subscribeE-wet, tier 2) — so its proof is the
+-- Ψ mirror of Subscribe-Face's proven caps clique, with the gas edge
+-- into `subscribeE` as the one real recursion.
 --
 -- CALL-SITE ARGUMENTS THESE ABSORB: none — every index is pinned by
--- WetFace above, and the two caps receipts are passed in verbatim from
--- the assembly's own `stepFrame-face` call.
+-- WetFace above.
 postulate
-  -- FROM-INNER reduces to its COMPLETION path alone (§ 2.4d proves the
-  -- other two): `fin` is pinned to `true` here, and the absorb test has
-  -- already gone the other way
-  wet-innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
-    (sf : Gas) (id : Id) (now : Tick)
-    (op : AllOp) (allNid instNid : NodeId)
-    (path′ : Path Γ s t) (vals : List (Val Γ s))
+  -- THE Ψ FACE OF ONE INNER SUBSCRIBE — mirrors `subscribeInner-caps`
+  -- (Subscribe-Face:951, PROVEN) with every caps conjunct dropped and
+  -- the Ψ conjuncts kept: constant bound, no growth witness, no
+  -- existential.  The `g0` clause is immediate (one `close` event,
+  -- `nextNode` bump, state untouched); the `gs` clause is the descent
+  -- into `subscribeE` under the extended from-inner path — the honest
+  -- recursion, to be ground where `subscribeE-caps` was
+  subscribeInner-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (from-inner op allNid instNid ↠ path′) ≡ true →
-    VbB c sl Ψ J vals ≡ true →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    let r = innerFinish sf op allNid instNid path′ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st)) in
-    capsOK? (frameStep (J + j′) c)
-            (proj₁ (proj₂ (proj₂ (proj₂ r))))
-            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-    WetFace c sl Ψ J j′ r
+    Sched.slots sched ≡ sl →
+    fnCapBounded? Ψ sched st ≡ true →
+    regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+    valΨ? Ψ (obs u) o ≡ true →
+    pathBΨ? Ψ κ ≡ true →
+    let r      = subscribeInner g op allNid κ id now o sched st
+        sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+        st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+    in (Sched.slots sched′ ≡ sl)
+     × (fnCapBounded? Ψ sched′ st′ ≡ true)
+     × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+     × (valsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+     × (eventsΨ? Ψ (proj₁ (proj₂ (proj₂ r))) ≡ true)
 
   -- THRU-OUTER is `thruWrap op nid fin (thruWalk …)`, and the two
   -- halves are nothing alike: `thruWalk` subscribes once per payload
   -- (the real content), while `thruWrap` only sets the node's `done`
-  -- FLAG.  SPLITTING THEM WAS TRIED 2026-08-10 AND REJECTED, and the
-  -- finding is worth more than the split would have been:
-  --   * THE WRAP IS fnCap-TRANSPARENT, so whoever proves this can
-  --     dispose of it in one step.  Payloads, events and schedule pass
-  --     through untouched; of the four nodes it rewrites, three have
-  --     `fnCapNode` ≡ `true` outright and `concat-st`'s measure reads
-  --     the queue `q`, which the rewrite does not touch.  Combine
-  --     `lookupNode-fnCap` (§ 2.4c) with `setNode-fnCap`.
-  --   * WHY NOT SPLIT: the assembly states its two caps receipts at the
-  --     WRAPPED result, and `proj₁ (thruWrap …) ≡ proj₁ (thruWalk …)`
-  --     is NOT definitional — it needs the same 26-branch case split
-  --     the transparency proof does.  So a `wet-thruWalk` leaf would
-  --     either carry hypotheses about a tuple it is not about, or pay
-  --     for a transport that buys no risk reduction.  Split it only if
-  --     the eventual proof wants the walk isolated for its own reasons.
+  -- FLAG.  SPLITTING THEM WAS TRIED 2026-08-10 AND REJECTED — the
+  -- caps receipts that forced the two halves together are gone with
+  -- the Ψ-pure restatement, but the transparency finding stands and
+  -- is what makes the wrap disposable in one step:
+  --   * THE WRAP IS fnCap-TRANSPARENT.  Payloads, events and schedule
+  --     pass through untouched; of the four nodes it rewrites, three
+  --     have `fnCapNode` ≡ `true` outright and `concat-st`'s measure
+  --     reads the queue `q`, which the rewrite does not touch.
+  --     Combine `lookupNode-fnCap` (§ 2.4c) with `setNode-fnCap`.
   wet-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
     (sf : Gas) (id : Id) (now : Tick)
     (op : AllOp) (nid : NodeId)
     (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
@@ -314,12 +329,7 @@ postulate
     PbB c Ψ J (thru-outer op nid ↠ path′) ≡ true →
     VbB c sl Ψ J vals ≡ true →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    let r = stepFrame sf id now (thru-outer op nid) path′ vals fin sched st in
-    capsOK? (frameStep (J + j′) c)
-            (proj₁ (proj₂ (proj₂ (proj₂ r))))
-            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-    WetFace c sl Ψ J j′ r
+    WetFace sl Ψ (stepFrame sf id now (thru-outer op nid) path′ vals fin sched st)
 
 -- § 2.4  THE MAP LEAF — a REAL PROOF.  `stepFrame` on a map-f touches
 -- no state and emits no events, so five of the six conjuncts pass
@@ -353,7 +363,7 @@ map-Ψ {s = s} Ψ fn (v ∷ vs) hfn h
           (map-Ψ Ψ fn vs hfn hvs)
 
 wet-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   (sf : Gas) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -361,8 +371,8 @@ wet-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   PbB c Ψ J (map-f fn ↠ path′) ≡ true →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  WetFace c sl Ψ J j′ (stepFrame sf id now (map-f fn) path′ vals fin sched st)
-wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg =
+  WetFace sl Ψ (stepFrame sf id now (map-f fn) path′ vals fin sched st)
+wet-map c sl Ψ J sf id now fn path′ vals fin sched st ok pb vb rg =
     proj₁ (proj₁ ok)
   , proj₂ ok
   , map-Ψ Ψ fn vals
@@ -374,7 +384,6 @@ wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg =
       (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb))
   , regP?-Ψ c Ψ J (EvalSt.registry st) rg
   , refl
-  , refl
 
 -- THE INERT RESULT.  Six of `stepFrame`'s take branches and six of its
 -- scan branches return `[] , [] , fin , sched , st` — nothing moved, so
@@ -383,23 +392,23 @@ wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg =
 -- needs (its dispatch is a `with`, not a helper: `stepFrame`'s scan
 -- branch reduces only once `lookupNode` itself is matched)
 wet-nil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ) (fin : Bool)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  WetFace {e = e} {u = u} c sl Ψ J j′ ([] , [] , fin , sched , st)
-wet-nil c sl Ψ J j′ fin sched st ok rg =
+  WetFace {e = e} {u = u} sl Ψ ([] , [] , fin , sched , st)
+wet-nil c sl Ψ J fin sched st ok rg =
     proj₁ (proj₁ ok) , proj₂ ok , refl
-  , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl , refl
+  , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl
 
 ------------------------------------------------------------------
 -- § 2.4b  THE TAKE LEAF — also a REAL PROOF.  `takeDispatch` keeps a
 -- PREFIX of the payloads, and on a cut it FILTERS the registry, SWEEPS
 -- the live set and writes back `take-st zero`.  Every conjunct is a
--- passthrough or a one-line induction, and the conjunct that rides j′ —
--- the one that looked hard — is FREE: `cutThrough-closes-caps` is
--- unconditional in the caps, because a cut mints only `close` events
--- and `eventCaps?` is `true` on those at every level.
+-- passthrough or a one-line induction.  (The events CAPS half — once
+-- the hard-looking conjunct here, closed by `cutThrough-closes-caps` —
+-- now rides `FrameFace`, where the caps side's own `takeDispatch-caps`
+-- supplies it.)
 
 -- takeVals keeps a PREFIX, so every kept payload was already Ψ-good.
 -- Clause-for-clause the mirror of `takeVals-caps` (Caps-Face:5290)
@@ -444,7 +453,7 @@ cutThrough-closes-Ψ Ψ nid d wm dy ((rid , src , ch) ∷ r)
 ...   | false = ∧-intro refl ih
 
 wet-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   (sf : Gas) (id : Id) (now : Tick)
   (nid : NodeId) (path′ : Path Γ s t) (vals : List (Val Γ s))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -452,14 +461,9 @@ wet-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   PbB c Ψ J (take-f nid ↠ path′) ≡ true →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  let r = stepFrame sf id now (take-f nid) path′ vals fin sched st in
-  capsOK? (frameStep (J + j′) c)
-          (proj₁ (proj₂ (proj₂ (proj₂ r))))
-          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-  WetFace c sl Ψ J j′ r
-wet-take {e = e} {s = s} c sl Ψ J j′ sf id now nid path′ vals fin sched st
-         ok pb vb rg hC hV =
+  WetFace sl Ψ (stepFrame sf id now (take-f nid) path′ vals fin sched st)
+wet-take {e = e} {s = s} c sl Ψ J sf id now nid path′ vals fin sched st
+         ok pb vb rg =
   go (lookupNode nid (EvalSt.nodes st))
   where
   vΨ : valsΨ? Ψ vals ≡ true
@@ -469,7 +473,7 @@ wet-take {e = e} {s = s} c sl Ψ J j′ sf id now nid path′ vals fin sched st
   rΨ = regP?-Ψ c Ψ J (EvalSt.registry st) rg
 
   go : (mns : Maybe (NodeState _)) →
-       WetFace {e = e} {u = s} c sl Ψ J j′ (takeDispatch nid vals fin sched st mns)
+       WetFace {e = e} {u = s} sl Ψ (takeDispatch nid vals fin sched st mns)
   -- THE CUT: the registry is filtered and the live set swept, both of
   -- which only DROP entries; the node write is `take-st zero`, on which
   -- `fnCapNode` is `true` outright
@@ -486,9 +490,6 @@ wet-take {e = e} {s = s} c sl Ψ J j′ sf id now nid path′ vals fin sched st
               , takeVals-Ψ Ψ k vals vΨ
               , cutThrough-keptP (λ {v} p → pathBΨ? Ψ p) nid (EvalSt.delivered st)
                   (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st) rΨ
-              , cutThrough-closes-caps (frameStep (J + j′) c) sl nid
-                  (EvalSt.delivered st) (EvalSt.regWatermark st) (EvalSt.dying st)
-                  (EvalSt.registry st)
               , cutThrough-closes-Ψ Ψ nid (EvalSt.delivered st)
                   (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st)
   -- NO CUT: the counter is written back and nothing else moves
@@ -499,13 +500,13 @@ wet-take {e = e} {s = s} c sl Ψ J j′ sf id now nid path′ vals fin sched st
                           (EvalSt.nodes st) refl
                           (fcB-nodes Ψ sched st (proj₂ ok)))
               , takeVals-Ψ Ψ k vals vΨ
-              , rΨ , refl , refl
-  go (just (scan-st _))       = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
-  go (just (merge-st _ _))    = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
-  go (just (concat-st _ _ _)) = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
-  go (just (switch-st _ _))   = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
-  go (just (exhaust-st _ _))  = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
-  go nothing                  = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+              , rΨ , refl
+  go (just (scan-st _))       = wet-nil {u = s} c sl Ψ J fin sched st ok rg
+  go (just (merge-st _ _))    = wet-nil {u = s} c sl Ψ J fin sched st ok rg
+  go (just (concat-st _ _ _)) = wet-nil {u = s} c sl Ψ J fin sched st ok rg
+  go (just (switch-st _ _))   = wet-nil {u = s} c sl Ψ J fin sched st ok rg
+  go (just (exhaust-st _ _))  = wet-nil {u = s} c sl Ψ J fin sched st ok rg
+  go nothing                  = wet-nil {u = s} c sl Ψ J fin sched st ok rg
 
 ------------------------------------------------------------------
 -- § 2.4c  THE SCAN LEAF — also a REAL PROOF, cribbed from
@@ -544,7 +545,7 @@ allΨ-of Ψ []       h          = refl
 allΨ-of Ψ (v ∷ vs) (p ∷ᵃ ps) = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ p)) (allΨ-of Ψ vs ps)
 
 wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   (sf : Gas) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
   (path′ : Path Γ u t) (vals : List (Val Γ s))
@@ -553,26 +554,21 @@ wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   PbB c Ψ J (scan-f fn nid ↠ path′) ≡ true →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  let r = stepFrame sf id now (scan-f fn nid) path′ vals fin sched st in
-  capsOK? (frameStep (J + j′) c)
-          (proj₁ (proj₂ (proj₂ (proj₂ r))))
-          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-  WetFace c sl Ψ J j′ r
-wet-scan {s = s} {u = u} c sl Ψ J j′ sf id now fn nid path′ vals fin sched st
-         ok pb vb rg hC hV
+  WetFace sl Ψ (stepFrame sf id now (scan-f fn nid) path′ vals fin sched st)
+wet-scan {s = s} {u = u} c sl Ψ J sf id now fn nid path′ vals fin sched st
+         ok pb vb rg
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st (proj₂ ok))
-... | nothing                | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
-... | just (take-st _)       | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
-... | just (merge-st _ _)    | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
-... | just (concat-st _ _ _) | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
-... | just (switch-st _ _)   | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
-... | just (exhaust-st _ _)  | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+... | nothing                | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
+... | just (take-st _)       | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
+... | just (merge-st _ _)    | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
+... | just (concat-st _ _ _) | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
+... | just (switch-st _ _)   | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
+... | just (exhaust-st _ _)  | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
 -- the accumulator type must match the frame's output type, and when it
 -- does not the branch is inert too
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
-...   | no _    = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+...   | no _    = wet-nil {u = u} c sl Ψ J fin sched st ok rg
 ...   | yes refl =
       proj₁ (proj₁ ok)
     , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
@@ -580,7 +576,7 @@ wet-scan {s = s} {u = u} c sl Ψ J j′ sf id now fn nid path′ vals fin sched 
                 (T⇒≡true _ (≤⇒≤ᵇ (proj₁ fcRun)))
                 (fcB-nodes Ψ sched st (proj₂ ok)))
     , allΨ-of Ψ (proj₁ run) (proj₂ fcRun)
-    , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl , refl
+    , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl
   where
   run   = scanVals fn ac vals
   capfn = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true (frameBΨ? Ψ (scan-f fn nid))
@@ -605,18 +601,235 @@ wet-scan {s = s} {u = u} c sl Ψ J j′ sf id now fn nid path′ vals fin sched 
 -- the INERT result generalised: payloads pass through, state and events
 -- untouched.  `wet-nil` is this at `[]`
 wet-pass : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   (vs : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   valsΨ? Ψ vs ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  WetFace {e = e} {u = u} c sl Ψ J j′ (vs , [] , fin , sched , st)
-wet-pass c sl Ψ J j′ vs fin sched st ok hv rg =
+  WetFace {e = e} {u = u} sl Ψ (vs , [] , fin , sched , st)
+wet-pass c sl Ψ J vs fin sched st ok hv rg =
     proj₁ (proj₁ ok) , proj₂ ok , hv
-  , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl , refl
+  , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl
+
+------------------------------------------------------------------
+-- § 2.4e  THE COMPLETION PATH — a REAL DEFINITION down to
+-- `subscribeInner-Ψ` (§ 2.3).  Mirrors the caps side's proven
+-- decomposition (`innerFinish-caps` over `concatDrain-caps` over
+-- `subscribeInner-caps`, Subscribe-Face): merge/switch/exhaust rewrite
+-- one node field on which `fnCapNode` is `true` outright, every
+-- mismatched read is the evaluator's catch-all pass, and concat+yes is
+-- the drain.
+
+-- the drain walk: one `subscribeInner-Ψ` receipt per queued inner,
+-- threading the Ψ state invariant; the residue queue is a suffix of
+-- the input, so its bound rides along rather than being re-derived
+concatDrain-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (allNid : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick)
+  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  fnCapBounded? Ψ sched st ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+  all (λ o → fnCapᵉ o ≤ᵇ Ψ) q ≡ true →
+  pathBΨ? Ψ κ ≡ true →
+  let r      = concatDrain g allNid κ id now q sched st
+      sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (valsΨ? Ψ (proj₁ r) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+   × (all (λ o → fnCapᵉ o ≤ᵇ Ψ) (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+concatDrain-Ψ sl Ψ g allNid κ id now [] sched st slEq fc rg qB pB =
+  slEq , fc , rg , refl , refl , refl
+concatDrain-Ψ sl Ψ g allNid κ id now (o ∷ q) sched st slEq fc rg qB pB
+  with subscribeInner g concatᵒ allNid κ id now o sched st
+     | subscribeInner-Ψ sl Ψ g concatᵒ allNid κ id now o sched st slEq fc rg
+         (proj₁ (∧-true (fnCapᵉ o ≤ᵇ Ψ) (all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q) qB)) pB
+-- the inner completed synchronously: keep draining the tail
+... | (inst , vs , bs , true , sched₁ , st₁) | (slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ)
+  with concatDrain g allNid κ id now q sched₁ st₁
+     | concatDrain-Ψ sl Ψ g allNid κ id now q sched₁ st₁ slEq₁ fc₁ rg₁
+         (proj₂ (∧-true (fnCapᵉ o ≤ᵇ Ψ) (all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q) qB)) pB
+...   | (vs′ , bs′ , act , q′ , sched₂ , st₂) | (slEq₂ , fc₂ , rg₂ , vsΨ′ , bsΨ′ , qB′) =
+      slEq₂ , fc₂ , rg₂
+    , all-++-intro _ vs vs′ vsΨ vsΨ′
+    , all-++-intro _ bs bs′ bsΨ bsΨ′
+    , qB′
+-- the inner stayed open: the drain stops with the tail as residue
+concatDrain-Ψ sl Ψ g allNid κ id now (o ∷ q) sched st slEq fc rg qB pB
+    | (inst , vs , bs , false , sched₁ , st₁) | (slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ) =
+      slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ
+    , proj₂ (∧-true (fnCapᵉ o ≤ᵇ Ψ) (all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q) qB)
+
+-- FROM-INNER's completion, per (op, node-read) clause.  `fin` is
+-- already pinned `true` and the absorb test already resolved by
+-- `wet-inner` (§ 2.4d), which is this definition's one consumer
+wet-innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
+  (sf : Gas) (id : Id) (now : Tick)
+  (op : AllOp) (allNid instNid : NodeId)
+  (path′ : Path Γ s t) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (from-inner op allNid instNid ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  WetFace sl Ψ (innerFinish sf op allNid instNid path′ id now vals sched st
+                  (lookupNode allNid (EvalSt.nodes st)))
+
+-- MERGE: decrement the counter — `fnCapNode Ψ (merge-st _ _)` is `true`
+wet-innerFinish c sl Ψ J sf id now mergeᵒ allNid instNid path′ vals sched st ok pb vb rg
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (merge-st k od) =
+      proj₁ (proj₁ ok)
+    , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
+              (setNode-fnCap Ψ allNid (merge-st (pred k) od) (EvalSt.nodes st) refl
+                (fcB-nodes Ψ sched st (proj₂ ok)))
+    , proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
+    , regP?-Ψ c Ψ J (EvalSt.registry st) rg
+    , refl
+... | nothing                = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (scan-st _)       = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (take-st _)       = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (concat-st _ _ _) = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (switch-st _ _)   = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (exhaust-st _ _)  = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+
+-- CONCAT: the drain — the one clause with real content
+wet-innerFinish {s = s} c sl Ψ J sf id now concatᵒ allNid instNid path′ vals sched st ok pb vb rg
+  with lookupNode allNid (EvalSt.nodes st)
+     | lookupNode-fnCap Ψ allNid (EvalSt.nodes st) (fcB-nodes Ψ sched st (proj₂ ok))
+... | nothing                | _ = wet-pass c sl Ψ J vals false sched st ok
+                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                    (valsΨ? Ψ vals) vb)) rg
+... | just (scan-st _)       | _ = wet-pass c sl Ψ J vals false sched st ok
+                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                    (valsΨ? Ψ vals) vb)) rg
+... | just (take-st _)       | _ = wet-pass c sl Ψ J vals false sched st ok
+                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                    (valsΨ? Ψ vals) vb)) rg
+... | just (merge-st _ _)    | _ = wet-pass c sl Ψ J vals false sched st ok
+                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                    (valsΨ? Ψ vals) vb)) rg
+... | just (switch-st _ _)   | _ = wet-pass c sl Ψ J vals false sched st ok
+                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                    (valsΨ? Ψ vals) vb)) rg
+... | just (exhaust-st _ _)  | _ = wet-pass c sl Ψ J vals false sched st ok
+                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                    (valsΨ? Ψ vals) vb)) rg
+... | just (concat-st {w} q act od) | nb with w ≟ᵗ s
+...   | no _     = wet-pass c sl Ψ J vals false sched st ok
+                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                    (valsΨ? Ψ vals) vb)) rg
+...   | yes refl =
+        proj₁ D
+      , ∧-intro (fcB-live Ψ sched′ st′ (proj₁ (proj₂ D)))
+                (setNode-fnCap Ψ allNid (concat-st q′ act′ od) (EvalSt.nodes st′)
+                  q′B (fcB-nodes Ψ sched′ st′ (proj₁ (proj₂ D))))
+      , all-++-intro _ vals (proj₁ dr)
+          (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb))
+          (proj₁ (proj₂ (proj₂ (proj₂ D))))
+      , proj₁ (proj₂ (proj₂ D))
+      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ D))))
+    where
+    D = concatDrain-Ψ sl Ψ sf allNid path′ id now q sched st
+          (proj₁ (proj₁ ok)) (proj₂ ok)
+          (regP?-Ψ c Ψ J (EvalSt.registry st) rg)
+          nb
+          (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c))
+                           (from-inner concatᵒ allNid instNid ↠ path′))
+                         (pathBΨ? Ψ (from-inner concatᵒ allNid instNid ↠ path′)) pb))
+    dr     = concatDrain sf allNid path′ id now q sched st
+    act′   = proj₁ (proj₂ (proj₂ dr))
+    q′     = proj₁ (proj₂ (proj₂ (proj₂ dr)))
+    sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
+    st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
+    q′B    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ D))))
+
+-- SWITCH: clear the current-inner slot if this was it —
+-- `fnCapNode Ψ (switch-st _ _)` is `true`
+wet-innerFinish c sl Ψ J sf id now switchᵒ allNid instNid path′ vals sched st ok pb vb rg
+  with lookupNode allNid (EvalSt.nodes st)
+... | nothing                = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (scan-st _)       = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (take-st _)       = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (merge-st _ _)    = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (concat-st _ _ _) = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (exhaust-st _ _)  = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (switch-st nothing od) = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (switch-st (just cur) od) with cur ≡ᵇ instNid
+...   | false = wet-pass c sl Ψ J vals false sched st ok
+                  (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                 (valsΨ? Ψ vals) vb)) rg
+...   | true  =
+        proj₁ (proj₁ ok)
+      , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
+                (setNode-fnCap Ψ allNid (switch-st nothing od) (EvalSt.nodes st) refl
+                  (fcB-nodes Ψ sched st (proj₂ ok)))
+      , proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
+      , regP?-Ψ c Ψ J (EvalSt.registry st) rg
+      , refl
+
+-- EXHAUST: clear the busy flag — `fnCapNode Ψ (exhaust-st _ _)` is `true`
+wet-innerFinish c sl Ψ J sf id now exhaustᵒ allNid instNid path′ vals sched st ok pb vb rg
+  with lookupNode allNid (EvalSt.nodes st)
+... | just (exhaust-st act od) =
+      proj₁ (proj₁ ok)
+    , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
+              (setNode-fnCap Ψ allNid (exhaust-st false od) (EvalSt.nodes st) refl
+                (fcB-nodes Ψ sched st (proj₂ ok)))
+    , proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
+    , regP?-Ψ c Ψ J (EvalSt.registry st) rg
+    , refl
+... | nothing                = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (scan-st _)       = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (take-st _)       = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (merge-st _ _)    = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (concat-st _ _ _) = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
+... | just (switch-st _ _)   = wet-pass c sl Ψ J vals false sched st ok
+                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
+                                                (valsΨ? Ψ vals) vb)) rg
 
 wet-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   (sf : Gas) (id : Id) (now : Tick)
   (op : AllOp) (allNid instNid : NodeId)
   (path′ : Path Γ s t) (vals : List (Val Γ s))
@@ -625,31 +838,26 @@ wet-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   PbB c Ψ J (from-inner op allNid instNid ↠ path′) ≡ true →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  let r = stepFrame sf id now (from-inner op allNid instNid) path′ vals fin sched st in
-  capsOK? (frameStep (J + j′) c)
-          (proj₁ (proj₂ (proj₂ (proj₂ r))))
-          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-  WetFace c sl Ψ J j′ r
+  WetFace sl Ψ (stepFrame sf id now (from-inner op allNid instNid) path′ vals fin sched st)
 -- NOT FINISHED: nothing happens at all
-wet-inner c sl Ψ J j′ sf id now op a i path′ vals false sched st ok pb vb rg hC hV =
-  wet-pass c sl Ψ J j′ vals false sched st ok
+wet-inner c sl Ψ J sf id now op a i path′ vals false sched st ok pb vb rg =
+  wet-pass c sl Ψ J vals false sched st ok
     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)) rg
-wet-inner c sl Ψ J j′ sf id now op a i path′ vals true sched st ok pb vb rg hC hV
+wet-inner c sl Ψ J sf id now op a i path′ vals true sched st ok pb vb rg
   with any (aliveThroughᶠ i st) (EvalSt.registry st)
 -- ABSORBED: a registration under this inner is still live, so the
 -- completion is swallowed and the payloads pass through
-... | true  = wet-pass c sl Ψ J j′ vals false sched st ok
+... | true  = wet-pass c sl Ψ J vals false sched st ok
                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                (valsΨ? Ψ vals) vb)) rg
-... | false = wet-innerFinish c sl Ψ J j′ sf id now op a i path′ vals sched st
-                ok pb vb rg hC hV
+... | false = wet-innerFinish c sl Ψ J sf id now op a i path′ vals sched st
+                ok pb vb rg
 
 ------------------------------------------------------------------
 -- § 2.5  THE DISPATCHER — one clause per frame constructor, so the
 -- assembly below never case-splits and the five leaves stay separable.
 wet-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   {s u} (sf : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -657,22 +865,17 @@ wet-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   PbB c Ψ J (f ↠ path′) ≡ true →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-  let r = stepFrame sf id now f path′ vals fin sched st in
-  capsOK? (frameStep (J + j′) c)
-          (proj₁ (proj₂ (proj₂ (proj₂ r))))
-          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-  WetFace c sl Ψ J j′ r
-wet-face c sl Ψ J j′ sf id now (map-f fn) path′ vals fin sched st ok pb vb rg _ _ =
-  wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg
-wet-face c sl Ψ J j′ sf id now (scan-f fn nid) path′ vals fin sched st ok pb vb rg hC hV =
-  wet-scan c sl Ψ J j′ sf id now fn nid path′ vals fin sched st ok pb vb rg hC hV
-wet-face c sl Ψ J j′ sf id now (take-f nid) path′ vals fin sched st ok pb vb rg hC hV =
-  wet-take c sl Ψ J j′ sf id now nid path′ vals fin sched st ok pb vb rg hC hV
-wet-face c sl Ψ J j′ sf id now (from-inner op a i) path′ vals fin sched st ok pb vb rg hC hV =
-  wet-inner c sl Ψ J j′ sf id now op a i path′ vals fin sched st ok pb vb rg hC hV
-wet-face c sl Ψ J j′ sf id now (thru-outer op nid) path′ vals fin sched st ok pb vb rg hC hV =
-  wet-thru c sl Ψ J j′ sf id now op nid path′ vals fin sched st ok pb vb rg hC hV
+  WetFace sl Ψ (stepFrame sf id now f path′ vals fin sched st)
+wet-face c sl Ψ J sf id now (map-f fn) path′ vals fin sched st ok pb vb rg =
+  wet-map c sl Ψ J sf id now fn path′ vals fin sched st ok pb vb rg
+wet-face c sl Ψ J sf id now (scan-f fn nid) path′ vals fin sched st ok pb vb rg =
+  wet-scan c sl Ψ J sf id now fn nid path′ vals fin sched st ok pb vb rg
+wet-face c sl Ψ J sf id now (take-f nid) path′ vals fin sched st ok pb vb rg =
+  wet-take c sl Ψ J sf id now nid path′ vals fin sched st ok pb vb rg
+wet-face c sl Ψ J sf id now (from-inner op a i) path′ vals fin sched st ok pb vb rg =
+  wet-inner c sl Ψ J sf id now op a i path′ vals fin sched st ok pb vb rg
+wet-face c sl Ψ J sf id now (thru-outer op nid) path′ vals fin sched st ok pb vb rg =
+  wet-thru c sl Ψ J sf id now op nid path′ vals fin sched st ok pb vb rg
 
 ------------------------------------------------------------------
 -- § 3  THE Ψ-STATE FACTS the walk's OK closure needs — all REAL.
@@ -767,12 +970,13 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 ------------------------------------------------------------------
 -- § 5b  THE FRAME FACE, ASSEMBLED — ex-postulate, now a definition.
 --
--- Six obligations, four of them off `stepFrame-face`'s single call:
--- the level bound and `capsOK?` verbatim, `valsCaps?` verbatim, and
--- `regP? (pathSz? …)` via `capsOK?-regs` on that same `capsOK?`.  The
--- other two conjuncts of the Σ recombine caps and Ψ halves pointwise —
--- `regP?-∧` for the registry, `∧-intro` for values and events.  All the
--- Ψ content, and the events caps half, comes from `wet-face`.
+-- Six obligations, FIVE of them off `stepFrame-face`'s single call:
+-- the level bound, `capsOK?`, `valsCaps?` and the events caps half
+-- verbatim, and `regP? (pathSz? …)` via `capsOK?-regs` on that same
+-- `capsOK?`.  The Σ's mixed conjuncts recombine caps and Ψ halves
+-- pointwise — `regP?-∧` for the registry, `∧-intro` for values and
+-- events.  All the Ψ content comes from `wet-face`, which is Ψ-pure
+-- since the FrameFace move (§ 2 header).
 ------------------------------------------------------------------
 
 stepFrame-burst-face : SiCFace →
@@ -807,8 +1011,7 @@ stepFrame-burst-face siC c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ va
       (EvalSt.registry t′)
       (capsOK?-regs (frameStep (J + j′) c) s′ t′ wCaps)
       (proj₁ (proj₂ (proj₂ (proj₂ WF))))
-  , ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ WF)))))
-            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ WF)))))
+  , ∧-intro capsEvs (proj₂ (proj₂ (proj₂ (proj₂ WF))))
   where
   r  = stepFrame sf id now f path′ vals fin sched st
   s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -823,11 +1026,11 @@ stepFrame-burst-face siC c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ va
 
   j′       = proj₁ FC
   wCaps    = proj₁ (proj₂ (proj₂ FC))
-  capsVals = proj₂ (proj₂ (proj₂ FC))
+  capsVals = proj₁ (proj₂ (proj₂ (proj₂ FC)))
+  capsEvs  = proj₂ (proj₂ (proj₂ (proj₂ FC)))
 
-  WF : WetFace c sl Ψ J j′ r
-  WF = wet-face c sl Ψ J j′ sf id now f path′ vals fin sched st
-         ok pb vb rg wCaps capsVals
+  WF : WetFace sl Ψ r
+  WF = wet-face c sl Ψ J sf id now f path′ vals fin sched st ok pb vb rg
 
 ------------------------------------------------------------------
 -- § 6  THE INSTANTIATION — every closure fact a real proof.

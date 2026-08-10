@@ -386,9 +386,31 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > Ψ conjuncts are FRAME-INVARIANT, so `j′` does not appear in them — they can
 > be stated once, level-free.  The emitted-EVENTS caps half is NOT: a step can
 > build values that only fit the grown level, so stating it at `J` would have
-> been the FOURTH mis-stated bridge on this route.  So `WetFace` takes `j′` and
+> been the FOURTH mis-stated bridge on this route.  So `WetFace` took `j′` and
 > the two caps receipts as HYPOTHESES, passed in verbatim from the assembly's
 > own `stepFrame-face` call.  Nothing is re-derived and nothing is guessed.
+>
+> **SUPERSEDED SAME DAY — the events caps half was STILL on the wrong face,
+> and the fourth mis-stated bridge had in fact been built (2026-08-10,
+> later).**  Taking the receipts as hypotheses dodged the false-at-J trap but
+> left the conjunct demanded at a UNIVERSAL j′ whose only witnesses are
+> state/vals receipts — and an emitted root delivery is pinned by NEITHER: a
+> program whose inner delivers one large root value while its post-state
+> stays small meets every hypothesis at j′ = 0 and fails the conclusion.  So
+> `wet-innerFinish`/`wet-thru` as first stated were unprovable (and likely
+> false).  Caught by census before any grind: the conjunct's only true
+> suppliers — `innerFinish-caps` and `subscribeInner-caps` (Subscribe-Face,
+> ZERO postulates, the whole caps clique proven) — mint it at the SAME j′ as
+> the state receipts, and `FrameFace` (the only route that witness travels)
+> was DROPPING it.  **Repair: `FrameFace` gained the events conjunct** (its
+> producers all pay: `[]`-emitting clauses `refl`, take `takeDispatch-caps`'s
+> own third conjunct, P3/P4 postulates strengthen automatically because they
+> conclude `FrameFace` by name and their named suppliers already report it),
+> **and `WetFace` became Ψ-PURE** — no caps, no level index, no growth
+> witness anywhere.  The two open wet leaves now say only that one frame
+> PRESERVES the Ψ ledger, the same invariant `INV?`'s Ψ half claims for whole
+> subscribes: their proof is the Ψ mirror of Subscribe-Face's proven caps
+> clique, with the gas edge into `subscribeE` as the one real recursion.
 >
 > **Then all three STATE-LOCAL leaves were proven, same day.**  `wet-take`
 > (§ 2.4b) and `wet-scan` (§ 2.4c) joined `wet-map`, each on the first fill
@@ -398,10 +420,10 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > - **take** — `takeVals-Ψ` mirrors `takeVals-caps` clause for clause;
 >   `cutThrough-keptP` is stated for a GENERAL path predicate (the caps side
 >   wants the same fact and can crib it); `fnCapNode Ψ (take-st _)` is `true`
->   outright.  **The conjunct that rides j′ — the one the split flagged as the
->   dangerous one — turned out to be FREE:** `cutThrough-closes-caps` is
->   unconditional in the caps, because a cut mints only `close` events and
->   `eventCaps?` is `true` on those at every level.
+>   outright.  (The events CAPS half was closed here by
+>   `cutThrough-closes-caps` while it still sat on the wet face; after the
+>   FrameFace move below it rides the caps side, where `takeDispatch-caps`'s
+>   own third conjunct supplies it.)
 > - **scan** — cribbed from `stepFrame-scan-wet` (Wet:441), the same clause
 >   proven against the capᴱ ledger.  One difference worth recording: the caps
 >   half is NOT re-derived (the assembly holds it), so the leaf needs only the
@@ -436,9 +458,32 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 >   rediscovering it.  This is the receipt route working as intended: the
 >   knowledge lands, the file does not.
 >
-> **Open surface now: `wet-innerFinish`, `wet-thru`, `subscribeInner-demand`.**
-> All three are the same *All-edge family, and whichever is discharged first
-> should absorb the others.
+> **THEN THE FROM-INNER EDGE WAS DISCHARGED ON TOP OF THE REPAIR (2026-08-10,
+> same session).**  With `WetFace` Ψ-pure, `wet-innerFinish` became provable
+> and was proven — a REAL DEFINITION (§ 2.4e), green on the first fill:
+> merge/switch/exhaust rewrite one node field on which `fnCapNode` is `true`
+> outright (`setNode-fnCap` + `fcB-live`/`fcB-nodes`); every mismatched
+> (op, node) read is the evaluator's catch-all pass (`wet-pass`); and
+> concat+yes goes through `concatDrain-Ψ`, a PROVEN walk (one
+> `subscribeInner-Ψ` receipt per queued inner, residue-queue bound threaded,
+> `all-++-intro` for the appends).  The one postulate left underneath is
+> **`subscribeInner-Ψ`** — the Ψ face of `subscribeInner`, mirroring the
+> PROVEN `subscribeInner-caps` with every caps conjunct dropped: constant
+> bound, no growth witness, no existential.  Its `g0` clause is immediate;
+> its `gs` clause is the descent into `subscribeE` — the honest recursion,
+> to be ground where `subscribeE-caps` was.
+>
+> **Open surface now: `subscribeInner-Ψ`, `wet-thru`, `subscribeInner-demand`.**
+> All three bottom out in `subscribeInner`/`subscribeE`.  `wet-thru` is now
+> a MECHANICAL mirror away from closing: `thruConsume-Ψ` (four ops, each a
+> node dispatch around `subscribeInner-Ψ` — mirror `thruConsume-caps`,
+> Subscribe-Face:1315), `thruWalk-Ψ` (a list walk shaped exactly like
+> `concatDrain-Ψ`), the fnCap-transparency of `thruWrap` (receipt in
+> `wet-thru`'s header), and the assembly.  New Ψ kit it needs beyond § 2.4e:
+> `mergeBump`'s fnCap face, `switchKill`'s (both `cutThrough-keptP` +
+> `sweepLive-fnCap` shapes, already in tree), and concat's queue-APPEND
+> bound (`all-++-intro` again).  This is now delegable grind — the pattern
+> is established twice over.
 >
 > **The postulate count went UP by one, net, and this is the mechanism
 > working:** one monolith that hid five unrelated obligations became two named
@@ -1558,7 +1603,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | id | DELETE the tied probes WHEN … |
 |---|---|
-| **T1** | the two wet leaves (`wet-innerFinish`/`wet-thru`, .Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface after the 2026-08-10 walk landing, its same-day split (`stepFrame-burst-face` is an assembly, not a postulate) and the three state-local leaves that split let through |
+| **T1** | `subscribeInner-Ψ` and `wet-thru` (.Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface after the 2026-08-10 walk landing, its same-day split, the three state-local leaves, the FrameFace repair and the `wet-innerFinish` discharge (now a real definition, § 2.4e) |
 | **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
 | **T3** | tier-1 #5's remaining depth postulates are discharged |
 | **T4** | `merge-cert` is stated in src AND discharged (task #33) |

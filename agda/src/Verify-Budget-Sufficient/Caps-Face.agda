@@ -4651,7 +4651,19 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 ------------------------------------------------------------------
 
 -- the tuple the face reports, named once so the assembly and its five
--- clause pieces read the same four conjuncts
+-- clause pieces read the same five conjuncts.
+--
+-- THE EVENTS CONJUNCT WAS MOVED HERE FROM THE WET FACE (2026-08-10),
+-- and the move is load-bearing, not cosmetic: stated on the wet side at
+-- a UNIVERSAL j′ whose only witnesses are state/vals receipts, the
+-- conjunct had no supplier — an emitted root delivery is pinned by no
+-- hypothesis, so a program whose inner delivers one large root value
+-- while its post-state stays small satisfies every hypothesis at j′ = 0
+-- and fails the conclusion.  The suppliers that DO carry it —
+-- `innerFinish-caps` and `subscribeInner-caps` (Subscribe-Face, PROVEN)
+-- — report it at the SAME j′ they mint for the state receipts, and this
+-- face is the only route that witness travels; dropping the conjunct
+-- here is what stranded the wet side with an unprovable statement.
 FrameFace : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (d j : ℕ) (sl : Slots Γ) →
   List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e → Set
@@ -4662,6 +4674,7 @@ FrameFace c d j sl r =
                 (proj₁ (proj₂ (proj₂ (proj₂ r))))
                 (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
      × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
 
 -- EVERY GROUND CLAUSE STILL PAYS `fCharge`, and this is the one lift
 -- that carries it to the landing form.  `fLvl S W j` IS `j + fCharge
@@ -4786,7 +4799,7 @@ walkH siC c d sl 2≤S 1≤R slC slSz = record
                                (stepFrame-keeps sf id now f path′ vals fin sched st))
                             (proj₁ ok)
                     , proj₁ (proj₂ (proj₂ FC)) )
-                  , proj₂ (proj₂ (proj₂ FC))
+                  , proj₁ (proj₂ (proj₂ (proj₂ FC)))
                   , capsOK?-regs (frameStep (J + proj₁ FC) c)
                       (proj₁ (proj₂ (proj₂ (proj₂ r))))
                       (proj₂ (proj₂ (proj₂ (proj₂ r))))
@@ -6175,6 +6188,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
             (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? {s = u} (frameStep x c) sl [] ≡ true)
             (sym (+-identityʳ j)) refl
+    , refl
 
 ------------------------------------------------------------------
 -- THE TWO *All FACES WAIT ON **TWO** NUMBERS, NOT ONE (2026-08-03).
@@ -6741,6 +6755,7 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
             (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
+    , refl
 
 -- the *All FINISH, face side.  Three of the four ops are the keep
 -- above under one node write; concatAll's is the drain, and that is
@@ -6904,6 +6919,7 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
             (frameStep-⊑-+ c 2≤S j j′) inv)
      , face-vals c j j′ sl (proj₁ run) 2≤S (proj₁ (proj₂ SC))
          (≤-trans (≤-reflexive (scanVals-len fn ac vals)) (proj₂ VP))
+     , refl
   where
   run = scanVals fn ac vals
   VP  = valsCaps?-parts (frameStep j c) sl vals vC
@@ -6926,6 +6942,7 @@ stepFrame-face _ {s = s} {u = u} c d j sl g id now (map-f fn) κ vals fin sched 
          (frameStep-⊑-+ c 2≤S j j′) inv
      , face-vals c j j′ sl (map (applyFn fn) vals) 2≤S (proj₂ MP)
          (≤-trans (≤-reflexive (length-map (applyFn fn) vals)) (proj₂ VP))
+     , refl
   where
   B   = Caps.cSize (frameStep j c)
   fS  = proj₁ (∧-true (frameSz? B (map-f fn))
@@ -6958,6 +6975,8 @@ stepFrame-face _ {s = s} c d j sl g id now (take-f nid) κ vals fin sched st
                   (≤-trans (takeDispatch-len nid vals fin sched st
                               (lookupNode nid (EvalSt.nodes st)))
                            (proj₂ VP)))))
+    , subst (λ x → all (eventCaps? (frameStep x c) sl) (proj₁ (proj₂ TD)) ≡ true)
+            (sym (+-identityʳ j)) (proj₂ (proj₂ TDc))
   where
   TD  = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   VP  = valsCaps?-parts (frameStep j c) sl vals vC
