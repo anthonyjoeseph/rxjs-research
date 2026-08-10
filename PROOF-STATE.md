@@ -263,16 +263,20 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 >   SUBJECT second; and the five kit hypotheses must be **eta-expanded** at
 >   the call site or their implicits go unsolved.
 
-> **OPEN AT SHUTDOWN (2026-08-07 morning; (b) CLOSED 2026-08-09).** Three things are staged and not done:
-> (a) the **consolidated cleanup round** — five orphans left by #7's discharge
-> (`B1-cSize≡sizeCapAt` Caps-Bridge:119, `slotsCaps?-widen` Caps-Face:814,
-> `size≤budget`/`init-bounded`/`1≤sizeᵗˢ` Measures:195/1163/1419). They were the
-> `-core`'s scaffold for a route through `sizeBudgetAt` that the direct proof does
-> not take; `B1` is `refl` and its own comment says it has no content; the
-> stBounded?-at-init argument survives at the base cap inside `Init-Caps`. Ruling
-> leans DELETE, but it touches Measures and Caps-Face — a full-tower recheck each —
-> so it must be BATCHED with (b). `make wiring-gate` is RED on exactly these five
-> and nothing else; `make agda`, `make bug-cache`, `make unsafe-check` are GREEN.
+> **OPEN AT SHUTDOWN (2026-08-07 morning; (a) and (b) both CLOSED 2026-08-09).**
+> (a) ~~the **consolidated cleanup round**~~ — **DONE 2026-08-09 (`9e85074`)**, full
+> tower green (`MAKE_EXIT=0`, `BUG_EXIT=0`), wiring gate PASS, unsafe-check clean.
+> Five definitions deleted: `B1-cSize≡sizeCapAt` (Caps-Bridge), `slotsGo?-widen` and
+> `slotsCaps?-widen` (Caps-Face), `size≤budget` / `init-bounded` / `1≤sizeᵗˢ`
+> (Measures). All were the `-core`'s scaffold for a route through `sizeBudgetAt`
+> that #7's direct proof does not take; the stBounded?-at-init argument survives at
+> the base cap inside `Init-Caps`. **`slotCaps?-widen` is NOT among them and was
+> nearly swept with its two lexical neighbours** — it is live, consumed by
+> `slotsCaps?-bound` (Caps-Face:913). A truncated grep hid the consumer. That is the
+> THIRD time in this campaign a consumer sweep has been read past its output window
+> (cf. `three-size-le-blowH`, twice, row 12): **when ruling on an orphan, read the
+> grep to the end or widen it — a truncated consumer list is indistinguishable from
+> an empty one.**
 > (b) ~~the **P3 + #9 signature pass**~~ — **DONE 2026-08-09**, see the block
 > above. It did NOT batch with (a): the pass is a large coherent unit and
 > deserved its own commit and its own verification, so (a) still owes one
