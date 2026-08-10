@@ -268,7 +268,7 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > registry row is DEGENERATE (empty registry at init). **NOT COVERED:** the
 > statement at the REAL `Dm = (2·B + 12) · towerℕ (suc sz)`, which is not an
 > evaluable numeral — that this Dm is likewise no fixed point of a doubling
-> map is reasoning, not a row.
+> map is reasoning, not a row.  **The probe is DELETED at f08b0bf** — its content is a refutation, so it takes the receipt route (this paragraph IS the receipt) rather than being assembled, and the numbers above are the whole of what it established.  Git history is the archive.
 >
 > **(2) THE RECURSION WAS NEVER THE OPEN PART — it is already proven, on
 > the caps axis.** `foldPath-caps`, `dispatchShare-caps`, `shareGo-caps` and

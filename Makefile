@@ -240,16 +240,6 @@ quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
 
 
-# WHY A CONSTANT DEMAND LEDGER CANNOT BE WALKED.  The Delivery-Walk threads
-# its ledger through every frame, so a `Vb` constant in the walk level asserts
-# that EVERY frame preserves a fixed size bound.  `stepFrame` on `map-f fn` is
-# `map (applyFn fn) vals`, and a duplicating `fn` roughly doubles `sizeᵛ`: at
-# Dm = 1 a value of size 1 comes back at size 3.  All five hypotheses are met
-# at `st-init` of a concrete program, so the refutation is not vacuous.  This
-# is why the burst walk's ledger is CAPS-INDEXED (see caps-burst-walk-probe).
-# Seconds.
-demand-sfstep-absurd:
-	cd agda && agda -i src -i probe probe/Demand-SfStep-Absurd.agda
 
 
 # THE CORRECTED BURST WALK, rehearsed: a Walk-Hyps instantiation whose burst
