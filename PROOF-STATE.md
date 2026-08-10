@@ -339,6 +339,42 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > and must come from `INV?`'s `fnCapBounded?`, not from the caps face);
 > (iii) rewrite `chainStep-dry` / `foldPath-dry` over (i)+(ii)+`capsAt-suc-full`.
 >
+> **LANDED, same day — with BOTH of the above steps' statements repaired
+> first.**  Review of the rehearsed route found v1's two bridging postulates
+> mis-stated, each in a canonical broken shape: `burstCaps→burstB` concluded
+> `fnCapᵛ ≤ Ψ` from hypotheses carrying NO fnCap information (`valCaps?` is
+> size ∧ width only, Caps-Face:674; `INV?` of the output STATE says nothing
+> about in-flight stream payloads) — the conclusion-from-no-hypothesis
+> anti-pattern; and `fold-level-fits` lacked the `plen`/`gas` guards, so at
+> unbounded `plen` its base `iterL plen 0` outruns the fixed `sizeCount c d` —
+> false by instantiation.
+>
+> **The repair (v2, `Verify-Budget-Sufficient/Burst-Walk.agda`) rests on one
+> observation: `valB? B Ψ`'s two conjuncts have OPPOSITE characters.**  The
+> SIZE half grows per frame (the constant-Dm refutation) and rides the walk's
+> caps level; the FNCAP half is frame-invariant ("Ψ never grows") and rides
+> CONSTANT.  The walk carries the conjunction; `Res.burst` returns both
+> flavours; they recombine pointwise into `burstB? (cSize c′) Ψ` as a REAL
+> PROOF (`burstB?-halves`).  And stating the receipt at the CASCADE level
+> (walk entered at J = 0) makes the landing-level bound `cascadeGo-caps`'s own
+> arithmetic, cribbed term for term — `fold-level-fits` is GONE, not repaired.
+>
+> **Net effect on the ledger:** `chainStep-demand`, `foldPath-demand`,
+> `chainStep-dry`, `foldPath-dry` all DELETED; `cascadeGo-burst-dry` is a REAL
+> DEFINITION (Burst-Walk § 7) consumed by `dry-tick-core`'s telescope; the ONE
+> new postulate is `stepFrame-burst-face` (Burst-Walk § 2), whose
+> walkOK/valsCaps?/pathSz?/level conjuncts ARE the proven `FrameFace` at the
+> same witness — genuinely open are its emitted-EVENTS caps half and its Ψ
+> halves (the wet face of one frame, from-inner/thru-outer cases being the
+> same family as `subscribeInner-demand`; whichever is discharged first should
+> absorb the other).  `fnCapB-latch`/`fnCapB-finish` and every walk closure
+> fact are real proofs.  frameBΨ?/pathBΨ?/regsBΨ? relocated from Caps-Bridge
+> to Burst-Walk (import direction).  If the eventual dry-tick grind needs
+> per-chain receipts mid-cascade, they come from re-entering the same walk at
+> the mid-cascade level; the cost that reappears then is the nonzero-base
+> level bound — v1's `fold-level-fits` repaired with `suc plen ≤ S` and a gas
+> guard.
+>
 > The discharges of #6 and #7 have a common shape worth naming: **both postulates
 > carried a pile of leading hypotheses that the eventual proof did not use.**
 > #6 shed seven expression-level lemmas (its proof is pure level arithmetic);
@@ -1436,7 +1472,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | id | DELETE the tied probes WHEN … |
 |---|---|
-| **T1** | the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3) |
+| **T1** | `stepFrame-burst-face` (.Burst-Walk) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface since the 2026-08-10 walk landing |
 | **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
 | **T3** | tier-1 #5's remaining depth postulates are discharged |
 | **T4** | `merge-cert` is stated in src AND discharged (task #33) |

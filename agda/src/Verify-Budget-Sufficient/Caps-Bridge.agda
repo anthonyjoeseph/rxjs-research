@@ -87,7 +87,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
 -- `chainStep-caps`, whose statement is stated at the chain depth measure.
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain; depthCascade)
 -- depth-capped (proven in Depth-Bound): depthE ≤ 3·cSize when capsOK?.
 -- Consumed by depthE≤capsH-root (at the SMALL baseCaps — the general-id
 -- depth bound does NOT route through depth-capped; see the depOK
@@ -101,7 +101,10 @@ open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
          frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup)
 open import Verify-Budget-Sufficient.Anchor-Dry
-  using (chainStep-dry; foldPath-dry; subscribeInner-dry; dry-hop)
+  using (subscribeInner-dry; dry-hop)
+open import Verify-Budget-Sufficient.Burst-Walk
+  using (cascadeGo-burst-dry; valΨ?;
+         frameBΨ?; pathBΨ?; regsBΨ?)
 open import Verify-Budget-Sufficient.Occurrences using (pathOccs?)
 open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
 open import Rx.Prim using (InstEvent)
@@ -212,21 +215,8 @@ B2-cReg≤cSize e sl (suc id) =
 -- INV? reads live below, next to where the assembly consumes them.
 ------------------------------------------------------------------
 
-frameBΨ? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
-frameBΨ? Ψ (map-f fn)         = (caseWᵗ fn ⊔ fnCapᵗ fn) ≤ᵇ Ψ
-frameBΨ? Ψ (scan-f fn _)      = (caseWᵗ fn ⊔ fnCapᵗ fn) ≤ᵇ Ψ
-frameBΨ? Ψ (take-f _)         = true
-frameBΨ? Ψ (from-inner _ _ _) = true
-frameBΨ? Ψ (thru-outer _ _)   = true
-
-pathBΨ? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-pathBΨ? Ψ root           = true
-pathBΨ? Ψ (share-sink i) = true
-pathBΨ? Ψ (f ↠ p)        = frameBΨ? Ψ f ∧ pathBΨ? Ψ p
-
-regsBΨ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
-        → List (RegId × Source × Chain Γ t) → Bool
-regsBΨ? Ψ = all (λ en → pathBΨ? Ψ (proj₂ (proj₂ (proj₂ en))))
+-- frameBΨ?/pathBΨ?/regsBΨ? RELOCATED to .Burst-Walk (2026-08-10): the
+-- burst walk's Ψ ledger consumes them there, upstream of this module.
 
 ------------------------------------------------------------------
 -- (B) THE SUPPLIERS.  S2 lands first: S1's proof calls it.
@@ -509,46 +499,39 @@ postulate
                    (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
                                    (cascadeLatch a st))))
      ) →
-    -- THE DRY FAMILY (Verify-Budget-Sufficient/Anchor-Dry.agda) — the
-    -- reachability-sourced anchor facts (Phase 1b step 3).  Threaded
-    -- here so the eventual clause grind consumes them where the
-    -- cascade meets chainStep/foldPath/subscribeInner; their premises
-    -- are exactly the INV?/capsOK? conjuncts this core's own driver
-    -- carries.  dry-hop closes hop-edge's size premise from valB?.
-    -- chainStep-dry  (Anchor-Dry.agda)
+    -- THE DRY FAMILY — the reachability-sourced anchor facts.
+    -- 2026-08-10: the per-chain/per-fold rows (chainStep-dry,
+    -- foldPath-dry) are REPLACED by ONE cascade-level receipt,
+    -- `cascadeGo-burst-dry` (.Burst-Walk) — the walk that proves it
+    -- enters at level 0, where the landing-level arithmetic is
+    -- cascadeGo-caps's own.  Its caps-flavoured hypotheses are this
+    -- core's own driver facts (the caps-tick chain); its Ψ-flavoured
+    -- ones project out of INV? (valB-fc, regsBΨ?-of, pathBΨ?-of); the
+    -- depth premise is cascade-depth-capsH.  dry-hop still closes
+    -- hop-edge's size premise from valB?.
+    -- cascadeGo-burst-dry  (Burst-Walk.agda)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+      (id : Id) (a : Arrival Γ)
+      (chains : List (RegId × Path Γ (arrTy a) t))
       (sched : Sched Γ) (st : EvalSt e) →
       let sl = Sched.slots sched
           Ψ  = ΨAt e sl
-          B  = sizeCapAt e sl id
-          sz = sizeᵉ e + slotsSize sl
-          Ŝ  = sizeCapAt e sl (suc id)
-      in INV? Ψ B sched st ≡ true →
-         capsOK? (capsAt e sl id) sched st ≡ true →
-         valB? B Ψ (arrTy a) (arrVal a) ≡ true →
-         pathB? B Ψ path ≡ true →
-         pathOccs? sz path ≡ true →
-         burstB? Ŝ Ψ (proj₁ (chainStep id a path sched st)) ≡ true
-     ) →
-    -- foldPath-dry  (Anchor-Dry.agda)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-      (path : Path Γ u t) (vals : List (Val Γ u))
-      (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-      (sched : Sched Γ) (st : EvalSt e) →
-      let sl = Sched.slots sched
-          Ψ  = ΨAt e sl
-          B  = sizeCapAt e sl id
-          sz = sizeᵉ e + slotsSize sl
-          Ŝ  = sizeCapAt e sl (suc id)
-      in INV? Ψ B sched st ≡ true →
-         capsOK? (capsAt e sl id) sched st ≡ true →
-         pathB? B Ψ path ≡ true →
-         pathOccs? sz path ≡ true →
-         all (valB? B Ψ u) vals ≡ true →
-         all (eventB? B Ψ) evs ≡ true →
-         burstB? Ŝ Ψ (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st)) ≡ true
+          c  = capsAt e sl id
+      in
+      slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+      slotsSize sl ≤ Caps.cSize c →
+      capsOK? c sched st ≡ true →
+      fnCapBounded? Ψ sched st ≡ true →
+      valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+      valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
+      all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+      all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
+      regsBΨ? Ψ (EvalSt.registry st) ≡ true →
+      n ≤ Caps.cSize c →
+      length chains ≤ Caps.cReg c →
+      depthCascade a id chains sched st ≤ capsH e sl id →
+      burstB? (sizeCapAt e sl (suc id)) Ψ
+              (proj₁ (cascadeGo a id chains sched st)) ≡ true
      ) →
     -- subscribeInner-dry  (Anchor-Dry.agda)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -597,8 +580,7 @@ dry-tick =
     (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeLatch-deliv {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascade-delivN {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → chainStep-dry {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} {u} → foldPath-dry {n} {Γ} {t} {e} {u})
+    (λ {n} {Γ} {t} {e} → cascadeGo-burst-dry {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} {u} → subscribeInner-dry {n} {Γ} {t} {e} {u})
     (λ {n} {Γ} {u} → dry-hop {n} {Γ} {u})
 

@@ -242,11 +242,3 @@ quickcheck: qc-build
 
 
 
-# THE CORRECTED BURST WALK, rehearsed: a Walk-Hyps instantiation whose burst
-# and event ledgers are CAPS-INDEXED (`burstCaps?`/`eventCaps?` at
-# `frameStep J c`) rather than constant.  Vb/Pb/OK are `walkH`'s verbatim and
-# every closure fact is proven; exactly one postulate is new, and only its
-# events half is genuinely open — `FrameFace` bounds a frame's output VALUES
-# and says nothing about its emitted EVENTS.  Seconds.
-caps-burst-walk-probe:
-	cd agda && agda -i src -i probe probe/Caps-Burst-Walk-Probe.agda

@@ -70,7 +70,6 @@ subscribeE-walk | subscribeE-wet-core | ≤14 | REASON: subscribeE-wet-core must
 unconn-keeps | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
 walk-hyps-round3b | subscribeE-walk-core | ≤2 | REASON: subscribeE-walk-core must be proven
 walk-hyps-splitAnchor | subscribeE-walk-core | ≤3 | REASON: subscribeE-walk-core must be proven
-chainStep-dry | dry-tick-core | ≤6 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; its own demand postulate is the anchor's open surface (Anchor-Dry.agda); ≤6 since pathOccs? premise added 2026-08-06
 dry-hop | dry-tick-core | ≤3 | REASON: hop-edge's size-premise discharger; applied when the walk grind reaches hop-edge's call sites
-foldPath-dry | dry-tick-core | ≤7 | REASON: consumed by the fold clause grind once dry-tick-core is proven; demand half postulated (Anchor-Dry.agda); ≤7 since pathOccs? premise added 2026-08-06
+cascadeGo-burst-dry | dry-tick-core | ≤13 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; replaces chainStep-dry + foldPath-dry (2026-08-10) — a REAL definition over the Burst-Walk with only stepFrame-burst-face open; its 12 hypotheses are all caller-owned (caps-tick chain, INV? projections, cascade-depth-capsH)
 subscribeInner-dry | dry-tick-core | ≤6 | REASON: the key hop-edge enabler at thruConsume sites; consumed by the walk grind once dry-tick-core is proven; ≤6 since pathOccs? premise added 2026-08-06
