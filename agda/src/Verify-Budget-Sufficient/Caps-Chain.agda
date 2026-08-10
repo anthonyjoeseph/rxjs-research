@@ -32,11 +32,12 @@
 -- REFUTED (agda/probe/Chain-Index-Probe.agda § 1: it asks that a sweep
 -- sized for a whole chain fit inside the operators the caller has
 -- remaining, and at zero operators left the walk transformer is the
--- identity).  § 2 below is the pair that does hold: a callee reporting
--- at m feeds a caller holding `suc m` by monotonicity alone, and a
--- member entered FRESH instantiates the index at the size cap and
--- converts by the clause equation, at the same site that spends the
--- budget descent.
+-- identity, so the entry sweep — which is strictly above the level —
+-- cannot fit).  For the OPERATOR COUNT the grind uses `chain-desc`
+-- (§ 3) for the descent and a bare `s≤s` for the fresh-entry case (both
+-- are inline at every site and need no conversion lemma).  § 2 below is
+-- the WIDTH-INDEX pair: `walk-index` (sIterD monotone in the payload
+-- count) and `burst-index` (fIterD monotone in the emit count).
 --
 -- This module is not mutual with any of them — it consumes the `-mono`
 -- and `-infl` families as finished facts — so it is its own compilation
