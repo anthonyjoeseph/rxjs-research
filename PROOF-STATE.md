@@ -126,6 +126,81 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > not as a specification — and check whether the direct proof needs it at all
 > before grinding through it.
 
+> **THE ANCHOR DESIGN RULING (2026-08-09, design session).** The three demand
+> postulates do NOT need a new mutual induction — **the induction is already
+> built and proven: it is `Delivery-Walk`.** The ruling, in full, because it
+> re-scopes the whole anchor block:
+>
+> 1. **Why the demand statements are not directly inductive, and why that is
+>    already solved.** `chainStep-demand`/`foldPath-demand` hypothesize inputs
+>    at `B` and conclude at `Dm` — but `foldPath (f ↠ path′)` feeds each
+>    frame's GROWN output back in as the next frame's input, so a fixed-bound
+>    mutual induction can never close on itself (the IH's `valB? B` hypothesis
+>    is violated one frame in). This is EXACTLY the problem the 2026-08-02
+>    walk repair solved on the caps axis (`Entry-Caps-Refuted`): growth is
+>    REPORTED as a level climb, not denied. And the walk already threads the
+>    level-indexed values ledger through every clause — `sf-step` CONCLUDES
+>    `Vb (J + j′) (proj₁ r) ≡ true`, the frame's outputs bounded at the
+>    landing level. The hard axis is DONE. It is just never read out.
+>
+> 2. **The one missing piece: `Res` drops the emits on the floor.**
+>    `foldPath`'s root clause packages `evs ++ map value vals ++ [complete]`
+>    into the delivery envelope, and `Res` (lvl/lo/hi/good/cnt) says nothing
+>    about `proj₁` of the run. Meanwhile `burstB? B Ψ = all emits, all events,
+>    eventB?` and **`eventB?` is `true` on everything except `value v`**
+>    (Measures:4857-61) — so the burst bound over the output stream is
+>    precisely: the packaged `vals` under `Vb`, plus the threaded `evs` under
+>    an event ledger. Both are one field away.
+>
+> 3. **The extension (grind-shaped, the same class as the depth pass that
+>    just landed — new premise + new conclusion threaded through the same
+>    four clauses):**
+>    - `Walk-Hyps` gains an event ledger `Eb : ℕ → List (InstEvent (Val Γ t))
+>      → Bool` with widening + `++`-closure fields; `sf-step`'s Σ-conclusion
+>      gains `Eb (J + j′) (proj₁ (proj₂ r)) ≡ true`.
+>    - `foldPath-go` gains premise `Eb J evs ≡ true` (chainStep seeds
+>      `close`/`[]` — bookkeeping, free at any eventB?-shaped instantiation).
+>    - `Res` gains a `burst` field: every emitted envelope's events bounded
+>      at `lvl` (value events read through `Vb`). Root packages hV/hE
+>      widened to lvl; share-sink's handoff is bookkeeping + the fanout's IH;
+>      the frame clause is `++`-closure at the widened level; shareGo/
+>      cascadeGo cons is `emits ++ rest` — FP's burst widened along
+>      `Res.lo REST`, then `++`-closure.
+>    - Existing consumers stay cheap: Caps-Face's three `cascadeGo-*`
+>      instantiations may set `Eb _ _ = true`, making every new obligation
+>      refl-shaped, and simply not read the new field.
+>
+> 4. **The demand instantiation** extends Caps-Face's existing one (same OK/
+>    Pb/Vb — they are already the right ledgers) with a real `Eb`, and reads
+>    the new `burst` field: every emitted value ≤ the size at the landing
+>    level. The demand postulates then follow from ONE new arithmetic
+>    obligation — the numeric bridge `size at (lvls … J₀ (delivN …)) ≤ Dm` —
+>    stated as a postulate FIRST (outside-in), sourced from the Tick-Headroom
+>    kit (`count-covers-tower`/`tick-covers-instant`). If the walk's natural
+>    landing form does not match `Dm = (2B+12)·towerℕ(suc sz)`, RESTATE the
+>    demand postulates' numeric form and keep the dry family's Ŝ conclusions
+>    fixed — Anchor-Dry is impl-layer, not spec.
+>
+> 5. **What is genuinely open AFTER the extension — the funnel.** `sf-step`'s
+>    discharge for `from-inner`/`thru-outer` frames re-enters `subscribeE` —
+>    the subscribe side, #1's territory (`subscribeE-walk-core`, whose
+>    Measures:5786 conjunct is exactly a `burstB?` on the subscribe-side
+>    output). `subscribeInner-demand` reads off that same face directly. So
+>    the extension reduces all three demand postulates, #2, and #3 to **one
+>    open surface: the subscribe-side burst face** — which is the postulate
+>    PROOF-STATE already ranks riskiest. Consequence, per de-risk mode:
+>    **probe #1's statement for falsity BEFORE grinding the extension's
+>    instantiation** — a refutation there moves the ground everything above
+>    lands on. And restart the `Demand-Battery` probe (open item (c)) for
+>    chainStep/foldPath-demand falsity first of all; it is the cheapest
+>    unmanaged risk in the block.
+>
+> Work order: (i) Demand-Battery probe (falsity, cheap); (ii) the walk
+> extension grind (worker-shaped: Delivery-Walk + trivial-Eb patches to
+> Caps-Face); (iii) the numeric bridge stated as a postulate + the demand
+> instantiation assembled over it; (iv) the subscribe-side face — the last
+> real mathematics in tier 1.
+
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
 | 1 | `subscribeE-walk-core` | Measures.agda:5750 | **FALSITY, critical** | The single riskiest statement in the repo. Nine conjuncts over the whole subscribeE mutual clique; its three predecessor statements were each MACHINE-REFUTED (`walk-hyps-absurd`, `hop-anchor-absurd`, `round3-old-ell-absurd`, `round3-anchor-indexed-absurd` — the base rate on this face is bad); its hypotheses (a one-entry-point Σ-receipt + arithmetic) contain NO induction; and it assumes exactly what THE ANCHOR PROBLEM (below) says is unestablished — that Ŝ/R̂/F can be sourced from reachability. Its own comment concedes: "Frame-Work-Probe is the evidence, not a proof." |

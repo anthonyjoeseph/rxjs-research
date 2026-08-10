@@ -112,14 +112,6 @@ open import Rx.Exp using (obs; sizeᵛ)
 -- to the wet family's own reading of them.
 ------------------------------------------------------------------
 
--- B1 : capsAt's cSize field IS sizeCapAt, by the very definition of
--- sizeCapAt (Wet.agda:4101-4102: `sizeCapAt e sl id = Caps.cSize
--- (capsAt e sl id)`).  PROVEN, by refl — there is no bridging content
--- here at all, only a naming one.
-B1-cSize≡sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) → Caps.cSize (capsAt e sl id) ≡ sizeCapAt e sl id
-B1-cSize≡sizeCapAt e sl id = refl
-
 -- B2 : the registration count never outruns the size cap.  PROVEN — the
 -- domination guessed at above is real: one `sizeStep` unfolds to a sum
 -- containing `2 * (S * X)`, which already dominates both the

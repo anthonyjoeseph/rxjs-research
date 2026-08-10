@@ -811,18 +811,6 @@ slotCaps?-widen {n = n} sl (shared d) {B} {B′} {W} {W′} le lw h =
                   ((pWᵉ n sl d ≤ᵇ W) ∧ (innWᵉ n sl d ≤ᵇ W)) h
   split₂ = ∧-true (pWᵉ n sl d ≤ᵇ W) (innWᵉ n sl d ≤ᵇ W) (proj₂ split₁)
 
-slotsGo?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (is : List (Fin n))
-  {B B′ W W′ : ℕ} →
-  B ≤ B′ → W ≤ W′ → slotsGo? B W sl is ≡ true → slotsGo? B′ W′ sl is ≡ true
-slotsGo?-widen sl []       le lw h = refl
-slotsGo?-widen sl (i ∷ is) le lw h =
-  ∧-intro (slotCaps?-widen sl (sl i) le lw (proj₁ (∧-true _ _ h)))
-          (slotsGo?-widen sl is le lw (proj₂ (∧-true _ _ h)))
-
-slotsCaps?-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) {B B′ W W′ : ℕ} →
-  B ≤ B′ → W ≤ W′ → slotsCaps? B W sl ≡ true → slotsCaps? B′ W′ sl ≡ true
-slotsCaps?-widen {n = n} sl le lw = slotsGo?-widen sl (tabulate {n = n} (λ i → i)) le lw
-
 -- one slot's condition, read out of the telescope's
 slotsGo?-tab : ∀ {n m} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ)
   (f : Fin m → Fin n) (i : Fin m) →

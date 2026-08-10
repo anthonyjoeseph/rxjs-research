@@ -192,11 +192,6 @@ sz≤budget e sl id =
   (≤-trans (m≤m*n (4 + (sizeᵉ e + slotsSize sl)) (suc id))
            (k≤towerℕ ((4 + (sizeᵉ e + slotsSize sl)) * suc id)))
 
-size≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : Id) → sizeᵉ e ≤ sizeBudgetAt e sl id
-size≤budget e sl id =
-  ≤-trans (m≤m+n (sizeᵉ e) (slotsSize sl)) (sz≤budget e sl id)
-
 slots≤budget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) → slotsSize sl ≤ sizeBudgetAt e sl id
 slots≤budget e sl id =
@@ -1160,18 +1155,6 @@ mkHot-bounded ins B i h with ins i | h
 ... | scripted (cold _ _)  | _ = refl
 ... | shared _             | _ = refl
 
-init-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-  (id : Id) → stBounded? (sizeBudgetAt e ins id) (sched-init e ins)
-                         (st-init e) ≡ true
-init-bounded {n = n} e ins id =
-  ∧-intro (all-concat-tab (boundedLive B) (mkHot ins) perSlot) refl
-  where
-  B = sizeBudgetAt e ins id
-  perSlot : ∀ i → all (boundedLive B) (mkHot ins i) ≡ true
-  perSlot i = mkHot-bounded ins B i
-                (≤-trans (fᵢ≤sum-tab (λ j → slotSize (ins j)) i)
-                         (slots≤budget e ins id))
-
 ------------------------------------------------------------------
 -- EDGE 1 — the connect latch, counted.  subscribeSharedSlot's
 -- connect fires only behind memberSource … ≡ false and prepends to
@@ -1415,11 +1398,6 @@ opaque
 1≤sizeᵗ (ifᵗ c a b)   = s≤s z≤n
 1≤sizeᵗ (primᵗ _ a)   = s≤s z≤n
 1≤sizeᵗ (strmᵗ e)     = s≤s z≤n
-
-1≤sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-  1 ≤ sizeᵗˢ ts
-1≤sizeᵗˢ []       = ≤-refl
-1≤sizeᵗˢ (y ∷ ys) = ≤-trans (1≤sizeᵗ y) (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))
 
 -- THE THREE ARITHMETIC FACTS the clauses reduce to.  Each is a
 -- statement about ℕ and `^` alone — no syntax, no measure — which is

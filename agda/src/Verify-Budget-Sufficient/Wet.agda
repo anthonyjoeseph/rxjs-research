@@ -4694,7 +4694,9 @@ pop-head-bounded Ψ B sched st eq inv with INV-parts Ψ B sched st inv
 
 ------------------------------------------------------------------
 -- THE SEED ON THE SIX-CONJUNCT FACE AT THE CAPS LEVEL — PROVEN.
--- init-bounded is its stBounded? projection but reads sizeBudgetAt;
+-- the stBounded? projection used to live here as `init-bounded`, read
+-- against sizeBudgetAt; it was DELETED 2026-08-09 with the rest of #7's
+-- superseded scaffold (git is the archive) because
 -- capsAt-base-size relocates the same mkHot argument to
 -- `Caps.cSize (capsAt …)`, the registry conjuncts are refl at st-init
 -- (the registry is []), and the two slot conjuncts come from
