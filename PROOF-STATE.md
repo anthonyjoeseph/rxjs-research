@@ -390,13 +390,36 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > the two caps receipts as HYPOTHESES, passed in verbatim from the assembly's
 > own `stepFrame-face` call.  Nothing is re-derived and nothing is guessed.
 >
-> **Open surface after the split:** `wet-scan` and `wet-take` (state-local — a
-> node write, and for take a registry filter plus a live sweep; grinds, not
-> design), `wet-inner` and `wet-thru` (the two *All edges, the real content —
-> same family as `subscribeInner-demand`), and `subscribeInner-demand` itself.
-> **The postulate count went UP by three and this is the mechanism working:**
-> one monolith that hid five unrelated obligations became four named leaves
-> plus a real proof, each separately attackable and none able to hide.
+> **Then all three STATE-LOCAL leaves were proven, same day.**  `wet-take`
+> (§ 2.4b) and `wet-scan` (§ 2.4c) joined `wet-map`, each on the first fill
+> attempt, because the split had already put every obligation where an
+> existing lemma could reach it:
+>
+> - **take** — `takeVals-Ψ` mirrors `takeVals-caps` clause for clause;
+>   `cutThrough-keptP` is stated for a GENERAL path predicate (the caps side
+>   wants the same fact and can crib it); `fnCapNode Ψ (take-st _)` is `true`
+>   outright.  **The conjunct that rides j′ — the one the split flagged as the
+>   dangerous one — turned out to be FREE:** `cutThrough-closes-caps` is
+>   unconditional in the caps, because a cut mints only `close` events and
+>   `eventCaps?` is `true` on those at every level.
+> - **scan** — cribbed from `stepFrame-scan-wet` (Wet:441), the same clause
+>   proven against the capᴱ ledger.  One difference worth recording: the caps
+>   half is NOT re-derived (the assembly holds it), so the leaf needs only the
+>   fnCap half of the node lookup — `lookupNode-fnCap`, not the two-sided
+>   `lookupNode-B`, whose `boundedNode` premise nothing at this level can pay.
+>   **Splitting a two-sided lemma to take only the half you can pay for is the
+>   move**; carrying the other half would have forced caps facts down into a
+>   leaf that has no business holding them.
+>
+> **Open surface now: `wet-inner` and `wet-thru`** — the two *All edges, the
+> real content, same family as `subscribeInner-demand` — plus
+> `subscribeInner-demand` itself.  Three postulates, and the two wet ones
+> should absorb the third.
+>
+> **The postulate count went UP by one, net, and this is the mechanism
+> working:** one monolith that hid five unrelated obligations became two named
+> leaves plus three real proofs.  Had the leaves not been named first, the
+> three easy clauses would have stayed buried behind the two hard ones.
 >
 > **`siC` is a PARAMETER, not an import.**  `stepFrame-face`'s own first
 > argument is the subscribeInner caps face; its supplier
@@ -1511,7 +1534,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | id | DELETE the tied probes WHEN … |
 |---|---|
-| **T1** | the four wet leaves (`wet-scan`/`wet-take`/`wet-inner`/`wet-thru`, .Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface since the 2026-08-10 walk landing and its same-day split (`stepFrame-burst-face` is now an assembly, not a postulate) |
+| **T1** | the two wet leaves (`wet-inner`/`wet-thru`, .Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface after the 2026-08-10 walk landing, its same-day split (`stepFrame-burst-face` is an assembly, not a postulate) and the three state-local leaves that split let through |
 | **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
 | **T3** | tier-1 #5's remaining depth postulates are discharged |
 | **T4** | `merge-cert` is stated in src AND discharged (task #33) |

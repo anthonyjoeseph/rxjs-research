@@ -41,12 +41,14 @@
 -- for it is v1's `fold-level-fits` REPAIRED with `suc plen ≤ S` and a
 -- gas guard (PROOF-STATE, tier-1 update).
 --
--- THE ONE OPEN POSTULATE is `stepFrame-burst-face` (§ 2).  Its
--- walkOK/valsCaps?/pathSz?/level conjuncts ARE `FrameFace`
--- (.Caps-Face:4655) — the PROVEN `stepFrame-face` — at the same
--- witness.  Genuinely new: the emitted-EVENTS caps half (FrameFace
--- bounds output VALUES only), and the Ψ halves — the wet face of one
--- frame, whose from-inner/thru-outer content is the same family as
+-- THE FRAME FACE IS NOT A POSTULATE.  `stepFrame-burst-face` (§ 5b) is
+-- an ASSEMBLY over the PROVEN `stepFrame-face` (.Caps-Face:4678) plus
+-- five per-frame WET leaves (§ 2).  Four of its six conjuncts come off
+-- that one call — the level bound and `capsOK?` verbatim, `valsCaps?`
+-- verbatim, and `regP? (pathSz? …)` via `capsOK?-regs` on that same
+-- `capsOK?`.  ALL THREE STATE-LOCAL LEAVES ARE PROVEN — map-f (§ 2.4),
+-- take-f (§ 2.4b), scan-f (§ 2.4c) — leaving `wet-inner` and `wet-thru`,
+-- the two *All edges, which carry the real content: the same family as
 -- `subscribeInner-demand` (.Anchor-Dry).
 --
 -- Also home to frameBΨ?/pathBΨ?/regsBΨ?, RELOCATED from .Caps-Bridge
@@ -55,10 +57,15 @@
 module Verify-Budget-Sufficient.Burst-Walk where
 
 open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≤ᵇ_; _⊔_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
-open import Data.List    using (List; []; _∷_; _++_; all; map; length)
+open import Data.List    using (List; []; _∷_; _++_; all; any; map; length)
+open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Unit    using (⊤; tt)
+open import Data.List.Relation.Unary.All using (All)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Relation.Nullary using (yes; no)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
@@ -66,14 +73,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent;
                            value; init; close; handoff; complete;
                            InstEmit)
-open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_)
+open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator
   using (Sched; EvalSt; Slots; Arrival; RegId; Chain; Path; Frame;
          _↠_; root; share-sink;
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
          arrTy; arrVal; fLvlD; regAt; subscribeInner; sLvlD;
-         AllOp; NodeId)
+         AllOp; NodeId; NodeState; takeDispatch; takeVals; cutThrough;
+         lookupNode; setNode; sweepLive; pathHasNode; memberSource; scanVals;
+         scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st)
 
 -- re-exports .Caps (frameStep, capsAt, sizeCount, the mono kit) and
 -- .Deliveries (delivN) public
@@ -96,12 +105,14 @@ open import Verify-Budget-Sufficient.Caps-Face
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
-         frameStep-mono-j; frameStep-0; stepFrame-face)
+         frameStep-mono-j; frameStep-0; stepFrame-face;
+         cutThrough-closes-caps)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
-         fnCapᵛ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true)
+         fnCapᵛ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
+         fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap)
 
 ------------------------------------------------------------------
 -- § 0  THE Ψ LEDGER — the fnCap halves of valB?/eventB?/burstB? and
@@ -177,7 +188,8 @@ OKB c sl Ψ J sched st =
 --
 -- 2026-08-10: `stepFrame-burst-face` was a MONOLITH; it is now a REAL
 -- ASSEMBLY (§ 5b) over the already-proven caps face plus five per-frame
--- WET leaves, of which map-f is proven here and four remain.
+-- WET leaves, of which the three STATE-LOCAL ones are proven here and
+-- the two *All edges remain.
 --
 -- WHAT THE CAPS SIDE ALREADY GIVES.  `stepFrame-face` (Caps-Face:4678)
 -- picks a j′ and reports the level bound, `capsOK?` at J+j′ and
@@ -240,49 +252,17 @@ WetFace c sl Ψ J j′ r =
    × (all (eventCaps? (frameStep (J + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
    × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
 
--- § 2.3  THE FOUR LEAVES STILL OPEN.  scan/take are state-local (a node
--- write, and for take a registry filter plus a live sweep) — grinds,
--- not design.  from-inner and thru-outer are the two *All edges and
--- carry the real content: the same family as `subscribeInner-demand`
--- (.Anchor-Dry), so whichever is discharged first should absorb it.
+-- § 2.3  THE TWO LEAVES STILL OPEN, and they are the two that were
+-- always going to be the work.  The three STATE-LOCAL frames are proven
+-- — map-f (§ 2.4), take-f (§ 2.4b), scan-f (§ 2.4c) — leaving only the
+-- two *All edges, which carry the real content: the same family as
+-- `subscribeInner-demand` (.Anchor-Dry), so whichever is discharged
+-- first should absorb the other.
 --
 -- CALL-SITE ARGUMENTS THESE ABSORB: none — every index is pinned by
 -- WetFace above, and the two caps receipts are passed in verbatim from
 -- the assembly's own `stepFrame-face` call.
 postulate
-  wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
-    (sf : Gas) (id : Id) (now : Tick)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (path′ : Path Γ u t) (vals : List (Val Γ s))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (scan-f fn nid ↠ path′) ≡ true →
-    VbB c sl Ψ J vals ≡ true →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    let r = stepFrame sf id now (scan-f fn nid) path′ vals fin sched st in
-    capsOK? (frameStep (J + j′) c)
-            (proj₁ (proj₂ (proj₂ (proj₂ r))))
-            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-    WetFace c sl Ψ J j′ r
-
-  wet-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
-    (sf : Gas) (id : Id) (now : Tick)
-    (nid : NodeId) (path′ : Path Γ s t) (vals : List (Val Γ s))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (take-f nid ↠ path′) ≡ true →
-    VbB c sl Ψ J vals ≡ true →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    let r = stepFrame sf id now (take-f nid) path′ vals fin sched st in
-    capsOK? (frameStep (J + j′) c)
-            (proj₁ (proj₂ (proj₂ (proj₂ r))))
-            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
-    valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
-    WetFace c sl Ψ J j′ r
-
   wet-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
     (sf : Gas) (id : Id) (now : Tick)
@@ -372,6 +352,223 @@ wet-map c sl Ψ J j′ sf id now fn path′ vals fin sched st ok pb vb rg =
   , refl
   , refl
 
+-- THE INERT RESULT.  Six of `stepFrame`'s take branches and six of its
+-- scan branches return `[] , [] , fin , sched , st` — nothing moved, so
+-- every conjunct is a projection.  Top-level because a `with`-clause's
+-- `where` is not in scope for its siblings, which is what the scan leaf
+-- needs (its dispatch is a `with`, not a helper: `stepFrame`'s scan
+-- branch reduces only once `lookupNode` itself is matched)
+wet-nil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  WetFace {e = e} {u = u} c sl Ψ J j′ ([] , [] , fin , sched , st)
+wet-nil c sl Ψ J j′ fin sched st ok rg =
+    proj₁ (proj₁ ok) , proj₂ ok , refl
+  , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl , refl
+
+------------------------------------------------------------------
+-- § 2.4b  THE TAKE LEAF — also a REAL PROOF.  `takeDispatch` keeps a
+-- PREFIX of the payloads, and on a cut it FILTERS the registry, SWEEPS
+-- the live set and writes back `take-st zero`.  Every conjunct is a
+-- passthrough or a one-line induction, and the conjunct that rides j′ —
+-- the one that looked hard — is FREE: `cutThrough-closes-caps` is
+-- unconditional in the caps, because a cut mints only `close` events
+-- and `eventCaps?` is `true` on those at every level.
+
+-- takeVals keeps a PREFIX, so every kept payload was already Ψ-good.
+-- Clause-for-clause the mirror of `takeVals-caps` (Caps-Face:5290)
+takeVals-Ψ : ∀ {n} {Γ : Ctx n} {s} (Ψ k : ℕ) (vals : List (Val Γ s)) →
+  valsΨ? Ψ vals ≡ true →
+  valsΨ? Ψ (proj₁ (takeVals k vals)) ≡ true
+takeVals-Ψ Ψ zero          vals     h = refl
+takeVals-Ψ Ψ (suc k)       []       h = refl
+takeVals-Ψ Ψ (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
+takeVals-Ψ Ψ (suc (suc k)) (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (takeVals-Ψ Ψ (suc k) vs (proj₂ (∧-true _ _ h)))
+
+-- the cut is a FILTER on the registry, so ANY pointwise path predicate
+-- survives it.  Stated for a general P deliberately: the caps side wants
+-- the same fact and can crib this rather than re-derive it
+cutThrough-keptP : ∀ {n} {Γ : Ctx n} {t} (P : ∀ {u} → Path Γ u t → Bool)
+  (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  regP? P reg ≡ true →
+  regP? P (proj₁ (cutThrough nid d wm dy reg)) ≡ true
+cutThrough-keptP P nid d wm dy []                     h = refl
+cutThrough-keptP P nid d wm dy ((rid , src , ch) ∷ r) h
+  with ∧-true (P (proj₂ ch)) (regP? P r) h
+... | hd , tl with pathHasNode nid (proj₂ ch)
+                 | cutThrough-keptP P nid d wm dy r tl
+...   | true  | ih = ih
+...   | false | ih = ∧-intro hd ih
+
+-- a cut mints ONLY `close` events, on which eventΨ? is `true`
+cutThrough-closes-Ψ : ∀ {n} {Γ : Ctx n} {t} (Ψ : ℕ)
+  (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  eventsΨ? Ψ (proj₁ (proj₂ (cutThrough nid d wm dy reg))) ≡ true
+cutThrough-closes-Ψ Ψ nid d wm dy []                     = refl
+cutThrough-closes-Ψ Ψ nid d wm dy ((rid , src , ch) ∷ r)
+  with pathHasNode nid (proj₂ ch) | cutThrough nid d wm dy r
+     | cutThrough-closes-Ψ Ψ nid d wm dy r
+... | false | _ | ih = ih
+... | true  | _ | ih with any (_≡ᵇ rid) d ∧ memberSource src dy
+...   | true  = ih
+...   | false = ∧-intro refl ih
+
+wet-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (sf : Gas) (id : Id) (now : Tick)
+  (nid : NodeId) (path′ : Path Γ s t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (take-f nid ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  let r = stepFrame sf id now (take-f nid) path′ vals fin sched st in
+  capsOK? (frameStep (J + j′) c)
+          (proj₁ (proj₂ (proj₂ (proj₂ r))))
+          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+  WetFace c sl Ψ J j′ r
+wet-take {e = e} {s = s} c sl Ψ J j′ sf id now nid path′ vals fin sched st
+         ok pb vb rg hC hV =
+  go (lookupNode nid (EvalSt.nodes st))
+  where
+  vΨ : valsΨ? Ψ vals ≡ true
+  vΨ = proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
+
+  rΨ : regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true
+  rΨ = regP?-Ψ c Ψ J (EvalSt.registry st) rg
+
+  go : (mns : Maybe (NodeState _)) →
+       WetFace {e = e} {u = s} c sl Ψ J j′ (takeDispatch nid vals fin sched st mns)
+  -- THE CUT: the registry is filtered and the live set swept, both of
+  -- which only DROP entries; the node write is `take-st zero`, on which
+  -- `fnCapNode` is `true` outright
+  go (just (take-st k)) with proj₂ (proj₂ (takeVals k vals))
+  ... | true  = proj₁ (proj₁ ok)
+              , ∧-intro (sweepLive-fnCap Ψ
+                          (proj₁ (cutThrough nid (EvalSt.delivered st)
+                                    (EvalSt.regWatermark st) (EvalSt.dying st)
+                                    (EvalSt.registry st)))
+                          (Sched.live sched)
+                          (fcB-live Ψ sched st (proj₂ ok)))
+                        (setNode-fnCap Ψ nid (take-st zero) (EvalSt.nodes st) refl
+                          (fcB-nodes Ψ sched st (proj₂ ok)))
+              , takeVals-Ψ Ψ k vals vΨ
+              , cutThrough-keptP (λ {v} p → pathBΨ? Ψ p) nid (EvalSt.delivered st)
+                  (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st) rΨ
+              , cutThrough-closes-caps (frameStep (J + j′) c) sl nid
+                  (EvalSt.delivered st) (EvalSt.regWatermark st) (EvalSt.dying st)
+                  (EvalSt.registry st)
+              , cutThrough-closes-Ψ Ψ nid (EvalSt.delivered st)
+                  (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st)
+  -- NO CUT: the counter is written back and nothing else moves
+  ... | false = proj₁ (proj₁ ok)
+              , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
+                        (setNode-fnCap Ψ nid
+                          (take-st (proj₁ (proj₂ (takeVals k vals))))
+                          (EvalSt.nodes st) refl
+                          (fcB-nodes Ψ sched st (proj₂ ok)))
+              , takeVals-Ψ Ψ k vals vΨ
+              , rΨ , refl , refl
+  go (just (scan-st _))       = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+  go (just (merge-st _ _))    = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+  go (just (concat-st _ _ _)) = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+  go (just (switch-st _ _))   = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+  go (just (exhaust-st _ _))  = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+  go nothing                  = wet-nil {u = s} c sl Ψ J j′ fin sched st ok rg
+
+------------------------------------------------------------------
+-- § 2.4c  THE SCAN LEAF — also a REAL PROOF, cribbed from
+-- `stepFrame-scan-wet` (Wet:441), the same clause proven against the
+-- capᴱ ledger.  The one difference that matters: the caps half is NOT
+-- re-derived (the assembly already holds it), so this needs only the
+-- fnCap half of the node lookup — hence `lookupNode-fnCap` below rather
+-- than the two-sided `lookupNode-B`, whose `boundedNode` premise
+-- nothing at this level can pay.
+
+-- the fnCap-ONLY half of `lookupNode-B` (Wet:416)
+NodeΨ : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Set
+NodeΨ Ψ nothing   = ⊤
+NodeΨ Ψ (just ns) = fnCapNode Ψ ns ≡ true
+
+lookupNode-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) nodes ≡ true →
+  NodeΨ Ψ (lookupNode nid nodes)
+lookupNode-fnCap Ψ nid []            h = tt
+lookupNode-fnCap Ψ nid ((k , ns) ∷ r) h with k ≡ᵇ nid
+... | true  = proj₁ (∧-true _ _ h)
+... | false = lookupNode-fnCap Ψ nid r (proj₂ (∧-true _ _ h))
+
+-- All ↔ all, the Ψ direction only (Wet's allB-* pair carries the size
+-- half alongside, which this leaf never sees)
+allΨ-to : ∀ {n} {Γ : Ctx n} {s} (Ψ : ℕ) (vs : List (Val Γ s)) →
+  valsΨ? Ψ vs ≡ true → All (λ v → fnCapᵛ s v ≤ Ψ) vs
+allΨ-to Ψ []       h = []ᵃ
+allΨ-to Ψ (v ∷ vs) h =
+  ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ h))) ∷ᵃ allΨ-to Ψ vs (proj₂ (∧-true _ _ h))
+
+allΨ-of : ∀ {n} {Γ : Ctx n} {s} (Ψ : ℕ) (vs : List (Val Γ s)) →
+  All (λ v → fnCapᵛ s v ≤ Ψ) vs → valsΨ? Ψ vs ≡ true
+allΨ-of Ψ []       h          = refl
+allΨ-of Ψ (v ∷ vs) (p ∷ᵃ ps) = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ p)) (allΨ-of Ψ vs ps)
+
+wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (sl : Slots Γ) (Ψ J j′ : ℕ)
+  (sf : Gas) (id : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (path′ : Path Γ u t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (scan-f fn nid ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  let r = stepFrame sf id now (scan-f fn nid) path′ vals fin sched st in
+  capsOK? (frameStep (J + j′) c)
+          (proj₁ (proj₂ (proj₂ (proj₂ r))))
+          (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+  valsCaps? (frameStep (J + j′) c) sl (proj₁ r) ≡ true →
+  WetFace c sl Ψ J j′ r
+wet-scan {s = s} {u = u} c sl Ψ J j′ sf id now fn nid path′ vals fin sched st
+         ok pb vb rg hC hV
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st (proj₂ ok))
+... | nothing                | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+... | just (take-st _)       | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+... | just (merge-st _ _)    | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+... | just (concat-st _ _ _) | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+... | just (switch-st _ _)   | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+... | just (exhaust-st _ _)  | _ = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+-- the accumulator type must match the frame's output type, and when it
+-- does not the branch is inert too
+... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
+...   | no _    = wet-nil {u = u} c sl Ψ J j′ fin sched st ok rg
+...   | yes refl =
+      proj₁ (proj₁ ok)
+    , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
+              (setNode-fnCap Ψ nid (scan-st (proj₂ run)) (EvalSt.nodes st)
+                (T⇒≡true _ (≤⇒≤ᵇ (proj₁ fcRun)))
+                (fcB-nodes Ψ sched st (proj₂ ok)))
+    , allΨ-of Ψ (proj₁ run) (proj₂ fcRun)
+    , regP?-Ψ c Ψ J (EvalSt.registry st) rg , refl , refl
+  where
+  run   = scanVals fn ac vals
+  capfn = ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true (frameBΨ? Ψ (scan-f fn nid))
+                                        (pathBΨ? Ψ path′)
+            (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c))
+                                    (scan-f fn nid ↠ path′))
+                           (pathBΨ? Ψ (scan-f fn nid ↠ path′)) pb)))))
+  vΨ    = proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
+  fcRun = scanVals-fnCap Ψ fn ac vals capfn
+            (≤ᵇ⇒≤ _ _ (T-to nb)) (allΨ-to Ψ vals vΨ)
+
+------------------------------------------------------------------
 -- § 2.5  THE DISPATCHER — one clause per frame constructor, so the
 -- assembly below never case-splits and the five leaves stay separable.
 wet-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
