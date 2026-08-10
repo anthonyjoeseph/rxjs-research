@@ -17,10 +17,8 @@
 #                       commit — git is the archive.
 #
 # Format: <filename> | <CLASS> | <one-line note>
-Battery-Anchor-Fit.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Batch-Online.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Burst-Done.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Caps-Init.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Depth-Iter.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Done-Thread.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Eval-Laws.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -30,13 +28,11 @@ Battery-Mu-Emissions.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on
 Battery-Nesting-Escalation.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Obs-Growth.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Reached-Sizes.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Readme.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-VWF-Prop.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Value-Count.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Burst-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 BurstLen-SyncSize-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Caps-Thread-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Chain-Descent-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Chain-Half-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Charge-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Concat-Frame-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -47,17 +43,12 @@ Cut-Caches-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on nex
 Dep0-Walk-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Depth-Blowup-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Depth-Compositional-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Depth-Discharge-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Depth-Mirror-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Depth-Wire-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Entry-Caps-Refuted.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Eval-Growth-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Fold-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Frame-Mint-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Frame-Work-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Fuel-Room-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Hop-Descent-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Import-Cost-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Inner-Step-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Instant-Height-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Instant-Height-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -77,7 +68,6 @@ Nest-Count-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next
 Nest-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Nest-Supply-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Of-Fits-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Payload-Share-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Queue-Push-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Refresh-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Rung-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
