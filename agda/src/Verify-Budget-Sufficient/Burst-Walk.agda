@@ -56,7 +56,7 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Burst-Walk where
 
-open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_)
+open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; not)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
@@ -84,6 +84,7 @@ open import Rx.Evaluator
          NodeId; NodeState; takeDispatch; takeVals; cutThrough;
          lookupNode; setNode; sweepLive; pathHasNode; memberSource; scanVals;
          innerFinish; concatDrain; aliveThroughᶠ;
+         mergeBump; switchKill; thruConsume; thruWalk; thruWrap;
          scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st)
 
 -- re-exports .Caps (frameStep, capsAt, sizeCount, the mono kit) and
@@ -306,30 +307,6 @@ postulate
      × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
      × (valsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
      × (eventsΨ? Ψ (proj₁ (proj₂ (proj₂ r))) ≡ true)
-
-  -- THRU-OUTER is `thruWrap op nid fin (thruWalk …)`, and the two
-  -- halves are nothing alike: `thruWalk` subscribes once per payload
-  -- (the real content), while `thruWrap` only sets the node's `done`
-  -- FLAG.  SPLITTING THEM WAS TRIED 2026-08-10 AND REJECTED — the
-  -- caps receipts that forced the two halves together are gone with
-  -- the Ψ-pure restatement, but the transparency finding stands and
-  -- is what makes the wrap disposable in one step:
-  --   * THE WRAP IS fnCap-TRANSPARENT.  Payloads, events and schedule
-  --     pass through untouched; of the four nodes it rewrites, three
-  --     have `fnCapNode` ≡ `true` outright and `concat-st`'s measure
-  --     reads the queue `q`, which the rewrite does not touch.
-  --     Combine `lookupNode-fnCap` (§ 2.4c) with `setNode-fnCap`.
-  wet-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
-    (sf : Gas) (id : Id) (now : Tick)
-    (op : AllOp) (nid : NodeId)
-    (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (thru-outer op nid ↠ path′) ≡ true →
-    VbB c sl Ψ J vals ≡ true →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    WetFace sl Ψ (stepFrame sf id now (thru-outer op nid) path′ vals fin sched st)
 
 -- § 2.4  THE MAP LEAF — a REAL PROOF.  `stepFrame` on a map-f touches
 -- no state and emits no events, so five of the six conjuncts pass
@@ -852,6 +829,356 @@ wet-inner c sl Ψ J sf id now op a i path′ vals true sched st ok pb vb rg
                                (valsΨ? Ψ vals) vb)) rg
 ... | false = wet-innerFinish c sl Ψ J sf id now op a i path′ vals sched st
                 ok pb vb rg
+
+------------------------------------------------------------------
+-- § 2.4f  THE THRU-OUTER LEAF.  `stepFrame (thru-outer op nid) =
+-- thruWrap op nid fin (thruWalk …)`.  Helpers in dependency order:
+-- mergeBump-fnCap, switchKill-Ψ, concatConsume-Ψ, thruConsume-Ψ,
+-- thruWalk-Ψ, thruWrap-Ψ, then the assembly `wet-thru`.
+
+mergeBump-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (nid : NodeId) (done : Bool)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) nodes ≡ true →
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) (mergeBump nid done nodes) ≡ true
+mergeBump-fnCap Ψ nid done nodes h with lookupNode nid nodes
+... | just (merge-st k od) =
+    setNode-fnCap Ψ nid (merge-st (if done then k else suc k) od) nodes refl h
+... | just (scan-st _)       = h
+... | just (take-st _)       = h
+... | just (switch-st _ _)   = h
+... | just (concat-st _ _ _) = h
+... | just (exhaust-st _ _)  = h
+... | nothing                = h
+
+switchKill-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (Ψ : ℕ) (cur : Maybe NodeId)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  fnCapBounded? Ψ sched st ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+  let r      = switchKill cur sched st
+      sched′ = proj₁ (proj₂ r)
+      st′    = proj₂ (proj₂ r)
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (eventsΨ? Ψ (proj₁ r) ≡ true)
+switchKill-Ψ sl Ψ nothing sched st slEq fc rg =
+  slEq , fc , rg , refl
+switchKill-Ψ sl Ψ (just v) sched st slEq fc rg =
+  slEq
+  , ∧-intro
+      (sweepLive-fnCap Ψ kept (Sched.live sched) (fcB-live Ψ sched st fc))
+      (fcB-nodes Ψ sched st fc)
+  , cutThrough-keptP (λ {w} p → pathBΨ? Ψ p) v
+      (EvalSt.delivered st) (EvalSt.regWatermark st)
+      (EvalSt.dying st) (EvalSt.registry st) rg
+  , cutThrough-closes-Ψ Ψ v
+      (EvalSt.delivered st) (EvalSt.regWatermark st)
+      (EvalSt.dying st) (EvalSt.registry st)
+  where
+  kept = proj₁ (cutThrough v (EvalSt.delivered st) (EvalSt.regWatermark st)
+                  (EvalSt.dying st) (EvalSt.registry st))
+
+concatConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  fnCapBounded? Ψ sched st ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+  valΨ? Ψ (obs u) o ≡ true →
+  pathBΨ? Ψ κ ≡ true →
+  let r      = thruConsume g concatᵒ nid κ id now o sched st
+      sched′ = proj₁ (proj₂ (proj₂ r))
+      st′    = proj₂ (proj₂ (proj₂ r))
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (valsΨ? Ψ (proj₁ r) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+concatConsume-Ψ {u = u} sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st fc)
+... | just (concat-st {w} q true od) | qB with w ≟ᵗ u
+...   | yes refl =
+    slEq
+    , ∧-intro (fcB-live Ψ sched st fc)
+               (setNode-fnCap Ψ nid (concat-st (q ++ o ∷ []) true od)
+                  (EvalSt.nodes st)
+                  (all-++-intro _ q (o ∷ []) qB (∧-intro oΨ refl))
+                  (fcB-nodes Ψ sched st fc))
+    , rg , refl , refl
+...   | no _     = slEq , fc , rg , refl , refl
+concatConsume-Ψ {u = u} sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | just (concat-st q false od) | _ =
+  slEq₁
+  , ∧-intro (fcB-live Ψ sched₁ st₁ fc₁)
+             (setNode-fnCap Ψ nid (concat-st {t = u} [] (not done) od)
+                (EvalSt.nodes st₁) refl (fcB-nodes Ψ sched₁ st₁ fc₁))
+  , rg₁ , vsΨ , bsΨ
+  where
+  R      = subscribeInner g concatᵒ nid κ id now o sched st
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  SI     = subscribeInner-Ψ sl Ψ g concatᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
+  slEq₁  = proj₁ SI
+  fc₁    = proj₁ (proj₂ SI)
+  rg₁    = proj₁ (proj₂ (proj₂ SI))
+  vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | nothing                | _ = slEq , fc , rg , refl , refl
+concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | just (scan-st _)       | _ = slEq , fc , rg , refl , refl
+concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | just (take-st _)       | _ = slEq , fc , rg , refl , refl
+concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | just (merge-st _ _)    | _ = slEq , fc , rg , refl , refl
+concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | just (switch-st _ _)   | _ = slEq , fc , rg , refl , refl
+concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+    | just (exhaust-st _ _)  | _ = slEq , fc , rg , refl , refl
+
+thruConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  fnCapBounded? Ψ sched st ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+  valΨ? Ψ (obs u) o ≡ true →
+  pathBΨ? Ψ κ ≡ true →
+  let r      = thruConsume g op nid κ id now o sched st
+      sched′ = proj₁ (proj₂ (proj₂ r))
+      st′    = proj₂ (proj₂ (proj₂ r))
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (valsΨ? Ψ (proj₁ r) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+thruConsume-Ψ sl Ψ g concatᵒ nid κ id now o sched st slEq fc rg oΨ pΨ =
+  concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+thruConsume-Ψ sl Ψ g mergeᵒ nid κ id now o sched st slEq fc rg oΨ pΨ =
+  slEq₁
+  , ∧-intro (fcB-live Ψ sched₁ st₁ fc₁)
+             (mergeBump-fnCap Ψ nid done (EvalSt.nodes st₁) (fcB-nodes Ψ sched₁ st₁ fc₁))
+  , rg₁ , vsΨ , bsΨ
+  where
+  R      = subscribeInner g mergeᵒ nid κ id now o sched st
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  SI     = subscribeInner-Ψ sl Ψ g mergeᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
+  slEq₁  = proj₁ SI
+  fc₁    = proj₁ (proj₂ SI)
+  rg₁    = proj₁ (proj₂ (proj₂ SI))
+  vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+thruConsume-Ψ sl Ψ g switchᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) =
+  slEq₂
+  , ∧-intro (fcB-live Ψ sched₂ st₂ fc₂)
+             (setNode-fnCap Ψ nid (switch-st (if done then nothing else just inst) od)
+                (EvalSt.nodes st₂) refl (fcB-nodes Ψ sched₂ st₂ fc₂))
+  , rg₂
+  , vsΨ
+  , all-++-intro _ closes bs (proj₂ (proj₂ (proj₂ SK))) bsΨ
+  where
+  KILL   = switchKill cur sched st
+  closes = proj₁ KILL
+  sched₁ = proj₁ (proj₂ KILL)
+  st₁    = proj₂ (proj₂ KILL)
+  SK     = switchKill-Ψ sl Ψ cur sched st slEq fc rg
+  slEq₁  = proj₁ SK
+  fc₁    = proj₁ (proj₂ SK)
+  rg₁    = proj₁ (proj₂ (proj₂ SK))
+  R      = subscribeInner g switchᵒ nid κ id now o sched₁ st₁
+  sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  inst   = proj₁ R
+  bs     = proj₁ (proj₂ (proj₂ R))
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  SI     = subscribeInner-Ψ sl Ψ g switchᵒ nid κ id now o sched₁ st₁ slEq₁ fc₁ rg₁ oΨ pΨ
+  slEq₂  = proj₁ SI
+  fc₂    = proj₁ (proj₂ SI)
+  rg₂    = proj₁ (proj₂ (proj₂ SI))
+  vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+... | nothing                = slEq , fc , rg , refl , refl
+... | just (scan-st _)       = slEq , fc , rg , refl , refl
+... | just (take-st _)       = slEq , fc , rg , refl , refl
+... | just (merge-st _ _)    = slEq , fc , rg , refl , refl
+... | just (concat-st _ _ _) = slEq , fc , rg , refl , refl
+... | just (exhaust-st _ _)  = slEq , fc , rg , refl , refl
+thruConsume-Ψ sl Ψ g exhaustᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st false od) =
+  slEq₁
+  , ∧-intro (fcB-live Ψ sched₁ st₁ fc₁)
+             (setNode-fnCap Ψ nid (exhaust-st (not done) od)
+                (EvalSt.nodes st₁) refl (fcB-nodes Ψ sched₁ st₁ fc₁))
+  , rg₁ , vsΨ , bsΨ
+  where
+  R      = subscribeInner g exhaustᵒ nid κ id now o sched st
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  SI     = subscribeInner-Ψ sl Ψ g exhaustᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
+  slEq₁  = proj₁ SI
+  fc₁    = proj₁ (proj₂ SI)
+  rg₁    = proj₁ (proj₂ (proj₂ SI))
+  vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+  bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+... | just (exhaust-st true od)  = slEq , fc , rg , refl , refl
+... | nothing                    = slEq , fc , rg , refl , refl
+... | just (scan-st _)           = slEq , fc , rg , refl , refl
+... | just (take-st _)           = slEq , fc , rg , refl , refl
+... | just (merge-st _ _)        = slEq , fc , rg , refl , refl
+... | just (concat-st _ _ _)     = slEq , fc , rg , refl , refl
+... | just (switch-st _ _)       = slEq , fc , rg , refl , refl
+
+thruWalk-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  fnCapBounded? Ψ sched st ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+  valsΨ? Ψ vals ≡ true →
+  pathBΨ? Ψ κ ≡ true →
+  let r      = thruWalk g op nid κ id now vals sched st
+      sched′ = proj₁ (proj₂ (proj₂ r))
+      st′    = proj₂ (proj₂ (proj₂ r))
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (valsΨ? Ψ (proj₁ r) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+thruWalk-Ψ sl Ψ g op nid κ id now [] sched st slEq fc rg vsΨ pΨ =
+  slEq , fc , rg , refl , refl
+thruWalk-Ψ sl Ψ g op nid κ id now (o ∷ os) sched st slEq fc rg vsΨ pΨ
+  with thruConsume g op nid κ id now o sched st
+     | thruConsume-Ψ sl Ψ g op nid κ id now o sched st
+         slEq fc rg (proj₁ (∧-true _ _ vsΨ)) pΨ
+... | (vs , bs , sched₁ , st₁) | (slEq₁ , fc₁ , rg₁ , vsΨ₁ , bsΨ₁)
+  with thruWalk g op nid κ id now os sched₁ st₁
+     | thruWalk-Ψ sl Ψ g op nid κ id now os sched₁ st₁
+         slEq₁ fc₁ rg₁ (proj₂ (∧-true _ _ vsΨ)) pΨ
+... | (vs′ , bs′ , sched₂ , st₂) | (slEq₂ , fc₂ , rg₂ , vsΨ₂ , bsΨ₂) =
+  slEq₂ , fc₂ , rg₂
+  , all-++-intro _ vs vs′ vsΨ₁ vsΨ₂
+  , all-++-intro _ bs bs′ bsΨ₁ bsΨ₂
+
+thruWrap-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (Ψ : ℕ) (op : AllOp) (nid : NodeId) (fin : Bool)
+  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (proj₂ r))) ≡ sl →
+  fnCapBounded? Ψ (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r))) ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p)
+        (EvalSt.registry (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+  valsΨ? Ψ (proj₁ r) ≡ true →
+  eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true →
+  let w  = thruWrap op nid fin r
+      ws = proj₁ (proj₂ (proj₂ (proj₂ w)))
+      wt = proj₂ (proj₂ (proj₂ (proj₂ w)))
+  in (Sched.slots ws ≡ sl)
+   × (fnCapBounded? Ψ ws wt ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry wt) ≡ true)
+   × (valsΨ? Ψ (proj₁ w) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ w)) ≡ true)
+thruWrap-Ψ sl Ψ op nid false (vs , bs , sched , st) slEq fc rg vsΨ bsΨ =
+  slEq , fc , rg , vsΨ , bsΨ
+thruWrap-Ψ sl Ψ mergeᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (merge-st k od) =
+    slEq
+  , ∧-intro (fcB-live Ψ sched st fc)
+             (setNode-fnCap Ψ nid (merge-st k true) (EvalSt.nodes st) refl
+               (fcB-nodes Ψ sched st fc))
+  , rg , vsΨ , bsΨ
+... | just (scan-st _)       = slEq , fc , rg , vsΨ , bsΨ
+... | just (take-st _)       = slEq , fc , rg , vsΨ , bsΨ
+... | just (switch-st _ _)   = slEq , fc , rg , vsΨ , bsΨ
+... | just (concat-st _ _ _) = slEq , fc , rg , vsΨ , bsΨ
+... | just (exhaust-st _ _)  = slEq , fc , rg , vsΨ , bsΨ
+... | nothing                = slEq , fc , rg , vsΨ , bsΨ
+thruWrap-Ψ sl Ψ concatᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st fc)
+... | just (concat-st q act od) | qB =
+    slEq
+  , ∧-intro (fcB-live Ψ sched st fc)
+             (setNode-fnCap Ψ nid (concat-st q act true) (EvalSt.nodes st) qB
+               (fcB-nodes Ψ sched st fc))
+  , rg , vsΨ , bsΨ
+... | just (scan-st _)       | _ = slEq , fc , rg , vsΨ , bsΨ
+... | just (take-st _)       | _ = slEq , fc , rg , vsΨ , bsΨ
+... | just (merge-st _ _)    | _ = slEq , fc , rg , vsΨ , bsΨ
+... | just (switch-st _ _)   | _ = slEq , fc , rg , vsΨ , bsΨ
+... | just (exhaust-st _ _)  | _ = slEq , fc , rg , vsΨ , bsΨ
+... | nothing                | _ = slEq , fc , rg , vsΨ , bsΨ
+thruWrap-Ψ sl Ψ switchᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) =
+    slEq
+  , ∧-intro (fcB-live Ψ sched st fc)
+             (setNode-fnCap Ψ nid (switch-st cur true) (EvalSt.nodes st) refl
+               (fcB-nodes Ψ sched st fc))
+  , rg , vsΨ , bsΨ
+... | just (scan-st _)       = slEq , fc , rg , vsΨ , bsΨ
+... | just (take-st _)       = slEq , fc , rg , vsΨ , bsΨ
+... | just (merge-st _ _)    = slEq , fc , rg , vsΨ , bsΨ
+... | just (concat-st _ _ _) = slEq , fc , rg , vsΨ , bsΨ
+... | just (exhaust-st _ _)  = slEq , fc , rg , vsΨ , bsΨ
+... | nothing                = slEq , fc , rg , vsΨ , bsΨ
+thruWrap-Ψ sl Ψ exhaustᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act od) =
+    slEq
+  , ∧-intro (fcB-live Ψ sched st fc)
+             (setNode-fnCap Ψ nid (exhaust-st act true) (EvalSt.nodes st) refl
+               (fcB-nodes Ψ sched st fc))
+  , rg , vsΨ , bsΨ
+... | just (scan-st _)       = slEq , fc , rg , vsΨ , bsΨ
+... | just (take-st _)       = slEq , fc , rg , vsΨ , bsΨ
+... | just (merge-st _ _)    = slEq , fc , rg , vsΨ , bsΨ
+... | just (concat-st _ _ _) = slEq , fc , rg , vsΨ , bsΨ
+... | just (switch-st _ _)   = slEq , fc , rg , vsΨ , bsΨ
+... | nothing                = slEq , fc , rg , vsΨ , bsΨ
+
+wet-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
+  (sf : Gas) (id : Id) (now : Tick)
+  (op : AllOp) (nid : NodeId)
+  (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (thru-outer op nid ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  WetFace sl Ψ (stepFrame sf id now (thru-outer op nid) path′ vals fin sched st)
+wet-thru c sl Ψ J sf id now op nid path′ vals fin sched st ok pb vb rg =
+  let wk = thruWalk-Ψ sl Ψ sf op nid path′ id now vals sched st
+             (proj₁ (proj₁ ok))
+             (proj₂ ok)
+             (regP?-Ψ c Ψ J (EvalSt.registry st) rg)
+             (proj₂ (∧-true _ _ vb))
+             (proj₂ (∧-true _ _ pb))
+      r  = thruWalk sf op nid path′ id now vals sched st
+      wr = thruWrap-Ψ sl Ψ op nid fin r
+             (proj₁ wk)
+             (proj₁ (proj₂ wk))
+             (proj₁ (proj₂ (proj₂ wk)))
+             (proj₁ (proj₂ (proj₂ (proj₂ wk))))
+             (proj₂ (proj₂ (proj₂ (proj₂ wk))))
+  in proj₁ wr
+   , proj₁ (proj₂ wr)
+   , proj₁ (proj₂ (proj₂ (proj₂ wr)))
+   , proj₁ (proj₂ (proj₂ wr))
+   , proj₂ (proj₂ (proj₂ (proj₂ wr)))
 
 ------------------------------------------------------------------
 -- § 2.5  THE DISPATCHER — one clause per frame constructor, so the
