@@ -295,6 +295,37 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > frame-local fact. That is the postulate to state next, and it is the same
 > shape the `subscribeInner` face (`siC`) already carries.
 >
+> **THE RULING THAT FALLS OUT — `Dm` AND THE TOWER ARE NOT ON THE PATH
+> FOR THESE TWO.** Chase the caps route to its end and it lands on the dry
+> family's own target without ever mentioning `Dm`:
+>
+>   1. the caps-indexed walk gives `burstCaps? (frameStep lvl c) sl str`
+>      with `lvl` bounded, at ONE witness (rehearsed, compiles);
+>   2. `cascadeGo-caps` (Caps-Face:4345) already bounds the cascade's level
+>      by `sizeCount c d` — it just does not carry a burst conjunct there,
+>      which is precisely the hole (1) fills;
+>   3. **`capsAt-suc-full` (Caps.agda:893) is `refl`**:
+>      `capsAt e sl (suc id) ≡ frameStep (sizeCount (capsAt e sl id) (capsH e sl id)) (capsAt e sl id)`.
+>      So `frameStep lvl c ⊑ᶜ capsAt e sl (suc id)` for any `lvl ≤ sizeCount …`,
+>      and `burstCaps?-widen` carries the burst up to `capsAt e sl (suc id)`;
+>   4. whose `cSize` IS `Ŝ = sizeCapAt e sl (suc id)` — `chainStep-dry` /
+>      `foldPath-dry`'s conclusion.
+>
+> `tick-covers-instant` / `count-covers-tower` stay wired (`subscribeInner-dry`
+> still consumes them), but they are NOT needed for these two. **This does not
+> make the anchor free — it RELOCATES its content**, off "a demand model with a
+> tower-sized constant" and onto "the landing level fits `sizeCount`", which is
+> what the entire caps machinery was built to prove. That is a better place for
+> it to live: it is the same obligation `budget-sufficient` already carries,
+> instead of a second, independent, measured-not-proven numeric model.
+>
+> **NEXT, in order:** (i) extend the cascade receipt with the burst conjunct at
+> the same `j` via the caps-indexed walk — one new postulate,
+> `stepFrame-burst-face`, and only its events half is genuinely open;
+> (ii) state the caps→wet flavour bridge (the `fnCapᵛ ≤ Ψ` conjunct is wet-only
+> and must come from `INV?`'s `fnCapBounded?`, not from the caps face);
+> (iii) rewrite `chainStep-dry` / `foldPath-dry` over (i)+(ii)+`capsAt-suc-full`.
+>
 > The discharges of #6 and #7 have a common shape worth naming: **both postulates
 > carried a pile of leading hypotheses that the eventual proof did not use.**
 > #6 shed seven expression-level lemmas (its proof is pure level arithmetic);
