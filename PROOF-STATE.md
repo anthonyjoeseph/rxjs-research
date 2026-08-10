@@ -89,6 +89,23 @@ fix the pointer.
 >   The verdict survived on other grounds (no named theorem to land, numbers
 >   already in src), but **a census row for a file with zero extracted
 >   definitions carries no information — check the extraction before the count.**
+>   A second instance of the same class: a name containing `→`
+>   (`not-true→false`) falls outside a `[\w\-?]` character class, so the
+>   signature never matches and the definition drops out of the count
+>   ENTIRELY — `Wf-Aux-Probe` read as "1 theorem, all landed" when it has
+>   three, two of them unlanded. Both blind spots err toward "nothing here",
+>   which is the direction that gets things deleted. **Re-extract permissively
+>   (`^(\S+)\s+:`) before acting on any census row.**
+>
+> **AND THE METRIC ITSELF WAS MIS-FRAMED AT FIRST.** The census counts names
+> defined in a probe that also appear in src, and that was initially read as
+> "src consumes this probe". It cannot: `agda/probe` is outside the build and
+> src never imports from it, so the number is a NAME COLLISION count, i.e. **how
+> much of the probe already landed**. That inverts the worklist — a HIGH count
+> means duplicate and is the cheap, safe deletion; a LOW count means unlanded
+> and needs judgement. The per-file verdicts held because each was made by
+> reading the src comment rather than the number, but the sweep order was
+> backwards for several rounds.
 
 ## The theorem chain (top → leaves)
 
