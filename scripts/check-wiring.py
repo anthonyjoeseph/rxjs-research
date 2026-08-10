@@ -1378,6 +1378,32 @@ def main():
                         f"{len(ghost_lines)} PROBES.txt line(s) whose file is gone"
                     )
 
+        # (C2) DANGLING MAKE TARGETS — the OTHER end of a probe deletion.
+        # C1 catches a PROBES.txt line whose file is gone; nothing caught a
+        # `make <x>-probe` target whose file is gone, so `make visited-width-
+        # probe` and `make frame-mint-probe` both sat broken after their
+        # files were deleted 2026-08-09 (agda exits 42, "Cannot read file").
+        # A probe's make target is its user-facing surface: deleting the file
+        # without the target leaves a command that only fails when someone
+        # runs it.  Scanned in the Makefile only — scripts/measure.sh names a
+        # probe path it GENERATES at runtime, which is not a dangling ref.
+        dangling_targets = []
+        mk_path = os.path.abspath(os.path.join(src_dir, "..", "..", "Makefile"))
+        if os.path.isfile(mk_path) and os.path.isdir(probe_dir):
+            agda_dir = os.path.dirname(probe_dir)
+            with open(mk_path, encoding="utf-8") as fh:
+                for lineno, line in enumerate(fh, 1):
+                    if line.lstrip().startswith("@echo"):
+                        continue  # help text, not a recipe
+                    for ref in re.findall(r"probe/[A-Za-z0-9_-]+\.agda", line):
+                        if not os.path.isfile(os.path.join(agda_dir, ref)):
+                            dangling_targets.append(f"Makefile:{lineno}: {ref}")
+            if dangling_targets:
+                problems.append(
+                    f"{len(dangling_targets)} Makefile recipe(s) naming a "
+                    "deleted probe file"
+                )
+
         if problems:
             print()
             print("=" * 78)
@@ -1420,6 +1446,12 @@ def main():
                 print()
                 print("GHOST LEDGER LINES — file deleted; remove the line:")
                 for name in ghost_lines:
+                    print(f"  {name}")
+            if dangling_targets:
+                print()
+                print("DANGLING MAKE RECIPES — probe file deleted; remove the")
+                print("target, its .PHONY entry, and its `make help` blurb:")
+                for name in dangling_targets:
                     print(f"  {name}")
             sys.exit(1)
         print()

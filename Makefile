@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe frame-mint-probe nest-count-probe instant-height-probe visited-width-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache unsafe-check wiring entry-caps-refuted level-walk-probe sub-charge-probe nest-budget-probe refresh-probe nest-count-probe instant-height-probe mult-width-probe burst-probe cut-caches-probe hop-descent-probe frame-work-probe state-blowup-probe j-budget-probe fold-count-probe mint-loop-probe joint-probe eval-growth-probe width-count-probe charge-probe chain-half-probe share-count-probe count-level-probe concat-sum-probe rung-count-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -127,12 +127,6 @@ help:
 	@echo "                  the four composition-gate steps re-proven; then names"
 	@echo "                  the one number still unruled: what the fuel is set to"
 	@echo "                  (see agda/probe/Refresh-Probe.agda).  Seconds"
-	@echo "  frame-mint-probe  what does ONE stepFrame mint, and how wide is the"
-	@echo "                  burst it is handed?  the per-FRAME maxima the two"
-	@echo "                  entry axioms bound.  Mints are 1 on every row of the"
-	@echo "                  amplifier family (against a cSize floor of 3-18); the"
-	@echo "                  frame WIDTH climbs across arrivals, 6 to 120"
-	@echo "                  (see agda/probe/Frame-Mint-Probe.agda).  ~4 min"
 	@echo "  joint-probe   is subscribeE-caps's joint hypothesis, pathLen + size"
 	@echo "                  <= cSize, true at the TIGHT admissible cSize?  NO — it"
 	@echo "                  fails on every one of seventeen families, and the"
@@ -170,14 +164,6 @@ help:
 	@echo "                  ones), and the BASE, where the whole root-fuel"
 	@echo "                  margin goes (see agda/probe/Mult-Width-Probe.agda)"
 	@echo "                  Fast, ~15 s"
-	@echo "  visited-width-probe  the ruling off slot-fuel-probe, measured:"
-	@echo "                  the slot descent drops VISITED slots instead of"
-	@echo "                  spending fuel, so a revisit contributes zero."
-	@echo "                  The 2-cycle's four tower stories collapse to a"
-	@echo "                  fixed point; acyclic telescopes agree by refl;"
-	@echo "                  the base height fits 3 + 2*sz (16 against 689"
-	@echo "                  where the fuel form demanded 792)"
-	@echo "                  (see agda/probe/Visited-Width-Probe.agda).  Fast"
 	@echo "  charge-probe  does one cascade's j fit D * cSize?  NO - the"
 	@echo "                  receipt-weighted j breaches it on the deepening"
 	@echo "                  scan, and twice over when a second scan sits"
@@ -438,14 +424,6 @@ nest-budget-probe:
 refresh-probe:
 	cd agda && agda -i src -i probe probe/Refresh-Probe.agda
 
-# The gate on the two frame-local axioms cascadeGo-deliveries WAS proven
-# from.  Mint-Loop-Frames reports mints and frames per CASCADE; these are
-# the per-FRAME MAXIMA, which is what stepFrame-entry-mint and
-# stepFrame-entry-caps bounded before Entry-Caps-Refuted killed them.
-# Same mirror walk, same real stepFrame, ~4 min.
-frame-mint-probe:
-	cd agda && agda -i src -i probe probe/Frame-Mint-Probe.agda
-
 # The gate on repairing the caps tree's two blocked companions.
 # subscribeE-caps hypothesises `pathLen κ + sizeᵉ b ≤ cSize` and the
 # delivery side carries the two bounds SEPARATELY; before the ℓ ledger is
@@ -508,19 +486,6 @@ charge-probe:
 # it.  Fast, ~15 s
 mult-width-probe:
 	cd agda && agda -i src -i probe probe/Mult-Width-Probe.agda
-
-# The ruling Slot-Fuel-Probe prices out, measured before it is ground in:
-# the slot descent stops spending generic fuel and starts DROPPING
-# VISITED SLOTS, so a revisit contributes ZERO (share-connect-no-replay).
-# On that probe's own 2-cycle the fuel measure's four tower stories
-# collapse to a FIXED POINT after two shared entries, and on any ACYCLIC
-# telescope the two descents are equal by refl — which confines the
-# soundness question to telescopes with a slot cycle.  The base-height
-# row that refuted `3 + 2 * sz` is re-run and fits: 16 against 689 where
-# the fuel form demanded 792.  Standalone, so src/Main.agda never
-# reaches it.  Fast.
-visited-width-probe:
-	cd agda && agda -i src -i probe probe/Visited-Width-Probe.agda
 
 # The instant sweep the charge form's V-coverage turns on: VMAX, WSTORE,
 # SSTORE and the receipt-weighted j at instants 0 … 3 on nine families.
