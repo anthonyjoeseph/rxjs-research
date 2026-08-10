@@ -1,3 +1,8 @@
+-- ROADMAP: ROUTE GUARD — the measured store-growth rows the caps tower must keep dominating (Caps-Face.agda:4836).
+-- DELETE WHEN: The-Proof.agda is discharged — a dead route cannot be retried once the proof is done  [T7]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- THE INSTANT-HEIGHT PROBE: how fast do the STORE's two axes climb
 -- ACROSS INSTANTS, and does the receipt's payload width V stay under

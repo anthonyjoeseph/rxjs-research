@@ -1315,6 +1315,73 @@ proofs — it is not knowing what it already has. Grep for a fact before plannin
 its proof; grep for a lemma's consumers before believing any status written
 here — including in this file.
 
+## PROBE ROADMAP TIES — every survivor has a named deletion trigger
+
+**22 files, and not one of them is kept "in case".** Each is tied to a roadmap
+item, and each carries its own `-- ROADMAP:` / `-- DELETE WHEN:` header naming
+the same tie. **The duplication is deliberate cross-checking: if you change one,
+change the other.** A probe whose trigger has fired and which is still on disk is
+a bug in this table, not a judgement call — delete it.
+
+The tie exists because "when does this go?" was previously answered per-session
+from scratch, which is how 60 files accumulated. It is answered here once.
+
+**The eight triggers:**
+
+| id | DELETE the tied probes WHEN … |
+|---|---|
+| **T1** | the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3) |
+| **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
+| **T3** | tier-1 #5's remaining depth postulates are discharged |
+| **T4** | `merge-cert` is stated in src AND discharged (task #33) |
+| **T5** | the five VWF push postulates are discharged |
+| **T6** | `μ-unfold` / `fuel-coherent` / `id-inheritance` are discharged |
+| **T7** | `The-Proof.agda` is discharged — a dead route cannot be retried once the proof is done |
+| **T8** | its last dependent probe is deleted |
+
+**The ties:**
+
+| probe | roadmap item | trigger |
+|---|---|---|
+| `Battery-Nesting-Escalation` | tier-1 #1/#2/#3 — measured basis of `demand` (Anchor-Dry:28) | T1 |
+| `Battery-Obs-Growth` | tier-1 #1/#2/#3 — source of Anchor-Dry:27's `a′ ≤ 2a+v+11` | T1 |
+| `Battery-Reached-Sizes` | tier-1 #1/#2/#3 — establishes `Ŝ := capsH e ins 0` | T1 |
+| `Battery-Value-Count` | tier-1 #1/#2/#3 — REFUTES `sync-count-bounded` | T1 |
+| `Battery-Mu-Emissions` | tier-1 #1/#2/#3 — the μ leg of the composition | T1 |
+| `SubInner-Demand-Probe` | tier-1 #3 — `subscribeInner-demand`'s only coverage | T1 |
+| `Battery-Hop-Premise` | tier-1 #1 — how `hop-edge` premise (iii) discharges | T2 |
+| `Install-Scan-Depth-Probe` | tier-1 #5 — `installScan-depth-bound` | T3 |
+| `Depth-Wire-Probe` | tier-1 #5 — `baseCaps-is-inner`, parked outside the graph by design (Caps-Bridge:1018) | T3 |
+| `Battery-Merge-Cert` | TIER 2, task #33 — the corrected `merge-cert` | T4 |
+| `Battery-VWF-Prop` | TIER 2 — the five VWF push postulates (VWF:1119-1163) | T5 |
+| `Battery-Eval-Laws` | Rx laws — `μ-unfold`, `fuel-coherent`, `id-inheritance` | T6 |
+| `Nest-Budget-Probe` | ROUTE GUARD — `nestᵉ` is the wrong measure (Caps-Face:6294) | T7 |
+| `Nest-Count-Probe` | ROUTE GUARD — per-instant width-count is false (Caps-Face:6299) | T7 |
+| `Level-Walk-Probe` | ROUTE GUARD — `old-cDel≤new-cDel` justifies the live `cDel` (Evaluator:505,572) | T7 |
+| `Joint-Probe` | ROUTE GUARD — joint bound false, so `subscribeE-caps` recurses at `suc j` | T7 |
+| `Instant-Height-Probe` | ROUTE GUARD — store-growth rows the caps tower must keep dominating | T7 |
+| `Charge-Probe` | INFRASTRUCTURE — program families for 4 probes | T8 |
+| `Mint-Loop-Shapes` | INFRASTRUCTURE — measurement harness for 6 probes | T8 |
+| `Instant-Height-Main` | INFRASTRUCTURE — GHC driver for Instant-Height-Probe | T8 |
+| `Nest-Count-Main` | INFRASTRUCTURE — GHC driver for Nest-Count-Probe | T8 |
+| `Measure-Main` | INFRASTRUCTURE — GHC driver for Mint-Loop-Shapes | T8 |
+
+**Why T7 is not "keep forever".** A route-guard's job is to stop a refuted
+approach from being retried while the proof is still being written. Once
+`The-Proof.agda` is discharged there is nothing left to retry, and the guard's
+content survives where it already lives: the src comment that states the
+finding with its numbers. Every T7 file above was checked to have such a
+comment — that is the precondition for the tie, not an assumption.
+
+**T8 is mechanical and has a gate.** `make wiring-gate` § C3 fails on a probe
+importing a module that no longer exists, so an infrastructure file deleted
+early fails loudly instead of silently breaking its dependents.
+
+**One survivor cannot be verified by the compile rule:** `Joint-Probe` does not
+typecheck against `agda/src` BY DESIGN — it builds only inside the instrumented
+scratch project `scripts/joint-probe.sh` creates. Its ledger line says so. It is
+the one file where "it compiles" is not the acceptance test.
+
 ## Debts on next touch (cheap, fold into a pass that dirties the file anyway)
 
 - **Prose that outlived its code:** eight comment references to `measureE` and

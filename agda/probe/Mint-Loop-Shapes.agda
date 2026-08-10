@@ -1,3 +1,8 @@
+-- ROADMAP: INFRASTRUCTURE — measurement harness for Instant-Height-Probe/-Main, Joint-Probe, Measure-Main, Nest-Count-Probe/-Main.
+-- DELETE WHEN: its last dependent probe is deleted  [T8]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- THE MINT-LOOP SHAPES AND MEASURES.  Split out of Mint-Loop-Probe so
 -- that measuring costs only the evaluator: every `refl` wall lives next

@@ -1,3 +1,8 @@
+-- ROADMAP: INFRASTRUCTURE — GHC driver for Instant-Height-Probe's rows.
+-- DELETE WHEN: its last dependent probe is deleted  [T8]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- THE COMPILED HARNESS FOR THE INSTANT SWEEP, Measure-Main's twin.
 --
 -- Every quantity Instant-Height-Probe measures at instant id re-runs the

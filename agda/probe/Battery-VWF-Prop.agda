@@ -1,3 +1,8 @@
+-- ROADMAP: TIER 2 — the five live VWF push postulates (VWF.agda:1119-1163).
+-- DELETE WHEN: the five VWF push postulates are discharged  [T5]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- BATTERY: VWF propagation postulates (Verify-Well-Formed.agda:1105-1174)
 -- Task 0f: probe all six gap postulates with concrete refl checks and
 -- supply the inline proof for scan-binv-adapt.

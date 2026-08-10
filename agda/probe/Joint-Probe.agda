@@ -1,3 +1,8 @@
+-- ROADMAP: ROUTE GUARD — the joint pathLen+size bound is false, so subscribeE-caps recurses at suc j (Subscribe-Face.agda:774).
+-- DELETE WHEN: The-Proof.agda is discharged — a dead route cannot be retried once the proof is done  [T7]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- THE JOINT-BOUND PROBE: is subscribeE-caps's hypothesis even TRUE?
 --

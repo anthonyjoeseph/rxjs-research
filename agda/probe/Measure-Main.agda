@@ -1,3 +1,8 @@
+-- ROADMAP: INFRASTRUCTURE — GHC driver for Mint-Loop-Shapes' measurements.
+-- DELETE WHEN: its last dependent probe is deleted  [T8]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- A COMPILED MEASUREMENT HARNESS.  `scripts/measure.sh` reads a number off
 -- an Agda NORMAL FORM, which is the honest thing to do for a number a
 -- `refl` pin will later have to reproduce.  But the deep rungs of the

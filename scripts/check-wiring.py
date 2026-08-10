@@ -1446,6 +1446,28 @@ def main():
                     "that no longer exists"
                 )
 
+        # (C4) MISSING ROADMAP TIE — every probe names the roadmap item it
+        # serves and the trigger that retires it, mirrored in PROOF-STATE.md
+        # § "PROBE ROADMAP TIES".  Without the tie, "when does this go?" gets
+        # re-answered per session from scratch, which is how 60 files
+        # accumulated.  The duplication between file and PROOF-STATE is
+        # deliberate cross-checking; this gate only enforces the file half.
+        untied = []
+        if os.path.isdir(probe_dir):
+            for f in sorted(os.listdir(probe_dir)):
+                if not f.endswith(".agda"):
+                    continue
+                with io.open(
+                    os.path.join(probe_dir, f), encoding="utf-8", errors="replace"
+                ) as fh:
+                    head = fh.read(4000)
+                if "-- ROADMAP:" not in head or "-- DELETE WHEN:" not in head:
+                    untied.append(f)
+            if untied:
+                problems.append(
+                    f"{len(untied)} probe file(s) with no ROADMAP/DELETE WHEN tie"
+                )
+
         if problems:
             print()
             print("=" * 78)
@@ -1500,6 +1522,13 @@ def main():
                 print("BROKEN PROBE IMPORTS — a deleted probe was shared")
                 print("INFRASTRUCTURE.  Restore it, or delete its importers too:")
                 for name in broken_imports:
+                    print(f"  {name}")
+            if untied:
+                print()
+                print("PROBE WITH NO ROADMAP TIE — add a `-- ROADMAP:` and a")
+                print("`-- DELETE WHEN:` header, and mirror it in PROOF-STATE.md")
+                print('§ "PROBE ROADMAP TIES":')
+                for name in untied:
                     print(f"  {name}")
             sys.exit(1)
         print()

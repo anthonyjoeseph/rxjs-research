@@ -1,3 +1,8 @@
+-- ROADMAP: INFRASTRUCTURE — GHC driver for Nest-Count-Probe's rows.
+-- DELETE WHEN: its last dependent probe is deleted  [T8]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- THE COMPILED HARNESS FOR THE NEST-COUNT PROBE, Instant-Height-Main's
 -- twin and for the same reason: every row re-runs the evaluator through
 -- id + 1 cascades, and the fan-out families do it once per delivery.

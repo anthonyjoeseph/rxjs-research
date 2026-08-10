@@ -1,3 +1,8 @@
+-- ROADMAP: TIER 2, task #33 — the corrected `merge-cert`, still unstated in src (VWF.agda:3870).
+-- DELETE WHEN: `merge-cert` is stated in src AND discharged (task #33)  [T4]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- Battery probe for the CORRECTED merge-cert invariant.
 --
 -- BACKGROUND

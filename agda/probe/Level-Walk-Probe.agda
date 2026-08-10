@@ -1,3 +1,8 @@
+-- ROADMAP: ROUTE GUARD — `old-cDel<=new-cDel` justifies the live cDel design (Rx/Evaluator.agda:505,572).
+-- DELETE WHEN: The-Proof.agda is discharged — a dead route cannot be retried once the proof is done  [T7]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- THE EVOLVING-CAPS DELIVERY WALK, PROBED BEFORE IT IS LANDED — and
 -- the GATE that says landing it costs no re-measurement.

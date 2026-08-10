@@ -1,3 +1,8 @@
+-- ROADMAP: ROUTE GUARD — the per-instant half of the width-count ruling is false (Caps-Face.agda:6299).
+-- DELETE WHEN: The-Proof.agda is discharged — a dead route cannot be retried once the proof is done  [T7]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- THE NEST-COUNT PROBE: is the WIDTH COUNT a SYNTACTIC CONSTANT?
 --

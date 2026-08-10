@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #5 — `installScan-depth-bound` (Depth-Compositional.agda:239).
+-- DELETE WHEN: tier-1 #5's remaining depth postulates are discharged  [T3]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- INSTALL-SCAN DEPTH PROBE
 --

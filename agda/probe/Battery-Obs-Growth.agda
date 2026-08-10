@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #1/#2/#3 — the anchor.  Source of Anchor-Dry:27's `a' <= 2a+v+11` recurrence.
+-- DELETE WHEN: the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3)  [T1]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- Battery-Obs-Growth.agda
 --
 -- QUESTION: Does the language permit programs where reachable inner

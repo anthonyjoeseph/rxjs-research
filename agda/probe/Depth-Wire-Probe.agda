@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #5 — `baseCaps-is-inner`, parked outside the claim graph BY DESIGN (Caps-Bridge.agda:1018).
+-- DELETE WHEN: tier-1 #5's remaining depth postulates are discharged  [T3]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- DEPTH-WIRE-PROBE.  Rehearsal for wiring `depth-capped`
 -- (Depth-Bound.agda:244, PROVEN, ORPHANED) to a real consumer.
 --

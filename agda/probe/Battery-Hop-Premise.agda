@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #1 — `subscribeE-walk-core`.  Shows how hop-edge premise (iii) discharges at each call site.
+-- DELETE WHEN: `subscribeE-walk-core` is discharged (tier-1 #1)  [T2]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- BATTERY-HOP-PREMISE: is hop-edge's premise (iii) a second blocker?
 --

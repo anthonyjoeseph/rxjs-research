@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #1/#2/#3 — the anchor.  Establishes `S-hat := capsH e ins 0` as the workable anchor.
+-- DELETE WHEN: the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3)  [T1]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- Battery-Reached-Sizes.agda
 --
 -- QUESTION: What sizes do inner observables actually have when they arrive

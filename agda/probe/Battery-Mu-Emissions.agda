@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #1/#2/#3 — the anchor.  The mu leg of the composition (syncSize invariant across unfold).
+-- DELETE WHEN: the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3)  [T1]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- Battery-Mu-Emissions.agda
 --
 -- QUESTION: Can a μᵉ-driven source, within ONE anchor scope (one subscribe

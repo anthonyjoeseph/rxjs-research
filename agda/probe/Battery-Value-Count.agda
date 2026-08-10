@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #1/#2/#3 — the anchor.  REFUTES `sync-count-bounded`; keeps the route from being retried.
+-- DELETE WHEN: the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3)  [T1]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- BATTERY: VALUE-COUNT vs syncSizeᵉ  (2026-08-06)
 --
 -- THE QUESTION, and it is the anchor's load-bearing arithmetic.  The dry

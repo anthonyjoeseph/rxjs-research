@@ -1,3 +1,8 @@
+-- ROADMAP: INFRASTRUCTURE — program families for Instant-Height-Probe/-Main and Nest-Count-Probe/-Main.
+-- DELETE WHEN: its last dependent probe is deleted  [T8]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 ------------------------------------------------------------------
 -- THE CHARGE PROBE: does one cascade's j fit `D * cSize`?
 --

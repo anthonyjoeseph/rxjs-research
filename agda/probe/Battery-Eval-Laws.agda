@@ -1,3 +1,8 @@
+-- ROADMAP: Rx laws — `mu-unfold`, `fuel-coherent` (Evaluator-Theorems), `id-inheritance` (Provenance-Theorems).
+-- DELETE WHEN: `mu-unfold` / `fuel-coherent` / `id-inheritance` are discharged  [T6]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- BATTERY-EVAL-LAWS (2026-08-06).  Concrete instance probes for three
 -- postulates from Rx.Evaluator-Theorems and Rx.Provenance-Theorems:
 --

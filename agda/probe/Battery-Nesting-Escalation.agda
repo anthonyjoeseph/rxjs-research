@@ -1,3 +1,8 @@
+-- ROADMAP: tier-1 #1/#2/#3 — the anchor.  Measured basis of the `demand` postulate (Anchor-Dry.agda:28).
+-- DELETE WHEN: the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3)  [T1]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other -- the duplication is deliberate cross-checking.
+--
 -- BATTERY: NESTING ESCALATION of per-instant value count  (2026-08-06)
 --
 -- FOLLOW-UP to Battery-Value-Count, which refuted `k ≤ syncSizeᵉ e`.  Two
