@@ -279,7 +279,7 @@ frameStep j c =
 -- `frameStep 0 c ≡ c` — and every registry length, chain cap and
 -- per-frame receipt the walk reads is read off the level it has climbed
 -- to.  Nothing is charged at the entry caps, which is the 2026-08-02
--- repair (agda/probe/Entry-Caps-Refuted.agda).
+-- repair (machine-refuted 2026-08-01).
 --
 -- ABSTRACT, and it is a NORMALISATION contract rather than an
 -- abstraction one.  `iterSize` and `iterFold` pattern-match on the

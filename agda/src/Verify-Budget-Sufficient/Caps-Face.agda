@@ -4231,7 +4231,7 @@ pathSz?-tail B f p h =
 -- axioms — `stepFrame-entry-caps` and `stepFrame-entry-mint` — briefly
 -- stood here and made this conjunct a theorem; both asserted SAME-LEVEL
 -- preservation (post-state and output burst back under the entry `c`
--- the frame started from), and `agda/probe/Entry-Caps-Refuted.agda`
+-- the frame started from), and the entry-caps refutation
 -- (make entry-caps-refuted, seconds) is a machine-checked
 -- `Entry-Caps → ⊥`.  It falls on the cheapest frame there is, a
 -- `map-f`, which touches no state at all: a map frame's output is
@@ -4825,7 +4825,7 @@ cascadeGo-deliveries siC {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R
 -- delivery's frames at the level the CASCADE entered at; the iteration
 -- charges each at the level the one before it LEFT.  That is the same
 -- distinction entry-charging was refuted on one stratum down
--- (agda/probe/Entry-Caps-Refuted.agda: a frame's own output breaches
+-- (machine-refuted 2026-08-01: a frame's own output breaches
 -- the cap it was charged at), which is why the walk was rebuilt around
 -- levels in the first place — and why the count the recurrence spends
 -- was rebuilt around them too.

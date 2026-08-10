@@ -483,7 +483,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- version threaded `R + Q · suc d` with `Q` a per-delivery mint budget
 -- read once at the cascade's ENTRY caps, and charging anything
 -- per-frame at the entry caps is machine-refuted
--- (agda/probe/Entry-Caps-Refuted.agda: one `map-f` frame's output
+-- (machine-refuted 2026-08-01: one `map-f` frame's output
 -- breaches the very cap it was charged at, because `applyFn` grows a
 -- value).  The honest per-frame face REPORTS its growth as an index j′
 -- and lands at `frameStep (j + j′) c`, so the walk carries that index:
@@ -545,7 +545,7 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 --
 -- `dCap` above threads a REGISTRY and charges each delivery a fixed `Q`
 -- read once at the cascade's ENTRY caps.  That charging is REFUTED
--- (agda/probe/Entry-Caps-Refuted.agda: one `map-f` frame's output
+-- (machine-refuted 2026-08-01: one `map-f` frame's output
 -- breaches the entry cap it was charged at, because `applyFn` grows a
 -- value), and the honest per-frame face — the PROVEN `stepFrame-caps`
 -- — reports a growth index j′ and lands its post-state at
@@ -610,7 +610,7 @@ fLvl S W J = J + fCharge S W J
 -- takes the same repair: a RECURSION on a budget, with every level
 -- quantity read at the level the walk has CLIMBED TO rather than at the
 -- entry (charging at the entry is machine-refuted,
--- agda/probe/Entry-Caps-Refuted.agda).
+-- machine-refuted 2026-08-01).
 --
 -- THE BUDGET IS THE SUBSCRIBE-NESTING DEPTH `k`, and the loop is not
 -- gas-escaping.  The obvious breach is a synchronous fixpoint

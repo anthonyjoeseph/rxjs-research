@@ -14,7 +14,7 @@
 -- 2026-08-02 repair, and it is forced: the walk used to thread a
 -- REGISTRY and charge each delivery a fixed `Q` read once at the
 -- cascade's entry caps, and charging anything per-frame at the entry
--- caps is machine-refuted (agda/probe/Entry-Caps-Refuted.agda — one
+-- caps is machine-refuted (2026-08-01 — one
 -- `map-f` frame's output breaches the very cap it was charged at,
 -- because `applyFn` grows a value).  The honest per-frame face is the
 -- PROVEN `stepFrame-caps`, which REPORTS its growth as an index j′ and
@@ -208,7 +208,7 @@ shareAdmit-chP {Γ = Γ} Pb i ((rid , s , (u , p)) ∷ r) h
 -- denied.  The face this record asks for is that shape with a bound on
 -- j′, where the previous record asked for same-level preservation —
 -- which is FALSE, machine-refuted by one `map-f` frame
--- (agda/probe/Entry-Caps-Refuted.agda).
+-- (machine-refuted 2026-08-01).
 --
 -- AND THE TWO SYNTACTIC LEDGERS ARE STILL NOT OPTIONAL, for the same
 -- reasons they never were: `sf-step` quantified over an arbitrary

@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring entry-caps-refuted level-walk-probe nest-budget-probe nest-count-probe instant-height-probe burst-probe joint-probe count-level-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe burst-probe joint-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -49,11 +49,6 @@ help:
 	@echo "                  proportional to def sizes (budgetAt = syncBudget sizeᵉ),"
 	@echo "                  making each program ≫ 90 min per seed.  Corpora A, C,"
 	@echo "                  and C₃ can be run at depth 5 without issue."
-	@echo "  entry-caps-refuted  the refutation of stepFrame-entry-caps: one"
-	@echo "                  map-f frame whose OUTPUT payload breaches the entry"
-	@echo "                  cap it was charged at, so cascadeGo-deliveries is"
-	@echo "                  not a theorem.  Carries the Leg-0 width lemma too"
-	@echo "                  (see agda/probe/Entry-Caps-Refuted.agda).  seconds"
 	@echo "  level-walk-probe  the EVOLVING-CAPS delivery walk, before it is"
 	@echo "                  landed: the walk carries the level and reads the"
 	@echo "                  registry off it, so nothing is charged at the"
@@ -96,15 +91,6 @@ help:
 	@echo "                  the stored width once (2 against 1).  The"
 	@echo "                  receipt-dictated charge fits every measured row"
 	@echo "                  (see agda/probe/Instant-Height-Probe.agda).  ~2.5 min"
-	@echo "  count-level-probe  what the COUNT FACE actually says: nothing."
-	@echo "                  Its own existential is free (cWid (frameStep k c)"
-	@echo "                  ≥ k, so a stream's own ceiling discharges it), and"
-	@echo "                  so is the three-conjunct fold-back, since every"
-	@echo "                  conjunct widens.  Level-locked to the caps witness"
-	@echo "                  it is FALSE: the input leaf reports j′ = 0 and"
-	@echo "                  hands back a cold script's whole sync list in one"
-	@echo "                  emit.  Repaired by a SIZE hypothesis and one fold"
-	@echo "                  (see agda/probe/Count-Level-Probe.agda).  ~9 s"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -185,12 +171,6 @@ burst-probe:
 
 
 
-# The REFUTATION of those two frame-local axioms: a machine-checked
-# Entry-Caps -> bottom on one map-f frame, plus the Leg-0 width lemma
-# (cWid at cascade (suc id)'s entry is at least a two-rung tower, 1024,
-# against the measured per-frame payload count of 120).  Seconds.
-entry-caps-refuted:
-	cd agda && agda -i src -i probe probe/Entry-Caps-Refuted.agda
 
 # The EVOLVING-CAPS delivery walk, probed before it is landed: the walk
 # carries the caps record and grows it per delivery, so the registry a
@@ -258,20 +238,6 @@ instant-height-probe:
 
 
 
-# WHAT DOES THE COUNT FACE SAY?  Nothing, as stated.  `cWid (frameStep k c)`
-# is `iterFold` and one fold clears a successor for S ≥ 2, so the width at
-# level k dominates k and a burst's own emit/value ceiling discharges the
-# face's existential without ever looking at subscribeE.  The fold-back into
-# subscribeE-caps's Σ is free for the same reason — all three conjuncts
-# widen along ⊑ᶜ.  The content is the WITNESS: op-step spends one frame per
-# emit at exactly the level the SOURCE's caps receipt reports.  LEVEL-LOCKED
-# THERE THE COUNT IS FALSE — subscribeE-input-caps reports j′ = 0 while its
-# cold-no-tail branch hands back `length sync` values in one emit, and
-# slotCaps? reads that list pointwise while slotCeil gives it width 0.  The
-# repair is a SIZE hypothesis (`slotsSize sl ≤ cSize c`, true at every
-# capsAt) and one fold, since `cWid (frameStep 1 c) = S ^ suc W ≥ S`.
-count-level-probe:
-	cd agda && agda -i src -i probe probe/Count-Level-Probe.agda
 
 
 

@@ -27,18 +27,16 @@ Battery-Reached-Sizes.agda | EVIDENCE | runs real subscribeE+splitBurst to measu
 Battery-VWF-Prop.agda | EVIDENCE | PROBED-TRUE (non-vacuous) for 5 live VWF postulates (map/scan nodry+valsLast push, scan-nodeP). scan-binv-adapt half is SPENT — real proof landed VWF:1191
 Battery-Value-Count.agda | EVIDENCE | REFUTES 'emissions per instant ≤ syncSizeᵉ e': K=4 gives valueCount 30 > syncSizeᵉ 20 (K=1..3 hold: 2≤17, 6≤18, 14≤19). Kills sync-count-bounded
 Burst-Probe.agda | EVIDENCE | live `make burst-probe` harness: 0 valsLast failures across ~14k bursts (corpora A/B/C/C₃, d3-d5), settling that TailRel's acc-le premise never held
-Count-Level-Probe.agda | EVIDENCE | refutes count-as-a-sibling-Σ (count-vacuous: upward-closed ⇒ vacuous) and finds it FALSE level-locked at the scripted-input leaf (j′=0 vs count 1,2 needed)
 Depth-Wire-Probe.agda | EVIDENCE | baseCaps-is-inner lives here BY DESIGN — Caps-Bridge:1018 says nothing in the claim graph consumes it and the wiring law admits no orphans there
-Entry-Caps-Refuted.agda | EVIDENCE | REFUTES stepFrame-entry-caps: one bare map-f frame grows payload size 3→7 at cSize=3, breaching the entry cap by refl. Cited 12x incl. core Rx/Evaluator
 Instant-Height-Main.agda | EVIDENCE | GHC-compiled driver for Instant-Height-Probe's rows (one row per process via stdin index); no proof content of its own, referenced from the Makefile
 Instant-Height-Probe.agda | EVIDENCE | store growth across instants (V vs W, S+ vs S); CAL iJ rows reproduce Charge-Probe's pinned 23/47 by refl
 Joint-Probe.agda | EVIDENCE | pathLen+sizeᵉ joint bound measured FALSE on all 17 families (worst 9.0x over adm). CAVEAT: builds ONLY in the scripts/joint-probe.sh scratch project, NOT against agda/src
 Level-Walk-Probe.agda | EVIDENCE | old-cDel≤new-cDel (a real proof, 0 postulates): the new level walk dominates the retired registry walk pointwise, so no measured row needs re-measurement. Cited Evaluator:505,572
 Measure-Main.agda | EVIDENCE | GHC-compiled driver for Mint-Loop-Shapes' measurements (mFolds/mFib/mS/mMints); calibration rows reproduce the refl-pinned 2546/576
-Mint-Loop-Shapes.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Nest-Budget-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Nest-Count-Main.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Nest-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
+Mint-Loop-Shapes.agda | EVIDENCE | INFRASTRUCTURE for 5 sibling probes (drainSt/runSt/mFolds/mMints + program families). Header says NO ASSERTIONS; refutes every subset-injection route for the delivery bound
+Nest-Budget-Probe.agda | EVIDENCE | REFUTES the nesting-budget descent: a scan under an *All mints a payload per fold, nestᵛ climbs to 43690 against a budget of 2 (S=2 W=1 J=0)
+Nest-Count-Main.agda | EVIDENCE | GHC-compiled row-dumper for Nest-Count-Probe (imports Charge-Probe + Mint-Loop-Shapes); no proof content. Dies with Nest-Count-Probe if that ever goes
+Nest-Count-Probe.agda | EVIDENCE | widthCount is syntactic per APPLICATION but NOT per instant (stories = deliveries x nesting; fan-out breaches at 4). Its nestᵉ is the WRONG measure per Caps-Face:6299
 SubInner-Demand-Probe.agda | EVIDENCE | first coverage for subscribeInner-demand (Anchor-Dry:117): 20 LOAD-BEARING rows over merge/exhaust programs A/B at evaluator-reached init states; second valB? conjunct FULLY covered, first covered symbolically via Dm≥16 (2≤sizeCapAt · 1≤towerℕ); NOT covered: sizeᵛ>16 inners, the stuck sizeᵛ≤ᵇB conjunct of Hyp 3, post-step states
 Install-Scan-Depth-Probe.agda | EVIDENCE | §1 refutes old storeNestMax-installScan (LOAD-BEARING: caseᵗ duplication gives storeNestMax=25 > sizeᵗ-bound=23); §2 validates new installScan-depth-bound at b=emptyᵉ (LOAD-BEARING: storeNestMax post-install=5 > RHS=2, yet depthE=0)
 Charge-Probe.agda | EVIDENCE | INFRASTRUCTURE: supplies the progD/progDT/progW/pF1/pF2/deepScan program families to 4 sibling probes. Also: j <= D*cSize breaches at 47 against 40
