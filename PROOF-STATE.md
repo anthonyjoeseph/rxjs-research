@@ -106,6 +106,17 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 >   is assembled with `storeNestMax-installScan` refuted and being rerouted; the
 >   two Caps-Face faces are grinds over kit that already exists.
 >
+> **UPDATE 2026-08-09.** The Caps-Face half of that second bullet is now
+> structural rather than open: the P3 + #9 signature pass landed, #10's
+> monolith is a real definition over the single sub-postulate
+> `innerFinish-concat-face-go`, and #9's statement carries the two
+> hypotheses it was missing. Both faces are now pure grinds over repaired
+> statements. The pass added exactly one genuinely new claim,
+> `cascade-depth-capsH` — the delivery-side depth bound, which nothing in
+> the repo had ever stated. **The anchor problem (#1/#2/#3, and #11 by
+> inheritance) is now the whole of tier 1's risk**, and it is where the
+> remaining work is.
+>
 > The discharges of #6 and #7 have a common shape worth naming: **both postulates
 > carried a pile of leading hypotheses that the eventual proof did not use.**
 > #6 shed seven expression-level lemmas (its proof is pure level arithmetic);
@@ -127,13 +138,57 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | 6 | ~~`opIterD-budget-core`~~ | **Op-Budget.agda (NEW)** | **DISCHARGED 2026-08-07 (`ac77b7e`) — a REAL PROOF, zero postulates, and the gas corner is now a NUMBER** | The residual-budget invariant is proven end to end and lives in its own module. **Two normal forms:** the climb is `TAIL^m ∘ (sLvlD k ∘ J₀)^m` (tails already lvls-dominated by the proven `fIterD-lvls`), and by the proven `dWalkᶜ-front` the budget is `regAt`-many iterations of [one dLvl-step, then a full gas-(g−1) budget from the level reached]. **One round costs FIVE walk positions:** two for the jump (`jump-2step`), one to absorb the entry's G-closure (`G-absorb` — a position spent as raw LENGTH cannot double as the sub-climb's walk), one whose sub-budget hosts the (g−1,k−1) sub-climb, one for the tail (`round-tail-glue`). The m-vs-positions tension (m′ exponential in the level, positions linear) is resolved by `boost-5x`: positions are counted at the BOOSTED level. **The load-bearing discovery was that the walk value at p positions IS the p-th restart level** (`walk-spend`/`walk-spend-many`), so each round's conclusion is the next round's hypothesis verbatim, with no residual bookkeeping. **THE STATEMENT REPAIR — the guard is `3 + k ≤ S`, not `k ≤ S`, and all three units are accounted:** cDel's gas is `suc S`; one unit unfolds `dCapᶜ` into the top WALK; one DESCENDS into a position, because level 0 has only `regAt S R 0 = R` positions and **R may be 1** — the descended level A₁ = `dLvl S W d 0` has `regAt ≥ suc (A₁·S) ≥ 5·S` (`5≤dLvl0`, two iterL unrollings); and `walk-paid`'s own `2 + k` is irreducible, because at k = 0 the entry still spends `G-absorb`, which rests on `tail-fits`, which a gas-1 sub-budget PROVABLY cannot pay. So the guard is not slack the scheme happens to want — it is what the recurrence costs. **The repair's one-unit cost at the consumer is PAID, not deferred:** `capsAt-base-size⁺` (Caps-Bridge) gives `3 + sizeᵉ e + slotsSize sl ≤ cSize (capsAt e sl id)` because capsAt's base is a `frameBlowup`, `2≤sizeCount` says a sizeStep runs, and one `sizeStep S S = S * suc (2 * S)` already clears a `suc`. **Fallout:** `opIterD-budget-core`'s seven expression-level hypotheses are gone — the proof never reaches the expression level — orphaning six proven lemmas (`entry-to-index`, `residAt-connected`, `share-step-resid`, `mu-1≤k`, `mu-step-le`, `k-raise`); ruled SUPERSEDED and swept (`mu-step-le` was already recorded as superseded by `mu-step` at Subscribe-Face:3118). The earlier `1 ≤ R` refutation stands and is recorded in the new assembly's header: at R = 0 the registry walk is empty, `cDel (caps S W 0) d = 0`, and the claim read `2 ≤ 0`. |
 | 7 | ~~`init-capsOK?-base-core`~~ | **Init-Caps.agda (NEW)** | **DISCHARGED 2026-08-07 — a REAL PROOF, zero postulates** | All five `capsOK?` conjuncts proven at `baseCaps` / `st-init`. (2), (4), (5) fall to the emptiness of the initial registry and node table. (1) is `all-concat-tab` over `mkHot-bounded`. **(3) was the open branch, and `scripted`'s own index closes it:** `scripted` carries `{ok : T (isData t)}`, and the new structural family `outWᵛ/dWᵛ/pWᵛ-data-zero` shows every data type has `pWᵛ ≡ 0`, so the width check reduces to `0 ≤ᵇ cWid`; cold and shared slots contribute no live source at init at all. The proof BYPASSES the -core's eight scaffold hypotheses — they were kit for a route it does not take — and `baseCaps` moved out of Caps-Bridge with it, so the module is self-contained and solo-checks in seconds. `init-capsOK?-base` is exported through an `abstract` alias: it sits on the budget-sufficient spine, where an unfoldable body is what OOMs VWF. |
 | 8 | ~~`init-capsOK?-suc`~~ (was `init-capsOK?`) | — | **DISCHARGED 2026-08-06 — proven at EVERY id, zero new postulates** | The recorded blocker (`capsAt e ins id` never reduces to a numeral because `sizeCount` is `abstract`) killed only the COMPUTATIONAL route. The monotonicity route never needs a numeral: `capsAt-⊑-suc` proves `capsAt e ins id ⊑ᶜ capsAt e ins (suc id)` by spanning `frameStep 0` (= the caps itself, `frameStep-0`) to the full endpoint (`frameStep-full`) with `frameStep-mono-j` at `0 ≤ sizeCount`, and `init-capsOK?` is then a two-clause induction: base `init-capsOK?-0` (rests on #7), step `capsOK?-mono` along `capsAt-⊑-suc` — the initial state never changes, only the caps widen. One Agda footnote worth keeping: the count had to be pinned by hand (`z≤n {n = sizeCount …}`) because `iterSize`/`iterFold` match on it, so unification cannot invert the `⊑ᶜ` endpoints — caught in the fast loop by checking Caps-Bridge against cached interfaces BEFORE paying the heavyweight recheck. Residual risk here is exactly #7 (`init-capsOK?-base-core`), nothing else. |
-| 9 | `thruOuter-face-core` (P4) | Caps-Face.agda:6317 | SHAPE | Its own header doubts itself: receipt "(a) is the SECOND number … `subscribeE-caps` bounds its j′ by nothing whatever" and "(a) may not fit `fCharge` as stated." Statement-level work before grind. |
-| 10 | `innerFinish-concat-face-core` (P3) | Caps-Face.agda:6377 | **PROVABLE — assembly green in `probe/InnerFinish-Concat-Probe.agda` (`634dd82`), pending a SIGNATURE PASS** | The grind ran and the statement needs TWO hypotheses it does not carry. **H1 `slotsSize sl ≤ Caps.cSize c`** — every route through the concat drain (`obsList→mList-strict`, `concatDrain-caps`, `innerFinish-caps`) wants it, and it is NOT derivable from `slotsCaps?`, which bounds per-element sizes and not the total; it IS free at `caps-tick` from the base formula `cSize (capsAt e sl id) = 2 + sizeᵉ e + slotsSize sl`. **H2 `depthFin … ≤ d`** — `innerFinish-caps`'s concat+yes branch is unreachable at `dep = 0`, so the budget lands in `fLvlD S W dep j` and widening to `d` needs `dep ≤ d`; free at `caps-tick` with `d = capsH e sl id`, but it is a NEW depth-fuel posting to state. **Agda mechanics worth keeping:** the sub-postulate takes `nd : Maybe (NodeState Γ)` EXPLICITLY rather than as `lookupNode …`, because after a `with w ≟ᵗ s` abstraction `dpt` reduces to `suc (depthDrain …) ≤ d` while re-evaluating `depthFin` on a variable `s` yields `depthFinC … (s ≟ᵗ s) ≤ d`, and the two are not definitionally equal. **The pass is seven signatures**: `innerFinish-concat-face` → `innerFinish-face` → `innerReact-face` → `stepFrame-face` → `walkH` → `cascadeGo-deliveries` → `caps-tick`, which sources both. Same shape as tier-1 #9's threading pass (`bd10d0a`), so batch the two. |
+| 9 | `thruOuter-face-core` (P4) | Caps-Face.agda | **STATEMENT REPAIRED 2026-08-09 — the grind itself is still owed** | The signature pass gave it the same two hypotheses P3 got: `slotsSize sl ≤ Caps.cSize c`, and the depth premise in its `suc` form — `suc (depthWalk g op nid κ id now vals sched st) ≤ d`, because `depthFrame … (thru-outer …) … = suc (depthWalk …)` is SPENDING ARC 1, the one hop of the depth mirror that is not the identity (a frame re-reads the budget, so its payload walk runs one level down). Both are now sourced at `caps-tick`. **What is still open is the original doubt in its own header**, untouched by this pass: receipt "(a) is the SECOND number … `subscribeE-caps` bounds its j′ by nothing whatever", and "(a) may not fit `fCharge` as stated". So this row is now a pure grind over a repaired statement, ranked behind the anchor block. |
+| 10 | ~~`innerFinish-concat-face-core`~~ (P3) | **Caps-Face.agda — now a REAL DEFINITION** | **ASSEMBLED 2026-08-09; the monolith is replaced by ONE sub-postulate** | The probe's assembly landed and the signature pass that unblocked it is done (see the block above the table). `innerFinish-concat-face-core` is a real definition whose body is a single call to **`innerFinish-concat-face-go`**, the one remaining gap: it takes the node read `nd : Maybe (NodeState Γ)` **explicitly**, which is load-bearing rather than cosmetic — writing the dispatch as a `with w ≟ᵗ s` inside the assembly makes `dpt` reduce to `suc (depthDrain …) ≤ d` while re-evaluating `depthFin` on a VARIABLE `s` yields `depthFinC … (s ≟ᵗ s) ≤ d`, and `s ≟ᵗ s` is not definitionally `yes refl`, so the two types never meet. With `nd` an argument there is no with-abstraction between the assembly and the premise and the types are literally the same expression. `-go` owes seven trivial node cases (`innerFinish-face-keep` at j′ = 0) and ONE real obligation, the concat+yes drain through `innerFinish-caps` (Subscribe-Face:1761) — which is precisely what H1 and H2 were added to feed. **The five kit hypotheses are passed straight through rather than dropped**, eta-expanded (bare they leave unsolved metas); dropping them would orphan `burstCaps?-∷` and the four `*-slots` transports. |
 | 11 | `dry-tick-core` | Caps-Bridge.agda:439 | DIFFICULTY | Given `cascadeGo-wet` (its first hypothesis) it is latch/finish bookkeeping plus the Deliveries counts. Nearly all its risk is inherited from #2, not its own. |
 | 13 | `sizeCount-mono-d` | Caps-Bridge.agda | **NEW 2026-08-06 — the single postulate tier-1 #4's discharge rests on** | `sizeCount c` is monotone in its depth-fuel argument (`2 ≤ cSize c`, `d ≤ d′` → `sizeCount c d ≤ sizeCount c d′`). **Why it is true:** `d` occurs only positively — `sizeCount c d = lvls S W d 0 (cDel c d)`, `d` feeds `lvls` through `fLvlD`'s fuel and `cDel` through `dCapᶜ`/`dWalkᶜ` (whose own `d`-occurrence is again `lvls`); the crux 0-vs-suc clause comparison is the Evaluator's own documented design intent (Rx/Evaluator.agda:762, "the refresh dominates it at every budget including the empty one": suc's sIterD takes `suc (widAt)` steps each mapping `J ↦ sLvlD … (suc J) ≥ suc J`, dominating `fLvl + suc (widAt)` pointwise). **Eventual proof:** the mutual monotonicity grind over the fLvlD SCC through its exported clause equations (`fLvlD-0`/`fLvlD-suc`/`fIterD-0`/…, since the SCC is `abstract`) — the same family as the proven `lvls-mono`, extended to vary `d`. **NOT cheaply probeable** (any instance at `d ≥ 1` walks `widAt`, a 2^-tower in the level), same class as #6; confidence rests on positivity, not rows. Lives in Caps-Bridge for recheck economics (Caps.agda is upstream of Wet/Subscribe-Face); move it home next time Caps.agda is dirty anyway. |
 | 12 | ~~`three-size≤capsH-core`~~ | — | **DISCHARGED 2026-08-06 (`559780a`), then re-shaped (`2d4b899`)** | `three-size-le-blowH` + a 7-lemma support chain landed in `Caps.agda`; the postulate is gone and `three-size≤capsH` is a real definition. `S≤sizeStep` was deleted with it (its sole consumer was the replaced hypothesis slot). **Then it nearly died twice by accident** — a worker deleting the superseded root chain stranded `three-size-le-blowH`, and a second worker proposed deleting THAT. Both times the orphan report was right and the ruling was wrong: it is one half of the depth composition (`depth-capped` gives `depthE ≤ 3·cSize`, this gives `3·cSize(base) ≤ blowH`), and the two chain to `depthE ≤ capsH e ins 0`. Now wired root-first: `three-size≤capsH` → `depthE≤capsH-root` → hypothesis of `sub-charge-capsOK-lift-core`. **The lesson is general: a consumer-count sweep cannot tell a dead lemma from an unconnected half of a composition. Read what an orphan SAYS before ruling on it.** |
 
-> **OPEN AT SHUTDOWN (2026-08-07 morning).** Three things are staged and not done:
+> **THE P3 + #9 SIGNATURE PASS IS DONE (2026-08-09).** Item (b) below is
+> closed. What it cost and what it bought, because the shape generalises:
+>
+> - **It was WIDER than "seven signatures".** Row 10 scoped the pass as
+>   `innerFinish-concat-face` → … → `caps-tick`. In fact H2 has to reach
+>   `Walk-Hyps.sf-step`, which quantifies over an ARBITRARY frame — so the
+>   premise threads through the walk's whole mutual block (`foldPath-go`,
+>   `dispatchShare-go`, `shareGo-go`, `cascadeGo-go`) in `Delivery-Walk`,
+>   not just through `Caps-Face`. Three modules, not one.
+> - **But it was SHALLOW, because the depth mirror is DEFINITIONALLY equal
+>   at every hop.** `depthFrame … (from-inner …) … fin = depthReact … fin`;
+>   `depthReact … true = depthFin … (lookupNode …)` — literally H2 as the
+>   probe stated it; `depthReact … false = 0`, so the absorbed branch is
+>   free. Up the walk it composes by `⊔`: `depthFold … (f ↠ path′) …
+>   = depthFrame f … ⊔ depthFold path′ …`, and the tail's arguments are the
+>   very terms `foldPath-go` already recurses with. So every discharge is a
+>   `≤-trans` with a `⊔` projection and NO transport anywhere.
+> - **`lub3-l/m/r` (Caps-Depth) were already there for exactly this**, with
+>   the standing warning that `⊔` bounds must be NAMED (`_⊔_` is a defined
+>   recursive function, so an unnamed bound turns the projection into an
+>   inversion Agda cannot solve — the 2026-08-05 Stage-A failure).
+> - **NEW: `depthCascade` (Caps-Depth), and it is deliberately BRANCH-FREE.**
+>   The honest measure would skip a cancelled chain by testing
+>   `any (_≡ᵇ rid) (EvalSt.cancelled st)` — but `cascadeGo-go` already
+>   with-abstracts that scrutinee, and **a with-abstraction does not rewrite
+>   the type of an already-bound hypothesis**, so the premise would be
+>   stranded in every branch. `depthShareGo` had solved this before and its
+>   comment says so: report the tail at BOTH states, land in `a ⊔ (b ⊔ c)`,
+>   and let the consumer read its case off a projection. Copied verbatim.
+> - **THE ONE GENUINELY NEW GAP: `cascade-depth-capsH` (Caps-Face).**
+>   `depth-compositional` (row 5) bounds `depthE`, the SUBSCRIBE side, and
+>   **nothing anywhere bounds the DELIVERY side** — `depthCascade` reaches
+>   frames through `chainStep`/`foldPath`/`stepFrame`, all outside `depthE`'s
+>   induction. So this is a real statement, not a repackaging, and it is the
+>   delivery-side twin of `depthE≤capsH-root`. Conditioned on `capsOK?`
+>   deliberately: the unconditional form is false for Depth-Bound:11's reason.
+> - **H1 was free**, as row 10 predicted: `capsAt-base-size` already has
+>   `slotsSize sl` as a summand of `cSize (capsAt e sl id)`.
+> - Three Agda mechanics worth keeping: a `where` block is **not** mutual
+>   (referencing a binding defined further down is a scope error, not a
+>   forward reference); stdlib's `m≤n⊔m : ∀ m n → n ≤ m ⊔ n` puts the
+>   SUBJECT second; and the five kit hypotheses must be **eta-expanded** at
+>   the call site or their implicits go unsolved.
+
+> **OPEN AT SHUTDOWN (2026-08-07 morning; (b) CLOSED 2026-08-09).** Three things are staged and not done:
 > (a) the **consolidated cleanup round** — five orphans left by #7's discharge
 > (`B1-cSize≡sizeCapAt` Caps-Bridge:119, `slotsCaps?-widen` Caps-Face:814,
 > `size≤budget`/`init-bounded`/`1≤sizeᵗˢ` Measures:195/1163/1419). They were the
@@ -143,8 +198,10 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > leans DELETE, but it touches Measures and Caps-Face — a full-tower recheck each —
 > so it must be BATCHED with (b). `make wiring-gate` is RED on exactly these five
 > and nothing else; `make agda`, `make bug-cache`, `make unsafe-check` are GREEN.
-> (b) the **P3 + #9 signature pass** (row 10 below) — two threading passes of the
-> same shape, to land in one Caps-Face edit and one gate.
+> (b) ~~the **P3 + #9 signature pass**~~ — **DONE 2026-08-09**, see the block
+> above. It did NOT batch with (a): the pass is a large coherent unit and
+> deserved its own commit and its own verification, so (a) still owes one
+> full tower rebuild of its own.
 > (c) `Demand-Battery.agda` was drafted (~520 lines, chainStep/foldPath demand rows
 > aimed at the doubling live-seed shape) and DELETED unverified when the run was cut
 > short — it never typechecked, and an unverified probe must not sit in `probe/`.

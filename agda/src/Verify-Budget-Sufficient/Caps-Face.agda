@@ -183,8 +183,16 @@ open import Verify-Budget-Sufficient.Delivery-Walk public
 -- row that supplies it.  Re-exported, so the clique names one module
 open import Verify-Budget-Sufficient.Caps-Nest public
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
--- new hypothesis ranges over (see below, ~6307)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthInner)
+-- new hypothesis ranges over (see below, ~6307).  The rest of the family
+-- carries THE DEPTH PREMISE down the frame chain, and it threads by
+-- IDENTITY because the mirror is definitionally equal at every hop:
+--   depthFrame … (from-inner op allNid inst) … fin = depthReact … fin
+--   depthReact … true  = depthFin … (lookupNode allNid (EvalSt.nodes st))
+--   depthReact … false = 0
+-- so each face passes its premise straight to the next and the absorbed
+-- branch needs nothing at all
+open import Verify-Budget-Sufficient.Caps-Depth
+  using (depthInner; depthFrame; depthReact; depthFin; depthWalk; depthCascade)
 
 ------------------------------------------------------------------
 -- THE REACHABILITY CLUSTER — round 3's remaining debt, and the answer
@@ -4294,6 +4302,9 @@ cascadeGo-deliveries :
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
+  -- the walk's two new obligations, sourced one level up at `caps-tick`
+  slotsSize sl ≤ Caps.cSize c →
+  depthCascade a id chains sched st ≤ d →
   delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
     ≤ cDel c d
 
@@ -4340,6 +4351,8 @@ cascadeGo-caps :
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
+  slotsSize sl ≤ Caps.cSize c →
+  depthCascade a id chains sched st ≤ d →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j → (j ≤ sizeCount c d)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -4711,6 +4724,10 @@ stepFrame-face :
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) (f ↠ κ) ≡ true →
   valsCaps? (frameStep j c) sl vals ≡ true →
+  -- H1 and H2, the two the from-inner chain cannot source locally: the
+  -- slot store fits the size cap, and this frame's depth fits the walk's
+  slotsSize sl ≤ Caps.cSize c →
+  depthFrame g id now f κ vals fin sched st ≤ d →
   FrameFace c d j sl (stepFrame g id now f κ vals fin sched st)
 
 walkH :
@@ -4742,8 +4759,9 @@ walkH :
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (d : ℕ) (sl : Slots Γ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
   Walk-Hyps e (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
-walkH siC c d sl 2≤S 1≤R slC = record
+walkH siC c d sl 2≤S 1≤R slC slSz = record
   { OK        = walkOK c sl
   ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p
   ; Vb        = λ J vs → valsCaps? (frameStep J c) sl vs
@@ -4757,10 +4775,10 @@ walkH siC c d sl 2≤S 1≤R slC = record
   ; ok-latch  = λ J i fin sched st ok →
                   proj₁ ok , shareLatch-caps (frameStep J c) i fin sched st (proj₂ ok)
   ; ok-finish = λ J i fin out ok → walkOK-finish c sl J i fin out ok
-  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL →
+  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL hD →
                   let r  = stepFrame sf id now f path′ vals fin sched st
                       FC = stepFrame-face siC c d J sl sf id now f path′ vals fin sched st
-                             2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV in
+                             2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV slSz hD in
                   proj₁ FC
                   , proj₁ (proj₂ FC)
                   , ( trans (KeepsC.slotsEq
@@ -4778,10 +4796,10 @@ walkH siC c d sl 2≤S 1≤R slC = record
 -- dispatch gas to cDel's index (n ≤ cSize), the walk length to the
 -- registry cap (length chains ≤ cReg), and dCapᶜ's own unfolding, which
 -- is what `cDel` abbreviates
-cascadeGo-deliveries siC {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
+cascadeGo-deliveries siC {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD =
   ≤-trans (W.Res.cnt (W.cascadeGo-go 0 a id chains sched st
              ((slEq , invʲ) , capsOK?-regs c sched st inv)
-             pS (∧-intro (∧-intro vC refl) refl)))
+             pS (∧-intro (∧-intro vC refl) refl) hD))
     (≤-trans (dWalkᶜ-mono n (Caps.cSize c) (length chains)
                 (regAt (Caps.cSize c) (Caps.cReg c) 0)
                 2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
@@ -4791,7 +4809,7 @@ cascadeGo-deliveries siC {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
   module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d 2≤S
-                  (walkH siC c d sl 2≤S 1≤R slC)
+                  (walkH siC c d sl 2≤S 1≤R slC slSz)
 
 ------------------------------------------------------------------
 -- THE CHARGE, IN THE CURRENCY THE WALK ACTUALLY PROVES — and the
@@ -4858,35 +4876,37 @@ cascadeGo-level :
   capsOK? c sched st ≡ true →
   valCaps? c sl (arrTy a) (arrVal a) ≡ true →
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  depthCascade a id chains sched st ≤ d →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j →
      (j ≤ lvls (Caps.cSize c) (Caps.cWid c) d 0
              (delivN st (proj₂ (proj₂ r))))
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-level siC {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS =
+cascadeGo-level siC {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD =
   W.Res.lvl GO , W.Res.hi GO , proj₂ (proj₁ (W.Res.good GO))
   where
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
   module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d 2≤S
-                  (walkH siC c d sl 2≤S 1≤R slC)
+                  (walkH siC c d sl 2≤S 1≤R slC slSz)
   GO = W.cascadeGo-go 0 a id chains sched st
          ((slEq , invʲ) , capsOK?-regs c sched st inv)
-         pS (∧-intro (∧-intro vC refl) refl)
+         pS (∧-intro (∧-intro vC refl) refl) hD
 
 -- and the assembly declared above: the landing level with the delivery
 -- count widened to its own recursion, which is `sizeCount` by definition
-cascadeGo-caps siC c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB =
+cascadeGo-caps siC c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD =
   proj₁ LV
     , ≤-trans (≤-trans (proj₁ (proj₂ LV))
                        (lvls-mono D (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl
                           (cascadeGo-deliveries siC c d a id chains sl sched st
-                             2≤S 1≤R slC slEq inv vC pS n≤S lenB)))
+                             2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD)))
               (≤-reflexive (sym (sizeCount-body c d)))
     , proj₂ (proj₂ LV)
   where
   D  = delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-  LV = cascadeGo-level siC c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS
+  LV = cascadeGo-level siC c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD
 
 ------------------------------------------------------------------
 -- GRINDING THE TREE, most uncertain first: subscribeInner-caps, the
@@ -6374,7 +6394,20 @@ postulate
   -- kit the drain's output needs — one `∷` per queued inner's burst,
   -- and the four `*-slots` substitutions that move a bound from the
   -- entry telescope to the drain's.
-  innerFinish-concat-face-core :
+  -- TAKES THE NODE READ EXPLICITLY, and that is load-bearing rather than
+  -- cosmetic.  Writing this as a `with w ≟ᵗ s` inside the assembly makes
+  -- `dpt` reduce to `suc (depthDrain …) ≤ d` while re-evaluating
+  -- `depthFin` on a variable `s` yields `depthFinC … (s ≟ᵗ s) ≤ d` —
+  -- and for a VARIABLE `s`, `s ≟ᵗ s` is not definitionally `yes refl`,
+  -- so the two types never meet.  With `nd` an argument, the assembly
+  -- below passes `lookupNode allNid (EvalSt.nodes st)` with NO
+  -- intervening with-abstraction and the premise's type is literally the
+  -- one the goal wants.  This head dispatches every node case itself:
+  -- nothing / scan / take / merge / switch / exhaust / concat+no all go
+  -- to `innerFinish-face-keep` at j′ = 0, and concat+yes is the one real
+  -- obligation — `innerFinish-caps` (Subscribe-Face:1761), which is
+  -- exactly what H1 and H2 were added to feed
+  innerFinish-concat-face-go :
     -- burstCaps?-∷  (Verify-Budget-Sufficient/Caps-Face.agda:3608)
     (∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
       (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
@@ -6405,7 +6438,8 @@ postulate
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+    (nd : Maybe (NodeState Γ)) →
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
     Sched.slots sched ≡ sl →
@@ -6414,8 +6448,16 @@ postulate
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
-    FrameFace c d j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
-                          (lookupNode allNid (EvalSt.nodes st)))
+    -- H1: the total slot store fits the size cap.  Every route through
+    -- the drain (`obsList→mList-strict`, `concatDrain-caps`,
+    -- `innerFinish-caps`) wants it, and it is NOT derivable from
+    -- `slotsCaps?`, which bounds per-element sizes and not the sum
+    slotsSize sl ≤ Caps.cSize c →
+    -- H2: this finish's depth fits the walk's budget.  `innerFinish-caps`'s
+    -- concat+yes branch is unreachable at `dep = 0`, so its budget lands
+    -- in `fLvlD S W dep j` and widening to `d` needs exactly this
+    depthFin g concatᵒ allNid inst κ id now vals sched st nd ≤ d →
+    FrameFace c d j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st nd)
 
   -- THE thru-outer EDGE, and the harder half of the same gap.
   -- `thruWrap` reshapes no values, so this is `thruWalk`: one
@@ -6524,10 +6566,80 @@ postulate
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
+    -- H1 and H2, matching `innerFinish-concat-face-go`'s.  Here H2 is the
+    -- `suc` form: a thru-outer frame re-reads the budget, so its own walk
+    -- runs one level DOWN and the premise must leave that unit spare
+    slotsSize sl ≤ Caps.cSize c →
+    suc (depthWalk g op nid κ id now vals sched st) ≤ d →
     FrameFace c d j sl
       (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
 
 -- the two faces, assembled over their cores
+-- P3's ASSEMBLY, landed from `probe/InnerFinish-Concat-Probe.agda`.
+-- `innerFinish-concat-face-core` is a REAL DEFINITION now: one call to
+-- the sub-postulate at `nd = lookupNode allNid (EvalSt.nodes st)`, with
+-- no with-abstraction anywhere between, so `dpt`'s type and the
+-- sub-postulate's H2 are the same expression rather than merely equal
+-- ones.  The five kit hypotheses are passed STRAIGHT THROUGH rather than
+-- dropped: the drain is what eventually consumes them, and dropping them
+-- here would orphan `burstCaps?-∷` and the four `*-slots` transports
+innerFinish-concat-face-core :
+    (∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+      (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
+      all (eventCaps? c sl) (InstEmit.events em) ≡ true →
+      burstCaps? c sl str ≡ true →
+      burstCaps? c sl (em ∷ str) ≡ true
+     ) →
+    (∀ {n} {Γ : Ctx n} {c : Caps} {sl sl′ : Slots Γ}
+      (u : Ty) (vs : List (Val Γ u)) → sl′ ≡ sl →
+      all (valCaps? c sl u) vs ≡ true → all (valCaps? c sl′ u) vs ≡ true
+     ) →
+    (∀ {n} {Γ : Ctx n} {u} {c : Caps} {sl sl′ : Slots Γ}
+      (evs : List (InstEvent (Val Γ u))) → sl′ ≡ sl →
+      all (eventCaps? c sl) evs ≡ true → all (eventCaps? c sl′) evs ≡ true
+     ) →
+    (∀ {n} {Γ : Ctx n} {u} {c : Caps} {sl sl′ : Slots Γ}
+      (str : Stream Γ u) → sl′ ≡ sl →
+      burstCaps? c sl str ≡ true → burstCaps? c sl′ str ≡ true
+     ) →
+    (∀ {n} {Γ : Ctx n} {s} {c : Caps} {sl sl′ : Slots Γ}
+      (q : List (Closed Γ s)) → sl′ ≡ sl →
+      all (obsCaps? c sl) q ≡ true → all (obsCaps? c sl′) q ≡ true
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
+    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    capsOK? (frameStep j c) sched st ≡ true →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    valsCaps? (frameStep j c) sl vals ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    depthFin g concatᵒ allNid inst κ id now vals sched st
+      (lookupNode allNid (EvalSt.nodes st)) ≤ d →
+    FrameFace c d j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
+                          (lookupNode allNid (EvalSt.nodes st)))
+innerFinish-concat-face-core k₁ k₂ k₃ k₄ k₅
+    c d j g allNid inst κ id now vals sl sched st
+    2≤S 1≤R slEq slC inv pC lC vC slSz dpt =
+  -- the five kit hypotheses are ETA-EXPANDED, not passed bare: their
+  -- implicits are not determined by any explicit argument, so a bare
+  -- `k₂`/`k₅` leaves unsolved metas.  Fresh binder names so the lambdas
+  -- do not shadow this clause's own `c`/`sl`
+  innerFinish-concat-face-go
+    (λ {n′} {Γ′} {u′} → k₁ {n′} {Γ′} {u′})
+    (λ {n′} {Γ′} {c′} {sa} {sb} → k₂ {n′} {Γ′} {c′} {sa} {sb})
+    (λ {n′} {Γ′} {u′} {c′} {sa} {sb} → k₃ {n′} {Γ′} {u′} {c′} {sa} {sb})
+    (λ {n′} {Γ′} {u′} {c′} {sa} {sb} → k₄ {n′} {Γ′} {u′} {c′} {sa} {sb})
+    (λ {n′} {Γ′} {s′} {c′} {sa} {sb} → k₅ {n′} {Γ′} {s′} {c′} {sa} {sb})
+    c d j g allNid inst κ id now vals sl sched st
+    (lookupNode allNid (EvalSt.nodes st))
+    2≤S 1≤R slEq slC inv pC lC vC slSz dpt
+
 innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -6540,6 +6652,9 @@ innerFinish-concat-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  depthFin g concatᵒ allNid inst κ id now vals sched st
+    (lookupNode allNid (EvalSt.nodes st)) ≤ d →
   FrameFace c d j sl (innerFinish g concatᵒ allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
 innerFinish-concat-face =
@@ -6590,6 +6705,12 @@ thruOuter-face :
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  -- SPENDING ARC 1.  `depthFrame … (thru-outer op nid) … = suc (depthWalk …)`
+  -- — the one hop of the mirror that is a `suc` rather than the identity,
+  -- because a frame is the arc of the cycle that RE-READS the budget and
+  -- `fLvlD S W (suc d) J` unfolds to its payload walk at `d`
+  suc (depthWalk g op nid κ id now vals sched st) ≤ d →
   FrameFace c d j sl
     (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
 thruOuter-face siC =
@@ -6634,12 +6755,17 @@ innerFinish-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  depthFin g op allNid inst κ id now vals sched st
+    (lookupNode allNid (EvalSt.nodes st)) ≤ d →
   FrameFace c d j sl (innerFinish g op allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
 
--- MERGE: decrement the active-inner counter, which carries no payload
+-- MERGE: decrement the active-inner counter, which carries no payload.
+-- `depthFin`'s only non-zero head is concatᵒ + `concat-st`, so on this op
+-- the measure is 0 whatever the node read returns — no stuck premise
 innerFinish-face c d j g mergeᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC
+                 2≤S 1≤R slEq slC inv pC lC vC _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | just (merge-st k od) =
   innerFinish-face-keep c d j sl vals (od ∧ (pred k ≡ᵇ 0)) sched
@@ -6657,13 +6783,13 @@ innerFinish-face c d j g mergeᵒ allNid inst κ id now vals sl sched st
 -- CONCAT: the queue drain, and the one clause of the whole *All face
 -- that appends a burst it did not already have
 innerFinish-face c d j g concatᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC =
+                 2≤S 1≤R slEq slC inv pC lC vC slSz hD =
   innerFinish-concat-face c d j g allNid inst κ id now vals sl sched st
-    2≤S 1≤R slEq slC inv pC lC vC
+    2≤S 1≤R slEq slC inv pC lC vC slSz hD
 
 -- SWITCH: clear the current-inner slot if this was it
 innerFinish-face c d j g switchᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC
+                 2≤S 1≤R slEq slC inv pC lC vC _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
@@ -6683,7 +6809,7 @@ innerFinish-face c d j g switchᵒ allNid inst κ id now vals sl sched st
 
 -- EXHAUST: clear the busy flag
 innerFinish-face c d j g exhaustᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC
+                 2≤S 1≤R slEq slC inv pC lC vC _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
@@ -6713,16 +6839,22 @@ innerReact-face : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  depthReact g op allNid inst κ id now vals sched st fin ≤ d →
   FrameFace c d j sl (innerReact g op allNid inst κ id now vals sched st fin)
+-- an absorbed fin finishes nothing: `depthReact … false = 0`
 innerReact-face c d j g op allNid inst κ id now vals false sl sched st
-                2≤S 1≤R slEq slC inv pC lC vC =
+                2≤S 1≤R slEq slC inv pC lC vC _ _ =
   innerFinish-face-keep c d j sl vals false sched st inv vC
+-- `depthReact … true = depthFin … (lookupNode …)`, and the aliveThroughᶠ
+-- test below is NOT a scrutinee of the depth mirror, so `hD` survives the
+-- with-abstraction untouched and reaches `innerFinish-face` as-is
 innerReact-face c d j g op allNid inst κ id now vals true sl sched st
-                2≤S 1≤R slEq slC inv pC lC vC
+                2≤S 1≤R slEq slC inv pC lC vC slSz hD
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | false = innerFinish-face c d j g op allNid inst κ id now vals sl sched st
-                2≤S 1≤R slEq slC inv pC lC vC
+                2≤S 1≤R slEq slC inv pC lC vC slSz hD
 
 -- SCAN, its own top-level piece as in the companion: the nested `with`
 -- on the stored accumulator's type cannot be elaborated inside a
@@ -6782,8 +6914,10 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
 
 -- MAP: nothing touches the state, the receipt is one fold per node of
 -- the step function, and the output is the input mapped
+-- map/scan/take subscribe nothing, so `depthFrame` is 0 on all three and
+-- neither new hypothesis is reached
 stepFrame-face _ {s = s} {u = u} c d j sl g id now (map-f fn) κ vals fin sched st
-               2≤S 1≤R slEq slC inv pS vC =
+               2≤S 1≤R slEq slC inv pS vC _ _ =
   j′ , face-lift c d j j′
            (face-charge1 c j (sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS)))
      , capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
@@ -6799,7 +6933,7 @@ stepFrame-face _ {s = s} {u = u} c d j sl g id now (map-f fn) κ vals fin sched 
   j′  = proj₁ MP
 
 stepFrame-face _ c d j sl g id now (scan-f fn nid) κ vals fin sched st
-               2≤S 1≤R slEq slC inv pS vC =
+               2≤S 1≤R slEq slC inv pS vC _ _ =
   stepFrame-face-scan c d j g id now fn nid κ vals fin sl sched st
     2≤S slC slEq inv
     (proj₁ (∧-true (frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid))
@@ -6809,7 +6943,7 @@ stepFrame-face _ c d j sl g id now (scan-f fn nid) κ vals fin sched st
 
 -- TAKE: a prefix and a cut, no folds — j′ = 0 either way
 stepFrame-face _ {s = s} c d j sl g id now (take-f nid) κ vals fin sched st
-               2≤S 1≤R slEq slC inv pS vC =
+               2≤S 1≤R slEq slC inv pS vC _ _ =
   0 , face-lift c d j 0 z≤n
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ (proj₂ (proj₂ TD))))
@@ -6830,11 +6964,13 @@ stepFrame-face _ {s = s} c d j sl g id now (take-f nid) κ vals fin sched st
 
 -- FROM-INNER and THRU-OUTER: the two *All edges, delegated whole to
 -- the two pieces above
+-- `depthFrame … (from-inner …) … fin` IS `depthReact … fin`, so `hD`
+-- passes through with no transport at all
 stepFrame-face _ c d j sl g id now (from-inner op allNid inst) κ vals fin sched st
-               2≤S 1≤R slEq slC inv pS vC =
+               2≤S 1≤R slEq slC inv pS vC slSz hD =
   innerReact-face c d j g op allNid inst κ id now vals fin sl sched st
     2≤S 1≤R slEq slC inv (proj₂ pS2)
-    (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC
+    (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC slSz hD
   where
   B   = Caps.cSize (frameStep j c)
   -- frameSz? is `true` on both *All frames, so naming the frame again
@@ -6842,11 +6978,13 @@ stepFrame-face _ c d j sl g id now (from-inner op allNid inst) κ vals fin sched
   pS1 = ∧-true true ((suc (pathLen κ) ≤ᵇ B) ∧ pathSz? B κ) pS
   pS2 = ∧-true (suc (pathLen κ) ≤ᵇ B) (pathSz? B κ) (proj₂ pS1)
 
+-- `depthFrame … (thru-outer …) … = suc (depthWalk …)` — SPENDING ARC 1,
+-- the one hop where the mirror is not the identity but a `suc`
 stepFrame-face siC c d j sl g id now (thru-outer op nid) κ vals fin sched st
-               2≤S 1≤R slEq slC inv pS vC =
+               2≤S 1≤R slEq slC inv pS vC slSz hD =
   thruOuter-face siC c d j g op nid κ id now vals fin sl sched st
     2≤S 1≤R slEq slC inv (proj₂ pS2)
-    (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC
+    (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC slSz hD
   where
   B   = Caps.cSize (frameStep j c)
   pS1 = ∧-true true ((suc (pathLen κ) ≤ᵇ B) ∧ pathSz? B κ) pS
@@ -7074,6 +7212,38 @@ chainsOf-length : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   length (chainsOf a st) ≤ length (EvalSt.registry st)
 chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 
+------------------------------------------------------------------
+-- THE DELIVERY-SIDE DEPTH BOUND — the cascade axis's mirror of
+-- `depthE≤capsH-root`, and the one genuinely NEW obligation the P3/#9
+-- signature pass creates.
+--
+-- WHY IT IS A POSTULATE AND NOT A DERIVATION.  `depth-compositional`
+-- (tier-1 #5) bounds `depthE`, the SUBSCRIBE side, by
+-- `sizeᵉ b + pathLen κ + storeNestMax sched st`.  Nothing anywhere
+-- bounds the DELIVERY side: `depthCascade` reaches frames through
+-- `chainStep`/`foldPath`/`stepFrame`, and every one of those is outside
+-- `depthE`'s induction.  So this is a real gap with a real statement,
+-- not a repackaging of one already proven.
+--
+-- WHY IT SHOULD BE TRUE.  A cascade climbs one nesting level per
+-- thru-outer frame (`depthFrame`'s only `suc`), and a chain's frames are
+-- bounded by its path length, which `pathSz?` caps at `sizeAt S J` — so
+-- the whole cascade climbs at most the registry's own depth, which is
+-- what `capsH` counts.  Its eventual proof is the delivery-side twin of
+-- `depth-compositional`'s induction and belongs beside it.
+--
+-- CONDITIONED ON `capsOK?`, deliberately: the unconditional form is
+-- false for the same reason `depthE ≤ capsH` is (Depth-Bound.agda:11) —
+-- a state may carry an arbitrarily deep store that no cap has seen
+postulate
+  cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+      ≤ capsH e sl id
+
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
     (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
@@ -7124,6 +7294,11 @@ caps-tick siC {e = e} sl id a nextId sched st slEq pre val =
            (chainsOf-caps (Caps.cSize c) a st (capsOK?-regs c sched st pre))
            (n≤capsAt-size e sl id)
            (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
+           -- H1 is FREE here: capsAt's base formula already contains the
+           -- slot store as a summand
+           (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e))
+                    (capsAt-base-size e sl id))
+           (cascade-depth-capsH sl id a nextId sched st slEq pre)
   GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
   j     = proj₁ GO
   jFits = proj₁ (proj₂ GO)

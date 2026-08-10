@@ -68,7 +68,8 @@ open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
                                        +-monoʳ-≤; *-monoʳ-≤; *-monoˡ-≤;
                                        +-assoc; +-comm; +-identityʳ;
                                        *-identityʳ; *-zeroʳ; *-distribˡ-+;
-                                       ≤ᵇ⇒≤; n≤1+n; m≤m+n; m≤n+m)
+                                       ≤ᵇ⇒≤; n≤1+n; m≤m+n; m≤n+m;
+                                       m≤m⊔n; m≤n⊔m)
 open import Data.List    using (List; []; _∷_; _++_; length; all; any; map)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -95,6 +96,16 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain;
 -- dropSource lemmas
 open import Verify-Budget-Sufficient.Caps public
 open import Verify-Budget-Sufficient.Deliveries public
+
+-- THE DELIVERY-SIDE DEPTH MEASURES, and the ⊔-projections that read a
+-- three-callee clause.  NOT A CYCLE: `Caps-Depth` imports only `Rx.*`,
+-- so it sits BESIDE `Caps` rather than above it.  The walk carries a
+-- depth premise because `stepFrame-face`'s from-inner chain needs one at
+-- the bottom (`innerFinish`'s concat drain is unreachable at `dep = 0`),
+-- and `d` — the record's own parameter — is the bound it is carried at
+open import Verify-Budget-Sufficient.Caps-Depth
+  using (depthFrame; depthFold; depthDisp; depthShareGo; depthChain;
+         depthCascade; lub3-l; lub3-m; lub3-r)
 
 ------------------------------------------------------------------
 -- § B.  THE REGISTRY LEDGER THE WALK READS.
@@ -237,6 +248,12 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
       (sched : Sched Γ) (st : EvalSt e) → OK J sched st →
       Pb J (f ↠ path′) ≡ true → Vb J vals ≡ true →
       regP? (Pb J) (EvalSt.registry st) ≡ true →
+      -- THE DEPTH PREMISE.  A frame that SUBSCRIBES lands its budget in
+      -- `fLvlD S W dep j` at its own `dep`, and widening that to the
+      -- walk's `d` is the only thing the from-inner faces cannot source
+      -- locally.  Carried here rather than derived because the walk is
+      -- where the frame is reached
+      depthFrame sf id now f path′ vals fin sched st ≤ d →
       let r = stepFrame sf id now f path′ vals fin sched st in
       Σ ℕ λ j′ → (J + j′ ≤ fLvlD S W d J)
         × OK (J + j′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
@@ -297,6 +314,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     Pb J path ≡ true → Vb J vals ≡ true →
+    depthFold sf gas id now envSrc path vals evs fin sched st ≤ d →
     let fp = foldPath sf gas id now envSrc path vals evs fin sched st in
     Res J (iterL S W d (pathLen path) J)
           (dCapᶜ S W R d gas (iterL S W d (pathLen path) J))
@@ -305,6 +323,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchShare-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st → Vb J vals ≡ true →
+    depthDisp sf gas id now i vals fin sched st ≤ d →
     let ds = dispatchShare {t = t} sf gas id now i vals fin sched st in
     Res J J (dCapᶜ S W R d gas J) (proj₁ (proj₂ ds)) st (proj₂ (proj₂ ds))
 
@@ -313,6 +332,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     chP? (Pb J) ps ≡ true → Vb J vals ≡ true →
+    depthShareGo sf gas id now i vals fin ps sched st ≤ d →
     let sg = shareGo sf gas id now i vals fin ps sched st in
     Res J J (dWalkᶜ S W R d gas J (length ps))
           (proj₁ (proj₂ sg)) st (proj₂ (proj₂ sg))
@@ -323,7 +343,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- LEFT — which is the whole repair, in one line.
   ----------------------------------------------------------------
 
-  foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV =
+  foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV _ =
     res J ≤-refl
         (≤-trans (≤-reflexive refl)
                  (lvls-infl S W d J (delivN st st)))
@@ -331,10 +351,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (≤-trans (≤-reflexive (foldPath-root-N sf gas id now envSrc vals evs fin sched st))
                  z≤n)
 
-  foldPath-go J sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV =
-    dispatchShare-go J sf gas id now i vals fin sched st g hV
+  -- `depthFold … (share-sink i) … = depthDisp …` definitionally, so the
+  -- premise passes through unchanged
+  foldPath-go J sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV hD =
+    dispatchShare-go J sf gas id now i vals fin sched st g hV hD
 
-  foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV =
+  foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV hD =
     res (Res.lvl IH) (≤-trans (m≤m+n J j′) (Res.lo IH))
         (≤-trans (Res.hi IH)
                  (≤-trans (lvls-mono (delivN st₁ (proj₂ (proj₂ fp)))
@@ -348,7 +370,20 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (dCapᶜ-mono gas gas 2≤S ≤-refl ≤-refl ≤-refl ≤-refl step)))
     where
     r   = stepFrame sf id now f path′ vals fin sched st
+    -- `depthFold … (f ↠ path′) … = dF ⊔ dR`, and the tail's arguments
+    -- below are LITERALLY the ones `IH` recurses with, so both halves
+    -- are one ⊔-projection away.  BOUNDS NAMED ON PURPOSE — see the
+    -- `lub3` header in .Caps-Depth: `_⊔_` is a defined recursive
+    -- function, so an unnamed bound turns the projection into an
+    -- inversion Agda cannot solve
+    dF  = depthFrame sf id now f path′ vals fin sched st
+    -- projections spelled out rather than via `sd₁`/`st₁`: a `where`
+    -- block is not mutual, and those two are bound further down
+    dR  = depthFold sf gas id now envSrc path′ (proj₁ r) (evs ++ proj₁ (proj₂ r))
+            (proj₁ (proj₂ (proj₂ r)))
+            (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
     SF  = sf-step J sf id now f path′ vals fin sched st ok hP hV len
+            (≤-trans (m≤m⊔n dF dR) hD)
     j′  = proj₁ SF
     st₁ = proj₂ (proj₂ (proj₂ (proj₂ r)))
     sd₁ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -368,6 +403,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            , proj₂ (proj₂ (proj₂ (proj₂ SF))) )
            (p-widen (m≤m+n J j′) path′ (p-tail J f path′ hP))
            (proj₁ (proj₂ (proj₂ (proj₂ SF))))
+           (≤-trans (m≤n⊔m dF dR) hD)
     eqD : delivN st (proj₂ (proj₂ fp)) ≡ delivN st₁ (proj₂ (proj₂ fp))
     eqD = foldPath-frame-N sf gas id now envSrc f path′ vals evs fin sched st
 
@@ -377,11 +413,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- how long that is (`ok-reg`, capsOK?'s own fifth conjunct)
   ----------------------------------------------------------------
 
-  dispatchShare-go J sf zero id now i vals fin sched st g hV =
+  dispatchShare-go J sf zero id now i vals fin sched st g hV _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (dispatchShare-zero-N sf id now i vals fin sched st))
 
-  dispatchShare-go J sf (suc gas) id now i vals fin sched st (ok , len) hV =
+  -- `depthDisp sf (suc gas) … = depthShareGo sf gas … (shareAdmit …)
+  -- sched (shareLatch i fin st)`, which is exactly `GO`'s argument list
+  dispatchShare-go J sf (suc gas) id now i vals fin sched st (ok , len) hV hD =
     res (Res.lvl GO) (Res.lo GO)
         (≤-trans (Res.hi GO)
                  (≤-reflexive (cong (lvls S W d J) (sym eqD))))
@@ -406,7 +444,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (shareAdmit i (EvalSt.registry st)) sched stL
            ( ok-latch J i fin sched st ok
            , subst (λ rs → regP? (Pb J) rs ≡ true) (sym (shareLatch-reg i fin st)) len )
-           (shareAdmit-chP (Pb J) i (EvalSt.registry st) len) hV
+           (shareAdmit-chP (Pb J) i (EvalSt.registry st) len) hV hD
 
   ----------------------------------------------------------------
   -- shareGo: one delivery per uncancelled registration, each a chain
@@ -415,11 +453,16 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- the evaluator's front-to-back fold agree exactly.
   ----------------------------------------------------------------
 
-  shareGo-go J sf gas id now i vals fin [] sched st g hp hV =
+  shareGo-go J sf gas id now i vals fin [] sched st g hp hV _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
 
-  shareGo-go J sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV
+  -- THE THREE-CALLEE CLAUSE.  `depthShareGo`'s cons clause is branch-free
+  -- `dSK ⊔ (dFP ⊔ dREST)` precisely so this `with` cannot strand the
+  -- premise (a with-abstraction does not rewrite a bound hypothesis's
+  -- type), and `lub3-l/m/r` read the three summands back out — one per
+  -- callee, with the bounds named as that header requires
+  shareGo-go J sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV hD
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
         res (Res.lvl SK) (Res.lo SK) (Res.hi SK) (Res.good SK)
@@ -427,8 +470,17 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                      (dWalkᶜ-mono gas gas (length ps) (suc (length ps))
                         2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (n≤1+n (length ps))))
         where
+        -- spelled out only to NAME the three ⊔ bounds; the skip branch
+        -- reaches none of the other two
+        evs₀  = if fin then close (toℕ i) exhausted ∷ [] else []
+        st₀   = consᵈ rid st
+        fp    = foldPath sf gas id now (toℕ i) p vals evs₀ fin sched st₀
+        dSK   = depthShareGo sf gas id now i vals fin ps sched st
+        dFP   = depthFold sf gas id now (toℕ i) p vals evs₀ fin sched st₀
+        dREST = depthShareGo sf gas id now i vals fin ps
+                  (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp))
         SK = shareGo-go J sf gas id now i vals fin ps sched st g
-               (proj₂ (∧-true _ _ hp)) hV
+               (proj₂ (∧-true _ _ hp)) hV (lub3-l dSK dFP dREST hD)
   ... | false =
         res (Res.lvl REST) (≤-trans (Res.lo FP) (Res.lo REST))
             (≤-trans (Res.hi REST)
@@ -444,9 +496,12 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         evs₀ = if fin then close (toℕ i) exhausted ∷ [] else []
         fp  = foldPath sf gas id now (toℕ i) p vals evs₀ fin sched st₀
         st₁ = proj₂ (proj₂ fp)
+        dSK   = depthShareGo sf gas id now i vals fin ps sched st
+        dFP   = depthFold sf gas id now (toℕ i) p vals evs₀ fin sched st₀
+        dREST = depthShareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         FP  = foldPath-go J sf gas id now (toℕ i) p vals evs₀ fin sched st₀
                 ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                (proj₁ (∧-true _ _ hp)) hV
+                (proj₁ (∧-true _ _ hp)) hV (lub3-m dSK dFP dREST hD)
         J₁  = Res.lvl FP
         rest = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         st₂ = proj₂ (proj₂ rest)
@@ -469,6 +524,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) ps (proj₂ (∧-true _ _ hp)))
                  (v-widen (Res.lo FP) vals hV)
+                 (lub3-r dSK dFP dREST hD)
         restCnt : D₂ ≤ dWalkᶜ S W R d gas (lvls S W d J (suc A)) (length ps)
         restCnt = ≤-trans (Res.cnt REST)
                     (dWalkᶜ-mono gas gas (length ps) (length ps) 2≤S ≤-refl ≤-refl ≤-refl
@@ -493,15 +549,19 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     chP? (Pb J) chains ≡ true → Vb J (arrVal a ∷ []) ≡ true →
+    depthCascade a id chains sched st ≤ d →
     let cg = cascadeGo a id chains sched st in
     Res J J (dWalkᶜ S W R d n J (length chains))
           (proj₁ (proj₂ cg)) st (proj₂ (proj₂ cg))
 
-  cascadeGo-go J a id [] sched st g hp hV =
+  cascadeGo-go J a id [] sched st g hp hV _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
 
-  cascadeGo-go J a id ((rid , c) ∷ chains) sched st g hp hV
+  -- same three-callee shape as `shareGo-go`, and `depthCascade` is
+  -- branch-free for the same reason: this `with` would otherwise strand
+  -- the premise on the unabstracted cancellation test
+  cascadeGo-go J a id ((rid , c) ∷ chains) sched st g hp hV hD
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
         res (Res.lvl SK) (Res.lo SK) (Res.hi SK) (Res.good SK)
@@ -509,7 +569,13 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                      (dWalkᶜ-mono n n (length chains) (suc (length chains))
                         2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (n≤1+n (length chains))))
         where
+        st₀   = consᵈ rid st
+        cs    = chainStep id a c sched st₀
+        dSK   = depthCascade a id chains sched st
+        dFP   = depthChain id a c sched st₀
+        dREST = depthCascade a id chains (proj₁ (proj₂ cs)) (proj₂ (proj₂ cs))
         SK = cascadeGo-go J a id chains sched st g (proj₂ (∧-true _ _ hp)) hV
+               (lub3-l dSK dFP dREST hD)
   ... | false =
         res (Res.lvl REST) (≤-trans (Res.lo FP) (Res.lo REST))
             (≤-trans (Res.hi REST)
@@ -526,10 +592,15 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         evs₀ = if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else []
         cs   = chainStep id a c sched st₀
         st₁  = proj₂ (proj₂ cs)
+        -- `depthChain` IS this `depthFold` — same `sf₀`, same `evs₀` —
+        -- so the middle projection lands on `FP`'s premise definitionally
+        dSK   = depthCascade a id chains sched st
+        dFP   = depthChain id a c sched st₀
+        dREST = depthCascade a id chains (proj₁ (proj₂ cs)) st₁
         FP   = foldPath-go J sf₀ n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
                  evs₀ (Arrival.isLast a) sched st₀
                  ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                 (proj₁ (∧-true _ _ hp)) hV
+                 (proj₁ (∧-true _ _ hp)) hV (lub3-m dSK dFP dREST hD)
         J₁   = Res.lvl FP
         rest = cascadeGo a id chains (proj₁ (proj₂ cs)) st₁
         st₂  = proj₂ (proj₂ rest)
@@ -550,6 +621,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) chains (proj₂ (∧-true _ _ hp)))
                  (v-widen (Res.lo FP) (arrVal a ∷ []) hV)
+                 (lub3-r dSK dFP dREST hD)
         restCnt : D₂ ≤ dWalkᶜ S W R d n (lvls S W d J (suc A)) (length chains)
         restCnt = ≤-trans (Res.cnt REST)
                     (dWalkᶜ-mono n n (length chains) (length chains) 2≤S ≤-refl ≤-refl ≤-refl

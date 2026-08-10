@@ -434,6 +434,44 @@ depthChain {n = n} {e = e} id a path sched st =
             (Arrival.isLast a) sched st
 
 ------------------------------------------------------------------
+-- ONE ARRIVAL INTO EVERY LIVE CHAIN, mirroring `cascadeGo` clause for
+-- clause.  This is the DELIVERY side's top measure, and the reason it
+-- exists: `depth-compositional` bounds `depthE`, the SUBSCRIBE side, and
+-- nothing bounds the delivery side at all.  The walk's `cascadeGo-go`
+-- reads its per-chain premise off this head, so the two clauses must
+-- match the evaluator's exactly or the projections stop being definitional.
+--
+-- NO `with` HERE, AND THE REASON IS `depthShareGo`'s, VERBATIM.  A
+-- cancelled chain delivers nothing, so the honest measure would skip it
+-- and branch on `any (_≡ᵇ rid) (EvalSt.cancelled st)` — but the consumer
+-- (`cascadeGo-go`) already with-abstracts that same scrutinee, and a
+-- with-abstraction does NOT rewrite the types of already-bound
+-- hypotheses.  The depth premise would stay stuck on the unabstracted
+-- test in every branch, and no case analysis could unstick it.
+--
+-- So this head is collapsed the OTHER way, exactly as `depthShareGo`'s
+-- cons clause is: the tail is reported at BOTH states, so the mirror
+-- covers whichever the test picks and the consuming clause reads its
+-- case off a PROJECTION instead.  That lands the clause in the shape
+-- `a ⊔ (b ⊔ c)`, which is precisely what `lub3-l/m/r` below project —
+-- the live chain runs at the delivered-marked state and the rest at the
+-- state that chain left, which is where `chainStep` puts them
+------------------------------------------------------------------
+
+depthCascade : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+             → (a : Arrival Γ) → Id
+             → List (RegId × Path Γ (arrTy a) t)
+             → Sched Γ → EvalSt e → ℕ
+depthCascade a id []                   sched st = 0
+depthCascade a id ((rid , c) ∷ chains) sched st =
+  depthCascade a id chains sched st
+  ⊔ (depthChain id a c sched st₀
+     ⊔ depthCascade a id chains (proj₁ (proj₂ cs)) (proj₂ (proj₂ cs)))
+  where
+  st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+  cs  = chainStep id a c sched st₀
+
+------------------------------------------------------------------
 -- PROJECTING A THREE-CALLEE CLAUSE.  `depthShareGo`'s cons clause is the
 -- only one above with three callees, `a ⊔ (b ⊔ c)`, and a consumer needs
 -- each summand separately.
