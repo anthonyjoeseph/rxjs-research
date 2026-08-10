@@ -56,7 +56,7 @@ open import Rx.Exp  using (Ty; Ctx; Closed; Val)
 open import Rx.Evaluator
   using (Sched; EvalSt; Slots; Arrival; Path; Frame; _↠_; Stream;
          RegId; Chain; stepFrame; foldPath; chainStep;
-         lvls; iterL;
+         lvls; iterL; dCapᶜ;
          arrTy; arrVal; arrTick; arrSource; budgetAt; fLvlD)
 
 open import Verify-Budget-Sufficient.Delivery-Walk
@@ -66,8 +66,11 @@ open import Verify-Budget-Sufficient.Delivery-Walk
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthFrame; depthFold; depthChain)
 
+-- the WET side, for the bridge's INV?/Ψ premise and its conclusion
+open import Verify-Budget-Sufficient.Wet using (INV?; burstB?; sizeCapAt)
+
 open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; pathSz?; walkOK; walkOK-finish;
+  using (capsOK?; pathSz?; walkOK; walkOK-finish; sizeCount; capsAt; capsH;
          valCaps?; valsCaps?; eventCaps?; burstCaps?;
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
@@ -206,3 +209,110 @@ module BurstWalk
     GO = V.foldPath-go 0 sf gas id now envSrc path vals evs fin sched st
            ((slEq , inv0) , capsOK?-regs c sched st inv)
            hP0 hV0 hE0 hD
+
+------------------------------------------------------------------
+-- § 4  THE REST OF THE ROUTE, REHEARSED.
+--
+-- § 3 hands back the burst at `frameStep lvl c` together with a bound
+-- on `lvl`, at ONE witness.  Two things stand between that and
+-- `foldPath-dry`'s conclusion (.Anchor-Dry § 2), and both are
+-- postulated here so the ASSEMBLY typechecks before either is ground —
+-- the point being that a wrong assembly is cheap to amend and proven
+-- pieces without one are not.
+--
+-- THE PAYOFF OF STATING IT THIS WAY: `Dm = (2·B + 12) · towerℕ (suc sz)`
+-- APPEARS NOWHERE BELOW.  `capsAt-suc-full` (Caps.agda:893) is `refl` —
+-- `capsAt e sl (suc id)` IS `frameStep (sizeCount (capsAt e sl id)
+-- (capsH e sl id)) (capsAt e sl id)` — so a burst good at `frameStep
+-- lvl c` for ANY `lvl` under that count widens straight onto the dry
+-- family's own target `Ŝ`, and the tower constant is off the path.
+------------------------------------------------------------------
+
+-- (i) THE LEVEL ARITHMETIC.  The walk's landing level fits the count
+-- `capsAt (suc id)` is built from.  Same shape `cascadeGo-caps`
+-- (Caps-Face:4345) already proves for the CASCADE — `lvls-mono` over
+-- `cascadeGo-deliveries`, closed by `sizeCount-body` — restated for one
+-- fold, whose base is `iterL` over the chain and whose count is
+-- `dCapᶜ` rather than `cDel`.
+-- BUCKET (c): needs the foldPath analogue of `cascadeGo-deliveries`.
+postulate
+  fold-level-fits : ∀ (c : Caps) (d gas lvl : ℕ) (plen : ℕ) (D : ℕ) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    D ≤ dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d gas
+                (iterL (Caps.cSize c) (Caps.cWid c) d plen 0) →
+    lvl ≤ lvls (Caps.cSize c) (Caps.cWid c) d
+               (iterL (Caps.cSize c) (Caps.cWid c) d plen 0) D →
+    lvl ≤ sizeCount c d
+
+-- (ii) THE CAPS→WET FLAVOUR BRIDGE, and the one genuinely new
+-- mathematics on this route.  `valCaps?` bounds `sizeᵛ` against
+-- `cSize`; `valB? B Ψ` bounds `sizeᵛ ≤ B` **and** `fnCapᵛ ≤ Ψ`
+-- (Measures:4853).  The second conjunct is WET-ONLY and cannot come
+-- from the caps face at all — it is Ψ-invariance, whose supplier is
+-- `INV?`'s own `fnCapBounded?` conjunct ("Ψ never grows — caseW is
+-- substitution-invariant", Measures:4835).  So the `INV?` premise is
+-- NOT decoration: without it the statement is false, not merely
+-- unproven.  Same shape as `pathSz? → pathBΨ? → pathB?` (Caps-Bridge:673).
+postulate
+  burstCaps→burstB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c′ : Caps) (sl : Slots Γ) (Ψ : ℕ)
+    (sched : Sched Γ) (st : EvalSt e) (str : Stream Γ t) →
+    Sched.slots sched ≡ sl →
+    INV? Ψ (Caps.cSize c′) sched st ≡ true →
+    burstCaps? c′ sl str ≡ true →
+    burstB? (Caps.cSize c′) Ψ str ≡ true
+
+------------------------------------------------------------------
+-- § 5  THE ASSEMBLY — `foldPath-dry`'s conclusion, with no `Dm`.
+--
+-- Right to left: the walk's burst at `frameStep lvl c`, widened along
+-- `frameStep lvl c ⊑ᶜ frameStep (sizeCount c d) c` (frameStep-mono-j
+-- over § 4 (i)), landed on `capsAt e sl (suc id)` by `capsAt-suc-full`,
+-- and converted to the wet flavour by § 4 (ii) — whose `Caps.cSize` IS
+-- `sizeCapAt e sl (suc id)` by definition (Wet.agda:4110).
+------------------------------------------------------------------
+
+module DryRoute
+  {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (Ψ : ℕ) (id : Id)
+  (2≤S : 2 ≤ Caps.cSize (capsAt e sl id))
+  (1≤R : 1 ≤ Caps.cReg (capsAt e sl id))
+  where
+
+  c = capsAt e sl id
+  d = capsH e sl id
+
+  foldPath-dry-route : ∀ (sf : Gas) (gas : ℕ) (now : Tick) (envSrc : Source)
+    {u} (path : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? c sched st ≡ true →
+    pathSz? (Caps.cSize c) path ≡ true →
+    valsCaps? c sl vals ≡ true →
+    all (eventCaps? c sl) evs ≡ true →
+    depthFold sf gas id now envSrc path vals evs fin sched st ≤ d →
+    let fp = foldPath sf gas id now envSrc path vals evs fin sched st in
+    -- the two facts the OUTPUT state carries, at Ŝ — the caller's,
+    -- exactly as in .Anchor-Dry's dry family
+    INV? Ψ (sizeCapAt e sl (suc id)) (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp)) ≡ true →
+    Sched.slots (proj₁ (proj₂ fp)) ≡ sl →
+    -- and the delivery count fits, which § 4 (i) consumes
+    delivN st (proj₂ (proj₂ fp))
+      ≤ dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d gas
+               (iterL (Caps.cSize c) (Caps.cWid c) d (pathLen path) 0) →
+    burstB? (sizeCapAt e sl (suc id)) Ψ (proj₁ fp) ≡ true
+  foldPath-dry-route sf gas now envSrc path vals evs fin sched st
+                     slEq inv hP hV hE hD invOut slEqOut hCnt =
+    burstCaps→burstB (capsAt e sl (suc id)) sl Ψ
+      (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp)) (proj₁ fp) slEqOut invOut
+      (burstCaps?-widen sl (proj₁ fp)
+         (frameStep-mono-j c 2≤S
+            (fold-level-fits c d gas (proj₁ B) (pathLen path)
+               (delivN st (proj₂ (proj₂ fp))) 2≤S 1≤R hCnt (proj₁ (proj₂ B))))
+         (proj₂ (proj₂ B)))
+    where
+    fp = foldPath sf gas id now envSrc path vals evs fin sched st
+    B  = BurstWalk.foldPath-burst c sl d 2≤S sf gas id now envSrc path vals evs fin
+           sched st slEq inv hP hV hE hD
