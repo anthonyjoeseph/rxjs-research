@@ -429,6 +429,29 @@ when a LANDING file lands, DELETE the file and its line in the same commit (git
 is the archive). **Never end a session with a new zero-postulate theorem in
 probe/ and no LANDING line naming its destination.**
 
+**A PROBE'S CLASSIFICATION IS WORTHLESS UNTIL IT COMPILES (2026-08-09).**
+`agda/probe` sits outside `make agda` by design, and the same exemption
+that makes it cheap means nothing ever asks whether a probe is still
+true. Ten of the thirty-three probes retired on 2026-08-09 did not
+typecheck — eight importing an umbrella module split apart in `a8508d6`,
+one stale against a moved API, and one failing on "Multiple definitions"
+**because its own content had landed in src** (that last is a positive
+signal: a name clash with src means the work is done). Every one had a
+live `make` target that would fail, and three independent classification
+sweeps had called most of them load-bearing evidence — because all three
+read headers and citations, and none ran the file. So:
+
+- **Run `agda -i src -i probe probe/X.agda` before classifying X.** A
+  refutation that cannot be re-run is not a machine-checked receipt, it
+  is a historical artifact whose only surviving value is the number
+  already transcribed into a src comment. Treat a non-compiling probe as
+  deleted-in-fact; do not repair one to restore evidence nobody runs.
+- **A DELETION HAS THREE ENDS.** The ledger line (C1), the `make` target
+  (C2), and the probes that IMPORT it (C3) — `Charge-Probe` was deleted
+  as a "receipt" while four live probes imported its program families.
+  All three are gated now; a probe is EVIDENCE and INFRASTRUCTURE
+  independently, so classify both axes before deleting.
+
 **A PROBE IS TEMPORARY, AND ITS END STATE IS ASSEMBLY + DELETION (Anthony,
 2026-08-09).** Full-on assembly into `src` — postulating whatever gaps the
 assembly needs — is the **vastly preferred** outcome for any probe, and this is

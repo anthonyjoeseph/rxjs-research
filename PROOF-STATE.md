@@ -97,6 +97,44 @@ fix the pointer.
 >   which is the direction that gets things deleted. **Re-extract permissively
 >   (`^(\S+)\s+:`) before acting on any census row.**
 >
+> **TEN OF THE THIRTY-THREE PROBES DELETED ON 2026-08-09 DID NOT COMPILE.**
+> This is the sweep's most important finding and it outranks every classification
+> above it. Eight (`Frame-Work`, `Eval-Growth`, `Hop-Descent`, `J-Budget`,
+> `Fold-Count`, `Mult-Width`, `Width-Count`, `State-Blowup`) still
+> `open import Verify-Budget-Sufficient`, an umbrella module deleted in `a8508d6`
+> when it was split into submodules; agda exits 42, "Failed to find source of
+> module". Two more failed on their own: `Count-Level-Probe` on "Multiple
+> definitions of `size≤widAt1`" — **it broke because its own content landed** in
+> Subscribe-Face:441, which is a positive signal — and `Entry-Caps-Refuted` on a
+> genuine type error (`ℕ → Caps !=< Caps`), stale against an API that moved.
+>
+> Every one of the ten had a live `make` target that would fail. Three
+> independent classification sweeps had recommended KEEP for most of them as
+> "load-bearing evidence", because all three read headers and citations and none
+> ran the file.
+>
+> **THE RULE THIS ESTABLISHES: a probe's classification is worthless until it
+> compiles.** `agda/probe` is outside `make agda` by design — that exemption is
+> what makes it cheap — but the same exemption means nothing ever asks whether a
+> probe is still true. A refutation that cannot be re-run is not a machine-checked
+> receipt, it is a historical artifact, and its only surviving value is the number
+> already transcribed into a src comment. **Compile-check before classifying, and
+> treat a non-compiling probe as deleted-in-fact.** Repairing one to restore
+> "re-runnable evidence" nobody has run since `a8508d6` is the inventory the
+> shit-or-get-off-the-pot rule forbids — and two of them cannot be run affordably
+> even repaired (`J-Budget` OOMs at 13 GB by design, `Frame-Work` takes ~30 min).
+>
+> **A DELETION HAS THREE ENDS, AND ONLY ONE WAS EVER GATED.** C1 gated
+> `PROBES.txt` against the directory. The other two both broke during this sweep:
+> **(C2)** a `make` target whose file is gone — `make visited-width-probe` and
+> `make frame-mint-probe` sat broken, and this round's own deletions left 14 more;
+> **(C3)** a probe importing a deleted probe — `Charge-Probe` was deleted as a
+> "receipt probe" while four live probes imported it for its program families
+> (`progD`/`progW`/`pF1`/`pF2`). It is restored, with a ledger line naming that
+> role. **A probe is EVIDENCE and INFRASTRUCTURE independently; classify both
+> axes before deleting.** Both gates were verified by planting the failure and
+> watching them fire, not by observing a green run.
+>
 > **AND THE METRIC ITSELF WAS MIS-FRAMED AT FIRST.** The census counts names
 > defined in a probe that also appear in src, and that was initially read as
 > "src consumes this probe". It cannot: `agda/probe` is outside the build and
