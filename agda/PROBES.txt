@@ -25,7 +25,6 @@ Battery-Depth-Iter.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on n
 Battery-Done-Thread.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Eval-Laws.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Hop-Premise.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Battery-Instant-Headroom.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Merge-Cert.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Mu-Emissions.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Nesting-Escalation.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -35,13 +34,10 @@ Battery-Readme.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next 
 Battery-VWF-Prop.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Battery-Value-Count.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Burst-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Burst-Step-Probe.agda | EVIDENCE | §1 (burst-step/burst-index) already landed in Caps-Chain; §2 clause-shapes and §3 refl-facts superseded by inline proofs in Subscribe-Face (no src consumer)
 BurstLen-SyncSize-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Caps-Thread-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Chain-Descent-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Chain-Half-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Chain-Index-Probe.agda | EVIDENCE | §1 refutation (entry-feeds-walk-absurd) documented in Caps-Chain header; §2 (index-mono/entry-to-index) were in Caps-Chain, deleted 2026-08-07 as superseded — no src consumer verified
-Chain-Supply-Probe.agda | EVIDENCE | Step C design investigation (now complete — Subscribe-Face fully proven); chain-index-desc superseded by chain-desc at Caps-Chain:312; no items have src consumers
 Charge-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Concat-Frame-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Concat-Sum-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
@@ -95,6 +91,5 @@ Wf-Fold-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next t
 Width-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 OpIterD-Budget-Probe.agda | EVIDENCE | REFUTATION of opIterD-budget at R=0: missing hypothesis 1≤R, symbolic proof in §1
 Occurrences-Probe.agda | LANDING: Verify-Budget-Sufficient/Occurrences.agda | frameOccs?/pathOccs? predicates + subΘTm-occs-le/occsᵗ≤sizeᵗ postulates for threading pathOccs? into Anchor-Dry demand postulates
-Init-CapsOK-Core-Probe.agda | LANDING: Verify-Budget-Sufficient/Caps-Bridge.agda | COMPLETE proof of tier-1 #7 (all five capsOK? conjuncts incl. the non-scripted-live branch via widLive-mkHot; new kit: pWᵛ-data-zero family). LANDING DEFERRED: the direct proof bypasses the -core's 8 scaffold hypotheses, so landing orphans them, and their homes (Measures, Frame-Width, Caps-Face) are full-rebuild modules — land when Measures is next dirty, deciding delete-vs-rewire for the 8 then
 SubInner-Demand-Probe.agda | EVIDENCE | first coverage for subscribeInner-demand (Anchor-Dry:117): 20 LOAD-BEARING rows over merge/exhaust programs A/B at evaluator-reached init states; second valB? conjunct FULLY covered, first covered symbolically via Dm≥16 (2≤sizeCapAt · 1≤towerℕ); NOT covered: sizeᵛ>16 inners, the stuck sizeᵛ≤ᵇB conjunct of Hyp 3, post-step states
 Install-Scan-Depth-Probe.agda | EVIDENCE | §1 refutes old storeNestMax-installScan (LOAD-BEARING: caseᵗ duplication gives storeNestMax=25 > sizeᵗ-bound=23); §2 validates new installScan-depth-bound at b=emptyᵉ (LOAD-BEARING: storeNestMax post-install=5 > RHS=2, yet depthE=0)

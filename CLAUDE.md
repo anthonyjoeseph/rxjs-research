@@ -449,6 +449,32 @@ consequences, in force:
   a future session must read and classify, and every stale one dilutes the
   signal of the ones that matter.
 
+**IF IT DOES NOT SERVE THE MAIN PROOF, DELETE IT — "shit or get off the pot"
+(Anthony, 2026-08-09).** The burden of proof is on KEEPING, never on deleting.
+A piece of probe content has exactly two honest destinations:
+
+1. **Assembled into src**, where something the main proof consumes actually uses
+   it; or
+2. **Deleted.**
+
+There is no third state. "Might be useful later", "it was expensive to prove",
+"it documents an idea" — none of these earn a file a place in the tree. Git
+history is the archive. A proven lemma with no route to `The-Proof.agda` is not
+an asset being saved, it is context every future session must read and dismiss.
+
+The ONE thing that keeps unassemblable content alive is that it is **actively
+load-bearing for the proof effort**: a refutation stops a known-false route from
+being retried (`nestᵉ` is the wrong measure — Caps-Face:6294 says "nobody should
+re-derive it", and that sentence is worth more than the probe that established
+it). Even then the deliverable is the RECEIPT in the src header, not the file —
+write the receipt, delete the file. If you cannot name what the content stops or
+supplies, it is not evidence, it is inventory. Delete it.
+
+Applied 2026-08-09 to `capsAt-covers-12pow` (Battery-Instant-Headroom): clean
+proof, one arithmetic gap, and its only consumer was `obs-fits-headroom`, which
+rests on the REFUTED `sync-count-bounded`. No route to the main proof, so it
+goes — rather than landing as an orphan or being kept "in case".
+
 **BEFORE CALLING A PROBE MUST-LAND, CHECK ITS SUBJECT IS STILL LIVE.** "Zero
 postulates + real theorems + not in src" is NECESSARY BUT NOT SUFFICIENT: a
 clean proof about something the code no longer does is still dead. Grep src for
