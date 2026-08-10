@@ -90,7 +90,6 @@ Share-Residue-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on 
 State-Blowup-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Sub-Charge-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Sub-Wire-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
-Visited-Width-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Wf-Aux-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Wf-Fold-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch
 Width-Count-Probe.agda | EVIDENCE | bulk-classified 2026-08-06; reclassify on next touch

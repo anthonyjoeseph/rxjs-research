@@ -29,6 +29,31 @@ fix the pointer.
 >   statement to make it typecheck, and postulate rather than grind when a gap
 >   is real mathematics.
 
+> **PROBE CLEANUP IS ASSEMBLY-FIRST, AND IT IS NOT TIER-GATED (Anthony,
+> 2026-08-09).** A probe is TEMPORARY; its end state is **assembly into src plus
+> deletion of the probe-side code**. Full-on assembly — postulating whatever
+> gaps the assembly needs — is the vastly preferred outcome, as the general rule
+> rather than a case-by-case call.
+>
+> - **Tier lines do not gate probe cleanup.** Probe cleanliness outranks tier
+>   order. The tier law governs which postulates get GROUND; it does not decide
+>   whether proven work is allowed a home. Never park an assembly behind a tier.
+> - **The receipt route is the fallback.** `-- PROBED <date>:` into a src
+>   postulate's header, then delete, is right only for content that cannot be
+>   assembled — a measurement, a refutation, a reached-state receipt. Anything
+>   with provable content gets assembled instead.
+> - **Check the SUBJECT is live before assigning a landing.** "Zero postulates +
+>   real theorems + not in src" is necessary but NOT sufficient — a clean proof
+>   about something the code no longer does is dead. `Visited-Width-Probe.agda`
+>   passed that three-part test and was unassemblable: it bounded a demand
+>   against an allowance `3 + 2 * sz` that appears NOWHERE in src, because
+>   `capsBase` (Rx/Evaluator.agda:920) deliberately reads `entryCeil` into the
+>   tower height instead of bracketing it (Caps.agda:1300-1310 states the
+>   rationale; the width conjunct discharges by `k≤towerℕ` and costs no
+>   postulate). Its structural content had already landed as `Sub`/`Sub-∷` at
+>   Caps-Face:1418. **Deleted 2026-08-09** — wiring it in would have required a
+>   vacuous bridge, which is worse than an orphan because it looks discharged.
+
 ## The theorem chain (top → leaves)
 
 ```

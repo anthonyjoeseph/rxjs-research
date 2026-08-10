@@ -428,6 +428,40 @@ when a LANDING file lands, DELETE the file and its line in the same commit (git
 is the archive). **Never end a session with a new zero-postulate theorem in
 probe/ and no LANDING line naming its destination.**
 
+**A PROBE IS TEMPORARY, AND ITS END STATE IS ASSEMBLY + DELETION (Anthony,
+2026-08-09).** Full-on assembly into `src` — postulating whatever gaps the
+assembly needs — is the **vastly preferred** outcome for any probe, and this is
+the general rule for probe cleanup rather than a case-by-case judgement. Three
+consequences, in force:
+
+- **TIER LINES DO NOT GATE PROBE CLEANUP.** Probe cleanliness outranks tier
+  order. Assembling a probe's content into src is authorised even when the
+  content is tier-2 or tier-3 material — the tier law governs which *postulates
+  get ground*, not whether proven work is allowed to have a home. Do not park an
+  assembly behind a tier.
+- **The receipt route is the FALLBACK, not the default.** Writing a
+  `-- PROBED <date>:` line into a src postulate's header and deleting the probe
+  is correct only for content that genuinely cannot be assembled — a measurement,
+  a refutation, a reached-state receipt. Anything with provable content gets
+  assembled instead. Ask "can this be a definition in src?" before reaching for
+  a receipt.
+- **A probe left in the directory is a cost, not a neutral.** It is context that
+  a future session must read and classify, and every stale one dilutes the
+  signal of the ones that matter.
+
+**BEFORE CALLING A PROBE MUST-LAND, CHECK ITS SUBJECT IS STILL LIVE.** "Zero
+postulates + real theorems + not in src" is NECESSARY BUT NOT SUFFICIENT: a
+clean proof about something the code no longer does is still dead. Grep src for
+the actual formula or function the theorem reasons about before assigning it a
+destination. `Visited-Width-Probe.agda` was classified MUST-LAND on the
+three-part test and was in fact unassemblable — it bounded a demand against an
+allowance `3 + 2 * sz` that appears nowhere in src, because `capsBase`
+(`Rx/Evaluator.agda`) deliberately reads `entryCeil` into the tower height
+rather than bracketing it, and its own comment says why. Deleted 2026-08-09.
+The failure mode is real and it errs toward inventing a consumer: **wiring such
+a file in would have meant a vacuous bridge, which is worse than an orphan
+because it looks discharged.**
+
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
 **THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level
