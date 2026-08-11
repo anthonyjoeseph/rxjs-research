@@ -1624,6 +1624,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 | `SubInner-Demand-Probe` | tier-1 #3 — `subscribeInner-demand`'s only coverage | T1 |
 | `Walk-Core-Census-Probe` | tier-1 #1 — per-clause sub-postulate census for `subscribeE-walk-core` | T2 |
 | `Battery-Hop-Premise` | tier-1 #1 — how `hop-edge` premise (iii) discharges | T2 |
+| `Cascade-Go-Wet-Core-Probe` | tier-1 #2 — `cascadeGo-wet-core` falsity probe (PROBED-GREEN 2026-08-11; NOT COVERED: from-inner/thru-outer paths) | T2 |
 | `Install-Scan-Depth-Probe` | tier-1 #5 — `installScan-depth-bound` | T3 |
 | `Depth-Wire-Probe` | tier-1 #5 — `baseCaps-is-inner`, parked outside the graph by design (Caps-Bridge:1018) | T3 |
 | `Battery-Merge-Cert` | TIER 2, task #33 — the corrected `merge-cert` | T4 |

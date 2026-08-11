@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe walk-core-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe walk-core-probe cascade-go-wet-core-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -173,6 +173,16 @@ level-walk-probe:
 # No refutation found.  Seconds.
 walk-core-probe:
 	cd agda && agda -i src -i probe probe/Walk-Core-Probe.agda
+
+# FALSITY PROBE: do the 2-conjunct conclusion of `cascadeGo-wet-core`
+# (Wet.agda:4499, tier-1 #2) hold for concrete programs?
+# 6 rows checked by refl on root-path chains at the empty initial state.
+# hasDry rows LOAD-BEARING (test exhausted != dried); INV? rows
+# DEGENERATE (empty state, 0 <=b abstract always true).
+# NOT COVERED: from-inner/thru-outer paths (abstract Gas blocks compute).
+# No refutation found.  Seconds (deserializes Wet.agdai only).
+cascade-go-wet-core-probe:
+	cd agda && ls probe/Cascade-Go-Wet-Core-Probe.agda && agda -i src -i probe probe/Cascade-Go-Wet-Core-Probe.agda
 
 
 # May the SUBSCRIBE-NESTING budget `k` be read off the SIZE CAP, as the
