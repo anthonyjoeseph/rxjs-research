@@ -1622,6 +1622,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 | `Battery-Value-Count` | tier-1 #1/#2/#3 — REFUTES `sync-count-bounded` | T1 |
 | `Battery-Mu-Emissions` | tier-1 #1/#2/#3 — the μ leg of the composition | T1 |
 | `SubInner-Demand-Probe` | tier-1 #3 — `subscribeInner-demand`'s only coverage | T1 |
+| `Walk-Core-Census-Probe` | tier-1 #1 — per-clause sub-postulate census for `subscribeE-walk-core` | T2 |
 | `Battery-Hop-Premise` | tier-1 #1 — how `hop-edge` premise (iii) discharges | T2 |
 | `Install-Scan-Depth-Probe` | tier-1 #5 — `installScan-depth-bound` | T3 |
 | `Depth-Wire-Probe` | tier-1 #5 — `baseCaps-is-inner`, parked outside the graph by design (Caps-Bridge:1018) | T3 |

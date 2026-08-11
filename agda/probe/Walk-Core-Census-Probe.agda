@@ -1,3 +1,9 @@
+-- ROADMAP: tier-1 #1 — per-clause census for `subscribeE-walk-core` sub-postulates.
+-- DELETE WHEN: `subscribeE-walk-core` is assembled into src and this file's content
+--   is superseded by the src landing.  [T2]
+-- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
+-- change the other — the duplication is deliberate cross-checking.
+--
 -- Walk-Core-Census-Probe.agda  (2026-08-11)
 --
 -- CLAUSE CENSUS for `subscribeE-walk-core` (Measures.agda:5733).
