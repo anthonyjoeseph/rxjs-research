@@ -121,10 +121,15 @@ storeNestMax sched st =
 ------------------------------------------------------------------
 
 postulate
-  -- depthConn (gs fuel') = depthE fuel' d (share-sink i).  Main IH
-  -- gives sizeᵉ d + storeNestMax, but goal needs ≤ storeNestMax.
-  -- Gap: sizeᵉ d = slotNest (shared d) is already IN storeNestMax, so
-  -- the IH double-counts.  Requires a tighter gas-induction argument.
+  -- depthConn (gs fuel') = depthE fuel' d (share-sink i).
+  -- KEY: pathLen(share-sink i) = 0 definitionally (Measures:5614), so
+  -- depth-compositional gives ≤ sizeᵉ d + 0 + storeNestMax sched st'
+  -- = sizeᵉ d + storeNestMax sched st (register doesn't touch nodes).
+  -- But goal is ≤ storeNestMax sched st; gap is sizeᵉ d (= slotNest
+  -- (shared d) ≤ storeNestMax sched st), so natural-number arithmetic
+  -- cannot absorb the double-count.  Needs a JOINT induction with
+  -- depth-all-bound (both require storeNestMax preservation through
+  -- subscribeE — census finding (4)).
   depth-conn-storeNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
     (κ : Path Γ (lookup Γ i) t) (bid : Id) (now : Tick)
@@ -240,6 +245,10 @@ storeNestMax-installTake sched st k =
 -- depthE = 0 at b=emptyᵉ with storeNestMax(post-install)=5 > 2=RHS,
 -- ruling out any hidden dependence of depthE on the scan accumulator.
 -- Shapes NOT covered: shared-slot inner b, post-cascade state.
+-- NOTE: nodeNestMax(scan-st v) = sizeᵛ t v (NOT 0), so storeNestMax
+-- increases when installing with a non-trivial value.  The proof cannot
+-- go through depth-compositional at (sched₁, st₀) directly; it needs
+-- an install-invariance argument showing depthE ignores the fresh node.
 postulate
   installScan-depth-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (b : Closed Γ s)

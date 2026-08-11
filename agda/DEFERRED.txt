@@ -48,7 +48,6 @@ enterInstant-held | mid-step-core | ≤5 | REASON: mid-step-core must be proven
 enterInstant-idle | mid-step-core | ≤3 | REASON: mid-step-core must be proven
 finish-bounded | cascadeGo-wet-core | ≤2 | REASON: cascadeGo-wet-core must be proven
 foldPath-root-out | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-foldPath-sink-N | thruOuter-face-core | ≤1 | REASON: thruOuter-face-core must be proven
 hop-edge | subscribeE-wet-core | ≤5 | REASON: subscribeE-wet-core must be proven; its premise sizeᵛ (obs u) o ≤ Ŝ is the worked example that motivated this ledger
 hop-step-gives | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
 hop-step-needs | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
@@ -59,10 +58,6 @@ mid-seed | mid-step-core | ≤3 | REASON: mid-step-core must be proven
 mu-edge | subscribeE-wet-core | ≤1 | REASON: subscribeE-wet-core must be proven
 obs-slot-shared | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
 paidUp-held | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-reach-resets | thruOuter-face-core | ≤4 | REASON: thruOuter-face-core must be proven
-shareFinish-len | thruOuter-face-core | ≤1 | REASON: thruOuter-face-core must be proven
-shareGo-cons-N | thruOuter-face-core | ≤2 | REASON: thruOuter-face-core must be proven
-shareGo-skip-N | thruOuter-face-core | ≤2 | REASON: thruOuter-face-core must be proven
 sharedConnect-unconn | subscribeE-wet-core | ≤3 | REASON: subscribeE-wet-core must be proven
 spendᴱ-compose | subscribeE-walk-core | ≤1 | REASON: subscribeE-walk-core must be proven
 subscribeE-take-wf | subscribeE-takeᵉ-wf-core | ≤5 | REASON: subscribeE-takeᵉ-wf-core must be proven
