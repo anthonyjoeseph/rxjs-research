@@ -5725,6 +5725,11 @@ postulate
   -- the receipt's composition law and the flat width measure the Ω
   -- hypotheses are read against.  The definition itself sits BELOW
   -- `walk-hyps-round3b`, which is declared after this block.
+  --
+  -- PROBED 2026-08-11 (Walk-Core-Probe.agda): 8/9 conclusion conjuncts
+  -- checked by refl on emptyᵉ and ofᵉ[nat̂ 0] at the initial state
+  -- with E=3, E′=3.  Conjunct 2 (E′ ≤ E·3^N) holds analytically.
+  -- No refutation found on these programs.
   subscribeE-walk-core :
     -- walk-hyps-splitAnchor  (Verify-Budget-Sufficient/Measures.agda:5876)
     (∀ (Ψ W Ω ℓ E B₀ R U r s : ℕ) →

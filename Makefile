@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe walk-core-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -165,6 +165,14 @@ gate:
 # arithmetic, so src/Main.agda never reaches it.  Seconds.
 level-walk-probe:
 	cd agda && agda -i src -i probe probe/Level-Walk-Probe.agda
+
+
+# FALSITY PROBE: do the 9 conclusion conjuncts of `subscribeE-walk-core`
+# (Measures.agda:5728, tier-1 #1) hold for emptyᵉ and ofᵉ[nat̂ 0]?
+# 8 of 9 checked by refl; conjunct 2 (ceiling) held analytically.
+# No refutation found.  Seconds.
+walk-core-probe:
+	cd agda && agda -i src -i probe probe/Walk-Core-Probe.agda
 
 
 # May the SUBSCRIBE-NESTING budget `k` be read off the SIZE CAP, as the
