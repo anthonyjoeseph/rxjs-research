@@ -2,9 +2,17 @@
 # Install the Agda toolchain this repo needs, from scratch, on a fresh
 # cloud box. Idempotent: re-running skips whatever is already in place.
 #
-#   Agda 2.7.0.1  (built with GHC's MAlonzo backend, so we need GHC)
+#   Agda 2.8.0  (built with GHC's MAlonzo backend, so we need GHC)
 #   GHC 9.4.7 + cabal 3.8  (from apt — the GHCup domain is proxy-blocked here)
-#   agda-stdlib 2.2  (registered in ~/.agda so `agda` finds it by default)
+#   agda-stdlib 2.3  (registered in ~/.agda so `agda` finds it by default)
+#
+# WHY 2.8.0, upgraded from 2.7.0.1 on 2026-08-11: Agda's Positivity pass is
+# 86-91% of this repo's build cost, and 2.8 cuts it 2.6x — Subscribe-Face's
+# solo dirty check went 927s -> 384s.  It is the only lever that reduced that
+# pass at all (see agda-performance-roadmap.md; flags, pragmas and RTS knobs
+# were all measured and all failed).  stdlib moved 2.2 -> 2.3 in the same pass
+# because v2.3 is the version tested against BOTH 2.7 and 2.8, which let the
+# two upgrades be validated one axis at a time.
 #
 # After this, from repo root:
 #   export PATH="$HOME/.cabal/bin:$PATH"
@@ -19,8 +27,8 @@
 # oracle is `npm run oracle`, the all-Agda QuickCheck is `npm run agda:qc`).
 set -euo pipefail
 
-AGDA_VERSION=2.7.0.1
-STDLIB_VERSION=2.2
+AGDA_VERSION=2.8.0
+STDLIB_VERSION=2.3
 STDLIB_DIR="$HOME/agda-stdlib-${STDLIB_VERSION}"
 
 log() { printf '\n=== %s ===\n' "$1"; }

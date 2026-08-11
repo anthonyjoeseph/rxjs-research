@@ -32,7 +32,7 @@ if [ ! -x "$BUILD/_out/Joint-Probe" ]; then
   cat > "$BUILD/rxjs-probe.agda-lib" <<'LIB'
 name: rxjs-joint-probe
 include: src
-depend: standard-library-2.2
+depend: standard-library-2.3
 LIB
 
   python3 "$REPO/scripts/joint-probe-instrument.py" "$BUILD/src/Rx/Evaluator.agda"

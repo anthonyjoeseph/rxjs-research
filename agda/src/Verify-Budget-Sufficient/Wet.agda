@@ -1,5 +1,10 @@
 -- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY.
 --
+-- TIMING RECEIPT 2026-08-11 (--profile=internal, dirty solo check): see
+-- agda-performance-roadmap.md.  Measured because Subscribe-Face's cost turned
+-- out to be 86% Agda's Positivity pass over ONE mutual block, and this module
+-- is written in the same style; the roadmap records whether that generalises.
+--
 -- The half that steps the evaluator.  The Keeps ring (slot/share
 -- monotonicity), the size-elim laws, the ledger arithmetic, the wet
 -- lemmas for every evaluator entry point, subscribeE-walkS and

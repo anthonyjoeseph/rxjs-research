@@ -42,7 +42,7 @@ cp "$REPO/agda/probe/Burst-Probe.agda" "$BUILD/src/Burst-Probe.agda"
 cat > "$BUILD/rxjs-probe.agda-lib" <<'LIB'
 name: rxjs-probe
 include: src
-depend: standard-library-2.2
+depend: standard-library-2.3
 LIB
 
 python3 "$REPO/scripts/burst-probe-instrument.py" "$BUILD/src/Rx/Evaluator.agda"

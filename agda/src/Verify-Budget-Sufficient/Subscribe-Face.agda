@@ -21,6 +21,41 @@
 -- This is the .Caps / .Keeps-Ring precedent applied a third time, in the
 -- other direction: .Caps was peeled off the FRONT (shared upstream),
 -- this is peeled off the BACK (unshared downstream).
+--
+-- TIMING, measured 2026-08-11 (--profile=definitions then --profile=internal,
+-- genuinely dirty solo check): 927s total, and the cost is NOT the proofs —
+-- every definition here typechecks in ~18s combined (largest: subscribeE-caps
+-- 2.9s).  The bill is POSITIVITY 779s (86%) and Termination.Graph 92s (10%),
+-- both whole-mutual-block analyses.  Consequences, so nobody re-derives them:
+--   * The 779s is the OCCURRENCE/POLARITY graph, not the strict-positivity
+--     verdict, and it CANNOT BE SWITCHED OFF.  A NO_POSITIVITY_CHECK pragma
+--     is invalid on a function-only block (InvalidNoPositivityCheckPragma, it
+--     is a no-op); `--no-positivity-check` on the command line is REJECTED
+--     (written without pragma delimiters on purpose: `make unsafe-check` greps
+--     for the delimited form and does not strip comments, so quoting a pragma
+--     verbatim in prose FAILS THE GATE — hit 2026-08-11)
+--     outright because agda-stdlib is --safe (EXIT=42 in 267ms); and as a
+--     per-module OPTIONS pragma it is accepted but measured 805s vs 779s —
+--     NO SAVING.  Do not re-attempt any of these three.
+--   * The TELESCOPES are not the cost either: all 19 clique signatures as bare
+--     postulates check in 9.0s (5.3s of that merely deserializing imports).
+--     Record-bundling the hypothesis kit would buy nothing measurable.
+--   * MUTUAL-BLOCK MEMBERSHIP is the whole cost, and it is steeply superlinear:
+--     ONE real body in the block puts Positivity at 3.0s, fifteen put it at
+--     779s.  The 904-line prelude below (~45 lemmas, each its own trivial
+--     block) checks in 7.8s.
+--   * The block cannot be split much: 13 of the 15 members form ONE genuine
+--     SCC (four independent cycles traced).  Only `innerFinish-zero′` and
+--     `retagEvents-caps` are pure callees and could be hoisted out, 15 -> 13.
+--   * What DOES work: check one member's real body against its siblings as
+--     POSTULATES — 17.7s, and 4 such checks run in parallel in 14s at ~120 MB
+--     each.  This is what `make agda-dev` is being built on.
+--   * AGDA 2.8.0 + stdlib v2.3 cuts this module's solo dirty check from 927s
+--     to 384s — Positivity 779s -> 300s, a 2.6x cut, measured like-for-like
+--     (solo, warm deps, 1 module).  Whole repo green under 2.8 (40 modules,
+--     EXIT=0).  This is the ONLY lever found that reduces the pass itself; it
+--     does not remove the need for the stub loop, since 384s is still minutes.
+-- See agda-performance-roadmap.md for the numbers, the plan, and the traps.
 module Verify-Budget-Sufficient.Subscribe-Face where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;

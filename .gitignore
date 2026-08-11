@@ -8,6 +8,10 @@ typescript/.oracle-tmp
 
 # agda
 **/_build
+# interface files: normally live in _build, but land next to sources under
+# `agda --local-interfaces` (used to keep an experimental/dev interface cache
+# isolated from the strict one).  Build artifacts either way — never commit.
+**/*.agdai
 **/_cli
 **/_measure
 **/_ih
