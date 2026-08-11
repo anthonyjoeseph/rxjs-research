@@ -98,7 +98,7 @@ open import Verify-Budget-Sufficient.Delivery-Walk
          ∧-intro; ∧-true; all-++-intro)
 
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthFrame; depthCascade; depthInner)
+  using (depthFrame; depthCascade; depthInner; depthFin)
 
 open import Verify-Budget-Sufficient.Caps-Nest using (nest)
 
@@ -109,7 +109,7 @@ open import Verify-Budget-Sufficient.Caps-Face
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
-         frameStep-mono-j; frameStep-0; stepFrame-face)
+         frameStep-mono-j; frameStep-0; stepFrame-face; frameBud)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
@@ -249,6 +249,40 @@ SiCFace =
        × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
+
+-- § 2.1b  THE ifc HYPOTHESIS, named once: `stepFrame-face`'s second
+-- argument.  It is a PARAMETER rather than an import because the
+-- supplier (`innerFinish-caps`, Subscribe-Face:1760, PROVEN) lives in
+-- the 44-minute module and importing it here would cost this module its
+-- fast loop.  Caps-Bridge, which imports both, applies it.
+IfcFace : Set
+IfcFace =
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    valsCaps? (frameStep j c) sl vals ≡ true →
+    frameBud c j ≤ bud →
+    depthFin g op allNid inst κ id now vals sched st
+      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
+    let r = innerFinish g op allNid inst κ id now vals sched st
+              (lookupNode allNid (EvalSt.nodes st))
+    in Σ ℕ λ j′ →
+       (capsOK? (frameStep (j + j′) c)
+                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                  ≡ true)
+       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+       × (all (eventCaps? (frameStep (j + j′) c) sl)
+              (proj₁ (proj₂ r)) ≡ true)
+       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 
 -- § 2.2  THE WET FACE — exactly what `stepFrame-face` does NOT say.
 -- Ψ-pure: no caps, no level index, no growth witness.
@@ -1406,7 +1440,7 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 -- since the FrameFace move (§ 2 header).
 ------------------------------------------------------------------
 
-stepFrame-burst-face : SiCFace →
+stepFrame-burst-face : SiCFace → IfcFace →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
@@ -1428,7 +1462,7 @@ stepFrame-burst-face : SiCFace →
     × (VbB c sl Ψ (J + j′) (proj₁ r) ≡ true)
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
-stepFrame-burst-face siC c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
+stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
                      ok pb vb rg hD =
     j′
   , proj₁ (proj₂ FC)
@@ -1444,7 +1478,7 @@ stepFrame-burst-face siC c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ va
   s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
   t′ = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
-  FC = stepFrame-face siC c d J sl sf id now f path′ vals fin sched st
+  FC = stepFrame-face siC ifc c d J sl sf id now f path′ vals fin sched st
          2≤S 1≤R (proj₁ (proj₁ ok)) slC (proj₂ (proj₁ ok))
          (proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (f ↠ path′))
                         (pathBΨ? Ψ (f ↠ path′)) pb))
@@ -1466,6 +1500,7 @@ stepFrame-burst-face siC c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ va
 module BurstWalk
   {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (siC : SiCFace)
+  (ifc : IfcFace)
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ)
   (2≤S : 2 ≤ Caps.cSize c) (1≤R : 1 ≤ Caps.cReg c)
   (slC : slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true)
@@ -1610,7 +1645,7 @@ module BurstWalk
     ; ok-finish = λ J i fin out ok →
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
-    ; sf-step   = stepFrame-burst-face siC {e = e} c sl Ψ d 2≤S 1≤R slC slSz
+    ; sf-step   = stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
@@ -1629,7 +1664,7 @@ module BurstWalk
 -- cascade-depth-capsH.
 ------------------------------------------------------------------
 
-cascadeGo-burst-dry : SiCFace →
+cascadeGo-burst-dry : SiCFace → IfcFace →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (a : Arrival Γ)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -1652,7 +1687,7 @@ cascadeGo-burst-dry : SiCFace →
   depthCascade a id chains sched st ≤ capsH e sl id →
   burstB? (sizeCapAt e sl (suc id)) Ψ
           (proj₁ (cascadeGo a id chains sched st)) ≡ true
-cascadeGo-burst-dry siC {n = n} {e = e} id a chains sched st
+cascadeGo-burst-dry siC ifc {n = n} {e = e} id a chains sched st
                     slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
   burstB?-halves (capsAt e sl (suc id)) sl Ψ (proj₁ cg)
     (subst (λ x → burstCaps? x sl (proj₁ cg) ≡ true)
@@ -1670,7 +1705,7 @@ cascadeGo-burst-dry siC {n = n} {e = e} id a chains sched st
   1≤R = 1≤capsAt-reg e sl id
   cg  = cascadeGo a id chains sched st
 
-  module BW = BurstWalk {e = e} siC c sl Ψ d 2≤S 1≤R slC slSz
+  module BW = BurstWalk {e = e} siC ifc c sl Ψ d 2≤S 1≤R slC slSz
 
   inv0 : capsOK? (frameStep 0 c) sched st ≡ true
   inv0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv

@@ -1603,7 +1603,7 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | id | DELETE the tied probes WHEN … |
 |---|---|
-| **T1** | `subscribeInner-Ψ` and `wet-thru` (.Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged — the anchor's whole open surface after the 2026-08-10 walk landing, its same-day split, the three state-local leaves, the FrameFace repair and the `wet-innerFinish` discharge (now a real definition, § 2.4e) |
+| **T1** | ~~`subscribeInner-Ψ` and `wet-thru` (.Burst-Walk § 2.3) and `subscribeInner-demand` (.Anchor-Dry) are discharged~~ **MILESTONE REACHED 2026-08-10**: all three are real definitions; the two new subscribeE-level postulates (`subscribeE-Ψ`, `subscribeE-demand`) name the subscribe-side burst face — same gap as `subscribeE-walk-core` |
 | **T2** | `subscribeE-walk-core` is discharged (tier-1 #1) |
 | **T3** | tier-1 #5's remaining depth postulates are discharged |
 | **T4** | `merge-cert` is stated in src AND discharged (task #33) |

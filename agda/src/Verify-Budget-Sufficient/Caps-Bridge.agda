@@ -590,7 +590,7 @@ dry-tick =
     (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeLatch-deliv {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascade-delivN {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascadeGo-burst-dry subscribeInner-caps {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → cascadeGo-burst-dry subscribeInner-caps innerFinish-caps {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} {u} → subscribeInner-dry {n} {Γ} {t} {e} {u})
     (λ {n} {Γ} {u} → dry-hop {n} {Γ} {u})
 
@@ -756,6 +756,8 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
     subst (λ s → capsOK? (capsAt e s (suc id)) sched′ st′ ≡ true) (sym slEq)
           (caps-tick (λ {n′} {Γ′} {t′} {e′} {u′} →
                         subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
+                     (λ {n′} {Γ′} {t′} {e′} {s′} →
+                        innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
                      sl id a id sched st refl pre valC)
 
   capsParts = capsOK?-parts (capsAt e sl′ (suc id)) sched′ st′ capsOut
