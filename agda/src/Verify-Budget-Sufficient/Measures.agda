@@ -52,7 +52,7 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
-open import Data.List.Properties using (length-++)
+open import Data.List.Properties using (length-++; length-map)
 open import Data.List.Membership.Propositional.Properties
   using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe   using (Maybe; nothing; just)
@@ -5687,50 +5687,561 @@ anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 --     until the landing composes (𝔉 into the boundary).
 ------------------------------------------------------------------
 
+----------------------------------------------------------------------
+-- WALK-CORE SUB-POSTULATES (32 total, landed from Walk-Core-Assembly-Probe.agda)
+-- subscribeE-walk-core below is now a REAL DEFINITION (structural
+-- recursion on b : Closed / g : Gas) over these per-clause gaps.
+-- Probe EXIT=0 on 2026-08-11; parameter reconciliation applied here.
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+-- § 1  SHARED ARITHMETIC CENSUS POSTULATES
+----------------------------------------------------------------------
+
 postulate
-  -- THE ROUND-3 FACE (2026-07-29), restated after three statement-level
-  -- refutations.  What each of them forced, so nothing here reads as
-  -- taste:
-  --
-  --   walk-hyps-absurd            one V could not be both the demand
-  --     anchor and the store ceiling.  Round 2 split them.
-  --   hop-anchor-absurd           the split then put a call and its hop
-  --     child at DIFFERENT anchors, and the hop edge died in the gap.
-  --     Round 3 shares ONE anchor, anchorᴬ, across the whole walk.
-  --   round3-old-ell-absurd       `pathLen κ + d ≤ ℓ` carried the same
-  --     loop through ℓ, because walkCap's base is (3 + Ω)·suc ℓ.  It is
-  --     now `pathLen κ + G ≤ ℓ` — path growth paid for by G-derived
-  --     work, never by remaining fuel.
-  --   round3-anchor-indexed-absurd  the work index may not be measured
-  --     at the anchor.  So `r` is `hopDᵉ F b` at an anchor-free F, and
-  --     F is THREADED UNCHANGED into the hop child — which is what
-  --     finally lets the *All recursion feed itself, since parent and
-  --     child now read the same index.
-  --
-  -- The ceiling is no longer a hypothesis.  anchorᴬ IS the expression
-  -- the receipt conjunct caps the ledger by, so "shared anchor" and
-  -- "ceiling" are one object rather than two constrained to agree —
-  -- which is exactly the failure mode of rounds 1 and 2, removed at the
-  -- level of the statement instead of patched at the level of a bound.
-  --
-  -- walk-hyps-round3b discharges every edge of this shape for arbitrary
-  -- entry data.  What it does NOT establish — and what
-  -- round3b-ledger-reset-absurd names as the price — is that Ŝ, R̂ and F
-  -- can be sourced from REACHABILITY rather than from the ledger.
-  -- Frame-Work-Probe is the evidence, not a proof.
-  --
-  -- ASSEMBLY (2026-08-06): narrowed over the facts named directly above
-  -- — `walk-hyps-round3b` (which discharges every edge of this shape)
-  -- and `walk-hyps-splitAnchor` (the satisfiability contrast) — plus
-  -- the receipt's composition law and the flat width measure the Ω
-  -- hypotheses are read against.  The definition itself sits BELOW
-  -- `walk-hyps-round3b`, which is declared after this block.
-  --
-  -- PROBED 2026-08-11 (Walk-Core-Probe.agda): 8/9 conclusion conjuncts
-  -- checked by refl on emptyᵉ and ofᵉ[nat̂ 0] at the initial state
-  -- with E=3, E′=3.  Conjunct 2 (E′ ≤ E·3^N) holds analytically.
-  -- No refutation found on these programs.
-  subscribeE-walk-core :
+  walk-core-mintSource-mintCount :
+    ∀ {n} {Γ : Ctx n} (Ω ℓ G : ℕ) (sched : Sched Γ)
+      {t} {e : Closed Γ t} (st : EvalSt e) →
+    mintCount (proj₂ (mintSource sched)) st
+      ≤ mintCount sched st + walkCap Ω ℓ G
+
+  walk-core-burstLen-empty :
+    ∀ {n} {Γ : Ctx n} (Ω ℓ G : ℕ)
+      (id : Id) (sched : Sched Γ) {u} →
+    1 ≤ G → 1 ≤ ℓ →
+    burstLen {u = u} (proj₁ (oneShotBurst [] id sched)) ≤ walkCap Ω ℓ G
+
+  walk-core-burstLen-of :
+    ∀ {n} {Γ : Ctx n} {u} (Ω ℓ G : ℕ) (B : ℕ) (id : Id) (sched : Sched Γ)
+      (vs : List (Val Γ u)) →
+    1 ≤ G → 1 ≤ ℓ → length vs ≤ B → 4 ≤ B →
+    burstLen (proj₁ (oneShotBurst vs id sched)) ≤ walkCap Ω ℓ G
+
+  walk-core-of-burstB :
+    ∀ {n} {Γ : Ctx n} {u} (Ψ W E : ℕ) (id : Id) (sched : Sched Γ)
+      (ts : List (Tm Γ [] [] [] u)) →
+    3 ≤ E →
+    sizeᵉ (ofᵉ ts) ≤ capᴱ W E →
+    fnCapᵉ (ofᵉ ts) ≤ Ψ →
+    burstB? (capᴱ W E) Ψ
+      (proj₁ (oneShotBurst (map (λ tm → evalTm tm) ts) id sched)) ≡ true
+
+  walk-core-of-burstHopD :
+    ∀ {n} {Γ : Ctx n} {u} (W E F : ℕ) (id : Id) (sched : Sched Γ)
+      (ts : List (Tm Γ [] [] [] u)) →
+    burstHopD? F (hopDᵉ F (ofᵉ ts))
+      (proj₁ (oneShotBurst (map (λ tm → evalTm tm) ts) id sched)) ≡ true
+
+  sizeᵗˢ≤sizeᵉ :
+    ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u)) →
+    length ts ≤ sizeᵉ (ofᵉ ts)
+
+  walk-core-G-pos :
+    ∀ {Ŝ R̂ U r s G : ℕ} →
+    dBound Ŝ R̂ U r s ≤ G → 1 ≤ G
+
+  walk-core-ℓ-pos :
+    ∀ {G ℓ κlen : ℕ} →
+    1 ≤ G → κlen + G ≤ ℓ → 1 ≤ ℓ
+
+  walk-core-oneShotBurst-hasDry :
+    ∀ {n} {Γ : Ctx n} {u} (vs : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
+    hasDry (proj₁ (oneShotBurst vs id sched)) ≡ false
+
+  walk-core-capᴱ-lb4 :
+    ∀ (W E : ℕ) → 3 ≤ E → 4 ≤ capᴱ W E
+
+----------------------------------------------------------------------
+-- § 2  PER-CLAUSE CENSUS POSTULATES
+----------------------------------------------------------------------
+
+postulate
+  -- walk-core-input: full 4-parameter form matching subscribeE-walk-core
+  -- (probe used simplified 2-parameter form; reconciled at landing)
+  walk-core-input :
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (h-split : ∀ Ψ W Ω ℓ E B₀ R U r s →
+        Σ ℕ λ V → Σ ℕ λ d →
+          (dBound B₀ R U r s ≤ d) × (capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d)) ≤ V))
+    (h-r3b : ∀ Ψ W Ω E p Ŝ R̂ U r s →
+        Σ ℕ λ G →
+            (dBound Ŝ R̂ U r s ≤ G)
+          × (p + G ≤ p + G)
+          × (anchorᴬ Ψ W Ω (p + G) G E ≡ capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω (p + G) G)))
+          × (∀ r″ s″ → r″ < r → s″ ≤ Ŝ → suc (dBound Ŝ R̂ U r″ s″) ≤ G)
+          × (∀ U″ r″ s″ → U″ < U → r″ ≤ R̂ → s″ ≤ Ŝ → suc (dBound Ŝ R̂ U″ r″ s″) ≤ G)
+          × (∀ s″ → s″ < s → suc (dBound Ŝ R̂ U r s″) ≤ G)
+          × (∀ q G′ → q + suc G′ ≤ p + G → suc q + G′ ≤ p + G))
+    (_compose : ∀ Ψ r₁ s₁ r₂ s₂ → spendᴱ Ψ r₁ s₁ * spendᴱ Ψ r₂ s₂ ≡ spendᴱ Ψ (r₁ + r₂) (s₁ + s₂))
+    (_ΩAt-eq : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → ΩAt e sl ≡ ofWᵉ e + slotsOfW sl)
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (i : Fin n)
+    (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walk-core-subscribeAll-walk :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (op : AllOp)
+    (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ b ≤ capᴱ W E → fnCapᵉ b ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ b ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeAll g op (merge-st 0 false) b κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (suc (hopDᵉ F b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walkCap-mono-d : ∀ Ω ℓ {G_inner G : ℕ} →
+    G_inner ≤ G → walkCap Ω ℓ G_inner ≤ walkCap Ω ℓ G
+
+  walk-core-mapᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t s u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ (mapᵉ f b) ≤ capᴱ W E → fnCapᵉ (mapᵉ f b) ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ (mapᵉ f b) ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F (mapᵉ f b)) (syncSizeᵉ (mapᵉ f b)) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g (mapᵉ f b) κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F (mapᵉ f b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walk-core-takeᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ (takeᵉ count b) ≤ capᴱ W E → fnCapᵉ (takeᵉ count b) ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ (takeᵉ count b) ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F (takeᵉ count b)) (syncSizeᵉ (takeᵉ count b)) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g (takeᵉ count b) κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F (takeᵉ count b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walk-core-scanᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (sc : Closed Γ u)
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ sc ≤ capᴱ W E → fnCapᵉ sc ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ sc ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F sc) (syncSizeᵉ sc) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g sc κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F sc) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walk-core-deferᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (db : Closed Γ u)
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ db ≤ capᴱ W E → fnCapᵉ db ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ db ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F db) (syncSizeᵉ db) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g db κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F db) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+----------------------------------------------------------------------
+-- § 3  NEW WHOLE-CLAUSE POSTULATES for concatAllᵉ / switchAllᵉ / exhaustAllᵉ
+----------------------------------------------------------------------
+
+postulate
+  walk-core-concatAllᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ (concatAllᵉ b) ≤ capᴱ W E → fnCapᵉ (concatAllᵉ b) ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ (concatAllᵉ b) ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F (concatAllᵉ b)) (syncSizeᵉ (concatAllᵉ b)) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g (concatAllᵉ b) κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F (concatAllᵉ b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walk-core-switchAllᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ (switchAllᵉ b) ≤ capᴱ W E → fnCapᵉ (switchAllᵉ b) ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ (switchAllᵉ b) ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F (switchAllᵉ b)) (syncSizeᵉ (switchAllᵉ b)) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g (switchAllᵉ b) κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F (switchAllᵉ b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  walk-core-exhaustAllᵉ-all :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+    3 ≤ E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ (exhaustAllᵉ b) ≤ capᴱ W E → fnCapᵉ (exhaustAllᵉ b) ≤ Ψ →
+    pathB? (capᴱ W E) Ψ κ ≡ true →
+    widthOK? Ω sched st ≡ true → ofWᵉ (exhaustAllᵉ b) ≤ Ω → pathΩ? Ω κ ≡ true →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F (exhaustAllᵉ b)) (syncSizeᵉ (exhaustAllᵉ b)) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g (exhaustAllᵉ b) κ id now sched st
+    in Σ ℕ λ E′ → (E ≤ E′)
+       × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+       × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F (exhaustAllᵉ b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ mintCount sched st + walkCap Ω ℓ G)
+       × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+----------------------------------------------------------------------
+-- § 2b  μ-SPECIFIC SUB-POSTULATES
+----------------------------------------------------------------------
+
+postulate
+  walk-core-μ-dBound-inner :
+    ∀ {n} {Γ : Ctx n} {t u} (F Ŝ R̂ G : ℕ)
+    (body : Exp Γ (u ∷ []) [] [] u)
+    (sched : Sched Γ) {e : Closed Γ t} (st : EvalSt e) →
+    dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+           (hopDᵉ F (μᵉ body)) (syncSizeᵉ (μᵉ body)) ≤ G →
+    Σ ℕ λ G′ →
+        suc G′ ≤ G
+      × dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+               (hopDᵉ F (unfoldμ body)) (syncSizeᵉ (unfoldμ body)) ≤ G′
+
+  walk-core-μ-hasAtLeast :
+    ∀ {fuel : Gas} {G G′ : ℕ} →
+    gs fuel hasAtLeast suc G →
+    suc G′ ≤ G →
+    fuel hasAtLeast suc G′
+
+  walk-core-μ-sz :
+    ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+    (Ψ W E : ℕ) (body : Exp Γ (u ∷ []) [] [] u)
+    (sched : Sched Γ) (st : EvalSt e) →
+    sizeᵉ (μᵉ body) ≤ capᴱ W E →
+    INV? Ψ (capᴱ W E) sched st ≡ true →
+    sizeᵉ (unfoldμ body) ≤ capᴱ W E
+
+  walk-core-μ-fc :
+    ∀ {n} {Γ : Ctx n} {u} (Ψ E : ℕ)
+    (body : Exp Γ (u ∷ []) [] [] u) →
+    fnCapᵉ (μᵉ body) ≤ Ψ →
+    fnCapᵉ (unfoldμ body) ≤ Ψ
+
+  walk-core-μ-ofW :
+    ∀ {n} {Γ : Ctx n} {u} (Ω : ℕ)
+    (body : Exp Γ (u ∷ []) [] [] u) →
+    ofWᵉ (μᵉ body) ≤ Ω →
+    ofWᵉ (unfoldμ body) ≤ Ω
+
+  walk-core-μ-hopD :
+    ∀ {n} {Γ : Ctx n} {u} (F : ℕ)
+    (body : Exp Γ (u ∷ []) [] [] u) →
+    hopDᵉ F (unfoldμ body) ≡ hopDᵉ F body
+
+----------------------------------------------------------------------
+-- § 4  PROVED LEMMAS (with real bodies, from Walk-Core-Assembly-Probe.agda § 4)
+----------------------------------------------------------------------
+
+g0-hasAtLeast-absurd : ∀ {G} → g0 hasAtLeast suc G → ⊥
+g0-hasAtLeast-absurd ()
+
+walk-core-emptyᵉ :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  1 ≤ capᴱ W E →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  widthOK? Ω sched st ≡ true → pathΩ? Ω κ ≡ true →
+  dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st)) 0 1 ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g emptyᵉ κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F 0 (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+          ≤ mintCount sched st + walkCap Ω ℓ G)
+     × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+walk-core-emptyᵉ {u = u} Ψ W Ω ℓ F Ŝ R̂ G g κ id now sched st E
+    h3≤E h-INV h-sz h-pB h-wOK h-pΩ h-dB h-hA h-pL h-rL =
+  E
+  , ≤-refl
+  , E≤E*3^ E (suc Ψ * walkCap Ω ℓ G)
+  , h-INV
+  , refl
+  , refl
+  , refl
+  , walk-core-mintSource-mintCount Ω ℓ G sched st
+  , walk-core-burstLen-empty Ω ℓ G id sched {u}
+      (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
+         {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
+         {r = 0} {s = 1} h-dB)
+      (walk-core-ℓ-pos
+         (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
+            {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
+            {r = 0} {s = 1} h-dB)
+         h-pL)
+  , h-rL
+
+walk-core-ofᵉ :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+  (ts : List (Tm Γ [] [] [] u))
+  (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ (ofᵉ ts) ≤ capᴱ W E → fnCapᵉ (ofᵉ ts) ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  widthOK? Ω sched st ≡ true → ofWᵉ (ofᵉ ts) ≤ Ω → pathΩ? Ω κ ≡ true →
+  dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+         (hopDᵉ F (ofᵉ ts)) (syncSizeᵉ (ofᵉ ts)) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g (ofᵉ ts) κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (hopDᵉ F (ofᵉ ts)) (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+          ≤ mintCount sched st + walkCap Ω ℓ G)
+     × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+walk-core-ofᵉ Ψ W Ω ℓ F Ŝ R̂ G g ts κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL =
+  E
+  , ≤-refl
+  , E≤E*3^ E (suc Ψ * walkCap Ω ℓ G)
+  , h-INV
+  , walk-core-of-burstB Ψ W E id sched ts h3≤E h-sz h-fc
+  , walk-core-of-burstHopD W E F id sched ts
+  , walk-core-oneShotBurst-hasDry (map evalTm ts) id sched
+  , walk-core-mintSource-mintCount Ω ℓ G sched st
+  , walk-core-burstLen-of Ω ℓ G (capᴱ W E) id sched
+      (map (λ tm → evalTm tm) ts)
+      (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
+         {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
+         {r = hopDᵉ F (ofᵉ ts)} {s = syncSizeᵉ (ofᵉ ts)} h-dB)
+      (walk-core-ℓ-pos
+         (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
+            {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
+            {r = hopDᵉ F (ofᵉ ts)} {s = syncSizeᵉ (ofᵉ ts)} h-dB)
+         h-pL)
+      (≤-trans (≤-trans (≤-reflexive (length-map _ ts)) (sizeᵗˢ≤sizeᵉ ts)) h-sz)
+      (walk-core-capᴱ-lb4 W E h3≤E)
+  , h-rL
+
+walk-core-mergeAllᵉ :
+  ∀ {n} {Γ : Ctx n} {t u} {e : Closed Γ t}
+  (Ψ W Ω ℓ F Ŝ R̂ G : ℕ) (g : Gas)
+  (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
+  3 ≤ E →
+  INV? Ψ (capᴱ W E) sched st ≡ true →
+  sizeᵉ (mergeAllᵉ b) ≤ capᴱ W E → fnCapᵉ (mergeAllᵉ b) ≤ Ψ →
+  pathB? (capᴱ W E) Ψ κ ≡ true →
+  widthOK? Ω sched st ≡ true → ofWᵉ (mergeAllᵉ b) ≤ Ω → pathΩ? Ω κ ≡ true →
+  dBound Ŝ R̂ (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+         (hopDᵉ F (mergeAllᵉ b)) (syncSizeᵉ (mergeAllᵉ b)) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g (mergeAllᵉ b) κ id now sched st
+  in Σ ℕ λ E′ → (E ≤ E′)
+     × (E′ ≤ E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
+     × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (capᴱ W E′) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (hopDᵉ F (mergeAllᵉ b)) (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (mintCount (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+          ≤ mintCount sched st + walkCap Ω ℓ G)
+     × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+walk-core-mergeAllᵉ Ψ W Ω ℓ F Ŝ R̂ G g b κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL =
+  let IH = walk-core-subscribeAll-walk Ψ W Ω ℓ F Ŝ R̂ G g mergeᵒ b κ id now sched st E
+             h3≤E h-INV
+             (≤-trans (n≤1+n (sizeᵉ b)) h-sz)
+             h-fc
+             h-pB h-wOK h-ofW h-pΩ
+             (≤-trans (n≤1+n _)
+               (≤-trans
+                 (dBound-struct Ŝ R̂
+                   (unconn (Sched.slots sched) (EvalSt.connectedShares st))
+                   (n≤1+n (hopDᵉ F b)) ≤-refl)
+                 h-dB))
+             h-hA h-pL h-rL
+  in proj₁ IH , proj₁ (proj₂ IH) , proj₁ (proj₂ (proj₂ IH))
+     , proj₁ (proj₂ (proj₂ (proj₂ IH)))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IH))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+     , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+
+----------------------------------------------------------------------
+-- § 5  MAIN ASSEMBLY: subscribeE-walk-core as a real definition
+--
+-- Structural recursion on (b : Closed Γ u) / (g : Gas).
+-- All non-μ clauses delegate to per-clause postulates/lemmas.
+-- The μᵉ | gs fuel case recurses on fuel (strict structural decrease).
+-- 4-parameter form: h-split, h-r3b (full/Measures form), compose, ΩAt-eq.
+----------------------------------------------------------------------
+
+subscribeE-walk-core :
     -- walk-hyps-splitAnchor  (Verify-Budget-Sufficient/Measures.agda:5876)
     (∀ (Ψ W Ω ℓ E B₀ R U r s : ℕ) →
       Σ ℕ λ V → Σ ℕ λ d →
@@ -5796,6 +6307,100 @@ postulate
             ≤ mintCount sched st + walkCap Ω ℓ G)
        × (burstLen (proj₁ r) ≤ walkCap Ω ℓ G)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+subscribeE-walk-core h-split h-r3b _compose _ΩAt-eq Ψ W Ω ℓ F Ŝ R̂ G g b κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+  with b
+... | emptyᵉ =
+  walk-core-emptyᵉ Ψ W Ω ℓ F Ŝ R̂ G g κ id now sched st E
+    h3≤E h-INV h-sz h-pB h-wOK h-pΩ h-dB h-hA h-pL h-rL
+... | ofᵉ ts =
+  walk-core-ofᵉ Ψ W Ω ℓ F Ŝ R̂ G g ts κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | mapᵉ f b₀ =
+  walk-core-mapᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g f b₀ κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | takeᵉ count b₀ =
+  walk-core-takeᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g count b₀ κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | scanᵉ f seed b₀ =
+  walk-core-scanᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g (scanᵉ f seed b₀) κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+-- varᵉ/deferᵉ/input/mergeAll/concatAll/switchAll/exhaustAll placed BEFORE μᵉ so that
+-- the nested `with g` in the μᵉ branch (which absorbs subsequent `... |` clauses in
+-- Agda's `with` desugaring) does not capture these remaining cases.
+... | varᵉ ()
+... | deferᵉ body₀ =
+  walk-core-deferᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g (deferᵉ body₀) κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | input i =
+  walk-core-input h-split h-r3b _compose _ΩAt-eq Ψ W Ω ℓ F Ŝ R̂ G g i (input i) κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | mergeAllᵉ b₀ =
+  walk-core-mergeAllᵉ Ψ W Ω ℓ F Ŝ R̂ G g b₀ κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | concatAllᵉ b₀ =
+  walk-core-concatAllᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g b₀ κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | switchAllᵉ b₀ =
+  walk-core-switchAllᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g b₀ κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+... | exhaustAllᵉ b₀ =
+  walk-core-exhaustAllᵉ-all Ψ W Ω ℓ F Ŝ R̂ G g b₀ κ id now sched st E
+    h3≤E h-INV h-sz h-fc h-pB h-wOK h-ofW h-pΩ h-dB h-hA h-pL h-rL
+-- LAST: μᵉ with nested `with g` — no subsequent `... |` clauses after this block.
+-- The nested `with g` here recurses on `fuel` (strict subterm of `gs fuel`)
+-- and on `unfoldμ body` (strict subterm of `μᵉ body`), establishing termination.
+... | μᵉ body with g
+...   | g0 = ⊥-elim (g0-hasAtLeast-absurd h-hA)
+...   | gs fuel =
+  -- definitionally: subscribeE (gs fuel) (μᵉ body) κ ... = subscribeE fuel (unfoldμ body) κ ...
+  let G′     = proj₁ (walk-core-μ-dBound-inner F Ŝ R̂ G body sched st h-dB)
+      sucG′≤G = proj₁ (proj₂ (walk-core-μ-dBound-inner F Ŝ R̂ G body sched st h-dB))
+      h-dB′   = proj₂ (proj₂ (walk-core-μ-dBound-inner F Ŝ R̂ G body sched st h-dB))
+      h-hA′   = walk-core-μ-hasAtLeast h-hA sucG′≤G
+      h-pL′   : pathLen κ + G′ ≤ ℓ
+      h-pL′   = ≤-trans
+                  (+-monoʳ-≤ (pathLen κ)
+                    (≤-trans (n≤1+n G′) sucG′≤G))
+                  h-pL
+      IH      = subscribeE-walk-core h-split h-r3b _compose _ΩAt-eq
+                  Ψ W Ω ℓ F Ŝ R̂ G′ fuel (unfoldμ body) κ id now sched st E
+                  h3≤E h-INV
+                  (walk-core-μ-sz Ψ W E body sched st h-sz h-INV)
+                  (walk-core-μ-fc Ψ E body h-fc)
+                  h-pB h-wOK
+                  (walk-core-μ-ofW Ω body h-ofW)
+                  h-pΩ h-dB′ h-hA′ h-pL′ h-rL
+      E₀      = proj₁ IH
+      h1      = proj₁ (proj₂ IH)
+      h2      = proj₁ (proj₂ (proj₂ IH))
+      h3      = proj₁ (proj₂ (proj₂ (proj₂ IH)))
+      h4      = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IH))))
+      h5      = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
+      h6      = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))
+      h7      = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))))
+      h8      = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+      h9      = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+      -- definitionally: subscribeE (gs fuel) (μᵉ body) ... = subscribeE fuel (unfoldμ body) ...
+      stream  = proj₁ (subscribeE (gs fuel) (μᵉ body) κ id now sched st)
+  in E₀ , h1
+  -- conjunct 2: ceiling at G′ → G by walkCap-mono-d
+  , ≤-trans h2
+      (*-monoʳ-≤ E
+        (^-monoʳ-≤ 3
+          (*-monoʳ-≤ (suc Ψ)
+            (walkCap-mono-d Ω ℓ (≤-trans (n≤1+n G′) sucG′≤G)))))
+  , h3 , h4
+  -- conjunct 5: rewrite hopDᵉ F (unfoldμ body) = hopDᵉ F body = hopDᵉ F (μᵉ body)
+  , subst (λ d → burstHopD? F d stream ≡ true) (walk-core-μ-hopD F body) h5
+  , h6
+  -- conjunct 7: mintCount at G′ → G by walkCap-mono-d
+  , ≤-trans h7
+      (+-monoʳ-≤ (mintCount sched st)
+        (walkCap-mono-d Ω ℓ (≤-trans (n≤1+n G′) sucG′≤G)))
+  -- conjunct 8: burstLen at G′ → G
+  , ≤-trans h8 (walkCap-mono-d Ω ℓ (≤-trans (n≤1+n G′) sucG′≤G))
+  , h9
 
 ------------------------------------------------------------------
 -- REFUTATION 1 (the statement): the 2026-07-24 face was vacuous.
