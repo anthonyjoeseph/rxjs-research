@@ -592,7 +592,7 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
-| 1 | `subscribeE-walk-core` | Measures.agda (was :5750) | **ASSEMBLED IN SRC (REAL DEFINITION) 2026-08-11** | **ASSEMBLED IN SRC 2026-08-11**: converted from a single monolithic postulate to a structurally-recursive real definition (structural recursion on `b : Closed Γ u` / `g : Gas`). The definition dispatches all 13 constructors of `Closed` and routes to 26 per-clause and shared sub-postulates. The probe `Walk-Core-Assembly-Probe.agda` (EXIT=0, 2026-08-11) validated the assembly's shape before landing. The ledger grew by design: one vague postulate became 26 specific ones (§1 shared arithmetic: 8 postulates, §2 per-clause: 7 postulates, §3 *All clauses: 3 postulates, §2b μ-specific: 6 postulates, plus 2 proved lemmas and 2 proved helpers). Sub-postulates consume the formerly-deferred `walk-hyps-splitAnchor`, `walk-hyps-round3b`, and `spendᴱ-compose` as explicit parameters. Probe file (`Walk-Core-Assembly-Probe.agda`) pending deletion by design session. |
+| 1 | `subscribeE-walk-core` | Measures.agda (was :5750) | **ASSEMBLED IN SRC (REAL DEFINITION) 2026-08-11** | **ASSEMBLED IN SRC 2026-08-11**: converted from a single monolithic postulate to a structurally-recursive real definition (structural recursion on `b : Closed Γ u` / `g : Gas`). The definition dispatches all 13 constructors of `Closed` and routes to 26 per-clause and shared sub-postulates. The probe `Walk-Core-Assembly-Probe.agda` (EXIT=0, 2026-08-11) validated the assembly's shape before landing. The ledger grew by design: one vague postulate became 26 specific ones (§1 shared arithmetic: 8 postulates, §2 per-clause: 7 postulates, §3 *All clauses: 3 postulates, §2b μ-specific: 6 postulates, plus 2 proved lemmas and 2 proved helpers). Sub-postulates consume the formerly-deferred `walk-hyps-splitAnchor`, `walk-hyps-round3b`, and `spendᴱ-compose` as explicit parameters. Probe file deleted with its ledger line (`3d476b2`). **GRIND ROUND 1 (2026-08-11): 26 → 20 sub-postulates.** One statement REPAIR and five real proofs: (i) **`walk-core-G-pos` was FALSE as stated** — `dBound Ŝ R̂ U r s ≤ G → 1 ≤ G` fails at `s = 0, G = 0`, where `dBound` is the identity; repaired by adding the `1 ≤ s` hypothesis, which every call site supplies free because **`syncSizeᵉ` is ≥ 1 at every `Exp` clause** (each returns `1` or `suc _`). Proof is `≤-trans hs (≤-trans (m≤m+n s _) h-dB)`. (ii) `sizeᵗˢ≤sizeᵉ`, (iii) `walk-core-ℓ-pos`, (iv) `walk-core-oneShotBurst-hasDry` (over one new `hasDry-burst`, since `dryEvent` fires only on `close _ dried` and a one-shot burst emits only init/value/close-exhausted/complete), (v) `walk-core-μ-hopD` — discharged for free by **relocating the already-proven `hopD-elimGᵉ`/`pm-elimGᵉ` mutual blocks from `Wet.agda` to `Rx/Hop-Depth.agda`**: the lemmas only ever mention `hopD`/`pm`/`elimGExp`, so they belonged in the `Rx` layer, and Measures already imported that module (it cannot import Wet — circular). This is the shape to look for first: **a sub-postulate whose proof already exists one module away and is blocked only by import direction.** Remaining 20: 14 clause faces (§2 per-clause + §3 *All), 5 μ-specific, `walkCap-mono-d`. |
 | 2 | `cascadeGo-wet-core` | Wet.agda:4499 | **DIFFICULTY** | P2's entire content (its only hypotheses are two stBounded? preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`). PROBED-GREEN 2026-08-11 on root-path chains (hasDry: confirmed no dried events; INV?: degenerate on tested shapes); from-inner/thru-outer paths NOT COVERED (abstract Gas). No refutation found — reclassified from FALSITY to DIFFICULTY. The INV? conjunct through subscribeE calls is the genuinely open question; it mirrors what cascadeGo-caps (Caps-Face:4345) already proves. |
 | 3 | `subscribeE-wet-core` | Wet.agda:4311 | FALSITY, conditional | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's G/ℓ/Ω entry data from `INV?` alone, and the INV?/capᴱ flavor conversion is unchecked. Moderate incremental risk over #1, with maximal blast radius (both branches of budget-sufficient). |
 | 4 | ~~`sub-charge-capsOK-lift-core`~~ | — | **DISCHARGED 2026-08-06 — the postulate is a REAL PROOF; the risk moved into #13 and one Phase-3 obligation** | The general-id depth bound (the residual design question recorded here) was RESOLVED as a THREADING ruling, not a lemma: `depthE g b κ id now sched st ≤ capsH e sl id` is a RUN INVARIANT — the unconditional form is FALSE (Depth-Bound's header: a long map-f chain over a tiny `e` breaks any state-free `depthE ≤ capsH`), and "reachable" is not first-class here, so the bound enters as a PREMISE (`depOK`) exactly as `nestOK`/`opsOK` did, discharged at `burst-caps` by `depthE≤capsH-root` and owed at general call sites by the Phase-3 induction (see the depOK preservation obligation, Phase 3 item 5). **Why the depth-capped route could never work off the root, recorded so nobody re-attempts it:** the state at counter `id` satisfies `capsOK?` only at `capsAt e sl id`, whose `cSize` is tower-sized (`capsAt-tower`: `cSize ≤ towerℕ (capsH)`), so `depth-capped` yields `dep ≤ 3·towerℕ(h)` against a target of `h` — off by "towerℕ of" at EVERY index; no index shift closes it. `depth-capped`'s role is confined to the root, where the SMALL `baseCaps` satisfies `capsOK?`. **With depOK threaded, every link of the old route comment became an existing lemma** — jB → `opIterD-dominated` (k≤S/m≤S from nestOK/opsOK, `2≤capsAt-size`/`1≤capsAt-reg` free) → `sizeCount-body` + record eta → `sizeCount-mono-d` (#13, the ONE new postulate) over depOK → `frameStep-mono-j` → `capsAt-suc-full` → `capsOK?-mono` — and `sub-charge-capsOK-lift` is now a ~20-line real definition in Caps-Bridge. Kit fallout: `capsAt-suc-full`/`frameStep-full`/`frameStep-mono-j`/`depthE≤capsH-root`/`opIterD-dominated` all kept real consumers; `⊑ᶜ-refl`, `frameSz?-⊑` (Caps-Face) and `prepend-fits` (Subscribe-Face) were speculative kit the proof never needed — DELETED 2026-08-06 (this commit; git is the archive). |
@@ -1209,6 +1209,45 @@ Cheapest-and-safest first, anchor-dependent mass last.
 
 **TIER 1 IS FINISHED when every postulate in the tier-1 table is discharged or
 deleted.** That is the gate. Only then does the parked work below resume.
+
+---
+
+#### WHERE TIER 1 ACTUALLY STANDS (2026-08-11, end of the walk-core grind)
+
+**Nine of the thirteen numbered rows are DISCHARGED** (#4, #6, #7, #8, #9, #10,
+#12, #13, and #5 assembled-with-residue). The four live rows are the anchor
+cluster of item 5 above, and they are **not independent — they form a chain**:
+
+| Row | Postulate | State | Blocks |
+|---|---|---|---|
+| **1** | `subscribeE-walk-core` | **assembly done; 20 sub-postulates left** (was 26) | #3 |
+| **2** | `cascadeGo-wet-core` | DIFFICULTY, probe found no refutation | #11 |
+| **3** | `subscribeE-wet-core` | conditional on #1 | — |
+| **11** | `dry-tick-core` | risk almost entirely inherited from #2 | — |
+
+**The shape of what remains is now known, and that is the round's main result.**
+Row 1 stopped being one unknown-size proof and became **20 named obligations in
+three shapes**:
+
+- **14 clause faces** (§2 per-clause + §3 *All) — `walk-core-mapᵉ-all`,
+  `-scanᵉ-all`, `-takeᵉ-all`, `-deferᵉ-all`, the four `*Allᵉ-all`,
+  `-input`, `-subscribeAll-walk`, `-of-burstB`, `-of-burstHopD`,
+  `-burstLen-empty`, `-burstLen-of`. Each is the same 9-conjunct face at one
+  constructor. These are the mass, and they are **worker-shaped and
+  parallelisable** — different clauses, no shared state.
+- **5 μ-specific** — `-μ-dBound-inner` (route: `dBound-μ`, Measures:1873),
+  `-μ-hasAtLeast`, `-μ-sz`, `-μ-fc`, `-μ-ofW`. All four measure-preservation
+  ones follow the `syncSize-unfoldμ`/`shellSize-unfoldμ` pattern already proven
+  in Measures — **look for the existing `*-elimG` congruence before writing a
+  new one**, which is exactly how `-μ-hopD` fell for free.
+- **1 monotonicity** — `walkCap-mono-d`.
+
+**RANKED RISK, unchanged by this round:** #2 remains the highest-risk live item.
+Its probe covered only root-path chains; the from-inner/thru-outer paths are
+uncovered because `Gas → budgetAt → abstract blowH` (Evaluator:898) blocks
+computation, so **a falsity there would still be found late**. Row 1's residue
+is now mostly *labour*, not *risk* — a materially different position from where
+the round started, when row 1 was a single opaque postulate.
 
 ### Phase 4 — TIER 2, PARKED BEHIND TIER 1
 

@@ -75,6 +75,9 @@ open import Data.Bool using (if_then_else_)
 open import Data.List using (List; []; _∷_)
 open import Data.Product using (_,_)
 open import Data.Sum     using (inj₁; inj₂)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any       using (here; there)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                           Ctx; Exp; Tm; Val;
@@ -83,7 +86,8 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                          varIx)
+                          varIx;
+                          elimGExp; elimGTm; elimGTms; unfoldμ)
 
 ------------------------------------------------------------------
 -- THE PLUG MULTIPLIER, which is what the coefficients actually are.
@@ -233,3 +237,125 @@ hopDᵛ V (s ×ᵗ t) (a , b)  = hopDᵛ V s a ⊔ hopDᵛ V t b
 hopDᵛ V (s +ᵗ t) (inj₁ a) = hopDᵛ V s a
 hopDᵛ V (s +ᵗ t) (inj₂ b) = hopDᵛ V t b
 hopDᵛ V (obs t)  e        = hopDᵉ V e
+
+------------------------------------------------------------------
+-- ELIMINATION CONGRUENCES: hopD and pm are invariant under
+-- Δᵍ-variable substitution (elimGExp rewrites Δᵍ-variables only).
+------------------------------------------------------------------
+
+mutual
+  pm-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    pmᵉ V k (elimGExp x cl b) ≡ pmᵉ V k b
+  pm-elimGᵉ V k x cl (input i)       = refl
+  pm-elimGᵉ V k x cl (ofᵉ ts)        = pm-elimGᵗˢ V k x cl ts
+  pm-elimGᵉ V k x cl emptyᵉ          = refl
+  pm-elimGᵉ V k x cl (mapᵉ f b)      =
+    cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
+              (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
+                         (pm-elimGᵉ V k x cl b))
+  pm-elimGᵉ V k x cl (takeᵉ c b)     = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (scanᵉ f z b)   =
+    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
+              (cong₂ _+_ (cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
+                                    (pm-elimGᵗ V k x cl z))
+                         (pm-elimGᵉ V k x cl b))
+  pm-elimGᵉ V k x cl (mergeAllᵉ b)   = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (concatAllᵉ b)  = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (switchAllᵉ b)  = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (exhaustAllᵉ b) = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (μᵉ b)          = pm-elimGᵉ V k (there x) cl b
+  pm-elimGᵉ V k x cl (varᵉ y)        = refl
+  pm-elimGᵉ V k x cl (deferᵉ b)      = refl
+
+  pm-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    pmᵗ V k (elimGTm x cl f) ≡ pmᵗ V k f
+  pm-elimGᵗ V k x cl (varᵗ y)      = refl
+  pm-elimGᵗ V k x cl unit̂          = refl
+  pm-elimGᵗ V k x cl (bool̂ b)      = refl
+  pm-elimGᵗ V k x cl (nat̂ m)       = refl
+  pm-elimGᵗ V k x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
+  pm-elimGᵗ V k x cl (fstᵗ p)      = pm-elimGᵗ V k x cl p
+  pm-elimGᵗ V k x cl (sndᵗ p)      = pm-elimGᵗ V k x cl p
+  pm-elimGᵗ V k x cl (inlᵗ a)      = pm-elimGᵗ V k x cl a
+  pm-elimGᵗ V k x cl (inrᵗ a)      = pm-elimGᵗ V k x cl a
+  pm-elimGᵗ V k x cl (caseᵗ s l r) =
+    cong₂ _+_ (cong₂ _⊔_ (pm-elimGᵗ V (suc k) x cl l)
+                         (pm-elimGᵗ V (suc k) x cl r))
+              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
+                                               (pm-elimGᵗ V 0 x cl r))
+                                    refl)
+                         (pm-elimGᵗ V k x cl s))
+  pm-elimGᵗ V k x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
+  pm-elimGᵗ V k x cl (primᵗ op a)  = refl
+  pm-elimGᵗ V k x cl (strmᵗ b)     = pm-elimGᵉ V k x cl b
+
+  pm-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    pmᵗˢ V k (elimGTms x cl ts) ≡ pmᵗˢ V k ts
+  pm-elimGᵗˢ V k x cl []       = refl
+  pm-elimGᵗˢ V k x cl (y ∷ ys) =
+    cong₂ _⊔_ (pm-elimGᵗ V k x cl y) (pm-elimGᵗˢ V k x cl ys)
+
+mutual
+  hopD-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    hopDᵉ V (elimGExp x cl b) ≡ hopDᵉ V b
+  hopD-elimGᵉ V x cl (input i)       = refl
+  hopD-elimGᵉ V x cl (ofᵉ ts)        = hopD-elimGᵗˢ V x cl ts
+  hopD-elimGᵉ V x cl emptyᵉ          = refl
+  hopD-elimGᵉ V x cl (mapᵉ f b)      =
+    cong₂ _+_ (hopD-elimGᵗ V x cl f)
+              (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
+                         (hopD-elimGᵉ V x cl b))
+  hopD-elimGᵉ V x cl (takeᵉ c b)     = hopD-elimGᵉ V x cl b
+  hopD-elimGᵉ V x cl (scanᵉ f z b)   =
+    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
+              (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V x cl f)
+                                    (hopD-elimGᵗ V x cl z))
+                         (hopD-elimGᵉ V x cl b))
+  hopD-elimGᵉ V x cl (mergeAllᵉ b)   = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (concatAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V x cl b)
+  hopD-elimGᵉ V x cl (μᵉ b)          = hopD-elimGᵉ V (there x) cl b
+  hopD-elimGᵉ V x cl (varᵉ y)        = refl
+  hopD-elimGᵉ V x cl (deferᵉ b)      = refl
+
+  hopD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    hopDᵗ V (elimGTm x cl f) ≡ hopDᵗ V f
+  hopD-elimGᵗ V x cl (varᵗ y)      = refl
+  hopD-elimGᵗ V x cl unit̂          = refl
+  hopD-elimGᵗ V x cl (bool̂ b)      = refl
+  hopD-elimGᵗ V x cl (nat̂ m)       = refl
+  hopD-elimGᵗ V x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
+  hopD-elimGᵗ V x cl (fstᵗ p)      = hopD-elimGᵗ V x cl p
+  hopD-elimGᵗ V x cl (sndᵗ p)      = hopD-elimGᵗ V x cl p
+  hopD-elimGᵗ V x cl (inlᵗ a)      = hopD-elimGᵗ V x cl a
+  hopD-elimGᵗ V x cl (inrᵗ a)      = hopD-elimGᵗ V x cl a
+  hopD-elimGᵗ V x cl (caseᵗ s l r) =
+    cong₂ _+_ (cong₂ _⊔_ (hopD-elimGᵗ V x cl l) (hopD-elimGᵗ V x cl r))
+              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
+                                               (pm-elimGᵗ V 0 x cl r))
+                                    refl)
+                         (hopD-elimGᵗ V x cl s))
+  hopD-elimGᵗ V x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
+  hopD-elimGᵗ V x cl (primᵗ op a)  = refl
+  hopD-elimGᵗ V x cl (strmᵗ b)     = hopD-elimGᵉ V x cl b
+
+  hopD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    hopDᵗˢ V (elimGTms x cl ts) ≡ hopDᵗˢ V ts
+  hopD-elimGᵗˢ V x cl []       = refl
+  hopD-elimGᵗˢ V x cl (y ∷ ys) =
+    cong₂ _⊔_ (hopD-elimGᵗ V x cl y) (hopD-elimGᵗˢ V x cl ys)
+
+hopD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
+  hopDᵉ V (unfoldμ body) ≡ hopDᵉ V (μᵉ body)
+hopD-unfoldμ V body = hopD-elimGᵉ V (here refl) (μᵉ body) body

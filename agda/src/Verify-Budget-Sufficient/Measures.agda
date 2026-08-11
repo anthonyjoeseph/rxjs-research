@@ -95,7 +95,8 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
+                                 hopD-unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -5732,25 +5733,6 @@ postulate
     burstHopD? F (hopDᵉ F (ofᵉ ts))
       (proj₁ (oneShotBurst (map (λ tm → evalTm tm) ts) id sched)) ≡ true
 
-  sizeᵗˢ≤sizeᵉ :
-    ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u)) →
-    length ts ≤ sizeᵉ (ofᵉ ts)
-
-  walk-core-G-pos :
-    ∀ {Ŝ R̂ U r s G : ℕ} →
-    dBound Ŝ R̂ U r s ≤ G → 1 ≤ G
-
-  walk-core-ℓ-pos :
-    ∀ {G ℓ κlen : ℕ} →
-    1 ≤ G → κlen + G ≤ ℓ → 1 ≤ ℓ
-
-  walk-core-oneShotBurst-hasDry :
-    ∀ {n} {Γ : Ctx n} {u} (vs : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
-    hasDry (proj₁ (oneShotBurst vs id sched)) ≡ false
-
-  walk-core-capᴱ-lb4 :
-    ∀ (W E : ℕ) → 3 ≤ E → 4 ≤ capᴱ W E
-
 ----------------------------------------------------------------------
 -- § 2  PER-CLAUSE CENSUS POSTULATES
 ----------------------------------------------------------------------
@@ -6074,17 +6056,85 @@ postulate
     ofWᵉ (μᵉ body) ≤ Ω →
     ofWᵉ (unfoldμ body) ≤ Ω
 
-  walk-core-μ-hopD :
-    ∀ {n} {Γ : Ctx n} {u} (F : ℕ)
-    (body : Exp Γ (u ∷ []) [] [] u) →
-    hopDᵉ F (unfoldμ body) ≡ hopDᵉ F body
-
 ----------------------------------------------------------------------
 -- § 4  PROVED LEMMAS (with real bodies, from Walk-Core-Assembly-Probe.agda § 4)
 ----------------------------------------------------------------------
 
+walk-core-μ-hopD :
+  ∀ {n} {Γ : Ctx n} {u} (F : ℕ)
+  (body : Exp Γ (u ∷ []) [] [] u) →
+  hopDᵉ F (unfoldμ body) ≡ hopDᵉ F body
+walk-core-μ-hopD F body = hopD-unfoldμ F body
+
 g0-hasAtLeast-absurd : ∀ {G} → g0 hasAtLeast suc G → ⊥
 g0-hasAtLeast-absurd ()
+
+-- sizeᵗˢ≤sizeᵉ: length ts ≤ sizeᵉ (ofᵉ ts).
+-- sizeᵉ (ofᵉ ts) = suc (sizeᵗˢ ts).
+-- Each Tm contributes ≥ 1 to sizeᵗˢ (every constructor's body ≥ 1),
+-- so length ts ≤ sizeᵗˢ ts ≤ suc (sizeᵗˢ ts) = sizeᵉ (ofᵉ ts).
+-- sizeᵗ-pos already lives above (every term has at least one node).
+private
+  length-ts≤sizeᵗˢ :
+    ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t))
+    → length ts ≤ sizeᵗˢ ts
+  length-ts≤sizeᵗˢ []       = z≤n
+  length-ts≤sizeᵗˢ (y ∷ ys) = +-mono-≤ (sizeᵗ-pos y) (length-ts≤sizeᵗˢ ys)
+
+sizeᵗˢ≤sizeᵉ :
+  ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u))
+  → length ts ≤ sizeᵉ (ofᵉ ts)
+-- sizeᵉ (ofᵉ ts) = suc (sizeᵗˢ ts); n≤1+n closes the gap.
+sizeᵗˢ≤sizeᵉ ts = ≤-trans (length-ts≤sizeᵗˢ ts) (n≤1+n _)
+
+-- walk-core-G-pos (FIXED): requires 1 ≤ s (syncSizeᵉ ≥ 1 at every call site).
+-- Old signature was false: dBound ... s ... ≤ G → 1 ≤ G fails at s=0, G=0.
+-- New: 1 ≤ s → dBound ≤ G → 1 ≤ G.
+-- Proof: 1 ≤ s ≤ s + suc Ŝ * (...) = dBound ≤ G.
+walk-core-G-pos : ∀ {Ŝ R̂ U r s G : ℕ} →
+  1 ≤ s → dBound Ŝ R̂ U r s ≤ G → 1 ≤ G
+-- NB: the first argument is NOT named `hs` — that is a constructor of
+-- `hasAtLeast` (line 212), and Agda reads it as a pattern, not a binder.
+walk-core-G-pos {s = s} h-s h-dB =
+  ≤-trans h-s (≤-trans (m≤m+n s _) h-dB)
+
+-- walk-core-ℓ-pos: 1 ≤ G ≤ κlen + G ≤ ℓ.
+walk-core-ℓ-pos : ∀ {G ℓ κlen : ℕ} →
+  1 ≤ G → κlen + G ≤ ℓ → 1 ≤ ℓ
+walk-core-ℓ-pos hG hpL = ≤-trans hG (≤-trans (m≤n+m _ _) hpL)
+
+-- walk-core-oneShotBurst-hasDry: hasDry of a one-shot burst is false.
+-- oneShotBurst vs id sched =
+--   ((init src ∷ map value vs ++ close src exhausted ∷ complete ∷ []) at ...) ∷ []
+-- where src = Sched.nextSource sched.
+-- dryEvent fires only on (close _ dried); every event here is init/value/
+-- close-exhausted/complete, so refl closes each concrete case.
+-- Inducting on vs with a concrete hasDry goal avoids any ∨-normalisation issue.
+private
+  hasDry-burst :
+    ∀ {A : Set} (vs : List A) (src : Source) (id : Id)
+    → hasDry {A = A}
+        ((init src ∷ map value vs ++ close src exhausted ∷ complete ∷ [])
+          at id from src as subscribe ∷ []) ≡ false
+  hasDry-burst []       src id = refl
+  hasDry-burst (_ ∷ vs) src id = hasDry-burst vs src id
+
+walk-core-oneShotBurst-hasDry :
+  ∀ {n} {Γ : Ctx n} {u} (vs : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
+  hasDry (proj₁ (oneShotBurst vs id sched)) ≡ false
+-- proj₁ (oneShotBurst vs id sched) reduces definitionally to
+--   ((init src ∷ map value vs ++ ...) at id from src as subscribe) ∷ []
+-- where src = Sched.nextSource sched.
+walk-core-oneShotBurst-hasDry vs id sched =
+  hasDry-burst vs (Sched.nextSource sched) id
+
+-- walk-core-capᴱ-lb4: capᴱ W E = (2+2W)^E ≥ 4 when E ≥ 3.
+-- Chain: 4 ≤ 8 = 2^3 ≤ 2^E ≤ (2+2W)^E.
+walk-core-capᴱ-lb4 : ∀ (W E : ℕ) → 3 ≤ E → 4 ≤ capᴱ W E
+walk-core-capᴱ-lb4 W E h3≤E =
+  ≤-trans (s≤s (s≤s (s≤s (s≤s z≤n))))       -- 4 ≤ 8 = 2^3
+    (≤-trans (^-monoʳ-≤ 2 h3≤E)              -- 2^3 ≤ 2^E
+             (^-monoˡ-≤ E (2≤C W)))          -- 2^E ≤ (2+2W)^E = capᴱ W E
 
 walk-core-emptyᵉ :
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -6123,11 +6173,11 @@ walk-core-emptyᵉ {u = u} Ψ W Ω ℓ F Ŝ R̂ G g κ id now sched st E
   , walk-core-burstLen-empty Ω ℓ G id sched {u}
       (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
          {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
-         {r = 0} {s = 1} h-dB)
+         {r = 0} {s = 1} (s≤s z≤n) h-dB)
       (walk-core-ℓ-pos
          (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
             {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
-            {r = 0} {s = 1} h-dB)
+            {r = 0} {s = 1} (s≤s z≤n) h-dB)
          h-pL)
   , h-rL
 
@@ -6172,11 +6222,11 @@ walk-core-ofᵉ Ψ W Ω ℓ F Ŝ R̂ G g ts κ id now sched st E
       (map (λ tm → evalTm tm) ts)
       (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
          {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
-         {r = hopDᵉ F (ofᵉ ts)} {s = syncSizeᵉ (ofᵉ ts)} h-dB)
+         {r = hopDᵉ F (ofᵉ ts)} {s = syncSizeᵉ (ofᵉ ts)} (s≤s z≤n) h-dB)
       (walk-core-ℓ-pos
          (walk-core-G-pos {Ŝ = Ŝ} {R̂ = R̂}
             {U = unconn (Sched.slots sched) (EvalSt.connectedShares st)}
-            {r = hopDᵉ F (ofᵉ ts)} {s = syncSizeᵉ (ofᵉ ts)} h-dB)
+            {r = hopDᵉ F (ofᵉ ts)} {s = syncSizeᵉ (ofᵉ ts)} (s≤s z≤n) h-dB)
          h-pL)
       (≤-trans (≤-trans (≤-reflexive (length-map _ ts)) (sizeᵗˢ≤sizeᵉ ts)) h-sz)
       (walk-core-capᴱ-lb4 W E h3≤E)

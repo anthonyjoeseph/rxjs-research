@@ -101,7 +101,10 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
+                                 pm-elimGᵉ; pm-elimGᵗ; pm-elimGᵗˢ;
+                                 hopD-elimGᵉ; hopD-elimGᵗ; hopD-elimGᵗˢ;
+                                 hopD-unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -3887,141 +3890,9 @@ hop-step-needs V R U r s s′ h =
     (≤-trans h (≤-reflexive (dBound-suc-r V R U r s)))
 
 ------------------------------------------------------------------
--- THE μ EDGE's r SIDE — hopD IS EQUAL ACROSS AN UNFOLD.  Asserted by
--- Rx.Hop-Depth's μ clause ("an unfold cannot change hopD") and by the
--- hop-descent memo in .Measures ("the UNFOLD step … is an equality
--- too"); proven here, because dBound-μ holds `r` FIXED and until this
--- is a theorem `hopDᵉ Ŝ (unfoldμ body)` and `hopDᵉ Ŝ (μᵉ body)` are
--- simply two different expressions and the edge cannot be taken.
+-- THE μ EDGE's r SIDE — hopD IS EQUAL ACROSS AN UNFOLD.  hopD-unfoldμ
+-- lives in Rx.Hop-Depth; imported above and used by mu-edge below.
 --
--- The content is one line of typing: elimGExp rewrites Δᵍ-VARIABLE
--- positions only, and Δᵍ moves into Δ at deferᵉ and nowhere else, so
--- every plug lands under a deferᵉ — which hopD reads as 0.  The
--- coefficient mirror comes first, since hopD's mapᵉ and scanᵉ clauses
--- read pm for their slopes.
---
--- It lives HERE rather than in .Measures for sweepLive-fnCap's
--- reason: the wet face is its only consumer, and the size face has no
--- use for it.
-------------------------------------------------------------------
-
-mutual
-  pm-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
-    pmᵉ V k (elimGExp x cl b) ≡ pmᵉ V k b
-  pm-elimGᵉ V k x cl (input i)       = refl
-  pm-elimGᵉ V k x cl (ofᵉ ts)        = pm-elimGᵗˢ V k x cl ts
-  pm-elimGᵉ V k x cl emptyᵉ          = refl
-  pm-elimGᵉ V k x cl (mapᵉ f b)      =
-    cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
-              (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
-                         (pm-elimGᵉ V k x cl b))
-  pm-elimGᵉ V k x cl (takeᵉ c b)     = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (scanᵉ f z b)   =
-    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
-              (cong₂ _+_ (cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
-                                    (pm-elimGᵗ V k x cl z))
-                         (pm-elimGᵉ V k x cl b))
-  pm-elimGᵉ V k x cl (mergeAllᵉ b)   = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (concatAllᵉ b)  = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (switchAllᵉ b)  = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (exhaustAllᵉ b) = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (μᵉ b)          = pm-elimGᵉ V k (there x) cl b
-  pm-elimGᵉ V k x cl (varᵉ y)        = refl
-  pm-elimGᵉ V k x cl (deferᵉ b)      = refl
-
-  pm-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
-    pmᵗ V k (elimGTm x cl f) ≡ pmᵗ V k f
-  pm-elimGᵗ V k x cl (varᵗ y)      = refl
-  pm-elimGᵗ V k x cl unit̂          = refl
-  pm-elimGᵗ V k x cl (bool̂ b)      = refl
-  pm-elimGᵗ V k x cl (nat̂ m)       = refl
-  pm-elimGᵗ V k x cl (pairᵗ a b)   =
-    cong₂ _⊔_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
-  pm-elimGᵗ V k x cl (fstᵗ p)      = pm-elimGᵗ V k x cl p
-  pm-elimGᵗ V k x cl (sndᵗ p)      = pm-elimGᵗ V k x cl p
-  pm-elimGᵗ V k x cl (inlᵗ a)      = pm-elimGᵗ V k x cl a
-  pm-elimGᵗ V k x cl (inrᵗ a)      = pm-elimGᵗ V k x cl a
-  pm-elimGᵗ V k x cl (caseᵗ s l r) =
-    cong₂ _+_ (cong₂ _⊔_ (pm-elimGᵗ V (suc k) x cl l)
-                         (pm-elimGᵗ V (suc k) x cl r))
-              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
-                                               (pm-elimGᵗ V 0 x cl r))
-                                    refl)
-                         (pm-elimGᵗ V k x cl s))
-  pm-elimGᵗ V k x cl (ifᵗ c a b)   =
-    cong₂ _⊔_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
-  pm-elimGᵗ V k x cl (primᵗ op a)  = refl
-  pm-elimGᵗ V k x cl (strmᵗ b)     = pm-elimGᵉ V k x cl b
-
-  pm-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    pmᵗˢ V k (elimGTms x cl ts) ≡ pmᵗˢ V k ts
-  pm-elimGᵗˢ V k x cl []       = refl
-  pm-elimGᵗˢ V k x cl (y ∷ ys) =
-    cong₂ _⊔_ (pm-elimGᵗ V k x cl y) (pm-elimGᵗˢ V k x cl ys)
-
-mutual
-  hopD-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
-    hopDᵉ V (elimGExp x cl b) ≡ hopDᵉ V b
-  hopD-elimGᵉ V x cl (input i)       = refl
-  hopD-elimGᵉ V x cl (ofᵉ ts)        = hopD-elimGᵗˢ V x cl ts
-  hopD-elimGᵉ V x cl emptyᵉ          = refl
-  hopD-elimGᵉ V x cl (mapᵉ f b)      =
-    cong₂ _+_ (hopD-elimGᵗ V x cl f)
-              (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
-                         (hopD-elimGᵉ V x cl b))
-  hopD-elimGᵉ V x cl (takeᵉ c b)     = hopD-elimGᵉ V x cl b
-  hopD-elimGᵉ V x cl (scanᵉ f z b)   =
-    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
-              (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V x cl f)
-                                    (hopD-elimGᵗ V x cl z))
-                         (hopD-elimGᵉ V x cl b))
-  hopD-elimGᵉ V x cl (mergeAllᵉ b)   = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (concatAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (μᵉ b)          = hopD-elimGᵉ V (there x) cl b
-  hopD-elimGᵉ V x cl (varᵉ y)        = refl
-  hopD-elimGᵉ V x cl (deferᵉ b)      = refl
-
-  hopD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
-    hopDᵗ V (elimGTm x cl f) ≡ hopDᵗ V f
-  hopD-elimGᵗ V x cl (varᵗ y)      = refl
-  hopD-elimGᵗ V x cl unit̂          = refl
-  hopD-elimGᵗ V x cl (bool̂ b)      = refl
-  hopD-elimGᵗ V x cl (nat̂ m)       = refl
-  hopD-elimGᵗ V x cl (pairᵗ a b)   =
-    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
-  hopD-elimGᵗ V x cl (fstᵗ p)      = hopD-elimGᵗ V x cl p
-  hopD-elimGᵗ V x cl (sndᵗ p)      = hopD-elimGᵗ V x cl p
-  hopD-elimGᵗ V x cl (inlᵗ a)      = hopD-elimGᵗ V x cl a
-  hopD-elimGᵗ V x cl (inrᵗ a)      = hopD-elimGᵗ V x cl a
-  hopD-elimGᵗ V x cl (caseᵗ s l r) =
-    cong₂ _+_ (cong₂ _⊔_ (hopD-elimGᵗ V x cl l) (hopD-elimGᵗ V x cl r))
-              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
-                                               (pm-elimGᵗ V 0 x cl r))
-                                    refl)
-                         (hopD-elimGᵗ V x cl s))
-  hopD-elimGᵗ V x cl (ifᵗ c a b)   =
-    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
-  hopD-elimGᵗ V x cl (primᵗ op a)  = refl
-  hopD-elimGᵗ V x cl (strmᵗ b)     = hopD-elimGᵉ V x cl b
-
-  hopD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    hopDᵗˢ V (elimGTms x cl ts) ≡ hopDᵗˢ V ts
-  hopD-elimGᵗˢ V x cl []       = refl
-  hopD-elimGᵗˢ V x cl (y ∷ ys) =
-    cong₂ _⊔_ (hopD-elimGᵗ V x cl y) (hopD-elimGᵗˢ V x cl ys)
-
--- the instance the μ clause takes
-hopD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
-  hopDᵉ V (unfoldμ body) ≡ hopDᵉ V (μᵉ body)
-hopD-unfoldμ V body = hopD-elimGᵉ V (here refl) (μᵉ body) body
 
 ------------------------------------------------------------------
 -- THE THREE GAS EDGES, PACKAGED.  Each one is "the machine's own step
