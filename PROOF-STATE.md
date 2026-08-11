@@ -593,7 +593,7 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
 | 1 | `subscribeE-walk-core` | Measures.agda (was :5750) | **ASSEMBLED IN SRC (REAL DEFINITION) 2026-08-11** | **ASSEMBLED IN SRC 2026-08-11**: converted from a single monolithic postulate to a structurally-recursive real definition (structural recursion on `b : Closed Γ u` / `g : Gas`). The definition dispatches all 13 constructors of `Closed` and routes to 26 per-clause and shared sub-postulates. The probe `Walk-Core-Assembly-Probe.agda` (EXIT=0, 2026-08-11) validated the assembly's shape before landing. The ledger grew by design: one vague postulate became 26 specific ones (§1 shared arithmetic: 8 postulates, §2 per-clause: 7 postulates, §3 *All clauses: 3 postulates, §2b μ-specific: 6 postulates, plus 2 proved lemmas and 2 proved helpers). Sub-postulates consume the formerly-deferred `walk-hyps-splitAnchor`, `walk-hyps-round3b`, and `spendᴱ-compose` as explicit parameters. Probe file deleted with its ledger line (`3d476b2`). **GRIND ROUND 1 (2026-08-11): 26 → 20 sub-postulates.** One statement REPAIR and five real proofs: (i) **`walk-core-G-pos` was FALSE as stated** — `dBound Ŝ R̂ U r s ≤ G → 1 ≤ G` fails at `s = 0, G = 0`, where `dBound` is the identity; repaired by adding the `1 ≤ s` hypothesis, which every call site supplies free because **`syncSizeᵉ` is ≥ 1 at every `Exp` clause** (each returns `1` or `suc _`). Proof is `≤-trans hs (≤-trans (m≤m+n s _) h-dB)`. (ii) `sizeᵗˢ≤sizeᵉ`, (iii) `walk-core-ℓ-pos`, (iv) `walk-core-oneShotBurst-hasDry` (over one new `hasDry-burst`, since `dryEvent` fires only on `close _ dried` and a one-shot burst emits only init/value/close-exhausted/complete), (v) `walk-core-μ-hopD` — discharged for free by **relocating the already-proven `hopD-elimGᵉ`/`pm-elimGᵉ` mutual blocks from `Wet.agda` to `Rx/Hop-Depth.agda`**: the lemmas only ever mention `hopD`/`pm`/`elimGExp`, so they belonged in the `Rx` layer, and Measures already imported that module (it cannot import Wet — circular). This is the shape to look for first: **a sub-postulate whose proof already exists one module away and is blocked only by import direction.** Remaining 20: 14 clause faces (§2 per-clause + §3 *All), 5 μ-specific, `walkCap-mono-d`. |
-| 2 | `cascadeGo-wet-core` | Wet.agda:4499 | **DIFFICULTY** | P2's entire content (its only hypotheses are two stBounded? preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`). PROBED-GREEN 2026-08-11 on root-path chains (hasDry: confirmed no dried events; INV?: degenerate on tested shapes); from-inner/thru-outer paths NOT COVERED (abstract Gas). No refutation found — reclassified from FALSITY to DIFFICULTY. The INV? conjunct through subscribeE calls is the genuinely open question; it mirrors what cascadeGo-caps (Caps-Face:4345) already proves. |
+| 2 | `cascadeGo-wet-core` | Wet.agda:4499 | **FALSITY — PRIORITY ONE (the anchor)** | P2's entire content (its only hypotheses are two stBounded? preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`). **CLASS RESTORED TO FALSITY 2026-08-11** — it had been lowered to DIFFICULTY (`e563093`) on a probe that covered only **root-path chains**, the near-degenerate case; the from-inner and thru-outer paths were NOT COVERED because `abstract blowH` blocks Gas from computing there. That is evidence from outside the risky region, so it cannot lower the class (see THE ANCHOR-FIRST LAW). What the probe does establish, and all it establishes: on root-path chains, `hasDry` is confirmed false and `INV?` is degenerate on every shape tested. The INV? conjunct through `subscribeE` calls on the **uncovered** paths is the genuinely open question; it mirrors what `cascadeGo-caps` (Caps-Face:4345) already proves. **Edited in src exactly once — its creation (`a8508d6`).** |
 | 3 | `subscribeE-wet-core` | Wet.agda:4311 | FALSITY, conditional | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's G/ℓ/Ω entry data from `INV?` alone, and the INV?/capᴱ flavor conversion is unchecked. Moderate incremental risk over #1, with maximal blast radius (both branches of budget-sufficient). |
 | 4 | ~~`sub-charge-capsOK-lift-core`~~ | — | **DISCHARGED 2026-08-06 — the postulate is a REAL PROOF; the risk moved into #13 and one Phase-3 obligation** | The general-id depth bound (the residual design question recorded here) was RESOLVED as a THREADING ruling, not a lemma: `depthE g b κ id now sched st ≤ capsH e sl id` is a RUN INVARIANT — the unconditional form is FALSE (Depth-Bound's header: a long map-f chain over a tiny `e` breaks any state-free `depthE ≤ capsH`), and "reachable" is not first-class here, so the bound enters as a PREMISE (`depOK`) exactly as `nestOK`/`opsOK` did, discharged at `burst-caps` by `depthE≤capsH-root` and owed at general call sites by the Phase-3 induction (see the depOK preservation obligation, Phase 3 item 5). **Why the depth-capped route could never work off the root, recorded so nobody re-attempts it:** the state at counter `id` satisfies `capsOK?` only at `capsAt e sl id`, whose `cSize` is tower-sized (`capsAt-tower`: `cSize ≤ towerℕ (capsH)`), so `depth-capped` yields `dep ≤ 3·towerℕ(h)` against a target of `h` — off by "towerℕ of" at EVERY index; no index shift closes it. `depth-capped`'s role is confined to the root, where the SMALL `baseCaps` satisfies `capsOK?`. **With depOK threaded, every link of the old route comment became an existing lemma** — jB → `opIterD-dominated` (k≤S/m≤S from nestOK/opsOK, `2≤capsAt-size`/`1≤capsAt-reg` free) → `sizeCount-body` + record eta → `sizeCount-mono-d` (#13, the ONE new postulate) over depOK → `frameStep-mono-j` → `capsAt-suc-full` → `capsOK?-mono` — and `sub-charge-capsOK-lift` is now a ~20-line real definition in Caps-Bridge. Kit fallout: `capsAt-suc-full`/`frameStep-full`/`frameStep-mono-j`/`depthE≤capsH-root`/`opIterD-dominated` all kept real consumers; `⊑ᶜ-refl`, `frameSz?-⊑` (Caps-Face) and `prepend-fits` (Subscribe-Face) were speculative kit the proof never needed — DELETED 2026-08-06 (this commit; git is the archive). |
 | 5 | `depth-compositional` | **Depth-Compositional.agda (LANDED from probe 2026-08-06; kit ground 2026-08-07)** | **ASSEMBLED IN SRC; 7 of 8 kit lemmas PROVEN (`943e690`); the 8th — `storeNestMax-installScan` — REFUTED** | The worker grind proved the three burst-zero lemmas, installTake, and the three size-arith lemmas, and REFUTED `storeNestMax-installScan`: `caseᵗ` duplication gives `sizeᵛ (evalTm seed) > sizeᵗ seed`, and evalTm blowup is tower-shaped, so the additive form is unrepairable and no linear `scan-size-arith` RHS absorbs it. **The theorem is plausibly still true** — the subscribe-side mirror never reads a freshly-installed scan node's value (accumulators are read at DELIVERY, census finding (2)) — so the repair is an install-invariance lemma rerouting the scanᵉ clause through the ENTRY store (task #49; if some subscribe-side clause DOES read scan values, this escalates to a possible statement refutation — probe with a duplicating seed first). Remaining open here: the 3 BUCKET-(d) postulates + #49. |
@@ -813,9 +813,54 @@ binaries, off every proof path. Carried, not counted.
 > to touch is NOT in the tier-1 table above, and the work is not one of the two
 > design questions, it is parked. Say so and pick a tier-1 item instead.
 
-Within tier 1, ordered so that each phase's findings can still cheaply change
-the phases after it. Do not reorder: grinding before probing risks proving
-towers over false ground.
+> ## THE ANCHOR-FIRST LAW (Anthony, 2026-08-11) ← **SUPERSEDES THE PHASE ORDER BELOW**
+>
+> **THE ANCHOR CLUSTER IS PRIORITY ONE. Nothing else in tier 1 is worked until
+> the anchor has been either resolved or refuted.**
+>
+> **What forced this rule — the measurement, not a feeling.** On 2026-08-11
+> Anthony asked whether the campaign was actually moving the anchor or grinding
+> its periphery. The git history answers it, and the answer is uncomfortable:
+>
+> | | Live tier-1 postulates |
+> |---|---|
+> | 2026-08-06 | walk-core, **cascadeGo-wet-core**, wet-core, sub-charge-capsOK-lift, depth-compositional, opIterD, init-capsOK ×2, thruOuter-face, innerFinish-concat-face, dry-tick, three-size (12) |
+> | 2026-08-11 | walk-core, **cascadeGo-wet-core**, wet-core, depth-compositional, dry-tick (5) |
+>
+> Twelve to five in five days, and **every one of the seven discharges was a
+> NON-ANCHOR row.** The anchor cluster is 4-for-4 unchanged. `cascadeGo-wet-core`
+> has been edited in `agda/src` exactly ONCE — the commit that created it
+> (`a8508d6`, 2026-08-06). Five days, one write.
+>
+> The periphery work was real and it is now gone, so the excuse it provided is
+> gone with it. **The remaining non-anchor work (row #1's 20 sub-postulates,
+> `depth-compositional`'s residue) is the most gratifying-looking work left and
+> the least informative.** Row #1's 14 clause faces are 14 instances of one
+> pattern; grinding them cannot discover a design failure, and a design failure
+> in #2 would move the ground under all of them.
+>
+> **THE FAILURE MODE THIS RULE EXISTS TO STOP — risk RELABELLED as risk
+> RETIRED.** On 2026-08-11 `cascadeGo-wet-core` was reclassified FALSITY →
+> DIFFICULTY (`e563093`) on the strength of a probe that, by its own ledger
+> line, **could not reach the from-inner or thru-outer paths** — `abstract
+> blowH` blocks Gas from computing there. The probe covered root-path chains,
+> the near-degenerate case. Downgrading a risk class on evidence that
+> structurally cannot touch the risky region makes the ledger look better
+> without making the proof safer. **That reclassification is REVERTED** (see the
+> tier-1 table, row 2). Rule going forward: **a risk class may only be lowered
+> by evidence that reached the region carrying the risk.** Name the region in
+> the receipt, or the receipt does not count.
+>
+> **Practical test, replacing the one above:** if the work is not on
+> `cascadeGo-wet-core` / `subscribeE-wet-core` / `dry-tick-core`, or on the ONE
+> unblocking question they need answered, it is parked — including the rest of
+> tier 1. Row #1's residue is explicitly parked behind the anchor.
+
+Within tier 1, the phases below are ordered so that each phase's findings can
+still cheaply change the phases after it. Do not reorder: grinding before
+probing risks proving towers over false ground. **Phases 1–3 are now subordinate
+to the ANCHOR-FIRST LAW above** — where they schedule non-anchor grinding, that
+grinding is parked.
 
 ### Phase 0 — THE FALSIFICATION SWEEP — ✅ COMPLETE (2026-08-06)
 
@@ -1169,7 +1214,60 @@ probing. All of this is tier 1, so all of it precedes tier 2.
   `capsOK?-mono` lift `init-capsOK?-base` to `init-capsOK?` and retire the
   latter.
 
-### Phase 3 — THE TIER 1 GRIND (workers; only over probed or repaired ground)
+### Phase A — THE ANCHOR, SYMBOLICALLY ← **PRIORITY ONE (2026-08-11)**
+
+> Supersedes Phases 1–3 for scheduling purposes. Everything else in tier 1 —
+> including row #1's 20 sub-postulates — is parked behind this.
+
+The probe route is closed (see the RULING under THE ANCHOR PROBLEM). What
+remains is symbolic, and there is one strong lead.
+
+**A1. THE MIRROR — start here.** `cascadeGo-caps` (Caps-Face:4335, body at
+:5054) is a **REAL DEFINITION, not a postulate** — the analogous statement is
+already PROVEN on the caps axis. `cascadeGo-wet-core`'s own header says it
+"mirrors what cascadeGo-caps already proves." So the first question is not
+"how do we prove the wet face" but:
+
+> **Can the wet conclusion be DERIVED FROM the caps conclusion, rather than
+> re-proven alongside it?**
+
+That is a bridge, not a grind, and it is the cheapest thing on this list that
+could actually close #2. Concretely: `cascadeGo-caps` carries 15 arguments
+(`siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz
+hD`) and concludes on the caps side; `cascadeGo-wet-core` takes 2 hypotheses +
+5 inputs and concludes `hasDry ≡ false × INV? ≡ true`. **The task is a census
+of which caps-side outputs already imply which wet-side conjuncts** — done by
+reading the two signatures side by side, no typechecking needed (the goals are
+declared, per the outside-in rule). Three outcomes, all useful: the wet face
+reduces to a bridge lemma; or it needs extra hypotheses the caps face does not
+carry (name them, that is the repair); or the two are genuinely independent
+(record why, and A2 becomes the route).
+
+**A2. THE SPLIT — if A1 says the faces are independent.** The two conjuncts have
+very different characters and should stop sharing a postulate:
+- `hasDry (proj₁ r) ≡ false` — **mentions neither `B` nor `Ψ`.** It is a
+  statement about which events `chainStep` can emit, and Evaluator:343 already
+  says no dried events are ever produced. This half is plausibly a short
+  structural induction over `cascadeGo`'s three cases, independent of the whole
+  caps tower. **Split it out and prove it on its own** — it is the one piece of
+  the anchor that the seal does not touch.
+- `INV? … ≡ true` — carries all the `B`/`Ψ` content and all the real risk.
+Splitting is not cosmetic here: it would take the *provable* half out of the
+anchor entirely and shrink what "the anchor problem" actually refers to.
+
+**A3. THE REFUTATION ATTEMPT, symbolically.** The naive per-chainStep
+decomposition is already machine-refuted (`caps-frame-boundary-absurd`), which
+is why the statement is fold-threaded. The open question is whether the
+fold-threaded form survives. Since it cannot be tested numerically, the attempt
+must be a derivation of `⊥` from the statement plus the `j`-index growth facts
+the caps face uses. **Time-box this** — a failed refutation attempt on a
+symbolic statement produces no receipt, unlike a numeric one.
+
+**A4. Only after #2 resolves:** `subscribeE-wet-core` (#3) is its outer
+instantiation and `dry-tick-core` (#11) inherits nearly all its risk from #2.
+Neither should be started first.
+
+### Phase 3 — THE TIER 1 GRIND (workers; PARKED behind Phase A)
 
 Cheapest-and-safest first, anchor-dependent mass last.
 
@@ -1275,6 +1373,47 @@ Ready-to-go work deliberately NOT being done, so it is not lost:
 ---
 
 ## THE ANCHOR PROBLEM — the campaign's one central open question
+
+> ### RULING (2026-08-11): THE ANCHOR CANNOT BE PROBED. THE SEAL IS THE DESIGN.
+>
+> **Tested, and the answer is negative — do not retry this.** The hypothesis was
+> that `cascadeGo-wet-core`'s uncovered from-inner / thru-outer paths were
+> blocked by a *probe-local* obstacle (`abstract blowH`, Evaluator:898) that a
+> cleverer probe could route around, since `blowH-body` (Evaluator:901) hands
+> the body back on demand. It cannot. Four measurements, in order:
+>
+> 1. `towerℕ` computes fine to height 4 (`towerℕ 4 ≡ 65536` by `refl`), so the
+>    tower is **not** the blocker — that was the intuitive guess and it is wrong.
+> 2. **`poolCount 1 0` — the smallest possible arguments — does NOT reduce to a
+>    numeral.** It sticks as `iterL 1 1 0 (iterSize 1 (lvls 1 1 0 0 (dWalkᶜ 1 1 1
+>    0 0 (fLvlD 1 1 0 (fLvlD 1 1 0 0)) …)))`. Unfolding `blowH` therefore buys
+>    nothing: it trades one opaque symbol for a nest of them.
+> 3. The reason is a **SECOND abstract block at Evaluator:727** — `fLvlD`,
+>    `lvls`, `iterL`, `iterSize`, `dWalkᶜ` — sealed for the same documented
+>    performance reason as `blowH`. Its header says why: every clause matches on
+>    an argument that is a literal `suc` even at a variable, so **with the bodies
+>    visible one whnf unfolds the whole family and mentions its arguments many
+>    times over.** That blowup is measured, twice, at over an hour without
+>    finishing. The seal is load-bearing, not incidental.
+> 4. **`cascadeGo` takes no `Gas` parameter** (Evaluator:1628) — it derives the
+>    budget internally through `chainStep`. So a probe cannot inject a small
+>    concrete Gas to sidestep the seal either.
+>
+> **DEAD ROUTE, recorded so nobody re-derives it:** defining a non-abstract
+> *copy* of the counting family and computing with it does not work either. The
+> blowup is COMPUTATIONAL, not definitional — a copy with the same body blows up
+> identically, and the `-body` equations that would justify the copy are exactly
+> what already fails to help.
+>
+> **THE CONSEQUENCE, and it is the important part.** Every probe of
+> `cascadeGo-wet-core` will only ever reach the region where `B`/`Ψ` do not
+> matter — root-path chains at empty states — because that is precisely the
+> region whose conjuncts reduce without the seal. **So probing cannot lower this
+> postulate's risk, ever, and a green probe here is not evidence.** That is why
+> the 2026-08-11 FALSITY → DIFFICULTY reclassification was reverted, and it
+> generalises: **the anchor must be attacked SYMBOLICALLY or not at all.** The
+> repo already knew this about the caps axis (Phase 0's boxed correction); it is
+> now established for the wet axis too.
 
 `hop-edge` (and `connect-edge`) reset their demand to an anchor `Ŝ`, and
 discharging one requires `sizeᵛ o ≤ Ŝ` for a value `o` arising **mid-walk /
