@@ -358,14 +358,47 @@ picking up any postulate.
   backwards — are itemised in PROOF-STATE's roadmap; all three were observed in one
   day, and all three erred toward false comfort.
 
-**TIER ORDER IS LAW: TIER 1 FINISHES BEFORE TIER 2 OR 3 RESUMES (Anthony,
-2026-08-06).** Strictly — not "mostly", not "while a build runs". Tier 2
-(`evaluate-well-formed`) is built ON tier 1's `budget-sufficient`, so proving a
-tier-2 statement while tier 1's anchor question is open bets on ground a tier-1
-design failure would move. The one carve-out is answering a *design question*
-(cheap, and it aims the grind) — never grinding over one. **Before starting any
-task: if the postulate is not in PROOF-STATE's tier-1 table, and the work is not
-one of the two design questions, it is parked — say so and take a tier-1 item.**
+**TIER ORDER IS LAW: TIER 0 FINISHES FIRST, THEN TIER 1, THEN 2 AND 3 (Anthony,
+2026-08-06; TIER 0 added 2026-08-11).** Strictly — not "mostly", not "while a
+build runs". Tier 2 (`evaluate-well-formed`) is built ON tier 1's
+`budget-sufficient`, so proving a tier-2 statement while the anchor question is
+open bets on ground a design failure would move. The one carve-out is answering
+a *design question* (cheap, and it aims the grind) — never grinding over one.
+
+**TIER 0 IS THE ANCHOR, and it exists because prose priority did not hold.**
+`cascadeGo-wet-core` (T0-1), `subscribeE-wet-core` (T0-2), `dry-tick-core`
+(T0-3). For five days the anchor sat inside tier 1 while every tier-1 discharge
+went to a non-anchor row — 12 live rows down to 5, anchor 4-for-4 untouched,
+`cascadeGo-wet-core` edited in `agda/src` exactly once. **Priority that lives
+only in prose gets spent on whatever is nearest**, so it is a tier now.
+
+**Before starting any task: if the postulate is not in PROOF-STATE's TIER 0
+table, and the work is not one of the two design questions, it is parked — say
+so and take a tier-0 item.** This explicitly parks **all of tier 1**, including
+`subscribeE-walk-core`'s 20 sub-postulates. Those 20 are the most
+gratifying-looking work left and the least informative: they are 14 instances of
+one clause pattern plus 5 μ-preservation facts, none of which can discover a
+design failure, and a T0-1 failure would move the ground under all of them.
+
+**TWO ANCHOR RULINGS THAT CHANGE HOW YOU WORK IT (2026-08-11):**
+
+- **THE ANCHOR CANNOT BE PROBED — do not spend a session trying.** Tested and
+  closed: `blowH` is `abstract` (Evaluator:898) and `blowH-body` unfolds it, but
+  `poolCount` then sticks on a SECOND abstract family (Evaluator:727 — `fLvlD`,
+  `lvls`, `iterL`, `iterSize`, `dWalkᶜ`) sealed for the same measured
+  performance reason; `poolCount 1 0` does not reduce to a numeral at the
+  smallest possible arguments. `towerℕ` is NOT the blocker (it computes to
+  height 4). `cascadeGo` takes no `Gas` parameter, so a small concrete Gas
+  cannot be injected around it. A non-abstract COPY of the counting family fails
+  too — the blowup is computational, not definitional. **Consequence: every
+  probe of T0-1 reaches only the region where `B`/`Ψ` do not matter, so a green
+  probe here is not evidence. The anchor is symbolic-or-nothing.**
+- **A RISK CLASS MAY ONLY BE LOWERED BY EVIDENCE THAT REACHED THE RISKY
+  REGION.** T0-1 was downgraded FALSITY → DIFFICULTY on a probe covering only
+  root-path chains — the near-degenerate case — and was reverted. Name the
+  region the evidence reached, or the receipt does not count. This is the
+  general form of "never extrapolate a probe past its shapes", and it is the
+  specific way this campaign has made itself feel safer than it was.
 
 **These still hold, unchanged from the wiring pass:**
 

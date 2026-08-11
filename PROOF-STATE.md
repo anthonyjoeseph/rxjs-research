@@ -208,7 +208,33 @@ decidable bound over COMPUTABLE functions (`evaluate`, `capsOK?`, `depthE`,
 QuickCheck/oracle only ever tested impl≡spec — before 2026-08-06 **no postulate
 in this ledger had ever been probed**; closing that blind spot is Phase 0.
 
-### Tier 1 — Verify-Budget-Sufficient (originally 12; #4, #6, #7, #8, #12, #13 discharged — 6 live)
+### Tier 0 — THE ANCHOR (3 live) — **EVERYTHING ELSE WAITS ON THIS**
+
+> **Why this tier exists (Anthony, 2026-08-11).** The anchor was inside tier 1
+> for five days while every discharge in tier 1 went to a NON-anchor row — 12
+> live rows down to 5, and the anchor cluster 4-for-4 untouched (the table is in
+> THE ANCHOR-FIRST LAW under THE ROADMAP). Priority that lives only in prose
+> gets spent on whatever is nearest. **It is a tier now so that the schedule
+> reads it.**
+>
+> **RENUMBERED, and the old numbers are dead.** These were tier-1 rows #2, #3,
+> and #11. All 7 citations of the old labels were updated in the same commit
+> (`Makefile`, `agda/PROBES.txt`, two probe files, this document) — nothing in
+> `agda/src` cited them, which is why the renumber cost no recheck. **Do not
+> reintroduce "tier-1 #2"** — it now resolves to a different row.
+>
+> **Entry test:** work is tier-0 work if it is on T0-1, T0-2, T0-3, or on the
+> one unblocking question they need answered. Everything else in tier 1 —
+> **including `subscribeE-walk-core`'s 20 sub-postulates** — is parked. The
+> phase plan is Phase A under THE ROADMAP.
+
+| # | Postulate | Where | Class | Why it ranks here |
+|---|-----------|-------|-------|-------------------|
+| **T0-1** | `cascadeGo-wet-core` (was tier-1 #2) | Wet.agda:4370 | **FALSITY — THE ANCHOR** | P2's entire content (its only hypotheses are two `stBounded?` preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`). **CLASS RESTORED TO FALSITY 2026-08-11** — it had been lowered to DIFFICULTY (`e563093`) on a probe covering only **root-path chains**, the near-degenerate case; from-inner and thru-outer were NOT COVERED. Per the RULING under THE ANCHOR PROBLEM, **that region is unreachable by any probe**, so no probe can ever lower this class. What the probe does establish, and all it establishes: on root-path chains `hasDry` is false and `INV?` is degenerate on every shape tested. **Edited in `agda/src` exactly once — its creation (`a8508d6`, 2026-08-06).** Route: Phase A1 (the `cascadeGo-caps` mirror), then A2 (split `hasDry` out). |
+| **T0-2** | `subscribeE-wet-core` (was tier-1 #3) | Wet.agda:4311 | FALSITY, conditional on T0-1 | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's `G`/`ℓ`/`Ω` entry data from `INV?` alone, and **the `INV?`/`capᴱ` flavour conversion is unchecked**. That is a named, specific unverified step, not general unease. Moderate incremental risk over the walk, with **maximal blast radius: both branches of `budget-sufficient`**. NOTE it consumes `subscribeE-walk-core` (tier-1 #1) as a finished fact, so it is workable NOW — #1 being a real definition over unproven leaves does not block it. |
+| **T0-3** | `dry-tick-core` (was tier-1 #11) | Caps-Bridge.agda:439 | DIFFICULTY, risk inherited | Given `cascadeGo-wet` (its first hypothesis) it is latch/finish bookkeeping plus the Deliveries counts. **Nearly all its risk is inherited from T0-1, not its own** — which is exactly why it must not be started first. Do it last of the three. |
+
+### Tier 1 — Verify-Budget-Sufficient (originally 12; #4, #6, #7, #8, #12, #13 discharged; #2/#3/#11 promoted to TIER 0 — 2 live)
 
 > **STATE, 2026-08-07 morning.** Six of the original ledger are gone. What is
 > LEFT splits cleanly in two, and the split is the schedule:
@@ -229,7 +255,7 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 > hypotheses it was missing. Both faces are now pure grinds over repaired
 > statements. The pass added exactly one genuinely new claim,
 > `cascade-depth-capsH` — the delivery-side depth bound, which nothing in
-> the repo had ever stated. **The anchor problem (#1/#2/#3, and #11 by
+> the repo had ever stated. **The anchor problem (TIER 0: T0-1/T0-2/T0-3; tier-1 #1 feeds it, by
 > inheritance) is now the whole of tier 1's risk**, and it is where the
 > remaining work is.
 >
@@ -593,8 +619,6 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | # | Postulate | Where | Class | Why it ranks here |
 |---|-----------|-------|-------|-------------------|
 | 1 | `subscribeE-walk-core` | Measures.agda (was :5750) | **ASSEMBLED IN SRC (REAL DEFINITION) 2026-08-11** | **ASSEMBLED IN SRC 2026-08-11**: converted from a single monolithic postulate to a structurally-recursive real definition (structural recursion on `b : Closed Γ u` / `g : Gas`). The definition dispatches all 13 constructors of `Closed` and routes to 26 per-clause and shared sub-postulates. The probe `Walk-Core-Assembly-Probe.agda` (EXIT=0, 2026-08-11) validated the assembly's shape before landing. The ledger grew by design: one vague postulate became 26 specific ones (§1 shared arithmetic: 8 postulates, §2 per-clause: 7 postulates, §3 *All clauses: 3 postulates, §2b μ-specific: 6 postulates, plus 2 proved lemmas and 2 proved helpers). Sub-postulates consume the formerly-deferred `walk-hyps-splitAnchor`, `walk-hyps-round3b`, and `spendᴱ-compose` as explicit parameters. Probe file deleted with its ledger line (`3d476b2`). **GRIND ROUND 1 (2026-08-11): 26 → 20 sub-postulates.** One statement REPAIR and five real proofs: (i) **`walk-core-G-pos` was FALSE as stated** — `dBound Ŝ R̂ U r s ≤ G → 1 ≤ G` fails at `s = 0, G = 0`, where `dBound` is the identity; repaired by adding the `1 ≤ s` hypothesis, which every call site supplies free because **`syncSizeᵉ` is ≥ 1 at every `Exp` clause** (each returns `1` or `suc _`). Proof is `≤-trans hs (≤-trans (m≤m+n s _) h-dB)`. (ii) `sizeᵗˢ≤sizeᵉ`, (iii) `walk-core-ℓ-pos`, (iv) `walk-core-oneShotBurst-hasDry` (over one new `hasDry-burst`, since `dryEvent` fires only on `close _ dried` and a one-shot burst emits only init/value/close-exhausted/complete), (v) `walk-core-μ-hopD` — discharged for free by **relocating the already-proven `hopD-elimGᵉ`/`pm-elimGᵉ` mutual blocks from `Wet.agda` to `Rx/Hop-Depth.agda`**: the lemmas only ever mention `hopD`/`pm`/`elimGExp`, so they belonged in the `Rx` layer, and Measures already imported that module (it cannot import Wet — circular). This is the shape to look for first: **a sub-postulate whose proof already exists one module away and is blocked only by import direction.** Remaining 20: 14 clause faces (§2 per-clause + §3 *All), 5 μ-specific, `walkCap-mono-d`. |
-| 2 | `cascadeGo-wet-core` | Wet.agda:4499 | **FALSITY — PRIORITY ONE (the anchor)** | P2's entire content (its only hypotheses are two stBounded? preservation facts). The anchor problem on the cascade axis. The naive per-chainStep decomposition is machine-refuted (`caps-frame-boundary-absurd`). **CLASS RESTORED TO FALSITY 2026-08-11** — it had been lowered to DIFFICULTY (`e563093`) on a probe that covered only **root-path chains**, the near-degenerate case; the from-inner and thru-outer paths were NOT COVERED because `abstract blowH` blocks Gas from computing there. That is evidence from outside the risky region, so it cannot lower the class (see THE ANCHOR-FIRST LAW). What the probe does establish, and all it establishes: on root-path chains, `hasDry` is confirmed false and `INV?` is degenerate on every shape tested. The INV? conjunct through `subscribeE` calls on the **uncovered** paths is the genuinely open question; it mirrors what `cascadeGo-caps` (Caps-Face:4345) already proves. **Edited in src exactly once — its creation (`a8508d6`).** |
-| 3 | `subscribeE-wet-core` | Wet.agda:4311 | FALSITY, conditional | Given the walk it is "the outer instantiation" — but the instantiation must manufacture the walk's G/ℓ/Ω entry data from `INV?` alone, and the INV?/capᴱ flavor conversion is unchecked. Moderate incremental risk over #1, with maximal blast radius (both branches of budget-sufficient). |
 | 4 | ~~`sub-charge-capsOK-lift-core`~~ | — | **DISCHARGED 2026-08-06 — the postulate is a REAL PROOF; the risk moved into #13 and one Phase-3 obligation** | The general-id depth bound (the residual design question recorded here) was RESOLVED as a THREADING ruling, not a lemma: `depthE g b κ id now sched st ≤ capsH e sl id` is a RUN INVARIANT — the unconditional form is FALSE (Depth-Bound's header: a long map-f chain over a tiny `e` breaks any state-free `depthE ≤ capsH`), and "reachable" is not first-class here, so the bound enters as a PREMISE (`depOK`) exactly as `nestOK`/`opsOK` did, discharged at `burst-caps` by `depthE≤capsH-root` and owed at general call sites by the Phase-3 induction (see the depOK preservation obligation, Phase 3 item 5). **Why the depth-capped route could never work off the root, recorded so nobody re-attempts it:** the state at counter `id` satisfies `capsOK?` only at `capsAt e sl id`, whose `cSize` is tower-sized (`capsAt-tower`: `cSize ≤ towerℕ (capsH)`), so `depth-capped` yields `dep ≤ 3·towerℕ(h)` against a target of `h` — off by "towerℕ of" at EVERY index; no index shift closes it. `depth-capped`'s role is confined to the root, where the SMALL `baseCaps` satisfies `capsOK?`. **With depOK threaded, every link of the old route comment became an existing lemma** — jB → `opIterD-dominated` (k≤S/m≤S from nestOK/opsOK, `2≤capsAt-size`/`1≤capsAt-reg` free) → `sizeCount-body` + record eta → `sizeCount-mono-d` (#13, the ONE new postulate) over depOK → `frameStep-mono-j` → `capsAt-suc-full` → `capsOK?-mono` — and `sub-charge-capsOK-lift` is now a ~20-line real definition in Caps-Bridge. Kit fallout: `capsAt-suc-full`/`frameStep-full`/`frameStep-mono-j`/`depthE≤capsH-root`/`opIterD-dominated` all kept real consumers; `⊑ᶜ-refl`, `frameSz?-⊑` (Caps-Face) and `prepend-fits` (Subscribe-Face) were speculative kit the proof never needed — DELETED 2026-08-06 (this commit; git is the archive). |
 | 5 | `depth-compositional` | **Depth-Compositional.agda (LANDED from probe 2026-08-06; kit ground 2026-08-07)** | **ASSEMBLED IN SRC; 7 of 8 kit lemmas PROVEN (`943e690`); the 8th — `storeNestMax-installScan` — REFUTED** | The worker grind proved the three burst-zero lemmas, installTake, and the three size-arith lemmas, and REFUTED `storeNestMax-installScan`: `caseᵗ` duplication gives `sizeᵛ (evalTm seed) > sizeᵗ seed`, and evalTm blowup is tower-shaped, so the additive form is unrepairable and no linear `scan-size-arith` RHS absorbs it. **The theorem is plausibly still true** — the subscribe-side mirror never reads a freshly-installed scan node's value (accumulators are read at DELIVERY, census finding (2)) — so the repair is an install-invariance lemma rerouting the scanᵉ clause through the ENTRY store (task #49; if some subscribe-side clause DOES read scan values, this escalates to a possible statement refutation — probe with a duplicating seed first). Remaining open here: the 3 BUCKET-(d) postulates + #49. |
 | 5° | (superseded row) | — | (was: assembled over 3 postulates + 8-lemma kit) | The monolithic postulate is gone from Depth-Bound: `depth-compositional` is now a structurally-recursive real definition in its own module (per the SCC-granularity rule), dispatching to `depth-conn-storeNest` / `depth-all-bound` / `depth-μ-bound` (the three schedule-blockers, each with its obstacle and route in its header) plus the burst-zero / installNode / size-arith kit (8 small postulates, each one lemma's worth). The `storeNestMax` measure moved with it (Depth-Bound would otherwise import its own consumer). Probe file deleted with its LANDING line per the ratchet. The ledger GREW by design: one vague postulate became 11 specific ones, each separately attackable. |
@@ -604,7 +628,6 @@ in this ledger had ever been probed**; closing that blind spot is Phase 0.
 | 8 | ~~`init-capsOK?-suc`~~ (was `init-capsOK?`) | — | **DISCHARGED 2026-08-06 — proven at EVERY id, zero new postulates** | The recorded blocker (`capsAt e ins id` never reduces to a numeral because `sizeCount` is `abstract`) killed only the COMPUTATIONAL route. The monotonicity route never needs a numeral: `capsAt-⊑-suc` proves `capsAt e ins id ⊑ᶜ capsAt e ins (suc id)` by spanning `frameStep 0` (= the caps itself, `frameStep-0`) to the full endpoint (`frameStep-full`) with `frameStep-mono-j` at `0 ≤ sizeCount`, and `init-capsOK?` is then a two-clause induction: base `init-capsOK?-0` (rests on #7), step `capsOK?-mono` along `capsAt-⊑-suc` — the initial state never changes, only the caps widen. One Agda footnote worth keeping: the count had to be pinned by hand (`z≤n {n = sizeCount …}`) because `iterSize`/`iterFold` match on it, so unification cannot invert the `⊑ᶜ` endpoints — caught in the fast loop by checking Caps-Bridge against cached interfaces BEFORE paying the heavyweight recheck. Residual risk here is exactly #7 (`init-capsOK?-base-core`), nothing else. |
 | 9 | ~~`thruOuter-face-core`~~ (P4) | **Caps-Face.agda — now a REAL DEFINITION** | **DISCHARGED 2026-08-11 (`0b9cca9`)** | Probe body (`ThruOuter-Face-Core-Probe.agda`, EXIT=0) promoted to `abstract` real definition via the private-impl + abstract-alias pattern. Private helpers inline Subscribe-Face's `thruConsume-caps` / `thruWalk-caps` walk machinery against a `siC` hypothesis (instead of a direct import), so the 44-minute module stays off the import chain. Two new module imports: `Caps-Chain` (walk-nil, inner-nil, walk-index, frame-step, queue-push) and `Caps-Sadd` (walk-step-suc). The original doubts about the second-number receipt and `fCharge` compatibility were resolved by the repaired statement's `suc (depthWalk …) ≤ d` premise threading — the grind closed in the probe. Sealed `abstract` per the VWF-spine rule. |
 | 10 | ~~`innerFinish-concat-face-core`~~ (P3) | **Caps-Face.agda — now a REAL DEFINITION** | **ASSEMBLED 2026-08-09; the monolith is replaced by ONE sub-postulate** | The probe's assembly landed and the signature pass that unblocked it is done (see the block above the table). `innerFinish-concat-face-core` is a real definition whose body is a single call to **`innerFinish-concat-face-go`**, the one remaining gap: it takes the node read `nd : Maybe (NodeState Γ)` **explicitly**, which is load-bearing rather than cosmetic — writing the dispatch as a `with w ≟ᵗ s` inside the assembly makes `dpt` reduce to `suc (depthDrain …) ≤ d` while re-evaluating `depthFin` on a VARIABLE `s` yields `depthFinC … (s ≟ᵗ s) ≤ d`, and `s ≟ᵗ s` is not definitionally `yes refl`, so the two types never meet. With `nd` an argument there is no with-abstraction between the assembly and the premise and the types are literally the same expression. `-go` owes seven trivial node cases (`innerFinish-face-keep` at j′ = 0) and ONE real obligation, the concat+yes drain through `innerFinish-caps` (Subscribe-Face:1761) — which is precisely what H1 and H2 were added to feed. **The five kit hypotheses are passed straight through rather than dropped**, eta-expanded (bare they leave unsolved metas); dropping them would orphan `burstCaps?-∷` and the four `*-slots` transports. |
-| 11 | `dry-tick-core` | Caps-Bridge.agda:439 | DIFFICULTY | Given `cascadeGo-wet` (its first hypothesis) it is latch/finish bookkeeping plus the Deliveries counts. Nearly all its risk is inherited from #2, not its own. |
 | 13 | ~~`sizeCount-mono-d`~~ | **Level-Mono.agda (NEW)** | **DISCHARGED (task #46) — REAL PROOF, zero postulates** | `sizeCount c` is monotone in its depth-fuel argument. Proven via the mutual monotonicity grind over the fLvlD SCC through its exported clause equations (`fLvlD-0`/`fLvlD-suc`/`fIterD-0`/…). Imported into Caps-Bridge via `open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)` (Caps-Bridge:99). PROOF-STATE was stale — the proof was complete but the row was not updated. |
 | 12 | ~~`three-size≤capsH-core`~~ | — | **DISCHARGED 2026-08-06 (`559780a`), then re-shaped (`2d4b899`)** | `three-size-le-blowH` + a 7-lemma support chain landed in `Caps.agda`; the postulate is gone and `three-size≤capsH` is a real definition. `S≤sizeStep` was deleted with it (its sole consumer was the replaced hypothesis slot). **Then it nearly died twice by accident** — a worker deleting the superseded root chain stranded `three-size-le-blowH`, and a second worker proposed deleting THAT. Both times the orphan report was right and the ruling was wrong: it is one half of the depth composition (`depth-capped` gives `depthE ≤ 3·cSize`, this gives `3·cSize(base) ≤ blowH`), and the two chain to `depthE ≤ capsH e ins 0`. Now wired root-first: `three-size≤capsH` → `depthE≤capsH-root` → hypothesis of `sub-charge-capsOK-lift-core`. **The lesson is general: a consumer-count sweep cannot tell a dead lemma from an unconnected half of a composition. Read what an orphan SAYS before ruling on it.** |
 
@@ -810,7 +833,7 @@ binaries, off every proof path. Carried, not counted.
 > parked behind tier 1 with everything else.
 >
 > **Practical test before starting any task:** if the postulate you are about
-> to touch is NOT in the tier-1 table above, and the work is not one of the two
+> to touch is NOT in the TIER 0 or tier-1 table above, and the work is not one of the two
 > design questions, it is parked. Say so and pick a tier-1 item instead.
 
 > ## THE ANCHOR-FIRST LAW (Anthony, 2026-08-11) ← **SUPERSEDES THE PHASE ORDER BELOW**
@@ -847,7 +870,7 @@ binaries, off every proof path. Carried, not counted.
 > the near-degenerate case. Downgrading a risk class on evidence that
 > structurally cannot touch the risky region makes the ledger look better
 > without making the proof safer. **That reclassification is REVERTED** (see the
-> tier-1 table, row 2). Rule going forward: **a risk class may only be lowered
+> TIER 0 table, row T0-1). Rule going forward: **a risk class may only be lowered
 > by evidence that reached the region carrying the risk.** Name the region in
 > the receipt, or the receipt does not count.
 >
@@ -1264,7 +1287,7 @@ the caps face uses. **Time-box this** — a failed refutation attempt on a
 symbolic statement produces no receipt, unlike a numeric one.
 
 **A4. Only after #2 resolves:** `subscribeE-wet-core` (#3) is its outer
-instantiation and `dry-tick-core` (#11) inherits nearly all its risk from #2.
+instantiation (T0-2) and `dry-tick-core` (T0-3) inherits nearly all its risk from T0-1.
 Neither should be started first.
 
 ### Phase 3 — THE TIER 1 GRIND (workers; PARKED behind Phase A)
@@ -1316,12 +1339,13 @@ deleted.** That is the gate. Only then does the parked work below resume.
 #12, #13, and #5 assembled-with-residue). The four live rows are the anchor
 cluster of item 5 above, and they are **not independent — they form a chain**:
 
-| Row | Postulate | State | Blocks |
-|---|---|---|---|
-| **1** | `subscribeE-walk-core` | **assembly done; 20 sub-postulates left** (was 26) | #3 |
-| **2** | `cascadeGo-wet-core` | DIFFICULTY, probe found no refutation | #11 |
-| **3** | `subscribeE-wet-core` | conditional on #1 | — |
-| **11** | `dry-tick-core` | risk almost entirely inherited from #2 | — |
+| Row | Postulate | Tier | State | Blocks |
+|---|---|---|---|---|
+| **T0-1** | `cascadeGo-wet-core` | **0** | **FALSITY — unprobeable, see the RULING** | T0-3 |
+| **T0-2** | `subscribeE-wet-core` | **0** | FALSITY, conditional; `INV?`/`capᴱ` conversion unchecked | — |
+| **T0-3** | `dry-tick-core` | **0** | risk almost entirely inherited from T0-1 | — |
+| 1 | `subscribeE-walk-core` | 1 | assembly done; 20 sub-postulates left (was 26) | feeds T0-2 |
+| 5 | `depth-compositional` | 1 | assembled; 3 bucket-(d) blockers left | — |
 
 **The shape of what remains is now known, and that is the round's main result.**
 Row 1 stopped being one unknown-size proof and became **20 named obligations in
@@ -1794,15 +1818,15 @@ from scratch, which is how 60 files accumulated. It is answered here once.
 
 | probe | roadmap item | trigger |
 |---|---|---|
-| `Battery-Nesting-Escalation` | tier-1 #1/#2/#3 — measured basis of `demand` (Anchor-Dry:28) | T1 |
-| `Battery-Obs-Growth` | tier-1 #1/#2/#3 — source of Anchor-Dry:27's `a′ ≤ 2a+v+11` | T1 |
-| `Battery-Reached-Sizes` | tier-1 #1/#2/#3 — establishes `Ŝ := capsH e ins 0` | T1 |
-| `Battery-Value-Count` | tier-1 #1/#2/#3 — REFUTES `sync-count-bounded` | T1 |
-| `Battery-Mu-Emissions` | tier-1 #1/#2/#3 — the μ leg of the composition | T1 |
-| `SubInner-Demand-Probe` | tier-1 #3 — `subscribeInner-demand`'s only coverage | T1 |
+| `Battery-Nesting-Escalation` | tier-1 #1 + tier-0 T0-1/T0-2 — measured basis of `demand` (Anchor-Dry:28) | T1 |
+| `Battery-Obs-Growth` | tier-1 #1 + tier-0 T0-1/T0-2 — source of Anchor-Dry:27's `a′ ≤ 2a+v+11` | T1 |
+| `Battery-Reached-Sizes` | tier-1 #1 + tier-0 T0-1/T0-2 — establishes `Ŝ := capsH e ins 0` | T1 |
+| `Battery-Value-Count` | tier-1 #1 + tier-0 T0-1/T0-2 — REFUTES `sync-count-bounded` | T1 |
+| `Battery-Mu-Emissions` | tier-1 #1 + tier-0 T0-1/T0-2 — the μ leg of the composition | T1 |
+| `SubInner-Demand-Probe` | tier-0 T0-2 — `subscribeInner-demand`'s only coverage | T1 |
 | `Walk-Core-Census-Probe` | tier-1 #1 — per-clause sub-postulate census for `subscribeE-walk-core` | T2 |
 | `Battery-Hop-Premise` | tier-1 #1 — how `hop-edge` premise (iii) discharges | T2 |
-| `Cascade-Go-Wet-Core-Probe` | tier-1 #2 — `cascadeGo-wet-core` falsity probe (PROBED-GREEN 2026-08-11; NOT COVERED: from-inner/thru-outer paths) | T2 |
+| `Cascade-Go-Wet-Core-Probe` | tier-0 T0-1 — `cascadeGo-wet-core` falsity probe. **Green ONLY on root-path chains (the near-degenerate region); from-inner/thru-outer are UNREACHABLE BY ANY PROBE — see the RULING. This green is not evidence for T0-1.** | T2 |
 | `Install-Scan-Depth-Probe` | tier-1 #5 — `installScan-depth-bound` | T3 |
 | `Depth-Wire-Probe` | tier-1 #5 — `baseCaps-is-inner`, parked outside the graph by design (Caps-Bridge:1018) | T3 |
 | `Battery-Merge-Cert` | TIER 2, task #33 — the corrected `merge-cert` | T4 |

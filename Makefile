@@ -175,7 +175,7 @@ walk-core-probe:
 	cd agda && agda -i src -i probe probe/Walk-Core-Probe.agda
 
 # FALSITY PROBE: do the 2-conjunct conclusion of `cascadeGo-wet-core`
-# (Wet.agda:4499, tier-1 #2) hold for concrete programs?
+# (Wet.agda:4499, tier-0 T0-1) hold for concrete programs?
 # 6 rows checked by refl on root-path chains at the empty initial state.
 # hasDry rows LOAD-BEARING (test exhausted != dried); INV? rows
 # DEGENERATE (empty state, 0 <=b abstract always true).

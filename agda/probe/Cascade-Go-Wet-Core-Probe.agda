@@ -1,5 +1,5 @@
--- ROADMAP: tier-1 #2 — cascadeGo-wet-core falsity probe.
--- DELETE WHEN: cascadeGo-wet-core is either proved (tier-1 #2 DONE) or
+-- ROADMAP: tier-0 T0-1 — cascadeGo-wet-core falsity probe.
+-- DELETE WHEN: cascadeGo-wet-core is either proved (tier-0 T0-1 DONE) or
 --   restated after a refutation.
 -- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".
 --

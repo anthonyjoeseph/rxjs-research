@@ -1,4 +1,4 @@
--- ROADMAP: tier-1 #3 — `subscribeInner-demand` (Anchor-Dry.agda:117).  Its only coverage.
+-- ROADMAP: tier-0 T0-2 — `subscribeInner-demand` (Anchor-Dry.agda:117).  Its only coverage.
 -- DELETE WHEN: the three Anchor-Dry demand postulates are discharged (tier-1 #1/#2/#3)  [T1]
 -- Mirrored in PROOF-STATE.md § "PROBE ROADMAP TIES".  If you change one,
 -- change the other -- the duplication is deliberate cross-checking.
