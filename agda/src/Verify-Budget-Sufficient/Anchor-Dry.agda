@@ -17,16 +17,13 @@
 -- walk does not cover (subscribeInner is a frame's INTERIOR, not a
 -- delivery):
 --
---   subscribeInner-demand (POSTULATE): one inner subscription's
---     values are valB?-good at Dm, given INV?/capsOK?-good state,
---     B-bounded inputs, and the occurrence hypothesis
---     pathOccs? sz κ (sz = sizeᵉ e + slotsSize sl; rationale in
---     .Occurrences' header).  Still stated at the tower Dm — this leg
---     keeps the numeric demand model until it too is rebuilt over a
---     walk face: its content is the same family as
---     stepFrame-burst-face's from-inner/thru-outer cases
---     (.Burst-Walk § 2), so whichever is discharged first should
---     absorb the other.
+--   subscribeE-demand (POSTULATE): the subscribe-side burst face — burst
+--     values are burstB?-good at Dm, given INV?/capsOK?-good state,
+--     B-bounded observable, B-good path, and pathOccs? sz κ.
+--     Its content is the same as stepFrame-burst-face's from-inner case
+--     (.Burst-Walk § 2); whichever is discharged first absorbs the other.
+--   subscribeInner-demand (DEFINITION): real definition over subscribeE-demand
+--     + splitBurst-vals-B.  g0: trivial.  gs: subscribeE + splitBurst.
 --   supply (PROVEN): Dm ≤ Ŝ = sizeCapAt e sl (suc id), by
 --     tick-covers-instant (one caps tick multiplies by ≥ 2^count,
 --     count-covers-tower).
@@ -48,13 +45,14 @@ open import Data.Nat     using (ℕ; suc; _+_; _*_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.List    using (List; all)
 open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; towerℕ)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; Source; InstEvent; towerℕ)
 open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; sizeᵛ; sizeᵉ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Slots; AllOp; NodeId; Path;
-         subscribeInner; slotsSize)
+         subscribeInner; subscribeE; splitBurst; slotsSize;
+         from-inner; _↠_)
 
 -- Wet → Caps → Keeps-Ring → Measures (all public): INV?, ΨAt,
 -- sizeCapAt, capsAt, valB?, burstB?, pathB?, eventB?, valB-sz,
@@ -74,21 +72,17 @@ open import Verify-Budget-Sufficient.Occurrences
 -- § 1  THE ONE REMAINING DEMAND POSTULATE — the subscribe-side leg.
 ------------------------------------------------------------------
 
+-- § 1a  subscribeE-demand — THE PENDING POSTULATE (subscribe-side burst face).
+-- Mirrors subscribeE-Ψ (.Burst-Walk § 2.3a) for the demand bound.
+-- PROBED 2026-08-08 (agda/probe/SubInner-Demand-Probe.agda): 20 rows at
+-- init states, no refutation.  Its ex-siblings (chainStep-demand,
+-- foldPath-demand) were retired 2026-08-10 for the delivery-walk route;
+-- this leg still bottoms out in the subscribe-side burst face (same gap as
+-- subscribeE-walk-core, .Measures:5750 — the riskiest postulate in tier 1).
 postulate
-  -- PROBED 2026-08-08 (agda/probe/SubInner-Demand-Probe.agda): 20
-  -- LOAD-BEARING rows over merge/exhaust programs A/B at
-  -- EVALUATOR-REACHED init states — no refutation.  The second valB?
-  -- conjunct is FULLY covered; the first only SYMBOLICALLY, via
-  -- Dm ≥ 16 (from 2 ≤ sizeCapAt and 1 ≤ towerℕ), because
-  -- towerℕ (suc sz) is not an evaluable numeral past sz = 4.
-  -- NOT COVERED, and each is a real gap rather than an oversight:
-  -- inners with sizeᵛ > 16, the stuck sizeᵛ ≤ᵇ B conjunct of Hyp 3,
-  -- and ALL post-step states.  Its two ex-siblings (chainStep-demand,
-  -- foldPath-demand) were retired 2026-08-10 for the walk route.
-  subscribeInner-demand : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
+  subscribeE-demand : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     let sl = Sched.slots sched
         Ψ  = ΨAt e sl
         B  = sizeCapAt e sl id
@@ -96,11 +90,44 @@ postulate
         Dm = (2 * B + 12) * towerℕ (suc sz)
     in INV? Ψ B sched st ≡ true →
        capsOK? (capsAt e sl id) sched st ≡ true →
-       valB? B Ψ (obs u) o ≡ true →
+       valB? B Ψ (obs u) b ≡ true →
        pathB? B Ψ κ ≡ true →
        pathOccs? sz κ ≡ true →
-       all (valB? Dm Ψ u)
-           (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
+       burstB? Dm Ψ (proj₁ (subscribeE g b κ id now sched st)) ≡ true
+
+-- § 1b  subscribeInner-demand — REAL DEFINITION over subscribeE-demand.
+-- Landed from probe/SubscribeInnerDemand-Rehearsal-Probe.agda.
+-- g0: vs = [], trivial.
+-- gs: vs = proj₁ (splitBurst burst) where burst from subscribeE;
+--     splitBurst-vals-B converts burstB? Dm Ψ burst to the goal.
+-- KEY: frameB?/frameOccs? (from-inner _ _ _) = true, so the composed
+--      path (from-inner ↠ κ) is pathB?/pathOccs?-good by ∧-intro refl.
+--      record sched { nextNode = suc inst } leaves slots/live unchanged,
+--      so hI/hC pass through definitionally.
+subscribeInner-demand : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      B  = sizeCapAt e sl id
+      sz = sizeᵉ e + slotsSize sl
+      Dm = (2 * B + 12) * towerℕ (suc sz)
+  in INV? Ψ B sched st ≡ true →
+     capsOK? (capsAt e sl id) sched st ≡ true →
+     valB? B Ψ (obs u) o ≡ true →
+     pathB? B Ψ κ ≡ true →
+     pathOccs? sz κ ≡ true →
+     all (valB? Dm Ψ u)
+         (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
+subscribeInner-demand g0 op allNid κ id now o sched st hI hC hV hP hPO = refl
+subscribeInner-demand {t = t} (gs fuel) op allNid κ id now o sched st hI hC hV hP hPO =
+  let inst   = Sched.nextNode sched
+      sched′ = record sched { nextNode = suc inst }
+      burst  = proj₁ (subscribeE fuel o (from-inner op allNid inst ↠ κ) id now sched′ st)
+  in splitBurst-vals-B {u = t} _ _ burst
+       (subscribeE-demand fuel o (from-inner op allNid inst ↠ κ) id now sched′ st
+          hI hC hV (∧-intro refl hP) (∧-intro refl hPO))
 
 ------------------------------------------------------------------
 -- § 2  THE DRY LEG — a real definition: demand widened to the
