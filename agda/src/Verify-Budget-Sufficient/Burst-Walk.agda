@@ -70,7 +70,7 @@ open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent;
+open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent;
                            value; init; close; handoff; complete;
                            InstEmit)
 open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_)
@@ -79,7 +79,8 @@ open import Rx.Evaluator
          _↠_; root; share-sink;
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
-         arrTy; arrVal; fLvlD; regAt; subscribeInner; sLvlD;
+         arrTy; arrVal; fLvlD; regAt; subscribeInner; subscribeE;
+         splitBurst; splitEvents; sLvlD;
          AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
          NodeId; NodeState; takeDispatch; takeVals; cutThrough;
          lookupNode; setNode; sweepLive; pathHasNode; memberSource; scanVals;
@@ -282,31 +283,130 @@ WetFace sl Ψ r =
 --
 -- CALL-SITE ARGUMENTS THESE ABSORB: none — every index is pinned by
 -- WetFace above.
+
+-- § 2.3a  subscribeE-Ψ — THE PENDING POSTULATE.
+-- Proof sketch: Ψ = fnCapᵉ e + slotsFnCap sl is set once at init.
+-- Slots never change (nextNode/live/ordinals never write the slots
+-- field).  fnCapBounded? reads only .live and .nodes; every new live
+-- entry fnCap ≤ Ψ (cold values come from a slot; deferᵉ body IS b
+-- whose fnCapᵉ b ≤ Ψ); new nodes are take-st/scan-st/… all trivially
+-- ≤ Ψ.  regP? grows only via `register` with path derived from κ;
+-- pathBΨ? Ψ κ ≡ true guarantees each new entry.  burstΨ?: base cases
+-- emit only init/close/complete (Ψ-bounded by definition); map/scan
+-- use applyFn-fnCap; the *All family recurses through subscribeInner
+-- (mutual structure — handled by the same descent as subscribeE-caps).
 postulate
-  -- THE Ψ FACE OF ONE INNER SUBSCRIBE — mirrors `subscribeInner-caps`
-  -- (Subscribe-Face:951, PROVEN) with every caps conjunct dropped and
-  -- the Ψ conjuncts kept: constant bound, no growth witness, no
-  -- existential.  The `g0` clause is immediate (one `close` event,
-  -- `nextNode` bump, state untouched); the `gs` clause is the descent
-  -- into `subscribeE` under the extended from-inner path — the honest
-  -- recursion, to be ground where `subscribeE-caps` was
-  subscribeInner-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
+  subscribeE-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     fnCapBounded? Ψ sched st ≡ true →
     regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
-    valΨ? Ψ (obs u) o ≡ true →
+    (fnCapᵉ b ≤ᵇ Ψ) ≡ true →
     pathBΨ? Ψ κ ≡ true →
-    let r      = subscribeInner g op allNid κ id now o sched st
-        sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
-        st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
-    in (Sched.slots sched′ ≡ sl)
-     × (fnCapBounded? Ψ sched′ st′ ≡ true)
-     × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
-     × (valsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
-     × (eventsΨ? Ψ (proj₁ (proj₂ (proj₂ r))) ≡ true)
+    let r = subscribeE g b κ id now sched st
+    in (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+     × (fnCapBounded? Ψ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+     × (burstΨ? Ψ (proj₁ r) ≡ true)
+
+-- § 2.3b  SPLIT LEMMAS — helpers for subscribeInner-Ψ's gs clause.
+-- Landed from probe/SubscribeInner-Psi-Probe.agda.  Pattern mirrors
+-- splitBurst-vals-caps / splitBurst-bk-caps (Caps-Face:5015-5032):
+-- pass xs to all-++-intro explicitly so Agda unifies directly with
+-- the splitBurst (em ∷ ems) → proj₁/proj₂ reduction.
+
+-- Ψ-bounded values from splitEvents; {A} is the bs-element type.
+private
+  splitEvents-vals-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
+    (events : List (InstEvent (Val Γ u))) →
+    all (eventΨ? Ψ) events ≡ true →
+    valsΨ? Ψ (proj₁ (splitEvents {A = A} events)) ≡ true
+  splitEvents-vals-Ψ Ψ [] _ = refl
+  splitEvents-vals-Ψ {u = u} {A = A} Ψ (value v ∷ es) h =
+    ∧-intro (proj₁ (∧-true (valΨ? Ψ u v) (all (eventΨ? Ψ) es) h))
+            (splitEvents-vals-Ψ {A = A} Ψ es
+              (proj₂ (∧-true (valΨ? Ψ u v) (all (eventΨ? Ψ) es) h)))
+  splitEvents-vals-Ψ {A = A} Ψ (init _ ∷ es) h =
+    splitEvents-vals-Ψ {A = A} Ψ es h
+  splitEvents-vals-Ψ {A = A} Ψ (close _ _ ∷ es) h =
+    splitEvents-vals-Ψ {A = A} Ψ es h
+  splitEvents-vals-Ψ {A = A} Ψ (handoff _ ∷ es) h =
+    splitEvents-vals-Ψ {A = A} Ψ es h
+  splitEvents-vals-Ψ {A = A} Ψ (complete ∷ es) h =
+    splitEvents-vals-Ψ {A = A} Ψ es h
+
+  splitBurst-vals-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
+    (burst : Stream Γ u) →
+    burstΨ? Ψ burst ≡ true →
+    valsΨ? Ψ (proj₁ (splitBurst {A = A} burst)) ≡ true
+  splitBurst-vals-Ψ Ψ [] _ = refl
+  splitBurst-vals-Ψ {u = u} {A = A} Ψ (em ∷ ems) h =
+    all-++-intro _ (proj₁ (splitEvents {A = A} (InstEmit.events em))) _
+      (splitEvents-vals-Ψ {A = A} Ψ (InstEmit.events em) (proj₁ (∧-true _ _ h)))
+      (splitBurst-vals-Ψ {A = A} Ψ ems (proj₂ (∧-true _ _ h)))
+
+  -- unconditional: splitEvents puts only init/close/handoff in bs
+  splitEvents-eventsΨ : ∀ {n} {Γ : Ctx n} {u t} (Ψ : ℕ)
+    (events : List (InstEvent (Val Γ u))) →
+    eventsΨ? {u = t} Ψ (proj₁ (proj₂ (splitEvents {A = Val Γ t} events))) ≡ true
+  splitEvents-eventsΨ Ψ [] = refl
+  splitEvents-eventsΨ {t = t} Ψ (value _ ∷ es) =
+    splitEvents-eventsΨ {t = t} Ψ es
+  splitEvents-eventsΨ {t = t} Ψ (init _ ∷ es) =
+    ∧-intro refl (splitEvents-eventsΨ {t = t} Ψ es)
+  splitEvents-eventsΨ {t = t} Ψ (close _ _ ∷ es) =
+    ∧-intro refl (splitEvents-eventsΨ {t = t} Ψ es)
+  splitEvents-eventsΨ {t = t} Ψ (handoff _ ∷ es) =
+    ∧-intro refl (splitEvents-eventsΨ {t = t} Ψ es)
+  splitEvents-eventsΨ {t = t} Ψ (complete ∷ es) =
+    splitEvents-eventsΨ {t = t} Ψ es
+
+  splitBurst-eventsΨ : ∀ {n} {Γ : Ctx n} {u t} (Ψ : ℕ) (burst : Stream Γ u) →
+    eventsΨ? {u = t} Ψ (proj₁ (proj₂ (splitBurst {A = Val Γ t} burst))) ≡ true
+  splitBurst-eventsΨ Ψ [] = refl
+  splitBurst-eventsΨ {Γ = Γ} {t = t} Ψ (em ∷ ems) =
+    all-++-intro _ (proj₁ (proj₂ (splitEvents {A = Val Γ t} (InstEmit.events em)))) _
+      (splitEvents-eventsΨ {t = t} Ψ (InstEmit.events em))
+      (splitBurst-eventsΨ {t = t} Ψ ems)
+
+-- § 2.3c  subscribeInner-Ψ — NOW A REAL DEFINITION.
+-- g0: nextNode bumped; Sched.slots unchanged (record-update transparent);
+--   fnCapBounded? reads only .live/.nodes, not .nextNode; vals=[];
+--   events=[close drySource dried], eventsΨ? Ψ [close _ _] = true.
+-- gs: subscribeE-Ψ supplies all three invariants + burstΨ?; then
+--   splitBurst-vals-Ψ and splitBurst-eventsΨ deliver the two output
+--   conjuncts from the burst.
+subscribeInner-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  fnCapBounded? Ψ sched st ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
+  valΨ? Ψ (obs u) o ≡ true →
+  pathBΨ? Ψ κ ≡ true →
+  let r      = subscribeInner g op allNid κ id now o sched st
+      sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+  in (Sched.slots sched′ ≡ sl)
+   × (fnCapBounded? Ψ sched′ st′ ≡ true)
+   × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
+   × (valsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
+   × (eventsΨ? Ψ (proj₁ (proj₂ (proj₂ r))) ≡ true)
+subscribeInner-Ψ sl Ψ g0 op allNid κ id now o sched st slEq fc rg oΨ pΨ =
+  slEq , fc , rg , refl , refl
+subscribeInner-Ψ {Γ = Γ} {t = t} sl Ψ (gs fuel) op allNid κ id now o sched st
+                 slEq fc rg oΨ pΨ
+  with subscribeE fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+                  (record sched { nextNode = suc (Sched.nextNode sched) }) st
+     | subscribeE-Ψ sl Ψ fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+                   (record sched { nextNode = suc (Sched.nextNode sched) }) st
+                   slEq fc rg oΨ pΨ
+... | (burst , _ , _) | (slEq′ , fc′ , rg′ , bΨ) =
+  slEq′ , fc′ , rg′
+  , splitBurst-vals-Ψ {A = Val Γ t} Ψ burst bΨ
+  , splitBurst-eventsΨ {t = t} Ψ burst
 
 -- § 2.4  THE MAP LEAF — a REAL PROOF.  `stepFrame` on a map-f touches
 -- no state and emits no events, so five of the six conjuncts pass
