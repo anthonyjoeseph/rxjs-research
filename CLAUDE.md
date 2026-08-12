@@ -155,8 +155,19 @@ report review. Standing protocol, per Anthony:
 `make agda` takes tens of minutes; the Bash tool's ceiling is 600s per foreground call.
 **Solo dirty per-module costs, re-measured 2026-08-11 under Agda 2.8** (the older 44-minute
 figure for Subscribe-Face included its downstream cone, not the module): Subscribe-Face
-**384 s**, Wet ~**350 s** (908 s under 2.7), Caps-Face ~**363 s**. Two facts to keep:
-86-91% of each is Agda's positivity pass over one mutual block and no flag touches it, and
+**384 s**, Wet ~**350 s** (908 s under 2.7), Caps-Face **63.9 s**. Two facts to keep:
+Subscribe-Face and Wet are ~90% positivity over one mutual block that no flag touches —
+**Caps-Face is not, and is not a bottleneck**: only 24% positivity (15.2 s), and its
+83-member block is the biggest in the repo — which is the whole point: **MEMBER COUNT
+DOES NOT PREDICT COST, TERM SIZE DOES.** 83 members cost 15.2 s there; 15 members cost
+300 s in Subscribe-Face. So "split the big mutual block up" is not the lever it looks
+like, and two refactors were measured and rejected on that basis (2026-08-11): Caps-Face's
+83-member block is *entirely spurious* — zero cycles, three gratuitous forward
+declarations sweeping in 80 unrelated definitions — and dissolving it saves nothing;
+hoisting the 22 non-SCC members out of Wet's 36 is worth 255 s → 220 s of positivity,
+~35 s of a ~17-minute build, for a large refactor with real meta-coupling risk.
+`make agda-dev ARGS='--list <file>'` reports which members are in a genuine cycle, so
+check that before proposing either. And
 **`make agda-dev` checks the same bodies in seconds** — reach for the long build only as
 the merge gate. Run long
 builds with the Bash tool's `run_in_background` (**NOT `nohup setsid` — `setsid` does not

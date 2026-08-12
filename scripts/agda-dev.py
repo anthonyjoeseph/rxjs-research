@@ -15,6 +15,17 @@ OFF.  Three routes were measured and all three failed -- do not re-attempt:
   * as a per-module OPTIONS pragma it is ACCEPTED AND BUYS NOTHING: 805s
     Positivity against 779s without it.  The pass computes the occurrence graph;
     the option only suppresses the strict-positivity VERDICT on datatypes.
+MEMBER COUNT DOES NOT PREDICT COST -- TERM SIZE DOES.  Measured @2.8: Caps-Face's
+83-member block costs 15.2s of Positivity; Subscribe-Face's 15-member block
+costs 300s.  So "split the big block up" is not the lever it looks like, and
+two refactors were measured and REJECTED on that basis:
+  * Caps-Face's 83-member block is 100% SPURIOUS -- zero cycles, held open by
+    three gratuitous forward declarations sweeping in 80 unrelated definitions.
+    Dissolving it saves nothing: the whole module is 63.9s.
+  * Wet's 36-member block contains a genuine 14-member SCC.  Hoisting the other
+    22 into their own module is worth 255s -> 220s of Positivity, i.e. ~35s of a
+    ~17-minute build, for a large refactor with real meta-coupling risk.  No.
+Use `--list` to see which members are in a genuine cycle before considering it.
 Also closed: +RTS -A128m is noise (944s solo vs 927s baseline -- not GC-bound),
 and telescope width is not the cost (all 19 clique signatures as bare postulates
 cost 9.0s with Positivity absent).  Upgrading 2.7.0.1 -> 2.8.0 was the ONE lever
@@ -130,9 +141,11 @@ NOT_DEV_CHECKABLE = {
         "INHERENT: its proofs case-split on SIBLING RESULTS, and a postulate "
         "does not reduce, so the split has nothing to match on "
         "(SplitError.NotADatatype, UnequalTerms).  This is failure mode 2 in "
-        "this file's header, hit for real.  Its blocks are also explicit "
-        "`mutual` blocks, which the tool keeps verbatim -- so it costs 362.9s "
-        "and buys nothing.  Use `make agda`.",
+        "this file's header, hit for real.  It is also not worth fixing: the "
+        "REAL module costs 63.9s (Positivity 15.2s / Typing 21.2s / Termination "
+        "8.4s, measured 2026-08-11 on a renamed copy), so `make agda` on it "
+        "alone is a minute.  Its 83-member block is big but its terms are "
+        "small -- member count alone does not predict cost.",
     "Rx/Exp.agda":
         "PARSER GAP: a mixfix clause whose LHS starts with a paren -- "
         "`(_ ×ᵗ _) ≟ᵗ unitᵗ = no λ ()` -- is not recognised as a clause of "
@@ -443,6 +456,69 @@ def publicize(block: list[str]) -> list[str]:
         if out[k].strip():
             out[k] = out[k].rstrip() + " public"
             break
+    return out
+
+
+def scc_of(p: Parsed, members: list[str]) -> dict[str, int]:
+    """Which members are in a genuine CYCLE, and which are only along for the ride.
+
+    Agda opens a mutual block at the first forward signature and closes it when
+    every pending signature has a body, so a block's SIZE reflects declaration
+    ORDER, not recursion.  Measured 2026-08-11: Caps-Face's 83-member block has
+    ZERO cycles in it -- three gratuitous forward declarations swept in 80
+    unrelated definitions.  Wet's 36 contain a real 14 and a real 3.
+    Edges are textual (bodies and signatures, comments stripped), so a missed
+    edge under-reports a cycle -- which is the safe direction for a diagnostic.
+    """
+    S = set(members)
+    g = {m: set() for m in members}
+    for it in p.items:
+        if it.name in S and it.kind in ("sig", "clauses"):
+            txt = "\n".join(l.split("--")[0] for l in p.lines[it.start : it.end])
+            for o in members:
+                if o != it.name and re.search(
+                        r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", txt):
+                    g[it.name].add(o)
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    stack: list[str] = []
+    on: set[str] = set()
+    out: dict[str, int] = {}
+    counter = [0, 0]
+
+    def strong(v: str) -> None:
+        # iterative Tarjan: these blocks reach 83 members and recursion depth
+        # is not worth risking on a diagnostic
+        work = [(v, iter(g[v]))]
+        index[v] = low[v] = counter[0]; counter[0] += 1
+        stack.append(v); on.add(v)
+        while work:
+            u, it2 = work[-1]
+            for w in it2:
+                if w not in index:
+                    index[w] = low[w] = counter[0]; counter[0] += 1
+                    stack.append(w); on.add(w)
+                    work.append((w, iter(g[w])))
+                    break
+                if w in on:
+                    low[u] = min(low[u], index[w])
+            else:
+                work.pop()
+                if work:
+                    low[work[-1][0]] = min(low[work[-1][0]], low[u])
+                if low[u] == index[u]:
+                    comp = []
+                    while True:
+                        w = stack.pop(); on.discard(w); comp.append(w)
+                        if w == u:
+                            break
+                    if len(comp) > 1:
+                        counter[1] += 1
+                        for w in comp:
+                            out[w] = counter[1]
+    for m in members:
+        if m not in index:
+            strong(m)
     return out
 
 
@@ -875,6 +951,24 @@ def main() -> int:
             heavy = heavy_blocks(p)
             print(f"  {len(p.blocks)} blocks, {len(heavy)} multi-member, "
                   f"{sum(len(p.blocks[i].members) for i in heavy)} focus check(s)")
+            for i in heavy:
+                mem = p.blocks[i].members
+                scc = scc_of(p, mem)
+                loose = [m for m in mem if m not in scc]
+                n = len(set(scc.values()))
+                print(f"\n  block {i}: {len(mem)} members, {n} genuine cycle(s) "
+                      f"{sorted((sum(1 for v in scc.values() if v == k) for k in set(scc.values())), reverse=True)}, "
+                      f"{len(loose)} in NO cycle")
+                if loose and not scc:
+                    print("    THE WHOLE BLOCK IS SPURIOUS: nothing here recurses with "
+                          "anything else.\n    It is one block only because a forward "
+                          "signature held it open.")
+                elif loose:
+                    print(f"    could in principle be hoisted out: {', '.join(loose[:8])}"
+                          + (" ..." if len(loose) > 8 else ""))
+                    print("    (MEASURE BEFORE DOING IT.  On Wet, hoisting 22 of 36 was "
+                          "worth 35s of\n     255s positivity -- the cost lives in the "
+                          "SCC's TERM SIZE, not the count.)")
             return 0
         t0 = time.time()
         ok = dev_check(rel, args, args.focus)
