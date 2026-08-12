@@ -138,18 +138,14 @@ from dataclasses import dataclass, field
 # The first entry is an INHERENT limit of the approach, not a bug: the other
 # four are parser gaps and are fixable.
 NOT_DEV_CHECKABLE = {
-    "Rx/Exp.agda":
-        "PARSER GAP: a mixfix clause whose LHS starts with a paren -- "
-        "`(_ ×ᵗ _) ≟ᵗ unitᵗ = no λ ()` -- is not recognised as a clause of "
-        "`≟ᵗ`, so the body is stranded from its signature "
-        "(MissingTypeSignature.Function).",
-    "Rx/Frame-Width.agda":
-        "PARSER GAP: a definition ends up out of scope in the generated context "
-        "(NotInScope: ceilᵉ).",
-    "Verify-Well-Formed.agda": "PARSER GAP: same as Rx/Frame-Width (NotInScope).",
-    "Rx/Provenance-Theorems.agda":
-        "PARSER GAP: a focus module gets a signature with no body "
-        "(MissingDefinitions).",
+    "Verify-Well-Formed.agda":
+        "NOT ACCELERABLE, and not a bug: 5,816 lines forming ONE block of 276 "
+        "members with ZERO cycles.  There is no mutual recursion to break, so "
+        "nothing is stubbed and a dev check IS the real check (>6 min).  The "
+        "only thing that makes this file faster is SPLITTING IT into modules -- "
+        "which is safe precisely because it has no cycles, and is the same "
+        "situation as Caps-Face's 83-member block.  Listed here so the tool "
+        "does not burn the whole-project budget on a file it cannot help.",
 }
 
 # CONCURRENCY IS A MEMORY BUDGET, NOT A CONSTANT.  CLAUDE.md's standing ceiling
@@ -758,10 +754,26 @@ def agda_flags(args) -> list[str]:
 
 
 def run_one(rel_dev: str, args) -> tuple[int, str, float]:
+    """One agda invocation, KILLED if it blows the budget.
+
+    The budget used to be checked after the fact, which meant a module the tool
+    cannot actually accelerate ran to completion first -- six minutes on
+    Verify-Well-Formed before a human killed it.  A loop that has to be
+    interrupted by hand is not a loop, so the limit is enforced by the clock.
+    """
     t0 = time.time()
     cmd = ["agda", *agda_flags(args), rel_dev]
-    pr = subprocess.run(cmd, cwd=AGDA, capture_output=True, text=True,
-                        env={**os.environ, "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"})
+    limit = getattr(args, "budget", 0) or 0
+    try:
+        pr = subprocess.run(cmd, cwd=AGDA, capture_output=True, text=True,
+                            timeout=(limit or None),
+                            env={**os.environ, "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"})
+    except subprocess.TimeoutExpired:
+        return 124, (f"agda-dev: killed at {limit:.0f}s (the budget).  This module "
+                     "has no mutual recursion for the tool to break, so nothing is "
+                     "stubbed and this IS the real check.  Splitting the file is the "
+                     "only thing that makes it faster -- and it is safe here, "
+                     "because there are no cycles."), time.time() - t0
     return pr.returncode, pr.stdout + pr.stderr, time.time() - t0
 
 
@@ -811,25 +823,6 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
 
     os.makedirs(DEV, exist_ok=True)
 
-    # STUBBING ONLY PAYS WHERE THERE IS A CYCLE TO BREAK.  If no member of any
-    # heavy block is in a genuine SCC, the block is an artefact of declaration
-    # order, its positivity cost is small, and every dependency has to be kept
-    # real anyway -- which made Caps-Face 22 batches of 53s each, against 64s
-    # for simply checking the module.  So: check it, once, for real.  That is
-    # also the only mode with NO caveats attached to a green result.
-    if heavy and not any(scc_of(p, p.blocks[bi].members) for bi in heavy):
-        name = f"{mod}-Whole"
-        with open(os.path.join(DEV, name + ".agda"), "w", encoding="utf-8") as fh:
-            fh.write(render_ctx(p, name, [m for bi in heavy
-                                          for m in p.blocks[bi].members]))
-        print(f"agda-dev: src/{rel} — no genuine mutual recursion "
-              f"({sum(len(p.blocks[bi].members) for bi in heavy)} members, 0 cycles), "
-              "so nothing is postulated: this is a REAL check.")
-        rc, out, secs = run_one(os.path.join("_dev", name + ".agda"), args)
-        ok = report("(whole module, nothing stubbed)", rc, out, secs)
-        print(f"agda-dev: src/{rel} {'GREEN' if ok else 'RED'} in {secs:.1f}s wall")
-        return ok
-
     share = shareable(p) and heavy
     args = copy.copy(args)
     ctxmod = f"{mod}-Ctx"
@@ -851,6 +844,25 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
             if ln:
                 print(f"        {ln}")
         return True
+
+    # STUBBING ONLY PAYS WHERE THERE IS A CYCLE TO BREAK.  If no member of any
+    # heavy block is in a genuine SCC, the block is an artefact of declaration
+    # order, its positivity cost is small, and every dependency has to be kept
+    # real anyway -- which made Caps-Face 22 batches of 53s each, against 64s
+    # for simply checking the module.  So: check it, once, for real.  That is
+    # also the only mode with NO caveats attached to a green result.
+    if heavy and not any(scc_of(p, p.blocks[bi].members) for bi in heavy):
+        name = f"{mod}-Whole"
+        with open(os.path.join(DEV, name + ".agda"), "w", encoding="utf-8") as fh:
+            fh.write(render_ctx(p, name, [m for bi in heavy
+                                          for m in p.blocks[bi].members]))
+        print(f"agda-dev: src/{rel} — no genuine mutual recursion "
+              f"({sum(len(p.blocks[bi].members) for bi in heavy)} members, 0 cycles), "
+              "so nothing is postulated: this is a REAL check.")
+        rc, out, secs = run_one(os.path.join("_dev", name + ".agda"), args)
+        ok = report("(whole module, nothing stubbed)", rc, out, secs)
+        print(f"agda-dev: src/{rel} {'GREEN' if ok else 'RED'} in {secs:.1f}s wall")
+        return ok
 
     print(f"agda-dev: {label} — {len(p.blocks)} block(s), {len(heavy)} multi-member, "
           f"{len(foci)} focus check(s) in batches of {args.batch}{'' if share else ' [self-contained: private block]'}")
@@ -1103,7 +1115,7 @@ def main() -> int:
                          "4.9s per-process interface toll too often; large ones "
                          "rebuild the mutual block they exist to avoid.")
     ap.add_argument("--clean", action="store_true", help="remove agda/_dev and exit")
-    ap.add_argument("--budget", type=float, default=0,
+    ap.add_argument("--budget", type=float, default=30,
                     help="wall-clock budget in seconds; exceeding it FAILS.  This is "
                          "the loop's whole purpose, so it is enforced rather than "
                          "documented -- a loop that quietly drifts to two minutes has "
