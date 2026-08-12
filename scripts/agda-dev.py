@@ -18,13 +18,15 @@ OFF.  Three routes were measured and all three failed -- do not re-attempt:
 MEMBER COUNT DOES NOT PREDICT COST -- TERM SIZE DOES.  Measured @2.8: Caps-Face's
 83-member block costs 15.2s of Positivity; Subscribe-Face's 15-member block
 costs 300s.  So "split the big block up" is not the lever it looks like, and
-two refactors were measured and REJECTED on that basis:
-  * Caps-Face's 83-member block is 100% SPURIOUS -- zero cycles, held open by
-    three gratuitous forward declarations sweeping in 80 unrelated definitions.
-    Dissolving it saves nothing: the whole module is 63.9s.
-  * Wet's 36-member block contains a genuine 14-member SCC.  Hoisting the other
-    22 into their own module is worth 255s -> 220s of Positivity, i.e. ~35s of a
-    ~17-minute build, for a large refactor with real meta-coupling risk.  No.
+Wet's hoist was measured and REJECTED on that basis: its 36-member block contains
+a genuine 14-member SCC, and hoisting the other 22 out is worth 255s -> 220s of
+Positivity -- ~35s of a ~17-minute build, for a large refactor with real
+meta-coupling risk.  No.  (Caps-Face's 83-member block was ALSO once rejected
+here, on the grounds that dissolving it "saves nothing" for `make agda`.  True of
+the gate and the wrong number to judge a split by: it was spurious -- zero cycles,
+three forward declarations sweeping in 80 unrelated definitions -- and dissolving
+it, then splitting the file, took the DEV cost 72.6s -> 8.3s.  Ask which cost you
+are paying.)
 Use `--list` to see which members are in a genuine cycle before considering it.
 Also closed: +RTS -A128m is noise (944s solo vs 927s baseline -- not GC-bound),
 and telescope width is not the cost (all 19 clique signatures as bare postulates
@@ -57,18 +59,26 @@ Two regimes, and quoting the wrong one is how the old figures misled:
   cached for it.  Warm only happens when you re-run having changed nothing,
   which is not the loop.  (Anthony, 2026-08-12.)
 
-  WARM (src unchanged since the last dev run) -- 12 modules, 122.4s
-    Caps-Face 24.1  Wet 18.4  Caps 15.5  Subscribe-Face 11.8  Keeps-Ring 9.6
-    Caps-Sadd 9.2  Evaluator 8.5  Caps-Depth 8.2  Exp 3.8  Provenance 3.7
-    Frame-Width 3.6  VWF/Part1 6.0
-  COLD, everything (after a `make agda`, or a pull) -- 12 modules, 242.5s
-    Caps-Face 72.6  Wet 55.8  Subscribe-Face 31.0  Caps 21.0  (rest ~unchanged)
-  COLD, one file (the real loop: you edited ONE module, the other 11 stay warm)
-    that module's cold cost + ~122s; worst case ~171s if it is Caps-Face
+  FULL COLD SCAN, ALL 66 CLAIM-GRAPH MODULES (2026-08-12, each dirtied
+  individually with every dependency present -- the real edit-one-file case):
+    TOTAL 512.9s serial   max 35.0s   median 6.6s   nothing over 45s, none RED
+    top: Wet/Part2 35.0  Subscribe-Face 22.3  Caps 21.5  Caps-Face/Part4 19.4
+         Caps-Depth 16.7  Keeps-Ring 16.1  then 12.1 12.0 11.8 11.5 ...
+    Main.agda 6.7s -- NOT the 904.6s once recorded here, which was measured
+    while Main's dependencies were rebuilding.
+  After the splits: Caps-Face 72.6s whole -> worst part 8.3s; Wet 55.1s whole ->
+  Part2 35.0s with every other part 6-12s.
 
   one member    ~6s      <- the grind loop, and the only number that matters
                             for iteration speed
   make agda     802s (13m22s) for the full gate, 41 modules rebuilt, @2.8
+
+DEV NUMBERS ARE NOT GATE NUMBERS, AND CONFLATING THEM OVERSTATES EVERY SPLIT.
+Where a block is stubbed, positivity over the real block never runs -- that is
+the whole reason the loop is fast.  Wet/Part2 is 35.0s here and 254.7s under real
+agda (Positivity 244.3s = 87.8%, Termination.Graph 20.8s, all Typing 5.7s).  A
+split does not change the gate's cost for the split-out block; it stops every
+OTHER edit from paying it.  Say which number you are quoting.
 
 The steady-state figures match the pre-2.8 warm claims (Subscribe-Face 11.3s,
 Wet 17.0s), which were accurate all along -- the cache bug just made them
@@ -99,8 +109,13 @@ minor:
      them in one mutual block).  Only recursion crossing out of the batch is lost.
   2. POSTULATES DO NOT REDUCE.  A clause needing a sibling to unfold under
      conversion can pass here and fail for real; witness arithmetic (j + j'
-     versus suc (j + j')) is where it bites.  Caps-Face is the module where this
-     is fatal -- see NOT_DEV_CHECKABLE.
+     versus suc (j + j')) is where it bites.  (Caps-Face used to be listed as
+     fatally affected; it is not -- NOT_DEV_CHECKABLE is EMPTY and Caps-Face's
+     parts check green.  Empty is the target; an entry there is a bug report.)
+BOTH ONLY APPLY WHERE SOMETHING WAS STUBBED.  A module with no multi-member
+block is emitted VERBATIM with zero postulates, so a check of one of those is a
+REAL check.  The residual risk of a dev-only workflow is therefore concentrated
+in the few modules that HAVE a heavy block.
 Everything else is checked in full: types, implicits, metas, and coverage.  So:
 DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.  `make agda`
 stays the merge gate.  `make agda-dev-selftest` (--falsify) proves the loop is
@@ -120,8 +135,6 @@ TWO BEHAVIOURS THE CODE NEEDED THAT THE DESIGN DID NOT ANTICIPATE:
     and dies last, and Measures.agda emits a standing RewritesNothing warning
     that buried the real error under a head-limited dump.
 
-  scripts/agda-dev.py                      EVERY dev-checkable module
-  scripts/agda-dev.py --dirty              only modules you have edited
   scripts/agda-dev.py <file>               one module, every member
   scripts/agda-dev.py <file> <member>      one member -- the actual grind loop
   scripts/agda-dev.py --list <file>        its block structure, no typechecking
@@ -1069,22 +1082,6 @@ def has_heavy(rel: str) -> bool:
         return False
 
 
-def dirty(rel: str) -> bool:
-    """Has this module been edited since its interface was written?
-
-    An mtime heuristic, deliberately.  Agda validates interfaces by CONTENT
-    hash, so mtime can only err toward doing MORE work (a `touch` shows up as
-    dirty), never toward skipping a real edit.
-    """
-    src = os.path.join(SRC, rel)
-    ver = subprocess.run(["agda", "--numeric-version"], capture_output=True,
-                         text=True).stdout.strip()
-    iface = os.path.join(AGDA, "_build", ver, "agda", "src", rel + "i")
-    if not os.path.exists(iface):
-        return True
-    return os.path.getmtime(src) > os.path.getmtime(iface)
-
-
 def within_budget(args, secs: float) -> bool:
     if not args.budget or secs <= args.budget:
         return True
@@ -1163,16 +1160,9 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="print block structure only")
     ap.add_argument("--scope", action="store_true")
     ap.add_argument("--holes", action="store_true")
-    # DIRTY IS OPT-IN, NOT THE DEFAULT (Anthony, 2026-08-11).  It was the other
-    # way round, and the argument for it was wrong: "I edited Wet, is it OK?"
-    # is answered by `agda-dev <file>`, not by the bare command.  You run the
-    # BARE command precisely when you do not know what is dirty -- which is
-    # exactly when silently checking nothing is the worst possible answer.
-    # Observed the day it was inverted: a bare run on a freshly built tree
-    # checked 0 of 12 modules and exited 0, and that got read as a pass.
-    ap.add_argument("--dirty", action="store_true",
-                    help="with no file: ONLY modules edited since their interface "
-                         "(the default is every claim-graph module)")
+    # --dirty was REMOVED with the whole-project sweep it belonged to: with no
+    # sweep there is nothing for it to restrict, and it was unsound for the job
+    # anyway (own-mtime only, so it misses everything downstream of an edit).
     # CONCURRENCY IS CAPPED BY MEMORY, NOT BY CORES.  A stubbed run is ~380 MB,
     # so several fit easily -- but a module the tool cannot stub falls back to a
     # near-real check of MULTIPLE GB, and CLAUDE.md's standing ceiling of TWO
@@ -1187,12 +1177,12 @@ def main() -> int:
                          "4.9s per-process interface toll too often; large ones "
                          "rebuild the mutual block they exist to avoid.")
     ap.add_argument("--clean", action="store_true", help="remove agda/_dev and exit")
-    ap.add_argument("--budget", type=float, default=30,
+    ap.add_argument("--budget", type=float, default=45,
                     help="wall-clock budget in seconds; exceeding it FAILS.  This is "
                          "the loop's whole purpose, so it is enforced rather than "
                          "documented -- a loop that quietly drifts to two minutes has "
-                         "stopped being a loop.  Makefile passes 30 per file, 180 for "
-                         "the whole project.")
+                         "stopped being a loop.  Makefile passes 45, set from a full "
+                         "cold scan: max 35.0s, median 6.6s, nothing in 36-90s.")
     ap.add_argument("--falsify", action="store_true",
                     help="SELF-TEST: corrupt a real body in src, confirm the dev "
                          "check goes RED, restore.  Run this whenever the stubbing "
@@ -1246,35 +1236,52 @@ def main() -> int:
         ok = dev_check(rel, args, args.focus)
         return 0 if (ok and within_budget(args, time.time() - t0)) else 1
 
-    # WHOLE-PROJECT SCOPE.  Only modules with a multi-member mutual block are
-    # dev-checkable: everywhere else the tool would just run the REAL check,
-    # and for Main.agda that is `make agda` itself (measured: 904.6s, against
-    # <30s for every other module in the tree).  Those modules are `make agda`'s
-    # job and saying so is the honest scope, not a gap being hidden.
-    mods = [m for m in claim_graph() if has_heavy(m) and m not in NOT_DEV_CHECKABLE]
-    for m, why in sorted(NOT_DEV_CHECKABLE.items()):
-        print(f"agda-dev: SKIPPING {m}\n           {why}")
-    todo = [m for m in mods if dirty(m)] if args.dirty else mods
-    print(f"agda-dev: {len(mods)} module(s) with a multi-member mutual block, "
-          f"{len(todo)} to check{' (--dirty)' if args.dirty else ''}.  "
-          "Modules without one are `make agda`'s job.")
-    if not todo:
-        print("agda-dev: NOTHING WAS CHECKED — --dirty was passed and the tree "
-              "matches its interfaces.  This is not a pass; no work was done.")
-        return 0
-    # Serial across modules, parallel within: a module's foci already saturate
-    # the cores, and two modules at once would just contend.
-    t0 = time.time()
-    bad = [m for m in todo if not dev_check(m, args, None)]
-    print()
-    if not within_budget(args, time.time() - t0):
-        return 1
-    if bad:
-        print(f"agda-dev: RED — {len(bad)} module(s) failed: {', '.join(bad)}")
-        return 1
-    print(f"agda-dev: GREEN across {len(todo)} module(s).  "
-          "Remember: dev-green means the types line up, not that the proof is valid.")
-    return 0
+    # THERE IS NO WHOLE-PROJECT SWEEP, AND THAT IS A MEASURED DECISION
+    # (Anthony, 2026-08-12: "I'm thinking it shouldn't even be supported").
+    # A sweep over all 66 claim-graph modules was built, measured, and removed:
+    #
+    #   full sweep, warm cache   521.3s   66 modules, heavy blocks STUBBED
+    #   full sweep, cold cache   512.9s   (identical -- see below)
+    #   `make gate`              ~350s    27 modules rechecked, FULL fidelity,
+    #                                     plus wiring-gate, unsafe-check, bug-cache
+    #
+    # It cost MORE than the real gate and delivered LESS, so it was strictly
+    # dominated -- there is no cache state in which running it beats running
+    # `make agda`.  Two things explain the shape and are worth keeping:
+    #
+    #   * WARM AND COLD ARE THE SAME (521.3 vs 512.9).  The sweep's cost is not
+    #     rechecking, it is the per-PROCESS interface deserialization toll paid
+    #     66 times (4.9s of a 5.6s focus run).  So a warm cache cannot speed it
+    #     up, which also kills the "use it to warm the cache" idea: it does not
+    #     write the real interface for the module it checks (it checks a renamed
+    #     COPY), so it barely warms anything `make agda` needs.
+    #   * THE LOOP'S VALUE IS PER-MEMBER, NOT PER-TREE.  One member is ~6s
+    #     against an 802s gate -- that is the 100x, and it is the whole product.
+    #     Breadth was never where the win lived.
+    #
+    # The cheap pre-gate role this was meant to fill is already filled by
+    # `make wiring-gate` and `make unsafe-check`, which are textual, run in
+    # seconds, and are why `make gate` runs them FIRST.
+    #
+    # DIRTY-ONLY WOULD NOT RESCUE IT EITHER: an own-mtime check compares a
+    # mtime to its interface, so editing Wet/Part2 selects Part2 ALONE and
+    # misses every module downstream of the change -- precisely the cascade a
+    # pre-gate exists to check.  A correct version would need downstream
+    # closure, and would still be paying the per-process toll to tell you less
+    # than the gate does.
+    print("agda-dev: NAME A FILE.  There is no whole-project sweep.\n"
+          "  It was built and measured: 521.3s warm / 512.9s cold across 66\n"
+          "  modules, against ~350s for `make gate` -- which rechecks with FULL\n"
+          "  fidelity and adds wiring-gate, unsafe-check and bug-cache.  More\n"
+          "  expensive and less trustworthy, so it is not supported.\n"
+          "\n"
+          "  What you want instead:\n"
+          "    make agda-dev ARGS='<file> <member>'   ~6s   the grind loop\n"
+          "    make agda-dev ARGS='<file>'            4-35s one module\n"
+          "    make wiring-gate && make unsafe-check  seconds, before the gate\n"
+          "    make bg T=gate                         the real thing, ~13 min\n"
+          "  Paths are src-relative, e.g. Verify-Budget-Sufficient/Wet/Part2.agda")
+    return 2
 
 
 if __name__ == "__main__":

@@ -23,16 +23,15 @@ help:
 	@echo "                  green here means every claim's support compiles"
 	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
 	@echo "                  time against its siblings POSTULATED at their exact"
-	@echo "                  signatures.  ONE MEMBER ~6s — the grind loop.  Whole"
-	@echo "                  modules, cold: Wet 55s, Subscribe-Face 21s, Caps-Face"
-	@echo "                  part 8s; whole project 159s (2026-08-12)"
+	@echo "                  signatures.  ONE MEMBER ~6s — the grind loop"
 	@echo "                  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF"
-	@echo "                  IS VALID: the real recursion's TERMINATION is not"
-	@echo "                  checked, and postulates do not reduce.  'make agda'"
-	@echo "                  stays the merge gate"
-	@echo "                  make agda-dev                    (EVERY module)"
-	@echo "                  make agda-dev DIRTY=1            (only what you edited)"
-	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet.agda'"
+	@echo "                  IS VALID, wherever a block was stubbed: the real"
+	@echo "                  recursion's TERMINATION is not checked and postulates"
+	@echo "                  do not reduce.  Modules with no multi-member block"
+	@echo "                  are checked verbatim.  'make agda' is the merge gate"
+	@echo "                  NO whole-project sweep: measured out as costlier"
+	@echo "                  than 'make gate' at lower fidelity"
+	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet/Part2.agda'"
 	@echo "                  make agda-dev ARGS='<file> <member>'   (the grind loop)"
 	@echo "                  make agda-dev ARGS='--list <file>'    (block structure)"
 	@echo "                  SCOPE=1 scope-check only; HOLES=1 tolerate ? holes"
@@ -81,79 +80,50 @@ help:
 agda:
 	cd agda && agda src/Main.agda
 
-# THE FAST DEV LOOP.  86-91% of `make agda` is Agda's occurrence/polarity pass
-# over two big mutual blocks, and no flag or pragma touches it (three routes
-# measured and closed; the record is scripts/agda-dev.py's docstring).  What it IS
-# sensitive to is mutual-block MEMBERSHIP, steeply: one real body in
-# Subscribe-Face's block costs 63ms of Positivity, fifteen cost 300s.  So this
-# checks ONE body at a time, against its siblings POSTULATED at their exact
-# existing signatures.  agda/src is never written to.
+# THE FAST DEV LOOP.  Checks one mutual-block member at a time against its
+# siblings POSTULATED at their exact signatures.  agda/src is never written to.
+# Rationale, measurements and the closed performance experiments live in
+# scripts/agda-dev.py's docstring -- read that before re-opening any of it.
 #
-#   make agda-dev                     EVERY dev-checkable module (DIRTY=1 to
-#                                     restrict to what you edited -- dirty is
-#                                     OPT-IN, because you run the bare command
-#                                     precisely when you do not know what is
-#                                     dirty, and "checked nothing" must never
-#                                     be the silent answer to that question)
+# THERE IS NO WHOLE-PROJECT SWEEP.  One was built and measured out: 521.3s warm
+# / 512.9s cold over 66 modules, against ~350s for `make gate` at full fidelity
+# -- more expensive and less trustworthy, so it is not supported.  The bare
+# command prints that and exits 2.  Warm and cold were identical because the
+# cost is the per-process interface toll paid 66 times, not rechecking, so it
+# was not a cache-warming play either.  The cheap pre-gate is `make wiring-gate`
+# plus `make unsafe-check`, both textual and seconds-long.
+#
 #   make agda-dev ARGS='<file>'       one module, every member
 #   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
 #   make agda-dev ARGS='--list <file>'     its mutual-block structure
 #
-# Measured 2026-08-12, COLD AND ON A COHERENT CACHE -- i.e. the real edit-one-
-# file case: append a line to the file, then check it, with every DEPENDENCY
-# already built.  Both halves matter.  Cold-but-incoherent (a dependency also
-# rebuilding) inflates a module by 50x and has produced three phantom
-# "slow module" diagnoses; see CLAUDE.md's "MEASURE ON A COHERENT CACHE".
-#   Wet/Part2 35.0s (rest of Wet 6-12s; was 55.1s before the split)
-#   Subscribe-Face 21.2s   Evaluator 9.4s   Caps.agda 15.7s
-#   Caps-Face (split into Part1..Part7) worst part 8.3s, was 72.6s whole
-#   Verify-Well-Formed/Part1 6.3s  <- measured 357s while Caps-Face rebuilt
-# Whole project 12 modules, 158.6s of module time, all GREEN, under the 300s
-# budget.  Only modules WITH a multi-member block are checked.
+# OPT-IN flags: SCOPE=1 (names and syntax only; buys no time, so not a speedup),
+# HOLES=1 (tolerate ? holes and missing clauses).
 #
-# THESE ARE DEV NUMBERS AND THEY ARE NOT THE COST OF AN EDIT.  agda-dev
-# postulates the block's siblings, so POSITIVITY OVER THE REAL BLOCK NEVER RUNS
-# -- that is the whole reason it is fast.  Wet/Part2 is 35.0s here and 254.7s
-# under real agda, 88% of it Positivity.  Compare dev to dev and gate to gate,
-# and always say which one a number is.
-# ONE MEMBER ~6s, and that is the number the grind loop actually runs at.
-# OPT-IN flags: SCOPE=1 (names and syntax only, no typechecking), HOLES=1
-# (tolerate ? holes and missing clauses).
+# DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID -- but only
+# where something was STUBBED.  A module with no multi-member block has nothing
+# stubbed and is checked verbatim, so the sweep is a real check there.  Where a
+# block IS stubbed, TERMINATION of the real mutual recursion goes unchecked (in
+# this proof the mutual recursion IS the induction) and postulates do not
+# REDUCE.  `make agda` stays the merge gate.
 #
-# DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.  Two things
-# are given up and the first is not minor: TERMINATION of the real mutual
-# recursion is not checked (and in this proof the mutual recursion IS the
-# induction), and postulates do not REDUCE.  `make agda` stays the merge gate.
-# BUDGETS ARE ENFORCED, NOT DOCUMENTED (Anthony, 2026-08-11): 90s for one file,
-# 300s for the whole project.  A loop that quietly drifts has stopped being a
-# loop, and a number that lives only in a comment is a number nobody maintains.
-#
-# SET FROM THE **COLD** NUMBERS, re-measured 2026-08-12 (Anthony: "wouldn't the
-# cold numbers be the relevant ones?  The use case would be that we're running
-# this after modifying the file").  Cold IS the normal case -- you edit a file,
-# so its generated module has new content and nothing is cached for it; warm
-# only happens when you re-run having changed nothing, which is not the loop.
-# Measured cold worst cases (2026-08-12): one file 35.0s (Wet/Part2, the
-# 36-member wet walk -- a genuine 14-cycle plus a genuine 3-cycle, so it cannot
-# be dissolved the way Caps-Face's spurious block was; hoisting around it and
-# disabling positivity were both measured and both rejected, see CLAUDE.md).
-# Whole project 158.6s of module time.  Both sit under 90s/300s with headroom.
-# NOTE the 90s budget was set when one file could cost 55.1s; it now has more
-# headroom than intended, which is fine -- do not tighten it to fit today's
-# numbers, since a cold dependency chain legitimately costs more (Part4 took
-# 271.8s the first time, building Part1..Part3 underneath it).  The
-# earlier 30s/180s were warm figures, and 30s failed on every heavyweight
-# module the moment you actually edited one.
+# BUDGETS ARE ENFORCED, NOT DOCUMENTED: 45s per file, 300s for the whole sweep.
+# Set from a full cold scan of all 66 modules (2026-08-12): max 35.0s, median
+# 6.6s, 512.9s serial, and NOTHING between 36s and 90s.  35s per file was asked
+# for and FAILS -- Wet/Part2 runs 33.8-35.6s.  RE-SCAN BEFORE MOVING EITHER
+# NUMBER: the gap is what makes a budget safe, not the margin.  A cold
+# DEPENDENCY CHAIN still blows any of them (edit Wet/Part1, check Wet/Part4, and
+# you pay for Part2 and Part3 too -- 271.8s); pass BUDGET= for that case.
 #
 # A BUDGET THAT FAILS ON NORMAL WORK IS WORSE THAN NO BUDGET: it trains everyone
 # to pass BUDGET= reflexively, and then a real regression sails through.
 # Exceeding it FAILS, with the usual causes printed.  Override deliberately with
 # BUDGET=<seconds> when the work has genuinely grown -- and move these numbers
 # when it has, rather than overriding twice.
-AGDA_DEV_BUDGET ?= $(if $(ARGS),90,300)
+AGDA_DEV_BUDGET ?= 45
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
-	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(if $(DIRTY),--dirty) $(ARGS)
+	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(ARGS)
 
 # Is the fast loop load-bearing, or green by construction?  Corrupts one token
 # in a real body in src, demands the dev check go RED, and restores the file
@@ -264,14 +234,10 @@ bg:
 #   * STILL RUNNING (exit 3) — no EXIT= line yet.  Not a pass; not finished.
 #   * RED (the real exit code) — plus the failing tail, so the reason is here.
 #   * GREEN — and it PRINTS THE LOG'S OWN LAST WORD alongside, because exit 0
-#     does not distinguish "checked twelve modules, all passed" from "checked
-#     NOTHING".  Hit 2026-08-11: `make agda-dev` on a freshly built tree found
-#     nothing dirty, did no work, and exited 0; agda-dev said so plainly
-#     ("nothing dirty — the tree matches its interfaces") and bg-check
-#     flattened it to GREEN, which then got read as a project-wide pass.
-#     A vacuous pass wearing a real pass's clothes is the same failure as the
-#     exit-code bug this file exists to prevent, one layer up.  So: never
-#     summarise a log to one word when the log's own last line is the answer.
+#     does not distinguish "checked everything, all passed" from "checked
+#     NOTHING".  A vacuous pass wearing a real pass's clothes is the same
+#     failure as the exit-code bug this file exists to prevent, one layer up.
+#     Never summarise a log to one word when its own last line is the answer.
 bg-check:
 	@test -n "$(T)" || { echo "usage: make bg-check T=<target> [LOG=<path>]" >&2; exit 2; }
 	@test -f $(LOG) || { echo "bg-check: no log at $(LOG) — never launched?"; exit 2; }
