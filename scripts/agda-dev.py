@@ -137,15 +137,6 @@ from dataclasses import dataclass, field
 # The first entry is an INHERENT limit of the approach, not a bug: the other
 # four are parser gaps and are fixable.
 NOT_DEV_CHECKABLE = {
-    "Verify-Budget-Sufficient/Caps-Face.agda":
-        "INHERENT: its proofs case-split on SIBLING RESULTS, and a postulate "
-        "does not reduce, so the split has nothing to match on "
-        "(SplitError.NotADatatype, UnequalTerms).  This is failure mode 2 in "
-        "this file's header, hit for real.  It is also not worth fixing: the "
-        "REAL module costs 63.9s (Positivity 15.2s / Typing 21.2s / Termination "
-        "8.4s, measured 2026-08-11 on a renamed copy), so `make agda` on it "
-        "alone is a minute.  Its 83-member block is big but its terms are "
-        "small -- member count alone does not predict cost.",
     "Rx/Exp.agda":
         "PARSER GAP: a mixfix clause whose LHS starts with a paren -- "
         "`(_ ×ᵗ _) ≟ᵗ unitᵗ = no λ ()` -- is not recognised as a clause of "
@@ -402,7 +393,8 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
     return "\n".join(out).rstrip() + "\n"
 
 
-def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str]) -> str:
+def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
+                 keep: list[str] = []) -> str:
     """A BATCH of real bodies, against the shared context's postulated siblings.
 
     `hiding (…)` is what lets the real definitions replace their stubs.  Two
@@ -428,14 +420,18 @@ def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str]) -> str:
     for it in p.items:
         if it.kind == "pass" and p.lines[it.start].startswith("import "):
             out.extend(p.lines[it.start : it.end])
-    out.append(f"open import {ctx} hiding ({'; '.join(foci)})")
+    shown = list(dict.fromkeys(keep + foci))
+    out.append(f"open import {ctx} hiding ({'; '.join(shown)})")
     out.append("")
+    if keep:
+        out.append("-- agda-dev: kept REAL because the focus reduces them and a")
+        out.append("-- postulate would not: " + ", ".join(keep))
     out.append("-- agda-dev: THE FOCUS BODIES, verbatim from the real module.")
     out.append("-- Signatures first so a call between them resolves: that makes")
     out.append("-- the batch one mutual block, which is checked for real.")
     for kind in ("sig", "clauses"):
         for it in p.items:
-            if it.kind == kind and it.name in foci:
+            if it.kind == kind and it.name in shown:
                 out.extend(p.lines[it.start : it.end])
                 out.append("")
     return "\n".join(out).rstrip() + "\n"
@@ -520,6 +516,83 @@ def scc_of(p: Parsed, members: list[str]) -> dict[str, int]:
         if m not in index:
             strong(m)
     return out
+
+
+def dep_closure(p: Parsed, members: list[str]) -> dict[str, set[str]]:
+    """Transitive intra-block dependencies of each member (textual edges)."""
+    S = set(members)
+    g = {m: set() for m in members}
+    for it in p.items:
+        if it.name in S and it.kind in ("sig", "clauses"):
+            txt = "\n".join(l.split("--")[0] for l in p.lines[it.start : it.end])
+            for o in members:
+                if o != it.name and re.search(
+                        r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", txt):
+                    g[it.name].add(o)
+    out = {}
+    for m in members:
+        seen, st = set(), [m]
+        while st:
+            for w in g[st.pop()]:
+                if w not in seen:
+                    seen.add(w); st.append(w)
+        out[m] = seen
+    return out
+
+
+def type_level(p: Parsed, members: list[str]) -> list[str]:
+    """Members that produce TYPES.  These can never be stubbed.
+
+    A postulated `NodeCaps : ... -> Set` never reduces to a record, so every
+    downstream `bn , wn` pattern against it dies with SplitError.NotADatatype --
+    and unlike a proof, nothing about it is expensive to check.  Caps-Face has
+    five (FrameFace, NodeCaps, walkOK, all-and, splitEvents-len); Wet and
+    Subscribe-Face have NONE, so this costs those two nothing at all.
+    """
+    S = set(members)
+    out = []
+    for it in p.items:
+        if it.kind == "sig" and it.name in S:
+            t = " ".join(l.split("--")[0] for l in p.lines[it.start : it.end])
+            if re.search(r"(→|->)\s*Set[₀-₉₊¹²³ω]*\s*$|(→|->)\s*Set\b", t):
+                out.append(it.name)
+    return out
+
+
+def keep_real_for(p: Parsed, foci: list[str]) -> list[str]:
+    """Which siblings must keep REAL bodies for this batch to typecheck.
+
+    A postulate does not reduce, so a body that CASE-SPLITS on a sibling's
+    result cannot be checked against a stub -- that is what makes Caps-Face fail
+    (SplitError.NotADatatype).  But stubbing is only *necessary* to break a
+    CYCLE.  So: stub the focus's own SCC (the whole point of the tool), and keep
+    real the dependencies that are not in it.
+
+    On Subscribe-Face and Wet this changes nothing -- a focus's dependencies are
+    its own SCC, so they are all stubbed as before.  On Caps-Face, whose
+    83-member block has no cycles at all, the median member depends on ONE other
+    and 40 depend on none, so almost nothing is kept and the split errors go away.
+    """
+    for b in p.blocks:
+        if len(b.members) > 1 and any(f in b.members for f in foci):
+            scc = scc_of(p, b.members)
+            deps = dep_closure(p, b.members)
+            # KEEP REAL exactly the ACYCLIC dependencies.  Anything inside a
+            # genuine cycle must stay postulated -- breaking cycles is the whole
+            # point, and keeping one real drags its whole SCC back in.  An
+            # earlier version kept SCC members whenever a batch happened to
+            # contain no SCC member, which rebuilt Wet's 14-member block and put
+            # it back to 273s from 17s.
+            need: set[str] = set()
+            frontier = [d for f in foci for d in deps.get(f, ())]
+            while frontier:
+                d = frontier.pop()
+                if d in foci or d in need or scc.get(d) is not None:
+                    continue
+                need.add(d)
+                frontier.extend(deps.get(d, ()))
+            return [m for m in b.members if m in need]
+    return []
 
 
 def weight(p: Parsed, name: str) -> int:
@@ -726,6 +799,10 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
         # cached: rediscovering it costs a whole failed context run (10.5s on
         # Wet) every single loop.  Invalidated by the file's own mtime.
         keep: list[str] = keep_cache(mod, path)
+        for bi in heavy:
+            for m in type_level(p, p.blocks[bi].members):
+                if m not in keep:
+                    keep.append(m)
         for _ in range(6):
             stub_lines: dict[str, tuple[int, int]] = {}
             with open(os.path.join(DEV, ctxmod + ".agda"), "w", encoding="utf-8") as fh:
@@ -764,8 +841,19 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
     for grp in batches:
         name = f"{mod}-{sanitize('|'.join(grp))}" if grp else ctxmod
         with open(os.path.join(DEV, name + ".agda"), "w", encoding="utf-8") as fh:
-            fh.write(render_focus(p, name, ctxmod, grp) if (share and grp)
-                     else render_ctx(p, name, grp))
+            if share and grp:
+                # Subtract what the CONTEXT already holds real: re-declaring it
+                # here would strand it from the sibling that solves its metas
+                # (connectWrap-wet needs sharedConnect-wet), which is exactly
+                # why it was put in the context in the first place.
+                kr = [m for m in keep_real_for(p, grp) if m not in keep]
+                fh.write(render_focus(p, name, ctxmod, grp, kr))
+            else:
+                # The self-contained path needs the SAME keep-real rules, or a
+                # `private` block silently costs the file every fix above.
+                extra = keep_real_for(p, grp) + [m for bi in heavy
+                                                 for m in type_level(p, p.blocks[bi].members)]
+                fh.write(render_ctx(p, name, list(dict.fromkeys(grp + extra))))
         jobs.append((", ".join(grp) if grp else "(no mutual block: the file as written)",
                      os.path.join("_dev", name + ".agda")))
 
