@@ -213,14 +213,31 @@ bg:
 	  exit 7
 
 # The verdict of a detached run, without having to remember the log path or
-# recognise what a green Agda log looks like.  "still running" is a distinct
-# answer from "green" — a log with no EXIT= line has not finished.
+# recognise what a green Agda log looks like.  Three distinct answers, and the
+# distinctions are the whole point:
+#
+#   * STILL RUNNING (exit 3) — no EXIT= line yet.  Not a pass; not finished.
+#   * RED (the real exit code) — plus the failing tail, so the reason is here.
+#   * GREEN — and it PRINTS THE LOG'S OWN LAST WORD alongside, because exit 0
+#     does not distinguish "checked twelve modules, all passed" from "checked
+#     NOTHING".  Hit 2026-08-11: `make agda-dev` on a freshly built tree found
+#     nothing dirty, did no work, and exited 0; agda-dev said so plainly
+#     ("nothing dirty — the tree matches its interfaces") and bg-check
+#     flattened it to GREEN, which then got read as a project-wide pass.
+#     A vacuous pass wearing a real pass's clothes is the same failure as the
+#     exit-code bug this file exists to prevent, one layer up.  So: never
+#     summarise a log to one word when the log's own last line is the answer.
 bg-check:
 	@test -n "$(T)" || { echo "usage: make bg-check T=<target> [LOG=<path>]" >&2; exit 2; }
 	@test -f $(LOG) || { echo "bg-check: no log at $(LOG) — never launched?"; exit 2; }
 	@if grep -q '^EXIT=' $(LOG); then \
 	  ec=$$(grep '^EXIT=' $(LOG) | tail -1 | cut -d= -f2); \
-	  if [ "$$ec" = 0 ]; then echo "bg-check: $(T) GREEN ($(LOG))"; \
+	  last=$$(grep -v '^EXIT=' $(LOG) | grep -v '^[[:space:]]*$$' | tail -1); \
+	  if [ "$$ec" = 0 ]; then \
+	    echo "bg-check: $(T) GREEN ($(LOG))"; \
+	    echo "  log's last word: $$last"; \
+	    echo "  ^ READ IT.  Exit 0 can also mean 'did no work' — check that the"; \
+	    echo "    run actually checked what you think it checked."; \
 	  else echo "bg-check: $(T) RED — exit $$ec ($(LOG)).  Last 25 lines:"; \
 	       tail -25 $(LOG); exit $$ec; fi; \
 	else \
