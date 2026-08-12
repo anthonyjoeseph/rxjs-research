@@ -99,8 +99,8 @@ TWO BEHAVIOURS THE CODE NEEDED THAT THE DESIGN DID NOT ANTICIPATE:
     and dies last, and Measures.agda emits a standing RewritesNothing warning
     that buried the real error under a head-limited dump.
 
-  scripts/agda-dev.py                      every dirty dev-checkable module
-  scripts/agda-dev.py --all                every dev-checkable module
+  scripts/agda-dev.py                      EVERY dev-checkable module
+  scripts/agda-dev.py --dirty              only modules you have edited
   scripts/agda-dev.py <file>               one module, every member
   scripts/agda-dev.py <file> <member>      one member -- the actual grind loop
   scripts/agda-dev.py --list <file>        its block structure, no typechecking
@@ -1101,8 +1101,16 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="print block structure only")
     ap.add_argument("--scope", action="store_true")
     ap.add_argument("--holes", action="store_true")
-    ap.add_argument("--all", action="store_true",
-                    help="with no file: every claim-graph module, not just dirty ones")
+    # DIRTY IS OPT-IN, NOT THE DEFAULT (Anthony, 2026-08-11).  It was the other
+    # way round, and the argument for it was wrong: "I edited Wet, is it OK?"
+    # is answered by `agda-dev <file>`, not by the bare command.  You run the
+    # BARE command precisely when you do not know what is dirty -- which is
+    # exactly when silently checking nothing is the worst possible answer.
+    # Observed the day it was inverted: a bare run on a freshly built tree
+    # checked 0 of 12 modules and exited 0, and that got read as a pass.
+    ap.add_argument("--dirty", action="store_true",
+                    help="with no file: ONLY modules edited since their interface "
+                         "(the default is every claim-graph module)")
     # CONCURRENCY IS CAPPED BY MEMORY, NOT BY CORES.  A stubbed run is ~380 MB,
     # so several fit easily -- but a module the tool cannot stub falls back to a
     # near-real check of MULTIPLE GB, and CLAUDE.md's standing ceiling of TWO
@@ -1184,12 +1192,13 @@ def main() -> int:
     mods = [m for m in claim_graph() if has_heavy(m) and m not in NOT_DEV_CHECKABLE]
     for m, why in sorted(NOT_DEV_CHECKABLE.items()):
         print(f"agda-dev: SKIPPING {m}\n           {why}")
-    todo = mods if args.all else [m for m in mods if dirty(m)]
+    todo = [m for m in mods if dirty(m)] if args.dirty else mods
     print(f"agda-dev: {len(mods)} module(s) with a multi-member mutual block, "
-          f"{len(todo)} to check{'' if args.all else ' (dirty only)'}.  "
+          f"{len(todo)} to check{' (--dirty)' if args.dirty else ''}.  "
           "Modules without one are `make agda`'s job.")
     if not todo:
-        print("agda-dev: nothing dirty — the tree matches its interfaces.")
+        print("agda-dev: NOTHING WAS CHECKED — --dirty was passed and the tree "
+              "matches its interfaces.  This is not a pass; no work was done.")
         return 0
     # Serial across modules, parallel within: a module's foci already saturate
     # the cores, and two modules at once would just contend.

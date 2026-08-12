@@ -29,7 +29,8 @@ help:
 	@echo "                  IS VALID: the real recursion's TERMINATION is not"
 	@echo "                  checked, and postulates do not reduce.  'make agda'"
 	@echo "                  stays the merge gate"
-	@echo "                  make agda-dev                    (all dirty modules)"
+	@echo "                  make agda-dev                    (EVERY module)"
+	@echo "                  make agda-dev DIRTY=1            (only what you edited)"
 	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet.agda'"
 	@echo "                  make agda-dev ARGS='<file> <member>'   (the grind loop)"
 	@echo "                  make agda-dev ARGS='--list <file>'    (block structure)"
@@ -87,7 +88,12 @@ agda:
 # checks ONE body at a time, against its siblings POSTULATED at their exact
 # existing signatures.  agda/src is never written to.
 #
-#   make agda-dev                     every module dirtier than its interface
+#   make agda-dev                     EVERY dev-checkable module (DIRTY=1 to
+#                                     restrict to what you edited -- dirty is
+#                                     OPT-IN, because you run the bare command
+#                                     precisely when you do not know what is
+#                                     dirty, and "checked nothing" must never
+#                                     be the silent answer to that question)
 #   make agda-dev ARGS='<file>'       one module, every member
 #   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
 #   make agda-dev ARGS='--list <file>'     its mutual-block structure
@@ -108,7 +114,7 @@ agda:
 AGDA_DEV_BUDGET ?= $(if $(ARGS),30,180)
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
-	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(ARGS)
+	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(if $(DIRTY),--dirty) $(ARGS)
 
 # Is the fast loop load-bearing, or green by construction?  Corrupts one token
 # in a real body in src, demands the dev check go RED, and restores the file
