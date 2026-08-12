@@ -26,9 +26,18 @@ Standing rules that apply to every task you are given:
 - If you ever find two real programs whose primitives produce byte-identical
   emit streams but that genuinely batch differently: **STOP**, report it, and do
   not act on it.
-- `setsid` does not exist on macOS. Pin the working directory in every build
-  command and guard with `ls Makefile &&` — the cwd drifts between tool calls.
-- **Do not babysit long builds.** Iterate in `agda/probe/` with minimal imports
-  (seconds per loop, because an unchanged heavy module is a cached interface).
-  When your edits are ready, hand the long gate back to the design session
-  rather than polling a build until your turn runs out.
+- **Launch any long build as `make bg T=<target>`; read it back with
+  `make bg-check T=<target>`.** Never hand-roll `(cmd > log 2>&1; echo EXIT=$?)` — a
+  subshell exits with `echo`'s status, always 0, so a RED build reports itself green.
+  **`make bg` ALWAYS EXITS NON-ZERO, green or red, on purpose** — a status that is
+  right most of the time gets believed, so this one is never right. The task
+  notification is not a verdict; `bg-check` is.
+  `setsid` and `timeout` do not exist on macOS. Pin the working directory in every
+  build command and guard with `ls Makefile &&` — the cwd drifts between tool calls.
+- **Do not babysit long builds.** Iterate with
+  `make agda-dev ARGS='<file> <member>'` (~6 s per member, against 384 s for a
+  real Subscribe-Face check). It runs inside `src`, so there is no staging area
+  to classify or forget. When your edits are ready, hand the long gate back to
+  the design session rather than polling a build until your turn runs out.
+  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID — the real
+  mutual recursion's termination is unchecked, so `make agda` stays the gate.

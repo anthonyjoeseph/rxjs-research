@@ -439,14 +439,18 @@ Readme, Time, Evaluator, Provenance. Depends on Tiers 1 and 2. Lowest priority.
 
 ---
 
-## The Probe-Before-Grind Law
+## The Fast-Loop Law (SUPERSEDES probe-before-grind, 2026-08-11)
 
-Any syntax/elaboration question you haven't used in THIS file → write a ≤10-line probe in
-`agda/probe/` BEFORE incorporating it into the big module. Probes are ephemeral (deleted
-after the proof, not shipped), but they save hours of big-module rechecks. Proven
-repeatedly: `with … in` binding, weak-vs-precise hole shapes, the chain-index currency,
-and the Dep0 walk refutation — each settled in seconds what a Subscribe-Face recheck would
-have charged 44 minutes for.
+Any syntax/elaboration question you haven't used in THIS file → settle it with
+`make agda-dev ARGS='<file> <member>'` (~6 s) BEFORE spending a real recheck on it.
+This replaces the old `agda/probe/` staging directory, which existed only because `src`
+had no cheap loop; `agda/probe/` is DELETED and must not be recreated. Everything now
+gets written straight into `agda/src`, under `make wiring`'s jurisdiction, where the
+orphan and reachability checks see it from the first minute.
+
+DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID: the real mutual
+recursion's TERMINATION is not checked (and here the mutual recursion IS the induction),
+and postulates do not reduce. `make agda` stays the merge gate.
 
 ### Two cheap gates BEFORE you spend a real build slot
 
@@ -528,15 +532,15 @@ zero error-line count. Read the `EXIT=` line out of the log, every time.
   machinery (`FrameFace` at 4578); `valsCaps→mList-strict` lives here and is the model for
   Unit 3's `obsList→mList-strict`.
 
-### Key probes (all in `agda/probe/`)
-- `Dep0-Walk-Probe.agda` — the machine refutation that forced Unit 3's ruling.
-- `Mu-Nest-Probe.agda`, `Nest-Budget-Probe.agda` § 3, `Nest-Count-Probe.agda` — the
-  refuted-candidate record cited by the ruling.
-- `Chain-Index-Probe`, `Chain-Supply-Probe`, `Chain-Descent-Probe`, `Sub-Charge-Probe` § 5
-  — Step C's settled shape decisions.
+### Where the old probe findings went (`agda/probe/` DELETED 2026-08-11)
+The load-bearing receipts were rewritten into the headers of the `src` postulates they
+concern — that is where a receipt belongs, and where `grep` will find it. The rest is in
+git history; PROOF-STATE.md's citations of `agda/probe/<File>.agda` are historical
+references, recoverable with `git show <sha>^:agda/probe/<File>.agda`, NOT live paths.
 
 ### Build & Test
-- **`Makefile`:** `make agda` (full check), `make bug-cache` (type-level unit tests), `make test`.
+- **`Makefile`:** `make agda-dev` (the ~6 s grind loop), `make agda` (full check, the merge
+  gate), `make bug-cache` (type-level unit tests), `make gate` (the acceptance test).
 - **`agda/src/Implementation/Unit-Test.agda`** via `make bug-cache`; append with `scripts/gen-unit-tests.sh`.
 
 ---

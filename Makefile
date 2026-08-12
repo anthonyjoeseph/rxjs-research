@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -55,6 +55,15 @@ help:
 	@echo "  gate          the acceptance test: wiring-gate + unsafe-check +"
 	@echo "                  agda + bug-cache, cheap checks first so"
 	@echo "                  a 2-second failure never waits on a 40-minute one"
+	@echo "  bg            RUN EVERY LONG BUILD THROUGH THIS.  ALWAYS EXITS 7,"
+	@echo "                  green or red — a launcher status that is right most"
+	@echo "                  of the time gets believed, so this one is never"
+	@echo "                  right.  It cannot report a false green because it"
+	@echo "                  cannot report anything.  Ask bg-check instead"
+	@echo "                  make bg T=agda   /   make bg T=gate LOG=/tmp/g.log"
+	@echo "  bg-check      THE VERDICT of a detached run: GREEN, RED + failing"
+	@echo "                  tail, or STILL RUNNING (exit 3 — not a pass)"
+	@echo "                  make bg-check T=agda"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -157,6 +166,67 @@ gate:
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory bug-cache
 	@echo "gate: ALL GREEN"
+
+# ─────────────────────────────────────────────────────────────────────────
+# DETACHED BUILDS — always launch a long target through `make bg`.
+#
+# `make agda` costs tens of minutes and the agent harness's foreground ceiling
+# is ~600s, so long builds get detached and polled.  THE BUG THIS TARGET
+# EXISTS TO CLOSE (hit 2026-08-11, and not for the first time) is the obvious
+# hand-rolled wrapper:
+#
+#     (make agda > /tmp/x.log 2>&1; echo EXIT=$$? >> /tmp/x.log)
+#
+# The subshell exits with ECHO's status, which is ALWAYS 0.  So the launcher
+# reports success no matter what happened, and a RED build is indistinguishable
+# from a green one unless someone remembers to read the log — which is exactly
+# the thing that did not happen.  Same family as the `timeout … | tail` trap
+# and the `make agda` run from the wrong directory: a green-looking lie.
+#
+# SO `make bg` ALWAYS EXITS 7, GREEN OR RED (Anthony, 2026-08-11).  Not a
+# propagated status — a deliberately USELESS one.  A launcher status that is
+# right most of the time is worse than one that is never right: the reliable
+# one gets read and believed, and every rare false green slips through.  An
+# invariant 7 carries no information at all, so it cannot carry a wrong answer,
+# and the only way to learn anything is `make bg-check` — which reads the log.
+# Never make this "smarter" by propagating the code; that is the bug, restored.
+#
+#     make bg T=agda                  detach this under run_in_background
+#     make bg T=gate LOG=/tmp/g.log   explicit log path
+#     make bg-check T=agda            THE VERDICT: green, red + tail, or running
+#
+LOG ?= /tmp/rxjs-bg-$(T).log
+bg:
+	@test -n "$(T)" || { echo "usage: make bg T=<target> [LOG=<path>] [ARGS=...]" >&2; exit 2; }
+	@rm -f $(LOG)
+	@echo "bg: $(T) -> $(LOG)"
+	@$(MAKE) --no-print-directory $(T) ARGS='$(ARGS)' > $(LOG) 2>&1; ec=$$?; \
+	  echo "EXIT=$$ec" >> $(LOG); \
+	  if [ $$ec -eq 0 ]; then \
+	    echo "bg: $(T) looks GREEN ($(LOG))"; \
+	  else \
+	    echo "bg: $(T) RED — exit $$ec ($(LOG)).  Last 25 lines:"; \
+	    tail -25 $(LOG); \
+	  fi; \
+	  echo "bg: exiting 7 BY DESIGN — this status is not a verdict."; \
+	  echo "bg: run \`make bg-check T=$(T)\` for the real result."; \
+	  exit 7
+
+# The verdict of a detached run, without having to remember the log path or
+# recognise what a green Agda log looks like.  "still running" is a distinct
+# answer from "green" — a log with no EXIT= line has not finished.
+bg-check:
+	@test -n "$(T)" || { echo "usage: make bg-check T=<target> [LOG=<path>]" >&2; exit 2; }
+	@test -f $(LOG) || { echo "bg-check: no log at $(LOG) — never launched?"; exit 2; }
+	@if grep -q '^EXIT=' $(LOG); then \
+	  ec=$$(grep '^EXIT=' $(LOG) | tail -1 | cut -d= -f2); \
+	  if [ "$$ec" = 0 ]; then echo "bg-check: $(T) GREEN ($(LOG))"; \
+	  else echo "bg-check: $(T) RED — exit $$ec ($(LOG)).  Last 25 lines:"; \
+	       tail -25 $(LOG); exit $$ec; fi; \
+	else \
+	  echo "bg-check: $(T) STILL RUNNING ($$(wc -l < $(LOG) | tr -d ' ') lines so far)"; \
+	  tail -2 $(LOG); exit 3; \
+	fi
 
 ts-check:
 	cd typescript && npm run typecheck

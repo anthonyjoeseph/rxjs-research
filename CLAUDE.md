@@ -121,8 +121,8 @@ report review. Standing protocol, per Anthony:
     as its LAST act before committing**, never before its final edit. A red gate whose
     cause is another worker's tree is not a licence to commit — it is a signal to
     identify the cause explicitly, confirm your own staged files are clean, and say so.
-  - **NEVER reach into another worker's lane to tidy a shared file.** `PROBES.txt`,
-    `DEFERRED.txt`, and `PROOF-STATE.md` are shared ledgers, and "helpfully" removing a
+  - **NEVER reach into another worker's lane to tidy a shared file.** `DEFERRED.txt`
+    and `PROOF-STATE.md` are shared ledgers, and "helpfully" removing a
     line for a file another worker is mid-landing is how the ratchet got bypassed above.
     Workers report the ledger lines they need; the design session applies them.
 - **No keep-alives.** The session runs on a persistent laptop, so the container does not
@@ -132,8 +132,10 @@ report review. Standing protocol, per Anthony:
   in-flight turn — diagnose via transcript mtime + ps, revive via SendMessage with re-verify
   instructions; **"queued" = alive, "resumed from transcript" = was dead**). Long builds
   still get detached with EXIT=$? logs and polled, since the Bash tool's ~600s foreground
-  ceiling per call applies. **`setsid` does not exist on macOS** — use the Bash tool's
-  `run_in_background`, not `nohup setsid`.
+  ceiling per call applies. **Launch it as `make bg T=<target>` and read it back with
+  `make bg-check T=<target>`** — never a hand-rolled `(cmd > log; echo EXIT=$?)`, which
+  exits with `echo`'s status and so reports every build green. (`setsid` does not exist
+  on macOS; `run_in_background` is the detach mechanism.)
 - **Directives carry the law.** Every worker prompt restates the standing rules it needs:
   spec is gospel; refute-before-grind; detached builds with EXIT= logs; report numbers
   plainly including failures; never extrapolate from shallow refutation rows; the
@@ -169,16 +171,55 @@ hoisting the 22 non-SCC members out of Wet's 36 is worth 255 s → 220 s of posi
 `make agda-dev ARGS='--list <file>'` reports which members are in a genuine cycle, so
 check that before proposing either. And
 **`make agda-dev` checks the same bodies in seconds** — reach for the long build only as
-the merge gate. Run long
-builds with the Bash tool's `run_in_background` (**NOT `nohup setsid` — `setsid` does not
-exist on macOS and the command silently does nothing**), appending `echo EXIT=$? >> log`, and
-poll the log for its EXIT= line with short foreground calls. Detached builds advance on their
-own — the polling is for pacing and verification, not for keeping anything awake.
-**`timeout` DOES NOT EXIST ON macOS EITHER** (same class as `setsid`). `timeout 580 make …`
-fails with `command not found`, so make never runs — and if you piped it to `tail`, the
-`$?` you read is `tail`'s zero. That looks exactly like a green build. Hit 2026-08-06.
-Never pipe agda through `head` (it hides OOM kills); read EXIT= from the log; `tail -3` and
-read indentation (an importer prints as the last line for its importee's whole leg).
+the merge gate.
+
+**LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`, AND READ IT BACK WITH
+`make bg-check T=<target>`. Do not hand-roll the wrapper (Anthony, 2026-08-11).**
+
+```
+make bg T=agda          ← under the Bash tool's run_in_background
+make bg-check T=agda    ← GREEN / RED + failing tail / STILL RUNNING
+```
+
+The hand-rolled shape everyone reaches for **reports every build as green:**
+
+```
+(make agda > /tmp/x.log 2>&1; echo EXIT=$? >> /tmp/x.log)   # ← WRONG
+```
+
+A subshell exits with its LAST command's status, and that is `echo` — always 0. So
+the launcher's exit code carries no information, and a RED build is indistinguishable
+from a green one unless someone remembers to open the log. On 2026-08-11 a whole-project
+`agda-dev` run that had gone RED (over budget, one module killed at 180 s) was reported
+as green on exactly this basis; the log's last line said `EXIT=1` the whole time.
+
+**`make bg` THEREFORE ALWAYS FAILS — green or red, every time (Anthony, 2026-08-11).**
+It exits 7 by construction and says so. This is deliberate and must not be "fixed" into
+propagating the real status: **a launcher status that is right most of the time is worse
+than one that is never right**, because the reliable one gets read and believed, and then
+every rare false green sails through. An invariant failure carries no information, so it
+cannot carry a WRONG answer — and the only way to learn anything is to ask `bg-check`,
+which reads the log. Treating "the background task finished with exit 0" as a verdict is
+the exact mistake this removes the possibility of.
+
+So: **a completion notification is never a result. `make bg-check T=<target>` is the
+result.** It answers GREEN, RED with the failing tail, or **STILL RUNNING** (exit 3) —
+and that third answer is a distinct one, because a log with no `EXIT=` line has not
+passed, it has not finished.
+
+This is the same family as the two traps below, and the reason the rule is now a make
+target rather than a habit: each of them produces a *green-looking lie*, which is the
+one failure mode that does not announce itself.
+
+- **`setsid` DOES NOT EXIST ON macOS** — `nohup setsid …` silently does nothing. Detach
+  with the Bash tool's `run_in_background`, which is what `make bg` is designed for.
+- **`timeout` DOES NOT EXIST ON macOS EITHER.** `timeout 580 make …` fails with
+  `command not found`, so make never runs — and piped to `tail`, the `$?` you read is
+  `tail`'s zero. Hit 2026-08-06.
+
+Never pipe agda through `head` (it hides OOM kills); `tail -3` and read indentation (an
+importer prints as the last line for its importee's whole leg). Detached builds advance
+on their own — polling is for pacing and verification, not for keeping anything awake.
 
 **Pin the working directory in EVERY build command — `cd agda/` for a raw `agda` call, repo
 root for `make` — and read the log's first lines, not just its exit code.** `make agda` from a
