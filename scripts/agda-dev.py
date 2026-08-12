@@ -119,6 +119,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import resource
 import hashlib
 import os
 import re
@@ -151,9 +152,37 @@ NOT_DEV_CHECKABLE = {
         "(MissingDefinitions).",
 }
 
-# The standing ceiling from CLAUDE.md, in code rather than in prose: at most
-# TWO heavyweight Agda checks at once.  Subscribe-Face alone peaks ~5.2 GB.
-HEAVY_JOBS = 2
+# CONCURRENCY IS A MEMORY BUDGET, NOT A CONSTANT.  CLAUDE.md's standing ceiling
+# ("at most TWO heavyweight checks at once") is about REAL checks of the big
+# modules, which peak ~5.2 GB.  A stubbed dev run is nothing like that: measured
+# 2026-08-11, a self-contained Caps-Face batch peaks 0.6-0.7 GB, so a flat cap of
+# 2 left it running 22 batches two at a time for no reason.
+#
+# So the cap is computed from the FIRST run's actual peak RSS rather than
+# guessed: fast, small runs get wide concurrency and genuinely heavy ones get
+# the two-at-a-time ceiling automatically.  Ignoring memory entirely is what
+# OOM'd this machine, so the budget stays conservative -- half of physical RAM.
+MEM_FRACTION = 0.5
+
+
+def total_ram() -> int:
+    try:
+        return int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True,
+                                  text=True).stdout.strip())
+    except Exception:
+        return 8 << 30
+
+
+def child_peak_bytes() -> int:
+    """Peak RSS of the largest child so far.  macOS reports bytes, Linux KB."""
+    m = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    return m if sys.platform == "darwin" else m * 1024
+
+
+def jobs_for(peak: int, ceiling: int) -> int:
+    if peak <= 0:
+        return 1
+    return max(1, min(ceiling, int(total_ram() * MEM_FRACTION // peak)))
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGDA = os.path.join(REPO, "agda")
@@ -346,7 +375,9 @@ def sig_text(p: Parsed, name: str) -> list[str] | None:
 
 
 def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
-               stub_lines: dict[str, tuple[int, int]] | None = None) -> str:
+               stub_lines: dict[str, tuple[int, int]] | None = None,
+               hoist: list[str] = [], force_stub: list[str] = [],
+               real_lines: dict[str, tuple[int, int]] | None = None) -> str:
     """The SHARED CONTEXT: the file with every heavy-block member postulated.
 
     Checked ONCE per dev run.  Every non-mutual body in the file is real here,
@@ -369,10 +400,21 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             if it.block not in emitted:
                 emitted.add(it.block)
                 b = p.blocks[it.block]
+                # TYPE-LEVEL members come FIRST: the stub signatures below
+                # mention them (walkOK, NodeCaps, FrameFace), so a postulate
+                # block placed above their definitions is 19 NotInScope errors.
+                for m in hoist:
+                    if m in b.members:
+                        for kind in ("sig", "clauses"):
+                            for jt in p.items:
+                                if jt.kind == kind and jt.name == m:
+                                    out.extend(p.lines[jt.start : jt.end])
+                        out.append("")
                 out += ["", f"-- agda-dev: mutual block of {len(b.members)} members,",
                         "-- POSTULATED at their exact existing signatures.", "postulate"]
+                cyc = scc_of(p, b.members)
                 for m in b.members:
-                    if m in foci:
+                    if m in foci or m in hoist or (m not in cyc and m not in force_stub):
                         continue
                     first = len(out) + 1
                     for ln in sig_text(p, m) or []:
@@ -380,13 +422,23 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                     if stub_lines is not None:
                         stub_lines[m] = (first, len(out))
                 out.append("")
-                if any(f in b.members for f in foci):
-                    out.append("-- agda-dev: THE FOCUS BODIES, verbatim.")
-                    for kind in ("sig", "clauses"):
-                        for jt in p.items:
-                            if jt.kind == kind and jt.name in foci:
-                                out.extend(p.lines[jt.start : jt.end])
-                                out.append("")
+            # A KEPT-REAL member stays EXACTLY WHERE IT WAS.  Relocating these
+            # to the head of the block was one bug producing all 22 of
+            # Caps-Face's NotInScope errors: a body originally at line 7500 got
+            # emitted at 4259, ahead of the `abstract` block defining what it
+            # calls.  Position carries scope; only the stubs may move.
+            # Acyclic members are NEVER stubbed -- stubbing exists to break a
+            # cycle, and a postulate that replaces a perfectly orderable
+            # definition only costs reduction (the SplitError class) while
+            # saving nothing.  They, and the foci, stay exactly where they are.
+            cyc = scc_of(p, p.blocks[it.block].members)
+            if ((it.name in foci or it.name not in cyc)
+                    and it.name not in hoist and it.name not in force_stub):
+                first = len(out) + 1
+                out.extend(p.lines[it.start : it.end])
+                if real_lines is not None and it.kind == "clauses":
+                    real_lines[it.name] = (first, len(out))
+                out.append("")
             continue
         out.extend(p.lines[it.start : it.end])
 
@@ -740,7 +792,8 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
 
     foci: list[str | None] = []
     for bi in heavy:
-        foci.extend(p.blocks[bi].members)
+        cyc = scc_of(p, p.blocks[bi].members)
+        foci.extend(m for m in p.blocks[bi].members if m in cyc)
     if focus_filter is not None:
         if focus_filter not in foci:
             print(f"agda-dev: {focus_filter!r} is not a member of a multi-member "
@@ -749,18 +802,36 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
                   file=sys.stderr)
             return False
         foci = [focus_filter]
+    if not foci:
+        foci = [None]   # nothing cyclic anywhere: the file checks as written
     if not heavy:
         # Nothing to stub: the file has no mutual recursion, so the honest dev
         # check is the file itself.
         foci = [None]
 
     os.makedirs(DEV, exist_ok=True)
+
+    # STUBBING ONLY PAYS WHERE THERE IS A CYCLE TO BREAK.  If no member of any
+    # heavy block is in a genuine SCC, the block is an artefact of declaration
+    # order, its positivity cost is small, and every dependency has to be kept
+    # real anyway -- which made Caps-Face 22 batches of 53s each, against 64s
+    # for simply checking the module.  So: check it, once, for real.  That is
+    # also the only mode with NO caveats attached to a green result.
+    if heavy and not any(scc_of(p, p.blocks[bi].members) for bi in heavy):
+        name = f"{mod}-Whole"
+        with open(os.path.join(DEV, name + ".agda"), "w", encoding="utf-8") as fh:
+            fh.write(render_ctx(p, name, [m for bi in heavy
+                                          for m in p.blocks[bi].members]))
+        print(f"agda-dev: src/{rel} — no genuine mutual recursion "
+              f"({sum(len(p.blocks[bi].members) for bi in heavy)} members, 0 cycles), "
+              "so nothing is postulated: this is a REAL check.")
+        rc, out, secs = run_one(os.path.join("_dev", name + ".agda"), args)
+        ok = report("(whole module, nothing stubbed)", rc, out, secs)
+        print(f"agda-dev: src/{rel} {'GREEN' if ok else 'RED'} in {secs:.1f}s wall")
+        return ok
+
     share = shareable(p) and heavy
-    if not share:
-        # Self-contained fallback: every run carries the file's real bodies, so
-        # these are HEAVYWEIGHT checks and the two-at-a-time ceiling governs.
-        args = copy.copy(args)
-        args.jobs = min(args.jobs, HEAVY_JOBS)
+    args = copy.copy(args)
     ctxmod = f"{mod}-Ctx"
     label = f"src/{rel}"
     t0 = time.time()
@@ -799,17 +870,31 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
         # cached: rediscovering it costs a whole failed context run (10.5s on
         # Wet) every single loop.  Invalidated by the file's own mtime.
         keep: list[str] = keep_cache(mod, path)
+        force: list[str] = []
         for bi in heavy:
             for m in type_level(p, p.blocks[bi].members):
                 if m not in keep:
                     keep.append(m)
         for _ in range(6):
             stub_lines: dict[str, tuple[int, int]] = {}
+            real_lines: dict[str, tuple[int, int]] = {}
             with open(os.path.join(DEV, ctxmod + ".agda"), "w", encoding="utf-8") as fh:
-                fh.write(render_ctx(p, ctxmod, keep, stub_lines))
+                fh.write(render_ctx(p, ctxmod, keep, stub_lines,
+                                    force_stub=force, real_lines=real_lines))
             rc, out, secs = run_one(os.path.join("_dev", ctxmod + ".agda"), args)
             if rc == 0:
                 break
+            # An ACYCLIC member can fail on its own too: connectWrap-wet's metas
+            # are solved by sharedConnect-wet, which is cyclic and therefore
+            # stubbed.  Keeping it real strands it -- so stub it instead.  This
+            # is the mirror of the case below.
+            for m in unstubbable(out, ctxmod, real_lines):
+                # `keep` (real, with its callers) wins over `force` (stub it):
+                # a name in both is emitted by neither branch and vanishes.
+                if m not in force and m not in keep:
+                    force.append(m)
+                    print(f"  ..    {secs:6.1f}s  stubbing instead (its metas need a "
+                          f"stubbed sibling): {m}")
             culprits = unstubbable(out, ctxmod, stub_lines)
             # A signature's metas can be solved by a SIBLING'S BODY, not only by
             # its own -- meta solving is a whole-mutual-block affair.  So the
@@ -820,8 +905,11 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
                                                for c2 in callers_of(p, c, foci)]
                         if c not in keep]
             if not culprits:
+                if force and rc != 0:
+                    continue
                 break
             keep += culprits
+            force[:] = [m for m in force if m not in keep]
             print(f"  ..    {secs:6.1f}s  keeping real (metas need the body): "
                   + ", ".join(culprits))
         if keep:
@@ -832,6 +920,17 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
             print(f"agda-dev: {label} RED in {time.time()-t0:.1f}s wall "
                   "(shared context failed; focus checks skipped)")
             return False
+
+    # CALIBRATE from what the run above actually cost.  Before this, a flat cap
+    # of 2 made Caps-Face take 95s to do 22 batches of 9s each.
+    peak = child_peak_bytes()
+    if peak:
+        fitted = jobs_for(peak, args.jobs)
+        if fitted != args.jobs:
+            print(f"  ..           concurrency {fitted} "
+                  f"(peak {peak/2**30:.1f} GB/run, budget "
+                  f"{total_ram()*MEM_FRACTION/2**30:.0f} GB)")
+        args.jobs = fitted
 
     # STAGE 2: the real bodies, batched, in parallel.  See render_focus for why
     # batching is the lever: the per-process interface toll dominates.
@@ -851,9 +950,10 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
             else:
                 # The self-contained path needs the SAME keep-real rules, or a
                 # `private` block silently costs the file every fix above.
-                extra = keep_real_for(p, grp) + [m for bi in heavy
-                                                 for m in type_level(p, p.blocks[bi].members)]
-                fh.write(render_ctx(p, name, list(dict.fromkeys(grp + extra))))
+                tl = [m for bi in heavy for m in type_level(p, p.blocks[bi].members)]
+                extra = keep_real_for(p, grp) + tl
+                fh.write(render_ctx(p, name, list(dict.fromkeys(grp + extra)),
+                                    hoist=tl))
         jobs.append((", ".join(grp) if grp else "(no mutual block: the file as written)",
                      os.path.join("_dev", name + ".agda")))
 
