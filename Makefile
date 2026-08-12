@@ -24,8 +24,8 @@ help:
 	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
 	@echo "                  time against its siblings POSTULATED at their exact"
 	@echo "                  signatures.  ONE MEMBER ~6s — the grind loop.  Whole"
-	@echo "                  modules, cold: Caps-Face 73s, Wet 56s, Subscribe-Face"
-	@echo "                  31s; whole project 242s cold / 122s warm (2026-08-12)"
+	@echo "                  modules, cold: Caps-Face/Part3 19s, Wet 22s, Subscribe-Face"
+	@echo "                  15s; whole project 131s warm (2026-08-12)"
 	@echo "                  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF"
 	@echo "                  IS VALID: the real recursion's TERMINATION is not"
 	@echo "                  checked, and postulates do not reduce.  'make agda'"
@@ -100,8 +100,12 @@ agda:
 #   make agda-dev ARGS='--list <file>'     its mutual-block structure
 #
 # Measured 2026-08-12 on a coherent cache, COLD (which is the normal case --
-# you just edited the file): Caps-Face 72.6s, Wet 55.8s, Subscribe-Face 31.0s,
-# whole project 242.5s.  Warm, for reference: 24.1 / 18.4 / 11.8 / 122.4s.
+# you just edited the file): Caps-Face split 2026-08-12 into 7 parts
+# (Part1 6.2s, Part2 16.4s, Part3 19.1s, Part4 15.4s, Part5 8.2s, Part6 11.0s,
+# Part7 13.2s), Wet 22.2s, Subscribe-Face 15.1s, whole project 131s WARM
+# (measured after all interfaces built; first cold run on new Part files is
+# ~480s because each Part file's .agdai is absent and must be built — a
+# one-time artifact, not the normal workflow).
 # ONE MEMBER ~6s, and that is the number the grind loop actually runs at.
 # OPT-IN flags: SCOPE=1 (names and syntax only, no typechecking), HOLES=1
 # (tolerate ? holes and missing clauses).
@@ -119,10 +123,11 @@ agda:
 # this after modifying the file").  Cold IS the normal case -- you edit a file,
 # so its generated module has new content and nothing is cached for it; warm
 # only happens when you re-run having changed nothing, which is not the loop.
-# Measured cold worst cases: one file 72.6s (Caps-Face), whole project 242.5s
-# (everything cold, i.e. straight after a `make agda`).  Warm, for reference:
-# 24.1s and 122.4s.  The earlier 30s/180s were warm figures, and 30s failed on
-# every heavyweight module the moment you actually edited one.
+# Measured cold worst cases: one file 22.2s (Wet; Caps-Face split 2026-08-12
+# into 7 parts, new worst per-part 19.1s).  Whole project warm: 131s measured
+# 2026-08-12 (12 modules with multi-member blocks checked serially).  The
+# earlier 30s/180s were warm figures, and 30s failed on every heavyweight
+# module the moment you actually edited one.
 #
 # A BUDGET THAT FAILS ON NORMAL WORK IS WORSE THAN NO BUDGET: it trains everyone
 # to pass BUDGET= reflexively, and then a real regression sails through.
