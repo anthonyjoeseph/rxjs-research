@@ -104,12 +104,18 @@ agda:
 # already built.  Both halves matter.  Cold-but-incoherent (a dependency also
 # rebuilding) inflates a module by 50x and has produced three phantom
 # "slow module" diagnoses; see CLAUDE.md's "MEASURE ON A COHERENT CACHE".
-#   Wet 55.1s   Subscribe-Face 21.2s   Evaluator 9.4s   Caps.agda 15.7s
+#   Wet/Part2 35.0s (rest of Wet 6-12s; was 55.1s before the split)
+#   Subscribe-Face 21.2s   Evaluator 9.4s   Caps.agda 15.7s
 #   Caps-Face (split into Part1..Part7) worst part 8.3s, was 72.6s whole
 #   Verify-Well-Formed/Part1 6.3s  <- measured 357s while Caps-Face rebuilt
 # Whole project 12 modules, 158.6s of module time, all GREEN, under the 300s
-# budget.  Only modules WITH a multi-member block are checked; after the
-# Caps-Face split only Part4 qualifies (its genuine 3-member cycle).
+# budget.  Only modules WITH a multi-member block are checked.
+#
+# THESE ARE DEV NUMBERS AND THEY ARE NOT THE COST OF AN EDIT.  agda-dev
+# postulates the block's siblings, so POSITIVITY OVER THE REAL BLOCK NEVER RUNS
+# -- that is the whole reason it is fast.  Wet/Part2 is 35.0s here and 254.7s
+# under real agda, 88% of it Positivity.  Compare dev to dev and gate to gate,
+# and always say which one a number is.
 # ONE MEMBER ~6s, and that is the number the grind loop actually runs at.
 # OPT-IN flags: SCOPE=1 (names and syntax only, no typechecking), HOLES=1
 # (tolerate ? holes and missing clauses).
@@ -127,10 +133,15 @@ agda:
 # this after modifying the file").  Cold IS the normal case -- you edit a file,
 # so its generated module has new content and nothing is cached for it; warm
 # only happens when you re-run having changed nothing, which is not the loop.
-# Measured cold worst cases (2026-08-12): one file 55.1s (Wet -- genuine
-# mutual recursion, cycles of 14+3/12/3, so it CANNOT be dissolved the way
-# Caps-Face was, and hoisting around it was measured and rejected).  Whole
-# project 158.6s of module time.  Both sit under 90s/300s with headroom.  The
+# Measured cold worst cases (2026-08-12): one file 35.0s (Wet/Part2, the
+# 36-member wet walk -- a genuine 14-cycle plus a genuine 3-cycle, so it cannot
+# be dissolved the way Caps-Face's spurious block was; hoisting around it and
+# disabling positivity were both measured and both rejected, see CLAUDE.md).
+# Whole project 158.6s of module time.  Both sit under 90s/300s with headroom.
+# NOTE the 90s budget was set when one file could cost 55.1s; it now has more
+# headroom than intended, which is fine -- do not tighten it to fit today's
+# numbers, since a cold dependency chain legitimately costs more (Part4 took
+# 271.8s the first time, building Part1..Part3 underneath it).  The
 # earlier 30s/180s were warm figures, and 30s failed on every heavyweight
 # module the moment you actually edited one.
 #

@@ -184,9 +184,19 @@ paying: the gate is paid once per merge, the dev loop is paid once per mistake.
 
 **WET IS SPLIT AND THE REMAINING HEAVY UNIT IS IRREDUCIBLE — THIS QUESTION IS CLOSED
 (2026-08-12).** Wet is now `Wet/Part1..Part6`, one module per genuine mutual block, with
-the umbrella re-exporting Part6. Per-edit cost went 55.1 s → 35.0 s worst, and every part
-except Part2 is 6-12 s. Part2 holds the 36-member wet walk and IS essentially all of
-Wet's cost: 254.7 s solo, attributed by `--profile=internal` as
+the umbrella re-exporting Part6. **DEV-LOOP** cost went 55.1 s → 35.0 s worst, and every
+part except Part2 is 6-12 s.
+
+**DO NOT READ THAT AS THE COST OF AN EDIT — the two numbers measure different things and
+conflating them overstates what a split buys.** `agda-dev` postulates the block's siblings
+at their signatures, so positivity over the real block NEVER RUNS in the dev loop; that is
+why it is fast and why dev-green does not mean valid. The GATE still pays **254.7 s** for a
+Part2 edit, unchanged by the split. What the split bought the gate is real but different:
+an edit to Part1/3/4/5/6 no longer drags the wet-walk core's 244 s of positivity with it.
+Quote dev numbers against dev numbers and gate numbers against gate numbers, and say which.
+
+Part2 holds the 36-member wet walk and IS essentially all of
+Wet's gate cost: 254.7 s solo, attributed by `--profile=internal` as
 
     Positivity 244,314 ms (87.8%)   Termination.Graph 20,754 ms (7.5%)
     Typing (all) 5,702 ms (2.0%)    everything else < 2%
@@ -198,7 +208,21 @@ splitting it further.** The two options were both measured and both rejected: ho
 19 acyclic members is the previously-recorded 35 s of 255 s (61% of the members for 14% of
 the time — which is itself the proof that the 14-cycle carries the term size), and
 separating the 3-cycle buys less. Either one means relocating definitions across a genuine
-mutual block for ~4% of the gate. **The Subscribe-Face move is NOT available here**: that
+mutual block for ~4% of the gate.
+
+**AND THE PRAGMA DOES NOT WORK EITHER — asked and answered, do not re-attempt.** The
+natural next thought is to switch positivity off for this module while grinding. All three
+routes are closed by measurement: `NO_POSITIVITY_CHECK` on the block is a NO-OP (Agda takes
+it only before a `data`/`record` or a mutual block containing one, and these blocks declare
+neither — `InvalidNoPositivityCheckPragma`); `--no-positivity-check` on the command line is
+REJECTED because agda-stdlib is `--safe` (exit 42 in 267 ms); and as a per-module `OPTIONS`
+pragma it is ACCEPTED AND BUYS NOTHING, 805 s against 779 s. The last is decisive and the
+reason generalises: **the expense is COMPUTING the occurrence graph, which Agda needs
+regardless — the flag only suppresses the strict-positivity VERDICT on datatypes.** There
+is no verdict to suppress in a block with no datatypes, so you pay the full graph and get
+nothing. It would also be a soundness hole that `make unsafe-check` gates.
+
+**The Subscribe-Face move is NOT available here**: that
 worked because the subscribe clique was a suffix with no back-edges into the block, and
 Part2 has no such seam. `--profile=definitions` is the wrong tool for this question — it
 files the whole 256 s under "Miscellaneous" because the cost belongs to no single
