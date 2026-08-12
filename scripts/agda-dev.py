@@ -137,16 +137,13 @@ from dataclasses import dataclass, field
 #
 # The first entry is an INHERENT limit of the approach, not a bug: the other
 # four are parser gaps and are fixable.
-NOT_DEV_CHECKABLE = {
-    "Verify-Well-Formed.agda":
-        "NOT ACCELERABLE, and not a bug: 5,816 lines forming ONE block of 276 "
-        "members with ZERO cycles.  There is no mutual recursion to break, so "
-        "nothing is stubbed and a dev check IS the real check (>6 min).  The "
-        "only thing that makes this file faster is SPLITTING IT into modules -- "
-        "which is safe precisely because it has no cycles, and is the same "
-        "situation as Caps-Face's 83-member block.  Listed here so the tool "
-        "does not burn the whole-project budget on a file it cannot help.",
-}
+# Modules this tool cannot accelerate, with the reason, so nobody rediscovers
+# them by running into a red wall.  Skipped by whole-project mode, still
+# runnable by name.  Empty is the goal, and as of 2026-08-11 it is empty:
+# Verify-Well-Formed was the last entry and it was SPLIT instead (5,816 lines,
+# 276 members, zero cycles -- nothing to break, so the file itself was the
+# problem).  Add an entry only after measuring, and say what the fix would be.
+NOT_DEV_CHECKABLE: dict[str, str] = {}
 
 # CONCURRENCY IS A MEMORY BUDGET, NOT A CONSTANT.  CLAUDE.md's standing ceiling
 # ("at most TWO heavyweight checks at once") is about REAL checks of the big
@@ -465,8 +462,13 @@ def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
     # Qualified-only imports do not re-export through the context, so they are
     # repeated here.  `open import` lines are not: the context re-exports them
     # publicly, and importing the same name twice invites an ambiguity error.
+    # Repeat the original imports, not just qualified ones.  INSTANCE arguments
+    # are resolved from what is OPENED, and re-export through the context does
+    # not carry them: Caps.agda's `NonZero 2` had no candidate.  Importing the
+    # same definition twice is fine -- Agda only complains when two routes
+    # disagree, which they cannot here.
     for it in p.items:
-        if it.kind == "pass" and p.lines[it.start].startswith("import "):
+        if it.kind == "pass" and p.lines[it.start].startswith(("import ", "open import ")):
             out.extend(p.lines[it.start : it.end])
     shown = list(dict.fromkeys(keep + foci))
     out.append(f"open import {ctx} hiding ({'; '.join(shown)})")
