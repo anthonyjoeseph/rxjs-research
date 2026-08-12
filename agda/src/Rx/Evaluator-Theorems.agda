@@ -21,6 +21,16 @@ open import Rx.Evaluator using (Slot; Slots; Stream; evaluate)
 -- lives in Verify-Well-Formed as a real proof over postulated
 -- stage lemmas.
 
+-- PROBED-GREEN 2026-08-11 (receipt; the probe is deleted).  No refutation
+-- found for `fuel-coherent` or `μ-unfold` on the evaluator's own laws.  Two
+-- facts worth keeping from that sweep:
+--   * μ SELF-SUBSCRIPTION IS A TYPE ERROR, not merely unreachable — the Δᵍ/Δ
+--     gate via `deferᵉ` rules it out at the type level, so no dynamic argument
+--     is owed for it.
+--   * across a μ unfold, `sizeᵉ` DOUBLES (10 → 20) while `syncSizeᵉ` HOLDS
+--     (9 → 9).  That asymmetry is the reason the budget measure reads
+--     syncSize; see Rx/Exp.agda's header, which also records the refutation
+--     of the emissions-per-instant bound.
 postulate
   -- fuel is arrivals: processing more arrivals only extends the stream
   fuel-coherent :

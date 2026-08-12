@@ -496,6 +496,15 @@ mutual
 -- reads (Verify-Budget-Sufficient): unfoldμ substitutes (μᵉ body)
 -- only at defer-gated var positions, so μ-unfolding PRESERVES
 -- syncSize while sizeᵉ grows.
+--
+-- REFUTED 2026-08-11, and this is the receipt for a route that must not be
+-- retried: **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT.**  Machine-
+-- checked counterexample: at K = 4 a scripted source emits valueCount 30
+-- against syncSizeᵉ 20.  K = 1..3 all hold (2≤17, 6≤18, 14≤19), which is
+-- exactly why the bound looks true from small cases — it fails only once the
+-- family is pushed.  This killed the `sync-count-bounded` postulate, which no
+-- longer exists anywhere in src; the note survives so nobody re-derives it
+-- from the first three rows.
 ------------------------------------------------------------------
 
 mutual

@@ -6289,6 +6289,20 @@ walk-core-mergeAllᵉ Ψ W Ω ℓ F Ŝ R̂ G g b κ id now sched st E
 -- All non-μ clauses delegate to per-clause postulates/lemmas.
 -- The μᵉ | gs fuel case recurses on fuel (strict structural decrease).
 -- 4-parameter form: h-split, h-r3b (full/Measures form), compose, ΩAt-eq.
+--
+-- PROBED-GREEN 2026-08-11 (receipt; the probe itself is deleted): 8 of the 9
+-- conclusion conjuncts hold by `refl` on `emptyᵉ` and `ofᵉ [nat̂ 0]`; conjunct
+-- 2 (the ceiling) holds analytically.  No refutation found.  SHAPES COVERED
+-- ARE ONLY THOSE TWO — this is a confidence receipt, not a theorem.
+--
+-- CLAUSE CENSUS, same date: one lemma per subscribeE clause.  The base and μ
+-- cases are real proofs; the hop / all / defer / input cases still need
+-- `walk-core-pushBurst-walk`, `walk-core-subscribeAll-walk`, `walk-core-input`
+-- and `walk-core-deferᵉ-INV`.  The arithmetic sub-postulates are provable.
+--
+-- And the hop-edge premise (iii) discharges in ONE step from this statement's
+-- own `burstHopD?` conjunct: hopDᵛ ≤ hopDᵉ b < suc (hopDᵉ b) = r.  That grind
+-- has not been done in src yet.
 ----------------------------------------------------------------------
 
 subscribeE-walk-core :

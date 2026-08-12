@@ -4372,6 +4372,16 @@ postulate
   -- cascade's own bookkeeping steps need — the latch touches only the
   -- per-cascade ledger fields and the finish only drops registry
   -- entries, so neither disturbs stBounded?.
+  --
+  -- THIS POSTULATE CANNOT BE PROBED, and a green probe of it is NOT evidence
+  -- (receipt, 2026-08-11; the probe is deleted).  A falsity probe went green
+  -- on root-path chains only — the near-degenerate region.  The from-inner and
+  -- thru-outer paths are unreachable by ANY probe, because the abstract Gas
+  -- family blocks computation, so no probe reaches the region where B and Ψ
+  -- matter.  Rows that DID run: chains = [] is DEGENERATE; chains =
+  -- [(0, root)] with isLast false/true is LOAD-BEARING for hasDry; INV? at
+  -- suc id is DEGENERATE on every shape tested.  The anchor is
+  -- symbolic-or-nothing — do not spend a session probing it.
   cascadeGo-wet-core :
     -- latch-bounded  (Verify-Budget-Sufficient/Measures.agda:408)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

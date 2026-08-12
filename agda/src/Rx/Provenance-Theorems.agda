@@ -31,6 +31,9 @@ ids = map InstEmit.instant
 horizon : Fuel → List Id
 horizon fuel = upTo (suc fuel)
 
+-- PROBED-GREEN 2026-08-11 (receipt; the probe is deleted): no refutation for
+-- `id-inheritance`, with the fuel-3 row checking (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ⊆ᵢ
+-- horizon 3.  A confidence receipt over small horizons, not a theorem.
 postulate
   -- every id in the output stream is the id of some arrival's cascade;
   -- sync-spawned inners inherit, never mint
