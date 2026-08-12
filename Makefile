@@ -23,7 +23,7 @@ help:
 	@echo "                  green here means every claim's support compiles"
 	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
 	@echo "                  time against its siblings POSTULATED at their exact"
-	@echo "                  signatures.  ONE MEMBER ~6s — the grind loop"
+	@echo "                  signatures.  ONE MEMBER AT A TIME — the grind loop"
 	@echo "                  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF"
 	@echo "                  IS VALID, wherever a block was stubbed: the real"
 	@echo "                  recursion's TERMINATION is not checked and postulates"
@@ -77,21 +77,31 @@ help:
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
 	@echo "                  make quickcheck ARGS='1 500 300 5' (seeds 1..500, 300 runs, depth 5)"
 
+# Times itself and records the result in typecheck-performance-numbers.md, so that
+# file stays current for free.  Only a GREEN run is recorded (`&&`), because a
+# timing from a failed build measures how long it took to fail.  The recorder
+# leaves the file byte-identical unless a number actually moved, so a normal build
+# does not dirty the tree.
 agda:
-	cd agda && agda src/Main.agda
+	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
+	 { (cd agda && agda src/Main.agda); echo $$? > $$rc; } 2>&1 | tee $$log; \
+	 st=$$(cat $$rc); el=$$(( $$(date +%s) - t0 )); \
+	 n=$$(grep -c '^[[:space:]]*Checking ' $$log || true); \
+	 if [ "$$st" -eq 0 ] && [ "$$n" -gt 0 ]; then \
+	   scripts/perf_record.py "make agda (full gate, $$n modules)" $$el; \
+	 fi; \
+	 rm -f $$log $$rc; exit $$st
 
 # THE FAST DEV LOOP.  Checks one mutual-block member at a time against its
 # siblings POSTULATED at their exact signatures.  agda/src is never written to.
 # Rationale, measurements and the closed performance experiments live in
 # scripts/agda-dev.py's docstring -- read that before re-opening any of it.
 #
-# THERE IS NO WHOLE-PROJECT SWEEP.  One was built and measured out: 521.3s warm
-# / 512.9s cold over 66 modules, against ~350s for `make gate` at full fidelity
-# -- more expensive and less trustworthy, so it is not supported.  The bare
-# command prints that and exits 2.  Warm and cold were identical because the
-# cost is the per-process interface toll paid 66 times, not rechecking, so it
-# was not a cache-warming play either.  The cheap pre-gate is `make wiring-gate`
-# plus `make unsafe-check`, both textual and seconds-long.
+# THERE IS NO WHOLE-PROJECT SWEEP.  One was built and measured against `make
+# gate`; it cost more and checked less, so it is not supported and the bare
+# command asks for a file.  It was not a cache-warming play either.  The cheap
+# pre-gate is `make wiring-gate` plus `make unsafe-check`, both textual and
+# seconds-long.  Figures: typecheck-performance-numbers.md.
 #
 #   make agda-dev ARGS='<file>'       one module, every member
 #   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
@@ -107,13 +117,14 @@ agda:
 # this proof the mutual recursion IS the induction) and postulates do not
 # REDUCE.  `make agda` stays the merge gate.
 #
-# BUDGETS ARE ENFORCED, NOT DOCUMENTED: 45s per file, 300s for the whole sweep.
-# Set from a full cold scan of all 66 modules (2026-08-12): max 35.0s, median
-# 6.6s, 512.9s serial, and NOTHING between 36s and 90s.  35s per file was asked
-# for and FAILS -- Wet/Part2 runs 33.8-35.6s.  RE-SCAN BEFORE MOVING EITHER
-# NUMBER: the gap is what makes a budget safe, not the margin.  A cold
-# DEPENDENCY CHAIN still blows any of them (edit Wet/Part1, check Wet/Part4, and
-# you pay for Part2 and Part3 too -- 271.8s); pass BUDGET= for that case.
+# THE BUDGET IS ENFORCED, NOT DOCUMENTED.  It is set from a full cold scan of
+# every module, and sits in the GAP in that distribution rather than just above
+# the worst case -- a budget set to the worst observed time fails about half the
+# time, since that time is a distribution and not a constant.  RE-SCAN BEFORE
+# MOVING IT; the scan and the reasoning are in typecheck-performance-numbers.md.
+# A cold DEPENDENCY CHAIN still blows it (edit Wet/Part1, check Wet/Part4, and
+# you pay for Part2 and Part3 too); pass BUDGET= for that case, which is what it
+# is for.
 #
 # A BUDGET THAT FAILS ON NORMAL WORK IS WORSE THAN NO BUDGET: it trains everyone
 # to pass BUDGET= reflexively, and then a real regression sails through.

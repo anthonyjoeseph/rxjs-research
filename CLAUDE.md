@@ -86,18 +86,18 @@ report review. Standing protocol, per Anthony:
   their turn budget on "still waiting" and losing all their context; one had already written
   263 good lines that then needed rediscovering. A worker's job ends when its edits are made
   and cheaply verified. Give workers this shape instead:
-  1. iterate with **`make agda-dev ARGS='<file> <member>'`** — ~6 s per member against
-     384 s for a real Subscribe-Face check under Agda 2.8. **This SUPERSEDES the
-     probe-first shape**, which existed only because a cheap loop was not otherwise
-     available: agda-dev gives the same ~6 s inside `src`, so the work needs no probe
-     file to be classified, landed, or forgotten. Read that section's caveat first —
-     dev-green does not check the real recursion's termination;
+  1. iterate with **`make agda-dev ARGS='<file> <member>'`** — seconds per member against
+     minutes for a real check of the same module. **This SUPERSEDES the probe-first
+     shape**, which existed only because a cheap loop was not otherwise available:
+     agda-dev gives that loop inside `src`, so the work needs no probe file to be
+     classified, landed, or forgotten. Read that section's caveat first — dev-green does
+     not check the real recursion's termination;
   2. land only dev-green bodies;
   3. hand the long `make gate` BACK to the design session, which can poll across
      turns without dying.
 - **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling.**
-  Measured on this machine: **24 GB RAM, 14 cores**, ~12 GB free at rest,
-  and **Subscribe-Face peaks ~5.2 GB** as a single check. So:
+  This machine has **24 GB RAM and 14 cores**, ~12 GB free at rest, and a single heavyweight
+  check peaks in the multi-GB range (figures in `typecheck-performance-numbers.md`). So:
   - **At most TWO heavyweight checks at once** (Subscribe-Face / Wet class, multi-GB). Two fit
     the headroom; three do not, and an OOM costs more than the wait. Re-measure with
     `ps -eo rss` before assuming otherwise.
@@ -154,9 +154,9 @@ report review. Standing protocol, per Anthony:
 
 ## Running long Agda builds
 
-`make agda` is the merge gate and takes ~13 min; the Bash tool's ceiling is 600 s per
-foreground call. Iterate with `make agda-dev` (seconds) and reach for the long build only
-to merge.
+`make agda` is the merge gate and takes many minutes; the Bash tool's ceiling is 600 s per
+foreground call, so it must be detached. Iterate with `make agda-dev` (seconds) and reach
+for the long build only to merge. Current timings: `typecheck-performance-numbers.md`.
 
 **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`; READ IT BACK WITH
 `make bg-check T=<target>`. Never hand-roll the wrapper.**
@@ -183,22 +183,29 @@ status and reports every build green; that is what this replaces.
   re-appending an IDENTICAL marker line measures nothing.
 
 **COST MODEL, and it is short: mutual-BLOCK membership is everything and file size is
-nearly irrelevant.** 86-91% of the gate is Agda's occurrence/polarity (`Positivity`) pass,
-it runs over a whole mutual block, and it **cannot be switched off** — every route was
-measured and closed. TERM SIZE drives it, not member count. Before proposing any split:
-run `make agda-dev ARGS='--list <file>'` (free) to see which members are in a genuine
-cycle, then MEASURE on a coherent cache — **a rebuilding dependency masquerades as module
-cost and has produced three phantom "slow module" diagnoses, each off by ~50×.** Attribute
+nearly irrelevant.** Most of the gate is Agda's occurrence/polarity (`Positivity`) pass, it
+runs over a whole mutual block, and it **cannot be switched off** — every route was measured
+and closed. TERM SIZE drives it, not member count. Before proposing any split: run
+`make agda-dev ARGS='--list <file>'` (free) to see which members are in a genuine cycle,
+then MEASURE on a coherent cache — **a rebuilding dependency masquerades as module cost and
+has produced four phantom "slow module" diagnoses, each off by up to ~50×.** Attribute
 whole-module passes with `--profile=internal` on a genuinely dirty module;
 `--profile=definitions` files them under "Miscellaneous". **The splits are DONE and the
 question is CLOSED: Caps-Face and Wet are both split, and Wet/Part2's remaining block is
-irreducible.** The measurements, the rejected refactors and the closed pragma routes are
-archived in `scripts/agda-dev.py`'s docstring — read it before re-opening any of this.
+irreducible.**
+
+**ALL MEASURED TIMINGS LIVE IN `typecheck-performance-numbers.md`, AND NOWHERE ELSE.** That
+includes the gate's cost, per-module costs, the pass attribution, the split before/afters
+and every closed experiment. Numbers age far faster than rules, so quoting one here would
+mean maintaining it in two places and getting it wrong in both. `make agda` and
+`make agda-dev` append their own timings to that file, so it stays current on its own —
+read it before re-opening any performance question, and re-measure before acting on it.
 
 **A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF DIES.**
-Three OOMs (>15 GB, 30-50 min before `Killed: 9`) came from turning a postulate on this
-spine into a real definition whose unfoldable body reached the `opIterD-dominated` /
-`lvls-mono` towers; sealed, VWF checks in ~1 min under 2 GB. **Whenever a postulate
+Three OOMs (`Killed: 9`, tens of GB and tens of minutes — see
+`typecheck-performance-numbers.md`) came from turning a postulate on this spine into a real
+definition whose unfoldable body reached the `opIterD-dominated` / `lvls-mono` towers;
+sealed, VWF checks in about a minute at a fraction of the memory. **Whenever a postulate
 consumed transitively by `budget-sufficient` becomes a definition, seal it in the SAME
 edit** — no consumer ever needs more than the type. A plain `abstract` block rejects
 untyped `where`-bindings and with-abstractions, so those bodies use private-impl +
@@ -231,10 +238,10 @@ immediately; it does not wait for the slow gate to earn a home.
 ### `make agda-dev` — THE ITERATION LOOP
 
 ```
-make agda-dev ARGS='<file> <member>'   ~6 s    ← the grind loop; use constantly
-make agda-dev ARGS='<file>'            4-35 s  every member of one module
-make agda-dev ARGS='--list <file>'     free    which members are in which block
-make agda-dev-selftest                         proves the loop is load-bearing
+make agda-dev ARGS='<file> <member>'   one member ← the grind loop; use constantly
+make agda-dev ARGS='<file>'            one module, every member
+make agda-dev ARGS='--list <file>'     free: which members are in which block
+make agda-dev-selftest                 proves the loop is load-bearing
 ```
 
 **THE LOOP COVERS THE WHOLE DEVELOPMENT PROCESS — use `agda-dev` throughout and `make
@@ -243,19 +250,18 @@ Two OPT-IN flags: **`SCOPE=1`** (`--only-scope-checking`) fails fast on typos bu
 **measured to buy no time**, so not a speedup; **`HOLES=1`** tolerates `?` and missing
 clauses, off by default so a `?` cannot pass silently.
 
-**THERE IS NO WHOLE-PROJECT SWEEP, AND DO NOT REBUILD ONE.** It existed, was measured, and
-was removed: 521.3 s warm / 512.9 s cold over 66 modules against **~350 s for `make gate`**
-at full fidelity — costlier and less trustworthy, so strictly dominated. Warm and cold came
-out identical because the cost is the per-process interface toll paid 66 times rather than
-rechecking, which also rules it out as a cache-warming trick (it checks a renamed copy and
-never writes the module's real interface). **The loop's value is per-MEMBER — ~6 s against
-an 802 s gate — not per-tree.** The cheap pre-gate role is already filled by
-`make wiring-gate` and `make unsafe-check`: textual, seconds, and why `make gate` runs them
-first. The bare command prints this and exits 2.
+**THERE IS NO WHOLE-PROJECT SWEEP, AND DO NOT REBUILD ONE.** It existed, was measured
+against `make gate`, and lost on both cost and fidelity — strictly dominated, with no cache
+state in which it wins. It could not serve as a cache-warmer either, since it checks a
+renamed copy and never writes the module's real interface. **The loop's value is
+per-MEMBER, not per-tree.** The cheap pre-gate role is already filled by `make wiring-gate`
+and `make unsafe-check`: textual, seconds, and why `make gate` runs them first. A bare
+`make agda-dev` asks for a file and exits 2.
 
-**THE PER-FILE BUDGET IS ENFORCED, NOT ADVISORY: 45 s.** Over budget is a FAILURE. It is
-set from a full cold scan (max 35.0 s, median 6.6 s, nothing between 36 s and 90 s), so
-re-scan before moving it — the gap is what makes a budget safe, not the margin.
+**THE PER-FILE BUDGET IS ENFORCED, NOT ADVISORY.** Over budget is a FAILURE. The number
+lives in the Makefile (`AGDA_DEV_BUDGET`) and is set from a full cold scan; re-scan before
+moving it, because **the gap in the distribution is what makes a budget safe, not the
+margin** — a budget set to the worst observed time fails about half the time.
 
 **DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID — BUT ONLY WHERE
 SOMETHING WAS STUBBED, AND THAT IS THE PART WORTH KNOWING.** A module with no multi-member
@@ -306,6 +312,7 @@ Mutual-BLOCK membership is what costs, not file size — see the cost model abov
   natural seam. SCC modules pay their SCC's price, which is irreducible in a real check —
   so keep it from being paid per-mistake: iterate with `agda-dev`, land bodies in verified
   batches, and detach the big recheck while writing the next batch.
+
 ## Agda: work from the outside in
 
 Define and refine the **datatypes, primitives, and end goals first**, then link them
@@ -558,9 +565,8 @@ gap by re-adding a bulk import to Main — that is the loophole, not the repair.
 
 **ACCEPTANCE TEST: `make gate`** — `wiring-gate`, `unsafe-check`, `agda`,
 `bug-cache`, in that order. **Cheap checks run FIRST, deliberately:** an orphan or an
-unsafe pragma is decidable in seconds by grep while the full gate costs ~13 minutes
-(802 s measured 2026-08-12, 41 modules), so there is no reason to spend the 13 minutes
-only to fail on something a textual pass already
+unsafe pragma is decidable in seconds by grep while the full gate costs many minutes, so
+there is no reason to spend those minutes only to fail on something a textual pass already
 knew. `make wiring-gate` is the report-turned-gate — it EXITS 1 (rather than always 0)
 on an orphan outside the exempt families, on a `⊤`-typed postulate that asserts nothing,
 or on a bare `open import` in Main. Run it rather than trusting a memo — including this

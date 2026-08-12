@@ -1,43 +1,37 @@
 #!/usr/bin/env python3
 """The FAST DEV LOOP: typecheck mutual-block members against POSTULATED siblings.
 
-THIS DOCSTRING IS THE ARCHIVE for the 2026-08-11 performance investigation.
-Every number is measured on this machine (24 GB, 14 cores) under Agda 2.8.0.
-
-WHY THIS EXISTS.  86-91% of `make agda` is Agda's occurrence/polarity
-("Positivity") pass over two big mutual blocks, and THAT PASS CANNOT BE SWITCHED
-OFF.  Three routes were measured and all three failed -- do not re-attempt:
+WHY THIS EXISTS.  Most of `make agda` is Agda's occurrence/polarity ("Positivity")
+pass over a few big mutual blocks, and THAT PASS CANNOT BE SWITCHED OFF.  Three
+routes were measured and all three failed -- do not re-attempt:
   * NO_POSITIVITY_CHECK on the block is a NO-OP: Agda accepts it only before a
     data/record definition or a mutual block containing one, and these blocks
     declare neither (InvalidNoPositivityCheckPragma).
   * --no-positivity-check on the command line is REJECTED, because agda-stdlib
-    is --safe (EXIT=42 in 267ms, at Data/Unit/Base.agda).
-  * as a per-module OPTIONS pragma it is ACCEPTED AND BUYS NOTHING: 805s
-    Positivity against 779s without it.  The pass computes the occurrence graph;
-    the option only suppresses the strict-positivity VERDICT on datatypes.
-MEMBER COUNT DOES NOT PREDICT COST -- TERM SIZE DOES.  Measured @2.8: Caps-Face's
-83-member block costs 15.2s of Positivity; Subscribe-Face's 15-member block
-costs 300s.  So "split the big block up" is not the lever it looks like, and
-Wet's hoist was measured and REJECTED on that basis: its 36-member block contains
-a genuine 14-member SCC, and hoisting the other 22 out is worth 255s -> 220s of
-Positivity -- ~35s of a ~17-minute build, for a large refactor with real
-meta-coupling risk.  No.  (Caps-Face's 83-member block was ALSO once rejected
-here, on the grounds that dissolving it "saves nothing" for `make agda`.  True of
-the gate and the wrong number to judge a split by: it was spurious -- zero cycles,
-three forward declarations sweeping in 80 unrelated definitions -- and dissolving
-it, then splitting the file, took the DEV cost 72.6s -> 8.3s.  Ask which cost you
-are paying.)
-Use `--list` to see which members are in a genuine cycle before considering it.
-Also closed: +RTS -A128m is noise (944s solo vs 927s baseline -- not GC-bound),
-and telescope width is not the cost (all 19 clique signatures as bare postulates
-cost 9.0s with Positivity absent).  Upgrading 2.7.0.1 -> 2.8.0 was the ONE lever
-that moved it: 927s -> 384s total, 779s -> 300s Positivity (2.6x).
+    is --safe.
+  * as a per-module OPTIONS pragma it is ACCEPTED AND BUYS NOTHING.  The pass
+    computes the occurrence graph regardless; the option only suppresses the
+    strict-positivity VERDICT on datatypes, and these blocks have no datatypes.
+MEMBER COUNT DOES NOT PREDICT COST -- TERM SIZE DOES.  An 83-member block has
+been measured far cheaper than a 15-member one, so "split the big block up" is
+not the lever it looks like, and Wet's hoist was measured and REJECTED on that
+basis: its block holds a genuine 14-member SCC that carries the term size, and
+hoisting the acyclic remainder out buys a few percent of the build for a large
+refactor with real meta-coupling risk.  Use `--list` to see which members are in
+a genuine cycle before considering it.  Also closed: +RTS -A128m (not GC-bound)
+and telescope width.  The Agda 2.7 -> 2.8 upgrade was the ONE lever that ever
+moved the gate.
+
+ASK WHICH COST YOU ARE PAYING.  Caps-Face's block was once rejected as not worth
+dissolving because it "saves nothing" -- true of the GATE, and the wrong number
+to judge by: dissolving it and splitting the file cut the DEV cost roughly ninefold.
+The gate is paid once per merge, the dev loop once per mistake.
 
 What the pass IS sensitive to is mutual-block MEMBERSHIP, steeply and
-superlinearly: in Subscribe-Face ONE real body costs 63ms of Positivity and
-FIFTEEN cost 300s.  Its 904-line prelude of 45 independent lemmas costs 7.8s.
-So module SIZE is nearly irrelevant and BLOCK size is everything, and the loop
-is not "disable a check", it is "check a few bodies at a time".
+superlinearly: one real body in a block is milliseconds of Positivity and fifteen
+are minutes, while a several-hundred-line prelude of independent lemmas is
+seconds.  So module SIZE is nearly irrelevant and BLOCK size is everything, and
+the loop is not "disable a check", it is "check a few bodies at a time".
 
 HOW IT WORKS.  Generated modules land in agda/_dev/ (gitignored) holding the
 file VERBATIM except that block members become `postulate`s at their exact
@@ -49,55 +43,39 @@ signature has a definition), because both heavy modules use IMPLICIT blocks --
 Subscribe-Face declares subscribeE-caps at line 936 and defines it at 2751, and
 there is no `mutual` keyword anywhere to grep for.
 
-MEASURED 2026-08-12, on a COHERENT cache (i.e. after the -W flag mismatch that
-used to make `make agda` and this tool invalidate each other was fixed -- every
-number recorded before that date is suspect, and suspect in the SLOW direction).
-Two regimes, and quoting the wrong one is how the old figures misled:
+ALL MEASURED TIMINGS LIVE IN typecheck-performance-numbers.md, NOT HERE.  This
+file used to carry the tables, and they went stale the moment a module was split.
+`make agda` and `make agda-dev` now append their own numbers to that file, so it
+maintains itself; this docstring keeps only the reasoning, which does not age.
 
-  COLD is the one the BUDGETS are set from, because cold is the normal case:
-  you edit a file, so its generated module has new content and nothing is
-  cached for it.  Warm only happens when you re-run having changed nothing,
-  which is not the loop.  (Anthony, 2026-08-12.)
+TWO WAYS A TIMING HERE LIES, and both have cost this project real time:
+  * AN INCOHERENT CACHE inflates a module by up to 50x -- if a dependency is
+    rebuilding, you measured the dependency.  Four phantom "slow module"
+    diagnoses came from this, each sending someone at a module that was fine.
+  * `touch` DOES NOT DIRTY A MODULE; invalidation is by CONTENT.  Unchanged
+    content reuses the interface, so the "recheck" measures deserialization and
+    prints no `Checking` lines.  Re-appending an IDENTICAL marker measures
+    nothing at all.
+Both distortions run in the SLOW direction, which is what makes the recorder in
+scripts/perf_record.py safe: the minimum over runs converges on the truth.  The
+one distortion it cannot absorb is a spuriously FAST run -- a check that did no
+work -- so recording is gated on the run having emitted a `Checking` line.
 
-  FULL COLD SCAN, ALL 66 CLAIM-GRAPH MODULES (2026-08-12, each dirtied
-  individually with every dependency present -- the real edit-one-file case):
-    TOTAL 512.9s serial   max 35.0s   median 6.6s   nothing over 45s, none RED
-    top: Wet/Part2 35.0  Subscribe-Face 22.3  Caps 21.5  Caps-Face/Part4 19.4
-         Caps-Depth 16.7  Keeps-Ring 16.1  then 12.1 12.0 11.8 11.5 ...
-    Main.agda 6.7s -- NOT the 904.6s once recorded here, which was measured
-    while Main's dependencies were rebuilding.
-  After the splits: Caps-Face 72.6s whole -> worst part 8.3s; Wet 55.1s whole ->
-  Part2 35.0s with every other part 6-12s.
-
-  one member    ~6s      <- the grind loop, and the only number that matters
-                            for iteration speed
-  make agda     802s (13m22s) for the full gate, 41 modules rebuilt, @2.8
-
-DEV NUMBERS ARE NOT GATE NUMBERS, AND CONFLATING THEM OVERSTATES EVERY SPLIT.
-Where a block is stubbed, positivity over the real block never runs -- that is
-the whole reason the loop is fast.  Wet/Part2 is 35.0s here and 254.7s under real
-agda (Positivity 244.3s = 87.8%, Termination.Graph 20.8s, all Typing 5.7s).  A
-split does not change the gate's cost for the split-out block; it stops every
-OTHER edit from paying it.  Say which number you are quoting.
-
-The steady-state figures match the pre-2.8 warm claims (Subscribe-Face 11.3s,
-Wet 17.0s), which were accurate all along -- the cache bug just made them
-unreachable in practice, because any gate run destroyed the warm state.
-
-THE MEASUREMENT THAT DECIDED THE DESIGN.  Profiling one focus run: 5.6s total,
-of which 4.9s is DESERIALIZATION and 63ms is Positivity (Typing 370ms).  Once
-the block is broken, the proof work is not the cost either -- loading imported
-interfaces is, and that is a per-PROCESS toll.  Three consequences:
-  * MAXIMUM PARALLELISM IS WRONG.  One process per member, 12-way: runs that
-    cost 5.6s solo took 13-24s each, 2.5 min wall.  Deserialization is
-    memory-bandwidth bound and does not scale with cores.
-  * BATCHING is the lever.  Whole-file wall by --batch: 1->42.3s 2->18.5s
-    3->18.6s 4->17.2s 5->23.6s 8->45.7s.  The U is the two costs crossing: too
-    small pays the toll too often, too large rebuilds the block.  Default 4.
+THE MEASUREMENT THAT DECIDED THE DESIGN.  Profiling one focus run, the great
+majority of it is DESERIALIZATION and almost none is Positivity.  Once the block
+is broken, the proof work is not the cost either -- loading imported interfaces
+is, and that is a per-PROCESS toll.  Three consequences:
+  * MAXIMUM PARALLELISM IS WRONG.  One process per member ran several times
+    SLOWER per member than solo: deserialization is memory-bandwidth bound and
+    does not scale with cores.
+  * BATCHING is the lever, and the curve is a U -- too small pays the toll too
+    often, too large rebuilds the block it exists to avoid.  The measured optimum
+    is the --batch default of 4.
   * A SHARED CONTEXT module, checked once, carries the prelude and every other
     non-mutual body, so focus runs import it instead of re-checking it apiece.
-Batches are balanced by body size (LPT): wall is `context + SLOWEST batch`, and
-file order put the three biggest bodies in one batch (16.1s against 8.0s).
+Batches are balanced by body size (LPT), because wall is `context + SLOWEST
+batch` and file order otherwise put the three biggest bodies in one batch.
+(Every figure behind this paragraph: typecheck-performance-numbers.md.)
 
 WHAT A GREEN RUN DOES NOT MEAN.  Two things are given up, and the first is not
 minor:
@@ -130,7 +108,7 @@ TWO BEHAVIOURS THE CODE NEEDED THAT THE DESIGN DID NOT ANTICIPATE:
     fails with UnsolvedMetaVariables.  Rather than weaken the run with
     --allow-unsolved-metas, such members and their callers are KEPT REAL (which
     checks strictly more), and the set is cached by source mtime because
-    rediscovering it costs a failed context run (Wet: 35.9s cold, 17.0s warm).
+    rediscovering it costs a whole failed context run.
   * THE FAILURE DUMP MUST BE THE TAIL, NOT THE HEAD.  Agda prints warnings first
     and dies last, and Measures.agda emits a standing RewritesNothing warning
     that buried the real error under a head-limited dump.
@@ -141,9 +119,9 @@ TWO BEHAVIOURS THE CODE NEEDED THAT THE DESIGN DID NOT ANTICIPATE:
   scripts/agda-dev.py --falsify            the self-test
 
 Flags (both OPT-IN, and they stay that way on purpose):
-  --scope   --only-scope-checking.  MEASURED TO BUY NOTHING HERE (11.1s against
-            11.3s): the run is 4.9s of deserialization and skipping the ~0.5s of
-            typing is invisible.  Kept as a fail-fast for syntax and naming
+  --scope   --only-scope-checking.  MEASURED TO BUY NOTHING HERE: the run is
+            almost entirely deserialization, so skipping the typing is invisible.
+            Kept as a fail-fast for syntax and naming
             errors, not as a speedup.  Hazard: with a DIRTY dependency it would
             write a scope-only interface and cost a rebuild.
   --holes   --allow-unsolved-metas + --allow-incomplete-matches.  Off by default
@@ -163,6 +141,9 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import perf_record  # noqa: E402  (needs the path fixup above)
 
 # MODULES THIS TOOL CANNOT DEV-CHECK, with the reason and the exact error it
 # produces, so nobody rediscovers them by running into a red wall.  They are
@@ -820,6 +801,9 @@ def agda_flags(args) -> list[str]:
     return flags
 
 
+WORK = {"checking": 0}   # `Checking` lines seen this process; see run_one
+
+
 def run_one(rel_dev: str, args) -> tuple[int, str, float]:
     """One agda invocation, KILLED if it blows the budget.
 
@@ -851,7 +835,15 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
             "        Only once the module is slow under BOTH is splitting the answer --\n"
             "        and if it has no mutual recursion, splitting is at least safe."
         ), time.time() - t0
-    return pr.returncode, pr.stdout + pr.stderr, time.time() - t0
+    out = pr.stdout + pr.stderr
+    # DID THIS RUN ACTUALLY CHECK ANYTHING?  A run whose interfaces are all still
+    # valid reports no `Checking` lines and returns in deserialization time.  That
+    # is a legitimate fast exit, but it is NOT the cost of checking the module, and
+    # recording it would permanently poison the `best` figure -- the one distortion
+    # the min-over-runs scheme cannot absorb, since it only guards against runs
+    # that are too SLOW.  So the timing recorder consults this.
+    WORK["checking"] += len(re.findall(r"^\s*Checking ", out, re.M))
+    return pr.returncode, out, time.time() - t0
 
 
 def noise(out: str) -> str:
@@ -1234,53 +1226,28 @@ def main() -> int:
             return 0
         t0 = time.time()
         ok = dev_check(rel, args, args.focus)
-        return 0 if (ok and within_budget(args, time.time() - t0)) else 1
+        elapsed = time.time() - t0
+        # RECORD ONLY A GREEN, WHOLE-MODULE RUN THAT ACTUALLY CHECKED SOMETHING.
+        # Green: a red run measures how long it took to fail.  Whole-module: a
+        # per-member timing depends on WHICH member, so filing it under the file's
+        # name would quietly redefine the row.  Did work: an all-interfaces-valid
+        # run returns in deserialization time, and recording that would poison
+        # `best` forever (see run_one's WORK counter).
+        if ok and not args.focus and WORK["checking"] > 0:
+            perf_record.record(f"agda-dev {rel}", elapsed)
+        return 0 if (ok and within_budget(args, elapsed)) else 1
 
-    # THERE IS NO WHOLE-PROJECT SWEEP, AND THAT IS A MEASURED DECISION
-    # (Anthony, 2026-08-12: "I'm thinking it shouldn't even be supported").
-    # A sweep over all 66 claim-graph modules was built, measured, and removed:
-    #
-    #   full sweep, warm cache   521.3s   66 modules, heavy blocks STUBBED
-    #   full sweep, cold cache   512.9s   (identical -- see below)
-    #   `make gate`              ~350s    27 modules rechecked, FULL fidelity,
-    #                                     plus wiring-gate, unsafe-check, bug-cache
-    #
-    # It cost MORE than the real gate and delivered LESS, so it was strictly
-    # dominated -- there is no cache state in which running it beats running
-    # `make agda`.  Two things explain the shape and are worth keeping:
-    #
-    #   * WARM AND COLD ARE THE SAME (521.3 vs 512.9).  The sweep's cost is not
-    #     rechecking, it is the per-PROCESS interface deserialization toll paid
-    #     66 times (4.9s of a 5.6s focus run).  So a warm cache cannot speed it
-    #     up, which also kills the "use it to warm the cache" idea: it does not
-    #     write the real interface for the module it checks (it checks a renamed
-    #     COPY), so it barely warms anything `make agda` needs.
-    #   * THE LOOP'S VALUE IS PER-MEMBER, NOT PER-TREE.  One member is ~6s
-    #     against an 802s gate -- that is the 100x, and it is the whole product.
-    #     Breadth was never where the win lived.
-    #
-    # The cheap pre-gate role this was meant to fill is already filled by
-    # `make wiring-gate` and `make unsafe-check`, which are textual, run in
-    # seconds, and are why `make gate` runs them FIRST.
-    #
-    # DIRTY-ONLY WOULD NOT RESCUE IT EITHER: an own-mtime check compares a
-    # mtime to its interface, so editing Wet/Part2 selects Part2 ALONE and
-    # misses every module downstream of the change -- precisely the cascade a
-    # pre-gate exists to check.  A correct version would need downstream
-    # closure, and would still be paying the per-process toll to tell you less
-    # than the gate does.
-    print("agda-dev: NAME A FILE.  There is no whole-project sweep.\n"
-          "  It was built and measured: 521.3s warm / 512.9s cold across 66\n"
-          "  modules, against ~350s for `make gate` -- which rechecks with FULL\n"
-          "  fidelity and adds wiring-gate, unsafe-check and bug-cache.  More\n"
-          "  expensive and less trustworthy, so it is not supported.\n"
+    # A FILE IS REQUIRED.  There is deliberately no whole-project mode: it was
+    # measured against `make gate` and lost on both cost and fidelity, and the
+    # loop's value is per-member anyway.  See typecheck-performance-numbers.md.
+    print("agda-dev: a file is required.\n"
           "\n"
-          "  What you want instead:\n"
-          "    make agda-dev ARGS='<file> <member>'   ~6s   the grind loop\n"
-          "    make agda-dev ARGS='<file>'            4-35s one module\n"
-          "    make wiring-gate && make unsafe-check  seconds, before the gate\n"
-          "    make bg T=gate                         the real thing, ~13 min\n"
-          "  Paths are src-relative, e.g. Verify-Budget-Sufficient/Wet/Part2.agda")
+          "  make agda-dev ARGS='<file> <member>'   one member -- the grind loop\n"
+          "  make agda-dev ARGS='<file>'            one module, every member\n"
+          "  make agda-dev ARGS='--list <file>'     its mutual-block structure\n"
+          "\n"
+          "  Paths are src-relative, e.g. Verify-Budget-Sufficient/Wet/Part2.agda\n"
+          "  To check the whole project, use `make gate`.")
     return 2
 
 
