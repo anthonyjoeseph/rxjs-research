@@ -3095,7 +3095,7 @@ seed-covers : ∀ (sz U : ℕ) → U ≤ sz →
   suc (suc V * suc (hopR V) * suc U)
     ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
 seed-covers sz U U≤sz
-  rewrite *-identityʳ sz | *-identityʳ sz | *-identityʳ (4 + sz) =
+  rewrite *-identityʳ sz | *-identityʳ sz =
   ≤-trans (prod≤3pow (towerℕ (4 + sz)) U 6≤V U≤V)
   (≤-trans (towerℕ-mono (m≤m*n (7 + sz) 2))
            (m≤n+m (towerℕ ((7 + sz) * 2)) (2 ^ sz)))

@@ -158,6 +158,29 @@ report review. Standing protocol, per Anthony:
 foreground call, so it must be detached. Iterate with `make agda-dev` (seconds) and reach
 for the long build only to merge. Current timings: `typecheck-performance-numbers.md`.
 
+**EVERY AGDA INVOCATION GOES THROUGH THE MAKEFILE'S `AGDA` VARIABLE, WHICH CARRIES
+`-W error`. A WARNING IS A BUILD FAILURE (Agda exits 42).** Never call bare `agda` in the
+Makefile — `grep -E '&& agda '` must stay empty. Rationale: a warning that costs nothing
+gets ignored. A `RewritesNothing` — a `rewrite` step doing literally nothing — rode *every
+single build for weeks*, printed twice per run, and nobody stopped, because green was
+green. Warnings are cheap to fix at the moment they appear and invisible forever after.
+**`DeprecationWarning` is deliberately included** (Anthony, 2026-08-12): when the stdlib
+bumps, the gate goes red until the migration is done, which is the same call the repo made
+by hand on the 2.3 bump (29 files migrated, `7664d8c`, rather than filtered).
+
+- **THE FLAG MUST BE IDENTICAL IN THE MAKEFILE AND IN `scripts/agda-dev.py`'s
+  `agda_flags()`. Change one, change both, in the SAME commit.** Agda records the warning
+  mode in an interface's validity key, so a target running a different `-W` than the dev
+  loop invalidates the whole cone on **every alternation** — measured 2026-08-11 at ~120
+  modules rebuilt per switch, the cost landing on whatever module came next, with each
+  tool blaming the other's module. Six call sites share the interface cache (`agda`,
+  `bug-cache`, `cli-build`, `qc-build`, `harness-build`, `agda-dev`); the single `AGDA`
+  variable exists so they cannot drift.
+- **Changing it costs one full cold rebuild**, since it invalidates every interface. Budget
+  for that before touching it, and never toggle it to quiet output.
+- **Do NOT silence a warning to get green.** Fix the cause, as the 29-file stdlib migration
+  did. If a warning is genuinely wrong, that is a finding worth reporting, not a filter.
+
 **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`; READ IT BACK WITH
 `make bg-check T=<target>`. Never hand-roll the wrapper.**
 

@@ -793,7 +793,15 @@ def agda_flags(args) -> list[str]:
     # thrash, so do not add one to quiet the output.
     # (--only-scope-checking and the --holes pair are exempt in practice: they
     # are opt-in, deliberate, and you accept a rebuild when you ask for them.)
-    flags = ["-i", "src", "-i", "_dev"]
+    #
+    # `-W error` IS THE ONE DELIBERATE EXCEPTION, and it is here for the
+    # opposite reason: it is added to make warnings LOUDER, not quieter, and it
+    # is mirrored in the Makefile's `AGDA` variable so the two stay in lockstep.
+    # A warning that costs nothing gets ignored -- a `RewritesNothing` rode
+    # every build for weeks because green was green.  IF YOU CHANGE IT, CHANGE
+    # THE MAKEFILE IN THE SAME COMMIT, or the cache thrash documented above
+    # comes straight back.
+    flags = ["-i", "src", "-i", "_dev", "-W", "error"]
     if args.scope:
         flags.append("--only-scope-checking")
     if args.holes:

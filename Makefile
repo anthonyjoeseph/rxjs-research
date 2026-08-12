@@ -4,6 +4,27 @@
 export LC_ALL := C.UTF-8
 export LANG := C.UTF-8
 
+# ─────────────────────────────────────────────────────────────────────────
+# THE AGDA INVOCATION — ONE DEFINITION, USED BY EVERY TARGET, AND BY
+# scripts/agda-dev.py.  NEVER call bare `agda` in this file.
+#
+# `-W error` PROMOTES EVERY WARNING TO AN ERROR, and it is here because a
+# warning that costs nothing gets ignored: a `RewritesNothing` sat on every
+# single build for weeks, printed twice per run, and nobody stopped, because
+# the build was green and the warning was free.  A dead `rewrite` is a proof
+# step doing nothing — cheap to fix, and exactly the kind of rot that hides a
+# real one later.  Agda exits 42 on a promoted warning; green now means
+# warning-free.
+#
+# ⚠ THE FLAG MUST MATCH scripts/agda-dev.py's `agda_flags()` EXACTLY.  Agda
+# records the WARNING MODE in an interface's validity key, so a target running
+# with a different -W than the dev loop invalidates the whole cone on EVERY
+# alternation — measured 2026-08-11 at 120 modules rebuilt per switch, with
+# the cost landing on whatever module happened to be next and each tool
+# blaming the other.  Change one, change both, in the same commit.
+# ─────────────────────────────────────────────────────────────────────────
+AGDA := agda -W error
+
 all: help
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -100,7 +121,7 @@ help:
 # does not dirty the tree.
 agda:
 	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
-	 { (cd agda && agda src/Main.agda); echo $$? > $$rc; } 2>&1 | tee $$log; \
+	 { (cd agda && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 | tee $$log; \
 	 st=$$(cat $$rc); el=$$(( $$(date +%s) - t0 )); \
 	 n=$$(grep -c '^[[:space:]]*Checking ' $$log || true); \
 	 if [ "$$st" -eq 0 ] && [ "$$n" -gt 0 ]; then \
@@ -164,7 +185,7 @@ agda-dev-selftest:
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
 bug-cache:
-	cd agda && agda src/Implementation/Unit-Test.agda
+	cd agda && $(AGDA) src/Implementation/Unit-Test.agda
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
@@ -287,7 +308,7 @@ ts-check:
 	cd typescript && npm run typecheck
 
 cli-build:
-	cd agda && agda --compile --compile-dir=_cli src/CLI/Main.agda
+	cd agda && $(AGDA) --compile --compile-dir=_cli src/CLI/Main.agda
 
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
@@ -324,7 +345,7 @@ oracle: cli-build
 #   make harness ARGS='5'     just row 5
 HARNESS_ROWS ?= 2
 harness-build:
-	cd agda && agda --compile --compile-dir=_harness src/Harness/Main.agda
+	cd agda && $(AGDA) --compile --compile-dir=_harness src/Harness/Main.agda
 
 harness: harness-build
 	@cd agda && cal=$$(echo 0 | ./_harness/Main); \
@@ -340,7 +361,7 @@ harness: harness-build
 	 else for n in $$(seq 1 $(HARNESS_ROWS)); do echo $$n | ./_harness/Main; done; fi
 
 qc-build:
-	cd agda && agda --compile --compile-dir=_cli src/QuickCheck.agda
+	cd agda && $(AGDA) --compile --compile-dir=_cli src/QuickCheck.agda
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
