@@ -86,11 +86,13 @@ report review. Standing protocol, per Anthony:
   their turn budget on "still waiting" and losing all their context; one had already written
   263 good lines that then needed rediscovering. A worker's job ends when its edits are made
   and cheaply verified. Give workers this shape instead:
-  1. iterate in `agda/probe/` with minimal imports — an UNCHANGED heavy module is a cached
-     interface, so a probe importing Wet deserializes in ~6 s instead of rechecking for 9 min
-     (measured 2026-08-05: a ~90× loop speedup, and the reason probe-first is the standing
-     shape rather than a preference);
-  2. land only probe-green bodies;
+  1. iterate with **`make agda-dev ARGS='<file> <member>'`** — ~6 s per member against
+     927 s for a real Subscribe-Face check (2026-08-11). **This SUPERSEDES the
+     probe-first shape**, which existed only because a cheap loop was not otherwise
+     available: agda-dev gives the same ~6 s inside `src`, so the work needs no probe
+     file to be classified, landed, or forgotten. Read that section's caveat first —
+     dev-green does not check the real recursion's termination;
+  2. land only dev-green bodies;
   3. hand the long `make gate` BACK to the design session, which can poll across
      turns without dying.
 - **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling.**
@@ -150,8 +152,13 @@ report review. Standing protocol, per Anthony:
 
 ## Running long Agda builds
 
-`make agda` takes ~35-40 minutes (Caps-Face ~80 s, Wet ~14-18 min, and **Subscribe-Face ~44 min
-peaking ~6.9 GB when dirty**); the Bash tool's ceiling is 600s per foreground call. Run long
+`make agda` takes tens of minutes; the Bash tool's ceiling is 600s per foreground call.
+**Solo dirty per-module costs, re-measured 2026-08-11 under Agda 2.8** (the older 44-minute
+figure for Subscribe-Face included its downstream cone, not the module): Subscribe-Face
+**384 s**, Wet ~**350 s** (908 s under 2.7), Caps-Face ~**363 s**. Two facts to keep:
+86-91% of each is Agda's positivity pass over one mutual block and no flag touches it, and
+**`make agda-dev` checks the same bodies in seconds** — reach for the long build only as
+the merge gate. Run long
 builds with the Bash tool's `run_in_background` (**NOT `nohup setsid` — `setsid` does not
 exist on macOS and the command silently does nothing**), appending `echo EXIT=$? >> log`, and
 poll the log for its EXIT= line with short foreground calls. Detached builds advance on their
@@ -221,10 +228,92 @@ proof path (Main does not import QuickCheck), but proof that the guard does not 
 Whole-module analyses cannot be switched off to time them; attribute them with
 `--profile=internal` on a genuinely dirty module instead.
 
+## ALL NEW CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction (Anthony, 2026-08-11)
+
+**There is no longer a reason to write Agda anywhere else, and therefore no licence to.**
+The probe workflow existed for exactly one reason — `src` had no cheap iteration loop, so
+work was staged outside the claim graph where a fast check was possible. `make agda-dev`
+removes that reason: it gives the same seconds-level loop **inside `src`**.
+
+So the rule is now simply:
+
+- **New definitions, new lemmas, new assemblies: straight into `agda/src`**, under
+  `make wiring`'s jurisdiction, where the orphan check, the ⊤-postulate check, the
+  reachability check and the claim graph all see them from the first minute.
+- **Anything written outside `src` is by definition invisible to the wiring law**, which
+  is how proven work parked itself for months and got re-derived — the repo's number-one
+  failure mode. Writing in `src` is not a tidiness preference; it is what makes "did we
+  already prove this?" a `grep` instead of a memory.
+- **Iterate with `make agda-dev`, land with `make agda`.** A dev-green body belongs in
+  `src` immediately; it does not wait for the slow gate to earn a home.
+
+### `make agda-dev` — THE ITERATION LOOP, and how to use it properly
+
+Full rationale, measurements and limits are in `scripts/agda-dev.py`'s docstring, which
+is the archive for the performance investigation. The working subset:
+
+```
+make agda-dev ARGS='<file> <member>'   ~6 s   ← the grind loop; use this constantly
+make agda-dev ARGS='<file>'            11-17 s  every member of one module
+make agda-dev ARGS='--list <file>'     free   which members are in which mutual block
+make agda-dev                          ~86 s  every dirty dev-checkable module
+make agda-dev-selftest                        proves the loop is load-bearing
+```
+
+Paths are `src`-relative (`Verify-Budget-Sufficient/Wet.agda`). Two OPT-IN flags:
+**`SCOPE=1`** (`--only-scope-checking`) — a fail-fast for typos and bad names, and
+**measured to buy no time at all**, so do not reach for it as a speedup; **`HOLES=1`**
+tolerates `?` holes and missing clauses, and stays off by default so a `?` can never
+pass silently.
+
+**BUDGETS ARE ENFORCED, NOT ADVISORY: 30 s per file, 180 s for the whole project.**
+Over budget is a FAILURE with the usual causes printed. If the work genuinely grew, move
+the number in the Makefile deliberately — a loop that quietly drifts to two minutes has
+stopped being a loop.
+
+**THE THREE THINGS A NEW AGENT MUST KNOW BEFORE TRUSTING A GREEN RUN:**
+
+1. **DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.** The real mutual
+   recursion's **termination is not checked** — and in this proof the mutual recursion IS
+   the induction, so a bad measure passes dev and fails `make agda`. That is a
+   proof-shape failure, not a typo. (Self-recursion, and recursion within one batch, are
+   checked.) And **postulates do not reduce**, so a clause needing a sibling to unfold
+   can pass dev and fail for real.
+2. **`make agda` is still the merge gate.** Never report a result as verified on a dev
+   run, never commit on one alone, and never describe dev-green as "typechecks".
+3. **Some modules are NOT dev-checkable**, listed with reasons in the script's
+   `NOT_DEV_CHECKABLE`. `Caps-Face` is there for an *inherent* reason — its proofs
+   case-split on sibling results, which a postulate cannot provide — so it needs the real
+   check; the others are parser gaps and are fixable. Do not "fix" a red dev run on those
+   by weakening anything.
+
 ## Module granularity: keep typechecks short
 
-Agda rechecks a whole module on any edit, so module size IS iteration speed. Rules
-(Anthony, 2026-08-03):
+**CORRECTED 2026-08-11 BY MEASUREMENT: module SIZE is nearly irrelevant; mutual-BLOCK
+membership is everything.** Subscribe-Face's 904-line prelude — 45 definitions, each its
+own block — checks in **7.8 s**; its 15-member mutual block costs **919 s**. A
+5,000-line module of independent lemmas would be fast; a 200-line module with one
+15-member block would not. The rules below are right, but the reason to follow them is
+block membership, not line count. (86-91% of the build is Agda's occurrence/polarity
+pass over those blocks, and no flag or pragma touches it — three routes measured and
+closed in `agda-performance-roadmap.md` §2.)
+
+**AND THE ITERATION RULE HAS CHANGED: use `make agda-dev`, not `agda/probe/`.**
+`make agda-dev ARGS='<file> <member>'` checks ONE mutual-block member against its
+siblings postulated at their exact signatures — **~6 s for one member, 11 s for all of
+Subscribe-Face, 17 s for all of Wet**, against 927 s and 908 s for the real modules. It
+runs **inside `src`**, so work stays under `make wiring`'s jurisdiction and there is no
+probe file to classify, land, or forget. `agda/src` is never written to.
+
+**DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.** Two things are given
+up: **termination of the real mutual recursion is not checked** (and in this proof the
+mutual recursion IS the induction, so a bad measure passes dev and fails `make agda` —
+that is a proof-shape failure, not a typo), and **postulates do not reduce**. Self-
+recursion and recursion within a batch are still checked. `make agda` stays the merge
+gate. `make agda-dev-selftest` proves the loop is load-bearing rather than
+green-by-construction; run it whenever the stubbing logic changes.
+
+Rules (Anthony, 2026-08-03):
 
 - **Cut at mutual-SCC boundaries.** A mutual block is an indivisible checking unit and
   cannot be split across modules; everything else can and should be. A module holds at most
@@ -236,10 +325,10 @@ Agda rechecks a whole module on any edit, so module size IS iteration speed. Rul
   import, not mutuality. "Related" is not a reason to co-locate: `open import X public`
   chains keep the namespace flat, so consumers never notice where a lemma physically lives.
 - **Target ≤20 s solo recheck for every non-SCC module.** Past that, split at the next
-  natural seam. SCC modules pay their SCC's price (Subscribe-Face ~7 min) — that cost is
-  irreducible, so keep it from being paid per-mistake: iterate in `agda/probe/` with
-  minimal imports (<20 s loops), land bodies in verified batches, and detach the big
-  module's recheck while writing the next batch.
+  natural seam. SCC modules pay their SCC's price (Subscribe-Face 6.4 min under Agda
+  2.8) — that cost is irreducible in a real check, so keep it from being paid
+  per-mistake: iterate with `make agda-dev` (~6 s per member), land bodies in verified
+  batches, and detach the big module's recheck while writing the next batch.
 
 ## Agda: work from the outside in
 
@@ -439,6 +528,39 @@ build the counterexample.
 available at the call site, adding it and deleting the postulate is less work than
 carrying it. (`depthE ≤ capsH` unconditionally is FALSE, `Depth-Bound.agda:11`; the
 `capsOK?`-conditioned form costs nothing extra, so it is the one that is stated.)
+
+### `probe/` IS BEING RETIRED — `make agda-dev` removed its reason to exist (Anthony, 2026-08-11)
+
+`probe/` was created because the only fast loop available was "import the heavy module and
+don't touch it". `make agda-dev` gives that loop **inside `src`**, so the directory's
+justification is gone and the standing complaint stands: code enters `probe/` and never
+leaves, diluting context and causing redundant work.
+
+**Nothing new goes into `probe/`. Write it in `src`.** The wind-down, when it is worked:
+
+1. **Assemble or delete every remaining probe file** — the existing rule ("a probe is
+   temporary, and its end state is assembly + deletion"), with no third state.
+2. What survives is not a scratchpad but a **cache of negative results**: refutations,
+   measurements, reached-state receipts — things whose value is *stopping* a route from
+   being retried. Rename it **`dead-ends/`**, which states the contents rather than the
+   ambition, and give it `bug-cache`'s standing: small, append-mostly, load-bearing.
+3. **Admission test, gated by `make wiring-gate`:** a file there must name in its header
+   the specific route it forecloses, **and must typecheck** — the 2026-08-09 finding that
+   ten of thirty-three probes did not compile is what makes that non-negotiable.
+4. The `PROBES.txt` ratchet mostly dissolves with the directory: its job was to catch
+   proven work parked outside the claim graph, which working in `src` prevents outright.
+
+Until that pass happens, the rules below still govern the files that are still there.
+
+### The stdlib v2.3 deprecation migration is OWED (mechanical, ~17 files)
+
+v2.3 deprecated `Data.List.all/any/sum` in favour of `Data.Nat.ListAction.all`,
+`Data.Bool.ListAction.any`, `Data.Nat.ListAction.sum`. **17 import sites across 17 files**
+still use the old names, so every build carries ~1,264 identical warnings — enough to bury
+a real message. The names still work, so this is not urgent, but it is **required before
+any move to stdlib v2.4**, and it should be folded into one full rebuild rather than paid
+as a separate recheck of the expensive modules. (`make agda-dev` suppresses these warnings
+with `-W noUserWarning`; `make agda` deliberately does not, so the debt stays visible.)
 
 ### The probe ledger: probes are three species, and the gate tracks all of them (Anthony, 2026-08-06)
 

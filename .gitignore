@@ -25,3 +25,9 @@ agda/*.log
 agda/*.out
 /*.log
 /*.out
+
+# agda-dev generates stubbed copies here; build artifacts, never sources
+_dev/
+
+# python bytecode from scripts/
+__pycache__/

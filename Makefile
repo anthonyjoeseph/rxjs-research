@@ -1,4 +1,4 @@
-.PHONY: all help agda bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe walk-core-probe cascade-go-wet-core-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda agda-dev agda-dev-selftest bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe walk-core-probe cascade-go-wet-core-probe ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -21,6 +21,22 @@ help:
 	@echo "  agda          typecheck the Agda source (src/Main.agda) — this is"
 	@echo "                  the CLAIM GRAPH: Main names individual claims, so"
 	@echo "                  green here means every claim's support compiles"
+	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
+	@echo "                  time against its siblings POSTULATED at their exact"
+	@echo "                  signatures.  Subscribe-Face 11s, Wet 17s, one member"
+	@echo "                  ~6s — against 927s and 908s for the real modules."
+	@echo "                  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF"
+	@echo "                  IS VALID: the real recursion's TERMINATION is not"
+	@echo "                  checked, and postulates do not reduce.  'make agda'"
+	@echo "                  stays the merge gate"
+	@echo "                  make agda-dev                    (all dirty modules)"
+	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet.agda'"
+	@echo "                  make agda-dev ARGS='<file> <member>'   (the grind loop)"
+	@echo "                  make agda-dev ARGS='--list <file>'    (block structure)"
+	@echo "                  SCOPE=1 scope-check only; HOLES=1 tolerate ? holes"
+	@echo "  agda-dev-selftest  falsification test for agda-dev: corrupt a real"
+	@echo "                  body in src, demand the fast check goes RED, restore."
+	@echo "                  Run whenever the stubbing logic changes"
 	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
 	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
 	@echo "                  green here <=> no known counterexample remains)"
@@ -95,6 +111,44 @@ help:
 
 agda:
 	cd agda && agda src/Main.agda
+
+# THE FAST DEV LOOP.  86-91% of `make agda` is Agda's occurrence/polarity pass
+# over two big mutual blocks, and no flag or pragma touches it (three routes
+# measured and closed — see agda-performance-roadmap.md §2).  What the pass IS
+# sensitive to is mutual-block MEMBERSHIP, steeply: one real body in
+# Subscribe-Face's block costs 63ms of Positivity, fifteen cost 300s.  So this
+# checks ONE body at a time, against its siblings POSTULATED at their exact
+# existing signatures.  agda/src is never written to.
+#
+#   make agda-dev                     every module dirtier than its interface
+#   make agda-dev ARGS='<file>'       one module, every member
+#   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
+#   make agda-dev ARGS='--list <file>'     its mutual-block structure
+#
+# Measured warm: Subscribe-Face 11.3s (against 927s), Wet 17.0s (against 908s),
+# one member ~6s.  OPT-IN flags: SCOPE=1 (names and syntax only, no
+# typechecking), HOLES=1 (tolerate ? holes and missing clauses).
+#
+# DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.  Two things
+# are given up and the first is not minor: TERMINATION of the real mutual
+# recursion is not checked (and in this proof the mutual recursion IS the
+# induction), and postulates do not REDUCE.  `make agda` stays the merge gate.
+# BUDGETS ARE ENFORCED, NOT DOCUMENTED (Anthony, 2026-08-11): 30s for one file,
+# 180s for the whole project.  A loop that quietly drifts to two minutes has
+# stopped being a loop, and a number that lives only in a comment is a number
+# nobody maintains.  Exceeding the budget FAILS, with the usual causes printed.
+# Override deliberately with BUDGET=<seconds> when the work has genuinely grown.
+AGDA_DEV_BUDGET ?= $(if $(ARGS),30,180)
+agda-dev:
+	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
+	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(ARGS)
+
+# Is the fast loop load-bearing, or green by construction?  Corrupts one token
+# in a real body in src, demands the dev check go RED, and restores the file
+# byte-for-byte.  RUN THIS WHENEVER THE STUBBING LOGIC CHANGES: a generator bug
+# that silently dropped the focus body would otherwise read as a very fast pass.
+agda-dev-selftest:
+	scripts/agda-dev.py --falsify $(ARGS)
 
 # Implementation/Unit-Test.agda is deliberately not imported by Main (it is a
 # throwaway performance cache, deleted once Formal-Verification is discharged),
