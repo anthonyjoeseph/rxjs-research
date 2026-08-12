@@ -742,12 +742,29 @@ def sanitize(name: str) -> str:
 
 
 def agda_flags(args) -> list[str]:
-    # -W noUserWarning: stdlib v2.3 deprecated Data.List.all/any/sum and this
-    # repo still imports them at 17 sites, so every build carries ~1,264
-    # identical warnings.  They would bury a real message.  Suppressed HERE
-    # only -- `make agda` still prints them, so the migration cannot be
-    # forgotten by hiding it in the loop everyone actually runs.
-    flags = ["-i", "src", "-i", "_dev", "-W", "noUserWarning"]
+    # THE FLAGS MUST MATCH `make agda` EXACTLY, OR THE TWO TOOLS DESTROY EACH
+    # OTHER'S INTERFACE CACHE (measured 2026-08-11).  Agda counts the warning
+    # mode in an interface's validity key, so this loop used to carry
+    #   -W noUserWarning
+    # (to hide the ~1,264 stdlib v2.3 deprecation warnings) while `make agda`
+    # ran without it -- and EVERY ALTERNATION between them invalidated the
+    # whole cone, stdlib included.  Ping-pong, measured on a 2-line module:
+    #   no -W, cold  -> 120 modules checked
+    #   no -W, warm  ->   0
+    #   add -W       -> 120        <-- the flag alone
+    #   drop -W      -> 120
+    #   add -W       -> 120
+    # The cost landed wherever it happened to land: Part1 read as a 400s
+    # module (real cost 7.1s) because its dev run was rebuilding Subscribe-Face
+    # and 12 more from source, and a `make agda` after any dev run paid a full
+    # cold rebuild.  Both were invisible -- each tool blamed its own module.
+    #
+    # So the warnings are filtered in `noise()` instead: suppression belongs to
+    # OUR output, never to Agda's flags.  ANY flag added here that Agda records
+    # in an interface re-opens this, so do not add one to quiet the output.
+    # (--only-scope-checking and the --holes pair are exempt in practice: they
+    # are opt-in, deliberate, and you accept a rebuild when you ask for them.)
+    flags = ["-i", "src", "-i", "_dev"]
     if args.scope:
         flags.append("--only-scope-checking")
     if args.holes:
@@ -779,12 +796,29 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
     return pr.returncode, pr.stdout + pr.stderr, time.time() - t0
 
 
+# One deprecation warning spans several lines: the location/-W line, the
+# "Warning: X was deprecated" line, the "Please use Y instead" line, and the
+# "when scope checking X" line.  Matched individually so a REAL message that
+# happens to sit between two of them is never swallowed.
+_DEPRECATION_RE = re.compile(
+    r"warning: -W\[no\]UserWarning"
+    r"|^Warning: .* was deprecated in v"
+    r"|^Please use .* instead\.$"
+    r"|^when scope checking (all|any|sum)$")
+
+
 def noise(out: str) -> str:
     keep = []
     for ln in out.split("\n"):
         if not ln.strip():
             continue
         if re.match(r"^\s*Checking ", ln) or ln.startswith(("Loading ", "Finished ")):
+            continue
+        # The stdlib v2.3 deprecations (Data.List.all/any/sum, 17 sites, ~1,264
+        # identical warnings) are filtered HERE rather than with -W, which would
+        # invalidate every interface `make agda` wrote -- see agda_flags().
+        # `make agda` still prints them, so the migration cannot be forgotten.
+        if _DEPRECATION_RE.search(ln):
             continue
         # v2.3 deprecations: 1,264 per build, and none of them are this tool's
         # business.  The migration is tracked in the roadmap.
