@@ -28,9 +28,13 @@ when nothing moved, so a build does not dirty the tree.
 
 <!-- AUTO:BEGIN -- maintained by scripts/perf_record.py, do not hand-edit -->
 
-*No runs recorded yet.*
+*Recorded automatically by the build. `best` is the number to trust — see `scripts/perf_record.py` for why.*
 
-<!-- AUTO:DATA {} -->
+| Target | Best | Last | Runs |
+|---|---|---|---|
+| `agda-dev Harness/Main.agda` | **4.3 s** | 4.3 s | 3 |
+
+<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 4.3, "runs": 3}} -->
 
 <!-- AUTO:END -->
 

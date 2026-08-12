@@ -754,6 +754,7 @@ MODULE_ROOTS = {
     "CLI.Main": "the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
     "QuickCheck": "the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
     "Implementation.Unit-Test": "the type-level bug cache — `make bug-cache`",
+    "Harness.Main": "the compiled measurement harness — `make harness-build` / `make harness`",
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

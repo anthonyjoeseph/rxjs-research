@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -71,6 +71,22 @@ help:
 	@echo "                  make oracle                   (full seed sweep)"
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
+	@echo "  harness       THE COMPILED MEASUREMENT HARNESS: read a number off"
+	@echo "                  the machine's own arithmetic via the GHC backend,"
+	@echo "                  which runs the same definitions and IGNORES"
+	@echo "                  'abstract' (opacity is a typechecking contract,"
+	@echo "                  not a runtime one).  For rungs the checker cannot"
+	@echo "                  normalise -- but NOT for the caps counting family,"
+	@echo "                  measured DIVERGENT here too (see the quarantine in"
+	@echo "                  src/Harness/Main.agda: that blowup is arithmetic,"
+	@echo "                  not opacity, so no backend reaches it)"
+	@echo "                  ANYTHING READ OFF IT IS measured-not-rechecked: it"
+	@echo "                  is NOT a refl pin, cannot discharge a postulate,"
+	@echo "                  and exists to AIM the grind and to REFUTE.  Row 0"
+	@echo "                  is a refl-pinned CALIBRATION and a mismatch there"
+	@echo "                  VOIDS every other row (the run stops)"
+	@echo "                  make harness             (the terminating rows)"
+	@echo "                  make harness ARGS='10'   (one row, incl. quarantine)"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary (agda/_cli/QuickCheck)"
 	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
@@ -275,6 +291,53 @@ cli-build:
 
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
+
+# THE MEASUREMENT HARNESS — a COMPILED calculator for the machine's own
+# arithmetic.  THE GHC BACKEND RUNS THE SAME DEFINITIONS AND IGNORES
+# `abstract`, because opacity is a TYPECHECKING contract and not a runtime one
+# — so a number sealed away from `refl` is readable here, and rungs that
+# exhaust the checker (one was killed at 12.6 GB after 20 minutes) are cheap.
+#
+# WHAT IT IS *NOT* FOR, measured 2026-08-12: the CAPS COUNTING FAMILY
+# (`poolCount`, `blowH`, `capsHgo`) is DIVERGENT under the compiled backend
+# too — `poolCount 1 0` and `blowH 0`, the smallest possible arguments, each
+# still running at 45 s with row 0 calibrating correctly in the same binary.
+# That blowup is ARITHMETIC (`blowH` feeds `poolCount` a tower), not opacity,
+# so no backend and no hardware reaches it.  Those rows are QUARANTINED at
+# 10+ and excluded from the default sweep; see src/Harness/Main.agda.
+#
+# ⚠ ANYTHING READ OFF THIS IS `measured-not-rechecked` BY CONSTRUCTION.  A
+# compiled number is NOT a `refl` pin: no proof may depend on it and it cannot
+# discharge a postulate.  It exists to AIM the grind and to REFUTE.
+#
+# ROW 0 IS THE CALIBRATION and it is not decoration.  It prints a value the
+# harness module ALSO pins by `refl`, so the typechecker fixes the expected
+# number and the binary prints the computed one.  IF ROW 0 IS NOT 65536 THE
+# BACKEND HAS DIVERGED AND EVERY OTHER ROW IS VOID — that is why `make harness`
+# runs row 0 first and stops on mismatch rather than reporting on.
+#
+# ONE PROCESS PER ROW, deliberately: one process computing several deep rungs
+# retains all of them and dies of memory; a fresh process per row does not.
+#
+#   make harness-build        compile it
+#   make harness              every row, one process each (calibrated first)
+#   make harness ARGS='5'     just row 5
+HARNESS_ROWS ?= 2
+harness-build:
+	cd agda && agda --compile --compile-dir=_harness src/Harness/Main.agda
+
+harness: harness-build
+	@cd agda && cal=$$(echo 0 | ./_harness/Main); \
+	 case "$$cal" in \
+	   *65536*) echo "harness: $$cal  [calibrated]";; \
+	   *) echo "harness: CALIBRATION FAILED — every other row is VOID."; \
+	      echo "  row 0 printed: $$cal"; \
+	      echo "  expected 65536, the value Harness/Main.agda pins by refl."; \
+	      echo "  the GHC backend has diverged from the typechecker; do not read on."; \
+	      exit 1;; \
+	 esac; \
+	 if [ -n "$(ARGS)" ]; then echo "$(ARGS)" | ./_harness/Main; \
+	 else for n in $$(seq 1 $(HARNESS_ROWS)); do echo $$n | ./_harness/Main; done; fi
 
 qc-build:
 	cd agda && agda --compile --compile-dir=_cli src/QuickCheck.agda

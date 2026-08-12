@@ -14,6 +14,7 @@ typescript/.oracle-tmp
 **/*.agdai
 **/_cli
 **/_measure
+**/_harness
 **/_ih
 **/_nc
 dist-newstyle

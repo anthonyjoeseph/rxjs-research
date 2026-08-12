@@ -295,6 +295,51 @@ not an exemption.** `NOT_DEV_CHECKABLE` exists for that, is currently EMPTY, and
 the target; its last entry was retired by splitting the file, not by tolerating the
 exclusion.
 
+### `make harness` — THE COMPILED CALCULATOR (numbers the typechecker cannot reach)
+
+```
+make harness-build        compile it (agda --compile → agda/_harness/Main)
+make harness              the terminating rows, one process each, calibrated first
+make harness ARGS='10'    ONE row by index (the only way to run a quarantined row)
+```
+
+`agda/src/Harness/Main.agda` is a **MODULE_ROOT** — in `src` under the wiring law, but
+not reached by `src/Main.agda`, so `make agda` never pays for it. **It exists because the
+GHC backend ignores `abstract`**: opacity is a *typechecking* contract, not a runtime one,
+so the compiled binary runs the real bodies of families the checker refuses to unfold
+(`fLvlD` at Evaluator:729, `blowH` at :899), and it laughs at rungs that OOM the checker.
+
+**⚠ EVERY NUMBER IT PRINTS IS `measured-not-rechecked`, AND SAYING SO IS MANDATORY.**
+A harness row is **not** a `refl` pin: it cannot discharge a postulate, no proof may
+depend on it, and reporting one as "verified" or "typechecks" is the same false-green
+failure as calling a dev run a gate. Its two legitimate uses are to **AIM the grind** and
+to **REFUTE** — and a row that contradicts a postulate is a lead to chase back to a
+type-level witness, not itself the finding.
+
+- **ROW 0 IS A CALIBRATION AND IT IS LOAD-BEARING.** It prints a value the module also
+  pins by `refl` (`towerℕ 4 ≡ 65536`), so the typechecker fixes the expected number and
+  the binary prints the computed one. `make harness` runs it FIRST and **stops on
+  mismatch**, because a backend that has quietly diverged makes every other row a
+  confident lie. Never bypass it by calling `./_harness/Main` directly.
+- **Adding a row:** extend `rowAt`, keep row 0 where it is, and say what would make the
+  row INTERESTING — the "a row that could not have failed is not a row" rule applies here
+  exactly as it does to probes.
+- **Pins are ANONYMOUS (`_ : lhs ≡ rhs`), by the bug-cache idiom.** A *named* pin is a
+  proven definition with no consumer — an orphan — and `make wiring-gate` correctly fails
+  it. Learned by doing it wrong while landing the file.
+
+**WHAT IT CANNOT DO — DEAD ROUTE 2026-08-12, and this one is settled.** The **caps
+counting family is unreachable by measurement, and compiling it does not change that**:
+`poolCount 1 0` and `blowH 0` — the smallest possible arguments — were each still running
+at 45 s natively at `-O`, while row 0 calibrated correctly in the same binary. The
+harness was built partly to test whether `poolCount`'s silence was mere opacity; **it is
+not**. `blowH m = 6 + m + 2 · poolCount (towerℕ m) m` feeds `poolCount` a TOWER, so the
+value is astronomically large by construction and no backend or hardware prints it. This
+**independently confirms the "THE ANCHOR CANNOT BE PROBED" ruling** by a route with no
+typechecker in it, and confirms its stated reason (the blowup is computational, not
+definitional). Those rows are quarantined at 10+ and excluded from the default sweep.
+**Do not build a probe, a harness row, or a `refl` pin against that family.**
+
 ## Module granularity: keep typechecks short
 
 Mutual-BLOCK membership is what costs, not file size — see the cost model above. Rules:
@@ -429,6 +474,35 @@ picking up any postulate.
   lies green — vacuous rows, hand-built (unreachable) states, and reading an assembly
   backwards — are itemised in PROOF-STATE's roadmap; all three were observed in one
   day, and all three erred toward false comfort.
+
+**RECORD A DEAD ROUTE WHERE THE NEXT PERSON WILL STAND (`-- DEAD ROUTE <date>:`).**
+A *refuted statement* and a *dead route* are different findings, and only the first
+has a natural home. A refutation is machine-checkable — state it in `src` as a proven
+`→ ⊥` (`Depth-Bound.agda:11`: unconditional `depthE ≤ capsH` is FALSE) and it can
+never decay. **A dead route has no `⊥` to state**: the statement may well be true, but
+*this way of proving it* cannot work. Those findings have historically lived only in
+PROOF-STATE prose, far from the postulate someone picks up six weeks later — and
+re-deriving a dead route is the same wasted week as re-deriving a proof.
+
+So: **when an attempt fails for a structural reason, add a `-- DEAD ROUTE <date>:`
+line to the header of the postulate you were trying to discharge** — not to a
+roadmap, not to a separate file. Same locality rule as `-- PROBED`. It must say
+**what was tried and what structurally blocked it**, because "tried X, didn't work"
+does not stop anyone: "route #2 is STRUCTURALLY DEAD — `cascadeLatch` sets `dying`
+before any chain is processed, so the invariant cannot be established at that point"
+does.
+
+- **This is the ONLY sanctioned home for a failed attempt. Do NOT create a
+  `dead-ends/` directory** (nor resurrect `probe/` under another name). A tree of
+  failure files outside the claim graph is read by nobody at the moment it would
+  help, and becomes the next thing every session has to read and classify — the
+  precise cost that got `probe/` deleted. What prevents a repeated mistake is
+  LOCALITY: the note sitting in the header of the thing you are about to grind.
+- **A dead route is not a licence to weaken the statement.** It kills a *route*.
+  The postulate stays at full strength; see "Do NOT weaken a statement to make it
+  typecheck".
+- **Deleting a dead-route line requires the route to be shown WORKABLE**, not merely
+  untried-again. It is evidence, and it ages better than the code around it.
 
 **TIER ORDER IS LAW: TIER 0 FINISHES FIRST, THEN TIER 1, THEN 2 AND 3 (Anthony,
 2026-08-06; TIER 0 added 2026-08-11).** Strictly — not "mostly", not "while a
