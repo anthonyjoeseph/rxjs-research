@@ -163,13 +163,35 @@ Subscribe-Face and Wet are ~90% positivity over one mutual block that no flag to
 83-member block is the biggest in the repo — which is the whole point: **MEMBER COUNT
 DOES NOT PREDICT COST, TERM SIZE DOES.** 83 members cost 15.2 s there; 15 members cost
 300 s in Subscribe-Face. So "split the big mutual block up" is not the lever it looks
-like, and two refactors were measured and rejected on that basis (2026-08-11): Caps-Face's
-83-member block is *entirely spurious* — zero cycles, three gratuitous forward
-declarations sweeping in 80 unrelated definitions — and dissolving it saves nothing;
-hoisting the 22 non-SCC members out of Wet's 36 is worth 255 s → 220 s of positivity,
-~35 s of a ~17-minute build, for a large refactor with real meta-coupling risk.
+like for `make agda`, and Wet's hoist was measured and rejected on that basis
+(2026-08-11): hoisting the 22 non-SCC members out of Wet's 36 is worth 255 s → 220 s of
+positivity, ~35 s of a ~17-minute build, for a large refactor with real meta-coupling
+risk. Wet's three multi-member blocks hold GENUINE cycles (14+3, 12, 3), so they cannot
+be dissolved at all — only hoisted around, which is the rejected trade.
 `make agda-dev ARGS='--list <file>'` reports which members are in a genuine cycle, so
-check that before proposing either. And
+check that before proposing either.
+
+**BUT THE TWO COSTS ARE DIFFERENT, AND A SPLIT BUYS THE DEV LOOP EVEN WHEN IT BUYS
+`make agda` NOTHING (2026-08-12).** This entry previously said Caps-Face's 83-member
+block was spurious and "dissolving it saves nothing." That was measured against
+`make agda` POSITIVITY, where it is still true — Caps-Face is only 24% positivity and
+was never the gate's bottleneck. It is the wrong number to decide a split on. Dissolving
+the spurious block (zero cycles; three forward declarations were sweeping in 80
+unrelated definitions) and then cutting the file into `Caps-Face/Part1..Part7` at its
+existing section headers took the **per-edit dev cost from 72.6 s to 8.3 s, 9×**,
+because an edit now rechecks one part instead of 8.3k lines. Ask which cost you are
+paying: the gate is paid once per merge, the dev loop is paid once per mistake.
+
+**MEASURE THE MODULE ON A COHERENT CACHE BEFORE REFACTORING IT — a dependency rebuild
+masquerades as module cost, and has now produced THREE phantom diagnoses.** After the
+Caps-Face split, `Verify-Well-Formed/Part1.agda` measured **357 s** and was promoted to
+"next split target" on the strength of a real 45-member zero-cycle block. Re-measured
+once the seven new part interfaces existed: **6.3 s.** The 357 s was entirely rebuilding
+Caps-Face underneath it. The two earlier instances were the `-W` flag cache thrash
+(same shape, 400 s vs a real 7.13 s). **A big block is evidence of nothing on its own** —
+`--list` is free and textual, the timing is what decides, and the timing is only valid
+when nothing downstream is being rebuilt. Re-measure after ANY change to a dependency.
+And
 **`make agda-dev` checks the same bodies in seconds** — reach for the long build only as
 the merge gate.
 

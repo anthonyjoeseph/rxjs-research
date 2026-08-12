@@ -24,8 +24,8 @@ help:
 	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
 	@echo "                  time against its siblings POSTULATED at their exact"
 	@echo "                  signatures.  ONE MEMBER ~6s — the grind loop.  Whole"
-	@echo "                  modules, cold: Caps-Face/Part3 19s, Wet 22s, Subscribe-Face"
-	@echo "                  15s; whole project 131s warm (2026-08-12)"
+	@echo "                  modules, cold: Wet 55s, Subscribe-Face 21s, Caps-Face"
+	@echo "                  part 8s; whole project 159s (2026-08-12)"
 	@echo "                  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF"
 	@echo "                  IS VALID: the real recursion's TERMINATION is not"
 	@echo "                  checked, and postulates do not reduce.  'make agda'"
@@ -99,13 +99,17 @@ agda:
 #   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
 #   make agda-dev ARGS='--list <file>'     its mutual-block structure
 #
-# Measured 2026-08-12 on a coherent cache, COLD (which is the normal case --
-# you just edited the file): Caps-Face split 2026-08-12 into 7 parts
-# (Part1 6.2s, Part2 16.4s, Part3 19.1s, Part4 15.4s, Part5 8.2s, Part6 11.0s,
-# Part7 13.2s), Wet 22.2s, Subscribe-Face 15.1s, whole project 131s WARM
-# (measured after all interfaces built; first cold run on new Part files is
-# ~480s because each Part file's .agdai is absent and must be built — a
-# one-time artifact, not the normal workflow).
+# Measured 2026-08-12, COLD AND ON A COHERENT CACHE -- i.e. the real edit-one-
+# file case: append a line to the file, then check it, with every DEPENDENCY
+# already built.  Both halves matter.  Cold-but-incoherent (a dependency also
+# rebuilding) inflates a module by 50x and has produced three phantom
+# "slow module" diagnoses; see CLAUDE.md's "MEASURE ON A COHERENT CACHE".
+#   Wet 55.1s   Subscribe-Face 21.2s   Evaluator 9.4s   Caps.agda 15.7s
+#   Caps-Face (split into Part1..Part7) worst part 8.3s, was 72.6s whole
+#   Verify-Well-Formed/Part1 6.3s  <- measured 357s while Caps-Face rebuilt
+# Whole project 12 modules, 158.6s of module time, all GREEN, under the 300s
+# budget.  Only modules WITH a multi-member block are checked; after the
+# Caps-Face split only Part4 qualifies (its genuine 3-member cycle).
 # ONE MEMBER ~6s, and that is the number the grind loop actually runs at.
 # OPT-IN flags: SCOPE=1 (names and syntax only, no typechecking), HOLES=1
 # (tolerate ? holes and missing clauses).
@@ -123,9 +127,10 @@ agda:
 # this after modifying the file").  Cold IS the normal case -- you edit a file,
 # so its generated module has new content and nothing is cached for it; warm
 # only happens when you re-run having changed nothing, which is not the loop.
-# Measured cold worst cases: one file 22.2s (Wet; Caps-Face split 2026-08-12
-# into 7 parts, new worst per-part 19.1s).  Whole project warm: 131s measured
-# 2026-08-12 (12 modules with multi-member blocks checked serially).  The
+# Measured cold worst cases (2026-08-12): one file 55.1s (Wet -- genuine
+# mutual recursion, cycles of 14+3/12/3, so it CANNOT be dissolved the way
+# Caps-Face was, and hoisting around it was measured and rejected).  Whole
+# project 158.6s of module time.  Both sit under 90s/300s with headroom.  The
 # earlier 30s/180s were warm figures, and 30s failed on every heavyweight
 # module the moment you actually edited one.
 #
