@@ -182,6 +182,28 @@ existing section headers took the **per-edit dev cost from 72.6 s to 8.3 s, 9×*
 because an edit now rechecks one part instead of 8.3k lines. Ask which cost you are
 paying: the gate is paid once per merge, the dev loop is paid once per mistake.
 
+**WET IS SPLIT AND THE REMAINING HEAVY UNIT IS IRREDUCIBLE — THIS QUESTION IS CLOSED
+(2026-08-12).** Wet is now `Wet/Part1..Part6`, one module per genuine mutual block, with
+the umbrella re-exporting Part6. Per-edit cost went 55.1 s → 35.0 s worst, and every part
+except Part2 is 6-12 s. Part2 holds the 36-member wet walk and IS essentially all of
+Wet's cost: 254.7 s solo, attributed by `--profile=internal` as
+
+    Positivity 244,314 ms (87.8%)   Termination.Graph 20,754 ms (7.5%)
+    Typing (all) 5,702 ms (2.0%)    everything else < 2%
+
+Positivity is a WHOLE-BLOCK analysis and Part2's block is 14 genuinely-cyclic members
+(the wet-walk core: subscribeE-input-wet, stepFrame-wet, subscribeE-walkS, …) + a genuine
+3-cycle (foldPath-wet, dispatchShare-wet, shareGo-wet) + 19 acyclic. **Do not propose
+splitting it further.** The two options were both measured and both rejected: hoisting the
+19 acyclic members is the previously-recorded 35 s of 255 s (61% of the members for 14% of
+the time — which is itself the proof that the 14-cycle carries the term size), and
+separating the 3-cycle buys less. Either one means relocating definitions across a genuine
+mutual block for ~4% of the gate. **The Subscribe-Face move is NOT available here**: that
+worked because the subscribe clique was a suffix with no back-edges into the block, and
+Part2 has no such seam. `--profile=definitions` is the wrong tool for this question — it
+files the whole 256 s under "Miscellaneous" because the cost belongs to no single
+definition.
+
 **MEASURE THE MODULE ON A COHERENT CACHE BEFORE REFACTORING IT — a dependency rebuild
 masquerades as module cost, and has now produced THREE phantom diagnoses.** After the
 Caps-Face split, `Verify-Well-Formed/Part1.agda` measured **357 s** and was promoted to
