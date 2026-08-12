@@ -47,11 +47,32 @@ signature has a definition), because both heavy modules use IMPLICIT blocks --
 Subscribe-Face declares subscribeE-caps at line 936 and defines it at 2751, and
 there is no `mutual` keyword anywhere to grep for.
 
-MEASURED, warm (the second run, which is what a dev loop actually is):
-  Subscribe-Face  11-12s   (against 927s @2.7 / 384s @2.8)   ~80x
-  Wet             17s      (against 908s @2.7)               ~53x
-  one member      ~6s
-  whole project   86.5s over 7 modules (budget 180s)
+MEASURED 2026-08-12, on a COHERENT cache (i.e. after the -W flag mismatch that
+used to make `make agda` and this tool invalidate each other was fixed -- every
+number recorded before that date is suspect, and suspect in the SLOW direction).
+Two regimes, and quoting the wrong one is how the old figures misled:
+
+  COLD is the one the BUDGETS are set from, because cold is the normal case:
+  you edit a file, so its generated module has new content and nothing is
+  cached for it.  Warm only happens when you re-run having changed nothing,
+  which is not the loop.  (Anthony, 2026-08-12.)
+
+  WARM (src unchanged since the last dev run) -- 12 modules, 122.4s
+    Caps-Face 24.1  Wet 18.4  Caps 15.5  Subscribe-Face 11.8  Keeps-Ring 9.6
+    Caps-Sadd 9.2  Evaluator 8.5  Caps-Depth 8.2  Exp 3.8  Provenance 3.7
+    Frame-Width 3.6  VWF/Part1 6.0
+  COLD, everything (after a `make agda`, or a pull) -- 12 modules, 242.5s
+    Caps-Face 72.6  Wet 55.8  Subscribe-Face 31.0  Caps 21.0  (rest ~unchanged)
+  COLD, one file (the real loop: you edited ONE module, the other 11 stay warm)
+    that module's cold cost + ~122s; worst case ~171s if it is Caps-Face
+
+  one member    ~6s      <- the grind loop, and the only number that matters
+                            for iteration speed
+  make agda     802s (13m22s) for the full gate, 41 modules rebuilt, @2.8
+
+The steady-state figures match the pre-2.8 warm claims (Subscribe-Face 11.3s,
+Wet 17.0s), which were accurate all along -- the cache bug just made them
+unreachable in practice, because any gate run destroyed the warm state.
 
 THE MEASUREMENT THAT DECIDED THE DESIGN.  Profiling one focus run: 5.6s total,
 of which 4.9s is DESERIALIZATION and 63ms is Positivity (Typing 370ms).  Once

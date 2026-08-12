@@ -87,7 +87,7 @@ report review. Standing protocol, per Anthony:
   263 good lines that then needed rediscovering. A worker's job ends when its edits are made
   and cheaply verified. Give workers this shape instead:
   1. iterate with **`make agda-dev ARGS='<file> <member>'`** — ~6 s per member against
-     927 s for a real Subscribe-Face check (2026-08-11). **This SUPERSEDES the
+     384 s for a real Subscribe-Face check under Agda 2.8. **This SUPERSEDES the
      probe-first shape**, which existed only because a cheap loop was not otherwise
      available: agda-dev gives the same ~6 s inside `src`, so the work needs no probe
      file to be classified, landed, or forgotten. Read that section's caveat first —
@@ -244,7 +244,7 @@ an experiment run with weakened flags cannot silently poison the cache this way 
 **A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF DIES.**
 Measured 2026-08-07, THREE times now — the third was `opIterD-budget`'s discharge, whose
 unsealed body handed VWF the whole Op-Budget tower and OOM'd it again. **The rule is
-cheap and the failure costs 40 minutes: whenever a postulate on this spine becomes a real
+cheap and the failure costs the whole build: whenever a postulate on this spine becomes a real
 definition, seal it IN THE SAME EDIT, before running anything.** The first two were
 `Killed: 9` OOMs (>15 GB, 30-50 min in VWF before death):
 converting the `sub-charge-capsOK-lift` / `init-capsOK?` / `depth-compositional` postulates
@@ -387,7 +387,9 @@ investigation was archived when the roadmap file was deleted.)
 **THE ITERATION LOOP IS `make agda-dev`.**
 `make agda-dev ARGS='<file> <member>'` checks ONE mutual-block member against its
 siblings postulated at their exact signatures — **~6 s for one member, 11 s for all of
-Subscribe-Face, 17 s for all of Wet**, against 927 s and 908 s for the real modules. It
+Subscribe-Face and 18 s for all of Wet WARM (73 s and 56 s cold, which is the
+case you actually hit after an edit)**, against 384 s and ~350 s for the real
+modules under Agda 2.8. It
 runs **inside `src`**, so work stays under `make wiring`'s jurisdiction and there is no
 probe file to classify, land, or forget. `agda/src` is never written to.
 
@@ -668,8 +670,9 @@ gap by re-adding a bulk import to Main — that is the loophole, not the repair.
 
 **ACCEPTANCE TEST: `make gate`** — `wiring-gate`, `unsafe-check`, `agda`,
 `bug-cache`, in that order. **Cheap checks run FIRST, deliberately:** an orphan or an
-unsafe pragma is decidable in seconds by grep while `agda` costs ~40 minutes, so there
-is no reason to spend the 40 minutes only to fail on something a textual pass already
+unsafe pragma is decidable in seconds by grep while the full gate costs ~13 minutes
+(802 s measured 2026-08-12, 41 modules), so there is no reason to spend the 13 minutes
+only to fail on something a textual pass already
 knew. `make wiring-gate` is the report-turned-gate — it EXITS 1 (rather than always 0)
 on an orphan outside the exempt families, on a `⊤`-typed postulate that asserts nothing,
 or on a bare `open import` in Main. Run it rather than trusting a memo — including this

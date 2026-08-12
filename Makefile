@@ -23,8 +23,9 @@ help:
 	@echo "                  green here means every claim's support compiles"
 	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
 	@echo "                  time against its siblings POSTULATED at their exact"
-	@echo "                  signatures.  Subscribe-Face 11s, Wet 17s, one member"
-	@echo "                  ~6s — against 927s and 908s for the real modules."
+	@echo "                  signatures.  ONE MEMBER ~6s — the grind loop.  Whole"
+	@echo "                  modules, cold: Caps-Face 73s, Wet 56s, Subscribe-Face"
+	@echo "                  31s; whole project 242s cold / 122s warm (2026-08-12)"
 	@echo "                  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF"
 	@echo "                  IS VALID: the real recursion's TERMINATION is not"
 	@echo "                  checked, and postulates do not reduce.  'make agda'"
@@ -55,7 +56,7 @@ help:
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
 	@echo "  gate          the acceptance test: wiring-gate + unsafe-check +"
 	@echo "                  agda + bug-cache, cheap checks first so"
-	@echo "                  a 2-second failure never waits on a 40-minute one"
+	@echo "                  a 2-second failure never waits on the 13-minute one"
 	@echo "  bg            RUN EVERY LONG BUILD THROUGH THIS.  ALWAYS EXITS 7,"
 	@echo "                  green or red — a launcher status that is right most"
 	@echo "                  of the time gets believed, so this one is never"
@@ -98,20 +99,37 @@ agda:
 #   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
 #   make agda-dev ARGS='--list <file>'     its mutual-block structure
 #
-# Measured warm: Subscribe-Face 11.3s (against 927s), Wet 17.0s (against 908s),
-# one member ~6s.  OPT-IN flags: SCOPE=1 (names and syntax only, no
-# typechecking), HOLES=1 (tolerate ? holes and missing clauses).
+# Measured 2026-08-12 on a coherent cache, COLD (which is the normal case --
+# you just edited the file): Caps-Face 72.6s, Wet 55.8s, Subscribe-Face 31.0s,
+# whole project 242.5s.  Warm, for reference: 24.1 / 18.4 / 11.8 / 122.4s.
+# ONE MEMBER ~6s, and that is the number the grind loop actually runs at.
+# OPT-IN flags: SCOPE=1 (names and syntax only, no typechecking), HOLES=1
+# (tolerate ? holes and missing clauses).
 #
 # DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.  Two things
 # are given up and the first is not minor: TERMINATION of the real mutual
 # recursion is not checked (and in this proof the mutual recursion IS the
 # induction), and postulates do not REDUCE.  `make agda` stays the merge gate.
-# BUDGETS ARE ENFORCED, NOT DOCUMENTED (Anthony, 2026-08-11): 30s for one file,
-# 180s for the whole project.  A loop that quietly drifts to two minutes has
-# stopped being a loop, and a number that lives only in a comment is a number
-# nobody maintains.  Exceeding the budget FAILS, with the usual causes printed.
-# Override deliberately with BUDGET=<seconds> when the work has genuinely grown.
-AGDA_DEV_BUDGET ?= $(if $(ARGS),30,180)
+# BUDGETS ARE ENFORCED, NOT DOCUMENTED (Anthony, 2026-08-11): 90s for one file,
+# 300s for the whole project.  A loop that quietly drifts has stopped being a
+# loop, and a number that lives only in a comment is a number nobody maintains.
+#
+# SET FROM THE **COLD** NUMBERS, re-measured 2026-08-12 (Anthony: "wouldn't the
+# cold numbers be the relevant ones?  The use case would be that we're running
+# this after modifying the file").  Cold IS the normal case -- you edit a file,
+# so its generated module has new content and nothing is cached for it; warm
+# only happens when you re-run having changed nothing, which is not the loop.
+# Measured cold worst cases: one file 72.6s (Caps-Face), whole project 242.5s
+# (everything cold, i.e. straight after a `make agda`).  Warm, for reference:
+# 24.1s and 122.4s.  The earlier 30s/180s were warm figures, and 30s failed on
+# every heavyweight module the moment you actually edited one.
+#
+# A BUDGET THAT FAILS ON NORMAL WORK IS WORSE THAN NO BUDGET: it trains everyone
+# to pass BUDGET= reflexively, and then a real regression sails through.
+# Exceeding it FAILS, with the usual causes printed.  Override deliberately with
+# BUDGET=<seconds> when the work has genuinely grown -- and move these numbers
+# when it has, rather than overriding twice.
+AGDA_DEV_BUDGET ?= $(if $(ARGS),90,300)
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
 	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(if $(DIRTY),--dirty) $(ARGS)
@@ -164,7 +182,7 @@ wiring-gate:
 
 # THE ACCEPTANCE TEST, cheap checks FIRST.  Ordering is the point: an orphan
 # or an unsafe pragma is decidable in seconds by grep, while `agda` costs
-# ~40 minutes — so there is no reason to spend the 40 minutes only to fail on
+# ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
 gate:
 	@$(MAKE) --no-print-directory wiring-gate
