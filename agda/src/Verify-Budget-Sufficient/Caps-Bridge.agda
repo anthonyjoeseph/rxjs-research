@@ -41,7 +41,8 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        *-distribˡ-+; *-identityʳ; +-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; all; any; length)
+open import Data.List    using (List; []; _∷_; length)
+open import Data.Bool.ListAction using (all; any)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality

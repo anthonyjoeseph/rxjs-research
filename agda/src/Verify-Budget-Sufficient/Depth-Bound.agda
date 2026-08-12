@@ -48,7 +48,9 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _⊔_; z�
 open import Data.Nat.Properties using (≤-trans; +-mono-≤; n≤1+n; ≤-refl;
                                        ⊔-lub; m≤m+n; m≤n+m; ≤ᵇ⇒≤)
 open import Data.Bool    using (Bool; true)
-open import Data.List    using (List; []; _∷_; foldr; tabulate; all; sum)
+open import Data.List    using (List; []; _∷_; foldr; tabulate)
+open import Data.Bool.ListAction using (all)
+open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin) renaming (zero to fzero; suc to fsuc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)

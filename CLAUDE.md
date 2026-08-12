@@ -381,7 +381,8 @@ own block — checks in **7.8 s**; its 15-member mutual block costs **919 s**. A
 15-member block would not. The rules below are right, but the reason to follow them is
 block membership, not line count. (86-91% of the build is Agda's occurrence/polarity
 pass over those blocks, and no flag or pragma touches it — three routes measured and
-closed in `agda-performance-roadmap.md` §2.)
+closed — the record is `scripts/agda-dev.py`'s docstring, which is where that
+investigation was archived when the roadmap file was deleted.)
 
 **THE ITERATION LOOP IS `make agda-dev`.**
 `make agda-dev ARGS='<file> <member>'` checks ONE mutual-block member against its

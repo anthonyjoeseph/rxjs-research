@@ -12,7 +12,8 @@
 module Rx.Slots where
 
 open import Data.Bool    using (T)
-open import Data.List    using (map; tabulate; sum)
+open import Data.List    using (map; tabulate)
+open import Data.Nat.ListAction  using (sum)
 open import Data.Nat     using (ℕ; suc; _+_)
 open import Data.Vec     using (lookup)
 

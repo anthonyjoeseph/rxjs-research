@@ -70,7 +70,8 @@ open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
                                        *-identityʳ; *-zeroʳ; *-distribˡ-+;
                                        ≤ᵇ⇒≤; n≤1+n; m≤m+n; m≤n+m;
                                        m≤m⊔n; m≤n⊔m)
-open import Data.List    using (List; []; _∷_; _++_; length; all; any; map)
+open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Vec     using (lookup)

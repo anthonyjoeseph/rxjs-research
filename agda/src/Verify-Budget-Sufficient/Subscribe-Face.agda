@@ -83,8 +83,9 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; _++_; all; any; length;
-                                sum; tabulate; concat; map)
+open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
+open import Data.Bool.ListAction using (all; any)
+open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.Bool.Properties using (∨-zeroʳ)

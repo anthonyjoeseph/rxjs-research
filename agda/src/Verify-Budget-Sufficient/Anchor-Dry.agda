@@ -43,7 +43,8 @@ module Verify-Budget-Sufficient.Anchor-Dry where
 open import Data.Bool    using (Bool; true)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.List    using (List; all)
+open import Data.List    using (List)
+open import Data.Bool.ListAction using (all)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 

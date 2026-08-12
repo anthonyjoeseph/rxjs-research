@@ -43,7 +43,8 @@ open import Data.Nat.Properties
          +-comm; m≤m+n; m≤n+m; +-monoˡ-≤; n≤1+n; ≡⇒≡ᵇ)
 open import Data.Fin  using (Fin; toℕ)
 import Data.Fin as Fin
-open import Data.List using (List; []; _∷_; sum; tabulate)
+open import Data.List using (List; []; _∷_; tabulate)
+open import Data.Nat.ListAction  using (sum)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)

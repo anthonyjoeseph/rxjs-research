@@ -403,8 +403,17 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                                 if jt.kind == kind and jt.name == m:
                                     out.extend(p.lines[jt.start : jt.end])
                         out.append("")
+                # Remember where the block starts: if nothing turns out to need
+                # stubbing (every member is a focus, hoisted, or acyclic), the
+                # header must be REMOVED rather than left standing.  An empty
+                # `postulate` is an EmptyPostulate warning on every run, and
+                # spurious warnings in this tool's output are precisely what it
+                # exists to prevent -- a loop nobody reads the output of is not
+                # a loop.
+                hdr = len(out)
                 out += ["", f"-- agda-dev: mutual block of {len(b.members)} members,",
                         "-- POSTULATED at their exact existing signatures.", "postulate"]
+                body_at = len(out)
                 cyc = scc_of(p, b.members)
                 for m in b.members:
                     if m in foci or m in hoist or (m not in cyc and m not in force_stub):
@@ -414,7 +423,10 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                         out.append(("  " + ln) if ln.strip() else "")
                     if stub_lines is not None:
                         stub_lines[m] = (first, len(out))
-                out.append("")
+                if len(out) == body_at:
+                    del out[hdr:]
+                else:
+                    out.append("")
             # A KEPT-REAL member stays EXACTLY WHERE IT WAS.  Relocating these
             # to the head of the block was one bug producing all 22 of
             # Caps-Face's NotInScope errors: a body originally at line 7500 got
@@ -759,9 +771,11 @@ def agda_flags(args) -> list[str]:
     # and 12 more from source, and a `make agda` after any dev run paid a full
     # cold rebuild.  Both were invisible -- each tool blamed its own module.
     #
-    # So the warnings are filtered in `noise()` instead: suppression belongs to
-    # OUR output, never to Agda's flags.  ANY flag added here that Agda records
-    # in an interface re-opens this, so do not add one to quiet the output.
+    # The warnings that motivated it are GONE: the 29 sites were migrated to
+    # Data.Bool.ListAction / Data.Nat.ListAction on 2026-08-11, which is the
+    # right fix -- an output filter would have been a second thing to maintain.
+    # ANY flag added here that Agda records in an interface re-opens the
+    # thrash, so do not add one to quiet the output.
     # (--only-scope-checking and the --holes pair are exempt in practice: they
     # are opt-in, deliberate, and you accept a rebuild when you ask for them.)
     flags = ["-i", "src", "-i", "_dev"]
@@ -788,23 +802,22 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
                             timeout=(limit or None),
                             env={**os.environ, "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"})
     except subprocess.TimeoutExpired:
-        return 124, (f"agda-dev: killed at {limit:.0f}s (the budget).  This module "
-                     "has no mutual recursion for the tool to break, so nothing is "
-                     "stubbed and this IS the real check.  Splitting the file is the "
-                     "only thing that makes it faster -- and it is safe here, "
-                     "because there are no cycles."), time.time() - t0
+        return 124, (
+            f"agda-dev: killed at {limit:.0f}s (the budget).\n"
+            "        CHECK THIS FIRST: how long does the module take under `make agda`?\n"
+            "        If it is FAST there and slow here, THIS IS A TOOL BUG, not a slow\n"
+            "        module, and splitting the file will not help.  The run above was\n"
+            "        probably rebuilding DEPENDENCIES, not checking your module -- count\n"
+            "        the `Checking` lines in the output to see what it actually built.\n"
+            "        (Measured 2026-08-11: Verify-Well-Formed/Part1 read as >400s here\n"
+            "        against 7.1s real, because a flag mismatch was invalidating the\n"
+            "        whole cone.  This message previously said 'splitting the file is\n"
+            "        the only thing that makes it faster', and that advice sent the\n"
+            "        investigation at re-splitting a seven-second module.)\n"
+            "        Only once the module is slow under BOTH is splitting the answer --\n"
+            "        and if it has no mutual recursion, splitting is at least safe."
+        ), time.time() - t0
     return pr.returncode, pr.stdout + pr.stderr, time.time() - t0
-
-
-# One deprecation warning spans several lines: the location/-W line, the
-# "Warning: X was deprecated" line, the "Please use Y instead" line, and the
-# "when scope checking X" line.  Matched individually so a REAL message that
-# happens to sit between two of them is never swallowed.
-_DEPRECATION_RE = re.compile(
-    r"warning: -W\[no\]UserWarning"
-    r"|^Warning: .* was deprecated in v"
-    r"|^Please use .* instead\.$"
-    r"|^when scope checking (all|any|sum)$")
 
 
 def noise(out: str) -> str:
@@ -813,12 +826,6 @@ def noise(out: str) -> str:
         if not ln.strip():
             continue
         if re.match(r"^\s*Checking ", ln) or ln.startswith(("Loading ", "Finished ")):
-            continue
-        # The stdlib v2.3 deprecations (Data.List.all/any/sum, 17 sites, ~1,264
-        # identical warnings) are filtered HERE rather than with -W, which would
-        # invalidate every interface `make agda` wrote -- see agda_flags().
-        # `make agda` still prints them, so the migration cannot be forgotten.
-        if _DEPRECATION_RE.search(ln):
             continue
         # v2.3 deprecations: 1,264 per build, and none of them are this tool's
         # business.  The migration is tracked in the roadmap.
