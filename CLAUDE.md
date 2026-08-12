@@ -62,7 +62,7 @@ semantics), or when the spec is genuinely ambiguous (then follow the ambiguity r
 
 ## Division of labor: the design session directs, Sonnet workers grind
 
-The design-authority session delegates the bulk of the work — clause grinds, probe sweeps,
+The design-authority session delegates the bulk of the work — clause grinds, falsity sweeps,
 build babysitting — to subagents, keeping design spend confined to rulings, directives, and
 report review. Standing protocol, per Anthony:
 
@@ -101,8 +101,8 @@ report review. Standing protocol, per Anthony:
   - **At most TWO heavyweight checks at once** (Subscribe-Face / Wet class, multi-GB). Two fit
     the headroom; three do not, and an OOM costs more than the wait. Re-measure with
     `ps -eo rss` before assuming otherwise.
-  - **Cheap modules parallelize freely** (probes and non-SCC modules solo-check in seconds and
-    cost well under a GB).
+  - **Cheap modules parallelize freely** (non-SCC modules solo-check in seconds and cost
+    well under a GB).  `make agda-dev` sizes its own concurrency from measured RSS.
   - **Never let two workers edit the same module.** This is a correctness constraint that
     hardware does not relax: a shared file is a write conflict, not a parallel task. When
     several edits land in ONE file (Subscribe-Face is the usual case), have workers return
@@ -135,8 +135,8 @@ report review. Standing protocol, per Anthony:
   ceiling per call applies. **`setsid` does not exist on macOS** — use the Bash tool's
   `run_in_background`, not `nohup setsid`.
 - **Directives carry the law.** Every worker prompt restates the standing rules it needs:
-  spec is gospel; probe-before-grind; detached builds with EXIT= logs; report numbers
-  plainly including failures; never extrapolate from shallow probe rows; the
+  spec is gospel; refute-before-grind; detached builds with EXIT= logs; report numbers
+  plainly including failures; never extrapolate from shallow refutation rows; the
   impossibility-pair stop rule (report, don't act).
 - **Workers commit and push per green task** to the working branch, in the repo's commit
   voice. `make agda && make bug-cache` green before any commit that touches `agda/src`.
@@ -242,9 +242,10 @@ Whole-module analyses cannot be switched off to time them; attribute them with
 ## ALL NEW CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction (Anthony, 2026-08-11)
 
 **There is no longer a reason to write Agda anywhere else, and therefore no licence to.**
-The probe workflow existed for exactly one reason — `src` had no cheap iteration loop, so
-work was staged outside the claim graph where a fast check was possible. `make agda-dev`
-removes that reason: it gives the same seconds-level loop **inside `src`**.
+A `probe/` directory used to exist for exactly one reason — `src` had no cheap iteration
+loop, so work was staged outside the claim graph where a fast check was possible. It was
+DELETED on 2026-08-11 along with its ledger, its make targets and its scripts, because
+`make agda-dev` gives the same seconds-level loop **inside `src`**. Do not recreate it.
 
 So the rule is now simply:
 
@@ -282,6 +283,38 @@ Over budget is a FAILURE with the usual causes printed. If the work genuinely gr
 the number in the Makefile deliberately — a loop that quietly drifts to two minutes has
 stopped being a loop.
 
+### A RED `agda-dev` ON ANY FILE IN `src` IS A CRITICAL FAILURE — FIX IT IMMEDIATELY (Anthony, 2026-08-11)
+
+**`make agda-dev` must be GREEN on every file in `agda/src`, always.** If it fails on a
+file, that is a P0 defect in the tooling and it gets fixed *before* the work you were doing.
+Never route around it: not by adding the file to a skip list, not by "it's just the tool",
+not by falling back to `make agda` and moving on. The loop is only trustworthy if it is
+universally green, and a single tolerated red teaches everyone to ignore the next one.
+
+**The default assumption is that the TOOL is wrong, not the proof.** This is not politeness
+— it is the measured base rate. Every single agda-dev failure investigated on 2026-08-11
+was a bug in `scripts/agda-dev.py`, and the proofs were fine in every case:
+
+- 22 `NotInScope` in Caps-Face — the renderer **relocated bodies** to the head of their
+  mutual block, so a body written at line 7,500 was emitted at 4,259, ahead of the
+  `abstract` block defining what it calls. Position carries scope.
+- 7 `SplitError` + 9 `UnequalTerms` — it **stubbed acyclic members**. Stubbing exists to
+  break cycles; postulating an orderable definition only costs reduction.
+- `InstanceNoCandidate` in Caps — focus modules did not repeat the original `open import`
+  lines, and **instance arguments resolve from what is opened**.
+- `MissingTypeSignature` in Rx/Exp and 3 more modules — all collateral from the relocation
+  bug, fixed without touching those files.
+
+**Corollary: do not diagnose these from the error NAME.** Each of the above was
+misdiagnosed at least once by reasoning about what the error class usually means; each was
+solved in minutes by reading the actual message and looking at the generated file in
+`agda/_dev/`. Read the file the tool produced — the bug is visible in it.
+
+**The only acceptable "cannot check this file" is a MEASURED one, and it is a bug report,
+not an exemption.** `NOT_DEV_CHECKABLE` in the script exists for that, it is currently
+EMPTY, and empty is the target. Its last entry, `Verify-Well-Formed`, was retired by
+splitting the file rather than by tolerating the exclusion.
+
 **THE THREE THINGS A NEW AGENT MUST KNOW BEFORE TRUSTING A GREEN RUN:**
 
 1. **DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.** The real mutual
@@ -309,7 +342,7 @@ block membership, not line count. (86-91% of the build is Agda's occurrence/pola
 pass over those blocks, and no flag or pragma touches it — three routes measured and
 closed in `agda-performance-roadmap.md` §2.)
 
-**AND THE ITERATION RULE HAS CHANGED: use `make agda-dev`, not `agda/probe/`.**
+**THE ITERATION LOOP IS `make agda-dev`.**
 `make agda-dev ARGS='<file> <member>'` checks ONE mutual-block member against its
 siblings postulated at their exact signatures — **~6 s for one member, 11 s for all of
 Subscribe-Face, 17 s for all of Wet**, against 927 s and 908 s for the real modules. It
@@ -354,7 +387,7 @@ upward-closed in the witness (each survives enlarging it), the statement is vacu
 satisfiable and proves nothing — check this BEFORE grinding clauses. Pin the witness to the
 one the consumers actually bound (share the Σ with the statement whose witness is spent), or
 put the bound itself in as a conjunct. (Learned 2026-08-03: the exit-level count face was
-machine-refuted as vacuous — `count-vacuous` in `agda/probe/Count-Level-Probe.agda`.)
+machine-refuted as vacuous — `count-vacuous`, machine-checked 2026-08-03.)
 
 **This rule applies recursively, and violating it inside a subproblem is an anti-pattern:
 never prove pieces before their assembly exists.** For any lemma cluster, first state the
@@ -389,7 +422,7 @@ above it. The census is one pass and it converts an unknown-length grind into a 
   work to delegate; grinding them first only buys the illusion of progress.
 - **Check every conjunct at zero before grinding it.** These bounds routinely go FALSE at
   `bud = 0`, `ops = 0`, `dep = 0` — the transformer is the identity there and a positive
-  witness cannot fit. A one-screen refutation probe (`agda/probe/Queue-Push-Probe.agda` § 1)
+  witness cannot fit. A one-screen refutation in `src`
   tells you the site needs a positivity hypothesis threaded rather than a cleverer proof.
 - **Count the sites by grepping the BARE postulate name.** A hyphenated guess
   (`grep TEMP-`) misses `level-TEMP` and reports a false all-clear; comment mentions of the
@@ -428,7 +461,7 @@ deleted on its merits. Two rules survive the freeze, permanently:
 - **Record the commit SHA in PROOF-STATE.md** for anything substantial removed.
   Git history is the archive only if someone can find the entry.
 
-### DE-RISK MODE: probe for falsity first, grind last (Anthony, 2026-08-06)
+### DE-RISK MODE: test for falsity first, grind last (Anthony, 2026-08-06)
 
 **The wiring pass is over; the current pass is DE-RISKING.** Every postulate carries
 a probability of being FALSE or EMPTY, and the proof's total risk is the SUM over the
@@ -445,8 +478,8 @@ picking up any postulate.
   correct response to a doubt you can test: test it.
 - **PROBE BEFORE GRINDING.** If a postulate's sides are computable (`evaluate`,
   `capsOK?`, `opIterD`, `depthE`, `spec-batchSimultaneous` …), instantiate it at
-  concrete programs in `agda/probe/` and check by `refl` — bug-cache shaped, seconds
-  per loop. Every probe ends in exactly one of two states: a refutation (record,
+  concrete programs **in `src`, checked with `make agda-dev`** and pinned by `refl` —
+  bug-cache shaped, seconds per loop. Every probe ends in exactly one of two states: a refutation (record,
   restate, re-rank) or a confidence receipt (`-- PROBED <date>:` in the postulate's
   own header, saying what shapes were covered). **An unprobed probeable postulate is
   the cheapest unmanaged risk in the repo.**
@@ -539,144 +572,6 @@ build the counterexample.
 available at the call site, adding it and deleting the postulate is less work than
 carrying it. (`depthE ≤ capsH` unconditionally is FALSE, `Depth-Bound.agda:11`; the
 `capsOK?`-conditioned form costs nothing extra, so it is the one that is stated.)
-
-### `probe/` IS BEING RETIRED — `make agda-dev` removed its reason to exist (Anthony, 2026-08-11)
-
-`probe/` was created because the only fast loop available was "import the heavy module and
-don't touch it". `make agda-dev` gives that loop **inside `src`**, so the directory's
-justification is gone and the standing complaint stands: code enters `probe/` and never
-leaves, diluting context and causing redundant work.
-
-**Nothing new goes into `probe/`. Write it in `src`.** The wind-down, when it is worked:
-
-1. **Assemble or delete every remaining probe file** — the existing rule ("a probe is
-   temporary, and its end state is assembly + deletion"), with no third state.
-2. What survives is not a scratchpad but a **cache of negative results**: refutations,
-   measurements, reached-state receipts — things whose value is *stopping* a route from
-   being retried. Rename it **`dead-ends/`**, which states the contents rather than the
-   ambition, and give it `bug-cache`'s standing: small, append-mostly, load-bearing.
-3. **Admission test, gated by `make wiring-gate`:** a file there must name in its header
-   the specific route it forecloses, **and must typecheck** — the 2026-08-09 finding that
-   ten of thirty-three probes did not compile is what makes that non-negotiable.
-4. The `PROBES.txt` ratchet mostly dissolves with the directory: its job was to catch
-   proven work parked outside the claim graph, which working in `src` prevents outright.
-
-Until that pass happens, the rules below still govern the files that are still there.
-
-### The stdlib v2.3 deprecation migration is OWED (mechanical, ~17 files)
-
-v2.3 deprecated `Data.List.all/any/sum` in favour of `Data.Nat.ListAction.all`,
-`Data.Bool.ListAction.any`, `Data.Nat.ListAction.sum`. **17 import sites across 17 files**
-still use the old names, so every build carries ~1,264 identical warnings — enough to bury
-a real message. The names still work, so this is not urgent, but it is **required before
-any move to stdlib v2.4**, and it should be folded into one full rebuild rather than paid
-as a separate recheck of the expensive modules. (`make agda-dev` suppresses these warnings
-with `-W noUserWarning`; `make agda` deliberately does not, so the debt stays visible.)
-
-### The probe ledger: probes are three species, and the gate tracks all of them (Anthony, 2026-08-06)
-
-`agda/probe/` is outside the claim graph BY DESIGN (that is what makes iteration
-cheap), which makes it the one place proven work can park invisibly — hit
-2026-08-06, when a zero-postulate theorem file sat there consumed by nothing.
-Three species actually live in the directory, and the failure mode is treating
-them as one:
-
-- **EVIDENCE** — refutations, measurements, reached-state receipts. Consumer is
-  a PROOF-STATE ruling, not a theorem. Never lands in src.
-- **REHEARSAL** — assemblies over postulated gaps, typechecked symbolically to
-  validate a proof's SHAPE before paying the src recheck. Destined for src.
-- **FINISHED PROOF** — real theorems born in probe/ because the fast loop is
-  there. These are src material, full stop, and MUST land.
-
-**The ratchet: `agda/PROBES.txt`, gated by `make wiring-gate` (section C1).**
-Every probe file carries a ledger line — `EVIDENCE | <note>` or
-`LANDING: <src target> | <note>`. A new probe fails the gate until classified;
-when a LANDING file lands, DELETE the file and its line in the same commit (git
-is the archive). **Never end a session with a new zero-postulate theorem in
-probe/ and no LANDING line naming its destination.**
-
-**A PROBE'S CLASSIFICATION IS WORTHLESS UNTIL IT COMPILES (2026-08-09).**
-`agda/probe` sits outside `make agda` by design, and the same exemption
-that makes it cheap means nothing ever asks whether a probe is still
-true. Ten of the thirty-three probes retired on 2026-08-09 did not
-typecheck — eight importing an umbrella module split apart in `a8508d6`,
-one stale against a moved API, and one failing on "Multiple definitions"
-**because its own content had landed in src** (that last is a positive
-signal: a name clash with src means the work is done). Every one had a
-live `make` target that would fail, and three independent classification
-sweeps had called most of them load-bearing evidence — because all three
-read headers and citations, and none ran the file. So:
-
-- **Run `agda -i src -i probe probe/X.agda` before classifying X.** A
-  refutation that cannot be re-run is not a machine-checked receipt, it
-  is a historical artifact whose only surviving value is the number
-  already transcribed into a src comment. Treat a non-compiling probe as
-  deleted-in-fact; do not repair one to restore evidence nobody runs.
-- **A DELETION HAS THREE ENDS.** The ledger line (C1), the `make` target
-  (C2), and the probes that IMPORT it (C3) — `Charge-Probe` was deleted
-  as a "receipt" while four live probes imported its program families.
-  All three are gated now; a probe is EVIDENCE and INFRASTRUCTURE
-  independently, so classify both axes before deleting.
-
-**A PROBE IS TEMPORARY, AND ITS END STATE IS ASSEMBLY + DELETION (Anthony,
-2026-08-09).** Full-on assembly into `src` — postulating whatever gaps the
-assembly needs — is the **vastly preferred** outcome for any probe, and this is
-the general rule for probe cleanup rather than a case-by-case judgement. Three
-consequences, in force:
-
-- **TIER LINES DO NOT GATE PROBE CLEANUP.** Probe cleanliness outranks tier
-  order. Assembling a probe's content into src is authorised even when the
-  content is tier-2 or tier-3 material — the tier law governs which *postulates
-  get ground*, not whether proven work is allowed to have a home. Do not park an
-  assembly behind a tier.
-- **The receipt route is the FALLBACK, not the default.** Writing a
-  `-- PROBED <date>:` line into a src postulate's header and deleting the probe
-  is correct only for content that genuinely cannot be assembled — a measurement,
-  a refutation, a reached-state receipt. Anything with provable content gets
-  assembled instead. Ask "can this be a definition in src?" before reaching for
-  a receipt.
-- **A probe left in the directory is a cost, not a neutral.** It is context that
-  a future session must read and classify, and every stale one dilutes the
-  signal of the ones that matter.
-
-**IF IT DOES NOT SERVE THE MAIN PROOF, DELETE IT — "shit or get off the pot"
-(Anthony, 2026-08-09).** The burden of proof is on KEEPING, never on deleting.
-A piece of probe content has exactly two honest destinations:
-
-1. **Assembled into src**, where something the main proof consumes actually uses
-   it; or
-2. **Deleted.**
-
-There is no third state. "Might be useful later", "it was expensive to prove",
-"it documents an idea" — none of these earn a file a place in the tree. Git
-history is the archive. A proven lemma with no route to `The-Proof.agda` is not
-an asset being saved, it is context every future session must read and dismiss.
-
-The ONE thing that keeps unassemblable content alive is that it is **actively
-load-bearing for the proof effort**: a refutation stops a known-false route from
-being retried (`nestᵉ` is the wrong measure — Caps-Face:6294 says "nobody should
-re-derive it", and that sentence is worth more than the probe that established
-it). Even then the deliverable is the RECEIPT in the src header, not the file —
-write the receipt, delete the file. If you cannot name what the content stops or
-supplies, it is not evidence, it is inventory. Delete it.
-
-Applied 2026-08-09 to `capsAt-covers-12pow` (Battery-Instant-Headroom): clean
-proof, one arithmetic gap, and its only consumer was `obs-fits-headroom`, which
-rests on the REFUTED `sync-count-bounded`. No route to the main proof, so it
-goes — rather than landing as an orphan or being kept "in case".
-
-**BEFORE CALLING A PROBE MUST-LAND, CHECK ITS SUBJECT IS STILL LIVE.** "Zero
-postulates + real theorems + not in src" is NECESSARY BUT NOT SUFFICIENT: a
-clean proof about something the code no longer does is still dead. Grep src for
-the actual formula or function the theorem reasons about before assigning it a
-destination. `Visited-Width-Probe.agda` was classified MUST-LAND on the
-three-part test and was in fact unassemblable — it bounded a demand against an
-allowance `3 + 2 * sz` that appears nowhere in src, because `capsBase`
-(`Rx/Evaluator.agda`) deliberately reads `entryCeil` into the tower height
-rather than bracketing it, and its own comment says why. Deleted 2026-08-09.
-The failure mode is real and it errs toward inventing a consumer: **wiring such
-a file in would have meant a vacuous bridge, which is worse than an orphan
-because it looks discharged.**
 
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 

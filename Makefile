@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bug-cache unsafe-check wiring level-walk-probe nest-budget-probe nest-count-probe instant-height-probe joint-probe walk-core-probe cascade-go-wet-core-probe ts-check cli-build oracle qc-build quickcheck
+.PHONY: all help agda agda-dev agda-dev-selftest bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -55,48 +55,6 @@ help:
 	@echo "  gate          the acceptance test: wiring-gate + unsafe-check +"
 	@echo "                  agda + bug-cache, cheap checks first so"
 	@echo "                  a 2-second failure never waits on a 40-minute one"
-	@echo "  level-walk-probe  the EVOLVING-CAPS delivery walk, before it is"
-	@echo "                  landed: the walk carries the level and reads the"
-	@echo "                  registry off it, so nothing is charged at the"
-	@echo "                  refuted entry caps.  Termination, the front"
-	@echo "                  decomposition, monotonicity, and the gate — the"
-	@echo "                  level walk is POINTWISE ABOVE the registry walk it"
-	@echo "                  replaces (see agda/probe/Level-Walk-Probe.agda)"
-	@echo "  nest-budget-probe  may the SUBSCRIBE-NESTING budget k be read off"
-	@echo "                  the SIZE CAP?  NO.  Carries the lemma the signature"
-	@echo "                  pass owes (nest <= size, proven, on values and both"
-	@echo "                  syntactic halves) and the (b)-conjunct arithmetic the"
-	@echo "                  two *All faces wait on (n^2 <= 2^n + 1, tight at 3)."
-	@echo "                  Then refutes the descent the budget was ruled on: a"
-	@echo "                  scan under an *All MINTS a payload per fold and the"
-	@echo "                  k-th mint nests k deep, from syntax whose own nesting"
-	@echo "                  stands still at 2 — so the budget is charged at the"
-	@echo "                  frame's ENTRY level while its payloads are bounded at"
-	@echo "                  the level it CLIMBED TO (3 against 43690)"
-	@echo "                  (see agda/probe/Nest-Budget-Probe.agda).  Seconds"
-	@echo "  joint-probe   is subscribeE-caps's joint hypothesis, pathLen + size"
-	@echo "                  <= cSize, true at the TIGHT admissible cSize?  NO — it"
-	@echo "                  fails on every one of seventeen families, and the"
-	@echo "                  half-cap chain watermark fails on the simplest of them"
-	@echo "                  (see agda/probe/Joint-Probe.agda)"
-	@echo "                  make joint-probe ARGS='0 80'   (the whole sweep)"
-	@echo "  nest-count-probe  is the WIDTH count a SYNTACTIC constant?  per"
-	@echo "                  APPLICATION yes, exactly — per INSTANT no: the"
-	@echo "                  same node folds once per DELIVERY and each fold"
-	@echo "                  pays the nesting again, so the stories are"
-	@echo "                  deliveries x nesting and the fan-out family"
-	@echo "                  breaches at four deliveries"
-	@echo "                  (see agda/probe/Nest-Count-Probe.agda).  Fast"
-	@echo "  instant-height-probe  how fast do the STORE's two axes climb"
-	@echo "                  ACROSS INSTANTS, and does the receipt's payload"
-	@echo "                  width V stay under what the PREVIOUS instant"
-	@echo "                  stored?  Nine families, four instants each where"
-	@echo "                  the container reaches them.  REAL WIDTH CLIMBS"
-	@echo "                  MORE THAN ONE STORY PER INSTANT (932 digits"
-	@echo "                  against 926 on the deepening scan), and V exceeds"
-	@echo "                  the stored width once (2 against 1).  The"
-	@echo "                  receipt-dictated charge fits every measured row"
-	@echo "                  (see agda/probe/Instant-Height-Probe.agda).  ~2.5 min"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -114,7 +72,7 @@ agda:
 
 # THE FAST DEV LOOP.  86-91% of `make agda` is Agda's occurrence/polarity pass
 # over two big mutual blocks, and no flag or pragma touches it (three routes
-# measured and closed — see agda-performance-roadmap.md §2).  What the pass IS
+# measured and closed; the record is scripts/agda-dev.py's docstring).  What it IS
 # sensitive to is mutual-block MEMBERSHIP, steeply: one real body in
 # Subscribe-Face's block costs 63ms of Positivity, fifteen cost 300s.  So this
 # checks ONE body at a time, against its siblings POSTULATED at their exact
@@ -200,102 +158,6 @@ gate:
 	@$(MAKE) --no-print-directory bug-cache
 	@echo "gate: ALL GREEN"
 
-
-
-
-
-
-
-
-
-
-# The EVOLVING-CAPS delivery walk, probed before it is landed: the walk
-# carries the caps record and grows it per delivery, so the registry a
-# dispatch sees is read off the LEVEL (capsOK?'s own fifth conjunct)
-# rather than off a per-delivery mint budget charged at the refuted
-# entry caps.  Termination, the front decomposition, monotonicity, and
-# the GATE — the level walk is POINTWISE ABOVE the registry walk it
-# replaces, so no measured D row has to be re-run.  Self-contained
-# arithmetic, so src/Main.agda never reaches it.  Seconds.
-level-walk-probe:
-	cd agda && agda -i src -i probe probe/Level-Walk-Probe.agda
-
-
-# FALSITY PROBE: do the 9 conclusion conjuncts of `subscribeE-walk-core`
-# (Measures.agda:5728, tier-1 #1) hold for emptyᵉ and ofᵉ[nat̂ 0]?
-# 8 of 9 checked by refl; conjunct 2 (ceiling) held analytically.
-# No refutation found.  Seconds.
-walk-core-probe:
-	cd agda && agda -i src -i probe probe/Walk-Core-Probe.agda
-
-# FALSITY PROBE: do the 2-conjunct conclusion of `cascadeGo-wet-core`
-# (Wet.agda:4499, tier-0 T0-1) hold for concrete programs?
-# 6 rows checked by refl on root-path chains at the empty initial state.
-# hasDry rows LOAD-BEARING (test exhausted != dried); INV? rows
-# DEGENERATE (empty state, 0 <=b abstract always true).
-# NOT COVERED: from-inner/thru-outer paths (abstract Gas blocks compute).
-# No refutation found.  Seconds (deserializes Wet.agdai only).
-cascade-go-wet-core-probe:
-	cd agda && ls probe/Cascade-Go-Wet-Core-Probe.agda && agda -i src -i probe probe/Cascade-Go-Wet-Core-Probe.agda
-
-
-# May the SUBSCRIBE-NESTING budget `k` be read off the SIZE CAP, as the
-# standing ruling instantiates it (fLvl′ S W J = fLvlK S W (suc (sizeAt S J)) J)?
-# NO.  The probe carries the one non-arithmetic lemma the signature pass owes —
-# nestᵛ ≤ sizeᵛ, proven, beside the other value measures — and the (b)-conjunct
-# arithmetic the two *All faces wait on, and then refutes the DESCENT the budget
-# was ruled on: a `scanᵉ` under an *All mints a payload per fold, the k-th mint
-# nests k deep (real `applyFn`, refl-checked), and the carrier's own nesting
-# stands still at 2.  So the budget is charged at the frame's ENTRY level while
-# the values its payload subscribes are handed are bounded only at the level the
-# frame has CLIMBED TO — the Entry-Caps-Refuted distinction, one stratum in.
-# Standalone, so src/Main.agda never reaches it.  Seconds
-nest-budget-probe:
-	cd agda && agda -i src -i probe probe/Nest-Budget-Probe.agda
-
-
-# The gate on repairing the caps tree's two blocked companions.
-# subscribeE-caps hypothesises `pathLen κ + sizeᵉ b ≤ cSize` and the
-# delivery side carries the two bounds SEPARATELY; before the ℓ ledger is
-# threaded through four ground clauses and a state predicate, this
-# measures whether the joint form is true at the tight admissible cSize.
-# It is not — see the reading at the head of agda/probe/Joint-Probe.agda.
-# Instruments a COPY of the evaluator (agda/src is never written).
-#   make joint-probe                 (row 0)
-#   make joint-probe ARGS='0 80'     (the whole sweep)
-joint-probe:
-	scripts/joint-probe.sh $(ARGS)
-
-
-
-# Is the WIDTH count a SYNTACTIC constant?  The split-count ruling gives the
-# width axis `suc (nestᵉ + slotsNest)` foldStep passes per instant, on
-# Mult-Width-Probe §7's price for ONE applyFn.  Per APPLICATION that holds
-# exactly (the fn2 ticker climbs two stories an instant, four instants).  Per
-# INSTANT it fails: the same node folds once per DELIVERY and each fold pays
-# the nesting again, so the stories are deliveries × nesting and the fan-out
-# family breaches at four deliveries.  Standalone, so src/Main.agda never
-# reaches it
-nest-count-probe:
-	cd agda && agda -i src -i probe probe/Nest-Count-Probe.agda
-
-
-
-# The instant sweep the charge form's V-coverage turns on: VMAX, WSTORE,
-# SSTORE and the receipt-weighted j at instants 0 … 3 on nine families.
-# It re-runs the evaluator once per instant per column, so the DEEP cells
-# are read off the compiled harness (probe/Instant-Height-Main.agda) and
-# recorded in the tables as measured-not-rechecked; this target checks the
-# `refl` pins and the numeral gates written on them.  Standalone, so
-# src/Main.agda never reaches it.  ~2.5 min
-instant-height-probe:
-	cd agda && agda -i src -i probe probe/Instant-Height-Probe.agda
-
-
-
-
-
-
 ts-check:
 	cd typescript && npm run typecheck
 
@@ -310,7 +172,4 @@ qc-build:
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
-
-
-
 
