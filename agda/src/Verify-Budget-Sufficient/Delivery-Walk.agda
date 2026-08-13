@@ -79,7 +79,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
-open import Rx.Prim      using (Tick; Id; Source; InstEvent; CloseReason;
+open import Rx.Prim      using (Tick; Id; Source; InstEvent;
                                 close; exhausted; value; handoff; complete;
                                 _at_from_as_; delivery; Gas)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; _≟ᵗ_)
@@ -236,9 +236,24 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     Eb : ℕ → List (InstEvent (Val Γ t)) → Bool
     Bb : ℕ → Stream Γ t → Bool
 
-    -- closure facts for Eb
+    -- GAS ADEQUACY HOOK.  `sf-step` quantifies over an arbitrary frame
+    -- gas, and a gas-conditional ledger flavour (the nodry conjunct:
+    -- `subscribeInner g0` emits a dried close, and the depth premise
+    -- does not exclude g0 — depth measures nesting demand, not supply)
+    -- is FALSE at sf = g0.  So the frame obligation may read `GOK sf
+    -- id`, and `g-mint` supplies it for the one gas the walk itself
+    -- mints: `chainStep`'s `budgetAt e (Sched.slots sched) id`
+    -- (cascadeGo-go below).  Gas-blind instantiations set GOK = ⊤.
+    GOK : Gas → Id → Set
+    g-mint : ∀ (J : ℕ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+             OK J sched st → GOK (budgetAt e (Sched.slots sched) id) id
+
+    -- closure facts for Eb.  e-close covers only the close the walk
+    -- itself seeds (`eb-seed`: a spent source's `exhausted`) — stated
+    -- at that reason, not all of CloseReason, so a nodry Eb flavour
+    -- stays satisfiable (`dried` never passes it)
     e-nil   : ∀ J → Eb J [] ≡ true
-    e-close : ∀ J (src : Source) (r : CloseReason) → Eb J (close src r ∷ []) ≡ true
+    e-close : ∀ J (src : Source) → Eb J (close src exhausted ∷ []) ≡ true
     e-app   : ∀ J evs₁ evs₂ → Eb J evs₁ ≡ true → Eb J evs₂ ≡ true →
               Eb J (evs₁ ++ evs₂) ≡ true
     e-widen : ∀ {J J′} → J ≤ J′ → ∀ evs → Eb J evs ≡ true → Eb J′ evs ≡ true
@@ -294,6 +309,7 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
       (sched : Sched Γ) (st : EvalSt e) → OK J sched st →
       Pb J (f ↠ path′) ≡ true → Vb J vals ≡ true →
       regP? (Pb J) (EvalSt.registry st) ≡ true →
+      GOK sf id →
       -- THE DEPTH PREMISE.  A frame that SUBSCRIBES lands its budget in
       -- `fLvlD S W dep j` at its own `dep`, and widening that to the
       -- walk's `d` is the only thing the from-inner faces cannot source
@@ -351,7 +367,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- allowed to happen
   eb-seed : ∀ (J : ℕ) (src : Source) (fin : Bool) →
             Eb J (if fin then close src exhausted ∷ [] else []) ≡ true
-  eb-seed J src true  = e-close J src exhausted
+  eb-seed J src true  = e-close J src
   eb-seed J src false = e-nil J
 
   -- WHAT ONE RUN REPORTS.  `lvl` is where it landed, `lo` that it only
@@ -383,6 +399,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     Pb J path ≡ true → Vb J vals ≡ true →
     Eb J evs ≡ true →
+    GOK sf id →
     depthFold sf gas id now envSrc path vals evs fin sched st ≤ d →
     let fp = foldPath sf gas id now envSrc path vals evs fin sched st in
     Res J (iterL S W d (pathLen path) J)
@@ -392,6 +409,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchShare-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st → Vb J vals ≡ true →
+    GOK sf id →
     depthDisp sf gas id now i vals fin sched st ≤ d →
     let ds = dispatchShare {t = t} sf gas id now i vals fin sched st in
     Res J J (dCapᶜ S W R d gas J) (proj₁ ds) (proj₁ (proj₂ ds)) st (proj₂ (proj₂ ds))
@@ -401,6 +419,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
     chP? (Pb J) ps ≡ true → Vb J vals ≡ true →
+    GOK sf id →
     depthShareGo sf gas id now i vals fin ps sched st ≤ d →
     let sg = shareGo sf gas id now i vals fin ps sched st in
     Res J J (dWalkᶜ S W R d gas J (length ps))
@@ -412,7 +431,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- LEFT — which is the whole repair, in one line.
   ----------------------------------------------------------------
 
-  foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV hE _ =
+  foldPath-go J sf gas id now envSrc root vals evs fin sched st g hP hV hE _ _ =
     res J ≤-refl
         (≤-trans (≤-reflexive refl)
                  (lvls-infl S W d J (delivN st st)))
@@ -427,7 +446,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- envelope is the handoff-carrying header and `proj₁ ds` is
   -- dispatchShare's stream, so the burst is `b-app` of the envelope
   -- (from `b-handoff`) and `Res.burst DS`.
-  foldPath-go J sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV hE hD =
+  foldPath-go J sf gas id now envSrc (share-sink i) vals evs fin sched st g hP hV hE gk hD =
     res (Res.lvl DS) (Res.lo DS) (Res.hi DS) (Res.good DS) (Res.cnt DS)
       (b-app (Res.lvl DS) (envelope ∷ []) (proj₁ ds)
         (b-widen (Res.lo DS) (envelope ∷ [])
@@ -435,10 +454,10 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (Res.burst DS))
     where
     ds       = dispatchShare {t = t} sf gas id now i vals fin sched st
-    DS       = dispatchShare-go J sf gas id now i vals fin sched st g hV hD
+    DS       = dispatchShare-go J sf gas id now i vals fin sched st g hV gk hD
     envelope = (evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery
 
-  foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV hE hD =
+  foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV hE gk hD =
     res (Res.lvl IH) (≤-trans (m≤m+n J j′) (Res.lo IH))
         (≤-trans (Res.hi IH)
                  (≤-trans (lvls-mono (delivN st₁ (proj₂ (proj₂ fp)))
@@ -465,7 +484,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     dR  = depthFold sf gas id now envSrc path′ (proj₁ r) (evs ++ proj₁ (proj₂ r))
             (proj₁ (proj₂ (proj₂ r)))
             (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-    SF  = sf-step J sf id now f path′ vals fin sched st ok hP hV len
+    SF  = sf-step J sf id now f path′ vals fin sched st ok hP hV len gk
             (≤-trans (m≤m⊔n dF dR) hD)
     j′  = proj₁ SF
     st₁ = proj₂ (proj₂ (proj₂ (proj₂ r)))
@@ -492,7 +511,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SF)))) )
            (p-widen (m≤m+n J j′) path′ (p-tail J f path′ hP))
            (proj₁ (proj₂ (proj₂ (proj₂ SF))))
-           hE-IH
+           hE-IH gk
            (≤-trans (m≤n⊔m dF dR) hD)
     eqD : delivN st (proj₂ (proj₂ fp)) ≡ delivN st₁ (proj₂ (proj₂ fp))
     eqD = foldPath-frame-N sf gas id now envSrc f path′ vals evs fin sched st
@@ -503,7 +522,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- how long that is (`ok-reg`, capsOK?'s own fifth conjunct)
   ----------------------------------------------------------------
 
-  dispatchShare-go J sf zero id now i vals fin sched st g hV _ =
+  dispatchShare-go J sf zero id now i vals fin sched st g hV _ _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (dispatchShare-zero-N sf id now i vals fin sched st))
         (b-nil J)
@@ -513,7 +532,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- shareFinish returns the emits stream UNCHANGED in both branches, so
   -- `proj₁ (dispatchShare … (suc gas) …) = proj₁ out = proj₁ GO_stream`,
   -- and `Res.burst GO` is exactly the burst for the outer Res
-  dispatchShare-go J sf (suc gas) id now i vals fin sched st (ok , len) hV hD =
+  dispatchShare-go J sf (suc gas) id now i vals fin sched st (ok , len) hV gk hD =
     res (Res.lvl GO) (Res.lo GO)
         (≤-trans (Res.hi GO)
                  (≤-reflexive (cong (lvls S W d J) (sym eqD))))
@@ -541,7 +560,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (shareAdmit i (EvalSt.registry st)) sched stL
            ( ok-latch J i fin sched st ok
            , subst (λ rs → regP? (Pb J) rs ≡ true) (sym (shareLatch-reg i fin st)) len )
-           (shareAdmit-chP (Pb J) i (EvalSt.registry st) len) hV hD
+           (shareAdmit-chP (Pb J) i (EvalSt.registry st) len) hV gk hD
 
   ----------------------------------------------------------------
   -- shareGo: one delivery per uncancelled registration, each a chain
@@ -550,7 +569,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- the evaluator's front-to-back fold agree exactly.
   ----------------------------------------------------------------
 
-  shareGo-go J sf gas id now i vals fin [] sched st g hp hV _ =
+  shareGo-go J sf gas id now i vals fin [] sched st g hp hV _ _ =
     res J ≤-refl (lvls-infl S W d J (delivN st st)) g
         (≤-reflexive (delivN-≡ st st refl))
         (b-nil J)
@@ -560,7 +579,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- premise (a with-abstraction does not rewrite a bound hypothesis's
   -- type), and `lub3-l/m/r` read the three summands back out — one per
   -- callee, with the bounds named as that header requires
-  shareGo-go J sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV hD
+  shareGo-go J sf gas id now i vals fin ((rid , p) ∷ ps) sched st g hp hV gk hD
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  =
         -- when cancelled, shareGo recurses on ps with the same state —
@@ -582,7 +601,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         dREST = depthShareGo sf gas id now i vals fin ps
                   (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp))
         SK = shareGo-go J sf gas id now i vals fin ps sched st g
-               (proj₂ (∧-true _ _ hp)) hV (lub3-l dSK dFP dREST hD)
+               (proj₂ (∧-true _ _ hp)) hV gk (lub3-l dSK dFP dREST hD)
   ... | false =
         -- output is `proj₁ fp ++ proj₁ rest`; burst is b-app of
         -- b-widen (Res.lo REST) applied to Res.burst FP, and Res.burst REST
@@ -611,7 +630,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         dREST = depthShareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         FP  = foldPath-go J sf gas id now (toℕ i) p vals evs₀ fin sched st₀
                 ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                (proj₁ (∧-true _ _ hp)) hV hE₀ (lub3-m dSK dFP dREST hD)
+                (proj₁ (∧-true _ _ hp)) hV hE₀ gk (lub3-m dSK dFP dREST hD)
         J₁  = Res.lvl FP
         rest = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         st₂ = proj₂ (proj₂ rest)
@@ -634,7 +653,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) ps (proj₂ (∧-true _ _ hp)))
                  (v-widen (Res.lo FP) vals hV)
-                 (lub3-r dSK dFP dREST hD)
+                 gk (lub3-r dSK dFP dREST hD)
         restCnt : D₂ ≤ dWalkᶜ S W R d gas (lvls S W d J (suc A)) (length ps)
         restCnt = ≤-trans (Res.cnt REST)
                     (dWalkᶜ-mono gas gas (length ps) (length ps) 2≤S ≤-refl ≤-refl ≤-refl
@@ -719,10 +738,14 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         dSK   = depthCascade a id chains sched st
         dFP   = depthChain id a c sched st₀
         dREST = depthCascade a id chains (proj₁ (proj₂ cs)) st₁
+        -- THE MINT: sf₀ IS `budgetAt e (Sched.slots sched) id`, so
+        -- g-mint at the incoming OK supplies its GOK verbatim
+        gk₀  : GOK sf₀ id
+        gk₀  = g-mint J id sched st (proj₁ g)
         FP   = foldPath-go J sf₀ n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
                  evs₀ (Arrival.isLast a) sched st₀
                  ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                 (proj₁ (∧-true _ _ hp)) hV hE₀ (lub3-m dSK dFP dREST hD)
+                 (proj₁ (∧-true _ _ hp)) hV hE₀ gk₀ (lub3-m dSK dFP dREST hD)
         J₁   = Res.lvl FP
         st₂  = proj₂ (proj₂ rest)
         D₁   = delivN st₀ st₁

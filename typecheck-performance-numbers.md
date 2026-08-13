@@ -36,11 +36,14 @@ when nothing moved, so a build does not dirty the tree.
 | `make agda (full gate, 49 modules)` | **743.0 s** | 743.0 s | 1 |
 | `make agda (full gate, 59 modules)` | **704.0 s** | 704.0 s | 1 |
 | `make agda (full gate, 45 modules)` | **662.0 s** | 662.0 s | 1 |
+| `make agda (full gate, 22 modules)` | **352.0 s** | 352.0 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda` | **37.3 s** | 37.3 s | 1 |
 | `agda-dev Verify-Budget-Sufficient/Measures.agda` | **21.9 s** | 21.9 s | 2 |
-| `agda-dev Verify-Budget-Sufficient/Burst-Walk.agda` | **9.9 s** | 9.9 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Burst-Walk.agda` | **9.9 s** | 13.7 s | 2 |
+| `agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda` | **9.4 s** | 9.4 s | 1 |
 | `agda-dev Harness/Main.agda` | **4.3 s** | 7.0 s | 4 |
 
-<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Burst-Walk.agda": {"best": 9.9, "last": 9.9, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 21.9, "last": 21.9, "runs": 2}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}} -->
+<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Burst-Walk.agda": {"best": 9.9, "last": 13.7, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda": {"best": 37.3, "last": 37.3, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda": {"best": 9.4, "last": 9.4, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 21.9, "last": 21.9, "runs": 2}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 22 modules)": {"best": 352.0, "last": 352.0, "runs": 1}, "make agda (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}} -->
 
 <!-- AUTO:END -->
 

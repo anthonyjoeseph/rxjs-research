@@ -1595,8 +1595,13 @@ module BurstWalk
     ; Vb        = VbB c sl Ψ
     ; Eb        = EbB c sl Ψ
     ; Bb        = BbB c sl Ψ
+    -- GAS-BLIND FOR NOW: the two-flavour ledger carries no fuel
+    -- content.  The nodry (third) flavour is what will spend this
+    -- hook — GOK becomes `sf ≡ budgetAt e sl id` when it lands
+    ; GOK       = λ _ _ → ⊤
+    ; g-mint    = λ _ _ _ _ _ → tt
     ; e-nil     = λ _ → refl
-    ; e-close   = λ _ _ _ → refl
+    ; e-close   = λ _ _ → refl
     ; e-app     = λ J es₁ es₂ h₁ h₂ →
                     ∧-intro (all-++-intro _ es₁ es₂ (ebC J es₁ h₁) (ebC J es₂ h₂))
                             (all-++-intro _ es₁ es₂ (ebΨ J es₁ h₁) (ebΨ J es₂ h₂))
@@ -1658,7 +1663,9 @@ module BurstWalk
     ; ok-finish = λ J i fin out ok →
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
-    ; sf-step   = stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
+    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg _ hD →
+                    stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
+                      J sf id now f path′ vals fin sched st ok pb vb rg hD
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH

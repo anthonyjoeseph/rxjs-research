@@ -67,13 +67,15 @@ the old anchor's INV? half already proven at `cascade-wet-via-caps` and
 deleted it; the anchor is now dry-only.
 
 - **`cascadeGo-nodry`** (Burst-Walk § 8) — **FALSITY, the anchor.** The
-  cascade's dry half, all that remains of the old two-conjunct core;
-  unprobeable (the abstract Gas family blocks every probe out of the risky
-  region), so symbolic-or-nothing. Route from its header: extend the Walk's
-  two-flavour ledger with a nodry conjunct (mechanical), landing the content
-  in `stepFrame-burst-face`'s dry conjunct — which is `subscribeE-demand`'s
-  territory, seeded-budget-covers-demand, the class `caps-fuel-root` already
-  proved at the root.
+  cascade's dry half, all that remains of the old two-conjunct core. The
+  falsity core is the demand/supply inequality Rx/Evaluator.agda:709-717
+  records as owed ("a stratification, not a domination — reported, not
+  assumed"); the ledger extension is TRANSPORT, demoted behind it. The
+  can't-probe ruling blocks the SUPPLY side only — demand is measurable
+  by injecting `gasPad h g0` into `subscribeE` and pinning the minimal
+  non-dry height on the amplifier shapes (sweep in flight); the supply
+  comparison stays symbolic and the risk class does not move on green
+  demand rows alone. Full route in the postulate's header.
 - **`subscribeE-wet-core`** (Wet/Part6) — FALSITY, conditional on the anchor.
   The outer instantiation; its named unverified step is the INV?/capᴱ flavour
   conversion; maximal blast radius (both branches of `budget-sufficient`).

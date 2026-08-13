@@ -665,11 +665,14 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p
   ; Vb        = λ J vs → valsCaps? (frameStep J c) sl vs
   -- TRIVIAL BURST INSTANTIATION: Eb and Bb are always true, so every
-  -- closure fact is refl and Res.burst is never projected by callers
+  -- closure fact is refl and Res.burst is never projected by callers.
+  -- GAS-BLIND: the caps axis carries no fuel content, so GOK is ⊤
+  ; GOK       = λ _ _ → ⊤
+  ; g-mint    = λ _ _ _ _ _ → tt
   ; Eb        = λ _ _ → true
   ; Bb        = λ _ _ → true
   ; e-nil     = λ _ → refl
-  ; e-close   = λ _ _ _ → refl
+  ; e-close   = λ _ _ → refl
   ; e-app     = λ _ _ _ _ _ → refl
   ; e-widen   = λ _ _ _ → refl
   ; b-nil     = λ _ → refl
@@ -687,7 +690,7 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   ; ok-latch  = λ J i fin sched st ok →
                   proj₁ ok , shareLatch-caps (frameStep J c) i fin sched st (proj₂ ok)
   ; ok-finish = λ J i fin out ok → walkOK-finish c sl J i fin out ok
-  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL hD →
+  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL _ hD →
                   let r  = stepFrame sf id now f path′ vals fin sched st
                       FC = stepFrame-face siC ifc c d J sl sf id now f path′ vals fin sched st
                              2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV slSz hD in
