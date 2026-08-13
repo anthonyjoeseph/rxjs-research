@@ -131,6 +131,8 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          burstCount?-widen; burstCount?-tail)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner)
+open import Verify-Budget-Sufficient.Op-Budget
+  using (opIterD-dominated)
 
 
 -- THE WALK FACE AND ITS CORE, as types — named once so that neither
@@ -1617,36 +1619,6 @@ postulate
   entry-slotsSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : Id) → slotsSize sl ≤ Caps.cSize (capsAt e sl id)
 
-  -- ENTRY, (iii): the reset cap CEILS the walk — no level the entry
-  -- budget can reach outgrows the NEXT instant's size cap.  This is
-  -- the size-cap half of wet-landing-lift's own chain (opIterD-dominated
-  -- → sizeCount-body → capsAt-suc-full → frameStep-mono-j), stated at
-  -- the entry instantiation exactly; the INV?-transport half stays in
-  -- wet-landing-lift, which should eventually become an assembly over
-  -- this and INV?'s B-monotonicity.  It funds the walk faces' ceiling
-  -- pin `cSize (frameStep L̂ c) ≤ Ŝ` at L̂ := the entry budget.
-  --
-  -- ⚠ SHAPE DEFECT, FOUND 2026-08-13 (same day it was stated): the
-  -- statement is MISSING the two bounds opIterD-dominated requires —
-  -- `3 + nest b sl cs ≤ Caps.cSize (capsAt e sl id)` and
-  -- `suc (sizeᵉ b) ≤ Caps.cSize (capsAt e sl id)` — and is likely
-  -- FALSE without them (an oversized b inflates the budget past one
-  -- instant's blowup).  Both sit UNUSED at the one call site
-  -- (WetOuter's nestOK/opsOK, subscribeE-wet-core).  WITH them the
-  -- postulate is dischargeable outright: sub-charge-capsOK-lift-go
-  -- (.Caps-Bridge, PROVEN, private) runs the exact chain —
-  -- instantiate at j′ := the budget itself (jB := ≤-refl,
-  -- dep := capsH e sl id so depOK := ≤-refl) and take the ⊑ᶜ's cSize
-  -- component.  Repair the statement and assemble in the SAME edit.
-  entry-ceiling : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : Id) {u} (b : Closed Γ u) (cs : List Source) →
-    Caps.cSize (frameStep (opIterD (Caps.cSize (capsAt e sl id))
-                                   (Caps.cWid (capsAt e sl id))
-                                   (capsH e sl id) (nest b sl cs)
-                                   (suc (sizeᵉ b)) 0)
-                          (capsAt e sl id))
-      ≤ sizeCapAt e sl (suc id)
-
   -- ENTRY, (iv): capsOK?'s registry conjunct, read as a LENGTH bound.
   -- capsOK? already carries `regsSz?` (every registered chain's frames
   -- fit the size cap); this is that conjunct with the per-chain path
@@ -1689,6 +1661,39 @@ postulate
             (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
+-- ENTRY, (iii): the reset cap ceils the walk — no level the entry budget can
+-- reach outgrows the NEXT instant's size cap.  Discharged 2026-08-13: the
+-- chain is opIterD-dominated → sizeCount-body → capsAt-suc-full →
+-- frameStep-mono-j (identical to sub-charge-capsOK-lift's route, .Caps-Bridge,
+-- without the final capsOK?-mono step — we only need the size projection).
+-- WetOuter's nestOK/opsOK supply the two size bounds opIterD-dominated needs.
+entry-ceiling : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) {u} (b : Closed Γ u) (cs : List Source) →
+  3 + nest b sl cs ≤ Caps.cSize (capsAt e sl id) →     -- nestOK
+  suc (sizeᵉ b) ≤ Caps.cSize (capsAt e sl id) →        -- opsOK
+  Caps.cSize (frameStep (opIterD (Caps.cSize (capsAt e sl id))
+                                 (Caps.cWid (capsAt e sl id))
+                                 (capsH e sl id) (nest b sl cs)
+                                 (suc (sizeᵉ b)) 0)
+                        (capsAt e sl id))
+    ≤ sizeCapAt e sl (suc id)
+entry-ceiling e sl id b cs nestOK opsOK = proj₁ lift-⊑
+  where
+  c   = capsAt e sl id
+  hS  = 2≤capsAt-size e sl id
+  L₀  = opIterD (Caps.cSize c) (Caps.cWid c) (capsH e sl id)
+                (nest b sl cs) (suc (sizeᵉ b)) 0
+  j≤full : L₀ ≤ sizeCount c (capsH e sl id)
+  j≤full =
+    ≤-trans (opIterD-dominated (Caps.cSize c) (Caps.cWid c) (capsH e sl id)
+                (nest b sl cs) (suc (sizeᵉ b)) (Caps.cReg c)
+                hS nestOK opsOK (1≤capsAt-reg e sl id))
+            (≤-reflexive (sym (sizeCount-body c (capsH e sl id))))
+  lift-⊑ : frameStep L₀ c ⊑ᶜ capsAt e sl (suc id)
+  lift-⊑ = subst (λ x → frameStep L₀ c ⊑ᶜ x)
+                 (sym (capsAt-suc-full e sl id))
+                 (frameStep-mono-j c hS j≤full)
+
 subscribeE-wet-core : WalkLevel → WetOuter
 subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
                     inv pB pS pLen szB fcB gas cOK dW nestOK opsOK depOK =
@@ -1726,7 +1731,7 @@ subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
          -- entry floor, and the ceiling is entry-ceiling at L̂ := the
          -- entry budget itself (so the budget pin is ≤-refl)
          (2≤capsAt-size e sl (suc id)) refl refl
-         (entry-ceiling e sl id b (EvalSt.connectedShares st)) ≤-refl
+         (entry-ceiling e sl id b (EvalSt.connectedShares st) nestOK opsOK) ≤-refl
          ≤-refl gas (m≤n+m (pathLen κ + G) B) regs
 
   -- the Σ's nine conjuncts, named rather than counted: capsOK?,

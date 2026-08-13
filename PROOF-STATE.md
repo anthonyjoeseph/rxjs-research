@@ -75,12 +75,6 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`entry-ceiling`** (Walk-Level) — **SHAPE, repair known, proof
-  available**: stated missing the nest/ops bounds opIterD-dominated
-  requires (likely false without them; both sit unused at its one call
-  site), and WITH them it assembles from sub-charge-capsOK-lift-go's
-  proven chain (Caps-Bridge). Route in its header. First: it is the
-  ground the reset-anchor pins stand on.
 - **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
   coincidence at a weaker instance: both decrement edges have their dry
   side matched by a proven lemma (dBound-connect, dBound-μ), so a green
