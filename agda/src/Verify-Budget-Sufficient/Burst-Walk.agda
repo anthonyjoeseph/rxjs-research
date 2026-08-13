@@ -1940,8 +1940,8 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
   regsO = regsLen?-mono B ℓ (EvalSt.registry st) (m≤m+n B _)
             (capsOK⇒regsLen (frameStep J c) sched st (proj₂ (proj₁ ok)))
 
-  W = wl c Ψ B B (hopR B) G ℓ dep bud (suc (sizeᵉ o)) J
-         fuel o (from-inner op allNid inst ↠ κ) id now sl sched' st
+  W = wl o c Ψ B B (hopR B) G ℓ dep bud (suc (sizeᵉ o)) J
+         fuel (from-inner op allNid inst ↠ κ) id now sl sched' st
          2≤S 1≤R slEq slC slSz cOK szO
          (inner-dWO c sl Ψ J o vb)
          (subscribeE-inner-nodry-pSz c Ψ J op allNid inst κ pb pLen')

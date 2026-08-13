@@ -78,10 +78,12 @@ open import Rx.Prim      using (Tick; Id; Source; init; value; close;
                                 complete; exhausted; subscribe;
                                 _at_from_as_;
                                 Gas; g0; gs; gasPad)
-open import Rx.Exp       using (Ty; obs; Ctx; Closed; Val; Exp; Tm; Fn;
+open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
                                 sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
                                 shellSizeᵉ; innerᵉ;
-                                mapᵉ; μᵉ; unfoldμ; applyFn)
+                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+                                mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
+                                μᵉ; varᵉ; deferᵉ; unfoldμ; applyFn)
 open import Rx.Frame-Width using (dWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain;
@@ -102,14 +104,21 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 
 
 -- THE WALK FACE AND ITS CORE, as types — named once so that neither
--- the postulate that asserts the face nor the assembly that consumes
--- it has to retype the statement.  Both sit above the postulate block
--- because a postulate cannot reference a definition below it.
-WalkLevel : Set
-WalkLevel =
-  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+-- the face nor the assembly that consumes it has to retype the
+-- statement.  All sit above the postulate block because a postulate
+-- cannot reference a definition below it.
+--
+-- WalkStmt ABSTRACTS THE STATEMENT OVER b, so that each clause of the
+-- face's dispatch can state its own obligation as `WalkStmt (ctor …)`
+-- in two lines instead of retyping the forty-line telescope — the
+-- clause postulates below are exactly those instances, and a wrong
+-- specialisation is a type error rather than a drifted copy.  b
+-- therefore moves to the FRONT of WalkLevel's telescope (the dispatch
+-- matches on it); its two application sites pass it first.
+WalkStmt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
+WalkStmt {n} {Γ} {t} {e} {u} b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
+    (g : Gas) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     -- caps prelims, subscribeE-caps' own
     2 ≤ Caps.cSize c →
@@ -150,6 +159,10 @@ WalkLevel =
        × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+WalkLevel : Set
+WalkLevel = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (b : Closed Γ u) → WalkStmt {e = e} b
 
 -- THE 19 ROUTE LEMMAS, RE-HOMED (2026-08-13).  They used to hang off
 -- `subscribeE-wet-core`'s hypothesis list, from the days when that
@@ -279,13 +292,29 @@ WalkLevelCore =
   WalkLevel
 
 postulate
-  -- THE COLLAPSED WALK FACE.  Hypotheses: subscribeE-caps' list
-  -- verbatim (caps prelims, the level-indexed size/width/path bounds,
-  -- the three charge indices dep/bud/ops), then the wet half at the
-  -- SAME level (INV? / fnCap / pathB? at cSize (frameStep j c)), then
-  -- the dry half unchanged (demand at the reset caps, one spare peel,
-  -- the free length ledger ℓ).  Conclusion: subscribeE-caps' Σ with
-  -- the wet conjuncts riding the same witness.
+  -- THE COLLAPSED WALK FACE, CLAUSE BY CLAUSE.  The face's statement:
+  -- subscribeE-caps' hypothesis list verbatim (caps prelims, the
+  -- level-indexed size/width/path bounds, the three charge indices
+  -- dep/bud/ops), then the wet half at the SAME level (INV? / fnCap /
+  -- pathB? at cSize (frameStep j c)), then the dry half unchanged
+  -- (demand at the reset caps, one spare peel, the free length ledger
+  -- ℓ).  Conclusion: subscribeE-caps' Σ with the wet conjuncts riding
+  -- the same witness.
+  --
+  -- THE DISPATCH IS REAL (`walkFace`, below): the face is now split
+  -- along subscribeE-caps' own clause structure, one postulate per
+  -- constructor of the subscribed expression, each a two-line
+  -- `WalkStmt (ctor …)` instance of the face.  What the split has
+  -- already PROVEN, because both discharges are structural: the μ DRY
+  -- MINT IS UNREACHABLE (at g0 the gas hypothesis `g0 hasAtLeast
+  -- suc G` has no constructor — the demand hypothesis excludes the one
+  -- dry close subscribeE itself can mint, the walk-face twin of
+  -- Burst-Walk's budgetAt-gs finding), and varᵉ is closed-term absurd.
+  -- Each remaining clause grinds by riding subscribeE-caps' proven
+  -- clause body (same IH calls, same level arithmetic) with the wet
+  -- conjuncts threaded through; the *All clauses will state the wet
+  -- faces of subscribeAll/subscribeInner as they reach them, which is
+  -- where the hop edge — hasDry's one live risk — gets paid.
   --
   -- Σ-CONTENT CHECKED 2026-08-13 (the "a Σ-receipt has content only
   -- through its witness" rule, run before any clause grind).  NOT
@@ -319,12 +348,11 @@ postulate
   -- need more level than the bound allows, that is the refutation and
   -- it should be stated as a `→ ⊥` here.
   --
-  -- To be ground clause by clause through the mutual block
-  -- (subscribeE / stepFrame / pushBurst / subscribeAll /
-  -- subscribeInner / subscribeSharedSlot), each decrement edge
-  -- consuming one hasAtLeast peel against dBound-μ / dBound-hop /
-  -- dBound-connect, riding subscribeE-caps' proven clause skeleton for
-  -- the level half.
+  -- The grind order for the clauses, per the containment receipt: the
+  -- decrement edges consume one hasAtLeast peel each against
+  -- dBound-μ / dBound-hop / dBound-connect (walk-mu, the *All
+  -- descendants, walk-input's connect respectively), riding
+  -- subscribeE-caps' proven clause skeleton for the level half.
   --
   -- ═══ CONTAINMENT RECEIPT, 2026-08-13 — checked by inspection, and
   -- it says exactly where the FALSITY can and cannot live ═══
@@ -460,7 +488,87 @@ postulate
   -- reachable and are harmless: opIterD's `suc m` clause bumps J
   -- unconditionally (J₀ = suc (J + …)) before any d/k-dependent step
   -- runs.
-  subscribeE-walk-level-core : WalkLevelCore
+
+  -- share/connect clause — expects connect-edge, sharedConnect-unconn,
+  -- obs-slot-shared, unconn-keeps, unconn-cons-≤, connect-anchor and
+  -- the two share-novals lemmas; connect is one of the three gas peels
+  walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (i : Fin n) → WalkStmt {e = e} (input i)
+  -- one-shot emitter — expects oneShot-tail-dry for hasDry
+  walk-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (ts : List (Tm Γ [] [] [] u)) → WalkStmt {e = e} (ofᵉ ts)
+  -- spent one-shot — oneShot-tail-dry at vals ≡ []
+  walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+    WalkStmt {e = e} (emptyᵉ {t = u})
+  -- chain edge — expects hopD-map-emit and applyFn-size for the
+  -- within-instant growth conjuncts
+  walk-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (f : Fn Γ [] [] [] s u) (b : Closed Γ s) → WalkStmt {e = e} (mapᵉ f b)
+  -- node install; takeᵉ 0 is a spent one-shot (oneShot-tail-dry)
+  walk-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
+    WalkStmt {e = e} (takeᵉ cnt b)
+  -- the accumulator clause — the one that GROWS values within an
+  -- instant (applyFn-size is the Ŝ-ceiling supplier; the P-series
+  -- probe receipts in the block header above ran exactly this shape)
+  walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+    (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
+  -- the four *All clauses — the payload-subscribe descendants; the HOP
+  -- gas peel (hasDry's one live risk edge) is paid inside the
+  -- subscribeAll/subscribeInner wet faces these will state, from
+  -- hop-edge + hop-step-gives/needs + seed-covers/budget-covers
+  walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ b)
+  walk-concatAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (b : Closed Γ (obs u)) → WalkStmt {e = e} (concatAllᵉ b)
+  walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (b : Closed Γ (obs u)) → WalkStmt {e = e} (switchAllᵉ b)
+  walk-exhaustAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (b : Closed Γ (obs u)) → WalkStmt {e = e} (exhaustAllᵉ b)
+  -- the μ gas peel — expects mu-edge, shellSize-unfoldμ,
+  -- inner-unfoldμ, hasAtLeast-peel; stated gas-generic (the g0
+  -- instance is vacuously true: its hypotheses are contradictory,
+  -- which walkFace's absurd clause proves rather than assumes)
+  walk-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (body : Exp Γ (u ∷ []) [] [] u) → WalkStmt {e = e} (μᵉ body)
+  -- registration + parked body — the clause that MINTS a registry
+  -- entry, so regsLen?'s growth is paid here
+  walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
+
+-- THE DISPATCH, real from day one: match the subscribed expression,
+-- hand the clause its own obligation.  Two clauses are PROVEN outright:
+-- varᵉ (a closed term has no value variables) and μᵉ at g0 — the μ dry
+-- mint, subscribeE's ONLY dry emit, is unreachable because
+-- `g0 hasAtLeast suc G` has no constructor.  So `hasDry ≡ false` needs
+-- no postulate at the one clause of subscribeE that emits dryness:
+-- what remains is showing the recursive clauses PRESERVE it.
+walkFace : WalkLevel
+walkFace (input i)       = walk-input i
+walkFace (ofᵉ ts)        = walk-of ts
+walkFace emptyᵉ          = walk-empty
+walkFace (mapᵉ f b)      = walk-map f b
+walkFace (takeᵉ cnt b)   = walk-take cnt b
+walkFace (scanᵉ f z b)   = walk-scan f z b
+walkFace (mergeAllᵉ b)   = walk-mergeAll b
+walkFace (concatAllᵉ b)  = walk-concatAll b
+walkFace (switchAllᵉ b)  = walk-switchAll b
+walkFace (exhaustAllᵉ b) = walk-exhaustAll b
+walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ dep bud ops j g0 κ bid now sl sched st
+  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
+walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ dep bud ops j (gs fuel) κ bid now sl sched st =
+  walk-mu body c Ψ F Ŝ R̂ G ℓ dep bud ops j (gs fuel) κ bid now sl sched st
+walkFace (varᵉ ())
+walkFace (deferᵉ body)   = walk-defer body
+
+-- EX-POSTULATE (2026-08-13): the core is the dispatch.  Its 21 route
+-- hypotheses are bound and awaiting their clauses — each clause
+-- postulate's header names the ones expected to pay it, and a clause
+-- grind spends them from module scope, shedding nothing here until the
+-- family is real.
+subscribeE-walk-level-core : WalkLevelCore
+subscribeE-walk-level-core _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = walkFace
 
 subscribeE-walk-level : WalkLevel
 subscribeE-walk-level =
@@ -613,9 +721,9 @@ subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
   regs = regsLen?-mono B ℓ (EvalSt.registry st) (m≤m+n B (pathLen κ + G))
            (capsOK⇒regsLen c sched st cOK)
 
-  W = wl c Ψ Ŝ Ŝ (hopR Ŝ) G ℓ (capsH e sl id)
+  W = wl b c Ψ Ŝ Ŝ (hopR Ŝ) G ℓ (capsH e sl id)
          (nest b sl (EvalSt.connectedShares st)) (suc (sizeᵉ b)) 0
-         g b κ id now sl sched st
+         g κ id now sl sched st
          (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id) refl
          (entry-slotsCaps e sl id) (entry-slotsSize e sl id)
          cOK0 szB dW pS pLen ≤-refl ≤-refl depOK

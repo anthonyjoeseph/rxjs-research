@@ -75,9 +75,14 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`subscribeE-walk-level`** (Walk-Level) — FALSITY. The collapsed walk
-  face; risk is confined to its hasDry and regsLen? conjuncts (containment
-  receipt, conjunct census, and probe coverage in its header).
+- **`walk-input` / `walk-mu` / `walk-{merge,concat,switch,exhaust}All`**
+  (Walk-Level) — FALSITY. The walk face's decrement-edge clauses
+  (connect, μ, hop); the face is clause-split and its hasDry/regsLen?
+  risk lives in these six (receipts and grind order in the block header;
+  the μ dry mint and varᵉ are already proven unreachable).
+- **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
+  The walk face's one-shot and chain clauses; scan exercises the
+  Ŝ-ceiling growth, defer mints the registry entry.
 - **`subscribeE-inner-nodry-pLen`** (Burst-Walk) — **SHAPE, known
   underdetermined**: its conclusion needs one unit of path-length slack
   that no hypothesis carries. Restate the chain; do not grind. Analysis

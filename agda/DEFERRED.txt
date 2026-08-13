@@ -42,22 +42,14 @@ cascadeGo-cons-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
 cascadeGo-skip-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
 cascadeLatch-deliv | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
 chainStep-caps | dry-tick-core | ≤11 | REASON: dry-tick-core must be proven
-connect-edge | subscribeE-walk-level-core | ≤6 | REASON: subscribeE-walk-level-core must be proven
 enterInstant-held | mid-step-core | ≤5 | REASON: mid-step-core must be proven
 enterInstant-idle | mid-step-core | ≤3 | REASON: mid-step-core must be proven
 foldPath-root-out | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-hop-edge | subscribeE-walk-level-core | ≤5 | REASON: subscribeE-walk-level-core must be proven; its premise sizeᵛ (obs u) o ≤ Ŝ is the worked example that motivated this ledger
-hop-step-gives | subscribeE-walk-level-core | ≤2 | REASON: subscribeE-walk-level-core must be proven
-hop-step-needs | subscribeE-walk-level-core | ≤2 | REASON: subscribeE-walk-level-core must be proven
 initReg-wf | subscribeE-input-wf-core | ≤4 | REASON: subscribeE-input-wf-core must be proven
 mid-enters | mid-step-core | ≤5 | REASON: mid-step-core must be proven
 mid-seed | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-mu-edge | subscribeE-walk-level-core | ≤1 | REASON: subscribeE-walk-level-core must be proven
-obs-slot-shared | subscribeE-walk-level-core | ≤2 | REASON: subscribeE-walk-level-core must be proven
 paidUp-held | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-sharedConnect-unconn | subscribeE-walk-level-core | ≤3 | REASON: subscribeE-walk-level-core must be proven
 subscribeE-take-wf | subscribeE-takeᵉ-wf-core | ≤5 | REASON: subscribeE-takeᵉ-wf-core must be proven
-unconn-keeps | subscribeE-walk-level-core | ≤2 | REASON: subscribeE-walk-level-core must be proven
 dry-hop | dry-tick-core | ≤3 | REASON: hop-edge's size-premise discharger; applied when the walk grind reaches hop-edge's call sites
 cascadeGo-burst-dry | dry-tick-core | ≤14 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; replaces chainStep-dry + foldPath-dry (2026-08-10) — a REAL definition over the Burst-Walk whose frame face is now itself an ASSEMBLY (stepFrame-burst-face, Burst-Walk), leaving four wet leaves open (wet-scan/wet-take/wet-inner/wet-thru); its 12 hypotheses are all caller-owned (caps-tick chain, INV? projections, cascade-depth-capsH), and the extra slot is the siC face, supplied at the dry-tick call site by the PROVEN subscribeInner-caps
 cascadeGo-nodry | dry-tick-core | ≤15 | REASON: the ex-anchor, now a REAL projection of the three-flavour walk (2026-08-13); consumed by dry-tick's assembly once dry-tick-core is proven.  Its own risk lives upstream in subscribeInner-nodry (Burst-Walk)
