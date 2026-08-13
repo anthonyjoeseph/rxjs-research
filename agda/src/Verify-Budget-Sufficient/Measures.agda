@@ -2928,7 +2928,7 @@ mutual
 -- the three stories syncBudget's tower height carries above
 -- sizeBudgetAt's (the "(4+sz) vs (1+sz)" gap, now theorem-backed at
 -- the burst; the id > 0 instances are the cascade dry face's
--- obligation, `cascadeGo-nodry`, .Burst-Walk § 8).
+-- obligation, `cascadeGo-nodry`, .Burst-Walk).
 ------------------------------------------------------------------
 
 1≤2^ : ∀ k → 1 ≤ 2 ^ k

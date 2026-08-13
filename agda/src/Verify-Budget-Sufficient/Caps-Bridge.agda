@@ -427,7 +427,7 @@ fn-tick {e = e} a id sched st inv val =
 -- TIER 0, LAST.  Nearly all this postulate's risk is INHERITED from
 -- the anchor chain — its first hypothesis is `cascadeGo-nodry`, which
 -- since 2026-08-13 is a REAL projection of the three-flavour walk
--- (.Burst-Walk § 8), so the inherited risk now bottoms out in
+-- (.Burst-Walk), so the inherited risk now bottoms out in
 -- `stepFrame-nodry` (§ 5a) and through it in `subscribeE-walk-level`
 -- (.Walk-Level).  Given those, what is left here is latch/finish
 -- bookkeeping plus the Deliveries counts.  Work it after the anchor
@@ -609,7 +609,7 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- ledger entries.  Cost one red gate, 2026-08-10.
 --
 -- `cascadeGo-burst-dry` is applied to `subscribeInner-caps` here: its
--- frame face is an ASSEMBLY over `stepFrame-face` (.Burst-Walk § 5b),
+-- frame face is an ASSEMBLY over `stepFrame-face` (`stepFrame-burst-face`, .Burst-Walk),
 -- which needs that face's own siC argument, and this is the first
 -- module importing both sides.
 dry-tick =

@@ -23,7 +23,17 @@ else lives in the code.
 - **No numbering.** Items are referred to BY NAME (postulates are unique,
   greppable names — the wiring law guarantees it). Order within a tier is
   the schedule: top item first. Reorder freely, in the same commit as the
-  finding that reorders it.
+  finding that reorders it. This covers EVERY positional scheme, not just
+  list indices: conjunct positions ("conjunct (8)" — say `the hasDry
+  conjunct`), source section numbers ("§ 5a" — say the postulate's name),
+  timing figures (those live in typecheck-performance-numbers.md alone).
+  A position silently re-aims when the thing it indexes is edited; a name
+  greps or it errors.
+- **One line per item: name + risk class + hook.** The hook says where
+  the risk lives and where the full story is (always a source header) —
+  it does not TELL the story. An entry that has grown sentences of
+  mechanism, receipts, or history is a header that leaked; move it to the
+  postulate's header and cut the entry back to its line.
 - **The ledger is the source of truth, not this file.** `make wiring` lists
   every live postulate; every one of them appears in exactly one tier below,
   and a name here that no longer greps is a bug in this file — fix on sight.
@@ -52,7 +62,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
      │   │                                ← subscribeE-wet ← subscribeE-wet-core
      │   │                                  ← subscribeE-walk-level   [tier 0]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: innerReact-/thruOuter-nodry, dry-tick-core]
+     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeInner-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
@@ -62,74 +72,23 @@ conjuncts, so no amount of caps work retires tier 0.
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
-The postulates form a chain; work them top to bottom. Full routes,
-probe-coverage receipts, and recovery pointers are in their headers.
-Two consolidations landed 2026-08-13: the wet contract restated over
-the COLLAPSED walk (`.Walk-Level`, the E-into-j ruling), and the
-ex-anchor `cascadeGo-nodry` discharged as a projection of the
-three-flavour walk — so both former FALSITY rows now bottom out in
-`subscribeE-walk-level`, and the tier-0 risk is CONSOLIDATED onto one
-statement plus one per-frame face.
+Work top to bottom. Every full route, receipt, and ruling lives in the
+named postulate's own header.
 
-- **`innerReact-nodry` / `thruOuter-nodry`** (Burst-Walk § 5a) —
-  **FALSITY, the anchor's residue**, and now two frames rather than
-  five: `stepFrame-nodry` became a REAL ASSEMBLY on 2026-08-13, with
-  map / scan / take discharged outright. Take fell to
-  `cutThrough-nodry` (§ 1, PROVEN, unconditional): every close the
-  severing path mints is `cut`/`cutPending`, so neither take's cut nor
-  switch's kill can be dry. Chased to their leaves the two survivors
-  MEET — `concatDrain` emits only `subscribeInner`'s events, and
-  `switchKill` is cutThrough — so **the entire remaining dry risk of
-  the cascade is `subscribeInner`**: its `g0` clause is the
-  evaluator's one dry mint, excluded by the gas hypothesis, and its
-  `gs` clause is `subscribeE-walk-level`'s hasDry conjunct. That leaf is
-  now STATED (`SiNodry` / `subscribeInner-nodry`) and both frames are
-  `-core`s over it, so the consolidation is structural rather than
-  prose. The gas threads through every intermediary unchanged
-  (checked), so the g0 exclusion is never re-won. The two manufacture
-  obligations (mid-delivery INV?; the general-id `caps-fuel-root`
-  crib) and the can't-probe ruling are in the § 5a header, unchanged.
-- **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk
-  § 5a) — DIFFICULTY, and delegable. Pure loop transport over the leaf
-  above: re-establish its state-dependent hypotheses after each
-  `concatDrain` queue element and each `thruWalk` step. **The loop
-  question was RULED (A) on 2026-08-13** — thread the already-proven
-  caps faces (siC/ifc) as extra parameters and re-establish `capsOK?`
-  from their Σ-witness, rather than widening those faces' conclusions
-  with a nodry conjunct: (B) re-grinds proven work inside
-  Subscribe-Face, the most expensive module in the tree, and buys no
-  strength. Rationale in the § 5a header.
-- **`subscribeE-walk-level`** (Walk-Level) — FALSITY, and it is now where
-  the conversion's risk lives. The COLLAPSED walk, landed 2026-08-13: the
-  running position is a caps level `j`, the statement is
-  `subscribeE-caps`' proven face verbatim ⊗ the wet conjuncts on one
-  shared witness `j′`, and the `capᴱ W E` ledger is gone from the walk
-  entirely. **CONTAINMENT RECEIPT + conjunct census in its header
-  (2026-08-13):** the thirteen caps hypotheses and the four caps
-  conjuncts are `subscribeE-caps`' own, verbatim — a proven theorem's
-  face — so the entire falsity surface is the WITNESS-COINCIDENCE of
-  the five wet conjuncts, and the census cuts that further: INV? and
-  burstB? are assemblies over the proven caps conjuncts (the
-  registry-cardinality piece is `frameStep-reg≤size`, PROVEN in
-  Caps-Bridge since 2026-08-05 — § 5a's "not yet machine" note was
-  stale), burstHopD? is the documented hop-descent conjunct, leaving
-  **hasDry and regsLen? as the real risk**. Both PROBED 2026-08-13
-  (Demand-Probe P-series, grown-inner shapes at k ≤ 2): mechanism
-  HELD, no refutation, strict-direction Ŝ; the compounding regime
-  (k ≥ 3, shares) is uncovered and keeps the class at FALSITY —
-  receipt with exact coverage in the header. Grind rides
-  subscribeE-caps' clause skeleton.
-- **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the
-  anchor. The outer instantiation; maximal blast radius (both branches of
-  `budget-sufficient`). Restated 2026-08-13 over the collapsed walk and
-  moved out of Wet/Part6, which cannot see the caps vocabulary; its
-  hypothesis list is now `subscribeE-wet-via-caps`' own, free at both
-  call sites. The instantiation to aim the grind (c := capsAt e sl id,
-  j := 0, ℓ floating) is in its header.
-- **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY, risk inherited from
-  the chain above (its first hypothesis, `cascadeGo-nodry`, is now a
-  real projection resting on the two `-nodry` frames above). Latch/finish
-  bookkeeping plus the Deliveries counts. Last in the tier, never first.
+- **`subscribeE-walk-level`** (Walk-Level) — FALSITY. The collapsed walk
+  face; risk is confined to its hasDry and regsLen? conjuncts (containment
+  receipt, conjunct census, and probe coverage in its header).
+- **`subscribeInner-nodry`** (Burst-Walk) — FALSITY. The one leaf every
+  dry path in the cascade reduces to; its risky clause IS the walk face's
+  hasDry conjunct.
+- **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the walk
+  face. Its outer instantiation; maximal blast radius; instantiation plan
+  in its header.
+- **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
+  DIFFICULTY, parked. Loop transport over the leaf; ruling and resumption
+  plans in their headers.
+- **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
+  plus the Deliveries counts. Last in the tier, never first.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 

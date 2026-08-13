@@ -2,7 +2,7 @@
 -- the minimal h* at which each program stops drying.
 -- MODULE_ROOT (see scripts/check-wiring.py): not imported by Main, not
 -- compiled; checked by `make bug-cache`.  Probe receipts are in the
--- headers of the relevant postulates (cascadeGo-nodry in Burst-Walk §8).
+-- headers of the relevant postulates (cascadeGo-nodry in Burst-Walk).
 module Verify-Budget-Sufficient.Demand-Probe where
 
 open import Data.Bool using (Bool; true; false)

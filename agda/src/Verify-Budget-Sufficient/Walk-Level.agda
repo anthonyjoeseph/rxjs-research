@@ -196,7 +196,7 @@ postulate
   --     entry INV? since slots never change and B only widens.  This
   --     is cascade-wet-via-caps' § C recombination, one face down.
   -- · burstB? at the landing cap — the size half is IMPLIED by the
-  --     burstCaps? conjunct via `burstB?-halves` (.Burst-Walk § 4,
+  --     burstCaps? conjunct via `burstB?-halves` (.Burst-Walk,
   --     PROVEN); only the Ψ half (burstΨ?) is new, and it is
   --     level-free.
   -- · burstHopD? — genuinely separate, level-free; the hop-descent
@@ -242,7 +242,8 @@ postulate
   -- V at the hop.  BOTH are funded by the same fact: values produced
   -- this instant stay under the Ŝ ceiling (mid-walk: the value-size
   -- conjuncts at the landing level; at the seam: lvl-fits +
-  -- capsAt-suc-full, .Burst-Walk § 7).  So the whole tier-0 FALSITY
+  -- capsAt-suc-full, `cascadeGo-burst-nodry`'s payoff arithmetic,
+  -- .Burst-Walk).  So the whole tier-0 FALSITY
   -- class now rests on ONE question — does within-instant growth stay
   -- under Ŝ — and that question is PROBEABLE (sizeᵉ / syncSizeᵉ /
   -- dBound / subscribeE all compute).

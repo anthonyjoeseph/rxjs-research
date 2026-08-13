@@ -21,7 +21,7 @@
 --     values are burstB?-good at Dm, given INV?/capsOK?-good state,
 --     B-bounded observable, B-good path, and pathOccs? sz κ.
 --     Its content is the same as stepFrame-burst-face's from-inner case
---     (.Burst-Walk § 2); whichever is discharged first absorbs the other.
+--     (`stepFrame-burst-face`'s wet leaves, .Burst-Walk); whichever is discharged first absorbs the other.
 --   subscribeInner-demand (DEFINITION): real definition over subscribeE-demand
 --     + splitBurst-vals-B.  g0: trivial.  gs: subscribeE + splitBurst.
 --   supply (PROVEN): Dm ≤ Ŝ = sizeCapAt e sl (suc id), by
@@ -74,7 +74,7 @@ open import Verify-Budget-Sufficient.Occurrences
 ------------------------------------------------------------------
 
 -- § 1a  subscribeE-demand — THE PENDING POSTULATE (subscribe-side burst face).
--- Mirrors subscribeE-Ψ (.Burst-Walk § 2.3a) for the demand bound.
+-- Mirrors subscribeE-Ψ (.Burst-Walk) for the demand bound.
 -- PROBED 2026-08-08 (agda/probe/SubInner-Demand-Probe.agda): 20 rows at
 -- init states, no refutation.  Its ex-siblings (chainStep-demand,
 -- foldPath-demand) were retired 2026-08-10 for the delivery-walk route;
