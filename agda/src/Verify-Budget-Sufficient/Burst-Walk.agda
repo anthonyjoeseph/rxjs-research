@@ -2128,6 +2128,7 @@ postulate
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     sf ≡ budgetAt e sl id →
     depthFrame sf id now (from-inner op allNid inst) path′ vals fin sched st ≤ d →
+    (Ŝ L̂ : ℕ) → Caps.cSize (frameStep L̂ c) ≤ Ŝ →
     any dryEvent
         (proj₁ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
                                  path′ vals fin sched st)))
@@ -2168,6 +2169,7 @@ postulate
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     sf ≡ budgetAt e sl id →
     depthFrame sf id now (thru-outer op nid) path′ vals fin sched st ≤ d →
+    (Ŝ L̂ : ℕ) → Caps.cSize (frameStep L̂ c) ≤ Ŝ →
     any dryEvent
         (proj₁ (proj₂ (stepFrame sf id now (thru-outer op nid)
                                  path′ vals fin sched st)))
@@ -2206,17 +2208,18 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
   depthFrame sf id now f path′ vals fin sched st ≤ d →
+  (Ŝ L̂ : ℕ) → Caps.cSize (frameStep L̂ c) ≤ Ŝ →
   any dryEvent
       (proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
     ≡ false
 
 -- MAP: the frame emits nothing at all
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
-                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ = refl
+                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ _ _ _ = refl
 
 -- SCAN: every arm of the node-state dispatch emits `[]`
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
-                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _
+                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _ _ _ _
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                  = refl
 ... | just (take-st _)         = refl
@@ -2230,23 +2233,23 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
 
 -- TAKE: the one severing frame, and it is free (cutThrough-nodry)
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
-                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ =
+                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ _ _ _ =
   takeDispatch-nodry nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
 -- the two *All edges: delegated whole, hypotheses passed verbatim
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
                 (from-inner op allNid inst) path′ vals fin sched st
-                ok pb vb rg gk hD =
+                ok pb vb rg gk hD Ŝ L̂ cl =
   innerReact-nodry-core subscribeInner-nodry
                    c sl Ψ d 2≤S 1≤R slC slSz J sf id now op allNid inst
-                   path′ vals fin sched st ok pb vb rg gk hD
+                   path′ vals fin sched st ok pb vb rg gk hD Ŝ L̂ cl
 
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
                 (thru-outer op nid) path′ vals fin sched st
-                ok pb vb rg gk hD =
+                ok pb vb rg gk hD Ŝ L̂ cl =
   thruOuter-nodry-core subscribeInner-nodry
                   c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid
-                  path′ vals fin sched st ok pb vb rg gk hD
+                  path′ vals fin sched st ok pb vb rg gk hD Ŝ L̂ cl
 
 ------------------------------------------------------------------
 -- THE FRAME FACE, ASSEMBLED (stepFrame-burst-face) — ex-postulate, now a definition.
@@ -2267,6 +2270,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  (Ŝ L̂ : ℕ) → Caps.cSize (frameStep L̂ c) ≤ Ŝ →
   ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -2284,7 +2288,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
     × (VbB c sl Ψ (J + j′) (proj₁ r) ≡ true)
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
-stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
+stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz Ŝ L̂ cl J sf id now f path′ vals fin sched st
                      ok pb vb rg gk hD =
     j′
   , proj₁ (proj₂ FC)
@@ -2298,7 +2302,7 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path�
       (∧-intro (proj₂ (proj₂ (proj₂ (proj₂ WF))))
                (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz
                           J sf id now f path′ vals fin sched st
-                          ok pb vb rg gk hD)))
+                          ok pb vb rg gk hD Ŝ L̂ cl)))
   where
   r  = stepFrame sf id now f path′ vals fin sched st
   s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -2331,6 +2335,7 @@ module BurstWalk
   (2≤S : 2 ≤ Caps.cSize c) (1≤R : 1 ≤ Caps.cReg c)
   (slC : slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true)
   (slSz : slotsSize sl ≤ Caps.cSize c)
+  (L̂ : ℕ) (Ŝ : ℕ) (cl : Caps.cSize (frameStep L̂ c) ≤ Ŝ)
   where
 
   S = Caps.cSize c
@@ -2539,7 +2544,7 @@ module BurstWalk
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
     ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk hD →
                     stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
-                      J sf id now f path′ vals fin sched st ok pb vb rg gk hD
+                      Ŝ L̂ cl J sf id now f path′ vals fin sched st ok pb vb rg gk hD
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
@@ -2605,6 +2610,8 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
   cg  = cascadeGo a id chains sched st
 
   module BW = BurstWalk {e = e} siC ifc c sl Ψ d 2≤S 1≤R slC slSz
+                (sizeCount c d) (sizeCapAt e sl (suc id))
+                (≤-reflexive (sym (cong Caps.cSize (capsAt-suc-full e sl id))))
 
   inv0 : capsOK? (frameStep 0 c) sched st ≡ true
   inv0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv

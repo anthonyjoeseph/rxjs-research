@@ -267,6 +267,26 @@ tail-desc S W d k m J j₁ 2≤S hd =
   ≤-trans (fIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl)
           (≤-reflexive (sym (fIterD-suc S W d k m J)))
 
+-- ONE sLvlD ADVANCE sits within the matching sIterD step — the same
+-- -suc/-infl two-liner as frame-desc/tail-desc.  Used at every element
+-- of a thruWalk loop in the wet walk face.
+walk-desc : ∀ (S W d k m j : ℕ) →
+  sLvlD S W d k (suc j) ≤ sIterD S W d k (suc m) j
+walk-desc S W d k m j =
+  ≤-trans (sIterD-infl S W d k m (sLvlD S W d k (suc j)))
+          (≤-reflexive (sym (sIterD-suc S W d k m j)))
+
+-- ACTUAL INNER OPS ≤ sLvlD MAX.  The inner subscribe at position suc j
+-- runs at most suc (sizeAt S (suc j)) operators (the size cap at that
+-- level); opIterD-mono + sLvlD-suc land the actual count under the max.
+inner-desc : ∀ (S W d bud j m : ℕ) → 2 ≤ S →
+  suc m ≤ suc (sizeAt S (suc j)) →
+  opIterD S W d bud (suc m) (suc j) ≤ sLvlD S W d (suc bud) (suc j)
+inner-desc S W d bud j m 2≤S hm =
+  ≤-trans (opIterD-mono (suc m) (suc (sizeAt S (suc j))) d d bud bud
+             2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hm)
+          (≤-reflexive (sym (sLvlD-suc S W d bud (suc j))))
+
 -- B + suc (B · B) ≤ suc B · suc B — the arithmetic the μ receipt needs,
 -- and the reason the per-operator eval receipt is a SQUARE
 quad-arith : ∀ (B : ℕ) → B + suc (B * B) ≤ suc B * suc B

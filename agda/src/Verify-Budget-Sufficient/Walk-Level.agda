@@ -100,7 +100,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain
                                 switch-st; exhaust-st;
                                 splitBurst; hasDry; dryEvent;
                                 sched-init; st-init; budgetAt; slotsSize;
-                                opIterD; fIterD; fLvlD; sLvlD;
+                                opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
                                 Frame; thru-outer; pushBurst; stepFrame;
                                 subscribeInner; splitEvents; retagEvents;
                                 installNode; NodeId)
@@ -121,7 +121,8 @@ open import Verify-Budget-Sufficient.Caps-Face
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
-         op-desc; push-desc; frame-desc; tail-desc)
+         op-desc; push-desc; frame-desc; tail-desc;
+         walk-desc; inner-desc)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
@@ -335,6 +336,15 @@ WalkLevelCore =
     -- inner-unfoldμ  (Verify-Budget-Sufficient/Measures.agda)
     (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
       innerᵉ (unfoldμ body) ≡ innerᵉ body
+     ) →
+    -- walk-desc  (Verify-Budget-Sufficient/Caps-Chain.agda)
+    (∀ (S W d k m j : ℕ) →
+      sLvlD S W d k (suc j) ≤ sIterD S W d k (suc m) j
+     ) →
+    -- inner-desc  (Verify-Budget-Sufficient/Caps-Chain.agda)
+    (∀ (S W d bud j m : ℕ) → 2 ≤ S →
+      suc m ≤ suc (sizeAt S (suc j)) →
+      opIterD S W d bud (suc m) (suc j) ≤ sLvlD S W d (suc bud) (suc j)
      ) →
   WalkLevel
 
@@ -1530,7 +1540,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
 -- grind spends them from module scope, shedding nothing here until the
 -- family is real.
 subscribeE-walk-level-core : WalkLevelCore
-subscribeE-walk-level-core _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = walkFace
+subscribeE-walk-level-core _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = walkFace
 
 subscribeE-walk-level : WalkLevel
 subscribeE-walk-level =
@@ -1544,7 +1554,7 @@ subscribeE-walk-level =
     (λ {n} {Γ} {u} {A} → share-spent-novals {n} {Γ} {u} {A})
     hasAtLeast-pad hasAtLeast-peel seed-covers budget-covers oneShot-tail-dry
     connect-anchor hopD-map-emit applyFn-size unconn-cons-≤
-    shellSize-unfoldμ inner-unfoldμ
+    shellSize-unfoldμ inner-unfoldμ walk-desc inner-desc
 
 -- THE OUTER WET FACE, as a type.
 WetOuter : Set
