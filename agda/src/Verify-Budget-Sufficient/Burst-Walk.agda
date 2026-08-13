@@ -1,6 +1,10 @@
 ------------------------------------------------------------------
--- BURST-WALK: the two-flavour burst ledger over the Delivery-Walk —
--- the walk/cascade burst content, landed at Ŝ with no tower constant.
+-- BURST-WALK: the THREE-flavour burst ledger over the Delivery-Walk —
+-- the walk/cascade burst content landed at Ŝ with no tower constant,
+-- and (2026-08-13) the cascade's DRY half off the same run: the third
+-- flavour is `nodry`, gas-conditioned through the walk's GOK hook, and
+-- `cascadeGo-nodry` — the ex-anchor — is now a projection (§ 8).  The
+-- anchor's risk lives in ONE per-frame face, `stepFrame-nodry` (§ 5a).
 --
 -- Landed from probe/Caps-Burst-Walk-Probe.agda (2026-08-10), which
 -- was v2 of the route: v1's two bridging postulates were BOTH
@@ -54,20 +58,21 @@
 --
 -- THE FRAME FACE IS NOT A POSTULATE.  `stepFrame-burst-face` (§ 5b) is
 -- an ASSEMBLY over the PROVEN `stepFrame-face` (.Caps-Face:4678) plus
--- five per-frame WET leaves (§ 2).  Four of its six conjuncts come off
--- that one call — the level bound and `capsOK?` verbatim, `valsCaps?`
--- verbatim, and `regP? (pathSz? …)` via `capsOK?-regs` on that same
--- `capsOK?`.  ALL THREE STATE-LOCAL LEAVES ARE PROVEN — map-f (§ 2.4),
--- take-f (§ 2.4b), scan-f (§ 2.4c) — leaving `wet-inner` and `wet-thru`,
--- the two *All edges, which carry the real content: the same family as
--- `subscribeInner-demand` (.Anchor-Dry).
+-- five per-frame WET leaves (§ 2) plus the DRY face (§ 5a).  Four of
+-- its conjuncts come off that one call — the level bound and `capsOK?`
+-- verbatim, `valsCaps?` verbatim, and `regP? (pathSz? …)` via
+-- `capsOK?-regs` on that same `capsOK?`.  ALL THREE STATE-LOCAL WET
+-- LEAVES ARE PROVEN — map-f (§ 2.4), take-f (§ 2.4b), scan-f (§ 2.4c)
+-- — leaving `wet-inner` and `wet-thru`, the two *All edges, which
+-- carry the wet content (same family as `subscribeInner-demand`,
+-- .Anchor-Dry), and `stepFrame-nodry`, which carries the dry.
 --
 -- Also home to frameBΨ?/pathBΨ?/regsBΨ?, RELOCATED from .Caps-Bridge
 -- (they were defined there, downstream of this module's consumers).
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Burst-Walk where
 
-open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; not)
+open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
@@ -80,18 +85,18 @@ open import Data.List.Relation.Unary.All using (All)
 open import Relation.Nullary using (yes; no)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 
 open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent;
                            value; init; close; handoff; complete;
-                           InstEmit)
+                           InstEmit; _at_from_as_; EmitKind; delivery)
 open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator
   using (Sched; EvalSt; Slots; Arrival; RegId; Chain; Path; Frame;
          _↠_; root; share-sink;
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
-         hasDry;
+         hasDry; dryEvent; budgetAt;
          arrTy; arrVal; fLvlD; regAt; subscribeInner; subscribeE;
          splitBurst; splitEvents; sLvlD;
          AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
@@ -128,7 +133,8 @@ open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
          fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
-         fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap)
+         fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
+         hasDry-append; ∨-false)
 
 ------------------------------------------------------------------
 -- § 0  THE Ψ LEDGER — the fnCap halves of valB?/eventB?/burstB? and
@@ -174,8 +180,18 @@ regsBΨ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
 regsBΨ? Ψ = all (λ en → pathBΨ? Ψ (proj₂ (proj₂ (proj₂ en))))
 
 ------------------------------------------------------------------
--- § 1  THE TWO-FLAVOUR LEDGERS, named once so the face postulate and
+-- § 1  THE THREE-FLAVOUR LEDGERS, named once so the face postulate and
 -- the Walk-Hyps instantiation are definitionally the same predicates.
+--
+-- THE THIRD FLAVOUR (2026-08-13, the anchor ruling — § 8): the event
+-- and stream ledgers carry `nodry` beside the caps and Ψ halves.  It
+-- spends the hook the walk always had for it (GOK/g-mint,
+-- .Delivery-Walk § C): nodry is GAS-CONDITIONED — `subscribeInner g0`
+-- emits a dried close, so no gas-blind ledger can carry it — and the
+-- walk's one minted gas (`chainStep`'s `budgetAt e sl id`) is exactly
+-- what GOK pins.  The flavour is level-INDEPENDENT (dryness does not
+-- mention J), so every widen law passes it through untouched; it rides
+-- the same J only because the ledger is one Bool.
 ------------------------------------------------------------------
 
 -- VbB sits OUTSIDE the t-anonymous-module: it never mentions t, and an
@@ -189,10 +205,32 @@ module _ {n} {Γ : Ctx n} {t : Ty} where
   PbB c Ψ J p = pathSz? (Caps.cSize (frameStep J c)) p ∧ pathBΨ? Ψ p
 
   EbB : Caps → Slots Γ → ℕ → ℕ → List (InstEvent (Val Γ t)) → Bool
-  EbB c sl Ψ J es = all (eventCaps? (frameStep J c) sl) es ∧ eventsΨ? Ψ es
+  EbB c sl Ψ J es =
+    all (eventCaps? (frameStep J c) sl) es ∧ eventsΨ? Ψ es
+      ∧ not (any dryEvent es)
 
   BbB : Caps → Slots Γ → ℕ → ℕ → Stream Γ t → Bool
-  BbB c sl Ψ J str = burstCaps? (frameStep J c) sl str ∧ burstΨ? Ψ str
+  BbB c sl Ψ J str =
+    burstCaps? (frameStep J c) sl str ∧ burstΨ? Ψ str
+      ∧ not (hasDry str)
+
+-- dry-freeness of event lists composes over ++ (the stream version is
+-- .Measures' hasDry-append; this is its one-emit mirror)
+any-dry-++ : ∀ {A : Set} (xs ys : List (InstEvent A)) →
+  any dryEvent xs ≡ false → any dryEvent ys ≡ false →
+  any dryEvent (xs ++ ys) ≡ false
+any-dry-++ []       ys h₁ h₂ = h₂
+any-dry-++ (x ∷ xs) ys h₁ h₂
+  with ∨-false (dryEvent x) _ h₁
+... | e₁ , h₁′ rewrite e₁ = any-dry-++ xs ys h₁′ h₂
+
+-- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
+-- carries the ∧-composable form, the dry lemmas speak the other
+not-out : ∀ {x : Bool} → not x ≡ true → x ≡ false
+not-out {false} _ = refl
+
+not-in : ∀ {x : Bool} → x ≡ false → not x ≡ true
+not-in refl = refl
 
 OKB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     → Caps → Slots Γ → ℕ → ℕ → Sched Γ → EvalSt e → Set
@@ -1442,6 +1480,93 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 ... | a₁ , b₁ | a₂ , b₂ = ∧-intro (∧-intro a₁ a₂) (chP?-∧ P Q rs b₁ b₂)
 
 ------------------------------------------------------------------
+-- § 5a  THE DRY FACE OF ONE FRAME — WHERE THE ANCHOR'S RISK NOW LIVES
+-- (2026-08-13; the ruling is § 8's header).
+--
+-- One frame of one delivery, run on the WALK'S OWN MINTED GAS, emits
+-- no dried close.  This is the anchor postulate (`cascadeGo-nodry`,
+-- § 8) with everything transport-shaped stripped off: the walk carries
+-- dryness through appends and widens mechanically (§ 1's third
+-- flavour), so the entire dry content of the cascade concentrates in
+-- this one per-frame face.
+--
+-- THE GAS HYPOTHESIS IS THE POINT.  `sf ≡ budgetAt e sl id` — the one
+-- gas `chainStep` mints (Rx/Evaluator:1598), carried to the frame by
+-- the walk's GOK hook (.Delivery-Walk § C, built for exactly this).
+-- Without it the statement is FALSE: `subscribeInner g0` emits a
+-- dried close and the depth premise does not exclude g0 (depth
+-- measures nesting demand, not supply).
+--
+-- THE GRIND ROUTE, per frame constructor:
+--   · map-f / take-f / scan-f — event inspection: these frames emit
+--     no events of their own (§ 2.4-c's proofs enumerate the outputs);
+--     their nodry halves are refl-shaped.
+--   · from-inner / thru-outer (the risky region, and the reason the
+--     anchor was FALSITY class) — the interior `subscribeE`, consumed
+--     through the COLLAPSED WALK FACE (`subscribeE-walk-level`,
+--     .Walk-Level), whose conjunct (8) is `hasDry ≡ false` and whose
+--     hypotheses are LEVEL-indexed at an arbitrary (c , j) — i.e.
+--     stated to be satisfiable MID-DELIVERY, which the retired outer
+--     face (fixed at capsAt e sl id / id-entry B) was not.  At the
+--     frame's own J, the walk supplies: capsOK? (frameStep J c) and
+--     fnCapBounded? Ψ from OKB; the path facts from PbB; the value
+--     size from VbB.  The two pieces to manufacture, each named the
+--     moment the grind reaches it:
+--       (i) INV? Ψ (cSize (frameStep J c)) mid-delivery — assembled
+--           conjunct-by-conjunct from capsOK? + fnCapBounded? + the
+--           regP? ledger, the SAME move as cascade-wet-via-caps § C
+--           (.Caps-Bridge) makes one stratum up.  Needs
+--           cReg (frameStep J c) ≤ cSize (frameStep J c) — B2's
+--           frameStep analogue — for the registry-length conjunct.
+--           ARITHMETIC CHECKED TRUE 2026-08-13 (hand derivation, not
+--           yet machine): with F j := cSize (frameStep j c), R ≤ S,
+--           2 ≤ S, induct on j: F 0 = S ≥ R; F (suc j) = S + 2S·F j
+--           (frameStep-size-suc) ≥ S·F j + S·F j ≥ F j + R·S, and
+--           R·(1+(1+j)·S) = R·(1+jS) + RS ≤ F j + RS.  Uses only
+--           R ≤ S ≤ F j (iterSize-infl) — no new machinery needed.
+--      (ii) the fuel: `budgetAt e sl id hasAtLeast suc G` for a demand
+--           G measured at Ŝ := sizeCapAt e sl (suc id) — the
+--           general-id crib of `caps-fuel-root` (.Wet/Part6, PROVEN,
+--           id = 0).  SHAPE CHECKED 2026-08-13: `budgetAt e sl id`
+--           unfolds to gasPad (2^(sz·suc id·suc id)) (gasTower
+--           (3 + capsHgo m (suc id))) — the EXACT gas
+--           `budget-hasAtLeast sz m id` (.Measures, PROVEN, general
+--           id) is stated at — and the demand side's chain
+--           (dBound-bound → prod≤3pow → tower-3 → capsAt-tower) is
+--           general in id throughout; only the 6≤V and size-fits
+--           facts change instantiation.  The inner value's size fits
+--           under Ŝ by the walk's own landing arithmetic (lvl-fits +
+--           capsAt-suc-full, § 7).
+--
+-- CLASS: FALSITY, inherited from the anchor — this face IS the
+-- anchor's risky region (a from-inner subscribe mid-delivery), now
+-- with a named engine instead of an unnamed gap.  A failure here that
+-- is not a walk-level failure means the walk cannot supply (i) or
+-- (ii), which would be a finding about the ledger, not this face.
+-- CANNOT BE PROBED, same receipt as the anchor: the gas family is
+-- abstract, and `budgetAt` is a tower the checker will not normalise.
+------------------------------------------------------------------
+
+postulate
+  stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
+    2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    PbB c Ψ J (f ↠ path′) ≡ true →
+    VbB c sl Ψ J vals ≡ true →
+    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+    sf ≡ budgetAt e sl id →
+    depthFrame sf id now f path′ vals fin sched st ≤ d →
+    any dryEvent
+        (proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
+      ≡ false
+
+------------------------------------------------------------------
 -- § 5b  THE FRAME FACE, ASSEMBLED — ex-postulate, now a definition.
 --
 -- Six obligations, FIVE of them off `stepFrame-face`'s single call:
@@ -1450,7 +1575,8 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 -- `capsOK?`.  The Σ's mixed conjuncts recombine caps and Ψ halves
 -- pointwise — `regP?-∧` for the registry, `∧-intro` for values and
 -- events.  All the Ψ content comes from `wet-face`, which is Ψ-pure
--- since the FrameFace move (§ 2 header).
+-- since the FrameFace move (§ 2 header); the nodry third comes from
+-- `stepFrame-nodry` (§ 5a), fed by the new gas hypothesis.
 ------------------------------------------------------------------
 
 stepFrame-burst-face : SiCFace → IfcFace →
@@ -1466,6 +1592,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
   PbB c Ψ J (f ↠ path′) ≡ true →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  sf ≡ budgetAt e sl id →
   depthFrame sf id now f path′ vals fin sched st ≤ d →
   let r  = stepFrame sf id now f path′ vals fin sched st
       s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -1476,7 +1603,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
 stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
-                     ok pb vb rg hD =
+                     ok pb vb rg gk hD =
     j′
   , proj₁ (proj₂ FC)
   , ((proj₁ WF , wCaps) , proj₁ (proj₂ WF))
@@ -1485,7 +1612,11 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path�
       (EvalSt.registry t′)
       (capsOK?-regs (frameStep (J + j′) c) s′ t′ wCaps)
       (proj₁ (proj₂ (proj₂ (proj₂ WF))))
-  , ∧-intro capsEvs (proj₂ (proj₂ (proj₂ (proj₂ WF))))
+  , ∧-intro capsEvs
+      (∧-intro (proj₂ (proj₂ (proj₂ (proj₂ WF))))
+               (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz
+                          J sf id now f path′ vals fin sched st
+                          ok pb vb rg gk hD)))
   where
   r  = stepFrame sf id now f path′ vals fin sched st
   s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -1544,19 +1675,37 @@ module BurstWalk
 
   ebC : ∀ (J : ℕ) (es : List (InstEvent (Val Γ t))) → EbB c sl Ψ J es ≡ true →
         all (eventCaps? (frameStep J c) sl) es ≡ true
-  ebC J es h = proj₁ (∧-true (all (eventCaps? (frameStep J c) sl) es) (eventsΨ? Ψ es) h)
+  ebC J es h = proj₁ (∧-true (all (eventCaps? (frameStep J c) sl) es)
+                             (eventsΨ? Ψ es ∧ not (any dryEvent es)) h)
 
   ebΨ : ∀ (J : ℕ) (es : List (InstEvent (Val Γ t))) → EbB c sl Ψ J es ≡ true →
         eventsΨ? Ψ es ≡ true
-  ebΨ J es h = proj₂ (∧-true (all (eventCaps? (frameStep J c) sl) es) (eventsΨ? Ψ es) h)
+  ebΨ J es h = proj₁ (∧-true (eventsΨ? Ψ es) (not (any dryEvent es))
+                 (proj₂ (∧-true (all (eventCaps? (frameStep J c) sl) es)
+                                (eventsΨ? Ψ es ∧ not (any dryEvent es)) h)))
+
+  ebD : ∀ (J : ℕ) (es : List (InstEvent (Val Γ t))) → EbB c sl Ψ J es ≡ true →
+        not (any dryEvent es) ≡ true
+  ebD J es h = proj₂ (∧-true (eventsΨ? Ψ es) (not (any dryEvent es))
+                 (proj₂ (∧-true (all (eventCaps? (frameStep J c) sl) es)
+                                (eventsΨ? Ψ es ∧ not (any dryEvent es)) h)))
 
   bbC : ∀ (J : ℕ) (str : Stream Γ t) → BbB c sl Ψ J str ≡ true →
         burstCaps? (frameStep J c) sl str ≡ true
-  bbC J str h = proj₁ (∧-true (burstCaps? (frameStep J c) sl str) (burstΨ? Ψ str) h)
+  bbC J str h = proj₁ (∧-true (burstCaps? (frameStep J c) sl str)
+                              (burstΨ? Ψ str ∧ not (hasDry str)) h)
 
   bbΨ : ∀ (J : ℕ) (str : Stream Γ t) → BbB c sl Ψ J str ≡ true →
         burstΨ? Ψ str ≡ true
-  bbΨ J str h = proj₂ (∧-true (burstCaps? (frameStep J c) sl str) (burstΨ? Ψ str) h)
+  bbΨ J str h = proj₁ (∧-true (burstΨ? Ψ str) (not (hasDry str))
+                 (proj₂ (∧-true (burstCaps? (frameStep J c) sl str)
+                                (burstΨ? Ψ str ∧ not (hasDry str)) h)))
+
+  bbD : ∀ (J : ℕ) (str : Stream Γ t) → BbB c sl Ψ J str ≡ true →
+        not (hasDry str) ≡ true
+  bbD J str h = proj₂ (∧-true (burstΨ? Ψ str) (not (hasDry str))
+                 (proj₂ (∧-true (burstCaps? (frameStep J c) sl str)
+                                (burstΨ? Ψ str ∧ not (hasDry str)) h)))
 
   vsC-all : ∀ (c′ : Caps) {s} (vs : List (Val Γ s)) →
     valsCaps? c′ sl vs ≡ true → all (valCaps? c′ sl s) vs ≡ true
@@ -1588,6 +1737,28 @@ module BurstWalk
   ft-Ψ true  = refl
   ft-Ψ false = refl
 
+  -- the nodry mirrors: a mapped value and an optional complete carry
+  -- no dried close by construction
+  mv-nodry : ∀ (vs : List (Val Γ t)) →
+    any dryEvent (map value vs) ≡ false
+  mv-nodry []       = refl
+  mv-nodry (v ∷ vs) = mv-nodry vs
+
+  ft-nodry : ∀ (fin : Bool) →
+    any (dryEvent {Val Γ t}) (if fin then complete ∷ [] else []) ≡ false
+  ft-nodry true  = refl
+  ft-nodry false = refl
+
+  -- one delivery emit is dry-free exactly when its event list is:
+  -- hasDry (em ∷ []) = any dryEvent es ∨ false, and the ∨ collapses
+  -- once the left side is known false
+  nodry-one : ∀ (es : List (InstEvent (Val Γ t))) (id : Id) (src : Source)
+    (k : EmitKind) →
+    any dryEvent es ≡ false →
+    not (hasDry ((es at id from src as k) ∷ [])) ≡ true
+  nodry-one es id src k h =
+    subst (λ x → not (x ∨ false) ≡ true) (sym h) refl
+
   burstH : Walk-Hyps e S W R d
   burstH = record
     { OK        = OKB {e = e} c sl Ψ
@@ -1595,28 +1766,35 @@ module BurstWalk
     ; Vb        = VbB c sl Ψ
     ; Eb        = EbB c sl Ψ
     ; Bb        = BbB c sl Ψ
-    -- GAS-BLIND FOR NOW: the two-flavour ledger carries no fuel
-    -- content.  The nodry (third) flavour is what will spend this
-    -- hook — GOK becomes `sf ≡ budgetAt e sl id` when it lands
-    ; GOK       = λ _ _ → ⊤
-    ; g-mint    = λ _ _ _ _ _ → tt
+    -- THE GAS HOOK, SPENT (2026-08-13, the anchor ruling — § 8): the
+    -- nodry flavour is gas-conditioned, so GOK pins the frame gas to
+    -- the one gas the walk mints.  g-mint is the walk's own slotsEq
+    ; GOK       = λ sf id → sf ≡ budgetAt e sl id
+    ; g-mint    = λ J id sched st ok →
+                    cong (λ s → budgetAt e s id) (proj₁ (proj₁ ok))
     ; e-nil     = λ _ → refl
     ; e-close   = λ _ _ → refl
     ; e-app     = λ J es₁ es₂ h₁ h₂ →
                     ∧-intro (all-++-intro _ es₁ es₂ (ebC J es₁ h₁) (ebC J es₂ h₂))
-                            (all-++-intro _ es₁ es₂ (ebΨ J es₁ h₁) (ebΨ J es₂ h₂))
+                    (∧-intro (all-++-intro _ es₁ es₂ (ebΨ J es₁ h₁) (ebΨ J es₂ h₂))
+                             (not-in (any-dry-++ es₁ es₂
+                                        (not-out (ebD J es₁ h₁))
+                                        (not-out (ebD J es₂ h₂)))))
     ; e-widen   = λ {J} {J′} le es h →
                     ∧-intro (eventsCaps?-widen sl es (frameStep-mono-j c 2≤S le)
                               (ebC J es h))
-                            (ebΨ J es h)
+                            (∧-intro (ebΨ J es h) (ebD J es h))
     ; b-nil     = λ _ → refl
     ; b-app     = λ J s₁ s₂ h₁ h₂ →
                     ∧-intro (all-++-intro _ s₁ s₂ (bbC J s₁ h₁) (bbC J s₂ h₂))
-                            (all-++-intro _ s₁ s₂ (bbΨ J s₁ h₁) (bbΨ J s₂ h₂))
+                    (∧-intro (all-++-intro _ s₁ s₂ (bbΨ J s₁ h₁) (bbΨ J s₂ h₂))
+                             (not-in (hasDry-append s₁ s₂
+                                        (not-out (bbD J s₁ h₁))
+                                        (not-out (bbD J s₂ h₂)))))
     ; b-widen   = λ {J} {J′} le str h →
                     ∧-intro (burstCaps?-widen sl str (frameStep-mono-j c 2≤S le)
                               (bbC J str h))
-                            (bbΨ J str h)
+                            (∧-intro (bbΨ J str h) (bbD J str h))
     ; b-deliv   = λ J id src evs vals fin hE hV →
                     ∧-intro
                       (∧-intro (all-++-intro _ evs _ (ebC J evs hE)
@@ -1625,15 +1803,29 @@ module BurstWalk
                                      (vsC-all (frameStep J c) vals (vbC J vals hV)))
                                    (ft-caps (frameStep J c) fin)))
                                refl)
-                      (∧-intro (all-++-intro _ evs _ (ebΨ J evs hE)
-                                 (all-++-intro _ (map value vals) _
-                                   (mv-Ψ vals (vbΨ J vals hV))
-                                   (ft-Ψ fin)))
-                               refl)
+                      (∧-intro
+                        (∧-intro (all-++-intro _ evs _ (ebΨ J evs hE)
+                                   (all-++-intro _ (map value vals) _
+                                     (mv-Ψ vals (vbΨ J vals hV))
+                                     (ft-Ψ fin)))
+                                 refl)
+                        (nodry-one
+                          (evs ++ map value vals ++ (if fin then complete ∷ [] else []))
+                          id src delivery
+                          (any-dry-++ evs
+                            (map value vals ++ (if fin then complete ∷ [] else []))
+                            (not-out (ebD J evs hE))
+                            (any-dry-++ (map value vals)
+                              (if fin then complete ∷ [] else [])
+                              (mv-nodry vals) (ft-nodry fin)))))
     ; b-handoff = λ J id src evs i hE →
                     ∧-intro
                       (∧-intro (all-++-intro _ evs _ (ebC J evs hE) refl) refl)
-                      (∧-intro (all-++-intro _ evs _ (ebΨ J evs hE) refl) refl)
+                      (∧-intro
+                        (∧-intro (all-++-intro _ evs _ (ebΨ J evs hE) refl) refl)
+                        (nodry-one (evs ++ handoff (toℕ i) ∷ []) id src delivery
+                          (any-dry-++ evs (handoff (toℕ i) ∷ [])
+                            (not-out (ebD J evs hE)) refl)))
     ; p-len     = λ J p h → pathSz?-len (Caps.cSize (frameStep J c)) p (pbC J p h)
     ; p-tail    = λ J f p h →
                     ∧-intro (pathSz?-tail (Caps.cSize (frameStep J c)) f p
@@ -1663,28 +1855,31 @@ module BurstWalk
     ; ok-finish = λ J i fin out ok →
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
-    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg _ hD →
+    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk hD →
                     stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
-                      J sf id now f path′ vals fin sched st ok pb vb rg hD
+                      J sf id now f path′ vals fin sched st ok pb vb rg gk hD
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
 
 ------------------------------------------------------------------
--- § 7  THE PAYOFF — the walk/cascade burst content, at Ŝ, with no Dm.
+-- § 7  THE PAYOFF — the walk/cascade burst content, at Ŝ, with no Dm,
+-- AND the cascade's dry half, off the SAME run (2026-08-13).
 --
 -- The level arithmetic is `cascadeGo-caps`'s own (Caps-Face:4901),
 -- cribbed term for term: Res.cnt through dWalkᶜ-mono and cDel-body,
 -- Res.hi through lvls-mono and sizeCount-body.  Then capsAt-suc-full
 -- lands the widened caps half on capsAt (suc id) — whose cSize IS
 -- sizeCapAt e sl (suc id) — and § 4 recombines with the constant Ψ
--- half.  The consumer (dry-tick-core's telescope, .Caps-Bridge) owns
--- every hypothesis: caps facts from the caps-tick chain, Ψ facts by
--- projection from INV? (valB-fc, regsB?, pathBΨ?-of), the depth from
--- cascade-depth-capsH.
+-- half.  The nodry half projects straight off the third flavour at
+-- the landing level — dryness is level-independent, so it needs no
+-- widening at all.  The consumer (dry-tick-core's telescope,
+-- .Caps-Bridge) owns every hypothesis: caps facts from the caps-tick
+-- chain, Ψ facts by projection from INV? (valB-fc, regsB?,
+-- pathBΨ?-of), the depth from cascade-depth-capsH.
 ------------------------------------------------------------------
 
-cascadeGo-burst-dry : SiCFace → IfcFace →
+cascadeGo-burst-nodry : SiCFace → IfcFace →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (a : Arrival Γ)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -1705,10 +1900,11 @@ cascadeGo-burst-dry : SiCFace → IfcFace →
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
   depthCascade a id chains sched st ≤ capsH e sl id →
-  burstB? (sizeCapAt e sl (suc id)) Ψ
-          (proj₁ (cascadeGo a id chains sched st)) ≡ true
-cascadeGo-burst-dry siC ifc {n = n} {e = e} id a chains sched st
-                    slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
+  (burstB? (sizeCapAt e sl (suc id)) Ψ
+           (proj₁ (cascadeGo a id chains sched st)) ≡ true)
+  × (hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false)
+cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
+                      slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
   burstB?-halves (capsAt e sl (suc id)) sl Ψ (proj₁ cg)
     (subst (λ x → burstCaps? x sl (proj₁ cg) ≡ true)
            (sym (capsAt-suc-full e sl id))
@@ -1716,6 +1912,7 @@ cascadeGo-burst-dry siC ifc {n = n} {e = e} id a chains sched st
               (frameStep-mono-j c 2≤S lvl-fits)
               (BW.bbC (BW.V.Res.lvl GO) (proj₁ cg) (BW.V.Res.burst GO))))
     (BW.bbΨ (BW.V.Res.lvl GO) (proj₁ cg) (BW.V.Res.burst GO))
+  , not-out (BW.bbD (BW.V.Res.lvl GO) (proj₁ cg) (BW.V.Res.burst GO))
   where
   sl  = Sched.slots sched
   Ψ   = ΨAt e sl
@@ -1756,91 +1953,87 @@ cascadeGo-burst-dry siC ifc {n = n} {e = e} id a chains sched st
             (≤-reflexive (sym (sizeCount-body c d)))
 
 ------------------------------------------------------------------
--- § 8  THE ANCHOR — the cascade's dry half, and nothing else.
+-- § 8  THE EX-ANCHOR — the cascade's dry half, now TWO PROJECTIONS of
+-- the § 7 run (2026-08-13; postulate → definition).
 --
--- THE MIRROR CENSUS (2026-08-12), which reshaped tier 0.  The old
--- anchor (`cascadeGo-wet-core`, .Wet/Part6, DELETED — RECOVERY: git
--- show 9b48235 restores it) concluded hasDry × INV?-landing in one
--- postulate.  The census read it against the proven caps apparatus and
--- found the two conjuncts in OPPOSITE states:
+-- THE RULING THAT DISCHARGED IT: the dry half rides the walk as a
+-- THIRD, GAS-CONDITIONED ledger flavour (§ 1), spending the GOK/g-mint
+-- hook the walk was built with (.Delivery-Walk § C).  Every transport
+-- law proved mechanical exactly as the route predicted — appends by
+-- `hasDry-append`/`any-dry-++`, seeds and deliveries by computation
+-- (`dryEvent` is false on value/init/close-exhausted/handoff/complete),
+-- widens for free (dryness is level-independent).  What remains is the
+-- per-frame face, `stepFrame-nodry` (§ 5a), where the WHOLE of the
+-- anchor's former risk now lives — one named postulate whose from-inner
+-- case consumes the COLLAPSED walk face (`subscribeE-walk-level`,
+-- .Walk-Level), the statement built to be satisfiable mid-delivery.
 --
---   · THE INV? HALF WAS ALREADY PROVEN, TWICE.  Externally,
---     `cascade-wet-via-caps` (.Caps-Bridge) lands INV? Ψ′ Ŝ at the
---     cascade's output from caps-tick + fn-tick + the B1/B2 bridges,
---     never reading the old core.  Internally, the Walk's `Res.good`
---     (.Delivery-Walk) threads slotsEq × capsOK? (frameStep J c) ×
---     fnCapBounded? Ψ × regP? through every intermediate cascadeGo
---     state — § 7 projects only `Res.burst` and discards it.  So the
---     old core's INV? conjunct asked for what the repo already had,
---     and its only consumer (dry-tick-core's first hypothesis, whose
---     own conclusion is dry-only) never needed to ask.
---   · THE DRY HALF IS STRUCTURALLY UNMIRRORABLE.  The caps axis is
---     gas-blind end to end: capsOK?, the Walk, cascadeGo-caps carry
---     no fuel content, so no caps output can feed hasDry.  This
---     conjunct is the anchor, and it is all of it.
+-- WHAT THIS MOVE BUYS, in risk-ledger terms: `cascadeGo-nodry` and
+-- `subscribeE-wet-core` used to be two independent FALSITY rows.  Both
+-- now bottom out in `subscribeE-walk-level` (the wet core by
+-- instantiation, the anchor through § 5a's from-inner case), so the
+-- tier-0 risk CONSOLIDATES onto one statement — plus § 5a's two named
+-- manufacture obligations, (i) mid-delivery INV? and (ii) the
+-- general-id fuel, each a crib of a proven sibling.
 --
--- THE POSTULATE CANNOT BE PROBED (receipt inherited 2026-08-11 from
--- the old core, unchanged by the split): the abstract Gas family
--- blocks computation, so no probe reaches the region where the caps
--- hypotheses matter; probed rows covered root-path chains only.
--- Symbolic-or-nothing — do not spend a session probing it.
---
--- PROBED 2026-08-13, DEMAND SIDE ONLY (Demand-Probe): the can't-probe
--- ruling covers the SUPPLY (the opaque seeded budget); the demand is
--- measurable by injecting `gasPad h g0` into subscribeE, and it came
--- back ADDITIVE on every probed shape — h* = k+1 for scan-under-*All
--- (all four operators identical), 2k+1 for double-wrap per step, n
--- per μ layer, 1 per first sharedConnect, 0 for deferᵉ.  Peels happen
--- ONLY at subscribeInner / sharedConnect / μ.  Covered region:
--- subscribe-time bursts.  NOT covered: the delivery path (cascadeGo
--- takes no Gas parameter, its gas is minted internally), which is
--- this postulate's own region — so this receipt AIMS the route's
--- step (2) and moves NO risk class.
---
--- THE ROUTE (this is where the grind goes next):
---   (1) EXTEND THE TWO-FLAVOUR LEDGER TO THREE.  hasDry rides the
---       walk's own burst ledger: Bb/Eb gain a nodry conjunct.  Every
---       ledger law is mechanical — hasDry-append (.Measures:145),
---       hasDry [] = false definitionally, and b-deliv/b-handoff append
---       only value events, exhausted closes and handoffs, none of
---       which is `close _ dried` (dryEvent computes to false on each).
---   (2) THE CONTENT LANDS IN THE FRAME FACE.  A dried close enters the
---       stream only from stepFrame's interior subscribes, so the
---       residue after (1) is stepFrame-burst-face's dry conjunct —
---       whose from-inner case IS `subscribeE-demand` (.Anchor-Dry, its
---       own header says whichever is discharged first absorbs the
---       other).  The gas is not free-floating: chainStep mints
---       `budgetAt e sl id` (Rx/Evaluator:1598), so the dry question is
---       seeded-budget-covers-delivery-demand — the class already
---       proven once at the root (caps-fuel-root), with the supply fact
---       Dm ≤ Ŝ proven in .Anchor-Dry.
---
--- Class FALSITY until evidence reaches the *All interiors — the risky
--- region is a from-inner subscribe mid-delivery, exactly where no
--- probe reaches.  Consumer: dry-tick-core (.Caps-Bridge), which owns
--- every hypothesis below (the caps-tick chain for the caps facts, INV?
--- projections for the Ψ facts, cascade-depth-capsH for the depth).
+-- History (mirror census 2026-08-12, demand-side probe 2026-08-13,
+-- the can't-probe receipt): superseded by this discharge; recover the
+-- full text from the parent of the landing commit if the route ever
+-- needs re-litigating.  The can't-probe receipt SURVIVES on § 5a,
+-- restated there.
 ------------------------------------------------------------------
 
-postulate
-  cascadeGo-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : Id) (a : Arrival Γ)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    let sl = Sched.slots sched
-        Ψ  = ΨAt e sl
-        c  = capsAt e sl id
-    in
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? c sched st ≡ true →
-    fnCapBounded? Ψ sched st ≡ true →
-    valCaps? c sl (arrTy a) (arrVal a) ≡ true →
-    valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
-    all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
-    all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
-    regsBΨ? Ψ (EvalSt.registry st) ≡ true →
-    n ≤ Caps.cSize c →
-    length chains ≤ Caps.cReg c →
-    depthCascade a id chains sched st ≤ capsH e sl id →
-    hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false
+cascadeGo-burst-dry : SiCFace → IfcFace →
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      c  = capsAt e sl id
+  in
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? c sched st ≡ true →
+  fnCapBounded? Ψ sched st ≡ true →
+  valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+  valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+  all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
+  regsBΨ? Ψ (EvalSt.registry st) ≡ true →
+  n ≤ Caps.cSize c →
+  length chains ≤ Caps.cReg c →
+  depthCascade a id chains sched st ≤ capsH e sl id →
+  burstB? (sizeCapAt e sl (suc id)) Ψ
+          (proj₁ (cascadeGo a id chains sched st)) ≡ true
+cascadeGo-burst-dry siC ifc id a chains sched st
+                    slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
+  proj₁ (cascadeGo-burst-nodry siC ifc id a chains sched st
+           slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD)
+
+cascadeGo-nodry : SiCFace → IfcFace →
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      c  = capsAt e sl id
+  in
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? c sched st ≡ true →
+  fnCapBounded? Ψ sched st ≡ true →
+  valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+  valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+  all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
+  regsBΨ? Ψ (EvalSt.registry st) ≡ true →
+  n ≤ Caps.cSize c →
+  length chains ≤ Caps.cReg c →
+  depthCascade a id chains sched st ≤ capsH e sl id →
+  hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false
+cascadeGo-nodry siC ifc id a chains sched st
+                slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
+  proj₂ (cascadeGo-burst-nodry siC ifc id a chains sched st
+           slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD)

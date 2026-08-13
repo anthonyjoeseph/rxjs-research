@@ -425,13 +425,15 @@ fn-tick {e = e} a id sched st inv val =
 -- (dBound-μ/hop/connect).
 --
 -- TIER 0, LAST.  Nearly all this postulate's risk is INHERITED from
--- `cascadeGo-nodry` (.Burst-Walk § 8, the anchor) — its first
--- hypothesis IS that postulate — so it sits squarely on the anchor
--- problem; given the anchor, what is left here is latch/finish
+-- the anchor chain — its first hypothesis is `cascadeGo-nodry`, which
+-- since 2026-08-13 is a REAL projection of the three-flavour walk
+-- (.Burst-Walk § 8), so the inherited risk now bottoms out in
+-- `stepFrame-nodry` (§ 5a) and through it in `subscribeE-walk-level`
+-- (.Walk-Level).  Given those, what is left here is latch/finish
 -- bookkeeping plus the Deliveries counts.  Work it after the anchor
--- resolves, never first.  (An earlier version of this header claimed
--- independence from the caps/INV? bridging problem — wrong, and the
--- kind of wrong that re-orders a schedule.)
+-- chain resolves, never first.  (An earlier version of this header
+-- claimed independence from the caps/INV? bridging problem — wrong,
+-- and the kind of wrong that re-orders a schedule.)
 --
 -- THE MIRROR CENSUS (2026-08-12) SWAPPED THE FIRST HYPOTHESIS.  It
 -- used to be the full `cascadeGo-wet` (hasDry × INV?-landing, the old
@@ -612,7 +614,7 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- module importing both sides.
 dry-tick =
   dry-tick-core
-    (λ {n} {Γ} {t} {e} → cascadeGo-nodry {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → cascadeGo-nodry subscribeInner-caps innerFinish-caps {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → chainStep-caps {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeGo-skip-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})

@@ -52,7 +52,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
      │   │                                ← subscribeE-wet ← subscribeE-wet-core
      │   │                                  ← subscribeE-walk-level   [tier 0]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: cascadeGo-nodry, dry-tick-core]
+     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: stepFrame-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
@@ -60,32 +60,33 @@ The caps route does not replace the wet contract — it rests on it: both
 branches of `budget-sufficient` read `subscribeE-wet`'s `hasDry`/`INV?`
 conjuncts, so no amount of caps work retires tier 0.
 
-## Tier 0 — THE ANCHOR (everything else waits on this)
+## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
-The three postulates form a chain; work them top to bottom. Full routes,
-probe-coverage receipts, and the recovery pointer are in their headers.
-The mirror census (2026-08-12, ruling in `cascadeGo-nodry`'s header) found
-the old anchor's INV? half already proven at `cascade-wet-via-caps` and
-deleted it; the anchor is now dry-only.
+The postulates form a chain; work them top to bottom. Full routes,
+probe-coverage receipts, and recovery pointers are in their headers.
+Two consolidations landed 2026-08-13: the wet contract restated over
+the COLLAPSED walk (`.Walk-Level`, the E-into-j ruling), and the
+ex-anchor `cascadeGo-nodry` discharged as a projection of the
+three-flavour walk — so both former FALSITY rows now bottom out in
+`subscribeE-walk-level`, and the tier-0 risk is CONSOLIDATED onto one
+statement plus one per-frame face.
 
-- **`cascadeGo-nodry`** (Burst-Walk § 8) — **FALSITY, the anchor.** The
-  cascade's dry half, all that remains of the old two-conjunct core. The
-  gas-side demand/supply theory already exists (dBound + hasAtLeast +
-  budget-hasAtLeast, all three decrement edges proven — Wet/Part3's
-  design header), so the anchor's dry content is the wet contract
-  transported through the cascade's frames; the third-flavour ledger
-  extension is demoted to that transport role. The risk concentrates in
-  the shared wet-contract core (see `subscribeE-wet-core`'s named
-  conversion, next) and in whether dBound's arithmetic reaches real
-  demand — which is now measurable: the can't-probe ruling blocks only
-  the opaque seeded budget, and injecting `gasPad h g0` into `subscribeE`
-  pins exact demand. Demand is measured ADDITIVE across every probed
-  shape (Demand-Probe: h* = k+1 single-wrap, 2k+1 double-wrap, n per μ,
-  1 per first connect, 0 for defer) — the chained-scan exponent test of
-  Part3's "tower gains dominate" sentence came back linear, supporting
-  dBound's shape. Subscribe-time region only; the delivery region stays
-  unprobed (cascadeGo mints its own gas), so the risk class does not
-  move. Full route in the postulate's header.
+- **`stepFrame-nodry`** (Burst-Walk § 5a) — **FALSITY, the anchor's
+  residue.** One frame of one delivery, on the walk's own minted gas
+  (`budgetAt e sl id`, pinned by the GOK hook), emits no dried close.
+  The transport that used to surround it is DONE — the third ledger
+  flavour, its closure laws, and the § 8 projections are all real —
+  so this face is the whole of the cascade's dry content. Its
+  from-inner case consumes `subscribeE-walk-level` at the frame's own
+  (c, J); the two manufacture obligations, each a crib of a proven
+  sibling, are named in its header: (i) mid-delivery INV? assembled
+  from the walk's carried facts (the cascade-wet-via-caps § C move,
+  one stratum down; needs B2's frameStep analogue), (ii) the
+  general-id `caps-fuel-root` crib (budget-hasAtLeast + prod≤3pow +
+  capsAt-tower are already general in id). Demand-side probe receipts
+  and the can't-probe supply ruling carry over from the ex-anchor
+  (its § 5a header). The map/take/scan cases are event-inspection
+  proofs — grind the from-inner case FIRST.
 - **`subscribeE-walk-level`** (Walk-Level) — FALSITY, and it is now where
   the conversion's risk lives. The COLLAPSED walk, landed 2026-08-13: the
   running position is a caps level `j`, the statement is
@@ -107,8 +108,9 @@ deleted it; the anchor is now dry-only.
   call sites. The instantiation to aim the grind (c := capsAt e sl id,
   j := 0, ℓ floating) is in its header.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY, risk inherited from
-  `cascadeGo-nodry` (its first hypothesis IS that postulate). Latch/finish
-  bookkeeping plus the Deliveries counts. Last of the three, never first.
+  the chain above (its first hypothesis, `cascadeGo-nodry`, is now a
+  real projection resting on `stepFrame-nodry`). Latch/finish
+  bookkeeping plus the Deliveries counts. Last in the tier, never first.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 
