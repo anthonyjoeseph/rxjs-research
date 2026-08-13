@@ -325,6 +325,11 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 --                          is what the way-out ceiling is exponential
 --                          in, so raising ℓ to satisfy this hypothesis
 --                          RAISES the ceiling GAP 4 already refutes.
+--                          Machine-checked: wet-ell-absurd, below.
+--                          RULED 2026-08-13: under GAP 4's E-into-j
+--                          collapse (ruling in its header) ℓ decouples
+--                          from Ŝ and floats above the demand — this
+--                          refutation kills the PIN, not the ledger.
 --                          (was: the caps face already reads path
 --                          LENGTH at cSize — pathSz?'s
 --                          `suc (pathLen p) ≤ᵇ B` conjunct is the ℓ
@@ -567,6 +572,48 @@ size≤sizeCapAt e sl id =
 -- Both are statement-level and both are face-level, so per the
 -- outside-in rule the clause grind stops here rather than guessing at
 -- them: the gas edges themselves are ground above and wait on this.
+--
+-- RULED 2026-08-13 (design session): THE NESTING BUDGET IS THE GAS.
+-- The one instantiation (a) waited on is ruled, and the ℓ finding in
+-- the parameter map above is what forced the ruling's shape:
+--
+--   · The charge companion recurses on the hasAtLeast PEEL COUNT,
+--     mirroring subscribeE's own gas recursion.  Within one peel
+--     level, frame work is non-recursive and the caps face's
+--     per-frame counting already bounds it; every subscribe → frame →
+--     subscribe re-entry costs exactly one peel, because
+--     subscribeInner / sharedConnect / μ are the machine's only peel
+--     sites and deferᵉ crosses a tick (closed by typing, above).
+--     MEASURED 2026-08-13 (Verify-Budget-Sufficient/Demand-Probe):
+--     demand is additive — one peel per *All layer, per μ, per first
+--     connect; zero for defer; payload-driven layers add linearly
+--     (h* = k+1 single-wrap, 2k+1 double-wrap).  Subscribe-time
+--     region only; the delivery region stays unprobed (cascadeGo
+--     mints its own gas), so this receipt AIMS the restatement and
+--     moves no risk class.  The companion's total is then
+--     entry-computable through G (dBound at the reset caps Ŝ), and
+--     the supply half is the seed-covers / budget-covers class,
+--     already stated and consumed below.
+--   · The walk restates its running position as a LEVEL j —
+--     frameStep iterates on capsAt e sl id — retiring the capᴱ W E
+--     ledger.  The landing becomes j_total ≤ capsH e sl id, which is
+--     caps-tick's own one-instant blowup, ground on the caps side.
+--   · ℓ THEREBY DECOUPLES FROM Ŝ.  Freed from walkCap's exponential
+--     consumption, ℓ floats to pathLen κ + G ⊔ the registry bound,
+--     where `suc Ŝ ≤ G` is harmless.  Both refutations — the way-out
+--     ceiling (wet-ceiling-absurd) and the way-in ℓ pin
+--     (wet-ell-absurd, below) — dissolve at one stroke, which is the
+--     sign they were ONE obstruction: the exponential way-out is what
+--     pinned ℓ down to Ŝ; the demand is what pushes ℓ up past it.
+--   · VERIFY FIRST in the restatement: the mintCount / burstLen
+--     conjuncts must re-index to the level machinery (cReg-driven
+--     per-level counting), not to walkCap Ω ℓ G.  If any consumer
+--     needs them at a caps level, the loop re-enters exactly there —
+--     that is the restatement's first falsity check, before any
+--     clause is ground.
+--   · (b) is unchanged by this ruling: the four INV? conjuncts with
+--     no caps counterpart stay explicit hypotheses on the outer face
+--     (the Caps-Bridge pattern — free at the call site).
 ------------------------------------------------------------------
 
 wet-ceiling-absurd : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -578,6 +625,25 @@ wet-ceiling-absurd : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 wet-ceiling-absurd e sl id Ψ W Ω ℓ E G U r s 3≤E 1≤ dem ceil =
   walk-hyps-absurd Ψ W Ω (sizeCapAt e sl (suc id)) ℓ
                    (hopR (sizeCapAt e sl (suc id))) U r s G E 3≤E 1≤ dem ceil
+
+-- THE WAY-IN INSTANCE (2026-08-13): pinning the walk's length ledger ℓ
+-- to the caps anchor is refuted by the same loop, with no walkCap and
+-- no ceiling needed — the demand measured AT Ŝ already exceeds Ŝ
+-- whenever the contract has content, so `pathLen κ + G ≤ Ŝ` cannot
+-- hold.  This is what generalises GAP 4 past its W/E instance: ANY
+-- walk parameter pinned to Ŝ inherits this, because sucV≤d is about
+-- the demand and the anchor alone.  Ruling in GAP 4's header.
+wet-ell-absurd : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) (p U r s G : ℕ) →
+  1 ≤ r + suc (hopR (sizeCapAt e sl (suc id))) * U →
+  dBound (sizeCapAt e sl (suc id)) (hopR (sizeCapAt e sl (suc id))) U r s ≤ G →
+  p + G ≤ sizeCapAt e sl (suc id) →
+  ⊥
+wet-ell-absurd e sl id p U r s G 1≤ dem len =
+  <-irrefl refl
+    (≤-trans (sucV≤d (sizeCapAt e sl (suc id))
+                     (hopR (sizeCapAt e sl (suc id))) U r s G 1≤ dem)
+             (≤-trans (m≤n+m G p) len))
 
 ------------------------------------------------------------------
 -- THE CASCADE BOOKENDS ON THE INV? FACE — the caps face's

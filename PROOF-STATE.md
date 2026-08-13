@@ -77,16 +77,23 @@ deleted it; the anchor is now dry-only.
   conversion, next) and in whether dBound's arithmetic reaches real
   demand — which is now measurable: the can't-probe ruling blocks only
   the opaque seeded budget, and injecting `gasPad h g0` into `subscribeE`
-  pins exact demand. First rows landed (h* = k+1, linear in delivered
-  values, identical across all four *All operators); the chained-scan
-  exponent — the exact test of Part3's "tower gains per instant
-  dominate" sentence — in flight. Risk class does not move on green
-  demand rows alone. Full route in the postulate's header.
+  pins exact demand. Demand is measured ADDITIVE across every probed
+  shape (Demand-Probe: h* = k+1 single-wrap, 2k+1 double-wrap, n per μ,
+  1 per first connect, 0 for defer) — the chained-scan exponent test of
+  Part3's "tower gains dominate" sentence came back linear, supporting
+  dBound's shape. Subscribe-time region only; the delivery region stays
+  unprobed (cascadeGo mints its own gas), so the risk class does not
+  move. Full route in the postulate's header.
 - **`subscribeE-wet-core`** (Wet/Part6) — FALSITY, conditional on the anchor.
-  The outer instantiation; its named unverified step is the INV?/capᴱ flavour
-  conversion; maximal blast radius (both branches of `budget-sufficient`).
-  The census does NOT shrink this one: the subscribe side has no caps-level
-  charge (GAP 4's named companion), so both its conjuncts stay.
+  The outer instantiation; maximal blast radius (both branches of
+  `budget-sufficient`). Its INV?/capᴱ conversion is RULED (GAP 4's header,
+  2026-08-13): the walk's ledger interface is one obstruction refuted at
+  both ends (`wet-ceiling-absurd` way-out, `wet-ell-absurd` way-in), the
+  route is the E-into-j collapse with the GAS as the charge companion's
+  nesting budget, and ℓ decouples from Ŝ under it. The work is restating
+  `subscribeE-walk` in level terms; first falsity check = the
+  mintCount/burstLen conjuncts' consumers (must re-index to levels, not
+  walkCap).
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY, risk inherited from
   `cascadeGo-nodry` (its first hypothesis IS that postulate). Latch/finish
   bookkeeping plus the Deliveries counts. Last of the three, never first.

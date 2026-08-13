@@ -1785,6 +1785,18 @@ cascadeGo-burst-dry siC ifc {n = n} {e = e} id a chains sched st
 -- hypotheses matter; probed rows covered root-path chains only.
 -- Symbolic-or-nothing — do not spend a session probing it.
 --
+-- PROBED 2026-08-13, DEMAND SIDE ONLY (Demand-Probe): the can't-probe
+-- ruling covers the SUPPLY (the opaque seeded budget); the demand is
+-- measurable by injecting `gasPad h g0` into subscribeE, and it came
+-- back ADDITIVE on every probed shape — h* = k+1 for scan-under-*All
+-- (all four operators identical), 2k+1 for double-wrap per step, n
+-- per μ layer, 1 per first sharedConnect, 0 for deferᵉ.  Peels happen
+-- ONLY at subscribeInner / sharedConnect / μ.  Covered region:
+-- subscribe-time bursts.  NOT covered: the delivery path (cascadeGo
+-- takes no Gas parameter, its gas is minted internally), which is
+-- this postulate's own region — so this receipt AIMS the route's
+-- step (2) and moves NO risk class.
+--
 -- THE ROUTE (this is where the grind goes next):
 --   (1) EXTEND THE TWO-FLAVOUR LEDGER TO THREE.  hasDry rides the
 --       walk's own burst ledger: Bb/Eb gain a nodry conjunct.  Every
