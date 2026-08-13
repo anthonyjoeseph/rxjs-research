@@ -106,6 +106,11 @@ open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-burst-dry; cascadeGo-nodry; valΨ?;
          frameBΨ?; pathBΨ?; regsBΨ?)
 open import Verify-Budget-Sufficient.Occurrences using (pathOccs?)
+-- the wet contract itself, stated over the COLLAPSED walk (2026-08-13).
+-- It lives one arrow above .Wet and .Subscribe-Face because its
+-- statement is the only one reading BOTH vocabularies; this module is
+-- its sole consumer.
+open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
 open import Rx.Prim using (InstEvent)
 open import Rx.Exp using (obs; sizeᵛ)
@@ -1333,7 +1338,12 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
   slotsOK : slotsSize sl ≤ Caps.cSize c
   slotsOK = ≤ᵇ⇒≤ (slotsSize sl) B (T-to ss-in)
 
-  wet     = subscribeE-wet g b κ id now sched st inv pathB szB fnB gas
+  -- the wet face now carries the caps hypotheses too (the collapsed
+  -- walk's outer instantiation reads them); every one is already a
+  -- hypothesis of THIS definition, so they ride through unchanged.
+  wet     = subscribeE-wet g b κ id now sched st
+                           inv pathB pathSzκ lenκ szB fnB gas cOK dW
+                           nestOK opsOK depOK
   dry     : hasDry (proj₁ r) ≡ false
   dry     = proj₁ wet
   invOut  : INV? (ΨAt e (Sched.slots sched′))
@@ -1458,51 +1468,81 @@ sizeE≤cap e ins =
   ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
           (capsAt-base-size e ins 0)
 
--- burst-caps: proven corollary of subscribeE-wet-via-caps.
--- pathLen root = 0, so suc (pathLen root) = 1 ≤ B (option 3 from the
--- design brief: moot at the root call).
+-- THE ROOT INSTANTIATION — ONE call to subscribeE-wet-via-caps, with
+-- burst-dry / burst-bounded / burst-caps as its three projections.
+-- The first two used to be a SECOND root call in .Wet, against the wet
+-- face's five-hypothesis form; on 2026-08-13 the wet face was restated
+-- over the collapsed walk (.Walk-Level) and gained the caps
+-- hypotheses, which are exactly the ones this call site already had to
+-- supply.  So the two calls merged rather than the second one growing.
+-- RECOVERY: git show c87c91a restores the split form.
+--
+-- pathLen root = 0, so suc (pathLen root) = 1 ≤ B (moot at the root).
+-- `EvalSt.connectedShares (st-init e) = []` (Evaluator:943) and
+-- `Sched.slots (sched-init e ins) = ins` (Evaluator:118), so the
+-- premises reduce to the root bounds at (capsAt e ins 0).
+burst-all : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r   = subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)
+      sl′ = Sched.slots (proj₁ (proj₂ r))
+  in (hasDry (proj₁ r) ≡ false)
+     × (INV? (ΨAt e sl′) (sizeCapAt e sl′ 1)
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (capsOK? (capsAt e sl′ 1) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+burst-all {n = n} e ins =
+  subscribeE-wet-via-caps
+    (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+    (init-INV e ins 0)
+    refl
+    refl                                          -- pathSz? B root
+    (≤-trans (s≤s z≤n) (2≤capsAt-size e ins 0))   -- 1 ≤ B
+    (sizeE≤cap e ins)
+    (m≤m+n (fnCapᵉ e) _)
+    (caps-fuel-root e ins)
+    (init-capsOK? e ins 0)
+    (dWe≤cWid e ins)
+    nestOK
+    opsOK
+    (depthE≤capsH-root e ins)
+  where
+  -- the guard repair (`3 + k ≤ S`, Op-Budget) asks for ONE unit more
+  -- than capsAt-base-size gives; capsAt-base-size⁺ supplies it
+  nestOK : 3 + nest e ins [] ≤ Caps.cSize (capsAt e ins 0)
+  nestOK = ≤-trans (+-monoʳ-≤ 3 (nest≤ e ins []))
+                   (capsAt-base-size⁺ e ins 0)
+  opsOK  : suc (sizeᵉ e) ≤ Caps.cSize (capsAt e ins 0)
+  opsOK  = ≤-trans (s≤s (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
+                                 (n≤1+n (sizeᵉ e + slotsSize ins))))
+                   (capsAt-base-size e ins 0)
+
+burst-dry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                            (sched-init e ins) (st-init e))) ≡ false
+burst-dry e ins = proj₁ (burst-all e ins)
+
+burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+          (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) 1)
+          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+burst-bounded e ins = proj₁ (proj₂ (burst-all e ins))
+
 burst-caps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   let r = subscribeE (budgetAt e ins 0) e root 0 0
                      (sched-init e ins) (st-init e)
   in capsOK? (capsAt e ins 1) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-burst-caps {n = n} e ins =
-  let r      = subscribeE (budgetAt e ins 0) e root 0 0
-                           (sched-init e ins) (st-init e)
-      sched₁ = proj₁ (proj₂ r)
-      st₁    = proj₂ (proj₂ r)
-      sl′    = Sched.slots sched₁
-      slEq   : sl′ ≡ ins
-      slEq   = subscribeE-slots (budgetAt e ins 0) e root 0 0
-                                (sched-init e ins) (st-init e)
-      -- `EvalSt.connectedShares (st-init e) = []` (Evaluator:943)
-      -- `Sched.slots (sched-init e ins) = ins` (Evaluator:118)
-      -- so the premises reduce to the root bounds at (capsAt e ins 0).
-      -- the guard repair (`3 + k ≤ S`, Op-Budget) asks for ONE unit
-      -- more than capsAt-base-size gives; capsAt-base-size⁺ supplies it
-      nestOK : 3 + nest e ins [] ≤ Caps.cSize (capsAt e ins 0)
-      nestOK = ≤-trans (+-monoʳ-≤ 3 (nest≤ e ins []))
-                       (capsAt-base-size⁺ e ins 0)
-      opsOK  : suc (sizeᵉ e) ≤ Caps.cSize (capsAt e ins 0)
-      opsOK  = ≤-trans (s≤s (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
-                                     (n≤1+n (sizeᵉ e + slotsSize ins))))
-                       (capsAt-base-size e ins 0)
-      result = subscribeE-wet-via-caps
-                 (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-                 (init-INV e ins 0)
-                 refl
-                 refl                                    -- pathSz? B root
-                 (≤-trans (s≤s z≤n) (2≤capsAt-size e ins 0))  -- 1 ≤ B
-                 (sizeE≤cap e ins)
-                 (m≤m+n (fnCapᵉ e) _)
-                 (caps-fuel-root e ins)
-                 (init-capsOK? e ins 0)
-                 (dWe≤cWid e ins)
-                 nestOK
-                 opsOK
-                 (depthE≤capsH-root e ins)
-      capsOK-out : capsOK? (capsAt e sl′ 1) sched₁ st₁ ≡ true
-      capsOK-out = proj₂ (proj₂ result)
-  in subst (λ s → capsOK? (capsAt e s 1) sched₁ st₁ ≡ true) slEq capsOK-out
+burst-caps e ins =
+  subst (λ s → capsOK? (capsAt e s 1) sched₁ st₁ ≡ true) slEq
+        (proj₂ (proj₂ (burst-all e ins)))
+  where
+  r      = subscribeE (budgetAt e ins 0) e root 0 0
+                      (sched-init e ins) (st-init e)
+  sched₁ = proj₁ (proj₂ r)
+  st₁    = proj₂ (proj₂ r)
+  slEq   : Sched.slots sched₁ ≡ ins
+  slEq   = subscribeE-slots (budgetAt e ins 0) e root 0 0
+                            (sched-init e ins) (st-init e)
 
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →

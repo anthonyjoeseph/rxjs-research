@@ -36,14 +36,21 @@ when nothing moved, so a build does not dirty the tree.
 | `make agda (full gate, 49 modules)` | **743.0 s** | 743.0 s | 1 |
 | `make agda (full gate, 59 modules)` | **704.0 s** | 704.0 s | 1 |
 | `make agda (full gate, 45 modules)` | **662.0 s** | 662.0 s | 1 |
+| `make agda (full gate, 50 modules)` | **660.0 s** | 660.0 s | 1 |
 | `make agda (full gate, 22 modules)` | **352.0 s** | 352.0 s | 1 |
 | `agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda` | **37.3 s** | 37.3 s | 1 |
-| `agda-dev Verify-Budget-Sufficient/Measures.agda` | **21.9 s** | 21.9 s | 2 |
-| `agda-dev Verify-Budget-Sufficient/Burst-Walk.agda` | **9.9 s** | 13.7 s | 2 |
+| `make agda (full gate, 21 modules)` | **35.0 s** | 35.0 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Measures.agda` | **15.9 s** | 15.9 s | 4 |
+| `agda-dev Verify-Budget-Sufficient/Caps-Bridge.agda` | **13.1 s** | 13.1 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Burst-Walk.agda` | **9.9 s** | 10.6 s | 3 |
 | `agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda` | **9.4 s** | 9.4 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Walk-Level.agda` | **6.5 s** | 6.5 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Demand-Probe.agda` | **5.5 s** | 5.5 s | 1 |
+| `agda-dev Verify-Budget-Sufficient/Wet/Part6.agda` | **5.2 s** | 5.2 s | 3 |
 | `agda-dev Harness/Main.agda` | **4.3 s** | 7.0 s | 4 |
+| `agda-dev Verify-Budget-Sufficient/Demand-Probe-TEMP.agda` | **3.7 s** | 5.4 s | 2 |
 
-<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Burst-Walk.agda": {"best": 9.9, "last": 13.7, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda": {"best": 37.3, "last": 37.3, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda": {"best": 9.4, "last": 9.4, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 21.9, "last": 21.9, "runs": 2}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 22 modules)": {"best": 352.0, "last": 352.0, "runs": 1}, "make agda (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}} -->
+<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Burst-Walk.agda": {"best": 9.9, "last": 10.6, "runs": 3}, "agda-dev Verify-Budget-Sufficient/Caps-Bridge.agda": {"best": 13.1, "last": 13.1, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda": {"best": 37.3, "last": 37.3, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda": {"best": 9.4, "last": 9.4, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Demand-Probe-TEMP.agda": {"best": 3.7, "last": 5.4, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Demand-Probe.agda": {"best": 5.5, "last": 5.5, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 15.9, "last": 15.9, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Walk-Level.agda": {"best": 6.5, "last": 6.5, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Wet/Part6.agda": {"best": 5.2, "last": 5.2, "runs": 3}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 21 modules)": {"best": 35.0, "last": 35.0, "runs": 1}, "make agda (full gate, 22 modules)": {"best": 352.0, "last": 352.0, "runs": 1}, "make agda (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 50 modules)": {"best": 660.0, "last": 660.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}} -->
 
 <!-- AUTO:END -->
 

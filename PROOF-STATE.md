@@ -48,8 +48,10 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed/ — tier 2
      ├─ budget-sufficient                Caps-Bridge.agda — PROVEN from:
-     │   ├─ burst-wet   ← subscribeE-wet           [tier 0/1: subscribeE-wet-core + walk residue]
-     │   ├─ burst-caps  ← subscribeE-wet-via-caps  [proven, but reads subscribeE-wet's conjuncts]
+     │   ├─ burst-dry/-bounded ┐ all three are projections of ONE
+     │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
+     │   │                                ← subscribeE-wet ← subscribeE-wet-core
+     │   │                                  ← subscribeE-walk-level   [tier 0]
      │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: cascadeGo-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
@@ -84,16 +86,26 @@ deleted it; the anchor is now dry-only.
   dBound's shape. Subscribe-time region only; the delivery region stays
   unprobed (cascadeGo mints its own gas), so the risk class does not
   move. Full route in the postulate's header.
-- **`subscribeE-wet-core`** (Wet/Part6) — FALSITY, conditional on the anchor.
-  The outer instantiation; maximal blast radius (both branches of
-  `budget-sufficient`). Its INV?/capᴱ conversion is RULED (GAP 4's header,
-  2026-08-13): the walk's ledger interface is one obstruction refuted at
-  both ends (`wet-ceiling-absurd` way-out, `wet-ell-absurd` way-in), the
-  route is the E-into-j collapse with the GAS as the charge companion's
-  nesting budget, and ℓ decouples from Ŝ under it. The work is restating
-  `subscribeE-walk` in level terms; first falsity check = the
-  mintCount/burstLen conjuncts' consumers (must re-index to levels, not
-  walkCap).
+- **`subscribeE-walk-level`** (Walk-Level) — FALSITY, and it is now where
+  the conversion's risk lives. The COLLAPSED walk, landed 2026-08-13: the
+  running position is a caps level `j`, the statement is
+  `subscribeE-caps`' proven face verbatim ⊗ the wet conjuncts on one
+  shared witness `j′`, and the `capᴱ W E` ledger is gone from the walk
+  entirely (with it: the Ω width trio, mintCount, burstLen, and ℓ's pin
+  to Ŝ). The ruling's own falsity check ran first and came back clean —
+  a census of every consumer of the old walk's conclusion found all four
+  retired conjuncts LEVEL-TOLERANT, with the outer `lenOK` sourced from
+  caps-tick rather than from the walk. What is UNTESTED is the statement
+  itself: no clause of it has been ground, and unlike the ledger walk it
+  has no satisfiability contrast. Grind it against subscribeE-caps'
+  clause skeleton, which already walks the level threading.
+- **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the
+  anchor. The outer instantiation; maximal blast radius (both branches of
+  `budget-sufficient`). Restated 2026-08-13 over the collapsed walk and
+  moved out of Wet/Part6, which cannot see the caps vocabulary; its
+  hypothesis list is now `subscribeE-wet-via-caps`' own, free at both
+  call sites. The instantiation to aim the grind (c := capsAt e sl id,
+  j := 0, ℓ floating) is in its header.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY, risk inherited from
   `cascadeGo-nodry` (its first hypothesis IS that postulate). Latch/finish
   bookkeeping plus the Deliveries counts. Last of the three, never first.
@@ -103,10 +115,6 @@ deleted it; the anchor is now dry-only.
 Labour, not risk: nothing here can discover a design failure, and an anchor
 failure would move the ground under all of it.
 
-- **`subscribeE-walk-core`'s residue** (Measures) — DIFFICULTY. 20 named
-  sub-postulates in three shapes: 14 clause faces (worker-shaped,
-  parallelisable), 5 μ-specific (the `syncSize-unfoldμ` pattern), and
-  `walkCap-mono-d`. Grind tips in the section header above them.
 - **`subscribeE-demand`** (Anchor-Dry) — DIFFICULTY. The subscribe-side burst
   face; the same gap as the walk faces, and whichever of it /
   `stepFrame-burst-face`'s wet leaves is discharged first absorbs the other.
