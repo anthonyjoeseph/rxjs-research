@@ -808,6 +808,18 @@ finList-dry false = refl
 -- finished walk face; this statement is the SUBSCRIBE-side leaf the
 -- walk face itself consumes.  Same evaluator function, opposite
 -- direction of dependency.)
+--
+-- PAYABILITY (census 2026-08-13): the ceiling conversion the gs body
+-- owes the inner walkFace call — its own `sLvlD S W dep (suc bud)
+-- (suc j) ≤ L̂` into the inner's `opIterD … (suc j) ≤ L̂` — is
+-- DEFINITIONAL.  sLvlD-suc (Rx.Evaluator, refl):
+--   sLvlD S W d (suc k) J ≡ opIterD S W d k (suc (sizeAt S J)) J
+-- so the leaf's budget IS the inner sweep's budget at ops :=
+-- suc (sizeAt S (suc j)); and `Caps.cSize (frameStep j c)` UNFOLDS to
+-- `sizeAt (Caps.cSize c) j` (both are iterSize S j S), so the inner's
+-- actual ops `suc (sizeᵉ o)` sits under the pinned one by szb +
+-- sizeAt-mono (.Caps, proven) over j ≤ suc j.  The tower was built
+-- for this edge; nothing new is owed here.
 SubscribeInnerWalk : Set
 SubscribeInnerWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j : ℕ)
@@ -931,6 +943,21 @@ postulate
   -- from frameBud, per the caps route (valsCaps→mList-strict).  concatᵒ
   -- additionally queues instead of subscribing; its drain is
   -- innerFinish's job, not this face's.
+  --
+  -- PAYABILITY (census 2026-08-13): the ceiling conversion this core
+  -- owes the leaf per element — its own `fLvlD S W dep j ≤ L̂` into the
+  -- leaf's `sLvlD S W dep′ (suc bud′) (suc jᵢ) ≤ L̂` — is PAYABLE from
+  -- the existing kit, no new mathematics.  The chain: per element,
+  -- `sLvlD S W d k (suc jᵢ) ≤ sIterD S W d k (suc m) jᵢ` is the same
+  -- two-line -suc/-infl shape as frame-desc/tail-desc (.Caps-Chain);
+  -- prefix positions compose by sIterD-mono (walk-step's spine); and
+  -- `fLvlD S W (suc d) j ≡ sIterD S W d (suc (sizeAt S (suc j)))
+  -- (suc (widAt S W j)) (fLvl S W j)` (fLvlD-suc, an EQUALITY) lands
+  -- it, with the loop's k/m under the pinned ones from its own
+  -- count/nest receipts.  THE DEPTH DECREMENTS AT THE FRAME (payload
+  -- priced at d from a frame at suc d — fLvlD-0 has no payload budget
+  -- at all), so this core hands the leaf the PREDECESSOR depth,
+  -- exactly as its proven caps twin already does.
   stepThru-walk-core : SubscribeInnerWalk → StepThruWalk
 
 -- wired per the law: the leaf is consumed the day it is stated

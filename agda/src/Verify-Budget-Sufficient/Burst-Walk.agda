@@ -2088,16 +2088,30 @@ postulate
   -- threads; crib its shape with the caps conjuncts swapped for
   -- `any dryEvent ≡ false` via the SiNodry leaf.
   --
-  -- ⚠ NEW OBLIGATION 2026-08-13, UNMEASURED: the SiNodry leaf now
-  -- carries the reset-anchor ceiling (`cSize (frameStep (opIterD …) c)
-  -- ≤ sizeCapAt e sl (suc id)`), so this loop must PAY it per element,
-  -- at its own c and the element's own nest/size — a postulated
-  -- consumer absorbs a hypothesis silently, so nothing has checked the
-  -- loop can.  Via opIterD-dominated the payment needs the element's
-  -- nest/ops bounds under cSize c, dep under capsH, and the J-shifted
-  -- budget under the J = 0 one (the sadd/mono tower).  The payer
-  -- anchors are the dry-tick chain's own (caps-tick, cascade-depth-
-  -- capsH) — plausible, NOT verified.  Same note on thruOuter below.
+  -- ⚠ CEILING PAYABILITY (census 2026-08-13, MEASURED): the SiNodry
+  -- leaf carries the reset-anchor ceiling (`cSize (frameStep
+  -- (opIterD …) c) ≤ sizeCapAt e sl (suc id)`), and this loop CANNOT
+  -- pay it from its current hypotheses — `c` is free in this statement
+  -- and in everything above it (stepFrame-nodry, stepFrame-burst-face),
+  -- and NO hypothesis in the chain links c to e's cap tower, so the
+  -- right-hand side is underivable.  That is a STATEMENT debt, not a
+  -- proof gap: this core, its twin below, stepFrame-nodry and
+  -- stepFrame-burst-face all owe the WalkStmt pin pair — an explicit
+  -- L̂ with `Caps.cSize (frameStep L̂ c) ≤ sizeCapAt e sl (suc id)` and
+  -- the frame's own budget `≤ L̂` — threaded exactly as Walk-Level
+  -- threads them.  ONCE PINNED, the per-element payments need NO new
+  -- mathematics: frameStep-mono-j (imported above) turns
+  -- element-budget-≤-L̂ into the element's ceiling, and each element's
+  -- opIterD sits under L̂ by the opIterD-mono/-infl kit over the same
+  -- per-element dep/nest/size bounds the caps twin's queue invariant
+  -- already prices (`all (obsCaps? (frameStep j c) sl) q`,
+  -- concatDrain-caps / thruWalk-caps, Subscribe-Face).  Note the twin's
+  -- invariant holds j FIXED across the queue, so no J-shift conversion
+  -- is ever owed — the sadd-tower worry in the earlier note was
+  -- unfounded.  Funding at the top of the chain: the walk face's own
+  -- pins at its stepFrame call sites, and entry-ceiling at the entry —
+  -- no new postulate.  Threading is mechanical, worker-grade.
+  -- Same verdict for thruOuter below.
   innerReact-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
@@ -2134,8 +2148,10 @@ postulate
   -- import block (switchKill-caps sits at Caps-Face/Part4:1619,
   -- exported through the Part5→…→Caps-Face chain).
   --
-  -- ⚠ NEW OBLIGATION 2026-08-13: owes the SiNodry ceiling per element,
-  -- exactly as innerReact-nodry-core above — see that note.
+  -- ⚠ CEILING PAYABILITY (census 2026-08-13, MEASURED): owes the
+  -- SiNodry ceiling per element and CANNOT pay it as stated — same
+  -- verdict, same repair (the WalkStmt pin pair), same funding as
+  -- innerReact-nodry-core above; the full analysis is in that note.
   thruOuter-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →

@@ -131,10 +131,10 @@ named postulate's own header.
   (Its former row-mate pathB?-mono-B is GONE — it duplicated the proven
   pathB?-widen, .Measures, found by a name clash; grep before stating.)
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
-  DIFFICULTY, parked. Loop transport over the leaf; ruling and resumption
-  plans in their headers. Their SiNodry leaf now carries the
-  reset-anchor ceiling, which their eventual proofs must pay at their
-  own c — payability unmeasured; note in their headers.
+  DIFFICULTY, parked, plus a known statement debt: they (and the
+  stepFrame-nodry chain above them) owe the WalkStmt pin pair to pay
+  the SiNodry ceiling — mechanical threading, verdict and route in
+  innerReact-nodry-core's header.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
   plus the Deliveries counts. Last in the tier, never first.
 
