@@ -68,13 +68,19 @@ deleted it; the anchor is now dry-only.
 
 - **`cascadeGo-nodry`** (Burst-Walk § 8) — **FALSITY, the anchor.** The
   cascade's dry half, all that remains of the old two-conjunct core. The
-  falsity core is the demand/supply inequality Rx/Evaluator.agda:709-717
-  records as owed ("a stratification, not a domination — reported, not
-  assumed"); the ledger extension is TRANSPORT, demoted behind it. The
-  can't-probe ruling blocks the SUPPLY side only — demand is measurable
-  by injecting `gasPad h g0` into `subscribeE` and pinning the minimal
-  non-dry height on the amplifier shapes (sweep in flight); the supply
-  comparison stays symbolic and the risk class does not move on green
+  gas-side demand/supply theory already exists (dBound + hasAtLeast +
+  budget-hasAtLeast, all three decrement edges proven — Wet/Part3's
+  design header), so the anchor's dry content is the wet contract
+  transported through the cascade's frames; the third-flavour ledger
+  extension is demoted to that transport role. The risk concentrates in
+  the shared wet-contract core (see `subscribeE-wet-core`'s named
+  conversion, next) and in whether dBound's arithmetic reaches real
+  demand — which is now measurable: the can't-probe ruling blocks only
+  the opaque seeded budget, and injecting `gasPad h g0` into `subscribeE`
+  pins exact demand. First rows landed (h* = k+1, linear in delivered
+  values, identical across all four *All operators); the chained-scan
+  exponent — the exact test of Part3's "tower gains per instant
+  dominate" sentence — in flight. Risk class does not move on green
   demand rows alone. Full route in the postulate's header.
 - **`subscribeE-wet-core`** (Wet/Part6) — FALSITY, conditional on the anchor.
   The outer instantiation; its named unverified step is the INV?/capᴱ flavour

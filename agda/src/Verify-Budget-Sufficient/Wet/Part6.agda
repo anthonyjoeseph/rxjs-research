@@ -308,10 +308,27 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 --                          why there is no cHop
 --   F  ←  Ŝ              — same object; reach-resets' second component
 --                          is stated at index C = Ŝ
---   ℓ  ←  Caps.cSize (capsAt e sl (suc id))  — the caps face already
---                          reads path LENGTH at cSize: pathSz?'s
+--   ℓ  ←  REFUTED AT Ŝ (2026-08-13).  The reading below is right about
+--                          where the LENGTH ledger lives, and wrong
+--                          about the level.  The walk also demands
+--                          `pathLen κ + G ≤ ℓ`, and G is the demand
+--                          MEASURED AT Ŝ, so `sucV≤d` (.Measures:6476)
+--                          gives `suc Ŝ ≤ G` under the same
+--                          one-hop-or-one-share side condition GAP 4
+--                          runs on.  Then `pathLen κ + G ≥ G > Ŝ`, and
+--                          ℓ := Ŝ cannot hold.  THIS IS GAP 4'S LOOP ON
+--                          THE WAY IN: any parameter the map pins to Ŝ
+--                          inherits the refutation, because the demand
+--                          measured at Ŝ exceeds Ŝ.  GAP 4 is the W/E
+--                          instance; this is the ℓ instance.  And the
+--                          two compose the wrong way — `walkCap Ω ℓ G`
+--                          is what the way-out ceiling is exponential
+--                          in, so raising ℓ to satisfy this hypothesis
+--                          RAISES the ceiling GAP 4 already refutes.
+--                          (was: the caps face already reads path
+--                          LENGTH at cSize — pathSz?'s
 --                          `suc (pathLen p) ≤ᵇ B` conjunct is the ℓ
---                          ledger at ℓ := cSize (its own memo says so)
+--                          ledger at ℓ := cSize, its own memo says so)
 --   Ω  ←  NOT a Caps field.  ΩAt e sl.  cWid is the FRAME width
 --                          (widLive / widNode); Ω is the per-NODE ofW
 --                          width (widthOK?), and om-is-not-a-frame-
