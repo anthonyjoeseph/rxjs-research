@@ -75,11 +75,11 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`walk-input` / `walk-mu` / `walk-{merge,concat,switch,exhaust}All`**
-  (Walk-Level) — FALSITY. The walk face's decrement-edge clauses
-  (connect, μ, hop); the face is clause-split and its hasDry/regsLen?
-  risk lives in these six (receipts and grind order in the block header;
-  the μ dry mint and varᵉ are already proven unreachable).
+- **`walk-input` / `walk-mu` / `subscribeAll-walk`** (Walk-Level) —
+  FALSITY. The walk face's decrement-edge clauses (connect, μ, hop);
+  the four *All heads are real delegations into subscribeAll-walk,
+  whose body will state the subscribeInner wet face where the hop peel
+  is paid (route and ledger receipt in its header).
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.

@@ -67,7 +67,8 @@ open import Data.Bool    using (Bool; true; false)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Nat.Properties using (≤-refl; m≤m+n; m≤n+m)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m+n; m≤n+m; n≤1+n)
+open import Data.Maybe   using (nothing)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (Vec; lookup)
@@ -89,6 +90,10 @@ open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain;
                                 memberSource; Path; root; share-sink; _↠_;
                                 Stream; subscribeE; sharedConnect;
+                                subscribeAll; AllOp;
+                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+                                NodeState; merge-st; concat-st;
+                                switch-st; exhaust-st;
                                 splitBurst; hasDry; dryEvent;
                                 sched-init; st-init; budgetAt; slotsSize;
                                 opIterD)
@@ -99,8 +104,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain
 open import Verify-Budget-Sufficient.Wet
 -- the caps face: only the five predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
+  using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
+         widNode; merge-step; concat-step; switch-step; exhaust-step)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthAll)
 
 
 -- THE WALK FACE AND ITS CORE, as types — named once so that neither
@@ -312,9 +318,10 @@ postulate
   -- Burst-Walk's budgetAt-gs finding), and varᵉ is closed-term absurd.
   -- Each remaining clause grinds by riding subscribeE-caps' proven
   -- clause body (same IH calls, same level arithmetic) with the wet
-  -- conjuncts threaded through; the *All clauses will state the wet
-  -- faces of subscribeAll/subscribeInner as they reach them, which is
-  -- where the hop edge — hasDry's one live risk — gets paid.
+  -- conjuncts threaded through; the *All clauses delegate to
+  -- subscribeAll-walk (below, the wet face of subscribeAll); the hop
+  -- edge — hasDry's one live risk — is paid one face further down
+  -- (subscribeInner), stated when that delegate's body is written.
   --
   -- Σ-CONTENT CHECKED 2026-08-13 (the "a Σ-receipt has content only
   -- through its witness" rule, run before any clause grind).  NOT
@@ -514,18 +521,95 @@ postulate
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
-  -- the four *All clauses — the payload-subscribe descendants; the HOP
-  -- gas peel (hasDry's one live risk edge) is paid inside the
-  -- subscribeAll/subscribeInner wet faces these will state, from
-  -- hop-edge + hop-step-gives/needs + seed-covers/budget-covers
-  walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ b)
-  walk-concatAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (b : Closed Γ (obs u)) → WalkStmt {e = e} (concatAllᵉ b)
-  walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (b : Closed Γ (obs u)) → WalkStmt {e = e} (switchAllᵉ b)
-  walk-exhaustAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (b : Closed Γ (obs u)) → WalkStmt {e = e} (exhaustAllᵉ b)
+  -- THE *All DELEGATE — subscribeAll-caps ⊗ the wet content, one Σ,
+  -- exactly as WalkStmt is subscribeE-caps ⊗ the same content.  The
+  -- four *All clause obligations are REAL definitions below the block,
+  -- each delegating its whole body here — mirroring subscribeE-caps'
+  -- own four heads → subscribeAll-caps (.Subscribe-Face:3108), so the
+  -- op-step index split and the mint→install→subscribe→push walk live
+  -- in ONE statement instead of four drifting copies.
+  --
+  -- The hypothesis list is subscribeAll-caps' own, verbatim and in its
+  -- order, then the wet half with the composite's measures in REDUCED
+  -- form — suc (hopDᵉ F b), suc (syncSizeᵉ b), fnCapᵉ b,
+  -- suc (suc (sizeᵉ b)) — because every *All constructor computes to
+  -- exactly those, so the four heads pass their hypotheses through
+  -- untouched (the caps precedent: "inherits their index and their
+  -- hypothesis verbatim").
+  --
+  -- ONE wet hypothesis is new, fnCapNode Ψ ns: INV?'s fnCapBounded?
+  -- conjunct reads EvalSt.nodes, which installNode extends, so the Ψ
+  -- half of the install must be funded.  (The SIZE half rides the caps
+  -- boundedNode hypothesis already in the list — stBounded? reads the
+  -- same node list.)  All four heads supply it by refl: merge-st /
+  -- switch-st / exhaust-st are `true` outright, concat-st [] is
+  -- `all _ []`.
+  --
+  -- THE LEDGER FUNDS THE EDGE (checked at authoring; the route for the
+  -- eventual body).  The recursive walk on b runs at κ′ = thru-outer
+  -- op nid ↠ κ, ONE frame longer, and the composite demand pays for
+  -- it: hop-step-gives at (r := hopDᵉ F b, s := suc (syncSizeᵉ b),
+  -- s′ := syncSizeᵉ b) turns the demand hypothesis into
+  -- suc (dBound … (hopDᵉ F b) (syncSizeᵉ b)) ≤ G, so G′ := that dBound
+  -- funds the recursive demand by ≤-refl, the gas by hasAtLeast's
+  -- downward monotonicity, and the ledger by
+  -- pathLen κ′ + G′ = suc (pathLen κ + G′) ≤ pathLen κ + G ≤ ℓ —
+  -- the extension unit paid exactly.  The one-unit slack that is
+  -- MISSING at subscribeE-inner-nodry-pLen (its header) is PRESENT
+  -- here: this edge spends a demand unit, the inner edge as stated has
+  -- none to spend.
+  --
+  -- WHERE THE HOP PEEL IS PAID: not here.  It sits inside
+  -- pushBurst→stepFrame→subscribeInner — the next face down, stated
+  -- when this body is written.  This statement's burstHopD? conjunct
+  -- on the returned burst is the plumbing that makes the peel strict
+  -- there with no arithmetic (hopDev?'s header, .Measures): an inner
+  -- drawn from b's burst has hopD ≤ hopDᵉ F b < suc (hopDᵉ F b), by
+  -- definition.
+  subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
+    (g : Gas) (op : AllOp) (ns : NodeState Γ)
+    (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    boundedNode (Caps.cSize (frameStep (suc j) c)) ns ≡ true →
+    widNode (Caps.cWid (frameStep (suc j) c)) sl ns ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (suc (sizeᵉ b)) ≤ ops →
+    depthAll g op ns b κ bid now sched st ≤ dep →
+    -- the wet half, WalkStmt's own
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    fnCapNode Ψ ns ≡ true →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    -- the dry half, at the composite's own measures (each *All
+    -- constructor computes to exactly this suc/suc form)
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (suc (hopDᵉ F b)) (suc (syncSizeᵉ b)) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeAll g op ns b κ bid now sched st
+    in Σ ℕ λ j′ →
+       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+       × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+       × (j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j)
+       × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (suc (hopDᵉ F b)) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
   -- the μ gas peel — expects mu-edge, shellSize-unfoldμ,
   -- inner-unfoldμ, hasAtLeast-peel; stated gas-generic (the g0
   -- instance is vacuously true: its hypotheses are contradictory,
@@ -536,6 +620,58 @@ postulate
   -- entry, so regsLen?'s growth is paid here
   walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
+
+-- THE FOUR *All HEADS, REAL: each delegates its whole body to
+-- subscribeAll-walk, exactly as subscribeE-caps' four heads delegate
+-- to subscribeAll-caps — the node bounds (caps AND wet) are refl at
+-- every initial state, the size hypothesis sheds the constructor's
+-- suc, the nest hypothesis steps by the Caps-Nest lemma, and every
+-- other hypothesis passes through untouched because the *All measures
+-- compute (sizeᵉ/hopDᵉ/syncSizeᵉ to suc, fnCapᵉ/dWᵉ to themselves,
+-- depthE to depthAll at this op and state).
+walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ b)
+walk-mergeAll b c Ψ F Ŝ R̂ G ℓ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB dmd gas lℓ rgs =
+  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud ops j g mergeᵒ (merge-st 0 false)
+    b κ bid now sl sched st
+    2≤S 1≤R slEq slC slSz inv refl refl
+    (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+    (merge-step _ sl _ bud nst) hidx dpt
+    invW fnC refl pB dmd gas lℓ rgs
+
+walk-concatAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (b : Closed Γ (obs u)) → WalkStmt {e = e} (concatAllᵉ b)
+walk-concatAll {u = u} b c Ψ F Ŝ R̂ G ℓ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB dmd gas lℓ rgs =
+  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud ops j g concatᵒ
+    (concat-st {t = u} [] false false) b κ bid now sl sched st
+    2≤S 1≤R slEq slC slSz inv refl refl
+    (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+    (concat-step _ sl _ bud nst) hidx dpt
+    invW fnC refl pB dmd gas lℓ rgs
+
+walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (b : Closed Γ (obs u)) → WalkStmt {e = e} (switchAllᵉ b)
+walk-switchAll b c Ψ F Ŝ R̂ G ℓ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB dmd gas lℓ rgs =
+  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud ops j g switchᵒ
+    (switch-st nothing false) b κ bid now sl sched st
+    2≤S 1≤R slEq slC slSz inv refl refl
+    (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+    (switch-step _ sl _ bud nst) hidx dpt
+    invW fnC refl pB dmd gas lℓ rgs
+
+walk-exhaustAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (b : Closed Γ (obs u)) → WalkStmt {e = e} (exhaustAllᵉ b)
+walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB dmd gas lℓ rgs =
+  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud ops j g exhaustᵒ
+    (exhaust-st false false) b κ bid now sl sched st
+    2≤S 1≤R slEq slC slSz inv refl refl
+    (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
+    (exhaust-step _ sl _ bud nst) hidx dpt
+    invW fnC refl pB dmd gas lℓ rgs
 
 -- THE DISPATCH, real from day one: match the subscribed expression,
 -- hand the clause its own obligation.  Two clauses are PROVEN outright:
