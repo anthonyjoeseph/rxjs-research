@@ -59,9 +59,9 @@ help:
 	@echo "  agda-dev-selftest  falsification test for agda-dev: corrupt a real"
 	@echo "                  body in src, demand the fast check goes RED, restore."
 	@echo "                  Run whenever the stubbing logic changes"
-	@echo "  bug-cache     typecheck the type-level bug cache (NOT reached by"
-	@echo "                  src/Main.agda, so 'make agda' does not cover it —"
-	@echo "                  green here <=> no known counterexample remains)"
+	@echo "  bug-cache     typecheck the type-level bug cache + the demand-probe rows"
+	@echo "                  (NOT reached by src/Main.agda, so 'make agda' does not"
+	@echo "                  cover them — green here <=> no known counterexample remains)"
 	@echo "  unsafe-check  SOUNDNESS GUARD: the build is NOT --safe (it cannot be,"
 	@echo "                  while postulates exist), so nothing stops an unsafe"
 	@echo "                  pragma reaching the proof path.  This greps for them."
@@ -186,6 +186,7 @@ agda-dev-selftest:
 # what makes its invariant enforceable rather than remembered.
 bug-cache:
 	cd agda && $(AGDA) src/Implementation/Unit-Test.agda
+	cd agda && $(AGDA) src/Verify-Budget-Sufficient/Demand-Probe.agda
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
