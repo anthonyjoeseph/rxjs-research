@@ -85,9 +85,9 @@ named postulate's own header.
 - **`subscribeE-inner-nodry-inv` / `-fuel`** (Burst-Walk) — FALSITY. The
   mid-delivery INV? and the general-id fuel crib; the two real
   manufacture obligations, routes in their headers.
-- **`subscribeE-inner-nodry-{pSz,pBO,depth}` / `inner-dWO`** (Burst-Walk)
-  — DIFFICULTY. Path-extension, depth-mirror and width plumbing for the
-  inner call; `inner-dWO` is a known short peel, not risk.
+- **`subscribeE-inner-nodry-{pSz,pBO,depth}`** (Burst-Walk)
+  — DIFFICULTY. Path-extension and depth-mirror plumbing for the inner
+  call.
 - **`wet-landing-lift`** (Walk-Level) — FALSITY, conditional on the walk
   face. Lifts the walk's landing INV? to the outer cap; the only conjunct
   of the outer assembly with content. Chain in its header.

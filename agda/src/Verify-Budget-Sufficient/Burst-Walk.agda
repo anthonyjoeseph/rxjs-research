@@ -127,7 +127,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using (nest)
 open import Verify-Budget-Sufficient.Caps-Face
   using (capsOK?; pathSz?; walkOK; walkOK-finish; slotsCaps?;
          valCaps?; valsCaps?; eventCaps?; burstCaps?;
-         eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl;
+         eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl; valsCaps?-parts;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
          frameStep-mono-j; frameStep-0; stepFrame-face; frameBud)
@@ -1742,26 +1742,44 @@ splitBurst-nodry (em ∷ ems) h
                  (splitEvents-nodry (InstEmit.events em) hd)
                  (splitBurst-nodry ems tl)
 
--- MECHANICAL, NOT A GAP — classified 2026-08-13.  This was postulated
--- by a worker "because outWᵛ is outside Burst-Walk's import scope",
--- which is not a mathematical obstacle and is the wrong reason for a
--- postulate.  The derivation is known and short: `dWᵛ` at an `obs`
--- type IS `dWᵉ` (Rx/Frame-Width:411, definitional), `valCaps?` already
--- carries `pWᵛ n sl (obs u) o ≤ᵇ cWid`, and `pWᵛ = outWᵛ ⊔ dWᵛ`, so the
--- bound is ⊔'s right injection (`m≤n⊔m`).
+-- EX-RESIDUE, PROVEN 2026-08-13.  It was postulated on the grounds
+-- that `outWᵛ` sits outside this module's import scope — a missing
+-- import, not a mathematical obstacle, and the wrong reason for a
+-- postulate.  `dWᵛ` at an `obs` type IS `dWᵉ` (Rx/Frame-Width:411,
+-- definitional) and `valCaps?` already carries
+-- `pWᵛ n sl (obs u) o ≤ᵇ cWid` with `pWᵛ = outWᵛ ⊔ dWᵛ`, so the bound
+-- is ⊔'s right injection.
 --
--- It is left postulated only because the `∧-true` peel through
--- `VbB → valsCaps? → valCaps?` has to name every Bool it splits off in
--- its UNFOLDED form (`_∧_` matches on its first argument, and
--- `valCaps?` is itself an `∧`, so naming it by name peels the wrong
--- one).  Getting that spelling right is a few minutes with agda-dev,
--- not research.  CLASS: DIFFICULTY-zero.  Do not count it as risk, and
--- do not leave it standing — it is the cheapest thing in this file.
-postulate
-  inner-dWO : ∀ {n} {Γ : Ctx n} {u}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (o : Val Γ (obs u)) →
-    VbB c sl Ψ J (o ∷ []) ≡ true →
-    dWᵉ n sl o ≤ Caps.cWid (frameStep J c)
+-- WHAT ACTUALLY BLOCKED IT, recorded because the error message points
+-- somewhere else: `valsCaps?` is NOT just `all valCaps?` — it carries
+-- a second conjunct bounding the LIST LENGTH by `suc (cWid c)`
+-- (Caps-Face/Part5:809).  A hand-peel that assumes the `all` shape
+-- fails with a mismatch reported against `sizeᵉ o ≤ᵇ …`, which reads
+-- like an `∧`-association problem and is not one.  `valsCaps?-parts`
+-- is the lemma that splits it; use it rather than peeling by hand.
+inner-dWO : ∀ {n} {Γ : Ctx n} {u}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (o : Val Γ (obs u)) →
+  VbB c sl Ψ J (o ∷ []) ≡ true →
+  dWᵉ n sl o ≤ Caps.cWid (frameStep J c)
+inner-dWO {n = n} {u = u} c sl Ψ J o vb =
+  ≤-trans (m≤n⊔m (outWᵛ n sl (obs u) o) (dWᵉ n sl o))
+          (≤ᵇ⇒≤ (pWᵛ n sl (obs u) o) W (T-to wOK))
+  where
+  B = Caps.cSize (frameStep J c)
+  W = Caps.cWid (frameStep J c)
+
+  vcs : valsCaps? (frameStep J c) sl (o ∷ []) ≡ true
+  vcs = proj₁ (∧-true (valsCaps? (frameStep J c) sl (o ∷ []))
+                      (valsΨ? Ψ (o ∷ [])) vb)
+
+  allv : all (valCaps? (frameStep J c) sl (obs u)) (o ∷ []) ≡ true
+  allv = proj₁ (valsCaps?-parts (frameStep J c) sl (o ∷ []) vcs)
+
+  vc : ((sizeᵉ o ≤ᵇ B) ∧ (pWᵛ n sl (obs u) o ≤ᵇ W)) ≡ true
+  vc = proj₁ (∧-true ((sizeᵉ o ≤ᵇ B) ∧ (pWᵛ n sl (obs u) o ≤ᵇ W)) true allv)
+
+  wOK : (pWᵛ n sl (obs u) o ≤ᵇ W) ≡ true
+  wOK = proj₂ (∧-true (sizeᵉ o ≤ᵇ B) (pWᵛ n sl (obs u) o ≤ᵇ W) vc)
 
 -- Residue postulates for subscribeE-inner-nodry-core.
 -- Each names one manufacturing obligation; all seven are consumed by
