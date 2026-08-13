@@ -75,12 +75,14 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`subscribeAll-walk`** (Walk-Level) — FALSITY, and the largest live
-  risk in the proof: the walk face's witness-coincidence, at the clause
-  where the caps face's own witness is largest. The wet conjuncts want
-  a large witness and the opIterD bound caps it; whether the two meet
-  is the question. Unprobeable, so symbolic-or-nothing — receipt,
-  ledger route and grind order in its header.
+- **`pushBurst-walk`** (Walk-Level) — FALSITY, and the largest live
+  risk in the proof: subscribeAll-walk is now REAL (its body mirrors
+  the proven caps head, mutual with walkFace), so the witness-
+  coincidence and the hop peel both sit here, one face down. Its
+  header names a POSSIBLE FALSITY OF THE FACE AS STATED (the Ŝ-scale
+  refill vs level-scale value receipts, unlinked) and the minimal-gas
+  hop probe that must run BEFORE any grind — hasDry is j′-free, so
+  this one IS probeable, unlike the caps half.
 - **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
   coincidence at a weaker instance: both decrement edges have their dry
   side matched by a proven lemma (dBound-connect, dBound-μ), so a green
@@ -109,6 +111,9 @@ named postulate's own header.
 - **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
   `regsLen?-mono`** (Walk-Level) — DIFFICULTY. Entry plumbing for the
   outer assembly; each self-contained, none level-indexed.
+- **`INV?-install` / `pathB?-mono-B`** (Walk-Level) — DIFFICULTY.
+  Node-install and B-monotonicity plumbing the *All body consumes;
+  conjunct-by-conjunct routes in their headers.
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
   DIFFICULTY, parked. Loop transport over the leaf; ruling and resumption
   plans in their headers.
