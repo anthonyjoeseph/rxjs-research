@@ -75,11 +75,17 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`walk-input` / `walk-mu` / `subscribeAll-walk`** (Walk-Level) —
-  FALSITY. The walk face's decrement-edge clauses (connect, μ, hop);
-  the four *All heads are real delegations into subscribeAll-walk,
-  whose body will state the subscribeInner wet face where the hop peel
-  is paid (route and ledger receipt in its header).
+- **`subscribeAll-walk`** (Walk-Level) — FALSITY, and the largest live
+  risk in the proof: the walk face's witness-coincidence, at the clause
+  where the caps face's own witness is largest. The wet conjuncts want
+  a large witness and the opIterD bound caps it; whether the two meet
+  is the question. Unprobeable, so symbolic-or-nothing — receipt,
+  ledger route and grind order in its header.
+- **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
+  coincidence at a weaker instance: both decrement edges have their dry
+  side matched by a proven lemma (dBound-connect, dBound-μ), so a green
+  here says nothing about the case that can fail. After
+  subscribeAll-walk, never before.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.
@@ -87,15 +93,19 @@ named postulate's own header.
   underdetermined**: its conclusion needs one unit of path-length slack
   that no hypothesis carries. Restate the chain; do not grind. Analysis
   in its header.
-- **`subscribeE-inner-nodry-inv` / `-fuel`** (Burst-Walk) — FALSITY. The
-  mid-delivery INV? and the general-id fuel crib; the two real
-  manufacture obligations, routes in their headers.
+- **`subscribeE-inner-nodry-fuel` / `-inv`** (Burst-Walk) — FALSITY, but
+  both are route-complete over PROVEN engines (budget-hasAtLeast general
+  in id, shape-checked; frameStep-reg≤size) with only instantiation left.
+  Expect the class to fall to DIFFICULTY the moment either assembly
+  typechecks — it has not been lowered yet because a named route is not
+  evidence that reached the risky region.
 - **`subscribeE-inner-nodry-{pSz,pBO,depth}`** (Burst-Walk)
   — DIFFICULTY. Path-extension and depth-mirror plumbing for the inner
   call.
-- **`wet-landing-lift`** (Walk-Level) — FALSITY, conditional on the walk
-  face. Lifts the walk's landing INV? to the outer cap; the only conjunct
-  of the outer assembly with content. Chain in its header.
+- **`wet-landing-lift`** (Walk-Level) — FALSITY INHERITED, not intrinsic:
+  its hypothesis IS the walk face's level bound, and its own content is
+  sub-charge-capsOK-lift's proven chain with INV? for capsOK?. Do not
+  work it before the face it lifts. Chain in its header.
 - **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
   `regsLen?-mono`** (Walk-Level) — DIFFICULTY. Entry plumbing for the
   outer assembly; each self-contained, none level-indexed.
