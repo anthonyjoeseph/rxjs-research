@@ -78,9 +78,16 @@ named postulate's own header.
 - **`subscribeE-walk-level`** (Walk-Level) — FALSITY. The collapsed walk
   face; risk is confined to its hasDry and regsLen? conjuncts (containment
   receipt, conjunct census, and probe coverage in its header).
-- **`subscribeE-inner-nodry`** (Burst-Walk) — FALSITY. All that survives
-  of the cascade's dry risk: the walk face's hasDry conjunct at the inner
-  call; manufacture obligations in its header.
+- **`subscribeE-inner-nodry-pLen`** (Burst-Walk) — **SHAPE, known
+  underdetermined**: its conclusion needs one unit of path-length slack
+  that no hypothesis carries. Restate the chain; do not grind. Analysis
+  in its header.
+- **`subscribeE-inner-nodry-inv` / `-fuel`** (Burst-Walk) — FALSITY. The
+  mid-delivery INV? and the general-id fuel crib; the two real
+  manufacture obligations, routes in their headers.
+- **`subscribeE-inner-nodry-{pSz,pBO,depth}` / `inner-dWO`** (Burst-Walk)
+  — DIFFICULTY. Path-extension, depth-mirror and width plumbing for the
+  inner call; `inner-dWO` is a known short peel, not risk.
 - **`wet-landing-lift`** (Walk-Level) — FALSITY, conditional on the walk
   face. Lifts the walk's landing INV? to the outer cap; the only conjunct
   of the outer assembly with content. Chain in its header.
