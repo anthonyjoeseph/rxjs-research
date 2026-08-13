@@ -89,6 +89,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 
 open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent;
                            value; init; close; handoff; complete;
+                           CloseReason; cut; cutPending;
                            InstEmit; _at_from_as_; EmitKind; delivery)
 open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator
@@ -231,6 +232,44 @@ not-out {false} _ = refl
 
 not-in : ∀ {x : Bool} → x ≡ false → not x ≡ true
 not-in refl = refl
+
+-- THE SEVERING CLOSE IS NEVER DRY.  `cutThrough` (Rx/Evaluator:246) is
+-- the only event source shared by take's cut and switch's kill, and
+-- every close it mints carries `cut` or `cutPending` — the two REASONS
+-- an operator ends a chain.  `dried` is minted in exactly one place
+-- (`subscribeInner g0`, Evaluator:1006) and this is not it.  So both
+-- severing paths are dry-free UNCONDITIONALLY: no gas hypothesis, no
+-- caps, no level.  Consequence for § 5a: of `stepFrame`'s five frames,
+-- take-f needs nothing beyond this lemma, and thru-outer's switchᵒ
+-- branch sheds its `closes` half here.
+close-severs-nodry : ∀ {A : Set} (src : Source) (b : Bool) →
+  dryEvent {A} (close src (if b then cut else cutPending)) ≡ false
+close-severs-nodry src true  = refl
+close-severs-nodry src false = refl
+
+-- the head of a cutThrough step is emitted under an `if`; both arms
+-- keep the list dry-free, so the guard never needs to be inspected
+nodry-if : ∀ {A : Set} (b : Bool) (ev : InstEvent A) (es : List (InstEvent A)) →
+  dryEvent ev ≡ false → any dryEvent es ≡ false →
+  any dryEvent (if b then es else (ev ∷ es)) ≡ false
+nodry-if true  ev es he hs = hs
+nodry-if false ev es he hs rewrite he = hs
+
+cutThrough-nodry : ∀ {n} {Γ : Ctx n} {t}
+  (nid : NodeId) (dl : List RegId) (wm : RegId) (dy : List Source)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  any dryEvent (proj₁ (proj₂ (cutThrough nid dl wm dy rs))) ≡ false
+cutThrough-nodry nid dl wm dy []                   = refl
+cutThrough-nodry nid dl wm dy ((rid , src , c) ∷ r)
+  with pathHasNode nid (proj₂ c)
+     | cutThrough nid dl wm dy r | cutThrough-nodry nid dl wm dy r
+... | false | _                    | ih = ih
+... | true  | kept , closes , rids | ih =
+      nodry-if (any (_≡ᵇ rid) dl ∧ memberSource src dy)
+               (close src (if any (_≡ᵇ rid) dl ∨ (wm ≤ᵇ rid) then cut else cutPending))
+               closes
+               (close-severs-nodry src (any (_≡ᵇ rid) dl ∨ (wm ≤ᵇ rid)))
+               ih
 
 OKB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     → Caps → Slots Γ → ℕ → ℕ → Sched Γ → EvalSt e → Set
@@ -1545,26 +1584,180 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 -- (ii), which would be a finding about the ledger, not this face.
 -- CANNOT BE PROBED, same receipt as the anchor: the gas family is
 -- abstract, and `budgetAt` is a tower the checker will not normalise.
+--
+-- ═══ THE FIVE-FRAME CENSUS, 2026-08-13 — three frames are now REAL ═══
+--
+-- `stepFrame-nodry` is no longer a monolith: it is an assembly over the
+-- frame constructors, and the risk does NOT spread evenly across them.
+-- Reading `stepFrame` (Rx/Evaluator:1252-1275) and everything it calls:
+--
+--   map-f    — events are literally `[]`.                    PROVEN, refl
+--   scan-f   — every `dispatch` arm emits `[]`.              PROVEN, refl
+--   take-f   — `takeDispatch`: `[]`, or `cutThrough`'s
+--              closes, and CUTTHROUGH NEVER MINTS `dried`
+--              (`cutThrough-nodry`, § 1 — every close it
+--              makes is `cut`/`cutPending`).                 PROVEN
+--   from-inner — `innerReact` → `innerFinish`, whose only
+--              emitting arm is concatᵒ's `concatDrain`.      postulated
+--   thru-outer — `thruWrap`/`thruWalk`/`thruConsume`, whose
+--              events are `switchKill`'s closes (cutThrough
+--              again, free) plus `subscribeInner`'s.         postulated
+--
+-- ═══ THE CONSOLIDATION THAT FALLS OUT, and it is the finding ═══
+--
+-- Chase the two postulated frames to their leaves and they MEET:
+-- `concatDrain` (Evaluator:1195) emits nothing of its own — its `bs`
+-- is `subscribeInner`'s, appended down the queue.  `switchKill` is
+-- cutThrough.  So after the three proven frames, EVERY remaining
+-- dried-close risk in the whole cascade is `subscribeInner`, whose two
+-- clauses are:
+--   · `g0`      — emits `close drySource dried` (Evaluator:1006).
+--                 THE one dry mint in the evaluator.  Excluded by the
+--                 gas hypothesis: `budgetAt` is a `gasPad` of a
+--                 `gasTower`, never `g0`.
+--   · `gs fuel` — `subscribeE fuel …`, i.e. `subscribeE-walk-level`'s
+--                 conjunct (8), at `fuel` — and the walk face asks for
+--                 `g hasAtLeast suc G`, an INEQUALITY, not a pin to
+--                 `budgetAt`, so the `gs`-peel goes straight through.
+--                 Checked 2026-08-13; had the walk pinned its gas the
+--                 descent would not have typed.
+--
+-- ═══ WHAT IS STILL OPEN, stated so the grind is not surprised ═══
+--
+-- The two postulated frames are NOT one-step: `concatDrain` and
+-- `thruWalk` LOOP, calling `subscribeInner` at a state that has
+-- already moved.  So their leaf hypotheses (capsOK? and friends, all
+-- state-dependent) must be RE-ESTABLISHED per iteration — which is
+-- exactly what the caps route's Σ-witness does and what a bare
+-- `≡ false` conclusion cannot.  The gas hypothesis itself threads for
+-- free (`fuel` is passed unchanged by every one of innerReact,
+-- innerFinish, concatDrain, thruWalk, thruConsume, thruWrap — checked
+-- 2026-08-13).  THE OPEN DESIGN QUESTION is whether the loops
+-- re-establish by riding the already-proven caps faces (siC/ifc as
+-- extra parameters, mirroring § 5b) or by widening those faces'
+-- conclusions with a nodry conjunct (correct but re-grinds the
+-- 44-minute module).  Answer it before grinding either frame.
 ------------------------------------------------------------------
 
 postulate
-  stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- from-inner: `innerReact` absorbs or finishes; `innerFinish`'s only
+  -- emitting arm is concatᵒ's `concatDrain`, whose events are
+  -- `subscribeInner`'s, looped over the queue
+  innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
     2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
     slotsSize sl ≤ Caps.cSize c →
-    ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+    ∀ (J : ℕ) {s} (sf : Gas) (id : Id) (now : Tick)
+    (op : AllOp) (allNid inst : NodeId)
+    (path′ : Path Γ s t) (vals : List (Val Γ s))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (f ↠ path′) ≡ true →
+    PbB c Ψ J (from-inner op allNid inst ↠ path′) ≡ true →
     VbB c sl Ψ J vals ≡ true →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     sf ≡ budgetAt e sl id →
-    depthFrame sf id now f path′ vals fin sched st ≤ d →
+    depthFrame sf id now (from-inner op allNid inst) path′ vals fin sched st ≤ d →
     any dryEvent
-        (proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
+        (proj₁ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
+                                 path′ vals fin sched st)))
       ≡ false
+
+  -- thru-outer: `thruWrap` passes events through untouched; `thruWalk`
+  -- loops `thruConsume`, whose events are `switchKill`'s (cutThrough,
+  -- free) plus `subscribeInner`'s
+  thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
+    2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    ∀ (J : ℕ) {u} (sf : Gas) (id : Id) (now : Tick)
+    (op : AllOp) (nid : NodeId)
+    (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    PbB c Ψ J (thru-outer op nid ↠ path′) ≡ true →
+    VbB c sl Ψ J vals ≡ true →
+    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+    sf ≡ budgetAt e sl id →
+    depthFrame sf id now (thru-outer op nid) path′ vals fin sched st ≤ d →
+    any dryEvent
+        (proj₁ (proj₂ (stepFrame sf id now (thru-outer op nid)
+                                 path′ vals fin sched st)))
+      ≡ false
+
+-- take's dispatch: the non-cut arm emits nothing, the cutting arm
+-- emits cutThrough's closes.  Unconditional — no gas, no caps, no level
+takeDispatch-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
+  any dryEvent (proj₁ (proj₂ (takeDispatch {t = t} nid vals fin sched st ns)))
+    ≡ false
+takeDispatch-nodry nid vals fin sched st (just (take-st k))
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = cutThrough-nodry nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                               (EvalSt.dying st) (EvalSt.registry st)
+... | false = refl
+takeDispatch-nodry nid vals fin sched st nothing                  = refl
+takeDispatch-nodry nid vals fin sched st (just (scan-st _))       = refl
+takeDispatch-nodry nid vals fin sched st (just (merge-st _ _))    = refl
+takeDispatch-nodry nid vals fin sched st (just (concat-st _ _ _)) = refl
+takeDispatch-nodry nid vals fin sched st (just (switch-st _ _))   = refl
+takeDispatch-nodry nid vals fin sched st (just (exhaust-st _ _))  = refl
+
+stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
+  2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J (f ↠ path′) ≡ true →
+  VbB c sl Ψ J vals ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  sf ≡ budgetAt e sl id →
+  depthFrame sf id now f path′ vals fin sched st ≤ d →
+  any dryEvent
+      (proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
+    ≡ false
+
+-- MAP: the frame emits nothing at all
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ = refl
+
+-- SCAN: every arm of the node-state dispatch emits `[]`
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
+                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                  = refl
+... | just (take-st _)         = refl
+... | just (merge-st _ _)      = refl
+... | just (concat-st _ _ _)   = refl
+... | just (switch-st _ _)     = refl
+... | just (exhaust-st _ _)    = refl
+... | just (scan-st {w} acc) with w ≟ᵗ u
+...   | yes refl = refl
+...   | no  _    = refl
+
+-- TAKE: the one severing frame, and it is free (cutThrough-nodry)
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ =
+  takeDispatch-nodry nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
+
+-- the two *All edges: delegated whole, hypotheses passed verbatim
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+                (from-inner op allNid inst) path′ vals fin sched st
+                ok pb vb rg gk hD =
+  innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op allNid inst
+                   path′ vals fin sched st ok pb vb rg gk hD
+
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+                (thru-outer op nid) path′ vals fin sched st
+                ok pb vb rg gk hD =
+  thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid
+                  path′ vals fin sched st ok pb vb rg gk hD
 
 ------------------------------------------------------------------
 -- § 5b  THE FRAME FACE, ASSEMBLED — ex-postulate, now a definition.

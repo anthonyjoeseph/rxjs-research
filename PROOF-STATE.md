@@ -52,7 +52,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
      │   │                                ← subscribeE-wet ← subscribeE-wet-core
      │   │                                  ← subscribeE-walk-level   [tier 0]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: stepFrame-nodry, dry-tick-core]
+     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: innerReact-/thruOuter-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
@@ -71,22 +71,27 @@ three-flavour walk — so both former FALSITY rows now bottom out in
 `subscribeE-walk-level`, and the tier-0 risk is CONSOLIDATED onto one
 statement plus one per-frame face.
 
-- **`stepFrame-nodry`** (Burst-Walk § 5a) — **FALSITY, the anchor's
-  residue.** One frame of one delivery, on the walk's own minted gas
-  (`budgetAt e sl id`, pinned by the GOK hook), emits no dried close.
-  The transport that used to surround it is DONE — the third ledger
-  flavour, its closure laws, and the § 8 projections are all real —
-  so this face is the whole of the cascade's dry content. Its
-  from-inner case consumes `subscribeE-walk-level` at the frame's own
-  (c, J); the two manufacture obligations, each a crib of a proven
-  sibling, are named in its header: (i) mid-delivery INV? assembled
-  from the walk's carried facts (the cascade-wet-via-caps § C move,
-  one stratum down; needs B2's frameStep analogue), (ii) the
-  general-id `caps-fuel-root` crib (budget-hasAtLeast + prod≤3pow +
-  capsAt-tower are already general in id). Demand-side probe receipts
-  and the can't-probe supply ruling carry over from the ex-anchor
-  (its § 5a header). The map/take/scan cases are event-inspection
-  proofs — grind the from-inner case FIRST.
+- **`innerReact-nodry` / `thruOuter-nodry`** (Burst-Walk § 5a) —
+  **FALSITY, the anchor's residue**, and now two frames rather than
+  five: `stepFrame-nodry` became a REAL ASSEMBLY on 2026-08-13, with
+  map / scan / take discharged outright. Take fell to
+  `cutThrough-nodry` (§ 1, PROVEN, unconditional): every close the
+  severing path mints is `cut`/`cutPending`, so neither take's cut nor
+  switch's kill can be dry. Chased to their leaves the two survivors
+  MEET — `concatDrain` emits only `subscribeInner`'s events, and
+  `switchKill` is cutThrough — so **the entire remaining dry risk of
+  the cascade is `subscribeInner`**: its `g0` clause is the
+  evaluator's one dry mint, excluded by the gas hypothesis, and its
+  `gs` clause is `subscribeE-walk-level`'s conjunct (8). The gas
+  threads through every intermediary unchanged (checked). **OPEN
+  DESIGN QUESTION, answer before grinding either:** `concatDrain` and
+  `thruWalk` LOOP, so their state-dependent leaf hypotheses need
+  re-establishing per iteration — ride the proven caps faces as extra
+  parameters (§ 5b's shape), or widen those faces' conclusions with a
+  nodry conjunct (correct, but re-grinds the 44-minute module). The
+  two manufacture obligations (mid-delivery INV?; the general-id
+  `caps-fuel-root` crib) and the can't-probe ruling are in the § 5a
+  header, unchanged.
 - **`subscribeE-walk-level`** (Walk-Level) — FALSITY, and it is now where
   the conversion's risk lives. The COLLAPSED walk, landed 2026-08-13: the
   running position is a caps level `j`, the statement is
@@ -109,7 +114,7 @@ statement plus one per-frame face.
   j := 0, ℓ floating) is in its header.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY, risk inherited from
   the chain above (its first hypothesis, `cascadeGo-nodry`, is now a
-  real projection resting on `stepFrame-nodry`). Latch/finish
+  real projection resting on the two `-nodry` frames above). Latch/finish
   bookkeeping plus the Deliveries counts. Last in the tier, never first.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
