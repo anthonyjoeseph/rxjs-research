@@ -1598,6 +1598,19 @@ postulate
   -- wet-landing-lift, which should eventually become an assembly over
   -- this and INV?'s B-monotonicity.  It funds the walk faces' ceiling
   -- pin `cSize (frameStep L̂ c) ≤ Ŝ` at L̂ := the entry budget.
+  --
+  -- ⚠ SHAPE DEFECT, FOUND 2026-08-13 (same day it was stated): the
+  -- statement is MISSING the two bounds opIterD-dominated requires —
+  -- `3 + nest b sl cs ≤ Caps.cSize (capsAt e sl id)` and
+  -- `suc (sizeᵉ b) ≤ Caps.cSize (capsAt e sl id)` — and is likely
+  -- FALSE without them (an oversized b inflates the budget past one
+  -- instant's blowup).  Both sit UNUSED at the one call site
+  -- (WetOuter's nestOK/opsOK, subscribeE-wet-core).  WITH them the
+  -- postulate is dischargeable outright: sub-charge-capsOK-lift-go
+  -- (.Caps-Bridge, PROVEN, private) runs the exact chain —
+  -- instantiate at j′ := the budget itself (jB := ≤-refl,
+  -- dep := capsH e sl id so depOK := ≤-refl) and take the ⊑ᶜ's cSize
+  -- component.  Repair the statement and assemble in the SAME edit.
   entry-ceiling : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : Id) {u} (b : Closed Γ u) (cs : List Source) →
     Caps.cSize (frameStep (opIterD (Caps.cSize (capsAt e sl id))

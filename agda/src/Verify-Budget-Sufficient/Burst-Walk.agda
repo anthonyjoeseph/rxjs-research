@@ -2087,6 +2087,17 @@ postulate
   -- the invariant `concatDrain-caps` (Subscribe-Face:1674) already
   -- threads; crib its shape with the caps conjuncts swapped for
   -- `any dryEvent ≡ false` via the SiNodry leaf.
+  --
+  -- ⚠ NEW OBLIGATION 2026-08-13, UNMEASURED: the SiNodry leaf now
+  -- carries the reset-anchor ceiling (`cSize (frameStep (opIterD …) c)
+  -- ≤ sizeCapAt e sl (suc id)`), so this loop must PAY it per element,
+  -- at its own c and the element's own nest/size — a postulated
+  -- consumer absorbs a hypothesis silently, so nothing has checked the
+  -- loop can.  Via opIterD-dominated the payment needs the element's
+  -- nest/ops bounds under cSize c, dep under capsH, and the J-shifted
+  -- budget under the J = 0 one (the sadd/mono tower).  The payer
+  -- anchors are the dry-tick chain's own (caps-tick, cascade-depth-
+  -- capsH) — plausible, NOT verified.  Same note on thruOuter below.
   innerReact-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
@@ -2122,6 +2133,9 @@ postulate
   -- `capsOK?-mergeBump` / `switchKill-caps` added to the .Caps-Face
   -- import block (switchKill-caps sits at Caps-Face/Part4:1619,
   -- exported through the Part5→…→Caps-Face chain).
+  --
+  -- ⚠ NEW OBLIGATION 2026-08-13: owes the SiNodry ceiling per element,
+  -- exactly as innerReact-nodry-core above — see that note.
   thruOuter-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →

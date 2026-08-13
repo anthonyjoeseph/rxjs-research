@@ -75,27 +75,19 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`subscribeInner-walk`** (Walk-Level) — DIFFICULTY, reclassified
-  from FALSITY by statement repair: the live edge (Ŝ-scale refill vs
-  level-scale receipts, unlinked) is closed by the reset-anchor pins
-  threaded through every wet face — hop-step-needs proves the link
-  necessary, hop-edge spends it, entry-ceiling funds it at the entry.
-  THE LEAF of the hop-edge chain; the gas peel is here, the g0 dry
-  mint excluded by the gas hypothesis's shape. Body = assembly against
-  the proven caps twin; route and repair story in its header.
-- **`entry-ceiling`** (Walk-Level) — DIFFICULTY. The size-cap half of
-  wet-landing-lift's chain, stated at the entry instantiation; funds
-  the ceiling pin. Chain named in its header.
-- **`stepThru-walk-core`** (Walk-Level) — DIFFICULTY. The thruWalk
-  queue loop over the leaf, thruWalk-caps' wet mirror; loop obligations
-  in its header.
+- **`entry-ceiling`** (Walk-Level) — **SHAPE, repair known, proof
+  available**: stated missing the nest/ops bounds opIterD-dominated
+  requires (likely false without them; both sit unused at its one call
+  site), and WITH them it assembles from sub-charge-capsOK-lift-go's
+  proven chain (Caps-Bridge). Route in its header. First: it is the
+  ground the reset-anchor pins stand on.
 - **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
   coincidence at a weaker instance: both decrement edges have their dry
   side matched by a proven lemma (dBound-connect, dBound-μ), so a green
   here says nothing about the case that can fail. The reset-anchor
   pins now supply the size-to-Ŝ link their edges spend (connect-edge's
   `sizeᵉ d ≤ Ŝ` premise); reclassify only when the clause is actually
-  worked. After subscribeInner-walk, never before.
+  worked.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.
@@ -118,6 +110,15 @@ named postulate's own header.
 - **`subscribeE-inner-nodry-{pSz,pBO,depth}`** (Burst-Walk)
   — DIFFICULTY. Path-extension and depth-mirror plumbing for the inner
   call.
+- **`subscribeInner-walk`** (Walk-Level) — DIFFICULTY, reclassified
+  from FALSITY by statement repair (the reset-anchor pins;
+  hop-step-needs proves the link necessary, hop-edge spends it). THE
+  LEAF of the hop-edge chain; gas peel here, g0 dry mint excluded by
+  type. Body = assembly against the proven caps twin; route in its
+  header.
+- **`stepThru-walk-core`** (Walk-Level) — DIFFICULTY. The thruWalk
+  queue loop over the leaf, thruWalk-caps' wet mirror; loop obligations
+  in its header.
 - **`wet-landing-lift`** (Walk-Level) — FALSITY INHERITED, not intrinsic:
   its hypothesis IS the walk face's level bound, and its own content is
   sub-charge-capsOK-lift's proven chain with INV? for capsOK?. Do not
@@ -131,7 +132,9 @@ named postulate's own header.
   pathB?-widen, .Measures, found by a name clash; grep before stating.)
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
   DIFFICULTY, parked. Loop transport over the leaf; ruling and resumption
-  plans in their headers.
+  plans in their headers. Their SiNodry leaf now carries the
+  reset-anchor ceiling, which their eventual proofs must pay at their
+  own c — payability unmeasured; note in their headers.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
   plus the Deliveries counts. Last in the tier, never first.
 
