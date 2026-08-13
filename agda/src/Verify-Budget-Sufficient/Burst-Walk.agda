@@ -311,8 +311,9 @@ OKB c sl Ψ J sched st =
 -- § 2.1  THE siC HYPOTHESIS, named once: `stepFrame-face`'s own first
 -- argument.  It is a PARAMETER rather than an import because the
 -- supplier (`subscribeInner-caps`, Subscribe-Face:951, PROVEN) lives in
--- the 44-minute module and importing it here would cost this module its
--- fast loop.  Caps-Bridge, which imports both, applies it.
+-- the most expensive module in the tree (timings:
+-- typecheck-performance-numbers.md) and importing it here would cost
+-- this module its fast loop.  Caps-Bridge, which imports both, applies it.
 SiCFace : Set
 SiCFace =
   ∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
@@ -343,8 +344,9 @@ SiCFace =
 -- § 2.1b  THE ifc HYPOTHESIS, named once: `stepFrame-face`'s second
 -- argument.  It is a PARAMETER rather than an import because the
 -- supplier (`innerFinish-caps`, Subscribe-Face:1760, PROVEN) lives in
--- the 44-minute module and importing it here would cost this module its
--- fast loop.  Caps-Bridge, which imports both, applies it.
+-- the most expensive module in the tree (timings:
+-- typecheck-performance-numbers.md) and importing it here would cost
+-- this module its fast loop.  Caps-Bridge, which imports both, applies it.
 IfcFace : Set
 IfcFace =
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -1543,7 +1545,7 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 --   · from-inner / thru-outer (the risky region, and the reason the
 --     anchor was FALSITY class) — the interior `subscribeE`, consumed
 --     through the COLLAPSED WALK FACE (`subscribeE-walk-level`,
---     .Walk-Level), whose conjunct (8) is `hasDry ≡ false` and whose
+--     .Walk-Level), whose hasDry conjunct is `hasDry ≡ false` and whose
 --     hypotheses are LEVEL-indexed at an arbitrary (c , j) — i.e.
 --     stated to be satisfiable MID-DELIVERY, which the retired outer
 --     face (fixed at capsAt e sl id / id-entry B) was not.  At the
@@ -1616,7 +1618,7 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 --                 gas hypothesis: `budgetAt` is a `gasPad` of a
 --                 `gasTower`, never `g0`.
 --   · `gs fuel` — `subscribeE fuel …`, i.e. `subscribeE-walk-level`'s
---                 conjunct (8), at `fuel` — and the walk face asks for
+--                 hasDry conjunct, at `fuel` — and the walk face asks for
 --                 `g hasAtLeast suc G`, an INEQUALITY, not a pin to
 --                 `budgetAt`, so the `gs`-peel goes straight through.
 --                 Checked 2026-08-13; had the walk pinned its gas the
@@ -1643,8 +1645,8 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 -- RULED: (A).  (B) is tidier to read and strictly worse to build —
 -- its suppliers (`subscribeInner-caps`, `innerFinish-caps`) are
 -- PROVEN inside Subscribe-Face, so widening their conclusions
--- re-grinds finished work in the most expensive module in the repo,
--- and buys no strength that threading the same witness does not.
+-- re-grinds finished work in the most expensive module in the repo
+-- (timings: typecheck-performance-numbers.md), and buys no strength that threading the same witness does not.
 -- (A) also has a working precedent in this file rather than a
 -- hypothetical one.
 --
@@ -1658,7 +1660,7 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 
 -- THE ONE LEAF.  Everything dry in the cascade reduces to this, and
 -- its own two clauses are the g0 mint (excluded by `gk`) and
--- `subscribeE fuel …` (= `subscribeE-walk-level` conjunct (8)).
+-- `subscribeE fuel …` (= `subscribeE-walk-level`'s hasDry conjunct).
 SiNodry : Set
 SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (Ψ dep bud : ℕ) →
@@ -1687,7 +1689,17 @@ postulate
   -- emitting arm is concatᵒ's `concatDrain`, whose events are
   -- `subscribeInner`'s, looped over the queue.  The loop is the whole
   -- obligation: re-establish the leaf's state-dependent hypotheses
-  -- after each queue element, per the (A) ruling above
+  -- after each queue element, per the (A) ruling above.
+  --
+  -- PARKED 2026-08-13 (tier-0 focus moved to the walk face's hasDry /
+  -- regsLen? conjuncts).  RESUMPTION PLAN, from the wind-down census:
+  -- every arm except concatᵒ + `just (concat-st q true od)` + yes refl
+  -- emits `[]`.  That arm is `concatDrain`, whose queue invariant is
+  -- `all (obsCaps? (frameStep j c) sl) q ≡ true` — exactly what
+  -- capsOK?'s node conjunct gives for the concat-st node, and exactly
+  -- the invariant `concatDrain-caps` (Subscribe-Face:1674) already
+  -- threads; crib its shape with the caps conjuncts swapped for
+  -- `any dryEvent ≡ false` via the SiNodry leaf.
   innerReact-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
@@ -1711,7 +1723,18 @@ postulate
 
   -- thru-outer: `thruWrap` passes events through untouched; `thruWalk`
   -- loops `thruConsume`, whose events are `switchKill`'s (cutThrough,
-  -- free) plus `subscribeInner`'s.  Same loop obligation as above
+  -- free) plus `subscribeInner`'s.  Same loop obligation as above.
+  --
+  -- PARKED 2026-08-13, same wind-down census.  RESUMPTION PLAN: the
+  -- body reduces to `thruWalk`'s events (thruWrap passes bs through in
+  -- every arm); the induction is `thruWalk-caps` (Subscribe-Face:1593)
+  -- with per-arm `thruConsume` handling cribbed from `thruConsume-caps`
+  -- (:1377).  One gap the census surfaced: SiCFace is subscribeInner's
+  -- face, not thruConsume's — re-establishing capsOK? after a
+  -- thruConsume arm additionally needs `capsOK?-setNode` /
+  -- `capsOK?-mergeBump` / `switchKill-caps` added to the .Caps-Face
+  -- import block (switchKill-caps sits at Caps-Face/Part4:1619,
+  -- exported through the Part5→…→Caps-Face chain).
   thruOuter-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →

@@ -112,30 +112,33 @@ postulate
   -- through its witness" rule, run before any clause grind).  NOT
   -- VACUOUS, and here is the exact accounting, because five of the nine
   -- conjuncts ARE upward-closed in j′ and would be vacuous alone:
-  --   · (1)(2)(3)(5)(6) capsOK? / burstCaps? / burstCount? / INV? /
-  --     burstB? all weaken as the level grows (frameStep is monotone in
-  --     j and every one of them is a ≤-against-the-caps test), so each
-  --     survives enlarging the witness;
-  --   · (4) `j + j′ ≤ opIterD …` is DOWNWARD-closed — it is the only
-  --     conjunct that bounds j′ from above, and it is what gives the
-  --     other five their content.  Deleting or weakening it makes the
-  --     whole Σ satisfiable by taking j′ enormous.  Do not.
-  --   · (7)(8)(9) burstHopD? / hasDry / regsLen? do not mention j′ at
-  --     all: real content at every witness.
+  --   · the capsOK? / burstCaps? / burstCount? / INV? / burstB?
+  --     conjuncts all weaken as the level grows (frameStep is monotone
+  --     in j and every one of them is a ≤-against-the-caps test), so
+  --     each survives enlarging the witness;
+  --   · the opIterD LEVEL BOUND (`j + j′ ≤ opIterD …`) is
+  --     DOWNWARD-closed — it is the only conjunct that bounds j′ from
+  --     above, and it is what gives the other five their content.
+  --     Deleting or weakening it makes the whole Σ satisfiable by
+  --     taking j′ enormous.  Do not.
+  --   · the burstHopD? / hasDry / regsLen? conjuncts do not mention j′
+  --     at all: real content at every witness.
   -- This is the SAME shape as `subscribeE-caps` (.Subscribe-Face:937),
-  -- which is ground with exactly conjuncts (1)–(4) — so the collapse
-  -- inherits a witness discipline that is already proven to close.
+  -- which is ground with exactly the caps conjuncts plus that level
+  -- bound — so the collapse inherits a witness discipline that is
+  -- already proven to close.
   --
   -- WHAT THIS CHECK DOES *NOT* SETTLE, and it is the live risk: whether
-  -- the j′ the caps face PRODUCES is large enough for the wet conjuncts
-  -- (5)(6) at the same time as (4) still holds.  Vacuity is ruled out;
-  -- falsity is not.  The two halves sharing one witness is the whole
-  -- content of the collapse, and it is untested — the caps half cannot
-  -- be probed (opIterD is in the sealed level family, Evaluator:746-828,
-  -- and the can't-probe ruling applies), so this one is symbolic-or-
-  -- nothing.  Grind (5)(6) FIRST, at the clause where subscribeE-caps'
-  -- own witness is largest; if they need more level than (4) allows,
-  -- that is the refutation and it should be stated as a `→ ⊥` here.
+  -- the j′ the caps face PRODUCES is large enough for the INV? and
+  -- burstB? conjuncts at the same time as the level bound still holds.
+  -- Vacuity is ruled out; falsity is not.  The two halves sharing one
+  -- witness is the whole content of the collapse, and it is untested —
+  -- the caps half cannot be probed (opIterD is in the sealed level
+  -- family, Evaluator:746-828, and the can't-probe ruling applies), so
+  -- this one is symbolic-or-nothing.  Grind INV? and burstB? FIRST, at
+  -- the clause where subscribeE-caps' own witness is largest; if they
+  -- need more level than the bound allows, that is the refutation and
+  -- it should be stated as a `→ ⊥` here.
   --
   -- To be ground clause by clause through the mutual block
   -- (subscribeE / stepFrame / pushBurst / subscribeAll /
@@ -153,18 +156,19 @@ postulate
   --   · the thirteen caps prelims below are subscribeE-caps' OWN
   --     hypothesis list, same statements, same ORDER, nothing added
   --     and nothing dropped;
-  --   · conjuncts (1) capsOK?, (2) burstCaps?, (3) burstCount? and
-  --     (4) `j + j′ ≤ opIterD …` are its OWN Σ, verbatim — including
-  --     (4)'s `j + j′` form.  (The `j′ ≤ …` form seen at
+  --   · the capsOK?, burstCaps? and burstCount? conjuncts and the
+  --     opIterD level bound are its OWN Σ, verbatim — including the
+  --     bound's `j + j′` form.  (The `j′ ≤ …` form seen at
   --     Caps-Bridge:659 is `sub-charge` WEAKENING this one by m≤n+m,
   --     not a competing statement — checked, since a mismatch there
-  --     would have meant the collapse silently strengthened (4).)
+  --     would have meant the collapse silently strengthened the
+  --     bound.)
   --
-  -- CONSEQUENCE: conjuncts (1)–(4) cannot be the failure point, and
-  -- neither can the hypothesis list be too weak for them.  What this
-  -- statement ADDS is three wet hypotheses and five wet conjuncts
-  -- (5)–(9), asked to hold AT THE WITNESS THE CAPS FACE ALREADY
-  -- PICKS.
+  -- CONSEQUENCE: the four caps conjuncts cannot be the failure point,
+  -- and neither can the hypothesis list be too weak for them.  What
+  -- this statement ADDS is three wet hypotheses and five wet conjuncts
+  -- (INV? / burstB? / burstHopD? / hasDry / regsLen?), asked to hold
+  -- AT THE WITNESS THE CAPS FACE ALREADY PICKS.
   --
   -- SO THE RISK IS WITNESS-COINCIDENCE, and nothing else: does the j′
   -- that subscribeE-caps produces also carry INV?, burstB?,
@@ -180,28 +184,42 @@ postulate
   -- ═══ THE COINCIDENCE, CONJUNCT BY CONJUNCT (census 2026-08-13) —
   -- the five wet conjuncts do NOT carry equal risk ═══
   --
-  -- (5) INV? at the landing size cap — ASSEMBLY, not independent risk.
+  -- · INV? at the landing size cap — ASSEMBLY, not independent risk.
   --     Six sub-conjuncts: stBounded?/regsB?'s size halves come from
-  --     the LANDING capsOK? (conjunct (1), proven at the same witness);
-  --     the two Ψ halves are level-free and mirror the proven wet
-  --     clique; the registry-cardinality conjunct needs
+  --     the LANDING capsOK? (proven at the same witness); the two Ψ
+  --     halves are level-free and mirror the proven wet clique; the
+  --     registry-cardinality conjunct needs
   --     `cReg (frameStep …) ≤ cSize (frameStep …)`, which is
   --     `frameStep-reg≤size` — PROVEN, .Caps-Bridge:151, since
   --     2026-08-05 (f306c9e; § 5a's "hand derivation, not yet machine"
   --     note predated finding it); the two slot conjuncts ride the
   --     entry INV? since slots never change and B only widens.  This
   --     is cascade-wet-via-caps' § C recombination, one face down.
-  -- (6) burstB? at the landing cap — the size half is IMPLIED by
-  --     conjunct (2) via `burstB?-halves` (.Burst-Walk § 4, PROVEN);
-  --     only the Ψ half (burstΨ?) is new, and it is level-free.
-  -- (7) burstHopD? — genuinely separate, level-free; the hop-descent
+  -- · burstB? at the landing cap — the size half is IMPLIED by the
+  --     burstCaps? conjunct via `burstB?-halves` (.Burst-Walk § 4,
+  --     PROVEN); only the Ψ half (burstΨ?) is new, and it is
+  --     level-free.
+  -- · burstHopD? — genuinely separate, level-free; the hop-descent
   --     conjunct, refuted once and restated with corpus receipts (the
   --     hop-descent memo, .Measures).  Its risk is documented there.
-  -- (8) hasDry ≡ false — REAL RISK.  The fuel walk: the entry gas must
-  --     reach every interior subscribeInner.  Same content as SiNodry's
-  --     gs clause (.Burst-Walk § 5a); the hasAtLeast hypothesis is an
-  --     inequality precisely so the gs-peel descends.
-  -- (9) regsLen? ℓ — REAL RISK, and PROBEABLE (unlike (8): dBound,
+  -- · hasDry ≡ false — REAL RISK, but the demand ledger CLOSES at
+  --     the interface (census 2026-08-13).  The evaluator has EXACTLY
+  --     THREE gas-peel sites — the only `g0` matches in Rx/Evaluator —
+  --     and each is matched by a PROVEN decrement lemma (.Measures):
+  --       · subscribeInner g0 (:1004, the hop)  ↔ dBound-hop
+  --       · sharedConnect g0 (:1346, connect)   ↔ dBound-connect,
+  --         side conditions PROVEN off the budget's slot summand
+  --         (connect-anchor — no state invariant consulted)
+  --       · subscribeE g0 (μᵉ …) (:1454, μ)     ↔ dBound-μ
+  --     So a hasDry falsity, if present, is a SIDE-CONDITION failure
+  --     at one of three named edges, not a missing lemma.  The connect
+  --     and μ conditions are structural; the live one is the HOP edge:
+  --     r′ < r is funded by the burstHopD? conjunct carried on the
+  --     SAME witness (this is why hop-descent and dryness ride one Σ —
+  --     hasDry cannot be ground before burstHopD? threads the same
+  --     clauses), and s′ ≤ V is funded by the value-size conjuncts via
+  --     reach-reset (syncSizeᵉ ≤ C from sizeᵉ ≤ C, .Measures:1783).
+  -- · regsLen? ℓ — REAL RISK, and PROBEABLE (unlike hasDry: dBound,
   --     subscribeE, regsLen? all compute).  The scare: a chain minted
   --     from an inner GROWN by within-instant applyFn (not a subterm
   --     of b) adds size-many frames on ONE gas peel, so gas does not
@@ -213,17 +231,31 @@ postulate
   --     hand-supplied Ŝ ≥ the program's observed sizes, the MECHANISM
   --     is broken, not just an instantiation.
   --
-  -- NET: the falsity surface is (8) and (9), plus the possibility that
-  -- one witness cannot serve both flavours at once — (5)/(6) cannot
-  -- fail except through their level-free Ψ halves.
+  -- NET: the falsity surface is hasDry and regsLen?, plus the
+  -- possibility that one witness cannot serve both flavours at once —
+  -- INV? and burstB? cannot fail except through their level-free Ψ
+  -- halves.
   --
-  -- NOTE for conjunct (4) at the degenerate corner: `opIterD` is the
-  -- identity at m = 0 (`opIterD-0`, Evaluator:811) and `ops` sits in
-  -- the m position — so `ops = 0` would pin j′ = 0.  It is excluded by
-  -- the `suc (sizeᵉ b) ≤ ops` hypothesis, i.e. the positivity is
-  -- already threaded.  `dep = 0` and `bud = 0` ARE reachable and are
-  -- harmless: opIterD's `suc m` clause bumps J unconditionally
-  -- (J₀ = suc (J + …)) before any d/k-dependent step runs.
+  -- ═══ AND THE TWO SHARE ONE MECHANISM (the consolidation) ═══
+  -- regsLen?'s scare is a within-instant GROWN inner minting size-many
+  -- frames; hasDry's live edge is a grown inner whose syncSize escapes
+  -- V at the hop.  BOTH are funded by the same fact: values produced
+  -- this instant stay under the Ŝ ceiling (mid-walk: the value-size
+  -- conjuncts at the landing level; at the seam: lvl-fits +
+  -- capsAt-suc-full, .Burst-Walk § 7).  So the whole tier-0 FALSITY
+  -- class now rests on ONE question — does within-instant growth stay
+  -- under Ŝ — and that question is PROBEABLE (sizeᵉ / syncSizeᵉ /
+  -- dBound / subscribeE all compute).  A probe hitting it from both
+  -- conjuncts' directions is in Demand-Probe.
+  --
+  -- NOTE for the opIterD level bound at the degenerate corner:
+  -- `opIterD` is the identity at m = 0 (`opIterD-0`, Evaluator:811)
+  -- and `ops` sits in the m position — so `ops = 0` would pin j′ = 0.
+  -- It is excluded by the `suc (sizeᵉ b) ≤ ops` hypothesis, i.e. the
+  -- positivity is already threaded.  `dep = 0` and `bud = 0` ARE
+  -- reachable and are harmless: opIterD's `suc m` clause bumps J
+  -- unconditionally (J₀ = suc (J + …)) before any d/k-dependent step
+  -- runs.
   subscribeE-walk-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)

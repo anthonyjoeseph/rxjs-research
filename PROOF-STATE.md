@@ -82,7 +82,7 @@ statement plus one per-frame face.
   `switchKill` is cutThrough — so **the entire remaining dry risk of
   the cascade is `subscribeInner`**: its `g0` clause is the
   evaluator's one dry mint, excluded by the gas hypothesis, and its
-  `gs` clause is `subscribeE-walk-level`'s conjunct (8). That leaf is
+  `gs` clause is `subscribeE-walk-level`'s hasDry conjunct. That leaf is
   now STATED (`SiNodry` / `subscribeInner-nodry`) and both frames are
   `-core`s over it, so the consolidation is structural rather than
   prose. The gas threads through every intermediary unchanged
@@ -96,23 +96,24 @@ statement plus one per-frame face.
   question was RULED (A) on 2026-08-13** — thread the already-proven
   caps faces (siC/ifc) as extra parameters and re-establish `capsOK?`
   from their Σ-witness, rather than widening those faces' conclusions
-  with a nodry conjunct: (B) re-grinds proven work inside the
-  44-minute module and buys no strength. Rationale in the § 5a header.
+  with a nodry conjunct: (B) re-grinds proven work inside
+  Subscribe-Face, the most expensive module in the tree, and buys no
+  strength. Rationale in the § 5a header.
 - **`subscribeE-walk-level`** (Walk-Level) — FALSITY, and it is now where
   the conversion's risk lives. The COLLAPSED walk, landed 2026-08-13: the
   running position is a caps level `j`, the statement is
   `subscribeE-caps`' proven face verbatim ⊗ the wet conjuncts on one
   shared witness `j′`, and the `capᴱ W E` ledger is gone from the walk
   entirely. **CONTAINMENT RECEIPT + conjunct census in its header
-  (2026-08-13):** the thirteen caps hypotheses and conjuncts (1)–(4)
-  are `subscribeE-caps`' own, verbatim — a proven theorem's face — so
-  the entire falsity surface is the WITNESS-COINCIDENCE of the five
-  wet conjuncts, and the census cuts that further: (5) INV? and (6)
+  (2026-08-13):** the thirteen caps hypotheses and the four caps
+  conjuncts are `subscribeE-caps`' own, verbatim — a proven theorem's
+  face — so the entire falsity surface is the WITNESS-COINCIDENCE of
+  the five wet conjuncts, and the census cuts that further: INV? and
   burstB? are assemblies over the proven caps conjuncts (the
   registry-cardinality piece is `frameStep-reg≤size`, PROVEN in
   Caps-Bridge since 2026-08-05 — § 5a's "not yet machine" note was
-  stale), (7) is the documented hop-descent conjunct, leaving **(8)
-  hasDry and (9) regsLen? as the real risk**. (9) is PROBEABLE
+  stale), burstHopD? is the documented hop-descent conjunct, leaving
+  **hasDry and regsLen? as the real risk**. regsLen? is PROBEABLE
   (dBound/subscribeE/regsLen? all compute) — probe in flight. Grind
   rides subscribeE-caps' clause skeleton.
 - **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the
