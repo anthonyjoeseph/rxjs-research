@@ -108,6 +108,35 @@ postulate
   -- the free length ledger ℓ).  Conclusion: subscribeE-caps' Σ with
   -- the wet conjuncts riding the same witness.
   --
+  -- Σ-CONTENT CHECKED 2026-08-13 (the "a Σ-receipt has content only
+  -- through its witness" rule, run before any clause grind).  NOT
+  -- VACUOUS, and here is the exact accounting, because five of the nine
+  -- conjuncts ARE upward-closed in j′ and would be vacuous alone:
+  --   · (1)(2)(3)(5)(6) capsOK? / burstCaps? / burstCount? / INV? /
+  --     burstB? all weaken as the level grows (frameStep is monotone in
+  --     j and every one of them is a ≤-against-the-caps test), so each
+  --     survives enlarging the witness;
+  --   · (4) `j + j′ ≤ opIterD …` is DOWNWARD-closed — it is the only
+  --     conjunct that bounds j′ from above, and it is what gives the
+  --     other five their content.  Deleting or weakening it makes the
+  --     whole Σ satisfiable by taking j′ enormous.  Do not.
+  --   · (7)(8)(9) burstHopD? / hasDry / regsLen? do not mention j′ at
+  --     all: real content at every witness.
+  -- This is the SAME shape as `subscribeE-caps` (.Subscribe-Face:937),
+  -- which is ground with exactly conjuncts (1)–(4) — so the collapse
+  -- inherits a witness discipline that is already proven to close.
+  --
+  -- WHAT THIS CHECK DOES *NOT* SETTLE, and it is the live risk: whether
+  -- the j′ the caps face PRODUCES is large enough for the wet conjuncts
+  -- (5)(6) at the same time as (4) still holds.  Vacuity is ruled out;
+  -- falsity is not.  The two halves sharing one witness is the whole
+  -- content of the collapse, and it is untested — the caps half cannot
+  -- be probed (opIterD is in the sealed level family, Evaluator:746-828,
+  -- and the can't-probe ruling applies), so this one is symbolic-or-
+  -- nothing.  Grind (5)(6) FIRST, at the clause where subscribeE-caps'
+  -- own witness is largest; if they need more level than (4) allows,
+  -- that is the refutation and it should be stated as a `→ ⊥` here.
+  --
   -- To be ground clause by clause through the mutual block
   -- (subscribeE / stepFrame / pushBurst / subscribeAll /
   -- subscribeInner / subscribeSharedSlot), each decrement edge
