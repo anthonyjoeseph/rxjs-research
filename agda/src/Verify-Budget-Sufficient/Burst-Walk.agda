@@ -138,7 +138,8 @@ open import Verify-Budget-Sufficient.Wet
          fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
          hasDry-append; ∨-false;
-         INV?; dBound; regsLen?; hopR; unconn; pathB?; _hasAtLeast_)
+         INV?; dBound; regsLen?; hopR; unconn; pathB?; _hasAtLeast_;
+         slotsFnCap)
 open import Verify-Budget-Sufficient.Walk-Level
   using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono)
 open import Rx.Hop-Depth using (hopDᵉ)
@@ -1674,6 +1675,9 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  -- the Ψ-side twin of the line above; see subscribeE-inner-nodry-inv's
+  -- header for why it is threaded (INV?'s slotsFnCap conjunct)
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
@@ -1836,12 +1840,45 @@ postulate
     depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
     depthE fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st ≤ dep
-  -- INV? at the inner frame's level, assembled from OKB + regP? ledger.
-  -- capsOK? carries stBounded?/regsSz?; fnCapBounded? from OKB second
-  -- conjunct; regsB? from PbB via pathBΨ?; registry-count from
-  -- frameStep-reg≤size (Caps-Bridge, PROVEN).
+  -- INV? at the inner frame's level, assembled from OKB + regP? ledger
+  -- + the two SLOT bounds.  Conjunct by conjunct: stBounded? and
+  -- regsSz? are capsOK?'s own; fnCapBounded? is OKB's second conjunct;
+  -- regsB? recombines capsOK?'s regsSz? with regP?'s pathBΨ? half
+  -- (regsB?-of-parts, .Caps-Bridge — DOWNSTREAM of this module, so the
+  -- proof either relocates it or inlines all-zip); registry-count is
+  -- frameStep-reg≤size (.Caps-Bridge:151, PROVEN); and the two slot
+  -- conjuncts are the added hypotheses.
+  --
+  -- ⚠ SHAPE DEFECT FOUND AND REPAIRED 2026-08-13 — the SAME anti-pattern
+  -- as `-pLen` above ("a conclusion needing information that appears in
+  -- NONE of its hypotheses"), caught by reading the definitions rather
+  -- than by a failed grind.  INV?'s last two conjuncts are
+  -- `slotsSize (Sched.slots sched) ≤ᵇ B` and `slotsFnCap … ≤ᵇ Ψ`, and
+  -- the ORIGINAL hypothesis list could reach NEITHER: OKB is
+  -- `walkOK × fnCapBounded?`, `walkOK` is `slots-eq × capsOK?`, and
+  -- capsOK? bounds live/nodes/registry/widths — it never bounds the
+  -- SLOT STORE's size or fn-weight, and fnCapBounded? reads only
+  -- live/nodes.  `PbB`/`VbB` are about the path and the value.  So the
+  -- statement was UNDERDETERMINED, not hard.
+  --
+  -- The repair is the sanctioned one ("prefer a free hypothesis to a
+  -- carried postulate"), and it is nearly free because it MIRRORS a
+  -- hypothesis already threaded at every level of this stack:
+  -- `slotsSize sl ≤ cSize c` was present all the way down (so that
+  -- conjunct was always reachable and only the transport was unstated);
+  -- its Ψ-side twin `slotsFnCap sl ≤ Ψ` was simply missing, and is now
+  -- threaded beside it through -core, subscribeE-inner-nodry and
+  -- SiNodry.  At the true instantiation Ψ := ΨAt e sl is
+  -- `fnCapᵉ e + slotsFnCap sl`, so the new hypothesis is `m≤n+m` — the
+  -- same way `caps-fuel-root` (.Wet/Part6) already discharges it.
+  --
+  -- CLASS: this row was carried as FALSITY and is neither false nor
+  -- merely hard — it was SHAPE.  With the hypotheses threaded it is
+  -- DIFFICULTY: every remaining conjunct has a named proven source.
   subscribeE-inner-nodry-inv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+    slotsSize sl ≤ Caps.cSize c →
+    slotsFnCap sl ≤ Ψ →
     OKB {e = e} c sl Ψ J sched st →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     INV? Ψ (Caps.cSize (frameStep J c)) sched st ≡ true
@@ -1880,6 +1917,7 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) (fuel : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
@@ -1895,7 +1933,7 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
     ≡ false
 subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
-    c sl Ψ dep bud 2≤S 1≤R slC slSz
+    c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
     J fuel op allNid κ id now o sched st ok pb vb rg nB hD gk =
   dry
   where
@@ -1947,7 +1985,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
          (subscribeE-inner-nodry-pSz c Ψ J op allNid inst κ pb pLen')
          pLen' nB ≤-refl
          (subscribeE-inner-nodry-depth c sl Ψ J dep fuel op allNid κ id now o sched st ok hD)
-         (subscribeE-inner-nodry-inv c sl Ψ J sched st ok rg)
+         (subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc ok rg)
          fnO
          (subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb)
          ≤-refl
@@ -1972,6 +2010,7 @@ subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) (fuel : Gas) (op : AllOp) (allNid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
@@ -1991,7 +2030,7 @@ subscribeE-inner-nodry = subscribeE-inner-nodry-core subscribeE-walk-level
 -- EX-POSTULATE.  Two clauses, and the dry one is now impossible by
 -- construction rather than by hypothesis.
 subscribeInner-nodry : SiNodry
-subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz J g op allNid
+subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op allNid
                      κ id now o sched st ok pb vb rg nB hD gk
   with budgetAt-gs e sl id
 ... | g′ , eq
@@ -2000,7 +2039,7 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz J g op allNid
         (proj₁ (subscribeE g′ o
                  (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
                  (record sched { nextNode = suc (Sched.nextNode sched) }) st))
-        (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz J g′ op allNid
+        (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g′ op allNid
            κ id now o sched st ok pb vb rg nB hD (sym eq))
 
 postulate

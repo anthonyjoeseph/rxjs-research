@@ -7,8 +7,8 @@ module Verify-Budget-Sufficient.Demand-Probe where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin  using (Fin; zero)
-open import Data.Nat  using (ℕ; _≤ᵇ_)
-open import Data.List using ([]; _∷_)
+open import Data.Nat  using (ℕ; suc; _+_; _≤ᵇ_)
+open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Product using (proj₁; proj₂)
@@ -20,7 +20,7 @@ open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                             strmᵗ; fstᵗ; varᵗ; nat̂;
                             μᵉ; deferᵉ; input;
-                            sizeᵉ; syncSizeᵉ)
+                            sizeᵉ; syncSizeᵉ; Tm; Fn)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
                                  Slots; Slot; shared; Path; root; EvalSt)
 open import Rx.Hop-Depth using (hopDᵉ)
@@ -597,3 +597,89 @@ _ = refl
 -- LOAD-BEARING (hasDry): fails if actual h* > G
 _ : (3 ≤ᵇ 1479) ≡ true    -- 3 ≤ suc 1478 = 1479
 _ = refl
+
+----------------------------------------------------------------------
+-- SERIES D — THE MINIMAL-Ŝ HOP PROBE (2026-08-13), aimed at the live
+-- edge named in `pushBurst-walk`'s header (.Walk-Level): the walk
+-- face's demand refill is Ŝ-SCALE while its value receipts are
+-- LEVEL-scale, and NO hypothesis links the two.  Ŝ, R̂ and F are
+-- quantified FREELY by the face, so the adversarial instantiation is
+-- the SMALLEST one:
+--
+--   Ŝ := 0, R̂ := 0, F := 0, and U := 0 (no shares, empty slot store)
+--     ⇒ G = dBound 0 0 0 (hopDᵉ 0 b) (syncSizeᵉ b)
+--         = syncSizeᵉ b + hopDᵉ 0 b            (dBound's own definition)
+--
+-- and `gasPad (suc G) g0 hasAtLeast suc G` by `hasAtLeast-pad`, so the
+-- gas hypothesis holds EXACTLY, with nothing spare.  Every other
+-- hypothesis of the face is satisfiable here (root path, entry state,
+-- caps taken as large as one likes — they are separate parameters).
+-- So the face asserts these runs do NOT dry, and a `true` row REFUTES
+-- IT — not merely pushBurst-walk but WalkStmt itself.
+--
+-- WHY THIS FAMILY.  `sucG` is a SUM (a static syntactic size), while
+-- gas demand tracks the within-instant nesting DEPTH, which for a scan
+-- fold of depth d over a k-element list is a PRODUCT d·k.  A sum
+-- cannot dominate a product forever, so if the mechanism is unsound
+-- the crossover is reachable by raising d and k together.  The
+-- B-series above cannot see this: its fold has d = 1, so both sides
+-- grow by exactly 1 per element and the margin is constant.
+--
+-- MEASURED, and the fit is exact on six points:
+--     sucG (progD d k) = 5·d + k + 12
+--   (19, 29, 31, 46, 50, 72 at (1,2) (3,2) (3,4) (6,4) (6,8) (10,10))
+-- against a demand of d·k + 1.
+----------------------------------------------------------------------
+
+-- wrap a term d mergeAll-levels deeper
+wrapD : ∀ {Θ} → ℕ → Tm Γ₀ [] [] Θ (obs natᵗ) → Tm Γ₀ [] [] Θ (obs natᵗ)
+wrapD 0       t = t
+wrapD (suc d) t = strmᵗ (mergeAllᵉ (ofᵉ (wrapD d t ∷ [])))
+
+-- the fold that wraps the accumulator d levels per value
+foldD : ℕ → Fn Γ₀ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
+foldD d = wrapD d (fstᵗ (varᵗ (here refl)))
+
+natsD : ℕ → List (Tm Γ₀ [] [] [] natᵗ)
+natsD 0       = []
+natsD (suc k) = nat̂ k ∷ natsD k
+
+progD : ℕ → ℕ → Closed Γ₀ natᵗ
+progD d k =
+  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) (ofᵉ (natsD k)))
+
+-- the gas the face's demand hypothesis supplies at the minimal
+-- instantiation: suc G, with G = syncSizeᵉ b + hopDᵉ 0 b
+sucG : Closed Γ₀ natᵗ → ℕ
+sucG b = suc (syncSizeᵉ b + hopDᵉ 0 b)
+
+-- the sum side, pinned.  LOAD-BEARING: each fails if syncSizeᵉ or
+-- hopDᵉ moves, which is what the whole comparison rests on.
+_ : sucG (progD 1 2) ≡ 19
+_ = refl
+_ : sucG (progD 3 2) ≡ 29
+_ = refl
+_ : sucG (progD 3 4) ≡ 31
+_ = refl
+_ : sucG (progD 6 4) ≡ 46
+_ = refl
+_ : sucG (progD 6 8) ≡ 50
+_ = refl
+_ : sucG (progD 10 10) ≡ 72
+_ = refl
+
+-- the demand side.  LOAD-BEARING: this is the row that validates the
+-- d·k model, and it fails if demand is not at least d·k+1 = 13 here.
+-- (The companion `runDry 13 … ≡ false` row is DELIBERATELY OMITTED:
+-- a non-drying run evaluates the whole program and did not finish in
+-- 600 s, while a drying run short-circuits at the first dry emit.
+-- The lower bound is the refuting direction, so it is the one that
+-- earns its cost.)
+_ : runDry 12 (progD 3 4) ≡ true
+_ = refl
+
+-- SAFE at these shapes, by three orders on the small ones and by 18
+-- at (3,4): sucG 31 vs demand 13.  The margin NARROWS as d·k grows
+-- against 5d+k+12, and the model puts the crossover just above
+-- (6,8) — sucG 50 against demand 49.  THAT ROW IS NOT YET MEASURED;
+-- see the header note in `pushBurst-walk` for what it would mean.

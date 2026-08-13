@@ -95,12 +95,16 @@ named postulate's own header.
   underdetermined**: its conclusion needs one unit of path-length slack
   that no hypothesis carries. Restate the chain; do not grind. Analysis
   in its header.
-- **`subscribeE-inner-nodry-fuel` / `-inv`** (Burst-Walk) — FALSITY, but
-  both are route-complete over PROVEN engines (budget-hasAtLeast general
-  in id, shape-checked; frameStep-reg≤size) with only instantiation left.
-  Expect the class to fall to DIFFICULTY the moment either assembly
-  typechecks — it has not been lowered yet because a named route is not
+- **`subscribeE-inner-nodry-fuel`** (Burst-Walk) — FALSITY, route-complete
+  over a PROVEN engine (budget-hasAtLeast, general in id, shape-checked)
+  with only instantiation left; not lowered, since a named route is not
   evidence that reached the risky region.
+- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY, reclassified
+  from FALSITY: it was neither false nor hard but SHAPE — INV?'s two slot
+  conjuncts were reachable from NO hypothesis it had. Repaired by
+  threading `slotsFnCap sl ≤ Ψ` beside the `slotsSize` bound already
+  carried at every level; every remaining conjunct has a named proven
+  source. Finding in its header.
 - **`subscribeE-inner-nodry-{pSz,pBO,depth}`** (Burst-Walk)
   — DIFFICULTY. Path-extension and depth-mirror plumbing for the inner
   call.
