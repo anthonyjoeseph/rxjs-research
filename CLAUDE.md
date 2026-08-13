@@ -95,6 +95,32 @@ report review. Standing protocol, per Anthony:
   2. land only dev-green bodies;
   3. hand the long `make gate` BACK to the design session, which can poll across
      turns without dying.
+- **DELEGATION HAS A FIXED CONTEXT COST — AMORTISE IT OR DO THE WORK YOURSELF
+  (Anthony, 2026-08-13).** A fresh worker must rebuild the model from nothing: read the
+  2000-line module, chase the definitions, trace the statement. Measured twice on one day
+  at **~20 minutes and hundreds of thousands of tokens BEFORE ANY OUTPUT**, and one of
+  those two returned analysis with **zero edits** — a full worker's spend for a report the
+  design session could have written. That cost is roughly CONSTANT in the size of the task,
+  so it is the whole question. Delegate only when it is amortised:
+  - **BREADTH** — several independent items, each paying the cost once and running
+    concurrently. Wall-clock wins even when token-expensive.
+  - **REPETITION** — one context, many similar obligations (fourteen instances of a clause
+    pattern; a probe series; a falsity sweep). Read once, grind N times.
+  - **NARROWNESS** — the task needs a small nameable slice (a self-contained arithmetic
+    lemma) rather than a module's whole design.
+
+  **KEEP DEPTH: a single hard thing in a file the design session already has loaded is
+  CHEAPER TO DO THAN TO DELEGATE**, because the session has already paid the cost and pays
+  it again reviewing the result.
+
+  **THE TELL, and it is reliable: if writing the directive required you to do the analysis,
+  the analysis WAS the expensive part and you have already done it.** A prompt carrying an
+  instantiation map, a list of expected residues, and a pre-warning about a trap is a prompt
+  whose author could have typed the proof in the time spent describing it. Notice this
+  BEFORE spawning, not after. (Both 2026-08-13 misfires had exactly this shape.)
+
+  Read-only fan-out is the standing exception below — it is cheap, parallel, and its whole
+  product is the reading.
 - **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling.**
   This machine has **24 GB RAM and 14 cores**, ~12 GB free at rest, and a single heavyweight
   check peaks in the multi-GB range (figures in `typecheck-performance-numbers.md`). So:
