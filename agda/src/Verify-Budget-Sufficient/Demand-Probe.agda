@@ -7,11 +7,11 @@ module Verify-Budget-Sufficient.Demand-Probe where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin  using (Fin; zero)
-open import Data.Nat  using (ℕ)
+open import Data.Nat  using (ℕ; _≤ᵇ_)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
-open import Data.Product using (proj₁)
+open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs; gasPad)
@@ -19,9 +19,12 @@ open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
                             ofᵉ; scanᵉ;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                             strmᵗ; fstᵗ; varᵗ; nat̂;
-                            μᵉ; deferᵉ; input)
+                            μᵉ; deferᵉ; input;
+                            sizeᵉ; syncSizeᵉ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
-                                 Slots; Slot; shared; Path; root)
+                                 Slots; Slot; shared; Path; root; EvalSt)
+open import Rx.Hop-Depth using (hopDᵉ)
+open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?)
 
 ----------------------------------------------------------------------
 -- Context and slots: empty (no inputs)
@@ -395,4 +398,202 @@ _ = refl
 _ : runDry 0 prog-H ≡ true
 _ = refl
 _ : runDry 1 prog-H ≡ false
+_ = refl
+
+----------------------------------------------------------------------
+-- Series P: registry and grown-inner probes
+-- Tests conjuncts (hasDry) and (regsLen?) of subscribeE-walk-level.
+--
+-- WHY deferᵉ as base: all B/D/E-series use ofᵉ[nat̂ 0] as accumulator
+-- seed, which produces empty registries at exit (ofᵉ fires synchronously
+-- via oneShotBurst, no registration).  regsLen? [] = true vacuously for
+-- any ℓ — those rows are DEGENERATE for conjunct (regsLen?).  Replacing
+-- the base with strmᵗ(deferᵉ(ofᵉ[nat̂ 0])) forces a non-empty registry:
+-- deferᵉ registers its body's source for async delivery, leaving a live
+-- chain entry in the exit registry whose pathLen this probe measures.
+--
+-- sizeCapAt is abstract (depends on abstract fLvlD, Evaluator:746).
+-- Ŝ = 5 is used for dBound; hopDᵉ and syncSizeᵉ compute at that Ŝ.
+-- R̂ = 0 is used throughout; with U = 0 the suc R̂ * U term vanishes,
+-- so R̂ is irrelevant to the numeral.
+-- MECHANISM NOTE: sizeᵉ of the k=1 grown inner (acc₁) = 8 > Ŝ = 5.
+-- The Ŝ-per-hop funding requires Ŝ ≥ sizeᵉ acc₁ = 8 to be non-vacuous
+-- for the mechanism; Ŝ = 5 makes the hypothesis (sizeᵉ b ≤ Ŝ) vacuously
+-- false at the acc₁ subscription point.  The dBound numeral is still
+-- a valid upper bound on pathLen for these concrete runs, and the
+-- regsLen? check confirms the conclusion holds regardless.
+----------------------------------------------------------------------
+
+-- Registry-checking runner: regsLen? ℓ against exit state's registry
+runReg : ∀ (ℓ h : ℕ) (e : Closed Γ₀ natᵗ) → Bool
+runReg ℓ h e =
+  regsLen? ℓ (EvalSt.registry
+    (proj₂ (proj₂ (subscribeE (gasPad h g0) e root 0 0
+                               (sched-init e ins₀) (st-init e)))))
+
+-- Deferred accumulator seed (compare scan-a0 = strmᵗ (ofᵉ [nat̂ 0]))
+-- Using deferᵉ instead of ofᵉ: deferᵉ subscription registers a chain
+-- entry, giving non-empty registry at exit for the path-length probe.
+scan-a0-defer : Rx.Exp.Tm Γ₀ [] [] [] (obs natᵗ)
+scan-a0-defer = strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ [])))
+
+-- P-c: mergeAll(ofᵉ[deferᵉ(ofᵉ[0])]) — CALIBRATION
+-- hasDry: CALIBRATION/DEGENERATE (h* = 1; same depth as A1, no scan growth)
+-- regsLen?: LOAD-BEARING (1 registry entry at pathLen = 2; deferᵉ's frame
+--   + the subscribeInner frame)
+-- Ŝ-ceiling: this IS acc₁, the k=1 grown inner — its sizeᵉ = 8 is the
+--   key mechanism measurement for both conjuncts
+prog-P-c : Closed Γ₀ natᵗ
+prog-P-c = mergeAllᵉ (ofᵉ (strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ []))) ∷ []))
+
+-- P-a: mergeAll(scan(f-B, a0-defer, ofᵉ[1])) — k=1 scan
+-- hasDry: LOAD-BEARING (grown inner acc₁ needs 2 gas peels; fails if scan
+--   k=1 gas demand changes)
+-- regsLen?: LOAD-BEARING (deferᵉ inside acc₁ registers at pathLen = 3;
+--   fails if path depth of grown-inner registration changes)
+prog-P-a : Closed Γ₀ natᵗ
+prog-P-a = mergeAllᵉ (scanᵉ scan-f-B scan-a0-defer (ofᵉ (nat̂ 1 ∷ [])))
+
+-- P-b: mergeAll(scan(f-B, a0-defer, ofᵉ[1,2])) — k=2 scan
+-- hasDry: LOAD-BEARING (acc₂ requires 3 gas peels; fails if k=2 demand changes)
+-- regsLen?: LOAD-BEARING (two registry entries: pathLen 3 from acc₁ and
+--   pathLen 4 from acc₂→acc₁ chain; fails if nesting depth changes)
+prog-P-b : Closed Γ₀ natᵗ
+prog-P-b = mergeAllᵉ (scanᵉ scan-f-B scan-a0-defer (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ [])))
+
+----------------------------------------------------------------------
+-- Ŝ-ceiling witnesses: sizeᵉ/syncSizeᵉ of the grown inner values
+-- acc₁ = prog-P-c (the k=1 accumulator value at runtime)
+-- Both conjuncts' mechanism rests on sizeᵉ b ≤ Ŝ per hop.
+----------------------------------------------------------------------
+
+-- sizeᵉ of the k=1 grown inner = 8
+-- LOAD-BEARING (hasDry + regsLen?): fails if acc₁'s syntactic size changes.
+-- MECHANISM: needs Ŝ ≥ 8 for non-vacuous coverage; Ŝ = 5 used below is
+-- conservative (dBound still bounds pathLen for concrete runs).
+_ : sizeᵉ prog-P-c ≡ 8
+_ = refl
+
+-- syncSizeᵉ = s in dBound; pin to document the budget argument
+-- LOAD-BEARING: fails if syncSizeᵉ formula changes for these programs
+_ : syncSizeᵉ prog-P-c ≡ 5
+_ = refl
+
+_ : syncSizeᵉ prog-P-a ≡ 13
+_ = refl
+
+_ : syncSizeᵉ prog-P-b ≡ 14
+_ = refl
+
+----------------------------------------------------------------------
+-- P-c measurement pins (CALIBRATION for hasDry; LOAD-BEARING for regsLen?)
+-- Ŝ = 5, R̂ = 0, U = 0, r = hopDᵉ 5 prog-P-c = 1, s = 5
+-- G = dBound 5 0 0 1 5 = 5 + 6*1 = 11
+----------------------------------------------------------------------
+
+-- hasDry: h* = 1 (CALIBRATION/DEGENERATE — no scan growth, same as A1)
+_ : runDry 0 prog-P-c ≡ true
+_ = refl
+_ : runDry 1 prog-P-c ≡ false
+_ = refl
+
+-- regsLen?: max pathLen = 2 (LOAD-BEARING)
+-- Fails if deferᵉ registration path length changes.
+_ : runReg 2 1 prog-P-c ≡ true    -- max len ≤ 2 ✓
+_ = refl
+_ : runReg 1 1 prog-P-c ≡ false   -- not all ≤ 1 → max exactly 2
+_ = refl
+
+-- dBound numerals (CALIBRATION: fails if formula changes)
+_ : hopDᵉ 5 prog-P-c ≡ 1
+_ = refl
+_ : dBound 5 0 0 1 5 ≡ 11
+_ = refl
+
+-- margin check: max pathLen = 2 ≤ G = 11 (exercises regsLen? conjunct)
+-- LOAD-BEARING (regsLen?): fails if max pathLen > G
+_ : (2 ≤ᵇ 12) ≡ true    -- 2 ≤ suc 11 = 12
+_ = refl
+
+-- hasDry bound: h* = 1 ≤ suc G = 12 (exercises hasDry conjunct)
+-- CALIBRATION/DEGENERATE: same depth as A1; no scan growth here
+_ : (1 ≤ᵇ 12) ≡ true    -- 1 ≤ suc 11 = 12
+_ = refl
+
+----------------------------------------------------------------------
+-- P-a measurement pins (LOAD-BEARING for hasDry and regsLen?)
+-- k=1 scan; acc₁ = prog-P-c; sizeᵉ acc₁ = 8
+-- Ŝ = 5, R̂ = 0, U = 0, r = hopDᵉ 5 prog-P-a = 244, s = 13
+-- G = dBound 5 0 0 244 13 = 13 + 6*244 = 13 + 1464 = 1477
+----------------------------------------------------------------------
+
+-- hasDry: h* = 2 (bisection — acc₁ inside outer mergeAll needs 2 peels)
+-- LOAD-BEARING (hasDry): fails if gas demand of mergeAll(scan k=1) changes
+_ : runDry 1 prog-P-a ≡ true
+_ = refl
+_ : runDry 2 prog-P-a ≡ false
+_ = refl
+
+-- regsLen?: max pathLen = 3 (deferᵉ inside acc₁ at depth 3)
+-- LOAD-BEARING (regsLen?): fails if the grown-inner path depth changes
+_ : runReg 3 2 prog-P-a ≡ true    -- max len ≤ 3 ✓
+_ = refl
+_ : runReg 2 2 prog-P-a ≡ false   -- not all ≤ 2 → max exactly 3
+_ = refl
+
+-- dBound numerals
+-- LOAD-BEARING: fails if hopDᵉ formula for scan(f-B) changes
+_ : hopDᵉ 5 prog-P-a ≡ 244
+_ = refl
+_ : dBound 5 0 0 244 13 ≡ 1477
+_ = refl
+
+-- margin check: max pathLen = 3 ≤ G = 1477 (margin 1474)
+-- LOAD-BEARING (regsLen?): fails if max pathLen > G
+_ : (3 ≤ᵇ 1478) ≡ true    -- 3 ≤ suc 1477 = 1478
+_ = refl
+
+-- hasDry bound: h* = 2 ≤ suc G = 1478
+-- LOAD-BEARING (hasDry): fails if actual h* > G
+_ : (2 ≤ᵇ 1478) ≡ true    -- 2 ≤ suc 1477 = 1478
+_ = refl
+
+----------------------------------------------------------------------
+-- P-b measurement pins (LOAD-BEARING for hasDry and regsLen?)
+-- k=2 scan; acc₁ at pathLen 3, acc₂→acc₁ at pathLen 4
+-- Ŝ = 5, R̂ = 0, U = 0, r = hopDᵉ 5 prog-P-b = 244, s = 14
+-- G = dBound 5 0 0 244 14 = 14 + 6*244 = 14 + 1464 = 1478
+----------------------------------------------------------------------
+
+-- hasDry: h* = 3 (acc₂ requires 3 gas peels through the nesting)
+-- LOAD-BEARING (hasDry): fails if gas demand of mergeAll(scan k=2) changes
+_ : runDry 2 prog-P-b ≡ true
+_ = refl
+_ : runDry 3 prog-P-b ≡ false
+_ = refl
+
+-- regsLen?: two entries, max pathLen = 4 (acc₂→acc₁→deferᵉ depth)
+-- LOAD-BEARING (regsLen?): fails if the max path depth for k=2 changes
+_ : runReg 4 3 prog-P-b ≡ true    -- max len ≤ 4 ✓
+_ = refl
+_ : runReg 3 3 prog-P-b ≡ false   -- not all ≤ 3 → max exactly 4
+_ = refl
+
+-- dBound numerals
+-- hopDᵉ is same as prog-P-a: ofᵉ[nat̂ 1, nat̂ 2] contributes 0 hops,
+-- scan-f-B and scan-a0-defer are unchanged
+-- LOAD-BEARING: fails if scan hopDᵉ formula changes
+_ : hopDᵉ 5 prog-P-b ≡ 244
+_ = refl
+_ : dBound 5 0 0 244 14 ≡ 1478
+_ = refl
+
+-- margin check: max pathLen = 4 ≤ G = 1478 (margin 1474)
+-- LOAD-BEARING (regsLen?): fails if max pathLen > G
+_ : (4 ≤ᵇ 1479) ≡ true    -- 4 ≤ suc 1478 = 1479
+_ = refl
+
+-- hasDry bound: h* = 3 ≤ suc G = 1479
+-- LOAD-BEARING (hasDry): fails if actual h* > G
+_ : (3 ≤ᵇ 1479) ≡ true    -- 3 ≤ suc 1478 = 1479
 _ = refl

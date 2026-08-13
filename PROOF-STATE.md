@@ -113,9 +113,12 @@ statement plus one per-frame face.
   registry-cardinality piece is `frameStep-reg≤size`, PROVEN in
   Caps-Bridge since 2026-08-05 — § 5a's "not yet machine" note was
   stale), burstHopD? is the documented hop-descent conjunct, leaving
-  **hasDry and regsLen? as the real risk**. regsLen? is PROBEABLE
-  (dBound/subscribeE/regsLen? all compute) — probe in flight. Grind
-  rides subscribeE-caps' clause skeleton.
+  **hasDry and regsLen? as the real risk**. Both PROBED 2026-08-13
+  (Demand-Probe P-series, grown-inner shapes at k ≤ 2): mechanism
+  HELD, no refutation, strict-direction Ŝ; the compounding regime
+  (k ≥ 3, shares) is uncovered and keeps the class at FALSITY —
+  receipt with exact coverage in the header. Grind rides
+  subscribeE-caps' clause skeleton.
 - **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the
   anchor. The outer instantiation; maximal blast radius (both branches of
   `budget-sufficient`). Restated 2026-08-13 over the collapsed walk and

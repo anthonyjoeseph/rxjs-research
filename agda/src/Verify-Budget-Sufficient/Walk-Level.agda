@@ -245,8 +245,32 @@ postulate
   -- capsAt-suc-full, .Burst-Walk § 7).  So the whole tier-0 FALSITY
   -- class now rests on ONE question — does within-instant growth stay
   -- under Ŝ — and that question is PROBEABLE (sizeᵉ / syncSizeᵉ /
-  -- dBound / subscribeE all compute).  A probe hitting it from both
-  -- conjuncts' directions is in Demand-Probe.
+  -- dBound / subscribeE all compute).
+  --
+  -- PROBED 2026-08-13 (Demand-Probe, P-series; dual-sided pins), and
+  -- the mechanism HELD on every shape run — no refutation of either
+  -- conjunct.  Coverage, stated exactly:
+  --   · regsLen?: scan-GROWN inners subscribed through mergeAll at
+  --     k = 1 and k = 2 nesting, registry non-empty at exit (deferᵉ
+  --     persistence; the B/D/E series turned out DEGENERATE here —
+  --     their registries empty at exit).  Max minted pathLen 2/3/4 vs
+  --     dBound 11/1477/1478 — and the comparison ran at Ŝ = 5, BELOW
+  --     the grown inner's measured sizeᵉ = 8, which is the STRICT
+  --     direction: dBound is monotone in Ŝ, so green here implies
+  --     green at every faithful (larger) Ŝ.
+  --   · hasDry: minimal dry-free pad bisected exactly (h* = 1/2/3),
+  --     h* ≤ suc dBound with three-orders margin; hasAtLeast-pad makes
+  --     the padded run a legitimate instance of the conjunct's
+  --     hypothesis.
+  --   · Ŝ-ceiling: grown-inner sizes pinned (sizeᵉ acc₁ ≡ 8), so the
+  --     true instantiation needs sizeCapAt ≥ 8 at that subscription
+  --     point — trivially met by the tower.
+  -- NOT COVERED, and the class stays FALSITY on account of it: the
+  -- COMPOUNDING regime (growth that squares repeatedly within one
+  -- instant, k ≥ 3, sizes beyond ~12), programs with shares/connect
+  -- edges, and mid-cascade registry states richer than two entries.
+  -- The margins (~3 orders) suggest slack, but slack observed at
+  -- small k is exactly what geometric growth eats.
   --
   -- NOTE for the opIterD level bound at the degenerate corner:
   -- `opIterD` is the identity at m = 0 (`opIterD-0`, Evaluator:811)
