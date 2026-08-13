@@ -27,6 +27,12 @@ else lives in the code.
 - **The ledger is the source of truth, not this file.** `make wiring` lists
   every live postulate; every one of them appears in exactly one tier below,
   and a name here that no longer greps is a bug in this file — fix on sight.
+- **There is no second roadmap.** Not a session task list, not a worker's
+  notes, not a scratch file. A parallel list is outside the repo, so no gate
+  and no `grep` can see it rot — one ran beside this file for weeks, kept
+  every completed row, and outlived this file's rewrite by a commit. The tell
+  is citing work by a NUMBER: names come from here and from the ledger,
+  numbers come from somewhere that should not exist. Find it and delete it.
 
 **The tier law (CLAUDE.md):** tier 0 finishes first, then 1, then 2, then 3 —
 strictly; the one carve-out is answering a design question. Risk classes,
