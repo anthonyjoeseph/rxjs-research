@@ -650,6 +650,49 @@ available at the call site, adding it and deleting the postulate is less work th
 carrying it. (`depthE ≤ capsH` unconditionally is FALSE, `Depth-Bound.agda:11`; the
 `capsOK?`-conditioned form costs nothing extra, so it is the one that is stated.)
 
+### CODE BEATS PROSE: if you can assemble it, ASSEMBLING IT IS THE JOB (Anthony, 2026-08-13)
+
+**A finding written in English that could have been written in Agda is not done — it is
+deferred.** This is not a matter of priority or of "documentation is also valuable". Work is
+not finished until it is **as discharged as the current knowledge allows**: if you have just
+worked out that A follows from B, the deliverable is the assembly `A = A-core B …`, not a
+header paragraph saying that it does.
+
+The tell, and it is easy to miss because the paragraph feels like progress: you write
+"X could be implemented in terms of Y" / "this reduces to Z" / "the route is …", and then
+you commit. **That sentence is a work order addressed to you, right now.** Either carry it
+out, or say plainly why you cannot (a signature must change, a hypothesis is missing, the
+grind is genuinely large) and postulate the residue at full strength. What is forbidden is
+recording the insight and moving on as though the insight were the deliverable.
+
+Why it matters more here than in ordinary code: an assembly is CHECKED — the typechecker
+holds the reduction to the actual hypotheses, `grep` finds the residue, and the wiring law
+counts it. A paragraph is checked by nobody, ages silently, and gets re-derived. (Two costs
+already paid: `frameStep-reg≤size` sat machine-proven for eight days while a header called
+the same arithmetic "hand derivation, not yet machine"; and `subscribeInner-nodry` was
+described in prose as assemblable from the walk face's `hasDry` conjunct, and committed that
+way, when the assembly was available — it turned out to discharge the `g0` clause outright
+and prove the burst-split transport, both of which the paragraph had silently classified as
+part of the postulate.)
+
+Corollary for headers: a header's job is what CANNOT be code — a refuted route, a coverage
+boundary, a ruling and its rationale, a recovery pointer. The moment a header explains a
+derivation that would typecheck, move it into the derivation.
+
+### THE GATE INCLUDES `PROOF-STATE.md` (Anthony, 2026-08-13)
+
+**`make gate` is necessary, not sufficient. Update PROOF-STATE before every commit that
+changes the ledger, in that same commit** — a postulate discharged, added, renamed, split,
+reclassified, or reordered. The roadmap is the file every session reads FIRST, so a stale
+row misdirects the next session's whole leg; one already did, naming two postulates that had
+become real definitions.
+
+And update it **to the hygiene rules in its own header, which are also part of the gate**:
+one line per item (name + risk class + hook), NO numbering of any kind (list indices,
+conjunct positions, source sections, timings), research in source headers rather than here,
+completed items DELETED rather than marked done, no dated narrative. Re-read that header
+when you touch the file; every one of those rules exists because it was violated.
+
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony, 2026-08-05)
 
 **THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level

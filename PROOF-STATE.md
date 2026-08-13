@@ -62,7 +62,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
      │   │                                ← subscribeE-wet ← subscribeE-wet-core
      │   │                                  ← subscribeE-walk-level   [tier 0]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeInner-nodry, dry-tick-core]
+     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeE-inner-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
@@ -78,9 +78,9 @@ named postulate's own header.
 - **`subscribeE-walk-level`** (Walk-Level) — FALSITY. The collapsed walk
   face; risk is confined to its hasDry and regsLen? conjuncts (containment
   receipt, conjunct census, and probe coverage in its header).
-- **`subscribeInner-nodry`** (Burst-Walk) — FALSITY. The one leaf every
-  dry path in the cascade reduces to; its risky clause IS the walk face's
-  hasDry conjunct.
+- **`subscribeE-inner-nodry`** (Burst-Walk) — FALSITY. All that survives
+  of the cascade's dry risk: the walk face's hasDry conjunct at the inner
+  call; manufacture obligations in its header.
 - **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the walk
   face. Its outer instantiation; maximal blast radius; instantiation plan
   in its header.

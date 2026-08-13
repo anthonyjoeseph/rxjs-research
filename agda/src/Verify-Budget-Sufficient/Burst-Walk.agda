@@ -74,7 +74,7 @@
 module Verify-Budget-Sufficient.Burst-Walk where
 
 open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; _∨_; not)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.List    using (List; []; _∷_; _++_; map; length)
@@ -86,19 +86,20 @@ open import Data.List.Relation.Unary.All using (All)
 open import Relation.Nullary using (yes; no)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent;
                            value; init; close; handoff; complete;
-                           CloseReason; cut; cutPending;
+                           CloseReason; cut; cutPending; exhausted; dried;
+                           gasPad; gasTower;
                            InstEmit; _at_from_as_; EmitKind; delivery)
-open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_; sizeᵉ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Slots; Arrival; RegId; Chain; Path; Frame;
          _↠_; root; share-sink;
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
-         hasDry; dryEvent; budgetAt;
+         hasDry; dryEvent; budgetAt; capsHgo; capsBase;
          arrTy; arrVal; fLvlD; regAt; subscribeInner; subscribeE;
          splitBurst; splitEvents; sLvlD;
          AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
@@ -1682,8 +1683,112 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (subscribeInner g op allNid κ id now o sched st))))
     ≡ false
 
+-- THE MINTED BUDGET IS NEVER EMPTY, and this is what excludes the
+-- evaluator's ONE dry mint.  `budgetAt` unfolds to
+-- `gasPad (2 ^ N) (gasTower H)`, and `2 ^ N` is positive whatever N is,
+-- so the gas the machine mints always carries a `gs` head.  Hence
+-- `subscribeInner g0` — the sole site that emits `close _ dried`
+-- (Rx/Evaluator:1006) — is UNREACHABLE under the gas hypothesis, as a
+-- theorem rather than as an appeal to the tower's size.
+2^-pos : ∀ (m : ℕ) → Σ ℕ (λ k → 2 ^ m ≡ suc k)
+2^-pos zero    = 0 , refl
+2^-pos (suc m) with 2^-pos m
+... | k , eq rewrite eq = k + suc (k + 0) , refl
+
+budgetAt-gs : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : Id) →
+  Σ Gas (λ g′ → budgetAt e sl id ≡ gs g′)
+budgetAt-gs e sl id
+  with 2^-pos ((sizeᵉ e + slotsSize sl) * suc id * suc id)
+... | k , eq rewrite eq =
+      gasPad k (gasTower (3 + capsHgo (capsBase e sl) (suc id))) , refl
+
+-- THE BURST SPLIT KEEPS EVERY CLOSE VERBATIM.  `splitEvents` rebuilds
+-- the bookkeeping list constructor for constructor — `close s r` goes
+-- through with its reason untouched — so a dry-free burst splits into a
+-- dry-free event list.  Proven, not assumed: this is the whole gap
+-- between the walk face's `hasDry` conjunct and what `subscribeInner`
+-- actually returns.
+splitEvents-nodry : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+  (es : List (InstEvent (Val Γ u))) → any dryEvent es ≡ false →
+  any (dryEvent {A}) (proj₁ (proj₂ (splitEvents {A = A} es))) ≡ false
+splitEvents-nodry []                h = refl
+splitEvents-nodry (value v   ∷ es)  h = splitEvents-nodry es h
+splitEvents-nodry (init s    ∷ es)  h = splitEvents-nodry es h
+splitEvents-nodry (handoff s ∷ es)  h = splitEvents-nodry es h
+splitEvents-nodry (complete  ∷ es)  h = splitEvents-nodry es h
+-- the reason is CASE-SPLIT rather than rewritten: the hypothesis lives
+-- at `Val Γ u` and the goal at `A`, so `dryEvent`'s implicit differs on
+-- the two sides and a rewrite cannot bridge them.  Split, and both
+-- sides compute; the `dried` arm is absurd, which is the real content
+splitEvents-nodry (close s cut        ∷ es) h = splitEvents-nodry es h
+splitEvents-nodry (close s cutPending ∷ es) h = splitEvents-nodry es h
+splitEvents-nodry (close s exhausted  ∷ es) h = splitEvents-nodry es h
+splitEvents-nodry (close s dried      ∷ es) ()
+
+splitBurst-nodry : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+  (str : Stream Γ u) → hasDry str ≡ false →
+  any (dryEvent {A}) (proj₁ (proj₂ (splitBurst {A = A} str))) ≡ false
+splitBurst-nodry []         h = refl
+splitBurst-nodry (em ∷ ems) h
+  with ∨-false (any dryEvent (InstEmit.events em)) (hasDry ems) h
+... | hd , tl =
+      any-dry-++ (proj₁ (proj₂ (splitEvents (InstEmit.events em))))
+                 (proj₁ (proj₂ (splitBurst ems)))
+                 (splitEvents-nodry (InstEmit.events em) hd)
+                 (splitBurst-nodry ems tl)
+
 postulate
-  subscribeInner-nodry : SiNodry
+  -- THE RESIDUE, and it is exactly `subscribeE-walk-level`'s hasDry
+  -- conjunct at the inner call.  `subscribeInner (gs fuel)` runs
+  -- `subscribeE fuel` on the freshly-minted instance and splits the
+  -- burst; the g0 clause is excluded by `budgetAt-gs` above and the
+  -- split is transported by `splitBurst-nodry` above, so EVERYTHING
+  -- between this statement and `SiNodry` is now proven and this is all
+  -- that is left.
+  --
+  -- Discharging it means applying the walk face at the frame's own
+  -- (c , J) and manufacturing its hypotheses there — the two named
+  -- obligations, each a crib of a proven sibling: the mid-delivery
+  -- INV? (assembled from capsOK? + fnCapBounded? + the regP? ledger,
+  -- with `frameStep-reg≤size` — PROVEN, .Caps-Bridge — supplying the
+  -- registry-cardinality piece), and the general-id `caps-fuel-root`
+  -- crib.  The walk face asks `g hasAtLeast suc G`, an INEQUALITY
+  -- rather than a pin to `budgetAt`, which is precisely why the
+  -- `gs`-peel to `fuel` descends here.
+  subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (Ψ dep bud : ℕ) →
+    2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    ∀ (J : ℕ) (fuel : Gas) (op : AllOp) (allNid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    PbB c Ψ J κ ≡ true →
+    VbB c sl Ψ J (o ∷ []) ≡ true →
+    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+    nest o sl (EvalSt.connectedShares st) ≤ bud →
+    depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
+    gs fuel ≡ budgetAt e sl id →
+    hasDry (proj₁ (subscribeE fuel o
+             (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+             (record sched { nextNode = suc (Sched.nextNode sched) }) st))
+      ≡ false
+
+-- EX-POSTULATE.  Two clauses, and the dry one is now impossible by
+-- construction rather than by hypothesis.
+subscribeInner-nodry : SiNodry
+subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz J g op allNid
+                     κ id now o sched st ok pb vb rg nB hD gk
+  with budgetAt-gs e sl id
+... | g′ , eq
+      rewrite trans gk eq =
+      splitBurst-nodry
+        (proj₁ (subscribeE g′ o
+                 (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+                 (record sched { nextNode = suc (Sched.nextNode sched) }) st))
+        (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz J g′ op allNid
+           κ id now o sched st ok pb vb rg nB hD (sym eq))
 
 postulate
   -- from-inner: `innerReact` absorbs or finishes; `innerFinish`'s only
