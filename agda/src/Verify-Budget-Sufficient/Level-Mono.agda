@@ -1,4 +1,4 @@
--- sizeCount-mono-d (tier-1 #13): sizeCount is monotone in its depth-fuel
+-- sizeCount-mono-d: sizeCount is monotone in its depth-fuel
 -- argument.  Full proof — zero postulates.
 --
 -- sizeCount c d = lvls S W d 0 (cDel c d) (sizeCount-body), where d

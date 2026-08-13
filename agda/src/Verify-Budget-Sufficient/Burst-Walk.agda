@@ -1,15 +1,26 @@
 ------------------------------------------------------------------
 -- BURST-WALK: the two-flavour burst ledger over the Delivery-Walk —
--- tier-1 #1/#2's content, landed at Ŝ with no tower constant.
+-- the walk/cascade burst content, landed at Ŝ with no tower constant.
 --
 -- Landed from probe/Caps-Burst-Walk-Probe.agda (2026-08-10), which
 -- was v2 of the route: v1's two bridging postulates were BOTH
 -- mis-stated (one concluded fnCap facts from hypotheses carrying no
 -- fnCap information; one lacked the plen/gas guards that keep its
 -- arithmetic true), and v0 — demand ledgers CONSTANT in the walk
--- level — was MACHINE-REFUTED (a duplicating map-f doubles sizeᵛ, so
--- no fixed bound survives one frame; receipt in PROOF-STATE's tier-1
--- block, 2026-08-10).
+-- level — was MACHINE-REFUTED (2026-08-10; the probe is deleted at
+-- 83b29c1, this paragraph is the receipt).  The refutation: at
+-- fn = pairᵗ (varᵗ x) (varᵗ x), Dm = 1, Ψ = 0, one payload 0 : natᵗ,
+-- `sizeᵛ natᵗ 0 = 1` fits the bound and `sizeᵛ (applyFn fn 0) = 3`
+-- does not — both by refl — so a level-constant Vb's OUTPUT conjunct
+-- reduces to false and the claim closes by ().  NOT VACUOUS: all five
+-- hypotheses discharged at st-init of a concrete program (four rows
+-- LOAD-BEARING; the empty-registry row DEGENERATE).  NOT COVERED: the
+-- real Dm = (2·B + 12) · towerℕ (suc sz), which is no evaluable
+-- numeral — that it too is no fixed point of a doubling map is
+-- reasoning, not a row.  The general lesson: the walk THREADS its
+-- ledger through every frame, so Walk's *-widen fields are not
+-- decoration — they are the walk telling you the ledger must GROW
+-- WITH THE LEVEL.
 --
 -- THE DESIGN, in one paragraph.  `valB? B Ψ`'s two conjuncts have
 -- OPPOSITE characters: the SIZE half grows per frame and must ride
@@ -39,7 +50,7 @@
 -- re-entering this same walk at the mid-cascade level — the cost that
 -- reappears then is the nonzero-base level bound, and the design note
 -- for it is v1's `fold-level-fits` REPAIRED with `suc plen ≤ S` and a
--- gas guard (PROOF-STATE, tier-1 update).
+-- gas guard.
 --
 -- THE FRAME FACE IS NOT A POSTULATE.  `stepFrame-burst-face` (§ 5b) is
 -- an ASSEMBLY over the PROVEN `stepFrame-face` (.Caps-Face:4678) plus
@@ -1652,7 +1663,7 @@ module BurstWalk
   module V = Walk {e = e} S W R d 2≤S burstH
 
 ------------------------------------------------------------------
--- § 7  THE PAYOFF — tier-1 #1/#2's content, at Ŝ, with no Dm.
+-- § 7  THE PAYOFF — the walk/cascade burst content, at Ŝ, with no Dm.
 --
 -- The level arithmetic is `cascadeGo-caps`'s own (Caps-Face:4901),
 -- cribbed term for term: Res.cnt through dWalkᶜ-mono and cDel-body,

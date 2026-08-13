@@ -1,6 +1,6 @@
 -- TICK HEADROOM — the tower-vs-tower comparison  (landed 2026-08-06)
 --
--- Phase 1b step 3.  Battery-Nesting-Escalation established that ONE instant
+-- The nesting-escalation measurements established that ONE instant
 -- can grow value sizes by a TOWER in nesting depth (≤ sizeᵉ e).  The dry
 -- family (Anchor-Dry-Probe.agda) survives as stated only if one caps tick —
 -- the step from B = cSize (capsAt e sl id) to Ŝ = cSize (capsAt e sl (suc id))
@@ -33,7 +33,7 @@
 -- arithmetic is CLOSED by tick-covers-instant, against the real recurrence,
 -- with zero postulates in this file.
 --
--- Landed from probe/Battery-Tick-Headroom.agda (Phase 1b step 3);
+-- Landed from probe/Battery-Tick-Headroom.agda;
 -- consumed by Anchor-Dry's dry-family assemblies via tick-covers-instant.
 module Verify-Budget-Sufficient.Tick-Headroom where
 
@@ -141,8 +141,8 @@ headroom-arith B t j hB hj =
 --   height n (lvls-tower below);
 --   and cDel c d ≥ cReg c ≥ 2 + sz  (dWalkᶜ walks at least regAt S R 0 = R
 --   positions, each adding ≥ 1; cReg's base is suc sz and frameStep only
---   multiplies it up — capsAt-reg below is the `capsAt-base-reg`-shaped
---   fact tier-1 #8's route note asked for, at ≥ 2 + sz).
+--   multiplies it up — capsAt-reg below proves the
+--   `capsAt-base-reg`-shaped fact at ≥ 2 + sz).
 -- Combining: sizeCount ≥ lvls 0 (2 + sz) ≥ 3 + towerℕ sz.
 ----------------------------------------------------------------------
 
@@ -300,11 +300,10 @@ tick-covers-instant e sl id =
 --     iterL/dLvl budget advancement, 2^J ≤ sizeAt S J, and
 --     cDel ≥ cReg (capsAt) ≥ 2 + sz.  What the earlier draft postulated is
 --     now a definition; this file carries ZERO postulates.
--- (3) BONUS WIRING NOTE: capsAt-reg is the `capsAt-base-reg`-shaped lemma
---     tier-1 #8's route note names as its sole missing sub-lemma (there
---     stated as `suc (sizeᵉ e + slotsSize sl) ≤ cReg (capsAt …)`; here
---     proven at the STRONGER 2 + sz).  When #8 is picked up, lift this
---     into Caps.agda rather than re-deriving it.
+-- (3) BONUS WIRING NOTE: capsAt-reg proves the `capsAt-base-reg`-shaped
+--     fact (`suc (sizeᵉ e + slotsSize sl) ≤ cReg (capsAt …)`, here at the
+--     STRONGER 2 + sz).  If a future consumer wants it, lift it into
+--     Caps.agda rather than re-deriving it.
 --
 -- SHAPES COVERED: the statement level — supply chain AND count bound proven
 -- for ALL e, sl, id, symbolically, zero postulates.  NOT COVERED: the demand

@@ -1,6 +1,6 @@
 -- GAP 4's ASSEMBLY (Wet.agda:4125-4199).  THE JOINT INVARIANT BRIDGE
 -- between the caps face's `capsOK?` (Caps-Face.agda) and the wet
--- family's `INV?` (Measures.agda).  Task #16 of PROOF-STATE.md.
+-- family's `INV?` (Measures.agda).
 --
 -- capsOK? and INV? do not imply each other: capsOK? carries two WIDTH
 -- conjuncts (widLive, widNode) INV? has no counterpart for, and INV?
@@ -14,8 +14,7 @@
 -- `cascadeGo-caps` concludes boundedness only, no dry — dryness stays
 -- on the gas axis (S3, P2's unchanged dry half).
 --
--- CONSUMERS.  CORRECTED 2026-08-05 (PROOF-STATE.md § "RULING:
--- Caps-Bridge was built UPSIDE DOWN") — the original text here said
+-- CONSUMERS.  CORRECTED 2026-08-05 (the 2026-08-05 upside-down ruling) — the original text here said
 -- "`cascade-dry` and `burst-wet` (.Wet) migrate to consume
 -- `cascade-wet-via-caps`", which is IMPOSSIBLE: `.Caps-Bridge` imports
 -- `.Wet` (below), so `.Wet` can never import `.Caps-Bridge` back. The
@@ -417,9 +416,17 @@ fn-tick {e = e} a id sched st inv val =
   Ψ′≡Ψ = cong (ΨAt e) slotsEq
 
 ------------------------------------------------------------------
--- S3 `dry-tick` : P2 (`cascadeGo-wet`, Wet.agda:4335)'s dry half,
--- unchanged — the gas-peel axis (dBound-μ/hop/connect).  Interim
--- postulate; not touched by the caps/INV? bridging problem at all.
+-- S3 `dry-tick` : P2 (`cascadeGo-wet`, .Wet/Part6)'s dry half,
+-- unchanged — the gas-peel axis (dBound-μ/hop/connect).
+--
+-- TIER 0, LAST.  Nearly all this postulate's risk is INHERITED from
+-- `cascadeGo-wet-core` — its first hypothesis IS that postulate's
+-- assembly — so it sits squarely on the anchor problem; given the
+-- anchor, what is left here is latch/finish bookkeeping plus the
+-- Deliveries counts.  Work it after the anchor resolves, never first.
+-- (An earlier version of this header claimed independence from the
+-- caps/INV? bridging problem — wrong, and the kind of wrong that
+-- re-orders a schedule.)
 --
 -- ASSEMBLY (2026-08-06): narrowed over the cascade-level facts it was
 -- written to be built from.  `cascade` IS cascadeLatch → cascadeGo →
@@ -810,7 +817,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
 
 ------------------------------------------------------------------
 -- (D) THE THREADED TOP OF THE TOWER.  MOVED here from .Wet
--- (PROOF-STATE.md § "RULING: Caps-Bridge was built UPSIDE DOWN") — this
+-- (the 2026-08-05 upside-down ruling) — this
 -- is not a copy beside `cascade-dry`/`drain-dry`/`budget-sufficient`,
 -- it IS them, generalised to also carry `capsOK?` beside `INV?` through
 -- the fuel loop.  `.Wet` cannot state this (it imports `.Wet`... no —
@@ -984,9 +991,8 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 --
 -- SPEND `depth-capped` AT THE PRE-BLOWUP BASE CAPS, NOT AT
 -- `capsAt e ins 0`.  This is the whole content of the arrangement and
--- it is not visible from the goal, so it is written here as well as in
--- PROOF-STATE.md § "RULING: `depth-capped` must be spent at the SMALL
--- caps".  `capsAt e sl zero` is ITSELF a `frameBlowup` (Caps.agda:452;
+-- it is not visible from the goal, so it is written out here, at the one
+-- site that spends it.  `capsAt e sl zero` is ITSELF a `frameBlowup` (Caps.agda:452;
 -- `baseCaps-is-inner` below pins that by `refl`), so its `cSize` is
 -- `sizeStep` iterated `sizeCount`-many times.  Routing the depth bound
 -- through THAT number demands `3 · cSize (capsAt e ins 0) ≤ capsH`,
@@ -1139,10 +1145,10 @@ depthE≤capsH-root e ins =
 -- discharges the root instance of the depOK premise threaded below.
 
 -- sizeCount-mono-d is now a real proof in Verify-Budget-Sufficient.Level-Mono
--- (imported above, tier-1 #13 discharged 2026-08-07).
+-- (imported above; discharged 2026-08-07).
 
 -- THE SUBSCRIBE-SIDE CAPS LIFT, and it is PROVEN (2026-08-06) — the
--- `sub-charge-capsOK-lift-core` postulate this replaces was tier-1 #4.
+-- `sub-charge-capsOK-lift-core` postulate is replaced outright.
 -- What made it provable is the LAST premise, depOK: the general-id
 -- depth bound `depthE … ≤ capsH e sl id` is a RUN INVARIANT, not a
 -- lemma — the unconditional form is FALSE (Depth-Bound.agda's header:
@@ -1150,9 +1156,17 @@ depthE≤capsH-root e ins =
 -- `depthE ≤ capsH`), and "reachable" is not a first-class predicate
 -- here, so the bound enters as a premise exactly the way nestOK/opsOK
 -- did and is owed by whoever owns the run structure: burst-caps
--- discharges it at the root via depthE≤capsH-root, and the Phase-3
--- induction must carry it as an invariant (see PROOF-STATE.md, the
--- depOK preservation obligation).
+-- discharges it at the root via depthE≤capsH-root, and the eventual
+-- subscribe/cascade induction must carry it as an invariant.  THE
+-- PRESERVATION STEP IS A ONE-INSTANT DEPTH-GROWTH BOUND: depthE data
+-- at ≤ h grows to ≤ blowH h in one instant, riding the recurrence
+-- `capsH e sl (suc id) = blowH (capsH e sl id)` (`blowH` is BY DESIGN
+-- "the worst one instant's cascades can do") — NOT `depth-capped` at
+-- the state's own caps, which is off by "towerℕ of" at every index
+-- (see (2) below; no index shift closes it).  That preservation lemma
+-- is genuinely new mathematics of the demand-walk flavour; per the
+-- wiring law it is not stated as a postulate until the induction that
+-- consumes it exists — this note is where it is recorded meanwhile.
 --
 -- THE CHAIN, every link named: jB puts j′ under the walk receipt
 -- `opIterD S W dep k m 0`; opIterD-dominated (with nestOK/opsOK

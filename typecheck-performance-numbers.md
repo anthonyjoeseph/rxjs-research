@@ -34,10 +34,11 @@ when nothing moved, so a build does not dirty the tree.
 |---|---|---|---|
 | `make agda (full gate, 174 modules)` | **802.0 s** | 802.0 s | 1 |
 | `make agda (full gate, 49 modules)` | **743.0 s** | 743.0 s | 1 |
+| `make agda (full gate, 59 modules)` | **704.0 s** | 704.0 s | 1 |
 | `agda-dev Verify-Budget-Sufficient/Measures.agda` | **25.2 s** | 25.2 s | 1 |
 | `agda-dev Harness/Main.agda` | **4.3 s** | 7.0 s | 4 |
 
-<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 25.2, "last": 25.2, "runs": 1}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}} -->
+<!-- AUTO:DATA {"agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 25.2, "last": 25.2, "runs": 1}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}} -->
 
 <!-- AUTO:END -->
 

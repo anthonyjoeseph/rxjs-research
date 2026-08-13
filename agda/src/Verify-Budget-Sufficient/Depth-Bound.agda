@@ -1,5 +1,5 @@
 ------------------------------------------------------------------
--- THE DEPTH OBLIGATION, STATED (PROOF-STATE.md Task #13).
+-- THE DEPTH OBLIGATION, STATED (2026-08-03).
 --
 -- `sub-charge` (Caps-Bridge.agda) bounds a subscribe's growth index by
 -- `opIterD … (depthE g b κ bid now sched st) …` — a receipt in terms of

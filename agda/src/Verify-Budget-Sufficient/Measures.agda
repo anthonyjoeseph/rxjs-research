@@ -5690,10 +5690,26 @@ anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 ------------------------------------------------------------------
 
 ----------------------------------------------------------------------
--- WALK-CORE SUB-POSTULATES (32 total, landed from Walk-Core-Assembly-Probe.agda)
--- subscribeE-walk-core below is now a REAL DEFINITION (structural
--- recursion on b : Closed / g : Gas) over these per-clause gaps.
--- Probe EXIT=0 on 2026-08-11; parameter reconciliation applied here.
+-- WALK-CORE SUB-POSTULATES (20 live of the 26 landed 2026-08-11).
+-- subscribeE-walk-core below is a REAL DEFINITION (structural
+-- recursion on b : Closed / g : Gas) over these per-clause gaps, in
+-- three shapes: 14 CLAUSE FACES (§ 2 per-clause + § 3 *All — the same
+-- 9-conjunct face at one constructor each; worker-shaped, no shared
+-- state), 5 μ-SPECIFIC (the measure-preservation ones follow the
+-- syncSize-unfoldμ/shellSize-unfoldμ pattern already proven in this
+-- module), and 1 monotonicity (walkCap-mono-d).
+--
+-- PARKED BEHIND THE ANCHOR (cascadeGo-wet-core, .Wet/Part6): grinding
+-- these cannot discover a design failure, and an anchor failure would
+-- move the ground under all of them.  When they ARE picked up, two
+-- tips from the first grind round: look for an existing *-elimG
+-- congruence before writing a new one, and check whether the proof
+-- already exists ONE MODULE AWAY blocked only by import direction —
+-- walk-core-μ-hopD fell for free by relocating the proven
+-- hopD-elimGᵉ/pm-elimGᵉ blocks from .Wet to Rx/Hop-Depth.  Also from
+-- that round: walk-core-G-pos was FALSE as first stated (dBound is the
+-- identity at s = 0, G = 0) — repaired with the `1 ≤ s` hypothesis,
+-- free at every call site since syncSizeᵉ ≥ 1 at every Exp clause.
 ----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
@@ -6335,7 +6351,7 @@ subscribeE-walk-core :
     -- as `(f : <its type>) → …` would quantify over every inhabitant of
     -- that type and make this core strictly STRONGER than the postulate
     -- it replaces; an equation is a proposition and keeps the two
-    -- equivalent.  See PROOF-STATE.md § the orphan accounting.
+    -- equivalent.
     (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
        ΩAt e sl ≡ ofWᵉ e + slotsOfW sl
      ) →

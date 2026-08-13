@@ -653,6 +653,15 @@ postulate
   -- boundary facts and the .Measures budget/size faces the clause grind
   -- consumes.  Every hypothesis is already proven, so this is neither
   -- stronger nor weaker than the postulate it replaces.
+  --
+  -- TIER 0, SECOND — after `cascadeGo-wet-core` (the anchor, below)
+  -- resolves.  Given the walk this is "the outer instantiation", but
+  -- the instantiation must manufacture the walk's G/ℓ/Ω entry data
+  -- from INV? alone, and that INV?/capᴱ flavour conversion is
+  -- UNCHECKED — a named, specific unverified step, not general unease,
+  -- with maximal blast radius: both branches of `budget-sufficient`
+  -- consume this face.  It takes `subscribeE-walk` as a finished fact,
+  -- so the walk's own sub-postulate residue does not block it.
   subscribeE-wet-core :
     -- subscribeE-walk  (Verify-Budget-Sufficient/Measures.agda:6125)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -851,6 +860,42 @@ postulate
   -- [(0, root)] with isLast false/true is LOAD-BEARING for hasDry; INV? at
   -- suc id is DEGENERATE on every shape tested.  The anchor is
   -- symbolic-or-nothing — do not spend a session probing it.
+  --
+  -- THE ANCHOR (tier 0, work it FIRST).  Class FALSITY: this postulate
+  -- is P2's entire content — its only hypotheses are the two stBounded?
+  -- preservation facts below — and the campaign's central open
+  -- question; everything else in tiers 1–2 waits on it.  Because no
+  -- probe reaches the risky region (above), the class can never be
+  -- lowered by probing.  The symbolic attack, in order:
+  --   (1) THE MIRROR.  `cascadeGo-caps` (.Caps-Face/Part7:914) is a
+  --       REAL DEFINITION proving the analogous statement on the caps
+  --       axis, and this header's own contract says the wet face
+  --       mirrors it.  Census which caps-side outputs already imply
+  --       which wet-side conjuncts, by reading the two signatures side
+  --       by side (the goals are declared — no typecheck needed).
+  --       Three outcomes, all useful: the wet face reduces to a bridge
+  --       lemma; or it needs hypotheses the caps face does not carry
+  --       (naming them IS the repair); or the faces are genuinely
+  --       independent (record why here, and (2) becomes the route).
+  --   (2) THE SPLIT.  `hasDry (proj₁ r) ≡ false` mentions neither B
+  --       nor Ψ — plausibly a short structural induction over
+  --       cascadeGo's three cases (no clause constructs a dried
+  --       event), independent of the whole caps tower.  Splitting it
+  --       out takes the provable half out of the anchor entirely and
+  --       shrinks what "the anchor" refers to.
+  --   (3) REFUTATION, symbolically: derive ⊥ from this statement plus
+  --       the j-index growth facts the caps face uses.  TIME-BOX it —
+  --       a failed symbolic refutation, unlike a numeric one, produces
+  --       no receipt.
+  -- Then `subscribeE-wet-core` (its outer instantiation) and
+  -- `dry-tick-core` (.Caps-Bridge, risk inherited from here) — in that
+  -- order, never first.
+  --
+  -- RECOVERY: if the resolution wants a well-founded multiset order
+  -- (the classical instrument for this descent class), `git show
+  -- 11a34db` restores the retired Dershowitz–Manna apparatus (_≺ᵛ_,
+  -- ≺ᵛ-wf, rank, shells, descent lemmas) — restore it, don't re-derive
+  -- ≺ᵛ-wf.
   cascadeGo-wet-core :
     -- latch-bounded  (Verify-Budget-Sufficient/Measures.agda:408)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -1184,8 +1229,7 @@ burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
 burst-bounded e ins = proj₂ (burst-wet e ins)
 
 -- `cascade-dry`, `drain-dry`, `budget-sufficient` MOVED to
--- `.Caps-Bridge` (PROOF-STATE.md § "RULING: Caps-Bridge was built
--- UPSIDE DOWN") — caps-threaded there, consuming `cascade-wet-via-caps`
+-- `.Caps-Bridge` (the 2026-08-05 upside-down ruling) — caps-threaded there, consuming `cascade-wet-via-caps`
 -- in place of `cascadeGo-wet` below.  `burst-wet`/`burst-dry`/
 -- `burst-bounded`/`pop-INV`/`pop-head-bounded` stay here: `.Caps-Bridge`
 -- consumes all five unchanged as the INV?-only half of its own burst

@@ -9,9 +9,9 @@
 -- postulate (`stepFrame-burst-face`) behind it.  The tower constant
 -- Dm = (2·B + 12) · towerℕ (suc sz) is OFF THE PATH for those two:
 -- `capsAt-suc-full` lands the walk's burst directly on Ŝ.  See
--- .Burst-Walk's header for the route, and PROOF-STATE's tier-1 block
--- for the two designs refuted/mis-stated on the way (the constant-Dm
--- walk, machine-refuted; v1's two flawed bridge postulates).
+-- .Burst-Walk's header for the route and for the two designs
+-- refuted/mis-stated on the way (the constant-Dm walk,
+-- machine-refuted; v1's two flawed bridge postulates).
 --
 -- WHAT REMAINS HERE is the SUBSCRIBE-side leg, which the delivery
 -- walk does not cover (subscribeInner is a frame's INTERIOR, not a

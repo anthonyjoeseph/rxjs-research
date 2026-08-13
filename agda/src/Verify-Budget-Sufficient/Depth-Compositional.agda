@@ -1,5 +1,5 @@
 ------------------------------------------------------------------
--- `depth-compositional`, ASSEMBLED (tier-1 #5) — landed from
+-- `depth-compositional`, ASSEMBLED — landed from
 -- agda/probe/Depth-Compositional-Assembly.agda 2026-08-06, where the
 -- shape was typechecked symbolically before paying this recheck.
 --

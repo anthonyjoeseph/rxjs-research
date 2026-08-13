@@ -1222,7 +1222,7 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- signature pass creates.
 --
 -- WHY IT IS A POSTULATE AND NOT A DERIVATION.  `depth-compositional`
--- (tier-1 #5) bounds `depthE`, the SUBSCRIBE side, by
+-- (Depth-Compositional.agda) bounds `depthE`, the SUBSCRIBE side, by
 -- `sizeᵉ b + pathLen κ + storeNestMax sched st`.  Nothing anywhere
 -- bounds the DELIVERY side: `depthCascade` reaches frames through
 -- `chainStep`/`foldPath`/`stepFrame`, and every one of those is outside

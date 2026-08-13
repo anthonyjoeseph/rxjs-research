@@ -41,8 +41,7 @@ open import Relation.Nullary using (Dec; yes; no)
 
 -- from .Caps-Bridge, not from the top module: the top module is the
 -- active caps grind, and importing it here would put this file on that
--- clock.  MOVED 2026-08-05 from .Wet (PROOF-STATE.md § "RULING:
--- Caps-Bridge was built UPSIDE DOWN") — `budget-sufficient`'s TYPE did
+-- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
 open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
@@ -155,14 +154,95 @@ burst-final sched st S binv dp cv = inv , paid (BurstInv.current-frame binv)
     ; caches       = cv
     }
 
+------------------------------------------------------------------
+-- MERGE-CERT — the corrected k↔liveness coherence, this branch's
+-- central design question (the anchor's tier-2 mirror).  Blocks the
+-- four *All wrap receipts, stepFrame-wf-outer, and the two root-exit
+-- postulates below.  The three refutations of the naive candidate
+-- (`k ≡ countRegsUnder nid registry`) and the corrected measure are
+-- Part8's ESTABLISHMENT block: key on from-inner allNid ≡ mnid frames
+-- ONLY (the outer's thru-outer threads mnid too), dedup by inst (a
+-- multi-source inner registers two chains under one bump), and
+-- exclude spent registrations (finish pred-decrements k while the
+-- registry entries linger to cascadeFinish).  That is exactly what
+-- hasAliveFromInner / mergeCertAt below compute.  Do NOT generalise
+-- to a global node↔registry theory, and not onto dispatchShare
+-- (standing, Part8).
+--
+-- WHY IT SURVIVES ITS OWN COUNTEREXAMPLE SHAPE (probed 2026-08-06;
+-- the probe is deleted — this header is the receipt).  A hand-built
+-- state with k = 0 and a live from-inner registration (dying /
+-- delivered / cancelled all empty) makes mergeCertAt FALSE, so the
+-- whole question is that shape's REACHABILITY — and the cascade
+-- ordering answers it:
+--   1. cascadeLatch fires FIRST, setting dying = [arrSource a] before
+--      any chain is processed;
+--   2. cascadeGo adds rid to delivered BEFORE calling chainStep;
+--   3. so when innerFinish decrements k to 0, the spent registration
+--      is dying AND delivered.  aliveThroughᶠ's liveness disjunct is
+--      `not (src ∈ dying) ∨ not (rid ∈ delivered)` — false only when
+--      BOTH hold — and the ordering supplies both, so
+--      aliveThroughᶠ ≡ false.  The "both" is load-bearing: either
+--      mark alone leaves the registration alive.
+-- The bad shape is unreachable by this path.  REACHED coverage (rows
+-- driven through subscribeE → cascadeLatch → cascadeGo, not
+-- hand-built): the single-inner mergeAll shape, mid-cascade and
+-- post-cascadeFinish — the decisive rows.  STILL UNCOVERED: the
+-- multi-source inner reached only at hand-built states, concat /
+-- switch / exhaust and nested *All, and the CUT route to k ≡ 0
+-- (registrations also drop at take-cuts — a distinct path).
+--
+-- STATED AT THE SETTLED ROOT EXIT — the same conditioning as the two
+-- consumers below, and the one region the refutations do not touch.
+-- "Reachable" is not first-class here, so the general mid-fold form
+-- enters as a threaded FoldInv field WHEN the six consumer rewrites
+-- land (parked behind tier 1); this root-exit form is what the root
+-- consumers read meanwhile.
+------------------------------------------------------------------
+
+-- a registration carries an ALIVE from-inner instance of mnid: its
+-- path mentions some inst via a `from-inner _ mnid inst` frame, and
+-- that inst is alive (aliveThroughᶠ)
+hasAliveFromInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → EvalSt e → RegId × Source × Chain Γ t → Bool
+hasAliveFromInner mnid st c@(_ , _ , (_ , p)) =
+  any (λ inst → aliveThroughᶠ inst st c) (innerInstsP mnid p)
+
+-- merge-cert at one node: when merge-st sits at k ≡ 0, no registry
+-- entry has an alive from-inner instance of this node.  k ≢ 0 and
+-- non-merge nodes are trivially certified.
+mergeCertAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → EvalSt e → Bool
+mergeCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
+... | just (merge-st zero od) =
+        not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
+... | _ = true
+
+postulate
+  merge-cert : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    (mnid : NodeId) →
+    mergeCertAt mnid
+      (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                (sched-init e ins) (st-init e)))) ≡ true
+
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
 -- root subscription's returned stream IS the emitted one, so its done-flip is a
 -- genuine full completion — which leaves only share sinks registered.  (On the
 -- inner-recursion path this is false, but done-plumbed is never read there; it
--- is consumed ONLY here, at the root frame-0 exit.)  Postulated for now — its
--- proof is the merge-coherence content, landed when the *All wrap clauses are.
+-- is consumed ONLY here, at the root frame-0 exit.)  An ASSEMBLY over
+-- merge-cert — its proof is the merge-coherence content, landed when the *All
+-- wrap clauses are; the -core takes today's root-exit merge-cert and gains the
+-- mid-fold hypotheses when those rewrites land.
 postulate
-  root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  root-done-plumbed-core :
+    -- merge-cert (above)
+    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+      (mnid : NodeId) →
+      mergeCertAt mnid
+        (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                  (sched-init e ins) (st-init e)))) ≡ true
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
       (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
@@ -175,14 +255,44 @@ postulate
   -- ROOT-EXIT caches, migrated out of BurstInv for the reason recorded on the
   -- record: the merge count trails the registry inside an inner's burst and
   -- leads it after a take-cut, so only the SETTLED state at the root exit — by
-  -- which point every mergeBump has landed — satisfies cachesValid.  This is
-  -- the same merge-coherence content root-done-plumbed is waiting on.
-  root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  -- which point every mergeBump has landed — satisfies cachesValid.  The same
+  -- merge-coherence content: an ASSEMBLY over merge-cert, like
+  -- root-done-plumbed above.
+  root-caches-core :
+    -- merge-cert (above)
+    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+      (mnid : NodeId) →
+      mergeCertAt mnid
+        (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                  (sched-init e ins) (st-init e)))) ≡ true
+     ) →
+    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     cachesValid
       (EvalSt.nodes (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                               (sched-init e ins) (st-init e)))))
       (EvalSt.registry (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                                  (sched-init e ins) (st-init e))))) ≡ true
+
+root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (S : ProtocolSt) →
+  runProtocol protocol-init
+    (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e))) ≡ just S →
+  ProtocolSt.done S ≡ true →
+  allShareSunk (EvalSt.registry
+    (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                              (sched-init e ins) (st-init e))))) ≡ true
+root-done-plumbed =
+  root-done-plumbed-core (λ {n} {Γ} {t} → merge-cert {n} {Γ} {t})
+
+root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  cachesValid
+    (EvalSt.nodes (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                            (sched-init e ins) (st-init e)))))
+    (EvalSt.registry (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                                               (sched-init e ins) (st-init e))))) ≡ true
+root-caches =
+  root-caches-core (λ {n} {Γ} {t} → merge-cert {n} {Γ} {t})
 
 -- the root subscription, composed (at the budget evaluate seeds)
 

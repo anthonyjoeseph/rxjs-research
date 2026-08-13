@@ -148,7 +148,7 @@ report review. Standing protocol, per Anthony:
   not extend to spec changes, which still require asking first.
 - **Run continuously through the weekend** — Anthony, 2026-07-31: "continue and continue,
   don't stop for context window or usage credits." Do not wind down because a session is
-  long, context is compacting, or spend is high. Work the task queue (tiers 1 → 2 → 3) end
+  long, context is compacting, or spend is high. Work the task queue (tiers 0 → 1 → 2 → 3) end
   to end: when a worker leg finishes, review it, merge it, launch the next. The only full
   stops are the standing ones: a spec question, or the impossibility pair.
 
@@ -465,16 +465,22 @@ deleted on its merits. Two rules survive the freeze, permanently:
   needed by work not yet written reads as dead, and a lemma stated AFTER its own
   specialisation is orphaned by placement alone and wires in one line. Prefer
   wiring to deleting whenever a plausible consumer is nameable.
-- **Record the commit SHA in PROOF-STATE.md** for anything substantial removed.
-  Git history is the archive only if someone can find the entry.
+- **The commit message carries the finding** for anything substantial removed —
+  write what the deleted thing established, so `git log` answers "what did that
+  prove" without restoring it. Git history is the archive only if someone can
+  find the entry. If the deletion leaves a NAMEABLE future consumer (apparatus
+  a later proof might want back), add a one-line `-- RECOVERY: git show <sha>
+  restores …` pointer to the header of the thing that would consume it — same
+  locality rule as `-- DEAD ROUTE`.
 
 ### DE-RISK MODE: test for falsity first, grind last (Anthony, 2026-08-06)
 
 **The wiring pass is over; the current pass is DE-RISKING.** Every postulate carries
 a probability of being FALSE or EMPTY, and the proof's total risk is the SUM over the
 ledger — so work is ordered by *risk reduced per unit effort*, not by proof-progress
-optics. The ranked ledger and the phase order live in PROOF-STATE.md; read it before
-picking up any postulate.
+optics. The tier-ordered roadmap lives in PROOF-STATE.md (order and one-line hooks
+only — the research lives in the postulates' own headers); read it before picking
+up any postulate.
 
 - **A machine refutation is worth as much as a proof — usually more, since it is
   cheaper.** A false statement found now costs a restatement; found after the towers
@@ -494,9 +500,14 @@ picking up any postulate.
   a receipt, not a theorem; say which shapes were covered and which were not.
 - **A row that could not have failed is not a row.** Label every probe row
   LOAD-BEARING or DEGENERATE and state what would make it fail. Three ways a probe
-  lies green — vacuous rows, hand-built (unreachable) states, and reading an assembly
-  backwards — are itemised in PROOF-STATE's roadmap; all three were observed in one
-  day, and all three erred toward false comfort.
+  lies green, all observed in one day, all erring toward false comfort:
+  **(1) vacuous rows** — the quantifier is empty (`all _ [] = true`, `0 ≤ᵇ _`), so
+  name the covered CONJUNCTS, not the covered programs; **(2) hand-built states** —
+  a state written as `record (st-init e) { … }` is not one the evaluator can reach,
+  so reach states by RUNNING, and treat a constructed state where the predicate
+  FAILS as a refutation candidate whose reachability is the finding, not a
+  "non-vacuity witness"; **(3) reading an assembly backwards** — `P = P-core o₁ … oₖ`
+  proves P FROM the postulated core, never the core; the `oᵢ` are its hypotheses.
 
 **RECORD A DEAD ROUTE WHERE THE NEXT PERSON WILL STAND (`-- DEAD ROUTE <date>:`).**
 A *refuted statement* and a *dead route* are different findings, and only the first
@@ -535,19 +546,18 @@ open bets on ground a design failure would move. The one carve-out is answering
 a *design question* (cheap, and it aims the grind) — never grinding over one.
 
 **TIER 0 IS THE ANCHOR, and it exists because prose priority did not hold.**
-`cascadeGo-wet-core` (T0-1), `subscribeE-wet-core` (T0-2), `dry-tick-core`
-(T0-3). For five days the anchor sat inside tier 1 while every tier-1 discharge
+`cascadeGo-wet-core`, `subscribeE-wet-core`, `dry-tick-core`. For five days the anchor sat inside tier 1 while every tier-1 discharge
 went to a non-anchor row — 12 live rows down to 5, anchor 4-for-4 untouched,
 `cascadeGo-wet-core` edited in `agda/src` exactly once. **Priority that lives
 only in prose gets spent on whatever is nearest**, so it is a tier now.
 
-**Before starting any task: if the postulate is not in PROOF-STATE's TIER 0
-table, and the work is not one of the two design questions, it is parked — say
+**Before starting any task: if the postulate is not in PROOF-STATE's tier-0
+list, and the work is not one of the two design questions, it is parked — say
 so and take a tier-0 item.** This explicitly parks **all of tier 1**, including
 `subscribeE-walk-core`'s 20 sub-postulates. Those 20 are the most
 gratifying-looking work left and the least informative: they are 14 instances of
 one clause pattern plus 5 μ-preservation facts, none of which can discover a
-design failure, and a T0-1 failure would move the ground under all of them.
+design failure, and a `cascadeGo-wet-core` failure would move the ground under all of them.
 
 **TWO ANCHOR RULINGS THAT CHANGE HOW YOU WORK IT (2026-08-11):**
 
@@ -560,10 +570,10 @@ design failure, and a T0-1 failure would move the ground under all of them.
   height 4). `cascadeGo` takes no `Gas` parameter, so a small concrete Gas
   cannot be injected around it. A non-abstract COPY of the counting family fails
   too — the blowup is computational, not definitional. **Consequence: every
-  probe of T0-1 reaches only the region where `B`/`Ψ` do not matter, so a green
+  probe of the anchor reaches only the region where `B`/`Ψ` do not matter, so a green
   probe here is not evidence. The anchor is symbolic-or-nothing.**
 - **A RISK CLASS MAY ONLY BE LOWERED BY EVIDENCE THAT REACHED THE RISKY
-  REGION.** T0-1 was downgraded FALSITY → DIFFICULTY on a probe covering only
+  REGION.** The anchor was downgraded FALSITY → DIFFICULTY on a probe covering only
   root-path chains — the near-degenerate case — and was reverted. Name the
   region the evidence reached, or the receipt does not count. This is the
   general form of "never extrapolate a probe past its shapes", and it is the
@@ -594,8 +604,39 @@ take that postulate, convert it into a REAL DEFINITION over several smaller post
 and have the definition CALL the orphans it was always meant to consume. This wires
 proven work, makes each remaining gap greppable, and proves nothing hard. It is what
 retired the last orphan in the repo, and it remains the move whenever a new proof has
-nowhere to plug in. The mechanics — hypothesis extraction, eta-expanded implicits,
-ordering — are written up in PROOF-STATE.md § "WRITING AN ASSEMBLY".
+nowhere to plug in.
+
+**WRITING AN ASSEMBLY — the mechanics.** For a parent postulate `P : T` with proven
+pieces `o₁…oₖ`, `T` is unchanged; it becomes
+
+```agda
+postulate P-core : <type of o₁> → … → <type of oₖ> → T
+P : T
+P = P-core (λ {a} {b} → o₁ {a} {b}) … oₖ
+```
+
+`P-core` is equivalent to `P` exactly when every hypothesis is a PROOF. A
+*function*-valued piece must be wired by its DEFINING EQUATION instead (`ΩAt` in
+`.Measures` is the worked example) — passing the function's type quantifies over
+every inhabitant and makes the core strictly STRONGER. Four rules, each of which
+otherwise costs a full build to rediscover:
+
+1. **EXTRACT hypothesis types from source; never retype them.**
+   `scripts/check-wiring.py`'s `signature_text` does it exactly.
+2. **Pass every lemma ETA-EXPANDED with explicit implicits** —
+   `(λ {n} {Γ} → f {n} {Γ})`. When a statement reduces away its own implicit,
+   bare arguments give `Unsolved metas`; the eta form always works.
+3. **Copied signatures drag in VOCABULARY the parent module does not import.**
+   Collect the names in one pass; Agda stops at the FIRST scope error.
+4. **ORDERING: a postulate cannot reference a definition below it.** The `-core`
+   sits where the postulate was; the definition sits after the last piece it
+   consumes. `make wiring` section B3 reports violations — do not learn this
+   from a failed typecheck.
+
+One more, from two discharges that shared it: **a `-core`'s hypothesis list is a
+HYPOTHESIS about the route, not a specification.** Both `opIterD-budget` and
+`init-capsOK?-base` shed seven-plus leading hypotheses because the direct proof
+never needed them — check whether it does before grinding through the list.
 
 **TWO SHAPES THAT ARE ALMOST ALWAYS WRONG — check every new postulate for both.** A
 statement whose conclusion needs information appearing in NONE of its hypotheses (e.g.
@@ -701,9 +742,14 @@ tower built without its consumer is a tower whose shape was never checked agains
 - Rationale is twofold: (1) aesthetic/cosmetic cleanliness, and (2) to keep the primitives and batchSimultaneous implementations in
   near-direct correspondence with the Agda, so translation between the two is straightforward.
 
-## The change workflow
+## The change workflow — for changes to the batchSimultaneous IMPLEMENTATION
 
-Follow these phases in order for any change to the implementation or spec:
+This workflow governs exactly one kind of change: a change to the
+**batchSimultaneous implementation** (the primitives + batching pipeline
+mirrored between `agda/src/Implementation` and `typescript/`) or, rarely and
+only after asking, to its spec. It does not apply to proof work, tooling, or
+documentation — those have their own rules above. For an impl/spec change,
+follow these phases in order:
 
 1. **Agda first.** Make the change to the spec/impl in Agda before touching TypeScript.
 2. **QuickCheck dev loop.** Use `npm run agda:qc` (the all-Agda QuickCheck comparing

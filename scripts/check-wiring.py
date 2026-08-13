@@ -65,8 +65,7 @@ ALLOWLIST = {
         "process — its consumer is the shell, not other Agda source, so "
         "textual search will never find one."
     ),
-    # --- design-session rulings, 2026-08-05 (see PROOF-STATE.md "Wiring
-    # --- rulings"). Two FAMILIES are exempt, matched by pattern below rather
+    # --- design-session rulings, 2026-08-05 (see CLAUDE.md § "The wiring law"). Two FAMILIES are exempt, matched by pattern below rather
     # --- than listed name by name.
     #
     # (1) `*-absurd` REFUTATION WITNESSES.  A machine-checked `… → ⊥` is the

@@ -14,7 +14,7 @@
 --
 -- `cascade-dry`, `drain-dry`, and `budget-sufficient` — the theorem
 -- Verify-Well-Formed consumes — MOVED to `.Caps-Bridge`
--- (PROOF-STATE.md § "RULING: Caps-Bridge was built UPSIDE DOWN"): a
+-- (the 2026-08-05 upside-down ruling): a
 -- module above `.Wet` can consume `.Caps-Bridge`'s `cascade-wet-via-caps`
 -- in place of the postulated `cascadeGo-wet` below; `.Wet` itself
 -- cannot, since `.Caps-Bridge` imports `.Wet`.
