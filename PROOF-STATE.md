@@ -82,16 +82,22 @@ statement plus one per-frame face.
   `switchKill` is cutThrough — so **the entire remaining dry risk of
   the cascade is `subscribeInner`**: its `g0` clause is the
   evaluator's one dry mint, excluded by the gas hypothesis, and its
-  `gs` clause is `subscribeE-walk-level`'s conjunct (8). The gas
-  threads through every intermediary unchanged (checked). **OPEN
-  DESIGN QUESTION, answer before grinding either:** `concatDrain` and
-  `thruWalk` LOOP, so their state-dependent leaf hypotheses need
-  re-establishing per iteration — ride the proven caps faces as extra
-  parameters (§ 5b's shape), or widen those faces' conclusions with a
-  nodry conjunct (correct, but re-grinds the 44-minute module). The
-  two manufacture obligations (mid-delivery INV?; the general-id
-  `caps-fuel-root` crib) and the can't-probe ruling are in the § 5a
-  header, unchanged.
+  `gs` clause is `subscribeE-walk-level`'s conjunct (8). That leaf is
+  now STATED (`SiNodry` / `subscribeInner-nodry`) and both frames are
+  `-core`s over it, so the consolidation is structural rather than
+  prose. The gas threads through every intermediary unchanged
+  (checked), so the g0 exclusion is never re-won. The two manufacture
+  obligations (mid-delivery INV?; the general-id `caps-fuel-root`
+  crib) and the can't-probe ruling are in the § 5a header, unchanged.
+- **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk
+  § 5a) — DIFFICULTY, and delegable. Pure loop transport over the leaf
+  above: re-establish its state-dependent hypotheses after each
+  `concatDrain` queue element and each `thruWalk` step. **The loop
+  question was RULED (A) on 2026-08-13** — thread the already-proven
+  caps faces (siC/ifc) as extra parameters and re-establish `capsOK?`
+  from their Σ-witness, rather than widening those faces' conclusions
+  with a nodry conjunct: (B) re-grinds proven work inside the
+  44-minute module and buys no strength. Rationale in the § 5a header.
 - **`subscribeE-walk-level`** (Walk-Level) — FALSITY, and it is now where
   the conversion's risk lives. The COLLAPSED walk, landed 2026-08-13: the
   running position is a caps level `j`, the statement is

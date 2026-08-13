@@ -1622,28 +1622,74 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
 --                 Checked 2026-08-13; had the walk pinned its gas the
 --                 descent would not have typed.
 --
--- ═══ WHAT IS STILL OPEN, stated so the grind is not surprised ═══
+-- ═══ THE LOOP QUESTION, RULED 2026-08-13 ═══
 --
--- The two postulated frames are NOT one-step: `concatDrain` and
+-- The two remaining frames are NOT one-step: `concatDrain` and
 -- `thruWalk` LOOP, calling `subscribeInner` at a state that has
--- already moved.  So their leaf hypotheses (capsOK? and friends, all
+-- already moved.  So the leaf's hypotheses (capsOK? and friends, all
 -- state-dependent) must be RE-ESTABLISHED per iteration — which is
--- exactly what the caps route's Σ-witness does and what a bare
--- `≡ false` conclusion cannot.  The gas hypothesis itself threads for
--- free (`fuel` is passed unchanged by every one of innerReact,
--- innerFinish, concatDrain, thruWalk, thruConsume, thruWrap — checked
--- 2026-08-13).  THE OPEN DESIGN QUESTION is whether the loops
--- re-establish by riding the already-proven caps faces (siC/ifc as
--- extra parameters, mirroring § 5b) or by widening those faces'
--- conclusions with a nodry conjunct (correct but re-grinds the
--- 44-minute module).  Answer it before grinding either frame.
+-- what the caps route's Σ-witness does and what a bare `≡ false`
+-- conclusion cannot.  The gas hypothesis is the one part that threads
+-- for FREE: `fuel` is passed unchanged by every one of innerReact,
+-- innerFinish, concatDrain, thruWalk, thruConsume and thruWrap
+-- (checked 2026-08-13), so the `g0` exclusion never has to be re-won.
+--
+-- TWO ROUTES WERE ON THE TABLE.  (A) take the already-proven caps
+-- faces (siC/ifc) as extra parameters and re-establish `capsOK?` at
+-- the moved state from their Σ-witness, mirroring what § 5b already
+-- does one level up.  (B) widen SiCFace/IfcFace's own conclusions
+-- with a nodry conjunct, so the re-establishment comes for free.
+--
+-- RULED: (A).  (B) is tidier to read and strictly worse to build —
+-- its suppliers (`subscribeInner-caps`, `innerFinish-caps`) are
+-- PROVEN inside Subscribe-Face, so widening their conclusions
+-- re-grinds finished work in the most expensive module in the repo,
+-- and buys no strength that threading the same witness does not.
+-- (A) also has a working precedent in this file rather than a
+-- hypothetical one.
+--
+-- WHAT THAT MAKES THE TWO FRAMES: transport over ONE leaf, named
+-- below as `SiNodry` and postulated once.  The `-core` pair keeps
+-- that structural rather than prose — each frame is a real definition
+-- applying its core to the single leaf, so `subscribeInner-nodry` has
+-- a consumer from the minute it is stated and the census above is
+-- checkable by grep instead of by reading this header.
 ------------------------------------------------------------------
+
+-- THE ONE LEAF.  Everything dry in the cascade reduces to this, and
+-- its own two clauses are the g0 mint (excluded by `gk`) and
+-- `subscribeE fuel …` (= `subscribeE-walk-level` conjunct (8)).
+SiNodry : Set
+SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (Ψ dep bud : ℕ) →
+  2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  ∀ (J : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched st →
+  PbB c Ψ J κ ≡ true →
+  VbB c sl Ψ J (o ∷ []) ≡ true →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  nest o sl (EvalSt.connectedShares st) ≤ bud →
+  depthInner g op allNid κ id now o sched st ≤ dep →
+  g ≡ budgetAt e sl id →
+  any dryEvent (proj₁ (proj₂ (proj₂
+    (subscribeInner g op allNid κ id now o sched st))))
+    ≡ false
+
+postulate
+  subscribeInner-nodry : SiNodry
 
 postulate
   -- from-inner: `innerReact` absorbs or finishes; `innerFinish`'s only
   -- emitting arm is concatᵒ's `concatDrain`, whose events are
-  -- `subscribeInner`'s, looped over the queue
-  innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- `subscribeInner`'s, looped over the queue.  The loop is the whole
+  -- obligation: re-establish the leaf's state-dependent hypotheses
+  -- after each queue element, per the (A) ruling above
+  innerReact-nodry-core : SiNodry →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
     2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
@@ -1665,8 +1711,9 @@ postulate
 
   -- thru-outer: `thruWrap` passes events through untouched; `thruWalk`
   -- loops `thruConsume`, whose events are `switchKill`'s (cutThrough,
-  -- free) plus `subscribeInner`'s
-  thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- free) plus `subscribeInner`'s.  Same loop obligation as above
+  thruOuter-nodry-core : SiNodry →
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
     2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
@@ -1750,13 +1797,15 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
                 (from-inner op allNid inst) path′ vals fin sched st
                 ok pb vb rg gk hD =
-  innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op allNid inst
+  innerReact-nodry-core subscribeInner-nodry
+                   c sl Ψ d 2≤S 1≤R slC slSz J sf id now op allNid inst
                    path′ vals fin sched st ok pb vb rg gk hD
 
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
                 (thru-outer op nid) path′ vals fin sched st
                 ok pb vb rg gk hD =
-  thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid
+  thruOuter-nodry-core subscribeInner-nodry
+                  c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid
                   path′ vals fin sched st ok pb vb rg gk hD
 
 ------------------------------------------------------------------
