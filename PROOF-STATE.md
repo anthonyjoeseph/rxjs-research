@@ -60,7 +60,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      ├─ budget-sufficient                Caps-Bridge.agda — PROVEN from:
      │   ├─ burst-dry/-bounded ┐ all three are projections of ONE
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
-     │   │                                ← subscribeE-wet ← subscribeE-wet-core
+     │   │                                ← subscribeE-wet ← wet-landing-lift
      │   │                                  ← subscribeE-walk-level   [tier 0]
      │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeE-inner-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
@@ -81,9 +81,12 @@ named postulate's own header.
 - **`subscribeE-inner-nodry`** (Burst-Walk) — FALSITY. All that survives
   of the cascade's dry risk: the walk face's hasDry conjunct at the inner
   call; manufacture obligations in its header.
-- **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the walk
-  face. Its outer instantiation; maximal blast radius; instantiation plan
-  in its header.
+- **`wet-landing-lift`** (Walk-Level) — FALSITY, conditional on the walk
+  face. Lifts the walk's landing INV? to the outer cap; the only conjunct
+  of the outer assembly with content. Chain in its header.
+- **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
+  `regsLen?-mono`** (Walk-Level) — DIFFICULTY. Entry plumbing for the
+  outer assembly; each self-contained, none level-indexed.
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
   DIFFICULTY, parked. Loop transport over the leaf; ruling and resumption
   plans in their headers.

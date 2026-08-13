@@ -67,6 +67,7 @@ open import Data.Bool    using (Bool; true; false)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Nat.Properties using (≤-refl; m≤m+n; m≤n+m)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (Vec; lookup)
@@ -83,7 +84,7 @@ open import Rx.Exp       using (Ty; obs; Ctx; Closed; Val; Exp; Tm; Fn;
                                 mapᵉ; μᵉ; unfoldμ; applyFn)
 open import Rx.Frame-Width using (dWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
-open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared;
+open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain;
                                 memberSource; Path; root; share-sink; _↠_;
                                 Stream; subscribeE; sharedConnect;
                                 splitBurst; hasDry; dryEvent;
@@ -98,6 +99,184 @@ open import Verify-Budget-Sufficient.Wet
 open import Verify-Budget-Sufficient.Caps-Face
   using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
+
+
+-- THE WALK FACE AND ITS CORE, as types — named once so that neither
+-- the postulate that asserts the face nor the assembly that consumes
+-- it has to retype the statement.  Both sit above the postulate block
+-- because a postulate cannot reference a definition below it.
+WalkLevel : Set
+WalkLevel =
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    -- caps prelims, subscribeE-caps' own
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
+    depthE g b κ bid now sched st ≤ dep →
+    -- the wet half, at the level (the E-into-j collapse: the wet
+    -- predicate's B position IS the level's size cap)
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    -- the dry half, unchanged: demand at the ENTRY-COMPUTABLE reset
+    -- caps, never at any ledger
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    -- the length ledger, ℓ FREE (wet-ell-absurd killed the Ŝ pin)
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ bid now sched st
+    in Σ ℕ λ j′ →
+       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+       × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+       × (j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j)
+       × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+-- THE 19 ROUTE LEMMAS, RE-HOMED (2026-08-13).  They used to hang off
+-- `subscribeE-wet-core`'s hypothesis list, from the days when that
+-- core walked the gas edges clause by clause.  Assembling the outer
+-- face showed it needs NONE of them — it is pure instantiation and
+-- lift — while the walk face, which IS the clause-by-clause gas walk,
+-- is where every one of them gets spent.  Their ONLY consumer in the
+-- repo was that hypothesis list, so re-homing them here is also what
+-- keeps them wired.  Set₁ rather than Set: two of them quantify over
+-- `{A : Set}` (splitBurst's payload), which lifts the whole core.
+WalkLevelCore : Set₁
+WalkLevelCore =
+    -- mu-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
+    (∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
+      suc (dBound Ŝ R̂ U (hopDᵉ Ŝ (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
+        ≤ dBound Ŝ R̂ U (hopDᵉ Ŝ (μᵉ body)) (syncSizeᵉ (μᵉ body))
+     ) →
+    -- hop-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
+    (∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) → 2 ≤ Ŝ →
+      (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r →
+      suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ (obs u) o) (syncSizeᵉ o))
+        ≤ dBound Ŝ (hopR Ŝ) U r s
+     ) →
+    -- connect-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
+    (∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
+      (sl : Slots Γ) (cs : List Source) (i : Fin n)
+      {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+      memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
+      suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
+        ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s
+     ) →
+    -- hop-step-gives  (Verify-Budget-Sufficient/Wet/Part6.agda)
+    (∀ (V R U r s s′ : ℕ) → suc s′ ≤ s + suc V →
+      suc (dBound V R U r s′) ≤ dBound V R U (suc r) s
+     ) →
+    -- hop-step-needs  (Verify-Budget-Sufficient/Wet/Part6.agda)
+    (∀ (V R U r s s′ : ℕ) →
+      suc (dBound V R U r s′) ≤ dBound V R U (suc r) s → suc s′ ≤ s + suc V
+     ) →
+    -- unconn-keeps  (Verify-Budget-Sufficient/Wet.agda)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (sched : Sched Γ) (st : EvalSt e) (sched′ : Sched Γ) (st′ : EvalSt e) →
+      Keeps sched st sched′ st′ →
+      unconn (Sched.slots sched′) (EvalSt.connectedShares st′)
+        ≤ unconn (Sched.slots sched) (EvalSt.connectedShares st)
+     ) →
+    -- sharedConnect-unconn  (Verify-Budget-Sufficient/Keeps-Ring.agda)
+    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+      (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+      (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
+      Sched.slots sched i ≡ shared dd →
+      memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
+      unconn (Sched.slots (proj₁ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
+             (EvalSt.connectedShares
+               (proj₂ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
+      < unconn (Sched.slots sched) (EvalSt.connectedShares st)
+     ) →
+    -- obs-slot-shared  (Verify-Budget-Sufficient/Keeps-Ring.agda)
+    (∀ {n} {Γ : Ctx n} {u} (s : Slot Γ (obs u)) →
+      Σ (Closed Γ (obs u)) λ d → s ≡ shared d
+     ) →
+    -- share-live-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda)
+    (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
+      proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
+              (((init s ∷ []) at id from s as subscribe) ∷ [])) ≡ []
+     ) →
+    -- share-spent-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda)
+    (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
+      proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
+              (((init s ∷ close s exhausted ∷ complete ∷ []) at id from s as subscribe) ∷ []))
+        ≡ []
+     ) →
+    -- hasAtLeast-pad  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ (m : ℕ) (g : Gas) {n} → n ≤ m → gasPad m g hasAtLeast n
+     ) →
+    -- hasAtLeast-peel  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {g : Gas} {m : ℕ} → g hasAtLeast suc m →
+      Σ Gas (λ g′ → (g ≡ gs g′) × (g′ hasAtLeast m))
+     ) →
+    -- seed-covers  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ (sz U : ℕ) → U ≤ sz →
+      let V = towerℕ ((4 + sz) * 1) in
+      suc (suc V * suc (hopR V) * suc U)
+        ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
+     ) →
+    -- budget-covers  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ (sz U id : ℕ) → U ≤ sz →
+      let V = towerℕ ((4 + sz) * suc (suc id)) in
+      suc (suc V * suc (hopR V) * suc U)
+        ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
+     ) →
+    -- oneShot-tail-dry  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (src : Source) →
+      any dryEvent (map value vals ++ close src exhausted ∷ complete ∷ []) ≡ false
+     ) →
+    -- connect-anchor  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+      (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+      let V = sizeBudgetAt e sl id in
+      (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
+     ) →
+    -- hopD-map-emit  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ)
+      (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) (v : Val Γ s) →
+      (f₀ : Fn Γ [] [] [] s u) → hopDᵗ V f₀ ≤ hopDᵗ V f → pmᵗ V 0 f₀ ≤ pmᵗ V 0 f →
+      hopDᵛ V s v ≤ hopDᵉ V b →
+      hopDᵛ V u (applyFn f₀ v) ≤ hopDᵉ V (mapᵉ f b)
+     ) →
+    -- applyFn-size  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
+      (fn : Fn Γ [] [] [] s t) (v : Val Γ s) → sizeᵛ s v ≤ V →
+      sizeᵛ t (applyFn fn v) ≤ (2 + 2 * V) ^ (3 ^ sizeᵗ fn)
+     ) →
+    -- unconn-cons-≤  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+      (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
+     ) →
+    -- shellSize-unfoldμ  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+      shellSizeᵉ (unfoldμ body) ≡ shellSizeᵉ body
+     ) →
+    -- inner-unfoldμ  (Verify-Budget-Sufficient/Measures.agda)
+    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+      innerᵉ (unfoldμ body) ≡ innerᵉ body
+     ) →
+  WalkLevel
 
 postulate
   -- THE COLLAPSED WALK FACE.  Hypotheses: subscribeE-caps' list
@@ -281,258 +460,26 @@ postulate
   -- reachable and are harmless: opIterD's `suc m` clause bumps J
   -- unconditionally (J₀ = suc (J + …)) before any d/k-dependent step
   -- runs.
-  subscribeE-walk-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    -- caps prelims, subscribeE-caps' own
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    nest b sl (EvalSt.connectedShares st) ≤ bud →
-    suc (sizeᵉ b) ≤ ops →
-    depthE g b κ bid now sched st ≤ dep →
-    -- the wet half, at the level (the E-into-j collapse: the wet
-    -- predicate's B position IS the level's size cap)
-    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-    fnCapᵉ b ≤ Ψ →
-    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-    -- the dry half, unchanged: demand at the ENTRY-COMPUTABLE reset
-    -- caps, never at any ledger
-    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
-           (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
-    g hasAtLeast suc G →
-    -- the length ledger, ℓ FREE (wet-ell-absurd killed the Ŝ pin)
-    pathLen κ + G ≤ ℓ →
-    regsLen? ℓ (EvalSt.registry st) ≡ true →
-    let r = subscribeE g b κ bid now sched st
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-       × (j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j)
-       × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
-               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
-       × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
-       × (hasDry (proj₁ r) ≡ false)
-       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+  subscribeE-walk-level-core : WalkLevelCore
 
-postulate
-  -- THE WET CONTRACT's CORE, restated over the collapsed walk
-  -- (2026-08-13; the previous form, narrowed over the ledger walk, is
-  -- in the RECOVERY commit above — its walk hypothesis was
-  -- machine-refuted as unsatisfiable-in-composition, wet-ceiling-absurd).
-  --
-  -- THE OUTER FACE GAINS THE CAPS-SIDE HYPOTHESES — exactly the list
-  -- `subscribeE-wet-via-caps` (.Caps-Bridge) already carries and its
-  -- call sites already supply (the root has init-capsOK? /
-  -- dWe≤cWid / depthE≤capsH-root; via-caps holds them as its own
-  -- hypotheses).  This is the ruling's clause (b) run in reverse: the
-  -- conjuncts one face has and the other lacks ride as explicit
-  -- hypotheses, free at every call site.
-  --
-  -- THE INSTANTIATION, so the grind starts aimed: c := capsAt e sl id,
-  -- j := 0 (frameStep-0 rewrites the entry hypotheses to the outer
-  -- face's own), dep := depthE (≤-refl), bud := nest (≤-refl),
-  -- ops := suc (sizeᵉ b) (≤-refl), G := the demand (≤-refl),
-  -- ℓ := (sizeCapAt e sl id) + (pathLen κ + G) — regsLen? at entry
-  -- weakens up from capsOK?'s regsSz? conjunct (pathSz? carries the
-  -- per-entry length bound), and the landing lifts by the
-  -- sub-charge-capsOK-lift chain plus INV?'s upward B-monotonicity.
-  subscribeE-wet-core :
-    -- subscribeE-walk-level  (above)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
-      (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-      (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-      2 ≤ Caps.cSize c →
-      1 ≤ Caps.cReg c →
-      Sched.slots sched ≡ sl →
-      slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-      slotsSize sl ≤ Caps.cSize c →
-      capsOK? (frameStep j c) sched st ≡ true →
-      sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-      dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
-      pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-      suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-      nest b sl (EvalSt.connectedShares st) ≤ bud →
-      suc (sizeᵉ b) ≤ ops →
-      depthE g b κ bid now sched st ≤ dep →
-      INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-      fnCapᵉ b ≤ Ψ →
-      pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-      dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
-             (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
-      g hasAtLeast suc G →
-      pathLen κ + G ≤ ℓ →
-      regsLen? ℓ (EvalSt.registry st) ≡ true →
-      let r = subscribeE g b κ bid now sched st
-      in Σ ℕ λ j′ →
-         (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-         × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-         × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-         × (j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j)
-         × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
-                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-         × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
-         × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
-         × (hasDry (proj₁ r) ≡ false)
-         × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
-     ) →
-    -- mu-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
-    (∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
-      suc (dBound Ŝ R̂ U (hopDᵉ Ŝ (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
-        ≤ dBound Ŝ R̂ U (hopDᵉ Ŝ (μᵉ body)) (syncSizeᵉ (μᵉ body))
-     ) →
-    -- hop-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
-    (∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) → 2 ≤ Ŝ →
-      (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r →
-      suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ (obs u) o) (syncSizeᵉ o))
-        ≤ dBound Ŝ (hopR Ŝ) U r s
-     ) →
-    -- connect-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
-    (∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
-      (sl : Slots Γ) (cs : List Source) (i : Fin n)
-      {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
-      memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
-      suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
-        ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s
-     ) →
-    -- hop-step-gives  (Verify-Budget-Sufficient/Wet/Part6.agda)
-    (∀ (V R U r s s′ : ℕ) → suc s′ ≤ s + suc V →
-      suc (dBound V R U r s′) ≤ dBound V R U (suc r) s
-     ) →
-    -- hop-step-needs  (Verify-Budget-Sufficient/Wet/Part6.agda)
-    (∀ (V R U r s s′ : ℕ) →
-      suc (dBound V R U r s′) ≤ dBound V R U (suc r) s → suc s′ ≤ s + suc V
-     ) →
-    -- unconn-keeps  (Verify-Budget-Sufficient/Wet.agda)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (sched : Sched Γ) (st : EvalSt e) (sched′ : Sched Γ) (st′ : EvalSt e) →
-      Keeps sched st sched′ st′ →
-      unconn (Sched.slots sched′) (EvalSt.connectedShares st′)
-        ≤ unconn (Sched.slots sched) (EvalSt.connectedShares st)
-     ) →
-    -- sharedConnect-unconn  (Verify-Budget-Sufficient/Keeps-Ring.agda)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
-      (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
-      (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
-      Sched.slots sched i ≡ shared dd →
-      memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
-      unconn (Sched.slots (proj₁ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
-             (EvalSt.connectedShares
-               (proj₂ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
-      < unconn (Sched.slots sched) (EvalSt.connectedShares st)
-     ) →
-    -- obs-slot-shared  (Verify-Budget-Sufficient/Keeps-Ring.agda)
-    (∀ {n} {Γ : Ctx n} {u} (s : Slot Γ (obs u)) →
-      Σ (Closed Γ (obs u)) λ d → s ≡ shared d
-     ) →
-    -- share-live-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda)
-    (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
-      proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
-              (((init s ∷ []) at id from s as subscribe) ∷ [])) ≡ []
-     ) →
-    -- share-spent-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda)
-    (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
-      proj₁ (splitBurst {Γ = Γ} {u = u} {A = A}
-              (((init s ∷ close s exhausted ∷ complete ∷ []) at id from s as subscribe) ∷ []))
-        ≡ []
-     ) →
-    -- hasAtLeast-pad  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ (m : ℕ) (g : Gas) {n} → n ≤ m → gasPad m g hasAtLeast n
-     ) →
-    -- hasAtLeast-peel  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {g : Gas} {m : ℕ} → g hasAtLeast suc m →
-      Σ Gas (λ g′ → (g ≡ gs g′) × (g′ hasAtLeast m))
-     ) →
-    -- seed-covers  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ (sz U : ℕ) → U ≤ sz →
-      let V = towerℕ ((4 + sz) * 1) in
-      suc (suc V * suc (hopR V) * suc U)
-        ≤ 2 ^ (sz * 1 * 1) + towerℕ ((7 + sz) * 2)
-     ) →
-    -- budget-covers  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ (sz U id : ℕ) → U ≤ sz →
-      let V = towerℕ ((4 + sz) * suc (suc id)) in
-      suc (suc V * suc (hopR V) * suc U)
-        ≤ 2 ^ (sz * suc id * suc id) + towerℕ ((7 + sz) * suc (suc id))
-     ) →
-    -- oneShot-tail-dry  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} {u} (vals : List (Val Γ u)) (src : Source) →
-      any dryEvent (map value vals ++ close src exhausted ∷ complete ∷ []) ≡ false
-     ) →
-    -- connect-anchor  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-      (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
-      let V = sizeBudgetAt e sl id in
-      (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
-     ) →
-    -- hopD-map-emit  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ)
-      (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) (v : Val Γ s) →
-      (f₀ : Fn Γ [] [] [] s u) → hopDᵗ V f₀ ≤ hopDᵗ V f → pmᵗ V 0 f₀ ≤ pmᵗ V 0 f →
-      hopDᵛ V s v ≤ hopDᵉ V b →
-      hopDᵛ V u (applyFn f₀ v) ≤ hopDᵉ V (mapᵉ f b)
-     ) →
-    -- applyFn-size  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
-      (fn : Fn Γ [] [] [] s t) (v : Val Γ s) → sizeᵛ s v ≤ V →
-      sizeᵛ t (applyFn fn v) ≤ (2 + 2 * V) ^ (3 ^ sizeᵗ fn)
-     ) →
-    -- unconn-cons-≤  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-      (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
-     ) →
-    -- shellSize-unfoldμ  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
-      shellSizeᵉ (unfoldμ body) ≡ shellSizeᵉ body
-     ) →
-    -- inner-unfoldμ  (Verify-Budget-Sufficient/Measures.agda)
-    (∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
-      innerᵉ (unfoldμ body) ≡ innerᵉ body
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    let sl = Sched.slots sched
-        Ψ  = ΨAt e sl
-        B  = sizeCapAt e sl id
-        Ŝ  = sizeCapAt e sl (suc id)
-    in INV? Ψ B sched st ≡ true →
-       pathB? B Ψ κ ≡ true →
-       pathSz? B κ ≡ true →
-       suc (pathLen κ) ≤ B →
-       sizeᵉ b ≤ B →
-       fnCapᵉ b ≤ Ψ →
-       g hasAtLeast
-         suc (dBound Ŝ (hopR Ŝ)
-                     (unconn sl (EvalSt.connectedShares st))
-                     (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
-       capsOK? (capsAt e sl id) sched st ≡ true →
-       dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
-       3 + nest b sl (EvalSt.connectedShares st) ≤ B →       -- nestOK
-       suc (sizeᵉ b) ≤ B →                                   -- opsOK
-       depthE g b κ id now sched st ≤ capsH e sl id →        -- depOK
-       let r = subscribeE g b κ id now sched st
-       in (hasDry (proj₁ r) ≡ false)
-          × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
-                  (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+subscribeE-walk-level : WalkLevel
+subscribeE-walk-level =
+  subscribeE-walk-level-core
+    mu-edge hop-edge connect-edge hop-step-gives hop-step-needs unconn-keeps
+    sharedConnect-unconn obs-slot-shared
+    -- these two must be instantiated EXPLICITLY: `splitBurst` computes on
+    -- the literal event list, so the reduced statement no longer mentions
+    -- Γ or u and Agda cannot solve those implicits from the expected type.
+    (λ {n} {Γ} {u} {A} → share-live-novals {n} {Γ} {u} {A})
+    (λ {n} {Γ} {u} {A} → share-spent-novals {n} {Γ} {u} {A})
+    hasAtLeast-pad hasAtLeast-peel seed-covers budget-covers oneShot-tail-dry
+    connect-anchor hopD-map-emit applyFn-size unconn-cons-≤
+    shellSize-unfoldμ inner-unfoldμ
 
--- the wet face, assembled over its core.  The outer statement is
--- subscribeE-wet-via-caps' own hypothesis list (.Caps-Bridge) minus its
--- caps conclusion — every call site already holds every argument.
-subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+-- THE OUTER WET FACE, as a type.
+WetOuter : Set
+WetOuter =
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) →
   let sl = Sched.slots sched
@@ -551,23 +498,145 @@ subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                    (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
      capsOK? (capsAt e sl id) sched st ≡ true →
      dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
-     3 + nest b sl (EvalSt.connectedShares st) ≤ B →
-     suc (sizeᵉ b) ≤ B →
-     depthE g b κ id now sched st ≤ capsH e sl id →
+     3 + nest b sl (EvalSt.connectedShares st) ≤ B →       -- nestOK
+     suc (sizeᵉ b) ≤ B →                                   -- opsOK
+     depthE g b κ id now sched st ≤ capsH e sl id →        -- depOK
      let r = subscribeE g b κ id now sched st
      in (hasDry (proj₁ r) ≡ false)
         × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
                 (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-subscribeE-wet =
-  subscribeE-wet-core subscribeE-walk-level
-    mu-edge hop-edge connect-edge hop-step-gives hop-step-needs unconn-keeps
-    sharedConnect-unconn obs-slot-shared
-    -- these two must be instantiated EXPLICITLY: `splitBurst` computes on
-    -- the literal event list, so the reduced statement no longer mentions
-    -- Γ or u and Agda cannot solve those implicits from the expected type.
-    (λ {n} {Γ} {u} {A} → share-live-novals {n} {Γ} {u} {A})
-    (λ {n} {Γ} {u} {A} → share-spent-novals {n} {Γ} {u} {A})
-    hasAtLeast-pad hasAtLeast-peel seed-covers budget-covers oneShot-tail-dry
-    connect-anchor hopD-map-emit applyFn-size unconn-cons-≤
-    shellSize-unfoldμ inner-unfoldμ
+
+------------------------------------------------------------------
+-- THE OUTER FACE, ASSEMBLED — ex-postulate (2026-08-13).
+--
+-- `subscribeE-wet-core` used to be a postulate over the walk face and
+-- 19 route lemmas.  Writing the assembly showed it is pure PLUMBING:
+-- instantiate the walk at the entry caps and lift its landing.  The
+-- instantiation is
+--
+--   c := capsAt e sl id     j := 0        Ψ := ΨAt e sl
+--   F , Ŝ := sizeCapAt e sl (suc id)      R̂ := hopR Ŝ
+--   G := the demand         dep := capsH e sl id
+--   bud := nest b sl …      ops := suc (sizeᵉ b)
+--   ℓ := B + (pathLen κ + G)
+--
+-- and `sizeCapAt e sl id` IS `Caps.cSize (capsAt e sl id)` by
+-- definition, so the size-indexed entry hypotheses transport by `refl`
+-- and only the whole-Caps one needs `frameStep-0`.
+--
+-- WHY ℓ CARRIES A `B +`, since the obvious `ℓ := pathLen κ + G` is
+-- WRONG and the assembly is what catches it: `dBound Ŝ R̂ U r s`
+-- degenerates to `s` when the hop index and the unconnected count are
+-- both 0 (a program with no hops and no shares), and `syncSizeᵉ b` is
+-- nowhere near the tower `B`.  So the entry registry — bounded by `B`
+-- through capsOK? — would not fit under `pathLen κ + G`, and the
+-- ledger hypothesis would be unsatisfiable at exactly the shapes the
+-- probe series calls degenerate.  Adding `B` is what makes the entry
+-- weakening go through, and costs the landing nothing.
+------------------------------------------------------------------
+
+postulate
+  -- ENTRY, (i): the slot store fits the caps its own recurrence is
+  -- built from.  Entry-only and slot-only — no state, no level.
+  entry-slotsCaps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : Id) →
+    slotsCaps? (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
+      ≡ true
+
+  -- ENTRY, (ii): and its total size does too.  Companion of
+  -- `size≤sizeCapAt` (.Wet/Part6, PROVEN) for the slot summand.
+  entry-slotsSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : Id) → slotsSize sl ≤ Caps.cSize (capsAt e sl id)
+
+  -- ENTRY, (iii): capsOK?'s registry conjunct, read as a LENGTH bound.
+  -- capsOK? already carries `regsSz?` (every registered chain's frames
+  -- fit the size cap); this is that conjunct with the per-chain path
+  -- length read off it.
+  capsOK⇒regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    regsLen? (Caps.cSize c) (EvalSt.registry st) ≡ true
+
+  -- ENTRY, (iv): the ledger weakens upward, which is what spends the
+  -- `B +` above.
+  regsLen?-mono : ∀ {n} {Γ : Ctx n} {t} (m ℓ : ℕ)
+    (rs : List (RegId × Source × Chain Γ t)) → m ≤ ℓ →
+    regsLen? m rs ≡ true → regsLen? ℓ rs ≡ true
+
+  -- THE LANDING LIFT, and it is the only conjunct of this assembly with
+  -- real content.  The walk lands INV? at its own level's size cap,
+  -- `cSize (frameStep j′ (capsAt e sl id))`, bounded by the walk's
+  -- opIterD conjunct; the outer face wants it at `sizeCapAt e sl
+  -- (suc id)`.  This is `sub-charge-capsOK-lift`'s chain (.Caps-Bridge)
+  -- — opIterD-dominated → sizeCount-body → sizeCount-mono-d over depOK
+  -- → capsAt-suc-full → frameStep-mono-j — plus INV?'s upward
+  -- monotonicity in B.  Slots never change across a run, so the Ψ index
+  -- transports untouched.
+  wet-landing-lift : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (j′ : ℕ) →
+    let sl = Sched.slots sched
+        r  = subscribeE g b κ id now sched st
+    in depthE g b κ id now sched st ≤ capsH e sl id →
+       0 + j′ ≤ opIterD (Caps.cSize (capsAt e sl id))
+                        (Caps.cWid (capsAt e sl id))
+                        (capsH e sl id)
+                        (nest b sl (EvalSt.connectedShares st))
+                        (suc (sizeᵉ b)) 0 →
+       INV? (ΨAt e sl)
+            (Caps.cSize (frameStep (0 + j′) (capsAt e sl id)))
+            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+            (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+subscribeE-wet-core : WalkLevel → WetOuter
+subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
+                    inv pB pS pLen szB fcB gas cOK dW nestOK opsOK depOK =
+    dry
+  , wet-landing-lift g b κ id now sched st j′ depOK lvl invL
+  where
+  sl = Sched.slots sched
+  c  = capsAt e sl id
+  Ψ  = ΨAt e sl
+  B  = sizeCapAt e sl id
+  Ŝ  = sizeCapAt e sl (suc id)
+  G  = dBound Ŝ (hopR Ŝ) (unconn sl (EvalSt.connectedShares st))
+               (hopDᵉ Ŝ b) (syncSizeᵉ b)
+  ℓ  = B + (pathLen κ + G)
+
+  cOK0 : capsOK? (frameStep 0 c) sched st ≡ true
+  cOK0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) cOK
+
+  regs : regsLen? ℓ (EvalSt.registry st) ≡ true
+  regs = regsLen?-mono B ℓ (EvalSt.registry st) (m≤m+n B (pathLen κ + G))
+           (capsOK⇒regsLen c sched st cOK)
+
+  W = wl c Ψ Ŝ Ŝ (hopR Ŝ) G ℓ (capsH e sl id)
+         (nest b sl (EvalSt.connectedShares st)) (suc (sizeᵉ b)) 0
+         g b κ id now sl sched st
+         (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id) refl
+         (entry-slotsCaps e sl id) (entry-slotsSize e sl id)
+         cOK0 szB dW pS pLen ≤-refl ≤-refl depOK
+         inv fcB pB ≤-refl gas (m≤n+m (pathLen κ + G) B) regs
+
+  -- the Σ's nine conjuncts, named rather than counted: capsOK?,
+  -- burstCaps?, burstCount?, the opIterD level bound, INV?, burstB?,
+  -- burstHopD?, hasDry, regsLen?
+  j′ = proj₁ W
+  p2 = proj₂ W
+  p3 = proj₂ p2
+  p4 = proj₂ p3
+  p5 = proj₂ p4
+  p6 = proj₂ p5
+  p7 = proj₂ p6
+  p8 = proj₂ p7
+  p9 = proj₂ p8
+
+  lvl  = proj₁ p5
+  invL = proj₁ p6
+  dry  = proj₁ p9
+
+subscribeE-wet : WetOuter
+subscribeE-wet = subscribeE-wet-core subscribeE-walk-level
