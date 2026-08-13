@@ -153,7 +153,7 @@ open import Verify-Budget-Sufficient.Wet.Part2 public
 ------------------------------------------------------------------
 -- THE FOLD DECOMPOSITION, PROVEN: cascadeGo threads the walk
 -- invariant chain by chain over chainStep-wet.  This is the
--- structure the cascadeGo-wet memo demanded — per-cascade growth
+-- structure the cascade fold-threading memo demanded — per-cascade growth
 -- threads through the fold at a moving ledger position, with the
 -- registry cardinality rider (INV?'s length conjunct) available at
 -- the latch for the eventual receipt arithmetic.  Not consumed yet:
@@ -268,7 +268,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --          exits the per-value measure — it anchors against the
 --          slot's own element of the GLOBAL multiset {program} ⊎
 --          {slots}; that re-anchoring is the ownership half of the
---          ledger (cascadeGo-wet), not the per-value order.
+--          ledger (the cascade fold-threading memo), not the per-value order.
 --      (The 2026-07-19 layer-derivation design worked but carried
 --      an unfixable wart: unused env entries gave layers with no
 --      syntactic footprint, so the entry-sum side condition needed
@@ -300,7 +300,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --
 -- The cores below are the contract instantiated at
 -- the root burst (burst-dry/-bounded) and at the chain fold
--- (cascadeGo-wet); the disjointness argument (each registration's
+-- (the cascade fold-threading memo); the disjointness argument (each registration's
 -- path owns its minted nodes, so per-cascade store traffic is
 -- structure-bounded) supplies the store-boundedness half.
 --

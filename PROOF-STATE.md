@@ -50,7 +50,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      ├─ budget-sufficient                Caps-Bridge.agda — PROVEN from:
      │   ├─ burst-wet   ← subscribeE-wet           [tier 0/1: subscribeE-wet-core + walk residue]
      │   ├─ burst-caps  ← subscribeE-wet-via-caps  [proven, but reads subscribeE-wet's conjuncts]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: cascadeGo-wet-core, dry-tick-core]
+     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: cascadeGo-nodry, dry-tick-core]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
@@ -62,17 +62,25 @@ conjuncts, so no amount of caps work retires tier 0.
 
 The three postulates form a chain; work them top to bottom. Full routes,
 probe-coverage receipts, and the recovery pointer are in their headers.
+The mirror census (2026-08-12, ruling in `cascadeGo-nodry`'s header) found
+the old anchor's INV? half already proven at `cascade-wet-via-caps` and
+deleted it; the anchor is now dry-only.
 
-- **`cascadeGo-wet-core`** (Wet/Part6) — **FALSITY, the anchor.** The
-  campaign's one central open question; unprobeable (the abstract Gas family
-  blocks every probe out of the risky region), so symbolic-or-nothing. Route,
-  in order, from its header: census the proven `cascadeGo-caps` mirror for a
-  bridge; split the `hasDry` conjunct out; time-boxed symbolic refutation.
+- **`cascadeGo-nodry`** (Burst-Walk § 8) — **FALSITY, the anchor.** The
+  cascade's dry half, all that remains of the old two-conjunct core;
+  unprobeable (the abstract Gas family blocks every probe out of the risky
+  region), so symbolic-or-nothing. Route from its header: extend the Walk's
+  two-flavour ledger with a nodry conjunct (mechanical), landing the content
+  in `stepFrame-burst-face`'s dry conjunct — which is `subscribeE-demand`'s
+  territory, seeded-budget-covers-demand, the class `caps-fuel-root` already
+  proved at the root.
 - **`subscribeE-wet-core`** (Wet/Part6) — FALSITY, conditional on the anchor.
   The outer instantiation; its named unverified step is the INV?/capᴱ flavour
   conversion; maximal blast radius (both branches of `budget-sufficient`).
+  The census does NOT shrink this one: the subscribe side has no caps-level
+  charge (GAP 4's named companion), so both its conjuncts stay.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY, risk inherited from
-  `cascadeGo-wet-core` (its first hypothesis IS that postulate). Latch/finish
+  `cascadeGo-nodry` (its first hypothesis IS that postulate). Latch/finish
   bookkeeping plus the Deliveries counts. Last of the three, never first.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)

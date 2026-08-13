@@ -400,16 +400,6 @@ stBounded-widen le sched st h
           (all-impl _ _ (λ kv → boundedNode-widen le (proj₂ kv))
                     (EvalSt.nodes st) hn)
 
--- the latch touches only per-cascade ledger fields — the value
--- stores are untouched
-latch-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (B : ℕ) (sched : Sched Γ) (a : Arrival Γ) (st : EvalSt e) →
-  stBounded? B sched st ≡ true →
-  stBounded? B sched (cascadeLatch a st) ≡ true
-latch-bounded B sched a st bnd with Arrival.isLast a
-... | true  = bnd
-... | false = bnd
-
 -- the sweep is a filter: every survivor was already bounded
 -- THE TWO REGISTRY FILTERS, generic in the predicate.  sweepLive and
 -- dropSource are both `keep a sublist`, so every face's version of
@@ -466,22 +456,6 @@ sweepLive-bounded : ∀ {n} {Γ : Ctx n} {t} (B : ℕ)
   all (boundedLive B) ls ≡ true →
   all (boundedLive B) (sweepLive reg ls) ≡ true
 sweepLive-bounded B = sweepLive-all (boundedLive B)
-
--- the finish drops registry entries (unread by stBounded?) and
--- filters the live schedule
-finish-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (B : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-  stBounded? B sched st ≡ true →
-  stBounded? B (proj₁ (cascadeFinish a sched st))
-               (proj₂ (cascadeFinish a sched st)) ≡ true
-finish-bounded B a sched st bnd with Arrival.isLast a
-... | false = bnd
-... | true  with ∧-true (all (boundedLive B) (Sched.live sched)) _ bnd
-...   | bls , bns =
-        ∧-intro (sweepLive-bounded B
-                  (dropSource (arrSource a) (EvalSt.registry st))
-                  (Sched.live sched) bls)
-                bns
 
 -- the finish never touches the slots either (record updates only)
 finish-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2936,7 +2910,8 @@ mutual
 -- and U ≤ V sits within THREE exponential stories above V — exactly
 -- the three stories syncBudget's tower height carries above
 -- sizeBudgetAt's (the "(4+sz) vs (1+sz)" gap, now theorem-backed at
--- the burst; the id > 0 instances are cascadeGo-wet's obligation).
+-- the burst; the id > 0 instances are the cascade dry face's
+-- obligation, `cascadeGo-nodry`, .Burst-Walk § 8).
 ------------------------------------------------------------------
 
 1≤2^ : ∀ k → 1 ≤ 2 ^ k
@@ -3720,7 +3695,7 @@ applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
 --     held only for the root program's chains).  chainStep-wet is
 --     stated against INV?, and cascadeGo-walk (PROVEN below) is
 --     the fold decomposition: it threads INV? and the ledger
---     position chain by chain — the structure the cascadeGo-wet
+--     position chain by chain — the structure the cascade fold-threading
 --     memo demanded — leaving the per-chain core and the landing
 --     arithmetic as the only leaves.
 --
@@ -5699,7 +5674,7 @@ anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 -- syncSize-unfoldμ/shellSize-unfoldμ pattern already proven in this
 -- module), and 1 monotonicity (walkCap-mono-d).
 --
--- PARKED BEHIND THE ANCHOR (cascadeGo-wet-core, .Wet/Part6): grinding
+-- PARKED BEHIND THE ANCHOR (cascadeGo-nodry, .Burst-Walk § 8): grinding
 -- these cannot discover a design failure, and an anchor failure would
 -- move the ground under all of them.  When they ARE picked up, two
 -- tips from the first grind round: look for an existing *-elimG

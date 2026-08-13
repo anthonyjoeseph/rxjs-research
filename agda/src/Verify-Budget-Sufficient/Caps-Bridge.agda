@@ -103,7 +103,7 @@ open import Verify-Budget-Sufficient.Caps
 open import Verify-Budget-Sufficient.Anchor-Dry
   using (subscribeInner-dry; dry-hop)
 open import Verify-Budget-Sufficient.Burst-Walk
-  using (cascadeGo-burst-dry; valΨ?;
+  using (cascadeGo-burst-dry; cascadeGo-nodry; valΨ?;
          frameBΨ?; pathBΨ?; regsBΨ?)
 open import Verify-Budget-Sufficient.Occurrences using (pathOccs?)
 open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
@@ -287,7 +287,7 @@ slots-tick a id sched st =
 -- that embedding, run cascadeLatch-INV → cascadeGo-walk →
 -- cascadeFinish-INV, then project `fnCapBounded?` and the Ψ half of
 -- `regsB?` out of the landed INV? at whatever bound the walk reached.
--- GAP 4's refuted size-axis composition (why P2/`cascadeGo-wet` is
+-- GAP 4's refuted size-axis composition (why the old cascade core was
 -- still stuck) never enters, because nothing here needs to land back
 -- at the fixed `sizeCapAt e sl (suc id)`.  The one remaining seam —
 -- the conclusion is stated at `Ψ′ = ΨAt e sl′` (output slots), the
@@ -416,43 +416,58 @@ fn-tick {e = e} a id sched st inv val =
   Ψ′≡Ψ = cong (ΨAt e) slotsEq
 
 ------------------------------------------------------------------
--- S3 `dry-tick` : P2 (`cascadeGo-wet`, .Wet/Part6)'s dry half,
--- unchanged — the gas-peel axis (dBound-μ/hop/connect).
+-- S3 `dry-tick` : the cascade's dry half, on the gas-peel axis
+-- (dBound-μ/hop/connect).
 --
 -- TIER 0, LAST.  Nearly all this postulate's risk is INHERITED from
--- `cascadeGo-wet-core` — its first hypothesis IS that postulate's
--- assembly — so it sits squarely on the anchor problem; given the
--- anchor, what is left here is latch/finish bookkeeping plus the
--- Deliveries counts.  Work it after the anchor resolves, never first.
--- (An earlier version of this header claimed independence from the
--- caps/INV? bridging problem — wrong, and the kind of wrong that
--- re-orders a schedule.)
+-- `cascadeGo-nodry` (.Burst-Walk § 8, the anchor) — its first
+-- hypothesis IS that postulate — so it sits squarely on the anchor
+-- problem; given the anchor, what is left here is latch/finish
+-- bookkeeping plus the Deliveries counts.  Work it after the anchor
+-- resolves, never first.  (An earlier version of this header claimed
+-- independence from the caps/INV? bridging problem — wrong, and the
+-- kind of wrong that re-orders a schedule.)
+--
+-- THE MIRROR CENSUS (2026-08-12) SWAPPED THE FIRST HYPOTHESIS.  It
+-- used to be the full `cascadeGo-wet` (hasDry × INV?-landing, the old
+-- two-conjunct anchor).  The INV? conjunct was never needed here — this
+-- core's own conclusion is dry-only, and the mid-cascade invariant a
+-- dry grind threads is the Walk's own caps-flavoured `Res.good`
+-- (.Delivery-Walk), proven; the landing is `cascade-wet-via-caps`'s
+-- (§ C below), also proven.  So the hypothesis is now the dry-only
+-- `cascadeGo-nodry`, at the caps telescope this core's driver facts
+-- already supply — the same telescope as `cascadeGo-burst-dry` below.
 --
 -- ASSEMBLY (2026-08-06): narrowed over the cascade-level facts it was
 -- written to be built from.  `cascade` IS cascadeLatch → cascadeGo →
--- cascadeFinish, so the pieces are .Wet's `cascadeGo-wet` (the walk's
--- own dry half — this is what makes that postulate reachable at all),
+-- cascadeFinish, so the pieces are the anchor's dry half,
 -- .Subscribe-Face's per-chain caps step, and .Deliveries' four cascade
 -- counts, which say the latch clears the ledger and the two walk lines
 -- account for it.
 postulate
   dry-tick-core :
-    -- cascadeGo-wet  (Verify-Budget-Sufficient/Wet.agda:4343)
+    -- cascadeGo-nodry  (Verify-Budget-Sufficient/Burst-Walk.agda § 8)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        (a : Arrival Γ) (id : Id)
-        (chains : List (RegId × Path Γ (arrTy a) t))
-        (sched : Sched Γ) (st : EvalSt e) →
-        let sl = Sched.slots sched
-            Ψ  = ΨAt e sl
-            B  = sizeCapAt e sl id
-        in INV? Ψ B sched st ≡ true →
-           valB? B Ψ (arrTy a) (arrVal a) ≡ true →
-           all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
-           let r = cascadeGo a id chains sched st
-           in (hasDry (proj₁ r) ≡ false)
-              × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
-                      (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                      (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+      (id : Id) (a : Arrival Γ)
+      (chains : List (RegId × Path Γ (arrTy a) t))
+      (sched : Sched Γ) (st : EvalSt e) →
+      let sl = Sched.slots sched
+          Ψ  = ΨAt e sl
+          c  = capsAt e sl id
+      in
+      slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+      slotsSize sl ≤ Caps.cSize c →
+      capsOK? c sched st ≡ true →
+      fnCapBounded? Ψ sched st ≡ true →
+      valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+      valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
+      all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+      all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
+      regsBΨ? Ψ (EvalSt.registry st) ≡ true →
+      n ≤ Caps.cSize c →
+      length chains ≤ Caps.cReg c →
+      depthCascade a id chains sched st ≤ capsH e sl id →
+      hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false
      ) →
     -- chainStep-caps  (Verify-Budget-Sufficient/Subscribe-Face.agda:3464)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -592,7 +607,7 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- module importing both sides.
 dry-tick =
   dry-tick-core
-    (λ {n} {Γ} {t} {e} → cascadeGo-wet {n} {Γ} {t} {e})
+    (λ {n} {Γ} {t} {e} → cascadeGo-nodry {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → chainStep-caps {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeGo-skip-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})
@@ -697,7 +712,8 @@ regsB?-of-parts rs hsz hΨ =
 -- a `capsOK?`/`valCaps?` hypothesis, concluding dryness, INV? at the
 -- output, AND capsOK? at the output — the joint invariant a future
 -- `cascade-dry`/`burst-wet` migrate to consume in place of the
--- postulated `cascadeGo-wet`.
+-- old postulated cascade face — which the 2026-08-12 census then
+-- retired outright (`cascadeGo-nodry` keeps only the dry half).
 --
 -- THE INV? ASSEMBLY CLOSED CONJUNCT-BY-CONJUNCT — no `inv-assemble`
 -- fallback was needed.  stBounded? and the registry-length bound come
@@ -824,7 +840,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
 -- it cannot consume `cascade-wet-via-caps`, since `.Caps-Bridge` imports
 -- `.Wet` and not the other way around), so the top of the tower had to
 -- move UP to where `cascade-wet-via-caps` already lives, not down to
--- where `cascadeGo-wet` (P2) does.  `.Wet` keeps `burst-wet`/`burst-dry`/
+-- where the cascade dry face does.  `.Wet` keeps `burst-wet`/`burst-dry`/
 -- `burst-bounded`/`pop-INV`/`pop-head-bounded` — this module consumes
 -- all five, unchanged, as the INV?-only half of its own burst and pop.
 --
@@ -974,7 +990,7 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- conclusion, character for character (above), so that step is a
 -- relocation and not a proof.  Its dryness half rests on `dry-tick`,
 -- which is where the ANCHOR PROBLEM sits — the postulate this route
--- trades P2 (`cascadeGo-wet`) for.
+-- trades the cascade core for.
 ------------------------------------------------------------------
 
 -- Historical note: burst-caps was previously a postulate in this block.

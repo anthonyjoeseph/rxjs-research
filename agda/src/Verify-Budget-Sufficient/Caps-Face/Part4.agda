@@ -753,7 +753,7 @@ pathSz?-tail B f p h =
 -- `c = caps 3 1 1` every hypothesis holds by `refl` and the conclusion
 -- computes to `false`.  That is `frameStep`'s own header ("same-level
 -- preservation is false, so the face must report growth"),
--- `caps-frame-boundary-absurd`, and cascadeGo-wet's fold-threading
+-- `caps-frame-boundary-absurd`, and the cascade fold-threading
 -- note, all saying one thing: a frame may not be charged at the level
 -- it started from.
 --

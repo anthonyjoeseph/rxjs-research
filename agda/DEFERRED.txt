@@ -40,19 +40,16 @@
 cascade-delivN | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
 cascadeGo-cons-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
 cascadeGo-skip-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
-cascadeGo-wet | cascadeGo-wet-core, dry-tick-core | ≤4 | REASON: cascadeGo-wet-core and dry-tick-core must be proven
 cascadeLatch-deliv | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
 chainStep-caps | dry-tick-core | ≤11 | REASON: dry-tick-core must be proven
 connect-edge | subscribeE-wet-core | ≤6 | REASON: subscribeE-wet-core must be proven
 enterInstant-held | mid-step-core | ≤5 | REASON: mid-step-core must be proven
 enterInstant-idle | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-finish-bounded | cascadeGo-wet-core | ≤2 | REASON: cascadeGo-wet-core must be proven
 foldPath-root-out | mid-step-core | ≤3 | REASON: mid-step-core must be proven
 hop-edge | subscribeE-wet-core | ≤5 | REASON: subscribeE-wet-core must be proven; its premise sizeᵛ (obs u) o ≤ Ŝ is the worked example that motivated this ledger
 hop-step-gives | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
 hop-step-needs | subscribeE-wet-core | ≤2 | REASON: subscribeE-wet-core must be proven
 initReg-wf | subscribeE-input-wf-core | ≤4 | REASON: subscribeE-input-wf-core must be proven
-latch-bounded | cascadeGo-wet-core | ≤2 | REASON: cascadeGo-wet-core must be proven
 mid-enters | mid-step-core | ≤5 | REASON: mid-step-core must be proven
 mid-seed | mid-step-core | ≤3 | REASON: mid-step-core must be proven
 mu-edge | subscribeE-wet-core | ≤1 | REASON: subscribeE-wet-core must be proven

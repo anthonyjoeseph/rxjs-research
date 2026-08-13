@@ -226,8 +226,8 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 -- closed: `stBounded? V` says nothing about a stored value's fn
 -- weight, the registry's cardinality, or a registered chain's frames
 -- (IN), and a stBounded?-only conclusion cannot re-seed an INV?-shaped
--- hypothesis (OUT), so drain-dry → cascade-dry → cascadeGo-wet did not
--- compose.  And subscribeE-wet's κ was completely unconstrained, where
+-- hypothesis (OUT), so drain-dry → cascade-dry → the cascade face did
+-- not compose.  And subscribeE-wet's κ was completely unconstrained, where
 -- every member needs `pathB? B Ψ κ` (register-INV consumes it to keep
 -- regsB?).
 --
@@ -281,7 +281,7 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 --   is needed — the two endpoints of one instant suffice.
 --
 -- GAP 3 — THE ARRIVAL WAS UNBOUNDED, AND THE POP RING COULD NOT BOUND
--- IT.  cascadeGo-wet quantified over `chains` and over `a` with no
+-- IT.  The cascade face quantified over `chains` and over `a` with no
 -- bound on either.  cascadeGo-walk needs `all (λ rc → pathB? …)
 -- chains` (which is INV?'s regsB? conjunct, so GAP 1 supplies it
 -- through chainsOf-B below) and, separately, `valB? … (arrTy a)
@@ -289,7 +289,7 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 -- schedHeadOf-bounded and pop-bounded both keep the TAIL and drop the
 -- popped element on the floor.
 --
---   CURED at the statement.  cascadeGo-wet gains the arrival
+--   CURED at the statement.  The cascade face gains the arrival
 --   hypothesis, and the companion that supplies it is NAMED:
 --   pop-head-bounded, the head-KEEPING schedGo inversion (the popped
 --   arrival was a pending of a live source, so stBounded?'s pendings
@@ -654,8 +654,8 @@ postulate
   -- consumes.  Every hypothesis is already proven, so this is neither
   -- stronger nor weaker than the postulate it replaces.
   --
-  -- TIER 0, SECOND — after `cascadeGo-wet-core` (the anchor, below)
-  -- resolves.  Given the walk this is "the outer instantiation", but
+  -- TIER 0, SECOND — after `cascadeGo-nodry` (.Burst-Walk § 8, the
+  -- anchor) resolves.  Given the walk this is "the outer instantiation", but
   -- the instantiation must manufacture the walk's G/ℓ/Ω entry data
   -- from INV? alone, and that INV?/capᴱ flavour conversion is
   -- UNCHECKED — a named, specific unverified step, not general unease,
@@ -825,108 +825,12 @@ postulate
                   (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
-  -- the chain fold at instant id, restated on the same two faces
-  -- (GAP 1) and with GAP 3's arrival hypothesis.  Its decomposition
-  -- (cascadeGo-walk, PROVEN) consumes exactly these three: INV? in and
-  -- out, a bound on the arrival's value, and a bound on every snapshot
-  -- chain — the last of which chainsOf-B above now supplies from
-  -- INV?'s own regsB? conjunct.
-  --
-  -- FOLD-THREADING (2026-07-20, the ledger finding) — still standing,
-  -- and orthogonal to all three gaps: this core does NOT decompose
-  -- into an end-to-end per-chainStep contract at two fixed bounds.
-  -- After chain k lands, chain k+1 starts from a mid-cascade state,
-  -- and a fixed-bound "start @ level L → land @ level L" step
-  -- statement is FALSE over its full quantification (a store value
-  -- near the bound grows past it under one more applyFn) — that is
-  -- caps-frame-boundary-absurd, uniform in the cap.  The honest
-  -- decomposition threads per-cascade growth through the fold, which
-  -- is what the caps face's `j` index does and what an eventual
-  -- chainStep-wet must mirror.  Until the two accounting mechanisms
-  -- are collapsed this stays one postulate (the FoldOut precedent: no
-  -- half-stated leaf).
-  --
-  -- ASSEMBLY (2026-08-06): narrowed over the two state-bound facts a
-  -- cascade's own bookkeeping steps need — the latch touches only the
-  -- per-cascade ledger fields and the finish only drops registry
-  -- entries, so neither disturbs stBounded?.
-  --
-  -- THIS POSTULATE CANNOT BE PROBED, and a green probe of it is NOT evidence
-  -- (receipt, 2026-08-11; the probe is deleted).  A falsity probe went green
-  -- on root-path chains only — the near-degenerate region.  The from-inner and
-  -- thru-outer paths are unreachable by ANY probe, because the abstract Gas
-  -- family blocks computation, so no probe reaches the region where B and Ψ
-  -- matter.  Rows that DID run: chains = [] is DEGENERATE; chains =
-  -- [(0, root)] with isLast false/true is LOAD-BEARING for hasDry; INV? at
-  -- suc id is DEGENERATE on every shape tested.  The anchor is
-  -- symbolic-or-nothing — do not spend a session probing it.
-  --
-  -- THE ANCHOR (tier 0, work it FIRST).  Class FALSITY: this postulate
-  -- is P2's entire content — its only hypotheses are the two stBounded?
-  -- preservation facts below — and the campaign's central open
-  -- question; everything else in tiers 1–2 waits on it.  Because no
-  -- probe reaches the risky region (above), the class can never be
-  -- lowered by probing.  The symbolic attack, in order:
-  --   (1) THE MIRROR.  `cascadeGo-caps` (.Caps-Face/Part7:914) is a
-  --       REAL DEFINITION proving the analogous statement on the caps
-  --       axis, and this header's own contract says the wet face
-  --       mirrors it.  Census which caps-side outputs already imply
-  --       which wet-side conjuncts, by reading the two signatures side
-  --       by side (the goals are declared — no typecheck needed).
-  --       Three outcomes, all useful: the wet face reduces to a bridge
-  --       lemma; or it needs hypotheses the caps face does not carry
-  --       (naming them IS the repair); or the faces are genuinely
-  --       independent (record why here, and (2) becomes the route).
-  --   (2) THE SPLIT.  `hasDry (proj₁ r) ≡ false` mentions neither B
-  --       nor Ψ — plausibly a short structural induction over
-  --       cascadeGo's three cases (no clause constructs a dried
-  --       event), independent of the whole caps tower.  Splitting it
-  --       out takes the provable half out of the anchor entirely and
-  --       shrinks what "the anchor" refers to.
-  --   (3) REFUTATION, symbolically: derive ⊥ from this statement plus
-  --       the j-index growth facts the caps face uses.  TIME-BOX it —
-  --       a failed symbolic refutation, unlike a numeric one, produces
-  --       no receipt.
-  -- Then `subscribeE-wet-core` (its outer instantiation) and
-  -- `dry-tick-core` (.Caps-Bridge, risk inherited from here) — in that
-  -- order, never first.
-  --
-  -- RECOVERY: if the resolution wants a well-founded multiset order
-  -- (the classical instrument for this descent class), `git show
-  -- 11a34db` restores the retired Dershowitz–Manna apparatus (_≺ᵛ_,
-  -- ≺ᵛ-wf, rank, shells, descent lemmas) — restore it, don't re-derive
-  -- ≺ᵛ-wf.
-  cascadeGo-wet-core :
-    -- latch-bounded  (Verify-Budget-Sufficient/Measures.agda:408)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (B : ℕ) (sched : Sched Γ) (a : Arrival Γ) (st : EvalSt e) →
-      stBounded? B sched st ≡ true →
-      stBounded? B sched (cascadeLatch a st) ≡ true
-     ) →
-    -- finish-bounded  (Verify-Budget-Sufficient/Measures.agda:475)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (B : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-      stBounded? B sched st ≡ true →
-      stBounded? B (proj₁ (cascadeFinish a sched st))
-                   (proj₂ (cascadeFinish a sched st)) ≡ true
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    let sl = Sched.slots sched
-        Ψ  = ΨAt e sl
-        B  = sizeCapAt e sl id
-    in INV? Ψ B sched st ≡ true →
-       valB? B Ψ (arrTy a) (arrVal a) ≡ true →
-       all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
-       let r = cascadeGo a id chains sched st
-       in (hasDry (proj₁ r) ≡ false)
-          × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
-                  (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-
--- the two wet faces, assembled over their cores
+-- the wet face, assembled over its core.  (The cascade-level face
+-- that used to sit beside it is gone: the 2026-08-12 mirror census
+-- found its INV? half already proven at `cascade-wet-via-caps`
+-- (.Caps-Bridge) and moved its dry half to `cascadeGo-nodry`
+-- (.Burst-Walk § 8) — RECOVERY: git show 9b48235 restores the old
+-- two-conjunct core.)
 subscribeE-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) →
@@ -959,23 +863,6 @@ subscribeE-wet =
     hasAtLeast-pad hasAtLeast-peel seed-covers budget-covers oneShot-tail-dry
     connect-anchor hopD-map-emit applyFn-size unconn-cons-≤
     shellSize-unfoldμ inner-unfoldμ
-
-cascadeGo-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (id : Id)
-  (chains : List (RegId × Path Γ (arrTy a) t))
-  (sched : Sched Γ) (st : EvalSt e) →
-  let sl = Sched.slots sched
-      Ψ  = ΨAt e sl
-      B  = sizeCapAt e sl id
-  in INV? Ψ B sched st ≡ true →
-     valB? B Ψ (arrTy a) (arrVal a) ≡ true →
-     all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true →
-     let r = cascadeGo a id chains sched st
-     in (hasDry (proj₁ r) ≡ false)
-        × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
-                (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-wet = cascadeGo-wet-core latch-bounded finish-bounded
 
 ------------------------------------------------------------------
 -- THE POP RING ON THE SIX-CONJUNCT FACE — PROVEN.  .Measures has the
@@ -1229,8 +1116,8 @@ burst-bounded : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
 burst-bounded e ins = proj₂ (burst-wet e ins)
 
 -- `cascade-dry`, `drain-dry`, `budget-sufficient` MOVED to
--- `.Caps-Bridge` (the 2026-08-05 upside-down ruling) — caps-threaded there, consuming `cascade-wet-via-caps`
--- in place of `cascadeGo-wet` below.  `burst-wet`/`burst-dry`/
+-- `.Caps-Bridge` (the 2026-08-05 upside-down ruling) — caps-threaded
+-- there, consuming `cascade-wet-via-caps`.  `burst-wet`/`burst-dry`/
 -- `burst-bounded`/`pop-INV`/`pop-head-bounded` stay here: `.Caps-Bridge`
 -- consumes all five unchanged as the INV?-only half of its own burst
 -- and pop.

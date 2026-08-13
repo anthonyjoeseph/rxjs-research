@@ -91,6 +91,7 @@ open import Rx.Evaluator
          _↠_; root; share-sink;
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
+         hasDry;
          arrTy; arrVal; fLvlD; regAt; subscribeInner; subscribeE;
          splitBurst; splitEvents; sLvlD;
          AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
@@ -1746,3 +1747,81 @@ cascadeGo-burst-dry siC ifc {n = n} {e = e} id a chains sched st
     ≤-trans (≤-trans (BW.V.Res.hi GO)
                      (lvls-mono D (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl cnt-cdel))
             (≤-reflexive (sym (sizeCount-body c d)))
+
+------------------------------------------------------------------
+-- § 8  THE ANCHOR — the cascade's dry half, and nothing else.
+--
+-- THE MIRROR CENSUS (2026-08-12), which reshaped tier 0.  The old
+-- anchor (`cascadeGo-wet-core`, .Wet/Part6, DELETED — RECOVERY: git
+-- show 9b48235 restores it) concluded hasDry × INV?-landing in one
+-- postulate.  The census read it against the proven caps apparatus and
+-- found the two conjuncts in OPPOSITE states:
+--
+--   · THE INV? HALF WAS ALREADY PROVEN, TWICE.  Externally,
+--     `cascade-wet-via-caps` (.Caps-Bridge) lands INV? Ψ′ Ŝ at the
+--     cascade's output from caps-tick + fn-tick + the B1/B2 bridges,
+--     never reading the old core.  Internally, the Walk's `Res.good`
+--     (.Delivery-Walk) threads slotsEq × capsOK? (frameStep J c) ×
+--     fnCapBounded? Ψ × regP? through every intermediate cascadeGo
+--     state — § 7 projects only `Res.burst` and discards it.  So the
+--     old core's INV? conjunct asked for what the repo already had,
+--     and its only consumer (dry-tick-core's first hypothesis, whose
+--     own conclusion is dry-only) never needed to ask.
+--   · THE DRY HALF IS STRUCTURALLY UNMIRRORABLE.  The caps axis is
+--     gas-blind end to end: capsOK?, the Walk, cascadeGo-caps carry
+--     no fuel content, so no caps output can feed hasDry.  This
+--     conjunct is the anchor, and it is all of it.
+--
+-- THE POSTULATE CANNOT BE PROBED (receipt inherited 2026-08-11 from
+-- the old core, unchanged by the split): the abstract Gas family
+-- blocks computation, so no probe reaches the region where the caps
+-- hypotheses matter; probed rows covered root-path chains only.
+-- Symbolic-or-nothing — do not spend a session probing it.
+--
+-- THE ROUTE (this is where the grind goes next):
+--   (1) EXTEND THE TWO-FLAVOUR LEDGER TO THREE.  hasDry rides the
+--       walk's own burst ledger: Bb/Eb gain a nodry conjunct.  Every
+--       ledger law is mechanical — hasDry-append (.Measures:145),
+--       hasDry [] = false definitionally, and b-deliv/b-handoff append
+--       only value events, exhausted closes and handoffs, none of
+--       which is `close _ dried` (dryEvent computes to false on each).
+--   (2) THE CONTENT LANDS IN THE FRAME FACE.  A dried close enters the
+--       stream only from stepFrame's interior subscribes, so the
+--       residue after (1) is stepFrame-burst-face's dry conjunct —
+--       whose from-inner case IS `subscribeE-demand` (.Anchor-Dry, its
+--       own header says whichever is discharged first absorbs the
+--       other).  The gas is not free-floating: chainStep mints
+--       `budgetAt e sl id` (Rx/Evaluator:1598), so the dry question is
+--       seeded-budget-covers-delivery-demand — the class already
+--       proven once at the root (caps-fuel-root), with the supply fact
+--       Dm ≤ Ŝ proven in .Anchor-Dry.
+--
+-- Class FALSITY until evidence reaches the *All interiors — the risky
+-- region is a from-inner subscribe mid-delivery, exactly where no
+-- probe reaches.  Consumer: dry-tick-core (.Caps-Bridge), which owns
+-- every hypothesis below (the caps-tick chain for the caps facts, INV?
+-- projections for the Ψ facts, cascade-depth-capsH for the depth).
+------------------------------------------------------------------
+
+postulate
+  cascadeGo-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (id : Id) (a : Arrival Γ)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    let sl = Sched.slots sched
+        Ψ  = ΨAt e sl
+        c  = capsAt e sl id
+    in
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? c sched st ≡ true →
+    fnCapBounded? Ψ sched st ≡ true →
+    valCaps? c sl (arrTy a) (arrVal a) ≡ true →
+    valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
+    all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
+    all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
+    regsBΨ? Ψ (EvalSt.registry st) ≡ true →
+    n ≤ Caps.cSize c →
+    length chains ≤ Caps.cReg c →
+    depthCascade a id chains sched st ≤ capsH e sl id →
+    hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false

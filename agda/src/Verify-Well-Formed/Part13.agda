@@ -274,7 +274,7 @@ drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
 -- instant-indexed size invariant, its burst cores, cascade-dry and
 -- drain-dry), and this module now imports that proof.  What the
 -- proof still rests on is named and scoped there — subscribeE-wet
--- and cascadeGo-wet, the fuel-accounting cores — rather than the
+-- and cascadeGo-nodry, the fuel-accounting cores — rather than the
 -- whole totality conjecture assumed outright.
 
 -- the primitives' half of the sandwich: remaining debt is the frame
