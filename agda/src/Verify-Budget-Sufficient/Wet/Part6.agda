@@ -344,6 +344,17 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 --                          is proven with no running position.
 --   Ψ  ←  NOT a Caps field.  ΨAt e sl.  Ψ never grows (caseW is
 --                          substitution-invariant), so no recurrence.
+--   L̂  ←  the ENTRY BUDGET, opIterD at the entry caps/depth/nest/ops
+--                          and j = 0 (2026-08-13).  The ceiling pin
+--                          `cSize (frameStep L̂ c) ≤ Ŝ` is
+--                          entry-ceiling (.Walk-Level) — the size-cap
+--                          half of wet-landing-lift's chain — and each
+--                          face's own budget sits under L̂ by the
+--                          Caps-Chain descents.  This is the statement
+--                          form of this section's GAP 2 ruling: it is
+--                          what lets a face prove hop-edge's
+--                          `sizeᵛ o ≤ Ŝ` premise from a mid-walk
+--                          value's LEVEL receipt.
 --   W, E ← the walk's OWN ledger.  The joint this map left open —
 --                            capᴱ W (E · 3^(suc Ψ · walkCap Ω ℓ G))
 --                              ≤ sizeCapAt e sl (suc id)

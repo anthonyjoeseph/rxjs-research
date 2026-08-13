@@ -100,7 +100,7 @@ open import Rx.Evaluator
          map-f; scan-f; take-f; from-inner; thru-outer; Stream;
          stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
          hasDry; dryEvent; budgetAt; capsHgo; capsBase;
-         arrTy; arrVal; fLvlD; regAt; subscribeInner; subscribeE;
+         arrTy; arrVal; fLvlD; opIterD; regAt; subscribeInner; subscribeE;
          splitBurst; splitEvents; sLvlD;
          AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
          NodeId; NodeState; takeDispatch; takeVals; cutThrough;
@@ -1687,6 +1687,14 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   depthInner g op allNid κ id now o sched st ≤ dep →
+  -- the reset-anchor ceiling (2026-08-13): the walk face's pins force
+  -- the honest instantiation Ŝ := sizeCapAt e sl (suc id), and this is
+  -- the c-to-entry anchoring the caller owns (c is free here; the
+  -- caller knows it is capsAt-rooted).  The face's budget at this
+  -- call's arguments stays under the next instant's size cap.
+  Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) dep bud
+                                 (suc (sizeᵉ o)) J) c)
+    ≤ sizeCapAt e sl (suc id) →
   g ≡ budgetAt e sl id →
   any dryEvent (proj₁ (proj₂ (proj₂
     (subscribeInner g op allNid κ id now o sched st))))
@@ -1891,6 +1899,12 @@ postulate
   -- Gas bound at the inner call: fuel hasAtLeast suc G.
   -- Follows from gk (gs fuel ≡ budgetAt e sl id) via budget-hasAtLeast
   -- and dBound monotonicity; the gs-peel is why this descends here.
+  -- RESTATED 2026-08-13 at the RESET caps Ŝ := sizeCapAt e sl (suc id):
+  -- the walk face's reset-anchor pins reject the old level-cap
+  -- instantiation (frameStep J c cannot ceiling a walk that climbs
+  -- past J), and the reset caps are where budget-hasAtLeast actually
+  -- lives — budgetAt e sl id is minted from e's entry measures, so
+  -- this form is the MORE provable one.
   subscribeE-inner-nodry-fuel : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (Ψ dep bud J : ℕ) (fuel : Gas)
     (op : AllOp) (allNid : NodeId) (κ : Path Γ u t) (id : Id) (now : Tick)
@@ -1899,10 +1913,10 @@ postulate
     nest o sl (EvalSt.connectedShares st) ≤ bud →
     depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
     gs fuel ≡ budgetAt e sl id →
-    fuel hasAtLeast suc (dBound (Caps.cSize (frameStep J c))
-                                (hopR (Caps.cSize (frameStep J c)))
+    fuel hasAtLeast suc (dBound (sizeCapAt e sl (suc id))
+                                (hopR (sizeCapAt e sl (suc id)))
                                 (unconn sl (EvalSt.connectedShares st))
-                                (hopDᵉ (Caps.cSize (frameStep J c)) o)
+                                (hopDᵉ (sizeCapAt e sl (suc id)) o)
                                 (syncSizeᵉ o))
 
 -- THE ASSEMBLY.  Applies the walk face at the inner frame's (c , J),
@@ -1927,6 +1941,10 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
+  -- the reset-anchor ceiling; see SiNodry
+  Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) dep bud
+                                 (suc (sizeᵉ o)) J) c)
+    ≤ sizeCapAt e sl (suc id) →
   gs fuel ≡ budgetAt e sl id →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
@@ -1934,14 +1952,18 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
     ≡ false
 subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
     c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
-    J fuel op allNid κ id now o sched st ok pb vb rg nB hD gk =
+    J fuel op allNid κ id now o sched st ok pb vb rg nB hD cl gk =
   dry
   where
   inst   = Sched.nextNode sched
   sched' = record sched { nextNode = suc inst }
   B      = Caps.cSize (frameStep J c)
-  G      = dBound B (hopR B) (unconn sl (EvalSt.connectedShares st))
-                  (hopDᵉ B o) (syncSizeᵉ o)
+  -- the demand at the RESET caps (the pins' Ŝ), not the level cap:
+  -- the level cap cannot ceiling the climb, and cl anchors it
+  Ŝr     = sizeCapAt e sl (suc id)
+  L̂      = opIterD (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) J
+  G      = dBound Ŝr (hopR Ŝr) (unconn sl (EvalSt.connectedShares st))
+                  (hopDᵉ Ŝr o) (syncSizeᵉ o)
   ℓ      = B + (suc (pathLen κ) + G)
 
   -- slots unchanged by nextNode bump (definitional)
@@ -1978,7 +2000,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
   regsO = regsLen?-mono B ℓ (EvalSt.registry st) (m≤m+n B _)
             (capsOK⇒regsLen (frameStep J c) sched st (proj₂ (proj₁ ok)))
 
-  W = wl o c Ψ B B (hopR B) G ℓ dep bud (suc (sizeᵉ o)) J
+  W = wl o c Ψ Ŝr Ŝr (hopR Ŝr) G ℓ L̂ dep bud (suc (sizeᵉ o)) J
          fuel (from-inner op allNid inst ↠ κ) id now sl sched' st
          2≤S 1≤R slEq slC slSz cOK szO
          (inner-dWO c sl Ψ J o vb)
@@ -1988,6 +2010,9 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
          (subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc ok rg)
          fnO
          (subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb)
+         -- the reset-anchor pins: floor from the entry lemma, F/R̂ by
+         -- construction, ceiling from the caller's cl, budget ≤-refl
+         (2≤capsAt-size e sl (suc id)) refl refl cl ≤-refl
          ≤-refl
          (subscribeE-inner-nodry-fuel c sl Ψ dep bud J fuel op allNid κ id now o sched st
                                       ok nB hD gk)
@@ -2020,6 +2045,10 @@ subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
+  -- the reset-anchor ceiling; see SiNodry
+  Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) dep bud
+                                 (suc (sizeᵉ o)) J) c)
+    ≤ sizeCapAt e sl (suc id) →
   gs fuel ≡ budgetAt e sl id →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
@@ -2031,7 +2060,7 @@ subscribeE-inner-nodry = subscribeE-inner-nodry-core subscribeE-walk-level
 -- construction rather than by hypothesis.
 subscribeInner-nodry : SiNodry
 subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op allNid
-                     κ id now o sched st ok pb vb rg nB hD gk
+                     κ id now o sched st ok pb vb rg nB hD cl gk
   with budgetAt-gs e sl id
 ... | g′ , eq
       rewrite trans gk eq =
@@ -2040,7 +2069,7 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op al
                  (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
                  (record sched { nextNode = suc (Sched.nextNode sched) }) st))
         (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g′ op allNid
-           κ id now o sched st ok pb vb rg nB hD (sym eq))
+           κ id now o sched st ok pb vb rg nB hD cl (sym eq))
 
 postulate
   -- from-inner: `innerReact` absorbs or finishes; `innerFinish`'s only

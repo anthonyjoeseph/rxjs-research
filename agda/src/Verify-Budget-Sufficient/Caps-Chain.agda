@@ -195,6 +195,78 @@ op-step-eval S W d k m j j₀ j₁ j₂ 2≤S hj₀ src pb =
   A≤X = ≤-trans src (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl seed≤
                        ≤-refl ≤-refl ≤-refl)
 
+------------------------------------------------------------------
+-- THE DESCENTS — each caller's D-tower budget dominates its callee's,
+-- so a hypothesis of the form `budget ≤ L̂` passes DOWN a call chain
+-- unchanged.  Consumed by the wet faces' reset-anchor ceiling
+-- (.Walk-Level): `Caps.cSize (frameStep L̂ c) ≤ Ŝ` is threaded once,
+-- and these convert each face's own budget to its callee's.  Pure
+-- D-tower arithmetic: the -suc equations read backwards, each the
+-- level-composition lemma above it minus the composition.
+------------------------------------------------------------------
+
+-- one operator in: the source sweep at `suc J` sits under the sweep
+-- with the operator still unspent (op-step's spine, no fIterD charge)
+op-desc : ∀ (S W d k m J : ℕ) → 2 ≤ S →
+  opIterD S W d k m (suc J) ≤ opIterD S W d k (suc m) J
+op-desc S W d k m J 2≤S =
+  ≤-trans (≤-trans (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl sucJ≤J₁
+                      ≤-refl ≤-refl ≤-refl)
+                   (fIterD-infl S W d k (suc (widAt S W X)) X))
+          (≤-reflexive (sym (opIterD-suc S W d k m J)))
+  where
+  J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
+  X  = opIterD S W d k m (sLvlD S W d k J₀)
+  sucJ≤J₁ : suc J ≤ sLvlD S W d k J₀
+  sucJ≤J₁ = ≤-trans (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J))))
+                    (sLvlD-infl S W d k J₀)
+
+-- the push after the source subscribe: given the source's level report
+-- and the emit-count bound, the whole fIterD charge sits under the
+-- operator sweep (op-step's tail, the level report left un-composed)
+push-desc : ∀ (S W d k m n J j₁ : ℕ) → 2 ≤ S →
+  suc J + j₁ ≤ opIterD S W d k m (suc J) →
+  n ≤ suc (widAt S W (suc J + j₁)) →
+  fIterD S W d k n (suc J + j₁) ≤ opIterD S W d k (suc m) J
+push-desc S W d k m n J j₁ 2≤S src cnt =
+  ≤-trans (≤-trans (burst-index′ 2≤S cnt)
+                   (fIterD-mono (suc (widAt S W (suc J + j₁))) (suc (widAt S W X))
+                      d d k k 2≤S ≤-refl ≤-refl A≤X ≤-refl ≤-refl
+                      (s≤s (widAt-mono 2≤S ≤-refl ≤-refl A≤X))))
+          (≤-reflexive (sym (opIterD-suc S W d k m J)))
+  where
+  J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
+  X  = opIterD S W d k m (sLvlD S W d k J₀)
+  sucJ≤J₁ : suc J ≤ sLvlD S W d k J₀
+  sucJ≤J₁ = ≤-trans (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J))))
+                    (sLvlD-infl S W d k J₀)
+  A≤X : suc J + j₁ ≤ X
+  A≤X = ≤-trans src (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl sucJ≤J₁
+                       ≤-refl ≤-refl ≤-refl)
+  burst-index′ : 2 ≤ S → n ≤ suc (widAt S W (suc J + j₁)) →
+    fIterD S W d k n (suc J + j₁)
+      ≤ fIterD S W d k (suc (widAt S W (suc J + j₁))) (suc J + j₁)
+  burst-index′ h hm =
+    fIterD-mono n (suc (widAt S W (suc J + j₁))) d d k k h
+      ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hm
+
+-- one frame in: the frame's own level allowance sits under any
+-- nonempty burst charge (burst-step's spine, no tail)
+frame-desc : ∀ (S W d k m J : ℕ) →
+  fLvlD S W d J ≤ fIterD S W d k (suc m) J
+frame-desc S W d k m J =
+  ≤-trans (fIterD-infl S W d k m (fLvlD S W d J))
+          (≤-reflexive (sym (fIterD-suc S W d k m J)))
+
+-- and the tail of the burst, from the level the head frame left
+-- (burst-step minus the composition)
+tail-desc : ∀ (S W d k m J j₁ : ℕ) → 2 ≤ S →
+  J + j₁ ≤ fLvlD S W d J →
+  fIterD S W d k m (J + j₁) ≤ fIterD S W d k (suc m) J
+tail-desc S W d k m J j₁ 2≤S hd =
+  ≤-trans (fIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl)
+          (≤-reflexive (sym (fIterD-suc S W d k m J)))
+
 -- B + suc (B · B) ≤ suc B · suc B — the arithmetic the μ receipt needs,
 -- and the reason the per-operator eval receipt is a SQUARE
 quad-arith : ∀ (B : ℕ) → B + suc (B * B) ≤ suc B * suc B

@@ -75,22 +75,27 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`subscribeInner-walk`** (Walk-Level) — FALSITY, and the largest live
-  risk in the proof: THE LEAF of the hop-edge chain, now that
-  pushThru-walk is REAL (recursion on the burst, mirroring the proven
-  caps push face) and stepThru-walk is an assembly over this leaf. The
-  gas peel is here; the g0 dry mint is already excluded by the gas
-  hypothesis's shape. The live edge (Ŝ-scale refill vs level-scale
-  value receipts, unlinked) sits in this one statement's future body —
-  probe coverage and the crossing region's cost in its header.
+- **`subscribeInner-walk`** (Walk-Level) — DIFFICULTY, reclassified
+  from FALSITY by statement repair: the live edge (Ŝ-scale refill vs
+  level-scale receipts, unlinked) is closed by the reset-anchor pins
+  threaded through every wet face — hop-step-needs proves the link
+  necessary, hop-edge spends it, entry-ceiling funds it at the entry.
+  THE LEAF of the hop-edge chain; the gas peel is here, the g0 dry
+  mint excluded by the gas hypothesis's shape. Body = assembly against
+  the proven caps twin; route and repair story in its header.
+- **`entry-ceiling`** (Walk-Level) — DIFFICULTY. The size-cap half of
+  wet-landing-lift's chain, stated at the entry instantiation; funds
+  the ceiling pin. Chain named in its header.
 - **`stepThru-walk-core`** (Walk-Level) — DIFFICULTY. The thruWalk
   queue loop over the leaf, thruWalk-caps' wet mirror; loop obligations
   in its header.
 - **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
   coincidence at a weaker instance: both decrement edges have their dry
   side matched by a proven lemma (dBound-connect, dBound-μ), so a green
-  here says nothing about the case that can fail. After
-  subscribeAll-walk, never before.
+  here says nothing about the case that can fail. The reset-anchor
+  pins now supply the size-to-Ŝ link their edges spend (connect-edge's
+  `sizeᵉ d ≤ Ŝ` premise); reclassify only when the clause is actually
+  worked. After subscribeInner-walk, never before.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.
@@ -101,7 +106,9 @@ named postulate's own header.
 - **`subscribeE-inner-nodry-fuel`** (Burst-Walk) — FALSITY, route-complete
   over a PROVEN engine (budget-hasAtLeast, general in id, shape-checked)
   with only instantiation left; not lowered, since a named route is not
-  evidence that reached the risky region.
+  evidence that reached the risky region. Restated at the reset caps
+  (the walk face's pins rejected the level-cap form — story in its
+  header), which moves it ONTO the engine's own anchor.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY, reclassified
   from FALSITY: it was neither false nor hard but SHAPE — INV?'s two slot
   conjuncts were reachable from NO hypothesis it had. Repaired by
