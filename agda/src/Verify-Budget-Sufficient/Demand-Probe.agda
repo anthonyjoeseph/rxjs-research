@@ -670,16 +670,32 @@ _ = refl
 
 -- the demand side.  LOAD-BEARING: this is the row that validates the
 -- d·k model, and it fails if demand is not at least d·k+1 = 13 here.
--- (The companion `runDry 13 … ≡ false` row is DELIBERATELY OMITTED:
--- a non-drying run evaluates the whole program and did not finish in
--- 600 s, while a drying run short-circuits at the first dry emit.
--- The lower bound is the refuting direction, so it is the one that
--- earns its cost.)
 _ : runDry 12 (progD 3 4) ≡ true
 _ = refl
 
--- SAFE at these shapes, by three orders on the small ones and by 18
--- at (3,4): sucG 31 vs demand 13.  The margin NARROWS as d·k grows
--- against 5d+k+12, and the model puts the crossover just above
--- (6,8) — sucG 50 against demand 49.  THAT ROW IS NOT YET MEASURED;
--- see the header note in `pushBurst-walk` for what it would mean.
+-- ⚠ COST, MEASURED 2026-08-13 — AND THE CROSSOVER ROW IS A MULTI-HOUR
+-- JOB, NOT A PIN.  `runDry` gives NO short-circuit in either direction:
+-- `hasDry` reads the stream `subscribeE` RETURNS, so the whole run is
+-- normalised before the first dry event can be seen.  (The cheap rows
+-- above are cheap because their PROGRAMS are small — not, as first
+-- assumed when this series was designed, because drying exits early.
+-- That assumption is what made the crossover row look affordable.)
+--
+-- The cost is intrinsic to the family and it is QUADRATIC in k: `scanᵉ`
+-- emits every intermediate accumulator, accᵢ carries d·i nested levels,
+-- and the outer *All subscribes all of them — so a run normalises
+-- d·k(k+1)/2 subscription levels.  At the cheapest crossing point that
+-- is ~250-300, and (8,8) had burned 56 min CPU without finishing.
+-- Nothing much cheaper exists: minimising d·k(k+1)/2 subject to the
+-- crossing condition 5d + k + 12 ≤ d·k bottoms out around 250 for
+-- (7,8)/(6,9)/(8,8), all within ~15% of each other.
+--
+-- So the family SAFE region is pinned above and the crossing region is
+-- NOT MEASURED — deliberately, with the cost named rather than the row
+-- quietly dropped.  Whoever runs it should detach it for hours, not
+-- expect a pin.  What it would mean is in `pushBurst-walk`'s header.
+--
+-- SAFE at these shapes, by three orders on the small ones and by 18 at
+-- (3,4): sucG 31 vs demand 13.  The margin NARROWS as d·k grows against
+-- 5d + k + 12, and the model puts the crossover just above (6,8) —
+-- sucG 50 against demand 49.

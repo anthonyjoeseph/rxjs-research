@@ -604,11 +604,28 @@ postulate
   -- growth stay under Ŝ" question surfacing as a POSSIBLE FALSITY OF
   -- THE FACE AS STATED, and unlike the anchor it is PROBEABLE: hasDry
   -- is j′-free, so a single run with all hypotheses satisfied and
-  -- hasDry ≡ true refutes the whole Σ with no opIterD evaluation —
-  -- build the minimal-gas hop probe BEFORE grinding this body.  If it
-  -- refutes, the repair is a threaded ceiling hypothesis (the walk's
+  -- hasDry ≡ true refutes the whole Σ with no opIterD evaluation.  If
+  -- it refutes, the repair is a threaded ceiling hypothesis (the walk's
   -- maximal level fits under Ŝ), a signature change to the whole face,
   -- NOT a weakening.
+  --
+  -- PROBE BUILT 2026-08-13 (Demand-Probe, series D) — READ ITS COVERAGE
+  -- AND COST RECEIPT BEFORE RE-OPENING THIS.  Ŝ/R̂/F are quantified
+  -- FREELY here, so the adversarial instantiation is the smallest, where
+  -- the demand collapses to `syncSizeᵉ b + hopDᵉ 0 b` — a SUM, against a
+  -- gas demand that tracks within-instant nesting DEPTH, a PRODUCT d·k
+  -- for a fold of depth d over k values.  The sum side is pinned at six
+  -- points (exactly 5d + k + 12) and the depth model is pinned in the
+  -- refuting direction at (3,4).
+  --
+  -- WHAT IS COVERED: the SAFE region only — margins of three orders at
+  -- the small shapes, 18 at (3,4).  WHAT IS NOT: the crossing region,
+  -- which the model puts just above (6,8).  That row is a MULTI-HOUR
+  -- job, not a pin (`runDry` has no short-circuit in either direction;
+  -- cost is quadratic in k, receipt in Demand-Probe), so a green
+  -- series D is NOT evidence for this face — it reaches only the region
+  -- where the sum still dominates, which is the region that was never
+  -- in doubt.  Per the standing rule, this does not lower the class.
   pushBurst-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j : ℕ)
     (g : Gas) (bid : Id) (now : Tick)
