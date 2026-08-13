@@ -103,14 +103,18 @@ statement plus one per-frame face.
   running position is a caps level `j`, the statement is
   `subscribeE-caps`' proven face verbatim ⊗ the wet conjuncts on one
   shared witness `j′`, and the `capᴱ W E` ledger is gone from the walk
-  entirely (with it: the Ω width trio, mintCount, burstLen, and ℓ's pin
-  to Ŝ). The ruling's own falsity check ran first and came back clean —
-  a census of every consumer of the old walk's conclusion found all four
-  retired conjuncts LEVEL-TOLERANT, with the outer `lenOK` sourced from
-  caps-tick rather than from the walk. What is UNTESTED is the statement
-  itself: no clause of it has been ground, and unlike the ledger walk it
-  has no satisfiability contrast. Grind it against subscribeE-caps'
-  clause skeleton, which already walks the level threading.
+  entirely. **CONTAINMENT RECEIPT + conjunct census in its header
+  (2026-08-13):** the thirteen caps hypotheses and conjuncts (1)–(4)
+  are `subscribeE-caps`' own, verbatim — a proven theorem's face — so
+  the entire falsity surface is the WITNESS-COINCIDENCE of the five
+  wet conjuncts, and the census cuts that further: (5) INV? and (6)
+  burstB? are assemblies over the proven caps conjuncts (the
+  registry-cardinality piece is `frameStep-reg≤size`, PROVEN in
+  Caps-Bridge since 2026-08-05 — § 5a's "not yet machine" note was
+  stale), (7) is the documented hop-descent conjunct, leaving **(8)
+  hasDry and (9) regsLen? as the real risk**. (9) is PROBEABLE
+  (dBound/subscribeE/regsLen? all compute) — probe in flight. Grind
+  rides subscribeE-caps' clause skeleton.
 - **`subscribeE-wet-core`** (Walk-Level) — FALSITY, conditional on the
   anchor. The outer instantiation; maximal blast radius (both branches of
   `budget-sufficient`). Restated 2026-08-13 over the collapsed walk and

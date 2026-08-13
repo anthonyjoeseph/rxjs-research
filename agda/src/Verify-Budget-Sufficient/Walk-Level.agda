@@ -143,6 +143,87 @@ postulate
   -- consuming one hasAtLeast peel against dBound-μ / dBound-hop /
   -- dBound-connect, riding subscribeE-caps' proven clause skeleton for
   -- the level half.
+  --
+  -- ═══ CONTAINMENT RECEIPT, 2026-08-13 — checked by inspection, and
+  -- it says exactly where the FALSITY can and cannot live ═══
+  --
+  -- This statement is a CONSERVATIVE EXTENSION of a PROVEN theorem.
+  -- Against `subscribeE-caps` (.Subscribe-Face:906, GROUND — that
+  -- module has no live postulate):
+  --   · the thirteen caps prelims below are subscribeE-caps' OWN
+  --     hypothesis list, same statements, same ORDER, nothing added
+  --     and nothing dropped;
+  --   · conjuncts (1) capsOK?, (2) burstCaps?, (3) burstCount? and
+  --     (4) `j + j′ ≤ opIterD …` are its OWN Σ, verbatim — including
+  --     (4)'s `j + j′` form.  (The `j′ ≤ …` form seen at
+  --     Caps-Bridge:659 is `sub-charge` WEAKENING this one by m≤n+m,
+  --     not a competing statement — checked, since a mismatch there
+  --     would have meant the collapse silently strengthened (4).)
+  --
+  -- CONSEQUENCE: conjuncts (1)–(4) cannot be the failure point, and
+  -- neither can the hypothesis list be too weak for them.  What this
+  -- statement ADDS is three wet hypotheses and five wet conjuncts
+  -- (5)–(9), asked to hold AT THE WITNESS THE CAPS FACE ALREADY
+  -- PICKS.
+  --
+  -- SO THE RISK IS WITNESS-COINCIDENCE, and nothing else: does the j′
+  -- that subscribeE-caps produces also carry INV?, burstB?,
+  -- burstHopD?, hasDry ≡ false and regsLen?.  THIS RECEIPT DOES NOT
+  -- LOWER THE CLASS — it reached the caps half, which was never the
+  -- risky region.  Per the standing rule (CLAUDE.md: a risk class may
+  -- only be lowered by evidence that REACHED the risky region), the
+  -- row stays FALSITY.  What it buys is aim: any refutation attempt
+  -- should target the coincidence, and any grind should ride
+  -- subscribeE-caps' clause skeleton rather than re-deriving a level
+  -- walk.
+  --
+  -- ═══ THE COINCIDENCE, CONJUNCT BY CONJUNCT (census 2026-08-13) —
+  -- the five wet conjuncts do NOT carry equal risk ═══
+  --
+  -- (5) INV? at the landing size cap — ASSEMBLY, not independent risk.
+  --     Six sub-conjuncts: stBounded?/regsB?'s size halves come from
+  --     the LANDING capsOK? (conjunct (1), proven at the same witness);
+  --     the two Ψ halves are level-free and mirror the proven wet
+  --     clique; the registry-cardinality conjunct needs
+  --     `cReg (frameStep …) ≤ cSize (frameStep …)`, which is
+  --     `frameStep-reg≤size` — PROVEN, .Caps-Bridge:151, since
+  --     2026-08-05 (f306c9e; § 5a's "hand derivation, not yet machine"
+  --     note predated finding it); the two slot conjuncts ride the
+  --     entry INV? since slots never change and B only widens.  This
+  --     is cascade-wet-via-caps' § C recombination, one face down.
+  -- (6) burstB? at the landing cap — the size half is IMPLIED by
+  --     conjunct (2) via `burstB?-halves` (.Burst-Walk § 4, PROVEN);
+  --     only the Ψ half (burstΨ?) is new, and it is level-free.
+  -- (7) burstHopD? — genuinely separate, level-free; the hop-descent
+  --     conjunct, refuted once and restated with corpus receipts (the
+  --     hop-descent memo, .Measures).  Its risk is documented there.
+  -- (8) hasDry ≡ false — REAL RISK.  The fuel walk: the entry gas must
+  --     reach every interior subscribeInner.  Same content as SiNodry's
+  --     gs clause (.Burst-Walk § 5a); the hasAtLeast hypothesis is an
+  --     inequality precisely so the gs-peel descends.
+  -- (9) regsLen? ℓ — REAL RISK, and PROBEABLE (unlike (8): dBound,
+  --     subscribeE, regsLen? all compute).  The scare: a chain minted
+  --     from an inner GROWN by within-instant applyFn (not a subterm
+  --     of b) adds size-many frames on ONE gas peel, so gas does not
+  --     bound minted path lengths.  The answer the statement bets on:
+  --     within-instant value sizes fit under Ŝ (lvl-fits +
+  --     capsAt-suc-full), and dBound Ŝ R̂ u r s = s + suc Ŝ · (r + …)
+  --     carries an Ŝ-PER-HOP term, so minted lengths stay under
+  --     pathLen κ + dBound.  If a probe refutes even with a generous
+  --     hand-supplied Ŝ ≥ the program's observed sizes, the MECHANISM
+  --     is broken, not just an instantiation.
+  --
+  -- NET: the falsity surface is (8) and (9), plus the possibility that
+  -- one witness cannot serve both flavours at once — (5)/(6) cannot
+  -- fail except through their level-free Ψ halves.
+  --
+  -- NOTE for conjunct (4) at the degenerate corner: `opIterD` is the
+  -- identity at m = 0 (`opIterD-0`, Evaluator:811) and `ops` sits in
+  -- the m position — so `ops = 0` would pin j′ = 0.  It is excluded by
+  -- the `suc (sizeᵉ b) ≤ ops` hypothesis, i.e. the positivity is
+  -- already threaded.  `dep = 0` and `bud = 0` ARE reachable and are
+  -- harmless: opIterD's `suc m` clause bumps J unconditionally
+  -- (J₀ = suc (J + …)) before any d/k-dependent step runs.
   subscribeE-walk-level : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ dep bud ops j : ℕ)
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
