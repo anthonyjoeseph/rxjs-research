@@ -75,14 +75,17 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`pushBurst-walk`** (Walk-Level) — FALSITY, and the largest live
-  risk in the proof: subscribeAll-walk is now REAL (its body mirrors
-  the proven caps head, mutual with walkFace), so the witness-
-  coincidence and the hop peel both sit here, one face down. Its
-  header names a POSSIBLE FALSITY OF THE FACE AS STATED (the Ŝ-scale
-  refill vs level-scale value receipts, unlinked) and the minimal-gas
-  hop probe that must run BEFORE any grind — hasDry is j′-free, so
-  this one IS probeable, unlike the caps half.
+- **`subscribeInner-walk`** (Walk-Level) — FALSITY, and the largest live
+  risk in the proof: THE LEAF of the hop-edge chain, now that
+  pushThru-walk is REAL (recursion on the burst, mirroring the proven
+  caps push face) and stepThru-walk is an assembly over this leaf. The
+  gas peel is here; the g0 dry mint is already excluded by the gas
+  hypothesis's shape. The live edge (Ŝ-scale refill vs level-scale
+  value receipts, unlinked) sits in this one statement's future body —
+  probe coverage and the crossing region's cost in its header.
+- **`stepThru-walk-core`** (Walk-Level) — DIFFICULTY. The thruWalk
+  queue loop over the leaf, thruWalk-caps' wet mirror; loop obligations
+  in its header.
 - **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
   coincidence at a weaker instance: both decrement edges have their dry
   side matched by a proven lemma (dBound-connect, dBound-μ), so a green
@@ -115,9 +118,10 @@ named postulate's own header.
 - **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
   `regsLen?-mono`** (Walk-Level) — DIFFICULTY. Entry plumbing for the
   outer assembly; each self-contained, none level-indexed.
-- **`INV?-install` / `pathB?-mono-B`** (Walk-Level) — DIFFICULTY.
-  Node-install and B-monotonicity plumbing the *All body consumes;
-  conjunct-by-conjunct routes in their headers.
+- **`INV?-install`** (Walk-Level) — DIFFICULTY. Node-install plumbing
+  the *All body consumes; conjunct-by-conjunct route in its header.
+  (Its former row-mate pathB?-mono-B is GONE — it duplicated the proven
+  pathB?-widen, .Measures, found by a name clash; grep before stating.)
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
   DIFFICULTY, parked. Loop transport over the leaf; ruling and resumption
   plans in their headers.

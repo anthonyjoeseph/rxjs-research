@@ -599,8 +599,8 @@ _ : (3 ≤ᵇ 1479) ≡ true    -- 3 ≤ suc 1478 = 1479
 _ = refl
 
 ----------------------------------------------------------------------
--- SERIES D — THE MINIMAL-Ŝ HOP PROBE (2026-08-13), aimed at the live
--- edge named in `pushBurst-walk`'s header (.Walk-Level): the walk
+-- SERIES Q — THE MINIMAL-Ŝ HOP PROBE (2026-08-13), aimed at the live
+-- edge named in `subscribeInner-walk`'s header (.Walk-Level): the walk
 -- face's demand refill is Ŝ-SCALE while its value receipts are
 -- LEVEL-scale, and NO hypothesis links the two.  Ŝ, R̂ and F are
 -- quantified FREELY by the face, so the adversarial instantiation is
@@ -615,15 +615,16 @@ _ = refl
 -- hypothesis of the face is satisfiable here (root path, entry state,
 -- caps taken as large as one likes — they are separate parameters).
 -- So the face asserts these runs do NOT dry, and a `true` row REFUTES
--- IT — not merely pushBurst-walk but WalkStmt itself.
+-- IT — not merely the hop-edge leaf but WalkStmt itself.
 --
 -- WHY THIS FAMILY.  `sucG` is a SUM (a static syntactic size), while
 -- gas demand tracks the within-instant nesting DEPTH, which for a scan
 -- fold of depth d over a k-element list is a PRODUCT d·k.  A sum
 -- cannot dominate a product forever, so if the mechanism is unsound
 -- the crossover is reachable by raising d and k together.  The
--- B-series above cannot see this: its fold has d = 1, so both sides
--- grow by exactly 1 per element and the margin is constant.
+-- B/D/E series above cannot see this: their folds have FIXED wrap
+-- depth (1, 1, and 2), so both sides grow linearly per element and
+-- the margin never closes.  Q varies d and k independently.
 --
 -- MEASURED, and the fit is exact on six points:
 --     sucG (progD d k) = 5·d + k + 12
@@ -693,7 +694,7 @@ _ = refl
 -- So the family SAFE region is pinned above and the crossing region is
 -- NOT MEASURED — deliberately, with the cost named rather than the row
 -- quietly dropped.  Whoever runs it should detach it for hours, not
--- expect a pin.  What it would mean is in `pushBurst-walk`'s header.
+-- expect a pin.  What it would mean is in `subscribeInner-walk`'s header.
 --
 -- SAFE at these shapes, by three orders on the small ones and by 18 at
 -- (3,4): sucG 31 vs demand 13.  The margin NARROWS as d·k grows against

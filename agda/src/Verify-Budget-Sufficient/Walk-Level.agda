@@ -63,24 +63,25 @@
 
 module Verify-Budget-Sufficient.Walk-Level where
 
-open import Data.Bool    using (Bool; true; false)
+open import Data.Bool    using (Bool; true; false; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive;
                                        m≤m+n; m≤n+m; n≤1+n;
-                                       +-suc; +-assoc; +-monoʳ-≤;
-                                       m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ)
+                                       +-suc; +-assoc; +-monoʳ-≤; +-identityʳ;
+                                       m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Maybe   using (nothing)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (Vec; lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import Rx.Prim      using (Tick; Id; Source; init; value; close;
-                                complete; exhausted; subscribe;
-                                _at_from_as_;
+                                complete; handoff; exhausted; dried;
+                                cut; cutPending; subscribe;
+                                InstEmit; InstEvent; _at_from_as_;
                                 Gas; g0; gs; gasPad)
 open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
                                 sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
@@ -99,8 +100,9 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain
                                 switch-st; exhaust-st;
                                 splitBurst; hasDry; dryEvent;
                                 sched-init; st-init; budgetAt; slotsSize;
-                                opIterD; fIterD;
-                                Frame; thru-outer; pushBurst;
+                                opIterD; fIterD; fLvlD; sLvlD;
+                                Frame; thru-outer; pushBurst; stepFrame;
+                                subscribeInner; splitEvents; retagEvents;
                                 installNode; NodeId)
 
 -- the wet stratum: INV?, dBound, hasAtLeast, regsLen?, pathLen, the gas
@@ -112,14 +114,22 @@ open import Verify-Budget-Sufficient.Caps-Face
   using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
          widNode; merge-step; concat-step; switch-step; exhaust-step;
          frameSz?; capsOK?-mono; capsOK?-setNode; capsOK?-nextNode;
-         pathSz?-⊑; frameStep-chain-suc; frameStep-⊑-+)
+         pathSz?-⊑; frameStep-chain-suc; frameStep-⊑-+;
+         valCaps?; valsCaps?; eventCaps?; valCountᵉ; frameBud;
+         mapValue-caps; valsCaps?-widen; finList-caps;
+         splitEvents-valsCaps; splitEvents-bk-caps; burstCaps?-widen)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
-  using (chain-desc; op-step; burst-index)
--- ONE proven projection, not the face: burstCount? read as a length
-open import Verify-Budget-Sufficient.Subscribe-Face using (countLen)
+  using (chain-desc; op-step; burst-index; burst-nil; burst-step)
+-- proven projections and per-emit plumbing off the caps push face —
+-- pieces, never the face itself (the wet twin re-walks its skeleton
+-- so both halves share one witness)
+open import Verify-Budget-Sufficient.Subscribe-Face
+  using (countLen; countVals; countIn; valsOf; pushEmit-count;
+         pushBurst-len; retagEvents-caps;
+         burstCount?-widen; burstCount?-tail)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthAll; depthBurst)
+  using (depthE; depthAll; depthBurst; depthFrame; depthInner)
 
 
 -- THE WALK FACE AND ITS CORE, as types — named once so that neither
@@ -334,8 +344,9 @@ postulate
   -- conjuncts threaded through; the *All clauses delegate to
   -- subscribeAll-walk (below, REAL — its body walks the mutual
   -- recursion with this face); the hop edge — hasDry's one live risk —
-  -- is paid below pushBurst-walk (its header names the live edge and
-  -- the minimal-gas probe that must precede its grind).
+  -- is paid at subscribeInner-walk, the LEAF of the hop-edge chain
+  -- (pushThru-walk is REAL, stepThru-walk is an assembly over the
+  -- leaf; the leaf's header names the live edge and the probe).
   --
   -- Σ-CONTENT CHECKED 2026-08-13 (the "a Σ-receipt has content only
   -- through its witness" rule, run before any clause grind).  NOT
@@ -564,111 +575,580 @@ postulate
     fnCapNode Ψ ns ≡ true →
     INV? Ψ B sched st ≡ true →
     INV? Ψ B′ sched′ (installNode nid ns st) ≡ true
-  -- pathB? weakens upward in B (Ψ fixed): every frameB? B test is a
-  -- size ≤ᵇ B, the Ψ tests don't mention B.  pathSz?-⊑'s wet twin.
-  pathB?-mono-B : ∀ {n} {Γ : Ctx n} {s t}
-    (B B′ Ψ : ℕ) (κ : Path Γ s t) → B ≤ B′ →
-    pathB? B Ψ κ ≡ true → pathB? B′ Ψ κ ≡ true
 
-  -- THE PUSH FACE, WET — pushBurst-caps ⊗ the wet content, one Σ,
-  -- the same conservative extension subscribeAll-walk was over
-  -- subscribeAll-caps, one face down.  The caps half (hypotheses and
-  -- the first four conjuncts, including the per-emit fIterD charge) is
-  -- pushBurst-caps' own face VERBATIM (.Subscribe-Face:2440, GROUND),
-  -- so the risk is again WITNESS-COINCIDENCE, plus the two live edges
-  -- below.  Σ-content: same accounting as the walk face's (five
-  -- conjuncts upward-closed in j′, given content by the downward
-  -- fIterD bound; burstHopD?/hasDry/regsLen? j′-free).
-  --
-  -- THE HOP PEEL IS PAID BELOW THIS FACE.  pushBurst's per-emit step
-  -- is stepFrame, and a thru-outer frame's consume subscribes each
-  -- inner value through subscribeInner — the gas-peel edge.  The
-  -- burstHopD? F r̂ hypothesis is what makes the peel STRICT with no
-  -- arithmetic: an inner drawn from str has hopD ≤ r̂ < suc r̂, and
-  -- dBound's per-hop refill (hop-step-gives) funds the inner's demand
-  -- at the descended index.  The ŝ DECOUPLING is deliberate: after one
-  -- hop the refill resets the sync budget to Ŝ-scale (suc s′ ≤ s +
-  -- suc Ŝ), so no hypothesis links ŝ to str's own values.
-  --
-  -- ⚠ THE LIVE EDGE, named at authoring — THE REFILL IS Ŝ-SCALE BUT
-  -- THE VALUE RECEIPTS ARE LEVEL-SCALE.  The inner's post-hop sync
-  -- budget is ~Ŝ; the receipts bound the inner's syncSize by the
-  -- LEVEL cap (burstB?'s size half + reach-reset, .Measures), and NO
-  -- hypothesis here — or anywhere in WalkStmt — links the two.  At
-  -- the true instantiation Ŝ IS the landing cap and every level the
-  -- walk visits sits under it (sub-charge-capsOK-lift's chain), so
-  -- the statement is BELIEVED at the instantiation that matters; but
-  -- the face quantifies Ŝ freely, and at a tiny Ŝ with the gas pinned
-  -- minimal (g := exactly suc G peels — nothing forbids it) the hop
-  -- may run dry.  This is the walk-input header's "does within-instant
-  -- growth stay under Ŝ" question surfacing as a POSSIBLE FALSITY OF
-  -- THE FACE AS STATED, and unlike the anchor it is PROBEABLE: hasDry
-  -- is j′-free, so a single run with all hypotheses satisfied and
-  -- hasDry ≡ true refutes the whole Σ with no opIterD evaluation.  If
-  -- it refutes, the repair is a threaded ceiling hypothesis (the walk's
-  -- maximal level fits under Ŝ), a signature change to the whole face,
-  -- NOT a weakening.
-  --
-  -- PROBE BUILT 2026-08-13 (Demand-Probe, series D) — READ ITS COVERAGE
-  -- AND COST RECEIPT BEFORE RE-OPENING THIS.  Ŝ/R̂/F are quantified
-  -- FREELY here, so the adversarial instantiation is the smallest, where
-  -- the demand collapses to `syncSizeᵉ b + hopDᵉ 0 b` — a SUM, against a
-  -- gas demand that tracks within-instant nesting DEPTH, a PRODUCT d·k
-  -- for a fold of depth d over k values.  The sum side is pinned at six
-  -- points (exactly 5d + k + 12) and the depth model is pinned in the
-  -- refuting direction at (3,4).
-  --
-  -- WHAT IS COVERED: the SAFE region only — margins of three orders at
-  -- the small shapes, 18 at (3,4).  WHAT IS NOT: the crossing region,
-  -- which the model puts just above (6,8).  That row is a MULTI-HOUR
-  -- job, not a pin (`runDry` has no short-circuit in either direction;
-  -- cost is quadratic in k, receipt in Demand-Probe), so a green
-  -- series D is NOT evidence for this face — it reaches only the region
-  -- where the sum still dominates, which is the region that was never
-  -- in doubt.  Per the standing rule, this does not lower the class.
-  pushBurst-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j : ℕ)
-    (g : Gas) (bid : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t) (str : Stream Γ s)
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    frameSz? (Caps.cSize (frameStep j c)) f ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    burstCaps? (frameStep j c) sl str ≡ true →
-    burstCount? (frameStep j c) str ≡ true →
-    depthBurst g bid now f κ str sched st ≤ dep →
-    -- the wet half, at the same level
-    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-    frameB? (Caps.cSize (frameStep j c)) Ψ f ≡ true →
-    burstB? (Caps.cSize (frameStep j c)) Ψ str ≡ true →
-    burstHopD? F r̂ str ≡ true →
-    hasDry str ≡ false →
-    -- the dry half: U carries the unconn slack (shares only connect
-    -- during a walk, so the caller's count weakens to any earlier one)
-    unconn sl (EvalSt.connectedShares st) ≤ U →
-    dBound Ŝ R̂ U (suc r̂) ŝ ≤ G →
-    g hasAtLeast suc G →
-    pathLen κ + G ≤ ℓ →
-    regsLen? ℓ (EvalSt.registry st) ≡ true →
-    let r = pushBurst g bid now f κ str sched st
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
-       × (j + j′ ≤ fIterD (Caps.cSize c) (Caps.cWid c) dep bud (length str) j)
-       × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
-               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
-       × (burstHopD? F (suc r̂) (proj₁ r) ≡ true)
-       × (hasDry (proj₁ r) ≡ false)
-       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+------------------------------------------------------------------
+-- PER-EMIT WET PLUMBING, hop and dryness family — the hopDev?/dryEvent
+-- halves of the splitEvents/retagEvents/map-value/terminator algebra
+-- the push face's cons clause reassembles.  THE B-FAMILY ALREADY
+-- EXISTED, PROVEN (.Measures W7 block: valB?/valsB?/eventB?/burstB?/
+-- pathB?/frameB?-widen, splitEvents-vals-B/-bk-B, mapValue-B, and
+-- finList-B in .Wet/Part2) — found by the clash, not the grep, which is
+-- the wrong order; grep first.  Only the hop/dry twins below are new.
+-- They live in THIS module rather than beside their family in
+-- .Measures deliberately: a Measures edit invalidates every interface
+-- above it (hours), a Walk-Level edit costs seconds.  When the
+-- map/take/scan wet push faces need them, THAT is the day they move
+-- down — not before.
+------------------------------------------------------------------
+
+-- any-p over ++ stays false when both halves are; hasDry-append's
+-- event-level sibling
+any-++-false : ∀ {A : Set} (p : A → Bool) (xs ys : List A) →
+  any p xs ≡ false → any p ys ≡ false → any p (xs ++ ys) ≡ false
+any-++-false p []       ys hx hy = hy
+any-++-false p (x ∷ xs) ys hx hy with ∨-false (p x) (any p xs) hx
+... | px , pxs = cong₂ _∨_ px (any-++-false p xs ys pxs hy)
+
+-- and the hop tests weaken upward in the hop index, F fixed
+hopDev?-widen : ∀ {n} {Γ : Ctx n} {u} (F r r′ : ℕ) (ev : InstEvent (Val Γ u)) →
+  r ≤ r′ → hopDev? F r ev ≡ true → hopDev? F r′ ev ≡ true
+hopDev?-widen {u = u} F r r′ (value v) le h = ≤ᵇ-widen (hopDᵛ F u v) le h
+hopDev?-widen F r r′ (init _)    le h = refl
+hopDev?-widen F r r′ (close _ _) le h = refl
+hopDev?-widen F r r′ (handoff _) le h = refl
+hopDev?-widen F r r′ complete    le h = refl
+
+burstHopD?-widen : ∀ {n} {Γ : Ctx n} {u} (F r r′ : ℕ) (str : Stream Γ u) →
+  r ≤ r′ → burstHopD? F r str ≡ true → burstHopD? F r′ str ≡ true
+burstHopD?-widen F r r′ str le h =
+  all-impl (λ em → all (hopDev? F r)  (InstEmit.events em))
+           (λ em → all (hopDev? F r′) (InstEmit.events em))
+           (λ em hem → all-impl (hopDev? F r) (hopDev? F r′)
+                         (λ ev hev → hopDev?-widen F r r′ ev le hev)
+                         (InstEmit.events em) hem)
+           str h
+
+splitEvents-vals-hop : ∀ {n} {Γ : Ctx n} {s u} (F r : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (hopDev? F r) es ≡ true →
+  all (λ v → hopDᵛ F s v ≤ᵇ r) (proj₁ (splitEvents {A = Val Γ u} es)) ≡ true
+splitEvents-vals-hop F r [] h = refl
+splitEvents-vals-hop {s = s} {u = u} F r (value v ∷ es) h
+  with ∧-true (hopDᵛ F s v ≤ᵇ r) (all (hopDev? F r) es) h
+... | hv , hes = ∧-intro hv (splitEvents-vals-hop {u = u} F r es hes)
+splitEvents-vals-hop {u = u} F r (init _ ∷ es) h =
+  splitEvents-vals-hop {u = u} F r es (proj₂ (∧-true _ _ h))
+splitEvents-vals-hop {u = u} F r (close _ _ ∷ es) h =
+  splitEvents-vals-hop {u = u} F r es (proj₂ (∧-true _ _ h))
+splitEvents-vals-hop {u = u} F r (handoff _ ∷ es) h =
+  splitEvents-vals-hop {u = u} F r es (proj₂ (∧-true _ _ h))
+splitEvents-vals-hop {u = u} F r (complete ∷ es) h =
+  splitEvents-vals-hop {u = u} F r es (proj₂ (∧-true _ _ h))
+
+splitEvents-bk-hop : ∀ {n} {Γ : Ctx n} {s u} (F r : ℕ)
+  (es : List (InstEvent (Val Γ s))) →
+  all (hopDev? F r) (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ true
+splitEvents-bk-hop F r []                    = refl
+splitEvents-bk-hop {u = u} F r (value _   ∷ es) = splitEvents-bk-hop {u = u} F r es
+splitEvents-bk-hop {u = u} F r (init _    ∷ es) = ∧-intro refl (splitEvents-bk-hop {u = u} F r es)
+splitEvents-bk-hop {u = u} F r (close _ _ ∷ es) = ∧-intro refl (splitEvents-bk-hop {u = u} F r es)
+splitEvents-bk-hop {u = u} F r (handoff _ ∷ es) = ∧-intro refl (splitEvents-bk-hop {u = u} F r es)
+splitEvents-bk-hop {u = u} F r (complete  ∷ es) = splitEvents-bk-hop {u = u} F r es
+
+-- dryness DOES cross the split (close events survive it), so this one
+-- is conditional, and the `dried` reason is matched absurd
+splitEvents-bk-dry : ∀ {n} {Γ : Ctx n} {s u}
+  (es : List (InstEvent (Val Γ s))) →
+  any dryEvent es ≡ false →
+  any dryEvent (proj₁ (proj₂ (splitEvents {A = Val Γ u} es))) ≡ false
+splitEvents-bk-dry []                          h = refl
+splitEvents-bk-dry {u = u} (value _          ∷ es) h = splitEvents-bk-dry {u = u} es h
+splitEvents-bk-dry {u = u} (init _           ∷ es) h = splitEvents-bk-dry {u = u} es h
+splitEvents-bk-dry {u = u} (close _ cut        ∷ es) h = splitEvents-bk-dry {u = u} es h
+splitEvents-bk-dry {u = u} (close _ cutPending ∷ es) h = splitEvents-bk-dry {u = u} es h
+splitEvents-bk-dry {u = u} (close _ exhausted  ∷ es) h = splitEvents-bk-dry {u = u} es h
+splitEvents-bk-dry {u = u} (close _ dried      ∷ es) ()
+splitEvents-bk-dry {u = u} (handoff _        ∷ es) h = splitEvents-bk-dry {u = u} es h
+splitEvents-bk-dry {u = u} (complete         ∷ es) h = splitEvents-bk-dry {u = u} es h
+
+-- a retagged list is value-free, so the wet tests are unconditional —
+-- retagEvents-caps' twins — while dryness again crosses
+retagEvents-B : ∀ {n} {Γ : Ctx n} {u} {A : Set} (B Ψ : ℕ)
+  (es : List (InstEvent A)) →
+  all (eventB? {u = u} B Ψ) (retagEvents {A = A} {B = Val Γ u} es) ≡ true
+retagEvents-B B Ψ []               = refl
+retagEvents-B B Ψ (value _   ∷ es) = retagEvents-B B Ψ es
+retagEvents-B B Ψ (init _    ∷ es) = ∧-intro refl (retagEvents-B B Ψ es)
+retagEvents-B B Ψ (close _ _ ∷ es) = ∧-intro refl (retagEvents-B B Ψ es)
+retagEvents-B B Ψ (handoff _ ∷ es) = ∧-intro refl (retagEvents-B B Ψ es)
+retagEvents-B B Ψ (complete  ∷ es) = ∧-intro refl (retagEvents-B B Ψ es)
+
+retagEvents-hop : ∀ {n} {Γ : Ctx n} {u} {A : Set} (F r : ℕ)
+  (es : List (InstEvent A)) →
+  all (hopDev? {u = u} F r) (retagEvents {A = A} {B = Val Γ u} es) ≡ true
+retagEvents-hop F r []               = refl
+retagEvents-hop F r (value _   ∷ es) = retagEvents-hop F r es
+retagEvents-hop F r (init _    ∷ es) = ∧-intro refl (retagEvents-hop F r es)
+retagEvents-hop F r (close _ _ ∷ es) = ∧-intro refl (retagEvents-hop F r es)
+retagEvents-hop F r (handoff _ ∷ es) = ∧-intro refl (retagEvents-hop F r es)
+retagEvents-hop F r (complete  ∷ es) = ∧-intro refl (retagEvents-hop F r es)
+
+retagEvents-dry : ∀ {A B : Set} (es : List (InstEvent A)) →
+  any dryEvent es ≡ false →
+  any dryEvent (retagEvents {A = A} {B = B} es) ≡ false
+retagEvents-dry []                          h = refl
+retagEvents-dry (value _          ∷ es) h = retagEvents-dry es h
+retagEvents-dry (init _           ∷ es) h = retagEvents-dry es h
+retagEvents-dry (close _ cut        ∷ es) h = retagEvents-dry es h
+retagEvents-dry (close _ cutPending ∷ es) h = retagEvents-dry es h
+retagEvents-dry (close _ exhausted  ∷ es) h = retagEvents-dry es h
+retagEvents-dry (close _ dried      ∷ es) ()
+retagEvents-dry (handoff _        ∷ es) h = retagEvents-dry es h
+retagEvents-dry (complete         ∷ es) h = retagEvents-dry es h
+
+mapValue-hop : ∀ {n} {Γ : Ctx n} {u} (F r : ℕ) (vs : List (Val Γ u)) →
+  all (λ v → hopDᵛ F u v ≤ᵇ r) vs ≡ true →
+  all (hopDev? F r) (map value vs) ≡ true
+mapValue-hop F r [] h = refl
+mapValue-hop {u = u} F r (v ∷ vs) h
+  with ∧-true (hopDᵛ F u v ≤ᵇ r) (all (λ w → hopDᵛ F u w ≤ᵇ r) vs) h
+... | hv , hvs = ∧-intro hv (mapValue-hop F r vs hvs)
+
+mapValue-dry : ∀ {n} {Γ : Ctx n} {u} (vs : List (Val Γ u)) →
+  any dryEvent (map value vs) ≡ false
+mapValue-dry []       = refl
+mapValue-dry (v ∷ vs) = mapValue-dry vs
+
+finList-hop : ∀ {n} {Γ : Ctx n} {u} (F r : ℕ) (b : Bool) →
+  all (hopDev? {n = n} {Γ = Γ} {u = u} F r)
+      (if b then complete ∷ [] else []) ≡ true
+finList-hop F r true  = refl
+finList-hop F r false = refl
+
+finList-dry : ∀ {A : Set} (b : Bool) →
+  any (dryEvent {A = A}) (if b then complete ∷ [] else []) ≡ false
+finList-dry true  = refl
+finList-dry false = refl
+
+------------------------------------------------------------------
+-- THE HOP-EDGE CHAIN, LEAF FIRST — subscribeInner-walk, its one-frame
+-- consumer stepThru-walk, and the REAL push face over them.  Each is
+-- its caps twin ⊗ the wet content on one witness, the discipline the
+-- whole module runs on.
+--
+-- ⚠ DEAD ROUTE 2026-08-13, and it shaped this whole section: A
+-- FRAME-GENERIC WET PUSH FACE IS FALSE.  The first statement of this
+-- face (one postulate `pushBurst-walk`, generic in `f : Frame Γ s u`,
+-- committed 9fb13d3) carried a uniform hop conjunct — input receipts
+-- at r̂, output at suc r̂ — and that is REFUTABLE BY CONSTRUCTION at
+-- f := map-f: a step function that wraps its input two mergeAll levels
+-- deep sends a value of hop exactly r̂ to hop r̂ + 2 > suc r̂, with every
+-- hypothesis satisfiable (frameB? bounds the fn's SIZE and WEIGHT,
+-- never its hop growth).  The caps face is frame-generic because caps
+-- measures are; THE HOP LEDGER IS FRAME-SPECIFIC.  pushBurst has four
+-- call sites (thru-outer, map-f, take-f, scan-f — Rx.Evaluator), so
+-- the repair is one wet push face PER FRAME KIND, this one thru-outer's;
+-- the chain frames' faces are authored when walk-map/take/scan are
+-- ground, funded by hopD-map-emit at their own output indices.
+------------------------------------------------------------------
+
+-- THE LEAF — the wet face of subscribeInner, WHERE THE GAS PEEL IS.
+-- subscribeInner-caps' hypothesis list and Σ verbatim (.Subscribe-Face,
+-- PROVEN both clauses, including the strict sLvlD report), ⊗ the wet
+-- content.  Σ-content: the strict level bound is the one downward
+-- conjunct; the hop/dry/regsLen? conjuncts are j′-free.
+--
+-- WHAT IS NAILED DOWN BY THE STATEMENT ALONE: subscribeInner's g0 arm
+-- is the evaluator's ONE remaining dry mint under this face
+-- (`close drySource dried`, Rx.Evaluator) — and the gas hypothesis
+-- `g hasAtLeast suc G` HAS NO CONSTRUCTOR AT g0, so the mint is
+-- unreachable by type, exactly as the μ mint is at walkFace's absurd
+-- clause.  Both of the machine's dry mints are now excluded by the
+-- same one-line shape; what remains everywhere else is PRESERVATION.
+--
+-- THE gs ROUTE (for the eventual body): hasAtLeast-peel the gas;
+-- walkFace o (the mutual walk at the inner — legitimate because the
+-- peel descends the gas, the same induction subscribeE-caps'
+-- subscribeInner clause runs) at level suc j under
+-- κ′ = from-inner op allNid inst ↠ κ; the walk's burst conjuncts feed
+-- the vs/bs receipts through the splitBurst square (the caps twins of
+-- those two splits are proven in .Subscribe-Face; the dry one is
+-- splitBurst-nodry, .Burst-Walk).  The demand: hop-step-gives at the
+-- descended index — hopDᵛ F o ≤ r̂ (hypothesis) and dBound monotone in
+-- r — funds the inner walk's demand STRICTLY below suc r̂'s.
+--
+-- ⚠ THE LIVE EDGE OF THE WHOLE TIER SITS IN THIS STATEMENT'S BODY, and
+-- nowhere else any more: hop-step-gives' premise needs
+-- suc (syncSizeᵉ o) ≤ ŝ + suc Ŝ, the receipts bound syncSizeᵉ o by the
+-- LEVEL cap (valB?'s size half + reach-reset, .Measures), and NO
+-- hypothesis links the level cap to Ŝ.  At the true instantiation
+-- Ŝ IS the landing cap and every level sits under it
+-- (sub-charge-capsOK-lift's chain, .Caps-Bridge); the face quantifies
+-- Ŝ freely.  Coverage and cost of the probe aimed at exactly this:
+-- Demand-Probe series Q — the SAFE region is pinned, the crossing
+-- region is a multi-hour run and is NOT measured, so the class stays
+-- FALSITY.  If it refutes, the repair is a threaded ceiling
+-- hypothesis through the whole face — a signature change, NOT a
+-- weakening.  (Burst-Walk's SiNodry states the DELIVERY-side leaf,
+-- hasDry only, PROVEN there by consuming the finished walk face; this
+-- statement is the SUBSCRIBE-side leaf the walk face itself consumes.
+-- Same evaluator function, opposite direction of dependency.)
+SubscribeInnerWalk : Set
+SubscribeInnerWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j : ℕ)
+  (g : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ u t) (bid : Id) (now : Tick) (o : Val Γ (obs u))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  valCaps? (frameStep j c) sl (obs u) o ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  nest o sl (EvalSt.connectedShares st) ≤ bud →
+  depthInner g op allNid κ bid now o sched st ≤ dep →
+  -- the wet half at the level
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  valB? (Caps.cSize (frameStep j c)) Ψ (obs u) o ≡ true →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  hopDᵛ F (obs u) o ≤ r̂ →
+  -- the dry half
+  unconn sl (EvalSt.connectedShares st) ≤ U →
+  dBound Ŝ R̂ U (suc r̂) ŝ ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeInner g op allNid κ bid now o sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c)
+              (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+              (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (valsCaps? (frameStep (j + j′) c) sl (proj₁ (proj₂ r)) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl)
+            (proj₁ (proj₂ (proj₂ r))) ≡ true)
+     × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
+     × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+             (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+             (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+     × (all (valB? (Caps.cSize (frameStep (j + j′) c)) Ψ u)
+            (proj₁ (proj₂ r)) ≡ true)
+     × (all (λ v → hopDᵛ F u v ≤ᵇ r̂) (proj₁ (proj₂ r)) ≡ true)
+     × (any dryEvent (proj₁ (proj₂ (proj₂ r))) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry
+          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))) ≡ true)
+
+-- ONE thru-outer FRAME — stepFrame-caps' Σ at f := thru-outer op nid
+-- (its frameSz? hypothesis is definitionally true there and is
+-- dropped), ⊗ the wet content.  The vs it emits are inner-burst values,
+-- so their hop receipts stay AT r̂ — no growth through this frame; the
+-- push face widens once at its consumer.
+StepThruWalk : Set
+StepThruWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j : ℕ)
+  (g : Gas) (bid : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  valsCaps? (frameStep j c) sl vals ≡ true →
+  frameBud c j ≤ bud →
+  depthFrame g bid now (thru-outer op nid) κ vals fin sched st ≤ dep →
+  -- the wet half at the level
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  all (valB? (Caps.cSize (frameStep j c)) Ψ (obs u)) vals ≡ true →
+  all (λ o → hopDᵛ F (obs u) o ≤ᵇ r̂) vals ≡ true →
+  -- the dry half
+  unconn sl (EvalSt.connectedShares st) ≤ U →
+  dBound Ŝ R̂ U (suc r̂) ŝ ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = stepFrame g bid now (thru-outer op nid) κ vals fin sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c)
+              (proj₁ (proj₂ (proj₂ (proj₂ r))))
+              (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+     × (all (eventCaps? (frameStep (j + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
+     × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
+     × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+             (proj₁ (proj₂ (proj₂ (proj₂ r))))
+             (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? (Caps.cSize (frameStep (j + j′) c)) Ψ u) (proj₁ r) ≡ true)
+     × (all (λ v → hopDᵛ F u v ≤ᵇ r̂) (proj₁ r) ≡ true)
+     × (any dryEvent (proj₁ (proj₂ r)) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+
+postulate
+  subscribeInner-walk : SubscribeInnerWalk
+  -- the -core carries the LOOP: thruWalk folds subscribeInner over the
+  -- value list (thruWalk-caps/thruWrap-caps are its proven caps twins,
+  -- .Subscribe-Face), re-establishing the state-dependent hypotheses
+  -- after each element — the same loop shape innerReact-nodry-core's
+  -- ruling names (.Burst-Walk) — and funds each element's nest premise
+  -- from frameBud, per the caps route (valsCaps→mList-strict).  concatᵒ
+  -- additionally queues instead of subscribing; its drain is
+  -- innerFinish's job, not this face's.
+  stepThru-walk-core : SubscribeInnerWalk → StepThruWalk
+
+-- wired per the law: the leaf is consumed the day it is stated
+stepThru-walk : StepThruWalk
+stepThru-walk = stepThru-walk-core subscribeInner-walk
+
+-- THE PUSH FACE AT thru-outer, REAL — pushBurst-caps' proven proof
+-- (.Subscribe-Face) step for step, wet conjuncts threaded through:
+-- per emit, split the events, step the values through the one frame
+-- (stepThru-walk), recurse on the tail from the stepped state, and
+-- reassemble the envelope with the per-segment plumbing above.  The
+-- input hop receipts arrive at r̂ and LEAVE at r̂ — the thru frame does
+-- not grow hops — so the composite's suc is paid by the consumer's one
+-- widening, never here.
+pushThru-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j : ℕ)
+  (g : Gas) (bid : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (str : Stream Γ (obs u))
+  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  burstCaps? (frameStep j c) sl str ≡ true →
+  burstCount? (frameStep j c) str ≡ true →
+  depthBurst g bid now (thru-outer op nid) κ str sched st ≤ dep →
+  -- the wet half at the level
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  burstB? (Caps.cSize (frameStep j c)) Ψ str ≡ true →
+  burstHopD? F r̂ str ≡ true →
+  hasDry str ≡ false →
+  -- the dry half
+  unconn sl (EvalSt.connectedShares st) ≤ U →
+  dBound Ŝ R̂ U (suc r̂) ŝ ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = pushBurst g bid now (thru-outer op nid) κ str sched st
+  in Σ ℕ λ j′ →
+     (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+     × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+     × (j + j′ ≤ fIterD (Caps.cSize c) (Caps.cWid c) dep bud (length str) j)
+     × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F r̂ (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+pushThru-walk c Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j g bid now op nid κ [] sl sched st
+  2≤S 1≤R slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry hU dmd gas lℓ rgs =
+  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
+            (sym (+-identityʳ j)) inv
+    , refl
+    , refl
+    , burst-nil (Caps.cSize c) (Caps.cWid c) dep bud j
+    , subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
+            (sym (+-identityʳ j)) invW
+    , refl
+    , refl
+    , refl
+    , rgs
+pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud j g bid now op nid κ (em ∷ ems) sl sched st
+  2≤S 1≤R slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry hU dmd gas lℓ rgs =
+  j₁ + j₂
+    , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST)) ≡ true) EQA W1
+    , subst (λ x → burstCaps? (frameStep x c) sl OUT ≡ true) EQA
+            (∧-intro EMIT W2)
+    , subst (λ x → burstCount? (frameStep x c) OUT ≡ true) EQA COUNT
+    , burst-step (Caps.cSize c) (Caps.cWid c) dep bud (length ems) j j₁ j₂ 2≤S
+        S4 W4
+    , subst (λ x → INV? Ψ (Caps.cSize (frameStep x c))
+                     (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST)) ≡ true) EQA W5
+    , subst (λ x → burstB? (Caps.cSize (frameStep x c)) Ψ OUT ≡ true) EQA
+            (∧-intro EMITB W6)
+    , ∧-intro EMITH W7
+    , cong₂ _∨_ EMITD W8
+    , W9
+  where
+  E    = InstEmit.events em
+  sp   = splitEvents {A = Val Γ u} E
+  step = stepFrame g bid now (thru-outer op nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ step)))
+  -- caps receipts for this emit, verbatim from the caps proof
+  eC   = proj₁ (∧-true _ _ bC)
+  cntW = suc (Caps.cWid (frameStep j c))
+  cntP : InstEmit (Val Γ (obs u)) → Bool
+  cntP em′ = valCountᵉ (InstEmit.events em′) ≤ᵇ cntW
+  cCv  = proj₂ (∧-true (length (em ∷ ems) ≤ᵇ cntW) (all cntP (em ∷ ems)) cC)
+  cntE = ≤ᵇ⇒≤ (valCountᵉ E) cntW
+           (T-to (proj₁ (∧-true (cntP em) (all cntP ems) cCv)))
+  -- wet receipts for this emit
+  eB   = proj₁ (∧-true _ _ bB)
+  eH   = proj₁ (∧-true _ _ bH)
+  dSp  = ∨-false (any dryEvent E) (hasDry ems) hDry
+  SF   = stepThru-walk c Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep (frameBud c j) j g bid now op nid κ
+           (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
+           2≤S 1≤R slEq slC slSz inv pS lC
+           (splitEvents-valsCaps {u = u} (frameStep j c) sl E eC cntE)
+           ≤-refl
+           -- both ⊔ arguments spelled out: _⊔_ matches on BOTH sides,
+           -- so the tail as a meta is a stuck constraint, not a hole
+           -- the unifier can fill
+           (≤-trans (m≤m⊔n
+              (depthFrame g bid now (thru-outer op nid) κ
+                 (proj₁ sp) (proj₂ (proj₂ sp)) sched st)
+              (depthBurst g bid now (thru-outer op nid) κ ems sd₁ st₁)) dpt)
+           invW pB
+           (splitEvents-vals-B {u = u} (Caps.cSize (frameStep j c)) Ψ E eB)
+           (splitEvents-vals-hop {u = u} F r̂ E eH)
+           hU dmd gas lℓ rgs
+  j₁   = proj₁ SF
+  S1   = proj₁ (proj₂ SF)
+  S2   = proj₁ (proj₂ (proj₂ SF))
+  S3   = proj₁ (proj₂ (proj₂ (proj₂ SF)))
+  S4   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SF))))
+  S5   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF)))))
+  S6   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF))))))
+  S7   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF)))))))
+  S8   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF))))))))
+  S9   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SF))))))))
+  ⊑₁   = frameStep-⊑-+ c 2≤S j j₁
+  KS   = stepFrame-keeps g bid now (thru-outer op nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sl₁eq : Sched.slots sd₁ ≡ sl
+  sl₁eq = trans (KeepsC.slotsEq KS) slEq
+  UK₁ : unconn sl (EvalSt.connectedShares st₁) ≤ U
+  UK₁ = ≤-trans
+          (subst₂ (λ y z → unconn y (EvalSt.connectedShares st₁)
+                             ≤ unconn z (EvalSt.connectedShares st))
+                  sl₁eq slEq
+                  (unconn-keeps sched st sd₁ st₁ KS))
+          hU
+  IH   = pushThru-walk c Ψ F Ŝ R̂ G ℓ U r̂ ŝ dep bud (j + j₁) g bid now op nid κ ems sl sd₁ st₁
+           2≤S 1≤R sl₁eq slC slSz
+           S1
+           (pathSz?-⊑ κ ⊑₁ pS)
+           (≤-trans lC (proj₁ ⊑₁))
+           (burstCaps?-widen sl ems ⊑₁ (proj₂ (∧-true _ _ bC)))
+           (burstCount?-widen ems ⊑₁ (burstCount?-tail (frameStep j c) em ems cC))
+           (≤-trans (m≤n⊔m _ _) dpt)
+           S5
+           (pathB?-widen κ (proj₁ ⊑₁) pB)
+           (burstB?-widen ems (proj₁ ⊑₁) (proj₂ (∧-true _ _ bB)))
+           (proj₂ (∧-true _ _ bH))
+           (proj₂ dSp)
+           UK₁ dmd gas lℓ
+           S9
+  j₂   = proj₁ IH
+  W1   = proj₁ (proj₂ IH)
+  W2   = proj₁ (proj₂ (proj₂ IH))
+  W3   = proj₁ (proj₂ (proj₂ (proj₂ IH)))
+  W4   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IH))))
+  W5   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
+  W6   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))
+  W7   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))))
+  W8   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+  W9   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+  REST = pushBurst g bid now (thru-outer op nid) κ ems sd₁ st₁
+  OUT  = ((proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+             ++ map value (proj₁ step)
+             ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+           at InstEmit.instant em from InstEmit.source em as InstEmit.kind em)
+          ∷ proj₁ REST
+  EQA : (j + j₁) + j₂ ≡ j + (j₁ + j₂)
+  EQA = +-assoc j j₁ j₂
+  ⊑₂  = frameStep-⊑-+ c 2≤S (j + j₁) j₂
+  ⊑ⱼ  = frameStep-mono-j c 2≤S (≤-trans (m≤m+n j j₁) (m≤m+n (j + j₁) j₂))
+  B″  = Caps.cSize (frameStep ((j + j₁) + j₂) c)
+  EMIT : all (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+             (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                ++ map value (proj₁ step)
+                ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+           ≡ true
+  EMIT = all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+           (proj₁ (proj₂ sp)) _
+           (splitEvents-bk-caps {u = u} (frameStep ((j + j₁) + j₂) c) sl E)
+           (all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+              (retagEvents (proj₁ (proj₂ step))) _
+              (retagEvents-caps {u = u} (frameStep ((j + j₁) + j₂) c) sl
+                 (proj₁ (proj₂ step)))
+              (all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
+                 (map value (proj₁ step)) _
+                 (mapValue-caps (frameStep ((j + j₁) + j₂) c) sl u (proj₁ step)
+                    (valsCaps?-widen sl u (proj₁ step) ⊑₂
+                       (valsOf (frameStep (j + j₁) c) sl (proj₁ step) S2)))
+                 (finList-caps (frameStep ((j + j₁) + j₂) c) sl
+                    (proj₁ (proj₂ (proj₂ step))))))
+  EMITB : all (eventB? B″ Ψ)
+              (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                 ++ map value (proj₁ step)
+                 ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+            ≡ true
+  EMITB = all-++-intro (eventB? B″ Ψ) (proj₁ (proj₂ sp)) _
+            (splitEvents-bk-B {u = u} B″ Ψ E)
+            (all-++-intro (eventB? B″ Ψ) (retagEvents (proj₁ (proj₂ step))) _
+               (retagEvents-B B″ Ψ (proj₁ (proj₂ step)))
+               (all-++-intro (eventB? B″ Ψ) (map value (proj₁ step)) _
+                  (mapValue-B B″ Ψ u (proj₁ step)
+                     (valsB?-widen u (proj₁ step) (proj₁ ⊑₂) S6))
+                  (finList-B {u = u} B″ Ψ (proj₁ (proj₂ (proj₂ step))))))
+  EMITH : all (hopDev? F r̂)
+              (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                 ++ map value (proj₁ step)
+                 ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+            ≡ true
+  EMITH = all-++-intro (hopDev? F r̂) (proj₁ (proj₂ sp)) _
+            (splitEvents-bk-hop {u = u} F r̂ E)
+            (all-++-intro (hopDev? F r̂) (retagEvents (proj₁ (proj₂ step))) _
+               (retagEvents-hop F r̂ (proj₁ (proj₂ step)))
+               (all-++-intro (hopDev? F r̂) (map value (proj₁ step)) _
+                  (mapValue-hop F r̂ (proj₁ step) S7)
+                  (finList-hop {n = n} {Γ = Γ} {u = u} F r̂
+                     (proj₁ (proj₂ (proj₂ step))))))
+  EMITD : any dryEvent
+              (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                 ++ map value (proj₁ step)
+                 ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+            ≡ false
+  EMITD = any-++-false dryEvent (proj₁ (proj₂ sp)) _
+            (splitEvents-bk-dry {u = u} E (proj₁ dSp))
+            (any-++-false dryEvent (retagEvents (proj₁ (proj₂ step))) _
+               (retagEvents-dry (proj₁ (proj₂ step)) S8)
+               (any-++-false dryEvent (map value (proj₁ step)) _
+                  (mapValue-dry (proj₁ step))
+                  (finList-dry {A = Val Γ u} (proj₁ (proj₂ (proj₂ step))))))
+  HEADV : valCountᵉ (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                       ++ map value (proj₁ step)
+                       ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+            ≡ length (proj₁ step)
+  HEADV = pushEmit-count {Γ = Γ} {s = obs u} {u = u} {A = Val Γ t}
+            E (proj₁ (proj₂ step)) (proj₁ step) (proj₁ (proj₂ (proj₂ step)))
+  HEADB : (valCountᵉ (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                        ++ map value (proj₁ step)
+                        ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+             ≤ᵇ suc (Caps.cWid (frameStep ((j + j₁) + j₂) c))) ≡ true
+  HEADB = subst (λ x → (x ≤ᵇ suc (Caps.cWid (frameStep ((j + j₁) + j₂) c))) ≡ true)
+                (sym HEADV)
+                (≤ᵇ-widen (length (proj₁ step)) (s≤s (proj₁ (proj₂ ⊑₂)))
+                   (proj₂ (∧-true
+                     (all (valCaps? (frameStep (j + j₁) c) sl u) (proj₁ step))
+                     (length (proj₁ step)
+                        ≤ᵇ suc (Caps.cWid (frameStep (j + j₁) c)))
+                     S2)))
+  LEN : length OUT ≤ suc (Caps.cWid (frameStep ((j + j₁) + j₂) c))
+  LEN = subst (λ x → suc x ≤ suc (Caps.cWid (frameStep ((j + j₁) + j₂) c)))
+              (sym (pushBurst-len g bid now (thru-outer op nid) κ ems sd₁ st₁))
+              (≤-trans (countLen (frameStep j c) (em ∷ ems) cC)
+                       (s≤s (proj₁ (proj₂ ⊑ⱼ))))
+  COUNT : burstCount? (frameStep ((j + j₁) + j₂) c) OUT ≡ true
+  COUNT = countIn (frameStep ((j + j₁) + j₂) c) OUT LEN
+            (∧-intro HEADB
+               (countVals (frameStep ((j + j₁) + j₂) c) (proj₁ REST) W3))
 
 -- THE *All DELEGATE — subscribeAll-caps ⊗ the wet content, one Σ,
 -- exactly as WalkStmt is subscribeE-caps ⊗ the same content, and REAL:
@@ -679,9 +1159,11 @@ postulate
 -- κ′ = thru-outer op nid ↠ κ, funded by hop-step-gives (the composite
 -- demand at suc/suc measures yields the source's demand STRICTLY
 -- smaller, the spent unit paying the ℓ extension exactly — the unit
--- subscribeE-inner-nodry-pLen lacks) → pushBurst-walk over the
--- returned burst → op-step for the level charge.  The residue is
--- pushBurst-walk and the two plumbing pieces, above.
+-- subscribeE-inner-nodry-pLen lacks) → pushThru-walk over the
+-- returned burst (REAL, above — its hop receipts return AT hopDᵉ F b,
+-- and the composite conjunct's suc is one widening here) → op-step for
+-- the level charge.  The residue is the hop-edge chain's two
+-- postulates: stepThru-walk-core and subscribeInner-walk, above.
 --
 -- The hypothesis list is subscribeAll-caps' own, verbatim and in its
 -- order, then the wet half with the composite's measures in REDUCED
@@ -843,7 +1325,11 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud (suc ops′) j g op ns b κ bid no
     , subst (λ x → INV? Ψ (Caps.cSize (frameStep x c))
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true) EQ W5
     , subst (λ x → burstB? (Caps.cSize (frameStep x c)) Ψ (proj₁ PB) ≡ true) EQ W6
-    , W7 , W8 , W9
+    -- the push face reports hop receipts AT hopDᵉ F b (the thru frame
+    -- does not grow hops); the composite conjunct's suc is one widening
+    , burstHopD?-widen F (hopDᵉ F b) (suc (hopDᵉ F b)) (proj₁ PB)
+        (n≤1+n (hopDᵉ F b)) W7
+    , W8 , W9
   where
   nid    = Sched.nextNode sched
   sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
@@ -885,7 +1371,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud (suc ops′) j g op ns b κ bid no
           (chain-desc 0 (sizeᵉ b) ops′ hidx)
           (≤-trans (m≤m⊔n _ _) dpt)
           invW′ fnC
-          (pathB?-mono-B (Caps.cSize (frameStep j c)) B′ Ψ κ (proj₁ step⊑) pB)
+          (pathB?-widen κ (proj₁ step⊑) pB)
           ≤-refl
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
@@ -912,21 +1398,19 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ dep bud (suc ops′) j g op ns b κ bid no
                          ≤ unconn z (EvalSt.connectedShares st))
               sl₂eq slEq
               (unconn-keeps sched₀ st₀ (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) KP)
-  PBW = pushBurst-walk c Ψ F Ŝ R̂ G ℓ U (hopDᵉ F b) (suc (syncSizeᵉ b))
-          dep bud (suc j + j₁) g bid now
-          (thru-outer op nid) κ (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  PBW = pushThru-walk c Ψ F Ŝ R̂ G ℓ U (hopDᵉ F b) (suc (syncSizeᵉ b))
+          dep bud (suc j + j₁) g bid now op nid
+          κ (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
           2≤S 1≤R sl₂eq slC slSz
-          S1 refl
+          S1
           (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S (suc j) j₁) (pathSz?-⊑ κ step⊑ pC))
           (≤-trans (≤-trans lC (proj₁ step⊑))
                    (proj₁ (frameStep-⊑-+ c 2≤S (suc j) j₁)))
           S2 S3
           (≤-trans (m≤n⊔m _ _) dpt)
           S5
-          (pathB?-mono-B (Caps.cSize (frameStep j c))
-             (Caps.cSize (frameStep (suc j + j₁) c)) Ψ κ
+          (pathB?-widen κ
              (≤-trans (proj₁ step⊑) (proj₁ (frameStep-⊑-+ c 2≤S (suc j) j₁))) pB)
-          refl
           S6 S7 S8
           UK dmd gas lℓ S9
   j₂  = proj₁ PBW
