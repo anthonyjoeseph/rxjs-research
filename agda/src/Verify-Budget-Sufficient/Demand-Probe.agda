@@ -18,7 +18,7 @@ open import Rx.Prim using (Gas; g0; gs; gasPad)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
                             ofᵉ; scanᵉ;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                            strmᵗ; fstᵗ; varᵗ; nat̂;
+                            strmᵗ; fstᵗ; sndᵗ; varᵗ; nat̂;
                             μᵉ; deferᵉ; input;
                             sizeᵉ; syncSizeᵉ; Tm; Fn)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
@@ -700,3 +700,225 @@ _ = refl
 -- (3,4): sucG 31 vs demand 13.  The margin NARROWS as d·k grows against
 -- 5d + k + 12, and the model puts the crossover just above (6,8) —
 -- sucG 50 against demand 49.
+
+----------------------------------------------------------------------
+-- SERIES P EXTENSION (2026-08-14) — covering the three NOT-COVERED
+-- shapes named in Walk-Level's PROBED receipt: (a) the compounding
+-- regime (k ≥ 3 and nested scans), (b) share/connect edges in the
+-- growth path, and (c) registry states with more than two entries.
+--
+-- These are DE-RISK rows.  A `true` bisection row REFUTES the
+-- regsLen? or hasDry conjunct at Ŝ = 5; a `false` row confirms
+-- the bound holds.  Ŝ = 5 is conservative (below acc₁'s sizeᵉ = 8),
+-- so green here implies green at any faithful (larger) Ŝ.
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+-- P-c3: k=3 B-series with deferᵉ seed (shapes a and c)
+-- hasDry: h* = 4 (acc₃ chain requires 4 subscribeInner peels)
+-- regsLen?: 3 entries at pathLen 3, 4, 5; max = 5
+-- shape (a): k = 3 > 2
+-- shape (c): 3 registry entries > 2
+-- Ŝ = 5, R̂ = 0, U = 0, r = hopDᵉ 5 prog-P-c3 = 244, s = 15
+-- G = dBound 5 0 0 244 15 = 15 + 6*244 = 1479
+----------------------------------------------------------------------
+
+prog-P-c3 : Closed Γ₀ natᵗ
+prog-P-c3 = mergeAllᵉ (scanᵉ scan-f-B scan-a0-defer
+                        (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ [])))
+
+-- hasDry: h* = 4 — LOAD-BEARING
+_ : runDry 3 prog-P-c3 ≡ true
+_ = refl
+_ : runDry 4 prog-P-c3 ≡ false
+_ = refl
+
+-- regsLen?: max pathLen = 5 — LOAD-BEARING (shape c: 3 entries)
+_ : runReg 5 4 prog-P-c3 ≡ true
+_ = refl
+_ : runReg 4 4 prog-P-c3 ≡ false
+_ = refl
+
+-- dBound numerals
+-- LOAD-BEARING: fails if hopDᵉ or syncSizeᵉ formula changes
+_ : hopDᵉ 5 prog-P-c3 ≡ 244
+_ = refl
+_ : syncSizeᵉ prog-P-c3 ≡ 15
+_ = refl
+_ : dBound 5 0 0 244 15 ≡ 1479
+_ = refl
+
+-- margin check: max pathLen = 5 ≤ G = 1479 (ratio ≈ 296)
+-- LOAD-BEARING (regsLen?): fails if max pathLen > G
+_ : (5 ≤ᵇ 1480) ≡ true
+_ = refl
+
+-- hasDry bound: h* = 4 ≤ suc G = 1480
+-- LOAD-BEARING (hasDry): fails if actual h* > G
+_ : (4 ≤ᵇ 1480) ≡ true
+_ = refl
+
+----------------------------------------------------------------------
+-- P-c4: k=4 B-series with deferᵉ seed (shapes a and c)
+-- hasDry: h* = 5 (acc₄ chain requires 5 subscribeInner peels)
+-- regsLen?: 4 entries at pathLen 3, 4, 5, 6; max = 6
+-- shape (a): k = 4 > 2
+-- shape (c): 4 registry entries > 2
+-- Ŝ = 5, R̂ = 0, U = 0, r = hopDᵉ 5 prog-P-c4 = 244, s = 16
+-- G = dBound 5 0 0 244 16 = 16 + 6*244 = 1480
+----------------------------------------------------------------------
+
+prog-P-c4 : Closed Γ₀ natᵗ
+prog-P-c4 = mergeAllᵉ (scanᵉ scan-f-B scan-a0-defer
+                        (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ nat̂ 4 ∷ [])))
+
+-- hasDry: h* = 5 — LOAD-BEARING
+_ : runDry 4 prog-P-c4 ≡ true
+_ = refl
+_ : runDry 5 prog-P-c4 ≡ false
+_ = refl
+
+-- regsLen?: max pathLen = 6 — LOAD-BEARING (shape c: 4 entries)
+_ : runReg 6 5 prog-P-c4 ≡ true
+_ = refl
+_ : runReg 5 5 prog-P-c4 ≡ false
+_ = refl
+
+-- dBound numerals
+_ : hopDᵉ 5 prog-P-c4 ≡ 244
+_ = refl
+_ : syncSizeᵉ prog-P-c4 ≡ 16
+_ = refl
+_ : dBound 5 0 0 244 16 ≡ 1480
+_ = refl
+
+-- margin check: max pathLen = 6 ≤ G = 1480 (ratio ≈ 247)
+_ : (6 ≤ᵇ 1481) ≡ true
+_ = refl
+
+-- hasDry bound: h* = 5 ≤ suc G = 1481
+_ : (5 ≤ᵇ 1481) ≡ true
+_ = refl
+
+----------------------------------------------------------------------
+-- P-COMP2: nested scan (outer scan over inner scan's emissions)
+-- shape (a) COMPOUNDING REGIME: hopDᵉ grows as a product of the two
+-- scan's hopDᵉ values, giving the squaring/compounding behaviour.
+--
+-- scan-f-COMP: takes (acc : obs natᵗ, val : obs natᵗ) and merges both
+-- inner scan: scanᵉ scan-f-B scan-a0-defer (ofᵉ [1,2]) → emits acc₀,acc₁,acc₂
+-- outer scan: scanᵉ scan-f-COMP scan-a0-defer inner_scan
+--
+-- hopDᵉ 5 inner_scan = 3^5 * (1+0+0) = 243
+-- hopDᵉ 5 outer_scan = 3^5 * (1+0+243) = 243 * 244 = 59292
+-- hopDᵉ 5 prog-P-COMP2 = suc 59292 = 59293
+-- dBound at Ŝ=5: G = syncSizeᵉ + 6*59293 — LARGE; margin ≫ h*
+--
+-- hasDry: h* = 4 (deepest path: outer→outer-acc₂→outer-acc₁→inner-acc₁→deferᵉ)
+-- regsLen?: max pathLen = 5 (thru-outer ↠ from-inner^4 ↠ root)
+----------------------------------------------------------------------
+
+-- compound fold: merges accumulator (obs natᵗ) with incoming (obs natᵗ)
+scan-f-COMP : Rx.Exp.Fn Γ₀ [] [] [] ((obs natᵗ) ×ᵗ (obs natᵗ)) (obs natᵗ)
+scan-f-COMP = strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl))
+                                     ∷ sndᵗ (varᵗ (here refl)) ∷ [])))
+
+prog-P-COMP2 : Closed Γ₀ natᵗ
+prog-P-COMP2 = mergeAllᵉ
+  (scanᵉ scan-f-COMP scan-a0-defer
+         (scanᵉ scan-f-B scan-a0-defer (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ []))))
+
+-- hasDry: h* = 4 — LOAD-BEARING (compounding does not deepen gas demand)
+_ : runDry 3 prog-P-COMP2 ≡ true
+_ = refl
+_ : runDry 4 prog-P-COMP2 ≡ false
+_ = refl
+
+-- regsLen?: max pathLen = 5 — LOAD-BEARING
+_ : runReg 5 4 prog-P-COMP2 ≡ true
+_ = refl
+_ : runReg 4 4 prog-P-COMP2 ≡ false
+_ = refl
+
+-- hopDᵉ at Ŝ=5: measures compounding growth (inner 243; outer 244× that)
+-- LOAD-BEARING: fails if nested-scan hopDᵉ formula changes
+_ : hopDᵉ 5 (scanᵉ scan-f-B scan-a0-defer (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ []))) ≡ 243
+_ = refl
+_ : hopDᵉ 5 prog-P-COMP2 ≡ 59293
+_ = refl
+
+-- margin check at Ŝ=5 (G grows with hopDᵉ; max pathLen = 5):
+-- Even without pinning syncSizeᵉ: G ≥ 6*59293 = 355758; pathLen 5 ≪ G
+-- LOAD-BEARING (regsLen?): 5 ≤ suc G trivially for any G ≥ 5
+_ : (5 ≤ᵇ 355759) ≡ true
+_ = refl
+
+----------------------------------------------------------------------
+-- P-S1: share in the growth path (shape b: share/connect edges)
+-- Context Γ₁ (one nat slot mapped to shared(ofᵉ[1])).
+-- scan-a0-share = strmᵗ(input zero): initial acc references shared slot.
+-- acc₁ at runtime = mergeAll([input zero]) = mergeAll([shared observable]).
+-- Subscribing acc₁ calls sharedConnect (1 peel), adding to the h* cost.
+--
+-- hasDry: h* = 3 (outer subscribeInner + acc₁'s subscribeInner + sharedConnect)
+-- regsLen?: sharedConnect registers at (from-inner ↠ from-inner ↠ root)
+--   → pathLen = 2 (same level as P-c calibration; no deferᵉ thru-outer added)
+-- Ŝ = 5, R̂ = 0, U = 0, r = hopDᵉ 5 prog-P-S1 = 244, s = 13
+-- G = dBound 5 0 0 244 13 = 1477
+----------------------------------------------------------------------
+
+-- Runners for Γ₁ context (share slot)
+runDry₁ : ∀ {t} (h : ℕ) (e : Closed Γ₁ t) → Bool
+runDry₁ h e =
+  hasDry (proj₁ (subscribeE (gasPad h g0) e root 0 0
+                             (sched-init e ins₁) (st-init e)))
+
+runReg₁ : ∀ (ℓ h : ℕ) (e : Closed Γ₁ natᵗ) → Bool
+runReg₁ ℓ h e =
+  regsLen? ℓ (EvalSt.registry
+    (proj₂ (proj₂ (subscribeE (gasPad h g0) e root 0 0
+                               (sched-init e ins₁) (st-init e)))))
+
+scan-a0-share : Rx.Exp.Tm Γ₁ [] [] [] (obs natᵗ)
+scan-a0-share = strmᵗ (input zero)
+
+prog-P-S1 : Closed Γ₁ natᵗ
+prog-P-S1 = mergeAllᵉ
+  (scanᵉ (strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ []))))
+         scan-a0-share
+         (ofᵉ (nat̂ 1 ∷ [])))
+
+-- hasDry: h* = 3 (outer subscribeInner + acc₁ subscribeInner + sharedConnect)
+-- LOAD-BEARING (hasDry): fails if sharedConnect cost changes or nesting depth changes
+_ : runDry₁ 2 prog-P-S1 ≡ true
+_ = refl
+_ : runDry₁ 3 prog-P-S1 ≡ false
+_ = refl
+
+-- regsLen?: DEGENERATE — sharedConnect writes to connectedShares, NOT to
+-- EvalSt.registry (the async delivery queue that regsLen? checks).  No deferᵉ
+-- in prog-P-S1, so the registry is empty; regsLen? is vacuously true at any ℓ.
+-- FINDING: the regsLen? conjunct is vacuous for share-only programs —
+-- only deferᵉ subscription adds to EvalSt.registry.
+_ : runReg₁ 0 3 prog-P-S1 ≡ true
+_ = refl
+
+-- dBound numerals
+-- hopDᵉ: input zero contributes 0, so same formula as P-a
+-- LOAD-BEARING: fails if shared-slot hopDᵉ formula changes
+_ : hopDᵉ 5 prog-P-S1 ≡ 244
+_ = refl
+_ : syncSizeᵉ prog-P-S1 ≡ 13
+_ = refl
+_ : dBound 5 0 0 244 13 ≡ 1477
+_ = refl
+
+-- margin check: max pathLen = 2 ≤ G = 1477 (ratio ≈ 739)
+-- LOAD-BEARING (regsLen?): confirms conjunct holds at this shape
+_ : (2 ≤ᵇ 1478) ≡ true
+_ = refl
+
+-- hasDry bound: h* = 3 ≤ suc G = 1478
+-- LOAD-BEARING (hasDry): confirms conjunct holds
+_ : (3 ≤ᵇ 1478) ≡ true
+_ = refl

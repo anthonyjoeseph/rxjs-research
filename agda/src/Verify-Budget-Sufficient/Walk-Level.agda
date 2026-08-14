@@ -515,30 +515,36 @@ postulate
   -- under Ŝ — and that question is PROBEABLE (sizeᵉ / syncSizeᵉ /
   -- dBound / subscribeE all compute).
   --
-  -- PROBED 2026-08-13 (Demand-Probe, P-series; dual-sided pins), and
-  -- the mechanism HELD on every shape run — no refutation of either
-  -- conjunct.  Coverage, stated exactly:
+  -- PROBED 2026-08-13 (Demand-Probe, P-series; dual-sided pins) and
+  -- extended 2026-08-14 (P-c3/c4, P-COMP2, P-S1).  The mechanism HELD
+  -- on every shape run — no refutation of either conjunct.  Coverage,
+  -- stated exactly:
   --   · regsLen?: scan-GROWN inners subscribed through mergeAll at
-  --     k = 1 and k = 2 nesting, registry non-empty at exit (deferᵉ
-  --     persistence; the B/D/E series turned out DEGENERATE here —
-  --     their registries empty at exit).  Max minted pathLen 2/3/4 vs
-  --     dBound 11/1477/1478 — and the comparison ran at Ŝ = 5, BELOW
-  --     the grown inner's measured sizeᵉ = 8, which is the STRICT
-  --     direction: dBound is monotone in Ŝ, so green here implies
-  --     green at every faithful (larger) Ŝ.
-  --   · hasDry: minimal dry-free pad bisected exactly (h* = 1/2/3),
-  --     h* ≤ suc dBound with three-orders margin; hasAtLeast-pad makes
-  --     the padded run a legitimate instance of the conjunct's
-  --     hypothesis.
+  --     k = 1, 2, 3, and 4 nesting, registry non-empty at exit (deferᵉ
+  --     persistence).  Max minted pathLen 2/3/4/5/6 vs dBound
+  --     11/1477/1478/1479/1480.  Comparison at Ŝ = 5, BELOW acc₁'s
+  --     sizeᵉ = 8: dBound is monotone in Ŝ, so green here implies green
+  --     at every faithful (larger) Ŝ.
+  --   · hasDry: minimal dry-free pad bisected exactly (h* = 1/2/3/4/5),
+  --     h* ≤ suc dBound with margin three orders or more.
   --   · Ŝ-ceiling: grown-inner sizes pinned (sizeᵉ acc₁ ≡ 8), so the
-  --     true instantiation needs sizeCapAt ≥ 8 at that subscription
-  --     point — trivially met by the tower.
-  -- NOT COVERED, and the class stays FALSITY on account of it: the
-  -- COMPOUNDING regime (growth that squares repeatedly within one
-  -- instant, k ≥ 3, sizes beyond ~12), programs with shares/connect
-  -- edges, and mid-cascade registry states richer than two entries.
-  -- The margins (~3 orders) suggest slack, but slack observed at
-  -- small k is exactly what geometric growth eats.
+  --     true instantiation needs sizeCapAt ≥ 8 — trivially met by the
+  --     tower.
+  --   · COMPOUNDING (P-COMP2): outer scan over inner scan; hopDᵉ 5 =
+  --     59293 (inner 243, outer 244×); hasDry h* = 4 (SAME depth as
+  --     k = 3 B-series — compounding inflates hopDᵉ/dBound but NOT gas
+  --     depth); max pathLen = 5; ratio dBound/pathLen ≈ 71000.
+  --   · SHARE EDGES (P-S1): shared slot in the growth path; h* = 3
+  --     (outer subscribeInner + acc₁ subscribeInner + sharedConnect).
+  --     FINDING: sharedConnect writes to connectedShares, NOT to
+  --     EvalSt.registry, so regsLen? is vacuously true for share-only
+  --     programs.  hasDry conjunct confirmed at h* = 3 ≤ suc dBound.
+  --   · RICHER REGISTRIES: P-c3 at k=3 has 3 entries (pathLen 3,4,5);
+  --     P-c4 at k=4 has 4 entries (pathLen 3,4,5,6) — both reached by
+  --     running, not hand-constructed.
+  -- NOT COVERED: μᵉ-recursive programs; programs with both deferᵉ AND
+  -- sharedConnect in the same growth chain; the Q-series crossover
+  -- region (multi-hour cost).  Class stays FALSITY.
   --
   -- NOTE for the opIterD level bound at the degenerate corner:
   -- `opIterD` is the identity at m = 0 (`opIterD-0`, Evaluator:811)
