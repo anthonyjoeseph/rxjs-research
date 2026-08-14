@@ -116,6 +116,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
+                                inputsBelowᵉ;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
@@ -1306,7 +1307,7 @@ sharedSlot-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dWᵉ n sl d ≤ Caps.cWid (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-  sl i ≡ shared d →
+  {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
   suc (resid sl (EvalSt.connectedShares st)) ≤ bud →
   depthShSlot g i d κ id now sched st ≤ dep →
   let r = subscribeSharedSlot g i d κ id now sched st

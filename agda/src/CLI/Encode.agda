@@ -14,7 +14,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; CloseReason; cut; cutPending; exhausted;
+                           complete; CloseReason; cut; cutPending; exhausted; dried;
                            EmitKind; subscribe; delivery; plumbing;
                            InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val; Ctx)

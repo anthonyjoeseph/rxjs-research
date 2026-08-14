@@ -394,10 +394,108 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
     sharing was measured at >2.5 min for one file; with it, ~25 s.
     """
     heavy = set(heavy_blocks(p))
+    # WHICH MEMBERS GET STUBBED, decided up front so the postulate block can
+    # be DELAYED to the first stubbed member's own position.  Emitting it at
+    # the block's FIRST item was a scope bug: a stub's signature may mention
+    # an acyclic sibling defined between the block's head and the stub's own
+    # source position (QuickCheck's genObsAt : SrcLeaf → …, with SrcLeaf a
+    # plain `: Set` alias 20 lines earlier), and no hoist regex can enumerate
+    # every mentionable shape.  Source order was scope-valid at the position
+    # the stub actually SITS, so the postulates are emitted THERE.
+    stubs_of: dict[int, set[str]] = {}
+    for bi in heavy:
+        cycb = scc_of(p, p.blocks[bi].members)
+        stubs_of[bi] = {m for m in p.blocks[bi].members
+                        if m not in foci and m not in hoist
+                        and (m in cycb or m in force_stub)}
+    all_stubs = {m for s in stubs_of.values() for m in s}
+
+    # THE INSERTION POINT must respect two more scope facts beyond "after
+    # what the stub signatures mention":
+    #   · it cannot fall between a kept-real member's signature and its
+    #     clauses — a `postulate` there splits their implicit mutual block,
+    #     so the signature is left with no definition;
+    #   · it cannot fall between a {-# TERMINATING #-}-style pragma and the
+    #     declaration it annotates (the pragma is its own parse item).
+    # So: start at the first stubbed member's item and back up past any open
+    # signature and any annotating pragma, to a clean boundary.
+    ins_at: dict[int, int] = {}
+    sig_at: dict[str, int] = {}
+    cls_at: dict[str, int] = {}
+    for i, it in enumerate(p.items):
+        if it.name is not None:
+            if it.kind == "sig" and it.name not in sig_at:
+                sig_at[it.name] = i
+            if it.kind == "clauses" and it.name not in cls_at:
+                cls_at[it.name] = i
+    for bi in heavy:
+        if stubs_of[bi]:
+            B = min(i for i, it in enumerate(p.items)
+                    if it.name in stubs_of[bi])
+        else:
+            B = min(i for i, it in enumerate(p.items) if it.block == bi)
+        while True:
+            moved = False
+            for m, si in sig_at.items():
+                if m in all_stubs:
+                    continue
+                ci = cls_at.get(m)
+                if ci is not None and si < B <= ci:
+                    B = si
+                    moved = True
+            while B > 0 and p.items[B - 1].name is None and "TERMINATING" in \
+                    "\n".join(p.lines[p.items[B - 1].start : p.items[B - 1].end]):
+                B -= 1
+                moved = True
+            if not moved:
+                break
+        ins_at[bi] = B
+
     out: list[str] = []
     emitted: set[int] = set()
+    pre_emitted: set[str] = set()   # hoist members already emitted IN PLACE
 
-    for it in p.items:
+    for idx, it in enumerate(p.items):
+        for bi in sorted(heavy):
+            if bi in emitted or ins_at[bi] != idx:
+                continue
+            emitted.add(bi)
+            b = p.blocks[bi]
+            # TYPE-LEVEL members come FIRST: the stub signatures below
+            # mention them (walkOK, NodeCaps, FrameFace), so a postulate
+            # block placed above their definitions is 19 NotInScope errors.
+            # One whose own position PRECEDES this point was already
+            # emitted in place (pre_emitted) and must not move.
+            for m in hoist:
+                if m in b.members and m not in pre_emitted:
+                    for kind in ("sig", "clauses"):
+                        for jt in p.items:
+                            if jt.kind == kind and jt.name == m:
+                                out.extend(p.lines[jt.start : jt.end])
+                    out.append("")
+            # Remember where the block starts: if nothing turns out to need
+            # stubbing (every member is a focus, hoisted, or acyclic), the
+            # header must be REMOVED rather than left standing.  An empty
+            # `postulate` is an EmptyPostulate warning on every run, and
+            # spurious warnings in this tool's output are precisely what it
+            # exists to prevent -- a loop nobody reads the output of is not
+            # a loop.
+            hdr = len(out)
+            out += ["", f"-- agda-dev: mutual block of {len(b.members)} members,",
+                    "-- POSTULATED at their exact existing signatures.", "postulate"]
+            body_at = len(out)
+            for m in b.members:
+                if m not in stubs_of[bi]:
+                    continue
+                first = len(out) + 1
+                for ln in sig_text(p, m) or []:
+                    out.append(("  " + ln) if ln.strip() else "")
+                if stub_lines is not None:
+                    stub_lines[m] = (first, len(out))
+            if len(out) == body_at:
+                del out[hdr:]
+            else:
+                out.append("")
         if it.kind == "pass" and it.start == p.module_line:
             out.append(f"module {mod} where")
             continue
@@ -405,43 +503,6 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             out.extend(publicize(p.lines[it.start : it.end]))
             continue
         if it.block is not None and it.block in heavy:
-            if it.block not in emitted:
-                emitted.add(it.block)
-                b = p.blocks[it.block]
-                # TYPE-LEVEL members come FIRST: the stub signatures below
-                # mention them (walkOK, NodeCaps, FrameFace), so a postulate
-                # block placed above their definitions is 19 NotInScope errors.
-                for m in hoist:
-                    if m in b.members:
-                        for kind in ("sig", "clauses"):
-                            for jt in p.items:
-                                if jt.kind == kind and jt.name == m:
-                                    out.extend(p.lines[jt.start : jt.end])
-                        out.append("")
-                # Remember where the block starts: if nothing turns out to need
-                # stubbing (every member is a focus, hoisted, or acyclic), the
-                # header must be REMOVED rather than left standing.  An empty
-                # `postulate` is an EmptyPostulate warning on every run, and
-                # spurious warnings in this tool's output are precisely what it
-                # exists to prevent -- a loop nobody reads the output of is not
-                # a loop.
-                hdr = len(out)
-                out += ["", f"-- agda-dev: mutual block of {len(b.members)} members,",
-                        "-- POSTULATED at their exact existing signatures.", "postulate"]
-                body_at = len(out)
-                cyc = scc_of(p, b.members)
-                for m in b.members:
-                    if m in foci or m in hoist or (m not in cyc and m not in force_stub):
-                        continue
-                    first = len(out) + 1
-                    for ln in sig_text(p, m) or []:
-                        out.append(("  " + ln) if ln.strip() else "")
-                    if stub_lines is not None:
-                        stub_lines[m] = (first, len(out))
-                if len(out) == body_at:
-                    del out[hdr:]
-                else:
-                    out.append("")
             # A KEPT-REAL member stays EXACTLY WHERE IT WAS.  Relocating these
             # to the head of the block was one bug producing all 22 of
             # Caps-Face's NotInScope errors: a body originally at line 7500 got
@@ -451,9 +512,18 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             # cycle, and a postulate that replaces a perfectly orderable
             # definition only costs reduction (the SplitError class) while
             # saving nothing.  They, and the foci, stay exactly where they are.
+            # A HOIST member ahead of the (delayed) postulate block also stays
+            # put: position carries scope for it exactly as for kept-real, and
+            # the hoist loop above then skips it via pre_emitted.
+            in_place_hoist = (it.name in hoist
+                              and (it.block not in emitted
+                                   or it.name in pre_emitted))
+            if in_place_hoist:
+                pre_emitted.add(it.name)
             cyc = scc_of(p, p.blocks[it.block].members)
-            if ((it.name in foci or it.name not in cyc)
-                    and it.name not in hoist and it.name not in force_stub):
+            if (in_place_hoist
+                    or ((it.name in foci or it.name not in cyc)
+                        and it.name not in hoist and it.name not in force_stub)):
                 first = len(out) + 1
                 out.extend(p.lines[it.start : it.end])
                 if real_lines is not None and it.kind == "clauses":
@@ -631,7 +701,10 @@ def type_level(p: Parsed, members: list[str]) -> list[str]:
     for it in p.items:
         if it.kind == "sig" and it.name in S:
             t = " ".join(l.split("--")[0] for l in p.lines[it.start : it.end])
-            if re.search(r"(→|->)\s*Set[₀-₉₊¹²³ω]*\s*$|(→|->)\s*Set\b", t):
+            # arrowless `X : Set` aliases (QuickCheck's SrcLeaf) produce types
+            # every bit as much as `… → Set` families do
+            if re.search(r"(→|->)\s*Set[₀-₉₊¹²³ω]*\s*$|(→|->)\s*Set\b"
+                         r"|:\s*Set[₀-₉₊¹²³ω]*\s*$", t):
                 out.append(it.name)
     return out
 

@@ -77,6 +77,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
+                                inputsBelowᵉ;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
@@ -462,9 +463,10 @@ open import Verify-Budget-Sufficient.Measures public
 -- is the whole content of the 2026-07-27 restriction, in one absurd pattern:
 -- before it, this lemma was false and the *All input clause had a case that
 -- could not be paid for.  Every hop that reaches a slot is now a connect.
-obs-slot-shared : ∀ {n} {Γ : Ctx n} {u} (s : Slot Γ (obs u)) →
-  Σ (Closed Γ (obs u)) λ d → s ≡ shared d
-obs-slot-shared (shared d)       = d , refl
+obs-slot-shared : ∀ {n} {Γ : Ctx n} {k u} (s : Slot Γ k (obs u)) →
+  Σ (Closed Γ (obs u)) λ d → Σ (T (inputsBelowᵉ k d)) λ ok →
+    s ≡ shared d {ok = ok}
+obs-slot-shared (shared d {ok = ok}) = d , ok , refl
 obs-slot-shared (scripted {ok = ()} _)
 
 -- and the two NON-connecting share paths carry no values: a spent share
@@ -980,8 +982,9 @@ subscribeE-connected-mono g b κ id now sched st s =
 sharedConnect-drop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
   (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
-  (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
-  Sched.slots sched i ≡ shared dd →
+  (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)}
+  {okd : T (inputsBelowᵉ (toℕ i) dd)} →
+  Sched.slots sched i ≡ shared dd {ok = okd} →
   memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
   unconn (Sched.slots (proj₁ (proj₂ (subscribeE fuel d (share-sink i) id now sched
             (register (toℕ i) κ (record st
@@ -1017,8 +1020,9 @@ sharedConnect-drop fuel i d κ id now sched st eqi fresh
 sharedConnect-unconn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
   (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
-  (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
-  Sched.slots sched i ≡ shared dd →
+  (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)}
+  {okd : T (inputsBelowᵉ (toℕ i) dd)} →
+  Sched.slots sched i ≡ shared dd {ok = okd} →
   memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
   unconn (Sched.slots (proj₁ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
          (EvalSt.connectedShares

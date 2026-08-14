@@ -75,11 +75,12 @@ Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
 - **`input-wet`** (Walk-Level) — **REFUTED, machine-checked** (Demand-Probe
-  series W): the burstHopD? conjunct is false at an obs-typed shared slot,
-  taking WalkStmt (input i) and subscribeE-walk-level down with it as
-  stated. Restatement required before any further walk-face work; the
-  three candidate routes and the *All descent implication are in its
-  header. This is the tier's top item and it is now a DESIGN decision.
+  series W); restatement IN PROGRESS. The Slot telescope is now stratified
+  (`inputsBelowᵉ k` on shared defs, Rx.Slots) — that landed green; the
+  remaining leg is the η-parameterized hopD (per-slot hop via slotHop,
+  well-founded by the stratification) and the WalkStmt restatement over
+  it. Routes, refutation story and census in its header. Still the tier's
+  top item; no other walk-face work until it is restated.
 - **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY. The μ edge's L̂ transport.
   No caps twin exists to donate it: the reset-anchor ceiling is wet-side
   only, so every walk clause re-derives its own. Route in its header.

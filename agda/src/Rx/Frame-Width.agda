@@ -430,7 +430,7 @@ pWᵛ j sl t v = outWᵛ j sl t v ⊔ dWᵛ j sl t v
 -- telescope and grows every type that mentions it.
 ------------------------------------------------------------------
 
-slotPW : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) → Slot Γ u → ℕ
+slotPW : ∀ {n} {Γ : Ctx n} {k u} (j : ℕ) (sl : Slots Γ) → Slot Γ k u → ℕ
 slotPW j sl (scripted _) = 0
 slotPW j sl (shared d)   = pWᵉ j sl d
 
@@ -456,7 +456,7 @@ slotsPW {n = n} j sl = slotsPWgo j sl (tabulate {n = n} (λ i → i))
 -- this collector (slotCaps?) is size-only on its scripted clauses —
 -- and the `innWᵉ (input i) = 1` a scripted slot presents to the
 -- induction is paid for by the `suc` on capsAt's base instead
-slotIW : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) → Slot Γ u → ℕ
+slotIW : ∀ {n} {Γ : Ctx n} {k u} (j : ℕ) (sl : Slots Γ) → Slot Γ k u → ℕ
 slotIW j sl (scripted _) = 0
 slotIW j sl (shared d)   = innWᵉ j sl d
 
@@ -725,7 +725,7 @@ mutual
   kidsᵗˢ j sl (y ∷ ys) = ceilᵗ j sl y ⊔ kidsᵗˢ j sl ys
 
 -- the slot telescope's own ceiling, mirroring slotsPW clause for clause
-slotCeil : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) → Slot Γ u → ℕ
+slotCeil : ∀ {n} {Γ : Ctx n} {k u} (j : ℕ) (sl : Slots Γ) → Slot Γ k u → ℕ
 slotCeil j sl (scripted _) = 0
 slotCeil j sl (shared d)   = ceilᵉ j sl d
 
@@ -794,12 +794,12 @@ pW≤ceil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
 pW≤ceil j sl e = ⊔-lub (outW≤ceil j sl e) (dW≤ceil j sl e)
 
 -- and the telescope's, index by index
-slotPW≤slotCeil : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) (s : Slot Γ u) →
+slotPW≤slotCeil : ∀ {n} {Γ : Ctx n} {k u} (j : ℕ) (sl : Slots Γ) (s : Slot Γ k u) →
   slotPW j sl s ≤ slotCeil j sl s
 slotPW≤slotCeil j sl (scripted _) = z≤n
 slotPW≤slotCeil j sl (shared d)   = pW≤ceil j sl d
 
-slotIW≤slotCeil : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ) (s : Slot Γ u) →
+slotIW≤slotCeil : ∀ {n} {Γ : Ctx n} {k u} (j : ℕ) (sl : Slots Γ) (s : Slot Γ k u) →
   slotIW j sl s ≤ slotCeil j sl s
 slotIW≤slotCeil j sl (scripted _) = z≤n
 slotIW≤slotCeil j sl (shared d)   = innW≤ceil j sl d

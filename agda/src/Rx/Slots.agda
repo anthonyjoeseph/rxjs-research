@@ -16,9 +16,11 @@ open import Data.List    using (map; tabulate)
 open import Data.Nat.ListAction  using (sum)
 open import Data.Nat     using (ℕ; suc; _+_)
 open import Data.Vec     using (lookup)
+open import Data.Fin     using (toℕ)
 
 open import Rx.Prim using (Timed; ObservableInput; hot; cold)
-open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; sizeᵉ; sizeᵛ)
+open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ;
+                           sizeᵉ; sizeᵛ)
 
 -- slot i of Γ is either an external SCRIPTED input (hot/cold) or a
 -- SHARED observable: an exp tree with an implicit all-resets-false
@@ -37,12 +39,27 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; sizeᵉ; sizeᵛ)
 -- `shared` def, which IS walked, so its emissions are syntactically
 -- inside it and the crossing is the connect edge (anchored by
 -- connect-anchor).
-data Slot {n} (Γ : Ctx n) (t : Ty) : Set where
-  scripted : {ok : T (isData t)} → ObservableInput (Val Γ t) → Slot Γ t
-  shared   : Closed Γ t → Slot Γ t
+--
+-- THE TELESCOPE IS STRATIFIED (`inputsBelowᵉ k`): slot k's def may
+-- reference only inputs at indices strictly below k — a real JS
+-- `const` telescope, where reading a later `const` is a TDZ error,
+-- and exactly what the TS generator builds (a def is generated
+-- against the strict prefix of earlier slot types).  The index `k`
+-- is a parameter of `Slot` so the side condition can name it; like
+-- `isData` on scripted slots, it discharges by unification at every
+-- concrete program.  What it buys: a per-slot hop depth is
+-- computable by recursion on the slot index (slot k's hop reads only
+-- hops j < k), which is what lets Rx.Hop-Depth's input clause report
+-- the slot's true hop instead of the refuted constant 0 — see the
+-- input-wet refutation (Verify-Budget-Sufficient.Walk-Level) that
+-- forced this: an obs-typed shared def emits values of positive hop,
+-- so a hop bound that zeroes the share boundary is false.
+data Slot {n} (Γ : Ctx n) (k : ℕ) (t : Ty) : Set where
+  scripted : {ok : T (isData t)} → ObservableInput (Val Γ t) → Slot Γ k t
+  shared   : (d : Closed Γ t) {ok : T (inputsBelowᵉ k d)} → Slot Γ k t
 
 Slots : ∀ {n} → Ctx n → Set
-Slots Γ = ∀ i → Slot Γ (lookup Γ i)
+Slots Γ = ∀ i → Slot Γ (toℕ i) (lookup Γ i)
 
 -- the size that seeds the budget is the WHOLE program's: root
 -- expression, every shared slot def (connect subscribes defs, and
@@ -57,7 +74,7 @@ inputSize {t = t} (cold sync async) =
   suc (sum (map (sizeᵛ t) sync)
        + sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
 
-slotSize : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
+slotSize : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
 slotSize (scripted i) = inputSize i
 slotSize (shared d)   = sizeᵉ d
 

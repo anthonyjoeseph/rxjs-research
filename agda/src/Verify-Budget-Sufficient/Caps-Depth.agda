@@ -128,7 +128,7 @@ depthE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- comes out of the constructor, so the slot cannot be ignored
 depthSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Gas → (i : Fin n) → Path Γ (lookup Γ i) t → Id → Tick
-          → Sched Γ → EvalSt e → Slot Γ (lookup Γ i) → ℕ
+          → Sched Γ → EvalSt e → Slot Γ (toℕ i) (lookup Γ i) → ℕ
 
 -- a take's count: the `suc k` branch installs a node whose state reads
 -- `k`, so the two branches do not agree

@@ -93,6 +93,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
 -- whole budget stratum reads it through this module
 open import Rx.Prim      using (towerℕ) public
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
+                                inputsBelowᵉ;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
@@ -1223,7 +1224,8 @@ unconn-antitone sl cs cs′ mono =
 -- connecting a fresh share strictly drops the count: its own slot
 -- goes 1 → 0 and no other slot rises
 unconn-insert : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-  (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  (i : Fin n) {d : Closed Γ (lookup Γ i)}
+  {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
   memberSource (toℕ i) cs ≡ false →
   unconn sl (toℕ i ∷ cs) < unconn sl cs
 unconn-insert sl cs i eqi fresh =
@@ -1789,7 +1791,8 @@ reach-reset C hC o h = ≤-trans (syncSize≤sizeᵉ o) h , hopD-cap C o hC h
 -- multiset {program} ⊎ {slots}: its size sits inside the budget's
 -- slot summand
 slotDef-size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n)
-  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
+  sl i ≡ shared d {ok = ok} →
   sizeᵉ d ≤ slotsSize sl
 slotDef-size sl i {d} eq =
   ≤-trans (≤-reflexive size-eq) (fᵢ≤sum-tab (λ j → slotSize (sl j)) i)
@@ -1816,7 +1819,8 @@ slotDef-size sl i {d} eq =
 -- (feeding dBound-hop/-connect's s′ ≤ V), straight off the
 -- budget's slot summand: no state invariant consulted
 connect-anchor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)}
+  {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
   let V = sizeBudgetAt e sl id in
   (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
 -- the SPECIALISED reader: same pair as `reach-reset` above, but with the
@@ -4816,7 +4820,7 @@ inputFnCap {t = t} (cold sync async) =
   sum (map (fnCapᵛ t) sync)
   + sum (map (λ tv → fnCapᵛ t (Timed.val tv)) async)
 
-slotFnCap : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
+slotFnCap : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
 slotFnCap (scripted i) = inputFnCap i
 slotFnCap (shared d)   = fnCapᵉ d
 
@@ -5514,7 +5518,7 @@ inputOfW {t = t} (cold sync async) =
   sum (map (ofWᵛ t) sync)
   + sum (map (λ tv → ofWᵛ t (Timed.val tv)) async)
 
-slotOfW : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
+slotOfW : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
 slotOfW (scripted i) = inputOfW i
 slotOfW (shared d)   = ofWᵉ d
 

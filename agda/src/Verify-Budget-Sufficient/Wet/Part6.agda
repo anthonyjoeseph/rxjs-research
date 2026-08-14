@@ -69,6 +69,7 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
+                                inputsBelowᵉ;
                                 Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
                                 syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
                                 shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
@@ -443,7 +444,8 @@ hop-edge Ŝ U r s 2≤Ŝ o szo r′<r =
 -- wants hop first, hence the swap.
 connect-edge : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
   (sl : Slots Γ) (cs : List Source) (i : Fin n)
-  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
+  sl i ≡ shared d {ok = ok} →
   memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
   suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
     ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s

@@ -17,6 +17,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_; after_,_; hot)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; isData;
+                                inputsBelowᵉ;
                                 input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 concatAllᵉ; exhaustAllᵉ; evalTm; applyFn)
 open import Rx.Evaluator using (Slot; scripted; shared; Slots; evaluate)
@@ -42,10 +43,10 @@ mergeOf es = mergeAllᵉ (ofᵉ (map strmᵗ es))
 
 -- scripted slots carry data only (Rx.Evaluator.Slot); these theorems
 -- therefore quantify over data types, which is every type they are read at
-hotOnce : ∀ {n} {Γ : Ctx n} {t} {ok : T (isData t)} → Val Γ t → Slot Γ t
+hotOnce : ∀ {n} {Γ : Ctx n} {k} {t} {ok : T (isData t)} → Val Γ t → Slot Γ k t
 hotOnce {ok = ok} v = scripted {ok = ok} (hot ((after 0 , v) ∷ []))
 
-oneSlot : ∀ {t} → Slot (t ∷ []) t → Slots (t ∷ [])
+oneSlot : ∀ {t} → Slot (t ∷ []) 0 t → Slots (t ∷ [])
 oneSlot s zero    = s
 oneSlot s (suc ())
 
@@ -189,9 +190,15 @@ postulate
       ≡ (u ∷ u ∷ evalTm w ∷ []) ∷ (v ∷ []) ∷ []
 
   readme-share-connect-no-replay :
-    ∀ {t} (v : Tm (t ∷ []) [] [] [] t) →
+    -- the telescope is stratified (Rx.Slots): slot 0's def may not read
+    -- any slot, and an abstract v at an obs type could smuggle
+    -- `strmᵗ (input zero)` — a self-reference no JS const can express —
+    -- so the claim carries the stratification of its own slot as a
+    -- hypothesis, discharged by unification at every concrete v
+    ∀ {t} (v : Tm (t ∷ []) [] [] [] t)
+      {okS : T (inputsBelowᵉ 0 (ofᵉ (v ∷ [])))} →
     emitValues (spec-batchSimultaneous
-                 (evaluate 0 shareProgram (oneSlot (shared (ofᵉ (v ∷ []))))))
+                 (evaluate 0 shareProgram (oneSlot (shared (ofᵉ (v ∷ [])) {ok = okS}))))
       ≡ (evalTm v ∷ []) ∷ []
 
   readme-late-join-growth :

@@ -1,14 +1,14 @@
 module Rx.Exp where
 
 open import Data.Nat     using (ℕ; suc; _+_; _∸_; _*_; _≡ᵇ_; _<ᵇ_)
-open import Data.Bool    using (Bool; true; false; not; if_then_else_)
+open import Data.Bool    using (Bool; true; false; not; _∧_; if_then_else_)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Vec     using (Vec; lookup)
-open import Data.Fin     using (Fin)
+open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -736,3 +736,56 @@ mutual
 varIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → ℕ
 varIx (here _)  = 0
 varIx (there p) = suc (varIx p)
+
+------------------------------------------------------------------
+-- STRATIFICATION of the slot telescope: every `input j` an
+-- expression mentions has j < k.  A shared slot's def carries this
+-- as a side condition (Rx.Slots.shared), so the telescope is a real
+-- JS `const` telescope — a def can read only strictly-earlier
+-- bindings, exactly what the TS generator already builds and what a
+-- JS const can reference without a TDZ error.  It exists so that a
+-- per-slot hop depth (Rx.Hop-Depth's η environment) is computable by
+-- recursion on the slot index: slot k's hop reads only hops j < k.
+--
+-- deferᵉ is NOT cut, unlike hopD's recursion: a deferred subtree
+-- subscribes later, but its `input` references are just as real
+-- when it does.  The check is about which slots a def can EVER
+-- reach, not about when.
+------------------------------------------------------------------
+mutual
+  inputsBelowᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → Exp Γ Δᵍ Δ Θ t → Bool
+  inputsBelowᵉ k (input i)       = toℕ i <ᵇ k
+  inputsBelowᵉ k (ofᵉ ts)        = inputsBelowᵗˢ k ts
+  inputsBelowᵉ k emptyᵉ          = true
+  inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (scanᵉ f z e)   =
+    inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (mergeAllᵉ e)   = inputsBelowᵉ k e
+  inputsBelowᵉ k (concatAllᵉ e)  = inputsBelowᵉ k e
+  inputsBelowᵉ k (switchAllᵉ e)  = inputsBelowᵉ k e
+  inputsBelowᵉ k (exhaustAllᵉ e) = inputsBelowᵉ k e
+  inputsBelowᵉ k (μᵉ e)          = inputsBelowᵉ k e
+  inputsBelowᵉ k (varᵉ x)        = true
+  inputsBelowᵉ k (deferᵉ e)      = inputsBelowᵉ k e
+
+  inputsBelowᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → Tm Γ Δᵍ Δ Θ t → Bool
+  inputsBelowᵗ k (varᵗ x)      = true
+  inputsBelowᵗ k unit̂          = true
+  inputsBelowᵗ k (bool̂ _)      = true
+  inputsBelowᵗ k (nat̂ _)       = true
+  inputsBelowᵗ k (pairᵗ a b)   = inputsBelowᵗ k a ∧ inputsBelowᵗ k b
+  inputsBelowᵗ k (fstᵗ p)      = inputsBelowᵗ k p
+  inputsBelowᵗ k (sndᵗ p)      = inputsBelowᵗ k p
+  inputsBelowᵗ k (inlᵗ a)      = inputsBelowᵗ k a
+  inputsBelowᵗ k (inrᵗ a)      = inputsBelowᵗ k a
+  inputsBelowᵗ k (caseᵗ s l r) =
+    inputsBelowᵗ k s ∧ inputsBelowᵗ k l ∧ inputsBelowᵗ k r
+  inputsBelowᵗ k (ifᵗ c a b)   =
+    inputsBelowᵗ k c ∧ inputsBelowᵗ k a ∧ inputsBelowᵗ k b
+  inputsBelowᵗ k (primᵗ _ a)   = inputsBelowᵗ k a
+  inputsBelowᵗ k (strmᵗ e)     = inputsBelowᵉ k e
+
+  inputsBelowᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → List (Tm Γ Δᵍ Δ Θ t) → Bool
+  inputsBelowᵗˢ k []       = true
+  inputsBelowᵗˢ k (y ∷ ys) = inputsBelowᵗ k y ∧ inputsBelowᵗˢ k ys

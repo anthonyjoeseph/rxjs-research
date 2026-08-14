@@ -782,7 +782,7 @@ obsCaps? {n = n} c sl o =
 --
 -- Scripted slots still need nothing on this axis: their element type is
 -- data, so pWᵛ is identically zero there
-slotCaps? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Slots Γ → Slot Γ u → Bool
+slotCaps? : ∀ {n} {Γ : Ctx n} {k u} → ℕ → ℕ → Slots Γ → Slot Γ k u → Bool
 slotCaps? {u = u} B W sl (scripted (hot async)) =
   all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
 slotCaps? {u = u} B W sl (scripted (cold sync async)) =
@@ -798,7 +798,7 @@ slotsGo? B W sl (i ∷ is) = slotCaps? B W sl (sl i) ∧ slotsGo? B W sl is
 slotsCaps? : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Slots Γ → Bool
 slotsCaps? {n = n} B W sl = slotsGo? B W sl (tabulate {n = n} (λ i → i))
 
-slotCaps?-widen : ∀ {n} {Γ : Ctx n} {u} (sl : Slots Γ) (s : Slot Γ u)
+slotCaps?-widen : ∀ {n} {Γ : Ctx n} {k u} (sl : Slots Γ) (s : Slot Γ k u)
   {B B′ W W′ : ℕ} →
   B ≤ B′ → W ≤ W′ → slotCaps? B W sl s ≡ true → slotCaps? B′ W′ sl s ≡ true
 slotCaps?-widen {u = u} sl (scripted (hot async)) le lw h =
@@ -853,7 +853,7 @@ sum-tabulate-lb {suc n} f (Fin.suc i) =
 -- nothing in capsOK? relates the two: the relation is a fact about the
 -- SLOT TELESCOPE, and it is true at every level because capsAt's base
 -- contains slotsSize as a summand and iterSize only grows it
-1≤slotSize : ∀ {n} {Γ : Ctx n} {t} (s : Slot Γ t) → 1 ≤ slotSize s
+1≤slotSize : ∀ {n} {Γ : Ctx n} {k t} (s : Slot Γ k t) → 1 ≤ slotSize s
 1≤slotSize (scripted (hot _))    = s≤s z≤n
 1≤slotSize (scripted (cold _ _)) = s≤s z≤n
 1≤slotSize (shared d)            = sizeᵉ-pos d
@@ -909,7 +909,7 @@ slotsIW-lb j sl i = slotsIWgo-tab j sl (λ k → k) i
 
 -- ONE SLOT, AT ITS OWN MEASURE: slotSize and slotPW are by construction
 -- big enough for everything the slot holds, on their own axis
-slotCaps?-self : ∀ {n} {Γ : Ctx n} {u} (sl : Slots Γ) (s : Slot Γ u) →
+slotCaps?-self : ∀ {n} {Γ : Ctx n} {k u} (sl : Slots Γ) (s : Slot Γ k u) →
   slotCaps? (slotSize s) (slotPW n sl s ⊔ slotIW n sl s) sl s ≡ true
 slotCaps?-self {u = u} sl (scripted (hot async)) =
   all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _ (n≤1+n _)

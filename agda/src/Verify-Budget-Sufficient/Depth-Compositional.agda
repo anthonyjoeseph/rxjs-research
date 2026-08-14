@@ -105,7 +105,7 @@ nodeNestMax (exhaust-st _ _)      = 0
 nodesNestMax : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
 nodesNestMax = foldr (λ kv acc → nodeNestMax (proj₂ kv) ⊔ acc) 0
 
-slotNest : ∀ {n} {Γ : Ctx n} {t} → Slot Γ t → ℕ
+slotNest : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
 slotNest (shared d)   = sizeᵉ d
 slotNest (scripted _) = 0
 

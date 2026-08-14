@@ -6,7 +6,7 @@ module CLI.Decode where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; T)
 open import Data.Char using () renaming (toℕ to charToℕ)
-open import Data.Fin using (Fin; zero; suc)
+open import Data.Fin using (Fin; zero; suc; toℕ)
 open import Data.List using (List; []; _∷_; map; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,6 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEmit)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
+                          inputsBelowᵉ;
                           Ctx; Val; Closed; Exp; Tm; Fn;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
@@ -290,17 +291,20 @@ tOf : (b : Bool) → Maybe (T b)
 tOf true  = just tt
 tOf false = nothing
 
-decodeSlotAt : ℕ → ∀ {n} (Γ : Ctx n) → List JSON → (i : Fin n) → Maybe (Slot Γ (lookup Γ i))
-decodeSlotAt fuel Γ slotsJ i = nth slotsJ (Data.Fin.toℕ i) >>=? λ j →
+decodeSlotAt : ℕ → ∀ {n} (Γ : Ctx n) → List JSON → (i : Fin n) → Maybe (Slot Γ (toℕ i) (lookup Γ i))
+decodeSlotAt fuel Γ slotsJ i = nth slotsJ (toℕ i) >>=? λ j →
   getField "type" j >>=? asStr >>=? λ tag →
   if tag is "scripted" then
     (getField "input" j >>=? decodeInput fuel Γ (lookup Γ i) >>=? λ inp →
      tOf (isData (lookup Γ i)) >>=? λ ok → just (scripted {ok = ok} inp))
      -- scripted slots carry data only; an obs-typed slot must be `shared`
   else if tag is "shared" then
-    (getField "def" j >>=? decodeExp fuel Γ [] [] [] (lookup Γ i) >>=? λ d → just (shared d))
+    (getField "def" j >>=? decodeExp fuel Γ [] [] [] (lookup Γ i) >>=? λ d →
+     -- the telescope is stratified: a def may reference only earlier
+     -- slots (Rx.Slots), so a non-stratified case decodes to nothing —
+     -- the same rejection TS enforces by generator construction
+     tOf (inputsBelowᵉ (toℕ i) d) >>=? λ ok → just (shared d {ok = ok}))
   else nothing
-  where open import Data.Fin using (toℕ)
 
 decodeSlots : ℕ → ∀ {n} (Γ : Ctx n) → List JSON → Maybe (Slots Γ)
 decodeSlots fuel Γ slotsJ = seqFin (decodeSlotAt fuel Γ slotsJ)

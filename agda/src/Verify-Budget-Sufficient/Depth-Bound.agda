@@ -124,7 +124,7 @@ nodesNestMax-bounded B nodes h =
     (λ kv → boundedNode B (proj₂ kv))
     (λ kv → node-nest-bounded B (proj₂ kv)) nodes h
 
-slotNest-≤-slotSize : ∀ {n} {Γ : Ctx n} {t} (s : Slot Γ t) →
+slotNest-≤-slotSize : ∀ {n} {Γ : Ctx n} {k t} (s : Slot Γ k t) →
   slotNest s ≤ slotSize s
 slotNest-≤-slotSize (scripted _) = z≤n
 slotNest-≤-slotSize (shared _)   = ≤-refl

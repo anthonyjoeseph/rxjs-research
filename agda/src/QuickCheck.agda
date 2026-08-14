@@ -375,7 +375,7 @@ showExp _               = "PLACEHOLDER-exp"
 -- slots render AFTER showExp because a shared slot's DEF is an expression and
 -- must be printed: a corpus-B witness whose slots read "shared" is not
 -- reproducible, which is the whole point of printing a witness
-showSlot : Slot Γ₂ natᵗ → String
+showSlot : ∀ {k} → Slot Γ₂ k natᵗ → String
 showSlot (scripted i) = "scripted (" ++ showInput i ++ ")"
 showSlot (shared d)   = "shared " ++ showExp d
 

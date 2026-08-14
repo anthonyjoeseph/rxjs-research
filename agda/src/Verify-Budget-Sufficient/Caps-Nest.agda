@@ -34,7 +34,7 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Caps-Nest where
 
-open import Data.Bool using (true; false; if_then_else_; _∨_)
+open import Data.Bool using (T; true; false; if_then_else_; _∨_)
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Nat  using (ℕ; suc; _+_; _*_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
@@ -54,7 +54,7 @@ open import Rx.Exp
   using (Ctx; Exp; Tm; Fn; Closed; obs;
          input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-         syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ)
+         syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ; inputsBelowᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
@@ -164,7 +164,8 @@ sum-tab-slack {suc m} f g w h (Fin.suc i) hi =
                                    (λ j → h (Fin.suc j)) i hi))
 
 resid-connect : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
-  {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+  {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
+  sl i ≡ shared d {ok = ok} →
   memberSource (toℕ i) cs ≡ false →
   syncSizeᵉ d + resid sl (toℕ i ∷ cs) ≤ resid sl cs
 resid-connect sl cs i {d} eqi fresh =
@@ -176,7 +177,8 @@ resid-connect sl cs i {d} eqi fresh =
               = ≤-reflexive (+-identityʳ (syncSizeᵉ d))
 
 share-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
-  {d : Closed Γ (lookup Γ i)} (k : ℕ) → sl i ≡ shared d →
+  {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} (k : ℕ) →
+  sl i ≡ shared d {ok = ok} →
   memberSource (toℕ i) cs ≡ false →
   nest (input {Γ = Γ} {Δᵍ = []} {Δ = []} {Θ = []} i) sl cs ≤ suc k →
   nest d sl (toℕ i ∷ cs) ≤ k

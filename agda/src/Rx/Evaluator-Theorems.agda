@@ -41,7 +41,7 @@ postulate
   -- causality: agreeing slot prefixes (scripted arrivals before tick
   -- k; shared defs, carrying no scripts, must agree outright) give
   -- agreeing output prefixes
-  truncateIn : ∀ {n} {Γ : Ctx n} {t} → Tick → Slot Γ t → Slot Γ t
+  truncateIn : ∀ {n} {Γ : Ctx n} {k t} → Tick → Slot Γ k t → Slot Γ k t
   emittedBefore : ∀ {n} {Γ : Ctx n} {t} → Tick → Stream Γ t → Stream Γ t
 
   causality :

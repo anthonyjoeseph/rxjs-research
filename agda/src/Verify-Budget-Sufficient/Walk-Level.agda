@@ -63,7 +63,7 @@
 
 module Verify-Budget-Sufficient.Walk-Level where
 
-open import Data.Bool    using (Bool; true; false; _∨_; _∧_; not; if_then_else_)
+open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
@@ -88,6 +88,7 @@ open import Rx.Prim      using (Tick; Id; Source; init; value; close;
                                 InstEmit; InstEvent; _at_from_as_;
                                 Gas; g0; gs; gasPad)
 open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
+                                inputsBelowᵉ;
                                 _≟ᵗ_;
                                 sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
                                 shellSizeᵉ; innerᵉ;
@@ -271,7 +272,8 @@ WalkLevelCore =
     -- connect-edge  (Verify-Budget-Sufficient/Wet/Part6.agda)
     (∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
       (sl : Slots Γ) (cs : List Source) (i : Fin n)
-      {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+      {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
+      sl i ≡ shared d {ok = ok} →
       memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
       suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
         ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s
@@ -295,8 +297,9 @@ WalkLevelCore =
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
       (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
-      (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)} →
-      Sched.slots sched i ≡ shared dd →
+      (sched : Sched Γ) (st : EvalSt e) {dd : Closed Γ (lookup Γ i)}
+      {okd : T (inputsBelowᵉ (toℕ i) dd)} →
+      Sched.slots sched i ≡ shared dd {ok = okd} →
       memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
       unconn (Sched.slots (proj₁ (proj₂ (sharedConnect (gs fuel) i d κ id now sched st))))
              (EvalSt.connectedShares
@@ -304,8 +307,9 @@ WalkLevelCore =
       < unconn (Sched.slots sched) (EvalSt.connectedShares st)
      ) →
     -- obs-slot-shared  (Verify-Budget-Sufficient/Keeps-Ring.agda)
-    (∀ {n} {Γ : Ctx n} {u} (s : Slot Γ (obs u)) →
-      Σ (Closed Γ (obs u)) λ d → s ≡ shared d
+    (∀ {n} {Γ : Ctx n} {k u} (s : Slot Γ k (obs u)) →
+      Σ (Closed Γ (obs u)) λ d → Σ (T (inputsBelowᵉ k d)) λ ok →
+        s ≡ shared d {ok = ok}
      ) →
     -- share-live-novals  (Verify-Budget-Sufficient/Keeps-Ring.agda)
     (∀ {n} {Γ : Ctx n} {u} {A : Set} (s : Source) (id : Id) →
@@ -343,7 +347,8 @@ WalkLevelCore =
      ) →
     -- connect-anchor  (Verify-Budget-Sufficient/Measures.agda)
     (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-      (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)} → sl i ≡ shared d →
+      (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)}
+      {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
       let V = sizeBudgetAt e sl id in
       (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
      ) →
