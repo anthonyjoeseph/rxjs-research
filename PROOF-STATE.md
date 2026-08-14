@@ -125,10 +125,10 @@ named postulate's own header.
   (Its former row-mate pathB?-mono-B is GONE — it duplicated the proven
   pathB?-widen, .Measures, found by a name clash; grep before stating.)
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
-  DIFFICULTY, parked, plus a statement debt: both owe a fused per-frame
-  ceiling hypothesis whose funding needs a Delivery-Walk premise channel;
-  the dead route and the repair shape live in innerReact-nodry-core's
-  header.
+  DIFFICULTY, parked; statement debt PAID — both now carry the fused
+  per-frame ceiling via the walk's CL channel (Delivery-Walk), funded at
+  the seam from capsAt-suc-full; dead route, channel design and the
+  remaining proof route live in innerReact-nodry-core's header.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
   plus the Deliveries counts. Last in the tier, never first.
 

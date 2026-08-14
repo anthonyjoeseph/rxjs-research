@@ -2119,19 +2119,21 @@ postulate
   -- `fLvlD S W d J ≤ L̂` across J ↦ J + j′ needs fLvlD (fLvlD J) ≤ L̂,
   -- a fixed point no finite tower rung satisfies (L̂ := sizeCount c d
   -- is not one).  Walk-Level's pins are NOT precedent: its walk-face
-  -- callers maintain per-level budgets; Delivery-Walk's sf-step has
-  -- no such channel.  The real repair is a Delivery-Walk change:
-  -- thread a delivery-counted level premise INWARD through the -go
-  -- family — the hi/cnt receipts' lvls/dCap arithmetic run in the
-  -- premise direction — so each frame receives "J is
-  -- delivery-reachable ⇒ its budget fits under the next instant's
-  -- cap".  ENTRY is already funded: at the cascade seam the J = 0
-  -- instance is one line, `≤-reflexive (sym (cong Caps.cSize
-  -- (capsAt-suc-full e sl id)))` at L̂ := sizeCount c d
-  -- (machine-demonstrated before the revert).  The earlier
-  -- "mechanical, worker-grade" verdict is WITHDRAWN for the budget
-  -- half; the engine channel is design work.
-  -- Same verdict for thruOuter below.
+  -- callers maintain per-level budgets; Delivery-Walk's sf-step had
+  -- no such channel.
+  --
+  -- THE CHANNEL NOW EXISTS (the CL/cl-anti field pair,
+  -- .Delivery-Walk's Walk-Hyps): each -go lemma carries one
+  -- delivery-counted `CL Λ id` premise and restricts it per frame by
+  -- the receipts' own lvls/dCapᶜ arithmetic run in the premise
+  -- direction, so this statement now CARRIES the fused per-frame
+  -- ceiling below — the statement debt is paid.  The seam funds the
+  -- entry instance from `capsAt-suc-full` at Λ ≤ sizeCount c d
+  -- (`cascadeGo-burst-nodry`'s hC).  What remains here is the PROOF:
+  -- the ceiling pays each element's SiNodry obligation via
+  -- frameStep-mono-j plus the opIterD-mono/-infl kit, per the fused-
+  -- hypothesis note above.
+  -- Same status for thruOuter below.
   innerReact-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
@@ -2147,6 +2149,8 @@ postulate
     VbB c sl Ψ J vals ≡ true →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     sf ≡ budgetAt e sl id →
+    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
+      ≤ sizeCapAt e sl (suc id) →
     depthFrame sf id now (from-inner op allNid inst) path′ vals fin sched st ≤ d →
     any dryEvent
         (proj₁ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
@@ -2168,11 +2172,11 @@ postulate
   -- import block (switchKill-caps sits at Caps-Face/Part4:1619,
   -- exported through the Part5→…→Caps-Face chain).
   --
-  -- ⚠ CEILING PAYABILITY (census 2026-08-13, MEASURED): owes the
-  -- SiNodry ceiling per element and CANNOT pay it as stated — same
-  -- verdict, same repair (the fused per-frame ceiling), same dead
-  -- route and same Delivery-Walk residue as innerReact-nodry-core
-  -- above; the full analysis is in that note.
+  -- ⚠ CEILING (census 2026-08-13): owes the SiNodry ceiling per
+  -- element; the fused per-frame ceiling is now CARRIED below via the
+  -- walk's CL channel, same as innerReact-nodry-core above — dead
+  -- route, channel design and remaining proof obligation are all in
+  -- that note.
   thruOuter-nodry-core : SiNodry →
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
@@ -2188,6 +2192,8 @@ postulate
     VbB c sl Ψ J vals ≡ true →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     sf ≡ budgetAt e sl id →
+    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
+      ≤ sizeCapAt e sl (suc id) →
     depthFrame sf id now (thru-outer op nid) path′ vals fin sched st ≤ d →
     any dryEvent
         (proj₁ (proj₂ (stepFrame sf id now (thru-outer op nid)
@@ -2226,6 +2232,9 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
+  -- the fused per-frame ceiling, delivered by the walk's CL channel
+  Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
+    ≤ sizeCapAt e sl (suc id) →
   depthFrame sf id now f path′ vals fin sched st ≤ d →
   any dryEvent
       (proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
@@ -2233,11 +2242,11 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
 -- MAP: the frame emits nothing at all
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
-                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ = refl
+                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ _ = refl
 
 -- SCAN: every arm of the node-state dispatch emits `[]`
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
-                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _
+                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _ _
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                  = refl
 ... | just (take-st _)         = refl
@@ -2251,23 +2260,23 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
 
 -- TAKE: the one severing frame, and it is free (cutThrough-nodry)
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
-                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ =
+                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ _ =
   takeDispatch-nodry nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
 -- the two *All edges: delegated whole, hypotheses passed verbatim
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
                 (from-inner op allNid inst) path′ vals fin sched st
-                ok pb vb rg gk hD =
+                ok pb vb rg gk cl hD =
   innerReact-nodry-core subscribeInner-nodry
                    c sl Ψ d 2≤S 1≤R slC slSz J sf id now op allNid inst
-                   path′ vals fin sched st ok pb vb rg gk hD
+                   path′ vals fin sched st ok pb vb rg gk cl hD
 
 stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
                 (thru-outer op nid) path′ vals fin sched st
-                ok pb vb rg gk hD =
+                ok pb vb rg gk cl hD =
   thruOuter-nodry-core subscribeInner-nodry
                   c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid
-                  path′ vals fin sched st ok pb vb rg gk hD
+                  path′ vals fin sched st ok pb vb rg gk cl hD
 
 ------------------------------------------------------------------
 -- THE FRAME FACE, ASSEMBLED (stepFrame-burst-face) — ex-postulate, now a definition.
@@ -2296,6 +2305,8 @@ stepFrame-burst-face : SiCFace → IfcFace →
   VbB c sl Ψ J vals ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
+  Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
+    ≤ sizeCapAt e sl (suc id) →
   depthFrame sf id now f path′ vals fin sched st ≤ d →
   let r  = stepFrame sf id now f path′ vals fin sched st
       s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -2306,7 +2317,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
 stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
-                     ok pb vb rg gk hD =
+                     ok pb vb rg gk cl hD =
     j′
   , proj₁ (proj₂ FC)
   , ((proj₁ WF , wCaps) , proj₁ (proj₂ WF))
@@ -2319,7 +2330,7 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path�
       (∧-intro (proj₂ (proj₂ (proj₂ (proj₂ WF))))
                (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz
                           J sf id now f path′ vals fin sched st
-                          ok pb vb rg gk hD)))
+                          ok pb vb rg gk cl hD)))
   where
   r  = stepFrame sf id now f path′ vals fin sched st
   s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
@@ -2475,6 +2486,11 @@ module BurstWalk
     ; GOK       = λ sf id → sf ≡ budgetAt e sl id
     ; g-mint    = λ J id sched st ok →
                     cong (λ s → budgetAt e s id) (proj₁ (proj₁ ok))
+    -- THE CEILING CHANNEL, HONEST: the fused per-frame ceiling the
+    -- SiNodry leaf prices new registrations against.  Downward closed
+    -- because frameStep is monotone in its level index
+    ; CL        = λ L id′ → Caps.cSize (frameStep L c) ≤ sizeCapAt e sl (suc id′)
+    ; cl-anti   = λ id′ le h → ≤-trans (proj₁ (frameStep-mono-j c 2≤S le)) h
     ; e-nil     = λ _ → refl
     ; e-close   = λ _ _ → refl
     ; e-app     = λ J es₁ es₂ h₁ h₂ →
@@ -2558,9 +2574,9 @@ module BurstWalk
     ; ok-finish = λ J i fin out ok →
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
-    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk hD →
+    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD →
                     stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
-                      J sf id now f path′ vals fin sched st ok pb vb rg gk hD
+                      J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
@@ -2630,13 +2646,29 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
   inv0 : capsOK? (frameStep 0 c) sched st ≡ true
   inv0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
 
+  -- THE ENTRY FUNDING for the walk's ceiling premise: the walk's whole
+  -- delivery-counted level cap Λ fits under `sizeCount c d` (the cnt-cdel
+  -- arithmetic below, read off the CAP rather than the run), and at
+  -- `sizeCount c d` the ceiling is `capsAt-suc-full` verbatim — the next
+  -- instant's caps ARE the current caps stepped by the full budget
+  walk≤cdel = ≤-trans (dWalkᶜ-mono n (Caps.cSize c) (length chains)
+                         (regAt (Caps.cSize c) (Caps.cReg c) 0)
+                         2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
+                         (≤-trans lenB (≤-reflexive (sym (*-identityʳ (Caps.cReg c))))))
+                      (≤-reflexive (sym (cDel-body c d)))
+
+  hC = ≤-trans (proj₁ (frameStep-mono-j c 2≤S
+                  (≤-trans (lvls-mono _ (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl walk≤cdel)
+                           (≤-reflexive (sym (sizeCount-body c d))))))
+               (≤-reflexive (sym (cong Caps.cSize (capsAt-suc-full e sl id))))
+
   GO = BW.V.cascadeGo-go 0 a id chains sched st
          ( ((refl , inv0) , hFC)
          , regP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ)
              (EvalSt.registry st) (capsOK?-regs c sched st inv) rΨ )
          (chP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ) chains pS pΨ)
          (∧-intro (∧-intro (∧-intro vC refl) refl) (∧-intro vΨ refl))
-         hD
+         hC hD
 
   D = delivN st (proj₂ (proj₂ cg))
 

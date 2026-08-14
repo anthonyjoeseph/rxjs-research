@@ -666,9 +666,12 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   ; Vb        = λ J vs → valsCaps? (frameStep J c) sl vs
   -- TRIVIAL BURST INSTANTIATION: Eb and Bb are always true, so every
   -- closure fact is refl and Res.burst is never projected by callers.
-  -- GAS-BLIND: the caps axis carries no fuel content, so GOK is ⊤
+  -- GAS-BLIND: the caps axis carries no fuel content, so GOK is ⊤;
+  -- CEILING-BLIND for the same reason, so CL is ⊤
   ; GOK       = λ _ _ → ⊤
   ; g-mint    = λ _ _ _ _ _ → tt
+  ; CL        = λ _ _ → ⊤
+  ; cl-anti   = λ _ _ _ → tt
   ; Eb        = λ _ _ → true
   ; Bb        = λ _ _ → true
   ; e-nil     = λ _ → refl
@@ -690,7 +693,7 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   ; ok-latch  = λ J i fin sched st ok →
                   proj₁ ok , shareLatch-caps (frameStep J c) i fin sched st (proj₂ ok)
   ; ok-finish = λ J i fin out ok → walkOK-finish c sl J i fin out ok
-  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL _ hD →
+  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL _ _ hD →
                   let r  = stepFrame sf id now f path′ vals fin sched st
                       FC = stepFrame-face siC ifc c d J sl sf id now f path′ vals fin sched st
                              2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV slSz hD in
@@ -786,7 +789,7 @@ cascadeGo-deliveries :
 cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD =
   ≤-trans (W.Res.cnt (W.cascadeGo-go 0 a id chains sched st
              ((slEq , invʲ) , capsOK?-regs c sched st inv)
-             pS (∧-intro (∧-intro vC refl) refl) hD))
+             pS (∧-intro (∧-intro vC refl) refl) tt hD))
     (≤-trans (dWalkᶜ-mono n (Caps.cSize c) (length chains)
                 (regAt (Caps.cSize c) (Caps.cReg c) 0)
                 2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
@@ -906,7 +909,7 @@ cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq
                   (walkH siC ifc c d sl 2≤S 1≤R slC slSz)
   GO = W.cascadeGo-go 0 a id chains sched st
          ((slEq , invʲ) , capsOK?-regs c sched st inv)
-         pS (∧-intro (∧-intro vC refl) refl) hD
+         pS (∧-intro (∧-intro vC refl) refl) tt hD
 
 -- and the assembly declared above: the landing level with the delivery
 -- count widened to its own recursion, which is `sizeCount` by definition
