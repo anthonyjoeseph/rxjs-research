@@ -542,9 +542,41 @@ postulate
   --   · RICHER REGISTRIES: P-c3 at k=3 has 3 entries (pathLen 3,4,5);
   --     P-c4 at k=4 has 4 entries (pathLen 3,4,5,6) — both reached by
   --     running, not hand-constructed.
+  -- ═══ THE SHAPE OF THE MARGIN (read this before probing further) ═══
+  -- The ratio dBound/pathLen FALLS with nesting (≈296 at k=3, ≈247 at
+  -- k=4) and that reads alarming, but the ratio is the wrong statistic:
+  -- the DIFFERENCE is invariant.  pathLen runs 2/3/4/5/6 against dBound
+  -- 11/1477/1478/1479/1480, so from k=1 on both sides increment by
+  -- EXACTLY +1 per nesting level and the gap is a flat 1474.  Nesting
+  -- moves both sides in lockstep; it does not erode the margin, and
+  -- crossover by nesting alone never arrives.
+  --
+  -- The original scare — "slack observed at small k is exactly what
+  -- geometric growth eats" — is now MEASURED, and it runs the other
+  -- way.  P-COMP2's compounding drives hopDᵉ to 59293 while h* stays
+  -- at 4, the SAME depth as the non-compounding k = 3 run: growth
+  -- enters through hopDᵉ, which multiplies the BOUND side, and never
+  -- through gas depth.  Compounding FEEDS the margin.
+  --
+  -- CONSEQUENCE, and it is the next move here: the +1/+1 lockstep is a
+  -- statable lemma (each nesting level costs one gas peel and one
+  -- minted frame, so the two sides are the same increment counted
+  -- twice).  Proving it retires this whole probe series, since it makes
+  -- the margin's invariance a THEOREM instead of five measured rows.
+  -- More probe rows are now the LOW-value move — prove the lockstep.
+  --
   -- NOT COVERED: μᵉ-recursive programs; programs with both deferᵉ AND
-  -- sharedConnect in the same growth chain; the Q-series crossover
-  -- region (multi-hour cost).  Class stays FALSITY.
+  -- sharedConnect in the same growth chain; and the crossover region
+  -- where the sum side (sucG) closes on the product demand, which no
+  -- row here reaches and which cost hours to approach by measurement.
+  -- (That crossing region is the one Demand-Probe SERIES Q already ran
+  -- at, against the OLD unlinked statement — see the series Q note in
+  -- subscribeInner-walk's header below.  Spell it "series Q": the
+  -- receipt that first cited it wrote "Q-series", which greps as
+  -- nothing and cost a review cycle.)
+  -- Class stays FALSITY: the lockstep above is an OBSERVED regularity
+  -- over five points, not a proof, and share-path regsLen? coverage is
+  -- vacuous (see P-S1) rather than real.
   --
   -- NOTE for the opIterD level bound at the degenerate corner:
   -- `opIterD` is the identity at m = 0 (`opIterD-0`, Evaluator:811)
