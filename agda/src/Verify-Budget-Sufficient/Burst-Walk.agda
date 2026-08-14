@@ -141,7 +141,8 @@ open import Verify-Budget-Sufficient.Wet
          INV?; dBound; regsLen?; hopR; unconn; pathB?; _hasAtLeast_;
          slotsFnCap)
 open import Verify-Budget-Sufficient.Walk-Level
-  using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono)
+  using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono;
+         any-dry-++; splitEvents-nodry; splitBurst-nodry)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Frame-Width using (dWᵉ; dWᵛ; pWᵛ; outWᵛ)
 
@@ -223,15 +224,9 @@ module _ {n} {Γ : Ctx n} {t : Ty} where
     burstCaps? (frameStep J c) sl str ∧ burstΨ? Ψ str
       ∧ not (hasDry str)
 
--- dry-freeness of event lists composes over ++ (the stream version is
--- .Measures' hasDry-append; this is its one-emit mirror)
-any-dry-++ : ∀ {A : Set} (xs ys : List (InstEvent A)) →
-  any dryEvent xs ≡ false → any dryEvent ys ≡ false →
-  any dryEvent (xs ++ ys) ≡ false
-any-dry-++ []       ys h₁ h₂ = h₂
-any-dry-++ (x ∷ xs) ys h₁ h₂
-  with ∨-false (dryEvent x) _ h₁
-... | e₁ , h₁′ rewrite e₁ = any-dry-++ xs ys h₁′ h₂
+-- any-dry-++ MOVED DOWN to .Walk-Level (2026-08-14), with the whole
+-- dry trio: the ground subscribeInner-walk consumes it there, and this
+-- module sits above .Walk-Level.  Imported back below.
 
 -- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
 -- carries the ∧-composable form, the dry lemmas speak the other
@@ -1719,40 +1714,9 @@ budgetAt-gs e sl id
 ... | k , eq rewrite eq =
       gasPad k (gasTower (3 + capsHgo (capsBase e sl) (suc id))) , refl
 
--- THE BURST SPLIT KEEPS EVERY CLOSE VERBATIM.  `splitEvents` rebuilds
--- the bookkeeping list constructor for constructor — `close s r` goes
--- through with its reason untouched — so a dry-free burst splits into a
--- dry-free event list.  Proven, not assumed: this is the whole gap
--- between the walk face's `hasDry` conjunct and what `subscribeInner`
--- actually returns.
-splitEvents-nodry : ∀ {n} {Γ : Ctx n} {u} {A : Set}
-  (es : List (InstEvent (Val Γ u))) → any dryEvent es ≡ false →
-  any (dryEvent {A}) (proj₁ (proj₂ (splitEvents {A = A} es))) ≡ false
-splitEvents-nodry []                h = refl
-splitEvents-nodry (value v   ∷ es)  h = splitEvents-nodry es h
-splitEvents-nodry (init s    ∷ es)  h = splitEvents-nodry es h
-splitEvents-nodry (handoff s ∷ es)  h = splitEvents-nodry es h
-splitEvents-nodry (complete  ∷ es)  h = splitEvents-nodry es h
--- the reason is CASE-SPLIT rather than rewritten: the hypothesis lives
--- at `Val Γ u` and the goal at `A`, so `dryEvent`'s implicit differs on
--- the two sides and a rewrite cannot bridge them.  Split, and both
--- sides compute; the `dried` arm is absurd, which is the real content
-splitEvents-nodry (close s cut        ∷ es) h = splitEvents-nodry es h
-splitEvents-nodry (close s cutPending ∷ es) h = splitEvents-nodry es h
-splitEvents-nodry (close s exhausted  ∷ es) h = splitEvents-nodry es h
-splitEvents-nodry (close s dried      ∷ es) ()
-
-splitBurst-nodry : ∀ {n} {Γ : Ctx n} {u} {A : Set}
-  (str : Stream Γ u) → hasDry str ≡ false →
-  any (dryEvent {A}) (proj₁ (proj₂ (splitBurst {A = A} str))) ≡ false
-splitBurst-nodry []         h = refl
-splitBurst-nodry (em ∷ ems) h
-  with ∨-false (any dryEvent (InstEmit.events em)) (hasDry ems) h
-... | hd , tl =
-      any-dry-++ (proj₁ (proj₂ (splitEvents (InstEmit.events em))))
-                 (proj₁ (proj₂ (splitBurst ems)))
-                 (splitEvents-nodry (InstEmit.events em) hd)
-                 (splitBurst-nodry ems tl)
+-- splitEvents-nodry / splitBurst-nodry MOVED DOWN to .Walk-Level
+-- (2026-08-14), with any-dry-++: the ground subscribeInner-walk
+-- consumes the split there.  Imported back through the module import.
 
 -- EX-RESIDUE, PROVEN 2026-08-13.  It was postulated on the grounds
 -- that `outWᵛ` sits outside this module's import scope — a missing

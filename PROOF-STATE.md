@@ -104,15 +104,6 @@ named postulate's own header.
 - **`subscribeE-inner-nodry-{pSz,pBO,depth}`** (Burst-Walk)
   — DIFFICULTY. Path-extension and depth-mirror plumbing for the inner
   call.
-- **`subscribeInner-walk`** (Walk-Level) — DIFFICULTY, reclassified
-  from FALSITY by statement repair (the reset-anchor pins;
-  hop-step-needs proves the link necessary, hop-edge spends it). THE
-  LEAF of the hop-edge chain; gas peel here, g0 dry mint excluded by
-  type. Body = assembly against the proven caps twin; route in its
-  header.
-- **`stepThru-walk-core`** (Walk-Level) — DIFFICULTY. The thruWalk
-  queue loop over the leaf, thruWalk-caps' wet mirror; loop obligations
-  in its header.
 - **`wet-landing-lift`** (Walk-Level) — FALSITY INHERITED, not intrinsic:
   its hypothesis IS the walk face's level bound, and its own content is
   sub-charge-capsOK-lift's proven chain with INV? for capsOK?. Do not
