@@ -93,6 +93,7 @@ open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pm�
                                  pm-elimGᵉ; pm-elimGᵗ; pm-elimGᵗˢ;
                                  hopD-elimGᵉ; hopD-elimGᵗ; hopD-elimGᵗˢ;
                                  hopD-unfoldμ)
+open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -412,12 +413,15 @@ hop-step-needs V R U r s s′ h =
 
 -- (1) THE μ EDGE.  r is fixed (hopD-unfoldμ), s strictly drops
 -- (unfoldμ-shrinks), U is untouched — an unfold moves no state at all.
-mu-edge : ∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
-  suc (dBound Ŝ R̂ U (hopDᵉ Ŝ (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
-    ≤ dBound Ŝ R̂ U (hopDᵉ Ŝ (μᵉ body)) (syncSizeᵉ (μᵉ body))
-mu-edge Ŝ R̂ U body
-  rewrite hopD-unfoldμ Ŝ body =
-  dBound-μ {Ŝ} {R̂} {U} {hopDᵉ Ŝ body}
+-- GENERIC IN η: an unfold moves no input, so the environment is
+-- carried untouched and no property of it is used.
+mu-edge : ∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (η : Fin n → ℕ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  suc (dBound Ŝ R̂ U (hopDᵉ Ŝ η (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
+    ≤ dBound Ŝ R̂ U (hopDᵉ Ŝ η (μᵉ body)) (syncSizeᵉ (μᵉ body))
+mu-edge Ŝ R̂ U η body
+  rewrite hopD-unfoldμ Ŝ η body =
+  dBound-μ {Ŝ} {R̂} {U} {hopDᵉ Ŝ η body}
            {syncSizeᵉ (unfoldμ body)} {syncSizeᵉ (μᵉ body)}
            (unfoldμ-shrinks body)
 
@@ -428,13 +432,18 @@ mu-edge Ŝ R̂ U body
 -- this module still reads nothing from the caps FACE.  hop-step-needs
 -- says the slack is exact: an r-drop of one buys `s + suc Ŝ`, and
 -- `suc Ŝ` alone already covers it.
-hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) → 2 ≤ Ŝ →
-  (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ (obs u) o < r →
-  suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ (obs u) o) (syncSizeᵉ o))
+-- GENERIC IN η, and it needs NOTHING from reach-reset's hop half: the
+-- only component spent is the syncSize reset, which is η-free.  So the
+-- call collapses to `syncSize≤sizeᵉ` composed with the size premise —
+-- one less hypothesis than the reach-reset route would have forced,
+-- and no `hη` obligation on the environment.
+hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) (η : Fin n → ℕ) → 2 ≤ Ŝ →
+  (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ η (obs u) o < r →
+  suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ η (obs u) o) (syncSizeᵉ o))
     ≤ dBound Ŝ (hopR Ŝ) U r s
-hop-edge Ŝ U r s 2≤Ŝ o szo r′<r =
-  dBound-hop {Ŝ} {hopR Ŝ} {U} {hopDᵉ Ŝ o} {r} {syncSizeᵉ o} {s}
-             r′<r (proj₁ (reach-reset Ŝ 2≤Ŝ o szo))
+hop-edge Ŝ U r s η 2≤Ŝ o szo r′<r =
+  dBound-hop {Ŝ} {hopR Ŝ} {U} {hopDᵉ Ŝ η o} {r} {syncSizeᵉ o} {s}
+             r′<r (≤-trans (syncSize≤sizeᵉ o) szo)
 
 -- (3) THE CONNECT EDGE.  U strictly drops (unconn-insert, behind the
 -- machine's own `memberSource … ≡ false` guard), and BOTH of the
@@ -442,21 +451,28 @@ hop-edge Ŝ U r s 2≤Ŝ o szo r′<r =
 -- cap-sized entry syntax — `reach-reset`'s two components, CALLED now
 -- rather than inlined.  Its tuple is (sync , hop) and dBound-connect
 -- wants hop first, hence the swap.
+-- PINNED at the honest environment `slotHop Ŝ sl`, because this is the
+-- one edge whose hop half is really spent: the child's measure is the
+-- SLOT DEF's, and after the refutation that number is `slotHop Ŝ sl i`
+-- rather than 0.  The `slotsSize sl ≤ Ŝ` hypothesis is NEW and is a
+-- restatement's, not a convenience: with the telescope unbounded
+-- `slotHop Ŝ sl` is unbounded and the hop reset is simply false.  It
+-- is carried at every walk level already (WalkStmt's slots bound,
+-- lifted along the frameStep ceiling), so no call site loses.
 connect-edge : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
-  (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  (sl : Slots Γ) → slotsSize sl ≤ Ŝ → (cs : List Source) (i : Fin n)
   {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
   sl i ≡ shared d {ok = ok} →
   memberSource (toℕ i) cs ≡ false → sizeᵉ d ≤ Ŝ →
-  suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs)) (hopDᵉ Ŝ d) (syncSizeᵉ d))
+  suc (dBound Ŝ (hopR Ŝ) (unconn sl (toℕ i ∷ cs))
+              (hopDᵉ Ŝ (slotHop Ŝ sl) d) (syncSizeᵉ d))
     ≤ dBound Ŝ (hopR Ŝ) (unconn sl cs) r s
-connect-edge Ŝ r s 2≤Ŝ sl cs i {d} eqi fresh szd =
+connect-edge Ŝ r s 2≤Ŝ sl slSz cs i {d} eqi fresh szd =
   dBound-connect {Ŝ} {hopR Ŝ} {unconn sl (toℕ i ∷ cs)} {unconn sl cs}
-                 {hopDᵉ Ŝ d} {r} {syncSizeᵉ d} {s}
+                 {hopDᵉ Ŝ (slotHop Ŝ sl) d} {r} {syncSizeᵉ d} {s}
                  (unconn-insert sl cs i eqi fresh)
-                 (proj₂ pair)
-                 (proj₁ pair)
-  where
-  pair = reach-reset Ŝ 2≤Ŝ d szd
+                 (slotHop-cap Ŝ sl 2≤Ŝ slSz d szd)
+                 (≤-trans (syncSize≤sizeᵉ d) szd)
 
 -- AND U NEVER RISES BETWEEN THE EDGES.  Every structural companion of
 -- the subscribe clique threads the demand's U component past arbitrary
@@ -906,7 +922,7 @@ abstract
   caps-fuel-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     budgetAt e ins 0 hasAtLeast
       suc (dBound (sizeCapAt e ins 1) (hopR (sizeCapAt e ins 1))
-                  (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) e)
+                  (unconn ins []) (hopDᵉ (sizeCapAt e ins 1) (slotHop (sizeCapAt e ins 1) ins) e)
                   (syncSizeᵉ e))
   caps-fuel-root e ins =
     hasAtLeast-mono demand (budget-hasAtLeast sz (capsBase e ins) 0)
@@ -927,9 +943,12 @@ abstract
                            (capsAt-base-size e ins 1))
     s≤V : syncSizeᵉ e ≤ V
     s≤V = ≤-trans (syncSize≤sizeᵉ e) sz≤V
-    r≤R : hopDᵉ V e ≤ hopR V
-    r≤R = hopD-cap V e (≤-trans (≤ᵇ⇒≤ 2 6 _) 6≤V) sz≤V
-    demand : suc (dBound V (hopR V) U (hopDᵉ V e) (syncSizeᵉ e))
+    slots≤V : slotsSize ins ≤ V
+    slots≤V = ≤-trans (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
+                      (capsAt-base-size e ins 1)
+    r≤R : hopDᵉ V (slotHop V ins) e ≤ hopR V
+    r≤R = slotHop-cap V ins (≤-trans (≤ᵇ⇒≤ 2 6 _) 6≤V) slots≤V e sz≤V
+    demand : suc (dBound V (hopR V) U (hopDᵉ V (slotHop V ins) e) (syncSizeᵉ e))
                ≤ 2 ^ (sz * 1 * 1) + towerℕ (3 + capsHgo (capsBase e ins) 1)
     demand =
       ≤-trans (s≤s (dBound-bound s≤V r≤R))

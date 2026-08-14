@@ -116,6 +116,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
                                  hopD-unfoldμ)
+open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -1538,31 +1539,32 @@ opaque
 -- for their coefficients.  Every clause is monotonicity plus one of the
 -- three facts above.
 mutual
-  hopD-sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
-    2 ≤ V → hopDᵉ V e ≤ szB V (sizeᵉ e)
-  hopD-sizeᵉ V (input i) hV = z≤n
-  hopD-sizeᵉ V (ofᵉ ts)  hV =
-    ≤-trans (hopD-sizeᵗˢ V ts hV) (szB-mono V (n≤1+n (sizeᵗˢ ts)))
-  hopD-sizeᵉ V emptyᵉ    hV = z≤n
-  hopD-sizeᵉ V (mapᵉ f e) hV =
-    ≤-trans (+-mono-≤ (≤-trans (hopD-sizeᵗ V f hV)
+  hopD-sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+    (e : Exp Γ Δᵍ Δ Θ t) →
+    2 ≤ V → (∀ i → η i ≤ szB V 1) → hopDᵉ V η e ≤ szB V (sizeᵉ e)
+  hopD-sizeᵉ V η (input i) hV hη = hη i
+  hopD-sizeᵉ V η (ofᵉ ts)  hV hη =
+    ≤-trans (hopD-sizeᵗˢ V η ts hV hη) (szB-mono V (n≤1+n (sizeᵗˢ ts)))
+  hopD-sizeᵉ V η emptyᵉ    hV hη = z≤n
+  hopD-sizeᵉ V η (mapᵉ f e) hV hη =
+    ≤-trans (+-mono-≤ (≤-trans (hopD-sizeᵗ V η f hV hη)
                                (szB-mono V (m≤m+n (sizeᵗ f) (sizeᵉ e))))
                       (*-mono-≤ (⊔-lub (≤-trans (pm-sizeᵗ V 0 f hV)
                                                 (szB-mono V (m≤m+n _ _)))
                                        (1≤szB V _))
-                                (≤-trans (hopD-sizeᵉ V e hV)
+                                (≤-trans (hopD-sizeᵉ V η e hV hη)
                                          (szB-mono V (m≤n+m (sizeᵉ e) (sizeᵗ f))))))
             (szB-sq V (sizeᵗ f + sizeᵉ e) hV
               (≤-trans (1≤sizeᵗ f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
-  hopD-sizeᵉ V (takeᵉ c e) hV =
-    ≤-trans (hopD-sizeᵉ V e hV)
+  hopD-sizeᵉ V η (takeᵉ c e) hV hη =
+    ≤-trans (hopD-sizeᵉ V η e hV hη)
             (szB-mono V (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c))
                                  (n≤1+n (sizeᵗ c + sizeᵉ e))))
-  hopD-sizeᵉ V (scanᵉ f z e) hV =
+  hopD-sizeᵉ V η (scanᵉ f z e) hV hη =
     ≤-trans (*-mono-≤ (^-monoˡ-≤ V (+-monoʳ-≤ 2 (pm-sizeᵗ V 0 f hV)))
-              (+-mono-≤ (+-mono-≤ (≤-trans (hopD-sizeᵗ V f hV) (szB-mono V lef))
-                                  (≤-trans (hopD-sizeᵗ V z hV) (szB-mono V lez)))
-                        (≤-trans (hopD-sizeᵉ V e hV) (szB-mono V lee))))
+              (+-mono-≤ (+-mono-≤ (≤-trans (hopD-sizeᵗ V η f hV hη) (szB-mono V lef))
+                                  (≤-trans (hopD-sizeᵗ V η z hV hη) (szB-mono V lez)))
+                        (≤-trans (hopD-sizeᵉ V η e hV hη) (szB-mono V lee))))
             (szB-scan V (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) hV
                       (1≤sizeᵗ f) (1≤sizeᵗ z) (1≤sizeᵉ e))
     where
@@ -1572,49 +1574,50 @@ mutual
     lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
     lee : sizeᵉ e ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
     lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
-  hopD-sizeᵉ V (mergeAllᵉ e) hV =
-    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
-  hopD-sizeᵉ V (concatAllᵉ e) hV =
-    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
-  hopD-sizeᵉ V (switchAllᵉ e) hV =
-    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
-  hopD-sizeᵉ V (exhaustAllᵉ e) hV =
-    ≤-trans (s≤s (hopD-sizeᵉ V e hV)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
-  hopD-sizeᵉ V (μᵉ e)     hV =
-    ≤-trans (hopD-sizeᵉ V e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
-  hopD-sizeᵉ V (varᵉ x)   hV = z≤n
-  hopD-sizeᵉ V (deferᵉ e) hV = z≤n
+  hopD-sizeᵉ V η (mergeAllᵉ e) hV hη =
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V η (concatAllᵉ e) hV hη =
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V η (switchAllᵉ e) hV hη =
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V η (exhaustAllᵉ e) hV hη =
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+  hopD-sizeᵉ V η (μᵉ e)     hV hη =
+    ≤-trans (hopD-sizeᵉ V η e hV hη) (szB-mono V (n≤1+n (sizeᵉ e)))
+  hopD-sizeᵉ V η (varᵉ x)   hV hη = z≤n
+  hopD-sizeᵉ V η (deferᵉ e) hV hη = z≤n
 
-  hopD-sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (tm : Tm Γ Δᵍ Δ Θ t) →
-    2 ≤ V → hopDᵗ V tm ≤ szB V (sizeᵗ tm)
-  hopD-sizeᵗ V (varᵗ x) hV = z≤n
-  hopD-sizeᵗ V unit̂     hV = z≤n
-  hopD-sizeᵗ V (bool̂ _) hV = z≤n
-  hopD-sizeᵗ V (nat̂ _)  hV = z≤n
-  hopD-sizeᵗ V (pairᵗ a b) hV =
-    ⊔-lub (≤-trans (hopD-sizeᵗ V a hV)
+  hopD-sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+    (tm : Tm Γ Δᵍ Δ Θ t) →
+    2 ≤ V → (∀ i → η i ≤ szB V 1) → hopDᵗ V η tm ≤ szB V (sizeᵗ tm)
+  hopD-sizeᵗ V η (varᵗ x) hV hη = z≤n
+  hopD-sizeᵗ V η unit̂     hV hη = z≤n
+  hopD-sizeᵗ V η (bool̂ _) hV hη = z≤n
+  hopD-sizeᵗ V η (nat̂ _)  hV hη = z≤n
+  hopD-sizeᵗ V η (pairᵗ a b) hV hη =
+    ⊔-lub (≤-trans (hopD-sizeᵗ V η a hV hη)
              (szB-mono V (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b))
                                   (n≤1+n (sizeᵗ a + sizeᵗ b)))))
-          (≤-trans (hopD-sizeᵗ V b hV)
+          (≤-trans (hopD-sizeᵗ V η b hV hη)
              (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a))
                                   (n≤1+n (sizeᵗ a + sizeᵗ b)))))
-  hopD-sizeᵗ V (fstᵗ q) hV =
-    ≤-trans (hopD-sizeᵗ V q hV) (szB-mono V (n≤1+n (sizeᵗ q)))
-  hopD-sizeᵗ V (sndᵗ q) hV =
-    ≤-trans (hopD-sizeᵗ V q hV) (szB-mono V (n≤1+n (sizeᵗ q)))
-  hopD-sizeᵗ V (inlᵗ a) hV =
-    ≤-trans (hopD-sizeᵗ V a hV) (szB-mono V (n≤1+n (sizeᵗ a)))
-  hopD-sizeᵗ V (inrᵗ a) hV =
-    ≤-trans (hopD-sizeᵗ V a hV) (szB-mono V (n≤1+n (sizeᵗ a)))
-  hopD-sizeᵗ V (caseᵗ sc l r) hV =
-    ≤-trans (+-mono-≤ (⊔-lub (≤-trans (hopD-sizeᵗ V l hV) (szB-mono V cl))
-                             (≤-trans (hopD-sizeᵗ V r hV) (szB-mono V cr)))
+  hopD-sizeᵗ V η (fstᵗ q) hV hη =
+    ≤-trans (hopD-sizeᵗ V η q hV hη) (szB-mono V (n≤1+n (sizeᵗ q)))
+  hopD-sizeᵗ V η (sndᵗ q) hV hη =
+    ≤-trans (hopD-sizeᵗ V η q hV hη) (szB-mono V (n≤1+n (sizeᵗ q)))
+  hopD-sizeᵗ V η (inlᵗ a) hV hη =
+    ≤-trans (hopD-sizeᵗ V η a hV hη) (szB-mono V (n≤1+n (sizeᵗ a)))
+  hopD-sizeᵗ V η (inrᵗ a) hV hη =
+    ≤-trans (hopD-sizeᵗ V η a hV hη) (szB-mono V (n≤1+n (sizeᵗ a)))
+  hopD-sizeᵗ V η (caseᵗ sc l r) hV hη =
+    ≤-trans (+-mono-≤ (⊔-lub (≤-trans (hopD-sizeᵗ V η l hV hη) (szB-mono V cl))
+                             (≤-trans (hopD-sizeᵗ V η r hV hη) (szB-mono V cr)))
                       (*-mono-≤ (⊔-lub (⊔-lub (≤-trans (pm-sizeᵗ V 0 l hV)
                                                        (szB-mono V cl))
                                               (≤-trans (pm-sizeᵗ V 0 r hV)
                                                        (szB-mono V cr)))
                                        (1≤szB V _))
-                                (≤-trans (hopD-sizeᵗ V sc hV) (szB-mono V cs))))
+                                (≤-trans (hopD-sizeᵗ V η sc hV hη) (szB-mono V cs))))
             (szB-sq V (sizeᵗ sc + sizeᵗ l + sizeᵗ r) hV
                     (≤-trans (1≤sizeᵗ sc) cs))
     where
@@ -1626,25 +1629,26 @@ mutual
                  (m≤m+n (sizeᵗ sc + sizeᵗ l) (sizeᵗ r))
     cr : sizeᵗ r ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
     cr = m≤n+m (sizeᵗ r) (sizeᵗ sc + sizeᵗ l)
-  hopD-sizeᵗ V (ifᵗ c a b) hV =
-    ⊔-lub (≤-trans (hopD-sizeᵗ V a hV)
+  hopD-sizeᵗ V η (ifᵗ c a b) hV hη =
+    ⊔-lub (≤-trans (hopD-sizeᵗ V η a hV hη)
              (szB-mono V (≤-trans (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
                                            (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))
                                   (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b)))))
-          (≤-trans (hopD-sizeᵗ V b hV)
+          (≤-trans (hopD-sizeᵗ V η b hV hη)
              (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))
                                   (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b)))))
-  hopD-sizeᵗ V (primᵗ _ a) hV = z≤n
-  hopD-sizeᵗ V (strmᵗ e)   hV =
-    ≤-trans (hopD-sizeᵉ V e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
+  hopD-sizeᵗ V η (primᵗ _ a) hV hη = z≤n
+  hopD-sizeᵗ V η (strmᵗ e)   hV hη =
+    ≤-trans (hopD-sizeᵉ V η e hV hη) (szB-mono V (n≤1+n (sizeᵉ e)))
 
-  hopD-sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ)
-    (ts : List (Tm Γ Δᵍ Δ Θ t)) → 2 ≤ V → hopDᵗˢ V ts ≤ szB V (sizeᵗˢ ts)
-  hopD-sizeᵗˢ V []       hV = z≤n
-  hopD-sizeᵗˢ V (y ∷ ys) hV =
-    ⊔-lub (≤-trans (hopD-sizeᵗ V y hV)
+  hopD-sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → 2 ≤ V → (∀ i → η i ≤ szB V 1) →
+    hopDᵗˢ V η ts ≤ szB V (sizeᵗˢ ts)
+  hopD-sizeᵗˢ V η []       hV hη = z≤n
+  hopD-sizeᵗˢ V η (y ∷ ys) hV hη =
+    ⊔-lub (≤-trans (hopD-sizeᵗ V η y hV hη)
                    (szB-mono V (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))))
-          (≤-trans (hopD-sizeᵗˢ V ys hV)
+          (≤-trans (hopD-sizeᵗˢ V η ys hV hη)
                    (szB-mono V (m≤n+m (sizeᵗˢ ys) (sizeᵗ y))))
 
   pm-sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
@@ -1763,10 +1767,11 @@ mutual
 opaque
   unfolding szB
 
-  hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (e : Exp Γ Δᵍ Δ Θ t) →
-    2 ≤ V → sizeᵉ e ≤ V → hopDᵉ V e ≤ hopR V
-  hopD-cap V e hV h =
-    ≤-trans (hopD-sizeᵉ V e hV)
+  hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+    (e : Exp Γ Δᵍ Δ Θ t) →
+    2 ≤ V → (∀ i → η i ≤ szB V 1) → sizeᵉ e ≤ V → hopDᵉ V η e ≤ hopR V
+  hopD-cap V η e hV hη h =
+    ≤-trans (hopD-sizeᵉ V η e hV hη)
     (≤-trans (^-monoˡ-≤ (suc V ^ sizeᵉ e) (+-monoʳ-≤ 2 h))
              (^-monoʳ-≤ (2 + V) (^-monoʳ-≤ (suc V) (≤-trans h (n≤1+n V)))))
 
@@ -1783,9 +1788,10 @@ opaque
 -- since this is the tenth duplicated proof found: when a fact is proven
 -- N times, move it DOWN — do not pick a winner among the copies.
 reach-reset : ∀ (C : ℕ) → 2 ≤ C →
-  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
-  (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
-reach-reset C hC o h = ≤-trans (syncSize≤sizeᵉ o) h , hopD-cap C o hC h
+  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (η : Fin n → ℕ) → (∀ i → η i ≤ szB C 1) →
+  (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+  (syncSizeᵉ o ≤ C) × (hopDᵉ C η o ≤ hopR C)
+reach-reset C hC η hη o h = ≤-trans (syncSize≤sizeᵉ o) h , hopD-cap C η o hC hη h
 
 -- a shared slot's def is an element of the global syntactic
 -- multiset {program} ⊎ {slots}: its size sits inside the budget's
@@ -1814,6 +1820,20 @@ slotDef-size sl i {d} eq =
             (≤-trans (s≤s (s≤s z≤n))
                      (m≤m*n (4 + (sizeᵉ e + slotsSize sl)) (suc id))))
 
+-- FALSITY-class, and the margin is thin BY CONSTRUCTION: slotHop
+-- telescopes hopD through the stratified slots, so over n ≤ slotsSize
+-- slots each of def size ≤ V the compound reaches an exponent on the
+-- order of V^(V+1) — the same order as hopR V's.  Whether hopR's
+-- exponent (via (1+V)^(1+V)) strictly dominates the telescope's, with
+-- the target term b's own factor multiplied in, is exactly the open
+-- quantitative question of the η leg.  Unprobed, unproven; do not
+-- lower without evidence reaching the nested-scan region.
+postulate
+  slotHop-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V : ℕ) (sl : Slots Γ) →
+    2 ≤ V → slotsSize sl ≤ V →
+    (b : Exp Γ Δᵍ Δ Θ u) → sizeᵉ b ≤ V →
+    hopDᵉ V (slotHop V sl) b ≤ hopR V
+
 -- slot content, so its hop depth sits under the store rank cap
 -- (feeding dBound-connect's r′ ≤ R) and its walk under the store bound
 -- (feeding dBound-hop/-connect's s′ ≤ V), straight off the
@@ -1822,18 +1842,16 @@ connect-anchor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) (i : Fin n) {d : Closed Γ (lookup Γ i)}
   {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
   let V = sizeBudgetAt e sl id in
-  (hopDᵉ V d ≤ hopR V) × (syncSizeᵉ d ≤ V)
--- the SPECIALISED reader: same pair as `reach-reset` above, but with the
--- cap pinned to the budget and the size bound DERIVED rather than
--- assumed.  Its tuple is the other way round from reach-reset's, so the
--- delegation swaps.
+  (hopDᵉ V (slotHop V sl) d ≤ hopR V) × (syncSizeᵉ d ≤ V)
 connect-anchor e sl id i {d} eq =
-  proj₂ pair , proj₁ pair
+  slotHop-cap V sl (2≤sizeBudget e sl id) slots≤V d size≤V
+  , ≤-trans (syncSize≤sizeᵉ d) size≤V
   where
   V = sizeBudgetAt e sl id
   size≤V : sizeᵉ d ≤ V
   size≤V = ≤-trans (slotDef-size sl i eq) (slots≤budget e sl id)
-  pair = reach-reset V (2≤sizeBudget e sl id) d size≤V
+  slots≤V : slotsSize sl ≤ V
+  slots≤V = slots≤budget e sl id
 
 ------------------------------------------------------------------
 -- THE DEMAND FUNCTION.  Fuel is depth-consumed, so the wet contract
@@ -1936,26 +1954,29 @@ dBound-bound {V} {R} {U} {r} {s} s≤V r≤R =
 
 module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
 
-  hopD-map : ∀ {s u} (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) →
-    hopDᵉ V b ≤ hopDᵉ V (mapᵉ f b)
-  hopD-map f b =
-    ≤-trans (1*≤ (hopDᵉ V b) (pmᵗ V 0 f ⊔ 1) (m≤n⊔m (pmᵗ V 0 f) 1))
-            (m≤n+m ((pmᵗ V 0 f ⊔ 1) * hopDᵉ V b) (hopDᵗ V f))
+  hopD-map : ∀ (η : Fin n → ℕ) {s u} (f : Tm Γ Δᵍ Δ (s ∷ Θ) u)
+    (b : Exp Γ Δᵍ Δ Θ s) →
+    hopDᵉ V η b ≤ hopDᵉ V η (mapᵉ f b)
+  hopD-map η f b =
+    ≤-trans (1*≤ (hopDᵉ V η b) (pmᵗ V 0 f ⊔ 1) (m≤n⊔m (pmᵗ V 0 f) 1))
+            (m≤n+m ((pmᵗ V 0 f ⊔ 1) * hopDᵉ V η b) (hopDᵗ V η f))
 
-  hopD-take : ∀ {u} (c : Tm Γ Δᵍ Δ Θ natᵗ) (b : Exp Γ Δᵍ Δ Θ u) →
-    hopDᵉ V b ≤ hopDᵉ V (takeᵉ c b)
-  hopD-take c b = ≤-refl
+  hopD-take : ∀ (η : Fin n → ℕ) {u} (c : Tm Γ Δᵍ Δ Θ natᵗ)
+    (b : Exp Γ Δᵍ Δ Θ u) →
+    hopDᵉ V η b ≤ hopDᵉ V η (takeᵉ c b)
+  hopD-take η c b = ≤-refl
 
-  hopD-scan : ∀ {s u} (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u) (z : Tm Γ Δᵍ Δ Θ u)
-    (b : Exp Γ Δᵍ Δ Θ s) → hopDᵉ V b ≤ hopDᵉ V (scanᵉ f z b)
-  hopD-scan f z b =
-    ≤-trans (m≤n+m (hopDᵉ V b) (hopDᵗ V f + hopDᵗ V z))
+  hopD-scan : ∀ (η : Fin n → ℕ) {s u} (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u)
+    (z : Tm Γ Δᵍ Δ Θ u) (b : Exp Γ Δᵍ Δ Θ s) →
+    hopDᵉ V η b ≤ hopDᵉ V η (scanᵉ f z b)
+  hopD-scan η f z b =
+    ≤-trans (m≤n+m (hopDᵉ V η b) (hopDᵗ V η f + hopDᵗ V η z))
             (1*≤ _ _ (1≤pow (suc (pmᵗ V 0 f)) V))
 
   -- the four hop carriers: the operator's own frame is the `suc`
-  hopD-all : ∀ {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
-    hopDᵉ V b ≤ suc (hopDᵉ V b)
-  hopD-all b = n≤1+n (hopDᵉ V b)
+  hopD-all : ∀ (η : Fin n → ℕ) {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
+    hopDᵉ V η b ≤ suc (hopDᵉ V η b)
+  hopD-all η b = n≤1+n (hopDᵉ V η b)
 
 ------------------------------------------------------------------
 -- PHASE 3, THE ASSEMBLY: the emitted-value invariant's engine.
@@ -2160,79 +2181,80 @@ mutual
     rewrite pm-renᵗ V k ρg ρd ρt p y | pm-renᵗˢ V k ρg ρd ρt p ys = refl
 
 mutual
-  hopD-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ)
+  hopD-renᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ) (η : Fin n → ℕ)
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
     (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
-    (e : Exp Γ Δᵍ Δ Θ t) → hopDᵉ V (renExp ρg ρd ρt e) ≡ hopDᵉ V e
-  hopD-renᵉ V ρg ρd ρt p (input i) = refl
-  hopD-renᵉ V ρg ρd ρt p (ofᵉ ts)  = hopD-renᵗˢ V ρg ρd ρt p ts
-  hopD-renᵉ V ρg ρd ρt p emptyᵉ    = refl
-  hopD-renᵉ V ρg ρd ρt p (mapᵉ f e)
-    rewrite hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+    (e : Exp Γ Δᵍ Δ Θ t) → hopDᵉ V η (renExp ρg ρd ρt e) ≡ hopDᵉ V η e
+  hopD-renᵉ V η ρg ρd ρt p (input i) = refl
+  hopD-renᵉ V η ρg ρd ρt p (ofᵉ ts)  = hopD-renᵗˢ V η ρg ρd ρt p ts
+  hopD-renᵉ V η ρg ρd ρt p emptyᵉ    = refl
+  hopD-renᵉ V η ρg ρd ρt p (mapᵉ f e)
+    rewrite hopD-renᵗ V η ρg ρd (ext∈ ρt) (ext-ix ρt p) f
           | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
-          | hopD-renᵉ V ρg ρd ρt p e = refl
-  hopD-renᵉ V ρg ρd ρt p (takeᵉ c e) = hopD-renᵉ V ρg ρd ρt p e
-  hopD-renᵉ V ρg ρd ρt p (scanᵉ f z e)
+          | hopD-renᵉ V η ρg ρd ρt p e = refl
+  hopD-renᵉ V η ρg ρd ρt p (takeᵉ c e) = hopD-renᵉ V η ρg ρd ρt p e
+  hopD-renᵉ V η ρg ρd ρt p (scanᵉ f z e)
     rewrite pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
-          | hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) f
-          | hopD-renᵗ V ρg ρd ρt p z
-          | hopD-renᵉ V ρg ρd ρt p e = refl
-  hopD-renᵉ V ρg ρd ρt p (mergeAllᵉ e)   = cong suc (hopD-renᵉ V ρg ρd ρt p e)
-  hopD-renᵉ V ρg ρd ρt p (concatAllᵉ e)  = cong suc (hopD-renᵉ V ρg ρd ρt p e)
-  hopD-renᵉ V ρg ρd ρt p (switchAllᵉ e)  = cong suc (hopD-renᵉ V ρg ρd ρt p e)
-  hopD-renᵉ V ρg ρd ρt p (exhaustAllᵉ e) = cong suc (hopD-renᵉ V ρg ρd ρt p e)
-  hopD-renᵉ V ρg ρd ρt p (μᵉ e)     = hopD-renᵉ V (ext∈ ρg) ρd ρt p e
-  hopD-renᵉ V ρg ρd ρt p (varᵉ x)   = refl
-  hopD-renᵉ V ρg ρd ρt p (deferᵉ e) = refl
+          | hopD-renᵗ V η ρg ρd (ext∈ ρt) (ext-ix ρt p) f
+          | hopD-renᵗ V η ρg ρd ρt p z
+          | hopD-renᵉ V η ρg ρd ρt p e = refl
+  hopD-renᵉ V η ρg ρd ρt p (mergeAllᵉ e)   = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
+  hopD-renᵉ V η ρg ρd ρt p (concatAllᵉ e)  = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
+  hopD-renᵉ V η ρg ρd ρt p (switchAllᵉ e)  = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
+  hopD-renᵉ V η ρg ρd ρt p (exhaustAllᵉ e) = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
+  hopD-renᵉ V η ρg ρd ρt p (μᵉ e)     = hopD-renᵉ V η (ext∈ ρg) ρd ρt p e
+  hopD-renᵉ V η ρg ρd ρt p (varᵉ x)   = refl
+  hopD-renᵉ V η ρg ρd ρt p (deferᵉ e) = refl
 
-  hopD-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ)
+  hopD-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ) (η : Fin n → ℕ)
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
     (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
-    (tm : Tm Γ Δᵍ Δ Θ t) → hopDᵗ V (renTm ρg ρd ρt tm) ≡ hopDᵗ V tm
-  hopD-renᵗ V ρg ρd ρt p (varᵗ x)  = refl
-  hopD-renᵗ V ρg ρd ρt p unit̂      = refl
-  hopD-renᵗ V ρg ρd ρt p (bool̂ _)  = refl
-  hopD-renᵗ V ρg ρd ρt p (nat̂ _)   = refl
-  hopD-renᵗ V ρg ρd ρt p (pairᵗ a b)
-    rewrite hopD-renᵗ V ρg ρd ρt p a | hopD-renᵗ V ρg ρd ρt p b = refl
-  hopD-renᵗ V ρg ρd ρt p (fstᵗ q)  = hopD-renᵗ V ρg ρd ρt p q
-  hopD-renᵗ V ρg ρd ρt p (sndᵗ q)  = hopD-renᵗ V ρg ρd ρt p q
-  hopD-renᵗ V ρg ρd ρt p (inlᵗ a)  = hopD-renᵗ V ρg ρd ρt p a
-  hopD-renᵗ V ρg ρd ρt p (inrᵗ a)  = hopD-renᵗ V ρg ρd ρt p a
-  hopD-renᵗ V ρg ρd ρt p (caseᵗ sc l r)
-    rewrite hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) l
-          | hopD-renᵗ V ρg ρd (ext∈ ρt) (ext-ix ρt p) r
+    (tm : Tm Γ Δᵍ Δ Θ t) → hopDᵗ V η (renTm ρg ρd ρt tm) ≡ hopDᵗ V η tm
+  hopD-renᵗ V η ρg ρd ρt p (varᵗ x)  = refl
+  hopD-renᵗ V η ρg ρd ρt p unit̂      = refl
+  hopD-renᵗ V η ρg ρd ρt p (bool̂ _)  = refl
+  hopD-renᵗ V η ρg ρd ρt p (nat̂ _)   = refl
+  hopD-renᵗ V η ρg ρd ρt p (pairᵗ a b)
+    rewrite hopD-renᵗ V η ρg ρd ρt p a | hopD-renᵗ V η ρg ρd ρt p b = refl
+  hopD-renᵗ V η ρg ρd ρt p (fstᵗ q)  = hopD-renᵗ V η ρg ρd ρt p q
+  hopD-renᵗ V η ρg ρd ρt p (sndᵗ q)  = hopD-renᵗ V η ρg ρd ρt p q
+  hopD-renᵗ V η ρg ρd ρt p (inlᵗ a)  = hopD-renᵗ V η ρg ρd ρt p a
+  hopD-renᵗ V η ρg ρd ρt p (inrᵗ a)  = hopD-renᵗ V η ρg ρd ρt p a
+  hopD-renᵗ V η ρg ρd ρt p (caseᵗ sc l r)
+    rewrite hopD-renᵗ V η ρg ρd (ext∈ ρt) (ext-ix ρt p) l
+          | hopD-renᵗ V η ρg ρd (ext∈ ρt) (ext-ix ρt p) r
           | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) l
           | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) r
-          | hopD-renᵗ V ρg ρd ρt p sc = refl
-  hopD-renᵗ V ρg ρd ρt p (ifᵗ c a b)
-    rewrite hopD-renᵗ V ρg ρd ρt p a | hopD-renᵗ V ρg ρd ρt p b = refl
-  hopD-renᵗ V ρg ρd ρt p (primᵗ _ a) = refl
-  hopD-renᵗ V ρg ρd ρt p (strmᵗ e)   = hopD-renᵉ V ρg ρd ρt p e
+          | hopD-renᵗ V η ρg ρd ρt p sc = refl
+  hopD-renᵗ V η ρg ρd ρt p (ifᵗ c a b)
+    rewrite hopD-renᵗ V η ρg ρd ρt p a | hopD-renᵗ V η ρg ρd ρt p b = refl
+  hopD-renᵗ V η ρg ρd ρt p (primᵗ _ a) = refl
+  hopD-renᵗ V η ρg ρd ρt p (strmᵗ e)   = hopD-renᵉ V η ρg ρd ρt p e
 
-  hopD-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ)
+  hopD-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (V : ℕ) (η : Fin n → ℕ)
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) →
     (∀ {u} (x : u ∈ Θ) → varIx (ρt x) ≡ varIx x) →
     (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-    hopDᵗˢ V (renTms ρg ρd ρt ts) ≡ hopDᵗˢ V ts
-  hopD-renᵗˢ V ρg ρd ρt p []       = refl
-  hopD-renᵗˢ V ρg ρd ρt p (y ∷ ys)
-    rewrite hopD-renᵗ V ρg ρd ρt p y | hopD-renᵗˢ V ρg ρd ρt p ys = refl
+    hopDᵗˢ V η (renTms ρg ρd ρt ts) ≡ hopDᵗˢ V η ts
+  hopD-renᵗˢ V η ρg ρd ρt p []       = refl
+  hopD-renᵗˢ V η ρg ρd ρt p (y ∷ ys)
+    rewrite hopD-renᵗ V η ρg ρd ρt p y | hopD-renᵗˢ V η ρg ρd ρt p ys = refl
 
 -- a reified value measures as the value did — the obs case is refl,
 -- since reify of an observable IS strmᵗ of it — and weakening it in
 -- changes nothing, since weakening out of the empty context moves no
 -- position
-hopD-wkReify : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} (V : ℕ) (t : Ty) (v : Val Γ t) →
-  hopDᵗ V (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify v)) ≡ hopDᵛ V t v
-hopD-wkReify V unitᵗ    v        = refl
-hopD-wkReify V boolᵗ    v        = refl
-hopD-wkReify V natᵗ     v        = refl
-hopD-wkReify V (s ×ᵗ t) (a , b) =
-  cong₂ _⊔_ (hopD-wkReify V s a) (hopD-wkReify V t b)
-hopD-wkReify V (s +ᵗ t) (inj₁ a) = hopD-wkReify V s a
-hopD-wkReify V (s +ᵗ t) (inj₂ b) = hopD-wkReify V t b
-hopD-wkReify V (obs t)  e        = hopD-renᵉ V (λ ()) (λ ()) (λ ()) (λ ()) e
+hopD-wkReify : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} (V : ℕ) (η : Fin n → ℕ)
+  (t : Ty) (v : Val Γ t) →
+  hopDᵗ V η (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify v)) ≡ hopDᵛ V η t v
+hopD-wkReify V η unitᵗ    v        = refl
+hopD-wkReify V η boolᵗ    v        = refl
+hopD-wkReify V η natᵗ     v        = refl
+hopD-wkReify V η (s ×ᵗ t) (a , b) =
+  cong₂ _⊔_ (hopD-wkReify V η s a) (hopD-wkReify V η t b)
+hopD-wkReify V η (s +ᵗ t) (inj₁ a) = hopD-wkReify V η s a
+hopD-wkReify V η (s +ᵗ t) (inj₂ b) = hopD-wkReify V η t b
+hopD-wkReify V η (obs t)  e        = hopD-renᵉ V η (λ ()) (λ ()) (λ ()) (λ ()) e
 
 -- AND THE SUM FIRES.  On the right injection the plug's depth has to be
 -- paid for by the slope, so the slope must be at least 1 there — and it
@@ -2334,10 +2356,11 @@ mutual
     rewrite pm-subΘᵗ V k Θloc σ y h | pm-subΘᵗˢ V k Θloc σ ys h = refl
 
 -- every value in an environment is bounded, POSITION BY POSITION
-EnvHopDs : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) → All (Val Γ) Θ → (ℕ → ℕ) → Set
-EnvHopDs V []ᵃ                Ds = ⊤
-EnvHopDs V (_∷ᵃ_ {x = t} v σ) Ds =
-  (hopDᵛ V t v ≤ Ds 0) × EnvHopDs V σ (λ j → Ds (suc j))
+EnvHopDs : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) →
+  All (Val Γ) Θ → (ℕ → ℕ) → Set
+EnvHopDs V η []ᵃ                Ds = ⊤
+EnvHopDs V η (_∷ᵃ_ {x = t} v σ) Ds =
+  (hopDᵛ V η t v ≤ Ds 0) × EnvHopDs V η σ (λ j → Ds (suc j))
 
 -- the slope over a WHOLE environment: one pm per substituted variable,
 -- read at the index that variable occupies once the local binders
@@ -2417,12 +2440,12 @@ sumW-hit g w (suc m) (suc j) lt hit =
   ≤-trans (sumW-hit (λ i → g (suc i)) (λ i → w (suc i)) m j (≤-pred lt) hit)
           (m≤n+m (sumW (λ i → g (suc i)) (λ i → w (suc i)) m) (g 0 * w 0))
 
-envHopDs-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (Ds : ℕ → ℕ)
-  (σ : All (Val Γ) Θ) → EnvHopDs V σ Ds → (z : t ∈ Θ) →
-  hopDᵛ V t (lookupEnv σ z) ≤ Ds (varIx z)
-envHopDs-lookup V Ds (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
-envHopDs-lookup V Ds (v ∷ᵃ σ) (hv , hσ) (there z)   =
-  envHopDs-lookup V (λ j → Ds (suc j)) σ hσ z
+envHopDs-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (η : Fin n → ℕ)
+  (Ds : ℕ → ℕ) (σ : All (Val Γ) Θ) → EnvHopDs V η σ Ds → (z : t ∈ Θ) →
+  hopDᵛ V η t (lookupEnv σ z) ≤ Ds (varIx z)
+envHopDs-lookup V η Ds (v ∷ᵃ σ) (hv , hσ) (here refl) = hv
+envHopDs-lookup V η Ds (v ∷ᵃ σ) (hv , hσ) (there z)   =
+  envHopDs-lookup V η (λ j → Ds (suc j)) σ hσ z
 
 -- the two regroupings the multiplying clauses need.  With the slope
 -- weighted, D no longer appears — it is inside the sum
@@ -2460,21 +2483,21 @@ envHopDs-lookup V Ds (v ∷ᵃ σ) (hv , hσ) (there z)   =
 -- its position's weight, and the slope collects that weight because the
 -- variable's position is exactly one of the indices the sum runs over.
 mutual
-  hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Ds : ℕ → ℕ)
-    (Θloc : List Ty) (σ : All (Val Γ) Θsub)
-    (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) → EnvHopDs V σ Ds →
-    hopDᵉ V (subΘExp Θloc σ e)
-      ≤ hopDᵉ V e
+  hopD-subΘᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (η : Fin n → ℕ)
+    (Ds : ℕ → ℕ) (Θloc : List Ty) (σ : All (Val Γ) Θsub)
+    (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) → EnvHopDs V η σ Ds →
+    hopDᵉ V η (subΘExp Θloc σ e)
+      ≤ hopDᵉ V η e
         + sumW (λ j → pmᵉ V (length Θloc + j) e) Ds (length Θsub)
-  hopD-subΘᵉ V Ds Θloc σ (input i) hσ = z≤n
-  hopD-subΘᵉ V Ds Θloc σ (ofᵉ ts)  hσ = hopD-subΘᵗˢ V Ds Θloc σ ts hσ
-  hopD-subΘᵉ V Ds Θloc σ emptyᵉ    hσ = z≤n
-  hopD-subΘᵉ {Θsub = Θsub} V Ds Θloc σ (mapᵉ {s = s} f e) hσ
+  hopD-subΘᵉ V η Ds Θloc σ (input i) hσ = m≤m+n (η i) _
+  hopD-subΘᵉ V η Ds Θloc σ (ofᵉ ts)  hσ = hopD-subΘᵗˢ V η Ds Θloc σ ts hσ
+  hopD-subΘᵉ V η Ds Θloc σ emptyᵉ    hσ = z≤n
+  hopD-subΘᵉ {Θsub = Θsub} V η Ds Θloc σ (mapᵉ {s = s} f e) hσ
     rewrite pm-subΘᵗ V 0 (s ∷ Θloc) σ f (s≤s z≤n) =
-    ≤-trans (+-mono-≤ (hopD-subΘᵗ V Ds (s ∷ Θloc) σ f hσ)
-                      (*-monoʳ-≤ C (hopD-subΘᵉ V Ds Θloc σ e hσ)))
-    (≤-trans (≤-reflexive (+*-mix (hopDᵗ V f) Sf C (hopDᵉ V e) Se))
-             (+-monoʳ-≤ (hopDᵗ V f + C * hopDᵉ V e)
+    ≤-trans (+-mono-≤ (hopD-subΘᵗ V η Ds (s ∷ Θloc) σ f hσ)
+                      (*-monoʳ-≤ C (hopD-subΘᵉ V η Ds Θloc σ e hσ)))
+    (≤-trans (≤-reflexive (+*-mix (hopDᵗ V η f) Sf C (hopDᵉ V η e) Se))
+             (+-monoʳ-≤ (hopDᵗ V η f + C * hopDᵉ V η e)
                (≤-reflexive
                  (trans (cong (Sf +_) (sumW-* C (λ j → pmᵉ V (length Θloc + j) e) Ds
                                               (length Θsub)))
@@ -2485,16 +2508,16 @@ mutual
     C  = pmᵗ V 0 f ⊔ 1
     Sf = sumW (λ j → pmᵗ V (suc (length Θloc + j)) f) Ds (length Θsub)
     Se = sumW (λ j → pmᵉ V (length Θloc + j) e) Ds (length Θsub)
-  hopD-subΘᵉ V Ds Θloc σ (takeᵉ c e) hσ = hopD-subΘᵉ V Ds Θloc σ e hσ
-  hopD-subΘᵉ {Θsub = Θsub} V Ds Θloc σ (scanᵉ {s = s} {t = t} f z e) hσ
+  hopD-subΘᵉ V η Ds Θloc σ (takeᵉ c e) hσ = hopD-subΘᵉ V η Ds Θloc σ e hσ
+  hopD-subΘᵉ {Θsub = Θsub} V η Ds Θloc σ (scanᵉ {s = s} {t = t} f z e) hσ
     rewrite pm-subΘᵗ V 0 ((t ×ᵗ s) ∷ Θloc) σ f (s≤s z≤n) =
     ≤-trans (*-monoʳ-≤ P
-              (+-mono-≤ (+-mono-≤ (hopD-subΘᵗ V Ds ((t ×ᵗ s) ∷ Θloc) σ f hσ)
-                                  (hopD-subΘᵗ V Ds Θloc σ z hσ))
-                        (hopD-subΘᵉ V Ds Θloc σ e hσ)))
+              (+-mono-≤ (+-mono-≤ (hopD-subΘᵗ V η Ds ((t ×ᵗ s) ∷ Θloc) σ f hσ)
+                                  (hopD-subΘᵗ V η Ds Θloc σ z hσ))
+                        (hopD-subΘᵉ V η Ds Θloc σ e hσ)))
     (≤-trans (≤-reflexive
-               (*3-mix P (hopDᵗ V f) Sf (hopDᵗ V z) Sz (hopDᵉ V e) Se))
-             (+-monoʳ-≤ (P * (hopDᵗ V f + hopDᵗ V z + hopDᵉ V e))
+               (*3-mix P (hopDᵗ V η f) Sf (hopDᵗ V η z) Sz (hopDᵉ V η e) Se))
+             (+-monoʳ-≤ (P * (hopDᵗ V η f + hopDᵗ V η z + hopDᵉ V η e))
                (≤-reflexive
                  (trans (cong (P *_)
                           (trans (cong (_+ Se) (sumW-+ Gf Gz Ds (length Θsub)))
@@ -2509,57 +2532,57 @@ mutual
     Sf = sumW Gf Ds (length Θsub)
     Sz = sumW Gz Ds (length Θsub)
     Se = sumW Ge Ds (length Θsub)
-  hopD-subΘᵉ V Ds Θloc σ (mergeAllᵉ e)   hσ = s≤s (hopD-subΘᵉ V Ds Θloc σ e hσ)
-  hopD-subΘᵉ V Ds Θloc σ (concatAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V Ds Θloc σ e hσ)
-  hopD-subΘᵉ V Ds Θloc σ (switchAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V Ds Θloc σ e hσ)
-  hopD-subΘᵉ V Ds Θloc σ (exhaustAllᵉ e) hσ = s≤s (hopD-subΘᵉ V Ds Θloc σ e hσ)
-  hopD-subΘᵉ V Ds Θloc σ (μᵉ e)     hσ = hopD-subΘᵉ V Ds Θloc σ e hσ
-  hopD-subΘᵉ V Ds Θloc σ (varᵉ x)   hσ = z≤n
-  hopD-subΘᵉ V Ds Θloc σ (deferᵉ e) hσ = z≤n
+  hopD-subΘᵉ V η Ds Θloc σ (mergeAllᵉ e)   hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
+  hopD-subΘᵉ V η Ds Θloc σ (concatAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
+  hopD-subΘᵉ V η Ds Θloc σ (switchAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
+  hopD-subΘᵉ V η Ds Θloc σ (exhaustAllᵉ e) hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
+  hopD-subΘᵉ V η Ds Θloc σ (μᵉ e)     hσ = hopD-subΘᵉ V η Ds Θloc σ e hσ
+  hopD-subΘᵉ V η Ds Θloc σ (varᵉ x)   hσ = z≤n
+  hopD-subΘᵉ V η Ds Θloc σ (deferᵉ e) hσ = z≤n
 
-  hopD-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Ds : ℕ → ℕ)
-    (Θloc : List Ty) (σ : All (Val Γ) Θsub)
-    (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) → EnvHopDs V σ Ds →
-    hopDᵗ V (subΘTm Θloc σ tm)
-      ≤ hopDᵗ V tm
+  hopD-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (η : Fin n → ℕ)
+    (Ds : ℕ → ℕ) (Θloc : List Ty) (σ : All (Val Γ) Θsub)
+    (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) → EnvHopDs V η σ Ds →
+    hopDᵗ V η (subΘTm Θloc σ tm)
+      ≤ hopDᵗ V η tm
         + sumW (λ j → pmᵗ V (length Θloc + j) tm) Ds (length Θsub)
   hopD-subΘᵗ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θsub = Θsub}
-             V Ds Θloc σ (varᵗ x) hσ with ∈-++⁻ Θloc x in eq
+             V η Ds Θloc σ (varᵗ x) hσ with ∈-++⁻ Θloc x in eq
   ... | inj₁ y = z≤n
   ... | inj₂ z =
-    ≤-trans (≤-reflexive (hopD-wkReify V _ (lookupEnv σ z)))
-    (≤-trans (envHopDs-lookup V Ds σ hσ z)
+    ≤-trans (≤-reflexive (hopD-wkReify V η _ (lookupEnv σ z)))
+    (≤-trans (envHopDs-lookup V η Ds σ hσ z)
              (sumW-hit (λ j → pmᵗ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ}
                                   V (length Θloc + j) (varᵗ x))
                        Ds (length Θsub) (varIx z) (varIx<len z)
                        (ifEq (varIx x) (length Θloc + varIx z)
                              (varIx-ix Θloc x eq))))
-  hopD-subΘᵗ V Ds Θloc σ unit̂     hσ = z≤n
-  hopD-subΘᵗ V Ds Θloc σ (bool̂ _) hσ = z≤n
-  hopD-subΘᵗ V Ds Θloc σ (nat̂ _)  hσ = z≤n
-  hopD-subΘᵗ {Θsub = Θsub} V Ds Θloc σ (pairᵗ a b) hσ =
-    ⊔-bound (hopDᵗ V a) (hopDᵗ V b)
+  hopD-subΘᵗ V η Ds Θloc σ unit̂     hσ = z≤n
+  hopD-subΘᵗ V η Ds Θloc σ (bool̂ _) hσ = z≤n
+  hopD-subΘᵗ V η Ds Θloc σ (nat̂ _)  hσ = z≤n
+  hopD-subΘᵗ {Θsub = Θsub} V η Ds Θloc σ (pairᵗ a b) hσ =
+    ⊔-bound (hopDᵗ V η a) (hopDᵗ V η b)
             (sumW (λ j → pmᵗ V (length Θloc + j) a) Ds (length Θsub))
             (sumW (λ j → pmᵗ V (length Θloc + j) b) Ds (length Θsub))
             (sumW (λ j → pmᵗ V (length Θloc + j) (pairᵗ a b)) Ds (length Θsub))
-            (hopD-subΘᵗ V Ds Θloc σ a hσ) (hopD-subΘᵗ V Ds Θloc σ b hσ)
+            (hopD-subΘᵗ V η Ds Θloc σ a hσ) (hopD-subΘᵗ V η Ds Θloc σ b hσ)
             (sumW-⊔ (λ j → pmᵗ V (length Θloc + j) a)
                     (λ j → pmᵗ V (length Θloc + j) b) Ds (length Θsub))
-  hopD-subΘᵗ V Ds Θloc σ (fstᵗ q) hσ = hopD-subΘᵗ V Ds Θloc σ q hσ
-  hopD-subΘᵗ V Ds Θloc σ (sndᵗ q) hσ = hopD-subΘᵗ V Ds Θloc σ q hσ
-  hopD-subΘᵗ V Ds Θloc σ (inlᵗ a) hσ = hopD-subΘᵗ V Ds Θloc σ a hσ
-  hopD-subΘᵗ V Ds Θloc σ (inrᵗ a) hσ = hopD-subΘᵗ V Ds Θloc σ a hσ
-  hopD-subΘᵗ {Θsub = Θsub} V Ds Θloc σ (caseᵗ {s = s} {t = t} sc l r) hσ
+  hopD-subΘᵗ V η Ds Θloc σ (fstᵗ q) hσ = hopD-subΘᵗ V η Ds Θloc σ q hσ
+  hopD-subΘᵗ V η Ds Θloc σ (sndᵗ q) hσ = hopD-subΘᵗ V η Ds Θloc σ q hσ
+  hopD-subΘᵗ V η Ds Θloc σ (inlᵗ a) hσ = hopD-subΘᵗ V η Ds Θloc σ a hσ
+  hopD-subΘᵗ V η Ds Θloc σ (inrᵗ a) hσ = hopD-subΘᵗ V η Ds Θloc σ a hσ
+  hopD-subΘᵗ {Θsub = Θsub} V η Ds Θloc σ (caseᵗ {s = s} {t = t} sc l r) hσ
     rewrite pm-subΘᵗ V 0 (s ∷ Θloc) σ l (s≤s z≤n)
           | pm-subΘᵗ V 0 (t ∷ Θloc) σ r (s≤s z≤n) =
     ≤-trans (+-mono-≤
-              (⊔-bound (hopDᵗ V l) (hopDᵗ V r) SL SR (SL ⊔ SR)
-                       (hopD-subΘᵗ V Ds (s ∷ Θloc) σ l hσ)
-                       (hopD-subΘᵗ V Ds (t ∷ Θloc) σ r hσ) ≤-refl)
-              (*-monoʳ-≤ C (hopD-subΘᵗ V Ds Θloc σ sc hσ)))
+              (⊔-bound (hopDᵗ V η l) (hopDᵗ V η r) SL SR (SL ⊔ SR)
+                       (hopD-subΘᵗ V η Ds (s ∷ Θloc) σ l hσ)
+                       (hopD-subΘᵗ V η Ds (t ∷ Θloc) σ r hσ) ≤-refl)
+              (*-monoʳ-≤ C (hopD-subΘᵗ V η Ds Θloc σ sc hσ)))
     (≤-trans (≤-reflexive
-               (+*-mix (hopDᵗ V l ⊔ hopDᵗ V r) (SL ⊔ SR) C (hopDᵗ V sc) SSC))
-             (+-monoʳ-≤ ((hopDᵗ V l ⊔ hopDᵗ V r) + C * hopDᵗ V sc)
+               (+*-mix (hopDᵗ V η l ⊔ hopDᵗ V η r) (SL ⊔ SR) C (hopDᵗ V η sc) SSC))
+             (+-monoʳ-≤ ((hopDᵗ V η l ⊔ hopDᵗ V η r) + C * hopDᵗ V η sc)
                (≤-trans (+-mono-≤ (sumW-⊔ GL GR Ds (length Θsub))
                                   (≤-reflexive (sumW-* C GSC Ds (length Θsub))))
                         (≤-reflexive
@@ -2573,30 +2596,30 @@ mutual
     SL  = sumW GL Ds (length Θsub)
     SR  = sumW GR Ds (length Θsub)
     SSC = sumW GSC Ds (length Θsub)
-  hopD-subΘᵗ {Θsub = Θsub} V Ds Θloc σ (ifᵗ c a b) hσ =
-    ⊔-bound (hopDᵗ V a) (hopDᵗ V b)
+  hopD-subΘᵗ {Θsub = Θsub} V η Ds Θloc σ (ifᵗ c a b) hσ =
+    ⊔-bound (hopDᵗ V η a) (hopDᵗ V η b)
             (sumW (λ j → pmᵗ V (length Θloc + j) a) Ds (length Θsub))
             (sumW (λ j → pmᵗ V (length Θloc + j) b) Ds (length Θsub))
             (sumW (λ j → pmᵗ V (length Θloc + j) (ifᵗ c a b)) Ds (length Θsub))
-            (hopD-subΘᵗ V Ds Θloc σ a hσ) (hopD-subΘᵗ V Ds Θloc σ b hσ)
+            (hopD-subΘᵗ V η Ds Θloc σ a hσ) (hopD-subΘᵗ V η Ds Θloc σ b hσ)
             (sumW-⊔ (λ j → pmᵗ V (length Θloc + j) a)
                     (λ j → pmᵗ V (length Θloc + j) b) Ds (length Θsub))
-  hopD-subΘᵗ V Ds Θloc σ (primᵗ _ a) hσ = z≤n
-  hopD-subΘᵗ V Ds Θloc σ (strmᵗ e)   hσ = hopD-subΘᵉ V Ds Θloc σ e hσ
+  hopD-subΘᵗ V η Ds Θloc σ (primᵗ _ a) hσ = z≤n
+  hopD-subΘᵗ V η Ds Θloc σ (strmᵗ e)   hσ = hopD-subΘᵉ V η Ds Θloc σ e hσ
 
-  hopD-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (Ds : ℕ → ℕ)
-    (Θloc : List Ty) (σ : All (Val Γ) Θsub)
-    (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) → EnvHopDs V σ Ds →
-    hopDᵗˢ V (subΘTms Θloc σ ts)
-      ≤ hopDᵗˢ V ts
+  hopD-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (V : ℕ) (η : Fin n → ℕ)
+    (Ds : ℕ → ℕ) (Θloc : List Ty) (σ : All (Val Γ) Θsub)
+    (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) → EnvHopDs V η σ Ds →
+    hopDᵗˢ V η (subΘTms Θloc σ ts)
+      ≤ hopDᵗˢ V η ts
         + sumW (λ j → pmᵗˢ V (length Θloc + j) ts) Ds (length Θsub)
-  hopD-subΘᵗˢ V Ds Θloc σ []       hσ = z≤n
-  hopD-subΘᵗˢ {Θsub = Θsub} V Ds Θloc σ (y ∷ ys) hσ =
-    ⊔-bound (hopDᵗ V y) (hopDᵗˢ V ys)
+  hopD-subΘᵗˢ V η Ds Θloc σ []       hσ = z≤n
+  hopD-subΘᵗˢ {Θsub = Θsub} V η Ds Θloc σ (y ∷ ys) hσ =
+    ⊔-bound (hopDᵗ V η y) (hopDᵗˢ V η ys)
             (sumW (λ j → pmᵗ V (length Θloc + j) y) Ds (length Θsub))
             (sumW (λ j → pmᵗˢ V (length Θloc + j) ys) Ds (length Θsub))
             (sumW (λ j → pmᵗˢ V (length Θloc + j) (y ∷ ys)) Ds (length Θsub))
-            (hopD-subΘᵗ V Ds Θloc σ y hσ) (hopD-subΘᵗˢ V Ds Θloc σ ys hσ)
+            (hopD-subΘᵗ V η Ds Θloc σ y hσ) (hopD-subΘᵗˢ V η Ds Θloc σ ys hσ)
             (sumW-⊔ (λ j → pmᵗ V (length Θloc + j) y)
                     (λ j → pmᵗˢ V (length Θloc + j) ys) Ds (length Θsub))
 
@@ -2622,49 +2645,49 @@ case-shape : ∀ a b c d → a + ((b + c) + d) ≡ (a + b) + (d + c)
 case-shape = solve 4
   (λ a b c d → a :+ ((b :+ c) :+ d) := (a :+ b) :+ (d :+ c)) refl
 
-hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (Ds : ℕ → ℕ)
-  (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) → EnvHopDs V env Ds →
-  hopDᵛ V u (evalWith tm env)
-    ≤ hopDᵗ V tm + sumW (λ j → pmᵗ V j tm) Ds (length Θ)
-hopD-evalWith {Γ = Γ} {Θ = Θ} V Ds (varᵗ x) env hσ =
-  ≤-trans (envHopDs-lookup V Ds env hσ x)
+hopD-evalWith : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (η : Fin n → ℕ) (Ds : ℕ → ℕ)
+  (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) → EnvHopDs V η env Ds →
+  hopDᵛ V η u (evalWith tm env)
+    ≤ hopDᵗ V η tm + sumW (λ j → pmᵗ V j tm) Ds (length Θ)
+hopD-evalWith {Γ = Γ} {Θ = Θ} V η Ds (varᵗ x) env hσ =
+  ≤-trans (envHopDs-lookup V η Ds env hσ x)
           (sumW-hit (λ j → pmᵗ {Γ = Γ} {Δᵍ = []} {Δ = []} V j (varᵗ x))
                     Ds (length Θ) (varIx x)
                     (varIx<len x) (ifEq (varIx x) (varIx x) refl))
-hopD-evalWith V Ds unit̂     env hσ = z≤n
-hopD-evalWith V Ds (bool̂ _) env hσ = z≤n
-hopD-evalWith V Ds (nat̂ _)  env hσ = z≤n
-hopD-evalWith {Θ = Θ} V Ds (pairᵗ a b) env hσ =
-  ⊔-bound (hopDᵗ V a) (hopDᵗ V b)
+hopD-evalWith V η Ds unit̂     env hσ = z≤n
+hopD-evalWith V η Ds (bool̂ _) env hσ = z≤n
+hopD-evalWith V η Ds (nat̂ _)  env hσ = z≤n
+hopD-evalWith {Θ = Θ} V η Ds (pairᵗ a b) env hσ =
+  ⊔-bound (hopDᵗ V η a) (hopDᵗ V η b)
           (sumW (λ j → pmᵗ V j a) Ds (length Θ))
           (sumW (λ j → pmᵗ V j b) Ds (length Θ))
           (sumW (λ j → pmᵗ V j (pairᵗ a b)) Ds (length Θ))
-          (hopD-evalWith V Ds a env hσ) (hopD-evalWith V Ds b env hσ)
+          (hopD-evalWith V η Ds a env hσ) (hopD-evalWith V η Ds b env hσ)
           (sumW-⊔ (λ j → pmᵗ V j a) (λ j → pmᵗ V j b) Ds (length Θ))
-hopD-evalWith V Ds (fstᵗ q) env hσ =
-  ≤-trans (m≤m⊔n _ _) (hopD-evalWith V Ds q env hσ)
-hopD-evalWith V Ds (sndᵗ q) env hσ =
-  ≤-trans (m≤n⊔m _ _) (hopD-evalWith V Ds q env hσ)
-hopD-evalWith V Ds (inlᵗ a) env hσ = hopD-evalWith V Ds a env hσ
-hopD-evalWith V Ds (inrᵗ a) env hσ = hopD-evalWith V Ds a env hσ
+hopD-evalWith V η Ds (fstᵗ q) env hσ =
+  ≤-trans (m≤m⊔n _ _) (hopD-evalWith V η Ds q env hσ)
+hopD-evalWith V η Ds (sndᵗ q) env hσ =
+  ≤-trans (m≤n⊔m _ _) (hopD-evalWith V η Ds q env hσ)
+hopD-evalWith V η Ds (inlᵗ a) env hσ = hopD-evalWith V η Ds a env hσ
+hopD-evalWith V η Ds (inrᵗ a) env hσ = hopD-evalWith V η Ds a env hσ
 -- the scrutinee's VALUE and the bound on it are abstracted together, so
 -- the branch sees the bound already specialised to its own injection
-hopD-evalWith {Θ = Θ} V Ds (caseᵗ {s = s} {t = t} sc l r) env hσ
-  with evalWith sc env | hopD-evalWith V Ds sc env hσ
+hopD-evalWith {Θ = Θ} V η Ds (caseᵗ {s = s} {t = t} sc l r) env hσ
+  with evalWith sc env | hopD-evalWith V η Ds sc env hσ
 ... | inj₁ x | ihsc =
-  ≤-trans (hopD-evalWith V (λ { zero → hopDᵛ V s x ; (suc j) → Ds j })
+  ≤-trans (hopD-evalWith V η (λ { zero → hopDᵛ V η s x ; (suc j) → Ds j })
                          l (x ∷ᵃ env) (≤-refl , hσ))
-  (≤-trans (+-mono-≤ (m≤m⊔n (hopDᵗ V l) (hopDᵗ V r))
+  (≤-trans (+-mono-≤ (m≤m⊔n (hopDᵗ V η l) (hopDᵗ V η r))
              (+-mono-≤
-               (≤-trans (*-monoˡ-≤ (hopDᵛ V s x) pm0l≤C)
+               (≤-trans (*-monoˡ-≤ (hopDᵛ V η s x) pm0l≤C)
                         (≤-trans (*-monoʳ-≤ C ihsc)
-                                 (≤-reflexive (*-distribˡ-+ C (hopDᵗ V sc) SSC))))
+                                 (≤-reflexive (*-distribˡ-+ C (hopDᵗ V η sc) SSC))))
                (sumW-mono GL (λ j → GL j ⊔ GR j) Ds (length Θ)
                           (λ j → m≤m⊔n (GL j) (GR j)))))
   (≤-trans (≤-reflexive
-             (case-shape (hopDᵗ V l ⊔ hopDᵗ V r) (C * hopDᵗ V sc)
+             (case-shape (hopDᵗ V η l ⊔ hopDᵗ V η r) (C * hopDᵗ V η sc)
                          (C * SSC) SLR))
-           (+-monoʳ-≤ ((hopDᵗ V l ⊔ hopDᵗ V r) + C * hopDᵗ V sc) fold)))
+           (+-monoʳ-≤ ((hopDᵗ V η l ⊔ hopDᵗ V η r) + C * hopDᵗ V η sc) fold)))
   where
   C    = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
   GL   = λ j → pmᵗ V (suc j) l
@@ -2680,19 +2703,19 @@ hopD-evalWith {Θ = Θ} V Ds (caseᵗ {s = s} {t = t} sc l r) env hσ
     (trans (cong (SLR +_) (sumW-* C GSC Ds (length Θ)))
            (sumW-+ (λ j → GL j ⊔ GR j) (λ j → C * GSC j) Ds (length Θ)))
 ... | inj₂ y | ihsc =
-  ≤-trans (hopD-evalWith V (λ { zero → hopDᵛ V t y ; (suc j) → Ds j })
+  ≤-trans (hopD-evalWith V η (λ { zero → hopDᵛ V η t y ; (suc j) → Ds j })
                          r (y ∷ᵃ env) (≤-refl , hσ))
-  (≤-trans (+-mono-≤ (m≤n⊔m (hopDᵗ V l) (hopDᵗ V r))
+  (≤-trans (+-mono-≤ (m≤n⊔m (hopDᵗ V η l) (hopDᵗ V η r))
              (+-mono-≤
-               (≤-trans (*-monoˡ-≤ (hopDᵛ V t y) pm0r≤C)
+               (≤-trans (*-monoˡ-≤ (hopDᵛ V η t y) pm0r≤C)
                         (≤-trans (*-monoʳ-≤ C ihsc)
-                                 (≤-reflexive (*-distribˡ-+ C (hopDᵗ V sc) SSC))))
+                                 (≤-reflexive (*-distribˡ-+ C (hopDᵗ V η sc) SSC))))
                (sumW-mono GR (λ j → GL j ⊔ GR j) Ds (length Θ)
                           (λ j → m≤n⊔m (GL j) (GR j)))))
   (≤-trans (≤-reflexive
-             (case-shape (hopDᵗ V l ⊔ hopDᵗ V r) (C * hopDᵗ V sc)
+             (case-shape (hopDᵗ V η l ⊔ hopDᵗ V η r) (C * hopDᵗ V η sc)
                          (C * SSC) SLR))
-           (+-monoʳ-≤ ((hopDᵗ V l ⊔ hopDᵗ V r) + C * hopDᵗ V sc) fold)))
+           (+-monoʳ-≤ ((hopDᵗ V η l ⊔ hopDᵗ V η r) + C * hopDᵗ V η sc) fold)))
   where
   C    = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
   GL   = λ j → pmᵗ V (suc j) l
@@ -2707,44 +2730,44 @@ hopD-evalWith {Θ = Θ} V Ds (caseᵗ {s = s} {t = t} sc l r) env hσ
   fold = ≤-reflexive
     (trans (cong (SLR +_) (sumW-* C GSC Ds (length Θ)))
            (sumW-+ (λ j → GL j ⊔ GR j) (λ j → C * GSC j) Ds (length Θ)))
-hopD-evalWith {Θ = Θ} V Ds (ifᵗ c a b) env hσ with evalWith c env
+hopD-evalWith {Θ = Θ} V η Ds (ifᵗ c a b) env hσ with evalWith c env
 ... | true =
-  ≤-trans (hopD-evalWith V Ds a env hσ)
-          (+-mono-≤ (m≤m⊔n (hopDᵗ V a) (hopDᵗ V b))
+  ≤-trans (hopD-evalWith V η Ds a env hσ)
+          (+-mono-≤ (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b))
                     (sumW-mono (λ j → pmᵗ V j a)
                                (λ j → pmᵗ V j a ⊔ pmᵗ V j b) Ds (length Θ)
                                (λ j → m≤m⊔n (pmᵗ V j a) (pmᵗ V j b))))
 ... | false =
-  ≤-trans (hopD-evalWith V Ds b env hσ)
-          (+-mono-≤ (m≤n⊔m (hopDᵗ V a) (hopDᵗ V b))
+  ≤-trans (hopD-evalWith V η Ds b env hσ)
+          (+-mono-≤ (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b))
                     (sumW-mono (λ j → pmᵗ V j b)
                                (λ j → pmᵗ V j a ⊔ pmᵗ V j b) Ds (length Θ)
                                (λ j → m≤n⊔m (pmᵗ V j a) (pmᵗ V j b))))
 -- every PrimOp lands in natᵗ or boolᵗ, so its value carries no hops —
 -- one clause per operator, since the result type is what makes that true
-hopD-evalWith V Ds (primᵗ add  a) env hσ = z≤n
-hopD-evalWith V Ds (primᵗ sub  a) env hσ = z≤n
-hopD-evalWith V Ds (primᵗ mul  a) env hσ = z≤n
-hopD-evalWith V Ds (primᵗ eqᵖ  a) env hσ = z≤n
-hopD-evalWith V Ds (primᵗ ltᵖ  a) env hσ = z≤n
-hopD-evalWith V Ds (primᵗ notᵖ a) env hσ = z≤n
+hopD-evalWith V η Ds (primᵗ add  a) env hσ = z≤n
+hopD-evalWith V η Ds (primᵗ sub  a) env hσ = z≤n
+hopD-evalWith V η Ds (primᵗ mul  a) env hσ = z≤n
+hopD-evalWith V η Ds (primᵗ eqᵖ  a) env hσ = z≤n
+hopD-evalWith V η Ds (primᵗ ltᵖ  a) env hσ = z≤n
+hopD-evalWith V η Ds (primᵗ notᵖ a) env hσ = z≤n
 -- and the two strmᵗ clauses: a closed template IS its own value, and an
 -- open one is closed by substitution — which is (H1) at Θloc ≡ []
-hopD-evalWith V Ds (strmᵗ e) []ᵃ       hσ =
-  ≤-reflexive (sym (+-identityʳ (hopDᵉ V e)))
-hopD-evalWith V Ds (strmᵗ e) (v ∷ᵃ vs) hσ =
-  hopD-subΘᵉ V Ds [] (v ∷ᵃ vs) e hσ
+hopD-evalWith V η Ds (strmᵗ e) []ᵃ       hσ =
+  ≤-reflexive (sym (+-identityʳ (hopDᵉ V η e)))
+hopD-evalWith V η Ds (strmᵗ e) (v ∷ᵃ vs) hσ =
+  hopD-subΘᵉ V η Ds [] (v ∷ᵃ vs) e hσ
 
 -- a one-value environment: the weighted sum collapses to exactly the pm
 -- the mapᵉ clause's coefficient is built from
-hopD-applyFn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ)
+hopD-applyFn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ)
   (f : Fn Γ [] [] [] s u) (v : Val Γ s) →
-  hopDᵛ V u (applyFn f v) ≤ hopDᵗ V f + (pmᵗ V 0 f ⊔ 1) * hopDᵛ V s v
-hopD-applyFn {s = s} V f v =
-  ≤-trans (hopD-evalWith V (λ _ → hopDᵛ V s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
-          (+-monoʳ-≤ (hopDᵗ V f)
-            (≤-trans (≤-reflexive (+-identityʳ (pmᵗ V 0 f * hopDᵛ V s v)))
-                     (*-monoˡ-≤ (hopDᵛ V s v) (m≤m⊔n (pmᵗ V 0 f) 1))))
+  hopDᵛ V η u (applyFn f v) ≤ hopDᵗ V η f + (pmᵗ V 0 f ⊔ 1) * hopDᵛ V η s v
+hopD-applyFn {s = s} V η f v =
+  ≤-trans (hopD-evalWith V η (λ _ → hopDᵛ V η s v) f (v ∷ᵃ []ᵃ) (≤-refl , tt))
+          (+-monoʳ-≤ (hopDᵗ V η f)
+            (≤-trans (≤-reflexive (+-identityʳ (pmᵗ V 0 f * hopDᵛ V η s v)))
+                     (*-monoˡ-≤ (hopDᵛ V η s v) (m≤m⊔n (pmᵗ V 0 f) 1))))
 
 -- THE CONSUMER, and the whole point of the block: a mapᵉ frame's
 -- emission sits under the mapᵉ's OWN hop depth, given only that the
@@ -2752,13 +2775,13 @@ hopD-applyFn {s = s} V f v =
 -- mapᵉ clause, with the arithmetic already done — and with hopDᵉ
 -- (mergeAllᵉ c) ≡ suc (hopDᵉ c) definitional, it is also the hop
 -- edge's strictness.
-hopD-map-emit : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ)
+hopD-map-emit : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ) (η : Fin n → ℕ)
   (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) (v : Val Γ s) →
-  (f₀ : Fn Γ [] [] [] s u) → hopDᵗ V f₀ ≤ hopDᵗ V f → pmᵗ V 0 f₀ ≤ pmᵗ V 0 f →
-  hopDᵛ V s v ≤ hopDᵉ V b →
-  hopDᵛ V u (applyFn f₀ v) ≤ hopDᵉ V (mapᵉ f b)
-hopD-map-emit V f b v f₀ hf hp hv =
-  ≤-trans (hopD-applyFn V f₀ v)
+  (f₀ : Fn Γ [] [] [] s u) → hopDᵗ V η f₀ ≤ hopDᵗ V η f → pmᵗ V 0 f₀ ≤ pmᵗ V 0 f →
+  hopDᵛ V η s v ≤ hopDᵉ V η b →
+  hopDᵛ V η u (applyFn f₀ v) ≤ hopDᵉ V η (mapᵉ f b)
+hopD-map-emit V η f b v f₀ hf hp hv =
+  ≤-trans (hopD-applyFn V η f₀ v)
           (+-mono-≤ hf (*-mono-≤ (⊔-mono-≤ hp ≤-refl) hv))
 
 
@@ -4876,15 +4899,17 @@ burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 -- against the index-blind coefficient, retracted, and restated here
 -- once occs0 had been re-gated — see the hop-descent memo below for the
 -- mechanism and the corpus numbers both ways.
-hopDev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → InstEvent (Val Γ u) → Bool
-hopDev? {u = u} V r (value v)   = hopDᵛ V u v ≤ᵇ r
-hopDev? V r (init _)    = true
-hopDev? V r (close _ _) = true
-hopDev? V r (handoff _) = true
-hopDev? V r complete    = true
+hopDev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → (Fin n → ℕ) → ℕ →
+          InstEvent (Val Γ u) → Bool
+hopDev? {u = u} V η r (value v)   = hopDᵛ V η u v ≤ᵇ r
+hopDev? V η r (init _)    = true
+hopDev? V η r (close _ _) = true
+hopDev? V η r (handoff _) = true
+hopDev? V η r complete    = true
 
-burstHopD? : ∀ {n} {Γ : Ctx n} {u} → ℕ → ℕ → Stream Γ u → Bool
-burstHopD? V r = all (λ em → all (hopDev? V r) (InstEmit.events em))
+burstHopD? : ∀ {n} {Γ : Ctx n} {u} → ℕ → (Fin n → ℕ) → ℕ →
+             Stream Γ u → Bool
+burstHopD? V η r = all (λ em → all (hopDev? V η r) (InstEmit.events em))
 
 ------------------------------------------------------------------
 -- PROJECTING THE INVARIANT.  _∧_ matches on its FIRST argument, so

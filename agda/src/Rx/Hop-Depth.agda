@@ -71,6 +71,7 @@
 module Rx.Hop-Depth where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≡ᵇ_)
+open import Data.Fin  using (Fin)
 open import Data.Bool using (if_then_else_)
 open import Data.List using (List; []; _∷_)
 open import Data.Product using (_,_)
@@ -176,67 +177,82 @@ mutual
   pmᵗˢ V k []       = 0
   pmᵗˢ V k (y ∷ ys) = pmᵗ V k y ⊔ pmᵗˢ V k ys
 
+-- WHY IT IS η-PARAMETERISED (η : Fin n → ℕ, the SLOT HOP ENVIRONMENT):
+-- the constant-0 input clause was REFUTED (input-wet, machine-checked —
+-- Verify-Budget-Sufficient.Walk-Level, Demand-Probe series W): an
+-- obs-typed shared slot's def emits values of positive hop, and a
+-- subscription that connects to the slot receives them, so a bound
+-- that zeroes the share boundary is false at the first mergeAllᵉ over
+-- an input.  The clause now reports η i — the caller's assignment of a
+-- hop depth to each slot.  The honest instantiation is Rx.Slot-Hop's
+-- slotHop, computable by recursion on the slot index because the
+-- telescope is stratified (a shared def reads only earlier inputs —
+-- `inputsBelowᵉ`, Rx.Slots).  η ≡ const 0 recovers the old measure,
+-- so nothing downstream is forced to care until it meets an input.
 mutual
-  hopDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  -- a slot is reached by a CONNECT, which pays with unconn, not with
-  -- hopD — the share boundary is not this measure's business
-  hopDᵉ V (input i)       = 0
-  hopDᵉ V (ofᵉ ts)        = hopDᵗˢ V ts
-  hopDᵉ V emptyᵉ          = 0
+  hopDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ) →
+          Exp Γ Δᵍ Δ Θ t → ℕ
+  -- THE SLOT: a connect delivers the def's emissions, so the input
+  -- reads the slot's own hop off the environment — see the header
+  hopDᵉ V η (input i)       = η i
+  hopDᵉ V η (ofᵉ ts)        = hopDᵗˢ V η ts
+  hopDᵉ V η emptyᵉ          = 0
   -- the fn's chain concatenates with the source's, and the source's
   -- depth lands at every Θ-var occurrence
-  hopDᵉ V (mapᵉ f e)      = hopDᵗ V f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ V e
+  hopDᵉ V η (mapᵉ f e)      = hopDᵗ V η f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ V η e
   -- the count is a natᵗ term: its value carries no observable
-  hopDᵉ V (takeᵉ c e)     = hopDᵉ V e
+  hopDᵉ V η (takeᵉ c e)     = hopDᵉ V η e
   -- the refold, bounded by V — see the header
-  hopDᵉ V (scanᵉ f z e)   =
-    (2 + pmᵗ V 0 f) ^ V * (hopDᵗ V f + hopDᵗ V z + hopDᵉ V e)
+  hopDᵉ V η (scanᵉ f z e)   =
+    (2 + pmᵗ V 0 f) ^ V * (hopDᵗ V η f + hopDᵗ V η z + hopDᵉ V η e)
   -- THE HOP EDGE: entering an inner costs exactly one
-  hopDᵉ V (mergeAllᵉ e)   = suc (hopDᵉ V e)
-  hopDᵉ V (concatAllᵉ e)  = suc (hopDᵉ V e)
-  hopDᵉ V (switchAllᵉ e)  = suc (hopDᵉ V e)
-  hopDᵉ V (exhaustAllᵉ e) = suc (hopDᵉ V e)
+  hopDᵉ V η (mergeAllᵉ e)   = suc (hopDᵉ V η e)
+  hopDᵉ V η (concatAllᵉ e)  = suc (hopDᵉ V η e)
+  hopDᵉ V η (switchAllᵉ e)  = suc (hopDᵉ V η e)
+  hopDᵉ V η (exhaustAllᵉ e) = suc (hopDᵉ V η e)
   -- unfoldμ substitutes the ORIGINAL closed μ for a Δᵍ var, and Δᵍ
   -- vars are reachable only under deferᵉ, which this measure cuts —
   -- so an unfold cannot change hopD, and the μ edge stays weakly
   -- monotone (it pays with dBound-μ's s, as it already did)
-  hopDᵉ V (μᵉ e)          = hopDᵉ V e
-  hopDᵉ V (varᵉ x)        = 0
-  hopDᵉ V (deferᵉ e)      = 0
+  hopDᵉ V η (μᵉ e)          = hopDᵉ V η e
+  hopDᵉ V η (varᵉ x)        = 0
+  hopDᵉ V η (deferᵉ e)      = 0
 
-  hopDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  hopDᵗ V (varᵗ x)      = 0
-  hopDᵗ V unit̂          = 0
-  hopDᵗ V (bool̂ _)      = 0
-  hopDᵗ V (nat̂ _)       = 0
-  hopDᵗ V (pairᵗ a b)   = hopDᵗ V a ⊔ hopDᵗ V b
-  hopDᵗ V (fstᵗ p)      = hopDᵗ V p
-  hopDᵗ V (sndᵗ p)      = hopDᵗ V p
-  hopDᵗ V (inlᵗ a)      = hopDᵗ V a
-  hopDᵗ V (inrᵗ a)      = hopDᵗ V a
+  hopDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ) →
+          Tm Γ Δᵍ Δ Θ t → ℕ
+  hopDᵗ V η (varᵗ x)      = 0
+  hopDᵗ V η unit̂          = 0
+  hopDᵗ V η (bool̂ _)      = 0
+  hopDᵗ V η (nat̂ _)       = 0
+  hopDᵗ V η (pairᵗ a b)   = hopDᵗ V η a ⊔ hopDᵗ V η b
+  hopDᵗ V η (fstᵗ p)      = hopDᵗ V η p
+  hopDᵗ V η (sndᵗ p)      = hopDᵗ V η p
+  hopDᵗ V η (inlᵗ a)      = hopDᵗ V η a
+  hopDᵗ V η (inrᵗ a)      = hopDᵗ V η a
   -- caseᵗ BINDS, so it plugs like a fn: the scrutinee's depth lands at
   -- every occurrence of the branch's bound variable
-  hopDᵗ V (caseᵗ s l r) =
-    (hopDᵗ V l ⊔ hopDᵗ V r) + (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * hopDᵗ V s
-  hopDᵗ V (ifᵗ c a b)   = hopDᵗ V a ⊔ hopDᵗ V b
+  hopDᵗ V η (caseᵗ s l r) =
+    (hopDᵗ V η l ⊔ hopDᵗ V η r) + (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * hopDᵗ V η s
+  hopDᵗ V η (ifᵗ c a b)   = hopDᵗ V η a ⊔ hopDᵗ V η b
   -- every PrimOp lands in natᵗ or boolᵗ, so its value carries nothing
-  hopDᵗ V (primᵗ _ a)   = 0
-  hopDᵗ V (strmᵗ e)     = hopDᵉ V e
+  hopDᵗ V η (primᵗ _ a)   = 0
+  hopDᵗ V η (strmᵗ e)     = hopDᵉ V η e
 
-  hopDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  hopDᵗˢ V []       = 0
-  hopDᵗˢ V (y ∷ ys) = hopDᵗ V y ⊔ hopDᵗˢ V ys
+  hopDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ) →
+           List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  hopDᵗˢ V η []       = 0
+  hopDᵗˢ V η (y ∷ ys) = hopDᵗ V η y ⊔ hopDᵗˢ V η ys
 
 -- the same reading on a runtime value: an embedded observable is its
 -- expression's, a ground payload carries no hops
-hopDᵛ : ∀ {n} {Γ : Ctx n} (V : ℕ) (t : Ty) → Val Γ t → ℕ
-hopDᵛ V unitᵗ    _        = 0
-hopDᵛ V boolᵗ    _        = 0
-hopDᵛ V natᵗ     _        = 0
-hopDᵛ V (s ×ᵗ t) (a , b)  = hopDᵛ V s a ⊔ hopDᵛ V t b
-hopDᵛ V (s +ᵗ t) (inj₁ a) = hopDᵛ V s a
-hopDᵛ V (s +ᵗ t) (inj₂ b) = hopDᵛ V t b
-hopDᵛ V (obs t)  e        = hopDᵉ V e
+hopDᵛ : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (t : Ty) → Val Γ t → ℕ
+hopDᵛ V η unitᵗ    _        = 0
+hopDᵛ V η boolᵗ    _        = 0
+hopDᵛ V η natᵗ     _        = 0
+hopDᵛ V η (s ×ᵗ t) (a , b)  = hopDᵛ V η s a ⊔ hopDᵛ V η t b
+hopDᵛ V η (s +ᵗ t) (inj₁ a) = hopDᵛ V η s a
+hopDᵛ V η (s +ᵗ t) (inj₂ b) = hopDᵛ V η t b
+hopDᵛ V η (obs t)  e        = hopDᵉ V η e
 
 ------------------------------------------------------------------
 -- ELIMINATION CONGRUENCES: hopD and pm are invariant under
@@ -301,61 +317,62 @@ mutual
     cong₂ _⊔_ (pm-elimGᵗ V k x cl y) (pm-elimGᵗˢ V k x cl ys)
 
 mutual
-  hopD-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
-    hopDᵉ V (elimGExp x cl b) ≡ hopDᵉ V b
-  hopD-elimGᵉ V x cl (input i)       = refl
-  hopD-elimGᵉ V x cl (ofᵉ ts)        = hopD-elimGᵗˢ V x cl ts
-  hopD-elimGᵉ V x cl emptyᵉ          = refl
-  hopD-elimGᵉ V x cl (mapᵉ f b)      =
-    cong₂ _+_ (hopD-elimGᵗ V x cl f)
+  hopD-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (η : Fin n → ℕ)
+    (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    hopDᵉ V η (elimGExp x cl b) ≡ hopDᵉ V η b
+  hopD-elimGᵉ V η x cl (input i)       = refl
+  hopD-elimGᵉ V η x cl (ofᵉ ts)        = hopD-elimGᵗˢ V η x cl ts
+  hopD-elimGᵉ V η x cl emptyᵉ          = refl
+  hopD-elimGᵉ V η x cl (mapᵉ f b)      =
+    cong₂ _+_ (hopD-elimGᵗ V η x cl f)
               (cong₂ _*_ (cong (_⊔ 1) (pm-elimGᵗ V 0 x cl f))
-                         (hopD-elimGᵉ V x cl b))
-  hopD-elimGᵉ V x cl (takeᵉ c b)     = hopD-elimGᵉ V x cl b
-  hopD-elimGᵉ V x cl (scanᵉ f z b)   =
+                         (hopD-elimGᵉ V η x cl b))
+  hopD-elimGᵉ V η x cl (takeᵉ c b)     = hopD-elimGᵉ V η x cl b
+  hopD-elimGᵉ V η x cl (scanᵉ f z b)   =
     cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
-              (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V x cl f)
-                                    (hopD-elimGᵗ V x cl z))
-                         (hopD-elimGᵉ V x cl b))
-  hopD-elimGᵉ V x cl (mergeAllᵉ b)   = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (concatAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V x cl b)
-  hopD-elimGᵉ V x cl (μᵉ b)          = hopD-elimGᵉ V (there x) cl b
-  hopD-elimGᵉ V x cl (varᵉ y)        = refl
-  hopD-elimGᵉ V x cl (deferᵉ b)      = refl
+              (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V η x cl f)
+                                    (hopD-elimGᵗ V η x cl z))
+                         (hopD-elimGᵉ V η x cl b))
+  hopD-elimGᵉ V η x cl (mergeAllᵉ b)   = cong suc (hopD-elimGᵉ V η x cl b)
+  hopD-elimGᵉ V η x cl (concatAllᵉ b)  = cong suc (hopD-elimGᵉ V η x cl b)
+  hopD-elimGᵉ V η x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V η x cl b)
+  hopD-elimGᵉ V η x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V η x cl b)
+  hopD-elimGᵉ V η x cl (μᵉ b)          = hopD-elimGᵉ V η (there x) cl b
+  hopD-elimGᵉ V η x cl (varᵉ y)        = refl
+  hopD-elimGᵉ V η x cl (deferᵉ b)      = refl
 
-  hopD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
-    hopDᵗ V (elimGTm x cl f) ≡ hopDᵗ V f
-  hopD-elimGᵗ V x cl (varᵗ y)      = refl
-  hopD-elimGᵗ V x cl unit̂          = refl
-  hopD-elimGᵗ V x cl (bool̂ b)      = refl
-  hopD-elimGᵗ V x cl (nat̂ m)       = refl
-  hopD-elimGᵗ V x cl (pairᵗ a b)   =
-    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
-  hopD-elimGᵗ V x cl (fstᵗ p)      = hopD-elimGᵗ V x cl p
-  hopD-elimGᵗ V x cl (sndᵗ p)      = hopD-elimGᵗ V x cl p
-  hopD-elimGᵗ V x cl (inlᵗ a)      = hopD-elimGᵗ V x cl a
-  hopD-elimGᵗ V x cl (inrᵗ a)      = hopD-elimGᵗ V x cl a
-  hopD-elimGᵗ V x cl (caseᵗ s l r) =
-    cong₂ _+_ (cong₂ _⊔_ (hopD-elimGᵗ V x cl l) (hopD-elimGᵗ V x cl r))
+  hopD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (η : Fin n → ℕ)
+    (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    hopDᵗ V η (elimGTm x cl f) ≡ hopDᵗ V η f
+  hopD-elimGᵗ V η x cl (varᵗ y)      = refl
+  hopD-elimGᵗ V η x cl unit̂          = refl
+  hopD-elimGᵗ V η x cl (bool̂ b)      = refl
+  hopD-elimGᵗ V η x cl (nat̂ m)       = refl
+  hopD-elimGᵗ V η x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (hopD-elimGᵗ V η x cl a) (hopD-elimGᵗ V η x cl b)
+  hopD-elimGᵗ V η x cl (fstᵗ p)      = hopD-elimGᵗ V η x cl p
+  hopD-elimGᵗ V η x cl (sndᵗ p)      = hopD-elimGᵗ V η x cl p
+  hopD-elimGᵗ V η x cl (inlᵗ a)      = hopD-elimGᵗ V η x cl a
+  hopD-elimGᵗ V η x cl (inrᵗ a)      = hopD-elimGᵗ V η x cl a
+  hopD-elimGᵗ V η x cl (caseᵗ s l r) =
+    cong₂ _+_ (cong₂ _⊔_ (hopD-elimGᵗ V η x cl l) (hopD-elimGᵗ V η x cl r))
               (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_ (pm-elimGᵗ V 0 x cl l)
                                                (pm-elimGᵗ V 0 x cl r))
                                     refl)
-                         (hopD-elimGᵗ V x cl s))
-  hopD-elimGᵗ V x cl (ifᵗ c a b)   =
-    cong₂ _⊔_ (hopD-elimGᵗ V x cl a) (hopD-elimGᵗ V x cl b)
-  hopD-elimGᵗ V x cl (primᵗ op a)  = refl
-  hopD-elimGᵗ V x cl (strmᵗ b)     = hopD-elimGᵉ V x cl b
+                         (hopD-elimGᵗ V η x cl s))
+  hopD-elimGᵗ V η x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (hopD-elimGᵗ V η x cl a) (hopD-elimGᵗ V η x cl b)
+  hopD-elimGᵗ V η x cl (primᵗ op a)  = refl
+  hopD-elimGᵗ V η x cl (strmᵗ b)     = hopD-elimGᵉ V η x cl b
 
-  hopD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    hopDᵗˢ V (elimGTms x cl ts) ≡ hopDᵗˢ V ts
-  hopD-elimGᵗˢ V x cl []       = refl
-  hopD-elimGᵗˢ V x cl (y ∷ ys) =
-    cong₂ _⊔_ (hopD-elimGᵗ V x cl y) (hopD-elimGᵗˢ V x cl ys)
+  hopD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (η : Fin n → ℕ)
+    (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    hopDᵗˢ V η (elimGTms x cl ts) ≡ hopDᵗˢ V η ts
+  hopD-elimGᵗˢ V η x cl []       = refl
+  hopD-elimGᵗˢ V η x cl (y ∷ ys) =
+    cong₂ _⊔_ (hopD-elimGᵗ V η x cl y) (hopD-elimGᵗˢ V η x cl ys)
 
-hopD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (body : Exp Γ (t ∷ []) [] [] t) →
-  hopDᵉ V (unfoldμ body) ≡ hopDᵉ V (μᵉ body)
-hopD-unfoldμ V body = hopD-elimGᵉ V (here refl) (μᵉ body) body
+hopD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (η : Fin n → ℕ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  hopDᵉ V η (unfoldμ body) ≡ hopDᵉ V η (μᵉ body)
+hopD-unfoldμ V η body = hopD-elimGᵉ V η (here refl) (μᵉ body) body

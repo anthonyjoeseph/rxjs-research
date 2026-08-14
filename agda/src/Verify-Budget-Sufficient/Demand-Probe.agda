@@ -28,6 +28,7 @@ open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
                                  Slots; Slot; shared; Path; root; EvalSt;
                                  Sched; opIterD; slotsSize)
 open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Slot-Hop using (slotHop; slotHop-fix)
 open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?;
                                  burstHopD?; hopR; unconn; hasAtLeast-pad)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep;
@@ -513,7 +514,7 @@ _ : runReg 1 1 prog-P-c ≡ false   -- not all ≤ 1 → max exactly 2
 _ = refl
 
 -- dBound numerals (CALIBRATION: fails if formula changes)
-_ : hopDᵉ 5 prog-P-c ≡ 1
+_ : hopDᵉ 5 (slotHop 5 ins₀) prog-P-c ≡ 1
 _ = refl
 _ : dBound 5 0 0 1 5 ≡ 11
 _ = refl
@@ -551,7 +552,7 @@ _ = refl
 
 -- dBound numerals
 -- LOAD-BEARING: fails if hopDᵉ formula for scan(f-B) changes
-_ : hopDᵉ 5 prog-P-a ≡ 244
+_ : hopDᵉ 5 (slotHop 5 ins₀) prog-P-a ≡ 244
 _ = refl
 _ : dBound 5 0 0 244 13 ≡ 1477
 _ = refl
@@ -591,7 +592,7 @@ _ = refl
 -- hopDᵉ is same as prog-P-a: ofᵉ[nat̂ 1, nat̂ 2] contributes 0 hops,
 -- scan-f-B and scan-a0-defer are unchanged
 -- LOAD-BEARING: fails if scan hopDᵉ formula changes
-_ : hopDᵉ 5 prog-P-b ≡ 244
+_ : hopDᵉ 5 (slotHop 5 ins₀) prog-P-b ≡ 244
 _ = refl
 _ : dBound 5 0 0 244 14 ≡ 1478
 _ = refl
@@ -660,7 +661,7 @@ progD d k =
 -- the gas the face's demand hypothesis supplies at the minimal
 -- instantiation: suc G, with G = syncSizeᵉ b + hopDᵉ 0 b
 sucG : Closed Γ₀ natᵗ → ℕ
-sucG b = suc (syncSizeᵉ b + hopDᵉ 0 b)
+sucG b = suc (syncSizeᵉ b + hopDᵉ 0 (slotHop 0 ins₀) b)
 
 -- the sum side, pinned.  LOAD-BEARING: each fails if syncSizeᵉ or
 -- hopDᵉ moves, which is what the whole comparison rests on.
@@ -749,7 +750,7 @@ _ = refl
 
 -- dBound numerals
 -- LOAD-BEARING: fails if hopDᵉ or syncSizeᵉ formula changes
-_ : hopDᵉ 5 prog-P-c3 ≡ 244
+_ : hopDᵉ 5 (slotHop 5 ins₀) prog-P-c3 ≡ 244
 _ = refl
 _ : syncSizeᵉ prog-P-c3 ≡ 15
 _ = refl
@@ -793,7 +794,7 @@ _ : runReg 5 5 prog-P-c4 ≡ false
 _ = refl
 
 -- dBound numerals
-_ : hopDᵉ 5 prog-P-c4 ≡ 244
+_ : hopDᵉ 5 (slotHop 5 ins₀) prog-P-c4 ≡ 244
 _ = refl
 _ : syncSizeᵉ prog-P-c4 ≡ 16
 _ = refl
@@ -850,9 +851,9 @@ _ = refl
 
 -- hopDᵉ at Ŝ=5: measures compounding growth (inner 243; outer 244× that)
 -- LOAD-BEARING: fails if nested-scan hopDᵉ formula changes
-_ : hopDᵉ 5 (scanᵉ scan-f-B scan-a0-defer (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ []))) ≡ 243
+_ : hopDᵉ 5 (slotHop 5 ins₀) (scanᵉ scan-f-B scan-a0-defer (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ []))) ≡ 243
 _ = refl
-_ : hopDᵉ 5 prog-P-COMP2 ≡ 59293
+_ : hopDᵉ 5 (slotHop 5 ins₀) prog-P-COMP2 ≡ 59293
 _ = refl
 
 -- margin check at Ŝ=5 (G grows with hopDᵉ; max pathLen = 5):
@@ -914,7 +915,7 @@ _ = refl
 -- dBound numerals
 -- hopDᵉ: input zero contributes 0, so same formula as P-a
 -- LOAD-BEARING: fails if shared-slot hopDᵉ formula changes
-_ : hopDᵉ 5 prog-P-S1 ≡ 244
+_ : hopDᵉ 5 (slotHop 5 ins₁) prog-P-S1 ≡ 244
 _ = refl
 _ : syncSizeᵉ prog-P-S1 ≡ 13
 _ = refl
@@ -932,43 +933,37 @@ _ : (3 ≤ᵇ 1478) ≡ true
 _ = refl
 
 ----------------------------------------------------------------------
--- SERIES W (2026-08-14) — the input clause's burstHopD? conjunct,
--- REFUTED.  This is the input-wet probe, and it found the statement
--- FALSE rather than confirming it.
+-- SERIES W (2026-08-14) — the input clause's burstHopD? conjunct.
+-- IT REFUTED THE OLD STATEMENT, AND IT NOW CERTIFIES THE NEW ONE, on
+-- the SAME program: that is the whole value of keeping it.
 --
--- THE MECHANISM, in four definitional facts:
---   · hopDᵉ V (input i) = 0                     (Hop-Depth, ∀ V)
+-- THE REFUTATION, for the record (the old conjunct read
+-- `burstHopD? F (hopDᵉ F prog-W)`, with hopD's input clause = 0):
+--   · hopDᵉ V (input i) = 0                     — the old clause, ∀ V
 --   · hopDᵛ V (obs t) e = hopDᵉ V e             — a stream-typed VALUE
 --     carries its expression's hop depth
 --   · sharedConnect passes the def's burst up via sharedPlumb, which
 --     retags `kind` only — values untouched
---   · no entry hypothesis bounds the hop content of a slot's def:
---     slotsCaps? is size/width, INV? is size/fnCap.  The hop channel
---     for slot defs is UNGUARDED.
+--   · no entry hypothesis bounded the hop content of a slot's def:
+--     slotsCaps? is size/width, INV? is size/fnCap.
 -- So a slot of type (obs natᵗ) whose shared def emits the stream-value
--- strmᵗ (mergeAllᵉ emptyᵉ) — hop depth 1 — puts a hop-1 value into the
--- connect burst, against a conjunct demanding ≤ hopDᵉ F (input i) = 0.
+-- strmᵗ (mergeAllᵉ emptyᵉ) — hop depth 1 — put a hop-1 value into the
+-- connect burst against a bound of 0, at every F and every witness j′.
 --
--- WHY NO ESCAPE: the conjunct does not mention the witness j′, so the
--- Σ fails at EVERY witness — this is not the upward-closure trap.  And
--- the bound is 0 at EVERY F (definitional with F free), so no choice
--- of measurement index saves it.
+-- THE REPAIR, which is what the rows below now pin: hopD carries an
+-- input environment η (Rx.Hop-Depth) and the walk face rides the
+-- honest one, `slotHop F sl` (Rx.Slot-Hop).  At this very program
+-- `slotHop F insᵂ zero` IS the def's hop, so the bound rises from 0 to
+-- 1 and the conjunct comes out TRUE — with the hop-1 value it used to
+-- reject now exactly at the bound.
 --
--- REGION REACHED: the share/connect edge itself, at an obs-typed slot
--- — the exact region input-wet was FALSITY for.  NOT reached: ground-
--- typed slots (their values have hopDᵛ = 0 and the conjunct holds
--- trivially there — that is where every earlier share probe lived).
---
--- CONSEQUENCE: WalkStmt (input i) is false as stated, hence so are
--- input-wet and the walk face subscribeE-walk-level.  The restatement
--- decision (a slots-hop hypothesis threaded like slotsFnCap, vs
--- restricting slot types, vs re-funding the *All hop descent for
--- shared carriers) is a design call — recorded in input-wet's header,
--- NOT taken here.
+-- REGION REACHED, and it is the point: the share/connect edge at an
+-- OBS-TYPED slot — the exact region input-wet was FALSITY for, and the
+-- one every earlier share probe missed by living at ground-typed slots
+-- (whose values are hop-0, where the old conjunct held trivially).
+-- NOT REACHED: slot defs whose own hop is large enough to test
+-- slotHop-cap's quantitative margin — that bound is still unprobed.
 ----------------------------------------------------------------------
-
-absurd-tf : true ≡ false → ⊥
-absurd-tf ()
 
 -- context: ONE slot of STREAM type — the shape no prior probe used
 Γᵂ : Ctx 1
@@ -993,23 +988,46 @@ schedᵂ = sched-init prog-W insᵂ
 stᵂ : EvalSt prog-W
 stᵂ = st-init prog-W
 
-cᵂ : Caps
-cᵂ = caps 10 10 1
-
--- the conjunct's bound is 0 at EVERY measurement index — definitional
--- LOAD-BEARING: fails if hopDᵉ's input clause ever learns to see slots
-_ : ∀ (V : ℕ) → hopDᵉ V prog-W ≡ 0
+-- THE OLD BOUND, kept as the refutation's own witness: with the
+-- constant-0 environment the input clause still measures 0 at every
+-- index.  LOAD-BEARING — it is what makes the row below a repair
+-- rather than a coincidence of renaming.
+_ : ∀ (V : ℕ) → hopDᵉ V (λ _ → 0) prog-W ≡ 0
 _ = λ _ → refl
 
 -- the smuggled value's hop depth is 1 at EVERY index — definitional
 -- LOAD-BEARING: fails if mergeAllᵉ's hop contribution changes
-_ : ∀ (V : ℕ) → hopDᵉ V Yᵂ ≡ 1
+_ : ∀ (V : ℕ) → hopDᵉ V (λ _ → 0) Yᵂ ≡ 1
 _ = λ _ → refl
 
--- THE CORE ROW: the conjunct is FALSE at every measurement index and
--- every non-dry gas.  LOAD-BEARING — this is the refutation.
+-- THE HONEST BOUND IS 1, NOT 0, AT EVERY INDEX — slotHop reads the
+-- slot's own def.  LOAD-BEARING: this single number is the difference
+-- between the refuted statement and the restated one.
+_ : ∀ (V : ℕ) → hopDᵉ V (slotHop V insᵂ) prog-W ≡ 1
+_ = λ _ → refl
+
+-- and it is the FIXPOINT, not a coincidence of this program's shape:
+-- the staged number equals the def's hop under the full environment.
+-- LOAD-BEARING: fails if ηAt's stage recursion misses slot zero.
+_ : ∀ (V : ℕ) →
+    slotHop V insᵂ zero ≡ hopDᵉ V (slotHop V insᵂ) defᵂ
+_ = λ V → slotHop-fix V insᵂ zero refl
+
+-- THE CORE ROW, FLIPPED.  The conjunct that was FALSE at every
+-- measurement index and every non-dry gas is now TRUE at both — same
+-- program, same burst, same hop-1 value, honest bound.
+-- LOAD-BEARING — this is the receipt that the restatement repairs the
+-- refuted region, and it fails if slotHop stops seeing the def.
 _ : ∀ (F : ℕ) (fl : Gas) →
-    burstHopD? F (hopDᵉ F prog-W)
+    burstHopD? F (slotHop F insᵂ) (hopDᵉ F (slotHop F insᵂ) prog-W)
+      (proj₁ (subscribeE (gs fl) prog-W root 0 0 schedᵂ stᵂ)) ≡ true
+_ = λ _ _ → refl
+
+-- and the OLD bound still rejects that same burst — so the row above
+-- is a real repair, not a weakened test.
+-- LOAD-BEARING: fails if the burst ever stops carrying the hop-1 value.
+_ : ∀ (F : ℕ) (fl : Gas) →
+    burstHopD? F (λ _ → 0) 0
       (proj₁ (subscribeE (gs fl) prog-W root 0 0 schedᵂ stᵂ)) ≡ false
 _ = λ _ _ → refl
 
@@ -1025,49 +1043,18 @@ _ = refl
 _ : hasDry (proj₁ (subscribeE g0 prog-W root 0 0 schedᵂ stᵂ)) ≡ true
 _ = refl
 
--- THE FULL REFUTATION: WalkStmt (input zero) → ⊥, every hypothesis
--- discharged at a concrete-or-verbatim instantiation.  The symbolic
--- choices: L̂ := opIterD itself (≤-refl), Ŝ = F := cSize (frameStep L̂ cᵂ)
--- (≤-refl; ≥ 2 by iterSize-infl), G ℓ := the dBound term (≤-refl),
--- g := gasPad (suc G) g0 (hasAtLeast-pad).  Everything else computes:
--- caps, INV?, sizes, depths, nest pinned by ≤ᵇ⇒≤ _ _ tt at
--- dep = bud = ops = 1000.  The burst normalizes under the symbolic
--- gas because no clause on the input/of path scrutinizes fuel past
--- the one connect peel, which gasPad (suc G) g0 exposes definitionally.
-_ : WalkStmt {e = prog-W} prog-W → ⊥
-_ = λ stmt →
-  let L̂ᵂ = opIterD 10 10 1000 1000 1000 0
-      Ŝᵂ = Caps.cSize (frameStep L̂ᵂ cᵂ)
-      Gᵂ = dBound Ŝᵂ (hopR Ŝᵂ) (unconn insᵂ (EvalSt.connectedShares stᵂ))
-                  (hopDᵉ Ŝᵂ prog-W) (syncSizeᵉ prog-W)
-      gᵂ = gasPad (suc Gᵂ) g0
-      res = stmt cᵂ 10 Ŝᵂ Ŝᵂ (hopR Ŝᵂ) Gᵂ Gᵂ L̂ᵂ 1000 1000 1000 0
-              gᵂ root 0 0 insᵂ schedᵂ stᵂ
-              (≤ᵇ⇒≤ _ _ tt)            -- 2 ≤ cSize
-              (≤ᵇ⇒≤ _ _ tt)            -- 1 ≤ cReg
-              refl                        -- Sched.slots ≡ sl
-              refl                        -- slotsCaps?
-              (≤ᵇ⇒≤ _ _ tt)            -- slotsSize ≤
-              refl                        -- capsOK? at entry
-              (≤ᵇ⇒≤ _ _ tt)            -- sizeᵉ ≤
-              (≤ᵇ⇒≤ _ _ tt)            -- dWᵉ ≤
-              refl                        -- pathSz? root
-              (≤ᵇ⇒≤ _ _ tt)            -- suc pathLen ≤
-              (≤ᵇ⇒≤ _ _ tt)            -- nest ≤ bud
-              (≤ᵇ⇒≤ _ _ tt)            -- suc sizeᵉ ≤ ops
-              (≤ᵇ⇒≤ _ _ tt)            -- depthE ≤ dep
-              refl                        -- INV? at entry
-              (≤ᵇ⇒≤ _ _ tt)            -- fnCapᵉ ≤ Ψ
-              refl                        -- pathB? root
-              (≤-trans (≤ᵇ⇒≤ 2 10 tt)
-                       (iterSize-infl 10 (s≤s z≤n) L̂ᵂ 10))  -- 2 ≤ Ŝ
-              refl                        -- F ≡ Ŝ
-              refl                        -- R̂ ≡ hopR Ŝ
-              ≤-refl                      -- cSize (frameStep L̂) ≤ Ŝ
-              ≤-refl                      -- opIterD ≤ L̂
-              ≤-refl                      -- dBound ≤ G
-              (hasAtLeast-pad (suc Gᵂ) g0 ≤-refl)  -- gas
-              ≤-refl                      -- pathLen + G ≤ ℓ
-              refl                        -- regsLen? at entry
-      w7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ res)))))))
-  in absurd-tf (trans (sym w7) refl)
+-- THE FULL INSTANTIATION that carried the refutation — WalkStmt
+-- {e = prog-W} prog-W → ⊥, every hypothesis discharged at concrete or
+-- verbatim values — IS DELETED, because the statement it refuted no
+-- longer exists: WalkStmt's hop conjunct now reads the honest
+-- environment and the rows above pin it TRUE on this very program.
+-- Keeping a ⊥-derivation against a restated conjunct would not
+-- typecheck, and re-deriving the restated conjunct FROM the face would
+-- be circular.  What the instantiation established is preserved where
+-- it is checkable: the flipped core row above, on the same program,
+-- same burst, same value.
+-- RECOVERY: git show 9c3527a restores the full ⊥-derivation, including
+-- the symbolic instantiation recipe (L̂ := opIterD itself, Ŝ = F :=
+-- cSize (frameStep L̂ cᵂ), G ℓ := the dBound term, g := gasPad (suc G)
+-- g0) — worth having if any future walk-face restatement needs to be
+-- re-refuted at this shape.

@@ -57,6 +57,7 @@ open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ;
                                 pmOⱽ; pmIⱽ; pWⱽ;
                                 pmO≤ceil; pmI≤ceil; pWᵉ≤entryCeil)
 open import Rx.Hop-Depth  using (hopDᵉ)
+open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 RegId; Chain;
                                 Path; root; share-sink; _↠_; Frame;
@@ -1305,7 +1306,7 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      g hasAtLeast
        suc (dBound Ŝ (hopR Ŝ)
                    (unconn sl (EvalSt.connectedShares st))
-                   (hopDᵉ Ŝ b) (syncSizeᵉ b)) →
+                   (hopDᵉ Ŝ (slotHop Ŝ sl) b) (syncSizeᵉ b)) →
      capsOK? (capsAt e sl id) sched st ≡ true →
      dWᵉ n sl b ≤ Caps.cWid (capsAt e sl id) →
      3 + nest b sl (EvalSt.connectedShares st) ≤ B →       -- nestOK

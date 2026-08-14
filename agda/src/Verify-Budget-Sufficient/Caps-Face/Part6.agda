@@ -780,8 +780,9 @@ private
                 (proj₁ (proj₂ (proj₂ r))) ≡ true)
          × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))) →
     (∀ (C : ℕ) → 2 ≤ C →
-      ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
-      (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)) →
+      ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (η : Fin n → ℕ) → (∀ i → η i ≤ szB C 1) →
+      (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+      (syncSizeᵉ o ≤ C) × (hopDᵉ C η o ≤ hopR C)) →
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
         (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
@@ -896,8 +897,9 @@ abstract
      ) →
     -- reach-resets  (Verify-Budget-Sufficient/Caps-Face.agda, above)
     (∀ (C : ℕ) → 2 ≤ C →
-      ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
-      (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
+      ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (η : Fin n → ℕ) → (∀ i → η i ≤ szB C 1) →
+      (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+      (syncSizeᵉ o ≤ C) × (hopDᵉ C η o ≤ hopR C)
      ) →
     -- foldPath-sink-N  (Verify-Budget-Sufficient/Deliveries.agda:787)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

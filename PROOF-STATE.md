@@ -74,13 +74,16 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`input-wet`** (Walk-Level) — **REFUTED, machine-checked** (Demand-Probe
-  series W); restatement IN PROGRESS. The Slot telescope is now stratified
-  (`inputsBelowᵉ k` on shared defs, Rx.Slots) — that landed green; the
-  remaining leg is the η-parameterized hopD (per-slot hop via slotHop,
-  well-founded by the stratification) and the WalkStmt restatement over
-  it. Routes, refutation story and census in its header. Still the tier's
-  top item; no other walk-face work until it is restated.
+- **`slotHop-cap`** (Measures) — FALSITY, and it is the whole
+  quantitative content of the η restatement: the slot telescope's own
+  hop must sit under `hopR`. Unprobed; margin analysis in its header.
+- **`hopD-η-congᵉ` / `ηAt-agrees`** (Rx.Slot-Hop) — DIFFICULTY. The two
+  mechanical inductions `slotHop-fix` is assembled from; stratification
+  hands each its guard.
+- **`input-wet`** (Walk-Level) — FALSITY, RESTATED over the honest hop
+  environment after a machine refutation (Demand-Probe series W, which
+  now certifies the new conjunct on the same program). Route taken and
+  the two rejected alternatives in its header.
 - **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY. The μ edge's L̂ transport.
   No caps twin exists to donate it: the reset-anchor ceiling is wet-side
   only, so every walk clause re-derives its own. Route in its header.

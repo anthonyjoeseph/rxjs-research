@@ -144,6 +144,7 @@ open import Verify-Budget-Sufficient.Walk-Level
   using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono;
          any-dry-++; splitEvents-nodry; splitBurst-nodry)
 open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Slot-Hop using (slotHop)
 open import Rx.Frame-Width using (dWᵉ; dWᵛ; pWᵛ; outWᵛ)
 
 ------------------------------------------------------------------
@@ -1880,7 +1881,7 @@ postulate
     fuel hasAtLeast suc (dBound (sizeCapAt e sl (suc id))
                                 (hopR (sizeCapAt e sl (suc id)))
                                 (unconn sl (EvalSt.connectedShares st))
-                                (hopDᵉ (sizeCapAt e sl (suc id)) o)
+                                (hopDᵉ (sizeCapAt e sl (suc id)) (slotHop (sizeCapAt e sl (suc id)) sl) o)
                                 (syncSizeᵉ o))
 
 -- THE ASSEMBLY.  Applies the walk face at the inner frame's (c , J),
@@ -1927,7 +1928,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
   Ŝr     = sizeCapAt e sl (suc id)
   L̂      = opIterD (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) J
   G      = dBound Ŝr (hopR Ŝr) (unconn sl (EvalSt.connectedShares st))
-                  (hopDᵉ Ŝr o) (syncSizeᵉ o)
+                  (hopDᵉ Ŝr (slotHop Ŝr sl) o) (syncSizeᵉ o)
   ℓ      = B + (suc (pathLen κ) + G)
 
   -- slots unchanged by nextNode bump (definitional)

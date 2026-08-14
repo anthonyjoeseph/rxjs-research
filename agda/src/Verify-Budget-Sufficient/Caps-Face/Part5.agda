@@ -1038,7 +1038,8 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- and that face is itself consumed further down the file than the hop
 -- section this used to sit in.
 reach-resets : ∀ (C : ℕ) → 2 ≤ C →
-  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
-  (syncSizeᵉ o ≤ C) × (hopDᵉ C o ≤ hopR C)
+  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (η : Fin n → ℕ) → (∀ i → η i ≤ szB C 1) →
+  (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
+  (syncSizeᵉ o ≤ C) × (hopDᵉ C η o ≤ hopR C)
 reach-resets = reach-reset
 
