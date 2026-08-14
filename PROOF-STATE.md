@@ -75,13 +75,15 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`walk-input` / `walk-mu`** (Walk-Level) — FALSITY, the SAME
-  coincidence at a weaker instance: both decrement edges have their dry
-  side matched by a proven lemma (dBound-connect, dBound-μ), so a green
-  here says nothing about the case that can fail. The reset-anchor
-  pins now supply the size-to-Ŝ link their edges spend (connect-edge's
-  `sizeᵉ d ≤ Ŝ` premise); reclassify only when the clause is actually
-  worked.
+- **`input-wet`** (Walk-Level) — FALSITY: the connect gas peel's dry side
+  is matched by the proven dBound-connect, so a green here says nothing
+  about the case that can fail. It is the share/connect edge and nothing
+  else; its header names the eight proven lemmas expected to pay it.
+- **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY. The μ edge's L̂ transport.
+  No caps twin exists to donate it: the reset-anchor ceiling is wet-side
+  only, so every walk clause re-derives its own. Route in its header.
+- **`fnCap-unfoldμ`** (Walk-Level) — DIFFICULTY, low: the fnCap sibling
+  of the proven shellSize-/syncSize-/size-unfoldμ inductions.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.

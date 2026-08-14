@@ -95,7 +95,7 @@ open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp;
                                 mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                                 μᵉ; varᵉ; deferᵉ; unfoldμ; applyFn)
 open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; hopD-unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain;
                                 memberSource; Path; root; share-sink; _↠_;
                                 Stream; subscribeE; sharedConnect;
@@ -137,6 +137,7 @@ open import Verify-Budget-Sufficient.Caps-Face
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
+         op-step-mu;
          op-desc; push-desc; frame-desc; tail-desc;
          walk-desc; inner-desc;
          inner-nil; inner-step; walk-nil;
@@ -151,7 +152,7 @@ open import Verify-Budget-Sufficient.Caps
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
 open import Verify-Budget-Sufficient.Subscribe-Face
-  using (countLen; countVals; countIn; valsOf; pushEmit-count;
+  using (unfoldμ-caps; subscribeE-caps; countLen; countVals; countIn; valsOf; pushEmit-count;
          pushBurst-len; retagEvents-caps;
          burstCount?-widen; burstCount?-tail;
          thruWrap-vals; splitBurst-len; mul-fits; valsIn; valsLen;
@@ -160,7 +161,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner;
          depthConsume; depthWalk)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps)
+  using (nest-keeps; mu-step)
 open import Verify-Budget-Sufficient.Op-Budget
   using (opIterD-dominated)
 
@@ -625,11 +626,8 @@ postulate
   -- unconditionally (J₀ = suc (J + …)) before any d/k-dependent step
   -- runs.
 
-  -- share/connect clause — expects connect-edge, sharedConnect-unconn,
-  -- obs-slot-shared, unconn-keeps, unconn-cons-≤, connect-anchor and
-  -- the two share-novals lemmas; connect is one of the three gas peels
-  walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (i : Fin n) → WalkStmt {e = e} (input i)
+  -- (walk-input is GROUND — assembled below over subscribeE-caps and
+  -- input-wet; the share/connect gas peel is what input-wet still owes)
   -- one-shot emitter — expects oneShot-tail-dry for hasDry
   walk-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (ts : List (Tm Γ [] [] [] u)) → WalkStmt {e = e} (ofᵉ ts)
@@ -650,12 +648,7 @@ postulate
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
-  -- the μ gas peel — expects mu-edge, shellSize-unfoldμ,
-  -- inner-unfoldμ, hasAtLeast-peel; stated gas-generic (the g0
-  -- instance is vacuously true: its hypotheses are contradictory,
-  -- which walkFace's absurd clause proves rather than assumes)
-  walk-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (body : Exp Γ (u ∷ []) [] [] u) → WalkStmt {e = e} (μᵉ body)
+  -- (walk-mu is GROUND — forward-declared below, body after walkFace)
   -- registration + parked body — the clause that MINTS a registry
   -- entry, so regsLen?'s growth is paid here
   walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -680,6 +673,167 @@ postulate
     INV? Ψ B sched st ≡ true →
     INV? Ψ B′ sched′ (installNode nid ns st) ≡ true
 
+------------------------------------------------------------------
+-- THE μ CLAUSE'S TWO MISSING PIECES.  Everything else walk-mu spends
+-- is proven and named in its body; these two are what the caps twin
+-- could NOT donate, for two different reasons.
+------------------------------------------------------------------
+postulate
+  -- (1) fnCap ACROSS AN UNFOLD.  `unfoldμ body` is `elimGExp` putting
+  -- `μᵉ body` at the guarded variable, `fnCapᵉ (varᵉ x) = 0` and
+  -- `fnCapᵉ (μᵉ e) = fnCapᵉ e` (.Measures), so substitution can only
+  -- reintroduce `fnCapᵉ body` where a 0 stood — the ⊔ is idempotent
+  -- and the measure is unchanged.  ROUTE: structural induction over
+  -- elimGExp, the same shape as the PROVEN shellSize-unfoldμ /
+  -- syncSize-unfoldμ / size-unfoldμ (.Measures, .Keeps-Ring); this is
+  -- their fnCap sibling and nothing more.
+  --
+  -- Stated as EQUALITY rather than ≤ deliberately: the ≤ direction is
+  -- all walk-mu spends, but the induction proves the equality and a
+  -- weaker statement here would be the "do NOT weaken to typecheck"
+  -- move (CLAUDE.md) rather than a simplification.
+  fnCap-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+    fnCapᵉ (unfoldμ body) ≡ fnCapᵉ (μᵉ body)
+
+  -- (2) THE μ LEVEL DESCENT, for the L̂ ceiling.  THIS ONE HAS NO CAPS
+  -- TWIN BY CONSTRUCTION: `ceil`/`lb` are the reset-anchor pins, wet
+  -- side only — subscribeE-caps carries no L̂ ledger at all — so no
+  -- caps clause can donate the transport and every walk clause
+  -- re-derives it (subscribeAll-walk spends `op-desc`; the *All
+  -- descendants spend `inner-desc`).
+  --
+  -- A μ unfolding is a FRESH ENTRY, not a chain edge: it subscribes a
+  -- LARGER term at a MINTED index (`suc (sizeAt S (j + j₀))`) while
+  -- spending one nesting level, which is exactly the shape `op-step-mu`
+  -- (.Caps-Chain) already opens quadratic room for.  ROUTE: the same
+  -- quad-arith room, with opIterD-mono and sLvlD-suc landing the minted
+  -- index under it — i.e. `inner-desc`'s argument at an offset index
+  -- rather than at `suc j`, which is the only reason inner-desc itself
+  -- does not apply (`j + j₀` is not definitionally a successor).
+  -- Stated over the Caps RECORD, not over raw S/W, so the call site
+  -- needs no sizeAt/frameStep conversion — the minted index IS
+  -- `suc (Caps.cSize (frameStep (j + j₀) c))`, which is what
+  -- subscribeE-caps' own μ clause passes its IH.
+  mu-lvl-desc : ∀ (c : Caps) (d bud m j j₀ : ℕ) → 2 ≤ Caps.cSize c →
+    opIterD (Caps.cSize c) (Caps.cWid c) d bud
+            (suc (Caps.cSize (frameStep (j + j₀) c))) (j + j₀)
+      ≤ opIterD (Caps.cSize c) (Caps.cWid c) d (suc bud) (suc m) j
+
+------------------------------------------------------------------
+-- THE INPUT CLAUSE'S WET RESIDUE.  walk-input is assembled below; this
+-- is the half the caps face cannot give.
+--
+-- WHY THE SPLIT IS EXACT.  WalkStmt's first thirteen hypotheses ARE
+-- subscribeE-caps' hypothesis list verbatim, and its first four
+-- conjuncts ARE subscribeE-caps' Σ verbatim (.Subscribe-Face) — the
+-- module header has said so since the statement was written, and it is
+-- literally true, so the caps half of EVERY walk clause is a delegation
+-- rather than a re-derivation.  What no caps call can supply is the wet
+-- five, and for `input i` those are what the share/connect edge owes:
+-- subscribeSharedSlot's third branch is `sharedConnect`, one of the
+-- three gas peels, and the demand drop that funds it is connect-edge's
+-- (U strictly drops on the connectedShares insert, both child measures
+-- reset at the anchor).
+--
+-- IT TAKES THE CAPS RECEIPTS AS HYPOTHESES, AND THAT IS THE POINT: j′
+-- is BOUND by the caps call at the assembly site, so this postulate
+-- cannot be satisfied by inflating the witness.  Stated with a free j′
+-- and no caps receipts it would be upward-closed and vacuous — the
+-- failure mode CLAUDE.md's Σ-receipt rule names, and the one that
+-- machine-refuted the exit-level count face.
+--
+-- EXPECTED TO PAY IT when it is ground: connect-edge (the demand drop),
+-- sharedConnect-unconn and unconn-cons-≤ (the U bookkeeping either side
+-- of the insert), obs-slot-shared and connect-anchor (the child's reset
+-- caps), unconn-keeps (U never rises across the child's own work), and
+-- the two share-novals lemmas for the hasDry conjunct on the two
+-- non-connecting branches.  All eight are PROVEN and in scope; what is
+-- missing is the induction that spends them, which needs walkFace at
+-- the peeled fuel and therefore this postulate's own mutual landing.
+------------------------------------------------------------------
+-- `input i` WITH ITS Exp INDICES PINNED.  Written bare in a postulate's
+-- type the guarded/value/parked contexts are metavariables — only
+-- `Closed` forces them to `[]`, and WalkStmt gets that for free from its
+-- own `b : Closed Γ u`.  A postulate has no such binder, so the six
+-- conjuncts mentioning the expression each raise an unsolved meta.
+inputᶜ : ∀ {n} {Γ : Ctx n} (i : Fin n) → Exp Γ [] [] [] (lookup Γ i)
+inputᶜ i = input i
+
+postulate
+  input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+    (g : Gas) (i : Fin n) (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    -- b is BOUND, not applied: the measures below take a general
+    -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+    -- `[]` — an alias of type `Closed Γ _` does not, so writing
+    -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+    b ≡ inputᶜ i →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    depthE g b κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ bid now sched st
+    in capsOK? (frameStep (j + j′) c)
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+-- THE INPUT CLAUSE, GROUND.  Caps half delegated to the proven face at
+-- ITS witness; wet half at the SAME witness, which is what makes the
+-- two receipts one receipt rather than two independent Σs.
+walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (i : Fin n) → WalkStmt {e = e} (input i)
+walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  j′ , C1 , C2 , C3 , C4
+     , proj₁ WET
+     , proj₁ (proj₂ WET)
+     , proj₁ (proj₂ (proj₂ WET))
+     , proj₁ (proj₂ (proj₂ (proj₂ WET)))
+     , proj₂ (proj₂ (proj₂ (proj₂ WET)))
+  where
+  CAPS = subscribeE-caps c dep bud ops j g (input i) κ bid now sl sched st
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+  j′ = proj₁ CAPS
+  C1 = proj₁ (proj₂ CAPS)
+  C2 = proj₁ (proj₂ (proj₂ CAPS))
+  C3 = proj₁ (proj₂ (proj₂ (proj₂ CAPS)))
+  C4 = proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
+  WET = input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i (input i) κ
+          bid now sl sched st refl
+          2≤S 1≤R slEq slC slSz inv szb pC lC nst dpt
+          invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
+          C1 C2 C3 C4
 
 ------------------------------------------------------------------
 -- PER-EMIT WET PLUMBING, hop and dryness family — the hopDev?/dryEvent
@@ -1400,6 +1554,15 @@ StepThruWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- for the thru-outer frame.
 subscribeInner-walk : SubscribeInnerWalk
 
+-- THE μ GAS PEEL, GROUND — body after walkFace, which it calls at the
+-- peeled fuel exactly as subscribeInner-walk does.  Declared HERE, with
+-- its fellow mutual members rather than beside its clause siblings up
+-- in the postulate block: the whole block's signatures must sit below
+-- SubscribeInnerWalk, and a forward declaration hoisted above it puts
+-- the block's own vocabulary out of scope.
+walk-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (body : Exp Γ (u ∷ []) [] [] u) → WalkStmt {e = e} (μᵉ body)
+
 -- one payload of the walk — thruConsume-caps' hypothesis list verbatim
 -- (subscribeInner-caps' own, as there), ⊗ the wet content
 thruConsume-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1920,6 +2083,116 @@ walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j (gs fuel) κ bid now
   walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j (gs fuel) κ bid now sl sched st
 walkFace (varᵉ ())
 walkFace (deferᵉ body)   = walk-defer body
+
+------------------------------------------------------------------
+-- THE μ CLAUSE, GROUND.  subscribeE (gs fuel) (μᵉ body) IS
+-- subscribeE fuel (unfoldμ body) — DEFINITIONALLY, one clause of the
+-- evaluator (.Rx/Evaluator) — so the result term is literally the
+-- recursive call's and every conjunct transports without a subst on
+-- the burst itself.  What moves is the MEASURE, and that is the whole
+-- content of the clause:
+--
+--   · the demand DROPS by one across the unfold (mu-edge: hopD is
+--     EQUAL either side, syncSize strictly shrinks), and that one unit
+--     pays the gas peel — the same lockstep shape subscribeInner-walk's
+--     gs clause spends, but bought by the μ edge rather than the hop;
+--   · the LEVEL is minted rather than descended, because the unfolding
+--     is a fresh entry subscribing a LARGER term (size-unfoldμ is
+--     quadratic, not a decrease) — op-step-mu opens the quadratic room
+--     and mu-lvl-desc carries the L̂ ceiling into it;
+--   · depth is UNCHANGED: depthE (gs fuel) (μᵉ body) is definitionally
+--     depthE fuel (unfoldμ body) (.Caps-Depth), so `dpt` passes straight
+--     through with no transport at all.
+--
+-- Three of the four clauses are absurd by CONSTRUCTOR, exactly as the
+-- caps twin's are: g0 has no `hasAtLeast suc G`, `ops = 0` contradicts
+-- the index hypothesis, and `bud = 0` contradicts the nesting one (a
+-- μ's nest is a successor).
+------------------------------------------------------------------
+walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g0 κ bid now sl sched st
+        2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+        invW fnC pB s2 fS rS ceil lb dmd ()
+walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j (gs fuel) κ bid now sl sched st
+        2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst () dpt
+        invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
+walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep zero (suc ops′) j (gs fuel) κ bid now sl sched st
+        2≤S 1≤R slEq slC slSz inv szb wdb pC lC () hidx dpt
+        invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
+walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs fuel)
+        κ bid now sl sched st
+        2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+        invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  j₀ + j₁
+    , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true) EQ S1
+    , subst (λ x → burstCaps? (frameStep x c) sl (proj₁ res) ≡ true) EQ S2
+    , subst (λ x → burstCount? (frameStep x c) (proj₁ res) ≡ true) EQ S3
+    -- the unfolding is a FRESH ENTRY, so its receipt is consumed at
+    -- sLvlD and op-step-mu converts it — subscribeE-caps' own move
+    , op-step-mu (Caps.cSize c) (Caps.cWid c) dep (suc bud′) ops′ j
+        (sizeᵉ (μᵉ body)) j₁ 2≤S szb
+        (≤-trans S4
+                 (≤-reflexive (sym (sLvlD-suc (Caps.cSize c) (Caps.cWid c)
+                                      dep bud′ (j + j₀)))))
+    , subst (λ x → INV? Ψ (Caps.cSize (frameStep x c))
+                     (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true) EQ S5
+    , subst (λ x → burstB? (Caps.cSize (frameStep x c)) Ψ (proj₁ res) ≡ true) EQ S6
+    -- the ONE wet transport this clause needs: the IH reports hops at
+    -- the unfolding's index, and hopD is equal across the unfold
+    , subst (λ x → burstHopD? F x (proj₁ res) ≡ true) (hopD-unfoldμ F body) S7
+    , S8 , S9
+  where
+  U   = unconn sl (EvalSt.connectedShares st)
+  US  = unfoldμ-caps c j sl body 2≤S slC szb wdb
+  j₀  = proj₁ US
+  ⊑₀  = frameStep-⊑-+ c 2≤S j j₀
+  -- the unfolding's demand: hopD equal (hopD-unfoldμ), syncSize strictly
+  -- smaller (unfoldμ-shrinks) — mu-edge fuses the pair
+  G′  : ℕ
+  G′  = dBound Ŝ R̂ U (hopDᵉ Ŝ (unfoldμ body)) (syncSizeᵉ (unfoldμ body))
+  dmdŜ : dBound Ŝ R̂ U (hopDᵉ Ŝ (μᵉ body)) (syncSizeᵉ (μᵉ body)) ≤ G
+  dmdŜ = subst (λ x → dBound Ŝ R̂ U (hopDᵉ x (μᵉ body))
+                        (syncSizeᵉ (μᵉ body)) ≤ G) fS dmd
+  sucG′≤G : suc G′ ≤ G
+  sucG′≤G = ≤-trans (mu-edge Ŝ R̂ U body) dmdŜ
+  G′≤G : G′ ≤ G
+  G′≤G = ≤-trans (n≤1+n G′) sucG′≤G
+  IH = walkFace (unfoldμ body) c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud′
+         (suc (Caps.cSize (frameStep (j + j₀) c))) (j + j₀) fuel
+         κ bid now sl sched st
+         2≤S 1≤R slEq slC slSz
+         (capsOK?-mono (frameStep j c) (frameStep (j + j₀) c) sched st ⊑₀ inv)
+         (proj₁ (proj₂ US))
+         (proj₂ (proj₂ US))
+         (pathSz?-⊑ κ ⊑₀ pC)
+         (≤-trans lC (proj₁ ⊑₀))
+         (mu-step body sl _ bud′ nst)
+         (s≤s (proj₁ (proj₂ US)))
+         -- depthE (gs fuel) (μᵉ body) IS depthE fuel (unfoldμ body)
+         dpt
+         (INV?-widen sched st (proj₁ ⊑₀) invW)
+         (subst (λ x → x ≤ Ψ) (sym (fnCap-unfoldμ body)) fnC)
+         (pathB?-widen κ (proj₁ ⊑₀) pB)
+         s2 fS rS ceil
+         (≤-trans (mu-lvl-desc c dep bud′ ops′ j j₀ 2≤S) lb)
+         (subst (λ x → dBound Ŝ R̂ U (hopDᵉ x (unfoldμ body))
+                         (syncSizeᵉ (unfoldμ body)) ≤ G′) (sym fS) ≤-refl)
+         (hasAtLeast-mono sucG′≤G (hasAtLeast-peel-gs gas))
+         (≤-trans (+-monoʳ-≤ (pathLen κ) G′≤G) lℓ)
+         rgs
+  j₁  = proj₁ IH
+  S1  = proj₁ (proj₂ IH)
+  S2  = proj₁ (proj₂ (proj₂ IH))
+  S3  = proj₁ (proj₂ (proj₂ (proj₂ IH)))
+  S4  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IH))))
+  S5  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
+  S6  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))
+  S7  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))))
+  S8  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+  S9  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH))))))))
+  res = subscribeE fuel (unfoldμ body) κ bid now sched st
+  EQ  : (j + j₀) + j₁ ≡ j + (j₀ + j₁)
+  EQ  = +-assoc j j₀ j₁
 
 -- THE *All BODY — subscribeAll-caps' proven proof, step for step, with
 -- the wet conjuncts threaded through.  ops splits exactly as there: at
