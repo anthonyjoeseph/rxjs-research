@@ -6,25 +6,33 @@
 module Verify-Budget-Sufficient.Demand-Probe where
 
 open import Data.Bool using (Bool; true; false)
+open import Data.Empty using (⊥)
 open import Data.Fin  using (Fin; zero)
-open import Data.Nat  using (ℕ; suc; _+_; _≤ᵇ_)
+open import Data.Nat  using (ℕ; suc; _+_; _≤ᵇ_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Gas; g0; gs; gasPad)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
-                            ofᵉ; scanᵉ;
+                            ofᵉ; scanᵉ; emptyᵉ;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                             strmᵗ; fstᵗ; sndᵗ; varᵗ; nat̂;
                             μᵉ; deferᵉ; input;
                             sizeᵉ; syncSizeᵉ; Tm; Fn)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
-                                 Slots; Slot; shared; Path; root; EvalSt)
+                                 Slots; Slot; shared; Path; root; EvalSt;
+                                 Sched; opIterD; slotsSize)
 open import Rx.Hop-Depth using (hopDᵉ)
-open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?)
+open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?;
+                                 burstHopD?; hopR; unconn; hasAtLeast-pad)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep;
+                                 iterSize-infl)
+open import Verify-Budget-Sufficient.Walk-Level using (WalkStmt)
 
 ----------------------------------------------------------------------
 -- Context and slots: empty (no inputs)
@@ -922,3 +930,144 @@ _ = refl
 -- LOAD-BEARING (hasDry): confirms conjunct holds
 _ : (3 ≤ᵇ 1478) ≡ true
 _ = refl
+
+----------------------------------------------------------------------
+-- SERIES W (2026-08-14) — the input clause's burstHopD? conjunct,
+-- REFUTED.  This is the input-wet probe, and it found the statement
+-- FALSE rather than confirming it.
+--
+-- THE MECHANISM, in four definitional facts:
+--   · hopDᵉ V (input i) = 0                     (Hop-Depth, ∀ V)
+--   · hopDᵛ V (obs t) e = hopDᵉ V e             — a stream-typed VALUE
+--     carries its expression's hop depth
+--   · sharedConnect passes the def's burst up via sharedPlumb, which
+--     retags `kind` only — values untouched
+--   · no entry hypothesis bounds the hop content of a slot's def:
+--     slotsCaps? is size/width, INV? is size/fnCap.  The hop channel
+--     for slot defs is UNGUARDED.
+-- So a slot of type (obs natᵗ) whose shared def emits the stream-value
+-- strmᵗ (mergeAllᵉ emptyᵉ) — hop depth 1 — puts a hop-1 value into the
+-- connect burst, against a conjunct demanding ≤ hopDᵉ F (input i) = 0.
+--
+-- WHY NO ESCAPE: the conjunct does not mention the witness j′, so the
+-- Σ fails at EVERY witness — this is not the upward-closure trap.  And
+-- the bound is 0 at EVERY F (definitional with F free), so no choice
+-- of measurement index saves it.
+--
+-- REGION REACHED: the share/connect edge itself, at an obs-typed slot
+-- — the exact region input-wet was FALSITY for.  NOT reached: ground-
+-- typed slots (their values have hopDᵛ = 0 and the conjunct holds
+-- trivially there — that is where every earlier share probe lived).
+--
+-- CONSEQUENCE: WalkStmt (input i) is false as stated, hence so are
+-- input-wet and the walk face subscribeE-walk-level.  The restatement
+-- decision (a slots-hop hypothesis threaded like slotsFnCap, vs
+-- restricting slot types, vs re-funding the *All hop descent for
+-- shared carriers) is a design call — recorded in input-wet's header,
+-- NOT taken here.
+----------------------------------------------------------------------
+
+absurd-tf : true ≡ false → ⊥
+absurd-tf ()
+
+-- context: ONE slot of STREAM type — the shape no prior probe used
+Γᵂ : Ctx 1
+Γᵂ = (obs natᵗ) ∷ⱽ []ⱽ
+
+-- the smuggled hop: a hop-1 expression carried as a VALUE
+Yᵂ : Closed Γᵂ natᵗ
+Yᵂ = mergeAllᵉ emptyᵉ
+
+defᵂ : Closed Γᵂ (obs natᵗ)
+defᵂ = ofᵉ (strmᵗ Yᵂ ∷ [])
+
+insᵂ : Slots Γᵂ
+insᵂ = λ { zero → shared defᵂ }
+
+prog-W : Closed Γᵂ (obs natᵗ)
+prog-W = input zero
+
+schedᵂ : Sched Γᵂ
+schedᵂ = sched-init prog-W insᵂ
+
+stᵂ : EvalSt prog-W
+stᵂ = st-init prog-W
+
+cᵂ : Caps
+cᵂ = caps 10 10 1
+
+-- the conjunct's bound is 0 at EVERY measurement index — definitional
+-- LOAD-BEARING: fails if hopDᵉ's input clause ever learns to see slots
+_ : ∀ (V : ℕ) → hopDᵉ V prog-W ≡ 0
+_ = λ _ → refl
+
+-- the smuggled value's hop depth is 1 at EVERY index — definitional
+-- LOAD-BEARING: fails if mergeAllᵉ's hop contribution changes
+_ : ∀ (V : ℕ) → hopDᵉ V Yᵂ ≡ 1
+_ = λ _ → refl
+
+-- THE CORE ROW: the conjunct is FALSE at every measurement index and
+-- every non-dry gas.  LOAD-BEARING — this is the refutation.
+_ : ∀ (F : ℕ) (fl : Gas) →
+    burstHopD? F (hopDᵉ F prog-W)
+      (proj₁ (subscribeE (gs fl) prog-W root 0 0 schedᵂ stᵂ)) ≡ false
+_ = λ _ _ → refl
+
+-- the burst is REAL, not dry — the failure is hop content, not gas
+-- LOAD-BEARING (separates this from a dryness artifact)
+_ : hasDry (proj₁ (subscribeE (gasPad 1 g0) prog-W root 0 0 schedᵂ stᵂ))
+    ≡ false
+_ = refl
+
+-- boundary: at g0 the connect dries (the gas hypothesis is what
+-- excludes this case; DEGENERATE for the refutation, pinned so the
+-- row above is known to sit past the dry boundary)
+_ : hasDry (proj₁ (subscribeE g0 prog-W root 0 0 schedᵂ stᵂ)) ≡ true
+_ = refl
+
+-- THE FULL REFUTATION: WalkStmt (input zero) → ⊥, every hypothesis
+-- discharged at a concrete-or-verbatim instantiation.  The symbolic
+-- choices: L̂ := opIterD itself (≤-refl), Ŝ = F := cSize (frameStep L̂ cᵂ)
+-- (≤-refl; ≥ 2 by iterSize-infl), G ℓ := the dBound term (≤-refl),
+-- g := gasPad (suc G) g0 (hasAtLeast-pad).  Everything else computes:
+-- caps, INV?, sizes, depths, nest pinned by ≤ᵇ⇒≤ _ _ tt at
+-- dep = bud = ops = 1000.  The burst normalizes under the symbolic
+-- gas because no clause on the input/of path scrutinizes fuel past
+-- the one connect peel, which gasPad (suc G) g0 exposes definitionally.
+_ : WalkStmt {e = prog-W} prog-W → ⊥
+_ = λ stmt →
+  let L̂ᵂ = opIterD 10 10 1000 1000 1000 0
+      Ŝᵂ = Caps.cSize (frameStep L̂ᵂ cᵂ)
+      Gᵂ = dBound Ŝᵂ (hopR Ŝᵂ) (unconn insᵂ (EvalSt.connectedShares stᵂ))
+                  (hopDᵉ Ŝᵂ prog-W) (syncSizeᵉ prog-W)
+      gᵂ = gasPad (suc Gᵂ) g0
+      res = stmt cᵂ 10 Ŝᵂ Ŝᵂ (hopR Ŝᵂ) Gᵂ Gᵂ L̂ᵂ 1000 1000 1000 0
+              gᵂ root 0 0 insᵂ schedᵂ stᵂ
+              (≤ᵇ⇒≤ _ _ tt)            -- 2 ≤ cSize
+              (≤ᵇ⇒≤ _ _ tt)            -- 1 ≤ cReg
+              refl                        -- Sched.slots ≡ sl
+              refl                        -- slotsCaps?
+              (≤ᵇ⇒≤ _ _ tt)            -- slotsSize ≤
+              refl                        -- capsOK? at entry
+              (≤ᵇ⇒≤ _ _ tt)            -- sizeᵉ ≤
+              (≤ᵇ⇒≤ _ _ tt)            -- dWᵉ ≤
+              refl                        -- pathSz? root
+              (≤ᵇ⇒≤ _ _ tt)            -- suc pathLen ≤
+              (≤ᵇ⇒≤ _ _ tt)            -- nest ≤ bud
+              (≤ᵇ⇒≤ _ _ tt)            -- suc sizeᵉ ≤ ops
+              (≤ᵇ⇒≤ _ _ tt)            -- depthE ≤ dep
+              refl                        -- INV? at entry
+              (≤ᵇ⇒≤ _ _ tt)            -- fnCapᵉ ≤ Ψ
+              refl                        -- pathB? root
+              (≤-trans (≤ᵇ⇒≤ 2 10 tt)
+                       (iterSize-infl 10 (s≤s z≤n) L̂ᵂ 10))  -- 2 ≤ Ŝ
+              refl                        -- F ≡ Ŝ
+              refl                        -- R̂ ≡ hopR Ŝ
+              ≤-refl                      -- cSize (frameStep L̂) ≤ Ŝ
+              ≤-refl                      -- opIterD ≤ L̂
+              ≤-refl                      -- dBound ≤ G
+              (hasAtLeast-pad (suc Gᵂ) g0 ≤-refl)  -- gas
+              ≤-refl                      -- pathLen + G ≤ ℓ
+              refl                        -- regsLen? at entry
+      w7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ res)))))))
+  in absurd-tf (trans (sym w7) refl)

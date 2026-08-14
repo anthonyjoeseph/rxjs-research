@@ -44,12 +44,11 @@ else lives in the code.
   is citing work by a NUMBER: names come from here and from the ledger,
   numbers come from somewhere that should not exist. Find it and delete it.
 
-**The tier law (CLAUDE.md):** tier 0 finishes first, then 1, then 2, then 3 —
-strictly; the one carve-out is answering a design question. Risk classes,
-worst first: **FALSITY** (the statement may be false — everything ground above
-it is then wasted), **SHAPE** (wrong statement, a guaranteed restatement),
-**VACUITY** (typechecks but asserts nothing), **DIFFICULTY** (true and
-correctly stated; the proof is just hard).
+**The tier law and the risk classes are DEFINED IN CLAUDE.md** — tier 0 finishes
+first, then 1, then 2, then 3, strictly; classes worst-first are FALSITY, SHAPE,
+VACUITY, DIFFICULTY. This file only ASSIGNS them. Read that section before
+re-classifying anything: what counts as evidence for lowering a class, and the
+convergence test for whether a spawned FALSITY is progress, both live there.
 
 ## The theorem chain (top → leaves)
 
@@ -75,10 +74,12 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`input-wet`** (Walk-Level) — FALSITY: the connect gas peel's dry side
-  is matched by the proven dBound-connect, so a green here says nothing
-  about the case that can fail. It is the share/connect edge and nothing
-  else; its header names the eight proven lemmas expected to pay it.
+- **`input-wet`** (Walk-Level) — **REFUTED, machine-checked** (Demand-Probe
+  series W): the burstHopD? conjunct is false at an obs-typed shared slot,
+  taking WalkStmt (input i) and subscribeE-walk-level down with it as
+  stated. Restatement required before any further walk-face work; the
+  three candidate routes and the *All descent implication are in its
+  header. This is the tier's top item and it is now a DESIGN decision.
 - **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY. The μ edge's L̂ transport.
   No caps twin exists to donate it: the reset-anchor ceiling is wet-side
   only, so every walk clause re-derives its own. Route in its header.

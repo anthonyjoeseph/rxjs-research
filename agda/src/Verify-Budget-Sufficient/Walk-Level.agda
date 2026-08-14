@@ -234,6 +234,10 @@ WalkStmt {n} {Γ} {t} {e} {u} b =
        × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
        × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       -- ⚠ the burstHopD? conjunct is REFUTED at b = input i
+       -- (Demand-Probe series W, 2026-08-14; full note in input-wet's
+       -- header below): hopDᵉ F (input i) = 0 cannot see the slot's
+       -- def, whose values arrive in the connect burst unretagged.
        × (burstHopD? F (hopDᵉ F b) (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
@@ -722,6 +726,30 @@ postulate
 ------------------------------------------------------------------
 -- THE INPUT CLAUSE'S WET RESIDUE.  walk-input is assembled below; this
 -- is the half the caps face cannot give.
+--
+-- ⚠ REFUTED 2026-08-14 (machine, Demand-Probe series W): the
+-- burstHopD? conjunct is FALSE as stated, and with it this postulate,
+-- WalkStmt (input i), and subscribeE-walk-level.  Mechanism: hopDᵉ V
+-- (input i) = 0 at every V, hopDᵛ V (obs t) e = hopDᵉ V e, and
+-- sharedConnect passes the def's burst up with values untouched — so
+-- an obs-typed slot whose shared def emits strmᵗ (mergeAllᵉ emptyᵉ)
+-- puts a hop-1 value into the connect burst against a bound of 0.  No
+-- entry hypothesis excludes it: slotsCaps? is size/width, INV? is
+-- size/fnCap — the hop channel for slot defs is UNGUARDED.  The
+-- refutation is total (WalkStmt {e = input zero} (input zero) → ⊥,
+-- every hypothesis discharged; the conjunct does not mention j′, so
+-- no witness escapes).  REGION REACHED: the share/connect edge at an
+-- obs-typed slot — the exact FALSITY region; ground-typed slots are
+-- untouched (their values are hop-0 and the conjunct holds there).
+--
+-- RESTATEMENT ROUTES, not chosen here (design call): (a) thread a
+-- slots-hop cap beside slotsFnCap in INV?/the entry hypotheses and
+-- raise the conjunct's bound to it for the input clause; (b) make
+-- hopDᵉ (input i) slot-aware (needs sl, a signature change); (c)
+-- restrict slot types to ground types if the spec permits.  Route (a)
+-- must also re-fund the *All hop descent for shared carriers — the
+-- strict-drop argument reads the carrier's hopDᵉ, which a smuggled
+-- def value exceeds.
 --
 -- WHY THE SPLIT IS EXACT.  WalkStmt's first thirteen hypotheses ARE
 -- subscribeE-caps' hypothesis list verbatim, and its first four

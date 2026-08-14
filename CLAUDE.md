@@ -377,17 +377,12 @@ type-level witness, not itself the finding.
   proven definition with no consumer — an orphan — and `make wiring-gate` correctly fails
   it. Learned by doing it wrong while landing the file.
 
-**WHAT IT CANNOT DO — DEAD ROUTE 2026-08-12, and this one is settled.** The **caps
-counting family is unreachable by measurement, and compiling it does not change that**:
-`poolCount 1 0` and `blowH 0` — the smallest possible arguments — were each still running
-at 45 s natively at `-O`, while row 0 calibrated correctly in the same binary. The
-harness was built partly to test whether `poolCount`'s silence was mere opacity; **it is
-not**. `blowH m = 6 + m + 2 · poolCount (towerℕ m) m` feeds `poolCount` a TOWER, so the
-value is astronomically large by construction and no backend or hardware prints it. This
-**independently confirms the "THE ANCHOR CANNOT BE PROBED" ruling** by a route with no
-typechecker in it, and confirms its stated reason (the blowup is computational, not
-definitional). Those rows are quarantined at 10+ and excluded from the default sweep.
-**Do not build a probe, a harness row, or a `refl` pin against that family.**
+**WHAT IT CANNOT DO — compiling a family does not make it measurable.** Unsealing buys
+opacity, not speed: a family whose blowup is COMPUTATIONAL runs just as long in the
+binary as it sticks in the checker, and rows against one are quarantined at 10+ and
+excluded from the default sweep. The measured instance and its consequences live at the
+`abstract` block in `Rx/Evaluator.agda` — read that header before proposing a harness row
+against anything it seals.
 
 ## Module granularity: keep typechecks short
 
@@ -508,6 +503,52 @@ optics. The tier-ordered roadmap lives in PROOF-STATE.md (order and one-line hoo
 only — the research lives in the postulates' own headers); read it before picking
 up any postulate.
 
+**THE RISK CLASSES — worst first.** Every live postulate carries exactly one, and
+the class is what orders the work; PROOF-STATE.md assigns them, this file defines
+them.
+
+- **FALSITY** — the statement may be false. Worst because it is retroactive:
+  everything ground above it is wasted, not merely delayed.
+- **SHAPE** — the statement is wrong as written and a restatement is *guaranteed*
+  (typically a conclusion needing information no hypothesis carries). Not FALSITY,
+  because it is already known; worse than DIFFICULTY, because restating cascades
+  through a family and can INTRODUCE falsity — you are changing statements, not
+  discharging them. Never grind a SHAPE row; restate it.
+- **VACUITY** — it typechecks and asserts nothing. Worse than DIFFICULTY because it
+  reads as discharged. The two live shapes are ⊤-typed postulates and Σ-statements
+  upward-closed in their witness; check both before landing anything.
+- **DIFFICULTY** — true and correctly stated; the proof is just hard. The only class
+  that is pure labour, and the only one where grinding is the right response.
+
+**A CLASS IS A PROPERTY OF EVIDENCE, NOT OF CONFIDENCE.** Lowering one requires
+evidence that reached the risky region (below); a named route, a proof sketch, or a
+green probe of the near-degenerate case is not evidence and does not lower anything.
+
+**THE CONVERGENCE TEST — the one thing that distinguishes progress from a spiral.**
+Grinding a FALSITY row routinely spawns new postulates, and spawning a new FALSITY
+is *not* by itself bad news. Apply this test:
+
+- **Converging** — the new FALSITY's risky region is strictly SMALLER than the one
+  it replaced (a sub-case of the same edge). That is the risk localising, and
+  localisation is what buys probeability: a region small enough to name is a region
+  small enough to instantiate. A statement about a whole clause cannot be probed; a
+  statement about one branch of it usually can.
+- **Spiralling** — the new FALSITY is not smaller, or reaches UPSTREAM into
+  machinery already ground. Each layer needing a fact at least as risky as the layer
+  itself means the decomposition is not converging, and more subdivision will not
+  find the problem.
+- **THE STOP CONDITION, and hold to it:** the SAME region producing FALSITY across
+  three successive subdivisions. That is not a hard proof — it is a wrong design in
+  the mechanism under it, and the response is to reconsider the mechanism, not to
+  subdivide a fourth time.
+
+**FALSITY does not mean the theorem is false.** It means this STATEMENT might be,
+and if it is, you restate. The common refutation is repairable by a hypothesis that
+is already available where it is needed, and costs a restatement. The expensive
+shape is a refutation whose repair needs a hypothesis NOT available at the call
+site — that one forces the design to move, and it is the one worth naming when you
+find it.
+
 - **A machine refutation is worth as much as a proof — usually more, since it is
   cheaper.** A false statement found now costs a restatement; found after the towers
   above it are ground, it costs the towers.
@@ -515,13 +556,24 @@ up any postulate.
   and the pass is done. Auditing statements for truth — especially by machine probe —
   is now the priority, not a distraction. A `-- SUSPECT:` note is no longer the
   correct response to a doubt you can test: test it.
-- **PROBE BEFORE GRINDING.** If a postulate's sides are computable (`evaluate`,
-  `capsOK?`, `opIterD`, `depthE`, `spec-batchSimultaneous` …), instantiate it at
-  concrete programs **in `src`, checked with `make agda-dev`** and pinned by `refl` —
+- **PROBE BEFORE GRINDING.** If a postulate's sides are computable, instantiate it
+  at concrete programs **in `src`, checked with `make agda-dev`** and pinned by `refl` —
   bug-cache shaped, seconds per loop. Every probe ends in exactly one of two states: a refutation (record,
   restate, re-rank) or a confidence receipt (`-- PROBED <date>:` in the postulate's
   own header, saying what shapes were covered). **An unprobed probeable postulate is
   the cheapest unmanaged risk in the repo.**
+- **DETERMINE COMPUTABILITY BY LOOKING, NEVER FROM A REMEMBERED LIST.** Whether a
+  family reduces is a property of the code TODAY: an `abstract` block seals it, and
+  blocks get added for measured performance reasons without the statements above them
+  changing. Check the definition site. Any list of "the computable ones" written in
+  this file would be a research finding pretending to be a rule, and would go stale
+  silently — one did, and it named a family that had since been sealed.
+- **HYPOTHESIS-SIDE AND CONCLUSION-SIDE COMPUTABILITY ARE SEPARATE QUESTIONS.** A
+  statement can be unprobeable in its hypotheses (you cannot discharge them at
+  concrete numerals) while its conclusion computes fine. That is still worth probing:
+  compute the conclusion at reachable states, and if a conjunct is false, the
+  hypotheses' satisfiability is a smaller job than proving them. "Sealed somewhere in
+  the statement" does NOT imply symbolic-or-nothing — say which SIDE is blocked.
 - **Never extrapolate a probe past its shapes.** Green on three canonical programs is
   a receipt, not a theorem; say which shapes were covered and which were not.
 - **A row that could not have failed is not a row.** Label every probe row
@@ -564,46 +616,27 @@ does.
 - **Deleting a dead-route line requires the route to be shown WORKABLE**, not merely
   untried-again. It is evidence, and it ages better than the code around it.
 
-**TIER ORDER IS LAW: TIER 0 FINISHES FIRST, THEN TIER 1, THEN 2 AND 3 (Anthony,
-2026-08-06; TIER 0 added 2026-08-11).** Strictly — not "mostly", not "while a
-build runs". Tier 2 (`evaluate-well-formed`) is built ON tier 1's
-`budget-sufficient`, so proving a tier-2 statement while the anchor question is
-open bets on ground a design failure would move. The one carve-out is answering
-a *design question* (cheap, and it aims the grind) — never grinding over one.
+**TIER ORDER IS LAW: LOWER TIERS FINISH FIRST (Anthony, 2026-08-06).** Strictly —
+not "mostly", not "while a build runs". Each tier is built ON the one below it, so
+grinding an upper-tier statement while a lower tier is open bets on ground that a
+design failure would move. The one carve-out is answering a *design question*
+(cheap, and it aims the grind) — never grinding over one.
 
-**TIER 0 IS THE ANCHOR, and it exists because prose priority did not hold.**
-`cascadeGo-wet-core`, `subscribeE-wet-core`, `dry-tick-core`. For five days the anchor sat inside tier 1 while every tier-1 discharge
-went to a non-anchor row — 12 live rows down to 5, anchor 4-for-4 untouched,
-`cascadeGo-wet-core` edited in `agda/src` exactly once. **Priority that lives
-only in prose gets spent on whatever is nearest**, so it is a tier now.
+**Before starting any task: if the postulate is not in the lowest open tier, and
+the work is not a design question, it is parked — say so and take a lowest-tier
+item.** Which postulates those are, and why each is ranked where it is, lives in
+PROOF-STATE.md; **this file never names them.** The tier structure exists because
+priority that lives only in prose gets spent on whatever is nearest — measured
+once at five days of discharges that all went to non-anchor rows while the anchor
+sat untouched.
 
-**Before starting any task: if the postulate is not in PROOF-STATE's tier-0
-list, and the work is not one of the two design questions, it is parked — say
-so and take a tier-0 item.** This explicitly parks **all of tier 1**, including
-`subscribeE-walk-core`'s 20 sub-postulates. Those 20 are the most
-gratifying-looking work left and the least informative: they are 14 instances of
-one clause pattern plus 5 μ-preservation facts, none of which can discover a
-design failure, and a `cascadeGo-wet-core` failure would move the ground under all of them.
-
-**TWO ANCHOR RULINGS THAT CHANGE HOW YOU WORK IT (2026-08-11):**
-
-- **THE ANCHOR CANNOT BE PROBED — do not spend a session trying.** Tested and
-  closed: `blowH` is `abstract` (Evaluator:898) and `blowH-body` unfolds it, but
-  `poolCount` then sticks on a SECOND abstract family (Evaluator:727 — `fLvlD`,
-  `lvls`, `iterL`, `iterSize`, `dWalkᶜ`) sealed for the same measured
-  performance reason; `poolCount 1 0` does not reduce to a numeral at the
-  smallest possible arguments. `towerℕ` is NOT the blocker (it computes to
-  height 4). `cascadeGo` takes no `Gas` parameter, so a small concrete Gas
-  cannot be injected around it. A non-abstract COPY of the counting family fails
-  too — the blowup is computational, not definitional. **Consequence: every
-  probe of the anchor reaches only the region where `B`/`Ψ` do not matter, so a green
-  probe here is not evidence. The anchor is symbolic-or-nothing.**
-- **A RISK CLASS MAY ONLY BE LOWERED BY EVIDENCE THAT REACHED THE RISKY
-  REGION.** The anchor was downgraded FALSITY → DIFFICULTY on a probe covering only
-  root-path chains — the near-degenerate case — and was reverted. Name the
-  region the evidence reached, or the receipt does not count. This is the
-  general form of "never extrapolate a probe past its shapes", and it is the
-  specific way this campaign has made itself feel safer than it was.
+**A RISK CLASS MAY ONLY BE LOWERED BY EVIDENCE THAT REACHED THE RISKY REGION.**
+Name the region the evidence reached, or the receipt does not count. This is the
+general form of "never extrapolate a probe past its shapes", and it is the
+specific way this campaign has made itself feel safer than it was: a row was once
+downgraded FALSITY → DIFFICULTY on a probe covering only the near-degenerate case,
+and had to be reverted. Corollary: **a named route is not evidence.** Knowing how
+a proof would go says nothing about whether the statement is true.
 
 **These still hold, unchanged from the wiring pass:**
 
@@ -671,10 +704,25 @@ deriving a path-LENGTH bound from `pathB?`, which carries no length conjunct), a
 witness" above). Under de-risk mode these are refutation targets, not `SUSPECT:` notes:
 build the counterexample.
 
-**Prefer a free hypothesis to a carried postulate.** If a missing hypothesis is
-available at the call site, adding it and deleting the postulate is less work than
-carrying it. (`depthE ≤ capsH` unconditionally is FALSE, `Depth-Bound.agda:11`; the
-`capsOK?`-conditioned form costs nothing extra, so it is the one that is stated.)
+**ADDING A HYPOTHESIS IS A RESTATEMENT, AND NEEDS A RESTATEMENT'S JUSTIFICATION.**
+`A → B` is weaker than `B`, and a hypothesis is INVISIBLE to the ledger in a way a
+postulate is not: a postulate greps, gets counted by `make wiring`, carries a risk
+class, and sits in PROOF-STATE; a hypothesis threaded into a signature does none of
+that. So trading a postulate for a hypothesis discharges nothing — it launders
+TRACKED debt into UNTRACKED debt, which is precisely the invisible debt the wiring
+law exists to prevent, in the one form that feels like progress while you do it.
+
+The one sufficient justification is that the unconditional form has been
+**REFUTED**: then the conditioned form is the true statement replacing a false one,
+which is not a weakening at all. (`depthE ≤ capsH` unconditionally is FALSE,
+`Depth-Bound.agda:11`, so the `capsOK?`-conditioned form is the one that is stated.)
+
+**"The call site happens to supply it" is NOT a reason.** Today's call sites are an
+artifact of today's assembly — usually exactly one caller. A hypothesis baked in
+because the current caller offers it makes the statement's shape accidental, and
+when a second caller appears that cannot supply it you do not discover a missing
+hypothesis, you discover the lemma does not apply. Same distinction as "no consumer
+today" vs "no consumer ever".
 
 ### CODE BEATS PROSE: if you can assemble it, ASSEMBLING IT IS THE JOB (Anthony, 2026-08-13)
 

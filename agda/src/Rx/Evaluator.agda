@@ -724,6 +724,26 @@ fLvl S W J = J + fCharge S W J
 -- times over.  Opaque, a frame's level is one symbol everywhere above
 -- it, and the `-body` equations hand the clauses back where the
 -- arithmetic needs them (.Caps)
+--
+-- DEAD ROUTE 2026-08-12: THIS FAMILY CANNOT BE PROBED, and the seal is
+-- not the reason — so unsealing it would not help.  `blowH-body`
+-- unfolds `blowH`, but `poolCount` then sticks on THIS block, and
+-- `poolCount 1 0` does not reduce to a numeral at the smallest possible
+-- arguments.  A non-abstract COPY of the whole family fails the same
+-- way: the blowup is COMPUTATIONAL, not definitional.  Confirmed
+-- independently with no typechecker in the loop — the compiled harness
+-- (`make harness`) ran `poolCount 1 0` and `blowH 0` for 45 s at `-O`
+-- without printing, in the same binary whose calibration row passed.
+-- `blowH m = 6 + m + 2 · poolCount (towerℕ m) m` feeds `poolCount` a
+-- TOWER, so the value is astronomically large by construction and no
+-- backend or hardware prints it.  `towerℕ` is NOT the blocker (it
+-- computes to height 4).
+--
+-- CONSEQUENCE, and check it before planning a probe: a statement whose
+-- CONCLUSION depends on this family is symbolic-or-nothing.  A
+-- statement that touches it only in its HYPOTHESES is a different case
+-- and may well be probeable on the conclusion side — do not read this
+-- note as covering the whole caps development.
 ------------------------------------------------------------------
 
 abstract
