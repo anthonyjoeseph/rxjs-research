@@ -619,7 +619,7 @@ def mixfix_core_of(name):
     return None
 
 
-def count_consumers(name, files, corpus, def_lines, extra_terms=()):
+def count_consumers(name, files, corpus, def_lines, extra_terms=(), cone=None):
     """Count boundary-matched occurrences of `name` (and any `extra_terms`
     — e.g. a mixfix operator's bare core) across all files, excluding
     name's own defining lines in its home file(s).
@@ -633,6 +633,7 @@ def count_consumers(name, files, corpus, def_lines, extra_terms=()):
     """
     own_lines = def_lines.get(name, ())
     total = 0
+    in_cone = 0
     locations = []
     terms = [name] + [t for t in extra_terms if t]
     for relpath in files:
@@ -661,10 +662,12 @@ def count_consumers(name, files, corpus, def_lines, extra_terms=()):
                     # CONSUMED — see import_span_lines
                     if (relpath, lineno) not in own_lines and lineno not in import_lines:
                         total += 1
+                        if cone is None or relpath in cone:
+                            in_cone += 1
                         if len(locations) < 3:
                             locations.append((relpath, lineno))
                 start = idx + 1
-    return total, locations
+    return total, locations, in_cone
 
 
 def signature_text(src_dir, relpath, name, line):
@@ -727,6 +730,39 @@ def final_conclusion(sig):
 # so, rather than implying content it does not have.  Same discipline as
 # ALLOWLIST above: short, specific, and a reviewable diff to extend.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# (A3) GATE-ONLY EXEMPTIONS.  A definition whose only consumers sit outside
+# `make agda`'s cone is normally dead proof code propped up by a probe.  Two
+# kinds are legitimate, and each is listed with its reason so extending this
+# is a reviewable diff:
+#   * it serves a compiled TOOL (the CLI, QuickCheck, the bug cache, the
+#     harness) — those have their own make targets and are not the proof;
+#   * it is PROVEN and waiting for a consumer that is still a postulate.
+# The second kind is real debt and every line of it should name what has to
+# be ground before the line can go.
+# ---------------------------------------------------------------------------
+GATE_ONLY_ALLOWLIST = {
+    "Grouped": (
+        "the oracle's wire format, consumed by CLI/Encode and compiled by "
+        "`make cli-build`.  Not proof code; it has no business in Main's cone "
+        "beyond living in Rx/Evaluator beside the evaluator it describes."
+    ),
+    "wellFormed?": (
+        "the protocol predicate QuickCheck and the type-level bug cache assert "
+        "against (`make quickcheck`, `make bug-cache`).  A tool's oracle, not "
+        "a proof obligation."
+    ),
+    "slotHop-fix": (
+        "PROVEN and genuinely waiting: it is the equation the walk face's "
+        "input clause spends, and that clause (input-wet-shared) is still a "
+        "postulate, so nothing in the gate's cone can spend it yet.  The "
+        "Demand-Probe rows are receipts, not consumers.  DELETE THIS LINE the "
+        "moment input-wet-shared is ground — if it survives that, the proof "
+        "found another route and this lemma is dead."
+    ),
+}
+
+
 VACUOUS_ALLOWLIST = {
     "defer-shift": (
         "Rx/Evaluator-Theorems.agda states this ⊤ on purpose and says so in "
@@ -858,7 +894,7 @@ def find_deferred_obligations(src_dir, defs, def_lines, postulate_names,
 
     rows = []
     for lem, parents in sorted(passed_lemmas.items()):
-        _n, locs = count_consumers(lem, files, corpus, def_lines,
+        _n, locs, _c = count_consumers(lem, files, corpus, def_lines,
                                    extra_terms=(mixfix_core_of(lem),))
         elsewhere = [(f, l) for (f, l) in locs if (f, l) not in arg_sites]
         if elsewhere:
@@ -903,6 +939,41 @@ def find_unreachable_modules(src_dir, files):
                 stack.append(g.group(1))
 
     return sorted((m, mods[m]) for m in set(mods) - seen)
+
+
+def gate_cone(src_dir, files):
+    """The modules `make agda` actually compiles: everything reachable from
+    Main, and NOTHING else.
+
+    THIS IS NOT find_unreachable_modules' set.  That one seeds from Main PLUS
+    every MODULE_ROOTS entry, because a separately-compiled binary is not dead.
+    But those roots are compiled by their OWN make targets, not by the gate —
+    so a definition whose only consumers live in a root (a probe file, the
+    harness, the CLI) is never touched by `make agda`.  Counting such a
+    definition as WIRED is the loophole this closes: a probe could keep dead
+    proof code alive indefinitely, and the report would read clean.
+    """
+    mods = {}
+    for rel in files:
+        mods[rel[:-5].replace(os.sep, ".")] = rel
+    seen, stack = set(), ["Main"]
+    while stack:
+        m = stack.pop()
+        if m in seen or m not in mods:
+            continue
+        seen.add(m)
+        try:
+            with io.open(os.path.join(src_dir, mods[m]), encoding="utf-8") as fh:
+                body = fh.read().split("\n")
+        except OSError:
+            continue
+        for line in body:
+            if line.lstrip().startswith("--"):
+                continue
+            g = _IMPORT_RE.match(line)
+            if g and g.group(1) in mods:
+                stack.append(g.group(1))
+    return {mods[m] for m in seen}
 
 
 def find_vacuous(src_dir, defs, postulate_names):
@@ -1019,10 +1090,12 @@ def main():
     files = find_agda_files(src_dir)
     defs, def_lines, postulate_names, order = extract_definitions(src_dir, files)
     corpus = build_corpus(src_dir, files)
+    cone_files = gate_cone(src_dir, files)
     main_claims, main_ok = read_main_claims(src_dir)
 
     orphans = []  # proven defs / data-record, zero consumers, not allowlisted
     allowlisted_unused = []
+    gate_only = []  # consumed, but never by anything `make agda` compiles
     ledger_with = []  # postulates with >=1 consumer
     ledger_without = []  # postulates with 0 consumers
     toplines = []  # top-line semantic postulates in *-Theorems.agda
@@ -1030,14 +1103,23 @@ def main():
     results = {}
     for name in order:
         core = mixfix_core_of(name)
-        count, locs = count_consumers(
-            name, files, corpus, def_lines, extra_terms=(core,) if core else ()
+        count, locs, cone_count = count_consumers(
+            name, files, corpus, def_lines, extra_terms=(core,) if core else (),
+            cone=cone_files,
         )
-        results[name] = (count, locs)
+        results[name] = (count, locs, cone_count)
 
     for name in order:
         d = defs[name]
-        count, locs = results[name]
+        count, locs, cone_count = results[name]
+        # (A3) WIRED ONLY OUTSIDE THE GATE.  It lives in a module `make agda`
+        # compiles, something references it, and yet nothing the gate compiles
+        # does — so its only consumers are probe/harness/CLI roots, which run
+        # under their own targets.  That is dead proof code held up by a probe.
+        if (count > 0 and cone_count == 0
+                and d.file in cone_files
+                and name not in main_claims):
+            gate_only.append((name, d, count, locs))
         is_postulate = name in postulate_names
         if is_postulate:
             if count > 0:
@@ -1162,6 +1244,32 @@ def main():
     vacuous = find_vacuous(src_dir, defs, postulate_names)
     dead_modules = find_unreachable_modules(src_dir, files)
     stranded = unreachable_parents(orphans, defs, postulate_names)
+
+    print("-" * 78)
+    print("(A3) WIRED ONLY OUTSIDE THE GATE — consumers exist, but none compile")
+    print("-" * 78)
+    if not gate_only:
+        print("  (none)")
+    else:
+        print("  These live in modules `make agda` compiles, and something does")
+        print("  reference them — but nothing the GATE compiles does.  Their only")
+        print("  consumers are MODULE_ROOTS (probe rows, the harness, the CLI),")
+        print("  which run under their own make targets.  A consumer that the")
+        print("  proof never reaches is not a wire: a probe file can otherwise")
+        print("  hold dead proof code alive forever and every count reads clean.")
+        for name, d, count, locs in gate_only:
+            where = ", ".join(f"{r}:{l}" for r, l in locs)
+            tag = "  [allowed]" if name in GATE_ONLY_ALLOWLIST else "  ** NEW **"
+            print(f"    {name}  ({d.file}:{d.line}) — {count} consumer(s), all outside: {where}{tag}")
+        stale_gate_only = sorted(set(GATE_ONLY_ALLOWLIST) - {n for n, _d, _c, _l in gate_only})
+        if stale_gate_only:
+            print()
+            print("  IN THE ALLOWLIST BUT NO LONGER MEASURED — the win case: these")
+            print("  gained a real consumer inside the gate (or were deleted), so")
+            print("  their exemption lines must go:")
+            for name in stale_gate_only:
+                print(f"    {name}")
+    print()
 
     print("-" * 78)
     print("(A2) UNREACHABLE MODULES — dead files, invisible to the orphan report")
@@ -1311,6 +1419,27 @@ def main():
         if not main_ok:
             problems.append("Main.agda has a bare `open import`")
 
+        # A3 RATCHET — a definition inside `make agda`'s cone whose only
+        # consumers are OUTSIDE it.  Reporting alone was not enough: the whole
+        # failure mode is that every count reads clean, so this has to gate.
+        # Exempt entries carry a reason in GATE_ONLY_ALLOWLIST; a NEW one is a
+        # new piece of dead proof code held up by a probe or a tool.
+        gate_only_new = sorted(
+            n for n, _d, _c, _l in gate_only if n not in GATE_ONLY_ALLOWLIST
+        )
+        gate_only_stale = sorted(
+            set(GATE_ONLY_ALLOWLIST) - {n for n, _d, _c, _l in gate_only}
+        )
+        if gate_only_new:
+            problems.append(
+                f"{len(gate_only_new)} definition(s) wired ONLY outside the gate"
+            )
+        if gate_only_stale:
+            problems.append(
+                f"{len(gate_only_stale)} GATE_ONLY_ALLOWLIST entry/entries no longer "
+                "measured (gained a real consumer, or deleted — remove the entry)"
+            )
+
         # B4 RATCHET — the passed-only set must equal agda/DEFERRED.txt.
         # A new passed-only lemma (measured but not in the ledger) is a NEW
         # DEFERRAL: deferral must be an explicit, reviewed act.  A lemma in
@@ -1357,6 +1486,21 @@ def main():
                         )
                     else:
                         print(f"  {name} | (unknown) | ≤? | REASON: TODO")
+            if gate_only_new:
+                print()
+                print("WIRED ONLY OUTSIDE THE GATE — nothing `make agda` compiles")
+                print("uses these.  Either give each a real consumer on the proof")
+                print("path, delete it, or add it to GATE_ONLY_ALLOWLIST with the")
+                print("reason it legitimately serves a tool or awaits a postulate:")
+                for name in gate_only_new:
+                    print(f"  {name}")
+            if gate_only_stale:
+                print()
+                print("GATE_ONLY_ALLOWLIST entries no longer measured — a WIN:")
+                print("each gained a consumer inside the gate (or was deleted).")
+                print("Remove the entry from scripts/check-wiring.py:")
+                for name in gate_only_stale:
+                    print(f"  {name}")
             if stale_entries:
                 print()
                 print(

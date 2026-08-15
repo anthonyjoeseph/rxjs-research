@@ -86,9 +86,9 @@ open import Rx.Prim      using (Tick; Id; Source; init; value; close;
                                 complete; handoff; exhausted; dried;
                                 cut; cutPending; subscribe;
                                 InstEmit; InstEvent; _at_from_as_;
-                                Gas; g0; gs; gasPad)
+                                Gas; g0; gs; gasPad; ObservableInput)
 open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
-                                inputsBelowᵉ;
+                                inputsBelowᵉ; isData;
                                 _≟ᵗ_;
                                 sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
                                 shellSizeᵉ; innerᵉ;
@@ -98,7 +98,8 @@ open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp;
 open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; hopD-unfoldμ)
 open import Rx.Slot-Hop  using (slotHop; slotHop-fix)
-open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; RegId; Chain;
+open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
+                                RegId; Chain;
                                 memberSource; Path; root; share-sink; _↠_;
                                 Stream; subscribeE; sharedConnect;
                                 subscribeAll; AllOp;
@@ -2161,12 +2162,75 @@ walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 
 
 postulate
-  input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- THE SLOT DISPATCH, SPLIT (2026-08-15).  input-wet-core was one opaque
+  -- postulate over every slot shape; it is now a real dispatch over the two
+  -- that behave differently, each with its own residue.  The split is the
+  -- point: only the SHARED branch connects, so only it needs the walk face,
+  -- and giving it one is what demonstrates the mutual landing is usable
+  -- rather than merely well-typed.  The caps twin subscribeE-input-caps
+  -- splits scripted further (hot / cold-nil / cold-cons); do that here too
+  -- when this branch is ground.
+  input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (g : Gas) → WalkLevelAt (peelGas g) →
     ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
     (κ : Path Γ (lookup Γ i) t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+    (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
+    Sched.slots sched i ≡ shared d {ok = ok} →
+    -- b is BOUND, not applied: the measures below take a general
+    -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+    -- `[]` — an alias of type `Closed Γ _` does not, so writing
+    -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+    b ≡ inputᶜ i →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    depthE g b κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ bid now sched st
+    in capsOK? (frameStep (j + j′) c)
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                     (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+  -- no connect, so no recursion: a scripted slot replays its own values
+  input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+    (g : Gas)
+    (i : Fin n) (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+    {ok : T (isData (lookup Γ i))}
+    (src : ObservableInput (Val Γ (lookup Γ i))) →
+    Sched.slots sched i ≡ scripted {ok = ok} src →
     -- b is BOUND, not applied: the measures below take a general
     -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
     -- `[]` — an alias of type `Closed Γ _` does not, so writing
@@ -2224,6 +2288,60 @@ postulate
 -- forward-declared so input-wet below can name it; clauses at the dispatch
 walkFace : WalkLevel
 
+-- the dispatch itself: match the slot, hand each shape its own residue.
+input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+  (g : Gas) → WalkLevelAt (peelGas g) →
+  ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  -- b is BOUND, not applied: the measures below take a general
+  -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+  -- `[]` — an alias of type `Closed Γ _` does not, so writing
+  -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+  b ≡ inputᶜ i →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  nest b sl (EvalSt.connectedShares st) ≤ bud →
+  depthE g b κ bid now sched st ≤ dep →
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  fnCapᵉ b ≤ Ψ →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  2 ≤ Ŝ →
+  F ≡ Ŝ →
+  R̂ ≡ hopR Ŝ →
+  Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+  opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+  dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+         (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g b κ bid now sched st
+  in capsOK? (frameStep (j + j′) c)
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+     burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+     burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+     j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+     (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                   (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+input-wet-core c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
+  with Sched.slots sched i in slotEq
+... | shared d   = input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st d slotEq
+... | scripted s = input-wet-scripted c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid now sl sched st s slotEq
+
 input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
   (g : Gas) (i : Fin n) (b : Closed Γ (lookup Γ i))
@@ -2277,6 +2395,8 @@ input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) i b κ bid now sl
   input-wet-core c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel)
     (λ b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ → walkFace b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ fuel)
     i b κ bid now sl sched st
+
+
 
 
 -- THE INPUT CLAUSE, GROUND.  Caps half delegated to the proven face at
