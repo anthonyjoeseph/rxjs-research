@@ -15,22 +15,32 @@
 -- shared slot the staged number IS the def's hopD under the full
 -- slotHop environment.  It holds because hopD only reads η at inputs
 -- the term actually contains, and stratification confines those to
--- indices where the stage already agrees with the fixpoint — the two
--- postulated pieces (hopD-η-congᵉ, ηAt-agrees) say exactly that, and
--- nothing more is needed.
+-- indices where the stage already agrees with the fixpoint — that is
+-- exactly what `hopD-η-congᵉ` (Rx.Hop-Eta-Cong) and `ηAt-agrees`
+-- (below) say, and nothing more is needed.
+--
+-- BOTH ARE NOW PROVEN (2026-08-14), so slotHop-fix rests on no
+-- postulate.  That matters beyond the count: the input-wet restatement
+-- is built on this equation, so while these two were postulates the
+-- repair for a machine-refuted statement was itself unverified.
 ------------------------------------------------------------------
 module Rx.Slot-Hop where
 
 open import Data.Nat  using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat.Properties
+  using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <ᵇ⇒<; <⇒<ᵇ; ≤∧≢⇒<; ≤-pred)
+open import Data.Unit using (tt)
 open import Data.Fin  using (Fin; toℕ)
-open import Data.Bool using (T; if_then_else_)
+open import Data.Bool using (T; true; false; if_then_else_)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; trans; cong)
+  using (_≡_; refl; trans; cong; sym; subst)
 
 open import Rx.Exp       using (Ctx; Exp; Closed; inputsBelowᵉ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
+-- PROVEN (ex-postulate 2026-08-14): the η congruence slotHop-fix spends
+open import Rx.Hop-Eta-Cong using (hopD-η-congᵉ)
 
 -- one slot's hop, given an environment for the inputs its def may
 -- read.  A scripted slot carries data only (isData), so no emission
@@ -52,47 +62,34 @@ slotHopD V η (shared d)   = hopDᵉ V η d
 slotHop : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) → Fin n → ℕ
 slotHop V sl i = slotHopD V (ηAt V sl (toℕ i)) (sl i)
 
-postulate
-  -- hopD reads η only at the term's own inputs, so environments that
-  -- agree below k agree on any term all of whose inputs sit below k.
-  -- Mechanical mutual induction over Exp/Tm/List Tm; only the input
-  -- clause touches η, and inputsBelowᵉ hands it exactly the guard the
-  -- agreement hypothesis wants.
-  --
-  -- PROBED 2026-08-14 (Demand-Probe series T), jointly with ηAt-agrees
-  -- and through their shared consumer slotHop-fix — see that
-  -- postulate's receipt below for the covered shapes.  What series T
-  -- exercises HERE is the congruence at defs whose inputs are really
-  -- read (k = 1 and k = 2, environments differing above k), which the
-  -- earlier slot-0 rows could not: there both environments are the
-  -- constant 0 and the congruence is an identity.
-  hopD-η-congᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)
-    {η₁ η₂ : Fin n → ℕ} →
-    (∀ j → T (toℕ j <ᵇ k) → η₁ j ≡ η₂ j) →
-    (e : Exp Γ Δᵍ Δ Θ t) → T (inputsBelowᵉ k e) →
-    hopDᵉ V η₁ e ≡ hopDᵉ V η₂ e
-
-  -- the stage is already right where it claims to be: below k, ηAt's
-  -- answer is the fixpoint's.  Induction on k; at toℕ j ≡ᵇ k the two
-  -- sides are the same slotHopD after transporting the index equality,
-  -- below it the stage delegates to itself and the IH closes.
-  --
-  -- PROBED 2026-08-14 (Demand-Probe series T).  This postulate is
-  -- VACUOUS AT k = 0 — there is no j below 0 — so the fixpoint rows in
-  -- series W, which sit at slot 0, exercised nothing of it.  Series T
-  -- pins the consequence `slotHop V sl i ≡ hopDᵉ V (slotHop V sl) d`
-  -- by refl (independently of this postulate) at i = 1 on a minimal
-  -- two-slot telescope and at i = 1, 2 on the amplifier telescope,
-  -- and pins the same equations through slotHop-fix — so the stage
-  -- and the fixpoint are checked to agree where this statement has
-  -- content.  The off-by-one that a staged environment usually fails
-  -- by is pinned as a live contrast (the naive environment gives 1
-  -- where the stage gives 2), so the rows separate real alternatives.
-  -- NOT COVERED: telescopes with a scripted slot below a shared one,
-  -- and any k > 2.
-  ηAt-agrees : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) (k : ℕ)
-    (j : Fin n) → T (toℕ j <ᵇ k) →
-    ηAt V sl k j ≡ slotHop V sl j
+-- THE STAGE IS ALREADY RIGHT WHERE IT CLAIMS TO BE — ex-postulate
+-- (2026-08-14): below k, ηAt's answer IS the fixpoint's.
+--
+-- Induction on k.  At k = 0 the guard `T (toℕ j <ᵇ 0)` is ⊥ and the
+-- statement is vacuous, which is exactly why Demand-Probe series W —
+-- whose fixpoint rows sit at slot 0 — exercised nothing of it, and why
+-- series T had to reach k = 1 and k = 2 before the probe meant
+-- anything.  At `suc k` the stage branches on `toℕ j ≡ᵇ k`:
+--
+--   · TRUE: both sides are the same `slotHopD V (ηAt V sl _) (sl j)`
+--     once the index equality is transported — `slotHop` reads stage
+--     `toℕ j`, the stage here is `k`, and the branch condition says
+--     they are the same number.
+--   · FALSE: `toℕ j ≤ k` from the guard and `toℕ j ≢ k` from the
+--     branch give `toℕ j < k`, so the stage delegates to itself one
+--     level down and the IH closes it.
+ηAt-agrees : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) (k : ℕ)
+  (j : Fin n) → T (toℕ j <ᵇ k) →
+  ηAt V sl k j ≡ slotHop V sl j
+ηAt-agrees V sl zero    j ()
+ηAt-agrees V sl (suc k) j lt with toℕ j ≡ᵇ k in eqb
+... | true  =
+  cong (λ m → slotHopD V (ηAt V sl m) (sl j))
+       (sym (≡ᵇ⇒≡ (toℕ j) k (subst T (sym eqb) tt)))
+... | false =
+  ηAt-agrees V sl k j
+    (<⇒<ᵇ (≤∧≢⇒< (≤-pred (<ᵇ⇒< (toℕ j) (suc k) lt))
+                 (λ e → subst T eqb (≡⇒≡ᵇ (toℕ j) k e))))
 
 -- THE FIXPOINT, assembled: at a shared slot, slotHop's staged answer
 -- is the def's hopD under the full slotHop environment — the equation

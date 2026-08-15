@@ -778,17 +778,56 @@ postulate
 -- `slotHop V sl i ≡ hopDᵉ V (slotHop V sl) d` by refl at i = 1 and
 -- i = 2, with the off-by-one alternative pinned as a live contrast).
 --
--- NOT COVERED, and the class stays FALSITY on it: the OTHER FOUR
--- conjuncts of this Σ, none of which has been run.  A channel audit
--- says each is guarded — burstB? by INV?'s own `slotsSize ≤ᵇ B` and
--- `slotsFnCap ≤ᵇ Ψ` conjuncts (.Measures), hasDry by dBound's
--- `suc V * suc R * U` term via connect-edge's strict U drop rather
--- than by `s` (syncSizeᵉ (input i) = 1, so the def's syncSize is not
--- smuggled the way its hop was), regsLen? and INV?-out by their own
--- entry hypotheses with the slots conjuncts riding unchanged.  THAT
--- AUDIT IS A READING, NOT EVIDENCE: it is why no second refutation of
--- the hop's shape is expected here, and it is NOT grounds to lower the
--- class — only running the conjuncts would be.
+-- PROBED 2026-08-14 (Demand-Probe series V): the other four conjuncts
+-- RUN, at the series W program, co-instantiated — INV?, burstB?,
+-- hasDry and regsLen? all `true` against one exit state, with B tight
+-- (B = 5 holds, B = 4 fails on slotsSize; B = 1 fails burstB? on the
+-- emitted value's sizeᵉ = 2) and hasDry pinned at series V's OWN gas
+-- term rather than cited from series W's, since that program dries one
+-- gas step down and the terms are not interchangeable by inspection.
+--
+-- NOT COVERED, and the class stays FALSITY on it: series V holds TWO
+-- axes flat — Ψ = 0 at every row (the def is mergeAllᵉ emptyᵉ, so
+-- slotsFnCap insᵂ = 0) and the exit registry is EMPTY (sharedConnect's
+-- burstCompleted branch drops the one entry), so regsLen? is vacuous
+-- there and the Ψ conjuncts of INV?/burstB? are satisfied by 0 ≤ 0.
+--
+-- THE Ψ AXIS IS NOT AN ARBITRARY GAP — IT IS WHERE THIS POSTULATE'S
+-- OWN REFUTATION WOULD RECUR.  `fnCapᵉ (input i) = 0` (.Measures) is
+-- CONSTANT and unparameterised: structurally the very clause shape that
+-- was machine-refuted for hop, where `hopDᵉ V η (input i)` was constant
+-- 0 until an obs-typed shared slot's def was shown to emit values the
+-- constant did not account for.  fnCapᵉ is positive on scanᵉ/mapᵉ with
+-- a function-valued term, so a shared slot whose def carries one is
+-- exactly the analogue of the refuting program.
+--
+-- THE Ψ AXIS IS ANSWERED, AND BY PROOF RATHER THAN BY PROBE (2026-08-15).
+-- Two lemmas in .Measures, both already proven, close the smuggle:
+--   · `caseW-subΘ` / `caseW-ren` (W1) — caseWᵗ is substitution- and
+--     renaming-INVARIANT, because reify images contain no caseᵗ at all and
+--     subΘ rewrites only var positions.  So although caseWᵗ (caseᵗ s l r)
+--     is ADDITIVE — the one clause in the family that is — evaluation never
+--     feeds it a case-heavy substituend, and the count cannot be multiplied
+--     by plugging a case-heavy value into a duplicated variable.
+--   · `fnCap-subΘᵉ` (W2) — EnvFnCap Ψ σ → fnCapᵉ e ≤ Ψ →
+--     fnCapᵉ (subΘExp Θloc σ e) ≤ Ψ.  Evaluation cannot lift fnCap past Ψ.
+-- Together: a value emitted anywhere in the telescope carries fnCap ≤ Ψ, so
+-- `fnCapᵉ (input i) = 0` is SAFE despite looking like the refuted hop clause.
+--
+-- AND THAT IS THE REAL DISANALOGY WITH HOP.  No lemma of this kind could
+-- exist for hop: hop genuinely depends on the slot environment, which is
+-- exactly why the repair had to parameterise the input clause by η.  fnCap
+-- has a preservation theorem; hop does not.  (`ΨAt e sl = fnCapᵉ e +
+-- slotsFnCap sl` summing rather than ⊔-ing the telescope is a second, weaker
+-- reason — it covers a def that reads ANOTHER input without a staged
+-- fixpoint — but the substitution lemmas are what actually settle it.)
+--
+-- METHOD NOTE, worth more than the result: three probe series (Ψ, Ψ2, Ψ3)
+-- were commissioned to test this before anyone grepped .Measures for a
+-- substitution lemma.  The receipts are real but they were never the cheapest
+-- route, and none of them COULD have refuted — in every series the emitted
+-- value is a subterm of its own def, where the ⊔-fold bounds it structurally.
+-- Grep for the fact before designing the experiment.
 --
 -- WHY THE SPLIT IS EXACT.  WalkStmt's first thirteen hypotheses ARE
 -- subscribeE-caps' hypothesis list verbatim, and its first four
@@ -3255,32 +3294,49 @@ postulate
     (rs : List (RegId × Source × Chain Γ t)) → m ≤ ℓ →
     regsLen? m rs ≡ true → regsLen? ℓ rs ≡ true
 
-  -- THE LANDING LIFT, and it is the only conjunct of this assembly with
-  -- real content.  The walk lands INV? at its own level's size cap,
-  -- `cSize (frameStep j′ (capsAt e sl id))`, bounded by the walk's
-  -- opIterD conjunct; the outer face wants it at `sizeCapAt e sl
-  -- (suc id)`.  This is `sub-charge-capsOK-lift`'s chain (.Caps-Bridge)
-  -- — opIterD-dominated → sizeCount-body → sizeCount-mono-d over depOK
-  -- → capsAt-suc-full → frameStep-mono-j — plus INV?'s upward
-  -- monotonicity in B.  Slots never change across a run, so the Ψ index
-  -- transports untouched.
-  wet-landing-lift : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) (j′ : ℕ) →
-    let sl = Sched.slots sched
-        r  = subscribeE g b κ id now sched st
-    in depthE g b κ id now sched st ≤ capsH e sl id →
-       0 + j′ ≤ opIterD (Caps.cSize (capsAt e sl id))
-                        (Caps.cWid (capsAt e sl id))
-                        (capsH e sl id)
-                        (nest b sl (EvalSt.connectedShares st))
-                        (suc (sizeᵉ b)) 0 →
-       INV? (ΨAt e sl)
-            (Caps.cSize (frameStep (0 + j′) (capsAt e sl id)))
-            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
-       INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
-            (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
-            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+  -- (the landing lift is DISCHARGED, below, as a definition rather than
+  -- a member of this block: it consumes entry-ceiling-at, and a
+  -- postulate cannot reference a definition below it.)
+
+-- THE SAME CEILING AT ANY LEVEL THE ENTRY BUDGET REACHES, which is the
+-- generalisation the landing lift needs: entry-ceiling is this at
+-- `j′ := L₀` with a `≤-refl`, and nothing in the chain ever depended on
+-- `j′` BEING L₀ — only on its sitting under it.  Reading the two side
+-- by side is what showed wet-landing-lift was assemblable rather than
+-- hard: the walk hands back a level bounded by the same opIterD term,
+-- so one `≤-trans` covers the gap.
+-- NOT SEALED, deliberately (2026-08-15).  It was sealed for one build on the
+-- theory that wet-landing-lift's body unfolding into the opIterD tower was
+-- what cost Walk-Level its memory.  That was wrong: the FIRST build, with
+-- both this and wet-landing-lift unsealed, cleared Walk-Level and died
+-- later in VWF.  Sealing is a CONSUMER-side fix and this module is the
+-- producer, so the seal bought nothing here and its duplicated signature
+-- cost real memory.  entry-ceiling below has consumed it unsealed since
+-- 2026-08-13 without trouble.
+entry-ceiling-at : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) {u} (b : Closed Γ u) (cs : List Source) (j′ : ℕ) →
+  3 + nest b sl cs ≤ Caps.cSize (capsAt e sl id) →     -- nestOK
+  suc (sizeᵉ b) ≤ Caps.cSize (capsAt e sl id) →        -- opsOK
+  j′ ≤ opIterD (Caps.cSize (capsAt e sl id))
+               (Caps.cWid (capsAt e sl id))
+               (capsH e sl id) (nest b sl cs) (suc (sizeᵉ b)) 0 →
+  Caps.cSize (frameStep j′ (capsAt e sl id)) ≤ sizeCapAt e sl (suc id)
+entry-ceiling-at e sl id b cs j′ nestOK opsOK j′≤L₀ = proj₁ lift-⊑
+  where
+  c   = capsAt e sl id
+  hS  = 2≤capsAt-size e sl id
+  L₀  = opIterD (Caps.cSize c) (Caps.cWid c) (capsH e sl id)
+                (nest b sl cs) (suc (sizeᵉ b)) 0
+  j≤full : L₀ ≤ sizeCount c (capsH e sl id)
+  j≤full =
+    ≤-trans (opIterD-dominated (Caps.cSize c) (Caps.cWid c) (capsH e sl id)
+                (nest b sl cs) (suc (sizeᵉ b)) (Caps.cReg c)
+                hS nestOK opsOK (1≤capsAt-reg e sl id))
+            (≤-reflexive (sym (sizeCount-body c (capsH e sl id))))
+  lift-⊑ : frameStep j′ c ⊑ᶜ capsAt e sl (suc id)
+  lift-⊑ = subst (λ x → frameStep j′ c ⊑ᶜ x)
+                 (sym (capsAt-suc-full e sl id))
+                 (frameStep-mono-j c hS (≤-trans j′≤L₀ j≤full))
 
 -- ENTRY, (iii): the reset cap ceils the walk — no level the entry budget can
 -- reach outgrows the NEXT instant's size cap.  Discharged 2026-08-13: the
@@ -3298,28 +3354,113 @@ entry-ceiling : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
                                  (suc (sizeᵉ b)) 0)
                         (capsAt e sl id))
     ≤ sizeCapAt e sl (suc id)
-entry-ceiling e sl id b cs nestOK opsOK = proj₁ lift-⊑
-  where
-  c   = capsAt e sl id
-  hS  = 2≤capsAt-size e sl id
-  L₀  = opIterD (Caps.cSize c) (Caps.cWid c) (capsH e sl id)
-                (nest b sl cs) (suc (sizeᵉ b)) 0
-  j≤full : L₀ ≤ sizeCount c (capsH e sl id)
-  j≤full =
-    ≤-trans (opIterD-dominated (Caps.cSize c) (Caps.cWid c) (capsH e sl id)
-                (nest b sl cs) (suc (sizeᵉ b)) (Caps.cReg c)
-                hS nestOK opsOK (1≤capsAt-reg e sl id))
-            (≤-reflexive (sym (sizeCount-body c (capsH e sl id))))
-  lift-⊑ : frameStep L₀ c ⊑ᶜ capsAt e sl (suc id)
-  lift-⊑ = subst (λ x → frameStep L₀ c ⊑ᶜ x)
-                 (sym (capsAt-suc-full e sl id))
-                 (frameStep-mono-j c hS j≤full)
+entry-ceiling e sl id b cs nestOK opsOK =
+  entry-ceiling-at e sl id b cs _ nestOK opsOK ≤-refl
+
+-- THE LANDING LIFT, DISCHARGED (2026-08-14) — ex-postulate, and it was
+-- the last FALSITY-classed row in this file that was not the walk face
+-- itself.  Its header used to say the content "is sub-charge-capsOK-lift's
+-- chain plus INV?'s upward monotonicity in B", and that sentence was a
+-- work order: every piece it named is proven and in scope, so the
+-- statement is an ASSEMBLY, not a lemma.
+--
+--   · the walk lands INV? at its own level's cap, cSize (frameStep j′ c),
+--     and its own Σ bounds j′ by the entry opIterD term (`lvl`);
+--   · entry-ceiling-at carries any such j′ up to sizeCapAt e sl (suc id)
+--     — that is entry-ceiling generalised off `j′ := L₀`, which is the
+--     one step that had to be invented here;
+--   · INV?-widen (.Wet/Part1) raises the B index;
+--   · subscribeE-slots (.Keeps-Ring) transports the Ψ and size indices,
+--     since slots never change across a run.
+--
+-- IT GAINED nestOK/opsOK, AND THAT IS A RESTATEMENT, NOT A CONVENIENCE.
+-- The justification is not "the call site has them" (CLAUDE.md rejects
+-- that reason outright): it is that without them the statement looks
+-- FALSE.  The only route from `j′ ≤ opIterD …` to the next instant's cap
+-- runs through opIterD-dominated, whose whole content is that the budget
+-- term is dominated by sizeCount — and it is dominated only when the nest
+-- and ops bounds hold.  Drop them and nothing bounds j′ against the
+-- ceiling at all.
+-- SEALED, AND THE SEAL IS LOAD-BEARING — established by measurement, not by
+-- the rule (2026-08-15).  This was a POSTULATE the wet spine consumed as an
+-- axiom; discharging it lets Verify-Well-Formed unfold the body, and VWF then
+-- dies exactly where CLAUDE.md records its three prior instances.
+--
+-- IT WAS CONFIRMED THE EXPENSIVE WAY, and the sequence is kept because the
+-- wrong turn is the instructive part:
+--   · first VWF death had a 3.8 GB competing agda beside a 7.3 GB build —
+--     11.1 GB against ~12 GB free — so CONTENTION was a sufficient
+--     explanation, and the seal looked possibly unnecessary;
+--   · unsealed and re-run on a QUIET machine: Walk-Level cleared, and
+--     Verify-Well-Formed.Part13 still died `Killed: 9` at 3.7 GB entering the
+--     module, with nothing else running.  That is the seal's justification —
+--     contention was ruled OUT by experiment, not argued away.
+--
+-- THE TYPE IS A SYNONYM, AND THAT IS NOT COSMETIC.  Sealing needs private-impl
+-- + abstract-alias, because the body's untyped `where r = …` is something a
+-- plain `abstract` block rejects — and that idiom needs the signature at BOTH
+-- sites.  This type binds a `subscribeE` run in a `let` and applies INV? at its
+-- projections, so writing it twice makes Agda elaborate all of that twice.
+-- Naming it once is what keeps the seal affordable; it is the same idiom the
+-- file already uses for WalkLevel / WetOuter, and Burst-Walk for InnerNodryFuel.
+--
+-- TWO THINGS THAT ARE **NOT** THE FIX, both tried:
+--   · sealing entry-ceiling-at as well, on the theory that the body unfolding
+--     into the opIterD tower was the cost — no effect, reverted; entry-ceiling
+--     has consumed it unsealed since 2026-08-13.  Sealing is a CONSUMER-side
+--     fix and this module is the producer.
+--   · reading a dev-green as evidence.  Every state above was `agda-dev` GREEN.
+--     What carried the signal was the RATIO to the module's recorded best in
+--     typecheck-performance-numbers.md (5.5 s → 38.4 s), not the absolute time.
+WetLandingLift : Set
+WetLandingLift = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (j′ : ℕ) →
+  let sl = Sched.slots sched
+      r  = subscribeE g b κ id now sched st
+  in 3 + nest b sl (EvalSt.connectedShares st)
+       ≤ Caps.cSize (capsAt e sl id) →                 -- nestOK
+     suc (sizeᵉ b) ≤ Caps.cSize (capsAt e sl id) →     -- opsOK
+     depthE g b κ id now sched st ≤ capsH e sl id →
+     0 + j′ ≤ opIterD (Caps.cSize (capsAt e sl id))
+                      (Caps.cWid (capsAt e sl id))
+                      (capsH e sl id)
+                      (nest b sl (EvalSt.connectedShares st))
+                      (suc (sizeᵉ b)) 0 →
+     INV? (ΨAt e sl)
+          (Caps.cSize (frameStep (0 + j′) (capsAt e sl id)))
+          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+     INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
+          (sizeCapAt e (Sched.slots (proj₁ (proj₂ r))) (suc id))
+          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+
+private
+  wet-landing-lift-go : WetLandingLift
+  -- NOT `rewrite`: that abstracts over EVERY occurrence of the run's
+  -- slots, including the ones INV?'s own unfolding regenerates from its
+  -- `sched` argument, which severs them from that argument and leaves a
+  -- pointwise `Sched.slots r i != Sched.slots sched i`.  The motive below
+  -- moves exactly the two index positions (Ψ and the size cap) and leaves
+  -- the state arguments alone.
+  wet-landing-lift-go {e = e} g b κ id now sched st j′ nestOK opsOK depOK lvl invL =
+    subst (λ sl′ → INV? (ΨAt e sl′) (sizeCapAt e sl′ (suc id))
+                        (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+          (sym (subscribeE-slots g b κ id now sched st))
+          (INV?-widen (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+             (entry-ceiling-at e (Sched.slots sched) id b
+                (EvalSt.connectedShares st) j′ nestOK opsOK lvl)
+             invL)
+    where r = subscribeE g b κ id now sched st
+
+abstract
+  wet-landing-lift : WetLandingLift
+  wet-landing-lift = wet-landing-lift-go
 
 subscribeE-wet-core : WalkLevel → WetOuter
 subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
                     inv pB pS pLen szB fcB gas cOK dW nestOK opsOK depOK =
     dry
-  , wet-landing-lift g b κ id now sched st j′ depOK lvl invL
+  , wet-landing-lift g b κ id now sched st j′ nestOK opsOK depOK lvl invL
   where
   sl = Sched.slots sched
   c  = capsAt e sl id

@@ -427,6 +427,48 @@ speculative inventory: they may get thrown out wholesale, and worse, their sunk 
 the design toward keeping them. Better to have a wrong assembly you can amend than proven
 pieces with no assembly at all.
 
+## SEARCH FIRST — assume the thing already exists until proven otherwise
+
+**Before you probe it, prove it, or write it: look for it.** The default assumption is that
+the fact you need is ALREADY IN THE REPO — proven, named, and greppable. That assumption is
+right far more often than it feels, because this campaign has been running long enough that
+most small facts have been needed before. Treat "I need a lemma saying X" as a SEARCH task,
+not a proof task, until a search has actually failed.
+
+This is the same law as the wiring pass, arriving from the other side: the wiring law exists
+so that "did we already prove this?" is a `grep` instead of a memory, and that only pays off
+if you actually run the grep. Every hour spent re-deriving something proven is an hour the
+wiring law already bought back and someone declined to collect.
+
+**The cost is asymmetric and that is the whole argument.** A search costs seconds and its
+worst case is that you learn the shape of the neighbourhood. Skipping it costs whatever you
+build instead — and what you build instead is usually *weaker* than what was already there,
+because a probe gives a receipt at concrete programs while the existing lemma gives a
+theorem. Three cases from a single night, each found only after the expensive route:
+
+- Three probe series (Ψ, Ψ2, Ψ3) were commissioned to test whether evaluation can inflate
+  `fnCap` past Ψ. `fnCap-subΘᵉ` and `caseW-subΘ` (.Measures) already prove it cannot. The
+  probes were real receipts but none of them COULD have refuted, and a two-second grep for a
+  substitution lemma would have replaced all of them with a citation.
+- A path-length unit was recorded as a `-- DEAD ROUTE` on the arithmetic being off by one.
+  `frameStep-chain-suc` (Caps-Face/Part3) delivers exactly that unit, and a sibling site in
+  Walk-Level was already spending it for the identical purpose.
+- `pathB?-mono-B` was stated as a fresh postulate; it duplicated the proven `pathB?-widen`,
+  and was caught by a name clash rather than by looking.
+
+**HOW TO SEARCH, since the failure is usually a bad search rather than no search.** Grep for
+the CONCLUSION's shape, not for the name you imagine it has — names in this repo are
+idiosyncratic (`frameStep-chain-suc` is a path-length lemma) and a name-guess reliably misses.
+Search for the operator and the relation (`pathLen`, `≤.*cSize`), for the type former, for a
+neighbouring lemma and then read what sits AROUND it — related facts cluster in one file.
+Then read the SIGNATURE rather than the header prose: a header saying a route is dead is a
+claim about an attempt, while the signature is a fact.
+
+**The one thing this rule does NOT license** is assuming a fact exists and building on it
+unchecked. "Assume it exists" is a directive about where to spend the next five minutes, not
+permission to cite something you have not opened. Find it, read its actual type, confirm the
+indices line up — the off-by-one above was invisible from the name and obvious from the type.
+
 ## Survey the whole hole-set before discharging any of it
 
 Outside-in applies to the HOLES too, not just the statements. When a batch of deferred sites

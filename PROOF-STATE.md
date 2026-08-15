@@ -74,19 +74,15 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`input-wet`** (Walk-Level) — FALSITY, RESTATED over the honest hop
-  environment after a machine refutation (Demand-Probe series W, which
-  now certifies the new conjunct on the same program). Its hop conjunct
-  and the staged fixpoint under it are probed; the other four conjuncts
-  of its Σ have never been run, and that residue is the class. Route,
-  rejected alternatives and coverage in its header.
+- **`input-wet`** (Walk-Level) — FALSITY. Every conjunct now runs
+  (Demand-Probe W/T/V/Ψ/Ψ2/Ψ3/REG), and the Ψ axis — where the hop
+  refutation's shape would have recurred — is answered by PROVEN
+  `caseW-subΘ` + `fnCap-subΘᵉ` (.Measures), not by the probes. Residue:
+  no probe reached a value that is not a subterm of its own def, so none
+  could have refuted. Coverage and the disanalogy with hop in its header.
 - **`slotHop-cap`** (Measures) — DIFFICULTY, lowered from FALSITY by
   Demand-Probe series S, which reached the amplifier-chain region and
   measured the margin widening. Route and coverage in its header.
-- **`hopD-η-congᵉ` / `ηAt-agrees`** (Rx.Slot-Hop) — DIFFICULTY. The two
-  mechanical inductions `slotHop-fix` is assembled from; stratification
-  hands each its guard. Probed jointly through that consumer at the
-  indices where they stop being vacuous; receipts in their headers.
 - **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY. The μ edge's L̂ transport.
   No caps twin exists to donate it: the reset-anchor ceiling is wet-side
   only, so every walk clause re-derives its own. Route in its header.
@@ -95,16 +91,11 @@ named postulate's own header.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.
-- **`subscribeE-inner-nodry-pLen`** (Burst-Walk) — **SHAPE, known
-  underdetermined**: its conclusion needs one unit of path-length slack
-  that no hypothesis carries. Restate the chain; do not grind. Analysis
-  in its header.
-- **`subscribeE-inner-nodry-fuel`** (Burst-Walk) — FALSITY, route-complete
-  over a PROVEN engine (budget-hasAtLeast, general in id, shape-checked)
-  with only instantiation left; not lowered, since a named route is not
-  evidence that reached the risky region. Restated at the reset caps
-  (the walk face's pins rejected the level-cap form — story in its
-  header), which moves it ONTO the engine's own anchor.
+- **`SiNodry`'s path-length hypothesis** (Burst-Walk) — SHAPE, and NOT a
+  postulate, which is why it needs naming here: it lives in a type synonym the
+  ledger cannot see, and lands on `innerReact-nodry-core` / `thruOuter-nodry-core`.
+  Proven `frameStep-chain-suc` pays it; the residue is that it delivers at
+  `suc J` while the hypothesis sits at `J`. Its header has the index question.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY, reclassified
   from FALSITY: it was neither false nor hard but SHAPE — INV?'s two slot
   conjuncts were reachable from NO hypothesis it had. Repaired by
@@ -114,10 +105,6 @@ named postulate's own header.
 - **`subscribeE-inner-nodry-{pSz,pBO,depth}`** (Burst-Walk)
   — DIFFICULTY. Path-extension and depth-mirror plumbing for the inner
   call.
-- **`wet-landing-lift`** (Walk-Level) — FALSITY INHERITED, not intrinsic:
-  its hypothesis IS the walk face's level bound, and its own content is
-  sub-charge-capsOK-lift's proven chain with INV? for capsOK?. Do not
-  work it before the face it lifts. Chain in its header.
 - **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
   `regsLen?-mono`** (Walk-Level) — DIFFICULTY. Entry plumbing for the
   outer assembly; each self-contained, none level-indexed.
@@ -126,10 +113,12 @@ named postulate's own header.
   (Its former row-mate pathB?-mono-B is GONE — it duplicated the proven
   pathB?-widen, .Measures, found by a name clash; grep before stating.)
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
-  DIFFICULTY, parked; statement debt PAID — both now carry the fused
-  per-frame ceiling via the walk's CL channel (Delivery-Walk), funded at
-  the seam from capsAt-suc-full; dead route, channel design and the
-  remaining proof route live in innerReact-nodry-core's header.
+  DIFFICULTY, parked, and both got STRONGER on 2026-08-15 by absorbing
+  SiNodry's new path-length hypothesis (row above) — they take SiNodry in
+  negative position, so a hypothesis added there is an obligation added
+  here. They carry the fused per-frame ceiling via the walk's CL channel
+  (Delivery-Walk), funded at the seam from capsAt-suc-full; dead route,
+  channel design and the remaining proof route in the first's header.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
   plus the Deliveries counts. Last in the tier, never first.
 
