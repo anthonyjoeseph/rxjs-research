@@ -14,7 +14,7 @@
 -- already holds, as `capsOK?`.
 --
 -- THE SHAPE (validated with C = 0 by
--- agda/probe/Depth-Compositional-Probe.agda, whose header traces every
+-- Depth-Compositional-Probe (DELETED; git history), whose header traces every
 -- clause of the depth mirror to one of these three channels):
 --
 --     depthE g b κ bid now sched st

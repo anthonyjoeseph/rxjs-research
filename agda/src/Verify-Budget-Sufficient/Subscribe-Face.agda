@@ -898,7 +898,7 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 --
 -- Every head below reports the LEVEL it leaves, in the one transformer
 -- its arc of the family's clause cycle forces
--- (agda/probe/Chain-Supply-Probe.agda § 4).  The heads are
+-- (Chain-Supply-Probe (DELETED; git history) § 4).  The heads are
 -- forward-declared, so the conjunct could not land head by head: the
 -- SHAPES all landed at once and the PROOFS landed per clause.  They are
 -- all in now — a leaf (`emptyᵉ`, `takeᵉ 0`, the dry closes), a chain edge
@@ -2355,7 +2355,7 @@ stepFrame-caps c dep bud j g id now (from-inner op allNid inst) κ vals fin sl s
 -- formula making no recursive call — that is what carries the family's
 -- termination — and a depth-zero walk STRICTLY overshoots it, so no
 -- rearrangement closes this clause and only a hypothesis can retire it
--- (`Dep0-Walk-Probe` § 1)
+-- (measured by a probe module since DELETED)
 stepFrame-caps c zero bud j g id now (thru-outer op nid) κ vals fin sl sched st
                2≤S 1≤R slEq slC slSz inv fS pS lC vC fb ()
 

@@ -75,7 +75,7 @@ open import Verify-Budget-Sufficient.Occurrences
 
 -- § 1a  subscribeE-demand — THE PENDING POSTULATE (subscribe-side burst face).
 -- Mirrors subscribeE-Ψ (.Burst-Walk) for the demand bound.
--- PROBED 2026-08-08 (agda/probe/SubInner-Demand-Probe.agda): 20 rows at
+-- PROBED 2026-08-08 (SubInner-Demand-Probe (DELETED; git history)): 20 rows at
 -- init states, no refutation.  Its ex-siblings (chainStep-demand,
 -- foldPath-demand) were retired 2026-08-10 for the delivery-walk route;
 -- this leg still bottoms out in the subscribe-side burst face (same gap as
@@ -97,7 +97,7 @@ postulate
        burstB? Dm Ψ (proj₁ (subscribeE g b κ id now sched st)) ≡ true
 
 -- § 1b  subscribeInner-demand — REAL DEFINITION over subscribeE-demand.
--- Landed from probe/SubscribeInnerDemand-Rehearsal-Probe.agda.
+-- Landed from SubscribeInnerDemand-Rehearsal-Probe (DELETED; git history).
 -- g0: vs = [], trivial.
 -- gs: vs = proj₁ (splitBurst burst) where burst from subscribeE;
 --     splitBurst-vals-B converts burstB? Dm Ψ burst to the goal.

@@ -71,6 +71,6 @@ climb S W d k m =
 -- `opIterD-dominated` — route steps (a)+(b) — are now PROVEN, in
 -- `Verify-Budget-Sufficient.Op-Budget`, which imports this module's
 -- results as finished facts.  The monolithic postulate
--- `opIterD-budget-core` and its seven expression-level hypotheses are
+-- `opIterD-budget` (.Op-Budget) and its seven expression-level hypotheses are
 -- gone with it: the proof is pure level arithmetic and never reaches
 -- the expression level at all.

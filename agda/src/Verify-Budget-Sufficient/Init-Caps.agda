@@ -1,7 +1,7 @@
 ------------------------------------------------------------------
 -- INIT-CAPS: `capsOK?` holds at the BASE caps, at the initial state.
 --
--- This discharges what tier-1 ledger #7 postulated
+-- This discharges what `init-capsOK?-base-core` postulated
 -- (`init-capsOK?-base-core`, Caps-Bridge).  Its own module because it
 -- is a lemma family that consumes Measures / Caps-Face / Frame-Width
 -- as finished facts — an import, not a mutuality — and because

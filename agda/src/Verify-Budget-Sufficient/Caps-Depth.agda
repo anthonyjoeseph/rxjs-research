@@ -6,7 +6,7 @@
 -- `dep`, because one arc of its cycle spends a unit of it — a frame's
 -- payload walk runs at `dep` minus one, on the refreshed budget — and
 -- at `dep = 0` there is nothing to descend into, while the walk still
--- re-enters the family.  `Dep0-Walk-Probe` § 1 proves that gap is
+-- re-enters the family.  A probe module since DELETED showed that gap is
 -- structural: `fLvlD S W zero` makes no recursive call (that is what
 -- carries the family's termination) and a depth-zero walk STRICTLY
 -- overshoots it, so no rearrangement closes those clauses.  They have

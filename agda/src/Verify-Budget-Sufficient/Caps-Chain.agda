@@ -29,7 +29,7 @@
 -- descends by one per operator.  So the recursive call inside an
 -- operator clause is not a fresh entry but the same sweep, one shorter,
 -- and the conversion the grind would need in the other direction is
--- REFUTED (agda/probe/Chain-Index-Probe.agda § 1: it asks that a sweep
+-- REFUTED (Chain-Index-Probe (DELETED; git history) § 1: it asks that a sweep
 -- sized for a whole chain fit inside the operators the caller has
 -- remaining, and at zero operators left the walk transformer is the
 -- identity, so the entry sweep — which is strictly above the level —
@@ -417,7 +417,7 @@ chain-desc hd src m′ (s≤s h) = ≤-trans (s≤s (m≤n+m src hd)) h
 --
 -- AND THE STATEMENT IS FALSE AT A ZERO BUDGET — `sLvlD S W d 0 J` is `J`
 -- on the nose, so the goal would ask `suc (suc j) ≤ suc j`
--- (machine-refuted, agda/probe/Queue-Push-Probe.agda § 1).  So the level
+-- (machine-refuted, Queue-Push-Probe (DELETED; git history) § 1).  So the level
 -- is bought with the budget's POSITIVITY — and since the walk heads now
 -- report at `suc bud`, that positivity is a literal `s≤s z≤n` at the
 -- clause.  It used to be earned from a head's `nest … ≤ bud` hypothesis
@@ -533,7 +533,7 @@ inner-step S W d k j j₂ 2≤S ih =
 -- depth hypothesis anywhere.
 --
 -- This is the whole reason buckets A and D of the site census do not wait
--- on the depth ruling that site 2203 forced (`Dep0-Walk-Probe`): a
+-- on the depth ruling that site forced (probe module since DELETED): a
 -- RECEIPT fits at depth zero, and only a WALK does not.
 ------------------------------------------------------------------
 

@@ -151,7 +151,7 @@ open import Verify-Budget-Sufficient.Measures public
 --   hop-descends (FALSE)  measureE B o ≺ᵛ measureE B b — "o's shells
 --             sit inside b's", fed to dBound-hop through rank-mono-≺.
 --             This does not hold, at ANY of its three claimed sites.
---             agda/probe/Hop-Descent-Probe.agda refutes all three by
+--             Hop-Descent-Probe (DELETED; git history) refutes all three by
 --             absurd pattern (make hop-descent-probe).
 --
 -- WHY IT IS FALSE, in one line: a hop value is a TEMPLATE
@@ -228,7 +228,7 @@ open import Verify-Budget-Sufficient.Measures public
 -- dBound already anticipates in allowing r ≤ R = suc V ^ suc V.
 --
 -- MEASURED (2026-07-27) before anything below took a dependency on it.
--- Static, in agda/probe/Hop-Descent-Probe.agda — all four refutation
+-- Static, in Hop-Descent-Probe (DELETED; git history) — all four refutation
 -- witnesses descend strictly (2↦1, 2↦1, 2↦1, 4↦2); the scan
 -- accumulator's depth is 0,1,2,3 after 0..3 folds, against a clause
 -- paying 256 at V ≡ 4; and hopD is EQUAL across a μ unfold, since an
@@ -360,7 +360,7 @@ open import Verify-Budget-Sufficient.Measures public
 --     subscribed                                        (burstHopD?)
 --
 -- would make the strictness definitional.  That conjunct is FALSE for
--- hopD as written.  agda/probe/Hop-Descent-Probe.agda (make
+-- hopD as written.  Hop-Descent-Probe (DELETED; git history) (make
 -- hop-descent-probe) carries the witness as refl-checked numbers plus
 -- an absurd pattern: a program whose allowance is 2 and whose very
 -- first emission is 3.
@@ -369,7 +369,7 @@ open import Verify-Budget-Sufficient.Measures public
 -- failure of the remaining-hop idea.  hopD's mapᵉ clause scales by a
 -- coefficient, and the question is what that coefficient counts.
 -- Three answers were tried in one day; the first two are refuted by
--- machine-checked witnesses in agda/probe/Hop-Descent-Probe.agda.
+-- machine-checked witnesses in Hop-Descent-Probe (DELETED; git history).
 --
 -- (1) occsᵗ, the index-blind count the sync-linearity ledger uses.
 -- It counts EVERY varᵗ in the template.  The coefficient exists to

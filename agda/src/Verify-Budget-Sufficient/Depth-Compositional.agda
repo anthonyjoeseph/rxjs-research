@@ -1,6 +1,6 @@
 ------------------------------------------------------------------
 -- `depth-compositional`, ASSEMBLED — landed from
--- agda/probe/Depth-Compositional-Assembly.agda 2026-08-06, where the
+-- Depth-Compositional-Assembly (DELETED; git history) 2026-08-06, where the
 -- shape was typechecked symbolically before paying this recheck.
 --
 -- THE MEASURE (`storeNestMax` and its four helpers) LIVES HERE, moved

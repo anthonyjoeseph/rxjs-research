@@ -621,7 +621,7 @@ pathSz?-tail B f p h =
 -- (Entry-Caps-Refuted), so the iteration is the honest currency and the
 -- product had no route through this walk.  `sizeCount` (.Caps) is
 -- therefore the LANDING LEVEL — it dominates the product it replaces
--- (`lvls-lin` at J = 0, Level-Walk-Probe's `count-gate`), so no measured
+-- (a linearity step at J = 0, measured by a probe module since DELETED), so no measured
 -- row moves — and this conjunct is `cascadeGo-level` composed with
 -- `cascadeGo-deliveries`, at the end of the section below.
 
@@ -1004,7 +1004,7 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 --       each construction site takes exactly one lift.  What the
 --       relaxation BUYS is the two *All edges: their receipt is a sum of
 --       `subscribeE-caps`'s growth indices, which does NOT fit inside one
---       `fCharge` (agda/probe/Sub-Charge-Probe.agda § 0/§ 1, measured) and
+--       `fCharge` (Sub-Charge-Probe (DELETED; git history) § 0/§ 1, measured) and
 --       does fit inside one refreshed frame level, which is what `fLvlD`
 --       spends and what `Walk-Hyps.sf-step` already consumes.
 --   (b) THE OUTPUT WIDTH — `valsCaps?` rather than `all valCaps?`, i.e.

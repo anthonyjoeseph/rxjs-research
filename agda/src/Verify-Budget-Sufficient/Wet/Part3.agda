@@ -157,7 +157,7 @@ open import Verify-Budget-Sufficient.Wet.Part2 public
 -- threads through the fold at a moving ledger position, with the
 -- registry cardinality rider (INV?'s length conjunct) available at
 -- the latch for the eventual receipt arithmetic.  Not consumed yet:
--- cascade-dry keeps riding the landing core below until the
+-- the cascade dry face keeps riding the landing core below until the
 -- quantitative debt (memo (3)) closes.
 ------------------------------------------------------------------
 

@@ -2,7 +2,7 @@
 -- THE REMAINING-HOP DEPTH, candidate replacement for dBound's `r`.
 --
 -- `rank ∘ measureE` was refuted as the hop-descending quantity on
--- 2026-07-27 (agda/probe/Hop-Descent-Probe.agda): a two-use template
+-- 2026-07-27 (Hop-Descent-Probe (DELETED; git history)): a two-use template
 -- copies the plugged value's shells once per occurrence, so the hop's
 -- multiset can EXCEED the carrier's.  hopD is the replacement under
 -- measurement.  It is stated here, alone, so the probes can gate it
@@ -25,7 +25,7 @@
 --     its argument still dominates the source's own walk.
 --
 --     Three drafts of "scaled by what", each refuted by a witness in
---     agda/probe/Hop-Descent-Probe.agda, all on 2026-07-28:
+--     Hop-Descent-Probe (DELETED; git history), all on 2026-07-28:
 --
 --       occsᵗ — the index-blind count the sync-linearity ledger
 --       (plugs-lenᵉ, inner-len-subΘ) uses.  It reads every varᵗ as 1,

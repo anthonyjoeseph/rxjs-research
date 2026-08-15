@@ -419,8 +419,8 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- i.e. the level one instant's deliveries climb to, each delivery
 -- charged at the level the one before it LEFT.  The product it replaces
 -- (`cDel c · cSize c · suc (suc cWid · suc cSize)`, a whole cascade
--- charged at its ENTRY level) is DOMINATED by it — `lvls-lin` at J = 0,
--- Level-Walk-Probe's `count-gate` — so nothing the old count covered is
+-- charged at its ENTRY level) is DOMINATED by it — a linearity step at J = 0,
+-- measured by a probe module since DELETED (git history) — so nothing the old count covered is
 -- lost, and the iterated form is what `cascadeGo-level` actually proves,
 -- which is what makes the per-instant charge a theorem.
 --
@@ -504,7 +504,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 --     a dispatch fans out over is `regAt S R J` long.
 --
 -- It is POINTWISE ABOVE the registry walk it replaces
--- (agda/probe/Level-Walk-Probe.agda, `old-cDel≤new-cDel`), so every
+-- (measured as `old-cDel≤new-cDel` in a probe module since DELETED), so every
 -- measured delivery row the old bound cleared this one clears too.
 --
 -- IT IS ACKERMANN-FLAVOURED IN THE GAS, and that costs nothing here:
@@ -571,7 +571,7 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- The recursion is the same lexicographic (dispatch gas, walk position)
 -- descent `dCap` runs on — only the threaded quantity changed — and it
 -- is POINTWISE ABOVE `dCap` at the same entry caps
--- (`old-cDel≤new-cDel`, agda/probe/Level-Walk-Probe.agda), so every
+-- (`old-cDel≤new-cDel`, in a probe module since DELETED), so every
 -- measured D row the old bound cleared this one clears too, with no
 -- re-measurement
 ------------------------------------------------------------------
@@ -606,7 +606,7 @@ fLvl S W J = J + fCharge S W J
 --
 -- and the two charges are MUTUALLY RECURSIVE (measured, clause by
 -- clause, off the ground companion tree —
--- agda/probe/Sub-Charge-Probe.agda § 0).  NO CLOSED FORM IN (S, W, J)
+-- Sub-Charge-Probe (DELETED; git history) § 0).  NO CLOSED FORM IN (S, W, J)
 -- CLOSES THAT LOOP; it is the same failure `dCapᶜ` takes one stratum up
 -- ("EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT", below), and it
 -- takes the same repair: a RECURSION on a budget, with every level
@@ -638,21 +638,21 @@ fLvl S W J = J + fCharge S W J
 -- linear — `unfoldμ-caps` pays `m + suc (m * m)`, which `suc B` does
 -- not cover and `suc B * suc B` does.  Each of the four clause shapes
 -- then lands in one monotonicity step (gated:
--- agda/probe/Sub-Charge-Probe.agda § 5).
+-- Sub-Charge-Probe (DELETED; git history) § 5).
 --
 -- THE BUDGET IS RE-READ AT EVERY FRAME ENTRY, AND THE DEPTH FUEL `d` IS
 -- WHAT PAYS FOR THE RE-READING.  `fLvlD S W (suc d) J` spends one unit
 -- and instantiates k at `suc (sizeAt S J)`, the size cap at the level
 -- THAT frame runs at — not at the level the subscribe that reached it
 -- began at.  Inheriting the budget instead is REFUTED (2026-08-03,
--- agda/probe/Nest-Budget-Probe.agda § 3): a `scanᵉ` under an *All mints
+-- Nest-Budget-Probe (DELETED; git history) § 3): a `scanᵉ` under an *All mints
 -- a payload per fold, the k-th mint nests k deep and is subscribed in
 -- the SAME delivery, and the carrier's own nesting stands still — so a
 -- k read where the subscribe BEGAN (2, at S = 2, W = 1, J = 0) is spent
 -- where the walk has CLIMBED TO (43690).  It is the Entry-Caps-Refuted
 -- distinction moved from the caps to the budget.
 --
--- THE REFRESH IS SOUND AS A THEOREM (agda/probe/Refresh-Probe.agda § 1):
+-- THE REFRESH IS SOUND AS A THEOREM (Refresh-Probe (DELETED; git history) § 1):
 -- `stepFrame` reaches `subscribeInner` from two clauses only —
 -- `thru-outer`, whose payloads are its own arriving values, and a concat
 -- drain, whose queue was filled at a LOWER level — so `valsCaps?` at the

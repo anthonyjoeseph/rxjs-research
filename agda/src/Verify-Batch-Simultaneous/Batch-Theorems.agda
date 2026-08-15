@@ -8,7 +8,7 @@
 -- and it is FALSE.  `impl-batchSimultaneous = foldBatch batch-init`, and
 -- `foldBatch st [] = flushBatch st` — so on `xs` alone the batcher FLUSHES a
 -- batch that is still open, and on `xs ++ ys` that same batch keeps growing.
--- Machine refutation in `agda/probe/Battery-Batch-Online.agda`
+-- Machine refutation in `Battery-Batch-Online (DELETED; git history)`
 -- (`batch-online-refuted`, a proven `¬`): two emits flush to `value [1]`, while
 -- three close the same batch as `value [1,2]`, so the first elements differ and
 -- no prefix relation can hold.  The old statement's own trailing comments —

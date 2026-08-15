@@ -228,7 +228,7 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 -- closed: `stBounded? V` says nothing about a stored value's fn
 -- weight, the registry's cardinality, or a registered chain's frames
 -- (IN), and a stBounded?-only conclusion cannot re-seed an INV?-shaped
--- hypothesis (OUT), so drain-dry → cascade-dry → the cascade face did
+-- hypothesis (OUT), so drain-dry → the one-cascade step → the cascade face did
 -- not compose.  And subscribeE-wet's κ was completely unconstrained, where
 -- every member needs `pathB? B Ψ κ` (register-INV consumes it to keep
 -- regsB?).
@@ -237,7 +237,7 @@ open import Verify-Budget-Sufficient.Wet.Part5 public
 --   (Ψ, B) = (ΨAt e sl, sizeCapAt e sl ·) — a fn-cap seed that never
 --   grows and a size cap that rides the caps recurrence per instant —
 --   plus `pathB? B Ψ κ` on subscribeE-wet's continuation.
---   cascade-dry's conclusion is now LITERALLY drain-dry's next-instant
+--   the one-cascade step's conclusion is now LITERALLY drain-dry's next-instant
 --   hypothesis, with no residue.
 --
 -- GAP 2 — THE DEMAND'S RESET CAPS WERE THE LEDGER.  subscribeE-wet
@@ -574,14 +574,14 @@ size≤sizeCapAt e sl id =
 --       `frameStep (j + j′) c` with j′ existentially produced and
 --       UNBOUNDED.  cascadeGo-level budgets a cascade's j (`lvls`, one
 --       dLvl per delivery); nothing budgets a bare subscribe's, so
---       burst-wet's own landing (root subscribe, capsAt 0 → capsAt 1)
+--       the burst face's own landing (root subscribe, capsAt 0 → capsAt 1)
 --       has no supplier either.  The missing companion is a
 --       subscribeE-level analogue of `fLvl`, and it is NAMED here
 --       rather than assumed.  It is the SAME hole the two *All frame
 --       faces wait on (.Caps-Face, conjunct (a) there), seen from the
 --       wet side — one companion would close both.
 --       AND THE COMPANION IS NOT A CLOSED FORM (measured,
---       agda/probe/Sub-Charge-Probe.agda): a subscribe installs frames
+--       Sub-Charge-Probe (DELETED; git history)): a subscribe installs frames
 --       and a frame subscribes one inner per payload, so the subscribe
 --       charge and the frame charge are MUTUALLY RECURSIVE and no
 --       function of (S, W, J) closes the loop — the same failure
@@ -745,7 +745,7 @@ chainsOf-B B Ψ a st = chainsGo-B B Ψ a (EvalSt.registry st)
 -- induction at fnCapLive, and the head-KEEPING variant, which nothing
 -- had: every existing inversion keeps the TAIL and drops the popped
 -- element on the floor, so none of them bounds the arrival drain-dry
--- hands to cascade-dry.
+-- hands to the one-cascade step.
 --
 -- The fnCap mirrors sit here rather than in .Measures for the reason
 -- sweepLive-fnCap does: they exist for the wet face only, and the size
@@ -957,7 +957,7 @@ abstract
                (m≤n+m (towerℕ (3 + capsHgo (capsBase e ins) 1)) (2 ^ (sz * 1 * 1)))))
 
 -- `subscribeE-wet-core` / `subscribeE-wet` and the root burst cores
--- (`burst-wet`/`burst-dry`/`burst-bounded`) LEFT this module on
+-- (`burst-dry`/`burst-bounded`) LEFT this module on
 -- 2026-08-13.  The wet contract is now stated over the COLLAPSED walk
 -- (`.Walk-Level`, the E-into-j restatement ruled in GAP 4's header
 -- above), whose statement reads the caps vocabulary this module

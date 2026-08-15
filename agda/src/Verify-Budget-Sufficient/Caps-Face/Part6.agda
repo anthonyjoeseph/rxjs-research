@@ -217,7 +217,7 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- to `innerFinish-face-keep` at j′ = 0, and concat+yes is the one real
 -- obligation — `innerFinish-caps` (Subscribe-Face:1761), which is
 -- exactly what H1 and H2 were added to feed.
--- LANDED from probe/InnerFinish-Concat-Go-Probe.agda (2026-08-10):
+-- LANDED from InnerFinish-Concat-Go-Probe (DELETED; git history) (2026-08-10):
 -- `ifc` (IfcFace = innerFinish-caps' type) threads as a new first kit
 -- arg so the proof can call innerFinish-caps without creating a circular
 -- import (Subscribe-Face already imports Caps-Face public).
@@ -362,7 +362,7 @@ innerFinish-concat-face-go ifc k₁ k₂ k₃ k₄ k₅
          rearranged
 
 -- thruOuter-face-core: PROVED (2026-08-11) by landing the body from
--- probe/ThruOuter-Face-Core-Probe.agda.  Private helpers inline
+-- ThruOuter-Face-Core-Probe (DELETED; git history).  Private helpers inline
 -- Subscribe-Face's walk machinery against a `siC` hypothesis instead
 -- of a direct call to subscribeInner-caps.  Abstract to keep VWF
 -- from reaching the walk helpers on the budget-sufficient spine.
@@ -965,7 +965,7 @@ abstract
   thruOuter-face-core = thruOuter-face-core-go
 
 -- the two faces, assembled over their cores
--- P3's ASSEMBLY, landed from `probe/InnerFinish-Concat-Probe.agda`.
+-- P3's ASSEMBLY, landed from `InnerFinish-Concat-Probe (DELETED; git history)`.
 -- `innerFinish-concat-face-core` is a REAL DEFINITION now: one call to
 -- the sub-postulate at `nd = lookupNode allNid (EvalSt.nodes st)`, with
 -- no with-abstraction anywhere between, so `dpt`'s type and the

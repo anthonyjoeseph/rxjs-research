@@ -6,7 +6,10 @@
 # TYPES.  A proven lemma whose only consumers are assembly argument positions
 # (i.e. it is PASSED into a postulate but never APPLIED) reads as fully wired
 # — no orphan, no gate failure — while its own premises sit permanently unpaid
-# as long as the parent postulate stands.  These 55 lemmas are in that state.
+# as long as the parent postulate stands.  The lemmas listed below are in
+# that state — the COUNT is deliberately not written here, because a number
+# in prose beside the list it describes is a second source of truth, and this
+# one had already drifted (it said 55; there were 18).
 # They are LOAD-BEARING and PROVEN; this is not a deletion list.
 # Passed-only is expected and normal while the parent is still a postulate.
 # The ratchet exists to make deferral an explicit, reviewed act, not a silent

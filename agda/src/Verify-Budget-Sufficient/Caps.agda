@@ -345,9 +345,9 @@ poolBody≤poolCount (suc M) d _ = ≤-refl
 -- `cascadeGo-deliveries` and nothing else.
 --
 -- IT DOMINATES THE PRODUCT IT REPLACES, so no measured row moves:
--- `lvls-lin` at J = 0 gives `D * chargeAt S W 0 ≤ lvls S W 0 D`, and
+-- a linearity step at J = 0 gives `D * chargeAt S W 0 ≤ lvls S W 0 D`, and
 -- `chargeAt S W 0` IS `cSize * suc (suc cWid * suc cSize)`
--- (Level-Walk-Probe's `count-gate`).
+-- (measured by a probe module since DELETED; git history has the rows).
 --
 -- READING cWid WAS FORBIDDEN AND IS NO LONGER.  Width-Count-Probe's
 -- objection was that a count reading cWid iterates the tower function
@@ -1006,8 +1006,7 @@ capsAt-base-wid e sl (suc id) =
 --                    ≤ 2^(2^T) = towerℕ (2+m)              TWO stories
 --                  (the delivery bound IS the two stories; the cSize
 --                   factor rides beside it in the exponent, which is
---                   what the STRICT registry hypothesis buys — see
---                   `sum-fits`)
+--                   what the STRICT registry hypothesis buys)
 --   THE ITERATION  iterSize cSize J cSize ≤ (3T)^J · T ≤ 2^(T·(J+1))
 --                  and T·(J+1) ≤ (2T)·J ≤ towerℕ (3+m)     TWO stories
 --                  (one for the product T·J landing above the count,
@@ -1354,7 +1353,7 @@ tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
 
 -- POOL LOWER BOUND: the auxiliary chain that discharges
 -- three-size≤capsH-core (tier-1 postulate #12).
--- Moved from agda/probe/Pool-Lower-Probe.agda.
+-- Moved from Pool-Lower-Probe (DELETED; git history).
 
 -- (1) suc J ≤ fLvlD S W d J
 sucJ≤fLvlD : ∀ (S W d J : ℕ) → suc J ≤ fLvlD S W d J

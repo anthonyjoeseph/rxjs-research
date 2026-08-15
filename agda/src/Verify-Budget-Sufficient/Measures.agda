@@ -366,7 +366,7 @@ pop-bounded B sched st eq bnd
 
 ------------------------------------------------------------------
 -- structural preservation around the cascade — PROVEN pieces the
--- eventual cascade-dry proof composes, whatever its core shape
+-- eventual cascade dry proof composes, whatever its core shape
 ------------------------------------------------------------------
 
 T-to : ∀ {b : Bool} → b ≡ true → T b
@@ -5997,7 +5997,7 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 --
 -- WHAT WAS STILL UNCHECKED HERE — that an entry-determined G really
 -- does bound the frame work — is semantic, not arithmetic, and it has
--- since been measured: agda/probe/Frame-Work-Probe.agda.  It reports
+-- since been measured: Frame-Work-Probe (DELETED; git history).  It reports
 -- YES, with one correction to the expected shape.  The fold count is
 -- the source's per-frame PAYLOAD count (for a literal source, the ofᵉ
 -- list's length), so it is entry-determined; but each *All nesting

@@ -2,7 +2,7 @@
 -- OP-BUDGET: the residual-budget invariant, PROVEN.
 --
 -- This is the arithmetic that `opIterD-budget` used to postulate
--- (tier-1 ledger #6, formerly `opIterD-budget-core` in Op-Dominance).
+-- (formerly `opIterD-budget-core` in Op-Dominance).
 -- It is its own module because it is a lemma FAMILY consuming
 -- Op-Dominance's results as finished facts — an import, not a
 -- mutuality — and because Op-Dominance is imported far more widely
@@ -524,7 +524,7 @@ mutual
 -- So `3 + k ≤ S` is not slack this scheme happens to want; it is what
 -- the recurrence costs.
 --
--- CONSEQUENCE FOR SRC — a statement repair on `opIterD-budget-core`
+-- CONSEQUENCE FOR SRC — a statement repair on `opIterD-budget`
 -- and `opIterD-dominated`, whose guard `k ≤ S` becomes `3 + k ≤ S`,
 -- and thence on `sub-charge-capsOK-lift-core`'s nestOK premise
 -- (`nest b sl cs ≤ cSize c` becomes `3 + nest b sl cs ≤ cSize c`).
@@ -652,7 +652,7 @@ climb-paid S W d k m R g 2≤S hk hm hR hg =
 
 ------------------------------------------------------------------
 -- § THE ASSEMBLY — route steps (a)+(b), which used to be the
--- monolithic postulate `opIterD-budget-core`.  cDel-body pins gas at
+-- monolithic postulate it replaced.  cDel-body pins gas at
 -- suc S; record eta pins `caps S W R`'s fields.
 --
 -- `1 ≤ R` IS LOAD-BEARING, and the statement without it is FALSE —

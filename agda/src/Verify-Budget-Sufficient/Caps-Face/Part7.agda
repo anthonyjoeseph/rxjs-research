@@ -819,9 +819,9 @@ cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1
 -- was rebuilt around them too.
 --
 -- NOTHING IS LOST BY THE MOVE.  The product is DOMINATED by the
--- iteration — `lvls-lin` at J = 0 gives `D * chargeAt S W 0` under
+-- iteration — a linearity step at J = 0 gives `D * chargeAt S W 0` under
 -- `lvls S W 0 D`, and `chargeAt S W 0` IS `cSize * fCharge S W 0`
--- (Level-Walk-Probe's `count-gate`) — so every Instant-Height row the
+-- (measured by a probe module since DELETED) — so every Instant-Height row the
 -- product cleared this clears, with the same margin or more, and no
 -- measurement is re-run.  `sizeCount` (.Caps) is now this level, its
 -- pooled twin `poolBody` (Rx.Evaluator) the same level with every field
@@ -1417,7 +1417,7 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- `pathSz? C κ` and `suc (pathLen κ) ≤ C`, concluding the registry is
 -- still bounded by C.
 --
--- IT IS FALSE, and agda/probe/Chain-Half-Probe.agda computes the
+-- IT IS FALSE, and Chain-Half-Probe (DELETED; git history) computes the
 -- counterexample: at C = 5, a κ of four map-f frames (both hypotheses
 -- TIGHT) and `mapᵉ f (mapᵉ f (input 0))` (sizeᵉ exactly 5) register a
 -- chain of length SIX.  subscribeE pushes one frame per shell of what
@@ -1449,7 +1449,7 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- the accumulator towers ONCE PER FOLD, and folds grow one per instant,
 -- so the height grows with `id`.  The machine-checked account, with the
 -- recurrence and the payload counts, is the deepScan section of
--- agda/probe/Frame-Work-Probe.agda.  The Caps recurrence above is the
+-- Frame-Work-Probe (DELETED; git history).  The Caps recurrence above is the
 -- replacement; git history is the archive for the rest.
 ------------------------------------------------------------------
 

@@ -18,10 +18,10 @@
 -- "`cascade-dry` and `burst-wet` (.Wet) migrate to consume
 -- `cascade-wet-via-caps`", which is IMPOSSIBLE: `.Caps-Bridge` imports
 -- `.Wet` (below), so `.Wet` can never import `.Caps-Bridge` back. The
--- real fix moves the TOP of the tower UP instead: `cascade-dry`/
--- `drain-dry`/`budget-sufficient` MOVED here from `.Wet`, caps-threaded,
+-- real fix moves the TOP of the tower UP instead: the one-cascade step,
+-- `drain-dry` and `budget-sufficient` MOVED here from `.Wet`, caps-threaded,
 -- consuming `cascade-wet-via-caps` directly (§ D below). `.Wet` keeps
--- `burst-wet`/`burst-dry`/`burst-bounded`/`pop-INV`/`pop-head-bounded`,
+-- `burst-dry`/`burst-bounded`/`pop-INV`/`pop-head-bounded`,
 -- which this module consumes unchanged. P1's analogue
 -- (`subscribeE-wet-via-caps`) is a REAL definition (§ D below), as are
 -- `init-capsOK?` (every id, by ⊑ᶜ-induction) and the subscribe-side
@@ -716,7 +716,8 @@ regsB?-of-parts rs hsz hΨ =
                 rs hsz hΨ
 
 ------------------------------------------------------------------
--- (C) THE ASSEMBLY.  Mirrors .Wet's `cascade-dry` (Wet.agda:4607) plus
+-- (C) THE ASSEMBLY.  Mirrors what .Wet's `cascade-dry` did (that name is
+-- GONE — absorbed here when the caps route landed) plus
 -- a `capsOK?`/`valCaps?` hypothesis, concluding dryness, INV? at the
 -- output, AND capsOK? at the output — the joint invariant a future
 -- `cascade-dry`/`burst-wet` migrate to consume in place of the
@@ -842,17 +843,17 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
 ------------------------------------------------------------------
 -- (D) THE THREADED TOP OF THE TOWER.  MOVED here from .Wet
 -- (the 2026-08-05 upside-down ruling) — this
--- is not a copy beside `cascade-dry`/`drain-dry`/`budget-sufficient`,
+-- is not a copy beside `drain-dry`/`budget-sufficient`,
 -- it IS them, generalised to also carry `capsOK?` beside `INV?` through
 -- the fuel loop.  `.Wet` cannot state this (it imports `.Wet`... no —
 -- it cannot consume `cascade-wet-via-caps`, since `.Caps-Bridge` imports
 -- `.Wet` and not the other way around), so the top of the tower had to
 -- move UP to where `cascade-wet-via-caps` already lives, not down to
--- where the cascade dry face does.  `.Wet` keeps `burst-wet`/`burst-dry`/
+-- where the cascade dry face does.  `.Wet` keeps `burst-dry`/
 -- `burst-bounded`/`pop-INV`/`pop-head-bounded` — this module consumes
 -- all five, unchanged, as the INV?-only half of its own burst and pop.
 --
--- REHEARSED in `agda/probe/Caps-Thread-Probe.agda` (2026-08-05) as
+-- REHEARSED in `Caps-Thread-Probe (DELETED; git history)` (2026-08-05) as
 -- `drain-dry-threaded`/`budget-sufficient-threaded`; landed here under
 -- their FINAL names (`drain-dry`, `budget-sufficient`) since they
 -- replace, not sit beside, `.Wet`'s versions of the same name.
@@ -911,7 +912,7 @@ pop-head-widCaps c sched st eq cOK
 ... | inj₂ (a″ , ls) | refl =
       schedGo-widHead (Caps.cWid c) (Sched.slots sched) (Sched.live sched) eqL wl
 
--- the joint reader cascade-dry's caps face wants.  The SIZE half is
+-- the joint reader the cascade dry face wants.  The SIZE half is
 -- free: `sizeCapAt e sl id` IS `Caps.cSize (capsAt e sl id)` by
 -- definition (Wet.agda:4117), so GAP 3's pop-head-bounded already
 -- supplies it; only the width half above is new content.
@@ -993,7 +994,7 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`
 -- travelling beside `INV?`.
 --
--- NOTE what is NOT restated here: the one-cascade step.  `cascade-dry`
+-- NOTE what is NOT restated here: the one-cascade step.  The wet original
 -- threaded with a caps face has EXACTLY `cascade-wet-via-caps`'s
 -- conclusion, character for character (above), so that step is a
 -- relocation and not a proof.  Its dryness half rests on `dry-tick`,
@@ -1040,12 +1041,12 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- the caps `capsAt e sl zero` blows up from, named so the depth bound
 -- can be taken at it.  That it IS that blowup's inner argument holds by
 -- `refl` — checked as `baseCaps-is-inner` in
--- agda/probe/Depth-Wire-Probe.agda, which is where it lives because
+-- Depth-Wire-Probe (DELETED; git history), which is where it lives because
 -- nothing in the claim graph consumes it and the wiring law admits no
 -- orphans here.
 -- `baseCaps` and `init-capsOK?-base` MOVED OUT 2026-08-07 to
 -- `Verify-Budget-Sufficient.Init-Caps`, where the postulate
--- `init-capsOK?-base-core` is DISCHARGED (tier-1 ledger #7).  The five
+-- `init-capsOK?-base-core` is DISCHARGED.  The five
 -- capsOK? conjuncts are proven directly, including the one that was
 -- open: `scripted`'s own `{ok : T (isData t)}` index forces `pWᵛ ≡ 0`
 -- on every pending value, so the width check reads `0 ≤ᵇ cWid`.
@@ -1109,7 +1110,7 @@ private
   -- capsOK?-mono), and the suc case is capsOK?-mono along capsAt-⊑-suc
   -- over the induction hypothesis: the initial state never changes,
   -- only the caps widen, so `capsOK?` at level id survives to level
-  -- suc id verbatim.  Tier-1 #8 discharged 2026-08-06.
+  -- suc id verbatim.  Discharged 2026-08-06.
   init-capsOK?-go : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (id : ℕ) →
     capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true

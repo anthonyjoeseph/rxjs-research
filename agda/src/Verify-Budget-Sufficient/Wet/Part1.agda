@@ -9,10 +9,10 @@
 -- monotonicity), the size-elim laws, the ledger arithmetic, the wet
 -- lemmas for every evaluator entry point, subscribeE-walkS and
 -- subscribeAll-wet, cascadeGo-walk, the width family, and the burst
--- cores (burst-wet/burst-dry/burst-bounded) and pop ring (pop-INV/
+-- cores (burst-dry/burst-bounded, now in .Caps-Bridge) and pop ring (pop-INV/
 -- pop-head-bounded) that compose them.
 --
--- `cascade-dry`, `drain-dry`, and `budget-sufficient` — the theorem
+-- `drain-dry` and `budget-sufficient` — the theorem
 -- Verify-Well-Formed consumes — MOVED to `.Caps-Bridge`
 -- (the 2026-08-05 upside-down ruling): a
 -- module above `.Wet` can consume `.Caps-Bridge`'s `cascade-wet-via-caps`

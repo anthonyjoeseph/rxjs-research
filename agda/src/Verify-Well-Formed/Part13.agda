@@ -271,7 +271,7 @@ drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
 -- the reified termination debt — the seeded sync budget never runs
 -- dry on a canonical run, the old TERMINATING pragma's claim.  NO
 -- LONGER A POSTULATE HERE: Verify-Budget-Sufficient PROVES it (the
--- instant-indexed size invariant, its burst cores, cascade-dry and
+-- instant-indexed size invariant, its burst cores, the cascade dry face and
 -- drain-dry), and this module now imports that proof.  What the
 -- proof still rests on is named and scoped there — subscribeE-wet
 -- and cascadeGo-nodry, the fuel-accounting cores — rather than the

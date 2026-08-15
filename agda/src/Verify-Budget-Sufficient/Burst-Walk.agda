@@ -6,7 +6,7 @@
 -- `cascadeGo-nodry` — the ex-anchor — is now a projection of `cascadeGo-burst-nodry`.  The
 -- anchor's risk lives in ONE per-frame face, `stepFrame-nodry` (its own header carries the census).
 --
--- Landed from probe/Caps-Burst-Walk-Probe.agda (2026-08-10), which
+-- Landed from Caps-Burst-Walk-Probe (DELETED; git history) (2026-08-10), which
 -- was v2 of the route: v1's two bridging postulates were BOTH
 -- mis-stated (one concluded fnCap facts from hypotheses carrying no
 -- fnCap information; one lacked the plen/gas guards that keep its
@@ -448,7 +448,7 @@ postulate
      × (burstΨ? Ψ (proj₁ r) ≡ true)
 
 -- SPLIT LEMMAS — helpers for subscribeInner-Ψ's gs clause.
--- Landed from probe/SubscribeInner-Psi-Probe.agda.  Pattern mirrors
+-- Landed from SubscribeInner-Psi-Probe (DELETED; git history).  Pattern mirrors
 -- splitBurst-vals-caps / splitBurst-bk-caps (Caps-Face:5015-5032):
 -- pass xs to all-++-intro explicitly so Agda unifies directly with
 -- the splitBurst (em ∷ ems) → proj₁/proj₂ reduction.

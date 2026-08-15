@@ -274,7 +274,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- `BurstInv id sched st S → done S ≡ false`.  It is FALSE — BurstInv's four
 -- fields never mention `done`, so the empty state with `done = true` inhabits
 -- it and forces `true ≡ false`.  Machine refutation:
--- `agda/probe/Battery-Burst-Done.agda` (`burst-done-false-absurd`, a proven ⊥).
+-- `Battery-Burst-Done (DELETED; git history)` (`burst-done-false-absurd`, a proven ⊥).
 -- oneShotBurst-wf's own header (below, ~line 876) had said so all along:
 -- `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it
 -- must come from the walk order."  So it now comes from the walk order —
@@ -350,7 +350,7 @@ postulate
 -- mints a node and installs it, and BurstInv reads NEITHER: `installNode`
 -- touches only `nodes`, `mintNode` only `nextNode`, so `EvalSt.registry` and
 -- `Sched.live` are unchanged and all four fields transport by record eta with
--- no rewrites.  Verified in `agda/probe/Battery-VWF-Prop.agda`.
+-- no rewrites.  Verified in `Battery-VWF-Prop (DELETED; git history)`.
 scan-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
   (b : Closed Γ s) (κ : Path Γ u t)

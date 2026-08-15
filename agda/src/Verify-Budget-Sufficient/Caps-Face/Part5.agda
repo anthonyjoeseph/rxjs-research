@@ -874,7 +874,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 --       climbed to emit them.
 --
 -- AND (a) DOES NOT FIT `fCharge`, NOR ANY CLOSED FORM IN (S, W, J) —
--- measured, agda/probe/Sub-Charge-Probe.agda, which reads the receipt
+-- measured, Sub-Charge-Probe (DELETED; git history), which reads the receipt
 -- table off this file's own GROUND clauses.  The crude reading said one
 -- subscribe walks the inner's operator chain paying a frame receipt per
 -- operator, `sizeᵉ o ≤ cSize` of them, so ~2·cSize per subscribe and
@@ -912,7 +912,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- inherited down the subscribe tree — and `iterL` spends `fLvlD S W d`
 -- per frame where it spent `fLvl`.  The inherited family it replaces is
 -- gone.  Reading the budget once, where a subscribe BEGAN, is refuted
--- (agda/probe/Nest-Budget-Probe.agda § 3: a `scanᵉ` under an *All mints
+-- (Nest-Budget-Probe (DELETED; git history) § 3: a `scanᵉ` under an *All mints
 -- a payload per fold, the k-th mint nests k deep, the carrier's own
 -- nesting stands still — 2 against 43690 at S = 2, W = 1, J = 0).  The
 -- refresh's soundness is a theorem (Refresh-Probe § 1: `stepFrame`
@@ -943,7 +943,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- under a nesting hypothesis on `b`, and the six companions it calls
 -- gain the matching conjunct.  The arithmetic each clause SHAPE needs
 -- is proven ahead of the grind, and now against the LANDED family
--- rather than a mirror of it (agda/probe/Sub-Charge-Probe.agda § 5, five
+-- rather than a mirror of it (Sub-Charge-Probe (DELETED; git history) § 5, five
 -- steps: `walk-step` a payload of thruWalk / concatDrain, `frame-step`
 -- the refresh itself — a frame's payload walk stops taking its nesting
 -- hypothesis from the subscribe that installed it and reads its own —

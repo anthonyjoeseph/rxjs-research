@@ -33,7 +33,7 @@
 -- arithmetic is CLOSED by tick-covers-instant, against the real recurrence,
 -- with zero postulates in this file.
 --
--- Landed from probe/Battery-Tick-Headroom.agda;
+-- Landed from Battery-Tick-Headroom (DELETED; git history);
 -- consumed by Anchor-Dry's dry-family assemblies via tick-covers-instant.
 module Verify-Budget-Sufficient.Tick-Headroom where
 
