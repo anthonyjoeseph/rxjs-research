@@ -8,7 +8,8 @@ module Verify-Budget-Sufficient.Demand-Probe where
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
 open import Data.Fin  using (Fin; zero)
-open import Data.Nat  using (ℕ; suc; _+_; _≤ᵇ_; _≤_; z≤n; s≤s)
+import Data.Fin as F
+open import Data.Nat  using (ℕ; suc; _+_; _^_; _≤ᵇ_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤)
 open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_)
@@ -1058,3 +1059,165 @@ _ = refl
 -- cSize (frameStep L̂ cᵂ), G ℓ := the dBound term, g := gasPad (suc G)
 -- g0) — worth having if any future walk-face restatement needs to be
 -- re-refuted at this shape.
+
+----------------------------------------------------------------------
+-- SERIES S (2026-08-14) — slotHop-cap, the η leg's quantitative core.
+--
+-- THE REGION: stratification lets slot k's def read input (k-1), and
+-- hopD's scan clause MULTIPLIES its body by (2 + pm)^V.  So a chain of
+-- shared slots is an AMPLIFIER TOWER, and it is the shape the cap has
+-- to survive.  These rows build the tower and measure it.
+--
+-- ⚠ WHAT THIS REFUTES: slotHop-cap's own header (and the analysis that
+-- dictated it) claimed the margin was "thin BY CONSTRUCTION", with the
+-- telescope reaching exponent order V^(V+1) — hopR's own order.  THAT
+-- IS WRONG, and the arithmetic error is instructive: `slotsSize sl ≤ V`
+-- caps the TOTAL slot size at V, so a telescope cannot hold V slots of
+-- size V.  Each amplifier link costs ~14 units of size, so a legal
+-- telescope holds at most ~V/14 links, and the compound exponent is
+-- O(V²) — against hopR's (1+V)^(1+V).  Amplification is exponential in
+-- V²; the cap is exponential in V^V.  The gap is superexponential and
+-- WIDENS with chain depth, because every extra link raises V too.
+--
+-- ⚠ WHY THERE IS NO ≤ᵇ ROW: the comparison is NOT computable in this
+-- region, and that is a property of the region, not a gap in effort.
+-- A telescope big enough to amplify forces V ≥ 16, and hopR 16 =
+-- 18^(17^17) has ~10^21 digits.  Where hopR IS computable (V ≤ 6) the
+-- telescope is too small to hold a single scan, so every row there is
+-- DEGENERATE.  Hence the split below: the left side is pinned exactly,
+-- and the right side is reached through its EXPONENT, which computes.
+-- CONCLUSION-SIDE blocked, HYPOTHESIS-SIDE fine — the two are separate
+-- questions and only the conclusion's magnitude is out of reach.
+----------------------------------------------------------------------
+
+Γˢ : Ctx 2
+Γˢ = (obs natᵗ) ∷ⱽ (obs natᵗ) ∷ⱽ []ⱽ
+
+-- slot 0's def: no inputs (stratification allows none below zero)
+dˢ0 : Closed Γˢ (obs natᵗ)
+dˢ0 = mergeAllᵉ emptyᵉ
+
+scan-fˢ : Rx.Exp.Fn Γˢ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
+scan-fˢ = strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ [])))
+
+scan-zˢ : Rx.Exp.Tm Γˢ [] [] [] (obs natᵗ)
+scan-zˢ = strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ [])))
+
+-- slot 1's def: SCANS OVER INPUT 0 — the amplifying link
+dˢ1 : Closed Γˢ (obs natᵗ)
+dˢ1 = scanᵉ scan-fˢ scan-zˢ (mergeAllᵉ (input zero))
+
+insˢ : Slots Γˢ
+insˢ = λ { zero → shared dˢ0 ; (F.suc zero) → shared dˢ1 }
+
+-- the target the walk face measures: the downstream slot itself
+bˢ : Closed Γˢ (obs natᵗ)
+bˢ = input (F.suc zero)
+
+-- the TIGHTEST legal budget: V := slotsSize.  This is the worst case
+-- for the cap — any larger V only inflates hopR.
+Vˢ : ℕ
+Vˢ = slotsSize insˢ
+
+-- HYPOTHESIS SIDE, all three discharged at Vˢ.  LOAD-BEARING: if any
+-- of these failed, every row below would say nothing about the cap.
+_ : (2 ≤ᵇ Vˢ) ≡ true
+_ = refl
+_ : (slotsSize insˢ ≤ᵇ Vˢ) ≡ true
+_ = refl
+_ : (sizeᵉ bˢ ≤ᵇ Vˢ) ≡ true
+_ = refl
+
+-- the tower is genuinely built: 16 units of slot, forcing V = 16
+_ : Vˢ ≡ 16
+_ = refl
+
+-- the base link's hop, and the amplified link's.  LOAD-BEARING: the
+-- second is the compound the cap must dominate, and it is 3^(V+1) —
+-- one scan factor (2+pm)^V = 3^16 times the base's (1 + 0 + suc 1).
+_ : slotHop Vˢ insˢ zero ≡ 1
+_ = refl
+_ : hopDᵉ Vˢ (slotHop Vˢ insˢ) bˢ ≡ 129140163
+_ = refl
+
+-- THE MARGIN, in the only terms that compute.  hopR V = (2+V)^((1+V)^(1+V)),
+-- so it suffices that the compound sit under 2 ^ ((1+V)^(1+V)).
+-- LOAD-BEARING both: the first fails if the compound grows past 2^27,
+-- the second fails if hopR's exponent ever drops below 27.
+_ : (129140163 ≤ᵇ 2 ^ 27) ≡ true
+_ = refl
+_ : (27 ≤ᵇ suc Vˢ ^ suc Vˢ) ≡ true
+_ = refl
+
+-- ⚠ RESIDUE, stated so it is not mistaken for closed: the step from
+-- those two rows to the cap is `2 ^ 27 ≤ (2+V) ^ ((1+V)^(1+V))`, i.e.
+-- ^-monotonicity in base and exponent.  That is a PROOF, not a pin,
+-- and it is the shape the general discharge would take: bound the
+-- compound by (2+V)^(O(V²)), then spend V² ≤ (1+V)^(1+V).
+
+-- ── DEPTH 2: does the gap NARROW as the tower grows?  This is the
+-- question a single link cannot answer, and the answer is no — every
+-- extra link costs slot size, which raises V, which raises hopR's
+-- exponent (1+V)^(1+V) far faster than it raises the compound.
+
+Γᵗ : Ctx 3
+Γᵗ = (obs natᵗ) ∷ⱽ (obs natᵗ) ∷ⱽ (obs natᵗ) ∷ⱽ []ⱽ
+
+dᵗ0 : Closed Γᵗ (obs natᵗ)
+dᵗ0 = mergeAllᵉ emptyᵉ
+
+scan-fᵗ : Rx.Exp.Fn Γᵗ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
+scan-fᵗ = strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ [])))
+
+scan-zᵗ : Rx.Exp.Tm Γᵗ [] [] [] (obs natᵗ)
+scan-zᵗ = strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ [])))
+
+dᵗ1 : Closed Γᵗ (obs natᵗ)
+dᵗ1 = scanᵉ scan-fᵗ scan-zᵗ (mergeAllᵉ (input zero))
+
+-- the SECOND amplifier, stacked on the first
+dᵗ2 : Closed Γᵗ (obs natᵗ)
+dᵗ2 = scanᵉ scan-fᵗ scan-zᵗ (mergeAllᵉ (input (F.suc zero)))
+
+insᵗ : Slots Γᵗ
+insᵗ = λ { zero → shared dᵗ0
+         ; (F.suc zero) → shared dᵗ1
+         ; (F.suc (F.suc zero)) → shared dᵗ2 }
+
+bᵗ : Closed Γᵗ (obs natᵗ)
+bᵗ = input (F.suc (F.suc zero))
+
+Vᵗ : ℕ
+Vᵗ = slotsSize insᵗ
+
+_ : (2 ≤ᵇ Vᵗ) ≡ true
+_ = refl
+_ : (slotsSize insᵗ ≤ᵇ Vᵗ) ≡ true
+_ = refl
+_ : (sizeᵉ bᵗ ≤ᵇ Vᵗ) ≡ true
+_ = refl
+
+_ : Vᵗ ≡ 30
+_ = refl
+
+-- the two-link compound.  LOAD-BEARING: fails if either scan factor or
+-- the chain's composition changes.
+_ : hopDᵉ Vᵗ (slotHop Vᵗ insᵗ) bᵗ ≡ 127173474825649022325147488901
+_ = refl
+
+-- THE SAME MARGIN, one link deeper — and it is WIDER, not thinner.
+-- LOAD-BEARING both.
+_ : (127173474825649022325147488901 ≤ᵇ 2 ^ 97) ≡ true
+_ = refl
+_ : (97 ≤ᵇ suc Vᵗ ^ suc Vᵗ) ≡ true
+_ = refl
+
+-- THE TREND, which is the finding.  Writing hopR V = (2+V)^E(V) with
+-- E(V) = (1+V)^(1+V), and the compound as ≤ 2^c:
+--   depth 1:  V = 16,  c = 27,  E = 17^17 ≈ 8.3e20   →  E/c ≈ 3e19
+--   depth 2:  V = 30,  c = 97,  E = 31^31 ≈ 1.7e46   →  E/c ≈ 1.8e44
+-- One extra link widens the ratio by twenty-five orders of magnitude.
+-- The reason is structural, not lucky: a link BUYS a factor (2+pm)^V
+-- (adding O(V) to c) but COSTS ~14 slot-size, and `slotsSize sl ≤ V`
+-- makes that cost raise V — which raises E super-exponentially.  So c
+-- is O(V²) while E is V^V, and no legal telescope can close that.

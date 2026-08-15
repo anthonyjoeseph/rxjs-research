@@ -1806,10 +1806,6 @@ slotDef-size sl i {d} eq =
   size-eq : sizeᵉ d ≡ slotSize (sl i)
   size-eq rewrite eq = refl
 
--- THE OWNERSHIP ANCHOR (the cascadeGo ledger's share-crossing
--- half), PROVEN: when a walked template's `input i` hits a shared
--- slot, the connect's resets re-anchor against the slot's OWN
--- element of the global syntactic multiset — its def d is fixed
 -- the budget's height is at least 2 at every instant, and towerℕ 2 ≡ 4:
 -- the V ≥ 2 that hopD-size wants is free wherever V is the budget
 2≤sizeBudget : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -1820,20 +1816,59 @@ slotDef-size sl i {d} eq =
             (≤-trans (s≤s (s≤s z≤n))
                      (m≤m*n (4 + (sizeᵉ e + slotsSize sl)) (suc id))))
 
--- FALSITY-class, and the margin is thin BY CONSTRUCTION: slotHop
--- telescopes hopD through the stratified slots, so over n ≤ slotsSize
--- slots each of def size ≤ V the compound reaches an exponent on the
--- order of V^(V+1) — the same order as hopR V's.  Whether hopR's
--- exponent (via (1+V)^(1+V)) strictly dominates the telescope's, with
--- the target term b's own factor multiplied in, is exactly the open
--- quantitative question of the η leg.  Unprobed, unproven; do not
--- lower without evidence reaching the nested-scan region.
+-- DIFFICULTY (was FALSITY until probed, 2026-08-14).  slotHop
+-- telescopes hopD through the stratified slots, and hopD's scan clause
+-- multiplies by (2 + pm)^V, so a chain of shared slots — slot k's def
+-- scanning over input (k-1), which stratification expressly permits —
+-- is an amplifier tower.  That tower is the risky region.
+--
+-- ⚠ THE ORIGINAL ANALYSIS IN THIS HEADER WAS WRONG, and the error is
+-- worth keeping: it claimed the compound reaches exponent order
+-- V^(V+1), hopR's own order, hence a thin margin.  It does not.
+-- `slotsSize sl ≤ V` bounds the TOTAL slot size by V, so a telescope
+-- cannot hold V slots of size V — it holds at most V/9 amplifier links
+-- (scanᵉ is the ONLY clause contributing a ^V factor, and its minimal
+-- legal instance costs 9 units of size).  Each link adds O(V) to the
+-- compound's base-2 exponent, so that exponent is O(V²) — against
+-- hopR's (1+V)^(1+V).  Amplification is exponential in V²; the cap is
+-- exponential in V^V.
+--
+-- PROBED 2026-08-14 (Demand-Probe series S), at the tightest legal
+-- budget V := slotsSize, which is the worst case since any larger V
+-- only inflates hopR:
+--   depth 1:  V = 16,  compound = 3^17 ≈ 2^27,   hopR exp 17^17 ≈ 8.3e20
+--   depth 2:  V = 30,  compound ≈ 1.27e29 ≈ 2^97, hopR exp 31^31 ≈ 1.7e46
+-- One extra link WIDENS the exponent ratio from ~3e19 to ~1.8e44,
+-- because a link costs slot size, which raises V, which raises hopR
+-- super-exponentially.  The trend runs away from falsity, and the
+-- structural reason above says it must.
+--
+-- COVERED: the scanᵉ amplifier chain at depths 1 and 2, hypotheses
+-- discharged, at the tightest V.  NOT COVERED: folds with large
+-- pmᵗ (which raise the per-link base to (2+pm)^V — still O(V² log V)
+-- in the exponent, so the argument survives, but it is unmeasured),
+-- caseᵗ amplification inside a fold, and depth ≥ 3.
+--
+-- ⚠ NO ≤ᵇ ROW EXISTS, and cannot: a telescope big enough to amplify
+-- forces V ≥ 16, where hopR has ~10^21 digits; where hopR computes
+-- (V ≤ 6) no scan fits and every row is degenerate.  CONCLUSION-SIDE
+-- magnitude is unreachable, hypothesis side is fine.  The probe
+-- therefore pins the compound exactly and reaches hopR through its
+-- EXPONENT, which does compute.
+--
+-- ROUTE, and the probe hands it over: bound the compound by
+-- (2+V)^(O(V²)) by induction over the telescope, then spend
+-- V² ≤ (1+V)^(1+V) and ^-monotonicity in base and exponent.
 postulate
   slotHop-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V : ℕ) (sl : Slots Γ) →
     2 ≤ V → slotsSize sl ≤ V →
     (b : Exp Γ Δᵍ Δ Θ u) → sizeᵉ b ≤ V →
     hopDᵉ V (slotHop V sl) b ≤ hopR V
 
+-- THE OWNERSHIP ANCHOR (the cascadeGo ledger's share-crossing
+-- half), PROVEN: when a walked template's `input i` hits a shared
+-- slot, the connect's resets re-anchor against the slot's OWN
+-- element of the global syntactic multiset — its def d is fixed
 -- slot content, so its hop depth sits under the store rank cap
 -- (feeding dBound-connect's r′ ≤ R) and its walk under the store bound
 -- (feeding dBound-hop/-connect's s′ ≤ V), straight off the
