@@ -58,6 +58,14 @@ postulate
   -- Mechanical mutual induction over Exp/Tm/List Tm; only the input
   -- clause touches η, and inputsBelowᵉ hands it exactly the guard the
   -- agreement hypothesis wants.
+  --
+  -- PROBED 2026-08-14 (Demand-Probe series T), jointly with ηAt-agrees
+  -- and through their shared consumer slotHop-fix — see that
+  -- postulate's receipt below for the covered shapes.  What series T
+  -- exercises HERE is the congruence at defs whose inputs are really
+  -- read (k = 1 and k = 2, environments differing above k), which the
+  -- earlier slot-0 rows could not: there both environments are the
+  -- constant 0 and the congruence is an identity.
   hopD-η-congᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)
     {η₁ η₂ : Fin n → ℕ} →
     (∀ j → T (toℕ j <ᵇ k) → η₁ j ≡ η₂ j) →
@@ -68,6 +76,20 @@ postulate
   -- answer is the fixpoint's.  Induction on k; at toℕ j ≡ᵇ k the two
   -- sides are the same slotHopD after transporting the index equality,
   -- below it the stage delegates to itself and the IH closes.
+  --
+  -- PROBED 2026-08-14 (Demand-Probe series T).  This postulate is
+  -- VACUOUS AT k = 0 — there is no j below 0 — so the fixpoint rows in
+  -- series W, which sit at slot 0, exercised nothing of it.  Series T
+  -- pins the consequence `slotHop V sl i ≡ hopDᵉ V (slotHop V sl) d`
+  -- by refl (independently of this postulate) at i = 1 on a minimal
+  -- two-slot telescope and at i = 1, 2 on the amplifier telescope,
+  -- and pins the same equations through slotHop-fix — so the stage
+  -- and the fixpoint are checked to agree where this statement has
+  -- content.  The off-by-one that a staged environment usually fails
+  -- by is pinned as a live contrast (the naive environment gives 1
+  -- where the stage gives 2), so the rows separate real alternatives.
+  -- NOT COVERED: telescopes with a scripted slot below a shared one,
+  -- and any k > 2.
   ηAt-agrees : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) (k : ℕ)
     (j : Fin n) → T (toℕ j <ᵇ k) →
     ηAt V sl k j ≡ slotHop V sl j

@@ -77,14 +77,16 @@ named postulate's own header.
 - **`input-wet`** (Walk-Level) — FALSITY, RESTATED over the honest hop
   environment after a machine refutation (Demand-Probe series W, which
   now certifies the new conjunct on the same program). Its hop conjunct
-  is probed; the rest of its Σ is not. Route, rejected alternatives and
-  coverage in its header.
+  and the staged fixpoint under it are probed; the other four conjuncts
+  of its Σ have never been run, and that residue is the class. Route,
+  rejected alternatives and coverage in its header.
 - **`slotHop-cap`** (Measures) — DIFFICULTY, lowered from FALSITY by
   Demand-Probe series S, which reached the amplifier-chain region and
   measured the margin widening. Route and coverage in its header.
 - **`hopD-η-congᵉ` / `ηAt-agrees`** (Rx.Slot-Hop) — DIFFICULTY. The two
   mechanical inductions `slotHop-fix` is assembled from; stratification
-  hands each its guard.
+  hands each its guard. Probed jointly through that consumer at the
+  indices where they stop being vacuous; receipts in their headers.
 - **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY. The μ edge's L̂ transport.
   No caps twin exists to donate it: the reset-anchor ceiling is wet-side
   only, so every walk clause re-derives its own. Route in its header.

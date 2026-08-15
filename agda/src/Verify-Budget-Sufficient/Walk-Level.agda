@@ -770,10 +770,25 @@ postulate
 -- weakened test.  slotHop-fix is pinned at that program too, so the
 -- fixpoint is exercised rather than assumed.
 -- COVERED: the hop conjunct, at the exact region the refutation
--- reached.  NOT COVERED: every other conjunct of this Σ, slot defs
--- deep enough to test slotHop-cap's quantitative margin, and slot
--- indices above zero (where ηAt's stage recursion does real work).
--- The class stays FALSITY on that residue.
+-- reached; slotHop-cap's quantitative margin (series S, the amplifier
+-- telescope); and the staged fixpoint at slot indices ABOVE zero
+-- (series T — series W's fixpoint row sits at slot 0, where
+-- `ηAt V sl 0 = λ _ → 0` makes both of slotHop-fix's postulates
+-- vacuous, so the staging recursion was untested until T pinned
+-- `slotHop V sl i ≡ hopDᵉ V (slotHop V sl) d` by refl at i = 1 and
+-- i = 2, with the off-by-one alternative pinned as a live contrast).
+--
+-- NOT COVERED, and the class stays FALSITY on it: the OTHER FOUR
+-- conjuncts of this Σ, none of which has been run.  A channel audit
+-- says each is guarded — burstB? by INV?'s own `slotsSize ≤ᵇ B` and
+-- `slotsFnCap ≤ᵇ Ψ` conjuncts (.Measures), hasDry by dBound's
+-- `suc V * suc R * U` term via connect-edge's strict U drop rather
+-- than by `s` (syncSizeᵉ (input i) = 1, so the def's syncSize is not
+-- smuggled the way its hop was), regsLen? and INV?-out by their own
+-- entry hypotheses with the slots conjuncts riding unchanged.  THAT
+-- AUDIT IS A READING, NOT EVIDENCE: it is why no second refutation of
+-- the hop's shape is expected here, and it is NOT grounds to lower the
+-- class — only running the conjuncts would be.
 --
 -- WHY THE SPLIT IS EXACT.  WalkStmt's first thirteen hypotheses ARE
 -- subscribeE-caps' hypothesis list verbatim, and its first four

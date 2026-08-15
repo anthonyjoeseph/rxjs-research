@@ -18,7 +18,7 @@ open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
-open import Rx.Prim using (Gas; g0; gs; gasPad)
+open import Rx.Prim using (Gas; g0; gs; gasPad; hot)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
                             ofᵉ; scanᵉ; emptyᵉ;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
@@ -26,7 +26,7 @@ open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
                             μᵉ; deferᵉ; input;
                             sizeᵉ; syncSizeᵉ; Tm; Fn)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
-                                 Slots; Slot; shared; Path; root; EvalSt;
+                                 Slots; Slot; shared; scripted; Path; root; EvalSt;
                                  Sched; opIterD; slotsSize)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop; slotHop-fix)
@@ -1221,3 +1221,148 @@ _ = refl
 -- (adding O(V) to c) but COSTS ~14 slot-size, and `slotsSize sl ≤ V`
 -- makes that cost raise V — which raises E super-exponentially.  So c
 -- is O(V²) while E is V^V, and no legal telescope can close that.
+
+----------------------------------------------------------------------
+-- SERIES T (2026-08-14) — the FIXPOINT at a staged slot: the one thing
+-- series W and series S each half-covered and neither closed.
+--
+-- THE GAP, precisely.  slotHop-fix is the equation input-wet's input
+-- clause spends, and it is ASSEMBLED from two postulates (hopD-η-congᵉ,
+-- ηAt-agrees, Rx.Slot-Hop).  Until now:
+--   · series W pins the fixpoint, but at slot ZERO — where
+--     `ηAt V sl 0 = λ _ → 0` and both postulates are vacuous (there is
+--     no index below 0, so ηAt-agrees quantifies over nothing).
+--   · series S stages at k = 2 and gets big honest numbers, but it only
+--     ever evaluates the STAGED side; it never asks whether that number
+--     equals the def's hop under the FULL environment.
+-- So the staging recursion had been exercised and the fixpoint had been
+-- pinned, but never both at once — and ηAt-agrees says something only
+-- where they meet.  These rows are that intersection.
+--
+-- WHY IT IS LOAD-BEARING RATHER THAN A FORMALITY: the classic failure
+-- of a staged environment is an off-by-one in `if toℕ i ≡ᵇ k`, and it
+-- is INVISIBLE at slot 0.  Under it slot 1 would read the environment's
+-- 0 for `input zero` instead of slot 0's true hop 1, and the rows below
+-- would read 1 where they now read 2.  The contrast row pins that the
+-- naive environment really does give the wrong number here, so the
+-- fixpoint rows are separating two live alternatives, not confirming a
+-- tautology.
+----------------------------------------------------------------------
+
+-- ── MINIMAL, DIAGNOSTIC: two slots, hops 1 and 2, no scan — the
+-- numbers are small enough to read, so a staging bug is legible.
+Γᵁ : Ctx 2
+Γᵁ = (obs natᵗ) ∷ⱽ (obs natᵗ) ∷ⱽ []ⱽ
+
+-- slot 0: closed, hop 1 (series W's def, in a wider context)
+dᵁ0 : Closed Γᵁ (obs natᵗ)
+dᵁ0 = ofᵉ (strmᵗ (mergeAllᵉ emptyᵉ) ∷ [])
+
+-- slot 1: READS input zero — the stratification actually being used.
+-- Its hop is `suc (η zero)`, so it is a direct probe of the environment.
+dᵁ1 : Closed Γᵁ (obs natᵗ)
+dᵁ1 = ofᵉ (strmᵗ (mergeAllᵉ (input zero)) ∷ [])
+
+insᵁ : Slots Γᵁ
+insᵁ = λ { zero → shared dᵁ0 ; (F.suc zero) → shared dᵁ1 }
+
+-- the stage-0 slot is unchanged from series W
+-- LOAD-BEARING: fails if slotHop stops reading slot 0's own def.
+_ : ∀ (V : ℕ) → slotHop V insᵁ zero ≡ 1
+_ = λ _ → refl
+
+-- THE CONTRAST, and it is what makes the next row separate something:
+-- under the naive constant-0 environment slot 1's def measures 1 — the
+-- WRONG number, one short, exactly the off-by-one a staging bug gives.
+-- LOAD-BEARING: if this were also 2 the fixpoint rows would be vacuous.
+_ : ∀ (V : ℕ) → hopDᵉ V (λ _ → 0) dᵁ1 ≡ 1
+_ = λ _ → refl
+
+-- the staged environment gets it RIGHT: slot 1 sees slot 0's hop 1 and
+-- adds its own hop edge.  LOAD-BEARING — this is the staging recursion
+-- doing real work, and it is 2 only if `ηAt`'s `≡ᵇ` branch fires at the
+-- right index.
+_ : ∀ (V : ℕ) → slotHop V insᵁ (F.suc zero) ≡ 2
+_ = λ _ → refl
+
+-- ★ THE FIXPOINT AT A STAGED SLOT, BY refl — INDEPENDENT of both
+-- postulates.  This is the row the series had been missing: the staged
+-- number equals the def's hop under the FULL environment, at an index
+-- where the stage is not the constant 0.
+-- LOAD-BEARING: fails under any off-by-one in ηAt's staging.
+_ : ∀ (V : ℕ) → slotHop V insᵁ (F.suc zero)
+              ≡ hopDᵉ V (slotHop V insᵁ) dᵁ1
+_ = λ _ → refl
+
+-- and the SAME equation through slotHop-fix — which spends ηAt-agrees
+-- at k = 1, i.e. in the region where it quantifies over a nonempty set
+-- of indices.  Agreement between this and the refl row above is a
+-- consistency check on the assembly, not a second proof of it.
+_ : ∀ (V : ℕ) → slotHop V insᵁ (F.suc zero)
+              ≡ hopDᵉ V (slotHop V insᵁ) dᵁ1
+_ = λ V → slotHop-fix V insᵁ (F.suc zero) refl
+
+-- ── AT SCALE: the same fixpoint on series S's amplifier telescope,
+-- where the staged numbers are ~1.3e29 and the stage runs to k = 2.
+-- Small-number agreement can hide an arithmetic mismatch that only
+-- appears once the scan factors are in play.
+-- LOAD-BEARING both: each fails if ηAt's stage disagrees with the
+-- fixpoint at its own index.
+_ : slotHop Vᵗ insᵗ (F.suc zero) ≡ hopDᵉ Vᵗ (slotHop Vᵗ insᵗ) dᵗ1
+_ = refl
+
+_ : slotHop Vᵗ insᵗ (F.suc (F.suc zero))
+  ≡ hopDᵉ Vᵗ (slotHop Vᵗ insᵗ) dᵗ2
+_ = refl
+
+-- the k = 2 stage through the assembly, at scale
+_ : slotHop Vᵗ insᵗ (F.suc (F.suc zero))
+  ≡ hopDᵉ Vᵗ (slotHop Vᵗ insᵗ) dᵗ2
+_ = slotHop-fix Vᵗ insᵗ (F.suc (F.suc zero)) refl
+
+
+-- ── HETEROGENEOUS: a SCRIPTED slot below a shared one, which is the
+-- ordinary telescope shape (a plain input feeding a derived const) and
+-- the one the rows above skip by making every slot shared.  It tests a
+-- different path through ηAt: the stage must carry slotHopD's
+-- `scripted _ = 0` clause across, and slot 2's def must read slot 1's
+-- hop past slot 0 rather than off the nearest neighbour.
+Γᵛ : Ctx 3
+Γᵛ = natᵗ ∷ⱽ (obs natᵗ) ∷ⱽ (obs natᵗ) ∷ⱽ []ⱽ
+
+-- slot 0: SCRIPTED, hop 0 by slotHopD's first clause
+dᵛ1 : Closed Γᵛ (obs natᵗ)
+dᵛ1 = ofᵉ (strmᵗ (mergeAllᵉ emptyᵉ) ∷ [])
+
+-- slot 2 reaches PAST the scripted slot to read slot 1
+dᵛ2 : Closed Γᵛ (obs natᵗ)
+dᵛ2 = ofᵉ (strmᵗ (mergeAllᵉ (input (F.suc zero))) ∷ [])
+
+insᵛ : Slots Γᵛ
+insᵛ = λ { zero → scripted (hot [])
+         ; (F.suc zero) → shared dᵛ1
+         ; (F.suc (F.suc zero)) → shared dᵛ2 }
+
+-- the scripted slot contributes 0 — LOAD-BEARING: fails if slotHopD's
+-- scripted clause is ever made to read the script's values
+_ : ∀ (V : ℕ) → slotHop V insᵛ zero ≡ 0
+_ = λ _ → refl
+
+_ : ∀ (V : ℕ) → slotHop V insᵛ (F.suc zero) ≡ 1
+_ = λ _ → refl
+
+-- slot 2 reads slot 1's hop ACROSS the scripted slot: 2, not 1.
+-- LOAD-BEARING: a stage that dropped the shared hop when a scripted
+-- slot sits below it would give 1 here.
+_ : ∀ (V : ℕ) → slotHop V insᵛ (F.suc (F.suc zero)) ≡ 2
+_ = λ _ → refl
+
+-- ★ the fixpoint on the heterogeneous telescope, by refl and through
+-- the assembly.  LOAD-BEARING both.
+_ : ∀ (V : ℕ) → slotHop V insᵛ (F.suc (F.suc zero))
+              ≡ hopDᵉ V (slotHop V insᵛ) dᵛ2
+_ = λ _ → refl
+
+_ : ∀ (V : ℕ) → slotHop V insᵛ (F.suc (F.suc zero))
+              ≡ hopDᵉ V (slotHop V insᵛ) dᵛ2
+_ = λ V → slotHop-fix V insᵛ (F.suc (F.suc zero)) refl
