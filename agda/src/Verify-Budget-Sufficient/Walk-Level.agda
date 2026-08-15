@@ -180,10 +180,18 @@ open import Verify-Budget-Sufficient.Op-Budget
 -- specialisation is a type error rather than a drifted copy.  b
 -- therefore moves to the FRONT of WalkLevel's telescope (the dispatch
 -- matches on it); its two application sites pass it first.
-WalkStmt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
-WalkStmt {n} {Γ} {t} {e} {u} b =
-  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ)
-    (g : Gas) (κ : Path Γ u t)
+-- THE TAIL, SHARED — everything from κ onwards, with the gas and the
+-- numeric prefix as PARAMETERS.  Factored out so one statement can be read
+-- two ways: with the gas INSIDE the telescope (WalkStmt, whose argument
+-- order is unchanged, so its call sites are untouched) and with the gas
+-- FIXED UP FRONT (WalkStmtAt).  The second is the only way to name a walk
+-- face at a given fuel: WalkStmt's conclusion is gas-indexed — a Σ about
+-- `subscribeE g b κ …` — so "walkFace at the peeled fuel" is not a term of
+-- type WalkLevel at all, it needs a type of its own.
+WalkTail : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+  Gas → Closed Γ u → Caps → (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) → Set
+WalkTail {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
+  ∀ (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     -- caps prelims, subscribeE-caps' own
     2 ≤ Caps.cSize c →
@@ -246,9 +254,35 @@ WalkStmt {n} {Γ} {t} {e} {u} b =
        × (hasDry (proj₁ r) ≡ false)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
+WalkStmt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
+WalkStmt {n} {Γ} {t} {e} {u} b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+  WalkTail {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+
+-- the same statement with the gas pinned: a walk face AT a fuel
+WalkStmtAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Gas → Closed Γ u → Set
+WalkStmtAt {n} {Γ} {t} {e} {u} g b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) →
+  WalkTail {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+
 WalkLevel : Set
 WalkLevel = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ u) → WalkStmt {e = e} b
+
+-- THE WALK FACE AT A FIXED GAS.  `walkFace` partially applied to a fuel
+-- inhabits this — no lambda over the tail is needed, since WalkStmtAt is
+-- WalkStmt with exactly the gas argument removed.
+WalkLevelAt : Gas → Set
+WalkLevelAt g = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (b : Closed Γ u) → WalkStmtAt {e = e} g b
+
+-- one gas step down, total.  In the type of input-wet-core below this is
+-- what turns the clause's own gas into the fuel its recursive walk runs at;
+-- at `gs fuel` it reduces to `fuel`, which is what makes the recursive call
+-- STRUCTURALLY smaller and so visible to the termination checker.
+peelGas : Gas → Gas
+peelGas g0       = g0
+peelGas (gs fuel) = fuel
 
 -- THE 19 ROUTE LEMMAS, RE-HOMED (2026-08-13).  They used to hang off
 -- `subscribeE-wet-core`'s hypothesis list, from the days when that
@@ -848,53 +882,43 @@ postulate
 -- failure mode CLAUDE.md's Σ-receipt rule names, and the one that
 -- machine-refuted the exit-level count face.
 --
--- ⚠ DEAD ROUTE 2026-08-15 — THE MUTUAL LANDING WAS BUILT AND IT FAILS
--- TERMINATION, and the reason is not the one this header used to give.
+-- THE MUTUAL LANDING IS DONE (2026-08-15).  input-wet is a real definition
+-- over input-wet-core, which RECEIVES the walk face at the peeled fuel, so
+-- the induction this clause needs can now be written.  `make agda` accepts
+-- the recursion: zero TerminationIssue.
 --
--- What was tried, in full, so nobody rebuilds it: input-wet was converted
--- from a bare postulate into an assembly `input-wet = input-wet-core walkFace`
--- (input-wet-core postulated over WalkLevel), walkFace was forward-declared
--- above it so the two land in one mutual block, and input-wet/walk-input were
--- relocated to sit beside walkFace's clauses.  That last step matters and is
--- worth keeping: declaring the signature far from the clauses sweeps EVERY
--- definition in between into the block — 47 members, of which 33 were in no
--- cycle at all — while moving them adjacent gives exactly the 14 that really
--- cycle.  `make agda-dev ARGS='--list <file>'` prints this for free, and the
--- tight version type-checks FASTER than the status quo (28.6 s vs 37.9 s).
+-- IT TOOK THREE SHAPES, AND THE TWO THAT FAILED ARE WHY THE THIRD IS WRITTEN
+-- THE WAY IT IS.  Do not simplify it back:
+--   · PASS walkFace ITSELF (`input-wet = input-wet-core walkFace`).  Typechecks;
+--     `make agda` then rejects the whole walk group on termination, and the
+--     call it names is not this clause's but a PRE-EXISTING one —
+--     `stepThru-walk … (proj₁ (sp …)) …`, projections of the with-abstracted
+--     `sp`.  Handing the core an unrestricted walk face means the checker must
+--     assume it can be re-entered at the SAME gas, so the loop never decreases.
+--     The group's termination had been relying on walkFace sitting outside its
+--     cycle; definition order was never the blocker, as this header used to say.
+--   · PASS A PEELED LAMBDA AT TYPE WalkLevel (`λ … _ κ′ … → walkFace … fuel …`,
+--     discarding the lambda's own gas).  Never reaches termination — it is
+--     ILL-TYPED.  WalkStmt's conclusion is gas-INDEXED, a Σ about
+--     `subscribeE g b κ …`, so a body computed at `fuel` cannot inhabit a type
+--     demanding the binder's `g`.  "A walk face at the peeled fuel" is simply
+--     not a term of type WalkLevel.
 --
--- IT TYPECHECKS AND IT DOES NOT TERMINATE.  `make agda` rejects the whole
--- group — subscribeInner-walk, thruConsume-walk, thruWalk-walk, stepThru-walk,
--- pushThru-walk, subscribeAll-walk, walk-mergeAll, walkFace, input-wet,
--- walk-input — and the problematic call it names is NOT input-wet's:
---     stepThru-walk … (proj₁ (sp …)) (proj₂ (proj₂ (sp …))) …
--- a pre-existing call passing projections of the with-abstracted `sp`.
+-- WHAT MADE IT WORK: give that phrase a type.  WalkTail factors the statement
+-- from κ onwards with the gas as a PARAMETER; WalkStmt keeps its old argument
+-- order over it (so none of its 23 call sites, nor Demand-Probe's
+-- instantiations, had to move) and WalkStmtAt pins the gas up front.  Then
+-- `WalkLevelAt fuel` is nameable, `walkFace` PARTIALLY APPLIED inhabits it with
+-- no lambda at all, and `peelGas` in input-wet-core's type carries the peel —
+-- so at `gs fuel` the type reduces to `WalkLevelAt fuel` and the call site
+-- shows the structural decrease the checker was looking for.
 --
--- SO THE REAL OBSTACLE IS THIS: the walk group's termination currently
--- DEPENDS on walkFace sitting OUTSIDE its cycle.  While walkFace is external,
--- those calls close no loop and nothing has to decrease.  Bringing walkFace in
--- — which is exactly what letting this clause call it means — closes the loop
--- through the whole group, and then `sp`'s projections have no structural
--- measure.  Definition ORDER was never the blocker; the group's recursion not
--- being structurally decreasing is.
---
--- WHAT WOULD UNBLOCK IT (unattempted).  Note first what does NOT: taking a
--- `WalkLevel →` parameter the way subscribeE-inner-nodry-core does is the
--- repo's usual answer, but it works THERE because Burst-Walk is handed the
--- FINISHED walk face from another module.  Here the only thing that could
--- supply the parameter is walkFace itself, so the loop closes anyway and
--- nothing is gained.  Two routes that might actually work:
---   · pass a walk face ALREADY SPECIALISED to the peeled fuel — i.e. the
---     input clause receives `λ b′ → walkFace b′ … fuel …` rather than
---     walkFace — so the recursive call carries its decrease at the site where
---     the checker looks.  Cheapest to try, and it is the literal reading of
---     "walkFace at the peeled fuel" this header has always asked for.
---   · failing that, well-founded recursion on gas for the whole walk group,
---     making the measure explicit instead of structural.  That is a redesign
---     of the group, not a local change, and it also has to carry `sp`'s
---     projections — the call the checker actually objected to.
---   RECOVERY: the built-and-rejected version is not committed; rebuild it from
---   this note if the well-founded route is taken, or read the parameter shape
---   off Burst-Walk's subscribeE-inner-nodry-core instead.
+-- ONE MEASUREMENT WORTH KEEPING: declaring walkFace's signature far from its
+-- clauses sweeps every definition in between into the mutual block — 47
+-- members, 33 of them in no cycle at all.  Relocating input-wet/walk-input
+-- adjacent to the dispatch gives exactly the 14 that genuinely cycle, and the
+-- tight block type-checks FASTER than the status quo (28.7 s against 37.9 s).
+-- `make agda-dev ARGS='--list <file>'` shows this for free.
 --
 -- THE PROVEN TEMPLATE IS `subscribeE-input-caps` (.Subscribe-Face), and it
 -- is worth naming because it settles the SHAPE of the missing induction
@@ -928,101 +952,6 @@ postulate
 -- conjuncts mentioning the expression each raise an unsolved meta.
 inputᶜ : ∀ {n} {Γ : Ctx n} (i : Fin n) → Exp Γ [] [] [] (lookup Γ i)
 inputᶜ i = input i
-
-postulate
-  input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
-    (g : Gas) (i : Fin n) (b : Closed Γ (lookup Γ i))
-    (κ : Path Γ (lookup Γ i) t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    -- b is BOUND, not applied: the measures below take a general
-    -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
-    -- `[]` — an alias of type `Closed Γ _` does not, so writing
-    -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
-    b ≡ inputᶜ i →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    nest b sl (EvalSt.connectedShares st) ≤ bud →
-    depthE g b κ bid now sched st ≤ dep →
-    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-    fnCapᵉ b ≤ Ψ →
-    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-    2 ≤ Ŝ →
-    F ≡ Ŝ →
-    R̂ ≡ hopR Ŝ →
-    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
-    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
-    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
-           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
-    g hasAtLeast suc G →
-    pathLen κ + G ≤ ℓ →
-    regsLen? ℓ (EvalSt.registry st) ≡ true →
-    let r = subscribeE g b κ bid now sched st
-    in capsOK? (frameStep (j + j′) c)
-               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
-       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
-       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
-       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
-       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
-              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
-       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
-                     (proj₁ r) ≡ true)
-       × (hasDry (proj₁ r) ≡ false)
-       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
-
--- THE INPUT CLAUSE, GROUND.  Caps half delegated to the proven face at
--- ITS witness; wet half at the SAME witness, which is what makes the
--- two receipts one receipt rather than two independent Σs.
-walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (i : Fin n) → WalkStmt {e = e} (input i)
-walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
-           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
-  j′ , C1 , C2 , C3 , C4
-     , proj₁ WET
-     , proj₁ (proj₂ WET)
-     , proj₁ (proj₂ (proj₂ WET))
-     , proj₁ (proj₂ (proj₂ (proj₂ WET)))
-     , proj₂ (proj₂ (proj₂ (proj₂ WET)))
-  where
-  CAPS = subscribeE-caps c dep bud ops j g (input i) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
-  j′ = proj₁ CAPS
-  C1 = proj₁ (proj₂ CAPS)
-  C2 = proj₁ (proj₂ (proj₂ CAPS))
-  C3 = proj₁ (proj₂ (proj₂ (proj₂ CAPS)))
-  C4 = proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
-  WET = input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i (input i) κ
-          bid now sl sched st refl
-          2≤S 1≤R slEq slC slSz inv szb pC lC nst dpt
-          invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
-          C1 C2 C3 C4
-
-------------------------------------------------------------------
--- PER-EMIT WET PLUMBING, hop and dryness family — the hopDev?/dryEvent
--- halves of the splitEvents/retagEvents/map-value/terminator algebra
--- the push face's cons clause reassembles.  THE B-FAMILY ALREADY
--- EXISTED, PROVEN (.Measures W7 block: valB?/valsB?/eventB?/burstB?/
--- pathB?/frameB?-widen, splitEvents-vals-B/-bk-B, mapValue-B, and
--- finList-B in .Wet/Part2) — found by the clash, not the grep, which is
--- the wrong order; grep first.  Only the hop/dry twins below are new.
--- They live in THIS module rather than beside their family in
--- .Measures deliberately: a Measures edit invalidates every interface
--- above it (hours), a Walk-Level edit costs seconds.  When the
--- map/take/scan wet push faces need them, THAT is the day they move
--- down — not before.
-------------------------------------------------------------------
-
--- any-p over ++ stays false when both halves are; hasDry-append's
--- event-level sibling
 any-++-false : ∀ {A : Set} (p : A → Bool) (xs ys : List A) →
   any p xs ≡ false → any p ys ≡ false → any p (xs ++ ys) ≡ false
 any-++-false p []       ys hx hy = hy
@@ -2230,6 +2159,172 @@ walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
     (exhaust-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
 
+
+postulate
+  input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+    (g : Gas) → WalkLevelAt (peelGas g) →
+    ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    -- b is BOUND, not applied: the measures below take a general
+    -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+    -- `[]` — an alias of type `Closed Γ _` does not, so writing
+    -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+    b ≡ inputᶜ i →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    depthE g b κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ bid now sched st
+    in capsOK? (frameStep (j + j′) c)
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                     (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+-- THE MUTUAL LANDING.  input-wet-core is handed a walk face AT THE PEELED
+-- FUEL — `walkFace` partially applied, which inhabits WalkLevelAt directly.
+-- Passing walkFace ITSELF instead was tried and fails termination (the
+-- checker must then assume any gas, and the loop through the walk group
+-- never decreases); passing a peeled lambda at type WalkLevel was tried and
+-- is ill-typed, since WalkStmt's conclusion is gas-indexed.  Both notes are
+-- at the dead-route block above.  This shape is the one that has a chance:
+-- the type carries the peel, so the call site shows the decrease.
+--
+-- g0 is absurd exactly as the μ clause is — `g hasAtLeast suc G` has no
+-- constructor there, so the connect is unreachable.
+-- forward-declared so input-wet below can name it; clauses at the dispatch
+walkFace : WalkLevel
+
+input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+  (g : Gas) (i : Fin n) (b : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+  -- b is BOUND, not applied: the measures below take a general
+  -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+  -- `[]` — an alias of type `Closed Γ _` does not, so writing
+  -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+  b ≡ inputᶜ i →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  nest b sl (EvalSt.connectedShares st) ≤ bud →
+  depthE g b κ bid now sched st ≤ dep →
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  fnCapᵉ b ≤ Ψ →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  2 ≤ Ŝ →
+  F ≡ Ŝ →
+  R̂ ≡ hopR Ŝ →
+  Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+  opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+  dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+         (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g b κ bid now sched st
+  in capsOK? (frameStep (j + j′) c)
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+     burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+     burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+     j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+     (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                   (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g0 i b κ bid now sl sched st
+  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
+input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) i b κ bid now sl sched st =
+  input-wet-core c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel)
+    (λ b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ → walkFace b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ fuel)
+    i b κ bid now sl sched st
+
+
+-- THE INPUT CLAUSE, GROUND.  Caps half delegated to the proven face at
+-- ITS witness; wet half at the SAME witness, which is what makes the
+-- two receipts one receipt rather than two independent Σs.
+walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (i : Fin n) → WalkStmt {e = e} (input i)
+walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  j′ , C1 , C2 , C3 , C4
+     , proj₁ WET
+     , proj₁ (proj₂ WET)
+     , proj₁ (proj₂ (proj₂ WET))
+     , proj₁ (proj₂ (proj₂ (proj₂ WET)))
+     , proj₂ (proj₂ (proj₂ (proj₂ WET)))
+  where
+  CAPS = subscribeE-caps c dep bud ops j g (input i) κ bid now sl sched st
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+  j′ = proj₁ CAPS
+  C1 = proj₁ (proj₂ CAPS)
+  C2 = proj₁ (proj₂ (proj₂ CAPS))
+  C3 = proj₁ (proj₂ (proj₂ (proj₂ CAPS)))
+  C4 = proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
+  WET = input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i (input i) κ
+          bid now sl sched st refl
+          2≤S 1≤R slEq slC slSz inv szb pC lC nst dpt
+          invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
+          C1 C2 C3 C4
+
+------------------------------------------------------------------
+-- PER-EMIT WET PLUMBING, hop and dryness family — the hopDev?/dryEvent
+-- halves of the splitEvents/retagEvents/map-value/terminator algebra
+-- the push face's cons clause reassembles.  THE B-FAMILY ALREADY
+-- EXISTED, PROVEN (.Measures W7 block: valB?/valsB?/eventB?/burstB?/
+-- pathB?/frameB?-widen, splitEvents-vals-B/-bk-B, mapValue-B, and
+-- finList-B in .Wet/Part2) — found by the clash, not the grep, which is
+-- the wrong order; grep first.  Only the hop/dry twins below are new.
+-- They live in THIS module rather than beside their family in
+-- .Measures deliberately: a Measures edit invalidates every interface
+-- above it (hours), a Walk-Level edit costs seconds.  When the
+-- map/take/scan wet push faces need them, THAT is the day they move
+-- down — not before.
+------------------------------------------------------------------
+
+-- any-p over ++ stays false when both halves are; hasDry-append's
+-- event-level sibling
+
 -- THE DISPATCH, real from day one: match the subscribed expression,
 -- hand the clause its own obligation.  Two clauses are PROVEN outright:
 -- varᵉ (a closed term has no value variables) and μᵉ at g0 — the μ dry
@@ -2237,7 +2332,6 @@ walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 -- `g0 hasAtLeast suc G` has no constructor.  So `hasDry ≡ false` needs
 -- no postulate at the one clause of subscribeE that emits dryness:
 -- what remains is showing the recursive clauses PRESERVE it.
-walkFace : WalkLevel
 walkFace (input i)       = walk-input i
 walkFace (ofᵉ ts)        = walk-of ts
 walkFace emptyᵉ          = walk-empty

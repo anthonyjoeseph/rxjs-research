@@ -79,8 +79,9 @@ named postulate's own header.
   refutation's shape would have recurred — is answered by PROVEN
   `caseW-subΘ` + `fnCap-subΘᵉ` (.Measures), not by the probes. Residue:
   no probe reached a value that is not a subterm of its own def, so none
-  could have refuted. Its mutual landing was BUILT and rejected on
-  termination — dead route, coverage and the hop disanalogy in its header.
+  could have refuted. Its mutual landing is DONE — the clause can now call
+  the walk face at peeled fuel, so what remains is the three-clause
+  induction. Coverage, the hop disanalogy and the landing in its header.
 - **`slotHop-cap`** (Measures) — DIFFICULTY, lowered from FALSITY by
   Demand-Probe series S, which reached the amplifier-chain region and
   measured the margin widening. Route and coverage in its header.
