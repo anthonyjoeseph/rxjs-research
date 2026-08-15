@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -86,6 +86,15 @@ help:
 	@echo "  bg-check      THE VERDICT of a detached run: GREEN, RED + failing"
 	@echo "                  tail, or STILL RUNNING (exit 3 — not a pass)"
 	@echo "                  make bg-check T=agda"
+	@echo "                  ⚠ DO NOT BRANCH ON make's EXIT CODE HERE: make"
+	@echo "                  collapses BOTH 3 and 1 to its own 2, so running"
+	@echo "                  and RED are indistinguishable.  Match the text,"
+	@echo "                  or use bg-wait, which cannot return while"
+	@echo "                  running, so its nonzero means RED and only RED"
+	@echo "  bg-wait       block until a detached run is TERMINAL, then report"
+	@echo "                  it — exit 0 green, NONZERO red.  This is the one"
+	@echo "                  to poll: it cannot return while still running"
+	@echo "                  make bg-wait T=gate   /   make bg-wait T=agda I=90"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -260,6 +269,9 @@ gate:
 #     make bg-check T=agda            THE VERDICT: green, red + tail, or running
 #
 LOG ?= /tmp/rxjs-bg-$(T).log
+
+# bg-wait's poll interval, seconds.  Override with I=<n>.
+I ?= 60
 bg:
 	@test -n "$(T)" || { echo "usage: make bg T=<target> [LOG=<path>] [ARGS=...]" >&2; exit 2; }
 	@rm -f $(LOG)
@@ -367,3 +379,29 @@ qc-build:
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
 
+
+# THE ONE TO POLL.  `make bg-check` exits 3 while running and 1 when red,
+# but MAKE COLLAPSES BOTH TO ITS OWN 2 — measured 2026-08-14 — so a loop
+# keyed on the exit code cannot tell "still building" from "build failed",
+# and will happily spin forever on a dead RED build.  That is the same
+# false-green shape `make bg`'s invariant exit exists to prevent, one
+# level up.  bg-wait BLOCKS until the log is TERMINAL, so by the time it
+# returns, nonzero can only mean RED — that is the whole point, and it is
+# what bg-check cannot offer at any exit code.  (make rewrites the recipe's
+# `exit 1` as its own 2, so test 0-vs-nonzero, never the specific number.)
+bg-wait:
+	@test -n "$(T)" || { echo "usage: make bg-wait T=<target> [LOG=<path>] [I=<secs>]" >&2; exit 2; }
+	@while :; do \
+	  test -f $(LOG) || { echo "bg-wait: no log at $(LOG) — never launched?" >&2; exit 2; }; \
+	  if grep -q '^EXIT=' $(LOG); then break; fi; \
+	  sleep $(I); \
+	done; \
+	ec=$$(grep '^EXIT=' $(LOG) | tail -1 | cut -d= -f2); \
+	if [ "$$ec" = 0 ]; then \
+	  echo "bg-wait: $(T) GREEN ($(LOG))"; \
+	  echo "  log's last word: $$(grep -v '^EXIT=' $(LOG) | grep -v '^[[:space:]]*$$' | tail -1)"; \
+	  echo "  ^ READ IT.  Exit 0 can also mean 'did no work'."; \
+	else \
+	  echo "bg-wait: $(T) RED — exit $$ec ($(LOG)).  Last 25 lines:"; \
+	  tail -25 $(LOG); exit 1; \
+	fi
