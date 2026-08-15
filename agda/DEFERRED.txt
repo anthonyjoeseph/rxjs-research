@@ -2,26 +2,54 @@
 # Generated 2026-08-06 from the (B4) report of scripts/check-wiring.py.
 # Maintained by the ratchet in `make wiring-gate` (see scripts/check-wiring.py).
 #
-# WHAT THIS FILE IS.  The wiring law tracks NAMES, not OBLIGATIONS INSIDE
-# TYPES.  A proven lemma whose only consumers are assembly argument positions
-# (i.e. it is PASSED into a postulate but never APPLIED) reads as fully wired
-# — no orphan, no gate failure — while its own premises sit permanently unpaid
-# as long as the parent postulate stands.  The lemmas listed below are in
-# that state — the COUNT is deliberately not written here, because a number
-# in prose beside the list it describes is a second source of truth, and this
-# one had already drifted (it said 55; there were 18).
+# WHAT THIS FILE IS — A FROZEN GRANDFATHER LIST THAT MAY ONLY SHRINK.
+# The wiring law tracks NAMES, not OBLIGATIONS INSIDE TYPES.  A proven lemma
+# whose only consumers are assembly argument positions (i.e. it is PASSED into
+# a postulate but never APPLIED) reads as fully wired — no orphan, no gate
+# failure — while its own premises sit permanently unpaid as long as the
+# parent postulate stands.  The lemmas listed below are in that state.
 # They are LOAD-BEARING and PROVEN; this is not a deletion list.
-# Passed-only is expected and normal while the parent is still a postulate.
-# The ratchet exists to make deferral an explicit, reviewed act, not a silent
-# side effect of writing an assembly.
+#
+# The COUNT is deliberately not written here: a number in prose beside the
+# list it describes is a second source of truth, and this one had already
+# drifted (it said 55; there were 18).  The line count IS the count, and a
+# diff that grows this file is the review signal.
+#
+# THE LEAF-ONLY RULE (Anthony, 2026-08-15) — WHY THE LIST IS FROZEN.
+# Passed-only is NOT "normal while the parent is a postulate".  It is the
+# state the rule exists to prevent, because such a lemma has never had its
+# FIT tested: nothing reduces it, so nothing checks that its type is the one
+# the parent actually needs.  Two `-core` discharges (opIterD-budget,
+# init-capsOK?-base) each shed seven-plus leading hypotheses for exactly
+# that reason — ingredients claimed, never actually ingredients, undetected
+# until someone wrote the real proof.
+#
+# So a postulate must be a LEAF.  Write an assembly as a REAL BODY over
+# POSTULATED LEAVES — `postulate l : L` and `P = <body applying l>`, where
+# the composition is CHECKED — never as a postulate over proven pieces
+# (`P = P-core l …`), where the composition is asserted and checked by
+# nobody.  When the body cannot be written yet, postulate the parent BARE
+# and mint no leaves; an unwritten route belongs in a header comment, not
+# in a type that verifies nothing.  Nothing is ever blocked by this: the
+# bare postulate is always available, so the ordering merely becomes
+# assembly-first, leaves-second — which is what outside-in already demands.
 #
 # HOW THE RATCHET WORKS.
 # `make wiring-gate` compares the measured passed-only set against this file:
-#   - a lemma measured but NOT in this file = NEW DEFERRAL — fails the gate
-#     until deliberately added here;
+#   - a lemma measured but NOT in this file = LEAF-ONLY VIOLATION — fails the
+#     gate.  The remedy is to write the parent's body, NOT to add a line here.
+#     Adding a line increases tracked debt and needs an explicit ruling from
+#     Anthony;
 #   - a lemma in this file but NOT measured = its premises are now discharged
 #     (or the lemma was deleted) — the ledger line must be removed.  This is
 #     the win case; the gate message says so.
+#
+# HOW A LINE LEAVES.  Only by its parent being proven, at which point the
+# lemma is genuinely applied.  Every entry names its parent, so this file is
+# a countdown against five postulates: dry-tick-core, mid-step-core,
+# subscribeE-takeᵉ-wf-core, subscribeE-input-wf-core, and the
+# innerReact-/thruOuter-nodry-core pair.  No separate work is scheduled for
+# it — the parents are already tier rows in PROOF-STATE.md.
 #
 # TWO CAVEATS INHERITED FROM (B4) — the numbers in this file are never exact.
 #

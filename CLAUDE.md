@@ -707,37 +707,53 @@ proven work, makes each remaining gap greppable, and proves nothing hard. It is 
 retired the last orphan in the repo, and it remains the move whenever a new proof has
 nowhere to plug in.
 
-**WRITING AN ASSEMBLY — the mechanics.** For a parent postulate `P : T` with proven
-pieces `o₁…oₖ`, `T` is unchanged; it becomes
+### A POSTULATE MUST BE A LEAF (Anthony, 2026-08-15)
+
+**Nothing proven may be PASSED INTO a postulate as its only use.** Write an assembly
+as a REAL BODY over POSTULATED LEAVES — never as a postulate over proven pieces:
 
 ```agda
-postulate P-core : <type of o₁> → … → <type of oₖ> → T
+postulate l₁ : L₁                        -- the gap, a true leaf
 P : T
-P = P-core (λ {a} {b} → o₁ {a} {b}) … oₖ
+P = <real body applying l₁ …>            -- the composition is CHECKED
 ```
 
-`P-core` is equivalent to `P` exactly when every hypothesis is a PROOF. A
-*function*-valued piece must be wired by its DEFINING EQUATION instead (`ΩAt` in
-`.Measures` is the worked example) — passing the function's type quantifies over
-every inhabitant and makes the core strictly STRONGER. Four rules, each of which
-otherwise costs a full build to rediscover:
+**not** the `-core` form `postulate P-core : L₁ → … → T` with `P = P-core l₁ …`,
+where the composition is asserted and **checked by nobody**. That form verifies only
+that `L₁…Lₖ` and `T` are well-formed types; it never verifies that they SUFFICE.
+`opIterD-budget` and `init-capsOK?-base` each shed seven-plus leading hypotheses when
+finally proven — ingredients claimed, never actually ingredients, undetected until
+someone wrote the real proof. **A `-core`'s hypothesis list is a HYPOTHESIS about the
+route, not a specification**, and the leaf-only form is what makes the typechecker say
+so at the moment the leaf is proven rather than months later.
 
-1. **EXTRACT hypothesis types from source; never retype them.**
-   `scripts/check-wiring.py`'s `signature_text` does it exactly.
-2. **Pass every lemma ETA-EXPANDED with explicit implicits** —
-   `(λ {n} {Γ} → f {n} {Γ})`. When a statement reduces away its own implicit,
-   bare arguments give `Unsolved metas`; the eta form always works.
-3. **Copied signatures drag in VOCABULARY the parent module does not import.**
-   Collect the names in one pass; Agda stops at the FIRST scope error.
-4. **ORDERING: a postulate cannot reference a definition below it.** The `-core`
-   sits where the postulate was; the definition sits after the last piece it
-   consumes. `make wiring` section B3 reports violations — do not learn this
-   from a failed typecheck.
+**When the body cannot be written yet, postulate the parent BARE and mint no leaves.**
+Nothing is ever blocked: the bare postulate is always available, so the rule only
+changes the ORDER to assembly-first, leaves-second — which is what outside-in already
+demands ("never prove pieces before their assembly exists"; leaf-only is that rule with
+teeth, since today "assembly exists" is satisfiable by a postulate that checks nothing).
+An unwritten route goes in the parent's header, not into a type that verifies nothing.
 
-One more, from two discharges that shared it: **a `-core`'s hypothesis list is a
-HYPOTHESIS about the route, not a specification.** Both `opIterD-budget` and
-`init-capsOK?-base` shed seven-plus leading hypotheses because the direct proof
-never needed them — check whether it does before grinding through the list.
+The payoff is that **a leaf's FIT is tested the moment it is proven**, because its
+consumer is a body that must reduce. The existing passed-only lemmas are grandfathered
+in `agda/DEFERRED.txt`, a frozen list that may only SHRINK; `make wiring-gate` fails on
+any new one. Growing that file needs a ruling from Anthony.
+
+**Mechanics that still bite, each of which otherwise costs a full build:**
+
+1. **Pass every lemma ETA-EXPANDED with explicit implicits** — `(λ {n} {Γ} → f {n} {Γ})`.
+   When a statement reduces away its own implicit, bare arguments give `Unsolved metas`;
+   the eta form always works.
+2. **A *function*-valued piece is wired by its DEFINING EQUATION**, not by its type
+   (`ΩAt` in `.Measures` is the worked example) — passing the type quantifies over every
+   inhabitant and makes the statement strictly STRONGER.
+3. **EXTRACT types from source; never retype them.** `scripts/check-wiring.py`'s
+   `signature_text` does it exactly. Copied signatures drag in VOCABULARY the parent
+   module does not import — collect the names in one pass, since Agda stops at the FIRST
+   scope error.
+4. **ORDERING: a postulate cannot reference a definition below it.** Leaves sit above the
+   body that consumes them. `make wiring` section B3 reports violations — do not learn
+   this from a failed typecheck.
 
 **TWO SHAPES THAT ARE ALMOST ALWAYS WRONG — check every new postulate for both.** A
 statement whose conclusion needs information appearing in NONE of its hypotheses (e.g.

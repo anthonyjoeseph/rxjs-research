@@ -835,9 +835,27 @@ def find_deferred_obligations(src_dir, defs, def_lines, postulate_names,
     nothing in the repo forced anyone to look at it.
 
     So: report every proven definition whose consumers are ONLY assembly
-    argument positions — passed, never applied.  This is a LEDGER, not a
-    gate: being passed-only is normal and expected while the parent is
-    still postulated.  The point is that the set and its size are visible.
+    argument positions — passed, never applied.
+
+    THE LEAF-ONLY RULE (Anthony, 2026-08-15).  This set is FROZEN and may
+    only SHRINK.  Passed-only is no longer "normal while the parent is
+    postulated" — it is the state the rule exists to prevent, because a
+    lemma in it has never had its FIT tested: nothing reduces it, so
+    nothing checks that its type is the one the parent actually needs.
+    Two `-core` discharges shed seven-plus leading hypotheses apiece for
+    exactly that reason.
+
+    The remedy for a NEW passed-only lemma is never "add a ledger line".
+    It is to write the parent as a REAL BODY over POSTULATED LEAVES:
+
+        postulate l₁ : L₁                 -- gap, a true leaf
+        P : T
+        P = <real body applying l₁>       -- CHECKED composition
+
+    rather than as a postulate over proven pieces (`P = P-core l₁ …`),
+    where the composition is asserted and checked by nobody.  When the
+    body cannot be written yet, postulate P BARE and mint no leaves — an
+    unwritten route is a header comment, not a type nobody verifies.
     """
     # 1. Assembly spans: for each `-core` postulate, the expression(s) that
     #    feed it.  An assembly is `Parent = Parent-core arg₁ … argₖ`, whose
@@ -1333,9 +1351,11 @@ def main():
     print("  given.  Nobody has supplied these lemmas' premises, and nobody will")
     print("  until the parent postulate is proven.  That is real remaining work")
     print("  appearing NOWHERE in the postulate ledger.")
-    print("  NOT A DELETION LIST.  These lemmas are proven and load-bearing;")
-    print("  passed-only is EXPECTED while the parent is still a postulate.")
-    print("  This is a ledger, and its point is that the set stays VISIBLE.")
+    print("  NOT A DELETION LIST.  These lemmas are proven and load-bearing.")
+    print("  But under the LEAF-ONLY RULE this set is FROZEN and may only")
+    print("  SHRINK: a passed-only lemma has never had its FIT tested, since")
+    print("  nothing reduces it.  New ones are a gate FAILURE, not a ledger")
+    print("  entry — write the parent as a real body over postulated leaves.")
     print()
     if not deferred_rows:
         print("  (none)")
@@ -1458,7 +1478,8 @@ def main():
         else:
             if new_deferrals:
                 problems.append(
-                    f"{len(new_deferrals)} NEW DEFERRAL(s) not in agda/DEFERRED.txt"
+                    f"{len(new_deferrals)} LEAF-ONLY VIOLATION(s) — proven lemma "
+                    "passed to a postulate, never applied"
                 )
             if stale_entries:
                 problems.append(
@@ -1473,7 +1494,20 @@ def main():
             print("=" * 78)
             if new_deferrals:
                 print()
-                print("NEW DEFERRALS — add these lines to agda/DEFERRED.txt:")
+                print("LEAF-ONLY VIOLATION — these proven lemmas are PASSED to a")
+                print("postulate and never APPLIED, so nothing checks that their")
+                print("types are the ones the parent actually needs.  The remedy is")
+                print("NOT to add a ledger line.  For each, write the parent as a")
+                print("REAL BODY over POSTULATED LEAVES:")
+                print()
+                print("    postulate l : L        -- the gap, a true leaf")
+                print("    P : T")
+                print("    P = <body applying l>  -- composition now CHECKED")
+                print()
+                print("If the body cannot be written yet, postulate the parent BARE")
+                print("and mint no leaves at all.  agda/DEFERRED.txt is a frozen")
+                print("grandfather list that may only SHRINK; growing it needs an")
+                print("explicit ruling from Anthony and increases tracked debt.")
                 # Build a lookup from deferred_rows for slot counts and parents
                 row_map = {r[0]: r for r in deferred_rows}
                 for name in new_deferrals:
@@ -1481,11 +1515,11 @@ def main():
                     if row:
                         _lem, _d, parents, slots = row
                         print(
-                            f"  {name} | {', '.join(parents)} | "
-                            f"≤{slots} | REASON: TODO"
+                            f"  {name}  — passed to {', '.join(parents)}, "
+                            f"≤{slots} premises unpaid"
                         )
                     else:
-                        print(f"  {name} | (unknown) | ≤? | REASON: TODO")
+                        print(f"  {name}  — parent unknown")
             if gate_only_new:
                 print()
                 print("WIRED ONLY OUTSIDE THE GATE — nothing `make agda` compiles")
