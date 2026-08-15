@@ -74,10 +74,11 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`input-wet`** (Walk-Level) — FALSITY. Every conjunct probed and the Ψ
-  axis closed by proof; the residue is that no probe reached a value which
-  is not a subterm of its own def. Mutual landing done, induction remains.
-  Coverage, the hop disanalogy and the landing in its header.
+- **`input-wet`** (Walk-Level) — DIFFICULTY, lowered from FALSITY: the Ψ
+  axis is closed by PROVEN `caseW-subΘ` + `fnCap-subΘᵉ`, the refuted hop
+  conjunct's repair is proven, and every conjunct has non-degenerate
+  coverage. Mutual landing done; the three-clause induction is the work.
+  Evidence, the hop disanalogy and the landing in its header.
 - **`slotHop-cap`** (Measures) — DIFFICULTY, lowered from FALSITY by
   Demand-Probe series S, which reached the amplifier-chain region and
   measured the margin widening. Route and coverage in its header.

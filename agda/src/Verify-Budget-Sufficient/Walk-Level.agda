@@ -836,6 +836,29 @@ postulate
 -- a function-valued term, so a shared slot whose def carries one is
 -- exactly the analogue of the refuting program.
 --
+-- CLASS LOWERED FALSITY → DIFFICULTY (2026-08-15).  What earned it, and
+-- what did NOT:
+--   · the conjunct that was actually REFUTED is repaired and the repair is
+--     PROVEN — slotHop-fix rests on no postulate — and it is pinned at the
+--     refutation's own program with the old bound still rejecting the same
+--     burst, so it is a repair rather than a weakened test;
+--   · the Ψ axis, where that refutation's shape would have recurred, is
+--     closed by PROOF (caseW-subΘ, fnCap-subΘᵉ) — see below;
+--   · hasDry is probed across several programs and gas terms, with a
+--     boundary row pinning it TRUE one gas step down so the green rows are
+--     known to sit past the dry boundary; its six funding lemmas
+--     (connect-edge, sharedConnect-unconn, unconn-cons-≤, obs-slot-shared,
+--     connect-anchor, unconn-keeps) are proven definitions;
+--   · INV?/burstB? carry negative controls on BOTH axes; regsLen? is
+--     non-degenerate via series REG.
+-- NOT part of the case: the Ψ/Ψ2/Ψ3 probe series, which were deleted for
+-- being structurally unable to refute.  The class rests on the proofs.
+--
+-- RESIDUE, and it is what would re-raise the class: every probe is a small
+-- program.  Deeper telescopes, scripted/shared mixes, and μ-nesting inside
+-- a slot def are uncovered, so a surprise would come from a fact about
+-- those shapes that no probe touched.
+--
 -- THE Ψ AXIS IS ANSWERED, AND BY PROOF RATHER THAN BY PROBE (2026-08-15).
 -- Two lemmas in .Measures, both already proven, close the smuggle:
 --   · `caseW-subΘ` / `caseW-ren` (W1) — caseWᵗ is substitution- and
