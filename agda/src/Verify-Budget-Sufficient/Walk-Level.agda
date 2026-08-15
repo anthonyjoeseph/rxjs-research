@@ -848,6 +848,22 @@ postulate
 -- failure mode CLAUDE.md's Σ-receipt rule names, and the one that
 -- machine-refuted the exit-level count face.
 --
+-- THE PROVEN TEMPLATE IS `subscribeE-input-caps` (.Subscribe-Face), and it
+-- is worth naming because it settles the SHAPE of the missing induction
+-- rather than leaving it to be rediscovered.  It is the caps twin of this
+-- statement and it has THREE clauses — one per subscribeSharedSlot branch —
+-- so the wet induction is three clauses too, not one.  Its second and third
+-- clauses are where `len≤inputSize` and the LENB chain do the work, which is
+-- the same bookkeeping the wet side's hasDry conjunct needs.
+--
+-- THE BLOCKER IS STRUCTURAL AND CHEAP TO STATE: `walkFace` is a PLAIN
+-- definition sitting AFTER this postulate block and dispatching into it, so
+-- nothing here can call it.  Proving this clause needs walkFace at the peeled
+-- fuel (the connect branch subscribes the slot's def), which means walkFace
+-- and the walk-* clauses have to become MUTUAL.  That refactor is the real
+-- prerequisite — the eight lemmas below are not the obstacle, the module's
+-- definition order is.
+--
 -- EXPECTED TO PAY IT when it is ground: connect-edge (the demand drop),
 -- sharedConnect-unconn and unconn-cons-≤ (the U bookkeeping either side
 -- of the insert), obs-slot-shared and connect-anchor (the child's reset

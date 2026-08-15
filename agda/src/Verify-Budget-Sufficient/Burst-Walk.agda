@@ -76,7 +76,8 @@ module Verify-Budget-Sufficient.Burst-Walk where
 open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⊔m)
+  using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⊔m;
+         n≤1+n)
 open import Data.List    using (List; []; _∷_; _++_; map; length)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -131,7 +132,9 @@ open import Verify-Budget-Sufficient.Caps-Face
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl; valsCaps?-parts;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
-         frameStep-mono-j; frameStep-0; stepFrame-face; frameBud)
+         frameStep-mono-j; frameStep-0; stepFrame-face; frameBud;
+         -- the inner-at-suc-J kit, cribbed from subscribeInner-caps
+         frameStep-chain-suc; pathSz?-⊑; capsOK?-mono)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
@@ -139,7 +142,8 @@ open import Verify-Budget-Sufficient.Wet
          fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
          hasDry-append; ∨-false;
-         INV?; dBound; regsLen?; hopR; unconn; pathB?; _hasAtLeast_;
+         INV?; INV?-widen; dBound; regsLen?; hopR; unconn; pathB?; pathB?-widen;
+         _hasAtLeast_;
          slotsFnCap;
          dBound-bound; prod≤3pow; unconn≤slots; syncSize≤sizeᵉ; slotHop-cap;
          hasAtLeast-pad-plus; hasAtLeast-tower; hasAtLeast-mono)
@@ -1682,30 +1686,20 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   PbB c Ψ J κ ≡ true →
-  -- path-length slack: suc (suc (pathLen κ)) ≤ B, threaded rather than
-  -- derived here.
+  -- THE PATH-LENGTH HYPOTHESIS, IN THE CAPS FACE'S OWN SHAPE (2026-08-15).
+  -- This is `lC` verbatim from subscribeE-caps / subscribeInner-caps, and
+  -- that is the point: WalkStmt's hypotheses ARE the caps face's, so the wet
+  -- inner call has no business asking for a different one.
   --
-  -- WHAT PAYS IT: `frameStep-chain-suc` (Caps-Face/Part3), PROVEN —
-  --     suc k ≤ cSize (frameStep j c) → suc (suc k) ≤ cSize (frameStep (suc j) c)
-  -- at k := pathLen κ.  Walk-Level (the `SUB = walkFace …` site) already
-  -- spends it for exactly this purpose: extend a path by one frame, bump
-  -- the level by one, and the length bound carries.
-  --
-  -- ⚠ THE UNIT COMES FROM THE LEVEL BUMP, NOT FROM THE PATH, and that is the
-  -- whole subtlety (checked 2026-08-15).  An earlier note here claimed the
-  -- outer PbB paid it via `pathSz?-len` on (from-inner ↠ κ); it does not.
-  -- `pathSz?-len B p` concludes `pathLen p ≤ B` and `pathLen (f ↠ p) =
-  -- suc (pathLen p)`, so that route yields `suc (pathLen κ) ≤ B` — one short,
-  -- and no amount of reading the outer path fixes it, because a longer path
-  -- does not fit at the SAME level for free.
-  --
-  -- SO THE RESIDUE IS AN INDEX QUESTION, not a missing lemma: this hypothesis
-  -- is stated at `frameStep J c`, while frameStep-chain-suc delivers at
-  -- `frameStep (suc J) c`.  Either the inner walk-face application moves to
-  -- level `suc J` — which is what the Walk-Level site does when it extends —
-  -- or the caller keeps supplying it.  Deciding that is a restatement of the
-  -- inner call, so it is left threaded and recorded rather than guessed.
-  suc (suc (pathLen κ)) ≤ Caps.cSize (frameStep J c) →
+  -- It previously asked for `suc (suc (pathLen κ))` at level J — one unit
+  -- more than any caller could produce.  The unit had nowhere to come from
+  -- because the wet core was subscribing the inner at level J while the
+  -- PROVEN twin `subscribeInner-caps` (.Subscribe-Face) subscribes at
+  -- `suc j`: "the inner is subscribed under one more frame, at the same
+  -- instant, and at ONE MORE j".  Extending a path without paying the frame
+  -- is what made the bound unreachable; paying it makes `frameStep-chain-suc`
+  -- deliver the extra unit exactly where the walk face wants it.
+  suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
   VbB c sl Ψ J (o ∷ []) ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
@@ -1715,8 +1709,11 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- the c-to-entry anchoring the caller owns (c is free here; the
   -- caller knows it is capsAt-rooted).  The face's budget at this
   -- call's arguments stays under the next instant's size cap.
+  -- AT suc J, matching the level the inner is now subscribed at (see the
+  -- path-length hypothesis above).  L̂ is opIterD's value at the level the
+  -- walk face is actually applied at, so bumping the call bumps this too.
   Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) dep bud
-                                 (suc (sizeᵉ o)) J) c)
+                                 (suc (sizeᵉ o)) (suc J)) c)
     ≤ sizeCapAt e sl (suc id) →
   g ≡ budgetAt e sl id →
   any dryEvent (proj₁ (proj₂ (proj₂
@@ -1807,50 +1804,19 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- Residue postulates for subscribeE-inner-nodry-core.
 -- Each names one manufacturing obligation; all seven are consumed by
 -- the assembly below.
-postulate
-  -- Path-size predicate for the extended path from-inner ↠ κ.
-  -- frameSz? B (from-inner ...) = true; pathSz? B κ from pb; the gap
-  -- is suc (pathLen κ) ≤ B, supplied as the pLen argument.
-  subscribeE-inner-nodry-pSz : ∀ {n} {Γ : Ctx n} {t u}
-    (c : Caps) (Ψ J : ℕ) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ u t) →
-    PbB c Ψ J κ ≡ true →
-    suc (suc (pathLen κ)) ≤ Caps.cSize (frameStep J c) →
-    pathSz? (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ κ) ≡ true
--- Path-length bound for the extended path.
---
--- RESTATED 2026-08-14, and the restatement is HONEST BUT NOT A DISCHARGE.
--- The original conclusion had no hypothesis that could supply
--- suc (suc (pathLen κ)) ≤ B — one unit more than PbB on κ delivers — so
--- the bound is now taken as a hypothesis (sspLen) and returned.  That
--- makes this an IDENTITY: it asserts nothing, and it is kept only as the
--- named place where the obligation is spent.  The debt moved up through
--- SiNodry → subscribeInner-nodry → subscribeE-inner-nodry →
--- subscribeE-inner-nodry-core, and lands on innerReact-nodry-core /
--- thruOuter-nodry-core, which take SiNodry in NEGATIVE position and so
--- became strictly stronger postulates when this hypothesis was added.
---
--- NOT A DEAD ROUTE — the payment EXISTS and is proven: `frameStep-chain-suc`
--- (Caps-Face/Part3) turns `suc k ≤ cSize (frameStep j c)` into
--- `suc (suc k) ≤ cSize (frameStep (suc j) c)`, which at k := pathLen κ is
--- this hypothesis.  What does NOT pay it is the route first written here,
--- `pathSz?-len` on the outer path: that concludes `pathLen p ≤ B`, one short,
--- because the extra unit comes from the LEVEL BUMP and not from the path.
--- Full statement of the residue (an index question about the inner call's
--- level, not a missing lemma) lives at the hypothesis in SiNodry.
---
--- CONSEQUENCE FOR THE LEDGER: this stopped being a postulate, but the
--- SHAPE risk it carried did NOT go away, so it is not a completed row.
-subscribeE-inner-nodry-pLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (Ψ J dep : ℕ)
-  (κ : Path Γ u t) (o : Val Γ (obs u))
-  (sched : Sched Γ) (st : EvalSt e)
-  (fuel : Gas) (op : AllOp) (allNid : NodeId) (id : Id) (now : Tick) →
-  OKB {e = e} c sl Ψ J sched st →
-  PbB c Ψ J κ ≡ true →
-  depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
-  suc (suc (pathLen κ)) ≤ Caps.cSize (frameStep J c) →
-  suc (suc (pathLen κ)) ≤ Caps.cSize (frameStep J c)
-subscribeE-inner-nodry-pLen _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ sspLen = sspLen
+-- subscribeE-inner-nodry-pSz and -pLen are BOTH GONE (2026-08-15), and they
+-- fell to the same one-line change: the inner call now subscribes at `suc J`,
+-- matching the PROVEN twin subscribeInner-caps.
+--   · -pLen was an identity returning a bound nothing could supply.  With the
+--     level bump, `frameStep-chain-suc` DERIVES it from the caps face's own lC.
+--   · -pSz manufactured pathSz? at the extended path.  It existed only because
+--     at level J its length conjunct was unreachable; at suc J the core builds
+--     it inline as `pC′`, exactly as subscribeInner-caps builds its own.
+-- The lesson is worth more than the two rows: a postulate whose hypotheses
+-- cannot supply its conclusion is often not a hard lemma but a MISPLACED CALL,
+-- and the proven twin is where to look for the placement.
+--   RECOVERY: git show 4a76fff restores the identity form and the analysis
+--   that led here, if the level bump ever has to be undone.
 
 postulate
   -- Depth bound for the inner subscribeE call.
@@ -2018,14 +1984,14 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
   (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   PbB c Ψ J κ ≡ true →
-  suc (suc (pathLen κ)) ≤ Caps.cSize (frameStep J c) →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
   VbB c sl Ψ J (o ∷ []) ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
   -- the reset-anchor ceiling; see SiNodry
   Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) dep bud
-                                 (suc (sizeᵉ o)) J) c)
+                                 (suc (sizeᵉ o)) (suc J)) c)
     ≤ sizeCapAt e sl (suc id) →
   gs fuel ≡ budgetAt e sl id →
   hasDry (proj₁ (subscribeE fuel o
@@ -2043,7 +2009,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
   -- the demand at the RESET caps (the pins' Ŝ), not the level cap:
   -- the level cap cannot ceiling the climb, and cl anchors it
   Ŝr     = sizeCapAt e sl (suc id)
-  L̂      = opIterD (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) J
+  L̂      = opIterD (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) (suc J)
   G      = dBound Ŝr (hopR Ŝr) (unconn sl (EvalSt.connectedShares st))
                   (hopDᵉ Ŝr (slotHop Ŝr sl) o) (syncSizeᵉ o)
   ℓ      = B + (suc (pathLen κ) + G)
@@ -2076,29 +2042,60 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
 
   -- sizeᵉ o ≤ Ŝr: from szO (sizeᵉ o ≤ B) via the monotone J ≤ L̂ step
   sz≤Ŝr : sizeᵉ o ≤ Ŝr
+  -- J ≤ opIterD … (suc J): one step up to suc J, then opIterD's own
+  -- inflation at that level.  The cl ceiling now anchors at suc J, so the
+  -- old `opIterD-infl … J` no longer meets it.
   sz≤Ŝr = ≤-trans szO
             (≤-trans (proj₁ (frameStep-mono-j c 2≤S
-                               (opIterD-infl (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) J)))
+                               (≤-trans (n≤1+n J)
+                                        (opIterD-infl (Caps.cSize c) (Caps.cWid c)
+                                                      dep bud (suc (sizeᵉ o)) (suc J)))))
                      cl)
 
-  -- path-length bound for from-inner ↠ κ (identity: returns sspLen)
-  pLen' = subscribeE-inner-nodry-pLen c sl Ψ J dep κ o sched st fuel op allNid id now ok pb hD sspLen
+  -- THE PATH-LENGTH BOUND, DERIVED (2026-08-15) — cribbed from
+  -- subscribeInner-caps, which pays the same unit the same way: extend the
+  -- path by a frame, subscribe at one more j, and the chain bound carries.
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n J)
+  B′     = Caps.cSize (frameStep (suc J) c)
+  -- every caps-indexed hypothesis the walk face wants must move up with the
+  -- level, exactly as subscribeInner-caps widens its own
+  cOK′   : capsOK? (frameStep (suc J) c) sched' st ≡ true
+  cOK′   = capsOK?-mono (frameStep J c) (frameStep (suc J) c) sched' st step⊑ cOK
+
+  -- pathSz? AT THE EXTENDED PATH, BUILT rather than postulated.  This is
+  -- subscribeInner-caps' `pC′` verbatim: the head frame is free (refl), the
+  -- new length conjunct is the widened lC, and κ's own chain rides
+  -- pathSz?-⊑ up the step.  Building it is what retires
+  -- subscribeE-inner-nodry-pSz — the postulate existed only because the
+  -- inner call sat at J, where the length conjunct was unreachable.
+  pC     : pathSz? (Caps.cSize (frameStep J c)) κ ≡ true
+  pC     = proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ)
+                         (pathBΨ? Ψ κ) pb)
+  pC′    : pathSz? B′ (from-inner op allNid inst ↠ κ) ≡ true
+  pC′    = ∧-intro refl
+             (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                        (≤⇒≤ᵇ (≤-trans sspLen (proj₁ step⊑))))
+                      (pathSz?-⊑ κ step⊑ pC))
+  pLen'  : suc (suc (pathLen κ)) ≤ B′
+  pLen'  = frameStep-chain-suc c J (pathLen κ) 2≤S sspLen
 
   -- regsLen? ℓ via capsOK⇒regsLen + regsLen?-mono
   regsO : regsLen? ℓ (EvalSt.registry st) ≡ true
   regsO = regsLen?-mono B ℓ (EvalSt.registry st) (m≤m+n B _)
             (capsOK⇒regsLen (frameStep J c) sched st (proj₂ (proj₁ ok)))
 
-  W = wl o c Ψ Ŝr Ŝr (hopR Ŝr) G ℓ L̂ dep bud (suc (sizeᵉ o)) J
+  W = wl o c Ψ Ŝr Ŝr (hopR Ŝr) G ℓ L̂ dep bud (suc (sizeᵉ o)) (suc J)
          fuel (from-inner op allNid inst ↠ κ) id now sl sched' st
-         2≤S 1≤R slEq slC slSz cOK szO
-         (inner-dWO c sl Ψ J o vb)
-         (subscribeE-inner-nodry-pSz c Ψ J op allNid inst κ pb pLen')
+         2≤S 1≤R slEq slC slSz cOK′ (≤-trans szO (proj₁ step⊑))
+         (≤-trans (inner-dWO c sl Ψ J o vb) (proj₁ (proj₂ step⊑)))
+         pC′
          pLen' nB ≤-refl
          (subscribeE-inner-nodry-depth c sl Ψ J dep fuel op allNid κ id now o sched st ok hD)
-         (subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc ok rg)
+         (INV?-widen sched' st (proj₁ step⊑)
+            (subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc ok rg))
          fnO
-         (subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb)
+         (pathB?-widen (from-inner op allNid inst ↠ κ) (proj₁ step⊑)
+            (subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb))
          -- the reset-anchor pins: floor from the entry lemma, F/R̂ by
          -- construction, ceiling from the caller's cl, budget ≤-refl
          (2≤capsAt-size e sl (suc id)) refl refl cl ≤-refl
@@ -2130,14 +2127,14 @@ subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   PbB c Ψ J κ ≡ true →
-  suc (suc (pathLen κ)) ≤ Caps.cSize (frameStep J c) →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
   VbB c sl Ψ J (o ∷ []) ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
   -- the reset-anchor ceiling; see SiNodry
   Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) dep bud
-                                 (suc (sizeᵉ o)) J) c)
+                                 (suc (sizeᵉ o)) (suc J)) c)
     ≤ sizeCapAt e sl (suc id) →
   gs fuel ≡ budgetAt e sl id →
   hasDry (proj₁ (subscribeE fuel o

@@ -746,6 +746,38 @@ deriving a path-LENGTH bound from `pathB?`, which carries no length conjunct), a
 witness" above). Under de-risk mode these are refutation targets, not `SUSPECT:` notes:
 build the counterexample.
 
+**AND FOR THE FIRST SHAPE, SUSPECT A MISPLACED CALL BEFORE A MISSING LEMMA.** When a
+statement's hypotheses cannot supply its conclusion, the instinct is that something is
+unproven. Often nothing is: the statement is being made at the wrong INDEX — a level, a
+fuel, a path depth — and the caller is what is misplaced, not the mathematics. The tell is
+that the gap is a fixed, small offset (one level, one frame, one `suc`) rather than a
+missing fact about the domain. Nothing about the problem changes when you stare at it; only
+where the call sits does.
+
+The check is cheap: find the same operation somewhere it is already PROVEN, and diff the
+ARGUMENTS rather than the statements. Two statements can read identically and still differ
+in the index each is made at, which is invisible if you only compare their types.
+
+**Parts of this development have a proven counterpart that answers "at what index should
+this be stated?" directly** — a second face of the same operation, already discharged,
+whose clauses correspond one-to-one with the ones still open. Where such a counterpart
+exists, its clause is a worked answer, and where the two disagree the undischarged side is
+the one that has not been checked. **Which families mirror which, and how exact the
+correspondence is, is recorded in the source headers of the statements themselves** — read
+those rather than any list kept here, since a list of module names outside the code goes
+stale silently and nothing greps it.
+
+That comparison has retired postulates that read as hard: a one-unit gap dismissed as an
+irreparable off-by-one turned out to be a call sitting one level too low, visible the
+moment its discharged counterpart's arguments were put beside it. Two postulates fell to
+moving the call, with no new mathematics.
+
+**Scope, stated plainly:** a mirrored counterpart is a property some parts of this
+development happen to have, not a general fact — do not expect one everywhere and do not
+force the analogy where the correspondence was never claimed. What generalises is the
+smaller claim: *an index-shaped gap points at the call site, so before proving anything,
+find the same operation where it already works and compare the arguments.*
+
 **ADDING A HYPOTHESIS IS A RESTATEMENT, AND NEEDS A RESTATEMENT'S JUSTIFICATION.**
 `A → B` is weaker than `B`, and a hypothesis is INVISIBLE to the ledger in a way a
 postulate is not: a postulate greps, gets counted by `make wiring`, carries a risk
