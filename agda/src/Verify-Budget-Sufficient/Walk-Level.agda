@@ -848,6 +848,54 @@ postulate
 -- failure mode CLAUDE.md's Σ-receipt rule names, and the one that
 -- machine-refuted the exit-level count face.
 --
+-- ⚠ DEAD ROUTE 2026-08-15 — THE MUTUAL LANDING WAS BUILT AND IT FAILS
+-- TERMINATION, and the reason is not the one this header used to give.
+--
+-- What was tried, in full, so nobody rebuilds it: input-wet was converted
+-- from a bare postulate into an assembly `input-wet = input-wet-core walkFace`
+-- (input-wet-core postulated over WalkLevel), walkFace was forward-declared
+-- above it so the two land in one mutual block, and input-wet/walk-input were
+-- relocated to sit beside walkFace's clauses.  That last step matters and is
+-- worth keeping: declaring the signature far from the clauses sweeps EVERY
+-- definition in between into the block — 47 members, of which 33 were in no
+-- cycle at all — while moving them adjacent gives exactly the 14 that really
+-- cycle.  `make agda-dev ARGS='--list <file>'` prints this for free, and the
+-- tight version type-checks FASTER than the status quo (28.6 s vs 37.9 s).
+--
+-- IT TYPECHECKS AND IT DOES NOT TERMINATE.  `make agda` rejects the whole
+-- group — subscribeInner-walk, thruConsume-walk, thruWalk-walk, stepThru-walk,
+-- pushThru-walk, subscribeAll-walk, walk-mergeAll, walkFace, input-wet,
+-- walk-input — and the problematic call it names is NOT input-wet's:
+--     stepThru-walk … (proj₁ (sp …)) (proj₂ (proj₂ (sp …))) …
+-- a pre-existing call passing projections of the with-abstracted `sp`.
+--
+-- SO THE REAL OBSTACLE IS THIS: the walk group's termination currently
+-- DEPENDS on walkFace sitting OUTSIDE its cycle.  While walkFace is external,
+-- those calls close no loop and nothing has to decrease.  Bringing walkFace in
+-- — which is exactly what letting this clause call it means — closes the loop
+-- through the whole group, and then `sp`'s projections have no structural
+-- measure.  Definition ORDER was never the blocker; the group's recursion not
+-- being structurally decreasing is.
+--
+-- WHAT WOULD UNBLOCK IT (unattempted).  Note first what does NOT: taking a
+-- `WalkLevel →` parameter the way subscribeE-inner-nodry-core does is the
+-- repo's usual answer, but it works THERE because Burst-Walk is handed the
+-- FINISHED walk face from another module.  Here the only thing that could
+-- supply the parameter is walkFace itself, so the loop closes anyway and
+-- nothing is gained.  Two routes that might actually work:
+--   · pass a walk face ALREADY SPECIALISED to the peeled fuel — i.e. the
+--     input clause receives `λ b′ → walkFace b′ … fuel …` rather than
+--     walkFace — so the recursive call carries its decrease at the site where
+--     the checker looks.  Cheapest to try, and it is the literal reading of
+--     "walkFace at the peeled fuel" this header has always asked for.
+--   · failing that, well-founded recursion on gas for the whole walk group,
+--     making the measure explicit instead of structural.  That is a redesign
+--     of the group, not a local change, and it also has to carry `sp`'s
+--     projections — the call the checker actually objected to.
+--   RECOVERY: the built-and-rejected version is not committed; rebuild it from
+--   this note if the well-founded route is taken, or read the parameter shape
+--   off Burst-Walk's subscribeE-inner-nodry-core instead.
+--
 -- THE PROVEN TEMPLATE IS `subscribeE-input-caps` (.Subscribe-Face), and it
 -- is worth naming because it settles the SHAPE of the missing induction
 -- rather than leaving it to be rediscovered.  It is the caps twin of this
