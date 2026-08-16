@@ -755,8 +755,21 @@ is the COST OF THE FACT BEING TRUE, not a reason to avoid it.**
 The same yields to the rest: do not WEAKEN the parent to make its body typecheck,
 do not close an arm with a ⊤-typed or otherwise vacuous postulate, do not seal a gap
 in prose. **If a migration cannot land without breaking one of these, it has FOUND
-something and it STOPS.** That is the result the pass exists to produce, not a
-failure to deliver one.
+something and it STOPS.**
+
+**A STOP IS A FINDING, NOT A DISCHARGE — IT IS NOT DONE TILL IT IS DONE (Anthony,
+2026-08-15).** Stopping produces a real result and is the right move; what it does
+not produce is a completed item. The roadmap row STAYS, the `DEFERRED.txt` line
+STAYS, the leaf-only violation stays live, and the parent is still a parent — until
+the migration actually lands and the parent stops taking proven lemmas. Write the
+finding in the postulate's header, record the ruling, and leave the row exactly where
+it was.
+
+This needs saying because a good finding is the most convincing thing there is to
+mistake for progress: it is genuinely valuable, it is genuinely publishable in a
+commit message, and it leaves the code in precisely the state it was in. That is the
+same failure as **CODE BEATS PROSE** — work converted into a paragraph, and the
+paragraph counted as the work.
 
 **Mechanics that still bite, each of which otherwise costs a full build:**
 
