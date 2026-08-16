@@ -377,6 +377,36 @@ postulate
   -- base clause every input subcase ends in — the init balances the new
   -- registration and the registered chain is well-typed against the live
   -- schedule.
+  --
+  -- ⚠ BLOCKED 2026-08-15, found by the leaf-only migration (PROOF-STATE
+  -- tier −1).  `initReg-wf` is PASSED here and never APPLIED, so its
+  -- premises are unpaid — and one of them CANNOT BE PAID at this call
+  -- site as the statement stands.
+  --
+  -- Writing the body means splitting on `Sched.slots sched i` to mirror
+  -- the evaluator (Evaluator:1400).  The hot/live arm registers
+  -- `(toℕ i) κ`, which is exactly `initReg-wf`'s shape at `src := toℕ i`
+  -- — so the arm is a one-liner EXCEPT for initReg-wf's `ltok`:
+  --
+  --     liveTypeOK? (toℕ i) (lookup Γ i) (Sched.live sched) ≡ true
+  --
+  -- Nothing in scope supplies it.  This postulate's own hypotheses
+  -- (BurstInv, done≡false, hasDry≡false) never mention `Sched.slots`;
+  -- BurstInv's four fields and Inv's seven (both .Part2) relate the
+  -- registry to `live` and say nothing about `slots`; and `Sched`
+  -- (Evaluator:63) is a PLAIN RECORD whose `live` and `slots` are
+  -- independent, so no free-standing lemma over an arbitrary `sched`
+  -- could be true — build one with a hot slot and `live = []`.
+  --
+  -- NOT the misplaced-call shape (CLAUDE.md): the gap is a whole absent
+  -- invariant, not a fixed small index offset, and `mkHot`
+  -- (Evaluator:110) establishes the fact ONLY at `sched-init`, with
+  -- nothing carrying it across schedule transitions (mintSource,
+  -- sweepLive, dropSource).  The repair is a reachability/well-formedness
+  -- predicate on `Sched` that does not exist yet, established at
+  -- sched-init and preserved by each transition — a claim-authoring call,
+  -- not a grind.  Note the existing `mkHot` reasoning in .Init-Caps
+  -- (widLive-mkHot) is about WIDTH bounds and does not donate this.
   subscribeE-input-wf-core :
     -- initReg-wf  (Verify-Well-Formed.agda:950)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

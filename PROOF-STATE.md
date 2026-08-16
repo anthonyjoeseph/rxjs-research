@@ -78,16 +78,24 @@ this site's own arguments, postulating only the residue. Applying is what pays
 each lemma's premises, and paying them is the point — a passed lemma has never
 had its FIT tested, so nothing checks that its type is the one the parent needs.
 
-**A MIGRATION ENDS AT A POSTULATE. Do NOT grind the residue** — write the body,
-state `P-rest` at full strength, stop. The residue belongs to its own tier, so
-this pass cannot smuggle tier-2 grinding ahead of tier 0. What it can do is
-refute a lemma's type, and that is worth knowing before anything is built on it.
+**TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
+not scheduled against the tier order and does not defer to it: a lemma whose type
+was never checked against its parent's need is wasted work at every tier, so the
+fit test is worth more the earlier it runs. `mid-step-core` in particular is to be
+**RESOLVED** in this phase, not parked because it is nominally tier 2.
+
+The residue `P-rest` may remain a postulate — that is what makes this a migration
+rather than a proof, and it is the FLOOR, not a ceiling. Where the parent falls
+out fully once its lemmas are actually applied, take it.
 
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
 
-- **`subscribeE-input-wf-core`** (Part3) — one lemma (`initReg-wf`). The smallest
-  real migration; do it first as the worked example.
+- **`subscribeE-input-wf-core`** (Part3) — **BLOCKED, and the first fit test already
+  fired**: `initReg-wf`'s `ltok` premise is undischargeable at the hot/live arm, and
+  no lemma over an arbitrary `Sched` could supply it. Needs a well-formedness
+  predicate on `Sched` that does not exist — claim authoring, needs Anthony. Full
+  finding in its header.
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) — one lemma
   (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT
@@ -96,7 +104,10 @@ first, so the single-lemma parents establish the pattern:
 - **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest. Its body must
   decompose `cascade` into latch/go/finish, so the migration carries the proof's
   skeleton even though the residue stays postulated. Tier-0 parent.
-- **`mid-step-core`** (Part11) — SIX lemmas. Tier-2 parent; migrate, do not grind.
+- **`mid-step-core`** (Part11) — SIX lemmas, and the only parent here carrying a
+  FALSITY class. To be RESOLVED, not merely migrated: it rests on FoldOut, a
+  6-field invariant validated at exactly one clause, so applying its six lemmas
+  is the cheapest test of whether that invariant actually holds.
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
