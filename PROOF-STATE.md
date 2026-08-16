@@ -91,11 +91,11 @@ out fully once its lemmas are actually applied, take it.
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
 
-- **`subscribeE-input-wf-core`** (Part3) — **BLOCKED, and the first fit test already
-  fired**: `initReg-wf`'s `ltok` premise is undischargeable at the hot/live arm, and
-  no lemma over an arbitrary `Sched` could supply it. Needs a well-formedness
-  predicate on `Sched` that does not exist — claim authoring, needs Anthony. Full
-  finding in its header.
+- **`subscribeE-input-wf-core`** (Part3) — **the first fit test fired, and its repair
+  is RULED**: `initReg-wf`'s `ltok` is undischargeable at the hot/live arm, and the
+  hot-slot-is-live fact becomes a NEW FIELD on `BurstInv`/`Inv` (.Part2), never a
+  hypothesis. Do this first — the field's cascade through both records' consumers is
+  the migration's real opening move. Finding and ruling in its header.
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) — one lemma
   (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT

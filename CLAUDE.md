@@ -729,6 +729,35 @@ consumer is a body that must reduce. The existing passed-only lemmas are grandfa
 in `agda/DEFERRED.txt`, a frozen list that may only SHRINK; `make wiring-gate` fails on
 any new one. Growing that file needs a ruling from Anthony.
 
+**THE MIGRATION DOES NOT LICENSE BREAKING OTHER LAWS (Anthony, 2026-08-15).**
+Distinguish two kinds of rule. The TIER ORDER is a *schedule*, and Anthony
+reordered it for this migration deliberately (PROOF-STATE's tier −1) — that is his
+call to make. The laws about what a statement may SAY are not schedule, and the
+migration yields to every one of them.
+
+The temptation is sharp and specific, so name it: **writing a body turns an unpaid
+premise into a TYPE ERROR, and the fastest way to clear a type error is to add a
+hypothesis to the parent.** That is exactly the laundering "ADDING A HYPOTHESIS IS A
+RESTATEMENT" forbids — tracked debt (a postulate: counted by `make wiring`, carrying
+a risk class, listed in PROOF-STATE) becomes untracked debt (a hypothesis: invisible
+to all three) — and the migration makes it *feel* like progress, because the file
+goes green as you do it.
+
+**So when a fit test reveals a MISSING INVARIANT, it goes in the INVARIANT RECORD,
+not in a signature** (Anthony's ruling on `initReg-wf`'s `ltok`, the first fit test
+this pass fired; the finding is in `subscribeE-input-wf-core`'s header). A field on
+`BurstInv`/`Inv` obliges every producer to supply it and every consumer to
+re-establish it, so the typechecker carries the fact everywhere it is needed. A
+hypothesis obliges only whoever happens to call today — the "the call site happens
+to supply it" trap, one call site later. **Cascading through the record's consumers
+is the COST OF THE FACT BEING TRUE, not a reason to avoid it.**
+
+The same yields to the rest: do not WEAKEN the parent to make its body typecheck,
+do not close an arm with a ⊤-typed or otherwise vacuous postulate, do not seal a gap
+in prose. **If a migration cannot land without breaking one of these, it has FOUND
+something and it STOPS.** That is the result the pass exists to produce, not a
+failure to deliver one.
+
 **Mechanics that still bite, each of which otherwise costs a full build:**
 
 1. **Pass every lemma ETA-EXPANDED with explicit implicits** — `(λ {n} {Γ} → f {n} {Γ})`.

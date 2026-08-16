@@ -404,9 +404,18 @@ postulate
   -- nothing carrying it across schedule transitions (mintSource,
   -- sweepLive, dropSource).  The repair is a reachability/well-formedness
   -- predicate on `Sched` that does not exist yet, established at
-  -- sched-init and preserved by each transition — a claim-authoring call,
-  -- not a grind.  Note the existing `mkHot` reasoning in .Init-Caps
-  -- (widLive-mkHot) is about WIDTH bounds and does not donate this.
+  -- sched-init and preserved by each transition.  Note the existing
+  -- `mkHot` reasoning in .Init-Caps (widLive-mkHot) is about WIDTH
+  -- bounds and does not donate this.
+  --
+  -- RULING (Anthony, 2026-08-15): the fact becomes a NEW FIELD on
+  -- BurstInv/Inv (.Part2), NOT a hypothesis on this signature.  A
+  -- hypothesis would launder tracked debt into untracked — invisible to
+  -- `make wiring`, to the risk classes and to PROOF-STATE — and would
+  -- bind only whoever calls today.  As a field, every producer must
+  -- supply it and every consumer re-establish it; the cascade through
+  -- the record's consumers is the cost of the fact being true.  See
+  -- CLAUDE.md, "THE MIGRATION DOES NOT LICENSE BREAKING OTHER LAWS".
   subscribeE-input-wf-core :
     -- initReg-wf  (Verify-Well-Formed.agda:950)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
