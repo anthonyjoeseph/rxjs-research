@@ -511,17 +511,11 @@ used somewhere — the only exceptions are the top-level, most-important exports
 backwards-compatibility shims, nothing "stored for reference", no legacy, no deprecated.
 **Do not be afraid to throw out code or documentation.** Git history is the archive.
 
-### DELETION: the wiring pass is COMPLETE, so the freeze is lifted (2026-08-06)
+### DELETION: an orphan may be deleted on its merits
 
-The freeze that ran through 2026-08-05 existed because deletion and wiring interfere
-in one direction only: **wiring only ADDS consumers** (monotone, safe to act on),
-while **deletion CREATES orphans** by stranding whatever fed only into the deleted
-cluster — measured once at six further definitions. Deleting mid-pass corrupts the
-very measurement used to decide what to delete.
-
-The pass is now done (zero orphans, zero unreachable modules, every postulate
-consumed), so `make wiring`'s orphan set is trustworthy again and an orphan may be
-deleted on its merits. Two rules survive the freeze, permanently:
+`make wiring`'s orphan set is trustworthy (zero orphans, zero unreachable modules,
+every postulate consumed), so a definition nothing consumes is a finding to act on.
+Two rules govern acting on it:
 
 - **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS.** A sweep
   answers the first; only building the consumer answers the second. A definition
@@ -594,10 +588,9 @@ find it.
 - **A machine refutation is worth as much as a proof — usually more, since it is
   cheaper.** A false statement found now costs a restatement; found after the towers
   above it are ground, it costs the towers.
-- **THE TRUTH-AUDIT PROHIBITION IS LIFTED.** It was scoped "during the wiring pass"
-  and the pass is done. Auditing statements for truth — especially by machine probe —
-  is now the priority, not a distraction. A `-- SUSPECT:` note is no longer the
-  correct response to a doubt you can test: test it.
+- **AUDITING STATEMENTS FOR TRUTH IS THE PRIORITY, not a distraction** — especially
+  by machine probe. A `-- SUSPECT:` note is not the correct response to a doubt you
+  can test: test it.
 - **PROBE BEFORE GRINDING.** If a postulate's sides are computable, instantiate it
   at concrete programs **in `src`, checked with `make agda-dev`** and pinned by `refl` —
   bug-cache shaped, seconds per loop. Every probe ends in exactly one of two states: a refutation (record,
@@ -680,8 +673,6 @@ downgraded FALSITY → DIFFICULTY on a probe covering only the near-degenerate c
 and had to be reverted. Corollary: **a named route is not evidence.** Knowing how
 a proof would go says nothing about whether the statement is true.
 
-**These still hold, unchanged from the wiring pass:**
-
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs
 saying because every instinct — and every subagent's default — runs the other way.
 Anthony, in the session that set this rule: *"the relentless mindset of reducing those
@@ -699,15 +690,14 @@ So, in worker directives and in your own work:
 - **Never grind a hard proof when a postulate will do.** If a lemma is real
   mathematics, state it and move on. Note it in the ledger and keep wiring.
 
-**THE PATTERN THAT DOES THE WORK — postulate-to-assembly conversion.** Most orphans are
-orphaned because *their only would-be consumer is itself a monolithic postulate*. So:
-take that postulate, convert it into a REAL DEFINITION over several smaller postulates,
-and have the definition CALL the orphans it was always meant to consume. This wires
-proven work, makes each remaining gap greppable, and proves nothing hard. It is what
-retired the last orphan in the repo, and it remains the move whenever a new proof has
-nowhere to plug in.
-
 ### A POSTULATE MUST BE A LEAF (Anthony, 2026-08-15)
+
+**THE PATTERN THAT DOES THE WORK — postulate-to-assembly conversion.** When a proof
+has nowhere to plug in because its only would-be consumer is itself a monolithic
+postulate: take that postulate, convert it into a REAL DEFINITION over several
+smaller postulates, and have the definition **CALL** the pieces it was always meant
+to consume. This makes each remaining gap greppable and proves nothing hard.
+**CALL, not pass** — which is the rest of this section.
 
 **Nothing proven may be PASSED INTO a postulate as its only use.** Write an assembly
 as a REAL BODY over POSTULATED LEAVES — never as a postulate over proven pieces:

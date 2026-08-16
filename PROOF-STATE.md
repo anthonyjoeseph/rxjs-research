@@ -69,6 +69,35 @@ The caps route does not replace the wet contract — it rests on it: both
 branches of `budget-sufficient` read `subscribeE-wet`'s `hasDry`/`INV?`
 conjuncts, so no amount of caps work retires tier 0.
 
+## Tier −1 — THE LEAF-ONLY MIGRATION (ahead of tier 0)
+
+The five postulates that still take PROVEN LEMMAS as arguments, in violation of
+the leaf-only rule (defined in CLAUDE.md). Each migrates by **INSTANTIATE, DON'T
+PASS**: replace `P = P-core l₁ … lₖ` with a real body that APPLIES each `lᵢ` at
+this site's own arguments, postulating only the residue. Applying is what pays
+each lemma's premises, and paying them is the point — a passed lemma has never
+had its FIT tested, so nothing checks that its type is the one the parent needs.
+
+**A MIGRATION ENDS AT A POSTULATE. Do NOT grind the residue** — write the body,
+state `P-rest` at full strength, stop. The residue belongs to its own tier, so
+this pass cannot smuggle tier-2 grinding ahead of tier 0. What it can do is
+refute a lemma's type, and that is worth knowing before anything is built on it.
+
+`agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
+first, so the single-lemma parents establish the pattern:
+
+- **`subscribeE-input-wf-core`** (Part3) — one lemma (`initReg-wf`). The smallest
+  real migration; do it first as the worked example.
+- **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
+- **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) — one lemma
+  (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT
+  ARTIFACT: the counter cannot see through the `SiNodry` type synonym, so census
+  the real premise set before assuming this one is free.
+- **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest. Its body must
+  decompose `cascade` into latch/go/finish, so the migration carries the proof's
+  skeleton even though the residue stays postulated. Tier-0 parent.
+- **`mid-step-core`** (Part11) — SIX lemmas. Tier-2 parent; migrate, do not grind.
+
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
 Work top to bottom. Every full route, receipt, and ruling lives in the
