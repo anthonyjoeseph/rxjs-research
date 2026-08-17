@@ -88,12 +88,14 @@ from the rest; neither is visible while the lemma is merely passed.
 **TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
 not scheduled against the tier order and does not defer to it: a lemma whose type
 was never checked against its parent's need is wasted work at every tier, so the
-fit test is worth more the earlier it runs. `mid-step-core` in particular is to be
-**RESOLVED** in this phase, not parked because it is nominally tier 2.
+fit test is worth more the earlier it runs — which is why the nominally-tier-2
+`mid-step-core` was migrated here rather than parked.
 
 The residue `P-rest` may remain a postulate — that is what makes this a migration
 rather than a proof, and it is the FLOOR, not a ceiling. Where the parent falls
-out fully once its lemmas are actually applied, take it.
+out fully once its lemmas are actually applied, take it. **A landed migration's
+residue leaves move to their own tier**, not this one: they take no proven lemma,
+so they are ordinary work and this tier stays the migration worklist.
 
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
@@ -111,10 +113,6 @@ first, so the single-lemma parents establish the pattern:
 - **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest. Its body must
   decompose `cascade` into latch/go/finish, so the migration carries the proof's
   skeleton even though the residue stays postulated. Tier-0 parent.
-- **`mid-step-core`** (Part11) — SIX lemmas, and the only parent here carrying a
-  FALSITY class. To be RESOLVED, not merely migrated: it rests on FoldOut, a
-  6-field invariant validated at exactly one clause, so applying its six lemmas
-  is the cheapest test of whether that invariant actually holds.
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
@@ -192,8 +190,15 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   written against a merge-cert form that may still gain hypotheses.
 - **`stepFrame-wf-outer`** (Part9) — SHAPE, same cluster plus the FoldOut
   question.
-- **`mid-step-core`** (Part11) — FALSITY, moderate: rests on FoldOut, a
-  6-field invariant validated at exactly one clause.
+- **`mid-readoff`** (Part11) — FALSITY, inherited from the retired
+  `mid-step-core`: the FoldOut readoff, and FoldOut is a 6-field invariant
+  validated at exactly one clause.
+- **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
+  `foldPath-out`'s two undischarged arms. The frame arm wants `stepFrame-wf`
+  enriched to carry FoldOut out; the share arm is the diamond's net-zero owed.
+- **`mid-fold-certs`** (Part11) — DIFFICULTY: one case split on
+  `Arrival.isLast a` off `Mid.done-plumbed`; the blueprint's GUARD applies to
+  its flip conjunct.
 - **`map-valsLast-push` / `scan-valsLast-push`** (Part3) — SHAPE: each papers
   over a recorded mismatch (the proven sub-lemmas don't return `valsLast?`).
 - **`map-nodry-push`, `scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY,

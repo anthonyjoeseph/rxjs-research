@@ -46,7 +46,7 @@
 #
 # HOW A LINE LEAVES.  Only by its parent being proven, at which point the
 # lemma is genuinely applied.  Every entry names its parent, so this file is
-# a countdown against four postulates: dry-tick-core, mid-step-core,
+# a countdown against three postulates: dry-tick-core,
 # subscribeE-takeᵉ-wf-core, and the innerReact-/thruOuter-nodry-core pair.
 # (subscribeE-input-wf-core is GONE — the first parent to land.  It became a
 # real body splitting on `Sched.slots sched i`, which APPLIED initReg-wf and
@@ -76,12 +76,6 @@ cascadeGo-cons-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
 cascadeGo-skip-N | dry-tick-core | ≤2 | REASON: dry-tick-core must be proven
 cascadeLatch-deliv | dry-tick-core | ≤1 | REASON: dry-tick-core must be proven
 chainStep-caps | dry-tick-core | ≤11 | REASON: dry-tick-core must be proven
-enterInstant-held | mid-step-core | ≤5 | REASON: mid-step-core must be proven
-enterInstant-idle | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-foldPath-root-out | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-mid-enters | mid-step-core | ≤5 | REASON: mid-step-core must be proven
-mid-seed | mid-step-core | ≤3 | REASON: mid-step-core must be proven
-paidUp-held | mid-step-core | ≤3 | REASON: mid-step-core must be proven
 subscribeE-take-wf | subscribeE-takeᵉ-wf-core | ≤5 | REASON: subscribeE-takeᵉ-wf-core must be proven
 dry-hop | dry-tick-core | ≤3 | REASON: hop-edge's size-premise discharger; applied when the walk grind reaches hop-edge's call sites
 cascadeGo-burst-dry | dry-tick-core | ≤14 | REASON: consumed by the cascade clause grind once dry-tick-core is proven; replaces chainStep-dry + foldPath-dry (2026-08-10) — a REAL definition over the Burst-Walk whose frame face is now itself an ASSEMBLY (stepFrame-burst-face, Burst-Walk), leaving four wet leaves open (wet-scan/wet-take/wet-inner/wet-thru); its 12 hypotheses are all caller-owned (caps-tick chain, INV? projections, cascade-depth-capsH), and the extra slot is the siC face, supplied at the dry-tick call site by the PROVEN subscribeInner-caps

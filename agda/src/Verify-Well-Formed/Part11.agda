@@ -284,77 +284,153 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- holding a root-sinking registration, that falsifies Inv.done-plumbed itself
 -- (a completion emitted while something could still deliver — an evaluator
 -- bug); STOP and surface the trace, do not patch around it.
+-- ════════════════════════════════════════════════════════════════
+-- foldPath-out — the FoldOut companion the blueprint above calls for
+-- ════════════════════════════════════════════════════════════════
+-- The blueprint says the readoff cannot be done post-hoc on `p` (the
+-- `arrTy a` pinning makes share-sink unmatchable at mid-step), so
+-- "foldPath-wf's CONCLUSION has to carry the readoff data".  This is
+-- that statement: foldPath-wf's run equation AND the FoldOut, over the
+-- FREE `u` where the Path constructors are matchable.
+--
+-- Its ROOT arm is PROVEN, and proving it is what gives
+-- `foldPath-root-out` a consumer that reduces — the whole point of the
+-- leaf-only rule.  The other two arms are leaves, so this is a 1-of-3
+-- discharge and not a proof of the fold.
 postulate
-  --
-  -- ASSEMBLY (2026-08-06): narrowed over the Mid-ledger facts this step
-  -- was written to consume — the automaton's three entry readings, the
-  -- seed that turns Mid into the chainStep FoldInv, and the root clause's
-  -- FoldOut readoff that the fold ends in.
-  mid-step-core :
-    -- mid-enters  (Verify-Well-Formed.agda:4362)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-      {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-      {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
-      {S : ProtocolSt} →
-      Mid a nextId ((rid , p) ∷ ps) sched st S →
-      any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-      Σ Owed λ ob → Σ Id λ hz → enterInstant S nextId ≡ just (ob , hz)
-     ) →
-    -- mid-seed  (Verify-Well-Formed.agda:4730)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-      {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-      {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
-      {S : ProtocolSt} →
-      Mid a nextId ((rid , p) ∷ ps) sched st S →
-      any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-      FoldInv nextId (arrSource a)
-        (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-        (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S
-     ) →
-    -- enterInstant-idle  (Verify-Well-Formed.agda:4289)
-    (∀ (S : ProtocolSt) (i : Id) →
-      ProtocolSt.current S ≡ nothing → (ProtocolSt.horizon S ≤ᵇ i) ≡ true →
-      enterInstant S i ≡ just ([] , ProtocolSt.horizon S)
-     ) →
-    -- enterInstant-held  (Verify-Well-Formed.agda:4306)
-    (∀ (S : ProtocolSt) (i j : Id) (ow : Owed) →
-      ProtocolSt.current S ≡ just (j , ow) → (i ≡ᵇ j) ≡ false →
-      allZero ow ≡ true → (suc j ≤ᵇ i) ≡ true →
-      enterInstant S i ≡ just ([] , suc j)
-     ) →
-    -- paidUp-held  (Verify-Well-Formed.agda:4324)
-    (∀ (S : ProtocolSt) (j : Id) (ow : Owed) →
-      ProtocolSt.current S ≡ just (j , ow) → paidUp S ≡ true → allZero ow ≡ true
-     ) →
-    -- foldPath-root-out  (Verify-Well-Formed.agda:4462)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-      (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
-      (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
-      (fi : FoldInv id envSrc evs fin sched st S) →
-      -- FLIP certificate: completion reached root (done S′ ≡ true) from not-yet-done
-      ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
-         allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
-      -- STEADY: an already-done registry is fully plumbed
-      (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
-      FoldOut sf gas id now envSrc root vals evs fin sched st (FoldInv.ob′ fi) S
-        (record { live = FoldInv.Lv fi ; horizon = FoldInv.hz fi
-                ; current = just (id , FoldInv.Ov fi)
-                ; done = if fin then true else ProtocolSt.done S })
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {nextId : Id} {rid : RegId}
-    {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
-    {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
+  -- FRAME arm.  `foldPath` recurses into path′ at the stepped
+  -- (vals,evs,fin,sched,st) — `stepFrame-wf` already transports FoldInv
+  -- across that step — but FoldOut's fields are keyed on `foldSt`/
+  -- `foldSched` at the OUTER path, and the flip/steady certificates are
+  -- statements about the CURRENT (fin, st) which stepFrame rewrites.
+  -- Discharging this means enriching stepFrame-wf to carry FoldOut back
+  -- out, which is the blueprint's "stepFrame-wf, enriched".
+  foldPath-frame-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (f : Frame Γ w u) (path′ : Path Γ u t)
+    (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t)))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+    (fi : FoldInv id envSrc evs fin sched st S) →
+    (ProtocolSt.done S ≡ true → sinksToShare path′ ≡ true) →
+    ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
+       allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
+    (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
+    Σ ProtocolSt λ S′ →
+      (runProtocol S (proj₁ (foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st))
+         ≡ just S′)
+      × FoldOut sf gas id now envSrc (f ↠ path′) vals evs fin sched st (FoldInv.ob′ fi) S S′
+
+  -- SHARE arm.  The handoff emit plus one delivery per registration of
+  -- share i, each its own foldPath — mutually recursive with this
+  -- family, exactly as `dispatchShare-wf` is with `foldPath-wf`.  Its
+  -- FoldOut is the diamond's net-zero owed statement.
+  foldPath-share-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+    (fi : FoldInv id envSrc evs fin sched st S) →
+    ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
+       allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
+    (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
+    Σ ProtocolSt λ S′ →
+      (runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
+         ≡ just S′)
+      × FoldOut sf gas id now envSrc (share-sink i) vals evs fin sched st (FoldInv.ob′ fi) S S′
+
+foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
+  (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
+  (fi : FoldInv id envSrc evs fin sched st S) →
+  (ProtocolSt.done S ≡ true → sinksToShare path ≡ true) →
+  ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
+     allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
+  (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
+  Σ ProtocolSt λ S′ →
+    (runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
+       ≡ just S′)
+    × FoldOut sf gas id now envSrc path vals evs fin sched st (FoldInv.ob′ fi) S S′
+foldPath-out sf gas id now envSrc root vals evs fin sched st S fi ds flip steady =
+  _ , foldPath-root-wf sf gas id now envSrc vals evs fin sched st S
+        (FoldInv.ob fi) (FoldInv.hz fi) (FoldInv.ob′ fi) (FoldInv.Lv fi) (FoldInv.Ov fi)
+        (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) done-nil
+    , foldPath-root-out sf gas id now envSrc vals evs fin sched st S fi flip steady
+  where
+  -- root does not sink to a share, so `ds` forces the automaton not-done
+  -- and the value list rides (foldPath-wf's own root argument)
+  df : ProtocolSt.done S ≡ false
+  df = force-false (ProtocolSt.done S) ds
+  done-nil : ProtocolSt.done S ≡ true → vals ≡ []
+  done-nil deq with trans (sym df) deq
+  ... | ()
+foldPath-out sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds flip steady =
+  foldPath-frame-out sf gas id now envSrc f path′ vals evs fin sched st S fi ds flip steady
+foldPath-out sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds flip steady =
+  foldPath-share-out sf gas id now envSrc i vals evs fin sched st S fi flip steady
+
+-- ════════════════════════════════════════════════════════════════
+-- THE Mid TRANSITION, ASSEMBLED — a real body over three leaves
+-- ════════════════════════════════════════════════════════════════
+-- Was `mid-step-core` taking SIX proven lemmas as arguments and
+-- applying none (PROOF-STATE tier −1, the leaf-only migration).
+-- Applying them is what tested the route, and the route was wrong about
+-- itself: FOUR of the six are not ingredients at all.  `mid-enters`,
+-- `enterInstant-idle`, `enterInstant-held` and `paidUp-held` are
+-- subsumed by what the real chain already goes through —
+-- `seed-enter-pay` reaches the automaton via `enterInstant-cont` and
+-- `enterInstant-fresh`, and the latter uses the `-aux` forms directly —
+-- so those four were second proofs of facts already proven, kept alive
+-- only by appearing in a `-core`'s hypothesis list.  They are deleted;
+-- `git show` carries them.  This is CLAUDE.md's "a `-core`'s hypothesis
+-- list is a HYPOTHESIS about the route, not a specification", measured.
+--
+-- What the assembly actually spends: `mid-seed` (Mid ⇒ FoldInv at the
+-- chainStep seed) and, through `foldPath-out` above, `foldPath-root-out`.
+postulate
+  -- The three certificates the fold demands of the arrival, all of them
+  -- near-restatements of `Mid.done-plumbed` — which is stated with the
+  -- `if isLast` conditional (drop arrSource iff isLast) while the fold
+  -- wants the plain and the dropped registry separately.  Bundled
+  -- because they are one case split on `Arrival.isLast a`, not three
+  -- independent facts.  The blueprint's GUARD applies to the middle
+  -- one: a reachable flip leaving a NON-arrival source holding a
+  -- root-sinking registration falsifies Inv.done-plumbed itself — an
+  -- evaluator bug, to surface rather than patch around.
+  mid-fold-certs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+    {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+    {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+    {S : ProtocolSt} →
     Mid a nextId ((rid , p) ∷ ps) sched st S →
     any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-    Σ ProtocolSt λ S′ →
-      let r = chainStep nextId a p sched
-                (record st { delivered = rid ∷ EvalSt.delivered st })
-      in (runProtocol S (proj₁ r) ≡ just S′)
-         × Mid a nextId ps (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+    (ProtocolSt.done S ≡ true → sinksToShare p ≡ true)
+    × ((if Arrival.isLast a then true else ProtocolSt.done S) ≡ true →
+         ProtocolSt.done S ≡ false →
+         allShareSunk (dropSource (arrSource a) (EvalSt.registry st)) ≡ true)
+    × (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true)
 
--- the Mid transition, assembled over its core
+  -- THE READOFF, the blueprint's remaining POST: rebuild `Mid ps` from
+  -- the fold's FoldOut.  Its eight fields all reference the OUTPUT
+  -- triple, which is exactly what FoldOut characterises — so this leaf
+  -- is field-by-field bookkeeping over a FoldOut now in hand, not the
+  -- path induction (that is foldPath-out's).
+  mid-readoff : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
+    {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
+    {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+    {S S′ : ProtocolSt} →
+    Mid a nextId ((rid , p) ∷ ps) sched st S →
+    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
+    (fi : FoldInv nextId (arrSource a)
+            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+            (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S) →
+    FoldOut (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a) (arrSource a)
+      p (arrVal a ∷ [])
+      (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+      (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
+      (FoldInv.ob′ fi) S S′ →
+    (let r = chainStep nextId a p sched
+               (record st { delivered = rid ∷ EvalSt.delivered st })
+     in Mid a nextId ps (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′)
+
 mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {nextId : Id} {rid : RegId}
   {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
@@ -366,16 +442,16 @@ mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               (record st { delivered = rid ∷ EvalSt.delivered st })
     in (runProtocol S (proj₁ r) ≡ just S′)
        × Mid a nextId ps (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
-mid-step =
-  mid-step-core
-    (λ {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S} →
-       mid-enters {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S})
-    (λ {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S} →
-       mid-seed {n} {Γ} {t} {e} {a} {nextId} {rid} {p} {ps} {sched} {st} {S})
-    enterInstant-idle
-    enterInstant-held
-    paidUp-held
-    (λ {n} {Γ} {t} {e} → foldPath-root-out {n} {Γ} {t} {e})
+mid-step {n = n} {e = e} {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq =
+  let fi    = mid-seed mid ceq
+      certs = mid-fold-certs mid ceq
+      (S′ , run , fo) =
+        foldPath-out (budgetAt e (Sched.slots sched) nextId) n nextId
+          (arrTick a) (arrSource a) p (arrVal a ∷ [])
+          (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+          (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
+          S fi (proj₁ certs) (proj₁ (proj₂ certs)) (proj₂ (proj₂ certs))
+  in S′ , run , mid-readoff mid ceq fi fo
 
 -- a cancelled head contributes nothing to countRemaining (the `if`
 -- takes the then-branch)
