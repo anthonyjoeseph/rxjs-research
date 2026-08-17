@@ -130,6 +130,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
                             src u κ (Sched.live sched) (BurstInv.reg-typed binv) ltok
         ; horizon-low   = BurstInv.horizon-low binv
         ; current-frame = inj₂ refl
+        ; hot-live      = BurstInv.hot-live binv
         }
   where
   run : runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ [])
@@ -363,6 +364,7 @@ scan-binv-adapt fuel f seed b κ id now sched st S binv = record
   ; reg-typed     = BurstInv.reg-typed     binv
   ; horizon-low   = BurstInv.horizon-low   binv
   ; current-frame = BurstInv.current-frame binv
+  ; hot-live      = BurstInv.hot-live      binv
   }
 
 -- ════════════════════════════════════════════════════════════════

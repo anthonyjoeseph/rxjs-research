@@ -221,6 +221,7 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
       { live-matches = lm-false isL
       ; reg-typed    = Mid.reg-typed mid
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
+      ; hot-live     = Mid.hot-live mid       -- goal flattened by the rewrite
       ; current-past = cpast
       ; done-plumbed = λ deq →
           subst (λ b → allShareSunk (if b then dropSource (arrSource a) (EvalSt.registry st)
@@ -247,6 +248,7 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
                        (reg-typed-finish (arrSource a) (EvalSt.registry st)
                           (Sched.live sched) (Mid.reg-typed mid)))
       ; horizon-low  = ≤-up (Mid.horizon-low mid)
+      ; hot-live     = cascadeFinish-hot-live a sched st (Mid.hot-live mid)
       ; current-past = cpast
       ; done-plumbed = λ deq →
           subst (λ reg → allShareSunk reg ≡ true)

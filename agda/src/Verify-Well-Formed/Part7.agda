@@ -596,6 +596,7 @@ cut-head-joint {Γ = Γ} {e = e} {s = s}
     ; reg-typed     = cut-reg-typed nid sched st (BurstInv.reg-typed binv₁)
     ; horizon-low   = subst (λ hz → hz ≤ id) hzEq (BurstInv.horizon-low binv₁)
     ; current-frame = inj₂ (cong (λ j → just (j , [])) i=id)
+    ; hot-live      = cutSched-hot-live nid sched st (BurstInv.hot-live binv₁)
     }
 
 -- assembled: the cut, transported off the reduced cons form onto the unreduced

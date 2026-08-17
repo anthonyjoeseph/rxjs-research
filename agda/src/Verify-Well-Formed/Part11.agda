@@ -417,6 +417,7 @@ mid-skip {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
             (cr-skip rid p ps (EvalSt.cancelled st) ceq))
   ; reg-typed    = Mid.reg-typed mid       -- same sched, st
   ; horizon-low  = Mid.horizon-low mid
+  ; hot-live     = Mid.hot-live mid        -- same sched
   ; ledger       = ledger′
   ; done-plumbed = Mid.done-plumbed mid
   ; caches       = trans (sym (cachesValidMid-skip a rid p ps (EvalSt.nodes st) st ceq))

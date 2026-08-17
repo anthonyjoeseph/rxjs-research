@@ -156,6 +156,10 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
     ; reg-typed     = regTF
     ; horizon-low   = BurstInv.horizon-low binv₀
     ; current-frame = BurstInv.current-frame binv₀
+      -- straight off the OUTER binv: schF IS this subscribeE's schedule,
+      -- so the leaf applies directly and neither regEq nor schEq is needed
+    ; hot-live      = subscribeE-hot-live fuel (scanᵉ f seed b) κ id now sched st
+                        (BurstInv.hot-live binv)
     }
 
 -- takeVals never fabricates output from nothing: an empty input yields an
@@ -198,6 +202,18 @@ cutSched nid sched st = record sched
       (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                          (EvalSt.dying st) (EvalSt.registry st)))
       (Sched.live sched) }
+
+-- cutSched only SWEEPS `live` and never touches `slots`, and liveTypeOK?
+-- is an ∧-fold over the list — so dropping entries can only help.  A real
+-- body over the proven liveTypeOK?-sweepLive, not a leaf.
+cutSched-hot-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  HotLive sched → HotLive (cutSched nid sched st)
+cutSched-hot-live {Γ = Γ} nid sched st hl i hot =
+  liveTypeOK?-sweepLive
+    (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                       (EvalSt.dying st) (EvalSt.registry st)))
+    (toℕ i) (lookup Γ i) (Sched.live sched) (hl i hot)
 
 cutSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nid : NodeId) (st : EvalSt e) → EvalSt e

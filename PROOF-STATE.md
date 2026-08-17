@@ -91,11 +91,16 @@ out fully once its lemmas are actually applied, take it.
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
 
-- **`subscribeE-input-wf-core`** (Part3) — **the first fit test fired, and its repair
-  is RULED**: `initReg-wf`'s `ltok` is undischargeable at the hot/live arm, and the
-  hot-slot-is-live fact becomes a NEW FIELD on `BurstInv`/`Inv` (.Part2), never a
-  hypothesis. Do this first — the field's cascade through both records' consumers is
-  the migration's real opening move. Finding and ruling in its header.
+- **`subscribeE-input-wf-core`** (Part3) — UNBLOCKED: the `hot-live` field is landed on
+  `Inv`/`BurstInv`/`Mid` and every construction site pays it, so `initReg-wf`'s `ltok`
+  is now reachable at the hot/live arm. What remains is the body itself — split on
+  `Sched.slots sched i` per Evaluator's input clause, apply `initReg-wf` at the hot/live
+  arm, leaf the other four. Finding and ruling in its header.
+- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the field's own cost:
+  `sched-init-hot-live` (base, from `mkHot`), `mintSource-hot-live`,
+  `subscribeE-hot-live`, `cascadeFinish-hot-live`, `sched-next-hot-live`. Each is a
+  schedule-transition fact; routes in their shared header. `cutSched`'s case is already
+  a real body over the proven `liveTypeOK?-sweepLive`, so it is not among them.
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) — one lemma
   (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT

@@ -175,6 +175,7 @@ mid-init nextId sched a sched′ st S eq inv paid nodry = record
                      (regTyped?-pop-sched sched sched′ (EvalSt.registry st) eq
                        (Inv.reg-typed inv))
   ; horizon-low  = Inv.horizon-low inv
+  ; hot-live     = sched-next-hot-live sched sched′ eq (Inv.hot-live inv)
   ; ledger       = inj₁ (Inv.current-past inv , paid)
   ; done-plumbed = λ deq →
       subst (λ reg → allShareSunk (if Arrival.isLast a

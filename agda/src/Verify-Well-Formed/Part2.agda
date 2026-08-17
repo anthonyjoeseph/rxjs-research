@@ -46,6 +46,7 @@ open import Relation.Nullary using (Dec; yes; no)
 -- to move with it.
 open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
+                                hot; cold;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
                                 dried;
@@ -54,7 +55,7 @@ open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn
                                 unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
                                 input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
                                 switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Slot; scripted; shared; Stream;
                                 RegId; Chain; Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
                                 mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
@@ -305,6 +306,65 @@ CurrentPast : Maybe (Id × Owed) → Id → Set
 CurrentPast nothing        nextId = ⊤
 CurrentPast (just (j , _)) nextId = suc j ≤ nextId
 
+-- IS THIS SLOT A HOT SCRIPT?  A Bool rather than an equation on
+-- `scripted (hot _)` so the `hot-live` field below needs no implicit
+-- `ok : T (isData …)` juggling: a call site that has split with
+-- `with Sched.slots sched i in eq` discharges the premise by
+-- `cong hotSlot? eq`.
+hotSlot? : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → Bool
+hotSlot? (scripted (hot _)) = true
+hotSlot? (scripted (cold _ _)) = false
+hotSlot? (shared _) = false
+
+-- THE SCHEDULE INVARIANT ITSELF, named once so that the `hot-live`
+-- fields below, and every preservation leaf, share one spelling.
+HotLive : ∀ {n} {Γ : Ctx n} → Sched Γ → Set
+HotLive {Γ = Γ} sched = ∀ (i : Fin _) →
+  hotSlot? (Sched.slots sched i) ≡ true →
+  liveTypeOK? (toℕ i) (lookup Γ i) (Sched.live sched) ≡ true
+
+postulate
+  -- BASE.  `sched-init`'s live list is `concat (tabulate (mkHot ins))`,
+  -- and `mkHot ins i` (Evaluator:110) emits exactly one LiveSource for a
+  -- hot slot, with `source = toℕ i` and `elemTy = lookup Γ i`.  So the
+  -- fact holds by construction; what it costs is the concat/tabulate
+  -- membership argument, which is why it is a leaf rather than a proof.
+  sched-init-hot-live : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    HotLive (sched-init e ins)
+
+  -- STEP, minting.  `mintSource` (via oneShotBurst and the cold-input
+  -- arm) prepends a FRESH source and never touches `slots`, so a hot
+  -- slot's own entry survives and the new head cannot collide with it.
+  mintSource-hot-live : ∀ {n} {Γ : Ctx n} (sched : Sched Γ) →
+    HotLive sched → HotLive (proj₂ (mintSource sched))
+
+  -- STEP, subscribing.  A subscribe burst mints and registers but never
+  -- rewrites `slots`, and it only ever PREPENDS to `live` (mintSource in
+  -- the cold arm, the anchored cold tail); nothing in subscribeE removes
+  -- a live source.  So a hot slot's entry is still there afterwards.
+  subscribeE-hot-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    HotLive sched →
+    HotLive (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
+
+  -- STEP, cascade exit.  `cascadeFinish` is the identity unless the
+  -- arrival isLast, in which case it sweeps the arrival's source out of
+  -- `live` and leaves `slots` alone.  A swept source is one whose
+  -- registrations are gone; a hot slot's own ordinal is only swept once
+  -- that slot is exhausted, which also makes its `liveTypeOK?` vacuous.
+  cascadeFinish-hot-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    HotLive sched → HotLive (proj₁ (cascadeFinish a sched st))
+
+  -- STEP, scheduler pop.  `sched-next` pops one arrival off one live
+  -- source and writes back the shortened pending list; `slots` is
+  -- untouched and no source's identity or elemTy changes.  Twin of the
+  -- proven `regTyped?-pop-sched` (.Part13's mid-init spends that one).
+  sched-next-hot-live : ∀ {n} {Γ : Ctx n} (sched sched′ : Sched Γ) {a : Arrival Γ} →
+    sched-next sched ≡ inj₂ (a , sched′) →
+    HotLive sched → HotLive sched′
+
 record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (nextId : Id) (sched : Sched Γ) (st : EvalSt e)
            (S : ProtocolSt) : Set where
@@ -329,6 +389,19 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- node counters cache the registry's ground truth (see cachesValid):
     -- the between-cascades carrier of the first global coherence field
     caches       : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
+    -- A HOT SLOT'S ORDINAL IS LIVE AT THE SLOT'S ELEMENT TYPE.
+    -- Added 2026-08-15 by the leaf-only migration (PROOF-STATE tier −1).
+    -- `mkHot` (Evaluator:110) establishes this at sched-init and NOTHING
+    -- carried it afterwards, so subscribeE's hot/live input arm could not
+    -- pay initReg-wf's `ltok` — the finding is in subscribeE-input-wf-core's
+    -- header.  It is a FIELD and not a hypothesis by ruling (Anthony,
+    -- 2026-08-15): `live` and `slots` are independent fields of the plain
+    -- record `Sched`, so no lemma over an arbitrary sched could be true,
+    -- and a hypothesis would bind only whoever calls today while making
+    -- the debt invisible to `make wiring`, the risk classes and
+    -- PROOF-STATE.  See CLAUDE.md, "THE MIGRATION DOES NOT LICENSE
+    -- BREAKING OTHER LAWS".
+    hot-live     : HotLive sched
 
 ------------------------------------------------------------------
 -- the subscribe frame: BurstInv and its entry/step/exit lemmas
@@ -350,6 +423,8 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     horizon-low   : ProtocolSt.horizon S ≤ id
     current-frame : (ProtocolSt.current S ≡ nothing)
                   ⊎ (ProtocolSt.current S ≡ just (id , []))
+    -- the mid-burst carrier of Inv's `hot-live` — see that field's note
+    hot-live      : HotLive sched
     -- NB: no caches here either, and for a sharper reason than done-plumbed's:
     -- cachesValid is not merely inconvenient mid-burst, it is FALSE there.
     -- nodeCacheOK's only load-bearing clause is merge — while the outer is
@@ -378,6 +453,7 @@ burst-init e ins = record
   ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
+  ; hot-live      = sched-init-hot-live e ins
   }
 
 -- ── base-case brick: a oneShotBurst's protocol trajectory ────────────────
@@ -482,6 +558,7 @@ oneShotBurst-wf vals id sched st S binv deq =
         ; reg-typed     = BurstInv.reg-typed binv
         ; horizon-low   = BurstInv.horizon-low binv
         ; current-frame = inj₂ refl
+        ; hot-live      = mintSource-hot-live sched (BurstInv.hot-live binv)
         }
 
 -- ── the register/init balance mechanism (blueprint step 2) ───────────────

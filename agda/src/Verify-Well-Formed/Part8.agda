@@ -187,6 +187,7 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
               ; reg-typed     = BurstInv.reg-typed binv₀
               ; horizon-low   = BurstInv.horizon-low binv₀
               ; current-frame = BurstInv.current-frame binv₀
+              ; hot-live      = BurstInv.hot-live binv₀
               }
             -- the whole burst's residual sched/st ARE the tail's (non-cut head
             -- leaves sched fixed, writes only the node) — by cong over takeDispatch

@@ -150,6 +150,7 @@ burst-final sched st S binv dp cv = inv , paid (BurstInv.current-frame binv)
     ; reg-typed    = BurstInv.reg-typed binv
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)
+    ; hot-live     = BurstInv.hot-live binv
     ; done-plumbed = dp
     ; caches       = cv
     }
@@ -331,6 +332,8 @@ record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          else countRegs (arrSource a) (EvalSt.registry st))
     reg-typed    : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low  : ProtocolSt.horizon S ≤ nextId
+    -- the mid-cascade carrier of Inv's `hot-live` — see that field's note
+    hot-live     : HotLive sched
     ledger       :
         (CurrentPast (ProtocolSt.current S) nextId × (paidUp S ≡ true))
       ⊎ (Σ Owed λ ow →
