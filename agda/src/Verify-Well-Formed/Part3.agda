@@ -48,7 +48,7 @@ open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
+                                dried; Timed; hot; cold;
                                 cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
                                 unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
@@ -71,6 +71,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
                                 oneShotBurst; mintSource; register; splitEvents;
                                 pushBurst; scanVals; installNode; mintNode; retagEvents;
                                 sameSource; dryEvent; hasDry;
+                                Slot; scripted; shared; subscribeSharedSlot;
+                                mintOrdinal; resolve;
                                 dropSource; sweepLive; budgetAt)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
                                 stepProtocol; runProtocol; paidUp; settle; hasOwed;
@@ -372,74 +374,79 @@ scan-binv-adapt fuel f seed b κ id now sched st S binv = record
 -- ════════════════════════════════════════════════════════════════
 
 postulate
-  -- ALL input clauses (hot/cold/shared).
-  -- The shared/new subcase recurses on the def stored in the slot (gas-decrement edge).
-  --
-  -- ASSEMBLY (2026-08-06): narrowed over `initReg-wf`, the registering
-  -- base clause every input subcase ends in — the init balances the new
-  -- registration and the registered chain is well-typed against the live
-  -- schedule.
-  --
-  -- ⚠ BLOCKED 2026-08-15, found by the leaf-only migration (PROOF-STATE
-  -- tier −1).  `initReg-wf` is PASSED here and never APPLIED, so its
-  -- premises are unpaid — and one of them CANNOT BE PAID at this call
-  -- site as the statement stands.
-  --
-  -- Writing the body means splitting on `Sched.slots sched i` to mirror
-  -- the evaluator (Evaluator:1400).  The hot/live arm registers
-  -- `(toℕ i) κ`, which is exactly `initReg-wf`'s shape at `src := toℕ i`
-  -- — so the arm is a one-liner EXCEPT for initReg-wf's `ltok`:
-  --
-  --     liveTypeOK? (toℕ i) (lookup Γ i) (Sched.live sched) ≡ true
-  --
-  -- Nothing in scope supplies it.  This postulate's own hypotheses
-  -- (BurstInv, done≡false, hasDry≡false) never mention `Sched.slots`;
-  -- BurstInv's four fields and Inv's seven (both .Part2) relate the
-  -- registry to `live` and say nothing about `slots`; and `Sched`
-  -- (Evaluator:63) is a PLAIN RECORD whose `live` and `slots` are
-  -- independent, so no free-standing lemma over an arbitrary `sched`
-  -- could be true — build one with a hot slot and `live = []`.
-  --
-  -- NOT the misplaced-call shape (CLAUDE.md): the gap is a whole absent
-  -- invariant, not a fixed small index offset, and `mkHot`
-  -- (Evaluator:110) establishes the fact ONLY at `sched-init`, with
-  -- nothing carrying it across schedule transitions (mintSource,
-  -- sweepLive, dropSource).  The repair is a reachability/well-formedness
-  -- predicate on `Sched` that does not exist yet, established at
-  -- sched-init and preserved by each transition.  Note the existing
-  -- `mkHot` reasoning in .Init-Caps (widLive-mkHot) is about WIDTH
-  -- bounds and does not donate this.
-  --
-  -- RULING (Anthony, 2026-08-15): the fact becomes a NEW FIELD on
-  -- BurstInv/Inv (.Part2), NOT a hypothesis on this signature.  A
-  -- hypothesis would launder tracked debt into untracked — invisible to
-  -- `make wiring`, to the risk classes and to PROOF-STATE — and would
-  -- bind only whoever calls today.  As a field, every producer must
-  -- supply it and every consumer re-establish it; the cascade through
-  -- the record's consumers is the cost of the fact being true.  See
-  -- CLAUDE.md, "THE MIGRATION DOES NOT LICENSE BREAKING OTHER LAWS".
-  subscribeE-input-wf-core :
-    -- initReg-wf  (Verify-Well-Formed.agda:950)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (src : Source) (κ : Path Γ u t) (id : Id)
-      (st : EvalSt e) (sched : Sched Γ) (S : ProtocolSt) →
-      BurstInv id sched st S →
-      liveTypeOK? src u (Sched.live sched) ≡ true →
-      Σ ProtocolSt λ S′ →
-        runProtocol S (((init {Val Γ u} src ∷ []) at id from src as subscribe) ∷ []) ≡ just S′
-        × BurstInv id sched (register src κ st) S′
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  -- ── THE INPUT CLAUSE'S ARMS ──────────────────────────────────────
+  -- These three are the residue of `subscribeE-input-wf` (assembled at
+  -- the foot of this file), which splits on `Sched.slots sched i` to
+  -- mirror the evaluator (Evaluator:1400).  The other two arms are NOT
+  -- here because they are DISCHARGED there, by proven lemmas:
+  --   · hot and live      → `initReg-wf` (above), at src := toℕ i
+  --   · cold, no async    → `oneShotBurst-wf` (.Part2)
+  -- Each leaf below is stated at its OWN arm's burst, not at
+  -- `subscribeE … (input i) …`, so none of them can be discharged by a
+  -- proof of a different arm.
+
+  -- SHARED slot.  `subscribeSharedSlot` (Evaluator:1384) is its own
+  -- three-way split — spent share, live share, and `sharedConnect`,
+  -- which RECURSES into subscribeE on the stored def at one less gas.
+  -- That recursion is why this arm is a leaf and not an application:
+  -- discharging it needs subscribeE-wf, which is mutual with it and
+  -- lives two files down.
+  subscribeSharedSlot-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeSharedSlot fuel i d κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (input i) κ id now sched st
+      let r = subscribeSharedSlot fuel i d κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
+
+  -- HOT slot already SPENT (`toℕ i ∈ completedSources`).  One emit —
+  -- init, close, complete — registering nothing and leaving the
+  -- schedule alone, so the close/complete drain exactly what the init
+  -- added.  `oneShotBurst-wf` (.Part2) is the same balance at a FRESHLY
+  -- MINTED source; this one re-inits a source that is already spent,
+  -- which is why that lemma does not donate it.
+  input-hot-spent-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (i : Fin n) (id : Id) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
+    Σ ProtocolSt λ S′ →
+      runProtocol S (((init {Val Γ (lookup Γ i)} (toℕ i)
+                        ∷ close (toℕ i) exhausted ∷ complete ∷ [])
+                      at id from toℕ i as subscribe) ∷ []) ≡ just S′
+      × BurstInv id sched st S′
+
+  -- COLD slot WITH an async tail: per-subscription anchoring mints a
+  -- fresh source AND ordinal, installs a live entry carrying the
+  -- resolved tail, and registers the chain.  `initReg-wf` does not
+  -- reach it — that lemma's emit is `init src ∷ []`, and this one ships
+  -- the sync prefix in the SAME emit (`init src ∷ map value sync`), so
+  -- the run has values to absorb and the schedule grows a live entry.
+  input-cold-async-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (i : Fin n) (sync : List (Val Γ (lookup Γ i)))
+    (d : Timed (Val Γ (lookup Γ i))) (ds : List (Timed (Val Γ (lookup Γ i))))
+    (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    BurstInv id sched st S →
+    ProtocolSt.done S ≡ false →
+    (let src    = proj₁ (mintSource sched)
+         sched₁ = proj₂ (mintSource sched)
+         ord    = proj₁ (mintOrdinal sched₁)
+         sched₂ = proj₂ (mintOrdinal sched₁)
+         sched₃ = record sched₂
+                    { live = record { source  = src
+                                    ; ordinal = ord
+                                    ; elemTy  = lookup Γ i
+                                    ; pending = resolve now (d ∷ ds) }
+                             ∷ Sched.live sched₂ }
+     in Σ ProtocolSt λ S′ →
+          runProtocol S (((init src ∷ map value sync) at id from src as subscribe) ∷ [])
+            ≡ just S′
+          × BurstInv id sched₃ (register src κ st) S′)
 
   -- deferᵉ: init + register, no inner burst at subscribe time.
   subscribeE-defer-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -560,4 +567,56 @@ postulate
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
 
--- the input clause, assembled over its core
+-- ════════════════════════════════════════════════════════════════
+-- THE INPUT CLAUSE, ASSEMBLED — a real body over the three leaves
+-- ════════════════════════════════════════════════════════════════
+-- Was `subscribeE-input-wf-core` taking `initReg-wf` as an argument
+-- and never applying it (PROOF-STATE tier −1, the leaf-only
+-- migration).  APPLYING it is what pays its premises, and that is
+-- what found the `ltok` gap: the hot/live arm needs
+--
+--     liveTypeOK? (toℕ i) (lookup Γ i) (Sched.live sched) ≡ true
+--
+-- which nothing in scope supplied, because `Sched` (Evaluator:63) is a
+-- plain record whose `live` and `slots` are independent and nothing
+-- tied them across a schedule transition.  Anthony's ruling (2026-08-15)
+-- put the fact on BurstInv/Inv/Mid as the `hot-live` field rather than
+-- into this signature as a hypothesis — tracked debt, not laundered —
+-- and `BurstInv.hot-live binv i (cong hotSlot? slotEq)` is what spends
+-- it here.  See CLAUDE.md, "THE MIGRATION DOES NOT LICENSE BREAKING
+-- OTHER LAWS".
+--
+-- The fit test also RETIRED an arm the core had absorbed silently: the
+-- cold/no-async arm is `oneShotBurst` verbatim, so the proven
+-- `oneShotBurst-wf` (.Part2) closes it outright.  Two of four arms are
+-- discharged; the leaves are the other two plus the shared slot.
+subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  ProtocolSt.done S ≡ false →
+  hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
+  Σ ProtocolSt λ S′ →
+    let r = subscribeE fuel (input i) κ id now sched st
+    in (runProtocol S (proj₁ r) ≡ just S′)
+       × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+       × (valsLast? (proj₁ r) ≡ true)
+subscribeE-input-wf fuel i κ id now sched st S binv deq nodry
+  with Sched.slots sched i in slotEq
+... | shared d = subscribeSharedSlot-wf fuel i d κ id now sched st S binv deq nodry
+... | scripted (cold sync []) =
+      let (S′ , run , binv′) = oneShotBurst-wf sync id sched st S binv deq
+      in S′ , run , binv′ , refl
+... | scripted (cold sync (d ∷ ds)) =
+      let (S′ , run , binv′) =
+            input-cold-async-wf i sync d ds κ id now sched st S binv deq
+      in S′ , run , binv′ , refl
+... | scripted (hot h) with memberSource (toℕ i) (EvalSt.completedSources st)
+...   | true =
+        let (S′ , run , binv′) = input-hot-spent-wf i id sched st S binv deq
+        in S′ , run , binv′ , refl
+...   | false =
+        let (S′ , run , binv′) =
+              initReg-wf (toℕ i) κ id st sched S binv
+                (BurstInv.hot-live binv i (cong hotSlot? slotEq))
+        in S′ , run , binv′ , refl

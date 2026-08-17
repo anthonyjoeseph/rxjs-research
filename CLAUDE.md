@@ -757,7 +757,7 @@ goes green as you do it.
 
 **So when a fit test reveals a MISSING INVARIANT, it goes in the INVARIANT RECORD,
 not in a signature** (Anthony's ruling on `initReg-wf`'s `ltok`, the first fit test
-this pass fired; the finding is in `subscribeE-input-wf-core`'s header). A field on
+this pass fired; the finding is in `subscribeE-input-wf`'s header). A field on
 `BurstInv`/`Inv` obliges every producer to supply it and every consumer to
 re-establish it, so the typechecker carries the fact everywhere it is needed. A
 hypothesis obliges only whoever happens to call today — the "the call site happens

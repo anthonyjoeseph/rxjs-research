@@ -393,8 +393,8 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- Added 2026-08-15 by the leaf-only migration (PROOF-STATE tier −1).
     -- `mkHot` (Evaluator:110) establishes this at sched-init and NOTHING
     -- carried it afterwards, so subscribeE's hot/live input arm could not
-    -- pay initReg-wf's `ltok` — the finding is in subscribeE-input-wf-core's
-    -- header.  It is a FIELD and not a hypothesis by ruling (Anthony,
+    -- pay initReg-wf's `ltok` — the finding is in subscribeE-input-wf's
+    -- header (.Part3), where `BurstInv.hot-live binv i` now spends it.  It is a FIELD and not a hypothesis by ruling (Anthony,
     -- 2026-08-15): `live` and `slots` are independent fields of the plain
     -- record `Sched`, so no lemma over an arbitrary sched could be true,
     -- and a hypothesis would bind only whoever calls today while making

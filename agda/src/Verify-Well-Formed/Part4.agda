@@ -86,21 +86,6 @@ open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-ini
 
 open import Verify-Well-Formed.Part3 public
 
-subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
-  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-  BurstInv id sched st S →
-  ProtocolSt.done S ≡ false →
-  hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
-  Σ ProtocolSt λ S′ →
-    let r = subscribeE fuel (input i) κ id now sched st
-    in (runProtocol S (proj₁ r) ≡ just S′)
-       × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
-       × (valsLast? (proj₁ r) ≡ true)
-subscribeE-input-wf =
-  subscribeE-input-wf-core
-    (λ {n} {Γ} {t} {e} {u} → initReg-wf {n} {Γ} {t} {e} {u})
-
 -- ════════════════════════════════════════════════════════════════
 -- ONE subscription's burst preserves the frame relation (see the blueprint
 -- above for the full clause-by-clause decomposition and build order).

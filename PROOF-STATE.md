@@ -71,12 +71,19 @@ conjuncts, so no amount of caps work retires tier 0.
 
 ## Tier −1 — THE LEAF-ONLY MIGRATION (ahead of tier 0)
 
-The five postulates that still take PROVEN LEMMAS as arguments, in violation of
-the leaf-only rule (defined in CLAUDE.md). Each migrates by **INSTANTIATE, DON'T
+The postulates that still take PROVEN LEMMAS as arguments, in violation of the
+leaf-only rule (defined in CLAUDE.md). Each migrates by **INSTANTIATE, DON'T
 PASS**: replace `P = P-core l₁ … lₖ` with a real body that APPLIES each `lᵢ` at
 this site's own arguments, postulating only the residue. Applying is what pays
 each lemma's premises, and paying them is the point — a passed lemma has never
 had its FIT tested, so nothing checks that its type is the one the parent needs.
+
+**THE FIRST ONE LANDED, AND IT PAID BOTH WAYS.** `subscribeE-input-wf` is a real
+body now. Applying `initReg-wf` is what surfaced the missing `ltok` — a whole
+absent schedule invariant, now the `hot-live` field — and it also RETIRED an arm
+the `-core` had absorbed silently: the cold/no-async arm is `oneShotBurst`
+verbatim, closed outright by the proven `oneShotBurst-wf`. Expect both outcomes
+from the rest; neither is visible while the lemma is merely passed.
 
 **TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
 not scheduled against the tier order and does not defer to it: a lemma whose type
@@ -91,11 +98,6 @@ out fully once its lemmas are actually applied, take it.
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
 
-- **`subscribeE-input-wf-core`** (Part3) — UNBLOCKED: the `hot-live` field is landed on
-  `Inv`/`BurstInv`/`Mid` and every construction site pays it, so `initReg-wf`'s `ltok`
-  is now reachable at the hot/live arm. What remains is the body itself — split on
-  `Sched.slots sched i` per Evaluator's input clause, apply `initReg-wf` at the hot/live
-  arm, leaf the other four. Finding and ruling in its header.
 - **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the field's own cost:
   `sched-init-hot-live` (base, from `mkHot`), `mintSource-hot-live`,
   `subscribeE-hot-live`, `cascadeFinish-hot-live`, `sched-next-hot-live`. Each is a
@@ -196,9 +198,12 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   over a recorded mismatch (the proven sub-lemmas don't return `valsLast?`).
 - **`map-nodry-push`, `scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY,
   probed non-vacuously (receipts in headers).
-- **`subscribeE-input-wf-core`, `subscribeE-defer-wf`,
-  `subscribeE-takeᵉ-wf-core`** (Part3) — DIFFICULTY: per-clause receipts of a
-  pattern already proven three times over.
+- **`subscribeSharedSlot-wf` / `input-hot-spent-wf` / `input-cold-async-wf`**
+  (Part3) — DIFFICULTY: the input clause's three surviving arms, each stated at
+  its own burst. The first is mutual with `subscribeE-wf` via `sharedConnect`;
+  the other two are register/init balances of a shape proven twice over.
+- **`subscribeE-defer-wf`, `subscribeE-takeᵉ-wf-core`** (Part3) — DIFFICULTY:
+  per-clause receipts of a pattern already proven three times over.
 - **`cut-owed`** (Part9) — DIFFICULTY, low: self-contained Owed-table algebra,
   independent of every blocker; the easiest real proof in the branch.
 - **`stepFrame-wf-inner-concat`** (Part9) — DIFFICULTY: concat's drain grows
