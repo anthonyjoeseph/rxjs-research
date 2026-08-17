@@ -243,6 +243,18 @@ whole-module passes with `--profile=internal` on a genuinely dirty module;
 question is CLOSED: Caps-Face and Wet are both split, and Wet/Part2's remaining block is
 irreducible.**
 
+**BUT RUN `--list` BEFORE YOU BELIEVE ANY OF THE ABOVE, BECAUSE A MODULE WITH NO MUTUAL
+BLOCK CANNOT BE PAYING FOR ONE.** Positivity needs a block; when `--list` says
+`0 multi-member`, that whole story is ruled out for free and the cost is somewhere else.
+The measured somewhere-else is **`Typing.With`** — `with` and `rewrite` abstract their
+scrutinee out of the GOAL whether or not the clause needs case analysis, so a `with` that
+merely destructures a Σ is pure loss, and it is charged in proportion to the goal's term
+size. That makes a body whose goal is a **fully-applied closed term** (a top-line theorem
+over `evaluate …`, not over variables) the expensive place to write one, and a **short,
+non-recursive, slow** definition the tell. Prefer irrefutable `let` patterns and `subst`
+there. The worked case, the profile that found it, and the sweep that found no second
+instance: `typecheck-performance-numbers.md`.
+
 **ALL MEASURED TIMINGS LIVE IN `typecheck-performance-numbers.md`, AND NOWHERE ELSE.** That
 includes the gate's cost, per-module costs, the pass attribution, the split before/afters
 and every closed experiment. Numbers age far faster than rules, so quoting one here would

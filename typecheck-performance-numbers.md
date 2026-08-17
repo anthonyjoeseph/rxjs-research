@@ -58,6 +58,7 @@ when nothing moved, so a build does not dirty the tree.
 | `agda-dev Verify-Budget-Sufficient/Caps-Bridge.agda` | **12.9 s** | 12.9 s | 2 |
 | `agda-dev Verify-Budget-Sufficient/Keeps-Ring.agda` | **11.0 s** | 11.0 s | 1 |
 | `agda-dev Rx/Evaluator.agda` | **10.9 s** | 10.9 s | 1 |
+| `make agda (full gate, 4 modules)` | **10.0 s** | 10.0 s | 2 |
 | `agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda` | **9.4 s** | 9.4 s | 1 |
 | `agda-dev Verify-Well-Formed/Part4.agda` | **9.3 s** | 9.3 s | 1 |
 | `agda-dev Verify-Well-Formed/Part9.agda` | **9.3 s** | 9.3 s | 1 |
@@ -70,6 +71,7 @@ when nothing moved, so a build does not dirty the tree.
 | `agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda` | **8.2 s** | 8.2 s | 2 |
 | `agda-dev Verify-Well-Formed/Part2.agda` | **7.9 s** | 9.3 s | 2 |
 | `agda-dev Verify-Well-Formed/Part6.agda` | **7.9 s** | 7.9 s | 1 |
+| `agda-dev Verify-Well-Formed/Part13.agda` | **7.5 s** | 8.7 s | 3 |
 | `agda-dev Verify-Well-Formed/Part3.agda` | **6.4 s** | 8.5 s | 3 |
 | `agda-dev QuickCheck.agda` | **6.3 s** | 6.3 s | 1 |
 | `agda-dev Rx/Frame-Width.agda` | **6.2 s** | 6.2 s | 1 |
@@ -89,7 +91,7 @@ when nothing moved, so a build does not dirty the tree.
 | `agda-dev Rx/Hop-Eta-Cong.agda` | **3.4 s** | 3.4 s | 1 |
 | `agda-dev Rx/Slot-Hop.agda` | **3.3 s** | 3.3 s | 2 |
 
-<!-- AUTO:DATA {"agda-dev CLI/Decode.agda": {"best": 5.1, "last": 5.1, "runs": 1}, "agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev QuickCheck.agda": {"best": 6.3, "last": 6.3, "runs": 1}, "agda-dev Readme-Theorems.agda": {"best": 4.1, "last": 4.1, "runs": 1}, "agda-dev Rx/Evaluator-Theorems.agda": {"best": 5.5, "last": 5.5, "runs": 1}, "agda-dev Rx/Evaluator.agda": {"best": 10.9, "last": 10.9, "runs": 1}, "agda-dev Rx/Exp.agda": {"best": 5.1, "last": 5.1, "runs": 1}, "agda-dev Rx/Frame-Width.agda": {"best": 6.2, "last": 6.2, "runs": 1}, "agda-dev Rx/Hop-Depth.agda": {"best": 4.2, "last": 4.2, "runs": 1}, "agda-dev Rx/Hop-Eta-Cong.agda": {"best": 3.4, "last": 3.4, "runs": 1}, "agda-dev Rx/Slot-Hop.agda": {"best": 3.3, "last": 3.3, "runs": 2}, "agda-dev Rx/Slots.agda": {"best": 5.0, "last": 5.0, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Burst-Walk.agda": {"best": 9.2, "last": 12.0, "runs": 8}, "agda-dev Verify-Budget-Sufficient/Caps-Bridge.agda": {"best": 12.9, "last": 12.9, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Chain.agda": {"best": 4.7, "last": 4.7, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Depth.agda": {"best": 13.1, "last": 13.1, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part6.agda": {"best": 18.5, "last": 18.5, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda": {"best": 8.2, "last": 8.2, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Nest.agda": {"best": 4.6, "last": 4.6, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda": {"best": 9.4, "last": 9.4, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Demand-Probe-TEMP.agda": {"best": 3.7, "last": 5.4, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Demand-Probe.agda": {"best": 5.5, "last": 26.6, "runs": 3}, "agda-dev Verify-Budget-Sufficient/Init-Caps.agda": {"best": 33.7, "last": 33.7, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Keeps-Ring.agda": {"best": 11.0, "last": 11.0, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 15.9, "last": 15.9, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Subscribe-Face.agda": {"best": 21.8, "last": 21.8, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Walk-Level.agda": {"best": 5.5, "last": 28.7, "runs": 16}, "agda-dev Verify-Budget-Sufficient/Wet/Part6.agda": {"best": 5.2, "last": 5.2, "runs": 3}, "agda-dev Verify-Well-Formed/Part10.agda": {"best": 8.7, "last": 8.7, "runs": 1}, "agda-dev Verify-Well-Formed/Part11.agda": {"best": 14.9, "last": 14.9, "runs": 1}, "agda-dev Verify-Well-Formed/Part12.agda": {"best": 8.7, "last": 8.7, "runs": 1}, "agda-dev Verify-Well-Formed/Part2.agda": {"best": 7.9, "last": 9.3, "runs": 2}, "agda-dev Verify-Well-Formed/Part3.agda": {"best": 6.4, "last": 8.5, "runs": 3}, "agda-dev Verify-Well-Formed/Part4.agda": {"best": 9.3, "last": 9.3, "runs": 1}, "agda-dev Verify-Well-Formed/Part5.agda": {"best": 8.4, "last": 8.4, "runs": 1}, "agda-dev Verify-Well-Formed/Part6.agda": {"best": 7.9, "last": 7.9, "runs": 1}, "agda-dev Verify-Well-Formed/Part7.agda": {"best": 8.8, "last": 8.8, "runs": 1}, "agda-dev Verify-Well-Formed/Part8.agda": {"best": 9.1, "last": 9.1, "runs": 1}, "agda-dev Verify-Well-Formed/Part9.agda": {"best": 9.3, "last": 9.3, "runs": 1}, "make agda (full gate, 15 modules)": {"best": 85.0, "last": 85.0, "runs": 1}, "make agda (full gate, 17 modules)": {"best": 76.0, "last": 76.0, "runs": 1}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 18 modules)": {"best": 40.0, "last": 69.0, "runs": 4}, "make agda (full gate, 19 modules)": {"best": 43.0, "last": 1138.0, "runs": 6}, "make agda (full gate, 21 modules)": {"best": 35.0, "last": 59.0, "runs": 3}, "make agda (full gate, 22 modules)": {"best": 352.0, "last": 352.0, "runs": 1}, "make agda (full gate, 23 modules)": {"best": 399.0, "last": 399.0, "runs": 1}, "make agda (full gate, 25 modules)": {"best": 1405.0, "last": 1405.0, "runs": 1}, "make agda (full gate, 34 modules)": {"best": 669.0, "last": 669.0, "runs": 1}, "make agda (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 50 modules)": {"best": 660.0, "last": 1935.0, "runs": 2}, "make agda (full gate, 51 modules)": {"best": 1980.0, "last": 1980.0, "runs": 1}, "make agda (full gate, 58 modules)": {"best": 2095.0, "last": 2095.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}, "make agda (full gate, 85 modules)": {"best": 114.0, "last": 114.0, "runs": 1}} -->
+<!-- AUTO:DATA {"agda-dev CLI/Decode.agda": {"best": 5.1, "last": 5.1, "runs": 1}, "agda-dev Harness/Main.agda": {"best": 4.3, "last": 7.0, "runs": 4}, "agda-dev QuickCheck.agda": {"best": 6.3, "last": 6.3, "runs": 1}, "agda-dev Readme-Theorems.agda": {"best": 4.1, "last": 4.1, "runs": 1}, "agda-dev Rx/Evaluator-Theorems.agda": {"best": 5.5, "last": 5.5, "runs": 1}, "agda-dev Rx/Evaluator.agda": {"best": 10.9, "last": 10.9, "runs": 1}, "agda-dev Rx/Exp.agda": {"best": 5.1, "last": 5.1, "runs": 1}, "agda-dev Rx/Frame-Width.agda": {"best": 6.2, "last": 6.2, "runs": 1}, "agda-dev Rx/Hop-Depth.agda": {"best": 4.2, "last": 4.2, "runs": 1}, "agda-dev Rx/Hop-Eta-Cong.agda": {"best": 3.4, "last": 3.4, "runs": 1}, "agda-dev Rx/Slot-Hop.agda": {"best": 3.3, "last": 3.3, "runs": 2}, "agda-dev Rx/Slots.agda": {"best": 5.0, "last": 5.0, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Burst-Walk.agda": {"best": 9.2, "last": 12.0, "runs": 8}, "agda-dev Verify-Budget-Sufficient/Caps-Bridge.agda": {"best": 12.9, "last": 12.9, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Chain.agda": {"best": 4.7, "last": 4.7, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Depth.agda": {"best": 13.1, "last": 13.1, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part6.agda": {"best": 18.5, "last": 18.5, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Caps-Face/Part7.agda": {"best": 8.2, "last": 8.2, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Caps-Nest.agda": {"best": 4.6, "last": 4.6, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Delivery-Walk.agda": {"best": 9.4, "last": 9.4, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Demand-Probe-TEMP.agda": {"best": 3.7, "last": 5.4, "runs": 2}, "agda-dev Verify-Budget-Sufficient/Demand-Probe.agda": {"best": 5.5, "last": 26.6, "runs": 3}, "agda-dev Verify-Budget-Sufficient/Init-Caps.agda": {"best": 33.7, "last": 33.7, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Keeps-Ring.agda": {"best": 11.0, "last": 11.0, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Measures.agda": {"best": 15.9, "last": 15.9, "runs": 4}, "agda-dev Verify-Budget-Sufficient/Subscribe-Face.agda": {"best": 21.8, "last": 21.8, "runs": 1}, "agda-dev Verify-Budget-Sufficient/Walk-Level.agda": {"best": 5.5, "last": 28.7, "runs": 16}, "agda-dev Verify-Budget-Sufficient/Wet/Part6.agda": {"best": 5.2, "last": 5.2, "runs": 3}, "agda-dev Verify-Well-Formed/Part10.agda": {"best": 8.7, "last": 8.7, "runs": 1}, "agda-dev Verify-Well-Formed/Part11.agda": {"best": 14.9, "last": 14.9, "runs": 1}, "agda-dev Verify-Well-Formed/Part12.agda": {"best": 8.7, "last": 8.7, "runs": 1}, "agda-dev Verify-Well-Formed/Part13.agda": {"best": 7.5, "last": 8.7, "runs": 3}, "agda-dev Verify-Well-Formed/Part2.agda": {"best": 7.9, "last": 9.3, "runs": 2}, "agda-dev Verify-Well-Formed/Part3.agda": {"best": 6.4, "last": 8.5, "runs": 3}, "agda-dev Verify-Well-Formed/Part4.agda": {"best": 9.3, "last": 9.3, "runs": 1}, "agda-dev Verify-Well-Formed/Part5.agda": {"best": 8.4, "last": 8.4, "runs": 1}, "agda-dev Verify-Well-Formed/Part6.agda": {"best": 7.9, "last": 7.9, "runs": 1}, "agda-dev Verify-Well-Formed/Part7.agda": {"best": 8.8, "last": 8.8, "runs": 1}, "agda-dev Verify-Well-Formed/Part8.agda": {"best": 9.1, "last": 9.1, "runs": 1}, "agda-dev Verify-Well-Formed/Part9.agda": {"best": 9.3, "last": 9.3, "runs": 1}, "make agda (full gate, 15 modules)": {"best": 85.0, "last": 85.0, "runs": 1}, "make agda (full gate, 17 modules)": {"best": 76.0, "last": 76.0, "runs": 1}, "make agda (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "make agda (full gate, 18 modules)": {"best": 40.0, "last": 69.0, "runs": 4}, "make agda (full gate, 19 modules)": {"best": 43.0, "last": 1138.0, "runs": 6}, "make agda (full gate, 21 modules)": {"best": 35.0, "last": 59.0, "runs": 3}, "make agda (full gate, 22 modules)": {"best": 352.0, "last": 352.0, "runs": 1}, "make agda (full gate, 23 modules)": {"best": 399.0, "last": 399.0, "runs": 1}, "make agda (full gate, 25 modules)": {"best": 1405.0, "last": 1405.0, "runs": 1}, "make agda (full gate, 34 modules)": {"best": 669.0, "last": 669.0, "runs": 1}, "make agda (full gate, 4 modules)": {"best": 10.0, "last": 10.0, "runs": 2}, "make agda (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "make agda (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "make agda (full gate, 50 modules)": {"best": 660.0, "last": 1935.0, "runs": 2}, "make agda (full gate, 51 modules)": {"best": 1980.0, "last": 1980.0, "runs": 1}, "make agda (full gate, 58 modules)": {"best": 2095.0, "last": 2095.0, "runs": 1}, "make agda (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}, "make agda (full gate, 85 modules)": {"best": 114.0, "last": 114.0, "runs": 1}} -->
 
 <!-- AUTO:END -->
 
@@ -109,22 +111,58 @@ on Subscribe-Face, **779 s → 300 s** of that being Positivity (2.6×).
 `make agda-dev ARGS='<file>'`, cold, on a coherent cache — i.e. the real edit-one-file
 case: the file is dirtied, every dependency already built.
 
-**⚠ `Verify-Well-Formed/Part13` EXCEEDS THE 45 s BUDGET AND ALWAYS HAS (measured
-2026-08-15).** It is the one module in `src` that `make agda-dev` cannot check, and it
-appears nowhere in the auto-recorded table above because the tool only records runs that
-finish. Four runs, warm dependency cache, two on a clean tree and two on the leaf-only
-migration's edits: **45.3 / 45.5 / 45.3 / 45.5 s**, killed at the budget every time.
-Identical across the pair, so it is NOT a regression from the `hot-live` field — it is
-pre-existing, and it was never noticed because a red Part13 was only ever seen as a
-knock-on from an upstream error.
+### `Typing.With` — a THIRD cost centre, and the only one a rewrite has ever removed
 
-Consequences, and they matter: edits to Part13 are verifiable ONLY by `make agda`, so
-that file has no cheap loop. Per CLAUDE.md this is a P0 in the tooling, and the sanctioned
-remedy is to SPLIT the file (which is how `NOT_DEV_CHECKABLE`'s last entry was retired),
-not to raise the budget — the budget is set from the distribution's gap, and Part13 is
-past it by an unknown margin because the kill hides the real number. **Measure it first
-with `BUDGET=600` to learn what the margin actually is**, then cut at the nearest
-mutual-SCC seam.
+**`Verify-Well-Formed/Part13`: 51.5 s → 7.5 s by deleting three `with`es and one
+`rewrite` from ONE definition (2026-08-17).** No split, no new module, no change to
+what is proven. This is the largest single-module win the repo has recorded outside
+the Agda 2.8 upgrade, and every part of the standing cost model pointed the wrong way
+at it, so the attribution is worth keeping:
+
+| | |
+|---|---|
+| `--list` | **6 blocks, 0 multi-member** — no mutual block to blame, and the smallest file in its directory (315 lines) |
+| `--profile=definitions` | `evaluate-well-formed` **36.6 s** of 44 s; the other five members 10–58 ms *each* |
+| `--profile=internal` | **`Typing.With` 42.3 s** of 49.6 s. `Positivity` **18 ms**. `Deserialization` 6.8 s |
+
+`with` abstracts its SCRUTINEE out of the goal, whether or not the clause needs case
+analysis — and all four steps here were irrefutable Σ destructurings that needed none.
+The goal is `WellFormed (evaluate fuel e ins)`, which unfolds to carry the whole seeded
+`subscribeE … ++ drain …` term, so each `with` (and `rewrite`, which is a fourth) paid
+to re-abstract that term. Irrefutable `let` patterns plus one `subst` do the same work
+with no abstraction at all.
+
+**The generalisation, and it is cheap to check: `with`/`rewrite` in a body whose goal
+is a fully-applied CLOSED term is a cost centre, and a `with` that only destructures a
+record is pure loss.** The tell is a body that is short, non-recursive, and slow —
+`drain-wf` sits directly above this one, uses four `with`es, and costs 54 ms, because
+its goal is over variables rather than over `evaluate fuel e ins`. Term SIZE is the
+common factor with the Positivity story; the pass is different.
+
+Method note: `--profile=definitions` localised this to one member in a single run, after
+`--list` had already ruled out the mutual-block explanation for free. Both were cheaper
+than the split that was queued, and the split would have moved the 36 s into a new module
+rather than removing it.
+
+**THE SWEEP FOR A SECOND INSTANCE CAME BACK EMPTY — do not re-run it.** Every other
+module in `src` whose recorded cost is above the deserialization floor AND which `--list`
+reports as **0 multi-member** (so Positivity cannot be the cost) was profiled the same
+way on 2026-08-17. `Typing.With`: Init-Caps **0 ms**, Caps-Bridge **85 ms**, Part11
+**45 ms**, Measures **684 ms** of its 18.1 s. Part13 was singular, and the lever does not
+generalise to a repo-wide pass.
+
+Two things that sweep incidentally settled, both worth more than the negative result:
+
+- **`Deserialization` IS the floor and it dominates everything left.** Init-Caps 4.1 s of
+  5.6 s, Part11 5.4 s of 7.7 s, Caps-Bridge 4.9 s of 9.7 s. No restructuring removes it —
+  it is the per-PROCESS import toll the dev loop's batching already exists to amortise.
+  A module sitting near 6–8 s is at the floor and is not worth looking at.
+- **THE SINGLE-RUN ENTRIES IN THE TABLE BELOW RUN HOT, CONFIRMED.** Init-Caps is recorded
+  at 33.7 s (`runs: 1`) and profiled at **5.5 s**; Part11 is recorded at 14.9 s (`runs: 1`)
+  and profiled at **7.7 s**. That is the incoherent-cache distortion this file warns about,
+  caught in the act — a 6× inflation. `perf_record` takes the minimum over runs, so these
+  self-correct with use, but **treat any `runs: 1` figure as an upper bound, not a
+  measurement**, and re-measure before acting on one.
 
 | Module | Cold |
 |---|---|

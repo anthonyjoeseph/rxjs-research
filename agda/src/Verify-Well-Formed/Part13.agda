@@ -280,36 +280,35 @@ drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
 
 -- the primitives' half of the sandwich: remaining debt is the frame
 -- relations and their step lemmas
+--
+-- ⚠ NO `with` AND NO `rewrite` IN THIS BODY, DELIBERATELY, AND KEEPING
+-- IT THAT WAY IS WORTH MOST OF THIS MODULE'S CHECK TIME.  Every step
+-- here is an irrefutable Σ destructuring and needs no case analysis —
+-- but `with` does not know that.  It abstracts its SCRUTINEE out of the
+-- GOAL regardless, and this goal is `WellFormed (evaluate fuel e ins)`,
+-- whose unfolding carries the whole seeded `subscribeE … ++ drain …`
+-- term; three nested `with`es plus a `rewrite` (a fourth) re-abstracted
+-- that term four times over.  `--profile=internal` charged nearly the
+-- entire module to `Typing.With`, against milliseconds of Positivity —
+-- so the cost was never this file's (nonexistent) mutual block, and the
+-- split that was queued for it would have MOVED the cost, not removed
+-- it.  Irrefutable `let` patterns abstract nothing, and `subst` does the
+-- transport `rewrite` was doing by with-abstraction.
+-- Figures, and the sweep that found no second instance in `src`:
+-- typecheck-performance-numbers.md.
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate fuel e ins)
-evaluate-well-formed fuel e ins
-  with hasDry-++
-         (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
-                            (sched-init e ins) (st-init e)))
-         (drain fuel 1
-           (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                     (sched-init e ins) (st-init e))))
-           (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                     (sched-init e ins) (st-init e)))))
-         (budget-sufficient fuel e ins)
-... | nodry₀ , nodry₁
-  with subscribe-wf e ins nodry₀
-... | S₀ , run₀ , inv₀ , paid₀
-  with drain-wf fuel 1
-         (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                   (sched-init e ins) (st-init e))))
-         (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                   (sched-init e ins) (st-init e))))
-         S₀ inv₀ paid₀ nodry₁
-... | S₁ , run₁ , paid₁
-  rewrite run-++-just protocol-init
-            (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
-                               (sched-init e ins) (st-init e)))
-            (drain fuel 1
-              (proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                        (sched-init e ins) (st-init e))))
-              (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                        (sched-init e ins) (st-init e)))))
-            run₀ run₁
-  = acceptPaid S₁ paid₁
+evaluate-well-formed fuel e ins =
+  let (nodry₀ , nodry₁)          = hasDry-++ burst rest (budget-sufficient fuel e ins)
+      (S₀ , run₀ , inv₀ , paid₀) = subscribe-wf e ins nodry₀
+      (S₁ , run₁ , paid₁)        = drain-wf fuel 1 sched₀ st₀ S₀ inv₀ paid₀ nodry₁
+  in subst (λ m → Accepted (checkFinal m))
+       (sym (run-++-just protocol-init burst rest run₀ run₁))
+       (acceptPaid S₁ paid₁)
+  where
+  r      = subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+  burst  = proj₁ r
+  sched₀ = proj₁ (proj₂ r)
+  st₀    = proj₂ (proj₂ r)
+  rest   = drain fuel 1 sched₀ st₀
