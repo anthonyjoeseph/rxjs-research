@@ -452,6 +452,52 @@ fn-tick {e = e} a id sched st inv val =
 -- .Subscribe-Face's per-chain caps step, and .Deliveries' four cascade
 -- counts, which say the latch clears the ledger and the two walk lines
 -- account for it.
+--
+-- ══ THAT ROUTE LIST IS WRONG ABOUT ITSELF (2026-08-17, the leaf-only
+-- ══ migration's fit test; same shape as mid-step-core's, which shed
+-- ══ four of six).  Two facts, one pinned and one cited:
+--
+-- (1) THE CONCLUSION IS `cascadeGo-nodry`'s VERBATIM.  `cascadeFinish`
+--     returns (Sched × EvalSt) and emits NOTHING (Evaluator:1683), so a
+--     cascade's stream IS its cascadeGo's — pinned by `refl` just above
+--     `dry-tick` below.  The paragraph above reads "`cascade` IS
+--     cascadeLatch → cascadeGo → cascadeFinish" and infers that all three
+--     stages owe something to the DRY half; only the middle one does.
+--     Nothing about the ledger survives into `hasDry`, so .Deliveries'
+--     four counts (cascadeLatch-deliv, cascade-delivN, cascadeGo-skip-N,
+--     cascadeGo-cons-N) cannot be ingredients HERE.  Nor can the four
+--     whose conclusions are bounds rather than dryness —
+--     cascadeGo-burst-dry (burstB?), subscribeInner-dry (valB? of the
+--     inner burst), dry-hop (a sizeᵛ bound), chainStep-caps (a
+--     capsOK?/burstCaps? Σ).  Their real home is the OTHER two conjuncts
+--     of `cascade-wet-via-caps` (§ C), which is where a cascade's bound
+--     and ledger obligations actually land; re-homing them there is what
+--     the migration owes, since all eight are PROVEN and orphaning them
+--     is not a licence to delete them.
+--
+-- (2) THE ONE REAL INGREDIENT CANNOT BE PAID AS `dry-tick` IS STATED.
+--     `cascadeGo-nodry`'s first premise is `capsOK? (capsAt e sl id)
+--     sched st ≡ true`, and dry-tick offers only `INV?` — which this
+--     module's own header (top of file) and .Wet/Part6's note (b) both
+--     record as INSUFFICIENT BY CONSTRUCTION: capsOK? carries two WIDTH
+--     conjuncts (widLive, widNode) for which INV? has no counterpart at
+--     all, so no proof can manufacture them.  The caps face is not
+--     missing a lemma; the statement is missing a hypothesis.
+--
+--     AND ITS SOLE CALLER ALREADY HOLDS IT.  `cascade-wet-via-caps` (§ C)
+--     takes `capsOK? (capsAt e sl id) sched st` and `valCaps? …` as its
+--     own hypotheses (`pre`, `valC`) and calls `dry-tick a id sched st
+--     inv val` without them — so the two premises the body needs are
+--     already proven one line up.
+--
+-- THE MIGRATION IS THEREFORE BLOCKED ON A RESTATEMENT, NOT A PROOF:
+-- dry-tick and this core gain `pre` and `valC`, threaded from the caller.
+-- That is "ADDING A HYPOTHESIS IS A RESTATEMENT" (CLAUDE.md), and the
+-- one sufficient justification is a REFUTATION of the unconditional
+-- form — a state satisfying INV? and failing capsOK?, which the width
+-- gap above says exists but which is NOT YET BUILT.  Build it before
+-- restating; "the call site happens to supply it" is explicitly not a
+-- reason, even when, as here, the call site demonstrably does.
 postulate
   dry-tick-core :
     -- cascadeGo-nodry  (Verify-Budget-Sufficient/Burst-Walk.agda § 8)
@@ -594,6 +640,19 @@ postulate
     in INV? Ψ B sched st ≡ true →
        valB? B Ψ (arrTy a) (arrVal a) ≡ true →
        hasDry (proj₁ (cascade a id sched st)) ≡ false
+
+-- ── WHAT THE DRY HALF ACTUALLY REDUCES TO (2026-08-17) ──────────────
+-- `cascadeFinish` returns a (Sched × EvalSt) and NO emits (Evaluator:1683),
+-- so a cascade's stream IS its cascadeGo's, and dry-tick's conclusion is
+-- `cascadeGo-nodry`'s conclusion verbatim at the latched state.  Pinned
+-- rather than argued, because it is what tells the migration above that
+-- latch/finish BOOKKEEPING cannot be an ingredient of the dry half — see
+-- dry-tick-core's header.  Anonymous by the bug-cache idiom.
+_ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+    proj₁ (cascade a id sched st)
+      ≡ proj₁ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st))
+_ = λ a id sched st → refl
 
 dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →

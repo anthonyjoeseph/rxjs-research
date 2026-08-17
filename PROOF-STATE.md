@@ -107,11 +107,6 @@ so they are ordinary work and this tier stays the migration worklist.
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
 
-- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the field's own cost:
-  `sched-init-hot-live` (base, from `mkHot`), `mintSource-hot-live`,
-  `subscribeE-hot-live`, `cascadeFinish-hot-live`, `sched-next-hot-live`. Each is a
-  schedule-transition fact; routes in their shared header. `cutSched`'s case is already
-  a real body over the proven `liveTypeOK?-sweepLive`, so it is not among them.
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
   **STOPPED, NOT DONE**: every arm but one is dev-green (the zero arm falls to
   `oneShotBurst-wf` outright), and the survivor is `dyF`, refuted by a pin beside
@@ -121,9 +116,12 @@ first, so the single-lemma parents establish the pattern:
   (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT
   ARTIFACT: the counter cannot see through the `SiNodry` type synonym, so census
   the real premise set before assuming this one is free.
-- **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest. Its body must
-  decompose `cascade` into latch/go/finish, so the migration carries the proof's
-  skeleton even though the residue stays postulated. Tier-0 parent.
+- **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest, and eight of them
+  are not ingredients: `cascadeFinish` emits nothing (pinned), so the conclusion is
+  `cascadeGo-nodry`'s verbatim. BLOCKED on restating `dry-tick` over the `capsOK?`
+  its sole caller already holds, which needs the INV?-without-capsOK? refutation
+  built first; and on re-homing the eight onto `cascade-wet-via-caps`'s other two
+  conjuncts. Finding in its header. Tier-0 parent.
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
@@ -225,6 +223,12 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   postulate), so the take-cut family — `dyF`'s consumers in Part7 and
   `pushBurst-take-joint` in Part8, all PROVEN — must be re-keyed off
   `FoldInv.dying-envSrc` first. Route in its header.
+- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the `hot-live` field's
+  own cost and the first migration's residue: `sched-init-hot-live` (base, from
+  `mkHot`), `mintSource-hot-live`, `subscribeE-hot-live`, `cascadeFinish-hot-live`,
+  `sched-next-hot-live`. Each is a schedule-transition fact; routes in their shared
+  header. `cutSched`'s case is already a real body over the proven
+  `liveTypeOK?-sweepLive`, so it is not among them.
 - **`cut-owed`** (Part9) — DIFFICULTY, low: self-contained Owed-table algebra,
   independent of every blocker; the easiest real proof in the branch.
 - **`stepFrame-wf-inner-concat`** (Part9) — DIFFICULTY: concat's drain grows
