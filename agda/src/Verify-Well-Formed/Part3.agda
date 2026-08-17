@@ -25,7 +25,7 @@ open import Data.Bool.Properties using (∨-assoc; ∨-comm; ∨-identityʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
+open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; 1+n≢0; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (any)
 open import Data.List.Properties using (++-identityʳ)
@@ -571,16 +571,39 @@ postulate
   -- contradict this file's stated design goal of a subscribeE-wf that is
   -- TRUE FOR INNERS.
   --
-  -- THE REPAIR, and it moves the design rather than adding a lemma: the
-  -- take-cut family is keyed on a ROOT-ONLY fact and must be re-keyed off
-  -- the envSrc-conditioned form, which already exists and is already
-  -- proven-shaped — `FoldInv.dying-envSrc` (.Part8), `∀ s → sameSource s
-  -- envSrc ≡ false → memberSource s (EvalSt.dying st) ≡ false`, whose own
-  -- header says it is what "lets the take-cut edge invoke
-  -- cutThrough-balance for s ≠ envSrc".  Re-keying reaches `dyF`'s three
-  -- consumers in .Part7 and both in .Part8 (pushBurst-take-joint), and
-  -- needs an envSrc that `subscribeE-wf` does not carry.  That is a
-  -- restatement of a PROVEN family, so it is scheduled work, not a leaf.
+  -- THE REPAIR PROPOSED HERE — re-key the take-cut family off the
+  -- envSrc-conditioned `FoldInv.dying-envSrc` (.Part8) — WAS TRIED AND IS
+  -- ITSELF REFUTED (2026-08-17); the pins below carry the refutation, and
+  -- this paragraph is kept only to stop it being proposed a third time.
+  -- It reads well: `dying-envSrc` already exists, is already proven-shaped,
+  -- and its own header says it is what "lets the take-cut edge invoke
+  -- cutThrough-balance for s ≠ envSrc".  What that header does NOT say is
+  -- that the take-cut edge needs the balance at s ≡ envSrc TOO.  `dyF` is
+  -- threaded untouched through pushBurst-take-joint and cut-head-joint and
+  -- spent in ONE place, `cutThrough-{close-bound,live-apply}` (.Part7),
+  -- whose product is `BurstInv.live-matches` at the cut state — an
+  -- ALL-SOURCES equality.  Conditioning on `s ≢ envSrc` is silent exactly
+  -- where the consumer must answer, and at that instance the equation is
+  -- FALSE, not merely unproven.
+  --
+  -- SO THE OPEN QUESTION MOVES ONE LEVEL UP, to `BurstInv.live-matches`
+  -- itself — and the FIRST step is a measurement, not a design move.
+  -- `cutThrough-live-apply` consumes live-matches at the PRE-cut state and
+  -- produces it at the post-cut one.  At `s ≡ envSrc` a delivered victim
+  -- sits in the registry while its exhausted close has already been
+  -- emitted on its own emit, so the two sides can only agree if that close
+  -- has not yet reached `live`.  WHICH IT IS HAS NOT BEEN TESTED, and it
+  -- decides everything:
+  --   · pre-cut live-matches FALSE at envSrc ⇒ BurstInv is over-stated in
+  --     this window and must carry the registry-leads/live-lags gap the
+  --     way `FoldInv`'s SHADOW already does deliberately (.Part8, "envSrc
+  --     is excluded — its own delivery/close is accounted separately");
+  --   · pre-cut live-matches TRUE at envSrc ⇒ BurstInv stands and only
+  --     `cutThrough-live-apply`'s ROUTE is dead at envSrc, which is a
+  --     lemma-shaped repair confined to .Part7.
+  -- Settle that by running the take-head-cut program and reading both
+  -- counts BEFORE restating anything: the two forks differ by ~13 files
+  -- against one, and the cheap experiment picks between them.
   --
   -- RECOVERY: `git show <this commit>^:agda/src/Verify-Well-Formed/Part8.agda`
   -- and the sibling Part3 hunk restore the dev-green body, take-binv-adapt,
@@ -655,6 +678,57 @@ _ = λ sched dyF →
         (dyF g0 (emptyᵉ {t = natᵗ}) root 0 0 sched
              (record (st-init (emptyᵉ {t = natᵗ})) { dying = 0 ∷ [] }) 0
              0)
+
+-- ── AND THE PROPOSED REPAIR IS REFUTED TOO (2026-08-17) ─────────────
+-- The route above says: re-key `dyF` off the envSrc-conditioned
+-- `FoldInv.dying-envSrc`.  Following it to the BOTTOM of the chain
+-- kills it.  `dyF` is threaded through pushBurst-take-joint and
+-- cut-head-joint untouched and spent in exactly one place — the pair
+-- `cutThrough-close-bound` / `cutThrough-live-apply` (.Part7) — and
+-- both spend it at EVERY source, because what they must produce is
+-- `∀ s → countIn s L′ ≡ countRegs s kept`, i.e. `BurstInv.live-matches`
+-- at the cut state, and live-matches is an ALL-SOURCES equality.  The
+-- conditioned form asserts nothing at `s ≡ envSrc`, and `s ≡ envSrc` is
+-- precisely the instance a cascade makes false (cascadeLatch seeds
+-- `dying` to `arrSource a ∷ []`).  So the conditioned premise is not a
+-- weaker sufficient hypothesis — it is silent exactly where the
+-- consumer needs an answer.  The two pins below say it as code.
+--
+-- FIRST: the conditioned premise really does HOLD at a cascade's
+-- `dying`, so this is not a claim that the re-keying is unavailable.
+_ : ∀ (envSrc s : Source) → sameSource s envSrc ≡ false →
+    memberSource s (envSrc ∷ []) ≡ false
+_ = λ envSrc s h → trans (∨-identityʳ (sameSource s envSrc)) h
+
+-- SECOND: and the equation it would have to feed is FALSE at
+-- `s ≡ envSrc`.  This is `cutThrough-balance` (.Part7) with its
+-- dying-freeness hypothesis removed — the one thing `dyF` is ever
+-- spent on.  Witness: one registration, on envSrc, whose chain runs
+-- through the cut node, ALREADY DELIVERED this cascade.  `cutThrough`
+-- drops it from the registry and deliberately emits NO close for it
+-- (its exhausted close went out on its own emit — Evaluator's
+-- `delivered ∧ memberSource src dying` guard), so the registry loses
+-- an entry the close list never accounts for: 1 ≡ 0 + 0.
+--
+-- CONSEQUENCE, and it is a design finding rather than a missing lemma:
+-- the take-cut edge cannot be re-keyed off envSrc while its consumer
+-- is `BurstInv.live-matches`.  Either live-matches itself is re-keyed
+-- to exclude envSrc — mirroring what `FoldInv`'s SHADOW field already
+-- does deliberately (.Part8, "envSrc is excluded — its own
+-- delivery/close is accounted separately") — or the envSrc instance is
+-- carried by a separate accounting that pays for the skipped close.
+-- That is a restatement of the well-formedness branch's CENTRAL
+-- invariant, so it is a ruling, not a grind.
+_ : ∀ (n : ℕ) (Γ : Ctx n) →
+    (∀ {n′} {Γ′ : Ctx n′} {t}
+       (s : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId)
+       (dying : List Source) (reg : List (RegId × Source × Chain Γ′ t)) →
+     countRegs s reg
+       ≡ countRegs s (proj₁ (cutThrough nid dlv wm dying reg))
+         + closeCount s (proj₁ (proj₂ (cutThrough nid dlv wm dying reg))))
+    → ⊥
+_ = λ n Γ bal → 1+n≢0 (bal {Γ′ = Γ} {t = natᵗ} 0 0 (0 ∷ []) 0 (0 ∷ [])
+                           ((0 , 0 , natᵗ , take-f 0 ↠ root) ∷ []))
 
 -- ════════════════════════════════════════════════════════════════
 -- THE INPUT CLAUSE, ASSEMBLED — a real body over the three leaves

@@ -110,12 +110,8 @@ first, so the single-lemma parents establish the pattern:
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
   **STOPPED, NOT DONE**: every arm but one is dev-green (the zero arm falls to
   `oneShotBurst-wf` outright), and the survivor is `dyF`, refuted by a pin beside
-  the postulate. Blocked on re-keying the take-cut family off `dying-envSrc`;
-  finding, repair and recovery pointer in its header.
-- **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) — one lemma
-  (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT
-  ARTIFACT: the counter cannot see through the `SiNodry` type synonym, so census
-  the real premise set before assuming this one is free.
+  the postulate — as is the envSrc re-keying that was to repair it. Blocked on a
+  ruling for `BurstInv.live-matches`; both refutations and the fork in its header.
 - **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest, and eight of them
   are not ingredients: `cascadeFinish` emits nothing (pinned), so the conclusion is
   `cascadeGo-nodry`'s verbatim. BLOCKED on restating `dry-tick` over the `capsOK?`
@@ -157,9 +153,20 @@ named postulate's own header.
   the *All body consumes; conjunct-by-conjunct route in its header.
   (Its former row-mate pathB?-mono-B is GONE — it duplicated the proven
   pathB?-widen, .Measures, found by a name clash; grep before stating.)
-- **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) —
-  DIFFICULTY, parked. They owe SiNodry's `lC` and a ceiling at `suc J`.
-  Dead route, channel design and remaining route in the first's header.
+- **`innerReact-nodry-slFc` / `thruOuter-nodry-slFc`** (Burst-Walk) — DIFFICULTY,
+  parked. The static `slotsFnCap sl ≤ Ψ` both nodry bodies need; wants INV?
+  threading that `stepFrame-nodry`'s hypotheses do not yet carry. The first
+  carries NO depth premise — dropped as a non-ingredient the fit test exposed,
+  which STRENGTHENS it; its twin still carries one, pending Anthony's ruling.
+  Reasoning in the first's header.
+- **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
+  (Burst-Walk) — DIFFICULTY, parked. Per-element context for concat's drain:
+  each re-establishes one hypothesis of `subscribeInner-nodry` after the
+  previous element has moved the state.
+- **`thruConsume-nodry-vb` / `-nestBud` / `-dep` / `-loop`, `thruWalk-nodry-dep`,
+  `VbB-tail`, `switchKill-context`** (Burst-Walk) — DIFFICULTY, parked. The same
+  per-element context on the thru-outer side, plus switchKill's OKB/regP
+  transport. `VbB-tail` carries a phantom `{e}` its statement never mentions.
 - **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
   plus the Deliveries counts. Last in the tier, never first.
 
@@ -219,10 +226,9 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 - **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: a per-clause receipt of a
   pattern already proven three times over.
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — SHAPE, and the restatement is not its
-  own: `subscribeE-take-wf`'s `dyF` premise is refuted (pin beside the
-  postulate), so the take-cut family — `dyF`'s consumers in Part7 and
-  `pushBurst-take-joint` in Part8, all PROVEN — must be re-keyed off
-  `FoldInv.dying-envSrc` first. Route in its header.
+  own but `BurstInv.live-matches`'s: `dyF` is refuted, and so is conditioning it
+  on envSrc, because the cut's balance is FALSE at envSrc and live-matches is an
+  all-sources equality. Both pins beside the postulate; the fork in its header.
 - **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the `hot-live` field's
   own cost and the first migration's residue: `sched-init-hot-live` (base, from
   `mkHot`), `mintSource-hot-live`, `subscribeE-hot-live`, `cascadeFinish-hot-live`,
