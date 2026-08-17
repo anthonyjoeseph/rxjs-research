@@ -266,6 +266,12 @@ subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
 -- the file than that block, and a postulate cannot reference a definition
 -- that follows it.  Its one consumer is the takeᵉ clause of subscribeE-wf,
 -- below.
+--
+-- STILL A `-core` ON PURPOSE — the leaf-only migration was ATTEMPTED here
+-- and STOPPED.  The body is writable and every other premise is payable;
+-- what cannot be paid is subscribeE-take-wf's `dyF`.  The full finding, and
+-- the machine refutation that closes the naive repair, are in this
+-- postulate's header in .Part3.
 subscribeE-takeᵉ-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
@@ -327,7 +333,9 @@ subscribeE-wf fuel (mapᵉ f b) κ id now sched st S binv deq nodry =
         subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀)
   in S″ , run , binv″ , map-valsLast-push fuel f b κ id now sched st vl₀
 
--- ── takeᵉ: postulated (WITH-ABSTRACTION; see per-clause postulates above) ────
+-- ── takeᵉ: STILL POSTULATED — the leaf-only migration stopped here ──────────
+-- The body was written and is dev-green except for ONE premise; the finding
+-- and its machine refutation live in subscribeE-takeᵉ-wf-core's header (.Part3).
 subscribeE-wf fuel (takeᵉ count b) κ id now sched st S binv deq nodry =
   subscribeE-takeᵉ-wf fuel count b κ id now sched st S binv deq nodry
 

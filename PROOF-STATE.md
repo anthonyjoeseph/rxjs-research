@@ -85,6 +85,13 @@ the `-core` had absorbed silently: the cold/no-async arm is `oneShotBurst`
 verbatim, closed outright by the proven `oneShotBurst-wf`. Expect both outcomes
 from the rest; neither is visible while the lemma is merely passed.
 
+**AND THE THIRD OUTCOME IS A STOP, WHICH IS A FINDING AND NOT A DISCHARGE.**
+`subscribeE-takeᵉ-wf-core` stays a parent: applying its lemma exposed a premise
+that is FALSE at the only call site, so the row, the `DEFERRED.txt` line and the
+leaf-only violation all stay live until the repair lands. A stopped migration
+still pays — it converts an unexamined premise into a machine refutation — but it
+does not close its row.
+
 **TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
 not scheduled against the tier order and does not defer to it: a lemma whose type
 was never checked against its parent's need is wasted work at every tier, so the
@@ -106,6 +113,10 @@ first, so the single-lemma parents establish the pattern:
   schedule-transition fact; routes in their shared header. `cutSched`'s case is already
   a real body over the proven `liveTypeOK?-sweepLive`, so it is not among them.
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
+  **STOPPED, NOT DONE**: every arm but one is dev-green (the zero arm falls to
+  `oneShotBurst-wf` outright), and the survivor is `dyF`, refuted by a pin beside
+  the postulate. Blocked on re-keying the take-cut family off `dying-envSrc`;
+  finding, repair and recovery pointer in its header.
 - **`innerReact-nodry-core` / `thruOuter-nodry-core`** (Burst-Walk) — one lemma
   (`subscribeInner-nodry`) feeding both. Its zero slot-count is a MEASUREMENT
   ARTIFACT: the counter cannot see through the `SiNodry` type synonym, so census
@@ -207,8 +218,13 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   (Part3) — DIFFICULTY: the input clause's three surviving arms, each stated at
   its own burst. The first is mutual with `subscribeE-wf` via `sharedConnect`;
   the other two are register/init balances of a shape proven twice over.
-- **`subscribeE-defer-wf`, `subscribeE-takeᵉ-wf-core`** (Part3) — DIFFICULTY:
-  per-clause receipts of a pattern already proven three times over.
+- **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: a per-clause receipt of a
+  pattern already proven three times over.
+- **`subscribeE-takeᵉ-wf-core`** (Part3) — SHAPE, and the restatement is not its
+  own: `subscribeE-take-wf`'s `dyF` premise is refuted (pin beside the
+  postulate), so the take-cut family — `dyF`'s consumers in Part7 and
+  `pushBurst-take-joint` in Part8, all PROVEN — must be re-keyed off
+  `FoldInv.dying-envSrc` first. Route in its header.
 - **`cut-owed`** (Part9) — DIFFICULTY, low: self-contained Owed-table algebra,
   independent of every blocker; the easiest real proof in the branch.
 - **`stepFrame-wf-inner-concat`** (Part9) — DIFFICULTY: concat's drain grows

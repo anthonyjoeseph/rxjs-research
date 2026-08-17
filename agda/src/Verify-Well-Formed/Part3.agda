@@ -342,11 +342,13 @@ postulate
   -- DISCHARGED 2026-08-06 — see `scan-binv-adapt` (a real definition) below.
 
   -- NOTE: the takeᵉ helper obligations (BurstInv adaptation, fresh-node
-  -- survival, dying-stability) are deliberately NOT stated here.  The takeᵉ
+  -- survival, hasDry push) are deliberately NOT stated here.  The takeᵉ
   -- clause is postulated wholesale as `subscribeE-takeᵉ-wf` below, so a
   -- helper for it would have NO CONSUMER — and an unconsumed postulate is
-  -- exactly the debt-without-a-wire this file's own law forbids.  They
-  -- belong inside that postulate's eventual proof, where they get one.
+  -- exactly the debt-without-a-wire this file's own law forbids.  The
+  -- migration that would have given them one was ATTEMPTED and STOPPED;
+  -- all three were written and dev-green, and the recovery pointer is in
+  -- that postulate's header.
 
 -- scan-binv-adapt: DISCHARGED (2026-08-06).  Was a postulate; its own comment
 -- said "provable inline as record { … }" and that was right.  A scanᵉ clause
@@ -530,6 +532,60 @@ postulate
   -- clause is declared FURTHER DOWN the file, so only the core lives
   -- here; the definition sits just after it and before this name's one
   -- consumer.
+  --
+  -- ══ DEAD ROUTE 2026-08-17: THE LEAF-ONLY MIGRATION CANNOT LAND ══════
+  -- The body was written, and it is dev-green on every arm but one.  What
+  -- was verified before the stop (recover with `git show`, see below):
+  --   · the LANDING FIX above is correct — the where-helper carrying
+  --     `ec` and `ecEq : evalTm count ≡ ec` as ordinary arguments does
+  --     dodge the with-abstraction, and the recursion on `b` under
+  --     `take-f nid ↠ κ` typechecks;
+  --   · the ZERO arm is FREE, and was invisible while the lemma was
+  --     merely passed: `take 0` never subscribes its source
+  --     (Evaluator:1442), so it is emptyᵉ verbatim and the PROVEN
+  --     `oneShotBurst-wf` closes it outright — the same silently-absorbed
+  --     arm the input migration found at cold/no-async;
+  --   · the BurstInv adaptation is not a gap either — `take-binv-adapt`,
+  --     scan-binv-adapt's twin, is a real definition (mintNode writes only
+  --     `nextNode`, installNode only `nodes`; BurstInv reads neither);
+  --   · `take-nodry-push` and `take-nodeP` are ordinary residue leaves.
+  --
+  -- THE ONE PREMISE THAT CANNOT BE PAID is subscribeE-take-wf's last
+  -- conjunct, `dyF : ∀ s → memberSource s (EvalSt.dying …) ≡ false`.  Its
+  -- own comment says it "rides in from the enclosing cascade", and that is
+  -- exactly backwards: `cascadeLatch` SEEDS `dying` to `arrSource a ∷ []`
+  -- whenever the arrival is last (Evaluator:1644), so inside a cascade the
+  -- premise is false, not free.  `subscribeE-wf`, the only thing that can
+  -- call this clause, quantifies over an arbitrary `st` and holds no
+  -- hypothesis about `dying` — so the premise is unpayable at its ONLY
+  -- call site, and the naive leaf (the same ∀-statement, postulated) is
+  -- REFUTED by the pin below.
+  --
+  -- WHY NOT A BurstInv FIELD, which is where the previous fit test's
+  -- missing invariant went (`ltok` → `hot-live`): `hot-live` is TRUE of
+  -- every schedule the evaluator produces, and dying-freeness is FALSE of
+  -- states it produces.  A field asserting it would be the THIRD instance
+  -- of the fork this record has already paid for twice — `done-plumbed`
+  -- and `caches`, both dropped for being root-only facts (the record's own
+  -- header, .Part2, and the SECOND FORK note above) — and it would
+  -- contradict this file's stated design goal of a subscribeE-wf that is
+  -- TRUE FOR INNERS.
+  --
+  -- THE REPAIR, and it moves the design rather than adding a lemma: the
+  -- take-cut family is keyed on a ROOT-ONLY fact and must be re-keyed off
+  -- the envSrc-conditioned form, which already exists and is already
+  -- proven-shaped — `FoldInv.dying-envSrc` (.Part8), `∀ s → sameSource s
+  -- envSrc ≡ false → memberSource s (EvalSt.dying st) ≡ false`, whose own
+  -- header says it is what "lets the take-cut edge invoke
+  -- cutThrough-balance for s ≠ envSrc".  Re-keying reaches `dyF`'s three
+  -- consumers in .Part7 and both in .Part8 (pushBurst-take-joint), and
+  -- needs an envSrc that `subscribeE-wf` does not carry.  That is a
+  -- restatement of a PROVEN family, so it is scheduled work, not a leaf.
+  --
+  -- RECOVERY: `git show <this commit>^:agda/src/Verify-Well-Formed/Part8.agda`
+  -- and the sibling Part3 hunk restore the dev-green body, take-binv-adapt,
+  -- take-nodry-push and take-nodeP verbatim; nothing there needs rederiving,
+  -- only rebasing onto the re-keyed premise.
   subscribeE-takeᵉ-wf-core :
     -- subscribeE-take-wf  (Verify-Well-Formed.agda:3277)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -566,6 +622,39 @@ postulate
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
+
+-- MACHINE REFUTATION of the naive residue leaf the migration above would
+-- have needed — subscribeE-take-wf's `dyF` conjunct, stated over the same
+-- arbitrary `st` its consumer quantifies over.  `EvalSt` is a plain record
+-- and `dying` a free field, so ONE state with a non-empty `dying` kills it:
+-- at `b = emptyᵉ` the subscribe is a one-shot that returns `st` untouched
+-- (Evaluator's oneShotBurst clause), `installNode` writes only `nodes`, and
+-- the conjunct at `s = 0` computes to `true ≡ false`.
+--
+-- The state IS hand-built, and here that is the point rather than the flaw
+-- (CLAUDE.md's trap (2) is about a hand-built state read as a green
+-- receipt): the statement quantifies over every `st : EvalSt e`, so a
+-- constructed inhabitant refutes it outright.  Reachability is established
+-- separately and does not rest on this pin — `cascadeLatch` produces
+-- exactly these states (Evaluator:1644, and .Part13's `dsrc`, which proves
+-- dying-freeness there only OFF `arrSource a`).
+--
+-- ANONYMOUS by the bug-cache idiom: a named pin is a proven definition with
+-- no consumer, and `make wiring-gate` would rightly orphan it.
+_ : ∀ {n} {Γ : Ctx n} → Sched Γ →
+    (∀ {n′} {Γ′ : Ctx n′} {t} {e : Closed Γ′ t} {s}
+      (fuel : Gas) (b : Closed Γ′ s) (κ : Path Γ′ s t)
+      (id : Id) (now : Tick) (sched : Sched Γ′) (st : EvalSt e) (k : ℕ) →
+      (let nid = proj₁ (mintNode sched)
+           r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+                   (installNode nid (take-st (suc k)) st)
+       in ∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂ r₀))) ≡ false))
+    → ⊥
+_ = λ sched dyF →
+      true≢false
+        (dyF g0 (emptyᵉ {t = natᵗ}) root 0 0 sched
+             (record (st-init (emptyᵉ {t = natᵗ})) { dying = 0 ∷ [] }) 0
+             0)
 
 -- ════════════════════════════════════════════════════════════════
 -- THE INPUT CLAUSE, ASSEMBLED — a real body over the three leaves
