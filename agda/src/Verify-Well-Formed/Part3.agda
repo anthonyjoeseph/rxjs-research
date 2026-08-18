@@ -342,14 +342,35 @@ postulate
   -- sched / st objects, not their projections.
   -- DISCHARGED 2026-08-06 — see `scan-binv-adapt` (a real definition) below.
 
-  -- NOTE: the takeᵉ helper obligations (BurstInv adaptation, fresh-node
-  -- survival, hasDry push) are deliberately NOT stated here.  The takeᵉ
-  -- clause is postulated wholesale as `subscribeE-takeᵉ-wf` below, so a
-  -- helper for it would have NO CONSUMER — and an unconsumed postulate is
-  -- exactly the debt-without-a-wire this file's own law forbids.  The
-  -- migration that would have given them one was ATTEMPTED and STOPPED;
-  -- all three were written and dev-green, and the recovery pointer is in
-  -- that postulate's header.
+  -- takeᵉ GAP 1: hasDry propagates inward through the take push.  Twin of
+  -- scan-nodry-push, plus the `ecEq` the evaluator's `with evalTm count`
+  -- needs before the outer side reduces at all.
+  take-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    evalTm count ≡ suc k →
+    hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
+                  (proj₂ (mintNode sched))
+                  (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)))
+           ≡ false
+
+  -- takeᵉ GAP 2: the fresh take node survives subscribeE b.  Twin of scan-nodeP,
+  -- but with NO Σ: a scan node's payload is an accumulator the inner burst
+  -- advances, while a take node's budget is only spent by the take FRAME (which
+  -- runs above this subscription, in pushBurst), so the count comes back
+  -- unchanged rather than merely present.
+  take-nodeP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    let nid = proj₁ (mintNode sched)
+        r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+                (installNode nid (take-st (suc k)) st)
+    in lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k))
+
+  -- NO takeᵉ valsLast-push twin: unlike scan, `subscribeE-take-wf` already
+  -- returns the valsLast? conjunct (off the proven pushBurst-take-valsLast),
+  -- so the take clause's conclusion needs no bridge.
 
 -- scan-binv-adapt: DISCHARGED (2026-08-06).  Was a postulate; its own comment
 -- said "provable inline as record { … }" and that was right.  A scanᵉ clause
@@ -365,6 +386,26 @@ scan-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   BurstInv id (proj₂ (mintNode sched))
              (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st) S
 scan-binv-adapt fuel f seed b κ id now sched st S binv = record
+  { live-matches  = BurstInv.live-matches  binv
+  ; reg-typed     = BurstInv.reg-typed     binv
+  ; horizon-low   = BurstInv.horizon-low   binv
+  ; current-frame = BurstInv.current-frame binv
+  ; hot-live      = BurstInv.hot-live      binv
+  }
+
+-- take-binv-adapt: scan-binv-adapt's twin, and a REAL DEFINITION for the same
+-- reason — `mintNode` writes only `nextNode` and `installNode` only `nodes`,
+-- and BurstInv reads neither, so every field transports by record eta.  The
+-- `live-matches` field's `dying` hypothesis rides through too: `installNode`
+-- does not touch `dying` either.  Takes only what it uses (k, sched, st, S),
+-- since it is a definition rather than a postulate and spare arguments are
+-- just noise.
+take-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (k : ℕ) (id : Id) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  BurstInv id sched st S →
+  BurstInv id (proj₂ (mintNode sched))
+             (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st) S
+take-binv-adapt k id sched st S binv = record
   { live-matches  = BurstInv.live-matches  binv
   ; reg-typed     = BurstInv.reg-typed     binv
   ; horizon-low   = BurstInv.horizon-low   binv
@@ -518,130 +559,51 @@ postulate
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
 
-  -- takeᵉ WHOLE CASE.
-  -- WITH-ABSTRACTION NOTE: `with evalTm count in ecEq` abstracts evalTm count
-  -- throughout the context.  After | suc k branch, the postulate's expected
-  -- type normalises to (proj₁ (pushBurst ...)) but nodry's type stays as | evalTm
-  -- — unification fails.  Entire takeᵉ case lives outside any `with evalTm`.
-  -- LANDING FIX: where-clause helper with ec : ℕ and ecEq : evalTm count ≡ ec as
-  -- separate non-with arguments; suc case calls subscribeE-wf fuel b (take-f nid ↠ κ).
-  -- subscribeE-take-wf (~line 3060) shape verified to match; recursion termination:
-  -- b is a structural subterm of takeᵉ count b.
-  --
-  -- ASSEMBLY (2026-08-06): narrowed over `subscribeE-take-wf`, the
-  -- positive-count clause this postulate's own header points at.  That
-  -- clause is declared FURTHER DOWN the file, so only the core lives
-  -- here; the definition sits just after it and before this name's one
-  -- consumer.
-  --
-  -- ══ DEAD ROUTE 2026-08-17: THE LEAF-ONLY MIGRATION CANNOT LAND ══════
-  -- The body was written, and it is dev-green on every arm but one.  What
-  -- was verified before the stop (recover with `git show`, see below):
-  --   · the LANDING FIX above is correct — the where-helper carrying
-  --     `ec` and `ecEq : evalTm count ≡ ec` as ordinary arguments does
-  --     dodge the with-abstraction, and the recursion on `b` under
-  --     `take-f nid ↠ κ` typechecks;
-  --   · the ZERO arm is FREE, and was invisible while the lemma was
-  --     merely passed: `take 0` never subscribes its source
-  --     (Evaluator:1442), so it is emptyᵉ verbatim and the PROVEN
-  --     `oneShotBurst-wf` closes it outright — the same silently-absorbed
-  --     arm the input migration found at cold/no-async;
-  --   · the BurstInv adaptation is not a gap either — `take-binv-adapt`,
-  --     scan-binv-adapt's twin, is a real definition (mintNode writes only
-  --     `nextNode`, installNode only `nodes`; BurstInv reads neither);
-  --   · `take-nodry-push` and `take-nodeP` are ordinary residue leaves.
-  --
-  -- THE ONE PREMISE THAT CANNOT BE PAID is subscribeE-take-wf's last
-  -- conjunct, `dyF : ∀ s → memberSource s (EvalSt.dying …) ≡ false`.  Its
-  -- own comment says it "rides in from the enclosing cascade", and that is
-  -- exactly backwards: `cascadeLatch` SEEDS `dying` to `arrSource a ∷ []`
-  -- whenever the arrival is last (Evaluator:1644), so inside a cascade the
-  -- premise is false, not free.  `subscribeE-wf`, the only thing that can
-  -- call this clause, quantifies over an arbitrary `st` and holds no
-  -- hypothesis about `dying` — so the premise is unpayable at its ONLY
-  -- call site, and the naive leaf (the same ∀-statement, postulated) is
-  -- REFUTED by the pin below.
-  --
-  -- WHY NOT A BurstInv FIELD, which is where the previous fit test's
-  -- missing invariant went (`ltok` → `hot-live`): `hot-live` is TRUE of
-  -- every schedule the evaluator produces, and dying-freeness is FALSE of
-  -- states it produces.  A field asserting it would be the THIRD instance
-  -- of the fork this record has already paid for twice — `done-plumbed`
-  -- and `caches`, both dropped for being root-only facts (the record's own
-  -- header, .Part2, and the SECOND FORK note above) — and it would
-  -- contradict this file's stated design goal of a subscribeE-wf that is
-  -- TRUE FOR INNERS.
-  --
-  -- THE REPAIR PROPOSED HERE — re-key the take-cut family off the
-  -- envSrc-conditioned `FoldInv.dying-envSrc` (.Part8) — WAS TRIED AND IS
-  -- ITSELF REFUTED (2026-08-17); the pins below carry the refutation, and
-  -- this paragraph is kept only to stop it being proposed a third time.
-  -- It reads well: `dying-envSrc` already exists, is already proven-shaped,
-  -- and its own header says it is what "lets the take-cut edge invoke
-  -- cutThrough-balance for s ≠ envSrc".  What that header does NOT say is
-  -- that the take-cut edge needs the balance at s ≡ envSrc TOO.  `dyF` is
-  -- threaded untouched through pushBurst-take-joint and cut-head-joint and
-  -- spent in ONE place, `cutThrough-{close-bound,live-apply}` (.Part7),
-  -- whose product is `BurstInv.live-matches` at the cut state — an
-  -- ALL-SOURCES equality.  Conditioning on `s ≢ envSrc` is silent exactly
-  -- where the consumer must answer, and at that instance the equation is
-  -- FALSE, not merely unproven.
-  --
-  -- SO THE OPEN QUESTION MOVES ONE LEVEL UP, to `BurstInv.live-matches`
-  -- itself — and the FIRST step is a measurement, not a design move.
-  -- `cutThrough-live-apply` consumes live-matches at the PRE-cut state and
-  -- produces it at the post-cut one.  At `s ≡ envSrc` a delivered victim
-  -- sits in the registry while its exhausted close has already been
-  -- emitted on its own emit, so the two sides can only agree if that close
-  -- has not yet reached `live`.  WHICH IT IS HAS NOT BEEN TESTED, and it
-  -- decides everything:
-  --   · pre-cut live-matches FALSE at envSrc ⇒ BurstInv is over-stated in
-  --     this window and must carry the registry-leads/live-lags gap the
-  --     way `FoldInv`'s SHADOW already does deliberately (.Part8, "envSrc
-  --     is excluded — its own delivery/close is accounted separately");
-  --   · pre-cut live-matches TRUE at envSrc ⇒ BurstInv stands and only
-  --     `cutThrough-live-apply`'s ROUTE is dead at envSrc, which is a
-  --     lemma-shaped repair confined to .Part7.
-  -- Settle that by running the take-head-cut program and reading both
-  -- counts BEFORE restating anything: the two forks differ by ~13 files
-  -- against one, and the cheap experiment picks between them.
-  --
-  -- RECOVERY: `git show <this commit>^:agda/src/Verify-Well-Formed/Part8.agda`
-  -- and the sibling Part3 hunk restore the dev-green body, take-binv-adapt,
-  -- take-nodry-push and take-nodeP verbatim; nothing there needs rederiving,
-  -- only rebasing onto the re-keyed premise.
-  subscribeE-takeᵉ-wf-core :
-    -- subscribeE-take-wf  (Verify-Well-Formed.agda:3277)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-      (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
-      (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) (k : ℕ) →
-      evalTm count ≡ suc k →
-      BurstInv id sched st S →
-      (let nid = proj₁ (mintNode sched)
-           r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
-                   (installNode nid (take-st (suc k)) st)
-       in Σ ProtocolSt λ S′ →
-            (runProtocol S (proj₁ r₀) ≡ just S′)
-            × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
-            × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
-            × (valsLast? (proj₁ r₀) ≡ true)) →
-      Σ ProtocolSt λ S″ →
-        (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
-        × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
-                   (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
-        × (valsLast? (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ true)
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    BurstInv id sched st S →
-    ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
-    Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (takeᵉ count b) κ id now sched st
-      in (runProtocol S (proj₁ r) ≡ just S′)
-         × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
-         × (valsLast? (proj₁ r) ≡ true)
+-- takeᵉ WHOLE CASE — MIGRATED 2026-08-18, and the header below is what the
+-- migration cost and found.  `subscribeE-takeᵉ-wf-core` is GONE: the takeᵉ
+-- clause of `subscribeE-wf` (.Part8) is a real body that APPLIES
+-- `subscribeE-take-wf` and `subscribeE-take0-wf`, over the residue leaves
+-- `take-nodry-push` / `take-nodeP` above and the real `take-binv-adapt`.
+--
+-- WHAT THE FIT TEST FOUND, in the order it found it:
+--   · THE WITH-ABSTRACTION TRAP IS REAL.  `with evalTm count` at the clause
+--     level abstracts that term throughout the context, after which the
+--     recursive call's type still mentions it unabstracted and unification
+--     fails.  The landing shape is a where-helper carrying `ec` and
+--     `ecEq : evalTm count ≡ ec` as ORDINARY arguments, each consumer doing
+--     its own `rewrite ecEq`.
+--   · THE ZERO ARM WAS FREE, and invisible while the clause was postulated
+--     wholesale — `take 0` never subscribes its source (Evaluator:1442), so
+--     it is `emptyᵉ` verbatim and the PROVEN `oneShotBurst-wf` closes it.
+--     Same silently-absorbed arm the input migration found at cold/no-async.
+--   · AND ONE PREMISE COULD NOT BE PAID — `subscribeE-take-wf`'s `dyF`,
+--     `∀ s → memberSource s (EvalSt.dying …) ≡ false`.  Its own comment said
+--     it "rides in from the enclosing cascade"; that was backwards, since
+--     `cascadeLatch` SEEDS `dying` before any chain is processed
+--     (Evaluator:1639), so inside a cascade the premise is false, not free —
+--     and `subscribeE-wf`, the only caller, quantifies over an arbitrary `st`
+--     and holds no hypothesis about `dying`.  The first pin below refutes the
+--     naive leaf outright.
+--
+-- THE REPAIR, AFTER THE FIRST ONE WAS ALSO REFUTED.  Re-keying `dyF` off the
+-- envSrc-conditioned `FoldInv.dying-envSrc` reads well and is dead: `dyF` is
+-- spent in ONE place, `cutThrough-{close-bound,live-apply}` (.Part7), whose
+-- product is `BurstInv.live-matches` at the cut state — an ALL-SOURCES
+-- equality — so conditioning on `s ≢ envSrc` is silent exactly where the
+-- consumer must answer, and at that instance the equation is FALSE.  The
+-- second and third pins below carry that.
+--
+-- So the question moved up to `BurstInv.live-matches` itself, and Anthony
+-- ruled it (2026-08-18): key the field off `EvalSt.dying st`, not off an
+-- envSrc index — A′, the field note in .Part2.  `dyF` is then not re-keyed
+-- but GONE, since what it was trying to establish became the field's own
+-- hypothesis.  Its TRUE form survives as `subscribeE-dying` (.Part8):
+-- PRESERVATION, not freeness, which is what makes it free at the root and
+-- false in a cascade — precisely what the pins say.
+--
+-- WHAT A′ DOES NOT CLOSE, so that nobody reads this as finished: the dying
+-- window still owes its close-landing bound.  `cutThrough-close-bound-dying`
+-- and `cutThrough-live-dying` (.Part7) carry it, with the exact ledger.
 
 -- MACHINE REFUTATION of the naive residue leaf the migration above would
 -- have needed — subscribeE-take-wf's `dyF` conjunct, stated over the same

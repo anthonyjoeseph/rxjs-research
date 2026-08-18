@@ -260,32 +260,30 @@ subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
   sched₂ = proj₁ (proj₂ r₀)
   st₁    = proj₂ (proj₂ r₀)
 
--- the takeᵉ clause, assembled over its core.  Declared HERE rather than
--- with the other per-clause postulates because the positive-count clause
--- it consumes (`subscribeE-take-wf`, just above) is defined further down
--- the file than that block, and a postulate cannot reference a definition
--- that follows it.  Its one consumer is the takeᵉ clause of subscribeE-wf,
--- below.
+-- THE ZERO ARM, and it was invisible while the clause was postulated wholesale.
+-- `take 0` never subscribes its source (Evaluator:1442) — it is `emptyᵉ`
+-- verbatim, a spent one-shot — so the PROVEN `oneShotBurst-wf` closes it
+-- outright and the valsLast? conjunct is `refl` by computation.  The same
+-- silently-absorbed arm the input migration found at cold/no-async: a `-core`
+-- hides not just unpaid premises but whole free cases.
 --
--- STILL A `-core` ON PURPOSE — the leaf-only migration was ATTEMPTED here
--- and STOPPED.  The body is writable and every other premise is payable;
--- what cannot be paid is subscribeE-take-wf's `dyF`.  The full finding, and
--- the machine refutation that closes the naive repair, are in this
--- postulate's header in .Part3.
-subscribeE-takeᵉ-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+-- `rewrite ecEq` is what lets it reduce: the evaluator's takeᵉ clause opens
+-- `with evalTm count`, so the goal is stuck until that scrutinee is known.
+subscribeE-take0-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →
-  hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
+  evalTm count ≡ zero →
   Σ ProtocolSt λ S′ →
     let r = subscribeE fuel (takeᵉ count b) κ id now sched st
     in (runProtocol S (proj₁ r) ≡ just S′)
        × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
        × (valsLast? (proj₁ r) ≡ true)
-subscribeE-takeᵉ-wf =
-  subscribeE-takeᵉ-wf-core
-    (λ {n} {Γ} {t} {e} {s} → subscribeE-take-wf {n} {Γ} {t} {e} {s})
+subscribeE-take0-wf {Γ = Γ} {s = s} fuel count b κ id now sched st S binv deq ecEq
+  rewrite ecEq =
+  let (S′ , run , binv′) = oneShotBurst-wf {Γ = Γ} {u = s} [] id sched st S binv deq
+  in S′ , run , binv′ , refl
 
 subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
@@ -333,11 +331,42 @@ subscribeE-wf fuel (mapᵉ f b) κ id now sched st S binv deq nodry =
         subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀)
   in S″ , run , binv″ , map-valsLast-push fuel f b κ id now sched st vl₀
 
--- ── takeᵉ: STILL POSTULATED — the leaf-only migration stopped here ──────────
--- The body was written and is dev-green except for ONE premise; the finding
--- and its machine refutation live in subscribeE-takeᵉ-wf-core's header (.Part3).
-subscribeE-wf fuel (takeᵉ count b) κ id now sched st S binv deq nodry =
-  subscribeE-takeᵉ-wf fuel count b κ id now sched st S binv deq nodry
+-- ── takeᵉ: REAL BODY (2026-08-18) — the leaf-only migration landed ──────────
+-- Was `subscribeE-takeᵉ-wf-core` taking `subscribeE-take-wf` as an argument and
+-- never applying it.  APPLYING it is what pays its premises, and its last one —
+-- `dyF` — is exactly what the fit test refuted and what the A′ re-keying of
+-- `BurstInv.live-matches` then removed (.Part2's field note).
+--
+-- `take-go` carries `ec` and `ecEq : evalTm count ≡ ec` as ORDINARY arguments
+-- rather than opening a `with evalTm count` here.  That is not style: a `with`
+-- at this level abstracts `evalTm count` throughout the context, after which
+-- the recursive call's type still mentions the unabstracted term and
+-- unification fails.  The two lemmas below each do their own `rewrite ecEq`.
+subscribeE-wf {Γ = Γ} {e = e} {u = u}
+  fuel (takeᵉ count b) κ id now sched st S binv deq nodry =
+  take-go (evalTm count) refl
+  where
+  take-go : (ec : ℕ) → evalTm count ≡ ec →
+    Σ ProtocolSt λ S′ →
+      let r = subscribeE fuel (takeᵉ count b) κ id now sched st
+      in (runProtocol S (proj₁ r) ≡ just S′)
+         × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
+         × (valsLast? (proj₁ r) ≡ true)
+  take-go zero ecEq =
+    subscribeE-take0-wf fuel count b κ id now sched st S binv deq ecEq
+  take-go (suc k) ecEq =
+    let nid    = proj₁ (mintNode sched)
+        sched₁ = proj₂ (mintNode sched)
+        st₁    = installNode nid (take-st (suc k)) st
+        (S′ , run₀ , binv₀ , vl₀) =
+          subscribeE-wf fuel b (take-f nid ↠ κ) id now sched₁ st₁ S
+            (take-binv-adapt k id sched st S binv)
+            deq
+            (take-nodry-push fuel count k b κ id now sched st ecEq nodry)
+        (S″ , run , binv″ , vl) =
+          subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
+            (S′ , run₀ , binv₀ , take-nodeP fuel k b κ id now sched st , vl₀)
+    in S″ , run , binv″ , vl
 
 -- ── scanᵉ: REAL subscribeE-scan-wf called here ───────────────────────────────
 -- Gap: scan-valsLast-push bridges inner valsLast? to outer (~line 2003 has no valsLast?).

@@ -85,18 +85,15 @@ the `-core` had absorbed silently: the cold/no-async arm is `oneShotBurst`
 verbatim, closed outright by the proven `oneShotBurst-wf`. Expect both outcomes
 from the rest; neither is visible while the lemma is merely passed.
 
-**AND THE THIRD OUTCOME IS A STOP, WHICH IS A FINDING AND NOT A DISCHARGE.**
-`subscribeE-takeᵉ-wf-core` stays a parent: applying its lemma exposed a premise
-that is FALSE at the only call site, so the row, the `DEFERRED.txt` line and the
-leaf-only violation all stay live until the repair lands. A stopped migration
-still pays — it converts an unexamined premise into a machine refutation — but it
-does not close its row.
-
-**AND A STOP CAN BE RESUMED BY A RULING.** `BurstInv.live-matches` is now keyed
-off `EvalSt.dying st` (Anthony, 2026-08-18), which unblocked that stop: the
-refuted `dyF` premise is not re-keyed but GONE from `cut-head-joint`,
-`pushBurst-take-{cut-,}joint` and `subscribeE-take-wf`'s conjunct list. The
-migration's own blocker is cleared; the row stays until the body actually lands.
+**AND THE THIRD OUTCOME IS A STOP, WHICH IS A FINDING AND NOT A DISCHARGE —
+BUT A RULING CAN RESUME IT.** `subscribeE-takeᵉ-wf-core` went both ways.
+Applying its lemma exposed a premise FALSE at the only call site, so the row,
+the `DEFERRED.txt` line and the leaf-only violation all stayed live — a stopped
+migration pays (it converts an unexamined premise into a machine refutation) but
+it does not close its row. What then cleared it was not a cleverer proof but a
+RULING on a statement: keying `BurstInv.live-matches` off `EvalSt.dying st`
+REMOVED the refuted premise rather than repairing it, and the body landed. Take
+a stop to the statement it indicts, not back to the grind.
 
 **TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
 not scheduled against the tier order and does not defer to it: a lemma whose type
@@ -113,12 +110,6 @@ so they are ordinary work and this tier stays the migration worklist.
 `agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
 first, so the single-lemma parents establish the pattern:
 
-- **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
-  **UNBLOCKED 2026-08-18, NOT YET LANDED**: the `dyF` survivor is gone with the
-  A′ re-keying of `BurstInv.live-matches`, so every arm is now payable (the zero
-  arm falls to `oneShotBurst-wf` outright). Remaining: write the body over
-  `ec`/`ecEq` as ordinary arguments (the with-abstraction dodge its header
-  records), with `take-binv-adapt`, `take-nodry-push`, `take-nodeP` as residue.
 - **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest, and eight of them
   are not ingredients: `cascadeFinish` emits nothing (pinned), so the conclusion is
   `cascadeGo-nodry`'s verbatim. The INV?-without-capsOK? refutation IS NOW BUILT
@@ -233,9 +224,10 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   the other two are register/init balances of a shape proven twice over.
 - **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: a per-clause receipt of a
   pattern already proven three times over.
-- **`subscribeE-takeᵉ-wf-core`** (Part3) — DIFFICULTY, lowered from SHAPE: the
-  restatement it was waiting on landed (A′, `BurstInv.live-matches` keyed off
-  `dying`), and what remains is writing the body. Tier −1 carries it.
+- **`take-nodry-push` / `take-nodeP`** (Part3) — DIFFICULTY, the takeᵉ
+  migration's residue: hasDry pushes inward through the take push, and the fresh
+  take node comes back with its budget unspent (the frame above, not the
+  subscription, spends it). Twins of the scan pair, which are the worked shape.
 - **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — FALSITY,
   A′'s residue and the honest cost of it: at a dying source the live list lags the
   registry by the already-delivered entries, and neither leaf can be proven until
