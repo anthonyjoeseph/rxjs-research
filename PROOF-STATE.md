@@ -223,15 +223,23 @@ mid-fold FoldInv form and the six consumer rewrites.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 
-- **`dispatchShare-wf`** (Part9) — **SHAPE, known too weak**: its conclusion
-  carries no FoldInv/FoldOut out, so it cannot feed `mid-step` as stated. A
-  guaranteed restatement, cascading into the stepFrame family — do it first.
+- **`dispatchShare-wf`** (Part9) — **DIFFICULTY, lowered from SHAPE 2026-08-18
+  by a fit test.** The SHAPE call was "its conclusion carries no FoldInv/FoldOut
+  out, so it cannot feed `mid-step` as stated". It now does feed it: wiring
+  `foldPath-wf` into `foldPath-out` splits the obligation, so this leaf owes the
+  run equation and `foldPath-share-out` owes the FoldOut, and the assembly
+  typechecks with the statement exactly as written. No restatement is
+  guaranteed any more, and the cascade into the stepFrame family is off.
 - **`root-done-plumbed-core` / `root-caches-core`** (Part4) — FALSITY,
   blocked on merge-cert's mid-fold form; the merge-coherence content itself.
 - **`subscribeE-{merge,concat,switch,exhaust}All-wf`** (Part3) — SHAPE:
   written against a merge-cert form that may still gain hypotheses.
-- **`stepFrame-wf-outer`** (Part9) — SHAPE, same cluster plus the FoldOut
-  question.
+- **`stepFrame-wf-outer`** (Part9) — SHAPE. The same fit test cleared the
+  statement-level objection (its FoldOut half is `foldPath-frame-out`'s, not
+  its own), so what remains is a ROUTE claim: `foldPath-frame-out`'s header
+  says discharging it means enriching `stepFrame-wf` to carry FoldOut out. A
+  route is not evidence, so the class does not move until that route is either
+  walked or replaced.
 - **`mid-readoff`** (Part11) — FALSITY, inherited from the retired
   `mid-step-core`: the FoldOut readoff, and FoldOut is a 6-field invariant
   validated at exactly one clause.
