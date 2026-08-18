@@ -10,17 +10,15 @@ They live in `agda/refuted/`, a second include root, checked by `make refuted`.
 Because keeping a dead route in `src` forces `src` to keep whatever machinery
 makes that route **state-able**, and that machinery is otherwise deletable.
 
-Measured 2026-08-18: the round-3 anchor vocabulary — `walkCap`, `anchorᴬ`,
-`sucV≤d`, `d≤walkCap`, `walkCap≤walkArg`, `d≤walkArg`, `ℓ≤walkCap` — was seven
-live definitions in `.Measures`, retired since 2026-08-13, held up by nothing
-but the six refutations that mention them. `src` was carrying a whole retired
-vocabulary so that its own obituary could be written. **Code is cost.**
+The round-3 anchor vocabulary is the measured case: seven definitions
+(`walkCap`, `anchorᴬ`, `sucV≤d`, `d≤walkCap`, `walkCap≤walkArg`, `d≤walkArg`,
+`ℓ≤walkCap`) whose only remaining consumers were the six refutations that
+mention them. Kept in `src`, that is a whole vocabulary carried so its own
+obituary can be written. **Code is cost.**
 
-The move also closed a real hole. Refutations used to be exempted from the
-wiring law by a **suffix match** on `*-absurd`, which meant any definition
-could exempt itself from the wiring law by choosing its name. Out here they
-need no exemption at all, so the checker has none: `make wiring` scans
-`agda/src` only.
+Out here a refutation needs no exemption from the wiring law at all, and the
+checker has none to give: `make wiring` scans `agda/src` only. A name-based
+exemption would let any definition exempt itself by choosing its name.
 
 ## The rules
 

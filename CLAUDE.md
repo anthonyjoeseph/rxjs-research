@@ -138,10 +138,9 @@ report review. Standing protocol, per Anthony:
   - **THE GATE MEASURES THE TREE, NOT THE WORKER.** Parallel workers share ONE working
     directory, so `make wiring-gate` reports on everyone's uncommitted edits at once. A
     worker running it while another has `src/` edits in flight gets a verdict about work
-    that is not its own — observed twice on 2026-08-06, once as a spurious FAIL (11
-    "orphans" that were really a concurrent mid-edit) and once as a spurious PASS (a
-    ledger line removed AFTER the gate was run, leaving an unledgered probe file
-    committed — precisely the C1 condition the ratchet exists to catch). Consequences:
+    that is not its own — observed as a spurious FAIL (eleven unreachable names that
+    were really a concurrent mid-edit) and as a spurious PASS (a file edited AFTER the
+    gate was run). Consequences:
     **a worker's gate result is only meaningful for the files it committed**; the design
     session owns the authoritative post-merge gate; and **a worker must re-run the gate
     as its LAST act before committing**, never before its final edit. A red gate whose
@@ -149,8 +148,8 @@ report review. Standing protocol, per Anthony:
     identify the cause explicitly, confirm your own staged files are clean, and say so.
   - **NEVER reach into another worker's lane to tidy a shared file.**
     `PROOF-STATE.md` is a shared ledger, and "helpfully" removing a line for a
-    file another worker is mid-landing is how a ratchet gets bypassed. Workers
-    report the ledger lines they need; the design session applies them.
+    file another worker is mid-landing silently retires a row that is still live.
+    Workers report the ledger lines they need; the design session applies them.
 - **No keep-alives.** The session runs on a persistent laptop, so the container does not
   suspend between tool calls — background workers and detached builds advance on their own,
   and worker completion notifications wake the design session. Keep only a SPARSE fallback
@@ -191,8 +190,7 @@ gets ignored. A `RewritesNothing` — a `rewrite` step doing literally nothing �
 single build for weeks*, printed twice per run, and nobody stopped, because green was
 green. Warnings are cheap to fix at the moment they appear and invisible forever after.
 **`DeprecationWarning` is deliberately included** (Anthony, 2026-08-12): when the stdlib
-bumps, the gate goes red until the migration is done, which is the same call the repo made
-by hand on the 2.3 bump (29 files migrated, `7664d8c`, rather than filtered).
+bumps, the gate stays red until every call site is migrated, rather than filtered.
 
 - **THE FLAG MUST BE IDENTICAL IN THE MAKEFILE AND IN `scripts/agda-dev.py`'s
   `agda_flags()`. Change one, change both, in the SAME commit.** Agda records the warning
@@ -204,8 +202,8 @@ by hand on the 2.3 bump (29 files migrated, `7664d8c`, rather than filtered).
   variable exists so they cannot drift.
 - **Changing it costs one full cold rebuild**, since it invalidates every interface. Budget
   for that before touching it, and never toggle it to quiet output.
-- **Do NOT silence a warning to get green.** Fix the cause, as the 29-file stdlib migration
-  did. If a warning is genuinely wrong, that is a finding worth reporting, not a filter.
+- **Do NOT silence a warning to get green.** Fix the cause. If a warning is genuinely
+  wrong, that is a finding worth reporting, not a filter.
 
 **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`; READ IT BACK WITH
 `make bg-check T=<target>`. Never hand-roll the wrapper.**
@@ -286,7 +284,7 @@ interfaces — it is not a free query.
 ## ALL NEW CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction
 
 **New definitions, new lemmas, new assemblies go straight into `agda/src`**, where the
-orphan check, the ⊤-postulate check, the reachability check and the claim graph see them
+reachability check, the ⊤-postulate check and the claim graph see them
 from the first minute. **Anything written outside `src` is invisible to the wiring law**,
 which is how proven work parked itself for months and got re-derived — the repo's
 number-one failure mode. Writing in `src` is what makes "did we already prove this?" a
@@ -389,8 +387,8 @@ type-level witness, not itself the finding.
   row INTERESTING — the "a row that could not have failed is not a row" rule applies here
   exactly as it does to probes.
 - **Pins are ANONYMOUS (`_ : lhs ≡ rhs`), by the bug-cache idiom.** A *named* pin is a
-  proven definition with no consumer — an orphan — and `make wiring-gate` correctly fails
-  it. Learned by doing it wrong while landing the file.
+  proven definition nothing reaches, and `make wiring-gate` correctly fails it; an
+  anonymous one is a reachability seed and is never reported.
 
 **WHAT IT CANNOT DO — compiling a family does not make it measurable.** Unsealing buys
 opacity, not speed: a family whose blowup is COMPUTATIONAL runs just as long in the
@@ -526,11 +524,11 @@ used somewhere — the only exceptions are the top-level, most-important exports
 backwards-compatibility shims, nothing "stored for reference", no legacy, no deprecated.
 **Do not be afraid to throw out code or documentation.** Git history is the archive.
 
-### DELETION: an orphan may be deleted on its merits
+### DELETION: an unreachable definition may be deleted on its merits
 
-`make wiring`'s orphan set is trustworthy (zero orphans, zero unreachable modules,
-every postulate consumed), so a definition nothing consumes is a finding to act on.
-Two rules govern acting on it:
+`make wiring` is trustworthy — every definition, postulate and module in `agda/src`
+has a route to Main today — so a name it reports is a finding to act on. Three rules
+govern acting on it:
 
 - **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS.** A sweep
   answers the first; only building the consumer answers the second. A definition
@@ -562,7 +560,7 @@ Two rules govern acting on it:
 
 ### DE-RISK MODE: test for falsity first, grind last (Anthony, 2026-08-06)
 
-**The wiring pass is over; the current pass is DE-RISKING.** Every postulate carries
+**The current pass is DE-RISKING.** Every postulate carries
 a probability of being FALSE or EMPTY, and the proof's total risk is the SUM over the
 ledger — so work is ordered by *risk reduced per unit effort*, not by proof-progress
 optics. The tier-ordered roadmap lives in PROOF-STATE.md (order and one-line hooks
@@ -788,50 +786,42 @@ ARGUMENT to a postulate **no reachability credit from that site**. Passing is
 not itself forbidden; what is forbidden is a postulate being the ONLY connective
 tissue between a proven definition and Main. A lemma that is also genuinely
 applied somewhere stays green; one whose only use is being handed to a postulate
-has no route home and fails R1. There is no grandfather list — `agda/DEFERRED.txt`
-and its ratchet were deleted once the migration emptied them, and the `-core`-suffix
-heuristic went with them, so the rule now sees EVERY postulate rather than the
-ones that happened to be named `-core`.
+has no route home and fails R1. There is no grandfather list and no name-based
+heuristic: the rule sees EVERY postulate, not the ones that happen to be named
+`-core`.
 
 The check errs toward over-suppressing edges, which is safe by construction: a
 misread edge can only fail a name whose ONLY route home was that edge, and such
 a name is exactly what the rule exists to report.
 
-**THE MIGRATION DOES NOT LICENSE BREAKING OTHER LAWS (Anthony, 2026-08-15).**
-Distinguish two kinds of rule. The TIER ORDER is a *schedule*, and Anthony
-reordered it for this migration deliberately (PROOF-STATE's tier −1) — that is his
-call to make. The laws about what a statement may SAY are not schedule, and the
-migration yields to every one of them.
-
+**WRITING THE BODY DOES NOT LICENSE BREAKING OTHER LAWS (Anthony, 2026-08-15).**
 The temptation is sharp and specific, so name it: **writing a body turns an unpaid
 premise into a TYPE ERROR, and the fastest way to clear a type error is to add a
 hypothesis to the parent.** That is exactly the laundering "ADDING A HYPOTHESIS IS A
 RESTATEMENT" forbids — tracked debt (a postulate: counted by `make wiring`, carrying
 a risk class, listed in PROOF-STATE) becomes untracked debt (a hypothesis: invisible
-to all three) — and the migration makes it *feel* like progress, because the file
-goes green as you do it.
+to all three) — and it *feels* like progress, because the file goes green as you do it.
 
 **So when a fit test reveals a MISSING INVARIANT, it goes in the INVARIANT RECORD,
-not in a signature** (Anthony's ruling on `initReg-wf`'s `ltok`, the first fit test
-this pass fired; the finding is in `subscribeE-input-wf`'s header). A field on
-`BurstInv`/`Inv` obliges every producer to supply it and every consumer to
-re-establish it, so the typechecker carries the fact everywhere it is needed. A
-hypothesis obliges only whoever happens to call today — the "the call site happens
-to supply it" trap, one call site later. **Cascading through the record's consumers
-is the COST OF THE FACT BEING TRUE, not a reason to avoid it.**
+not in a signature** (Anthony's ruling on `initReg-wf`'s `ltok`; the finding is in
+`subscribeE-input-wf`'s header). A field on `BurstInv`/`Inv` obliges every producer
+to supply it and every consumer to re-establish it, so the typechecker carries the
+fact everywhere it is needed. A hypothesis obliges only whoever happens to call
+today — the "the call site happens to supply it" trap, one call site later.
+**Cascading through the record's consumers is the COST OF THE FACT BEING TRUE, not
+a reason to avoid it.**
 
 The same yields to the rest: do not WEAKEN the parent to make its body typecheck,
 do not close an arm with a ⊤-typed or otherwise vacuous postulate, do not seal a gap
-in prose. **If a migration cannot land without breaking one of these, it has FOUND
+in prose. **If a body cannot land without breaking one of these, it has FOUND
 something and it STOPS.**
 
 **A STOP IS A FINDING, NOT A DISCHARGE — IT IS NOT DONE TILL IT IS DONE (Anthony,
 2026-08-15).** Stopping produces a real result and is the right move; what it does
-not produce is a completed item. The roadmap row STAYS, the leaf-only violation
-stays live, and the parent is still a parent — until
-the migration actually lands and the parent stops taking proven lemmas. Write the
-finding in the postulate's header, record the ruling, and leave the row exactly where
-it was.
+not produce is a completed item. The roadmap row STAYS and the parent is still a
+parent until the body actually lands and the parent stops taking proven lemmas.
+Write the finding in the postulate's header, record the ruling, and leave the row
+exactly where it was.
 
 This needs saying because a good finding is the most convincing thing there is to
 mistake for progress: it is genuinely valuable, it is genuinely publishable in a
@@ -852,8 +842,8 @@ paragraph counted as the work.
    module does not import — collect the names in one pass, since Agda stops at the FIRST
    scope error.
 4. **ORDERING: a postulate cannot reference a definition below it.** Leaves sit above the
-   body that consumes them. `make wiring` section B3 reports violations — do not learn
-   this from a failed typecheck.
+   body that consumes them. This is Agda scoping, not a checker rule — nothing reports it,
+   so get it right rather than learning it from a failed typecheck.
 
 **TWO SHAPES THAT ARE ALMOST ALWAYS WRONG — check every new postulate for both.** A
 statement whose conclusion needs information appearing in NONE of its hypotheses (e.g.
@@ -965,9 +955,11 @@ and both are *checkable* rather than aspirational:
 
 - **Every GAP is a postulate with a real signature** — never a comment, never a merely-missing
   statement. "This still needs X" in prose is invisible to the compiler and to `grep`. State X.
-  Then `grep -rn '^postulate' agda/src` **is** the complete remaining-work ledger and no branch
-  of the proof can hide. (A hidden branch is exactly how the eight well-formedness postulates
-  went uncounted for months while the index claimed the campaign reduced to two.)
+  Then **`make postulates`** — every postulate by name — **is** the complete remaining-work
+  ledger and no branch of the proof can hide. (Do NOT substitute `grep '^postulate'`: that
+  finds the block HEADERS, a third of the count, and a branch hidden inside a block is
+  exactly how eight well-formedness postulates once went uncounted while the index claimed
+  the campaign reduced to two.)
 - **Every DEFINITION and every POSTULATE is consumed, in code, transitively by a top-level
   theorem.** Then "did we forget something?" is answered by the typechecker instead of by
   memory — if a piece is not needed, `The-Proof.agda` does not compile.
@@ -979,15 +971,16 @@ from. If the assembly needs a different signature to accept the piece, **change 
 first.** A piece that cannot be plugged in is not progress, and its shape is not yet known to be
 right.
 
-**A POSTULATE MUST ASSERT SOMETHING.** Wiring an orphan with a vacuous bridge is worse than
-leaving it orphaned, because it looks discharged. Two traps, both live in this repo:
+**A POSTULATE MUST ASSERT SOMETHING.** Wiring an unreachable definition in with a vacuous
+bridge is worse than leaving it unreachable, because it looks discharged. Two traps, both live in this repo:
 `⊤`-typed postulates whose real claim sits in a trailing comment (`id-inheritance`,
 `defer-shift` — fix on sight), and Σ-statements that are upward-closed in their witness (see
 "A Σ-receipt has content only through its witness" above). Check every new postulate for both
 BEFORE landing it.
 
-**FORBIDDEN STATES.** An **orphan** — a proven definition nothing consumes; it is either a
-missing wire or dead weight, both are findings, and leaving it undecided is not an option. A
+**FORBIDDEN STATES.** An **unreachable definition** — one with no route from Main; it is
+either a missing wire or dead weight, both are findings, and leaving it undecided is not an
+option. A
 **lying comment** — prose describing an intent the code does not encode; `FoldOut`'s header said
 it was "deliberately NOT yet stated" while the record sat stated 60 lines below, so
 `foldPath-root-out` was proven against an assembly that never existed.
@@ -998,44 +991,41 @@ root of the consumption graph and the deletion exemption. Three rules:
 definitions — NEVER a bare `open import`**, so that "imported" means "claimed"
 and not merely "compiled"; **(3) Main is never touched without Anthony's
 explicit approval** — draft the change and ask. `make wiring` reads Main's
-`using` clauses to get its exempt set, so a filename never earns an exemption
-and a claim cannot self-certify.
+`using` clauses to get its reachability seeds, so a filename never earns an
+exemption and a claim cannot self-certify.
 
 Because Agda compiles exactly what is transitively imported, Main also defines
 the build's COVERAGE — **`make agda` IS the claim graph**, and anything outside
 it is not being checked at all. `make wiring` guards that boundary directly: a
-module nothing reaches fails the gate (section A2) in seconds, rather than
-needing a second full compile of the tower to notice. **Never close a coverage
-gap by re-adding a bulk import to Main — that is the loophole, not the repair.**
+module nothing reaches fails the gate in seconds, rather than needing a second
+full compile of the tower to notice. **Never close a coverage gap by re-adding a
+bulk import to Main — that is the loophole, not the repair.**
 
-**ACCEPTANCE TEST: `make gate`** — `wiring-gate`, `unsafe-check`, `agda`,
-`bug-cache`, in that order. **Cheap checks run FIRST, deliberately:** an orphan or an
-unsafe pragma is decidable in seconds by grep while the full gate costs many minutes, so
-there is no reason to spend those minutes only to fail on something a textual pass already
-knew. `make wiring-gate` is the report-turned-gate — it EXITS 1 (rather than always 0)
-on an orphan outside the exempt families, on a `⊤`-typed postulate that asserts nothing,
-or on a bare `open import` in Main. Run it rather than trusting a memo — including this
-one. Also: grep for a fact before planning its proof, and grep for a definition's
+**ACCEPTANCE TEST: `make gate`** — `wiring-selftest`, `wiring-gate`, `unsafe-check`,
+`agda`, `refuted`, `bug-cache`, in that order. **Cheap checks run FIRST, deliberately:**
+an unreachable name or an unsafe pragma is decidable in seconds by grep while the full
+gate costs many minutes, so there is no reason to spend those minutes only to fail on
+something a textual pass already knew. Run it rather than trusting a memo — including
+this one. Also: grep for a fact before planning its proof, and grep for a definition's
 consumers before believing any status claimed for it.
 
-Four things the checker now enforces that it previously only documented:
-- **UNREACHABLE MODULES fail the gate** (section A2). This closes a blind spot that
-  hid a dead file for most of the campaign: the orphan report scans DEFINITIONS for
-  consumers, so a module holding only `open import … public` re-exports has nothing
-  to orphan and reads as clean however dead it is. **A module can be entirely unused
-  while every other number says zero** — module reachability is a different question
-  from definition reachability. Reachability is computed from Main plus the
-  `MODULE_ROOTS` entry points (each a separately compiled binary with its own make
-  target), so anything those import is covered automatically.
-- **Inline trailing comments are stripped before consumer counting.** A name mentioned
-  only in a `-- …` tail used to count as a real consumer, so a genuinely orphaned
-  definition could read as WIRED — a false negative in the dangerous direction.
-- **`⊤`-typed postulates are reported and gated** (`VACUOUS_ALLOWLIST` carries the one
+**`make wiring-gate` EXITS 1 on exactly these**, and on nothing else:
+- an **unreachable definition or postulate** — R1;
+- an **unreachable MODULE**. A different question from definition reachability, and a
+  blind spot a per-definition check cannot see: a module holding only
+  `open import … public` re-exports has no definitions to report and reads as clean
+  however dead it is. Reachability is computed from Main plus the `MODULE_ROOTS` entry
+  points (each a separately compiled binary with its own make target), so anything
+  those import is covered automatically;
+- a **`⊤`-typed postulate** that asserts nothing (`VACUOUS_ALLOWLIST` carries the one
   deliberate exception, `defer-shift`, whose own comment says it is "an honest gap, not
-  a claim"). A NEW one fails the gate.
-- **The ordering hazard is reported** (section B3): an orphan that no postulate in its
-  own file can consume, because they all precede it. Decidable from line numbers — do
-  not learn it from a failed typecheck.
+  a claim"). A NEW one fails;
+- a **bare `open import` in Main**, or a Main claim whose name no longer exists.
+
+**`make wiring-selftest` proves the check is load-bearing**, against a fixture outside
+`agda/src`: R2 must fire on a lemma passed bare to a postulate and on nothing else, and
+a module application must still conduct reachability. R2 fires on nothing in `agda/src`
+today, so without the fixture it would rot untested.
 
 **WHY THIS IS LAW.** Unwired proven work costs this campaign more than refutations do. Its
 two failure modes: a proof nobody calls sits inert while the work it would have done gets

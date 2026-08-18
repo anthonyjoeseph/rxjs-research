@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: postulates all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -76,6 +76,7 @@ help:
 	@echo "                  a human to rule on — always exits 0, deletes"
 	@echo "                  nothing (see scripts/check-wiring.py)"
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
+	@echo "  postulates    every postulate in agda/src by name — the work ledger"
 	@echo "  refuted       typecheck agda/refuted/ — the machine-checked '-> bottom'"
 	@echo "                  witnesses.  Separate include root: 'make agda' never"
 	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
@@ -238,16 +239,23 @@ wiring:
 wiring-gate:
 	scripts/check-wiring.py --gate
 
+# THE REMAINING-WORK LEDGER: every postulate in agda/src, by name.  A grep for
+# `^postulate` finds the 32 BLOCK HEADERS, not the 110 names inside them, so it
+# is not the ledger and never was.  PROOF-STATE must carry a row for each of
+# these, in exactly one tier.
+postulates:
+	@scripts/check-wiring.py --postulates
+
 # PROVES THE WIRING CHECK IS LOAD-BEARING.  R2 (a name passed as a bare
-# argument to a postulate earns no reachability from that site) currently
-# fires on NOTHING in agda/src — the leaf-only migration emptied it — so
-# without this it would rot untested and silently stop working.  The fixture
-# is an A/B: `bad-lemma` is passed bare to a postulate and must be REPORTED;
-# `good-lemma` (applied by a real body) and `nested` (applied inside parens to
-# compute a value AT a postulate call site) must both stay LIVE.  `nested` is
-# the control for the false-positive class that sank an earlier design, which
-# gated on the passed-vs-applied classifier directly and misread 40 of 110
-# postulates.
+# argument to a postulate earns no reachability from that site) fires on
+# NOTHING in agda/src, so without this it would rot untested and silently stop
+# working.  The fixture is an A/B: `bad-lemma` is passed bare to a postulate and
+# must be REPORTED; `good-lemma` (applied by a real body) and `nested` (applied
+# inside parens to compute a value AT a postulate call site) must both stay
+# LIVE.  `nested` is the control for the false-positive class that sinks any
+# design gating on the passed-vs-applied classifier directly — measured at 40
+# of 110 postulates.  `via-top`/`via-mod` cover module applications, whose RHS
+# names are real uses; a scanner blind to them reports live clusters as dead.
 # THE REFUTATION TREE (Anthony, 2026-08-18).  `agda/refuted/` holds the
 # machine-checked `... -> bottom` witnesses: proofs that a route CANNOT work.
 # It is a SEPARATE include root, so:

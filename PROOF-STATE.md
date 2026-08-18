@@ -34,9 +34,10 @@ else lives in the code.
   it does not TELL the story. An entry that has grown sentences of
   mechanism, receipts, or history is a header that leaked; move it to the
   postulate's header and cut the entry back to its line.
-- **The ledger is the source of truth, not this file.** `make wiring` lists
-  every live postulate; every one of them appears in exactly one tier below,
-  and a name here that no longer greps is a bug in this file — fix on sight.
+- **The ledger is the source of truth, not this file.** `make postulates` lists
+  every live postulate by name; every one of them appears in exactly one tier
+  below, and a name here that no longer greps is a bug in this file — fix on
+  sight.
 - **There is no second roadmap.** Not a session task list, not a worker's
   notes, not a scratch file. A parallel list is outside the repo, so no gate
   and no `grep` can see it rot — one ran beside this file for weeks, kept
@@ -69,100 +70,18 @@ The caps route does not replace the wet contract — it rests on it: both
 branches of `budget-sufficient` read `subscribeE-wet`'s `hasDry`/`INV?`
 conjuncts, so no amount of caps work retires tier 0.
 
-## Tier −1 — THE LEAF-ONLY MIGRATION (ahead of tier 0)
-
-The postulates that still take PROVEN LEMMAS as arguments, in violation of the
-leaf-only rule (defined in CLAUDE.md). Each migrates by **INSTANTIATE, DON'T
-PASS**: replace `P = P-core l₁ … lₖ` with a real body that APPLIES each `lᵢ` at
-this site's own arguments, postulating only the residue. Applying is what pays
-each lemma's premises, and paying them is the point — a passed lemma has never
-had its FIT tested, so nothing checks that its type is the one the parent needs.
-
-**THE FIRST ONE LANDED, AND IT PAID BOTH WAYS.** `subscribeE-input-wf` is a real
-body now. Applying `initReg-wf` is what surfaced the missing `ltok` — a whole
-absent schedule invariant, now the `hot-live` field — and it also RETIRED an arm
-the `-core` had absorbed silently: the cold/no-async arm is `oneShotBurst`
-verbatim, closed outright by the proven `oneShotBurst-wf`. Expect both outcomes
-from the rest; neither is visible while the lemma is merely passed.
-
-**AND THE THIRD OUTCOME IS A STOP, WHICH IS A FINDING AND NOT A DISCHARGE —
-BUT A RULING CAN RESUME IT.** `subscribeE-takeᵉ-wf-core` went both ways.
-Applying its lemma exposed a premise FALSE at the only call site, so the row,
-the leaf-only violation all stayed live — a stopped
-migration pays (it converts an unexamined premise into a machine refutation) but
-it does not close its row. What then cleared it was not a cleverer proof but a
-RULING on a statement: keying `BurstInv.live-matches` off `EvalSt.dying st`
-REMOVED the refuted premise rather than repairing it, and the body landed. Take
-a stop to the statement it indicts, not back to the grind.
-
-**TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
-not scheduled against the tier order and does not defer to it: a lemma whose type
-was never checked against its parent's need is wasted work at every tier, so the
-fit test is worth more the earlier it runs — which is why the nominally-tier-2
-`mid-step-core` was migrated here rather than parked.
-
-The residue `P-rest` may remain a postulate — that is what makes this a migration
-rather than a proof, and it is the FLOOR, not a ceiling. Where the parent falls
-out fully once its lemmas are actually applied, take it. **A landed migration's
-residue leaves move to their own tier**, not this one: they take no proven lemma,
-so they are ordinary work and this tier stays the migration worklist.
-
-**THE MIGRATION IS DONE (2026-08-18). `make wiring-gate` measures ZERO
-passed-only lemmas, and R2 now fails ANY new one** — no longer a ratchet
-against `agda/DEFERRED.txt` (deleted) but a consequence of reachability: a name
-passed as a bare argument to a postulate earns no reachability from that site,
-so a lemma whose ONLY use is being handed to a postulate has no route to Main.** The last parent, `dry-tick-core`,
-is where the pattern paid most: nine lemmas, EIGHT of which the fit test proved
-were never ingredients. They had been PARKED in an argument list — which reads as
-fully wired to every check the repo has — and under the leaf-only rule a proven
-lemma has no legal home but a real consumer, so they went, and with them three
-modules nothing else reached (`.Anchor-Dry`, `.Occurrences`, `.Tick-Headroom`)
-and the `subscribeE-demand` obligation that only that cone needed. A RECOVERY
-pointer sits on `hop-edge`'s header (.Wet/Part6), where the walk grind will want
-the dry apparatus back.
-
-Keep the tier heading: it is where the next `-core` goes if one is ever minted,
-and R2's zero is the thing being defended.
-
-### THE TIER IS EMPTY AGAIN — and the two "predecessor generations" were not (2026-08-18)
-
-The strengthened check first reported 44 unreachable names in two clusters, and
-both were written up here as predecessor generations left standing. Neither was.
-The write-up is kept in `git show` only; what replaced it:
-
-- **`burstH` + 38 (Burst-Walk) was a CHECKER BLIND SPOT, not dead code.** Its
-  only consumer is `module V = Walk … burstH`, a module APPLICATION — a binding,
-  not a scope — and both scan loops skipped the line, so the names right of `=`
-  got no owner. That cluster is the engine of `cascadeGo-burst-nodry`. The
-  checker now registers the alias (kind `module-app`, never reported); the four
-  tier-2 postulates it holds were never orphaned and their rows stand unchanged.
-- **`foldPath-wf` + 4 (Part9) WAS a missing wire, and it is now wired.**
-  Part11's `foldPath-out` re-proved the run equation in its frame and share
-  arms, which is exactly what `foldPath-wf` proves for every path constructor —
-  so `foldPath-frame-out` was a second proof of the `stepFrame-wf` induction and
-  `foldPath-share-out` a second proof of `dispatchShare-wf`'s obligation. Both
-  arms now take the run's `S′` and the equation that pins it from `foldPath-wf`
-  and owe only the FoldOut readoff.
-
-**The standing lesson is the checker's, not the code's: a LOCAL consumer count
-wires a dead cluster to itself, so only reachability can see one — and a
-reachability report is only as good as the edges the scanner can parse.** Both
-findings came out of the same run, in opposite directions.
-
-
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-- **`input-wet`** (Walk-Level) — DIFFICULTY, lowered from FALSITY: the Ψ
-  axis is closed by PROVEN `caseW-subΘ` + `fnCap-subΘᵉ`, the refuted hop
-  conjunct's repair is proven, and every conjunct has non-degenerate
-  coverage. Mutual landing done; the three-clause induction is the work.
-  Evidence, the hop disanalogy and the landing in its header.
-- **`slotHop-cap`** (Measures) — DIFFICULTY, lowered from FALSITY by
-  Demand-Probe series S, which reached the amplifier-chain region and
-  measured the margin widening. Route and coverage in its header.
+- **`input-wet`** (Walk-Level) — DIFFICULTY: the Ψ axis is closed by PROVEN
+  `caseW-subΘ` + `fnCap-subΘᵉ`, the refuted hop conjunct's repair is proven,
+  and every conjunct has non-degenerate coverage. The three-clause induction
+  is the work. Evidence and the hop disanalogy in its header.
+- **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
+  the amplifier-chain region and measures the margin widening. Route and
+  coverage in its header.
 - **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY, low. The μ edge's L̂
   transport, and its header names a route over FOUR PROVEN lemmas
   (op-step-mu, inner-desc, opIterD-mono, sLvlD-suc) — the caps side does
@@ -172,9 +91,8 @@ named postulate's own header.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.
-- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY, reclassified
-  from FALSITY: it was SHAPE, and the repair is landed. Finding in its
-  header.
+- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY: the repaired
+  statement, finding in its header.
 - **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — DIFFICULTY.
   Path-extension and depth-mirror plumbing for the inner call.
 - **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
@@ -182,14 +100,11 @@ named postulate's own header.
   outer assembly; each self-contained, none level-indexed.
 - **`INV?-install`** (Walk-Level) — DIFFICULTY. Node-install plumbing
   the *All body consumes; conjunct-by-conjunct route in its header.
-  (Its former row-mate pathB?-mono-B is GONE — it duplicated the proven
-  pathB?-widen, .Measures, found by a name clash; grep before stating.)
 - **`innerReact-nodry-slFc` / `thruOuter-nodry-slFc`** (Burst-Walk) — DIFFICULTY,
   parked. The static `slotsFnCap sl ≤ Ψ` both nodry bodies need; wants INV?
   threading that `stepFrame-nodry`'s hypotheses do not yet carry. The first
-  carries NO depth premise — dropped as a non-ingredient the fit test exposed,
-  which STRENGTHENS it; its twin still carries one, pending Anthony's ruling.
-  Reasoning in the first's header.
+  carries NO depth premise, which STRENGTHENS it; its twin still carries one,
+  pending Anthony's ruling. Reasoning in the first's header.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
   (Burst-Walk) — DIFFICULTY, parked. Per-element context for concat's drain:
   each re-establishes one hypothesis of `subscribeInner-nodry` after the
@@ -217,37 +132,31 @@ failure would move the ground under all of it.
 
 Built on `budget-sufficient`, so proving anything here while tier 0 is open
 bets on ground an anchor failure would move. The branch's own design question
-is **merge-cert** — now STATED (`merge-cert`, Part4, with the reachability
+is **merge-cert** — STATED (`merge-cert`, Part4, with the reachability
 mechanism and coverage residue in its header); what stays parked is its
 mid-fold FoldInv form and the six consumer rewrites.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 
-- **`dispatchShare-wf`** (Part9) — **DIFFICULTY, lowered from SHAPE 2026-08-18
-  by a fit test.** The SHAPE call was "its conclusion carries no FoldInv/FoldOut
-  out, so it cannot feed `mid-step` as stated". It now does feed it: wiring
-  `foldPath-wf` into `foldPath-out` splits the obligation, so this leaf owes the
-  run equation and `foldPath-share-out` owes the FoldOut, and the assembly
-  typechecks with the statement exactly as written. No restatement is
-  guaranteed any more, and the cascade into the stepFrame family is off.
+- **`dispatchShare-wf`** (Part9) — DIFFICULTY: the share arm's run equation,
+  `foldPath-wf`'s third clause. Its FoldOut half belongs to
+  `foldPath-share-out`, so the statement as written is what `foldPath-out`
+  spends.
 - **`root-done-plumbed-core` / `root-caches-core`** (Part4) — FALSITY,
   blocked on merge-cert's mid-fold form; the merge-coherence content itself.
 - **`subscribeE-{merge,concat,switch,exhaust}All-wf`** (Part3) — SHAPE:
   written against a merge-cert form that may still gain hypotheses.
-- **`stepFrame-wf-outer`** (Part9) — SHAPE. The same fit test cleared the
-  statement-level objection (its FoldOut half is `foldPath-frame-out`'s, not
-  its own), so what remains is a ROUTE claim: `foldPath-frame-out`'s header
-  says discharging it means enriching `stepFrame-wf` to carry FoldOut out. A
-  route is not evidence, so the class does not move until that route is either
-  walked or replaced.
-- **`mid-readoff`** (Part11) — FALSITY, inherited from the retired
-  `mid-step-core`: the FoldOut readoff, and FoldOut is a 6-field invariant
-  validated at exactly one clause.
+- **`stepFrame-wf-outer`** (Part9) — SHAPE, on a ROUTE claim rather than the
+  statement: `foldPath-frame-out`'s header says discharging it means enriching
+  `stepFrame-wf` to carry FoldOut out, which would restate this family. A route
+  is not evidence, so the class holds until that route is walked or replaced.
+- **`mid-readoff`** (Part11) — FALSITY: the FoldOut readoff, and FoldOut is a
+  6-field invariant validated at exactly one clause.
 - **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
-  `foldPath-out`'s two undischarged arms, now the FoldOut readoff ONLY — each
-  takes the run's `S′` and equation from the proven `foldPath-wf`, so neither
-  re-proves a run half any more. The frame arm wants `stepFrame-wf` enriched to
-  carry FoldOut out; the share arm is the diamond's net-zero owed.
+  `foldPath-out`'s two undischarged arms, each the FoldOut readoff only (the
+  run's `S′` and equation come in from `foldPath-wf`). The frame arm wants
+  `stepFrame-wf` enriched to carry FoldOut out; the share arm is the diamond's
+  net-zero owed.
 - **`mid-fold-certs`** (Part11) — DIFFICULTY: one case split on
   `Arrival.isLast a` off `Mid.done-plumbed`; the blueprint's GUARD applies to
   its flip conjunct.
@@ -261,10 +170,10 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   the other two are register/init balances of a shape proven twice over.
 - **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: a per-clause receipt of a
   pattern already proven three times over.
-- **`take-nodry-push` / `take-nodeP`** (Part3) — DIFFICULTY, the takeᵉ
-  migration's residue: hasDry pushes inward through the take push, and the fresh
-  take node comes back with its budget unspent (the frame above, not the
-  subscription, spends it). Twins of the scan pair, which are the worked shape.
+- **`take-nodry-push` / `take-nodeP`** (Part3) — DIFFICULTY: hasDry pushes
+  inward through the take push, and the fresh take node comes back with its
+  budget unspent (the frame above, not the subscription, spends it). Twins of
+  the scan pair, which are the worked shape.
 - **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — FALSITY,
   A′'s residue and the honest cost of it: at a dying source the live list lags the
   registry by the already-delivered entries, and neither leaf can be proven until
@@ -273,8 +182,8 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 - **`subscribeE-dying`** (Part8) — DIFFICULTY, low: `subscribeE` never writes
   `dying` (two writers, neither reachable from it). An induction over its clause
   set; the route is in its header.
-- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the `hot-live` field's
-  own cost and the first migration's residue: `sched-init-hot-live` (base, from
+- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the `hot-live`
+  field's own cost: `sched-init-hot-live` (base, from
   `mkHot`), `mintSource-hot-live`, `subscribeE-hot-live`, `cascadeFinish-hot-live`,
   `sched-next-hot-live`. Each is a schedule-transition fact; routes in their shared
   header. `cutSched`'s case is already a real body over the proven

@@ -948,8 +948,8 @@ def noise(out: str) -> str:
             continue
         if re.match(r"^\s*Checking ", ln) or ln.startswith(("Loading ", "Finished ")):
             continue
-        # v2.3 deprecations: 1,264 per build, and none of them are this tool's
-        # business.  The migration is tracked in the roadmap.
+        # stdlib deprecations: over a thousand per build, and none of them are
+        # this tool's business.
         if "is deprecated" in ln or ln.startswith("Warning: "):
             continue
         keep.append(ln)

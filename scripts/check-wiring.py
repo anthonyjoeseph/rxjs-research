@@ -32,15 +32,15 @@ this script only has text.  It errs by over-suppressing.  But a suppressed
 edge can only produce a FAILURE when it was that name's ONLY route home —
 and a name whose only route is into a postulate is exactly what R2 exists
 to report.  A misread edge on a name with any other consumer is invisible.
-Contrast the earlier standalone leaf check, which gated on the classifier
-directly and measured 40 false positives out of 110 postulates.
+A check that gates on the classifier DIRECTLY, rather than on the edge it
+suppresses, is the design to avoid: measured at 40 false positives out of
+110 postulates.
 
-WHAT THIS REPLACES.  `agda/DEFERRED.txt` and its ratchet are GONE: R2 is
-absolute, so there is nothing to grandfather.  The `-core`-suffix heuristic
-is gone with it — R2 is structural and sees every postulate.  The A3
-gate-cone check and the B3 ordering hazard are gone too, both subsumed by
-R1 (a definition wired only by a probe no longer traces to Main, so it
-fails R1 on its own).
+R2 IS ABSOLUTE — no grandfather list, and no name-based heuristic: it is
+structural, so it sees every postulate rather than the ones named `-core`.
+Nor is there a separate ordering or gate-cone check; both are subsumed by
+R1, since a definition wired only by something Main does not reach fails
+R1 on its own.
 
 TWO CHECKS BEYOND R1/R2, kept because R1 structurally cannot see them:
   * UNREACHABLE MODULES — a file of pure `open import … public` re-exports
@@ -992,6 +992,12 @@ def main():
     parser.add_argument("--src", default=None,
                         help="path to agda/src (default: inferred from this "
                              "script's location)")
+    parser.add_argument("--postulates", action="store_true",
+                        help="list every postulate in agda/src, one `name  "
+                             "file:line` per line, and exit. This is the "
+                             "complete remaining-work ledger: a grep for "
+                             "`^postulate` finds the BLOCK HEADERS, not the "
+                             "names inside them.")
     parser.add_argument("--gate", action="store_true",
                         help="exit 1 when the wiring law is violated. Without "
                              "this the script is a report and always exits 0.")
@@ -1009,6 +1015,14 @@ def main():
 
     files = find_agda_files(src_dir)
     defs, def_lines, postulate_names, order = extract_definitions(src_dir, files)
+
+    if args.postulates:
+        for name in sorted(postulate_names):
+            d = defs[name]
+            print(f"{name}  {d.file}:{d.line}")
+        print(f"-- {len(postulate_names)} postulate(s)")
+        return
+
     corpus = build_corpus(src_dir, files)
     main_claims, main_ok = read_main_claims(src_dir)
     suppressed = postulate_arg_sites(src_dir, files, defs, def_lines,
