@@ -2166,11 +2166,17 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op al
 -- what those bodies cannot pay.  Every one is a genuine open obligation
 -- and none takes a proven lemma as an argument.
 --
--- NOTE ON slFc: slotsFnCap sl ≤ Ψ is required by SiNodry but absent
--- from stepFrame-nodry's hypotheses.  It is a static capsule invariant
--- that lives in INV? (subscribeE-inner-nodry-inv's header), not in OKB.
--- It will need to be threaded from the walk's INV? channel once that
--- exists.  For now it is a leaf postulate taking the full context.
+-- NOTE ON slFc: slotsFnCap sl ≤ Ψ is THREADED, not postulated.  It is a
+-- static capsule invariant that OKB cannot reach — `walkOK` is
+-- slots-eq × capsOK?, and capsOK? bounds live/nodes/registry/widths but
+-- never the slot store's fn-weight; `fnCapBounded?` reads only
+-- live/nodes.  So it rides beside its already-threaded size-side twin
+-- `slotsSize sl ≤ cSize c`, all the way down through stepFrame-nodry,
+-- innerReact-nodry/thruOuter-nodry and SiNodry, and is a PARAMETER of
+-- module BurstWalk.  It costs nothing: at the true instantiation
+-- Ψ := ΨAt e sl is `fnCapᵉ e + slotsFnCap sl`, so the whole chain is
+-- discharged by `m≤n+m` at cascadeGo-burst-nodry — the same way
+-- `caps-fuel-root` (.Wet/Part6) already discharges it.
 --
 -- NOTE ON ceiling: opIterD S W d bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W d J
 -- is needed to pay each element's SiNodry ceiling from the frame's
@@ -2188,43 +2194,6 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op al
 postulate
 
   -- ── innerReact / concatDrain loop leaves ────────────────────────
-
-  -- Static: slotsFnCap sl ≤ Ψ from the innerReact context.
-  -- Needs INV? invariant threading (not yet in stepFrame-nodry's hyps).
-  --
-  -- NO DEPTH PREMISE, deliberately, and the reason is not convenience.
-  -- The conclusion is STATIC — a fact about `sl` and `Ψ` alone — so a
-  -- `depthFrame … ≤ d` hypothesis was never an ingredient, only a claim
-  -- about the route (exactly what CLAUDE.md's "A POSTULATE MUST BE A
-  -- LEAF" says a hypothesis list must not be).  It was also unusable: `depthFrame` unfolds
-  -- through `depthFin`'s `lookupNode allNid (EvalSt.nodes st)`, so at the
-  -- concat call site — which sits under a `with` on that very term — the
-  -- caller's `hD` is refined to `suc (depthDrain …)` while this
-  -- signature re-elaborates it unrefined, and the two are compared at ℕ
-  -- and differ.  Carrying it could not have been discharged from the
-  -- concat arm at all.
-  --
-  -- ⚠ This DROPS hypotheses from a postulate, which STRENGTHENS it and
-  -- so raises its own falsity risk.  Flagged for Anthony rather than
-  -- absorbed silently; the twin thruOuter-nodry-slFc is unchanged
-  -- pending the same ruling.
-  innerReact-nodry-slFc : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
-    2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    ∀ (J : ℕ) {s} (sf : Gas) (id : Id) (now : Tick)
-    (op : AllOp) (allNid inst : NodeId)
-    (path′ : Path Γ s t) (vals : List (Val Γ s))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (from-inner op allNid inst ↠ path′) ≡ true →
-    VbB c sl Ψ J vals ≡ true →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    sf ≡ budgetAt e sl id →
-    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
-      ≤ sizeCapAt e sl (suc id) →
-    slotsFnCap sl ≤ Ψ
 
   -- Per-element: VbB for one queue element, from OKB's capsOK? node conjunct.
   concatDrain-nodry-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -2299,26 +2268,6 @@ postulate
     in all (λ o′ → nest o′ sl (EvalSt.connectedShares st₁) ≤ᵇ bud) q ≡ true
 
   -- ── thruOuter / thruWalk / thruConsume loop leaves ───────────────
-
-  -- Static: slotsFnCap sl ≤ Ψ from the thruOuter context.
-  thruOuter-nodry-slFc : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
-    2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    ∀ (J : ℕ) {u} (sf : Gas) (id : Id) (now : Tick)
-    (op : AllOp) (nid : NodeId)
-    (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    PbB c Ψ J (thru-outer op nid ↠ path′) ≡ true →
-    VbB c sl Ψ J vals ≡ true →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    sf ≡ budgetAt e sl id →
-    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
-      ≤ sizeCapAt e sl (suc id) →
-    depthFrame sf id now (thru-outer op nid) path′ vals fin sched st ≤ d →
-    slotsFnCap sl ≤ Ψ
 
   -- Per-element: VbB for one val element, from the outer VbB list.
   thruConsume-nodry-vb : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
@@ -2405,8 +2354,7 @@ postulate
 -- concatDrain-nodry — structural recursion over the concat queue.
 -- Applies subscribeInner-nodry at each element (THE FIT TEST).
 --
--- slFc is taken as a direct parameter (not re-derived per call;
--- the caller innerReact-nodry extracts it once via innerReact-nodry-slFc).
+-- slFc is taken as a direct parameter, threaded from module BurstWalk.
 concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (Ψ dep : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
@@ -2678,6 +2626,7 @@ innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) {s} (sf : Gas) (id : Id) (now : Tick)
   (op : AllOp) (allNid inst : NodeId)
   (path′ : Path Γ s t) (vals : List (Val Γ s))
@@ -2714,7 +2663,7 @@ innerFinish-switch-nodry sf allNid inst c₀ path′ id now vals od sched st
 ... | false = refl
 
 -- fin = false: innerReact emits []
-innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz J {s} sf id now op allNid inst path′ vals fin sched st
+innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {s} sf id now op allNid inst path′ vals fin sched st
                  ok pb vb rg gk cl hD
   with fin
 ... | false = refl
@@ -2767,9 +2716,7 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz J {s} sf id now op allNid inst p
 ...     | concatᵒ | just (concat-st {w} q act od) with w ≟ᵗ s
 ...       | no _    = refl
 ...       | yes refl =
-              let slFc = innerReact-nodry-slFc c sl Ψ d 2≤S 1≤R slC slSz J sf id now
-                           concatᵒ allNid inst path′ vals true sched st ok pb vb rg gk cl
-                  -- Strip the from-inner frame from pb to get PbB for path′.
+              let -- Strip the from-inner frame from pb to get PbB for path′.
                   -- ∧-true's Bool arguments are EXPLICIT: PbB reduces to a
                   -- conjunction Agda cannot recover from the equation alone.
                   pb-sz   = proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ path′))
@@ -2795,6 +2742,7 @@ thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) {u} (sf : Gas) (id : Id) (now : Tick)
   (op : AllOp) (nid : NodeId)
   (path′ : Path Γ u t) (vals : List (Val Γ (obs u)))
@@ -2812,9 +2760,8 @@ thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                                path′ vals fin sched st)))
     ≡ false
 
-thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD =
-  let slFc  = thruOuter-nodry-slFc c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD
-      TW    = thruWalk sf op nid path′ id now vals sched st
+thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD =
+  let TW    = thruWalk sf op nid path′ id now vals sched st
       eq    = proj₁ (thruWrap-pass op nid fin TW)
       -- strip thru-outer frame from pb.  ∧-true's two Bool arguments are
       -- given EXPLICITLY: PbB reduces to a conjunction whose sides Agda
@@ -2858,6 +2805,7 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -2875,11 +2823,11 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≡ false
 
 -- MAP: the frame emits nothing at all
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
                 (map-f fn) path′ vals fin sched st _ _ _ _ _ _ _ = refl
 
 -- SCAN: every arm of the node-state dispatch emits `[]`
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {u = u} sf id now
                 (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _ _
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                  = refl
@@ -2893,21 +2841,21 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J {u = u} sf id now
 ...   | no  _    = refl
 
 -- TAKE: the one severing frame, and it is free (cutThrough-nodry)
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
                 (take-f nid) path′ vals fin sched st _ _ _ _ _ _ _ =
   takeDispatch-nodry nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
 -- the two *All edges: real definitions, subscribeInner-nodry is APPLIED inside
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
                 (from-inner op allNid inst) path′ vals fin sched st
                 ok pb vb rg gk cl hD =
-  innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op allNid inst
+  innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op allNid inst
                    path′ vals fin sched st ok pb vb rg gk cl hD
 
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
                 (thru-outer op nid) path′ vals fin sched st
                 ok pb vb rg gk cl hD =
-  thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz J sf id now op nid
+  thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op nid
                   path′ vals fin sched st ok pb vb rg gk cl hD
 
 ------------------------------------------------------------------
@@ -2929,6 +2877,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (path′ : Path Γ u t) (vals : List (Val Γ s))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -2948,7 +2897,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
     × (VbB c sl Ψ (J + j′) (proj₁ r) ≡ true)
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
-stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path′ vals fin sched st
+stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now f path′ vals fin sched st
                      ok pb vb rg gk cl hD =
     j′
   , proj₁ (proj₂ FC)
@@ -2960,7 +2909,7 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz J sf id now f path�
       (proj₁ (proj₂ (proj₂ (proj₂ WF))))
   , ∧-intro capsEvs
       (∧-intro (proj₂ (proj₂ (proj₂ (proj₂ WF))))
-               (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz
+               (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc
                           J sf id now f path′ vals fin sched st
                           ok pb vb rg gk cl hD)))
   where
@@ -2995,6 +2944,7 @@ module BurstWalk
   (2≤S : 2 ≤ Caps.cSize c) (1≤R : 1 ≤ Caps.cReg c)
   (slC : slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true)
   (slSz : slotsSize sl ≤ Caps.cSize c)
+  (slFc : slotsFnCap sl ≤ Ψ)
   where
 
   S = Caps.cSize c
@@ -3207,7 +3157,7 @@ module BurstWalk
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
     ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD →
-                    stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz
+                    stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz slFc
                       J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD
     }
 
@@ -3271,9 +3221,12 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
   d   = capsH e sl id
   2≤S = 2≤capsAt-size e sl id
   1≤R = 1≤capsAt-reg e sl id
+  -- FREE at the true instantiation: Ψ = ΨAt e sl = fnCapᵉ e + slotsFnCap sl.
+  slFc : slotsFnCap sl ≤ Ψ
+  slFc = m≤n+m (slotsFnCap sl) (fnCapᵉ e)
   cg  = cascadeGo a id chains sched st
 
-  module BW = BurstWalk {e = e} siC ifc c sl Ψ d 2≤S 1≤R slC slSz
+  module BW = BurstWalk {e = e} siC ifc c sl Ψ d 2≤S 1≤R slC slSz slFc
 
   inv0 : capsOK? (frameStep 0 c) sched st ≡ true
   inv0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv

@@ -100,11 +100,6 @@ named postulate's own header.
   outer assembly; each self-contained, none level-indexed.
 - **`INV?-install`** (Walk-Level) — DIFFICULTY. Node-install plumbing
   the *All body consumes; conjunct-by-conjunct route in its header.
-- **`innerReact-nodry-slFc` / `thruOuter-nodry-slFc`** (Burst-Walk) — DIFFICULTY,
-  parked. The static `slotsFnCap sl ≤ Ψ` both nodry bodies need; wants INV?
-  threading that `stepFrame-nodry`'s hypotheses do not yet carry. The first
-  carries NO depth premise, which STRENGTHENS it; its twin still carries one,
-  pending Anthony's ruling. Reasoning in the first's header.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
   (Burst-Walk) — DIFFICULTY, parked. Per-element context for concat's drain:
   each re-establishes one hypothesis of `subscribeInner-nodry` after the
