@@ -207,7 +207,9 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- checkable by the typechecker).  The gap postulates below cover blocked clauses
 -- (map-*/scan-*/take-* shape gaps, the four *All wrap clauses,
 -- subscribeE-input-wf/defer-wf/takeᵉ-wf).  dispatchShare-wf and the
--- stepFrame-wf-inner-concat/outer residues remain blocked on merge-cert.
+-- stepFrame-wf-inner-concat/outer residues remain blocked on merge-cert — the
+-- SKETCH in Part8's establishment block, no longer a Part4 postulate (retired
+-- 2026-08-18 with the alive-vs-present finding on Part4.root-mergeCache).
 -- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other recursion
 -- drops Closed structurally; Agda sees it inline, mirroring subscribeE itself.
 --

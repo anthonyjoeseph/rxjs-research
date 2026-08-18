@@ -878,6 +878,14 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       frameNodes).  The merge-cert still needs the CORRECTED k↔live-inst
 --       coherence as a threaded FoldInv field — its exact statement (and whether
 --       k≡0⇒none is seed-provable) is the remaining design point, NOT countRegsUnder.
+--       NAME NOTE 2026-08-18: `merge-cert` above is this SKETCH, not a postulate —
+--       the Part4 postulate of that name is gone.  It existed only as the
+--       hypothesis of the two root-exit -cores, and writing those as real bodies
+--       showed it does not close even their k ≡ 0 case: mergeCertAt rules out
+--       ALIVE from-inner instances while countLiveInners counts PRESENT ones, so
+--       a dead-but-present instance defeats it.  Full finding on
+--       Part4.root-mergeCache; RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda.
+--       Whatever is threaded here must close that alive-vs-present gap too.
 --     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise
 --       is done ≡ true, vacuous right up until the flip; the flip is mid-cascade,
 --       where Inv does not exist.  Nothing to derive from at the one moment the

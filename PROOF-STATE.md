@@ -127,9 +127,13 @@ failure would move the ground under all of it.
 
 Built on `budget-sufficient`, so proving anything here while tier 0 is open
 bets on ground an anchor failure would move. The branch's own design question
-is **merge-cert** — STATED (`merge-cert`, Part4, with the reachability
-mechanism and coverage residue in its header); what stays parked is its
-mid-fold FoldInv form and the six consumer rewrites.
+is **merge coherence** — UNSTATED again as of 2026-08-18. The `merge-cert`
+postulate was retired when the two root-exit assemblies became real bodies and
+showed it does not close even their `k ≡ 0` case: `mergeCertAt` rules out ALIVE
+from-inner instances while `countLiveInners` counts PRESENT ones. The decidable
+predicate and its probe evidence survive (`mergeCertAt`, Root-Probe); what is
+parked is the corrected statement, its mid-fold FoldInv form, and the six
+consumer rewrites. Full finding on `Part4.root-mergeCache`.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 
@@ -137,14 +141,19 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   `foldPath-wf`'s third clause. Its FoldOut half belongs to
   `foldPath-share-out`, so the statement as written is what `foldPath-out`
   spends.
-- **`root-done-plumbed-core`** (Part4) — FALSITY, blocked on merge-cert's
-  mid-fold form. Probed; the load-bearing region (`done` with a live registry)
-  was NOT reached, so the class stands. Coverage boundary in its header.
-- **`root-caches-core`** (Part4) — DIFFICULTY: probed non-vacuously over all
-  four *All node kinds and the take-cut edge its header names as the hard one.
-  Both are `-core` postulates and owe the leaf-only conversion.
+- **`root-entry-sunk`** (Part4) — FALSITY: the per-entry residue of
+  `root-done-plumbed`, now a real body. The load-bearing region (`done` with a
+  live registry) was NOT reached by probe, so the class stands — but it is now
+  a statement about ONE surviving entry, which is a size a counterexample can
+  be built at. Coverage boundary in its header.
+- **`root-mergeCache`** (Part4) — DIFFICULTY: the per-node residue of
+  `root-caches`, now a real body, split to the merge clause alone. Probed
+  non-vacuously in assembled form over all four *All node kinds and the
+  take-cut edge. Carries a DEAD ROUTE: merge-cert does not close even its
+  k ≡ 0 case (alive-vs-present), which is why that postulate is gone.
 - **`subscribeE-{merge,concat,switch,exhaust}All-wf`** (Part3) — SHAPE:
-  written against a merge-cert form that may still gain hypotheses.
+  written against a merge coherence whose statement is still open (the
+  merge-cert sketch in Part8's establishment block, no longer a postulate).
 - **`stepFrame-wf-outer`** (Part9) — SHAPE, on a ROUTE claim rather than the
   statement: `foldPath-frame-out`'s header says discharging it means enriching
   `stepFrame-wf` to carry FoldOut out, which would restate this family. A route

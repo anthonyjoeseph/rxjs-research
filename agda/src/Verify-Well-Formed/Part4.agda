@@ -29,6 +29,8 @@ open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-p
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (any)
 open import Data.List.Properties using (++-identityʳ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -226,81 +228,102 @@ mergeCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
         not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
 ... | _ = true
 
-postulate
-  merge-cert : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-    (mnid : NodeId) →
-    mergeCertAt mnid
-      (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                (sched-init e ins) (st-init e)))) ≡ true
+-- NO `merge-cert` POSTULATE LIVES HERE ANY MORE (2026-08-18).  It existed
+-- ONLY as the hypothesis of `root-caches-core` / `root-done-plumbed-core`,
+-- and writing those two assemblies as real bodies showed that hypothesis
+-- does not close: see the ALIVE-vs-PRESENT gap recorded on root-mergeCache
+-- below.  `mergeCertAt` itself stays — it is the decidable predicate
+-- Root-Probe pins at reachable states, and that evidence is what a restated
+-- merge-cert will be built on.
+-- RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda restores
+-- the postulate as it stood.
+
+-- the SETTLED root-exit state: the evaluator state the root subscription's
+-- burst leaves behind.  Both root-exit facts below are stated at it, and it
+-- is the only state at which either is claimed.
+rootExitSt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → EvalSt e
+rootExitSt e ins =
+  proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+                           (sched-init e ins) (st-init e)))
 
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
 -- root subscription's returned stream IS the emitted one, so its done-flip is a
 -- genuine full completion — which leaves only share sinks registered.  (On the
 -- inner-recursion path this is false, but done-plumbed is never read there; it
--- is consumed ONLY here, at the root frame-0 exit.)  An ASSEMBLY over
--- merge-cert — its proof is the merge-coherence content, landed when the *All
--- wrap clauses are; the -core takes today's root-exit merge-cert and gains the
--- mid-fold hypotheses when those rewrites land.
+-- is consumed ONLY here, at the root frame-0 exit.)
+--
+-- LEAF-ONLY 2026-08-18.  Was `root-done-plumbed-core`, a postulate taking
+-- merge-cert, whose composition was checked by nobody.  `allShareSunk` is a
+-- conjunction fold over the registry, so the assembly IS writable today: the
+-- fold's induction is below and the whole residue is the PER-ENTRY leaf.
+-- What the conversion bought beyond the fit test: the residue no longer
+-- quantifies over the registry, so the FALSITY region the Root-Probe sweep
+-- could not reach is now a statement about ONE surviving entry — a size a
+-- counterexample can actually be built at.
 postulate
-  -- PROBED 2026-08-18 (Verify-Well-Formed.Root-Probe): the load-bearing
-  -- region was NOT reached, so this row's class is unchanged.  The
-  -- conclusion is only non-vacuous when `done ≡ true` AND the registry
-  -- is still live, and no construction tried produces that: every
-  -- done-state reached (merge, concat, and take(0) over a share) has a
-  -- DRAINED registry, where `allShareSunk [] ≡ true` outright.  The one
-  -- state with a live registry has `done ≡ false` — and allShareSunk is
-  -- genuinely FALSE there, which at least shows the `done` guard is
-  -- load-bearing rather than decorative.  The header below asserts such
-  -- states exist; the probe module records that none of the obvious
-  -- programs is one.
-  root-done-plumbed-core :
-    -- merge-cert (above)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-      (mnid : NodeId) →
-      mergeCertAt mnid
-        (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                  (sched-init e ins) (st-init e)))) ≡ true
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  -- one registry entry outliving a DONE root exit sinks to a share.  The
+  -- `done` guard is load-bearing and measured so: Root-Probe reaches a state
+  -- whose registry is live and where this is FALSE — with done ≡ false.
+  root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
       (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
                          (sched-init e ins) (st-init e))) ≡ just S →
     ProtocolSt.done S ≡ true →
-    allShareSunk (EvalSt.registry
-      (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                (sched-init e ins) (st-init e))))) ≡ true
+    (rid : RegId) (src : Source) (u : Ty) (p : Path Γ u t) →
+    (rid , src , (u , p)) ∈ EvalSt.registry (rootExitSt e ins) →
+    sinksToShare p ≡ true
 
   -- ROOT-EXIT caches, migrated out of BurstInv for the reason recorded on the
   -- record: the merge count trails the registry inside an inner's burst and
   -- leads it after a take-cut, so only the SETTLED state at the root exit — by
-  -- which point every mergeBump has landed — satisfies cachesValid.  The same
-  -- merge-coherence content: an ASSEMBLY over merge-cert, like
-  -- root-done-plumbed above.
-  -- PROBED 2026-08-18 (Verify-Well-Formed.Root-Probe), NON-VACUOUSLY:
-  -- `cachesValid` holds at the settled root exit for seven programs whose
-  -- node lists are pinned non-empty in the same file — merge (one inner,
-  -- two inners, nested), concat, switch, exhaust, and take-over-merge.
-  -- That last is the region THIS header names as the hard one: the merge
-  -- count leads the registry after a take-cut, so it is the edge a wrong
-  -- cache would show at.  merge-cert, the shared hypothesis, is pinned at
-  -- the same states rather than assumed.
+  -- which point every mergeBump has landed — satisfies cachesValid.
+  --
+  -- LEAF-ONLY 2026-08-18, the same conversion as root-entry-sunk above: was
+  -- `root-caches-core` over merge-cert.  `cachesValid` is a conjunction fold
+  -- over the node list, so the residue is this PER-NODE leaf — and five of
+  -- nodeCacheOK's six constructor clauses are `true` outright, so what is
+  -- actually open here is the merge clause alone.
+  --
+  -- PROBED 2026-08-18 (Verify-Well-Formed.Root-Probe), NON-VACUOUSLY, in the
+  -- assembled form: `cachesValid` holds at the settled root exit for seven
+  -- programs whose node lists are pinned non-empty in the same file — merge
+  -- (one inner, two inners, nested), concat, switch, exhaust, and
+  -- take-over-merge.  That last is the region this header names as the hard
+  -- one: the merge count leads the registry after a take-cut, so it is the
+  -- edge a wrong cache would show at.
   -- COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
   -- levels, and a single slot context at most.
-  root-caches-core :
-    -- merge-cert (above)
-    (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-      (mnid : NodeId) →
-      mergeCertAt mnid
-        (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                  (sched-init e ins) (st-init e)))) ≡ true
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    cachesValid
-      (EvalSt.nodes (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                              (sched-init e ins) (st-init e)))))
-      (EvalSt.registry (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
-                                                 (sched-init e ins) (st-init e))))) ≡ true
+  -- DEAD ROUTE 2026-08-18: `merge-cert` (mergeCertAt at the root exit) does
+  -- NOT discharge even the k ≡ 0 case of this clause, which is what the old
+  -- `root-caches-core` hypothesis list silently claimed.  The two predicates
+  -- count DIFFERENT things: `countLiveInners` is `nubLen ∘ innerInstsR`, and
+  -- innerInstsP collects EVERY `from-inner _ nid j` frame on a registered
+  -- path with no aliveness test at all, while mergeCertAt only rules out the
+  -- ones with `aliveThroughᶠ`.  A registration whose path still mentions a
+  -- DEAD instance of nid is therefore counted by countLiveInners and ignored
+  -- by mergeCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
+  -- Closing this needs the separate invariant that no dead-but-present
+  -- from-inner instance survives in the root-exit registry; that fact does
+  -- not exist in the repo today.  The gap was invisible while this was a
+  -- -core, and became a type error the moment the assembly was real.
+  root-mergeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    (nid : NodeId) (k : ℕ) (od : Bool) →
+    (nid , merge-st k od) ∈ EvalSt.nodes (rootExitSt e ins) →
+    nodeCacheOK nid (merge-st k od) (EvalSt.registry (rootExitSt e ins)) ≡ true
+
+-- the per-node residue, split on the constructor: five of nodeCacheOK's six
+-- clauses are `true` outright, so the whole open content is the merge one.
+root-nodeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (nid : NodeId) (s : NodeState Γ) →
+  (nid , s) ∈ EvalSt.nodes (rootExitSt e ins) →
+  nodeCacheOK nid s (EvalSt.registry (rootExitSt e ins)) ≡ true
+root-nodeCache e ins nid (scan-st _)       m = refl
+root-nodeCache e ins nid (take-st _)       m = refl
+root-nodeCache e ins nid (concat-st _ _ _) m = refl
+root-nodeCache e ins nid (switch-st _ _)   m = refl
+root-nodeCache e ins nid (exhaust-st _ _)  m = refl
+root-nodeCache e ins nid (merge-st k od)   m = root-mergeCache e ins nid k od m
 
 root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →
@@ -311,8 +334,18 @@ root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   allShareSunk (EvalSt.registry
     (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                               (sched-init e ins) (st-init e))))) ≡ true
-root-done-plumbed =
-  root-done-plumbed-core (λ {n} {Γ} {t} → merge-cert {n} {Γ} {t})
+root-done-plumbed {n} {Γ} {t} e ins S req deq =
+  go (EvalSt.registry (rootExitSt e ins))
+     (λ rid src u p m → root-entry-sunk e ins S req deq rid src u p m)
+  where
+  go : (r : List (RegId × Source × Chain Γ t)) →
+       (∀ rid src u (p : Path Γ u t) →
+          (rid , src , (u , p)) ∈ r → sinksToShare p ≡ true) →
+       allShareSunk r ≡ true
+  go []                          h = refl
+  go ((rid , src , (u , p)) ∷ r) h =
+    ∧-intro (h rid src u p (here refl))
+            (go r (λ rid′ src′ u′ p′ m → h rid′ src′ u′ p′ (there m)))
 
 root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   cachesValid
@@ -320,8 +353,18 @@ root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
                                             (sched-init e ins) (st-init e)))))
     (EvalSt.registry (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                                (sched-init e ins) (st-init e))))) ≡ true
-root-caches =
-  root-caches-core (λ {n} {Γ} {t} → merge-cert {n} {Γ} {t})
+root-caches {n} {Γ} {t} e ins =
+  go (EvalSt.nodes (rootExitSt e ins))
+     (λ nid s m → root-nodeCache e ins nid s m)
+  where
+  go : (ns : List (NodeId × NodeState Γ)) →
+       (∀ nid s → (nid , s) ∈ ns →
+          nodeCacheOK nid s (EvalSt.registry (rootExitSt e ins)) ≡ true) →
+       cachesValid ns (EvalSt.registry (rootExitSt e ins)) ≡ true
+  go []               h = refl
+  go ((nid , s) ∷ ns) h =
+    ∧-intro (h nid s (here refl))
+            (go ns (λ nid′ s′ m → h nid′ s′ (there m)))
 
 -- the root subscription, composed (at the budget evaluate seeds)
 

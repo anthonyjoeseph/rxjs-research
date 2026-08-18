@@ -1097,11 +1097,12 @@ def main():
     missing_claims = sorted(n for n in main_claims if n not in defs)
 
     print("=" * 78)
-    print("WIRING CHECK \u2014 agda/src")
+    print(f"WIRING CHECK \u2014 {src_dir}  (root {ROOT_REL})")
     print("=" * 78)
     print(f"files {len(files)}   top-level names {len(order)}   "
           f"postulates {len(postulate_names)}")
-    print(f"reachability seeds {len(seed)}  (Main's claims + MODULE_ROOTS)")
+    print(f"reachability seeds {len(seed)}  "
+          f"({root_module()}'s claims + MODULE_ROOTS)")
     print(f"REACHABLE {len(R)}   unreachable {len(unreached)}   "
           f"anonymous pins (never reported) {len(exempted)}")
     if not main_ok:

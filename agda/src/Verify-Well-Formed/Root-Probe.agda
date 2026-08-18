@@ -2,14 +2,18 @@
 --
 -- MODULE_ROOT (see scripts/check-wiring.py): not imported by Main, not
 -- compiled; checked by `make bug-cache`.  Receipts live in the headers of
--- `root-caches-core` / `root-done-plumbed-core` (.Part4).
+-- `root-caches` / `root-done-plumbed` (.Part4), whose residues are now the
+-- per-node / per-entry leaves `root-mergeCache` and `root-entry-sunk`.
 --
 -- WHAT IS BEING TESTED, and why it is testable at all: both postulates'
 -- CONCLUSIONS are decidable Bool functions of a run — `cachesValid` and
 -- `allShareSunk` over the settled root-exit state — so instantiating at
 -- concrete programs either refutes them or gives a real receipt.  Their
--- shared merge-cert HYPOTHESIS is decidable too (`mergeCertAt`), so it is
--- pinned at the same states rather than assumed.
+-- former shared merge-cert HYPOTHESIS is decidable too (`mergeCertAt`), so
+-- it is pinned at the same states rather than assumed.  That postulate was
+-- retired 2026-08-18 when the two assemblies became real bodies (it does not
+-- close their k ≡ 0 case — see Part4.root-mergeCache); the pins stay, since
+-- they are the evidence base a restated merge coherence will be built on.
 --
 -- EVERY ROW IS LABELLED.  A row that could not have failed is not a row:
 -- `cachesValid [] reg` and `allShareSunk []` are both `true` outright, so
@@ -85,9 +89,9 @@ P7 = takeᵉ (nat̂ 1) P2                     -- take severs mid-merge, so the m
                                           -- count LEADS the registry after the cut
 
 ----------------------------------------------------------------------
--- ROW SET A — `root-caches-core`'s conclusion, which is UNCONDITIONAL
--- in (e, ins) once merge-cert is granted.  So a single `false` here is
--- an outright refutation of that postulate, not a hint.
+-- ROW SET A — `root-caches`'s conclusion, which is UNCONDITIONAL in
+-- (e, ins).  So a single `false` here is an outright refutation of the
+-- assembly and of its per-node leaf, not a hint.
 ----------------------------------------------------------------------
 
 _ : cachesValid (EvalSt.nodes (RUN P0)) (EvalSt.registry (RUN P0)) ≡ true
@@ -151,7 +155,7 @@ _ : null (EvalSt.nodes (RUN P7)) ≡ false
 _ = refl
 
 ----------------------------------------------------------------------
--- ROW SET B — `root-done-plumbed-core`'s conclusion, `allShareSunk` at
+-- ROW SET B — `root-done-plumbed`'s conclusion, `allShareSunk` at
 -- the settled root exit.
 --
 -- IT IS NOT PROBEABLE ON ROW SET A's PROGRAMS, and that is a finding
@@ -221,7 +225,7 @@ _ : cachesValid (EvalSt.nodes (RUN₂ S2)) (EvalSt.registry (RUN₂ S2)) ≡ tru
 _ = refl
 
 -- ⚠ allShareSunk is FALSE at that state.  Whether that REFUTES
--- `root-done-plumbed-core` turns entirely on its guard: the postulate
+-- `root-done-plumbed` turns entirely on its guard: the postulate
 -- claims allShareSunk only when the root stream drives the protocol to
 -- `done ≡ true`.  So compute the guard rather than assume it.
 doneOf : Maybe ProtocolSt → Bool
@@ -239,7 +243,7 @@ _ = refl
 -- nothing.  That is the most useful thing a non-refuting row can say —
 -- the `done` hypothesis is LOAD-BEARING, not decoration.
 
--- The genuinely load-bearing region for root-done-plumbed-core is
+-- The genuinely load-bearing region for root-done-plumbed is
 -- done ≡ true AND a non-empty registry.  Candidates:
 S3 : Closed Γ₂ natᵗ
 S3 = takeᵉ (nat̂ 0) (input (suc zero))          -- take(0): completes at once
@@ -268,12 +272,12 @@ _ = refl
 ----------------------------------------------------------------------
 -- COVERAGE, STATED AS A BOUNDARY RATHER THAN A RESULT.
 --
--- `root-caches-core`'s conclusion is COVERED non-vacuously: seven
+-- `root-caches`'s conclusion is COVERED non-vacuously: seven
 -- programs with populated node lists, spanning merge (three shapes),
 -- concat, switch, exhaust, and the take-cut edge its own header calls
 -- out as the hard case.  Row set A is a real receipt.
 --
--- `root-done-plumbed-core`'s conclusion is NOT COVERED, and no row here
+-- `root-done-plumbed`'s conclusion is NOT COVERED, and no row here
 -- should be read as evidence for it.  Its load-bearing region is
 -- `done ≡ true` WITH a live registry, and this probe set never reached
 -- it: every state with `done ≡ true` (P2, P4, S3) has a DRAINED
@@ -290,10 +294,13 @@ _ = refl
 -- the record that none of the obvious constructions produces one.
 ----------------------------------------------------------------------
 
--- THE SHARED HYPOTHESIS.  Both postulates take merge-cert, which is
--- decidable, so it is pinned rather than assumed — at every node id the
--- merge programs actually mint, plus one that does not exist (where
--- mergeCertAt is true by its catch-all, hence DEGENERATE).
+-- THE FORMER SHARED HYPOTHESIS.  Both -cores took merge-cert; neither
+-- assembly does any more (retired 2026-08-18).  mergeCertAt is decidable, so
+-- it is pinned rather than assumed — at every node id the merge programs
+-- actually mint, plus one that does not exist (where mergeCertAt is true by
+-- its catch-all, hence DEGENERATE).  These rows are now evidence for a
+-- FUTURE statement rather than for a live hypothesis, and they are what
+-- keeps mergeCertAt honest while it has no consumer in a proof.
 _ : mergeCertAt 0 (RUN P1) ∷ mergeCertAt 0 (RUN P2) ∷ mergeCertAt 1 (RUN P3)
   ∷ mergeCertAt 0 (RUN P3) ∷ mergeCertAt 0 (RUN P7) ∷ mergeCertAt 0 (RUN₂ S2)
   ∷ mergeCertAt 99 (RUN P1) ∷ []
