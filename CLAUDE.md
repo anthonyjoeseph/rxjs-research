@@ -307,9 +307,12 @@ make agda-dev-selftest                 proves the loop is load-bearing
 
 **THE LOOP COVERS THE WHOLE DEVELOPMENT PROCESS — use `agda-dev` throughout and `make
 agda` once at the end.** Paths are `src`-relative, and it works on ANY module you name.
-Two OPT-IN flags: **`SCOPE=1`** (`--only-scope-checking`) fails fast on typos but is
-**measured to buy no time**, so not a speedup; **`HOLES=1`** tolerates `?` and missing
-clauses, off by default so a `?` cannot pass silently.
+One OPT-IN flag: **`HOLES=1`** tolerates `?` and missing clauses, off by default so a
+`?` cannot pass silently. Its flags are scoped to the GENERATED module by a file-level
+OPTIONS pragma — never on the command line, where they would apply to the stdlib's
+`--safe` modules and fail inside `Data/Unit/Base.agda` before reaching our code.
+(`SCOPE=1` was REMOVED 2026-08-17: measured to buy no time, and against a dirty
+dependency it wrote a scope-only interface and cost a rebuild.)
 
 **THERE IS NO WHOLE-PROJECT SWEEP, AND DO NOT REBUILD ONE.** It existed, was measured
 against `make gate`, and lost on both cost and fidelity — strictly dominated, with no cache

@@ -55,7 +55,7 @@ help:
 	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet/Part2.agda'"
 	@echo "                  make agda-dev ARGS='<file> <member>'   (the grind loop)"
 	@echo "                  make agda-dev ARGS='--list <file>'    (block structure)"
-	@echo "                  SCOPE=1 scope-check only; HOLES=1 tolerate ? holes"
+	@echo "                  HOLES=1 tolerate ? holes"
 	@echo "  agda-dev-selftest  falsification test for agda-dev: corrupt a real"
 	@echo "                  body in src, demand the fast check goes RED, restore."
 	@echo "                  Run whenever the stubbing logic changes"
@@ -153,7 +153,7 @@ agda:
 #   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
 #   make agda-dev ARGS='--list <file>'     its mutual-block structure
 #
-# OPT-IN flags: SCOPE=1 (names and syntax only; buys no time, so not a speedup),
+# OPT-IN flag:
 # HOLES=1 (tolerate ? holes and missing clauses).
 #
 # DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID -- but only
@@ -180,7 +180,7 @@ agda:
 AGDA_DEV_BUDGET ?= 45
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
-	  $(if $(SCOPE),--scope) $(if $(HOLES),--holes) $(ARGS)
+	  $(if $(HOLES),--holes) $(ARGS)
 
 # Is the fast loop load-bearing, or green by construction?  Corrupts one token
 # in a real body in src, demands the dev check go RED, and restores the file

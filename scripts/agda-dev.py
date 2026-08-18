@@ -118,14 +118,17 @@ TWO BEHAVIOURS THE CODE NEEDED THAT THE DESIGN DID NOT ANTICIPATE:
   scripts/agda-dev.py --list <file>        its block structure, no typechecking
   scripts/agda-dev.py --falsify            the self-test
 
-Flags (both OPT-IN, and they stay that way on purpose):
-  --scope   --only-scope-checking.  MEASURED TO BUY NOTHING HERE: the run is
-            almost entirely deserialization, so skipping the typing is invisible.
-            Kept as a fail-fast for syntax and naming
-            errors, not as a speedup.  Hazard: with a DIRTY dependency it would
-            write a scope-only interface and cost a rebuild.
+Flags (OPT-IN, and it stays that way on purpose):
   --holes   --allow-unsolved-metas + --allow-incomplete-matches.  Off by default
             because a silently passing ? would break "the types line up".
+            Scoped to the generated module by a file-level OPTIONS pragma, not
+            by command-line flags -- see HOLES_PRAGMA.
+
+  (--scope/--only-scope-checking was REMOVED 2026-08-17: measured to buy no
+  time -- the run is almost entirely deserialization, so skipping the typing is
+  invisible -- while carrying a real hazard, since against a DIRTY dependency it
+  writes a scope-only interface and costs a rebuild.  A fail-fast that saves
+  nothing and can corrupt the cache is not worth its surface.)
 """
 from __future__ import annotations
 
@@ -532,7 +535,7 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             continue
         out.extend(p.lines[it.start : it.end])
 
-    return "\n".join(out).rstrip() + "\n"
+    return "\n".join(HOLES_PRAGMA + out).rstrip() + "\n"
 
 
 def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
@@ -581,7 +584,7 @@ def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
             if it.kind == kind and it.name in shown:
                 out.extend(p.lines[it.start : it.end])
                 out.append("")
-    return "\n".join(out).rstrip() + "\n"
+    return "\n".join(HOLES_PRAGMA + out).rstrip() + "\n"
 
 
 def publicize(block: list[str]) -> list[str]:
@@ -864,8 +867,8 @@ def agda_flags(args) -> list[str]:
     # right fix -- an output filter would have been a second thing to maintain.
     # ANY flag added here that Agda records in an interface re-opens the
     # thrash, so do not add one to quiet the output.
-    # (--only-scope-checking and the --holes pair are exempt in practice: they
-    # are opt-in, deliberate, and you accept a rebuild when you ask for them.)
+    # (the --holes pair is exempt in practice: it is opt-in, deliberate, and
+    # scoped to the generated module by a pragma rather than added here.)
     #
     # `-W error` IS THE ONE DELIBERATE EXCEPTION, and it is here for the
     # opposite reason: it is added to make warnings LOUDER, not quieter, and it
@@ -875,12 +878,23 @@ def agda_flags(args) -> list[str]:
     # THE MAKEFILE IN THE SAME COMMIT, or the cache thrash documented above
     # comes straight back.
     flags = ["-i", "src", "-i", "_dev", "-W", "error"]
-    if args.scope:
-        flags.append("--only-scope-checking")
-    if args.holes:
-        flags += ["--allow-unsolved-metas", "--allow-incomplete-matches"]
+    # --holes deliberately adds NOTHING here.  Its flags are scoped to the
+    # GENERATED module by a file-level OPTIONS pragma instead (HOLES_PRAGMA
+    # below).  A command-line --allow-unsolved-metas applies to EVERY module
+    # Agda checks, including the stdlib modules that declare
+    # {-# OPTIONS --safe #-}, and Agda rejects the combination inside the
+    # stdlib -- Data/Unit/Base.agda -- before it ever reaches our code.
+    # Measured 2026-08-17: HOLES=1 was dead on EVERY file in the repo for
+    # exactly this reason, failing in 0.3s at scope-check.  Do not "simplify"
+    # this back onto the command line.
     return flags
 
+
+# Prepended to every generated dev file when --holes is on.  A file-level
+# OPTIONS pragma binds to THIS module only, so the stdlib's --safe modules are
+# untouched.  Set once in main(); empty otherwise.  It sits before the source's
+# own header comments, which is where Agda requires an OPTIONS pragma to be.
+HOLES_PRAGMA: list[str] = []
 
 WORK = {"checking": 0}   # `Checking` lines seen this process; see run_one
 
@@ -1231,7 +1245,6 @@ def main() -> int:
                     "Verify-Budget-Sufficient/Subscribe-Face.agda")
     ap.add_argument("focus", nargs="?", help="one mutual-block member")
     ap.add_argument("--list", action="store_true", help="print block structure only")
-    ap.add_argument("--scope", action="store_true")
     ap.add_argument("--holes", action="store_true")
     # --dirty was REMOVED with the whole-project sweep it belonged to: with no
     # sweep there is nothing for it to restrict, and it was unsound for the job
@@ -1262,6 +1275,9 @@ def main() -> int:
                          "logic changes -- a generator that silently dropped the "
                          "focus body would otherwise read as a very fast pass.")
     args = ap.parse_args()
+    if args.holes:
+        HOLES_PRAGMA[:] = ["{-# OPTIONS --allow-unsolved-metas "
+                           "--allow-incomplete-matches #-}"]
 
     if args.clean:
         shutil.rmtree(DEV, ignore_errors=True)
