@@ -104,7 +104,10 @@ report review. Standing protocol, per Anthony:
   corrupt cache or a spurious failure, in a run that costs many minutes to repeat. It
   is also pure waste: the gate rebuilds that module anyway. Kill it before reporting,
   and say in the report that nothing is still running. Observed 2026-08-18, caught by
-  `ps` before it could land.
+  `ps` before it could land. **This covers `make agda-dev` too**, which is not
+  obvious and is the easy way to trip it: the dev loop and the gate deliberately
+  share ONE interface cache (the mirror's `_build`), so a dev run during a gate is
+  the same two-writer race as any other — not a lighter one.
 - **DELEGATION HAS A FIXED CONTEXT COST — AMORTISE IT OR DO THE WORK YOURSELF
   (Anthony, 2026-08-13).** A fresh worker must rebuild the model from nothing: read the
   2000-line module, chase the definitions, trace the statement. Measured twice on one day
@@ -215,12 +218,61 @@ bumps, the gate stays red until every call site is migrated, rather than filtere
 - **Do NOT silence a warning to get green.** Fix the cause. If a warning is genuinely
   wrong, that is a finding worth reporting, not a filter.
 
+**AGDA NEVER CHECKS `agda/src`. IT CHECKS `agda/_stripped-comments/`, AND
+THAT IS WHY A COMMENT EDIT IS FREE.** `scripts/strip-comments.py` mirrors
+`src` + `refuted` with every FULL-LINE `--` comment DELETED, so a comment-only
+edit leaves the mirror byte-identical and Agda rebuilds NOTHING. 29% of this
+tree is comment lines, and this file *requires* writing findings into headers
+(`-- PROBED`, `-- DEAD ROUTE`), so before the mirror every such line cost a
+full cone rebuild. Measured 2026-08-18, with the control run FIRST: a real
+definition appended to `Rx/Prim` rechecks its dependents; three comment lines
+inserted into the same module recheck **zero**.
+
+- **NEVER run `agda` against `agda/src` directly.** That builds a SECOND
+  interface cache, and every alternation between the two invalidates the
+  other's cone — the same thrash the single `AGDA` variable prevents for `-W`,
+  and for the same reason. All six call sites and `agda-dev` go through the
+  mirror; `stripped` is a prerequisite of every one of them and costs ~50 ms.
+- **Positions are mapped back to `src/` by `scripts/unmap-positions.py`**, off
+  a sidecar `.linemap.json`. The map is only valid for the source that
+  produced it — which is why the strip is a hard prerequisite rather than a
+  convenience, and why a hand-rolled `agda` invocation reports positions
+  against a stale map.
+- **`agda-dev` GENERATES INTO THE MIRROR (`_stripped-comments/_dev/`) AND RUNS
+  WITH THE MIRROR AS ITS CWD.** Do not "tidy" it back to `agda/_dev`: Agda finds
+  a project by walking UP from the file it is checking, so a dev module there
+  lands on `agda/rxjs-research.agda-lib`, whose `include: src` puts the REAL
+  sources on the path beside the mirrored ones — every module name then matches
+  two files and Agda dies with `AmbiguousTopLevelModuleName` before checking
+  anything. Generating inside the mirror stops that walk at the mirror's own
+  `.agda-lib`, and as a bonus gives the dev loop and the gate ONE `_build`.
+  Consequently the stripper's orphan sweep walks only `src` and `refuted`,
+  never the mirror wholesale — a wholesale sweep would delete `_dev` on every
+  run, which is every run.
+- **THE MAP CANNOT LIVE INSIDE THE MIRROR.** A `-- source line N` marker in
+  the stripped files would itself change whenever a comment is added above it,
+  making the mirror maximally sensitive to exactly the edits it exists to
+  absorb. Anything Agda hashes is off limits for this datum.
+- **WHY THE STRIPPER IS SAFE**, which is the whole question, since a wrong
+  strip typechecks a DIFFERENT program and reports green. It only touches
+  lines whose first non-whitespace run is the dashes, so the `--` is
+  unambiguously at a token start and `x--y` can never match; it applies Agda's
+  actual rule (dashes then end-of-line or a NON-symbol character, so `-->` and
+  `--|` are operators); it copies VERBATIM any file containing a non-pragma
+  `{-`, which retires the block-comment and string-literal questions entirely
+  at a cost of two files; and Agda has no multi-line string literal, which is
+  what makes a line-local rule sound. The invariant asserted on every file on
+  every run is `output[i] == source[kept[i]]`, so a bug can only DROP a line —
+  and a dropped code line is a parse error, which is loud.
+- **`make strip-selftest`** pins the lexical traps and the property that
+  matters: inserting a comment line does not change the stripped output.
+
 **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`; READ IT BACK WITH
 `make bg-check T=<target>`. Never hand-roll the wrapper.**
 
 ```
 make bg T=agda          ← under the Bash tool's run_in_background
-make bg-check T=agda    ← GREEN / RED + failing tail / STILL RUNNING (exit 3)
+make bg-check T=agda    ← GREEN / RED + failing tail / STILL RUNNING
 ```
 
 `make bg` **always exits non-zero, green or red, by design.** A launcher status that is
@@ -228,6 +280,22 @@ right most of the time gets believed, and then the rare false green sails throug
 invariant failure cannot carry a wrong answer. So **a completion notification is never a
 result — `bg-check` is.** The hand-rolled `(cmd > log; echo EXIT=$?)` exits with `echo`'s
 status and reports every build green; that is what this replaces.
+
+**TO WAIT FOR A BUILD, USE `make bg-wait T=<target>` — NEVER A LOOP AROUND
+`bg-check`.** `bg-wait` blocks until the log is TERMINAL, so its nonzero can only mean
+RED; that is the one thing `bg-check` cannot offer at any exit code:
+
+```
+make bg-wait T=gate     ← blocks; GREEN, or RED + failing tail
+```
+
+**`bg-check`'s exit status cannot be looped on**, because make collapses every recipe
+failure to its own exit 2 — still-running and failed become the same number, and the
+distinction dies at make's boundary. A loop keyed on the specific code either exits on
+the first poll and calls a running build finished (observed 2026-08-18: a gate with 62
+log lines and half the tower still to check) or spins forever on a dead RED one. Both
+are the false green `make bg`'s invariant exit exists to prevent, arriving one level up.
+So: `bg-check` to LOOK once, `bg-wait` to WAIT.
 
 - **`setsid` and `timeout` DO NOT EXIST ON macOS.** Piped to `tail`, the `$?` you read is
   `tail`'s zero. Detach with the Bash tool's `run_in_background`.

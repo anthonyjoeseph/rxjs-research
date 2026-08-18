@@ -28,3 +28,6 @@ _dev/
 
 # python bytecode from scripts/
 __pycache__/
+
+# the comment-stripped mirror agda actually checks (scripts/strip-comments.py)
+agda/_stripped-comments/

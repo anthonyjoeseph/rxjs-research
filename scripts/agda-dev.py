@@ -33,8 +33,8 @@ are minutes, while a several-hundred-line prelude of independent lemmas is
 seconds.  So module SIZE is nearly irrelevant and BLOCK size is everything, and
 the loop is not "disable a check", it is "check a few bodies at a time".
 
-HOW IT WORKS.  Generated modules land in agda/_dev/ (gitignored) holding the
-file VERBATIM except that block members become `postulate`s at their exact
+HOW IT WORKS.  Generated modules land in the stripped mirror's _dev/
+(gitignored) holding the file VERBATIM except that block members become `postulate`s at their exact
 existing signatures -- all but the FOCUS batch, which keeps its real bodies.
 agda/src is NEVER written to, and the generated names cannot collide with real
 interfaces in _build.  Mutual blocks are recovered exactly by reproducing Agda's
@@ -198,7 +198,37 @@ def jobs_for(peak: int, ceiling: int) -> int:
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGDA = os.path.join(REPO, "agda")
 SRC = os.path.join(AGDA, "src")
-DEV = os.path.join(AGDA, "_dev")
+# WHAT AGDA READS, AND WHERE IT STANDS: the comment-stripped mirror, entered as
+# the working directory exactly as `make agda` enters it.  Both facts are
+# load-bearing and neither is cosmetic.
+#
+#   THE CWD.  Agda finds a project by walking UP from the file it is checking
+#   until it hits an `.agda-lib`.  With the generated modules under `agda/_dev`
+#   that walk lands on `agda/rxjs-research.agda-lib`, whose `include: src`
+#   puts the REAL sources on the path beside the mirrored ones -- so every
+#   module name matches two files and Agda fails with
+#   AmbiguousTopLevelModuleName before checking anything.  Generating into the
+#   mirror instead makes the walk stop at the mirror's own `.agda-lib`.
+#
+#   THE SHARED `_build`.  One project root means ONE interface cache for this
+#   tool and the gate.  Split them and every alternation between the two
+#   invalidates the other's cone -- the same thrash the `-W` lockstep below
+#   exists to prevent, and the reason the include path is not `src`.
+MIRROR = os.path.join(AGDA, "_stripped-comments")
+DEV = os.path.join(MIRROR, "_dev")
+
+
+def sync_mirror() -> None:
+    """Regenerate the stripped mirror before checking anything.
+
+    ~50 ms, and skipping it is not an option: a generated dev module imports
+    the module under test's dependencies, which resolve through the mirror, so
+    a stale mirror checks against yesterday's sources.
+    """
+    subprocess.run(
+        [os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "strip-comments.py")],
+        check=True, capture_output=True)
 
 # A top-level line opening a construct we keep VERBATIM and never stub.  Its
 # indented body comes along with it.  `mutual`/`private`/`abstract` blocks are
@@ -877,7 +907,13 @@ def agda_flags(args) -> list[str]:
     # every build for weeks because green was green.  IF YOU CHANGE IT, CHANGE
     # THE MAKEFILE IN THE SAME COMMIT, or the cache thrash documented above
     # comes straight back.
-    flags = ["-i", "src", "-i", "_dev", "-W", "error"]
+    # THE INCLUDE PATH IS THE MIRROR, NOT `src`, and that is load-bearing:
+    # `make agda` checks agda/_stripped-comments/ (see the Makefile's `stripped`
+    # target), so an `-i src` here would build a SECOND interface cache and
+    # every alternation between the two tools would invalidate the other's
+    # cone -- the exact thrash the `-W` lockstep above exists to prevent.
+    # `sync_mirror()` runs first so the mirror is current.
+    flags = ["-i", "src", "-i", "refuted", "-i", "_dev", "-W", "error"]
     # --holes deliberately adds NOTHING here.  Its flags are scoped to the
     # GENERATED module by a file-level OPTIONS pragma instead (HOLES_PRAGMA
     # below).  A command-line --allow-unsolved-metas applies to EVERY module
@@ -911,7 +947,7 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
     cmd = ["agda", *agda_flags(args), rel_dev]
     limit = getattr(args, "budget", 0) or 0
     try:
-        pr = subprocess.run(cmd, cwd=AGDA, capture_output=True, text=True,
+        pr = subprocess.run(cmd, cwd=MIRROR, capture_output=True, text=True,
                             timeout=(limit or None),
                             env={**os.environ, "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"})
     except subprocess.TimeoutExpired:
@@ -1223,11 +1259,14 @@ def falsify(args) -> int:
           f"(src/{rel}:{it.start+1})")
     try:
         open(path, "w", encoding="utf-8").write("\n".join(lines))
+        # the corruption must reach the MIRROR, or the check reads the clean copy
+        sync_mirror()
         args.batch, args.jobs = 1, 1
         ok = dev_check(rel, args, target)
     finally:
         open(path, "w", encoding="utf-8").write(original)
         assert open(path, encoding="utf-8").read() == original, "RESTORE FAILED"
+        sync_mirror()
         print(f"agda-dev --falsify: src/{rel} restored byte-for-byte.")
 
     if ok:
@@ -1262,7 +1301,7 @@ def main() -> int:
                          "4->17.2s 5->23.6s 8->45.7s.  Small batches pay the "
                          "4.9s per-process interface toll too often; large ones "
                          "rebuild the mutual block they exist to avoid.")
-    ap.add_argument("--clean", action="store_true", help="remove agda/_dev and exit")
+    ap.add_argument("--clean", action="store_true", help="remove the generated dev modules and exit")
     ap.add_argument("--budget", type=float, default=45,
                     help="wall-clock budget in seconds; exceeding it FAILS.  This is "
                          "the loop's whole purpose, so it is enforced rather than "
@@ -1281,8 +1320,10 @@ def main() -> int:
 
     if args.clean:
         shutil.rmtree(DEV, ignore_errors=True)
-        print("agda-dev: removed agda/_dev")
+        print(f"agda-dev: removed {os.path.relpath(DEV, REPO)}")
         return 0
+
+    sync_mirror()
 
     if args.falsify:
         return falsify(args)

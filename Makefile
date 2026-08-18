@@ -1,4 +1,4 @@
-.PHONY: postulates all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: stripped strip-selftest postulates all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -77,6 +77,12 @@ help:
 	@echo "                  nothing (see scripts/check-wiring.py)"
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
 	@echo "  postulates    every postulate in agda/src by name — the work ledger"
+	@echo "  stripped      regenerate agda/_stripped-comments/, the comment-free"
+	@echo "                  mirror agda ACTUALLY checks — so a comment-only edit"
+	@echo "                  leaves it byte-identical and rebuilds nothing.  Runs"
+	@echo "                  automatically before every agda target (~50 ms)"
+	@echo "  strip-selftest  proves the stripper safe: the lexical traps (-->, x--y,"
+	@echo "                  {-# #-}) and comment-insert invariance"
 	@echo "  refuted       typecheck agda/refuted/ — the machine-checked '-> bottom'"
 	@echo "                  witnesses.  Separate include root: 'make agda' never"
 	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
@@ -138,9 +144,10 @@ help:
 # timing from a failed build measures how long it took to fail.  The recorder
 # leaves the file byte-identical unless a number actually moved, so a normal build
 # does not dirty the tree.
-agda:
+agda: stripped
 	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
-	 { (cd agda && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 | tee $$log; \
+	 { (cd agda/_stripped-comments && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 \
+	   | scripts/unmap-positions.py | tee $$log; \
 	 st=$$(cat $$rc); el=$$(( $$(date +%s) - t0 )); \
 	 n=$$(grep -c '^[[:space:]]*Checking ' $$log || true); \
 	 if [ "$$st" -eq 0 ] && [ "$$n" -gt 0 ]; then \
@@ -203,9 +210,9 @@ agda-dev-selftest:
 # throwaway performance cache, deleted once Formal-Verification is discharged),
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
-bug-cache:
-	cd agda && $(AGDA) src/Implementation/Unit-Test.agda
-	cd agda && $(AGDA) src/Verify-Budget-Sufficient/Demand-Probe.agda
+bug-cache: stripped
+	@$(call AGDA_RUN,src/Implementation/Unit-Test.agda)
+	@$(call AGDA_RUN,src/Verify-Budget-Sufficient/Demand-Probe.agda)
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
@@ -227,6 +234,40 @@ unsafe-check:
 	  else \
 	    echo "unsafe-check: clean (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
 	  fi
+
+# THE COMMENT-STRIPPED MIRROR — what Agda actually checks.
+#
+# `scripts/strip-comments.py` copies agda/src + agda/refuted into
+# agda/_stripped-comments/ with every FULL-LINE `--` comment DELETED.  A
+# comment-only edit therefore leaves the mirror byte-identical, and Agda
+# rebuilds NOTHING: 29% of this tree is comment lines, and a `-- PROBED` or
+# `-- DEAD ROUTE` line added to a low module used to cost a full cone rebuild.
+# Measured 2026-08-18 with a control: a real code change to Rx/Prim rechecks
+# its dependents, three inserted comment lines recheck zero.
+#
+# EVERY agda invocation goes through the mirror, so there is exactly ONE
+# interface cache and nothing can drift — the same rule the single `AGDA`
+# variable enforces for `-W`.  Nothing typechecks agda/src directly.
+#
+# `stripped` is a prerequisite of every agda target and runs in ~50 ms.  It is
+# not optional: the sidecar `.linemap.json` that maps mirror lines back to
+# source lines is only valid for the source that produced it, so an agda run
+# that skipped the strip would report positions against a stale map.
+stripped:
+	@scripts/strip-comments.py >/dev/null
+
+strip-selftest:
+	@scripts/strip-comments.py --selftest
+
+# Run agda against the mirror and map its positions back onto agda/src, WITHOUT
+# letting the pipe swallow agda's exit status — `$$?` is stashed before the pipe,
+# exactly as the `agda` recipe does.
+define AGDA_RUN
+rc=$$(mktemp); \
+	 { (cd agda/_stripped-comments && $(AGDA) $(1)); echo $$? > $$rc; } 2>&1 \
+	   | scripts/unmap-positions.py; \
+	 st=$$(cat $$rc); rm -f $$rc; exit $$st
+endef
 
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
 # LEAVE A PROOF HANGING").  Pure textual analysis of agda/src, no Agda
@@ -269,8 +310,8 @@ postulates:
 # machinery makes the route STATE-able.  Measured -- the round-3 anchor
 # vocabulary was seven definitions in Measures kept alive by nothing but the
 # six refutations that mention it.
-refuted:
-	cd agda && $(AGDA) refuted/Refuted/Main.agda
+refuted: stripped
+	@$(call AGDA_RUN,refuted/Refuted/Main.agda)
 
 wiring-selftest:
 	@out=$$(scripts/check-wiring.py --src scripts/wiring-selftest 2>&1); \
@@ -375,8 +416,8 @@ bg-check:
 ts-check:
 	cd typescript && npm run typecheck
 
-cli-build:
-	cd agda && $(AGDA) --compile --compile-dir=_cli src/CLI/Main.agda
+cli-build: stripped
+	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
 
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
@@ -412,8 +453,8 @@ oracle: cli-build
 #   make harness              every row, one process each (calibrated first)
 #   make harness ARGS='5'     just row 5
 HARNESS_ROWS ?= 2
-harness-build:
-	cd agda && $(AGDA) --compile --compile-dir=_harness src/Harness/Main.agda
+harness-build: stripped
+	@$(call AGDA_RUN,--compile --compile-dir=../_harness src/Harness/Main.agda)
 
 harness: harness-build
 	@cd agda && cal=$$(echo 0 | ./_harness/Main); \
@@ -428,8 +469,8 @@ harness: harness-build
 	 if [ -n "$(ARGS)" ]; then echo "$(ARGS)" | ./_harness/Main; \
 	 else for n in $$(seq 1 $(HARNESS_ROWS)); do echo $$n | ./_harness/Main; done; fi
 
-qc-build:
-	cd agda && $(AGDA) --compile --compile-dir=_cli src/QuickCheck.agda
+qc-build: stripped
+	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/QuickCheck.agda)
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
