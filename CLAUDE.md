@@ -780,8 +780,8 @@ An unwritten route goes in the parent's header, not into a type that verifies no
 The payoff is that **a leaf's FIT is tested the moment it is proven**, because its
 consumer is a body that must reduce.
 
-**HOW THIS IS ENFORCED (Anthony, 2026-08-18) — it is now a corollary of
-reachability, not a ledger.** `make wiring-gate` gives a name passed as a BARE
+**HOW THIS IS ENFORCED — as a corollary of reachability, needing no ledger of
+its own.** `make wiring-gate` gives a name passed as a BARE
 ARGUMENT to a postulate **no reachability credit from that site**. Passing is
 not itself forbidden; what is forbidden is a postulate being the ONLY connective
 tissue between a proven definition and Main. A lemma that is also genuinely
