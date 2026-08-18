@@ -107,8 +107,11 @@ out fully once its lemmas are actually applied, take it. **A landed migration's
 residue leaves move to their own tier**, not this one: they take no proven lemma,
 so they are ordinary work and this tier stays the migration worklist.
 
-**THE TIER IS EMPTY (2026-08-18). `make wiring-gate` measures ZERO passed-only
-lemmas, and the ratchet now fails ANY new one.** The last parent, `dry-tick-core`,
+**THE MIGRATION IS DONE (2026-08-18). `make wiring-gate` measures ZERO
+passed-only lemmas, and R2 now fails ANY new one** — no longer a ratchet
+against `agda/DEFERRED.txt` (deleted) but a consequence of reachability: a name
+passed as a bare argument to a postulate earns no reachability from that site,
+so a lemma whose ONLY use is being handed to a postulate has no route to Main.** The last parent, `dry-tick-core`,
 is where the pattern paid most: nine lemmas, EIGHT of which the fit test proved
 were never ingredients. They had been PARKED in an argument list — which reads as
 fully wired to every check the repo has — and under the leaf-only rule a proven
@@ -119,7 +122,38 @@ pointer sits on `hop-edge`'s header (.Wet/Part6), where the walk grind will want
 the dry apparatus back.
 
 Keep the tier heading: it is where the next `-core` goes if one is ever minted,
-and the ratchet's zero is the thing being defended.
+and R2's zero is the thing being defended.
+
+### STILL OPEN IN THIS TIER: two PREDECESSOR GENERATIONS (2026-08-18)
+
+The strengthened wiring check found 44 names in `agda/src` with **no route to
+Main**, in two clusters. The old check could not see them: "has ≥1 consumer" is
+a LOCAL question, so a cluster of dead code wires itself. Both clusters are the
+same shape — **a predecessor generation left standing when its successor
+landed** — and each holds postulates this file still tracks as live work, so
+neither may be deleted without a ruling.
+
+- **`burstH` + 38 (Burst-Walk)** — the residue of `cascadeGo-burst-dry`, which
+  was PASSED into `dry-tick-core`'s telescope and never applied; the leaf-only
+  migration proved it was never an ingredient (`cascadeFinish` emits nothing) and
+  it was deleted, orphaning its whole support cone unnoticed. The live successor
+  `cascadeGo-burst-nodry` IS reachable (→ `cascadeGo-nodry` → `dry-tick` →
+  `cascade-wet-via-caps`) and runs on different machinery (`burstCaps?`,
+  `capsAt-*`, `burstB?-halves`). **Holds four tier-2 postulates**
+  (`thruOuter-nodry-slFc`, `thruConsume-nodry-loop`, `VbB-tail`,
+  `thruWalk-nodry-dep`), all used only inside the dead cluster. Decide whether
+  the nodry obligations they carry are already discharged by the live chain; if
+  so this is a deletion and those four rows go with it.
+- **`foldPath-wf` + 4 (Verify-Well-Formed/Part9)** — superseded in shape by
+  Part11's `foldPath-out`, which has the identical telescope plus the FoldOut
+  readoff. NOT simply dead: `foldPath-frame-out` is documented as wanting
+  `stepFrame-wf` **enriched** to carry FoldOut out, and `dispatchShare-wf` is a
+  tier-2 SHAPE row marked "do it first". This is a restatement in waiting, and
+  the restatement is what re-wires it. Deleting it was attempted and reverted.
+
+**The gate is RED until these are resolved**, which is correct: `make wiring-gate`
+exits 1 on an unreachable definition. Resolve by ruling, not by exemption —
+there is no exemption list any more.
 
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
