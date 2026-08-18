@@ -84,7 +84,7 @@ open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; ou
                                 pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
                                 _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ;
                                 pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
-                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ; pWⱽ;
+                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ;
                                 slotPW; slotsPW; slotsPWgo;
                                 slotIW; slotsIW; slotsIWgo;
                                 slotsPW≤entryCeil; slotsIW≤entryCeil)
@@ -1204,31 +1204,6 @@ mutual
                          (ren-iWᵗ q sl ρg ρd ρt hp s))
   ren-iWᵗ q sl ρg ρd ρt hp (strmᵗ e) = ren-oWᵉ q sl ρg ρd ρt hp e
 
-  ren-pOᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (q : ℕ) (sl : Slots Γ)
-    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) → IxPres ρt →
-    (k : ℕ) (tm : Tm Γ Δᵍ Δ Θ t) → pmOᵗ q sl k (renTm ρg ρd ρt tm) ≡ pmOᵗ q sl k tm
-  ren-pOᵗ q sl ρg ρd ρt hp k (varᵗ x)    = refl
-  ren-pOᵗ q sl ρg ρd ρt hp k unit̂        = refl
-  ren-pOᵗ q sl ρg ρd ρt hp k (bool̂ _)    = refl
-  ren-pOᵗ q sl ρg ρd ρt hp k (nat̂ _)     = refl
-  ren-pOᵗ q sl ρg ρd ρt hp k (primᵗ _ a) = refl
-  ren-pOᵗ q sl ρg ρd ρt hp k (pairᵗ a b) =
-    cong₂ _⊔_ (ren-pOᵗ q sl ρg ρd ρt hp k a) (ren-pOᵗ q sl ρg ρd ρt hp k b)
-  ren-pOᵗ q sl ρg ρd ρt hp k (fstᵗ p) = ren-pOᵗ q sl ρg ρd ρt hp k p
-  ren-pOᵗ q sl ρg ρd ρt hp k (sndᵗ p) = ren-pOᵗ q sl ρg ρd ρt hp k p
-  ren-pOᵗ q sl ρg ρd ρt hp k (inlᵗ a) = ren-pOᵗ q sl ρg ρd ρt hp k a
-  ren-pOᵗ q sl ρg ρd ρt hp k (inrᵗ a) = ren-pOᵗ q sl ρg ρd ρt hp k a
-  ren-pOᵗ q sl ρg ρd ρt hp k (ifᵗ c a b) =
-    cong₂ _⊔_ (ren-pOᵗ q sl ρg ρd ρt hp k a) (ren-pOᵗ q sl ρg ρd ρt hp k b)
-  ren-pOᵗ q sl ρg ρd ρt hp k (caseᵗ s l r) =
-    cong₂ _⊔_ (cong₂ _⊔_ (ren-pOᵗ q sl ρg ρd (ext∈ ρt) (ext∈-IxPres hp) (suc k) l)
-                         (ren-pOᵗ q sl ρg ρd (ext∈ ρt) (ext∈-IxPres hp) (suc k) r))
-              (cong₂ _*_ (cong₂ _⊔_ (cong₂ _⊔_
-                            (ren-pIᵗ q sl ρg ρd (ext∈ ρt) (ext∈-IxPres hp) 0 l)
-                            (ren-pIᵗ q sl ρg ρd (ext∈ ρt) (ext∈-IxPres hp) 0 r))
-                            refl)
-                         (ren-pOᵗ q sl ρg ρd ρt hp k s))
-  ren-pOᵗ q sl ρg ρd ρt hp k (strmᵗ e) = ren-pOᵉ q sl ρg ρd ρt hp k e
 
   ren-pIᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (q : ℕ) (sl : Slots Γ)
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) → IxPres ρt →

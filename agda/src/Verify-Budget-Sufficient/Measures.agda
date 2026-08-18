@@ -1989,29 +1989,9 @@ dBound-bound {V} {R} {U} {r} {s} s≤V r≤R =
 
 module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
 
-  hopD-map : ∀ (η : Fin n → ℕ) {s u} (f : Tm Γ Δᵍ Δ (s ∷ Θ) u)
-    (b : Exp Γ Δᵍ Δ Θ s) →
-    hopDᵉ V η b ≤ hopDᵉ V η (mapᵉ f b)
-  hopD-map η f b =
-    ≤-trans (1*≤ (hopDᵉ V η b) (pmᵗ V 0 f ⊔ 1) (m≤n⊔m (pmᵗ V 0 f) 1))
-            (m≤n+m ((pmᵗ V 0 f ⊔ 1) * hopDᵉ V η b) (hopDᵗ V η f))
 
-  hopD-take : ∀ (η : Fin n → ℕ) {u} (c : Tm Γ Δᵍ Δ Θ natᵗ)
-    (b : Exp Γ Δᵍ Δ Θ u) →
-    hopDᵉ V η b ≤ hopDᵉ V η (takeᵉ c b)
-  hopD-take η c b = ≤-refl
 
-  hopD-scan : ∀ (η : Fin n → ℕ) {s u} (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u)
-    (z : Tm Γ Δᵍ Δ Θ u) (b : Exp Γ Δᵍ Δ Θ s) →
-    hopDᵉ V η b ≤ hopDᵉ V η (scanᵉ f z b)
-  hopD-scan η f z b =
-    ≤-trans (m≤n+m (hopDᵉ V η b) (hopDᵗ V η f + hopDᵗ V η z))
-            (1*≤ _ _ (1≤pow (suc (pmᵗ V 0 f)) V))
 
-  -- the four hop carriers: the operator's own frame is the `suc`
-  hopD-all : ∀ (η : Fin n → ℕ) {u} (b : Exp Γ Δᵍ Δ Θ (obs u)) →
-    hopDᵉ V η b ≤ suc (hopDᵉ V η b)
-  hopD-all η b = n≤1+n (hopDᵉ V η b)
 
 ------------------------------------------------------------------
 -- PHASE 3, THE ASSEMBLY: the emitted-value invariant's engine.
@@ -3007,14 +2987,6 @@ k+2≤2^k (suc (suc (suc j))) _ =
   ≤-trans (s≤s (k+2≤2^k (suc (suc j)) (s≤s (s≤s z≤n))))
           (suc-2^ (suc (suc j)))
 
-2k≤2^k : ∀ k → 2 ≤ k → k + k ≤ 2 ^ k
-2k≤2^k (suc zero)          (s≤s ())
-2k≤2^k (suc (suc zero))    _ = ≤ᵇ⇒≤ 4 4 tt
-2k≤2^k (suc (suc (suc j))) _ =
-  ≤-trans (≤-reflexive (cong suc (+-suc (suc (suc j)) (suc (suc j)))))
-  (+-mono-≤ (^-monoʳ-≤ 2 {x = 1} {y = suc (suc j)} (s≤s z≤n))
-            (≤-trans (2k≤2^k (suc (suc j)) (s≤s (s≤s z≤n)))
-                     (≤-reflexive (sym (+-identityʳ (2 ^ suc (suc j)))))))
 
 -- THE SQUARE's side condition.  The retired occurrence count made
 -- hopR's exponent a polynomial and this was 3k ≤ 2^k (true from 4);

@@ -53,10 +53,7 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ;
                                 -- named by the assembled cores' hypothesis types
                                 Exp; Tm; sizeᵗˢ; μᵉ; unfoldμ)
 open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ;
-                                -- the three ceiling injections init-capsOK?-base is
-                                -- assembled over, and the measures they bound
-                                pmOⱽ; pmIⱽ; pWⱽ;
-                                pmO≤ceil; pmI≤ceil; pWᵉ≤entryCeil)
+                                pmOⱽ; pmIⱽ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;

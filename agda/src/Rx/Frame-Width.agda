@@ -395,10 +395,6 @@ dWᵗ j sl tm = dWᵗⱽ j [] sl tm
 dWᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
 dWᵗˢ j sl ts = dWᵗˢⱽ j [] sl ts
 
--- and the join, on the descent itself: the caps side reads it at `[]`
-pWⱽ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n))
-    (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
-pWⱽ j vs sl e = outWⱽ j vs sl e ⊔ dWⱽ j vs sl e
 
 -- the parked width of a runtime VALUE, mirroring outWᵛ clause for clause
 dWᵛ : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty) → Val Γ t → ℕ
@@ -570,102 +566,6 @@ mutual
   pmI♯ᵗˢⱽ j vs sl []       = 0
   pmI♯ᵗˢⱽ j vs sl (y ∷ ys) = pmI♯ᵗⱽ j vs sl y ⊔ pmI♯ᵗˢⱽ j vs sl ys
 
-------------------------------------------------------------------
--- THE DOMINATION, clause for clause
-------------------------------------------------------------------
-
-mutual
-  pmO≤♯ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ)
-        (k : ℕ) (e : Exp Γ Δᵍ Δ Θ t) → pmOⱽ j vs sl k e ≤ pmO♯ⱽ j vs sl e
-  pmO≤♯ j vs sl k (input i)       = z≤n
-  pmO≤♯ j vs sl k (ofᵉ ts)        = z≤n
-  pmO≤♯ j vs sl k emptyᵉ          = z≤n
-  pmO≤♯ j vs sl k (mapᵉ f e)      = pmO≤♯ j vs sl k e
-  pmO≤♯ j vs sl k (takeᵉ c e)     = pmO≤♯ j vs sl k e
-  pmO≤♯ j vs sl k (scanᵉ f z e)   = pmO≤♯ j vs sl k e
-  pmO≤♯ j vs sl k (mergeAllᵉ e)   =
-    +-mono-≤ (*-monoʳ-≤ (outWⱽ j vs sl e) (pmI≤♯ j vs sl k e))
-             (*-monoˡ-≤ (innWⱽ j vs sl e) (pmO≤♯ j vs sl k e))
-  pmO≤♯ j vs sl k (concatAllᵉ e)  =
-    +-mono-≤ (*-monoʳ-≤ (outWⱽ j vs sl e) (pmI≤♯ j vs sl k e))
-             (*-monoˡ-≤ (innWⱽ j vs sl e) (pmO≤♯ j vs sl k e))
-  pmO≤♯ j vs sl k (switchAllᵉ e)  =
-    +-mono-≤ (*-monoʳ-≤ (outWⱽ j vs sl e) (pmI≤♯ j vs sl k e))
-             (*-monoˡ-≤ (innWⱽ j vs sl e) (pmO≤♯ j vs sl k e))
-  pmO≤♯ j vs sl k (exhaustAllᵉ e) =
-    +-mono-≤ (*-monoʳ-≤ (outWⱽ j vs sl e) (pmI≤♯ j vs sl k e))
-             (*-monoˡ-≤ (innWⱽ j vs sl e) (pmO≤♯ j vs sl k e))
-  pmO≤♯ j vs sl k (μᵉ e)          = pmO≤♯ j vs sl k e
-  pmO≤♯ j vs sl k (varᵉ x)        = z≤n
-  pmO≤♯ j vs sl k (deferᵉ e)      = z≤n
-
-  pmOᵗ≤♯ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ)
-         (k : ℕ) (tm : Tm Γ Δᵍ Δ Θ t) → pmOᵗⱽ j vs sl k tm ≤ pmO♯ᵗⱽ j vs sl tm
-  pmOᵗ≤♯ j vs sl k (varᵗ x)      = z≤n
-  pmOᵗ≤♯ j vs sl k unit̂          = z≤n
-  pmOᵗ≤♯ j vs sl k (bool̂ _)      = z≤n
-  pmOᵗ≤♯ j vs sl k (nat̂ _)       = z≤n
-  pmOᵗ≤♯ j vs sl k (pairᵗ a b)   = ⊔-mono-≤ (pmOᵗ≤♯ j vs sl k a) (pmOᵗ≤♯ j vs sl k b)
-  pmOᵗ≤♯ j vs sl k (fstᵗ p)      = pmOᵗ≤♯ j vs sl k p
-  pmOᵗ≤♯ j vs sl k (sndᵗ p)      = pmOᵗ≤♯ j vs sl k p
-  pmOᵗ≤♯ j vs sl k (inlᵗ a)      = pmOᵗ≤♯ j vs sl k a
-  pmOᵗ≤♯ j vs sl k (inrᵗ a)      = pmOᵗ≤♯ j vs sl k a
-  pmOᵗ≤♯ j vs sl k (caseᵗ s l r) =
-    ⊔-mono-≤ (⊔-mono-≤ (pmOᵗ≤♯ j vs sl (suc k) l) (pmOᵗ≤♯ j vs sl (suc k) r))
-             (*-mono-≤ (⊔-mono-≤ (⊔-mono-≤ (pmIᵗ≤♯ j vs sl 0 l) (pmIᵗ≤♯ j vs sl 0 r)) ≤-refl)
-                       (pmOᵗ≤♯ j vs sl k s))
-  pmOᵗ≤♯ j vs sl k (ifᵗ c a b)   = ⊔-mono-≤ (pmOᵗ≤♯ j vs sl k a) (pmOᵗ≤♯ j vs sl k b)
-  pmOᵗ≤♯ j vs sl k (primᵗ _ a)   = z≤n
-  pmOᵗ≤♯ j vs sl k (strmᵗ e)     = pmO≤♯ j vs sl k e
-
-  pmI≤♯ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ)
-        (k : ℕ) (e : Exp Γ Δᵍ Δ Θ t) → pmIⱽ j vs sl k e ≤ pmI♯ⱽ j vs sl e
-  pmI≤♯ j vs sl k (input i)       = z≤n
-  pmI≤♯ j vs sl k (ofᵉ ts)        = pmIᵗˢ≤♯ j vs sl k ts
-  pmI≤♯ j vs sl k emptyᵉ          = z≤n
-  pmI≤♯ j vs sl k (mapᵉ f e)      =
-    +-mono-≤ (pmIᵗ≤♯ j vs sl (suc k) f)
-             (*-mono-≤ (⊔-mono-≤ (pmIᵗ≤♯ j vs sl 0 f) ≤-refl) (pmI≤♯ j vs sl k e))
-  pmI≤♯ j vs sl k (takeᵉ c e)     = pmI≤♯ j vs sl k e
-  pmI≤♯ j vs sl k (scanᵉ f z e)   =
-    *-mono-≤ (^-monoˡ-≤ (outWⱽ j vs sl e) (⊔-mono-≤ (pmIᵗ≤♯ j vs sl 0 f) ≤-refl))
-             (+-mono-≤ (+-mono-≤ (pmIᵗ≤♯ j vs sl (suc k) f) (pmIᵗ≤♯ j vs sl k z))
-                       (pmI≤♯ j vs sl k e))
-  pmI≤♯ j vs sl k (mergeAllᵉ e)   = pmI≤♯ j vs sl k e
-  pmI≤♯ j vs sl k (concatAllᵉ e)  = pmI≤♯ j vs sl k e
-  pmI≤♯ j vs sl k (switchAllᵉ e)  = pmI≤♯ j vs sl k e
-  pmI≤♯ j vs sl k (exhaustAllᵉ e) = pmI≤♯ j vs sl k e
-  pmI≤♯ j vs sl k (μᵉ e)          = pmI≤♯ j vs sl k e
-  pmI≤♯ j vs sl k (varᵉ x)        = z≤n
-  pmI≤♯ j vs sl k (deferᵉ e)      = z≤n
-
-  pmIᵗ≤♯ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ)
-         (k : ℕ) (tm : Tm Γ Δᵍ Δ Θ t) → pmIᵗⱽ j vs sl k tm ≤ pmI♯ᵗⱽ j vs sl tm
-  pmIᵗ≤♯ j vs sl k (varᵗ x)      = ite1 (varIx x ≡ᵇ k)
-    where
-    ite1 : ∀ (b : Bool) → (if b then 1 else 0) ≤ 1
-    ite1 true  = ≤-refl
-    ite1 false = z≤n
-  pmIᵗ≤♯ j vs sl k unit̂          = z≤n
-  pmIᵗ≤♯ j vs sl k (bool̂ _)      = z≤n
-  pmIᵗ≤♯ j vs sl k (nat̂ _)       = z≤n
-  pmIᵗ≤♯ j vs sl k (pairᵗ a b)   = ⊔-mono-≤ (pmIᵗ≤♯ j vs sl k a) (pmIᵗ≤♯ j vs sl k b)
-  pmIᵗ≤♯ j vs sl k (fstᵗ p)      = pmIᵗ≤♯ j vs sl k p
-  pmIᵗ≤♯ j vs sl k (sndᵗ p)      = pmIᵗ≤♯ j vs sl k p
-  pmIᵗ≤♯ j vs sl k (inlᵗ a)      = pmIᵗ≤♯ j vs sl k a
-  pmIᵗ≤♯ j vs sl k (inrᵗ a)      = pmIᵗ≤♯ j vs sl k a
-  pmIᵗ≤♯ j vs sl k (caseᵗ s l r) =
-    +-mono-≤ (⊔-mono-≤ (pmIᵗ≤♯ j vs sl (suc k) l) (pmIᵗ≤♯ j vs sl (suc k) r))
-             (*-mono-≤ (⊔-mono-≤ (⊔-mono-≤ (pmIᵗ≤♯ j vs sl 0 l) (pmIᵗ≤♯ j vs sl 0 r)) ≤-refl)
-                       (pmIᵗ≤♯ j vs sl k s))
-  pmIᵗ≤♯ j vs sl k (ifᵗ c a b)   = ⊔-mono-≤ (pmIᵗ≤♯ j vs sl k a) (pmIᵗ≤♯ j vs sl k b)
-  pmIᵗ≤♯ j vs sl k (primᵗ _ a)   = z≤n
-  pmIᵗ≤♯ j vs sl k (strmᵗ e)     = pmO≤♯ j vs sl k e
-
-  pmIᵗˢ≤♯ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (vs : List (Fin n)) (sl : Slots Γ)
-          (k : ℕ) (ts : List (Tm Γ Δᵍ Δ Θ t)) → pmIᵗˢⱽ j vs sl k ts ≤ pmI♯ᵗˢⱽ j vs sl ts
-  pmIᵗˢ≤♯ j vs sl k []       = z≤n
-  pmIᵗˢ≤♯ j vs sl k (y ∷ ys) = ⊔-mono-≤ (pmIᵗ≤♯ j vs sl k y) (pmIᵗˢ≤♯ j vs sl k ys)
 
 -- THE COLLECTOR ITSELF: a node's own measures, joined with its
 -- children's ceilings
@@ -757,11 +657,7 @@ slotsCeil {n = n} j sl = slotsCeilgo j sl (tabulate {n = n} (λ i → i))
 ⊔₅₃ a b c d e = ≤-trans (m≤n⊔m (a ⊔ b) c)
                 (≤-trans (m≤m⊔n (a ⊔ b ⊔ c) d) (m≤m⊔n (a ⊔ b ⊔ c ⊔ d) e))
 
-⊔₅₄ : ∀ (a b c d e : ℕ) → d ≤ a ⊔ b ⊔ c ⊔ d ⊔ e
-⊔₅₄ a b c d e = ≤-trans (m≤n⊔m (a ⊔ b ⊔ c) d) (m≤m⊔n (a ⊔ b ⊔ c ⊔ d) e)
 
-⊔₅₅ : ∀ (a b c d e : ℕ) → e ≤ a ⊔ b ⊔ c ⊔ d ⊔ e
-⊔₅₅ a b c d e = m≤n⊔m (a ⊔ b ⊔ c ⊔ d) e
 
 own≤ceilᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
   (e : Exp Γ Δᵍ Δ Θ t) → ownᵉ j sl e ≤ ceilᵉ j sl e
@@ -779,15 +675,7 @@ dW≤ceil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
   (e : Exp Γ Δᵍ Δ Θ t) → dWⱽ j [] sl e ≤ ceilᵉ j sl e
 dW≤ceil j sl e = ≤-trans (⊔₅₃ (outWⱽ j [] sl e) (innWⱽ j [] sl e) (dWⱽ j [] sl e) (pmO♯ⱽ j [] sl e) (pmI♯ⱽ j [] sl e)) (own≤ceilᵉ j sl e)
 
-pmO≤ceil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ)
-  (e : Exp Γ Δᵍ Δ Θ t) → pmOⱽ j [] sl k e ≤ ceilᵉ j sl e
-pmO≤ceil j sl k e = ≤-trans (pmO≤♯ j [] sl k e)
-                            (≤-trans (⊔₅₄ (outWⱽ j [] sl e) (innWⱽ j [] sl e) (dWⱽ j [] sl e) (pmO♯ⱽ j [] sl e) (pmI♯ⱽ j [] sl e)) (own≤ceilᵉ j sl e))
 
-pmI≤ceil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) (k : ℕ)
-  (e : Exp Γ Δᵍ Δ Θ t) → pmIⱽ j [] sl k e ≤ ceilᵉ j sl e
-pmI≤ceil j sl k e = ≤-trans (pmI≤♯ j [] sl k e)
-                            (≤-trans (⊔₅₅ (outWⱽ j [] sl e) (innWⱽ j [] sl e) (dWⱽ j [] sl e) (pmO♯ⱽ j [] sl e) (pmI♯ⱽ j [] sl e)) (own≤ceilᵉ j sl e))
 
 pW≤ceil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
   (e : Exp Γ Δᵍ Δ Θ t) → outWⱽ j [] sl e ⊔ dWⱽ j [] sl e ≤ ceilᵉ j sl e
@@ -827,10 +715,6 @@ slotsIW≤slotsCeil {n = n} j sl = slotsIW≤go j sl (tabulate {n = n} (λ i →
 entryCeil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
 entryCeil j sl e = ceilᵉ j sl e ⊔ slotsCeil j sl
 
--- the three old base terms, each one ⊔-injection down
-pWᵉ≤entryCeil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
-  (e : Exp Γ Δᵍ Δ Θ t) → pWⱽ j [] sl e ≤ entryCeil j sl e
-pWᵉ≤entryCeil j sl e = ≤-trans (pW≤ceil j sl e) (m≤m⊔n (ceilᵉ j sl e) (slotsCeil j sl))
 
 slotsPW≤entryCeil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (j : ℕ) (sl : Slots Γ)
   (e : Exp Γ Δᵍ Δ Θ t) → slotsPW j sl ≤ entryCeil j sl e

@@ -84,7 +84,7 @@ open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; ou
                                 pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
                                 _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ;
                                 pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
-                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ; pWⱽ;
+                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ;
                                 slotPW; slotsPW; slotsPWgo;
                                 slotIW; slotsIW; slotsIWgo;
                                 slotsPW≤entryCeil; slotsIW≤entryCeil)
