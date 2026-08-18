@@ -76,9 +76,16 @@ help:
 	@echo "                  a human to rule on — always exits 0, deletes"
 	@echo "                  nothing (see scripts/check-wiring.py)"
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
-	@echo "  gate          the acceptance test: wiring-gate + unsafe-check +"
-	@echo "                  agda + bug-cache, cheap checks first so"
-	@echo "                  a 2-second failure never waits on the 13-minute one"
+	@echo "  refuted       typecheck agda/refuted/ — the machine-checked '-> bottom'"
+	@echo "                  witnesses.  Separate include root: 'make agda' never"
+	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
+	@echo "                  after 'make agda' (it imports src, so the cache is"
+	@echo "                  warm by then).  See REFUTATION.md"
+	@echo "  gate          the acceptance test: wiring-selftest + wiring-gate +"
+	@echo "                  unsafe-check + agda + refuted + bug-cache.  Cheap"
+	@echo "                  checks FIRST so a 2-second failure never waits on"
+	@echo "                  the 13-minute one; 'refuted' comes AFTER 'agda'"
+	@echo "                  because it imports src and wants that cache warm"
 	@echo "  bg            RUN EVERY LONG BUILD THROUGH THIS.  ALWAYS EXITS 7,"
 	@echo "                  green or red — a launcher status that is right most"
 	@echo "                  of the time gets believed, so this one is never"
@@ -272,9 +279,11 @@ wiring-selftest:
 # ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
 gate:
+	@$(MAKE) --no-print-directory wiring-selftest
 	@$(MAKE) --no-print-directory wiring-gate
 	@$(MAKE) --no-print-directory unsafe-check
 	@$(MAKE) --no-print-directory agda
+	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory bug-cache
 	@echo "gate: ALL GREEN"
 

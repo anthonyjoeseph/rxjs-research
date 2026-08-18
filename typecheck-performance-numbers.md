@@ -244,6 +244,43 @@ Each was measured and lost. The rules they justify are in CLAUDE.md.
 
 ## Parallelism and memory
 
+- **A PARALLEL `warm-cache` FOR `make agda` WAS MEASURED AND REJECTED (2026-08-18).
+  THE DAG DOES NOT OFFER THE PARALLELISM.** Main's cone is 66 modules over a
+  **37-level** critical path, and **levels 15–36 are WIDTH 1** — a strict chain
+  holding every expensive module: Caps-Face → Subscribe-Face → Walk-Level →
+  Burst-Walk → Caps-Bridge → Verify-Well-Formed Part1…Part13 → VWF → The-Proof →
+  Main. Weighting each module by its recorded best:
+
+  | | |
+  |---|---|
+  | serial total | 510.7 s |
+  | critical path | **302.6 s** — the floor for ANY parallelism |
+  | max speedup | **1.69×**, with infinite cores and zero contention |
+
+  And 1.69× is an OVERESTIMATE, because the weights come from `agda-dev` bests,
+  which stub mutual blocks — the modules that cost most under real `make agda`
+  are exactly the ones ON the critical path, so true weights push the ceiling
+  DOWN. Against that ceiling stand two measured facts in this same section:
+  deserialization is memory-bandwidth bound and does not scale with cores
+  (12-way turned 5.6 s runs into 13–24 s), and at most TWO heavyweight checks
+  fit in RAM. Two-way parallelism against a <1.69× ceiling, with per-process
+  contention, is net zero at best.
+  There is also a CORRECTNESS hazard, not just a wasted-work one: two `agda`
+  processes on overlapping cones both build the shared prefix and race on
+  writing the same `.agdai` files.
+  **The Verify-Well-Formed chain is genuine** — Part_n imports Part_{n-1} for
+  every n in 2…13, checked, not incidental — so 13 of those serial levels
+  cannot be widened without restructuring proof shape, which "cut at mutual-SCC
+  boundaries" forbids doing for check time.
+  **What actually governs `make agda`'s cost is which module you EDITED.** Warm
+  with a shallow change it is 19–43 s (14–21 modules); editing something
+  foundational (Rx/Exp, Frame-Width, Measures) invalidates the cone and costs
+  the near-cold 660–2095 s. No scheduler changes that.
+
+- **`make refuted` warm: 5.46 s** (real, right after `make agda`). It imports
+  `src` deeply, so run AFTER `agda` — which is where `make gate` puts it.
+
+
 - **Subscribe-Face peaks ~5.2 GB** as a single check — and a dev run was observed at
   **6.3 GB**, so 5.2 is not the true ceiling. Re-measure with `ps -eo rss` rather than
   assuming.
