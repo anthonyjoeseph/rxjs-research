@@ -544,6 +544,21 @@ Two rules govern acting on it:
   a later proof might want back), add a one-line `-- RECOVERY: git show <sha>
   restores …` pointer to the header of the thing that would consume it — same
   locality rule as `-- DEAD ROUTE`.
+- **A SUPERSEDED PREDECESSOR IS DELETED, ALWAYS (Anthony, 2026-08-18).** When a
+  successor lands and the generation it replaced is left standing, the old one
+  goes — not wired, not parked, not kept "until the successor is proven". It is
+  the repo's most expensive orphan shape, because a predecessor drags a whole
+  support cone with it and every local check reads that cone as wired: a mutual
+  cluster consumes itself, so "has ≥1 consumer" is satisfied by dead code. Only
+  reachability sees it.
+  **But ESTABLISH that it is one before invoking this rule.** Both clusters the
+  first reachability sweep reported as predecessor generations turned out not to
+  be: one was a checker blind spot (a module APPLICATION conducting the cluster's
+  only edge), the other a MISSING WIRE whose successor was re-proving what the
+  predecessor already proved — delete either and live proof goes with it. The
+  distinguishing question is not "does a successor exist" but **"does the
+  successor prove everything the predecessor proves?"** — and it is answered by
+  diffing the two bodies' arms, not their statements.
 
 ### DE-RISK MODE: test for falsity first, grind last (Anthony, 2026-08-06)
 
