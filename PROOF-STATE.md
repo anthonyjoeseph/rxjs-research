@@ -124,36 +124,30 @@ the dry apparatus back.
 Keep the tier heading: it is where the next `-core` goes if one is ever minted,
 and R2's zero is the thing being defended.
 
-### STILL OPEN IN THIS TIER: two PREDECESSOR GENERATIONS (2026-08-18)
+### THE TIER IS EMPTY AGAIN — and the two "predecessor generations" were not (2026-08-18)
 
-The strengthened wiring check found 44 names in `agda/src` with **no route to
-Main**, in two clusters. The old check could not see them: "has ≥1 consumer" is
-a LOCAL question, so a cluster of dead code wires itself. Both clusters are the
-same shape — **a predecessor generation left standing when its successor
-landed** — and each holds postulates this file still tracks as live work, so
-neither may be deleted without a ruling.
+The strengthened check first reported 44 unreachable names in two clusters, and
+both were written up here as predecessor generations left standing. Neither was.
+The write-up is kept in `git show` only; what replaced it:
 
-- **`burstH` + 38 (Burst-Walk)** — the residue of `cascadeGo-burst-dry`, which
-  was PASSED into `dry-tick-core`'s telescope and never applied; the leaf-only
-  migration proved it was never an ingredient (`cascadeFinish` emits nothing) and
-  it was deleted, orphaning its whole support cone unnoticed. The live successor
-  `cascadeGo-burst-nodry` IS reachable (→ `cascadeGo-nodry` → `dry-tick` →
-  `cascade-wet-via-caps`) and runs on different machinery (`burstCaps?`,
-  `capsAt-*`, `burstB?-halves`). **Holds four tier-2 postulates**
-  (`thruOuter-nodry-slFc`, `thruConsume-nodry-loop`, `VbB-tail`,
-  `thruWalk-nodry-dep`), all used only inside the dead cluster. Decide whether
-  the nodry obligations they carry are already discharged by the live chain; if
-  so this is a deletion and those four rows go with it.
-- **`foldPath-wf` + 4 (Verify-Well-Formed/Part9)** — superseded in shape by
-  Part11's `foldPath-out`, which has the identical telescope plus the FoldOut
-  readoff. NOT simply dead: `foldPath-frame-out` is documented as wanting
-  `stepFrame-wf` **enriched** to carry FoldOut out, and `dispatchShare-wf` is a
-  tier-2 SHAPE row marked "do it first". This is a restatement in waiting, and
-  the restatement is what re-wires it. Deleting it was attempted and reverted.
+- **`burstH` + 38 (Burst-Walk) was a CHECKER BLIND SPOT, not dead code.** Its
+  only consumer is `module V = Walk … burstH`, a module APPLICATION — a binding,
+  not a scope — and both scan loops skipped the line, so the names right of `=`
+  got no owner. That cluster is the engine of `cascadeGo-burst-nodry`. The
+  checker now registers the alias (kind `module-app`, never reported); the four
+  tier-2 postulates it holds were never orphaned and their rows stand unchanged.
+- **`foldPath-wf` + 4 (Part9) WAS a missing wire, and it is now wired.**
+  Part11's `foldPath-out` re-proved the run equation in its frame and share
+  arms, which is exactly what `foldPath-wf` proves for every path constructor —
+  so `foldPath-frame-out` was a second proof of the `stepFrame-wf` induction and
+  `foldPath-share-out` a second proof of `dispatchShare-wf`'s obligation. Both
+  arms now take the run's `S′` and the equation that pins it from `foldPath-wf`
+  and owe only the FoldOut readoff.
 
-**The gate is RED until these are resolved**, which is correct: `make wiring-gate`
-exits 1 on an unreachable definition. Resolve by ruling, not by exemption —
-there is no exemption list any more.
+**The standing lesson is the checker's, not the code's: a LOCAL consumer count
+wires a dead cluster to itself, so only reachability can see one — and a
+reachability report is only as good as the edges the scanner can parse.** Both
+findings came out of the same run, in opposite directions.
 
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
@@ -242,8 +236,10 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   `mid-step-core`: the FoldOut readoff, and FoldOut is a 6-field invariant
   validated at exactly one clause.
 - **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
-  `foldPath-out`'s two undischarged arms. The frame arm wants `stepFrame-wf`
-  enriched to carry FoldOut out; the share arm is the diamond's net-zero owed.
+  `foldPath-out`'s two undischarged arms, now the FoldOut readoff ONLY — each
+  takes the run's `S′` and equation from the proven `foldPath-wf`, so neither
+  re-proves a run half any more. The frame arm wants `stepFrame-wf` enriched to
+  carry FoldOut out; the share arm is the diamond's net-zero owed.
 - **`mid-fold-certs`** (Part11) — DIFFICULTY: one case split on
   `Arrival.isLast a` off `Mid.done-plumbed`; the blueprint's GUARD applies to
   its flip conjunct.

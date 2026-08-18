@@ -298,13 +298,16 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- leaf-only rule.  The other two arms are leaves, so this is a 1-of-3
 -- discharge and not a proof of the fold.
 postulate
-  -- FRAME arm.  `foldPath` recurses into path′ at the stepped
-  -- (vals,evs,fin,sched,st) — `stepFrame-wf` already transports FoldInv
-  -- across that step — but FoldOut's fields are keyed on `foldSt`/
-  -- `foldSched` at the OUTER path, and the flip/steady certificates are
-  -- statements about the CURRENT (fin, st) which stepFrame rewrites.
-  -- Discharging this means enriching stepFrame-wf to carry FoldOut back
-  -- out, which is the blueprint's "stepFrame-wf, enriched".
+  -- FRAME arm, NOW THE FoldOut ONLY (2026-08-18).  The run equation is
+  -- not this leaf's to prove: `foldPath-wf` (.Part9) already proves it
+  -- for EVERY path constructor, by the same `stepFrame-wf` + IH
+  -- induction this arm was restating — so as posed it was a second
+  -- proof of a proven fact, and `foldPath-wf` had no consumer at all.
+  -- It now takes the run's own S′ and the equation that pins it, and
+  -- owes only the readoff.  What is left is genuinely the blueprint's
+  -- "stepFrame-wf, enriched": FoldOut's fields are keyed on `foldSt`/
+  -- `foldSched` at the OUTER path, and the flip/steady certificates
+  -- speak of the CURRENT (fin, st) which stepFrame rewrites.
   foldPath-frame-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (f : Frame Γ w u) (path′ : Path Γ u t)
@@ -315,15 +318,17 @@ postulate
     ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
        allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
     (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
-    Σ ProtocolSt λ S′ →
-      (runProtocol S (proj₁ (foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st))
-         ≡ just S′)
-      × FoldOut sf gas id now envSrc (f ↠ path′) vals evs fin sched st (FoldInv.ob′ fi) S S′
+    (S′ : ProtocolSt) →
+    runProtocol S (proj₁ (foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st))
+      ≡ just S′ →
+    FoldOut sf gas id now envSrc (f ↠ path′) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
-  -- SHARE arm.  The handoff emit plus one delivery per registration of
-  -- share i, each its own foldPath — mutually recursive with this
-  -- family, exactly as `dispatchShare-wf` is with `foldPath-wf`.  Its
-  -- FoldOut is the diamond's net-zero owed statement.
+  -- SHARE arm, NOW THE FoldOut ONLY (2026-08-18).  The handoff emit plus
+  -- one delivery per registration of share i, each its own foldPath.  As
+  -- posed this arm re-proved the run equation that `dispatchShare-wf`
+  -- (.Part9) already owes — two postulates for one obligation — so it
+  -- now takes S′ and the equation from `foldPath-wf` and owes only the
+  -- FoldOut, the diamond's net-zero owed statement.
   foldPath-share-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
@@ -332,10 +337,10 @@ postulate
     ((if fin then true else ProtocolSt.done S) ≡ true → ProtocolSt.done S ≡ false →
        allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
     (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
-    Σ ProtocolSt λ S′ →
-      (runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
-         ≡ just S′)
-      × FoldOut sf gas id now envSrc (share-sink i) vals evs fin sched st (FoldInv.ob′ fi) S S′
+    (S′ : ProtocolSt) →
+    runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
+      ≡ just S′ →
+    FoldOut sf gas id now envSrc (share-sink i) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
 foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -364,9 +369,17 @@ foldPath-out sf gas id now envSrc root vals evs fin sched st S fi ds flip steady
   done-nil deq with trans (sym df) deq
   ... | ()
 foldPath-out sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds flip steady =
-  foldPath-frame-out sf gas id now envSrc f path′ vals evs fin sched st S fi ds flip steady
+  proj₁ W , proj₂ W
+  , foldPath-frame-out sf gas id now envSrc f path′ vals evs fin sched st S fi
+      ds flip steady (proj₁ W) (proj₂ W)
+  where
+  W = foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds
 foldPath-out sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds flip steady =
-  foldPath-share-out sf gas id now envSrc i vals evs fin sched st S fi flip steady
+  proj₁ W , proj₂ W
+  , foldPath-share-out sf gas id now envSrc i vals evs fin sched st S fi
+      flip steady (proj₁ W) (proj₂ W)
+  where
+  W = foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds
 
 -- ════════════════════════════════════════════════════════════════
 -- THE Mid TRANSITION, ASSEMBLED — a real body over three leaves
