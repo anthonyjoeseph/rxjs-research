@@ -701,6 +701,7 @@ MODULE_ROOTS = {
     "Implementation.Unit-Test": "the type-level bug cache — `make bug-cache`",
     "Harness.Main": "the compiled measurement harness — `make harness-build` / `make harness`",
     "Verify-Budget-Sufficient.Demand-Probe": "the gas-demand measurement rows — checked by `make bug-cache`",
+    "Verify-Well-Formed.Root-Probe": "the root-exit coherence rows — checked by `make bug-cache`",
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

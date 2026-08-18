@@ -242,6 +242,17 @@ postulate
 -- wrap clauses are; the -core takes today's root-exit merge-cert and gains the
 -- mid-fold hypotheses when those rewrites land.
 postulate
+  -- PROBED 2026-08-18 (Verify-Well-Formed.Root-Probe): the load-bearing
+  -- region was NOT reached, so this row's class is unchanged.  The
+  -- conclusion is only non-vacuous when `done ≡ true` AND the registry
+  -- is still live, and no construction tried produces that: every
+  -- done-state reached (merge, concat, and take(0) over a share) has a
+  -- DRAINED registry, where `allShareSunk [] ≡ true` outright.  The one
+  -- state with a live registry has `done ≡ false` — and allShareSunk is
+  -- genuinely FALSE there, which at least shows the `done` guard is
+  -- load-bearing rather than decorative.  The header below asserts such
+  -- states exist; the probe module records that none of the obvious
+  -- programs is one.
   root-done-plumbed-core :
     -- merge-cert (above)
     (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
@@ -266,6 +277,16 @@ postulate
   -- which point every mergeBump has landed — satisfies cachesValid.  The same
   -- merge-coherence content: an ASSEMBLY over merge-cert, like
   -- root-done-plumbed above.
+  -- PROBED 2026-08-18 (Verify-Well-Formed.Root-Probe), NON-VACUOUSLY:
+  -- `cachesValid` holds at the settled root exit for seven programs whose
+  -- node lists are pinned non-empty in the same file — merge (one inner,
+  -- two inners, nested), concat, switch, exhaust, and take-over-merge.
+  -- That last is the region THIS header names as the hard one: the merge
+  -- count leads the registry after a take-cut, so it is the edge a wrong
+  -- cache would show at.  merge-cert, the shared hypothesis, is pinned at
+  -- the same states rather than assumed.
+  -- COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
+  -- levels, and a single slot context at most.
   root-caches-core :
     -- merge-cert (above)
     (∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)

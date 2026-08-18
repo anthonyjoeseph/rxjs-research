@@ -137,8 +137,12 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   `foldPath-wf`'s third clause. Its FoldOut half belongs to
   `foldPath-share-out`, so the statement as written is what `foldPath-out`
   spends.
-- **`root-done-plumbed-core` / `root-caches-core`** (Part4) — FALSITY,
-  blocked on merge-cert's mid-fold form; the merge-coherence content itself.
+- **`root-done-plumbed-core`** (Part4) — FALSITY, blocked on merge-cert's
+  mid-fold form. Probed; the load-bearing region (`done` with a live registry)
+  was NOT reached, so the class stands. Coverage boundary in its header.
+- **`root-caches-core`** (Part4) — DIFFICULTY: probed non-vacuously over all
+  four *All node kinds and the take-cut edge its header names as the hard one.
+  Both are `-core` postulates and owe the leaf-only conversion.
 - **`subscribeE-{merge,concat,switch,exhaust}All-wf`** (Part3) — SHAPE:
   written against a merge-cert form that may still gain hypotheses.
 - **`stepFrame-wf-outer`** (Part9) — SHAPE, on a ROUTE claim rather than the
