@@ -360,6 +360,23 @@ def extract_definitions(src_dir, files):
             # four of the heaviest modules in the tree.  Recurse exactly as
             # into `mutual`; never register the module's OWN name, because
             # a module is a scope and not a definition.
+            # A MODULE APPLICATION (`module V = Walk … burstH`) is a
+            # BINDING, not a scope, and the names on its right are real uses.
+            # Skipping the line cost `burstH` its only consumer and reported a
+            # 39-name LIVE cluster as dead (2026-08-18) — that module
+            # application is what makes `cascadeGo-burst-nodry` run.  Register
+            # the alias, so the RHS has an owner and the alias's own mentions
+            # (`BW.V.cascadeGo-go`) carry reachability through it.  Never
+            # REPORTED — a binding is not a claim — so it conducts
+            # reachability without manufacturing any.  Tested BEFORE the
+            # `where` search, which scans ahead and would otherwise mistake a
+            # LATER `module … where` for this line's header.
+            if (tok0 == "module" and len(tokens) > 2
+                    and tokens[1] != "_" and tokens[2] == "="):
+                register(tokens[1], relpath, i + 1, "module-app")
+                i += 1
+                continue
+
             if tok0 == "module":
                 k, limit = i, min(end, i + 12)
                 while k < limit and visible[k].split("--", 1)[0].split()[-1:] != ["where"]:
@@ -495,6 +512,14 @@ def extract_definitions(src_dir, files):
                 continue
             tok0 = tokens[0]
 
+            # A MODULE APPLICATION nested in a scope — see scan_block's copy.
+            # `module V = Walk … burstH` is a member of `module BurstWalk …
+            # where`, so it is THIS loop that has to see it (2026-08-18).
+            if (tok0 == "module" and len(tokens) > 2
+                    and tokens[1] != "_" and tokens[2] == "="):
+                register(tokens[1], relpath, i + 1, "module-app")
+                i += 1
+                continue
             if tok0 in SKIP_HEAD_TOKENS:
                 i += 1
                 continue
@@ -993,7 +1018,7 @@ def main():
         main_claims, suppressed)
     R = reachable_from(seed, edges)
 
-    exempt = lambda n: defs[n].kind == "anon"
+    exempt = lambda n: defs[n].kind in ("anon", "module-app")
     unreached = [n for n in order if n not in R and not exempt(n)]
     exempted = [n for n in order if n not in R and exempt(n)]
     dead_post = [n for n in unreached if n in postulate_names]

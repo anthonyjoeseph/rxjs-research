@@ -21,4 +21,28 @@ other : Nat → Nat
 other y = good-lemma y
 
 top-line : Nat → Nat
-top-line z = other (parent-core bad-lemma (nested z))
+top-line z = other (parent-core bad-lemma (nested (both-mods z)))
+
+-- MODULE APPLICATIONS.  `module M = F args` is a BINDING, not a scope: the
+-- names on its right are real uses, and a scanner that skips the line hands
+-- them no consumer.  Both loops must see it — `via-top` exercises the
+-- file-level scan, `via-mod` the nested one, which is the case that bit
+-- (2026-08-18: `module V = Walk … burstH` was `burstH`'s only consumer, and
+-- skipping it reported a 39-name LIVE cluster as dead).
+module Box (f : Nat → Nat) where
+  run : Nat → Nat
+  run x = f x
+
+via-top : Nat → Nat
+via-top x = x
+
+module TopInst = Box via-top
+
+module Scope where
+  via-mod : Nat → Nat
+  via-mod x = x
+
+  module Inst = Box via-mod
+
+both-mods : Nat → Nat
+both-mods w = TopInst.run (Scope.Inst.run w)
