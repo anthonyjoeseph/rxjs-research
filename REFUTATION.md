@@ -16,9 +16,12 @@ The round-3 anchor vocabulary is the measured case: seven definitions
 mention them. Kept in `src`, that is a whole vocabulary carried so its own
 obituary can be written. **Code is cost.**
 
-Out here a refutation needs no exemption from the wiring law at all, and the
-checker has none to give: `make wiring` scans `agda/src` only. A name-based
-exemption would let any definition exempt itself by choosing its name.
+Out here a refutation needs no exemption from the wiring law — but it is not
+OUTSIDE that law either. **`make wiring-refuted`** runs the same checker over
+this tree with `Refuted/Main.agda` as the root, so a witness `Refuted.Main`
+does not name, and any helper no witness reaches, fails the gate exactly as a
+dead lemma in `src` does. A name-based exemption would let any definition
+exempt itself by choosing its name; a ROOT-based one cannot.
 
 ## The rules
 

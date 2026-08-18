@@ -766,10 +766,14 @@ does.
     by nothing but the six refutations that mention it.
   Because a refuted route does **not change**, `src` may refer to one in a
   `-- REFUTED:` comment; that is the locality, and it costs `src` nothing.
-  `agda/refuted/` is NOT subject to the wiring law — `make wiring` scans
-  `agda/src` only — so a refutation needs no exemption and cannot self-exempt
-  by choosing its name, which is what the old `*-absurd` suffix match allowed.
-  Nothing in `src` may import it.
+  `agda/refuted/` IS under the wiring law, by its own root: **`make
+  wiring-refuted`** runs the same checker with `--src agda/refuted --root
+  Refuted/Main.agda`, so every witness and every helper out there must trace
+  to a name `Refuted.Main` claims. It has no MODULE_ROOTS — no compiled
+  binaries, just witnesses — so the whole tree hangs off that claim list, and
+  "Refuted.Main names every witness" is enforced rather than merely stated.
+  A refutation still cannot self-exempt by choosing its name, which is what
+  the old `*-absurd` suffix match allowed. Nothing in `src` may import it.
 
   This does NOT reopen `probe/` or a `dead-ends/` tree of prose files. The
   distinction is that everything in `agda/refuted/` is TYPECHECKED and named
@@ -1079,7 +1083,7 @@ module nothing reaches fails the gate in seconds, rather than needing a second
 full compile of the tower to notice. **Never close a coverage gap by re-adding a
 bulk import to Main — that is the loophole, not the repair.**
 
-**ACCEPTANCE TEST: `make gate`** — `wiring-selftest`, `wiring-gate`, `unsafe-check`,
+**ACCEPTANCE TEST: `make gate`** — `wiring-selftest`, `wiring-gate`, `wiring-refuted`, `unsafe-check`,
 `agda`, `refuted`, `bug-cache`, in that order. **Cheap checks run FIRST, deliberately:**
 an unreachable name or an unsafe pragma is decidable in seconds by grep while the full
 gate costs many minutes, so there is no reason to spend those minutes only to fail on
@@ -1092,9 +1096,15 @@ consumers before believing any status claimed for it.
 - an **unreachable MODULE**. A different question from definition reachability, and a
   blind spot a per-definition check cannot see: a module holding only
   `open import … public` re-exports has no definitions to report and reads as clean
-  however dead it is. Reachability is computed from Main plus the `MODULE_ROOTS` entry
-  points (each a separately compiled binary with its own make target), so anything
-  those import is covered automatically;
+  however dead it is. Reachability is computed from Main plus each `MODULE_ROOTS`
+  module's declared ENTRY POINTS — `main` for a compiled binary (the shell is its
+  consumer, and no textual search finds that edge), and NOTHING for a type-level
+  cache or probe module, which is held up entirely by its anonymous `_ : T` pins.
+  **It is the entries, not the module.** Seeding a root module wholesale exempted
+  every internal helper in it, so a probe module or a binary could accumulate dead
+  code forever while the gate read `unreachable 0` — measured with a canary in
+  Root-Probe that went unreported. Anything those entries reach is covered
+  automatically;
 - a **`⊤`-typed postulate** that asserts nothing (`VACUOUS_ALLOWLIST` carries the one
   deliberate exception, `defer-shift`, whose own comment says it is "an honest gap, not
   a claim"). A NEW one fails;

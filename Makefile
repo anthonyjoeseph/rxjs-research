@@ -281,6 +281,16 @@ wiring:
 wiring-gate:
 	scripts/check-wiring.py --gate
 
+# THE SAME LAW, APPLIED TO agda/refuted (Anthony, 2026-08-18).  A refutation
+# nothing reaches is as dead as a lemma nothing reaches, and until this target
+# existed NOTHING checked that tree: `make wiring` scanned agda/src only, so
+# `Refuted.Main` naming every witness was a convention with no enforcement.
+# The root differs (Refuted/Main.agda, not Main.agda) and there are no
+# MODULE_ROOTS out here — no compiled binaries, just witnesses — so the whole
+# tree hangs off what Refuted.Main claims, which is exactly the intent.
+wiring-refuted:
+	scripts/check-wiring.py --src agda/refuted --root Refuted/Main.agda --gate
+
 # THE REMAINING-WORK LEDGER: every postulate in agda/src, by name.  A grep for
 # `^postulate` finds the 32 BLOCK HEADERS, not the 110 names inside them, so it
 # is not the ledger and never was.  PROOF-STATE must carry a row for each of
@@ -331,6 +341,7 @@ wiring-selftest:
 gate:
 	@$(MAKE) --no-print-directory wiring-selftest
 	@$(MAKE) --no-print-directory wiring-gate
+	@$(MAKE) --no-print-directory wiring-refuted
 	@$(MAKE) --no-print-directory unsafe-check
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted

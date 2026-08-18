@@ -105,7 +105,7 @@ def read_main_claims(src_dir):
     a bare `open import` with no `using` clause — a violation of rule 2, and
     the caller must say so loudly rather than silently reporting fewer claims.
     """
-    path = os.path.join(src_dir, "Main.agda")
+    path = os.path.join(src_dir, ROOT_REL)
     try:
         with open(path, encoding="utf-8") as fh:
             raw = fh.read().split("\n")
@@ -695,16 +695,52 @@ VACUOUS_ALLOWLIST = {
 # modules means anything they import is covered automatically; only a module
 # nothing reaches at all is reported.
 # ---------------------------------------------------------------------------
+# EACH ROOT NAMES ITS ENTRY POINTS, and that second field is the whole
+# point of the mapping (Anthony, 2026-08-18).  Seeding a root MODULE
+# wholesale — which is what this did — exempted every INTERNAL HELPER in
+# it from R1, so a probe module or a compiled binary could accumulate
+# dead code indefinitely and the gate would report `unreachable 0`.
+# Measured with a canary: a definition added to Root-Probe that nothing
+# mentions was NOT flagged.
+#
+# A compiled binary's entry is `main` — the shell is its consumer, and no
+# textual search will ever find that edge, so it must be seeded.  A
+# type-level cache or probe module has NO named entry: its entries are the
+# anonymous `_ : T` pins, which the typechecker checks and which are
+# seeded everywhere anyway.  So `()` is not an omission — it says this
+# module is held up entirely by its pins, and any name a pin cannot reach
+# is dead.
 MODULE_ROOTS = {
-    "CLI.Main": "the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
-    "QuickCheck": "the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
-    "Implementation.Unit-Test": "the type-level bug cache — `make bug-cache`",
-    "Harness.Main": "the compiled measurement harness — `make harness-build` / `make harness`",
-    "Verify-Budget-Sufficient.Demand-Probe": "the gas-demand measurement rows — checked by `make bug-cache`",
-    "Verify-Well-Formed.Root-Probe": "the root-exit coherence rows — checked by `make bug-cache`",
+    "CLI.Main": ("the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
+                 ("main",)),
+    "QuickCheck": ("the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
+                   ("main",)),
+    "Implementation.Unit-Test": ("the type-level bug cache — `make bug-cache`",
+                                 ()),
+    "Harness.Main": ("the compiled measurement harness — `make harness-build` / `make harness`",
+                     ("main",)),
+    "Verify-Budget-Sufficient.Demand-Probe": ("the gas-demand measurement rows — checked by `make bug-cache`",
+                                              ()),
+    "Verify-Well-Formed.Root-Probe": ("the root-exit coherence rows — checked by `make bug-cache`",
+                                      ()),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
+
+# ---------------------------------------------------------------------------
+# THE REACHABILITY ROOT, relative to --src.  `agda/src` roots at Main.agda;
+# `agda/refuted` roots at Refuted/Main.agda.  Parameterised rather than
+# hardcoded so the SAME law applies to both trees (Anthony, 2026-08-18):
+# a refutation nothing reaches is as dead as a lemma nothing reaches, and
+# until this existed nothing checked the second tree at all.
+# Set once by main(); read by the four places that need to know which file
+# is the claim list rather than a claimant.
+# ---------------------------------------------------------------------------
+ROOT_REL = "Main.agda"
+
+
+def root_module():
+    return ROOT_REL[:-5].replace(os.sep, ".")
 
 
 
@@ -723,7 +759,7 @@ def find_unreachable_modules(src_dir, files):
         mods[rel[:-5].replace(os.sep, ".")] = rel
 
     seen = set()
-    stack = ["Main"] + [m for m in MODULE_ROOTS if m in mods]
+    stack = [root_module()] + [m for m in MODULE_ROOTS if m in mods]
     while stack:
         m = stack.pop()
         if m in seen or m not in mods:
@@ -883,7 +919,7 @@ def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
         own = def_lines.get(P, ())
         pat = re.compile(r"(?<!" + _BND + r")" + re.escape(P) + r"(?!" + _BND + r")")
         for relpath in files:
-            if relpath == "Main.agda":
+            if relpath == ROOT_REL:
                 continue
             _raw, visible = load_file(src_dir, relpath)
             for i, line in enumerate(visible, start=1):
@@ -937,11 +973,13 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
     consumer is the shell, so no textual search will ever find one)."""
     by_file = owner_index(def_lines)
     mods = {rel[:-5].replace(os.sep, "."): rel for rel in files}
-    root_files = {mods[m] for m in MODULE_ROOTS if m in mods}
+    # file -> its ENTRY names.  Not the whole file: see MODULE_ROOTS.
+    root_entries = {mods[m]: set(MODULE_ROOTS[m][1]) for m in MODULE_ROOTS if m in mods}
     edges, consumers = defaultdict(set), defaultdict(set)
     seed = {c for c in main_claims if c in defs}
     for name in order:
-        if defs[name].file in root_files or defs[name].kind == "anon":
+        if (name in root_entries.get(defs[name].file, ())
+                or defs[name].kind == "anon"):
             seed.add(name)
         terms = [name]
         core = mixfix_core_of(name)
@@ -949,7 +987,7 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
             terms.append(core)
         own = def_lines.get(name, ())
         for relpath in files:
-            if relpath == "Main.agda":
+            if relpath == ROOT_REL:
                 continue
             text, offsets, import_lines = corpus[relpath]
             if not text:
@@ -964,8 +1002,6 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
                         lineno = bisect_right(offsets, idx)
                         if ((relpath, lineno) not in own
                                 and lineno not in import_lines):
-                            if relpath in root_files:
-                                seed.add(name)
                             o = owner_of(by_file, relpath, lineno)
                             # R2: a bare argument handed to a postulate earns
                             # nothing from this site.
@@ -993,6 +1029,11 @@ def main():
     parser.add_argument("--src", default=None,
                         help="path to agda/src (default: inferred from this "
                              "script's location)")
+    parser.add_argument("--root", default="Main.agda",
+                        help="the reachability root, relative to --src "
+                             "(default: Main.agda; agda/refuted uses "
+                             "Refuted/Main.agda). Everything in the tree must "
+                             "trace to a name this file claims.")
     parser.add_argument("--postulates", action="store_true",
                         help="list every postulate in agda/src, one `name  "
                              "file:line` per line, and exit. This is the "
@@ -1003,6 +1044,9 @@ def main():
                         help="exit 1 when the wiring law is violated. Without "
                              "this the script is a report and always exits 0.")
     args = parser.parse_args()
+
+    global ROOT_REL
+    ROOT_REL = args.root
 
     if args.src:
         src_dir = args.src
@@ -1033,7 +1077,17 @@ def main():
         main_claims, suppressed)
     R = reachable_from(seed, edges)
 
-    exempt = lambda n: defs[n].kind in ("anon", "module-app")
+    # `...` continues a `with` clause and can sit at column 0, so it is
+    # registered as a definition head — and that registration is
+    # LOAD-BEARING: it is what attributes each continuation line to an
+    # owner, and dropping it re-attributes every such line to whatever
+    # head precedes it, which silently orphaned 115 live names when tried
+    # (Anthony, 2026-08-18).  So it stays in the graph and is excluded
+    # from REPORTING only.  It is not a name and can never have a
+    # consumer, so in agda/src it rode along as accidentally-reachable
+    # (the token appears in most files) and in agda/refuted — one column-0
+    # `...` — it surfaced as a phantom dead definition.
+    exempt = lambda n: defs[n].kind in ("anon", "module-app") or n == "..."
     unreached = [n for n in order if n not in R and not exempt(n)]
     exempted = [n for n in order if n not in R and exempt(n)]
     dead_post = [n for n in unreached if n in postulate_names]
@@ -1052,13 +1106,13 @@ def main():
           f"anonymous pins (never reported) {len(exempted)}")
     if not main_ok:
         print()
-        print("  !! Main.agda has a bare `open import` with no `using (...)`.")
+        print(f"  !! {ROOT_REL} has a bare `open import` with no `using (...)`.")
         print("     Main must NAME individual definitions, so that 'imported'")
         print("     means 'claimed' and not merely 'compiled'.  Until it does,")
         print("     the seed set is INCOMPLETE and every number here is soft.")
     if missing_claims:
         print()
-        print("  !! BROKEN CLAIMS \u2014 Main.agda names these, no definition found:")
+        print(f"  !! BROKEN CLAIMS \u2014 {ROOT_REL} names these, no definition found:")
         for n in missing_claims:
             print(f"       {n}")
     print()
@@ -1160,7 +1214,7 @@ def main():
         if unexcused:
             problems.append(f"{len(unexcused)} vacuous (\u22a4-typed) postulate(s)")
         if not main_ok:
-            problems.append("Main.agda has a bare `open import`")
+            problems.append(f"{ROOT_REL} has a bare `open import`")
         if missing_claims:
             problems.append(f"{len(missing_claims)} broken Main claim(s)")
         if problems:
