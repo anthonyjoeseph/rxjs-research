@@ -88,7 +88,7 @@ from the rest; neither is visible while the lemma is merely passed.
 **AND THE THIRD OUTCOME IS A STOP, WHICH IS A FINDING AND NOT A DISCHARGE —
 BUT A RULING CAN RESUME IT.** `subscribeE-takeᵉ-wf-core` went both ways.
 Applying its lemma exposed a premise FALSE at the only call site, so the row,
-the `DEFERRED.txt` line and the leaf-only violation all stayed live — a stopped
+the leaf-only violation all stayed live — a stopped
 migration pays (it converts an unexamined premise into a machine refutation) but
 it does not close its row. What then cleared it was not a cleverer proof but a
 RULING on a statement: keying `BurstInv.live-matches` off `EvalSt.dying st`
@@ -107,7 +107,7 @@ out fully once its lemmas are actually applied, take it. **A landed migration's
 residue leaves move to their own tier**, not this one: they take no proven lemma,
 so they are ordinary work and this tier stays the migration worklist.
 
-**THE TIER IS EMPTY (2026-08-18). `agda/DEFERRED.txt` measures ZERO passed-only
+**THE TIER IS EMPTY (2026-08-18). `make wiring-gate` measures ZERO passed-only
 lemmas, and the ratchet now fails ANY new one.** The last parent, `dry-tick-core`,
 is where the pattern paid most: nine lemmas, EIGHT of which the fit test proved
 were never ingredients. They had been PARKED in an argument list — which reads as

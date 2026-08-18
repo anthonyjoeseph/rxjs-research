@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -67,12 +67,14 @@ help:
 	@echo "                  pragma reaching the proof path.  This greps for them."
 	@echo "                  Retires at the finish line, when 'agda --safe"
 	@echo "                  src/Main.agda' checks postulates and pragmas at once"
-	@echo "  wiring        the wiring-law report ('a comment is not a wire'):"
-	@echo "                  every top-level definition/postulate in agda/src,"
-	@echo "                  its consumer count, and the ledger of postulates"
-	@echo "                  with vs without a real consumer.  A report for a"
-	@echo "                  human to rule on, not a build gate — always exits"
-	@echo "                  0 and deletes nothing (see scripts/check-wiring.py)"
+	@echo "  wiring        the wiring-law report ('never leave a proof hanging'):"
+	@echo "                  R1 every definition and postulate in agda/src must"
+	@echo "                  be REACHABLE from Main's claims; R2 a name passed"
+	@echo "                  as a bare argument to a postulate earns nothing"
+	@echo "                  from that site, so a postulate can never be the"
+	@echo "                  only tissue holding a proof to Main.  A report for"
+	@echo "                  a human to rule on — always exits 0, deletes"
+	@echo "                  nothing (see scripts/check-wiring.py)"
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
 	@echo "  gate          the acceptance test: wiring-gate + unsafe-check +"
 	@echo "                  agda + bug-cache, cheap checks first so"
@@ -218,16 +220,36 @@ unsafe-check:
 	    echo "unsafe-check: clean (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
 	  fi
 
-# The wiring law's mechanised check (see CLAUDE.md, "the wiring law: a
-# comment is not a wire").  Pure textual analysis of agda/src, no Agda
+# The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
+# LEAVE A PROOF HANGING").  Pure textual analysis of agda/src, no Agda
 # invocation — always exits 0, this is a report for a human to rule on.
 wiring:
 	scripts/check-wiring.py
 
-# The same check AS A GATE: exits 1 on a wiring-law violation (an orphan
-# outside the exempt families, or a ⊤-typed postulate that asserts nothing).
+# The same check AS A GATE: exits 1 when something in agda/src has no route
+# to Main, when a module is unreachable, or on a ⊤-typed postulate.
 wiring-gate:
 	scripts/check-wiring.py --gate
+
+# PROVES THE WIRING CHECK IS LOAD-BEARING.  R2 (a name passed as a bare
+# argument to a postulate earns no reachability from that site) currently
+# fires on NOTHING in agda/src — the leaf-only migration emptied it — so
+# without this it would rot untested and silently stop working.  The fixture
+# is an A/B: `bad-lemma` is passed bare to a postulate and must be REPORTED;
+# `good-lemma` (applied by a real body) and `nested` (applied inside parens to
+# compute a value AT a postulate call site) must both stay LIVE.  `nested` is
+# the control for the false-positive class that sank an earlier design, which
+# gated on the passed-vs-applied classifier directly and misread 40 of 110
+# postulates.
+wiring-selftest:
+	@out=$$(scripts/check-wiring.py --src scripts/wiring-selftest 2>&1); \
+	  fail=0; \
+	  echo "$$out" | grep -q "bad-lemma" || { echo "SELFTEST FAIL: bad-lemma not reported — R2 has stopped firing"; fail=1; }; \
+	  for n in good-lemma nested other top-line; do \
+	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
+	  done; \
+	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma, and on nothing else)"; \
+	  else echo "$$out"; exit 1; fi
 
 # THE ACCEPTANCE TEST, cheap checks FIRST.  Ordering is the point: an orphan
 # or an unsafe pragma is decidable in seconds by grep, while `agda` costs

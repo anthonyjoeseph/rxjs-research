@@ -1,29 +1,64 @@
 #!/usr/bin/env python3
-"""The wiring-law checker: "a comment is not a wire" (see CLAUDE.md).
+"""The wiring law, mechanised: NEVER LEAVE A PROOF HANGING (see CLAUDE.md).
 
-Scans agda/src/**/*.agda and reports:
+Two rules, and the second is a special case of the first.
 
-  (A) ORPHANS       top-level definitions (proven code) with zero consumers
-                     anywhere in agda/src.
-  (B) THE LEDGER     every `postulate` member, split into "with consumers"
-                     (real remaining work) and "zero consumers" (dead-weight
-                     deletion candidates).
-  (C) SUMMARY        counts.
+  R1  REACHABILITY.  Every top-level definition and every postulate must be
+      reachable from `Main.agda`'s claims (or from a MODULE_ROOTS entry
+      point), following the edge relation below.  One route suffices: a
+      name used in ten places needs only one of them to trace home.
 
-This is a TEXTUAL heuristic, not a semantic one — see the "limitations"
-footer this script prints, and read it before trusting a borderline case.
+  R2  A POSTULATE IS A LEAF.  A name passed as a bare argument TO a
+      postulate earns NO reachability from that site.  Passing is allowed —
+      what is forbidden is a postulate being the ONLY connective tissue
+      between a proven definition and Main.  Such a lemma has never had its
+      FIT tested: nothing reduces it, so nothing checks that its type is
+      the one the parent actually needs.
+
+THE EDGE RELATION.  Two kinds of edge, and they differ only under R2:
+
+                          | counts for reachability
+    ----------------------+------------------------
+    type edge  (a name    | YES — a postulate's statement legitimately
+    in a statement)       | needs vocabulary, and Main claims the statement
+    ----------------------+------------------------
+    application edge (a   | NO when the callee is a POSTULATE.  Yes when it
+    name passed as a bare | is a definition: a real body APPLIES what it is
+    argument at a call)   | given, so the composition is checked.
+
+WHY THIS SHAPE IS ROBUST TO ITS OWN IMPRECISION.  Deciding "lemma passed as
+a proof" vs "function applied to compute a value" is a TYPE question and
+this script only has text.  It errs by over-suppressing.  But a suppressed
+edge can only produce a FAILURE when it was that name's ONLY route home —
+and a name whose only route is into a postulate is exactly what R2 exists
+to report.  A misread edge on a name with any other consumer is invisible.
+Contrast the earlier standalone leaf check, which gated on the classifier
+directly and measured 40 false positives out of 110 postulates.
+
+WHAT THIS REPLACES.  `agda/DEFERRED.txt` and its ratchet are GONE: R2 is
+absolute, so there is nothing to grandfather.  The `-core`-suffix heuristic
+is gone with it — R2 is structural and sees every postulate.  The A3
+gate-cone check and the B3 ordering hazard are gone too, both subsumed by
+R1 (a definition wired only by a probe no longer traces to Main, so it
+fails R1 on its own).
+
+TWO CHECKS BEYOND R1/R2, kept because R1 structurally cannot see them:
+  * UNREACHABLE MODULES — a file of pure `open import … public` re-exports
+    has no definitions to orphan, so definition-level reachability is blind
+    to it however dead it is.
+  * VACUOUS POSTULATES — R2 is perfectly happy with a `⊤`-typed leaf, but a
+    postulate that asserts nothing reads as discharged.  CLAUDE.md: "A
+    POSTULATE MUST ASSERT SOMETHING."
+
+This is a TEXTUAL heuristic, not a semantic one — see the limitations
+footer, and read it before trusting a borderline case.
 
 Usage:
     scripts/check-wiring.py [--src DIR] [--gate]
-
-Without --gate the exit code is always 0: a report for a human to rule
-on.  With --gate it exits 1 on a wiring-law violation (an orphan outside
-the exempt families, or a postulate that asserts nothing), which is what
-makes the law enforceable next to the typechecker instead of merely
-documented.
 """
 
 import argparse
+import functools
 import io
 import os
 import re
@@ -32,84 +67,25 @@ from bisect import bisect_right
 from collections import defaultdict
 
 # ---------------------------------------------------------------------------
-# ALLOWLIST — top-level exports CLAUDE.md exempts from "every definition
-# must be used somewhere" ("the only exceptions are the top-level,
-# most-important exports").  Kept intentionally SHORT and SPECIFIC: this is
-# not a place to park anything that merely *looks* important — a name goes
-# here only when there is a concrete, textual reason it is the campaign's
-# outward-facing finish line rather than internal plumbing.  Everything else
-# that turns up with zero consumers is reported, not hidden, so a human
-# rules on it (see DELIVERABLE 2 in the task this script was written for).
+# EXEMPT FAMILY — `*-absurd` REFUTATION WITNESSES (design-session ruling,
+# 2026-08-05).  A machine-checked `… → ⊥` is the only durable form of "this
+# route is dead, do not retry it", and it is load-bearing for the DESIGN
+# process rather than for another term.  Tested twice: `caps-frame-boundary-
+# absurd` and `round3b-ledger-reset-absurd` are what proved the anchor
+# problem real rather than a wiring gap, saving a long wasted grind.  A
+# worker classified them "archive, not live infrastructure" and was
+# overruled; deleting one costs a future session the whole refutation.
+#
+# Everything else that used to sit in an ALLOWLIST here is now handled
+# STRUCTURALLY and needs no entry: the top-line theorems and the semantic
+# claims are Main's own `using (...)` names, so they are reachability SEEDS;
+# and `main` in CLI/Main.agda and QuickCheck.agda is a definition of a
+# MODULE_ROOTS file, seeded the same way.  A name earns exemption by being
+# claimed, never by being listed.
 # ---------------------------------------------------------------------------
-ALLOWLIST = {
-    "formal-verification-batchSimultaneous": (
-        "The ultimate goal named explicitly by CLAUDE.md: "
-        "'agda/src/Verify-Batch-Simultaneous/The-Proof.agda fully discharged' "
-        "IS this theorem.  It is the outermost consumer of the whole proof "
-        "tree beneath it; nothing consumes IT because it is the finish line."
-    ),
-    "evaluate-well-formed": (
-        "CLAUDE.md's other named half of 'the sandwich' (Rx.Evaluator-"
-        "Theorems.agda's header: 'evaluate-well-formed ... now lives in "
-        "Verify-Well-Formed as a real proof').  It happens to already have "
-        "one real consumer (The-Proof.agda calls it directly), so it would "
-        "not currently be flagged as an orphan even without this entry —  "
-        "it is listed anyway because it is named, by CLAUDE.md, as a "
-        "top-line export that is not REQUIRED to have one."
-    ),
-    "main": (
-        "Two compiled-binary entry points share this name: CLI/Main.agda "
-        "(built by `make cli-build`, run by `make oracle`) and "
-        "QuickCheck.agda (built by `make qc-build`, run by `make "
-        "quickcheck`). Each is `agda --compile`d and then run as an OS "
-        "process — its consumer is the shell, not other Agda source, so "
-        "textual search will never find one."
-    ),
-    # --- design-session rulings, 2026-08-05 (see CLAUDE.md § "The wiring law"). Two FAMILIES are exempt, matched by pattern below rather
-    # --- than listed name by name.
-    #
-    # (1) `*-absurd` REFUTATION WITNESSES.  A machine-checked `… → ⊥` is the
-    # only durable form of "this route is dead, do not retry it", and it is
-    # load-bearing for the DESIGN process rather than for another term.
-    # Tested twice on 2026-08-05: `caps-frame-boundary-absurd` and
-    # `round3b-ledger-reset-absurd` are exactly what proved the anchor problem
-    # real rather than a wiring gap, saving a long wasted grind. A worker
-    # classified them "archive, not live infrastructure" and was overruled.
-    # Deleting one costs a future session the whole refutation.
-    #
-    # (2) THE TOP-LINE SEMANTIC POSTULATES in `*-Theorems.agda`
-    # (`readme-*`, `fuel-coherent`, `causality`, `μ-unfold`, `μ-guarded`,
-    # `defer-shift`, `id-inheritance`, `locality`, `non-interference`,
-    # `timing-invariance`, `batch-online`).  These are
-    # deliberately-stated outward-facing claims, imported by Main.agda; nothing
-    # consumes them because they ARE the claims.  They are NOT dead weight —
-    # but they ARE unproven, so they form a SECOND ledger, distinct from the
-    # critical path to formal-verification-batchSimultaneous.  Exempt from the
-    # orphan report; still counted as postulates.
-    #
-    # "anything Main.agda invokes": Main.agda (agda/src/Main.agda) has no
-    # body beyond a wall of `open import` statements — no function
-    # application, no `main = ...` term.  There is therefore nothing else
-    # to add on that basis; the instruction to "inspect Main.agda rather
-    # than guess" is satisfied by the fact that inspection turns up nothing
-    # more.  (Everything Main.agda transitively imports is NOT thereby
-    # allowlisted — subscribeE-walk is transitively imported too, via
-    # Verify-Budget-Sufficient, and known-true fact #1 requires it to be
-    # reported as an orphan regardless.)
-}
+EXEMPT_SUFFIXES = ("-absurd",)
 
-# Characters that can NEVER be part of an Agda identifier in this codebase's
-# style, i.e. token boundaries.  Deliberately does NOT try to enumerate
-# identifier characters — this repo's names are heavy with Unicode (≤, ᵉ, ⊔,
-# ′, ?, -, _) and enumerating "identifier chars" would be an unwinnable
-# whack-a-mole.  Instead we enumerate the much smaller, stable set of
-# characters Agda reserves and this codebase actually uses as separators:
-# whitespace and ASCII structural punctuation.  Anything NOT in this set
-# (including all the Unicode math/sub/superscript characters, '-', '_', '?',
-# '′') is treated as a potential identifier character, so e.g. "capsOK?" and
-# "capsOK?-parts" are correctly recognised as two different tokens: the
-# character right after a "capsOK?" match inside "capsOK?-parts" is '-',
-# which is NOT a boundary character, so the match is rejected.
+
 BOUNDARY_CHARS = set(" \t\n\r\f\v(){}[];.,@\"'`=:\\|")
 
 
@@ -262,7 +238,8 @@ def find_agda_files(src_dir):
     return files
 
 
-def load_file(src_dir, relpath):
+@functools.lru_cache(maxsize=None)   # 110 postulates × 75 files of
+def load_file(src_dir, relpath):     # re-reads was the whole runtime
     with open(os.path.join(src_dir, relpath), encoding="utf-8") as f:
         raw_lines = f.readlines()
     visible = strip_block_comments(raw_lines)
@@ -374,6 +351,38 @@ def extract_definitions(src_dir, files):
                 i += 1
                 continue
             tok0 = tokens[0]
+
+            # `module … where` OPENS AN INDENTED SCOPE OF ORDINARY
+            # DEFINITIONS.  Anonymous parameterised modules (`module _ (S
+            # M : ℕ) … where`) are used across Caps-Face / Measures /
+            # Burst-Walk to share a telescope, and `module` sitting in
+            # SKIP_HEAD_TOKENS meant every definition inside one was never
+            # registered at all — not orphan-checked, not reachability-
+            # checked, invisible.  Measured 2026-08-18: 7 such blocks in
+            # four of the heaviest modules in the tree.  Recurse exactly as
+            # into `mutual`; never register the module's OWN name, because
+            # a module is a scope and not a definition.
+            if tok0 == "module":
+                k, limit = i, min(end, i + 12)
+                while k < limit and visible[k].split("--", 1)[0].split()[-1:] != ["where"]:
+                    k += 1
+                if k >= limit:
+                    i += 1          # not a `… where` header after all
+                    continue
+                j = k + 1
+                base_indent = None
+                while j < end:
+                    if visible[j].strip() != "":
+                        base_indent = leading_spaces(raw_lines[j])
+                        break
+                    j += 1
+                if base_indent is None or base_indent <= indent_level:
+                    i = k + 1   # a FILE-level `module Foo where`: its body
+                    continue    # sits at this same indent, so do not recurse
+                i = scan_sub_block(
+                    raw_lines, visible, j, end, base_indent, relpath, "def"
+                )
+                continue
 
             if tok0 in SKIP_HEAD_TOKENS:
                 i += 1
@@ -619,55 +628,95 @@ def mixfix_core_of(name):
     return None
 
 
-def count_consumers(name, files, corpus, def_lines, extra_terms=(), cone=None):
-    """Count boundary-matched occurrences of `name` (and any `extra_terms`
-    — e.g. a mixfix operator's bare core) across all files, excluding
-    name's own defining lines in its home file(s).
+VACUOUS_ALLOWLIST = {
+    "defer-shift": (
+        "Rx/Evaluator-Theorems.agda states this ⊤ on purpose and says so in "
+        "the declaration's own comment: 'Left as ⊤ on purpose: an honest gap, "
+        "not a claim.'  Stating it for real needs a defined tick-trace and a "
+        "defined (not postulated) renaming equivalence — borrowing the one "
+        "relation of that shape, Rx.Time-Theorems._≈ˢ_, would relocate the "
+        "vacuity rather than fix it.  That is a design call on a top-line "
+        "semantic claim, not a leaf-module repair, so it is exempted "
+        "EXPLICITLY here instead of being silently fabricated or silently "
+        "ignored.  A NEW ⊤ postulate still fails the gate."
+    ),
+}
 
-    Main.agda is EXCLUDED as a consumer.  It is the ROOT of the consumption
-    graph, not a participant in it: since it names individual claims (rule 2),
-    every claim would otherwise score a consumer purely from its own
-    `using (...)` mention and land in the critical-path ledger.  That would
-    erase the distinction between "postulate some other proof depends on" and
-    "top-line claim we assert", which is the whole point of the two ledgers.
+
+# ---------------------------------------------------------------------------
+# MODULE ROOTS.  Reachability is computed from Main plus these — each is a
+# SEPARATE compiled entry point with its own make target, so it is legitimately
+# unreachable from Main but is NOT dead.  Listing ROOTS rather than individual
+# modules means anything they import is covered automatically; only a module
+# nothing reaches at all is reported.
+# ---------------------------------------------------------------------------
+MODULE_ROOTS = {
+    "CLI.Main": "the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
+    "QuickCheck": "the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
+    "Implementation.Unit-Test": "the type-level bug cache — `make bug-cache`",
+    "Harness.Main": "the compiled measurement harness — `make harness-build` / `make harness`",
+    "Verify-Budget-Sufficient.Demand-Probe": "the gas-demand measurement rows — checked by `make bug-cache`",
+}
+
+_IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
+
+
+
+def find_unreachable_modules(src_dir, files):
+    """Modules under src/ that NOTHING reaches — not Main, not any entry point.
+
+    THE BLIND SPOT THIS CLOSES: the orphan report scans DEFINITIONS for
+    consumers, so a module holding only `open import … public` re-exports has
+    nothing to orphan and reads as clean no matter how dead it is.  A module can
+    therefore be entirely unused while every report above says zero.  Module
+    reachability is a different question from definition reachability, and it
+    needs asking separately.
     """
-    own_lines = def_lines.get(name, ())
-    total = 0
-    in_cone = 0
-    locations = []
-    terms = [name] + [t for t in extra_terms if t]
-    for relpath in files:
-        # EXACTLY src/Main.agda — NOT CLI/Main.agda, which is an unrelated
-        # compiled entry point whose six helpers (process, nl, splitLines,
-        # nonEmpty, parseJSON, decodeCase) really are consumed, by it. An
-        # `endswith("/Main.agda")` here orphaned all six.
-        if relpath == "Main.agda":
+    mods = {}
+    for rel in files:
+        mods[rel[:-5].replace(os.sep, ".")] = rel
+
+    seen = set()
+    stack = ["Main"] + [m for m in MODULE_ROOTS if m in mods]
+    while stack:
+        m = stack.pop()
+        if m in seen or m not in mods:
             continue
-        text, offsets, import_lines = corpus[relpath]
-        if not text:
+        seen.add(m)
+        try:
+            with io.open(os.path.join(src_dir, mods[m]), encoding="utf-8") as fh:
+                body = fh.read().split("\n")
+        except OSError:
             continue
-        for term in terms:
-            start = 0
-            L = len(term)
-            while True:
-                idx = text.find(term, start)
-                if idx == -1:
-                    break
-                end = idx + L
-                before = text[idx - 1] if idx > 0 else None
-                after = text[end] if end < len(text) else None
-                if is_boundary(before) and is_boundary(after):
-                    lineno = bisect_right(offsets, idx)
-                    # an `import ... using (name)` mention is IMPORTED, not
-                    # CONSUMED — see import_span_lines
-                    if (relpath, lineno) not in own_lines and lineno not in import_lines:
-                        total += 1
-                        if cone is None or relpath in cone:
-                            in_cone += 1
-                        if len(locations) < 3:
-                            locations.append((relpath, lineno))
-                start = idx + 1
-    return total, locations, in_cone
+        for line in body:
+            if line.lstrip().startswith("--"):
+                continue
+            g = _IMPORT_RE.match(line)
+            if g and g.group(1) in mods:
+                stack.append(g.group(1))
+
+    return sorted((m, mods[m]) for m in set(mods) - seen)
+
+
+
+def find_vacuous(src_dir, defs, postulate_names):
+    """Postulates whose CONCLUSION is `⊤`.  CLAUDE.md names this as a live
+    trap: such a postulate asserts nothing, its real claim sitting in a
+    trailing comment, yet it reads as discharged work.  Cheap to detect,
+    so it is detected rather than merely documented."""
+    bad = []
+    for name in sorted(postulate_names):
+        d = defs.get(name)
+        if d is None:
+            continue
+        sig = signature_text(src_dir, d.file, name, d.line)
+        if sig is None:
+            continue
+        if final_conclusion(sig) in ("⊤", "Unit"):
+            bad.append((name, d, name in VACUOUS_ALLOWLIST))
+    return sorted(bad, key=lambda x: (x[1].file, x[1].line))
+
+
 
 
 def signature_text(src_dir, relpath, name, line):
@@ -698,7 +747,6 @@ def signature_text(src_dir, relpath, name, line):
         out.append(cur.strip())
         j += 1
     return "\n".join(out)
-
 
 def final_conclusion(sig):
     """The conclusion of a (possibly dependent) function type: the text
@@ -741,817 +789,331 @@ def final_conclusion(sig):
 # The second kind is real debt and every line of it should name what has to
 # be ground before the line can go.
 # ---------------------------------------------------------------------------
-GATE_ONLY_ALLOWLIST = {
-    "Grouped": (
-        "the oracle's wire format, consumed by CLI/Encode and compiled by "
-        "`make cli-build`.  Not proof code; it has no business in Main's cone "
-        "beyond living in Rx/Evaluator beside the evaluator it describes."
-    ),
-    "wellFormed?": (
-        "the protocol predicate QuickCheck and the type-level bug cache assert "
-        "against (`make quickcheck`, `make bug-cache`).  A tool's oracle, not "
-        "a proof obligation."
-    ),
-    "slotHop-fix": (
-        "PROVEN and genuinely waiting: it is the equation the walk face's "
-        "input clause spends, and that clause (input-wet-shared) is still a "
-        "postulate, so nothing in the gate's cone can spend it yet.  The "
-        "Demand-Probe rows are receipts, not consumers.  DELETE THIS LINE the "
-        "moment input-wet-shared is ground — if it survives that, the proof "
-        "found another route and this lemma is dead."
-    ),
-}
-
-
-VACUOUS_ALLOWLIST = {
-    "defer-shift": (
-        "Rx/Evaluator-Theorems.agda states this ⊤ on purpose and says so in "
-        "the declaration's own comment: 'Left as ⊤ on purpose: an honest gap, "
-        "not a claim.'  Stating it for real needs a defined tick-trace and a "
-        "defined (not postulated) renaming equivalence — borrowing the one "
-        "relation of that shape, Rx.Time-Theorems._≈ˢ_, would relocate the "
-        "vacuity rather than fix it.  That is a design call on a top-line "
-        "semantic claim, not a leaf-module repair, so it is exempted "
-        "EXPLICITLY here instead of being silently fabricated or silently "
-        "ignored.  A NEW ⊤ postulate still fails the gate."
-    ),
-}
 
 
 # ---------------------------------------------------------------------------
-# MODULE ROOTS.  Reachability is computed from Main plus these — each is a
-# SEPARATE compiled entry point with its own make target, so it is legitimately
-# unreachable from Main but is NOT dead.  Listing ROOTS rather than individual
-# modules means anything they import is covered automatically; only a module
-# nothing reaches at all is reported.
+# THE GRAPH
 # ---------------------------------------------------------------------------
-MODULE_ROOTS = {
-    "CLI.Main": "the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
-    "QuickCheck": "the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
-    "Implementation.Unit-Test": "the type-level bug cache — `make bug-cache`",
-    "Harness.Main": "the compiled measurement harness — `make harness-build` / `make harness`",
-    "Verify-Budget-Sufficient.Demand-Probe": "the gas-demand measurement rows — checked by `make bug-cache`",
-}
 
-_IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
-
-
-def arrow_slots(sig):
-    """Count `→` at brace/paren depth 0 in a signature — an UPPER BOUND on
-    the number of premises (it also counts the binder arrow of a leading
-    `∀ … →` telescope).  Used only to size the deferred-obligation ledger,
-    never to gate."""
-    if not sig:
-        return 0
-    depth = 0
-    n = 0
-    for ch in sig:
-        if ch in "({[":
-            depth += 1
-        elif ch in ")}]":
-            depth -= 1
-        elif ch in "→" and depth == 0:
-            n += 1
-    return n
+def owner_index(def_lines):
+    """file -> sorted [(line, name)] of every definition head, so any line can
+    be attributed to the definition whose body it belongs to."""
+    by_file = defaultdict(list)
+    for name, sites in def_lines.items():
+        for (f, ln) in sites:
+            by_file[f].append((ln, name))
+    for f in by_file:
+        by_file[f].sort()
+    return by_file
 
 
-def find_deferred_obligations(src_dir, defs, def_lines, postulate_names,
-                              files, corpus):
-    """Section B4 — PASSED-ONLY LEMMAS, i.e. DEFERRED OBLIGATIONS.
+def owner_of(by_file, relpath, lineno):
+    lst = by_file.get(relpath)
+    if not lst:
+        return None
+    i = bisect_right(lst, (lineno, "\uffff")) - 1
+    return lst[i][1] if i >= 0 else None
 
-    THE BLIND SPOT THIS CLOSES.  The wiring law tracks NAMES: every
-    definition must have a consumer.  It does not track OBLIGATIONS INSIDE
-    TYPES.  A PROVEN lemma with its own premises can be handed as a bare
-    value into a POSTULATE's hypothesis slot — `subscribeE-wet-core` takes
-    22 such lemmas — and that counts as a consumer, so the lemma reads as
-    fully wired and the gate stays green.  But a postulate never runs, so
-    it never APPLIES what it was given: nobody has supplied that lemma's
-    premises, and nobody will until the postulate is proven.
 
-    Those premises are real remaining work that appears NOWHERE in the
-    postulate ledger.  `hop-edge` (Wet.agda:4052) is the worked example:
-    proven, wired, consumed — and all three of its premises unpaid, one of
-    which (`hopDᵛ Ŝ o < r`) went unexamined for the whole campaign because
-    nothing in the repo forced anyone to look at it.
+_BND = r"[\w\'\u1d49\u1d5b\u1d9c\u1d4d\u1d57\u02e2\u2264\u2261?\u2032-]"
 
-    So: report every proven definition whose consumers are ONLY assembly
-    argument positions — passed, never applied.
 
-    THE LEAF-ONLY RULE (Anthony, 2026-08-15).  This set is FROZEN and may
-    only SHRINK.  Passed-only is no longer "normal while the parent is
-    postulated" — it is the state the rule exists to prevent, because a
-    lemma in it has never had its FIT tested: nothing reduces it, so
-    nothing checks that its type is the one the parent actually needs.
-    Two `-core` discharges shed seven-plus leading hypotheses apiece for
-    exactly that reason.
+def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
+    """R2's suppression set: (file, line) -> {names passed as BARE arguments
+    to an applied postulate}.
 
-    The remedy for a NEW passed-only lemma is never "add a ledger line".
-    It is to write the parent as a REAL BODY over POSTULATED LEAVES:
+    Only a BARE identifier at the application's top level counts as passed.
+    A name nested inside parentheses with its own arguments is a VALUE being
+    COMPUTED — `INV?-install \u03a8 (Caps.cSize (frameStep j c)) \u2026` applies
+    `frameStep` to build a Caps, it does not hand `frameStep` over as a
+    proof.  Measured 2026-08-18: without this restriction the classifier
+    reported 40 of 110 postulates as non-leaves, every one a false positive.
 
-        postulate l₁ : L₁                 -- gap, a true leaf
-        P : T
-        P = <real body applying l₁>       -- CHECKED composition
-
-    rather than as a postulate over proven pieces (`P = P-core l₁ …`),
-    where the composition is asserted and checked by nobody.  When the
-    body cannot be written yet, postulate P BARE and mint no leaves — an
-    unwritten route is a header comment, not a type nobody verifies.
+    A mention left of the clause's `=` is in a TYPE, not an application, so
+    it is never suppressed: that is the type edge, and R2 does not touch it.
     """
-    # 1. Assembly spans: for each `-core` postulate, the expression(s) that
-    #    feed it.  An assembly is `Parent = Parent-core arg₁ … argₖ`, whose
-    #    RHS may continue across more-indented lines.
-    assemblies = []          # (parent, core, relpath, first_line, [arg tokens])
-    arg_sites = {}           # (relpath, lineno) -> core name
-    cores = sorted(n for n in postulate_names if n.endswith("-core"))
-    for core in cores:
+    suppressed = defaultdict(set)
+    for P in sorted(postulate_names):
+        own = def_lines.get(P, ())
+        pat = re.compile(r"(?<!" + _BND + r")" + re.escape(P) + r"(?!" + _BND + r")")
         for relpath in files:
-            text, offsets, _imports = corpus[relpath]
+            if relpath == "Main.agda":
+                continue
             _raw, visible = load_file(src_dir, relpath)
             for i, line in enumerate(visible, start=1):
-                if (relpath, i) in def_lines.get(core, ()):
+                if (relpath, i) in own or not pat.search(line):
                     continue
-                if re.search(r"(?<![\w'-])" + re.escape(core) + r"(?![\w'-])", line) is None:
-                    continue
-                if line.lstrip().startswith("--"):
-                    continue
-                # collect this line plus its more-indented continuations
-                span = [(i, line)]
                 base = len(line) - len(line.lstrip())
-                j = i + 1
-                while j <= len(visible):
-                    nxt = visible[j - 1]
-                    if not nxt.strip():
+                span, j = [(i, line)], i
+                while j < len(visible):
+                    nxt = visible[j]
+                    if not nxt.strip() or len(nxt) - len(nxt.lstrip()) <= base:
                         break
-                    ind = len(nxt) - len(nxt.lstrip())
-                    if ind <= base:
-                        break
-                    span.append((j, nxt))
+                    span.append((j + 1, nxt))
                     j += 1
-                toks = set()
-                for ln, txt in span:
-                    body = txt.split("--", 1)[0]
-                    for t in re.findall(r"[A-Za-z_][\w'ᵉᵛᶜᵍᵗˢ≤≡?′-]*|[^\s()\\{}]+", body):
-                        toks.add(t)
-                    arg_sites[(relpath, ln)] = core
-                parent = visible[i - 1].split("=", 1)[0].strip().split()
-                parent = parent[0] if parent else "?"
-                passed = sorted(
-                    t for t in toks
-                    if t in defs and t != core and t not in postulate_names
-                    and defs[t].kind == "def"
-                )
-                if passed:
-                    assemblies.append((parent, core, relpath, i, passed))
-
-    # 2. A lemma is PASSED-ONLY when every consumer site of it is an
-    #    assembly argument position.
-    passed_lemmas = {}
-    for _parent, core, _rp, _ln, passed in assemblies:
-        for lem in passed:
-            passed_lemmas.setdefault(lem, set()).add(core)
-
-    rows = []
-    for lem, parents in sorted(passed_lemmas.items()):
-        _n, locs, _c = count_consumers(lem, files, corpus, def_lines,
-                                   extra_terms=(mixfix_core_of(lem),))
-        elsewhere = [(f, l) for (f, l) in locs if (f, l) not in arg_sites]
-        if elsewhere:
-            continue                      # genuinely applied somewhere
-        d = defs[lem]
-        sig = signature_text(src_dir, d.file, lem, d.line)
-        rows.append((lem, d, sorted(parents), arrow_slots(sig)))
-    return rows, assemblies
+                expr = " ".join(t.strip() for _l, t in span)
+                eq = expr.find("=")
+                for m in pat.finditer(expr):
+                    if eq == -1 or m.start() < eq:
+                        continue                      # a TYPE mention
+                    k, n = m.end(), len(expr)
+                    while k < n:
+                        ch = expr[k]
+                        if ch == " ":
+                            k += 1
+                            continue
+                        if ch in ")}],;=":
+                            break                     # application ends
+                        if ch in "({":                # nested: a computation
+                            d, k2 = 1, k + 1
+                            while k2 < n and d:
+                                if expr[k2] in "({":
+                                    d += 1
+                                elif expr[k2] in ")}":
+                                    d -= 1
+                                k2 += 1
+                            k = k2
+                            continue
+                        mm = re.match(r"[^\s(){}\[\],;]+", expr[k:])
+                        if not mm:
+                            break
+                        for (ln, _t) in span:
+                            suppressed[(relpath, ln)].add(mm.group(0))
+                        k += mm.end()
+    return suppressed
 
 
-def find_unreachable_modules(src_dir, files):
-    """Modules under src/ that NOTHING reaches — not Main, not any entry point.
-
-    THE BLIND SPOT THIS CLOSES: the orphan report scans DEFINITIONS for
-    consumers, so a module holding only `open import … public` re-exports has
-    nothing to orphan and reads as clean no matter how dead it is.  A module can
-    therefore be entirely unused while every report above says zero.  Module
-    reachability is a different question from definition reachability, and it
-    needs asking separately.
-    """
-    mods = {}
-    for rel in files:
-        mods[rel[:-5].replace(os.sep, ".")] = rel
-
-    seen = set()
-    stack = ["Main"] + [m for m in MODULE_ROOTS if m in mods]
-    while stack:
-        m = stack.pop()
-        if m in seen or m not in mods:
-            continue
-        seen.add(m)
-        try:
-            with io.open(os.path.join(src_dir, mods[m]), encoding="utf-8") as fh:
-                body = fh.read().split("\n")
-        except OSError:
-            continue
-        for line in body:
-            if line.lstrip().startswith("--"):
+def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
+                corpus, main_claims, suppressed):
+    """edges: name -> names it reaches.  consumers: name -> names reaching it.
+    seed: the reachability roots (Main's claims + everything a MODULE_ROOTS
+    file defines or mentions — those are separately compiled binaries whose
+    consumer is the shell, so no textual search will ever find one)."""
+    by_file = owner_index(def_lines)
+    mods = {rel[:-5].replace(os.sep, "."): rel for rel in files}
+    root_files = {mods[m] for m in MODULE_ROOTS if m in mods}
+    edges, consumers = defaultdict(set), defaultdict(set)
+    seed = {c for c in main_claims if c in defs}
+    for name in order:
+        if defs[name].file in root_files:
+            seed.add(name)
+        terms = [name]
+        core = mixfix_core_of(name)
+        if core:
+            terms.append(core)
+        own = def_lines.get(name, ())
+        for relpath in files:
+            if relpath == "Main.agda":
                 continue
-            g = _IMPORT_RE.match(line)
-            if g and g.group(1) in mods:
-                stack.append(g.group(1))
-
-    return sorted((m, mods[m]) for m in set(mods) - seen)
-
-
-def gate_cone(src_dir, files):
-    """The modules `make agda` actually compiles: everything reachable from
-    Main, and NOTHING else.
-
-    THIS IS NOT find_unreachable_modules' set.  That one seeds from Main PLUS
-    every MODULE_ROOTS entry, because a separately-compiled binary is not dead.
-    But those roots are compiled by their OWN make targets, not by the gate —
-    so a definition whose only consumers live in a root (a probe file, the
-    harness, the CLI) is never touched by `make agda`.  Counting such a
-    definition as WIRED is the loophole this closes: a probe could keep dead
-    proof code alive indefinitely, and the report would read clean.
-    """
-    mods = {}
-    for rel in files:
-        mods[rel[:-5].replace(os.sep, ".")] = rel
-    seen, stack = set(), ["Main"]
-    while stack:
-        m = stack.pop()
-        if m in seen or m not in mods:
-            continue
-        seen.add(m)
-        try:
-            with io.open(os.path.join(src_dir, mods[m]), encoding="utf-8") as fh:
-                body = fh.read().split("\n")
-        except OSError:
-            continue
-        for line in body:
-            if line.lstrip().startswith("--"):
+            text, offsets, import_lines = corpus[relpath]
+            if not text:
                 continue
-            g = _IMPORT_RE.match(line)
-            if g and g.group(1) in mods:
-                stack.append(g.group(1))
-    return {mods[m] for m in seen}
+            for term in terms:
+                idx = text.find(term)
+                while idx != -1:
+                    end = idx + len(term)
+                    before = text[idx - 1] if idx > 0 else None
+                    after = text[end] if end < len(text) else None
+                    if is_boundary(before) and is_boundary(after):
+                        lineno = bisect_right(offsets, idx)
+                        if ((relpath, lineno) not in own
+                                and lineno not in import_lines):
+                            if relpath in root_files:
+                                seed.add(name)
+                            o = owner_of(by_file, relpath, lineno)
+                            # R2: a bare argument handed to a postulate earns
+                            # nothing from this site.
+                            if (o is not None and o != name
+                                    and name not in suppressed.get((relpath, lineno), ())):
+                                edges[o].add(name)
+                                consumers[name].add(o)
+                    idx = text.find(term, idx + 1)
+    return edges, consumers, seed
 
 
-def find_vacuous(src_dir, defs, postulate_names):
-    """Postulates whose CONCLUSION is `⊤`.  CLAUDE.md names this as a live
-    trap: such a postulate asserts nothing, its real claim sitting in a
-    trailing comment, yet it reads as discharged work.  Cheap to detect,
-    so it is detected rather than merely documented."""
-    bad = []
-    for name in sorted(postulate_names):
-        d = defs.get(name)
-        if d is None:
-            continue
-        sig = signature_text(src_dir, d.file, name, d.line)
-        if sig is None:
-            continue
-        if final_conclusion(sig) in ("⊤", "Unit"):
-            bad.append((name, d, name in VACUOUS_ALLOWLIST))
-    return sorted(bad, key=lambda x: (x[1].file, x[1].line))
-
-
-def unreachable_parents(orphans, defs, postulate_names):
-    """Orphans that NO postulate in their own file could ever consume,
-    because every such postulate is declared ABOVE them.
-
-    This is the ordering hazard that costs the most time in practice: a
-    parent postulate cannot reference a definition that follows it, so an
-    orphan sitting below its intended parent cannot be wired where it
-    stands — either the definition moves up, or the assembly's body moves
-    down.  Discovering that from a failed 40-minute typecheck is the
-    expensive way; it is decidable from line numbers alone."""
-    by_file = {}
-    for name in postulate_names:
-        d = defs.get(name)
-        if d is not None:
-            by_file.setdefault(d.file, []).append(d.line)
-    out = []
-    for name, d in orphans:
-        later = [ln for ln in by_file.get(d.file, []) if ln > d.line]
-        if by_file.get(d.file) and not later:
-            out.append((name, d, len(by_file[d.file])))
-    return sorted(out, key=lambda x: (x[1].file, x[1].line))
-
-
-def read_deferred_ledger(path):
-    """Read agda/DEFERRED.txt and return (names, missing).
-
-    `names` is a frozenset of lemma names recorded as passed-only.
-    `missing` is True when the file does not exist (the gate treats a missing
-    ledger the same as an empty one: every measured lemma becomes a NEW
-    DEFERRAL).
-
-    Format: each non-comment, non-blank line is:
-        LEMMA | DEFERRED-BY | ≤SLOTS | REASON: ...
-    Only field 0 (the lemma name, before the first ' | ') is used for the
-    ratchet comparison.  The rest is informational and not parsed.
-    """
-    try:
-        with open(path, encoding="utf-8") as fh:
-            lines = fh.readlines()
-    except OSError:
-        return frozenset(), True
-    names = set()
-    for line in lines:
-        line = line.rstrip("\n")
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        name = line.split(" | ")[0].strip()
-        if name:
-            names.add(name)
-    return frozenset(names), False
+def reachable_from(seed, edges):
+    R, stack = set(seed), list(seed)
+    while stack:
+        n = stack.pop()
+        for m in edges.get(n, ()):
+            if m not in R:
+                R.add(m)
+                stack.append(m)
+    return R
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--src",
-        default=None,
-        help="path to agda/src (default: <repo-root>/agda/src, inferred from "
-        "this script's own location)",
-    )
-    parser.add_argument(
-        "--gate",
-        action="store_true",
-        help="exit 1 when the wiring law is violated (orphans outside the "
-        "exempt families, a ⊤-typed postulate, or a B4 ratchet mismatch). "
-        "Without this the script is a report and always exits 0.",
-    )
-    parser.add_argument(
-        "--ledger",
-        default=None,
-        help="path to agda/DEFERRED.txt (default: <repo-root>/agda/DEFERRED.txt, "
-        "inferred from this script's own location)",
-    )
+    parser.add_argument("--src", default=None,
+                        help="path to agda/src (default: inferred from this "
+                             "script's location)")
+    parser.add_argument("--gate", action="store_true",
+                        help="exit 1 when the wiring law is violated. Without "
+                             "this the script is a report and always exits 0.")
     args = parser.parse_args()
 
     if args.src:
         src_dir = args.src
     else:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        src_dir = os.path.join(script_dir, "..", "agda", "src")
+        here = os.path.dirname(os.path.abspath(__file__))
+        src_dir = os.path.join(here, "..", "agda", "src")
     src_dir = os.path.abspath(src_dir)
-
-    if args.ledger:
-        ledger_path = args.ledger
-    else:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        ledger_path = os.path.join(script_dir, "..", "agda", "DEFERRED.txt")
-    ledger_path = os.path.abspath(ledger_path)
-
     if not os.path.isdir(src_dir):
         print(f"error: no such directory: {src_dir}", file=sys.stderr)
-        sys.exit(0)  # still exit 0 — this is a report, not a gate
+        sys.exit(2)
 
     files = find_agda_files(src_dir)
     defs, def_lines, postulate_names, order = extract_definitions(src_dir, files)
     corpus = build_corpus(src_dir, files)
-    cone_files = gate_cone(src_dir, files)
     main_claims, main_ok = read_main_claims(src_dir)
+    suppressed = postulate_arg_sites(src_dir, files, defs, def_lines,
+                                     postulate_names)
+    edges, consumers, seed = build_graph(
+        src_dir, files, defs, def_lines, postulate_names, order, corpus,
+        main_claims, suppressed)
+    R = reachable_from(seed, edges)
 
-    orphans = []  # proven defs / data-record, zero consumers, not allowlisted
-    allowlisted_unused = []
-    gate_only = []  # consumed, but never by anything `make agda` compiles
-    ledger_with = []  # postulates with >=1 consumer
-    ledger_without = []  # postulates with 0 consumers
-    toplines = []  # top-line semantic postulates in *-Theorems.agda
-
-    results = {}
-    for name in order:
-        core = mixfix_core_of(name)
-        count, locs, cone_count = count_consumers(
-            name, files, corpus, def_lines, extra_terms=(core,) if core else (),
-            cone=cone_files,
-        )
-        results[name] = (count, locs, cone_count)
-
-    for name in order:
-        d = defs[name]
-        count, locs, cone_count = results[name]
-        # (A3) WIRED ONLY OUTSIDE THE GATE.  It lives in a module `make agda`
-        # compiles, something references it, and yet nothing the gate compiles
-        # does — so its only consumers are probe/harness/CLI roots, which run
-        # under their own targets.  That is dead proof code held up by a probe.
-        if (count > 0 and cone_count == 0
-                and d.file in cone_files
-                and name not in main_claims):
-            gate_only.append((name, d, count, locs))
-        is_postulate = name in postulate_names
-        if is_postulate:
-            if count > 0:
-                ledger_with.append((name, d, count, locs))
-            elif name in main_claims:
-                # Exempt family (2): a top-line semantic claim, because MAIN
-                # NAMES IT. Unproven, so still counted as a postulate — but it
-                # belongs to the SECOND ledger, off the critical path.
-                toplines.append((name, d))
-            else:
-                ledger_without.append((name, d, count, locs))
-        else:
-            if count == 0:
-                if name in main_claims or name in ALLOWLIST or name.endswith("-absurd"):
-                    # Exempt family (1): refutation witnesses. Their consumer
-                    # is the design record, not another term.
-                    allowlisted_unused.append((name, d))
-                else:
-                    orphans.append((name, d))
-            # count > 0, not a postulate: nothing to report, it is wired.
-
-    # Also: allowlisted names that DO have consumers are unremarkable —
-    # only report allowlist entries that never even appear in ALLOWLIST at
-    # all is a no-op; nothing to do here beyond allowlisted_unused above.
-    # But an allowlist entry that isn't a known def at all (typo, renamed)
-    # is worth a nudge:
-    stale_allowlist = [n for n in ALLOWLIST if n not in defs]
-
-    # A name Main claims that no longer exists in src is a BROKEN CLAIM — Main
-    # would not compile, so this should be impossible; report it rather than
-    # skip it, because a silent skip is how a claim goes missing.
+    exempt = lambda n: n.endswith(EXEMPT_SUFFIXES)
+    unreached = [n for n in order if n not in R and not exempt(n)]
+    exempted = [n for n in order if n not in R and exempt(n)]
+    dead_post = [n for n in unreached if n in postulate_names]
+    dead_defs = [n for n in unreached if n not in postulate_names]
+    dead_modules = find_unreachable_modules(src_dir, files)
+    vacuous = find_vacuous(src_dir, defs, postulate_names)
     missing_claims = sorted(n for n in main_claims if n not in defs)
 
-    # Top-line claims are EXEMPT from the orphan report but are still
-    # unproven assumptions, so they count here. Excluding them would make the
-    # headline number lie in the reassuring direction.
-    total_postulates = len(ledger_with) + len(ledger_without) + len(toplines)
-
-    # ------------------------------------------------------------------
-    # REPORT
-    # ------------------------------------------------------------------
     print("=" * 78)
-    print("WIRING CHECK — agda/src")
+    print("WIRING CHECK \u2014 agda/src")
     print("=" * 78)
-    print(f"files scanned: {len(files)}    top-level names found: {len(order)}")
-    print(f"Main.agda claims: {len(main_claims)}  (the exempt set — Main IS the top-line proof)")
+    print(f"files {len(files)}   top-level names {len(order)}   "
+          f"postulates {len(postulate_names)}")
+    print(f"reachability seeds {len(seed)}  (Main's claims + MODULE_ROOTS)")
+    print(f"REACHABLE {len(R)}   unreachable {len(unreached)}   "
+          f"exempt (*-absurd) {len(exempted)}")
     if not main_ok:
         print()
-        print("  !! RULE 2 VIOLATION: Main.agda has a bare `open import` with no")
-        print("     `using (...)` clause. Main must name individual definitions, so")
-        print("     that 'imported' means 'claimed' and not merely 'compiled'.")
-        print("     Until it does, the exempt set below is INCOMPLETE and every")
-        print("     number in this report is unreliable.")
+        print("  !! Main.agda has a bare `open import` with no `using (...)`.")
+        print("     Main must NAME individual definitions, so that 'imported'")
+        print("     means 'claimed' and not merely 'compiled'.  Until it does,")
+        print("     the seed set is INCOMPLETE and every number here is soft.")
     if missing_claims:
         print()
-        print("  !! BROKEN CLAIMS: Main.agda names these, but no definition was")
-        print("     found in agda/src. Main could not compile in this state:")
+        print("  !! BROKEN CLAIMS \u2014 Main.agda names these, no definition found:")
         for n in missing_claims:
             print(f"       {n}")
     print()
 
     print("-" * 78)
-    print("(A) ORPHANS — proven top-level definitions with ZERO consumers")
+    print("(R1) UNREACHABLE \u2014 no route from Main to these")
     print("-" * 78)
-    if not orphans:
-        print("  (none)")
-    for name, d in sorted(orphans, key=lambda x: (x[1].file, x[1].line)):
-        print(f"  {name}")
-        print(f"      {d.file}:{d.line}  [{d.kind}]")
-    print()
-
-    print("-" * 78)
-    print("(B) THE LEDGER — postulate members")
-    print("-" * 78)
-    print(f"  -- WITH consumers ({len(ledger_with)}) — real remaining work --")
-    if not ledger_with:
-        print("    (none)")
-    for name, d, count, locs in sorted(ledger_with, key=lambda x: (x[1].file, x[1].line)):
-        loc_str = "; ".join(f"{f}:{ln}" for f, ln in locs)
-        print(f"    {name}  ({count} consumer{'s' if count != 1 else ''}: {loc_str})")
-        print(f"        {d.file}:{d.line}")
-    print()
-    print(
-        f"  -- ZERO consumers ({len(ledger_without)}) — dead-weight deletion "
-        "candidates --"
-    )
-    if not ledger_without:
-        print("    (none)")
-    for name, d, _count, _locs in sorted(
-        ledger_without, key=lambda x: (x[1].file, x[1].line)
-    ):
-        print(f"    {name}")
-        print(f"        {d.file}:{d.line}")
-    print()
-
-    print(
-        f"  -- TOP-LINE semantic claims ({len(toplines)}) — the SECOND ledger, "
-        "off the critical path --"
-    )
-    if not toplines:
-        print("    (none)")
-    for name, d in sorted(toplines, key=lambda x: (x[1].file, x[1].line)):
-        print(f"    {name}")
-        print(f"        {d.file}:{d.line}")
-    print()
-
-    print("-" * 78)
-    print("ALLOWLISTED (expected to have no in-repo consumer) — non-alarming")
-    print("-" * 78)
-    if not allowlisted_unused:
-        print("  (none currently zero-consumer)")
-    for name, d in allowlisted_unused:
-        print(f"  {name}  -- {d.file}:{d.line}")
-    if stale_allowlist:
-        print("  NOTE — allowlist entries not found as any top-level name")
-        print("  (typo, or the name was renamed/removed — worth a look):")
-        for name in stale_allowlist:
-            print(f"    {name}")
-    print()
-
-    print("-" * 78)
-    vacuous = find_vacuous(src_dir, defs, postulate_names)
-    dead_modules = find_unreachable_modules(src_dir, files)
-    stranded = unreachable_parents(orphans, defs, postulate_names)
-
-    print("-" * 78)
-    print("(A3) WIRED ONLY OUTSIDE THE GATE — consumers exist, but none compile")
-    print("-" * 78)
-    if not gate_only:
+    if not unreached:
         print("  (none)")
     else:
-        print("  These live in modules `make agda` compiles, and something does")
-        print("  reference them — but nothing the GATE compiles does.  Their only")
-        print("  consumers are MODULE_ROOTS (probe rows, the harness, the CLI),")
-        print("  which run under their own make targets.  A consumer that the")
-        print("  proof never reaches is not a wire: a probe file can otherwise")
-        print("  hold dead proof code alive forever and every count reads clean.")
-        for name, d, count, locs in gate_only:
-            where = ", ".join(f"{r}:{l}" for r, l in locs)
-            tag = "  [allowed]" if name in GATE_ONLY_ALLOWLIST else "  ** NEW **"
-            print(f"    {name}  ({d.file}:{d.line}) — {count} consumer(s), all outside: {where}{tag}")
-        stale_gate_only = sorted(set(GATE_ONLY_ALLOWLIST) - {n for n, _d, _c, _l in gate_only})
-        if stale_gate_only:
-            print()
-            print("  IN THE ALLOWLIST BUT NO LONGER MEASURED — the win case: these")
-            print("  gained a real consumer inside the gate (or were deleted), so")
-            print("  their exemption lines must go:")
-            for name in stale_gate_only:
-                print(f"    {name}")
+        print("  Nothing that Main claims reaches these, so `make agda` proves")
+        print("  nothing about them.  Each is EITHER a missing wire (its")
+        print("  consumer exists but is itself unreachable, or the assembly")
+        print("  that should call it was never written) OR dead weight.  Both")
+        print("  are findings; leaving it undecided is not an option.")
+        print()
+        print(f"  -- POSTULATES ({len(dead_post)}) --")
+        if not dead_post:
+            print("    (none)")
+        for n in dead_post:
+            d = defs[n]
+            print(f"    {n}")
+            print(f"        {d.file}:{d.line}   named by {len(consumers.get(n, ()))} "
+                  f"other definition(s), none reachable")
+        print()
+        print(f"  -- PROVEN DEFINITIONS ({len(dead_defs)}) --")
+        if not dead_defs:
+            print("    (none)")
+        for n in dead_defs:
+            d = defs[n]
+            c = len(consumers.get(n, ()))
+            tag = "  <- ZERO consumers anywhere" if c == 0 else f"  ({c} consumer(s), all unreachable)"
+            print(f"    {n}")
+            print(f"        {d.file}:{d.line}{tag}")
     print()
 
     print("-" * 78)
-    print("(A2) UNREACHABLE MODULES — dead files, invisible to the orphan report")
+    print("UNREACHABLE MODULES \u2014 dead files, invisible to R1")
     print("-" * 78)
     if not dead_modules:
         print("  (none)")
     else:
-        print("  Nothing reaches these — not Main, not any compiled entry point.")
-        print("  A module of pure `open import … public` re-exports has NO")
-        print("  definitions to orphan, so section (A) cannot see it however")
-        print("  dead it is.  Module reachability is a separate question from")
-        print("  definition reachability; this is where it gets asked.")
+        print("  Nothing reaches these \u2014 not Main, not any entry point.  A")
+        print("  module of pure `open import \u2026 public` re-exports has NO")
+        print("  definitions to orphan, so R1 cannot see it however dead it is.")
     for mod, rel in dead_modules:
         print(f"    {mod}")
         print(f"        {rel}")
     print()
 
     print("-" * 78)
-    print("(B2) VACUOUS POSTULATES — assert nothing, but read as discharged")
+    print("VACUOUS POSTULATES \u2014 assert nothing, but read as discharged")
     print("-" * 78)
     if not vacuous:
         print("  (none)")
     else:
-        print("  A `⊤`-typed postulate is inhabited by `tt`, so it carries no")
-        print("  content at all — its real claim is sitting in a comment, where")
-        print("  neither the typechecker nor grep can see it.  State the claim.")
-    for name, d, exempt in vacuous:
-        tag = "  [EXEMPT — deliberate, see VACUOUS_ALLOWLIST]" if exempt else ""
+        print("  A `\u22a4`-typed postulate is inhabited by `tt`, so it carries no")
+        print("  content \u2014 its real claim sits in a comment, where neither the")
+        print("  typechecker nor grep can see it.  State the claim.")
+    for name, d, is_exempt in vacuous:
+        tag = "  [EXEMPT \u2014 see VACUOUS_ALLOWLIST]" if is_exempt else ""
         print(f"    {name}{tag}")
         print(f"        {d.file}:{d.line}")
-    print()
-
-    print("-" * 78)
-    deferred_rows, assemblies = find_deferred_obligations(
-        src_dir, defs, def_lines, postulate_names, files, corpus)
-
-    print("(B3) ORDERING HAZARD — orphans no same-file postulate can consume")
-    print("-" * 78)
-    if not stranded:
-        print("  (none)")
-    else:
-        print("  A postulate cannot reference a definition declared BELOW it.")
-        print("  For each of these, every postulate in its own file precedes")
-        print("  it, so its parent must live in an IMPORTING module — or the")
-        print("  definition has to move up / the assembly body move down.")
-        print("  Decidable from line numbers; do not learn it from a failed")
-        print("  40-minute typecheck.")
-    for name, d, n_post in stranded:
-        print(f"    {name}")
-        print(f"        {d.file}:{d.line}  (all {n_post} postulate(s) in this file are above it)")
-    print()
-
-    print("-" * 78)
-    print("(B4) DEFERRED OBLIGATIONS — proven lemmas PASSED to a postulate,")
-    print("     never APPLIED, so their own premises are unpaid")
-    print("-" * 78)
-    print("  The wiring law tracks NAMES, not OBLIGATIONS INSIDE TYPES.  A")
-    print("  proven lemma handed as a bare value into a postulate's hypothesis")
-    print("  slot HAS a consumer, so it reads as fully wired and the gate stays")
-    print("  green — but a postulate never runs, so it never APPLIES what it was")
-    print("  given.  Nobody has supplied these lemmas' premises, and nobody will")
-    print("  until the parent postulate is proven.  That is real remaining work")
-    print("  appearing NOWHERE in the postulate ledger.")
-    print("  NOT A DELETION LIST.  These lemmas are proven and load-bearing.")
-    print("  But under the LEAF-ONLY RULE this set is FROZEN and may only")
-    print("  SHRINK: a passed-only lemma has never had its FIT tested, since")
-    print("  nothing reduces it.  New ones are a gate FAILURE, not a ledger")
-    print("  entry — write the parent as a real body over postulated leaves.")
-    print()
-    if not deferred_rows:
-        print("  (none)")
-    else:
-        for name, d, parents, slots in deferred_rows:
-            print(f"    {name}   (≤{slots} →-slots deferred)")
-            print(f"        {d.file}:{d.line}")
-            print(f"        passed to: {', '.join(parents)}")
-    print()
-    print(f"  assemblies feeding a -core postulate: {len(assemblies)}")
-    print(f"  passed-only lemmas:                   {len(deferred_rows)}")
-    print(f"  →-slots deferred (upper bound):       {sum(r[3] for r in deferred_rows)}")
-    print()
-
-    print("-" * 78)
-    print("(C) SUMMARY")
-    print("-" * 78)
-    print(f"  total postulates:              {total_postulates}")
-    print(f"  orphaned postulates:            {len(ledger_without)}")
-    print(f"  orphaned proven definitions:    {len(orphans)}")
-    print(f"  unreachable modules:            {len(dead_modules)}")
-    print(f"  passed-only lemmas (B4):        {len(deferred_rows)}")
-    print(f"  vacuous (⊤-typed) postulates:   {len(vacuous)}"
-          f"  ({sum(1 for v in vacuous if v[2])} exempt)")
     print()
 
     print("-" * 78)
     print("--- limitations ---")
     print("-" * 78)
     print(
-        "  * TEXTUAL matching, not semantic. A name mentioned only inside a\n"
-        "    `where` block, or only inside an inline trailing `-- comment` on\n"
-        "    an otherwise-live code line, still counts as a 'consumer' here —\n"
-        "    neither is a real use.\n"
+        "  * TEXTUAL matching, not semantic.  A name mentioned only inside an\n"
+        "    inline trailing `-- comment` on an otherwise-live code line still\n"
+        "    counts as an edge.  Whole-line `--` and `{- -}` comments ARE\n"
+        "    stripped; nested block comments are not specially handled.\n"
         "  * Record FIELD names can shadow unrelated top-level names of the\n"
-        "    same spelling; this script does not disambiguate by type or\n"
-        "    scope, only by text.\n"
-        "  * Only whole-line `--` comments and `{- ... -}` block comments are\n"
-        "    stripped; nested block comments are not specially handled (none\n"
-        "    are known to exist in agda/src today).\n"
-        "  * A postulate member's OWN defining line is excluded from its own\n"
-        "    consumer count, but its (possibly multi-line) TYPE is not masked\n"
-        "    beyond that first line — this matches the task's literal\n"
-        "    definition of 'defining line' (the line starting with the name\n"
-        "    at column 0 / at the postulate block's base indent), not the\n"
-        "    whole signature.\n"
-        "  * Two DIFFERENT top-level definitions that happen to share a name\n"
-        "    (e.g. `main` in both CLI/Main.agda and QuickCheck.agda — two\n"
-        "    distinct compiled entry points) are treated as ONE name: their\n"
-        "    defining lines and consumer counts merge.  Only `main` is known\n"
-        "    to collide like this today.\n"
-        "  * A mixfix operator `_op_` is searched for BOTH underscored\n"
-        "    (its declaration form) and bare (`op`, its real infix use\n"
-        "    form) — but only the LHS half of a clause line (before its own\n"
-        "    `=`/`with`/`rewrite`) is checked when deciding whether a line\n"
-        "    DEFINES that operator, so a line whose RHS merely USES the\n"
-        "    operator is never mistaken for one of its clauses.\n"
-        "  * (B4)'s →-slot count is an UPPER BOUND on premises: it counts\n"
-        "    every depth-0 `→`, including the binder arrow of a leading\n"
-        "    `∀ … →` telescope.  It sizes the ledger, it is not an exact\n"
-        "    obligation count.  (B4) is TEXTUAL too — a lemma used only\n"
-        "    inside a `where` block can be misreported as passed-only.\n"
-        "  * Without --gate this is a report for a human to rule on rather\n"
-        "    than a build gate; it deletes nothing either way."
+        "    same spelling, and a short name (`S`, `G`) is usually a local\n"
+        "    binder rather than the top-level definition it collides with.\n"
+        "    This script disambiguates by text alone, never by type or scope.\n"
+        "  * R2's suppression errs toward over-suppressing (see the module\n"
+        "    docstring).  That is deliberate and self-limiting: it can only\n"
+        "    fail a name whose ONLY route home was the suppressed edge.\n"
+        "  * Two DIFFERENT definitions sharing a name (`main` in both\n"
+        "    CLI/Main.agda and QuickCheck.agda) merge into one node.\n"
+        "  * Reachability answers 'no consumer TODAY', never 'no consumer\n"
+        "    EVER'.  A definition needed by work not yet written reads as\n"
+        "    unreachable; prefer WIRING to deleting whenever a plausible\n"
+        "    consumer is nameable (CLAUDE.md, DELETION).\n"
+        "  * Without --gate this is a report for a human to rule on."
     )
 
     if args.gate:
         problems = []
-        if orphans:
-            problems.append(f"{len(orphans)} orphaned proven definition(s)")
+        if dead_defs:
+            problems.append(f"{len(dead_defs)} unreachable definition(s)")
+        if dead_post:
+            problems.append(f"{len(dead_post)} unreachable postulate(s)")
         if dead_modules:
             problems.append(f"{len(dead_modules)} unreachable module(s)")
-        # The law is "every DEFINITION *and every POSTULATE* is consumed".
-        # Enforcing only the definition half let three unconsumed postulates
-        # sit green indefinitely, so the postulate half gates too.
-        if ledger_without:
-            problems.append(f"{len(ledger_without)} unconsumed postulate(s)")
         unexcused = [v for v in vacuous if not v[2]]
         if unexcused:
-            problems.append(f"{len(unexcused)} vacuous (⊤-typed) postulate(s)")
+            problems.append(f"{len(unexcused)} vacuous (\u22a4-typed) postulate(s)")
         if not main_ok:
             problems.append("Main.agda has a bare `open import`")
-
-        # A3 RATCHET — a definition inside `make agda`'s cone whose only
-        # consumers are OUTSIDE it.  Reporting alone was not enough: the whole
-        # failure mode is that every count reads clean, so this has to gate.
-        # Exempt entries carry a reason in GATE_ONLY_ALLOWLIST; a NEW one is a
-        # new piece of dead proof code held up by a probe or a tool.
-        gate_only_new = sorted(
-            n for n, _d, _c, _l in gate_only if n not in GATE_ONLY_ALLOWLIST
-        )
-        gate_only_stale = sorted(
-            set(GATE_ONLY_ALLOWLIST) - {n for n, _d, _c, _l in gate_only}
-        )
-        if gate_only_new:
-            problems.append(
-                f"{len(gate_only_new)} definition(s) wired ONLY outside the gate"
-            )
-        if gate_only_stale:
-            problems.append(
-                f"{len(gate_only_stale)} GATE_ONLY_ALLOWLIST entry/entries no longer "
-                "measured (gained a real consumer, or deleted — remove the entry)"
-            )
-
-        # B4 RATCHET — the passed-only set must equal agda/DEFERRED.txt.
-        # A new passed-only lemma (measured but not in the ledger) is a NEW
-        # DEFERRAL: deferral must be an explicit, reviewed act.  A lemma in
-        # the ledger but not measured means its premises are discharged or it
-        # was deleted — the win case, but the ledger line must be removed so
-        # the numbers stay honest.
-        measured_names = frozenset(r[0] for r in deferred_rows)
-        ledger_names, ledger_missing = read_deferred_ledger(ledger_path)
-        new_deferrals = sorted(measured_names - ledger_names)
-        stale_entries = sorted(ledger_names - measured_names)
-        if ledger_missing:
-            problems.append(
-                f"agda/DEFERRED.txt not found at {ledger_path} — "
-                "create it (run `make wiring` and add all (B4) entries)"
-            )
-        else:
-            if new_deferrals:
-                problems.append(
-                    f"{len(new_deferrals)} LEAF-ONLY VIOLATION(s) — proven lemma "
-                    "passed to a postulate, never applied"
-                )
-            if stale_entries:
-                problems.append(
-                    f"{len(stale_entries)} ledger entry/entries no longer measured "
-                    "(premises discharged or lemma deleted — remove from agda/DEFERRED.txt)"
-                )
-
+        if missing_claims:
+            problems.append(f"{len(missing_claims)} broken Main claim(s)")
         if problems:
             print()
             print("=" * 78)
-            print("WIRING GATE: FAIL — " + "; ".join(problems))
+            print("WIRING GATE: FAIL \u2014 " + "; ".join(problems))
             print("=" * 78)
-            if new_deferrals:
-                print()
-                print("LEAF-ONLY VIOLATION — these proven lemmas are PASSED to a")
-                print("postulate and never APPLIED, so nothing checks that their")
-                print("types are the ones the parent actually needs.  The remedy is")
-                print("NOT to add a ledger line.  For each, write the parent as a")
-                print("REAL BODY over POSTULATED LEAVES:")
-                print()
-                print("    postulate l : L        -- the gap, a true leaf")
-                print("    P : T")
-                print("    P = <body applying l>  -- composition now CHECKED")
-                print()
-                print("If the body cannot be written yet, postulate the parent BARE")
-                print("and mint no leaves at all.  agda/DEFERRED.txt is a frozen")
-                print("grandfather list that may only SHRINK; growing it needs an")
-                print("explicit ruling from Anthony and increases tracked debt.")
-                # Build a lookup from deferred_rows for slot counts and parents
-                row_map = {r[0]: r for r in deferred_rows}
-                for name in new_deferrals:
-                    row = row_map.get(name)
-                    if row:
-                        _lem, _d, parents, slots = row
-                        print(
-                            f"  {name}  — passed to {', '.join(parents)}, "
-                            f"≤{slots} premises unpaid"
-                        )
-                    else:
-                        print(f"  {name}  — parent unknown")
-            if gate_only_new:
-                print()
-                print("WIRED ONLY OUTSIDE THE GATE — nothing `make agda` compiles")
-                print("uses these.  Either give each a real consumer on the proof")
-                print("path, delete it, or add it to GATE_ONLY_ALLOWLIST with the")
-                print("reason it legitimately serves a tool or awaits a postulate:")
-                for name in gate_only_new:
-                    print(f"  {name}")
-            if gate_only_stale:
-                print()
-                print("GATE_ONLY_ALLOWLIST entries no longer measured — a WIN:")
-                print("each gained a consumer inside the gate (or was deleted).")
-                print("Remove the entry from scripts/check-wiring.py:")
-                for name in gate_only_stale:
-                    print(f"  {name}")
-            if stale_entries:
-                print()
-                print(
-                    "STALE ENTRIES — remove these lines from agda/DEFERRED.txt."
-                )
-                print(
-                    "Their premises are now discharged (or the lemma was deleted)."
-                )
-                print("This is a WIN; the gate fails only until the ledger is tidied:")
-                for name in stale_entries:
-                    print(f"  {name}")
             sys.exit(1)
         print()
         print("=" * 78)
-        print("WIRING GATE: PASS — every definition AND every postulate")
-        print("traces to a top-level claim, every module is reached,")
-        print("and the (B4) passed-only set matches agda/DEFERRED.txt")
+        print("WIRING GATE: PASS \u2014 every definition and every postulate")
+        print("traces to a top-level claim through real bodies; no postulate")
+        print("is the only tissue holding a proof to Main")
         print("=" * 78)
 
 

@@ -147,10 +147,10 @@ report review. Standing protocol, per Anthony:
     as its LAST act before committing**, never before its final edit. A red gate whose
     cause is another worker's tree is not a licence to commit — it is a signal to
     identify the cause explicitly, confirm your own staged files are clean, and say so.
-  - **NEVER reach into another worker's lane to tidy a shared file.** `DEFERRED.txt`
-    and `PROOF-STATE.md` are shared ledgers, and "helpfully" removing a
-    line for a file another worker is mid-landing is how the ratchet got bypassed above.
-    Workers report the ledger lines they need; the design session applies them.
+  - **NEVER reach into another worker's lane to tidy a shared file.**
+    `PROOF-STATE.md` is a shared ledger, and "helpfully" removing a line for a
+    file another worker is mid-landing is how a ratchet gets bypassed. Workers
+    report the ledger lines they need; the design session applies them.
 - **No keep-alives.** The session runs on a persistent laptop, so the container does not
   suspend between tool calls — background workers and detached builds advance on their own,
   and worker completion notifications wake the design session. Keep only a SPARSE fallback
@@ -740,9 +740,22 @@ teeth, since today "assembly exists" is satisfiable by a postulate that checks n
 An unwritten route goes in the parent's header, not into a type that verifies nothing.
 
 The payoff is that **a leaf's FIT is tested the moment it is proven**, because its
-consumer is a body that must reduce. The existing passed-only lemmas are grandfathered
-in `agda/DEFERRED.txt`, a frozen list that may only SHRINK; `make wiring-gate` fails on
-any new one. Growing that file needs a ruling from Anthony.
+consumer is a body that must reduce.
+
+**HOW THIS IS ENFORCED (Anthony, 2026-08-18) — it is now a corollary of
+reachability, not a ledger.** `make wiring-gate` gives a name passed as a BARE
+ARGUMENT to a postulate **no reachability credit from that site**. Passing is
+not itself forbidden; what is forbidden is a postulate being the ONLY connective
+tissue between a proven definition and Main. A lemma that is also genuinely
+applied somewhere stays green; one whose only use is being handed to a postulate
+has no route home and fails R1. There is no grandfather list — `agda/DEFERRED.txt`
+and its ratchet were deleted once the migration emptied them, and the `-core`-suffix
+heuristic went with them, so the rule now sees EVERY postulate rather than the
+ones that happened to be named `-core`.
+
+The check errs toward over-suppressing edges, which is safe by construction: a
+misread edge can only fail a name whose ONLY route home was that edge, and such
+a name is exactly what the rule exists to report.
 
 **THE MIGRATION DOES NOT LICENSE BREAKING OTHER LAWS (Anthony, 2026-08-15).**
 Distinguish two kinds of rule. The TIER ORDER is a *schedule*, and Anthony
@@ -774,8 +787,8 @@ something and it STOPS.**
 
 **A STOP IS A FINDING, NOT A DISCHARGE — IT IS NOT DONE TILL IT IS DONE (Anthony,
 2026-08-15).** Stopping produces a real result and is the right move; what it does
-not produce is a completed item. The roadmap row STAYS, the `DEFERRED.txt` line
-STAYS, the leaf-only violation stays live, and the parent is still a parent — until
+not produce is a completed item. The roadmap row STAYS, the leaf-only violation
+stays live, and the parent is still a parent — until
 the migration actually lands and the parent stops taking proven lemmas. Write the
 finding in the postulate's header, record the ruling, and leave the row exactly where
 it was.
