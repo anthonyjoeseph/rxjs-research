@@ -2160,17 +2160,11 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op al
            κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq))
 
 -- ─────────────────────────────────────────────────────────────────
--- LEAF-ONLY MIGRATION 2026-08-17
--- ─────────────────────────────────────────────────────────────────
--- innerReact-nodry-core / thruOuter-nodry-core become REAL DEFINITIONS
--- whose bodies case-split the evaluator's dispatch and APPLY
--- subscribeInner-nodry at each arm that calls subscribeInner.
--- subscribeInner-nodry is no longer passed as an argument; it is called.
--- That call is the fit test — and it fires here.
---
--- Residue leaves minted by the fit test.  None take a proven lemma as
--- an argument; they are genuine open obligations exposed by writing the
--- body rather than postulating the whole.
+-- THE NODRY RESIDUE LEAVES.  `innerReact-nodry` / `thruOuter-nodry` are
+-- real bodies that case-split the evaluator's dispatch and APPLY
+-- `subscribeInner-nodry` at each arm calling `subscribeInner`; these are
+-- what those bodies cannot pay.  Every one is a genuine open obligation
+-- and none takes a proven lemma as an argument.
 --
 -- NOTE ON slFc: slotsFnCap sl ≤ Ψ is required by SiNodry but absent
 -- from stepFrame-nodry's hypotheses.  It is a static capsule invariant
@@ -2201,8 +2195,8 @@ postulate
   -- NO DEPTH PREMISE, deliberately, and the reason is not convenience.
   -- The conclusion is STATIC — a fact about `sl` and `Ψ` alone — so a
   -- `depthFrame … ≤ d` hypothesis was never an ingredient, only a claim
-  -- about the route (exactly what the leaf-only law says a hypothesis
-  -- list must not be).  It was also unusable: `depthFrame` unfolds
+  -- about the route (exactly what CLAUDE.md's "A POSTULATE MUST BE A
+  -- LEAF" says a hypothesis list must not be).  It was also unusable: `depthFrame` unfolds
   -- through `depthFin`'s `lookupNode allNid (EvalSt.nodes st)`, so at the
   -- concat call site — which sits under a `with` on that very term — the
   -- caller's `hD` is refined to `suc (depthDrain …)` while this
@@ -3358,9 +3352,9 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 
 -- (DELETED 2026-08-18) `cascadeGo-burst-dry` sat here — `proj₁` of
 -- `cascadeGo-burst-nodry`, exactly as `cascadeGo-nodry` below is `proj₂`.
--- Its only consumer was `dry-tick-core`'s argument list, and the leaf-only
--- migration showed that list was wrong about itself: the dry half concludes
--- `hasDry`, and a `burstB?` bound cannot be an ingredient of it.  Recreating
+-- Its only consumer was `dry-tick-core`'s argument list, and that list is
+-- wrong about itself: the dry half concludes `hasDry`, and a `burstB?`
+-- bound cannot be an ingredient of it.  Recreating
 -- it is one line against `cascadeGo-burst-nodry`, so nothing is lost but the
 -- typing; RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Burst-Walk.agda
 

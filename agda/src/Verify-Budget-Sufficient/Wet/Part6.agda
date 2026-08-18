@@ -437,13 +437,11 @@ mu-edge Ŝ R̂ U η body
 -- one less hypothesis than the reach-reset route would have forced,
 -- and no `hη` obligation on the environment.
 -- ══ RECOVERY POINTER (2026-08-18) — THE DRY APPARATUS THAT WAS DELETED ══
--- The leaf-only migration of `dry-tick-core` proved its nine-lemma route
--- list wrong about itself (the dry half is `cascadeGo`'s stream verbatim, so
--- no bound and no ledger fact can enter it), and eight proven lemmas turned
--- out to have been PARKED in that argument list rather than consumed by it.
--- Under the leaf-only rule a proven lemma has no legal home but a real
--- consumer, so they went — and with them three modules that nothing else
--- reached: `.Anchor-Dry` (subscribeInner-demand / subscribeInner-dry /
+-- `dry-tick-core`'s nine-lemma route list is wrong about itself: the dry
+-- half is `cascadeGo`'s stream verbatim, so no bound and no ledger fact
+-- can enter it.  Eight proven lemmas had no real consumer — they were in
+-- that argument list only — so they went, and with them three modules
+-- nothing else reached: `.Anchor-Dry` (subscribeInner-demand / subscribeInner-dry /
 -- dry-hop), `.Occurrences` (frameOccs? / pathOccs?) and `.Tick-Headroom`
 -- (tick-covers-instant plus its arithmetic: pow2-mono, headroom-arith,
 -- lvls-tower, fLvlD-strict, dLvl-plus and the rest).

@@ -697,8 +697,7 @@ fLvl S W J = J + fCharge S W J
 -- BROKEN BY THE STORY INDEX.  `budgetAt`'s height runs through
 -- `capsHgo`, hence `blowH`, hence `poolCount`, hence `lvls` — so a `d`
 -- taken from the gas at the level would make `poolCount` depend on
--- `budgetAt` and `budgetAt` on `poolCount` (agda/probe/Refresh-Probe
--- .agda § 8 states the cycle exactly).  `blowH` breaks it by handing the
+-- `budgetAt` and `budgetAt` on `poolCount`.  `blowH` breaks it by handing the
 -- count ITS OWN story index `m`: `blowH m = 6 + m + 2 · poolCount
 -- (towerℕ m) m`, where m is blowH's own argument and the recurrence
 -- builds it incrementally.  `capsAt` (.Caps) makes the same reading one

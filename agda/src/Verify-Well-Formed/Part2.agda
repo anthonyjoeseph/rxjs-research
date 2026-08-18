@@ -390,17 +390,16 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- the between-cascades carrier of the first global coherence field
     caches       : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
     -- A HOT SLOT'S ORDINAL IS LIVE AT THE SLOT'S ELEMENT TYPE.
-    -- Added 2026-08-15 by the leaf-only migration (PROOF-STATE tier −1).
     -- `mkHot` (Evaluator:110) establishes this at sched-init and NOTHING
     -- carried it afterwards, so subscribeE's hot/live input arm could not
     -- pay initReg-wf's `ltok` — the finding is in subscribeE-input-wf's
-    -- header (.Part3), where `BurstInv.hot-live binv i` now spends it.  It is a FIELD and not a hypothesis by ruling (Anthony,
+    -- header (.Part3), where `BurstInv.hot-live binv i` spends it.  It is a
+    -- FIELD and not a hypothesis by ruling (Anthony,
     -- 2026-08-15): `live` and `slots` are independent fields of the plain
     -- record `Sched`, so no lemma over an arbitrary sched could be true,
     -- and a hypothesis would bind only whoever calls today while making
-    -- the debt invisible to `make wiring`, the risk classes and
-    -- PROOF-STATE.  See CLAUDE.md, "THE MIGRATION DOES NOT LICENSE
-    -- BREAKING OTHER LAWS".
+    -- the debt invisible to `make wiring`.  See CLAUDE.md, "A POSTULATE
+    -- MUST BE A LEAF".
     hot-live     : HotLive sched
 
 ------------------------------------------------------------------

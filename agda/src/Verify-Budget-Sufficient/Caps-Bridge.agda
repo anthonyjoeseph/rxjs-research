@@ -449,9 +449,8 @@ fn-tick {e = e} a id sched st inv val =
 -- counts, which say the latch clears the ledger and the two walk lines
 -- account for it.
 --
--- ══ THAT ROUTE LIST IS WRONG ABOUT ITSELF (2026-08-17, the leaf-only
--- ══ migration's fit test; same shape as mid-step-core's, which shed
--- ══ four of six).  Two facts, one pinned and one cited:
+-- ══ THAT ROUTE LIST IS WRONG ABOUT ITSELF (2026-08-17).  Two facts, one
+-- ══ pinned and one cited:
 --
 -- (1) THE CONCLUSION IS `cascadeGo-nodry`'s VERBATIM.  `cascadeFinish`
 --     returns (Sched × EvalSt) and emits NOTHING (Evaluator:1683), so a
@@ -467,9 +466,9 @@ fn-tick {e = e} a id sched st inv val =
 --     inner burst), dry-hop (a sizeᵛ bound), chainStep-caps (a
 --     capsOK?/burstCaps? Σ).  Their real home is the OTHER two conjuncts
 --     of `cascade-wet-via-caps` (§ C), which is where a cascade's bound
---     and ledger obligations actually land; re-homing them there is what
---     the migration owes, since all eight are PROVEN and orphaning them
---     is not a licence to delete them.
+--     and ledger obligations actually land; re-homing them there is the
+--     remaining obligation: all eight are PROVEN and orphaning them is not
+--     a licence to delete them.
 --
 -- (2) THE ONE REAL INGREDIENT CANNOT BE PAID AS `dry-tick` IS STATED.
 --     `cascadeGo-nodry`'s first premise is `capsOK? (capsAt e sl id)
@@ -486,7 +485,7 @@ fn-tick {e = e} a id sched st inv val =
 --     inv val` without them — so the two premises the body needs are
 --     already proven one line up.
 --
--- THE MIGRATION IS THEREFORE BLOCKED ON A RESTATEMENT, NOT A PROOF:
+-- WRITING THE REAL BODY IS BLOCKED ON A RESTATEMENT, NOT A PROOF:
 -- dry-tick and this core gain `pre` and `valC`, threaded from the caller.
 -- That is "ADDING A HYPOTHESIS IS A RESTATEMENT" (CLAUDE.md), and the
 -- one sufficient justification is a REFUTATION of the unconditional
@@ -506,8 +505,8 @@ fn-tick {e = e} a id sched st inv val =
 -- `cascadeFinish` returns a (Sched × EvalSt) and NO emits (Evaluator:1683),
 -- so a cascade's stream IS its cascadeGo's, and dry-tick's conclusion is
 -- `cascadeGo-nodry`'s conclusion verbatim at the latched state.  Pinned
--- rather than argued, because it is what tells the migration above that
--- latch/finish BOOKKEEPING cannot be an ingredient of the dry half — see
+-- rather than argued, because it is what shows that latch/finish
+-- BOOKKEEPING cannot be an ingredient of the dry half — see
 -- dry-tick-core's header.  Anonymous by the bug-cache idiom.
 _ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
@@ -516,8 +515,8 @@ _ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 _ = λ a id sched st → refl
 
 -- ══ INV? DOES NOT IMPLY capsOK? — MACHINE-REFUTED 2026-08-17 ═══════
--- dry-tick-core's header (above) says its migration is BLOCKED on a
--- restatement: dry-tick and the core gain `pre`/`valC`, threaded from
+-- dry-tick-core's header (above) names the restatement that blocks it:
+-- dry-tick and the core gain `pre`/`valC`, threaded from
 -- `cascade-wet-via-caps`.  CLAUDE.md's "ADDING A HYPOTHESIS IS A
 -- RESTATEMENT" allows that only against a REFUTATION of the
 -- unconditional form.  This is it.

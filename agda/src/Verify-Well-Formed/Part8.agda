@@ -260,12 +260,12 @@ subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
   sched₂ = proj₁ (proj₂ r₀)
   st₁    = proj₂ (proj₂ r₀)
 
--- THE ZERO ARM, and it was invisible while the clause was postulated wholesale.
+-- THE ZERO ARM IS FREE, and a wholesale postulate would hide that.
 -- `take 0` never subscribes its source (Evaluator:1442) — it is `emptyᵉ`
 -- verbatim, a spent one-shot — so the PROVEN `oneShotBurst-wf` closes it
--- outright and the valsLast? conjunct is `refl` by computation.  The same
--- silently-absorbed arm the input migration found at cold/no-async: a `-core`
--- hides not just unpaid premises but whole free cases.
+-- outright and the valsLast? conjunct is `refl` by computation.  Same pattern
+-- as at the cold/no-async arm: a postulate hides not just unpaid premises but
+-- whole free cases.
 --
 -- `rewrite ecEq` is what lets it reduce: the evaluator's takeᵉ clause opens
 -- `with evalTm count`, so the goal is stuck until that scrutinee is known.
@@ -331,11 +331,11 @@ subscribeE-wf fuel (mapᵉ f b) κ id now sched st S binv deq nodry =
         subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀)
   in S″ , run , binv″ , map-valsLast-push fuel f b κ id now sched st vl₀
 
--- ── takeᵉ: REAL BODY (2026-08-18) — the leaf-only migration landed ──────────
--- Was `subscribeE-takeᵉ-wf-core` taking `subscribeE-take-wf` as an argument and
--- never applying it.  APPLYING it is what pays its premises, and its last one —
--- `dyF` — is exactly what the fit test refuted and what the A′ re-keying of
--- `BurstInv.live-matches` then removed (.Part2's field note).
+-- ── takeᵉ: REAL BODY ─────────────────────────────────────────────────────────
+-- `subscribeE-take-wf` is APPLIED here rather than passed.
+-- Applying it is what pays its premises, and its last one —
+-- `dyF` — is exactly what the pins in .Part3 refuted and what the A′ re-keying
+-- of `BurstInv.live-matches` then removed (.Part2's field note).
 --
 -- `take-go` carries `ec` and `ecEq : evalTm count ≡ ec` as ORDINARY arguments
 -- rather than opening a `with evalTm count` here.  That is not style: a `with`

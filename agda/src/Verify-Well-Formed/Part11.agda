@@ -294,9 +294,8 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- FREE `u` where the Path constructors are matchable.
 --
 -- Its ROOT arm is PROVEN, and proving it is what gives
--- `foldPath-root-out` a consumer that reduces — the whole point of the
--- leaf-only rule.  The other two arms are leaves, so this is a 1-of-3
--- discharge and not a proof of the fold.
+-- `foldPath-root-out` a consumer that reduces.  The other two arms are
+-- leaves, so this is a 1-of-3 discharge and not a proof of the fold.
 postulate
   -- FRAME arm, NOW THE FoldOut ONLY (2026-08-18).  The run equation is
   -- not this leaf's to prove: `foldPath-wf` (.Part9) already proves it
@@ -384,18 +383,17 @@ foldPath-out sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds f
 -- ════════════════════════════════════════════════════════════════
 -- THE Mid TRANSITION, ASSEMBLED — a real body over three leaves
 -- ════════════════════════════════════════════════════════════════
--- Was `mid-step-core` taking SIX proven lemmas as arguments and
--- applying none (PROOF-STATE tier −1, the leaf-only migration).
--- Applying them is what tested the route, and the route was wrong about
--- itself: FOUR of the six are not ingredients at all.  `mid-enters`,
+-- The former route list was wrong about itself: FOUR of the six alleged
+-- ingredients are not ingredients at all.  `mid-enters`,
 -- `enterInstant-idle`, `enterInstant-held` and `paidUp-held` are
 -- subsumed by what the real chain already goes through —
 -- `seed-enter-pay` reaches the automaton via `enterInstant-cont` and
 -- `enterInstant-fresh`, and the latter uses the `-aux` forms directly —
 -- so those four were second proofs of facts already proven, kept alive
 -- only by appearing in a `-core`'s hypothesis list.  They are deleted;
--- `git show` carries them.  This is CLAUDE.md's "a `-core`'s hypothesis
--- list is a HYPOTHESIS about the route, not a specification", measured.
+-- `git show` carries them.  See CLAUDE.md, "A POSTULATE MUST BE A LEAF":
+-- a `-core`'s hypothesis list is a hypothesis about the route, not a
+-- specification.
 --
 -- What the assembly actually spends: `mid-seed` (Mid ⇒ FoldInv at the
 -- chainStep seed) and, through `foldPath-out` above, `foldPath-root-out`.

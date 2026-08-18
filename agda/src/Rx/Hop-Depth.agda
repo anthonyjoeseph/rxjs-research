@@ -110,9 +110,8 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
 --   · an occurrence count UNDER-prices a nested mapᵉ, where hopD
 --     MULTIPLIES.  A plug in an inner map's source is scaled by that
 --     inner template's coefficient, and a count of the outer mentions
---     cannot see the inner factor at all.  (agda/probe/Hop-Descent-
---     Probe.agda's mul-exceeds: one mention, no duplication, 6 against
---     an allowance of 4.)
+--     cannot see the inner factor at all.  Measured: one mention, no
+--     duplication, 6 against an allowance of 4.
 --
 -- So pm is hopD's own recursion with two changes and nothing else: a
 -- variable at index k contributes 1 where hopD contributes 0, and the

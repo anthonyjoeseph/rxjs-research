@@ -559,23 +559,22 @@ postulate
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
 
--- takeᵉ WHOLE CASE — MIGRATED 2026-08-18, and the header below is what the
--- migration cost and found.  `subscribeE-takeᵉ-wf-core` is GONE: the takeᵉ
+-- takeᵉ WHOLE CASE.  The takeᵉ
 -- clause of `subscribeE-wf` (.Part8) is a real body that APPLIES
 -- `subscribeE-take-wf` and `subscribeE-take0-wf`, over the residue leaves
 -- `take-nodry-push` / `take-nodeP` above and the real `take-binv-adapt`.
 --
--- WHAT THE FIT TEST FOUND, in the order it found it:
+-- FINDINGS:
 --   · THE WITH-ABSTRACTION TRAP IS REAL.  `with evalTm count` at the clause
 --     level abstracts that term throughout the context, after which the
 --     recursive call's type still mentions it unabstracted and unification
 --     fails.  The landing shape is a where-helper carrying `ec` and
 --     `ecEq : evalTm count ≡ ec` as ORDINARY arguments, each consumer doing
 --     its own `rewrite ecEq`.
---   · THE ZERO ARM WAS FREE, and invisible while the clause was postulated
---     wholesale — `take 0` never subscribes its source (Evaluator:1442), so
+--   · THE ZERO ARM IS FREE, and a wholesale postulate would hide that —
+--     `take 0` never subscribes its source (Evaluator:1442), so
 --     it is `emptyᵉ` verbatim and the PROVEN `oneShotBurst-wf` closes it.
---     Same silently-absorbed arm the input migration found at cold/no-async.
+--     Same pattern as at the cold/no-async arm.
 --   · AND ONE PREMISE COULD NOT BE PAID — `subscribeE-take-wf`'s `dyF`,
 --     `∀ s → memberSource s (EvalSt.dying …) ≡ false`.  Its own comment said
 --     it "rides in from the enclosing cascade"; that was backwards, since
@@ -605,8 +604,8 @@ postulate
 -- window still owes its close-landing bound.  `cutThrough-close-bound-dying`
 -- and `cutThrough-live-dying` (.Part7) carry it, with the exact ledger.
 
--- MACHINE REFUTATION of the naive residue leaf the migration above would
--- have needed — subscribeE-take-wf's `dyF` conjunct, stated over the same
+-- MACHINE REFUTATION of the naive residue leaf the real body above would
+-- have consumed — subscribeE-take-wf's `dyF` conjunct, stated over the same
 -- arbitrary `st` its consumer quantifies over.  `EvalSt` is a plain record
 -- and `dying` a free field, so ONE state with a non-empty `dying` kills it:
 -- at `b = emptyᵉ` the subscribe is a one-shot that returns `st` untouched
@@ -690,26 +689,22 @@ _ = λ n Γ bal → 1+n≢0 (bal {Γ′ = Γ} {t = natᵗ} 0 0 (0 ∷ []) 0 (0 �
                            ((0 , 0 , natᵗ , take-f 0 ↠ root) ∷ []))
 
 -- ════════════════════════════════════════════════════════════════
--- THE INPUT CLAUSE, ASSEMBLED — a real body over the three leaves
+-- THE INPUT CLAUSE, ASSEMBLED — a real body over three leaves
 -- ════════════════════════════════════════════════════════════════
--- Was `subscribeE-input-wf-core` taking `initReg-wf` as an argument
--- and never applying it (PROOF-STATE tier −1, the leaf-only
--- migration).  APPLYING it is what pays its premises, and that is
--- what found the `ltok` gap: the hot/live arm needs
+-- `initReg-wf` is APPLIED here, which pays its premises.  The hot/live arm
+-- needs
 --
 --     liveTypeOK? (toℕ i) (lookup Γ i) (Sched.live sched) ≡ true
 --
--- which nothing in scope supplied, because `Sched` (Evaluator:63) is a
+-- which nothing in scope supplies, because `Sched` (Evaluator:63) is a
 -- plain record whose `live` and `slots` are independent and nothing
 -- tied them across a schedule transition.  Anthony's ruling (2026-08-15)
 -- put the fact on BurstInv/Inv/Mid as the `hot-live` field rather than
 -- into this signature as a hypothesis — tracked debt, not laundered —
--- and `BurstInv.hot-live binv i (cong hotSlot? slotEq)` is what spends
--- it here.  See CLAUDE.md, "THE MIGRATION DOES NOT LICENSE BREAKING
--- OTHER LAWS".
+-- and `BurstInv.hot-live binv i (cong hotSlot? slotEq)` spends it
+-- here.  See CLAUDE.md, "A POSTULATE MUST BE A LEAF".
 --
--- The fit test also RETIRED an arm the core had absorbed silently: the
--- cold/no-async arm is `oneShotBurst` verbatim, so the proven
+-- The cold/no-async arm is `oneShotBurst` verbatim, so the proven
 -- `oneShotBurst-wf` (.Part2) closes it outright.  Two of four arms are
 -- discharged; the leaves are the other two plus the shared slot.
 subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

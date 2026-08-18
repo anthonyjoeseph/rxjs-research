@@ -870,11 +870,9 @@ abstract
 -- counted flat, because the latch clears `delivered` and cascadeFinish
 -- touches it not at all.  Together with `cascadeGo-skip-N` / `cascadeGo-cons-N`
 -- (the cascade's own two ledger lines, also deleted) they existed for ONE
--- consumer, `dry-tick-core`'s argument list, and the leaf-only migration
--- proved that list wrong about itself: the dry half is `cascadeGo`'s stream
--- verbatim (cascadeFinish emits nothing), so no ledger fact can enter it.
--- Parking them was the whole problem, and under the leaf-only rule a proven
--- lemma has no legal home but a real consumer.
+-- consumer, `dry-tick-core`'s argument list, and that list is wrong about
+-- itself: the dry half is `cascadeGo`'s stream verbatim (cascadeFinish
+-- emits nothing), so no ledger fact can enter it.
 --
 -- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Deliveries.agda
 -- restores all five.  `delivN` itself is LIVE (.Delivery-Walk reads it all
