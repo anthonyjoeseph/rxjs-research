@@ -863,14 +863,34 @@ The payoff is that **a leaf's FIT is tested the moment it is proven**, because i
 consumer is a body that must reduce.
 
 **HOW THIS IS ENFORCED — as a corollary of reachability, needing no ledger of
-its own.** `make wiring-gate` gives a name passed as a BARE
-ARGUMENT to a postulate **no reachability credit from that site**. Passing is
+its own.** `make wiring-gate` gives a name PASSED to a postulate **no
+reachability credit from that site**. Passing is
 not itself forbidden; what is forbidden is a postulate being the ONLY connective
 tissue between a proven definition and Main. A lemma that is also genuinely
 applied somewhere stays green; one whose only use is being handed to a postulate
 has no route home and fails R1. There is no grandfather list and no name-based
 heuristic: the rule sees EVERY postulate, not the ones that happen to be named
 `-core`.
+
+**"PASSED" COVERS THE ETA FORM AND THE CONTINUATION LINE (2026-08-18), and it
+had to, because together they are how the rule's own worked example escaped
+it.** `merge-cert` was an ingredient of nothing for months and read as wired,
+by this shape:
+
+```agda
+root-caches =
+  root-caches-core (λ {n} {Γ} {t} → merge-cert {n} {Γ} {t})
+```
+
+Each half hid it independently. The application sits BELOW its clause's `=`, so
+the checker read the whole line as a type mention and never examined the
+arguments; and the argument is PARENTHESISED, so it read as a nested value
+being computed rather than a proof handed over. The eta form is not exotic —
+**this file MANDATES it** (mechanic 1 below: a bare argument gives `Unsolved
+metas` when the statement reduces its own implicit away), so the one shape R2
+most needs to see was the one shape it could not. Both are pinned in
+`scripts/wiring-selftest` (`bad-lemma`, `eta-lemma`); neither costs the real
+tree a name.
 
 The check errs toward over-suppressing edges, which is safe by construction: a
 misread edge can only fail a name whose ONLY route home was that edge, and such

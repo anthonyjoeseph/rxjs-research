@@ -8,8 +8,11 @@ Two rules, and the second is a special case of the first.
       point), following the edge relation below.  One route suffices: a
       name used in ten places needs only one of them to trace home.
 
-  R2  A POSTULATE IS A LEAF.  A name passed as a bare argument TO a
-      postulate earns NO reachability from that site.  Passing is allowed —
+  R2  A POSTULATE IS A LEAF.  A name passed TO a postulate — as a bare
+      argument, or eta-expanded as `(\u03bb {n} \u2192 f {n})`, the form CLAUDE.md
+      mandates for implicits — earns NO reachability from that site.  The
+      application may also sit on a CONTINUATION line, below its clause's
+      `=`.  Passing is allowed —
       what is forbidden is a postulate being the ONLY connective tissue
       between a proven definition and Main.  Such a lemma has never had its
       FIT tested: nothing reduces it, so nothing checks that its type is
@@ -23,8 +26,8 @@ THE EDGE RELATION.  Two kinds of edge, and they differ only under R2:
     in a statement)       | needs vocabulary, and Main claims the statement
     ----------------------+------------------------
     application edge (a   | NO when the callee is a POSTULATE.  Yes when it
-    name passed as a bare | is a definition: a real body APPLIES what it is
-    argument at a call)   | given, so the composition is checked.
+    name passed bare or   | is a definition: a real body APPLIES what it is
+    eta-expanded)         | given, so the composition is checked.
 
 WHY THIS SHAPE IS ROBUST TO ITS OWN IMPRECISION.  Deciding "lemma passed as
 a proof" vs "function applied to compute a value" is a TYPE question and
@@ -35,6 +38,19 @@ to report.  A misread edge on a name with any other consumer is invisible.
 A check that gates on the classifier DIRECTLY, rather than on the edge it
 suppresses, is the design to avoid: measured at 40 false positives out of
 110 postulates.
+
+THE TWO WAYS IT UNDER-SUPPRESSED, both fixed 2026-08-18 and both found by
+one name.  `merge-cert`'s only use was two sites of the shape
+
+    root-caches =
+      root-caches-core (\u03bb {n} {\u0393} {t} \u2192 merge-cert {n} {\u0393} {t})
+
+and each half of that hid it: the application sits on a CONTINUATION line,
+so the `=` test read it as a type mention and never looked at the
+arguments; and the argument is PARENTHESISED, so it read as a nested value
+being computed.  Either alone was enough for a postulate that was an
+ingredient of nothing to report as wired.  Both are load-bearing in the
+fixture (`bad-lemma`, `eta-lemma`), and neither costs the real tree a name.
 
 R2 IS ABSOLUTE — no grandfather list, and no name-based heuristic: it is
 structural, so it sees every postulate rather than the ones named `-core`.
@@ -900,13 +916,54 @@ def owner_of(by_file, relpath, lineno):
 _BND = r"[\w\'\u1d49\u1d5b\u1d9c\u1d4d\u1d57\u02e2\u2264\u2261?\u2032-]"
 
 
+_ETA_TOK = re.compile(r"\s*(\{[^{}]*\}|[A-Za-z_][A-Za-z0-9_'\u2032]*)")
+
+
+def eta_target(inner):
+    """The name an ETA-EXPANSION passes, or None if this is a real computation.
+
+    `(\u03bb {n} {\u0393} \u2192 f {n} {\u0393})` hands `f` over exactly as `f` would, but the
+    parentheses made it look like a nested value to the caller below, so it
+    used to earn reachability R2 means to deny.  That is not an exotic case:
+    CLAUDE.md MANDATES this form for any lemma with implicits ("Pass every
+    lemma ETA-EXPANDED with explicit implicits"), because a bare argument
+    gives `Unsolved metas` when the statement reduces its own implicit away.
+    So the one shape the rule most needs to see was the one shape it could
+    not — measured 2026-08-18, when `merge-cert`'s only route home turned
+    out to be two such lambdas into the postulates it was a hypothesis of.
+
+    Only a HEAD applied to implicit-argument groups and plain identifiers
+    counts.  Anything else after the arrow — an operator, a literal, a
+    nested application — is a computation and returns None, so this stays on
+    the over-suppressing side of the classifier's error budget.
+    """
+    body = inner.strip()
+    if not (body.startswith("\u03bb") or body.startswith("\\")):
+        return None
+    arrow = body.rfind("\u2192")
+    if arrow == -1:
+        return None
+    body = body[arrow + 1:].strip()
+    head = re.match(r"[^\s(){}\[\],;]+", body)
+    if not head:
+        return None
+    pos, rest = 0, body[head.end():]
+    while rest[pos:].strip():
+        m = _ETA_TOK.match(rest, pos)
+        if not m:
+            return None
+        pos = m.end()
+    return head.group(0)
+
+
 def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
     """R2's suppression set: (file, line) -> {names passed as BARE arguments
     to an applied postulate}.
 
-    Only a BARE identifier at the application's top level counts as passed.
-    A name nested inside parentheses with its own arguments is a VALUE being
-    COMPUTED — `INV?-install \u03a8 (Caps.cSize (frameStep j c)) \u2026` applies
+    A BARE identifier at the application's top level counts as passed, and so
+    does an ETA-EXPANSION of one (see eta_target above) — `(\u03bb {n} → f {n})`
+    hands `f` over exactly as `f` would.  A name nested inside parentheses
+    with its own arguments is a VALUE being COMPUTED — `INV?-install \u03a8 (Caps.cSize (frameStep j c)) \u2026` applies
     `frameStep` to build a Caps, it does not hand `frameStep` over as a
     proof.  Measured 2026-08-18: without this restriction the classifier
     reported 40 of 110 postulates as non-leaves, every one a false positive.
@@ -926,7 +983,24 @@ def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
                 if (relpath, i) in own or not pat.search(line):
                     continue
                 base = len(line) - len(line.lstrip())
-                span, j = [(i, line)], i
+                # Walk UP to the clause head first.  A postulate applied on a
+                # CONTINUATION line carries no `=` of its own, and without one
+                # the `=` test below reads the whole application as a TYPE
+                # mention and suppresses nothing at all.  BOTH root-exit
+                # -cores were written that way —
+                #     root-caches =
+                #       root-caches-core (\u03bb {n} \u2192 merge-cert {n})
+                # — so R2 never even looked at their arguments (2026-08-18).
+                start, ind = i, base
+                while start > 1:
+                    prev = visible[start - 2]
+                    pind = len(prev) - len(prev.lstrip())
+                    if not prev.strip() or pind >= ind:
+                        break
+                    start, ind = start - 1, pind
+                    if "=" in prev:
+                        break
+                span, j = [(ln, visible[ln - 1]) for ln in range(start, i + 1)], i
                 while j < len(visible):
                     nxt = visible[j]
                     if not nxt.strip() or len(nxt) - len(nxt.lstrip()) <= base:
@@ -954,6 +1028,12 @@ def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
                                 elif expr[k2] in ")}":
                                     d -= 1
                                 k2 += 1
+                            # … unless it is an ETA-EXPANSION, which passes a
+                            # name as surely as a bare argument does.
+                            eta = eta_target(expr[k + 1:k2 - 1])
+                            if eta:
+                                for (ln, _t) in span:
+                                    suppressed[(relpath, ln)].add(eta)
                             k = k2
                             continue
                         mm = re.match(r"[^\s(){}\[\],;]+", expr[k:])
