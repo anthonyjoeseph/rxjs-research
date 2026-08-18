@@ -93,7 +93,11 @@ pushBurst-scan-fixed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)))
      ≡ EvalSt.registry st)
   × (proj₁ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)) ≡ sched)
-pushBurst-scan-fixed fuel id now fn nid κ [] sched st acc lk = refl , refl
+  -- `dying` too, since BurstInv.live-matches is keyed on it (.Part2's field
+  -- note): a scan push writes only `nodes`, so all three fields ride through
+  × (EvalSt.dying (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)))
+     ≡ EvalSt.dying st)
+pushBurst-scan-fixed fuel id now fn nid κ [] sched st acc lk = refl , refl , refl
 pushBurst-scan-fixed {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ ems) sched st acc lk
   rewrite lk | ≟ᵗ-refl u =
   pushBurst-scan-fixed fuel id now fn nid κ ems sched
@@ -136,7 +140,8 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
 
   cRes   = pushBurst-scan-fixed fuel id now f nid κ burst sched₂ st₁ acc nodeP
   regEq  = proj₁ cRes
-  schEq  = proj₂ cRes
+  schEq  = proj₁ (proj₂ cRes)
+  dyEq   = proj₂ (proj₂ cRes)
 
   stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
   schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
@@ -144,8 +149,10 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
   run″ : runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S′
   run″ = pushBurst-scan-run fuel id now f nid κ burst sched₂ st₁ acc S S′ nodeP run₀
 
-  lmF : ∀ s → countIn s (ProtocolSt.live S′) ≡ countRegs s (EvalSt.registry stF)
-  lmF s rewrite regEq = BurstInv.live-matches binv₀ s
+  lmF : ∀ s → memberSource s (EvalSt.dying stF) ≡ false →
+              countIn s (ProtocolSt.live S′) ≡ countRegs s (EvalSt.registry stF)
+  lmF s h rewrite regEq = BurstInv.live-matches binv₀ s
+                            (subst (λ dy → memberSource s dy ≡ false) dyEq h)
 
   regTF : regTyped? (EvalSt.registry stF) (Sched.live schF) ≡ true
   regTF rewrite regEq | schEq = BurstInv.reg-typed binv₀

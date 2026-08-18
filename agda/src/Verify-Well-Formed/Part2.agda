@@ -417,7 +417,30 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                 (id : Id) (sched : Sched Γ) (st : EvalSt e)
                 (S : ProtocolSt) : Set where
   field
+    -- OFF THE DYING SOURCES ONLY (2026-08-18, ruling by Anthony).  The
+    -- all-sources form was REFUTED at a dying source: a victim that has
+    -- already delivered on a dying source carried its exhausted close on
+    -- its own emit, so `cutThrough` drops it from the registry and emits
+    -- no close for it (Evaluator's `delivered ∧ memberSource src dying`
+    -- guard) — the registry loses an entry the live list never sees.  The
+    -- refutation is the third pin in .Part3 (`cutThrough-balance` with its
+    -- dying hypothesis removed: 1 ≡ 0 + 0).
+    --
+    -- KEYED ON `EvalSt.dying st`, NOT ON AN envSrc INDEX.  The fold branch
+    -- solved the same problem by excluding envSrc (`FoldInv.shadow`,
+    -- .Part8), and its take-cut clause is proven that way (.Part9's
+    -- stepFrame-wf-take-cut).  Copying that here would have meant giving
+    -- BurstInv an envSrc parameter it does not have and does not need:
+    -- `dying` is readable off `st`, which BurstInv already takes, and the
+    -- whole cut chain is ALREADY conditioned pointwise on this exact
+    -- predicate — `cutThrough-balance`'s own `mem` argument (.Part7).  So
+    -- the hypothesis is discharged at every source the machinery can serve,
+    -- and the take-cut edge's unpayable `dyF` premise does not get re-keyed,
+    -- it DISAPPEARS: what it was trying to establish is now the field's own
+    -- hypothesis.  See subscribeE-takeᵉ-wf's header (.Part3) for the two
+    -- refutations that forced this.
     live-matches  : ∀ (s : Source) →
+      memberSource s (EvalSt.dying st) ≡ false →
       countIn s (ProtocolSt.live S) ≡ countRegs s (EvalSt.registry st)
     reg-typed     : regTyped? (EvalSt.registry st) (Sched.live sched) ≡ true
     horizon-low   : ProtocolSt.horizon S ≤ id
@@ -449,7 +472,7 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   BurstInv {e = e} 0 (sched-init e ins) (st-init e) protocol-init
 burst-init e ins = record
-  { live-matches  = λ s → refl
+  { live-matches  = λ s _ → refl
   ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
@@ -554,7 +577,7 @@ oneShotBurst-wf vals id sched st S binv deq =
   _ , oneShotBurst-run vals id sched S deq (BurstInv.current-frame binv)
                        (BurstInv.horizon-low binv)
     , record
-        { live-matches  = λ s → BurstInv.live-matches binv s
+        { live-matches  = λ s h → BurstInv.live-matches binv s h
         ; reg-typed     = BurstInv.reg-typed binv
         ; horizon-low   = BurstInv.horizon-low binv
         ; current-frame = inj₂ refl

@@ -92,6 +92,12 @@ leaf-only violation all stay live until the repair lands. A stopped migration
 still pays — it converts an unexamined premise into a machine refutation — but it
 does not close its row.
 
+**AND A STOP CAN BE RESUMED BY A RULING.** `BurstInv.live-matches` is now keyed
+off `EvalSt.dying st` (Anthony, 2026-08-18), which unblocked that stop: the
+refuted `dyF` premise is not re-keyed but GONE from `cut-head-joint`,
+`pushBurst-take-{cut-,}joint` and `subscribeE-take-wf`'s conjunct list. The
+migration's own blocker is cleared; the row stays until the body actually lands.
+
 **TIER MEMBERSHIP EXEMPTS NOTHING HERE (Anthony, 2026-08-15).** The migration is
 not scheduled against the tier order and does not defer to it: a lemma whose type
 was never checked against its parent's need is wasted work at every tier, so the
@@ -108,10 +114,11 @@ so they are ordinary work and this tier stays the migration worklist.
 first, so the single-lemma parents establish the pattern:
 
 - **`subscribeE-takeᵉ-wf-core`** (Part3) — one lemma (`subscribeE-take-wf`).
-  **STOPPED, NOT DONE**: every arm but one is dev-green (the zero arm falls to
-  `oneShotBurst-wf` outright), and the survivor is `dyF`, refuted by a pin beside
-  the postulate — as is the envSrc re-keying that was to repair it. Blocked on a
-  ruling for `BurstInv.live-matches`; both refutations and the fork in its header.
+  **UNBLOCKED 2026-08-18, NOT YET LANDED**: the `dyF` survivor is gone with the
+  A′ re-keying of `BurstInv.live-matches`, so every arm is now payable (the zero
+  arm falls to `oneShotBurst-wf` outright). Remaining: write the body over
+  `ec`/`ecEq` as ordinary arguments (the with-abstraction dodge its header
+  records), with `take-binv-adapt`, `take-nodry-push`, `take-nodeP` as residue.
 - **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest, and eight of them
   are not ingredients: `cascadeFinish` emits nothing (pinned), so the conclusion is
   `cascadeGo-nodry`'s verbatim. The INV?-without-capsOK? refutation IS NOW BUILT
@@ -226,10 +233,17 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   the other two are register/init balances of a shape proven twice over.
 - **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: a per-clause receipt of a
   pattern already proven three times over.
-- **`subscribeE-takeᵉ-wf-core`** (Part3) — SHAPE, and the restatement is not its
-  own but `BurstInv.live-matches`'s: `dyF` is refuted, and so is conditioning it
-  on envSrc, because the cut's balance is FALSE at envSrc and live-matches is an
-  all-sources equality. Both pins beside the postulate; the fork in its header.
+- **`subscribeE-takeᵉ-wf-core`** (Part3) — DIFFICULTY, lowered from SHAPE: the
+  restatement it was waiting on landed (A′, `BurstInv.live-matches` keyed off
+  `dying`), and what remains is writing the body. Tier −1 carries it.
+- **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — FALSITY,
+  A′'s residue and the honest cost of it: at a dying source the live list lags the
+  registry by the already-delivered entries, and neither leaf can be proven until
+  that lag is an invariant. The exact ledger, and why adding it as a `BurstInv`
+  field spirals into the registry's id discipline, are in their shared header.
+- **`subscribeE-dying`** (Part8) — DIFFICULTY, low: `subscribeE` never writes
+  `dying` (two writers, neither reachable from it). An induction over its clause
+  set; the route is in its header.
 - **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the `hot-live` field's
   own cost and the first migration's residue: `sched-init-hot-live` (base, from
   `mkHot`), `mintSource-hot-live`, `subscribeE-hot-live`, `cascadeFinish-hot-live`,

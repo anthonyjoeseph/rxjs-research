@@ -109,13 +109,35 @@ paid-empty S ceq with ProtocolSt.current S | ceq
 
 -- leaving the frame: the open instant settles (owed never seeded ⇒
 -- paid), landing Inv-related for the first arrival
+--
+-- `dyF` ADDED 2026-08-18, and it is a RESTATEMENT WITH THE SANCTIONED
+-- JUSTIFICATION: the unconditional form is not weakened away, it was
+-- REFUTED.  `BurstInv.live-matches` is now conditioned on non-dying
+-- (.Part2's field note) because at a dying source the equation is FALSE
+-- — a delivered victim's exhausted close rode its own emit, so the cut
+-- drops a registry entry the live list never sees.  `Inv.live-matches`
+-- stays ALL-SOURCES, since between cascades `cascadeFinish` has swept
+-- the dying source out; this premise is what bridges the two.
+--
+-- IT IS FREE AT THE ONLY CALL SITE, which is the point.  burst-final is
+-- the root frame-0 exit (.Part8's subscribe-wf, its sole consumer), where
+-- `st` is the ROOT subscribe's output over `st-init e` — and `subscribeE`
+-- never writes `dying`: the field's only two writers are `shareLatch`
+-- (Evaluator:1514, reached only from dispatchShare ← foldPath) and
+-- `cascadeLatch` (:1639, reached only from the cascade).  `subscribeE-dying`
+-- (.Part8) is that fact, and `st-init` has `dying ≡ []`, so the premise
+-- discharges by `refl`.  This is the same `dyF` the takeᵉ clause could NOT
+-- pay — its original comment claimed it "free at a root subscribe", which
+-- was right about the root and wrong about inners.  A′ moves it to the one
+-- place it is true.
 burst-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv 0 sched st S →
+  (∀ s → memberSource s (EvalSt.dying st) ≡ false) →
   (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
   cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true →
   Inv 1 sched st S × (paidUp S ≡ true)
-burst-final sched st S binv dp cv = inv , paid (BurstInv.current-frame binv)
+burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
   where
   past : (ProtocolSt.current S ≡ nothing)
        ⊎ (ProtocolSt.current S ≡ just (0 , [])) →
@@ -131,7 +153,7 @@ burst-final sched st S binv dp cv = inv , paid (BurstInv.current-frame binv)
 
   inv : Inv 1 sched st S
   inv = record
-    { live-matches = BurstInv.live-matches binv
+    { live-matches = λ s → BurstInv.live-matches binv s (dyF s)
     ; reg-typed    = BurstInv.reg-typed binv
     ; horizon-low  = ≤-up (BurstInv.horizon-low binv)
     ; current-past = past (BurstInv.current-frame binv)

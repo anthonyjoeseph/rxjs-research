@@ -94,7 +94,6 @@ pushBurst-take-cut-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
   stepProtocol (es at i from src as ek) S ≡ just S₁ →
   BurstInv id sched st S₁ →
-  (∀ s → memberSource s (EvalSt.dying st) ≡ false) →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ
                             ((es at i from src as ek) ∷ []) sched st)) ≡ just S″)
@@ -102,9 +101,9 @@ pushBurst-take-cut-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ []) sched st)))
         (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ ((es at i from src as ek) ∷ []) sched st))) S″
 pushBurst-take-cut-joint {Γ = Γ} {t = t} {e = e} {s = s}
-  fuel id now nid κ es i src ek sched st kCount S S₁ lk dc seq binv₁ dyF =
+  fuel id now nid κ es i src ek sched st kCount S S₁ lk dc seq binv₁ =
   let (S″ , step , binv″) =
-        cut-head-joint id nid es i src ek sched st kCount S S₁ lk dc seq binv₁ dyF
+        cut-head-joint id nid es i src ek sched st kCount S S₁ lk dc seq binv₁
   in S″
    , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
        (sym (pushBurst-take-cut-cons fuel id now nid κ es i src ek [] sched st kCount lk dc))
@@ -144,15 +143,14 @@ pushBurst-take-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   valsLast? burst ≡ true →
   BurstInv id sched st S′ →
   runProtocol S burst ≡ just S′ →
-  (∀ s → memberSource s (EvalSt.dying st) ≡ false) →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (pushBurst fuel id now (take-f nid) κ burst sched st)) ≡ just S″)
     × BurstInv id (proj₁ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st)))
                   (proj₂ (proj₂ (pushBurst fuel id now (take-f nid) κ burst sched st))) S″
-pushBurst-take-joint fuel id now nid κ [] sched st kCount S S′ lk vl binv₀ runEq dyF
+pushBurst-take-joint fuel id now nid κ [] sched st kCount S S′ lk vl binv₀ runEq
   = S , refl , subst (BurstInv id sched st) (sym (just-injᵂ runEq)) binv₀
 pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
-  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk vl binv₀ runEq dyF
+  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk vl binv₀ runEq
   with stepProtocol (es at i from src as ek) S in seq
 ... | nothing = ⊥-elim (n≢jᵂ runEq)
 ... | just S₁ with takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)) in tvEq
@@ -163,9 +161,9 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
           pushBurst-take-cut-joint {Γ = Γ} {s = s} fuel id now nid κ es i src ek sched st
             kCount S S₁ lk
             (takeVals-flag kCount (proj₁ (splitEvents {A = Val Γ s} es)) tvEq)
-            seq (subst (BurstInv id sched st) (sym (just-injᵂ runEq)) binv₀) dyF
+            seq (subst (BurstInv id sched st) (sym (just-injᵂ runEq)) binv₀)
 pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
-  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk vl binv₀ runEq dyF
+  fuel id now nid κ ((es at i from src as ek) ∷ ems) sched st kCount S S′ lk vl binv₀ runEq
   | just S₁ | out , rem , false =
         let rem′ : ℕ
             rem′ = proj₁ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es))))
@@ -208,7 +206,7 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
             (S″ , tailRun , rec) =
               pushBurst-take-joint fuel id now nid κ ems sched ust rem′ S₁ S′
                 (lookupNode-setNode nid (take-st rem′) (EvalSt.nodes st))
-                (valsLast-tail (es at i from src as ek) ems vl) tailBinv runEq dyF
+                (valsLast-tail (es at i from src as ek) ems vl) tailBinv runEq
         in S″
          , subst (λ (b : Stream Γ s) → runProtocol S b ≡ just S″)
              (sym (pushBurst-take-noncut-cons fuel id now nid κ es i src ek ems sched st kCount lk dcF))
@@ -234,22 +232,24 @@ subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         (runProtocol S (proj₁ r₀) ≡ just S′)
         × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
         × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
-        × (valsLast? (proj₁ r₀) ≡ true)
-        -- the cut's live/registry balance is off a dying source only; subscribeE
-        -- never writes `dying` (cascadeLatch alone does), so this rides in from
-        -- the enclosing cascade — free at a root subscribe, where st-init has it []
-        × (∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂ r₀))) ≡ false)) →
+        -- `dyF` CONJUNCT REMOVED 2026-08-18 (A′).  It used to sit here claiming
+        -- the cut's balance held off every source, "riding in from the enclosing
+        -- cascade" — and it was the one premise this clause could never pay, since
+        -- `cascadeLatch` seeds `dying` before any chain is processed.  The cut no
+        -- longer asks for it: `cut-head-joint` reads the `dying`-conditioned
+        -- `BurstInv.live-matches` instead (.Part2's field note, .Part7's split).
+        × (valsLast? (proj₁ r₀) ≡ true)) →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
     × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
                (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
     × (valsLast? (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ true)
 subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
-  (S′ , run₀ , binv₀ , nodeP , vl₀ , dyF)
+  (S′ , run₀ , binv₀ , nodeP , vl₀)
   rewrite ecEq =
   let (S″ , run , binv″) =
         pushBurst-take-joint fuel id now nid κ burst sched₂ st₁ (suc k) S S′ nodeP vl₀ binv₀
-          run₀ dyF
+          run₀
   in S″ , run , binv″
    , pushBurst-take-valsLast fuel id now nid κ burst sched₂ st₁ (suc k) nodeP vl₀
   where
@@ -394,6 +394,36 @@ subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv deq nodry =
 
 -- ── input ────────────────────────────────────────────────────────────────────
 
+-- `subscribeE` NEVER WRITES `dying`.  The field has exactly two writers —
+-- `shareLatch` (Evaluator:1514), reached only from dispatchShare ← foldPath,
+-- and `cascadeLatch` (:1639), reached only from the cascade — and subscribeE
+-- calls neither: its one share route is `sharedConnect` (:1367), which touches
+-- `registry`, `connectedShares` and `completedSources` and leaves `dying`
+-- alone.  A leaf because the proof is an induction over subscribeE's whole
+-- clause set, and its consumer needs only the equation.
+--
+-- THIS IS THE TRUE FORM OF THE OLD `dyF`.  That premise asserted dying-freeness
+-- of an ARBITRARY state and was refuted outright (.Part3's first pin).  What is
+-- actually true is PRESERVATION, and it is what makes the premise free at the
+-- root — where `st-init` starts `dying` at `[]` — while remaining false inside a
+-- cascade, exactly as the refutation says.
+postulate
+  subscribeE-dying : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    EvalSt.dying (proj₂ (proj₂ (subscribeE fuel b κ id now sched st)))
+      ≡ EvalSt.dying st
+
+-- and so the root subscribe's output state is dying-free, which is the premise
+-- `burst-final` now takes (.Part4)
+root-dying-free : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  ∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂
+          (subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)))))
+        ≡ false
+root-dying-free e ins s
+  rewrite subscribeE-dying (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+  = refl
+
 subscribe-wf :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
@@ -410,7 +440,8 @@ subscribe-wf e ins nodry
                      (sched-init e ins) (st-init e)
                      protocol-init (burst-init e ins) refl nodry
 ... | S , run , binv , _
-  with burst-final _ _ S binv (root-done-plumbed e ins S run) (root-caches e ins)
+  with burst-final _ _ S binv (root-dying-free e ins)
+                   (root-done-plumbed e ins S run) (root-caches e ins)
 ... | inv , paid = S , run , inv , paid
 
 

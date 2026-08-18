@@ -424,23 +424,94 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 ...   | true  = ih
 ...   | false = ih
 
+-- THE DYING SOURCE'S CLOSE BOUND — the residue A′ leaves behind, and the one
+-- thing `BurstInv.live-matches` can no longer supply now that it is keyed off
+-- `dying` (.Part2's field note).  Off a dying source the bound comes straight
+-- off `cutThrough-balance`; AT one it does not, and the gap is real rather
+-- than notational: a delivered registration on a dying source already emitted
+-- its exhausted close on its own emit, so `live` has dropped it while the
+-- registry still carries it.  The closes cutThrough emits there are exactly
+-- the NOT-yet-delivered victims, and they must still land.
+--
+-- THE LEDGER THAT PAYS IT, derived by hand 2026-08-18 and exact (not a bound).
+-- Write dlv for the entries on s already folded this cascade.  At a dying s
+-- the live list lags the registry by precisely those:
+--
+--     countIn s live + dlv(reg)  ≡  countRegs s reg                    … (LAG)
+--
+-- Split the registry by the cut: reg = victims ++ kept, victims =
+-- delivVictims ++ nonDelivVictims, and cutThrough emits a close for exactly
+-- the nonDelivVictims (its `delivered ∧ memberSource src dying` guard skips
+-- the rest).  Then
+--
+--     countIn s live = nonDelivVictims + (kept − dlv(kept))
+--
+-- so the bound `closeCount ≤ countIn s live` holds with slack `kept − dlv(kept)`,
+-- and applying the closes lands on `countIn s L′ = kept − dlv(kept)` — which is
+-- (LAG) again at the post-cut state.  The cut PRESERVES the ledger exactly.
+--
+-- WHY (LAG) IS NOT A `BurstInv` FIELD TODAY, which is a finding and not a
+-- shrug.  Adding it obliges every producer, and `initReg-wf` cannot discharge
+-- it: `register` mints `rid = nextReg st`, and showing the fresh id is absent
+-- from `EvalSt.delivered` needs a SECOND invariant (delivered ids all below
+-- nextReg) reaching upstream into the registry's id discipline.  That is
+-- CLAUDE.md's SPIRALLING signature — a new obligation at least as risky as the
+-- one it replaces, reaching into machinery already ground — not the converging
+-- one, so the subdivision stops here and (LAG) stands as a leaf.  Adding the
+-- field is the route; it needs the id-discipline invariant first.
+postulate
+  cutThrough-close-bound-dying : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
+    (∀ s → memberSource s (EvalSt.dying st) ≡ false →
+       countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
+    ∀ s → memberSource s (EvalSt.dying st) ≡ true →
+      closeCount s (retagEvents {B = A}
+        (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                  (EvalSt.dying st) (EvalSt.registry st)))))
+      ≤ countIn s L₁
+
+  -- the same edge on the OUTPUT side: applying those closes lands the post-cut
+  -- live list back on the kept registry.  Off a dying source this is
+  -- `cutThrough-balance`; at one it is (LAG) at the post-cut state, per the
+  -- derivation above.  Stated at the conclusion `live-matches` actually needs,
+  -- so nothing downstream has to know which side of the split it is on.
+  cutThrough-live-dying : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (st : EvalSt e) (L₁ L′ : List Source) →
+    (∀ s → memberSource s (EvalSt.dying st) ≡ false →
+       countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
+    applyEvents {A}
+      (retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                              (EvalSt.dying st) (EvalSt.registry st)))))
+      L₁ [] false ≡ just (L′ , [] , false) →
+    ∀ s → memberSource s (EvalSt.dying st) ≡ true →
+      countIn s L′ ≡ countRegs s
+        (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                           (EvalSt.dying st) (EvalSt.registry st)))
+
 -- every close cutThrough emits has a live entry to land on: the closes are
 -- bounded by the registry (cutThrough-balance) and the registry is what the
--- live list shadows (live-matches)
+-- live list shadows (live-matches).  SPLIT ON `dying` (2026-08-18): the
+-- unconditional `dyF` premise this used to take was REFUTED at its only call
+-- site — `cascadeLatch` seeds `dying` before any chain is processed, so inside
+-- a cascade it is false, not free (the refutation is the first pin in .Part3).
+-- Off a dying source the old proof stands verbatim; at one, the leaf above.
 cutThrough-close-bound : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
-  (∀ s → memberSource s (EvalSt.dying st) ≡ false) →
-  (∀ s → countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
+  (∀ s → memberSource s (EvalSt.dying st) ≡ false →
+     countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
   ∀ s → closeCount s (retagEvents {B = A}
           (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                                     (EvalSt.dying st) (EvalSt.registry st)))))
         ≤ countIn s L₁
-cutThrough-close-bound {A} nid st L₁ dyF lm s =
+cutThrough-close-bound {A} nid st L₁ lm s
+  with memberSource s (EvalSt.dying st) in mem
+... | true  = cutThrough-close-bound-dying {A} nid st L₁ lm s mem
+... | false =
   subst (_≤ countIn s L₁) (sym (retag-closeCount s (proj₁ (proj₂ CT))))
-    (subst (closeCount s (proj₁ (proj₂ CT)) ≤_) (sym (lm s))
+    (subst (closeCount s (proj₁ (proj₂ CT)) ≤_) (sym (lm s mem))
       (subst (closeCount s (proj₁ (proj₂ CT)) ≤_)
         (sym (cutThrough-balance s nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-               (EvalSt.dying st) (EvalSt.registry st) (dyF s)))
+               (EvalSt.dying st) (EvalSt.registry st) mem))
         (m≤n+m (closeCount s (proj₁ (proj₂ CT))) (countRegs s (proj₁ CT)))))
   where
   CT = cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
@@ -454,10 +525,16 @@ cutThrough-close-bound {A} nid st L₁ dyF lm s =
 -- The `dying` guard is cutThrough-balance's own: a victim that already
 -- delivered on a dying source carried its exhausted close on its own emit, so
 -- the registry would drop an entry the live list does not.
+-- PREMISE WEAKENED 2026-08-18 (A′): takes the `dying`-conditioned shadow that
+-- `BurstInv.live-matches` now supplies, and STILL RETURNS THE ALL-SOURCES
+-- equality — the dying instance comes off `cutThrough-live-dying`, so no
+-- consumer has to learn which side of the split it is on.  The old
+-- `∀ s → memberSource s (EvalSt.dying st) ≡ false` premise is gone; it was
+-- unpayable at the only call site inside a cascade.
 cutThrough-live-apply : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
-  (∀ s → memberSource s (EvalSt.dying st) ≡ false) →
-  (∀ s → countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
+  (∀ s → memberSource s (EvalSt.dying st) ≡ false →
+     countIn s L₁ ≡ countRegs s (EvalSt.registry st)) →
   Σ (List Source) λ L′ →
     applyEvents {A}
       (retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
@@ -466,27 +543,30 @@ cutThrough-live-apply : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     × (∀ s → countIn s L′ ≡ countRegs s
                (proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                                   (EvalSt.dying st) (EvalSt.registry st))))
-cutThrough-live-apply {A} nid st L₁ dyF lm
+cutThrough-live-apply {A} nid st L₁ lm
   with closes-apply {A}
          (retagEvents (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st)
                         (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st)))))
          L₁
          (cutThrough-allCloses {A} nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                                (EvalSt.dying st) (EvalSt.registry st))
-         (cutThrough-close-bound {A} nid st L₁ dyF lm)
+         (cutThrough-close-bound {A} nid st L₁ lm)
 ... | L′ , ap , cnt = L′ , ap , final
   where
   CT = cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                   (EvalSt.dying st) (EvalSt.registry st)
   final : ∀ s → countIn s L′ ≡ countRegs s (proj₁ CT)
-  final s = +-cancelʳᵂ (countIn s L′) (countRegs s (proj₁ CT))
-              (closeCount s (proj₁ (proj₂ CT)))
-              (trans (trans (sym (cong (countIn s L′ +_)
-                                    (retag-closeCount s (proj₁ (proj₂ CT))))) (cnt s))
-                     (trans (lm s)
-                            (cutThrough-balance s nid (EvalSt.delivered st)
-                              (EvalSt.regWatermark st) (EvalSt.dying st)
-                              (EvalSt.registry st) (dyF s))))
+  final s with memberSource s (EvalSt.dying st) in mem
+  ... | true  = cutThrough-live-dying {A} nid st L₁ L′ lm ap s mem
+  ... | false =
+    +-cancelʳᵂ (countIn s L′) (countRegs s (proj₁ CT))
+      (closeCount s (proj₁ (proj₂ CT)))
+      (trans (trans (sym (cong (countIn s L′ +_)
+                            (retag-closeCount s (proj₁ (proj₂ CT))))) (cnt s))
+             (trans (lm s mem)
+                    (cutThrough-balance s nid (EvalSt.delivered st)
+                      (EvalSt.regWatermark st) (EvalSt.dying st)
+                      (EvalSt.registry st) mem)))
 
 cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (id : Id) (nid : NodeId)
@@ -496,10 +576,14 @@ cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
   stepProtocol (es at i from src as ek) S ≡ just S₁ →
   BurstInv id sched st S₁ →
-  -- the cut's live/registry balance holds only off a dying source: a victim
-  -- that already delivered carried its own exhausted close, so no close is
-  -- emitted for it and the registry drops an entry the live list does not
-  (∀ s → memberSource s (EvalSt.dying st) ≡ false) →
+  -- NO `dyF` PREMISE (dropped 2026-08-18).  It used to sit here, asserting the
+  -- cut's live/registry balance off every source, with a comment claiming it
+  -- "rides in from the enclosing cascade".  That was backwards — `cascadeLatch`
+  -- SEEDS `dying` before any chain is processed, so inside a cascade it is
+  -- false, and it was the one premise the takeᵉ clause could never pay (both
+  -- refutations are in .Part3).  Under A′ it is not re-keyed but GONE: the
+  -- conditioned `BurstInv.live-matches` carries the off-dying half and
+  -- `cutThrough-live-dying` the rest.
   Σ ProtocolSt λ S″ →
     (stepProtocol
       ((proj₁ (proj₂ (splitEvents {A = Val Γ s} es))
@@ -510,7 +594,7 @@ cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         at i from src as ek) S ≡ just S″)
     × BurstInv id (cutSched nid sched st) (cutSt nid st) S″
 cut-head-joint {Γ = Γ} {e = e} {s = s}
-  id nid es i src ek sched st kCount S S₁ lk dc step binv₁ dyF
+  id nid es i src ek sched st kCount S S₁ lk dc step binv₁
   with stepProtocol-extract-enter es i src ek S step
 ... | ob , hz′ , ob′ , O₁ , entEq , stEq , aeEq , hzEq , curEq = S″ , cutStep , binv″
   where
@@ -560,7 +644,7 @@ cut-head-joint {Γ = Γ} {e = e} {s = s}
   CTA : Σ (List Source) λ Lx →
           applyEvents {Val Γ s} cuts (ProtocolSt.live S₁) [] false ≡ just (Lx , [] , false)
           × (∀ s₁ → countIn s₁ Lx ≡ countRegs s₁ kept)
-  CTA      = cutThrough-live-apply {Val Γ s} nid st (ProtocolSt.live S₁) dyF
+  CTA      = cutThrough-live-apply {Val Γ s} nid st (ProtocolSt.live S₁)
                (BurstInv.live-matches binv₁)
   L′ : List Source
   L′       = proj₁ CTA
@@ -592,7 +676,7 @@ cut-head-joint {Γ = Γ} {e = e} {s = s}
   -- assemble BurstInv for S″
   binv″ : BurstInv id (cutSched nid sched st) (cutSt nid st) S″
   binv″ = record
-    { live-matches  = lm′
+    { live-matches  = λ s₁ _ → lm′ s₁
     ; reg-typed     = cut-reg-typed nid sched st (BurstInv.reg-typed binv₁)
     ; horizon-low   = subst (λ hz → hz ≤ id) hzEq (BurstInv.horizon-low binv₁)
     ; current-frame = inj₂ (cong (λ j → just (j , [])) i=id)

@@ -140,13 +140,14 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
                        ; current = just (id , []) ; done = ProtocolSt.done S })
   run = initReg-run {Val Γ u} id src S (BurstInv.current-frame binv) (BurstInv.horizon-low binv)
 
-  lm : ∀ s → countIn s (src ∷ ProtocolSt.live S)
+  lm : ∀ s → memberSource s (EvalSt.dying (register src κ st)) ≡ false →
+             countIn s (src ∷ ProtocolSt.live S)
              ≡ countRegs s (EvalSt.registry (register src κ st))
-  lm s rewrite countRegs-snoc s (EvalSt.registry st) (EvalSt.nextReg st) src u κ
+  lm s h rewrite countRegs-snoc s (EvalSt.registry st) (EvalSt.nextReg st) src u κ
     with s ≡ᵇ src
-  ... | true  = trans (cong suc (BurstInv.live-matches binv s))
+  ... | true  = trans (cong suc (BurstInv.live-matches binv s h))
                       (sym (+-comm (countRegs s (EvalSt.registry st)) 1))
-  ... | false = trans (BurstInv.live-matches binv s)
+  ... | false = trans (BurstInv.live-matches binv s h)
                       (sym (+-identityʳ (countRegs s (EvalSt.registry st))))
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -623,11 +624,7 @@ postulate
             (runProtocol S (proj₁ r₀) ≡ just S′)
             × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
             × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
-            × (valsLast? (proj₁ r₀) ≡ true)
-            -- the cut's live/registry balance is off a dying source only; subscribeE
-            -- never writes `dying` (cascadeLatch alone does), so this rides in from
-            -- the enclosing cascade — free at a root subscribe, where st-init has it []
-            × (∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂ r₀))) ≡ false)) →
+            × (valsLast? (proj₁ r₀) ≡ true)) →
       Σ ProtocolSt λ S″ →
         (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
         × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
