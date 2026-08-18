@@ -169,11 +169,10 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   inward through the take push, and the fresh take node comes back with its
   budget unspent (the frame above, not the subscription, spends it). Twins of
   the scan pair, which are the worked shape.
-- **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — FALSITY,
-  A′'s residue and the honest cost of it: at a dying source the live list lags the
-  registry by the already-delivered entries, and neither leaf can be proven until
-  that lag is an invariant. The exact ledger, and why adding it as a `BurstInv`
-  field spirals into the registry's id discipline, are in their shared header.
+- **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — SHAPE:
+  both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the sources the
+  conclusions speak about. Restate over the (LAG) ledger; header carries the
+  repair and why it was not ground here.
 - **`subscribeE-dying`** (Part8) — DIFFICULTY, low: `subscribeE` never writes
   `dying` (two writers, neither reachable from it). An induction over its clause
   set; the route is in its header.

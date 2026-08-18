@@ -14,3 +14,5 @@ open import Refuted.Anchor
          round3-anchor-indexed-absurd)
 open import Refuted.Wet
   using (wet-ceiling-absurd; wet-ell-absurd)
+open import Refuted.Cut-Through
+  using (cutThrough-close-bound-dying-absurd; cutThrough-live-dying-absurd)

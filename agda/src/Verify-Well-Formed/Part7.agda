@@ -459,6 +459,36 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- one it replaces, reaching into machinery already ground — not the converging
 -- one, so the subdivision stops here and (LAG) stands as a leaf.  Adding the
 -- field is the route; it needs the id-discipline invariant first.
+--
+-- ⚠ REFUTED 2026-08-18 — BOTH LEAVES BELOW ARE FALSE AS STATED.
+-- `Refuted.Cut-Through.cutThrough-close-bound-dying-absurd` and
+-- `-live-dying-absurd` (agda/refuted/, `make refuted`).
+--
+-- THE DEFECT IS IN THE QUANTIFIER STRUCTURE, NOT IN THE EVALUATOR — say
+-- this first, because the shape invites the opposite reading.  `L₁` is
+-- universally quantified and its ONLY hypothesis constrains it at
+-- NON-dying sources, while both conclusions speak ONLY about DYING ones.
+-- So `L₁` is free exactly where it is used, and a registry whose lone
+-- entry is an undelivered victim on the dying source refutes both: take
+-- L₁ = [] for the bound (it demands 1 ≤ 0) and L₁ = 0 ∷ 0 ∷ [] for the
+-- live half, whose `applyEvents` premise ties L′ to L₁ but leaves L₁
+-- itself unconstrained (it demands 1 ≡ 0).  Nothing about reachability
+-- is at stake: the statements quantify over every `st`, so a free `L₁`
+-- alone sinks them.
+--
+-- This is CLAUDE.md's first almost-always-wrong shape — a conclusion
+-- needing information appearing in NONE of its hypotheses — and it is
+-- the same diagnosis `subscribeE-inner-nodry-inv`'s header records for
+-- its own repair: UNDERDETERMINED, not hard.
+--
+-- THE REPAIR IS THE (LAG) LEDGER ABOVE, hypothesised AT the dying source
+-- rather than derived there: `countIn s L₁ + dlv(s, reg) ≡ countRegs s reg`,
+-- which needs a delivered-count helper `dlv` that does not exist yet.
+-- That is a restatement of both leaves and of what their consumer must
+-- supply — NOT a weakening, since the unconditional form is now refuted
+-- (CLAUDE.md's one sufficient justification for adding a hypothesis).
+-- It is deliberately NOT done here: this family is tier 2 and tier 0 is
+-- open, so the finding is recorded and the repair scheduled, not ground.
 postulate
   cutThrough-close-bound-dying : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
