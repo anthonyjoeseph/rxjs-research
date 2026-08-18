@@ -654,12 +654,37 @@ does not stop anyone: "route #2 is STRUCTURALLY DEAD — `cascadeLatch` sets `dy
 before any chain is processed, so the invariant cannot be established at that point"
 does.
 
-- **This is the ONLY sanctioned home for a failed attempt. Do NOT create a
-  `dead-ends/` directory** (nor resurrect `probe/` under another name). A tree of
-  failure files outside the claim graph is read by nobody at the moment it would
-  help, and becomes the next thing every session has to read and classify — the
-  precise cost that got `probe/` deleted. What prevents a repeated mistake is
-  LOCALITY: the note sitting in the header of the thing you are about to grind.
+- **A PROSE note is the home for a dead ROUTE. A machine-checked refutation
+  lives in `agda/refuted/` (Anthony, 2026-08-18).** These are different
+  artifacts and they get different homes:
+  - a **dead route** — "this way of proving it cannot work" — has no `⊥` to
+    state, so it is a `-- DEAD ROUTE` line in the header of the postulate you
+    were grinding. LOCALITY is what makes it work: the note sits in front of
+    the next person about to try the same thing.
+  - a **refutation** — a proven `… → ⊥` — is a theorem, and it goes in
+    `agda/refuted/`, a separate include root checked by `make refuted`.
+    **The rules for that tree live in `REFUTATION.md` — read it before adding,
+    repairing or deleting a refutation.** It covers the one-way import
+    direction, what to do when `src` moves under a refutation, and why a
+    refutation is kept even after its route's goal is proven some other way.
+    **KEEPING A REFUTATION IN `src` IS ACTIVELY HARMFUL**, because `src` must
+    then keep whatever machinery makes the dead route STATE-able, and that
+    machinery is otherwise deletable. Measured 2026-08-18: the round-3 anchor
+    vocabulary (`walkCap`, `anchorᴬ`, `sucV≤d`, `d≤walkCap`, `walkCap≤walkArg`,
+    `d≤walkArg`, `ℓ≤walkCap`) was seven live definitions in `.Measures` held up
+    by nothing but the six refutations that mention it.
+  Because a refuted route does **not change**, `src` may refer to one in a
+  `-- REFUTED:` comment; that is the locality, and it costs `src` nothing.
+  `agda/refuted/` is NOT subject to the wiring law — `make wiring` scans
+  `agda/src` only — so a refutation needs no exemption and cannot self-exempt
+  by choosing its name, which is what the old `*-absurd` suffix match allowed.
+  Nothing in `src` may import it.
+
+  This does NOT reopen `probe/` or a `dead-ends/` tree of prose files. The
+  distinction is that everything in `agda/refuted/` is TYPECHECKED and named
+  by `Refuted.Main`, so it cannot rot unnoticed; a tree of failure *notes*
+  outside the claim graph is read by nobody at the moment it would help, and
+  that is still forbidden.
 - **A dead route is not a licence to weaken the statement.** It kills a *route*.
   The postulate stays at full strength; see "Do NOT weaken a statement to make it
   typecheck".

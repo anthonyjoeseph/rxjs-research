@@ -1,0 +1,283 @@
+-- ══════════════════════════════════════════════════════════════════
+-- CAPS-FACE: two impossible frame bounds
+--
+-- REFUTATIONS: machine-checked `… → ⊥`.  Each theorem here says a route
+-- CANNOT work, and says it in a form the typechecker rechecks — unlike a
+-- prose note, which decays silently.
+--
+-- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony, 2026-08-18).
+-- Keeping a dead route in `src` forces `src` to keep whatever machinery
+-- makes the route STATE-able, and that machinery is otherwise deletable:
+-- these two files held seven definitions alive in Measures for no other
+-- reason.  So refutations live here, are checked by `make refuted`, and
+-- are NOT subject to the wiring law — nothing in `src` may import them.
+-- They do not change, so `src` refers to them in COMMENTS (`-- REFUTED:`).
+-- ══════════════════════════════════════════════════════════════════
+module Refuted.Caps-Face where
+
+open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
+                                if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _∸_; _≤_; _<_;
+                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
+                                       ≤-reflexive; <-≤-trans; ≤-pred;
+                                       +-suc; +-identityʳ;
+                                       +-comm; +-assoc; +-monoʳ-<;
+                                       +-monoˡ-<; +-monoˡ-≤;
+                                       *-monoˡ-≤; *-monoʳ-≤;
+                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
+                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
+                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
+                                       ^-monoʳ-≤; *-assoc;
+                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
+                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
+                                       ^-monoˡ-≤; ^-*-assoc;
+                                       ^-distribˡ-+-*; *-mono-≤;
+                                       +-monoʳ-≤; *-comm;
+                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
+                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
+open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Nat.Induction  using (<-wellFounded)
+open import Data.Nat.Solver     using (module +-*-Solver)
+open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
+open import Data.Bool.ListAction using (all; any)
+open import Data.Nat.ListAction  using (sum)
+open import Data.Fin     using (Fin; toℕ)
+import Data.Fin as Fin
+open import Data.Bool.Properties using (∨-zeroʳ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using (All)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
+open import Data.List.Relation.Unary.All.Properties
+  using (concat⁺; tabulate⁺)
+  renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
+open import Data.List.Properties using (length-++; length-map)
+open import Data.List.Membership.Propositional.Properties
+  using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.Maybe   using (Maybe; nothing; just)
+open import Relation.Nullary using (yes; no)
+open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum     using (inj₁; inj₂)
+open import Data.Unit    using (⊤; tt)
+open import Induction.WellFounded using (Acc; acc; WellFounded)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
+open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
+                                _at_from_as_; EmitKind; subscribe;
+                                InstEvent; init; value; close; handoff;
+                                complete; exhausted; delivery;
+                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
+                                Timed; after_,_; ObservableInput; hot; cold)
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
+                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
+                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
+                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
+                                subΘExp; subΘTm; subΘTms;
+                                varIx;
+                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
+                                wkExp; wkTm; reify;
+                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
+                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
+                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+                                elimGExp; elimGTm; elimGTms;
+                                elimDExp; elimDTm; elimDTms;
+                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
+                                evalWith; evalTm; applyFn; lookupEnv)
+open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
+                                outWᵉ; innWᵉ; innWᵗ; innWᵗˢ;
+                                pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
+                                _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ;
+                                pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
+                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ;
+                                slotPW; slotsPW; slotsPWgo;
+                                slotIW; slotsIW; slotsIWgo;
+                                slotsPW≤entryCeil; slotsIW≤entryCeil)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
+                                Slot; scripted; shared; resolve; mkHot;
+                                arrVal; scanVals; memberSource;
+                                slotSize; inputSize;
+                                RegId; Chain;
+                                NodeState; scan-st; take-st; merge-st;
+                                concat-st; switch-st; exhaust-st;
+                                oneShotBurst; installNode; setNode; lookupNode;
+                                NodeId;
+                                root; share-sink; _↠_; Frame; AllOp;
+                                map-f; scan-f; take-f; from-inner;
+                                thru-outer; Stream;
+                                sched-init; st-init; sched-next;
+                                schedHeadOf; schedGo; schedEarlier;
+                                cascadeLatch; cascadeFinish; sweepLive;
+                                takeVals; takeDispatch; cutThrough; pathHasNode;
+                                dropSource; arrSource; chainsOf; chainsGo; cascadeGo;
+                                Path; arrTy;
+                                subscribeE; stepFrame; pushBurst;
+                                subscribeInner; chainStep; subscribeAll;
+                                mintNode; mintSource; mintOrdinal; register;
+                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+                                splitEvents; splitBurst; retagEvents;
+                                mergeBump; switchKill;
+                                thruConsume; thruWalk; thruWrap;
+                                concatDrain; innerFinish; innerReact;
+                                sizeAt;
+                                sharedPlumb; sharedConnect; subscribeSharedSlot;
+                                burstCompleted;
+                                shareLatch; shareAdmit; shareFinish; shareGo;
+                                dryBurst;
+                                foldPath; dispatchShare; arrTick;
+                                aliveThroughᶠ;
+                                cascade; drain; evaluate;
+                                hasDry; dryEvent; sameSource;
+                                budgetAt; slotsSize; fCharge; regAt;
+                                sizeStep; iterSize; foldStep; iterFold;
+                                fLvl; fLvlD; iterL; dLvl; lvls;
+                                sIterD; sLvlD)
+open import Verify-Budget-Sufficient.Delivery-Walk public
+open import Verify-Budget-Sufficient.Caps-Nest public
+open import Verify-Budget-Sufficient.Caps-Depth
+  using (depthInner; depthFrame; depthReact; depthFin; depthWalk; depthCascade;
+         depthConsume)
+open import Verify-Budget-Sufficient.Caps-Chain
+  using (walk-nil; inner-nil; walk-index; frame-step; queue-push)
+open import Verify-Budget-Sufficient.Caps-Sadd using (walk-step-suc)
+open import Verify-Budget-Sufficient.Caps-Face.Part6 public
+
+open import Verify-Budget-Sufficient.Caps-Face.Part7
+
+------------------------------------------------------------------
+-- REFUTED: caps-frame AS STATED IS FALSE, TWICE OVER.  Both halves are
+-- statement-level — the face is uninstantiable, not merely unproven —
+-- and the same disease class as the original vacuity.
+--
+-- (1) THE BOUNDARY FOLD.  caps-frame's hypothesis admits a state
+-- satisfying capsOK? with ZERO slack and a `b` whose size is exactly the
+-- level's cSize, and demands capsOK? at the SAME level afterwards.  But
+-- the subscribe frame itself folds: subscribeE's scanᵉ clause
+-- (Rx/Evaluator.agda:958) installs `scan-st (evalTm seed)` and runs the
+-- source's sync burst through pushBurst with the scan-f frame, and
+-- dispatch updates that node once per synchronous payload.  A cap-sized
+-- `b` with one duplicating fold therefore lands at sizeStep C C, above
+-- C — and the arithmetic below is uniform in C, so specialising C to
+-- capsAt's own tower does not escape it.
+--
+-- State-Blowup-Probe's framePreserves-absurd is the concrete witness:
+-- pRs, whose size is 19 and whose initial state is bounded by 19, leaves
+-- a size-30 node after its own root subscribe.  (The root subscribe is
+-- one of caps-frame's own instances: κ = root, id = 0, level 0.)
+--
+-- (2) THE MID-CASCADE HYPOTHESIS, an independent defect.  caps-tick says
+-- a whole cascade moves the state from level id to level suc id, so
+-- mid-drain states live strictly BETWEEN the two levels.  A proof of
+-- caps-tick must apply caps-frame at every inner subscribe inside that
+-- cascade, and there are exactly two such call sites:
+--
+--   · subscribeInner   (Rx/Evaluator.agda:531) — a *All consuming an
+--     obs payload mid-cascade, reached from stepFrame
+--   · sharedConnect    (Rx/Evaluator.agda:871) — a shared slot's lazy
+--     connect, which subscribes the def mid-cascade
+--
+-- At both, earlier chains in the SAME cascade have already grown the
+-- store, so the level-id hypothesis is simply unavailable.  Even had (1)
+-- survived, the face could not feed the induction it exists for.
+--
+-- THE REPAIR SHAPE UNDER EVALUATION (not yet taken on faith — it owes
+-- its own probe): make the mid-instant states explicit with a
+-- CONSUMED-ITERATION index.  One parametric face against level suc id
+-- whose pre-state is bounded by frameBlowup partially applied — k of the
+-- 2 ^ cReg * cSize iterations still unspent — and a subscribeE with fold
+-- count j consuming j of k.  caps-frame and caps-tick then become the
+-- two ENDPOINTS (k = full, k = 0) of a single face rather than siblings,
+-- and (2) dissolves because a mid-cascade state is just a smaller k.
+--
+-- AND THE THING TO CHECK BEFORE BUILDING IT: this is structurally the
+-- same bookkeeping the walk face's E′ receipt already does.  Two
+-- parallel accounting mechanisms for one growth is a smell; if E′ can
+-- carry the iteration count, caps preservation falls out of the walk
+-- face instead of standing beside it as a second ledger.
+------------------------------------------------------------------
+
+-- the arithmetic obstruction behind (1), UNIFORM IN C: one fold from a
+-- cap-sized value on a cap-sized step function always overflows the cap,
+-- whatever the cap is.  This is why no choice of level rescues
+-- same-level preservation
+caps-frame-boundary-absurd : ∀ (C : ℕ) → 1 ≤ C → sizeStep C C ≤ C → ⊥
+caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
+  where
+  1≤2C : 1 ≤ 2 * C
+  1≤2C = ≤-trans hC (m≤m+n C (C + 0))
+
+  0<prod : 0 < C * (2 * C)
+  0<prod = *-mono-≤ hC 1≤2C
+
+  C<step : C < sizeStep C C
+  C<step = subst (C <_) (sym (*-suc C (2 * C)))
+                 (subst (_< C + C * (2 * C)) (+-identityʳ C)
+                        (+-monoʳ-< C 0<prod))
+
+------------------------------------------------------------------
+-- WHAT WAS HERE, AND WHY IT IS GONE (2026-08-01).  regsSz?-subscribeE,
+-- "the chain half of ANY repaired face" — a fixed cap C, a registry
+-- bounded by it, an expression of size ≤ C subscribed under a κ with
+-- `pathSz? C κ` and `suc (pathLen κ) ≤ C`, concluding the registry is
+-- still bounded by C.
+--
+-- IT IS FALSE, and Chain-Half-Probe (DELETED; git history) computes the
+-- counterexample: at C = 5, a κ of four map-f frames (both hypotheses
+-- TIGHT) and `mapᵉ f (mapᵉ f (input 0))` (sizeᵉ exactly 5) register a
+-- chain of length SIX.  subscribeE pushes one frame per shell of what
+-- it walks, and `suc (pathLen κ) ≤ C` buys room for exactly one.
+--
+-- The defect is the FIXED cap, not the descent.  subscribeE-caps
+-- carries the identical two hypotheses and is GROUND, because it
+-- reports at `frameStep (j + j′) c` and one j at least doubles cSize
+-- (frameStep-size-suc) — so the frame a hop pushes is paid for by the
+-- j that hop spends.  A statement with no j has nothing to pay with,
+-- and no repair of its hypotheses helps: the joint form
+-- `pathLen κ + sizeᵉ b ≤ C` that would make it inductive is the one
+-- Joint-Probe refuted at the tight admissible cSize, and it would in
+-- any case not survive an *All hop, where the chain grows by the
+-- SHELLS OF A PAYLOAD rather than of the syntax.
+--
+-- AND IT WAS REDUNDANT.  `capsOK?`'s second conjunct IS `regsSz?`, so
+-- the ground subscribeE-caps already hands the chain half back at the
+-- level it reports.  The postulate had no consumer in the tree.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- WHAT WAS HERE, AND WHY IT IS GONE.  A fixed-height reach cap —
+-- foldBudget, reachCap, reach-covers — built on the measured claim that
+-- a reachable observable's tower has its HEIGHT fixed by the syntax and
+-- only its BASE growing with the instant count.
+--
+-- deepScan refuted it: a scan whose step function contains a scan over
+-- the accumulator towers ONCE PER FOLD, and folds grow one per instant,
+-- so the height grows with `id`.  The machine-checked account, with the
+-- recurrence and the payload counts, is the deepScan section of
+-- Frame-Work-Probe (DELETED; git history).  The Caps recurrence above is the
+-- replacement; git history is the archive for the rest.
+------------------------------------------------------------------
+
+-- WHY cSize AND cWid ARE SEPARATE FIELDS, machine-checked so that nobody
+-- collapses them.  The tempting move is to carry size only and derive
+-- width from it — the way hopD-sizeᵉ derives hop depth from szB of size,
+-- which is exactly why cHop is NOT a field.  THAT ROUTE IS CIRCULAR for
+-- width.  outW is not polynomial in size: pWᵉ (mergeAllᵉ e)
+-- is pWᵉ e * innWᵉ e and innWᵉ towers at a scanᵉ, so any size-to-width
+-- bound is at least exponential, and the cap would have to dominate an
+-- exponential of itself.
+--
+-- The non-circular route is to iterate them TOGETHER, which is what the
+-- Caps recurrence does: one instant's folds are counted by the current
+-- width and each fold costs one foldStep, so the next width comes from
+-- the current width and the current cascade count — never from the size.
+--
+-- This is the fourth time this loop has been available in this proof
+-- (walk-hyps-absurd, hop-anchor-absurd, round3b-ledger-reset-absurd, and
+-- now here), so it gets a witness rather than a warning
+reach-via-size-absurd : ∀ (C : ℕ) → 2 ^ C ≤ C → ⊥
+reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)

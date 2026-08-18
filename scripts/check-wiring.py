@@ -67,23 +67,21 @@ from bisect import bisect_right
 from collections import defaultdict
 
 # ---------------------------------------------------------------------------
-# EXEMPT FAMILY — `*-absurd` REFUTATION WITNESSES (design-session ruling,
-# 2026-08-05).  A machine-checked `… → ⊥` is the only durable form of "this
-# route is dead, do not retry it", and it is load-bearing for the DESIGN
-# process rather than for another term.  Tested twice: `caps-frame-boundary-
-# absurd` and `round3b-ledger-reset-absurd` are what proved the anchor
-# problem real rather than a wiring gap, saving a long wasted grind.  A
-# worker classified them "archive, not live infrastructure" and was
-# overruled; deleting one costs a future session the whole refutation.
+# NO EXEMPTION LIST, AND THAT IS THE DESIGN.
 #
-# Everything else that used to sit in an ALLOWLIST here is now handled
-# STRUCTURALLY and needs no entry: the top-line theorems and the semantic
-# claims are Main's own `using (...)` names, so they are reachability SEEDS;
-# and `main` in CLI/Main.agda and QuickCheck.agda is a definition of a
-# MODULE_ROOTS file, seeded the same way.  A name earns exemption by being
-# claimed, never by being listed.
+# A name earns its place by being CLAIMED, never by being listed here.  The
+# top-line theorems and the semantic claims are Main's own `using (...)`
+# names, so they are reachability SEEDS; `main` in CLI/Main.agda and
+# QuickCheck.agda is a definition of a MODULE_ROOTS file, seeded the same
+# way; an anonymous `_ : T` pin is a seed because the typechecker checks it.
+#
+# The `*-absurd` REFUTATION WITNESSES used to be exempted here by SUFFIX,
+# which meant any definition could exempt itself from the wiring law by
+# choosing its name.  They now live in `agda/refuted/`, a separate include
+# root outside this scan (Anthony, 2026-08-18) — checked by `make refuted`,
+# imported by nothing in src, referred to from src only in `-- REFUTED:`
+# comments.  So there is nothing left to exempt.
 # ---------------------------------------------------------------------------
-EXEMPT_SUFFIXES = ("-absurd",)
 
 
 BOUNDARY_CHARS = set(" \t\n\r\f\v(){}[];.,@\"'`=:\\|")
@@ -917,19 +915,7 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
     edges, consumers = defaultdict(set), defaultdict(set)
     seed = {c for c in main_claims if c in defs}
     for name in order:
-        if (defs[name].file in root_files
-                or defs[name].kind == "anon"
-                or name.endswith(EXEMPT_SUFFIXES)):
-            # A `*-absurd` REFUTATION WITNESS IS A SEED, not merely exempt
-            # from the report.  Its consumer is the design record rather
-            # than another term (the standing ruling), so what it CONSUMES
-            # is genuinely used.  Exempting it from being reported while
-            # leaving it out of the seed set made every lemma a refutation
-            # depends on read as unreachable — measured 2026-08-18 on the
-            # retired round-3 anchor vocabulary (`walkCap`, `anchorᴬ`,
-            # `sucV≤d`, `d≤walkCap`, `walkCap≤walkArg`, `d≤walkArg`,
-            # `ℓ≤walkCap`), which Measures' own header says is kept alive
-            # for exactly the four absurds that consume it.
+        if defs[name].file in root_files or defs[name].kind == "anon":
             seed.add(name)
         terms = [name]
         core = mixfix_core_of(name)
@@ -1007,7 +993,7 @@ def main():
         main_claims, suppressed)
     R = reachable_from(seed, edges)
 
-    exempt = lambda n: n.endswith(EXEMPT_SUFFIXES) or defs[n].kind == "anon"
+    exempt = lambda n: defs[n].kind == "anon"
     unreached = [n for n in order if n not in R and not exempt(n)]
     exempted = [n for n in order if n not in R and exempt(n)]
     dead_post = [n for n in unreached if n in postulate_names]
@@ -1023,7 +1009,7 @@ def main():
           f"postulates {len(postulate_names)}")
     print(f"reachability seeds {len(seed)}  (Main's claims + MODULE_ROOTS)")
     print(f"REACHABLE {len(R)}   unreachable {len(unreached)}   "
-          f"exempt (*-absurd) {len(exempted)}")
+          f"anonymous pins (never reported) {len(exempted)}")
     if not main_ok:
         print()
         print("  !! Main.agda has a bare `open import` with no `using (...)`.")

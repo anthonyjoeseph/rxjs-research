@@ -1,4 +1,4 @@
-.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -241,6 +241,22 @@ wiring-gate:
 # the control for the false-positive class that sank an earlier design, which
 # gated on the passed-vs-applied classifier directly and misread 40 of 110
 # postulates.
+# THE REFUTATION TREE (Anthony, 2026-08-18).  `agda/refuted/` holds the
+# machine-checked `... -> bottom` witnesses: proofs that a route CANNOT work.
+# It is a SEPARATE include root, so:
+#   * `make agda` never pays for it (it compiles src/Main.agda, which cannot
+#     import this tree);
+#   * `make wiring` never sees it (it scans agda/src only), so a refutation
+#     needs no exemption and cannot self-exempt by choosing its name;
+#   * `src` refers to these by COMMENT (`-- REFUTED:`), which is safe
+#     precisely because a refuted route does not change.
+# WHY OUT OF src: keeping a dead route in src forces src to keep whatever
+# machinery makes the route STATE-able.  Measured -- the round-3 anchor
+# vocabulary was seven definitions in Measures kept alive by nothing but the
+# six refutations that mention it.
+refuted:
+	cd agda && $(AGDA) refuted/Refuted/Main.agda
+
 wiring-selftest:
 	@out=$$(scripts/check-wiring.py --src scripts/wiring-selftest 2>&1); \
 	  fail=0; \
