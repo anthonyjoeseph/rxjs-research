@@ -917,7 +917,19 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
     edges, consumers = defaultdict(set), defaultdict(set)
     seed = {c for c in main_claims if c in defs}
     for name in order:
-        if defs[name].file in root_files or defs[name].kind == "anon":
+        if (defs[name].file in root_files
+                or defs[name].kind == "anon"
+                or name.endswith(EXEMPT_SUFFIXES)):
+            # A `*-absurd` REFUTATION WITNESS IS A SEED, not merely exempt
+            # from the report.  Its consumer is the design record rather
+            # than another term (the standing ruling), so what it CONSUMES
+            # is genuinely used.  Exempting it from being reported while
+            # leaving it out of the seed set made every lemma a refutation
+            # depends on read as unreachable — measured 2026-08-18 on the
+            # retired round-3 anchor vocabulary (`walkCap`, `anchorᴬ`,
+            # `sucV≤d`, `d≤walkCap`, `walkCap≤walkArg`, `d≤walkArg`,
+            # `ℓ≤walkCap`), which Measures' own header says is kept alive
+            # for exactly the four absurds that consume it.
             seed.add(name)
         terms = [name]
         core = mixfix_core_of(name)
