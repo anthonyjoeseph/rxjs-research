@@ -44,6 +44,7 @@ open import Data.List    using (List; []; _∷_; length)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
+open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂; module ≡-Reasoning)
 
@@ -51,7 +52,7 @@ open import Rx.Prim      using (Gas; Tick; Id; Fuel; Source; close; exhausted)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ;
                                 -- named by the assembled cores' hypothesis types
                                 Exp; Tm; sizeᵗˢ; μᵉ; unfoldμ)
-open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ;
+open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ;
                                 -- the three ceiling injections init-capsOK?-base is
                                 -- assembled over, and the measures they bound
                                 pmOⱽ; pmIⱽ; pWⱽ;
@@ -59,6 +60,7 @@ open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ;
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
+                                NodeState; concat-st;
                                 RegId; Chain;
                                 Path; root; share-sink; _↠_; Frame;
                                 map-f; scan-f; take-f; from-inner; thru-outer;
@@ -494,10 +496,18 @@ fn-tick {e = e} a id sched st inv val =
 -- dry-tick and this core gain `pre` and `valC`, threaded from the caller.
 -- That is "ADDING A HYPOTHESIS IS A RESTATEMENT" (CLAUDE.md), and the
 -- one sufficient justification is a REFUTATION of the unconditional
--- form — a state satisfying INV? and failing capsOK?, which the width
--- gap above says exists but which is NOT YET BUILT.  Build it before
--- restating; "the call site happens to supply it" is explicitly not a
--- reason, even when, as here, the call site demonstrably does.
+-- form — a state satisfying INV? and failing capsOK?.
+--
+-- ══ THAT REFUTATION IS NOW BUILT (2026-08-17) — see the anonymous pin
+-- ══ below, just above `dry-tick`.  The restatement is UNBLOCKED.
+-- The witness is not a width at all but the concat queue's LENGTH: INV?
+-- reaches a node only through boundedNode and fnCapNode, both `all`s
+-- over the queue's ELEMENTS, while capsOK?'s widNode also demands
+-- `length q ≤ᵇ cWid`.  One concat node holding cWid+1 copies of a single
+-- small expression therefore satisfies INV? and fails capsOK?, at
+-- `capsAt e sl id` itself.  So dry-tick may not consume capsOK? from the
+-- INV? it is given, and "the call site happens to supply it" — which
+-- here it demonstrably does — remains not a reason.
 postulate
   dry-tick-core :
     -- cascadeGo-nodry  (Verify-Budget-Sufficient/Burst-Walk.agda § 8)
@@ -653,6 +663,159 @@ _ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     proj₁ (cascade a id sched st)
       ≡ proj₁ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st))
 _ = λ a id sched st → refl
+
+-- ══ INV? DOES NOT IMPLY capsOK? — MACHINE-REFUTED 2026-08-17 ═══════
+-- dry-tick-core's header (above) says its migration is BLOCKED on a
+-- restatement: dry-tick and the core gain `pre`/`valC`, threaded from
+-- `cascade-wet-via-caps`.  CLAUDE.md's "ADDING A HYPOTHESIS IS A
+-- RESTATEMENT" allows that only against a REFUTATION of the
+-- unconditional form.  This is it.
+--
+-- THE GAP IS NARROWER THAN THE HEADER SAYS.  That header names the two
+-- WIDTH conjuncts (widLive, widNode) as the place INV? has no
+-- counterpart.  True, but the cheapest witness is not a width at all —
+-- it is the concat queue's LENGTH:
+--
+--   boundedNode B (concat-st q _ _) = all (λ o → sizeᵉ o ≤ᵇ B) q
+--   fnCapNode   Ψ (concat-st q _ _) = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
+--   widNode   W sl (concat-st q _ _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
+--                                      ∧ (length q ≤ᵇ W)
+--
+-- INV? reads a node ONLY through boundedNode (inside stBounded?) and
+-- fnCapNode (inside fnCapBounded?).  Both are `all`s over the queue's
+-- ELEMENTS; NEITHER bounds how many elements there are.  capsOK? does.
+-- So one concat node holding W+1 copies of a single small expression
+-- satisfies INV? and fails capsOK? — and it fails at `capsAt e sl id`,
+-- the caps the assembly actually uses, not at caps chosen to break it.
+-- No value has to be made wide, and no numeral appears: the queue is
+-- built at length `suc (Caps.cWid (capsAt e sl id))` symbolically.
+--
+-- NOT VACUOUS, but say what that rests on.  This is an IMPLICATION, so
+-- it would assert nothing if its six hypotheses were unsatisfiable.  They
+-- are not exotic: the four state-side ones are literally INV?'s own
+-- conjuncts at a node-free state, and the two element-side ones just ask
+-- that ONE expression fit the size and fnCap caps.  If that set were
+-- unsatisfiable, `dry-tick`'s own INV? hypothesis would be too, and the
+-- postulate would be vacuous — a different and larger finding.  What is
+-- NOT machine-witnessed here is a concrete instance discharging all six;
+-- exhibiting one would close the last gap in this receipt.
+--
+-- SCOPE, and this is the whole caveat.  It refutes the POSTULATE AS
+-- STATED, which quantifies over every `sched`/`st`.  It does NOT show
+-- the evaluator can REACH such a state — per CLAUDE.md a constructed
+-- state where the predicate fails is a refutation candidate whose
+-- reachability is itself the finding, and that question stays open.
+-- For the restatement that is already enough: dry-tick may not consume
+-- what its own hypothesis does not give it, reachable or not.
+private
+  -- The capsOK? side is stated as `≡ true → ⊥` rather than `≡ false`.
+  -- CONSTRUCTING a `≡ false` through a stuck conjunction is the blocked
+  -- direction: `_∧_` is a FUNCTION, not a constructor, so Agda will not
+  -- decompose `?x ∧ ?y = C₁ ∧ REST` by unification, and a collapse chain
+  -- postpones forever (measured: UnsolvedConstraints, "blocked on _x").
+  -- EXTRACTING from `≡ true` has no such problem — it is what ∧-true
+  -- does thirty times in this file — so the refutation runs that way.
+  f≢t : false ≡ true → ⊥
+  f≢t ()
+
+  -- widNode W sl (concat-st q _ _) = all (pWᵉ-bound) q ∧ (length q ≤ᵇ W).
+  -- Peeled HERE rather than at the use site because the RESULT type pins
+  -- ∧-true's second Bool, leaving only the first to solve — and because
+  -- `n` is in scope here, so the pWᵉ side needs no underscore (one there
+  -- sends Agda inverting `_≤ᵇ_` to depth 50).
+  widNode-len : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) {u}
+                (q : List (Closed Γ u)) (a b : Bool) →
+                widNode W sl (concat-st q a b) ≡ true →
+                (length q ≤ᵇ W) ≡ true
+  widNode-len {n = n} W sl q a b h =
+    proj₂ (∧-true (all (λ o′ → pWᵉ n sl o′ ≤ᵇ W) q) (length q ≤ᵇ W) h)
+
+  -- k copies of one queued expression
+  repQ : ∀ {n} {Γ : Ctx n} {u} → ℕ → Closed Γ u → List (Closed Γ u)
+  repQ zero    o = []
+  repQ (suc k) o = o ∷ repQ k o
+
+  repQ-len : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (o : Closed Γ u) →
+             length (repQ k o) ≡ k
+  repQ-len zero    o = refl
+  repQ-len (suc k) o = cong suc (repQ-len k o)
+
+  repQ-all : ∀ {n} {Γ : Ctx n} {u} (P : Closed Γ u → Bool)
+             (k : ℕ) (o : Closed Γ u) → P o ≡ true →
+             all P (repQ k o) ≡ true
+  repQ-all P zero    o h = refl
+  repQ-all P (suc k) o h rewrite h = repQ-all P k o h
+
+  -- the one arithmetic fact: a list of length W+1 does not fit width W
+  sucW≰W : (W : ℕ) → (suc W ≤ᵇ W) ≡ false
+  sucW≰W zero    = refl
+  sucW≰W (suc W) = sucW≰W W
+
+-- `e` is EXPLICIT: the proof term needs it (for `capsAt e sl id`), and an
+-- anonymous `_ = λ …` cannot bind the type's leading implicits — that is
+-- WrongHidingInLambda, the same trap the take-cut pin hit.
+--
+-- The four INV? conjuncts that do NOT concern the new node are taken as
+-- HYPOTHESES rather than split out of a compound `INV? … ≡ true` with
+-- ∧-true: decomposing it leaves the split point as a metavariable that
+-- Agda cannot solve while it is simultaneously matching the rebuilt
+-- conjunction against the goal.  Basing the state on `st-init e` makes
+-- the two registry conjuncts `refl`, so what remains is exactly the two
+-- live halves and the two slot bounds — none of which the node edit
+-- touches, which is the point being made.
+_ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) {u}
+      (id : Id) (sched : Sched Γ) (o : Closed Γ u) →
+    let sl  = Sched.slots sched
+        Ψ   = ΨAt e sl
+        B   = sizeCapAt e sl id
+        c   = capsAt e sl id
+        q   = repQ (suc (Caps.cWid c)) o
+        st  = record (st-init e) { nodes = (0 , concat-st q false false) ∷ [] }
+    in all (boundedLive B) (Sched.live sched) ≡ true →
+       all (fnCapLive Ψ) (Sched.live sched) ≡ true →
+       (slotsSize sl ≤ᵇ B) ≡ true →
+       (slotsFnCap sl ≤ᵇ Ψ) ≡ true →
+       (sizeᵉ o ≤ᵇ B) ≡ true →
+       (fnCapᵉ o ≤ᵇ Ψ) ≡ true →
+       (INV? Ψ B sched st ≡ true) × (capsOK? c sched st ≡ true → ⊥)
+_ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
+  let sl = Sched.slots sched
+      Ψ  = ΨAt e sl
+      B  = sizeCapAt e sl id
+      c  = capsAt e sl id
+      W  = Caps.cWid c
+      q  = repQ (suc W) o
+      st = record (st-init e) { nodes = (0 , concat-st q false false) ∷ [] }
+      hNodeSz : all (λ o′ → sizeᵉ o′ ≤ᵇ B) q ≡ true
+      hNodeSz = repQ-all (λ o′ → sizeᵉ o′ ≤ᵇ B) (suc W) o hsz
+      hNodeFn : all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q ≡ true
+      hNodeFn = repQ-all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) (suc W) o hfn
+      hLen : (length q ≤ᵇ W) ≡ false
+      hLen = trans (cong (_≤ᵇ W) (repQ-len (suc W) o)) (sucW≰W W)
+      -- capsOK?'s five conjuncts, NAMED.  ∧-true's Bool arguments must be
+      -- given explicitly: `_` leaves them as metas that Agda will not
+      -- solve, because decomposing `?a ∧ ?b = C ∧ REST` needs `_∧_` to be
+      -- injective and it is a function.  Same lesson as the ∧-true sites
+      -- in .Burst-Walk.
+      A3 = all (widLive W sl) (Sched.live sched)
+      A4 = all (λ kv → widNode W sl (proj₂ kv)) (EvalSt.nodes st)
+      A5 = (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
+      A2 = regsSz? B (EvalSt.registry st)
+      A1 = stBounded? B sched st
+      WD = widNode W sl (concat-st q false false)
+  in ∧-intro (∧-intro hLive   (∧-intro hNodeSz refl))
+             (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
+                      (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
+   -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount.
+   -- Peel to the widNode conjunct, then to its queue-LENGTH half, and
+   -- read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
+   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ A5))) hc)
+                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ A5)) t2)
+                t4 = proj₂ (∧-true A3 (A4 ∧ A5) t3)
+                t5 = proj₁ (∧-true A4 A5 t4)
+                w  = proj₁ (∧-true WD true t5)
+                ln = widNode-len W sl q false false w
+            in f≢t (trans (sym hLen) ln)
 
 dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →

@@ -114,10 +114,11 @@ first, so the single-lemma parents establish the pattern:
   ruling for `BurstInv.live-matches`; both refutations and the fork in its header.
 - **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest, and eight of them
   are not ingredients: `cascadeFinish` emits nothing (pinned), so the conclusion is
-  `cascadeGo-nodry`'s verbatim. BLOCKED on restating `dry-tick` over the `capsOK?`
-  its sole caller already holds, which needs the INV?-without-capsOK? refutation
-  built first; and on re-homing the eight onto `cascade-wet-via-caps`'s other two
-  conjuncts. Finding in its header. Tier-0 parent.
+  `cascadeGo-nodry`'s verbatim. The INV?-without-capsOK? refutation IS NOW BUILT
+  (pin beside the postulate; the gap is the concat queue's LENGTH, not a width), so
+  restating `dry-tick` over the `capsOK?` its sole caller already holds is
+  UNBLOCKED. Remaining: do that restatement, and re-home the eight onto
+  `cascade-wet-via-caps`'s other two conjuncts. Finding in its header. Tier-0 parent.
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
