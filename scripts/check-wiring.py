@@ -444,6 +444,17 @@ def extract_definitions(src_dir, files):
             # consumer BY DESIGN, so it is not a definition worth tracking
             # at all, let alone flagging as an orphan.
             if tok0 == "_":
+                # AN ANONYMOUS PIN OWNS ITS SPAN.  `_ : T` / `_ = …` (the
+                # bug-cache idiom, and the `refl` pins through the proof) can
+                # never HAVE a consumer, so it is not a name worth orphan-
+                # checking — but it is a real body that CONSUMES, and the
+                # typechecker checks it, so whatever it uses IS used.
+                # Skipping it entirely mis-attributed its whole body to the
+                # definition ABOVE it: measured 2026-08-18, `sucW≰W`'s only
+                # real use sits inside the anonymous pin following it and was
+                # dropped as a self-reference.  Register it under a synthetic
+                # per-site name — never reported, always a reachability seed.
+                register(f"_#{relpath}:{i + 1}", relpath, i + 1, "anon")
                 i += 1
                 continue
             # Only clause-shaped lines are candidates for infix
@@ -526,6 +537,17 @@ def extract_definitions(src_dir, files):
                     continue
 
             if tok0 == "_":
+                # AN ANONYMOUS PIN OWNS ITS SPAN.  `_ : T` / `_ = …` (the
+                # bug-cache idiom, and the `refl` pins through the proof) can
+                # never HAVE a consumer, so it is not a name worth orphan-
+                # checking — but it is a real body that CONSUMES, and the
+                # typechecker checks it, so whatever it uses IS used.
+                # Skipping it entirely mis-attributed its whole body to the
+                # definition ABOVE it: measured 2026-08-18, `sucW≰W`'s only
+                # real use sits inside the anonymous pin following it and was
+                # dropped as a self-reference.  Register it under a synthetic
+                # per-site name — never reported, always a reachability seed.
+                register(f"_#{relpath}:{i + 1}", relpath, i + 1, "anon")
                 i += 1
                 continue
             # Only clause-shaped lines are candidates for infix
@@ -895,7 +917,7 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
     edges, consumers = defaultdict(set), defaultdict(set)
     seed = {c for c in main_claims if c in defs}
     for name in order:
-        if defs[name].file in root_files:
+        if defs[name].file in root_files or defs[name].kind == "anon":
             seed.add(name)
         terms = [name]
         core = mixfix_core_of(name)
@@ -973,7 +995,7 @@ def main():
         main_claims, suppressed)
     R = reachable_from(seed, edges)
 
-    exempt = lambda n: n.endswith(EXEMPT_SUFFIXES)
+    exempt = lambda n: n.endswith(EXEMPT_SUFFIXES) or defs[n].kind == "anon"
     unreached = [n for n in order if n not in R and not exempt(n)]
     exempted = [n for n in order if n not in R and exempt(n)]
     dead_post = [n for n in unreached if n in postulate_names]
