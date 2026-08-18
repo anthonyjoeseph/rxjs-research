@@ -865,76 +865,19 @@ abstract
         trans (delivN-cons rid st _ (⊑ᵈ-trans FP GO))
               (cong suc (delivN-split FP GO))
 
-  -- the cascade's own two lines, the same shape one level up
-  cascadeGo-skip-N : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (rid : RegId) (c : Path Γ (arrTy a) t)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
-    delivN st (proj₂ (proj₂ (cascadeGo a id ((rid , c) ∷ chains) sched st)))
-      ≡ delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-  cascadeGo-skip-N a id rid c chains sched st h
-    with any (_≡ᵇ rid) (EvalSt.cancelled st) | h
-  ... | true | refl = refl
-
-  cascadeGo-cons-N : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (rid : RegId) (c : Path Γ (arrTy a) t)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-    let st₀ = consᵈ rid st
-        cs  = chainStep id a c sched st₀
-        st₁ = proj₂ (proj₂ cs) in
-    delivN st (proj₂ (proj₂ (cascadeGo a id ((rid , c) ∷ chains) sched st)))
-      ≡ suc (delivN st₀ st₁
-             + delivN st₁ (proj₂ (proj₂ (cascadeGo a id chains
-                                          (proj₁ (proj₂ cs)) st₁))))
-  cascadeGo-cons-N a id rid c chains sched st h
-    with any (_≡ᵇ rid) (EvalSt.cancelled st) | h
-  ... | false | refl =
-        let st₀ = consᵈ rid st
-            cs  = chainStep id a c sched st₀
-            CS  = chainStep-deliv id a c sched st₀
-            GO  = cascadeGo-deliv a id chains
-                    (proj₁ (proj₂ cs)) (proj₂ (proj₂ cs)) in
-        trans (delivN-cons rid st _ (⊑ᵈ-trans CS GO))
-              (cong suc (delivN-split CS GO))
-
-------------------------------------------------------------------
--- § E.  THE CASCADE LEVEL, AND WHY delivN IS PER-CASCADE.
+-- (DELETED 2026-08-18) § E held `cascadeLatch-deliv`, `cascadeFinish-deliv`
+-- and `cascade-delivN` — one cascade's deliveries are its final ledger,
+-- counted flat, because the latch clears `delivered` and cascadeFinish
+-- touches it not at all.  Together with `cascadeGo-skip-N` / `cascadeGo-cons-N`
+-- (the cascade's own two ledger lines, also deleted) they existed for ONE
+-- consumer, `dry-tick-core`'s argument list, and the leaf-only migration
+-- proved that list wrong about itself: the dry half is `cascadeGo`'s stream
+-- verbatim (cascadeFinish emits nothing), so no ledger fact can enter it.
+-- Parking them was the whole problem, and under the leaf-only rule a proven
+-- lemma has no legal home but a real consumer.
 --
--- `cascadeLatch` opens a cascade by CLEARING the ledger — the one write
--- to `delivered` that is not a cons, and the reason every count above
--- is read between a latch and the next one rather than across a run.
--- `cascadeFinish` closes it by dropping the spent source's registry
--- entries and touches nothing.  So one cascade's deliveries are just
--- the ledger's LENGTH when it ends, with no subtraction to carry.
+-- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Deliveries.agda
+-- restores all five.  `delivN` itself is LIVE (.Delivery-Walk reads it all
+-- through the walk), so the cascade-level counts are the natural thing to
+-- want back the moment a delivery-count obligation is actually stated.
 ------------------------------------------------------------------
-
-abstract
-
-  cascadeLatch-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (st : EvalSt e) → EvalSt.delivered (cascadeLatch a st) ≡ []
-  cascadeLatch-deliv a st = refl
-
-  cascadeFinish-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    EvalSt.delivered (proj₂ (cascadeFinish a sched st)) ≡ EvalSt.delivered st
-  cascadeFinish-deliv a sched st with Arrival.isLast a
-  ... | true  = refl
-  ... | false = refl
-
-  -- ONE CASCADE'S DELIVERIES ARE ITS FINAL LEDGER, counted flat.  The
-  -- entry ledger is [] by the latch, so the ∸ in delivN is inert and
-  -- the cascade conjuncts' D is a plain length
-  cascade-delivN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-    length (EvalSt.delivered (proj₂ (proj₂ (cascade a id sched st))))
-      ≡ delivN (cascadeLatch a st)
-               (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
-                               (cascadeLatch a st))))
-  cascade-delivN a id sched st =
-    cong length
-      (cascadeFinish-deliv a
-        (proj₁ (proj₂ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st))))
-        (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st)))))

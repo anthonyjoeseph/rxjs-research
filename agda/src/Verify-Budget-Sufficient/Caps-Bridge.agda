@@ -103,12 +103,9 @@ open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
          frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup)
-open import Verify-Budget-Sufficient.Anchor-Dry
-  using (subscribeInner-dry; dry-hop)
 open import Verify-Budget-Sufficient.Burst-Walk
-  using (cascadeGo-burst-dry; cascadeGo-nodry; valΨ?;
+  using (cascadeGo-nodry; valΨ?;
          frameBΨ?; pathBΨ?; regsBΨ?)
-open import Verify-Budget-Sufficient.Occurrences using (pathOccs?)
 -- the wet contract itself, stated over the COLLAPSED walk (2026-08-13).
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
@@ -508,149 +505,6 @@ fn-tick {e = e} a id sched st inv val =
 -- `capsAt e sl id` itself.  So dry-tick may not consume capsOK? from the
 -- INV? it is given, and "the call site happens to supply it" — which
 -- here it demonstrably does — remains not a reason.
-postulate
-  dry-tick-core :
-    -- cascadeGo-nodry  (Verify-Budget-Sufficient/Burst-Walk.agda § 8)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (id : Id) (a : Arrival Γ)
-      (chains : List (RegId × Path Γ (arrTy a) t))
-      (sched : Sched Γ) (st : EvalSt e) →
-      let sl = Sched.slots sched
-          Ψ  = ΨAt e sl
-          c  = capsAt e sl id
-      in
-      slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-      slotsSize sl ≤ Caps.cSize c →
-      capsOK? c sched st ≡ true →
-      fnCapBounded? Ψ sched st ≡ true →
-      valCaps? c sl (arrTy a) (arrVal a) ≡ true →
-      valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
-      all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
-      all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
-      regsBΨ? Ψ (EvalSt.registry st) ≡ true →
-      n ≤ Caps.cSize c →
-      length chains ≤ Caps.cReg c →
-      depthCascade a id chains sched st ≤ capsH e sl id →
-      hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false
-     ) →
-    -- chainStep-caps  (Verify-Budget-Sufficient/Subscribe-Face.agda:3464)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (c : Caps) (dep bud j : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
-      (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-      2 ≤ Caps.cSize c →
-      1 ≤ Caps.cReg c →
-      Sched.slots sched ≡ sl →
-      slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-      slotsSize sl ≤ Caps.cSize c →
-      capsOK? (frameStep j c) sched st ≡ true →
-      pathSz? (Caps.cSize (frameStep j c)) path ≡ true →
-      valCaps? (frameStep j c) sl (arrTy a) (arrVal a) ≡ true →
-      depthChain id a path sched st ≤ dep →
-      let r = chainStep id a path sched st
-      in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
-                              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-         × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-     ) →
-    -- cascadeGo-skip-N  (Verify-Budget-Sufficient/Deliveries.agda:868)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        (a : Arrival Γ) (id : Id) (rid : RegId) (c : Path Γ (arrTy a) t)
-        (chains : List (RegId × Path Γ (arrTy a) t))
-        (sched : Sched Γ) (st : EvalSt e) →
-        any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
-        delivN st (proj₂ (proj₂ (cascadeGo a id ((rid , c) ∷ chains) sched st)))
-          ≡ delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-     ) →
-    -- cascadeGo-cons-N  (Verify-Budget-Sufficient/Deliveries.agda:879)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        (a : Arrival Γ) (id : Id) (rid : RegId) (c : Path Γ (arrTy a) t)
-        (chains : List (RegId × Path Γ (arrTy a) t))
-        (sched : Sched Γ) (st : EvalSt e) →
-        any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-        let st₀ = consᵈ rid st
-            cs  = chainStep id a c sched st₀
-            st₁ = proj₂ (proj₂ cs) in
-        delivN st (proj₂ (proj₂ (cascadeGo a id ((rid , c) ∷ chains) sched st)))
-          ≡ suc (delivN st₀ st₁
-                 + delivN st₁ (proj₂ (proj₂ (cascadeGo a id chains
-                                              (proj₁ (proj₂ cs)) st₁))))
-     ) →
-    -- cascadeLatch-deliv  (Verify-Budget-Sufficient/Deliveries.agda:915)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        (a : Arrival Γ) (st : EvalSt e) → EvalSt.delivered (cascadeLatch a st) ≡ []
-     ) →
-    -- cascade-delivN  (Verify-Budget-Sufficient/Deliveries.agda:929)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-        length (EvalSt.delivered (proj₂ (proj₂ (cascade a id sched st))))
-          ≡ delivN (cascadeLatch a st)
-                   (proj₂ (proj₂ (cascadeGo a id (chainsOf a st) sched
-                                   (cascadeLatch a st))))
-     ) →
-    -- THE DRY FAMILY — the reachability-sourced anchor facts.
-    -- 2026-08-10: the per-chain/per-fold rows (chainStep-dry,
-    -- foldPath-dry) are REPLACED by ONE cascade-level receipt,
-    -- `cascadeGo-burst-dry` (.Burst-Walk) — the walk that proves it
-    -- enters at level 0, where the landing-level arithmetic is
-    -- cascadeGo-caps's own.  Its caps-flavoured hypotheses are this
-    -- core's own driver facts (the caps-tick chain); its Ψ-flavoured
-    -- ones project out of INV? (valB-fc, regsBΨ?-of, pathBΨ?-of); the
-    -- depth premise is cascade-depth-capsH.  dry-hop still closes
-    -- hop-edge's size premise from valB?.
-    -- cascadeGo-burst-dry  (Burst-Walk.agda)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (id : Id) (a : Arrival Γ)
-      (chains : List (RegId × Path Γ (arrTy a) t))
-      (sched : Sched Γ) (st : EvalSt e) →
-      let sl = Sched.slots sched
-          Ψ  = ΨAt e sl
-          c  = capsAt e sl id
-      in
-      slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-      slotsSize sl ≤ Caps.cSize c →
-      capsOK? c sched st ≡ true →
-      fnCapBounded? Ψ sched st ≡ true →
-      valCaps? c sl (arrTy a) (arrVal a) ≡ true →
-      valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
-      all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
-      all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
-      regsBΨ? Ψ (EvalSt.registry st) ≡ true →
-      n ≤ Caps.cSize c →
-      length chains ≤ Caps.cReg c →
-      depthCascade a id chains sched st ≤ capsH e sl id →
-      burstB? (sizeCapAt e sl (suc id)) Ψ
-              (proj₁ (cascadeGo a id chains sched st)) ≡ true
-     ) →
-    -- subscribeInner-dry  (Anchor-Dry.agda)
-    (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
-      (id : Id) (now : Tick) (o : Val Γ (obs u))
-      (sched : Sched Γ) (st : EvalSt e) →
-      let sl = Sched.slots sched
-          Ψ  = ΨAt e sl
-          B  = sizeCapAt e sl id
-          sz = sizeᵉ e + slotsSize sl
-          Ŝ  = sizeCapAt e sl (suc id)
-      in INV? Ψ B sched st ≡ true →
-         capsOK? (capsAt e sl id) sched st ≡ true →
-         valB? B Ψ (obs u) o ≡ true →
-         pathB? B Ψ κ ≡ true →
-         pathOccs? sz κ ≡ true →
-         all (valB? Ŝ Ψ u)
-             (proj₁ (proj₂ (subscribeInner g op allNid κ id now o sched st))) ≡ true
-     ) →
-    -- dry-hop  (Anchor-Dry.agda)
-    (∀ {n} {Γ : Ctx n} {u : Ty} (B Ŝ Ψ : ℕ) (o : Val Γ (obs u)) →
-      B ≤ Ŝ → valB? B Ψ (obs u) o ≡ true → sizeᵛ (obs u) o ≤ Ŝ
-     ) →
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-    let sl = Sched.slots sched
-        Ψ  = ΨAt e sl
-        B  = sizeCapAt e sl id
-    in INV? Ψ B sched st ≡ true →
-       valB? B Ψ (arrTy a) (arrVal a) ≡ true →
-       hasDry (proj₁ (cascade a id sched st)) ≡ false
-
 -- ── WHAT THE DRY HALF ACTUALLY REDUCES TO (2026-08-17) ──────────────
 -- `cascadeFinish` returns a (Sched × EvalSt) and NO emits (Evaluator:1683),
 -- so a cascade's stream IS its cascadeGo's, and dry-tick's conclusion is
@@ -817,6 +671,31 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
                 ln = widNode-len W sl q false false w
             in f≢t (trans (sym hLen) ln)
 
+-- ══ MIGRATED 2026-08-18 — `dry-tick-core` IS GONE ═══════════════════
+-- It was a postulate over NINE proven lemmas.  Eight were never
+-- ingredients (the route list was wrong about itself, refuted by the pin
+-- above: `cascadeFinish` emits nothing, so the dry half is `cascadeGo`'s
+-- and no latch/finish bookkeeping or bound can enter it), and the ninth —
+-- `cascadeGo-nodry` — could not be applied because its `capsOK?` premise
+-- is not derivable from the `INV?` this statement offered.  Both facts are
+-- now CHECKED rather than claimed: the body below applies exactly one
+-- lemma, and the typechecker holds the reduction.
+--
+-- `pre`/`valC` ADDED, which is a RESTATEMENT with the one sufficient
+-- justification: the unconditional form is REFUTED (the pin above — a
+-- concat node holding cWid+1 copies satisfies INV? and fails capsOK?, at
+-- `capsAt e sl id` itself).  Its sole caller `cascade-wet-via-caps` holds
+-- both already, so nothing downstream had to be found; but "the call site
+-- happens to supply it" is not the reason, the refutation is.
+--
+-- WHERE THE TWELVE PREMISES CAME FROM, and none of them needed new
+-- mathematics.  `caps-tick` (.Caps-Face/Part7) already discharges the
+-- caps-side eight for `cascadeGo-caps` at THIS EXACT call — same `c`,
+-- same `chainsOf a st`, same `cascadeLatch a st` — and `fn-tick` (above,
+-- in this file) already discharges the Ψ-side four for `cascadeGo-walk`.
+-- The body below is their union.  This is CLAUDE.md's index rule paying
+-- out: the answer to "at what index should this be stated?" was sitting
+-- in two proven bodies whose arguments only had to be read off.
 dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
   let sl = Sched.slots sched
@@ -824,28 +703,48 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       B  = sizeCapAt e sl id
   in INV? Ψ B sched st ≡ true →
      valB? B Ψ (arrTy a) (arrVal a) ≡ true →
+     capsOK? (capsAt e sl id) sched st ≡ true →
+     valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
      hasDry (proj₁ (cascade a id sched st)) ≡ false
--- NO BLANK OR COMMENT LINE INSIDE THE ARGUMENT LIST BELOW.  `make
--- wiring-gate`'s (B4) span collector blanks comment lines and stops at
--- the first empty one, so a comment mid-list silently truncates the
--- assembly's argument set and reports the arguments below it as stale
--- ledger entries.  Cost one red gate, 2026-08-10.
---
--- `cascadeGo-burst-dry` is applied to `subscribeInner-caps` here: its
--- frame face is an ASSEMBLY over `stepFrame-face` (`stepFrame-burst-face`, .Burst-Walk),
--- which needs that face's own siC argument, and this is the first
--- module importing both sides.
-dry-tick =
-  dry-tick-core
-    (λ {n} {Γ} {t} {e} → cascadeGo-nodry subscribeInner-caps innerFinish-caps {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → chainStep-caps {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascadeGo-skip-N {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascadeGo-cons-N {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascadeLatch-deliv {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascade-delivN {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} → cascadeGo-burst-dry subscribeInner-caps innerFinish-caps {n} {Γ} {t} {e})
-    (λ {n} {Γ} {t} {e} {u} → subscribeInner-dry {n} {Γ} {t} {e} {u})
-    (λ {n} {Γ} {u} → dry-hop {n} {Γ} {u})
+dry-tick {n = n} {e = e} a id sched st inv val pre valC =
+  cascadeGo-nodry subscribeInner-caps innerFinish-caps
+    id a chains sched latched
+    (slotsCaps?-capsAt e sl id)
+    (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id))
+    (cascadeLatch-caps c a sched st pre)
+    fnB
+    valC
+    (proj₂ (∧-true (sizeᵛ (arrTy a) (arrVal a) ≤ᵇ B)
+                   (fnCapᵛ (arrTy a) (arrVal a) ≤ᵇ Ψ) val))
+    (chainsOf-caps (Caps.cSize c) a st (capsOK?-regs c sched st pre))
+    chainsΨ
+    regsΨ
+    (n≤capsAt-size e sl id)
+    (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
+    (cascade-depth-capsH sl id a id sched st refl pre)
+  where
+  sl      = Sched.slots sched
+  Ψ       = ΨAt e sl
+  B       = sizeCapAt e sl id
+  c       = capsAt e sl id
+  chains  = chainsOf a st
+  latched = cascadeLatch a st
+  -- the Ψ axis rides the latch on INV?, exactly as fn-tick does it
+  inv-latch : INV? Ψ B sched latched ≡ true
+  inv-latch = cascadeLatch-INV Ψ B a sched st inv
+  partsL    = INV-parts Ψ B sched latched inv-latch
+  fnB : fnCapBounded? Ψ sched latched ≡ true
+  fnB = proj₁ (proj₂ partsL)
+  regsB-latch : regsB? B Ψ (EvalSt.registry latched) ≡ true
+  regsB-latch = proj₁ (proj₂ (proj₂ (proj₂ partsL)))
+  regsΨ : regsBΨ? Ψ (EvalSt.registry latched) ≡ true
+  regsΨ = regsBΨ?-of (EvalSt.registry latched) regsB-latch
+  -- and the chains' Ψ half, off the SAME regsB? the size half is read from
+  chainsB : all (λ rc → pathB? B Ψ (proj₂ rc)) chains ≡ true
+  chainsB = chainsOf-B B Ψ a st
+              (proj₁ (proj₂ (proj₂ (proj₂ (INV-parts Ψ B sched st inv)))))
+  chainsΨ : all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true
+  chainsΨ = all-impl _ _ (λ rc → pathBΨ?-of (proj₂ rc)) chains chainsB
 
 ------------------------------------------------------------------
 -- S4 `sub-charge` : GAP 4 (a)'s missing subscribe-level charge.  NO
@@ -988,7 +887,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
   Ŝ      = sizeCapAt e sl′ (suc id)
 
   dry : hasDry (proj₁ r) ≡ false
-  dry = dry-tick a id sched st inv val
+  dry = dry-tick a id sched st inv val pre valC
 
   -- S2, instantiated: the output's slots equal the entry's
   slEq : sl′ ≡ sl

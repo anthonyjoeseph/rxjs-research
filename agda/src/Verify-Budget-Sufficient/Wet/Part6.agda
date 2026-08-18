@@ -437,6 +437,30 @@ mu-edge Ŝ R̂ U η body
 -- call collapses to `syncSize≤sizeᵉ` composed with the size premise —
 -- one less hypothesis than the reach-reset route would have forced,
 -- and no `hη` obligation on the environment.
+-- ══ RECOVERY POINTER (2026-08-18) — THE DRY APPARATUS THAT WAS DELETED ══
+-- The leaf-only migration of `dry-tick-core` proved its nine-lemma route
+-- list wrong about itself (the dry half is `cascadeGo`'s stream verbatim, so
+-- no bound and no ledger fact can enter it), and eight proven lemmas turned
+-- out to have been PARKED in that argument list rather than consumed by it.
+-- Under the leaf-only rule a proven lemma has no legal home but a real
+-- consumer, so they went — and with them three modules that nothing else
+-- reached: `.Anchor-Dry` (subscribeInner-demand / subscribeInner-dry /
+-- dry-hop), `.Occurrences` (frameOccs? / pathOccs?) and `.Tick-Headroom`
+-- (tick-covers-instant plus its arithmetic: pow2-mono, headroom-arith,
+-- lvls-tower, fLvlD-strict, dLvl-plus and the rest).
+--
+-- THE NOTE IS HERE because this is where the walk grind will want them:
+-- `dry-hop` existed to discharge hop-edge's SECOND premise
+-- (`sizeᵛ (obs u) o ≤ Ŝ`) from a `valB?` at B with B ≤ Ŝ, and
+-- `subscribeInner-dry` to supply the inner burst's `valB?` at the anchor Ŝ
+-- for hop-edge's call sites in thruConsume.  Neither was ever wrong; they
+-- were early.
+--
+-- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Anchor-Dry.agda
+--           git show fa9692d:agda/src/Verify-Budget-Sufficient/Tick-Headroom.agda
+--           git show fa9692d:agda/src/Verify-Budget-Sufficient/Occurrences.agda
+-- Restore in that order; Anchor-Dry needs both of the others.
+
 hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) (η : Fin n → ℕ) → 2 ≤ Ŝ →
   (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ η (obs u) o < r →
   suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ η (obs u) o) (syncSizeᵉ o))

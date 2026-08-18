@@ -3356,33 +3356,13 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 -- restated there.
 ------------------------------------------------------------------
 
-cascadeGo-burst-dry : SiCFace → IfcFace →
-  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (id : Id) (a : Arrival Γ)
-  (chains : List (RegId × Path Γ (arrTy a) t))
-  (sched : Sched Γ) (st : EvalSt e) →
-  let sl = Sched.slots sched
-      Ψ  = ΨAt e sl
-      c  = capsAt e sl id
-  in
-  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  slotsSize sl ≤ Caps.cSize c →
-  capsOK? c sched st ≡ true →
-  fnCapBounded? Ψ sched st ≡ true →
-  valCaps? c sl (arrTy a) (arrVal a) ≡ true →
-  valΨ? Ψ (arrTy a) (arrVal a) ≡ true →
-  all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
-  all (λ rc → pathBΨ? Ψ (proj₂ rc)) chains ≡ true →
-  regsBΨ? Ψ (EvalSt.registry st) ≡ true →
-  n ≤ Caps.cSize c →
-  length chains ≤ Caps.cReg c →
-  depthCascade a id chains sched st ≤ capsH e sl id →
-  burstB? (sizeCapAt e sl (suc id)) Ψ
-          (proj₁ (cascadeGo a id chains sched st)) ≡ true
-cascadeGo-burst-dry siC ifc id a chains sched st
-                    slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
-  proj₁ (cascadeGo-burst-nodry siC ifc id a chains sched st
-           slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD)
+-- (DELETED 2026-08-18) `cascadeGo-burst-dry` sat here — `proj₁` of
+-- `cascadeGo-burst-nodry`, exactly as `cascadeGo-nodry` below is `proj₂`.
+-- Its only consumer was `dry-tick-core`'s argument list, and the leaf-only
+-- migration showed that list was wrong about itself: the dry half concludes
+-- `hasDry`, and a `burstB?` bound cannot be an ingredient of it.  Recreating
+-- it is one line against `cascadeGo-burst-nodry`, so nothing is lost but the
+-- typing; RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Burst-Walk.agda
 
 cascadeGo-nodry : SiCFace → IfcFace →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

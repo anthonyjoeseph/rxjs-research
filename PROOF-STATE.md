@@ -61,7 +61,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
      │   │                                ← subscribeE-wet ← wet-landing-lift
      │   │                                  ← subscribeE-walk-level   [tier 0]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeE-inner-nodry, dry-tick-core]
+     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeE-inner-nodry]
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
@@ -107,16 +107,20 @@ out fully once its lemmas are actually applied, take it. **A landed migration's
 residue leaves move to their own tier**, not this one: they take no proven lemma,
 so they are ordinary work and this tier stays the migration worklist.
 
-`agda/DEFERRED.txt` is the grandfather list and shrinks as these land. Cheapest
-first, so the single-lemma parents establish the pattern:
+**THE TIER IS EMPTY (2026-08-18). `agda/DEFERRED.txt` measures ZERO passed-only
+lemmas, and the ratchet now fails ANY new one.** The last parent, `dry-tick-core`,
+is where the pattern paid most: nine lemmas, EIGHT of which the fit test proved
+were never ingredients. They had been PARKED in an argument list — which reads as
+fully wired to every check the repo has — and under the leaf-only rule a proven
+lemma has no legal home but a real consumer, so they went, and with them three
+modules nothing else reached (`.Anchor-Dry`, `.Occurrences`, `.Tick-Headroom`)
+and the `subscribeE-demand` obligation that only that cone needed. A RECOVERY
+pointer sits on `hop-edge`'s header (.Wet/Part6), where the walk grind will want
+the dry apparatus back.
 
-- **`dry-tick-core`** (Caps-Bridge) — NINE lemmas, the largest, and eight of them
-  are not ingredients: `cascadeFinish` emits nothing (pinned), so the conclusion is
-  `cascadeGo-nodry`'s verbatim. The INV?-without-capsOK? refutation IS NOW BUILT
-  (pin beside the postulate; the gap is the concat queue's LENGTH, not a width), so
-  restating `dry-tick` over the `capsOK?` its sole caller already holds is
-  UNBLOCKED. Remaining: do that restatement, and re-home the eight onto
-  `cascade-wet-via-caps`'s other two conjuncts. Finding in its header. Tier-0 parent.
+Keep the tier heading: it is where the next `-core` goes if one is ever minted,
+and the ratchet's zero is the thing being defended.
+
 
 ## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
 
@@ -166,17 +170,12 @@ named postulate's own header.
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — DIFFICULTY, parked. The same
   per-element context on the thru-outer side, plus switchKill's OKB/regP
   transport. `VbB-tail` carries a phantom `{e}` its statement never mentions.
-- **`dry-tick-core`** (Caps-Bridge) — DIFFICULTY. Latch/finish bookkeeping
-  plus the Deliveries counts. Last in the tier, never first.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 
 Labour, not risk: nothing here can discover a design failure, and an anchor
 failure would move the ground under all of it.
 
-- **`subscribeE-demand`** (Anchor-Dry) — DIFFICULTY. The subscribe-side burst
-  face; the same gap as the walk faces, and whichever of it /
-  `stepFrame-burst-face`'s wet leaves is discharged first absorbs the other.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY. The Ψ face of subscribeE;
   proof sketch in its header, mirror of the proven caps clique.
 - **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY.

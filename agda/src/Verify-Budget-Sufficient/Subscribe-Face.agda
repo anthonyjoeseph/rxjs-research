@@ -4,12 +4,12 @@
 -- definitions in ONE mutual block — subscribeE-caps and the companion
 -- tree it is decomposed into (subscribeInner, sharedConnect, sharedSlot,
 -- thruConsume, thruWalk, concatDrain, innerFinish, subscribeE-input,
--- innerReact, stepFrame-caps, pushBurst, subscribeAll) — plus the four
+-- innerReact, stepFrame-caps, pushBurst, subscribeAll) — plus the three
 -- delivery leaves that CALL it (foldPath-caps, dispatchShare-caps,
--- shareGo-caps, chainStep-caps) and pushBurst's private retagEvents-caps.
+-- shareGo-caps) and pushBurst's private retagEvents-caps.
 --
 -- WHY IT MOVED.  Nothing here is imported by anything else in .Caps-Face:
--- reverse-reachability from the clique lands on exactly those four
+-- reverse-reachability from the clique lands on exactly those three
 -- delivery leaves, and stepFrame-FACE does not call stepFrame-CAPS, so
 -- the whole cascade side (cascadeGo-caps, walkH, caps-tick, reach-resets)
 -- is upstream-independent.  The clique is therefore a SUFFIX of the caps
@@ -3490,29 +3490,12 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
   j₂  = proj₁ IH
   REST = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
 
--- one arrival into one chain: foldPath seeded with the payload, the
--- source's close if it is spent, and the completion flag
-chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (dep bud j : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
-  (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-  2 ≤ Caps.cSize c →
-  1 ≤ Caps.cReg c →
-  Sched.slots sched ≡ sl →
-  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  slotsSize sl ≤ Caps.cSize c →
-  capsOK? (frameStep j c) sched st ≡ true →
-  pathSz? (Caps.cSize (frameStep j c)) path ≡ true →
-  valCaps? (frameStep j c) sl (arrTy a) (arrVal a) ≡ true →
-  depthChain id a path sched st ≤ dep →
-  let r = chainStep id a path sched st
-  in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
-                          (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-     × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-chainStep-caps {n = n} {e = e} c dep bud j id a path sl sched st 2≤S 1≤R slEq slC slSz inv pS vC dpt =
-  foldPath-caps c dep bud j (budgetAt e (Sched.slots sched) id) n id (arrTick a)
-    (arrSource a) path (arrVal a ∷ [])
-    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-    (Arrival.isLast a) sl sched st
-    2≤S 1≤R slEq slC slSz inv pS (∧-intro (∧-intro vC refl) refl)
-    (closeList-caps (frameStep j c) sl (arrSource a) (Arrival.isLast a))
-    dpt
+-- (DELETED 2026-08-18) `chainStep-caps` sat here — one arrival into one
+-- chain, a thin wrapper over `foldPath-caps`.  Its only consumer was
+-- `dry-tick-core`'s argument list, and the leaf-only migration showed that
+-- list was wrong about itself: the dry half concludes `hasDry`, so a
+-- capsOK?/burstCaps? Σ cannot be an ingredient of it.  The cascade-level
+-- induction it looks like the step for — `cascadeGo-caps` (.Caps-Face/Part7)
+-- — is ALREADY PROVEN without it, which is the real reason it is redundant
+-- rather than merely unwired.
+-- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda
