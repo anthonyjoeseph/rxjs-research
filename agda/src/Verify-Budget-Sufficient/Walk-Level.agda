@@ -330,6 +330,146 @@ WalkStmt⁻ {n} {Γ} {t} {e} {u} b =
   WalkTail⁻ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
 
+------------------------------------------------------------------
+-- SPLITTING THE HOP CONJUNCT OFF THE REST.
+--
+-- The burstHopD? conjunct is the ONE axis on which the chain clauses
+-- differ from each other, and it is the only conjunct in the Σ that
+-- mentions neither `j′` nor the caps — so it detaches cleanly, and a
+-- clause's remaining eight can be stated (and ground) without it.  That
+-- matters because the eight are a DELEGATION to `subscribeE-caps` plus
+-- the wet predicates, identical in shape across map / take / scan,
+-- while the hop conjunct is where each frame's own ledger lives and
+-- where scan is genuinely harder than its siblings:
+--
+--   · takeᵉ transforms no value, so `hopDᵉ (takeᵉ c e) = hopDᵉ e` and
+--     the source's receipt IS the receipt;
+--   · mapᵉ applies its fn ONCE per value, so one hopD-applyFn step
+--     closes it, and hopD-map-emit (.Measures) is that step, PROVEN;
+--   · scanᵉ REFOLDS the accumulator, so the fn's multiplier compounds
+--     along the burst and the receipt needs an INVARIANT rather than a
+--     step.  Nothing else about scan is harder — it mints no
+--     subscription the other chain frames do not, and its caps half is
+--     the same delegation theirs is.
+--
+-- So the split is not scan-specific plumbing: it is where the family's
+-- one real difference lives, and `walk-join` below is the assembly that
+-- puts a clause back together from the two halves.
+------------------------------------------------------------------
+
+-- THE HOP CONJUNCT ALONE, at WalkTail's hypothesis list verbatim (the
+-- store bound it spends is `INV?` + `ceil` + `F ≡ Ŝ`, so it needs the
+-- telescope; read WalkTail's comments, they are not repeated).
+WalkTailᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+  Gas → Closed Γ u → Caps → (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) → Set
+WalkTailᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
+  ∀ (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
+    depthE g b κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+               (proj₁ (subscribeE g b κ bid now sched st)) ≡ true
+
+WalkStmtᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
+WalkStmtᴴ {n} {Γ} {t} {e} {u} b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+  WalkTailᴴ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+
+-- WalkStmt WITH THE burstHopD? CONJUNCT REMOVED — the other eight.
+WalkTail⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+  Gas → Closed Γ u → Caps → (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) → Set
+WalkTail⁻ᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
+  ∀ (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
+    depthE g b κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ bid now sched st
+    in Σ ℕ λ j′ →
+       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+       × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+       × (j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j)
+       × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+WalkStmt⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
+WalkStmt⁻ᴴ {n} {Γ} {t} {e} {u} b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+  WalkTail⁻ᴴ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+
+-- PUTTING A CLAUSE BACK TOGETHER.  Both halves are handed the same
+-- hypotheses, and the hop conjunct is j′-free, so the assembly is a
+-- re-association and nothing more.  It is written once because every
+-- chain clause splits the same way.
+walk-join : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} (b : Closed Γ u) →
+  WalkStmt⁻ᴴ {e = e} b → WalkStmtᴴ {e = e} b → WalkStmt {e = e} b
+walk-join b h⁻ hᴴ c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
+        h⁻ c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+          2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+          s2 fS rS ceil lb dmd gas lℓ rgs
+  in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆
+   , hᴴ c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+       2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+       s2 fS rS ceil lb dmd gas lℓ rgs
+   , a₇ , a₈
+
+
 WalkLevel : Set
 WalkLevel = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ u) → WalkStmt {e = e} b
@@ -880,10 +1020,10 @@ postulate
   -- space below is therefore MOOT; it is kept only so the two dead
   -- candidates are not re-proposed.
   --
-  -- WHAT IS ACTUALLY OWED IS A CURRENCY MISMATCH, NOT ARITHMETIC
-  -- (2026-08-19, correcting the paragraph below).  This header has said
-  -- "arithmetic rather than design-risk", and that undersells it.  Take
-  -- the inventory of what bounds the fold's step count k at all:
+  -- ✗ DEAD ROUTE 2026-08-19 — BOUNDING k AT ALL.  Recorded because it is
+  -- the obvious first move and it cannot work; it is NOT the row's
+  -- residue, and an earlier draft of this header wrongly promoted it to
+  -- one.  Take the inventory of what bounds the fold's step count k:
   --
   --   · `burstCount?` (.Caps-Face/Part1), which this face carries as a
   --     hypothesis, is `length str ≤ᵇ suc (Caps.cWid c)` together with a
@@ -898,20 +1038,19 @@ postulate
   --     holding, which is why it looks true from small cases.
   --
   -- And hopDᵉ's scan clause targets `(2 + pmᵗ V 0 f) ^ V`, with V the
-  -- SIZE cap.  So the bound on k and the budget for it are in different
+  -- SIZE cap.  So a bound on k and the budget for it are in different
   -- currencies, and converting between them is dead route #1 below —
   -- width sits ABOVE size at the true instantiation because foldStep
-  -- towers where sizeStep scales.  THAT is why the k-form cannot close
-  -- from anything in the telescope; it is not that the arithmetic is
-  -- fiddly.
+  -- towers where sizeStep scales.
   --
-  -- The size-in-exponent restatement below is still the live candidate,
-  -- but it is now a candidate for a DIFFERENT problem than the one this
-  -- header first framed, and it should be judged against the currency
-  -- question rather than against the k-form.  Before grinding it, settle
-  -- whether `valCountᵉ ≤ sizeᵉ b` is reachable-false the way its
-  -- syncSizeᵉ analogue is: that single question decides whether k is
-  -- size-bounded after all, and it is probeable.
+  -- WHY THAT COSTS NOTHING: THE LIVE ROUTE NEVER MENTIONS k.  Rx.Hop-Depth's
+  -- own header is explicit — "a fold that deepens the accumulator adds at
+  -- least one constructor, and a fold that does not deepen it does not raise
+  -- hopD either" — so the exponent is the accumulator's SIZE and the store
+  -- bound supplies it directly.  k is an artefact of reading the recurrence
+  -- in steps rather than in the accumulator's own measure.  Do not re-open
+  -- it, and do not commission the `valCountᵉ ≤ sizeᵉ b` probe an earlier
+  -- draft of this header asked for: its answer changes nothing here.
   --
   -- THE OLD FRAMING, kept because its refutation is still load-bearing.
   -- `k ≤ sizeᵛ accₖ` is FALSE as literally stated — an identity or
@@ -1006,9 +1145,37 @@ postulate
   --
   -- The one thing series X does NOT settle: what bounds k.  It says the
   -- growth is geometric, not that k exceeds V.
-  walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  --
+  -- ═══ THE ROW IS SPLIT (2026-08-19), AND ONLY THE HOP HALF IS HARD ═══
+  -- `walk-scan` is now a real body (below, over `walk-join`) pairing the
+  -- two leaves that follow.  Everything above this line is about the hop
+  -- half ALONE; the other eight conjuncts never see the fold's arithmetic.
+  --
+  -- the eight — GRINDABLE, and it is walk-map's census verbatim at this
+  -- shape.  scanᵉ mints no subscription mapᵉ does not: subscribeE's scan
+  -- clause (Evaluator:1453) installs ONE node, subscribes the source with
+  -- `scan-f f nid ↠ κ`, and pushes the resulting burst — the same
+  -- install-subscribe-push the other chain frames run, with `scanFrame-caps`
+  -- (.Caps-Face, PROVEN) paying the frame charge and `subscribeE-caps`
+  -- delegating the caps half.  So the *budget* really is map-difficulty,
+  -- which is what the shape of this leaf records.
+  walk-scan-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-    (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
+    (b : Closed Γ s) → WalkStmt⁻ᴴ {e = e} (scanᵉ f z b)
+  -- the hop conjunct — DIFFICULTY, and the whole of this row's risk.  What
+  -- it owes is the ACCUMULATOR INVARIANT, `hopDᵛ accᵢ ≤ (2 + pmᵗ V 0 f) ^
+  -- sizeᵛ accᵢ * B`, carried along `scanVals`' fold (Evaluator:1279) and
+  -- closed against the clause's `(2 + pmᵗ V 0 f) ^ V` by the store bound
+  -- `sizeᵛ accᵢ ≤ V` — which is HYPOTHESIS-SIDE here (INV? + ceil + F ≡ Ŝ,
+  -- see the store-invariant paragraph above) and needs no new premise.
+  -- Its one missing ingredient is a SHARPER hopD-applyFn: one that spends a
+  -- size INCREASE to pay for each factor of the multiplier.  That is exactly
+  -- what makes the exponent the accumulator's own size rather than the step
+  -- count k — and it is why `k` need never be bounded at all, which retires
+  -- the currency question the paragraph above raises against the k-form.
+  walk-scan-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+    (b : Closed Γ s) → WalkStmtᴴ {e = e} (scanᵉ f z b)
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)
   -- registration + parked body — GRINDABLE.  The clause that MINTS a
   -- registry entry, so regsLen?'s growth is paid here, and it is the
@@ -1748,6 +1915,15 @@ walk-defer body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
        (subst (_≤ ℓ) (+-comm (pathLen κ) 1)
               (≤-trans (+-monoʳ-≤ (pathLen κ) (≤-trans (s≤s z≤n) dmd)) lℓ))
        rgs
+
+-- THE scan CLAUSE, ASSEMBLED.  Nothing is proven here that the two leaves
+-- do not already say; the point of the assembly is that it puts the row's
+-- risk in ONE of them.  See walk-scan-hop's header for what that one owes.
+walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+  (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
+walk-scan f z b =
+  walk-join (scanᵉ f z b) (walk-scan-rest f z b) (walk-scan-hop f z b)
 
 switchKill-closes-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →

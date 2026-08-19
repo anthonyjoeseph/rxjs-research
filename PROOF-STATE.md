@@ -105,31 +105,28 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`walk-scan`** (Walk-Level) — DIFFICULTY, and the ONLY one left in this
-  tier. Its residue is a CURRENCY mismatch, not the arithmetic its header used
-  to claim: every bound on the fold's step count is width-denominated
-  (`burstCount?`) while hopDᵉ's scan clause budgets the exponent at the SIZE
-  cap, and converting between them is the row's own dead route. The next move
-  is a probe, not a grind — whether `valCountᵉ ≤ sizeᵉ b` is reachable-false
-  the way its `syncSizeᵉ` analogue already is (Rx/Exp header) decides it.
-  Everything below is the older framing, still accurate about the fold itself:
-  restatement SHAPE predicted is not needed. The fold half is settled (its
-  header derives the accumulator invariant, closing at exactly the base
-  `hopDᵉ`'s scan clause carries, over PROVEN `hopD-applyFn`), and the bound on
-  the exponent comes from the STORE INVARIANT this face already carries as a
-  hypothesis — `boundedNode B (scan-st v) = sizeᵛ v ≤ᵇ B` under `INV?`, carried
-  to `Ŝ` by `ceil` — not from the ceiling pins. `scan-count-under-ceiling-absurd`
-  (Refuted.Caps-Face) refutes only the ceiling route, and reading it as a blocker
-  is what produced the SHAPE call; the width-ceiling and decouple-`Ŝ` repairs it
-  motivated are dead (`wid≤size-absurd`; `dBound-connect` wants `hopR F ≤ hopR Ŝ`)
-  and the surviving raise-`Ŝ` one is moot. What is genuinely owed is arithmetic:
-  `k ≤ sizeᵛ accₖ` is FALSE for non-deepening folds, so the exponent must be the
-  accumulator's SIZE, and preserving that wants a sharper `hopD-applyFn` spending
-  a size increase per factor of `P`. PROVEN `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT
-  serve — they land at the global cap `szB V V`, far above this conjunct's
-  target. The additive escape is separately CLOSED: series X (Demand-Probe)
-  exhibits an amplifying step meeting `hopD-applyFn` with EQUALITY at every
-  iteration, needing only a nat-typed `caseᵗ`, so no size budget excludes it.
+- **`walk-scan-hop`** (Walk-Level) — DIFFICULTY, and the ONLY one left in this
+  tier. `walk-scan` is now a real body over `walk-join`, so the row's risk is
+  one CONJUNCT rather than a clause: the burstHopD? receipt for the fold, and
+  nothing else scan does is harder than `mapᵉ`. What it owes is the accumulator
+  invariant `hopDᵛ accᵢ ≤ (2 + pmᵗ V 0 f) ^ sizeᵛ accᵢ * B`, whose exponent the
+  STORE INVARIANT supplies hypothesis-side — `boundedNode B (scan-st v) =
+  sizeᵛ v ≤ᵇ B` under `INV?`, carried to `Ŝ` by `ceil` — and whose one missing
+  ingredient is a sharper `hopD-applyFn` spending a size increase per factor of
+  `P`. `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT serve: they land at the global cap
+  `szB V V`, far above this conjunct's target. Two routes are closed and are
+  recorded in the leaf's header so they are not re-proposed — bounding the step
+  count `k` at all (width-vs-size currency, and the live route never mentions
+  `k`), and the ceiling pins (`scan-count-under-ceiling-absurd`,
+  Refuted.Caps-Face, whose width-ceiling and decouple-`Ŝ` repairs are dead and
+  whose raise-`Ŝ` one is moot). The additive escape is separately CLOSED:
+  series X (Demand-Probe) exhibits an amplifying step meeting `hopD-applyFn`
+  with EQUALITY at every iteration, needing only a nat-typed `caseᵗ`.
+- **`walk-scan-rest`** (Walk-Level) — GRINDABLE: the other eight conjuncts, at
+  `WalkStmt⁻ᴴ`. It is walk-map's census verbatim at this shape — subscribeE's
+  scan clause installs one node, subscribes the source and pushes, with PROVEN
+  `scanFrame-caps` paying the frame charge and `subscribeE-caps` delegating the
+  caps half.
 - **`hopD-relᵉ`** (Measures) — GRINDABLE: the ONLY remaining leaf of
   `slotHop-cap`, whose telescope half (`slotHop-sup`, `ηAt-bound`) is now
   PROVEN off it. hopDᵉ is LINEAR in η, so this is the PROVEN `hopD-sizeᵉ`
