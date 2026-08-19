@@ -7,7 +7,8 @@
 module Refuted.Main where
 
 open import Refuted.Caps-Face
-  using (caps-frame-boundary-absurd; reach-via-size-absurd)
+  using (caps-frame-boundary-absurd; reach-via-size-absurd;
+         scan-count-under-ceiling-absurd; wid≤size-absurd)
 open import Refuted.Anchor
   using (g0-hasAtLeast-absurd; walk-hyps-absurd; hop-anchor-absurd;
          round3b-ledger-reset-absurd; round3-old-ell-absurd;

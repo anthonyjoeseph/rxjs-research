@@ -87,7 +87,7 @@ open import Rx.Prim      using (Tick; Id; Source; init; value; close;
                                 complete; handoff; exhausted; dried;
                                 cut; cutPending; subscribe;
                                 InstEmit; InstEvent; _at_from_as_;
-                                Gas; g0; gs; gasPad; ObservableInput)
+                                Gas; g0; gs; gasPad; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
                                 inputsBelowᵉ; isData;
                                 _≟ᵗ_;
@@ -117,7 +117,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 thruConsume; thruWalk; thruWrap;
                                 mergeBump; switchKill; cutThrough; sweepLive;
                                 lookupNode; setNode; pathHasNode; LiveSource;
-                                sameSource; installNode; NodeId)
+                                sameSource; installNode; NodeId; register; mintNode)
 
 -- the wet stratum: INV?, dBound, hasAtLeast, regsLen?, pathLen, the gas
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
@@ -272,6 +272,63 @@ WalkStmtAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Gas → Closed �
 WalkStmtAt {n} {Γ} {t} {e} {u} g b =
   ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) →
   WalkTail {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+
+-- WalkStmt WITH THE regsLen? CONJUNCT REMOVED — the shape a clause's leaf
+-- takes once its length-ledger conjunct is actually proven, so that the
+-- proof plugs into a real body instead of being asserted inside a bigger
+-- postulate.  It exists once, here, because every clause that registers
+-- splits the same way; walk-defer is the first.  The hypothesis list is
+-- WalkTail's verbatim — read the comments there, they are not repeated.
+WalkTail⁻ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+  Gas → Closed Γ u → Caps → (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) → Set
+WalkTail⁻ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
+  ∀ (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
+    depthE g b κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE g b κ bid now sched st
+    in Σ ℕ λ j′ →
+       (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+       × (burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true)
+       × (j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j)
+       × (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                     (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+
+WalkStmt⁻ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
+WalkStmt⁻ {n} {Γ} {t} {e} {u} b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+  WalkTail⁻ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+
 
 WalkLevel : Set
 WalkLevel = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -790,13 +847,40 @@ postulate
   --
   -- SO THE INVARIANT IS `hopDᵛ acc ≤ (2 + pmᵗ V 0 f) ^ k * B after k
   -- applications`, established at the seed and preserved by
-  -- hopD-applyFn.  WHAT REMAINS IS ONE QUESTION AND IT IS NOT ABOUT THE
-  -- FOLD: does k ≤ V — is the number of applications the bound must cover
-  -- capped by the store bound?  That is a question about how many values
-  -- reach one scan node within the measured scope (burstCount? and the
-  -- width cap are where to look), NOT about the accumulator.  Until it is
-  -- answered the row stays DIFFICULTY; answered, this becomes an
-  -- assembly over PROVEN hopD-applyFn and the row is mechanical.
+  -- hopD-applyFn.  The one remaining question was `k ≤ V`, and it is
+  -- ANSWERED — in the negative, from the hypotheses this face states:
+  --
+  -- REFUTED 2026-08-19: `scan-count-under-ceiling-absurd` (agda/refuted,
+  -- Refuted.Caps-Face) — `k ≤ V` DOES NOT FOLLOW from the ceiling pins.
+  -- `k` is bounded only by burstCount?, which caps instants and
+  -- per-instant values SEPARATELY, each by `suc (Caps.cWid c)`, so `k` is
+  -- bounded by a WIDTH SQUARED and by nothing smaller.  The only lower
+  -- bound stated on `V = Ŝ` is `Caps.cSize (frameStep L̂ c) ≤ Ŝ`: a SIZE.
+  -- The axes diverge — a level step EXPONENTIATES the width (`foldStep S
+  -- w = S ^ suc w`, a tower in the level) and merely SCALES the size
+  -- (`sizeStep S s = S * suc (2 * s)`) — so at the smallest admissible
+  -- caps the squared width passes the size at j = 2 and the bare width
+  -- passes it at j = 3.  No level offset is available to spend either:
+  -- the ceiling asks only `opIterD … ≤ L̂` while the walk's own exit level
+  -- is bounded by that same `opIterD …`, so `L̂ := opIterD …` is admissible
+  -- and both are read at the SAME level.
+  --
+  -- AND THE SLACK IS NIL, which is why this is not repairable by
+  -- arithmetic: at `pmᵗ V 0 f = 0` the fold's base `1 + (pmᵗ ⊔ 1)` and
+  -- the clause's base `2 + pmᵗ` are BOTH 2, so `2 ^ k ≤ 2 ^ V` demands
+  -- `k ≤ V` on the nose.
+  --
+  -- SO THE ROW IS NOT A FOLD PROBLEM.  Two repairs are open and both
+  -- change a statement rather than discharge one, which is why this is
+  -- SHAPE and not DIFFICULTY: add a WIDTH ceiling to the walk face
+  -- alongside the size one (`Caps.cWid (frameStep L̂ c) ≤ Ŝ`, threaded
+  -- like `ceil` and paid for at the same places), or re-index hopDᵉ's
+  -- scan clause so its exponent is width-derived rather than V.  Decide
+  -- which BEFORE grinding: the first cascades through every producer of
+  -- `ceil`, the second changes a measure the whole demand side reads.
+  -- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) does not rescue either
+  -- route — it constrains opIterD's iteration count, not the relation
+  -- between the two axes at a level.
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
@@ -809,13 +893,15 @@ postulate
   -- burst at all, hence burstB? and burstHopD? over an empty payload
   -- (`hopDᵉ V η (deferᵉ e) = 0`), hasDry by computation on a lone init,
   -- INV? by INV?-install (below, PROVEN) then addLive-INV (.Wet/Part2,
-  -- PROVEN).  The fifth is regsLen?, and it wants the SAME missing lemma
-  -- input-wet-scripted's census writes out — `register-regsLen`, five
-  -- lines, dev-checked and reverted unlanded there.  This row is its
-  -- SECOND nameable consumer, which is the argument for landing it with
-  -- whichever of the two grounds first rather than with a body of its own.
-  walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
+  -- PROVEN).  The fifth, regsLen?, IS DISCHARGED (2026-08-19): `walk-defer`
+  -- below is a real body pairing this leaf with PROVEN register-regsLen,
+  -- which is why this leaf is at WalkStmt⁻ rather than WalkStmt.  What the
+  -- defer clause registers is `thru-outer mergeᵒ nid ↠ κ` over an
+  -- installNode — one longer than κ, and installNode leaves the registry
+  -- alone — so the growth is funded by G, which is at least 1 here because
+  -- `syncSizeᵉ (deferᵉ e) = 1` sits in dBound's summand position.
+  walk-defer-eight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (body : Closed Γ u) → WalkStmt⁻ {e = e} (deferᵉ body)
 
 -- THE *All BODY'S PIECES — INV?-install (below, after all-setNode) and the
 -- push face its assembly (below) consumes.
@@ -1483,6 +1569,84 @@ switchKill-regsLen ℓ (just v) sched st h =
   all-cutThrough (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ) v
     (EvalSt.delivered st) (EvalSt.regWatermark st)
     (EvalSt.dying st) (EvalSt.registry st) h
+
+-- REGISTERING KEEPS THE LENGTH LEDGER, given the new path fits.  The
+-- sibling of switchKill-regsLen above.
+--
+-- `register` APPENDS rather than prepends (Evaluator:319 — `registry st
+-- ++ (nextReg , src , u , path) ∷ []`), so this is all-++-intro over the
+-- old registry and a SINGLETON, not a cons.  Worth saying because the
+-- cons reading typechecks nowhere and the shape is invisible from the name.
+register-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (ℓ : ℕ) (src : Source) (κ : Path Γ u t) (st : EvalSt e) →
+  pathLen κ ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  regsLen? ℓ (EvalSt.registry (register src κ st)) ≡ true
+register-regsLen ℓ src κ st pℓ h =
+  all-++-intro (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
+    (EvalSt.registry st) _ h
+    (∧-intro (T⇒≡true (pathLen κ ≤ᵇ ℓ) (≤⇒≤ᵇ pℓ)) refl)
+
+-- THE regsLen? CONJUNCT AT A SCRIPTED SLOT, for all four shapes.  Split
+-- out of input-wet-scripted because it is the one conjunct of the wet
+-- five that closes today, and factoring it is what gives register-regsLen
+-- a consumer: the other four are still owed by a leaf.
+--
+-- Two of the four shapes leave the registry alone and spend the
+-- hypothesis; the two that REGISTER (hot with an unspent source, and cold
+-- with an async tail) are register-regsLen at the source each mints —
+-- `toℕ i` for hot, `Sched.nextSource sched` for cold.
+input-wet-scripted-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (ℓ : ℕ) (g : Gas) (i : Fin n) (b : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t) (bid : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e)
+  {ok : T (isData (lookup Γ i))}
+  (src : ObservableInput (Val Γ (lookup Γ i))) →
+  Sched.slots sched i ≡ scripted {ok = ok} src →
+  b ≡ inputᶜ i →
+  pathLen κ ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  regsLen? ℓ (EvalSt.registry
+                (proj₂ (proj₂ (subscribeE g b κ bid now sched st)))) ≡ true
+input-wet-scripted-regs ℓ g i b κ bid now sched st (hot asy) slotEq refl pℓ rgs
+  with Sched.slots sched i | slotEq
+... | .(scripted (hot asy)) | refl
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+...   | true  = rgs
+...   | false = register-regsLen ℓ (toℕ i) κ st pℓ rgs
+input-wet-scripted-regs ℓ g i b κ bid now sched st (cold sync []) slotEq refl pℓ rgs
+  with Sched.slots sched i | slotEq
+... | .(scripted (cold sync [])) | refl = rgs
+input-wet-scripted-regs ℓ g i b κ bid now sched st (cold sync (d ∷ ds)) slotEq refl pℓ rgs
+  with Sched.slots sched i | slotEq
+... | .(scripted (cold sync (d ∷ ds))) | refl =
+  register-regsLen ℓ (Sched.nextSource sched) κ st pℓ rgs
+
+-- THE defer CLAUSE, ASSEMBLED.  The leaf owes the eight conjuncts that need
+-- the caps twin and the wet predicates; the ninth is register-regsLen at the
+-- path the clause actually registers.
+--
+-- The length arithmetic is the whole content and it is three steps:
+-- `syncSizeᵉ (deferᵉ body) = 1` (Rx.Exp) sits in dBound's summand position,
+-- so `1 ≤ dBound … ≤ G` by s≤s z≤n; that funds `pathLen κ + 1 ≤ pathLen κ + G
+-- ≤ ℓ`; and +-comm turns it into the `suc (pathLen κ) ≤ ℓ` the extended path
+-- needs.  installNode touches `nodes` alone (Evaluator:326), so the registry
+-- hypothesis passes through unchanged.
+walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
+walk-defer body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
+        walk-defer-eight body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+          2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+          s2 fS rS ceil lb dmd gas lℓ rgs
+  in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈
+   , register-regsLen ℓ _ (thru-outer mergeᵒ (proj₁ (mintNode sched)) ↠ κ)
+       (installNode (proj₁ (mintNode sched)) (merge-st 0 false) st)
+       (subst (_≤ ℓ) (+-comm (pathLen κ) 1)
+              (≤-trans (+-monoʳ-≤ (pathLen κ) (≤-trans (s≤s z≤n) dmd)) lℓ))
+       rgs
 
 switchKill-closes-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
@@ -2438,41 +2602,23 @@ postulate
   -- The record update reduces, so the mint is invisible to the predicate.
   -- Only D's addLive genuinely moves `live`, and that is addLive-INV's job.
   --
-  -- ⚠ THE ONE MISSING INGREDIENT, and it is the whole residue:
+  -- THE regsLen? CONJUNCT IS DISCHARGED (2026-08-19).  `input-wet-scripted`
+  -- below is a REAL BODY over this leaf: it pairs the four conjuncts owed
+  -- here with the PROVEN `input-wet-scripted-regs` (above, this module),
+  -- which closes the fifth for all four shapes off `register-regsLen`.  So
+  -- the ⚠ rows in A-D are shape B's and shape D's, and they are shut.
   --
-  --   register-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  --     (ℓ : ℕ) (src : Source) (κ : Path Γ u t) (st : EvalSt e) →
-  --     pathLen κ ≤ ℓ →
-  --     regsLen? ℓ (EvalSt.registry st) ≡ true →
-  --     regsLen? ℓ (EvalSt.registry (register src κ st)) ≡ true
-  --   register-regsLen ℓ src κ st pℓ h =
-  --     all-++-intro (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
-  --       (EvalSt.registry st) _ h
-  --       (∧-intro (T⇒≡true (pathLen κ ≤ᵇ ℓ) (≤⇒≤ᵇ pℓ)) refl)
+  -- `pathLen κ ≤ ℓ`, which that lemma wants, comes from this statement's own
+  -- `pathLen κ + G ≤ ℓ` by m≤m+n — nothing new is spent for it.
   --
-  -- That body was WRITTEN AND DEV-CHECKED GREEN on 2026-08-19 (whole-module
-  -- agda-dev, beside switchKill-regsLen, which is its shape twin) and then
-  -- REVERTED UNLANDED, because with its consumer still a postulate it is a
-  -- proven piece ahead of its assembly — `make wiring-gate` correctly failed
-  -- it as unreachable.  It costs one import (`register`, Rx.Evaluator) and
-  -- belongs beside switchKill-regsLen.  Land it IN THE SAME COMMIT as the
-  -- body below, never before.
-  --   · `register` APPENDS, it does not prepend (Evaluator:319 — `registry
-  --     st ++ (nextReg , src , u , path) ∷ []`).  So this is all-++-intro
-  --     over a singleton, NOT a cons.  Invisible from the name, and the
-  --     cons reading typechecks nowhere.
-  --   · `pathLen κ ≤ ℓ` comes from this statement's own `pathLen κ + G ≤ ℓ`
-  --     by m≤m+n.  Nothing new is needed to discharge it.
-  --
-  -- PLACEMENT, which is a real constraint and cheap to get wrong: this body
-  -- takes no walk face, so it MUST NOT join the heavy mutual block (block 42,
-  -- 15 members — `make agda-dev ARGS='--list …'` shows it free).  Put it
-  -- ABOVE that block, where the dry/hop helpers it spends already live
-  -- (retagEvents-dry, mapValue-hop, mapValue-dry, any-dry-++, all in the
-  -- 1049-1156 range).  The regsLen? helpers do NOT: capsOK⇒regsLen and
-  -- regsLen?-mono sit ~1200 lines BELOW, after the block, so anything of
-  -- theirs this body wants has to move up with it.
-  input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- PLACEMENT, a real constraint and cheap to get wrong: neither the leaf nor
+  -- the body takes a walk face, so neither may join the heavy mutual block
+  -- (block 42, 15 members — `make agda-dev ARGS='--list …'` shows them free).
+  -- The regs lemma sits ABOVE that block with the dry/hop helpers it spends
+  -- (retagEvents-dry, mapValue-hop, mapValue-dry, any-dry-++).  The regsLen?
+  -- helpers do NOT: capsOK⇒regsLen and regsLen?-mono sit ~1200 lines BELOW,
+  -- after the block, so anything of theirs a future clause wants moves up too.
+  input-wet-scripted-four : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (g : Gas)
     (i : Fin n) (b : Closed Γ (lookup Γ i))
@@ -2523,7 +2669,74 @@ postulate
        × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
                      (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
-       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+-- THE SCRIPTED SLOT, ASSEMBLED.  A real body over the four-conjunct leaf and
+-- the proven regs lemma — the leaf-only shape, so that when a shape's wet
+-- four lands the fit is tested by the typechecker rather than asserted.
+
+input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+  (g : Gas)
+  (i : Fin n) (b : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+  {ok : T (isData (lookup Γ i))}
+  (src : ObservableInput (Val Γ (lookup Γ i))) →
+  Sched.slots sched i ≡ scripted {ok = ok} src →
+  -- b is BOUND, not applied: the measures below take a general
+  -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+  -- `[]` — an alias of type `Closed Γ _` does not, so writing
+  -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+  b ≡ inputᶜ i →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  nest b sl (EvalSt.connectedShares st) ≤ bud →
+  depthE g b κ bid now sched st ≤ dep →
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  fnCapᵉ b ≤ Ψ →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  2 ≤ Ŝ →
+  F ≡ Ŝ →
+  R̂ ≡ hopR Ŝ →
+  Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+  opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+  dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+         (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g b κ bid now sched st
+  in capsOK? (frameStep (j + j′) c)
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+     burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+     burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+     j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+     (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                   (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+input-wet-scripted c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid now sl sched st
+  src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle =
+  let (a₁ , a₂ , a₃ , a₄) =
+        input-wet-scripted-four c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid
+          now sl sched st src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz
+          lC nst dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
+  in a₁ , a₂ , a₃ , a₄
+   , input-wet-scripted-regs ℓ g i b κ bid now sched st src slotEq bEq
+       (≤-trans (m≤m+n (pathLen κ) G) lℓ) rgs
+
 
 -- THE MUTUAL LANDING.  input-wet-core is handed a walk face AT THE PEELED
 -- FUEL — `walkFace` partially applied, which inhabits WalkLevelAt directly.

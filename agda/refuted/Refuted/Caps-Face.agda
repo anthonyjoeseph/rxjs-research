@@ -281,3 +281,53 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- now here), so it gets a witness rather than a warning
 reach-via-size-absurd : ∀ (C : ℕ) → 2 ^ C ≤ C → ⊥
 reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
+
+-- ══════════════════════════════════════════════════════════════════
+-- WALK-SCAN'S APPLICATION COUNT IS NOT FUNDED BY THE SIZE CEILING
+--
+-- `hopDᵉ`'s scan clause (Rx.Hop-Depth) bounds a scan's output at
+-- `(2 + pmᵗ V 0 f) ^ V * B`, and the fold invariant that clause is
+-- evidently sized for — `Aₖ ≤ (1 + (pmᵗ V 0 f ⊔ 1)) ^ k * B`, over
+-- PROVEN hopD-applyFn — closes exactly when `k ≤ V`.  Not approximately:
+-- at `pmᵗ V 0 f = 0` both bases are 2 and the slack is nil.
+--
+-- `k` is the number of source values one scan node folds inside a single
+-- subscribe burst, and the only thing bounding it is `burstCount?`
+-- (.Caps-Face/Part1), which caps INSTANTS and PER-INSTANT VALUES
+-- separately, each by `suc (Caps.cWid c)` — so `k` is bounded by a
+-- WIDTH SQUARED and by nothing smaller.  The only lower bound the walk
+-- face states on `V = Ŝ` is `Caps.cSize (frameStep L̂ c) ≤ Ŝ`: a SIZE.
+--
+-- The two axes diverge, and that is what this pins.  A level step
+-- EXPONENTIATES the width (`foldStep S w = S ^ suc w`, so `cWid
+-- (frameStep j c)` is a tower of height j) and merely SCALES the size
+-- (`sizeStep S s = S * suc (2 * s)`, geometric in j).  At the smallest
+-- admissible caps the squared width passes the size at j = 2 (81 vs 42)
+-- and the bare width passes it at j = 3 (512 vs 170).
+--
+-- AND THERE IS NO LEVEL OFFSET TO SPEND, which is what makes this a
+-- refutation rather than an off-by-one: the ceiling requires only
+-- `opIterD … ≤ L̂`, while the walk's own exit level is bounded by that
+-- same `opIterD …` — so `L̂ := opIterD …` is admissible and the width
+-- and the size are then read at the SAME level.
+--
+-- CONSEQUENCE for walk-scan: the missing hypothesis is a WIDTH ceiling,
+-- not a cleverer fold.  `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`)
+-- does not rescue it — it constrains opIterD's iteration count, not the
+-- relation between the two axes at a level.
+-- ══════════════════════════════════════════════════════════════════
+scan-count-under-ceiling-absurd :
+  (∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+     Caps.cReg c ≤ Caps.cSize c →
+     suc (Caps.cWid (frameStep j c)) * suc (Caps.cWid (frameStep j c))
+       ≤ Caps.cSize (frameStep j c)) → ⊥
+scan-count-under-ceiling-absurd h =
+  ≤⇒≤ᵇ (h (caps 2 0 1) 2 (s≤s (s≤s z≤n)) (s≤s z≤n) (s≤s z≤n))
+
+-- the bare width passes the size one level later — the same divergence
+-- without the squaring, kept because it is the form any future route
+-- through `cWid ≤ cSize` would reach for
+wid≤size-absurd :
+  (∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c →
+     Caps.cWid (frameStep j c) ≤ Caps.cSize (frameStep j c)) → ⊥
+wid≤size-absurd h = ≤⇒≤ᵇ (h (caps 2 0 1) 3 (s≤s (s≤s z≤n)))

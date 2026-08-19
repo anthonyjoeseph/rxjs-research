@@ -1065,6 +1065,28 @@ Corollary for headers: a header's job is what CANNOT be code — a refuted route
 boundary, a ruling and its rationale, a recovery pointer. The moment a header explains a
 derivation that would typecheck, move it into the derivation.
 
+**NEVER WRITE CODE IN A COMMENT (Anthony, 2026-08-19).** Not a body, not a signature, not a
+"here is the lemma we need" block. This is the sharpest form of the rule above and it is
+absolute: **if you are sure the code is needed, take the time to wire it in — with the
+SIMPLEST assembly that will hold it.** A commented-out proof is the worst of both worlds. It
+is not checked, so it rots the moment anything under it moves; it is not counted, so it is
+invisible to `make postulates`, `make wiring` and PROOF-STATE; and it *looks* discharged, so
+the next reader budgets nothing for it.
+
+The excuse that produces it, every time, is the wiring law: the piece typechecks but its
+consumer is still a postulate, so `make wiring-gate` calls it unreachable and it gets parked
+in a comment "until the consumer lands". **That is the wrong repair.** The right one is to
+convert the consumer into a real body over a smaller leaf — the postulate-to-assembly
+conversion in "A POSTULATE MUST BE A LEAF" — so the piece has somewhere to plug in TODAY.
+The assembly may be as thin as splitting one conjunct off a tuple; thin is fine, because the
+leaf-only shape is what makes the fit checked rather than asserted. (Worked instance:
+`register-regsLen` was dev-checked, reverted into `input-wet-scripted`'s header as commented
+code, and landed only after that postulate was split into `input-wet-scripted-four` plus a
+real body — an assembly that cost four lines.)
+
+If the consumer genuinely cannot be split yet, **do not keep the code**. Say in one sentence
+what is owed and why the assembly is blocked, and let git history hold the text.
+
 ### THE GATE INCLUDES `PROOF-STATE.md` (Anthony, 2026-08-13)
 
 **`make gate` is necessary, not sufficient. Update PROOF-STATE before every commit that

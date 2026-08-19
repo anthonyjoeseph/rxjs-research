@@ -1447,9 +1447,44 @@ slotDef-size sl i {d} eq =
 -- therefore pins the compound exactly and reaches hopR through its
 -- EXPONENT, which does compute.
 --
--- ROUTE, and the probe hands it over: bound the compound by
--- (2+V)^(O(V²)) by induction over the telescope, then spend
--- V² ≤ (1+V)^(1+V) and ^-monotonicity in base and exponent.
+-- ⚠ ROUTE, CORRECTED 2026-08-19 — the "O(V²) exponent" reading above is
+-- WRONG, and it is wrong in the one place that decides the margin.  It
+-- assumed the scan clause's base `2 + pmᵗ V 0 f` is bounded by `2 + V`.
+-- It is not: `pm-szB` (below) gives only `pmᵗ V k tm ≤ szB V (sizeᵗ tm)`,
+-- so the base is DOUBLY exponential in the fold's own size and a link's
+-- contribution is exponential in `sizeᵗ f`, not linear in V.
+--
+-- The corrected accounting, and it closes with room to spare.  Work at
+-- base `2 + V` and compare EXPONENTS, since hopR V = (2+V)^((1+V)^(1+V)):
+--
+--   · ONE LINK of fold-size sf contributes `(2 + pmᵗ V 0 f) ^ V`, and
+--     `2 + pmᵗ ≤ 2 + szB V sf = 2 + (2+sf)^((1+V)^sf)`, so the link is
+--     under `(2+V) ^ (V * (1+V)^sf)`.  Exponent `V * (1+V)^sf`.
+--   · EXPONENTS ADD along the telescope, because hopDᵉ's scan clause
+--     MULTIPLIES its factor into the inner hopDᵉ and every base has been
+--     widened to the common `2 + V`.
+--   · `Σ sfᵢ ≤ slotsSize sl ≤ V`, and `(1+V)^x` is CONVEX, so the sum of
+--     link exponents is maximised by concentrating all the size in a
+--     SINGLE link: `V * (1+V)^V`.  Splitting strictly reduces it.
+--   · against hopR's exponent `(1+V)^(1+V) = (1+V) * (1+V)^V`.  So the
+--     margin is one whole factor of `(1+V)^V`, at every V ≥ 2.
+--
+-- CHECKED AGAINST SERIES S's OWN NUMBERS: at V = 16 the worst single
+-- link is 16*17^16 = 778579070010669895696 against hopR's exponent
+-- 17^17 = 827240261886336764177 — fits, with 17^16 to spare, exactly the
+-- predicted one factor.  V = 2, 3, 4, 30 all fit likewise, and the k
+-- extra links cost at least V each (k ≤ V/9 by scanᵉ's 9-unit minimum),
+-- which the spare factor absorbs many times over.
+--
+-- SO THE PROOF SHAPE IS TWO INDUCTIONS, not one telescope argument:
+--   A. a RELATIVE bound on a single expression, multiplicative in the
+--      environment — `hopDᵉ V η e ≤ (2+V) ^ (V * (1+V)^(sizeᵉ e))
+--      * (1 + ⨆η)`.  Multiplicative is what makes exponents add at the
+--      splice; an additive bound does not compose.
+--   B. the telescope, accumulating that product over the slots, where
+--      the size sum is capped by `slotsSize sl ≤ V`.
+-- Neither needs a per-index bound, which is why this route survives the
+-- refuted one below — the margin lives at hopR and is never spent early.
 --
 -- ⚠ DEAD ROUTE 2026-08-19: DO NOT DELEGATE THIS TO `hopD-cap`.  The
 -- attempt is near-irresistible and it is refuted by rows already in the

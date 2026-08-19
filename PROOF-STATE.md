@@ -90,33 +90,39 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   where this has one, so the induction is still to be designed. The Ψ axis is
   closed by PROVEN `caseW-subΘ` + `fnCap-subΘᵉ`; evidence and the hop
   disanalogy in its header.
-- **`input-wet-scripted`** (Walk-Level) — GRINDABLE: takes NO walk face, so
+- **`input-wet-scripted-four`** (Walk-Level) — GRINDABLE: takes NO walk face, so
   nothing recurses and no induction has to be designed. Its header carries a
-  full census — four slot shapes × the wet five against the PROVEN
+  full census — four slot shapes × the wet four against the PROVEN
   clause-for-clause twin `subscribeE-input-caps` — naming a proven ingredient
-  for every conjunct, with one 5-line gap (`register-regsLen`) written out and
-  dev-checked green. The routes marked "by computation" are read off the
-  evaluator, not yet typechecked.
+  for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
+  real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
+  marked "by computation" are read off the evaluator, not yet typechecked.
 - **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
   the amplifier-chain region and measures the margin widening. Route and
   coverage in its header, and with them a DEAD ROUTE that costs nothing to
   read and a day to rediscover — delegating to PROVEN `hopD-cap` at
   `η := slotHop V sl` is refuted by series S's own depth-2 row, exactly
   tight at depth 1.
-- **`walk-scan`** (Walk-Level) — DIFFICULTY, but down to ONE question that is
-  not about scan: its header now derives the accumulator invariant, and the
-  induction closes at exactly the base `hopDᵉ`'s scan clause already carries,
-  over PROVEN `hopD-applyFn`. What is left is whether the application count
-  is capped by the store bound — a burstCount?/width-cap question. Answer
-  that and the row is an assembly.
+- **`walk-scan`** (Walk-Level) — SHAPE, promoted from DIFFICULTY: the fold half
+  is settled (its header derives the accumulator invariant, closing at exactly
+  the base `hopDᵉ`'s scan clause carries, over PROVEN `hopD-applyFn`), and the
+  one remaining question `k ≤ V` is REFUTED from this face's hypotheses —
+  `scan-count-under-ceiling-absurd` (Refuted.Caps-Face). The count is bounded
+  only by a WIDTH squared and `V = Ŝ` only from below by a SIZE, and the two
+  axes diverge because a level step exponentiates the width and merely scales
+  the size. A restatement is therefore guaranteed: either a width ceiling
+  joins the face beside `ceil`, or `hopDᵉ`'s scan exponent is re-indexed.
+  Header names the trade. Do NOT grind this row. Its FALSITY question — can a
+  real program push more than Ŝ values into one scan node in one subscribe
+  burst — is unprobed and would settle which repair is needed.
 - **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
   order. The family census in their shared header reads every output index
   off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause
   twin `subscribeE-caps`. `walk-empty` has no residue at all; `walk-of` owes
   only a wet twin of PROVEN `evalTms-caps`; `take` is the identity on the
-  hop ledger; `defer` is the second consumer of `register-regsLen`. `map`
-  and `take` additionally need their own push face — a frame-generic one is
-  REFUTED, per the DEAD ROUTE their header points at.
+  hop ledger. `map` and `take` additionally need their own push face — a frame-generic one is
+  REFUTED, per the DEAD ROUTE their header points at. `defer` is now the leaf
+  `walk-defer-eight` at `WalkStmt⁻`, its regsLen? conjunct already proven.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the repaired
   statement; its header names a proven source for every remaining conjunct, one
   of which (`regsB?-of-parts`) sits downstream and must relocate or inline.
