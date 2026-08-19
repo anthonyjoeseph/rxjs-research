@@ -375,6 +375,19 @@ T-to refl = tt
 T⇒≡true : ∀ b → T b → b ≡ true
 T⇒≡true true _ = refl
 
+-- generic: two pointwise `all`s zip into an `all` of their combined
+-- predicate — the two-hypothesis sibling of all-impl below.  It LIVED in
+-- Caps-Bridge until 2026-08-19, when .Hop-Spine-Face needed it from below
+-- and `make dup-check` caught the second copy; moved down here, which is
+-- the lowest module reaching both.
+all-zip : ∀ {A : Set} (P Q R : A → Bool) →
+  (∀ x → P x ≡ true → Q x ≡ true → R x ≡ true) →
+  ∀ (xs : List A) → all P xs ≡ true → all Q xs ≡ true → all R xs ≡ true
+all-zip P Q R imp []       hp hq = refl
+all-zip P Q R imp (x ∷ xs) hp hq
+  with ∧-true (P x) (all P xs) hp | ∧-true (Q x) (all Q xs) hq
+... | (px , pxs) | (qx , qxs) = ∧-intro (imp x px qx) (all-zip P Q R imp xs pxs qxs)
+
 -- generic: a pointwise implication lifts through all
 all-impl : ∀ {A : Set} (p q : A → Bool) →
   (∀ x → p x ≡ true → q x ≡ true) →

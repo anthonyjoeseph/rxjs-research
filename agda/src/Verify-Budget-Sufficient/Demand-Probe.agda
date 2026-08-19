@@ -37,6 +37,7 @@ open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?;
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep;
                                  iterSize-infl)
 open import Verify-Budget-Sufficient.Walk-Level using (WalkStmt)
+open import Verify-Budget-Sufficient.Hop-Spine-Face using (valHopSpn?)
 
 ----------------------------------------------------------------------
 -- Context and slots: empty (no inputs)
@@ -1790,3 +1791,50 @@ _ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) Uʸ (accʸ 1) ≡ 2
 _ = λ _ → refl
 _ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) Uʸ (accʸ 2) ≡ 6
 _ = λ _ → refl
+
+----------------------------------------------------------------------
+-- SERIES Ω — DOES THE HEREDITARY INVARIANT ACTUALLY SURVIVE THE FOLD?
+--
+-- `walk-scan-hop-spn` (.Walk-Level) concludes at `burstHopSpnH?`, whose
+-- value predicate `valHopSpn? V η P B` recurses through pairs and sums
+-- and asks, at each `obs` leaf, `hopDᵉ e ≤ (2 + P) ^ spnᵉ e * B`.  The
+-- fold is supposed to PRESERVE that.  Nothing has checked it, and
+-- `valHopSpn?` computes, so this does.
+--
+-- ⚠ DEGENERATE, AND THE REASON IS THE FINDING.  These rows are GREEN and
+-- they COULD NOT HAVE FAILED, which is worth more than a receipt would
+-- have been.  The step is series Y's `fʸ` — the AMPLIFYING one, `pmᵗ V 0
+-- fʸ ≡ 2`, reached by plugging the accumulator into a `mapᵉ` SOURCE,
+-- which is the one clause of hopDᵉ that multiplies — so this is the
+-- sharpest shape in the file, and the invariant still clears it by
+-- orders of magnitude: depth runs 0 ↦ 2 ↦ 6 ↦ 14 while the bound runs
+-- 4 ^ spnᵉ * 2, and one step adds ~2 to the spine.
+--
+-- SO THE SLACK IS STRUCTURAL, NOT AN ARTEFACT OF SMALL k.  Per step the
+-- depth multiplies by P while the bound multiplies by (2 + P) ^ Δspine,
+-- and Δspine ≥ 1 whenever the accumulator is plugged at all — that is
+-- the drag, restated on the spine, where it is TRUE (on `sizeᵛ` it is
+-- refuted: Refuted.Hop-Drag).  Nor can an adversary buy a bigger P
+-- cheaply: `pm-sizeᵗ` (.Measures, PROVEN) bounds `pmᵗ V k tm` by the
+-- template's own size, and template size is exactly what the step's
+-- spine contribution charges for.  A bigger multiplier costs spine in
+-- the same breath it buys depth.
+--
+-- WHAT WOULD MAKE A ROW FAIL: a step that multiplies the accumulator's
+-- depth while contributing ZERO to the result's spine.  No such step is
+-- constructible — the plug has to sit under a `mapᵉ` source, and that
+-- node is counted.  This is why the residue on `walk-scan-hop-spn` is
+-- PROOF LABOUR rather than a truth question, and it is what retires the
+-- header's earlier instruction to probe the caseᵗ clause: a caseᵗ probe
+-- would be degenerate for the same reason.
+_ : ∀ (V : ℕ) → hopDᵗ V (λ _ → 0) fʸ ≡ 2
+_ = λ _ → refl
+
+_ : valHopSpn? 4 (λ _ → 0) 2 2 Uʸ (accʸ 0) ≡ true
+_ = refl
+_ : valHopSpn? 4 (λ _ → 0) 2 2 Uʸ (accʸ 1) ≡ true
+_ = refl
+_ : valHopSpn? 4 (λ _ → 0) 2 2 Uʸ (accʸ 2) ≡ true
+_ = refl
+_ : valHopSpn? 4 (λ _ → 0) 2 2 Uʸ (accʸ 3) ≡ true
+_ = refl

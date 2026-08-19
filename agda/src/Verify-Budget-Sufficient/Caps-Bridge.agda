@@ -720,16 +720,6 @@ pathB?-of-parts (f ↠ p) {B} {Ψ} hsz hΨ
 ... | _ , hp with ∧-true (frameBΨ? Ψ f) (pathBΨ? Ψ p) hΨ
 ... | hfΨ , hpΨ = ∧-intro (frameB?-of-parts f hf hfΨ) (pathB?-of-parts p hp hpΨ)
 
--- generic: two pointwise `all`s zip into an `all` of their combined
--- predicate — the two-hypothesis sibling of Measures.agda's all-impl
-all-zip : ∀ {A : Set} (P Q R : A → Bool) →
-  (∀ x → P x ≡ true → Q x ≡ true → R x ≡ true) →
-  ∀ (xs : List A) → all P xs ≡ true → all Q xs ≡ true → all R xs ≡ true
-all-zip P Q R imp []       hp hq = refl
-all-zip P Q R imp (x ∷ xs) hp hq
-  with ∧-true (P x) (all P xs) hp | ∧-true (Q x) (all Q xs) hq
-... | (px , pxs) | (qx , qxs) = ∧-intro (imp x px qx) (all-zip P Q R imp xs pxs qxs)
-
 regsB?-of-parts : ∀ {n} {Γ : Ctx n} {t}
   (rs : List (RegId × Source × Chain Γ t)) {B Ψ : ℕ} →
   regsSz? B rs ≡ true → regsBΨ? Ψ rs ≡ true → regsB? B Ψ rs ≡ true

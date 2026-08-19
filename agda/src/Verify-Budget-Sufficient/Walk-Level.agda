@@ -166,6 +166,8 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          burstCount?-widen; burstCount?-tail;
          thruWrap-vals; splitBurst-len; mul-fits; valsIn; valsLen;
          lenWiden; frameStep-+suc; concat-fits)
+open import Verify-Budget-Sufficient.Hop-Spine-Face
+  using (burstHopSpn?; burstHopSpn-cap; burstHopSpnH?; burstHopSpnH-headline)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner;
          depthConsume; depthWalk; depthSlot; depthConn)
@@ -353,16 +355,26 @@ WalkStmt⁻ {n} {Γ} {t} {e} {u} b =
 --     the same delegation theirs is.
 --
 -- So the split is not scan-specific plumbing: it is where the family's
--- one real difference lives, and `walk-join` below is the assembly that
--- puts a clause back together from the two halves.
+-- one real difference lives, and `walk-scan` below is the assembly that
+-- puts scan's clause back together from the two halves.
 ------------------------------------------------------------------
 
--- THE HOP CONJUNCT ALONE, at WalkTail's hypothesis list verbatim (the
--- store bound it spends is `INV?` + `ceil` + `F ≡ Ŝ`, so it needs the
--- telescope; read WalkTail's comments, they are not repeated).
-WalkTailᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
-  Gas → Closed Γ u → Caps → (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) → Set
-WalkTailᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
+-- THE HOP CONJUNCT AT THE FOLD'S OWN EXPONENT — scan only.
+--
+-- `WalkTailᴴ` asks the burst to sit under ONE number, and for a scan
+-- frame that number carries the exponent `F` outright.  Reaching it in
+-- one step forces the fold to carry `F` in the exponent from the start,
+-- which `Refuted.Hop-Drag` refutes: a step can DEEPEN the accumulator
+-- while shrinking its `sizeᵛ`.  So the leaf concludes at each emitted
+-- value's OWN SPINE — `spnᵛ`, size along the hop-deepest path, which
+-- that step does not decrease — and `walk-scan` below raises the
+-- exponent to `F` once, by `spn≤sizeᵛ` against the size receipt the
+-- other half already proves.  Everything else is `WalkTailᴴ` verbatim
+-- at `b := scanᵉ f z b`.
+WalkTailᴴˢ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} →
+  Gas → Fn Γ [] [] [] (u ×ᵗ s) u → Tm Γ [] [] [] u → Closed Γ s →
+  Caps → (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) → Set
+WalkTailᴴˢ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
   ∀ (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
     2 ≤ Caps.cSize c →
@@ -372,15 +384,15 @@ WalkTailᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
     slotsSize sl ≤ Caps.cSize c →
     capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-    dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
+    sizeᵉ (scanᵉ f z b) ≤ Caps.cSize (frameStep j c) →
+    dWᵉ n sl (scanᵉ f z b) ≤ Caps.cWid (frameStep j c) →
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    nest b sl (EvalSt.connectedShares st) ≤ bud →
-    suc (sizeᵉ b) ≤ ops →
-    depthE g b κ bid now sched st ≤ dep →
+    nest (scanᵉ f z b) sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ (scanᵉ f z b)) ≤ ops →
+    depthE g (scanᵉ f z b) κ bid now sched st ≤ dep →
     INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-    fnCapᵉ b ≤ Ψ →
+    fnCapᵉ (scanᵉ f z b) ≤ Ψ →
     pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
     2 ≤ Ŝ →
     F ≡ Ŝ →
@@ -388,17 +400,21 @@ WalkTailᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     Caps.cSize (frameStep L̂ c) ≤ Ŝ →
     opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
     dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
-           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+           (hopDᵉ F (slotHop F sl) (scanᵉ f z b))
+           (syncSizeᵉ (scanᵉ f z b)) ≤ G →
     g hasAtLeast suc G →
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
-    burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
-               (proj₁ (subscribeE g b κ bid now sched st)) ≡ true
+    burstHopSpnH? F (slotHop F sl) (pmᵗ F 0 f)
+      (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
+         + hopDᵉ F (slotHop F sl) b)
+      (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st)) ≡ true
 
-WalkStmtᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
-WalkStmtᴴ {n} {Γ} {t} {e} {u} b =
+WalkStmtᴴˢ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} →
+  Fn Γ [] [] [] (u ×ᵗ s) u → Tm Γ [] [] [] u → Closed Γ s → Set
+WalkStmtᴴˢ {n} {Γ} {t} {e} {s} {u} f z b =
   ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
-  WalkTailᴴ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
+  WalkTailᴴˢ {e = e} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
 -- WalkStmt WITH THE burstHopD? CONJUNCT REMOVED — the other eight.
 WalkTail⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
@@ -445,30 +461,16 @@ WalkTail⁻ᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
        × (hasDry (proj₁ r) ≡ false)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
+-- RECOVERY: `git show 62fb817` restores `WalkTailᴴ`/`WalkStmtᴴ` (the hop
+-- conjunct at WalkTail's telescope, bounded by ONE number) and `walk-join`
+-- (the generic re-association of the two halves).  They were scan's assembly
+-- until the hop half moved to the SPINE exponent, which is scan-specific;
+-- another chain clause needing the SAME split at a single bound would want
+-- them back verbatim.
 WalkStmt⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
 WalkStmt⁻ᴴ {n} {Γ} {t} {e} {u} b =
   ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
   WalkTail⁻ᴴ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
-
--- PUTTING A CLAUSE BACK TOGETHER.  Both halves are handed the same
--- hypotheses, and the hop conjunct is j′-free, so the assembly is a
--- re-association and nothing more.  It is written once because every
--- chain clause splits the same way.
-walk-join : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} (b : Closed Γ u) →
-  WalkStmt⁻ᴴ {e = e} b → WalkStmtᴴ {e = e} b → WalkStmt {e = e} b
-walk-join b h⁻ hᴴ c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
-  let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
-        h⁻ c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-          2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs
-  in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆
-   , hᴴ c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-       2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-       s2 fS rS ceil lb dmd gas lℓ rgs
-   , a₇ , a₈
-
 
 WalkLevel : Set
 WalkLevel = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1147,8 +1149,8 @@ postulate
   -- growth is geometric, not that k exceeds V.
   --
   -- ═══ THE ROW IS SPLIT (2026-08-19), AND ONLY THE HOP HALF IS HARD ═══
-  -- `walk-scan` is now a real body (below, over `walk-join`) pairing the
-  -- two leaves that follow.  Everything above this line is about the hop
+  -- `walk-scan` is now a real body (below) pairing the two leaves that
+  -- follow.  Everything above this line is about the hop
   -- half ALONE; the other eight conjuncts never see the fold's arithmetic.
   --
   -- the eight — GRINDABLE, and it is walk-map's census verbatim at this
@@ -1227,55 +1229,124 @@ postulate
   -- accumulator's INITIAL size, which the store invariant caps at V.  What
   -- is refuted is the per-step reading, not the bound.
   --
-  -- ═══ THE ROUTE THE REFUTATION LEAVES ═══
+  -- ═══ THE ROUTE THE REFUTATION LEAVES — TAKEN, AND HALF LANDED ═══
   -- The exponent has to be a quantity the fold cannot DECREASE, and
-  -- `sizeᵛ accᵢ` is not one.  What the refutation's step actually discards
-  -- is a sibling that was never carrying the depth — the deep component
-  -- goes on being copied, and its own size goes on growing.  So the
-  -- exponent wants a SPINE MEASURE: the size of the hop-deepest path
-  -- through the value rather than the size of the whole value.  On the
-  -- refutation's own run the spine is monotone across every step,
-  -- including the one that drops 27 units of total size, and the drag
-  -- argument restated on it is the true one — a step that deepens the
-  -- accumulator must copy the SPINE, siblings being exactly what it may
-  -- discard.  `spine w ≤ sizeᵛ w ≤ V` then re-enters the store bound
-  -- unchanged.
+  -- `sizeᵛ accᵢ` is not one.  What the refuting step discards is a
+  -- sibling that was never carrying the depth; the deep component goes
+  -- on being copied.  So the exponent is the SPINE — size along the
+  -- hop-deepest path — and `Rx.Hop-Spine` defines it as `sizeᵉ/sizeᵗ/
+  -- sizeᵛ` with `⊔` at exactly hopD's branch positions (pairs, sums,
+  -- `ofᵉ` lists, caseᵗ/ifᵗ branches).  On the refutation's own run the
+  -- spine is 4 ↦ 7 ↦ 10 ↦ 13, strictly monotone across the very step
+  -- that drops 27 units of total size; pinned there beside it.
+  --
+  -- WHAT IS ALREADY PROVEN, and it is why this leaf is stated at the
+  -- spine rather than at F:
+  --   · `spn≤sizeᵛ` (Rx.Hop-Spine) — every ⊔ sits where size has a `+`,
+  --     so the store bound caps the spine too and no second cap is
+  --     needed anywhere downstream;
+  --   · `burstHopSpn-cap` (.Hop-Spine-Face) — the conversion, and
+  --     `walk-scan` below is a real body spending it: it takes this
+  --     leaf's spine-indexed burst, takes `walk-scan-rest`'s `burstB?`
+  --     size receipt at `frameStep (j + j′) c`, puts that frame under Ŝ
+  --     (a₄ then `lb` then `frameStep-mono-j` then `ceil`), and raises
+  --     the exponent to F once.  `hopDᵉ F η (scanᵉ f z b)` is
+  --     definitionally `(2 + pmᵗ F 0 f) ^ F * (…)`, so the conclusion
+  --     lands with no arithmetic at the boundary.
+  --
+  -- SO THE RESIDUE IS THE FOLD AT THE SPINE EXPONENT, and nothing else.
+  -- Two twins govern it, both PROVEN and both at this exact shape:
+  --   · `scanVals-size` (.Caps-Face/Part5) — the SAME fold over the SAME
+  --     list, threading a growing bound through `applyFn`; its clause
+  --     structure is what this leaf's induction copies;
+  --   · `hopD-evalWith` (.Measures) — the per-step substitution, whose
+  --     TIGHT form (before `hopD-applyFn` loosens the coefficient to
+  --     `pmᵗ V 0 f ⊔ 1`) already settles the degenerate half for free:
+  --     at `pmᵗ V 0 f ≡ 0` it gives `hopDᵛ (applyFn f v) ≤ hopDᵗ f ≤ B`
+  --     outright, so the arithmetic is only ever asked at `≥ 1`.
+  --
+  -- THE INVARIANT IS HEREDITARY, AND THAT DECISION IS LANDED (2026-08-19).
+  -- This leaf now concludes at `burstHopSpnH?` (.Hop-Spine-Face), whose
+  -- value predicate `valHopSpn?` recurses through pairs and sums and
+  -- bottoms out at `obs` with the headline inequality.  Headline-only
+  -- does not survive `fstᵗ`: projecting a pair yields a component whose
+  -- SPINE is smaller than the pair's (spnᵛ takes `⊔` and adds one) while
+  -- its DEPTH may be the pair's whole depth, and `evalWith` projects.
+  -- `valHopSpn?-hopD` (PROVEN) recovers the headline, and `walk-scan`
+  -- spends it through `burstHopSpnH-headline`, so the extra structure is
+  -- free at the consumer.
+  --
+  -- IT STOPS AT `obs`, which is the substantive half of the decision:
+  -- `Tm` HAS NO ELIMINATOR FOR `obs`.  The only eliminating term formers
+  -- are `fstᵗ`, `sndᵗ` and `caseᵗ` — pairs and sums and nothing else —
+  -- so those are exactly the positions where a bound can be projected
+  -- away, and exactly the positions the recursion covers.  Streams are
+  -- only ever BUILT, and a builder needs its argument's headline bound,
+  -- not its interior.  Recursing into the expression would be a second
+  -- structural induction and a second predicate to preserve, for nothing.
+  --
+  -- WHAT IS LEFT, all three with named PROVEN twins:
+  --   · the fold — `scanVals` preserves `valHopSpn?`; twin
+  --     `scanVals-size` (.Caps-Face/Part5), the same fold over the same
+  --     list, whose clause structure this copies;
+  --   · the step — `valHopSpn?` preserved by `evalWith` under an
+  --     env-wise hypothesis; twins `hopD-evalWith` (.Measures, the same
+  --     induction over Tm) and `evalWith-iterSize` (.Caps-Face/Part1,
+  --     which already carries an env predicate, `EnvSize`, in the shape
+  --     the env-wise hypothesis needs);
+  --   · the evaluator connection — subscribeE's scan clause emits the
+  --     fold's accumulators; the same job `walk-map` does for mapᵉ.
+  --
+  -- THE RESIDUE IS PROOF LABOUR, NOT A TRUTH QUESTION (Demand-Probe
+  -- series Ω, 2026-08-19).  Those rows are DEGENERATE and that is the
+  -- finding: run at the AMPLIFYING step (`pmᵗ V 0 fʸ ≡ 2`, the
+  -- accumulator plugged into a `mapᵉ` source, the one clause of hopDᵉ
+  -- that multiplies) the invariant clears by orders of magnitude, and it
+  -- could not have done otherwise.  Per step the depth multiplies by P
+  -- while the bound multiplies by `(2 + P) ^ Δspine`, and Δspine ≥ 1
+  -- whenever the accumulator is plugged at all — the drag, restated on
+  -- the spine, where it is TRUE.  Nor is a bigger P cheap: `pm-sizeᵗ`
+  -- (.Measures, PROVEN) bounds the multiplier by the template's own
+  -- size, and template size is what the step's spine contribution
+  -- charges for.  A step that multiplies the depth at ZERO spine cost
+  -- would refute this, and none is constructible — the plug must sit
+  -- under a `mapᵉ` source and that node is counted.
+  --
+  -- STILL DIFFICULTY, and the one open bookkeeping question is `caseᵗ`.
+  -- Its branch is evaluated under an EXTENDED env, so the step lemma has
+  -- to bound the branch's own plug slope, and the parent's `pmᵗ V j
+  -- (caseᵗ s l r)` does NOT see `pmᵗ V 0 l` when the scrutinee is closed
+  -- (`pmᵗ V j s ≡ 0` makes the coefficient's summand vanish).  `hopDᵗ`
+  -- does see it — `(pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * hopDᵗ s` — so it should
+  -- close through the depth side rather than the slope side.  Do NOT
+  -- probe that: a caseᵗ probe is degenerate for the same reason series Ω
+  -- is, so the only way to settle it is to write the clause.
   --
   -- ✗ DEAD ROUTE 2026-08-19 — A VALUE-LOCAL BOUND BASED ON `fnCapᵛ`.
-  -- Recorded because it is the obvious repair and it is one instantiation
-  -- from being checkable: a sharper twin of `hopD-sizeᵗ`/`pm-sizeᵗ`
-  -- (.Measures, both PROVEN, both landing at the global `szB V (sizeᵗ
-  -- tm)`) reading `hopDᵛ w ≤ (2 + fnCapᵛ w) ^ sizeᵛ w * <leaf depth>`,
-  -- with the fold then carrying only ⊔-shaped quantities — immune to the
-  -- shrink, and `map-Ψ` (.Burst-Walk, PROVEN) is already that step for
-  -- `caseWᵗ ⊔ fnCapᵗ` under `applyFn`.  DEAD because the base comes out
-  -- wrong by an unbounded margin: the conjunct is measured against `pmᵗ V
-  -- 0 f`, a SLOPE, and fnCap is a CAP.  Take `f = pairᵗ (fstᵗ var) (strmᵗ
-  -- (mapᵉ g (ofᵉ (nat̂ 0 ∷ []))))` with `g` carrying a large `caseWᵗ`: the
-  -- second component ignores the argument, so `pmᵗ V 0 f = 1`, while
-  -- `fnCapᵛ accᵢ ≥ caseWᵗ g` without bound.  No choice of leaf depth
-  -- repairs a base that is already too big.
-  --
-  -- The degenerate direction is settled and costs nothing: at `pmᵗ V 0 f
-  -- ≡ 0`, `hopD-evalWith`'s TIGHT form (its weighted sum, before
-  -- `hopD-applyFn` loosens the coefficient to `pmᵗ V 0 f ⊔ 1`) gives
-  -- `hopDᵛ (applyFn f v) ≤ hopDᵗ f ≤ B` outright, with no induction at
-  -- all.  So the fold's arithmetic is only ever asked at `pmᵗ V 0 f ≥ 1`.
-  --
-  -- WHY THE ROW IS STILL DIFFICULTY: the spine measure does not exist,
-  -- and `hopDᵛ` combines a pair by `⊔`, so defining one means picking the
-  -- branch that achieved the max — an argmax, not a fold.  Choosing that
-  -- definition is the design decision, and inventing it wrong is worse
-  -- than naming it.
+  -- Recorded because it is the obvious repair and it is one
+  -- instantiation from being checkable: a sharper twin of
+  -- `hopD-sizeᵗ`/`pm-sizeᵗ` (.Measures, both PROVEN, both landing at the
+  -- global `szB V (sizeᵗ tm)`) reading `hopDᵛ w ≤ (2 + fnCapᵛ w) ^
+  -- sizeᵛ w * <leaf depth>`, with the fold then carrying only ⊔-shaped
+  -- quantities — immune to the shrink, and `map-Ψ` (.Burst-Walk,
+  -- PROVEN) is already that step for `caseWᵗ ⊔ fnCapᵗ` under `applyFn`.
+  -- DEAD because the base comes out wrong by an unbounded margin: the
+  -- conjunct is measured against `pmᵗ V 0 f`, a SLOPE, and fnCap is a
+  -- CAP.  Take `f = pairᵗ (fstᵗ var) (strmᵗ (mapᵉ g (ofᵉ (nat̂ 0 ∷ []))))`
+  -- with `g` carrying a large `caseWᵗ`: the second component ignores the
+  -- argument, so `pmᵗ V 0 f = 1`, while `fnCapᵛ accᵢ ≥ caseWᵗ g` without
+  -- bound.  No choice of leaf depth repairs a base already too big, and
+  -- the same objection kills every measure of the VALUE ALONE — which is
+  -- why the spine is spent inside the fold rather than instead of it.
   --
   -- THE ADDITIVE CORNER IS NOT A SEPARATE CASE, correcting the P-split
-  -- above: at P = 1 the recurrence is Aᵢ₊₁ ≤ B + Aᵢ and the invariant asks
-  -- `1 + 2^s ≤ 2^(suc s)` — the same split, the same failing arm.  It is
-  -- "comfortably true" only AFTER the size-preserving step is discharged,
-  -- so it buys no separate route.
-  walk-scan-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  -- above: at P = 1 the recurrence is Aᵢ₊₁ ≤ B + Aᵢ and the invariant
+  -- asks `1 + 2^s ≤ 2^(suc s)` — the same split, the same failing arm.
+  -- It is "comfortably true" only AFTER the size-preserving step is
+  -- discharged, so it buys no separate route.
+  walk-scan-hop-spn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-    (b : Closed Γ s) → WalkStmtᴴ {e = e} (scanᵉ f z b)
+    (b : Closed Γ s) → WalkStmtᴴˢ {e = e} f z b
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)
   -- registration + parked body — GRINDABLE.  The clause that MINTS a
   -- registry entry, so regsLen?'s growth is paid here, and it is the
@@ -2022,8 +2093,35 @@ walk-defer body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
   (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
-walk-scan f z b =
-  walk-join (scanᵉ f z b) (walk-scan-rest f z b) (walk-scan-hop f z b)
+walk-scan f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
+        walk-scan-rest f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+          2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+          s2 fS rS ceil lb dmd gas lℓ rgs
+      -- the frame the burst's SIZE receipt is stated at sits under Ŝ:
+      -- a₄ puts j + j′ under opIterD, `lb` puts that under L̂, and
+      -- frameStep is monotone in its index, so `ceil` closes it
+      Bsz≤F : Caps.cSize (frameStep (j + j′) c) ≤ F
+      Bsz≤F = subst (Caps.cSize (frameStep (j + j′) c) ≤_) (sym fS)
+                (≤-trans (proj₁ (frameStep-mono-j c 2≤S (≤-trans a₄ lb))) ceil)
+  in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆
+   , burstHopSpn-cap F Ψ (2 + pmᵗ F 0 f)
+       (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
+          + hopDᵉ F (slotHop F sl) b)
+       (Caps.cSize (frameStep (j + j′) c)) (slotHop F sl)
+       (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st))
+       (s≤s z≤n) Bsz≤F a₆
+       (burstHopSpnH-headline F (pmᵗ F 0 f)
+          (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
+             + hopDᵉ F (slotHop F sl) b)
+          (slotHop F sl)
+          (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st))
+          (walk-scan-hop-spn f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+             2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+             s2 fS rS ceil lb dmd gas lℓ rgs))
+   , a₇ , a₈
 
 switchKill-closes-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →

@@ -31,8 +31,16 @@
 -- The first step SHRINKS the accumulator by 27 and DEEPENS it — so the
 -- statement below, the size-preserving arm's whole content, is false.
 --
--- WHAT SURVIVES, and it is why the theorem is not in doubt: the refund is
--- ONE-SHOT.  The sibling slot is spent by the step that discards it, and
+-- THE REPAIR, and it is machine-checked below: `spnᵛ` (Rx.Hop-Spine) is
+-- size along the HOP-DEEPEST PATH — sizeᵛ with `⊔` at exactly hopD's
+-- branch positions.  The sibling this step discards was never on that
+-- path, so the spine runs 4 ↦ 7 ↦ 10 ↦ 13, strictly monotone across the
+-- very step that drops 27 units of total size, and `spn≤sizeᵛ` keeps it
+-- under the store bound.  `walk-scan` (.Walk-Level) is a real body
+-- spending exactly that.
+--
+-- WHAT SURVIVES, and it is why the theorem was never in doubt: the refund
+-- is ONE-SHOT.  The sibling slot is spent by the step that discards it, and
 -- from there the deep chain can only grow — a flat +4 of size per +1 of
 -- depth.  So the pool a shrinking step draws on is bounded by the
 -- accumulator's INITIAL size, which the store invariant caps at V.  The
@@ -58,6 +66,7 @@ open import Rx.Exp using (Ty; Ctx; natᵗ; obs; _×ᵗ_; _+ᵗ_;
                           strmᵗ; fstᵗ; varᵗ; nat̂; inlᵗ; caseᵗ; pairᵗ;
                           sizeᵛ; Tm; Fn; Val; applyFn)
 open import Rx.Hop-Depth using (hopDᵗ; hopDᵛ)
+open import Rx.Hop-Spine using (spnᵛ)
 
 Γᶻ : Ctx 0
 Γᶻ = []ⱽ
@@ -128,6 +137,22 @@ _ : sizeᵛ Uᶻ (accᶻ 3) ≡ 17
 _ = refl
 _ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) Uᶻ (accᶻ 3) ≡ 4
 _ = λ _ → refl
+
+-- AND THE MEASURE THAT SURVIVES IT.  `spnᵛ` (Rx.Hop-Spine) is sizeᵛ
+-- with `⊔` at exactly hopD's branch positions — size along the
+-- hop-deepest path.  The sibling this step discards was never on that
+-- path, so the spine is MONOTONE across the very step that drops 27
+-- units of total size, and stays under it throughout.  LOAD-BEARING:
+-- a non-increase in the first of these rows would refute the repair
+-- exactly as the size rows refute the original.
+_ : spnᵛ Uᶻ (accᶻ 0) ≡ 4
+_ = refl
+_ : spnᵛ Uᶻ (accᶻ 1) ≡ 7
+_ = refl
+_ : spnᵛ Uᶻ (accᶻ 2) ≡ 10
+_ = refl
+_ : spnᵛ Uᶻ (accᶻ 3) ≡ 13
+_ = refl
 
 hop-drag-absurd : NoDeepenWithoutGrowth → ⊥
 hop-drag-absurd h with h 0 (λ _ → 0) fᶻ (accᶻ 0) 0 (≤ᵇ⇒≤ 9 36 tt)
