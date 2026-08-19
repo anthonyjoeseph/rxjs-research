@@ -1450,6 +1450,41 @@ slotDef-size sl i {d} eq =
 -- ROUTE, and the probe hands it over: bound the compound by
 -- (2+V)^(O(V²)) by induction over the telescope, then spend
 -- V² ≤ (1+V)^(1+V) and ^-monotonicity in base and exponent.
+--
+-- ⚠ DEAD ROUTE 2026-08-19: DO NOT DELEGATE THIS TO `hopD-cap`.  The
+-- attempt is near-irresistible and it is refuted by rows already in the
+-- repo, so it is worth the space.  `hopD-cap` (two definitions above,
+-- PROVEN) concludes `hopDᵉ V η e ≤ hopR V` for a GENERAL η — literally
+-- this statement's conclusion — so slotHop-cap looks like `hopD-cap`
+-- applied at `η := slotHop V sl`, leaving one residue:
+--
+--     ∀ i → slotHop V sl i ≤ szB V 1            -- hopD-cap's η premise
+--
+-- THAT RESIDUE IS FALSE.  `szB V 1 = 3 ^ (suc V)`, and Demand-Probe's
+-- series S measures the left side directly: its targets are `input i`,
+-- and `hopDᵉ V η (input i) = η i` definitionally, so those rows ARE
+-- slotHop at the top slot.
+--   · depth 1 (Vˢ = 16): slotHop = 129140163 = 3^17 = szB 16 1 EXACTLY.
+--     Equality — the premise holds with zero slack.
+--   · depth 2 (Vᵗ = 30): slotHop = 127173474825649022325147488901 ≈
+--     1.27e29, against szB 30 1 = 3^31 ≈ 6.18e14.  Over by fourteen
+--     orders of magnitude.
+-- One amplifier link saturates the premise and the second blows it.
+--
+-- WHY IT FAILS, structurally, so the shape is not re-attempted with a
+-- cleverer η: szB V 1 is exponential in V and a staged telescope's
+-- compound is exponential in V², so no per-index bound of szB-order can
+-- survive two links.  hopD-cap's premise is calibrated for an η that
+-- reads STORED sizes, not one that telescopes through amplifying slots.
+-- The cap itself survives because hopR is exponential in V^V — the
+-- margin is real, but it lives at hopR, and routing through szB V 1
+-- throws it away before the comparison happens.
+--
+-- This is also why the header's own route does NOT factor through a
+-- per-index bound: it goes to hopR directly.  And it is a clean instance
+-- of the near-degenerate trap — the route is not merely true-at-depth-1,
+-- it is EXACTLY TIGHT there, which is the most convincing way for a
+-- refutable premise to look proven.
 postulate
   slotHop-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V : ℕ) (sl : Slots Γ) →
     2 ≤ V → slotsSize sl ≤ V →

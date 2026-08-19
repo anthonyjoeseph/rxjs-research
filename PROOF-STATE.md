@@ -99,7 +99,10 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   evaluator, not yet typechecked.
 - **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
   the amplifier-chain region and measures the margin widening. Route and
-  coverage in its header.
+  coverage in its header, and with them a DEAD ROUTE that costs nothing to
+  read and a day to rediscover — delegating to PROVEN `hopD-cap` at
+  `η := slotHop V sl` is refuted by series S's own depth-2 row, exactly
+  tight at depth 1.
 - **`walk-scan`** (Walk-Level) — DIFFICULTY, and the only walk clause still
   carrying a decision: map's emitted value is a function of one source value
   and PROVEN `hopD-map-emit` bounds it, scan's is a function of the source
