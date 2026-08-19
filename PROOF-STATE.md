@@ -116,14 +116,17 @@ the order attention is OWED, not a bar on running the bottom concurrently.
 Labour, not risk: nothing here can discover a design failure, and an anchor
 failure would move the ground under all of it.
 
-- **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY. The Ψ face of subscribeE;
-  proof sketch in its header, mirror of the proven caps clique.
-- **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY.
-  `depth-conn-storeNest`, `depth-all-bound`, `depth-μ-bound`,
-  `installScan-depth-bound`; each blocker's obstacle and route in its header.
-- **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY. The delivery-side
-  depth bound, twin of the proven root bound; conditioned on `capsOK?`
-  deliberately.
+- **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
+  `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
+  clause-by-clause sketch in its header names no undecided index.
+- **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY, and the
+  module header buckets it BLOCKED: `depth-conn-storeNest`, `depth-all-bound`,
+  `depth-μ-bound`, `installScan-depth-bound`. No worked precedent among them, and
+  `depth-μ-bound`'s size IH is refuted in its own header. Obstacles and routes there.
+- **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
+  twins are proven, but its header rules out repackaging — the delivery machinery
+  sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
+  unconditional form is false.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
@@ -152,7 +155,9 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   `root-caches`, now a real body, split to the merge clause alone. Probed
   non-vacuously in assembled form over all four *All node kinds and the
   take-cut edge. Carries a DEAD ROUTE: merge-cert does not close even its
-  k ≡ 0 case (alive-vs-present), which is why that postulate is gone.
+  k ≡ 0 case (alive-vs-present), which is why that postulate is gone. The
+  blocker it leaves is a MISSING INVARIANT — no dead-but-present from-inner
+  instance survives in the root-exit registry — which the repo does not have.
 - **`subscribeE-{merge,concat,switch,exhaust}All-wf`** (Part3) — SHAPE:
   written against a merge coherence whose statement is still open (the
   merge-cert sketch in Part8's establishment block, no longer a postulate).
@@ -164,41 +169,48 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   6-field invariant validated at exactly one clause.
 - **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
   `foldPath-out`'s two undischarged arms, each the FoldOut readoff only (the
-  run's `S′` and equation come in from `foldPath-wf`). The frame arm wants
-  `stepFrame-wf` enriched to carry FoldOut out; the share arm is the diamond's
-  net-zero owed.
+  run's `S′` and equation come in from the PROVEN `foldPath-wf`). The frame arm
+  wants `stepFrame-wf` enriched to carry FoldOut out; the share arm is the
+  diamond's net-zero owed and additionally waits on `dispatchShare-wf`.
 - **`mid-fold-certs`** (Part11) — DIFFICULTY: one case split on
   `Arrival.isLast a` off `Mid.done-plumbed`; the blueprint's GUARD applies to
   its flip conjunct.
 - **`map-valsLast-push` / `scan-valsLast-push`** (Part3) — SHAPE: each papers
   over a recorded mismatch (the proven sub-lemmas don't return `valsLast?`).
-- **`map-nodry-push`, `scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY,
-  probed non-vacuously (receipts in headers).
-- **`subscribeSharedSlot-wf` / `input-hot-spent-wf` / `input-cold-async-wf`**
-  (Part3) — DIFFICULTY: the input clause's three surviving arms, each stated at
-  its own burst. The first is mutual with `subscribeE-wf` via `sharedConnect`;
-  the other two are register/init balances of a shape proven twice over.
-- **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: a per-clause receipt of a
-  pattern already proven three times over.
-- **`take-nodry-push` / `take-nodeP`** (Part3) — DIFFICULTY: hasDry pushes
-  inward through the take push, and the fresh take node comes back with its
-  budget unspent (the frame above, not the subscription, spends it). Twins of
-  the scan pair, which are the worked shape.
+- **`map-nodry-push`, `scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY:
+  one-line headers, no precedent named and no probe receipt anywhere. Each may
+  well be cheap; nothing on record says so, so audit before grinding.
+- **`input-hot-spent-wf`** (Part3) — GRINDABLE: the PROVEN `oneShotBurst-wf`
+  (.Part2) is the same init/close/complete balance one source-state over, and
+  the header carries the whole argument with nothing left open.
+- **`subscribeSharedSlot-wf`** (Part3) — DIFFICULTY, blocked: `sharedConnect`
+  recurses into `subscribeE`, so this arm cannot close outside the mutual block
+  holding `subscribeE-wf`, two files down.
+- **`input-cold-async-wf`** (Part3) — DIFFICULTY: its one named precedent
+  `initReg-wf` is ruled out in the header — that lemma's emit is `init src ∷ []`
+  while this ships the sync prefix in the same emit.
+- **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: one-line header naming no
+  precedent. Probably cheap; nothing on record backs that, so audit first.
+- **`take-nodry-push` / `take-nodeP`** (Part3) — DIFFICULTY, NOT demotable: each
+  names a scan twin and BOTH scan twins are themselves live postulates, so the
+  precedent is a plan. `-nodry` also needs the `ecEq` that the evaluator's
+  `with evalTm count` demands before the outer side reduces.
 - **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — SHAPE:
   both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the sources the
   conclusions speak about. Restate over the (LAG) ledger; header carries the
   repair and why it was not ground here.
-- **`subscribeE-dying`** (Part8) — DIFFICULTY, low: `subscribeE` never writes
-  `dying` (two writers, neither reachable from it). An induction over its clause
-  set; the route is in its header.
-- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, the `hot-live`
-  field's own cost: `sched-init-hot-live` (base, from
-  `mkHot`), `mintSource-hot-live`, `subscribeE-hot-live`, `cascadeFinish-hot-live`,
-  `sched-next-hot-live`. Each is a schedule-transition fact; routes in their shared
-  header. `cutSched`'s case is already a real body over the proven
-  `liveTypeOK?-sweepLive`, so it is not among them.
-- **`cut-owed`** (Part9) — DIFFICULTY, low: self-contained Owed-table algebra,
-  independent of every blocker; the easiest real proof in the branch.
+- **`subscribeE-dying`** (Part8) — GRINDABLE, large: `subscribeE` never writes
+  `dying` — two writers, neither reachable from it, both named in its header.
+  Nothing undecided; the cost is that the induction covers every clause.
+- **`HotLive`'s preservation leaves** (Part2) — GRINDABLE, all five:
+  `sched-init-hot-live`, `mintSource-hot-live`, `subscribeE-hot-live`,
+  `cascadeFinish-hot-live`, `sched-next-hot-live`. Every header states a
+  slots-untouched / prepend-only route with nothing undecided; `sched-next`'s
+  twin `regTyped?-pop-sched` is PROVEN, and `cutSched-hot-live` (.Part6) is the
+  family's worked body over the PROVEN `liveTypeOK?-sweepLive`.
+- **`cut-owed`** (Part9) — DIFFICULTY: independent of every blocker, but its own
+  header calls the owed-shape obligation "genuinely semantic" and names no
+  precedent, so being unblocked is not the same as being mechanical.
 - **`stepFrame-wf-inner-concat`** (Part9) — DIFFICULTY: concat's drain grows
   the registry; re-establish FoldInv. Independent of merge-cert.
 
@@ -207,16 +219,19 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 The second ledger: claims Main asserts beside the main theorem, off its
 critical path.
 
-- **Vacuous-by-abstraction** — `locality`, `non-interference`,
+- **Vacuous-by-abstraction — VACUITY** — `locality`, `non-interference`,
   `timing-invariance` (Rx/Time-Theorems, over nine postulated abstractions),
   `causality` (postulated `truncateIn`/`emittedBefore`), `μ-guarded` (type
   identical to `μ-unfold`'s), `defer-shift` (⊤ on purpose — the one allowlisted
   honest gap). De-risking these means DEFINING the abstractions — claim
-  authoring that needs Anthony, not a grind.
-- **Real, probed, awaiting proof** — `μ-unfold` (residual risk: a program near
-  the `gs`-level boundary), `fuel-coherent`, `id-inheritance`,
+  authoring that needs Anthony, not a grind. **Not GRINDABLE and never will
+  be**: no precedent can make them mechanical, because nothing is stated yet.
+- **Real, probed, awaiting proof — DIFFICULTY** — `μ-unfold` (residual risk: a
+  program near the `gs`-level boundary), `fuel-coherent`, `id-inheritance`,
   `batch-online` (restated pre-flush over `foldBatch-no-flush`), and the ten
   `readme-*` claims. Probe receipts live in the module headers. A refutation
   of a `readme-*` claim is SPEC-level: surface to Anthony, do not patch.
+  None has been header-audited for a worked precedent, so none is demoted;
+  the audit is worth doing only if this tier is ever reached.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.
