@@ -47,9 +47,12 @@ else lives in the code.
 
 **The tier law and the risk classes are DEFINED IN CLAUDE.md** — tier 0 finishes
 first, then 1, then 2, then 3, strictly; classes worst-first are FALSITY, SHAPE,
-VACUITY, DIFFICULTY. This file only ASSIGNS them. Read that section before
-re-classifying anything: what counts as evidence for lowering a class, and the
-convergence test for whether a spawned FALSITY is progress, both live there.
+VACUITY, DIFFICULTY, GRINDABLE. This file only ASSIGNS them. Read that section
+before re-classifying anything: what counts as evidence for lowering a class, the
+convergence test for whether a spawned FALSITY is progress, and why GRINDABLE is
+the delegation boundary, all live there. A GRINDABLE row must name its worked
+precedent in the postulate's own header — if the hook here cannot point at one,
+the row is DIFFICULTY.
 
 ## The theorem chain (top → leaves)
 
@@ -75,6 +78,12 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
+The three DIFFICULTY rows head the tier and are the design session's own
+work; the GRINDABLE rows below them do NOT block on those three — every
+row in a tier is available to its siblings as a postulate, so the
+mechanical ones can be ground in parallel by a worker. Top-to-bottom is
+the order attention is OWED, not a bar on running the bottom concurrently.
+
 - **`input-wet`** (Walk-Level) — DIFFICULTY: the Ψ axis is closed by PROVEN
   `caseW-subΘ` + `fnCap-subΘᵉ`, the refuted hop conjunct's repair is proven,
   and every conjunct has non-degenerate coverage. The three-clause induction
@@ -85,18 +94,22 @@ named postulate's own header.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.
-- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY: the repaired
-  statement, finding in its header.
-- **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — DIFFICULTY.
+- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the repaired
+  statement; its header names a proven source for every remaining conjunct, one
+  of which (`regsB?-of-parts`) sits downstream and must relocate or inline.
+- **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — GRINDABLE.
   Path-extension and depth-mirror plumbing for the inner call.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
-  (Burst-Walk) — DIFFICULTY, parked. Per-element context for concat's drain:
-  each re-establishes one hypothesis of `subscribeInner-nodry` after the
-  previous element has moved the state.
+  (Burst-Walk) — GRINDABLE. Per-element context for concat's drain: each
+  re-establishes one hypothesis of `subscribeInner-nodry` after the previous
+  element has moved the state, and the shared header names the caps face
+  (`.Subscribe-Face`) as the worked twin at the same indices. `-cl` is the
+  hardest of the six — its opIterD/fLvlD arithmetic is the reason it is a leaf.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-dep` / `-loop`, `thruWalk-nodry-dep`,
-  `VbB-tail`, `switchKill-context`** (Burst-Walk) — DIFFICULTY, parked. The same
-  per-element context on the thru-outer side, plus switchKill's OKB/regP
-  transport. `VbB-tail` carries a phantom `{e}` its statement never mentions.
+  `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE. The same
+  per-element context on the thru-outer side against the same twin, plus
+  switchKill's OKB/regP transport. `VbB-tail` carries a phantom `{e}` its
+  statement never mentions.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 

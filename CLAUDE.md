@@ -659,8 +659,38 @@ them.
 - **VACUITY** — it typechecks and asserts nothing. Worse than DIFFICULTY because it
   reads as discharged. The two live shapes are ⊤-typed postulates and Σ-statements
   upward-closed in their witness; check both before landing anything.
-- **DIFFICULTY** — true and correctly stated; the proof is just hard. The only class
-  that is pure labour, and the only one where grinding is the right response.
+- **DIFFICULTY** — true and correctly stated; the proof is just hard. Labour, but
+  labour with a DESIGN decision still inside it: the shape of the induction, the
+  measure that decreases, the index the statement belongs at. Grinding is the right
+  response, and the deciding is the expensive half.
+- **GRINDABLE** — true, correctly stated, and the shape is ALREADY KNOWN: a proven
+  twin exists whose clauses correspond, or the route is mechanical — transport a
+  hypothesis, widen a bound, re-establish an invariant a sibling face already
+  preserves at the same indices. Nothing remains to decide, only to type. Weakest
+  class: it is the absence of every risk above it, including the design risk that
+  keeps DIFFICULTY expensive.
+
+**GRINDABLE IS THE DELEGATION BOUNDARY — THAT IS WHAT THE CLASS IS FOR.** A
+GRINDABLE row is what a worker (or a cheaper model) should be handed: the expensive
+part, deciding the shape, is already done and written down, so a fresh context can
+execute it without rebuilding the design. A DIFFICULTY row is the design session's
+own work — delegating one pays the fixed context cost to hand over a decision that
+has not been made yet, and it comes back as analysis instead of edits. This is the
+"KEEP DEPTH" rule of the delegation section, stated as a property of the row rather
+than a judgement call at spawn time.
+
+Measured 2026-08-19, and it is why the class exists: a Sonnet-4.6 session discharged
+seven GRINDABLE rows in under four hours (the ledger went 107 → 100, gate green,
+PROOF-STATE updated per commit) and then spent two full context windows on ONE
+DIFFICULTY row, producing a complete proof plan and no code. Same session, same
+rules, same repo — the class of the row predicted the outcome.
+
+**EARNING THE CLASS: NAME THE PRECEDENT.** GRINDABLE is not "feels easy", it is
+"here is the worked instance." The postulate's own header must name the proven twin
+or the mechanical route; absent one, the row is DIFFICULTY. Without this the class
+becomes the place everything nobody wants to think about gets parked, which is the
+one failure mode that would make it worse than not having it. Same evidence rule as
+every class above — see the next paragraph, which governs this demotion too.
 
 **A CLASS IS A PROPERTY OF EVIDENCE, NOT OF CONFIDENCE.** Lowering one requires
 evidence that reached the risky region (below); a named route, a proof sketch, or a
