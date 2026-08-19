@@ -1189,11 +1189,34 @@ postulate
   --   · sᵢ₊₁ ≡ sᵢ — DOES NOT close: it asks `1 + P * (1+P)^s ≤ (1+P)^s`,
   --     false for every P ≥ 1.
   -- So the ENTIRE residue is the SIZE-PRESERVING step, and what is owed
-  -- there is that such a step cannot multiply either: hopD multiplies only
-  -- under a `mapᵉ` source (and `caseᵗ`), and putting the accumulator in
-  -- that position adds a constructor, so a step with P ≥ 2 grows the size.
-  -- That implication is the sharper hopD-applyFn, stated at the case that
-  -- needs it rather than in general.
+  -- there is that such a step cannot multiply either.
+  --
+  -- PROBED 2026-08-19, Demand-Probe SERIES Y — the preserving arm survived
+  -- the best attack available, and the MECHANISM is not the one this header
+  -- first gave.  The reason offered was "hopD multiplies only under a mapᵉ
+  -- source, and putting the accumulator there adds a constructor": worth one
+  -- unit, and a PAIR-typed accumulator can refund a constructor many times
+  -- over, since hopDᵛ combines components by ⊔ while sizeᵛ ADDS them — wrap
+  -- one component, discard a large shallow sibling, collect the difference.
+  -- Series Y runs exactly that step against a sibling of size 32 and the
+  -- refund is never collected: 34 ↦ 51 ↦ 68 monotone while the depth runs
+  -- 0 ↦ 2 ↦ 6.
+  --
+  -- THE REAL REASON IS THE DRAG, and it is much stronger than the one it
+  -- replaces.  An obs-typed output is an EXPRESSION and `subΘ` substitutes
+  -- the reified argument at the variable SYNTACTICALLY — a projection inside
+  -- a `strmᵗ` is not reduced away.  So a step that reads the accumulator in
+  -- order to deepen it copies the WHOLE reified pair into the emitted
+  -- syntax, discarded sibling included, and pays for it.  The contrast row
+  -- pins it: series X's identical wrapper over a seed with nothing to drag
+  -- costs 13, series Y's costs 17.
+  --
+  -- What is owed is therefore that lemma, and only that lemma: a step whose
+  -- output DEEPENS the accumulator mentions it inside a `strmᵗ`, hence
+  -- carries a copy, hence grows the size.  Not reached by the probe and not
+  -- believed to matter: a step reading the accumulator only at evaluated Tm
+  -- position (`fstᵗ (fstᵗ (varᵗ …))`), which shrinks the size and does not
+  -- deepen; and accumulators nesting the trade several siblings deep.
   --
   -- THE ADDITIVE CORNER IS NOT A SEPARATE CASE, correcting the P-split
   -- above: at P = 1 the recurrence is Aᵢ₊₁ ≤ B + Aᵢ and the invariant asks

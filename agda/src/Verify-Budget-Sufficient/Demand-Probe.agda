@@ -19,12 +19,13 @@ open import Data.Product using (proj₁; proj₂; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Gas; g0; gs; gasPad; hot)
-open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_; _+ᵗ_;
+open import Rx.Exp  using (Ty; Ctx; Closed; natᵗ; obs; _×ᵗ_; _+ᵗ_;
                             ofᵉ; mapᵉ; scanᵉ; emptyᵉ;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                             strmᵗ; fstᵗ; sndᵗ; varᵗ; nat̂; inlᵗ; caseᵗ;
+                            pairᵗ;
                             μᵉ; deferᵉ; input;
-                            sizeᵉ; syncSizeᵉ; Tm; Fn; Val; applyFn)
+                            sizeᵉ; sizeᵛ; syncSizeᵉ; Tm; Fn; Val; applyFn)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
                                  Slots; Slot; shared; scripted; Path; root; EvalSt;
                                  Sched; opIterD; slotsSize)
@@ -1677,4 +1678,114 @@ _ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 3)
 _ = λ _ → refl
 _ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 4)
               ≡ 2 + 2 * hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 3)
+_ = λ _ → refl
+
+
+----------------------------------------------------------------------
+-- SERIES Y (2026-08-19) — CAN AN AMPLIFYING SCAN STEP AVOID GROWING THE
+-- ACCUMULATOR'S SIZE?  NO — and the mechanism is not the one
+-- `walk-scan-hop`'s header first guessed.
+--
+-- THE ROUTE UNDER TEST.  Carry `hopDᵛ accᵢ ≤ (2 + pmᵗ V 0 f) ^ sizeᵛ accᵢ
+-- * B` along scanVals.  Run against hopD-applyFn it splits two ways: the
+-- size-INCREASING arm closes on one binomial step, the size-PRESERVING
+-- arm does not.  So the route lives or dies on the preserving arm being
+-- EMPTY.
+--
+-- THE ATTACK.  The header's reason for emptiness — "a wrap adds a
+-- constructor" — is worth only one unit, and a PAIR-typed accumulator
+-- looks like it can refund that and more: hopDᵛ combines components by ⊔
+-- while sizeᵛ ADDS them, so a step may wrap one component (buying depth)
+-- while DISCARDING a large shallow sibling (refunding its whole size).
+-- `fʸ` below does exactly that, against a sibling of size 32.
+--
+-- IT FAILS, AND THE REASON IS THE DRAG.  An obs-typed output is an
+-- EXPRESSION, and `subΘ` substitutes the reified argument at the variable
+-- syntactically — projections inside a `strmᵗ` are not reduced away.  So
+-- a step that reads the accumulator in order to deepen it carries the
+-- WHOLE reified pair into the emitted syntax, discarded sibling included.
+-- The refund is never collected: 34 ↦ 51 ↦ 68 below, monotone, while the
+-- depth runs 0 ↦ 2 ↦ 6.  The contrast row is series X's own first step,
+-- 14 — the same wrapper over a seed carrying nothing to drag.
+--
+-- SO THE PER-STEP LEMMA STANDS, with its reason corrected: a step that
+-- multiplies the depth costs at least one unit of size, not because it
+-- adds a constructor but because it cannot mention the accumulator
+-- without copying it.  Here the cost is a CONSTANT 17 per step, so the
+-- multiplying steps are ~V/17 against a budget of (2 + P) ^ V.
+--
+-- REGION REACHED: a pair-typed accumulator, P = 2, an adversarial
+-- discard of the largest component, three steps.  NOT REACHED: whether
+-- the drag argument survives a step whose obs output reads the
+-- accumulator ONLY at evaluated Tm position (`fstᵗ (fstᵗ (varᵗ …))`,
+-- which shrinks the size and does not deepen — believed harmless, not
+-- pinned); and deeper accumulator shapes where several siblings could
+-- fund several refunds.
+----------------------------------------------------------------------
+
+-- the same amplifying nat template as series X, at the pair-typed arg
+gʸ : Fn Γ₀ [] [] (((obs natᵗ ×ᵗ obs natᵗ) ×ᵗ natᵗ) ∷ []) natᵗ natᵗ
+gʸ = caseᵗ (inlᵗ {t = natᵗ} (varᵗ (here refl)))
+           (varᵗ (there (here refl)))
+           (nat̂ 0)
+
+_ : ∀ (V : ℕ) → pmᵗ V 0 gʸ ≡ 2
+_ = λ _ → refl
+
+-- THE REFUNDING STEP.  First component: wrap the OLD first component, as
+-- series X does.  Second component: throw the old one away and put back a
+-- constant the step function carries.
+fʸ : Fn Γ₀ [] [] [] ((obs natᵗ ×ᵗ obs natᵗ) ×ᵗ natᵗ) (obs natᵗ ×ᵗ obs natᵗ)
+fʸ = pairᵗ (strmᵗ (mapᵉ gʸ (mergeAllᵉ (ofᵉ (fstᵗ (fstᵗ (varᵗ (here refl))) ∷ [])))))
+           (strmᵗ emptyᵉ)
+
+_ : ∀ (V : ℕ) → pmᵗ V 0 fʸ ≡ 2
+_ = λ _ → refl
+
+-- the big shallow sibling the seed carries: size 32, hop depth 0
+bigʸ : Val Γ₀ (obs natᵗ)
+bigʸ = ofᵉ (nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷
+            nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷
+            nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷
+            nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ [])
+
+_ : sizeᵛ (obs natᵗ) bigʸ ≡ 32
+_ = refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) bigʸ ≡ 0
+_ = λ _ → refl
+
+Uʸ : Ty
+Uʸ = obs natᵗ ×ᵗ obs natᵗ
+
+-- reached by the evaluator's own scan step (Rx.Evaluator:1075), not built
+accʸ : ℕ → Val Γ₀ Uʸ
+accʸ 0       = emptyᵉ , bigʸ
+accʸ (suc k) = applyFn fʸ (accʸ k , 0)
+
+-- THE ANSWER.  LOAD-BEARING, and it is the whole series: a `≤` in place
+-- of any of these strict steps would say the refund was collected and
+-- would reopen the size-preserving arm.  The 32 the step discards is
+-- refunded NOWHERE — the growth is a flat 17 a step, and 17 is what the
+-- wrapper costs once the dragged copy is counted.
+_ : sizeᵛ Uʸ (accʸ 0) ≡ 34
+_ = refl
+_ : sizeᵛ Uʸ (accʸ 1) ≡ 51
+_ = refl
+_ : sizeᵛ Uʸ (accʸ 2) ≡ 68
+_ = refl
+
+-- THE CONTRAST that identifies the mechanism as the drag rather than the
+-- wrapper: series X's first step is the SAME wrapper over a seed with
+-- nothing to carry, and it costs 13 (emptyᵉ's 1 ↦ 14).  LOAD-BEARING:
+-- if subΘ reduced projections inside a strmᵗ this would match Y's step.
+_ : sizeᵛ (obs natᵗ) (accˣ 1) ≡ 14
+_ = refl
+
+-- and the depth multiplies exactly as in series X, so the size the step
+-- pays really did buy a factor
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) Uʸ (accʸ 0) ≡ 0
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) Uʸ (accʸ 1) ≡ 2
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) Uʸ (accʸ 2) ≡ 6
 _ = λ _ → refl

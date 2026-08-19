@@ -113,10 +113,24 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   STORE INVARIANT supplies hypothesis-side — `boundedNode B (scan-st v) =
   sizeᵛ v ≤ᵇ B` under `INV?`, carried to `Ŝ` by `ceil` — and whose one missing
   ingredient is a sharper `hopD-applyFn` spending a size increase per factor of
-  `P` — and the leaf's header now pins that to ONE case: the invariant closes
-  on every size-INCREASING step by a binomial step, and the whole residue is
-  the size-PRESERVING one, where what is owed is that a step which does not
-  grow the accumulator cannot multiply its depth either. `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT serve: they land at the global cap
+  `P` — and the leaf's header pins that to ONE case: the invariant closes on
+  every size-INCREASING step by a binomial step, and the whole residue is the
+  size-PRESERVING one. PROBED (Demand-Probe series Y): that arm survived the
+  best attack available — a pair-typed accumulator wrapping one component
+  while discarding a size-32 shallow sibling, which refunds nothing (34 ↦ 51
+  ↦ 68 monotone, depth 0 ↦ 2 ↦ 6). The mechanism is the DRAG, not the
+  constructor count the header first claimed: `subΘ` substitutes the reified
+  argument syntactically, so a step that deepens the accumulator copies the
+  whole thing. Region reached is that arm at P = 2, three steps; NOT reached
+  is a step reading the accumulator only at evaluated Tm position, and deeper
+  nestings of the trade. Stays DIFFICULTY: stating the drag lemma is still a
+  design decision. The body it will plug into needs the source's receipt, so
+  the leaf takes the face at the SUBTERM and the same gas — structural on the
+  Exp, the pattern `input-wet-core` already uses at peeled gas, and a
+  signature change to make when the body lands rather than before. The caps
+  twin recurses the same way (`subscribeE-caps`'s scan clause calls itself on
+  `b` under `scan-f f nid ↠ κ`), which is the worked precedent for the whole
+  chain family, not just scan. `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT serve: they land at the global cap
   `szB V V`, far above this conjunct's target. Two routes are closed and are
   recorded in the leaf's header so they are not re-proposed — bounding the step
   count `k` at all (width-vs-size currency, and the live route never mentions
