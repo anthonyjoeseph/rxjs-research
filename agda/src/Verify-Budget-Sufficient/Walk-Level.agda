@@ -909,41 +909,49 @@ postulate
   -- mechanical (18 clause sites, `ceil` and its neighbour), and doing it
   -- against an unsatisfiable ceiling is the one way to waste it.
   --
+  -- The rough shape is discouraging, and is a reason to price it CAREFULLY
+  -- rather than to assume either answer: `gasTower h` is a tower of 2s of
+  -- height h (Rx.Prim) supplying `towerℕ h`, while a width-scale Ŝ is
+  -- `iterFold` — a tower of height N — so hopR of it sits at height ~N+2
+  -- against the gas's `3 + capsH`, and `opIterD-dominated` bounds levels
+  -- by `sizeCount`, not by capsH.  Those quantities have NOT been read
+  -- properly; this is a sketch to aim the reading, not a finding.
+  --
   -- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) rescues nothing here — it
   -- constrains opIterD's iteration count, not the relation between the two
   -- axes at a level.
   --
-  -- ⚠ ASK THE CHEAP QUESTION FIRST, BEFORE PRICING ANY GAS TOWER — it may
-  -- dissolve the row outright, and it is one lemma's tightness rather than
-  -- a budget argument.  IS THE FOLD'S GROWTH REALLY GEOMETRIC?
+  -- IS THE FOLD'S GROWTH REALLY GEOMETRIC?  ANSWERED 2026-08-19: YES.
+  -- The cheap escape is CLOSED, so the raise-Ŝ repair above is the only
+  -- one left and the gas question is the live one.  Do not re-open this.
   --
-  -- The whole `Aₖ ≤ (1+P)^k * B` invariant rests on PROVEN hopD-applyFn's
-  -- MULTIPLICATIVE factor, `hopDᵛ (applyFn f v) ≤ hopDᵗ f + (pmᵗ V 0 f ⊔ 1)
-  -- * hopDᵛ v`.  But `hopDᵛ` is a DEPTH read through ⊔, not a size: pairs
-  -- take `hopDᵛ a ⊔ hopDᵛ b` (Rx.Hop-Depth), sums project, and only `obs`
-  -- descends into hopDᵉ.  So DUPLICATING the accumulator into k positions
-  -- cannot multiply its depth — under ⊔ that is the identity — and the
-  -- honest recurrence looks additive, `Aₖ ≤ A₀ + k * (hopDᵗ f + hopDᵉ b)`,
-  -- which needs only `k ≤ (2 + pmᵗ) ^ V` and is exponentially weaker than
-  -- `k ≤ V`.
+  -- The hope was that hopD-applyFn's MULTIPLICATIVE factor, `hopDᵛ
+  -- (applyFn f v) ≤ hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵛ v`, is loose for a
+  -- DEPTH — hopDᵛ reads pairs by ⊔ (Rx.Hop-Depth), so duplicating the
+  -- accumulator into k positions cannot deepen it.  That observation is
+  -- TRUE AND IRRELEVANT, which is the trap worth recording: the
+  -- multiplication never came from duplication.  It comes from plugging
+  -- the accumulator into the SOURCE position of a `mapᵉ`, the one clause
+  -- of hopDᵉ that multiplies — `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e` —
+  -- where the source's WHOLE depth is scaled.  The ⊔ at the pair node
+  -- never sees that factor and cannot damp it.
   --
-  -- Where a genuine multiplication CAN come from is the one clause of
-  -- hopDᵉ that multiplies at all — scan's own `(2 + pmᵗ) ^ V` — i.e. a step
-  -- function whose body itself scans over its argument.  SO THE QUESTION
-  -- IS: can `pmᵗ V 0 f`'s factor be tight for a DEPTH, and if so only via
-  -- a nested scan?  Two outcomes, and both are cheap to act on:
-  --   · NOT TIGHT (or tight only via nested scan, which the fold's own
-  --     size budget may exclude) — restate the invariant additively, and
-  --     the row closes over hopD-applyFn's additive strengthening with no
-  --     ceiling, no re-indexing and no gas.  walk-scan becomes GRINDABLE.
-  --   · TIGHT — then the raise-Ŝ repair is the only one left and the gas
-  --     question above has to be priced.  The rough shape is discouraging:
-  --     `gasTower h` is a tower of 2s of height h (Rx.Prim) supplying
-  --     `towerℕ h`, while a width-scale Ŝ is `iterFold` — a tower of height
-  --     N — so hopR of it sits at height ~N+2 against the gas's 3 + capsH,
-  --     and `opIterD-dominated` bounds levels by `sizeCount`, not by capsH.
+  -- MACHINE-CHECKED: Demand-Probe series X.  A scan step with P = 2
+  -- iterated four times gives Aₖ = 2^(k+1) − 2, and hopD-applyFn's bound
+  -- instantiates to `Aₖ₊₁ ≤ 2 + 2 * Aₖ` — MET WITH EQUALITY at every
+  -- step, so there is no slack to strengthen away.
   --
-  -- READ pmᵗ's CLAUSES AND hopD-evalWith BEFORE ANYTHING ELSE ON THIS ROW.
+  -- AND AMPLIFICATION NEEDS NOTHING EXOTIC, which is what kills the
+  -- fallback hope that a nested scan could be excluded by the fold's own
+  -- size budget.  `pmᵗ V 0 g = 2` is reachable in a NAT-TYPED template
+  -- containing no stream, no map and no scan at all: pmᵗ's caseᵗ clause
+  -- ADDS the branches' slope to the scrutinee's, and `1 + 1 = 2`.  A
+  -- step function need only route its accumulator through `ofᵉ` + a *All
+  -- frame (the only way an obs-typed Θ-var reaches expression position)
+  -- into such a map.
+  --
+  -- The one thing series X does NOT settle: what bounds k.  It says the
+  -- growth is geometric, not that k exceeds V.
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)

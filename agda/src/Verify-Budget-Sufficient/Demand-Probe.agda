@@ -9,13 +9,13 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
 open import Data.Fin  using (Fin; zero)
 import Data.Fin as F
-open import Data.Nat  using (ℕ; suc; _+_; _^_; _≤ᵇ_; _≤_; z≤n; s≤s)
+open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤)
 open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (proj₁; proj₂; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Gas; g0; gs; gasPad; hot)
@@ -24,11 +24,11 @@ open import Rx.Exp  using (Ctx; Closed; natᵗ; obs; _×ᵗ_; _+ᵗ_;
                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                             strmᵗ; fstᵗ; sndᵗ; varᵗ; nat̂; inlᵗ; caseᵗ;
                             μᵉ; deferᵉ; input;
-                            sizeᵉ; syncSizeᵉ; Tm; Fn)
+                            sizeᵉ; syncSizeᵉ; Tm; Fn; Val; applyFn)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
                                  Slots; Slot; shared; scripted; Path; root; EvalSt;
                                  Sched; opIterD; slotsSize)
-open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
 open import Rx.Slot-Hop using (slotHop; slotHop-fix)
 open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?;
                                  burstHopD?; hopR; unconn; hasAtLeast-pad;
@@ -1576,3 +1576,105 @@ _ = refl
 _ : let r = subscribeE (gs g0) prog-W root 0 0 schedREG stREG
     in regsLen? 5 (EvalSt.registry (proj₂ (proj₂ r))) ≡ true
 _ = refl
+
+----------------------------------------------------------------------
+-- SERIES X (2026-08-19) — IS walk-scan's FOLD REALLY GEOMETRIC?
+--
+-- ANSWERED: YES.  hopD-applyFn's multiplicative factor is attained with
+-- EQUALITY here, so the additive restatement walk-scan's header hoped
+-- for is dead and the `Aₖ ≤ (1+P)^k * B` invariant is the honest one.
+--
+-- The header's guess about WHERE the multiplication could come from was
+-- wrong, and that is the useful part.  It guessed "only via a nested
+-- scan".  In fact the only clause of hopDᵉ that multiplies at all is
+-- `mapᵉ` — `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e` — and a coefficient of
+-- 2 is reachable from a `caseᵗ` in a NAT-TYPED template, with no stream,
+-- no map and no scan inside it: pmᵗ's caseᵗ clause ADDS the branches'
+-- slope to the scrutinee's.  So amplification needs nothing exotic and
+-- the fold's own size budget cannot exclude it.
+--
+-- The observation that motivated the question — hopDᵛ reads pairs by ⊔,
+-- so duplicating the accumulator into k positions cannot deepen it — is
+-- TRUE and IRRELEVANT.  The multiplication never came from duplication.
+-- It comes from plugging the accumulator into the SOURCE position of a
+-- map, where hopD scales the source's whole depth by the template's plug
+-- multiplier.  ⊔ at the pair node does not see that and cannot damp it.
+--
+-- REGION REACHED: an amplifying scan step (P = 2) at an obs-typed
+-- accumulator, iterated four times, with the recurrence pinned at each
+-- step.  NOT REACHED: P ≥ 3, and the relation between k and V — this
+-- series says the growth is geometric, it does not say what bounds k.
+----------------------------------------------------------------------
+
+-- THE AMPLIFYING TEMPLATE.  Nat-typed, no observable anywhere; the
+-- slope of 2 is purely pmᵗ's caseᵗ clause, `(slope of the branches) +
+-- (branch multiplier ⊔ 1) * (slope of the scrutinee)` = 1 + 1.
+gˣ : Fn Γ₀ [] [] ((obs natᵗ ×ᵗ natᵗ) ∷ []) natᵗ natᵗ
+gˣ = caseᵗ (inlᵗ {t = natᵗ} (varᵗ (here refl)))
+           (varᵗ (there (here refl)))
+           (nat̂ 0)
+
+-- LOAD-BEARING: this is the whole finding.  Fails if pmᵗ's caseᵗ clause
+-- stops adding the scrutinee's slope to the branches'.
+_ : ∀ (V : ℕ) → pmᵗ V 0 gˣ ≡ 2
+_ = λ _ → refl
+
+-- the template contributes NO depth of its own — so every unit of growth
+-- below is multiplication, not accumulation
+_ : ∀ (V : ℕ) → hopDᵗ V (λ _ → 0) gˣ ≡ 0
+_ = λ _ → refl
+
+-- THE SCAN STEP: plug the accumulator into a mapᵉ's SOURCE.  A Θ-var of
+-- obs type is a Tm, and no Exp constructor embeds one back, so it reaches
+-- expression position via `ofᵉ` + a *All frame — that mergeAllᵉ is the
+-- only reason this typechecks, and it costs the `suc` visible below.
+fˣ : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+fˣ = strmᵗ (mapᵉ gˣ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ []))))
+
+-- P = pmᵗ V 0 fˣ ⊔ 1 = 2, so hopDᵉ's scan clause funds base (2 + 2) = 4
+_ : ∀ (V : ℕ) → pmᵗ V 0 fˣ ≡ 2
+_ = λ _ → refl
+
+-- the step's own depth, which is B's first summand — the mergeAllᵉ's suc
+-- scaled by the template's 2
+_ : ∀ (V : ℕ) → hopDᵗ V (λ _ → 0) fˣ ≡ 2
+_ = λ _ → refl
+
+-- ITERATE IT.  This is the evaluator's own scan step: Rx.Evaluator:1075
+-- reads `acc′ = applyFn fn (acc , v)`, so these are reached accumulators,
+-- not hand-built ones.  The fed value is irrelevant (gˣ discards it).
+accˣ : ℕ → Val Γ₀ (obs natᵗ)
+-- (`zero` in scope here is Data.Fin's, so the base case is the literal)
+accˣ 0       = emptyᵉ
+accˣ (suc k) = applyFn fˣ (accˣ k , 0)
+
+-- THE GROWTH, pinned step by step.  Aₖ = 2^(k+1) − 2 — GEOMETRIC.
+-- LOAD-BEARING: fails the moment hopDᵉ's mapᵉ clause stops multiplying.
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 0) ≡ 0
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 1) ≡ 2
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 2) ≡ 6
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 3) ≡ 14
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 4) ≡ 30
+_ = λ _ → refl
+
+-- AND hopD-applyFn IS TIGHT HERE, which is what kills the additive
+-- restatement outright rather than merely leaving it unproven.  Its
+-- bound instantiates to `Aₖ₊₁ ≤ hopDᵗ fˣ + P * Aₖ = 2 + 2 * Aₖ`, and the
+-- computed value MEETS it at every step — no slack to strengthen away.
+-- LOAD-BEARING: a single ≢ here would reopen the additive route.
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 1)
+              ≡ 2 + 2 * hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 0)
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 2)
+              ≡ 2 + 2 * hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 1)
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 3)
+              ≡ 2 + 2 * hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 2)
+_ = λ _ → refl
+_ : ∀ (V : ℕ) → hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 4)
+              ≡ 2 + 2 * hopDᵛ V (λ _ → 0) (obs natᵗ) (accˣ 3)
+_ = λ _ → refl
