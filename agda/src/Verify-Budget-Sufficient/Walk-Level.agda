@@ -865,22 +865,53 @@ postulate
   -- is bounded by that same `opIterD …`, so `L̂ := opIterD …` is admissible
   -- and both are read at the SAME level.
   --
-  -- AND THE SLACK IS NIL, which is why this is not repairable by
-  -- arithmetic: at `pmᵗ V 0 f = 0` the fold's base `1 + (pmᵗ ⊔ 1)` and
-  -- the clause's base `2 + pmᵗ` are BOTH 2, so `2 ^ k ≤ 2 ^ V` demands
-  -- `k ≤ V` on the nose.
+  -- THE RISKY REGION IS AMPLIFYING FOLDS ONLY (corrected 2026-08-19; an
+  -- earlier draft of this header said the slack is nil everywhere, which
+  -- is wrong and made the region look bigger than it is).  Write
+  -- P = pmᵗ V 0 f ⊔ 1 and split on it:
+  --   · P = 1 (pmᵗ ≤ 1) — the recurrence `Aₖ₊₁ ≤ hopDᵗ f + P * (Aₖ ⊔
+  --     hopDᵉ b)` is ADDITIVE, not geometric, so `Aₖ ≤ (1+k) * B` and the
+  --     clause's `2 ^ V * B` needs only `1 + k ≤ 2 ^ V`.  Exponentially
+  --     weaker than `k ≤ V`, and comfortably true.
+  --   · P ≥ 2 — `Aₖ ≤ (1+P)^k * B` against `(2+P)^V * B` needs
+  --     `k ≤ V * log(2+P)/log(1+P)`, which at P = 2 is 1.26·V.  That is
+  --     `k ≤ V` up to a constant, and it is where the row actually lives.
   --
-  -- SO THE ROW IS NOT A FOLD PROBLEM.  Two repairs are open and both
-  -- change a statement rather than discharge one, which is why this is
-  -- SHAPE and not DIFFICULTY: add a WIDTH ceiling to the walk face
-  -- alongside the size one (`Caps.cWid (frameStep L̂ c) ≤ Ŝ`, threaded
-  -- like `ceil` and paid for at the same places), or re-index hopDᵉ's
-  -- scan clause so its exponent is width-derived rather than V.  Decide
-  -- which BEFORE grinding: the first cascades through every producer of
-  -- `ceil`, the second changes a measure the whole demand side reads.
-  -- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) does not rescue either
-  -- route — it constrains opIterD's iteration count, not the relation
-  -- between the two axes at a level.
+  -- SO THE ROW IS NOT A FOLD PROBLEM, and the repair space is SMALLER
+  -- than it looks.  Three candidates; two are dead already:
+  --
+  --   ✗ A WIDTH CEILING AGAINST Ŝ — `suc (cWid (frameStep L̂ c)) ^ 2 ≤ Ŝ`,
+  --     threaded beside `ceil`.  DEAD: `sizeCapAt e sl id ≡ Caps.cSize
+  --     (capsAt e sl id)` (.Wet/Part6), so at the true instantiation Ŝ is
+  --     a size and `cWid (capsAt …)` is the width of the SAME caps —
+  --     `foldStep` towers where `sizeStep` scales, so the width is already
+  --     above the size there.  The hypothesis would be unsatisfiable at
+  --     the only instantiation that matters.
+  --   ✗ DECOUPLE F FROM Ŝ — carry the hop index separately with its own
+  --     width ceiling, leaving Ŝ the size cap.  DEAD: the demand side
+  --     spends `dBound-connect`'s `r′ ≤ R` with `R̂ ≡ hopR Ŝ`, and hopD-cap
+  --     yields only `hopDᵉ F η e ≤ hopR F`.  For F > Ŝ that needs
+  --     `hopR F ≤ hopR Ŝ`, and hopR is monotone the other way.  Every
+  --     consumer wants ONE index; splitting it breaks the connect edge.
+  --   ⚠ RAISE Ŝ ITSELF to a width-scale cap.  The only live one, and it
+  --     is monotone-safe everywhere the index appears as an upper bound:
+  --     `2 ≤ Ŝ`, `cSize (frameStep L̂ c) ≤ Ŝ`, `slotsSize sl ≤ V` and
+  --     `sizeᵉ b ≤ V` (slotHop-cap) all survive a BIGGER Ŝ, hopR grows
+  --     with it so hopD-cap still applies, and burstHopD?'s two sides move
+  --     together so the conclusion only loosens.
+  --
+  -- SO THE WHOLE ROW REDUCES TO ONE QUESTION, AND IT IS NOT ABOUT SCAN:
+  -- raising Ŝ raises `dBound Ŝ R̂ …` and hence G, and G is what
+  -- `g hasAtLeast suc G` must fund.  DOES THE GAS BUDGET FUND A
+  -- WIDTH-SCALE HOP INDEX?  That is a question for the budget development
+  -- (gasTower / budgetAt / opIterD-dominated's margin), not for this
+  -- clause.  Answer it before touching the face: the threading itself is
+  -- mechanical (18 clause sites, `ceil` and its neighbour), and doing it
+  -- against an unsatisfiable ceiling is the one way to waste it.
+  --
+  -- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) rescues nothing here — it
+  -- constrains opIterD's iteration count, not the relation between the two
+  -- axes at a level.
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)

@@ -113,11 +113,16 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   `scan-count-under-ceiling-absurd` (Refuted.Caps-Face). The count is bounded
   only by a WIDTH squared and `V = Ŝ` only from below by a SIZE, and the two
   axes diverge because a level step exponentiates the width and merely scales
-  the size. A restatement is therefore guaranteed: either a width ceiling
-  joins the face beside `ceil`, or `hopDᵉ`'s scan exponent is re-indexed.
-  Header names the trade. Do NOT grind this row. Its FALSITY question — can a
-  real program push more than Ŝ values into one scan node in one subscribe
-  burst — is unprobed and would settle which repair is needed.
+  the size. The repair space is now down to ONE candidate: a width ceiling
+  against `Ŝ` is dead (`sizeCapAt ≡ cSize ∘ capsAt`, so it orders the width
+  and size of the same caps the wrong way — `wid≤size-absurd`), and decoupling
+  the hop index from `Ŝ` is dead (`dBound-connect` wants `hopR F ≤ hopR Ŝ`).
+  What is left is RAISING `Ŝ` to a width-scale cap, which is monotone-safe at
+  every site except one: it raises `dBound` and hence `G`. So the row now
+  reduces to a budget question — **does the gas fund a width-scale hop
+  index?** — and the risky region has narrowed to amplifying folds
+  (`pmᵗ V 0 f ≥ 2`); at `pmᵗ ≤ 1` the fold is additive and closes easily.
+  Do NOT thread the face until the budget question is answered.
 - **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
   order. The family census in their shared header reads every output index
   off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause

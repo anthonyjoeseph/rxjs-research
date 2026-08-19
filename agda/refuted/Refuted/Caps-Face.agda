@@ -288,8 +288,12 @@ reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
 -- `hopDᵉ`'s scan clause (Rx.Hop-Depth) bounds a scan's output at
 -- `(2 + pmᵗ V 0 f) ^ V * B`, and the fold invariant that clause is
 -- evidently sized for — `Aₖ ≤ (1 + (pmᵗ V 0 f ⊔ 1)) ^ k * B`, over
--- PROVEN hopD-applyFn — closes exactly when `k ≤ V`.  Not approximately:
--- at `pmᵗ V 0 f = 0` both bases are 2 and the slack is nil.
+-- PROVEN hopD-applyFn — closes when `k ≤ V`.  With P = pmᵗ V 0 f ⊔ 1
+-- that demand is real only for AMPLIFYING folds: at P = 1 the recurrence
+-- is additive and `1 + k ≤ 2 ^ V` suffices, while at P ≥ 2 the need is
+-- `k ≤ V * log(2+P)/log(1+P)`, i.e. `k ≤ V` up to a constant (1.26 at
+-- P = 2).  So this witness bounds the P ≥ 2 region, which is the one the
+-- clause is actually exposed on.
 --
 -- `k` is the number of source values one scan node folds inside a single
 -- subscribe burst, and the only thing bounding it is `burstCount?`
@@ -325,8 +329,14 @@ scan-count-under-ceiling-absurd h =
   ≤⇒≤ᵇ (h (caps 2 0 1) 2 (s≤s (s≤s z≤n)) (s≤s z≤n) (s≤s z≤n))
 
 -- the bare width passes the size one level later — the same divergence
--- without the squaring, kept because it is the form any future route
--- through `cWid ≤ cSize` would reach for
+-- without the squaring.  Kept because it is the form any future route
+-- through `cWid ≤ cSize` reaches for, and because it is what kills the
+-- obvious repair to walk-scan: `capsAt e sl (suc id)` IS a `frameStep N`
+-- (Caps: `capsAt e sl (suc id) = frameBlowup (capsAt e sl id) …`), and
+-- `sizeCapAt e sl id ≡ Caps.cSize (capsAt e sl id)` (.Wet/Part6), so
+-- adding a WIDTH ceiling stated against Ŝ asks for the width and the size
+-- of the same caps to be ordered the wrong way.  Unsatisfiable at the one
+-- instantiation that matters, for N ≥ 3.
 wid≤size-absurd :
   (∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c →
      Caps.cWid (frameStep j c) ≤ Caps.cSize (frameStep j c)) → ⊥
