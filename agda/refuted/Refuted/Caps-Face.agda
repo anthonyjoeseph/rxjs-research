@@ -315,10 +315,21 @@ reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
 -- same `opIterD …` — so `L̂ := opIterD …` is admissible and the width
 -- and the size are then read at the SAME level.
 --
--- CONSEQUENCE for walk-scan: the missing hypothesis is a WIDTH ceiling,
--- not a cleverer fold.  `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`)
--- does not rescue it — it constrains opIterD's iteration count, not the
--- relation between the two axes at a level.
+-- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) does not rescue it — it
+-- constrains opIterD's iteration count, not the relation between the two
+-- axes at a level.
+--
+-- ⚠ SCOPE, ADDED 2026-08-19 AFTER THIS WAS READ TOO WIDELY.  What is
+-- refuted is bounding the fold's exponent FROM THE CEILING PINS.  It is
+-- NOT a blocker on walk-scan, and it does NOT show a width ceiling is the
+-- missing hypothesis — an earlier draft of this note said exactly that
+-- and cost the row a spurious SHAPE classification plus a detour through
+-- three candidate ceilings.  The exponent is bounded from the STORE
+-- INVARIANT instead: `boundedNode B (scan-st v) = sizeᵛ v ≤ᵇ B`, supplied
+-- by WalkTail's own `INV?` hypothesis and carried to `Ŝ` by `ceil`.  That
+-- was worked out on 2026-07-28 and is recorded in Keeps-Ring's header.
+-- This witness stays because the ceiling route is genuinely dead and
+-- someone will propose it again; it decides nothing else.
 -- ══════════════════════════════════════════════════════════════════
 scan-count-under-ceiling-absurd :
   (∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →

@@ -847,23 +847,54 @@ postulate
   --
   -- SO THE INVARIANT IS `hopDᵛ acc ≤ (2 + pmᵗ V 0 f) ^ k * B after k
   -- applications`, established at the seed and preserved by
-  -- hopD-applyFn.  The one remaining question was `k ≤ V`, and it is
-  -- ANSWERED — in the negative, from the hypotheses this face states:
+  -- hopD-applyFn.  The one remaining question is the exponent, and the
+  -- answer is that it is NOT `k` — it is the ACCUMULATOR'S OWN SIZE:
   --
-  -- REFUTED 2026-08-19: `scan-count-under-ceiling-absurd` (agda/refuted,
-  -- Refuted.Caps-Face) — `k ≤ V` DOES NOT FOLLOW from the ceiling pins.
-  -- `k` is bounded only by burstCount?, which caps instants and
-  -- per-instant values SEPARATELY, each by `suc (Caps.cWid c)`, so `k` is
-  -- bounded by a WIDTH SQUARED and by nothing smaller.  The only lower
-  -- bound stated on `V = Ŝ` is `Caps.cSize (frameStep L̂ c) ≤ Ŝ`: a SIZE.
-  -- The axes diverge — a level step EXPONENTIATES the width (`foldStep S
-  -- w = S ^ suc w`, a tower in the level) and merely SCALES the size
-  -- (`sizeStep S s = S * suc (2 * s)`) — so at the smallest admissible
-  -- caps the squared width passes the size at j = 2 and the bare width
-  -- passes it at j = 3.  No level offset is available to spend either:
-  -- the ceiling asks only `opIterD … ≤ L̂` while the walk's own exit level
-  -- is bounded by that same `opIterD …`, so `L̂ := opIterD …` is admissible
-  -- and both are read at the SAME level.
+  -- ⚠ DO NOT BOUND k FROM THE CEILING PINS.  That route is REFUTED
+  -- (`scan-count-under-ceiling-absurd`, agda/refuted, Refuted.Caps-Face):
+  -- via the ceiling, `k` is bounded only by burstCount?, which caps
+  -- instants and per-instant values SEPARATELY, each by `suc (Caps.cWid
+  -- c)` — a WIDTH SQUARED — while the only lower bound on `V = Ŝ` is
+  -- `Caps.cSize (frameStep L̂ c) ≤ Ŝ`, a SIZE.  The axes diverge: a level
+  -- step EXPONENTIATES the width (`foldStep S w = S ^ suc w`, a tower in
+  -- the level) and merely SCALES the size (`sizeStep S s = S * suc (2 *
+  -- s)`), so the squared width passes the size at j = 2 and the bare
+  -- width at j = 3.  No level offset is available either: the ceiling
+  -- asks `opIterD … ≤ L̂` while the walk's exit level is bounded by that
+  -- same `opIterD …`, so `L̂ := opIterD …` is admissible and both are read
+  -- at the SAME level.
+  --
+  -- BUT THE CEILING WAS NEVER THE ROUTE, and reading the refutation as a
+  -- blocker cost this row a SHAPE classification it did not deserve.  The
+  -- bound comes from the STORE INVARIANT, which this face already carries
+  -- as a hypothesis — worked out 2026-07-28 and recorded in Keeps-Ring's
+  -- header, where a search would have found it:
+  --   · `boundedNode B (scan-st v) = sizeᵛ t v ≤ᵇ B` (.Measures) — the
+  --     accumulator is a STORED value and stBounded? reads it as a size;
+  --   · WalkTail's `INV? Ψ (Caps.cSize (frameStep j c)) sched st` supplies
+  --     that at `B = Caps.cSize (frameStep j c)`;
+  --   · `ceil` (`Caps.cSize (frameStep L̂ c) ≤ Ŝ`) with `F ≡ Ŝ` carries it
+  --     to `sizeᵛ accₖ ≤ V`.
+  -- So the size bound is HYPOTHESIS-SIDE and needs no new premise, no
+  -- width ceiling, no re-indexing and no gas.  The three-candidate repair
+  -- space below is therefore MOOT; it is kept only so the two dead
+  -- candidates are not re-proposed.
+  --
+  -- WHAT IS ACTUALLY OWED, and it is arithmetic rather than design-risk.
+  -- `k ≤ sizeᵛ accₖ` is FALSE as literally stated — an identity or
+  -- constant fold leaves the size alone — so the exponent cannot be the
+  -- step count.  State the invariant with the size IN the exponent,
+  -- `hopDᵛ accₖ ≤ (1 + P) ^ sizeᵛ accₖ * B`, which degenerates correctly
+  -- on the non-deepening folds that break the k-form.  Preserving it
+  -- wants a sharper hopD-applyFn: one that spends a size INCREASE to pay
+  -- for each factor of P.
+  --
+  -- ✗ DO NOT REACH FOR `hopD-sizeᵗ` / `hopD-sizeᵉ` (.Measures, PROVEN)
+  -- HERE, despite their being exactly "depth bounded by size".  They land
+  -- at `szB V (sizeᵉ e)`, and `szB V V = (2+V)^((1+V)^V)` is the GLOBAL
+  -- hop cap — astronomically above the `(2 + pmᵗ V 0 f) ^ V * B` this
+  -- conjunct is measured against.  The base has to be the plug
+  -- multiplier, not the size; that gap is the lemma this row owes.
   --
   -- THE RISKY REGION IS AMPLIFYING FOLDS ONLY (corrected 2026-08-19; an
   -- earlier draft of this header said the slack is nil everywhere, which
@@ -877,8 +908,10 @@ postulate
   --     `k ≤ V * log(2+P)/log(1+P)`, which at P = 2 is 1.26·V.  That is
   --     `k ≤ V` up to a constant, and it is where the row actually lives.
   --
-  -- SO THE ROW IS NOT A FOLD PROBLEM, and the repair space is SMALLER
-  -- than it looks.  Three candidates; two are dead already:
+  -- THE REPAIR SPACE BELOW IS MOOT — kept so the dead candidates are not
+  -- re-proposed, since each cost a day to kill.  It was written while the
+  -- ceiling looked like the only source of a bound on the exponent; the
+  -- store invariant above removes the need for any of it.
   --
   --   ✗ A WIDTH CEILING AGAINST Ŝ — `suc (cWid (frameStep L̂ c)) ^ 2 ≤ Ŝ`,
   --     threaded beside `ceil`.  DEAD: `sizeCapAt e sl id ≡ Caps.cSize
@@ -900,22 +933,10 @@ postulate
   --     with it so hopD-cap still applies, and burstHopD?'s two sides move
   --     together so the conclusion only loosens.
   --
-  -- SO THE WHOLE ROW REDUCES TO ONE QUESTION, AND IT IS NOT ABOUT SCAN:
-  -- raising Ŝ raises `dBound Ŝ R̂ …` and hence G, and G is what
-  -- `g hasAtLeast suc G` must fund.  DOES THE GAS BUDGET FUND A
-  -- WIDTH-SCALE HOP INDEX?  That is a question for the budget development
-  -- (gasTower / budgetAt / opIterD-dominated's margin), not for this
-  -- clause.  Answer it before touching the face: the threading itself is
-  -- mechanical (18 clause sites, `ceil` and its neighbour), and doing it
-  -- against an unsatisfiable ceiling is the one way to waste it.
-  --
-  -- The rough shape is discouraging, and is a reason to price it CAREFULLY
-  -- rather than to assume either answer: `gasTower h` is a tower of 2s of
-  -- height h (Rx.Prim) supplying `towerℕ h`, while a width-scale Ŝ is
-  -- `iterFold` — a tower of height N — so hopR of it sits at height ~N+2
-  -- against the gas's `3 + capsH`, and `opIterD-dominated` bounds levels
-  -- by `sizeCount`, not by capsH.  Those quantities have NOT been read
-  -- properly; this is a sketch to aim the reading, not a finding.
+  -- (Had raise-Ŝ been needed it would have raised `dBound Ŝ R̂ …` and hence
+  -- G, which `g hasAtLeast suc G` must fund — a budget question, and one
+  -- whose rough shape was discouraging.  It is not asked; the store
+  -- invariant makes the whole detour unnecessary.)
   --
   -- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) rescues nothing here — it
   -- constrains opIterD's iteration count, not the relation between the two

@@ -106,29 +106,24 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   read and a day to rediscover — delegating to PROVEN `hopD-cap` at
   `η := slotHop V sl` is refuted by series S's own depth-2 row, exactly
   tight at depth 1.
-- **`walk-scan`** (Walk-Level) — SHAPE, promoted from DIFFICULTY: the fold half
-  is settled (its header derives the accumulator invariant, closing at exactly
-  the base `hopDᵉ`'s scan clause carries, over PROVEN `hopD-applyFn`), and the
-  one remaining question `k ≤ V` is REFUTED from this face's hypotheses —
-  `scan-count-under-ceiling-absurd` (Refuted.Caps-Face). The count is bounded
-  only by a WIDTH squared and `V = Ŝ` only from below by a SIZE, and the two
-  axes diverge because a level step exponentiates the width and merely scales
-  the size. The repair space is now down to ONE candidate: a width ceiling
-  against `Ŝ` is dead (`sizeCapAt ≡ cSize ∘ capsAt`, so it orders the width
-  and size of the same caps the wrong way — `wid≤size-absurd`), and decoupling
-  the hop index from `Ŝ` is dead (`dBound-connect` wants `hopR F ≤ hopR Ŝ`).
-  What is left is RAISING `Ŝ` to a width-scale cap, which is monotone-safe at
-  every site except one: it raises `dBound` and hence `G`. So the row now
-  reduces to a budget question — **does the gas fund a width-scale hop
-  index?** — and the risky region has narrowed to amplifying folds
-  (`pmᵗ V 0 f ≥ 2`); at `pmᵗ ≤ 1` the fold is additive and closes easily.
-  Do NOT thread the face until the budget question is answered. The cheaper
-  escape that might have dissolved the row — that `hopD-applyFn`'s
-  multiplicative factor is loose for a max-based depth — is CLOSED: series X
-  (Demand-Probe) exhibits an amplifying step meeting that bound with
-  EQUALITY at every iteration, and the amplification needs only a
-  nat-typed `caseᵗ`, so no size budget can exclude it. Next act is pricing
-  the gas, per the sketch in the postulate's header.
+- **`walk-scan`** (Walk-Level) — DIFFICULTY, demoted back from SHAPE: the
+  restatement SHAPE predicted is not needed. The fold half is settled (its
+  header derives the accumulator invariant, closing at exactly the base
+  `hopDᵉ`'s scan clause carries, over PROVEN `hopD-applyFn`), and the bound on
+  the exponent comes from the STORE INVARIANT this face already carries as a
+  hypothesis — `boundedNode B (scan-st v) = sizeᵛ v ≤ᵇ B` under `INV?`, carried
+  to `Ŝ` by `ceil` — not from the ceiling pins. `scan-count-under-ceiling-absurd`
+  (Refuted.Caps-Face) refutes only the ceiling route, and reading it as a blocker
+  is what produced the SHAPE call; the width-ceiling and decouple-`Ŝ` repairs it
+  motivated are dead (`wid≤size-absurd`; `dBound-connect` wants `hopR F ≤ hopR Ŝ`)
+  and the surviving raise-`Ŝ` one is moot. What is genuinely owed is arithmetic:
+  `k ≤ sizeᵛ accₖ` is FALSE for non-deepening folds, so the exponent must be the
+  accumulator's SIZE, and preserving that wants a sharper `hopD-applyFn` spending
+  a size increase per factor of `P`. PROVEN `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT
+  serve — they land at the global cap `szB V V`, far above this conjunct's
+  target. The additive escape is separately CLOSED: series X (Demand-Probe)
+  exhibits an amplifying step meeting `hopD-applyFn` with EQUALITY at every
+  iteration, needing only a nat-typed `caseᵗ`, so no size budget excludes it.
 - **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
   order. The family census in their shared header reads every output index
   off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause
