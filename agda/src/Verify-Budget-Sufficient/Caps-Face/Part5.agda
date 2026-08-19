@@ -1,5 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part5
--- innerFinish-zero … reach-resets
+-- innerFinish-zero … reach-reset
 -- (lines 5200–6073 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part5 where
 
@@ -1036,9 +1036,4 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- DECLARED HERE, above the faces, because `thruOuter-face` consumes it
 -- and that face is itself consumed further down the file than the hop
 -- section this used to sit in.
-reach-resets : ∀ (C : ℕ) → 2 ≤ C →
-  ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (η : Fin n → ℕ) → (∀ i → η i ≤ szB C 1) →
-  (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
-  (syncSizeᵉ o ≤ C) × (hopDᵉ C η o ≤ hopR C)
-reach-resets = reach-reset
 

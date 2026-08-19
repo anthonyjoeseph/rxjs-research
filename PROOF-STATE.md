@@ -78,8 +78,8 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-The three DIFFICULTY rows head the tier and are the design session's own
-work; the GRINDABLE rows below them do NOT block on those three — every
+The two DIFFICULTY rows head the tier and are the design session's own
+work; the GRINDABLE rows below them do NOT block on those two — every
 row in a tier is available to its siblings as a postulate, so the
 mechanical ones can be ground in parallel by a worker. Top-to-bottom is
 the order attention is OWED, not a bar on running the bottom concurrently.
@@ -90,8 +90,8 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   A and B verbatim, and whose third makes exactly ONE recursive call, at the
   fuel `wl` is already indexed at. What is owed is a call-site discharge and a
   transport, both decomposed in the header. The discharge turns on PROVEN
-  `dBound-connect`, whose `r′ ≤ R` premise is **`slotHop-cap`** — a real
-  dependency between two tier-0 rows. The Ψ axis is closed by PROVEN
+  `dBound-connect`, whose `r′ ≤ R` premise is the real body `slotHop-cap`,
+  now resting on the single leaf **`hopD-relᵉ`**. The Ψ axis is closed by PROVEN
   `caseW-subΘ` + `fnCap-subΘᵉ`.
 - **`input-wet-scripted-four`** (Walk-Level) — GRINDABLE: takes NO walk face, so
   nothing recurses and no induction has to be designed. Its header carries a
@@ -100,12 +100,6 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
-  the amplifier-chain region and measures the margin widening. Route and
-  coverage in its header, and with them a DEAD ROUTE that costs nothing to
-  read and a day to rediscover — delegating to PROVEN `hopD-cap` at
-  `η := slotHop V sl` is refuted by series S's own depth-2 row, exactly
-  tight at depth 1.
 - **`walk-scan`** (Walk-Level) — DIFFICULTY, demoted back from SHAPE: the
   restatement SHAPE predicted is not needed. The fold half is settled (its
   header derives the accumulator invariant, closing at exactly the base
@@ -124,6 +118,13 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   target. The additive escape is separately CLOSED: series X (Demand-Probe)
   exhibits an amplifying step meeting `hopD-applyFn` with EQUALITY at every
   iteration, needing only a nat-typed `caseᵗ`, so no size budget excludes it.
+- **`hopD-relᵉ`** (Measures) — GRINDABLE: the ONLY remaining leaf of
+  `slotHop-cap`, whose telescope half (`slotHop-sup`, `ηAt-bound`) is now
+  PROVEN off it. hopDᵉ is LINEAR in η, so this is the PROVEN `hopD-sizeᵉ`
+  with its η premise replaced by a multiplicative factor — same clauses,
+  same arithmetic lemmas (`szB-mono`/`-suc`/`-sq`/`-scan`) unchanged, and
+  the η-free `pm-size*` family reused verbatim. `1 ≤ N` is load-bearing and
+  is what pays for `suc` in the four `*Allᵉ` clauses.
 - **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
   order. The family census in their shared header reads every output index
   off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause

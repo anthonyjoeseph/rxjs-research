@@ -54,7 +54,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        +-monoʳ-≤; *-comm;
                                        m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
                                        suc-injective; <-irrefl; ≡ᵇ⇒≡;
-                                       ≤-antisym)
+                                       ≤-antisym; m^n≢0; m^n>0)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -62,6 +62,7 @@ open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat;
 open import Data.Bool.ListAction using (all; any)
 open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin; toℕ)
+open import Data.Fin.Properties using (toℕ<n)
 import Data.Fin as Fin
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -115,7 +116,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
 open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
                                  hopD-unfoldμ)
-open import Rx.Slot-Hop using (slotHop)
+open import Rx.Slot-Hop using (slotHop; slotHopD; ηAt)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -765,6 +766,23 @@ sum-tab-mono {zero}  f g h = z≤n
 sum-tab-mono {suc m} f g h =
   +-mono-≤ (h Fin.zero) (sum-tab-mono _ _ (λ i → h (Fin.suc i)))
 
+-- a sum of n terms each at least 1 is at least n.  The counting step of
+-- the telescope-length bound (n≤slotsSize, below): it is what turns
+-- "the slots FIT in the size budget V" into "there are at most V of
+-- them", and hence into a bound on how many stages slotHop can cross.
+--
+-- MOVED DOWN from .Caps-Face.Part1 (2026-08-19), where this and the two
+-- slot lemmas below were proven for `n≤capsAt-size` and could not be
+-- reached from here.  slotHop-sup needed the identical three and they
+-- were rewritten from scratch, clashing on the name — the tenth-plus
+-- instance of the same lesson, and the reason the rule is "move it
+-- DOWN, do not pick a winner among the copies".
+n≤sum-tab : ∀ {n} (f : Fin n → ℕ) → (∀ (i : Fin n) → 1 ≤ f i) →
+  n ≤ sum (tabulate f)
+n≤sum-tab {zero}  f h = z≤n
+n≤sum-tab {suc n} f h =
+  +-mono-≤ (h Fin.zero) (n≤sum-tab (λ k → f (Fin.suc k)) (λ k → h (Fin.suc k)))
+
 sum-tab-strict : ∀ {m} (f g : Fin m → ℕ) → (∀ j → f j ≤ g j) →
   (i : Fin m) → f i < g i → sum (tabulate f) < sum (tabulate g)
 sum-tab-strict {suc m} f g h Fin.zero    fi<gi =
@@ -828,10 +846,14 @@ unconn-insert sl cs i eqi fresh =
                | T⇒≡true (toℕ i ≡ᵇ toℕ i) (≡⇒≡ᵇ (toℕ i) (toℕ i) refl)
                = s≤s z≤n
 
--- U is syntactically owned: every unconnected slot contributes at
--- most its own slot size (a shared slot's def is nonempty syntax),
--- so the connect count sits under the program's slot content — the
--- U ≤ sz leg of the seed inequality
+-- EVERY EXPRESSION AND EVERY TERM HAS AT LEAST ONE NODE.  One header
+-- over both, and one NAMING CONVENTION over both, because two spellings
+-- of the same fact is the machine that generates duplicates: these were
+-- `sizeᵉ-pos`/`1≤sizeᵉ` and `1≤sizeᵗ`/`sizeᵗ-pos`, each pair the same
+-- statement twice in THIS file, and `1≤sizeᵗ` was written by someone
+-- who grepped for the `1≤` spelling and did not find `sizeᵗ-pos` 3000
+-- lines below.  Merged 2026-08-19; `make dup-check` now fails on a
+-- recurrence.
 sizeᵉ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
   1 ≤ sizeᵉ e
 sizeᵉ-pos (input i)       = s≤s z≤n
@@ -848,6 +870,25 @@ sizeᵉ-pos (μᵉ e)          = s≤s z≤n
 sizeᵉ-pos (varᵉ x)        = s≤s z≤n
 sizeᵉ-pos (deferᵉ e)      = s≤s z≤n
 
+sizeᵗ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵗ tm
+sizeᵗ-pos (varᵗ _)      = s≤s z≤n
+sizeᵗ-pos unit̂          = s≤s z≤n
+sizeᵗ-pos (bool̂ _)      = s≤s z≤n
+sizeᵗ-pos (nat̂ _)       = s≤s z≤n
+sizeᵗ-pos (pairᵗ _ _)   = s≤s z≤n
+sizeᵗ-pos (fstᵗ _)      = s≤s z≤n
+sizeᵗ-pos (sndᵗ _)      = s≤s z≤n
+sizeᵗ-pos (inlᵗ _)      = s≤s z≤n
+sizeᵗ-pos (inrᵗ _)      = s≤s z≤n
+sizeᵗ-pos (caseᵗ _ _ _) = s≤s z≤n
+sizeᵗ-pos (ifᵗ _ _ _)   = s≤s z≤n
+sizeᵗ-pos (primᵗ _ _)   = s≤s z≤n
+sizeᵗ-pos (strmᵗ _)     = s≤s z≤n
+
+-- U is syntactically owned: every unconnected slot contributes at
+-- most its own slot size (a shared slot's def is nonempty syntax),
+-- so the connect count sits under the program's slot content — the
+-- U ≤ sz leg of the seed inequality
 unconnAt≤slot : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
   (i : Fin n) → unconnAt sl cs i ≤ slotSize (sl i)
 unconnAt≤slot sl cs i with sl i
@@ -898,6 +939,49 @@ unconn≤slots sl cs = sum-tab-mono _ _ (unconnAt≤slot sl cs)
 
 hopR : ℕ → ℕ
 hopR V = (2 + V) ^ (suc V ^ suc V)
+
+-- ONE FULL BUDGET.  hopW V is the szB cap with its size argument
+-- saturated at V and its base widened to hopR's, so `szB V s ≤ hopW V`
+-- for every s ≤ V (szB≤hopW, below).  It is the unit a route's cost
+-- should be counted in.
+--
+-- WHY IT EXISTS, and it is the fact three successive readings of
+-- slotHop-cap's margin got wrong: hopR V ≡ hopW V ^ suc V.  hopR is NOT
+-- one budget with a sliver of margin — it is (1 + V) budgets
+-- MULTIPLIED.  A route may therefore spend several whole size-V budgets
+-- and still fit, which is exactly what a telescope through the slots
+-- must do (one budget for the walked expression, and the accumulated
+-- product of the slot defs' own).  Reading hopR as a single budget is
+-- what made that route look impossible; it has room for V + 1 of them.
+--
+-- The corresponding trap, since the two readings disagree only in the
+-- BASE: comparing exponents at a common base (2+V) is exact, but
+-- bounding a link's `(2 + pmᵗ V 0 f) ^ V` by widening pm to szB FIRST
+-- and only then raising to the V costs a factor of V in the exponent
+-- per link, and that route does not close.  szB-scan already absorbs
+-- the same `^ V` into ONE unit of size — see slotHop-cap's header.
+hopW : ℕ → ℕ
+hopW V = (2 + V) ^ (suc V ^ V)
+
+-- hopR is (1 + V) copies of hopW.  `suc V ^ suc V` reduces to
+-- `suc V * suc V ^ V`, so this is ^-*-assoc plus a commutation.
+hopW^suc : ∀ (V : ℕ) → hopW V ^ suc V ≡ hopR V
+hopW^suc V =
+  trans (^-*-assoc (2 + V) (suc V ^ V) (suc V))
+        (cong ((2 + V) ^_) (*-comm (suc V ^ V) (suc V)))
+
+-- AND THE COUNT IS EXACT, not slack: `1≤slotSize` (below) puts the
+-- number of slots under slotsSize ≤ V, so the telescope is at most V
+-- links deep and costs at most V budgets, leaving exactly one for the
+-- walked expression.  `suc V` is a HEADCOUNT.  slotHop-cap spends the
+-- whole of it and `hopW^suc` closes the chain by `≤-reflexive` — there
+-- is no room left over, and none is needed.
+--
+-- (An earlier `hopW-cube : hopW V ^ 3 ≤ hopR V` sat here, from a
+-- reading that priced the telescope at two budgets before the headcount
+-- was written down.  Deleted 2026-08-19 with slotHop-sup's proof: the
+-- telescope's cost is V, not 2, and the assembly is exact rather than
+-- comfortable.)
 
 -- (P1) hopD is bounded by SIZE.  The exponent is V′^s, not V′·s, and
 -- that is forced: the coefficient is a MULTIPLIER (pm), not an
@@ -955,36 +1039,32 @@ opaque
   1≤szB : ∀ (V s : ℕ) → 1 ≤ szB V s
   1≤szB V s = 1≤pow (suc s) (suc V ^ s)
 
--- every expression and term has at least one node
-1≤sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵉ e
-1≤sizeᵉ (input i)       = ≤-refl
-1≤sizeᵉ (ofᵉ ts)        = s≤s z≤n
-1≤sizeᵉ emptyᵉ          = ≤-refl
-1≤sizeᵉ (mapᵉ f e)      = s≤s z≤n
-1≤sizeᵉ (takeᵉ c e)     = s≤s z≤n
-1≤sizeᵉ (scanᵉ f z e)   = s≤s z≤n
-1≤sizeᵉ (mergeAllᵉ e)   = s≤s z≤n
-1≤sizeᵉ (concatAllᵉ e)  = s≤s z≤n
-1≤sizeᵉ (switchAllᵉ e)  = s≤s z≤n
-1≤sizeᵉ (exhaustAllᵉ e) = s≤s z≤n
-1≤sizeᵉ (μᵉ e)          = s≤s z≤n
-1≤sizeᵉ (varᵉ x)        = ≤-refl
-1≤sizeᵉ (deferᵉ e)      = s≤s z≤n
 
-1≤sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵗ tm
-1≤sizeᵗ (varᵗ x)      = ≤-refl
-1≤sizeᵗ unit̂          = ≤-refl
-1≤sizeᵗ (bool̂ _)      = ≤-refl
-1≤sizeᵗ (nat̂ _)       = ≤-refl
-1≤sizeᵗ (pairᵗ a b)   = s≤s z≤n
-1≤sizeᵗ (fstᵗ q)      = s≤s z≤n
-1≤sizeᵗ (sndᵗ q)      = s≤s z≤n
-1≤sizeᵗ (inlᵗ a)      = s≤s z≤n
-1≤sizeᵗ (inrᵗ a)      = s≤s z≤n
-1≤sizeᵗ (caseᵗ sc l r) = s≤s z≤n
-1≤sizeᵗ (ifᵗ c a b)   = s≤s z≤n
-1≤sizeᵗ (primᵗ _ a)   = s≤s z≤n
-1≤sizeᵗ (strmᵗ e)     = s≤s z≤n
+-- EVERY SLOT COSTS AT LEAST ONE UNIT OF THE SIZE BUDGET.  A scripted
+-- slot's `inputSize` is a `suc` outright — the subscribe frame is real
+-- syntax however empty the script — and a shared slot's def is an
+-- expression, so `sizeᵉ-pos`.  Hence `n ≤ slotsSize sl`, and a telescope
+-- that fits inside budget V is AT MOST V LINKS DEEP.
+--
+-- That is the fact hopR's exponent was always about.  hopR V ≡
+-- hopW V ^ suc V (hopW^suc), i.e. `suc V` whole size-V budgets — and
+-- `suc V` is exactly ONE PER LINK plus ONE for the expression being
+-- walked.  The margin is not slack to be spent cleverly; it is a
+-- headcount, and this lemma is the head count.
+--
+-- TWO CONSUMERS, AND THEY FOUND IT SEPARATELY: `n≤capsAt-size`
+-- (.Caps-Face.Part1) uses the same count for the caps recurrence's
+-- `n ≤ cSize`, and proved it there first.  slotHop-sup rewrote all
+-- three lemmas from scratch and collided on the NAME — the search that
+-- would have found them was run against two files instead of the tree.
+-- Kept here, the lowest module both reach.
+1≤slotSize : ∀ {n} {Γ : Ctx n} {k t} (s : Slot Γ k t) → 1 ≤ slotSize s
+1≤slotSize (scripted (hot _))    = s≤s z≤n
+1≤slotSize (scripted (cold _ _)) = s≤s z≤n
+1≤slotSize (shared d)            = sizeᵉ-pos d
+
+n≤slotsSize : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) → n ≤ slotsSize sl
+n≤slotsSize sl = n≤sum-tab (λ i → slotSize (sl i)) (λ i → 1≤slotSize (sl i))
 
 -- THE THREE ARITHMETIC FACTS the clauses reduce to.  Each is a
 -- statement about ℕ and `^` alone — no syntax, no measure — which is
@@ -1146,7 +1226,7 @@ mutual
                                 (≤-trans (hopD-sizeᵉ V η e hV hη)
                                          (szB-mono V (m≤n+m (sizeᵉ e) (sizeᵗ f))))))
             (szB-sq V (sizeᵗ f + sizeᵉ e) hV
-              (≤-trans (1≤sizeᵗ f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
+              (≤-trans (sizeᵗ-pos f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
   hopD-sizeᵉ V η (takeᵉ c e) hV hη =
     ≤-trans (hopD-sizeᵉ V η e hV hη)
             (szB-mono V (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c))
@@ -1157,7 +1237,7 @@ mutual
                                   (≤-trans (hopD-sizeᵗ V η z hV hη) (szB-mono V lez)))
                         (≤-trans (hopD-sizeᵉ V η e hV hη) (szB-mono V lee))))
             (szB-scan V (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) hV
-                      (1≤sizeᵗ f) (1≤sizeᵗ z) (1≤sizeᵉ e))
+                      (sizeᵗ-pos f) (sizeᵗ-pos z) (sizeᵉ-pos e))
     where
     lef : sizeᵗ f ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
     lef = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) (m≤m+n _ (sizeᵉ e))
@@ -1166,13 +1246,13 @@ mutual
     lee : sizeᵉ e ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
     lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
   hopD-sizeᵉ V η (mergeAllᵉ e) hV hη =
-    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e))
   hopD-sizeᵉ V η (concatAllᵉ e) hV hη =
-    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e))
   hopD-sizeᵉ V η (switchAllᵉ e) hV hη =
-    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e))
   hopD-sizeᵉ V η (exhaustAllᵉ e) hV hη =
-    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (1≤sizeᵉ e))
+    ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e))
   hopD-sizeᵉ V η (μᵉ e)     hV hη =
     ≤-trans (hopD-sizeᵉ V η e hV hη) (szB-mono V (n≤1+n (sizeᵉ e)))
   hopD-sizeᵉ V η (varᵉ x)   hV hη = z≤n
@@ -1210,7 +1290,7 @@ mutual
                                        (1≤szB V _))
                                 (≤-trans (hopD-sizeᵗ V η sc hV hη) (szB-mono V cs))))
             (szB-sq V (sizeᵗ sc + sizeᵗ l + sizeᵗ r) hV
-                    (≤-trans (1≤sizeᵗ sc) cs))
+                    (≤-trans (sizeᵗ-pos sc) cs))
     where
     cs : sizeᵗ sc ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
     cs = ≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
@@ -1257,7 +1337,7 @@ mutual
                                 (≤-trans (pm-sizeᵉ V k e hV)
                                          (szB-mono V (m≤n+m (sizeᵉ e) (sizeᵗ f))))))
             (szB-sq V (sizeᵗ f + sizeᵉ e) hV
-              (≤-trans (1≤sizeᵗ f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
+              (≤-trans (sizeᵗ-pos f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))
   pm-sizeᵉ V k (takeᵉ c e) hV =
     ≤-trans (pm-sizeᵉ V k e hV)
             (szB-mono V (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c))
@@ -1268,7 +1348,7 @@ mutual
                                   (≤-trans (pm-sizeᵗ V k z hV) (szB-mono V lez)))
                         (≤-trans (pm-sizeᵉ V k e hV) (szB-mono V lee))))
             (szB-scan V (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) hV
-                      (1≤sizeᵗ f) (1≤sizeᵗ z) (1≤sizeᵉ e))
+                      (sizeᵗ-pos f) (sizeᵗ-pos z) (sizeᵉ-pos e))
     where
     lef : sizeᵗ f ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
     lef = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) (m≤m+n _ (sizeᵉ e))
@@ -1320,7 +1400,7 @@ mutual
                                        (1≤szB V _))
                                 (≤-trans (pm-sizeᵗ V k sc hV) (szB-mono V cs))))
             (szB-sq V (sizeᵗ sc + sizeᵗ l + sizeᵗ r) hV
-                    (≤-trans (1≤sizeᵗ sc) cs))
+                    (≤-trans (sizeᵗ-pos sc) cs))
     where
     cs : sizeᵗ sc ≤ sizeᵗ sc + sizeᵗ l + sizeᵗ r
     cs = ≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l))
@@ -1357,6 +1437,14 @@ mutual
 -- stBounded?, no extra invariant
 opaque
   unfolding szB
+
+  -- a size-≤V budget is at most ONE hopW.  Same two steps hopD-cap's
+  -- tail takes — widen the base, then the exponent — stopped one story
+  -- earlier so the result can be MULTIPLIED with others.
+  szB≤hopW : ∀ (V s : ℕ) → s ≤ V → szB V s ≤ hopW V
+  szB≤hopW V s h =
+    ≤-trans (^-monoˡ-≤ (suc V ^ s) (+-monoʳ-≤ 2 h))
+            (^-monoʳ-≤ (2 + V) (^-monoʳ-≤ (suc V) h))
 
   hopD-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
     (e : Exp Γ Δᵍ Δ Θ t) →
@@ -1413,16 +1501,27 @@ slotDef-size sl i {d} eq =
 -- scanning over input (k-1), which stratification expressly permits —
 -- is an amplifier tower.  That tower is the risky region.
 --
--- ⚠ THE ORIGINAL ANALYSIS IN THIS HEADER WAS WRONG, and the error is
--- worth keeping: it claimed the compound reaches exponent order
--- V^(V+1), hopR's own order, hence a thin margin.  It does not.
--- `slotsSize sl ≤ V` bounds the TOTAL slot size by V, so a telescope
--- cannot hold V slots of size V — it holds at most V/9 amplifier links
--- (scanᵉ is the ONLY clause contributing a ^V factor, and its minimal
--- legal instance costs 9 units of size).  Each link adds O(V) to the
--- compound's base-2 exponent, so that exponent is O(V²) — against
--- hopR's (1+V)^(1+V).  Amplification is exponential in V²; the cap is
--- exponential in V^V.
+-- THE STRUCTURAL FACT THAT MAKES IT SURVIVABLE: `slotsSize sl ≤ V`
+-- bounds the TOTAL slot size by V, so a telescope cannot hold V slots
+-- of size V — it holds at most V/9 amplifier links (scanᵉ is the ONLY
+-- clause contributing a ^V factor, and its minimal legal instance
+-- costs 9 units of size).
+--
+-- ⚠ THE MARGIN HAD BEEN MISREAD THREE TIMES, ALWAYS BY TREATING
+-- hopR AS A SINGLE BUDGET, so the correction is pinned in CODE rather
+-- than argued here: `hopW^suc` (above) proves hopR V ≡ hopW V ^ suc V.
+-- hopR is (1 + V) whole size-V budgets MULTIPLIED.  Both earlier
+-- readings ("exponent order V^(V+1), hence a thin margin"; "O(V²)
+-- against hopR's (1+V)^(1+V)") were comparing a product of budgets
+-- against one budget, which is why one of them made the statement look
+-- tight and the other made it look impossible.
+--
+-- AND THE FOURTH READING IS THE RIGHT ONE, because it stopped asking
+-- how big the margin is and asked what it COUNTS.  `1≤slotSize` puts
+-- the slot COUNT under `slotsSize sl ≤ V`; each link costs at most one
+-- hopW (szB≤hopW); the walked expression costs one more.  `suc V` is
+-- one per link plus one for b — a headcount, not a margin.  The
+-- assembly below spends all of it and closes by `≤-reflexive`.
 --
 -- PROBED 2026-08-14 (Demand-Probe series S), at the tightest legal
 -- budget V := slotsSize, which is the worst case since any larger V
@@ -1435,9 +1534,9 @@ slotDef-size sl i {d} eq =
 -- structural reason above says it must.
 --
 -- COVERED: the scanᵉ amplifier chain at depths 1 and 2, hypotheses
--- discharged, at the tightest V.  NOT COVERED: folds with large
--- pmᵗ (which raise the per-link base to (2+pm)^V — still O(V² log V)
--- in the exponent, so the argument survives, but it is unmeasured),
+-- discharged, at the tightest V.  NOT COVERED: folds with large pmᵗ
+-- (unmeasured; the route no longer prices them in the exponent, since
+-- szB-scan absorbs the `^ V` into one unit of size whatever pm is),
 -- caseᵗ amplification inside a fold, and depth ≥ 3.
 --
 -- ⚠ NO ≤ᵇ ROW EXISTS, and cannot: a telescope big enough to amplify
@@ -1447,44 +1546,63 @@ slotDef-size sl i {d} eq =
 -- therefore pins the compound exactly and reaches hopR through its
 -- EXPONENT, which does compute.
 --
--- ⚠ ROUTE, CORRECTED 2026-08-19 — the "O(V²) exponent" reading above is
--- WRONG, and it is wrong in the one place that decides the margin.  It
--- assumed the scan clause's base `2 + pmᵗ V 0 f` is bounded by `2 + V`.
--- It is not: `pm-szB` (below) gives only `pmᵗ V k tm ≤ szB V (sizeᵗ tm)`,
--- so the base is DOUBLY exponential in the fold's own size and a link's
--- contribution is exponential in `sizeᵗ f`, not linear in V.
+-- ⚠ DEAD ROUTE 2026-08-19 (route A, superseded the same day it was
+-- written).  It kept the two inductions below but priced a link by
+-- widening pm to szB FIRST and only then raising to the `^ V`:
+-- `2 + pmᵗ V 0 f ≤ 2 + szB V sf`, hence a link under
+-- `(2+V) ^ (V * (1+V)^sf)`, exponents adding along the telescope, and
+-- `Σ sfᵢ ≤ V` with `(1+V)^x` convex giving `V * (1+V)^V` against hopR's
+-- `(1+V)^(1+V) = (1+V) * (1+V)^V` — "one whole factor of (1+V)^V to
+-- spare".  STRUCTURALLY DEAD for two independent reasons:
 --
--- The corrected accounting, and it closes with room to spare.  Work at
--- base `2 + V` and compare EXPONENTS, since hopR V = (2+V)^((1+V)^(1+V)):
+--   · it counted only the TELESCOPE.  The walked expression b carries
+--     its own budget `V * (1+V)^(sizeᵉ b)`, and `sizeᵉ b ≤ V` and
+--     `slotsSize sl ≤ V` are INDEPENDENT hypotheses, so both saturate.
+--     Two budgets need `2V ≤ 1+V`, i.e. V ≤ 1 — false for every V this
+--     statement is used at.  Its own numeric check at V = 16 shows the
+--     problem once b is counted: 2*16*17^16 exceeds 17^17.
+--   · the `^ V` is overpriced by a factor of V per link.  The PROVEN
+--     `szB-scan` already absorbs the identical `(2 + pmᵗ V 0 f) ^ V`
+--     into ONE unit of szB's size argument — szB's exponent multiplies
+--     by (1+V) per size unit, which is what the `^ V` costs.  Paying
+--     for it a second time, at the top level, is where the factor went.
 --
---   · ONE LINK of fold-size sf contributes `(2 + pmᵗ V 0 f) ^ V`, and
---     `2 + pmᵗ ≤ 2 + szB V sf = 2 + (2+sf)^((1+V)^sf)`, so the link is
---     under `(2+V) ^ (V * (1+V)^sf)`.  Exponent `V * (1+V)^sf`.
---   · EXPONENTS ADD along the telescope, because hopDᵉ's scan clause
---     MULTIPLIES its factor into the inner hopDᵉ and every base has been
---     widened to the common `2 + V`.
---   · `Σ sfᵢ ≤ slotsSize sl ≤ V`, and `(1+V)^x` is CONVEX, so the sum of
---     link exponents is maximised by concentrating all the size in a
---     SINGLE link: `V * (1+V)^V`.  Splitting strictly reduces it.
---   · against hopR's exponent `(1+V)^(1+V) = (1+V) * (1+V)^V`.  So the
---     margin is one whole factor of `(1+V)^V`, at every V ≥ 2.
+-- Both errors are the same mistake in different clothes, and it is the
+-- one `hopW` now exists to prevent: comparing a PRODUCT of budgets
+-- against hopR read as ONE budget.
 --
--- CHECKED AGAINST SERIES S's OWN NUMBERS: at V = 16 the worst single
--- link is 16*17^16 = 778579070010669895696 against hopR's exponent
--- 17^17 = 827240261886336764177 — fits, with 17^16 to spare, exactly the
--- predicted one factor.  V = 2, 3, 4, 30 all fit likewise, and the k
--- extra links cost at least V each (k ≤ V/9 by scanᵉ's 9-unit minimum),
--- which the spare factor absorbs many times over.
+-- THE ROUTE, assembled in code below rather than described here.  ONE
+-- postulate remains, and it is not about the telescope at all:
+--   A′. `hopD-relᵉ` — the RELATIVE bound, multiplicative in the
+--       environment.  This is the PROVEN `hopD-sizeᵉ` with its η
+--       premise replaced by a factor N, clause for clause, reusing its
+--       arithmetic unchanged.  Multiplicative is what lets the
+--       telescope splice in as a factor; an additive bound does not
+--       compose.
+--   B′. `slotHop-sup` — PROVEN 2026-08-19, by `ηAt-bound` below.  Stage
+--       k is under k budgets, one per link crossed; a slot reads its
+--       own stage, and its index is under the slot count, which
+--       `n≤slotsSize` puts under V.
 --
--- SO THE PROOF SHAPE IS TWO INDUCTIONS, not one telescope argument:
---   A. a RELATIVE bound on a single expression, multiplicative in the
---      environment — `hopDᵉ V η e ≤ (2+V) ^ (V * (1+V)^(sizeᵉ e))
---      * (1 + ⨆η)`.  Multiplicative is what makes exponents add at the
---      splice; an additive bound does not compose.
---   B. the telescope, accumulating that product over the slots, where
---      the size sum is capped by `slotsSize sl ≤ V`.
--- Neither needs a per-index bound, which is why this route survives the
--- refuted one below — the margin lives at hopR and is never spent early.
+-- ⚠ AN EARLIER PLAN FOR B′ WANTED szB SUBMULTIPLICATIVITY
+-- (`szB V a * szB V b ≤ szB V (a+b)`) TO ACCUMULATE THE SLOT SIZES, and
+-- carried a separate `4 ^ Sₖ` factor because the per-link constant may
+-- NOT be folded into szB's size argument (one extra unit multiplies the
+-- exponent by (1+V)).  All of that is unnecessary and none of it was
+-- written.  Accumulating SIZES is the wrong measure: leaf A′ already
+-- collapses each link to one hopW whatever its size is, so what the
+-- telescope accumulates is a COUNT, and the count needs no arithmetic
+-- beyond `^-monoʳ-≤`.  The lesson is the general one — when a bound
+-- wants a new arithmetic lemma, check first whether the quantity being
+-- accumulated is the quantity that matters.
+--
+-- B′ IS A PER-INDEX BOUND, AND THAT DOES NOT REOPEN THE ROUTE REFUTED
+-- BELOW.  What series S refutes is a per-index bound of szB-V-1 ORDER;
+-- `slotHop-sup` proves one at `hopW V ^ V`, astronomically above series
+-- S's worst measured slotHop.  The refutation is about the CAP the
+-- bound is stated at, not about per-index bounds as a shape — routing
+-- through `szB V 1` spends the margin before the comparison, routing
+-- through hopW does not.
 --
 -- ⚠ DEAD ROUTE 2026-08-19: DO NOT DELEGATE THIS TO `hopD-cap`.  The
 -- attempt is near-irresistible and it is refuted by rows already in the
@@ -1507,24 +1625,111 @@ slotDef-size sl i {d} eq =
 -- One amplifier link saturates the premise and the second blows it.
 --
 -- WHY IT FAILS, structurally, so the shape is not re-attempted with a
--- cleverer η: szB V 1 is exponential in V and a staged telescope's
--- compound is exponential in V², so no per-index bound of szB-order can
--- survive two links.  hopD-cap's premise is calibrated for an η that
--- reads STORED sizes, not one that telescopes through amplifying slots.
--- The cap itself survives because hopR is exponential in V^V — the
--- margin is real, but it lives at hopR, and routing through szB V 1
+-- cleverer η: szB V 1 is a bound at ONE unit of size, while a staged
+-- telescope compounds a factor per link, so no per-index bound at that
+-- order can survive two links.  hopD-cap's premise is calibrated for an
+-- η that reads STORED sizes, not one that telescopes through
+-- amplifying slots.  The cap itself survives because hopR holds (1 + V)
+-- whole budgets — the margin is real, but routing through szB V 1
 -- throws it away before the comparison happens.
 --
--- This is also why the header's own route does NOT factor through a
--- per-index bound: it goes to hopR directly.  And it is a clean instance
--- of the near-degenerate trap — the route is not merely true-at-depth-1,
--- it is EXACTLY TIGHT there, which is the most convincing way for a
--- refutable premise to look proven.
+-- What is dead is therefore the ORDER, not the per-index shape: leaf 2
+-- above states a per-index bound at `hopW V ^ 2` and is not touched by
+-- this.  And it is a clean instance of the near-degenerate trap — the
+-- route is not merely true-at-depth-1, it is EXACTLY TIGHT there, which
+-- is the most convincing way for a refutable premise to look proven.
 postulate
-  slotHop-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V : ℕ) (sl : Slots Γ) →
-    2 ≤ V → slotsSize sl ≤ V →
-    (b : Exp Γ Δᵍ Δ Θ u) → sizeᵉ b ≤ V →
-    hopDᵉ V (slotHop V sl) b ≤ hopR V
+  -- LEAF 1 — ROUTE A′, the relative induction.  hopDᵉ is LINEAR in η:
+  -- every clause either takes ⊔/+ of its children's hopD or multiplies
+  -- one by a pm coefficient, and pm carries no η at all, so a common
+  -- factor N bounding `η i` pulls straight out.  Hence the
+  -- PROVEN `hopD-sizeᵉ` generalises by replacing its η premise with a
+  -- multiplicative N, and every arithmetic lemma that proof spends —
+  -- szB-mono, szB-suc, szB-sq, szB-scan — is reused UNCHANGED, because
+  -- N factors through each of them linearly.  That correspondence is
+  -- clause-for-clause, which is what makes this leaf GRINDABLE.
+  --
+  -- Multiplicative is the whole point: it is what lets the telescope's
+  -- accumulated environment splice in as a FACTOR (below), where an
+  -- additive bound would not compose.
+  --
+  -- ⚠ `1 ≤ N` IS LOAD-BEARING AND IS NOT A CALL-SITE CONVENIENCE.  At
+  -- N = 0 the conclusion reads `hopDᵉ … ≤ 0`, which `mergeAllᵉ`'s
+  -- `suc (hopDᵉ e)` clause falsifies outright — and N = 0 is reachable,
+  -- because at `n = 0` the η premise quantifies over no index and
+  -- constrains nothing.  The same `1 ≤ N` is what pays for `suc` in all
+  -- four *Allᵉ clauses (`suc (X * N) ≤ suc X * N`).
+  hopD-relᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+    (e : Exp Γ Δᵍ Δ Θ t) (N : ℕ) → 2 ≤ V → 1 ≤ N → (∀ i → η i ≤ N) →
+    hopDᵉ V η e ≤ szB V (sizeᵉ e) * N
+
+-- LEAF 2 IS NOW A THEOREM — THE STAGE BOUND.  Stage k's environment is
+-- under k whole hopW budgets, one per link the telescope has crossed.
+-- Induction on k, and only one of the three cases spends anything:
+--
+--   · off-diagonal — the IH, widened by one story (^-monoʳ-≤);
+--   · diagonal SCRIPTED — slotHopD is 0 by definition (a scripted slot
+--     carries data only, so no emission of its holds an observable);
+--   · diagonal SHARED — leaf 1 turns the stage-k bound into
+--     `szB V (sizeᵉ d) * hopW V ^ k`, and `slotDef-size` puts the def's
+--     size inside V, so `szB≤hopW` collapses the left factor to exactly
+--     ONE hopW.  `hopW V * hopW V ^ k` IS `hopW V ^ suc k`, so the
+--     accounting needs no arithmetic at all.
+--
+-- The `1 ≤ N` leaf 1 demands is `m^n>0` here — nothing in the telescope
+-- has to arrange it, which is the payoff for stating leaf 1 with the
+-- premise rather than with a `suc`.
+ηAt-bound : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) →
+  2 ≤ V → slotsSize sl ≤ V → (k : ℕ) (i : Fin n) →
+  ηAt V sl k i ≤ hopW V ^ k
+ηAt-bound V sl hV hsl zero    i = z≤n
+ηAt-bound V sl hV hsl (suc k) i with toℕ i ≡ᵇ k
+... | false = ≤-trans (ηAt-bound V sl hV hsl k i)
+                      (^-monoʳ-≤ (hopW V) {{m^n≢0 (2 + V) (suc V ^ V)}}
+                                 (n≤1+n k))
+... | true with sl i in eq
+...   | scripted _ = z≤n
+...   | shared d   =
+        ≤-trans (hopD-relᵉ V (ηAt V sl k) d (hopW V ^ k) hV
+                   (m^n>0 (hopW V) {{m^n≢0 (2 + V) (suc V ^ V)}} k)
+                   (ηAt-bound V sl hV hsl k))
+                (*-monoˡ-≤ (hopW V ^ k)
+                   (szB≤hopW V (sizeᵉ d) (≤-trans (slotDef-size sl i eq) hsl)))
+
+-- THE TELESCOPE, CAPPED.  A slot reads its own stage (`slotHop` is
+-- `slotHopD` at stage `toℕ i`), so the count of links below it is its
+-- INDEX — and the index is under the number of slots, which
+-- `n≤slotsSize` puts under `slotsSize sl ≤ V`.  Hence no slot's hop
+-- exceeds V budgets: one per link strictly below it, plus its own.
+slotHop-sup : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) →
+  2 ≤ V → slotsSize sl ≤ V →
+  (i : Fin n) → slotHop V sl i ≤ hopW V ^ V
+slotHop-sup V sl hV hsl i with sl i in eq
+... | scripted _ = z≤n
+... | shared d =
+      ≤-trans (hopD-relᵉ V (ηAt V sl (toℕ i)) d (hopW V ^ toℕ i) hV
+                 (m^n>0 (hopW V) {{m^n≢0 (2 + V) (suc V ^ V)}} (toℕ i))
+                 (ηAt-bound V sl hV hsl (toℕ i)))
+      (≤-trans (*-monoˡ-≤ (hopW V ^ toℕ i)
+                 (szB≤hopW V (sizeᵉ d) (≤-trans (slotDef-size sl i eq) hsl)))
+               (^-monoʳ-≤ (hopW V) {{m^n≢0 (2 + V) (suc V ^ V)}}
+                          (≤-trans (toℕ<n i)
+                                   (≤-trans (n≤slotsSize sl) hsl))))
+
+-- THE ASSEMBLY, and it is CHECKED AND EXACT: V budgets for the
+-- telescope and one for the walked expression, against the `suc V` that
+-- `hopW^suc` says hopR IS.  The chain closes by `≤-reflexive` — nothing
+-- is left over, and the headcount above is why nothing needs to be.
+slotHop-cap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (V : ℕ) (sl : Slots Γ) →
+  2 ≤ V → slotsSize sl ≤ V →
+  (b : Exp Γ Δᵍ Δ Θ u) → sizeᵉ b ≤ V →
+  hopDᵉ V (slotHop V sl) b ≤ hopR V
+slotHop-cap V sl hV hsl b hb =
+  ≤-trans (hopD-relᵉ V (slotHop V sl) b (hopW V ^ V) hV
+                     (m^n>0 (hopW V) {{m^n≢0 (2 + V) (suc V ^ V)}} V)
+                     (slotHop-sup V sl hV hsl))
+  (≤-trans (*-monoˡ-≤ (hopW V ^ V) (szB≤hopW V (sizeᵉ b) hb))
+           (≤-reflexive (hopW^suc V)))
 
 -- THE OWNERSHIP ANCHOR (the cascadeGo ledger's share-crossing
 -- half), PROVEN: when a walked template's `input i` hits a shared
@@ -4011,21 +4216,6 @@ abstract
                (⊔-lub ≤-refl ≤-refl))
       (fnCap-elimG-lower (here refl) (μᵉ body) body)
 
--- every term has at least one node
-sizeᵗ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵗ tm
-sizeᵗ-pos (varᵗ _)      = s≤s z≤n
-sizeᵗ-pos unit̂          = s≤s z≤n
-sizeᵗ-pos (bool̂ _)      = s≤s z≤n
-sizeᵗ-pos (nat̂ _)       = s≤s z≤n
-sizeᵗ-pos (pairᵗ _ _)   = s≤s z≤n
-sizeᵗ-pos (fstᵗ _)      = s≤s z≤n
-sizeᵗ-pos (sndᵗ _)      = s≤s z≤n
-sizeᵗ-pos (inlᵗ _)      = s≤s z≤n
-sizeᵗ-pos (inrᵗ _)      = s≤s z≤n
-sizeᵗ-pos (caseᵗ _ _ _) = s≤s z≤n
-sizeᵗ-pos (ifᵗ _ _ _)   = s≤s z≤n
-sizeᵗ-pos (primᵗ _ _)   = s≤s z≤n
-sizeᵗ-pos (strmᵗ _)     = s≤s z≤n
 
 -- a cap scaled by a positive size factor still dominates 1, and (at a
 -- positive exponent) the base cap itself

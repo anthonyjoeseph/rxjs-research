@@ -1,4 +1,4 @@
-.PHONY: stripped strip-selftest postulates all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: stripped strip-selftest postulates dup-check find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -77,6 +77,15 @@ help:
 	@echo "                  nothing (see scripts/check-wiring.py)"
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
 	@echo "  postulates    every postulate in agda/src by name — the work ledger"
+	@echo "  find          SEARCH FIRST, made cheap: search the declared TYPE of"
+	@echo "                  every statement in agda/src.  Always the whole tree —"
+	@echo "                  the failure this prevents was a search scoped to two"
+	@echo "                  files.  Run it BEFORE proving anything"
+	@echo "                  make find Q='≤ slotsSize'"
+	@echo "  dup-check     no fact proven twice under two names: compares declared"
+	@echo "                  TYPES up to renaming of bound variables.  Agda catches"
+	@echo "                  the name collision; this catches the one that costs"
+	@echo "                  time, where the names differ.  EXITS 1 on a violation"
 	@echo "  stripped      regenerate agda/_stripped-comments/, the comment-free"
 	@echo "                  mirror agda ACTUALLY checks — so a comment-only edit"
 	@echo "                  leaves it byte-identical and rebuilds nothing.  Runs"
@@ -89,7 +98,7 @@ help:
 	@echo "                  after 'make agda' (it imports src, so the cache is"
 	@echo "                  warm by then).  See REFUTATION.md"
 	@echo "  gate          the acceptance test: wiring-selftest + wiring-gate +"
-	@echo "                  unsafe-check + agda + refuted + bug-cache.  Cheap"
+	@echo "                  unsafe-check + dup-check + agda + refuted + bug-cache.  Cheap"
 	@echo "                  checks FIRST so a 2-second failure never waits on"
 	@echo "                  the 13-minute one; 'refuted' comes AFTER 'agda'"
 	@echo "                  because it imports src and wants that cache warm"
@@ -291,6 +300,28 @@ wiring-gate:
 wiring-refuted:
 	scripts/check-wiring.py --src agda/refuted --root Refuted/Main.agda --gate
 
+# NO FACT IS PROVEN TWICE UNDER TWO NAMES.  Compares the DECLARED TYPE of every
+# definition and postulate, up to renaming of bound variables.  Agda already
+# rejects the case where the NAMES collide too (ClashingDefinition); this is for
+# the case that has actually cost us time, where they do not — `sizeᵉ-pos` and
+# `1≤sizeᵉ`, the same statement 170 lines apart in ONE file, unnoticed for
+# months.  CLAUDE.md has carried a SEARCH FIRST section throughout; prose lost,
+# as it did for wiring and for unsafe pragmas, so this is the machine.
+dup-check:
+	@scripts/check-duplicates.py --gate
+
+# SEARCH FIRST, made cheap and impossible to scope wrong: search the declared
+# TYPE of every statement in the tree.  dup-check catches a duplicate only once
+# both copies exist; this is the same law applied BEFORE the writing.  It walks
+# all of agda/src always — the 2026-08-19 failure was a search scoped to two
+# files, so there is deliberately no argument that narrows it.
+# Q is matched as ONE PHRASE against the type text, so `Q='≤ slotsSize'` means
+# what it looks like.  Search for the OPERATOR and the RELATION, not the name
+# you imagine — names here are idiosyncratic and a name-guess reliably misses.
+#   make find Q='≤ slotsSize'      make find Q='1 ≤ sizeᵉ'
+find:
+	@scripts/find-lemma.py "$(Q)"
+
 # THE REMAINING-WORK LEDGER: every postulate in agda/src, by name.  A grep for
 # `^postulate` finds the 32 BLOCK HEADERS, not the 110 names inside them, so it
 # is not the ledger and never was.  PROOF-STATE must carry a row for each of
@@ -344,6 +375,7 @@ gate:
 	@$(MAKE) --no-print-directory wiring-gate
 	@$(MAKE) --no-print-directory wiring-refuted
 	@$(MAKE) --no-print-directory unsafe-check
+	@$(MAKE) --no-print-directory dup-check
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory bug-cache

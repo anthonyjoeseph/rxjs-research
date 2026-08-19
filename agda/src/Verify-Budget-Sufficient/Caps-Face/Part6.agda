@@ -366,39 +366,54 @@ innerFinish-concat-face-go ifc k₁ k₂ k₃ k₄ k₅
 -- of a direct call to subscribeInner-caps.  Abstract to keep VWF
 -- from reaching the walk helpers on the budget-sufficient spine.
 
+-- LIFTED OUT OF THE `private` BLOCK BELOW, 2026-08-19.  These nine were
+-- private clones of lemmas .Subscribe-Face also proved, and the clones
+-- existed because Part6 sits BELOW Subscribe-Face and could not see the
+-- originals — a duplicate forced by module ORDER, not by carelessness.
+-- Public here, the originals are deleted, and everyone shares one proof.
+-- `private` is not `abstract`, so nothing about unfolding changes.
+valsOf : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
+  valsCaps? c sl vs ≡ true → all (valCaps? c sl s) vs ≡ true
+valsLen : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
+  valsCaps? c sl vs ≡ true → length vs ≤ suc (Caps.cWid c)
+valsIn : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
+  all (valCaps? c sl s) vs ≡ true → length vs ≤ suc (Caps.cWid c) →
+  valsCaps? c sl vs ≡ true
+lenWiden : ∀ {A : Set} {c c′ : Caps} (xs : List A) → c ⊑ᶜ c′ →
+  length xs ≤ suc (Caps.cWid c) → length xs ≤ suc (Caps.cWid c′)
+frameStep-+suc : ∀ (c : Caps) (j a b : ℕ) → 2 ≤ Caps.cSize c →
+  frameStep ((j + a) + b) c ⊑ᶜ frameStep (j + suc (a + b)) c
+double≤foldStep : ∀ (S w : ℕ) → 2 ≤ S → 2 * suc w ≤ foldStep S w
+sum-fold : ∀ (S W a b : ℕ) → 2 ≤ S →
+  a ≤ suc W → b ≤ suc W → a + b ≤ suc (foldStep S W)
+concat-fits : ∀ {A : Set} (c : Caps) (L : ℕ) (xs ys : List A) →
+  2 ≤ Caps.cSize c →
+  length xs ≤ suc (Caps.cWid (frameStep L c)) →
+  length ys ≤ suc (Caps.cWid (frameStep L c)) →
+  length (xs ++ ys) ≤ suc (Caps.cWid (frameStep (suc L) c))
+thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (fin : Bool)
+  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+  proj₁ (thruWrap op nid fin r) ≡ proj₁ r
+
 private
   -- valsOf / valsLen / valsIn / lenWiden: wrappers around valsCaps?-parts
-  valsOf′ : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
-    valsCaps? c sl vs ≡ true → all (valCaps? c sl s) vs ≡ true
-  valsOf′ c sl vs h = proj₁ (valsCaps?-parts c sl vs h)
+  valsOf c sl vs h = proj₁ (valsCaps?-parts c sl vs h)
 
-  valsLen′ : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
-    valsCaps? c sl vs ≡ true → length vs ≤ suc (Caps.cWid c)
-  valsLen′ c sl vs h = proj₂ (valsCaps?-parts c sl vs h)
+  valsLen c sl vs h = proj₂ (valsCaps?-parts c sl vs h)
 
-  valsIn′ : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
-    all (valCaps? c sl s) vs ≡ true → length vs ≤ suc (Caps.cWid c) →
-    valsCaps? c sl vs ≡ true
-  valsIn′ c sl vs h hl = ∧-intro h (T⇒≡true _ (≤⇒≤ᵇ hl))
+  valsIn c sl vs h hl = ∧-intro h (T⇒≡true _ (≤⇒≤ᵇ hl))
 
-  lenWiden′ : ∀ {A : Set} {c c′ : Caps} (xs : List A) → c ⊑ᶜ c′ →
-    length xs ≤ suc (Caps.cWid c) → length xs ≤ suc (Caps.cWid c′)
-  lenWiden′ xs (_ , wd≤ , _) h = ≤-trans h (s≤s wd≤)
+  lenWiden xs (_ , wd≤ , _) h = ≤-trans h (s≤s wd≤)
 
-  frameStep-+suc′ : ∀ (c : Caps) (j a b : ℕ) → 2 ≤ Caps.cSize c →
-    frameStep ((j + a) + b) c ⊑ᶜ frameStep (j + suc (a + b)) c
-  frameStep-+suc′ c j a b 2≤S =
+  frameStep-+suc c j a b 2≤S =
     frameStep-mono-j c 2≤S
       (≤-trans (≤-reflexive (+-assoc j a b))
         (≤-trans (n≤1+n (j + (a + b)))
                  (≤-reflexive (sym (+-suc j (a + b))))))
 
-  thruWrap-vals′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (op : AllOp) (nid : NodeId) (fin : Bool)
-    (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
-    proj₁ (thruWrap op nid fin r) ≡ proj₁ r
-  thruWrap-vals′ op nid false _ = refl
-  thruWrap-vals′ mergeᵒ nid true (vs , bs , sd , st)
+  thruWrap-vals op nid false _ = refl
+  thruWrap-vals mergeᵒ nid true (vs , bs , sd , st)
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
@@ -407,7 +422,7 @@ private
   ... | just (concat-st _ _ _) = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
-  thruWrap-vals′ concatᵒ nid true (vs , bs , sd , st)
+  thruWrap-vals concatᵒ nid true (vs , bs , sd , st)
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
@@ -416,7 +431,7 @@ private
   ... | just (concat-st _ _ _) = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
-  thruWrap-vals′ switchᵒ nid true (vs , bs , sd , st)
+  thruWrap-vals switchᵒ nid true (vs , bs , sd , st)
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
@@ -425,7 +440,7 @@ private
   ... | just (concat-st _ _ _) = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
-  thruWrap-vals′ exhaustᵒ nid true (vs , bs , sd , st)
+  thruWrap-vals exhaustᵒ nid true (vs , bs , sd , st)
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
@@ -441,25 +456,17 @@ private
   2*suc≤2^suc : ∀ (w : ℕ) → 2 * suc w ≤ 2 ^ suc w
   2*suc≤2^suc w = *-monoʳ-≤ 2 (n<2^n w)
 
-  double≤foldStep′ : ∀ (S w : ℕ) → 2 ≤ S → 2 * suc w ≤ foldStep S w
-  double≤foldStep′ S w hS = ≤-trans (2*suc≤2^suc w) (^-monoˡ-≤ (suc w) hS)
+  double≤foldStep S w hS = ≤-trans (2*suc≤2^suc w) (^-monoˡ-≤ (suc w) hS)
 
-  sum-fold′ : ∀ (S W a b : ℕ) → 2 ≤ S →
-    a ≤ suc W → b ≤ suc W → a + b ≤ suc (foldStep S W)
-  sum-fold′ S W a b hS ha hb =
+  sum-fold S W a b hS ha hb =
     ≤-trans (+-mono-≤ ha hb)
             (≤-trans (≤-reflexive (dbl-suc W))
-                     (≤-trans (double≤foldStep′ S W hS) (n≤1+n (foldStep S W))))
+                     (≤-trans (double≤foldStep S W hS) (n≤1+n (foldStep S W))))
 
-  concat-fits′ : ∀ {A : Set} (c : Caps) (L : ℕ) (xs ys : List A) →
-    2 ≤ Caps.cSize c →
-    length xs ≤ suc (Caps.cWid (frameStep L c)) →
-    length ys ≤ suc (Caps.cWid (frameStep L c)) →
-    length (xs ++ ys) ≤ suc (Caps.cWid (frameStep (suc L) c))
-  concat-fits′ c L xs ys hS hx hy =
+  concat-fits c L xs ys hS hx hy =
     subst (λ x → length (xs ++ ys) ≤ suc x) (sym (frameStep-wid-suc c L))
       (≤-trans (≤-reflexive (length-++ xs))
-               (sum-fold′ (Caps.cSize c) (Caps.cWid (frameStep L c))
+               (sum-fold (Caps.cSize c) (Caps.cWid (frameStep L c))
                           (length xs) (length ys) hS hx hy))
 
   SiCType : Set
@@ -694,23 +701,23 @@ private
       , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
           (proj₁ (proj₂ (proj₂ REST))) (proj₂ (proj₂ (proj₂ REST)))
           ⊑ˢ (proj₁ (proj₂ IH))
-      , valsIn′ (frameStep (j + suc (j₁ + j₂)) c) sl (proj₁ TC ++ proj₁ REST)
+      , valsIn (frameStep (j + suc (j₁ + j₂)) c) sl (proj₁ TC ++ proj₁ REST)
           (valsCaps?-widen sl u (proj₁ TC ++ proj₁ REST) ⊑ˢ
              (all-++-intro (valCaps? (frameStep ((j + j₁) + j₂) c) sl u)
                 (proj₁ TC) (proj₁ REST)
                 (valsCaps?-widen sl u (proj₁ TC) (frameStep-⊑-+ c 2≤S (j + j₁) j₂)
-                   (valsOf′ (frameStep (j + j₁) c) sl (proj₁ TC)
+                   (valsOf (frameStep (j + j₁) c) sl (proj₁ TC)
                       (proj₁ (proj₂ (proj₂ HD)))))
-                (valsOf′ (frameStep ((j + j₁) + j₂) c) sl (proj₁ REST)
+                (valsOf (frameStep ((j + j₁) + j₂) c) sl (proj₁ REST)
                    (proj₁ (proj₂ (proj₂ IH))))))
           (subst (λ x → length (proj₁ TC ++ proj₁ REST)
                           ≤ suc (Caps.cWid (frameStep x c)))
                  (sym lvlW)
-                 (concat-fits′ c ((j + j₁) + j₂) (proj₁ TC) (proj₁ REST) 2≤S
-                    (lenWiden′ (proj₁ TC) (frameStep-⊑-+ c 2≤S (j + j₁) j₂)
-                       (valsLen′ (frameStep (j + j₁) c) sl (proj₁ TC)
+                 (concat-fits c ((j + j₁) + j₂) (proj₁ TC) (proj₁ REST) 2≤S
+                    (lenWiden (proj₁ TC) (frameStep-⊑-+ c 2≤S (j + j₁) j₂)
+                       (valsLen (frameStep (j + j₁) c) sl (proj₁ TC)
                           (proj₁ (proj₂ (proj₂ HD)))))
-                    (valsLen′ (frameStep ((j + j₁) + j₂) c) sl (proj₁ REST)
+                    (valsLen (frameStep ((j + j₁) + j₂) c) sl (proj₁ REST)
                        (proj₁ (proj₂ (proj₂ IH))))))
       , eventsCaps?-widen sl (proj₁ (proj₂ TC) ++ proj₁ (proj₂ REST)) ⊑ˢ
           (all-++-intro (eventCaps? (frameStep ((j + j₁) + j₂) c) sl)
@@ -722,7 +729,7 @@ private
           (proj₂ (proj₂ (proj₂ (proj₂ HD))))
           (proj₂ (proj₂ (proj₂ (proj₂ IH))))
     where
-    vCa = valsOf′ (frameStep j c) sl (o ∷ os) vC
+    vCa = valsOf (frameStep j c) sl (o ∷ os) vC
     HD  = thruConsume-caps-go siC c dep bud j g op nid κ id now o sl sched st
             2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ vCa)) pC lC
             (mList?-head bud sl _ o os nst)
@@ -737,12 +744,12 @@ private
                    slEq)
             slC slSz (proj₁ (proj₂ HD))
             (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S j j₁) pC)
-            (valsIn′ (frameStep (j + j₁) c) sl os
+            (valsIn (frameStep (j + j₁) c) sl os
                (valsCaps?-widen sl (obs u) os (frameStep-⊑-+ c 2≤S j j₁)
                   (proj₂ (∧-true _ _ vCa)))
-               (lenWiden′ os (frameStep-⊑-+ c 2≤S j j₁)
+               (lenWiden os (frameStep-⊑-+ c 2≤S j j₁)
                   (≤-trans (n≤1+n (length os))
-                           (valsLen′ (frameStep j c) sl (o ∷ os) vC))))
+                           (valsLen (frameStep j c) sl (o ∷ os) vC))))
             (≤-trans lC (proj₁ (frameStep-⊑-+ c 2≤S j j₁)))
             (mList?-keeps bud sl _ _ os
                (KeepsC.connMono (thruConsume-keeps g op nid κ id now o sched st))
@@ -750,7 +757,7 @@ private
             (≤-trans (m≤n⊔m _ _) dpt)
     j₂   = proj₁ IH
     REST = thruWalk g op nid κ id now os sd₁ st₁
-    ⊑ˢ   = frameStep-+suc′ c j j₁ j₂ 2≤S
+    ⊑ˢ   = frameStep-+suc c j j₁ j₂ 2≤S
     lvlW : j + suc (j₁ + j₂) ≡ suc ((j + j₁) + j₂)
     lvlW = trans (+-suc j (j₁ + j₂)) (cong suc (sym (+-assoc j j₁ j₂)))
 
@@ -843,26 +850,26 @@ private
                   (≤-trans (proj₂ (proj₂ (proj₂ (proj₂ TW))))
                      (walk-index (Caps.cSize c) (Caps.cWid c) dep′ (frameBud c j)
                         (length vals) j j 2≤S
-                        (valsLen′ (frameStep j c) sl vals vC))))
+                        (valsLen (frameStep j c) sl vals vC))))
        , proj₁ WR
-       , valsIn′ (frameStep (j + j′) c) sl (proj₁ (thruWrap op nid fin WK))
+       , valsIn (frameStep (j + j′) c) sl (proj₁ (thruWrap op nid fin WK))
            (proj₁ (proj₂ WR))
            (subst (λ x → length x ≤ suc (Caps.cWid (frameStep (j + j′) c)))
-                  (sym (thruWrap-vals′ op nid fin WK))
-                  (valsLen′ (frameStep (j + j′) c) sl (proj₁ WK)
+                  (sym (thruWrap-vals op nid fin WK))
+                  (valsLen (frameStep (j + j′) c) sl (proj₁ WK)
                      (proj₁ (proj₂ (proj₂ TW)))))
        , proj₂ (proj₂ WR)
     where
     TW = thruWalk-caps-go siC c dep′ (sizeAt (Caps.cSize c) (suc j)) j g op nid κ id now vals sl sched st
            2≤S 1≤R slEq slC slSz inv pS vC lC
            (valsCaps→mList-strict c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
-              (valsOf′ (frameStep j c) sl vals vC))
+              (valsOf (frameStep j c) sl vals vC))
            (≤-pred hd)
     j′ = proj₁ TW
     WK = thruWalk g op nid κ id now vals sched st
     WR = thruWrap-caps (frameStep (j + j′) c) op nid fin sl WK
            (proj₁ (proj₂ TW))
-           (valsOf′ (frameStep (j + j′) c) sl (proj₁ WK)
+           (valsOf (frameStep (j + j′) c) sl (proj₁ WK)
               (proj₁ (proj₂ (proj₂ TW))))
            (proj₁ (proj₂ (proj₂ (proj₂ TW))))
 

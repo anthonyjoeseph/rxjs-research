@@ -144,7 +144,7 @@ mid-init-caches {Γ = Γ} a sched sched″ st rt eq h rewrite latch-nodes a st =
                           + countLiveInners nid (dropSource (arrSource a) (EvalSt.registry st)))) ≡ true
             snd = subst (λ z → (k ≡ᵇ z) ≡ true) keq (≡ᵇ-refl k)
         in trans (cong (not (mergeReachable nid (dropSource (arrSource a) (EvalSt.registry st))) ∨_) snd)
-                 (∨-zeroʳ (not (mergeReachable nid (dropSource (arrSource a) (EvalSt.registry st)))))
+                 (∨-trueʳ (not (mergeReachable nid (dropSource (arrSource a) (EvalSt.registry st)))))
 
   go : (nodes : List (NodeId × NodeState Γ)) →
        cachesValid nodes (EvalSt.registry st) ≡ true →

@@ -330,9 +330,6 @@ latch-nodes a st with Arrival.isLast a
 ∨-fʳ : ∀ (b c : Bool) → (b ∨ c) ≡ false → c ≡ false
 ∨-fʳ false c h = h
 ∨-fʳ true  c ()
-∨-zeroʳ : ∀ (b : Bool) → (b ∨ true) ≡ true
-∨-zeroʳ true  = refl
-∨-zeroʳ false = refl
 
 ------------------------------------------------------------------
 -- pure elemℕ / nubLen / keepAbsent combinatorics — the set-partition
@@ -370,7 +367,7 @@ nubLen-partition : ∀ (A B : List NodeId) →
   nubLen (A ++ B) ≡ nubLen (keepAbsent B A) + nubLen B
 nubLen-partition []       B = refl
 nubLen-partition (x ∷ xs) B with elemℕ x B in eqB
-... | true  rewrite elemℕ-++ x xs B | eqB | ∨-zeroʳ (elemℕ x xs) = nubLen-partition xs B
+... | true  rewrite elemℕ-++ x xs B | eqB | ∨-trueʳ (elemℕ x xs) = nubLen-partition xs B
 ... | false rewrite elemℕ-++ x xs B | eqB | ∨-identityʳ (elemℕ x xs)
                   | elemℕ-keepAbsent-absent x B xs eqB with elemℕ x xs
 ...   | true  = nubLen-partition xs B

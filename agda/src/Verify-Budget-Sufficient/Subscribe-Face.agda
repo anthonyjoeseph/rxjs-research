@@ -299,38 +299,17 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- report.  Both halves are .Caps-Face's `valsCaps?-parts`; only the
 -- packing direction is new, and it now takes the cardinality it used to
 -- postulate
-valsOf : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
-  valsCaps? c sl vs ≡ true → all (valCaps? c sl s) vs ≡ true
-valsOf c sl vs h = proj₁ (valsCaps?-parts c sl vs h)
 
-valsLen : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
-  valsCaps? c sl vs ≡ true → length vs ≤ suc (Caps.cWid c)
-valsLen c sl vs h = proj₂ (valsCaps?-parts c sl vs h)
 
-valsIn : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ) (vs : List (Val Γ s)) →
-  all (valCaps? c sl s) vs ≡ true → length vs ≤ suc (Caps.cWid c) →
-  valsCaps? c sl vs ≡ true
-valsIn c sl vs h hl =
-  ∧-intro h (T⇒≡true (length vs ≤ᵇ suc (Caps.cWid c)) (≤⇒≤ᵇ hl))
 
 -- a cardinality rides the caps order exactly as the two receipts do:
 -- ⊑ᶜ's middle component IS `cWid ≤ cWid`
-lenWiden : ∀ {A : Set} {c c′ : Caps} (xs : List A) → c ⊑ᶜ c′ →
-  length xs ≤ suc (Caps.cWid c) → length xs ≤ suc (Caps.cWid c′)
-lenWiden xs (_ , wd≤ , _) h = ≤-trans h (s≤s wd≤)
 
 -- ONE MORE FOLD, CHARGED PER CONS.  The three concatenating clauses
 -- report `suc (j₁ + j₂)` where the additive ones report `j₁ + j₂`, so
 -- what they hold at `(j + j₁) + j₂` has to travel one rung further than
 -- +-assoc alone would take it.  This is that rung: `(j + j₁) + j₂ ≤
 -- j + suc (j₁ + j₂)`, rebracketed and bumped, then frameStep-mono-j
-frameStep-+suc : ∀ (c : Caps) (j a b : ℕ) → 2 ≤ Caps.cSize c →
-  frameStep ((j + a) + b) c ⊑ᶜ frameStep (j + suc (a + b)) c
-frameStep-+suc c j a b 2≤S =
-  frameStep-mono-j c 2≤S
-    (≤-trans (≤-reflexive (+-assoc j a b))
-      (≤-trans (n≤1+n (j + (a + b)))
-               (≤-reflexive (sym (+-suc j (a + b))))))
 
 -- burstCount? WIDENS.  Both conjuncts are `_ ≤ᵇ suc (cWid c)` and ⊑ᶜ
 -- gives `cWid c ≤ cWid c′`, so the whole predicate rides the order —
@@ -413,11 +392,9 @@ burstCount?-tail c em str h =
 
 -- § 1.  THE SIZE→WIDTH BRIDGE.
 
-two* : ∀ (X : ℕ) → 2 * X ≡ X + X
-two* X = cong (X +_) (*-identityˡ X)
 
 sucX≤2X : ∀ (X : ℕ) → 1 ≤ X → suc X ≤ 2 * X
-sucX≤2X X h = ≤-trans (+-monoˡ-≤ X h) (≤-reflexive (sym (two* X)))
+sucX≤2X X h = ≤-trans (+-monoˡ-≤ X h) (≤-reflexive (sym (2X≡X+X X)))
 
 -- the base of the bridge, at S = 2: `suc (2 * R) ≤ 2 ^ R` from R = 3
 -- (7 ≤ 8) up, by doubling both sides
@@ -448,16 +425,13 @@ sizeStep≤foldStep : ∀ (S s R : ℕ) → 2 ≤ S → 3 ≤ R → s ≤ R →
 sizeStep≤foldStep S s R 2≤S 3≤R s≤R =
   *-monoʳ-≤ S (≤-trans (s≤s (*-monoʳ-≤ 2 s≤R)) (suc2≤pow S R 2≤S 3≤R))
 
-pow-pos′ : ∀ (S w : ℕ) → 1 ≤ S → 1 ≤ S ^ w
-pow-pos′ S zero    h = s≤s z≤n
-pow-pos′ S (suc w) h = *-mono-≤ h (pow-pos′ S w h)
 
 -- and the bridge itself, by induction on j against the SAME j three
 -- folds up.  The base is `S ≤ S * S ^ W ≤ iterFold S 3 W`
 sizeBelowWid : ∀ (S W j : ℕ) → 2 ≤ S → iterSize S j S ≤ iterFold S (j + 3) W
 sizeBelowWid S W zero 2≤S =
   ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ S)))
-                   (*-monoʳ-≤ S (pow-pos′ S W (≤-trans (s≤s z≤n) 2≤S))))
+                   (*-monoʳ-≤ S (1≤pow≤ S W (≤-trans (s≤s z≤n) 2≤S))))
           (iterFold-mono-count S W 2≤S {1} {3} (s≤s z≤n))
 sizeBelowWid S W (suc j) 2≤S =
   ≤-trans (≤-reflexive (iterSize-suc S j S))
@@ -478,7 +452,7 @@ size≤widAt1 : ∀ (c : Caps) → 1 ≤ Caps.cSize c →
   Caps.cSize c ≤ Caps.cWid (frameStep 1 c)
 size≤widAt1 c 1≤S =
   ≤-trans (≤-reflexive (sym (*-identityʳ (Caps.cSize c))))
-          (*-monoʳ-≤ (Caps.cSize c) (pow-pos′ (Caps.cSize c) (Caps.cWid c) 1≤S))
+          (*-monoʳ-≤ (Caps.cSize c) (1≤pow≤ (Caps.cSize c) (Caps.cWid c) 1≤S))
 
 -- § 2.  THE EMIT'S VALUE COUNT, computed rather than bounded.
 
@@ -619,29 +593,11 @@ slotSize≤slotsSize sl i = fᵢ≤sum-tab (λ k → slotSize (sl k)) i
 2*suc≤2^suc : ∀ (w : ℕ) → 2 * suc w ≤ 2 ^ suc w
 2*suc≤2^suc w = *-monoʳ-≤ 2 {suc w} {2 ^ w} (n<2^n w)
 
-double≤foldStep : ∀ (S w : ℕ) → 2 ≤ S → 2 * suc w ≤ foldStep S w
-double≤foldStep S w hS = ≤-trans (2*suc≤2^suc w) (^-monoˡ-≤ (suc w) hS)
 
 dbl-suc : ∀ (w : ℕ) → suc w + suc w ≡ 2 * suc w
 dbl-suc w = sym (trans (cong (λ x → suc w + x) (+-identityʳ (suc w))) refl)
 
-sum-fold : ∀ (S W a b : ℕ) → 2 ≤ S →
-  a ≤ suc W → b ≤ suc W → a + b ≤ suc (foldStep S W)
-sum-fold S W a b hS ha hb =
-  ≤-trans (+-mono-≤ ha hb)
-          (≤-trans (≤-reflexive (dbl-suc W))
-                   (≤-trans (double≤foldStep S W hS) (n≤1+n (foldStep S W))))
 
-concat-fits : ∀ {A : Set} (c : Caps) (L : ℕ) (xs ys : List A) →
-  2 ≤ Caps.cSize c →
-  length xs ≤ suc (Caps.cWid (frameStep L c)) →
-  length ys ≤ suc (Caps.cWid (frameStep L c)) →
-  length (xs ++ ys) ≤ suc (Caps.cWid (frameStep (suc L) c))
-concat-fits c L xs ys hS hx hy =
-  subst (λ x → length (xs ++ ys) ≤ suc x) (sym (frameStep-wid-suc c L))
-    (≤-trans (≤-reflexive (length-++ xs))
-             (sum-fold (Caps.cSize c) (Caps.cWid (frameStep L c))
-                       (length xs) (length ys) hS hx hy))
 
 suc-fits : ∀ (c : Caps) (L a : ℕ) → 2 ≤ Caps.cSize c →
   a ≤ suc (Caps.cWid (frameStep L c)) →
@@ -722,47 +678,6 @@ splitBurst-len {Γ = Γ} {u = u} N (em ∷ ems) h =
 -- wrap and the scan frame's node dispatch are not, and both are pure
 -- pass-throughs on the payload — thruWrap only sets a completion flag,
 -- and scan's dispatch either scans or emits nothing
-thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (op : AllOp) (nid : NodeId) (fin : Bool)
-  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
-  proj₁ (thruWrap op nid fin r) ≡ proj₁ r
-thruWrap-vals op nid false (vs , bs , sd , st′) = refl
-thruWrap-vals mergeᵒ nid true (vs , bs , sd , st′)
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                = refl
-... | just (scan-st _)       = refl
-... | just (take-st _)       = refl
-... | just (merge-st _ _)    = refl
-... | just (concat-st _ _ _) = refl
-... | just (switch-st _ _)   = refl
-... | just (exhaust-st _ _)  = refl
-thruWrap-vals concatᵒ nid true (vs , bs , sd , st′)
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                = refl
-... | just (scan-st _)       = refl
-... | just (take-st _)       = refl
-... | just (merge-st _ _)    = refl
-... | just (concat-st _ _ _) = refl
-... | just (switch-st _ _)   = refl
-... | just (exhaust-st _ _)  = refl
-thruWrap-vals switchᵒ nid true (vs , bs , sd , st′)
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                = refl
-... | just (scan-st _)       = refl
-... | just (take-st _)       = refl
-... | just (merge-st _ _)    = refl
-... | just (concat-st _ _ _) = refl
-... | just (switch-st _ _)   = refl
-... | just (exhaust-st _ _)  = refl
-thruWrap-vals exhaustᵒ nid true (vs , bs , sd , st′)
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                = refl
-... | just (scan-st _)       = refl
-... | just (take-st _)       = refl
-... | just (merge-st _ _)    = refl
-... | just (concat-st _ _ _) = refl
-... | just (switch-st _ _)   = refl
-... | just (exhaust-st _ _)  = refl
 
 stepFrame-scan-len : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (g : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)

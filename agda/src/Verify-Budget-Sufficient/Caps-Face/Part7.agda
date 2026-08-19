@@ -218,7 +218,7 @@ thruOuter-face :
 thruOuter-face siC =
   thruOuter-face-core
     siC
-    reach-resets
+    reach-reset
     (λ {n} {Γ} {t} {e} → foldPath-sink-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → shareGo-skip-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → shareGo-cons-N {n} {Γ} {t} {e})

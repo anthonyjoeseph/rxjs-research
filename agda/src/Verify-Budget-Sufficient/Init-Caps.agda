@@ -57,7 +57,12 @@ open import Verify-Budget-Sufficient.Measures
 
 -- capsOK? and widLive live in Caps-Face
 open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; widLive)
+  using (capsOK?; widLive;
+         -- the data-slot zeros: PROVEN in .Caps-Face.Part5, which this
+         -- module imports through the umbrella.  They were duplicated
+         -- here as `outWᵛ-data-zero`/`dWᵛ-data-zero`/`pWᵛ-data-zero`
+         -- until 2026-08-19; a `using` list is what hid the originals.
+         outWᵛ-data; dWᵛ-data; pWᵛ-data)
 
 -- Caps record type and constructor
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
@@ -76,54 +81,16 @@ baseCaps {n = n} e sl =
 
 -- When T (isData (s ×ᵗ t)) holds, extract T (isData s).
 -- Works equally for s +ᵗ t since isData (s ×ᵗ t) = isData (s +ᵗ t) definitionally.
-isData-fst : ∀ (s t : Ty) → T (isData (s ×ᵗ t)) → T (isData s)
-isData-fst s t ok with isData s
-... | false = ⊥-elim ok   -- ok : T false = ⊥
-... | true  = tt            -- T (isData s) = T true = ⊤
 
-isData-snd : ∀ (s t : Ty) → T (isData (s ×ᵗ t)) → T (isData t)
-isData-snd s t ok with isData s
-... | false = ⊥-elim ok   -- ok : T false = ⊥
-... | true  = ok            -- T (isData (s ×ᵗ t)) = T (isData t) after subst
 
 ----------------------------------------------------------------------
 -- STEP 2.  outWᵛ = 0 and dWᵛ = 0 for data types; hence pWᵛ = 0.
 ----------------------------------------------------------------------
 
-outWᵛ-data-zero : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty)
-  → T (isData t) → (v : Val Γ t) → outWᵛ j sl t v ≡ 0
-outWᵛ-data-zero j sl unitᵗ      ok _        = refl
-outWᵛ-data-zero j sl boolᵗ      ok _        = refl
-outWᵛ-data-zero j sl natᵗ       ok _        = refl
-outWᵛ-data-zero j sl (s ×ᵗ t)   ok (a , b)  =
-  cong₂ _⊔_ (outWᵛ-data-zero j sl s (isData-fst s t ok) a)
-             (outWᵛ-data-zero j sl t (isData-snd s t ok) b)
-outWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₁ a) =
-  outWᵛ-data-zero j sl s (isData-fst s t ok) a
-outWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₂ b) =
-  outWᵛ-data-zero j sl t (isData-snd s t ok) b
-outWᵛ-data-zero j sl (obs t)     ok _        = ⊥-elim ok  -- isData (obs t) = false
 
-dWᵛ-data-zero : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty)
-  → T (isData t) → (v : Val Γ t) → dWᵛ j sl t v ≡ 0
-dWᵛ-data-zero j sl unitᵗ      ok _        = refl
-dWᵛ-data-zero j sl boolᵗ      ok _        = refl
-dWᵛ-data-zero j sl natᵗ       ok _        = refl
-dWᵛ-data-zero j sl (s ×ᵗ t)   ok (a , b)  =
-  cong₂ _⊔_ (dWᵛ-data-zero j sl s (isData-fst s t ok) a)
-             (dWᵛ-data-zero j sl t (isData-snd s t ok) b)
-dWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₁ a) =
-  dWᵛ-data-zero j sl s (isData-fst s t ok) a
-dWᵛ-data-zero j sl (s +ᵗ t)   ok (inj₂ b) =
-  dWᵛ-data-zero j sl t (isData-snd s t ok) b
-dWᵛ-data-zero j sl (obs t)     ok _        = ⊥-elim ok
 
 -- pWᵛ j sl t v = outWᵛ j sl t v ⊔ dWᵛ j sl t v (Frame-Width.agda:418-419)
 -- cong₂ _⊔_ p q : outWᵛ ⊔ dWᵛ ≡ 0 ⊔ 0; and 0 ⊔ 0 = 0 definitionally
-pWᵛ-data-zero : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (t : Ty)
-  → T (isData t) → (v : Val Γ t) → pWᵛ j sl t v ≡ 0
-pWᵛ-data-zero j sl t ok v =
-  cong₂ _⊔_ (outWᵛ-data-zero j sl t ok v) (dWᵛ-data-zero j sl t ok v)
 
 ----------------------------------------------------------------------
 -- STEP 3.  The widLive predicate holds on any list of pending values
@@ -136,8 +103,8 @@ all-pWᵛ-data : ∀ {n} {Γ : Ctx n} {A : Set} (j W : ℕ) (sl : Slots Γ) (t :
 all-pWᵛ-data j W sl t ok [] = refl
 all-pWᵛ-data j W sl t ok ((tk , v) ∷ ps) =
   ∧-intro
-    -- pWᵛ-data-zero gives pWᵛ = 0; subst replaces it; 0 ≤ᵇ W = refl
-    (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (pWᵛ-data-zero j sl t ok v)) refl)
+    -- pWᵛ-data gives pWᵛ = 0; subst replaces it; 0 ≤ᵇ W = refl
+    (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (pWᵛ-data j sl t ok v)) refl)
     (all-pWᵛ-data j W sl t ok ps)
 
 ----------------------------------------------------------------------

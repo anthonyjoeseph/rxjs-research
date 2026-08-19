@@ -189,8 +189,6 @@ cr-fresh rid x ps c h rewrite h = refl
 -- drops its count by one.  Small hit/miss reductions feed the two.
 ------------------------------------------------------------------
 
-suc-inj : ∀ {m k : ℕ} → suc m ≡ suc k → m ≡ k
-suc-inj refl = refl
 
 lookupOwed-hit : ∀ (s x : Source) (n : ℕ) (o : Owed) →
   (s ≡ᵇ x) ≡ true → lookupOwed s ((x , n) ∷ o) ≡ n
@@ -372,7 +370,7 @@ countIn-removeOne : ∀ (s : Source) (lv : List Source) (k : ℕ) →
   Σ (List Source) λ lv′ → (removeOne s lv ≡ just lv′) × (countIn s lv′ ≡ k)
 countIn-removeOne s [] k ()
 countIn-removeOne s (x ∷ xs) k eq with s ≡ᵇ x in sx
-... | true  = xs , refl , suc-inj eq
+... | true  = xs , refl , sucInjᵂ eq
 countIn-removeOne s (x ∷ xs) k eq | false
   with countIn-removeOne s xs k eq
 ... | xs′ , ro , ci rewrite ro = x ∷ xs′ , refl , trans (countIn-miss s x xs′ sx) ci

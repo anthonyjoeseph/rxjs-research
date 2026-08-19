@@ -852,20 +852,9 @@ sum-tabulate-lb {suc n} f (Fin.suc i) =
 -- nothing in capsOK? relates the two: the relation is a fact about the
 -- SLOT TELESCOPE, and it is true at every level because capsAt's base
 -- contains slotsSize as a summand and iterSize only grows it
-1≤slotSize : ∀ {n} {Γ : Ctx n} {k t} (s : Slot Γ k t) → 1 ≤ slotSize s
-1≤slotSize (scripted (hot _))    = s≤s z≤n
-1≤slotSize (scripted (cold _ _)) = s≤s z≤n
-1≤slotSize (shared d)            = sizeᵉ-pos d
-
-n≤sum-tab : ∀ {n} (f : Fin n → ℕ) → (∀ (i : Fin n) → 1 ≤ f i) →
-  n ≤ sum (tabulate f)
-n≤sum-tab {zero}  f h = z≤n
-n≤sum-tab {suc n} f h =
-  +-mono-≤ (h Fin.zero) (n≤sum-tab (λ k → f (Fin.suc k)) (λ k → h (Fin.suc k)))
-
-n≤slotsSize : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) → n ≤ slotsSize sl
-n≤slotsSize sl = n≤sum-tab (λ i → slotSize (sl i)) (λ i → 1≤slotSize (sl i))
-
+-- (1≤slotSize / n≤sum-tab / n≤slotsSize MOVED DOWN to .Measures
+-- 2026-08-19, where slotHop-sup also needs them.  They are still in
+-- scope here, through this module's `public` import chain.)
 n≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   n ≤ Caps.cSize (capsAt e sl id)
 n≤capsAt-size e sl id =
@@ -1117,8 +1106,6 @@ linStep : ∀ (t : ℕ) → suc (2 * suc t) ≡ suc (2 * t) + 2
 linStep = solve 1 (λ a → con 1 :+ con 2 :* (con 1 :+ a)
                        := (con 1 :+ con 2 :* a) :+ con 2) refl
 
-dbl : ∀ (y : ℕ) → 2 * y ≡ y + y
-dbl = solve 1 (λ a → con 2 :* a := a :+ a) refl
 
 -- the engine, with the linear fact it needs carried alongside
 sq-exp : ∀ (k : ℕ) →
@@ -1129,7 +1116,7 @@ sq-exp (suc k) = SQ , LIN
   t   = 4 + k
   ih  = sq-exp k
   half : 2 ^ suc t ≡ 2 ^ t + 2 ^ t
-  half = dbl (2 ^ t)
+  half = 2X≡X+X (2 ^ t)
   two≤ : 2 ≤ 2 ^ t
   two≤ = ≤-trans (≤ᵇ⇒≤ 2 4 tt) (^-monoʳ-≤ 2 (≤ᵇ⇒≤ 2 t tt))
   SQ : suc t * suc t ≤ 2 ^ suc t
@@ -1180,7 +1167,7 @@ two-folds S Tb hS hT =
   expfit =
     ≤-trans (+-mono-≤ (sq≤pow Tb hT) (s≤s (n<2^n Tb)))
     (≤-trans (≤-reflexive (+-suc (2 ^ Tb) (2 ^ Tb)))
-             (s≤s (≤-trans (≤-reflexive (sym (dbl (2 ^ Tb))))
+             (s≤s (≤-trans (≤-reflexive (sym (2X≡X+X (2 ^ Tb))))
                            (^-monoˡ-≤ (suc Tb) hS))))
 
 ------------------------------------------------------------------
@@ -1212,7 +1199,7 @@ len≤sizeᵗˢ (y ∷ ys) = +-mono-≤ (sizeᵗ-pos y) (len≤sizeᵗˢ ys)
 -- everything ONE fold has to dominate, at the children's bound Tb
 one-fits : ∀ (S Tb x : ℕ) → 2 ≤ S → 4 ≤ Tb → x ≤ Tb * Tb + Tb * Tb → x ≤ foldStep S Tb
 one-fits S Tb x hS hT h =
-  ≤-trans (≤-trans h (≤-reflexive (sym (dbl (Tb * Tb))))) (one-fold S Tb hS hT)
+  ≤-trans (≤-trans h (≤-reflexive (sym (2X≡X+X (Tb * Tb))))) (one-fold S Tb hS hT)
 
 T≤TT : ∀ (Tb : ℕ) → 1 ≤ Tb → Tb ≤ Tb * Tb
 T≤TT Tb hT = ≤-trans (≤-reflexive (sym (*-identityʳ Tb))) (*-monoʳ-≤ Tb hT)

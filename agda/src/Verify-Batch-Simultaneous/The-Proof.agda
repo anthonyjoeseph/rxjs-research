@@ -27,7 +27,12 @@ open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init;
                                          WellFormed; settle; applyEvents; hasOwed;
                                          bumpOwed; payOwed; cancelOwed; removeOne;
                                          countIn)
-open import Verify-Well-Formed    using (evaluate-well-formed)
+-- `just-injᵂ`/`n≢jᵂ` are imported rather than re-proven: this module had
+-- its own `just-inj`/`n≢j`, the same two Maybe facts .Part4 already
+-- proves for the rest of the Well-Formed tree.  The import surface here
+-- is a CLAIM, so it stays minimal — but re-proving a fact to keep a
+-- using-list short is the trade `make dup-check` exists to refuse.
+open import Verify-Well-Formed    using (evaluate-well-formed; just-injᵂ; n≢jᵂ)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
@@ -149,17 +154,13 @@ step-accepted x S xs acc with stepProtocol x S | acc
 -- (the clamps never fire).  Self-contained inductions.
 ------------------------------------------------------------------
 
-just-inj : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
-just-inj refl = refl
 
-n≢j : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
-n≢j ()
 
 settle-agree : (k : EmitKind) (s : Source)
   (live : List Source) (owed : Owed) {owed′ : Owed} →
   settle k s live owed ≡ just owed′ → settleBatch k s live owed ≡ owed′
-settle-agree subscribe s live owed eq = just-inj eq
-settle-agree plumbing  s live owed eq = just-inj eq
+settle-agree subscribe s live owed eq = just-injᵂ eq
+settle-agree plumbing  s live owed eq = just-injᵂ eq
 settle-agree delivery  s live owed eq with hasOwed s owed | eq
 ... | true  | eq′ rewrite eq′ = refl
 ... | false | eq′ rewrite eq′ = refl
@@ -172,7 +173,7 @@ apply-agree : ∀ {A : Set} (es : List (InstEvent A)) (live : List Source)
   (proj₁ (applyBatch es live owed vs) ≡ live′)
   × (proj₁ (proj₂ (applyBatch es live owed vs)) ≡ owed′)
 apply-agree []                  live owed done vs eq =
-  cong proj₁ (just-inj eq) , cong (λ t → proj₁ (proj₂ t)) (just-inj eq)
+  cong proj₁ (just-injᵂ eq) , cong (λ t → proj₁ (proj₂ t)) (just-injᵂ eq)
 apply-agree (init x    ∷ es) live owed done vs eq =
   apply-agree es (x ∷ live) owed done vs eq
 apply-agree (value v   ∷ es) live owed done vs eq with done | eq
@@ -243,15 +244,15 @@ stepProtocol-idle-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : So
   × (applyEvents es lv o₁ dn ≡ just (l″ , o″ , d″))
   × (S′ ≡ record { live = l″ ; horizon = hz ; current = just (i , o″) ; done = d″ })
 stepProtocol-idle-aux es i s k lv hz dn S′ stepEq with hz ≤ᵇ i in hle
-... | false = ⊥-elim (n≢j stepEq)
+... | false = ⊥-elim (n≢jᵂ stepEq)
 ... | true  with settle k s lv []
-...   | nothing = ⊥-elim (n≢j stepEq)
+...   | nothing = ⊥-elim (n≢jᵂ stepEq)
 ...   | just o₁ with applyEvents es lv o₁ dn in aeq
-...     | nothing              = ⊥-elim (n≢j stepEq)
+...     | nothing              = ⊥-elim (n≢jᵂ stepEq)
 ...     | just (l″ , o″ , d″)  =
           o₁ , l″ , o″ , d″
           , ≤ᵇ⇒≤ hz i (subst T (sym hle) tt)
-          , refl , aeq , sym (just-inj stepEq)
+          , refl , aeq , sym (just-injᵂ stepEq)
 
 stepProtocol-idle : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
   (k : EmitKind) (S S′ : ProtocolSt) →
@@ -288,20 +289,20 @@ stepProtocol-held-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : So
   × (S′ ≡ record { live = l″ ; horizon = suc j ; current = just (i , o″) ; done = d″ })
 stepProtocol-held-aux es i s k lv hz dn j oⱼ S′ pj stepEq with i ≡ᵇ j
 ... | true with paidOff oⱼ | pj
-...   | true | refl = ⊥-elim (n≢j stepEq)
+...   | true | refl = ⊥-elim (n≢jᵂ stepEq)
 stepProtocol-held-aux es i s k lv hz dn j oⱼ S′ pj stepEq | false
         with allZero oⱼ
-...   | false = ⊥-elim (n≢j stepEq)
+...   | false = ⊥-elim (n≢jᵂ stepEq)
 ...   | true  with suc j ≤ᵇ i in hle
-...     | false = ⊥-elim (n≢j stepEq)
+...     | false = ⊥-elim (n≢jᵂ stepEq)
 ...     | true  with settle k s lv []
-...       | nothing = ⊥-elim (n≢j stepEq)
+...       | nothing = ⊥-elim (n≢jᵂ stepEq)
 ...       | just o₁ with applyEvents es lv o₁ dn in aeq
-...         | nothing              = ⊥-elim (n≢j stepEq)
+...         | nothing              = ⊥-elim (n≢jᵂ stepEq)
 ...         | just (l″ , o″ , d″)  =
               o₁ , l″ , o″ , d″
               , ≤ᵇ⇒≤ (suc j) i (subst T (sym hle) tt)
-              , refl , aeq , sym (just-inj stepEq)
+              , refl , aeq , sym (just-injᵂ stepEq)
 
 stepProtocol-held : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
   (k : EmitKind) (S S′ : ProtocolSt) (j : Id) (oⱼ : Owed) →
@@ -335,11 +336,11 @@ stepProtocol-cont-aux es i s k lv hz dn j oⱼ S′ ib np stepEq
   with i ≡ᵇ j | ib
 ... | true | refl with paidOff oⱼ | np
 ...   | false | refl with settle k s lv oⱼ
-...     | nothing = ⊥-elim (n≢j stepEq)
+...     | nothing = ⊥-elim (n≢jᵂ stepEq)
 ...     | just o₁ with applyEvents es lv o₁ dn in aeq
-...       | nothing              = ⊥-elim (n≢j stepEq)
+...       | nothing              = ⊥-elim (n≢jᵂ stepEq)
 ...       | just (l″ , o″ , d″)  =
-            o₁ , l″ , o″ , d″ , refl , aeq , sym (just-inj stepEq)
+            o₁ , l″ , o″ , d″ , refl , aeq , sym (just-injᵂ stepEq)
 
 stepProtocol-cont : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
   (k : EmitKind) (S S′ : ProtocolSt) (j : Id) (oⱼ : Owed) →
@@ -373,17 +374,17 @@ stepProtocol-fresh-aux : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : S
   × (S′ ≡ record { live = l″ ; horizon = suc j ; current = just (i , o″) ; done = d″ })
 stepProtocol-fresh-aux es i s k lv hz dn j oⱼ S′ nb stepEq with i ≡ᵇ j | nb
 ... | false | refl with allZero oⱼ
-...   | false = ⊥-elim (n≢j stepEq)
+...   | false = ⊥-elim (n≢jᵂ stepEq)
 ...   | true  with suc j ≤ᵇ i in hle
-...     | false = ⊥-elim (n≢j stepEq)
+...     | false = ⊥-elim (n≢jᵂ stepEq)
 ...     | true  with settle k s lv []
-...       | nothing = ⊥-elim (n≢j stepEq)
+...       | nothing = ⊥-elim (n≢jᵂ stepEq)
 ...       | just o₁ with applyEvents es lv o₁ dn in aeq
-...         | nothing              = ⊥-elim (n≢j stepEq)
+...         | nothing              = ⊥-elim (n≢jᵂ stepEq)
 ...         | just (l″ , o″ , d″)  =
               o₁ , l″ , o″ , d″
               , ≤ᵇ⇒≤ (suc j) i (subst T (sym hle) tt)
-              , refl , aeq , sym (just-inj stepEq)
+              , refl , aeq , sym (just-injᵂ stepEq)
 
 stepProtocol-fresh : ∀ {A : Set} (es : List (InstEvent A)) (i : Id) (s : Source)
   (k : EmitKind) (S S′ : ProtocolSt) (j : Id) (oⱼ : Owed) →
@@ -486,7 +487,7 @@ HorInv S = ∀ j o → ProtocolSt.current S ≡ just (j , o) → ProtocolSt.hori
 
 horinv-just : ∀ (lv : List Source) (hz : Id) (i : Id) (o″ : Owed) (dn : Bool) →
   hz ≤ i → HorInv (record { live = lv ; horizon = hz ; current = just (i , o″) ; done = dn })
-horinv-just lv hz i o″ dn h j′ o′ eq = subst (hz ≤_) (cong proj₁ (just-inj eq)) h
+horinv-just lv hz i o″ dn h j′ o′ eq = subst (hz ≤_) (cong proj₁ (just-injᵂ eq)) h
 
 -- one accepted step: the horizon never decreases, and HorInv is preserved.
 -- Dispatch on the current value as an EXPLICIT argument (not `with current

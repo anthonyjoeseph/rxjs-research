@@ -547,13 +547,55 @@ theorem. Three cases from a single night, each found only after the expensive ro
 - `pathB?-mono-B` was stated as a fresh postulate; it duplicated the proven `pathB?-widen`,
   and was caught by a name clash rather than by looking.
 
-**HOW TO SEARCH, since the failure is usually a bad search rather than no search.** Grep for
-the CONCLUSION's shape, not for the name you imagine it has — names in this repo are
-idiosyncratic (`frameStep-chain-suc` is a path-length lemma) and a name-guess reliably misses.
-Search for the operator and the relation (`pathLen`, `≤.*cSize`), for the type former, for a
-neighbouring lemma and then read what sits AROUND it — related facts cluster in one file.
-Then read the SIGNATURE rather than the header prose: a header saying a route is dead is a
-claim about an attempt, while the signature is a fact.
+### HOW TO SEARCH: `make find` FIRST, BEFORE WRITING ANYTHING NEW
+
+```
+make find Q='≤ slotsSize'        every STATEMENT whose type mentions it
+make find Q='1 ≤ sizeᵉ'          the phrase, matched against the type text
+```
+
+**Run it before you state a postulate, write a lemma, or commission a probe. Not
+"consider searching" — run this command.** It walks the whole of `agda/src` and prints
+the declared TYPE of every match, which is the thing you need in order to answer "does
+this already exist?".
+
+**IT REPLACES A HAND-ROLLED `grep`, AND THAT IS THE POINT — the rule above used to say
+"grep for the conclusion's shape", and it was FOLLOWED and STILL FAILED.** On 2026-08-19
+`1≤slotSize`, `n≤slotsSize` and `n≤sum-tab` were rewritten from scratch and collided on
+the name with copies that had been sitting in `.Caps-Face.Part1` for months. The search
+had been run, and run for the right shape — it was scoped to two `grep` arguments
+instead of the tree. `make find` takes no argument that narrows it, so that mistake is
+not available. A rule you can satisfy while still failing is a rule that needs a machine.
+
+Then, and only then, the judgement that no command can do for you:
+
+- **Search for the CONCLUSION's shape, not the name you imagine.** Names here are
+  idiosyncratic (`frameStep-chain-suc` is a path-length lemma) and a name-guess reliably
+  misses. Feed `find` the operator and the relation.
+- **A miss is weak evidence; two misses on different phrasings is strong.** If `≤ cSize`
+  finds nothing, try the operator alone, or a neighbouring lemma and read what sits
+  AROUND it — related facts cluster in one file.
+- **Read the SIGNATURE, never the header prose.** A header saying a route is dead is a
+  claim about an attempt; the signature is a fact.
+
+**AND THE CHECK BEHIND IT: `make dup-check`** — part of `make gate` — fails the build when
+two declarations prove the same fact under different names, comparing declared types up to
+renaming of bound variables. Agda already rejects the case where the NAMES collide too
+(`ClashingDefinition`); this catches the case that actually costs time, where they do not —
+`sizeᵉ-pos` and `1≤sizeᵉ`, the same statement 170 lines apart in ONE file, unnoticed for
+months. It is the after-the-fact net; `make find` is how you avoid needing it.
+
+**WHEN IT FIRES, MOVE THE FACT DOWN — do not pick a winner among the copies.** The usual
+cause is structural rather than careless: two SIBLING modules both need a fact and neither
+can import the other, so each grows its own copy (`reach-reset`'s own header documents
+exactly this, and the ten primed pairs across `.Subscribe-Face` and `.Caps-Face.Part6` are
+one missing home, not ten accidents). The repair is to put the fact in the lowest module
+that reaches both and delete the copies. Deleting one copy at random re-creates it later.
+
+**AND KEEP ONE NAMING CONVENTION PER CLASS OF FACT**, because two conventions are the
+machine that generates duplicates: someone wanting "term size is positive" greps `1≤`,
+finds nothing under that spelling, and writes a third copy. That is precisely how
+`sizeᵉ-pos` and `1≤sizeᵉ` came to coexist.
 
 **The one thing this rule does NOT license** is assuming a fact exists and building on it
 unchecked. "Assume it exists" is a directive about where to spend the next five minutes, not

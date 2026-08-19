@@ -1548,20 +1548,6 @@ INV?-install Ψ B B′ nid ns sched sched′ st B≤ slotsEq liveEq bn fn inv =
 
 -- merge's counter bump — capsOK?-mergeBump's wet twin, and the same
 -- shape: both bounds on a merge-st are `true` outright
-INV?-mergeBump : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (Ψ B : ℕ) (nid : NodeId) (done : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  INV? Ψ B sched st ≡ true →
-  INV? Ψ B sched (record st { nodes = mergeBump nid done (EvalSt.nodes st) }) ≡ true
-INV?-mergeBump Ψ B nid done sched st inv with lookupNode nid (EvalSt.nodes st)
-... | just (merge-st k od) =
-      INV?-setNode Ψ B nid (merge-st (if done then k else suc k) od) sched st
-        refl refl inv
-... | nothing                = inv
-... | just (scan-st _)       = inv
-... | just (take-st _)       = inv
-... | just (concat-st _ _ _) = inv
-... | just (switch-st _ _)   = inv
-... | just (exhaust-st _ _)  = inv
 
 -- cutThrough keeps a sublist of the registry, entries verbatim — so
 -- every `all` over the registry survives it, and so does its length
@@ -1596,16 +1582,6 @@ cutThrough-closes-nodry nid d wm dy ((rid , src , c) ∷ r)
 ...     | false = ih
 
 -- sweepLive keeps a sublist of the live ring, entries verbatim
-all-sweepLive : ∀ {n} {Γ : Ctx n} {t} (P : LiveSource Γ → Bool)
-  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
-  all P ls ≡ true → all P (sweepLive reg ls) ≡ true
-all-sweepLive P reg [] h = refl
-all-sweepLive {n = n} P reg (l ∷ ls) h
-  with (LiveSource.source l <ᵇ n)
-       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
-... | true  = ∧-intro (proj₁ (∧-true (P l) (all P ls) h))
-                      (all-sweepLive P reg ls (proj₂ (∧-true (P l) (all P ls) h)))
-... | false = all-sweepLive P reg ls (proj₂ (∧-true (P l) (all P ls) h))
 
 -- switchAll's cut, wet side: registry filtered (every `all` and the
 -- length bound survive), live swept (a sublist), slots and nodes
@@ -1617,9 +1593,9 @@ INV?-switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (proj₂ (proj₂ (switchKill cur sched st))) ≡ true
 INV?-switchKill Ψ B nothing  sched st inv = inv
 INV?-switchKill Ψ B (just v) sched st inv =
-  ∧-intro (∧-intro (all-sweepLive (boundedLive B) kept (Sched.live sched) liveB)
+  ∧-intro (∧-intro (sweepLive-all (boundedLive B) kept (Sched.live sched) liveB)
                    nodesB)
-    (∧-intro (∧-intro (all-sweepLive (fnCapLive Ψ) kept (Sched.live sched) liveΨ)
+    (∧-intro (∧-intro (sweepLive-all (fnCapLive Ψ) kept (Sched.live sched) liveΨ)
                       nodesΨ)
       (∧-intro lenOK
         (∧-intro (all-cutThrough (λ en → pathB? B Ψ (proj₂ (proj₂ (proj₂ en)))) v
@@ -3515,7 +3491,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ bi
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))
-     , INV?-mergeBump Ψ (Caps.cSize (frameStep (j + j′) c)) nid done sd₁ st₁
+     , mergeBump-INV Ψ (Caps.cSize (frameStep (j + j′) c)) nid done sd₁ st₁
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))))

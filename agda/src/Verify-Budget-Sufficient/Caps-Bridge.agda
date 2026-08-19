@@ -230,15 +230,12 @@ regsBΨ?-of rs h =
   all-impl _ _ (λ en → pathBΨ?-of (proj₂ (proj₂ (proj₂ en)))) rs h
 
 -- embedding a fixed bound B into capᴱ form: B ≤ 2 + 2·B ≤ capᴱ B 3,
--- the second step by `pow1` (Measures.agda, already proven).
-2+b+b≡2+2b : ∀ b → (2 + b) + b ≡ 2 + 2 * b
-2+b+b≡2+2b = solve 1 (λ b → (con 2 :+ b) :+ b := con 2 :+ (con 2 :* b)) refl
-
-b≤2+2b : ∀ b → b ≤ 2 + 2 * b
-b≤2+2b b = ≤-trans (m≤n+m b (2 + b)) (≤-reflexive (2+b+b≡2+2b b))
-
+-- the second step by `pow1` (Measures.agda, already proven).  The `≤`
+-- step is `V≤C` (.Measures) — this module had its own `b≤2+2b` and the
+-- rearrangement lemma under it until 2026-08-19; both are gone, and the
+-- one proof lives in the lower module.
 b≤capᴱ-b-3 : ∀ b → b ≤ capᴱ b 3
-b≤capᴱ-b-3 b = ≤-trans (b≤2+2b b) (pow1 b {3} (s≤s z≤n))
+b≤capᴱ-b-3 b = ≤-trans (V≤C b) (pow1 b {3} (s≤s z≤n))
 
 fn-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
