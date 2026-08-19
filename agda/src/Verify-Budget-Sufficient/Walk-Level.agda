@@ -1188,35 +1188,85 @@ postulate
   --     binomial step, every P and s.
   --   · sᵢ₊₁ ≡ sᵢ — DOES NOT close: it asks `1 + P * (1+P)^s ≤ (1+P)^s`,
   --     false for every P ≥ 1.
-  -- So the ENTIRE residue is the SIZE-PRESERVING step, and what is owed
-  -- there is that such a step cannot multiply either.
+  -- So the ENTIRE residue is the SIZE-PRESERVING step — and that step is
+  -- REACHABLE, which is the next section.
   --
-  -- PROBED 2026-08-19, Demand-Probe SERIES Y — the preserving arm survived
-  -- the best attack available, and the MECHANISM is not the one this header
-  -- first gave.  The reason offered was "hopD multiplies only under a mapᵉ
-  -- source, and putting the accumulator there adds a constructor": worth one
-  -- unit, and a PAIR-typed accumulator can refund a constructor many times
-  -- over, since hopDᵛ combines components by ⊔ while sizeᵛ ADDS them — wrap
-  -- one component, discard a large shallow sibling, collect the difference.
-  -- Series Y runs exactly that step against a sibling of size 32 and the
-  -- refund is never collected: 34 ↦ 51 ↦ 68 monotone while the depth runs
-  -- 0 ↦ 2 ↦ 6.
+  -- ═══ THE SIZE-PRESERVING ARM IS NOT EMPTY.  REFUTED 2026-08-19 ═══
+  -- REFUTED: `Refuted.Hop-Drag.hop-drag-absurd`, which states and kills
+  -- the arm's whole content — "a step that does not GROW the accumulator
+  -- cannot DEEPEN it" — in the strongest form (the size hypothesis
+  -- compares new accumulator against old, not against the step's whole
+  -- argument).  So the invariant `hopDᵛ accᵢ ≤ (1 + P) ^ sizeᵛ accᵢ * B`
+  -- is not provable step-by-step, and the paragraph an earlier draft of
+  -- this header ended on — "what is owed is therefore that lemma, and
+  -- only that lemma" — was owed a FALSE lemma.
   --
-  -- THE REAL REASON IS THE DRAG, and it is much stronger than the one it
-  -- replaces.  An obs-typed output is an EXPRESSION and `subΘ` substitutes
-  -- the reified argument at the variable SYNTACTICALLY — a projection inside
-  -- a `strmᵗ` is not reduced away.  So a step that reads the accumulator in
-  -- order to deepen it copies the WHOLE reified pair into the emitted
-  -- syntax, discarded sibling included, and pays for it.  The contrast row
-  -- pins it: series X's identical wrapper over a seed with nothing to drag
-  -- costs 13, series Y's costs 17.
+  -- THE DRAG ARGUMENT HAS A HOLE, AND IT IS `caseᵗ`.  Demand-Probe series
+  -- Y (below, still standing) established the drag: a step can mention the
+  -- accumulator inside a `strmᵗ` only by substitution, `subΘ` substitutes
+  -- the reified argument SYNTACTICALLY, and projections are not reduced
+  -- away — so a wrapper that deepens the accumulator carries a full copy
+  -- of it and pays in size.  Series Y ran the sharpest attack available on
+  -- that (wrap one component of a pair, discard a large shallow sibling)
+  -- and collected no refund at all: 34 ↦ 51 ↦ 68, monotone.
   --
-  -- What is owed is therefore that lemma, and only that lemma: a step whose
-  -- output DEEPENS the accumulator mentions it inside a `strmᵗ`, hence
-  -- carries a copy, hence grows the size.  Not reached by the probe and not
-  -- believed to matter: a step reading the accumulator only at evaluated Tm
-  -- position (`fstᵗ (fstᵗ (varᵗ …))`), which shrinks the size and does not
-  -- deepen; and accumulators nesting the trade several siblings deep.
+  -- What series Y could not reach is a BINDER.  A `caseᵗ` branch binds the
+  -- SCRUTINEE'S PAYLOAD, and evalWith EVALUATES the scrutinee before the
+  -- branch is substituted — so the branch's `strmᵗ` drags a copy of that
+  -- payload alone, not of the argument it was projected out of.
+  -- Scrutinising the small deep component wraps it while the large shallow
+  -- sibling is discarded for free.  The refutation's step does exactly
+  -- that and the first move SHRINKS the accumulator by 27 while DEEPENING
+  -- it: size 36 ↦ 9 ↦ 13 ↦ 17 against hopD 1 ↦ 2 ↦ 3 ↦ 4.
+  --
+  -- ⇒ THE ROW'S RISK CLASS IS UNCHANGED AND ITS RESIDUE HAS MOVED.  The
+  -- THEOREM is not in doubt — the refutation's own rows show why.  The
+  -- refund is ONE-SHOT: the sibling slot is spent by the step that
+  -- discards it, and from there the deep chain pays a flat +4 of size per
+  -- +1 of depth.  A shrinking step draws on a pool bounded by the
+  -- accumulator's INITIAL size, which the store invariant caps at V.  What
+  -- is refuted is the per-step reading, not the bound.
+  --
+  -- ═══ THE ROUTE THE REFUTATION LEAVES ═══
+  -- The exponent has to be a quantity the fold cannot DECREASE, and
+  -- `sizeᵛ accᵢ` is not one.  What the refutation's step actually discards
+  -- is a sibling that was never carrying the depth — the deep component
+  -- goes on being copied, and its own size goes on growing.  So the
+  -- exponent wants a SPINE MEASURE: the size of the hop-deepest path
+  -- through the value rather than the size of the whole value.  On the
+  -- refutation's own run the spine is monotone across every step,
+  -- including the one that drops 27 units of total size, and the drag
+  -- argument restated on it is the true one — a step that deepens the
+  -- accumulator must copy the SPINE, siblings being exactly what it may
+  -- discard.  `spine w ≤ sizeᵛ w ≤ V` then re-enters the store bound
+  -- unchanged.
+  --
+  -- ✗ DEAD ROUTE 2026-08-19 — A VALUE-LOCAL BOUND BASED ON `fnCapᵛ`.
+  -- Recorded because it is the obvious repair and it is one instantiation
+  -- from being checkable: a sharper twin of `hopD-sizeᵗ`/`pm-sizeᵗ`
+  -- (.Measures, both PROVEN, both landing at the global `szB V (sizeᵗ
+  -- tm)`) reading `hopDᵛ w ≤ (2 + fnCapᵛ w) ^ sizeᵛ w * <leaf depth>`,
+  -- with the fold then carrying only ⊔-shaped quantities — immune to the
+  -- shrink, and `map-Ψ` (.Burst-Walk, PROVEN) is already that step for
+  -- `caseWᵗ ⊔ fnCapᵗ` under `applyFn`.  DEAD because the base comes out
+  -- wrong by an unbounded margin: the conjunct is measured against `pmᵗ V
+  -- 0 f`, a SLOPE, and fnCap is a CAP.  Take `f = pairᵗ (fstᵗ var) (strmᵗ
+  -- (mapᵉ g (ofᵉ (nat̂ 0 ∷ []))))` with `g` carrying a large `caseWᵗ`: the
+  -- second component ignores the argument, so `pmᵗ V 0 f = 1`, while
+  -- `fnCapᵛ accᵢ ≥ caseWᵗ g` without bound.  No choice of leaf depth
+  -- repairs a base that is already too big.
+  --
+  -- The degenerate direction is settled and costs nothing: at `pmᵗ V 0 f
+  -- ≡ 0`, `hopD-evalWith`'s TIGHT form (its weighted sum, before
+  -- `hopD-applyFn` loosens the coefficient to `pmᵗ V 0 f ⊔ 1`) gives
+  -- `hopDᵛ (applyFn f v) ≤ hopDᵗ f ≤ B` outright, with no induction at
+  -- all.  So the fold's arithmetic is only ever asked at `pmᵗ V 0 f ≥ 1`.
+  --
+  -- WHY THE ROW IS STILL DIFFICULTY: the spine measure does not exist,
+  -- and `hopDᵛ` combines a pair by `⊔`, so defining one means picking the
+  -- branch that achieved the max — an argmax, not a fold.  Choosing that
+  -- definition is the design decision, and inventing it wrong is worse
+  -- than naming it.
   --
   -- THE ADDITIVE CORNER IS NOT A SEPARATE CASE, correcting the P-split
   -- above: at P = 1 the recurrence is Aᵢ₊₁ ≤ B + Aᵢ and the invariant asks

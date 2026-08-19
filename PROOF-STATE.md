@@ -108,37 +108,50 @@ the order attention is OWED, not a bar on running the bottom concurrently.
 - **`walk-scan-hop`** (Walk-Level) — DIFFICULTY, and the ONLY one left in this
   tier. `walk-scan` is now a real body over `walk-join`, so the row's risk is
   one CONJUNCT rather than a clause: the burstHopD? receipt for the fold, and
-  nothing else scan does is harder than `mapᵉ`. What it owes is the accumulator
-  invariant `hopDᵛ accᵢ ≤ (2 + pmᵗ V 0 f) ^ sizeᵛ accᵢ * B`, whose exponent the
-  STORE INVARIANT supplies hypothesis-side — `boundedNode B (scan-st v) =
-  sizeᵛ v ≤ᵇ B` under `INV?`, carried to `Ŝ` by `ceil` — and whose one missing
-  ingredient is a sharper `hopD-applyFn` spending a size increase per factor of
-  `P` — and the leaf's header pins that to ONE case: the invariant closes on
-  every size-INCREASING step by a binomial step, and the whole residue is the
-  size-PRESERVING one. PROBED (Demand-Probe series Y): that arm survived the
-  best attack available — a pair-typed accumulator wrapping one component
-  while discarding a size-32 shallow sibling, which refunds nothing (34 ↦ 51
-  ↦ 68 monotone, depth 0 ↦ 2 ↦ 6). The mechanism is the DRAG, not the
-  constructor count the header first claimed: `subΘ` substitutes the reified
-  argument syntactically, so a step that deepens the accumulator copies the
-  whole thing. Region reached is that arm at P = 2, three steps; NOT reached
-  is a step reading the accumulator only at evaluated Tm position, and deeper
-  nestings of the trade. Stays DIFFICULTY: stating the drag lemma is still a
-  design decision. The body it will plug into needs the source's receipt, so
-  the leaf takes the face at the SUBTERM and the same gas — structural on the
-  Exp, the pattern `input-wet-core` already uses at peeled gas, and a
-  signature change to make when the body lands rather than before. The caps
-  twin recurses the same way (`subscribeE-caps`'s scan clause calls itself on
-  `b` under `scan-f f nid ↠ κ`), which is the worked precedent for the whole
-  chain family, not just scan. `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT serve: they land at the global cap
-  `szB V V`, far above this conjunct's target. Two routes are closed and are
-  recorded in the leaf's header so they are not re-proposed — bounding the step
-  count `k` at all (width-vs-size currency, and the live route never mentions
-  `k`), and the ceiling pins (`scan-count-under-ceiling-absurd`,
-  Refuted.Caps-Face, whose width-ceiling and decouple-`Ŝ` repairs are dead and
-  whose raise-`Ŝ` one is moot). The additive escape is separately CLOSED:
-  series X (Demand-Probe) exhibits an amplifying step meeting `hopD-applyFn`
-  with EQUALITY at every iteration, needing only a nat-typed `caseᵗ`.
+  nothing else scan does is harder than `mapᵉ`. The accumulator invariant
+  `hopDᵛ accᵢ ≤ (2 + pmᵗ V 0 f) ^ sizeᵛ accᵢ * B` closes on every
+  size-INCREASING step by one binomial step, and the entire residue is the
+  size-PRESERVING one. THAT ARM IS REACHABLE AND ITS LEMMA IS REFUTED
+  (`Refuted.Hop-Drag.hop-drag-absurd`): a `caseᵗ` branch binds the scrutinee's
+  EVALUATED payload, so its `strmᵗ` drags that payload alone and a large
+  shallow sibling is discarded free — size 36 ↦ 9 while depth 1 ↦ 2. So the
+  invariant is not provable step-by-step and the exponent cannot be
+  `sizeᵛ accᵢ`, which the fold can decrease. The THEOREM survives on the same
+  rows: the refund is one-shot (9 ↦ 13 ↦ 17 against depth 2 ↦ 3 ↦ 4), so a
+  shrinking step draws on a pool the store invariant caps at `V`. Series Y
+  stands and its drag is real — a step reaching the accumulator through a
+  `strmᵗ` copies it (34 ↦ 51 ↦ 68) — it simply contains no binder. ROUTE: a SPINE
+  measure — the size of the hop-deepest path, not of the whole value. What
+  the refuting step discards is a sibling that never carried the depth, so
+  the spine is monotone across it, and the drag restated on the spine is the
+  true one (deepening must copy the spine; siblings are exactly what may be
+  dropped). `spine w ≤ sizeᵛ w ≤ V` re-enters the store bound unchanged —
+  `sizeᵛ accᵢ ≤ V` is already hypothesis-side (`boundedNode B (scan-st v)`
+  under `INV?`, carried to `Ŝ` by `ceil`). The degenerate half is settled
+  free: at `pmᵗ V 0 f ≡ 0` the TIGHT form of `hopD-evalWith` (before
+  `hopD-applyFn` loosens the coefficient to `⊔ 1`) gives
+  `hopDᵛ (applyFn f v) ≤ hopDᵗ f ≤ B` with no induction, so the arithmetic is
+  only ever asked at `pmᵗ V 0 f ≥ 1`. STAYS DIFFICULTY: the spine measure
+  does not exist, and `hopDᵛ` joins a pair by `⊔`, so defining one means an
+  argmax rather than a fold — that choice is the design decision. One repair
+  is newly DEAD and recorded in the leaf's header: a value-local bound based
+  on `fnCapᵛ` (the sharper twin of the PROVEN `hopD-sizeᵗ`/`pm-sizeᵗ`, which
+  land at the global `szB V V`), because the conjunct is measured against a
+  SLOPE and `fnCapᵛ` is a CAP — `f = pairᵗ (fstᵗ var) (strmᵗ (mapᵉ g …))`
+  with a large `caseWᵗ g` has `pmᵗ V 0 f = 1` and `fnCapᵛ accᵢ` unbounded. The body it plugs into
+  needs the source's receipt, so the leaf takes the face at the SUBTERM and
+  the same gas — structural on the Exp, the pattern `input-wet-core` already
+  uses at peeled gas, and a signature change to make when the body lands. The
+  caps twin recurses the same way (`subscribeE-caps`'s scan clause calls
+  itself on `b` under `scan-f f nid ↠ κ`), the worked precedent for the whole
+  chain family. Two routes are closed and recorded in the leaf's header so
+  they are not re-proposed — bounding the step count `k` at all
+  (width-vs-size currency, and the live route never mentions `k`), and the
+  ceiling pins (`scan-count-under-ceiling-absurd`, Refuted.Caps-Face, whose
+  width-ceiling and decouple-`Ŝ` repairs are dead and whose raise-`Ŝ` one is
+  moot). The additive escape is separately CLOSED: series X (Demand-Probe)
+  exhibits an amplifying step meeting `hopD-applyFn` with EQUALITY at every
+  iteration, needing only a nat-typed `caseᵗ`.
 - **`walk-scan-rest`** (Walk-Level) — GRINDABLE: the other eight conjuncts, at
   `WalkStmt⁻ᴴ`. It is walk-map's census verbatim at this shape — subscribeE's
   scan clause installs one node, subscribes the source and pushes, with PROVEN

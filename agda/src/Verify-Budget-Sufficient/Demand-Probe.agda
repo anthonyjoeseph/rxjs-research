@@ -1708,19 +1708,20 @@ _ = λ _ → refl
 -- depth runs 0 ↦ 2 ↦ 6.  The contrast row is series X's own first step,
 -- 14 — the same wrapper over a seed carrying nothing to drag.
 --
--- SO THE PER-STEP LEMMA STANDS, with its reason corrected: a step that
--- multiplies the depth costs at least one unit of size, not because it
--- adds a constructor but because it cannot mention the accumulator
--- without copying it.  Here the cost is a CONSTANT 17 per step, so the
--- multiplying steps are ~V/17 against a budget of (2 + P) ^ V.
+-- SO THE DRAG IS REAL, AND IT IS STILL NOT ENOUGH.  A step that reaches
+-- the accumulator THROUGH A `strmᵗ` cannot deepen it without copying it,
+-- which is what these rows pin — the cost is a constant 17 per step here.
+-- But the per-step lemma this series was built to support is FALSE, and
+-- the hole is a BINDER, which is precisely the shape this series does not
+-- contain: a `caseᵗ` branch binds the scrutinee's EVALUATED payload, so
+-- its `strmᵗ` drags that payload alone and the sibling is discarded for
+-- free.  REFUTED: `Refuted.Hop-Drag`; see walk-scan-hop's header.
 --
 -- REGION REACHED: a pair-typed accumulator, P = 2, an adversarial
--- discard of the largest component, three steps.  NOT REACHED: whether
--- the drag argument survives a step whose obs output reads the
--- accumulator ONLY at evaluated Tm position (`fstᵗ (fstᵗ (varᵗ …))`,
--- which shrinks the size and does not deepen — believed harmless, not
--- pinned); and deeper accumulator shapes where several siblings could
--- fund several refunds.
+-- discard of the largest component through a PROJECTION, three steps.
+-- NOT REACHED, and the second one is where the refutation lives: a step
+-- whose obs output reads the accumulator only at evaluated Tm position;
+-- and any step routing the accumulator through a caseᵗ binder.
 ----------------------------------------------------------------------
 
 -- the same amplifying nat template as series X, at the pair-typed arg
