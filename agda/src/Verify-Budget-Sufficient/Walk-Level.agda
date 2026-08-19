@@ -929,13 +929,22 @@ abstract
 -- clauses are where `len≤inputSize` and the LENB chain do the work, which is
 -- the same bookkeeping the wet side's hasDry conjunct needs.
 --
--- THE BLOCKER IS STRUCTURAL AND CHEAP TO STATE: `walkFace` is a PLAIN
--- definition sitting AFTER this postulate block and dispatching into it, so
--- nothing here can call it.  Proving this clause needs walkFace at the peeled
--- fuel (the connect branch subscribes the slot's def), which means walkFace
--- and the walk-* clauses have to become MUTUAL.  That refactor is the real
--- prerequisite — the eight lemmas below are not the obstacle, the module's
--- definition order is.
+-- THE BLOCKER THIS HEADER USED TO NAME IS GONE (corrected 2026-08-19).  It
+-- said walkFace was a plain definition sitting after the postulate block, so
+-- nothing could call it, and that making walkFace and the walk-* clauses
+-- MUTUAL was "the real prerequisite".  That refactor LANDED on 2026-08-15 —
+-- it is the mutual-landing paragraph above, in this same header — and the
+-- paragraph describing it as still owed was never removed.  The walk face is
+-- available: `input-wet-core` takes `WalkLevelAt (peelGas g)` and passes it
+-- to `input-wet-shared` as `wl` (the shared dispatch clause below).  So the
+-- prerequisite is met and the eight PROVEN lemmas named below are in scope;
+-- what remains is the induction that spends them, and nothing structural is
+-- in its way.
+--
+-- Two paragraphs of one header disagreeing is the "lying comment" forbidden
+-- state, and this is what it costs: the stale half reads as a work order for
+-- a refactor already done, which is a session's worth of misdirection aimed
+-- squarely at whoever picks this up next.
 --
 -- EXPECTED TO PAY IT when it is ground: connect-edge (the demand drop),
 -- sharedConnect-unconn and unconn-cons-≤ (the U bookkeeping either side
@@ -2274,6 +2283,89 @@ postulate
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
   -- no connect, so no recursion: a scripted slot replays its own values
+  --
+  -- ═══ THE CENSUS (2026-08-19).  FOUR SHAPES × THE WET FIVE ═══
+  -- GRINDABLE.  The precedent is `subscribeE-input-caps` (.Subscribe-Face,
+  -- PROVEN), whose scripted side splits into exactly these four branches
+  -- and whose clauses correspond one-to-one.  Note this postulate takes NO
+  -- walk face (contrast input-wet-shared) — the scripted slot never
+  -- connects, so nothing here recurses and no induction has to be designed.
+  -- The caps receipts arrive as HYPOTHESES, so only the wet five are owed.
+  --
+  -- What subscribeE produces (Evaluator:1401-1426), and the ingredient for
+  -- each conjunct.  Every one named below is PROVEN except where marked:
+  --
+  --   A. hot, memberSource ≡ true — burst init/close-exhausted/complete;
+  --      sched AND st untouched; caps twin returns j′ = 0.
+  --        INV?       INV?-widen (.Wet/Part1) over +-identityʳ
+  --        burstB?    no values in the burst — computation
+  --        burstHopD? no values in the burst — computation
+  --        hasDry     dryEvent fires on `dried` ALONE (Evaluator:370), and
+  --                   this burst carries `exhausted` — computation
+  --        regsLen?   registry untouched — the hypothesis, as-is
+  --
+  --   B. hot, memberSource ≡ false — burst `init` only; st = register; j′ = 1.
+  --        INV?       register-INV (.Wet/Part1)
+  --        burstB?    no values — computation
+  --        burstHopD? no values — computation
+  --        hasDry     `init` only — computation
+  --        regsLen?   ⚠ register-regsLen — THE ONE GAP, stated below
+  --
+  --   C. cold sync [] — oneShotBurst; st untouched; j′ = 1.
+  --        INV?       INV?-widen; the mint is TRANSPARENT (below)
+  --        burstB?    mapValue-B (.Measures)
+  --        burstHopD? mapValue-hop (above, this module)
+  --        hasDry     oneShot-tail-dry (.Measures)
+  --        regsLen?   registry untouched — the hypothesis, as-is
+  --
+  --   D. cold sync (d ∷ ds) — mint + addLive; st = register; j′ = 1.
+  --        INV?       register-INV then addLive-INV (.Wet/Part2)
+  --        burstB?    mapValue-B (.Measures)
+  --        burstHopD? mapValue-hop (above, this module)
+  --        hasDry     mapValue-dry + any-dry-++ (above, this module)
+  --        regsLen?   ⚠ register-regsLen — THE ONE GAP, stated below
+  --
+  -- THE MINT IS TRANSPARENT TO INV?, which is why C and D need no lemma for
+  -- it: INV? reads the schedule ONLY through `Sched.live` and `Sched.slots`
+  -- (Measures:4438, via stBounded? and fnCapBounded?), while mintSource and
+  -- mintOrdinal touch `nextSource` / `nextOrdinal` alone (Evaluator:305).
+  -- The record update reduces, so the mint is invisible to the predicate.
+  -- Only D's addLive genuinely moves `live`, and that is addLive-INV's job.
+  --
+  -- ⚠ THE ONE MISSING INGREDIENT, and it is the whole residue:
+  --
+  --   register-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  --     (ℓ : ℕ) (src : Source) (κ : Path Γ u t) (st : EvalSt e) →
+  --     pathLen κ ≤ ℓ →
+  --     regsLen? ℓ (EvalSt.registry st) ≡ true →
+  --     regsLen? ℓ (EvalSt.registry (register src κ st)) ≡ true
+  --   register-regsLen ℓ src κ st pℓ h =
+  --     all-++-intro (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
+  --       (EvalSt.registry st) _ h
+  --       (∧-intro (T⇒≡true (pathLen κ ≤ᵇ ℓ) (≤⇒≤ᵇ pℓ)) refl)
+  --
+  -- That body was WRITTEN AND DEV-CHECKED GREEN on 2026-08-19 (whole-module
+  -- agda-dev, beside switchKill-regsLen, which is its shape twin) and then
+  -- REVERTED UNLANDED, because with its consumer still a postulate it is a
+  -- proven piece ahead of its assembly — `make wiring-gate` correctly failed
+  -- it as unreachable.  It costs one import (`register`, Rx.Evaluator) and
+  -- belongs beside switchKill-regsLen.  Land it IN THE SAME COMMIT as the
+  -- body below, never before.
+  --   · `register` APPENDS, it does not prepend (Evaluator:319 — `registry
+  --     st ++ (nextReg , src , u , path) ∷ []`).  So this is all-++-intro
+  --     over a singleton, NOT a cons.  Invisible from the name, and the
+  --     cons reading typechecks nowhere.
+  --   · `pathLen κ ≤ ℓ` comes from this statement's own `pathLen κ + G ≤ ℓ`
+  --     by m≤m+n.  Nothing new is needed to discharge it.
+  --
+  -- PLACEMENT, which is a real constraint and cheap to get wrong: this body
+  -- takes no walk face, so it MUST NOT join the heavy mutual block (block 42,
+  -- 15 members — `make agda-dev ARGS='--list …'` shows it free).  Put it
+  -- ABOVE that block, where the dry/hop helpers it spends already live
+  -- (retagEvents-dry, mapValue-hop, mapValue-dry, any-dry-++, all in the
+  -- 1049-1156 range).  The regsLen? helpers do NOT: capsOK⇒regsLen and
+  -- regsLen?-mono sit ~1200 lines BELOW, after the block, so anything of
+  -- theirs this body wants has to move up with it.
   input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (g : Gas)

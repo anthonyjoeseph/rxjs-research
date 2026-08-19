@@ -84,10 +84,19 @@ row in a tier is available to its siblings as a postulate, so the
 mechanical ones can be ground in parallel by a worker. Top-to-bottom is
 the order attention is OWED, not a bar on running the bottom concurrently.
 
-- **`input-wet`** (Walk-Level) — DIFFICULTY: the Ψ axis is closed by PROVEN
-  `caseW-subΘ` + `fnCap-subΘᵉ`, the refuted hop conjunct's repair is proven,
-  and every conjunct has non-degenerate coverage. The three-clause induction
-  is the work. Evidence and the hop disanalogy in its header.
+- **`input-wet-shared`** (Walk-Level) — DIFFICULTY: the CONNECTING half, and
+  the only one that recurses. Its eight ingredients are PROVEN and the walk
+  face now reaches it, but the caps twin `sharedSlot-caps` has no recursion
+  where this has one, so the induction is still to be designed. The Ψ axis is
+  closed by PROVEN `caseW-subΘ` + `fnCap-subΘᵉ`; evidence and the hop
+  disanalogy in its header.
+- **`input-wet-scripted`** (Walk-Level) — GRINDABLE: takes NO walk face, so
+  nothing recurses and no induction has to be designed. Its header carries a
+  full census — four slot shapes × the wet five against the PROVEN
+  clause-for-clause twin `subscribeE-input-caps` — naming a proven ingredient
+  for every conjunct, with one 5-line gap (`register-regsLen`) written out and
+  dev-checked green. The routes marked "by computation" are read off the
+  evaluator, not yet typechecked.
 - **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
   the amplifier-chain region and measures the margin widening. Route and
   coverage in its header.
