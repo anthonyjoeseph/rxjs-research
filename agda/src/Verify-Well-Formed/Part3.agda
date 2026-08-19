@@ -290,6 +290,22 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- rehearsal is spent and the probe is retired (2026-08-09).
 postulate
   -- mapᵉ GAP 1: hasDry propagates inward through the map push.
+  --
+  -- ROUTE (2026-08-19): `pushBurst-map-char` (Part5:432) shows that
+  -- subscribeE (mapᵉ f b) κ ... ≡ (map (reEmit (map (applyFn f))) burst, sched, st)
+  -- where burst = proj₁ (subscribeE b (map-f f ↠ κ) ...).  `stepFrame (map-f f)`
+  -- returns evs = [] (Evaluator:1271-1272), so the events of each reEmitted emit are
+  -- exactly: `splitEvents(inner events).bookkeeping ++ map value vals′ ++ finFlag`.
+  -- `close s dried` events are in the bookkeeping list (splitEvents-nodry,
+  -- Walk-Level:1139) and never in map value or the finFlag (mapValue-dry :1070,
+  -- finList-dry :1081).  Therefore `hasDry (map (reEmit g) burst) = hasDry burst`
+  -- in both directions.  The needed direction (outer false → inner false) is the
+  -- contrapositive: if inner has a dried event, so does the reEmit of it.
+  --
+  -- POTENTIALLY DISCHARGEABLE: all ingredients are proven.  The obstacle is that
+  -- `splitEvents-nodry`, `mapValue-dry`, `finList-dry`, and `any-dry-++` all live
+  -- in Walk-Level.agda, which Part3 does not import.  They could be proven inline
+  -- in the body or added to a Part5 lemma accessible here.  No conceptual barrier.
   map-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -306,6 +322,20 @@ postulate
     valsLast? (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ true
 
   -- scanᵉ GAP 1: hasDry propagates inward through the scan push.
+  --
+  -- ROUTE (2026-08-19): `stepFrame (scan-f fn nid)` also returns evs = []
+  -- (Evaluator:1274-1284 — the scan frame writes only to the node table, never
+  -- emitting protocol events).  So the events of each pushBurst emit are
+  -- `splitEvents(inner events).bookkeeping ++ map value vals′ ++ finFlag`,
+  -- the same shape as the map case above.  `hasDry` is therefore preserved
+  -- bidirectionally through the scan push for the same reason.
+  --
+  -- Unlike map-nodry-push, there is no `pushBurst-scan-char` characterization
+  -- (scan threads a stateful accumulator), so the proof is a direct induction
+  -- over pushBurst's definition using the same dry-preservation ingredients:
+  -- `splitEvents-nodry` / `mapValue-dry` / `finList-dry` / `any-dry-++`
+  -- (all Walk-Level.agda — not currently imported by Part3).  Twin of
+  -- map-nodry-push and has the same import obstacle; no conceptual barrier.
   scan-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
     (b : Closed Γ s) (κ : Path Γ u t)
@@ -316,6 +346,25 @@ postulate
            ≡ false
 
   -- scanᵉ GAP 2: fresh scan node (with updated acc) survives subscribeE b.
+  --
+  -- ROUTE (2026-08-19): nid is minted BEFORE the inner subscribeE call.  All
+  -- subsequent node ids allocated inside `subscribeE b (scan-f f nid ↠ κ) ...`
+  -- come from `proj₂ (mintNode sched)` onward, so they are all strictly > nid.
+  -- The only writers to a specific node id are `setNode nid' ...` inside
+  -- `stepFrame (scan-f f nid')` and `takeDispatch nid' ...`, and both fire only
+  -- from `pushBurst ... nid' ...` in the OUTER `subscribeE (scanᵉ ...)` or
+  -- `subscribeE (takeᵉ ...)` clauses — AFTER their own inner subscribeE returns.
+  -- Since all inner push-Burst calls use nid' > nid, the node at nid is never
+  -- overwritten by the inner `subscribeE b ...`.  The witness is `evalTm seed`:
+  -- the node starts as `scan-st (evalTm seed)` and is unchanged.
+  --
+  -- OBSTACLE (2026-08-19): no "subscribeE only mints fresh nodes" lemma exists
+  -- in the repo.  The argument above is correct but needs a full induction over
+  -- all of subscribeE's clauses, plus the monotone-minting invariant (`Sched.nextNode`
+  -- is strictly monotone across subscribeE).  No analog of `subscribeE-keeps`
+  -- (Keeps-Ring) covers the node table — that family tracks slots and
+  -- connectedShares, not nodes.  Searched: `subscribeE-keeps`, `lookupNode`,
+  -- `installNode`, `fresh`, `nextNode`, `node-persist`; nothing found.
   scan-nodeP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
     (b : Closed Γ s) (κ : Path Γ u t)
@@ -347,6 +396,21 @@ postulate
   -- takeᵉ GAP 1: hasDry propagates inward through the take push.  Twin of
   -- scan-nodry-push, plus the `ecEq` the evaluator's `with evalTm count`
   -- needs before the outer side reduces at all.
+  --
+  -- ROUTE (2026-08-19): Same structural argument as scan-nodry-push.  The `evs`
+  -- from `takeDispatch` in the NON-cut case are [] (Evaluator:1096).  In the
+  -- CUT case, `evs = closes` where `closes = proj₁ (proj₂ (cutThrough ...))`.
+  -- `cutThrough` (Evaluator:251-261) emits only `close src cut` or
+  -- `close src cutPending` — never `close src dried`.  Therefore
+  -- `any dryEvent closes = false`, so `retagEvents closes` is also dry-free by
+  -- `retagEvents-dry` (Walk-Level:1049).  The pushBurst events are
+  -- `bk ++ retagEvents closes ++ map value vals′ ++ finFlag`, all dry-free when
+  -- the inner emit's events are dry-free.  Same import obstacle as scan-nodry-push
+  -- (ingredients in Walk-Level, not Part3).
+  --
+  -- EXTRA PREMISE: `ecEq : evalTm count ≡ suc k` is needed because the evaluator
+  -- case-splits on `evalTm count` (Evaluator:1440-1451) before the takeᵉ clause
+  -- reduces.  Without it the outer hasDry does not reduce to the inner hasDry.
   take-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -362,6 +426,17 @@ postulate
   -- advances, while a take node's budget is only spent by the take FRAME (which
   -- runs above this subscription, in pushBurst), so the count comes back
   -- unchanged rather than merely present.
+  --
+  -- ROUTE (2026-08-19): Same monotone-minting argument as scan-nodeP, and
+  -- STRONGER: `takeDispatch nid ...` (the only writer to a take node at nid)
+  -- fires only from `pushBurst (take-f nid) ...`, which lives in the OUTER
+  -- `subscribeE (takeᵉ count b)` clause.  All inner subscribeE calls use
+  -- nid' > nid and therefore never call `takeDispatch nid`.  So the count
+  -- `suc k` is not just present but EXACTLY preserved — no Σ needed.
+  --
+  -- OBSTACLE (2026-08-19): same missing "subscribeE only mints fresh nodes"
+  -- induction as scan-nodeP.  Precedent named in current header is scan-nodeP
+  -- itself — also a live postulate.  No existing proven lemma covers either.
   take-nodeP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -472,6 +547,24 @@ postulate
   -- reach it — that lemma's emit is `init src ∷ []`, and this one ships
   -- the sync prefix in the SAME emit (`init src ∷ map value sync`), so
   -- the run has values to absorb and the schedule grows a live entry.
+  --
+  -- STRUCTURAL OBSTACLE (2026-08-19): the emit is `(init src ∷ map value sync)
+  -- at id from src as subscribe`.  `runProtocol` must handle this combined
+  -- init + values emit.  `stepProtocol-faithful` (Part5:415) handles value-free
+  -- transforms of bursts, and `initReg-run` (above) covers `init src ∷ []` only.
+  -- No lemma in the repo handles `init ∷ map value sync` in a single emit for
+  -- protocol-state purposes.  The protocol is value-agnostic for the init step
+  -- (values don't appear in the Owed table), but the existing proof infrastructure
+  -- does not expose a "init + values = init" reduction for `runProtocol`.
+  --
+  -- `BurstInv` balance: `liveTypeOK? src (lookup Γ i) sched₃.live = true` requires
+  -- that the freshly-added live entry (source = src, elemTy = lookup Γ i) self-
+  -- certifies at the head, and that the pre-existing live list has no src entry
+  -- (src is freshly minted by `mintSource`).  Same freshness argument as
+  -- `subscribeE-defer-wf` below; no proved lemma for this yet.
+  --
+  -- Searched: `initReg-wf`, `initReg-run`, `runProtocol`, `stepProtocol-faithful`,
+  -- `oneShotBurst-wf`, `liveTypeOK?`; no existing lemma covers the init+values case.
   input-cold-async-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (i : Fin n) (sync : List (Val Γ (lookup Γ i)))
     (d : Timed (Val Γ (lookup Γ i))) (ds : List (Timed (Val Γ (lookup Γ i))))
@@ -495,6 +588,42 @@ postulate
           × BurstInv id sched₃ (register src κ st) S′)
 
   -- deferᵉ: init + register, no inner burst at subscribe time.
+  --
+  -- ROUTE (2026-08-19): `subscribeE fuel (deferᵉ body) κ ...` reduces to
+  -- (Evaluator:1485-1496):
+  --   burst  = ((init src ∷ []) at id from src as subscribe) ∷ []
+  --   sched' = sched₄ (after mintNode, mintSource, mintOrdinal, live ∷= entry)
+  --   st'    = register src (thru-outer mergeᵒ nid ↠ κ) (installNode nid (merge-st 0 false) st)
+  --
+  -- Three of the four conclusion conjuncts are immediate:
+  --   · hasDry premise is VACUOUS: `init src` is not `close _ dried`, so
+  --     `any dryEvent (init src ∷ []) = false`.
+  --   · valsLast? = true by `valsLast? (em ∷ []) = true` (Protocol:323).
+  --   · runProtocol equation: `initReg-run id src S ...` (lines 106-115 above)
+  --     applies — the emit shape matches exactly.
+  --
+  -- REMAINING: BurstInv id sched₄ (register src ... (installNode nid ... st)) S′.
+  --   · live-matches: same balance as `initReg-wf` — `installNode` and
+  --     `register` don't conflict; countRegs/countIn bump in lockstep via the
+  --     init event.
+  --   · reg-typed: needs `liveTypeOK? src (obs u) (Sched.live sched₄) = true`.
+  --     sched₄.live = record { source=src; elemTy=obs u; ... } ∷ (rest).
+  --     Head: `src ≡ᵇ src = true`, `sameTy (obs u) (obs u) = true`.  Rest:
+  --     `src` is freshly minted by `mintSource`; no pre-existing live entry has
+  --     source = src, so every remaining entry returns true.  This
+  --     self-certification argument has no proved lemma yet.
+  --   · hot-live: sched₄.slots = sched.slots (mintNode/mintSource/mintOrdinal
+  --     and the live-prepend all leave slots unchanged), so HotLive sched₄ =
+  --     HotLive sched definitionally.  `BurstInv.hot-live binv` supplies it.
+  --   · horizon-low, current-frame: carried unchanged from `initReg-run`.
+  --
+  -- NOT dischargeable from `initReg-wf` directly: that lemma assumes sched is
+  -- unchanged after the burst, but here sched₄ ≠ sched (it grew a live entry).
+  -- The missing piece is the freshness lemma for liveTypeOK?.
+  --
+  -- Searched: `initReg-wf`, `liveTypeOK?`, `mintSource-hot-live`,
+  -- `liveTypeOK?-sweepLive`, `liveTypeOK?-swap`; no existing lemma certifies
+  -- that a freshly-minted live entry is self-typing.
   subscribeE-defer-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (fuel : Gas) (body : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →

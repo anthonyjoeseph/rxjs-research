@@ -262,6 +262,27 @@ postulate
     let (vals′ , evs′ , fin′ , sched₁ , st₁) = stepFrame sf id now (from-inner concatᵒ allNid inst) path′ vals true sched st
     in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
+  -- thru-outer, and it STRICTLY CONTAINS the concat residue above — do not
+  -- pick it up first.  Read off the evaluator (Evaluator:1293): this clause is
+  -- `thruWrap op nid fin (thruWalk fuel op nid κ id now vals sched st)`, and
+  -- `thruWalk` (:1166) FOLDS `thruConsume` over the value LIST, threading
+  -- (sched, st) element to element.  Three consequences, none of them visible
+  -- from the block comment above:
+  --  · it is a LIST INDUCTION, not a single frame step.  Every other stepFrame
+  --    clause moves the state once; this one moves it once per emitted inner,
+  --    so FoldInv has to be re-established at each element and the statement
+  --    above is only the fold's endpoint.
+  --  · `thruConsume` (:1124) calls `subscribeInner` on the merge arm, concat's
+  --    queue-EMPTY arm, switch and exhaust — so the registry GROWS, which is
+  --    exactly the obstacle `stepFrame-wf-inner-concat` records for concatᵒ,
+  --    here at all four ops instead of one.
+  --  · switchᵒ additionally runs `switchKill` BEFORE subscribing (:1146), so
+  --    within one element the registry both shrinks and grows; the shadow and
+  --    reg-typed fields see a non-monotone registry, which the concat residue
+  --    never has to face.
+  -- So the per-element step is the concat residue and the fold above it is new
+  -- work on top.  Ordering it after that one is not a preference: proving this
+  -- first means proving that one inline. (2026-08-19)
   stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (envSrc : Source)
     (op : AllOp) (nid : NodeId) (path′ : Path Γ u t)

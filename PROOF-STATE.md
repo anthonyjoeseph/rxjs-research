@@ -165,6 +165,8 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   statement: `foldPath-frame-out`'s header says discharging it means enriching
   `stepFrame-wf` to carry FoldOut out, which would restate this family. A route
   is not evidence, so the class holds until that route is walked or replaced.
+  Order it AFTER `stepFrame-wf-inner-concat`, which it strictly contains — its
+  header now derives why from the evaluator.
 - **`mid-readoff`** (Part11) — FALSITY: the FoldOut readoff, and FoldOut is a
   6-field invariant validated at exactly one clause.
 - **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
@@ -177,9 +179,15 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   its flip conjunct.
 - **`map-valsLast-push` / `scan-valsLast-push`** (Part3) — SHAPE: each papers
   over a recorded mismatch (the proven sub-lemmas don't return `valsLast?`).
-- **`map-nodry-push`, `scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY:
-  one-line headers, no precedent named and no probe receipt anywhere. Each may
-  well be cheap; nothing on record says so, so audit before grinding.
+- **`map-nodry-push`** (Part3) — GRINDABLE: every ingredient is PROVEN —
+  `pushBurst-map-char` (.Part5) and the dry family `splitEvents-nodry` /
+  `retagEvents-dry` / `mapValue-dry` / `any-dry-++` (.Walk-Level). Only import
+  wiring remains, and Part3 already reaches that cone through Caps-Bridge.
+- **`scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY: no
+  `pushBurst-scan-char` counterpart of the map characterisation exists, and
+  `-nodeP` additionally wants an unproven "inner `subscribeE` never overwrites a
+  pre-existing nid" induction — `subscribeE-keeps` tracks slots, not the node
+  table.
 - **`input-hot-spent-wf`** (Part3) — GRINDABLE: the PROVEN `oneShotBurst-wf`
   (.Part2) is the same init/close/complete balance one source-state over, and
   the header carries the whole argument with nothing left open.
@@ -189,12 +197,17 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 - **`input-cold-async-wf`** (Part3) — DIFFICULTY: its one named precedent
   `initReg-wf` is ruled out in the header — that lemma's emit is `init src ∷ []`
   while this ships the sync prefix in the same emit.
-- **`subscribeE-defer-wf`** (Part3) — DIFFICULTY: one-line header naming no
-  precedent. Probably cheap; nothing on record backs that, so audit first.
-- **`take-nodry-push` / `take-nodeP`** (Part3) — DIFFICULTY, NOT demotable: each
-  names a scan twin and BOTH scan twins are themselves live postulates, so the
-  precedent is a plan. `-nodry` also needs the `ecEq` that the evaluator's
-  `with evalTm count` demands before the outer side reduces.
+- **`subscribeE-defer-wf`** (Part3) — DIFFICULTY, now well-scoped: three BurstInv
+  conjuncts fall out at once (hasDry vacuous, valsLast? by computation, hot-live
+  definitional); the whole residue is `liveTypeOK?` at the minted source, whose
+  tail needs a mintSource-freshness lemma the repo does not have.
+- **`take-nodry-push`** (Part3) — GRINDABLE, and NOT by the scan twin its header
+  names: `cutThrough` emits only `close src cut`/`cutPending` while `dryEvent`
+  fires on `dried` alone, so dryness is structural, and `retagEvents-dry`
+  (.Walk-Level) is proven. `ecEq` comes from the outer pushBurst's node lookup.
+- **`take-nodeP`** (Part3) — DIFFICULTY: strictly stronger than `scan-nodeP`
+  (exact kCount, not mere presence), so it inherits that row's missing induction
+  and adds count bookkeeping over cutThrough's closes.
 - **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — SHAPE:
   both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the sources the
   conclusions speak about. Restate over the (LAG) ledger; header carries the
