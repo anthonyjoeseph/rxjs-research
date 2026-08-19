@@ -2500,6 +2500,68 @@ postulate
   -- rather than merely well-typed.  The caps twin subscribeE-input-caps
   -- splits scripted further (hot / cold-nil / cold-cons); do that here too
   -- when this branch is ground.
+  --
+  -- ═══ THE INDUCTION, DESIGNED (2026-08-19) — AND THERE ISN'T ONE ═══
+  -- The row has been carried as "the induction is still to be designed".
+  -- Reading subscribeSharedSlot and sharedConnect (Evaluator) says
+  -- otherwise: this branch makes exactly ONE recursive call, and `wl` is
+  -- already the right tool for it.  What is owed is a call-site discharge
+  -- and a transport, not a new induction.  The three arms:
+  --
+  --   A. `memberSource (toℕ i) completedSources` — burst init/close/
+  --      complete, sched AND st untouched.  This is the scripted census's
+  --      shape A VERBATIM; the same ingredients close it.
+  --   B. `memberSource (toℕ i) connectedShares` — burst init only, st =
+  --      `register (toℕ i) κ st`.  The scripted census's shape B verbatim,
+  --      and its regsLen? conjunct is PROVEN register-regsLen (above).
+  --   C. neither — `sharedConnect`, and only this arm recurses:
+  --        st₁ = register (toℕ i) κ (st with connectedShares := toℕ i ∷ …)
+  --        (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) …
+  --        then branch on `burstCompleted burst`, prepending init(/close)
+  --        onto `sharedPlumb burst`, with st₂'s registry dropSource'd and
+  --        completedSources extended in the completed case.
+  --      `fuel′` IS `peelGas g`, which is exactly `wl`'s index.
+  --
+  -- SO ARM C IS `wl d …` PLUS TWO JOBS, and they are what to postulate as
+  -- LEAVES — never the whole arm:
+  --
+  --   1. THE CALL-SITE DISCHARGE.  Most of the 26 hypotheses are free at
+  --      `share-sink i`, because `pathLen (share-sink i) = 0`: the pathSz?,
+  --      pathB?, `suc pathLen ≤ cSize` and `pathLen + G ≤ ℓ` conjuncts all
+  --      collapse.  `sizeᵉ d ≤ cSize` is the slot telescope's own bound
+  --      (obs-slot-shared).  The ONE that carries content is the demand
+  --      descent, and PROVEN dBound-connect is already its exact shape —
+  --      `U′ < U` from unconn-cons-≤ (connectedShares just grew by toℕ i),
+  --      `s′ ≤ V` from the slot bound, and `r′ ≤ R` from **slotHop-cap**.
+  --      ⚠ THAT IS A REAL DEPENDENCY AND IT IS WHY BOTH ROWS ARE TIER 0:
+  --      this arm cannot close before slotHop-cap does.  The gas peel then
+  --      follows the μ clause's pattern — `G′ < G` is what lets
+  --      `gas : g hasAtLeast suc G` fund `fuel′ hasAtLeast suc G′`, and
+  --      `sharedConnect g0 = dryBurst id` is unreachable for the same
+  --      reason walk-mu's g0 clause is (no constructor at g0).
+  --
+  --   2. THE TRANSPORT, which is where the genuinely new lemmas live.
+  --      Every one of the nine conjuncts has to survive the prepended
+  --      emission, `sharedPlumb`, and the two state edits:
+  --        · the prepend carries NO values (init, close), so burstB? and
+  --          burstHopD? see it by computation, and hasDry likewise —
+  --          `dried` is not among the events prepended.
+  --        · burstHopD? is stated here at `suc (hopDᵉ F η b)`, one MORE
+  --          than the scripted side, and that suc is the share edge.  It is
+  --          free: `hopDᵉ F η (input i) = η i = slotHop F sl i`, which
+  --          slotHop-fix equates to the def's own hop, so d's values land
+  --          under the bound with the suc unspent.
+  --        · regsLen? is PROVEN register-regsLen at st₁, then the inner
+  --          conjunct, then a `dropSource` step — and dropSource only
+  --          REMOVES entries, so it preserves an `all` outright.
+  --        · capsOK? / INV? need the two state edits, both monotone in the
+  --          easy direction (registry shrinks, a source list grows).
+  --
+  -- WHAT TO WRITE NEXT, in this order: the three-arm real body with arms A
+  -- and B closed off the scripted ingredients, arm C calling `wl`, and the
+  -- transport postulated as leaves.  Landing that shape BEFORE slotHop-cap
+  -- is deliberate — it tests the fit of the dBound-connect instantiation
+  -- while it is still cheap to move.
   input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (g : Gas) → WalkLevelAt (peelGas g) →
