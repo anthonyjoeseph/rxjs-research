@@ -880,7 +880,40 @@ postulate
   -- space below is therefore MOOT; it is kept only so the two dead
   -- candidates are not re-proposed.
   --
-  -- WHAT IS ACTUALLY OWED, and it is arithmetic rather than design-risk.
+  -- WHAT IS ACTUALLY OWED IS A CURRENCY MISMATCH, NOT ARITHMETIC
+  -- (2026-08-19, correcting the paragraph below).  This header has said
+  -- "arithmetic rather than design-risk", and that undersells it.  Take
+  -- the inventory of what bounds the fold's step count k at all:
+  --
+  --   · `burstCount?` (.Caps-Face/Part1), which this face carries as a
+  --     hypothesis, is `length str ≤ᵇ suc (Caps.cWid c)` together with a
+  --     per-emit `valCountᵉ … ≤ᵇ suc (Caps.cWid c)`.  WIDTH-denominated.
+  --   · `make find Q='valCount'` returns NO size-denominated bound
+  --     anywhere in the development — every consumer (countVals, countIn,
+  --     splitEvents-valsCaps) is against suc (cWid c).
+  --   · the natural size-denominated candidate is REFUTED, with a
+  --     machine-checked receipt sitting on the measure itself
+  --     (Rx/Exp:500): `syncSizeᵉ` does NOT bound emissions per instant —
+  --     valueCount 30 against syncSizeᵉ 20 at K = 4, with K = 1..3 all
+  --     holding, which is why it looks true from small cases.
+  --
+  -- And hopDᵉ's scan clause targets `(2 + pmᵗ V 0 f) ^ V`, with V the
+  -- SIZE cap.  So the bound on k and the budget for it are in different
+  -- currencies, and converting between them is dead route #1 below —
+  -- width sits ABOVE size at the true instantiation because foldStep
+  -- towers where sizeStep scales.  THAT is why the k-form cannot close
+  -- from anything in the telescope; it is not that the arithmetic is
+  -- fiddly.
+  --
+  -- The size-in-exponent restatement below is still the live candidate,
+  -- but it is now a candidate for a DIFFERENT problem than the one this
+  -- header first framed, and it should be judged against the currency
+  -- question rather than against the k-form.  Before grinding it, settle
+  -- whether `valCountᵉ ≤ sizeᵉ b` is reachable-false the way its
+  -- syncSizeᵉ analogue is: that single question decides whether k is
+  -- size-bounded after all, and it is probeable.
+  --
+  -- THE OLD FRAMING, kept because its refutation is still load-bearing.
   -- `k ≤ sizeᵛ accₖ` is FALSE as literally stated — an identity or
   -- constant fold leaves the size alone — so the exponent cannot be the
   -- step count.  State the invariant with the size IN the exponent,

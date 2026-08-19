@@ -105,7 +105,14 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`walk-scan`** (Walk-Level) — DIFFICULTY, demoted back from SHAPE: the
+- **`walk-scan`** (Walk-Level) — DIFFICULTY, and the ONLY one left in this
+  tier. Its residue is a CURRENCY mismatch, not the arithmetic its header used
+  to claim: every bound on the fold's step count is width-denominated
+  (`burstCount?`) while hopDᵉ's scan clause budgets the exponent at the SIZE
+  cap, and converting between them is the row's own dead route. The next move
+  is a probe, not a grind — whether `valCountᵉ ≤ sizeᵉ b` is reachable-false
+  the way its `syncSizeᵉ` analogue already is (Rx/Exp header) decides it.
+  Everything below is the older framing, still accurate about the fold itself:
   restatement SHAPE predicted is not needed. The fold half is settled (its
   header derives the accumulator invariant, closing at exactly the base
   `hopDᵉ`'s scan clause carries, over PROVEN `hopD-applyFn`), and the bound on
