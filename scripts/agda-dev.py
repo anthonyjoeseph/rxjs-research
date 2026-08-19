@@ -236,6 +236,10 @@ def sync_mirror() -> None:
 # structure, and neither heavy module uses them (both use implicit top-level
 # mutual blocks, which is what this tool understands).
 OPAQUE = re.compile(r"^(private|abstract|mutual|postulate|instance)\b|^(data|record)\s")
+# The header line of one Agda error: `<file>.agda:12.3-9: error: [SomeClass]`.
+# `report` anchors its dump here so a long trailing type dump cannot push the
+# position and the error class out of view.
+ERRLINE = re.compile(r"\.agda:\d+[.,]\d+[-\d.,]*:\s*error:")
 # Lines that are neither declarations nor bodies: they pass through in place.
 PASSTHRU = re.compile(r"^(open|import|module|infix\w*|syntax|pattern|variable)\b|^\{-#")
 # `name : type`.  The name may be any Agda operator-ish token; what disqualifies
@@ -1034,9 +1038,21 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
         msg = noise(out)
         if rc != 0:
             print(f"  FAIL  {secs:6.1f}s  {focus}   (exit {rc})")
-            # The TAIL, not the head: Agda prints warnings first and dies on the
-            # error last, so a head-limited dump shows only the noise.
-            for ln in msg.split("\n")[-40:]:
+            # ANCHOR THE DUMP AT THE LAST ERROR HEADER, not at a fixed offset
+            # from either end.  The head is wrong because Agda prints warnings
+            # first and dies on the error last, so a head-limited view shows
+            # only noise — that is why this tailed.  But a pure TAIL is wrong
+            # for the same reason in reverse: an error whose message ends in a
+            # long type dump (this face's telescopes run to 40+ lines) pushes
+            # the position and the error CLASS off the top, and those two lines
+            # are the whole diagnosis.  Observed 2026-08-19 on a
+            # Walk-Level clause whose error was invisible in both directions.
+            lines = msg.split("\n")
+            heads = [k for k, ln in enumerate(lines) if ERRLINE.search(ln)]
+            body = lines[heads[-1]:] if heads else lines[-40:]
+            if len(body) > 40:
+                body = body[:39] + [f"… {len(body) - 39} more line(s) elided"]
+            for ln in body:
                 print(f"        {ln}")
             return False
         print(f"  ok    {secs:6.1f}s  {focus}")

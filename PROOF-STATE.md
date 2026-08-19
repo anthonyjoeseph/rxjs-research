@@ -84,15 +84,20 @@ row in a tier is available to its siblings as a postulate, so the
 mechanical ones can be ground in parallel by a worker. Top-to-bottom is
 the order attention is OWED, not a bar on running the bottom concurrently.
 
-- **`input-wet-shared`** (Walk-Level) — DIFFICULTY: the CONNECTING half. There
-  is NO induction to design and the header now says why — `subscribeSharedSlot`
-  is a three-way dispatch whose first two arms are the scripted census's shapes
-  A and B verbatim, and whose third makes exactly ONE recursive call, at the
-  fuel `wl` is already indexed at. What is owed is a call-site discharge and a
-  transport, both decomposed in the header. The discharge turns on PROVEN
-  `dBound-connect`, whose `r′ ≤ R` premise is the real body `slotHop-cap`,
-  now resting on the single leaf **`hopD-relᵉ`**. The Ψ axis is closed by PROVEN
-  `caseW-subΘ` + `fnCap-subΘᵉ`.
+- **`sharedConnect-walk`** (Walk-Level) — DIFFICULTY: the CONNECTING arm, all
+  that is left of `input-wet-shared` now that the dispatch is a real three-arm
+  body and arms A and B are closed. Cut where the PROVEN twin
+  `sharedConnect-caps` cuts. There is NO induction to design — one recursive
+  call, at the fuel `wl` is already indexed at — and the header decomposes what
+  is owed into a call-site discharge and a transport. The discharge turns on
+  PROVEN `dBound-connect`, whose `r′ ≤ R` premise is the real body
+  `slotHop-cap`, now resting on the single leaf **`hopD-relᵉ`**. The Ψ axis is
+  closed by PROVEN `caseW-subΘ` + `fnCap-subΘᵉ`.
+- **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
+  the one conjunct of arm B not closed by computation. Its header carries the
+  refutation that fixed its shape (false at `j′ = 0` without the caps receipt)
+  and names a proven source per conjunct. `input-wet-scripted-four`'s shape B
+  spends the same lemma.
 - **`input-wet-scripted-four`** (Walk-Level) — GRINDABLE: takes NO walk face, so
   nothing recurses and no induction has to be designed. Its header carries a
   full census — four slot shapes × the wet four against the PROVEN

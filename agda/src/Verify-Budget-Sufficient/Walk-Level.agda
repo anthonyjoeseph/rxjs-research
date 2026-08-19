@@ -168,7 +168,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          lenWiden; frameStep-+suc; concat-fits)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner;
-         depthConsume; depthWalk)
+         depthConsume; depthWalk; depthSlot; depthConn)
 open import Verify-Budget-Sufficient.Caps-Nest
   using (nest-keeps; mu-step)
 open import Verify-Budget-Sufficient.Op-Budget
@@ -2560,38 +2560,77 @@ walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 
 
 postulate
-  -- THE SLOT DISPATCH, SPLIT (2026-08-15).  input-wet-core was one opaque
-  -- postulate over every slot shape; it is now a real dispatch over the two
-  -- that behave differently, each with its own residue.  The split is the
-  -- point: only the SHARED branch connects, so only it needs the walk face,
-  -- and giving it one is what demonstrates the mutual landing is usable
-  -- rather than merely well-typed.  The caps twin subscribeE-input-caps
-  -- splits scripted further (hot / cold-nil / cold-cons); do that here too
-  -- when this branch is ground.
+  -- ARM B's INV?, AND ONLY IT.  The live-share join registers and touches
+  -- nothing else, so four of the wet five close by computation or by the
+  -- hypothesis (see the body below); this is the fifth.
+  --
+  -- ⚠ THE CAPS RECEIPT IS LOAD-BEARING, AND WITHOUT IT THIS IS FALSE AT
+  -- j′ = 0.  Stated first as `INV? at j → INV? at (j + j′) after register`
+  -- with no caps hypothesis; that is refuted by INV?'s own third conjunct,
+  -- `length (EvalSt.registry st) ≤ᵇ B` (.Measures).  `register` APPENDS one
+  -- entry, so the length goes L ↦ suc L, while j′ = 0 leaves B alone — and
+  -- a registry sitting exactly at its cap satisfies the hypothesis and
+  -- refutes the conclusion.  j′ = 0 is not hypothetical here: this face
+  -- quantifies j′ universally and the caller supplies it.
+  --
+  -- The repair is not `1 ≤ j′` (which the dispatch cannot supply) but the
+  -- observation that the length conjunct never came from widening in the
+  -- first place: `capsOK?` (.Caps-Face/Part1) carries
+  -- `length (registry st) ≤ᵇ Caps.cReg c` at the POST-state, and PROVEN
+  -- `frameStep-reg≤size` (.Caps) lifts cReg to cSize at any j.  So the
+  -- caps face already pays for the entry and this lemma spends its receipt.
+  --
+  -- GRINDABLE: third conjunct from `cOK′` through frameStep-reg≤size, the
+  -- other five by widening across `frameStep-mono-j` — stBounded? and
+  -- regsB? through their own -widen lemmas, pathB? for the new entry from
+  -- `pB` through the same ⊑ᶜ, and the two slots conjuncts unchanged (slots
+  -- never move).  The scripted census's shape B needs exactly this lemma
+  -- too, so input-wet-scripted-four spends it rather than restating it.
+  shared-live-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (Ψ j j′ : ℕ) (src : Source) (κ : Path Γ u t)
+    (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    Caps.cReg c ≤ Caps.cSize c →
+    capsOK? (frameStep (j + j′) c) sched (register src κ st) ≡ true →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    INV? Ψ (Caps.cSize (frameStep (j + j′) c)) sched (register src κ st) ≡ true
+
+  -- ARM C — THE CONNECT, cut at `sharedConnect` because that is where the
+  -- PROVEN caps twin cuts.  `sharedConnect-caps` (.Subscribe-Face) is a
+  -- lemma of its own, separate from `sharedSlot-caps`'s dispatch, and the
+  -- evaluator lifts `sharedConnect` out of subscribeSharedSlot's where
+  -- block for exactly this reason (Evaluator:1358 — "so the budget proof
+  -- can name it").  Cutting anywhere else would put this face and its
+  -- proven twin at different granularities, which is the one thing that
+  -- makes the clause-for-clause comparison stop working.
+  --
+  -- `-walk`, NOT `-wet`, and the suffix is load-bearing: `sharedConnect-wet`
+  -- ALREADY EXISTS (.Wet/Part2) and is a different face of the same
+  -- evaluator function — `capᴱ` currency, concluding INV? and burstB? over
+  -- a Σ-quantified E′.  This one is the walk face: frameStep currency, and
+  -- the five conjuncts including hasDry / burstHopD? / regsLen?.  Two real
+  -- statements, so this is a name collision rather than a duplicate fact;
+  -- the module's other walk faces (subscribeInner-walk, thruConsume-walk,
+  -- stepThru-walk) already carry the suffix that tells them apart.
   --
   -- ═══ THE INDUCTION, DESIGNED (2026-08-19) — AND THERE ISN'T ONE ═══
-  -- The row has been carried as "the induction is still to be designed".
-  -- Reading subscribeSharedSlot and sharedConnect (Evaluator) says
-  -- otherwise: this branch makes exactly ONE recursive call, and `wl` is
-  -- already the right tool for it.  What is owed is a call-site discharge
-  -- and a transport, not a new induction.  The three arms:
+  -- This row was carried for weeks as "the induction is still to be
+  -- designed".  Reading subscribeSharedSlot and sharedConnect (Evaluator)
+  -- says otherwise: this branch makes exactly ONE recursive call, and `wl`
+  -- is already the right tool for it.  What is owed is a call-site
+  -- discharge and a transport, not a new induction.
   --
-  --   A. `memberSource (toℕ i) completedSources` — burst init/close/
-  --      complete, sched AND st untouched.  This is the scripted census's
-  --      shape A VERBATIM; the same ingredients close it.
-  --   B. `memberSource (toℕ i) connectedShares` — burst init only, st =
-  --      `register (toℕ i) κ st`.  The scripted census's shape B verbatim,
-  --      and its regsLen? conjunct is PROVEN register-regsLen (above).
-  --   C. neither — `sharedConnect`, and only this arm recurses:
-  --        st₁ = register (toℕ i) κ (st with connectedShares := toℕ i ∷ …)
-  --        (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) …
-  --        then branch on `burstCompleted burst`, prepending init(/close)
-  --        onto `sharedPlumb burst`, with st₂'s registry dropSource'd and
-  --        completedSources extended in the completed case.
-  --      `fuel′` IS `peelGas g`, which is exactly `wl`'s index.
+  --   st₁ = register (toℕ i) κ (st with connectedShares := toℕ i ∷ …)
+  --   (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) …
+  --   then branch on `burstCompleted burst`, prepending init(/close) onto
+  --   `sharedPlumb burst`, with st₂'s registry dropSource'd and
+  --   completedSources extended in the completed case.
+  -- `fuel′` IS `peelGas g`, which is exactly `wl`'s index — which is why
+  -- this leaf takes the walk face rather than recursing on its own.
   --
-  -- SO ARM C IS `wl d …` PLUS TWO JOBS, and they are what to postulate as
-  -- LEAVES — never the whole arm:
+  -- SO IT IS `wl d …` PLUS TWO JOBS, and those are the leaves to split out
+  -- next — never a third copy of the whole arm:
   --
   --   1. THE CALL-SITE DISCHARGE.  Most of the 26 hypotheses are free at
   --      `share-sink i`, because `pathLen (share-sink i) = 0`: the pathSz?,
@@ -2609,7 +2648,7 @@ postulate
   --      reason walk-mu's g0 clause is (no constructor at g0).
   --
   --   2. THE TRANSPORT, which is where the genuinely new lemmas live.
-  --      Every one of the nine conjuncts has to survive the prepended
+  --      Every one of the five conjuncts has to survive the prepended
   --      emission, `sharedPlumb`, and the two state edits:
   --        · the prepend carries NO values (init, close), so burstB? and
   --          burstHopD? see it by computation, and hasDry likewise —
@@ -2625,12 +2664,86 @@ postulate
   --        · capsOK? / INV? need the two state edits, both monotone in the
   --          easy direction (registry shrinks, a source list grows).
   --
-  -- WHAT TO WRITE NEXT, in this order: the three-arm real body with arms A
-  -- and B closed off the scripted ingredients, arm C calling `wl`, and the
-  -- transport postulated as leaves.  Landing that shape BEFORE slotHop-cap
-  -- is deliberate — it tests the fit of the dBound-connect instantiation
-  -- while it is still cheap to move.
-  input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- The hypothesis list is input-wet-shared's VERBATIM, so the dispatch
+  -- passes it straight through and no call-site arithmetic hides here.
+  sharedConnect-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+    (g : Gas) → WalkLevelAt (peelGas g) →
+    ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+    (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
+    Sched.slots sched i ≡ shared d {ok = ok} →
+    b ≡ inputᶜ i →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    -- depthCONN, not depthE, and this is forced rather than cosmetic: in
+    -- the dispatch's arm C the slot scrutinee is with-abstracted, so a
+    -- `depthE g b κ …` hypothesis there reduces to `depthConn g i d′ κ …`
+    -- while the caller's own `dpt` still reads `depthSlot … (Sched.slots
+    -- sched i)`, and the two are not convertible.  Stating it at depthConn
+    -- also puts this face on exactly the proven twin's telescope
+    -- (sharedConnect-caps, .Subscribe-Face), which is where it belongs.
+    depthConn g i d κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    g hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = sharedConnect g i d κ bid now sched st
+    in capsOK? (frameStep (j + j′) c)
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                     (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+-- THE SHARED SLOT, ASSEMBLED (2026-08-19).  Was one opaque postulate over
+-- the whole slot; it is now the real three-way dispatch subscribeSharedSlot
+-- performs, against the PROVEN clause-for-clause twin `sharedSlot-caps`
+-- (.Subscribe-Face), whose three arms are these three at the same
+-- scrutinees and in the same order.
+--
+-- ARM A (spent share) and ARM B (live share) are CLOSED HERE — neither
+-- connects, so neither recurses, and between them they account for four of
+-- the wet five by computation:
+--   · burstB? / burstHopD?  `eventB?` and `hopDev?` are `true` on init,
+--     close, handoff and complete alike (.Measures) and these two arms emit
+--     no values at all, so both are refl.
+--   · hasDry                `dryEvent` fires on `close _ dried` ALONE
+--     (Evaluator:370); arm A emits `close _ exhausted`, arm B emits no
+--     close.  refl both times.
+--   · INV? (arm A)          the state is untouched, so this is INV?-widen
+--     across the cap step, and `frameStep-mono-j` supplies the step.
+--   · regsLen?              arm A leaves the registry alone (the
+--     hypothesis); arm B is PROVEN register-regsLen, spending
+--     `pathLen κ ≤ ℓ` out of this statement's own `pathLen κ + G ≤ ℓ`.
+-- What is left of arm B is its INV? alone (`shared-live-INV`), and arm C is
+-- `sharedConnect-walk`.  Both are stated above with their routes.
+input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (g : Gas) → WalkLevelAt (peelGas g) →
     ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
@@ -2681,7 +2794,49 @@ postulate
                      (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+-- `with … in slotEq2`, NOT `with … | slotEq`.  Both abstract the scrutinee
+-- so that subscribeE's own `with Sched.slots sched i` can fire — that much
+-- is forced, since subscribeE is stuck on it and the goal does not mention
+-- it syntactically, which is why `rewrite` cannot serve here.  But the
+-- `| slotEq` form CONSUMES the equation, and arm C has to hand it on to
+-- sharedConnect-walk; re-forming it as `refl` afterwards does not typecheck
+-- (Agda re-elaborates `Sched.slots sched i` un-reduced).  The `in` form
+-- keeps it, at the cost of a scripted branch that slotEq itself refutes.
+input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
+  d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
+  with Sched.slots sched i in slotEq2
+-- the slot cannot be scripted: this face was dispatched on `shared`
+... | scripted s with slotEq
+...   | ()
+input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
+  d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
+  | shared d′
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+-- ARM A — the spent share.  sched and st both untouched, so the only
+-- moving part is the cap widening on INV?.
+...  | true =
+    INV?-widen sched st (proj₁ (frameStep-mono-j c 2≤S (m≤m+n j j′))) invW
+  , refl , refl , refl , rgs
+...  | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+-- ARM B — the live share joins mid-flight: one `init`, and a registration.
+...    | true =
+    shared-live-INV c Ψ j j′ (toℕ i) κ sched st 2≤S hCR cOK′ invW pB
+  , refl , refl , refl
+  , register-regsLen ℓ (toℕ i) κ st (≤-trans (m≤m+n (pathLen κ) G) lℓ) rgs
+-- ARM C — the connect, and the only arm that recurses; `wl` goes with it.
+...    | false =
+  sharedConnect-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl
+    -- `dpt` needs NO transport: depthE at an input is `depthSlot … (Sched
+    -- .slots sched i)` by refl (.Caps-Depth) and depthSlot takes the slot
+    -- as its LAST argument, so the with-abstraction of the scrutinee has
+    -- already carried this hypothesis' type to depthConn at d′.  That is
+    -- the whole reason the leaf is stated at depthConn.
+    sched st d′ slotEq2 refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt
+    invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
 
+postulate
   -- no connect, so no recursion: a scripted slot replays its own values
   --
   -- ═══ THE CENSUS (2026-08-19).  FOUR SHAPES × THE WET FIVE ═══
