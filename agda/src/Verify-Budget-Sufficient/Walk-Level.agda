@@ -138,7 +138,8 @@ open import Verify-Budget-Sufficient.Caps-Face
          valsCaps→mList-strict; splitBurst-vals-caps; splitBurst-bk-caps;
          widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
          frameStep-size-strict-suc;
-         capsOK?-regs; pathSz?-len)
+         capsOK?-regs; pathSz?-len;
+         slotsCaps?-capsAt)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
@@ -154,7 +155,8 @@ open import Verify-Budget-Sufficient.Caps-Sadd
 open import Verify-Budget-Sufficient.Caps
   using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
          sLvlD-mono; opIterD-infl; fIterD-infl;
-         B2-cReg≤cSize; frameStep-reg≤size)
+         B2-cReg≤cSize; frameStep-reg≤size;
+         capsAt-base-size)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
@@ -709,24 +711,8 @@ postulate
   walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
 
--- THE *All BODY'S PIECES — the two plumbing lemmas and the push face
--- its assembly (below) consumes.
-postulate
-  -- INV? across a node install plus a nextNode mint, lifted one level.
-  -- Conjunct by conjunct: stBounded?'s new-node entry is the caps
-  -- boundedNode hypothesis (both read the same node list), fnCapBounded?'s
-  -- is fnCapNode; the registry conjuncts don't see nodes; the slot
-  -- conjuncts transport along the slots equality; every B test is ≤ᵇ,
-  -- upward in B.  The nextNode field is read by NO conjunct.
-  INV?-install : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (Ψ B B′ : ℕ) (nid : NodeId) (ns : NodeState Γ)
-    (sched sched′ : Sched Γ) (st : EvalSt e) →
-    B ≤ B′ →
-    Sched.slots sched′ ≡ Sched.slots sched →
-    boundedNode B′ ns ≡ true →
-    fnCapNode Ψ ns ≡ true →
-    INV? Ψ B sched st ≡ true →
-    INV? Ψ B′ sched′ (installNode nid ns st) ≡ true
+-- THE *All BODY'S PIECES — INV?-install (below, after all-setNode) and the
+-- push face its assembly (below) consumes.
 
 ------------------------------------------------------------------
 -- THE μ CLAUSE'S REMAINING MISSING PIECE.  Everything else walk-mu spends
@@ -1221,6 +1207,51 @@ INV?-setNode Ψ B nid ns sched st bn fn inv =
   nodesΨ = proj₂ (∧-true (all (fnCapLive Ψ) (Sched.live sched))
                          (all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st))
                          (proj₁ (proj₂ parts)))
+
+-- INV? across a node install plus a nextNode mint, lifted one level.
+-- Conjunct by conjunct: stBounded?'s live entry transports via liveEq,
+-- new-node entry uses boundedNode-widen + all-setNode; fnCapBounded?'s
+-- live transports via liveEq, new-node uses all-setNode; the registry
+-- conjuncts don't see nodes; the slot conjuncts transport along slotsEq;
+-- every B test is ≤ᵇ, upward in B.  The nextNode field is read by NO
+-- conjunct (slots and live are the only sched fields INV? touches).
+INV?-install : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ B B′ : ℕ) (nid : NodeId) (ns : NodeState Γ)
+  (sched sched′ : Sched Γ) (st : EvalSt e) →
+  B ≤ B′ →
+  Sched.slots sched′ ≡ Sched.slots sched →
+  Sched.live sched′ ≡ Sched.live sched →
+  boundedNode B′ ns ≡ true →
+  fnCapNode Ψ ns ≡ true →
+  INV? Ψ B sched st ≡ true →
+  INV? Ψ B′ sched′ (installNode nid ns st) ≡ true
+INV?-install Ψ B B′ nid ns sched sched′ st B≤ slotsEq liveEq bn fn inv =
+  let parts   = INV-parts Ψ B sched st inv
+      stBound = proj₁ parts
+      fnCap   = proj₁ (proj₂ parts)
+      rl      = proj₁ (proj₂ (proj₂ parts))
+      rb      = proj₁ (proj₂ (proj₂ (proj₂ parts)))
+      ss      = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ parts))))
+      sf      = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ parts))))
+      stLive  = proj₁ (∧-true _ _ stBound)
+      stNodes = proj₂ (∧-true _ _ stBound)
+      fcLive  = proj₁ (∧-true _ _ fnCap)
+      fcNodes = proj₂ (∧-true _ _ fnCap)
+      liveB′  = subst (λ li → all (boundedLive B′) li ≡ true) (sym liveEq)
+                  (all-impl _ _ (λ l → boundedLive-widen B≤ l) (Sched.live sched) stLive)
+      nodesB′ = all-setNode (boundedNode B′) nid ns (EvalSt.nodes st)
+                  (all-impl _ _ (λ kv → boundedNode-widen B≤ (proj₂ kv))
+                             (EvalSt.nodes st) stNodes) bn
+      liveΨ′  = subst (λ li → all (fnCapLive Ψ) li ≡ true) (sym liveEq) fcLive
+      nodesΨ′ = all-setNode (fnCapNode Ψ) nid ns (EvalSt.nodes st) fcNodes fn
+      ss′     = subst (λ sl → (slotsSize sl ≤ᵇ B′) ≡ true) (sym slotsEq)
+                  (≤ᵇ-widen (slotsSize (Sched.slots sched)) B≤ ss)
+      sf′     = subst (λ sl → (slotsFnCap sl ≤ᵇ Ψ) ≡ true) (sym slotsEq) sf
+  in ∧-intro (∧-intro liveB′ nodesB′)
+       (∧-intro (∧-intro liveΨ′ nodesΨ′)
+         (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) B≤ rl)
+           (∧-intro (regsB?-widen (EvalSt.registry st) B≤ rb)
+             (∧-intro ss′ sf′))))
 
 -- merge's counter bump — capsOK?-mergeBump's wet twin, and the same
 -- shape: both bounds on a merge-st are `true` outright
@@ -2667,7 +2698,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
                                 sched st inv))
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
-            (proj₁ step⊑) refl bn fnN invW
+            (proj₁ step⊑) refl refl bn fnN invW
   SUB = walkFace b c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j) g κ′ bid now sl sched₀ st₀
           2≤S 1≤R hCR slEq slC slSz inv₀
           (≤-trans szb (proj₁ step⊑))
@@ -3574,18 +3605,22 @@ WetOuter =
 -- weakening go through, and costs the landing nothing.
 ------------------------------------------------------------------
 
-postulate
-  -- ENTRY, (i): the slot store fits the caps its own recurrence is
-  -- built from.  Entry-only and slot-only — no state, no level.
-  entry-slotsCaps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : Id) →
-    slotsCaps? (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
-      ≡ true
+-- ENTRY, (i): the slot store fits the caps its own recurrence is
+-- built from.  Entry-only and slot-only — no state, no level.
+-- Proof: slotsCaps?-capsAt (Caps-Face/Part4), proven there.
+entry-slotsCaps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) →
+  slotsCaps? (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
+    ≡ true
+entry-slotsCaps e sl id = slotsCaps?-capsAt e sl id
 
-  -- ENTRY, (ii): and its total size does too.  Companion of
-  -- `size≤sizeCapAt` (.Wet/Part6, PROVEN) for the slot summand.
-  entry-slotsSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : Id) → slotsSize sl ≤ Caps.cSize (capsAt e sl id)
+-- ENTRY, (ii): and its total size does too.  Companion of
+-- `size≤sizeCapAt` (.Wet/Part6, PROVEN) for the slot summand.
+-- Proof: slotsSize sl ≤ 2 + sizeᵉ e + slotsSize sl (m≤n+m) ≤ cSize(capsAt) (capsAt-base-size).
+entry-slotsSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → slotsSize sl ≤ Caps.cSize (capsAt e sl id)
+entry-slotsSize e sl id =
+  ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
 
 -- ENTRY, (iv): capsOK?'s registry conjunct as a path-length bound.
 -- capsOK? carries regsSz? (pathSz? per chain); pathSz?-len extracts pathLen ≤ B.
