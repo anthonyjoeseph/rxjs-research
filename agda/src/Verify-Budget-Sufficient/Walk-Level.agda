@@ -137,7 +137,8 @@ open import Verify-Budget-Sufficient.Caps-Face
          thruWrap-caps; mList?; mList?-head; mList?-tail; mList?-keeps;
          valsCaps→mList-strict; splitBurst-vals-caps; splitBurst-bk-caps;
          widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
-         frameStep-size-strict-suc)
+         frameStep-size-strict-suc;
+         capsOK?-regs; pathSz?-len)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
@@ -3586,24 +3587,24 @@ postulate
   entry-slotsSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : Id) → slotsSize sl ≤ Caps.cSize (capsAt e sl id)
 
-  -- ENTRY, (iv): capsOK?'s registry conjunct, read as a LENGTH bound.
-  -- capsOK? already carries `regsSz?` (every registered chain's frames
-  -- fit the size cap); this is that conjunct with the per-chain path
-  -- length read off it.
-  capsOK⇒regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    regsLen? (Caps.cSize c) (EvalSt.registry st) ≡ true
+-- ENTRY, (iv): capsOK?'s registry conjunct as a path-length bound.
+-- capsOK? carries regsSz? (pathSz? per chain); pathSz?-len extracts pathLen ≤ B.
+capsOK⇒regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  regsLen? (Caps.cSize c) (EvalSt.registry st) ≡ true
+capsOK⇒regsLen c sched st h =
+  all-impl _ _
+    (λ en hSz → T⇒≡true _ (≤⇒≤ᵇ (pathSz?-len _ (proj₂ (proj₂ (proj₂ en))) hSz)))
+    (EvalSt.registry st)
+    (capsOK?-regs c sched st h)
 
-  -- ENTRY, (v): the ledger weakens upward, which is what spends the
-  -- `B +` above.
-  regsLen?-mono : ∀ {n} {Γ : Ctx n} {t} (m ℓ : ℕ)
-    (rs : List (RegId × Source × Chain Γ t)) → m ≤ ℓ →
-    regsLen? m rs ≡ true → regsLen? ℓ rs ≡ true
-
-  -- (the landing lift is DISCHARGED, below, as a definition rather than
-  -- a member of this block: it consumes entry-ceiling-at, and a
-  -- postulate cannot reference a definition below it.)
+-- ENTRY, (v): regsLen? weakens upward in the bound.
+regsLen?-mono : ∀ {n} {Γ : Ctx n} {t} (m ℓ : ℕ)
+  (rs : List (RegId × Source × Chain Γ t)) → m ≤ ℓ →
+  regsLen? m rs ≡ true → regsLen? ℓ rs ≡ true
+regsLen?-mono m ℓ rs m≤ℓ h =
+  all-impl _ _ (λ en → ≤ᵇ-widen (pathLen (proj₂ (proj₂ (proj₂ en)))) m≤ℓ) rs h
 
 -- THE SAME CEILING AT ANY LEVEL THE ENTRY BUDGET REACHES, which is the
 -- generalisation the landing lift needs: entry-ceiling is this at

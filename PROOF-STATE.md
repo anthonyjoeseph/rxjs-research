@@ -89,9 +89,7 @@ named postulate's own header.
   statement, finding in its header.
 - **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — DIFFICULTY.
   Path-extension and depth-mirror plumbing for the inner call.
-- **`entry-slotsCaps` / `entry-slotsSize` / `capsOK⇒regsLen` /
-  `regsLen?-mono`** (Walk-Level) — DIFFICULTY. Entry plumbing for the
-  outer assembly; each self-contained, none level-indexed.
+- **`entry-slotsCaps` / `entry-slotsSize`** (Walk-Level) — DIFFICULTY. Entry plumbing for the outer assembly; each self-contained, none level-indexed.
 - **`INV?-install`** (Walk-Level) — DIFFICULTY. Node-install plumbing
   the *All body consumes; conjunct-by-conjunct route in its header.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
