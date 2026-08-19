@@ -43,7 +43,7 @@ open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; subst; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; cong; subst; subst₂; module ≡-Reasoning)
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Frame-Width using (entryCeil)
@@ -991,6 +991,80 @@ capsAt-base-wid e sl (suc id) =
   ≤-trans (capsAt-base-wid e sl id)
           (cWid≤frameBlowup (capsAt e sl id) (capsH e sl id)
              (2≤capsAt-size e sl id))
+
+------------------------------------------------------------------
+-- B2 : THE REGISTRATION COUNT NEVER OUTRUNS THE SIZE CAP.
+-- (Moved here from Caps-Bridge.agda so Walk-Level can import it
+-- without creating a cycle through Burst-Walk.)
+------------------------------------------------------------------
+
+2X≡X+X : ∀ (X : ℕ) → 2 * X ≡ X + X
+2X≡X+X X = cong (X +_) (+-identityʳ X)
+
+sizeStep-eqn : ∀ (S X : ℕ) → sizeStep S X ≡ S + (S * X + S * X)
+sizeStep-eqn S X =
+  begin
+    S * suc (2 * X)
+  ≡⟨ *-distribˡ-+ S 1 (2 * X) ⟩
+    S * 1 + S * (2 * X)
+  ≡⟨ cong (_+ S * (2 * X)) (*-identityʳ S) ⟩
+    S + S * (2 * X)
+  ≡⟨ cong (λ y → S + S * y) (2X≡X+X X) ⟩
+    S + S * (X + X)
+  ≡⟨ cong (S +_) (*-distribˡ-+ S X X) ⟩
+    S + (S * X + S * X)
+  ∎
+  where open ≡-Reasoning
+
+frameStep-reg≤size : ∀ (c : Caps) (j : ℕ) → 1 ≤ Caps.cSize c →
+  Caps.cReg c ≤ Caps.cSize c →
+  Caps.cReg (frameStep j c) ≤ Caps.cSize (frameStep j c)
+frameStep-reg≤size c zero hS h =
+  subst (λ x → Caps.cReg x ≤ Caps.cSize x) (sym (frameStep-0 c)) h
+frameStep-reg≤size c (suc j) hS h = final
+  where
+  S  = Caps.cSize c
+  X  = Caps.cSize (frameStep j c)
+  R  = Caps.cReg (frameStep j c)
+  Rc = Caps.cReg c
+  IH : R ≤ X
+  IH = frameStep-reg≤size c j hS h
+  S≤X : S ≤ X
+  S≤X = iterSize-infl S hS j S
+  Rc*S≤S*X : Rc * S ≤ S * X
+  Rc*S≤S*X = ≤-trans (*-mono-≤ h ≤-refl) (*-monoʳ-≤ S S≤X)
+  step1 : R + Rc * S ≤ X + S * X
+  step1 = +-mono-≤ IH Rc*S≤S*X
+  X≤S*X : X ≤ S * X
+  X≤S*X =
+    ≤-trans (≤-reflexive (sym (*-identityʳ X)))
+            (≤-trans (*-monoʳ-≤ X hS) (≤-reflexive (*-comm X S)))
+  step2 : X + S * X ≤ S * X + S * X
+  step2 = +-mono-≤ X≤S*X ≤-refl
+  step3 : S * X + S * X ≤ S + (S * X + S * X)
+  step3 = m≤n+m (S * X + S * X) S
+  chain : R + Rc * S ≤ S + (S * X + S * X)
+  chain = ≤-trans step1 (≤-trans step2 step3)
+  result : R + Rc * S ≤ sizeStep S X
+  result = subst (λ y → R + Rc * S ≤ y) (sym (sizeStep-eqn S X)) chain
+  final : Caps.cReg (frameStep (suc j) c) ≤ Caps.cSize (frameStep (suc j) c)
+  final = subst₂ _≤_ (frameStep-reg-suc c j) (sym (frameStep-size-suc c j)) result
+
+B2-cReg≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) → Caps.cReg (capsAt e sl id) ≤ Caps.cSize (capsAt e sl id)
+B2-cReg≤cSize {n = n} e sl zero =
+  frameStep-reg≤size c₀ (sizeCount c₀ (capsBase e sl)) 1≤S₀ hReg₀
+  where
+  c₀ = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+            (suc (sizeᵉ e + slotsSize sl))
+  1≤S₀ : 1 ≤ Caps.cSize c₀
+  1≤S₀ = ≤-trans (s≤s z≤n) (s≤s (s≤s z≤n))
+  hReg₀ : Caps.cReg c₀ ≤ Caps.cSize c₀
+  hReg₀ = s≤s (n≤1+n (sizeᵉ e + slotsSize sl))
+B2-cReg≤cSize e sl (suc id) =
+  frameStep-reg≤size (capsAt e sl id) (sizeCount (capsAt e sl id) (capsH e sl id))
+                     (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+                     (B2-cReg≤cSize e sl id)
 
 ------------------------------------------------------------------
 -- THE RECURRENCE UNDER A TOWER — the last supply lemma, and the one

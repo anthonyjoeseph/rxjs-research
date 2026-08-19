@@ -99,7 +99,8 @@ open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-bas
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
-         frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup)
+         frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup;
+         B2-cReg≤cSize; frameStep-reg≤size)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry; valΨ?;
          frameBΨ?; pathBΨ?; regsBΨ?)
@@ -111,99 +112,6 @@ open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
 open import Rx.Prim using (InstEvent)
 open import Rx.Exp using (obs; sizeᵛ)
-
-------------------------------------------------------------------
--- (A) BRIDGE LEMMAS.  What `capsAt`'s two numeric fields ARE, related
--- to the wet family's own reading of them.
-------------------------------------------------------------------
-
--- B2 : the registration count never outruns the size cap.  PROVEN — the
--- domination guessed at above is real: one `sizeStep` unfolds to a sum
--- containing `2 * (S * X)`, which already dominates both the
--- registration increment `Rc * S` (via `Rc ≤ S` and `S ≤ X`) and the
--- carried registration count `R` (via `R ≤ X` and `X ≤ S * X`, `S ≥ 1`
--- always holding).  `frameStep-reg≤size` is that joint induction over
--- frameStep's own recurrence, bootstrapped from the base triple's own
--- `cReg₀ = suc k ≤ suc (suc k) = cSize₀` (`capsAt`'s zero clause hard-
--- codes a "2 +"/"suc" floor on both fields, so the base is never the
--- vacuous (0,0,0) case) and carried through every later frameBlowup.
-2X≡X+X : ∀ (X : ℕ) → 2 * X ≡ X + X
-2X≡X+X X = cong (X +_) (+-identityʳ X)
-
-sizeStep-eqn : ∀ (S X : ℕ) → sizeStep S X ≡ S + (S * X + S * X)
-sizeStep-eqn S X =
-  begin
-    S * suc (2 * X)
-  ≡⟨ *-distribˡ-+ S 1 (2 * X) ⟩
-    S * 1 + S * (2 * X)
-  ≡⟨ cong (_+ S * (2 * X)) (*-identityʳ S) ⟩
-    S + S * (2 * X)
-  ≡⟨ cong (λ y → S + S * y) (2X≡X+X X) ⟩
-    S + S * (X + X)
-  ≡⟨ cong (S +_) (*-distribˡ-+ S X X) ⟩
-    S + (S * X + S * X)
-  ∎
-  where open ≡-Reasoning
-
-frameStep-reg≤size : ∀ (c : Caps) (j : ℕ) → 1 ≤ Caps.cSize c →
-  Caps.cReg c ≤ Caps.cSize c →
-  Caps.cReg (frameStep j c) ≤ Caps.cSize (frameStep j c)
-frameStep-reg≤size c zero hS h =
-  subst (λ x → Caps.cReg x ≤ Caps.cSize x) (sym (frameStep-0 c)) h
-frameStep-reg≤size c (suc j) hS h = final
-  where
-  S  = Caps.cSize c
-  X  = Caps.cSize (frameStep j c)
-  R  = Caps.cReg (frameStep j c)
-  Rc = Caps.cReg c
-
-  IH : R ≤ X
-  IH = frameStep-reg≤size c j hS h
-
-  S≤X : S ≤ X
-  S≤X = iterSize-infl S hS j S
-
-  Rc*S≤S*X : Rc * S ≤ S * X
-  Rc*S≤S*X = ≤-trans (*-mono-≤ h ≤-refl) (*-monoʳ-≤ S S≤X)
-
-  step1 : R + Rc * S ≤ X + S * X
-  step1 = +-mono-≤ IH Rc*S≤S*X
-
-  X≤S*X : X ≤ S * X
-  X≤S*X =
-    ≤-trans (≤-reflexive (sym (*-identityʳ X)))
-            (≤-trans (*-monoʳ-≤ X hS) (≤-reflexive (*-comm X S)))
-
-  step2 : X + S * X ≤ S * X + S * X
-  step2 = +-mono-≤ X≤S*X ≤-refl
-
-  step3 : S * X + S * X ≤ S + (S * X + S * X)
-  step3 = m≤n+m (S * X + S * X) S
-
-  chain : R + Rc * S ≤ S + (S * X + S * X)
-  chain = ≤-trans step1 (≤-trans step2 step3)
-
-  result : R + Rc * S ≤ sizeStep S X
-  result = subst (λ y → R + Rc * S ≤ y) (sym (sizeStep-eqn S X)) chain
-
-  final : Caps.cReg (frameStep (suc j) c) ≤ Caps.cSize (frameStep (suc j) c)
-  final = subst₂ _≤_ (frameStep-reg-suc c j) (sym (frameStep-size-suc c j)) result
-
-B2-cReg≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) → Caps.cReg (capsAt e sl id) ≤ Caps.cSize (capsAt e sl id)
-B2-cReg≤cSize {n = n} e sl zero =
-  frameStep-reg≤size c₀ (sizeCount c₀ (capsBase e sl)) 1≤S₀ hReg₀
-  where
-  c₀ = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
-            (suc (sizeᵉ e + slotsSize sl))
-  1≤S₀ : 1 ≤ Caps.cSize c₀
-  1≤S₀ = ≤-trans (s≤s z≤n) (s≤s (s≤s z≤n))
-  hReg₀ : Caps.cReg c₀ ≤ Caps.cSize c₀
-  hReg₀ = s≤s (n≤1+n (sizeᵉ e + slotsSize sl))
-B2-cReg≤cSize e sl (suc id) =
-  frameStep-reg≤size (capsAt e sl id) (sizeCount (capsAt e sl id) (capsH e sl id))
-                     (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
-                     (B2-cReg≤cSize e sl id)
 
 ------------------------------------------------------------------
 -- (B3, EARLY) THE Ψ-ONLY HALVES, defined before the suppliers that

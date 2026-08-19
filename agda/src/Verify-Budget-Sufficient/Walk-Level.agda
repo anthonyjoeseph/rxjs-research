@@ -152,7 +152,8 @@ open import Verify-Budget-Sufficient.Caps-Sadd
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
   using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
-         sLvlD-mono; opIterD-infl; fIterD-infl)
+         sLvlD-mono; opIterD-infl; fIterD-infl;
+         B2-cReg≤cSize; frameStep-reg≤size)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
@@ -199,6 +200,7 @@ WalkTail {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     -- caps prelims, subscribeE-caps' own
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
     Sched.slots sched ≡ sl →
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
     slotsSize sl ≤ Caps.cSize c →
@@ -1542,6 +1544,7 @@ SubscribeInnerWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -1604,6 +1607,7 @@ StepThruWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -1684,6 +1688,7 @@ thruConsume-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -1730,6 +1735,7 @@ thruWalk-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -1784,6 +1790,7 @@ pushThru-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -1824,7 +1831,7 @@ pushThru-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (hasDry (proj₁ r) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g bid now op nid κ [] sl sched st
-  2≤S 1≤R slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , refl
@@ -1837,7 +1844,7 @@ pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g bid now op nid κ [] 
     , refl
     , rgs
 pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g bid now op nid κ (em ∷ ems) sl sched st
-  2≤S 1≤R slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs =
   j₁ + j₂
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST)) ≡ true) EQA W1
@@ -1873,7 +1880,7 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
   dSp  = ∨-false (any dryEvent E) (hasDry ems) hDry
   SF   = stepThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep (frameBud c j) j g bid now op nid κ
            (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
-           2≤S 1≤R slEq slC slSz inv pS lC
+           2≤S 1≤R hCR slEq slC slSz inv pS lC
            (splitEvents-valsCaps {u = u} (frameStep j c) sl E eC cntE)
            ≤-refl
            -- both ⊔ arguments spelled out: _⊔_ matches on BOTH sides,
@@ -1911,7 +1918,7 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
                   (unconn-keeps sched st sd₁ st₁ KS))
           hU
   IH   = pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud (j + j₁) g bid now op nid κ ems sl sd₁ st₁
-           2≤S 1≤R sl₁eq slC slSz
+           2≤S 1≤R hCR sl₁eq slC slSz
            S1
            (pathSz?-⊑ κ ⊑₁ pS)
            (≤-trans lC (proj₁ ⊑₁))
@@ -2074,6 +2081,7 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -2130,10 +2138,10 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ b)
 walk-mergeAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g mergeᵒ (merge-st 0 false)
     b κ bid now sl sched st
-    2≤S 1≤R slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (merge-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -2141,10 +2149,10 @@ walk-mergeAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 walk-concatAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ (obs u)) → WalkStmt {e = e} (concatAllᵉ b)
 walk-concatAll {u = u} b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g concatᵒ
     (concat-st {t = u} [] false false) b κ bid now sl sched st
-    2≤S 1≤R slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (concat-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -2152,10 +2160,10 @@ walk-concatAll {u = u} b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl s
 walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ (obs u)) → WalkStmt {e = e} (switchAllᵉ b)
 walk-switchAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g switchᵒ
     (switch-st nothing false) b κ bid now sl sched st
-    2≤S 1≤R slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (switch-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -2163,10 +2171,10 @@ walk-switchAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 walk-exhaustAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ (obs u)) → WalkStmt {e = e} (exhaustAllᵉ b)
 walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g exhaustᵒ
     (exhaust-st false false) b κ bid now sl sched st
-    2≤S 1≤R slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (exhaust-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -2196,6 +2204,7 @@ postulate
     b ≡ inputᶜ i →
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
     Sched.slots sched ≡ sl →
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
     slotsSize sl ≤ Caps.cSize c →
@@ -2249,6 +2258,7 @@ postulate
     b ≡ inputᶜ i →
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
     Sched.slots sched ≡ sl →
     slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
     slotsSize sl ≤ Caps.cSize c →
@@ -2313,6 +2323,7 @@ input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   b ≡ inputᶜ i →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -2365,6 +2376,7 @@ input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   b ≡ inputᶜ i →
   2 ≤ Caps.cSize c →
   1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   Sched.slots sched ≡ sl →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
@@ -2401,7 +2413,7 @@ input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (hasDry (proj₁ r) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g0 i b κ bid now sl sched st
-  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
+  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
 input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) i b κ bid now sl sched st =
   input-wet-core c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel)
     (λ b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ → walkFace b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ fuel)
@@ -2416,7 +2428,7 @@ input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) i b κ bid now sl
 walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (i : Fin n) → WalkStmt {e = e} (input i)
 walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt
            invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   j′ , C1 , C2 , C3 , C4
      , proj₁ WET
@@ -2434,7 +2446,7 @@ walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   C4 = proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
   WET = input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i (input i) κ
           bid now sl sched st refl
-          2≤S 1≤R slEq slC slSz inv szb pC lC nst dpt
+          2≤S 1≤R hCR slEq slC slSz inv szb pC lC nst dpt
           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
           C1 C2 C3 C4
 
@@ -2474,7 +2486,7 @@ walkFace (concatAllᵉ b)  = walk-concatAll b
 walkFace (switchAllᵉ b)  = walk-switchAll b
 walkFace (exhaustAllᵉ b) = walk-exhaustAll b
 walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g0 κ bid now sl sched st
-  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
+  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
 walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j (gs fuel) κ bid now sl sched st =
   walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j (gs fuel) κ bid now sl sched st
 walkFace (varᵉ ())
@@ -2506,17 +2518,17 @@ walkFace (deferᵉ body)   = walk-defer body
 -- μ's nest is a successor).
 ------------------------------------------------------------------
 walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g0 κ bid now sl sched st
-        2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+        2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt
         invW fnC pB s2 fS rS ceil lb dmd ()
 walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j (gs fuel) κ bid now sl sched st
-        2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst () dpt
+        2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
         invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
 walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep zero (suc ops′) j (gs fuel) κ bid now sl sched st
-        2≤S 1≤R slEq slC slSz inv szb wdb pC lC () hidx dpt
+        2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC () hidx dpt
         invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
 walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs fuel)
         κ bid now sl sched st
-        2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+        2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt
         invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   j₀ + j₁
     , subst (λ x → capsOK? (frameStep x c)
@@ -2562,7 +2574,7 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
   IH = walkFace (unfoldμ body) c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud′
          (suc (Caps.cSize (frameStep (j + j₀) c))) (j + j₀) fuel
          κ bid now sl sched st
-         2≤S 1≤R slEq slC slSz
+         2≤S 1≤R hCR slEq slC slSz
          (capsOK?-mono (frameStep j c) (frameStep (j + j₀) c) sched st ⊑₀ inv)
          (proj₁ (proj₂ US))
          (proj₂ (proj₂ US))
@@ -2601,9 +2613,9 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
 -- zero the index hypothesis `suc (suc (sizeᵉ b)) ≤ zero` is uninhabited,
 -- and the successor clause spends op-step's one operator.
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g op ns b κ bid now sl sched st
-  2≤S 1≤R slEq slC slSz inv bn wn szb wdb pC lC nst ()
+  2≤S 1≤R hCR slEq slC slSz inv bn wn szb wdb pC lC nst ()
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bid now sl sched st
-  2≤S 1≤R slEq slC slSz inv bn wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv bn wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true) EQ W1
@@ -2656,7 +2668,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ step⊑) refl bn fnN invW
   SUB = walkFace b c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j) g κ′ bid now sl sched₀ st₀
-          2≤S 1≤R slEq slC slSz inv₀
+          2≤S 1≤R hCR slEq slC slSz inv₀
           (≤-trans szb (proj₁ step⊑))
           (≤-trans wdb (proj₁ (proj₂ step⊑)))
           pC′
@@ -2697,7 +2709,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
   PBW = pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U (hopDᵉ F (slotHop F sl) b) (suc (syncSizeᵉ b))
           dep bud (suc j + j₁) g bid now op nid
           κ (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-          2≤S 1≤R sl₂eq slC slSz
+          2≤S 1≤R hCR sl₂eq slC slSz
           S1
           (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S (suc j) j₁) (pathSz?-⊑ κ step⊑ pC))
           (≤-trans (≤-trans lC (proj₁ step⊑))
@@ -2746,11 +2758,11 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
 -- splitBurst-vals-hop, dry from splitBurst-nodry, regs verbatim.
 ------------------------------------------------------------------
 subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g0 op allNid κ bid now o
-                    sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+                    sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                     invW vB pB hR s2 fS rS ceil lb hU dmd ()
 subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
                     dep bud j (gs fuel) op allNid κ bid now o sl sched st
-                    2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+                    2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                     invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs =
   suc (suc (suc j₂)) , R1 , R2 , R3
     , inner-step (Caps.cSize c) (Caps.cWid c) dep bud j j₂ 2≤S S4
@@ -2815,7 +2827,7 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
                  lb
   IH = walkFace o c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j) fuel κ′ bid now
          sl sched₀ st
-         2≤S 1≤R slEq slC slSz inv₀
+         2≤S 1≤R hCR slEq slC slSz inv₀
          (≤-trans szo (proj₁ step⊑))
          (≤-trans wdo (proj₁ (proj₂ step⊑)))
          pC′
@@ -2900,7 +2912,7 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
 -- goes through the cutThrough kit above.
 ------------------------------------------------------------------
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ bid now o
-                 sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+                 sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                  invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs =
   j′ , capsOK?-mergeBump (frameStep (j + j′) c) nid done sd₁ st₁ S1
      , proj₁ (proj₂ (proj₂ SI))
@@ -2914,7 +2926,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ bi
      , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ
-         bid now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+         bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
          invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   j′   = proj₁ SI
   S1   = proj₁ (proj₂ SI)
@@ -2924,7 +2936,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ bi
   st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
 
 thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g concatᵒ
-                 nid κ bid now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC
+                 nid κ bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC
                  lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
@@ -3004,7 +3016,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
      , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g concatᵒ nid κ
-         bid now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+         bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
          invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   j′   = proj₁ SI
   S1   = proj₁ (proj₂ SI)
@@ -3061,7 +3073,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
                  (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))) invW)
 
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ bid now o
-                 sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+                 sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                  invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   with lookupNode nid (EvalSt.nodes st) | dpt
 ... | nothing                | dpt′ =
@@ -3155,7 +3167,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
                      (switchKill-keeps cur sched st)))
           hU
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ
-         bid now o sl sched₁ st₁ 2≤S 1≤R
+         bid now o sl sched₁ st₁ 2≤S 1≤R hCR
          (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) slEq) slC slSz
          (switchKill-caps (frameStep j c) cur sched st inv) vC pC lC
          (nest-keeps o sl _ _ bud
@@ -3169,7 +3181,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
   R  = subscribeInner g switchᵒ nid κ bid now o sched₁ st₁
 
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ bid now o
-                 sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+                 sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                  invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                =
@@ -3249,7 +3261,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
      , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ
-         bid now o sl sched st 2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
+         bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
          invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   j′ = proj₁ SI
   R  = subscribeInner g exhaustᵒ nid κ bid now o sched st
@@ -3260,7 +3272,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
 -- receipts re-established from the head's own Σ and the Keeps ring
 ------------------------------------------------------------------
 thruWalk-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now []
-              sl sched st 2≤S 1≤R slEq slC slSz inv pC vC lC nst dpt
+              sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC vC lC nst dpt
               invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -3269,7 +3281,7 @@ thruWalk-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now []
             (sym (+-identityʳ j)) invW
     , refl , refl , refl , rgs
 thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now
-              (o ∷ os) sl sched st 2≤S 1≤R slEq slC slSz inv pC vC lC nst dpt
+              (o ∷ os) sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC vC lC nst dpt
               invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs =
   suc (j₁ + j₂)
     , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
@@ -3319,7 +3331,7 @@ thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid
   st₁ = proj₂ (proj₂ (proj₂ TC))
   TCK = thruConsume-keeps g op nid κ bid now o sched st
   HD = thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now o
-         sl sched st 2≤S 1≤R slEq slC slSz inv
+         sl sched st 2≤S 1≤R hCR slEq slC slSz inv
          (proj₁ (∧-true _ _ vCa)) pC lC
          (mList?-head bud sl _ o os nst)
          (≤-trans (m≤m⊔n
@@ -3359,7 +3371,7 @@ thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid
               lb
   IH = thruWalk-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud (j + j₁) g op nid κ bid now
          os sl sd₁ st₁
-         2≤S 1≤R (trans (KeepsC.slotsEq TCK) slEq) slC slSz
+         2≤S 1≤R hCR (trans (KeepsC.slotsEq TCK) slEq) slC slSz
          H1
          (pathSz?-⊑ κ (frameStep-⊑-+ c 2≤S j j₁) pC)
          (valsIn (frameStep (j + j₁) c) sl os
@@ -3407,9 +3419,9 @@ thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid
 -- equalities (vals/events/registry)
 ------------------------------------------------------------------
 stepThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ zero bud j g bid now op nid κ vals fin
-              sl sched st 2≤S 1≤R slEq slC slSz inv pC lC vC fb ()
+              sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC lC vC fb ()
 stepThru-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ (suc dep′) bud j g bid now op nid
-              κ vals fin sl sched st 2≤S 1≤R slEq slC slSz inv pC lC vC fb dpt
+              κ vals fin sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC lC vC fb dpt
               invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs =
   j′ , proj₁ WR
      , valsIn (frameStep (j + j′) c) sl (proj₁ (thruWrap op nid fin WK))
@@ -3456,7 +3468,7 @@ stepThru-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ (suc dep′) bud j g bid 
   TW = thruWalk-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep′
          (sizeAt (Caps.cSize c) (suc j)) j g op nid κ bid now vals
          sl sched st
-         2≤S 1≤R slEq slC slSz inv pC vC lC
+         2≤S 1≤R hCR slEq slC slSz inv pC vC lC
          (valsCaps→mList-strict c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
             (valsOf (frameStep j c) sl vals vC))
          (≤-pred dpt)
@@ -3779,7 +3791,7 @@ subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
   W = wl b c Ψ Ŝ Ŝ (hopR Ŝ) G ℓ L₀ (capsH e sl id)
          (nest b sl (EvalSt.connectedShares st)) (suc (sizeᵉ b)) 0
          g κ id now sl sched st
-         (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id) refl
+         (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id) (B2-cReg≤cSize e sl id) refl
          (entry-slotsCaps e sl id) (entry-slotsSize e sl id)
          cOK0 szB dW pS pLen ≤-refl ≤-refl depOK
          inv fcB pB

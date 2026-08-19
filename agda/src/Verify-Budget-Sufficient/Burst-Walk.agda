@@ -138,6 +138,7 @@ open import Verify-Budget-Sufficient.Caps-Face
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
+         B2-cReg≤cSize;
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
          fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
@@ -1677,6 +1678,7 @@ SiNodry : Set
 SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (Ψ dep bud : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   -- the Ψ-side twin of the line above; see subscribeE-inner-nodry-inv's
@@ -1977,6 +1979,7 @@ abstract
 subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (Ψ dep bud : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2000,7 +2003,7 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
     ≡ false
 subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
-    c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
+    c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J fuel op allNid κ id now o sched st ok pb sspLen vb rg nB hD cl gk =
   dry
   where
@@ -2087,7 +2090,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
 
   W = wl o c Ψ Ŝr Ŝr (hopR Ŝr) G ℓ L̂ dep bud (suc (sizeᵉ o)) (suc J)
          fuel (from-inner op allNid inst ↠ κ) id now sl sched' st
-         2≤S 1≤R slEq slC slSz cOK′ (≤-trans szO (proj₁ step⊑))
+         2≤S 1≤R hCR slEq slC slSz cOK′ (≤-trans szO (proj₁ step⊑))
          (≤-trans (inner-dWO c sl Ψ J o vb) (proj₁ (proj₂ step⊑)))
          pC′
          pLen' nB ≤-refl
@@ -2120,6 +2123,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
 subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (Ψ dep bud : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2147,7 +2151,7 @@ subscribeE-inner-nodry = subscribeE-inner-nodry-core subscribeE-walk-level
 -- EX-POSTULATE.  Two clauses, and the dry one is now impossible by
 -- construction rather than by hypothesis.
 subscribeInner-nodry : SiNodry
-subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op allNid
+subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g op allNid
                      κ id now o sched st ok pb sspLen vb rg nB hD cl gk
   with budgetAt-gs e sl id
 ... | g′ , eq
@@ -2156,7 +2160,7 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g op al
         (proj₁ (subscribeE g′ o
                  (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
                  (record sched { nextNode = suc (Sched.nextNode sched) }) st))
-        (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc J g′ op allNid
+        (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g′ op allNid
            κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq))
 
 -- ─────────────────────────────────────────────────────────────────
@@ -2358,6 +2362,7 @@ postulate
 concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (Ψ dep : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2373,10 +2378,10 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     ≤ sizeCapAt e sl (suc id) →
   any dryEvent (proj₁ (proj₂ (concatDrain sf allNid κ id now q sched st))) ≡ false
 
-concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
+concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
                   [] sched st _ _ _ _ _ _ = refl
 
-concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
+concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
                   (o ∷ q) sched₀ st₀ ok pb sspLen rg gk cl
   with concatDrain-nodry-nestBud c sl Ψ J allNid (o ∷ q) sched₀ st₀ ok
 ... | bud , nestQ
@@ -2386,7 +2391,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
   with proj₁ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀))))
 ... | false =
   -- done=false: concatDrain returns the element's events; goal = subscribeInner-nodry's type
-  subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
+  subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J sf concatᵒ allNid κ id now o sched₀ st₀
     ok pb sspLen
     (concatDrain-nodry-vb c sl Ψ J allNid o q sched₀ st₀ ok)
@@ -2401,7 +2406,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
   let sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))
       st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))
       bs     = proj₁ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))
-      h-head = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
+      h-head = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                  J sf concatᵒ allNid κ id now o sched₀ st₀
                  ok pb sspLen
                  (concatDrain-nodry-vb c sl Ψ J allNid o q sched₀ st₀ ok)
@@ -2416,7 +2421,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
       rg₁    = proj₂ loop
       nestQ′ = concatDrain-nodry-nestRec c sl Ψ J bud sf allNid κ id now o q sched₀ st₀
                  ok (proj₂ (∧-true _ _ nestQ))
-      h-tail = concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
+      h-tail = concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
                  q sched₁ st₁ ok₁ pb sspLen rg₁ gk cl
   in any-dry-++ bs _ h-head h-tail
 
@@ -2426,6 +2431,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf allNid κ id now
 thruConsume-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ dep : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2458,6 +2464,7 @@ thruConsume-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
 thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ dep : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2471,24 +2478,24 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
   any dryEvent (proj₁ (proj₂ (proj₂ (subscribeInner sf op nid κ id now o sched st)))) ≡ false
-thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk =
+thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk =
   let vb-elem = thruConsume-nodry-vb c sl Ψ J o os sched st vb
       bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched st ok
       hD-elem = thruConsume-nodry-dep c sl Ψ dep J sf op nid κ id now o os sched st ok
-  in subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
+  in subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
        J sf op nid κ id now o sched st
        ok pb sspLen vb-elem rg nB hD-elem cl-elem gk
 
 -- MERGE: one subscribeInner call, events = bs
-thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl =
-  thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl =
+  thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
 
 -- CONCAT: dispatch on node state
 -- The scrutinee and the clause ORDER both mirror Rx.Evaluator's own
 -- `with w ≟ᵗ u` exactly.  Writing `w ≟ᵗ _` here does not abstract the
 -- goal's occurrence (the metavariable is not syntactically the
 -- evaluator's `u`), leaving the with-function stuck and `refl` red.
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
   with lookupNode nid (EvalSt.nodes st)
 -- concat active=true + type match: parks the element, emits []
 ... | just (concat-st {w} q true od) with w ≟ᵗ u
@@ -2499,29 +2506,29 @@ thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ n
 -- `with` above forces the repeats, and an LHS that omits it does not
 -- line up with the first clause, leaving the goal's `thruConsume`
 -- stuck on its own `lookupNode` with-scrutinee.
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (concat-st q false od) =
-  thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+  thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
 -- other node shapes: thruConsume's own catch-all emits [].  These are
 -- enumerated rather than written `| _`, because a VARIABLE scrutinee
 -- leaves the evaluator's with-function stuck — its catch-all only fires
 -- once Agda knows the shape is none of the concat cases.
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | nothing = refl
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (scan-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (take-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (merge-st _ _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (switch-st _ _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (exhaust-st _ _) = refl
 
 -- SWITCH: switchKill (closes only, nodry by switchKill-closes-nodry)
 --         + subscribeInner (bs, nodry by SiNodry), combined by any-dry-++
-thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf switchᵒ nid κ id now o os sched₀ st₀ ok pb sspLen vb rg gk hD cl
+thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid κ id now o os sched₀ st₀ ok pb sspLen vb rg gk hD cl
   with lookupNode nid (EvalSt.nodes st₀)
 -- NO `with subscribeInner …` here.  Scrutinising the tuple rebinds its
 -- third component as a FRESH variable `bs`, which no longer unifies with
@@ -2540,7 +2547,7 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf switchᵒ nid κ id
       vb-elem    = thruConsume-nodry-vb c sl Ψ J o os sched₀ st₀ vb
       bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched₁ st₁ ok₁
       hD-elem    = thruConsume-nodry-dep c sl Ψ dep J sf switchᵒ nid κ id now o os sched₁ st₁ ok₁
-      h-bs       = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R slC slSz slFc
+      h-bs       = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                      J sf switchᵒ nid κ id now o sched₁ st₁
                      ok₁ pb sspLen vb-elem rg₁ nB hD-elem cl-elem gk
   in any-dry-++ (proj₁ (switchKill cur sched₀ st₀)) _ h-closes h-bs
@@ -2552,12 +2559,12 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf switchᵒ nid κ id
 ... | just (exhaust-st _ _) = refl
 
 -- EXHAUST active=true: drops the payload, emits []
-thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
+thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
   with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st true od)  = refl
 -- EXHAUST active=false: subscribes, emits bs
 ... | just (exhaust-st false od) =
-  thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+  thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl
@@ -2570,6 +2577,7 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf exhaustᵒ nid κ i
 thruWalk-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ dep : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2587,7 +2595,7 @@ thruWalk-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     ≤ sizeCapAt e sl (suc id) →
   any dryEvent (proj₁ (proj₂ (thruWalk sf op nid κ id now vals sched st))) ≡ false
 
-thruWalk-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id now
+thruWalk-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now
                [] sched st _ _ _ _ _ _ _ _ = refl
 
 -- The head's outputs are LET-BOUND PROJECTIONS, never `with`-scrutinised.
@@ -2596,13 +2604,13 @@ thruWalk-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id now
 -- thruConsume-nodry-loop) still mention `proj… (thruConsume …)` — a fresh
 -- instance the abstraction never touched — so the recursive call's OKB
 -- argument is compared at `Sched Γ` against a variable and fails.
-thruWalk-nodry {e = e} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id now
+thruWalk-nodry {e = e} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now
                (o ∷ os) sched₀ st₀ ok pb sspLen vb rg gk hD cl =
   let step   = thruConsume sf op nid κ id now o sched₀ st₀
       bs     = proj₁ (proj₂ step)
       sched₁ = proj₁ (proj₂ (proj₂ step))
       st₁    = proj₂ (proj₂ (proj₂ step))
-      h-head = thruConsume-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id now o os
+      h-head = thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os
                  sched₀ st₀ ok pb sspLen vb rg gk hD cl
       loop   = thruConsume-nodry-loop c sl Ψ J sf op nid κ id now o sched₀ st₀ ok rg
       ok₁    = proj₁ loop
@@ -2611,7 +2619,7 @@ thruWalk-nodry {e = e} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id n
       -- in the explicit arguments or the conclusion can solve it.
       vb₁    = VbB-tail {e = e} c sl Ψ J o os vb
       hD₁    = thruWalk-nodry-dep c sl Ψ dep J sf op nid κ id now o os sched₀ st₀ ok hD
-      h-tail = thruWalk-nodry c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id now
+      h-tail = thruWalk-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now
                  os sched₁ st₁ ok₁ pb sspLen vb₁ rg₁ gk hD₁ cl
   -- the tail's event list is NAMED rather than left as `_`: with the head's
   -- outputs let-bound (see above) there is no with-pattern to fix it.
@@ -2624,6 +2632,7 @@ thruWalk-nodry {e = e} c sl Ψ dep 2≤S 1≤R slC slSz slFc J sf op nid κ id n
 innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2663,7 +2672,7 @@ innerFinish-switch-nodry sf allNid inst c₀ path′ id now vals od sched st
 ... | false = refl
 
 -- fin = false: innerReact emits []
-innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {s} sf id now op allNid inst path′ vals fin sched st
+innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allNid inst path′ vals fin sched st
                  ok pb vb rg gk cl hD
   with fin
 ... | false = refl
@@ -2732,7 +2741,7 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {s} sf id now op allNid i
                               (pathSz?-tail (Caps.cSize (frameStep J c)) (from-inner op allNid inst) path′ pb-sz)
                               pb-bΨ
                   sspLen  = pathSz?-len (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ path′) pb-sz
-              in concatDrain-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf allNid path′ id now
+              in concatDrain-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf allNid path′ id now
                    q sched st ok pb′ sspLen rg gk cl
 
 ------------------------------------------------------------------
@@ -2740,6 +2749,7 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {s} sf id now op allNid i
 thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2760,7 +2770,7 @@ thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                                path′ vals fin sched st)))
     ≡ false
 
-thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD =
+thruOuter-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD =
   let TW    = thruWalk sf op nid path′ id now vals sched st
       eq    = proj₁ (thruWrap-pass op nid fin TW)
       -- strip thru-outer frame from pb.  ∧-true's two Bool arguments are
@@ -2778,7 +2788,7 @@ thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op nid path′ v
                   pb-bΨ
       sspLen  = pathSz?-len (Caps.cSize (frameStep J c)) (thru-outer op nid ↠ path′) pb-sz
   in subst (λ x → any dryEvent x ≡ false) (sym eq)
-           (thruWalk-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf op nid path′ id now vals sched st
+           (thruWalk-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf op nid path′ id now vals sched st
               ok pb′ sspLen vb rg gk hD cl)
 
 -- take's dispatch: the non-cut arm emits nothing, the cutting arm
@@ -2803,6 +2813,7 @@ takeDispatch-nodry nid vals fin sched st (just (exhaust-st _ _))  = refl
 stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2823,11 +2834,11 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≡ false
 
 -- MAP: the frame emits nothing at all
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
                 (map-f fn) path′ vals fin sched st _ _ _ _ _ _ _ = refl
 
 -- SCAN: every arm of the node-state dispatch emits `[]`
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {u = u} sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {u = u} sf id now
                 (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _ _
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                  = refl
@@ -2841,21 +2852,21 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J {u = u} sf id now
 ...   | no  _    = refl
 
 -- TAKE: the one severing frame, and it is free (cutThrough-nodry)
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
                 (take-f nid) path′ vals fin sched st _ _ _ _ _ _ _ =
   takeDispatch-nodry nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
 -- the two *All edges: real definitions, subscribeInner-nodry is APPLIED inside
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
                 (from-inner op allNid inst) path′ vals fin sched st
                 ok pb vb rg gk cl hD =
-  innerReact-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op allNid inst
+  innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now op allNid inst
                    path′ vals fin sched st ok pb vb rg gk cl hD
 
-stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
                 (thru-outer op nid) path′ vals fin sched st
                 ok pb vb rg gk cl hD =
-  thruOuter-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now op nid
+  thruOuter-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now op nid
                   path′ vals fin sched st ok pb vb rg gk cl hD
 
 ------------------------------------------------------------------
@@ -2875,6 +2886,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
@@ -2897,7 +2909,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
     × (VbB c sl Ψ (J + j′) (proj₁ r) ≡ true)
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
-stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now f path′ vals fin sched st
+stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now f path′ vals fin sched st
                      ok pb vb rg gk cl hD =
     j′
   , proj₁ (proj₂ FC)
@@ -2909,7 +2921,7 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R slC slSz slFc J sf id now f p
       (proj₁ (proj₂ (proj₂ (proj₂ WF))))
   , ∧-intro capsEvs
       (∧-intro (proj₂ (proj₂ (proj₂ (proj₂ WF))))
-               (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R slC slSz slFc
+               (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc
                           J sf id now f path′ vals fin sched st
                           ok pb vb rg gk cl hD)))
   where
@@ -2942,6 +2954,7 @@ module BurstWalk
   (ifc : IfcFace)
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ)
   (2≤S : 2 ≤ Caps.cSize c) (1≤R : 1 ≤ Caps.cReg c)
+  (hCR : Caps.cReg c ≤ Caps.cSize c)
   (slC : slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true)
   (slSz : slotsSize sl ≤ Caps.cSize c)
   (slFc : slotsFnCap sl ≤ Ψ)
@@ -3157,7 +3170,7 @@ module BurstWalk
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
     ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD →
-                    stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R slC slSz slFc
+                    stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R hCR slC slSz slFc
                       J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD
     }
 
@@ -3226,7 +3239,7 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
   slFc = m≤n+m (slotsFnCap sl) (fnCapᵉ e)
   cg  = cascadeGo a id chains sched st
 
-  module BW = BurstWalk {e = e} siC ifc c sl Ψ d 2≤S 1≤R slC slSz slFc
+  module BW = BurstWalk {e = e} siC ifc c sl Ψ d 2≤S 1≤R (B2-cReg≤cSize e sl id) slC slSz slFc
 
   inv0 : capsOK? (frameStep 0 c) sched st ≡ true
   inv0 = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
