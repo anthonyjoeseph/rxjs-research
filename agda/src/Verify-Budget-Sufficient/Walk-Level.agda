@@ -685,29 +685,107 @@ postulate
 
   -- (walk-input is GROUND — assembled below over subscribeE-caps and
   -- input-wet; the share/connect gas peel is what input-wet still owes)
-  -- one-shot emitter — expects oneShot-tail-dry for hasDry
+  --
+  -- ═══ THE FAMILY CENSUS (2026-08-19) ═══
+  -- These six are what is left of walkFace; the other six clauses
+  -- (walk-mu, walk-input, and the four *All) are GROUND.  The caps half
+  -- of every one of them is a DELEGATION, not a re-derivation — see the
+  -- "WHY THE SPLIT IS EXACT" paragraph above — and the proven twin is
+  -- `subscribeE-caps` (.Subscribe-Face), whose own header carries a
+  -- clause-to-form map matching this family one for one.  So what each
+  -- row below owes is the WET FIVE at its shape, and the census is of
+  -- those.  Derived by reading the evaluator and the measures, NOT by
+  -- typechecking — treat each named ingredient as located, not spent.
+  --
+  -- THE CHAIN FRAMES DO NOT SHARE A PUSH FACE, and that is the one thing
+  -- to internalise before touching map/take/scan.  A frame-generic wet
+  -- push face is REFUTED — the DEAD ROUTE at the hop-edge chain section
+  -- below (`pushBurst-walk`, generic in `f : Frame Γ s u`) — because caps
+  -- measures are frame-generic and THE HOP LEDGER IS NOT.  Each chain
+  -- frame needs its own face, at its own output index, and the index is
+  -- read off hopDᵉ (Rx.Hop-Depth) rather than chosen:
+  --   · takeᵉ  `hopDᵉ V η (takeᵉ c e) = hopDᵉ V η e` — the IDENTITY.
+  --            take-f transforms no value, so the source's bound IS the
+  --            bound and no growth lemma is owed at all.
+  --   · mapᵉ   `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e`, and hopD-map-emit
+  --            (.Measures, PROVEN) delivers exactly that conjunct.
+  --   · scanᵉ  `(2 + pmᵗ V 0 f) ^ V * (hopDᵗ f + hopDᵗ z + hopDᵉ e)` —
+  --            EXPONENTIAL in V, which is the room that funds repeated
+  --            application, and the only row with no emit lemma yet.
+  -- The shape of such a face is `pushThru-walk` below (PROVEN, thru-outer),
+  -- which is pushBurst-caps' proof step for step with the wet conjuncts
+  -- threaded through.
+  --
+  -- one-shot emitter — GRINDABLE.  oneShotBurst with the state untouched,
+  -- the same shape as input-wet-scripted's cold-nil (that census names the
+  -- ingredient per conjunct, and they carry over): INV?-widen with the mint
+  -- transparent, mapValue-B, mapValue-hop, oneShot-tail-dry, and regsLen?
+  -- straight off the hypothesis.  THE ONE DIFFERENCE, and it is the whole
+  -- residue: the values here are `map evalTm ts`, not a slot's, so their
+  -- size/weight bound comes from an evalTms lemma — and `evalTms-caps`
+  -- (.Caps-Face/Part7, PROVEN) has NO wet twin.  That twin is this row.
   walk-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (ts : List (Tm Γ [] [] [] u)) → WalkStmt {e = e} (ofᵉ ts)
-  -- spent one-shot — oneShot-tail-dry at vals ≡ []
+  -- spent one-shot — GRINDABLE, and the CHEAPEST row in the family: it is
+  -- walk-of at `vals ≡ []`.  `oneShotBurst []`, state untouched, so
+  -- oneShot-tail-dry degenerates, the two value conjuncts (burstB?,
+  -- burstHopD?) are vacuous over an empty payload, and regsLen? is the
+  -- hypothesis.  `hopDᵉ V η emptyᵉ = 0`.  Needs no evalTms twin — there
+  -- are no values — so unlike walk-of it has NO residue at all.
   walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
     WalkStmt {e = e} (emptyᵉ {t = u})
-  -- chain edge — expects hopD-map-emit and applyFn-size for the
-  -- within-instant growth conjuncts
+  -- chain edge — GRINDABLE.  Subscribe the source under ONE more frame,
+  -- then pushBurst; one j for the frame (frameStep-chain-suc), receipts
+  -- add.  Both growth conjuncts are supplied by PROVEN lemmas at the
+  -- index hopDᵉ already fixes: hopD-map-emit for burstHopD? (its header
+  -- calls itself "burstHopD? at the mapᵉ clause, with the arithmetic
+  -- already done") and applyFn-size for the Ŝ ceiling.  What has to be
+  -- authored is map-f's OWN push face — see the family note above on why
+  -- it cannot be shared — with pushThru-walk as the worked instance.
   walk-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s) → WalkStmt {e = e} (mapᵉ f b)
-  -- node install; takeᵉ 0 is a spent one-shot (oneShot-tail-dry)
+  -- node install — GRINDABLE, and the EASIEST of the three chain frames,
+  -- which is not what the ordering here suggests.  take-f transforms no
+  -- value and `hopDᵉ (takeᵉ c e) = hopDᵉ e` is the identity, so the hop
+  -- ledger passes through and NO emit lemma is owed; the size axis is
+  -- likewise unmoved.  Two clauses: `evalTm cnt ≡ zero` is `oneShotBurst
+  -- []`, i.e. walk-empty exactly, and `suc k` is mintNode + installNode +
+  -- recurse + push, with INV?-install (below, PROVEN) for the install.
+  -- Still needs take-f's own push face, per the family note.
   walk-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
     WalkStmt {e = e} (takeᵉ cnt b)
-  -- the accumulator clause — the one that GROWS values within an
-  -- instant (applyFn-size is the Ŝ-ceiling supplier; the P-series
-  -- probe receipts in the block header above ran exactly this shape)
+  -- the accumulator clause — DIFFICULTY, and the ONE row in this family
+  -- with a design decision still inside it.  It is the clause that GROWS
+  -- values within an instant (applyFn-size is the Ŝ-ceiling supplier; the
+  -- P-series probe receipts in the block header above ran exactly this
+  -- shape).  Why it is not GRINDABLE beside walk-map: map's emitted value
+  -- is a function of ONE source value and hopD-map-emit bounds it; scan's
+  -- is a function of the source value AND the running accumulator, and
+  -- there is no hopD-scan-emit.  The funding is visible and generous —
+  -- hopDᵉ's scan clause carries a `(2 + pmᵗ V 0 f) ^ V` factor, room for
+  -- V applications, against map's single `(pmᵗ V 0 f ⊔ 1)` — but an
+  -- exponential with room to spare is not an induction, and what has to
+  -- be decided is what the accumulator's invariant IS across the fold.
+  -- Decide that before authoring scan-f's push face, not after: the face
+  -- reports at whatever index the invariant turns out to need.
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)
-  -- registration + parked body — the clause that MINTS a registry
-  -- entry, so regsLen?'s growth is paid here
+  -- registration + parked body — GRINDABLE.  The clause that MINTS a
+  -- registry entry, so regsLen?'s growth is paid here, and it is the
+  -- ONLY row in this family that neither recurses nor pushes: install,
+  -- mint, park, register, and the burst is `init src ∷ []` (Evaluator:
+  -- 1485-1496).  So four of the wet five are cheap — no values in the
+  -- burst at all, hence burstB? and burstHopD? over an empty payload
+  -- (`hopDᵉ V η (deferᵉ e) = 0`), hasDry by computation on a lone init,
+  -- INV? by INV?-install (below, PROVEN) then addLive-INV (.Wet/Part2,
+  -- PROVEN).  The fifth is regsLen?, and it wants the SAME missing lemma
+  -- input-wet-scripted's census writes out — `register-regsLen`, five
+  -- lines, dev-checked and reverted unlanded there.  This row is its
+  -- SECOND nameable consumer, which is the argument for landing it with
+  -- whichever of the two grounds first rather than with a body of its own.
   walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
 

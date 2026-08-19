@@ -100,9 +100,19 @@ the order attention is OWED, not a bar on running the bottom concurrently.
 - **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
   the amplifier-chain region and measures the margin widening. Route and
   coverage in its header.
-- **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
-  The walk face's one-shot and chain clauses; scan exercises the
-  Ŝ-ceiling growth, defer mints the registry entry.
+- **`walk-scan`** (Walk-Level) — DIFFICULTY, and the only walk clause still
+  carrying a decision: map's emitted value is a function of one source value
+  and PROVEN `hopD-map-emit` bounds it, scan's is a function of the source
+  AND the accumulator, and no `hopD-scan-emit` exists. hopDᵉ's `^ V` factor
+  is generous funding but the accumulator's fold invariant is unchosen.
+- **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
+  order. The family census in their shared header reads every output index
+  off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause
+  twin `subscribeE-caps`. `walk-empty` has no residue at all; `walk-of` owes
+  only a wet twin of PROVEN `evalTms-caps`; `take` is the identity on the
+  hop ledger; `defer` is the second consumer of `register-regsLen`. `map`
+  and `take` additionally need their own push face — a frame-generic one is
+  REFUTED, per the DEAD ROUTE their header points at.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the repaired
   statement; its header names a proven source for every remaining conjunct, one
   of which (`regsB?-of-parts`) sits downstream and must relocate or inline.
