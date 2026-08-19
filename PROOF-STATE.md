@@ -103,11 +103,12 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   read and a day to rediscover — delegating to PROVEN `hopD-cap` at
   `η := slotHop V sl` is refuted by series S's own depth-2 row, exactly
   tight at depth 1.
-- **`walk-scan`** (Walk-Level) — DIFFICULTY, and the only walk clause still
-  carrying a decision: map's emitted value is a function of one source value
-  and PROVEN `hopD-map-emit` bounds it, scan's is a function of the source
-  AND the accumulator, and no `hopD-scan-emit` exists. hopDᵉ's `^ V` factor
-  is generous funding but the accumulator's fold invariant is unchosen.
+- **`walk-scan`** (Walk-Level) — DIFFICULTY, but down to ONE question that is
+  not about scan: its header now derives the accumulator invariant, and the
+  induction closes at exactly the base `hopDᵉ`'s scan clause already carries,
+  over PROVEN `hopD-applyFn`. What is left is whether the application count
+  is capped by the store bound — a burstCount?/width-cap question. Answer
+  that and the row is an assembly.
 - **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
   order. The family census in their shared header reads every output index
   off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause

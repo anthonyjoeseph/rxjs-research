@@ -769,6 +769,34 @@ postulate
   -- be decided is what the accumulator's invariant IS across the fold.
   -- Decide that before authoring scan-f's push face, not after: the face
   -- reports at whatever index the invariant turns out to need.
+  --
+  -- THE INVARIANT, DERIVED (2026-08-19) — the fold half is settled and
+  -- one arithmetic question is all that is left.  Write P = pmᵗ V 0 f ⊔ 1
+  -- and B = hopDᵗ f + hopDᵗ z + hopDᵉ b, so hopDᵉ's scan clause is
+  -- `(2 + pmᵗ V 0 f) ^ V * B`.  Let Aₖ be the accumulator's hop after k
+  -- applications.  Then, with `hopDᵛ (s ×ᵗ t) (a , b) = hopDᵛ a ⊔ hopDᵛ b`
+  -- (Rx.Hop-Depth — a MAX, not a sum, which is what keeps this linear)
+  -- and PROVEN hopD-applyFn giving
+  -- `hopDᵛ (applyFn f w) ≤ hopDᵗ f + P * hopDᵛ w`:
+  --
+  --     A₀   = hopDᵗ z                       ≤ B
+  --     Aₖ₊₁ ≤ hopDᵗ f + P * (Aₖ ⊔ hopDᵉ b)  ≤ B + P * Aₖ
+  --     ⇒ Aₖ ≤ (1 + P) ^ k * B
+  --
+  -- and `1 + P = 1 + (pmᵗ V 0 f ⊔ 1) ≤ 2 + pmᵗ V 0 f` in BOTH cases of
+  -- the ⊔.  So the induction closes at exactly the base hopDᵉ already
+  -- carries — the scan clause was evidently sized for this fold, which is
+  -- the strongest evidence the shape is the intended one.
+  --
+  -- SO THE INVARIANT IS `hopDᵛ acc ≤ (2 + pmᵗ V 0 f) ^ k * B after k
+  -- applications`, established at the seed and preserved by
+  -- hopD-applyFn.  WHAT REMAINS IS ONE QUESTION AND IT IS NOT ABOUT THE
+  -- FOLD: does k ≤ V — is the number of applications the bound must cover
+  -- capped by the store bound?  That is a question about how many values
+  -- reach one scan node within the measured scope (burstCount? and the
+  -- width cap are where to look), NOT about the accumulator.  Until it is
+  -- answered the row stays DIFFICULTY; answered, this becomes an
+  -- assembly over PROVEN hopD-applyFn and the row is mechanical.
   walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
