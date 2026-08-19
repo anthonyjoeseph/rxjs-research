@@ -122,7 +122,13 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   reduces to a budget question — **does the gas fund a width-scale hop
   index?** — and the risky region has narrowed to amplifying folds
   (`pmᵗ V 0 f ≥ 2`); at `pmᵗ ≤ 1` the fold is additive and closes easily.
-  Do NOT thread the face until the budget question is answered.
+  Do NOT thread the face until the budget question is answered — and ask
+  the CHEAPER question first, which may dissolve the row: `hopDᵛ` is a
+  max-based DEPTH, so duplication cannot multiply it, and the whole
+  geometric invariant rests on whether `hopD-applyFn`'s multiplicative
+  `pmᵗ V 0 f *` is tight for a depth. If it is not, the invariant is
+  additive and the row is GRINDABLE with no ceiling and no gas. Next act
+  on this row is reading `pmᵗ`'s clauses and `hopD-evalWith`.
 - **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
   order. The family census in their shared header reads every output index
   off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause
