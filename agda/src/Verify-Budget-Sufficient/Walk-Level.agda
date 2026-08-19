@@ -2632,20 +2632,46 @@ postulate
   -- SO IT IS `wl d …` PLUS TWO JOBS, and those are the leaves to split out
   -- next — never a third copy of the whole arm:
   --
-  --   1. THE CALL-SITE DISCHARGE.  Most of the 26 hypotheses are free at
-  --      `share-sink i`, because `pathLen (share-sink i) = 0`: the pathSz?,
-  --      pathB?, `suc pathLen ≤ cSize` and `pathLen + G ≤ ℓ` conjuncts all
-  --      collapse.  `sizeᵉ d ≤ cSize` is the slot telescope's own bound
-  --      (obs-slot-shared).  The ONE that carries content is the demand
-  --      descent, and PROVEN dBound-connect is already its exact shape —
-  --      `U′ < U` from unconn-cons-≤ (connectedShares just grew by toℕ i),
-  --      `s′ ≤ V` from the slot bound, and `r′ ≤ R` from **slotHop-cap**.
-  --      ⚠ THAT IS A REAL DEPENDENCY AND IT IS WHY BOTH ROWS ARE TIER 0:
-  --      this arm cannot close before slotHop-cap does.  The gas peel then
-  --      follows the μ clause's pattern — `G′ < G` is what lets
-  --      `gas : g hasAtLeast suc G` fund `fuel′ hasAtLeast suc G′`, and
-  --      `sharedConnect g0 = dryBurst id` is unreachable for the same
-  --      reason walk-mu's g0 clause is (no constructor at g0).
+  --   1. THE CALL-SITE DISCHARGE — AND IT NEEDS NO NEW MATHEMATICS.  Every
+  --      hypothesis `wl` wants at `share-sink i` and `st₁` has a PROVEN
+  --      source today; the inventory was taken 2026-08-19 and is the
+  --      evidence for this row's GRINDABLE class, so keep it current.
+  --      The inner call runs at level `suc j` — register-caps says so —
+  --      and at `bud′` where `bud ≡ suc bud′`, exactly as sharedSlot-caps
+  --      hands sharedConnect-caps the predecessor.
+  --
+  --        capsOK? at st₁      register-caps      (.Caps-Face/Part4)
+  --        INV? at st₁         shared-live-INV    (above, at j′ := 1)
+  --        nest shift          share-step         (.Caps-Nest) — its
+  --                            `nest (input i) sl cs ≤ suc k → nest d sl
+  --                            (toℕ i ∷ cs) ≤ k` is this obligation
+  --                            verbatim, and it is what forces bud to be
+  --                            matched as a successor
+  --        U′ < U              unconn-insert      (.Measures)
+  --        r′ ≤ R              slotHop-cap        (.Measures)
+  --        the descent         dBound-connect     (.Measures)
+  --        regsLen? at st₁     register-regsLen   (above)
+  --        depth               NOTHING: `depthConn (gs fuel′) …` unfolds
+  --                            to `depthE fuel′ d (share-sink i) … st₁`
+  --                            (.Caps-Depth), which IS the inner call's
+  --                            hypothesis, so `dpt` passes through as-is
+  --        pathSz? / pathB? /  computation: `pathSz? B (share-sink i) =
+  --        suc pathLen ≤ B /   true` (.Caps-Face/Part1) and `pathLen
+  --        pathLen + G′ ≤ ℓ    (share-sink i) = 0` collapse all four
+  --
+  --      ⚠ slotHop-cap IS A REAL DEPENDENCY AND IT IS WHY BOTH ROWS ARE
+  --      TIER 0: it is a real body resting on the leaf `hopD-relᵉ`, so
+  --      this arm cannot close before that one does.  The gas peel then
+  --      follows the μ clause's pattern — `suc G′ ≤ G` out of
+  --      dBound-connect is what lets `gas : g hasAtLeast suc G` fund
+  --      `fuel′ hasAtLeast suc G′` — and `sharedConnect g0 = dryBurst id`
+  --      is unreachable for the same reason walk-mu's g0 clause is (no
+  --      constructor at g0).
+  --
+  --      ⚠ unconn-insert AND share-step WERE BOTH NEARLY REWRITTEN while
+  --      taking this inventory; `unconn-insert` sits thirty lines under
+  --      `unconn-cons-≤`, which is the ≤ half every other consumer wants.
+  --      Searching for the ≤ form and stopping is how that happens.
   --
   --   2. THE TRANSPORT, which is where the genuinely new lemmas live.
   --      Every one of the five conjuncts has to survive the prepended
