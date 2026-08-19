@@ -492,9 +492,6 @@ enterInstant S i with ProtocolSt.current S
       then (if paidOff owed then nothing else just (owed , ProtocolSt.horizon S))
       else openFreshᴵ S i
 
-≡true→T : ∀ (b : Bool) → b ≡ true → T b
-≡true→T true _ = tt
-
 -- the horizon the automaton opens an instant with never exceeds the instant
 -- id: a fresh open only admits when horizon ≤ᵇ id (the openFreshᴵ guard), and
 -- a continued instant keeps horizon S, already ≤ id.  Feeds FoldOut.horizon-out.
@@ -502,7 +499,7 @@ openFreshᴵ-hz≤ : ∀ (S : ProtocolSt) (i : Id) {ob hz′} →
   openFreshᴵ S i ≡ just (ob , hz′) → hz′ ≤ i
 openFreshᴵ-hz≤ S i eq with settleInstant S | eq
 ... | just hz | eq′ with hz ≤ᵇ i in hi | eq′
-...   | true  | refl = ≤ᵇ⇒≤ hz i (≡true→T (hz ≤ᵇ i) hi)
+...   | true  | refl = ≤ᵇ⇒≤ hz i (subst T (sym hi) tt)
 
 enterInstant-hz≤id : ∀ (S : ProtocolSt) (i : Id) {ob hz′} →
   enterInstant S i ≡ just (ob , hz′) → ProtocolSt.horizon S ≤ i → hz′ ≤ i

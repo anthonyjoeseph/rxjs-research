@@ -579,11 +579,26 @@ Then, and only then, the judgement that no command can do for you:
   claim about an attempt; the signature is a fact.
 
 **AND THE CHECK BEHIND IT: `make dup-check`** — part of `make gate` — fails the build when
-two declarations prove the same fact under different names, comparing declared types up to
-renaming of bound variables. Agda already rejects the case where the NAMES collide too
-(`ClashingDefinition`); this catches the case that actually costs time, where they do not —
-`sizeᵉ-pos` and `1≤sizeᵉ`, the same statement 170 lines apart in ONE file, unnoticed for
-months. It is the after-the-fact net; `make find` is how you avoid needing it.
+two declarations prove the same fact, comparing declared types up to renaming of bound
+variables — `sizeᵉ-pos` and `1≤sizeᵉ`, the same statement 170 lines apart in ONE file,
+unnoticed for months. It is the after-the-fact net; `make find` is how you avoid needing it.
+
+**A FINDING IS TWO SITES, NOT TWO NAMES, and the difference is the whole subtlety.** The
+tempting assumption — that Agda's `ClashingDefinition` already covers copies sharing a
+name, so only DIFFERING names need a checker — is FALSE, and this file asserted it for a
+while. Agda says nothing when either copy is `private`, or when the two modules are simply
+never in scope together: `dbl-suc` and `2*suc≤2^suc` sat verbatim in `.Subscribe-Face` and
+in `.Caps-Face/Part6`'s private block, invisible to the compiler and to the check.
+
+Three ways one fact wears two types, all of which it now matches through: **binder
+spelling** (`∀ X →` against `∀ (X : ℕ) →`, and explicit against implicit — different types,
+but not different facts, and merging them costs only an eta-expansion at the call sites);
+**atomic type synonyms** (`Id = ℕ`, so `(id : Id)` and `(id : ℕ)` are one signature); and
+plain differing names. **`make dup-selftest`** — also in the gate — pins each of those rows
+against a fixture outside `agda/src`, and pins the four shapes that must NOT fire (record
+fields, `where`-locals, the mandated `-go` alias, and two lemmas differing only in their
+operators). It earns its keep: three separate bugs shipped in this checker, and every one
+was found by hand rather than by the check failing.
 
 **WHEN IT FIRES, MOVE THE FACT DOWN — do not pick a winner among the copies.** The usual
 cause is structural rather than careless: two SIBLING modules both need a fact and neither

@@ -4146,14 +4146,10 @@ WetOuter =
 -- weakening go through, and costs the landing nothing.
 ------------------------------------------------------------------
 
--- ENTRY, (i): the slot store fits the caps its own recurrence is
--- built from.  Entry-only and slot-only — no state, no level.
--- Proof: slotsCaps?-capsAt (Caps-Face/Part4), proven there.
-entry-slotsCaps : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : Id) →
-  slotsCaps? (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
-    ≡ true
-entry-slotsCaps e sl id = slotsCaps?-capsAt e sl id
+-- ENTRY, (i) is `slotsCaps?-capsAt` (Caps-Face/Part4) as it stands — the
+-- slot store fits the caps its own recurrence is built from.  It had a
+-- local eta-alias here until 2026-08-19; `Id` and `ℕ` are the same type,
+-- so that was one fact under two names.
 
 -- ENTRY, (ii): and its total size does too.  Companion of
 -- `size≤sizeCapAt` (.Wet/Part6, PROVEN) for the slot summand.
@@ -4369,7 +4365,7 @@ subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
          (nest b sl (EvalSt.connectedShares st)) (suc (sizeᵉ b)) 0
          g κ id now sl sched st
          (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id) (B2-cReg≤cSize e sl id) refl
-         (entry-slotsCaps e sl id) (entry-slotsSize e sl id)
+         (slotsCaps?-capsAt e sl id) (entry-slotsSize e sl id)
          cOK0 szB dW pS pLen ≤-refl ≤-refl depOK
          inv fcB pB
          -- the reset-anchor pins at the entry: the F/R̂ equations are

@@ -998,9 +998,6 @@ capsAt-base-wid e sl (suc id) =
 -- without creating a cycle through Burst-Walk.)
 ------------------------------------------------------------------
 
-2X≡X+X : ∀ (X : ℕ) → 2 * X ≡ X + X
-2X≡X+X X = cong (X +_) (+-identityʳ X)
-
 sizeStep-eqn : ∀ (S X : ℕ) → sizeStep S X ≡ S + (S * X + S * X)
 sizeStep-eqn S X =
   begin

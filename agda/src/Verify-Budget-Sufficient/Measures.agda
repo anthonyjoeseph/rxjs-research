@@ -2916,9 +2916,12 @@ mutual
     cong₂ _+_ (size-renᵗ ρg ρd ρt y) (size-renᵗˢ ρg ρd ρt ys)
 
 -- small doubling identities (solver) and the "suc absorbs into the double" step
+-- PUBLIC because .Caps had its own copy under the name `2X≡X+X` and this
+-- is the lower module; the name is the one its five call sites already use.
+2X≡X+X : ∀ X → 2 * X ≡ X + X
+2X≡X+X = solve 1 (λ x → con 2 :* x := x :+ x) refl
+
 private
-  dbl : ∀ X → 2 * X ≡ X + X
-  dbl = solve 1 (λ x → con 2 :* x := x :+ x) refl
   two-distrib : ∀ a b → 2 * (a + b) ≡ 2 * a + 2 * b
   two-distrib = solve 2 (λ a b → con 2 :* (a :+ b) := con 2 :* a :+ con 2 :* b) refl
 
@@ -2942,7 +2945,7 @@ size-reify (s ×ᵗ t) (a , b) =
 size-reify (s +ᵗ t) (inj₁ a) = ≤-trans (s≤s (size-reify s a)) (bump (sizeᵛ s a))
 size-reify (s +ᵗ t) (inj₂ b) = ≤-trans (s≤s (size-reify t b)) (bump (sizeᵛ t b))
 size-reify (obs t)  e =
-  subst (suc (sizeᵉ e) ≤_) (sym (dbl (sizeᵉ e)))
+  subst (suc (sizeᵉ e) ≤_) (sym (2X≡X+X (sizeᵉ e)))
         (+-monoˡ-≤ (sizeᵉ e) (sizeᵉ-pos e))
 
 -- (G4) helpers.  Each subΘ clause is a `suc (Σ subterm sizes)` over a

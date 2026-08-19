@@ -1,4 +1,4 @@
-.PHONY: stripped strip-selftest postulates dup-check find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: stripped strip-selftest postulates dup-check dup-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -82,10 +82,15 @@ help:
 	@echo "                  the failure this prevents was a search scoped to two"
 	@echo "                  files.  Run it BEFORE proving anything"
 	@echo "                  make find Q='≤ slotsSize'"
-	@echo "  dup-check     no fact proven twice under two names: compares declared"
-	@echo "                  TYPES up to renaming of bound variables.  Agda catches"
-	@echo "                  the name collision; this catches the one that costs"
-	@echo "                  time, where the names differ.  EXITS 1 on a violation"
+	@echo "  dup-check     no fact proven twice: compares declared TYPES up to"
+	@echo "                  renaming of bound variables, binder spelling"
+	@echo "                  (bare/annotated, explicit/implicit) and atomic type"
+	@echo "                  synonyms.  A finding is two SITES, not two names —"
+	@echo "                  Agda does NOT catch a same-name copy when either is"
+	@echo "                  private.  EXITS 1 on a violation"
+	@echo "  dup-selftest  proves dup-check load-bearing against a fixture outside"
+	@echo "                  agda/src: fires on each duplicate shape, and not on"
+	@echo "                  record fields, where-locals, -go aliases or operators"
 	@echo "  stripped      regenerate agda/_stripped-comments/, the comment-free"
 	@echo "                  mirror agda ACTUALLY checks — so a comment-only edit"
 	@echo "                  leaves it byte-identical and rebuilds nothing.  Runs"
@@ -98,7 +103,8 @@ help:
 	@echo "                  after 'make agda' (it imports src, so the cache is"
 	@echo "                  warm by then).  See REFUTATION.md"
 	@echo "  gate          the acceptance test: wiring-selftest + wiring-gate +"
-	@echo "                  unsafe-check + dup-check + agda + refuted + bug-cache.  Cheap"
+	@echo "                  unsafe-check + dup-selftest + dup-check + agda +"
+	@echo "                  refuted + bug-cache.  Cheap"
 	@echo "                  checks FIRST so a 2-second failure never waits on"
 	@echo "                  the 13-minute one; 'refuted' comes AFTER 'agda'"
 	@echo "                  because it imports src and wants that cache warm"
@@ -300,15 +306,43 @@ wiring-gate:
 wiring-refuted:
 	scripts/check-wiring.py --src agda/refuted --root Refuted/Main.agda --gate
 
-# NO FACT IS PROVEN TWICE UNDER TWO NAMES.  Compares the DECLARED TYPE of every
-# definition and postulate, up to renaming of bound variables.  Agda already
-# rejects the case where the NAMES collide too (ClashingDefinition); this is for
-# the case that has actually cost us time, where they do not — `sizeᵉ-pos` and
-# `1≤sizeᵉ`, the same statement 170 lines apart in ONE file, unnoticed for
-# months.  CLAUDE.md has carried a SEARCH FIRST section throughout; prose lost,
-# as it did for wiring and for unsafe pragmas, so this is the machine.
+# NO FACT IS PROVEN TWICE.  Compares the DECLARED TYPE of every definition and
+# postulate, up to renaming of bound variables — `sizeᵉ-pos` and `1≤sizeᵉ`, the
+# same statement 170 lines apart in ONE file, unnoticed for months.  CLAUDE.md
+# has carried a SEARCH FIRST section throughout; prose lost, as it did for
+# wiring and for unsafe pragmas, so this is the machine.
+#
+# A finding is two SITES, not two names.  Do NOT re-introduce the assumption
+# that Agda's ClashingDefinition covers same-name copies: it does not when
+# either copy is `private`, or when the two modules are never in scope
+# together, and both escapees were exactly that shape.  It also matches up to
+# BINDER SPELLING (bare/annotated, explicit/implicit) and expands atomic type
+# synonyms (Id = ℕ), because those are three ways one fact wears two types.
+# `make dup-selftest` pins every one of those rows.
 dup-check:
 	@scripts/check-duplicates.py --gate
+
+# PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It
+# earns its keep: three separate bugs shipped in this checker and each was
+# found by hand, not by the check failing.  The MUST-NOT rows are the
+# regressions — an operator pair the binder regex used to rename away, record
+# fields that a multi-line record header spilled into the scan, where-locals,
+# and the mandated -go alias.  The MUST-FIRE rows cover all three ways one
+# fact wears two types: differing names, ONE name in two modules (which Agda
+# does not catch when either copy is private), and binder spelling.
+dup-selftest:
+	@out=$$(scripts/check-duplicates.py --src scripts/dup-selftest 2>&1); \
+	  fail=0; \
+	  echo "$$out" | grep -q "3 exact + 2 up-to-binder" \
+	    || { echo "SELFTEST FAIL: expected 3 exact + 2 up-to-binder groups"; fail=1; }; \
+	  for n in twin-different-name shared-name annotated-binder implicit-binder synonym-rhs; do \
+	    echo "$$out" | grep -q "$$n" || { echo "SELFTEST FAIL: $$n not reported — a real duplicate stopped firing"; fail=1; }; \
+	  done; \
+	  for n in op-and op-or sealed fld-a fld-b helper outer; do \
+	    echo "$$out" | grep -q "$$n" && { echo "SELFTEST FAIL: $$n reported, but it is not a duplicate"; fail=1; }; \
+	  done; \
+	  if [ $$fail -eq 0 ]; then echo "dup-selftest: PASS (fires on differing names, on one name in two modules, and on binder spelling; not on operators, record fields, where-locals or the -go alias)"; \
+	  else echo "$$out"; exit 1; fi
 
 # SEARCH FIRST, made cheap and impossible to scope wrong: search the declared
 # TYPE of every statement in the tree.  dup-check catches a duplicate only once
@@ -375,6 +409,7 @@ gate:
 	@$(MAKE) --no-print-directory wiring-gate
 	@$(MAKE) --no-print-directory wiring-refuted
 	@$(MAKE) --no-print-directory unsafe-check
+	@$(MAKE) --no-print-directory dup-selftest
 	@$(MAKE) --no-print-directory dup-check
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted

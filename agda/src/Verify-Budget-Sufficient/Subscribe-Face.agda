@@ -590,12 +590,8 @@ slotSize≤slotsSize sl i = fᵢ≤sum-tab (λ k → slotSize (sl k)) i
 -- `suc w ≤ 2 ^ w` doubles to `2 * suc w ≤ S ^ suc w = foldStep S w`, so
 -- two receipts at one level add to one receipt a fold up
 
-2*suc≤2^suc : ∀ (w : ℕ) → 2 * suc w ≤ 2 ^ suc w
-2*suc≤2^suc w = *-monoʳ-≤ 2 {suc w} {2 ^ w} (n<2^n w)
-
-
-dbl-suc : ∀ (w : ℕ) → suc w + suc w ≡ 2 * suc w
-dbl-suc w = sym (trans (cong (λ x → suc w + x) (+-identityʳ (suc w))) refl)
+-- `2*suc≤2^suc` and `dbl-suc` are .Caps-Face/Part6's, public since
+-- 2026-08-19; they were verbatim here too until dup-check saw them.
 
 
 

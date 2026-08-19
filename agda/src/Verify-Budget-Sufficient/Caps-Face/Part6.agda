@@ -396,6 +396,16 @@ thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
   proj₁ (thruWrap op nid fin r) ≡ proj₁ r
 
+-- PUBLIC because .Subscribe-Face had verbatim copies of both under the
+-- same names, and this is the lower module.  Same name in two modules is
+-- invisible to Agda when one copy is private, which is how these two sat
+-- duplicated until `make dup-check` learned to key on SITES not names.
+dbl-suc : ∀ (w : ℕ) → suc w + suc w ≡ 2 * suc w
+dbl-suc w = sym (trans (cong (λ x → suc w + x) (+-identityʳ (suc w))) refl)
+
+2*suc≤2^suc : ∀ (w : ℕ) → 2 * suc w ≤ 2 ^ suc w
+2*suc≤2^suc w = *-monoʳ-≤ 2 (n<2^n w)
+
 private
   -- valsOf / valsLen / valsIn / lenWiden: wrappers around valsCaps?-parts
   valsOf c sl vs h = proj₁ (valsCaps?-parts c sl vs h)
@@ -449,12 +459,6 @@ private
   ... | just (concat-st _ _ _) = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
-
-  dbl-suc : ∀ (w : ℕ) → suc w + suc w ≡ 2 * suc w
-  dbl-suc w = sym (trans (cong (λ x → suc w + x) (+-identityʳ (suc w))) refl)
-
-  2*suc≤2^suc : ∀ (w : ℕ) → 2 * suc w ≤ 2 ^ suc w
-  2*suc≤2^suc w = *-monoʳ-≤ 2 (n<2^n w)
 
   double≤foldStep S w hS = ≤-trans (2*suc≤2^suc w) (^-monoˡ-≤ (suc w) hS)
 

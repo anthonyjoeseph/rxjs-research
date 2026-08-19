@@ -32,7 +32,8 @@ open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init;
 -- proves for the rest of the Well-Formed tree.  The import surface here
 -- is a CLAIM, so it stays minimal — but re-proving a fact to keep a
 -- using-list short is the trade `make dup-check` exists to refuse.
-open import Verify-Well-Formed    using (evaluate-well-formed; just-injᵂ; n≢jᵂ)
+open import Verify-Well-Formed    using (evaluate-well-formed; just-injᵂ; n≢jᵂ;
+                                         ≡ᵇ→≡; ≡ᵇ-refl; ≡ᵇ-sym)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
@@ -197,19 +198,8 @@ apply-agree (close x dried ∷ es) live owed done vs eq with removeOne x live | 
 -- already seen, so it's unseen and extends SeenBelow.
 ------------------------------------------------------------------
 
-≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
-≡ᵇ→≡ zero    zero    _ = refl
-≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
-≡ᵇ-refl : ∀ (i : ℕ) → (i ≡ᵇ i) ≡ true
-≡ᵇ-refl zero    = refl
-≡ᵇ-refl (suc i) = ≡ᵇ-refl i
-
-≡ᵇ-sym : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ (k ≡ᵇ m)
-≡ᵇ-sym zero    zero    = refl
-≡ᵇ-sym zero    (suc k) = refl
-≡ᵇ-sym (suc m) zero    = refl
-≡ᵇ-sym (suc m) (suc k) = ≡ᵇ-sym m k
+-- `≡ᵇ→≡`, `≡ᵇ-refl` and `≡ᵇ-sym` come from .Verify-Well-Formed (Part1
+-- and Part12); they were re-proved verbatim here until 2026-08-19.
 
 -- an id is always seen in a list it heads
 seenBefore-hit : ∀ (i : Id) (seen : List Id) → seenBefore i (i ∷ seen) ≡ true

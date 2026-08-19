@@ -87,7 +87,7 @@ open import Rx.Evaluator
          sLvlD-0; sLvlD-suc; fLvlD; fLvlD-0; fLvlD-suc; fIterD-0; fIterD-suc)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD;
-         iterL-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front;
+         iterL-infl; lvls-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front;
          lvls-mono; lvls-add; n<2^n; dLvl-mono; sLvlD-mono; 2≤dLvl)
 open import Verify-Budget-Sufficient.Op-Dominance
   using (climb; fLvlD-le-dLvl; fIterD-lvls)
@@ -218,12 +218,8 @@ tail-fits S W d R J g 2≤S 1≤R 2≤g =
 -- residual bookkeeping.
 ------------------------------------------------------------------
 
--- spending never descends
-lvls-infl : ∀ S W d J n → J ≤ lvls S W d J n
-lvls-infl S W d J zero    = ≤-refl
-lvls-infl S W d J (suc n) =
-  ≤-trans (lvls-infl S W d J n)
-          (iterL-infl S W d (suc (sizeAt S (lvls S W d J n))) (lvls S W d J n))
+-- spending never descends: `lvls-infl` is .Caps's, re-proved here (via
+-- iterL-infl rather than dLvl-infl) until 2026-08-19.
 
 -- the tail-closure is monotone
 G-mono : ∀ S W d {X Y} → 2 ≤ S → X ≤ Y → G S W d X ≤ G S W d Y

@@ -91,12 +91,6 @@ lookup-pos-not-paidOff : ∀ (s : Source) (ow : Owed) (k : ℕ) →
 lookup-pos-not-paidOff s [] k ()
 lookup-pos-not-paidOff s (e ∷ ow) k eq = lookup-pos-not-allZero s (e ∷ ow) k eq
 
-T→≡ : ∀ (b : Bool) → T b → b ≡ true
-T→≡ true _ = refl
-
-≤→≤ᵇ : ∀ {m n : ℕ} → m ≤ n → (m ≤ᵇ n) ≡ true
-≤→≤ᵇ {m} {n} p = T→≡ (m ≤ᵇ n) (≤⇒≤ᵇ p)
-
 -- the automaton admits an OPEN unpaid instant: enterInstant continues it,
 -- seeding go with the running owed and the standing horizon.  Fields taken
 -- literally so enterInstant's `with current` reduces (enterInstant reads
@@ -166,10 +160,10 @@ enterInstant-fresh-aux : ∀ (lv : List Source) (hz i : Id) (cur : Maybe (Id × 
     enterInstant (record { live = lv ; horizon = hz ; current = cur ; done = dn }) i
       ≡ just ([] , hz′)
 enterInstant-fresh-aux lv hz i nothing dn cp pu hle =
-  hz , enterInstant-idle-aux lv hz i nothing dn refl (≤→≤ᵇ hle)
+  hz , enterInstant-idle-aux lv hz i nothing dn refl (≤ᵇ-true _ _ hle)
 enterInstant-fresh-aux lv hz i (just (j , ow)) dn cp pu hle =
   suc j , enterInstant-held-aux lv hz i j (just (j , ow)) ow dn refl
-    (sucle→≢ᵇ cp) (paidUp-held-aux lv hz (just (j , ow)) dn j ow refl pu) (≤→≤ᵇ cp)
+    (sucle→≢ᵇ cp) (paidUp-held-aux lv hz (just (j , ow)) dn j ow refl pu) (≤ᵇ-true _ _ cp)
 
 enterInstant-fresh : ∀ (S : ProtocolSt) (i : Id) →
   CurrentPast (ProtocolSt.current S) i → paidUp S ≡ true → ProtocolSt.horizon S ≤ i →

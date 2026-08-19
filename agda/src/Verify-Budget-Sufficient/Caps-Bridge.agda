@@ -470,8 +470,8 @@ private
   -- postpones forever (measured: UnsolvedConstraints, "blocked on _x").
   -- EXTRACTING from `≡ true` has no such problem — it is what ∧-true
   -- does thirty times in this file — so the refutation runs that way.
-  f≢t : false ≡ true → ⊥
-  f≢t ()
+  -- (the refutation itself is `f≡t-absurd`, .Measures — strictly stronger,
+  -- and in scope here through .Caps's public chain.)
 
   -- widNode W sl (concat-st q _ _) = all (pWᵉ-bound) q ∧ (length q ≤ᵇ W).
   -- Peeled HERE rather than at the use site because the RESULT type pins
@@ -570,7 +570,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
                 t5 = proj₁ (∧-true A4 A5 t4)
                 w  = proj₁ (∧-true WD true t5)
                 ln = widNode-len W sl q false false w
-            in f≢t (trans (sym hLen) ln)
+            in f≡t-absurd (trans (sym hLen) ln)
 
 -- ══ MIGRATED 2026-08-18 — `dry-tick-core` IS GONE ═══════════════════
 -- It was a postulate over NINE proven lemmas.  Eight were never
