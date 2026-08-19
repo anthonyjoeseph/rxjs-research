@@ -53,7 +53,8 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        ^-distribˡ-+-*; *-mono-≤;
                                        +-monoʳ-≤; *-comm;
                                        m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
+                                       suc-injective; <-irrefl; ≡ᵇ⇒≡;
+                                       ≤-antisym)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -3789,6 +3790,156 @@ mutual
     ⊔-elim-help (caseWᵗ y ⊔ fnCapᵗ y) (fnCapᵗˢ ys) (fnCapᵉ cl)
                 (fn-comb-D x cl y (fnCapᵉ cl) (fnCap-elimDᵗ x cl y))
                 (fnCap-elimDᵗˢ x cl ys)
+
+-- (W3) elimG/D keep fnCap ≥ host (guarded vars contribute 0, so substitution
+-- can only ADD the closure's measure where a 0 stood — the result never shrinks)
+mutual
+  fnCap-elimG-lower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    fnCapᵉ e ≤ fnCapᵉ (elimGExp x cl e)
+  fnCap-elimG-lower x cl (input i)       = z≤n
+  fnCap-elimG-lower x cl (ofᵉ ts)        = fnCap-elimGᵗˢ-lower x cl ts
+  fnCap-elimG-lower x cl emptyᵉ          = z≤n
+  fnCap-elimG-lower x cl (mapᵉ f e)      =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ f) (sym (caseW-elimGᵗ x cl f))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimGᵗ-lower x cl f)))
+      (fnCap-elimG-lower x cl e)
+  fnCap-elimG-lower x cl (takeᵉ c e)     =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ c) (sym (caseW-elimGᵗ x cl c))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimGᵗ-lower x cl c)))
+      (fnCap-elimG-lower x cl e)
+  fnCap-elimG-lower x cl (scanᵉ f z e)   =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ f) (sym (caseW-elimGᵗ x cl f))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimGᵗ-lower x cl f)))
+      (⊔-mono-≤
+        (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ z) (sym (caseW-elimGᵗ x cl z))))
+                 (⊔-mono-≤ ≤-refl (fnCap-elimGᵗ-lower x cl z)))
+        (fnCap-elimG-lower x cl e))
+  fnCap-elimG-lower x cl (mergeAllᵉ e)   = fnCap-elimG-lower x cl e
+  fnCap-elimG-lower x cl (concatAllᵉ e)  = fnCap-elimG-lower x cl e
+  fnCap-elimG-lower x cl (switchAllᵉ e)  = fnCap-elimG-lower x cl e
+  fnCap-elimG-lower x cl (exhaustAllᵉ e) = fnCap-elimG-lower x cl e
+  fnCap-elimG-lower x cl (μᵉ e)          = fnCap-elimG-lower (there x) cl e
+  fnCap-elimG-lower x cl (varᵉ y)        = z≤n
+  fnCap-elimG-lower x cl (deferᵉ e)      =
+    ≤-trans (fnCap-elimD-lower (∈-++⁺ˡ x) cl e)
+            (≤-reflexive (sym (fnCap-substᴱ (⊟-++ˡ x) (elimDExp (∈-++⁺ˡ x) cl e))))
+
+  fnCap-elimD-lower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    fnCapᵉ e ≤ fnCapᵉ (elimDExp x cl e)
+  fnCap-elimD-lower x cl (input i)       = z≤n
+  fnCap-elimD-lower x cl (ofᵉ ts)        = fnCap-elimDᵗˢ-lower x cl ts
+  fnCap-elimD-lower x cl emptyᵉ          = z≤n
+  fnCap-elimD-lower x cl (mapᵉ f e)      =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ f) (sym (caseW-elimDᵗ x cl f))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimDᵗ-lower x cl f)))
+      (fnCap-elimD-lower x cl e)
+  fnCap-elimD-lower x cl (takeᵉ c e)     =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ c) (sym (caseW-elimDᵗ x cl c))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimDᵗ-lower x cl c)))
+      (fnCap-elimD-lower x cl e)
+  fnCap-elimD-lower x cl (scanᵉ f z e)   =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ f) (sym (caseW-elimDᵗ x cl f))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimDᵗ-lower x cl f)))
+      (⊔-mono-≤
+        (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ z) (sym (caseW-elimDᵗ x cl z))))
+                 (⊔-mono-≤ ≤-refl (fnCap-elimDᵗ-lower x cl z)))
+        (fnCap-elimD-lower x cl e))
+  fnCap-elimD-lower x cl (mergeAllᵉ e)   = fnCap-elimD-lower x cl e
+  fnCap-elimD-lower x cl (concatAllᵉ e)  = fnCap-elimD-lower x cl e
+  fnCap-elimD-lower x cl (switchAllᵉ e)  = fnCap-elimD-lower x cl e
+  fnCap-elimD-lower x cl (exhaustAllᵉ e) = fnCap-elimD-lower x cl e
+  fnCap-elimD-lower x cl (μᵉ e)          = fnCap-elimD-lower x cl e
+  fnCap-elimD-lower x cl (varᵉ y)        with compare∈ x y
+  ... | inj₁ refl = z≤n
+  ... | inj₂ y′   = z≤n
+  fnCap-elimD-lower {Δᵍ = Δᵍ} x cl (deferᵉ e) =
+    ≤-trans (fnCap-elimD-lower (∈-++⁺ʳ Δᵍ x) cl e)
+            (≤-reflexive (sym (fnCap-substᴱ (⊟-++ʳ {Δᵍ = Δᵍ} x) (elimDExp (∈-++⁺ʳ Δᵍ x) cl e))))
+
+  fnCap-elimGᵗ-lower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+    fnCapᵗ tm ≤ fnCapᵗ (elimGTm x cl tm)
+  fnCap-elimGᵗ-lower x cl (varᵗ y)      = z≤n
+  fnCap-elimGᵗ-lower x cl unit̂          = z≤n
+  fnCap-elimGᵗ-lower x cl (bool̂ _)      = z≤n
+  fnCap-elimGᵗ-lower x cl (nat̂ _)       = z≤n
+  fnCap-elimGᵗ-lower x cl (pairᵗ a b)   =
+    ⊔-mono-≤ (fnCap-elimGᵗ-lower x cl a) (fnCap-elimGᵗ-lower x cl b)
+  fnCap-elimGᵗ-lower x cl (fstᵗ p)      = fnCap-elimGᵗ-lower x cl p
+  fnCap-elimGᵗ-lower x cl (sndᵗ p)      = fnCap-elimGᵗ-lower x cl p
+  fnCap-elimGᵗ-lower x cl (inlᵗ a)      = fnCap-elimGᵗ-lower x cl a
+  fnCap-elimGᵗ-lower x cl (inrᵗ a)      = fnCap-elimGᵗ-lower x cl a
+  fnCap-elimGᵗ-lower x cl (caseᵗ s l r) =
+    ⊔-mono-≤ (fnCap-elimGᵗ-lower x cl s)
+              (⊔-mono-≤ (fnCap-elimGᵗ-lower x cl l) (fnCap-elimGᵗ-lower x cl r))
+  fnCap-elimGᵗ-lower x cl (ifᵗ c a b)   =
+    ⊔-mono-≤ (fnCap-elimGᵗ-lower x cl c)
+              (⊔-mono-≤ (fnCap-elimGᵗ-lower x cl a) (fnCap-elimGᵗ-lower x cl b))
+  fnCap-elimGᵗ-lower x cl (primᵗ _ a)   = fnCap-elimGᵗ-lower x cl a
+  fnCap-elimGᵗ-lower x cl (strmᵗ e)     = fnCap-elimG-lower x cl e
+
+  fnCap-elimDᵗ-lower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
+    fnCapᵗ tm ≤ fnCapᵗ (elimDTm x cl tm)
+  fnCap-elimDᵗ-lower x cl (varᵗ y)      = z≤n
+  fnCap-elimDᵗ-lower x cl unit̂          = z≤n
+  fnCap-elimDᵗ-lower x cl (bool̂ _)      = z≤n
+  fnCap-elimDᵗ-lower x cl (nat̂ _)       = z≤n
+  fnCap-elimDᵗ-lower x cl (pairᵗ a b)   =
+    ⊔-mono-≤ (fnCap-elimDᵗ-lower x cl a) (fnCap-elimDᵗ-lower x cl b)
+  fnCap-elimDᵗ-lower x cl (fstᵗ p)      = fnCap-elimDᵗ-lower x cl p
+  fnCap-elimDᵗ-lower x cl (sndᵗ p)      = fnCap-elimDᵗ-lower x cl p
+  fnCap-elimDᵗ-lower x cl (inlᵗ a)      = fnCap-elimDᵗ-lower x cl a
+  fnCap-elimDᵗ-lower x cl (inrᵗ a)      = fnCap-elimDᵗ-lower x cl a
+  fnCap-elimDᵗ-lower x cl (caseᵗ s l r) =
+    ⊔-mono-≤ (fnCap-elimDᵗ-lower x cl s)
+              (⊔-mono-≤ (fnCap-elimDᵗ-lower x cl l) (fnCap-elimDᵗ-lower x cl r))
+  fnCap-elimDᵗ-lower x cl (ifᵗ c a b)   =
+    ⊔-mono-≤ (fnCap-elimDᵗ-lower x cl c)
+              (⊔-mono-≤ (fnCap-elimDᵗ-lower x cl a) (fnCap-elimDᵗ-lower x cl b))
+  fnCap-elimDᵗ-lower x cl (primᵗ _ a)   = fnCap-elimDᵗ-lower x cl a
+  fnCap-elimDᵗ-lower x cl (strmᵗ e)     = fnCap-elimD-lower x cl e
+
+  fnCap-elimGᵗˢ-lower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    fnCapᵗˢ ts ≤ fnCapᵗˢ (elimGTms x cl ts)
+  fnCap-elimGᵗˢ-lower x cl []       = z≤n
+  fnCap-elimGᵗˢ-lower x cl (y ∷ ys) =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ y) (sym (caseW-elimGᵗ x cl y))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimGᵗ-lower x cl y)))
+      (fnCap-elimGᵗˢ-lower x cl ys)
+
+  fnCap-elimDᵗˢ-lower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    fnCapᵗˢ ts ≤ fnCapᵗˢ (elimDTms x cl ts)
+  fnCap-elimDᵗˢ-lower x cl []       = z≤n
+  fnCap-elimDᵗˢ-lower x cl (y ∷ ys) =
+    ⊔-mono-≤
+      (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ y) (sym (caseW-elimDᵗ x cl y))))
+               (⊔-mono-≤ ≤-refl (fnCap-elimDᵗ-lower x cl y)))
+      (fnCap-elimDᵗˢ-lower x cl ys)
+
+-- fnCap is preserved by unfoldμ: substituting μᵉ body at the guarded var
+-- reintroduces fnCapᵉ body where 0 stood, and n ⊔ n = n closes the ≤ gap.
+-- abstract: seals the body so consumers on the budget-sufficient spine do
+-- not trigger expensive reduction during their own mutual-block checks.
+abstract
+  fnCap-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+    fnCapᵉ (unfoldμ body) ≡ fnCapᵉ (μᵉ body)
+  fnCap-unfoldμ body =
+    ≤-antisym
+      (≤-trans (fnCap-elimG (here refl) (μᵉ body) body)
+               (⊔-lub ≤-refl ≤-refl))
+      (fnCap-elimG-lower (here refl) (μᵉ body) body)
 
 -- every term has at least one node
 sizeᵗ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) → 1 ≤ sizeᵗ tm

@@ -82,12 +82,6 @@ named postulate's own header.
 - **`slotHop-cap`** (Measures) — DIFFICULTY: Demand-Probe series S reaches
   the amplifier-chain region and measures the margin widening. Route and
   coverage in its header.
-- **`mu-lvl-desc`** (Walk-Level) — DIFFICULTY, low. The μ edge's L̂
-  transport, and its header names a route over FOUR PROVEN lemmas
-  (op-step-mu, inner-desc, opIterD-mono, sLvlD-suc) — the caps side does
-  not donate the statement, but it does donate all the machinery.
-- **`fnCap-unfoldμ`** (Walk-Level) — DIFFICULTY, low: the fnCap sibling
-  of the proven shellSize-/syncSize-/size-unfoldμ inductions.
 - **`walk-{of,empty,map,take,scan,defer}`** (Walk-Level) — DIFFICULTY.
   The walk face's one-shot and chain clauses; scan exercises the
   Ŝ-ceiling growth, defer mints the registry entry.

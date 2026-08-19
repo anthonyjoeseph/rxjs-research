@@ -71,7 +71,8 @@ open import Data.Unit    using (⊤; tt)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred;
                                        m≤m+n; m≤n+m; n≤1+n;
                                        +-suc; +-assoc; +-comm;
-                                       +-monoʳ-≤; +-monoˡ-≤; *-monoʳ-≤;
+                                       +-mono-≤; +-monoʳ-≤; +-monoˡ-≤;
+                                       *-mono-≤; *-monoʳ-≤;
                                        +-identityʳ;
                                        m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -109,7 +110,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 splitBurst; hasDry; dryEvent;
                                 sched-init; st-init; budgetAt; slotsSize;
                                 opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
-                                sLvlD-suc; sIterD-suc; fLvlD-suc; fLvl; widAt;
+                                sLvlD-suc; opIterD-suc; sIterD-suc; fLvlD-suc; fLvl; widAt;
                                 Frame; thru-outer; from-inner;
                                 pushBurst; stepFrame;
                                 subscribeInner; splitEvents; retagEvents;
@@ -140,7 +141,7 @@ open import Verify-Budget-Sufficient.Caps-Face
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
-         op-step-mu;
+         op-step-mu; quad-arith;
          op-desc; push-desc; frame-desc; tail-desc;
          walk-desc; inner-desc;
          inner-nil; inner-step; walk-nil;
@@ -150,7 +151,8 @@ open import Verify-Budget-Sufficient.Caps-Sadd
 -- the transformer monotonicity/inflation family, cited directly by the
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
-  using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl)
+  using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
+         sLvlD-mono; opIterD-infl; fIterD-infl)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
@@ -724,50 +726,36 @@ postulate
     INV? Ψ B′ sched′ (installNode nid ns st) ≡ true
 
 ------------------------------------------------------------------
--- THE μ CLAUSE'S TWO MISSING PIECES.  Everything else walk-mu spends
--- is proven and named in its body; these two are what the caps twin
--- could NOT donate, for two different reasons.
+-- THE μ CLAUSE'S REMAINING MISSING PIECE.  Everything else walk-mu spends
+-- is proven and named in its body; this is what the caps twin could NOT
+-- donate (`ceil`/`lb` are wet-side reset-anchor pins; subscribeE-caps
+-- carries no L̂ ledger).  fnCap-unfoldμ is now proven in .Measures.
 ------------------------------------------------------------------
-postulate
-  -- (1) fnCap ACROSS AN UNFOLD.  `unfoldμ body` is `elimGExp` putting
-  -- `μᵉ body` at the guarded variable, `fnCapᵉ (varᵉ x) = 0` and
-  -- `fnCapᵉ (μᵉ e) = fnCapᵉ e` (.Measures), so substitution can only
-  -- reintroduce `fnCapᵉ body` where a 0 stood — the ⊔ is idempotent
-  -- and the measure is unchanged.  ROUTE: structural induction over
-  -- elimGExp, the same shape as the PROVEN shellSize-unfoldμ /
-  -- syncSize-unfoldμ / size-unfoldμ (.Measures, .Keeps-Ring); this is
-  -- their fnCap sibling and nothing more.
-  --
-  -- Stated as EQUALITY rather than ≤ deliberately: the ≤ direction is
-  -- all walk-mu spends, but the induction proves the equality and a
-  -- weaker statement here would be the "do NOT weaken to typecheck"
-  -- move (CLAUDE.md) rather than a simplification.
-  fnCap-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
-    fnCapᵉ (unfoldμ body) ≡ fnCapᵉ (μᵉ body)
-
-  -- (2) THE μ LEVEL DESCENT, for the L̂ ceiling.  THIS ONE HAS NO CAPS
-  -- TWIN BY CONSTRUCTION: `ceil`/`lb` are the reset-anchor pins, wet
-  -- side only — subscribeE-caps carries no L̂ ledger at all — so no
-  -- caps clause can donate the transport and every walk clause
-  -- re-derives it (subscribeAll-walk spends `op-desc`; the *All
-  -- descendants spend `inner-desc`).
-  --
-  -- A μ unfolding is a FRESH ENTRY, not a chain edge: it subscribes a
-  -- LARGER term at a MINTED index (`suc (sizeAt S (j + j₀))`) while
-  -- spending one nesting level, which is exactly the shape `op-step-mu`
-  -- (.Caps-Chain) already opens quadratic room for.  ROUTE: the same
-  -- quad-arith room, with opIterD-mono and sLvlD-suc landing the minted
-  -- index under it — i.e. `inner-desc`'s argument at an offset index
-  -- rather than at `suc j`, which is the only reason inner-desc itself
-  -- does not apply (`j + j₀` is not definitionally a successor).
-  -- Stated over the Caps RECORD, not over raw S/W, so the call site
-  -- needs no sizeAt/frameStep conversion — the minted index IS
-  -- `suc (Caps.cSize (frameStep (j + j₀) c))`, which is what
-  -- subscribeE-caps' own μ clause passes its IH.
+-- THE μ LEVEL DESCENT, for the L̂ ceiling.  A μ unfolding is a FRESH
+-- ENTRY, not a chain edge: it subscribes a LARGER term at a MINTED
+-- index (`suc (sizeAt S (j + j₀))`) while spending one nesting level,
+-- which is exactly the shape `op-step-mu` (.Caps-Chain) already opens
+-- quadratic room for.  ROUTE: sLvlD-suc converts LHS to sLvlD; sLvlD-mono
+-- bounds sLvlD (j+j₀) ≤ sLvlD J₀ under hJ₀; two -infl steps; opIterD-suc
+-- closes.  hJ₀ at the call site is j + j₀ ≤ J₀ = suc(j + suc B * suc B)
+-- with B = cSize(frameStep j c), derived from szb via quad-arith.
+-- SEALED: body on the budget-sufficient spine; consumers need only the type.
+abstract
   mu-lvl-desc : ∀ (c : Caps) (d bud m j j₀ : ℕ) → 2 ≤ Caps.cSize c →
+    j + j₀ ≤ suc (j + suc (Caps.cSize (frameStep j c)) * suc (Caps.cSize (frameStep j c))) →
     opIterD (Caps.cSize c) (Caps.cWid c) d bud
             (suc (Caps.cSize (frameStep (j + j₀) c))) (j + j₀)
       ≤ opIterD (Caps.cSize c) (Caps.cWid c) d (suc bud) (suc m) j
+  mu-lvl-desc c d bud m j j₀ 2≤S hJ₀ =
+    let S  = Caps.cSize c
+        W  = Caps.cWid c
+        J₀ = suc (j + suc (Caps.cSize (frameStep j c)) * suc (Caps.cSize (frameStep j c)))
+        J₂ = opIterD S W d (suc bud) m (sLvlD S W d (suc bud) J₀)
+    in ≤-trans (≤-reflexive (sym (sLvlD-suc S W d bud (j + j₀))))
+       (≤-trans (sLvlD-mono d d (suc bud) (suc bud) 2≤S ≤-refl ≤-refl hJ₀ ≤-refl ≤-refl)
+       (≤-trans (opIterD-infl S W d (suc bud) m (sLvlD S W d (suc bud) J₀))
+       (≤-trans (fIterD-infl S W d (suc bud) (suc (widAt S W J₂)) J₂)
+                (≤-reflexive (sym (opIterD-suc S W d (suc bud) m j))))))
 
 ------------------------------------------------------------------
 -- THE INPUT CLAUSE'S WET RESIDUE.  walk-input is assembled below; this
@@ -2553,6 +2541,12 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
   U   = unconn sl (EvalSt.connectedShares st)
   US  = unfoldμ-caps c j sl body 2≤S slC szb wdb
   j₀  = proj₁ US
+  hJ₀ : j + j₀ ≤ suc (j + suc (Caps.cSize (frameStep j c)) * suc (Caps.cSize (frameStep j c)))
+  hJ₀ = ≤-trans
+    (+-monoʳ-≤ j
+       (≤-trans (+-mono-≤ szb (s≤s (*-mono-≤ szb szb)))
+                (quad-arith (Caps.cSize (frameStep j c)))))
+    (n≤1+n _)
   ⊑₀  = frameStep-⊑-+ c 2≤S j j₀
   -- the unfolding's demand: hopD equal (hopD-unfoldμ), syncSize strictly
   -- smaller (unfoldμ-shrinks) — mu-edge fuses the pair
@@ -2582,7 +2576,7 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
          (subst (λ x → x ≤ Ψ) (sym (fnCap-unfoldμ body)) fnC)
          (pathB?-widen κ (proj₁ ⊑₀) pB)
          s2 fS rS ceil
-         (≤-trans (mu-lvl-desc c dep bud′ ops′ j j₀ 2≤S) lb)
+         (≤-trans (mu-lvl-desc c dep bud′ ops′ j j₀ 2≤S hJ₀) lb)
          (subst (λ x → dBound Ŝ R̂ U (hopDᵉ x (slotHop x sl) (unfoldμ body))
                          (syncSizeᵉ (unfoldμ body)) ≤ G′) (sym fS) ≤-refl)
          (hasAtLeast-mono sucG′≤G (hasAtLeast-peel-gs gas))
