@@ -113,7 +113,10 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   STORE INVARIANT supplies hypothesis-side — `boundedNode B (scan-st v) =
   sizeᵛ v ≤ᵇ B` under `INV?`, carried to `Ŝ` by `ceil` — and whose one missing
   ingredient is a sharper `hopD-applyFn` spending a size increase per factor of
-  `P`. `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT serve: they land at the global cap
+  `P` — and the leaf's header now pins that to ONE case: the invariant closes
+  on every size-INCREASING step by a binomial step, and the whole residue is
+  the size-PRESERVING one, where what is owed is that a step which does not
+  grow the accumulator cannot multiply its depth either. `hopD-sizeᵗ`/`hopD-sizeᵉ` do NOT serve: they land at the global cap
   `szB V V`, far above this conjunct's target. Two routes are closed and are
   recorded in the leaf's header so they are not re-proposed — bounding the step
   count `k` at all (width-vs-size currency, and the live route never mentions

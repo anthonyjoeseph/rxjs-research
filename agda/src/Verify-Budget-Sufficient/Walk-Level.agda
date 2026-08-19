@@ -1173,6 +1173,33 @@ postulate
   -- what makes the exponent the accumulator's own size rather than the step
   -- count k — and it is why `k` need never be bounded at all, which retires
   -- the currency question the paragraph above raises against the k-form.
+  --
+  -- WHERE EXACTLY THE INVARIANT BREAKS, AND IT IS ONE CASE (derived
+  -- 2026-08-19; arithmetic, NOT typechecked).  Write P = pmᵗ V 0 f ⊔ 1,
+  -- B = hopDᵗ f + hopDᵗ z + hopDᵉ b — the clause's own summand — and
+  -- Aᵢ = hopDᵛ accᵢ, sᵢ = sizeᵛ accᵢ along scanVals' fold.
+  --   · BASE: `hopD-evalWith` (.Measures, PROVEN) at the empty env, since
+  --     `evalTm` is `evalWith … []ᵃ` — the same reduction
+  --     `evalTm-iterSize` (.Caps-Face/Part1) already makes for the size.
+  --     Gives A₀ ≤ hopDᵗ z ≤ B.
+  --   · STEP: hopD-applyFn against the pair's ⊔ gives Aᵢ₊₁ ≤ B + P * (Aᵢ ⊔ B).
+  -- Against the invariant `Aᵢ ≤ (1 + P) ^ sᵢ * B`, that splits two ways:
+  --   · sᵢ₊₁ ≥ suc sᵢ — CLOSES, on `1 + P * (1+P)^s ≤ (1+P)^(suc s)`, one
+  --     binomial step, every P and s.
+  --   · sᵢ₊₁ ≡ sᵢ — DOES NOT close: it asks `1 + P * (1+P)^s ≤ (1+P)^s`,
+  --     false for every P ≥ 1.
+  -- So the ENTIRE residue is the SIZE-PRESERVING step, and what is owed
+  -- there is that such a step cannot multiply either: hopD multiplies only
+  -- under a `mapᵉ` source (and `caseᵗ`), and putting the accumulator in
+  -- that position adds a constructor, so a step with P ≥ 2 grows the size.
+  -- That implication is the sharper hopD-applyFn, stated at the case that
+  -- needs it rather than in general.
+  --
+  -- THE ADDITIVE CORNER IS NOT A SEPARATE CASE, correcting the P-split
+  -- above: at P = 1 the recurrence is Aᵢ₊₁ ≤ B + Aᵢ and the invariant asks
+  -- `1 + 2^s ≤ 2^(suc s)` — the same split, the same failing arm.  It is
+  -- "comfortably true" only AFTER the size-preserving step is discharged,
+  -- so it buys no separate route.
   walk-scan-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmtᴴ {e = e} (scanᵉ f z b)
