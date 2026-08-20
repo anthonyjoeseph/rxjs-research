@@ -2283,9 +2283,50 @@ postulate
     OKB {e = e} c sl Ψ J sched st →
     depthInner sf concatᵒ allNid κ id now o sched st ≤ dep
 
-  -- Ceiling transfer: opIterD ≤ fLvlD, so frameStep-mono-j closes the gap.
-  -- opIterD S W d bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W d J, then
-  -- frameStep-mono-j makes the per-element ceiling follow from the frame's.
+  -- ⚠ CLASS: SHAPE (2026-08-20).  DO NOT GRIND THIS.  The route written
+  -- below is DEAD, and the statement is not derivable from its own
+  -- hypothesis — the repair is at the CALLER's signature, not here.
+  --
+  -- DEAD ROUTE 2026-08-20: THE CEILING TRANSFER IS BACKWARDS.  The route
+  -- claimed `opIterD S W d bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W d J`,
+  -- then frameStep-mono-j.  The inequality runs the OTHER WAY, and every
+  -- step of the derivation is an already-PROVEN lemma:
+  --
+  --   opIterD S W d k (suc m) (suc J)
+  --     ≡ fIterD S W d k (suc (widAt S W J₂)) J₂          -- opIterD-suc
+  --     ≡ fIterD S W d k (widAt S W J₂) (fLvlD S W d J₂)  -- fIterD-suc
+  --     ≥ fLvlD S W d J₂                                  -- fIterD-infl
+  --     ≥ fLvlD S W d J                                   -- fLvlD-mono
+  --
+  -- where J₂ = opIterD S W d k m (sLvlD S W d k J₀),
+  --       J₀ = suc (suc J + suc (sizeAt S (suc J)) ^2),
+  -- and J ≤ J₂ because J ≤ suc J ≤ J₀ ≤ sLvlD … J₀ ≤ J₂ by sLvlD-infl and
+  -- opIterD-infl.  So `fLvlD S W d J ≤ opIterD S W d k (suc m) (suc J)`.
+  -- The structural reason is visible in the clause: opIterD's step APPLIES
+  -- fLvlD at the SAME d, at least once (`suc (widAt …)` is never zero),
+  -- starting from a level already above suc J.  An iteration of fLvlD
+  -- cannot be bounded by one fLvlD below its own starting point.
+  --
+  -- WHY THAT MAKES IT SHAPE RATHER THAN MERELY UNPROVEN: `cSize ∘
+  -- frameStep` is monotone in j (frameStep-mono-j), so the hypothesis
+  -- bounds a STRICTLY SMALLER quantity than the conclusion.  An upper
+  -- bound on the smaller says nothing about the larger, so the conclusion
+  -- needs information NO hypothesis carries — the second of the two
+  -- always-wrong shapes CLAUDE.md names.
+  --
+  -- THE REPAIR IS AT THE CALL SITE, and this is the misplaced-call
+  -- diagnosis, not a missing lemma.  `concatDrain-nodry` (below) receives
+  -- `cl` at the fLvlD level and must hand `subscribeInner-nodry` a bound
+  -- at the opIterD level; it passes the same `dep` to both, so its own
+  -- hypothesis is simply stated at the wrong level.  It has to be stated
+  -- at a level DOMINATING every queue element's opIterD level — which is
+  -- why it cannot be per-element: `bud` and `sizeᵉ o` are per-element
+  -- data, and that is the real content this postulate was standing in
+  -- for.  Restating `concatDrain-nodry`'s `cl` pushes the obligation to
+  -- ITS caller and makes this row a monotonicity transport or nothing at
+  -- all.  Cascading through those callers is the cost of the fact being
+  -- true, not a reason to keep this shape.
+  --
   -- id is explicit so the sizeCapAt reference is well-scoped.
   --
   -- ⚠ THIS BODY MUST LAND `abstract`, IN THE SAME EDIT THAT WRITES IT, AND

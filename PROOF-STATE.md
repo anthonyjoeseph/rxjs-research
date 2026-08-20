@@ -80,9 +80,9 @@ named postulate's own header.
 
 Rows are available to their siblings as postulates, so GRINDABLE ones can be
 ground in parallel by workers; top-to-bottom is the order attention is OWED,
-not a bar on running the bottom concurrently. `concatDrain-nodry-cl` is
-DIFFICULTY and the design session's own, per the delegation boundary in
-CLAUDE.md.
+not a bar on running the bottom concurrently. The SHAPE row is the design
+session's own — a restatement is not a grind, and per CLAUDE.md a SHAPE row is
+never handed to a worker.
 
 A row's class here must agree with its postulate's header, which is where the
 research lives; where they disagreed, the header won. Two rows in this tier
@@ -146,10 +146,11 @@ reading the evaluator and the measures, NOT by typechecking".
   (Burst-Walk) — GRINDABLE. Per-element context for concat's drain: each
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
   element has moved the state, and the shared header names the caps face
-  (`.Subscribe-Face`) as the worked twin at the same indices. `-cl` is
-  DIFFICULTY and the design session's: it is on the `budget-sufficient` spine
-  and its arithmetic is over the SEALED opIterD/fLvlD family, so its body must
-  land sealed or the check OOMs — see its header.
+  (`.Subscribe-Face`) as the worked twin at the same indices.
+- **`concatDrain-nodry-cl`** (Burst-Walk) — SHAPE, so it is restated rather than
+  ground: its ceiling-transfer route is proven BACKWARDS in its header, and the
+  repair is `concatDrain-nodry`'s own `cl` hypothesis, which is stated one level
+  too low. Cascades to that caller.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-dep` / `-loop`, `thruWalk-nodry-dep`,
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE. The same
   per-element context on the thru-outer side against the same twin, plus
