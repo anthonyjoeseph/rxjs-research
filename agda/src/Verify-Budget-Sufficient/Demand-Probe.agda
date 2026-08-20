@@ -39,25 +39,12 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep;
 open import Verify-Budget-Sufficient.Walk-Level using (WalkStmt)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using (valHopSpn?)
 open import Rx.Hop-Spine using (spnᵛ)
+-- THE SERIES Q FAMILY AND THE ENTRY RUNNER live in .Demand-Programs, so
+-- the COMPILED harness can import them without dragging this module's
+-- pins (and the whole Verify tower) into `make harness-build`.
+open import Verify-Budget-Sufficient.Demand-Programs
+  using (Γ₀; ins₀; runDry; wrapD; foldD; natsD; progD; sucG)
 
-----------------------------------------------------------------------
--- Context and slots: empty (no inputs)
-----------------------------------------------------------------------
-
-Γ₀ : Ctx 0
-Γ₀ = []ⱽ
-
-ins₀ : Slots Γ₀
-ins₀ = λ ()
-
-----------------------------------------------------------------------
--- Convenience runner
-----------------------------------------------------------------------
-
-runDry : ∀ {t} (h : ℕ) (e : Closed Γ₀ t) → Bool
-runDry h e =
-  hasDry (proj₁ (subscribeE (gasPad h g0) e root 0 0
-                             (sched-init e ins₀) (st-init e)))
 
 ----------------------------------------------------------------------
 -- Programs — series A: static ladders (calibration)
@@ -646,27 +633,6 @@ _ = refl
 -- against a demand of d·k + 1.
 ----------------------------------------------------------------------
 
--- wrap a term d mergeAll-levels deeper
-wrapD : ∀ {Θ} → ℕ → Tm Γ₀ [] [] Θ (obs natᵗ) → Tm Γ₀ [] [] Θ (obs natᵗ)
-wrapD 0       t = t
-wrapD (suc d) t = strmᵗ (mergeAllᵉ (ofᵉ (wrapD d t ∷ [])))
-
--- the fold that wraps the accumulator d levels per value
-foldD : ℕ → Fn Γ₀ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
-foldD d = wrapD d (fstᵗ (varᵗ (here refl)))
-
-natsD : ℕ → List (Tm Γ₀ [] [] [] natᵗ)
-natsD 0       = []
-natsD (suc k) = nat̂ k ∷ natsD k
-
-progD : ℕ → ℕ → Closed Γ₀ natᵗ
-progD d k =
-  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) (ofᵉ (natsD k)))
-
--- the gas the face's demand hypothesis supplies at the minimal
--- instantiation: suc G, with G = syncSizeᵉ b + hopDᵉ 0 b
-sucG : Closed Γ₀ natᵗ → ℕ
-sucG b = suc (syncSizeᵉ b + hopDᵉ 0 (slotHop 0 ins₀) b)
 
 -- the sum side, pinned.  LOAD-BEARING: each fails if syncSizeᵉ or
 -- hopDᵉ moves, which is what the whole comparison rests on.
@@ -688,32 +654,49 @@ _ = refl
 _ : runDry 12 (progD 3 4) ≡ true
 _ = refl
 
--- ⚠ COST, MEASURED 2026-08-13 — AND THE CROSSOVER ROW IS A MULTI-HOUR
--- JOB, NOT A PIN.  `runDry` gives NO short-circuit in either direction:
--- `hasDry` reads the stream `subscribeE` RETURNS, so the whole run is
--- normalised before the first dry event can be seen.  (The cheap rows
--- above are cheap because their PROGRAMS are small — not, as first
--- assumed when this series was designed, because drying exits early.
--- That assumption is what made the crossover row look affordable.)
+-- ⚠ THE CROSSOVER REGION IS UNREACHABLE BY MEASUREMENT — FOREVER, AND
+-- THIS SUPERSEDES THE 2026-08-13 COST NOTE, WHICH HAD THE MODEL WRONG.
+-- That note called the row "a MULTI-HOUR JOB, NOT A PIN", on the reading
+-- that cost is QUADRATIC in k (d·k(k+1)/2 subscription levels, ~250 at
+-- the cheapest crossing, so ~hours).  It is not quadratic.  It is
+-- EXPONENTIAL, and the crossing is past the end of physics.
 --
--- The cost is intrinsic to the family and it is QUADRATIC in k: `scanᵉ`
--- emits every intermediate accumulator, accᵢ carries d·i nested levels,
--- and the outer *All subscribes all of them — so a run normalises
--- d·k(k+1)/2 subscription levels.  At the cheapest crossing point that
--- is ~250-300, and (8,8) had burned 56 min CPU without finishing.
--- Nothing much cheaper exists: minimising d·k(k+1)/2 subject to the
--- crossing condition 5d + k + 12 ≤ d·k bottoms out around 250 for
--- (7,8)/(6,9)/(8,8), all within ~15% of each other.
+-- MEASURED 2026-08-20 in the COMPILED harness (rows 3-8 and the
+-- sweepable row of Harness.Main; `measured-not-rechecked`), 26 points
+-- over d ∈ 1..9, k ∈ 1..6.  Cost is a function of the PRODUCT d·k and
+-- barely depends on the shape — four different shapes at d·k = 12 all
+-- land within a factor of 1.7:
 --
--- So the family SAFE region is pinned above and the crossing region is
--- NOT MEASURED — deliberately, with the cost named rather than the row
--- quietly dropped.  Whoever runs it should detach it for hours, not
--- expect a pin.  What it would mean is in `subscribeInner-walk`'s header.
+--     d·k   |  8      9        10        12
+--     cost  |  53ms   80-107   235-352   2141-3659ms
+--     shapes at d·k=12: (6,2) (4,3) (3,4) (2,6)
 --
--- SAFE at these shapes, by three orders on the small ones and by 18 at
--- (3,4): sucG 31 vs demand 13.  The margin NARROWS as d·k grows against
--- 5d + k + 12, and the model puts the crossover just above (6,8) —
--- sucG 50 against demand 49.
+-- Least squares on log(cost) gives a base of 2.895 per unit of d·k.
+-- The crossing condition 5d + k + 12 ≤ d·k first bites at d·k ≈ 54, so
+-- the cheapest refuting row costs ~2×10¹² YEARS — about 150× the age of
+-- the universe.  The practical ceiling is d·k ≈ 21 (roughly one day of
+-- CPU); the crossing needs 54, a gap of 2.9³³ ≈ 10¹⁵.  No machine, no
+-- backend, and no amount of patience reaches it.
+--
+-- WHY EXPONENTIAL.  `scanᵉ` re-emits every intermediate accumulator and
+-- the outer *All subscribes each one; accᵢ carries d·i nested
+-- `mergeAllᵉ (ofᵉ [·])` levels, and each level's burst is re-pushed
+-- through every level enclosing it.  That is a re-traversal cascade, not
+-- a walk — the "subscription levels" count was counting the walk.
+--
+-- CONSEQUENCE, and it is the point of the measurement: SERIES Q CANNOT
+-- SETTLE THE QUESTION IT WAS BUILT FOR.  A FALSITY class resting on this
+-- region is not awaiting evidence, it is unfalsifiable by measurement.
+-- Same structural verdict as the caps-counting quarantine (Harness.Main
+-- rows 10+), reached the same way and for the same reason: the blowup is
+-- COMPUTATIONAL, not definitional, so compiling it does not help.
+-- The walk face's FALSITY question is settled STRUCTURALLY instead —
+-- see the gas-peel finding in `walk-map`'s header (.Walk-Level).
+--
+-- WHAT IS MEASURED, and it is now much more than before: 26 points, ALL
+-- `false` (safe), spanning every shape with d·k ≤ 12 plus d up to 9 at
+-- k = 1.  The margin at (3,4) is sucG 31 against demand 13.  This does
+-- NOT reach the risky region and does not on its own lower any class.
 
 ----------------------------------------------------------------------
 -- SERIES P EXTENSION (2026-08-14) — covering the three NOT-COVERED

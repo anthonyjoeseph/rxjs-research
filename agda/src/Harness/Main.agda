@@ -47,6 +47,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Char using (Char; toℕ)
 open import Data.List using (List; []; _∷_; map)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≤ᵇ_)
+open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_; toList)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -54,6 +55,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import CLI.IO
 open import Rx.Prim using (towerℕ)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; dCapᶜ)
+open import Verify-Budget-Sufficient.Demand-Programs
+  using (runDry; progD; sucG)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -79,6 +82,17 @@ calibration = towerℕ 4
 _ : calibration ≡ 65536
 _ = refl
 
+-- THE FAMILY CALIBRATION, pinned.  `towerℕ` agreement says the backend
+-- does arithmetic; it says nothing about whether it runs `subscribeE`.
+-- These two pin the dry threshold of `progD 1 2` exactly, and rows 3-4
+-- print the same two expressions from the compiled binary.  Cheap
+-- because the PROGRAM is small (d·k(k+1)/2 = 3 subscription levels), not
+-- because drying exits early — it does not.
+_ : runDry 2 (progD 1 2) ≡ true
+_ = refl
+_ : runDry 3 (progD 1 2) ≡ false
+_ = refl
+
 ------------------------------------------------------------------
 -- THE ROWS.  Add rows freely; keep row 0 where it is.  State for each
 -- what it would take to make the row INTERESTING — a row that could not
@@ -90,6 +104,10 @@ _ = refl
 -- they are the exact expressions someone will want to retry.  They are
 -- NOT in the default sweep — running them is an explicit `ARGS=10`.
 
+showB : Bool → String
+showB true  = "true"
+showB false = "false"
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -100,6 +118,51 @@ rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
 -- full.
 rowAt 1 = "towerℕ 3 = " ++ show (towerℕ 3)
 rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
+
+------------------------------------------------------------------
+-- SERIES Q, THE CROSSOVER — rows 3-8.  The one region this campaign
+-- has named FALSITY and left unmeasured, and the reason it was left is
+-- exactly the reason this harness exists: `runDry` short-circuits in
+-- NEITHER direction (`hasDry` reads the stream `subscribeE` returns, so
+-- the whole run normalises before the first dry event is visible), the
+-- cost is d·k(k+1)/2 subscription levels, and at the cheapest crossing
+-- point that is ~250 — where the typechecker burned 56 min CPU at (8,8)
+-- without finishing.  The blowup here is NORMALISER OVERHEAD, not the
+-- computational blowup that quarantined rows 10+: ~250 subscription
+-- levels is nothing for native code.
+--
+-- WHAT A ROW MEANS.  `sucG p` is the gas the walk face's demand
+-- hypothesis supplies at the adversarial instantiation (Ŝ = R̂ = F = 0,
+-- no shares), where `hasAtLeast-pad` makes the gas hypothesis hold
+-- EXACTLY.  Every other hypothesis of the face is satisfiable there.
+-- So the face asserts `runDry (sucG p) p ≡ false`, and a TRUE row
+-- REFUTES WalkStmt itself — not merely a leaf.
+--
+-- ROWS 3-4 ARE THE FAMILY CALIBRATION and they are load-bearing in both
+-- directions: they pin the dry threshold of `progD 1 2` EXACTLY (true at
+-- 2, false at 3), and both are ALSO `refl`-pinned in this module below.
+-- Row 0 calibrates `towerℕ`, which says nothing about whether the
+-- backend runs `subscribeE` the way the typechecker does; these do.
+------------------------------------------------------------------
+
+-- the sum side, so a crossover row is self-documenting
+rowAt 3 = "CALIBRATION runDry 2 (progD 1 2) [refl-pinned true here] = "
+            ++ showB (runDry 2 (progD 1 2))
+rowAt 4 = "CALIBRATION runDry 3 (progD 1 2) [refl-pinned false here] = "
+            ++ showB (runDry 3 (progD 1 2))
+rowAt 5 = "sucG (progD 6 8) = " ++ show (sucG (progD 6 8))
+            ++ "   sucG (progD 6 9) = " ++ show (sucG (progD 6 9))
+            ++ "   sucG (progD 7 8) = " ++ show (sucG (progD 7 8))
+-- (6,8): model says the LAST SAFE point — sucG 50 against demand 49.
+-- INTERESTING either way: `true` refutes, `false` is the tight safe row.
+rowAt 6 = "runDry (sucG (progD 6 8)) (progD 6 8)  [false = safe] = "
+            ++ showB (runDry (sucG (progD 6 8)) (progD 6 8))
+-- (6,9): model says the FIRST REFUTING point — sucG 51 against demand 55.
+rowAt 7 = "runDry (sucG (progD 6 9)) (progD 6 9)  [TRUE = REFUTES] = "
+            ++ showB (runDry (sucG (progD 6 9)) (progD 6 9))
+-- (7,8): the second crossing, independent of (6,9) in both d and k.
+rowAt 8 = "runDry (sucG (progD 7 8)) (progD 7 8)  [TRUE = REFUTES] = "
+            ++ showB (runDry (sucG (progD 7 8)) (progD 7 8))
 
 ------------------------------------------------------------------
 -- QUARANTINE — DEAD ROUTE 2026-08-12: the caps counting family is
@@ -139,7 +202,24 @@ rowAt 14 = "blowH 1 = "       ++ show (blowH 1)         -- DIVERGENT
 rowAt 15 = "capsHgo 0 0 = "   ++ show (capsHgo 0 0)     -- DIVERGENT
 rowAt 16 = "lvls 1 1 0 0 1 = "  ++ show (lvls 1 1 0 0 1)
 rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
-rowAt _ = "(no such row)"
+-- THE SWEEPABLE ROW — `d*100 + k + 1000`, so 1608 is (6,8).  Rows 6-8
+-- above are the three points the model singles out; this one exists
+-- because the COST CURVE of the family had to be measured before any of
+-- them could be trusted to terminate, and a rebuild per point is not a
+-- measurement loop.  Prints the sum side and the verdict together, so a
+-- row is readable without cross-referencing row 5.
+rowAt n with 1000 ≤ᵇ n
+... | false = "(no such row)"
+... | true  =
+  let dk = n ∸ 1000
+      d  = dk / 100
+      k  = dk % 100
+      p  = progD d k
+      G  = sucG p
+  in "d=" ++ show d ++ " k=" ++ show k
+     ++ "  sucG=" ++ show G
+     ++ "  runDry G p = " ++ showB (runDry G p)
+     ++ "   [true = REFUTES WalkStmt]"
 
 ------------------------------------------------------------------
 -- stdin: a single row index.  Anything unparseable reads as 0, which is
