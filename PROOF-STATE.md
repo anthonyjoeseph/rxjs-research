@@ -152,8 +152,11 @@ row governed by it inherits that caveat.
   (mirroring the thru twin), which retired `-cl` outright, and it is now a real
   DIFFICULTY obligation. `-dep` is GONE: `depthDrain` is a ⊔-fold, so threading
   the caller's own bound makes both projections one-liners. Still open: `-vb` is
-  SHAPE (`o` unconstrained; `q` and `allNid` unused), repairable by adding queue
-  membership.
+  SHAPE and BLOCKED on a MISSING INVARIANT — `widNode` bounds a stored concat
+  queue's width and length only, so `valCaps?`'s size half and `valsΨ?`'s
+  fn-cap half have no source; membership buys one conjunct of three. The repair
+  is a field on the invariant, not a hypothesis, and cascades through capsOK?'s
+  producers.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-loop`, `thruWalk-nodry-dep`,
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE, and audited: each
   takes the fact it needs as a hypothesis rather than conjuring it. `VbB-tail`

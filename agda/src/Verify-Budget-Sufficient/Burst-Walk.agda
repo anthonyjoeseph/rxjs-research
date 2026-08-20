@@ -2287,12 +2287,35 @@ postulate
   -- `innerReact-nodry`, the queue is `concat-st {w} q act od` read out of the
   -- NODE TABLE, and nothing above holds a VbB for it.
   --
-  -- So the missing hypothesis is not a passed-in VbB but MEMBERSHIP: `o ∈ q`
-  -- together with the queue being the stored one, at which point OKB's
-  -- capsOK? node conjunct does reach it — which is what this row's original
-  -- header ("from OKB's capsOK? node conjunct") always intended and what the
-  -- statement simply failed to say.  What the thru twin supplies is the
-  -- discipline, not the ingredient: TAKE the fact, never conjure it.
+  -- ⚠ AND MEMBERSHIP ALONE IS NOT ENOUGH — this row is BLOCKED on a MISSING
+  -- INVARIANT, established 2026-08-20 by reading the predicates rather than
+  -- by grinding.  The obvious repair is `o ∈ q` plus OKB's capsOK? node
+  -- conjunct, which is what this row's original header intended.  Count the
+  -- halves and it does not close:
+  --
+  --   VbB c sl Ψ J vs  =  valsCaps? (frameStep J c) sl vs ∧ valsΨ? Ψ vs
+  --   valCaps? c sl u v = (sizeᵛ u v ≤ᵇ cSize c) ∧ (pWᵛ n sl u v ≤ᵇ cWid c)
+  --   widNode W sl (concat-st q _ _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
+  --                                  ∧ (length q ≤ᵇ W)
+  --
+  -- So capsOK? bounds a stored concat queue's WIDTH and its LENGTH — and
+  -- nothing else.  The SIZE half of valCaps? has no source, and neither does
+  -- valsΨ?'s fn-cap half (fnCapBounded? reads live and nodes, not a node's
+  -- stored queue).  Membership buys exactly one of the three conjuncts.
+  --
+  -- THEREFORE THE REPAIR IS A FIELD, NOT A HYPOTHESIS, and CLAUDE.md's rule
+  -- applies directly: a fact the proof needs everywhere belongs in the
+  -- INVARIANT RECORD, so that every producer owes it and every consumer
+  -- re-establishes it.  `widNode`'s concat clause has to bound the queue's
+  -- elements in size and fn-weight as well as width.  Threading it as a
+  -- hypothesis instead would launder tracked debt into untracked debt at the
+  -- one call site that happens to be convenient.
+  --
+  -- That cascades through every producer and consumer of capsOK?, which is
+  -- the cost of the fact being true rather than a reason to avoid it — but it
+  -- is a change to core machinery and wants a deliberate pass, not a
+  -- drive-by.  What the thru twin supplies here is only the discipline: TAKE
+  -- the fact, never conjure it.
   --
   -- THE TELL IS IN THE BINDER LIST, and it is free to read: `q` and `allNid`
   -- appear in NEITHER the hypothesis nor the conclusion.  A parameter used
