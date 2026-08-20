@@ -17,3 +17,9 @@
 - **`f-grindable`** — GRINDABLE.
 - **the `glob-*` family** — GRINDABLE: a glob covers the family it names.
 - **`g-unclassified`** — carried, not counted.
+- **`names-are-free-one` / `names-are-free-two` / `names-are-free-three` /
+  `names-are-free-four` / `names-are-free-five` / `names-are-free-six` /
+  `names-are-free-seven` / `names-are-free-eight` / `names-are-free-nine`** —
+  GRINDABLE: nine names, well past the budget in raw characters, but the prose
+  is a hook, so the length check must NOT fire. Shortening a row is never done
+  by dropping a name.

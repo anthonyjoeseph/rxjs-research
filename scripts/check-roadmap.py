@@ -31,6 +31,47 @@ The roadmap's own shorthand is honoured, because forbidding it would make the
 file worse to read: `{a,b}` brace expansion, `*` globs, and a leading-dash
 suffix (`-nestRec` after `concatDrain-nodry-loop` in the same row) all count
 as naming.  Anything else must appear verbatim in backticks.
+
+THIRD CHECK — LENGTH: a row is name + risk class + hook, and nothing more.
+PROOF-STATE.md has always said "one line per item"; the failure mode is not
+sloppiness but a HEADER LEAKING UPWARD, one clause at a time.  A finding gets
+written here because here is where it is being discussed, and it then sits far
+from the postulate someone picks up six weeks later — which is the locality
+argument `-- DEAD ROUTE` exists for, running backwards.  Measured 2026-08-20:
+rows ranged 128 to 627 characters, and every row over ~250 held mechanism,
+receipts, or dated audit narrative that the file's own rules forbid.
+
+The budget is a CHARACTER count, not a line count — a line count is gamed by
+rewrapping.  It charges the row's PROSE ONLY: everything in backticks is
+subtracted first, because the names are mandatory.  A row must name every
+postulate it schedules (a collective phrase is invisible to the coverage check
+above, which is how nine abstractions once sat unnamed behind the words "nine
+postulated abstractions"), so charging for names would put the two checks in
+direct conflict and the length one would win by deleting names.  Under this
+rule a family row listing eight leaves costs the same as a single-name row,
+and only the explaining costs.
+
+A row naming no risk class is not a work item and is skipped, as it is for
+ordering.
+
+FOURTH CHECK — DATES: the file names no calendar date, anywhere.  Its first
+hygiene rule is "stay current: this file describes the repo's present state
+and the work ahead, never its history", and a date is the one violation of it
+that a machine can see with no judgement at all.  Every other form of history
+here arrives WITH a date attached — a ruling's attribution, a "measured
+<date>" receipt, an audit note, a "retired <date>" — because the writer knows
+the reader will want to know when, so banning the timestamp bans the genre.
+Prose that has gone stale without one still has to be caught by eye; that is
+not a reason to catch none of it.
+
+Where the dated thing belongs instead: a receipt or a dead route goes in the
+source header of the postulate it is about, and that is the ONLY place a date is
+wanted anywhere in this repo — such a receipt is only as good as the code being
+unmoved since, so its age is a signal about the evidence.  A ruling goes in
+CLAUDE.md with its attribution and WITHOUT its timestamp (a rule in the file of
+record is in force whatever its age); a timing figure goes in
+typecheck-performance-numbers.md; the rationale for a gate goes in the gate,
+which is this file.
 """
 
 import argparse
@@ -42,22 +83,62 @@ import pathlib
 CLASSES = ["FALSITY", "SHAPE", "VACUITY", "DIFFICULTY", "GRINDABLE"]
 CLASS_RE = re.compile(r"\b(" + "|".join(CLASSES) + r")\b")
 TIER_RE = re.compile(r"^##\s+Tier\s+(\S+)")
-ROW_RE = re.compile(r"^-\s+\*\*(.+?)\*\*")
+# A row STARTS at a bulleted bold open; the label is closed in the JOINED text,
+# not on the opening line.  A name list long enough to wrap is exactly the shape
+# the tier-3 abstraction rows have, and requiring the close on line one made
+# every such row invisible to the sort and length checks while still counting
+# for coverage — a row that dodges the check by wrapping.
+ROW_START_RE = re.compile(r"^-\s+\*\*")
+LABEL_RE = re.compile(r"\*\*(.+?)\*\*")
+
+# Prose characters per row, names free.  Set from a full scan of the file:
+# the post-cleanup rows cluster at 77-260 with a clear gap to the next
+# inhabitant, and this sits in that gap.  Re-scan before moving it — the GAP
+# is what makes a budget safe, not the margin (same rule as AGDA_DEV_BUDGET).
+ROW_BUDGET = 280
+
+BACKTICK_SPAN_RE = re.compile(r"`[^`]*`")
+
+# Any ISO-ish or spelled date.  The roadmap has no legitimate use for one.
+DATE_RE = re.compile(
+    r"\b(?:\d{4}-\d{2}-\d{2}"
+    r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}"
+    r"|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b")
+
+
+def dated_lines(path):
+    """-> [(line_no, the matched date, the line)] — history the machine can see."""
+    out = []
+    for i, line in enumerate(path.read_text().splitlines(), 1):
+        m = DATE_RE.search(line)
+        if m:
+            out.append((i, m.group(0), line.strip()))
+    return out
+
+
+def prose_cost(chunks):
+    """Characters a row spends EXPLAINING — every backticked name is free."""
+    text = " ".join(c.strip() for c in chunks)
+    text = re.sub(r"^-\s+", "", text).replace("**", "")
+    return len(re.sub(r"\s+", " ", BACKTICK_SPAN_RE.sub("", text)).strip())
 
 
 def parse(path):
-    """-> [(tier_name, [(row_label, class_or_None, line_no)])]"""
+    """-> [(tier_name, [(row_label, class_or_None, line_no, prose_cost)])]"""
     tiers = []
     cur = None
     rows = None
-    row = None  # (label, lineno, [text chunks])
+    row = None  # (lineno, [text chunks])
 
     def flush_row():
         if row is not None:
-            label, lineno, chunks = row
+            lineno, chunks = row
             text = " ".join(chunks)
+            ml = LABEL_RE.search(text)
+            label = ml.group(1) if ml else text.strip()[:60]
             m = CLASS_RE.search(text)
-            rows.append((label, m.group(1) if m else None, lineno))
+            rows.append((label, m.group(1) if m else None, lineno,
+                         prose_cost(chunks)))
 
     for i, line in enumerate(path.read_text().splitlines(), 1):
         mt = TIER_RE.match(line)
@@ -70,13 +151,12 @@ def parse(path):
             continue
         if cur is None:
             continue
-        mr = ROW_RE.match(line)
-        if mr:
+        if ROW_START_RE.match(line):
             flush_row()
-            row = (mr.group(1), i, [line])
+            row = (i, [line])
         elif row is not None:
             if line.startswith("  ") or line.startswith("\t"):
-                row[2].append(line)
+                row[1].append(line)
             elif not line.strip():
                 pass  # blank line does not end a row; a new bullet or tier does
             else:
@@ -166,13 +246,16 @@ def main():
 
     failures = []
     unclassified = []
+    overlong = []
     for tier, rows in tiers:
         worst = -1  # highest class index seen so far
         worst_label = None
-        for label, cls, lineno in rows:
+        for label, cls, lineno, cost in rows:
             if cls is None:
                 unclassified.append((tier, label, lineno))
                 continue
+            if cost > ROW_BUDGET:
+                overlong.append((tier, label, lineno, cost))
             idx = CLASSES.index(cls)
             if idx < worst:
                 failures.append((tier, label, cls, worst_label, CLASSES[worst], lineno))
@@ -180,7 +263,7 @@ def main():
                 worst, worst_label = idx, label
 
     for tier, rows in tiers:
-        shown = [f"{c or '-'}" for _, c, _ in rows]
+        shown = [f"{c or '-'}" for _, c, _, _ in rows]
         print(f"  Tier {tier}: {' → '.join(shown) if shown else '(no rows)'}")
 
     if unclassified:
@@ -204,6 +287,37 @@ def main():
         print("  sibling in the same row. Anything else must appear verbatim in backticks.")
         failures.append(None)
 
+    dated = dated_lines(path)
+    if dated:
+        print(f"\nDATED NARRATIVE — {len(dated)} line(s) naming a calendar date:")
+        for lineno, date, line in dated:
+            print(f"  {path.name}:{lineno}  {date}")
+            print(f"    {line[:100]}")
+        print("\nThis file describes the repo's PRESENT state and the work ahead,")
+        print("never its history — that is its first hygiene rule, and a date is the")
+        print("one violation of it a machine can see. Move the dated thing to where it")
+        print("belongs: a probe receipt or a dead route goes in the source header of")
+        print("the postulate it is about; a ruling goes in CLAUDE.md, the file of")
+        print("record for directives; a gate's rationale goes in the gate. Then delete")
+        print("the line here. Git history is the archive.")
+        failures.append(None)
+
+    if overlong:
+        print(f"\nROWS OVER BUDGET — {len(overlong)} row(s) spend more than "
+              f"{ROW_BUDGET} prose characters:")
+        for tier, label, lineno, cost in overlong:
+            print(f"  Tier {tier}  {path.name}:{lineno}  {cost} chars "
+                  f"(+{cost - ROW_BUDGET})  {label}")
+        print("\nA row is a NAME, a RISK CLASS, and a HOOK saying where the risk")
+        print("lives and which source header holds the full story. Over budget means")
+        print("a header leaked upward: mechanism, a per-conjunct inventory, a probe")
+        print("receipt, a dead route, an audit note, or dated narrative. Move it into")
+        print("the postulate's own header, where the next person to pick that")
+        print("postulate up will actually stand, and cut the row back to its line.")
+        print("Backticked names are FREE, so shortening is never done by dropping a")
+        print("name — every postulate a row schedules must stay named.")
+        failures.append(None)
+
     order_failures = [f for f in failures if f is not None]
     if order_failures:
         print("\nROADMAP OUT OF ORDER — every tier is sorted riskiest-class-first.")
@@ -218,7 +332,8 @@ def main():
     if failures:
         return 1
 
-    print("\ncheck-roadmap: every tier sorted riskiest-class-first"
+    print(f"\ncheck-roadmap: every tier sorted riskiest-class-first; every row "
+          f"within its {ROW_BUDGET}-char hook budget; no dated narrative"
           + ("" if unscheduled is None else "; every live postulate is on the roadmap"))
     return 0
 

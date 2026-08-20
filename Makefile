@@ -440,6 +440,32 @@ roadmap-selftest:
 	    echo "$$gap" | grep -q "^  $$n$$" \
 	      && { echo "SELFTEST FAIL: $$n reported — roadmap shorthand stopped counting as naming"; fail=1; }; \
 	  done; \
+	  long=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/overlong.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/overlong.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a leaked-header row PASSED — the length check is dead"; fail=1; \
+	  fi; \
+	  echo "$$long" | grep -q leaked-header \
+	    || { echo "SELFTEST FAIL: leaked-header not reported by the length check"; fail=1; }; \
+	  echo "$$long" | grep -q short-row \
+	    && { echo "SELFTEST FAIL: a within-budget row was reported over budget"; fail=1; }; \
+	  echo "$$out" | grep -q "OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: the length check fired on the sort fixture"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	      --ledger scripts/roadmap-selftest/ledger.txt 2>&1 \
+	    | grep -q names-are-free \
+	    && { echo "SELFTEST FAIL: a nine-name row was charged for its names — shortening a row would mean dropping a name"; fail=1; }; \
+	  dat=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/dated.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/dated.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a roadmap naming calendar dates PASSED — the date check is dead"; fail=1; \
+	  fi; \
+	  for d in "2026-08-20" "2026-07-31" "Aug 18 2026"; do \
+	    echo "$$dat" | grep -q "$$d" \
+	      || { echo "SELFTEST FAIL: $$d not reported — the date check missed an attribution, a receipt or a spelled-out date"; fail=1; }; \
+	  done; \
+	  echo "$$dat" | grep -q "3 line(s) naming" \
+	    || { echo "SELFTEST FAIL: the date check did not report exactly the 3 dated lines — a bare year, a bare month-day or a version number was counted as a date"; fail=1; }; \
+	  echo "$$out" | grep -q "DATED NARRATIVE" \
+	    && { echo "SELFTEST FAIL: the date check fired on the sort fixture"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 gate:
