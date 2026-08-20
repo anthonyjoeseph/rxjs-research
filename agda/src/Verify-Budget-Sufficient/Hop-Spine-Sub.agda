@@ -22,9 +22,9 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Hop-Spine-Sub where
 
-open import Data.Bool using (Bool; true; false)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_; s≤s; z≤n)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; ≤-total;
+open import Data.Bool using (Bool; true; false; _∧_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<_; s≤s; z≤n)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; 1+n≰n; ≤-refl; ≤-reflexive; ≤-total;
                                        ^-monoʳ-≤; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
                                        +-mono-≤; +-monoˡ-≤; +-monoʳ-≤;
                                        ⊔-lub; m≤m⊔n; m≤n⊔m; ⊔-mono-≤;
@@ -36,8 +36,10 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Unit using (⊤; tt)
+open import Data.Empty using (⊥-elim)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_) renaming (inj₁ to inl; inj₂ to inr)
+open import Data.Sum     using (inj₁; inj₂)
 open import Data.Fin  using (Fin)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans;
                                                           cong; cong₂; subst)
@@ -55,7 +57,8 @@ open import Rx.Exp using (Ty; Ctx; Val; Tm; Exp; Ren∈; ext∈;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; hopDᵗˢ; pmᵗ; pmᵉ; pmᵗˢ)
 open import Rx.Hop-Spine using (spnᵉ; spnᵗ; spnᵗˢ; spnᵛ)
-open import Verify-Budget-Sufficient.Measures using (∧-true; T-to; hopD-wkReify;
+open import Verify-Budget-Sufficient.Measures using (∧-true; ∧-intro; T-to; T⇒≡true;
+                                                     1*≤; hopD-wkReify;
                                                      pm-subΘᵗ; varIx-ix; ifEq)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using (valHopSpn?; B≤powB)
 
@@ -324,6 +327,123 @@ pow⊔-fold P B a b =
         (powB-mono P B b (a ⊔ b) (m≤n⊔m a b))
 
 ------------------------------------------------------------------
+-- THE SLOPE-SCALED RECEIPT.  `valHopSpn?` with a COEFFICIENT on the
+-- hop, hereditarily.  It is what a value pushed onto the environment by
+-- `caseᵗ` can carry and the plain receipt cannot: the scrutinee's value
+-- is read through the branch's own binder slope, and that slope is
+-- template-internal, so no hypothesis bounds it.  Scaling the receipt
+-- instead of the budget keeps the statement closed under the `⊔` and
+-- `+` clauses alike — which `Ps * hopDᵛ v ≤ B` is not, since a `mapᵉ`
+-- splits into two summands and `B + B` is not `B`.
+--
+-- `valHopSpn?` is this at `c ≡ 1` (`valHopSpnC?-one`), and the two are
+-- kept separate rather than one defined from the other because the
+-- unscaled form is what every consumer of this family already reads.
+valHopSpnC? : ∀ {n} {Γ : Ctx n} → ℕ → (Fin n → ℕ) → ℕ → ℕ → ℕ →
+              (t : Ty) → Val Γ t → Bool
+valHopSpnC? V η P B c unitᵗ    _        = true
+valHopSpnC? V η P B c boolᵗ    _        = true
+valHopSpnC? V η P B c natᵗ     _        = true
+valHopSpnC? V η P B c (s ×ᵗ t) (a , b)  =
+  valHopSpnC? V η P B c s a ∧ valHopSpnC? V η P B c t b
+valHopSpnC? V η P B c (s +ᵗ t) (inj₁ a) = valHopSpnC? V η P B c s a
+valHopSpnC? V η P B c (s +ᵗ t) (inj₂ b) = valHopSpnC? V η P B c t b
+valHopSpnC? V η P B c (obs t)  e        =
+  c * hopDᵉ V η e ≤ᵇ (2 + P) ^ spnᵉ e * B
+
+-- ANTITONE IN THE COEFFICIENT, which is how every recursive call spends
+-- it: a subterm's slope is under its parent's, so the parent's receipt
+-- is already the subterm's.
+valHopSpnC?-mono : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (P B c d : ℕ)
+  (t : Ty) (v : Val Γ t) → c ≤ d →
+  valHopSpnC? V η P B d t v ≡ true → valHopSpnC? V η P B c t v ≡ true
+valHopSpnC?-mono V η P B c d unitᵗ _ le h = refl
+valHopSpnC?-mono V η P B c d boolᵗ _ le h = refl
+valHopSpnC?-mono V η P B c d natᵗ  _ le h = refl
+valHopSpnC?-mono V η P B c d (s ×ᵗ t) (a , b) le h =
+  ∧-intro (valHopSpnC?-mono V η P B c d s a le (proj₁ sp))
+          (valHopSpnC?-mono V η P B c d t b le (proj₂ sp))
+  where
+  sp = ∧-true (valHopSpnC? V η P B d s a) (valHopSpnC? V η P B d t b) h
+valHopSpnC?-mono V η P B c d (s +ᵗ t) (inj₁ a) le h =
+  valHopSpnC?-mono V η P B c d s a le h
+valHopSpnC?-mono V η P B c d (s +ᵗ t) (inj₂ b) le h =
+  valHopSpnC?-mono V η P B c d t b le h
+valHopSpnC?-mono V η P B c d (obs t) e le h =
+  T⇒≡true _ (≤⇒≤ᵇ (≤-trans (*-monoˡ-≤ (hopDᵉ V η e) le)
+                           (≤ᵇ⇒≤ (d * hopDᵉ V η e)
+                                 ((2 + P) ^ spnᵉ e * B) (T-to h))))
+
+-- a ZERO coefficient asserts nothing, and that is load-bearing: a
+-- position the scrutinee does not mention arrives with exactly this
+valHopSpnC?-zero : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (t : Ty) (v : Val Γ t) → valHopSpnC? V η P B 0 t v ≡ true
+valHopSpnC?-zero V η P B unitᵗ _ = refl
+valHopSpnC?-zero V η P B boolᵗ _ = refl
+valHopSpnC?-zero V η P B natᵗ  _ = refl
+valHopSpnC?-zero V η P B (s ×ᵗ t) (a , b) =
+  ∧-intro (valHopSpnC?-zero V η P B s a) (valHopSpnC?-zero V η P B t b)
+valHopSpnC?-zero V η P B (s +ᵗ t) (inj₁ a) = valHopSpnC?-zero V η P B s a
+valHopSpnC?-zero V η P B (s +ᵗ t) (inj₂ b) = valHopSpnC?-zero V η P B t b
+valHopSpnC?-zero V η P B (obs t) e =
+  T⇒≡true _ (≤⇒≤ᵇ (z≤n {(2 + P) ^ spnᵉ e * B}))
+
+valHopSpnC?-one : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (t : Ty) (v : Val Γ t) →
+  valHopSpnC? V η P B 1 t v ≡ true → valHopSpn? V η P B t v ≡ true
+valHopSpnC?-one V η P B unitᵗ _ h = refl
+valHopSpnC?-one V η P B boolᵗ _ h = refl
+valHopSpnC?-one V η P B natᵗ  _ h = refl
+valHopSpnC?-one V η P B (s ×ᵗ t) (a , b) h =
+  ∧-intro (valHopSpnC?-one V η P B s a (proj₁ sp))
+          (valHopSpnC?-one V η P B t b (proj₂ sp))
+  where
+  sp = ∧-true (valHopSpnC? V η P B 1 s a) (valHopSpnC? V η P B 1 t b) h
+valHopSpnC?-one V η P B (s +ᵗ t) (inj₁ a) h = valHopSpnC?-one V η P B s a h
+valHopSpnC?-one V η P B (s +ᵗ t) (inj₂ b) h = valHopSpnC?-one V η P B t b h
+valHopSpnC?-one V η P B (obs t) e h =
+  T⇒≡true _ (≤⇒≤ᵇ (≤-trans (≤-reflexive (sym (*-identityˡ (hopDᵉ V η e))))
+                           (≤ᵇ⇒≤ (1 * hopDᵉ V η e)
+                                 ((2 + P) ^ spnᵉ e * B) (T-to h))))
+
+-- THE PLUG, from a SCALED receipt.  Simpler than `plug-hopSpn`: the
+-- coefficient is already inside the predicate, so the plug's own spine
+-- unit is pure slack rather than the thing that pays.
+plug-hopSpnC : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} (V : ℕ) (η : Fin n → ℕ)
+  (P B d : ℕ) (t : Ty) (v : Val Γ t) → valHopSpnC? V η P B d t v ≡ true →
+  d * hopDᵛ V η t v
+    ≤ (2 + P) ^ spnᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify v)) * B
+plug-hopSpnC V η P B d unitᵗ _ h = ≤-trans (≤-reflexive (*-zeroʳ d)) z≤n
+plug-hopSpnC V η P B d boolᵗ _ h = ≤-trans (≤-reflexive (*-zeroʳ d)) z≤n
+plug-hopSpnC V η P B d natᵗ  _ h = ≤-trans (≤-reflexive (*-zeroʳ d)) z≤n
+plug-hopSpnC {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} V η P B d (s ×ᵗ t) (a , b) h =
+  ≤-trans (≤-reflexive (*-distribˡ-⊔ d (hopDᵛ V η s a) (hopDᵛ V η t b)))
+          (⊔-lub (≤-trans (plug-hopSpnC V η P B d s a (proj₁ sp))
+                          (powB-mono P B sA (suc (sA ⊔ sB))
+                                     (≤-trans (m≤m⊔n sA sB) (n≤1+n (sA ⊔ sB)))))
+                 (≤-trans (plug-hopSpnC V η P B d t b (proj₂ sp))
+                          (powB-mono P B sB (suc (sA ⊔ sB))
+                                     (≤-trans (m≤n⊔m sA sB) (n≤1+n (sA ⊔ sB))))))
+  where
+  sA = spnᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify a))
+  sB = spnᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify b))
+  sp = ∧-true (valHopSpnC? V η P B d s a) (valHopSpnC? V η P B d t b) h
+plug-hopSpnC {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} V η P B d (s +ᵗ t) (inj₁ a) h =
+  ≤-trans (plug-hopSpnC V η P B d s a h)
+          (powB-suc P B (spnᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify a))))
+plug-hopSpnC {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} V η P B d (s +ᵗ t) (inj₂ b) h =
+  ≤-trans (plug-hopSpnC V η P B d t b h)
+          (powB-suc P B (spnᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify b))))
+plug-hopSpnC {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} V η P B d (obs t) e h =
+  ≤-trans (≤ᵇ⇒≤ (d * hopDᵉ V η e) ((2 + P) ^ spnᵉ e * B) (T-to h))
+          (≤-trans (powB-suc P B (spnᵉ e))
+                   (≤-reflexive (cong (λ k → (2 + P) ^ k * B) (sym eqn))))
+  where
+  eqn : spnᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (reify {t = obs t} e))
+          ≡ suc (spnᵉ e)
+  eqn = cong suc (spn-renᵉ (λ ()) (λ ()) (λ ()) e)
+
+------------------------------------------------------------------
 -- THE ENVIRONMENT CONDITION, PER POSITION, AND THE DISJUNCTION IS THE
 -- FINDING (2026-08-19).  Three single-number hypotheses were tried and
 -- each died at the opposite end from the one it fixed — a derived bound
@@ -349,7 +469,7 @@ EnvPlug : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ) �
 EnvPlug V η P B []ᵃ                Ps = ⊤
 EnvPlug V η P B (_∷ᵃ_ {x = t} v σ) Ps =
   ((Ps 0 ≤ P) × (valHopSpn? V η P B t v ≡ true)
-     ⊎ (Ps 0 * hopDᵛ V η t v ≤ B))
+     ⊎ (valHopSpnC? V η P B (Ps 0) t v ≡ true))
   × EnvPlug V η P B σ (λ j → Ps (suc j))
 
 EnvPlug-mono : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
@@ -361,11 +481,12 @@ EnvPlug-mono V η P B (v ∷ᵃ σ) Ps Qs le (h0 , hσ) =
                          (λ j → le (suc j)) hσ
   where
   head : ((Ps 0 ≤ P) × (valHopSpn? V η P B _ v ≡ true)
-            ⊎ (Ps 0 * hopDᵛ V η _ v ≤ B)) →
+            ⊎ (valHopSpnC? V η P B (Ps 0) _ v ≡ true)) →
          ((Qs 0 ≤ P) × (valHopSpn? V η P B _ v ≡ true)
-            ⊎ (Qs 0 * hopDᵛ V η _ v ≤ B))
+            ⊎ (valHopSpnC? V η P B (Qs 0) _ v ≡ true))
   head (inl (hp , hv)) = inl (≤-trans (le 0) hp , hv)
-  head (inr hprod)     = inr (≤-trans (*-monoˡ-≤ (hopDᵛ V η _ v) (le 0)) hprod)
+  head (inr hsc)       =
+    inr (valHopSpnC?-mono V η P B (Qs 0) (Ps 0) _ v (le 0) hsc)
 
 -- THE PLUG SITE.  Either disjunct lands the plugged value under the
 -- spine of the term it becomes: the first spends the plug's own spine
@@ -380,9 +501,11 @@ envPlug-plug : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θloc Θ t} (V : ℕ) (η : Fin n 
 envPlug-plug V η P B d Ps (_∷ᵃ_ {x = t} v σ) (inl (hp , hv) , _) (here refl) hd =
   plug-hopSpn V η P B d t v hv
               (≤-trans hd (≤-trans hp (≤-trans (n≤1+n P) (n≤1+n (suc P)))))
-envPlug-plug V η P B d Ps (_∷ᵃ_ {x = t} v σ) (inr hprod , _) (here refl) hd =
-  ≤-trans (≤-trans (*-monoˡ-≤ (hopDᵛ V η t v) hd) hprod)
-          (B≤powB P B (spnᵗ (wkTm (reify v))))
+-- the SCALED disjunct spends `plug-hopSpnC`; the plug's own spine unit
+-- is slack here, because the coefficient is already inside the receipt
+envPlug-plug V η P B d Ps (_∷ᵃ_ {x = t} v σ) (inr hsc , _) (here refl) hd =
+  plug-hopSpnC V η P B d t v
+               (valHopSpnC?-mono V η P B d (Ps 0) t v hd hsc)
 envPlug-plug V η P B d Ps (v ∷ᵃ σ) (_ , hσ) (there z) hd =
   envPlug-plug V η P B d (λ j → Ps (suc j)) σ hσ z hd
 
@@ -721,3 +844,88 @@ mutual
             (EnvPlug-mono V η P B σ (λ j → c * pmᵗˢ V (length Θloc + j) (y ∷ ys))
                           (λ j → c * pmᵗˢ V (length Θloc + j) ys)
                           (λ j → *-monoʳ-≤ c (m≤n⊔m _ _)) hσ)
+
+------------------------------------------------------------------
+-- THE SAME CONDITION WITHOUT THE DISJUNCTION.  Every position carries
+-- the SCALED receipt outright.  This is strictly stronger than
+-- `EnvPlug` (`envC⇒envPlug`), and it is what a COEFFICIENT-CARRYING
+-- induction over terms needs, because its `varᵗ` clause copies a value
+-- straight out of the environment into a conclusion that is itself
+-- scaled — a slope bound plus an unscaled receipt is a factor `P` short
+-- there, which is exactly why the two conditions both have to exist.
+--
+-- `EnvPlug` survives as the OUTER interface: the fold supplies an
+-- unscaled receipt and a slope under `P`, which is its first disjunct,
+-- and only that form can be met at the top.
+EnvC : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ) →
+  All (Val Γ) Θ → (ℕ → ℕ) → Set
+EnvC V η P B []ᵃ                Ps = ⊤
+EnvC V η P B (_∷ᵃ_ {x = t} v σ) Ps =
+  (valHopSpnC? V η P B (Ps 0) t v ≡ true) × EnvC V η P B σ (λ j → Ps (suc j))
+
+EnvC-mono : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (σ : All (Val Γ) Θ) (Ps Qs : ℕ → ℕ) → (∀ j → Qs j ≤ Ps j) →
+  EnvC V η P B σ Ps → EnvC V η P B σ Qs
+EnvC-mono V η P B []ᵃ      Ps Qs le h = tt
+EnvC-mono V η P B (v ∷ᵃ σ) Ps Qs le (h0 , hσ) =
+  valHopSpnC?-mono V η P B (Qs 0) (Ps 0) _ v (le 0) h0
+  , EnvC-mono V η P B σ (λ j → Ps (suc j)) (λ j → Qs (suc j))
+              (λ j → le (suc j)) hσ
+
+envC-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (Ps : ℕ → ℕ) (σ : All (Val Γ) Θ) → EnvC V η P B σ Ps → (z : t ∈ Θ) →
+  valHopSpnC? V η P B (Ps (varIx z)) t (lookupEnv σ z) ≡ true
+envC-lookup V η P B Ps (v ∷ᵃ σ) (h0 , _) (here refl) = h0
+envC-lookup V η P B Ps (v ∷ᵃ σ) (_ , hσ) (there z) =
+  envC-lookup V η P B (λ j → Ps (suc j)) σ hσ z
+
+envC⇒envPlug : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (σ : All (Val Γ) Θ) (Ps : ℕ → ℕ) →
+  EnvC V η P B σ Ps → EnvPlug V η P B σ Ps
+envC⇒envPlug V η P B []ᵃ      Ps h         = tt
+envC⇒envPlug V η P B (v ∷ᵃ σ) Ps (h0 , hσ) =
+  inr h0 , envC⇒envPlug V η P B σ (λ j → Ps (suc j)) hσ
+
+------------------------------------------------------------------
+-- FROM THE DISJUNCTIVE CONDITION TO THE SCALED ONE.  This is what the
+-- outer `caseᵗ` clause needs, and the side condition is the whole
+-- content: a position held under the FIRST disjunct carries only an
+-- unscaled receipt, so it can be re-used at a coefficient of at most 1.
+-- The way out is that such a position must have coefficient ZERO, and
+-- `big-forces-zero` is what makes that happen — when the branch
+-- coefficient exceeds `P`, any position the scrutinee actually mentions
+-- has parent slope above `P` and so cannot be under the first disjunct
+-- at all.
+------------------------------------------------------------------
+
+-- the second summand of a `caseᵗ` clause dominates its own factor
+≤2nd : ∀ (a c x : ℕ) → 1 ≤ c → x ≤ a + c * x
+≤2nd a c x h = ≤-trans (1*≤ x c h) (m≤n+m (c * x) a)
+
+1≤C : ∀ (x : ℕ) → 1 ≤ x ⊔ 1
+1≤C x = m≤n⊔m x 1
+
+big-forces-zero : ∀ (P C k : ℕ) → suc P ≤ C → C * k ≤ P → k ≡ 0
+big-forces-zero P C zero    hC hle = refl
+big-forces-zero P C (suc m) hC hle =
+  ⊥-elim (1+n≰n (≤-trans hC
+                   (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ C)))
+                                     (*-monoʳ-≤ C (s≤s z≤n)))
+                            hle)))
+
+envPlug⇒envC : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (σ : All (Val Γ) Θ) (Ps Qs : ℕ → ℕ) →
+  (∀ j → Qs j ≤ Ps j) → (∀ j → Ps j ≤ P → Qs j ≡ 0) →
+  EnvPlug V η P B σ Ps → EnvC V η P B σ Qs
+envPlug⇒envC V η P B []ᵃ      Ps Qs le hz h = tt
+envPlug⇒envC V η P B (v ∷ᵃ σ) Ps Qs le hz (h0 , hσ) =
+  head h0 , envPlug⇒envC V η P B σ (λ j → Ps (suc j)) (λ j → Qs (suc j))
+                         (λ j → le (suc j)) (λ j → hz (suc j)) hσ
+  where
+  head : ((Ps 0 ≤ P) × (valHopSpn? V η P B _ v ≡ true)
+            ⊎ (valHopSpnC? V η P B (Ps 0) _ v ≡ true)) →
+         valHopSpnC? V η P B (Qs 0) _ v ≡ true
+  head (inl (hp , _)) =
+    subst (λ k → valHopSpnC? V η P B k _ v ≡ true) (sym (hz 0 hp))
+          (valHopSpnC?-zero V η P B _ v)
+  head (inr hsc) = valHopSpnC?-mono V η P B (Qs 0) (Ps 0) _ v (le 0) hsc

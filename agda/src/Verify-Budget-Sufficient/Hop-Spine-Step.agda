@@ -9,21 +9,38 @@
 -- from paying for an induction over `Tm` that it never mentions.
 --
 -- WHAT IT PROVES.  One `applyFn` preserves the hereditary spine bound,
--- and the fold therefore preserves it across a whole burst.  The
--- induction is over the TERM, with the type as an index; the hereditary
--- conclusion is what makes the projections work, and `EnvPlug`'s
--- per-position disjunction is what makes `caseᵗ` statable.  Both
--- findings are recorded at their own declarations below.
+-- and the fold therefore preserves it across a whole burst.  Fully
+-- discharged: no postulate remains in this family.
+--
+-- THE INDUCTION IS OVER THE TERM, with the type as an index.  A
+-- type-directed front end cannot host it: at `fstᵗ q` the result is
+-- `proj₁ (evalWith q env)`, whose spine is STRICTLY SMALLER than the
+-- pair's, so a headline bound on the pair points the wrong way and only
+-- the HEREDITARY predicate at the pair supplies the component.
+--
+-- THERE ARE TWO INDUCTIONS, and the split is forced rather than chosen.
+-- `evalWith-hopSpn` concludes the plain receipt and takes `EnvPlug`'s
+-- per-position DISJUNCTION, which is the only form the fold can supply
+-- at the top — an unscaled receipt plus a slope under `P`.
+-- `evalWith-hopSpnC` concludes a receipt SCALED by a coefficient and
+-- takes `EnvC`, the scaled condition, which is what `caseᵗ` needs for
+-- the value it pushes onto the environment: the branch reads that value
+-- through `pmᵗ V 0 l`, a template-internal slope no hypothesis bounds.
+-- Neither subsumes the other — the first cannot scale a receipt, the
+-- second cannot be met at the top — and `case-small`/`case-big` are
+-- where the two meet, split on how the branch coefficient compares
+-- with `P`.  The reasons are recorded at those declarations.
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Hop-Spine-Step where
 
 open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Bool.ListAction using (all)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; s≤s; z≤n)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive;
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_; _≤ᵇ_; _≤?_; s≤s; z≤n)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≰⇒>; ≤-trans; ≤-refl; ≤-reflexive;
                                        ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤;
                                        ⊔-lub; m≤m⊔n; m≤n⊔m; n≤1+n;
-                                       m≤m+n; *-identityˡ; +-identityʳ;
+                                       m≤m+n; m≤n+m; *-identityˡ; *-identityʳ;
+                                       *-assoc; *-monoʳ-≤; *-zeroʳ; +-identityʳ;
                                        +-monoʳ-≤)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -32,7 +49,8 @@ open import Data.Fin  using (Fin)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_) renaming (inj₁ to inl; inj₂ to inr)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Nullary using (yes; no)
 
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
@@ -49,7 +67,10 @@ open import Verify-Budget-Sufficient.Measures using
 open import Verify-Budget-Sufficient.Hop-Spine-Face using
   (valHopSpn?; valHopSpn?-intro; valHopSpn?-hopD; B≤powB)
 open import Verify-Budget-Sufficient.Hop-Spine-Sub using
-  (EnvPlug; EnvPlug-mono; hopD-sub-spnᵉ)
+  (EnvPlug; EnvPlug-mono; hopD-sub-spnᵉ; ⊔₁+; ⊔₂+;
+   ≤2nd; 1≤C; big-forces-zero; envPlug⇒envC;
+   valHopSpnC?; valHopSpnC?-mono; valHopSpnC?-one;
+   EnvC; EnvC-mono; envC-lookup; envC⇒envPlug)
 
 ------------------------------------------------------------------
 -- THE STEP, AND IT IS ONE LEMMA OVER THE TERM.
@@ -88,67 +109,137 @@ envPlug-lookup : ∀ {n} {Γ : Ctx n} {Θ t} (V : ℕ) (η : Fin n → ℕ) (P B
   1 ≤ Ps (varIx z) →
   valHopSpn? V η P B t (lookupEnv σ z) ≡ true
 envPlug-lookup V η P B Ps (v ∷ᵃ σ) (inl (_ , hv) , _) (here refl) hit = hv
-envPlug-lookup V η P B Ps (_∷ᵃ_ {x = t} v σ) (inr hprod , _) (here refl) hit =
-  valHopSpn?-intro V η P B t v
-    (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (hopDᵛ V η t v))))
-                      (*-monoˡ-≤ (hopDᵛ V η t v) hit))
-             hprod)
+-- the SCALED disjunct hands back the unscaled receipt as soon as the
+-- slope is at least one, which a MENTIONED position always is
+envPlug-lookup V η P B Ps (_∷ᵃ_ {x = t} v σ) (inr hsc , _) (here refl) hit =
+  valHopSpnC?-one V η P B t v
+    (valHopSpnC?-mono V η P B 1 (Ps 0) t v hit hsc)
 envPlug-lookup V η P B Ps (v ∷ᵃ σ) (_ , hσ) (there z) hit =
   envPlug-lookup V η P B (λ j → Ps (suc j)) σ hσ z hit
 
-postulate
-  -- THE CLAUSE THAT EXTENDS THE ENVIRONMENT, and the one residue of the
-  -- whole family.  What it needs is `EnvPlug` at the branch's own
-  -- environment `x ∷ᵃ env`, where `x` is the scrutinee's evaluated
-  -- payload — so, at position 0, one of the two disjuncts for the slope
-  -- `pmᵗ V 0 l`.  The receipt half is FREE: the recursive call on `sc`
-  -- hands back `valHopSpn?` of its value directly, which is what making
-  -- the conclusion hereditary bought.  What is open is the slope.
-  --
-  -- THE TWO EXTREMES EACH CLOSE, AND BY DIFFERENT DISJUNCTS.
-  --   * `sc` MENTIONS an environment position j.  Then `pmᵗ V j (caseᵗ
-  --     sc l r)` contains `(pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * pmᵗ V j sc`, so
-  --     the PARENT's slope at j already dominates `pmᵗ V 0 l`, and the
-  --     parent's own condition bounds it.  Disjunct (a).
-  --   * `sc` is CLOSED.  Then `hopDᵛ x ≤ hopDᵗ sc` with nothing added,
-  --     and `hopDᵗ (caseᵗ sc l r)`'s second summand already paid
-  --     `(pmᵗ V 0 l ⊔ … ⊔ 1) * hopDᵗ sc ≤ B`.  Disjunct (b).
-  --
-  -- WHAT IS OPEN is the MIXED case: `sc` mentioning several positions,
-  -- some of them held under disjunct (a).  Pricing `x` through
-  -- `hopD-evalWith` (.Measures) then leaves `Σⱼ pmᵗ V j sc * hopDᵛ envⱼ`,
-  -- and a disjunct-(a) position bounds `hopDᵛ envⱼ` only by `Q ^ spnᵛ *
-  -- B`, so the sum runs to M * B and disjunct (b) fails at M ≥ 2 exactly
-  -- as it does upstream.  The mechanism that fixes it is a PER-POSITION
-  -- BUDGET in `EnvPlug` — the closed-scrutinee arm wants `x` carried at
-  -- `B / (c * C)` rather than at `B` — and that is a restatement of the
-  -- environment condition, not a grind, which is why this row is
-  -- DIFFICULTY and not GRINDABLE.
-  --
-  -- x DEAD ROUTE 2026-08-20: the four-piece `maxW`/`EnvSpn` plan that
-  -- stood here.  `maxW` is refuted one clause into the substitution
-  -- induction (`mapᵉ` needs a sum of maxes under a max of sums; the
-  -- record is at `hopD-sub-spnᵉ` in .Hop-Spine-Sub), and with it goes the
-  -- claim that `EnvPlug`'s disjunction "could not be spent".  It CAN:
-  -- `envPlug-plug` spends it at every plug site, and `hopD-sub-spnᵉ`
-  -- discharged the sibling `strmᵗ` leaf outright with `EnvPlug`
-  -- unchanged.  The two leaves did NOT want the same apparatus.
-  --
-  -- x SUPERSEDED 2026-08-20 — "M positions need `1 + M * P ≤ Q`" is a
-  -- real obstruction, but only for a bound that SUMS over positions.
-  -- The coefficient-carrying induction never forms that sum, so the
-  -- environment's LENGTH does not enter it; the M-dependence survives
-  -- only in this clause, and only through `hopD-evalWith`.
-  evalWith-hopSpn-case : ∀ {n} {Γ : Ctx n} {Θ a b u} (V : ℕ) (η : Fin n → ℕ)
-    (P B : ℕ) (sc : Tm Γ [] [] Θ (a +ᵗ b))
-    (l : Tm Γ [] [] (a ∷ Θ) u) (r : Tm Γ [] [] (b ∷ Θ) u)
-    (env : All (Val Γ) Θ) →
-    hopDᵗ V η (caseᵗ sc l r) ≤ B →
-    EnvPlug V η P B env (λ j → pmᵗ V j (caseᵗ sc l r)) →
-    valHopSpn? V η P B u (evalWith (caseᵗ sc l r) env) ≡ true
+------------------------------------------------------------------
+-- THE SAME INDUCTION, CARRYING A COEFFICIENT.  This is what the outer
+-- `caseᵗ` clause spends on its SCRUTINEE, and the reason it exists is
+-- that `caseᵗ` pushes the scrutinee's value onto the environment where
+-- the branch reads it through `pmᵗ V 0 l` — a template-internal slope
+-- that no hypothesis bounds.  Scaling the receipt by the coefficient
+-- carries that slope, and every clause hands its own coefficient down:
+-- the scrutinee runs at `c * C`, which is exactly the factor `pmᵗ`'s own
+-- `caseᵗ` clause applies to it, so the branch's position-0 requirement
+-- follows by monotonicity ALONE.  No case analysis, no sum over
+-- positions, no dependence on the environment's length.
+--
+-- Why this cannot simply REPLACE `evalWith-hopSpn`: its `varᵗ` clause
+-- copies an environment value into a scaled conclusion, so its
+-- environment condition has to be the scaled receipt (`EnvC`) rather
+-- than a slope bound plus an unscaled one.  The fold supplies the
+-- latter, and at the top the two differ by a factor of `P`.  So the
+-- unscaled lemma stays the outer interface and this one is its engine.
+------------------------------------------------------------------
+
+evalWith-hopSpnC : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (η : Fin n → ℕ)
+  (P B c : ℕ) (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) →
+  c * hopDᵗ V η tm ≤ B →
+  EnvC V η P B env (λ j → c * pmᵗ V j tm) →
+  valHopSpnC? V η P B c u (evalWith tm env) ≡ true
+evalWith-hopSpnC {Γ = Γ} {u = u} V η P B c (varᵗ x) env hB hσ =
+  valHopSpnC?-mono V η P B c
+    (c * pmᵗ {Γ = Γ} {Δᵍ = []} {Δ = []} V (varIx x) (varᵗ x))
+    u (lookupEnv env x)
+    (≤-trans (≤-reflexive (sym (*-identityʳ c)))
+             (*-monoʳ-≤ c (ifEq (varIx x) (varIx x) refl)))
+    (envC-lookup V η P B
+      (λ j → c * pmᵗ {Γ = Γ} {Δᵍ = []} {Δ = []} V j (varᵗ x)) env hσ x)
+evalWith-hopSpnC V η P B c unit̂     env hB hσ = refl
+evalWith-hopSpnC V η P B c (bool̂ _) env hB hσ = refl
+evalWith-hopSpnC V η P B c (nat̂ _)  env hB hσ = refl
+evalWith-hopSpnC V η P B c (pairᵗ a b) env hB hσ =
+  ∧-intro (evalWith-hopSpnC V η P B c a env
+             (≤-trans (*-monoʳ-≤ c (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b))) hB)
+             (EnvC-mono V η P B env (λ j → c * pmᵗ V j (pairᵗ a b))
+                        (λ j → c * pmᵗ V j a)
+                        (λ j → *-monoʳ-≤ c (m≤m⊔n (pmᵗ V j a) (pmᵗ V j b))) hσ))
+          (evalWith-hopSpnC V η P B c b env
+             (≤-trans (*-monoʳ-≤ c (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b))) hB)
+             (EnvC-mono V η P B env (λ j → c * pmᵗ V j (pairᵗ a b))
+                        (λ j → c * pmᵗ V j b)
+                        (λ j → *-monoʳ-≤ c (m≤n⊔m (pmᵗ V j a) (pmᵗ V j b))) hσ))
+evalWith-hopSpnC V η P B c (fstᵗ q) env hB hσ =
+  proj₁ (∧-true _ _ (evalWith-hopSpnC V η P B c q env hB hσ))
+evalWith-hopSpnC V η P B c (sndᵗ q) env hB hσ =
+  proj₂ (∧-true _ _ (evalWith-hopSpnC V η P B c q env hB hσ))
+evalWith-hopSpnC V η P B c (inlᵗ a) env hB hσ = evalWith-hopSpnC V η P B c a env hB hσ
+evalWith-hopSpnC V η P B c (inrᵗ a) env hB hσ = evalWith-hopSpnC V η P B c a env hB hσ
+-- the scrutinee's value and its SCALED receipt are abstracted together,
+-- so the branch sees the receipt already specialised to its injection
+evalWith-hopSpnC V η P B c (caseᵗ {s = s} {t = t} sc l r) env hB hσ
+  with evalWith sc env
+     | evalWith-hopSpnC V η P B (c * (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1)) sc env
+         (≤-trans (≤-reflexive
+                    (*-assoc c (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) (hopDᵗ V η sc)))
+                  (≤-trans (*-monoʳ-≤ c
+                             (m≤n+m ((pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * hopDᵗ V η sc)
+                                    (hopDᵗ V η l ⊔ hopDᵗ V η r))) hB))
+         (EnvC-mono V η P B env (λ j → c * pmᵗ V j (caseᵗ sc l r))
+                    (λ j → (c * (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1)) * pmᵗ V j sc)
+                    (λ j → ≤-trans (≤-reflexive
+                                     (*-assoc c (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1)
+                                                (pmᵗ V j sc)))
+                                   (*-monoʳ-≤ c (m≤n+m _ _))) hσ)
+... | inl x | ihsc =
+  evalWith-hopSpnC V η P B c l (x ∷ᵃ env)
+    (≤-trans (*-monoʳ-≤ c (≤-trans (m≤m⊔n (hopDᵗ V η l) (hopDᵗ V η r))
+                                   (m≤m+n LR (C * hopDᵗ V η sc)))) hB)
+    ( valHopSpnC?-mono V η P B (c * pmᵗ V 0 l) (c * C) s x
+        (*-monoʳ-≤ c (≤-trans (m≤m⊔n (pmᵗ V 0 l) (pmᵗ V 0 r))
+                              (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1))) ihsc
+    , EnvC-mono V η P B env (λ j → c * pmᵗ V j (caseᵗ sc l r))
+                (λ j → c * pmᵗ V (suc j) l)
+                (λ j → *-monoʳ-≤ c (⊔₁+ (pmᵗ V (suc j) l) (pmᵗ V (suc j) r)
+                                        (C * pmᵗ V j sc))) hσ )
+  where
+  C  = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  LR = hopDᵗ V η l ⊔ hopDᵗ V η r
+... | inr y | ihsc =
+  evalWith-hopSpnC V η P B c r (y ∷ᵃ env)
+    (≤-trans (*-monoʳ-≤ c (≤-trans (m≤n⊔m (hopDᵗ V η l) (hopDᵗ V η r))
+                                   (m≤m+n LR (C * hopDᵗ V η sc)))) hB)
+    ( valHopSpnC?-mono V η P B (c * pmᵗ V 0 r) (c * C) t y
+        (*-monoʳ-≤ c (≤-trans (m≤n⊔m (pmᵗ V 0 l) (pmᵗ V 0 r))
+                              (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1))) ihsc
+    , EnvC-mono V η P B env (λ j → c * pmᵗ V j (caseᵗ sc l r))
+                (λ j → c * pmᵗ V (suc j) r)
+                (λ j → *-monoʳ-≤ c (⊔₂+ (pmᵗ V (suc j) l) (pmᵗ V (suc j) r)
+                                        (C * pmᵗ V j sc))) hσ )
+  where
+  C  = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  LR = hopDᵗ V η l ⊔ hopDᵗ V η r
+evalWith-hopSpnC V η P B c (ifᵗ cnd a b) env hB hσ with evalWith cnd env
+... | true  = evalWith-hopSpnC V η P B c a env
+                (≤-trans (*-monoʳ-≤ c (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b))) hB)
+                (EnvC-mono V η P B env (λ j → c * pmᵗ V j (ifᵗ cnd a b))
+                           (λ j → c * pmᵗ V j a)
+                           (λ j → *-monoʳ-≤ c (m≤m⊔n _ _)) hσ)
+... | false = evalWith-hopSpnC V η P B c b env
+                (≤-trans (*-monoʳ-≤ c (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b))) hB)
+                (EnvC-mono V η P B env (λ j → c * pmᵗ V j (ifᵗ cnd a b))
+                           (λ j → c * pmᵗ V j b)
+                           (λ j → *-monoʳ-≤ c (m≤n⊔m _ _)) hσ)
+evalWith-hopSpnC V η P B c (primᵗ add  a) env hB hσ = refl
+evalWith-hopSpnC V η P B c (primᵗ sub  a) env hB hσ = refl
+evalWith-hopSpnC V η P B c (primᵗ mul  a) env hB hσ = refl
+evalWith-hopSpnC V η P B c (primᵗ eqᵖ  a) env hB hσ = refl
+evalWith-hopSpnC V η P B c (primᵗ ltᵖ  a) env hB hσ = refl
+evalWith-hopSpnC V η P B c (primᵗ notᵖ a) env hB hσ = refl
+evalWith-hopSpnC V η P B c (strmᵗ e) []ᵃ hB hσ =
+  T⇒≡true _ (≤⇒≤ᵇ (≤-trans hB (B≤powB P B (spnᵉ e))))
+evalWith-hopSpnC V η P B c (strmᵗ e) (v ∷ᵃ vs) hB hσ =
+  T⇒≡true _ (≤⇒≤ᵇ
+    (hopD-sub-spnᵉ V η P B c [] (v ∷ᵃ vs) e hB
+      (envC⇒envPlug V η P B (v ∷ᵃ vs) (λ j → c * pmᵉ V j e) hσ)))
 
 ------------------------------------------------------------------
--- THE STEP, AS A REAL BODY.  Eleven of the thirteen clauses are
+-- THE STEP, AS A REAL BODY — every clause.  Most of them are pure
 -- structure: the copied leaves read the environment through
 -- `envPlug-lookup`, the projections take a conjunct of the pair's own
 -- receipt — which is the whole reason the conclusion is hereditary —
@@ -158,75 +249,190 @@ postulate
 -- bound the same way.
 ------------------------------------------------------------------
 
-evalWith-hopSpn : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-  (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) →
-  hopDᵗ V η tm ≤ B →
-  EnvPlug V η P B env (λ j → pmᵗ V j tm) →
-  valHopSpn? V η P B u (evalWith tm env) ≡ true
-evalWith-hopSpn {Γ = Γ} V η P B (varᵗ x) env hB hσ =
-  envPlug-lookup V η P B
-    (λ j → pmᵗ {Γ = Γ} {Δᵍ = []} {Δ = []} V j (varᵗ x)) env hσ x
-    (ifEq (varIx x) (varIx x) refl)
-evalWith-hopSpn V η P B unit̂     env hB hσ = refl
-evalWith-hopSpn V η P B (bool̂ _) env hB hσ = refl
-evalWith-hopSpn V η P B (nat̂ _)  env hB hσ = refl
-evalWith-hopSpn V η P B (pairᵗ a b) env hB hσ =
-  ∧-intro (evalWith-hopSpn V η P B a env
-             (≤-trans (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b)) hB)
-             (EnvPlug-mono V η P B env (λ j → pmᵗ V j (pairᵗ a b))
-                           (λ j → pmᵗ V j a)
-                           (λ j → m≤m⊔n (pmᵗ V j a) (pmᵗ V j b)) hσ))
-          (evalWith-hopSpn V η P B b env
-             (≤-trans (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b)) hB)
-             (EnvPlug-mono V η P B env (λ j → pmᵗ V j (pairᵗ a b))
-                           (λ j → pmᵗ V j b)
-                           (λ j → m≤n⊔m (pmᵗ V j a) (pmᵗ V j b)) hσ))
-evalWith-hopSpn V η P B (fstᵗ q) env hB hσ =
-  proj₁ (∧-true _ _ (evalWith-hopSpn V η P B q env hB hσ))
-evalWith-hopSpn V η P B (sndᵗ q) env hB hσ =
-  proj₂ (∧-true _ _ (evalWith-hopSpn V η P B q env hB hσ))
-evalWith-hopSpn V η P B (inlᵗ a) env hB hσ = evalWith-hopSpn V η P B a env hB hσ
-evalWith-hopSpn V η P B (inrᵗ a) env hB hσ = evalWith-hopSpn V η P B a env hB hσ
-evalWith-hopSpn V η P B (caseᵗ sc l r) env hB hσ =
-  evalWith-hopSpn-case V η P B sc l r env hB hσ
-evalWith-hopSpn V η P B (ifᵗ c a b) env hB hσ with evalWith c env
-... | true  = evalWith-hopSpn V η P B a env
-                (≤-trans (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b)) hB)
-                (EnvPlug-mono V η P B env (λ j → pmᵗ V j (ifᵗ c a b))
-                              (λ j → pmᵗ V j a)
-                              (λ j → m≤m⊔n (pmᵗ V j a) (pmᵗ V j b)) hσ)
-... | false = evalWith-hopSpn V η P B b env
-                (≤-trans (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b)) hB)
-                (EnvPlug-mono V η P B env (λ j → pmᵗ V j (ifᵗ c a b))
-                              (λ j → pmᵗ V j b)
-                              (λ j → m≤n⊔m (pmᵗ V j a) (pmᵗ V j b)) hσ)
--- one clause per operator, since the RESULT type is what makes the
--- predicate `true` — every PrimOp lands in natᵗ or boolᵗ
-evalWith-hopSpn V η P B (primᵗ add  a) env hB hσ = refl
-evalWith-hopSpn V η P B (primᵗ sub  a) env hB hσ = refl
-evalWith-hopSpn V η P B (primᵗ mul  a) env hB hσ = refl
-evalWith-hopSpn V η P B (primᵗ eqᵖ  a) env hB hσ = refl
-evalWith-hopSpn V η P B (primᵗ ltᵖ  a) env hB hσ = refl
-evalWith-hopSpn V η P B (primᵗ notᵖ a) env hB hσ = refl
--- a CLOSED template is its own value, so the headline receipt is the
--- whole story and `B≤powB` is the lift
-evalWith-hopSpn V η P B (strmᵗ e) []ᵃ hB hσ =
-  T⇒≡true _ (≤⇒≤ᵇ (≤-trans hB (B≤powB P B (spnᵉ e))))
--- THE BUILT LEAF, and the only place the drag is actually spent.
--- `closeUnderFn` IS `subΘExp []`, so this is exactly the substitution
--- the induction in .Hop-Spine-Sub prices; the coefficient starts at 1
--- and every clause of that induction hands its own on down.
-evalWith-hopSpn V η P B (strmᵗ e) (v ∷ᵃ vs) hB hσ =
-  T⇒≡true _ (≤⇒≤ᵇ
-    (≤-trans (≤-reflexive (sym (*-identityˡ (hopDᵉ V η (subΘExp [] (v ∷ᵃ vs) e)))))
-      (hopD-sub-spnᵉ V η P B 1 [] (v ∷ᵃ vs) e
-        (≤-trans (≤-reflexive (*-identityˡ (hopDᵉ V η e))) hB)
-        (EnvPlug-mono V η P B (v ∷ᵃ vs) (λ j → pmᵉ V j e)
-                      (λ j → 1 * pmᵉ V j e)
-                      (λ j → ≤-reflexive (*-identityˡ (pmᵉ V j e))) hσ))))
+mutual
+  evalWith-hopSpn : ∀ {n} {Γ : Ctx n} {Θ u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+    (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) →
+    hopDᵗ V η tm ≤ B →
+    EnvPlug V η P B env (λ j → pmᵗ V j tm) →
+    valHopSpn? V η P B u (evalWith tm env) ≡ true
+  evalWith-hopSpn {Γ = Γ} V η P B (varᵗ x) env hB hσ =
+    envPlug-lookup V η P B
+      (λ j → pmᵗ {Γ = Γ} {Δᵍ = []} {Δ = []} V j (varᵗ x)) env hσ x
+      (ifEq (varIx x) (varIx x) refl)
+  evalWith-hopSpn V η P B unit̂     env hB hσ = refl
+  evalWith-hopSpn V η P B (bool̂ _) env hB hσ = refl
+  evalWith-hopSpn V η P B (nat̂ _)  env hB hσ = refl
+  evalWith-hopSpn V η P B (pairᵗ a b) env hB hσ =
+    ∧-intro (evalWith-hopSpn V η P B a env
+               (≤-trans (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b)) hB)
+               (EnvPlug-mono V η P B env (λ j → pmᵗ V j (pairᵗ a b))
+                             (λ j → pmᵗ V j a)
+                             (λ j → m≤m⊔n (pmᵗ V j a) (pmᵗ V j b)) hσ))
+            (evalWith-hopSpn V η P B b env
+               (≤-trans (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b)) hB)
+               (EnvPlug-mono V η P B env (λ j → pmᵗ V j (pairᵗ a b))
+                             (λ j → pmᵗ V j b)
+                             (λ j → m≤n⊔m (pmᵗ V j a) (pmᵗ V j b)) hσ))
+  evalWith-hopSpn V η P B (fstᵗ q) env hB hσ =
+    proj₁ (∧-true _ _ (evalWith-hopSpn V η P B q env hB hσ))
+  evalWith-hopSpn V η P B (sndᵗ q) env hB hσ =
+    proj₂ (∧-true _ _ (evalWith-hopSpn V η P B q env hB hσ))
+  evalWith-hopSpn V η P B (inlᵗ a) env hB hσ = evalWith-hopSpn V η P B a env hB hσ
+  evalWith-hopSpn V η P B (inrᵗ a) env hB hσ = evalWith-hopSpn V η P B a env hB hσ
+  evalWith-hopSpn V η P B (caseᵗ sc l r) env hB hσ
+    with (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) ≤? P
+  ... | yes hle = case-small V η P B sc l r env hB hσ hle
+  ... | no  hgt = case-big   V η P B sc l r env hB hσ (≰⇒> hgt)
+  evalWith-hopSpn V η P B (ifᵗ c a b) env hB hσ with evalWith c env
+  ... | true  = evalWith-hopSpn V η P B a env
+                  (≤-trans (m≤m⊔n (hopDᵗ V η a) (hopDᵗ V η b)) hB)
+                  (EnvPlug-mono V η P B env (λ j → pmᵗ V j (ifᵗ c a b))
+                                (λ j → pmᵗ V j a)
+                                (λ j → m≤m⊔n (pmᵗ V j a) (pmᵗ V j b)) hσ)
+  ... | false = evalWith-hopSpn V η P B b env
+                  (≤-trans (m≤n⊔m (hopDᵗ V η a) (hopDᵗ V η b)) hB)
+                  (EnvPlug-mono V η P B env (λ j → pmᵗ V j (ifᵗ c a b))
+                                (λ j → pmᵗ V j b)
+                                (λ j → m≤n⊔m (pmᵗ V j a) (pmᵗ V j b)) hσ)
+  -- one clause per operator, since the RESULT type is what makes the
+  -- predicate `true` — every PrimOp lands in natᵗ or boolᵗ
+  evalWith-hopSpn V η P B (primᵗ add  a) env hB hσ = refl
+  evalWith-hopSpn V η P B (primᵗ sub  a) env hB hσ = refl
+  evalWith-hopSpn V η P B (primᵗ mul  a) env hB hσ = refl
+  evalWith-hopSpn V η P B (primᵗ eqᵖ  a) env hB hσ = refl
+  evalWith-hopSpn V η P B (primᵗ ltᵖ  a) env hB hσ = refl
+  evalWith-hopSpn V η P B (primᵗ notᵖ a) env hB hσ = refl
+  -- a CLOSED template is its own value, so the headline receipt is the
+  -- whole story and `B≤powB` is the lift
+  evalWith-hopSpn V η P B (strmᵗ e) []ᵃ hB hσ =
+    T⇒≡true _ (≤⇒≤ᵇ (≤-trans hB (B≤powB P B (spnᵉ e))))
+  -- THE BUILT LEAF, and the only place the drag is actually spent.
+  -- `closeUnderFn` IS `subΘExp []`, so this is exactly the substitution
+  -- the induction in .Hop-Spine-Sub prices; the coefficient starts at 1
+  -- and every clause of that induction hands its own on down.
+  evalWith-hopSpn V η P B (strmᵗ e) (v ∷ᵃ vs) hB hσ =
+    T⇒≡true _ (≤⇒≤ᵇ
+      (≤-trans (≤-reflexive (sym (*-identityˡ (hopDᵉ V η (subΘExp [] (v ∷ᵃ vs) e)))))
+        (hopD-sub-spnᵉ V η P B 1 [] (v ∷ᵃ vs) e
+          (≤-trans (≤-reflexive (*-identityˡ (hopDᵉ V η e))) hB)
+          (EnvPlug-mono V η P B (v ∷ᵃ vs) (λ j → pmᵉ V j e)
+                        (λ j → 1 * pmᵉ V j e)
+                        (λ j → ≤-reflexive (*-identityˡ (pmᵉ V j e))) hσ))))
 
--- and the scan fold's own shape: the argument is the pair the fold hands
--- in, at the single position the fn binds
+  ------------------------------------------------------------------
+  -- `caseᵗ`, SPLIT ON THE BRANCH COEFFICIENT, and the split is forced.
+  -- The branch reads the pushed value through `pmᵗ V 0 l`, so position 0
+  -- of its environment needs one of `EnvPlug`'s two disjuncts, and which
+  -- one is available depends on how that slope compares with `P`:
+  --
+  --   * `C ≤ P` — the FIRST disjunct.  `pmᵗ V 0 l ≤ C ≤ P` is the slope
+  --     bound outright, and the unscaled receipt on the pushed value is
+  --     the plain recursive call on the scrutinee.  Nothing is scaled.
+  --   * `P < C` — the SECOND.  No slope bound is available at all, so
+  --     the value must arrive already scaled by `C`, which is
+  --     `evalWith-hopSpnC`'s conclusion.
+  --
+  -- The two are genuinely different proofs, not two cases of one, and
+  -- neither covers the other: the first cannot scale a receipt and the
+  -- second cannot bound a slope.
+  ------------------------------------------------------------------
+
+  -- THE SMALL BRANCH.  Everything runs unscaled; `C ≤ P` does all the
+  -- work, since it bounds `pmᵗ V 0 l` and `pmᵗ V 0 r` at once.
+  case-small : ∀ {n} {Γ : Ctx n} {Θ a b u} (V : ℕ) (η : Fin n → ℕ)
+    (P B : ℕ) (sc : Tm Γ [] [] Θ (a +ᵗ b))
+    (l : Tm Γ [] [] (a ∷ Θ) u) (r : Tm Γ [] [] (b ∷ Θ) u)
+    (env : All (Val Γ) Θ) →
+    hopDᵗ V η (caseᵗ sc l r) ≤ B →
+    EnvPlug V η P B env (λ j → pmᵗ V j (caseᵗ sc l r)) →
+    (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) ≤ P →
+    valHopSpn? V η P B u (evalWith (caseᵗ sc l r) env) ≡ true
+  case-small V η P B sc l r env hB hσ hle
+    with evalWith sc env
+       | evalWith-hopSpn V η P B sc env
+           (≤-trans (≤2nd (hopDᵗ V η l ⊔ hopDᵗ V η r)
+                          (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) (hopDᵗ V η sc)
+                          (1≤C (pmᵗ V 0 l ⊔ pmᵗ V 0 r))) hB)
+           (EnvPlug-mono V η P B env (λ j → pmᵗ V j (caseᵗ sc l r))
+                         (λ j → pmᵗ V j sc)
+                         (λ j → ≤2nd _ (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) (pmᵗ V j sc)
+                                      (1≤C (pmᵗ V 0 l ⊔ pmᵗ V 0 r))) hσ)
+  ... | inl x | ihsc =
+    evalWith-hopSpn V η P B l (x ∷ᵃ env)
+      (≤-trans (≤-trans (m≤m⊔n (hopDᵗ V η l) (hopDᵗ V η r))
+                        (m≤m+n (hopDᵗ V η l ⊔ hopDᵗ V η r) (C * hopDᵗ V η sc))) hB)
+      ( inl (≤-trans (≤-trans (m≤m⊔n (pmᵗ V 0 l) (pmᵗ V 0 r))
+                              (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1)) hle
+            , ihsc)
+      , EnvPlug-mono V η P B env (λ j → pmᵗ V j (caseᵗ sc l r))
+                     (λ j → pmᵗ V (suc j) l)
+                     (λ j → ⊔₁+ (pmᵗ V (suc j) l) (pmᵗ V (suc j) r)
+                                (C * pmᵗ V j sc)) hσ )
+    where C = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  ... | inr y | ihsc =
+    evalWith-hopSpn V η P B r (y ∷ᵃ env)
+      (≤-trans (≤-trans (m≤n⊔m (hopDᵗ V η l) (hopDᵗ V η r))
+                        (m≤m+n (hopDᵗ V η l ⊔ hopDᵗ V η r) (C * hopDᵗ V η sc))) hB)
+      ( inl (≤-trans (≤-trans (m≤n⊔m (pmᵗ V 0 l) (pmᵗ V 0 r))
+                              (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1)) hle
+            , ihsc)
+      , EnvPlug-mono V η P B env (λ j → pmᵗ V j (caseᵗ sc l r))
+                     (λ j → pmᵗ V (suc j) r)
+                     (λ j → ⊔₂+ (pmᵗ V (suc j) l) (pmᵗ V (suc j) r)
+                                (C * pmᵗ V j sc)) hσ )
+    where C = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+
+  -- THE BIG BRANCH.  `envPlug⇒envC` is where `P < C` is spent: a
+  -- position the scrutinee mentions has parent slope at least `C > P`,
+  -- so it cannot be held under the unscaled disjunct, and a position it
+  -- does not mention arrives at coefficient zero.
+  case-big : ∀ {n} {Γ : Ctx n} {Θ a b u} (V : ℕ) (η : Fin n → ℕ)
+    (P B : ℕ) (sc : Tm Γ [] [] Θ (a +ᵗ b))
+    (l : Tm Γ [] [] (a ∷ Θ) u) (r : Tm Γ [] [] (b ∷ Θ) u)
+    (env : All (Val Γ) Θ) →
+    hopDᵗ V η (caseᵗ sc l r) ≤ B →
+    EnvPlug V η P B env (λ j → pmᵗ V j (caseᵗ sc l r)) →
+    suc P ≤ (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) →
+    valHopSpn? V η P B u (evalWith (caseᵗ sc l r) env) ≡ true
+  case-big V η P B sc l r env hB hσ hgt
+    with evalWith sc env
+       | evalWith-hopSpnC V η P B (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) sc env
+           (≤-trans (m≤n+m ((pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * hopDᵗ V η sc)
+                           (hopDᵗ V η l ⊔ hopDᵗ V η r)) hB)
+           (envPlug⇒envC V η P B env (λ j → pmᵗ V j (caseᵗ sc l r))
+                         (λ j → (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * pmᵗ V j sc)
+                         (λ j → m≤n+m _ _)
+                         (λ j hp → trans
+                           (cong ((pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) *_)
+                             (big-forces-zero P (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1)
+                               (pmᵗ V j sc) hgt (≤-trans (m≤n+m _ _) hp)))
+                           (*-zeroʳ (pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1)))
+                         hσ)
+  ... | inl x | ihsc =
+    evalWith-hopSpn V η P B l (x ∷ᵃ env)
+      (≤-trans (≤-trans (m≤m⊔n (hopDᵗ V η l) (hopDᵗ V η r))
+                        (m≤m+n (hopDᵗ V η l ⊔ hopDᵗ V η r) (C * hopDᵗ V η sc))) hB)
+      ( inr (valHopSpnC?-mono V η P B (pmᵗ V 0 l) C _ x
+               (≤-trans (m≤m⊔n (pmᵗ V 0 l) (pmᵗ V 0 r))
+                        (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1)) ihsc)
+      , EnvPlug-mono V η P B env (λ j → pmᵗ V j (caseᵗ sc l r))
+                     (λ j → pmᵗ V (suc j) l)
+                     (λ j → ⊔₁+ (pmᵗ V (suc j) l) (pmᵗ V (suc j) r)
+                                (C * pmᵗ V j sc)) hσ )
+    where C = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+  ... | inr y | ihsc =
+    evalWith-hopSpn V η P B r (y ∷ᵃ env)
+      (≤-trans (≤-trans (m≤n⊔m (hopDᵗ V η l) (hopDᵗ V η r))
+                        (m≤m+n (hopDᵗ V η l ⊔ hopDᵗ V η r) (C * hopDᵗ V η sc))) hB)
+      ( inr (valHopSpnC?-mono V η P B (pmᵗ V 0 r) C _ y
+               (≤-trans (m≤n⊔m (pmᵗ V 0 l) (pmᵗ V 0 r))
+                        (m≤m⊔n (pmᵗ V 0 l ⊔ pmᵗ V 0 r) 1)) ihsc)
+      , EnvPlug-mono V η P B env (λ j → pmᵗ V j (caseᵗ sc l r))
+                     (λ j → pmᵗ V (suc j) r)
+                     (λ j → ⊔₂+ (pmᵗ V (suc j) l) (pmᵗ V (suc j) r)
+                                (C * pmᵗ V j sc)) hσ )
+    where C = pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1
+
 applyFn-hopSpn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (v : Val Γ s) →
   pmᵗ V 0 fn ≤ P →
