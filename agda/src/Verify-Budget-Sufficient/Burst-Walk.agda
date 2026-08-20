@@ -2264,6 +2264,12 @@ postulate
   -- J, sched, st — stays true.  Conclusion needing information no hypothesis
   -- carries, exactly as in `-cl` above.
   --
+  -- THE REPAIR HAS A WORKED TWIN IN THIS FILE: `thruConsume-nodry-vb` below
+  -- states the same fact correctly, taking `VbB c sl Ψ J (o ∷ os)` as a
+  -- HYPOTHESIS and projecting the head out of it.  That is the shape this row
+  -- should have — the caller holds the whole burst's VbB, so the hypothesis is
+  -- free where it is spent.  Mirror it; do not invent a route from OKB.
+  --
   -- THE TELL IS IN THE BINDER LIST, and it is free to read: `q` and `allNid`
   -- appear in NEITHER the hypothesis nor the conclusion.  A parameter used
   -- nowhere is a parameter the statement forgot to constrain — here the
@@ -2292,6 +2298,17 @@ postulate
   -- statement whose witness is actually spent, or put the bound itself in as a
   -- second conjunct (`bud ≤ <the cap the ceiling can afford>`).  Do not grind
   -- it as written; a proof of this statement is worth nothing.
+  --
+  -- AND THE PINNED FORM ALREADY EXISTS ON THE OTHER SIDE:
+  -- `thruConsume-nodry-nestBud` below returns a Σ with TWO conjuncts — the
+  -- nest bound AND the opIterD ceiling at that same bud — which is exactly
+  -- the pin this row is missing.  Mirror it.
+  --
+  -- DOING SO ALSO RETIRES `-cl` ABOVE.  The thru side has no ceiling-transfer
+  -- postulate because it never needs one: folding the ceiling into the Σ means
+  -- the witness arrives already knowing it fits, so there is nothing to
+  -- transfer from an fLvlD-level bound afterwards.  That is the structural
+  -- answer to `-cl`'s SHAPE defect, and it is a deletion rather than a proof.
   concatDrain-nodry-nestBud : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
     (q : List (Closed Γ s))
@@ -2316,6 +2333,14 @@ postulate
   -- REPAIR is a restatement, not a proof: either take the frame's depth bound
   -- as a hypothesis (it is what the caller has), or state the conclusion at
   -- the depth the frame actually carries instead of at a free variable.
+  --
+  -- THE CORRECT SHAPE IS `thruWalk-nodry-dep` BELOW: it TAKES `depthFrame … ≤
+  -- dep` as a hypothesis and transports it across one consumed element.  That
+  -- is a real transport with content; this row's `OKB → … ≤ dep` is not.
+  --
+  -- ⚠ `thruConsume-nodry-dep` BELOW HAS THE IDENTICAL DEFECT — same
+  -- unconstrained `dep`, same OKB-only hypothesis — and is refuted by the same
+  -- instantiation.  Fix both together.
   concatDrain-nodry-dep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
     (allNid : NodeId) (κ : Path Γ s t)
@@ -2454,6 +2479,14 @@ postulate
 
   -- Per-element: depthInner for one val element, from OKB.
   -- walkOK carries the depth budget; per-element depth follows from it.
+  -- ⚠ CLASS: FALSITY (2026-08-20).  THE SAME DEFECT as
+  -- `concatDrain-nodry-dep` above, refuted by the same instantiation: `dep` is
+  -- universally quantified, OKB cannot reach it (no depth field anywhere in
+  -- walkOK, capsOK? or Caps), so `dep := 0` with `sf := gs fuel` reduces the
+  -- claim to `depthE fuel o (from-inner …) … ≤ 0`.  The correct shape is
+  -- `thruWalk-nodry-dep` directly below, which takes the depth bound as a
+  -- hypothesis instead of inventing it.  See the fuller note on the concat
+  -- twin; fix the pair together.
   thruConsume-nodry-dep : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)

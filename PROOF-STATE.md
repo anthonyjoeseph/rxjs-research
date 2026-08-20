@@ -152,18 +152,23 @@ row governed by it inherits that caveat.
   element has moved the state, and the shared header names the caps face
   (`.Subscribe-Face`) as the worked twin at the same indices. THREE OF THE SIX
   ARE NOT GRINDABLE — `-dep` is FALSITY (refuted at `dep = 0`), `-vb` is SHAPE
-  (`o` is unconstrained; `q` and `allNid` are unused), `-nestBud` is VACUITY (Σ
-  upward-closed in `bud`, and its consumer needs `bud` small). Each header
-  carries the instance and the repair.
+  (`o` unconstrained; `q` and `allNid` unused), `-nestBud` is VACUITY (Σ
+  upward-closed in `bud`, whose consumer needs `bud` small). Each repair is a
+  RESTATEMENT mirroring an already-correct twin on the thru-outer side of the
+  same file; headers carry the instance and the twin. Fixing `-nestBud`'s pin
+  deletes `-cl` outright.
 - **`concatDrain-nodry-cl`** (Burst-Walk) — SHAPE, so it is restated rather than
   ground: its ceiling-transfer route is proven BACKWARDS in its header, and the
   repair is `concatDrain-nodry`'s own `cl` hypothesis, which is stated one level
   too low. Cascades to that caller.
-- **`thruConsume-nodry-vb` / `-nestBud` / `-dep` / `-loop`, `thruWalk-nodry-dep`,
-  `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE. The same
-  per-element context on the thru-outer side against the same twin, plus
-  switchKill's OKB/regP transport. `VbB-tail` carries a phantom `{e}` its
-  statement never mentions.
+- **`thruConsume-nodry-vb` / `-nestBud` / `-loop`, `thruWalk-nodry-dep`,
+  `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE, and audited: each
+  takes the fact it needs as a hypothesis rather than conjuring it, so these are
+  the correct shapes the concat side must be restated to match. `VbB-tail`
+  carries a phantom `{e}` its statement never mentions.
+- **`thruConsume-nodry-dep`** (Burst-Walk) — FALSITY, the identical defect as
+  `concatDrain-nodry-dep` and refuted by the same `dep = 0` instantiation. Fix
+  the pair together, against `thruWalk-nodry-dep`'s shape.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 
