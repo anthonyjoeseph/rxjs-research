@@ -283,6 +283,63 @@ module _ {n} {Γ : Ctx n} {t : Ty} where
 -- dry trio: the ground subscribeInner-walk consumes it there, and this
 -- module sits above .Walk-Level.  Imported back below.
 
+-- VbB's HEAD AND TAIL PROJECTIONS.  `thruConsume-nodry-vb` and
+-- `concatDrain-nodry-vb` in the block below are the head projection stated
+-- again at one instantiation (`Val Γ (obs u)` IS `Closed Γ s`, per Rx/Exp's
+-- definition of `Val`), so anything that wants a projection wants one of
+-- these two: they are `all` over a cons and nothing more, proven here once
+-- and spent by the callers.
+--
+-- The length conjunct is why these are lemmas rather than `refl`: `valsCaps?`
+-- carries `length vs ≤ᵇ suc (cWid c)` beside the per-element `all`, so the
+-- head needs `1 ≤ᵇ suc _` and the tail needs the bound to survive dropping a
+-- cons.  Both hold, and neither is definitional in the list.
+VbB-head : ∀ {n} {Γ : Ctx n} {s}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
+  (o : Val Γ s) (os : List (Val Γ s)) →
+  VbB c sl Ψ J (o ∷ os) ≡ true →
+  VbB c sl Ψ J (o ∷ []) ≡ true
+VbB-head {s = s} c sl Ψ J o os h
+  with ∧-true (valsCaps? (frameStep J c) sl (o ∷ os)) (valsΨ? Ψ (o ∷ os)) h
+... | hc , hΨ
+  with ∧-true (all (valCaps? (frameStep J c) sl s) (o ∷ os))
+              (length (o ∷ os) ≤ᵇ suc (Caps.cWid (frameStep J c))) hc
+... | hall , _ =
+  -- ∧-true's Bool arguments are EXPLICIT, per this module's standing note:
+  -- `all` over a cons reduces to a conjunction Agda cannot recover from the
+  -- equation alone, so underscores here leave one unsolved meta per projection.
+  ∧-intro
+    (∧-intro
+      (∧-intro (proj₁ (∧-true (valCaps? (frameStep J c) sl s o)
+                              (all (valCaps? (frameStep J c) sl s) os) hall))
+               refl)
+      refl)
+    (∧-intro (proj₁ (∧-true (valΨ? Ψ s o) (all (valΨ? Ψ s) os) hΨ)) refl)
+
+VbB-tail : ∀ {n} {Γ : Ctx n} {s}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
+  (o : Val Γ s) (os : List (Val Γ s)) →
+  VbB c sl Ψ J (o ∷ os) ≡ true →
+  VbB c sl Ψ J os ≡ true
+VbB-tail {s = s} c sl Ψ J o os h
+  with ∧-true (valsCaps? (frameStep J c) sl (o ∷ os)) (valsΨ? Ψ (o ∷ os)) h
+... | hc , hΨ
+  with ∧-true (all (valCaps? (frameStep J c) sl s) (o ∷ os))
+              (length (o ∷ os) ≤ᵇ suc (Caps.cWid (frameStep J c))) hc
+... | hall , hlen =
+  -- The length conjunct drops a cons, so it goes through ≤ rather than
+  -- ≤ᵇ-widen: the widen's B is `cWid C` only AFTER `suc … ≤ᵇ suc …` reduces,
+  -- and Agda will not run that reduction backwards to solve for B.
+  ∧-intro
+    (∧-intro (proj₂ (∧-true (valCaps? (frameStep J c) sl s o)
+                            (all (valCaps? (frameStep J c) sl s) os) hall))
+             (T⇒≡true (length os ≤ᵇ suc (Caps.cWid (frameStep J c)))
+               (≤⇒≤ᵇ (≤-trans (n≤1+n (length os))
+                              (≤ᵇ⇒≤ (length (o ∷ os))
+                                    (suc (Caps.cWid (frameStep J c)))
+                                    (T-to hlen))))))
+    (proj₂ (∧-true (valΨ? Ψ s o) (all (valΨ? Ψ s) os) hΨ))
+
 -- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
 -- carries the ∧-composable form, the dry lemmas speak the other
 not-out : ∀ {x : Bool} → not x ≡ true → x ≡ false
@@ -2439,14 +2496,6 @@ postulate
 
   -- ── thruOuter / thruWalk / thruConsume loop leaves ───────────────
 
-  -- Per-element: VbB for one val element, from the outer VbB list.
-  thruConsume-nodry-vb : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
-    (o : Val Γ (obs u)) (os : List (Val Γ (obs u)))
-    (sched : Sched Γ) (st : EvalSt e) →
-    VbB c sl Ψ J (o ∷ os) ≡ true →
-    VbB c sl Ψ J (o ∷ []) ≡ true
-
   -- Per-element: nest budget + ceiling for one val element.
   -- dep and id are explicit params so they are in scope in the Σ-body.
   thruConsume-nodry-nestBud : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
@@ -2476,13 +2525,6 @@ postulate
        × regP? (PbB c Ψ J) (EvalSt.registry st₁) ≡ true
 
   -- ── thruWalk recursion leaves ────────────────────
-
-  -- Tail of a VbB list: if (o ∷ os) all satisfy the caps bound, so does os.
-  VbB-tail : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
-    (o : Val Γ (obs u)) (os : List (Val Γ (obs u))) →
-    VbB c sl Ψ J (o ∷ os) ≡ true →
-    VbB c sl Ψ J os ≡ true
 
   thruWalk-nodry-dep : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
@@ -2644,7 +2686,7 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   depthInner sf op nid κ id now o sched st ≤ dep →
   any dryEvent (proj₁ (proj₂ (proj₂ (subscribeInner sf op nid κ id now o sched st)))) ≡ false
 thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem =
-  let vb-elem = thruConsume-nodry-vb c sl Ψ J o os sched st vb
+  let vb-elem = VbB-head c sl Ψ J o os vb
       bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched st ok
   in subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
        J sf op nid κ id now o sched st
@@ -2710,7 +2752,7 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid �
       ok₁        = proj₁ ctx₁
       rg₁        = proj₂ ctx₁
       -- VbB is state-independent (valsCaps? ∧ valsΨ? depend only on vals and caps)
-      vb-elem    = thruConsume-nodry-vb c sl Ψ J o os sched₀ st₀ vb
+      vb-elem    = VbB-head c sl Ψ J o os vb
       bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched₁ st₁ ok₁
       -- depthConsume switchᵒ routes through depthConsumeS, which on a
       -- switch-st node IS depthInner at the POST-switchKill state — exactly
@@ -2787,7 +2829,7 @@ thruWalk-nodry {e = e} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ 
       rg₁    = proj₂ loop
       -- {e} is a PHANTOM on VbB-tail: VbB does not mention e, so nothing
       -- in the explicit arguments or the conclusion can solve it.
-      vb₁    = VbB-tail {e = e} c sl Ψ J o os vb
+      vb₁    = VbB-tail c sl Ψ J o os vb
       hD₁    = thruWalk-nodry-dep c sl Ψ dep J sf op nid κ id now o os sched₀ st₀ ok hD
       h-tail = thruWalk-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now
                  os sched₁ st₁ ok₁ pb sspLen vb₁ rg₁ gk hD₁ cl
