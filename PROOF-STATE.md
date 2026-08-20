@@ -147,20 +147,20 @@ row governed by it inherits that caveat.
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
   element has moved the state, and the shared header names the caps face
   (`.Subscribe-Face`) as the worked twin at the same indices. THREE OF THE SIX
-  ARE NOT GRINDABLE. `-nestBud` is REPAIRED (its Σ now pins the witness with the
-  ceiling conjunct, mirroring the thru twin, which retired `-cl` outright) and
-  is now a real DIFFICULTY obligation. Still open: `-dep` is FALSITY (refuted at
-  `dep = 0`) and `-vb` is SHAPE (`o` unconstrained; `q` and `allNid` unused) —
-  each repaired by mirroring the thru side's discipline of taking the fact
-  rather than conjuring it.
+  ARE REPAIRED. `-nestBud`'s Σ now pins its witness with the ceiling conjunct
+  (mirroring the thru twin), which retired `-cl` outright, and it is now a real
+  DIFFICULTY obligation. `-dep` is GONE: `depthDrain` is a ⊔-fold, so threading
+  the caller's own bound makes both projections one-liners. Still open: `-vb` is
+  SHAPE (`o` unconstrained; `q` and `allNid` unused), repairable by adding queue
+  membership.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-loop`, `thruWalk-nodry-dep`,
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE, and audited: each
   takes the fact it needs as a hypothesis rather than conjuring it, so these are
   the correct shapes the concat side must be restated to match. `VbB-tail`
   carries a phantom `{e}` its statement never mentions.
-- **`thruConsume-nodry-dep`** (Burst-Walk) — FALSITY, the identical defect as
-  `concatDrain-nodry-dep` and refuted by the same `dep = 0` instantiation. Fix
-  the pair together, against `thruWalk-nodry-dep`'s shape.
+- **`thruConsume-nodry-dep`** (Burst-Walk) — FALSITY, unconstrained `dep`. Now
+  has a WORKED precedent: the concat twin was removed by threading the caller's
+  fold bound and projecting; `depthWalk` is a ⊔-fold the same way.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 

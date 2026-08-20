@@ -77,7 +77,7 @@ open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; _∨
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⊔m;
-         n≤1+n)
+         m≤m⊔n; n≤1+n)
 open import Data.List    using (List; []; _∷_; _++_; map; length)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -121,7 +121,7 @@ open import Verify-Budget-Sufficient.Delivery-Walk
          opIterD-infl; capsAt-base-size; 6≤capsAt-size; tower-3; capsAt-tower)
 
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthFrame; depthCascade; depthInner; depthFin; depthE)
+  using (depthFrame; depthCascade; depthInner; depthFin; depthE; depthDrain)
 
 open import Verify-Budget-Sufficient.Caps-Nest using (nest)
 
@@ -2362,40 +2362,6 @@ postulate
                                                      dep bud (suc (sizeᵉ o)) (suc J)) c)
                         ≤ᵇ sizeCapAt e sl (suc id)) q ≡ true)
 
-  -- ⚠ CLASS: FALSITY (2026-08-20).  REFUTED AT dep = 0.  `dep` is universally
-  -- quantified here and NOTHING constrains it: OKB is `walkOK ×
-  -- fnCapBounded?`, walkOK is `slots-eq × capsOK?`, capsOK? bounds
-  -- live/nodes/registry/widths, and `Caps` has no depth field at all.  So
-  -- instantiate `dep := 0` and `sf := gs fuel`: the claim becomes `depthE fuel
-  -- o (from-inner …) … ≤ 0` (Caps-Depth:296 is depthInner's gs clause), which
-  -- the depth of a from-inner path does not satisfy.
-  --
-  -- The header line this replaces said "depthDrain is bounded by the frame's
-  -- depth budget, which walkOK carries" — that is the INTENT, and walkOK does
-  -- not carry it.  This is the `dep = 0` corner CLAUDE.md names explicitly
-  -- ("these bounds routinely go FALSE at bud = 0, ops = 0, dep = 0"), and it
-  -- costs one instantiation to see.
-  --
-  -- REPAIR is a restatement, not a proof: either take the frame's depth bound
-  -- as a hypothesis (it is what the caller has), or state the conclusion at
-  -- the depth the frame actually carries instead of at a free variable.
-  --
-  -- THE CORRECT SHAPE IS `thruWalk-nodry-dep` BELOW: it TAKES `depthFrame … ≤
-  -- dep` as a hypothesis and transports it across one consumed element.  That
-  -- is a real transport with content; this row's `OKB → … ≤ dep` is not.
-  --
-  -- ⚠ `thruConsume-nodry-dep` BELOW HAS THE IDENTICAL DEFECT — same
-  -- unconstrained `dep`, same OKB-only hypothesis — and is refuted by the same
-  -- instantiation.  Fix both together.
-  concatDrain-nodry-dep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
-    (allNid : NodeId) (κ : Path Γ s t)
-    (id : Id) (now : Tick)
-    (o : Closed Γ s)
-    (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    depthInner sf concatᵒ allNid κ id now o sched st ≤ dep
-
   -- Loop invariant after one subscribeInner step in concatDrain.
   -- OKB + regP? are preserved (the caps face proves the caps side;
   -- the nodry face needs its own copy here).
@@ -2539,13 +2505,14 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   sf ≡ budgetAt e sl id →
   Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
     ≤ sizeCapAt e sl (suc id) →
+  depthDrain sf allNid κ id now q sched st ≤ dep →
   any dryEvent (proj₁ (proj₂ (concatDrain sf allNid κ id now q sched st))) ≡ false
 
 concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  [] sched st _ _ _ _ _ _ = refl
+                  [] sched st _ _ _ _ _ _ _ = refl
 
 concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  (o ∷ q) sched₀ st₀ ok pb sspLen rg gk cl
+                  (o ∷ q) sched₀ st₀ ok pb sspLen rg gk cl hD
   with concatDrain-nodry-nestBud c sl Ψ dep J id allNid (o ∷ q) sched₀ st₀ ok
 ... | bud , nestQ , clQ
   -- Scrutinise only `done` (4th component).  This preserves
@@ -2561,7 +2528,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
     rg
     (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
       (T-to (proj₁ (∧-true _ _ nestQ))))
-    (concatDrain-nodry-dep c sl Ψ dep J sf allNid κ id now o sched₀ st₀ ok)
+    (≤-trans (m≤m⊔n _ _) hD)
     (≤ᵇ⇒≤ (Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
                                           dep bud (suc (sizeᵉ o)) (suc J)) c))
            _
@@ -2579,7 +2546,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
                  rg
                  (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
                    (T-to (proj₁ (∧-true _ _ nestQ))))
-                 (concatDrain-nodry-dep c sl Ψ dep J sf allNid κ id now o sched₀ st₀ ok)
+                 (≤-trans (m≤m⊔n _ _) hD)
                  (≤ᵇ⇒≤ (Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
                                                        dep bud (suc (sizeᵉ o)) (suc J)) c))
                         _
@@ -2592,6 +2559,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
                  ok (proj₂ (∧-true _ _ nestQ))
       h-tail = concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
                  q sched₁ st₁ ok₁ pb sspLen rg₁ gk cl
+                 (≤-trans (m≤n⊔m _ _) hD)
   in any-dry-++ bs _ h-head h-tail
 
 ------------------------------------------------------------------
@@ -2912,6 +2880,12 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
                   sspLen  = pathSz?-len (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ path′) pb-sz
               in concatDrain-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf allNid path′ id now
                    q sched st ok pb′ sspLen rg gk cl
+                   -- hD reduces HERE and only here: the `with` above
+                   -- scrutinises `lookupNode allNid (nodes st)` and `w ≟ᵗ s`,
+                   -- so depthFrame → depthReact → depthFin → depthFinC has
+                   -- unfolded to `suc (depthDrain … q …) ≤ d`.  One n≤1+n
+                   -- spends the frame's own arc and hands the drain its fold.
+                   (≤-trans (n≤1+n _) hD)
 
 ------------------------------------------------------------------
 -- thruOuter-nodry — thru-outer frame; uses thruWrap-pass + thruWalk-nodry.
