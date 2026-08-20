@@ -85,10 +85,11 @@ session's own — a restatement is not a grind, and per CLAUDE.md a SHAPE row is
 never handed to a worker.
 
 A row's class here must agree with its postulate's header, which is where the
-research lives; where they disagreed, the header won. Two rows in this tier
-have never been audited against their headers at all — `input-wet-scripted-four`
-and `walk-scan-rest` — and the former's own census says it was "derived by
-reading the evaluator and the measures, NOT by typechecking".
+research lives; where they disagreed, the header won — and on this tier they
+disagreed more often than not. The walkFace family census disclaims its own
+verification ("derived by reading the evaluator and the measures, NOT by
+typechecking — treat each named ingredient as located, not spent"), so every
+row governed by it inherits that caveat.
 
 - **`sharedConnect-walk`** (Walk-Level) — GRINDABLE, large: the CONNECTING arm,
   all that is left of `input-wet-shared` now that the dispatch is a real
@@ -108,19 +109,22 @@ reading the evaluator and the measures, NOT by typechecking".
   nothing recurses and no induction has to be designed. Its header carries a
   full census — four slot shapes × the wet four against the PROVEN
   clause-for-clause twin `subscribeE-input-caps` — naming a proven ingredient
-  for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
-  real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
-  marked "by computation" are read off the evaluator, not yet typechecked.
+  for every conjunct. AUDITED 2026-08-20 and the label holds: the four scripted
+  shapes were checked against the evaluator and against the twin's own clauses.
+  Two chores, neither structural — `subscribeE-input-caps` is missing from the
+  Subscribe-Face `using` list, and eight conjuncts routed "by computation" are
+  not yet typechecked.
 - **`walk-scan-source-frame`** (Walk-Level) — GRINDABLE: the scan clause's frame
   condition. Two conjuncts, both shapes this family already produces — the
   source's ordinary `burstHopD?` receipt, and that the freshly minted scan node
   still holds `evalTm z` after the source is subscribed. The caps face proves the
   node-table frame condition in the same position for its own predicates.
-- **`walk-scan-rest`** (Walk-Level) — GRINDABLE: the other eight conjuncts, at
-  `WalkStmt⁻ᴴ`. It is walk-map's census verbatim at this shape — subscribeE's
-  scan clause installs one node, subscribes the source and pushes, with PROVEN
-  `scanFrame-caps` paying the frame charge and `subscribeE-caps` delegating the
-  caps half.
+- **`walk-scan-rest`** (Walk-Level) — FALSITY, per its own block header, which
+  rules `Class stays FALSITY` for `hasDry` and `regsLen?` — two of the eight
+  conjuncts this row must prove. Its proven twin covers only the caps half it
+  does not owe; the wet half's twin is the open `walk-map`. Additionally needs a
+  `scan-f` wet push face that does not exist and whose frame-generic form is
+  REFUTED.
 - **`hopD-relᵉ`** (Measures) — GRINDABLE: the ONLY remaining leaf of
   `slotHop-cap`, whose telescope half (`slotHop-sup`, `ηAt-bound`) is now
   PROVEN off it. hopDᵉ is LINEAR in η, so this is the PROVEN `hopD-sizeᵉ`
@@ -146,7 +150,11 @@ reading the evaluator and the measures, NOT by typechecking".
   (Burst-Walk) — GRINDABLE. Per-element context for concat's drain: each
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
   element has moved the state, and the shared header names the caps face
-  (`.Subscribe-Face`) as the worked twin at the same indices.
+  (`.Subscribe-Face`) as the worked twin at the same indices. THREE OF THE SIX
+  ARE NOT GRINDABLE — `-dep` is FALSITY (refuted at `dep = 0`), `-vb` is SHAPE
+  (`o` is unconstrained; `q` and `allNid` are unused), `-nestBud` is VACUITY (Σ
+  upward-closed in `bud`, and its consumer needs `bud` small). Each header
+  carries the instance and the repair.
 - **`concatDrain-nodry-cl`** (Burst-Walk) — SHAPE, so it is restated rather than
   ground: its ceiling-transfer route is proven BACKWARDS in its header, and the
   repair is `concatDrain-nodry`'s own `cl` hypothesis, which is stated one level

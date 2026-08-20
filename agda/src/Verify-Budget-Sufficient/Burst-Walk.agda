@@ -2255,7 +2255,20 @@ postulate
 
   -- ── innerReact / concatDrain loop leaves ────────────────────────
 
-  -- Per-element: VbB for one queue element, from OKB's capsOK? node conjunct.
+  -- ⚠ CLASS: SHAPE (2026-08-20).  DO NOT GRIND.  "For one queue element" is
+  -- what the statement MEANS TO SAY and not what it says: `o` is an arbitrary
+  -- `Closed Γ s`, and NO hypothesis ties it to `q`, to `sched`, or to `st`.
+  -- `VbB c sl Ψ J (o ∷ [])` unfolds to `valsCaps? (frameStep J c) sl (o ∷ [])
+  -- ∧ valsΨ? Ψ (o ∷ [])`, both of which bound o against the caps, so an o
+  -- larger than the cap refutes it while OKB — which speaks only of c, sl, Ψ,
+  -- J, sched, st — stays true.  Conclusion needing information no hypothesis
+  -- carries, exactly as in `-cl` above.
+  --
+  -- THE TELL IS IN THE BINDER LIST, and it is free to read: `q` and `allNid`
+  -- appear in NEITHER the hypothesis nor the conclusion.  A parameter used
+  -- nowhere is a parameter the statement forgot to constrain — here the
+  -- missing conjunct is exactly `o ∈ q` (or membership in the state's queue),
+  -- which is what would let OKB's node conjunct reach it.
   concatDrain-nodry-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
     (o : Closed Γ s) (q : List (Closed Γ s))
@@ -2263,8 +2276,22 @@ postulate
     OKB {e = e} c sl Ψ J sched st →
     VbB c sl Ψ J (o ∷ []) ≡ true
 
-  -- Per-element: nest budget from OKB for the entire queue.
-  -- Returns a single bud covering every element at once.
+  -- ⚠ CLASS: VACUITY (2026-08-20).  It typechecks and asserts nothing usable.
+  -- The Σ's only conjunct, `all (λ o → nest o sl … ≤ᵇ bud) q ≡ true`, is
+  -- UPWARD-CLOSED in `bud`, so it is satisfied by any large enough witness and
+  -- is discharged for free by the max over a finite `q`.  That is the
+  -- Σ-receipt trap in CLAUDE.md: content only through the witness.
+  --
+  -- AND THE WITNESS IS LOAD-BEARING IN THE OPPOSITE DIRECTION, which is what
+  -- makes the vacuity harmful rather than merely weak: the consumer feeds this
+  -- same `bud` to `subscribeInner-nodry` in opIterD's `k` position, where a
+  -- BIGGER bud means a HIGHER level and a strictly harder ceiling.  So the
+  -- free large witness is the one witness that cannot be spent.
+  --
+  -- REPAIR: pin it, per the sanctioned form — either share the Σ with the
+  -- statement whose witness is actually spent, or put the bound itself in as a
+  -- second conjunct (`bud ≤ <the cap the ceiling can afford>`).  Do not grind
+  -- it as written; a proof of this statement is worth nothing.
   concatDrain-nodry-nestBud : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
     (q : List (Closed Γ s))
@@ -2272,8 +2299,23 @@ postulate
     OKB {e = e} c sl Ψ J sched st →
     Σ ℕ (λ bud → all (λ o → nest o sl (EvalSt.connectedShares st) ≤ᵇ bud) q ≡ true)
 
-  -- Per-element: depthInner for one queue element, from OKB.
-  -- depthDrain is bounded by the frame's depth budget, which walkOK carries.
+  -- ⚠ CLASS: FALSITY (2026-08-20).  REFUTED AT dep = 0.  `dep` is universally
+  -- quantified here and NOTHING constrains it: OKB is `walkOK ×
+  -- fnCapBounded?`, walkOK is `slots-eq × capsOK?`, capsOK? bounds
+  -- live/nodes/registry/widths, and `Caps` has no depth field at all.  So
+  -- instantiate `dep := 0` and `sf := gs fuel`: the claim becomes `depthE fuel
+  -- o (from-inner …) … ≤ 0` (Caps-Depth:296 is depthInner's gs clause), which
+  -- the depth of a from-inner path does not satisfy.
+  --
+  -- The header line this replaces said "depthDrain is bounded by the frame's
+  -- depth budget, which walkOK carries" — that is the INTENT, and walkOK does
+  -- not carry it.  This is the `dep = 0` corner CLAUDE.md names explicitly
+  -- ("these bounds routinely go FALSE at bud = 0, ops = 0, dep = 0"), and it
+  -- costs one instantiation to see.
+  --
+  -- REPAIR is a restatement, not a proof: either take the frame's depth bound
+  -- as a hypothesis (it is what the caller has), or state the conclusion at
+  -- the depth the frame actually carries instead of at a free variable.
   concatDrain-nodry-dep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
     (allNid : NodeId) (κ : Path Γ s t)
