@@ -477,26 +477,9 @@ regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r 
 ≡ᵇ→≡ zero    zero    _ = refl
 ≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
 
-≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
-≡ᵇ-refl zero    = refl
-≡ᵇ-refl (suc m) = ≡ᵇ-refl m
-
--- decidable type-equality is reflexive on the nose — lets stepFrame's scan-f
--- dispatch (w ≟ᵗ u) reduce when the node was installed at the matching type
-≟ᵗ-refl : ∀ (u : Ty) → (u ≟ᵗ u) ≡ yes refl
-≟ᵗ-refl unitᵗ    = refl
-≟ᵗ-refl boolᵗ    = refl
-≟ᵗ-refl natᵗ     = refl
-≟ᵗ-refl (a ×ᵗ b) rewrite ≟ᵗ-refl a | ≟ᵗ-refl b = refl
-≟ᵗ-refl (a +ᵗ b) rewrite ≟ᵗ-refl a | ≟ᵗ-refl b = refl
-≟ᵗ-refl (obs a)  rewrite ≟ᵗ-refl a = refl
-
--- reading back the node you just wrote: the scan/take clauses install their node
--- then read it inside stepFrame, so this pins the lookup that dispatch depends on
-lookupNode-setNode : ∀ {n} {Γ : Ctx n} (nid : NodeId) (s : NodeState Γ)
-  (nodes : List (NodeId × NodeState Γ)) →
-  lookupNode nid (setNode nid s nodes) ≡ just s
-lookupNode-setNode nid s []             rewrite ≡ᵇ-refl nid = refl
-lookupNode-setNode nid s ((k , s′) ∷ r) with k ≡ᵇ nid in keq
-... | true  rewrite ≡ᵇ-refl nid = refl
-... | false rewrite keq = lookupNode-setNode nid s r
+-- the node table's reduction facts moved DOWN to .Node-Table when the hop
+-- ledger's scan push face needed the identical pair from below this tree;
+-- re-exported here because this module is where the rest of the branch
+-- reads them from
+open import Verify-Budget-Sufficient.Node-Table public
+  using (≡ᵇ-refl; ≟ᵗ-refl; lookupNode-setNode)
