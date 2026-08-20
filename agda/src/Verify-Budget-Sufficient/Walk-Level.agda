@@ -1267,7 +1267,11 @@ walkFace (ofᵉ ts)        = walk-of ts
 walkFace emptyᵉ          = walk-empty
 walkFace (mapᵉ f b)      = walk-map f b
 walkFace (takeᵉ cnt b)   = walk-take cnt b
-walkFace (scanᵉ f z b)   = walk-scan f z b
+walkFace (scanᵉ f z b) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g =
+  walk-scan g f z b
+    (λ c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ →
+       walkFace b c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ g)
+    c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 walkFace (mergeAllᵉ b)   = walk-mergeAll b
 walkFace (concatAllᵉ b)  = walk-concatAll b
 walkFace (switchAllᵉ b)  = walk-switchAll b

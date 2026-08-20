@@ -221,6 +221,28 @@ op-desc S W d k m J 2≤S =
   sucJ≤J₁ = ≤-trans (s≤s (m≤m+n J (suc (sizeAt S J) * suc (sizeAt S J))))
                     (sLvlD-infl S W d k J₀)
 
+-- the same descent for the SCAN shape, where the source's sweep sits at
+-- `suc (J + j₀)` rather than `suc J`: the seed is BUILT by evalTm, so an
+-- eval receipt is spent before the source is subscribed at all.  It fits
+-- in the slack `sLvlD` already leaves — this is `op-step-eval`'s own
+-- `seed≤`, reused with the fIterD charge left un-composed, exactly as
+-- `op-desc` is `op-step` minus its charge.
+op-desc-eval : ∀ (S W d k m J j₀ : ℕ) → 2 ≤ S →
+  j₀ ≤ suc (sizeAt S J) →
+  opIterD S W d k m (suc (J + j₀)) ≤ opIterD S W d k (suc m) J
+op-desc-eval S W d k m J j₀ 2≤S hj₀ =
+  ≤-trans (≤-trans (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl seed≤
+                      ≤-refl ≤-refl ≤-refl)
+                   (fIterD-infl S W d k (suc (widAt S W X)) X))
+          (≤-reflexive (sym (opIterD-suc S W d k m J)))
+  where
+  J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
+  X  = opIterD S W d k m (sLvlD S W d k J₀)
+  seed≤ : suc (J + j₀) ≤ sLvlD S W d k J₀
+  seed≤ = ≤-trans (s≤s (+-monoʳ-≤ J
+                    (≤-trans hj₀ (m≤m*n (suc (sizeAt S J)) (suc (sizeAt S J))))))
+                  (sLvlD-infl S W d k J₀)
+
 -- the push after the source subscribe: given the source's level report
 -- and the emit-count bound, the whole fIterD charge sits under the
 -- operator sweep (op-step's tail, the level report left un-composed)

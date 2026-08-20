@@ -508,22 +508,32 @@ WalkTailᴴˢᶠ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
               (installNode nid (scan-st (evalTm z)) st)
     in burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b) (proj₁ r) ≡ true
 
-WalkStmtᴴˢᶠ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} →
+-- THE THREE SCAN HALVES ARE GAS-PINNED, AND THAT IS LOAD-BEARING, NOT
+-- COSMETIC.  Their assembly (`walk-scan`, .Parts) receives the walk face
+-- AT THE SOURCE — `walkFace b` — so the dispatch has to hand it over at
+-- the clause's OWN gas: a gas-polymorphic argument can only be supplied
+-- as a lambda whose gas binder is unrelated to the clause's, and the
+-- termination checker then reads the recursive call's fuel as UNKNOWN and
+-- rejects the whole walk group (measured; it takes walk-mu down with it).
+-- Pinned, the call is `walkFace b … g …`: fuel equal, source structurally
+-- smaller, which is the shape `subscribeAll-walk` already recurses at.
+-- Same lesson as `WalkStmtAt` above, arriving from the other clause.
+WalkStmtᴴˢᶠ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} → Gas →
   Fn Γ [] [] [] (u ×ᵗ s) u → Tm Γ [] [] [] u → Closed Γ s → Set
-WalkStmtᴴˢᶠ {n} {Γ} {t} {e} {s} {u} f z b =
-  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+WalkStmtᴴˢᶠ {n} {Γ} {t} {e} {s} {u} g f z b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) →
   WalkTailᴴˢᶠ {e = e} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
-WalkStmtᴴˢ⁰ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} →
+WalkStmtᴴˢ⁰ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} → Gas →
   Fn Γ [] [] [] (u ×ᵗ s) u → Tm Γ [] [] [] u → Closed Γ s → Set
-WalkStmtᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} f z b =
-  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+WalkStmtᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} g f z b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) →
   WalkTailᴴˢ⁰ {e = e} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
-WalkStmtᴴˢ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} →
+WalkStmtᴴˢ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} → Gas →
   Fn Γ [] [] [] (u ×ᵗ s) u → Tm Γ [] [] [] u → Closed Γ s → Set
-WalkStmtᴴˢ {n} {Γ} {t} {e} {s} {u} f z b =
-  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+WalkStmtᴴˢ {n} {Γ} {t} {e} {s} {u} g f z b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) →
   WalkTailᴴˢ {e = e} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
 -- WalkStmt WITH THE burstHopD? CONJUNCT REMOVED — the other eight.
@@ -1200,30 +1210,6 @@ postulate
   walk-scan-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt⁻ᴴ {e = e} (scanᵉ f z b)
-  -- THE SOURCE HALF OF THE SCAN HOP RECEIPT — DIFFICULTY, and it is now
-  -- ONE conjunct.  Everything the scan clause used to owe on this axis has
-  -- moved: `walk-scan-hop-spn` (.Parts) is a REAL BODY (subscribe, then
-  -- push), `walk-scan-source` beside it is a REAL BODY, and the fold
-  -- itself is PROVEN in `.Hop-Spine-Push`.
-  --
-  -- WHAT LEFT, 2026-08-20, and it was the row's whole risk: the node-table
-  -- conjunct that used to sit beside this one — subscribing `b` under
-  -- `scan-f f nid ↠ κ` leaves node `nid` holding exactly `scan-st (evalTm
-  -- z)` — is DISCHARGED at the consumer off PROVEN `mint-install-survives`
-  -- (.Node-Fresh), which also retired `scan-nodeP` and `take-nodeP`.
-  -- The dead route that conjunct cost (the caps face BOUNDS every node and
-  -- IDENTIFIES none) and the probe that covered it moved to that leaf's own
-  -- header, which is where the next reader will stand.
-  --
-  -- STILL DIFFICULTY, AND FOR THE SAME REASON AS `walk-scan-rest` ABOVE:
-  -- what remains is the walk face's own `burstHopD?` for the subscribe of
-  -- `b`, so the route is to apply the recursion AT `b` — and this family's
-  -- statements carry no `WalkLevelAt` argument, so reaching it is a
-  -- restatement (the precedent for threading one is `input-wet-core`) and
-  -- not a grind.  There is no proven twin at these indices.
-  walk-scan-source-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-    (b : Closed Γ s) → WalkStmtᴴˢᶠ {e = e} f z b
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)
   -- registration + parked body — GRINDABLE.  The clause that MINTS a
   -- registry entry, so regsLen?'s growth is paid here, and it is the

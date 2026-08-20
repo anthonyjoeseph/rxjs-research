@@ -140,10 +140,6 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`walk-scan-source-burst`** (Walk-Level) — DIFFICULTY: what is left of the
-  scan source half once its node conjunct went to the node-freshness ring. The
-  route is the recursion at `b`, which this family's statements do not carry, so
-  reaching it is a restatement.
 - **`walk-map` / `walk-take-suc` / `walk-scan-rest`** (Walk-Level) —
   DIFFICULTY: gas exhaustion sites at none of the three, and that region is
   unreachable by measurement. Residue is the unauthored per-frame push face,

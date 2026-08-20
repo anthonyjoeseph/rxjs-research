@@ -19,7 +19,7 @@
 module Verify-Budget-Sufficient.Walk-Level.Parts where
 
 open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Unit    using (⊤; tt)
@@ -27,10 +27,12 @@ open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-p
                                        m≤m+n; m≤n+m; n≤1+n;
                                        +-suc; +-assoc; +-comm;
                                        +-mono-≤; +-monoʳ-≤; +-monoˡ-≤;
-                                       *-mono-≤; *-monoʳ-≤;
+                                       *-mono-≤; *-monoʳ-≤; *-monoˡ-≤;
+                                       *-identityˡ;
                                        +-identityʳ;
                                        m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (Vec; lookup)
@@ -46,12 +48,12 @@ open import Rx.Prim      using (Tick; Id; Source; init; value; close;
 open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
                                 inputsBelowᵉ; isData;
                                 _≟ᵗ_;
-                                sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
+                                sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ; syncSizeᵗ;
                                 shellSizeᵉ; innerᵉ;
                                 input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                                 mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                                 μᵉ; varᵉ; deferᵉ; unfoldμ; applyFn; evalTm)
-open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
+open import Rx.Frame-Width using (dWᵉ; dWᵗ; pWᵉ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; hopD-unfoldμ)
 open import Rx.Slot-Hop  using (slotHop; slotHop-fix)
 open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
@@ -95,13 +97,16 @@ open import Verify-Budget-Sufficient.Caps-Face
          widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
          frameStep-size-strict-suc;
          capsOK?-regs; pathSz?-len;
-         slotsCaps?-capsAt; capsOK?-parts)
+         slotsCaps?-capsAt; capsOK?-parts;
+         -- the scan frame's install: the seed is BUILT, so its two node
+         -- bounds cost an eval receipt and a level step of their own
+         evalSeed-caps; valCaps?-widen; frameStep-mono-j; ⊑ᶜ-trans)
 open import Verify-Budget-Sufficient.Psi-Split
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
          op-step-mu; quad-arith;
-         op-desc; push-desc; frame-desc; tail-desc;
+         op-desc; op-desc-eval; push-desc; frame-desc; tail-desc;
          walk-desc; inner-desc;
          inner-nil; inner-step; walk-nil;
          frame-step; walk-index; queue-push)
@@ -113,7 +118,7 @@ open import Verify-Budget-Sufficient.Caps
   using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
          sLvlD-mono; opIterD-infl; fIterD-infl;
          B2-cReg≤cSize; frameStep-reg≤size;
-         capsAt-base-size)
+         capsAt-base-size; 1≤pow≤)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
@@ -132,7 +137,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner;
          depthConsume; depthWalk; depthSlot; depthConn)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step)
+  using (nest-keeps; mu-step; scan-step)
 open import Verify-Budget-Sufficient.Op-Budget
   using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Node-Fresh
@@ -705,12 +710,140 @@ walk-take {Γ = Γ} {e = e} cnt b = go (evalTm cnt) refl
   go zero    eq = walk-take-zero cnt b eq
   go (suc k) eq = walk-take-suc  cnt b k eq
 
+-- THE SOURCE BURST'S HOP RECEIPT, AND IT IS NO LONGER A LEAF.  The
+-- conjunct is `burstHopD?` about the SOURCE's OWN burst — `proj₁ r` for
+-- `r = subscribeE g b (scan-f f nid ↠ κ) …` — so no part of the scan push
+-- face enters it.  It is the walk face's own eighth conjunct AT `b`, and
+-- everything this body does is discharge the walk face's hypotheses at the
+-- minted-and-installed state.
+--
+-- `wb` IS THAT RECURSION, APPLIED TO `b` AND PINNED AT THE CALLER'S GAS —
+-- and the pinning is load-bearing, not tidiness: passing the bare
+-- `walkFace b` at the gas-POLYMORPHIC type is a PARTIAL application, whose
+-- fuel the termination checker reads as unknown, and it rejects the whole
+-- walk group (walk-mu with it).  Why, and the shape that works, is in
+-- WalkStmtᴴˢᶠ's header, beside the type that carries the pin.
+--
+-- THE TEMPLATE IS `subscribeE-caps`'s OWN scanᵉ CLAUSE (.Subscribe-Face),
+-- PROVEN, AT THESE VERY INDICES, and the one thing to carry from it is
+-- that the callee runs at `suc (j + j₀)` and NOT at `suc j`: the seed is
+-- BUILT by evalTm, which can grow it, so `evalSeed-caps` steps the level
+-- by its own `j₀` before the source is subscribed.  The wet half's splits
+-- are `subscribeE-walkS`'s scan clause (.Wet/Part2) on the capᴱ axis.
+--
+-- THE DEMAND DROP IS THE ONE THING NEITHER TWIN HAS, because a chain frame
+-- has no hop edge to spend — `hopDᵉ` at a scan MULTIPLIES rather than
+-- adding one.  It comes off `dBound-struct`, which is strict on the
+-- syncSize axis, and `syncSizeᵉ (scanᵉ f z b)` is a `suc`: the source's
+-- demand is therefore strictly below the frame's whatever the hops do,
+-- which is what funds the ℓ ledger's charge for the longer path.
+walk-scan-source-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢᶠ {e = e} g f z b
+walk-scan-source-burst g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
+walk-scan-source-burst {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
+  κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SUB)))))))
+  where
+  -- the size splits, verbatim from the caps twin
+  szsum : sizeᵗ f + sizeᵗ z + sizeᵉ b ≤ Caps.cSize (frameStep j c)
+  szsum = ≤-trans (n≤1+n (sizeᵗ f + sizeᵗ z + sizeᵉ b)) szb
+  szfz  = ≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b)) szsum
+  szf   = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) szfz
+  szz   = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) szfz
+  szb′  = ≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f + sizeᵗ z)) szsum
+  -- the Ψ splits, verbatim from the wet twin
+  capf  = ≤-trans (m≤m⊔n (caseWᵗ f ⊔ fnCapᵗ f) _) fnC
+  capz  : caseWᵗ z ⊔ fnCapᵗ z ≤ Ψ
+  capz  = ≤-trans (m≤m⊔n (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ b))
+            (≤-trans (m≤n⊔m (caseWᵗ f ⊔ fnCapᵗ f) _) fnC)
+  fcb   = ≤-trans (m≤n⊔m (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ b))
+            (≤-trans (m≤n⊔m (caseWᵗ f ⊔ fnCapᵗ f) _) fnC)
+  SD    = evalSeed-caps c j sl z 2≤S slC szz
+            (≤-trans (m≤n⊔m (dWᵗ n sl f) (dWᵗ n sl z))
+              (≤-trans (m≤m⊔n (dWᵗ n sl f ⊔ dWᵗ n sl z) (dWᵉ n sl b)) wdb))
+  j₀     = proj₁ SD
+  ⊑₀     = frameStep-⊑-+ c 2≤S j j₀
+  nid    = Sched.nextNode sched
+  sched₀ = record sched { nextNode = suc (Sched.nextNode sched) }
+  ns     = scan-st (evalTm z)
+  st₀    = installNode nid ns st
+  step⊑  = frameStep-mono-j c 2≤S (n≤1+n (j + j₀))
+  B′     = Caps.cSize (frameStep (suc (j + j₀)) c)
+  ⊑both  = ⊑ᶜ-trans ⊑₀ step⊑
+  VW     = valCaps?-widen sl _ (evalTm z) step⊑ (proj₂ SD)
+  bnd    = valCaps?-size (frameStep (suc (j + j₀)) c) sl _ (evalTm z) VW
+  fnN    = T⇒≡true _ (≤⇒≤ᵇ (fnCap-evalWith Ψ z []ᵃ tt capz))
+  U      = unconn sl (EvalSt.connectedShares st)
+  G′     = dBound Ŝ R̂ U (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b)
+  -- the source's hop sits under the frame's: `hopDᵉ` at a scan MULTIPLIES
+  -- by a positive power (Rx.Hop-Depth, the refold bound), so the ≤ is the
+  -- summand's, widened by a factor of at least one
+  hop≤ : hopDᵉ F (slotHop F sl) b
+           ≤ (2 + pmᵗ F 0 f) ^ F
+             * (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
+                + hopDᵉ F (slotHop F sl) b)
+  hop≤ = ≤-trans (m≤n+m (hopDᵉ F (slotHop F sl) b)
+                    (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z))
+           (≤-trans (≤-reflexive (sym (*-identityˡ _)))
+                    (*-monoˡ-≤ _ (1≤pow≤ (2 + pmᵗ F 0 f) F (s≤s z≤n))))
+  sucG′≤G : suc G′ ≤ G
+  sucG′≤G =
+    ≤-trans (dBound-struct Ŝ R̂ U hop≤
+               (s≤s (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f + syncSizeᵗ z))))
+            dmd
+  pC′ : pathSz? B′ (scan-f f nid ↠ κ) ≡ true
+  pC′ = ∧-intro (T⇒≡true (sizeᵗ f ≤ᵇ B′)
+                  (≤⇒≤ᵇ (≤-trans szf (proj₁ ⊑both))))
+          (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B′)
+                     (≤⇒≤ᵇ (≤-trans lC (proj₁ ⊑both))))
+                   (pathSz?-⊑ κ step⊑ (pathSz?-⊑ κ ⊑₀ pC)))
+  pB′ : pathB? B′ Ψ (scan-f f nid ↠ κ) ≡ true
+  pB′ = ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans szf (proj₁ ⊑both))))
+                         (T⇒≡true _ (≤⇒≤ᵇ capf)))
+                (pathB?-widen κ (proj₁ ⊑both) pB)
+  inv₀ : capsOK? (frameStep (suc (j + j₀)) c) sched₀ st₀ ≡ true
+  inv₀ = capsOK?-setNode (frameStep (suc (j + j₀)) c) nid ns sched₀ st bnd
+           (subst (λ y → widNode (Caps.cWid (frameStep (suc (j + j₀)) c)) y ns ≡ true)
+                  (sym slEq)
+                  (valCaps?-wid (frameStep (suc (j + j₀)) c) sl _ (evalTm z) VW))
+           (capsOK?-mono (frameStep j c) (frameStep (suc (j + j₀)) c) sched₀ st ⊑both
+              (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
+                                sched st inv))
+  invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
+  invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
+            (proj₁ ⊑both) refl refl bnd fnN invW
+  SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc (j + j₀))
+          (scan-f f nid ↠ κ) bid now sl sched₀ st₀
+          2≤S 1≤R hCR slEq slC slSz inv₀
+          (≤-trans szb′ (proj₁ ⊑both))
+          (≤-trans (m≤n⊔m (dWᵗ n sl f ⊔ dWᵗ n sl z) (dWᵉ n sl b))
+             (≤-trans wdb (proj₁ (proj₂ ⊑both))))
+          pC′
+          (frameStep-chain-suc c (j + j₀) (pathLen κ) 2≤S
+             (≤-trans lC (proj₁ ⊑₀)))
+          (scan-step f z b sl _ bud nst)
+          (chain-desc (sizeᵗ f + sizeᵗ z) (sizeᵉ b) ops′ hidx)
+          (≤-trans (m≤m⊔n _ _) dpt)
+          invW′ fcb pB′
+          s2 fS rS ceil
+          (≤-trans (op-desc-eval (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₀
+                      2≤S (s≤s szz)) lb)
+          ≤-refl
+          (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
+          (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
+                   (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
+          rgs
+
 -- THE SOURCE HALF, ASSEMBLED.  Both conjuncts are the frame leaf's,
 -- lifted from headline to hereditary — free, per `valHopSpn?-intro`.
 walk-scan-source : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-  (b : Closed Γ s) → WalkStmtᴴˢ⁰ {e = e} f z b
-walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢ⁰ {e = e} g f z b
+walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs =
   burstHopSpnH-intro F (slotHop F sl) (pmᵗ F 0 f) BND
@@ -725,7 +858,7 @@ walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sch
   r = subscribeE g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
         (proj₂ (mintNode sched))
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
-  frB = walk-scan-source-burst f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  frB = walk-scan-source-burst g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
           s2 fS rS ceil lb dmd gas lℓ rgs
   -- THE NODE HALF, AND IT IS NOW GAPLESS.  `mint-install-survives`
@@ -751,9 +884,9 @@ walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sch
 -- and carrying the accumulator across.  The two numeric side conditions
 -- are the identity on the multiplier and the first summand of the bound.
 walk-scan-hop-spn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-  (b : Closed Γ s) → WalkStmtᴴˢ {e = e} f z b
-walk-scan-hop-spn f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢ {e = e} g f z b
+walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs =
   proj₁ (pushBurst-scan-hopSpn F (slotHop F sl) (pmᵗ F 0 f) BND
@@ -767,7 +900,7 @@ walk-scan-hop-spn f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sc
   r = subscribeE g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
         (proj₂ (mintNode sched))
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
-  src = walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  src = walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
           s2 fS rS ceil lb dmd gas lℓ rgs
 
@@ -775,9 +908,10 @@ walk-scan-hop-spn f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sc
 -- do not already say; the point of the assembly is that it puts the row's
 -- risk in ONE of them.  See walk-scan-hop's header for what that one owes.
 walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-  (b : Closed Γ s) → WalkStmt {e = e} (scanᵉ f z b)
-walk-scan f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) →
+  WalkStmtAt {e = e} g (scanᵉ f z b)
+walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
@@ -802,7 +936,7 @@ walk-scan f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
              + hopDᵉ F (slotHop F sl) b)
           (slotHop F sl)
           (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st))
-          (walk-scan-hop-spn f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+          (walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
              2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
              s2 fS rS ceil lb dmd gas lℓ rgs))
    , a₇ , a₈
