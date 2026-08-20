@@ -25,6 +25,15 @@ bare-binder : ∀ X → 3 * X ≡ X + X + X
 -- MUST FIRE (up-to-binder): explicit here, implicit in B
 explicit-binder : ∀ (m n : ℕ) → m ≤ n → (m ≤ᵇ n) ≡ true
 
+-- MUST FIRE (exact): the binder is an UNANNOTATED IMPLICIT —
+-- `{n}` here against B's `{m}`, with nothing else different.  This is
+-- the shape that escaped for real: `sum-tabulate-lb` (.Caps-Face/Part1)
+-- and `fᵢ≤sum-tab` (.Measures) were the same fact with the same proof,
+-- in two modules of ONE public import chain, and neither Agda nor this
+-- check said a word.  `∀ {n} {Γ : Ctx n}` opens most statements here,
+-- so the blind spot covered nearly every pair in the tree.
+implicit-unannotated-a : ∀ {n} (f : Fin n → ℕ) (i : Fin n) → f i ≤ sum (tabulate f)
+
 -- MUST FIRE (exact, after synonym expansion): Id here, ℕ in B
 synonym-lhs : ∀ (i : Id) → i + 0 ≡ i
 

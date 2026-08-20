@@ -92,6 +92,37 @@ report, not an exemption.** `NOT_DEV_CHECKABLE` exists for that, is currently EM
 and empty is the target; its last entry was retired by splitting the file, not by
 tolerating the exclusion.
 
+## A block member in NO cycle is never stubbed, and that is what blows the budget
+
+The loop's whole trick is that a focused check keeps ONE body real and replaces its
+block-siblings with postulates. **A sibling the tool cannot stub is a sibling every
+focused check re-proves in full** — and the tool cannot stub one whose body other
+members' bodies need to reduce, which in practice is the members that are in the
+block but in NO genuine cycle. Four such members are enough to make every check of
+all the others cost what the whole file costs, and the symptom is uniform: every
+shard times out at the same number, whatever body it was focused on. That symptom is
+the tell — a per-member cost that does not vary with the member is not a member cost.
+
+**`--list` already names them,** under `could in principle be hoisted out`, and its
+warning is about a different and much smaller thing: the POSITIVITY cost inside
+`make agda`, where hoisting 22 of 36 members bought 35s of 255s. The dev-loop effect
+is the bigger one and points the same way, so a no-cycle member is worth hoisting on
+the loop's evidence even when the gate would barely notice.
+
+**Hoisting means MOVING IT OUT OF THE MODULE, not out of the block.** A definition
+left in the file is still checked when the file is; only an import is cheap. A member
+that takes the recursion as an ARGUMENT (`wl : WalkLevelAt …`) rather than calling it
+is one that can move one arrow down and be imported back, which is the same fact that
+kept it out of the cycle.
+
+**And do not reach for the telescopes first, which is the tempting move and the wrong
+one.** Naming a big signature as a `Set` abbreviation in a lower module is a real
+device with a real second payoff — the obligation gets a name, so a caller states it
+instead of retyping it — but as a COST fix it is noise: measured, moving a 72-line
+telescope out was worth well under a second against the same file's 35s of unstubbable
+bodies. Line counts predict nothing here. Attribute the cost first, on a coherent
+cache, and hoist what the attribution names.
+
 ## Concurrency
 
 `make agda-dev` sizes its own concurrency from measured RSS. But the dev loop and

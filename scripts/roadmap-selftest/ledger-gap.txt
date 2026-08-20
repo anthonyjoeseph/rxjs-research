@@ -10,4 +10,14 @@ glob-one  Fixture/Two.agda:5
 glob-two  Fixture/Two.agda:6
 suf-nodry-loop  Fixture/Two.agda:7
 suf-nodry-nestRec  Fixture/Two.agda:8
+g-unclassified  Fixture/Two.agda:10
+names-are-free-one  Fixture/Three.agda:1
+names-are-free-two  Fixture/Three.agda:1
+names-are-free-three  Fixture/Three.agda:1
+names-are-free-four  Fixture/Three.agda:1
+names-are-free-five  Fixture/Three.agda:1
+names-are-free-six  Fixture/Three.agda:1
+names-are-free-seven  Fixture/Three.agda:1
+names-are-free-eight  Fixture/Three.agda:1
+names-are-free-nine  Fixture/Three.agda:1
 never-scheduled  Fixture/Two.agda:9

@@ -85,7 +85,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `dup-selftest` | the duplicate checker still fires | [docs/dup-check.md](docs/find.md) |
 | `dup-check` | no two declarations proving the same fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate, keeps rows within budget, and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows within budget, and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` | the refutations typecheck | REFUTATION.md |
 | `bug-cache` | no known impl counterexample has regressed. `Unit-Test.agda` is off Main, so nothing else would notice it rotting | [docs/bug-cache.md](docs/bug-cache.md) |
@@ -272,8 +272,18 @@ build only to merge. Timings: `typecheck-performance-numbers.md`.
   nearly irrelevant** — but run `make agda-dev ARGS='--list <file>'` before believing it,
   because a module with no mutual block cannot be paying for one, and MEASURE on a
   coherent cache, because a rebuilding dependency masquerading as module cost has
-  produced four phantom diagnoses. The splits are DONE and the question is CLOSED.
-  → [docs/typecheck-cost.md](docs/typecheck-cost.md)
+  produced four phantom diagnoses. The POSITIVITY splits are done and that question is
+  closed. → [docs/typecheck-cost.md](docs/typecheck-cost.md)
+- **BUT A SECOND AXIS COSTS MORE, AND IT IS NOT FILE SIZE: A BLOCK MEMBER IN NO CYCLE
+  IS NEVER STUBBED, so every focused check of every OTHER member re-proves it in
+  full.** The tell is that per-member times do not vary with the member — a cost that
+  ignores which body is real is not a body cost. `--list` already names the
+  candidates; hoisting means moving them to ANOTHER MODULE, since a definition left in
+  the file is checked when the file is. **Attribute before splitting, on a coherent
+  cache**: measured on one module, moving out the statement telescopes, the lemma shelf
+  and a named signature together bought under two seconds, and moving out four
+  no-cycle members took the per-member loop from timing out to a quarter of the budget.
+  → [docs/agda-dev.md](docs/agda-dev.md)
 - **ALL MEASURED TIMINGS LIVE IN `typecheck-performance-numbers.md`, AND NOWHERE ELSE.**
   Numbers age far faster than rules, so quoting one elsewhere means maintaining it in two
   places and getting it wrong in both. `make agda` and `make agda-dev` append their own,
@@ -919,8 +929,9 @@ And update it **to the hygiene rules in its own header, which are also part of t
 one line per item (name + risk class + hook), NO numbering of any kind, research in source
 headers rather than here, completed items DELETED rather than marked done, no dated
 narrative. Re-read that header when you touch the file; every one of those rules exists
-because it was violated. `make roadmap-check` mechanises the sort, the coverage, the row
-budget and the dates — → [docs/roadmap-check.md](docs/roadmap-check.md).
+because it was violated. `make roadmap-check` mechanises the sort, the coverage, its
+REVERSE at row heads (a head may not name a postulate that has been discharged or
+deleted), the row budget and the dates — → [docs/roadmap-check.md](docs/roadmap-check.md).
 
 ### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony)
 

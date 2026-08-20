@@ -839,12 +839,6 @@ slotsCaps?-lookup B W sl i h = slotsGo?-tab B W sl (λ k → k) i h
 -- slotsSize, and slotsSize is a summand of the recurrence's base.
 ------------------------------------------------------------------
 
--- a summand never exceeds the sum, over a tabulated index
-sum-tabulate-lb : ∀ {n} (f : Fin n → ℕ) (i : Fin n) → f i ≤ sum (tabulate f)
-sum-tabulate-lb {suc n} f Fin.zero    = m≤m+n (f Fin.zero) _
-sum-tabulate-lb {suc n} f (Fin.suc i) =
-  ≤-trans (sum-tabulate-lb (λ k → f (Fin.suc k)) i) (m≤n+m _ _)
-
 -- EVERY SLOT COSTS AT LEAST ONE, so the slot COUNT is under the caps'
 -- own size — the supply behind the `n ≤ cSize` hypothesis the delivery
 -- bound now carries.  `cDel`'s gas index is `suc (cSize c)` while the
@@ -869,7 +863,7 @@ all-≤-sum f (x ∷ xs) B h =
   ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (m≤m+n (f x) (sum (map f xs))) h)))
           (all-≤-sum f xs B (≤-trans (m≤n+m (sum (map f xs)) (f x)) h))
 
--- the width axis's counterpart of sum-tabulate-lb: a summand never
+-- the width axis's counterpart of `fᵢ≤sum-tab` (.Measures): a summand never
 -- exceeds the ⊔-collect, over the same tabulated index
 slotsPWgo-tab : ∀ {n m} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ)
   (f : Fin m → Fin n) (i : Fin m) →
@@ -924,7 +918,7 @@ slotsCaps?-bound : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) →
 slotsCaps?-bound {n = n} B W sl h hw hi =
   slotsGo?-bound B W sl (tabulate {n = n} (λ i → i))
     (λ i → slotCaps?-widen sl (sl i)
-             (≤-trans (sum-tabulate-lb (λ k → slotSize (sl k)) i) h)
+             (≤-trans (fᵢ≤sum-tab (λ k → slotSize (sl k)) i) h)
              (⊔-lub (≤-trans (slotsPW-lb n sl i) hw)
                     (≤-trans (slotsIW-lb n sl i) hi))
              (slotCaps?-self sl (sl i)))

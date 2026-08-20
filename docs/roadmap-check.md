@@ -5,18 +5,43 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Four checks
+## Five checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
    nearest.
 2. **Coverage** — every live postulate in `agda/src` is named by some row. A branch of
    the proof cannot hide from the roadmap.
-3. **Row budget** — each row's PROSE is within `ROW_BUDGET` characters (names are
+3. **Staleness** — coverage run BACKWARDS: no row head names a postulate that is no
+   longer live. This is the direction that has actually bitten — the two rows in the
+   paragraph above.
+4. **Row budget** — each row's PROSE is within `ROW_BUDGET` characters (names are
    free). Research belongs in the postulate's own source header, where it sits in front
    of the next person to pick the row up; a roadmap row is a hook.
-4. **No calendar dates** — anywhere in PROOF-STATE.md, and anywhere in the files listed
+5. **No calendar dates** — anywhere in PROOF-STATE.md, and anywhere in the files listed
    in `DATE_ONLY_FILES` (CLAUDE.md and `docs/*.md`), which get this check only.
+
+## Why staleness is checked over ROW HEADS and not every name
+
+The roadmap CITES far more names than it CLAIMS, and it must: a row earns GRINDABLE by
+naming the proven twin that makes it mechanical, so its prose is full of definitions,
+record fields and module names that are legitimately not postulates. A reverse check
+over every backticked token would fire on all of them.
+
+So the head's own syntax says which kind it is. A head that is **nothing but names** —
+backticks and separators — CLAIMS them, and each must be a live postulate. A head
+carrying **prose** ("`X`'s residue", "the `glob-*` family") names a PARENT, so its
+names need only still exist in `agda/src`; that is the failure a descriptive head can
+have. A claim head's dead names are split by what became of them, because the repair
+differs: still declared in `agda/src` means DISCHARGED, absent means deleted or
+misspelled.
+
+**The boundary, and it is a real gap.** A family row schedules its siblings in the
+HOOK, and a sibling discharged out from under such a row is NOT caught. It cannot be
+without marking claims apart from citations in the prose, and the coverage check needs
+those hook names to keep counting — narrowing the forward token set to heads would
+leave dozens of live postulates unscheduled. **The way to bring a name under this check
+is to give it a head of its own.**
 
 ## Why the date check covers two kinds of file
 
@@ -39,7 +64,10 @@ since, so its age is a signal about the evidence.
 Also in the gate. It pins every check against fixtures under
 `scripts/roadmap-selftest/`, including a **rowless** rules-file fixture — so the date
 scan is proven to fire on a file the row parser cannot read, which is exactly
-CLAUDE.md's shape.
+CLAUDE.md's shape — and a **stale** fixture exercising all three arms of the staleness
+check, beside a clean fixture whose rows deliberately cite a proven precedent and carry
+a descriptive head, so the two exemptions are pinned as load-bearing rather than
+assumed.
 
 ## The hygiene rules a machine cannot check
 

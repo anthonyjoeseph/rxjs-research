@@ -21,8 +21,17 @@ diagnoses, each off by up to ~50×.** Attribute whole-module passes with
 `--profile=internal` on a genuinely dirty module; `--profile=definitions` files them
 under "Miscellaneous".
 
-**The splits are DONE and the question is CLOSED:** Caps-Face and Wet are both split,
-and Wet/Part2's remaining block is irreducible.
+**The POSITIVITY splits are DONE and that question is CLOSED:** Caps-Face and Wet are
+both split, and Wet/Part2's remaining block is irreducible.
+
+**A separate axis reopens splitting for a different reason, and it is not this one.** A
+block member in NO cycle cannot be stubbed by the dev loop, so it is re-proved on every
+focused check of every other member — a per-member cost that has nothing to do with
+positivity, term size, or the gate. That is what split Walk-Level into its statement
+vocabulary, its lemma shelf, its arms and its dispatch. Do not read that split as
+evidence about the positivity question, and do not read the closed positivity question
+as a reason not to make that kind of split.
+→ [docs/agda-dev.md](docs/agda-dev.md)
 
 ## But run `--list` before believing any of the above
 

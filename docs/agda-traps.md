@@ -48,3 +48,16 @@ error message actively misdirects. Read the entry before reasoning from the erro
   binds the equation and adds no `with` nesting level. Where the proof and the lookup
   can share ONE `with`, prefer that — refining the lookup then refines the proof's type
   and the equation is not needed at all.
+
+- **A CONTEXT-INDEXED CONSTRUCTOR ALIAS IN A `where` TYPE LEAVES `Γ` UNSOLVABLE, AND
+  THE META IS REPORTED AT ITS CONSUMER.** `inputᶜ : ∀ {n} {Γ : Ctx n} (i : Fin n) →
+  Exp Γ … (lookup Γ i)` mentions `Γ` only in its RESULT, so `hopDᵉ V (slotHop V sl)
+  (inputᶜ i)` cannot solve it: `Fin n` does not carry `Γ`, and `slotHop`'s result type
+  (`Fin n → ℕ`) has already forgotten it. In the enclosing STATEMENT the same term is
+  fine, because a telescope variable of type `Closed Γ …` pins it — so the trap only
+  appears when a `where` binding re-spells the statement's own term. Agda blames the
+  outer application (`hopDᵉ`, `syncSizeᵉ`), never the alias, and the clause head that
+  would supply `Γ` typically binds `{n = n}` and stops. Bind `{Γ = Γ}` in the clause
+  head and write `inputᶜ {Γ = Γ} i`. The general form: **when an unsolved meta is
+  reported at a function whose own arguments look fully determined, look for an argument
+  whose type variable appears in ITS result only.**

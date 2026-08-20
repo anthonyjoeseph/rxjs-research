@@ -14,7 +14,10 @@
 - **`fam-{alpha,beta}`** — DIFFICULTY: brace expansion counts as naming both.
 - **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY: a leading-dash suffix after a
   sibling in the same row counts as naming `suf-nodry-nestRec`.
-- **`f-grindable`** — GRINDABLE.
+- **`f-grindable`** — GRINDABLE: mechanical because the PROVEN twin
+  `a-proven-citation` did the same thing at the same indices. A name CITED in a
+  hook is not a name the row claims, so the staleness check must NOT fire on it
+  — earning GRINDABLE requires naming a precedent, and a precedent is proven.
 - **the `glob-*` family** — GRINDABLE: a glob covers the family it names.
 - **`g-unclassified`** — carried, not counted.
 - **`names-are-free-one` / `names-are-free-two` / `names-are-free-three` /
@@ -23,3 +26,5 @@
   GRINDABLE: nine names, well past the budget in raw characters, but the prose
   is a hook, so the length check must NOT fire. Shortening a row is never done
   by dropping a name.
+- **`nonpostulate-parent`'s residue** — GRINDABLE: a head carrying prose names a
+  PARENT, so a name declared in agda/src that is not a postulate must pass.

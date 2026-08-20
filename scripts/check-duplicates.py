@@ -95,6 +95,26 @@ BINDER = re.compile(r"[{(]\s*([^:{}()]+?)\s*:")
 BARE = re.compile(r"∀\s+([^→(){}:]+?)\s*→")
 # An annotated binder group, innermost-first so nesting unwinds by
 # iteration: `(p : A → Bool)` ↦ `p`, `{Γ : Ctx n}` ↦ `Γ`.
+# An UNANNOTATED IMPLICIT binder group — `{n}`, `{t}`, `{s u}`.  It has
+# no `:`, so BINDER never sees it, and no `→` closes it, so BARE never
+# sees it either: `∀ {n} {Γ : Ctx n}` left that `n` un-renamed, and two
+# statements differing ONLY in that letter normalised to different keys.
+# `∀ {n} {Γ : Ctx n}` opens most statements in this development, so the
+# blind spot covered very nearly every pair in the tree — it let
+# `sum-tabulate-lb` and `fᵢ≤sum-tab`, the same fact with the same proof
+# and the same clause structure, sit in two modules of one import chain.
+# `alpha`'s docstring had CLAIMED this case for months.
+#
+# ⚠ THE PREFIX AND THE LOOKAHEAD ARE BOTH LOAD-BEARING, and dropping
+# either is silent.  A binder group is preceded by `∀` or by another
+# group's closer, while an implicit ARGUMENT is preceded by the thing it
+# is applied to — that prefix is the only thing separating them, since
+# by shape they are identical.  And the closing brace must be matched by
+# LOOKAHEAD rather than consumed: consuming it eats the prefix of the
+# NEXT group, so a run like `{n} {t} {u}` would report only its first
+# and last.  Python allows no variable-width lookbehind, which is why
+# the prefix is consumed and the suffix is not.
+IMPL = re.compile(r"(?:∀|[)}])\s*\{\s*([^\s:{}()=,→][^:{}()=,→]*?)\s*(?=\})")
 ANNOT = re.compile(r"[({]\s*([^:{}()]+?)\s*:\s*[^{}()]*?\s*[)}]")
 # An ATOMIC type synonym — `Id = ℕ`, `RegId = ℕ`.  Expanding these is
 # sound (it is a definitional equality) and it closes a third way one
@@ -190,7 +210,7 @@ def alpha(ty):
     """Canonicalise bound-variable names in order of first appearance, so
     `∀ {m} (f : Fin m → ℕ) …` and `∀ {n} (f : Fin n → ℕ) …` agree."""
     names = []
-    for group in BARE.findall(ty) + BINDER.findall(ty):
+    for group in BARE.findall(ty) + BINDER.findall(ty) + IMPL.findall(ty):
         for nm in group.split():
             if nm not in names and re.match(r"^[A-Za-zÀ-￿][^\s]*$", nm):
                 names.append(nm)

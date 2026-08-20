@@ -140,10 +140,6 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`sharedConnect-inner-wet`** (Walk-Level) — DIFFICULTY: the parent is now a
-  real body, so this owes one `wl` instantiation at the slot's stored def,
-  reporting its own level. The caps twin discharges that telescope's caps
-  half; the wet half has no precedent.
 - **`concatDrain-nodry-nestBud`** (Burst-Walk) — DIFFICULTY: its Σ pins the
   witness with the ceiling conjunct, mirroring the thru twin, so the obligation
   is real and not upward-closed.

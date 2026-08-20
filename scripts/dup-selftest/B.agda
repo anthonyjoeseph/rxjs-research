@@ -13,6 +13,9 @@ annotated-binder : ∀ (X : ℕ) → 3 * X ≡ X + X + X
 -- MUST FIRE (up-to-binder): implicit here, explicit in A
 implicit-binder : ∀ {m n : ℕ} → m ≤ n → (m ≤ᵇ n) ≡ true
 
+-- MUST FIRE (exact): unannotated implicit, `{m}` against A's `{n}`
+implicit-unannotated-b : ∀ {m} (f : Fin m → ℕ) (i : Fin m) → f i ≤ sum (tabulate f)
+
 -- MUST FIRE (exact, after synonym expansion): ℕ here, Id in A
 synonym-rhs : ∀ (i : ℕ) → i + 0 ≡ i
 

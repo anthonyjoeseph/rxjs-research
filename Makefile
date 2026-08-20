@@ -280,21 +280,23 @@ dup-check:
 # found by hand, not by the check failing.  The MUST-NOT rows are the
 # regressions — an operator pair the binder regex used to rename away, record
 # fields that a multi-line record header spilled into the scan, where-locals,
-# and the mandated -go alias.  The MUST-FIRE rows cover all three ways one
-# fact wears two types: differing names, ONE name in two modules (which Agda
-# does not catch when either copy is private), and binder spelling.
+# and the mandated -go alias.  The MUST-FIRE rows cover every way one fact
+# wears two types: differing names, ONE name in two modules (which Agda does
+# not catch when either copy is private), binder spelling, and an UNANNOTATED
+# IMPLICIT binder's letter -- the last of which escaped the check itself, in
+# the `∀ {n} {Γ : Ctx n}` opening that most statements in this tree share.
 dup-selftest:
 	@out=$$(scripts/check-duplicates.py --src scripts/dup-selftest 2>&1); \
 	  fail=0; \
-	  echo "$$out" | grep -q "3 exact + 2 up-to-binder" \
-	    || { echo "SELFTEST FAIL: expected 3 exact + 2 up-to-binder groups"; fail=1; }; \
-	  for n in twin-different-name shared-name annotated-binder implicit-binder synonym-rhs; do \
+	  echo "$$out" | grep -q "4 exact + 2 up-to-binder" \
+	    || { echo "SELFTEST FAIL: expected 4 exact + 2 up-to-binder groups"; fail=1; }; \
+	  for n in twin-different-name shared-name annotated-binder implicit-binder synonym-rhs implicit-unannotated-a implicit-unannotated-b; do \
 	    echo "$$out" | grep -q "$$n" || { echo "SELFTEST FAIL: $$n not reported — a real duplicate stopped firing"; fail=1; }; \
 	  done; \
 	  for n in op-and op-or sealed fld-a fld-b helper outer; do \
 	    echo "$$out" | grep -q "$$n" && { echo "SELFTEST FAIL: $$n reported, but it is not a duplicate"; fail=1; }; \
 	  done; \
-	  if [ $$fail -eq 0 ]; then echo "dup-selftest: PASS (fires on differing names, on one name in two modules, and on binder spelling; not on operators, record fields, where-locals or the -go alias)"; \
+	  if [ $$fail -eq 0 ]; then echo "dup-selftest: PASS (fires on differing names, on one name in two modules, on binder spelling and on an unannotated implicit's letter; not on operators, record fields, where-locals or the -go alias)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SEARCH FIRST, made cheap and impossible to scope wrong: search the declared
@@ -349,7 +351,7 @@ roadmap-check:
 roadmap-selftest:
 	@fail=0; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt > /dev/null \
+	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null \
 	    || { echo "SELFTEST FAIL: a correctly sorted, fully covered roadmap was rejected"; fail=1; }; \
 	  out=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md > /dev/null 2>&1; then \
@@ -362,9 +364,9 @@ roadmap-selftest:
 	  echo "$$out" | grep -q "a-grindable is" \
 	    && { echo "SELFTEST FAIL: the row a violation sits below was itself reported"; fail=1; }; \
 	  gap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger-gap.txt 2>&1); \
+	           --ledger scripts/roadmap-selftest/ledger-gap.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	       --ledger scripts/roadmap-selftest/ledger-gap.txt > /dev/null 2>&1; then \
+	       --ledger scripts/roadmap-selftest/ledger-gap.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: an unscheduled postulate PASSED — the coverage check is dead"; fail=1; \
 	  fi; \
 	  echo "$$gap" | grep -q never-scheduled \
@@ -384,7 +386,7 @@ roadmap-selftest:
 	  echo "$$out" | grep -q "OVER BUDGET" \
 	    && { echo "SELFTEST FAIL: the length check fired on the sort fixture"; fail=1; }; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt 2>&1 \
+	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1 \
 	    | grep -q names-are-free \
 	    && { echo "SELFTEST FAIL: a nine-name row was charged for its names — shortening a row would mean dropping a name"; fail=1; }; \
 	  dat=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/dated.md 2>&1); \
@@ -400,19 +402,38 @@ roadmap-selftest:
 	  echo "$$out" | grep -q "DATED NARRATIVE" \
 	    && { echo "SELFTEST FAIL: the date check fired on the sort fixture"; fail=1; }; \
 	  rul=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt \
+	           --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt \
 	           --dates-only scripts/roadmap-selftest/dated-rules.md 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt \
+	       --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt \
 	       --dates-only scripts/roadmap-selftest/dated-rules.md > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a dated RULES file PASSED beside a clean roadmap — the CLAUDE.md half of the date check is dead"; fail=1; \
 	  fi; \
 	  echo "$$rul" | grep -q "dated-rules.md:" \
 	    || { echo "SELFTEST FAIL: the rules file was not named in the date report — a rowless file is being skipped"; fail=1; }; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt \
+	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt \
 	      --dates-only /dev/null > /dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a dateless extra file was rejected"; fail=1; }; \
+	  stl=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/stale.md \
+	           --ledger scripts/roadmap-selftest/ledger-stale.txt \
+	           --src-names scripts/roadmap-selftest/src-names-stale.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/stale.md \
+	       --ledger scripts/roadmap-selftest/ledger-stale.txt \
+	       --src-names scripts/roadmap-selftest/src-names-stale.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a roadmap naming discharged postulates PASSED — the staleness check is dead"; fail=1; \
+	  fi; \
+	  for n in b-discharged c-vanished d-gone-parent; do \
+	    echo "$$stl" | grep -q "$$n" \
+	      || { echo "SELFTEST FAIL: $$n not reported — one arm of the staleness check stopped firing"; fail=1; }; \
+	  done; \
+	  echo "$$stl" | grep -q "a-live" \
+	    && { echo "SELFTEST FAIL: a still-live postulate was reported stale"; fail=1; }; \
+	  cln=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  echo "$$cln" | grep -q "STALE ROWS" \
+	    && { echo "SELFTEST FAIL: the staleness check fired on a clean roadmap — a CITED precedent or a descriptive head is being read as a claim, and earning GRINDABLE requires naming a proven precedent"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 gate:
