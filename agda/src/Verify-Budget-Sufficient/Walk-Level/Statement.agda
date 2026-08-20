@@ -67,7 +67,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 subscribeAll; AllOp;
                                 mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
                                 NodeState; merge-st; concat-st;
-                                switch-st; exhaust-st; scan-st; take-st; scan-f;
+                                switch-st; exhaust-st; scan-st; take-st;
+                                scan-f; take-f;
                                 splitBurst; hasDry; dryEvent;
                                 burstCompleted; sharedPlumb; dropSource;
                                 sched-init; st-init; budgetAt; slotsSize;
@@ -1154,38 +1155,50 @@ postulate
   -- block calls load-bearing — PROBED, not proven.
   walk-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s) → WalkStmt {e = e} (mapᵉ f b)
-  -- node install — GRINDABLE, and the EASIEST of the three chain frames,
-  -- which is not what the ordering here suggests.  take-f transforms no
-  -- value and `hopDᵉ (takeᵉ c e) = hopDᵉ e` is the identity, so the hop
-  -- ledger passes through and NO emit lemma is owed; the size axis is
-  -- likewise unmoved.  Two clauses: `evalTm cnt ≡ zero` is `oneShotBurst
-  -- []`, i.e. walk-empty exactly, and `suc k` is mintNode + installNode +
-  -- recurse + push, with INV?-install (below, PROVEN) for the install.
-  -- Still needs take-f's own push face, per the family note.
+  -- THE PER-EMIT WET STEP AT take-f — the take clause's ONLY remaining
+  -- leaf, and the whole of it.  `stepFrame … (take-f nid) …` is
+  -- `takeDispatch` over the node lookup (Rx.Evaluator): the non-cut arm
+  -- passes the budgeted prefix and rewrites the node's remaining count,
+  -- the cut arm exhausts it, forces `complete` and severs the registry
+  -- through `cutThrough`.  Neither arm subscribes anything, which is why
+  -- this face carries no caps level, no gas and no depth: B is FIXED
+  -- across it, and the four caps conjuncts of the clause come off the
+  -- frame-generic `pushBurst-caps` instead.
   --
-  -- ⚠ CLASS: DIFFICULTY (2026-08-20), on the `suc k` clause; the FALSITY
-  -- raised earlier the same day is WITHDRAWN for the reason given in
-  -- walk-map's header — the chain frames peel no gas (Evaluator:1440-51:
-  -- the `suc k` arm passes `fuel` to both the recursive subscribe and the
-  -- push, and the `zero` arm never subscribes), so series Q's gas
-  -- exhaustion cannot be sited here.  What survives from that note is
-  -- still true and still the point: "a cheap axis is not a cheap row" —
-  -- the hop axis being the identity does not author take-f's push face.
-  --
-  -- THE `zero` ARM IS DISCHARGED (2026-08-20) — `walk-take-zero` below is a
-  -- real body over walk-empty, and `walk-take` is the dispatcher, so the
-  -- split is landed rather than described.  What that arm cost, for the
-  -- next split of this shape: three transports were `z≤n` outright (dWⱽ,
-  -- depthE and fnCapᵉ are all 0 at emptyᵉ), the two size axes were `≤-trans`
-  -- against a `suc`, and the only new algebra was dBound-mono-rs.
-  -- ONLY THE `suc k` ARM IS A LEAF NOW (2026-08-20).  `walk-take` itself
-  -- is a real body below, dispatching on `evalTm cnt`; the `zero` arm is
-  -- PROVEN there from walk-empty.  So this leaf carries the arm that
-  -- actually recurses and pushes, and its residue is exactly take-f's
-  -- unauthored push face — nothing else.
-  walk-take-suc : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (k : ℕ) →
-    evalTm cnt ≡ suc k → WalkStmt {e = e} (takeᵉ cnt b)
+  -- ⚠ CLASS: DIFFICULTY, and it is the only thing left of what was
+  -- walk-take-suc: the burst induction over it (`pushTake-wet`) and the
+  -- clause assembly (`walk-take-suc`) are both real bodies now.  Every
+  -- conjunct has a named route and the routes are the content:
+  --   INV?      cut arm is INV?-switchKill's shape plus one setNode of
+  --             `take-st zero`, whose two node bounds are `true` outright
+  --   valB?     takeVals-B (.Wet/Part1), a prefix
+  --   hop       the SAME prefix fact at hopDev? — the fifth copy of
+  --             takeVals-{caps,B,Ψ,Ω}, so state it GENERICALLY over an
+  --             `all P` and let the four spend it, per the one-convention
+  --             -per-class rule; do not add a fifth bespoke lemma
+  --   nodry     cutThrough-closes-nodry (below, PROVEN) — the cut's
+  --             closes carry cut/cutPending reasons, never `dried`
+  --   regsLen?  all-cutThrough (below, PROVEN) at the pathLen test, i.e.
+  --             switchKill-regsLen's body at take's own nid
+  -- What is NOT mechanical is the case tree: `takeDispatch` scrutinises a
+  -- node lookup that no hypothesis pins, so the mismatch arm has to be
+  -- discharged from its own reduction rather than from the invariant.
+  stepTake-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (Ψ B F ℓ r̂ : ℕ) (η : Fin n → ℕ) (g : Gas) (bid : Id) (now : Tick)
+    (nid : NodeId) (κ : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    INV? Ψ B sched st ≡ true →
+    pathB? B Ψ κ ≡ true →
+    all (valB? B Ψ s) vals ≡ true →
+    all (λ v → hopDᵛ F η s v ≤ᵇ r̂) vals ≡ true →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = stepFrame g bid now (take-f nid) κ vals fin sched st
+    in (INV? Ψ B (proj₁ (proj₂ (proj₂ (proj₂ r))))
+              (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+     × (all (valB? B Ψ s) (proj₁ r) ≡ true)
+     × (all (λ v → hopDᵛ F η s v ≤ᵇ r̂) (proj₁ r) ≡ true)
+     × (any dryEvent (proj₁ (proj₂ r)) ≡ false)
+     × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
   -- the eight OTHER conjuncts of the scan clause — DIFFICULTY, and it is
   -- walk-map's census verbatim at this shape.
   --
