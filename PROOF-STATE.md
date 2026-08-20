@@ -91,14 +91,15 @@ verification ("derived by reading the evaluator and the measures, NOT by
 typechecking — treat each named ingredient as located, not spent"), so every
 row governed by it inherits that caveat.
 
-- **`sharedConnect-walk`** (Walk-Level) — SHAPE, so restate rather than grind:
-  the telescope is missing `memberSource (toℕ i) (connectedShares st) ≡ false`,
-  without which its own named ingredients `share-step` and `unconn-insert` do
-  not apply and `dBound-connect`'s descent cannot fund the recursive call.
-  FALSITY suspected on `hasDry` (sharedConnect does not re-check membership and
-  `sharedPlumb` preserves a dried close) — unconfirmed. The repair is at the
-  consumer's bare `with`, which discards the equation that `in` would keep. No
-  longer blocked on `slotHop-cap`/`hopD-relᵉ`.
+- **`sharedConnect-walk`** (Walk-Level) — DIFFICULTY. RESTATED 2026-08-20 with
+  the freshness premise `memberSource (toℕ i) (connectedShares st) ≡ false`,
+  which is a precondition of the operation (`subscribeSharedSlot` reaches
+  `sharedConnect` only on that branch), not a convenience. That makes
+  `share-step` and `unconn-insert` applicable and funds `dBound-connect`'s
+  descent, and it retires the `hasDry` FALSITY suspicion, which was about an
+  already-connected share. What remains is the transport, where the genuinely
+  new lemmas live and where `dropSource` is still argued in prose — hence
+  DIFFICULTY rather than GRINDABLE.
 - **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
   the one conjunct of arm B not closed by computation. Its header carries the
   refutation that fixed its shape (false at `j′ = 0` without the caps receipt)

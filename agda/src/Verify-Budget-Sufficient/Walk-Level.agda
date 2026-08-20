@@ -3020,11 +3020,16 @@ postulate
   --        · the prepend carries NO values (init, close), so burstB? and
   --          burstHopD? see it by computation, and hasDry likewise —
   --          `dried` is not among the events prepended.
-  --        · burstHopD? is stated here at `suc (hopDᵉ F η b)`, one MORE
-  --          than the scripted side, and that suc is the share edge.  It is
-  --          free: `hopDᵉ F η (input i) = η i = slotHop F sl i`, which
-  --          slotHop-fix equates to the def's own hop, so d's values land
-  --          under the bound with the suc unspent.
+  --        · burstHopD? — ⚠ THIS LINE WAS STALE (corrected 2026-08-20).  It
+  --          claimed the conjunct is stated at `suc (hopDᵉ F η b)`, "one MORE
+  --          than the scripted side", with "the suc unspent".  The
+  --          declaration below has NO suc: it reads `burstHopD? F (slotHop F
+  --          sl) (hopDᵉ F (slotHop F sl) b)`.  So the slack the route was
+  --          counting on does not exist and must not be budgeted for.  The
+  --          tight form still looks reachable by the same argument —
+  --          `hopDᵉ F η (input i) = η i = slotHop F sl i`, which PROVEN
+  --          slotHop-fix equates to the def's own hop — but at equality
+  --          rather than with a spare unit.
   --        · regsLen? is PROVEN register-regsLen at st₁, then the inner
   --          conjunct, then a `dropSource` step — and dropSource only
   --          REMOVES entries, so it preserves an `all` outright.
@@ -3042,6 +3047,23 @@ postulate
     (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     b ≡ inputᶜ i →
+    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- OPERATION rather than a convenience of today's caller — which is
+    -- what makes this a restatement of a true theorem and not a
+    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
+    -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
+    -- operation on an already-connected share; the unconditioned
+    -- statement was about a case that does not occur.
+    --
+    -- Without it two of this row's own named ingredients do not apply:
+    -- `share-step` (.Caps-Nest) and `unconn-insert` (.Measures) each take
+    -- this equation as a premise, and no route avoids them, because
+    -- `residAt sl cs i` is `if memberSource (toℕ i) cs then 0 else
+    -- syncSizeᵉ d` — a connected slot donates ZERO, leaving `nest d sl
+    -- (i ∷ cs) ≤ bud-1` unreachable and `dBound-connect`'s `U′ < U`
+    -- unavailable, so the single recursive `wl` call cannot be funded.
+    memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
     2 ≤ Caps.cSize c →
     1 ≤ Caps.cReg c →
     Caps.cReg c ≤ Caps.cSize c →
@@ -3186,7 +3208,7 @@ input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now 
 ...  | true =
     INV?-widen sched st (proj₁ (frameStep-mono-j c 2≤S (m≤m+n j j′))) invW
   , refl , refl , refl , rgs
-...  | false with memberSource (toℕ i) (EvalSt.connectedShares st)
+...  | false with memberSource (toℕ i) (EvalSt.connectedShares st) in eqM
 -- ARM B — the live share joins mid-flight: one `init`, and a registration.
 ...    | true =
     shared-live-INV c Ψ j j′ (toℕ i) κ sched st 2≤S hCR cOK′ invW pB
@@ -3200,7 +3222,11 @@ input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now 
     -- as its LAST argument, so the with-abstraction of the scrutinee has
     -- already carried this hypothesis' type to depthConn at d′.  That is
     -- the whole reason the leaf is stated at depthConn.
-    sched st d′ slotEq2 refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt
+    -- eqM is ARM C's own scrutinee equation, kept by `with … in eqM`
+    -- above.  It IS the freshness premise the leaf now takes, and it is
+    -- free here precisely because this arm is the not-yet-connected
+    -- branch — the same branch `subscribeSharedSlot` guards on.
+    sched st d′ slotEq2 refl eqM 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt
     invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
 
 postulate
