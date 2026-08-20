@@ -122,7 +122,8 @@ open import Verify-Budget-Sufficient.Delivery-Walk
          opIterD-infl; capsAt-base-size; 6≤capsAt-size; tower-3; capsAt-tower)
 
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthFrame; depthWalk; depthCascade; depthInner; depthFin; depthE; depthDrain)
+  using (depthFrame; depthWalk; depthConsume; depthCascade; depthInner; depthFin;
+         depthE; depthDrain)
 
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; nest-keeps)
 
@@ -139,6 +140,11 @@ open import Verify-Budget-Sufficient.Keeps-Ring
 -- is what took the per-element ceiling off an unstated fLvlD inequality.
 open import Verify-Budget-Sufficient.Caps-Chain using (walk-desc; inner-desc)
 open import Verify-Budget-Sufficient.Caps using (sIterD-mono; sizeAt-mono)
+
+-- THE CAPS FACE'S OWN thruConsume STEP, PROVEN.  It carries the level the
+-- step lands at and the caps invariant there; the nodry walk's loop
+-- invariant is that plus the Ψ half, which this module proves itself.
+open import Verify-Budget-Sufficient.Subscribe-Face using (thruConsume-caps)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face
@@ -675,6 +681,30 @@ regP?-Ψ c Ψ J (r ∷ rs) h
                                   (proj₂ (proj₂ (proj₂ r))))
                          (pathBΨ? Ψ (proj₂ (proj₂ (proj₂ r)))) hd))
           (regP?-Ψ c Ψ J rs tl)
+
+-- AND BACK.  `PbB` is a size half and a Ψ half, `regsSz?` IS `regP?` of the
+-- size half, so the ledger recombines entrywise.  Spent where the two halves
+-- are re-established by DIFFERENT faces — caps proves the size side at the
+-- new level, this module's Ψ pass proves the other — and neither hands back
+-- the conjunction.
+regP?-of-parts : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (Ψ J : ℕ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regsSz? (Caps.cSize (frameStep J c)) rs ≡ true →
+  regP? (λ {v} p → pathBΨ? Ψ p) rs ≡ true →
+  regP? (PbB c Ψ J) rs ≡ true
+regP?-of-parts c Ψ J []       hs hΨ = refl
+regP?-of-parts c Ψ J (r ∷ rs) hs hΨ =
+  ∧-intro (∧-intro (proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κᵣ)
+                                  (regsSz? (Caps.cSize (frameStep J c)) rs) hs))
+                   (proj₁ (∧-true (pathBΨ? Ψ κᵣ)
+                                  (regP? (λ {v} p → pathBΨ? Ψ p) rs) hΨ)))
+          (regP?-of-parts c Ψ J rs
+             (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κᵣ)
+                            (regsSz? (Caps.cSize (frameStep J c)) rs) hs))
+             (proj₂ (∧-true (pathBΨ? Ψ κᵣ)
+                            (regP? (λ {v} p → pathBΨ? Ψ p) rs) hΨ)))
+  where
+  κᵣ = proj₂ (proj₂ (proj₂ r))
 
 map-Ψ : ∀ {n} {Γ : Ctx n} {s u} (Ψ : ℕ) (fn : Fn Γ [] [] [] s u)
   (vs : List (Val Γ s)) →
@@ -2454,65 +2484,6 @@ postulate
 
   -- ── thruOuter / thruWalk / thruConsume loop leaves ───────────────
 
-  -- Loop invariant after one thruConsume step: OKB + regP? at the level
-  -- the step LANDS at, with that level reported.
-  --
-  -- ⚠ REFUTED IN THE SAME-LEVEL FORM (2026-08-20) — `Refuted.Thru-Loop`,
-  -- and the witness computes: `capsOK?` on the post-state evaluates to
-  -- `false` while the conclusion demanded `true`.
-  --
-  -- WHY.  Concat's park clause is a pure GROWTH step: with the node's
-  -- inner already active, `thruConsume` appends the element to the node's
-  -- queue and emits nothing — which is exactly why the nodry conclusion
-  -- is `refl` there, and why nothing else in this block notices.  And
-  -- `capsOK?`'s width conjunct bounds that queue's LENGTH
-  -- (`widNode`'s `length q ≤ᵇ W`).  A queue sitting AT the cap is one
-  -- park from breaching it, and the refuted telescope said nothing about
-  -- the queue at all: CLAUDE.md's first almost-always-wrong shape.
-  --
-  -- IT WAS NOT A ZERO-CAP ARTIFACT: the refutation's caps are read off the
-  -- value (cSize 3, cWid 2, both pinned by `refl`), every other conjunct
-  -- held with margin, and the only tight one was the length.  Threading
-  -- `vb : VbB c sl Ψ J vals` would NOT have repaired it either: VbB bounds
-  -- each element, never the queue's length.
-  --
-  -- THE REPAIR IS A REPORTED LEVEL, NOT A HYPOTHESIS — conditioning on the
-  -- queue would be the "call site happens to supply it" trade, since the
-  -- walk's SECOND element cannot supply it: the FIRST is what filled the
-  -- queue.  So the step reports the level it lands at, and the walk above
-  -- re-reads its ledgers there.
-  --
-  -- AND THE REPORTED CEILING IS `sLvlD`, NOT `fIterD`.  The first reading of
-  -- this defect took `pushThru-walk` for the mirror and so wrote the walk's
-  -- index as `fIterD` over `length str` — one whole FRAME per payload, which
-  -- is the wrong granularity and does not fit under the frame's own charge
-  -- (`fLvlD` is inflationary, so k frames cannot sit inside one).  The
-  -- mirror is `stepThru-walk`, which measures THIS traversal — a value list
-  -- inside one frame — against `sIterD S W dep (suc bud) (length vals) j`,
-  -- one `sLvlD` per payload.  Diffing the two mirrors' ARGUMENTS is what
-  -- separated them; their statements read alike.
-  --
-  -- IT WAS CLASSED GRINDABLE on the grounds that it is pure preservation,
-  -- hypothesis P at state₀ and conclusion P at state₁.  That reading is
-  -- the trap: preservation is only cheap when the step cannot grow the
-  -- thing preserved, and this step exists to grow it.  Shape-checking a
-  -- statement against `hypothesis ⇒ conclusion` says nothing about the
-  -- STEP in between.
-  thruConsume-nodry-loop : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ dep bud J : ℕ) (sf : Gas)
-    (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched₀ : Sched Γ) (st₀ : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched₀ st₀ →
-    regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
-    let r      = thruConsume sf op nid κ id now o sched₀ st₀
-        sched₁ = proj₁ (proj₂ (proj₂ r))
-        st₁    = proj₂ (proj₂ (proj₂ r))
-    in Σ ℕ (λ j′ →
-            OKB {e = e} c sl Ψ (J + j′) sched₁ st₁
-          × regP? (PbB c Ψ (J + j′)) (EvalSt.registry st₁) ≡ true
-          × (J + j′ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc J)))
-
   -- ── switch arm leaves ─────────────────────────────────────────────
 
   -- OKB + regP? after switchKill; needed by the switch arm's subscribeInner-nodry call.
@@ -2611,6 +2582,120 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
                  q sched₁ st₁ ok₁ pb sspLen (VbB-tail c sl Ψ J o q vbq) rg₁ gk cl
                  (≤-trans (m≤n⊔m _ _) hD)
   in any-dry-++ bs _ h-head h-tail
+
+-- Loop invariant after one thruConsume step: OKB + regP? at the level
+-- the step LANDS at, with that level reported.
+--
+-- ⚠ REFUTED IN THE SAME-LEVEL FORM (2026-08-20) — `Refuted.Thru-Loop`,
+-- and the witness computes: `capsOK?` on the post-state evaluates to
+-- `false` while the conclusion demanded `true`.
+--
+-- WHY.  Concat's park clause is a pure GROWTH step: with the node's
+-- inner already active, `thruConsume` appends the element to the node's
+-- queue and emits nothing — which is exactly why the nodry conclusion
+-- is `refl` there, and why nothing else in this block notices.  And
+-- `capsOK?`'s width conjunct bounds that queue's LENGTH
+-- (`widNode`'s `length q ≤ᵇ W`).  A queue sitting AT the cap is one
+-- park from breaching it, and the refuted telescope said nothing about
+-- the queue at all: CLAUDE.md's first almost-always-wrong shape.
+--
+-- IT WAS NOT A ZERO-CAP ARTIFACT: the refutation's caps are read off the
+-- value (cSize 3, cWid 2, both pinned by `refl`), every other conjunct
+-- held with margin, and the only tight one was the length.  Threading
+-- `vb : VbB c sl Ψ J vals` would NOT have repaired it either: VbB bounds
+-- each element, never the queue's length.
+--
+-- THE REPAIR IS A REPORTED LEVEL, NOT A HYPOTHESIS — conditioning on the
+-- queue would be the "call site happens to supply it" trade, since the
+-- walk's SECOND element cannot supply it: the FIRST is what filled the
+-- queue.  So the step reports the level it lands at, and the walk above
+-- re-reads its ledgers there.
+--
+-- AND THE REPORTED CEILING IS `sLvlD`, NOT `fIterD`.  The first reading of
+-- this defect took `pushThru-walk` for the mirror and so wrote the walk's
+-- index as `fIterD` over `length str` — one whole FRAME per payload, which
+-- is the wrong granularity and does not fit under the frame's own charge
+-- (`fLvlD` is inflationary, so k frames cannot sit inside one).  The
+-- mirror is `stepThru-walk`, which measures THIS traversal — a value list
+-- inside one frame — against `sIterD S W dep (suc bud) (length vals) j`,
+-- one `sLvlD` per payload.  Diffing the two mirrors' ARGUMENTS is what
+-- separated them; their statements read alike.
+--
+-- IT WAS CLASSED GRINDABLE on the grounds that it is pure preservation,
+-- hypothesis P at state₀ and conclusion P at state₁.  That reading is
+-- the trap: preservation is only cheap when the step cannot grow the
+-- thing preserved, and this step exists to grow it.  Shape-checking a
+-- statement against `hypothesis ⇒ conclusion` says nothing about the
+-- STEP in between.
+
+-- IT IS NO LONGER A POSTULATE.  `thruConsume-caps` (.Subscribe-Face) is this
+-- step's caps face, PROVEN, and it already reports the landing level in the
+-- `sLvlD` shape above; this module's own `thruConsume-Ψ` is the other half.
+-- What the postulate was missing was not a proof but the hypotheses the
+-- report actually needs: a level report cannot come out of OKB and regP?
+-- alone, since neither mentions the element, the bud or the depth fuel it is
+-- measured against.  Those arrive here, and the postulate goes away entirely
+-- rather than trading tracked debt for a signature.
+thruConsume-nodry-loop : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (Ψ dep bud J : ℕ) (sf : Gas)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u)) (os : List (Val Γ (obs u)))
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  OKB {e = e} c sl Ψ J sched₀ st₀ →
+  PbB c Ψ J κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
+  VbB c sl Ψ J (o ∷ os) ≡ true →
+  nest o sl (EvalSt.connectedShares st₀) ≤ bud →
+  depthConsume sf op nid κ id now o sched₀ st₀ ≤ dep →
+  regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
+  let r      = thruConsume sf op nid κ id now o sched₀ st₀
+      sched₁ = proj₁ (proj₂ (proj₂ r))
+      st₁    = proj₂ (proj₂ (proj₂ r))
+  in Σ ℕ (λ j′ →
+          OKB {e = e} c sl Ψ (J + j′) sched₁ st₁
+        × regP? (PbB c Ψ (J + j′)) (EvalSt.registry st₁) ≡ true
+        × (J + j′ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc J)))
+thruConsume-nodry-loop {u = u} c sl Ψ dep bud J sf op nid κ id now o os sched₀ st₀
+                       2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg =
+  j′
+  , ((slEq₁ , inv₁) , fc₁)
+  , regP?-of-parts c Ψ (J + j′) (EvalSt.registry st₁)
+      (capsOK?-regs (frameStep (J + j′) c) sched₁ st₁ inv₁) rg₁
+  , ≤-trans (n≤1+n (J + j′)) lvl
+  where
+  slEq  = proj₁ (proj₁ ok)
+  inv   = proj₂ (proj₁ ok)
+  fc    = proj₂ ok
+  -- ∧-true's two Bool sides are given EXPLICITLY throughout, per this
+  -- module's standing note: PbB, VbB and `all` on a cons all reduce to
+  -- conjunctions the unifier will not recover from the equation alone.
+  pb-sz = proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb)
+  pb-bΨ = proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb)
+  vb-c  = proj₁ (∧-true (valsCaps? (frameStep J c) sl (o ∷ os))
+                        (valsΨ? Ψ (o ∷ os)) vb)
+  vb-Ψ  = proj₂ (∧-true (valsCaps? (frameStep J c) sl (o ∷ os))
+                        (valsΨ? Ψ (o ∷ os)) vb)
+  oC    = proj₁ (∧-true (valCaps? (frameStep J c) sl (obs u) o)
+                        (all (valCaps? (frameStep J c) sl (obs u)) os)
+                        (valsOf (frameStep J c) sl (o ∷ os) vb-c))
+  oΨ    = proj₁ (∧-true (valΨ? Ψ (obs u) o) (all (valΨ? Ψ (obs u)) os) vb-Ψ)
+  TC    = thruConsume-caps c dep bud J sf op nid κ id now o sl sched₀ st₀
+            2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD
+  j′    = proj₁ TC
+  inv₁  = proj₁ (proj₂ TC)
+  lvl   = proj₂ (proj₂ (proj₂ (proj₂ TC)))
+  TΨ    = thruConsume-Ψ sl Ψ sf op nid κ id now o sched₀ st₀
+            slEq fc (regP?-Ψ c Ψ J (EvalSt.registry st₀) rg) oΨ pb-bΨ
+  slEq₁ = proj₁ TΨ
+  fc₁   = proj₁ (proj₂ TΨ)
+  rg₁   = proj₁ (proj₂ (proj₂ TΨ))
+  r      = thruConsume sf op nid κ id now o sched₀ st₀
+  sched₁ = proj₁ (proj₂ (proj₂ r))
+  st₁    = proj₂ (proj₂ (proj₂ r))
 
 ------------------------------------------------------------------
 -- thruConsume-nodry — per-element nodry proof for one thruConsume step.
@@ -2843,7 +2928,8 @@ thruWalk-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op
                        (≤-trans (walk-desc S W dep (suc bud) (length os) J) dsc)
       h-head = thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os
                  sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc₀
-      loop   = thruConsume-nodry-loop c sl Ψ dep bud J sf op nid κ id now o sched₀ st₀ ok rg
+      loop   = thruConsume-nodry-loop c sl Ψ dep bud J sf op nid κ id now o os sched₀ st₀
+                 2≤S 1≤R slC slSz ok pb sspLen vb nBst (≤-trans (m≤m⊔n _ _) hD) rg
       j₁     = proj₁ loop
       ok₁    = proj₁ (proj₂ loop)
       rg₁    = proj₁ (proj₂ (proj₂ loop))

@@ -140,11 +140,6 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`thruConsume-nodry-loop`** (Burst-Walk) — DIFFICULTY: RESTATED after
-  refutation, and it now reports the level the step lands at, one `sLvlD` per
-  payload. The whole `thruWalk` induction hangs off it. Header carries the
-  refutation, why the first `fIterD` reading was the wrong granularity, and
-  which mirror settled it.
 - **`concatDrain-nodry-nestBud`** (Burst-Walk) — DIFFICULTY: REFUTED as first
   stated, and restated. What is left is a tension between the Σ's two conjuncts
   over one shared bud. Its thru-side twin is gone — ceiling half threaded as a
