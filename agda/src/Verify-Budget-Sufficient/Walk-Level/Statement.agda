@@ -1242,6 +1242,30 @@ postulate
   -- identification, so no strengthening of the caps receipt reaches it,
   -- and the fresh-node induction named above stays owed.  Recorded here
   -- because the alignment is what makes the route look mechanical.
+  -- PROBED 2026-08-20 (.Scan-Node-Probe, a MODULE_ROOT under
+  -- `make bug-cache`): the node-table conjunct is COMPUTABLE — every symbol
+  -- in it is a real evaluator function — so it was instantiated at the
+  -- evaluator's own scan clause, with `sched`/`st` the initial pair a
+  -- top-level subscribe of `scanᵉ f z b` actually starts in and `nid`/`sched₁`
+  -- from `mintNode`.  Twelve rows, all green.  THE HYPOTHESIS SIDE IS NOT
+  -- PROBED and does not need to be: the conclusion evaluates without them.
+  --
+  -- WHAT THE ROWS COVER, and it reaches the region that matters.  A subscribe
+  -- can only endanger the conjunct by writing a node it did not mint, and
+  -- there are two ways that could happen: a nested frame's own push, and a
+  -- share connect fanning values out to chains the subscribe did not create.
+  -- Both are covered — nested scan, take-under-scan, and all four *All
+  -- operators for the first; a SHARED slot with two subscribers (in a merge
+  -- and in a concat) plus a bare shared input for the second, each pinning
+  -- `connectedShares` non-empty so the connect demonstrably happened.  Each
+  -- row also pins whether the source's subscribe left more than the scan's own
+  -- node behind, so the degenerate rows say so instead of passing as evidence.
+  --
+  -- WHAT IT DOES NOT COVER: `κ` is `root` at every row, so no path ending in
+  -- `share-sink` is exercised — reaching one needs a mid-run state, which is
+  -- the hand-built-state trap.  And a receipt at concrete programs is not a
+  -- theorem: this lowers nothing (the class was never FALSITY), it says the
+  -- grind is not chasing a false statement.
   walk-scan-source-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmtᴴˢᶠ {e = e} f z b

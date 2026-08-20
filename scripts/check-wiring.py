@@ -777,6 +777,8 @@ MODULE_ROOTS = {
                                               ()),
     "Verify-Well-Formed.Root-Probe": ("the root-exit coherence rows — checked by `make bug-cache`",
                                       ()),
+    "Verify-Budget-Sufficient.Scan-Node-Probe": ("the scan-node survival rows — checked by `make bug-cache`",
+                                                 ()),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

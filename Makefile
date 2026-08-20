@@ -202,6 +202,7 @@ bug-cache: stripped
 	@$(call AGDA_RUN,src/Implementation/Unit-Test.agda)
 	@$(call AGDA_RUN,src/Verify-Budget-Sufficient/Demand-Probe.agda)
 	@$(call AGDA_RUN,src/Verify-Well-Formed/Root-Probe.agda)
+	@$(call AGDA_RUN,src/Verify-Budget-Sufficient/Scan-Node-Probe.agda)
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
