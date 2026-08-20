@@ -121,12 +121,14 @@ row governed by it inherits that caveat.
   itself open, and its header records the search that came back empty. The
   claim that the caps face proves this "in the same position" is wrong in kind:
   `capsOK?` bounds all nodes and identifies none.
-- **`walk-scan-rest`** (Walk-Level) — FALSITY, per its own block header, which
-  rules `Class stays FALSITY` for `hasDry` and `regsLen?` — two of the eight
-  conjuncts this row must prove. Its proven twin covers only the caps half it
-  does not owe; the wet half's twin is the open `walk-map`. Additionally needs a
-  `scan-f` wet push face that does not exist and whose frame-generic form is
-  REFUTED.
+- **`walk-map` / `walk-take` / `walk-scan-rest`** (Walk-Level) — DIFFICULTY, the
+  FALSITY raise WITHDRAWN 2026-08-20: the chain frames pass `fuel` unchanged to
+  both the recursive subscribe and the push, so series Q's gas exhaustion cannot
+  be sited at any of the three, and that region is unreachable by measurement
+  anyway (compiled harness, 26 points, exponential in d·k). Residue is the
+  unauthored per-frame push face, whose frame-generic form is REFUTED at
+  `burstHopD?` — neither ruled-FALSITY conjunct. `walk-take`'s `zero` arm is an
+  assembly over `walk-empty` waiting to be written.
 - **`walk-defer-eight` / `walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in
   that order, and audited 2026-08-20. None recurses or pushes, so none needs a
   push face and none reaches the ledger conjuncts. `walk-defer-eight` is the
@@ -134,11 +136,6 @@ row governed by it inherits that caveat.
   so its fit gets typechecked rather than asserted. `walk-empty`'s residue is
   four definitional transports, not none. `walk-of`'s residue is smaller than
   its header claims.
-- **`walk-map` / `walk-take`** (Walk-Level) — FALSITY, reclassified for internal
-  consistency with `walk-scan-rest`: both sit at `WalkStmt`, whose nine
-  conjuncts are a superset of that row's eight, reach `hasDry`/`regsLen?`
-  through the same ledger, and need an equally non-existent per-frame push face.
-  `walk-take`'s `zero` clause alone is GRINDABLE.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the placement that
   blocked it is resolved (`regsB?-of-parts` now lives beside the Ψ predicates it
   consumes), so all six conjuncts have a named source in scope. Header carries

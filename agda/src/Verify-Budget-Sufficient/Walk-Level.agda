@@ -1018,6 +1018,41 @@ postulate
   -- program's entry bound is the question there), and share-path
   -- regsLen? coverage is vacuous (see P-S1) rather than real.
   --
+  -- ⚠ THIS RULING DOES NOT REACH THE CHAIN FRAMES (2026-08-20), and it
+  -- was read as if it did — walk-map, walk-take and walk-scan-rest were
+  -- all classed FALSITY by citing it.  Two independent reasons it cannot
+  -- carry them, and the first is decisive:
+  --
+  --   · THE CHAIN FRAMES PEEL NO GAS.  Evaluator:1436-1458: the mapᵉ,
+  --     takeᵉ-`suc k` and scanᵉ clauses each pass `fuel` UNCHANGED to
+  --     both the recursive `subscribeE` and the following `pushBurst`,
+  --     and takeᵉ-`zero` never subscribes at all.  The ONLY clauses that
+  --     consume gas are μᵉ (`subscribeE (gs fuel) (μᵉ …)`) and
+  --     subscribeAll/subscribeInner.  Series Q's mechanism IS gas
+  --     exhaustion — a static sum failing to dominate a runtime product
+  --     — so it cannot be sited at a clause that spends no gas.  What
+  --     these three owe on the hasDry/regsLen? axis is TRANSPORT across
+  --     one frame at the same fuel, not a demand argument.
+  --   · IT WOULD REFUTE THE PROVEN ROWS FIRST.  Series Q's own header
+  --     says a true row "REFUTES IT — not merely the hop-edge leaf but
+  --     WalkStmt itself".  Eight of walkFace's twelve clauses are REAL
+  --     BODIES at the full nine-conjunct WalkStmt, the four *All rows
+  --     among them, and those four are exactly the gas-peeling ones. A
+  --     risk shared with the proven rows cannot be what distinguishes
+  --     the open ones.
+  --
+  -- AND THE REGION IS UNREACHABLE BY MEASUREMENT, so this is not a
+  -- ruling awaiting evidence.  Measured 2026-08-20 in the compiled
+  -- harness at 26 points: cost is exponential in d·k with base 2.895,
+  -- putting the cheapest refuting row at ~2×10¹² years against a
+  -- practical ceiling of d·k ≈ 21.  The full curve and what it
+  -- supersedes are in series Q's header (.Demand-Probe).
+  --
+  -- The chain frames' real residue is the PER-FRAME PUSH FACE — the
+  -- DEAD ROUTE below, whose refutation is at `burstHopD?` and NOT at
+  -- either ruled-FALSITY conjunct — which is labour with a design
+  -- decision in it, i.e. DIFFICULTY.
+  --
   -- NOTE for the opIterD level bound at the degenerate corner:
   -- `opIterD` is the identity at m = 0 (`opIterD-0`, Evaluator:811)
   -- and `ops` sits in the m position — so `ops = 0` would pin j′ = 0.
@@ -1100,16 +1135,34 @@ postulate
   -- authored is map-f's OWN push face — see the family note above on why
   -- it cannot be shared — with pushThru-walk as the worked instance.
   --
-  -- ⚠ CLASS: FALSITY (2026-08-20), reclassified for INTERNAL CONSISTENCY
-  -- rather than on new evidence.  `walk-scan-rest` is classed FALSITY
-  -- because it must prove `hasDry` and `regsLen?` — the two conjuncts this
-  -- block's own header rules "Class stays FALSITY" — and needs a scan-f
-  -- push face that does not exist.  This row sits at `WalkStmt`, whose
-  -- NINE conjuncts are a strict SUPERSET of that row's eight (it adds
-  -- burstHopD?), reaches those same two through the same ledger (the
-  -- mutual walk at `b` under map-f, then the push), and needs an equally
-  -- non-existent map-f face.  Calling that row FALSITY and this one
-  -- GRINDABLE cannot both be right.
+  -- ⚠ CLASS: DIFFICULTY (2026-08-20).  It read GRINDABLE, was raised to
+  -- FALSITY earlier the same day "for INTERNAL CONSISTENCY rather than on
+  -- new evidence", and that raise is now WITHDRAWN on evidence.  The
+  -- consistency argument was sound as far as it went — this row and
+  -- walk-scan-rest do stand or fall together — but both were on the wrong
+  -- side of it, because the ruling they cited does not reach either.
+  --
+  -- THE GAS-PEEL FINDING, and it is the whole reason.  Evaluator:1436-38:
+  --
+  --     subscribeE fuel (mapᵉ f b) κ id now sched st =
+  --       let (burst , sched₁ , st₁) = subscribeE fuel b (map-f f ↠ κ) …
+  --       in pushBurst fuel id now (map-f f) κ burst sched₁ st₁
+  --
+  -- `fuel` goes to the recursive call and to `pushBurst` UNCHANGED.  The
+  -- chain frames spend no gas; only μᵉ and subscribeAll/subscribeInner
+  -- do.  The FALSITY on this family is series Q's, and series Q's
+  -- mechanism is gas exhaustion — a static sum (`sucG`) failing to
+  -- dominate a runtime product (d·k).  A clause that peels no gas is not
+  -- a place that mechanism can bite: `hasDry`/`regsLen?` here are a
+  -- TRANSPORT across one frame at the same fuel.  The block header above
+  -- carries the argument in full, including why series Q would refute the
+  -- four PROVEN *All rows before it touched this one.
+  --
+  -- So the floor this header already named is the actual class: two
+  -- unauthored per-frame push faces.  That is labour with a design
+  -- decision inside it (the output index each face is stated at), which
+  -- is DIFFICULTY, not GRINDABLE — no proven twin has corresponding
+  -- clauses, per the pushThru-walk note below.
   --
   -- And `pushThru-walk` is a worked instance at a DIFFERENT INDEX, not a
   -- twin whose clauses correspond: its hop conjunct is the identity
@@ -1135,20 +1188,46 @@ postulate
   -- recurse + push, with INV?-install (below, PROVEN) for the install.
   -- Still needs take-f's own push face, per the family note.
   --
-  -- ⚠ CLASS: FALSITY on the `suc k` CLAUSE (2026-08-20); the `zero` clause
-  -- alone is GRINDABLE, being walk-empty exactly.  "EASIEST of the three
-  -- chain frames" is defensible on the HOP axis only — it is true that
-  -- `hopDᵉ (takeᵉ c e) = hopDᵉ e` and that no emit lemma is owed — but
-  -- that does not touch either thing that decides the class: the `suc k`
-  -- clause recurses and pushes, so it reaches `hasDry`/`regsLen?` through
-  -- the same ledger as walk-map at the same nine conjuncts, and take-f's
-  -- own push face still has to be authored.  A cheap axis is not a cheap
-  -- row.
+  -- ⚠ CLASS: DIFFICULTY (2026-08-20), on the `suc k` clause; the FALSITY
+  -- raised earlier the same day is WITHDRAWN for the reason given in
+  -- walk-map's header — the chain frames peel no gas (Evaluator:1440-51:
+  -- the `suc k` arm passes `fuel` to both the recursive subscribe and the
+  -- push, and the `zero` arm never subscribes), so series Q's gas
+  -- exhaustion cannot be sited here.  What survives from that note is
+  -- still true and still the point: "a cheap axis is not a cheap row" —
+  -- the hop axis being the identity does not author take-f's push face.
+  --
+  -- THE `zero` ARM IS AN ASSEMBLY WAITING TO BE WRITTEN, and it is the
+  -- cheapest real progress available on this row.  `subscribeE fuel
+  -- (takeᵉ count b)` at `evalTm count ≡ zero` is
+  -- `let (burst , sched₁) = oneShotBurst [] id sched in burst , sched₁ , st`
+  -- (Evaluator:1441-44) — the SAME TERM, symbol for symbol, as the
+  -- emptyᵉ clause at Evaluator:1432-34.  So the arm is walk-empty's Σ at
+  -- a different `b`, and every hypothesis transports the easy way, since
+  -- each measure is SMALLER at emptyᵉ: sizeᵉ 1 ≤ suc (sizeᵗ c + sizeᵉ e),
+  -- syncSizeᵉ 1 likewise, hopDᵉ 0 ≤ hopDᵉ e (Exp:461-463, 514-516,
+  -- Hop-Depth:198-203), and dBound is monotone in the two positions that
+  -- move (dBound-mono-r, and dBound-μ for the strict step in s).
+  -- Splitting this row into a real body over walk-empty plus a
+  -- `walk-take-suc` leaf is the postulate-to-assembly conversion, and it
+  -- makes the arm's fit CHECKED instead of asserted.
   walk-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
     WalkStmt {e = e} (takeᵉ cnt b)
-  -- the eight OTHER conjuncts of the scan clause — GRINDABLE, and it is
-  -- walk-map's census verbatim at this shape.  scanᵉ mints no subscription
+  -- the eight OTHER conjuncts of the scan clause — DIFFICULTY, and it is
+  -- walk-map's census verbatim at this shape.
+  --
+  -- ⚠ CLASS HISTORY, because this header and the ledger had DRIFTED apart:
+  -- this row was moved to FALSITY in PROOF-STATE on 2026-08-20 while this
+  -- header still read GRINDABLE, and walk-map/walk-take were then raised
+  -- to FALSITY for consistency with the ledger row.  All three raises are
+  -- WITHDRAWN (2026-08-20) on the gas-peel finding in walk-map's header:
+  -- the scanᵉ clause passes `fuel` unchanged to both the recursive
+  -- subscribe and the push (Evaluator:1453-58), so series Q's gas
+  -- exhaustion cannot be sited here either.  GRINDABLE was also wrong —
+  -- the scan-f push face is unauthored and its frame-generic form is
+  -- REFUTED — which leaves DIFFICULTY, agreeing with the two rows this
+  -- one is tied to.  scanᵉ mints no subscription
   -- mapᵉ does not: subscribeE's scan clause (Evaluator:1453) installs ONE
   -- node, subscribes the source with `scan-f f nid ↠ κ`, and pushes the
   -- resulting burst — the same install-subscribe-push the other chain
