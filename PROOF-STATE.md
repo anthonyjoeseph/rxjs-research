@@ -140,10 +140,6 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`concatDrain-nodry-nestBud`** (Burst-Walk) — DIFFICULTY: REFUTED as first
-  stated, and restated. What is left is a tension between the Σ's two conjuncts
-  over one shared bud. Its thru-side twin is gone — ceiling half threaded as a
-  level, nest half split off — the move offered here too.
 - **`walk-scan-source-frame`** (Walk-Level) — DIFFICULTY: its `burstHopD?`
   conjunct is ordinary; the node-table one needs a fresh-node induction the repo
   does not have, and the weaker `scan-nodeP` is itself open. Header carries the
@@ -166,11 +162,6 @@ spent"), so every row governed by it inherits that caveat.
   typechecked rather than asserted. Residues are in the headers.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: all six conjuncts
   have a named source in scope. Header carries the per-conjunct inventory.
-- **`concatDrain-nodry-loop` / `-nestRec`** (Burst-Walk) — GRINDABLE. Per-element
-  context for concat's drain: each re-establishes one hypothesis of
-  `subscribeInner-nodry` after the previous element has moved the state, and the
-  shared header names the caps face (`.Subscribe-Face`) as the worked twin at
-  the same indices.
 - **`switchKill-context`** (Burst-Walk) — GRINDABLE: pure preservation, and
   every quantity in the conclusion appears in a hypothesis.
 

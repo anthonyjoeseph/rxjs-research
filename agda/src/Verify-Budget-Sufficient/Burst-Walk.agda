@@ -132,7 +132,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using (nest; nest-keeps)
 -- proves exactly that, per evaluator step, as a `KeepsC` record.  This is
 -- what the walk's two nest-preservation obligations spend.
 open import Verify-Budget-Sufficient.Keeps-Ring
-  using (KeepsC; thruConsume-keeps; switchKill-keeps)
+  using (KeepsC; thruConsume-keeps; switchKill-keeps; subscribeInner-keeps)
 
 -- THE LEVEL DESCENTS, spent by the thru walk's ceiling channel.  The wet
 -- walk face already threads an abstract ceiling level and converts it to
@@ -144,7 +144,8 @@ open import Verify-Budget-Sufficient.Caps using (sIterD-mono; sizeAt-mono)
 -- THE CAPS FACE'S OWN thruConsume STEP, PROVEN.  It carries the level the
 -- step lands at and the caps invariant there; the nodry walk's loop
 -- invariant is that plus the Ψ half, which this module proves itself.
-open import Verify-Budget-Sufficient.Subscribe-Face using (thruConsume-caps)
+open import Verify-Budget-Sufficient.Subscribe-Face
+  using (thruConsume-caps; subscribeInner-caps)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face
@@ -287,19 +288,21 @@ VbB-tail {s = s} c sl Ψ J o os h
                                     (T-to hlen))))))
     (proj₂ (∧-true (valΨ? Ψ s o) (all (valΨ? Ψ s) os) hΨ))
 
--- ONE ELEMENT'S SIZE, at the level `inner-desc` reads it.  `valsCaps?`
+-- ONE ELEMENT'S SIZE, at the level `inner-desc` reads it.  Spent by both
+-- payload walks — the thru walk over a value list and the concat drain over
+-- a queue — which is why it is named for neither.  `valsCaps?`
 -- carries a per-element `valCaps?`, whose size half bounds the element at
 -- `Caps.cSize (frameStep J c)` — which IS `sizeAt (cSize c) J`; `inner-desc`
 -- wants that bound one level up, and one level up is a RAISE.  It mentions
 -- no bud, which is the point: it is what takes the ceiling descent off the
 -- bud entirely.
-thruWalk-nodry-elem-size : ∀ {n} {Γ : Ctx n} {u}
+nodry-elem-size : ∀ {n} {Γ : Ctx n} {u}
   (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
   (o : Val Γ (obs u)) (os : List (Val Γ (obs u))) →
   2 ≤ Caps.cSize c →
   VbB c sl Ψ J (o ∷ os) ≡ true →
   suc (sizeᵉ o) ≤ suc (sizeAt (Caps.cSize c) (suc J))
-thruWalk-nodry-elem-size {u = u} c sl Ψ J o os 2≤S vb =
+nodry-elem-size {u = u} c sl Ψ J o os 2≤S vb =
   s≤s (≤-trans
         (≤ᵇ⇒≤ (sizeᵉ o) (Caps.cSize (frameStep J c))
           (T-to (valCaps?-size (frameStep J c) sl (obs u) o
@@ -354,6 +357,38 @@ thruWalk-nodry-dep : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   in depthWalk sf op nid κ id now os sched₁ st₁ ≤ dep
 thruWalk-nodry-dep dep sf op nid κ id now o os sched₀ st₀ h =
   ≤-trans (m≤n⊔m _ _) h
+
+-- ONE FRAME'S ALLOWANCE, OPENED FOR THE TRAVERSAL INSIDE IT.  `fLvlD S W
+-- (suc d) j` unfolds to exactly an `sIterD` at `d`, over `suc (widAt S W j)`
+-- payloads, at `k = suc (sizeAt S (suc j))`, starting from `fLvl S W j` --
+-- so a traversal that fits those two counts fits inside the frame, and the
+-- `k` slot is `≤-refl` whenever the bud is pinned to the frame's own refresh.
+-- Both frame boundaries that open a payload traversal spend this: the
+-- thru-outer frame over a value list, and the from-inner frame over a
+-- concat queue.
+--
+-- THE FUEL IS TAKEN AS `pred d`, NOT BY SPLITTING `d`, and that is what
+-- makes it usable at both.  A frame charges itself one level before opening
+-- the traversal, so `1 ≤ d` is free at every such call site; matching on THAT
+-- rather than on `d` keeps a caller with a thirty-arm clause tree from
+-- having to split all of it just to name `d′`.
+frame-room : ∀ (S W d m j : ℕ) → 2 ≤ S → 1 ≤ d →
+  m ≤ suc (widAt S W j) →
+  sIterD S W (pred d) (suc (sizeAt S (suc j))) m j ≤ fLvlD S W d j
+frame-room S W zero     m j 2≤S ()      hm
+frame-room S W (suc d′) m j 2≤S (s≤s _) hm =
+  ≤-trans (sIterD-mono m (suc (widAt S W j)) d′ d′
+             (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j)))
+             2≤S ≤-refl ≤-refl (m≤m+n j _) ≤-refl ≤-refl hm)
+          (≤-reflexive (sym (fLvlD-suc S W d′ j)))
+
+-- THE FRAME'S OWN ARC, SPENT.  A frame clause that opens a traversal charges
+-- itself first, so the hypothesis in hand is `suc <inner> ≤ d`; this reads the
+-- inner charge back out at `pred d`, again without splitting `d` at the
+-- caller.  Matching `s≤s` is what forces the fuel to be a successor, so the
+-- two lemmas agree on `pred d` by construction rather than by convention.
+fuel-pred : ∀ {m d : ℕ} → suc m ≤ d → m ≤ pred d
+fuel-pred (s≤s h) = h
 
 -- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
 -- carries the ∧-composable form, the dry lemmas speak the other
@@ -2388,103 +2423,14 @@ abstract
 -- survives is a nest bound with no ceiling coupled to it, and one
 -- k-and-index fit at the frame boundary.
 --
--- NOTE ON loop invariants: OKB/regP? after each subscribeInner step
--- are left as leaves.  These are the capsOK?-preservation obligations
--- that the caps face (.Subscribe-Face) already proves for its own
--- induction; the nodry face needs its own copy at the same indices.
---
--- NOTE ON nest: mList?-style nest bounds per element are not in
--- stepFrame-nodry's hypotheses.  Each leaf postulate takes the
--- minimum context needed.
+-- NOTE ON loop invariants, RESOLVED (2026-08-20): OKB/regP? after a
+-- subscribeInner / thruConsume step are no longer leaves.  Each is the caps
+-- face's own step (.Subscribe-Face) tensored with this module's Ψ face, with
+-- `capsOK?-regs` and `regP?-of-parts` recombining the registry halves at the
+-- level the step reports — so the level the walk re-reads its ledgers at is
+-- CARRIED rather than asserted, which is what the refuted same-level form
+-- (Refuted.Thru-Loop) got wrong.
 postulate
-
-  -- ── innerReact / concatDrain loop leaves ────────────────────────
-
-
-  -- PINNED 2026-08-20, THEN REFUTED AND RESTATED THE SAME DAY.
-  --
-  -- THE PIN IS SOUND AND STAYS.  Before it the Σ's only conjunct was
-  -- `all (nest … ≤ᵇ bud) q`, UPWARD-CLOSED in bud, so the max over a finite q
-  -- discharged it for free — while the consumer needs bud SMALL, feeding the
-  -- same bud to opIterD's `k` position where a bigger bud is a higher level and
-  -- a harder ceiling.  The free witness was the one witness that could not be
-  -- spent.  The ceiling conjunct demands the ceiling AT THAT SAME BUD, so
-  -- enlarging the witness now costs something.  Pinning here RETIRED
-  -- `concatDrain-nodry-cl`: with the witness arriving already knowing it fits,
-  -- there is nothing left to transfer from an fLvlD-level bound.
-  --
-  -- REFUTED (2026-08-20) in the OKB-only form —
-  -- `Refuted.Concat-Drain.concatDrain-nodry-nestBud-absurd`, and checked the
-  -- decisive way: the postulate itself, applied to the witness, gave `⊥`.  The
-  -- ceiling conjunct measures a cap derived from `c` against
-  -- `sizeCapAt e sl (suc id)`, and OKB relates the two NOT AT ALL — it gets
-  -- easier as `c` grows, while sizeCapAt reads only `e` and `sl` — so
-  -- `cSize c = suc (sizeCapAt e sl 1)` kills it at every bud, whatever the
-  -- queue holds.  Conjunct one was unreachable for its own reason: a free
-  -- `Closed Γ s` list has no nest bound, which is the retired
-  -- `concatDrain-nodry-vb`'s defect arriving one conjunct over.
-  --
-  -- SO THE TWO ADDED HYPOTHESES ARE A RESTATEMENT AND NOT A CONVENIENCE, one
-  -- per conjunct: the fLvlD tie for the ceiling, `VbB` for the nest bound.
-  -- `concatDrain-nodry` carried both and passed neither, which is exactly the
-  -- reading "the call site happens to supply it" is not allowed to have — the
-  -- licence here is the refutation, not the caller.
-  --
-  -- WHAT REMAINS IS THE ROW'S REAL CONTENT, and it is a tension rather than a
-  -- grind: conjunct one wants bud LARGE enough for every element, conjunct two
-  -- wants `opIterD S W dep bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W dep J` and so
-  -- wants it SMALL.  Whether one bud does both is open.  Two sub-facts are
-  -- owed and neither exists in the tree: that opIterD/fLvlD inequality (the
-  -- block header above calls it "stated as a separate leaf" — it is not, and
-  -- `make find Q='fLvlD'` says so), and `nest` from `VbB`'s per-element size
-  -- and width bounds.
-  concatDrain-nodry-nestBud : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (id : Id) (allNid : NodeId)
-    (q : List (Closed Γ s))
-    (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    VbB c sl Ψ J q ≡ true →
-    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
-      ≤ sizeCapAt e sl (suc id) →
-    Σ ℕ (λ bud →
-           all (λ o → nest o sl (EvalSt.connectedShares st) ≤ᵇ bud) q ≡ true
-         × all (λ o → Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
-                                                     dep bud (suc (sizeᵉ o)) (suc J)) c)
-                        ≤ᵇ sizeCapAt e sl (suc id)) q ≡ true)
-
-  -- Loop invariant after one subscribeInner step in concatDrain.
-  -- OKB + regP? are preserved (the caps face proves the caps side;
-  -- the nodry face needs its own copy here).
-  concatDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sf : Gas)
-    (allNid : NodeId) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (o : Closed Γ s)
-    (sched₀ : Sched Γ) (st₀ : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched₀ st₀ →
-    regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
-    let r      = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
-        sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
-        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
-    in OKB {e = e} c sl Ψ J sched₁ st₁
-       × regP? (PbB c Ψ J) (EvalSt.registry st₁) ≡ true
-
-  -- Nest bound for remaining queue elements after one subscribeInner step.
-  -- connectedShares can grow, so bud from state₀ may not bound state₁;
-  -- this leaf asserts the invariant holds at the new state.
-  concatDrain-nodry-nestRec : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ J bud : ℕ) (sf : Gas)
-    (allNid : NodeId) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (o : Closed Γ s) (q : List (Closed Γ s))
-    (sched₀ : Sched Γ) (st₀ : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched₀ st₀ →
-    all (λ o′ → nest o′ sl (EvalSt.connectedShares st₀) ≤ᵇ bud) q ≡ true →
-    let r      = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
-        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
-    in all (λ o′ → nest o′ sl (EvalSt.connectedShares st₁) ≤ᵇ bud) q ≡ true
-
-  -- ── thruOuter / thruWalk / thruConsume loop leaves ───────────────
-
-  -- ── switch arm leaves ─────────────────────────────────────────────
 
   -- OKB + regP? after switchKill; needed by the switch arm's subscribeInner-nodry call.
   switchKill-context : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2498,13 +2444,97 @@ postulate
     in OKB {e = e} c sl Ψ J sched₁ st₁
        × regP? (PbB c Ψ J) (EvalSt.registry st₁) ≡ true
 
+-- THE DRAIN'S LOOP INVARIANT, at the level the step LANDS at.  Exact twin of
+-- `thruConsume-nodry-loop`: the caps half is the caps face's own
+-- `subscribeInner-caps`, the Ψ half is this module's `subscribeInner-Ψ`, and
+-- the registry's two halves are recombined by `capsOK?-regs` (the size half,
+-- read at the NEW level out of the invariant the step reports) and
+-- `regP?-of-parts`.
+--
+-- THE LEVEL IS REPORTED AND NOT ASSUMED, for the reason the thru side's
+-- same-level form was refuted (Refuted.Thru-Loop): concat's park clause GROWS
+-- the node's queue, and `capsOK?`'s width conjunct bounds that queue's length,
+-- so a step's post-state need not satisfy the invariant at the level its
+-- pre-state did.  `subscribeInner-caps` reports STRICTLY (`suc (j + j′) ≤ …`);
+-- one `n≤1+n` relaxes it to the form the drain's own descent consumes.
+concatDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (Ψ dep bud J : ℕ) (sf : Gas)
+  (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (o : Closed Γ s) (q : List (Closed Γ s))
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  OKB {e = e} c sl Ψ J sched₀ st₀ →
+  PbB c Ψ J κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
+  VbB c sl Ψ J (o ∷ q) ≡ true →
+  nest o sl (EvalSt.connectedShares st₀) ≤ bud →
+  depthInner sf concatᵒ allNid κ id now o sched₀ st₀ ≤ dep →
+  regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
+  let r      = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
+      sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+  in Σ ℕ (λ j′ →
+          OKB {e = e} c sl Ψ (J + j′) sched₁ st₁
+        × regP? (PbB c Ψ (J + j′)) (EvalSt.registry st₁) ≡ true
+        × (J + j′ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc J)))
+concatDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
+                       2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg =
+  j′
+  , ((slEq₁ , inv₁) , fc₁)
+  , regP?-of-parts c Ψ (J + j′) (EvalSt.registry st₁)
+      (capsOK?-regs (frameStep (J + j′) c) sched₁ st₁ inv₁) rg₁
+  , ≤-trans (n≤1+n (J + j′)) lvl
+  where
+  slEq  = proj₁ (proj₁ ok) ; inv = proj₂ (proj₁ ok) ; fc = proj₂ ok
+  pb-sz = proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb)
+  pb-bΨ = proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb)
+  vb-c  = proj₁ (∧-true (valsCaps? (frameStep J c) sl (o ∷ q)) (valsΨ? Ψ (o ∷ q)) vb)
+  vb-Ψ  = proj₂ (∧-true (valsCaps? (frameStep J c) sl (o ∷ q)) (valsΨ? Ψ (o ∷ q)) vb)
+  oC    = proj₁ (∧-true (valCaps? (frameStep J c) sl (obs s) o)
+                        (all (valCaps? (frameStep J c) sl (obs s)) q)
+                        (valsOf (frameStep J c) sl (o ∷ q) vb-c))
+  oΨ    = proj₁ (∧-true (valΨ? Ψ (obs s) o) (all (valΨ? Ψ (obs s)) q) vb-Ψ)
+  SI    = subscribeInner-caps c dep bud J sf concatᵒ allNid κ id now o sl sched₀ st₀
+            2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD
+  j′ = proj₁ SI ; inv₁ = proj₁ (proj₂ SI)
+  lvl = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+  SΨ    = subscribeInner-Ψ sl Ψ sf concatᵒ allNid κ id now o sched₀ st₀
+            slEq fc (regP?-Ψ c Ψ J (EvalSt.registry st₀) rg) oΨ pb-bΨ
+  slEq₁ = proj₁ SΨ ; fc₁ = proj₁ (proj₂ SΨ) ; rg₁ = proj₁ (proj₂ (proj₂ SΨ))
+  r = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+-- THE REMAINING QUEUE'S NEST LEDGER, ACROSS ONE STEP.  `nest` is antitone in
+-- the connected set and `subscribeInner` only ever enlarges it, which is
+-- exactly what the share-ledger ring proves per step; `mList?-keeps` lifts it
+-- over the whole queue.  Nothing about the step's own element is needed.
+concatDrain-nodry-nestRec : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (bud : ℕ) (sf : Gas)
+  (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (o : Closed Γ s) (q : List (Closed Γ s))
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  mList? bud sl (EvalSt.connectedShares st₀) q ≡ true →
+  let st₁ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+              (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))
+  in mList? bud sl (EvalSt.connectedShares st₁) q ≡ true
+concatDrain-nodry-nestRec sl bud sf allNid κ id now o q sched₀ st₀ h =
+  mList?-keeps bud sl (EvalSt.connectedShares st₀)
+    (EvalSt.connectedShares
+      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+        (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))))
+    q (KeepsC.connMono (subscribeInner-keeps sf concatᵒ allNid κ id now o sched₀ st₀)) h
+
 ------------------------------------------------------------------
 -- concatDrain-nodry — structural recursion over the concat queue.
 -- Applies subscribeInner-nodry at each element (THE FIT TEST).
 --
 -- slFc is taken as a direct parameter, threaded from module BurstWalk.
 concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (Ψ dep : ℕ) →
+  (c : Caps) (sl : Slots Γ) (Ψ dep bud L̂ : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   Caps.cReg c ≤ Caps.cSize c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
@@ -2524,63 +2554,110 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   VbB c sl Ψ J q ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
-  Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
-    ≤ sizeCapAt e sl (suc id) →
   depthDrain sf allNid κ id now q sched st ≤ dep →
+  -- THE DRAIN'S THREE CHANNELS, and all three arrive from the caller — which
+  -- is a RESTATEMENT and not a convenience.  The bud-and-ceiling pair used to
+  -- be manufactured out of `ok` alone by `concatDrain-nodry-nestBud`, and both
+  -- of its conjuncts are refutable that way
+  -- (`Refuted.Concat-Drain.concatDrain-nodry-nestBud-absurd`): a free
+  -- `Closed Γ s` has no nest bound, and OKB relates a `c`-derived cap to
+  -- `sizeCapAt e sl` not at all.  What the refutation also showed is that the
+  -- two must be DECOUPLED — one conjunct wanted the bud large, the other small
+  -- — so the ceiling is now an abstract level L̂ and the bud rides beside it,
+  -- meeting only through the proven Caps-Chain descents.
+  --
+  -- `sIterD … (length q) J` is the level this drain climbs to, one `sLvlD` per
+  -- queue element, which is exactly what the caps face's `concatDrain-caps`
+  -- (.Subscribe-Face) already measures the same drain against.
+  mList? bud sl (EvalSt.connectedShares st) q ≡ true →
+  Caps.cSize (frameStep L̂ c) ≤ sizeCapAt e sl (suc id) →
+  sIterD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length q) J ≤ L̂ →
   any dryEvent (proj₁ (proj₂ (concatDrain sf allNid κ id now q sched st))) ≡ false
 
-concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  [] sched st _ _ _ _ _ _ _ _ = refl
+concatDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
+                  [] sched st _ _ _ _ _ _ _ _ _ _ = refl
 
-concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk cl hD
-  with concatDrain-nodry-nestBud c sl Ψ dep J id allNid (o ∷ q) sched₀ st₀ ok vbq cl
-... | bud , nestQ , clQ
+concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
+                  (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk hD nst clL̂ dsc
   -- Scrutinise only `done` (4th component).  This preserves
   -- `proj₁ (proj₂ (proj₂ (subscribeInner ...)))` (3rd component) in the goal
   -- so that subscribeInner-nodry's return type matches directly.
   with proj₁ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀))))
+-- done=false: concatDrain returns the element's events; goal = subscribeInner-nodry's type
 ... | false =
-  -- done=false: concatDrain returns the element's events; goal = subscribeInner-nodry's type
   subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J sf concatᵒ allNid κ id now o sched₀ st₀
-    ok pb sspLen
-    (VbB-head c sl Ψ J o q vbq)
-    rg
-    (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
-      (T-to (proj₁ (∧-true _ _ nestQ))))
+    ok pb sspLen (VbB-head c sl Ψ J o q vbq) rg
+    (mList?-head bud sl (EvalSt.connectedShares st₀) o q nst)
     (≤-trans (m≤m⊔n _ _) hD)
-    (≤ᵇ⇒≤ (Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
-                                          dep bud (suc (sizeᵉ o)) (suc J)) c))
-           _
-           (T-to (proj₁ (∧-true _ _ clQ))))
+    (≤-trans (proj₁ (frameStep-mono-j c 2≤S
+                       (≤-trans (inner-desc (Caps.cSize c) (Caps.cWid c) dep bud J (sizeᵉ o) 2≤S
+                                   (nodry-elem-size c sl Ψ J o q 2≤S vbq))
+                                (≤-trans (walk-desc (Caps.cSize c) (Caps.cWid c) dep
+                                            (suc bud) (length q) J)
+                                         dsc))))
+              clL̂)
     gk
+-- done=true: concatDrain appends element events ++ tail events.
+--
+-- The head's outputs are LET-BOUND PROJECTIONS, never `with`-scrutinised —
+-- the same reason as `thruWalk-nodry`'s cons arm: abstracting the tuple
+-- rebinds `sched₁`/`st₁` as fresh variables while `ok₁`/`rg₁` keep mentioning
+-- a `proj… (subscribeInner …)` the abstraction never touched.
 ... | true =
-  -- done=true: concatDrain appends element events ++ tail events
-  let sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))
-      st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))
-      bs     = proj₁ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))
+  let step   = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
+      bs     = proj₁ (proj₂ (proj₂ step))
+      sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ step))))
+      st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ step))))
+      S      = Caps.cSize c
+      W      = Caps.cWid  c
+      -- the nest ledger, split at the head by the ring's own projections
+      nBst   = mList?-head bud sl (EvalSt.connectedShares st₀) o q nst
+      nstT   = mList?-tail bud sl (EvalSt.connectedShares st₀) o q nst
+      -- THE HEAD'S CEILING, by the two proven descents: this element's inner
+      -- subscribe sits inside the drain's own step (`inner-desc`, on the
+      -- element's SIZE and not on bud), and that step inside the drain
+      -- (`walk-desc`).  Neither move mentions the ceiling, which is what
+      -- decoupled the bud from it.
+      dsc₀   = ≤-trans (inner-desc S W dep bud J (sizeᵉ o) 2≤S
+                          (nodry-elem-size c sl Ψ J o q 2≤S vbq))
+                       (≤-trans (walk-desc S W dep (suc bud) (length q) J) dsc)
+      hDo    = ≤-trans (m≤m⊔n _ _) hD
       h-head = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                  J sf concatᵒ allNid κ id now o sched₀ st₀
-                 ok pb sspLen
-                 (VbB-head c sl Ψ J o q vbq)
-                 rg
-                 (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
-                   (T-to (proj₁ (∧-true _ _ nestQ))))
-                 (≤-trans (m≤m⊔n _ _) hD)
-                 (≤ᵇ⇒≤ (Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
-                                                       dep bud (suc (sizeᵉ o)) (suc J)) c))
-                        _
-                        (T-to (proj₁ (∧-true _ _ clQ))))
-                 gk
-      loop   = concatDrain-nodry-loop c sl Ψ J sf allNid κ id now o sched₀ st₀ ok rg
-      ok₁    = proj₁ loop
-      rg₁    = proj₂ loop
-      nestQ′ = concatDrain-nodry-nestRec c sl Ψ J bud sf allNid κ id now o q sched₀ st₀
-                 ok (proj₂ (∧-true _ _ nestQ))
-      h-tail = concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                 q sched₁ st₁ ok₁ pb sspLen (VbB-tail c sl Ψ J o q vbq) rg₁ gk cl
-                 (≤-trans (m≤n⊔m _ _) hD)
+                 ok pb sspLen (VbB-head c sl Ψ J o q vbq) rg nBst hDo
+                 (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc₀)) clL̂) gk
+      loop   = concatDrain-nodry-loop c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
+                 2≤S 1≤R slC slSz ok pb sspLen vbq nBst hDo rg
+      j₁     = proj₁ loop
+      ok₁    = proj₁ (proj₂ loop)
+      rg₁    = proj₁ (proj₂ (proj₂ loop))
+      hj₁    = proj₂ (proj₂ (proj₂ loop))
+      -- every OTHER ledger is read again at the level the step landed at, and
+      -- every one of them WIDENS upward; the ceiling is the only conjunct that
+      -- gets harder, and `dsc₁` is where it is paid
+      le₁    = m≤m+n J j₁
+      mono₁  = frameStep-mono-j c 2≤S le₁
+      pb₁    = ∧-intro (pathSz?-widen κ (proj₁ mono₁)
+                          (proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ)
+                                         (pathBΨ? Ψ κ) pb)))
+                       (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ)
+                                      (pathBΨ? Ψ κ) pb))
+      sspL₁  = ≤-trans sspLen (proj₁ mono₁)
+      vbT    = VbB-tail c sl Ψ J o q vbq
+      vb₁    = ∧-intro (valsCaps?-lvl _ _ sl q mono₁
+                          (proj₁ (∧-true (valsCaps? (frameStep J c) sl q)
+                                         (valsΨ? Ψ q) vbT)))
+                       (proj₂ (∧-true (valsCaps? (frameStep J c) sl q)
+                                      (valsΨ? Ψ q) vbT))
+      nst₁   = concatDrain-nodry-nestRec sl bud sf allNid κ id now o q sched₀ st₀ nstT
+      dsc₁   = ≤-trans (sIterD-mono (length q) (length q) dep dep (suc bud) (suc bud)
+                          2≤S ≤-refl ≤-refl hj₁ ≤-refl ≤-refl ≤-refl)
+                       (≤-trans (≤-reflexive (sym (sIterD-suc S W dep (suc bud) (length q) J)))
+                                dsc)
+      h-tail = concatDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc (J + j₁) sf
+                 allNid κ id now q sched₁ st₁ ok₁ pb₁ sspL₁ vb₁ rg₁ gk
+                 (≤-trans (m≤n⊔m _ _) hD) nst₁ clL̂ dsc₁
   in any-dry-++ bs _ h-head h-tail
 
 -- Loop invariant after one thruConsume step: OKB + regP? at the level
@@ -2924,7 +3001,7 @@ thruWalk-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op
       -- (`walk-desc`).  Neither move mentions the ceiling, which is what
       -- decoupled the bud from it.
       dsc₀   = ≤-trans (inner-desc S W dep bud J (sizeᵉ o) 2≤S
-                          (thruWalk-nodry-elem-size c sl Ψ J o os 2≤S vb))
+                          (nodry-elem-size c sl Ψ J o os 2≤S vb))
                        (≤-trans (walk-desc S W dep (suc bud) (length os) J) dsc)
       h-head = thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os
                  sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc₀
@@ -3086,16 +3163,37 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
                               (pathSz?-tail (Caps.cSize (frameStep J c)) (from-inner op allNid inst) path′ pb-sz)
                               pb-bΨ
                   sspLen  = pathSz?-len (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ path′) pb-sz
-              in concatDrain-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf allNid path′ id now
-                   q sched st ok pb′ sspLen
-                   (concatNode-vb c sl Ψ J allNid q act od sched st ok eqN)
-                   rg gk cl
-                   -- hD reduces HERE and only here: the `with` above
-                   -- scrutinises `lookupNode allNid (nodes st)` and `w ≟ᵗ s`,
-                   -- so depthFrame → depthReact → depthFin → depthFinC has
-                   -- unfolded to `suc (depthDrain … q …) ≤ d`.  One n≤1+n
-                   -- spends the frame's own arc and hands the drain its fold.
-                   (≤-trans (n≤1+n _) hD)
+                  S       = Caps.cSize c
+                  W       = Caps.cWid  c
+                  vbq     = concatNode-vb c sl Ψ J allNid q act od sched st ok eqN
+                  vbq-c   = proj₁ (∧-true (valsCaps? (frameStep J c) sl q)
+                                          (valsΨ? Ψ q) vbq)
+                  -- THE DRAIN'S BUD IS THE FRAME'S REFRESH, exactly as at the
+                  -- thru-outer boundary: `valsCaps→mList-strict` bounds every
+                  -- queued payload's nesting by `sizeAt S (suc J)` at EVERY
+                  -- share ledger, out of the per-element size half and the
+                  -- threaded `slotsSize sl ≤ S`.  At that pin the ROOM
+                  -- conjunct is `fLvlD`'s own `k`, so `frame-room` closes it
+                  -- on the queue's LENGTH alone.
+                  nst     = valsCaps→mList-strict c J sl (EvalSt.connectedShares st) q
+                              (≤-trans (s≤s z≤n) 2≤S) slSz
+                              (valsOf (frameStep J c) sl q vbq-c)
+              -- hD reduces HERE and only here: the `with` above scrutinises
+              -- `lookupNode allNid (nodes st)` and `w ≟ᵗ s`, so
+              -- depthFrame → depthReact → depthFin → depthFinC has unfolded to
+              -- `suc (depthDrain … q …) ≤ d`.  THE FRAME'S OWN ARC IS THE FUEL
+              -- THE DRAIN RUNS ONE BELOW: `fuel-pred` hands the drain `pred d`
+              -- and `frame-room` opens `fLvlD S W d J` at that same `pred d`,
+              -- which is the only depth pairing the two sides can agree on —
+              -- `fLvlD S W (suc d′) J` IS an `sIterD` at `d′`.  Relaxing the
+              -- `suc` away instead (the earlier `n≤1+n`) left the drain at the
+              -- frame's own fuel and made the room conjunct unprovable.
+              in concatDrain-nodry c sl Ψ (pred d) (sizeAt S (suc J)) (fLvlD S W d J)
+                   2≤S 1≤R hCR slC slSz slFc J sf allNid path′ id now
+                   q sched st ok pb′ sspLen vbq rg gk
+                   (fuel-pred hD) nst cl
+                   (frame-room S W d (length q) J 2≤S (≤-trans (s≤s z≤n) hD)
+                      (valsLen (frameStep J c) sl q vbq-c))
 
 ------------------------------------------------------------------
 -- thruOuter-nodry — thru-outer frame; uses thruWrap-pass + thruWalk-nodry.
@@ -3163,11 +3261,8 @@ thruOuter-nodry c sl Ψ (suc d′) 2≤S 1≤R hCR slC slSz slFc J sf id now op 
       -- index against `fLvl S W J` (inflationary).
       nst     = valsCaps→mList-strict c J sl (EvalSt.connectedShares st) vals
                   (≤-trans (s≤s z≤n) 2≤S) slSz (valsOf (frameStep J c) sl vals vb-c)
-      room    = ≤-trans (sIterD-mono (length vals) (suc (widAt S W J)) d′ d′
-                           (suc (sizeAt S (suc J))) (suc (sizeAt S (suc J)))
-                           2≤S ≤-refl ≤-refl (m≤m+n J _) ≤-refl ≤-refl
-                           (valsLen (frameStep J c) sl vals vb-c))
-                        (≤-reflexive (sym (fLvlD-suc S W d′ J)))
+      room    = frame-room S W (suc d′) (length vals) J 2≤S (s≤s z≤n)
+                  (valsLen (frameStep J c) sl vals vb-c)
   in subst (λ x → any dryEvent x ≡ false) (sym eq)
            (thruWalk-nodry c sl Ψ d′ (sizeAt S (suc J)) (fLvlD S W (suc d′) J)
               2≤S 1≤R hCR slC slSz slFc J sf op nid path′ id now vals sched st
