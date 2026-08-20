@@ -78,11 +78,9 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-ONE DIFFICULTY row (`applyFn-hopSpn-obs`) heads the tier and is the design
-session's own work; everything below it is GRINDABLE and does NOT block on
-it — every row in a tier is available to its siblings as a postulate, so the
-mechanical ones can be ground in parallel by workers. Top-to-bottom is the
-order attention is OWED, not a bar on running the bottom concurrently.
+Every row in this tier is now GRINDABLE. Rows are available to their siblings
+as postulates, so they can be ground in parallel by workers; top-to-bottom is
+the order attention is OWED, not a bar on running the bottom concurrently.
 
 - **`sharedConnect-walk`** (Walk-Level) — GRINDABLE, large: the CONNECTING arm,
   all that is left of `input-wet-shared` now that the dispatch is a real
@@ -105,33 +103,22 @@ order attention is OWED, not a bar on running the bottom concurrently.
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`applyFn-hopSpn-obs`** (Hop-Spine-Face) — DIFFICULTY, and the only one in
-  this tier. `applyFn-hopSpn` itself is now a REAL BODY by induction on the
-  result type, so pairs and grounds cost nothing and the zero-slope `obs` case
-  is discharged outright off `applyFn-hopD-lin`. This is what is left: the
-  `obs` leaf at a PLUGGING fn, i.e. the drag. The DRAG'S TRUTH is well
-  evidenced (see the row's header and Demand-Probe series Ω′); what is open is
-  the SHAPE of the generalised lemma the body must induct with, and the header
-  sets out the tension in full — a uniform `pmᵗ V j tm ≤ P` dies at `caseᵗ`
-  with a closed scrutinee, a per-variable `Bs` fixes `caseᵗ` termwise but no
-  longer returns the conclusion at `B`, and the resolution looks to be keeping
-  `Bs` and letting the drag convert — but BOTH single-number shapes have now
-  been tried and both fail, at opposite ends: a derived bound fixes `caseᵗ`
-  termwise and leaves the fold decaying by a factor per step, and a product
-  hypothesis fixes `caseᵗ` and is false at the fold's own call site. The
-  finding is that the multiplier condition is not one inequality — a COPIED
-  leaf needs none, a BUILT leaf needs one of two sufficient forms, and
-  `caseᵗ`'s own clause is the disjunction of them. Next attempt is a
-  TWO-PREDICATE induction; the header says why a third single-number
-  hypothesis is not worth looking for. Do NOT grind clauses before that
-  statement typechecks.
-- **`applyFn-hopSpn-inj`** (Hop-Spine-Face) — GRINDABLE: the sum arm of the
-  same induction. `Tm` has no eliminator taking a sum to its payload's type,
-  so there is no projection to push the induction through — but every Ty is
-  inhabited, so `caseᵗ fn (varᵗ here) <default>` IS that eliminator, and its
-  `hopDᵗ` and `pmᵗ V 0` are `fn`'s by computation once the default is built
-  from `unit̂`/`nat̂`/`strmᵗ emptyᵉ`. No new mathematics; the route is in the
-  header.
+- **`evalWith-hopSpn-strm`** (Hop-Spine-Step) — GRINDABLE: the per-step
+  substitution's BUILT leaf, and the only place the drag is spent. What used to
+  be `applyFn-hopSpn-obs`, DIFFICULTY, is now a decided shape: the induction is
+  over the TERM with the hereditary predicate as its conclusion (which is what
+  makes the projections work — a headline bound on a pair is the wrong direction
+  at `fstᵗ`), and the coefficient is slope-weighted by `⊔` rather than summed,
+  which is what removes the environment's length from the accounting and closes
+  `caseᵗ` exactly. Four pieces to write, all named in the leaf's header with the
+  arithmetic that each one has to satisfy: `maxW`, `EnvSpn`, the `wkReify` spine
+  unit, and `hopD-subΘᵉ`'s own induction re-run with `maxW` in place of `sumW`.
+  The three single-number hypotheses that failed, and why a fourth is not worth
+  looking for, are recorded there too.
+- **`evalWith-hopSpn-case`** (Hop-Spine-Step) — GRINDABLE: the `caseᵗ` clause of
+  the same induction, the one that extends the environment. Wants the SAME four
+  pieces as the strm leaf and neither blocks the other; its header carries the
+  termwise check that closes it.
 - **`walk-scan-source-frame`** (Walk-Level) — GRINDABLE: the scan clause's frame
   condition. Two conjuncts, both shapes this family already produces — the
   source's ordinary `burstHopD?` receipt, and that the freshly minted scan node

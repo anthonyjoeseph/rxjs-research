@@ -44,7 +44,8 @@ open import Verify-Budget-Sufficient.Node-Table using (≟ᵗ-refl; lookupNode-s
 open import Verify-Budget-Sufficient.Measures using
   (∧-true; ∧-intro; all-++-intro)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using
-  (valHopSpn?; evHopSpnH?; burstHopSpnH?; scanVals-hopSpn)
+  (valHopSpn?; evHopSpnH?; burstHopSpnH?)
+open import Verify-Budget-Sufficient.Hop-Spine-Step using (scanVals-hopSpn)
 
 ------------------------------------------------------------------
 -- THE CARRIER.  A node the walk does not own reads as `true`: only a

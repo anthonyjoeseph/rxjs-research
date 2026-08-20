@@ -19,7 +19,7 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Hop-Spine-Face where
 
-open import Data.Bool using (Bool; true; T; _∧_)
+open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Bool.ListAction using (all)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive;
@@ -28,26 +28,31 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        m≤m+n; *-identityˡ; +-identityʳ;
                                        +-monoʳ-≤)
 open import Data.List using (List; []; _∷_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin  using (Fin)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
+open import Data.Sum     using (inj₁; inj₂; _⊎_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim  using (InstEmit; InstEvent; init; value; close;
                             handoff; complete)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.Sum using () renaming (inj₁ to inl; inj₂ to inr)
-open import Data.List.Relation.Unary.All renaming ([] to []ᵃ; _∷_ to _∷ᵃ_) using ()
-open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; applyFn; evalTm; sizeᵛ;
-                            fstᵗ; sndᵗ;
+open import Data.List.Relation.Unary.All using (All)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; Exp; applyFn; evalTm; evalWith; sizeᵛ;
+                            varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
+                            inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+                            add; sub; mul; eqᵖ; ltᵖ; notᵖ; varIx; lookupEnv;
                             unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; pmᵉ)
 open import Rx.Hop-Spine using (spnᵉ; spnᵛ; spn≤sizeᵛ)
 open import Rx.Evaluator using (Stream; scanVals)
 open import Verify-Budget-Sufficient.Measures using
   (burstB?; burstHopD?; valB?; eventB?; hopDev?; all-impl;
    ∧-true; ∧-intro; T⇒≡true; T-to; all-zip; 1≤2^;
-   hopD-evalWith; sumW; EnvHopDs)
+   hopD-evalWith; sumW; EnvHopDs; ifEq)
 
 -- the same event walk as hopDev?, with the bound read off the VALUE
 hopSpnev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → (Fin n → ℕ) → ℕ → ℕ →
@@ -755,222 +760,6 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- asks `1 + 2^s ≤ 2^(suc s)` — the same split, the same failing arm.
 -- It is "comfortably true" only AFTER the size-preserving step is
 -- discharged, so it buys no separate route.
--- THE LINEAR HEADLINE, and it is `hopD-evalWith` (.Measures, PROVEN) at a
--- ONE-ELEMENT environment, where `sumW` collapses to a single product.
--- Read it as: applying a fn costs the fn's own hop plus its plug
--- multiplier times whatever it was handed.
-applyFn-hopD-lin : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ)
-  (fn : Fn Γ [] [] [] s u) (x : Val Γ s) →
-  hopDᵛ V η u (applyFn fn x) ≤ hopDᵗ V η fn + pmᵗ V 0 fn * hopDᵛ V η s x
-applyFn-hopD-lin {s = s} V η fn x =
-  ≤-trans (hopD-evalWith V η (λ _ → hopDᵛ V η s x) fn (x ∷ᵃ []ᵃ) (≤-refl , tt))
-          (+-monoʳ-≤ (hopDᵗ V η fn)
-            (≤-reflexive (+-identityʳ (pmᵗ V 0 fn * hopDᵛ V η s x))))
-
-postulate
-  -- THE ONE REAL GAP — the `obs` leaf at a PLUGGING fn.  Everything else in
-  -- this family is type-directed bookkeeping; this is the drag, and the
-  -- research record above is about exactly this statement.  `1 ≤ pmᵗ V 0 fn`
-  -- is not a weakening: the zero case is DISCHARGED below by
-  -- `applyFn-hopD-lin`, which is why the hypothesis can be assumed here.
-  --
-  -- ⚠ THE INDUCTION'S SHAPE IS A LIVE DESIGN QUESTION (2026-08-19), and
-  -- this is a CORRECTION to the GRINDABLE demotion recorded above: that
-  -- demotion was earned on the DRAG being true, which the evidence there
-  -- does support, and it silently assumed the induction could be STATED.
-  -- Stating it is the open problem.  The row's own statement is fine; what
-  -- is unsettled is the generalised lemma its body must induct with.
-  --
-  -- THE INDUCTION IS OVER THE TERM, not the type.  The type-directed front
-  -- end below handles pairs and grounds, but `obs` is reached by `varᵗ`,
-  -- `fstᵗ`, `sndᵗ`, `caseᵗ`, `ifᵗ` and `strmᵗ`, and the projections need
-  -- the HEREDITARY receipt at the projected term's own type — so the
-  -- recursion must shrink the TERM, with the type as an index.  Thirteen
-  -- clauses; `strmᵗ` is the only one with content, and it is
-  -- `hopD-subΘᵉ` (.Measures, PROVEN) plus one measure-theoretic lemma:
-  --
-  --     1 + Σⱼ pmᵉ V j e * (2 + P) ^ spnᵛ σⱼ  ≤  (2 + P) ^ spnᵉ (subΘExp Θloc σ e)
-  --
-  -- which is where the drag lives, stated with no hopD and no B in it.
-  -- Its `mapᵉ` clause closes EXACTLY — the node's own `suc` in `spnᵉ`
-  -- pays for the two summands and nothing is left over — and the local
-  -- multiplier `pmᵗ V 0 f` it needs is bounded by the node's own `pmᵉ`
-  -- whenever the source is env-dependent, and multiplied by zero when it
-  -- is not.  So that lemma's hypotheses are available.
-  --
-  -- THE TENSION IS AT `caseᵗ`, AND IT IS A TENSION BETWEEN TWO CLAUSES OF
-  -- THE SAME LEMMA — which is why neither obvious formulation works:
-  --
-  --   · A UNIFORM `∀ j → pmᵗ V j tm ≤ P` dies at `caseᵗ`.  The branch is
-  --     evaluated under an extended env, so it needs `pmᵗ V 0 l ≤ P`, and
-  --     a CLOSED scrutinee makes `pmᵗ V k (caseᵗ s l r)`'s only occurrence
-  --     of `pmᵗ V 0 l` vanish (it sits in a product with `pmᵗ V k s`).
-  --
-  --   · A PER-VARIABLE `Bs : ℕ → ℕ` in place of the single `B` fixes
-  --     `caseᵗ` exactly, and the check is termwise: the branch's derived
-  --     bound `hopDᵗ l + pmᵗ V 0 l * (hopDᵗ s + Σⱼ pmᵗ V j s * Bs j) +
-  --     Σⱼ pmᵗ V (1+j) l * Bs j` is dominated summand by summand by the
-  --     parent's, because `hopDᵗ l ≤ hopDᵗ l ⊔ hopDᵗ r` and `pmᵗ V 0 l ≤
-  --     pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1`.  But the DERIVED bound is not `B`:
-  --     at the fold's own shape it comes out `hopDᵗ f + pmᵗ V 0 f * Bs 0`,
-  --     and the fold needs the conclusion back at `B` or the invariant
-  --     does not compose across steps.
-  --
-  -- WHERE THE RESOLUTION LOOKS TO BE, so the next attempt starts here
-  -- rather than re-deriving it: keep the per-variable `Bs` (it is what
-  -- makes `caseᵗ` free) and let the DRAG convert the derived bound back
-  -- to `B`.  At the fold, `Bs 0` is the argument's own receipt
-  -- `(2 + P) ^ spnᵛ (ac , v) * B`, the derived bound is
-  -- `B + P * (2 + P) ^ spnᵛ (ac , v) * B`, and one extra spine node on
-  -- the RESULT absorbs it — `(2 + P) ^ (1 + spn) ≥ 1 + P * (2 + P) ^ spn`.
-  -- At `caseᵗ` no drag is needed at all, because there `Bs 0` is the
-  -- scrutinee's own `hopDᵗ s`, which the parent's `hopDᵗ` already pays
-  -- for.  So the two clauses want the SAME apparatus for different
-  -- reasons, which is the encouraging sign; what has not been done is
-  -- writing the indices down and checking them.
-  --
-  -- DO NOT grind clauses before that statement typechecks.  The whole
-  -- point of the outside-in rule is that a wrong assembly amended in
-  -- place is cheap and proven pieces hanging off one are not.
-  -- THE `Bs` ROUTE WAS TRIED AND IT FAILS — recorded because the
-  -- paragraph above proposed it and it is one instantiation from looking
-  -- right.  Two concrete shapes, and each dies at the OTHER end from the
-  -- one it fixes:
-  --
-  --   · DERIVED BOUND (conclusion at `hopDᵗ tm + sumW (pmᵗ V j tm) Bs n`
-  --     instead of at `B`).  `caseᵗ` checks termwise and beautifully — the
-  --     branch's derived bound is dominated summand by summand.  But the
-  --     fold gets its conclusion at `(1 + P) * B`, so the invariant decays
-  --     by a factor per step, and NOTHING recovers it: the leaf's spine is
-  --     whatever it is, and there is no earlier spine at a LEAF to compare
-  --     it against.  Globalising the bound is the error — the degradation
-  --     is per-leaf information and a single number cannot carry it.
-  --
-  --   · PRODUCT HYPOTHESIS (`∀ j → pmᵗ V j tm * Ds j ≤ B`).  This is what
-  --     makes `caseᵗ` work at a CLOSED scrutinee, and it propagates
-  --     through `mapᵉ` cleanly.  It is FALSE at the fold's own call site:
-  --     `Ds 0` is the accumulator's hop, which is exponential in its
-  --     spine, not under B.  That is the whole reason the exponent exists.
-  --
-  -- WHAT THE TWO FAILURES SAY TOGETHER, and this is the actual finding:
-  -- the multiplier condition is NOT one inequality.  A leaf of the result
-  -- is either COPIED from the environment — `varᵗ`, `fstᵗ`, `sndᵗ`, a
-  -- `caseᵗ` payload — or BUILT by a `strmᵗ`, and the two need different
-  -- arithmetic.  A copied leaf already carries its receipt at B and needs
-  -- no multiplier bound at all.  A built leaf needs one, and there are two
-  -- sufficient forms: `pmᵗ V 0 l ≤ P` (spend the drag: one extra spine
-  -- node gives the factor `2 + P`), or `pmᵗ V 0 l * hopDᵛ payload ≤ B`
-  -- (spend nothing: the parent's own `hopDᵗ` already paid, and `spnᵉ ≥ 1`
-  -- covers the resulting `2B`).  `caseᵗ` supplies the FIRST when its
-  -- scrutinee is env-dependent and the SECOND when it is closed, and the
-  -- parent's `pmᵗ`/`hopDᵗ` clause is exactly the disjunction of those two.
-  --
-  -- SO THE NEXT ATTEMPT IS A TWO-PREDICATE INDUCTION (or one predicate
-  -- over a disjunctive multiplier condition), not a third single-number
-  -- hypothesis.  Do not spend another pass looking for one — both ends of
-  -- that space are now pinned.
-  applyFn-hopSpn-obs : ∀ {n} {Γ : Ctx n} {s w} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-    (fn : Fn Γ [] [] [] s (obs w)) (x : Val Γ s) →
-    1 ≤ pmᵗ V 0 fn →
-    pmᵗ V 0 fn ≤ P →
-    hopDᵗ V η fn ≤ B →
-    valHopSpn? V η P B s x ≡ true →
-    hopDᵉ V η (applyFn fn x) ≤ (2 + P) ^ spnᵉ (applyFn fn x) * B
-
-  -- THE SUM ARM.  `Tm` has no eliminator taking a sum to its PAYLOAD's
-  -- type, so unlike `fstᵗ`/`sndᵗ` below there is no projection to push the
-  -- induction through, and the payload's receipt is a leaf.  ROUTE, and it
-  -- needs no new mathematics: every Ty is inhabited, so
-  -- `caseᵗ fn (varᵗ here) <default>` IS that eliminator — its `hopDᵗ` is
-  -- `fn`'s and its `pmᵗ V 0` is `fn`'s, both by computation, once the
-  -- default is built from `unit̂`/`nat̂`/`strmᵗ emptyᵉ` so that its own hop
-  -- and slope are zero.
-  applyFn-hopSpn-inj : ∀ {n} {Γ : Ctx n} {s a b} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-    (fn : Fn Γ [] [] [] s (a +ᵗ b)) (x : Val Γ s) →
-    pmᵗ V 0 fn ≤ P →
-    hopDᵗ V η fn ≤ B →
-    valHopSpn? V η P B s x ≡ true →
-    valHopSpn? V η P B (a +ᵗ b) (applyFn fn x) ≡ true
-
-------------------------------------------------------------------
--- THE STEP, BY INDUCTION ON THE RESULT TYPE.
---
--- The hereditary predicate follows the result's type, so the induction
--- does too — and `Tm`'s eliminators line up with it exactly.  At a pair
--- the two components ARE `applyFn (fstᵗ fn)` and `applyFn (sndᵗ fn)`
--- (evalWith's own clauses), and BOTH side conditions survive by
--- COMPUTATION: `hopDᵗ (fstᵗ fn) = hopDᵗ fn` and `pmᵗ V 0 (fstᵗ fn) =
--- pmᵗ V 0 fn`.  So the pair arm costs nothing at all, which is what makes
--- this the right induction.
---
--- At `obs` the zero-slope case is FREE, and that is `hopD-evalWith`'s
--- tight form paying off exactly as the header predicted: a fn that does
--- not plug its argument cannot exceed its own hop, which is under B.
-------------------------------------------------------------------
-
-applyFn-hopSpn-gen : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-  (u : Ty) (fn : Fn Γ [] [] [] s u) (x : Val Γ s) →
-  pmᵗ V 0 fn ≤ P →
-  hopDᵗ V η fn ≤ B →
-  valHopSpn? V η P B s x ≡ true →
-  valHopSpn? V η P B u (applyFn fn x) ≡ true
-applyFn-hopSpn-gen V η P B unitᵗ fn x hP hB hx = refl
-applyFn-hopSpn-gen V η P B boolᵗ fn x hP hB hx = refl
-applyFn-hopSpn-gen V η P B natᵗ  fn x hP hB hx = refl
-applyFn-hopSpn-gen V η P B (a ×ᵗ b) fn x hP hB hx =
-  ∧-intro (applyFn-hopSpn-gen V η P B a (fstᵗ fn) x hP hB hx)
-          (applyFn-hopSpn-gen V η P B b (sndᵗ fn) x hP hB hx)
-applyFn-hopSpn-gen V η P B (a +ᵗ b) fn x hP hB hx =
-  applyFn-hopSpn-inj V η P B fn x hP hB hx
-applyFn-hopSpn-gen {s = s} V η P B (obs w) fn x hP hB hx with pmᵗ V 0 fn in pq
-... | suc k  = T⇒≡true _ (≤⇒≤ᵇ (applyFn-hopSpn-obs V η P B fn x
-                 (subst (1 ≤_) (sym pq) (s≤s z≤n))
-                 (subst (_≤ P) (sym pq) hP) hB hx))
-... | zero   = T⇒≡true _ (≤⇒≤ᵇ
-                 (≤-trans lin (≤-trans hB (B≤powB P B (spnᵉ (applyFn fn x))))))
-  where
-  lin : hopDᵉ V η (applyFn fn x) ≤ hopDᵗ V η fn
-  lin = ≤-trans (applyFn-hopD-lin V η fn x)
-        (≤-trans (≤-reflexive
-                   (cong (λ z → hopDᵗ V η fn + z * hopDᵛ V η s x) pq))
-                 (≤-reflexive (+-identityʳ (hopDᵗ V η fn))))
-
--- and the scan fold's own shape: the argument is the pair the fold hands in
-applyFn-hopSpn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (v : Val Γ s) →
-  pmᵗ V 0 fn ≤ P →
-  hopDᵗ V η fn ≤ B →
-  valHopSpn? V η P B u ac ≡ true →
-  valHopSpn? V η P B s v ≡ true →
-  valHopSpn? V η P B u (applyFn fn (ac , v)) ≡ true
-applyFn-hopSpn V η P B fn ac v hP hB hac hv =
-  applyFn-hopSpn-gen V η P B _ fn (ac , v) hP hB (∧-intro hac hv)
-
-------------------------------------------------------------------
--- THE FOLD.  Mechanical over the list, exactly `scanVals-ofW`'s shape
--- (.Wet/Part3) — the same fold, the same `all`, the same ∧-intro — with
--- the ⊔-shaped invariant replaced by the hereditary one.  Every output
--- IS an accumulator, so the outputs' receipt and the last accumulator's
--- are the same fact collected twice.
-------------------------------------------------------------------
-
-scanVals-hopSpn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s)) →
-  pmᵗ V 0 fn ≤ P →
-  hopDᵗ V η fn ≤ B →
-  valHopSpn? V η P B u ac ≡ true →
-  all (valHopSpn? V η P B _) vs ≡ true →
-  (valHopSpn? V η P B u (proj₂ (scanVals fn ac vs)) ≡ true)
-  × (all (valHopSpn? V η P B u) (proj₁ (scanVals fn ac vs)) ≡ true)
-scanVals-hopSpn V η P B fn ac []       hP hB hac _ = hac , refl
-scanVals-hopSpn {s = s} V η P B fn ac (v ∷ vs) hP hB hac h =
-  proj₁ IH , ∧-intro hac′ (proj₂ IH)
-  where
-  hv  : valHopSpn? V η P B s v ≡ true
-  hv  = proj₁ (∧-true (valHopSpn? V η P B s v) _ h)
-  hac′ = applyFn-hopSpn V η P B fn ac v hP hB hac hv
-  IH  = scanVals-hopSpn V η P B fn (applyFn fn (ac , v)) vs hP hB hac′
-          (proj₂ (∧-true (valHopSpn? V η P B s v) _ h))
 
 
 ------------------------------------------------------------------
