@@ -108,6 +108,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 NodeState; merge-st; concat-st;
                                 switch-st; exhaust-st; scan-st; take-st; scan-f;
                                 splitBurst; hasDry; dryEvent;
+                                burstCompleted; sharedPlumb; dropSource;
                                 sched-init; st-init; budgetAt; slotsSize;
                                 opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
                                 sLvlD-suc; opIterD-suc; sIterD-suc; fLvlD-suc; fLvl; widAt;
@@ -139,7 +140,8 @@ open import Verify-Budget-Sufficient.Caps-Face
          widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
          frameStep-size-strict-suc;
          capsOK?-regs; pathSz?-len;
-         slotsCaps?-capsAt)
+         slotsCaps?-capsAt; capsOK?-parts)
+open import Verify-Budget-Sufficient.Psi-Split
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
@@ -3151,10 +3153,12 @@ postulate
   -- `fuel′` IS `peelGas g`, which is exactly `wl`'s index — which is why
   -- this leaf takes the walk face rather than recursing on its own.
   --
-  -- SO IT IS `wl d …` PLUS TWO JOBS, and those are the leaves to split out
-  -- next — never a third copy of the whole arm:
+  -- SO IT IS `wl d …` PLUS ONE JOB — the CALL-SITE DISCHARGE, and never a
+  -- second copy of the whole arm.  (The transport that stood beside it is
+  -- gone from this list because it is no longer owed: it is the parent’s
+  -- real body below, and the typechecker holds it.)
   --
-  --   1. THE CALL-SITE DISCHARGE — AND IT NEEDS NO NEW MATHEMATICS.  Every
+  --   THE CALL-SITE DISCHARGE — AND IT NEEDS NO NEW MATHEMATICS.  Every
   --      hypothesis `wl` wants at `share-sink i` and `st₁` has a PROVEN
   --      source today; the inventory was taken 2026-08-19 and is the
   --      evidence for this row's GRINDABLE class, so keep it current.
@@ -3232,73 +3236,311 @@ postulate
   --      `unconn-cons-≤`, which is the ≤ half every other consumer wants.
   --      Searching for the ≤ form and stopping is how that happens.
   --
-  --   2. THE TRANSPORT, which is where the genuinely new lemmas live.
-  --      Every one of the five conjuncts has to survive the prepended
-  --      emission, `sharedPlumb`, and the two state edits:
-  --        · the prepend carries NO values (init, close), so burstB? and
-  --          burstHopD? see it by computation, and hasDry likewise —
-  --          `dried` is not among the events prepended.
-  --        · burstHopD? — ⚠ THIS LINE WAS STALE (corrected 2026-08-20).  It
-  --          claimed the conjunct is stated at `suc (hopDᵉ F η b)`, "one MORE
-  --          than the scripted side", with "the suc unspent".  The
-  --          declaration below has NO suc: it reads `burstHopD? F (slotHop F
-  --          sl) (hopDᵉ F (slotHop F sl) b)`.  So the slack the route was
-  --          counting on does not exist and must not be budgeted for.  The
-  --          tight form still looks reachable by the same argument —
-  --          `hopDᵉ F η (input i) = η i = slotHop F sl i`, which PROVEN
-  --          slotHop-fix equates to the def's own hop — but at equality
-  --          rather than with a spare unit.
-  --        · regsLen? is PROVEN register-regsLen at st₁, then the inner
-  --          conjunct, then a `dropSource` step — and dropSource only
-  --          REMOVES entries, so it preserves an `all` outright.
-  --        · capsOK? / INV? need the two state edits, both monotone in the
-  --          easy direction (registry shrinks, a source list grows).
+  -- WHAT IS LEFT OF ARM C ONCE THE WRAP IS CHECKED: THE RECURSIVE WALK,
+  -- AND NOTHING ELSE.  This is the residue of `sharedConnect-walk-conn`,
+  -- which is now a real body — so what this owes is exactly one
+  -- instantiation of `wl` at the slot's stored def, reporting the level it
+  -- happens to reach rather than the caller's.
   --
-  -- The hypothesis list is input-wet-shared's VERBATIM, so the dispatch
-  -- passes it straight through and no call-site arithmetic hides here.
+  -- REPORTING AT ITS OWN LEVEL IS THE POINT, and it is what keeps the
+  -- statement smaller than its parent rather than a renaming of it.  The
+  -- parent receives caps receipts at the CALLER's level and reconciles the
+  -- two by re-indexing, which costs only a size receipt because every
+  -- Ψ-indexed conjunct is level-free; so no level arithmetic belongs in
+  -- here.  Deliver the walk's own `j₂` and let the parent move it.
   --
-  -- ═══ THE LEVEL RECONCILIATION IS A NON-PROBLEM, AND THE TRAP IS THAT IT
-  -- LOOKS LIKE ONE ═══
+  -- WHAT THE DISCHARGE OWES, and none of it is about this statement's
+  -- shape: the walk's telescope has to be met at `d` rather than at `b`,
+  -- which means the slot's stored size and width bounds out of the slots
+  -- receipt, the nesting and demand descents the connect edge funds, and
+  -- the hop widening from the def's own hop depth to the input's.  The
+  -- proven caps twin `sharedConnect-caps` (.Subscribe-Face) discharges the
+  -- caps-only half of that same telescope at the same arguments and is the
+  -- template; what it does not cover is the wet half, which is why this is
+  -- still a postulate and not an assembly.
   --
-  -- The obvious reading of this statement is that it cannot be proven at
-  -- all: `j′` is a PARAMETER, fixed by the caller, while the only recursion
-  -- available is `wl` at the def, whose Σ mints its OWN witness.  Nothing in
-  -- either telescope orders the two — `wl`'s level receipt is against
-  -- `opIterD … (suc j)` and this row's `jle` is against `opIterD … j`, and
-  -- there is no lemma between them.  So `INV?` and `burstB?`, the only two
-  -- of the five conjuncts that carry a level, appear to be stranded: the IH
-  -- proves them at a cap this statement cannot reach.
-  --
-  -- That reading is what nearly bought a restatement of five definitions
-  -- (make the whole input-wet family Σ-shaped, mirroring walk-mu, so the
-  -- witness is chosen here instead of received).  It is UNNECESSARY, and the
-  -- reason is that the two stranded conjuncts SPLIT:
-  --
-  --   INV? Ψ B  = stBounded? B ∧ fnCapBounded? Ψ ∧ (|reg| ≤ᵇ B)
-  --               ∧ regsB? B Ψ ∧ (slotsSize ≤ᵇ B) ∧ (slotsFnCap ≤ᵇ Ψ)
-  --   burstB? B Ψ = per value, (sizeᵛ ≤ᵇ B) ∧ (fnCapᵛ ≤ᵇ Ψ)
-  --
-  -- Every B-indexed half is CAPS content, and this row already receives it
-  -- at the caller's own level — that is what `cOK′` and `bC` are for, and it
-  -- is why the fixed-j′ shape is right rather than broken.  Every Ψ-indexed
-  -- half carries NO level at all, so it needs no reconciliation: it is
-  -- supplied by the Ψ-pure face over `subscribeE`, which is stated with no
-  -- level index and no caps receipts precisely so that it can be spent here.
-  -- The zips are PROVEN and already exist (the B?-halves family for the
-  -- burst, the of-parts family for the registry and the paths); the splits
-  -- likewise (the -parts family off INV? and off capsOK?).
-  --
-  -- So `wl` is spent on the THREE conjuncts that are level-free anyway —
-  -- burstHopD?, hasDry, regsLen? — and on nothing else.  The apparent
-  -- reconciliation was an artifact of trying to take all five from one
-  -- source.
-  --
-  -- ⚠ AND THE ARM WRAP IS ALREADY PROVEN: `connectWrap-wet` (.Wet/Part2)
-  -- takes INV? and burstB? at ONE cap and delivers both for the wrapped
-  -- result, covering BOTH arms in a single `if c then … else …` statement,
-  -- so the prepended emit, `sharedPlumb`, and the latch's registry drop are
-  -- not this row's work.  Do NOT re-derive them from `sharedPlumb-B` and
-  -- `latch-INV`; those are what it is built from.
+  -- ⚠ AND THE HOP CONJUNCT IS TIGHT — THERE IS NO SPARE UNIT.  A note here
+  -- once claimed it is stated at `suc (hopDᵉ F η b)`, "one MORE than the
+  -- scripted side", with the suc unspent; the declaration below has no
+  -- `suc` at all.  So the widening from the def's own hop depth to the
+  -- input's has to land at EQUALITY, and the route that does is `hopDᵉ F η
+  -- (input i) = η i = slotHop F sl i` against PROVEN slotHop-fix — not an
+  -- arithmetic slack that does not exist.
+  sharedConnect-inner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ)
+    (fuel : Gas) → WalkLevelAt fuel →
+    ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+    (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
+    Sched.slots sched i ≡ shared d {ok = ok} →
+    b ≡ inputᶜ i →
+    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- OPERATION rather than a convenience of today's caller — which is
+    -- what makes this a restatement of a true theorem and not a
+    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
+    -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
+    -- operation on an already-connected share; the unconditioned
+    -- statement was about a case that does not occur.
+    --
+    -- Without it two of this row's own named ingredients do not apply:
+    -- `share-step` (.Caps-Nest) and `unconn-insert` (.Measures) each take
+    -- this equation as a premise, and no route avoids them, because
+    -- `residAt sl cs i` is `if memberSource (toℕ i) cs then 0 else
+    -- syncSizeᵉ d` — a connected slot donates ZERO, leaving `nest d sl
+    -- (i ∷ cs) ≤ bud-1` unreachable and `dBound-connect`'s `U′ < U`
+    -- unavailable, so the single recursive `wl` call cannot be funded.
+    memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
+    -- depthCONN, not depthE, and this is forced rather than cosmetic: in
+    -- the dispatch's arm C the slot scrutinee is with-abstracted, so a
+    -- `depthE g b κ …` hypothesis there reduces to `depthConn g i d′ κ …`
+    -- while the caller's own `dpt` still reads `depthSlot … (Sched.slots
+    -- sched i)`, and the two are not convertible.  Stating it at depthConn
+    -- also puts this face on exactly the proven twin's telescope
+    -- (sharedConnect-caps, .Subscribe-Face), which is where it belongs.
+    depthConn (gs fuel) i d κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    gs fuel hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = subscribeE fuel d (share-sink i) bid now sched
+              (register (toℕ i) κ
+                (record st { connectedShares =
+                               toℕ i ∷ EvalSt.connectedShares st }))
+    in Σ ℕ λ j₂ →
+       (INV? Ψ (Caps.cSize (frameStep (suc j + j₂) c))
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (suc j + j₂) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                     (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+
+-- ARM C, ASSEMBLED — THE WRAP AND THE LEVEL RECONCILIATION ARE NOW
+-- CHECKED, and only the recursive walk is still postulated
+-- (`sharedConnect-inner-wet` above).
+--
+-- THE SPLIT IS THE WHOLE CONTENT.  Both of the level-sensitive conjuncts
+-- factor into a B-indexed half and a Ψ-indexed half, and the Ψ half
+-- MENTIONS NO LEVEL — so the walk's facts, which arrive at whatever level
+-- the recursion happened to reach, cross to the caller's level without any
+-- ordering between the two bounds at all: the Ψ half is carried untouched
+-- and the size half is RE-SUPPLIED from the caps receipt this statement
+-- already takes as a hypothesis.  That is `INV?-reindex` and
+-- `burstB?-reindex` (.Psi-Split), and it is why this face can be stated at
+-- a fixed caller-supplied level and still be provable.
+--
+-- ⚠ A LEVEL RECONCILIATION READ AS UNPROVABLE HERE FOR A WHILE, and the
+-- reading nearly bought a restatement of five definitions in this family.
+-- What was missing was not a lemma but the observation above; the split and
+-- the zips were already proven and already in the tree.  Read
+-- `INV?-reindex`'s own header before concluding that two levels have to be
+-- ordered.
+--
+-- THE OTHER THREE CONJUNCTS ARE THE WRAP, and they are computation plus a
+-- relabel.  The prepended emit carries `init` and `close _ exhausted`
+-- only: `hopDev?` is `true` on both and `dryEvent` fires on `close _
+-- dried` ALONE, so the hop and dry conjuncts are `refl` on the prepend and
+-- a `sharedPlumb` transport on the tail.  The latch arm's registry shrinks
+-- under `dropSource`, and `regsLen?` is an `all`, so `dropSource-all`
+-- carries it.
+--
+-- THE HYPOTHESIS LIST IS THE DISPATCH'S VERBATIM, so arm C's caller passes
+-- it straight through and no call-site arithmetic hides here.
+--
+-- SEALED, and this is not optional: the row is consumed transitively by
+-- `budget-sufficient`, whose towers OOM the checker on an unfoldable body
+-- on this spine.  The with-abstraction and the untyped `where` bindings
+-- rule out a plain `abstract` block, so this takes the mandated
+-- private-impl plus abstract-alias shape.
+private
+  sharedConnect-walk-conn-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+    (fuel : Gas) → WalkLevelAt fuel →
+    ∀ (i : Fin n) (b : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+    (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
+    Sched.slots sched i ≡ shared d {ok = ok} →
+    b ≡ inputᶜ i →
+    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- OPERATION rather than a convenience of today's caller — which is
+    -- what makes this a restatement of a true theorem and not a
+    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
+    -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
+    -- operation on an already-connected share; the unconditioned
+    -- statement was about a case that does not occur.
+    --
+    -- Without it two of this row's own named ingredients do not apply:
+    -- `share-step` (.Caps-Nest) and `unconn-insert` (.Measures) each take
+    -- this equation as a premise, and no route avoids them, because
+    -- `residAt sl cs i` is `if memberSource (toℕ i) cs then 0 else
+    -- syncSizeᵉ d` — a connected slot donates ZERO, leaving `nest d sl
+    -- (i ∷ cs) ≤ bud-1` unreachable and `dBound-connect`'s `U′ < U`
+    -- unavailable, so the single recursive `wl` call cannot be funded.
+    memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Caps.cReg c ≤ Caps.cSize c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
+    -- depthCONN, not depthE, and this is forced rather than cosmetic: in
+    -- the dispatch's arm C the slot scrutinee is with-abstracted, so a
+    -- `depthE g b κ …` hypothesis there reduces to `depthConn g i d′ κ …`
+    -- while the caller's own `dpt` still reads `depthSlot … (Sched.slots
+    -- sched i)`, and the two are not convertible.  Stating it at depthConn
+    -- also puts this face on exactly the proven twin's telescope
+    -- (sharedConnect-caps, .Subscribe-Face), which is where it belongs.
+    depthConn (gs fuel) i d κ bid now sched st ≤ dep →
+    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+    fnCapᵉ b ≤ Ψ →
+    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+    2 ≤ Ŝ →
+    F ≡ Ŝ →
+    R̂ ≡ hopR Ŝ →
+    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+    gs fuel hasAtLeast suc G →
+    pathLen κ + G ≤ ℓ →
+    regsLen? ℓ (EvalSt.registry st) ≡ true →
+    let r = sharedConnect (gs fuel) i d κ bid now sched st
+    in capsOK? (frameStep (j + j′) c)
+               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                     (proj₁ r) ≡ true)
+       × (hasDry (proj₁ r) ≡ false)
+       × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+  sharedConnect-walk-conn-go {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ fuel wl i b κ bid now sl
+    sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
+    s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
+    with burstCompleted (proj₁ (subscribeE fuel d (share-sink i) bid now sched
+                                 (register (toℕ i) κ
+                                   (record st { connectedShares =
+                                                  toℕ i ∷ EvalSt.connectedShares st }))))
+  ... | true =
+      INV?-reindex Ψ B₂ B′ sched₁ DROP (proj₁ WRAP) (proj₁ CP) RL (proj₁ (proj₂ CP)) SS
+    , burstB?-reindex (frameStep (j + j′) c) sl B₂ Ψ
+        (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+            at bid from toℕ i as subscribe) ∷ sharedPlumb burst)
+        (proj₂ WRAP) bC
+    , ∧-intro refl
+        (sharedPlumb-hopD F (slotHop F sl) (hopDᵉ F (slotHop F sl) b) burst iHOP)
+    , sharedPlumb-nodry burst iDRY
+    , dropSource-all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
+        (toℕ i) (EvalSt.registry st₂) iRGS
+    where
+    st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
+    st₁ = register (toℕ i) κ st₀
+    res = subscribeE fuel d (share-sink i) bid now sched st₁
+    burst  = proj₁ res
+    sched₁ = proj₁ (proj₂ res)
+    st₂    = proj₂ (proj₂ res)
+    DROP = record st₂ { registry = dropSource (toℕ i) (EvalSt.registry st₂)
+                      ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
+    IW = sharedConnect-inner-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j fuel wl i b κ bid now sl
+           sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx
+           dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
+    j₂ = proj₁ IW
+    B₂ = Caps.cSize (frameStep (suc j + j₂) c)
+    B′ = Caps.cSize (frameStep (j + j′) c)
+    iINV = proj₁ (proj₂ IW)
+    iBB  = proj₁ (proj₂ (proj₂ IW))
+    iHOP = proj₁ (proj₂ (proj₂ (proj₂ IW)))
+    iDRY = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IW))))
+    iRGS = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IW))))
+    WRAP = connectWrap-wet Ψ B₂ i bid true burst sched₁ st₂ iINV iBB
+    CP = capsOK?-parts (frameStep (j + j′) c) sched₁ DROP cOK′
+    RL = ≤ᵇ-widen (length (EvalSt.registry DROP))
+           (frameStep-reg≤size c (j + j′) (≤-trans (s≤s z≤n) 2≤S) hCR)
+           (proj₂ (proj₂ (proj₂ (proj₂ CP))))
+    slEq₁ : Sched.slots sched₁ ≡ sl
+    slEq₁ = trans (KeepsC.slotsEq
+                     (subscribeE-keeps fuel d (share-sink i) bid now sched st₁)) slEq
+    c≤B′ : Caps.cSize c ≤ B′
+    c≤B′ = subst (λ x → Caps.cSize x ≤ B′) (frameStep-0 c)
+             (proj₁ (frameStep-mono-j c 2≤S {0} {j + j′} z≤n))
+    SS = T⇒≡true _ (≤⇒≤ᵇ (subst (λ x → slotsSize x ≤ B′) (sym slEq₁)
+                                (≤-trans slSz c≤B′)))
+  ... | false =
+      INV?-reindex Ψ B₂ B′ sched₁ st₂ (proj₁ WRAP) (proj₁ CP) RL (proj₁ (proj₂ CP)) SS
+    , burstB?-reindex (frameStep (j + j′) c) sl B₂ Ψ
+        (((init (toℕ i) ∷ []) at bid from toℕ i as subscribe) ∷ sharedPlumb burst)
+        (proj₂ WRAP) bC
+    , ∧-intro refl
+        (sharedPlumb-hopD F (slotHop F sl) (hopDᵉ F (slotHop F sl) b) burst iHOP)
+    , sharedPlumb-nodry burst iDRY
+    , iRGS
+    where
+    st₀ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
+    st₁ = register (toℕ i) κ st₀
+    res = subscribeE fuel d (share-sink i) bid now sched st₁
+    burst  = proj₁ res
+    sched₁ = proj₁ (proj₂ res)
+    st₂    = proj₂ (proj₂ res)
+    IW = sharedConnect-inner-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j fuel wl i b κ bid now sl
+           sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx
+           dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
+    j₂ = proj₁ IW
+    B₂ = Caps.cSize (frameStep (suc j + j₂) c)
+    B′ = Caps.cSize (frameStep (j + j′) c)
+    iINV = proj₁ (proj₂ IW)
+    iBB  = proj₁ (proj₂ (proj₂ IW))
+    iHOP = proj₁ (proj₂ (proj₂ (proj₂ IW)))
+    iDRY = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ IW))))
+    iRGS = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IW))))
+    WRAP = connectWrap-wet Ψ B₂ i bid false burst sched₁ st₂ iINV iBB
+    CP = capsOK?-parts (frameStep (j + j′) c) sched₁ st₂ cOK′
+    RL = ≤ᵇ-widen (length (EvalSt.registry st₂))
+           (frameStep-reg≤size c (j + j′) (≤-trans (s≤s z≤n) 2≤S) hCR)
+           (proj₂ (proj₂ (proj₂ (proj₂ CP))))
+    slEq₁ : Sched.slots sched₁ ≡ sl
+    slEq₁ = trans (KeepsC.slotsEq
+                     (subscribeE-keeps fuel d (share-sink i) bid now sched st₁)) slEq
+    c≤B′ : Caps.cSize c ≤ B′
+    c≤B′ = subst (λ x → Caps.cSize x ≤ B′) (frameStep-0 c)
+             (proj₁ (frameStep-mono-j c 2≤S {0} {j + j′} z≤n))
+    SS = T⇒≡true _ (≤⇒≤ᵇ (subst (λ x → slotsSize x ≤ B′) (sym slEq₁)
+                                (≤-trans slSz c≤B′)))
+
+abstract
   sharedConnect-walk-conn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (fuel : Gas) → WalkLevelAt fuel →
@@ -3336,6 +3578,7 @@ postulate
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
     -- depthCONN, not depthE, and this is forced rather than cosmetic: in
     -- the dispatch's arm C the slot scrutinee is with-abstracted, so a
     -- `depthE g b κ …` hypothesis there reduces to `depthConn g i d′ κ …`
@@ -3370,6 +3613,8 @@ postulate
                      (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+  sharedConnect-walk-conn = sharedConnect-walk-conn-go
+
 
 -- ARM C, ASSEMBLED — the gas split, and the g0 half is CLOSED HERE.
 -- `sharedConnect g0 = dryBurst id` would emit `close _ dried` and so fail
@@ -3425,6 +3670,7 @@ sharedConnect-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   nest b sl (EvalSt.connectedShares st) ≤ bud →
+  suc (sizeᵉ b) ≤ ops →
   -- depthCONN, not depthE, and this is forced rather than cosmetic: in
   -- the dispatch's arm C the slot scrutinee is with-abstracted, so a
   -- `depthE g b κ …` hypothesis there reduces to `depthConn g i d′ κ …`
@@ -3460,12 +3706,12 @@ sharedConnect-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (hasDry (proj₁ r) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 sharedConnect-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g0 wl i b κ bid now sl
-  sched st d _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
+  sched st d _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
 sharedConnect-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) wl i b κ bid now sl
-  sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle =
   sharedConnect-walk-conn c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ fuel wl i b κ bid now sl
-    sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+    sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
     s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
 
 
@@ -3515,6 +3761,7 @@ input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     nest b sl (EvalSt.connectedShares st) ≤ bud →
+    suc (sizeᵉ b) ≤ ops →
     depthE g b κ bid now sched st ≤ dep →
     INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
     fnCapᵉ b ≤ Ψ →
@@ -3551,14 +3798,14 @@ input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- (Agda re-elaborates `Sched.slots sched i` un-reduced).  The `in` form
 -- keeps it, at the cost of a scripted branch that slotEq itself refutes.
 input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
-  d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
   with Sched.slots sched i in slotEq2
 -- the slot cannot be scripted: this face was dispatched on `shared`
 ... | scripted s with slotEq
 ...   | ()
 input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
-  d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
   | shared d′
   with memberSource (toℕ i) (EvalSt.completedSources st)
@@ -3585,7 +3832,7 @@ input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now 
     -- above.  It IS the freshness premise the leaf now takes, and it is
     -- free here precisely because this arm is the not-yet-connected
     -- branch — the same branch `subscribeSharedSlot` guards on.
-    sched st d′ slotEq2 refl eqM 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt
+    sched st d′ slotEq2 refl eqM 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt
     invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle
 
 postulate
@@ -3754,6 +4001,11 @@ input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   nest b sl (EvalSt.connectedShares st) ≤ bud →
+  -- TAKEN AND DROPPED.  The scripted slot never connects, so nothing here
+  -- needs an ops ledger; this is carried only to keep the telescope aligned
+  -- with input-wet-core's, which DOES need it for the connect arm.  It is
+  -- not passed on, so the postulate above stays at full strength.
+  suc (sizeᵉ b) ≤ ops →
   depthE g b κ bid now sched st ≤ dep →
   INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
   fnCapᵉ b ≤ Ψ →
@@ -3782,7 +4034,7 @@ input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (hasDry (proj₁ r) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 input-wet-scripted c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid now sl sched st
-  src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst dpt invW fnC pB
+  src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst _ dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs cOK′ bC bCnt jle =
   let (a₁ , a₂ , a₃ , a₄) =
         input-wet-scripted-four c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid
@@ -3830,6 +4082,7 @@ input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   nest b sl (EvalSt.connectedShares st) ≤ bud →
+  suc (sizeᵉ b) ≤ ops →
   depthE g b κ bid now sched st ≤ dep →
   INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
   fnCapᵉ b ≤ Ψ →
@@ -3883,6 +4136,7 @@ input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   nest b sl (EvalSt.connectedShares st) ≤ bud →
+  suc (sizeᵉ b) ≤ ops →
   depthE g b κ bid now sched st ≤ dep →
   INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
   fnCapᵉ b ≤ Ψ →
@@ -3911,7 +4165,7 @@ input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (hasDry (proj₁ r) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g0 i b κ bid now sl sched st
-  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
+  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
 input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) i b κ bid now sl sched st =
   input-wet-core c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel)
     (λ b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ → walkFace b′ c′ Ψ′ F′ Ŝ′ R̂′ G′ ℓ′ L̂′ dep′ bud′ ops′ j″ fuel)
@@ -3944,7 +4198,7 @@ walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   C4 = proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
   WET = input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i (input i) κ
           bid now sl sched st refl
-          2≤S 1≤R hCR slEq slC slSz inv szb pC lC nst dpt
+          2≤S 1≤R hCR slEq slC slSz inv szb pC lC nst hidx dpt
           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
           C1 C2 C3 C4
 

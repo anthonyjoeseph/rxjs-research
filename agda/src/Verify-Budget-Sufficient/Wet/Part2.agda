@@ -589,6 +589,28 @@ sharedPlumb-B B Ψ []         h = refl
 sharedPlumb-B B Ψ (em ∷ ems) h =
   ∧-intro (proj₁ (∧-true _ _ h)) (sharedPlumb-B B Ψ ems (proj₂ (∧-true _ _ h)))
 
+-- THE SAME RELABEL, FOR THE OTHER TWO FLAVOURS THE WALK CARRIES.  It is
+-- one fact three times: `sharedPlumb` rewrites an emit's KIND and touches
+-- nothing else, and none of the three predicates reads the kind.  They sit
+-- together so the next flavour lands here too rather than growing a fourth
+-- copy of the same induction somewhere downstream.
+sharedPlumb-hopD : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) (η : Fin n → ℕ) (r : ℕ)
+  (str : Stream Γ u) →
+  burstHopD? V η r str ≡ true → burstHopD? V η r (sharedPlumb str) ≡ true
+sharedPlumb-hopD V η r []         h = refl
+sharedPlumb-hopD V η r (em ∷ ems) h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (sharedPlumb-hopD V η r ems (proj₂ (∧-true _ _ h)))
+
+-- dryness is a DISJUNCTION rather than a conjunction, so this one peels
+-- with ∨-false; the shape is otherwise identical
+sharedPlumb-nodry : ∀ {n} {Γ : Ctx n} {u} (str : Stream Γ u) →
+  hasDry str ≡ false → hasDry (sharedPlumb str) ≡ false
+sharedPlumb-nodry []         h = refl
+sharedPlumb-nodry (em ∷ ems) h
+  with ∨-false (any dryEvent (InstEmit.events em)) (hasDry ems) h
+... | hd , tl rewrite hd = sharedPlumb-nodry ems tl
+
 -- the completion latch: dropping a source SHRINKS the registry on
 -- both riders, and completedSources / connectedShares are read by no
 -- conjunct at all

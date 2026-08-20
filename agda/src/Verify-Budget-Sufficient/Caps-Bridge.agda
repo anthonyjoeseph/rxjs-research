@@ -102,9 +102,8 @@ open import Verify-Budget-Sufficient.Caps
          frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup;
          B2-cReg≤cSize; frameStep-reg≤size)
 open import Verify-Budget-Sufficient.Burst-Walk
-  using (cascadeGo-nodry; valΨ?;
-         frameBΨ?; pathBΨ?; regsBΨ?;
-         frameB?-of-parts; pathB?-of-parts; regsB?-of-parts)
+  using (cascadeGo-nodry)
+open import Verify-Budget-Sufficient.Psi-Split
 -- the wet contract itself, stated over the COLLAPSED walk (2026-08-13).
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
@@ -204,31 +203,6 @@ slots-tick a id sched st =
 -- the conclusion is stated at `Ψ′ = ΨAt e sl′` (output slots), the
 -- walk runs at `Ψ = ΨAt e sl` (input slots) — closes by S2 above.
 ------------------------------------------------------------------
-
--- reverse projections: pulling the Ψ-only half back OUT of an already
--- landed frameB?/pathB?/regsB? (Measures.agda) — the other direction
--- of frameB?-of-parts/pathB?-of-parts/regsB?-of-parts below.
-frameBΨ?-of : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) {B Ψ : ℕ} →
-  frameB? B Ψ f ≡ true → frameBΨ? Ψ f ≡ true
-frameBΨ?-of (map-f fn)         h = proj₂ (∧-true _ _ h)
-frameBΨ?-of (scan-f fn _)      h = proj₂ (∧-true _ _ h)
-frameBΨ?-of (take-f _)         h = refl
-frameBΨ?-of (from-inner _ _ _) h = refl
-frameBΨ?-of (thru-outer _ _)   h = refl
-
-pathBΨ?-of : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B Ψ : ℕ} →
-  pathB? B Ψ p ≡ true → pathBΨ? Ψ p ≡ true
-pathBΨ?-of root           h = refl
-pathBΨ?-of (share-sink i) h = refl
-pathBΨ?-of (f ↠ p) {B} {Ψ} h
-  with ∧-true (frameB? B Ψ f) (pathB? B Ψ p) h
-... | hf , hp = ∧-intro (frameBΨ?-of f hf) (pathBΨ?-of p hp)
-
-regsBΨ?-of : ∀ {n} {Γ : Ctx n} {t}
-  (rs : List (RegId × Source × Chain Γ t)) {B Ψ : ℕ} →
-  regsB? B Ψ rs ≡ true → regsBΨ? Ψ rs ≡ true
-regsBΨ?-of rs h =
-  all-impl _ _ (λ en → pathBΨ?-of (proj₂ (proj₂ (proj₂ en)))) rs h
 
 -- embedding a fixed bound B into capᴱ form: B ≤ 2 + 2·B ≤ capᴱ B 3,
 -- the second step by `pow1` (Measures.agda, already proven).  The `≤`
