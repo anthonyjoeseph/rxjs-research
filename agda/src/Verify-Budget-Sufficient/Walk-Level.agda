@@ -1197,23 +1197,20 @@ postulate
   -- still true and still the point: "a cheap axis is not a cheap row" —
   -- the hop axis being the identity does not author take-f's push face.
   --
-  -- THE `zero` ARM IS AN ASSEMBLY WAITING TO BE WRITTEN, and it is the
-  -- cheapest real progress available on this row.  `subscribeE fuel
-  -- (takeᵉ count b)` at `evalTm count ≡ zero` is
-  -- `let (burst , sched₁) = oneShotBurst [] id sched in burst , sched₁ , st`
-  -- (Evaluator:1441-44) — the SAME TERM, symbol for symbol, as the
-  -- emptyᵉ clause at Evaluator:1432-34.  So the arm is walk-empty's Σ at
-  -- a different `b`, and every hypothesis transports the easy way, since
-  -- each measure is SMALLER at emptyᵉ: sizeᵉ 1 ≤ suc (sizeᵗ c + sizeᵉ e),
-  -- syncSizeᵉ 1 likewise, hopDᵉ 0 ≤ hopDᵉ e (Exp:461-463, 514-516,
-  -- Hop-Depth:198-203), and dBound is monotone in the two positions that
-  -- move (dBound-mono-r, and dBound-μ for the strict step in s).
-  -- Splitting this row into a real body over walk-empty plus a
-  -- `walk-take-suc` leaf is the postulate-to-assembly conversion, and it
-  -- makes the arm's fit CHECKED instead of asserted.
-  walk-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
-    WalkStmt {e = e} (takeᵉ cnt b)
+  -- THE `zero` ARM IS DISCHARGED (2026-08-20) — `walk-take-zero` below is a
+  -- real body over walk-empty, and `walk-take` is the dispatcher, so the
+  -- split is landed rather than described.  What that arm cost, for the
+  -- next split of this shape: three transports were `z≤n` outright (dWⱽ,
+  -- depthE and fnCapᵉ are all 0 at emptyᵉ), the two size axes were `≤-trans`
+  -- against a `suc`, and the only new algebra was dBound-mono-rs.
+  -- ONLY THE `suc k` ARM IS A LEAF NOW (2026-08-20).  `walk-take` itself
+  -- is a real body below, dispatching on `evalTm cnt`; the `zero` arm is
+  -- PROVEN there from walk-empty.  So this leaf carries the arm that
+  -- actually recurses and pushes, and its residue is exactly take-f's
+  -- unauthored push face — nothing else.
+  walk-take-suc : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (k : ℕ) →
+    evalTm cnt ≡ suc k → WalkStmt {e = e} (takeᵉ cnt b)
   -- the eight OTHER conjuncts of the scan clause — DIFFICULTY, and it is
   -- walk-map's census verbatim at this shape.
   --
@@ -1686,6 +1683,21 @@ dBound-mono-U : ∀ (V R : ℕ) {U U′} (r s : ℕ) → U ≤ U′ →
 dBound-mono-U V R r s hU =
   +-monoʳ-≤ s (*-monoʳ-≤ (suc V) (+-monoʳ-≤ r (*-monoʳ-≤ (suc R) hU)))
 
+-- BOTH POSITIONS AT ONCE, WEAKLY — dBound-mono-r's shape with the summand
+-- moving too.  dBound-struct covers this only when s moves STRICTLY, and
+-- walk-take-zero needs it at s = 1 against a `suc`, where weak is what
+-- holds.  V R U EXPLICIT for the reason dBound-struct's header gives:
+-- dBound unfolds through _*_, which matches on its first argument, so
+-- implicits in these positions get stuck.
+-- EVERY position explicit, r and s included, and that is not tidiness:
+-- with them implicit the conclusion has to be unified against an already
+-- reduced `dBound`, where `0 + x` has collapsed to `x` and `r := 0` is no
+-- longer recoverable — UnsolvedMetaVariables at the call site.
+dBound-mono-rs : ∀ (V R U r r′ s s′ : ℕ) → r ≤ r′ → s ≤ s′ →
+  dBound V R U r s ≤ dBound V R U r′ s′
+dBound-mono-rs V R U r r′ s s′ hr hsz =
+  +-mono-≤ hsz (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) hr))
+
 dBound-mono-r : ∀ (V R U : ℕ) {r r′} (s : ℕ) → r ≤ r′ →
   dBound V R U r s ≤ dBound V R U r′ s
 dBound-mono-r V R U {r} {r′} s hr =
@@ -2004,6 +2016,86 @@ walk-defer body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
        (subst (_≤ ℓ) (+-comm (pathLen κ) 1)
               (≤-trans (+-monoʳ-≤ (pathLen κ) (≤-trans (s≤s z≤n) dmd)) lℓ))
        rgs
+
+-- THE take CLAUSE, ASSEMBLED — and the `zero` arm is PROVEN, not a leaf.
+--
+-- `subscribeE fuel (takeᵉ count b)` at `evalTm count ≡ zero` is
+-- `let (burst , sched₁) = oneShotBurst [] id sched in burst , sched₁ , st`
+-- (Evaluator:1441-44), the SAME TERM symbol for symbol as the emptyᵉ clause
+-- at Evaluator:1432-34.  So the arm IS walk-empty at a different subscribed
+-- expression, and every hypothesis transports the easy way because every
+-- measure is SMALLER at emptyᵉ:
+--
+--   sizeᵉ emptyᵉ = 1 ≤ suc (sizeᵗ cnt + sizeᵉ b)     (Rx.Exp:461,463)
+--   syncSizeᵉ likewise                               (Rx.Exp:514,516)
+--   dWⱽ … emptyᵉ = 0                                 (Rx.Frame-Width:347)
+--   depthE fuel emptyᵉ … = 0                         (.Caps-Depth:219)
+--   fnCapᵉ emptyᵉ = 0                                (.Measures:3771)
+--   nest e sl cs = syncSizeᵉ e + resid sl cs         (.Caps-Nest:134)
+--
+-- and `dBound V R U r s = s + suc V * (r + suc R * U)` (.Measures:1936) is
+-- monotone in both moving positions by inspection, so the demand hypothesis
+-- needs no lemma — `1 ≤ syncSizeᵉ (takeᵉ …)` is `s≤s z≤n` because that clause
+-- is literally a `suc`.
+--
+-- `rewrite ecEq` IS WHAT LETS IT REDUCE, and it is not optional: the
+-- evaluator's takeᵉ clause opens `with evalTm count`, so the goal is stuck on
+-- that scrutinee until it is known.  Precedent, same evaluator clause and same
+-- move: `subscribeE-take0-wf` (.Verify-Well-Formed/Part8:272).
+--
+-- THE ONE CONJUNCT THAT IS NOT A TRANSPORT is burstHopD?: walk-empty reports
+-- it at `hopDᵉ F η emptyᵉ = 0` and this clause is asked for it at
+-- `hopDᵉ F η (takeᵉ cnt b) = hopDᵉ F η b` (Rx.Hop-Depth:198,203).  Widening
+-- upward is exactly burstHopD?-widen above.
+walk-take-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
+  evalTm cnt ≡ zero → WalkStmt {e = e} (takeᵉ cnt b)
+walk-take-zero {u = u} cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs
+  rewrite ecEq =
+  let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈ , a₉) =
+        walk-empty c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+          2≤S 1≤R hCR slEq slC slSz inv
+          (≤-trans (s≤s z≤n) szb) z≤n pC lC
+          (≤-trans (+-monoˡ-≤ _ (s≤s z≤n)) nst)
+          (≤-trans (s≤s (s≤s z≤n)) hidx) z≤n
+          invW z≤n pB s2 fS rS ceil lb
+          (≤-trans (dBound-mono-rs Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+                                   0 (hopDᵉ F (slotHop F sl) b)
+                                   1 (syncSizeᵉ (takeᵉ cnt b))
+                                   z≤n (s≤s z≤n)) dmd)
+          gas lℓ rgs
+  in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆
+     -- the stream is given EXPLICITLY: left as `_` it is a meta Agda tries
+     -- to solve by inverting burstHopD?'s foldr, which hits the inversion
+     -- depth limit and (under -W error) fails the build.
+     , burstHopD?-widen F (slotHop F sl) 0 (hopDᵉ F (slotHop F sl) b)
+         (proj₁ (subscribeE g (emptyᵉ {t = u}) κ bid now sched st)) z≤n a₇
+     , a₈ , a₉
+
+-- THE DISPATCH.  Two arms, and the split is the point: the `zero` arm never
+-- subscribes, so it owes no push face, while the `suc k` arm mints a node,
+-- recurses and pushes.  Keeping them in one postulate hid the free case —
+-- "a postulate hides not just unpaid premises but whole free cases"
+-- (subscribeE-take0-wf's own header, on this same clause).
+walk-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
+  WalkStmt {e = e} (takeᵉ cnt b)
+-- NOT a `with`, and the reason is worth keeping: `with evalTm cnt in ecEq`
+-- ABSTRACTS the scrutinee out of the goal, so the branch is asked for
+-- `subscribeE … | evalWith cnt []` while each leaf's type still says
+-- `subscribeE …` — UnequalTerms on `Sched.live`, which reads as a proof
+-- error and is really the with-abstraction.  Matching on a FRESH variable
+-- inside `go` leaves the goal untouched and needs no telescope spelled out,
+-- since the whole statement is `WalkStmt`.  It is also the cheaper shape:
+-- a `with` here would abstract over a fully-applied closed goal, which is
+-- what the Typing.With cost note warns about.
+walk-take {Γ = Γ} {e = e} cnt b = go (evalTm cnt) refl
+  where
+  go : (m : Val Γ natᵗ) → evalTm cnt ≡ m → WalkStmt {e = e} (takeᵉ cnt b)
+  go zero    eq = walk-take-zero cnt b eq
+  go (suc k) eq = walk-take-suc  cnt b k eq
 
 -- THE SOURCE HALF, ASSEMBLED.  Both conjuncts are the frame leaf's,
 -- lifted from headline to hereditary — free, per `valHopSpn?-intro`.

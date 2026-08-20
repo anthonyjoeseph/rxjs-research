@@ -121,14 +121,18 @@ row governed by it inherits that caveat.
   itself open, and its header records the search that came back empty. The
   claim that the caps face proves this "in the same position" is wrong in kind:
   `capsOK?` bounds all nodes and identifies none.
-- **`walk-map` / `walk-take` / `walk-scan-rest`** (Walk-Level) — DIFFICULTY, the
+- **`walk-map` / `walk-take-suc` / `walk-scan-rest`** (Walk-Level) — DIFFICULTY, the
   FALSITY raise WITHDRAWN 2026-08-20: the chain frames pass `fuel` unchanged to
   both the recursive subscribe and the push, so series Q's gas exhaustion cannot
   be sited at any of the three, and that region is unreachable by measurement
   anyway (compiled harness, 26 points, exponential in d·k). Residue is the
   unauthored per-frame push face, whose frame-generic form is REFUTED at
-  `burstHopD?` — neither ruled-FALSITY conjunct. `walk-take`'s `zero` arm is an
-  assembly over `walk-empty` waiting to be written.
+  `burstHopD?` — neither ruled-FALSITY conjunct.
+- **`walk-take-zero`** — DISCHARGED 2026-08-20. `walk-take` is now a real body
+  dispatching on `evalTm cnt`; the `zero` arm is proven from `walk-empty` (same
+  evaluator term, every measure smaller), leaving `walk-take-suc` to carry only
+  the arm that recurses and pushes. Raises the value of `walk-empty` below: it
+  now has two consumers, so its fit is checked twice.
 - **`walk-defer-eight` / `walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in
   that order, and audited 2026-08-20. None recurses or pushes, so none needs a
   push face and none reaches the ledger conjuncts. `walk-defer-eight` is the
