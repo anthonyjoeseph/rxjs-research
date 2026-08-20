@@ -12,7 +12,9 @@ else lives in the code.
   superseded plans, no references to code that no longer exists. Git history
   is the archive.
   **`make roadmap-check` ENFORCES THE DATE HALF** — this file names no calendar
-  date, anywhere, and one is a build failure. It is the half a machine can see
+  date, anywhere, and one is a build failure. The same scan holds CLAUDE.md to
+  the rule, for the neighbouring reason: this file must be CURRENT, that one
+  must be TIMELESS. It is the half a machine can see
   with no judgement, and it catches most of the rest by proxy: history arrives
   here WITH a timestamp attached, because the writer knows the reader will want
   to know when. Dates are wanted in a postulate's header, where their age is
@@ -130,9 +132,7 @@ named postulate's own header.
 Rows are available to their siblings as postulates, so the bottom of the tier
 is technically runnable while the top is open. **It is not run: per CLAUDE.md's
 risk-reduction priority, while this tier holds an open row of a worse class,
-workers do not fan out across its GRINDABLE rows.** The SHAPE row is the design
-session's own — a restatement is not a grind, and a SHAPE row is never handed
-to a worker.
+workers do not fan out across its GRINDABLE rows.**
 
 A row's class here must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins. The walkFace family
@@ -140,10 +140,6 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`concatDrain-nodry-vb`** (Burst-Walk) — SHAPE: its queue-element parameter
-  is tied to the state by no hypothesis, so the statement is refutable as
-  written; the repair threads the caller's receipt. Header carries the corrected
-  census.
 - **`sharedConnect-walk`** (Walk-Level) — DIFFICULTY: stated over the freshness
   premise the operation guarantees, which funds the descent and answers the
   `hasDry` suspicion. The residue is the transport, one step of which is argued

@@ -136,7 +136,11 @@ open import Verify-Budget-Sufficient.Caps-Face
          -- the inner-at-suc-J kit, cribbed from subscribeInner-caps
          frameStep-chain-suc; pathSz?-⊑; capsOK?-mono;
          -- the size half of the recombination lemmas below
-         frameSz?; regsSz?)
+         frameSz?; regsSz?;
+         -- the node ring: capsOK? bounds every stored node, and the lookup
+         -- projects that bound onto the one node a clause is looking at
+         NodeCaps; lookupNode-caps; capsOK?-nodeSz; capsOK?-nodeWid;
+         boundedNode; widNode)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
@@ -144,7 +148,7 @@ open import Verify-Budget-Sufficient.Wet
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
          fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
-         hasDry-append; ∨-false;
+         hasDry-append; ∨-false; ≤ᵇ-widen;
          INV?; INV?-widen; dBound; regsLen?; hopR; unconn; pathB?; pathB?-widen;
          frameB?; regsB?; all-zip;
          _hasAtLeast_;
@@ -155,6 +159,7 @@ open import Verify-Budget-Sufficient.Walk-Level
   using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono;
          any-dry-++; splitEvents-nodry; splitBurst-nodry;
          switchKill-closes-nodry; thruWrap-pass)
+open import Rx.Frame-Width using (pWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Frame-Width using (dWᵉ; dWᵛ; pWᵛ; outWᵛ)
@@ -283,12 +288,12 @@ module _ {n} {Γ : Ctx n} {t : Ty} where
 -- dry trio: the ground subscribeInner-walk consumes it there, and this
 -- module sits above .Walk-Level.  Imported back below.
 
--- VbB's HEAD AND TAIL PROJECTIONS.  `thruConsume-nodry-vb` and
--- `concatDrain-nodry-vb` in the block below are the head projection stated
--- again at one instantiation (`Val Γ (obs u)` IS `Closed Γ s`, per Rx/Exp's
--- definition of `Val`), so anything that wants a projection wants one of
--- these two: they are `all` over a cons and nothing more, proven here once
--- and spent by the callers.
+-- VbB's HEAD AND TAIL PROJECTIONS.  `thruConsume-nodry-vb` in the block below
+-- is the head projection stated again at one instantiation (`Val Γ (obs u)` IS
+-- `Closed Γ s`, per Rx/Exp's definition of `Val`).  Both are `all` over a cons
+-- and nothing more, so they are proven here once and the callers spend them —
+-- which is what the concat side does: one receipt minted per node lookup
+-- (`concatNode-vb`), then projected down the drain's recursion.
 --
 -- The length conjunct is why these are lemmas rather than `refl`: `valsCaps?`
 -- carries `length vs ≤ᵇ suc (cWid c)` beside the per-element `all`, so the
@@ -2291,6 +2296,93 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g o
         (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g′ op allNid
            κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq))
 
+-- THE CONCAT NODE'S STORED QUEUE IS VbB-BOUNDED, and this is a real body: the
+-- leaves it stands on are all proven, so nothing here is postulated.  It is the
+-- receipt `concatDrain-nodry` drains against, and the whole reason that drain is
+-- allowed to take one: the queue it is handed is not an arbitrary list but the
+-- `q` of a `concat-st` READ OUT OF THE NODE TABLE, which `capsOK?` bounds.
+-- `innerReact-nodry` is the single site that performs the lookup, so the receipt
+-- is minted there once and projected per element afterwards (`VbB-head` for the
+-- element, `VbB-tail` for the recursive call).
+--
+-- ⚠ THIS REPLACES `concatDrain-nodry-vb`, WHICH WAS REFUTABLE AS WRITTEN.  That
+-- statement concluded `VbB c sl Ψ J (o ∷ [])` for an ARBITRARY `o : Closed Γ s`
+-- from a hypothesis mentioning only `sched` and `st`, so it quantified over
+-- expressions far larger than `cSize c` — a conclusion needing information no
+-- hypothesis carried.  Adding a premise is licensed here precisely because the
+-- unconditional form is FALSE, and because the premise is a genuine
+-- precondition of the operation rather than a convenience of today's call site.
+-- Note also what the repair is NOT: `o ∈ q` does not work, since `q` is itself a
+-- free parameter of the drain — that relates one unconstrained thing to another.
+-- The link has to reach the STATE, which is what makes `allNid` and this
+-- equation load-bearing.
+--
+-- THE CENSUS, one proven source per conjunct of `VbB`, and `capsOK?` reaches
+-- `nodes` three times to supply them:
+--
+--   all (valCaps? …) q     ← boundedNode's `all` (the sizeᵉ half, via
+--                             capsOK?-nodeSz) zipped with widNode's first
+--                             conjunct (the pWᵉ half, via capsOK?-nodeWid).
+--                             `valCaps? C sl (obs s) o` IS that conjunction.
+--   length q ≤ᵇ suc (cWid C) ← widNode's SECOND conjunct, `length q ≤ᵇ cWid C`,
+--                             widened by one.
+--   all (valΨ? …) q        ← fnCapNode's `all`, via OKB's fnCapBounded?
+--                             conjunct.  `fnCapᵛ (obs s) o` IS `fnCapᵉ o`.
+--
+-- ⚠ AND THE LENGTH CONJUNCT IS THE CORRECTION WORTH KEEPING.  Two successive
+-- readings of `capsOK?` got this census wrong in opposite directions.  The
+-- first found only widNode, concluded the size and fn-cap halves had no source,
+-- and proposed a new FIELD on widNode cascading through every producer and
+-- consumer of capsOK?.  The second found those two and concluded the LENGTH had
+-- no source above it, guessing the bound would have to come from an arrival-
+-- ledger induction over the pushes.  Both were false, and for the same reason:
+-- the reading stopped early.  `widNode`'s concat clause COUNTS the queue
+-- outright.  Read the whole record before concluding a conjunct is unreachable.
+--
+-- Sealed per the budget-sufficient-spine rule; the `with` on the slots equation
+-- is why it is private-impl + abstract-alias rather than a plain block.
+private
+  concatNode-vb-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
+    (q : List (Closed Γ s)) (act od : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (concat-st q act od) →
+    VbB c sl Ψ J q ≡ true
+  concatNode-vb-go {n = n} c sl Ψ J allNid q act od sched st ok eqN
+    with proj₁ (proj₁ ok)
+  ... | refl =
+    let C   = frameStep J c
+        cok = proj₂ (proj₁ ok)
+        nc  = subst (NodeCaps C (Sched.slots sched)) eqN
+                (lookupNode-caps C (Sched.slots sched) allNid (EvalSt.nodes st)
+                   (capsOK?-nodeSz C sched st cok)
+                   (capsOK?-nodeWid C sched st cok))
+        nf  = subst (NodeΨ Ψ) eqN
+                (lookupNode-fnCap Ψ allNid (EvalSt.nodes st)
+                   (fcB-nodes Ψ sched st (proj₂ ok)))
+        hwq = ∧-true (all (λ o → pWᵉ n (Sched.slots sched) o ≤ᵇ Caps.cWid C) q)
+                     (length q ≤ᵇ Caps.cWid C) (proj₂ nc)
+    in ∧-intro
+         (∧-intro
+            (all-zip (λ o → sizeᵉ o ≤ᵇ Caps.cSize C)
+                     (λ o → pWᵉ n (Sched.slots sched) o ≤ᵇ Caps.cWid C)
+                     _
+                     (λ o hs hp → ∧-intro hs hp)
+                     q (proj₁ nc) (proj₁ hwq))
+            (≤ᵇ-widen (length q) (n≤1+n (Caps.cWid C)) (proj₂ hwq)))
+         nf
+
+abstract
+  concatNode-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
+    (q : List (Closed Γ s)) (act od : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    OKB {e = e} c sl Ψ J sched st →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (concat-st q act od) →
+    VbB c sl Ψ J q ≡ true
+  concatNode-vb = concatNode-vb-go
+
 -- ─────────────────────────────────────────────────────────────────
 -- THE NODRY RESIDUE LEAVES.  `innerReact-nodry` / `thruOuter-nodry` are
 -- real bodies that case-split the evaluator's dispatch and APPLY
@@ -2327,86 +2419,6 @@ postulate
 
   -- ── innerReact / concatDrain loop leaves ────────────────────────
 
-  -- ⚠ CLASS: SHAPE (2026-08-20).  DO NOT GRIND.  "For one queue element" is
-  -- what the statement MEANS TO SAY and not what it says: `o` is an arbitrary
-  -- `Closed Γ s`, and NO hypothesis ties it to `q`, to `sched`, or to `st`.
-  -- `VbB c sl Ψ J (o ∷ [])` unfolds to `valsCaps? (frameStep J c) sl (o ∷ [])
-  -- ∧ valsΨ? Ψ (o ∷ [])`, both of which bound o against the caps, so an o
-  -- larger than the cap refutes it while OKB — which speaks only of c, sl, Ψ,
-  -- J, sched, st — stays true.  Conclusion needing information no hypothesis
-  -- carries, exactly as in `-cl` above.
-  --
-  -- `thruConsume-nodry-vb` BELOW IS THE RIGHT SHAPE BUT NOT THE RIGHT SOURCE,
-  -- and the difference is the actual work here.  It takes `VbB c sl Ψ J (o ∷
-  -- os)` as a HYPOTHESIS and projects the head, which is free on that side
-  -- because its `os` is a BURST the caller already validated.  This side has
-  -- no such caller: tracing up through `concatDrain-nodry` to
-  -- `innerReact-nodry`, the queue is `concat-st {w} q act od` read out of the
-  -- NODE TABLE, and nothing above holds a VbB for it.
-  --
-  -- ⚠ THE "MISSING INVARIANT" BLOCKER RECORDED HERE DOES NOT EXIST
-  -- (corrected 2026-08-20).  This header asserted that capsOK? bounds a
-  -- stored concat queue's WIDTH and LENGTH "and nothing else", that the
-  -- size half of valCaps? and the fn-cap half of valsΨ? therefore had no
-  -- source, that "membership buys exactly one of the three conjuncts", and
-  -- that the repair was consequently a new FIELD on `widNode` cascading
-  -- through every producer and consumer of capsOK?.  Every one of those
-  -- claims is false, and the error was a census that read capsOK?'s NODE
-  -- conjunct (widNode) and stopped, missing that two OTHER conjuncts of the
-  -- same record reach the same stored queue:
-  --
-  --   boundedNode B (concat-st q _ _) = all (λ o → sizeᵉ o ≤ᵇ B) q
-  --     — .Measures, reached via capsOK?'s FIRST conjunct stBounded?
-  --   fnCapNode Ψ (concat-st q _ _)   = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
-  --     — .Measures, reached via OKB's SECOND conjunct fnCapBounded?
-  --
-  -- So all three non-trivial obligations have a PROVEN source, and the
-  -- fourth is arithmetic:
-  --   sizeᵉ o  ≤ᵇ cSize (frameStep J c)   boundedNode, via stBounded?
-  --   pWᵉ o    ≤ᵇ cWid  (frameStep J c)   widNode
-  --   fnCapᵉ o ≤ᵇ Ψ                       fnCapNode, via fnCapBounded?
-  --   length (o ∷ []) ≤ᵇ suc (cWid …)     `1 ≤ᵇ suc _`, refl
-  -- Membership buys THREE of three, not one of three, and no field is owed.
-  -- The general lesson is the one this file already teaches about `-pLen`:
-  -- read the whole record before concluding a conjunct is unreachable.  A
-  -- predicate that mentions `nodes` twice is easy to census once.
-  --
-  -- ⚠ BUT THE ROW IS STILL SHAPE, FOR A DIFFERENT AND SIMPLER REASON, and
-  -- the tell this header already found is the right one: `q` and `allNid`
-  -- appear in NEITHER a hypothesis nor the conclusion.  `o` is a FREE
-  -- parameter that no hypothesis relates to `st` — OKB constrains `sched`
-  -- and `st` alone — so the statement quantifies over every expression of
-  -- type `Closed Γ s`, including ones far larger than `cSize c`.  It is
-  -- refutable as written, which is what licenses restating it (CLAUDE.md:
-  -- the unconditional form being FALSE is the one sufficient justification
-  -- for adding a hypothesis).
-  --
-  -- AND THE MISSING HYPOTHESIS IS NOT `o ∈ q` EITHER, because `q` is itself
-  -- a free parameter of `concatDrain-nodry` — the drain takes its queue as
-  -- an ARGUMENT (see its signature below), so relating `o` to `q` relates
-  -- one unconstrained thing to another.  The link has to reach the STATE.
-  -- Two shapes do that, and the second is the one the thru side already
-  -- uses:
-  --   · a node-lookup premise — `lookup allNid (nodes st) ≡ concat-st (o ∷ q) …`
-  --     — which is what makes `allNid` load-bearing, and from which the three
-  --     `all`s above are extracted by head projection;
-  --   · a receipt premise — `VbB c sl Ψ J (o ∷ q) ≡ true` — threaded down
-  --     from the caller that performed the lookup, this row then being the
-  --     head projection alone.  This is EXACTLY `thruConsume-nodry-vb`'s
-  --     shape, which is why that row needs no invariant either.
-  -- Prefer the second: it puts both sides of the family on one statement,
-  -- and it moves the lookup to the single place that actually performs it
-  -- (`innerReact-nodry`, where the queue is read out of the node table)
-  -- rather than re-deriving it per element.  Threading it is NOT the
-  -- untracked-debt trap, because the unconditioned form is refutable and
-  -- the premise is a genuine precondition of the operation: the queue being
-  -- drained IS a node's stored queue, which capsOK? bounds.
-  concatDrain-nodry-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
-    (o : Closed Γ s) (q : List (Closed Γ s))
-    (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    VbB c sl Ψ J (o ∷ []) ≡ true
 
   -- PINNED 2026-08-20, and the pin is the whole point of the row.  Before
   -- today the Σ's only conjunct was `all (nest … ≤ᵇ bud) q`, UPWARD-CLOSED in
@@ -2570,6 +2582,12 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   OKB {e = e} c sl Ψ J sched st →
   PbB c Ψ J κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
+  -- THE QUEUE'S RECEIPT, minted once by `concatNode-vb` at the node lookup in
+  -- `innerReact-nodry` and projected per element here.  A genuine
+  -- precondition and not a convenience of the call site: the unconditional
+  -- per-element form (the retired `concatDrain-nodry-vb`) is refutable,
+  -- because nothing ties a free `Closed Γ s` to this state.
+  VbB c sl Ψ J q ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
   Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
@@ -2578,10 +2596,10 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   any dryEvent (proj₁ (proj₂ (concatDrain sf allNid κ id now q sched st))) ≡ false
 
 concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  [] sched st _ _ _ _ _ _ _ = refl
+                  [] sched st _ _ _ _ _ _ _ _ = refl
 
 concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  (o ∷ q) sched₀ st₀ ok pb sspLen rg gk cl hD
+                  (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk cl hD
   with concatDrain-nodry-nestBud c sl Ψ dep J id allNid (o ∷ q) sched₀ st₀ ok
 ... | bud , nestQ , clQ
   -- Scrutinise only `done` (4th component).  This preserves
@@ -2593,7 +2611,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
   subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J sf concatᵒ allNid κ id now o sched₀ st₀
     ok pb sspLen
-    (concatDrain-nodry-vb c sl Ψ J allNid o q sched₀ st₀ ok)
+    (VbB-head c sl Ψ J o q vbq)
     rg
     (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
       (T-to (proj₁ (∧-true _ _ nestQ))))
@@ -2611,7 +2629,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
       h-head = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                  J sf concatᵒ allNid κ id now o sched₀ st₀
                  ok pb sspLen
-                 (concatDrain-nodry-vb c sl Ψ J allNid o q sched₀ st₀ ok)
+                 (VbB-head c sl Ψ J o q vbq)
                  rg
                  (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
                    (T-to (proj₁ (∧-true _ _ nestQ))))
@@ -2627,7 +2645,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
       nestQ′ = concatDrain-nodry-nestRec c sl Ψ J bud sf allNid κ id now o q sched₀ st₀
                  ok (proj₂ (∧-true _ _ nestQ))
       h-tail = concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                 q sched₁ st₁ ok₁ pb sspLen rg₁ gk cl
+                 q sched₁ st₁ ok₁ pb sspLen (VbB-tail c sl Ψ J o q vbq) rg₁ gk cl
                  (≤-trans (m≤n⊔m _ _) hD)
   in any-dry-++ bs _ h-head h-tail
 
@@ -2896,7 +2914,12 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
 -- `| _`.  innerFinish's own catch-all clause only fires once Agda can
 -- rule out its four specific (op, node) clauses, which a variable
 -- scrutinee never does — it stays stuck and `refl` is red.
-...   | false with op | lookupNode allNid (EvalSt.nodes st)
+-- `in eqN` CAPTURES THE LOOKUP EQUATION, which is what `concatNode-vb` needs
+-- in the concat arm below and what a plain `with` discards.  It costs no
+-- clause changes anywhere in this 30-arm block: `in` NAMES the proof, it does
+-- not add a pattern position — nor a `with` nesting level, which this
+-- function has no room for (see the note above).
+...   | false with op | lookupNode allNid (EvalSt.nodes st) in eqN
 -- MERGE: innerFinish emits []
 ...     | mergeᵒ  | just (merge-st k od)          = refl
 ...     | mergeᵒ  | nothing                       = refl
@@ -2954,7 +2977,9 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
                               pb-bΨ
                   sspLen  = pathSz?-len (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ path′) pb-sz
               in concatDrain-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf allNid path′ id now
-                   q sched st ok pb′ sspLen rg gk cl
+                   q sched st ok pb′ sspLen
+                   (concatNode-vb c sl Ψ J allNid q act od sched st ok eqN)
+                   rg gk cl
                    -- hD reduces HERE and only here: the `with` above
                    -- scrutinises `lookupNode allNid (nodes st)` and `w ≟ᵗ s`,
                    -- so depthFrame → depthReact → depthFin → depthFinC has
