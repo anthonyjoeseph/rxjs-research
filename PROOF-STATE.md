@@ -145,10 +145,6 @@ spent"), so every row governed by it inherits that caveat.
   payload. The whole `thruWalk` induction hangs off it. Header carries the
   refutation, why the first `fIterD` reading was the wrong granularity, and
   which mirror settled it.
-- **`thruOuter-nodry-bud`** (Burst-Walk) — DIFFICULTY: the walk's bud and its
-  room at the frame boundary. The nest conjunct's route is known and
-  state-free; the room conjunct wants a frame-boundary DESCENT the D-tower
-  section does not carry, and that missing descent is the entire residue.
 - **`concatDrain-nodry-nestBud`** (Burst-Walk) — DIFFICULTY: REFUTED as first
   stated, and restated. What is left is a tension between the Σ's two conjuncts
   over one shared bud. Its thru-side twin is gone — ceiling half threaded as a
@@ -180,14 +176,8 @@ spent"), so every row governed by it inherits that caveat.
   `subscribeInner-nodry` after the previous element has moved the state, and the
   shared header names the caps face (`.Subscribe-Face`) as the worked twin at
   the same indices.
-- **`thruConsume-nodry-nestRec` / `switchKill-nest`** (Burst-Walk) — GRINDABLE:
-  a nest bound carried across one step. `nest-keeps` spends the arithmetic
-  already, so each is one share-ledger membership fact with a proven sibling.
-- **`thruWalk-nodry-elem-size`** (Burst-Walk) — GRINDABLE: one element's size
-  read off the walk's value ledger, one level up and in the other spelling.
-  Both moves are size-cap arithmetic and neither mentions the walk's bud.
-- **`thruWalk-nodry-dep`, `switchKill-context`** (Burst-Walk) — GRINDABLE: pure
-  preservation, and every quantity in the conclusion appears in a hypothesis.
+- **`switchKill-context`** (Burst-Walk) — GRINDABLE: pure preservation, and
+  every quantity in the conclusion appears in a hypothesis.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 
