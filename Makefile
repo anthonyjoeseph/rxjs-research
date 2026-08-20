@@ -444,6 +444,31 @@ gate:
 #     make bg T=gate LOG=/tmp/g.log   explicit log path
 #     make bg-check T=agda            THE VERDICT: green, red + tail, or running
 #
+# THE SIGNAL TRAP IS LOAD-BEARING (2026-08-20), and its absence produced the
+# one failure this whole apparatus is supposed to be immune to.  `EXIT=` is
+# written AFTER the sub-make returns, so a build killed by a signal — the whole
+# process group going down, e.g. because the launcher was run inside a
+# foreground command that hit a tool timeout — left the log with NO terminal
+# marker.  `bg-check` then reported STILL RUNNING for a build that was already
+# dead, and `bg-wait` would have blocked forever waiting for a line nobody was
+# going to write.  A hang is not a safer failure than a false green; it is the
+# same defect pointed the other way, and it is worse for being patient.
+#
+# So the recipe traps TERM/INT/HUP and writes a terminal `EXIT=143` plus a line
+# saying the build was KILLED rather than failed — the distinction matters,
+# because a bare 143 sends the reader hunting for an Agda error that does not
+# exist.  Two constraints, both learned by breaking them:
+#   * the explanation goes on its OWN line, above the marker.  `bg-check`
+#     parses `EXIT=` and does `exit $ec`, so any prose on that line becomes
+#     extra arguments and the shell errors out mid-verdict.
+#   * `EXIT=143` alone, never the real signal number: bg-check only needs
+#     "terminal and nonzero", and inventing per-signal codes gives the reader
+#     a distinction that carries nothing.
+#
+# AND THE LESSON THAT PROMPTED IT: launch `make bg` under the Bash tool's OWN
+# background flag, never inside a foreground compound command.  `make bg`
+# detaching the build does NOT protect it — the timeout kills the group.
+#
 LOG ?= /tmp/rxjs-bg-$(T).log
 
 # bg-wait's poll interval, seconds.  Override with I=<n>.
@@ -452,7 +477,8 @@ bg:
 	@test -n "$(T)" || { echo "usage: make bg T=<target> [LOG=<path>] [ARGS=...]" >&2; exit 2; }
 	@rm -f $(LOG)
 	@echo "bg: $(T) -> $(LOG)"
-	@$(MAKE) --no-print-directory $(T) ARGS='$(ARGS)' > $(LOG) 2>&1; ec=$$?; \
+	@trap 'echo "bg: TERMINATED BY SIGNAL (the build did NOT finish — this is not an Agda failure)" >> $(LOG); echo "EXIT=143" >> $(LOG); exit 7' TERM INT HUP; \
+	  $(MAKE) --no-print-directory $(T) ARGS='$(ARGS)' > $(LOG) 2>&1; ec=$$?; \
 	  echo "EXIT=$$ec" >> $(LOG); \
 	  if [ $$ec -eq 0 ]; then \
 	    echo "bg: $(T) looks GREEN ($(LOG))"; \
