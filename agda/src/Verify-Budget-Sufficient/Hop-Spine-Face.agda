@@ -312,13 +312,39 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- discards a SIBLING, and a sibling is never on the hop-deepest path, so
 -- `spnᵉ` never counted it.
 --
--- THIS IS WHY THE ROW IS STILL DIFFICULTY.  There is no proven twin for
--- `spnᵉ` under `subΘᵉ` — `hopD-evalWith` covers the depth side and
--- nothing covers the spine side — so the route is NAMED but not
--- EVIDENCED, and CLAUDE.md's rule on classes is explicit that a named
--- route is not evidence.  It is also PROBEABLE: both sides compute, the
--- statement is purely syntactic, and a refutation would look exactly
--- like Hop-Drag's.  That probe is the next thing this row is owed.
+-- AND THAT CLAIM IS NOW EVIDENCED, WHICH IS WHY THIS ROW IS GRINDABLE
+-- RATHER THAN DIFFICULTY (2026-08-19).  Three things, and the class rests
+-- on all three together:
+--
+--   · EXHAUSTIVE INSPECTION OF THE MEASURE.  Every non-leaf clause of
+--     `spnᵗ` and `spnᵉ` (Rx.Hop-Spine) is `suc (…)`, and not one of them
+--     DROPS a subterm — the combining operators are `+`, `⊔` and `suc`,
+--     all monotone in every argument.  So a plugged value's spine
+--     propagates upward to the root by construction, and any non-variable
+--     template contributes at least the one node the arithmetic needs.
+--     That is a property of twenty-six lines, checkable by reading them.
+--
+--   · MACHINE RECEIPTS AT BOTH ADVERSARIAL SHAPES.  `Refuted.Hop-Drag`
+--     pins 4 ↦ 7 ↦ 10 ↦ 13 across the very caseᵗ step that drops `sizeᵛ`
+--     from 36 to 9 — the projecting discard, the shape that REFUTED the
+--     size measure.  Demand-Probe series Ω′ pins 3 ↦ 15 ↦ 27 ↦ 39 on the
+--     amplifying `mapᵉ`-plug step, and pins the claim itself rather than
+--     the numbers: `suc (spnᵛ accₖ) ≤ᵇ spnᵛ accₖ₊₁` at three steps.
+--
+--   · THE PRECEDENT FOR THE INDUCTION.  `hopD-evalWith` (.Measures,
+--     PROVEN) is this same induction over the same syntax with the same
+--     env apparatus; the hereditary version carries a Bool predicate
+--     where it carries a number.  Its `EnvHopDs`/`sumW` shape is also the
+--     answer to the `caseᵗ` question above, so the generalisation the
+--     body needs is already written down and discharged next door.
+--
+-- WHAT THE EVIDENCE DID NOT REACH, stated so the demotion is auditable:
+-- no probe covers `ifᵗ` or nested `caseᵗ` plugs, and nobody has typed the
+-- induction, so the bookkeeping could still surprise.  What would REOPEN
+-- this as DIFFICULTY is a template that plugs the accumulator and does
+-- not advance the spine — the same refutation Hop-Drag ran against
+-- `sizeᵛ`, which is exactly what these two series looked for and did not
+-- find.
 --
 -- THE `caseᵗ` BOOKKEEPING QUESTION IS ANSWERED, and the answer changes
 -- the induction's SHAPE rather than adding a lemma.  A uniform

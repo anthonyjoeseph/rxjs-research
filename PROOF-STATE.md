@@ -78,11 +78,13 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-The two DIFFICULTY rows head the tier and are the design session's own
-work; the GRINDABLE rows below them do NOT block on those two — every
-row in a tier is available to its siblings as a postulate, so the
-mechanical ones can be ground in parallel by a worker. Top-to-bottom is
+EVERY ROW IN THIS TIER IS GRINDABLE. There is no DIFFICULTY row left here,
+so nothing in it is reserved for the design session and no row blocks on a
+design decision — every one of them is available to its siblings as a
+postulate, and they can be ground in parallel by workers. Top-to-bottom is
 the order attention is OWED, not a bar on running the bottom concurrently.
+Size, not risk, is what now separates them: `sharedConnect-walk` and
+`applyFn-hopSpn` are the two large ones.
 
 - **`sharedConnect-walk`** (Walk-Level) — GRINDABLE, large: the CONNECTING arm,
   all that is left of `input-wet-shared` now that the dispatch is a real
@@ -105,19 +107,19 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`applyFn-hopSpn`** (Hop-Spine-Face) — DIFFICULTY, and the ONLY one left in
-  this tier. The per-step substitution for scan's fold: `valHopSpn?` preserved
-  by `applyFn`. Everything around it is now a REAL BODY — the fold
-  (`scanVals-hopSpn`), the burst walk (`pushBurst-scan-hopSpn`, .Hop-Spine-Push),
-  the scan clause (`walk-scan-hop-spn`, .Walk-Level) and both headline-to-
-  hereditary lifts — so the whole scan hop receipt reduces to this one step plus
-  a frame condition. Its header carries the entire research record, including
-  the refutation (`Refuted.Hop-Drag.hop-drag-absurd`) that killed the size
-  measure and the spine repair that replaced it. STAYS DIFFICULTY on ONE
-  unknown: there is no proven twin for `spnᵉ` under substitution — the drag
-  restated on the spine — and until that is stated and established the route is
-  named rather than evidenced. The arithmetic and the `caseᵗ` bookkeeping are
-  both settled, and the header says how.
+- **`applyFn-hopSpn`** (Hop-Spine-Face) — GRINDABLE, large: the per-step
+  substitution for scan's fold, `valHopSpn?` preserved by `applyFn`. Everything
+  around it is a REAL BODY — the fold, the burst walk, the scan clause and both
+  headline-to-hereditary lifts — so the whole scan hop receipt reduces to this
+  plus a frame condition. Demoted from DIFFICULTY on three things its header
+  sets out: every `spnᵗ`/`spnᵉ` clause is `suc (…)` and none drops a subterm, so
+  the spine propagates by construction; both adversarial shapes now carry
+  machine receipts (`Refuted.Hop-Drag`'s 4 ↦ 7 ↦ 10 ↦ 13 across the caseᵗ step
+  that drops `sizeᵛ` 36 ↦ 9, and Demand-Probe series Ω′'s pins of the claim
+  itself at the amplifying step); and `hopD-evalWith` is the same induction over
+  the same syntax with the same env apparatus, whose `EnvHopDs`/`sumW` shape is
+  also the answer to the `caseᵗ` question. The header names what the evidence
+  did NOT reach and what would reopen it.
 - **`walk-scan-source-frame`** (Walk-Level) — GRINDABLE: the scan clause's frame
   condition. Two conjuncts, both shapes this family already produces — the
   source's ordinary `burstHopD?` receipt, and that the freshly minted scan node

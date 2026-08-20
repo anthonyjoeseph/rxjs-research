@@ -38,6 +38,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep;
                                  iterSize-infl)
 open import Verify-Budget-Sufficient.Walk-Level using (WalkStmt)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using (valHopSpn?)
+open import Rx.Hop-Spine using (spnᵛ)
 
 ----------------------------------------------------------------------
 -- Context and slots: empty (no inputs)
@@ -1837,4 +1838,42 @@ _ = refl
 _ : valHopSpn? 4 (λ _ → 0) 2 2 Uʸ (accʸ 2) ≡ true
 _ = refl
 _ : valHopSpn? 4 (λ _ → 0) 2 2 Uʸ (accʸ 3) ≡ true
+_ = refl
+
+
+----------------------------------------------------------------------
+-- SERIES Ω′ — THE SPINE UNDER SUBSTITUTION, at the amplifying step.
+--
+-- LOAD-BEARING, and it is the one row in this file that could still
+-- refute the repair.  `applyFn-hopSpn`'s `strmᵗ` clause needs the plugged
+-- value's spine to REAPPEAR in the substituted expression's, plus at
+-- least one template node above it.  Series Y showed `sizeᵛ` growing here
+-- and `Refuted.Hop-Drag` showed `sizeᵛ` DROPPING (36 ↦ 9) on a caseᵗ
+-- shape while the depth grew — so growth of the whole-value measure is
+-- exactly what is NOT safe to assume, and these rows say what the spine
+-- does at the step that multiplies.
+--
+-- WHAT WOULD MAKE A ROW FAIL: any step where the spine fails to advance.
+-- Together with Hop-Drag's own spine pins (4 ↦ 7 ↦ 10 ↦ 13, taken across
+-- the very step that discards 27 units of size) this brackets both
+-- adversarial shapes — the projecting discard and the binder.
+----------------------------------------------------------------------
+
+_ : spnᵛ Uʸ (accʸ 0) ≡ 3
+_ = refl
+_ : spnᵛ Uʸ (accʸ 1) ≡ 15
+_ = refl
+_ : spnᵛ Uʸ (accʸ 2) ≡ 27
+_ = refl
+_ : spnᵛ Uʸ (accʸ 3) ≡ 39
+_ = refl
+
+-- and the CLAIM itself, not just the numbers: one step advances the spine
+-- by at least one.  `1 ≤ sp` is the hypothesis the binomial step spends,
+-- and it is what `sizeᵛ` cannot supply on Hop-Drag's caseᵗ shape.
+_ : (suc (spnᵛ Uʸ (accʸ 0)) ≤ᵇ spnᵛ Uʸ (accʸ 1)) ≡ true
+_ = refl
+_ : (suc (spnᵛ Uʸ (accʸ 1)) ≤ᵇ spnᵛ Uʸ (accʸ 2)) ≡ true
+_ = refl
+_ : (suc (spnᵛ Uʸ (accʸ 2)) ≤ᵇ spnᵛ Uʸ (accʸ 3)) ≡ true
 _ = refl
