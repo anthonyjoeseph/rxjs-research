@@ -2287,41 +2287,63 @@ postulate
   -- `innerReact-nodry`, the queue is `concat-st {w} q act od` read out of the
   -- NODE TABLE, and nothing above holds a VbB for it.
   --
-  -- ⚠ AND MEMBERSHIP ALONE IS NOT ENOUGH — this row is BLOCKED on a MISSING
-  -- INVARIANT, established 2026-08-20 by reading the predicates rather than
-  -- by grinding.  The obvious repair is `o ∈ q` plus OKB's capsOK? node
-  -- conjunct, which is what this row's original header intended.  Count the
-  -- halves and it does not close:
+  -- ⚠ THE "MISSING INVARIANT" BLOCKER RECORDED HERE DOES NOT EXIST
+  -- (corrected 2026-08-20).  This header asserted that capsOK? bounds a
+  -- stored concat queue's WIDTH and LENGTH "and nothing else", that the
+  -- size half of valCaps? and the fn-cap half of valsΨ? therefore had no
+  -- source, that "membership buys exactly one of the three conjuncts", and
+  -- that the repair was consequently a new FIELD on `widNode` cascading
+  -- through every producer and consumer of capsOK?.  Every one of those
+  -- claims is false, and the error was a census that read capsOK?'s NODE
+  -- conjunct (widNode) and stopped, missing that two OTHER conjuncts of the
+  -- same record reach the same stored queue:
   --
-  --   VbB c sl Ψ J vs  =  valsCaps? (frameStep J c) sl vs ∧ valsΨ? Ψ vs
-  --   valCaps? c sl u v = (sizeᵛ u v ≤ᵇ cSize c) ∧ (pWᵛ n sl u v ≤ᵇ cWid c)
-  --   widNode W sl (concat-st q _ _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
-  --                                  ∧ (length q ≤ᵇ W)
+  --   boundedNode B (concat-st q _ _) = all (λ o → sizeᵉ o ≤ᵇ B) q
+  --     — .Measures, reached via capsOK?'s FIRST conjunct stBounded?
+  --   fnCapNode Ψ (concat-st q _ _)   = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
+  --     — .Measures, reached via OKB's SECOND conjunct fnCapBounded?
   --
-  -- So capsOK? bounds a stored concat queue's WIDTH and its LENGTH — and
-  -- nothing else.  The SIZE half of valCaps? has no source, and neither does
-  -- valsΨ?'s fn-cap half (fnCapBounded? reads live and nodes, not a node's
-  -- stored queue).  Membership buys exactly one of the three conjuncts.
+  -- So all three non-trivial obligations have a PROVEN source, and the
+  -- fourth is arithmetic:
+  --   sizeᵉ o  ≤ᵇ cSize (frameStep J c)   boundedNode, via stBounded?
+  --   pWᵉ o    ≤ᵇ cWid  (frameStep J c)   widNode
+  --   fnCapᵉ o ≤ᵇ Ψ                       fnCapNode, via fnCapBounded?
+  --   length (o ∷ []) ≤ᵇ suc (cWid …)     `1 ≤ᵇ suc _`, refl
+  -- Membership buys THREE of three, not one of three, and no field is owed.
+  -- The general lesson is the one this file already teaches about `-pLen`:
+  -- read the whole record before concluding a conjunct is unreachable.  A
+  -- predicate that mentions `nodes` twice is easy to census once.
   --
-  -- THEREFORE THE REPAIR IS A FIELD, NOT A HYPOTHESIS, and CLAUDE.md's rule
-  -- applies directly: a fact the proof needs everywhere belongs in the
-  -- INVARIANT RECORD, so that every producer owes it and every consumer
-  -- re-establishes it.  `widNode`'s concat clause has to bound the queue's
-  -- elements in size and fn-weight as well as width.  Threading it as a
-  -- hypothesis instead would launder tracked debt into untracked debt at the
-  -- one call site that happens to be convenient.
+  -- ⚠ BUT THE ROW IS STILL SHAPE, FOR A DIFFERENT AND SIMPLER REASON, and
+  -- the tell this header already found is the right one: `q` and `allNid`
+  -- appear in NEITHER a hypothesis nor the conclusion.  `o` is a FREE
+  -- parameter that no hypothesis relates to `st` — OKB constrains `sched`
+  -- and `st` alone — so the statement quantifies over every expression of
+  -- type `Closed Γ s`, including ones far larger than `cSize c`.  It is
+  -- refutable as written, which is what licenses restating it (CLAUDE.md:
+  -- the unconditional form being FALSE is the one sufficient justification
+  -- for adding a hypothesis).
   --
-  -- That cascades through every producer and consumer of capsOK?, which is
-  -- the cost of the fact being true rather than a reason to avoid it — but it
-  -- is a change to core machinery and wants a deliberate pass, not a
-  -- drive-by.  What the thru twin supplies here is only the discipline: TAKE
-  -- the fact, never conjure it.
-  --
-  -- THE TELL IS IN THE BINDER LIST, and it is free to read: `q` and `allNid`
-  -- appear in NEITHER the hypothesis nor the conclusion.  A parameter used
-  -- nowhere is a parameter the statement forgot to constrain — here the
-  -- missing conjunct is exactly `o ∈ q` (or membership in the state's queue),
-  -- which is what would let OKB's node conjunct reach it.
+  -- AND THE MISSING HYPOTHESIS IS NOT `o ∈ q` EITHER, because `q` is itself
+  -- a free parameter of `concatDrain-nodry` — the drain takes its queue as
+  -- an ARGUMENT (see its signature below), so relating `o` to `q` relates
+  -- one unconstrained thing to another.  The link has to reach the STATE.
+  -- Two shapes do that, and the second is the one the thru side already
+  -- uses:
+  --   · a node-lookup premise — `lookup allNid (nodes st) ≡ concat-st (o ∷ q) …`
+  --     — which is what makes `allNid` load-bearing, and from which the three
+  --     `all`s above are extracted by head projection;
+  --   · a receipt premise — `VbB c sl Ψ J (o ∷ q) ≡ true` — threaded down
+  --     from the caller that performed the lookup, this row then being the
+  --     head projection alone.  This is EXACTLY `thruConsume-nodry-vb`'s
+  --     shape, which is why that row needs no invariant either.
+  -- Prefer the second: it puts both sides of the family on one statement,
+  -- and it moves the lookup to the single place that actually performs it
+  -- (`innerReact-nodry`, where the queue is read out of the node table)
+  -- rather than re-deriving it per element.  Threading it is NOT the
+  -- untracked-debt trap, because the unconditioned form is refutable and
+  -- the premise is a genuine precondition of the operation: the queue being
+  -- drained IS a node's stored queue, which capsOK? bounds.
   concatDrain-nodry-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
     (o : Closed Γ s) (q : List (Closed Γ s))

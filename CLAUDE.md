@@ -1212,7 +1212,8 @@ module nothing reaches fails the gate in seconds, rather than needing a second
 full compile of the tower to notice. **Never close a coverage gap by re-adding a
 bulk import to Main — that is the loophole, not the repair.**
 
-**ACCEPTANCE TEST: `make gate`** — `wiring-selftest`, `wiring-gate`, `wiring-refuted`, `unsafe-check`,
+**ACCEPTANCE TEST: `make gate`** — `wiring-selftest`, `wiring-gate`, `wiring-refuted`,
+`unsafe-check`, `dup-selftest`, `dup-check`, `roadmap-selftest`, `roadmap-check`,
 `agda`, `refuted`, `bug-cache`, in that order. **Cheap checks run FIRST, deliberately:**
 an unreachable name or an unsafe pragma is decidable in seconds by grep while the full
 gate costs many minutes, so there is no reason to spend those minutes only to fail on

@@ -1,0 +1,12 @@
+a-falsity  Fixture/One.agda:1
+b-shape  Fixture/One.agda:2
+c-difficulty  Fixture/One.agda:3
+d-grindable  Fixture/One.agda:4
+e-difficulty  Fixture/Two.agda:1
+f-grindable  Fixture/Two.agda:2
+fam-alpha  Fixture/Two.agda:3
+fam-beta  Fixture/Two.agda:4
+glob-one  Fixture/Two.agda:5
+glob-two  Fixture/Two.agda:6
+suf-nodry-loop  Fixture/Two.agda:7
+suf-nodry-nestRec  Fixture/Two.agda:8

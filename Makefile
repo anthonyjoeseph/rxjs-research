@@ -404,6 +404,44 @@ wiring-selftest:
 # or an unsafe pragma is decidable in seconds by grep, while `agda` costs
 # ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
+roadmap-check:
+	@scripts/check-roadmap.py
+
+# PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
+# Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
+# the failing path never runs on it and would rot untested.  The MUST-NOT row is
+# the one that matters — a row whose prose MENTIONS a better class later must
+# still be read at its declared class, or every "the FALSITY raise is WITHDRAWN,
+# this is DIFFICULTY" row in the real file would be misclassified.
+roadmap-selftest:
+	@fail=0; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	      --ledger scripts/roadmap-selftest/ledger.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a correctly sorted, fully covered roadmap was rejected"; fail=1; }; \
+	  out=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: an out-of-order roadmap PASSED — the sort check is dead"; fail=1; \
+	  fi; \
+	  for n in b-falsity d-shape; do \
+	    echo "$$out" | grep -q "$$n" \
+	      || { echo "SELFTEST FAIL: $$n not reported — a real sort violation stopped firing"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q "a-grindable is" \
+	    && { echo "SELFTEST FAIL: the row a violation sits below was itself reported"; fail=1; }; \
+	  gap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	           --ledger scripts/roadmap-selftest/ledger-gap.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	       --ledger scripts/roadmap-selftest/ledger-gap.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: an unscheduled postulate PASSED — the coverage check is dead"; fail=1; \
+	  fi; \
+	  echo "$$gap" | grep -q never-scheduled \
+	    || { echo "SELFTEST FAIL: never-scheduled not reported by the coverage check"; fail=1; }; \
+	  for n in fam-alpha fam-beta glob-one glob-two suf-nodry-nestRec; do \
+	    echo "$$gap" | grep -q "^  $$n$$" \
+	      && { echo "SELFTEST FAIL: $$n reported — roadmap shorthand stopped counting as naming"; fail=1; }; \
+	  done; \
+	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
+
 gate:
 	@$(MAKE) --no-print-directory wiring-selftest
 	@$(MAKE) --no-print-directory wiring-gate
@@ -411,6 +449,8 @@ gate:
 	@$(MAKE) --no-print-directory unsafe-check
 	@$(MAKE) --no-print-directory dup-selftest
 	@$(MAKE) --no-print-directory dup-check
+	@$(MAKE) --no-print-directory roadmap-selftest
+	@$(MAKE) --no-print-directory roadmap-check
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory bug-cache
