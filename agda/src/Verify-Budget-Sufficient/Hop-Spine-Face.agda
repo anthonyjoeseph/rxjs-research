@@ -832,6 +832,43 @@ postulate
   -- DO NOT grind clauses before that statement typechecks.  The whole
   -- point of the outside-in rule is that a wrong assembly amended in
   -- place is cheap and proven pieces hanging off one are not.
+  -- THE `Bs` ROUTE WAS TRIED AND IT FAILS — recorded because the
+  -- paragraph above proposed it and it is one instantiation from looking
+  -- right.  Two concrete shapes, and each dies at the OTHER end from the
+  -- one it fixes:
+  --
+  --   · DERIVED BOUND (conclusion at `hopDᵗ tm + sumW (pmᵗ V j tm) Bs n`
+  --     instead of at `B`).  `caseᵗ` checks termwise and beautifully — the
+  --     branch's derived bound is dominated summand by summand.  But the
+  --     fold gets its conclusion at `(1 + P) * B`, so the invariant decays
+  --     by a factor per step, and NOTHING recovers it: the leaf's spine is
+  --     whatever it is, and there is no earlier spine at a LEAF to compare
+  --     it against.  Globalising the bound is the error — the degradation
+  --     is per-leaf information and a single number cannot carry it.
+  --
+  --   · PRODUCT HYPOTHESIS (`∀ j → pmᵗ V j tm * Ds j ≤ B`).  This is what
+  --     makes `caseᵗ` work at a CLOSED scrutinee, and it propagates
+  --     through `mapᵉ` cleanly.  It is FALSE at the fold's own call site:
+  --     `Ds 0` is the accumulator's hop, which is exponential in its
+  --     spine, not under B.  That is the whole reason the exponent exists.
+  --
+  -- WHAT THE TWO FAILURES SAY TOGETHER, and this is the actual finding:
+  -- the multiplier condition is NOT one inequality.  A leaf of the result
+  -- is either COPIED from the environment — `varᵗ`, `fstᵗ`, `sndᵗ`, a
+  -- `caseᵗ` payload — or BUILT by a `strmᵗ`, and the two need different
+  -- arithmetic.  A copied leaf already carries its receipt at B and needs
+  -- no multiplier bound at all.  A built leaf needs one, and there are two
+  -- sufficient forms: `pmᵗ V 0 l ≤ P` (spend the drag: one extra spine
+  -- node gives the factor `2 + P`), or `pmᵗ V 0 l * hopDᵛ payload ≤ B`
+  -- (spend nothing: the parent's own `hopDᵗ` already paid, and `spnᵉ ≥ 1`
+  -- covers the resulting `2B`).  `caseᵗ` supplies the FIRST when its
+  -- scrutinee is env-dependent and the SECOND when it is closed, and the
+  -- parent's `pmᵗ`/`hopDᵗ` clause is exactly the disjunction of those two.
+  --
+  -- SO THE NEXT ATTEMPT IS A TWO-PREDICATE INDUCTION (or one predicate
+  -- over a disjunctive multiplier condition), not a third single-number
+  -- hypothesis.  Do not spend another pass looking for one — both ends of
+  -- that space are now pinned.
   applyFn-hopSpn-obs : ∀ {n} {Γ : Ctx n} {s w} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
     (fn : Fn Γ [] [] [] s (obs w)) (x : Val Γ s) →
     1 ≤ pmᵗ V 0 fn →

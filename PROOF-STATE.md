@@ -115,8 +115,16 @@ order attention is OWED, not a bar on running the bottom concurrently.
   sets out the tension in full — a uniform `pmᵗ V j tm ≤ P` dies at `caseᵗ`
   with a closed scrutinee, a per-variable `Bs` fixes `caseᵗ` termwise but no
   longer returns the conclusion at `B`, and the resolution looks to be keeping
-  `Bs` and letting the drag convert. Nobody has written the indices down. Do
-  NOT grind clauses before that statement typechecks.
+  `Bs` and letting the drag convert — but BOTH single-number shapes have now
+  been tried and both fail, at opposite ends: a derived bound fixes `caseᵗ`
+  termwise and leaves the fold decaying by a factor per step, and a product
+  hypothesis fixes `caseᵗ` and is false at the fold's own call site. The
+  finding is that the multiplier condition is not one inequality — a COPIED
+  leaf needs none, a BUILT leaf needs one of two sufficient forms, and
+  `caseᵗ`'s own clause is the disjunction of them. Next attempt is a
+  TWO-PREDICATE induction; the header says why a third single-number
+  hypothesis is not worth looking for. Do NOT grind clauses before that
+  statement typechecks.
 - **`applyFn-hopSpn-inj`** (Hop-Spine-Face) — GRINDABLE: the sum arm of the
   same induction. `Tm` has no eliminator taking a sum to its payload's type,
   so there is no projection to push the induction through — but every Ty is
