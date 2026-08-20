@@ -2264,11 +2264,20 @@ postulate
   -- J, sched, st — stays true.  Conclusion needing information no hypothesis
   -- carries, exactly as in `-cl` above.
   --
-  -- THE REPAIR HAS A WORKED TWIN IN THIS FILE: `thruConsume-nodry-vb` below
-  -- states the same fact correctly, taking `VbB c sl Ψ J (o ∷ os)` as a
-  -- HYPOTHESIS and projecting the head out of it.  That is the shape this row
-  -- should have — the caller holds the whole burst's VbB, so the hypothesis is
-  -- free where it is spent.  Mirror it; do not invent a route from OKB.
+  -- `thruConsume-nodry-vb` BELOW IS THE RIGHT SHAPE BUT NOT THE RIGHT SOURCE,
+  -- and the difference is the actual work here.  It takes `VbB c sl Ψ J (o ∷
+  -- os)` as a HYPOTHESIS and projects the head, which is free on that side
+  -- because its `os` is a BURST the caller already validated.  This side has
+  -- no such caller: tracing up through `concatDrain-nodry` to
+  -- `innerReact-nodry`, the queue is `concat-st {w} q act od` read out of the
+  -- NODE TABLE, and nothing above holds a VbB for it.
+  --
+  -- So the missing hypothesis is not a passed-in VbB but MEMBERSHIP: `o ∈ q`
+  -- together with the queue being the stored one, at which point OKB's
+  -- capsOK? node conjunct does reach it — which is what this row's original
+  -- header ("from OKB's capsOK? node conjunct") always intended and what the
+  -- statement simply failed to say.  What the thru twin supplies is the
+  -- discipline, not the ingredient: TAKE the fact, never conjure it.
   --
   -- THE TELL IS IN THE BINDER LIST, and it is free to read: `q` and `allNid`
   -- appear in NEITHER the hypothesis nor the conclusion.  A parameter used
