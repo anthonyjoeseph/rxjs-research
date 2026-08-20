@@ -1259,6 +1259,18 @@ postulate
   -- row's type carries none of the ruled-FALSITY conjuncts, and the
   -- informal argument is convincing — but there is no proven twin and no
   -- mechanical route, which is DIFFICULTY by definition.
+  --
+  -- ⚠ DEAD ROUTE 2026-08-20: THE CAPS FACE IS NOT THE TWIN FOR THIS
+  -- CONJUNCT, AND ITS APPARENT ALIGNMENT IS THE TRAP.  It is tempting to
+  -- read the caps face as proving this "in the same position", because the
+  -- two statements sit at the same indices and the caps side really is
+  -- discharged there.  It cannot: `capsOK?` BOUNDS every node and
+  -- IDENTIFIES none, while this conjunct asserts a particular nid is
+  -- PRESENT with a particular shape.  The gap is not a missing quantifier
+  -- or a widening — it is a difference in KIND between a bound and an
+  -- identification, so no strengthening of the caps receipt reaches it,
+  -- and the fresh-node induction named above stays owed.  Recorded here
+  -- because the alignment is what makes the route look mechanical.
   walk-scan-source-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmtᴴˢᶠ {e = e} f z b
@@ -3467,6 +3479,24 @@ postulate
   -- (retagEvents-dry, mapValue-hop, mapValue-dry, any-dry-++).  The regsLen?
   -- helpers do NOT: capsOK⇒regsLen and regsLen?-mono sit ~1200 lines BELOW,
   -- after the block, so anything of theirs a future clause wants moves up too.
+  --
+  -- ═══ TWO CHORES BEFORE THE GRIND, NEITHER STRUCTURAL ═══
+  -- Both are bookkeeping, and both are recorded because each reads as
+  -- already-done from the census above.
+  --
+  --   · THE PRECEDENT IS NOT IN SCOPE.  `subscribeE-input-caps` is named
+  --     as the clause-for-clause twin, and it is PROVEN, but it is absent
+  --     from this module's `using` list for .Subscribe-Face — so the twin
+  --     cannot be APPLIED here until it is added.  Deliberately not added
+  --     ahead of the body: an unapplied name in a `using` list earns no
+  --     reachability credit and is indistinguishable from clutter.  Add it
+  --     in the commit that spends it.
+  --   · EIGHT CONJUNCTS ARE ROUTED "BY COMPUTATION" AND NONE OF THE EIGHT
+  --     IS TYPECHECKED.  The census discharges them by inspection of the
+  --     evaluator, which is the same disclaimer the walkFace family carries
+  --     — located, not spent.  Expect the residue to be larger than four
+  --     lemmas, and treat any of the eight that does NOT fall out as the
+  --     finding rather than as a slip in the census.
   input-wet-scripted-four : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
     (g : Gas)
