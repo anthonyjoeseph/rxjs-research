@@ -2231,6 +2231,26 @@ postulate
   -- opIterD S W d bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W d J, then
   -- frameStep-mono-j makes the per-element ceiling follow from the frame's.
   -- id is explicit so the sizeCapAt reference is well-scoped.
+  --
+  -- ⚠ THIS BODY MUST LAND `abstract`, IN THE SAME EDIT THAT WRITES IT, AND
+  -- THE FAILURE MODE IS NOT A RED BUILD.  Both families it reasons about are
+  -- SEALED (Rx/Evaluator's abstract blocks at :748 and :918), and this module
+  -- is on the `budget-sufficient` spine via cascade-wet-via-caps → drain-dry.
+  -- An unsealed body on that spine puts fLvlD's unfoldable clauses back under
+  -- the opIterD-dominated / lvls-mono towers: the three recorded outcomes are
+  -- `Killed: 9` at tens of GB after tens of minutes, and the seal header at
+  -- :720 records caps-fuel-root running PAST AN HOUR with the bodies visible
+  -- and finishing in minutes with them hidden.  So the cost of forgetting is
+  -- a long wait ending in an OOM, which reads as "this proof is too big"
+  -- rather than as "the seal is missing" — which is why it is written here
+  -- and not left to be rediscovered.
+  --
+  -- The shape is therefore the awkward one: the proof needs the `-body`
+  -- equations (.Caps) to unfold the family LOCALLY while its own result stays
+  -- one opaque symbol to every consumer.  And a plain `abstract` block rejects
+  -- untyped `where`-bindings, which this arithmetic will want, so it wants the
+  -- private-impl + abstract-alias form (`private cl-go : T; cl-go = …` then
+  -- `abstract concatDrain-nodry-cl = cl-go`).
   concatDrain-nodry-cl : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (d bud J : ℕ) (id : Id)
     (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →

@@ -78,9 +78,16 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-Every row in this tier is now GRINDABLE. Rows are available to their siblings
-as postulates, so they can be ground in parallel by workers; top-to-bottom is
-the order attention is OWED, not a bar on running the bottom concurrently.
+Rows are available to their siblings as postulates, so GRINDABLE ones can be
+ground in parallel by workers; top-to-bottom is the order attention is OWED,
+not a bar on running the bottom concurrently. The two DIFFICULTY rows are the
+design session's own, per the delegation boundary in CLAUDE.md.
+
+A row's class here must agree with its postulate's header, which is where the
+research lives; where they disagreed, the header won. Two rows in this tier
+have never been audited against their headers at all — `input-wet-scripted-four`
+and `walk-scan-rest` — and the former's own census says it was "derived by
+reading the evaluator and the measures, NOT by typechecking".
 
 - **`sharedConnect-walk`** (Walk-Level) — GRINDABLE, large: the CONNECTING arm,
   all that is left of `input-wet-shared` now that the dispatch is a real
@@ -128,17 +135,21 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   hop ledger. `map` and `take` additionally need their own push face — a frame-generic one is
   REFUTED, per the DEAD ROUTE their header points at. `defer` is now the leaf
   `walk-defer-eight` at `WalkStmt⁻`, its regsLen? conjunct already proven.
-- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the repaired
-  statement; its header names a proven source for every remaining conjunct, one
-  of which (`regsB?-of-parts`) sits downstream and must relocate or inline.
+- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY, per its own
+  header, and BLOCKED on a placement decision rather than on mathematics:
+  `regsB?-of-parts` sits DOWNSTREAM, so the fact must move down before the
+  conjunct can be spent. Copying it here goes green and is caught only by
+  `dup-check`.
 - **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — GRINDABLE.
   Path-extension and depth-mirror plumbing for the inner call.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
   (Burst-Walk) — GRINDABLE. Per-element context for concat's drain: each
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
   element has moved the state, and the shared header names the caps face
-  (`.Subscribe-Face`) as the worked twin at the same indices. `-cl` is the
-  hardest of the six — its opIterD/fLvlD arithmetic is the reason it is a leaf.
+  (`.Subscribe-Face`) as the worked twin at the same indices. `-cl` is
+  DIFFICULTY and the design session's: it is on the `budget-sufficient` spine
+  and its arithmetic is over the SEALED opIterD/fLvlD family, so its body must
+  land sealed or the check OOMs — see its header.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-dep` / `-loop`, `thruWalk-nodry-dep`,
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE. The same
   per-element context on the thru-outer side against the same twin, plus
