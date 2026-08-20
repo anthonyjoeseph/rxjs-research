@@ -140,9 +140,14 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`concatDrain-nodry-nestBud`** (Burst-Walk) — DIFFICULTY: its Σ pins the
-  witness with the ceiling conjunct, mirroring the thru twin, so the obligation
-  is real and not upward-closed.
+- **`thruConsume-nodry-loop`** (Burst-Walk) — SHAPE: REFUTED as stated. Concat's
+  park grows the node's queue past the width cap the conclusion is still
+  measured at. The repair is a reported level, not a hypothesis, and it
+  re-levels `thruWalk-nodry`'s recursion; the header has it.
+- **`concatDrain-nodry-nestBud` / `thruConsume-nodry-nestBud`** (Burst-Walk) —
+  DIFFICULTY: both REFUTED as first stated, and restated. What is left is a
+  tension between the Σ's two conjuncts over one shared bud, and two sub-facts
+  the tree does not have. The concat header holds the story for the pair.
 - **`walk-scan-source-frame`** (Walk-Level) — DIFFICULTY: its `burstHopD?`
   conjunct is ordinary; the node-table one needs a fresh-node induction the repo
   does not have, and the weaker `scan-nodeP` is itself open. Header carries the
@@ -170,9 +175,8 @@ spent"), so every row governed by it inherits that caveat.
   `subscribeInner-nodry` after the previous element has moved the state, and the
   shared header names the caps face (`.Subscribe-Face`) as the worked twin at
   the same indices.
-- **`thruConsume-nodry-nestBud` / `-loop`, `thruWalk-nodry-dep`,
-  `switchKill-context`** (Burst-Walk) — GRINDABLE: each takes the fact it needs
-  as a hypothesis rather than conjuring it.
+- **`thruWalk-nodry-dep`, `switchKill-context`** (Burst-Walk) — GRINDABLE: pure
+  preservation, and every quantity in the conclusion appears in a hypothesis.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 

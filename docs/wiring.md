@@ -31,6 +31,16 @@ that went unreported. Anything those entries reach is covered automatically.
 `make wiring` reads Main's `using` clauses to get its seeds, so a filename never earns
 an exemption and a claim cannot self-certify.
 
+**Two kinds of line own their span under a synthetic PER-SITE name, and both are
+seeds.** An anonymous `_ : T` pin, and a column-0 `... | p = body` `with` arm. Neither
+can ever HAVE a consumer, but both are real bodies the typechecker checks, so whatever
+they use IS used. The per-site part is what makes them safe: attribute such a line to
+the definition ABOVE it instead and a name used there becomes a self-reference and is
+dropped (measured: 115 live names orphaned when the `with` arm's own head was removed,
+and one pin's only real consumer lost the same way). Giving every `with` arm ONE shared
+owner is the other failure — that node has no route home, so a helper consumed only
+inside `with` arms reads as dead. Both are pinned by the selftest.
+
 ## R2: a name PASSED to a postulate gets no reachability credit
 
 That is how "a postulate must be a leaf" is enforced — as a corollary of
@@ -66,9 +76,14 @@ exactly what the rule exists to report.
 ## `make wiring-selftest`
 
 Proves the check is load-bearing, against a fixture outside `agda/src`: R2 must fire
-on a lemma passed bare to a postulate and on nothing else, and a module application
-must still conduct reachability. **R2 fires on nothing in `agda/src` today, so without
-the fixture it would rot untested.**
+on a lemma passed bare to a postulate and on nothing else, a module application must
+still conduct reachability, and a helper used only inside a `with` arm must not be
+reported — at the file scope and one scope down, since two scanners register heads and
+only one of them was ever exercised by the real tree. No bare `...` may surface as a
+definition. **R2 fires on nothing in `agda/src` today, so without the fixture it would
+rot untested**, and the `with`-arm case was invisible there for a sharper reason: the
+token `...` appears in nearly every file in `agda/src`, so the shared owner rode along
+accidentally reachable and the bug only surfaced in `agda/refuted`.
 
 ## `make wiring-refuted`
 

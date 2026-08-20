@@ -474,6 +474,25 @@ def extract_definitions(src_dir, files):
             # Implementation/Unit-Test.agda) — it can never have a
             # consumer BY DESIGN, so it is not a definition worth tracking
             # at all, let alone flagging as an orphan.
+            if tok0 == "...":
+                # A `with` CONTINUATION OWNS ITS SPAN, for the anonymous
+                # pin's reason and by the same device.  `... | pat = body`
+                # continues the clause above it and can sit at column 0, so
+                # it has to be a registered head or its lines are
+                # mis-attributed to the definition ABOVE it — dropping the
+                # registration silently orphaned 115 live names when tried
+                # (Anthony, 2026-08-18), because a name used in `f`'s
+                # continuation would then be a self-reference of `f`.
+                # But registering every continuation under the single name
+                # `...` gave that node no route home, so a name used ONLY in
+                # continuations read as dead: measured in agda/refuted, where
+                # a refutation's two `with` arms are the only consumers of
+                # their own `2 ≤ cSize` helper.  Per-SITE synthetic name,
+                # never reported, always a reachability seed — whatever a
+                # continuation the typechecker checks uses IS used.
+                register(f"...#{relpath}:{i + 1}", relpath, i + 1, "anon")
+                i += 1
+                continue
             if tok0 == "_":
                 # AN ANONYMOUS PIN OWNS ITS SPAN.  `_ : T` / `_ = …` (the
                 # bug-cache idiom, and the `refl` pins through the proof) can
@@ -575,6 +594,25 @@ def extract_definitions(src_dir, files):
                     i += 1
                     continue
 
+            if tok0 == "...":
+                # A `with` CONTINUATION OWNS ITS SPAN, for the anonymous
+                # pin's reason and by the same device.  `... | pat = body`
+                # continues the clause above it and can sit at column 0, so
+                # it has to be a registered head or its lines are
+                # mis-attributed to the definition ABOVE it — dropping the
+                # registration silently orphaned 115 live names when tried
+                # (Anthony, 2026-08-18), because a name used in `f`'s
+                # continuation would then be a self-reference of `f`.
+                # But registering every continuation under the single name
+                # `...` gave that node no route home, so a name used ONLY in
+                # continuations read as dead: measured in agda/refuted, where
+                # a refutation's two `with` arms are the only consumers of
+                # their own `2 ≤ cSize` helper.  Per-SITE synthetic name,
+                # never reported, always a reachability seed — whatever a
+                # continuation the typechecker checks uses IS used.
+                register(f"...#{relpath}:{i + 1}", relpath, i + 1, "anon")
+                i += 1
+                continue
             if tok0 == "_":
                 # AN ANONYMOUS PIN OWNS ITS SPAN.  `_ : T` / `_ = …` (the
                 # bug-cache idiom, and the `refl` pins through the proof) can
@@ -1157,17 +1195,11 @@ def main():
         main_claims, suppressed)
     R = reachable_from(seed, edges)
 
-    # `...` continues a `with` clause and can sit at column 0, so it is
-    # registered as a definition head — and that registration is
-    # LOAD-BEARING: it is what attributes each continuation line to an
-    # owner, and dropping it re-attributes every such line to whatever
-    # head precedes it, which silently orphaned 115 live names when tried
-    # (Anthony, 2026-08-18).  So it stays in the graph and is excluded
-    # from REPORTING only.  It is not a name and can never have a
-    # consumer, so in agda/src it rode along as accidentally-reachable
-    # (the token appears in most files) and in agda/refuted — one column-0
-    # `...` — it surfaced as a phantom dead definition.
-    exempt = lambda n: defs[n].kind in ("anon", "module-app") or n == "..."
+    # A column-0 `...` is registered per SITE with kind "anon" (see the
+    # scanner), so it is exempt and seeded by that kind alone — there is no
+    # single `...` node left to special-case here.  It used to be one, and
+    # that is what made a name used only inside `with` arms read as dead.
+    exempt = lambda n: defs[n].kind in ("anon", "module-app")
     unreached = [n for n in order if n not in R and not exempt(n)]
     exempted = [n for n in order if n not in R and exempt(n)]
     dead_post = [n for n in unreached if n in postulate_names]

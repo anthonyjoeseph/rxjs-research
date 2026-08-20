@@ -19,3 +19,7 @@ open import Refuted.Hop-Drag
   using (hop-drag-absurd)
 open import Refuted.Cut-Through
   using (cutThrough-close-bound-dying-absurd; cutThrough-live-dying-absurd)
+open import Refuted.Concat-Drain
+  using (concatDrain-nodry-nestBud-absurd; thruConsume-nodry-nestBud-absurd)
+open import Refuted.Thru-Loop
+  using (thruConsume-nodry-loop-absurd)

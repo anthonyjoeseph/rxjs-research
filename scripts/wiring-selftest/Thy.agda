@@ -33,7 +33,26 @@ computed x = x
 postulate eta-parent : (Nat → Nat) → (Nat → Nat) → Nat → Nat
 
 other : Nat → Nat
-other y = good-lemma y
+other y = good-lemma (via-with y)
+
+-- USED ONLY INSIDE A `with` ARM.  A column-0 `... | p = body` continues the
+-- clause above it, so it has to be a registered head or its lines are
+-- mis-attributed to the definition above — but registering every arm under
+-- ONE shared `...` node left that node with no route home, and a helper
+-- whose only consumers are `with` arms read as dead (measured in
+-- agda/refuted).  Neither of these may be reported.
+postulate Two : Set
+postulate decide : Nat → Two
+
+consume : Two → Nat → Nat
+consume t x = x
+
+with-only : Nat → Nat
+with-only x = x
+
+via-with : Nat → Nat
+via-with x with decide x
+... | d = consume d (with-only x)
 
 top-line : Nat → Nat
 top-line z = other (parent-core bad-lemma
@@ -62,5 +81,13 @@ module Scope where
 
   module Inst = Box via-mod
 
+  -- the same, one scope down: the NESTED scanner registers arms too
+  nested-with-only : Nat → Nat
+  nested-with-only x = x
+
+  via-nested-with : Nat → Nat
+  via-nested-with x with decide x
+  ... | d = consume d (nested-with-only x)
+
 both-mods : Nat → Nat
-both-mods w = TopInst.run (Scope.Inst.run w)
+both-mods w = TopInst.run (Scope.Inst.run (Scope.via-nested-with w))

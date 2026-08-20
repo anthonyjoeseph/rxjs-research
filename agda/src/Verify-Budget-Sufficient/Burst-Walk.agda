@@ -2262,8 +2262,11 @@ abstract
 --
 -- NOTE ON ceiling: opIterD S W d bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W d J
 -- is needed to pay each element's SiNodry ceiling from the frame's
--- fused ceiling.  Stated as a separate leaf rather than proven inline,
--- as the opIterD/fLvlD arithmetic is non-trivial.
+-- fused ceiling.  IT IS NOT STATED ANYWHERE — this note used to claim it
+-- sat as a separate leaf, and `make find Q='fLvlD'` says otherwise.  It
+-- is owed by the two *-nestBud rows below, whose Σ cannot close without
+-- it, and it is the harder half of what they owe: a bound ON THE WITNESS,
+-- pulling against the same witness's per-element nest bound.
 --
 -- NOTE ON loop invariants: OKB/regP? after each subscribeInner step
 -- are left as leaves.  These are the capsOK?-preservation obligations
@@ -2278,56 +2281,51 @@ postulate
   -- ── innerReact / concatDrain loop leaves ────────────────────────
 
 
-  -- PINNED 2026-08-20, and the pin is the whole point of the row.  Before
-  -- today the Σ's only conjunct was `all (nest … ≤ᵇ bud) q`, UPWARD-CLOSED in
-  -- bud, so the max over a finite q discharged it for free — while the
-  -- consumer needed bud SMALL, feeding the same bud to opIterD's `k` position
-  -- where a bigger bud is a higher level and a harder ceiling.  The free
-  -- witness was the one witness that could not be spent.
+  -- PINNED 2026-08-20, THEN REFUTED AND RESTATED THE SAME DAY.
   --
-  -- The second conjunct closes that: it demands the ceiling AT THAT SAME BUD,
-  -- so enlarging the witness now costs something.  This mirrors
-  -- `thruConsume-nodry-nestBud` below, which has carried both conjuncts all
-  -- along — which is also why the thru side never needed a ceiling-transfer
-  -- postulate.  Pinning here RETIRED `concatDrain-nodry-cl`: with the witness
-  -- arriving already knowing it fits, nothing is left to transfer from an
-  -- fLvlD-level bound, and that transfer was provably backwards anyway.
+  -- THE PIN IS SOUND AND STAYS.  Before it the Σ's only conjunct was
+  -- `all (nest … ≤ᵇ bud) q`, UPWARD-CLOSED in bud, so the max over a finite q
+  -- discharged it for free — while the consumer needs bud SMALL, feeding the
+  -- same bud to opIterD's `k` position where a bigger bud is a higher level and
+  -- a harder ceiling.  The free witness was the one witness that could not be
+  -- spent.  The ceiling conjunct demands the ceiling AT THAT SAME BUD, so
+  -- enlarging the witness now costs something.  Pinning here RETIRED
+  -- `concatDrain-nodry-cl`: with the witness arriving already knowing it fits,
+  -- there is nothing left to transfer from an fLvlD-level bound.
   --
-  -- No longer VACUITY.  It is now a real obligation — plausibly a hard one,
-  -- since it asserts the caps have room for every element at ONE shared bud —
-  -- and that is the correct outcome: an honest hard statement replacing a free
-  -- empty one.
-  -- The Σ's only conjunct, `all (λ o → nest o sl … ≤ᵇ bud) q ≡ true`, is
-  -- UPWARD-CLOSED in `bud`, so it is satisfied by any large enough witness and
-  -- is discharged for free by the max over a finite `q`.  That is the
-  -- Σ-receipt trap in CLAUDE.md: content only through the witness.
+  -- REFUTED (2026-08-20) in the OKB-only form —
+  -- `Refuted.Concat-Drain.concatDrain-nodry-nestBud-absurd`, and checked the
+  -- decisive way: the postulate itself, applied to the witness, gave `⊥`.  The
+  -- ceiling conjunct measures a cap derived from `c` against
+  -- `sizeCapAt e sl (suc id)`, and OKB relates the two NOT AT ALL — it gets
+  -- easier as `c` grows, while sizeCapAt reads only `e` and `sl` — so
+  -- `cSize c = suc (sizeCapAt e sl 1)` kills it at every bud, whatever the
+  -- queue holds.  Conjunct one was unreachable for its own reason: a free
+  -- `Closed Γ s` list has no nest bound, which is the retired
+  -- `concatDrain-nodry-vb`'s defect arriving one conjunct over.
   --
-  -- AND THE WITNESS IS LOAD-BEARING IN THE OPPOSITE DIRECTION, which is what
-  -- makes the vacuity harmful rather than merely weak: the consumer feeds this
-  -- same `bud` to `subscribeInner-nodry` in opIterD's `k` position, where a
-  -- BIGGER bud means a HIGHER level and a strictly harder ceiling.  So the
-  -- free large witness is the one witness that cannot be spent.
+  -- SO THE TWO ADDED HYPOTHESES ARE A RESTATEMENT AND NOT A CONVENIENCE, one
+  -- per conjunct: the fLvlD tie for the ceiling, `VbB` for the nest bound.
+  -- `concatDrain-nodry` carried both and passed neither, which is exactly the
+  -- reading "the call site happens to supply it" is not allowed to have — the
+  -- licence here is the refutation, not the caller.
   --
-  -- REPAIR: pin it, per the sanctioned form — either share the Σ with the
-  -- statement whose witness is actually spent, or put the bound itself in as a
-  -- second conjunct (`bud ≤ <the cap the ceiling can afford>`).  Do not grind
-  -- it as written; a proof of this statement is worth nothing.
-  --
-  -- AND THE PINNED FORM ALREADY EXISTS ON THE OTHER SIDE:
-  -- `thruConsume-nodry-nestBud` below returns a Σ with TWO conjuncts — the
-  -- nest bound AND the opIterD ceiling at that same bud — which is exactly
-  -- the pin this row is missing.  Mirror it.
-  --
-  -- DOING SO ALSO RETIRES `-cl` ABOVE.  The thru side has no ceiling-transfer
-  -- postulate because it never needs one: folding the ceiling into the Σ means
-  -- the witness arrives already knowing it fits, so there is nothing to
-  -- transfer from an fLvlD-level bound afterwards.  That is the structural
-  -- answer to `-cl`'s SHAPE defect, and it is a deletion rather than a proof.
+  -- WHAT REMAINS IS THE ROW'S REAL CONTENT, and it is a tension rather than a
+  -- grind: conjunct one wants bud LARGE enough for every element, conjunct two
+  -- wants `opIterD S W dep bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W dep J` and so
+  -- wants it SMALL.  Whether one bud does both is open.  Two sub-facts are
+  -- owed and neither exists in the tree: that opIterD/fLvlD inequality (the
+  -- block header above calls it "stated as a separate leaf" — it is not, and
+  -- `make find Q='fLvlD'` says so), and `nest` from `VbB`'s per-element size
+  -- and width bounds.
   concatDrain-nodry-nestBud : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (id : Id) (allNid : NodeId)
     (q : List (Closed Γ s))
     (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
+    VbB c sl Ψ J q ≡ true →
+    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
+      ≤ sizeCapAt e sl (suc id) →
     Σ ℕ (λ bud →
            all (λ o → nest o sl (EvalSt.connectedShares st) ≤ᵇ bud) q ≡ true
          × all (λ o → Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
@@ -2368,19 +2366,87 @@ postulate
 
   -- Per-element: nest budget + ceiling for one val element.
   -- dep and id are explicit params so they are in scope in the Σ-body.
+  -- REFUTED (2026-08-20) in the OKB-only form —
+  -- `Refuted.Concat-Drain.thruConsume-nodry-nestBud-absurd`, the same witness
+  -- one step shorter, and the postulate itself applied to it gave `⊥`.  This
+  -- row WAS THE PRECEDENT the concat side was pinned against, so the pin
+  -- copied the two-conjunct Σ (right) together with the OKB-only telescope
+  -- (the defect).  Worth recording as a class failure and not just a bug: this
+  -- was GRINDABLE, meaning "shape known, only the typing left", earned by
+  -- naming a worked precedent — and the precedent named was its own twin, with
+  -- the identical hole.  A precedent audit that compares Σ SHAPES and not
+  -- TELESCOPES certifies both halves of a false pair.
+  --
+  -- Restated with the same two hypotheses as the concat side, and for the same
+  -- two conjuncts; `thruConsume-nodry` already carried both.  The residue is
+  -- the concat row's residue verbatim — see its header, which holds the story
+  -- for the pair.
   thruConsume-nodry-nestBud : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (id : Id)
     (o : Val Γ (obs u)) (os : List (Val Γ (obs u)))
     (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
+    VbB c sl Ψ J (o ∷ os) ≡ true →
+    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
+      ≤ sizeCapAt e sl (suc id) →
     Σ ℕ (λ bud → nest o sl (EvalSt.connectedShares st) ≤ bud
                  × Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
                                                   dep bud (suc (sizeᵉ o)) (suc J)) c)
                      ≤ sizeCapAt e sl (suc id))
 
-  -- Per-element: depthInner for one val element, from OKB.
-  -- walkOK carries the depth budget; per-element depth follows from it.
   -- Loop invariant after one thruConsume step: OKB + regP? are preserved.
+  --
+  -- ⚠ REFUTED AS STATED (2026-08-20) — `Refuted.Thru-Loop`, and the
+  -- witness computes: `capsOK?` on the post-state evaluates to `false`
+  -- while this conclusion demands `true`.
+  --
+  -- WHY.  Concat's park clause is a pure GROWTH step: with the node's
+  -- inner already active, `thruConsume` appends the element to the node's
+  -- queue and emits nothing — which is exactly why the nodry conclusion
+  -- is `refl` there, and why nothing else in this block notices.  And
+  -- `capsOK?`'s width conjunct bounds that queue's LENGTH
+  -- (`widNode`'s `length q ≤ᵇ W`).  A queue sitting AT the cap is one
+  -- park from breaching it, and this telescope says nothing about the
+  -- queue at all: CLAUDE.md's first almost-always-wrong shape.
+  --
+  -- IT IS NOT A ZERO-CAP ARTIFACT: the refutation's caps are read off the
+  -- value (cSize 3, cWid 2, both pinned by `refl`), every other conjunct
+  -- holds with margin, and the only tight one is the length.  Threading
+  -- `vb : VbB c sl Ψ J vals` — which the consumer has and does not pass —
+  -- would NOT repair it: VbB bounds each element, never the queue's
+  -- length.
+  --
+  -- THE REPAIR IS A LEVEL, NOT A HYPOTHESIS, and the walk face already
+  -- has the shape: `pushThru-walk` (Walk-Level) states THIS frame's
+  -- receipt as a Σ reporting j′, bounded by
+  -- `fIterD S W dep bud (length str) j` — the ITERATED level, one
+  -- `fLvlD` step per payload, which is exactly what `fIterD`'s own clause
+  -- says (`fIterD … (suc m) J = fIterD … m (fLvlD … J)`).  Caps-Face's
+  -- `widNode` header supplies the width half: one level of width pays for
+  -- one cons, and `wid-suc-step` proves it.
+  --
+  -- SO THE DEFECT IS A LEVEL FUNCTION, AND THAT NARROWS IT: the wet face
+  -- measures this walk against `fLvlD … dep J` — ONE frame — where the
+  -- walk face measures the same traversal against `fIterD … (length …) J`.
+  -- The restatement is therefore (a) this row reports a j′ with
+  -- `J + j′ ≤ fLvlD (cSize c) (cWid c) dep J`, one payload's climb, so it
+  -- needs `dep` in its telescope; and (b) `thruWalk-nodry`'s ceiling moves
+  -- from `fLvlD` to `fIterD` over `length vals`, which is what makes the
+  -- tail's ceiling the inductive step rather than a strictly harder claim.
+  -- Widening the rest is routine (PbB / VbB / sspLen all weaken upward);
+  -- the ceiling is the only conjunct that gets HARDER as J grows, and it
+  -- is the one the `fIterD` move fixes.
+  --
+  -- Conditioning on the queue instead would be the "call site happens to
+  -- supply it" trade: the walk's SECOND element cannot supply it, because
+  -- the FIRST element is what filled the queue.
+  --
+  -- IT WAS CLASSED GRINDABLE on the grounds that it is pure preservation,
+  -- hypothesis P at state₀ and conclusion P at state₁.  That reading is
+  -- the trap: preservation is only cheap when the step cannot grow the
+  -- thing preserved, and this step exists to grow it.  Shape-checking a
+  -- statement against `hypothesis ⇒ conclusion` says nothing about the
+  -- STEP in between.
   thruConsume-nodry-loop : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sf : Gas)
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
@@ -2458,7 +2524,7 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
 
 concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
                   (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk cl hD
-  with concatDrain-nodry-nestBud c sl Ψ dep J id allNid (o ∷ q) sched₀ st₀ ok
+  with concatDrain-nodry-nestBud c sl Ψ dep J id allNid (o ∷ q) sched₀ st₀ ok vbq cl
 ... | bud , nestQ , clQ
   -- Scrutinise only `done` (4th component).  This preserves
   -- `proj₁ (proj₂ (proj₂ (subscribeInner ...)))` (3rd component) in the goal
@@ -2560,10 +2626,15 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
   depthInner sf op nid κ id now o sched st ≤ dep →
+  -- THE TIE, threaded rather than conjured: `thruConsume-nodry-nestBud`'s
+  -- ceiling conjunct is refutable without it (Refuted.Concat-Drain), and
+  -- every caller of this helper already holds it
+  Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) dep J) c)
+    ≤ sizeCapAt e sl (suc id) →
   any dryEvent (proj₁ (proj₂ (proj₂ (subscribeInner sf op nid κ id now o sched st)))) ≡ false
-thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem =
+thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem cl =
   let vb-elem = VbB-head c sl Ψ J o os vb
-      bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched st ok
+      bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched st ok vb cl
   in subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
        J sf op nid κ id now o sched st
        ok pb sspLen vb-elem rg nB hD-elem cl-elem gk
@@ -2571,7 +2642,7 @@ thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ
 -- MERGE: one subscribeInner call, events = bs
 thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl =
   thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD))
+    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD)) cl
 
 -- CONCAT: dispatch on node state
 -- The scrutinee and the clause ORDER both mirror Rx.Evaluator's own
@@ -2592,7 +2663,7 @@ thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concat�
 thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (concat-st q false od) =
   thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD))
+    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD)) cl
 -- other node shapes: thruConsume's own catch-all emits [].  These are
 -- enumerated rather than written `| _`, because a VARIABLE scrutinee
 -- leaves the evaluator's with-function stuck — its catch-all only fires
@@ -2629,7 +2700,7 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid �
       rg₁        = proj₂ ctx₁
       -- VbB is state-independent (valsCaps? ∧ valsΨ? depend only on vals and caps)
       vb-elem    = VbB-head c sl Ψ J o os vb
-      bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched₁ st₁ ok₁
+      bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched₁ st₁ ok₁ vb cl
       -- depthConsume switchᵒ routes through depthConsumeS, which on a
       -- switch-st node IS depthInner at the POST-switchKill state — exactly
       -- sched₁/st₁ above.  So the same ⊔/suc projection serves here.
@@ -2652,7 +2723,7 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid 
 -- EXHAUST active=false: subscribes, emits bs
 ... | just (exhaust-st false od) =
   thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD))
+    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD)) cl
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl
