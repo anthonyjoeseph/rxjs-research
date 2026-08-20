@@ -103,7 +103,8 @@ open import Verify-Budget-Sufficient.Caps
          B2-cReg≤cSize; frameStep-reg≤size)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry; valΨ?;
-         frameBΨ?; pathBΨ?; regsBΨ?)
+         frameBΨ?; pathBΨ?; regsBΨ?;
+         frameB?-of-parts; pathB?-of-parts; regsB?-of-parts)
 -- the wet contract itself, stated over the COLLAPSED walk (2026-08-13).
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
@@ -119,10 +120,10 @@ open import Rx.Exp using (obs; sizeᵛ)
 -- weight test per frame (`(sizeᵗ fn ≤ᵇ B) ∧ ((caseWᵗ fn ⊔ fnCapᵗ fn) ≤ᵇ
 -- Ψ)` on map-f/scan-f, `true` elsewhere) — and `frameSz? B f` (the
 -- caps side, Caps-Face.agda:254) is EXACTLY its size half, clause for
--- clause.  So the missing half is the Ψ-only one, mirrored here; the
--- recombination lemmas that reunite it with the caps side's size-only
--- half into the real `frameB?`/`pathB?`/`regsB?` (Measures.agda) that
--- INV? reads live below, next to where the assembly consumes them.
+-- clause.  So the missing half is the Ψ-only one, and both it and the
+-- recombination lemmas that reunite the two into the real
+-- `frameB?`/`pathB?`/`regsB?` (Measures.agda) that INV? reads now live
+-- in .Burst-Walk, imported above.
 ------------------------------------------------------------------
 
 -- frameBΨ?/pathBΨ?/regsBΨ? RELOCATED to .Burst-Walk (2026-08-10): the
@@ -696,36 +697,13 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
   jj′≤  = proj₂ (proj₂ (proj₂ (proj₂ IH)))
 
 ------------------------------------------------------------------
--- (B3, CONTINUED) THE RECOMBINATION LEMMAS: capsOK?'s size-only half
--- (regsSz?) plus S1's Ψ-only half (regsBΨ?, above) reunite into the
--- real `frameB?`/`pathB?`/`regsB?` (Measures.agda) that INV? reads,
--- one line of ∧-intro per clause.
+-- (B3, CONTINUED) THE RECOMBINATION LEMMAS have MOVED to .Burst-Walk,
+-- beside the Ψ predicates they consume, and arrive here through this
+-- module's existing import of it.  They were never at home in this
+-- module: it is downstream of all three of their ingredient families,
+-- so stating them here put them out of reach of the one postulate that
+-- most needs them (`subscribeE-inner-nodry-inv`).
 ------------------------------------------------------------------
-
-frameB?-of-parts : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) {B Ψ : ℕ} →
-  frameSz? B f ≡ true → frameBΨ? Ψ f ≡ true → frameB? B Ψ f ≡ true
-frameB?-of-parts (map-f fn)         hb hΨ = ∧-intro hb hΨ
-frameB?-of-parts (scan-f fn _)      hb hΨ = ∧-intro hb hΨ
-frameB?-of-parts (take-f _)         hb hΨ = refl
-frameB?-of-parts (from-inner _ _ _) hb hΨ = refl
-frameB?-of-parts (thru-outer _ _)   hb hΨ = refl
-
-pathB?-of-parts : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B Ψ : ℕ} →
-  pathSz? B p ≡ true → pathBΨ? Ψ p ≡ true → pathB? B Ψ p ≡ true
-pathB?-of-parts root           hsz hΨ = refl
-pathB?-of-parts (share-sink i) hsz hΨ = refl
-pathB?-of-parts (f ↠ p) {B} {Ψ} hsz hΨ
-  with ∧-true (frameSz? B f) _ hsz
-... | hf , hrest with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hrest
-... | _ , hp with ∧-true (frameBΨ? Ψ f) (pathBΨ? Ψ p) hΨ
-... | hfΨ , hpΨ = ∧-intro (frameB?-of-parts f hf hfΨ) (pathB?-of-parts p hp hpΨ)
-
-regsB?-of-parts : ∀ {n} {Γ : Ctx n} {t}
-  (rs : List (RegId × Source × Chain Γ t)) {B Ψ : ℕ} →
-  regsSz? B rs ≡ true → regsBΨ? Ψ rs ≡ true → regsB? B Ψ rs ≡ true
-regsB?-of-parts rs hsz hΨ =
-  all-zip _ _ _ (λ en psz pΨ → pathB?-of-parts (proj₂ (proj₂ (proj₂ en))) psz pΨ)
-                rs hsz hΨ
 
 ------------------------------------------------------------------
 -- (C) THE ASSEMBLY.  Mirrors what .Wet's `cascade-dry` did (that name is

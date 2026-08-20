@@ -80,8 +80,9 @@ named postulate's own header.
 
 Rows are available to their siblings as postulates, so GRINDABLE ones can be
 ground in parallel by workers; top-to-bottom is the order attention is OWED,
-not a bar on running the bottom concurrently. The two DIFFICULTY rows are the
-design session's own, per the delegation boundary in CLAUDE.md.
+not a bar on running the bottom concurrently. `concatDrain-nodry-cl` is
+DIFFICULTY and the design session's own, per the delegation boundary in
+CLAUDE.md.
 
 A row's class here must agree with its postulate's header, which is where the
 research lives; where they disagreed, the header won. Two rows in this tier
@@ -135,11 +136,10 @@ reading the evaluator and the measures, NOT by typechecking".
   hop ledger. `map` and `take` additionally need their own push face — a frame-generic one is
   REFUTED, per the DEAD ROUTE their header points at. `defer` is now the leaf
   `walk-defer-eight` at `WalkStmt⁻`, its regsLen? conjunct already proven.
-- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — DIFFICULTY, per its own
-  header, and BLOCKED on a placement decision rather than on mathematics:
-  `regsB?-of-parts` sits DOWNSTREAM, so the fact must move down before the
-  conjunct can be spent. Copying it here goes green and is caught only by
-  `dup-check`.
+- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the placement that
+  blocked it is resolved (`regsB?-of-parts` now lives beside the Ψ predicates it
+  consumes), so all six conjuncts have a named source in scope. Header carries
+  the per-conjunct inventory.
 - **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — GRINDABLE.
   Path-extension and depth-mirror plumbing for the inner call.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**

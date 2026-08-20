@@ -134,7 +134,9 @@ open import Verify-Budget-Sufficient.Caps-Face
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
          frameStep-mono-j; frameStep-0; stepFrame-face; frameBud;
          -- the inner-at-suc-J kit, cribbed from subscribeInner-caps
-         frameStep-chain-suc; pathSz?-⊑; capsOK?-mono)
+         frameStep-chain-suc; pathSz?-⊑; capsOK?-mono;
+         -- the size half of the recombination lemmas below
+         frameSz?; regsSz?)
 
 open import Verify-Budget-Sufficient.Wet
   using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
@@ -144,6 +146,7 @@ open import Verify-Budget-Sufficient.Wet
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
          hasDry-append; ∨-false;
          INV?; INV?-widen; dBound; regsLen?; hopR; unconn; pathB?; pathB?-widen;
+         frameB?; regsB?; all-zip;
          _hasAtLeast_;
          slotsFnCap;
          dBound-bound; prod≤3pow; unconn≤slots; syncSize≤sizeᵉ; slotHop-cap;
@@ -198,6 +201,48 @@ pathBΨ? Ψ (f ↠ p)        = frameBΨ? Ψ f ∧ pathBΨ? Ψ p
 regsBΨ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
         → List (RegId × Source × Chain Γ t) → Bool
 regsBΨ? Ψ = all (λ en → pathBΨ? Ψ (proj₂ (proj₂ (proj₂ en))))
+
+------------------------------------------------------------------
+-- THE RECOMBINATION LEMMAS.  capsOK?'s size-only half (regsSz?,
+-- .Caps-Face) plus the Ψ-only half directly above reunite into the
+-- real `frameB?`/`pathB?`/`regsB?` (.Measures) that INV? reads — one
+-- ∧-intro per clause.
+--
+-- THEY LIVE HERE BECAUSE THIS IS WHERE THE Ψ HALF IS DEFINED.  They
+-- sat in .Caps-Bridge until 2026-08-20, which is DOWNSTREAM of every
+-- ingredient they use, so `subscribeE-inner-nodry-inv` below could not
+-- reach its own regsB? conjunct and was blocked on placement rather
+-- than on mathematics.  Nothing had to move down: the ingredients are
+-- the three Ψ predicates above (this module), the three Sz predicates
+-- (.Caps-Face, imported), and the three combined ones plus all-zip
+-- (.Measures, imported) — so the lowest module reaching all of them is
+-- this one, and Caps-Bridge picks them up by its existing import.
+------------------------------------------------------------------
+
+frameB?-of-parts : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) {B Ψ : ℕ} →
+  frameSz? B f ≡ true → frameBΨ? Ψ f ≡ true → frameB? B Ψ f ≡ true
+frameB?-of-parts (map-f fn)         hb hΨ = ∧-intro hb hΨ
+frameB?-of-parts (scan-f fn _)      hb hΨ = ∧-intro hb hΨ
+frameB?-of-parts (take-f _)         hb hΨ = refl
+frameB?-of-parts (from-inner _ _ _) hb hΨ = refl
+frameB?-of-parts (thru-outer _ _)   hb hΨ = refl
+
+pathB?-of-parts : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) {B Ψ : ℕ} →
+  pathSz? B p ≡ true → pathBΨ? Ψ p ≡ true → pathB? B Ψ p ≡ true
+pathB?-of-parts root           hsz hΨ = refl
+pathB?-of-parts (share-sink i) hsz hΨ = refl
+pathB?-of-parts (f ↠ p) {B} {Ψ} hsz hΨ
+  with ∧-true (frameSz? B f) _ hsz
+... | hf , hrest with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hrest
+... | _ , hp with ∧-true (frameBΨ? Ψ f) (pathBΨ? Ψ p) hΨ
+... | hfΨ , hpΨ = ∧-intro (frameB?-of-parts f hf hfΨ) (pathB?-of-parts p hp hpΨ)
+
+regsB?-of-parts : ∀ {n} {Γ : Ctx n} {t}
+  (rs : List (RegId × Source × Chain Γ t)) {B Ψ : ℕ} →
+  regsSz? B rs ≡ true → regsBΨ? Ψ rs ≡ true → regsB? B Ψ rs ≡ true
+regsB?-of-parts rs hsz hΨ =
+  all-zip _ _ _ (λ en psz pΨ → pathB?-of-parts (proj₂ (proj₂ (proj₂ en))) psz pΨ)
+                rs hsz hΨ
 
 ------------------------------------------------------------------
 -- THE THREE-FLAVOUR LEDGERS, named once so the face postulate and
@@ -1836,8 +1881,14 @@ postulate
   -- + the two SLOT bounds.  Conjunct by conjunct: stBounded? and
   -- regsSz? are capsOK?'s own; fnCapBounded? is OKB's second conjunct;
   -- regsB? recombines capsOK?'s regsSz? with regP?'s pathBΨ? half
-  -- (regsB?-of-parts, .Caps-Bridge — DOWNSTREAM of this module, so the
-  -- proof either relocates it or inlines all-zip); registry-count is
+  -- (regsB?-of-parts — RELOCATED INTO THIS MODULE 2026-08-20, above,
+  -- beside the Ψ predicates it consumes; it previously sat in
+  -- .Caps-Bridge, downstream, and that placement was this row's only
+  -- blocker.  Nothing had to move DOWN and no all-zip inlining is
+  -- needed: .Caps-Bridge was downstream of all three ingredient
+  -- families, so the lemmas were simply left behind when the Ψ
+  -- predicates themselves were relocated here on 2026-08-10);
+  -- registry-count is
   -- frameStep-reg≤size (.Caps-Bridge:151, PROVEN); and the two slot
   -- conjuncts are the added hypotheses.
   --
@@ -1865,8 +1916,13 @@ postulate
   -- same way `caps-fuel-root` (.Wet/Part6) already discharges it.
   --
   -- CLASS: this row was carried as FALSITY and is neither false nor
-  -- merely hard — it was SHAPE.  With the hypotheses threaded it is
-  -- DIFFICULTY: every remaining conjunct has a named proven source.
+  -- merely hard — it was SHAPE.  With the hypotheses threaded it was
+  -- DIFFICULTY, blocked on the placement above rather than on
+  -- mathematics; with that relocated it is GRINDABLE.  Every conjunct
+  -- now has a named source IN SCOPE — the recombination lemma above,
+  -- PROVEN frameStep-reg≤size (.Caps-Bridge:151), capsOK?'s own two,
+  -- OKB's second, and the two threaded slot hypotheses — so what is
+  -- left is assembling six conjuncts, with nothing to decide.
   subscribeE-inner-nodry-inv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sched : Sched Γ) (st : EvalSt e) →
     slotsSize sl ≤ Caps.cSize c →
