@@ -1,0 +1,45 @@
+# `docs/` — one file per tool, and why they are not in CLAUDE.md
+
+CLAUDE.md is the **file of record for directives**: rulings, standing rules, laws.
+It is read in full at the start of every session, so every byte in it is paid for
+by every worker. These files hold the part that is **not a directive** — how a
+tool works, what its flags mean, which trap cost a day, what a measurement
+showed. A session reads one of these when it is about to USE the thing.
+
+**The split is by KIND, not by length.** A rule that must be obeyed
+prophylactically — before you have any reason to open a doc — stays in CLAUDE.md.
+Mechanics, error catalogues, and the evidence behind a rule come here.
+
+**These files are under the same no-dates rule as CLAUDE.md**, enforced by
+`make roadmap-check`. A tool doc describes the tool as it is; when it happened is
+not a property of the tool. The one file that legitimately carries dates is
+`typecheck-performance-numbers.md`, because a timing's age IS information about
+the timing — and that is why it is not in the scan.
+
+## The gate, in order (`make gate`)
+
+| Target | Doc | What it will not let you do |
+| --- | --- | --- |
+| `wiring-selftest` | [wiring.md](wiring.md) | ship a wiring checker that has stopped firing |
+| `wiring-gate` | [wiring.md](wiring.md) | leave a definition, postulate or module with no route to Main |
+| `wiring-refuted` | [wiring.md](wiring.md) | leave a refutation `Refuted.Main` does not claim |
+| `unsafe-check` | [unsafe-check.md](unsafe-check.md) | slip an unsafe pragma onto the proof path |
+| `dup-selftest` | [dup-check.md](dup-check.md) | ship a duplicate checker that has stopped firing |
+| `dup-check` | [dup-check.md](dup-check.md) | prove the same fact twice under two names |
+| `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
+| `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
+| `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
+| `refuted` | [wiring.md](wiring.md) | land a refutation that does not typecheck |
+| `bug-cache` | [bug-cache.md](bug-cache.md) | regress a known impl counterexample |
+
+## The rest
+
+| Doc | Subject |
+| --- | --- |
+| [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, and the comment-stripped mirror Agda actually checks |
+| [agda-dev.md](agda-dev.md) | `make agda-dev` — the per-member iteration loop |
+| [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
+| [find.md](find.md) | `make find` — search by the shape of the STATEMENT |
+| [harness.md](harness.md) | `make harness` — the compiled calculator, and why its numbers prove nothing |
+| [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
+| [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |

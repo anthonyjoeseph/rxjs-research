@@ -54,10 +54,21 @@ and only the explaining costs.
 A row naming no risk class is not a work item and is skipped, as it is for
 ordering.
 
-FOURTH CHECK — DATES: the file names no calendar date, anywhere.  Its first
-hygiene rule is "stay current: this file describes the repo's present state
-and the work ahead, never its history", and a date is the one violation of it
-that a machine can see with no judgement at all.  Every other form of history
+FOURTH CHECK — DATES: no calendar date appears anywhere, in the roadmap OR
+in CLAUDE.md.  The roadmap's first hygiene rule is "stay current: this file
+describes the repo's present state and the work ahead, never its history",
+and a date is the one violation of it that a machine can see with no
+judgement at all.
+
+CLAUDE.md is held to the same rule for a DIFFERENT reason, and it is worth
+stating because the two files are not alike.  The roadmap must be current;
+CLAUDE.md must be TIMELESS.  A ruling in the file of record is in force
+whatever its age — that is what "file of record" means — so a timestamp
+beside it adds nothing to its authority, and two rulings that genuinely
+conflict get MERGED rather than ordered by date.  Same for the evidence under
+a rule: that three of four workers died polling a build is the argument; when
+it happened is decoration.  Timing figures have exactly one home and it is
+neither of these files.  Every other form of history
 here arrives WITH a date attached — a ruling's attribution, a "measured
 <date>" receipt, an audit note, a "retired <date>" — because the writer knows
 the reader will want to know when, so banning the timestamp bans the genre.
@@ -104,6 +115,15 @@ DATE_RE = re.compile(
     r"\b(?:\d{4}-\d{2}-\d{2}"
     r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}"
     r"|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b")
+
+
+# Files whose dates are build failures, checked with the same scan.  The
+# roadmap gets all four checks; these get the date check only.  The reasons
+# differ by one word and both are in docs/roadmap-check.md: the roadmap must be
+# CURRENT, the rules and the tool docs must be TIMELESS.  Globs are expanded at
+# use, so a new docs/ page is covered the moment it lands.
+DATE_ONLY_FILES = ["CLAUDE.md"]
+DATE_ONLY_GLOBS = ["docs/*.md"]
 
 
 def dated_lines(path):
@@ -230,6 +250,9 @@ def main():
                                   "used by make roadmap-selftest against fixtures")
     ap.add_argument("--ledger", help="file of postulate names to require coverage of, "
                                      "one 'name path.agda:N' per line; selftest only")
+    ap.add_argument("--dates-only", action="append", default=None, metavar="PATH",
+                    help="also refuse dates in PATH (date check only, no rows). "
+                         "Defaults to CLAUDE.md; repeatable; selftest passes fixtures.")
     args = ap.parse_args()
 
     root = pathlib.Path(__file__).resolve().parent.parent
@@ -287,16 +310,27 @@ def main():
         print("  sibling in the same row. Anything else must appear verbatim in backticks.")
         failures.append(None)
 
-    dated = dated_lines(path)
+    date_targets = [path]
+    if args.dates_only is not None:
+        date_targets += [pathlib.Path(f) for f in args.dates_only]
+    elif not args.file:
+        date_targets += [root / f for f in DATE_ONLY_FILES]
+        for g in DATE_ONLY_GLOBS:
+            date_targets += sorted(root.glob(g))
+
+    dated = [(f, lineno, date, line)
+             for f in date_targets if f.exists()
+             for lineno, date, line in dated_lines(f)]
     if dated:
         print(f"\nDATED NARRATIVE — {len(dated)} line(s) naming a calendar date:")
-        for lineno, date, line in dated:
-            print(f"  {path.name}:{lineno}  {date}")
+        for f, lineno, date, line in dated:
+            print(f"  {f.name}:{lineno}  {date}")
             print(f"    {line[:100]}")
-        print("\nThis file describes the repo's PRESENT state and the work ahead,")
-        print("never its history — that is its first hygiene rule, and a date is the")
-        print("one violation of it a machine can see. Move the dated thing to where it")
-        print("belongs: a probe receipt or a dead route goes in the source header of")
+        print("\nThe roadmap describes the repo's PRESENT state and the work ahead,")
+        print("never its history; CLAUDE.md states rules that are TIMELESS, in force")
+        print("whatever their age. A date is the one violation of either a machine can")
+        print("see. Move the dated thing to where it belongs: a receipt or a dead")
+        print("route goes in the source header of")
         print("the postulate it is about; a ruling goes in CLAUDE.md, the file of")
         print("record for directives; a gate's rationale goes in the gate. Then delete")
         print("the line here. Git history is the archive.")
@@ -333,7 +367,13 @@ def main():
         return 1
 
     print(f"\ncheck-roadmap: every tier sorted riskiest-class-first; every row "
-          f"within its {ROW_BUDGET}-char hook budget; no dated narrative"
+          f"within its {ROW_BUDGET}-char hook budget; no dated narrative in "
+          # named individually up to a handful, then counted -- a report line
+          # that grows with docs/ stops being read
+          + (" or ".join(f.name for f in date_targets) if len(date_targets) <= 4
+             else f"{len(date_targets)} file(s): "
+                  + ", ".join(f.name for f in date_targets[:2])
+                  + f" and {len(date_targets) - 2} more")
           + ("" if unscheduled is None else "; every live postulate is on the roadmap"))
     return 0
 

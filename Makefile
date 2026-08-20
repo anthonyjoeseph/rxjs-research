@@ -171,44 +171,17 @@ agda: stripped
 	 rm -f $$log $$rc; exit $$st
 
 # THE FAST DEV LOOP.  Checks one mutual-block member at a time against its
-# siblings POSTULATED at their exact signatures.  agda/src is never written to.
-# Rationale, measurements and the closed performance experiments live in
-# scripts/agda-dev.py's docstring -- read that before re-opening any of it.
+# siblings POSTULATED at their exact signatures; agda/src is never written to.
 #
-# THERE IS NO WHOLE-PROJECT SWEEP.  One was built and measured against `make
-# gate`; it cost more and checked less, so it is not supported and the bare
-# command asks for a file.  It was not a cache-warming play either.  The cheap
-# pre-gate is `make wiring-gate` plus `make unsafe-check`, both textual and
-# seconds-long.  Figures: typecheck-performance-numbers.md.
+#   make agda-dev ARGS='<file>'             one module, every member
+#   make agda-dev ARGS='<file> <member>'    one member -- the actual grind loop
+#   make agda-dev ARGS='--list <file>'      its mutual-block structure
 #
-#   make agda-dev ARGS='<file>'       one module, every member
-#   make agda-dev ARGS='<file> <member>'   one member — the actual grind loop
-#   make agda-dev ARGS='--list <file>'     its mutual-block structure
-#
-# OPT-IN flag:
-# HOLES=1 (tolerate ? holes and missing clauses).
-#
-# DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID -- but only
-# where something was STUBBED.  A module with no multi-member block has nothing
-# stubbed and is checked verbatim, so the sweep is a real check there.  Where a
-# block IS stubbed, TERMINATION of the real mutual recursion goes unchecked (in
-# this proof the mutual recursion IS the induction) and postulates do not
-# REDUCE.  `make agda` stays the merge gate.
-#
-# THE BUDGET IS ENFORCED, NOT DOCUMENTED.  It is set from a full cold scan of
-# every module, and sits in the GAP in that distribution rather than just above
-# the worst case -- a budget set to the worst observed time fails about half the
-# time, since that time is a distribution and not a constant.  RE-SCAN BEFORE
-# MOVING IT; the scan and the reasoning are in typecheck-performance-numbers.md.
-# A cold DEPENDENCY CHAIN still blows it (edit Wet/Part1, check Wet/Part4, and
-# you pay for Part2 and Part3 too); pass BUDGET= for that case, which is what it
-# is for.
-#
-# A BUDGET THAT FAILS ON NORMAL WORK IS WORSE THAN NO BUDGET: it trains everyone
-# to pass BUDGET= reflexively, and then a real regression sails through.
-# Exceeding it FAILS, with the usual causes printed.  Override deliberately with
-# BUDGET=<seconds> when the work has genuinely grown -- and move these numbers
-# when it has, rather than overriding twice.
+# HOLES=1 tolerates ? holes and missing clauses (opt-in).  BUDGET=<seconds>
+# overrides the enforced per-file budget below, and is for a cold dependency
+# chain only.  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID
+# -- `make agda` stays the merge gate.  There is deliberately no whole-project
+# sweep.  All of it, with the measurements: docs/agda-dev.md.
 AGDA_DEV_BUDGET ?= 45
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
@@ -251,24 +224,9 @@ unsafe-check:
 	    echo "unsafe-check: clean (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
 	  fi
 
-# THE COMMENT-STRIPPED MIRROR — what Agda actually checks.
-#
-# `scripts/strip-comments.py` copies agda/src + agda/refuted into
-# agda/_stripped-comments/ with every FULL-LINE `--` comment DELETED.  A
-# comment-only edit therefore leaves the mirror byte-identical, and Agda
-# rebuilds NOTHING: 29% of this tree is comment lines, and a `-- PROBED` or
-# `-- DEAD ROUTE` line added to a low module used to cost a full cone rebuild.
-# Measured 2026-08-18 with a control: a real code change to Rx/Prim rechecks
-# its dependents, three inserted comment lines recheck zero.
-#
-# EVERY agda invocation goes through the mirror, so there is exactly ONE
-# interface cache and nothing can drift — the same rule the single `AGDA`
-# variable enforces for `-W`.  Nothing typechecks agda/src directly.
-#
-# `stripped` is a prerequisite of every agda target and runs in ~50 ms.  It is
-# not optional: the sidecar `.linemap.json` that maps mirror lines back to
-# source lines is only valid for the source that produced it, so an agda run
-# that skipped the strip would report positions against a stale map.
+# THE COMMENT-STRIPPED MIRROR -- what Agda actually checks, and why a
+# comment-only edit rebuilds nothing.  NEVER run agda against agda/src
+# directly: that is a second interface cache.  See docs/agda-build.md.
 stripped:
 	@scripts/strip-comments.py >/dev/null
 
@@ -296,13 +254,8 @@ wiring:
 wiring-gate:
 	scripts/check-wiring.py --gate
 
-# THE SAME LAW, APPLIED TO agda/refuted (Anthony, 2026-08-18).  A refutation
-# nothing reaches is as dead as a lemma nothing reaches, and until this target
-# existed NOTHING checked that tree: `make wiring` scanned agda/src only, so
-# `Refuted.Main` naming every witness was a convention with no enforcement.
-# The root differs (Refuted/Main.agda, not Main.agda) and there are no
-# MODULE_ROOTS out here — no compiled binaries, just witnesses — so the whole
-# tree hangs off what Refuted.Main claims, which is exactly the intent.
+# THE SAME LAW, APPLIED TO agda/refuted (Anthony).  Rooted at Refuted/Main.agda,
+# no MODULE_ROOTS -- every witness must be claimed there.  See REFUTATION.md.
 wiring-refuted:
 	scripts/check-wiring.py --src agda/refuted --root Refuted/Main.agda --gate
 
@@ -363,29 +316,9 @@ find:
 postulates:
 	@scripts/check-wiring.py --postulates
 
-# PROVES THE WIRING CHECK IS LOAD-BEARING.  R2 (a name passed as a bare
-# argument to a postulate earns no reachability from that site) fires on
-# NOTHING in agda/src, so without this it would rot untested and silently stop
-# working.  The fixture is an A/B: `bad-lemma` is passed bare to a postulate and
-# must be REPORTED; `good-lemma` (applied by a real body) and `nested` (applied
-# inside parens to compute a value AT a postulate call site) must both stay
-# LIVE.  `nested` is the control for the false-positive class that sinks any
-# design gating on the passed-vs-applied classifier directly — measured at 40
-# of 110 postulates.  `via-top`/`via-mod` cover module applications, whose RHS
-# names are real uses; a scanner blind to them reports live clusters as dead.
-# THE REFUTATION TREE (Anthony, 2026-08-18).  `agda/refuted/` holds the
-# machine-checked `... -> bottom` witnesses: proofs that a route CANNOT work.
-# It is a SEPARATE include root, so:
-#   * `make agda` never pays for it (it compiles src/Main.agda, which cannot
-#     import this tree);
-#   * `make wiring` never sees it (it scans agda/src only), so a refutation
-#     needs no exemption and cannot self-exempt by choosing its name;
-#   * `src` refers to these by COMMENT (`-- REFUTED:`), which is safe
-#     precisely because a refuted route does not change.
-# WHY OUT OF src: keeping a dead route in src forces src to keep whatever
-# machinery makes the route STATE-able.  Measured -- the round-3 anchor
-# vocabulary was seven definitions in Measures kept alive by nothing but the
-# six refutations that mention it.
+# PROVES THE WIRING CHECK IS LOAD-BEARING, against a fixture outside agda/src.
+# R2 fires on nothing in the real tree today, so without the fixture it would
+# rot untested.  See docs/wiring.md.
 refuted: stripped
 	@$(call AGDA_RUN,refuted/Refuted/Main.agda)
 
@@ -466,6 +399,20 @@ roadmap-selftest:
 	    || { echo "SELFTEST FAIL: the date check did not report exactly the 3 dated lines — a bare year, a bare month-day or a version number was counted as a date"; fail=1; }; \
 	  echo "$$out" | grep -q "DATED NARRATIVE" \
 	    && { echo "SELFTEST FAIL: the date check fired on the sort fixture"; fail=1; }; \
+	  rul=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt \
+	           --dates-only scripts/roadmap-selftest/dated-rules.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt \
+	       --dates-only scripts/roadmap-selftest/dated-rules.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a dated RULES file PASSED beside a clean roadmap — the CLAUDE.md half of the date check is dead"; fail=1; \
+	  fi; \
+	  echo "$$rul" | grep -q "dated-rules.md:" \
+	    || { echo "SELFTEST FAIL: the rules file was not named in the date report — a rowless file is being skipped"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
+	      --ledger scripts/roadmap-selftest/ledger.txt \
+	      --dates-only /dev/null > /dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: a dateless extra file was rejected"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 gate:
@@ -483,58 +430,20 @@ gate:
 	@echo "gate: ALL GREEN"
 
 # ─────────────────────────────────────────────────────────────────────────
-# DETACHED BUILDS — always launch a long target through `make bg`.
-#
-# `make agda` costs tens of minutes and the agent harness's foreground ceiling
-# is ~600s, so long builds get detached and polled.  THE BUG THIS TARGET
-# EXISTS TO CLOSE (hit 2026-08-11, and not for the first time) is the obvious
-# hand-rolled wrapper:
-#
-#     (make agda > /tmp/x.log 2>&1; echo EXIT=$$? >> /tmp/x.log)
-#
-# The subshell exits with ECHO's status, which is ALWAYS 0.  So the launcher
-# reports success no matter what happened, and a RED build is indistinguishable
-# from a green one unless someone remembers to read the log — which is exactly
-# the thing that did not happen.  Same family as the `timeout … | tail` trap
-# and the `make agda` run from the wrong directory: a green-looking lie.
-#
-# SO `make bg` ALWAYS EXITS 7, GREEN OR RED (Anthony, 2026-08-11).  Not a
-# propagated status — a deliberately USELESS one.  A launcher status that is
-# right most of the time is worse than one that is never right: the reliable
-# one gets read and believed, and every rare false green slips through.  An
-# invariant 7 carries no information at all, so it cannot carry a wrong answer,
-# and the only way to learn anything is `make bg-check` — which reads the log.
-# Never make this "smarter" by propagating the code; that is the bug, restored.
+# DETACHED BUILDS -- always launch a long target through `make bg`.
 #
 #     make bg T=agda                  detach this under run_in_background
 #     make bg T=gate LOG=/tmp/g.log   explicit log path
-#     make bg-check T=agda            THE VERDICT: green, red + tail, or running
+#     make bg-check T=agda            THE VERDICT: green, red + tail, running
+#     make bg-wait  T=agda            blocks until terminal
 #
-# THE SIGNAL TRAP IS LOAD-BEARING (2026-08-20), and its absence produced the
-# one failure this whole apparatus is supposed to be immune to.  `EXIT=` is
-# written AFTER the sub-make returns, so a build killed by a signal — the whole
-# process group going down, e.g. because the launcher was run inside a
-# foreground command that hit a tool timeout — left the log with NO terminal
-# marker.  `bg-check` then reported STILL RUNNING for a build that was already
-# dead, and `bg-wait` would have blocked forever waiting for a line nobody was
-# going to write.  A hang is not a safer failure than a false green; it is the
-# same defect pointed the other way, and it is worse for being patient.
-#
-# So the recipe traps TERM/INT/HUP and writes a terminal `EXIT=143` plus a line
-# saying the build was KILLED rather than failed — the distinction matters,
-# because a bare 143 sends the reader hunting for an Agda error that does not
-# exist.  Two constraints, both learned by breaking them:
-#   * the explanation goes on its OWN line, above the marker.  `bg-check`
-#     parses `EXIT=` and does `exit $ec`, so any prose on that line becomes
-#     extra arguments and the shell errors out mid-verdict.
-#   * `EXIT=143` alone, never the real signal number: bg-check only needs
-#     "terminal and nonzero", and inventing per-signal codes gives the reader
-#     a distinction that carries nothing.
-#
-# AND THE LESSON THAT PROMPTED IT: launch `make bg` under the Bash tool's OWN
-# background flag, never inside a foreground compound command.  `make bg`
-# detaching the build does NOT protect it — the timeout kills the group.
-#
+# `make bg` ALWAYS EXITS 7, GREEN OR RED (Anthony) -- a deliberately useless
+# status, because one that is right most of the time gets believed and the
+# rare false green slips through.  Never make it "smarter" by propagating
+# the code; that is the bug, restored.  The signal trap below is equally
+# load-bearing: without it a killed build leaves no terminal marker and
+# `bg-wait` blocks forever.  Full reasoning and both constraints on the
+# trap's output format: docs/bg.md.
 LOG ?= /tmp/rxjs-bg-$(T).log
 
 # bg-wait's poll interval, seconds.  Override with I=<n>.
@@ -556,17 +465,8 @@ bg:
 	  echo "bg: run \`make bg-check T=$(T)\` for the real result."; \
 	  exit 7
 
-# The verdict of a detached run, without having to remember the log path or
-# recognise what a green Agda log looks like.  Three distinct answers, and the
-# distinctions are the whole point:
-#
-#   * STILL RUNNING (exit 3) — no EXIT= line yet.  Not a pass; not finished.
-#   * RED (the real exit code) — plus the failing tail, so the reason is here.
-#   * GREEN — and it PRINTS THE LOG'S OWN LAST WORD alongside, because exit 0
-#     does not distinguish "checked everything, all passed" from "checked
-#     NOTHING".  A vacuous pass wearing a real pass's clothes is the same
-#     failure as the exit-code bug this file exists to prevent, one layer up.
-#     Never summarise a log to one word when its own last line is the answer.
+# The verdict of a detached run, without having to remember the log path.
+# See docs/bg.md.
 bg-check:
 	@test -n "$(T)" || { echo "usage: make bg-check T=<target> [LOG=<path>]" >&2; exit 2; }
 	@test -f $(LOG) || { echo "bg-check: no log at $(LOG) — never launched?"; exit 2; }
@@ -594,36 +494,10 @@ cli-build: stripped
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
 
-# THE MEASUREMENT HARNESS — a COMPILED calculator for the machine's own
-# arithmetic.  THE GHC BACKEND RUNS THE SAME DEFINITIONS AND IGNORES
-# `abstract`, because opacity is a TYPECHECKING contract and not a runtime one
-# — so a number sealed away from `refl` is readable here, and rungs that
-# exhaust the checker (one was killed at 12.6 GB after 20 minutes) are cheap.
-#
-# WHAT IT IS *NOT* FOR, measured 2026-08-12: the CAPS COUNTING FAMILY
-# (`poolCount`, `blowH`, `capsHgo`) is DIVERGENT under the compiled backend
-# too — `poolCount 1 0` and `blowH 0`, the smallest possible arguments, each
-# still running at 45 s with row 0 calibrating correctly in the same binary.
-# That blowup is ARITHMETIC (`blowH` feeds `poolCount` a tower), not opacity,
-# so no backend and no hardware reaches it.  Those rows are QUARANTINED at
-# 10+ and excluded from the default sweep; see src/Harness/Main.agda.
-#
-# ⚠ ANYTHING READ OFF THIS IS `measured-not-rechecked` BY CONSTRUCTION.  A
-# compiled number is NOT a `refl` pin: no proof may depend on it and it cannot
-# discharge a postulate.  It exists to AIM the grind and to REFUTE.
-#
-# ROW 0 IS THE CALIBRATION and it is not decoration.  It prints a value the
-# harness module ALSO pins by `refl`, so the typechecker fixes the expected
-# number and the binary prints the computed one.  IF ROW 0 IS NOT 65536 THE
-# BACKEND HAS DIVERGED AND EVERY OTHER ROW IS VOID — that is why `make harness`
-# runs row 0 first and stops on mismatch rather than reporting on.
-#
-# ONE PROCESS PER ROW, deliberately: one process computing several deep rungs
-# retains all of them and dies of memory; a fresh process per row does not.
-#
-#   make harness-build        compile it
-#   make harness              every row, one process each (calibrated first)
-#   make harness ARGS='5'     just row 5
+# THE MEASUREMENT HARNESS -- a COMPILED calculator for numbers the typechecker
+# cannot reach.  Every row it prints is measured-not-rechecked and can
+# discharge nothing.  Row 0 is a calibration and `make harness` stops on a
+# mismatch.  See docs/harness.md.
 HARNESS_ROWS ?= 2
 harness-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_harness src/Harness/Main.agda)
@@ -648,15 +522,8 @@ quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
 
 
-# THE ONE TO POLL.  `make bg-check` exits 3 while running and 1 when red,
-# but MAKE COLLAPSES BOTH TO ITS OWN 2 — measured 2026-08-14 — so a loop
-# keyed on the exit code cannot tell "still building" from "build failed",
-# and will happily spin forever on a dead RED build.  That is the same
-# false-green shape `make bg`'s invariant exit exists to prevent, one
-# level up.  bg-wait BLOCKS until the log is TERMINAL, so by the time it
-# returns, nonzero can only mean RED — that is the whole point, and it is
-# what bg-check cannot offer at any exit code.  (make rewrites the recipe's
-# `exit 1` as its own 2, so test 0-vs-nonzero, never the specific number.)
+# THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it
+# through make, which collapses both to exit 2.  See docs/bg.md.
 bg-wait:
 	@test -n "$(T)" || { echo "usage: make bg-wait T=<target> [LOG=<path>] [I=<secs>]" >&2; exit 2; }
 	@while :; do \
