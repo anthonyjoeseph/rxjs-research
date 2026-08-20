@@ -36,7 +36,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; Exp; applyFn; evalWith;
+open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; Exp; applyFn; evalWith; subΘExp;
                             varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                             inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
                             add; sub; mul; eqᵖ; ltᵖ; notᵖ; varIx; lookupEnv;
@@ -48,6 +48,8 @@ open import Verify-Budget-Sufficient.Measures using
   (∧-true; ∧-intro; T⇒≡true; T-to; hopD-evalWith; ifEq)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using
   (valHopSpn?; valHopSpn?-intro; valHopSpn?-hopD; B≤powB)
+open import Verify-Budget-Sufficient.Hop-Spine-Sub using
+  (EnvPlug; EnvPlug-mono; hopD-sub-spnᵉ)
 
 ------------------------------------------------------------------
 -- THE STEP, AND IT IS ONE LEMMA OVER THE TERM.
@@ -76,51 +78,6 @@ open import Verify-Budget-Sufficient.Hop-Spine-Face using
 -- a value carried at the SAME `B` as the outer ones.
 ------------------------------------------------------------------
 
--- THE ENVIRONMENT CONDITION, PER POSITION, AND THE DISJUNCTION IS THE
--- FINDING (2026-08-19).  Three single-number hypotheses were tried and
--- each died at the opposite end from the one it fixed — a derived
--- bound decays per step, a global `∀ j → pmᵗ V j tm ≤ P` dies at a
--- CLOSED `caseᵗ` scrutinee, and a global product `pmᵗ V j tm * Ds j ≤
--- B` is false at the fold's own call site, where `Ds 0` is the
--- accumulator's hop and exponential in its spine by construction.
---
--- What the three failures say together is that the multiplier
--- condition is NOT one inequality: a leaf of the result is either
--- COPIED out of the environment or BUILT by a `strmᵗ`, and the two
--- need different arithmetic.  A position whose slope is under `P`
--- feeds a value that must carry the hereditary receipt, and the drag
--- pays for it.  A position whose slope is NOT under `P` is reachable
--- only through a PRODUCT the parent's own `hopDᵗ` clause already paid
--- for — `hopDᵗ (caseᵗ s l r)` prices the scrutinee at `pmᵗ V 0 l ⊔
--- pmᵗ V 0 r ⊔ 1`, so the product is under `B` however big the slope
--- is — and then no receipt on the value is needed at all.
---
--- DOWNWARD CLOSED IN THE SLOPE, which is what makes it usable at every
--- recursive call: a subterm's slope is under its parent's at every
--- index, so `EnvPlug-mono` re-uses the parent's condition unchanged.
-EnvPlug : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ) →
-  All (Val Γ) Θ → (ℕ → ℕ) → Set
-EnvPlug V η P B []ᵃ                Ps = ⊤
-EnvPlug V η P B (_∷ᵃ_ {x = t} v σ) Ps =
-  ((Ps 0 ≤ P) × (valHopSpn? V η P B t v ≡ true)
-     ⊎ (Ps 0 * hopDᵛ V η t v ≤ B))
-  × EnvPlug V η P B σ (λ j → Ps (suc j))
-
-EnvPlug-mono : ∀ {n} {Γ : Ctx n} {Θ} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-  (σ : All (Val Γ) Θ) (Ps Qs : ℕ → ℕ) → (∀ j → Qs j ≤ Ps j) →
-  EnvPlug V η P B σ Ps → EnvPlug V η P B σ Qs
-EnvPlug-mono V η P B []ᵃ      Ps Qs le h = tt
-EnvPlug-mono V η P B (v ∷ᵃ σ) Ps Qs le (h0 , hσ) =
-  head h0 , EnvPlug-mono V η P B σ (λ j → Ps (suc j)) (λ j → Qs (suc j))
-                         (λ j → le (suc j)) hσ
-  where
-  head : ((Ps 0 ≤ P) × (valHopSpn? V η P B _ v ≡ true)
-            ⊎ (Ps 0 * hopDᵛ V η _ v ≤ B)) →
-         ((Qs 0 ≤ P) × (valHopSpn? V η P B _ v ≡ true)
-            ⊎ (Qs 0 * hopDᵛ V η _ v ≤ B))
-  head (inl (hp , hv)) = inl (≤-trans (le 0) hp , hv)
-  head (inr hprod)     = inr (≤-trans (*-monoˡ-≤ (hopDᵛ V η _ v) (le 0)) hprod)
-
 -- THE LOOKUP.  A position the term actually MENTIONS hands back the
 -- hereditary receipt under either disjunct: the first carries it
 -- outright, and the second gives `hopDᵛ v ≤ B` once the slope is at
@@ -140,48 +97,48 @@ envPlug-lookup V η P B Ps (v ∷ᵃ σ) (_ , hσ) (there z) hit =
   envPlug-lookup V η P B (λ j → Ps (suc j)) σ hσ z hit
 
 postulate
-  -- THE CLAUSE THAT EXTENDS THE ENVIRONMENT.  Both remaining leaves want
-  -- the SAME apparatus, and the apparatus is now decided; what is left is
-  -- to write it.  The design, so the next pass grinds rather than
-  -- re-derives:
+  -- THE CLAUSE THAT EXTENDS THE ENVIRONMENT, and the one residue of the
+  -- whole family.  What it needs is `EnvPlug` at the branch's own
+  -- environment `x ∷ᵃ env`, where `x` is the scrutinee's evaluated
+  -- payload — so, at position 0, one of the two disjuncts for the slope
+  -- `pmᵗ V 0 l`.  The receipt half is FREE: the recursive call on `sc`
+  -- hands back `valHopSpn?` of its value directly, which is what making
+  -- the conclusion hereditary bought.  What is open is the slope.
   --
-  --   * `maxW g w m = ⊔ⱼ<m (g j * w j)` — `sumW`'s (.Measures) sibling
-  --     with `⊔` in place of `+`, and the `⊔` is the whole point.  Read
-  --     it as the SLOPE-WEIGHTED coefficient of a term over an
-  --     environment carrying a PER-POSITION bound `Bs`.
-  --   * `EnvSpn V η P σ Bs` — position-wise `hopDᵛ σⱼ ≤ Bs j * (2 + P) ^
-  --     spnᵛ σⱼ`.  This REPLACES `EnvPlug`'s disjunction: the choice
-  --     between "the value carries the receipt" and "the parent already
-  --     paid for the product" is not a case analysis inside the proof, it
-  --     is which `Bs j` the CALLER picks.  `EnvPlug` was that disjunction
-  --     written at a place where it could not be spent.
-  --   * the conclusion at a DERIVED coefficient, Q-shifted:
-  --     `(2 + P) * hopDᵉ e ≤ C * (2 + P) ^ spnᵉ e` at every `obs` leaf,
-  --     with `C = hopDᵗ tm + maxW (λ j → pmᵗ V j tm) Bs (length Θ)`.  The
-  --     leading factor is what pays for the drag at the top, where
-  --     `C ≤ B + P * B ≤ (2 + P) * B` cancels it exactly.
+  -- THE TWO EXTREMES EACH CLOSE, AND BY DIFFERENT DISJUNCTS.
+  --   * `sc` MENTIONS an environment position j.  Then `pmᵗ V j (caseᵗ
+  --     sc l r)` contains `(pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * pmᵗ V j sc`, so
+  --     the PARENT's slope at j already dominates `pmᵗ V 0 l`, and the
+  --     parent's own condition bounds it.  Disjunct (a).
+  --   * `sc` is CLOSED.  Then `hopDᵛ x ≤ hopDᵗ sc` with nothing added,
+  --     and `hopDᵗ (caseᵗ sc l r)`'s second summand already paid
+  --     `(pmᵗ V 0 l ⊔ … ⊔ 1) * hopDᵗ sc ≤ B`.  Disjunct (b).
   --
-  -- WHY `caseᵗ` CLOSES, and it is the `⊔` that does it.  The branch runs
-  -- at `Cs ∷ Bs` where `Cs` is the scrutinee's own derived coefficient,
-  -- so its coefficient is `hopDᵗ l + ((pmᵗ V 0 l * Cs) ⊔ maxW (λ j →
-  -- pmᵗ V (suc j) l) Bs M)`.  Expand `pmᵗ V 0 l * Cs` into
-  -- `pmᵗ V 0 l * hopDᵗ sc` plus `pmᵗ V 0 l * maxW (pmᵗ V · sc) Bs M`: the
-  -- first is under `(pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) * hopDᵗ sc`, which is
-  -- `hopDᵗ (caseᵗ sc l r)`'s own second summand, and the second is under
-  -- the parent's `maxW` termwise, because `pmᵗ`'s `caseᵗ` clause carries
-  -- that very product.  A `+` in `maxW` would then cost a factor of two
-  -- and the invariant would decay per nesting level; the `⊔` absorbs the
-  -- third term into the first two and it closes EXACTLY.
+  -- WHAT IS OPEN is the MIXED case: `sc` mentioning several positions,
+  -- some of them held under disjunct (a).  Pricing `x` through
+  -- `hopD-evalWith` (.Measures) then leaves `Σⱼ pmᵗ V j sc * hopDᵛ envⱼ`,
+  -- and a disjunct-(a) position bounds `hopDᵛ envⱼ` only by `Q ^ spnᵛ *
+  -- B`, so the sum runs to M * B and disjunct (b) fails at M ≥ 2 exactly
+  -- as it does upstream.  The mechanism that fixes it is a PER-POSITION
+  -- BUDGET in `EnvPlug` — the closed-scrutinee arm wants `x` carried at
+  -- `B / (c * C)` rather than at `B` — and that is a restatement of the
+  -- environment condition, not a grind, which is why this row is
+  -- DIFFICULTY and not GRINDABLE.
   --
-  -- x SUPERSEDED 2026-08-19 — "M positions need `1 + M * P ≤ Q`".  That
-  -- was read off the one-shot route through `hopD-subΘᵉ` (.Measures),
-  -- which SUMS over positions and so pays for every plug even when they
-  -- sit on different branches of a `⊔`.  Weighting by `maxW` instead
-  -- removes the M-dependence outright: `pm` itself combines by `⊔` at
-  -- every `⊔` node and by `+` only where the measure multiplies, and
-  -- there the node's own `suc` in `spnᵉ` funds it.  So the environment's
-  -- LENGTH does not enter, and neither leaf needs the other settled
-  -- first — they need the same four pieces above.
+  -- x DEAD ROUTE 2026-08-20: the four-piece `maxW`/`EnvSpn` plan that
+  -- stood here.  `maxW` is refuted one clause into the substitution
+  -- induction (`mapᵉ` needs a sum of maxes under a max of sums; the
+  -- record is at `hopD-sub-spnᵉ` in .Hop-Spine-Sub), and with it goes the
+  -- claim that `EnvPlug`'s disjunction "could not be spent".  It CAN:
+  -- `envPlug-plug` spends it at every plug site, and `hopD-sub-spnᵉ`
+  -- discharged the sibling `strmᵗ` leaf outright with `EnvPlug`
+  -- unchanged.  The two leaves did NOT want the same apparatus.
+  --
+  -- x SUPERSEDED 2026-08-20 — "M positions need `1 + M * P ≤ Q`" is a
+  -- real obstruction, but only for a bound that SUMS over positions.
+  -- The coefficient-carrying induction never forms that sum, so the
+  -- environment's LENGTH does not enter it; the M-dependence survives
+  -- only in this clause, and only through `hopD-evalWith`.
   evalWith-hopSpn-case : ∀ {n} {Γ : Ctx n} {Θ a b u} (V : ℕ) (η : Fin n → ℕ)
     (P B : ℕ) (sc : Tm Γ [] [] Θ (a +ᵗ b))
     (l : Tm Γ [] [] (a ∷ Θ) u) (r : Tm Γ [] [] (b ∷ Θ) u)
@@ -189,34 +146,6 @@ postulate
     hopDᵗ V η (caseᵗ sc l r) ≤ B →
     EnvPlug V η P B env (λ j → pmᵗ V j (caseᵗ sc l r)) →
     valHopSpn? V η P B u (evalWith (caseᵗ sc l r) env) ≡ true
-
-  -- THE BUILT LEAF, and the only place the drag is actually spent.
-  -- `subΘExp` is where an environment value physically enters an
-  -- expression, so this is where the spine has to pay: a plugged value
-  -- lands as `wkReify σⱼ` UNDER an `Exp` node, that node's own `suc` is
-  -- one spine unit, and `spnᵗ (wkReify v)` is itself `suc (spnᵛ v)`
-  -- wherever `hopDᵛ v` is non-zero (at a ground leaf both sides of the
-  -- inequality are zero and the unit is not needed).  Those two units are
-  -- exactly the drag: they turn `1 + P` into a factor of `2 + P`.
-  --
-  -- SO THE INDUCTION IS OVER THE EXPRESSION, not a call to
-  -- `hopD-subΘᵉ` — the one-shot route discards the `⊔` structure the
-  -- accounting depends on (see the superseded note above).  It is
-  -- `hopD-subΘᵉ`'s own induction, clause for clause, with `sumW` replaced
-  -- by `maxW` and the bound scaled by `(2 + P) ^ spnᵉ`.  Its `mapᵉ`,
-  -- `scanᵉ` and `caseᵗ` clauses are the multiplying ones and each is
-  -- funded by its node's `suc`; `scanᵉ` needs `(2 + P) ^ a + (2 + P) ^ b
-  -- + (2 + P) ^ c ≤ (2 + P) ^ (a + b + c)` at `1 ≤ a , b , c`, which is
-  -- why no `1 ≤ P` hypothesis is needed anywhere.
-  --
-  -- The empty-environment case is not here at all — it is `B≤powB` in the
-  -- body below — so this leaf is exactly the substituting one.
-  evalWith-hopSpn-strm : ∀ {n} {Γ : Ctx n} {Θ t w} (V : ℕ) (η : Fin n → ℕ)
-    (P B : ℕ) (e : Exp Γ [] [] (t ∷ Θ) w)
-    (v : Val Γ t) (vs : All (Val Γ) Θ) →
-    hopDᵉ V η e ≤ B →
-    EnvPlug V η P B (v ∷ᵃ vs) (λ j → pmᵉ V j e) →
-    valHopSpn? V η P B (obs w) (evalWith (strmᵗ e) (v ∷ᵃ vs)) ≡ true
 
 ------------------------------------------------------------------
 -- THE STEP, AS A REAL BODY.  Eleven of the thirteen clauses are
@@ -283,8 +212,18 @@ evalWith-hopSpn V η P B (primᵗ notᵖ a) env hB hσ = refl
 -- whole story and `B≤powB` is the lift
 evalWith-hopSpn V η P B (strmᵗ e) []ᵃ hB hσ =
   T⇒≡true _ (≤⇒≤ᵇ (≤-trans hB (B≤powB P B (spnᵉ e))))
+-- THE BUILT LEAF, and the only place the drag is actually spent.
+-- `closeUnderFn` IS `subΘExp []`, so this is exactly the substitution
+-- the induction in .Hop-Spine-Sub prices; the coefficient starts at 1
+-- and every clause of that induction hands its own on down.
 evalWith-hopSpn V η P B (strmᵗ e) (v ∷ᵃ vs) hB hσ =
-  evalWith-hopSpn-strm V η P B e v vs hB hσ
+  T⇒≡true _ (≤⇒≤ᵇ
+    (≤-trans (≤-reflexive (sym (*-identityˡ (hopDᵉ V η (subΘExp [] (v ∷ᵃ vs) e)))))
+      (hopD-sub-spnᵉ V η P B 1 [] (v ∷ᵃ vs) e
+        (≤-trans (≤-reflexive (*-identityˡ (hopDᵉ V η e))) hB)
+        (EnvPlug-mono V η P B (v ∷ᵃ vs) (λ j → pmᵉ V j e)
+                      (λ j → 1 * pmᵉ V j e)
+                      (λ j → ≤-reflexive (*-identityˡ (pmᵉ V j e))) hσ))))
 
 -- and the scan fold's own shape: the argument is the pair the fold hands
 -- in, at the single position the fn binds

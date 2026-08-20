@@ -78,7 +78,8 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-Every row in this tier is now GRINDABLE. Rows are available to their siblings
+One DIFFICULTY row (`evalWith-hopSpn-case`); the rest are GRINDABLE. Rows are
+available to their siblings
 as postulates, so they can be ground in parallel by workers; top-to-bottom is
 the order attention is OWED, not a bar on running the bottom concurrently.
 
@@ -103,22 +104,20 @@ the order attention is OWED, not a bar on running the bottom concurrently.
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`evalWith-hopSpn-strm`** (Hop-Spine-Step) — GRINDABLE: the per-step
-  substitution's BUILT leaf, and the only place the drag is spent. What used to
-  be `applyFn-hopSpn-obs`, DIFFICULTY, is now a decided shape: the induction is
-  over the TERM with the hereditary predicate as its conclusion (which is what
-  makes the projections work — a headline bound on a pair is the wrong direction
-  at `fstᵗ`), and the coefficient is slope-weighted by `⊔` rather than summed,
-  which is what removes the environment's length from the accounting and closes
-  `caseᵗ` exactly. Four pieces to write, all named in the leaf's header with the
-  arithmetic that each one has to satisfy: `maxW`, `EnvSpn`, the `wkReify` spine
-  unit, and `hopD-subΘᵉ`'s own induction re-run with `maxW` in place of `sumW`.
-  The three single-number hypotheses that failed, and why a fourth is not worth
-  looking for, are recorded there too.
-- **`evalWith-hopSpn-case`** (Hop-Spine-Step) — GRINDABLE: the `caseᵗ` clause of
-  the same induction, the one that extends the environment. Wants the SAME four
-  pieces as the strm leaf and neither blocks the other; its header carries the
-  termwise check that closes it.
+- **`evalWith-hopSpn-case`** (Hop-Spine-Step) — DIFFICULTY: the last residue of
+  what was `applyFn-hopSpn-obs`. The rest of that family is now real code: the
+  induction runs over the TERM with the hereditary predicate as its conclusion,
+  and its BUILT leaf is discharged by `hopD-sub-spnᵉ` (Hop-Spine-Sub), a
+  substitution induction that CARRIES THE COEFFICIENT — which is what keeps the
+  environment's length out of the accounting, since no sum over positions is
+  ever formed. What is left is only the clause that EXTENDS the environment.
+  Both extremes close and by different disjuncts of `EnvPlug` (a mentioned
+  scrutinee bounds the branch's own slope through the parent's; a closed one is
+  already paid for by `hopDᵗ`'s second summand); the MIXED case is open, and its
+  header says why the repair is a per-position budget — a restatement of the
+  environment condition rather than a grind. Two dead routes are recorded there
+  and at `hopD-sub-spnᵉ`: the one-shot route through `hopD-subΘᵉ`, and the
+  `⊔`-weighted `maxW` that was this tier's plan until `mapᵉ` refuted it.
 - **`walk-scan-source-frame`** (Walk-Level) — GRINDABLE: the scan clause's frame
   condition. Two conjuncts, both shapes this family already produces — the
   source's ordinary `burstHopD?` receipt, and that the freshly minted scan node
