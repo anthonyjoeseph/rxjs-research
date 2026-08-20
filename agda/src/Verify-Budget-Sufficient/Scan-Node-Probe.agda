@@ -2,12 +2,16 @@
 -- `subscribeE-nodes-below` (.Node-Fresh), instantiated at the consumer that
 -- commissioned it.  These rows were written against a conjunct of
 -- `walk-scan-source-frame`; that postulate has since been split, its node
--- half discharged from the .Node-Fresh leaf, and the rows retargeted at the
--- leaf without changing a line — they were always testing this fact.
+-- half discharged from .Node-Fresh, and the rows retargeted without
+-- changing a line — they were always testing this fact.
+--
+-- ⚠ NO LONGER LOAD-BEARING ON THE FACT: .Node-Fresh proves it outright, at
+-- every `κ`, including the `share-sink` tail these rows cannot reach.  What
+-- they still pin is the EVALUATOR — that these composites reduce, and reduce
+-- to this — which is a claim about the impl and not about the statement.
 --
 -- MODULE_ROOT (see scripts/check-wiring.py): not imported by Main, not
--- compiled; checked by `make bug-cache`.  The receipt lives in that
--- postulate's own header.
+-- compiled; checked by `make bug-cache`.
 --
 -- WHAT IS BEING TESTED.  The fact says that subscribing a scan's SOURCE
 -- under `scan-f f nid ↠ κ` leaves node `nid` holding exactly the seed it was

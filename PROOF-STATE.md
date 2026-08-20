@@ -140,13 +140,8 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`subscribeE-nodes-below`** (Node-Fresh) — DIFFICULTY: a subscribe writes no
-  node below the `nextNode` watermark it was handed. Missing structure, not a
-  clause: a whole-of-`subscribeE` induction, `.Keeps-Ring`'s shape for a
-  different table. Three consumers spend it; header carries the evaluator
-  argument and the probe.
 - **`walk-scan-source-burst`** (Walk-Level) — DIFFICULTY: what is left of the
-  scan source half once its node conjunct went to `subscribeE-nodes-below`. The
+  scan source half once its node conjunct went to the node-freshness ring. The
   route is the recursion at `b`, which this family's statements do not carry, so
   reaching it is a restatement.
 - **`walk-map` / `walk-take-suc` / `walk-scan-rest`** (Walk-Level) —

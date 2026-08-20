@@ -109,14 +109,6 @@ enterInstant-cont S i ow cur pf =
   enterInstant-cont-aux (ProtocolSt.live S) (ProtocolSt.horizon S) i
     (ProtocolSt.current S) (ProtocolSt.done S) ow cur pf
 
--- a strictly-greater id is not equal (for the held instant's i ≢ j)
-≢ᵇ-from-< : ∀ {j i : ℕ} → j ≤ i → (suc i ≡ᵇ j) ≡ false
-≢ᵇ-from-< z≤n     = refl
-≢ᵇ-from-< (s≤s q) = ≢ᵇ-from-< q
-
-sucle→≢ᵇ : ∀ {j nextId : ℕ} → suc j ≤ nextId → (nextId ≡ᵇ j) ≡ false
-sucle→≢ᵇ (s≤s q) = ≢ᵇ-from-< q
-
 -- the automaton opens FRESH over an idle slot: settleInstant is the
 -- standing horizon, admitted once horizon ≤ i
 enterInstant-idle-aux : ∀ (lv : List Source) (hz i : Id) (cur : Maybe (Id × Owed))

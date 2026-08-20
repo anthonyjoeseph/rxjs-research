@@ -401,8 +401,8 @@ postulate
 -- consumer (.Part8) asks for one; the witness is `evalTm seed` on the nose,
 -- since a subscribe writes nothing below the watermark it was handed.  The
 -- whole route is `mint-install-survives` (.Node-Fresh) — mint, install,
--- subscribe, read the node back — and the one remaining gap is that
--- module's own leaf, which `take-node` below spends in the same line.
+-- subscribe, read the node back — which is PROVEN there, over a ring on the
+-- whole of `subscribeE`; `take-node` below spends it in the same line.
 scan-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
   (b : Closed Γ s) (κ : Path Γ u t)

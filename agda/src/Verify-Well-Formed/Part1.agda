@@ -473,13 +473,9 @@ regTyped? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t)
 regTyped? []                      live = true
 regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r live
 
-≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
-≡ᵇ→≡ zero    zero    _ = refl
-≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
 -- the node table's reduction facts moved DOWN to .Node-Table when the hop
 -- ledger's scan push face needed the identical pair from below this tree;
 -- re-exported here because this module is where the rest of the branch
 -- reads them from
 open import Verify-Budget-Sufficient.Node-Table public
-  using (≡ᵇ-refl; ≟ᵗ-refl; lookupNode-setNode)
+  using (≡ᵇ-refl; ≡ᵇ→≡; ≢ᵇ-from-<; sucle→≢ᵇ; ≟ᵗ-refl; lookupNode-setNode)

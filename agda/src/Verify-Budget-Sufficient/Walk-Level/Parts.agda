@@ -728,11 +728,11 @@ walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sch
   frB = walk-scan-source-burst f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
           s2 fS rS ceil lb dmd gas lℓ rgs
-  -- THE NODE HALF, no longer a leaf.  `mint-install-survives` (.Node-Fresh)
-  -- is exactly this shape — mint, install, subscribe under a frame naming the
-  -- minted nid, read the node back — and it holds because a subscribe writes
-  -- nothing below the `nextNode` watermark it was handed.  Its own leaf is
-  -- the single remaining gap, shared with `scan-node` / `take-node` (.Part3).
+  -- THE NODE HALF, AND IT IS NOW GAPLESS.  `mint-install-survives`
+  -- (.Node-Fresh) is exactly this shape — mint, install, subscribe under a
+  -- frame naming the minted nid, read the node back — and it is PROVEN there
+  -- off a ring over the whole of `subscribeE`.  `scan-node` / `take-node`
+  -- (.Part3) spend the same lemma.
   frN = mint-install-survives g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
           (scan-st (evalTm z)) sched st
   accOK : nodeAccSpn? F (slotHop F sl) (pmᵗ F 0 f) BND _

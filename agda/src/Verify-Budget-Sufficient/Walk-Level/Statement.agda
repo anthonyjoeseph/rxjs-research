@@ -455,8 +455,8 @@ WalkTailᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
 -- consumer (`walk-scan-source`, .Parts) off `mint-install-survives`
 -- (.Node-Fresh), so the statement no longer carries it — a subscribe
 -- writes nothing below the `nextNode` watermark it was handed, and the
--- caller minted `nid` below it.  The one gap that argument still leans on
--- is .Node-Fresh's own leaf, stated once and spent by three consumers.
+-- caller minted `nid` below it.  That watermark fact is itself PROVEN
+-- there, so nothing under this conjunct is postulated any more.
 --
 -- WHAT IT IS NOT, kept because the alignment is what made the route look
 -- mechanical: the caps face.  `capsOK?` (.Caps-Face/Part1) BOUNDS every
@@ -1209,8 +1209,8 @@ postulate
   -- WHAT LEFT, 2026-08-20, and it was the row's whole risk: the node-table
   -- conjunct that used to sit beside this one — subscribing `b` under
   -- `scan-f f nid ↠ κ` leaves node `nid` holding exactly `scan-st (evalTm
-  -- z)` — is DISCHARGED at the consumer off `mint-install-survives`
-  -- (.Node-Fresh), whose leaf also retired `scan-nodeP` and `take-nodeP`.
+  -- z)` — is DISCHARGED at the consumer off PROVEN `mint-install-survives`
+  -- (.Node-Fresh), which also retired `scan-nodeP` and `take-nodeP`.
   -- The dead route that conjunct cost (the caps face BOUNDS every node and
   -- IDENTIFIES none) and the probe that covered it moved to that leaf's own
   -- header, which is where the next reader will stand.
