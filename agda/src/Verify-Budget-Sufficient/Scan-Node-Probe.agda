@@ -1,11 +1,15 @@
--- THE SCAN NODE'S SURVIVAL — the computable half of
--- `walk-scan-source-frame`'s second conjunct (.Walk-Level/Statement).
+-- THE SCAN NODE'S SURVIVAL — the computable face of
+-- `subscribeE-nodes-below` (.Node-Fresh), instantiated at the consumer that
+-- commissioned it.  These rows were written against a conjunct of
+-- `walk-scan-source-frame`; that postulate has since been split, its node
+-- half discharged from the .Node-Fresh leaf, and the rows retargeted at the
+-- leaf without changing a line — they were always testing this fact.
 --
 -- MODULE_ROOT (see scripts/check-wiring.py): not imported by Main, not
 -- compiled; checked by `make bug-cache`.  The receipt lives in that
 -- postulate's own header.
 --
--- WHAT IS BEING TESTED.  The conjunct says that subscribing a scan's SOURCE
+-- WHAT IS BEING TESTED.  The fact says that subscribing a scan's SOURCE
 -- under `scan-f f nid ↠ κ` leaves node `nid` holding exactly the seed it was
 -- installed with:
 --

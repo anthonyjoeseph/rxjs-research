@@ -443,32 +443,28 @@ WalkTailᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
      × (scanAccSpn? F (slotHop F sl) (pmᵗ F 0 f) BND u nid (proj₂ (proj₂ r)) ≡ true)
 
 ------------------------------------------------------------------
--- THE FRAME CONDITION, and it is all that is left of the source half.
+-- THE SOURCE BURST'S HOP RECEIPT, and it is all that is left of the
+-- source half.
 --
--- THE FIRST CONJUNCT IS ORDINARY: the walk face's own `burstHopD?` at
--- the source's headline bound, the shape every sibling clause produces.
+-- ORDINARY: the walk face's own `burstHopD?` at the source's headline
+-- bound, the shape every sibling clause produces.
 --
--- ⚠ THE SECOND IS NOT, AND THIS HEADER PREVIOUSLY CLAIMED OTHERWISE.
--- It said the node-table frame condition is one "which the caps face
--- proves in the same position for its own predicates."  That is wrong IN
--- KIND, not merely optimistic: `capsOK?` (.Caps-Face/Part1) is an
--- all-nodes BOUND predicate — it constrains every node's measure and
--- IDENTIFIES none.  Nothing in it can say which value a particular nid
--- holds.
+-- THE NODE-TABLE CONJUNCT USED TO SIT HERE, AND IT WAS THE WHOLE RISK.
+-- It asked that subscribing `b` under `scan-f f nid ↠ κ` leave node `nid`
+-- holding exactly `scan-st (evalTm z)`.  That is now DISCHARGED at the
+-- consumer (`walk-scan-source`, .Parts) off `mint-install-survives`
+-- (.Node-Fresh), so the statement no longer carries it — a subscribe
+-- writes nothing below the `nextNode` watermark it was handed, and the
+-- caller minted `nid` below it.  The one gap that argument still leans on
+-- is .Node-Fresh's own leaf, stated once and spent by three consumers.
 --
--- What the conjunct actually needs is that subscribing `b` under
--- `scan-f f nid ↠ κ` leaves node `nid` holding exactly `scan-st (evalTm
--- z)` — a strictly STRONGER form of the open postulate `scan-nodeP`
--- (Verify-Well-Formed/Part3), which asks only for SOME accumulator.
--- That postulate's header records the obstacle: no "subscribeE only
--- mints fresh nodes" lemma exists in the repo, `subscribeE-keeps`
--- (.Keeps-Ring) tracks SLOTS and not the node table, and the search for
--- one is written out there and came back empty.  So this is missing
--- structure — a whole-of-subscribeE freshness induction plus monotone
--- minting of `Sched.nextNode` — and not a clause to grind.
+-- WHAT IT IS NOT, kept because the alignment is what made the route look
+-- mechanical: the caps face.  `capsOK?` (.Caps-Face/Part1) BOUNDS every
+-- node and IDENTIFIES none, so no strengthening of it reaches a claim
+-- that a particular nid holds a particular value.
 --
--- Nothing about the SPINE appears here.  `walk-scan-source` below
--- converts both to the hereditary form by `burstHopSpnH-intro` and
+-- Nothing about the SPINE appears here.  `walk-scan-source` converts both
+-- of its conjuncts to the hereditary form by `burstHopSpnH-intro` and
 -- `scanSeed-hopSpn` (.Hop-Spine-Face, both PROVEN), which cost nothing
 -- because `hopDᵛ` is a `⊔` over obs-leaves and the exponent is spare
 -- room.
@@ -510,9 +506,7 @@ WalkTailᴴˢᶠ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
     let (nid , sched₁) = mintNode sched
         r = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁
               (installNode nid (scan-st (evalTm z)) st)
-    in (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b) (proj₁ r) ≡ true)
-     × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
-          ≡ just (scan-st (evalTm z)))
+    in burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b) (proj₁ r) ≡ true
 
 WalkStmtᴴˢᶠ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} →
   Fn Γ [] [] [] (u ×ᵗ s) u → Tm Γ [] [] [] u → Closed Γ s → Set
@@ -1206,67 +1200,28 @@ postulate
   walk-scan-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt⁻ᴴ {e = e} (scanᵉ f z b)
-  -- THE SOURCE HALF OF THE SCAN HOP RECEIPT — DIFFICULTY (reclassified
-  -- 2026-08-20; it read GRINDABLE, and both reasons given for that have
-  -- since evaporated).  Everything the scan clause used to owe on this
-  -- axis has moved: `walk-scan-hop-spn` below is a REAL BODY (subscribe,
-  -- then push), `walk-scan-source` above it is a REAL BODY, and the fold
+  -- THE SOURCE HALF OF THE SCAN HOP RECEIPT — DIFFICULTY, and it is now
+  -- ONE conjunct.  Everything the scan clause used to owe on this axis has
+  -- moved: `walk-scan-hop-spn` (.Parts) is a REAL BODY (subscribe, then
+  -- push), `walk-scan-source` beside it is a REAL BODY, and the fold
   -- itself is PROVEN in `.Hop-Spine-Push`.
   --
-  -- ⚠ THE HOP RISK IS GONE, WHICH IS NOT AS GOOD AS IT SOUNDS.  This
-  -- header used to say the row's remaining risk was `applyFn-hopSpn`
-  -- "and that postulate's header carries the whole research record".
-  -- `applyFn-hopSpn` IS NOW A REAL BODY (.Hop-Spine-Step) and no
-  -- postulate remains anywhere in that family, so the pointer was
-  -- dangling — a lying comment about a header that no longer exists.
-  -- Corrected here rather than left, because a stale risk note misleads
-  -- in BOTH directions: it aimed attention at a discharged row while the
-  -- row's real obstacle sat unnamed in the other conjunct.
+  -- WHAT LEFT, 2026-08-20, and it was the row's whole risk: the node-table
+  -- conjunct that used to sit beside this one — subscribing `b` under
+  -- `scan-f f nid ↠ κ` leaves node `nid` holding exactly `scan-st (evalTm
+  -- z)` — is DISCHARGED at the consumer off `mint-install-survives`
+  -- (.Node-Fresh), whose leaf also retired `scan-nodeP` and `take-nodeP`.
+  -- The dead route that conjunct cost (the caps face BOUNDS every node and
+  -- IDENTIFIES none) and the probe that covered it moved to that leaf's own
+  -- header, which is where the next reader will stand.
   --
-  -- THAT OBSTACLE is the node-table frame condition, and it is written
-  -- out at WalkTailᴴˢᶠ's own header above: it needs a whole-of-subscribeE
-  -- fresh-node induction the repo does not have, whose weaker form
-  -- (`scan-nodeP`) is itself an open postulate.  Not FALSITY — this
-  -- row's type carries none of the ruled-FALSITY conjuncts, and the
-  -- informal argument is convincing — but there is no proven twin and no
-  -- mechanical route, which is DIFFICULTY by definition.
-  --
-  -- ⚠ DEAD ROUTE 2026-08-20: THE CAPS FACE IS NOT THE TWIN FOR THIS
-  -- CONJUNCT, AND ITS APPARENT ALIGNMENT IS THE TRAP.  It is tempting to
-  -- read the caps face as proving this "in the same position", because the
-  -- two statements sit at the same indices and the caps side really is
-  -- discharged there.  It cannot: `capsOK?` BOUNDS every node and
-  -- IDENTIFIES none, while this conjunct asserts a particular nid is
-  -- PRESENT with a particular shape.  The gap is not a missing quantifier
-  -- or a widening — it is a difference in KIND between a bound and an
-  -- identification, so no strengthening of the caps receipt reaches it,
-  -- and the fresh-node induction named above stays owed.  Recorded here
-  -- because the alignment is what makes the route look mechanical.
-  -- PROBED 2026-08-20 (.Scan-Node-Probe, a MODULE_ROOT under
-  -- `make bug-cache`): the node-table conjunct is COMPUTABLE — every symbol
-  -- in it is a real evaluator function — so it was instantiated at the
-  -- evaluator's own scan clause, with `sched`/`st` the initial pair a
-  -- top-level subscribe of `scanᵉ f z b` actually starts in and `nid`/`sched₁`
-  -- from `mintNode`.  Twelve rows, all green.  THE HYPOTHESIS SIDE IS NOT
-  -- PROBED and does not need to be: the conclusion evaluates without them.
-  --
-  -- WHAT THE ROWS COVER, and it reaches the region that matters.  A subscribe
-  -- can only endanger the conjunct by writing a node it did not mint, and
-  -- there are two ways that could happen: a nested frame's own push, and a
-  -- share connect fanning values out to chains the subscribe did not create.
-  -- Both are covered — nested scan, take-under-scan, and all four *All
-  -- operators for the first; a SHARED slot with two subscribers (in a merge
-  -- and in a concat) plus a bare shared input for the second, each pinning
-  -- `connectedShares` non-empty so the connect demonstrably happened.  Each
-  -- row also pins whether the source's subscribe left more than the scan's own
-  -- node behind, so the degenerate rows say so instead of passing as evidence.
-  --
-  -- WHAT IT DOES NOT COVER: `κ` is `root` at every row, so no path ending in
-  -- `share-sink` is exercised — reaching one needs a mid-run state, which is
-  -- the hand-built-state trap.  And a receipt at concrete programs is not a
-  -- theorem: this lowers nothing (the class was never FALSITY), it says the
-  -- grind is not chasing a false statement.
-  walk-scan-source-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  -- STILL DIFFICULTY, AND FOR THE SAME REASON AS `walk-scan-rest` ABOVE:
+  -- what remains is the walk face's own `burstHopD?` for the subscribe of
+  -- `b`, so the route is to apply the recursion AT `b` — and this family's
+  -- statements carry no `WalkLevelAt` argument, so reaching it is a
+  -- restatement (the precedent for threading one is `input-wet-core`) and
+  -- not a grind.  There is no proven twin at these indices.
+  walk-scan-source-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmtᴴˢᶠ {e = e} f z b
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)

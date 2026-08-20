@@ -135,6 +135,8 @@ open import Verify-Budget-Sufficient.Caps-Nest
   using (nest-keeps; mu-step)
 open import Verify-Budget-Sufficient.Op-Budget
   using (opIterD-dominated)
+open import Verify-Budget-Sufficient.Node-Fresh
+  using (mint-install-survives)
 open import Verify-Budget-Sufficient.Walk-Level.Statement public
 
 
@@ -715,7 +717,7 @@ walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sch
     (hopDᵉ F (slotHop F sl) b) (proj₁ r)
     (m≤n+m (hopDᵉ F (slotHop F sl) b)
            (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z))
-    (proj₁ fr)
+    frB
   , accOK
   where
   BND = hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
@@ -723,12 +725,19 @@ walk-scan-source f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sch
   r = subscribeE g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
         (proj₂ (mintNode sched))
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
-  fr = walk-scan-source-frame f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-         2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-         s2 fS rS ceil lb dmd gas lℓ rgs
+  frB = walk-scan-source-burst f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+          2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+          s2 fS rS ceil lb dmd gas lℓ rgs
+  -- THE NODE HALF, no longer a leaf.  `mint-install-survives` (.Node-Fresh)
+  -- is exactly this shape — mint, install, subscribe under a frame naming the
+  -- minted nid, read the node back — and it holds because a subscribe writes
+  -- nothing below the `nextNode` watermark it was handed.  Its own leaf is
+  -- the single remaining gap, shared with `scan-node` / `take-node` (.Part3).
+  frN = mint-install-survives g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
+          (scan-st (evalTm z)) sched st
   accOK : nodeAccSpn? F (slotHop F sl) (pmᵗ F 0 f) BND _
             (lookupNode (proj₁ (mintNode sched)) (EvalSt.nodes (proj₂ (proj₂ r)))) ≡ true
-  accOK rewrite proj₂ fr =
+  accOK rewrite frN =
     trans (nodeAccSpn?-scan F (slotHop F sl) (pmᵗ F 0 f) BND _ (evalTm z))
           (scanSeed-hopSpn F (slotHop F sl) (pmᵗ F 0 f) BND z
             (≤-trans (m≤n+m (hopDᵗ F (slotHop F sl) z) (hopDᵗ F (slotHop F sl) f))

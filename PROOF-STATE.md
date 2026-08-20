@@ -140,10 +140,15 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`walk-scan-source-frame`** (Walk-Level) — DIFFICULTY: its `burstHopD?`
-  conjunct is ordinary; the node-table one needs a fresh-node induction the repo
-  does not have, and the weaker `scan-nodeP` is itself open. Header carries the
-  dead route — the caps face bounds every node and identifies none.
+- **`subscribeE-nodes-below`** (Node-Fresh) — DIFFICULTY: a subscribe writes no
+  node below the `nextNode` watermark it was handed. Missing structure, not a
+  clause: a whole-of-`subscribeE` induction, `.Keeps-Ring`'s shape for a
+  different table. Three consumers spend it; header carries the evaluator
+  argument and the probe.
+- **`walk-scan-source-burst`** (Walk-Level) — DIFFICULTY: what is left of the
+  scan source half once its node conjunct went to `subscribeE-nodes-below`. The
+  route is the recursion at `b`, which this family's statements do not carry, so
+  reaching it is a restatement.
 - **`walk-map` / `walk-take-suc` / `walk-scan-rest`** (Walk-Level) —
   DIFFICULTY: gas exhaustion sites at none of the three, and that region is
   unreachable by measurement. Residue is the unauthored per-frame push face,
@@ -229,11 +234,9 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 - **`mid-fold-certs`** (Part11) — DIFFICULTY: one case split on
   `Arrival.isLast a` off `Mid.done-plumbed`; the blueprint's GUARD applies to
   its flip conjunct.
-- **`scan-nodry-push`, `scan-nodeP`** (Part3) — DIFFICULTY: no
-  `pushBurst-scan-char` counterpart of the map characterisation exists, and
-  `-nodeP` additionally wants an unproven "inner `subscribeE` never overwrites a
-  pre-existing nid" induction — `subscribeE-keeps` tracks slots, not the node
-  table.
+- **`scan-nodry-push`** (Part3) — DIFFICULTY: no `pushBurst-scan-char`
+  counterpart of the map characterisation exists, so the dry-preservation route
+  is a direct induction over `pushBurst` rather than a rewrite.
 - **`subscribeSharedSlot-wf`** (Part3) — DIFFICULTY, blocked: `sharedConnect`
   recurses into `subscribeE`, so this arm cannot close outside the mutual block
   holding `subscribeE-wf`, two files down.
@@ -244,9 +247,6 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   conjuncts fall out at once (hasDry vacuous, valsLast? by computation, hot-live
   definitional); the whole residue is `liveTypeOK?` at the minted source, whose
   tail needs a mintSource-freshness lemma the repo does not have.
-- **`take-nodeP`** (Part3) — DIFFICULTY: strictly stronger than `scan-nodeP`
-  (exact kCount, not mere presence), so it inherits that row's missing induction
-  and adds count bookkeeping over cutThrough's closes.
 - **`cut-owed`** (Part9) — DIFFICULTY: independent of every blocker, but its own
   header calls the owed-shape obligation "genuinely semantic" and names no
   precedent, so being unblocked is not the same as being mechanical.

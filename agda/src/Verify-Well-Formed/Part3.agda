@@ -45,6 +45,7 @@ open import Relation.Nullary using (Dec; yes; no)
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
 open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
+open import Verify-Budget-Sufficient.Node-Fresh using (mint-install-survives)
 open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
                                 InstEvent; init; value; close; handoff; complete;
                                 EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
@@ -345,36 +346,6 @@ postulate
                   (proj₂ (mintNode sched)) (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)))
            ≡ false
 
-  -- scanᵉ GAP 2: fresh scan node (with updated acc) survives subscribeE b.
-  --
-  -- ROUTE (2026-08-19): nid is minted BEFORE the inner subscribeE call.  All
-  -- subsequent node ids allocated inside `subscribeE b (scan-f f nid ↠ κ) ...`
-  -- come from `proj₂ (mintNode sched)` onward, so they are all strictly > nid.
-  -- The only writers to a specific node id are `setNode nid' ...` inside
-  -- `stepFrame (scan-f f nid')` and `takeDispatch nid' ...`, and both fire only
-  -- from `pushBurst ... nid' ...` in the OUTER `subscribeE (scanᵉ ...)` or
-  -- `subscribeE (takeᵉ ...)` clauses — AFTER their own inner subscribeE returns.
-  -- Since all inner push-Burst calls use nid' > nid, the node at nid is never
-  -- overwritten by the inner `subscribeE b ...`.  The witness is `evalTm seed`:
-  -- the node starts as `scan-st (evalTm seed)` and is unchanged.
-  --
-  -- OBSTACLE (2026-08-19): no "subscribeE only mints fresh nodes" lemma exists
-  -- in the repo.  The argument above is correct but needs a full induction over
-  -- all of subscribeE's clauses, plus the monotone-minting invariant (`Sched.nextNode`
-  -- is strictly monotone across subscribeE).  No analog of `subscribeE-keeps`
-  -- (Keeps-Ring) covers the node table — that family tracks slots and
-  -- connectedShares, not nodes.  Searched: `subscribeE-keeps`, `lookupNode`,
-  -- `installNode`, `fresh`, `nextNode`, `node-persist`; nothing found.
-  scan-nodeP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
-    (b : Closed Γ s) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    let nid = proj₁ (mintNode sched)
-        r₀  = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
-                (installNode nid (scan-st (evalTm seed)) st)
-    in Σ (Val Γ u) λ acc →
-         lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (scan-st acc)
-
   -- scanᵉ GAP 3: pushBurst scan-f preserves valsLast?.
   -- REAL SHAPE MISMATCH: subscribeE-scan-wf (~line 2003) does NOT return valsLast?;
   -- subscribeE-wf's conclusion REQUIRES it.
@@ -421,33 +392,44 @@ postulate
                   (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)))
            ≡ false
 
-  -- takeᵉ GAP 2: the fresh take node survives subscribeE b.  Twin of scan-nodeP,
-  -- but with NO Σ: a scan node's payload is an accumulator the inner burst
-  -- advances, while a take node's budget is only spent by the take FRAME (which
-  -- runs above this subscription, in pushBurst), so the count comes back
-  -- unchanged rather than merely present.
-  --
-  -- ROUTE (2026-08-19): Same monotone-minting argument as scan-nodeP, and
-  -- STRONGER: `takeDispatch nid ...` (the only writer to a take node at nid)
-  -- fires only from `pushBurst (take-f nid) ...`, which lives in the OUTER
-  -- `subscribeE (takeᵉ count b)` clause.  All inner subscribeE calls use
-  -- nid' > nid and therefore never call `takeDispatch nid`.  So the count
-  -- `suc k` is not just present but EXACTLY preserved — no Σ needed.
-  --
-  -- OBSTACLE (2026-08-19): same missing "subscribeE only mints fresh nodes"
-  -- induction as scan-nodeP.  Precedent named in current header is scan-nodeP
-  -- itself — also a live postulate.  No existing proven lemma covers either.
-  take-nodeP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    let nid = proj₁ (mintNode sched)
-        r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
-                (installNode nid (take-st (suc k)) st)
-    in lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k))
-
   -- NO takeᵉ valsLast-push twin: unlike scan, `subscribeE-take-wf` already
   -- returns the valsLast? conjunct (off the proven pushBurst-take-valsLast),
   -- so the take clause's conclusion needs no bridge.
+
+-- scanᵉ GAP 2, DISCHARGED (2026-08-20): the freshly installed scan node
+-- survives the inner `subscribeE b`.  The Σ is here only because the
+-- consumer (.Part8) asks for one; the witness is `evalTm seed` on the nose,
+-- since a subscribe writes nothing below the watermark it was handed.  The
+-- whole route is `mint-install-survives` (.Node-Fresh) — mint, install,
+-- subscribe, read the node back — and the one remaining gap is that
+-- module's own leaf, which `take-node` below spends in the same line.
+scan-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  let nid = proj₁ (mintNode sched)
+      r₀  = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+              (installNode nid (scan-st (evalTm seed)) st)
+  in Σ (Val Γ u) λ acc →
+       lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (scan-st acc)
+scan-node fuel f seed b κ id now sched st =
+  evalTm seed
+  , mint-install-survives fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
+      (scan-st (evalTm seed)) sched st
+
+-- takeᵉ GAP 2, DISCHARGED (2026-08-20): scan-node's twin, and it needs no Σ
+-- — a take node's count is spent by the take FRAME, which runs above this
+-- subscription rather than inside it, so `suc k` comes back exactly.
+take-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  let nid = proj₁ (mintNode sched)
+      r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+              (installNode nid (take-st (suc k)) st)
+  in lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k))
+take-node fuel k b κ id now sched st =
+  mint-install-survives fuel b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
+    (take-st (suc k)) sched st
 
 -- scan-binv-adapt: DISCHARGED (2026-08-06).  Was a postulate; its own comment
 -- said "provable inline as record { … }" and that was right.  A scanᵉ clause
@@ -693,7 +675,7 @@ postulate
 -- takeᵉ WHOLE CASE.  The takeᵉ
 -- clause of `subscribeE-wf` (.Part8) is a real body that APPLIES
 -- `subscribeE-take-wf` and `subscribeE-take0-wf`, over the residue leaves
--- `take-nodry-push` / `take-nodeP` above and the real `take-binv-adapt`.
+-- `take-nodry-push` above and the real `take-node` / `take-binv-adapt`.
 --
 -- FINDINGS:
 --   · THE WITH-ABSTRACTION TRAP IS REAL.  `with evalTm count` at the clause

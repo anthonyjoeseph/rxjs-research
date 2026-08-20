@@ -365,7 +365,7 @@ subscribeE-wf {Γ = Γ} {e = e} {u = u}
             (take-nodry-push fuel count k b κ id now sched st ecEq nodry)
         (S″ , run , binv″ , vl) =
           subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
-            (S′ , run₀ , binv₀ , take-nodeP fuel k b κ id now sched st , vl₀)
+            (S′ , run₀ , binv₀ , take-node fuel k b κ id now sched st , vl₀)
     in S″ , run , binv″ , vl
 
 -- ── scanᵉ: REAL subscribeE-scan-wf called here ───────────────────────────────
@@ -381,7 +381,7 @@ subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv deq nodry =
           (scan-nodry-push fuel f seed b κ id now sched st nodry)
       (S″ , run , binv″) =
         subscribeE-scan-wf fuel f seed b κ id now sched st S binv
-          (S′ , run₀ , binv₀ , scan-nodeP fuel f seed b κ id now sched st)
+          (S′ , run₀ , binv₀ , scan-node fuel f seed b κ id now sched st)
   in S″ , run , binv″ , scan-valsLast-push fuel f seed b κ id now sched st vl₀
 
 -- ── *All ─────────────────────────────────────────────────────────────────────
