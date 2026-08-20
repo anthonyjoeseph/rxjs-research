@@ -2306,7 +2306,25 @@ postulate
     OKB {e = e} c sl Ψ J sched st →
     VbB c sl Ψ J (o ∷ []) ≡ true
 
-  -- ⚠ CLASS: VACUITY (2026-08-20).  It typechecks and asserts nothing usable.
+  -- PINNED 2026-08-20, and the pin is the whole point of the row.  Before
+  -- today the Σ's only conjunct was `all (nest … ≤ᵇ bud) q`, UPWARD-CLOSED in
+  -- bud, so the max over a finite q discharged it for free — while the
+  -- consumer needed bud SMALL, feeding the same bud to opIterD's `k` position
+  -- where a bigger bud is a higher level and a harder ceiling.  The free
+  -- witness was the one witness that could not be spent.
+  --
+  -- The second conjunct closes that: it demands the ceiling AT THAT SAME BUD,
+  -- so enlarging the witness now costs something.  This mirrors
+  -- `thruConsume-nodry-nestBud` below, which has carried both conjuncts all
+  -- along — which is also why the thru side never needed a ceiling-transfer
+  -- postulate.  Pinning here RETIRED `concatDrain-nodry-cl`: with the witness
+  -- arriving already knowing it fits, nothing is left to transfer from an
+  -- fLvlD-level bound, and that transfer was provably backwards anyway.
+  --
+  -- No longer VACUITY.  It is now a real obligation — plausibly a hard one,
+  -- since it asserts the caps have room for every element at ONE shared bud —
+  -- and that is the correct outcome: an honest hard statement replacing a free
+  -- empty one.
   -- The Σ's only conjunct, `all (λ o → nest o sl … ≤ᵇ bud) q ≡ true`, is
   -- UPWARD-CLOSED in `bud`, so it is satisfied by any large enough witness and
   -- is discharged for free by the max over a finite `q`.  That is the
@@ -2334,11 +2352,15 @@ postulate
   -- transfer from an fLvlD-level bound afterwards.  That is the structural
   -- answer to `-cl`'s SHAPE defect, and it is a deletion rather than a proof.
   concatDrain-nodry-nestBud : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
+    (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (id : Id) (allNid : NodeId)
     (q : List (Closed Γ s))
     (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
-    Σ ℕ (λ bud → all (λ o → nest o sl (EvalSt.connectedShares st) ≤ᵇ bud) q ≡ true)
+    Σ ℕ (λ bud →
+           all (λ o → nest o sl (EvalSt.connectedShares st) ≤ᵇ bud) q ≡ true
+         × all (λ o → Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
+                                                     dep bud (suc (sizeᵉ o)) (suc J)) c)
+                        ≤ᵇ sizeCapAt e sl (suc id)) q ≡ true)
 
   -- ⚠ CLASS: FALSITY (2026-08-20).  REFUTED AT dep = 0.  `dep` is universally
   -- quantified here and NOTHING constrains it: OKB is `walkOK ×
@@ -2373,81 +2395,6 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
     depthInner sf concatᵒ allNid κ id now o sched st ≤ dep
-
-  -- ⚠ CLASS: SHAPE (2026-08-20).  DO NOT GRIND THIS.  The route written
-  -- below is DEAD, and the statement is not derivable from its own
-  -- hypothesis — the repair is at the CALLER's signature, not here.
-  --
-  -- DEAD ROUTE 2026-08-20: THE CEILING TRANSFER IS BACKWARDS.  The route
-  -- claimed `opIterD S W d bud (suc (sizeᵉ o)) (suc J) ≤ fLvlD S W d J`,
-  -- then frameStep-mono-j.  The inequality runs the OTHER WAY, and every
-  -- step of the derivation is an already-PROVEN lemma:
-  --
-  --   opIterD S W d k (suc m) (suc J)
-  --     ≡ fIterD S W d k (suc (widAt S W J₂)) J₂          -- opIterD-suc
-  --     ≡ fIterD S W d k (widAt S W J₂) (fLvlD S W d J₂)  -- fIterD-suc
-  --     ≥ fLvlD S W d J₂                                  -- fIterD-infl
-  --     ≥ fLvlD S W d J                                   -- fLvlD-mono
-  --
-  -- where J₂ = opIterD S W d k m (sLvlD S W d k J₀),
-  --       J₀ = suc (suc J + suc (sizeAt S (suc J)) ^2),
-  -- and J ≤ J₂ because J ≤ suc J ≤ J₀ ≤ sLvlD … J₀ ≤ J₂ by sLvlD-infl and
-  -- opIterD-infl.  So `fLvlD S W d J ≤ opIterD S W d k (suc m) (suc J)`.
-  -- The structural reason is visible in the clause: opIterD's step APPLIES
-  -- fLvlD at the SAME d, at least once (`suc (widAt …)` is never zero),
-  -- starting from a level already above suc J.  An iteration of fLvlD
-  -- cannot be bounded by one fLvlD below its own starting point.
-  --
-  -- WHY THAT MAKES IT SHAPE RATHER THAN MERELY UNPROVEN: `cSize ∘
-  -- frameStep` is monotone in j (frameStep-mono-j), so the hypothesis
-  -- bounds a STRICTLY SMALLER quantity than the conclusion.  An upper
-  -- bound on the smaller says nothing about the larger, so the conclusion
-  -- needs information NO hypothesis carries — the second of the two
-  -- always-wrong shapes CLAUDE.md names.
-  --
-  -- THE REPAIR IS AT THE CALL SITE, and this is the misplaced-call
-  -- diagnosis, not a missing lemma.  `concatDrain-nodry` (below) receives
-  -- `cl` at the fLvlD level and must hand `subscribeInner-nodry` a bound
-  -- at the opIterD level; it passes the same `dep` to both, so its own
-  -- hypothesis is simply stated at the wrong level.  It has to be stated
-  -- at a level DOMINATING every queue element's opIterD level — which is
-  -- why it cannot be per-element: `bud` and `sizeᵉ o` are per-element
-  -- data, and that is the real content this postulate was standing in
-  -- for.  Restating `concatDrain-nodry`'s `cl` pushes the obligation to
-  -- ITS caller and makes this row a monotonicity transport or nothing at
-  -- all.  Cascading through those callers is the cost of the fact being
-  -- true, not a reason to keep this shape.
-  --
-  -- id is explicit so the sizeCapAt reference is well-scoped.
-  --
-  -- ⚠ THIS BODY MUST LAND `abstract`, IN THE SAME EDIT THAT WRITES IT, AND
-  -- THE FAILURE MODE IS NOT A RED BUILD.  Both families it reasons about are
-  -- SEALED (Rx/Evaluator's abstract blocks at :748 and :918), and this module
-  -- is on the `budget-sufficient` spine via cascade-wet-via-caps → drain-dry.
-  -- An unsealed body on that spine puts fLvlD's unfoldable clauses back under
-  -- the opIterD-dominated / lvls-mono towers: the three recorded outcomes are
-  -- `Killed: 9` at tens of GB after tens of minutes, and the seal header at
-  -- :720 records caps-fuel-root running PAST AN HOUR with the bodies visible
-  -- and finishing in minutes with them hidden.  So the cost of forgetting is
-  -- a long wait ending in an OOM, which reads as "this proof is too big"
-  -- rather than as "the seal is missing" — which is why it is written here
-  -- and not left to be rediscovered.
-  --
-  -- The shape is therefore the awkward one: the proof needs the `-body`
-  -- equations (.Caps) to unfold the family LOCALLY while its own result stays
-  -- one opaque symbol to every consumer.  And a plain `abstract` block rejects
-  -- untyped `where`-bindings, which this arithmetic will want, so it wants the
-  -- private-impl + abstract-alias form (`private cl-go : T; cl-go = …` then
-  -- `abstract concatDrain-nodry-cl = cl-go`).
-  concatDrain-nodry-cl : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (d bud J : ℕ) (id : Id)
-    (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
-      ≤ sizeCapAt e sl (suc id) →
-    Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c) d bud
-                                   (suc (sizeᵉ o)) (suc J)) c)
-      ≤ sizeCapAt e sl (suc id)
 
   -- Loop invariant after one subscribeInner step in concatDrain.
   -- OKB + regP? are preserved (the caps face proves the caps side;
@@ -2599,8 +2546,8 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
 
 concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
                   (o ∷ q) sched₀ st₀ ok pb sspLen rg gk cl
-  with concatDrain-nodry-nestBud c sl Ψ J allNid (o ∷ q) sched₀ st₀ ok
-... | bud , nestQ
+  with concatDrain-nodry-nestBud c sl Ψ dep J id allNid (o ∷ q) sched₀ st₀ ok
+... | bud , nestQ , clQ
   -- Scrutinise only `done` (4th component).  This preserves
   -- `proj₁ (proj₂ (proj₂ (subscribeInner ...)))` (3rd component) in the goal
   -- so that subscribeInner-nodry's return type matches directly.
@@ -2615,7 +2562,10 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
     (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
       (T-to (proj₁ (∧-true _ _ nestQ))))
     (concatDrain-nodry-dep c sl Ψ dep J sf allNid κ id now o sched₀ st₀ ok)
-    (concatDrain-nodry-cl c sl dep bud J id o sched₀ st₀ 2≤S cl)
+    (≤ᵇ⇒≤ (Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
+                                          dep bud (suc (sizeᵉ o)) (suc J)) c))
+           _
+           (T-to (proj₁ (∧-true _ _ clQ))))
     gk
 ... | true =
   -- done=true: concatDrain appends element events ++ tail events
@@ -2630,7 +2580,10 @@ concatDrain-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id no
                  (≤ᵇ⇒≤ (nest o sl (EvalSt.connectedShares st₀)) bud
                    (T-to (proj₁ (∧-true _ _ nestQ))))
                  (concatDrain-nodry-dep c sl Ψ dep J sf allNid κ id now o sched₀ st₀ ok)
-                 (concatDrain-nodry-cl c sl dep bud J id o sched₀ st₀ 2≤S cl)
+                 (≤ᵇ⇒≤ (Caps.cSize (frameStep (opIterD (Caps.cSize c) (Caps.cWid c)
+                                                       dep bud (suc (sizeᵉ o)) (suc J)) c))
+                        _
+                        (T-to (proj₁ (∧-true _ _ clQ))))
                  gk
       loop   = concatDrain-nodry-loop c sl Ψ J sf allNid κ id now o sched₀ st₀ ok rg
       ok₁    = proj₁ loop

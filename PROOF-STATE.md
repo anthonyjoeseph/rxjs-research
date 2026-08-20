@@ -147,16 +147,12 @@ row governed by it inherits that caveat.
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
   element has moved the state, and the shared header names the caps face
   (`.Subscribe-Face`) as the worked twin at the same indices. THREE OF THE SIX
-  ARE NOT GRINDABLE — `-dep` is FALSITY (refuted at `dep = 0`), `-vb` is SHAPE
-  (`o` unconstrained; `q` and `allNid` unused), `-nestBud` is VACUITY (Σ
-  upward-closed in `bud`, whose consumer needs `bud` small). Each repair is a
-  RESTATEMENT mirroring an already-correct twin on the thru-outer side of the
-  same file; headers carry the instance and the twin. Fixing `-nestBud`'s pin
-  deletes `-cl` outright.
-- **`concatDrain-nodry-cl`** (Burst-Walk) — SHAPE, so it is restated rather than
-  ground: its ceiling-transfer route is proven BACKWARDS in its header, and the
-  repair is `concatDrain-nodry`'s own `cl` hypothesis, which is stated one level
-  too low. Cascades to that caller.
+  ARE NOT GRINDABLE. `-nestBud` is REPAIRED (its Σ now pins the witness with the
+  ceiling conjunct, mirroring the thru twin, which retired `-cl` outright) and
+  is now a real DIFFICULTY obligation. Still open: `-dep` is FALSITY (refuted at
+  `dep = 0`) and `-vb` is SHAPE (`o` unconstrained; `q` and `allNid` unused) —
+  each repaired by mirroring the thru side's discipline of taking the fact
+  rather than conjuring it.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-loop`, `thruWalk-nodry-dep`,
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE, and audited: each
   takes the fact it needs as a hypothesis rather than conjuring it, so these are
