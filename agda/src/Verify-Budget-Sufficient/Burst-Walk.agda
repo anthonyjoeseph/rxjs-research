@@ -1867,33 +1867,6 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 --   that led here, if the level bump ever has to be undone.
 
 postulate
-  -- ⚠ DELETE THIS ROW — IT IS A TAUTOLOGY (2026-08-20).  Do not grind it;
-  -- it asserts nothing beyond its own hypothesis.  `depthInner`'s gs
-  -- clause (Caps-Depth:296) reads
-  --
-  --   depthInner (gs fuel) op allNid κ id now o sched st =
-  --     depthE fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ)
-  --       id now (record sched { nextNode = suc (Sched.nextNode sched) }) st
-  --
-  -- so the conclusion IS the hypothesis δ-unfolded, term for term, record
-  -- update included.  The inhabitant is `λ … ok hD → hD`, and the call
-  -- site below already has `hD` in hand — passing it directly removes the
-  -- row and its four dead binders (c, sl, Ψ, J occur only in the OKB
-  -- hypothesis, which nothing in the conclusion needs).
-  --
-  -- This is the same criterion that retired `-pLen`, which this block's
-  -- own header describes as "an identity returning a bound nothing could
-  -- supply".  The only difference is that here the bound IS supplied, so
-  -- the identity is provable rather than unprovable — which makes it
-  -- deletable rather than a finding.
-  subscribeE-inner-nodry-depth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (Ψ J dep : ℕ) (fuel : Gas) (op : AllOp) (allNid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    depthInner (gs fuel) op allNid κ id now o sched st ≤ dep →
-    depthE fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
-           (record sched { nextNode = suc (Sched.nextNode sched) }) st ≤ dep
   -- INV? at the inner frame's level, assembled from OKB + regP? ledger
   -- + the two SLOT bounds.  Conjunct by conjunct: stBounded? and
   -- regsSz? are capsOK?'s own; fnCapBounded? is OKB's second conjunct;
@@ -1958,10 +1931,26 @@ postulate
   -- why this row's route used to elide the recombination step and read as
   -- vaguer than it is.  `pathB?` carries no length conjunct, which is what
   -- keeps it cheap.
-  subscribeE-inner-nodry-pBO : ∀ {n} {Γ : Ctx n} {t u}
-    (c : Caps) (Ψ J : ℕ) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ u t) →
-    PbB c Ψ J κ ≡ true →
-    pathB? (Caps.cSize (frameStep J c)) Ψ (from-inner op allNid inst ↠ κ) ≡ true
+-- pathB? FOR THE EXTENDED PATH — a real body since 2026-08-20, and it is
+-- three lines.  `frameB? B Ψ (from-inner _ _ _) = true` (.Measures) gives the
+-- head by `refl`, and `pathB?-of-parts` — PROVEN above in this module since
+-- the relocation that moved it out of downstream .Caps-Bridge — recombines
+-- PbB's `pathSz?` and `pathBΨ?` halves into the real `pathB?` that INV?
+-- reads.  `pathB?` carries no length conjunct, which is what keeps it cheap.
+--
+-- ∧-true's Bool arguments are EXPLICIT here on purpose: `PbB` reduces to a
+-- conjunction Agda cannot recover from the equation alone, the same reason
+-- the from-inner strip in .Caps-Bridge spells them out.
+subscribeE-inner-nodry-pBO : ∀ {n} {Γ : Ctx n} {t u}
+  (c : Caps) (Ψ J : ℕ) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ u t) →
+  PbB c Ψ J κ ≡ true →
+  pathB? (Caps.cSize (frameStep J c)) Ψ (from-inner op allNid inst ↠ κ) ≡ true
+subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb =
+  ∧-intro refl
+    (pathB?-of-parts κ
+      (proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb))
+      (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb)))
+
 -- Gas bound at the inner call: fuel hasAtLeast suc G.
 -- ASSEMBLED 2026-08-14: follows from gk via budgetAt-gs (gs-peel) and the
 -- demand chain dBound-bound → prod≤3pow → tower-3 → m≤n+m.  sizeᵉ o ≤ Ŝr
@@ -2176,7 +2165,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
          (≤-trans (inner-dWO c sl Ψ J o vb) (proj₁ (proj₂ step⊑)))
          pC′
          pLen' nB ≤-refl
-         (subscribeE-inner-nodry-depth c sl Ψ J dep fuel op allNid κ id now o sched st ok hD)
+         hD
          (INV?-widen sched' st (proj₁ step⊑)
             (subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc ok rg))
          fnO

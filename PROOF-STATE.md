@@ -142,12 +142,6 @@ row governed by it inherits that caveat.
   blocked it is resolved (`regsB?-of-parts` now lives beside the Ψ predicates it
   consumes), so all six conjuncts have a named source in scope. Header carries
   the per-conjunct inventory.
-- **`subscribeE-inner-nodry-pBO`** (Burst-Walk) — GRINDABLE, three lines:
-  `frameB?` on `from-inner` is `refl`, and the relocated `pathB?-of-parts`
-  recombines PbB's two halves.
-- **`subscribeE-inner-nodry-depth`** (Burst-Walk) — DELETE, not grind: a
-  tautology. Its conclusion is its hypothesis δ-unfolded through `depthInner`'s
-  `gs` clause; the inhabitant is `hD`, which the call site already holds.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
   (Burst-Walk) — GRINDABLE. Per-element context for concat's drain: each
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
