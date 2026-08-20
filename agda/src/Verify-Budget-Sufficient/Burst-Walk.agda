@@ -1867,8 +1867,25 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 --   that led here, if the level bump ever has to be undone.
 
 postulate
-  -- Depth bound for the inner subscribeE call.
-  -- depthE fuel o (from-inner ... ↠ κ) ... ≤ depthInner (gs fuel) ... ≤ dep.
+  -- ⚠ DELETE THIS ROW — IT IS A TAUTOLOGY (2026-08-20).  Do not grind it;
+  -- it asserts nothing beyond its own hypothesis.  `depthInner`'s gs
+  -- clause (Caps-Depth:296) reads
+  --
+  --   depthInner (gs fuel) op allNid κ id now o sched st =
+  --     depthE fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ)
+  --       id now (record sched { nextNode = suc (Sched.nextNode sched) }) st
+  --
+  -- so the conclusion IS the hypothesis δ-unfolded, term for term, record
+  -- update included.  The inhabitant is `λ … ok hD → hD`, and the call
+  -- site below already has `hD` in hand — passing it directly removes the
+  -- row and its four dead binders (c, sl, Ψ, J occur only in the OKB
+  -- hypothesis, which nothing in the conclusion needs).
+  --
+  -- This is the same criterion that retired `-pLen`, which this block's
+  -- own header describes as "an identity returning a bound nothing could
+  -- supply".  The only difference is that here the bound IS supplied, so
+  -- the identity is provable rather than unprovable — which makes it
+  -- deletable rather than a finding.
   subscribeE-inner-nodry-depth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (Ψ J dep : ℕ) (fuel : Gas) (op : AllOp) (allNid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -1889,7 +1906,8 @@ postulate
   -- families, so the lemmas were simply left behind when the Ψ
   -- predicates themselves were relocated here on 2026-08-10);
   -- registry-count is
-  -- frameStep-reg≤size (.Caps-Bridge:151, PROVEN); and the two slot
+  -- frameStep-reg≤size (.Caps, PROVEN — the citation here read
+  -- ".Caps-Bridge:151" and that line is unrelated comment text); and the two slot
   -- conjuncts are the added hypotheses.
   --
   -- ⚠ SHAPE DEFECT FOUND AND REPAIRED 2026-08-13 — the SAME anti-pattern
@@ -1930,8 +1948,16 @@ postulate
     OKB {e = e} c sl Ψ J sched st →
     regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
     INV? Ψ (Caps.cSize (frameStep J c)) sched st ≡ true
-  -- pathB? for the extended path.
-  -- frameB? B Ψ (from-inner ...) = true; pathB? B Ψ κ from PbB.
+  -- pathB? for the extended path — GRINDABLE, and it is THREE LINES:
+  --   ∧-intro refl (pathB?-of-parts κ (proj₁ (∧-true _ _ pb))
+  --                                   (proj₂ (∧-true _ _ pb)))
+  -- `frameB? B Ψ (from-inner _ _ _) = true` gives the head by `refl`, and
+  -- `pathB?-of-parts` — PROVEN, IN THIS MODULE above the block since the
+  -- 2026-08-20 relocation — recombines PbB's pathSz? and pathBΨ? halves
+  -- into pathB?.  It was previously in .Caps-Bridge, downstream, which is
+  -- why this row's route used to elide the recombination step and read as
+  -- vaguer than it is.  `pathB?` carries no length conjunct, which is what
+  -- keeps it cheap.
   subscribeE-inner-nodry-pBO : ∀ {n} {Γ : Ctx n} {t u}
     (c : Caps) (Ψ J : ℕ) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ u t) →
     PbB c Ψ J κ ≡ true →

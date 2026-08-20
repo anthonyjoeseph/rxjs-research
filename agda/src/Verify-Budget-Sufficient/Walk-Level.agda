@@ -474,12 +474,27 @@ WalkTailᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
 ------------------------------------------------------------------
 -- THE FRAME CONDITION, and it is all that is left of the source half.
 --
--- Both conjuncts are ORDINARY: the first is the walk face's own
--- `burstHopD?` at the source's headline bound, the shape every sibling
--- clause already produces; the second says the freshly minted scan node
--- still holds `evalTm z` once the source has been subscribed — a frame
--- condition on the node table, which the caps face proves in the same
--- position for its own predicates.
+-- THE FIRST CONJUNCT IS ORDINARY: the walk face's own `burstHopD?` at
+-- the source's headline bound, the shape every sibling clause produces.
+--
+-- ⚠ THE SECOND IS NOT, AND THIS HEADER PREVIOUSLY CLAIMED OTHERWISE.
+-- It said the node-table frame condition is one "which the caps face
+-- proves in the same position for its own predicates."  That is wrong IN
+-- KIND, not merely optimistic: `capsOK?` (.Caps-Face/Part1) is an
+-- all-nodes BOUND predicate — it constrains every node's measure and
+-- IDENTIFIES none.  Nothing in it can say which value a particular nid
+-- holds.
+--
+-- What the conjunct actually needs is that subscribing `b` under
+-- `scan-f f nid ↠ κ` leaves node `nid` holding exactly `scan-st (evalTm
+-- z)` — a strictly STRONGER form of the open postulate `scan-nodeP`
+-- (Verify-Well-Formed/Part3), which asks only for SOME accumulator.
+-- That postulate's header records the obstacle: no "subscribeE only
+-- mints fresh nodes" lemma exists in the repo, `subscribeE-keeps`
+-- (.Keeps-Ring) tracks SLOTS and not the node table, and the search for
+-- one is written out there and came back empty.  So this is missing
+-- structure — a whole-of-subscribeE freshness induction plus monotone
+-- minting of `Sched.nextNode` — and not a clause to grind.
 --
 -- Nothing about the SPINE appears here.  `walk-scan-source` below
 -- converts both to the hereditary form by `burstHopSpnH-intro` and
@@ -1060,7 +1075,20 @@ postulate
   -- oneShot-tail-dry degenerates, the two value conjuncts (burstB?,
   -- burstHopD?) are vacuous over an empty payload, and regsLen? is the
   -- hypothesis.  `hopDᵉ V η emptyᵉ = 0`.  Needs no evalTms twin — there
-  -- are no values — so unlike walk-of it has NO residue at all.
+  -- are no values.
+  --
+  -- ⚠ "NO RESIDUE AT ALL" WAS OVERSTATED (corrected 2026-08-20): FOUR of
+  -- the nine conjuncts are not vacuous over an empty payload.  capsOK? is
+  -- about sched₁/st and not the payload at all; burstCount? reduces to
+  -- `0 ≤ᵇ cWid` by computation rather than by emptiness; the level bound
+  -- needs `+-identityʳ` plus inflationarity; and INV? — which this row
+  -- comment omitted entirely — is a STATE conjunct needing that transport
+  -- plus mint-transparency (INV? reads the schedule only through
+  -- `Sched.live` and `Sched.slots`, while mintSource touches `nextSource`
+  -- alone).  The honest statement is "residue is four definitional
+  -- transports and no lemma" — still the cheapest row in the family.  And
+  -- the better twin for conjuncts 1-4 is the PROVEN `subscribeE-caps`
+  -- emptyᵉ clause (.Subscribe-Face), not the open sibling walk-of.
   walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
     WalkStmt {e = e} (emptyᵉ {t = u})
   -- chain edge — GRINDABLE.  Subscribe the source under ONE more frame,
@@ -1071,6 +1099,31 @@ postulate
   -- already done") and applyFn-size for the Ŝ ceiling.  What has to be
   -- authored is map-f's OWN push face — see the family note above on why
   -- it cannot be shared — with pushThru-walk as the worked instance.
+  --
+  -- ⚠ CLASS: FALSITY (2026-08-20), reclassified for INTERNAL CONSISTENCY
+  -- rather than on new evidence.  `walk-scan-rest` is classed FALSITY
+  -- because it must prove `hasDry` and `regsLen?` — the two conjuncts this
+  -- block's own header rules "Class stays FALSITY" — and needs a scan-f
+  -- push face that does not exist.  This row sits at `WalkStmt`, whose
+  -- NINE conjuncts are a strict SUPERSET of that row's eight (it adds
+  -- burstHopD?), reaches those same two through the same ledger (the
+  -- mutual walk at `b` under map-f, then the push), and needs an equally
+  -- non-existent map-f face.  Calling that row FALSITY and this one
+  -- GRINDABLE cannot both be right.
+  --
+  -- And `pushThru-walk` is a worked instance at a DIFFERENT INDEX, not a
+  -- twin whose clauses correspond: its hop conjunct is the identity
+  -- (r̂ → r̂), while map's is `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * r̂` — precisely
+  -- the growing shape the frame-generic DEAD ROUTE's counterexample
+  -- exploits at `f := map-f`.  Absent the FALSITY reading the floor is
+  -- DIFFICULTY (two unauthored faces); GRINDABLE is not available either
+  -- way.
+  --
+  -- `applyFn-size` is also weaker than this row needs: it concludes
+  -- `sizeᵛ (applyFn fn v) ≤ (2 + 2*V) ^ (3 ^ sizeᵗ fn)`, exponential in
+  -- the fn's SYNTAX, not `≤ Caps.cSize (frameStep (j + j′) c)`.  Fitting
+  -- it under the level cap is the within-instant growth question this
+  -- block calls load-bearing — PROBED, not proven.
   walk-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s) → WalkStmt {e = e} (mapᵉ f b)
   -- node install — GRINDABLE, and the EASIEST of the three chain frames,
@@ -1081,6 +1134,16 @@ postulate
   -- []`, i.e. walk-empty exactly, and `suc k` is mintNode + installNode +
   -- recurse + push, with INV?-install (below, PROVEN) for the install.
   -- Still needs take-f's own push face, per the family note.
+  --
+  -- ⚠ CLASS: FALSITY on the `suc k` CLAUSE (2026-08-20); the `zero` clause
+  -- alone is GRINDABLE, being walk-empty exactly.  "EASIEST of the three
+  -- chain frames" is defensible on the HOP axis only — it is true that
+  -- `hopDᵉ (takeᵉ c e) = hopDᵉ e` and that no emit lemma is owed — but
+  -- that does not touch either thing that decides the class: the `suc k`
+  -- clause recurses and pushes, so it reaches `hasDry`/`regsLen?` through
+  -- the same ledger as walk-map at the same nine conjuncts, and take-f's
+  -- own push face still has to be authored.  A cheap axis is not a cheap
+  -- row.
   walk-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
     WalkStmt {e = e} (takeᵉ cnt b)
@@ -1096,19 +1159,30 @@ postulate
   walk-scan-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmt⁻ᴴ {e = e} (scanᵉ f z b)
-  -- THE SOURCE HALF OF THE SCAN HOP RECEIPT — GRINDABLE.  Everything the
-  -- scan clause used to owe on this axis has moved: `walk-scan-hop-spn`
-  -- below is a REAL BODY (subscribe, then push), `walk-scan-source` above
-  -- it is a REAL BODY (lift both conjuncts from headline to hereditary),
-  -- and the fold itself is PROVEN in `.Hop-Spine-Push`.  What is left
-  -- here is a frame condition and a receipt this family already produces
-  -- everywhere else — see WalkTailᴴˢᶠ's own header for the two conjuncts.
+  -- THE SOURCE HALF OF THE SCAN HOP RECEIPT — DIFFICULTY (reclassified
+  -- 2026-08-20; it read GRINDABLE, and both reasons given for that have
+  -- since evaporated).  Everything the scan clause used to owe on this
+  -- axis has moved: `walk-scan-hop-spn` below is a REAL BODY (subscribe,
+  -- then push), `walk-scan-source` above it is a REAL BODY, and the fold
+  -- itself is PROVEN in `.Hop-Spine-Push`.
   --
-  -- The row's remaining RISK is not here.  It is `applyFn-hopSpn`
-  -- (.Hop-Spine-Face), the per-step substitution, and that postulate's
-  -- header carries the whole research record — the refutation that killed
-  -- the size measure, the spine repair, the hereditary decision, the
-  -- probe series, and every dead route.
+  -- ⚠ THE HOP RISK IS GONE, WHICH IS NOT AS GOOD AS IT SOUNDS.  This
+  -- header used to say the row's remaining risk was `applyFn-hopSpn`
+  -- "and that postulate's header carries the whole research record".
+  -- `applyFn-hopSpn` IS NOW A REAL BODY (.Hop-Spine-Step) and no
+  -- postulate remains anywhere in that family, so the pointer was
+  -- dangling — a lying comment about a header that no longer exists.
+  -- Corrected here rather than left, because a stale risk note misleads
+  -- in BOTH directions: it aimed attention at a discharged row while the
+  -- row's real obstacle sat unnamed in the other conjunct.
+  --
+  -- THAT OBSTACLE is the node-table frame condition, and it is written
+  -- out at WalkTailᴴˢᶠ's own header above: it needs a whole-of-subscribeE
+  -- fresh-node induction the repo does not have, whose weaker form
+  -- (`scan-nodeP`) is itself an open postulate.  Not FALSITY — this
+  -- row's type carries none of the ruled-FALSITY conjuncts, and the
+  -- informal argument is convincing — but there is no proven twin and no
+  -- mechanical route, which is DIFFICULTY by definition.
   walk-scan-source-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) → WalkStmtᴴˢᶠ {e = e} f z b
@@ -2827,6 +2901,40 @@ postulate
     pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
     INV? Ψ (Caps.cSize (frameStep (j + j′) c)) sched (register src κ st) ≡ true
 
+  -- ⚠ CLASS: SHAPE (2026-08-20).  DO NOT GRIND — RESTATE.  The telescope
+  -- is MISSING A FRESHNESS HYPOTHESIS, and without it two of this row's
+  -- OWN named ingredients do not apply:
+  --
+  --     memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false
+  --
+  -- `share-step` (.Caps-Nest) and `unconn-insert` (.Measures) each take
+  -- that equation as a premise, and neither is optional apparatus — they
+  -- are the two the inventory below names for the nest descent.  The
+  -- reason it cannot be worked around is in `resid`: `residAt sl cs i`
+  -- is `if memberSource (toℕ i) cs then 0 else syncSizeᵉ d`, so an
+  -- ALREADY-CONNECTED slot donates ZERO, and `nest d sl (i ∷ cs) ≤
+  -- bud-1` is then unreachable from `nest (inputᶜ i) sl cs ≤ bud`.  The
+  -- gas descent fails through the same gate: `dBound-connect` needs
+  -- `U′ < U` strictly to pay for the two resets, and on a connected
+  -- share `U′ ≡ U`, so `suc G′ ≤ G` does not hold and the one recursive
+  -- `wl` call cannot be funded.
+  --
+  -- FALSITY IS SUSPECTED, NOT ESTABLISHED, and the suspected conjunct is
+  -- `hasDry`: `sharedConnect` does NOT re-check membership — the guard
+  -- lives one level up in `subscribeSharedSlot` — and it splices
+  -- `sharedPlumb burst` into its output, where `sharedPlumb` only rewrites
+  -- `kind` to `plumbing` and so PRESERVES a `close _ dried`.  Confirming
+  -- that needs the evaluator's actual fuel consumption on an under-funded
+  -- inner subscribe, which reading alone cannot settle.
+  --
+  -- THE REPAIR IS AVAILABLE AND CHEAP AT THE CALL SITE.  The consumer
+  -- below scrutinises `memberSource (toℕ i) (EvalSt.connectedShares st)`
+  -- with a bare `with`, which DISCARDS the equation; adding `in` recovers
+  -- it, exactly as this file already does for the slot scrutinee.  The
+  -- PROVEN twin avoids needing freshness at all by stating `nest` in its
+  -- post-insert form (`nest d sl (toℕ i ∷ …) ≤ bud`) — either shape works,
+  -- and the twin's is the one already known to close.
+  --
   -- ARM C — THE CONNECT, cut at `sharedConnect` because that is where the
   -- PROVEN caps twin cuts.  `sharedConnect-caps` (.Subscribe-Face) is a
   -- lemma of its own, separate from `sharedSlot-caps`'s dispatch, and the
@@ -2890,9 +2998,11 @@ postulate
   --        suc pathLen ≤ B /   true` (.Caps-Face/Part1) and `pathLen
   --        pathLen + G′ ≤ ℓ    (share-sink i) = 0` collapse all four
   --
-  --      ⚠ slotHop-cap IS A REAL DEPENDENCY AND IT IS WHY BOTH ROWS ARE
-  --      TIER 0: it is a real body resting on the leaf `hopD-relᵉ`, so
-  --      this arm cannot close before that one does.  The gas peel then
+  --      slotHop-cap IS NO LONGER A BLOCKER (2026-08-20): its last leaf
+  --      `hopD-relᵉ` is a real mutual body in .Measures, which holds no
+  --      postulate at all now, so this arm is not waiting on it.  The
+  --      note that stood here said the opposite and was the reason this
+  --      row was ordered first.  The gas peel then
   --      follows the μ clause's pattern — `suc G′ ≤ G` out of
   --      dBound-connect is what lets `gas : g hasAtLeast suc G` fund
   --      `fuel′ hasAtLeast suc G′` — and `sharedConnect g0 = dryBurst id`

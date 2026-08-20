@@ -91,20 +91,20 @@ verification ("derived by reading the evaluator and the measures, NOT by
 typechecking — treat each named ingredient as located, not spent"), so every
 row governed by it inherits that caveat.
 
-- **`sharedConnect-walk`** (Walk-Level) — GRINDABLE, large: the CONNECTING arm,
-  all that is left of `input-wet-shared` now that the dispatch is a real
-  three-arm body and arms A and B are closed. Cut where the PROVEN twin
-  `sharedConnect-caps` cuts. No induction to design — one recursive call, at
-  the fuel `wl` is already indexed at — and its header carries a per-hypothesis
-  inventory naming a PROVEN source for every one of the discharge's
-  obligations, with nothing left to decide. Blocks only on `slotHop-cap`, hence
-  on **`hopD-relᵉ`**. What is genuinely new is the transport, and the header
-  splits it per conjunct.
+- **`sharedConnect-walk`** (Walk-Level) — SHAPE, so restate rather than grind:
+  the telescope is missing `memberSource (toℕ i) (connectedShares st) ≡ false`,
+  without which its own named ingredients `share-step` and `unconn-insert` do
+  not apply and `dBound-connect`'s descent cannot fund the recursive call.
+  FALSITY suspected on `hasDry` (sharedConnect does not re-check membership and
+  `sharedPlumb` preserves a dried close) — unconfirmed. The repair is at the
+  consumer's bare `with`, which discards the equation that `in` would keep. No
+  longer blocked on `slotHop-cap`/`hopD-relᵉ`.
 - **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
   the one conjunct of arm B not closed by computation. Its header carries the
   refutation that fixed its shape (false at `j′ = 0` without the caps receipt)
   and names a proven source per conjunct. `input-wet-scripted-four`'s shape B
-  spends the same lemma.
+  spends the same lemma. AUDITED 2026-08-20: label holds, every ingredient
+  proven and in scope.
 - **`input-wet-scripted-four`** (Walk-Level) — GRINDABLE: takes NO walk face, so
   nothing recurses and no induction has to be designed. Its header carries a
   full census — four slot shapes × the wet four against the PROVEN
@@ -114,38 +114,40 @@ row governed by it inherits that caveat.
   Two chores, neither structural — `subscribeE-input-caps` is missing from the
   Subscribe-Face `using` list, and eight conjuncts routed "by computation" are
   not yet typechecked.
-- **`walk-scan-source-frame`** (Walk-Level) — GRINDABLE: the scan clause's frame
-  condition. Two conjuncts, both shapes this family already produces — the
-  source's ordinary `burstHopD?` receipt, and that the freshly minted scan node
-  still holds `evalTm z` after the source is subscribed. The caps face proves the
-  node-table frame condition in the same position for its own predicates.
+- **`walk-scan-source-frame`** (Walk-Level) — DIFFICULTY: its `burstHopD?`
+  conjunct is ordinary, but the node-table conjunct needs a whole-of-subscribeE
+  fresh-node induction the repo does not have — the weaker `scan-nodeP` is
+  itself open, and its header records the search that came back empty. The
+  claim that the caps face proves this "in the same position" is wrong in kind:
+  `capsOK?` bounds all nodes and identifies none.
 - **`walk-scan-rest`** (Walk-Level) — FALSITY, per its own block header, which
   rules `Class stays FALSITY` for `hasDry` and `regsLen?` — two of the eight
   conjuncts this row must prove. Its proven twin covers only the caps half it
   does not owe; the wet half's twin is the open `walk-map`. Additionally needs a
   `scan-f` wet push face that does not exist and whose frame-generic form is
   REFUTED.
-- **`hopD-relᵉ`** (Measures) — GRINDABLE: the ONLY remaining leaf of
-  `slotHop-cap`, whose telescope half (`slotHop-sup`, `ηAt-bound`) is now
-  PROVEN off it. hopDᵉ is LINEAR in η, so this is the PROVEN `hopD-sizeᵉ`
-  with its η premise replaced by a multiplicative factor — same clauses,
-  same arithmetic lemmas (`szB-mono`/`-suc`/`-sq`/`-scan`) unchanged, and
-  the η-free `pm-size*` family reused verbatim. `1 ≤ N` is load-bearing and
-  is what pays for `suc` in the four `*Allᵉ` clauses.
-- **`walk-{of,empty,take,map,defer}`** (Walk-Level) — GRINDABLE, in that
-  order. The family census in their shared header reads every output index
-  off hopDᵉ rather than choosing one, against the PROVEN clause-for-clause
-  twin `subscribeE-caps`. `walk-empty` has no residue at all; `walk-of` owes
-  only a wet twin of PROVEN `evalTms-caps`; `take` is the identity on the
-  hop ledger. `map` and `take` additionally need their own push face — a frame-generic one is
-  REFUTED, per the DEAD ROUTE their header points at. `defer` is now the leaf
-  `walk-defer-eight` at `WalkStmt⁻`, its regsLen? conjunct already proven.
+- **`walk-defer-eight` / `walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in
+  that order, and audited 2026-08-20. None recurses or pushes, so none needs a
+  push face and none reaches the ledger conjuncts. `walk-defer-eight` is the
+  best-supported row in the tier — a real consumer (`walk-defer`) already exists,
+  so its fit gets typechecked rather than asserted. `walk-empty`'s residue is
+  four definitional transports, not none. `walk-of`'s residue is smaller than
+  its header claims.
+- **`walk-map` / `walk-take`** (Walk-Level) — FALSITY, reclassified for internal
+  consistency with `walk-scan-rest`: both sit at `WalkStmt`, whose nine
+  conjuncts are a superset of that row's eight, reach `hasDry`/`regsLen?`
+  through the same ledger, and need an equally non-existent per-frame push face.
+  `walk-take`'s `zero` clause alone is GRINDABLE.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: the placement that
   blocked it is resolved (`regsB?-of-parts` now lives beside the Ψ predicates it
   consumes), so all six conjuncts have a named source in scope. Header carries
   the per-conjunct inventory.
-- **`subscribeE-inner-nodry-{pBO,depth}`** (Burst-Walk) — GRINDABLE.
-  Path-extension and depth-mirror plumbing for the inner call.
+- **`subscribeE-inner-nodry-pBO`** (Burst-Walk) — GRINDABLE, three lines:
+  `frameB?` on `from-inner` is `refl`, and the relocated `pathB?-of-parts`
+  recombines PbB's two halves.
+- **`subscribeE-inner-nodry-depth`** (Burst-Walk) — DELETE, not grind: a
+  tautology. Its conclusion is its hypothesis δ-unfolded through `depthInner`'s
+  `gs` clause; the inhabitant is `hD`, which the call site already holds.
 - **`concatDrain-nodry-vb` / `-nestBud` / `-dep` / `-cl` / `-loop` / `-nestRec`**
   (Burst-Walk) — GRINDABLE. Per-element context for concat's drain: each
   re-establishes one hypothesis of `subscribeInner-nodry` after the previous
