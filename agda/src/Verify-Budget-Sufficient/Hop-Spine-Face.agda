@@ -25,18 +25,21 @@ open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤�
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive;
                                        ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤;
                                        ⊔-lub; m≤m⊔n; m≤n⊔m; n≤1+n;
-                                       m≤m+n; *-identityˡ; +-identityʳ)
+                                       m≤m+n; *-identityˡ; +-identityʳ;
+                                       +-monoʳ-≤)
 open import Data.List using (List; []; _∷_)
 open import Data.Fin  using (Fin)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim  using (InstEmit; InstEvent; init; value; close;
                             handoff; complete)
 open import Data.Unit using (tt)
-open import Data.List.Relation.Unary.All renaming ([] to []ᵃ) using ()
+open import Data.Sum using () renaming (inj₁ to inl; inj₂ to inr)
+open import Data.List.Relation.Unary.All renaming ([] to []ᵃ; _∷_ to _∷ᵃ_) using ()
 open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; applyFn; evalTm; sizeᵛ;
+                            fstᵗ; sndᵗ;
                             unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ)
 open import Rx.Hop-Spine using (spnᵉ; spnᵛ; spn≤sizeᵛ)
@@ -44,7 +47,7 @@ open import Rx.Evaluator using (Stream; scanVals)
 open import Verify-Budget-Sufficient.Measures using
   (burstB?; burstHopD?; valB?; eventB?; hopDev?; all-impl;
    ∧-true; ∧-intro; T⇒≡true; T-to; all-zip; 1≤2^;
-   hopD-evalWith; sumW)
+   hopD-evalWith; sumW; EnvHopDs)
 
 -- the same event walk as hopDev?, with the bound read off the VALUE
 hopSpnev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → (Fin n → ℕ) → ℕ → ℕ →
@@ -752,14 +755,159 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- asks `1 + 2^s ≤ 2^(suc s)` — the same split, the same failing arm.
 -- It is "comfortably true" only AFTER the size-preserving step is
 -- discharged, so it buys no separate route.
+-- THE LINEAR HEADLINE, and it is `hopD-evalWith` (.Measures, PROVEN) at a
+-- ONE-ELEMENT environment, where `sumW` collapses to a single product.
+-- Read it as: applying a fn costs the fn's own hop plus its plug
+-- multiplier times whatever it was handed.
+applyFn-hopD-lin : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ)
+  (fn : Fn Γ [] [] [] s u) (x : Val Γ s) →
+  hopDᵛ V η u (applyFn fn x) ≤ hopDᵗ V η fn + pmᵗ V 0 fn * hopDᵛ V η s x
+applyFn-hopD-lin {s = s} V η fn x =
+  ≤-trans (hopD-evalWith V η (λ _ → hopDᵛ V η s x) fn (x ∷ᵃ []ᵃ) (≤-refl , tt))
+          (+-monoʳ-≤ (hopDᵗ V η fn)
+            (≤-reflexive (+-identityʳ (pmᵗ V 0 fn * hopDᵛ V η s x))))
+
 postulate
-  applyFn-hopSpn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (v : Val Γ s) →
+  -- THE ONE REAL GAP — the `obs` leaf at a PLUGGING fn.  Everything else in
+  -- this family is type-directed bookkeeping; this is the drag, and the
+  -- research record above is about exactly this statement.  `1 ≤ pmᵗ V 0 fn`
+  -- is not a weakening: the zero case is DISCHARGED below by
+  -- `applyFn-hopD-lin`, which is why the hypothesis can be assumed here.
+  --
+  -- ⚠ THE INDUCTION'S SHAPE IS A LIVE DESIGN QUESTION (2026-08-19), and
+  -- this is a CORRECTION to the GRINDABLE demotion recorded above: that
+  -- demotion was earned on the DRAG being true, which the evidence there
+  -- does support, and it silently assumed the induction could be STATED.
+  -- Stating it is the open problem.  The row's own statement is fine; what
+  -- is unsettled is the generalised lemma its body must induct with.
+  --
+  -- THE INDUCTION IS OVER THE TERM, not the type.  The type-directed front
+  -- end below handles pairs and grounds, but `obs` is reached by `varᵗ`,
+  -- `fstᵗ`, `sndᵗ`, `caseᵗ`, `ifᵗ` and `strmᵗ`, and the projections need
+  -- the HEREDITARY receipt at the projected term's own type — so the
+  -- recursion must shrink the TERM, with the type as an index.  Thirteen
+  -- clauses; `strmᵗ` is the only one with content, and it is
+  -- `hopD-subΘᵉ` (.Measures, PROVEN) plus one measure-theoretic lemma:
+  --
+  --     1 + Σⱼ pmᵉ V j e * (2 + P) ^ spnᵛ σⱼ  ≤  (2 + P) ^ spnᵉ (subΘExp Θloc σ e)
+  --
+  -- which is where the drag lives, stated with no hopD and no B in it.
+  -- Its `mapᵉ` clause closes EXACTLY — the node's own `suc` in `spnᵉ`
+  -- pays for the two summands and nothing is left over — and the local
+  -- multiplier `pmᵗ V 0 f` it needs is bounded by the node's own `pmᵉ`
+  -- whenever the source is env-dependent, and multiplied by zero when it
+  -- is not.  So that lemma's hypotheses are available.
+  --
+  -- THE TENSION IS AT `caseᵗ`, AND IT IS A TENSION BETWEEN TWO CLAUSES OF
+  -- THE SAME LEMMA — which is why neither obvious formulation works:
+  --
+  --   · A UNIFORM `∀ j → pmᵗ V j tm ≤ P` dies at `caseᵗ`.  The branch is
+  --     evaluated under an extended env, so it needs `pmᵗ V 0 l ≤ P`, and
+  --     a CLOSED scrutinee makes `pmᵗ V k (caseᵗ s l r)`'s only occurrence
+  --     of `pmᵗ V 0 l` vanish (it sits in a product with `pmᵗ V k s`).
+  --
+  --   · A PER-VARIABLE `Bs : ℕ → ℕ` in place of the single `B` fixes
+  --     `caseᵗ` exactly, and the check is termwise: the branch's derived
+  --     bound `hopDᵗ l + pmᵗ V 0 l * (hopDᵗ s + Σⱼ pmᵗ V j s * Bs j) +
+  --     Σⱼ pmᵗ V (1+j) l * Bs j` is dominated summand by summand by the
+  --     parent's, because `hopDᵗ l ≤ hopDᵗ l ⊔ hopDᵗ r` and `pmᵗ V 0 l ≤
+  --     pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1`.  But the DERIVED bound is not `B`:
+  --     at the fold's own shape it comes out `hopDᵗ f + pmᵗ V 0 f * Bs 0`,
+  --     and the fold needs the conclusion back at `B` or the invariant
+  --     does not compose across steps.
+  --
+  -- WHERE THE RESOLUTION LOOKS TO BE, so the next attempt starts here
+  -- rather than re-deriving it: keep the per-variable `Bs` (it is what
+  -- makes `caseᵗ` free) and let the DRAG convert the derived bound back
+  -- to `B`.  At the fold, `Bs 0` is the argument's own receipt
+  -- `(2 + P) ^ spnᵛ (ac , v) * B`, the derived bound is
+  -- `B + P * (2 + P) ^ spnᵛ (ac , v) * B`, and one extra spine node on
+  -- the RESULT absorbs it — `(2 + P) ^ (1 + spn) ≥ 1 + P * (2 + P) ^ spn`.
+  -- At `caseᵗ` no drag is needed at all, because there `Bs 0` is the
+  -- scrutinee's own `hopDᵗ s`, which the parent's `hopDᵗ` already pays
+  -- for.  So the two clauses want the SAME apparatus for different
+  -- reasons, which is the encouraging sign; what has not been done is
+  -- writing the indices down and checking them.
+  --
+  -- DO NOT grind clauses before that statement typechecks.  The whole
+  -- point of the outside-in rule is that a wrong assembly amended in
+  -- place is cheap and proven pieces hanging off one are not.
+  applyFn-hopSpn-obs : ∀ {n} {Γ : Ctx n} {s w} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+    (fn : Fn Γ [] [] [] s (obs w)) (x : Val Γ s) →
+    1 ≤ pmᵗ V 0 fn →
     pmᵗ V 0 fn ≤ P →
     hopDᵗ V η fn ≤ B →
-    valHopSpn? V η P B u ac ≡ true →
-    valHopSpn? V η P B s v ≡ true →
-    valHopSpn? V η P B u (applyFn fn (ac , v)) ≡ true
+    valHopSpn? V η P B s x ≡ true →
+    hopDᵉ V η (applyFn fn x) ≤ (2 + P) ^ spnᵉ (applyFn fn x) * B
+
+  -- THE SUM ARM.  `Tm` has no eliminator taking a sum to its PAYLOAD's
+  -- type, so unlike `fstᵗ`/`sndᵗ` below there is no projection to push the
+  -- induction through, and the payload's receipt is a leaf.  ROUTE, and it
+  -- needs no new mathematics: every Ty is inhabited, so
+  -- `caseᵗ fn (varᵗ here) <default>` IS that eliminator — its `hopDᵗ` is
+  -- `fn`'s and its `pmᵗ V 0` is `fn`'s, both by computation, once the
+  -- default is built from `unit̂`/`nat̂`/`strmᵗ emptyᵉ` so that its own hop
+  -- and slope are zero.
+  applyFn-hopSpn-inj : ∀ {n} {Γ : Ctx n} {s a b} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+    (fn : Fn Γ [] [] [] s (a +ᵗ b)) (x : Val Γ s) →
+    pmᵗ V 0 fn ≤ P →
+    hopDᵗ V η fn ≤ B →
+    valHopSpn? V η P B s x ≡ true →
+    valHopSpn? V η P B (a +ᵗ b) (applyFn fn x) ≡ true
+
+------------------------------------------------------------------
+-- THE STEP, BY INDUCTION ON THE RESULT TYPE.
+--
+-- The hereditary predicate follows the result's type, so the induction
+-- does too — and `Tm`'s eliminators line up with it exactly.  At a pair
+-- the two components ARE `applyFn (fstᵗ fn)` and `applyFn (sndᵗ fn)`
+-- (evalWith's own clauses), and BOTH side conditions survive by
+-- COMPUTATION: `hopDᵗ (fstᵗ fn) = hopDᵗ fn` and `pmᵗ V 0 (fstᵗ fn) =
+-- pmᵗ V 0 fn`.  So the pair arm costs nothing at all, which is what makes
+-- this the right induction.
+--
+-- At `obs` the zero-slope case is FREE, and that is `hopD-evalWith`'s
+-- tight form paying off exactly as the header predicted: a fn that does
+-- not plug its argument cannot exceed its own hop, which is under B.
+------------------------------------------------------------------
+
+applyFn-hopSpn-gen : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (u : Ty) (fn : Fn Γ [] [] [] s u) (x : Val Γ s) →
+  pmᵗ V 0 fn ≤ P →
+  hopDᵗ V η fn ≤ B →
+  valHopSpn? V η P B s x ≡ true →
+  valHopSpn? V η P B u (applyFn fn x) ≡ true
+applyFn-hopSpn-gen V η P B unitᵗ fn x hP hB hx = refl
+applyFn-hopSpn-gen V η P B boolᵗ fn x hP hB hx = refl
+applyFn-hopSpn-gen V η P B natᵗ  fn x hP hB hx = refl
+applyFn-hopSpn-gen V η P B (a ×ᵗ b) fn x hP hB hx =
+  ∧-intro (applyFn-hopSpn-gen V η P B a (fstᵗ fn) x hP hB hx)
+          (applyFn-hopSpn-gen V η P B b (sndᵗ fn) x hP hB hx)
+applyFn-hopSpn-gen V η P B (a +ᵗ b) fn x hP hB hx =
+  applyFn-hopSpn-inj V η P B fn x hP hB hx
+applyFn-hopSpn-gen {s = s} V η P B (obs w) fn x hP hB hx with pmᵗ V 0 fn in pq
+... | suc k  = T⇒≡true _ (≤⇒≤ᵇ (applyFn-hopSpn-obs V η P B fn x
+                 (subst (1 ≤_) (sym pq) (s≤s z≤n))
+                 (subst (_≤ P) (sym pq) hP) hB hx))
+... | zero   = T⇒≡true _ (≤⇒≤ᵇ
+                 (≤-trans lin (≤-trans hB (B≤powB P B (spnᵉ (applyFn fn x))))))
+  where
+  lin : hopDᵉ V η (applyFn fn x) ≤ hopDᵗ V η fn
+  lin = ≤-trans (applyFn-hopD-lin V η fn x)
+        (≤-trans (≤-reflexive
+                   (cong (λ z → hopDᵗ V η fn + z * hopDᵛ V η s x) pq))
+                 (≤-reflexive (+-identityʳ (hopDᵗ V η fn))))
+
+-- and the scan fold's own shape: the argument is the pair the fold hands in
+applyFn-hopSpn : ∀ {n} {Γ : Ctx n} {s u} (V : ℕ) (η : Fin n → ℕ) (P B : ℕ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (v : Val Γ s) →
+  pmᵗ V 0 fn ≤ P →
+  hopDᵗ V η fn ≤ B →
+  valHopSpn? V η P B u ac ≡ true →
+  valHopSpn? V η P B s v ≡ true →
+  valHopSpn? V η P B u (applyFn fn (ac , v)) ≡ true
+applyFn-hopSpn V η P B fn ac v hP hB hac hv =
+  applyFn-hopSpn-gen V η P B _ fn (ac , v) hP hB (∧-intro hac hv)
 
 ------------------------------------------------------------------
 -- THE FOLD.  Mechanical over the list, exactly `scanVals-ofW`'s shape

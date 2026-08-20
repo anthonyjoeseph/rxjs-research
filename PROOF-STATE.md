@@ -78,13 +78,11 @@ conjuncts, so no amount of caps work retires tier 0.
 Work top to bottom. Every full route, receipt, and ruling lives in the
 named postulate's own header.
 
-EVERY ROW IN THIS TIER IS GRINDABLE. There is no DIFFICULTY row left here,
-so nothing in it is reserved for the design session and no row blocks on a
-design decision — every one of them is available to its siblings as a
-postulate, and they can be ground in parallel by workers. Top-to-bottom is
-the order attention is OWED, not a bar on running the bottom concurrently.
-Size, not risk, is what now separates them: `sharedConnect-walk` and
-`applyFn-hopSpn` are the two large ones.
+ONE DIFFICULTY row (`applyFn-hopSpn-obs`) heads the tier and is the design
+session's own work; everything below it is GRINDABLE and does NOT block on
+it — every row in a tier is available to its siblings as a postulate, so the
+mechanical ones can be ground in parallel by workers. Top-to-bottom is the
+order attention is OWED, not a bar on running the bottom concurrently.
 
 - **`sharedConnect-walk`** (Walk-Level) — GRINDABLE, large: the CONNECTING arm,
   all that is left of `input-wet-shared` now that the dispatch is a real
@@ -107,19 +105,25 @@ Size, not risk, is what now separates them: `sharedConnect-walk` and
   for every conjunct. The wet fifth is off it: `input-wet-scripted` is now a
   real body pairing this leaf with PROVEN `input-wet-scripted-regs`. The routes
   marked "by computation" are read off the evaluator, not yet typechecked.
-- **`applyFn-hopSpn`** (Hop-Spine-Face) — GRINDABLE, large: the per-step
-  substitution for scan's fold, `valHopSpn?` preserved by `applyFn`. Everything
-  around it is a REAL BODY — the fold, the burst walk, the scan clause and both
-  headline-to-hereditary lifts — so the whole scan hop receipt reduces to this
-  plus a frame condition. Demoted from DIFFICULTY on three things its header
-  sets out: every `spnᵗ`/`spnᵉ` clause is `suc (…)` and none drops a subterm, so
-  the spine propagates by construction; both adversarial shapes now carry
-  machine receipts (`Refuted.Hop-Drag`'s 4 ↦ 7 ↦ 10 ↦ 13 across the caseᵗ step
-  that drops `sizeᵛ` 36 ↦ 9, and Demand-Probe series Ω′'s pins of the claim
-  itself at the amplifying step); and `hopD-evalWith` is the same induction over
-  the same syntax with the same env apparatus, whose `EnvHopDs`/`sumW` shape is
-  also the answer to the `caseᵗ` question. The header names what the evidence
-  did NOT reach and what would reopen it.
+- **`applyFn-hopSpn-obs`** (Hop-Spine-Face) — DIFFICULTY, and the only one in
+  this tier. `applyFn-hopSpn` itself is now a REAL BODY by induction on the
+  result type, so pairs and grounds cost nothing and the zero-slope `obs` case
+  is discharged outright off `applyFn-hopD-lin`. This is what is left: the
+  `obs` leaf at a PLUGGING fn, i.e. the drag. The DRAG'S TRUTH is well
+  evidenced (see the row's header and Demand-Probe series Ω′); what is open is
+  the SHAPE of the generalised lemma the body must induct with, and the header
+  sets out the tension in full — a uniform `pmᵗ V j tm ≤ P` dies at `caseᵗ`
+  with a closed scrutinee, a per-variable `Bs` fixes `caseᵗ` termwise but no
+  longer returns the conclusion at `B`, and the resolution looks to be keeping
+  `Bs` and letting the drag convert. Nobody has written the indices down. Do
+  NOT grind clauses before that statement typechecks.
+- **`applyFn-hopSpn-inj`** (Hop-Spine-Face) — GRINDABLE: the sum arm of the
+  same induction. `Tm` has no eliminator taking a sum to its payload's type,
+  so there is no projection to push the induction through — but every Ty is
+  inhabited, so `caseᵗ fn (varᵗ here) <default>` IS that eliminator, and its
+  `hopDᵗ` and `pmᵗ V 0` are `fn`'s by computation once the default is built
+  from `unit̂`/`nat̂`/`strmᵗ emptyᵉ`. No new mathematics; the route is in the
+  header.
 - **`walk-scan-source-frame`** (Walk-Level) — GRINDABLE: the scan clause's frame
   condition. Two conjuncts, both shapes this family already produces — the
   source's ordinary `burstHopD?` receipt, and that the freshly minted scan node
