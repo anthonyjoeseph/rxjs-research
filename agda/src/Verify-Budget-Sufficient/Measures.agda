@@ -1651,30 +1651,183 @@ slotDef-size sl i {d} eq =
 -- this.  And it is a clean instance of the near-degenerate trap — the
 -- route is not merely true-at-depth-1, it is EXACTLY TIGHT there, which
 -- is the most convincing way for a refutable premise to look proven.
-postulate
-  -- LEAF 1 — ROUTE A′, the relative induction.  hopDᵉ is LINEAR in η:
-  -- every clause either takes ⊔/+ of its children's hopD or multiplies
-  -- one by a pm coefficient, and pm carries no η at all, so a common
-  -- factor N bounding `η i` pulls straight out.  Hence the
-  -- PROVEN `hopD-sizeᵉ` generalises by replacing its η premise with a
-  -- multiplicative N, and every arithmetic lemma that proof spends —
-  -- szB-mono, szB-suc, szB-sq, szB-scan — is reused UNCHANGED, because
-  -- N factors through each of them linearly.  That correspondence is
-  -- clause-for-clause, which is what makes this leaf GRINDABLE.
-  --
-  -- Multiplicative is the whole point: it is what lets the telescope's
-  -- accumulated environment splice in as a FACTOR (below), where an
-  -- additive bound would not compose.
-  --
-  -- ⚠ `1 ≤ N` IS LOAD-BEARING AND IS NOT A CALL-SITE CONVENIENCE.  At
-  -- N = 0 the conclusion reads `hopDᵉ … ≤ 0`, which `mergeAllᵉ`'s
-  -- `suc (hopDᵉ e)` clause falsifies outright — and N = 0 is reachable,
-  -- because at `n = 0` the η premise quantifies over no index and
-  -- constrains nothing.  The same `1 ≤ N` is what pays for `suc` in all
-  -- four *Allᵉ clauses (`suc (X * N) ≤ suc X * N`).
-  hopD-relᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
-    (e : Exp Γ Δᵍ Δ Θ t) (N : ℕ) → 2 ≤ V → 1 ≤ N → (∀ i → η i ≤ N) →
-    hopDᵉ V η e ≤ szB V (sizeᵉ e) * N
+-- LEAF 1 — ROUTE A′, the relative induction.  hopDᵉ is LINEAR in η:
+-- every clause either takes ⊔/+ of its children's hopD or multiplies
+-- one by a pm coefficient, and pm carries no η at all, so a common
+-- factor N bounding `η i` pulls straight out.  Hence the
+-- PROVEN `hopD-sizeᵉ` generalises by replacing its η premise with a
+-- multiplicative N, and every arithmetic lemma that proof spends —
+-- szB-mono, szB-suc, szB-sq, szB-scan — is reused UNCHANGED, because
+-- N factors through each of them linearly.  That correspondence is
+-- clause-for-clause, which is what makes this leaf GRINDABLE.
+--
+-- Multiplicative is the whole point: it is what lets the telescope's
+-- accumulated environment splice in as a FACTOR (below), where an
+-- additive bound would not compose.
+--
+-- ⚠ `1 ≤ N` IS LOAD-BEARING AND IS NOT A CALL-SITE CONVENIENCE.  At
+-- N = 0 the conclusion reads `hopDᵉ … ≤ 0`, which `mergeAllᵉ`'s
+-- `suc (hopDᵉ e)` clause falsifies outright — and N = 0 is reachable,
+-- because at `n = 0` the η premise quantifies over no index and
+-- constrains nothing.  The same `1 ≤ N` is what pays for `suc` in all
+-- four *Allᵉ clauses (`suc (X * N) ≤ suc X * N`).
+hopD-relᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+  (e : Exp Γ Δᵍ Δ Θ t) (N : ℕ) → 2 ≤ V → 1 ≤ N → (∀ i → η i ≤ N) →
+  hopDᵉ V η e ≤ szB V (sizeᵉ e) * N
+hopD-relᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+  (tm : Tm Γ Δᵍ Δ Θ t) (N : ℕ) → 2 ≤ V → 1 ≤ N → (∀ i → η i ≤ N) →
+  hopDᵗ V η tm ≤ szB V (sizeᵗ tm) * N
+hopD-relᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
+  (ts : List (Tm Γ Δᵍ Δ Θ t)) (N : ℕ) → 2 ≤ V → 1 ≤ N → (∀ i → η i ≤ N) →
+  hopDᵗˢ V η ts ≤ szB V (sizeᵗˢ ts) * N
+hopD-relᵉ V η (input i) N hV hN hη =
+  ≤-trans (hη i) (≤-trans (≤-reflexive (sym (*-identityˡ N)))
+                           (*-monoˡ-≤ N (1≤szB V 1)))
+hopD-relᵉ V η (ofᵉ ts) N hV hN hη =
+  ≤-trans (hopD-relᵗˢ V η ts N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵗˢ ts))))
+hopD-relᵉ V η emptyᵉ N hV hN hη = z≤n
+hopD-relᵉ V η (mapᵉ f e) N hV hN hη =
+  ≤-trans
+    (+-mono-≤
+       (≤-trans (hopD-relᵗ V η f N hV hN hη)
+                (*-monoˡ-≤ N (szB-mono V (m≤m+n (sizeᵗ f) (sizeᵉ e)))))
+       (*-mono-≤
+          (⊔-lub (≤-trans (pm-sizeᵗ V 0 f hV)
+                          (szB-mono V (m≤m+n _ _)))
+                 (1≤szB V _))
+          (≤-trans (hopD-relᵉ V η e N hV hN hη)
+                   (*-monoˡ-≤ N (szB-mono V (m≤n+m (sizeᵉ e) (sizeᵗ f)))))))
+    (≤-trans
+       (≤-reflexive
+          (trans (cong (szB V p * N +_) (sym (*-assoc (szB V p) (szB V p) N)))
+                 (sym (*-distribʳ-+ N (szB V p) (szB V p * szB V p)))))
+       (*-monoˡ-≤ N (szB-sq V p hV
+                            (≤-trans (sizeᵗ-pos f) (m≤m+n (sizeᵗ f) (sizeᵉ e))))))
+  where p = sizeᵗ f + sizeᵉ e
+hopD-relᵉ V η (takeᵉ c e) N hV hN hη =
+  ≤-trans (hopD-relᵉ V η e N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c))
+                                             (n≤1+n (sizeᵗ c + sizeᵉ e)))))
+hopD-relᵉ V η (scanᵉ f z e) N hV hN hη =
+  ≤-trans
+    (*-mono-≤
+       (^-monoˡ-≤ V (+-monoʳ-≤ 2 (pm-sizeᵗ V 0 f hV)))
+       (+-mono-≤
+          (+-mono-≤
+             (≤-trans (hopD-relᵗ V η f N hV hN hη)
+                      (*-monoˡ-≤ N (szB-mono V lef)))
+             (≤-trans (hopD-relᵗ V η z N hV hN hη)
+                      (*-monoˡ-≤ N (szB-mono V lez))))
+          (≤-trans (hopD-relᵉ V η e N hV hN hη)
+                   (*-monoˡ-≤ N (szB-mono V lee)))))
+    (≤-trans
+       (≤-reflexive
+          (trans
+             (cong ((2 + szB V (sizeᵗ f)) ^ V *_)
+                   (sym (trans (*-distribʳ-+ N (szB V p + szB V p) (szB V p))
+                               (cong (_+ szB V p * N)
+                                     (*-distribʳ-+ N (szB V p) (szB V p))))))
+             (sym (*-assoc ((2 + szB V (sizeᵗ f)) ^ V)
+                           (szB V p + szB V p + szB V p) N))))
+       (*-monoˡ-≤ N (szB-scan V (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) hV
+                                (sizeᵗ-pos f) (sizeᵗ-pos z) (sizeᵉ-pos e))))
+  where
+  p   = sizeᵗ f + sizeᵗ z + sizeᵉ e
+  lef = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) (m≤m+n _ (sizeᵉ e))
+  lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
+  lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
+hopD-relᵉ V η (mergeAllᵉ e) N hV hN hη =
+  ≤-trans (≤-trans (s≤s (hopD-relᵉ V η e N hV hN hη))
+                   (+-monoˡ-≤ (szB V (sizeᵉ e) * N) hN))
+          (*-monoˡ-≤ N (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e)))
+hopD-relᵉ V η (concatAllᵉ e) N hV hN hη =
+  ≤-trans (≤-trans (s≤s (hopD-relᵉ V η e N hV hN hη))
+                   (+-monoˡ-≤ (szB V (sizeᵉ e) * N) hN))
+          (*-monoˡ-≤ N (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e)))
+hopD-relᵉ V η (switchAllᵉ e) N hV hN hη =
+  ≤-trans (≤-trans (s≤s (hopD-relᵉ V η e N hV hN hη))
+                   (+-monoˡ-≤ (szB V (sizeᵉ e) * N) hN))
+          (*-monoˡ-≤ N (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e)))
+hopD-relᵉ V η (exhaustAllᵉ e) N hV hN hη =
+  ≤-trans (≤-trans (s≤s (hopD-relᵉ V η e N hV hN hη))
+                   (+-monoˡ-≤ (szB V (sizeᵉ e) * N) hN))
+          (*-monoˡ-≤ N (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e)))
+hopD-relᵉ V η (μᵉ e) N hV hN hη =
+  ≤-trans (hopD-relᵉ V η e N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵉ e))))
+hopD-relᵉ V η (varᵉ x) N hV hN hη = z≤n
+hopD-relᵉ V η (deferᵉ e) N hV hN hη = z≤n
+hopD-relᵗ V η (varᵗ x) N hV hN hη = z≤n
+hopD-relᵗ V η unit̂ N hV hN hη = z≤n
+hopD-relᵗ V η (bool̂ _) N hV hN hη = z≤n
+hopD-relᵗ V η (nat̂ _) N hV hN hη = z≤n
+hopD-relᵗ V η (pairᵗ a b) N hV hN hη =
+  ⊔-lub
+    (≤-trans (hopD-relᵗ V η a N hV hN hη)
+             (*-monoˡ-≤ N (szB-mono V (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b))
+                                                (n≤1+n (sizeᵗ a + sizeᵗ b))))))
+    (≤-trans (hopD-relᵗ V η b N hV hN hη)
+             (*-monoˡ-≤ N (szB-mono V (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a))
+                                                (n≤1+n (sizeᵗ a + sizeᵗ b))))))
+hopD-relᵗ V η (fstᵗ q) N hV hN hη =
+  ≤-trans (hopD-relᵗ V η q N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵗ q))))
+hopD-relᵗ V η (sndᵗ q) N hV hN hη =
+  ≤-trans (hopD-relᵗ V η q N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵗ q))))
+hopD-relᵗ V η (inlᵗ a) N hV hN hη =
+  ≤-trans (hopD-relᵗ V η a N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵗ a))))
+hopD-relᵗ V η (inrᵗ a) N hV hN hη =
+  ≤-trans (hopD-relᵗ V η a N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵗ a))))
+hopD-relᵗ V η (caseᵗ sc l r) N hV hN hη =
+  ≤-trans
+    (+-mono-≤
+       (⊔-lub
+          (≤-trans (hopD-relᵗ V η l N hV hN hη)
+                   (*-monoˡ-≤ N (szB-mono V cl)))
+          (≤-trans (hopD-relᵗ V η r N hV hN hη)
+                   (*-monoˡ-≤ N (szB-mono V cr))))
+       (*-mono-≤
+          (⊔-lub (⊔-lub (≤-trans (pm-sizeᵗ V 0 l hV) (szB-mono V cl))
+                        (≤-trans (pm-sizeᵗ V 0 r hV) (szB-mono V cr)))
+                 (1≤szB V _))
+          (≤-trans (hopD-relᵗ V η sc N hV hN hη)
+                   (*-monoˡ-≤ N (szB-mono V cs)))))
+    (≤-trans
+       (≤-reflexive
+          (trans (cong (szB V p * N +_) (sym (*-assoc (szB V p) (szB V p) N)))
+                 (sym (*-distribʳ-+ N (szB V p) (szB V p * szB V p)))))
+       (*-monoˡ-≤ N (szB-sq V p hV (≤-trans (sizeᵗ-pos sc) cs))))
+  where
+  p  = sizeᵗ sc + sizeᵗ l + sizeᵗ r
+  cs = ≤-trans (m≤m+n (sizeᵗ sc) (sizeᵗ l)) (m≤m+n _ (sizeᵗ r))
+  cl = ≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ sc)) (m≤m+n _ (sizeᵗ r))
+  cr = m≤n+m (sizeᵗ r) (sizeᵗ sc + sizeᵗ l)
+hopD-relᵗ V η (ifᵗ c a b) N hV hN hη =
+  ⊔-lub
+    (≤-trans (hopD-relᵗ V η a N hV hN hη)
+             (*-monoˡ-≤ N (szB-mono V (≤-trans
+                (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                         (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))
+                (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b))))))
+    (≤-trans (hopD-relᵗ V η b N hV hN hη)
+             (*-monoˡ-≤ N (szB-mono V (≤-trans
+                (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))
+                (n≤1+n (sizeᵗ c + sizeᵗ a + sizeᵗ b))))))
+hopD-relᵗ V η (primᵗ _ a) N hV hN hη = z≤n
+hopD-relᵗ V η (strmᵗ e) N hV hN hη =
+  ≤-trans (hopD-relᵉ V η e N hV hN hη)
+          (*-monoˡ-≤ N (szB-mono V (n≤1+n (sizeᵉ e))))
+hopD-relᵗˢ V η [] N hV hN hη = z≤n
+hopD-relᵗˢ V η (y ∷ ys) N hV hN hη =
+  ⊔-lub
+    (≤-trans (hopD-relᵗ V η y N hV hN hη)
+             (*-monoˡ-≤ N (szB-mono V (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)))))
+    (≤-trans (hopD-relᵗˢ V η ys N hV hN hη)
+             (*-monoˡ-≤ N (szB-mono V (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)))))
 
 -- LEAF 2 IS NOW A THEOREM — THE STAGE BOUND.  Stage k's environment is
 -- under k whole hopW budgets, one per link the telescope has crossed.
