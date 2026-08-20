@@ -2416,24 +2416,7 @@ postulate
 
   -- Per-element: depthInner for one val element, from OKB.
   -- walkOK carries the depth budget; per-element depth follows from it.
-  -- ⚠ CLASS: FALSITY (2026-08-20).  THE SAME DEFECT as
-  -- `concatDrain-nodry-dep` above, refuted by the same instantiation: `dep` is
-  -- universally quantified, OKB cannot reach it (no depth field anywhere in
-  -- walkOK, capsOK? or Caps), so `dep := 0` with `sf := gs fuel` reduces the
-  -- claim to `depthE fuel o (from-inner …) … ≤ 0`.  The correct shape is
-  -- `thruWalk-nodry-dep` directly below, which takes the depth bound as a
-  -- hypothesis instead of inventing it.  See the fuller note on the concat
-  -- twin; fix the pair together.
-  thruConsume-nodry-dep : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
-    (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick)
-    (o : Val Γ (obs u)) (os : List (Val Γ (obs u)))
-    (sched : Sched Γ) (st : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched st →
-    depthInner sf op nid κ id now o sched st ≤ dep
-
-  -- Loop invariant after one thruConsume step in thruWalk.
+  -- Loop invariant after one thruConsume step: OKB + regP? are preserved.
   thruConsume-nodry-loop : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sf : Gas)
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
@@ -2447,7 +2430,7 @@ postulate
     in OKB {e = e} c sl Ψ J sched₁ st₁
        × regP? (PbB c Ψ J) (EvalSt.registry st₁) ≡ true
 
-  -- ── thruWalk recursion leaves ────────────────────────────────────
+  -- ── thruWalk recursion leaves ────────────────────
 
   -- Tail of a VbB list: if (o ∷ os) all satisfy the caps bound, so does os.
   VbB-tail : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
@@ -2456,7 +2439,6 @@ postulate
     VbB c sl Ψ J (o ∷ os) ≡ true →
     VbB c sl Ψ J os ≡ true
 
-  -- Remaining frame depth after one thruConsume step.
   thruWalk-nodry-dep : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (sf : Gas)
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
@@ -2614,11 +2596,11 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   VbB c sl Ψ J (o ∷ os) ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   sf ≡ budgetAt e sl id →
+  depthInner sf op nid κ id now o sched st ≤ dep →
   any dryEvent (proj₁ (proj₂ (proj₂ (subscribeInner sf op nid κ id now o sched st)))) ≡ false
-thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk =
+thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem =
   let vb-elem = thruConsume-nodry-vb c sl Ψ J o os sched st vb
       bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched st ok
-      hD-elem = thruConsume-nodry-dep c sl Ψ dep J sf op nid κ id now o os sched st ok
   in subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
        J sf op nid κ id now o sched st
        ok pb sspLen vb-elem rg nB hD-elem cl-elem gk
@@ -2626,6 +2608,7 @@ thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf op nid κ
 -- MERGE: one subscribeInner call, events = bs
 thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl =
   thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD))
 
 -- CONCAT: dispatch on node state
 -- The scrutinee and the clause ORDER both mirror Rx.Evaluator's own
@@ -2646,6 +2629,7 @@ thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concat�
 thruConsume-nodry {u = u} c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD cl
     | just (concat-st q false od) =
   thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD))
 -- other node shapes: thruConsume's own catch-all emits [].  These are
 -- enumerated rather than written `| _`, because a VARIABLE scrutinee
 -- leaves the evaluator's with-function stuck — its catch-all only fires
@@ -2683,7 +2667,10 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid �
       -- VbB is state-independent (valsCaps? ∧ valsΨ? depend only on vals and caps)
       vb-elem    = thruConsume-nodry-vb c sl Ψ J o os sched₀ st₀ vb
       bud , nB , cl-elem = thruConsume-nodry-nestBud c sl Ψ dep J id o os sched₁ st₁ ok₁
-      hD-elem    = thruConsume-nodry-dep c sl Ψ dep J sf switchᵒ nid κ id now o os sched₁ st₁ ok₁
+      -- depthConsume switchᵒ routes through depthConsumeS, which on a
+      -- switch-st node IS depthInner at the POST-switchKill state — exactly
+      -- sched₁/st₁ above.  So the same ⊔/suc projection serves here.
+      hD-elem    = ≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD)
       h-bs       = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                      J sf switchᵒ nid κ id now o sched₁ st₁
                      ok₁ pb sspLen vb-elem rg₁ nB hD-elem cl-elem gk
@@ -2702,6 +2689,7 @@ thruConsume-nodry c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid 
 -- EXHAUST active=false: subscribes, emits bs
 ... | just (exhaust-st false od) =
   thruConsume-nodry-apply c sl Ψ dep 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+    (≤-trans (m≤m⊔n _ _) (≤-trans (n≤1+n _) hD))
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl

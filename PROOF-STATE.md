@@ -155,12 +155,9 @@ row governed by it inherits that caveat.
   membership.
 - **`thruConsume-nodry-vb` / `-nestBud` / `-loop`, `thruWalk-nodry-dep`,
   `VbB-tail`, `switchKill-context`** (Burst-Walk) — GRINDABLE, and audited: each
-  takes the fact it needs as a hypothesis rather than conjuring it, so these are
-  the correct shapes the concat side must be restated to match. `VbB-tail`
-  carries a phantom `{e}` its statement never mentions.
-- **`thruConsume-nodry-dep`** (Burst-Walk) — FALSITY, unconstrained `dep`. Now
-  has a WORKED precedent: the concat twin was removed by threading the caller's
-  fold bound and projecting; `depthWalk` is a ⊔-fold the same way.
+  takes the fact it needs as a hypothesis rather than conjuring it. `VbB-tail`
+  carries a phantom `{e}` its statement never mentions. The family's only
+  remaining defect is `concatDrain-nodry-vb`.
 
 ## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
 
