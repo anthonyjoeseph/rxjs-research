@@ -2368,7 +2368,7 @@ private
             (all-zip (λ o → sizeᵉ o ≤ᵇ Caps.cSize C)
                      (λ o → pWᵉ n (Sched.slots sched) o ≤ᵇ Caps.cWid C)
                      _
-                     (λ o hs hp → ∧-intro hs hp)
+                     (λ o hsz hwd → ∧-intro hsz hwd)
                      q (proj₁ nc) (proj₁ hwq))
             (≤ᵇ-widen (length q) (n≤1+n (Caps.cWid C)) (proj₂ hwq)))
          nf

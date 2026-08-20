@@ -140,10 +140,10 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`sharedConnect-walk`** (Walk-Level) — DIFFICULTY: stated over the freshness
-  premise the operation guarantees, which funds the descent and answers the
-  `hasDry` suspicion. The residue is the transport, one step of which is argued
-  in prose rather than checked.
+- **`sharedConnect-walk-conn`** (Walk-Level) — DIFFICULTY: the gas split landed
+  and `g0` is closed, so the leaf's gas is a known successor. Its inventory is
+  now complete against `wl`'s own telescope, making the call-site discharge
+  mechanical; the residue is the transport.
 - **`concatDrain-nodry-nestBud`** (Burst-Walk) — DIFFICULTY: its Σ pins the
   witness with the ceiling conjunct, mirroring the thru twin, so the obligation
   is real and not upward-closed.
