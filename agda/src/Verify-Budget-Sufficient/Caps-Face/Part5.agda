@@ -275,6 +275,28 @@ pWᵛ-data : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (u : Ty) → T (isDa
 pWᵛ-data k sl u ok v =
   cong₂ _⊔_ (outWᵛ-data k sl u ok v) (dWᵛ-data k sl u ok v)
 
+-- and the SAME emptiness on the Ψ axis, which is the cheapest of the three:
+-- fnCapᵛ is a plain structural recursion with no isData scrutinee of its own
+-- and no slots to carry, so where outWᵛ needs the `with` to see that a pair's
+-- left half is data, this reads it straight off the conjunction.  fnCapᵛ is
+-- nonzero at `obs` ALONE, and isData is exactly the absence of obs.
+fnCapᵛ-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) →
+  (v : Val Γ u) → fnCapᵛ u v ≡ 0
+fnCapᵛ-data unitᵗ ok v = refl
+fnCapᵛ-data boolᵗ ok v = refl
+fnCapᵛ-data natᵗ  ok v = refl
+fnCapᵛ-data (s ×ᵗ u) ok (a , b) with isData s in eqs
+... | true  = cong₂ _⊔_ (fnCapᵛ-data s (subst T (sym eqs) tt) a)
+                        (fnCapᵛ-data u ok b)
+... | false = ⊥-elim ok
+fnCapᵛ-data (s +ᵗ u) ok (inj₁ a) with isData s in eqs
+... | true  = fnCapᵛ-data s (subst T (sym eqs) tt) a
+... | false = ⊥-elim ok
+fnCapᵛ-data (s +ᵗ u) ok (inj₂ b) with isData s
+... | true  = fnCapᵛ-data u ok b
+... | false = ⊥-elim ok
+fnCapᵛ-data (obs u) ok v = ⊥-elim ok
+
 valCaps?-data : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) → T (isData u) →
   (v : Val Γ u) → (sizeᵛ u v ≤ᵇ Caps.cSize c) ≡ true → valCaps? c sl u v ≡ true
 valCaps?-data {n = n} c sl u ok v h =
@@ -311,6 +333,18 @@ resolve-wid-data {n = n} {u = u} W sl ok ((tk , v) ∷ ps) =
   ∧-intro (subst (λ x → (x ≤ᵇ W) ≡ true) (sym (pWᵛ-data n sl u ok v)) refl)
           (resolve-wid-data W sl ok ps)
 
+-- so a data slot's resolved tail is free on the Ψ axis too, exactly as
+-- resolve-wid-data gives it free on the width axis -- and that is the whole
+-- fnCapLive half of a fresh cold's live entry, which no caps receipt can ever
+-- supply because capsOK? has no Ψ conjunct.
+resolve-fnCap-data : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (u : Ty) → T (isData u) →
+  (ps : List (Tick × Val Γ u)) →
+  all (λ tv → fnCapᵛ u (proj₂ tv) ≤ᵇ Ψ) ps ≡ true
+resolve-fnCap-data Ψ u ok []             = refl
+resolve-fnCap-data Ψ u ok ((tk , v) ∷ ps) =
+  ∧-intro (subst (λ x → (x ≤ᵇ Ψ) ≡ true) (sym (fnCapᵛ-data u ok v)) refl)
+          (resolve-fnCap-data Ψ u ok ps)
+
 -- a fresh cold's live entry, bounded on both halves
 capsOK?-addLive : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (l : LiveSource Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -333,6 +367,61 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl inv =
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+-- AND THE SAME STEP BACKWARDS, which costs no hypothesis at all: every
+-- capsOK? conjunct that reads `live` reads it through an `all`, so the head
+-- comes off for free, and `record sched { live = _ }` leaves `Sched.slots`
+-- definitionally alone, so the widLive conjunct does not move.
+--
+-- Owed by a cold scripted subscribe, where the two INV? steps do not meet:
+-- the register step wants its caps receipt at the schedule it registers
+-- under -- the PRE-addLive one -- while the clause is handed a receipt at the
+-- POST-addLive schedule, and capsOK? genuinely reads `Sched.live`.  Its
+-- absence is why that shape was split off as its own leaf rather than ground.
+capsOK?-dropLive : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (l : LiveSource Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c (record sched { live = l ∷ Sched.live sched }) st ≡ true →
+  capsOK? c sched st ≡ true
+capsOK?-dropLive {Γ = Γ} c l sched st ok =
+    ∧-intro (∧-intro (proj₂ hL) (proj₂ hB))
+    (∧-intro h1
+    (∧-intro (proj₂ hW)
+    (∧-intro h3 h4)))
+  where
+  sched′ = record sched { live = l ∷ Sched.live sched }
+  P  = capsOK?-parts c sched′ st ok
+  hB = ∧-true (all (boundedLive {Γ = Γ} (Caps.cSize c)) (l ∷ Sched.live sched))
+              (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv))
+                   (EvalSt.nodes st))
+              (proj₁ P)
+  hL = ∧-true (boundedLive (Caps.cSize c) l)
+              (all (boundedLive {Γ = Γ} (Caps.cSize c)) (Sched.live sched))
+              (proj₁ hB)
+  hW = ∧-true (widLive (Caps.cWid c) (Sched.slots sched) l)
+              (all (widLive (Caps.cWid c) (Sched.slots sched))
+                   (Sched.live sched))
+              (proj₁ (proj₂ (proj₂ P)))
+  h1 = proj₁ (proj₂ P)
+  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+-- and the head of the same conjunct, which the drop throws away and a fresh
+-- cold subscribe then needs: the entry it just prepended is bounded, and the
+-- receipt it is handed already says so, so this costs nothing either.
+capsOK?-liveHead : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (l : LiveSource Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c (record sched { live = l ∷ Sched.live sched }) st ≡ true →
+  boundedLive (Caps.cSize c) l ≡ true
+capsOK?-liveHead {Γ = Γ} c l sched st ok =
+  proj₁ (∧-true (boundedLive (Caps.cSize c) l)
+                (all (boundedLive {Γ = Γ} (Caps.cSize c)) (Sched.live sched))
+                (proj₁ (∧-true
+                  (all (boundedLive {Γ = Γ} (Caps.cSize c))
+                       (l ∷ Sched.live sched))
+                  (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv))
+                       (EvalSt.nodes st))
+                  (proj₁ (capsOK?-parts c
+                    (record sched { live = l ∷ Sched.live sched }) st ok)))))
 
 -- and cSize only ever grows with j, which is what widens a slot bound
 -- stated at `c` to the level a clause reports at

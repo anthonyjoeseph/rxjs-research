@@ -32,6 +32,9 @@ open import Data.Vec     using (Vec; lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open import Data.List    using (List; []; _∷_)
+-- `all` is the list action on Bool, not Data.List's `All`-valued one;
+-- added in the commit that spends it, per this file's own rule
+open import Data.Bool.ListAction using (all)
 
 open import Rx.Prim      using (Tick; Id; Source; init; value; close;
                                 complete; handoff; exhausted; dried;
@@ -68,7 +71,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 thruConsume; thruWalk; thruWrap;
                                 mergeBump; switchKill; cutThrough; sweepLive;
                                 lookupNode; setNode; pathHasNode; LiveSource;
-                                sameSource; installNode; NodeId; register; mintNode)
+                                sameSource; installNode; NodeId; register; mintNode;
+                                mintSource; mintOrdinal; resolve)
 
 -- the wet stratum: INV?, dBound, hasAtLeast, regsLen?, pathLen, the gas
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
@@ -90,7 +94,9 @@ open import Verify-Budget-Sufficient.Caps-Face
          widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
          frameStep-size-strict-suc;
          capsOK?-regs; pathSz?-len;
-         slotsCaps?-capsAt; capsOK?-parts)
+         slotsCaps?-capsAt; capsOK?-parts;
+         capsOK?-dropLive; capsOK?-liveHead; resolve-fnCap-data;
+         cSize≤frameStep)
 open import Verify-Budget-Sufficient.Psi-Split
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 -- the transformer monotonicity/inflation family, cited directly by the
@@ -301,88 +307,173 @@ postulate
                      (proj₁ r) ≡ true)
        × (hasDry (proj₁ r) ≡ false)
 
-  -- SHAPE D — cold with an async tail.  A fresh source per subscribe: two
-  -- mints, one live source prepended, and the state registered.
+  -- ═══ THE TWO BOUNDS ON A SCRIPTED SLOT'S SYNC PREFIX ═══
   --
-  -- ⚠ THE CENSUS'S ROUTE FOR THIS SHAPE DOES NOT COMPOSE AS WRITTEN, and
-  -- that is this leaf's reason to exist.  It says "register-INV then
-  -- addLive-INV", and both lemmas are real: `shared-live-INV` (.Connect,
-  -- now PROVEN) moves INV? across the register, and `addLive-INV`
-  -- (.Wet/Part2) moves it across exactly this record update.  But they do
-  -- not meet.  `shared-live-INV` needs a caps receipt at the schedule it
-  -- registers under — the PRE-addLive one — while the receipt this clause
-  -- is handed (`cOK′`) is stated at the POST-addLive schedule, and
-  -- `capsOK?` genuinely reads `Sched.live`: its widLive conjunct is
-  -- `all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)`
-  -- (see capsOK?-parts, .Caps-Face/Part4).  So a third step is owed that
-  -- the census never named: DROP one live entry from a caps receipt.
+  -- Both cold shapes need exactly these and nothing else, which is why they
+  -- are stated here rather than inside either: `burstB?` and `burstHopD?` are
+  -- `all … ∘ InstEmit.events` over a ONE-emit burst whose events are
+  -- `init src ∷ map value sync`, `init` satisfies both predicates outright,
+  -- and `mapValue-B` / `mapValue-hop` then reduce each conjunct to a bound on
+  -- `sync` itself.  The tail never appears, so the SAME two facts serve the
+  -- empty and async shapes -- and stating them at the slot rather than at the
+  -- clause is what makes that sharing visible instead of duplicated.
   --
-  -- It looks cheap rather than deep — `all p (l ∷ ls) ≡ true` gives
-  -- `all p ls ≡ true`, slots are untouched by the mint, and the other four
-  -- capsOK? conjuncts do not read `live` at all — but it is a missing
-  -- ingredient and not a slip, so it is recorded here rather than assumed.
-  -- Establish it BEFORE grinding the rest of this shape: if the drop is
-  -- not available the INV? conjunct needs a different assembly, and the
-  -- other three conjuncts are wasted work until that is known.
-  --
-  -- The other three conjuncts are shape C's, minus the tail: burstB? and
-  -- burstHopD? are the same `mapValue-B` / `mapValue-hop` over the same
-  -- two bounds on `sync` (so C's owed lemmas serve both), and hasDry is
-  -- `mapValue-dry` with `any-dry-++` (both .Walk-Level/Parts) since this
-  -- burst carries no close at all.
-  scripted-cold-async-four : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
-    (g : Gas)
-    (i : Fin n) (b : Closed Γ (lookup Γ i))
-    (κ : Path Γ (lookup Γ i) t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
-    {ok : T (isData (lookup Γ i))}
+  -- GRINDABLE, and the size half's route is located: it is `slotCaps?`'s
+  -- first conjunct at this slot (.Caps-Face/Part1), reached through a
+  -- tabulate-lookup projection of `slotsCaps?`.  The Ψ half is FREE and needs
+  -- no hypothesis at all -- `fnCapᵛ-data` (.Caps-Face/Part5, PROVEN below the
+  -- twin it was transcribed from) sends every data-typed value to 0, and
+  -- `isData` is exactly the `ok` binder the slot already carries.
+  scripted-sync-valB : ∀ {n} {Γ : Ctx n} (B Ψ W : ℕ) (sl : Slots Γ)
+    (i : Fin n) {ok : T (isData (lookup Γ i))}
     (sync : List (Val Γ (lookup Γ i)))
-    (d : Timed (Val Γ (lookup Γ i)))
-    (ds : List (Timed (Val Γ (lookup Γ i)))) →
-    Sched.slots sched i ≡ scripted {ok = ok} (cold sync (d ∷ ds)) →
-    -- b is BOUND, not applied: the measures below take a general
-    -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
-    -- `[]` — an alias of type `Closed Γ _` does not, so writing
-    -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+    (tl : List (Timed (Val Γ (lookup Γ i)))) →
+    sl i ≡ scripted {ok = ok} (cold sync tl) →
+    slotsCaps? B W sl ≡ true →
+    all (valB? B Ψ (lookup Γ i)) sync ≡ true
+
+  -- and the hop axis, whose bound is the subscribed expression's own depth:
+  -- `slotHop` is a fixpoint over the slots (slotHop-fix), so a scripted
+  -- slot's values weigh no more than the `input i` that replays them.
+  scripted-sync-hopD : ∀ {n} {Γ : Ctx n} (F : ℕ) (sl : Slots Γ)
+    (i : Fin n) (b : Closed Γ (lookup Γ i)) {ok : T (isData (lookup Γ i))}
+    (sync : List (Val Γ (lookup Γ i)))
+    (tl : List (Timed (Val Γ (lookup Γ i)))) →
+    sl i ≡ scripted {ok = ok} (cold sync tl) →
     b ≡ inputᶜ i →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Caps.cReg c ≤ Caps.cSize c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    sizeᵉ b ≤ Caps.cSize (frameStep j c) →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    nest b sl (EvalSt.connectedShares st) ≤ bud →
-    depthE g b κ bid now sched st ≤ dep →
-    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-    fnCapᵉ b ≤ Ψ →
-    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-    2 ≤ Ŝ →
-    F ≡ Ŝ →
-    R̂ ≡ hopR Ŝ →
-    Caps.cSize (frameStep L̂ c) ≤ Ŝ →
-    opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
-    dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
-           (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
-    g hasAtLeast suc G →
-    pathLen κ + G ≤ ℓ →
-    regsLen? ℓ (EvalSt.registry st) ≡ true →
-    let r = subscribeE g b κ bid now sched st
-    in capsOK? (frameStep (j + j′) c)
-               (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
-       burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
-       burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
-       j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
-       (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
-              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-       × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
-       × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
-                     (proj₁ r) ≡ true)
-       × (hasDry (proj₁ r) ≡ false)
+    all (λ v → hopDᵛ F (slotHop F sl) (lookup Γ i) v
+                 ≤ᵇ hopDᵉ F (slotHop F sl) b) sync ≡ true
+
+
+-- SHAPE D, ASSEMBLED — and the composition failure its header recorded is
+-- REPAIRED rather than routed around.  The census said "register-INV then
+-- addLive-INV"; the two did not meet, because `shared-live-INV` wants its
+-- caps receipt at the schedule it registers under while this clause is handed
+-- one at the POST-addLive schedule, and `capsOK?` genuinely reads
+-- `Sched.live`.  The step nobody had named is `capsOK?-dropLive`
+-- (.Caps-Face/Part5), which costs no hypothesis: every conjunct that reads
+-- `live` reads it through an `all`, and the mints leave `Sched.slots`
+-- definitionally alone.
+--
+-- WHAT THE BODY SPENDS, and only the last line is still owed:
+--   · the caps receipt is DROPPED to the pre-addLive schedule, carried across
+--     the register by `shared-live-INV` (.Connect), and put back across the
+--     live entry by `addLive-INV` (.Wet/Part2) -- so the INV? conjunct is
+--     CLOSED, which is what this row was blocked on.
+--   · addLive-INV's two side conditions cost nothing.  `boundedLive` is the
+--     HEAD of the very conjunct the drop throws away, so the receipt already
+--     says it (`capsOK?-liveHead`); and `fnCapLive` no caps receipt could
+--     ever supply, since capsOK? has no Ψ conjunct -- it comes from
+--     `resolve-fnCap-data`, free on a data slot.
+--   · `inv` is stated at `sched` and spent at the double-minted `sched₂`
+--     WITHOUT transport: both mints are record updates on counter fields, and
+--     INV? reads the schedule only through `live` and `slots`, so the two
+--     types are definitionally equal.  That is the "mint is transparent"
+--     claim the census made in prose, here made a typecheck.
+--   · hasDry is `refl`: `dryEvent` fires on `close _ dried` alone and this
+--     burst carries no close at all.
+--   · burstB? and burstHopD? are `mapValue-B` / `mapValue-hop` over the two
+--     slot bounds above, which are the only thing left postulated.
+
+scripted-cold-async-four : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ : ℕ)
+  (g : Gas)
+  (i : Fin n) (b : Closed Γ (lookup Γ i))
+  (κ : Path Γ (lookup Γ i) t)
+  (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e)
+  {ok : T (isData (lookup Γ i))}
+  (sync : List (Val Γ (lookup Γ i)))
+  (d : Timed (Val Γ (lookup Γ i)))
+  (ds : List (Timed (Val Γ (lookup Γ i)))) →
+  Sched.slots sched i ≡ scripted {ok = ok} (cold sync (d ∷ ds)) →
+  -- b is BOUND, not applied: the measures below take a general
+  -- `Exp Γ Δᵍ Δ Θ t`, and only a binder pins those three contexts to
+  -- `[]` — an alias of type `Closed Γ _` does not, so writing
+  -- `sizeᵉ (input i)` here leaves an unsolved meta per measure.
+  b ≡ inputᶜ i →
+  2 ≤ Caps.cSize c →
+  1 ≤ Caps.cReg c →
+  Caps.cReg c ≤ Caps.cSize c →
+  Sched.slots sched ≡ sl →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  capsOK? (frameStep j c) sched st ≡ true →
+  sizeᵉ b ≤ Caps.cSize (frameStep j c) →
+  pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+  nest b sl (EvalSt.connectedShares st) ≤ bud →
+  depthE g b κ bid now sched st ≤ dep →
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  fnCapᵉ b ≤ Ψ →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  2 ≤ Ŝ →
+  F ≡ Ŝ →
+  R̂ ≡ hopR Ŝ →
+  Caps.cSize (frameStep L̂ c) ≤ Ŝ →
+  opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j ≤ L̂ →
+  dBound Ŝ R̂ (unconn sl (EvalSt.connectedShares st))
+         (hopDᵉ F (slotHop F sl) b) (syncSizeᵉ b) ≤ G →
+  g hasAtLeast suc G →
+  pathLen κ + G ≤ ℓ →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = subscribeE g b κ bid now sched st
+  in capsOK? (frameStep (j + j′) c)
+             (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+     burstCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true →
+     burstCount? (frameStep (j + j′) c) (proj₁ r) ≡ true →
+     j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j →
+     (INV? Ψ (Caps.cSize (frameStep (j + j′) c))
+            (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+     × (burstB? (Caps.cSize (frameStep (j + j′) c)) Ψ (proj₁ r) ≡ true)
+     × (burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F sl) b)
+                   (proj₁ r) ≡ true)
+     × (hasDry (proj₁ r) ≡ false)
+scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid now sl sched st {ok} sync d ds slotEq refl
+  2≤S 1≤R hCR slEq slC slS cOK szb pSz spL nst dpt inv fnc pB 2≤Ŝ FŜ R̂eq Ŝge opL dB gHas pℓ rgs cOK′ bC bCt jle
+  -- the slot equation is stated at `Sched.slots sched i`, which the `with`
+  -- below consumes; the two slot bounds want it at `sl i`.  Carrying the
+  -- converted form THROUGH the with costs nothing, because its type names no
+  -- occurrence of the scrutinee and so survives the abstraction untouched.
+  with trans (sym (cong (λ x → x i) slEq)) slotEq
+     | Sched.slots sched i | slotEq
+... | slEq′ | .(scripted (cold sync (d ∷ ds))) | refl =
+      addLive-INV Ψ B sch₂ (register src κ st) L
+        (capsOK?-liveHead (frameStep (j + j′) c) L sch₂ (register src κ st) cOK′)
+        (resolve-fnCap-data Ψ (lookup Γ i) ok (resolve now (d ∷ ds)))
+        (shared-live-INV c Ψ j j′ src κ sch₂ st 2≤S hCR
+           (capsOK?-dropLive (frameStep (j + j′) c) L sch₂
+              (register src κ st) cOK′)
+           inv pB)
+    , ∧-intro (∧-intro refl
+        (mapValue-B B Ψ (lookup Γ i) sync
+          -- the slot bound is stated at the BASE caps, because that is where
+          -- slotsCaps? is; the clause reports at frameStep (j + j′), and
+          -- cSize only ever grows with j
+          (valsB?-widen (lookup Γ i) sync (cSize≤frameStep c (j + j′) 2≤S)
+            (scripted-sync-valB (Caps.cSize c) Ψ (Caps.cWid c) sl i
+              {ok} sync (d ∷ ds) slEq′ slC))))
+        refl
+    -- the hop bound is left to UNIFICATION rather than written out: the
+    -- measures take a general `Exp Γ Δᵍ Δ Θ t` and only a BINDER pins those
+    -- three contexts, so spelling `hopDᵉ F (slotHop F sl) (inputᶜ i)` here
+    -- leaves a meta per measure -- the same trap the statement's own header
+    -- records.  The goal already carries the term with its implicits solved.
+    , ∧-intro (∧-intro refl
+        (mapValue-hop F (slotHop F sl) _ sync
+          (scripted-sync-hopD F sl i _ {ok} sync (d ∷ ds) slEq′ refl)))
+        refl
+    -- dryEvent fires on `close _ dried` ALONE, and this burst is `init` plus
+    -- values: the init reduces away and the values are mapValue-dry's whole
+    -- statement.  No close at all, so no tail term to account for.
+    , cong (λ x → x ∨ false) (mapValue-dry sync)
+  where
+  B    = Caps.cSize (frameStep (j + j′) c)
+  src  = proj₁ (mintSource sched)
+  sch₁ = proj₂ (mintSource sched)
+  sch₂ = proj₂ (mintOrdinal sch₁)
+  L : LiveSource Γ
+  L = record { source = src ; ordinal = proj₁ (mintOrdinal sch₁)
+             ; elemTy = lookup Γ i ; pending = resolve now (d ∷ ds) }
 
 -- no connect, so no recursion: a scripted slot replays its own values
 --
