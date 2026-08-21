@@ -119,6 +119,23 @@ So the sweep subtracts the claim roots and says which ones it held back. What
 covers a root is the DRIFT counter and the heavy gate, which is what they are
 for.
 
+### AND A CONE MEMBER WHOSE DEV CHECK WOULD BE STUBBED IS NAMED, NOT DROPPED
+
+`agda-dev` stubs a multi-member mutual block's siblings, so a dev check on such
+a module is not a check. The sweep therefore cannot run it — and its first
+version dealt with that by **skipping it in silence**, which is worse than
+running it: the summary line said the changed modules were dev-green and `make
+agda` would add only the consumers, while the consumers most worth checking had
+never been looked at.
+
+The shape that makes it expensive: a new clause body lands in a leaf module, and
+the module that validates its **fit** — the dispatch it plugs into — is the one
+with the mutual block. Measured on the leg that found this, a sweep of 50
+consumers silently dropped exactly the two modules that consume the new arms.
+
+So the sweep names each stubbed member, counts it in the unchecked list, and the
+final line says how many stayed unchecked. `make agda` is what covers them.
+
 ### A BUDGET TIMEOUT IS NOT A RED, and conflating them made the sweep lie
 
 `agda-dev` exits non-zero for a budget kill exactly as it does for a type

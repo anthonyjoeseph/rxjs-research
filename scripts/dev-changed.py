@@ -281,6 +281,7 @@ def main() -> int:
                   f"checking it rather than escalating to the tower")
             deps = True
     cone_only = set()
+    cone_stubbed = []
     if deps:
         ci = _load("check-imports")
         ci.TREES = list(ci.CLAIM_ROOT)
@@ -304,12 +305,24 @@ def main() -> int:
                   f"which is the heavy gate's job: "
                   + ", ".join(skipped_roots))
         by_mod = {ci.module_of(f): f for f in src_files}
+        # A CONE MEMBER WITH A MULTI-MEMBER BLOCK IS NOT SWEEPABLE, and
+        # dropping it in SILENCE is how the light path came to read as
+        # reassurance while the one consumer that validates a new arm's FIT
+        # went unchecked: agda-dev stubs a block's siblings, so a dev check
+        # there is not a check.  Say so and count it unchecked.
         for m in sorted(cone):
             p = os.path.join(SRC, m.replace(".", os.sep) + ".agda")
             if os.path.exists(os.path.join(REPO, p)) and p not in by_mod:
-                if multi_member(os.path.relpath(p, SRC)) == 0:
+                k = multi_member(os.path.relpath(p, SRC))
+                if k == 0:
                     checkable.append(p)
                     cone_only.add(p)
+                else:
+                    cone_stubbed.append(p)
+        for m in cone_stubbed:
+            print(f"dev-changed: skip  {m}  — has a multi-member mutual block, "
+                  f"where agda-dev stubs the siblings; only `make agda` "
+                  f"checks it")
 
     if a.plan:
         for f in checkable:
@@ -322,7 +335,7 @@ def main() -> int:
     # failure -- that module has to be checked.  For a cone module it is only
     # the bet the light path was making anyway, so it is reported as still
     # unchecked and the sweep goes on.
-    unchecked = []
+    unchecked = list(cone_stubbed)
     cone_spent = 0.0
     for f in checkable:
         if f in cone_only and cone_spent > a.cone_budget:
@@ -384,7 +397,9 @@ def main() -> int:
         print("dev-changed: FULL GATE REQUIRED — run `make gate`")
         return 2
     print(f"dev-changed: {len(checkable)} module(s) dev-green; no multi-member "
-          f"block touched, so `make agda` adds only the consumers")
+          f"block touched, so `make agda` adds only the consumers"
+          + (f" — {len(unchecked)} of which stayed UNCHECKED, named above"
+             if unchecked else ""))
     return 0
 
 
