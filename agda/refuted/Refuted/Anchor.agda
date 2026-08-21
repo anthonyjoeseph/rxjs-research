@@ -15,8 +15,6 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Anchor where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
-                                if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
                                 _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
@@ -37,29 +35,13 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
                                        suc-injective; <-irrefl; ≡ᵇ⇒≡)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.Nat.Solver     using (module +-*-Solver)
-open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
-open import Data.Bool.ListAction using (all; any)
-open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
-open import Data.Bool.Properties using (∨-zeroʳ)
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
-open import Data.List.Properties using (length-++; length-map)
-open import Data.List.Membership.Propositional.Properties
-  using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.Maybe   using (Maybe; nothing; just)
-open import Relation.Nullary using (yes; no)
-open import Data.Vec     using (lookup)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
-open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
@@ -69,63 +51,6 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Prim      using (towerℕ) public
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                                inputsBelowᵉ;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
-                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
-                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                subΘExp; subΘTm; subΘTms;
-                                varIx;
-                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
-                                wkExp; wkTm; reify;
-                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
-                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms;
-                                elimDExp; elimDTm; elimDTms;
-                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
-                                evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (outWᵉ; outWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
-                                 hopD-unfoldμ)
-open import Rx.Slot-Hop using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
-                                Slot; scripted; shared; resolve; mkHot;
-                                arrVal; scanVals; memberSource;
-                                slotSize; inputSize;
-                                RegId; Chain;
-                                NodeState; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; setNode; lookupNode;
-                                NodeId;
-                                root; share-sink; _↠_; Frame; AllOp;
-                                map-f; scan-f; take-f; from-inner;
-                                thru-outer; Stream;
-                                sched-init; st-init; sched-next;
-                                schedHeadOf; schedGo; schedEarlier;
-                                cascadeLatch; cascadeFinish; sweepLive;
-                                takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; cascadeGo;
-                                Path; arrTy;
-                                subscribeE; stepFrame; pushBurst;
-                                subscribeInner; chainStep; subscribeAll;
-                                mintNode; mintSource; mintOrdinal; register;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                splitEvents; splitBurst; retagEvents;
-                                mergeBump; switchKill;
-                                thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
-                                sharedPlumb; sharedConnect; subscribeSharedSlot;
-                                burstCompleted;
-                                shareLatch; shareAdmit; shareFinish; shareGo;
-                                foldPath; dispatchShare; arrTick;
-                                aliveThroughᶠ;
-                                cascade; drain; evaluate;
-                                hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize; blowH; capsHgo; capsBase)
 
 open import Verify-Budget-Sufficient.Measures
 

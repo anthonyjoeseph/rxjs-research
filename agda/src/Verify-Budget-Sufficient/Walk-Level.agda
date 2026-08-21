@@ -77,7 +77,6 @@ open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Unit    using (⊤; tt)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred;
                                        m≤m+n; m≤n+m; n≤1+n;
                                        +-suc; +-assoc; +-comm;
@@ -178,11 +177,6 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          burstCount?-widen; burstCount?-tail;
          thruWrap-vals; splitBurst-len; mul-fits; valsIn; valsLen;
          lenWiden; frameStep-+suc; concat-fits)
-open import Verify-Budget-Sufficient.Hop-Spine-Face
-  using (burstHopSpn?; burstHopSpn-cap; burstHopSpnH?; burstHopSpnH-headline;
-         burstHopSpnH-intro; scanSeed-hopSpn)
-open import Verify-Budget-Sufficient.Hop-Spine-Push
-  using (scanAccSpn?; nodeAccSpn?; nodeAccSpn?-scan; pushBurst-scan-hopSpn)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner;
          depthConsume; depthWalk; depthSlot; depthConn)

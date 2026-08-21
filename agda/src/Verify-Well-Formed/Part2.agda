@@ -21,14 +21,12 @@
 module Verify-Well-Formed.Part2 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Bool.Properties using (∨-assoc; ∨-comm; ∨-identityʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (any)
-open import Data.List.Properties using (++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -44,7 +42,6 @@ open import Relation.Nullary using (Dec; yes; no)
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
                                 hot; cold;
                                 InstEvent; init; value; close; handoff; complete;

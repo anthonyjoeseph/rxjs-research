@@ -35,10 +35,7 @@ open import Data.List    using (List; []; _∷_; concat; tabulate)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin     using (Fin)
 open import Data.Vec     using (lookup)
-open import Data.Unit    using (⊤; tt)
-open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; cong₂; subst)
 

@@ -114,8 +114,6 @@ open import Verify-Budget-Sufficient.Caps-Chain
          walk-desc; inner-desc;
          inner-nil; inner-step; walk-nil;
          frame-step; walk-index; queue-push)
-open import Verify-Budget-Sufficient.Caps-Sadd
-  using (walk-step-suc)
 -- the transformer monotonicity/inflation family, cited directly by the
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
@@ -138,13 +136,8 @@ open import Verify-Budget-Sufficient.Hop-Spine-Face
          burstHopSpnH-intro; scanSeed-hopSpn)
 open import Verify-Budget-Sufficient.Hop-Spine-Push
   using (scanAccSpn?; nodeAccSpn?; nodeAccSpn?-scan; pushBurst-scan-hopSpn)
-open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthAll; depthBurst; depthFrame; depthInner;
-         depthConsume; depthWalk; depthSlot; depthConn)
 open import Verify-Budget-Sufficient.Caps-Nest
   using (nest-keeps; mu-step; map-step; scan-step; take-step)
-open import Verify-Budget-Sufficient.Op-Budget
-  using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Node-Fresh
   using (mint-install-survives)
 -- take's push costs no depth at all: takeDispatch subscribes nothing

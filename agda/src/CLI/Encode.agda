@@ -6,12 +6,10 @@ module CLI.Encode where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; _++_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
                            complete; CloseReason; cut; cutPending; exhausted; dried;
@@ -19,7 +17,6 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
                            InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val; Ctx)
 open import Rx.Evaluator using (Grouped)
-open import Data.Vec using (Vec)
 
 private
   quote′ : String → String

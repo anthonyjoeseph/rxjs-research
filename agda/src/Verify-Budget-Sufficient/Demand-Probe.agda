@@ -6,12 +6,9 @@
 module Verify-Budget-Sufficient.Demand-Probe where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.Empty using (⊥)
 open import Data.Fin  using (Fin; zero)
 import Data.Fin as F
 open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_; _≤_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤)
-open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
@@ -34,9 +31,6 @@ open import Rx.Slot-Hop using (slotHop; slotHop-fix)
 open import Verify-Budget-Sufficient.Measures using (dBound; regsLen?;
                                  burstHopD?; hopR; unconn; hasAtLeast-pad;
                                  INV?; burstB?; slotsFnCap; ΨAt; fnCapᵉ)
-open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep;
-                                 iterSize-infl)
-open import Verify-Budget-Sufficient.Walk-Level using (WalkStmt)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using (valHopSpn?)
 open import Rx.Hop-Spine using (spnᵛ)
 -- THE SERIES Q FAMILY AND THE ENTRY RUNNER live in .Demand-Programs, so

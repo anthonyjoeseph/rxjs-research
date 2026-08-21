@@ -197,6 +197,9 @@ def jobs_for(peak: int, ceiling: int) -> int:
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGDA = os.path.join(REPO, "agda")
+# The BINARY, not the directory.  Exported by the Makefile so the dev loop and
+# the gate can never end up on two different agdas -- see its AGDA_BIN comment.
+AGDA_BIN = os.environ.get("AGDA_BIN") or "agda"
 SRC = os.path.join(AGDA, "src")
 # WHAT AGDA READS, AND WHERE IT STANDS: the comment-stripped mirror, entered as
 # the working directory exactly as `make agda` enters it.  Both facts are
@@ -948,7 +951,7 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
     interrupted by hand is not a loop, so the limit is enforced by the clock.
     """
     t0 = time.time()
-    cmd = ["agda", *agda_flags(args), rel_dev]
+    cmd = [AGDA_BIN, *agda_flags(args), rel_dev]
     limit = getattr(args, "budget", 0) or 0
     try:
         pr = subprocess.run(cmd, cwd=MIRROR, capture_output=True, text=True,

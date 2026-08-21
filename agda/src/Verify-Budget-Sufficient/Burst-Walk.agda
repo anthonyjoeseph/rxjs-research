@@ -81,7 +81,6 @@ open import Data.Nat.Properties
 open import Data.List    using (List; []; _∷_; _++_; map; length)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Unit    using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Relation.Nullary using (yes; no)

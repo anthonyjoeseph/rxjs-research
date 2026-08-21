@@ -15,8 +15,6 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Caps-Face where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
-                                if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _∸_; _≤_; _<_;
                                 _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
@@ -37,31 +35,14 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
                                        suc-injective; <-irrefl; ≡ᵇ⇒≡)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.Nat.Induction  using (<-wellFounded)
-open import Data.Nat.Solver     using (module +-*-Solver)
-open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
-open import Data.Bool.ListAction using (all; any)
-open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
-open import Data.Bool.Properties using (∨-zeroʳ)
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
-open import Data.List.Properties using (length-++; length-map)
-open import Data.List.Membership.Propositional.Properties
-  using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.Maybe   using (Maybe; nothing; just)
-open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
-open import Data.Unit    using (⊤; tt)
-open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
@@ -70,34 +51,6 @@ open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
                                 complete; exhausted; delivery;
                                 Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
                                 Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
-                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
-                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                subΘExp; subΘTm; subΘTms;
-                                varIx;
-                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
-                                wkExp; wkTm; reify;
-                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
-                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms;
-                                elimDExp; elimDTm; elimDTms;
-                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
-                                evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
-                                outWᵉ; innWᵉ; innWᵗ; innWᵗˢ;
-                                pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
-                                _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ;
-                                pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
-                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ;
-                                slotPW; slotsPW; slotsPWgo;
-                                slotIW; slotsIW; slotsIWgo;
-                                slotsPW≤entryCeil; slotsIW≤entryCeil)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;
@@ -139,12 +92,6 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 sIterD; sLvlD)
 open import Verify-Budget-Sufficient.Delivery-Walk public
 open import Verify-Budget-Sufficient.Caps-Nest public
-open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFrame; depthReact; depthFin; depthWalk; depthCascade;
-         depthConsume)
-open import Verify-Budget-Sufficient.Caps-Chain
-  using (walk-nil; inner-nil; walk-index; frame-step; queue-push)
-open import Verify-Budget-Sufficient.Caps-Sadd using (walk-step-suc)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 public
 
 open import Verify-Budget-Sufficient.Caps-Face.Part7

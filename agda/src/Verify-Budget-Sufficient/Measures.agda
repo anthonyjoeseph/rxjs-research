@@ -72,11 +72,8 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
-open import Data.List.Properties using (length-++; length-map)
 open import Data.List.Membership.Propositional.Properties
   using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.Maybe   using (Maybe; nothing; just)
-open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -113,7 +110,6 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (outWᵉ; outWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
                                  hopD-unfoldμ)
 open import Rx.Slot-Hop using (slotHop; slotHopD; ηAt)

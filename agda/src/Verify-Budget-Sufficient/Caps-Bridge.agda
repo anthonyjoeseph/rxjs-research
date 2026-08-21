@@ -109,8 +109,6 @@ open import Verify-Budget-Sufficient.Psi-Split
 -- statement is the only one reading BOTH vocabularies; this module is
 -- its sole consumer.
 open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
-open import Rx.Evaluator using (foldPath; subscribeInner; AllOp; NodeId)
-open import Rx.Prim using (InstEvent)
 open import Rx.Exp using (obs; sizeᵛ)
 
 ------------------------------------------------------------------

@@ -1,4 +1,4 @@
-.PHONY: stripped strip-selftest postulates dup-check dup-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -16,6 +16,14 @@ export LANG := C.UTF-8
 # real one later.  Agda exits 42 on a promoted warning; green now means
 # warning-free.
 #
+# ⚠ AND SO IS THE BINARY.  `AGDA_BIN` names it in ONE place so an A/B is
+# `make agda AGDA_BIN=/path/to/other/agda` instead of a PATH edit nobody can
+# see afterwards.  It is EXPORTED, so scripts/agda-dev.py picks up the same
+# one; two tools on two binaries is the same cache war as two tools on two
+# warning modes, one layer lower down.  Which binary a bare `agda` resolves
+# to is a property of PATH, and on Apple silicon it is worth checking that it
+# is not an x86_64 build under Rosetta -- see docs/agda-build.md.
+#
 # ⚠ THE FLAG MUST MATCH scripts/agda-dev.py's `agda_flags()` EXACTLY.  Agda
 # records the WARNING MODE in an interface's validity key, so a target running
 # with a different -W than the dev loop invalidates the whole cone on EVERY
@@ -23,7 +31,9 @@ export LANG := C.UTF-8
 # the cost landing on whatever module happened to be next and each tool
 # blaming the other.  Change one, change both, in the same commit.
 # ─────────────────────────────────────────────────────────────────────────
-AGDA := agda -W error
+AGDA_BIN ?= agda
+export AGDA_BIN
+AGDA := $(AGDA_BIN) -W error
 
 all: help
 
@@ -276,6 +286,101 @@ wiring-refuted:
 dup-check:
 	@scripts/check-duplicates.py --gate
 
+# ─────────────────────────────────────────────────────────────────────────
+# AN IMPORT NOTHING USES IS A MODULE EDGE NOTHING PAYS FOR.  Agda has no
+# unused-import warning, so this is the one dependency in the tree that can be
+# asserted and never spent -- and an edge decides both what `make agda` must
+# build BEFORE a file and what an edit to the imported module INVALIDATES.
+# Mechanics, and the twelve-edge instance that paid for the checker:
+# docs/imports-check.md
+# ─────────────────────────────────────────────────────────────────────────
+imports-check:
+	@scripts/check-imports.py
+
+imports-fix:
+	@scripts/check-imports.py --fix
+
+imports-selftest:
+	@out=$$(scripts/check-imports.py --src scripts/imports-selftest --names 2>&1); \
+	  fail=0; \
+	  for n in Fixture.Plain Fixture.Doc Fixture.Wide Fixture.Token dead-beside-live; do \
+	    echo "$$out" | grep -q "$$n" \
+	      || { echo "SELFTEST FAIL: $$n not reported — a real dead import stopped firing"; fail=1; }; \
+	  done; \
+	  for n in Fixture.Precise Fixture.Mixfix Fixture.Renamed Fixture.Qualified Fixture.Solver live-used; do \
+	    echo "$$out" | grep -q "$$n" \
+	      && { echo "SELFTEST FAIL: $$n reported, but it is used or undecidable"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q 'found 4 dead import(s) and 1 dead name' \
+	    || { echo "SELFTEST FAIL: expected exactly 4 dead imports + 1 dead name"; fail=1; }; \
+	  echo "$$out" | grep -qE 'Main.agda:.*(DEAD IMPORT|dead name)' \
+	    && { echo "SELFTEST FAIL: the CLAIM ROOT was use-audited — its imports are claims, not uses"; fail=1; }; \
+	  echo "$$out" | grep -q 'Guard-Root.agda:.*WIRING' \
+	    || { echo "SELFTEST FAIL: the orphan guard did not fire on the sole route to Guard-Leaf"; fail=1; }; \
+	  echo "$$out" | grep -q 'Guard-Root.agda:.*DEAD' \
+	    && { echo "SELFTEST FAIL: a sole-route edge was reported DEAD — --fix would orphan a module"; fail=1; }; \
+	  for n in Guard-Two-A Guard-Two-B; do \
+	    echo "$$out" | grep -q "$$n.agda:.*WIRING" \
+	      || { echo "SELFTEST FAIL: the guard tested $$n edge-at-a-time — jointly these two are the only routes to Guard-Shared"; fail=1; }; \
+	    echo "$$out" | grep -q "$$n.agda:.*DEAD" \
+	      && { echo "SELFTEST FAIL: $$n reported DEAD — deleting BOTH orphans Guard-Shared"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q '3 unused import(s) HELD BACK' \
+	    || { echo "SELFTEST FAIL: expected exactly 3 held-back edges"; fail=1; }; \
+	  for n in Fixture.Bare Fixture.BareRenaming; do \
+	    echo "$$out" | grep -q "BLANKET IMPORT  $$n" \
+	      || { echo "SELFTEST FAIL: $$n has no \`using\` list and was not reported BLANKET"; fail=1; }; \
+	    echo "$$out" | grep -q "DEAD IMPORT  $$n" \
+	      && { echo "SELFTEST FAIL: $$n reported DEAD — the use check cannot decide a blanket import"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q 'Main.agda:.*BLANKET IMPORT  Fixture.Root-Blanket' \
+	    || { echo "SELFTEST FAIL: the blanket rule skipped the CLAIM ROOT — it binds every file (Anthony)"; fail=1; }; \
+	  echo "$$out" | grep -q 'BLANKET IMPORT  Fixture.Precise' \
+	    && { echo "SELFTEST FAIL: \`using () renaming (…)\` reported BLANKET — it is the most precise form there is"; fail=1; }; \
+	  echo "$$out" | grep -q 'BLANKET IMPORT  Fixture.Qualified' \
+	    && { echo "SELFTEST FAIL: a qualified \`import M as Q\` reported BLANKET — it puts nothing in unqualified scope"; fail=1; }; \
+	  for n in Fixture.Reexport Fixture.BarePublic; do \
+	    echo "$$out" | grep -q "RE-EXPORT  $$n" \
+	      || { echo "SELFTEST FAIL: $$n is a \`public\` re-export and was not reported — they are illegal (Anthony)"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q '2 \`public\` re-export(s)' \
+	    || { echo "SELFTEST FAIL: expected exactly 2 public re-exports"; fail=1; }; \
+	  echo "$$out" | grep -q '4 BLANKET import(s)' \
+	    || { echo "SELFTEST FAIL: expected exactly 4 blanket imports"; fail=1; }; \
+	  echo "$$out" | grep -q 'held back' \
+	    || echo "$$out" | grep -q 'HELD BACK' \
+	    || { echo "SELFTEST FAIL: the held-back count went missing from the summary"; fail=1; }; \
+	  tmp=$$(mktemp -d); cp -a scripts/imports-selftest/. $$tmp/; \
+	  scripts/check-imports.py --src $$tmp --names --fix >/dev/null 2>&1; \
+	  after=$$(scripts/check-imports.py --src $$tmp --names 2>&1); \
+	  echo "$$after" | grep -q 'found 0 dead import(s)' \
+	    || { echo "SELFTEST FAIL: --fix left dead findings behind (not idempotent)"; fail=1; }; \
+	  echo "$$after" | grep -q 'HELD BACK' \
+	    || { echo "SELFTEST FAIL: the wiring finding vanished after --fix"; fail=1; }; \
+	  for n in Guard-Root Guard-Two-A Guard-Two-B; do \
+	    diff -q scripts/imports-selftest/$$n.agda $$tmp/$$n.agda >/dev/null \
+	      || { echo "SELFTEST FAIL: --fix deleted a held-back edge in $$n and orphaned a module"; fail=1; }; \
+	  done; \
+	  for n in Fixture.Bare Fixture.BareRenaming Fixture.Reexport Fixture.BarePublic; do \
+	    grep -q "$$n" $$tmp/Fires.agda \
+	      || { echo "SELFTEST FAIL: --fix deleted $$n — a blanket import or a re-export is repaired by a human, not by the fixer"; fail=1; }; \
+	  done; \
+	  echo "$$after" | grep -q '4 BLANKET import(s)' \
+	    || { echo "SELFTEST FAIL: the blanket findings vanished after --fix"; fail=1; }; \
+	  diff -q scripts/imports-selftest/Main.agda $$tmp/Main.agda >/dev/null \
+	    || { echo "SELFTEST FAIL: --fix rewrote the CLAIM ROOT"; fail=1; }; \
+	  grep -q 'live-used' $$tmp/Fires.agda \
+	    || { echo "SELFTEST FAIL: --fix deleted a LIVE name"; fail=1; }; \
+	  grep -q 'dead-beside-live' $$tmp/Fires.agda \
+	    && { echo "SELFTEST FAIL: --fix left a dead name in a surviving clause"; fail=1; }; \
+	  grep -q 'Fixture.Plain' $$tmp/Fires.agda \
+	    && { echo "SELFTEST FAIL: --fix left a dead import declaration"; fail=1; }; \
+	  diff -q scripts/imports-selftest/Quiet.agda $$tmp/Quiet.agda >/dev/null \
+	    || { echo "SELFTEST FAIL: --fix rewrote the file it must not touch"; fail=1; }; \
+	  rm -rf $$tmp; \
+	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent and spares the live names; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare)"; \
+	  else echo "$$out"; exit 1; fi
+
 # PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It
 # earns its keep: three separate bugs shipped in this checker and each was
 # found by hand, not by the check failing.  The MUST-NOT rows are the
@@ -439,6 +544,18 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: the staleness check fired on a clean roadmap — a CITED precedent or a descriptive head is being read as a claim, and earning GRINDABLE requires naming a proven precedent"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
+# `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and
+# not before -- its dead-import half is clean, but the blanket and no-`public`
+# halves have 89 + 66 open findings whose repair is one refactor (3231 names
+# become explicit across 91 modules).  Wiring it now would land a knowingly-red
+# gate, which is the one thing that teaches everyone to ignore red.  The check is
+# NOT suppressed meanwhile: `make imports-check` runs it in full, and
+# `imports-selftest` below still holds the checker itself to firing.
+#
+# AND A `#` COMMENT AT COLUMN 0 CANNOT GO INSIDE A RECIPE -- it ENDS the recipe,
+# and the tab-indented lines after it become orphans ("recipe commences before
+# first target").  That is why this note sits here rather than beside the line it
+# is about; a recipe-internal comment must itself be tab-indented to be one.
 gate:
 	@$(MAKE) --no-print-directory wiring-selftest
 	@$(MAKE) --no-print-directory wiring-gate
@@ -446,6 +563,7 @@ gate:
 	@$(MAKE) --no-print-directory unsafe-check
 	@$(MAKE) --no-print-directory dup-selftest
 	@$(MAKE) --no-print-directory dup-check
+	@$(MAKE) --no-print-directory imports-selftest
 	@$(MAKE) --no-print-directory roadmap-selftest
 	@$(MAKE) --no-print-directory roadmap-check
 	@$(MAKE) --no-print-directory agda

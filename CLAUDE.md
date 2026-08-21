@@ -82,15 +82,17 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `wiring-gate` | every definition, postulate and module has a route to Main; no `⊤`-typed postulate; no bare `open import` in Main. A name PASSED to a postulate gets no credit, which is how "a postulate must be a leaf" is enforced | [docs/wiring.md](docs/wiring.md) |
 | `wiring-refuted` | same law over `agda/refuted`, rooted at `Refuted.Main` — every witness is claimed | [docs/wiring.md](docs/wiring.md), REFUTATION.md |
 | `unsafe-check` | no `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` etc. on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
-| `dup-selftest` | the duplicate checker still fires | [docs/dup-check.md](docs/find.md) |
+| `dup-selftest` | the duplicate checker still fires | [docs/find.md](docs/find.md) |
 | `dup-check` | no two declarations proving the same fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
+| `imports-selftest` | the import checker still fires, in both directions | [docs/imports-check.md](docs/imports-check.md) |
+| `imports-check` | no `using` clause none of whose names the file spends — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. Both halves buy LEGIBILITY, not time: `using` filters scope, not the build, and a re-export removes no edge, since a ladder's name-level dependencies are genuine | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows within budget, and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` | the refutations typecheck | REFUTATION.md |
 | `bug-cache` | no known impl counterexample has regressed. `Unit-Test.agda` is off Main, so nothing else would notice it rotting | [docs/bug-cache.md](docs/bug-cache.md) |
 
-Also `make postulates` (the complete remaining-work ledger, by name),
+Also `make imports-fix` (delete every dead import), `make postulates` (the complete remaining-work ledger, by name),
 `make find` (search by the shape of a STATEMENT — see [docs/find.md](docs/find.md)),
 `make strip-selftest`, `make agda-dev-selftest`.
 

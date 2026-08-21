@@ -28,7 +28,6 @@ open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
                                 _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Unit    using (⊤; tt)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred;
                                        m≤m+n; m≤n+m; n≤1+n;
                                        +-suc; +-assoc; +-comm;
@@ -36,13 +35,11 @@ open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-p
                                        *-mono-≤; *-monoʳ-≤;
                                        +-identityʳ;
                                        m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
-open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (Vec; lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
-open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Source; init; value; close;
                                 complete; handoff; exhausted; dried;
@@ -105,15 +102,6 @@ open import Verify-Budget-Sufficient.Caps-Face
          slotsCaps?-capsAt; capsOK?-parts)
 open import Verify-Budget-Sufficient.Psi-Split
 -- the chain-charge algebra subscribeE-caps' own *All head spends
-open import Verify-Budget-Sufficient.Caps-Chain
-  using (chain-desc; op-step; burst-index; burst-nil; burst-step;
-         op-step-mu; quad-arith;
-         op-desc; push-desc; frame-desc; tail-desc;
-         walk-desc; inner-desc;
-         inner-nil; inner-step; walk-nil;
-         frame-step; walk-index; queue-push)
-open import Verify-Budget-Sufficient.Caps-Sadd
-  using (walk-step-suc)
 -- the transformer monotonicity/inflation family, cited directly by the
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
@@ -124,12 +112,6 @@ open import Verify-Budget-Sufficient.Caps
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
-open import Verify-Budget-Sufficient.Subscribe-Face
-  using (unfoldμ-caps; subscribeE-caps; countLen; countVals; countIn; valsOf; pushEmit-count;
-         pushBurst-len; retagEvents-caps;
-         burstCount?-widen; burstCount?-tail;
-         thruWrap-vals; splitBurst-len; mul-fits; valsIn; valsLen;
-         lenWiden; frameStep-+suc; concat-fits)
 open import Verify-Budget-Sufficient.Hop-Spine-Face
   using (burstHopSpn?; burstHopSpn-cap; burstHopSpnH?; burstHopSpnH-headline;
          burstHopSpnH-intro; scanSeed-hopSpn)
@@ -138,10 +120,6 @@ open import Verify-Budget-Sufficient.Hop-Spine-Push
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner;
          depthConsume; depthWalk; depthSlot; depthConn)
-open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step)
-open import Verify-Budget-Sufficient.Op-Budget
-  using (opIterD-dominated)
 
 -- `input i` WITH ITS Exp INDICES PINNED.  Written bare in a postulate's
 -- type the guarded/value/parked contexts are metavariables — only

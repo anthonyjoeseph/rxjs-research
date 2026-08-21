@@ -14,51 +14,19 @@ open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
                                 if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
                                 _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans; ≤-pred;
-                                       +-suc; +-identityʳ;
-                                       +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-<; +-monoˡ-≤;
-                                       *-monoˡ-≤; *-monoʳ-≤;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
-                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
-                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
-                                       ^-monoˡ-≤; ^-*-assoc;
-                                       ^-distribˡ-+-*; *-mono-≤;
-                                       +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡;
-                                       +-cancelʳ-≤)
-open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.Nat.Induction  using (<-wellFounded)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
 open import Data.Bool.ListAction using (all; any)
-open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
-open import Data.Bool.Properties using (∨-zeroʳ)
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
-open import Data.List.Properties using (length-++)
-open import Data.List.Membership.Propositional.Properties
-  using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.Maybe   using (Maybe; nothing; just)
-open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
-open import Data.Unit    using (⊤; tt)
-open import Induction.WellFounded using (Acc; acc; WellFounded)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 
@@ -86,11 +54,6 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
                                 elimDExp; elimDTm; elimDTms;
                                 compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
                                 evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (outWᵉ; outWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
-                                 pm-elimGᵉ; pm-elimGᵗ; pm-elimGᵗˢ;
-                                 hopD-elimGᵉ; hopD-elimGᵗ; hopD-elimGᵗˢ;
-                                 hopD-unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
                                 Slot; scripted; shared; resolve; mkHot;
                                 arrVal; scanVals; memberSource;

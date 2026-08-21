@@ -24,8 +24,10 @@ the timing — and that is why it is not in the scan.
 | `wiring-gate` | [wiring.md](wiring.md) | leave a definition, postulate or module with no route to Main |
 | `wiring-refuted` | [wiring.md](wiring.md) | leave a refutation `Refuted.Main` does not claim |
 | `unsafe-check` | [unsafe-check.md](unsafe-check.md) | slip an unsafe pragma onto the proof path |
-| `dup-selftest` | [dup-check.md](dup-check.md) | ship a duplicate checker that has stopped firing |
-| `dup-check` | [dup-check.md](dup-check.md) | prove the same fact twice under two names |
+| `dup-selftest` | [find.md](find.md) | ship a duplicate checker that has stopped firing |
+| `dup-check` | [find.md](find.md) | prove the same fact twice under two names |
+| `imports-selftest` | [imports-check.md](imports-check.md) | ship an import checker that has stopped firing |
+| `imports-check` | [imports-check.md](imports-check.md) | leave an import no name in the file spends, or one that names nothing it takes |
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
 | `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
@@ -39,7 +41,8 @@ the timing — and that is why it is not in the scan.
 | [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, and the comment-stripped mirror Agda actually checks |
 | [agda-dev.md](agda-dev.md) | `make agda-dev` — the per-member iteration loop |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
-| [find.md](find.md) | `make find` — search by the shape of the STATEMENT |
+| [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
+| [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard, and why an edge costs |
 | [harness.md](harness.md) | `make harness` — the compiled calculator, and why its numbers prove nothing |
 | [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |

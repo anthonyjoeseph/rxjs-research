@@ -28,8 +28,6 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
                                        m≤m+n; *-identityˡ; +-identityʳ;
                                        +-monoʳ-≤)
 open import Data.List using (List; []; _∷_)
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin  using (Fin)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; _⊎_)

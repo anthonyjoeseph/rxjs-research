@@ -1,6 +1,5 @@
 module Rx.Time-Theorems where
 
-open import Data.List    using (List)
 open import Data.Product using (_×_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 

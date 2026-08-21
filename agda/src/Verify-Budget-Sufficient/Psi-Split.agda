@@ -41,8 +41,6 @@ open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Unit    using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Relation.Nullary using (yes; no)
-open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
