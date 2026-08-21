@@ -140,10 +140,14 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`input-wet-scripted-four`** (Walk-Level) — GRINDABLE: takes NO walk face, so
-  nothing recurses and no induction has to be designed. Header carries the full
-  census against a PROVEN clause-for-clause twin, plus two chores that read as
-  already done and are not.
+- **`scripted-cold-async-four`** (Walk-Level) — DIFFICULTY: the census's route
+  for this shape does not compose. Its two lemmas are real but want the caps
+  receipt at different schedules, and capsOK? reads Sched.live — so a live-drop
+  step nobody named is owed first. Establish it before grinding the rest.
+- **`scripted-cold-empty-four`** (Walk-Level) — GRINDABLE: every conjunct has a
+  PROVEN source and the clause reduces. What is owed is two value bounds on the
+  scripted list; the Ψ half is free from the isData binder once its lemma exists,
+  and that lemma's exact twin is proven.
 - **`walk-defer-eight` / `walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in
   that order. None recurses or pushes, so none needs a push face or reaches the
   ledger conjuncts. The first two already have real consumers, so their fit gets
