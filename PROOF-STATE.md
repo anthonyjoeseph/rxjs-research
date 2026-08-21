@@ -138,11 +138,9 @@ A row's class here must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
 The walkFace family is GROUND — `walkFace` is a real definition on every clause
-and the Walk-Level tree holds no live postulate — so both remaining rows sit on
-the burst side.
+and the Walk-Level tree holds no live postulate — so the one remaining row sits
+on the burst side.
 
-- **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: all six conjuncts
-  have a named source in scope. Header carries the per-conjunct inventory.
 - **`switchKill-context`** (Burst-Walk) — GRINDABLE: pure preservation, and
   every quantity in the conclusion appears in a hypothesis.
 

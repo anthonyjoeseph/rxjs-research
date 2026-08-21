@@ -154,6 +154,9 @@ open import Verify-Budget-Sufficient.Caps-Face
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
          frameStep-mono-j; frameStep-0; stepFrame-face; frameBud;
+         -- the INV? assembly's peel, and the two ladder side conditions it
+         -- and its call site spend
+         capsOK?-parts; cSize≤frameStep; frameStep-reg≤size;
          -- the inner-at-suc-J kit, cribbed from subscribeInner-caps
          frameStep-chain-suc; pathSz?-⊑; capsOK?-mono;
          -- the nest ledger over a payload list, and the two readings of a
@@ -1866,71 +1869,87 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 --   RECOVERY: git show 4a76fff restores the identity form and the analysis
 --   that led here, if the level bump ever has to be undone.
 
-postulate
-  -- INV? at the inner frame's level, assembled from OKB + regP? ledger
-  -- + the two SLOT bounds.  Conjunct by conjunct: stBounded? and
-  -- regsSz? are capsOK?'s own; fnCapBounded? is OKB's second conjunct;
-  -- regsB? recombines capsOK?'s regsSz? with regP?'s pathBΨ? half
-  -- (regsB?-of-parts — RELOCATED INTO THIS MODULE 2026-08-20, above,
-  -- beside the Ψ predicates it consumes; it previously sat in
-  -- .Caps-Bridge, downstream, and that placement was this row's only
-  -- blocker.  Nothing had to move DOWN and no all-zip inlining is
-  -- needed: .Caps-Bridge was downstream of all three ingredient
-  -- families, so the lemmas were simply left behind when the Ψ
-  -- predicates themselves were relocated here on 2026-08-10);
-  -- registry-count is
-  -- frameStep-reg≤size (.Caps, PROVEN — the citation here read
-  -- ".Caps-Bridge:151" and that line is unrelated comment text); and the two slot
-  -- conjuncts are the added hypotheses.
-  --
-  -- ⚠ SHAPE DEFECT FOUND AND REPAIRED 2026-08-13 — the SAME anti-pattern
-  -- as `-pLen` above ("a conclusion needing information that appears in
-  -- NONE of its hypotheses"), caught by reading the definitions rather
-  -- than by a failed grind.  INV?'s last two conjuncts are
-  -- `slotsSize (Sched.slots sched) ≤ᵇ B` and `slotsFnCap … ≤ᵇ Ψ`, and
-  -- the ORIGINAL hypothesis list could reach NEITHER: OKB is
-  -- `walkOK × fnCapBounded?`, `walkOK` is `slots-eq × capsOK?`, and
-  -- capsOK? bounds live/nodes/registry/widths — it never bounds the
-  -- SLOT STORE's size or fn-weight, and fnCapBounded? reads only
-  -- live/nodes.  `PbB`/`VbB` are about the path and the value.  So the
-  -- statement was UNDERDETERMINED, not hard.
-  --
-  -- The repair is the sanctioned one ("prefer a free hypothesis to a
-  -- carried postulate"), and it is nearly free because it MIRRORS a
-  -- hypothesis already threaded at every level of this stack:
-  -- `slotsSize sl ≤ cSize c` was present all the way down (so that
-  -- conjunct was always reachable and only the transport was unstated);
-  -- its Ψ-side twin `slotsFnCap sl ≤ Ψ` was simply missing, and is now
-  -- threaded beside it through -core, subscribeE-inner-nodry and
-  -- SiNodry.  At the true instantiation Ψ := ΨAt e sl is
-  -- `fnCapᵉ e + slotsFnCap sl`, so the new hypothesis is `m≤n+m` — the
-  -- same way `caps-fuel-root` (.Wet/Part6) already discharges it.
-  --
-  -- CLASS: this row was carried as FALSITY and is neither false nor
-  -- merely hard — it was SHAPE.  With the hypotheses threaded it was
-  -- DIFFICULTY, blocked on the placement above rather than on
-  -- mathematics; with that relocated it is GRINDABLE.  Every conjunct
-  -- now has a named source IN SCOPE — the recombination lemma above,
-  -- PROVEN frameStep-reg≤size (.Caps-Bridge:151), capsOK?'s own two,
-  -- OKB's second, and the two threaded slot hypotheses — so what is
-  -- left is assembling six conjuncts, with nothing to decide.
-  subscribeE-inner-nodry-inv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sched : Sched Γ) (st : EvalSt e) →
-    slotsSize sl ≤ Caps.cSize c →
-    slotsFnCap sl ≤ Ψ →
-    OKB {e = e} c sl Ψ J sched st →
-    regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
-    INV? Ψ (Caps.cSize (frameStep J c)) sched st ≡ true
-  -- pathB? for the extended path — GRINDABLE, and it is THREE LINES:
-  --   ∧-intro refl (pathB?-of-parts κ (proj₁ (∧-true _ _ pb))
-  --                                   (proj₂ (∧-true _ _ pb)))
-  -- `frameB? B Ψ (from-inner _ _ _) = true` gives the head by `refl`, and
-  -- `pathB?-of-parts` — PROVEN, IN THIS MODULE above the block since the
-  -- 2026-08-20 relocation — recombines PbB's pathSz? and pathBΨ? halves
-  -- into pathB?.  It was previously in .Caps-Bridge, downstream, which is
-  -- why this row's route used to elide the recombination step and read as
-  -- vaguer than it is.  `pathB?` carries no length conjunct, which is what
-  -- keeps it cheap.
+-- INV? AT THE INNER FRAME'S LEVEL, assembled from OKB + the regP? ledger
+-- + the two slot bounds + the ladder's registration/size side condition.
+-- Conjunct by conjunct: stBounded? is capsOK?'s own first; fnCapBounded?
+-- is OKB's second; the registry CARDINALITY is capsOK?'s last conjunct
+-- carried across `cReg ≤ cSize` at the level the conclusion is stated at;
+-- regsB? recombines capsOK?'s regsSz? with regP?'s pathBΨ? half
+-- (`regsB?-of-parts` — in .Psi-Split, beside the Ψ predicates it consumes;
+-- it previously sat in .Caps-Bridge, downstream, and that placement was
+-- this row's only blocker.  Nothing had to move DOWN and no all-zip
+-- inlining is needed: .Caps-Bridge was downstream of all three ingredient
+-- families, so the lemmas were simply left behind when the Ψ predicates
+-- themselves were relocated); and the two slot conjuncts are hypotheses,
+-- transported across walkOK's `Sched.slots sched ≡ sl`.
+--
+-- ⚠ SHAPE DEFECT FOUND AND REPAIRED — the SAME anti-pattern as `-pLen`
+-- above ("a conclusion needing information that appears in NONE of its
+-- hypotheses"), caught by reading the definitions rather than by a failed
+-- grind.  INV?'s last two conjuncts are `slotsSize (Sched.slots sched) ≤ᵇ
+-- B` and `slotsFnCap … ≤ᵇ Ψ`, and the ORIGINAL hypothesis list could reach
+-- NEITHER: OKB is `walkOK × fnCapBounded?`, `walkOK` is
+-- `slots-eq × capsOK?`, and capsOK? bounds live/nodes/registry/widths — it
+-- never bounds the SLOT STORE's size or fn-weight, and fnCapBounded? reads
+-- only live/nodes.  `PbB`/`VbB` are about the path and the value.  So the
+-- statement was UNDERDETERMINED, not hard.
+--
+-- The repair MIRRORS a hypothesis already threaded at every level of this
+-- stack: `slotsSize sl ≤ cSize c` was present all the way down (so that
+-- conjunct was always reachable and only the transport was unstated); its
+-- Ψ-side twin `slotsFnCap sl ≤ Ψ` was simply missing, and is now threaded
+-- beside it through -core, subscribeE-inner-nodry and SiNodry.  At the true
+-- instantiation Ψ := ΨAt e sl is `fnCapᵉ e + slotsFnCap sl`, so the new
+-- hypothesis is `m≤n+m` — the same way `caps-fuel-root` (.Wet/Part6)
+-- already discharges it.
+--
+-- ⚠ AND THE SAME DEFECT AGAIN, ONE CONJUNCT OVER — REFUTED 2026-08-21,
+-- machine-checked: `inner-nodry-inv-regLen-absurd` (agda/refuted,
+-- Refuted.Inner-Nodry).  INV?'s THIRD conjunct is the registry CARDINALITY
+-- against the SIZE cap, and the only hypothesis mentioning that length is
+-- capsOK?'s last, which bounds it against the REGISTRATION cap.  The two
+-- caps dimensions are independent, so a caps with `cReg > cSize` satisfies
+-- every hypothesis and breaks the conclusion — the witness holds four root
+-- chains under cReg 4 and cSize 3, with every other conjunct clear by a
+-- margin.
+--
+-- THE LESSON, and it is why the row was misclassified: this row was called
+-- GRINDABLE on the grounds that "every conjunct has a named source IN
+-- SCOPE", and `frameStep-reg≤size` was one of the names.  A lemma being
+-- PROVEN and in scope says NOTHING about its own hypotheses being
+-- available where it is applied — that lemma needs `1 ≤ cSize c` and
+-- `cReg c ≤ cSize c`, neither of which the statement carried.  So the
+-- premise is now stated at the level the conclusion is stated at, where
+-- the consumer discharges it from its own `2≤S` and `hCR`.
+--
+-- AND THE SLOT PREMISE IS RE-INDEXED RATHER THAN CONDITIONED.  It reads
+-- `slotsSize sl ≤ Caps.cSize (frameStep J c)`, which is the WEAKER
+-- hypothesis and therefore the STRONGER statement: the inflation transport
+-- belongs at the call site, which owns the `2≤S` that `cSize≤frameStep`
+-- needs.  No hypothesis was added for it.
+subscribeE-inner-nodry-inv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+  slotsSize sl ≤ Caps.cSize (frameStep J c) →
+  slotsFnCap sl ≤ Ψ →
+  Caps.cReg (frameStep J c) ≤ Caps.cSize (frameStep J c) →
+  OKB {e = e} c sl Ψ J sched st →
+  regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
+  INV? Ψ (Caps.cSize (frameStep J c)) sched st ≡ true
+subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc rgSz ((slEq , cOK) , fcb) rp
+  with capsOK?-parts (frameStep J c) sched st cOK
+... | stB , rgSzP , _ , _ , rLen =
+  INV?-of-parts Ψ (Caps.cSize (frameStep J c)) sched st stB fcb
+    (T⇒≡true (length (EvalSt.registry st) ≤ᵇ Caps.cSize (frameStep J c))
+      (≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ (length (EvalSt.registry st))
+                            (Caps.cReg (frameStep J c)) (T-to rLen))
+                     rgSz)))
+    (regsB?-of-parts (EvalSt.registry st) rgSzP
+      (regP?-Ψ c Ψ J (EvalSt.registry st) rp))
+    (subst (λ x → (slotsSize x ≤ᵇ Caps.cSize (frameStep J c)) ≡ true) (sym slEq)
+      (T⇒≡true (slotsSize sl ≤ᵇ Caps.cSize (frameStep J c)) (≤⇒≤ᵇ slSz)))
+    (subst (λ x → (slotsFnCap x ≤ᵇ Ψ) ≡ true) (sym slEq)
+      (T⇒≡true (slotsFnCap sl ≤ᵇ Ψ) (≤⇒≤ᵇ slFc)))
+
 -- pathB? FOR THE EXTENDED PATH — a real body since 2026-08-20, and it is
 -- three lines.  `frameB? B Ψ (from-inner _ _ _) = true` (.Measures) gives the
 -- head by `refl`, and `pathB?-of-parts` — PROVEN above in this module since
@@ -2167,7 +2186,10 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
          pLen' nB ≤-refl
          hD
          (INV?-widen sched' st (proj₁ step⊑)
-            (subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc ok rg))
+            (subscribeE-inner-nodry-inv c sl Ψ J sched st
+               (≤-trans slSz (cSize≤frameStep c J 2≤S)) slFc
+               (frameStep-reg≤size c J (≤-trans (s≤s z≤n) 2≤S) hCR)
+               ok rg))
          fnO
          (pathB?-widen (from-inner op allNid inst ↠ κ) (proj₁ step⊑)
             (subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb))

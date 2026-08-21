@@ -23,3 +23,5 @@ open import Refuted.Concat-Drain
   using (concatDrain-nodry-nestBud-absurd; thruConsume-nodry-nestBud-absurd)
 open import Refuted.Thru-Loop
   using (thruConsume-nodry-loop-absurd)
+open import Refuted.Inner-Nodry
+  using (inner-nodry-inv-regLen-absurd)
