@@ -58,7 +58,9 @@ cache.
 
 ## Adding a probe
 
-1. Write it at `agda/evidence/Probed/<Name>.agda`, module `Probed.<Name>`.
+1. Write it at `agda/evidence/probed/Probed/<Name>.agda`, module
+   `Probed.<Name>` — the tree name and the module namespace are separate
+   directory levels, and the `.agda-lib` includes `probed`, not its parent.
    Import from `src` freely — that direction is the point.
 2. Give it a `-- TARGET: <postulate>` line naming what it is evidence for, one
    name per line, bare (no module prefix). E2 checks each against
@@ -67,7 +69,12 @@ cache.
    it unreachable.
 4. Put the RECEIPT — which shapes were covered — in the target postulate's own
    header in `src`, as `-- PROBED <date>:`. The probe is apparatus; the
-   receipt is the finding, and it belongs next to the statement.
+   receipt is the finding, and it belongs next to the statement. A receipt on a
+   `postulate` BLOCK MEMBER is indented, and E3 reads it there and attributes
+   it to that member rather than to the member above — but only since the day
+   a real one was written that way and the receipt total did not move. Two
+   receipts had been invisible, one of them for days, so if you are auditing
+   coverage against a count taken before that, take it again.
 
 ## What bites
 
@@ -84,9 +91,14 @@ cache.
   their target because what they really test is that some composite reduces,
   it is a unit test: move it to `Implementation/Unit-Test.agda`, which is
   append-only and has its own end-of-life.
-- **The comment-stripped mirror covers the evidence tree too**, so error
-  positions come back through `scripts/unmap-positions.py` like everything
-  else, and a comment-only edit out here is free in the same way.
+- **The comment-stripped mirror covers the evidence tree too**, so a
+  comment-only edit out here is free in the same way — but **`make refuted` and
+  `make probed` map the PATH back and not the LINE.** An error reports the
+  `agda/evidence/…` path with the STRIPPED file's line number, which resolves
+  in your editor and points at unrelated code, usually an import. Read the line
+  out of `agda/_stripped-comments/evidence/…`, or match on the statement text
+  rather than the number. This is the stale-line-number failure the repo's
+  rules are written against, arriving from the tooling instead of a comment.
 - **`make unsafe-check` covers the evidence trees as well as `src`.** A
   refutation proven with `NO_POSITIVITY_CHECK`, or a probe row that `refl`s
   because of `--type-in-type`, is worse than no evidence: it is evidence

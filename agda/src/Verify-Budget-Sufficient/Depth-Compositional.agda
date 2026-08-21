@@ -215,6 +215,21 @@ postulate
   -- depthAll's burst uses thru-outer (the spending arc).  Bounding the
   -- inner subscribes requires storeNestMax preservation through
   -- subscribeE proved simultaneously (census finding (4)).
+  --
+  -- PROBED 2026-08-21 (Probed.Depth-All): the burst takes a MAX across
+  -- SIBLINGS, not a sum.  A merge over one slot-chain top measures 5;
+  -- a merge over two independent 4-link chains measures 5 as well,
+  -- with the store held at 51 in both rows by using the same slots.
+  -- So the arc that accumulates is the CONNECT — which is what forced
+  -- `slotsNestSum` (Refuted.Depth-Chain) — and NOT the sibling entry,
+  -- so `suc (sizeᵉ b)` is not being asked to pay for k chains.  This
+  -- was the live falsity candidate once the chain finding landed, and
+  -- it is the region the rows reached.
+  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
+  -- burst (different `initSt`, and their queueing is what
+  -- `nodesNestMax` charges); no nested burst; no post-cascade state;
+  -- and both arms are the same length, so a burst over siblings of
+  -- DIFFERENT depths is untested.
   depth-all-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)

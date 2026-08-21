@@ -122,7 +122,12 @@ def check_e2(evidence, postulates):
 # were spelled `PROBED-GREEN`, a marker someone invented for exactly the
 # distinction this check enforces -- and a regex admitting only the two legal
 # spellings would have walked straight past both.
-RECEIPT = re.compile(r"^--\s*PROBED(?P<suffix>-[A-Z-]+)?\s+(?P<date>\d{4}-\d{2}-\d{2})")
+# LEADING WHITESPACE IS ALLOWED, because a receipt on a block member is
+# indented and an anchor at column 0 made it a SILENT SKIP -- not reported, not
+# counted, not a subject.  That is the one outcome this check exists to prevent,
+# and it went unnoticed until a real receipt was written inside a `postulate`
+# block and the receipt total did not move.
+RECEIPT = re.compile(r"^\s*--\s*PROBED(?P<suffix>-[A-Z-]+)?\s+(?P<date>\d{4}-\d{2}-\d{2})")
 LEGAL_SUFFIX = (None, "-HISTORICAL")
 # The subject line: a top-level declaration, which is what a header sits above.
 DECL = re.compile(r"^(?!--)(?P<name>[^\s:(){}]+)\s*:")
@@ -162,8 +167,13 @@ def check_e3(src, postulates):
             if not m:
                 continue
             n += 1
-            # the subject is the first declaration below the comment block
-            subject, in_block = None, False
+            # the subject is the first declaration below the comment block.
+            # AN INDENTED RECEIPT IS ALREADY INSIDE A BLOCK: its `postulate`
+            # keyword sits ABOVE it, so waiting to meet one below would never
+            # enter block mode and the indented sibling declaration would not
+            # match `DECL`.  The indentation of the marker itself is the signal.
+            subject = None
+            in_block = line[:1].isspace()
             for j in range(i + 1, len(lines)):
                 nxt = lines[j]
                 if not nxt.strip() or nxt.lstrip().startswith("--"):
@@ -315,6 +325,10 @@ def selftest():
     run(os.path.join(fx, "receipt-prose"), os.path.join(fx, "empty"),
         {"live-one"}, None,
         "E3 quiet on prose mentioning PROBED with no date")
+    run(os.path.join(fx, "receipt-indented"), os.path.join(fx, "empty"),
+        {"live-one"}, "is no longer a postulate",
+        "E3 reads an INDENTED receipt on a `postulate` block member, rather "
+        "than skipping it silently")
 
     if fails:
         for f in fails:
@@ -329,7 +343,9 @@ def selftest():
           "discharged out from under the receipt -- on a receipt above no "
           "declaration at all, and on an invented marker rather than skipping "
           "it; and stays quiet on a receipt above a live postulate and on "
-          "prose mentioning the word with no date)")
+          "prose mentioning the word with no date.  A receipt INDENTED inside "
+          "a `postulate` block is read and attributed to its own block "
+          "member, not skipped and not credited to the member above it)")
     return 0
 
 
