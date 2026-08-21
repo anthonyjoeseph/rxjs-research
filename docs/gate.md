@@ -1,4 +1,4 @@
-# `make gate-light` and `make gate` — two gates, and the machine decides which
+# `make gate` — it routes, and the machine picks light or heavy
 
 `make gate` typechecks the whole tower and takes many minutes. Almost none of
 that work is ever implicated by a given edit: most modules in `agda/src` contain
@@ -7,12 +7,24 @@ VERBATIM by `agda-dev`**, so a dev pass over it is a *real* check and not a
 stubbed one. Where that holds, the full build is buying a recheck of code
 nothing touched.
 
-So there are two gates:
+So there are three targets, and **`gate` is the one you type** — it routes:
 
 | Target | What it runs | Cost |
 | --- | --- | --- |
-| `gate-light` | every cheap check, plus a real dev check of each module this tree has touched | seconds, plus one dev pass per changed module |
-| `gate` | the cheap checks, the full tower, the refutations, the bug cache — and stamps the commit | many minutes |
+| `gate` | asks for the verdict, then takes the light path or the heavy one, and says which and why | either of the below |
+| `gate-light` | every cheap check, plus a real dev check of each module this tree has touched. Red when the heavy path is owed | seconds, plus one dev pass per changed module |
+| `gate-heavy` | the cheap checks, the full tower, the refutations, the bug cache — and stamps the commit | many minutes |
+
+**`gate` routing is the whole point.** If the expensive target kept the
+plainest name, every session would reach for the tower by default, whatever a
+doc said. So `gate` asks `dev-changed --verdict-only` — free, a `--list` pass
+and a `git` query, no typecheck — and takes the cheap road when the cheap road
+is valid. `gate-heavy` forces the tower when you want it regardless.
+
+Because `gate` routes on that verdict, **every escalation trigger must be
+visible to `--verdict-only`**, drift included. It was not, once: the drift check
+sat after the early return, so a routing caller would have been told the light
+path was fine with the consumers long unchecked. The selftest pins it.
 
 **The cheap half is identical.** `GATE_CHEAP` is one list, shared: wiring,
 `unsafe-check`, `dup-check`, the import checker's selftest, `roadmap-check`,
@@ -37,9 +49,59 @@ which escalates:
   full build buys the entire tower for about the same money — and checks the
   consumers, which the light gate does not.
 - **DRIFT: more than `--drift` commits (default 10) since the last green full
-  gate.** The stamp is `.gate-full-stamp`, written by `make gate`, ignored by
+  gate.** The stamp is `.gate-heavy-stamp`, written by the heavy path, ignored by
   git, and wiped by a clean checkout — so a fresh working copy escalates, which
   is the right default for a cold cache.
+
+## Why the trigger is "multi-member block", not "contains `mutual`"
+
+The obvious cheap version of this rule is to grep the changed files for a
+`mutual` keyword. It is wrong in **both** directions, and measured over the 90
+modules of `agda/src`:
+
+| rule | escalates | needlessly heavy | **wrongly LIGHT** |
+| --- | --- | --- | --- |
+| a literal `mutual` keyword appears | 14 | 9 | **17** |
+| ≥1 multi-member block (implemented) | 22 | — | — |
+
+The 17 are the finding, and `scripts/agda-dev.py`'s own header had already
+said why: **an Agda mutual block is not the `mutual` keyword.** A block runs
+from the first forward signature until every pending signature has a
+definition, so a pair of forward-declared functions that call each other is a
+two-member block with no keyword anywhere -- and this repo's heavy modules are
+written exactly that way. A keyword grep misses them — among them `Rx/Evaluator.agda`, `Verify-Budget-Sufficient/
+Burst-Walk.agda` and `Subscribe-Face.agda`, which are exactly the modules where
+a stubbed sibling makes dev-green and gate-green come apart. The grep would
+wave those onto the light path: a false green, the one failure direction that
+costs something.
+
+The 9 in the other column are the smaller half of the same point — a
+single-member `mutual` block has no siblings to stub, so it is emitted verbatim
+and its dev check is real.
+
+The block is the right unit because it is the unit of TWO things at once: it
+is what Agda's termination checker examines (one decreasing measure across
+every call in the block), and it is what `agda-dev` stubs. Those coincide, and
+that coincidence is the whole basis of the split -- in a multi-member block the
+dev run loses precisely the check the heavy path uniquely buys.
+
+So the trigger **asks the generator what it will actually stub** (`agda-dev
+--list`, free) rather than grepping for a proxy. A criterion derived from the
+same code that does the stubbing cannot drift from the tool it exists to guard
+against; a grep can, and does.
+
+## A WIDE CONSUMER CONE IS NOT A REASON TO ESCALATE
+
+It reads like one — a deep module with 22 consumers feels like it wants the
+tower — and reaching for the tower on that feeling is how the light gate gets
+abandoned in practice. It is the wrong move. The cone is the ONLY thing the
+light path leaves unchecked, so a wide cone is an argument for **checking the
+cone**, which is a few dev passes, not for buying the whole build.
+
+`dev-changed` therefore turns `--deps` on by itself once the cone exceeds
+`--deps-over` (default 8), and the selftest pins that a wide cone does **not**
+escalate — the regression being guarded against is a future session
+"tightening" this into an escalation trigger.
 
 Ask for the verdict alone, at no typecheck cost:
 
@@ -67,8 +129,10 @@ They belong to the merge gate.
 ## Flags and knobs
 
 ```
-make gate-light                 the default gate
-make gate-light DRIFT=20        raise the commit limit
+make gate                       WHAT YOU TYPE — routes, and says which and why
+make gate-light                 force the light path (red if heavy is owed)
+make gate-heavy                 force the tower
+make gate DRIFT=20              raise the commit limit
 make gate-light DEPS=1          dev-check the consumer cone as well
 make gate-light ARGS='--max-files 12'
 make dev-changed                the dev half alone

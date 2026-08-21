@@ -16,15 +16,17 @@ not a property of the tool. The one file that legitimately carries dates is
 `typecheck-performance-numbers.md`, because a timing's age IS information about
 the timing — and that is why it is not in the scan.
 
-## Which gate (`make gate-light` vs `make gate`)
+## Which gate — `make gate` routes
 
-Start at [gate.md](gate.md). `gate-light` is the default: the whole cheap block
-below, plus a real dev check of the modules this tree touched. It **refuses to
-pass** when the full build is still owed — a touched multi-member mutual block,
-a file outside `agda/src`, too many changed modules, or too many commits of
-drift — so the choice is the machine's, not yours.
+Start at [gate.md](gate.md). **Type `make gate`** — it asks for a free verdict
+and takes the light path (the cheap block below, plus a real dev check of the
+modules this tree touched) or the heavy one (that block plus the full tower),
+printing which and why. The escalation triggers are a touched multi-member
+mutual block, a file outside `agda/src`, too many changed modules, or too many
+commits of drift since the last heavy run — so the choice is the machine's, not
+yours. `gate-light` and `gate-heavy` force a path.
 
-## The gate, in order (`make gate`)
+## The cheap block, in order — both paths run all of it
 
 | Target | Doc | What it will not let you do |
 | --- | --- | --- |
@@ -49,7 +51,7 @@ drift — so the choice is the machine's, not yours.
 | --- | --- |
 | [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, and the comment-stripped mirror Agda actually checks |
 | [agda-dev.md](agda-dev.md) | `make agda-dev` — the per-member iteration loop |
-| [gate.md](gate.md) | `make gate-light` vs `make gate` — the four escalation triggers, and the consumer cone neither dev check reaches |
+| [gate.md](gate.md) | `make gate` routing, `gate-light` / `gate-heavy` — the four escalation triggers, and the consumer cone the light path does not reach |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard, and why an edge costs |

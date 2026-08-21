@@ -1,4 +1,4 @@
-.PHONY: gate gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -94,9 +94,12 @@ help:
 	@echo "                  DRIFT=n  raise/lower the commit limit (default 10)"
 	@echo "                  ARGS='--max-files n'  the changed-set ceiling"
 	@echo "                  DEPS=1   dev-check the consumer cone too"
-	@echo "  gate          THE MERGE GATE: gate-light's cheap half plus the full"
-	@echo "                  tower, the refutations and the bug cache.  Many"
-	@echo "                  minutes; stamps the commit gate-light counts from"
+	@echo "  gate          WHAT YOU TYPE.  Routes: takes the light path when the"
+	@echo "                  changed set is light-checkable, the full one when it"
+	@echo "                  is not, and prints which and why"
+	@echo "  gate-heavy     the tower, forced: gate-light's cheap half plus every"
+	@echo "                  module, the refutations and the bug cache.  Many"
+	@echo "                  minutes; stamps the commit the drift check counts from"
 	@echo "  postulates    every postulate in agda/src by name — the work ledger"
 	@echo "  find          SEARCH FIRST, made cheap: search the declared TYPE of"
 	@echo "                  every statement in agda/src.  Always the whole tree —"
@@ -586,15 +589,33 @@ gate-light:
 	@$(MAKE) --no-print-directory dev-changed
 	@echo "gate-light: ALL GREEN"
 
-# THE MERGE GATE.  Everything, including the full tower.  Stamps the commit on
-# the way out, which is what `dev-changed`'s drift trigger counts from.
+# THE GATE YOU TYPE, and it ROUTES.  `gate` is the name every session reaches
+# for, so it must not be the expensive one by default -- otherwise the habit is
+# the full tower every time, whatever a doc says.  It asks dev-changed for the
+# verdict (free: a --list pass and a git query, no typecheck) and takes the
+# light path when the light path is valid, the full one when it is not.
 gate:
+	@if scripts/dev-changed.py --verdict-only --drift $(or $(DRIFT),10) \
+	     >/dev/null 2>&1; then \
+	  echo "gate: the changed set is light-checkable — taking the LIGHT path"; \
+	  echo "gate: (\`make gate-heavy\` forces the tower)"; \
+	  $(MAKE) --no-print-directory gate-light; \
+	else \
+	  echo "gate: the heavy path is owed — taking it:"; \
+	  scripts/dev-changed.py --verdict-only --drift $(or $(DRIFT),10) \
+	    2>&1 | sed -n 's/^dev-changed: ESCALATE/gate:  reason:/p'; \
+	  $(MAKE) --no-print-directory gate-heavy; \
+	fi
+
+# THE MERGE GATE, forced.  Everything, including the full tower.  Stamps the
+# commit on the way out, which is what dev-changed's drift trigger counts from.
+gate-heavy:
 	@$(MAKE) --no-print-directory gate-cheap
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory bug-cache
 	@scripts/dev-changed.py --stamp
-	@echo "gate: ALL GREEN"
+	@echo "gate-heavy: ALL GREEN"
 
 # The one way this driver can lie is by checking NOTHING and exiting 0 — an
 # empty changed set, or a multi-member block it failed to notice.  Both
@@ -617,13 +638,19 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only --max-files 2 --files $$n $$m $$n $$m 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
 	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
+	  w=agda/src/Verify-Budget-Sufficient/Caps-Face/Part5.agda; \
+	  scripts/dev-changed.py --verdict-only --files $$w >/dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: a wide consumer cone escalated to the tower — a wide cone is the one thing the light path leaves unchecked, so the answer is to CHECK the cone (a few dev passes), never to buy the whole build"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --files $$n 2>&1); \
+	  echo "$$out" | grep -q 'ESCALATE.*commits since' \
+	    || { echo "SELFTEST FAIL: drift is invisible to --verdict-only — \`make gate\` routes on that verdict, so it would take the light path with the consumers long unchecked"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only --files agda/refuted/Refuted/Main.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
 	    || { echo "SELFTEST FAIL: a file outside agda/src did not escalate — nothing would have checked it"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
 	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; a file outside agda/src escalates because no dev check can reach it; and an empty changed set says so rather than passing quietly)"; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone is cheaper than the tower; a file outside agda/src escalates because no dev check can reach it; and an empty changed set says so rather than passing quietly)"; \
 	  else exit 1; fi
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is

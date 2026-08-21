@@ -21,7 +21,7 @@ THE ESCALATION TRIGGERS, all three mechanical:
     only case the user's rule cares about.
   · a changed file is NOT dev-checkable at all — anything under
     `agda/refuted`, which has its own root and its own target.
-  · DRIFT: too many commits since the last green `make gate`.  A light gate is
+  · DRIFT: too many commits since the last green heavy gate.  A light gate is
     a bet that the consumers still typecheck, and a long run of unchecked bets
     is exactly how a tree gets far down a wrong road cheaply.
 
@@ -40,7 +40,7 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join("agda", "src")
-STAMP = os.path.join(REPO, ".gate-full-stamp")
+STAMP = os.path.join(REPO, ".gate-heavy-stamp")
 MULTI = re.compile(r"^\s*\d+ blocks?, (\d+) multi-member", re.M)
 
 
@@ -146,8 +146,14 @@ def main() -> int:
                          "sequential dev checks cost more than one full "
                          "build, which checks the whole tower for the price")
     ap.add_argument("--drift", type=int, default=10,
-                    help="commits since the last green `make gate` before the "
+                    help="commits since the last green heavy gate before the "
                          "full build is owed regardless of what changed")
+    ap.add_argument("--deps-over", type=int, default=8,
+                    help="dev-check the consumer cone automatically once it "
+                         "exceeds this many modules.  A wide cone is the one "
+                         "thing that used to justify reaching for the tower by "
+                         "hand; checking the cone answers it directly, and for "
+                         "a few dev passes rather than the whole build")
     ap.add_argument("--deps", action="store_true",
                     help="also dev-check the reverse-dependency cone")
     ap.add_argument("--verdict-only", action="store_true",
@@ -199,15 +205,47 @@ def main() -> int:
             escalate.append(f"{f}: {k} multi-member mutual block(s) — agda-dev "
                             f"stubs them, so a dev pass here is not a check")
 
+    n = commits_since_full()
+    if n is None:
+        escalate.append("no record of a green `make gate` in this working copy "
+                        "— the stamp is written by the heavy gate and wiped by a "
+                        "clean, so this is the cold-cache case")
+    elif n > a.drift:
+        escalate.append(f"{n} commits since the last green heavy gate "
+                        f"(limit {a.drift}) — the consumers have gone "
+                        f"unchecked for too long")
+    else:
+        print(f"dev-changed: {n} commit(s) since the last green full gate "
+              f"(limit {a.drift})")
+
     if a.verdict_only:
         for line in escalate:
             print("dev-changed: ESCALATE  " + line)
-        print("dev-changed: FULL GATE REQUIRED" if escalate
-              else "dev-changed: light gate sufficient for this changed set")
+        if escalate:
+            print("dev-changed: FULL GATE REQUIRED")
+        else:
+            print("dev-changed: light gate sufficient for this changed set — "
+                  "no changed module has a multi-member block, so NOTHING was "
+                  "stubbed and the termination question is not asked, not "
+                  "merely likely to pass.  Overriding this verdict by hand is "
+                  "a claim that this tool is broken, which is a finding.")
         return 2 if escalate else 0
 
     checkable = [f for f in src_files if multi.get(f) == 0]
-    if a.deps:
+    # A WIDE CONE IS NOT A REASON TO REACH FOR THE TOWER, and it used to be
+    # taken as one.  The cone is the only thing the light path leaves unchecked,
+    # so when it is wide the answer is to CHECK IT -- a few dev passes -- not to
+    # buy the whole build.  Escalating instead pays half an hour to cover a risk
+    # a cheap pass covers, and it never announces itself as the wrong call.
+    deps = a.deps
+    if not deps and src_files:
+        ci0 = _load("check-imports")
+        ci0.TREES = list(ci0.CLAIM_ROOT)
+        if len(consumers({ci0.module_of(f) for f in src_files})) > a.deps_over:
+            print(f"dev-changed: the cone is wider than {a.deps_over} — "
+                  f"checking it rather than escalating to the tower")
+            deps = True
+    if deps:
         ci = _load("check-imports")
         ci.TREES = list(ci.CLAIM_ROOT)
         mods = {ci.module_of(f) for f in src_files}
@@ -234,29 +272,22 @@ def main() -> int:
               "actually checked")
         fail = 1
 
-    n = commits_since_full()
-    if n is None:
-        escalate.append("no record of a green `make gate` in this working copy "
-                        "— the stamp is written by `make gate` and wiped by a "
-                        "clean, so this is the cold-cache case")
-    elif n > a.drift:
-        escalate.append(f"{n} commits since the last green `make gate` "
-                        f"(limit {a.drift}) — the consumers have gone "
-                        f"unchecked for too long")
-    else:
-        print(f"dev-changed: {n} commit(s) since the last green full gate "
-              f"(limit {a.drift})")
-
     mods = {_load("check-imports").module_of(f) for f in src_files} \
         if src_files else set()
     if mods:
         cone = consumers(mods)
-        print(f"dev-changed: NOT CHECKED — {len(cone)} consumer module(s) of "
-              f"the changed set; the light gate bets these still typecheck")
-        for m in sorted(cone)[:12]:
-            print(f"                {m}")
-        if len(cone) > 12:
-            print(f"                … and {len(cone) - 12} more")
+        if deps:
+            print(f"dev-changed: the cone was CHECKED — {len(cone)} consumer "
+                  f"module(s), so the light path leaves no unchecked bet here "
+                  f"beyond a stubbed mutual block, and none was touched")
+        else:
+            print(f"dev-changed: NOT CHECKED — {len(cone)} consumer module(s) "
+                  f"of the changed set; the light gate bets these still "
+                  f"typecheck")
+            for m in sorted(cone)[:12]:
+                print(f"                {m}")
+            if len(cone) > 12:
+                print(f"                … and {len(cone) - 12} more")
 
     for line in escalate:
         print("dev-changed: ESCALATE  " + line)

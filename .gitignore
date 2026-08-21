@@ -33,4 +33,4 @@ __pycache__/
 agda/_stripped-comments/
 
 # scripts/dev-changed.py records the last green `make gate` here; local state
-.gate-full-stamp
+.gate-heavy-stamp
