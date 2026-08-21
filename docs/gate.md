@@ -103,6 +103,42 @@ cone**, which is a few dev passes, not for buying the whole build.
 escalate — the regression being guarded against is a future session
 "tightening" this into an escalation trigger.
 
+### …but a CLAIM ROOT is never part of the sweep, or the sweep IS the tower
+
+The first version of the auto-`--deps` path checked the cone as computed, and
+that is wrong in a way the phrase "cheaper than the tower" hides: **every
+module in `agda/src` has a route to Main by the wiring law, so EVERY cone
+contains the claim roots**, and a dev check on `Main.agda` is `make agda` with
+a comment-stripping round trip in front of it. Measured on the run that found
+this: the roots and `The-Proof.agda` each hit the 45 s budget and were reported
+`FAIL`, then at 560 s `Main.agda` took minutes and `The-Proof.agda` had still
+not finished — while **every non-root consumer in the same run came in under
+12 s.** The cheap part was real; the roots were the whole cost.
+
+So the sweep subtracts the claim roots and says which ones it held back. What
+covers a root is the DRIFT counter and the heavy gate, which is what they are
+for.
+
+### A BUDGET TIMEOUT IS NOT A RED, and conflating them made the sweep lie
+
+`agda-dev` exits non-zero for a budget kill exactly as it does for a type
+error, so the sweep called both `FAIL`. For a module the commit **changed**
+that is right — that module is the one thing the run exists to check. For a
+**cone** module it is not: an unfinished consumer check is precisely the bet
+the light path was already making, so it is reported `skip` and the sweep goes
+on. Both halves are selftest rows, because collapsing either direction is a
+one-character edit: red on a cone timeout fails every wide-cone run, and skip
+on a changed timeout passes a module nothing checked.
+
+The budget kill is distinguishable only by the per-member `(exit 124)` in
+`agda-dev`'s own report, never by the process status. A cone member has no
+multi-member block by construction, so it runs exactly one focus check and the
+marker cannot belong to a sibling.
+
+`--plan` prints the sweep plan — what would be checked, what was held back —
+and runs no agda, which is what makes the root exclusion testable at
+`gate-cheap` speed.
+
 Ask for the verdict alone, at no typecheck cost:
 
 ```

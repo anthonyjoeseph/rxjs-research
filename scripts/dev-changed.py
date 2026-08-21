@@ -156,6 +156,12 @@ def main() -> int:
                          "a few dev passes rather than the whole build")
     ap.add_argument("--deps", action="store_true",
                     help="also dev-check the reverse-dependency cone")
+    ap.add_argument("--plan", action="store_true",
+                    help="print the sweep PLAN — which modules would be dev "
+                         "checked and which cone members are held back — then "
+                         "stop.  Free: it runs no agda, which is what makes "
+                         "the claim-root exclusion testable at gate-cheap "
+                         "speed.")
     ap.add_argument("--verdict-only", action="store_true",
                     help="decide escalation from the free --list pass; run no "
                          "real check")
@@ -245,22 +251,61 @@ def main() -> int:
             print(f"dev-changed: the cone is wider than {a.deps_over} — "
                   f"checking it rather than escalating to the tower")
             deps = True
+    cone_only = set()
     if deps:
         ci = _load("check-imports")
         ci.TREES = list(ci.CLAIM_ROOT)
         mods = {ci.module_of(f) for f in src_files}
         cone = consumers(mods)
+        # A CLAIM ROOT'S DEV CHECK *IS* THE TOWER, so it is never part of a
+        # cone sweep.  Every module in `src` has a route to Main by the wiring
+        # law, so EVERY cone contains the roots -- which is why the cone sweep
+        # read as "cheaper than the tower" and then ran the tower.  Measured:
+        # the roots timed out at 45s and Main alone took minutes at 560s, while
+        # every non-root consumer in the same run came in under 12s.  What
+        # covers the roots is the DRIFT counter and the heavy gate, not this.
+        roots = {ci.module_of(os.path.join(t, r))
+                 for t, r in ci.CLAIM_ROOT.items()}
+        skipped_roots = sorted(cone & roots)
+        cone = cone - roots
         print(f"dev-changed: --deps: adding {len(cone)} consumer module(s)")
+        if skipped_roots:
+            print(f"dev-changed: --deps: NOT the {len(skipped_roots)} claim "
+                  f"root(s) in the cone — a root's dev check is the tower, "
+                  f"which is the heavy gate's job: "
+                  + ", ".join(skipped_roots))
         by_mod = {ci.module_of(f): f for f in src_files}
         for m in sorted(cone):
             p = os.path.join(SRC, m.replace(".", os.sep) + ".agda")
             if os.path.exists(os.path.join(REPO, p)) and p not in by_mod:
                 if multi_member(os.path.relpath(p, SRC)) == 0:
                     checkable.append(p)
+                    cone_only.add(p)
 
+    if a.plan:
+        for f in checkable:
+            print(f"dev-changed: plan  {'cone' if f in cone_only else 'chgd'}"
+                  f"  {f}")
+        return 0
+
+    # A BUDGET TIMEOUT IS NOT A RED, AND CONFLATING THEM MAKES A CONE SWEEP
+    # LIE.  For a module the commit actually CHANGED, an unfinished check is a
+    # failure -- that module has to be checked.  For a cone module it is only
+    # the bet the light path was making anyway, so it is reported as still
+    # unchecked and the sweep goes on.
+    unchecked = []
     for f in checkable:
         rc, out = dev_check(os.path.relpath(f, SRC), a.budget)
         tail = [l for l in out.split("\n") if l.strip()][-1:] or [""]
+        # agda-dev's PROCESS exit is 1 for any red; the budget kill is
+        # distinguishable only by the per-member `(exit 124)` it reports.  A
+        # cone member has no multi-member block by construction, so it runs
+        # exactly ONE focus check and that marker cannot be another member's.
+        if "(exit 124)" in out and f in cone_only:
+            unchecked.append(f)
+            print(f"dev-changed: skip  {f}  — over the {a.budget}s budget; "
+                  f"still an unchecked consumer")
+            continue
         print(f"dev-changed: {'ok  ' if rc == 0 else 'FAIL'}  {f}"
               f"  — {tail[0].strip()}")
         if rc != 0:
@@ -278,8 +323,8 @@ def main() -> int:
         cone = consumers(mods)
         if deps:
             print(f"dev-changed: the cone was CHECKED — {len(cone)} consumer "
-                  f"module(s), so the light path leaves no unchecked bet here "
-                  f"beyond a stubbed mutual block, and none was touched")
+                  f"module(s), minus the claim roots and "
+                  f"{len(unchecked)} over budget")
         else:
             print(f"dev-changed: NOT CHECKED — {len(cone)} consumer module(s) "
                   f"of the changed set; the light gate bets these still "
