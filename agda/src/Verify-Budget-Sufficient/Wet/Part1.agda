@@ -512,12 +512,7 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
 takeVals-B : ∀ {n} {Γ : Ctx n} {s} (B Ψ : ℕ) (k : ℕ) (vals : List (Val Γ s)) →
   all (valB? B Ψ s) vals ≡ true →
   all (valB? B Ψ s) (proj₁ (takeVals k vals)) ≡ true
-takeVals-B B Ψ zero          _        h = refl
-takeVals-B B Ψ (suc k)       []       h = refl
-takeVals-B B Ψ (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
-takeVals-B B Ψ (suc (suc k)) (v ∷ vs) h =
-  ∧-intro (proj₁ (∧-true _ _ h))
-          (takeVals-B B Ψ (suc k) vs (proj₂ (∧-true _ _ h)))
+takeVals-B {s = s} B Ψ k vals h = takeVals-all (valB? B Ψ s) k vals h
 
 -- the sweep is a filter on the fn-cap face too (mirror of
 -- sweepLive-bounded)

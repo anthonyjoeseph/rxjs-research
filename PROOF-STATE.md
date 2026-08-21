@@ -140,14 +140,10 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`walk-map` / `walk-scan-rest`** (Walk-Level) — DIFFICULTY: gas exhaustion
-  sites at neither, and that region is unreachable by measurement. Residue is
-  the unauthored per-frame push face, whose frame-generic form is REFUTED; the
-  take frame's is now landed, so `pushTake-wet` is the worked instance.
-- **`stepTake-wet`** (Walk-Level) — DIFFICULTY: all that is left of the take
-  clause. One emit through `takeDispatch`, no caps level and no gas; the case
-  tree over an unpinned node lookup is the unmechanical part. Header carries
-  the per-conjunct inventory.
+- **`walk-map` / `walk-scan-rest`** (Walk-Level) — DIFFICULTY: residue is the
+  unauthored per-frame push face, whose frame-generic form is REFUTED. The takeᵉ
+  clause is now postulate-free end to end (`pushTake-wet` ⊗ `stepTake-wet`), so
+  it is the worked instance for both of these.
 - **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
   the one conjunct of arm B not closed by computation. Header carries the
   refutation pinning its shape and a proven source per conjunct;

@@ -173,6 +173,7 @@ open import Verify-Budget-Sufficient.Wet
          B2-cReg≤cSize;
          fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
          fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
+         takeVals-all;
          fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
          hasDry-append; ∨-false; ≤ᵇ-widen;
          INV?; INV?-widen; dBound; regsLen?; hopR; unconn; pathB?; pathB?-widen;
@@ -803,16 +804,12 @@ wet-nil c sl Ψ J fin sched st ok rg =
 -- supplies it.)
 
 -- takeVals keeps a PREFIX, so every kept payload was already Ψ-good.
--- Clause-for-clause the mirror of `takeVals-caps` (Caps-Face:5290)
+-- The induction itself lives once in .Measures as `takeVals-all`; this
+-- name stays because its call sites read it
 takeVals-Ψ : ∀ {n} {Γ : Ctx n} {s} (Ψ k : ℕ) (vals : List (Val Γ s)) →
   valsΨ? Ψ vals ≡ true →
   valsΨ? Ψ (proj₁ (takeVals k vals)) ≡ true
-takeVals-Ψ Ψ zero          vals     h = refl
-takeVals-Ψ Ψ (suc k)       []       h = refl
-takeVals-Ψ Ψ (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
-takeVals-Ψ Ψ (suc (suc k)) (v ∷ vs) h =
-  ∧-intro (proj₁ (∧-true _ _ h))
-          (takeVals-Ψ Ψ (suc k) vs (proj₂ (∧-true _ _ h)))
+takeVals-Ψ {s = s} Ψ k vals h = takeVals-all (valΨ? Ψ s) k vals h
 
 -- the cut is a FILTER on the registry, so ANY pointwise path predicate
 -- survives it.  Stated for a general P deliberately: the caps side wants

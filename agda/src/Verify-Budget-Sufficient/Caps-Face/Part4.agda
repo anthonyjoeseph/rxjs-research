@@ -1441,12 +1441,7 @@ takeVals-caps : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ)
   (k : ℕ) (vals : List (Val Γ s)) →
   all (valCaps? c sl s) vals ≡ true →
   all (valCaps? c sl s) (proj₁ (takeVals k vals)) ≡ true
-takeVals-caps c sl zero          vals      h = refl
-takeVals-caps c sl (suc k)       []        h = refl
-takeVals-caps c sl (suc zero)    (v ∷ vs)  h = ∧-intro (proj₁ (∧-true _ _ h)) refl
-takeVals-caps c sl (suc (suc k)) (v ∷ vs)  h =
-  ∧-intro (proj₁ (∧-true _ _ h))
-          (takeVals-caps c sl (suc k) vs (proj₂ (∧-true _ _ h)))
+takeVals-caps {s = s} c sl k vals h = takeVals-all (valCaps? c sl s) k vals h
 
 -- THE take-f CLAUSE, and it spends no folds: j′ = 0 either way
 takeDispatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}

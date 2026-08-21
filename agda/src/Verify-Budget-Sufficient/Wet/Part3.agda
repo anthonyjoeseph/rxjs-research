@@ -584,12 +584,7 @@ scanVals-ofW {s = s} Ω fn ac (v ∷ vs) hfn hacc h =
 takeVals-Ω : ∀ {n} {Γ : Ctx n} {s} (Ω : ℕ) (k : ℕ) (vals : List (Val Γ s)) →
   all (λ v → ofWᵛ s v ≤ᵇ Ω) vals ≡ true →
   all (λ v → ofWᵛ s v ≤ᵇ Ω) (proj₁ (takeVals k vals)) ≡ true
-takeVals-Ω Ω zero          _        h = refl
-takeVals-Ω Ω (suc k)       []       h = refl
-takeVals-Ω Ω (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
-takeVals-Ω Ω (suc (suc k)) (v ∷ vs) h =
-  ∧-intro (proj₁ (∧-true _ _ h))
-          (takeVals-Ω Ω (suc k) vs (proj₂ (∧-true _ _ h)))
+takeVals-Ω {s = s} Ω k vals h = takeVals-all (λ v → ofWᵛ s v ≤ᵇ Ω) k vals h
 
 cutThrough-regsΩ : ∀ {n} {Γ : Ctx n} {t} (Ω : ℕ) (nid : NodeId)
   (d : List RegId) (wm : RegId) (dy : List Source)

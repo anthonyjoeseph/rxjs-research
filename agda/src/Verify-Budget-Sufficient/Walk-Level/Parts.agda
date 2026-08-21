@@ -75,6 +75,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 subscribeInner; splitEvents; retagEvents;
                                 thruConsume; thruWalk; thruWrap;
                                 mergeBump; switchKill; cutThrough; sweepLive;
+                                takeVals;
                                 lookupNode; setNode; pathHasNode; LiveSource;
                                 sameSource; installNode; NodeId; register; mintNode)
 
@@ -693,6 +694,93 @@ walk-take-zero {u = u} g cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid
          (proj₁ (subscribeE g (emptyᵉ {t = u}) κ bid now sched st)) z≤n a₇
      , a₈ , a₉
 
+-- THE PER-EMIT WET STEP AT take-f.  `stepFrame … (take-f nid) …` is
+-- `takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))`
+-- (Rx.Evaluator) and NOTHING ELSE: it subscribes nothing, so it spends no
+-- gas, no caps level and no depth, which is why B is a parameter here
+-- rather than a column.
+--
+-- The node lookup is pinned by no hypothesis, so the six mismatch arms
+-- are discharged from takeDispatch's own catch-all clause — it returns
+-- sched and st verbatim and emits nothing, so the invariant IS the
+-- hypothesis and the three emission conjuncts are `refl`.  On a
+-- `take-st`, both arms hand on `takeVals`' PREFIX; the cutting arm
+-- additionally severs the registry through `cutThrough`, sweeps the live
+-- ring against what survived, and writes `take-st zero` back, whose two
+-- node bounds are `true` outright.
+stepTake-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (Ψ B F ℓ r̂ : ℕ) (η : Fin n → ℕ) (g : Gas) (bid : Id) (now : Tick)
+  (nid : NodeId) (κ : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true →
+  all (valB? B Ψ s) vals ≡ true →
+  all (λ v → hopDᵛ F η s v ≤ᵇ r̂) vals ≡ true →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = stepFrame g bid now (take-f nid) κ vals fin sched st
+  in (INV? Ψ B (proj₁ (proj₂ (proj₂ (proj₂ r))))
+            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+   × (all (valB? B Ψ s) (proj₁ r) ≡ true)
+   × (all (λ v → hopDᵛ F η s v ≤ᵇ r̂) (proj₁ r) ≡ true)
+   × (any dryEvent (proj₁ (proj₂ r)) ≡ false)
+   × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+stepTake-wet {s = s} Ψ B F ℓ r̂ η g bid now nid κ vals fin sched st invW vB vH rgs
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                = invW , refl , refl , refl , rgs
+... | just (scan-st _)       = invW , refl , refl , refl , rgs
+... | just (merge-st _ _)    = invW , refl , refl , refl , rgs
+... | just (concat-st _ _ _) = invW , refl , refl , refl , rgs
+... | just (switch-st _ _)   = invW , refl , refl , refl , rgs
+... | just (exhaust-st _ _)  = invW , refl , refl , refl , rgs
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | false =
+  INV?-setNode Ψ B nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+    sched st refl refl invW
+  , takeVals-B B Ψ k vals vB
+  , takeVals-all (λ v → hopDᵛ F η s v ≤ᵇ r̂) k vals vH
+  , refl
+  , rgs
+...   | true =
+  ∧-intro (∧-intro (sweepLive-all (boundedLive B) kept (Sched.live sched) liveB)
+                   (all-setNode (boundedNode B) nid (take-st zero)
+                      (EvalSt.nodes st) nodesB refl))
+    (∧-intro (∧-intro (sweepLive-all (fnCapLive Ψ) kept (Sched.live sched) liveΨ)
+                      (all-setNode (fnCapNode Ψ) nid (take-st zero)
+                         (EvalSt.nodes st) nodesΨ refl))
+      (∧-intro lenOK
+        (∧-intro (all-cutThrough (λ en → pathB? B Ψ (proj₂ (proj₂ (proj₂ en))))
+                    nid del wm dy (EvalSt.registry st)
+                    (proj₁ (proj₂ (proj₂ (proj₂ parts)))))
+          (∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ parts)))))
+                   (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ parts)))))))))
+  , takeVals-B B Ψ k vals vB
+  , takeVals-all (λ v → hopDᵛ F η s v ≤ᵇ r̂) k vals vH
+  , cutThrough-closes-nodry nid del wm dy (EvalSt.registry st)
+  , all-cutThrough (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
+      nid del wm dy (EvalSt.registry st) rgs
+  where
+  del    = EvalSt.delivered st
+  wm     = EvalSt.regWatermark st
+  dy     = EvalSt.dying st
+  kept   = proj₁ (cutThrough nid del wm dy (EvalSt.registry st))
+  parts  = INV-parts Ψ B sched st invW
+  liveB  = proj₁ (∧-true (all (boundedLive B) (Sched.live sched))
+                         (all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st))
+                         (proj₁ parts))
+  nodesB = proj₂ (∧-true (all (boundedLive B) (Sched.live sched))
+                         (all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st))
+                         (proj₁ parts))
+  liveΨ  = proj₁ (∧-true (all (fnCapLive Ψ) (Sched.live sched))
+                         (all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st))
+                         (proj₁ (proj₂ parts)))
+  nodesΨ = proj₂ (∧-true (all (fnCapLive Ψ) (Sched.live sched))
+                         (all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st))
+                         (proj₁ (proj₂ parts)))
+  lenOK : (length kept ≤ᵇ B) ≡ true
+  lenOK = T⇒≡true (length kept ≤ᵇ B)
+            (≤⇒≤ᵇ (≤-trans (cutThrough-len nid del wm dy (EvalSt.registry st))
+                           (≤ᵇ⇒≤ (length (EvalSt.registry st)) B
+                              (T-to (proj₁ (proj₂ (proj₂ parts)))))))
+
 -- THE BURST INDUCTION AT take-f, WET HALF, AND B IS FIXED THROUGHOUT —
 -- which is the finding this body encodes rather than describes.
 -- `stepFrame … (take-f nid) …` is `takeDispatch` (Rx.Evaluator), and
@@ -718,7 +806,6 @@ pushTake-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (nid : NodeId) (κ : Path Γ s t) (str : Stream Γ s)
   (sched : Sched Γ) (st : EvalSt e) →
   INV? Ψ B sched st ≡ true →
-  pathB? B Ψ κ ≡ true →
   burstB? B Ψ str ≡ true →
   burstHopD? F η r̂ str ≡ true →
   hasDry str ≡ false →
@@ -729,10 +816,10 @@ pushTake-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
    × (burstHopD? F η r̂ (proj₁ r) ≡ true)
    × (hasDry (proj₁ r) ≡ false)
    × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
-pushTake-wet Ψ B F ℓ r̂ η g bid now nid κ [] sched st invW pB bB bH hDry rgs =
+pushTake-wet Ψ B F ℓ r̂ η g bid now nid κ [] sched st invW bB bH hDry rgs =
   invW , refl , refl , refl , rgs
 pushTake-wet {n = n} {Γ = Γ} {s = s} Ψ B F ℓ r̂ η g bid now nid κ (em ∷ ems) sched st
-  invW pB bB bH hDry rgs =
+  invW bB bH hDry rgs =
   W1 , ∧-intro EMITB W2 , ∧-intro EMITH W3 , cong₂ _∨_ EMITD W4 , W5
   where
   E    = InstEmit.events em
@@ -745,7 +832,7 @@ pushTake-wet {n = n} {Γ = Γ} {s = s} Ψ B F ℓ r̂ η g bid now nid κ (em �
   dSp  = ∨-false (any dryEvent E) (hasDry ems) hDry
   SF   = stepTake-wet Ψ B F ℓ r̂ η g bid now nid κ
            (proj₁ sp) (proj₂ (proj₂ sp)) sched st
-           invW pB
+           invW
            (splitEvents-vals-B {u = s} B Ψ E eB)
            (splitEvents-vals-hop {u = s} F η r̂ E eH)
            rgs
@@ -755,7 +842,7 @@ pushTake-wet {n = n} {Γ = Γ} {s = s} Ψ B F ℓ r̂ η g bid now nid κ (em �
   S4   = proj₁ (proj₂ (proj₂ (proj₂ SF)))
   S5   = proj₂ (proj₂ (proj₂ (proj₂ SF)))
   IH   = pushTake-wet Ψ B F ℓ r̂ η g bid now nid κ ems sd₁ st₁
-           S1 pB (proj₂ (∧-true _ _ bB)) (proj₂ (∧-true _ _ bH)) (proj₂ dSp) S5
+           S1 (proj₂ (∧-true _ _ bB)) (proj₂ (∧-true _ _ bH)) (proj₂ dSp) S5
   W1   = proj₁ IH
   W2   = proj₁ (proj₂ IH)
   W3   = proj₁ (proj₂ (proj₂ IH))
@@ -947,9 +1034,7 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           (hopDᵉ F (slotHop F sl) b) (slotHop F sl)
           g bid now nid κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-          a₅
-          (pathB?-widen κ (proj₁ ⊑₁) (pathB?-widen κ (proj₁ step⊑) pB))
-          a₆ a₇ a₈ a₉
+          a₅ a₆ a₇ a₈ a₉
   V1  = proj₁ WET
   V2  = proj₁ (proj₂ WET)
   V3  = proj₁ (proj₂ (proj₂ WET))

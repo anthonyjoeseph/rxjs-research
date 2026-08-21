@@ -460,6 +460,24 @@ dropSource-all P src ((rid , s , c) ∷ r) h with sameSource src s
 ... | false = ∧-intro (proj₁ (∧-true _ _ h))
                       (dropSource-all P src r (proj₂ (∧-true _ _ h)))
 
+
+-- AND take's EMISSION FILTER, same argument one more time.  `takeVals`
+-- hands on a PREFIX of what it was given (Rx.Evaluator), so every
+-- pointwise test on values is inherited rather than paid for — and that
+-- induction had been written out FOUR times, once per face
+-- (takeVals-caps, takeVals-B, takeVals-Ψ, takeVals-Ω), with the walk's
+-- hop ledger about to want a fifth.  Once, here, instead; the four are
+-- one-liners over it now and keep their own names, which is what their
+-- call sites read.
+takeVals-all : ∀ {n} {Γ : Ctx n} {s} (P : Val Γ s → Bool)
+  (k : ℕ) (vals : List (Val Γ s)) →
+  all P vals ≡ true → all P (proj₁ (takeVals k vals)) ≡ true
+takeVals-all P zero          _        h = refl
+takeVals-all P (suc k)       []       h = refl
+takeVals-all P (suc zero)    (v ∷ vs) h = ∧-intro (proj₁ (∧-true _ _ h)) refl
+takeVals-all P (suc (suc k)) (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true _ _ h))
+          (takeVals-all P (suc k) vs (proj₂ (∧-true _ _ h)))
 -- and the count, which no predicate sees
 -- the take/switch cut is a filter on the registry too, by node
 -- membership rather than by source, so its count only drops.  Here
