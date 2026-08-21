@@ -291,3 +291,68 @@ INV?-reindex Ψ B B′ sched st inv hsb hrl hrsz hss
     (regsB?-of-parts (EvalSt.registry st) hrsz
       (regsBΨ?-of (EvalSt.registry st) hregs))
     hss hsfc
+
+------------------------------------------------------------------
+-- THE PER-EMIT PLUMBING, Ψ FLAVOUR — the `all`-facts a wet push face's
+-- cons clause needs about `pushBurst`'s emit shape (back events ++
+-- retagged step events ++ mapped values ++ an optional terminator),
+-- stated at the Ψ predicate above.  The B and hop flavours of the same
+-- family sit with the push faces that spend them; these sit HERE, with
+-- the predicate, because two faces need them at once — the level walk's
+-- map push and the burst face's inner walk — and this module is below
+-- both.
+--
+-- Two of the four are UNCONDITIONAL, and that is a fact about the
+-- reassembly rather than about Ψ: splitEvents puts only bookkeeping in
+-- its back list, and a terminator carries no value.  There is no
+-- RETAG flavour here, and that is deliberate: map's stepFrame emits
+-- `[]` literally, so its retag layer reduces away and never needs a
+-- lemma; scan's is the first face that will, and it can be written
+-- then rather than parked here now.
+------------------------------------------------------------------
+
+splitEvents-vals-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
+  (events : List (InstEvent (Val Γ u))) →
+  all (eventΨ? Ψ) events ≡ true →
+  valsΨ? Ψ (proj₁ (splitEvents {A = A} events)) ≡ true
+splitEvents-vals-Ψ Ψ [] _ = refl
+splitEvents-vals-Ψ {u = u} {A = A} Ψ (value v ∷ es) h =
+  ∧-intro (proj₁ (∧-true (valΨ? Ψ u v) (all (eventΨ? Ψ) es) h))
+          (splitEvents-vals-Ψ {A = A} Ψ es
+            (proj₂ (∧-true (valΨ? Ψ u v) (all (eventΨ? Ψ) es) h)))
+splitEvents-vals-Ψ {A = A} Ψ (init _ ∷ es) h =
+  splitEvents-vals-Ψ {A = A} Ψ es h
+splitEvents-vals-Ψ {A = A} Ψ (close _ _ ∷ es) h =
+  splitEvents-vals-Ψ {A = A} Ψ es h
+splitEvents-vals-Ψ {A = A} Ψ (handoff _ ∷ es) h =
+  splitEvents-vals-Ψ {A = A} Ψ es h
+splitEvents-vals-Ψ {A = A} Ψ (complete ∷ es) h =
+  splitEvents-vals-Ψ {A = A} Ψ es h
+
+splitEvents-bk-Ψ : ∀ {n} {Γ : Ctx n} {u t} (Ψ : ℕ)
+  (events : List (InstEvent (Val Γ u))) →
+  eventsΨ? {u = t} Ψ (proj₁ (proj₂ (splitEvents {A = Val Γ t} events))) ≡ true
+splitEvents-bk-Ψ Ψ [] = refl
+splitEvents-bk-Ψ {t = t} Ψ (value _ ∷ es) =
+  splitEvents-bk-Ψ {t = t} Ψ es
+splitEvents-bk-Ψ {t = t} Ψ (init _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-Ψ {t = t} Ψ es)
+splitEvents-bk-Ψ {t = t} Ψ (close _ _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-Ψ {t = t} Ψ es)
+splitEvents-bk-Ψ {t = t} Ψ (handoff _ ∷ es) =
+  ∧-intro refl (splitEvents-bk-Ψ {t = t} Ψ es)
+splitEvents-bk-Ψ {t = t} Ψ (complete ∷ es) =
+  splitEvents-bk-Ψ {t = t} Ψ es
+
+mapValue-Ψ : ∀ {n} {Γ : Ctx n} {u} (Ψ : ℕ) (vs : List (Val Γ u)) →
+  valsΨ? Ψ vs ≡ true → all (eventΨ? Ψ) (map value vs) ≡ true
+mapValue-Ψ Ψ []       h = refl
+mapValue-Ψ {u = u} Ψ (v ∷ vs) h =
+  ∧-intro (proj₁ (∧-true (valΨ? Ψ u v) (valsΨ? Ψ vs) h))
+          (mapValue-Ψ Ψ vs (proj₂ (∧-true (valΨ? Ψ u v) (valsΨ? Ψ vs) h)))
+
+finList-Ψ : ∀ {n} {Γ : Ctx n} {u} (Ψ : ℕ) (b : Bool) →
+  all (eventΨ? {n = n} {Γ = Γ} {u = u} Ψ)
+      (if b then complete ∷ [] else []) ≡ true
+finList-Ψ Ψ true  = refl
+finList-Ψ Ψ false = refl

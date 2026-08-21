@@ -140,10 +140,10 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`walk-map` / `walk-scan-rest`** (Walk-Level) — DIFFICULTY: residue is the
-  unauthored per-frame push face, whose frame-generic form is REFUTED. The takeᵉ
-  clause is now postulate-free end to end (`pushTake-wet` ⊗ `stepTake-wet`), so
-  it is the worked instance for both of these.
+- **`walk-scan-rest`** (Walk-Level) — DIFFICULTY: the scan frame's own wet push
+  face, last of the three; the frame-generic form is REFUTED. takeᵉ and mapᵉ are
+  postulate-free end to end now, so both are worked instances and what is left
+  unfunded is scanᵉ's exponential hop index.
 - **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
   the one conjunct of arm B not closed by computation. Header carries the
   refutation pinning its shape and a proven source per conjunct;

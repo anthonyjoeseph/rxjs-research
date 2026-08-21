@@ -1042,9 +1042,10 @@ postulate
   -- input-wet; the share/connect gas peel is what input-wet still owes)
   --
   -- ═══ THE FAMILY CENSUS (2026-08-19) ═══
-  -- These six are what is left of walkFace; the other six clauses
-  -- (walk-mu, walk-input, and the four *All) are GROUND.  The caps half
-  -- of every one of them is a DELEGATION, not a re-derivation — see the
+  -- These four are what is left of walkFace; the other eight clauses
+  -- (walk-mu, walk-input, walk-map, walk-take and the four *All) are
+  -- GROUND.  The caps half of every one of them is a DELEGATION, not a
+  -- re-derivation — see the
   -- "WHY THE SPLIT IS EXACT" paragraph above — and the proven twin is
   -- `subscribeE-caps` (.Subscribe-Face), whose own header carries a
   -- clause-to-form map matching this family one for one.  So what each
@@ -1053,23 +1054,46 @@ postulate
   -- typechecking — treat each named ingredient as located, not spent.
   --
   -- THE CHAIN FRAMES DO NOT SHARE A PUSH FACE, and that is the one thing
-  -- to internalise before touching map/take/scan.  A frame-generic wet
-  -- push face is REFUTED — the DEAD ROUTE at the hop-edge chain section
-  -- below (`pushBurst-walk`, generic in `f : Frame Γ s u`) — because caps
-  -- measures are frame-generic and THE HOP LEDGER IS NOT.  Each chain
-  -- frame needs its own face, at its own output index, and the index is
-  -- read off hopDᵉ (Rx.Hop-Depth) rather than chosen:
-  --   · takeᵉ  `hopDᵉ V η (takeᵉ c e) = hopDᵉ V η e` — the IDENTITY.
-  --            take-f transforms no value, so the source's bound IS the
-  --            bound and no growth lemma is owed at all.
-  --   · mapᵉ   `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e`, and hopD-map-emit
-  --            (.Measures, PROVEN) delivers exactly that conjunct.
+  -- to internalise before touching scan — the last of the three.  A
+  -- frame-generic wet push face is REFUTED — the DEAD ROUTE at the
+  -- hop-edge chain section below (`pushBurst-walk`, generic in
+  -- `f : Frame Γ s u`) — because caps measures are frame-generic and THE
+  -- HOP LEDGER IS NOT.  Each chain frame needs its own face, at its own
+  -- output index, and the index is read off hopDᵉ (Rx.Hop-Depth) rather
+  -- than chosen:
+  --   · takeᵉ  `hopDᵉ V η (takeᵉ c e) = hopDᵉ V η e` — the IDENTITY, so
+  --            no growth lemma is owed at all.  SPENT: `pushTake-wet`
+  --            ⊗ `stepTake-wet` (.Walk-Level/Parts), both real bodies.
+  --   · mapᵉ   `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e`.  SPENT:
+  --            `pushMap-wet` (ibid.), whose per-value step is
+  --            hopD-map-emit (.Measures) — and whose SIZE half rides
+  --            `burstB?-halves` rather than any growth theorem, which
+  --            is why applyFn-size never had to be fitted under the
+  --            level cap after all.
   --   · scanᵉ  `(2 + pmᵗ V 0 f) ^ V * (hopDᵗ f + hopDᵗ z + hopDᵉ e)` —
   --            EXPONENTIAL in V, which is the room that funds repeated
   --            application, and the only row with no emit lemma yet.
-  -- The shape of such a face is `pushThru-walk` below (PROVEN, thru-outer),
-  -- which is pushBurst-caps' proof step for step with the wet conjuncts
-  -- threaded through.
+  -- The worked instances for the last one are `pushTake-wet` and
+  -- `pushMap-wet`; `pushThru-walk` below (PROVEN, thru-outer) is the
+  -- shape when a face has to carry the caps column too.
+  --
+  -- THE GAS-PEEL FINDING, and it is what took this family off FALSITY.
+  -- Evaluator:1436-38 and 1453-58:
+  --
+  --     subscribeE fuel (mapᵉ f b) κ id now sched st =
+  --       let (burst , sched₁ , st₁) = subscribeE fuel b (map-f f ↠ κ) …
+  --       in pushBurst fuel id now (map-f f) κ burst sched₁ st₁
+  --
+  -- `fuel` goes to the recursive call and to `pushBurst` UNCHANGED, and
+  -- the scanᵉ clause does the same.  The chain frames spend no gas; only
+  -- μᵉ and subscribeAll/subscribeInner do.  The FALSITY once carried by
+  -- this family is series Q's, and series Q's mechanism is gas
+  -- exhaustion — a static sum (`sucG`) failing to dominate a runtime
+  -- product (d·k).  A clause that peels no gas is not a place that
+  -- mechanism can bite: `hasDry`/`regsLen?` here are a TRANSPORT across
+  -- one frame at the same fuel.  The block header above carries the
+  -- argument in full, including why series Q would refute the four
+  -- PROVEN *All rows before it touched any of these.
   --
   -- one-shot emitter — GRINDABLE.  oneShotBurst with the state untouched,
   -- the same shape as input-wet-scripted's cold-nil (that census names the
@@ -1102,67 +1126,16 @@ postulate
   -- emptyᵉ clause (.Subscribe-Face), not the open sibling walk-of.
   walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
     WalkStmt {e = e} (emptyᵉ {t = u})
-  -- chain edge — GRINDABLE.  Subscribe the source under ONE more frame,
-  -- then pushBurst; one j for the frame (frameStep-chain-suc), receipts
-  -- add.  Both growth conjuncts are supplied by PROVEN lemmas at the
-  -- index hopDᵉ already fixes: hopD-map-emit for burstHopD? (its header
-  -- calls itself "burstHopD? at the mapᵉ clause, with the arithmetic
-  -- already done") and applyFn-size for the Ŝ ceiling.  What has to be
-  -- authored is map-f's OWN push face — see the family note above on why
-  -- it cannot be shared — with pushThru-walk as the worked instance.
-  --
-  -- ⚠ CLASS: DIFFICULTY (2026-08-20).  It read GRINDABLE, was raised to
-  -- FALSITY earlier the same day "for INTERNAL CONSISTENCY rather than on
-  -- new evidence", and that raise is now WITHDRAWN on evidence.  The
-  -- consistency argument was sound as far as it went — this row and
-  -- walk-scan-rest do stand or fall together — but both were on the wrong
-  -- side of it, because the ruling they cited does not reach either.
-  --
-  -- THE GAS-PEEL FINDING, and it is the whole reason.  Evaluator:1436-38:
-  --
-  --     subscribeE fuel (mapᵉ f b) κ id now sched st =
-  --       let (burst , sched₁ , st₁) = subscribeE fuel b (map-f f ↠ κ) …
-  --       in pushBurst fuel id now (map-f f) κ burst sched₁ st₁
-  --
-  -- `fuel` goes to the recursive call and to `pushBurst` UNCHANGED.  The
-  -- chain frames spend no gas; only μᵉ and subscribeAll/subscribeInner
-  -- do.  The FALSITY on this family is series Q's, and series Q's
-  -- mechanism is gas exhaustion — a static sum (`sucG`) failing to
-  -- dominate a runtime product (d·k).  A clause that peels no gas is not
-  -- a place that mechanism can bite: `hasDry`/`regsLen?` here are a
-  -- TRANSPORT across one frame at the same fuel.  The block header above
-  -- carries the argument in full, including why series Q would refute the
-  -- four PROVEN *All rows before it touched this one.
-  --
-  -- So the floor this header already named is the actual class: two
-  -- unauthored per-frame push faces.  That is labour with a design
-  -- decision inside it (the output index each face is stated at), which
-  -- is DIFFICULTY, not GRINDABLE — no proven twin has corresponding
-  -- clauses, per the pushThru-walk note below.
-  --
-  -- And `pushThru-walk` is a worked instance at a DIFFERENT INDEX, not a
-  -- twin whose clauses correspond: its hop conjunct is the identity
-  -- (r̂ → r̂), while map's is `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * r̂` — precisely
-  -- the growing shape the frame-generic DEAD ROUTE's counterexample
-  -- exploits at `f := map-f`.  Absent the FALSITY reading the floor is
-  -- DIFFICULTY (two unauthored faces); GRINDABLE is not available either
-  -- way.
-  --
-  -- `applyFn-size` is also weaker than this row needs: it concludes
-  -- `sizeᵛ (applyFn fn v) ≤ (2 + 2*V) ^ (3 ^ sizeᵗ fn)`, exponential in
-  -- the fn's SYNTAX, not `≤ Caps.cSize (frameStep (j + j′) c)`.  Fitting
-  -- it under the level cap is the within-instant growth question this
-  -- block calls load-bearing — PROBED, not proven.
-  walk-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (f : Fn Γ [] [] [] s u) (b : Closed Γ s) → WalkStmt {e = e} (mapᵉ f b)
   -- the eight OTHER conjuncts of the scan clause — DIFFICULTY, and it is
-  -- walk-map's census verbatim at this shape.
+  -- the map clause's census verbatim at this shape; that clause is now a
+  -- real body (`walk-map` ⊗ `pushMap-wet`, .Walk-Level/Parts), so it is
+  -- the worked instance rather than a sibling guess.
   --
   -- ⚠ CLASS HISTORY, because this header and the ledger had DRIFTED apart:
   -- this row was moved to FALSITY in PROOF-STATE on 2026-08-20 while this
   -- header still read GRINDABLE, and walk-map/walk-take were then raised
   -- to FALSITY for consistency with the ledger row.  All three raises are
-  -- WITHDRAWN (2026-08-20) on the gas-peel finding in walk-map's header:
+  -- WITHDRAWN (2026-08-20) on the gas-peel finding in the census above:
   -- the scanᵉ clause passes `fuel` unchanged to both the recursive
   -- subscribe and the push (Evaluator:1453-58), so series Q's gas
   -- exhaustion cannot be sited here either.  GRINDABLE was also wrong —

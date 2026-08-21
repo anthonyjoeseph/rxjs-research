@@ -185,7 +185,7 @@ open import Verify-Budget-Sufficient.Wet
 open import Verify-Budget-Sufficient.Walk-Level
   using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono;
          any-dry-++; splitEvents-nodry; splitBurst-nodry;
-         switchKill-closes-nodry; thruWrap-pass)
+         switchKill-closes-nodry; thruWrap-pass; map-Ψ)
 open import Verify-Budget-Sufficient.Psi-Split
 open import Rx.Frame-Width using (pWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ)
@@ -602,32 +602,15 @@ postulate
      × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
      × (burstΨ? Ψ (proj₁ r) ≡ true)
 
--- SPLIT LEMMAS — helpers for subscribeInner-Ψ's gs clause.
--- Landed from SubscribeInner-Psi-Probe (DELETED; git history).  Pattern mirrors
--- splitBurst-vals-caps / splitBurst-bk-caps (Caps-Face:5015-5032):
--- pass xs to all-++-intro explicitly so Agda unifies directly with
--- the splitBurst (em ∷ ems) → proj₁/proj₂ reduction.
-
--- Ψ-bounded values from splitEvents; {A} is the bs-element type.
+-- SPLIT LEMMAS — helpers for subscribeInner-Ψ's gs clause, over the
+-- WHOLE burst.  Their per-emit halves moved DOWN to .Psi-Split, beside
+-- the predicate and the other three flavours of the same reassembly,
+-- when the level walk's map push face turned out to need them too —
+-- same reason the dry trio moved out of this module before them.
+-- Pattern mirrors splitBurst-vals-caps / splitBurst-bk-caps: pass xs to
+-- all-++-intro explicitly so Agda unifies directly with the
+-- splitBurst (em ∷ ems) → proj₁/proj₂ reduction.
 private
-  splitEvents-vals-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
-    (events : List (InstEvent (Val Γ u))) →
-    all (eventΨ? Ψ) events ≡ true →
-    valsΨ? Ψ (proj₁ (splitEvents {A = A} events)) ≡ true
-  splitEvents-vals-Ψ Ψ [] _ = refl
-  splitEvents-vals-Ψ {u = u} {A = A} Ψ (value v ∷ es) h =
-    ∧-intro (proj₁ (∧-true (valΨ? Ψ u v) (all (eventΨ? Ψ) es) h))
-            (splitEvents-vals-Ψ {A = A} Ψ es
-              (proj₂ (∧-true (valΨ? Ψ u v) (all (eventΨ? Ψ) es) h)))
-  splitEvents-vals-Ψ {A = A} Ψ (init _ ∷ es) h =
-    splitEvents-vals-Ψ {A = A} Ψ es h
-  splitEvents-vals-Ψ {A = A} Ψ (close _ _ ∷ es) h =
-    splitEvents-vals-Ψ {A = A} Ψ es h
-  splitEvents-vals-Ψ {A = A} Ψ (handoff _ ∷ es) h =
-    splitEvents-vals-Ψ {A = A} Ψ es h
-  splitEvents-vals-Ψ {A = A} Ψ (complete ∷ es) h =
-    splitEvents-vals-Ψ {A = A} Ψ es h
-
   splitBurst-vals-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
     (burst : Stream Γ u) →
     burstΨ? Ψ burst ≡ true →
@@ -638,28 +621,12 @@ private
       (splitEvents-vals-Ψ {A = A} Ψ (InstEmit.events em) (proj₁ (∧-true _ _ h)))
       (splitBurst-vals-Ψ {A = A} Ψ ems (proj₂ (∧-true _ _ h)))
 
-  -- unconditional: splitEvents puts only init/close/handoff in bs
-  splitEvents-eventsΨ : ∀ {n} {Γ : Ctx n} {u t} (Ψ : ℕ)
-    (events : List (InstEvent (Val Γ u))) →
-    eventsΨ? {u = t} Ψ (proj₁ (proj₂ (splitEvents {A = Val Γ t} events))) ≡ true
-  splitEvents-eventsΨ Ψ [] = refl
-  splitEvents-eventsΨ {t = t} Ψ (value _ ∷ es) =
-    splitEvents-eventsΨ {t = t} Ψ es
-  splitEvents-eventsΨ {t = t} Ψ (init _ ∷ es) =
-    ∧-intro refl (splitEvents-eventsΨ {t = t} Ψ es)
-  splitEvents-eventsΨ {t = t} Ψ (close _ _ ∷ es) =
-    ∧-intro refl (splitEvents-eventsΨ {t = t} Ψ es)
-  splitEvents-eventsΨ {t = t} Ψ (handoff _ ∷ es) =
-    ∧-intro refl (splitEvents-eventsΨ {t = t} Ψ es)
-  splitEvents-eventsΨ {t = t} Ψ (complete ∷ es) =
-    splitEvents-eventsΨ {t = t} Ψ es
-
   splitBurst-eventsΨ : ∀ {n} {Γ : Ctx n} {u t} (Ψ : ℕ) (burst : Stream Γ u) →
     eventsΨ? {u = t} Ψ (proj₁ (proj₂ (splitBurst {A = Val Γ t} burst))) ≡ true
   splitBurst-eventsΨ Ψ [] = refl
   splitBurst-eventsΨ {Γ = Γ} {t = t} Ψ (em ∷ ems) =
     all-++-intro _ (proj₁ (proj₂ (splitEvents {A = Val Γ t} (InstEmit.events em)))) _
-      (splitEvents-eventsΨ {t = t} Ψ (InstEmit.events em))
+      (splitEvents-bk-Ψ {t = t} Ψ (InstEmit.events em))
       (splitBurst-eventsΨ {t = t} Ψ ems)
 
 -- subscribeInner-Ψ — NOW A REAL DEFINITION.
@@ -741,19 +708,6 @@ regP?-of-parts c Ψ J (r ∷ rs) hs hΨ =
                             (regP? (λ {v} p → pathBΨ? Ψ p) rs) hΨ)))
   where
   κᵣ = proj₂ (proj₂ (proj₂ r))
-
-map-Ψ : ∀ {n} {Γ : Ctx n} {s u} (Ψ : ℕ) (fn : Fn Γ [] [] [] s u)
-  (vs : List (Val Γ s)) →
-  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ →
-  valsΨ? Ψ vs ≡ true →
-  valsΨ? Ψ (map (applyFn fn) vs) ≡ true
-map-Ψ Ψ fn []       hfn h = refl
-map-Ψ {s = s} Ψ fn (v ∷ vs) hfn h
-  with ∧-true (valΨ? Ψ s v) (valsΨ? Ψ vs) h
-... | hv , hvs =
-  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (applyFn-fnCap Ψ fn v
-             (≤ᵇ⇒≤ (fnCapᵛ s v) Ψ (T-to hv)) hfn)))
-          (map-Ψ Ψ fn vs hfn hvs)
 
 wet-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)

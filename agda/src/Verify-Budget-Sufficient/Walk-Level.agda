@@ -420,9 +420,10 @@ open import Verify-Budget-Sufficient.Walk-Level.Arms public
 -- never its hop growth).  The caps face is frame-generic because caps
 -- measures are; THE HOP LEDGER IS FRAME-SPECIFIC.  pushBurst has four
 -- call sites (thru-outer, map-f, take-f, scan-f — Rx.Evaluator), so
--- the repair is one wet push face PER FRAME KIND, this one thru-outer's;
--- the chain frames' faces are authored when walk-map/take/scan are
--- ground, funded by hopD-map-emit at their own output indices.
+-- the repair is one wet push face PER FRAME KIND, this one thru-outer's.
+-- Two of the chain frames' faces are now authored — `pushTake-wet` at
+-- the identity index and `pushMap-wet` at hopD-map-emit's — leaving
+-- scan-f's, whose index is the exponential one.
 ------------------------------------------------------------------
 
 -- THE LEAF — the wet face of subscribeInner, WHERE THE GAS PEEL IS.
@@ -1237,24 +1238,6 @@ walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs
           C1 C2 C3 C4
 
-------------------------------------------------------------------
--- PER-EMIT WET PLUMBING, hop and dryness family — the hopDev?/dryEvent
--- halves of the splitEvents/retagEvents/map-value/terminator algebra
--- the push face's cons clause reassembles.  THE B-FAMILY ALREADY
--- EXISTED, PROVEN (.Measures W7 block: valB?/valsB?/eventB?/burstB?/
--- pathB?/frameB?-widen, splitEvents-vals-B/-bk-B, mapValue-B, and
--- finList-B in .Wet/Part2) — found by the clash, not the grep, which is
--- the wrong order; grep first.  Only the hop/dry twins below are new.
--- They live in THIS module rather than beside their family in
--- .Measures deliberately: a Measures edit invalidates every interface
--- above it (hours), a Walk-Level edit costs seconds.  When the
--- map/take/scan wet push faces need them, THAT is the day they move
--- down — not before.
-------------------------------------------------------------------
-
--- any-p over ++ stays false when both halves are; hasDry-append's
--- event-level sibling
-
 -- THE DISPATCH, real from day one: match the subscribed expression,
 -- hand the clause its own obligation.  Two clauses are PROVEN outright:
 -- varᵉ (a closed term has no value variables) and μᵉ at g0 — the μ dry
@@ -1265,7 +1248,11 @@ walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
 walkFace (input i)       = walk-input i
 walkFace (ofᵉ ts)        = walk-of ts
 walkFace emptyᵉ          = walk-empty
-walkFace (mapᵉ f b)      = walk-map f b
+walkFace (mapᵉ f b)      c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g =
+  walk-map g f b
+    (λ c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ →
+       walkFace b c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ g)
+    c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 walkFace (takeᵉ cnt b)   c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g =
   walk-take g cnt b
     (λ c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ →
