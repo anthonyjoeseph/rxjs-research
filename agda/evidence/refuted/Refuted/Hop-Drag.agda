@@ -53,7 +53,7 @@ open import Data.Empty using (⊥)
 open import Data.Nat   using (ℕ; suc; _≤_; _⊔_; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Data.Unit  using (tt)
-open import Data.List  using (List; []; _∷_)
+open import Data.List  using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec   using () renaming ([] to []ⱽ)
 open import Data.Product using (_,_)
@@ -61,10 +61,8 @@ open import Data.Sum   using (inj₁)
 open import Data.Fin   using (Fin)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ty; Ctx; natᵗ; obs; _×ᵗ_; _+ᵗ_;
-                          ofᵉ; emptyᵉ; mergeAllᵉ;
-                          strmᵗ; fstᵗ; varᵗ; nat̂; inlᵗ; caseᵗ; pairᵗ;
-                          sizeᵛ; Tm; Fn; Val; applyFn)
+open import Rx.Exp using (Ty; Ctx; natᵗ; obs; _×ᵗ_; _+ᵗ_; ofᵉ; emptyᵉ; mergeAllᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; inlᵗ; caseᵗ;
+  pairᵗ; sizeᵛ; Fn; Val; applyFn)
 open import Rx.Hop-Depth using (hopDᵗ; hopDᵛ)
 open import Rx.Hop-Spine using (spnᵛ)
 

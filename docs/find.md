@@ -55,6 +55,19 @@ Three ways one fact wears two types, all of which it matches through:
   signature.
 - **plain differing names.**
 
+And one shape it does NOT see: **redundant PARENTHESES.** `a ∧ b ≡ true` and
+`(a ∧ b) ≡ true` are the same type to Agda and two different strings to the
+normaliser, so a duplicate hides behind a pair of brackets. Measured: two
+`∧-intro`s, one per tier, identical bodies (`∧-intro refl refl = refl`),
+differing in exactly that — the check reported CLEAN, and the compiler could
+not help either because neither copy was ever in scope with the other. Both
+were consumed on their own side of the tier boundary, ~660 call sites between
+them, and the pair was found by a hand census of the generic-adapter class
+rather than by any gate. Normalising parenthesisation properly means parsing to
+a term tree, not string surgery: `a ∧ (b ∨ c)` and `(a ∧ b) ∨ c` differ, so
+stripping brackets wholesale would trade a false negative for a false positive.
+Until that lands, a class of tiny facts is the place to look by hand.
+
 **`make dup-selftest`** — also in the gate — pins each of those rows against a
 fixture outside `agda/src`, and pins the four shapes that must NOT fire (record
 fields, `where`-locals, the mandated `-go` alias, and two lemmas differing only in
@@ -74,3 +87,13 @@ copy at random re-creates it later.
 machine that generates duplicates: someone wanting "term size is positive" greps
 `1≤`, finds nothing under that spelling, and writes a third copy. That is precisely
 how `sizeᵉ-pos` and `1≤sizeᵉ` came to coexist.
+
+**BUT WHERE THE CLASS IS ALREADY SCATTERED, MOVING IT DOWN BEATS RENAMING IT.**
+The generic decider↔proposition adapters were the worst case of this: no home, a
+copy per tree, and four names for `true ≢ false`. Renaming them to one convention
+would have rewritten roughly 1900 call sites for no proof content, while moving
+them to one module below both trees cost only the import lines — a call site
+reads the same name whichever module it comes from. The duplicate-generating
+mechanism there was LOCALITY, not spelling: with the class in one file, the check
+before adding to it is reading that file. Rename inside a class only when the
+class already has a home.

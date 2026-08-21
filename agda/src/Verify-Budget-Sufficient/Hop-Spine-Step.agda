@@ -5,8 +5,11 @@
 -- mutual with anything there — the burst predicates consume this
 -- module's `scanVals-hopSpn` as a finished fact, which is an import
 -- rather than mutuality.  Keeping it here also stops every consumer of
--- `valHopSpn?` (`.Demand-Probe`'s wall of `refl` pins, in particular)
--- from paying for an induction over `Tm` that it never mentions.
+-- `valHopSpn?` from paying for an induction over `Tm` that it never
+-- mentions.  The consumer that made the cost visible was a probe's wall
+-- of `refl` pins; it has since expired with its targets and been deleted,
+-- so the saving is now only the ordinary one, but the split is what keeps
+-- this family importable without the `Tm` induction.
 --
 -- WHAT IT PROVES.  One `applyFn` preserves the hereditary spine bound,
 -- and the fold therefore preserves it across a whole burst.  Fully
@@ -33,44 +36,39 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Hop-Spine-Step where
 
-open import Data.Bool using (Bool; true; false; T; _∧_)
+open import Data.Bool using (true; false)
 open import Data.Bool.ListAction using (all)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_; _≤ᵇ_; _≤?_; s≤s; z≤n)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≰⇒>; ≤-trans; ≤-refl; ≤-reflexive;
-                                       ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤;
-                                       ⊔-lub; m≤m⊔n; m≤n⊔m; n≤1+n;
-                                       m≤m+n; m≤n+m; *-identityˡ; *-identityʳ;
-                                       *-assoc; *-monoʳ-≤; *-zeroʳ; +-identityʳ;
-                                       +-monoʳ-≤)
+open import Data.Nat  using (ℕ; suc; _*_; _⊔_; _≤_; _≤?_)
+open import Data.Nat.Properties using (≤⇒≤ᵇ; ≰⇒>; ≤-trans; ≤-reflexive; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m; *-identityˡ; *-identityʳ;
+  *-assoc; *-monoʳ-≤; *-zeroʳ)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin  using (Fin)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_) renaming (inj₁ to inl; inj₂ to inr)
-open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 open import Relation.Nullary using (yes; no)
 
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; Exp; applyFn; evalWith; subΘExp;
-                            varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
-                            inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                            add; sub; mul; eqᵖ; ltᵖ; notᵖ; varIx; lookupEnv;
-                            unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; pmᵉ)
-open import Rx.Hop-Spine using (spnᵉ; spnᵛ)
+open import Rx.Exp   using (Ctx; Val; Fn; Tm; applyFn; evalWith; subΘExp; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
+  inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ; varIx; lookupEnv; _×ᵗ_;
+  _+ᵗ_)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; pmᵗ; pmᵉ)
+open import Rx.Hop-Spine using (spnᵉ)
 open import Rx.Evaluator using (scanVals)
 open import Verify-Budget-Sufficient.Measures using
-  (∧-true; ∧-intro; T⇒≡true; T-to; hopD-evalWith; ifEq)
+  (∧-true)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using
-  (valHopSpn?; valHopSpn?-intro; valHopSpn?-hopD; B≤powB)
+  (valHopSpn?; B≤powB)
 open import Verify-Budget-Sufficient.Hop-Spine-Sub using
   (EnvPlug; EnvPlug-mono; hopD-sub-spnᵉ; ⊔₁+; ⊔₂+;
    ≤2nd; 1≤C; big-forces-zero; envPlug⇒envC;
    valHopSpnC?; valHopSpnC?-mono; valHopSpnC?-one;
    EnvC; EnvC-mono; envC-lookup; envC⇒envPlug)
+open import Decide using (T⇒≡true; ifEq; ∧-intro)
 
 ------------------------------------------------------------------
 -- THE STEP, AND IT IS ONE LEMMA OVER THE TERM.

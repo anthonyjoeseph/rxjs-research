@@ -44,17 +44,18 @@
 module Harness.Main where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.Char using (Char; toℕ)
+open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≤ᵇ_)
+open import Data.Nat using (ℕ; _+_; _*_; _∸_; _≤ᵇ_)
 open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_; toList)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import CLI.IO
+open import Agda.Builtin.IO using (IO)
+open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 open import Rx.Prim using (towerℕ)
-open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; dCapᶜ)
+open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG)
 

@@ -2,44 +2,39 @@ module Verify-Batch-Simultaneous.The-Proof where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; T)
 open import Data.Unit    using (tt)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat     using (suc; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; n≤1+n; ≤-refl; 1+n≰n)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
-open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
+open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Function     using (_∋_)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_;
-                                         InstEvent; init; value; close; handoff;
-                                         complete; EmitKind; subscribe; delivery;
-                                         plumbing; CloseReason; cut; cutPending;
-                                         exhausted; dried)
+open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
+  EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted; dried)
 open import Rx.Exp                using (Ctx; Closed)
-open import Rx.Evaluator          using (Slots; evaluate)
-open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init;
-                                         runProtocol; stepProtocol; checkFinal;
-                                         paidOff; allZero; Accepted; accepted;
-                                         WellFormed; settle; applyEvents; hasOwed;
-                                         bumpOwed; payOwed; cancelOwed; removeOne;
-                                         countIn)
+open import Rx.Evaluator          using (evaluate)
+open import Rx.Slots using (Slots)
+open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; checkFinal; paidOff; allZero;
+  Accepted; accepted; WellFormed; settle; applyEvents; hasOwed; bumpOwed; cancelOwed;
+  removeOne; countIn)
 -- `just-injᵂ`/`n≢jᵂ` are imported rather than re-proven: this module had
 -- its own `just-inj`/`n≢j`, the same two Maybe facts .Part4 already
 -- proves for the rest of the Well-Formed tree.  The import surface here
 -- is a CLAIM, so it stays minimal — but re-proving a fact to keep a
 -- using-list short is the trade `make dup-check` exists to refuse.
-open import Verify-Well-Formed    using (evaluate-well-formed; just-injᵂ; n≢jᵂ;
-                                         ≡ᵇ→≡; ≡ᵇ-refl; ≡ᵇ-sym)
+open import Verify-Well-Formed.Part13 using (evaluate-well-formed)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
                                          step-batch; flushBatch; closeBatch;
                                          settleBatch; applyBatch;
                                          batch-init; BatchSt; OpenBatch)
+open import Decide using (just-injᵂ; n≢jᵂ; ≡ᵇ-refl; ≡ᵇ-sym; ≡ᵇ→≡)
 
 ------------------------------------------------------------------
 -- The batcher's half of the sandwich: on any protocol-respecting

@@ -85,15 +85,18 @@ module Rx.Frame-Width where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ⊔-lub; ⊔-mono-≤; m≤m⊔n; m≤n⊔m;
-         *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; +-mono-≤; ^-monoˡ-≤)
+  using (≤-trans; ⊔-lub; ⊔-mono-≤; m≤m⊔n; m≤n⊔m)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Fin  using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; length; tabulate)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 
-open import Rx.Exp
+open import Rx.Exp using (_+ᵗ_; _×ᵗ_; bool̂; boolᵗ; caseᵗ; concatAllᵉ; Ctx;
+                          deferᵉ; emptyᵉ; exhaustAllᵉ; Exp; fstᵗ; ifᵗ; inlᵗ;
+                          input; inrᵗ; mapᵉ; mergeAllᵉ; nat̂; natᵗ; obs; ofᵉ;
+                          pairᵗ; primᵗ; scanᵉ; sndᵗ; strmᵗ; switchAllᵉ; takeᵉ;
+                          Tm; Ty; unit̂; unitᵗ; Val; varIx; varᵉ; varᵗ; μᵉ)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
 
 -- membership on the visited set, decidable by the index's ℕ view

@@ -19,20 +19,17 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Node-Table where
 
-open import Data.Bool using (Bool; true; false)
-open import Data.Nat  using (ℕ; zero; suc; _≡ᵇ_; _≤_; z≤n; s≤s)
+open import Data.Bool using (true; false)
+open import Data.Nat  using (_≡ᵇ_)
 open import Data.List using (List; []; _∷_)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just)
 open import Data.Product using (_×_; _,_)
-open import Relation.Nullary using (yes; no)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Nullary using (yes)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp  using (Ctx; Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_)
 open import Rx.Evaluator using (NodeId; NodeState; lookupNode; setNode)
-
-≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
-≡ᵇ-refl zero    = refl
-≡ᵇ-refl (suc m) = ≡ᵇ-refl m
+open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 
 -- decidable type-equality is reflexive on the nose — lets stepFrame's scan-f
 -- dispatch (w ≟ᵗ u) reduce when the node was installed at the matching type
@@ -54,28 +51,9 @@ lookupNode-setNode nid s ((k , s′) ∷ r) with k ≡ᵇ nid in keq
 ... | true  rewrite ≡ᵇ-refl nid = refl
 ... | false rewrite keq = lookupNode-setNode nid s r
 
--- reading back a node OTHER than the one just written.  The freshness ring
--- (.Node-Fresh) spends this at every `setNode`: below the watermark the key
--- cannot be the frame's own nid, so the write is invisible there.  Note the
--- ORIENTATION — the table is keyed `entry ≡ᵇ query`, so the hypothesis is
--- `nid ≡ᵇ k`, and getting it the other way round costs a build.
--- `≡ᵇ→≡` and the `≢ᵇ` pair below live HERE, at the bottom of the branch,
--- rather than in .Verify-Well-Formed where they were first needed: the
--- freshness ring (.Node-Fresh) sits beneath that tree and needs the identical
--- facts, and `make dup-check` will not let one fact stand under two names.
--- .Part1 re-exports them, so their ~36 call sites up there are unchanged.
-≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
-≡ᵇ→≡ zero    zero    _ = refl
-≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
 -- a strictly-greater id is not equal — the ring's key inequality, and the
 -- held instant's `i ≢ j` in .Part10
-≢ᵇ-from-< : ∀ {j i : ℕ} → j ≤ i → (suc i ≡ᵇ j) ≡ false
-≢ᵇ-from-< z≤n     = refl
-≢ᵇ-from-< (s≤s q) = ≢ᵇ-from-< q
 
-sucle→≢ᵇ : ∀ {j nextId : ℕ} → suc j ≤ nextId → (nextId ≡ᵇ j) ≡ false
-sucle→≢ᵇ (s≤s q) = ≢ᵇ-from-< q
 
 lookupNode-setNode-other : ∀ {n} {Γ : Ctx n} (k nid : NodeId) (v : NodeState Γ)
   (nodes : List (NodeId × NodeState Γ)) → (nid ≡ᵇ k) ≡ false →

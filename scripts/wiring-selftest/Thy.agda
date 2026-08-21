@@ -40,7 +40,7 @@ other y = good-lemma (via-with y)
 -- mis-attributed to the definition above — but registering every arm under
 -- ONE shared `...` node left that node with no route home, and a helper
 -- whose only consumers are `with` arms read as dead (measured in
--- agda/refuted).  Neither of these may be reported.
+-- agda/evidence/refuted).  Neither of these may be reported.
 postulate Two : Set
 postulate decide : Nat → Two
 

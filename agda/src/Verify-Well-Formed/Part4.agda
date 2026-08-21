@@ -20,20 +20,19 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part4 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Bool.ListAction using (any)
+open import Data.Bool    using (Bool; true; false; if_then_else_; T)
+open import Data.Nat     using (ℕ; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Data.Unit    using (⊤; tt)
-open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Unit    using (tt)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 
 -- from .Caps-Bridge, not from the top module: the top module is the
@@ -41,46 +40,25 @@ open import Relation.Binary.PropositionalEquality
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; handoff; complete; EmitKind; exhausted; dried;
+  cut; cutPending; _at_from_as_)
+open import Rx.Exp       using (Ctx; Closed; Ty)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; memberSource; NodeId; NodeState; scan-st;
+  take-st; merge-st; concat-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
+  cascadeGo; subscribeE; sameSource; hasDry; dropSource; budgetAt)
+open import Rx.Slots using (Slots)
+open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init; stepProtocol; runProtocol; paidUp; settle;
+  paidOff; applyEvents; removeOne; cancelOwed; bumpOwed; settleInstant)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part3 public
+open import Verify-Well-Formed.Part1 using (allShareSunk; cachesValid; cachesValidMid; countRegs; countRemaining; lookupOwed;
+  nodeCacheOK; regTyped?; sinksToShare; UniqueOwed; zeroExcept)
+open import Verify-Well-Formed.Part2 using (BurstInv; CurrentPast; HotLive; Inv)
+open import Decide using (just-injᵂ; n≢jᵂ; ∧-intro)
 
 -- ════════════════════════════════════════════════════════════════
 -- ONE subscription's burst preserves the frame relation (see the blueprint
@@ -169,32 +147,13 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- multi-source inner registers two chains under one bump), and
 -- exclude spent registrations (finish pred-decrements k while the
 -- registry entries linger to cascadeFinish).  That is exactly what
--- hasAliveFromInner / mergeCertAt below compute.  Do NOT generalise
--- to a global node↔registry theory, and not onto dispatchShare
--- (standing, Part8).
+-- `Probed.Root`'s `hasAliveFromInner` / `mergeCertAt` compute — they
+-- moved there with the probe that is their only consumer, so a
+-- restatement here states its own predicate rather than inheriting
+-- one whose evidence was earned against a different statement.  Do NOT
+-- generalise to a global node↔registry theory, and not onto
+-- dispatchShare (standing, Part8).
 --
--- WHY IT SURVIVES ITS OWN COUNTEREXAMPLE SHAPE (probed 2026-08-06;
--- the probe is deleted — this header is the receipt).  A hand-built
--- state with k = 0 and a live from-inner registration (dying /
--- delivered / cancelled all empty) makes mergeCertAt FALSE, so the
--- whole question is that shape's REACHABILITY — and the cascade
--- ordering answers it:
---   1. cascadeLatch fires FIRST, setting dying = [arrSource a] before
---      any chain is processed;
---   2. cascadeGo adds rid to delivered BEFORE calling chainStep;
---   3. so when innerFinish decrements k to 0, the spent registration
---      is dying AND delivered.  aliveThroughᶠ's liveness disjunct is
---      `not (src ∈ dying) ∨ not (rid ∈ delivered)` — false only when
---      BOTH hold — and the ordering supplies both, so
---      aliveThroughᶠ ≡ false.  The "both" is load-bearing: either
---      mark alone leaves the registration alive.
--- The bad shape is unreachable by this path.  REACHED coverage (rows
--- driven through subscribeE → cascadeLatch → cascadeGo, not
--- hand-built): the single-inner mergeAll shape, mid-cascade and
--- post-cascadeFinish — the decisive rows.  STILL UNCOVERED: the
--- multi-source inner reached only at hand-built states, concat /
--- switch / exhaust and nested *All, and the CUT route to k ≡ 0
--- (registrations also drop at take-cuts — a distinct path).
 --
 -- STATED AT THE SETTLED ROOT EXIT — the same conditioning as the two
 -- consumers below, and the one region the refutations do not touch.
@@ -204,31 +163,18 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- consumers read meanwhile.
 ------------------------------------------------------------------
 
--- a registration carries an ALIVE from-inner instance of mnid: its
--- path mentions some inst via a `from-inner _ mnid inst` frame, and
--- that inst is alive (aliveThroughᶠ)
-hasAliveFromInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  → NodeId → EvalSt e → RegId × Source × Chain Γ t → Bool
-hasAliveFromInner mnid st c@(_ , _ , (_ , p)) =
-  any (λ inst → aliveThroughᶠ inst st c) (innerInstsP mnid p)
-
--- merge-cert at one node: when merge-st sits at k ≡ 0, no registry
--- entry has an alive from-inner instance of this node.  k ≢ 0 and
--- non-merge nodes are trivially certified.
-mergeCertAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  → NodeId → EvalSt e → Bool
-mergeCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
-... | just (merge-st zero od) =
-        not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
-... | _ = true
-
 -- NO `merge-cert` POSTULATE LIVES HERE ANY MORE (2026-08-18).  It existed
 -- ONLY as the hypothesis of `root-caches-core` / `root-done-plumbed-core`,
 -- and writing those two assemblies as real bodies showed that hypothesis
 -- does not close: see the ALIVE-vs-PRESENT gap recorded on root-mergeCache
--- below.  `mergeCertAt` itself stays — it is the decidable predicate
--- Root-Probe pins at reachable states, and that evidence is what a restated
--- merge-cert will be built on.
+-- below.  `mergeCertAt` LEFT WITH IT, and that is the wiring law rather
+-- than a tidy-up: its only consumer was the probe, so once the probe moved
+-- to `agda/evidence/probed` this file held a definition no proof reached.
+-- It is now `Probed.Root`'s own decision procedure — see the reachability
+-- receipt in that file, which travelled with it.  A restated merge-cert
+-- states its predicate HERE, freshly; the probe's rows are evidence about
+-- the predicate they were written against, and inheriting them across a
+-- restatement is the extrapolation the probe rules forbid.
 -- RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda restores
 -- the postulate as it stood.
 
@@ -251,12 +197,12 @@ rootExitSt e ins =
 -- conjunction fold over the registry, so the assembly IS writable today: the
 -- fold's induction is below and the whole residue is the PER-ENTRY leaf.
 -- What the conversion bought beyond the fit test: the residue no longer
--- quantifies over the registry, so the FALSITY region the Root-Probe sweep
+-- quantifies over the registry, so the FALSITY region the `Probed.Root` sweep
 -- could not reach is now a statement about ONE surviving entry — a size a
 -- counterexample can actually be built at.
 postulate
   -- one registry entry outliving a DONE root exit sinks to a share.  The
-  -- `done` guard is load-bearing and measured so: Root-Probe reaches a state
+  -- `done` guard is load-bearing and measured so: `Probed.Root` reaches a state
   -- whose registry is live and where this is FALSE — with done ≡ false.
   root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
@@ -279,7 +225,7 @@ postulate
   -- nodeCacheOK's six constructor clauses are `true` outright, so what is
   -- actually open here is the merge clause alone.
   --
-  -- PROBED 2026-08-18 (Verify-Well-Formed.Root-Probe), NON-VACUOUSLY, in the
+  -- PROBED 2026-08-18 (Probed.Root, `make probed`), NON-VACUOUSLY, in the
   -- assembled form: `cachesValid` holds at the settled root exit for seven
   -- programs whose node lists are pinned non-empty in the same file — merge
   -- (one inner, two inners, nested), concat, switch, exhaust, and
@@ -596,14 +542,8 @@ stepProtocol-extract-enter es i s k S eq =
 -- accumulated bookkeeping (init/close only — never value/complete, which
 -- splitEvents routes to the value list / done flag) leaves `done`
 -- untouched, and the value list + optional complete tack on cleanly.
-just-injᵂ : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
-just-injᵂ refl = refl
 
-n≢jᵂ : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
-n≢jᵂ ()
 
-t≢fᵂ : true ≡ false → ⊥
-t≢fᵂ ()
 
 applyEvents-++just : ∀ {A : Set} (es₁ es₂ : List (InstEvent A))
   (lv : List Source) (o : Owed) (d : Bool) {L : List Source} {O : Owed} {D : Bool} →

@@ -136,18 +136,28 @@ research lives; where they disagree, the header wins.
 
 **The tier is ONE statement, not a directory.** `budget-sufficient`
 (Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false`, and it is the only
-CLAIM the `Verify-Budget-Sufficient` tree exports: 45 of the tree's 48 modules
-sit in Caps-Bridge's import cone, and the other three are `MODULE_ROOTS` off
-Main by design (`Demand-Probe`, `Demand-Programs`, `Scan-Node-Probe`).
+CLAIM the `Verify-Budget-Sufficient` tree exports: 41 of the tree's 42 modules
+sit in Caps-Bridge's import cone, and the one that does not is `Demand-Programs`,
+a program corpus reaching Main through `Harness.Main`.  The tree's two probes
+used to sit outside that cone as well; both expired with their targets and are
+deleted, and a live probe now lives in `agda/evidence/probed` instead.
 
-**It is not the tree's only DOOR, and the other two are import-hygiene debt.**
-`Verify-Well-Formed` also draws `mint-install-survives` (Node-Fresh) by name,
-and re-exports `Node-Table` BLANKET and `public` — so Node-Table's utility
-lemmas cross two tier boundaries and reach `The-Proof`, which then cites two of
-them (`≡ᵇ→≡`, `≡ᵇ-refl`) at a module that does not define them. That is the
-`public`-re-export harm in one instance: `grep` and `make find` point at the
-wrong home. Neither door carries proof obligations, so neither changes the
-tier's rows — they are work for the imports migration.
+**AND THE COUNT WENT DOWN BY DELETION, WHICH IS WHAT THE CONE IS FOR.** `Wet`
+Parts 4 and 5 and most of Part 3 were the W11 width walk — 1820 proven lines
+whose consuming face, the ledger walk, was retired. It reached Main through a
+`public` re-export in Wet/Part6 and nothing else, so a mutual cluster consuming
+itself read as wired; reachability was the only check that could see it. The
+`ofW` measures stay, spent by the successor face (`Walk-Level`), which is what
+distinguishes a superseded predecessor from a missing wire.
+
+**IT IS ALSO THE TREE'S ONLY DOOR NOW, and what closed the others was a
+module, not a cleanup.** `Verify-Well-Formed` still draws `mint-install-survives`
+(Node-Fresh) by name — one real cross-tier claim. What used to sit beside it was
+`Node-Table`'s utility lemmas crossing two tier boundaries into `The-Proof`,
+which cited `≡ᵇ→≡` and `≡ᵇ-refl` at a module defining neither. Those were never
+claims on this tier; they were arithmetic with no home, so they had accreted a
+copy per tree. They now live in `Decide` below both trees, and `The-Proof`
+reaches into the trees for exactly `evaluate-well-formed` and this door.
 
 **"A REAL BODY" IS NOT "POSTULATE-FREE".** `budget-sufficient` is a definition
 rather than a postulate; the rows below are the leaves still under it. Reading
@@ -172,12 +182,21 @@ Labour, not risk: nothing here can discover a design failure.
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
-bets on ground a `Verify-Budget-Sufficient` failure would move. The branch's own design question
-is **merge coherence, and it is UNSTATED**: `mergeCertAt` is the decidable
-predicate, probed at reachable states by Root-Probe, but the coherence itself
-owes a statement, a mid-fold FoldInv form, and the consumer rewrites that spend
-it. The ALIVE-vs-PRESENT gap any statement has to close is recorded on
-`Part4.root-mergeCache`.
+bets on ground a `Verify-Budget-Sufficient` failure would move.
+
+**THE TIER IS ONE STATEMENT.** `The-Proof` draws `evaluate-well-formed` (Part13)
+and nothing else from this tree, and all fourteen `Verify-Well-Formed` modules
+sit in its cone. The four utility names it also used to draw are in `Decide`
+now, so the count is a fact about the import graph rather than about which
+lemmas happened to be re-exported.
+
+The branch's own design question is **merge coherence, and it is UNSTATED**: the
+decidable predicate a statement would be about lives with the probe that is its
+only consumer (`Probed.Root`, moved there when the probes left `MODULE_ROOTS`),
+so a restatement here states its own and does not inherit evidence earned
+against that one. The coherence owes a statement, a mid-fold FoldInv form, and
+the consumer rewrites that spend it. The ALIVE-vs-PRESENT gap any statement has
+to close is recorded on `Part4.root-mergeCache`.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 

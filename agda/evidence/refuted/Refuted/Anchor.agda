@@ -15,27 +15,11 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Anchor where
 
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
-                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans; ≤-pred;
-                                       +-suc; +-identityʳ;
-                                       +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-<; +-monoˡ-≤;
-                                       *-monoˡ-≤; *-monoʳ-≤;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
-                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
-                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
-                                       ^-monoˡ-≤; ^-*-assoc;
-                                       ^-distribˡ-+-*; *-mono-≤;
-                                       +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
-open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.Fin     using (Fin; toℕ)
+open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; <-≤-trans; *-monoˡ-≤; *-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
+  ^-monoʳ-≤; *-identityʳ; <⇒≤; ^-monoˡ-≤; *-identityˡ; <-irrefl)
+open import Data.Empty   using (⊥)
+open import Data.Fin     using (Fin)
 import Data.Fin as Fin
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
@@ -43,16 +27,12 @@ open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
-                                _at_from_as_; EmitKind; subscribe;
-                                InstEvent; init; value; close; handoff;
-                                complete; exhausted;
-                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
-                                Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Prim      using (towerℕ) public
+  using (refl; sym)
+open import Rx.Prim      using (_at_from_as_; g0)
+open import Rx.Prim using (_at_from_as_; g0)
 
-open import Verify-Budget-Sufficient.Measures
+open import Verify-Budget-Sufficient.Measures using
+  (_hasAtLeast_; capᴱ; dBound; hopR; k≤3^k; n<2^n)
 
 -- THE RECURRENCE-CLOSED CAP.  Per-clause obligations (c ≤ 4 own
 -- mints; oneShotBurst events ≤ 3+Ω; hops ≤ the child's burstLen,
@@ -102,7 +82,8 @@ anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 --   · the dry half consumes hasAtLeast (suc d) peels against
 --     dBound-μ/-hop/-connect; hop targets get their rank drop
 --     from the shell hop machinery and their width bound from W11
---     applied to the child call.
+--     applied to the child call (W11 deleted 2026-08-21 with the
+--     retired walk; this records the contract, not live machinery).
 --   · subsumption: subscribeE-walkS below is this contract's
 --     store-half projection — its ground clauses lift conjunct by
 --     conjunct in the grind.  The two cores at the bottom stay
@@ -360,7 +341,8 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- consequence.  It is hopD's scan-clause allowance, which must move
 -- off the store bound and onto an entry-determined frame-emission
 -- bound.  The premises for that are in the machine already: per-node
--- sync emissions are ≤ 3 + Ω (widthOK? / ofWᵉ / pathΩ? carry it);
+-- sync emissions are ≤ 3 + Ω (widthOK? / ofWᵉ / pathΩ? carried it,
+-- and only ofWᵉ is still in the tree);
 -- widths are syntax-fixed (strmᵗ is Tm's only obs introduction and
 -- substitution plugs into list elements, never appends); and a sync
 -- frame has no μ feedback (a μ-bound variable lives in Δᵍ and is

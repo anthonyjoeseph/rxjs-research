@@ -35,8 +35,10 @@
 -- in mint flavour (they fed only the old walk's own induction; the
 -- outer lenOK is sourced from caps-tick via capsOK?-count +
 -- B2-cReg≤cSize, not from the walk).  The Ω width trio (widthOK? /
--- ofWᵉ ≤ Ω / pathΩ?) is retired WITH the ledger: Ω fed only walkCap's
--- base, and the caps side carries width as dWᵉ ≤ cWid.
+-- ofWᵉ ≤ Ω / pathΩ?) went WITH the ledger: Ω fed only walkCap's base,
+-- and the caps side carries width as dWᵉ ≤ cWid.  Its proofs were
+-- DELETED 2026-08-21 (.Measures carries the record); `ofWᵉ` itself
+-- stays, and this module is what spends it.
 --
 -- WHAT SURVIVES UNCHANGED: the dry half.  The demand `dBound Ŝ R̂ U
 -- (hopDᵉ F b) (syncSizeᵉ b) ≤ G` at the ENTRY-COMPUTABLE reset caps,
@@ -68,89 +70,84 @@
 -- and the shelf lemmas are not in the cycle, so both are pure cost
 -- here and free one arrow down.  What stays is the dispatch itself, the
 -- statements only IT reads, and the outer assemblies that spend it.
--- Both are re-exported `public`, so this module's interface is
--- unchanged and no consumer downstream can tell.
+-- Both live one arrow down now, and consumers name what they need from
+-- there directly, so the split shows up in their import lists.
 
 module Verify-Budget-Sufficient.Walk-Level where
 
-open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
-                                _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Bool    using (Bool; true; false; _∨_; not; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred;
-                                       m≤m+n; m≤n+m; n≤1+n;
-                                       +-suc; +-assoc; +-comm;
-                                       +-mono-≤; +-monoʳ-≤; +-monoˡ-≤;
-                                       *-mono-≤; *-monoʳ-≤;
-                                       +-identityʳ;
-                                       m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
-open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred; m≤m+n; m≤n+m; n≤1+n; +-suc; +-assoc; +-comm; +-mono-≤;
+  +-monoʳ-≤; *-mono-≤; +-identityʳ; m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
+open import Data.Maybe   using (just; nothing)
 open import Data.Bool.ListAction using (all; any)
-open import Data.Fin     using (Fin; toℕ)
-open import Data.Vec     using (Vec; lookup)
+open import Data.Fin     using (Fin)
+open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim      using (Tick; Id; Source; init; value; close;
-                                complete; handoff; exhausted; dried;
-                                cut; cutPending; subscribe;
-                                InstEmit; InstEvent; _at_from_as_;
-                                Gas; g0; gs; gasPad; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
-                                inputsBelowᵉ; isData;
-                                _≟ᵗ_;
-                                sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
-                                shellSizeᵉ; innerᵉ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                                μᵉ; varᵉ; deferᵉ; unfoldμ; applyFn; evalTm)
+open import Rx.Prim      using (Tick; Id; Source; value; complete; InstEmit; _at_from_as_; Gas; g0; gs)
+open import Rx.Exp       using (obs; Ctx; Closed; Val; Exp; _≟ᵗ_; sizeᵉ; sizeᵛ; syncSizeᵉ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
+  scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
 open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; hopD-unfoldμ)
-open import Rx.Slot-Hop  using (slotHop; slotHop-fix)
-open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
-                                RegId; Chain;
-                                memberSource; Path; root; share-sink; _↠_;
-                                Stream; subscribeE; sharedConnect;
-                                subscribeAll; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                NodeState; merge-st; concat-st;
-                                switch-st; exhaust-st; scan-st; take-st; scan-f;
-                                splitBurst; hasDry; dryEvent;
-                                burstCompleted; sharedPlumb; dropSource;
-                                sched-init; st-init; budgetAt; slotsSize;
-                                opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
-                                sLvlD-suc; opIterD-suc; sIterD-suc; fLvlD-suc; fLvl; widAt;
-                                Frame; thru-outer; from-inner;
-                                pushBurst; stepFrame;
-                                subscribeInner; splitEvents; retagEvents;
-                                thruConsume; thruWalk; thruWrap;
-                                mergeBump; switchKill; cutThrough; sweepLive;
-                                lookupNode; setNode; pathHasNode; LiveSource;
-                                sameSource; installNode; NodeId; register; mintNode)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ; hopD-unfoldμ)
+open import Rx.Slot-Hop  using (slotHop)
+open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; _↠_; Stream; subscribeE; subscribeAll; AllOp; mergeᵒ;
+  concatᵒ; switchᵒ; exhaustᵒ; NodeState; merge-st; concat-st; switch-st; exhaust-st; scan-st;
+  take-st; splitBurst; hasDry; dryEvent; opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
+  sLvlD-suc; sIterD-suc; fLvlD-suc; widAt; thru-outer; from-inner; pushBurst; stepFrame;
+  subscribeInner; splitEvents; retagEvents; thruConsume; thruWalk; thruWrap; switchKill;
+  lookupNode; setNode; installNode; NodeId)
+open import Rx.Slots using (Slots; slotsSize)
 
 -- the wet stratum: INV?, dBound, hasAtLeast, regsLen?, pathLen, the gas
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
-open import Verify-Budget-Sufficient.Wet
+open import Verify-Budget-Sufficient.Measures using
+  (_hasAtLeast_; all-++-intro; all-impl;
+                                                      applyFn-size; boundedLive; boundedNode;
+                                                      budget-covers; burstB?; burstB?-widen;
+                                                      burstHopD?; connect-anchor; dBound;
+                                                      eventB?; fnCap-unfoldμ; fnCapLive;
+                                                      fnCapNode; fnCapᵉ; fnCapᵛ;
+                                                      hasAtLeast-mono; hasAtLeast-pad;
+                                                      hasAtLeast-peel; hopD-map-emit;
+                                                      hopDev?; hopR; inner-unfoldμ;
+                                                      INV-parts; INV?; mapValue-B;
+                                                      oneShot-tail-dry; pathB?; pathB?-widen;
+                                                      pathLen; regsLen?; seed-covers;
+                                                      shellSize-unfoldμ; splitEvents-bk-B;
+                                                      splitEvents-vals-B; syncSize≤sizeᵉ;
+                                                      unconn; unconn-cons-≤; valB?;
+                                                      valsB?-widen; ΨAt; ∧-true; ∨-false;
+                                                      szB)
+open import Verify-Budget-Sufficient.Wet.Part6 using
+  (connect-edge; hop-edge; hop-step-gives; hop-step-needs; mu-edge; sizeCapAt;
+   unconn-keeps)
+open import Verify-Budget-Sufficient.Keeps-Ring using
+  (KeepsC; obs-slot-shared; share-live-novals; share-spent-novals;
+   sharedConnect-unconn; stepFrame-keeps; subscribeE-keeps; subscribeE-slots;
+   switchKill-keeps; thruConsume-keeps)
+open import Verify-Budget-Sufficient.Wet.Part1 using
+  (INV?-widen; lookupNode-B; mergeBump-INV; splitBurst-vals-B)
+open import Verify-Budget-Sufficient.Wet.Part2 using
+  (finList-B)
 -- the caps face: only the five predicates the statement reads there
-open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
-         widNode; merge-step; concat-step; switch-step; exhaust-step;
-         frameSz?; capsOK?-mono; capsOK?-setNode; capsOK?-nextNode;
-         pathSz?-⊑; frameStep-chain-suc; frameStep-⊑-+;
-         valCaps?; valsCaps?; eventCaps?; valCountᵉ; frameBud;
-         mapValue-caps; valsCaps?-widen; finList-caps;
-         splitEvents-valsCaps; splitEvents-bk-caps; burstCaps?-widen;
-         capsOK?-mergeBump; switchKill-caps; switchKill-closes-caps;
-         lookupNode-caps; capsOK?-nodeSz; capsOK?-nodeWid;
-         thruWrap-caps; mList?; mList?-head; mList?-tail; mList?-keeps;
-         valsCaps→mList-strict; splitBurst-vals-caps; splitBurst-bk-caps;
-         widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
-         frameStep-size-strict-suc;
-         capsOK?-regs; pathSz?-len;
-         slotsCaps?-capsAt; capsOK?-parts)
-open import Verify-Budget-Sufficient.Psi-Split
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; eventCaps?; pathSz?; slotsCaps?; valCaps?;
+  valCountᵉ; widNode; widNode-push)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using
+  (capsOK?-mergeBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
+  capsOK?-setNode; frameBud; lookupNode-caps; mList?; mList?-head; mList?-keeps; mList?-tail;
+  pathSz?-len; slotsCaps?-capsAt; splitBurst-bk-caps; splitBurst-vals-caps;
+  splitEvents-bk-caps; splitEvents-valsCaps; switchKill-caps; switchKill-closes-caps;
+  thruWrap-caps; valsCaps?; valsCaps→mList-strict)
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using
+  (burstCaps?-widen; eventsCaps?-widen; finList-caps; frameStep-chain-suc;
+   frameStep-size-strict-suc; frameStep-⊑-+; mapValue-caps; pathSz?-⊑;
+   valCaps?-size; valCaps?-wid; valsCaps?-widen)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
   using (chain-desc; op-step; burst-index; burst-nil; burst-step;
@@ -164,27 +161,42 @@ open import Verify-Budget-Sufficient.Caps-Sadd
 -- the transformer monotonicity/inflation family, cited directly by the
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
-  using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
-         sLvlD-mono; opIterD-infl; fIterD-infl;
-         B2-cReg≤cSize; frameStep-reg≤size;
-         capsAt-base-size)
+  using (opIterD-mono; sIterD-mono; sLvlD-infl; B2-cReg≤cSize; capsAt-base-size; 1≤capsAt-reg;
+  2≤capsAt-size; _⊑ᶜ_; Caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0;
+  frameStep-mono-j; sizeCount; sizeCount-body)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
 open import Verify-Budget-Sufficient.Subscribe-Face
-  using (unfoldμ-caps; subscribeE-caps; countLen; countVals; countIn; valsOf; pushEmit-count;
+  using (subscribeE-caps; countLen; countVals; countIn; pushEmit-count;
          pushBurst-len; retagEvents-caps;
          burstCount?-widen; burstCount?-tail;
-         thruWrap-vals; splitBurst-len; mul-fits; valsIn; valsLen;
-         lenWiden; frameStep-+suc; concat-fits)
+         splitBurst-len; mul-fits)
+open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+  (unfoldμ-caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part6 using
+  (concat-fits; frameStep-+suc; lenWiden; thruWrap-vals; valsIn; valsLen;
+   valsOf)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthAll; depthBurst; depthFrame; depthInner;
-         depthConsume; depthWalk; depthSlot; depthConn)
+  using (depthE; depthAll; depthBurst; depthFrame; depthInner; depthConsume; depthWalk)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step)
+  using (nest-keeps; mu-step; concat-step; exhaust-step; merge-step; nest;
+         switch-step)
 open import Verify-Budget-Sufficient.Op-Budget
   using (opIterD-dominated)
-open import Verify-Budget-Sufficient.Walk-Level.Arms public
+open import Verify-Budget-Sufficient.Walk-Level.Arms using
+  (input-wet-core; walk-defer)
+open import Verify-Budget-Sufficient.Walk-Level.Parts using
+  (any-++-false; burstHopD?-widen; dBound-mono-r; dBound-mono-U; finList-dry;
+   finList-hop; hasAtLeast-peel-gs; INV?-install; INV?-setNode;
+   INV?-switchKill; mapValue-dry; mapValue-hop; retagEvents-B; retagEvents-dry;
+   retagEvents-hop; splitBurst-nodry; splitBurst-vals-hop; splitEvents-bk-dry;
+   splitEvents-bk-hop; splitEvents-vals-hop; switchKill-closes-nodry;
+   switchKill-regsLen; thruWrap-INV; thruWrap-pass; walk-empty; walk-map;
+   walk-of; walk-scan; walk-take)
+open import Verify-Budget-Sufficient.Walk-Level.Statement using
+  (inputᶜ; mu-lvl-desc; WalkLevel; WalkLevelCore; WalkStmt)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 
 
@@ -216,7 +228,7 @@ open import Verify-Budget-Sufficient.Walk-Level.Arms public
 -- shared carriers (the strict-drop argument reads the carrier's own
 -- hopDᵉ, which a smuggled def value exceeds), and (c) is a spec change.
 --
--- PROBED 2026-08-14 (Demand-Probe series W, the refutation's own
+-- PROBED-HISTORICAL 2026-08-14 (Demand-Probe series W, the refutation's own
 -- program, flipped): at the obs-typed shared slot whose def emits
 -- strmᵗ (mergeAllᵉ emptyᵉ), the hop conjunct is now `true` at every
 -- measurement index and every non-dry gas, and the OLD bound is pinned
@@ -232,7 +244,7 @@ open import Verify-Budget-Sufficient.Walk-Level.Arms public
 -- `slotHop V sl i ≡ hopDᵉ V (slotHop V sl) d` by refl at i = 1 and
 -- i = 2, with the off-by-one alternative pinned as a live contrast).
 --
--- PROBED 2026-08-14 (Demand-Probe series V): the other four conjuncts
+-- PROBED-HISTORICAL 2026-08-14 (Demand-Probe series V): the other four conjuncts
 -- RUN, at the series W program, co-instantiated — INV?, burstB?,
 -- hasDry and regsLen? all `true` against one exit state, with B tight
 -- (B = 5 holds, B = 4 fails on slotsSize; B = 1 fails burstB? on the
@@ -240,20 +252,28 @@ open import Verify-Budget-Sufficient.Walk-Level.Arms public
 -- term rather than cited from series W's, since that program dries one
 -- gas step down and the terms are not interchangeable by inspection.
 --
--- NOT COVERED, and the class stays FALSITY on it: series V holds TWO
+-- NOT COVERED BY THE PROBES, and while the face was open this was its
+-- FALSITY region: series V holds TWO
 -- axes flat — Ψ = 0 at every row (the def is mergeAllᵉ emptyᵉ, so
 -- slotsFnCap insᵂ = 0) and the exit registry is EMPTY (sharedConnect's
 -- burstCompleted branch drops the one entry), so regsLen? is vacuous
 -- there and the Ψ conjuncts of INV?/burstB? are satisfied by 0 ≤ 0.
 --
--- THE Ψ AXIS IS NOT AN ARBITRARY GAP — IT IS WHERE THIS POSTULATE'S
--- OWN REFUTATION WOULD RECUR.  `fnCapᵉ (input i) = 0` (.Measures) is
+-- THE Ψ AXIS WAS NOT AN ARBITRARY GAP — IT IS WHERE THE REFUTATION WOULD
+-- HAVE RECURRED, HAD THE FACE STAYED OPEN.  It did not; what follows is
+-- why, and it is the reason the face is ground rather than parked.  `fnCapᵉ (input i) = 0` (.Measures) is
 -- CONSTANT and unparameterised: structurally the very clause shape that
 -- was machine-refuted for hop, where `hopDᵉ V η (input i)` was constant
 -- 0 until an obs-typed shared slot's def was shown to emit values the
 -- constant did not account for.  fnCapᵉ is positive on scanᵉ/mapᵉ with
 -- a function-valued term, so a shared slot whose def carries one is
 -- exactly the analogue of the refuting program.
+--
+-- THE RISK HISTORY, and it is HISTORY: the face is a real definition on
+-- every clause and holds no live postulate, so no risk class applies to it
+-- any more.  What follows is kept because it says what the probes reached
+-- and what they could not, which is a fact about the evidence rather than a
+-- claim about an open statement.
 --
 -- CLASS LOWERED FALSITY → DIFFICULTY (2026-08-15).  What earned it, and
 -- what did NOT:
@@ -273,10 +293,12 @@ open import Verify-Budget-Sufficient.Walk-Level.Arms public
 -- NOT part of the case: the Ψ/Ψ2/Ψ3 probe series, which were deleted for
 -- being structurally unable to refute.  The class rests on the proofs.
 --
--- RESIDUE, and it is what would re-raise the class: every probe is a small
--- program.  Deeper telescopes, scripted/shared mixes, and μ-nesting inside
--- a slot def are uncovered, so a surprise would come from a fact about
--- those shapes that no probe touched.
+-- PROBE RESIDUE, and while the face was open it was what would have
+-- re-raised the class: every probe is a small program.  Deeper telescopes,
+-- scripted/shared mixes, and μ-nesting inside a slot def are uncovered, so
+-- a surprise would have come from a fact about those shapes that no probe
+-- touched.  The proof closes all of them; the boundary is recorded because
+-- a reader restating any of this inherits the probes, not the proof.
 --
 -- THE Ψ AXIS IS ANSWERED, AND BY PROOF RATHER THAN BY PROBE (2026-08-15).
 -- Two lemmas in .Measures, both already proven, close the smuggle:

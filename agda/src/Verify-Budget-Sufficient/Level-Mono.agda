@@ -31,14 +31,13 @@
 -- A solo recheck is cheap (< 20s) — no heavyweight SCC.
 module Verify-Budget-Sufficient.Level-Mono where
 
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤)
 open import Relation.Binary.PropositionalEquality using (sym)
 
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; cDel; cDel-body; sizeCount; sizeCount-body;
-         fLvlD-mono; iterL-mono; dLvl-mono; lvls-mono;
-         dCapᶜ-mono; dWalkᶜ-mono; regAt-mono)
+  using (Caps; cDel; cDel-body; sizeCount; sizeCount-body; fLvlD-mono; iterL-mono; dLvl-mono;
+  lvls-mono; regAt-mono)
 
 open import Rx.Evaluator using (iterL; dLvl; lvls; dCapᶜ; dWalkᶜ; fLvlD; sizeAt; regAt)
 

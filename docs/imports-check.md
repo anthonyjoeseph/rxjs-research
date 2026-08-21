@@ -26,36 +26,148 @@ make imports-fix          delete them in place
 make imports-selftest     the checker still fires, both ways   ← in the gate
 ```
 
-Directly, for a narrower scope or to see the name-level report:
+Directly, for a narrower scope:
 
 ```
-scripts/check-imports.py --src agda/src/Verify-Well-Formed --names --stats
-scripts/check-imports.py --src <one file> --names --fix
+scripts/check-imports.py --src agda/src/Verify-Well-Formed --stats
+scripts/check-imports.py --src <one file> --fix
+scripts/check-imports.py --keep-names        # module edges only, no name-level
 ```
 
-## What the gate checks, and what it deliberately does not
+## What the gate checks
 
-**The gate fails on a dead DECLARATION only** — an `open import M using (…)` where
-*none* of the imported names is used. That is exactly the set that moves the
-module graph.
+**Two findings are about USE, and the gate fails on both.** A dead DECLARATION
+— an `open import M using (…)` where *none* of the imported names is used,
+which is the set that moves the module graph. And a dead NAME inside a clause
+that still has a live one, which does not. The sections below carry the rest:
+a PHANTOM name, a missing or mismatched module header, a BLANKET import, a
+`public` re-export, and the orphan guard's WIRING findings.
 
-**`--names` is the eslint-ish extra and is hygiene only.** It reports unused names
-*inside* a clause that still has at least one live name. Those cost nothing a
-build can measure: one live name holds the edge open, so the other thirty are
-scope noise. They are reportable and fixable, and they are not a gate failure —
-running `--fix --names` over the tree rewrites almost every header in it, which is
-a large diff bought for no measured second.
+The name-level half used to be an opt-in `--names` flag, on the argument that a
+clause with one live name holds the edge open so the other thirty cost nothing a
+build can measure. That argument was about BUILD TIME and the check is not about
+build time — it is the same legibility argument `using` lists rest on in the
+first place. A list that names thirty things a file does not touch is not a
+record of what the file depends on, and the reader cannot tell which claim is
+real without doing the search themselves. Anthony: *"no unused imports,
+either."* Cost of the switchover: **5710 names across 67 files**, and the tree
+holds at zero.
 
-Three cases are **skipped**, and `--stats` counts them so the blind spot has a
-size:
+`--keep-names` suppresses the name-level half. It is for isolating a
+module-EDGE question from a name one while reading a report, not for the gate.
+
+Four cases are **skipped for the USE check**, and `--stats` counts them so the
+blind spot has a size. Each still answers to the other checks — skipped here is
+not exempt:
 
 | skipped | why |
 | --- | --- |
 | `open import M public` | a re-export is FOR its consumers, so locally unused is normal — it gets a `RE-EXPORT` finding instead |
-| `open import M` with no `using` | it imports every name `M` has, so "unused" is not decidable from this file |
+| `open import M` with no `using` | it imports every name `M` has, so "unused" is not decidable from this file — it gets a `BLANKET` finding instead |
 | a clause with `renaming` and no `using` | same reason — the un-renamed rest is still imported |
 | the tree's **claim root** | its imports ARE the claim; unused is the design |
-| an import with no `using` list | nothing to compare a body against — it is a `BLANKET` finding instead |
+
+## A PHANTOM NAME — imported from a module that does not have it
+
+The one finding here that Agda would eventually catch on its own:
+
+```
+Phantom.agda:12: PHANTOM NAME  gone  — Phantom-Src does not mention `gone`
+anywhere, so it cannot be exporting it.
+```
+
+Agda's own report is a `ModuleDoesntExport` **warning**, which `-W error` turns
+into exit 42 — so the build does fail, many minutes down the tower, naming the
+importer and saying nothing about where the name went. One instance per run,
+too: the module aborts at the first error, so a migration that broke four
+consumers costs four full builds to find. This check decides all of them in
+milliseconds, before the tower starts.
+
+**The shape it catches is a definition MOVING.** The old module stops exporting
+the name; one consumer's `using` clause still asks for it while its siblings
+have already been repaired. The instance that motivated it: a name migrated to
+a small shared module, and one file kept the old edge — while ALSO carrying a
+correct import of the same name from the new home, so the file read as fine and
+`grep` for the name found it twice, both times looking right. The name-level
+check cannot see it, because the file genuinely *uses* the name.
+
+**What makes it sound is the `public` ban.** Without re-exports a module can
+only export what its own text mentions, so "the name appears nowhere in M" is a
+proof that M does not export it. Two consequences worth knowing:
+
+- **It reads a module's text with its import DECLARATIONS excised.** A name M
+  merely imports is not a name M exports, so a whole-file read would call it
+  exported and miss the row.
+- **It only asks modules it can read.** A stdlib module is not a file in this
+  tree and re-exports freely, so every such import is skipped. The check
+  under-reports by construction and never invents: the finding it does make is
+  certain, which is why it is a gate failure rather than a report.
+
+**It is not auto-fixable, and `--fix` leaves it alone.** The repair is the RIGHT
+module, which only a human knows; deleting the item would trade a scope-check
+warning for an unbound name.
+
+**The one side to get wrong is the renaming.** `x to y` binds `y` locally but
+the module must export `x` — the opposite of what every other question in this
+file wants, and `split_list` returns the bound name for exactly that reason.
+Reading the bound side reports a phantom on the item that is CORRECT and stays
+silent on the one that is not: it fires and misses in the same breath. The
+fixture pins both directions.
+
+## THE FILE'S OWN NAME IS CHECKED FIRST
+
+**A missing `module … where` header is not a syntax error.** Agda infers the
+name from the path and checks the file happily as a TARGET. It crashes only
+when something IMPORTS it, and then with
+
+```
+An internal error has occurred. Please report this as a bug.
+Location of the error: __IMPOSSIBLE__, called at src/full/Agda/Interaction/Imports.hs
+```
+
+naming neither the file nor the import — the log's last line is the module
+Agda was checking when it tried to load the headerless one, which is a
+different, healthy file.
+
+**And `make agda-dev` cannot see it**, which is what makes this expensive:
+agda-dev checks a GENERATED copy under its own `Dev-…` module name, so the
+missing header is supplied by the generator and the module reports GREEN. A
+red gate plus a green dev check on the same file reads as a tooling problem,
+and this is the one shape where it is not.
+
+Bisecting it is fast once you suspect the import graph rather than the file:
+a two-line module that does nothing but `import M` reproduces in seconds, and
+the same probe over each of a crashing file's imports finds the culprit
+directly. `grep -L '^module ' ` over the tree finds it faster still, which is
+why the check lives here — one pass, milliseconds, before any finding about a
+file's imports.
+
+A declaration that disagrees with its path is the same finding: reported, and
+a gate failure.
+
+**A MIXFIX IS SPENT AS A SECTION AT LEAST AS OFTEN AS FULLY APPLIED, AND `_`
+DOES NOT SEPARATE TOKENS.** `(x ⊔_) *_` is two tokens, `⊔_` and `*_` — not
+`⊔` and `*` — so an atom-equality test over raw tokens calls `_*_` unused
+while the file multiplies three times. That is the checker's worst failure
+mode by a distance: a false positive DELETES a live import, and the build then
+dies far from the edit with
+
+```
+error: [NoParseForApplication]
+Could not parse the application (pmᵗ V 0 f ⊔ 1) *_
+Operators used in the grammar:
+  None
+```
+
+which names the USE and never the deleted import. It cost 507 live names in
+one `--fix` run.
+
+The repair is to split the TOKENS on `_` exactly as the NAMES are split, so
+both sides sit in one alphabet — which also covers a multi-hole section
+(`hop_via_onto_`), where stripping the underscores out instead does not.
+`-` is NOT a separator, so `setNode-fnCap` is one token and does not count as
+a use of `setNode`; that is correct, and it is most of what an over-loose
+substring audit turns up.
 
 A `using` entry may name a MODULE (`using (module M)`); the name it binds is `M`,
 and the keyword comes off before the search. See the false-positive note below —
@@ -159,7 +271,7 @@ definitions only." Main already complies; all six of its imports carry lists.
 ## The claim root, and it is the only exception (Anthony)
 
 **One file per include root is skipped wholesale: the claim root.** `agda/src`
-roots at `Main.agda`, `agda/refuted` at `Refuted/Main.agda`, and both files exist
+roots at `Main.agda`, `agda/evidence/refuted` at `Refuted/Main.agda`, and both files exist
 to NAME definitions rather than apply them — "individual definitions only, so
 that `imported` means `claimed`". So every import in one is locally unused *by
 design*, and `make wiring` reads precisely those `using` clauses to seed

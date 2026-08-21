@@ -72,23 +72,22 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Op-Budget where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-refl; ≤-reflexive; ≤-trans; n≤1+n; m≤n+m; m≤m+n;
-         *-identityˡ; *-identityʳ; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; *-suc;
-         *-assoc; *-comm; ≤-pred; m≤m*n; +-assoc; +-comm;
-         +-suc; +-identityʳ; +-mono-≤; +-monoʳ-≤; <⇒≤; ^-monoˡ-≤)
+  using (≤-refl; ≤-reflexive; ≤-trans; n≤1+n; m≤n+m; m≤m+n; *-identityˡ; *-identityʳ; *-monoˡ-≤;
+  *-monoʳ-≤; *-mono-≤; *-suc; *-assoc; *-comm; ≤-pred; +-suc; +-identityʳ; +-mono-≤; +-monoʳ-≤;
+  <⇒≤; ^-monoˡ-≤)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
 open import Rx.Evaluator
-  using (sizeAt; widAt; opIterD; sLvlD; dLvl; lvls; dCapᶜ; dWalkᶜ; regAt;
-         fLvl; iterFold; foldStep; fIterD; opIterD-0; opIterD-suc;
-         sLvlD-0; sLvlD-suc; fLvlD; fLvlD-0; fLvlD-suc; fIterD-0; fIterD-suc)
+  using (sizeAt; widAt; opIterD; sLvlD; dLvl; lvls; dCapᶜ; dWalkᶜ; regAt; fLvl; iterFold; foldStep;
+  fIterD; opIterD-0; opIterD-suc; sLvlD-0; sLvlD-suc; fLvlD)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD;
-         iterL-infl; lvls-infl; 1≤regAt; dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front;
-         lvls-mono; lvls-add; n<2^n; dLvl-mono; sLvlD-mono; 2≤dLvl)
+  using (caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD; iterL-infl; lvls-infl; 1≤regAt;
+  dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front; lvls-mono; lvls-add; dLvl-mono; 2≤dLvl)
+open import Verify-Budget-Sufficient.Measures using
+  (n<2^n)
 open import Verify-Budget-Sufficient.Op-Dominance
   using (climb; fLvlD-le-dLvl; fIterD-lvls)
 

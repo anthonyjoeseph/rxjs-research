@@ -149,9 +149,12 @@ DATE_RE = re.compile(
 # Files whose dates are build failures, checked with the same scan.  The
 # roadmap gets all four checks; these get the date check only.  The reasons
 # differ by one word and both are in docs/roadmap-check.md: the roadmap must be
-# CURRENT, the rules and the tool docs must be TIMELESS.  Globs are expanded at
+# CURRENT, the rules and the tool docs must be TIMELESS.  EVIDENCE.md is here
+# for the same reason as CLAUDE.md and not as an afterthought: it STATES RULES,
+# and it spent its previous life as REFUTATION.md carrying two timestamps that
+# nothing checked -- which is the failure this scan is about.  Globs are expanded at
 # use, so a new docs/ page is covered the moment it lands.
-DATE_ONLY_FILES = ["CLAUDE.md"]
+DATE_ONLY_FILES = ["CLAUDE.md", "EVIDENCE.md"]
 DATE_ONLY_GLOBS = ["docs/*.md"]
 
 

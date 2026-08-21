@@ -1,6 +1,6 @@
 module Rx.Evaluator where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
+open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
@@ -13,18 +13,11 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source;
-                           Gas; g0; gs; gasTower; gasPad; towerℕ;
-                           Timed; after_,_; ObservableInput; hot; cold;
-                           InstEvent; init; value; close; handoff; complete;
-                           CloseReason; cut; cutPending; exhausted; dried;
-                           EmitKind; subscribe; delivery; plumbing;
-                           InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; isData;
-                           applyFn; evalTm; unfoldμ; sizeᵉ; sizeᵛ;
-                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                           mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                           μᵉ; varᵉ; deferᵉ)
+open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Gas; g0; gs; gasTower; gasPad; towerℕ; Timed; after_,_; hot;
+  cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted; dried;
+  subscribe; delivery; plumbing; InstEmit; _at_from_as_)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; sizeᵉ; input; ofᵉ;
+  emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 -- for `entryCeil`: the caps recurrence's BASE width, which `budgetAt`
 -- must know because it must dominate the recurrence
 open import Rx.Frame-Width using (entryCeil)
@@ -40,7 +33,7 @@ open import Rx.Frame-Width using (entryCeil)
 -- only strictly earlier slots (a const telescope) — checked by the
 -- generator/decoder, not by these types; a forward reference is
 -- rejected there.
-open import Rx.Slots public
+open import Rx.Slots using (scripted; shared; Slots; slotsSize)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))

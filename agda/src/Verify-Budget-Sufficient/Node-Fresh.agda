@@ -36,11 +36,10 @@
 -- a caps receipt reaches a statement that a particular nid holds a
 -- particular value — the difference is in KIND, not in a quantifier.
 --
--- The probe series in `.Scan-Node-Probe` is no longer load-bearing on
--- this fact — the ring proves it at every `κ`, including the
--- `share-sink` tail the probe could not reach — but it stays as an impl
--- pin under `make bug-cache`, which is a claim about the evaluator's
--- reduction behaviour rather than about this statement.
+-- A probe series once carried this fact and no longer does: the ring
+-- proves it at every `κ`, including the `share-sink` tail the probe could
+-- not reach, so the probe expired with its target and was deleted.  The
+-- RECOVERY pointer is on `subscribeE-nodes-below` below.
 --
 -- THE MEMBER LIST MIRRORS `.Keeps-Ring` ONE FOR ONE, and the two rings
 -- are complementary in a way worth knowing before editing either: where
@@ -51,12 +50,12 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Node-Fresh where
 
-open import Data.Bool  using (Bool; true; false; not; _∧_; if_then_else_)
-open import Data.Nat   using (ℕ; zero; suc; pred; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Bool  using (Bool; true; false; not; if_then_else_)
+open import Data.Nat   using (ℕ; zero; suc; pred; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n)
 open import Data.List  using (List; []; _∷_; _++_)
 open import Data.Bool.ListAction using (any)
-open import Data.Maybe using (Maybe; just; nothing; is-nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Fin   using (Fin; toℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit  using (⊤; tt)
@@ -66,12 +65,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Rx.Prim   using (Gas; g0; gs; Tick; Id; InstEmit; InstEvent;
                              hot; cold)
 open import Data.Vec  using (lookup)
-open import Rx.Exp    using (Ctx; Closed; Val; Ty; obs; _≟ᵗ_; evalTm;
-                             input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                             mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                             μᵉ; varᵉ; deferᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Slot; scripted; shared;
-                                NodeId; NodeState; Stream; Path; Frame; AllOp;
+open import Rx.Exp    using (Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+  concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
+open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; Stream; Path;
+                                Frame; AllOp;
                                 mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
                                 map-f; scan-f; take-f; from-inner; thru-outer;
                                 share-sink; _↠_;
@@ -88,9 +85,11 @@ open import Rx.Evaluator using (Sched; EvalSt; Slot; scripted; shared;
                                 concatDrain; innerFinish; innerReact;
                                 sharedConnect; subscribeSharedSlot;
                                 aliveThroughᶠ)
+open import Rx.Slots using (scripted; shared)
 
 open import Verify-Budget-Sufficient.Node-Table
-  using (lookupNode-setNode; lookupNode-setNode-other; sucle→≢ᵇ)
+  using (lookupNode-setNode; lookupNode-setNode-other)
+open import Decide using (sucle→≢ᵇ)
 
 ------------------------------------------------------------------
 -- the relation, and its two structural facts
@@ -639,6 +638,11 @@ subscribeE-fresh w g (deferᵉ body) κ id now sched st hw =
 -- THE FACE THE CONSUMERS SPEND
 ------------------------------------------------------------------
 
+-- RECOVERY: `git log --diff-filter=D -- agda/src/Verify-Budget-Sufficient/Scan-Node-Probe.agda`
+-- restores 297 lines / 24 refl rows that probed this fact at the scan source
+-- before it was proven here.  They pinned the EVALUATOR (that those composites
+-- reduce, and reduce to this) rather than the statement, which is why they
+-- outlived their target and had to go.
 subscribeE-nodes-below : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (k : NodeId) →

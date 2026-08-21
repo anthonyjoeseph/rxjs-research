@@ -1,4 +1,4 @@
--- THE SERIES Q PROGRAM FAMILY, with one home and two consumers.
+-- THE SERIES Q PROGRAM FAMILY.  One home, and today one consumer.
 --
 -- Q varies a scan fold's wrap DEPTH d and its source list LENGTH k
 -- independently, which is what makes it the only probe family that can
@@ -7,19 +7,23 @@
 -- within-instant nesting depth, a PRODUCT d·k.  A sum cannot dominate a
 -- product forever.
 --
--- WHY IT LIVES HERE rather than inside Demand-Probe.  The crossing
--- region is unreachable in the TYPECHECKER — `runDry` gives no
+-- WHY IT IS A MODULE OF ITS OWN, and why that survives the probe that
+-- used to share it.  The crossing region is unreachable in the
+-- TYPECHECKER — `runDry` gives no
 -- short-circuit in either direction (`hasDry` reads the stream
 -- `subscribeE` returns, so the whole run normalises before the first dry
 -- event is visible), and the cost is quadratic in k: a run normalises
 -- d·k(k+1)/2 subscription levels, ~250 at the cheapest crossing point,
--- where (8,8) burned 56 min CPU without finishing.  The COMPILED harness
--- reaches it, so the family needs a home both `Demand-Probe` (type-level
--- pins) and `Harness.Main` (compiled rows) can import.
+-- where (8,8) burned 56 min CPU without finishing.  Only the COMPILED
+-- harness reaches it.  The type-level half of that pair — a probe that
+-- pinned what the checker COULD reach — has since expired with its
+-- targets and been deleted, so `Harness.Main` is the sole consumer; see
+-- the RECOVERY pointer in `.Burst-Walk` for what those rows measured.
 --
--- IMPORTS ONLY `Rx.*`, deliberately: `Harness.Main` is a cheap
--- calculator, and importing `Demand-Probe` itself would drag the whole
--- Verify tower into `make harness-build`.
+-- IMPORTS ONLY `Rx.*`, deliberately, and that is why the deletion cost
+-- nothing here: `Harness.Main` is a cheap calculator, and a family that
+-- reached up into the Verify tower would drag the whole thing into
+-- `make harness-build`.
 module Verify-Budget-Sufficient.Demand-Programs where
 
 open import Data.List using (List; []; _∷_)
@@ -27,15 +31,14 @@ open import Data.Nat using (ℕ; suc; _+_)
 open import Data.Bool using (Bool)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (proj₁)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Gas; g0; gasPad)
-open import Rx.Exp using (Ty; Ctx; Closed; natᵗ; obs; _×ᵗ_;
-                          ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂;
-                          syncSizeᵉ; Tm; Fn)
-open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry;
-                                Slots; root; EvalSt)
+open import Rx.Prim using (g0; gasPad)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
+  Fn)
+open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root)
+open import Rx.Slots using (Slots)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 

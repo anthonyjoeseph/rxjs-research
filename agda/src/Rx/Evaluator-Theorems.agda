@@ -8,7 +8,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Tick; Fuel)
 open import Rx.Exp       using (Ctx; Closed; Exp; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Slot; Slots; Stream; evaluate)
+open import Rx.Evaluator using (Stream; evaluate)
+open import Rx.Slots using (Slot; Slots)
 
 
 
@@ -21,7 +22,7 @@ open import Rx.Evaluator using (Slot; Slots; Stream; evaluate)
 -- lives in Verify-Well-Formed as a real proof over postulated
 -- stage lemmas.
 
--- PROBED-GREEN 2026-08-11 (receipt; the probe is deleted).  No refutation
+-- PROBED 2026-08-11 (receipt; the probe is deleted).  No refutation
 -- found for `fuel-coherent` or `μ-unfold` on the evaluator's own laws.  Two
 -- facts worth keeping from that sweep:
 --   * μ SELF-SUBSCRIPTION IS A TYPE ERROR, not merely unreachable — the Δᵍ/Δ

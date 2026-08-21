@@ -1,17 +1,14 @@
 module Implementation where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_)
+open import Data.Bool    using (if_then_else_)
 open import Data.Nat     using (_≡ᵇ_)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
 open import Data.Product using (_×_; _,_)
 
-open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; CloseReason; cutPending;
-                           EmitKind; subscribe; delivery; plumbing;
-                           InstEmit; _at_from_as_)
-open import Rx.Protocol using (Owed; countIn; removeOne; hasOwed; bumpOwed;
-                               payOwed; cancelOwed; allZero; paidOff)
+open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; complete; cutPending; EmitKind;
+  subscribe; delivery; plumbing; InstEmit; _at_from_as_)
+open import Rx.Protocol using (Owed; countIn; removeOne; hasOwed; bumpOwed; payOwed; cancelOwed; paidOff)
 
 ------------------------------------------------------------------
 -- The ONLINE batcher: one emission at a time, own state only, no

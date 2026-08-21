@@ -19,31 +19,13 @@
 -- structural and measure-free in the same way.
 module Verify-Budget-Sufficient.Keeps-Ring where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
-                                if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
-                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans; ≤-pred;
-                                       +-suc; +-identityʳ;
-                                       +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-<; +-monoˡ-≤;
-                                       *-monoˡ-≤; *-monoʳ-≤;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
-                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
-                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
-                                       ^-monoˡ-≤; ^-*-assoc;
-                                       ^-distribˡ-+-*; *-mono-≤;
-                                       +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
+open import Data.Bool    using (Bool; true; false; T)
+open import Data.Nat     using (zero; suc; _+_; _*_; _≤_; _<_; _≡ᵇ_; s≤s)
+open import Data.Nat.Properties using (≤-trans; ≤-reflexive; +-identityʳ; *-monoˡ-≤; n≤1+n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
-open import Data.Bool.ListAction using (all; any)
+open import Data.List    using (List; []; _∷_)
+open import Data.Bool.ListAction using (any)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.List.Membership.Propositional using (_∈_)
@@ -54,75 +36,32 @@ open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Data.List.Membership.Propositional.Properties
-  using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
+  using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe   using (Maybe; nothing; just)
 open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; subst)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
-                                _at_from_as_; EmitKind; subscribe;
-                                InstEvent; init; value; close; handoff;
-                                complete; exhausted;
-                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
-                                Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                                inputsBelowᵉ;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
-                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
-                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                subΘExp; subΘTm; subΘTms;
-                                varIx;
-                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
-                                wkExp; wkTm; reify;
-                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
-                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms;
-                                elimDExp; elimDTm; elimDTms;
-                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
-                                evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
-                                Slot; scripted; shared; resolve; mkHot;
-                                arrVal; scanVals; memberSource;
-                                slotSize; inputSize;
-                                RegId; Chain;
-                                NodeState; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; setNode; lookupNode;
-                                NodeId;
-                                root; share-sink; _↠_; Frame; AllOp;
-                                map-f; scan-f; take-f; from-inner;
-                                thru-outer; Stream;
-                                sched-init; st-init; sched-next;
-                                schedHeadOf; schedGo; schedEarlier;
-                                cascadeLatch; cascadeFinish; sweepLive;
-                                takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; cascadeGo;
-                                Path; arrTy;
-                                subscribeE; stepFrame; pushBurst;
-                                subscribeInner; chainStep; subscribeAll;
-                                mintNode; mintSource; mintOrdinal; register;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                splitEvents; splitBurst; retagEvents;
-                                mergeBump; switchKill;
-                                thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
-                                sharedPlumb; sharedConnect; subscribeSharedSlot;
-                                burstCompleted;
-                                shareLatch; shareAdmit; shareFinish; shareGo;
-                                foldPath; dispatchShare; arrTick;
-                                aliveThroughᶠ;
-                                cascade; drain; evaluate;
-                                hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize)
-open import Verify-Budget-Sufficient.Measures public
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; subscribe; InstEvent; init; close; complete;
+  exhausted; Gas; g0; gs; after_,_; hot; cold)
+open import Rx.Exp       using (obs; _≟ᵗ_; inputsBelowᵉ; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; varᵗ; unit̂; bool̂;
+  nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; input; ofᵉ; emptyᵉ; mapᵉ;
+  takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; elimGExp;
+  elimGTm; elimGTms; elimDExp; elimDTm; elimDTms; compare∈; ⊟-++ˡ; ⊟-++ʳ; unfoldμ; evalTm)
+open import Rx.Evaluator using (Sched; EvalSt; memberSource; NodeState; scan-st; take-st; merge-st; concat-st; switch-st;
+  exhaust-st; installNode; lookupNode; NodeId; share-sink; _↠_; Frame; AllOp; map-f; scan-f;
+  take-f; from-inner; thru-outer; Stream; takeVals; takeDispatch; Path; subscribeE; stepFrame;
+  pushBurst; subscribeInner; subscribeAll; register; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+  splitEvents; splitBurst; switchKill; thruConsume; thruWalk; thruWrap; concatDrain;
+  innerFinish; innerReact; sharedConnect; subscribeSharedSlot; burstCompleted; aliveThroughᶠ;
+  sameSource)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
+open import Verify-Budget-Sufficient.Measures using
+  (size-renᵉ; sizeᵉ-pos; sucmul; sum2; sum3; unconn; unconn-antitone;
+   unconn-insert)
 
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
 -- subscribeInner re-enters subscribeE on an observable VALUE o

@@ -70,7 +70,7 @@
 ------------------------------------------------------------------
 module Rx.Hop-Depth where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≡ᵇ_)
+open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≡ᵇ_)
 open import Data.Fin  using (Fin)
 open import Data.Bool using (if_then_else_)
 open import Data.List using (List; []; _∷_)

@@ -3,30 +3,13 @@
 -- (lines 3664–5199 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part4 where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
-                                if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _∸_; _≤_; _<_;
-                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans; ≤-pred;
-                                       +-suc; +-identityʳ;
-                                       +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-<; +-monoˡ-≤;
-                                       *-monoˡ-≤; *-monoʳ-≤;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
-                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
-                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
-                                       ^-monoˡ-≤; ^-*-assoc;
-                                       ^-distribˡ-+-*; *-mono-≤;
-                                       +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-identityʳ; m≤n+m; n≤1+n; +-mono-≤; *-mono-≤;
+  +-monoʳ-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
+open import Data.List    using (List; []; _∷_; _++_; length)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
@@ -35,87 +18,26 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
-open import Data.List.Properties using (length-++; length-map)
+open import Data.List.Properties using (length-++)
 open import Data.Maybe   using (Maybe; nothing; just)
 open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
+  using (_≡_; refl; trans; cong; subst)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
-                                _at_from_as_; EmitKind; subscribe;
-                                InstEvent; init; value; close; handoff;
-                                complete; exhausted; delivery;
-                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
-                                Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
-                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
-                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                subΘExp; subΘTm; subΘTms;
-                                varIx;
-                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
-                                wkExp; wkTm; reify;
-                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
-                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms;
-                                elimDExp; elimDTm; elimDTms;
-                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
-                                evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ;
-                                outWᵉ; innWᵉ; innWᵗ; innWᵗˢ;
-                                pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ;
-                                _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ;
-                                pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ;
-                                dWⱽ; dWᵗⱽ; dWᵗˢⱽ;
-                                slotPW; slotsPW; slotsPWgo;
-                                slotIW; slotsIW; slotsIWgo;
-                                slotsPW≤entryCeil; slotsIW≤entryCeil)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
-                                Slot; scripted; shared; resolve; mkHot;
-                                arrVal; scanVals; memberSource;
-                                slotSize; inputSize;
-                                RegId; Chain;
-                                NodeState; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; setNode; lookupNode;
-                                NodeId;
-                                root; share-sink; _↠_; Frame; AllOp;
-                                map-f; scan-f; take-f; from-inner;
-                                thru-outer; Stream;
-                                sched-init; st-init; sched-next;
-                                schedHeadOf; schedGo; schedEarlier;
-                                cascadeLatch; cascadeFinish; sweepLive;
-                                takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; chainsGo; cascadeGo;
-                                Path; arrTy;
-                                subscribeE; stepFrame; pushBurst;
-                                subscribeInner; chainStep; subscribeAll;
-                                mintNode; mintSource; mintOrdinal; register;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                splitEvents; splitBurst; retagEvents;
-                                mergeBump; switchKill;
-                                thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
-                                sizeAt;
-                                sharedPlumb; sharedConnect; subscribeSharedSlot;
-                                burstCompleted;
-                                shareLatch; shareAdmit; shareFinish; shareGo;
-                                dryBurst;
-                                foldPath; dispatchShare; arrTick;
-                                aliveThroughᶠ;
-                                cascade; drain; evaluate;
-                                hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize; fCharge; regAt;
-                                sizeStep; iterSize; foldStep; iterFold;
-                                fLvl; fLvlD; iterL; dLvl; lvls;
-                                sIterD; sLvlD)
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete;
+  exhausted; Gas; after_,_)
+open import Rx.Exp       using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ)
+open import Rx.Frame-Width using (pWᵉ; slotsPW≤entryCeil; slotsIW≤entryCeil)
+open import Rx.Evaluator using (Sched; EvalSt; memberSource; RegId; Chain; NodeState; scan-st; take-st; merge-st; concat-st;
+  switch-st; exhaust-st; setNode; lookupNode; NodeId; root; share-sink; _↠_; Frame; AllOp;
+  Stream; sweepLive; takeVals; takeDispatch; cutThrough; pathHasNode; dropSource; Path;
+  stepFrame; register; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; mergeBump;
+  switchKill; thruWrap; sizeAt; sharedPlumb; shareLatch; shareAdmit; shareFinish; shareGo;
+  foldPath; dispatchShare; sameSource; fCharge; fLvlD)
+open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -133,10 +55,22 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
 --     RUNS at, which it takes as a record of hypotheses rather than
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
-open import Verify-Budget-Sufficient.Delivery-Walk public
+open import Verify-Budget-Sufficient.Caps using
+  (_⊑ᶜ_; Caps; capsAt; capsAt-base-size; capsAt-base-wid; fLvl≤fLvlD;
+   frameStep; frameStep-mono-j; frameStep-reg-suc)
+open import Verify-Budget-Sufficient.Keeps-Ring using
+  (KeepsC; stepFrame-keeps)
+open import Verify-Budget-Sufficient.Measures using
+  (all-++-intro; boundedLive; boundedNode;
+                                                      cutThrough-len; dropSource-all;
+                                                      dropSource-len; pathLen;
+                                                      setNode-bounded; stBounded?;
+                                                      sweepLive-all; takeVals-all; ∧-true)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
-open import Verify-Budget-Sufficient.Caps-Nest public
+open import Verify-Budget-Sufficient.Caps-Nest using
+  (nest; nest-cons; nest-keeps; refresh-supplies-nest;
+   refresh-supplies-nest-strict)
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
 -- new hypothesis ranges over (see below, ~6307).  The rest of the family
 -- carries THE DEPTH PREMISE down the frame chain, and it threads by
@@ -148,7 +82,12 @@ open import Verify-Budget-Sufficient.Caps-Nest public
 -- branch needs nothing at all
 -- arithmetic lemmas consumed by thruOuter-face-core's walk helpers
 
-open import Verify-Budget-Sufficient.Caps-Face.Part3 public
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using
+  (pathSz?-⊑; valCaps?-size; valsCaps?-widen)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; frameSz?; obsCaps?; pathSz?;
+   regsSz?; slotsCaps?; slotsCaps?-bound; valCaps?; valCountᵉ; widLive; widNode)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
 -- THE DELIVERY CLIQUE'S SLOTS COROLLARIES.

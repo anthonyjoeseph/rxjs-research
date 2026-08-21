@@ -39,53 +39,32 @@
 -- (delivN is stated here and read there).
 module Verify-Budget-Sufficient.Deliveries where
 
-open import Data.Bool    using (Bool; true; false; _∧_; _∨_; not;
-                                if_then_else_)
+open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
-open import Data.Nat.Properties using (m+n∸n≡m; n∸n≡0; +-assoc; +-suc; +-comm)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Nat.Properties using (m+n∸n≡m; n∸n≡0; +-suc; +-comm)
+open import Data.List    using (List; []; _∷_; _++_; length)
 open import Data.Bool.ListAction using (any)
 open import Data.List.Properties using (++-assoc; length-++)
 open import Data.Maybe   using (Maybe; nothing; just)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec     using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂)
 
-open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent;
-                                close; exhausted; Gas; g0; gs;
-                                ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; _≟ᵗ_; Fn; obs;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                evalTm; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Slot;
-                                scripted; shared;
-                                RegId; Chain; NodeId; NodeState;
-                                scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                lookupNode; installNode; register;
-                                mintNode; mintSource; mintOrdinal;
-                                root; share-sink; _↠_; Path; Frame; AllOp;
-                                map-f; scan-f; take-f; from-inner; thru-outer;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                Stream; splitEvents; splitBurst;
-                                memberSource; burstCompleted;
-                                aliveThroughᶠ; takeVals;
-                                takeDispatch; switchKill; mergeBump;
-                                thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
-                                stepFrame; pushBurst; subscribeAll;
-                                subscribeE; subscribeInner;
-                                sharedConnect; subscribeSharedSlot;
-                                shareLatch; shareAdmit; shareFinish;
-                                foldPath; dispatchShare; shareGo;
-                                chainStep; cascadeGo; cascadeLatch;
-                                cascadeFinish; cascade; chainsOf; budgetAt;
-                                arrTy; arrTick; arrSource; arrVal)
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent; close; exhausted; Gas; g0; gs; hot; cold)
+open import Rx.Exp       using (Ctx; Closed; Val; _≟ᵗ_; obs; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalTm; unfoldμ)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; NodeId; NodeState; scan-st; take-st; merge-st; concat-st;
+  switch-st; exhaust-st; lookupNode; installNode; register; mintNode; root; share-sink; _↠_;
+  Path; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer; mergeᵒ; concatᵒ; switchᵒ;
+  exhaustᵒ; Stream; splitEvents; memberSource; burstCompleted; aliveThroughᶠ; takeVals;
+  takeDispatch; switchKill; thruConsume; thruWalk; thruWrap; concatDrain; innerFinish;
+  innerReact; stepFrame; pushBurst; subscribeAll; subscribeE; subscribeInner; sharedConnect;
+  subscribeSharedSlot; shareLatch; shareAdmit; shareFinish; foldPath; dispatchShare; shareGo;
+  chainStep; cascadeGo; budgetAt; arrTy; arrTick; arrSource; arrVal)
+open import Rx.Slots using (scripted; shared)
 
 ------------------------------------------------------------------
 -- § A.  THE LEDGER ORDER AND ITS ARITHMETIC.

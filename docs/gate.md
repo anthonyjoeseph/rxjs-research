@@ -42,7 +42,7 @@ which escalates:
   other members, so termination of the real mutual recursion is not checked and
   postulates do not reduce — and in this proof the mutual recursion IS the
   induction. This is the trigger the whole split exists for.
-- **A changed file is outside `agda/src`.** `agda/refuted` has its own include
+- **A changed file is outside `agda/src`.** `agda/evidence/refuted` has its own include
   root and its own target; no dev check reaches it.
 - **The changed set exceeds `--max-files` (default 6).** A dev check is cheap
   *singly*: run N of them sequentially, each rebuilding its own cone, and the

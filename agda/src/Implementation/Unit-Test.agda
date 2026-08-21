@@ -13,19 +13,17 @@ module Implementation.Unit-Test where
 
 open import Data.Bool using (true)
 open import Data.Nat using (ℕ)
-open import Data.List using (List; []; _∷_)
-open import Data.Fin using (Fin; zero; suc)
+open import Data.List using ([]; _∷_)
+open import Data.Fin using (zero; suc)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEmit)
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; _×ᵗ_;
-                          input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ;
-                          add; sub; mul; eqᵖ; ltᵖ; notᵖ)
-open import Rx.Evaluator using (evaluate; Slot; scripted; shared; Slots)
+open import Rx.Prim using (after_,_; hot; cold)
+open import Rx.Exp using (Ctx; Closed; natᵗ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
+open import Rx.Evaluator using (evaluate)
+open import Rx.Slots using (scripted; Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Implementation using (impl-batchSimultaneous)
 open import Spec using (spec-batchSimultaneous)

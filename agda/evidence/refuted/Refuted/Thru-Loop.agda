@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE *All OUTER WALK'S LOOP INVARIANT, as stated, is FALSE.
 --
--- REFUTATION: machine-checked `… → ⊥`.  See REFUTATION.md for why this
+-- REFUTATION: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE` notes.
 --
 -- WHAT IS WRONG.  `thruConsume-nodry-loop` claims `OKB c sl Ψ J` is
@@ -48,8 +48,8 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Thru-Loop where
 
-open import Data.Bool using (Bool; true; false)
-open import Data.Nat  using (ℕ; zero; suc)
+open import Data.Bool using (true; false)
+open import Data.Nat  using (ℕ; suc)
 open import Data.List using (List; []; _∷_; replicate)
 open import Data.Empty using (⊥)
 open import Data.Product using (proj₁; proj₂; _,_; _×_)

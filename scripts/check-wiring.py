@@ -93,10 +93,20 @@ from collections import defaultdict
 #
 # The `*-absurd` REFUTATION WITNESSES used to be exempted here by SUFFIX,
 # which meant any definition could exempt itself from the wiring law by
-# choosing its name.  They now live in `agda/refuted/`, a separate include
-# root outside this scan (Anthony, 2026-08-18) — checked by `make refuted`,
-# imported by nothing in src, referred to from src only in `-- REFUTED:`
-# comments.  So there is nothing left to exempt.
+# choosing its name.  They now live in `agda/evidence/refuted/`, outside this
+# scan (Anthony, 2026-08-18) — checked by `make refuted`, imported by nothing in
+# src (the library layout makes that unresolvable), referred to from src only in
+# `-- REFUTED:` comments.
+#
+# THE PROBES LEFT FOR THE SAME REASON, AND IT IS THE SHARPER CASE (Anthony).
+# Three probe modules used to sit in this table.  A MODULE_ROOTS entry is a
+# reachability SEED inside the PROOF's own scan, so those probes and their whole
+# cone counted as wired while NOTHING in the proof consumed any of it — which is
+# how a probe came to read as reachable from Main when `make agda`, which
+# compiles Main's cone and nothing else, never saw the file at all.  They are
+# now `agda/evidence/probed/`, claimed by `Probed.Main` and held to this same law
+# by `make wiring-probed`.  A root-based claim cannot self-certify; a
+# name-based exemption always can.  So there is nothing left to exempt.
 # ---------------------------------------------------------------------------
 
 
@@ -485,7 +495,7 @@ def extract_definitions(src_dir, files):
                 # continuation would then be a self-reference of `f`.
                 # But registering every continuation under the single name
                 # `...` gave that node no route home, so a name used ONLY in
-                # continuations read as dead: measured in agda/refuted, where
+                # continuations read as dead: measured in agda/evidence/refuted, where
                 # a refutation's two `with` arms are the only consumers of
                 # their own `2 ≤ cSize` helper.  Per-SITE synthetic name,
                 # never reported, always a reachability seed — whatever a
@@ -605,7 +615,7 @@ def extract_definitions(src_dir, files):
                 # continuation would then be a self-reference of `f`.
                 # But registering every continuation under the single name
                 # `...` gave that node no route home, so a name used ONLY in
-                # continuations read as dead: measured in agda/refuted, where
+                # continuations read as dead: measured in agda/evidence/refuted, where
                 # a refutation's two `with` arms are the only consumers of
                 # their own `2 ≤ cSize` helper.  Per-SITE synthetic name,
                 # never reported, always a reachability seed — whatever a
@@ -754,8 +764,8 @@ VACUOUS_ALLOWLIST = {
 # wholesale — which is what this did — exempted every INTERNAL HELPER in
 # it from R1, so a probe module or a compiled binary could accumulate
 # dead code indefinitely and the gate would report `unreachable 0`.
-# Measured with a canary: a definition added to Root-Probe that nothing
-# mentions was NOT flagged.
+# Measured with a canary: a definition added to a probe module that
+# nothing mentions was NOT flagged.
 #
 # A compiled binary's entry is `main` — the shell is its consumer, and no
 # textual search will ever find that edge, so it must be seeded.  A
@@ -773,19 +783,13 @@ MODULE_ROOTS = {
                                  ()),
     "Harness.Main": ("the compiled measurement harness — `make harness-build` / `make harness`",
                      ("main",)),
-    "Verify-Budget-Sufficient.Demand-Probe": ("the gas-demand measurement rows — checked by `make bug-cache`",
-                                              ()),
-    "Verify-Well-Formed.Root-Probe": ("the root-exit coherence rows — checked by `make bug-cache`",
-                                      ()),
-    "Verify-Budget-Sufficient.Scan-Node-Probe": ("the scan-node survival rows — checked by `make bug-cache`",
-                                                 ()),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
 
 # ---------------------------------------------------------------------------
 # THE REACHABILITY ROOT, relative to --src.  `agda/src` roots at Main.agda;
-# `agda/refuted` roots at Refuted/Main.agda.  Parameterised rather than
+# `agda/evidence/refuted` roots at Refuted/Main.agda.  Parameterised rather than
 # hardcoded so the SAME law applies to both trees (Anthony, 2026-08-18):
 # a refutation nothing reaches is as dead as a lemma nothing reaches, and
 # until this existed nothing checked the second tree at all.
@@ -1151,7 +1155,7 @@ def main():
                              "script's location)")
     parser.add_argument("--root", default="Main.agda",
                         help="the reachability root, relative to --src "
-                             "(default: Main.agda; agda/refuted uses "
+                             "(default: Main.agda; agda/evidence/refuted uses "
                              "Refuted/Main.agda). Everything in the tree must "
                              "trace to a name this file claims.")
     parser.add_argument("--postulates", action="store_true",

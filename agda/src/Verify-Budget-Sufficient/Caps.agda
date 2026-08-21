@@ -27,18 +27,10 @@
 -- ledger, and round3b-ledger-reset-absurd stays unavailable.
 module Verify-Budget-Sufficient.Caps where
 
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_;
-                                _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive;
-                                       +-assoc; +-comm; *-suc; *-assoc;
-                                       *-monoˡ-≤; *-monoʳ-≤; *-mono-≤;
-                                       +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ;
-                                       +-suc;
-                                       m≤m+n; m≤n+m; n≤1+n; m≤m*n;
-                                       ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤;
-                                       ^-*-assoc; ^-distribˡ-+-*; *-comm;
-                                       *-distribˡ-+; *-identityʳ;
-                                       *-identityˡ; m≤m⊔n; m≤n⊔m)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; +-assoc; +-comm; *-suc; *-assoc; *-monoˡ-≤; *-monoʳ-≤;
+  *-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ; +-suc; m≤m+n; m≤n+m; n≤1+n; m≤m*n;
+  ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤; ^-*-assoc; *-comm; *-distribˡ-+; *-identityʳ; *-identityˡ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -47,7 +39,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Frame-Width using (entryCeil)
-open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase;
+open import Rx.Evaluator using (blowH; capsHgo; capsBase;
                                 foldStep; iterFold; sizeStep; iterSize;
                                 sizeAt; widAt; regAt; fCharge; fLvl; iterL;
                                 dLvl; lvls; dCapᶜ; dWalkᶜ;
@@ -56,10 +48,13 @@ open import Rx.Evaluator using (Slots; slotsSize; blowH; capsHgo; capsBase;
                                 fLvlD-0; fLvlD-suc; sIterD-0; sIterD-suc;
                                 sLvlD-0; sLvlD-suc; opIterD-0; opIterD-suc;
                                 fIterD-0; fIterD-suc)
+open import Rx.Slots using (Slots; slotsSize)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
-open import Verify-Budget-Sufficient.Keeps-Ring public
+open import Verify-Budget-Sufficient.Measures using
+  (2X≡X+X; k≤towerℕ; n<2^n; sizeᵉ-pos; sq≤2^; towerℕ-mono)
+open import Rx.Prim using (towerℕ)
 
 ------------------------------------------------------------------
 -- ROUND 4: PER-INSTANT CAPS, BY RECURRENCE ON THE INSTANT.

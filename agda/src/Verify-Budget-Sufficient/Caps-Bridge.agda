@@ -30,14 +30,9 @@
 module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_;
-                                z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; m≤n+m; m≤m+n; n≤1+n;
-                                       m≤m⊔n; m≤m*n;
-                                       *-mono-≤; *-monoʳ-≤; +-mono-≤; *-comm;
-                                       +-monoˡ-≤; +-monoʳ-≤; *-suc;
-                                       *-distribˡ-+; *-identityʳ; +-identityʳ)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
+  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
@@ -46,48 +41,64 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import Rx.Prim      using (Gas; Tick; Id; Fuel; Source; close; exhausted)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ;
-                                -- named by the assembled cores' hypothesis types
-                                Exp; Tm; sizeᵗˢ; μᵉ; unfoldμ)
-open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ;
-                                pmOⱽ; pmIⱽ)
+open import Rx.Prim      using (Gas; Tick; Id; Fuel; close; exhausted)
+open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
+open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
-                                NodeState; concat-st;
-                                RegId; Chain;
-                                Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer;
-                                arrTy; arrVal; arrTick; arrSource; cascade;
-                                cascadeGo; cascadeLatch; cascadeFinish;
-                                chainStep; chainsOf; hasDry;
-                                subscribeE; budgetAt; slotsSize; opIterD;
-                                sizeStep; capsBase;
-                                sched-next; schedGo; schedHeadOf; schedEarlier;
-                                drain; evaluate; sched-init; st-init;
-                                -- named by the assembled cores' hypothesis types
-                                shared; memberSource; foldStep;
-                                sLvlD; sizeAt; lvls)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; concat-st; RegId; Path; root; arrTy; arrVal; arrTick;
+  arrSource; cascade; cascadeGo; cascadeLatch; cascadeFinish; chainStep; chainsOf; hasDry;
+  subscribeE; budgetAt; opIterD; sizeStep; capsBase; sched-next; schedGo; schedHeadOf;
+  schedEarlier; drain; evaluate; sched-init; st-init)
+open import Rx.Slots using (Slots; slotsSize)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
 -- fnCapBounded?, regsB?, slotsFnCap, INV-parts, pathLen, the Bool
--- toolkit ∧-true/∧-intro/all-impl/≤ᵇ-widen/T-to/T⇒≡true) via the public
--- chain Wet → Caps → Keeps-Ring → Measures
-open import Verify-Budget-Sufficient.Wet
+-- toolkit ∧-true/∧-intro/all-impl/≤ᵇ-widen/T-to/T⇒≡true), each imported
+-- below from the module that defines it
+open import Verify-Budget-Sufficient.Measures using
+  (_hasAtLeast_; all-impl; boundedLive;
+                                                      capᴱ; chainsB?-widen; dBound;
+                                                      finish-slots; fnCapBounded?; fnCapLive;
+                                                      fnCapᵉ; fnCapᵛ; hasDry-append; hopR;
+                                                      INV-parts; INV?; pathB?; pathLen;
+                                                      pop-bounded; pop-slots; pow1; regsB?;
+                                                      slotsFnCap; stBounded?; unconn; valB?;
+                                                      valB?-widen; V≤C; ΨAt; ∧-true; szB)
+open import Verify-Budget-Sufficient.Keeps-Ring using
+  (subscribeE-slots)
+open import Verify-Budget-Sufficient.Wet.Part6 using
+  (caps-fuel-root; cascadeFinish-INV; cascadeLatch-INV; chainsOf-B; init-INV;
+   pop-head-bounded; pop-INV; sizeCapAt; sizeCapAt-mono)
+open import Verify-Budget-Sufficient.Wet.Part1 using
+  (INV?-widen)
+open import Verify-Budget-Sufficient.Wet.Part3 using
+  (cascadeGo-walk)
 
 -- the caps face and the subscribe clique (capsOK?, capsOK?-parts,
 -- capsOK?-count, caps-tick, pathSz?/regsSz?/frameSz?, slotsCaps?,
--- valCaps?, burstCaps?/burstCount?, subscribeE-caps, nest) via the
--- public chain Subscribe-Face → Caps-Face → {Delivery-Walk, Caps-Nest}
-open import Verify-Budget-Sufficient.Subscribe-Face
+-- valCaps?, burstCaps?/burstCount?, subscribeE-caps, nest), each
+-- imported below from the module that defines it
+open import Verify-Budget-Sufficient.Subscribe-Face using
+  (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
+   regsSz?; slotsCaps?; valCaps?; widLive; widNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+  (caps-tick; cascade-depth-capsH; cascadeLatch-caps; chainsOf-caps;
+   chainsOf-length)
+open import Verify-Budget-Sufficient.Caps-Nest using
+  (nest; nest≤)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using
+  (capsOK?-count; capsOK?-parts; capsOK?-regs; foldPath-slots;
+   slotsCaps?-capsAt)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
 -- `chainStep-caps`, whose statement is stated at the chain depth measure.
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthChain; depthCascade)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 -- depth-capped (proven in Depth-Bound): depthE ≤ 3·cSize when capsOK?.
 -- Consumed by depthE≤capsH-root (at the SMALL baseCaps — the general-id
 -- depth bound does NOT route through depth-capped; see the depOK
@@ -99,17 +110,20 @@ open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-bas
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
-         frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup;
-         B2-cReg≤cSize; frameStep-reg≤size)
+  frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize;
+  1≤capsAt-reg; _⊑ᶜ_; Caps; caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0;
+  frameStep-full; frameStep-mono-j; sizeCount)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
-open import Verify-Budget-Sufficient.Psi-Split
+open import Verify-Budget-Sufficient.Psi-Split using
+  (pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
 -- the wet contract itself, stated over the COLLAPSED walk (2026-08-13).
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
 -- its sole consumer.
 open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
-open import Rx.Exp using (obs; sizeᵛ)
+open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
+open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
 -- (B3, EARLY) THE Ψ-ONLY HALVES, defined before the suppliers that
@@ -142,7 +156,7 @@ open import Rx.Exp using (obs; sizeᵛ)
 -- whole file — `sched-init`'s own construction.  No `record sched
 -- { ... }` update anywhere in the mutual delivery clique ever touches
 -- the `slots` field.  Most of the clique's own slots-invariance is
--- ALREADY PROVEN one layer down and reachable via the public chain:
+-- ALREADY PROVEN one layer down:
 -- `Keeps-Ring.agda:952` (`subscribeE-slots`) carries it through the
 -- whole subscribe clique via the `Keeps` invariant, `Caps-Face.agda:
 -- 3690+` (`foldPath-slots`/`dispatchShare-slots`/`shareGo-slots`) has
@@ -444,7 +458,7 @@ private
   -- EXTRACTING from `≡ true` has no such problem — it is what ∧-true
   -- does thirty times in this file — so the refutation runs that way.
   -- (the refutation itself is `f≡t-absurd`, .Measures — strictly stronger,
-  -- and in scope here through .Caps's public chain.)
+  -- and imported here directly from .Measures.)
 
   -- widNode W sl (concat-st q _ _) = all (pWᵉ-bound) q ∧ (length q ≤ᵇ W).
   -- Peeled HERE rather than at the use site because the RESULT type pins

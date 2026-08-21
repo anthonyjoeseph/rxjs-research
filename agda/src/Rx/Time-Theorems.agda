@@ -5,7 +5,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Sched; Arrival; EvalSt; Slots; Stream; evaluate)
+open import Rx.Evaluator using (Sched; Arrival; EvalSt; Stream; evaluate)
+open import Rx.Slots using (Slots)
 
 
 ------------------------------------------------------------------

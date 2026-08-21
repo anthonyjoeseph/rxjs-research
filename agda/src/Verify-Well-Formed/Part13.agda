@@ -20,16 +20,16 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part13 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Bool    using (true; false; if_then_else_; _∨_; not)
+open import Data.Nat     using (zero; suc; _≤_; _≡ᵇ_; _+_)
+open import Data.Nat.Properties using (≤-reflexive; 1+n≰n)
+open import Data.List    using (List; []; _∷_; _++_)
+open import Data.Maybe   using (just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Sum     using (inj₁; inj₂)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 
 -- from .Caps-Bridge, not from the top module: the top module is the
@@ -38,46 +38,41 @@ open import Relation.Binary.PropositionalEquality
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
 open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Fuel; Id; Source)
+open import Rx.Exp       using (Ctx; Closed)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; NodeId; NodeState; scan-st; take-st; merge-st;
+  concat-st; switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
+  chainsOf; cascadeLatch; cascadeGo; subscribeE; cascade; drain; evaluate; sameSource; hasDry;
+  dropSource; budgetAt)
+open import Rx.Slots using (Slots)
+open import Rx.Protocol  using (ProtocolSt; countIn; protocol-init; runProtocol; paidUp; checkFinal; Accepted; WellFormed)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part12 public
+open import Verify-Well-Formed.Part12 using (allShareSunk-if; cascadeGo-wf;
+                                             countRemaining-[];
+                                             elemℕ-++; latch-nodes;
+                                             latch-registry; memб-split;
+                                             mergeAdjustSt;
+                                             mergeReachable-drop-false;
+                                             mid-final; nubLen-partition;
+                                             nubLen-same-elems)
+open import Verify-Well-Formed.Part1 using (acceptPaid; allShareSunk;
+                                            cachesValid; cachesValidMid;
+                                            collectAdjInsts; countLiveInners;
+                                            countRegs; countRemaining;
+                                            hasDry-++; innerInstsR;
+                                            mergeReachable; nodeCacheMid;
+                                            nodeCacheOK; regTyped?; run-++-just)
+open import Verify-Well-Formed.Part2 using (chains-count-derived; CurrentPast; Inv;
+                                           regTyped?-pop-sched; sched-next-hot-live;
+                                           schedGo-mem)
+open import Verify-Well-Formed.Part8 using (subscribe-wf)
+open import Verify-Well-Formed.Part4 using (Mid)
+open import Decide using (∧-intro; ∧-trueʳ; ∧-trueˡ; ∨-trueʳ; ≡ᵇ-refl; ≡ᵇ→≡)
 
 countLiveInners-partition : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nid : NodeId) (a : Arrival Γ) (sched sched″ : Sched Γ) (st : EvalSt e) →

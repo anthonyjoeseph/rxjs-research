@@ -57,15 +57,23 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Gas; Tick; Id)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; sizeᵛ)
-open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; scripted; shared;
-                                NodeId; NodeState; scan-st; take-st; merge-st;
+open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; scan-st;
+                                take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
-                                Path; slotsSize; slotSize)
+                                Path)
+open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 
--- the wet family (pathLen via Wet → … → Measures) and the caps face
--- (Caps, capsOK? via Subscribe-Face → Caps-Face), both public chains
-open import Verify-Budget-Sufficient.Wet
-open import Verify-Budget-Sufficient.Subscribe-Face
+-- the wet family (pathLen, from .Measures) and the caps face (Caps,
+-- capsOK?), each imported below from the module that defines it
+open import Verify-Budget-Sufficient.Measures using
+  (boundedNode; pathLen; stB-nodes;
+                                                      ∧-true; szB)
+open import Verify-Budget-Sufficient.Caps using
+  (Caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (capsOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using
+  (capsOK?-parts)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 
 -- `storeNestMax` and `depth-compositional` LANDED 2026-08-06: the
@@ -77,6 +85,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Depth-Compositional
   using (nodeNestMax; nodesNestMax; slotNest; slotsNestMax; storeNestMax;
          depth-compositional)
+open import Decide using (T-to)
 
 ------------------------------------------------------------------
 -- `storeNest-capped` — PROVEN.  The `⊔` splits, and each half is an

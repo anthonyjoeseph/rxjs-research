@@ -39,7 +39,7 @@ the gate stays red until every call site is migrated, rather than filtered.
 ## Agda never checks `agda/src`
 
 It checks `agda/_stripped-comments/`, **and that is why a comment edit is free.**
-`scripts/strip-comments.py` mirrors `src` + `refuted` with every FULL-LINE `--`
+`scripts/strip-comments.py` mirrors `src` + `evidence` with every FULL-LINE `--`
 comment DELETED, so a comment-only edit leaves the mirror byte-identical and Agda
 rebuilds NOTHING.
 
@@ -66,7 +66,7 @@ comment lines inserted into the same module recheck **zero**.
   Agda dies with `AmbiguousTopLevelModuleName` before checking anything. Generating
   inside the mirror stops that walk at the mirror's own `.agda-lib`, and as a bonus
   gives the dev loop and the gate ONE `_build`. Consequently the stripper's orphan
-  sweep walks only `src` and `refuted`, never the mirror wholesale — a wholesale
+  sweep walks only `src` and `evidence`, never the mirror wholesale — a wholesale
   sweep would delete `_dev` on every run, which is every run.
 - **The map cannot live inside the mirror.** A `-- source line N` marker in the
   stripped files would itself change whenever a comment is added above it, making
@@ -92,6 +92,47 @@ reports green.
 
 **`make strip-selftest`** pins the lexical traps and the property that matters:
 inserting a comment line does not change the stripped output.
+
+## A DELETED MODULE'S INTERFACE CRASHES THE BUILD, AND AGDA WILL NOT NAME IT
+
+Delete a module and its `.agdai` is orphaned. Agda does not report that as stale
+or as a missing file — it dies with
+
+```
+An internal error has occurred. Please report this as a bug.
+Location of the error: __IMPOSSIBLE__, called at src/full/Agda/Interaction/Imports.hs
+```
+
+partway down the tower, naming the last module it checked SUCCESSFULLY and
+nothing about the orphan. So the symptom points at healthy code, and the usual
+next move — read that module, suspect the last edit — is aimed at the wrong
+file entirely.
+
+`make stripped` sweeps them, so in practice this is handled; it is written down
+because the crash is unrecognisable if you ever meet it another way (a
+hand-rolled `agda` invocation, a partially-restored tree).
+
+**The interface does NOT live beside the source.** Agda 2.8 keeps it at
+`_build/<ver>/agda/<rel>.agdai`, so the obvious `Foo.agda` → `Foo.agdai`
+sibling names a path no interface has ever occupied. `strip-comments.py`
+pruned exactly that sibling for as long as the mirror has existed, which is why
+orphans accumulated across every deletion the repo ever made and then surfaced
+all at once: seventeen of them, from three separate migrations.
+
+Two properties the sweep needs, both pinned by `make strip-selftest`:
+
+- **It is a SWEEP of the cache, not a delta of this run.** An orphan was
+  dropped by whichever run deleted the source, and a run that removes nothing
+  would never revisit it.
+- **`_dev` is exempt.** `agda-dev` generates and discards modules by design,
+  and its interfaces are the cache that makes the loop fast — pruning them
+  silently turns the seconds-long loop into a slow one.
+
+Resolve the interface path against the `_build/<ver>/agda` root by walking to
+it, never by splitting a path on `"agda"`: every checkout has an `agda/`
+directory further left, so a leftmost split resolves every interface against
+the wrong root and reports the whole cache as orphaned. That mistake wiped 47M
+of interfaces on its first run, and the selftest above is what caught it.
 
 ## `--safe` is the finish-line certificate, not today's flag
 

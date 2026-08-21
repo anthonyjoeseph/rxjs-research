@@ -82,7 +82,7 @@
 module Verify-Budget-Sufficient.Caps-Depth where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≡ᵇ_; _≤_)
+open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≤_)
 open import Data.Nat.Properties using (≤-trans; m≤m⊔n; m≤n⊔m)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -94,24 +94,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim  using (Gas; g0; gs; Id; Tick; Source;
                             InstEmit; InstEvent; close; exhausted)
-open import Rx.Exp   using (Ty; Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; unfoldμ;
-                            input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                            mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                            μᵉ; varᵉ; deferᵉ)
+open import Rx.Exp   using (Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+  mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator
-  using (Sched; EvalSt; Arrival; NodeId; RegId; Path; Frame; AllOp; Stream;
-         NodeState; scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st;
-         mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-         root; share-sink; _↠_;
-         map-f; scan-f; take-f; from-inner; thru-outer;
-         mintNode; installNode; lookupNode; register;
-         splitEvents; switchKill; shareLatch; shareAdmit;
-         subscribeE; subscribeInner; subscribeAll; subscribeSharedSlot;
-         sharedConnect; thruConsume; thruWalk; concatDrain;
-         innerFinish; innerReact; stepFrame; pushBurst;
-         foldPath; dispatchShare; shareGo; chainStep;
-         arrVal; arrSource; arrTick; arrTy; budgetAt)
+  using (Sched; EvalSt; Arrival; NodeId; RegId; Path; Frame; AllOp; Stream; NodeState; scan-st;
+  take-st; merge-st; concat-st; switch-st; exhaust-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+  root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer; mintNode; installNode;
+  lookupNode; register; splitEvents; switchKill; shareLatch; shareAdmit; subscribeE;
+  subscribeInner; thruConsume; stepFrame; foldPath; chainStep; arrVal; arrSource; arrTick;
+  arrTy; budgetAt)
 
 ------------------------------------------------------------------
 -- THE FAMILY.  One head per evaluator head on the subscribe path, with

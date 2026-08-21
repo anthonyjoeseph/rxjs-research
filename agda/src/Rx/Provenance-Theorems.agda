@@ -7,7 +7,8 @@ open import Data.Nat                              using (suc)
 
 open import Rx.Prim      using (Fuel; Id; InstEmit)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Slots; Stream; evaluate)
+open import Rx.Evaluator using (Stream; evaluate)
+open import Rx.Slots using (Slots)
 
 ------------------------------------------------------------------
 -- Id discipline: the bridge premise.  formal-verification says the
@@ -31,7 +32,7 @@ ids = map InstEmit.instant
 horizon : Fuel → List Id
 horizon fuel = upTo (suc fuel)
 
--- PROBED-GREEN 2026-08-11 (receipt; the probe is deleted): no refutation for
+-- PROBED 2026-08-11 (receipt; the probe is deleted): no refutation for
 -- `id-inheritance`, with the fuel-3 row checking (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ⊆ᵢ
 -- horizon 3.  A confidence receipt over small horizons, not a theorem.
 postulate

@@ -19,38 +19,30 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Hop-Spine-Face where
 
-open import Data.Bool using (Bool; true; false; T; _∧_)
+open import Data.Bool using (Bool; true; _∧_)
 open import Data.Bool.ListAction using (all)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; s≤s; z≤n)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive;
-                                       ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤;
-                                       ⊔-lub; m≤m⊔n; m≤n⊔m; n≤1+n;
-                                       m≤m+n; *-identityˡ; +-identityʳ;
-                                       +-monoʳ-≤)
-open import Data.List using (List; []; _∷_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
+  n≤1+n; m≤m+n; *-identityˡ; +-identityʳ)
+open import Data.List using ([])
 open import Data.Fin  using (Fin)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂; _⊎_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
+open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Sum     using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Rx.Prim  using (InstEmit; InstEvent; init; value; close;
                             handoff; complete)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Data.Sum using () renaming (inj₁ to inl; inj₂ to inr)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Rx.Exp   using (Ty; Ctx; Val; Fn; Tm; Exp; applyFn; evalTm; evalWith; sizeᵛ;
-                            varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
-                            inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                            add; sub; mul; eqᵖ; ltᵖ; notᵖ; varIx; lookupEnv;
-                            unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; pmᵉ)
+open import Rx.Exp   using (Ty; Ctx; Val; Tm; evalTm; sizeᵛ; unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ)
 open import Rx.Hop-Spine using (spnᵉ; spnᵛ; spn≤sizeᵛ)
-open import Rx.Evaluator using (Stream; scanVals)
+open import Rx.Evaluator using (Stream)
 open import Verify-Budget-Sufficient.Measures using
-  (burstB?; burstHopD?; valB?; eventB?; hopDev?; all-impl;
-   ∧-true; ∧-intro; T⇒≡true; T-to; all-zip; 1≤2^;
-   hopD-evalWith; sumW; EnvHopDs; ifEq)
+  (burstB?; burstHopD?; eventB?; hopDev?; all-impl; ∧-true; all-zip; 1≤2^; hopD-evalWith)
+open import Decide using (T-to; T⇒≡true; ∧-intro)
 
 -- the same event walk as hopDev?, with the bound read off the VALUE
 hopSpnev? : ∀ {n} {Γ : Ctx n} {u} → ℕ → (Fin n → ℕ) → ℕ → ℕ →
@@ -410,7 +402,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- answer is that it is NOT `k` — it is the ACCUMULATOR'S OWN SIZE:
 --
 -- ⚠ DO NOT BOUND k FROM THE CEILING PINS.  That route is REFUTED
--- (`scan-count-under-ceiling-absurd`, agda/refuted, Refuted.Caps-Face):
+-- (`scan-count-under-ceiling-absurd`, agda/evidence/refuted, Refuted.Caps-Face):
 -- via the ceiling, `k` is bounded only by burstCount?, which caps
 -- instants and per-instant values SEPARATELY, each by `suc (Caps.cWid
 -- c)` — a WIDTH SQUARED — while the only lower bound on `V = Ŝ` is

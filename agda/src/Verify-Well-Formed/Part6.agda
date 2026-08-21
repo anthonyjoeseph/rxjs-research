@@ -20,12 +20,12 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part6 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Fin     using (Fin; toℕ)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
+open import Data.Fin     using (toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Nat     using (ℕ; zero; suc)
+open import Data.List    using (List; []; _∷_; _++_; map)
+open import Data.Maybe   using (just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
@@ -36,46 +36,27 @@ open import Relation.Binary.PropositionalEquality
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Gas; Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
+  _at_from_as_)
+open import Rx.Exp       using (Ctx; Closed; Val; Fn; _×ᵗ_; Tm; scanᵉ; evalTm)
+open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; _↠_; scan-f; take-f; takeVals; takeDispatch; cutThrough;
+  setNode; memberSource; NodeId; lookupNode; scan-st; take-st; subscribeE; splitEvents;
+  pushBurst; scanVals; installNode; mintNode; retagEvents; sweepLive)
+open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; hasValue; valsLast?)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part5 public
+open import Verify-Well-Formed.Part5 using (pushBurst-scan-run)
+open import Verify-Well-Formed.Part2 using (BurstInv; HotLive;
+                                            liveTypeOK?-sweepLive;
+                                            subscribeE-hot-live)
+open import Verify-Budget-Sufficient.Node-Table using
+  (lookupNode-setNode; ≟ᵗ-refl)
+open import Verify-Well-Formed.Part1 using (countRegs; regTyped?)
+open import Decide using (not-out; true≢false)
 
 pushBurst-scan-fixed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -317,10 +298,6 @@ pushBurst-take-cut-cons {Γ = Γ} {t = t} {e = e} {s = s}
 ∧-true true  y eq = refl , eq
 ∧-true false y ()
 
-not-true : (b : Bool) → not b ≡ true → b ≡ false
-not-true false eq = refl
-not-true true  ()
-
 -- peel one emit: the tail of a valsLast burst is valsLast
 valsLast-tail : ∀ {A : Set} (em : InstEmit A) (ems : List (InstEmit A)) →
   valsLast? (em ∷ ems) ≡ true → valsLast? ems ≡ true
@@ -332,7 +309,7 @@ valsLast-cut : ∀ {A : Set} (em : InstEmit A) (ems : List (InstEmit A)) →
   hasValue (InstEmit.events em) ≡ true → valsLast? (em ∷ ems) ≡ true → ems ≡ []
 valsLast-cut em []          hv vl = refl
 valsLast-cut em (em′ ∷ ems) hv vl =
-  true≢false (trans (sym hv) (not-true _ (proj₁ (∧-true _ _ vl))))
+  true≢false (trans (sym hv) (not-out (proj₁ (∧-true _ _ vl))))
 
 -- a takeVals cut NEEDS a payload: budget zero and an empty value list both leave
 -- the flag down, so a raised flag means the emit really carried a value
@@ -433,7 +410,7 @@ pushBurst-take-valsLast {Γ = Γ} {e = e} {s = s}
         (proj₂ (∧-true _ _ vl))))
   where
   hv0 : hasValue es ≡ false
-  hv0 = not-true _ (proj₁ (∧-true _ _ vl))
+  hv0 = not-out (proj₁ (∧-true _ _ vl))
 
   nilv : proj₁ (splitEvents {A = Val Γ s} es) ≡ []
   nilv = splitEvents-noValue es hv0

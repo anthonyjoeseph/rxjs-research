@@ -7,6 +7,12 @@
 -- THE ANCHOR CHAIN IS DISCHARGED: `stepFrame-nodry`, which carried the last of
 -- its risk, is a real definition, and this module's only live postulate is
 -- `subscribeE-Ψ`.
+-- RECOVERY: `git log --diff-filter=D -- agda/src/Verify-Budget-Sufficient/Demand-Probe.agda`
+-- restores 1857 lines / 194 refl rows of GAS-DEMAND measurement — the minimal
+-- gasPad h* at which each canonical program stops drying.  Deleted because its
+-- target `cascadeGo-nodry` is discharged; wanted back only if a restatement
+-- reopens gas SUFFICIENCY, which `subscribeE-Ψ` is not (that is fnCap/Ψ
+-- preservation, and the probe says nothing about it).
 --
 -- Landed from Caps-Burst-Walk-Probe (DELETED; git history) (2026-08-10), which
 -- was v2 of the route: v1's two bridging postulates were BOTH
@@ -74,7 +80,7 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Burst-Walk where
 
-open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; _∨_; not)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; s≤s; z≤n; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⊔m;
@@ -89,41 +95,33 @@ open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent;
-                           value; init; close; handoff; complete;
-                           CloseReason; cut; cutPending; exhausted; dried;
-                           gasPad; gasTower; towerℕ;
-                           InstEmit; _at_from_as_; EmitKind; delivery)
-open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_; sizeᵉ; syncSizeᵉ)
+open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent; value; close; handoff; complete; cut; cutPending;
+  gasPad; gasTower; towerℕ; InstEmit; _at_from_as_; EmitKind; delivery)
+open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; syncSizeᵉ)
 open import Rx.Evaluator
-  using (Sched; EvalSt; Slots; Arrival; RegId; Chain; Path; Frame;
-         _↠_; root; share-sink;
-         map-f; scan-f; take-f; from-inner; thru-outer; Stream;
-         stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; slotsSize;
-         hasDry; dryEvent; budgetAt; capsHgo; capsBase;
-         arrTy; arrVal; fLvlD; opIterD; regAt; subscribeInner; subscribeE;
-         splitBurst; splitEvents; sLvlD; sIterD; sIterD-suc; sizeAt;
-         fLvlD-suc; widAt;
-         AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-         NodeId; NodeState; takeDispatch; takeVals; cutThrough;
-         lookupNode; setNode; sweepLive; pathHasNode; memberSource; scanVals;
-         innerFinish; concatDrain; aliveThroughᶠ;
-         mergeBump; switchKill; thruConsume; thruWalk; thruWrap;
-         scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st)
+  using (Sched; EvalSt; Arrival; RegId; Chain; Path; Frame; _↠_; map-f; scan-f; take-f; from-inner;
+  thru-outer; Stream; stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; hasDry;
+  dryEvent; budgetAt; capsHgo; capsBase; arrTy; arrVal; fLvlD; opIterD; regAt; subscribeInner;
+  subscribeE; splitBurst; splitEvents; sLvlD; sIterD; sIterD-suc; sizeAt; fLvlD-suc; widAt;
+  AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals;
+  cutThrough; lookupNode; pathHasNode; memberSource; scanVals; innerFinish; concatDrain;
+  aliveThroughᶠ; mergeBump; switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st;
+  merge-st; concat-st; switch-st; exhaust-st)
+open import Rx.Slots using (Slots; slotsSize)
 
--- re-exports .Caps (frameStep, capsAt, sizeCount, the mono kit) and
--- .Deliveries (delivN) public
 open import Verify-Budget-Sufficient.Delivery-Walk
-  using (Walk-Hyps; module Walk; regP?; chP?; Caps; frameStep; delivN;
-         capsAt; capsH; sizeCount; cDel; cDel-body; sizeCount-body;
-         lvls-mono; dWalkᶜ-mono; capsAt-suc-full;
-         2≤capsAt-size; 1≤capsAt-reg;
-         ∧-intro; ∧-true; all-++-intro;
-         opIterD-infl; capsAt-base-size; 6≤capsAt-size; tower-3; capsAt-tower)
+  using (Walk-Hyps; module Walk; regP?)
+open import Verify-Budget-Sufficient.Deliveries using
+  (delivN)
+open import Verify-Budget-Sufficient.Measures using
+  (_hasAtLeast_; all-++-intro; all-zip; burstB?; caseWᵗ; dBound; dBound-bound; fcB-live;
+  fcB-nodes; fnCapBounded?; fnCapNode; fnCapᵉ; fnCapᵗ; hasAtLeast-mono; hasAtLeast-pad-plus;
+  hasAtLeast-tower; hasDry-append; hopR; INV?; pathB?; pathB?-widen; pathLen; prod≤3pow;
+  regsLen?; slotHop-cap; slotsFnCap; syncSize≤sizeᵉ; takeVals-all; unconn; unconn≤slots; ΨAt;
+  ∧-true)
 
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthFrame; depthWalk; depthConsume; depthCascade; depthInner; depthFin;
-         depthE; depthDrain)
+  using (depthFrame; depthWalk; depthConsume; depthCascade; depthInner; depthFin; depthDrain)
 
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; nest-keeps)
 
@@ -139,7 +137,18 @@ open import Verify-Budget-Sufficient.Keeps-Ring
 -- each callee's budget with these; the nodry face now does the same, which
 -- is what took the per-element ceiling off an unstated fLvlD inequality.
 open import Verify-Budget-Sufficient.Caps-Chain using (walk-desc; inner-desc)
-open import Verify-Budget-Sufficient.Caps using (sIterD-mono; sizeAt-mono)
+open import Verify-Budget-Sufficient.Caps using (sIterD-mono; sizeAt-mono;
+                                                 1≤capsAt-reg; 2≤capsAt-size;
+                                                 6≤capsAt-size; B2-cReg≤cSize;
+                                                 Caps; capsAt;
+                                                 capsAt-base-size;
+                                                 capsAt-suc-full; capsAt-tower;
+                                                 capsH; cDel; cDel-body;
+                                                 dWalkᶜ-mono; frameStep;
+                                                 frameStep-0; frameStep-mono-j;
+                                                 frameStep-reg≤size; lvls-mono;
+                                                 opIterD-infl; sizeCount;
+                                                 sizeCount-body; tower-3)
 
 -- THE CAPS FACE'S OWN thruConsume STEP, PROVEN.  It carries the level the
 -- step lands at and the caps invariant there; the nodry walk's loop
@@ -148,53 +157,45 @@ open import Verify-Budget-Sufficient.Subscribe-Face
   using (thruConsume-caps; subscribeInner-caps)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
-open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; pathSz?; walkOK; walkOK-finish; slotsCaps?;
-         valCaps?; valsCaps?; eventCaps?; burstCaps?;
-         eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl; valsCaps?-parts;
-         pathSz?-len; pathSz?-tail; pathSz?-widen;
-         capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
-         switchKill-caps;
-         frameStep-mono-j; frameStep-0; stepFrame-face; frameBud;
-         -- the INV? assembly's peel, and the two ladder side conditions it
-         -- and its call site spend
-         capsOK?-parts; cSize≤frameStep; frameStep-reg≤size;
-         -- the inner-at-suc-J kit, cribbed from subscribeInner-caps
-         frameStep-chain-suc; pathSz?-⊑; capsOK?-mono;
-         -- the nest ledger over a payload list, and the two readings of a
-         -- `valsCaps?` receipt the frame boundary spends
-         mList?; mList?-head; mList?-tail; mList?-keeps;
-         valsCaps→mList-strict; valsOf; valsLen; valCaps?-size;
-         -- the size half of the recombination lemmas below
-         frameSz?; regsSz?;
-         -- the node ring: capsOK? bounds every stored node, and the lookup
-         -- projects that bound onto the one node a clause is looking at
-         NodeCaps; lookupNode-caps; capsOK?-nodeSz; capsOK?-nodeWid;
-         boundedNode; widNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?;
+  valCaps?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using
+  (capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
+   capsOK?-parts; capsOK?-regs; frameBud; lookupNode-caps; mList?; mList?-head;
+   mList?-keeps; mList?-tail; NodeCaps; pathSz?-len; pathSz?-tail;
+   shareLatch-caps; switchKill-caps; valsCaps?; valsCaps?-lvl;
+   valsCaps→mList-strict; walkOK; walkOK-finish)
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using
+  (burstCaps?-widen; eventsCaps?-widen; frameStep-chain-suc; pathSz?-⊑;
+   valCaps?-size)
+open import Verify-Budget-Sufficient.Caps-Face.Part5 using
+  (cSize≤frameStep; valsCaps?-parts)
+open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+  (stepFrame-face)
+open import Verify-Budget-Sufficient.Caps-Face.Part6 using
+  (valsLen; valsOf)
 
-open import Verify-Budget-Sufficient.Wet
-  using (burstB?; eventB?; valB?; sizeCapAt; ΨAt;
-         B2-cReg≤cSize;
-         fnCapBounded?; fcB-live; fcB-nodes; sweepLive-fnCap;
-         fnCapᵛ; fnCapᵉ; caseWᵗ; fnCapᵗ; applyFn-fnCap; pathLen; T-to; T⇒≡true;
-         takeVals-all;
-         fnCapLive; fnCapNode; setNode-fnCap; scanVals-fnCap;
-         hasDry-append; ∨-false; ≤ᵇ-widen;
-         INV?; INV?-widen; dBound; regsLen?; hopR; unconn; pathB?; pathB?-widen;
-         frameB?; regsB?; all-zip;
-         _hasAtLeast_;
-         slotsFnCap;
-         dBound-bound; prod≤3pow; unconn≤slots; syncSize≤sizeᵉ; slotHop-cap;
-         hasAtLeast-pad-plus; hasAtLeast-tower; hasAtLeast-mono)
+open import Verify-Budget-Sufficient.Wet.Part6 using
+  (sizeCapAt)
+open import Verify-Budget-Sufficient.Wet.Part1 using
+  (INV?-widen; scanVals-fnCap; setNode-fnCap; sweepLive-fnCap)
 open import Verify-Budget-Sufficient.Walk-Level
-  using (WalkLevel; subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono;
-         any-dry-++; splitEvents-nodry; splitBurst-nodry;
-         switchKill-closes-nodry; thruWrap-pass; map-Ψ)
-open import Verify-Budget-Sufficient.Psi-Split
-open import Rx.Frame-Width using (pWᵉ)
+  using (subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono)
+open import Verify-Budget-Sufficient.Walk-Level.Statement using
+  (WalkLevel)
+open import Verify-Budget-Sufficient.Walk-Level.Parts using
+  (any-dry-++; map-Ψ; splitBurst-nodry; switchKill-closes-nodry; thruWrap-pass)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (allΨ-of; allΨ-to; burstB?-halves; burstΨ?; chP?-∧; eventsΨ?; frameBΨ?;
+   INV?-of-parts; lookupNode-fnCap; NodeΨ; pathB?-of-parts; pathBΨ?; regP?-∧;
+   regsB?-of-parts; regsBΨ?; splitEvents-bk-Ψ; splitEvents-vals-Ψ; valsΨ?;
+   valΨ?)
+open import Rx.Frame-Width using (pWᵉ; dWᵉ; outWᵛ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Rx.Frame-Width using (dWᵉ; dWᵛ; pWᵛ; outWᵛ)
+open import Rx.Frame-Width using (dWᵉ; pWᵛ; outWᵛ; pWᵉ)
+open import Decide using (T-to; T⇒≡true; not-in; not-out; ∧-intro; ≤ᵇ-widen)
 
 
 ------------------------------------------------------------------
@@ -397,11 +398,6 @@ fuel-pred (s≤s h) = h
 
 -- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
 -- carries the ∧-composable form, the dry lemmas speak the other
-not-out : ∀ {x : Bool} → not x ≡ true → x ≡ false
-not-out {false} _ = refl
-
-not-in : ∀ {x : Bool} → x ≡ false → not x ≡ true
-not-in refl = refl
 
 -- THE SEVERING CLOSE IS NEVER DRY.  `cutThrough` (Rx/Evaluator:246) is
 -- the only event source shared by take's cut and switch's kill, and
@@ -1906,7 +1902,7 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- already discharges it.
 --
 -- ⚠ AND THE SAME DEFECT AGAIN, ONE CONJUNCT OVER — REFUTED 2026-08-21,
--- machine-checked: `inner-nodry-inv-regLen-absurd` (agda/refuted,
+-- machine-checked: `inner-nodry-inv-regLen-absurd` (agda/evidence/refuted,
 -- Refuted.Inner-Nodry).  INV?'s THIRD conjunct is the registry CARDINALITY
 -- against the SIZE cap, and the only hypothesis mentioning that length is
 -- capsOK?'s last, which bounds it against the REGISTRATION cap.  The two

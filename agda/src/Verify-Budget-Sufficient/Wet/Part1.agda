@@ -1,7 +1,15 @@
+------------------------------------------------------------------
+-- STRATUM DOCUMENTATION, INHERITED FROM THE DELETED `Wet` UMBRELLA.
+-- That module held nothing but an `open import ... public` re-export,
+-- which is now illegal — a name is imported from where it is DEFINED — so
+-- the umbrella went and its prose came here, this file being the
+-- stratum's bottom rung.  Consumers import the Parts directly now;
+-- nothing was proven or unproven by the move.
+------------------------------------------------------------------
 -- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY.
 --
 -- TIMING RECEIPT 2026-08-11 (--profile=internal, dirty solo check): see
--- agda-performance-roadmap.md.  Measured because Subscribe-Face's cost turned
+-- typecheck-performance-numbers.md.  Measured because Subscribe-Face's cost turned
 -- out to be 86% Agda's Positivity pass over ONE mutual block, and this module
 -- is written in the same style; the roadmap records whether that generalises.
 --
@@ -28,36 +36,23 @@
 -- .Caps-Face — the Keeps-Ring precedent, taken the same day the layering
 -- landed — so this module and the caps FACE are still siblings and a
 -- caps-face grind does not re-check twenty minutes of wet clauses.
+
+-- Split 2026-08-12 into Wet/Part1..Part6 to bound per-edit recheck time;
+-- no mutual block was broken and no content changed.  Parts 4 and 5 were
+-- the width walk and went with it (2026-08-21), so the family is now
+-- Parts 1, 2, 3 and 6, imported directly — there is no umbrella.
 module Verify-Budget-Sufficient.Wet.Part1 where
 
-
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
-                                if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
-                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans; ≤-pred;
-                                       +-suc; +-identityʳ;
-                                       +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-<; +-monoˡ-≤;
-                                       *-monoˡ-≤; *-monoʳ-≤;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
-                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
-                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
-                                       ^-monoˡ-≤; ^-*-assoc;
-                                       ^-distribˡ-+-*; *-mono-≤;
-                                       +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡;
-                                       +-cancelʳ-≤)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
+  m≤m+n; m≤n+m; +-mono-≤; ^-monoʳ-≤; *-identityʳ; ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*;
+  *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
+open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (all; any)
-open import Data.Fin     using (Fin; toℕ)
+open import Data.Fin     using (Fin)
 import Data.Fin as Fin
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
@@ -71,73 +66,37 @@ open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _�
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; cong)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
-                                _at_from_as_; EmitKind; subscribe;
-                                InstEvent; init; value; close; handoff;
-                                complete; exhausted;
-                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
-                                Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
-                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
-                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                subΘExp; subΘTm; subΘTms;
-                                varIx;
-                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
-                                wkExp; wkTm; reify;
-                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
-                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms;
-                                elimDExp; elimDTm; elimDTms;
-                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
-                                evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
-                                Slot; scripted; shared; resolve; mkHot;
-                                arrVal; scanVals; memberSource;
-                                slotSize; inputSize;
-                                RegId; Chain;
-                                NodeState; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; setNode; lookupNode;
-                                NodeId;
-                                root; share-sink; _↠_; Frame; AllOp;
-                                map-f; scan-f; take-f; from-inner;
-                                thru-outer; Stream;
-                                sched-init; st-init; sched-next;
-                                schedHeadOf; schedGo; schedEarlier;
-                                cascadeLatch; cascadeFinish; sweepLive;
-                                takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; chainsGo;
-                                cascadeGo;
-                                Path; arrTy;
-                                subscribeE; stepFrame; pushBurst;
-                                subscribeInner; chainStep; subscribeAll;
-                                mintNode; mintSource; mintOrdinal; register;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                splitEvents; splitBurst; retagEvents;
-                                mergeBump; switchKill;
-                                thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
-                                sharedPlumb; sharedConnect; subscribeSharedSlot;
-                                burstCompleted;
-                                shareLatch; shareAdmit; shareFinish; shareGo;
-                                foldPath; dispatchShare; arrTick;
-                                aliveThroughᶠ;
-                                cascade; drain; evaluate;
-                                hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize; capsHgo; capsBase)
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; Gas; after_,_)
+open import Rx.Exp       using (Ty; _×ᵗ_; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; sizeᵗˢ; sizeᵛ; Tm; Fn; evalTm; applyFn)
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; scanVals; memberSource; RegId; Chain; NodeState; scan-st; take-st;
+  merge-st; concat-st; switch-st; exhaust-st; installNode; setNode; lookupNode; NodeId; AllOp;
+  scan-f; take-f; Stream; sweepLive; takeVals; cutThrough; pathHasNode; Path; stepFrame;
+  register; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; mergeBump; switchKill;
+  thruWrap)
+open import Rx.Slots using (slotsSize)
 
--- .Caps re-exports .Keeps-Ring (which re-exports .Measures), so this one
--- import carries the whole stratum below.  It is here for `Caps` /
--- `capsAt` / the supply lemmas only — this module reads NOTHING from the
--- caps FACE, which is why the recurrence was extracted out of it.
-open import Verify-Budget-Sufficient.Caps public
+open import Verify-Budget-Sufficient.Measures using
+  (2≤C; all-++-intro; all-impl; allB-head;
+                                                      allB-tail; applyFn-sharp; boundedNode;
+                                                      burstB?; capᴱ; capᴱ-mono; caseWᵗ;
+                                                      cutThrough-len; evalWith-sharp;
+                                                      eventB?; eventB?-widen; E≤E*3^;
+                                                      fcB-live; fcB-nodes; fnCap-evalWith;
+                                                      fnCapBounded?; fnCapLive; fnCapNode;
+                                                      fnCapᵗ; fnCapᵗˢ; fnCapᵛ; frameB?;
+                                                      grow-pow; install-bounded; INV-parts;
+                                                      INV?; m+n≤m*n; one≤3^; pathB?;
+                                                      pathB?-widen; pow1; regsB?;
+                                                      regsB?-widen; scanVals-sharp;
+                                                      setNode-bounded; splitEvents-bk-B;
+                                                      splitEvents-vals-B; stB-live;
+                                                      stB-nodes; stBounded-widen; stBounded?;
+                                                      sweepLive-all; sweepLive-bounded;
+                                                      takeVals-all; valB-fc; valB-sz; valB?;
+                                                      ∧-true)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
 -- the Keeps ring and the share-boundary facts moved to

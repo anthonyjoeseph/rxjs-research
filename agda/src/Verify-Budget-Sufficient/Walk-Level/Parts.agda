@@ -7,8 +7,8 @@
 -- The split is the same cost argument the statement module's header
 -- makes: a focused check of one dispatch member should not re-pay for
 -- eight hundred lines of lemma it merely calls.  Nothing here changes,
--- and every name is re-exported `public` upward, so the move is
--- invisible to every consumer.
+-- and consumers name what they need from here directly, so the move
+-- shows up in their import lists.
 --
 -- WHAT BELONGS HERE: a lemma with a body that the dispatch (or a
 -- sibling on this shelf) applies.  A CLAUSE LEAF does not — it is a
@@ -18,138 +18,108 @@
 
 module Verify-Budget-Sufficient.Walk-Level.Parts where
 
-open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_;
-                                _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Unit    using (⊤; tt)
+open import Data.Unit    using (tt)
 -- the data-emptiness induction discharges its obs arm from the absurd `ok`
 open import Data.Empty   using (⊥-elim)
 -- the value cases of a Ty induction: a sum's payload is inj₁/inj₂
 open import Data.Sum     using (inj₁; inj₂)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred;
-                                       m≤m+n; m≤n+m; n≤1+n;
-                                       +-suc; +-assoc;
-                                       +-mono-≤; +-monoʳ-≤; +-monoˡ-≤;
-                                       *-mono-≤; *-monoʳ-≤; *-monoˡ-≤;
-                                       *-identityˡ;
-                                       +-identityʳ;
-                                       m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; +-suc; +-assoc; +-mono-≤; +-monoʳ-≤;
+  +-monoˡ-≤; *-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.Vec     using (Vec; lookup)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
+open import Data.Vec     using (lookup)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim      using (Tick; Id; Source; init; value; close;
-                                complete; handoff; exhausted; dried;
-                                cut; cutPending; subscribe;
-                                InstEmit; InstEvent; _at_from_as_;
-                                Gas; g0; gs; gasPad; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; obs; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_;
-                                Ctx; Closed; Val; Exp; Tm; Fn;
-                                inputsBelowᵉ; isData;
-                                _≟ᵗ_;
-                                sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵉ; syncSizeᵗ;
-                                shellSizeᵉ; innerᵉ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                                μᵉ; varᵉ; unfoldμ; applyFn; evalTm)
-open import Rx.Frame-Width using (dWᵉ; dWᵗ; pWᵉ; pWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ; hopD-unfoldμ)
-open import Rx.Slot-Hop  using (slotHop; slotHop-fix)
-open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
-                                RegId; Chain;
-                                memberSource; Path; root; share-sink; _↠_;
-                                Stream; subscribeE; sharedConnect;
-                                subscribeAll; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                NodeState; merge-st; concat-st;
-                                switch-st; exhaust-st; scan-st; take-st;
-                                map-f; scan-f; take-f;
-                                splitBurst; hasDry; dryEvent;
-                                burstCompleted; sharedPlumb; dropSource;
-                                sched-init; st-init; budgetAt; slotsSize;
-                                opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
-                                sLvlD-suc; opIterD-suc; sIterD-suc; fLvlD-suc; fLvl; widAt;
-                                Frame; thru-outer; from-inner;
-                                pushBurst; stepFrame;
-                                subscribeInner; splitEvents; retagEvents;
-                                thruConsume; thruWalk; thruWrap;
-                                mergeBump; switchKill; cutThrough; sweepLive;
-                                takeVals; scanVals;
-                                lookupNode; setNode; pathHasNode; LiveSource;
-                                sameSource; installNode; NodeId; register; mintNode)
+open import Rx.Prim      using (Tick; Id; Source; init; value; close; complete; handoff; exhausted; dried; cut; cutPending;
+  InstEmit; InstEvent; Gas; gs; ObservableInput; hot; cold)
+open import Rx.Exp       using (Ty; obs; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; Ctx; Closed; Val; Tm; Fn; isData; _≟ᵗ_; sizeᵉ;
+  sizeᵗ; sizeᵗˢ; syncSizeᵉ; syncSizeᵗ; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; applyFn; evalTm)
+open import Rx.Frame-Width using (dWᵉ; dWᵗ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ)
+open import Rx.Slot-Hop  using (slotHop)
+open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; memberSource; Path; _↠_; Stream; subscribeE; AllOp; mergeᵒ;
+  concatᵒ; switchᵒ; exhaustᵒ; NodeState; merge-st; concat-st; switch-st; exhaust-st; scan-st;
+  take-st; map-f; scan-f; take-f; splitBurst; hasDry; dryEvent; pushBurst; stepFrame;
+  splitEvents; retagEvents; thruWrap; switchKill; cutThrough; takeVals; scanVals; lookupNode;
+  setNode; pathHasNode; installNode; NodeId; register; mintNode)
+open import Rx.Slots using (scripted; Slots; slotsSize)
 
 -- the wet stratum: INV?, dBound, hasAtLeast, regsLen?, pathLen, the gas
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
-open import Verify-Budget-Sufficient.Wet
+open import Verify-Budget-Sufficient.Measures using
+  (_hasAtLeast_; all-++-intro; all-impl;
+                                                      boundedLive; boundedLive-widen;
+                                                      boundedNode; boundedNode-widen;
+                                                      burstB?; burstB?-widen; burstHopD?;
+                                                      caseWᵗ; cutThrough-len; dBound;
+                                                      dBound-struct; eventB?; fcB-live;
+                                                      fcB-nodes; fnCap-evalWith; fnCapLive;
+                                                      fnCapNode; fnCapᵉ; fnCapᵗ; fnCapᵗˢ;
+                                                      fnCapᵛ; hasAtLeast-mono; hopD-map-emit;
+                                                      hopDev?; hs; INV-parts; INV?;
+                                                      mapValue-B; oneShot-tail-dry; pathB?;
+                                                      pathB?-widen; pathLen; regsB?-widen;
+                                                      regsLen?; slotsFnCap; splitEvents-bk-B;
+                                                      splitEvents-vals-B; sweepLive-all;
+                                                      takeVals-all; unconn; valB?; ∧-true;
+                                                      ∨-false; ⊔ʳ; ⊔ˡ)
+open import Verify-Budget-Sufficient.Wet.Part1 using
+  (applyFn-fnCap; INV?-widen; lookupNode-B; scanVals-fnCap; takeVals-B)
+open import Verify-Budget-Sufficient.Keeps-Ring using
+  (KeepsC; subscribeE-keeps)
+open import Verify-Budget-Sufficient.Wet.Part2 using
+  (finList-B)
 -- the caps face: only the five predicates the statement reads there
-open import Verify-Budget-Sufficient.Caps-Face
-  using (evalTms-caps;
-         capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
-         widNode; merge-step; concat-step; switch-step; exhaust-step;
-         frameSz?; capsOK?-mono; capsOK?-setNode; capsOK?-nextNode;
-         pathSz?-⊑; frameStep-chain-suc; frameStep-⊑-+;
-         valCaps?; valsCaps?; eventCaps?; valCountᵉ; frameBud;
-         mapValue-caps; valsCaps?-widen; finList-caps;
-         splitEvents-valsCaps; splitEvents-bk-caps; burstCaps?-widen;
-         capsOK?-mergeBump; switchKill-caps; switchKill-closes-caps;
-         lookupNode-caps; capsOK?-nodeSz; capsOK?-nodeWid;
-         thruWrap-caps; mList?; mList?-head; mList?-tail; mList?-keeps;
-         valsCaps→mList-strict; splitBurst-vals-caps; splitBurst-bk-caps;
-         widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
-         frameStep-size-strict-suc;
-         capsOK?-regs; pathSz?-len;
-         slotsCaps?-capsAt; capsOK?-parts;
-         -- the scan frame's install: the seed is BUILT, so its two node
-         -- bounds cost an eval receipt and a level step of their own
-         evalSeed-caps; valCaps?-widen; frameStep-mono-j; ⊑ᶜ-trans;
-         frameSz?-widen;
-         frameStep-+assoc-caps; frameStep-+assoc-burst)
-open import Verify-Budget-Sufficient.Psi-Split
+open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+  (evalSeed-caps; evalTms-caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathSz?; valCaps?; widNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using
+  (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using
+  (frameStep-+assoc-burst; frameStep-+assoc-caps; frameStep-chain-suc; frameStep-⊑-+;
+  frameSz?-widen; pathSz?-⊑; valCaps?-size; valCaps?-wid; valCaps?-widen; valsCaps?-widen;
+  ⊑ᶜ-trans)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (allΨ-of; allΨ-to; burstB?-halves; burstΨ?; burstΨ?-of; eventΨ?; finList-Ψ;
+   frameB?-of-parts; frameBΨ?; INV?-of-stB; INV⁻?; INV⁻?-of; INV⁻?-parts;
+   INV⁻?-widen; lookupNode-fnCap; mapValue-Ψ; retagEvents-Ψ; splitEvents-bk-Ψ;
+   splitEvents-vals-Ψ; valsΨ?; valΨ?)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
-  using (chain-desc; op-step; op-step-eval; burst-index; burst-nil; burst-step;
-         op-step-mu; quad-arith;
-         op-desc; op-desc-eval; push-desc; frame-desc; tail-desc;
-         walk-desc; inner-desc;
-         inner-nil; inner-step; walk-nil;
-         frame-step; walk-index; queue-push)
+  using (chain-desc; op-step; op-step-eval; burst-index; op-desc; op-desc-eval)
 -- the transformer monotonicity/inflation family, cited directly by the
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
-  using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
-         sLvlD-mono; opIterD-infl; fIterD-infl;
-         B2-cReg≤cSize; frameStep-reg≤size;
-         capsAt-base-size; 1≤pow≤)
+  using (1≤pow≤; _⊑ᶜ_; Caps; frameStep; frameStep-mono-j)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
 open import Verify-Budget-Sufficient.Subscribe-Face
-  using (unfoldμ-caps; subscribeE-caps; countLen; countVals; countIn; valsOf; pushEmit-count;
-         pushBurst-len; retagEvents-caps;
-         burstCount?-widen; burstCount?-tail;
-         thruWrap-vals; splitBurst-len; mul-fits; valsIn; valsLen;
-         lenWiden; frameStep-+suc; concat-fits;
-         frameStep-+assoc-count; pushBurst-caps)
+  using (subscribeE-caps; countLen; frameStep-+assoc-count; pushBurst-caps)
 open import Verify-Budget-Sufficient.Hop-Spine-Face
-  using (burstHopSpn?; burstHopSpn-cap; burstHopSpnH?; burstHopSpnH-headline;
-         burstHopSpnH-intro; scanSeed-hopSpn; hopD-evalTm)
+  using (burstHopSpn-cap; burstHopSpnH-headline; burstHopSpnH-intro; scanSeed-hopSpn; hopD-evalTm)
 open import Verify-Budget-Sufficient.Hop-Spine-Push
-  using (scanAccSpn?; nodeAccSpn?; nodeAccSpn?-scan; pushBurst-scan-hopSpn)
+  using (nodeAccSpn?; nodeAccSpn?-scan; pushBurst-scan-hopSpn)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step; map-step; scan-step; take-step)
+  using (map-step; scan-step; take-step)
 open import Verify-Budget-Sufficient.Node-Fresh
   using (mint-install-survives)
 -- take's push costs no depth at all: takeDispatch subscribes nothing
 open import Verify-Budget-Sufficient.Depth-Compositional
   using (burst-takef-zero)
-open import Verify-Budget-Sufficient.Walk-Level.Statement public
+open import Verify-Budget-Sufficient.Walk-Level.Statement using
+  (inputᶜ; WalkStmt; WalkStmtAt; WalkStmtAt⁻ᴴ; WalkStmtᴴˢ; WalkStmtᴴˢˢ;
+   WalkStmtᴴˢ⁰)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 
 any-++-false : ∀ {A : Set} (p : A → Bool) (xs ys : List A) →

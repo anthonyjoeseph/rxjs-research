@@ -25,13 +25,11 @@ open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; +-suc; +-assoc;
          +-mono-≤; +-monoʳ-≤; *-mono-≤; n≤1+n)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong)
+  using (_≡_; sym; trans; cong)
 
 open import Rx.Evaluator
-  using (sizeAt; widAt; fCharge; fLvl;
-         fLvlD; sIterD; sLvlD; opIterD; fIterD;
-         fLvlD-0; fLvlD-suc; sIterD-0; sIterD-suc; sLvlD-0; sLvlD-suc;
-         opIterD-0; opIterD-suc; fIterD-0; fIterD-suc)
+  using (sizeAt; widAt; fLvl; fLvlD; sIterD; sLvlD; opIterD; fIterD; fLvlD-0; fLvlD-suc; sIterD-0;
+  sIterD-suc; sLvlD-0; sLvlD-suc; opIterD-0; opIterD-suc; fIterD-0; fIterD-suc)
 open import Verify-Budget-Sufficient.Caps
   using (sizeAt-mono; widAt-mono; fCharge-mono;
          sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)

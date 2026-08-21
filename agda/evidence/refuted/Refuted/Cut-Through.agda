@@ -1,14 +1,14 @@
 -- ══════════════════════════════════════════════════════════════════
 -- CUT-THROUGH: the dying-source close bound, as stated, is FALSE.
 --
--- REFUTATIONS: machine-checked `… → ⊥`.  See REFUTATION.md for why this
+-- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE` notes.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Cut-Through where
 
-open import Data.Bool using (Bool; true; false; _∨_; _∧_; if_then_else_)
-open import Data.Nat  using (ℕ; zero; suc; _≤_; _≤ᵇ_; _≡ᵇ_)
-open import Data.List using (List; []; _∷_; any)
+open import Data.Bool using (true; false)
+open import Data.Nat  using (_≤_; _≡ᵇ_)
+open import Data.List using (List; []; _∷_)
 open import Data.Empty using (⊥)
 open import Data.Product using (proj₁; proj₂; _,_; _×_)
 open import Data.Maybe using (just)
@@ -18,9 +18,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Source)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; ofᵉ; nat̂)
 open import Rx.Protocol using (countIn; applyEvents)
-open import Rx.Evaluator using (EvalSt; st-init; NodeId; RegId; Chain; Path; root;
-                                Frame; take-f; _↠_; cutThrough; memberSource;
-                                retagEvents)
+open import Rx.Evaluator using (EvalSt; st-init; NodeId; RegId; Chain; root; take-f; _↠_; cutThrough; memberSource;
+  retagEvents)
 open import Verify-Well-Formed.Part1 using (countRegs; closeCount)
 
 ----------------------------------------------------------------------

@@ -62,30 +62,25 @@ open import Data.Nat.Properties
 open import Data.Fin   using (Fin)
 open import Data.Vec   using (lookup)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
-open import Data.Bool  using (Bool; false; true)
+open import Data.Bool  using (false; true)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
-  using (Ty; natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ;
-         sizeᵉ; sizeᵗ; sizeᵛ;
-         input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-         mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-         μᵉ; varᵉ; deferᵉ)
+  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; sizeᵉ; sizeᵗ; sizeᵛ; input;
+  ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ;
+  deferᵉ)
 open import Rx.Evaluator
-  using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream;
-         Slot; Slots; scripted; shared;
-         scan-st; merge-st; concat-st; switch-st; exhaust-st; take-st;
-         mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-         root; share-sink; _↠_;
-         map-f; scan-f; take-f; thru-outer;
-         mintNode; installNode; subscribeE;
-         splitEvents; stepFrame; setNode)
+  using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
+  switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
+  take-f; mintNode; installNode; subscribeE; splitEvents; stepFrame; setNode)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
 
--- pathLen via the wet family's public chain (Wet → … → Measures) — the
+-- pathLen, imported from .Measures where it is defined — the
 -- SAME pathLen `depth-capped`'s statement reads, so the landing plugs
 -- into its consumer unchanged.
-open import Verify-Budget-Sufficient.Wet using (pathLen)
+open import Verify-Budget-Sufficient.Measures using
+  (pathLen)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthConn; depthAll; depthBurst)
 

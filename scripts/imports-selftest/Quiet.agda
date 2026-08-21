@@ -3,6 +3,7 @@ module Quiet where
 
 open import Fixture.Precise using () renaming (only to only-precise)
 open import Fixture.Mixfix using (_∷_; _++_)
+open import Fixture.Section using (_*_; _hop_via_onto_)
 open import Fixture.Renamed using (old) renaming (old to new)
 import Fixture.Qualified as Q
 open import Fixture.Solver using (module Solver-Mod)
@@ -36,3 +37,19 @@ open Solver-Mod using (solve)
 
 module-use : Set
 module-use = solve
+
+-- A MIXFIX SPENT AS A SECTION.  `_` does not separate Agda tokens, so a
+-- section is ONE token carrying the underscores -- `*_`, not `*` -- and an
+-- atom-equality test over raw tokens calls `_*_` unused while this file
+-- multiplies right here.  That is the checker's worst failure mode: a false
+-- positive deletes a live import, and the build dies far from the edit with
+-- `NoParseForApplication ... Operators used in the grammar: None`, naming the
+-- USE and never the deleted import.  It cost 507 live names in one --fix run.
+-- The multi-hole row is the one that decides the repair: splitting the TOKEN
+-- on `_` handles `hop_via_onto_`, while stripping the underscores out of it
+-- does not.  Its holes are named to collide with NOTHING -- an earlier
+-- spelling used `at_from_as_`, and the atom `as` matched the `as` keyword that
+-- `import M as Q` leaves in the body, so the row passed against a checker that
+-- could not see it.  A row that cannot fail is not a row.
+section-use : Set
+section-use = cong (two *_) (x hop_via_onto_)

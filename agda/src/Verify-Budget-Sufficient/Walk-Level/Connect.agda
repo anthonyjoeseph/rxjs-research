@@ -12,105 +12,72 @@
 -- worth its own file — the other arms should not be re-proved to
 -- iterate on this one, and this one is where the grinding is.
 --
--- Re-exported `public` upward.
+-- Consumers name what they need from here directly.
 
 module Verify-Budget-Sufficient.Walk-Level.Connect where
 
-open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_; not; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_;
-                                _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred;
-                                       m≤m+n; m≤n+m; n≤1+n;
-                                       +-suc; +-assoc; +-comm;
-                                       +-mono-≤; +-monoʳ-≤; +-monoˡ-≤;
-                                       *-mono-≤; *-monoʳ-≤;
-                                       +-identityʳ;
-                                       m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
+open import Data.Bool    using (T; true; false)
+open import Data.Nat     using (ℕ; suc; _+_; _*_; _≤_; _≤ᵇ_; z≤n; s≤s)
+open import Data.List    using ([]; _∷_; _++_; length)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; +-comm; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.Vec     using (Vec; lookup)
+open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
-open import Rx.Prim      using (Tick; Id; Source; init; value; close;
-                                complete; handoff; exhausted; dried;
-                                cut; cutPending; subscribe;
-                                InstEmit; InstEvent; _at_from_as_;
-                                Gas; g0; gs; gasPad; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; obs; natᵗ; _×ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn;
-                                inputsBelowᵉ; isData;
-                                _≟ᵗ_;
-                                sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ;
-                                shellSizeᵉ; innerᵉ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                                μᵉ; varᵉ; deferᵉ; unfoldμ; applyFn; evalTm)
-open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; hopD-unfoldμ)
+open import Rx.Prim      using (Tick; Id; Source; init; close; exhausted; subscribe; _at_from_as_; Gas; g0; gs)
+open import Rx.Exp       using (Ctx; Closed; inputsBelowᵉ; sizeᵉ; syncSizeᵉ)
+open import Rx.Frame-Width using (dWᵉ; pWᵉ)
+open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop  using (slotHop; slotHop-fix)
-open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
-                                RegId; Chain;
-                                memberSource; Path; root; share-sink; _↠_;
-                                Stream; subscribeE; sharedConnect;
-                                subscribeAll; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                NodeState; merge-st; concat-st;
-                                switch-st; exhaust-st; scan-st; take-st; scan-f;
-                                splitBurst; hasDry; dryEvent;
-                                burstCompleted; sharedPlumb; dropSource;
-                                sched-init; st-init; budgetAt; slotsSize;
-                                opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
-                                sLvlD-suc; opIterD-suc; sIterD-suc; fLvlD-suc; fLvl; widAt;
-                                Frame; thru-outer; from-inner;
-                                pushBurst; stepFrame;
-                                subscribeInner; splitEvents; retagEvents;
-                                thruConsume; thruWalk; thruWrap;
-                                mergeBump; switchKill; cutThrough; sweepLive;
-                                lookupNode; setNode; pathHasNode; LiveSource;
-                                sameSource; installNode; NodeId; register; mintNode)
+open import Rx.Evaluator using (Sched; EvalSt; memberSource; Path; share-sink; subscribeE; sharedConnect; hasDry;
+  burstCompleted; sharedPlumb; dropSource; opIterD; register)
+open import Rx.Slots using (shared; Slots; slotsSize)
 
 -- the wet stratum: INV?, dBound, hasAtLeast, regsLen?, pathLen, the gas
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
-open import Verify-Budget-Sufficient.Wet
+open import Verify-Budget-Sufficient.Measures using
+  (_hasAtLeast_; all-++-intro; burstB?;
+                                                      burstHopD?; dBound; dropSource-all;
+                                                      fnCapᵉ; fᵢ≤sum-tab; hasAtLeast-mono;
+                                                      hopR; INV-parts; INV?; pathB?;
+                                                      pathB?-widen; pathLen; regsB?;
+                                                      regsB?-widen; regsLen?; slotFnCap;
+                                                      slotsFnCap; stBounded-widen; unconn;
+                                                      ∧-true)
+open import Verify-Budget-Sufficient.Wet.Part2 using
+  (connectWrap-wet; sharedPlumb-hopD; sharedPlumb-nodry)
+open import Verify-Budget-Sufficient.Keeps-Ring using
+  (KeepsC; subscribeE-keeps)
+open import Verify-Budget-Sufficient.Wet.Part6 using
+  (connect-edge)
 -- the caps face: only the five predicates the statement reads there
-open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
-         widNode; merge-step; concat-step; switch-step; exhaust-step;
-         frameSz?; capsOK?-mono; capsOK?-setNode; capsOK?-nextNode;
-         pathSz?-⊑; frameStep-chain-suc; frameStep-⊑-+;
-         valCaps?; valsCaps?; eventCaps?; valCountᵉ; frameBud;
-         mapValue-caps; valsCaps?-widen; finList-caps;
-         splitEvents-valsCaps; splitEvents-bk-caps; burstCaps?-widen;
-         capsOK?-mergeBump; switchKill-caps; switchKill-closes-caps;
-         lookupNode-caps; capsOK?-nodeSz; capsOK?-nodeWid;
-         thruWrap-caps; mList?; mList?-head; mList?-tail; mList?-keeps;
-         valsCaps→mList-strict; splitBurst-vals-caps; splitBurst-bk-caps;
-         widNode-push; valCaps?-size; valCaps?-wid; eventsCaps?-widen;
-         frameStep-size-strict-suc;
-         capsOK?-regs; pathSz?-len;
-         slotsCaps?-capsAt; capsOK?-parts;
-         -- the connect arm's own slot-telescope projections
-         slotCaps?; slotsCaps?-lookup; register-caps;
-         cSize≤frameStep; cWid≤frameStep)
-open import Verify-Budget-Sufficient.Psi-Split
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; burstCount?; capsOK?; pathSz?; slotCaps?; slotsCaps?; slotsCaps?-lookup)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using
+  (capsOK?-parts; register-caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part5 using
+  (cSize≤frameStep; cWid≤frameStep)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (burstB?-reindex; INV?-reindex)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 -- the transformer monotonicity/inflation family, cited directly by the
 -- loop faces' ceiling conversions
 open import Verify-Budget-Sufficient.Caps
-  using (opIterD-mono; sIterD-mono; sLvlD-infl; sIterD-infl;
-         sLvlD-mono; opIterD-infl; fIterD-infl;
-         B2-cReg≤cSize; frameStep-reg≤size;
-         capsAt-base-size)
+  using (frameStep-reg≤size; Caps; frameStep; frameStep-0; frameStep-mono-j)
 -- proven projections and per-emit plumbing off the caps push face —
 -- pieces, never the face itself (the wet twin re-walks its skeleton
 -- so both halves share one witness)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthAll; depthBurst; depthFrame; depthInner;
-         depthConsume; depthWalk; depthSlot; depthConn)
+  using (depthConn)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step; share-step)
-open import Verify-Budget-Sufficient.Walk-Level.Parts public
+  using (share-step; nest)
+open import Verify-Budget-Sufficient.Walk-Level.Parts using
+  (hasAtLeast-peel-gs; register-regsLen)
+open import Verify-Budget-Sufficient.Walk-Level.Statement using
+  (inputᶜ; mu-lvl-desc; peelGas; WalkLevelAt)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 
 -- ARM B's INV?, AND ONLY IT.  The live-share join registers and touches

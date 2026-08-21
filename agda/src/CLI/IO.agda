@@ -3,7 +3,7 @@
 -- formatting, string building — is plain stdlib on top of this.
 module CLI.IO where
 
-open import Agda.Builtin.IO public using (IO)
+open import Agda.Builtin.IO using (IO)
 
 open import Data.String using (String)
 

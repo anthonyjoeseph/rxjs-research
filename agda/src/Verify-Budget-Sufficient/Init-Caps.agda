@@ -28,41 +28,37 @@ module Verify-Budget-Sufficient.Init-Caps where
 
 
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; z≤n)
+open import Data.Bool    using (true; T)
+open import Data.Nat     using (ℕ; suc; _+_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-trans; m≤n+m)
-open import Data.List    using (List; []; _∷_; concat; tabulate)
+open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin     using (Fin)
 open import Data.Vec     using (lookup)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; cong₂; subst)
+  using (_≡_; refl; sym; subst)
 
-open import Rx.Exp    using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                             Ctx; Closed; Val; sizeᵉ; isData)
-open import Rx.Slots  using (Slot; scripted; shared; slotSize; slotsSize; Slots)
-open import Rx.Prim   using (ObservableInput; hot; cold)
-open import Rx.Frame-Width  using (outWᵛ; dWᵛ; pWᵛ; entryCeil)
-open import Rx.Evaluator    using (LiveSource; mkHot; sched-init; st-init; resolve)
+open import Rx.Exp    using (Ty; Ctx; Closed; Val; sizeᵉ; isData)
+open import Rx.Slots  using (scripted; shared; slotSize; slotsSize; Slots)
+open import Rx.Prim   using (hot; cold)
+open import Rx.Frame-Width  using (pWᵛ; entryCeil)
+open import Rx.Evaluator    using (mkHot; sched-init; st-init; resolve)
 
 -- Boolean and bound toolkit from Measures (the lightest path; avoids
 -- pulling in the full Wet/Caps/Keeps-Ring chain)
 open import Verify-Budget-Sufficient.Measures
-  using (stBounded?; boundedLive; ∧-intro; all-concat-tab; mkHot-bounded;
-         fᵢ≤sum-tab)
+  using (boundedLive; all-concat-tab; mkHot-bounded; fᵢ≤sum-tab)
 
 -- capsOK? and widLive live in Caps-Face
-open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; widLive;
-         -- the data-slot zeros: PROVEN in .Caps-Face.Part5, which this
-         -- module imports through the umbrella.  They were duplicated
-         -- here as `outWᵛ-data-zero`/`dWᵛ-data-zero`/`pWᵛ-data-zero`
-         -- until 2026-08-19; a `using` list is what hid the originals.
-         outWᵛ-data; dWᵛ-data; pWᵛ-data)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (capsOK?; widLive)
+open import Verify-Budget-Sufficient.Caps-Face.Part5 using
+  (pWᵛ-data)
 
 -- Caps record type and constructor
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+open import Decide using (∧-intro)
 
 -- baseCaps lives here now; Caps-Bridge imports it back.  (It used to
 -- be defined in Caps-Bridge, which is downstream of this module.)

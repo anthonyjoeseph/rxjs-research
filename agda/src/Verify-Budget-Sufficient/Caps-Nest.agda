@@ -51,15 +51,16 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim  using (Source)
 open import Rx.Exp
-  using (Ctx; Exp; Tm; Fn; Closed; obs;
-         input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-         mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-         syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ; inputsBelowᵉ)
+  using (Ctx; Exp; Tm; Fn; Closed; obs; input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; μᵉ; syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ; inputsBelowᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
-  using (iterSize-suc; sizeAt-mono; syncSize≤sizeᵉ; sum-tab-mono; T⇒≡true;
-         syncSize-unfoldμ; f≡t-absurd)
+  using (iterSize-suc)
+open import Verify-Budget-Sufficient.Measures using
+  (sum-tab-mono; syncSize-unfoldμ;
+                                                      syncSize≤sizeᵉ)
+open import Decide using (T⇒≡true; f≡t-absurd)
 
 ------------------------------------------------------------------
 -- § 1.  THE RESIDUE — `unconn`, reweighted.

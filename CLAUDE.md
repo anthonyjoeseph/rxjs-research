@@ -42,9 +42,9 @@ than a name that gets discharged next week, and it teaches the same lesson. Wher
 specific instance really is the content, its home is the source header, which moves
 when the code moves; that is the locality argument the `-- DEAD ROUTE` and `-- PROBED`
 conventions already rest on. The standing exceptions are the load-bearing *documents*
-and *commands* — this file, PROOF-STATE.md, REFUTATION.md,
+and *commands* — this file, PROOF-STATE.md, EVIDENCE.md,
 `typecheck-performance-numbers.md`, `docs/`, the semantics document, `make` targets and
-the directories the laws are stated over (`agda/src`, `agda/refuted`) — which are the
+the directories the laws are stated over (`agda/src`, `agda/evidence`) — which are the
 vocabulary the rules are written in rather than instances they cite.
 
 **AND NO CALENDAR DATES, INCLUDING ON A RULING (Anthony).** An attribution's job is to
@@ -80,16 +80,20 @@ reason to spend those minutes only to fail on something a textual pass already k
 | --- | --- | --- |
 | `wiring-selftest` | the wiring checker still fires — R2 fires on nothing in `src` today, so without a fixture it would rot untested | [docs/wiring.md](docs/wiring.md) |
 | `wiring-gate` | every definition, postulate and module has a route to Main; no `⊤`-typed postulate; no bare `open import` in Main. A name PASSED to a postulate gets no credit, which is how "a postulate must be a leaf" is enforced | [docs/wiring.md](docs/wiring.md) |
-| `wiring-refuted` | same law over `agda/refuted`, rooted at `Refuted.Main` — every witness is claimed | [docs/wiring.md](docs/wiring.md), REFUTATION.md |
+| `wiring-refuted` | same law over `agda/evidence/refuted`, rooted at `Refuted.Main` — every witness is claimed | [docs/wiring.md](docs/wiring.md), EVIDENCE.md |
+| `wiring-probed` | same law over `agda/evidence/probed`, rooted at `Probed.Main` — this is what replaced the probes' old self-granted reachability exemptions | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
+| `evidence-selftest` | E1 and E2 still fire | [docs/evidence.md](docs/evidence.md) |
+| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, and its marker says whether that statement is still a postulate, so DISCHARGING one fails the gate until the receipt above it has been re-read | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `unsafe-check` | no `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` etc. on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-selftest` | the duplicate checker still fires | [docs/find.md](docs/find.md) |
 | `dup-check` | no two declarations proving the same fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-selftest` | the import checker still fires, in both directions | [docs/imports-check.md](docs/imports-check.md) |
-| `imports-check` | no `using` clause none of whose names the file spends — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. Both halves buy LEGIBILITY, not time: `using` filters scope, not the build, and a re-export removes no edge, since a ladder's name-level dependencies are genuine | [docs/imports-check.md](docs/imports-check.md) |
+| `imports-check` | **NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE (Anthony: "no unused imports, either")** — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. AND no `using` clause may ask a module of this tree for a name that module does not have — a definition MOVES, one consumer's clause is repaired and its sibling's is not, and Agda reports that only as a scope warning `-W error` promotes MANY MINUTES down the tower, one instance per build, naming the importer and not the name's new home. What makes the cheap check sound is the `public` ban directly above: with no re-exports, a module can only export what its own text mentions. AND every file DECLARES its own module name, matching its path: a missing header is not a syntax error, so Agda checks such a file as a target and then crashes every IMPORTER with an internal error naming neither end — and a dev check cannot see it, because it checks a generated copy carrying its own header. Every part of this buys LEGIBILITY, not time: `using` filters scope rather than the build, a re-export removes no edge since a ladder's name-level dependencies are genuine, and a clause with one live name holds its edge open however many dead names sit beside it — which is why the name-level half was once argued to be optional, and is the wrong measure. A list naming thirty things the file never touches is not a record of what the file depends on | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows within budget, and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
-| `refuted` | the refutations typecheck | REFUTATION.md |
+| `refuted` | the refutations typecheck | EVIDENCE.md |
+| `probed` | the probes typecheck | EVIDENCE.md |
 | `bug-cache` | no known impl counterexample has regressed. `Unit-Test.agda` is off Main, so nothing else would notice it rotting | [docs/bug-cache.md](docs/bug-cache.md) |
 
 Also `make imports-fix` (delete every dead import), `make postulates` (the complete remaining-work ledger, by name),
@@ -292,15 +296,31 @@ build only to merge. Timings: `typecheck-performance-numbers.md`.
   places and getting it wrong in both. `make agda` and `make agda-dev` append their own,
   so it stays current on its own.
 
-## ALL NEW CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction
+## ALL NEW PROOF CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction
 
 **New definitions, new lemmas, new assemblies go straight into `agda/src`**, where the
 reachability check, the ⊤-postulate check and the claim graph see them from the first
-minute. **Anything written outside `src` is invisible to the wiring law**, which is how
-proven work parked itself for months and got re-derived — the repo's number-one failure
-mode. Writing in `src` is what makes "did we already prove this?" a `grep` instead of a
-memory. A `probe/` directory existed only because `src` had no cheap loop; `make
-agda-dev` gives one, so it was deleted. Do not recreate it.
+minute. Writing in `src` is what makes "did we already prove this?" a `grep` instead of
+a memory.
+
+**AND THE FAILURE THIS PREVENTS IS BEING UNCLAIMED, NOT BEING OUTSIDE `src`.** That
+distinction used to cost nothing, because `src` was the only claimed tree; it is stated
+now because it is not. Work no claim root reaches is what parked itself for months and
+got re-derived — the repo's number-one failure mode — and a tree with its own root and
+its own gate target is not in that position.
+
+**SO EVIDENCE IS WRITTEN OUTSIDE `src`, AND THAT IS NOT AN EXEMPTION (Anthony).** A
+refutation and a probe are not proof code: nothing may depend on either, and a probe in
+particular is a `refl` at a handful of concrete inputs that must never be mistaken for a
+theorem. Both live in `agda/evidence/`, whose two trees each carry their OWN claim root,
+so the wiring law applies out there in full — and a `.agda-lib` boundary makes a `src`
+import of either one UNRESOLVABLE rather than merely forbidden. **`EVIDENCE.md` is the
+law; read it before adding, retargeting or deleting either.**
+
+A bare `probe/` directory once existed for a different reason — `src` had no cheap loop —
+and was deleted when `make agda-dev` gave one. **`evidence/probed/` is not that
+directory**: the old one sat outside every claim graph, this one is rooted at
+`Probed.Main`, gated, and expires its own contents. Do not recreate the former.
 
 **Iterate with `make agda-dev`, land with `make agda`.** A dev-green body belongs in
 `src` immediately; it does not wait for the slow gate to earn a home.
@@ -481,7 +501,7 @@ above it. The census is one pass and it converts an unknown-length grind into a 
   work to delegate; grinding them first only buys the illusion of progress.
 - **Check every conjunct at zero before grinding it.** These bounds routinely go FALSE at
   `bud = 0`, `ops = 0`, `dep = 0` — the transformer is the identity there and a positive
-  witness cannot fit. A one-screen refutation in `src`
+  witness cannot fit. A one-screen refutation in `agda/evidence/refuted/`
   tells you the site needs a positivity hypothesis threaded rather than a cleverer proof.
 - **Count the sites by grepping the BARE postulate name.** A hyphenated guess
   (`grep TEMP-`) misses every site where the marker is a SUFFIX and reports a false
@@ -503,8 +523,18 @@ backwards-compatibility shims, nothing "stored for reference", no legacy, no dep
 ### DELETION: an unreachable definition may be deleted on its merits
 
 `make wiring` is trustworthy — every definition, postulate and module in `agda/src`
-has a route to Main today — so a name it reports is a finding to act on. Three rules
-govern acting on it:
+has a route to Main today — so a name it reports is a finding to act on.
+
+**DECIDING IT IS YOURS, AND ASKING IS THE FAILURE MODE (Anthony: "let's delete it
+if it's not used? That seems obvious to me — not sure why you needed my input").**
+A reachability finding is not a design question, and the autonomy grant already
+covers it: no spec moves when dead code goes. The three rules below say how to
+decide, and every one of them names something to VERIFY, never a reason to
+escalate — "prefer wiring when a plausible consumer is nameable" means go look for
+one, and "establish that it is a superseded predecessor" means diff the arms.
+Routing the decision upward turns a check worth minutes into a round trip and
+leaves the finding sitting in the tree meanwhile, which is the state this whole
+section exists to end. Three rules govern acting on it:
 
 - **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS.** A sweep
   answers the first; only building the consumer answers the second. A definition
@@ -645,11 +675,67 @@ design to move, and it is the one worth naming when you find it.
   machine probe. A `-- SUSPECT:` note is not the correct response to a doubt you can test:
   test it.
 - **PROBE BEFORE GRINDING.** If a postulate's sides are computable, instantiate it at
-  concrete programs **in `src`, checked with `make agda-dev`** and pinned by `refl` —
+  concrete programs **in `agda/evidence/probed/`, checked with `make agda-dev`** and pinned by `refl` —
   bug-cache shaped, seconds per loop. Every probe ends in exactly one of two states: a
   refutation (record, restate, re-rank) or a confidence receipt (`-- PROBED <date>:` in
   the postulate's own header, saying what shapes were covered). **An unprobed probeable
   postulate is the cheapest unmanaged risk in the repo.**
+- **AND ASSUME A PROBE ALREADY EXISTED, UNTIL A SEARCH HAS FAILED (Anthony).** This
+  is SEARCH FIRST arriving at the evidence, and it binds on every row that is not
+  GRINDABLE — a FALSITY, SHAPE, VACUITY or DIFFICULTY row is exactly the kind that
+  has been picked up before, put down, and probed on the way. The default
+  assumption is that someone has already instantiated this statement, and the
+  search costs one command:
+
+  ```
+  git log -S'<postulate name>' --all --format='%h %s'
+  ```
+
+  **SEARCH BY THE TARGET'S NAME, NEVER BY THE PROBE DIRECTORY'S PATH.** Probes
+  name the statement they test in their own headers, so the name reaches them
+  wherever they lived — and they have not always lived where they live now, so a
+  path-scoped search reports a false ALL-CLEAR, which is the worst possible answer
+  to this question. Then `git show <sha>^:<path>` reads the probe back, and
+  `git log --diff-filter=D` on the commit names everything it deleted.
+
+  **The receipt convention does not make this redundant, and the numbers say so:**
+  a probe's finding is supposed to land as a `-- PROBED` line in its target's
+  header, and at the sweep that recorded this rule the tree held ten such receipts
+  against **ninety-eight probe files deleted** over the campaign. A convention
+  capturing a tenth of the evidence is a convention that needs a search behind it.
+
+  **AND WHAT YOU RECOVER IS USUALLY WORTH MORE THAN A VERDICT.** Two kinds of
+  thing, both expensive to rebuild and neither of which fits in a header line.
+  The **HARNESS** — real-evaluator plumbing, the ⊔-shaped measures a bound needs,
+  and the refutation families someone already thought to try — is most of the cost
+  of a probe and none of its receipt. And the **BLOCKED or BOUNDED verdict**: "both
+  families are sealed, so this side cannot be instantiated at all", or "the cost is
+  geometric in two parameters, so this reached k ≤ 4 and not the k = 9 that was
+  asked for". Those are coverage boundaries and infrastructure limits, they are
+  findings about what CANNOT be probed, and rediscovering one costs exactly what it
+  cost the first time.
+
+  **THE TRAP, AND IT IS THE COMMON CASE: READ THE RECOVERED PROBE'S STATEMENT, NOT
+  ITS VERDICT.** A probe is expired by its target being discharged *or restated*,
+  so the probe you find is usually evidence about the statement that USED to be
+  there. A green on `A + B + C` says nothing about `(A + B) ⊔ C`, which is a
+  strictly smaller bound — the rows have to be re-run even though the harness
+  transfers. This is "never extrapolate a probe past its shapes" applied one level
+  up, to the statement rather than the inputs, and it is the mistake a found probe
+  invites: the verdict is the part you read first and the part least likely to
+  still apply.
+
+- **AND A PROBE EXPIRES WITH ITS TARGET, MECHANICALLY (Anthony).** A probe declares
+  `-- TARGET: <postulate>` and `make evidence-check` fails the moment that name leaves the
+  postulate ledger — discharged, restated or deleted. The probe is then DELETED or
+  retargeted; the check is never relaxed, because an expired probe is exactly what it
+  exists to surface. This is needed because probes and refutations decay differently and
+  only one of them says so: a refutation dies when `src` can no longer STATE it, and `make
+  refuted` goes red that day, whereas a probe dies when its target is PROVEN and nothing
+  happens at all — the rows still compute, the `refl`s still hold, and the file stays
+  green forever as evidence for a question already settled. A probe that outlives its
+  target because what it really pins is the EVALUATOR is not a probe: it is a unit test,
+  and its home is the bug cache.
 - **DETERMINE COMPUTABILITY BY LOOKING, NEVER FROM A REMEMBERED LIST.** Whether a family
   reduces is a property of the code TODAY: an `abstract` block seals it, and blocks get
   added for measured performance reasons without the statements above them changing. Check
@@ -690,15 +776,15 @@ is STRUCTURALLY DEAD — `cascadeLatch` sets `dying` before any chain is process
 invariant cannot be established at that point" does.
 
 - **A PROSE note is the home for a dead ROUTE; a machine-checked refutation lives in
-  `agda/refuted/` (Anthony)** — a separate include root checked by `make refuted` and
-  `make wiring-refuted`, whose rules are in **`REFUTATION.md`; read it before adding,
-  repairing or deleting a refutation.** **KEEPING A REFUTATION IN `src` IS ACTIVELY
+  `agda/evidence/refuted/` (Anthony)** — a separate library checked by `make refuted` and
+  `make wiring-refuted`, whose rules are in **`EVIDENCE.md`; read it before adding,
+  repairing or deleting a refutation, or a probe.** **KEEPING A REFUTATION IN `src` IS ACTIVELY
   HARMFUL**, because `src` must then keep whatever machinery makes the dead route
   STATE-able, and that machinery is otherwise deletable — measured at seven live
   definitions held up by nothing but the six refutations that mention them. `src` may
   refer to a refutation in a `-- REFUTED:` comment, since a refuted route does not change;
   it may never import one. This does NOT reopen a tree of failure *notes*: everything in
-  `agda/refuted/` is TYPECHECKED and claimed by `Refuted.Main`, so it cannot rot
+  `agda/evidence/refuted/` is TYPECHECKED and claimed by `Refuted.Main`, so it cannot rot
   unnoticed, while prose outside the claim graph is read by nobody when it would help.
 - **A dead route is not a licence to weaken the statement.** It kills a *route*; the
   postulate stays at full strength. **Deleting a dead-route line requires the route to be
@@ -860,7 +946,7 @@ the one form that feels like progress while you do it.
 The one sufficient justification is that the unconditional form has been **REFUTED**: then
 the conditioned form is the true statement replacing a false one, which is not a weakening
 at all. (One inequality on the caps face is FALSE unconditionally — refuted in
-`agda/refuted/`, against an adversarial stored state — so the conditioned form is the one
+`agda/evidence/refuted/`, against an adversarial stored state — so the conditioned form is the one
 that is stated.)
 
 **"The call site happens to supply it" is NOT a reason.** Today's call sites are an

@@ -23,8 +23,7 @@
 ------------------------------------------------------------------
 module Rx.Hop-Eta-Cong where
 
-open import Data.Bool using (Bool; true; false; T; _∧_)
-open import Data.Unit using (tt)
+open import Data.Bool using (T; _∧_)
 open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _⊔_; _<ᵇ_)
 open import Data.Fin  using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
@@ -39,6 +38,7 @@ open import Rx.Exp using (Ctx; Exp; Tm;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
                           inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; pmᵗ)
+open import Decide using (∧ʳ; ∧ˡ)
 
 -- The two projections out of a Bool conjunction's truth.
 --
@@ -50,13 +50,7 @@ open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; pmᵗ)
 -- Passing them costs verbosity and buys total independence from
 -- inference; `T-∧` in Data.Bool.Properties has the same problem behind
 -- a ⇔.
-∧ˡ : ∀ (a b : Bool) → T (a ∧ b) → T a
-∧ˡ true  b _  = tt
-∧ˡ false b ()
 
-∧ʳ : ∀ (a b : Bool) → T (a ∧ b) → T b
-∧ʳ true  b h = h
-∧ʳ false b ()
 
 mutual
   hopD-η-congᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)

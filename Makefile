@@ -123,11 +123,11 @@ help:
 	@echo "                  automatically before every agda target (~50 ms)"
 	@echo "  strip-selftest  proves the stripper safe: the lexical traps (-->, x--y,"
 	@echo "                  {-# #-}) and comment-insert invariance"
-	@echo "  refuted       typecheck agda/refuted/ — the machine-checked '-> bottom'"
+	@echo "  refuted       typecheck agda/evidence/refuted/ — the machine-checked '-> bottom'"
 	@echo "                  witnesses.  Separate include root: 'make agda' never"
 	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
 	@echo "                  after 'make agda' (it imports src, so the cache is"
-	@echo "                  warm by then).  See REFUTATION.md"
+	@echo "                  warm by then).  See EVIDENCE.md"
 	@echo "  gate          the acceptance test: wiring-selftest + wiring-gate +"
 	@echo "                  unsafe-check + dup-selftest + dup-check + agda +"
 	@echo "                  refuted + bug-cache.  Cheap"
@@ -226,9 +226,6 @@ agda-dev-selftest:
 # what makes its invariant enforceable rather than remembered.
 bug-cache: stripped
 	@$(call AGDA_RUN,src/Implementation/Unit-Test.agda)
-	@$(call AGDA_RUN,src/Verify-Budget-Sufficient/Demand-Probe.agda)
-	@$(call AGDA_RUN,src/Verify-Well-Formed/Root-Probe.agda)
-	@$(call AGDA_RUN,src/Verify-Budget-Sufficient/Scan-Node-Probe.agda)
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
@@ -240,15 +237,15 @@ bug-cache: stripped
 # At the finish line this target retires: once The-Proof.agda carries no
 # postulates, `agda --safe src/Main.agda` checks both halves at once.
 unsafe-check:
-	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ \
+	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ evidence/ \
 	    --include='*.agda' | grep -v '^src/QuickCheck.agda:' || true); \
-	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ \
+	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ evidence/ \
 	    --include='*.agda' || true); \
 	  if [ -n "$$hits$$opts" ]; then \
-	    echo "UNSAFE PRAGMA ON THE PROOF PATH — this is a soundness hole, not a shortcut:"; \
+	    echo "UNSAFE PRAGMA ON THE PROOF PATH OR IN THE EVIDENCE — a soundness hole, not a shortcut:"; \
 	    echo "$$hits"; echo "$$opts"; exit 1; \
 	  else \
-	    echo "unsafe-check: clean (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
+	    echo "unsafe-check: clean in src and evidence (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
 	  fi
 
 # THE COMMENT-STRIPPED MIRROR -- what Agda actually checks, and why a
@@ -270,6 +267,21 @@ rc=$$(mktemp); \
 	 st=$$(cat $$rc); rm -f $$rc; exit $$st
 endef
 
+# THE SAME, FROM THE EVIDENCE ROOT.  The working directory is the whole
+# src/evidence boundary: Agda reads the .agda-lib of the directory it starts in,
+# so starting here picks up `include: refuted probed ../src` and starting one
+# level up picks up `include: src`.  That is why an evidence import in src does
+# not resolve (EVIDENCE.md, E1) -- and it costs no second interface cache,
+# because Agda derives a file's build directory from the nearest .agda-lib ABOVE
+# THE FILE, not from the invocation, so every src module still lands in the one
+# shared _build.
+define AGDA_RUN_EV
+rc=$$(mktemp); \
+	 { (cd agda/_stripped-comments/evidence && $(AGDA) $(1)); echo $$? > $$rc; } 2>&1 \
+	   | scripts/unmap-positions.py; \
+	 st=$$(cat $$rc); rm -f $$rc; exit $$st
+endef
+
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
 # LEAVE A PROOF HANGING").  Pure textual analysis of agda/src, no Agda
 # invocation — always exits 0, this is a report for a human to rule on.
@@ -281,10 +293,25 @@ wiring:
 wiring-gate:
 	scripts/check-wiring.py --gate
 
-# THE SAME LAW, APPLIED TO agda/refuted (Anthony).  Rooted at Refuted/Main.agda,
-# no MODULE_ROOTS -- every witness must be claimed there.  See REFUTATION.md.
+# THE SAME LAW, APPLIED TO EACH EVIDENCE TREE (Anthony).  Rooted at that tree's
+# own claim root, no MODULE_ROOTS -- every witness and every probe must be
+# claimed there.  `wiring-probed` is what REPLACED the probes' MODULE_ROOTS
+# entries, each of which was a reachability seed inside the PROOF's own scan and
+# so let a probe read as wired to Main while Main could not reach it.  See
+# EVIDENCE.md.
 wiring-refuted:
-	scripts/check-wiring.py --src agda/refuted --root Refuted/Main.agda --gate
+	scripts/check-wiring.py --src agda/evidence/refuted --root Refuted/Main.agda --gate
+
+wiring-probed:
+	scripts/check-wiring.py --src agda/evidence/probed --root Probed/Main.agda --gate
+
+# E1 (nothing in src imports evidence) and E2 (every probe names a LIVE
+# postulate).  Textual, sub-second, and in the cheap block.  See EVIDENCE.md.
+evidence-check:
+	@scripts/check-evidence.py --gate
+
+evidence-selftest:
+	@scripts/check-evidence.py --selftest
 
 # NO FACT IS PROVEN TWICE.  Compares the DECLARED TYPE of every definition and
 # postulate, up to renaming of bound variables — `sizeᵉ-pos` and `1≤sizeᵉ`, the
@@ -317,18 +344,20 @@ imports-fix:
 	@scripts/check-imports.py --fix
 
 imports-selftest:
-	@out=$$(scripts/check-imports.py --src scripts/imports-selftest --names 2>&1); \
+	@out=$$(scripts/check-imports.py --src scripts/imports-selftest 2>&1); \
 	  fail=0; \
-	  for n in Fixture.Plain Fixture.Doc Fixture.Wide Fixture.Token dead-beside-live; do \
+	  for n in Fixture.Plain Fixture.Doc Fixture.Wide Fixture.Token dead-beside-live Dead-Mod; do \
 	    echo "$$out" | grep -q "$$n" \
 	      || { echo "SELFTEST FAIL: $$n not reported — a real dead import stopped firing"; fail=1; }; \
 	  done; \
-	  for n in Fixture.Precise Fixture.Mixfix Fixture.Renamed Fixture.Qualified Fixture.Solver live-used; do \
+	  for n in Fixture.Precise Fixture.Mixfix Fixture.Renamed Fixture.Qualified Fixture.Solver Fixture.Section live-used; do \
 	    echo "$$out" | grep -q "$$n" \
 	      && { echo "SELFTEST FAIL: $$n reported, but it is used or undecidable"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q 'found 4 dead import(s) and 1 dead name' \
-	    || { echo "SELFTEST FAIL: expected exactly 4 dead imports + 1 dead name"; fail=1; }; \
+	  echo "$$out" | grep -q 'found 4 dead import(s) and 2 dead name' \
+	    || { echo "SELFTEST FAIL: expected exactly 4 dead imports + 2 dead names"; fail=1; }; \
+	  echo "$$out" | grep -q 'live-mod' \
+	    && { echo "SELFTEST FAIL: live-mod reported, but it is used"; fail=1; }; \
 	  echo "$$out" | grep -qE 'Main.agda:.*(DEAD IMPORT|dead name)' \
 	    && { echo "SELFTEST FAIL: the CLAIM ROOT was use-audited — its imports are claims, not uses"; fail=1; }; \
 	  echo "$$out" | grep -q 'Guard-Root.agda:.*WIRING' \
@@ -349,6 +378,24 @@ imports-selftest:
 	    echo "$$out" | grep -q "DEAD IMPORT  $$n" \
 	      && { echo "SELFTEST FAIL: $$n reported DEAD — the use check cannot decide a blanket import"; fail=1; }; \
 	  done; \
+	  echo "$$out" | grep -q 'No-Header.agda:1: NO MODULE DECLARATION' \
+	    || { echo "SELFTEST FAIL: a file with no module declaration was not reported — every import of one crashes Agda with __IMPOSSIBLE__, and agda-dev cannot see it"; fail=1; }; \
+	  echo "$$out" | grep -q 'Bad-Name.agda:1: MODULE NAME MISMATCH' \
+	    || { echo "SELFTEST FAIL: a module declaration disagreeing with its path was not reported"; fail=1; }; \
+	  echo "$$out" | grep -q '2 file(s) whose module DECLARATION' \
+	    || { echo "SELFTEST FAIL: expected exactly 2 module-declaration findings"; fail=1; }; \
+	  for n in gone hidden absent; do \
+	    echo "$$out" | grep -q "PHANTOM NAME  $$n" \
+	      || { echo "SELFTEST FAIL: $$n is imported from a module of this tree that does not contain it — Agda finds that only as a ModuleDoesntExport warning, many minutes down the tower"; fail=1; }; \
+	  done; \
+	  for n in real-thing Sub-Mod r2; do \
+	    echo "$$out" | grep -q "PHANTOM NAME  $$n" \
+	      && { echo "SELFTEST FAIL: $$n reported PHANTOM, but Phantom-Src does export it ($$n tests, in order: a plain definition; a \`module M\` item whose keyword must come off; and the SOURCE side of a renaming, since \`x to y\` binds y and the module must export x)"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q '3 PHANTOM name(s)' \
+	    || { echo "SELFTEST FAIL: expected exactly 3 phantom names — a count over 3 means the check guessed at a module it cannot read, and every Fixture.* name in this tree names no file"; fail=1; }; \
+	  echo "$$out" | grep -qE 'Phantom.agda:.*(DEAD IMPORT|dead name)' \
+	    && { echo "SELFTEST FAIL: a phantom row also fired as dead — a phantom is a name that does not EXIST, not one that goes unused, and a row that fires both ways cannot tell them apart"; fail=1; }; \
 	  echo "$$out" | grep -q 'Main.agda:.*BLANKET IMPORT  Fixture.Root-Blanket' \
 	    || { echo "SELFTEST FAIL: the blanket rule skipped the CLAIM ROOT — it binds every file (Anthony)"; fail=1; }; \
 	  echo "$$out" | grep -q 'BLANKET IMPORT  Fixture.Precise' \
@@ -367,10 +414,10 @@ imports-selftest:
 	    || echo "$$out" | grep -q 'HELD BACK' \
 	    || { echo "SELFTEST FAIL: the held-back count went missing from the summary"; fail=1; }; \
 	  tmp=$$(mktemp -d); cp -a scripts/imports-selftest/. $$tmp/; \
-	  scripts/check-imports.py --src $$tmp --names --fix >/dev/null 2>&1; \
-	  after=$$(scripts/check-imports.py --src $$tmp --names 2>&1); \
-	  echo "$$after" | grep -q 'found 0 dead import(s)' \
-	    || { echo "SELFTEST FAIL: --fix left dead findings behind (not idempotent)"; fail=1; }; \
+	  scripts/check-imports.py --src $$tmp --fix >/dev/null 2>&1; \
+	  after=$$(scripts/check-imports.py --src $$tmp 2>&1); \
+	  echo "$$after" | grep -q 'found 0 dead import(s) and 0 dead name(s)' \
+	    || { echo "SELFTEST FAIL: --fix left dead findings behind (not idempotent).  BOTH counts are asserted: a prefix match on the import count alone passes against '0 dead import(s) and 18 dead name(s)', which is the state that shipped"; fail=1; }; \
 	  echo "$$after" | grep -q 'HELD BACK' \
 	    || { echo "SELFTEST FAIL: the wiring finding vanished after --fix"; fail=1; }; \
 	  for n in Guard-Root Guard-Two-A Guard-Two-B; do \
@@ -383,18 +430,24 @@ imports-selftest:
 	  done; \
 	  echo "$$after" | grep -q '4 BLANKET import(s)' \
 	    || { echo "SELFTEST FAIL: the blanket findings vanished after --fix"; fail=1; }; \
+	  echo "$$after" | grep -q '3 PHANTOM name(s)' \
+	    || { echo "SELFTEST FAIL: --fix deleted a phantom name — the repair is the RIGHT module, which the fixer cannot know, and deleting the item trades a scope-check warning for an unbound name"; fail=1; }; \
 	  diff -q scripts/imports-selftest/Main.agda $$tmp/Main.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the CLAIM ROOT"; fail=1; }; \
 	  grep -q 'live-used' $$tmp/Fires.agda \
 	    || { echo "SELFTEST FAIL: --fix deleted a LIVE name"; fail=1; }; \
 	  grep -q 'dead-beside-live' $$tmp/Fires.agda \
 	    && { echo "SELFTEST FAIL: --fix left a dead name in a surviving clause"; fail=1; }; \
+	  grep -q 'live-mod' $$tmp/Fires.agda \
+	    || { echo "SELFTEST FAIL: --fix deleted a LIVE name from the clause holding a dead \`module\` item"; fail=1; }; \
+	  grep -q 'module Dead-Mod' $$tmp/Fires.agda \
+	    && { echo "SELFTEST FAIL: --fix left a dead \`module M\` item — it must compare the BOUND name, keyword off, exactly as the report does"; fail=1; }; \
 	  grep -q 'Fixture.Plain' $$tmp/Fires.agda \
 	    && { echo "SELFTEST FAIL: --fix left a dead import declaration"; fail=1; }; \
 	  diff -q scripts/imports-selftest/Quiet.agda $$tmp/Quiet.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the file it must not touch"; fail=1; }; \
 	  rm -rf $$tmp; \
-	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent and spares the live names; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare)"; \
+	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module)"; \
 	  else echo "$$out"; exit 1; fi
 
 # PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It
@@ -444,7 +497,11 @@ postulates:
 # R2 fires on nothing in the real tree today, so without the fixture it would
 # rot untested.  See docs/wiring.md.
 refuted: stripped
-	@$(call AGDA_RUN,refuted/Refuted/Main.agda)
+	@$(call AGDA_RUN_EV,refuted/Refuted/Main.agda)
+
+# THE PROBES.  Same tree, same law, opposite decay: see EVIDENCE.md.
+probed: stripped
+	@$(call AGDA_RUN_EV,probed/Probed/Main.agda)
 
 wiring-selftest:
 	@out=$$(scripts/check-wiring.py --src scripts/wiring-selftest 2>&1); \
@@ -574,8 +631,10 @@ roadmap-selftest:
 # is about; a recipe-internal comment must itself be tab-indented to be one.
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a
 # textual violation never costs a full build to discover.  Both gates run it.
-GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted unsafe-check \
-             dup-selftest dup-check imports-selftest \
+GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
+             unsafe-check dup-selftest dup-check \
+             imports-selftest imports-check \
+             evidence-selftest evidence-check \
              roadmap-selftest roadmap-check dev-changed-selftest
 
 gate-cheap:
@@ -615,6 +674,7 @@ gate-heavy:
 	@$(MAKE) --no-print-directory gate-cheap
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted
+	@$(MAKE) --no-print-directory probed
 	@$(MAKE) --no-print-directory bug-cache
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
@@ -646,7 +706,7 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE.*commits since' \
 	    || { echo "SELFTEST FAIL: drift is invisible to --verdict-only — \`make gate\` routes on that verdict, so it would take the light path with the consumers long unchecked"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only --files agda/refuted/Refuted/Main.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
 	    || { echo "SELFTEST FAIL: a file outside agda/src did not escalate — nothing would have checked it"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
@@ -654,10 +714,10 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: the cone sweep did not hold back the claim roots — EVERY cone contains them by the wiring law, so a sweep that checks them IS the tower it claims to be cheaper than"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan  cone  agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: Main.agda is in the sweep plan — a claim root's dev check is the whole build"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Verify-Well-Formed.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Verify-Well-Formed/Part13.agda 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
-	  echo "$$out" | grep -q 'FAIL  agda/src/Verify-Well-Formed.agda' \
+	  echo "$$out" | grep -q 'FAIL  agda/src/Verify-Well-Formed/Part13.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files agda/src/Verify-Budget-Sufficient/Caps-Bridge.agda 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \

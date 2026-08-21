@@ -20,15 +20,15 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part10 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; s≤s; _≡ᵇ_; _≤ᵇ_; _+_; _∸_)
+open import Data.Nat.Properties using (+-suc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
+open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 
 -- from .Caps-Bridge, not from the top module: the top module is the
@@ -36,46 +36,30 @@ open import Relation.Binary.PropositionalEquality
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Gas; Tick; Id; Source; InstEvent; init; value; close; handoff; complete; delivery; exhausted;
+  dried; cut; cutPending)
+open import Rx.Exp       using (Ctx; Closed; Val)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Path; root; arrTy; arrSource; dropSource)
+open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; paidUp; settle; hasOwed; payOwed; paidOff; applyEvents;
+  removeOne; cancelOwed; bumpOwed)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part9 public
+open import Verify-Well-Formed.Part9 using (FoldOut; lookup-pos-not-allZero)
+open import Verify-Well-Formed.Part2 using (CurrentPast)
+open import Verify-Well-Formed.Part7 using (close-count; countIn-hit;
+                                            countIn-miss; sucInjᵂ)
+open import Verify-Well-Formed.Part1 using (allShareSunk; closeCount;
+                                            countRegs; countRemaining;
+                                            initCount; lookupOwed; notKeyOwed;
+                                            UniqueOwed; zeroExcept)
+open import Verify-Well-Formed.Part4 using (enterInstant; enterInstant-hz≤id; Mid)
+open import Verify-Well-Formed.Part8 using (FoldInv)
+open import Decide using (if-false; if-true; just-injᵂ; sucle→≢ᵇ; ∧-intro; ∧-trueʳ; ∧-trueˡ;
+                          ≡ᵇ-refl; ≤ᵇ-true)
 
 lookup-pos-not-paidOff : ∀ (s : Source) (ow : Owed) (k : ℕ) →
   lookupOwed s ow ≡ suc k → paidOff ow ≡ false

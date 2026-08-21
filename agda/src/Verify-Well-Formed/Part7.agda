@@ -20,17 +20,17 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part7 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _+_)
+open import Data.Nat.Properties using (≤-trans; ≤-pred; m≤n+m; +-suc; +-identityʳ)
+open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Bool.ListAction using (any)
-open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Maybe   using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Sum     using (inj₁; inj₂)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 
 -- from .Caps-Bridge, not from the top module: the top module is the
@@ -38,46 +38,29 @@ open import Relation.Binary.PropositionalEquality
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; handoff; complete; EmitKind; CloseReason;
+  exhausted; dried; cut; cutPending; _at_from_as_)
+open import Rx.Exp       using (Ctx; Closed; Val)
+open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; takeVals; cutThrough; pathHasNode; memberSource; NodeId;
+  lookupNode; take-st; splitEvents; retagEvents; sweepLive)
+open import Rx.Protocol  using (ProtocolSt; Owed; countIn; stepProtocol; applyEvents; removeOne; cancelOwed; bumpOwed;
+  hasValue)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part6 public
+open import Verify-Well-Formed.Part6 using (cutSched; cutSched-hot-live; cutSt;
+                                            splitEvents-vals-hasValue;
+                                            takeVals-cut-cons)
+open import Verify-Well-Formed.Part4 using (applyEvents-++just; applyEvents-vc;
+                                           stepProtocol-enter; stepProtocol-extract-enter)
+open import Verify-Well-Formed.Part2 using (BurstInv; regTyped?-cutThrough;
+                                            regTyped?-sweepLive)
+open import Verify-Well-Formed.Part1 using (closeCount; countRegs; initCount;
+                                            regTyped?)
+open import Decide using (just-injᵂ; n≢jᵂ; true≢false; ≡ᵇ-refl; ≡ᵇ→≡)
 
 cut-reg-typed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nid : NodeId) (sched : Sched Γ) (st : EvalSt e) →
@@ -455,7 +438,7 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 --
 -- ⚠ REFUTED 2026-08-18 — BOTH LEAVES BELOW ARE FALSE AS STATED.
 -- `Refuted.Cut-Through.cutThrough-close-bound-dying-absurd` and
--- `-live-dying-absurd` (agda/refuted/, `make refuted`).
+-- `-live-dying-absurd` (agda/evidence/refuted/, `make refuted`).
 --
 -- THE DEFECT IS IN THE QUANTIFIER STRUCTURE, NOT IN THE EVALUATOR — say
 -- this first, because the shape invites the opposite reading.  `L₁` is
@@ -646,7 +629,7 @@ cut-head-joint {Γ = Γ} {e = e} {s = s}
              ProtocolSt.done S ≡ false
   dn-false ae with ProtocolSt.done S
   ... | false = refl
-  ... | true  = ⊥-elim (t≢fᵂ (trans (sym hv) (applyEvents-val-done-absurd es lv ob′ ae)))
+  ... | true  = ⊥-elim (true≢false (trans (sym hv) (applyEvents-val-done-absurd es lv ob′ ae)))
   done-false : ProtocolSt.done S ≡ false
   done-false = dn-false aeEq
   -- normalize aeEq with done = false and O₁ = []

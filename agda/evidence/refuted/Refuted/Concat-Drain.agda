@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- CONCAT'S DRAIN: the shared-bud receipt, as stated, is FALSE.
 --
--- REFUTATIONS: machine-checked `… → ⊥`.  See REFUTATION.md for why this
+-- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE` notes.
 --
 -- WHAT IS WRONG, AND IT IS NOT THE WITNESS.  The row's pin is sound: the
@@ -43,13 +43,13 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Concat-Drain where
 
-open import Data.Bool using (Bool; true; _∧_)
-open import Data.Nat  using (ℕ; zero; suc; _≤_; _≤ᵇ_)
+open import Data.Bool using (true)
+open import Data.Nat  using (ℕ; suc; _≤_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ≤ᵇ⇒≤; 1+n≰n; n≤1+n)
 open import Data.List using (List; []; _∷_)
 open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥)
-open import Data.Product using (proj₁; proj₂; _,_; _×_; Σ)
+open import Data.Product using (proj₁; _,_; _×_; Σ)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -60,10 +60,11 @@ open import Rx.Evaluator using (Sched; EvalSt; NodeId; sched-init; st-init;
                                opIterD)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest)
-open import Verify-Budget-Sufficient.Measures using (∧-true; T-to)
+open import Verify-Budget-Sufficient.Measures using (∧-true)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using (cSize≤frameStep)
 open import Verify-Budget-Sufficient.Wet.Part6 using (sizeCapAt; 2≤sizeCapAt)
 open import Verify-Budget-Sufficient.Burst-Walk using (OKB)
+open import Decide using (T-to)
 
 ----------------------------------------------------------------------
 -- THE WITNESS.  The empty context, so every list in the state and the

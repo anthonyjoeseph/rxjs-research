@@ -4,17 +4,15 @@
 -- streams up to id renaming, so the exact numerals do not matter.
 module CLI.Encode where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_)
 open import Data.Nat.Show using (show)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_,_)
 open import Data.String using (String; _++_)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 
-open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; CloseReason; cut; cutPending; exhausted; dried;
-                           EmitKind; subscribe; delivery; plumbing;
-                           InstEmit; _at_from_as_)
+open import Rx.Prim using (InstEvent; init; value; close; handoff; complete; CloseReason; cut; cutPending; exhausted;
+  dried; EmitKind; subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val; Ctx)
 open import Rx.Evaluator using (Grouped)
 

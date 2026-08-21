@@ -1,9 +1,12 @@
 -- ROOT-EXIT COHERENCE PROBES — the computable half of the Part4 pair.
 --
--- MODULE_ROOT (see scripts/check-wiring.py): not imported by Main, not
--- compiled; checked by `make bug-cache`.  Receipts live in the headers of
--- `root-caches` / `root-done-plumbed` (.Part4), whose residues are now the
--- per-node / per-entry leaves `root-mergeCache` and `root-entry-sunk`.
+-- EVIDENCE, not a claim: `src` cannot import this file (the library layout
+-- makes the name `Probed.Root` unresolvable from there) and nothing in the
+-- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
+-- Receipts live in the headers of `root-caches` / `root-done-plumbed`
+-- (.Part4), whose residues are the two leaves named below.
+-- TARGET: root-mergeCache
+-- TARGET: root-entry-sunk
 --
 -- WHAT IS BEING TESTED, and why it is testable at all: both postulates'
 -- CONCLUSIONS are decidable Bool functions of a run — `cachesValid` and
@@ -20,26 +23,26 @@
 -- a program with no nodes, or one whose registry drains, proves nothing.
 -- Each load-bearing block therefore pins the SIZE of the thing being
 -- quantified over, in the same file, by refl.
-module Verify-Well-Formed.Root-Probe where
+module Probed.Root where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; not)
+open import Data.Bool.ListAction using (any)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; _∷_; length; null)
-open import Data.Nat  using (ℕ; zero; suc)
-open import Data.Product using (proj₁; proj₂)
+open import Data.List using ([]; _∷_; null)
+open import Data.Nat  using (zero; suc)
+open import Data.Product using (proj₁; proj₂; _×_; _,_)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
-open import Data.Fin  using (Fin; zero; suc)
+open import Data.Fin  using (zero; suc)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Gas; g0; hot)
-open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; nat̂; input;
-                            ofᵉ; mapᵉ; takeᵉ; emptyᵉ;
-                            mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ)
-open import Rx.Evaluator using (subscribeE; sched-init; st-init; budgetAt;
-                                 Slots; Slot; shared; scripted; Path; root; EvalSt; NodeId)
-open import Verify-Well-Formed.Part1 using (cachesValid; allShareSunk)
-open import Verify-Well-Formed.Part4 using (mergeCertAt)
+open import Rx.Prim using (hot; Source)
+open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; nat̂; input; ofᵉ; takeᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  exhaustAllᵉ)
+open import Rx.Evaluator using (subscribeE; sched-init; st-init; budgetAt; root; EvalSt; NodeId; Chain; RegId; lookupNode;
+  merge-st; aliveThroughᶠ)
+open import Rx.Slots using (scripted; shared; Slots)
+open import Verify-Well-Formed.Part1 using (cachesValid; allShareSunk; innerInstsP)
 open import Rx.Protocol using (ProtocolSt; runProtocol; protocol-init)
 
 ----------------------------------------------------------------------
@@ -52,6 +55,54 @@ open import Rx.Protocol using (ProtocolSt; runProtocol; protocol-init)
 
 ins₀ : Slots Γ₀
 ins₀ = λ ()
+
+-- ═══ THE MERGE-CERT DECISION PROCEDURE, and it lives here because the
+-- probe is its only consumer.  It sat in .Part4 while a MODULE_ROOTS
+-- entry made this file read as reachable from Main; with the probes out
+-- of that table the definition had no proof consumer, which is the
+-- wiring law reporting the truth rather than a new problem.  A restated
+-- merge-cert in .Part4 states its own predicate; these rows are evidence
+-- about THIS one.
+-- WHY IT SURVIVES ITS OWN COUNTEREXAMPLE SHAPE (probed 2026-08-06;
+-- the probe is deleted — this header is the receipt).  A hand-built
+-- state with k = 0 and a live from-inner registration (dying /
+-- delivered / cancelled all empty) makes mergeCertAt FALSE, so the
+-- whole question is that shape's REACHABILITY — and the cascade
+-- ordering answers it:
+--   1. cascadeLatch fires FIRST, setting dying = [arrSource a] before
+--      any chain is processed;
+--   2. cascadeGo adds rid to delivered BEFORE calling chainStep;
+--   3. so when innerFinish decrements k to 0, the spent registration
+--      is dying AND delivered.  aliveThroughᶠ's liveness disjunct is
+--      `not (src ∈ dying) ∨ not (rid ∈ delivered)` — false only when
+--      BOTH hold — and the ordering supplies both, so
+--      aliveThroughᶠ ≡ false.  The "both" is load-bearing: either
+--      mark alone leaves the registration alive.
+-- The bad shape is unreachable by this path.  REACHED coverage (rows
+-- driven through subscribeE → cascadeLatch → cascadeGo, not
+-- hand-built): the single-inner mergeAll shape, mid-cascade and
+-- post-cascadeFinish — the decisive rows.  STILL UNCOVERED: the
+-- multi-source inner reached only at hand-built states, concat /
+-- switch / exhaust and nested *All, and the CUT route to k ≡ 0
+-- (registrations also drop at take-cuts — a distinct path).
+
+-- a registration carries an ALIVE from-inner instance of mnid: its
+-- path mentions some inst via a `from-inner _ mnid inst` frame, and
+-- that inst is alive (aliveThroughᶠ)
+hasAliveFromInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → EvalSt e → RegId × Source × Chain Γ t → Bool
+hasAliveFromInner mnid st c@(_ , _ , (_ , p)) =
+  any (λ inst → aliveThroughᶠ inst st c) (innerInstsP mnid p)
+
+-- merge-cert at one node: when merge-st sits at k ≡ 0, no registry
+-- entry has an alive from-inner instance of this node.  k ≢ 0 and
+-- non-merge nodes are trivially certified.
+mergeCertAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  → NodeId → EvalSt e → Bool
+mergeCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
+... | just (merge-st zero od) =
+        not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
+... | _ = true
 
 RUN : ∀ {t} (e : Closed Γ₀ t) → EvalSt e
 RUN e = proj₂ (proj₂ (subscribeE (budgetAt e ins₀ 0) e root 0 0

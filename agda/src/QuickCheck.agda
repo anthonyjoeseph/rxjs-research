@@ -14,7 +14,7 @@
 module QuickCheck where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
-open import Data.Char using (Char; toℕ)
+open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
 open import Data.List using (List; []; _∷_; map; length)
                       renaming (_++_ to _++ᴸ_)
@@ -30,19 +30,17 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold;
                            InstEvent; init; value; close; handoff; complete;
                            CloseReason; cut; cutPending; exhausted; EmitKind;
                            subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_;
-                          Ctx; Exp; Tm; Fn; PrimOp;
-                          input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ;
-                          varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ;
-                          add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+  mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
+  strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Rx.Evaluator using (evaluate; Slot; scripted; shared; Slots)
+open import Rx.Evaluator using (evaluate)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Implementation using (impl-batchSimultaneous)
 open import Spec using (spec-batchSimultaneous)
-open import CLI.IO
+open import Agda.Builtin.IO using (IO)
+open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
 ------------------------------------------------------------------------
 -- randomness (FFI: a pure LCG over Integer, no unary-ℕ blowup)

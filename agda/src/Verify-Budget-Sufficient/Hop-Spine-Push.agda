@@ -23,7 +23,7 @@ module Verify-Budget-Sufficient.Hop-Spine-Push where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all)
 open import Data.Nat  using (ℕ; _≤_)
-open import Data.List using (List; []; _∷_; _++_; map)
+open import Data.List using (List; []; _∷_; map)
 open import Data.Fin  using (Fin)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -42,10 +42,11 @@ open import Rx.Evaluator using (Stream; EvalSt; Sched; Path; NodeId; NodeState;
                                 pushBurst; stepFrame; scanVals)
 open import Verify-Budget-Sufficient.Node-Table using (≟ᵗ-refl; lookupNode-setNode)
 open import Verify-Budget-Sufficient.Measures using
-  (∧-true; ∧-intro; all-++-intro)
+  (∧-true; all-++-intro)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using
   (valHopSpn?; evHopSpnH?; burstHopSpnH?)
 open import Verify-Budget-Sufficient.Hop-Spine-Step using (scanVals-hopSpn)
+open import Decide using (∧-intro)
 
 ------------------------------------------------------------------
 -- THE CARRIER.  A node the walk does not own reads as `true`: only a

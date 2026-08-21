@@ -1,0 +1,5 @@
+FIXTURES for `make evidence-selftest`.  Not Agda that typechecks — the
+evidence checker is a purely textual pass, and these exist so that E1 and E2
+are proven to still FIRE.  A checker nobody has seen fail is a checker that
+has quietly stopped checking; every other gate in this repo carries the same
+fixture for the same reason.

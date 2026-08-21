@@ -61,15 +61,8 @@
 module Verify-Budget-Sufficient.Delivery-Walk where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_;
-                                z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
-                                       +-mono-≤; *-mono-≤; +-monoˡ-≤;
-                                       +-monoʳ-≤; *-monoʳ-≤; *-monoˡ-≤;
-                                       +-assoc; +-comm; +-identityʳ;
-                                       *-identityʳ; *-zeroʳ; *-distribˡ-+;
-                                       ≤ᵇ⇒≤; n≤1+n; m≤m+n; m≤n+m;
-                                       m≤m⊔n; m≤n⊔m)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; n≤1+n; m≤m+n; m≤m⊔n; m≤n⊔m)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
@@ -77,27 +70,30 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Vec     using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim      using (Tick; Id; Source; InstEvent;
                                 close; exhausted; value; handoff; complete;
                                 _at_from_as_; delivery; Gas)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain;
-                                Path; Frame; root; share-sink; _↠_; Stream;
-                                stepFrame; foldPath; dispatchShare; shareGo;
-                                shareAdmit; shareLatch; shareFinish;
-                                chainStep; cascadeGo; dropSource; sameSource;
-                                arrTy; arrTick; arrSource; arrVal;
-                                budgetAt;
-                                sizeAt; regAt; fLvlD; iterL; lvls;
-                                dCapᶜ; dWalkᶜ)
+open import Rx.Exp       using (Ctx; Closed; Val; _≟ᵗ_)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; Frame; root; share-sink; _↠_; Stream; stepFrame;
+  foldPath; dispatchShare; shareGo; shareAdmit; shareLatch; shareFinish; chainStep; cascadeGo;
+  sameSource; arrTy; arrTick; arrSource; arrVal; budgetAt; sizeAt; regAt; fLvlD; iterL; lvls;
+  dCapᶜ; dWalkᶜ)
 
 -- .Caps for the level walk and its monotonicity toolkit (dCapᶜ-mono /
 -- dWalkᶜ-mono / lvls-mono) and, under it, .Measures for pathLen and the
 -- dropSource lemmas
-open import Verify-Budget-Sufficient.Caps public
-open import Verify-Budget-Sufficient.Deliveries public
+open import Verify-Budget-Sufficient.Caps using
+  (dCapᶜ-mono; dWalkᶜ-front; dWalkᶜ-mono; iterL-infl; iterL-mono; lvls-add;
+   lvls-infl; lvls-mono)
+open import Verify-Budget-Sufficient.Measures using
+  (dropSource-all; dropSource-len;
+                                                      pathLen; ∧-true)
+open import Verify-Budget-Sufficient.Deliveries using
+  (cascadeGo-deliv; chainStep-deliv; consᵈ; delivN; delivN-cons; delivN-split;
+   delivN-≡; dispatchShare-suc-N; dispatchShare-zero-N; foldPath-deliv;
+   foldPath-frame-N; foldPath-root-N; shareGo-deliv; ⊑ᵈ-trans)
 
 -- THE DELIVERY-SIDE DEPTH MEASURES, and the ⊔-projections that read a
 -- three-callee clause.  NOT A CYCLE: `Caps-Depth` imports only `Rx.*`,
@@ -108,6 +104,7 @@ open import Verify-Budget-Sufficient.Deliveries public
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthFrame; depthFold; depthDisp; depthShareGo; depthChain;
          depthCascade; lub3-l; lub3-m; lub3-r)
+open import Decide using (∧-intro)
 
 ------------------------------------------------------------------
 -- § B.  THE REGISTRY LEDGER THE WALK READS.

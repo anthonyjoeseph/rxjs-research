@@ -1,3 +1,45 @@
+------------------------------------------------------------------
+-- STRATUM DOCUMENTATION, INHERITED FROM THE DELETED `Verify-Well-Formed` UMBRELLA.
+-- That module held nothing but an `open import ... public` re-export,
+-- which is now illegal — a name is imported from where it is DEFINED — so
+-- the umbrella went and its prose came here, this file being the
+-- stratum's bottom rung.  Consumers import the Parts directly now;
+-- nothing was proven or unproven by the move.
+------------------------------------------------------------------
+-- THE PROOF that the evaluator's output satisfies the protocol
+-- automaton: evaluate-well-formed, the primitives' half of the
+-- batching sandwich (see Verify-Batch-Simultaneous.The-Proof).
+--
+-- Architecture: a simulation, in three layers.
+--   1. Inv (CONCRETE below) relates evaluator state to automaton
+--      state between cascades.
+--   2. Two frame relations — BurstInv (mid-subscribe-frame) and Mid
+--      (mid-cascade, indexed by the chains still to fold) — both
+--      CONCRETE records now, with entry/step/exit lemmas.  Proven:
+--      burst-init, burst-final.  Postulated (all believed true and
+--      properly hypothesised — no known-false placeholders): the
+--      step lemmas
+--      (subscribeE-wf, mid-step — the per-clause preservation
+--      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
+--      is no longer assumed here: it is imported, proven, from
+--      Verify-Budget-Sufficient.
+--   3. The compositions — the subscribe frame, the chain fold, the
+--      fuel loop, and the theorem — are all DEFINED, glued by
+--      runProtocol's distribution over ++.
+
+-- SPLIT 2026-08-11 into 13 parts.  This file was 5,816 lines forming ONE mutual
+-- block of 276 members with ZERO cycles -- an artefact of declaration order,
+-- not recursion.  Nothing could make a check of it incremental and
+-- `make agda-dev` had no cycle to break, so it was the one module in the repo
+-- that could not be iterated on.
+--
+-- The cut is mechanical: parts are consecutive runs of the ORIGINAL text, at
+-- boundaries where no definition depends on a later one.  Two definitions moved
+-- to make every boundary safe -- `subscribe-wf` and `subscribeE-wf`'s signature,
+-- both DOWN to sit after what they use.  No statement, proof or signature
+-- changed.  Consumers are unaffected: the parts are re-exported here under the
+-- original module name.
+
 -- THE PROOF that the evaluator's output satisfies the protocol
 -- automaton: evaluate-well-formed, the primitives' half of the
 -- batching sandwich (see Verify-Batch-Simultaneous.The-Proof).
@@ -20,55 +62,29 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part1 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Nat     using (ℕ; zero; suc; _≡ᵇ_; _+_)
+open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; trans; cong; cong₂)
 
-open import Relation.Nullary using (Dec; yes; no)
+open import Relation.Nullary using (yes; no)
 
 -- from .Caps-Bridge, not from the top module: the top module is the
 -- active caps grind, and importing it here would put this file on that
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
+open import Rx.Evaluator using (EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; from-inner; thru-outer;
+  NodeId; NodeState; scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st; LiveSource;
+  arrTy; arrSource; dryEvent; hasDry; dropSource)
+open import Rx.Protocol  using (ProtocolSt; Owed; stepProtocol; runProtocol; paidUp; checkFinal; Accepted; accepted)
+open import Decide using (true≢false)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
@@ -100,8 +116,6 @@ acceptPaid S eq rewrite eq = accepted
 
 -- dry-freeness splits over ++ (the step lemmas are conditioned on it;
 -- the imported budget-sufficient supplies it for the whole seeded run)
-true≢false : {A : Set} → true ≡ false → A
-true≢false ()
 
 hasDry-++ : ∀ {A : Set} (xs ys : List (InstEmit A)) →
   hasDry (xs ++ ys) ≡ false →
@@ -468,5 +482,3 @@ regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r 
 -- ledger's scan push face needed the identical pair from below this tree;
 -- re-exported here because this module is where the rest of the branch
 -- reads them from
-open import Verify-Budget-Sufficient.Node-Table public
-  using (≡ᵇ-refl; ≡ᵇ→≡; ≢ᵇ-from-<; sucle→≢ᵇ; ≟ᵗ-refl; lookupNode-setNode)

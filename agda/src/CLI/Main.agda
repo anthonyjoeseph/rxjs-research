@@ -7,12 +7,13 @@ module CLI.Main where
 
 open import Data.Char using (Char; toℕ)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Maybe using (Maybe; just; nothing; maybe′)
+open import Data.Maybe using (maybe′)
 open import Data.Nat using (ℕ; _≡ᵇ_)
 open import Data.String using (String; toList; fromChar; _++_)
 open import Data.Bool using (if_then_else_)
 
-open import CLI.IO
+open import Agda.Builtin.IO using (IO)
+open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 open import CLI.JSON using (parseJSON)
 open import CLI.Decode using (decodeCase)
 

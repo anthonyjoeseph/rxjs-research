@@ -20,66 +20,52 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part12 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
-open import Data.Bool.Properties using (∨-assoc; ∨-comm; ∨-identityʳ)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
-open import Data.List    using (List; []; _∷_; _++_; length; map)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∨_)
+open import Data.Bool.Properties using (∨-assoc; ∨-identityʳ)
+open import Data.Nat     using (ℕ; suc; _≡ᵇ_; _+_)
+open import Data.Nat.Properties using (≤-refl)
+open import Data.List    using (List; []; _∷_; _++_; length)
 open import Data.Bool.ListAction using (any)
-open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Maybe   using (just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Sum     using (inj₁; inj₂)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
-open import Relation.Nullary using (Dec; yes; no)
+open import Relation.Nullary using (yes; no)
 
 -- from .Caps-Bridge, not from the top module: the top module is the
 -- active caps grind, and importing it here would put this file on that
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Id; Source)
+open import Rx.Exp       using (Ctx; Closed; _≟ᵗ_)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; NodeId; LiveSource; arrTy; arrSource; chainsOf;
+  chainsGo; chainStep; cascadeLatch; cascadeGo; cascadeFinish; sameSource; dropSource;
+  sweepLive)
+open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; paidUp)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part11 public
+open import Verify-Well-Formed.Part11 using (allZero-clean; currentPast-up;
+                                             dropSource-self; mid-skip;
+                                             mid-step; paid-allzero)
+open import Verify-Well-Formed.Part1 using (allShareSunk; cachesValid; cachesValidMid-nil;
+                                           collectAdjInsts; countRegs; countRemaining; elemℕ;
+                                           innerInstsP; innerInstsR; keepAbsent; liveTypeOK?;
+                                           mergeReachable; nubLen; pathThruOuter; regTyped?;
+                                           run-++-just)
+open import Verify-Well-Formed.Part2 using (cascadeFinish-hot-live; CurrentPast; Inv; liveHas;
+                                           liveTypeOK?-extract; reg-typed-finish;
+                                           sameTy-sound)
+open import Verify-Well-Formed.Part4 using (Mid; ≤-up)
+open import Decide using (f≡t-absurd; if-false; if-true; true≢false; ∧-intro; ∧-trueʳ;
+                          ∧-trueˡ; ∨-fʳ; ∨-fˡ; ∨-swap; ∨-trueʳ; ≡ᵇ-refl; ≡ᵇ-sym; ≡ᵇ→≡)
 
 dropSource-other : ∀ {n} {Γ : Ctx n} {t}
   (s s′ : Source) (reg : List (RegId × Source × Chain Γ t)) →
@@ -319,20 +305,11 @@ latch-nodes a st with Arrival.isLast a
 ... | false = refl
 
 -- Bool scaffolding for the guard algebra
-∨-fˡ : ∀ (b c : Bool) → (b ∨ c) ≡ false → b ≡ false
-∨-fˡ false c h = refl
-∨-fˡ true  c h = h
-∨-fʳ : ∀ (b c : Bool) → (b ∨ c) ≡ false → c ≡ false
-∨-fʳ false c h = h
-∨-fʳ true  c ()
-
 ------------------------------------------------------------------
 -- pure elemℕ / nubLen / keepAbsent combinatorics — the set-partition
 -- and permutation-invariance behind countLiveInners-partition
 ------------------------------------------------------------------
 
-f≢t : false ≡ true → ⊥
-f≢t ()
 
 elemℕ-++ : ∀ (x : NodeId) (xs ys : List NodeId) →
   elemℕ x (xs ++ ys) ≡ (elemℕ x xs ∨ elemℕ x ys)
@@ -346,7 +323,7 @@ elem-neq : ∀ (x y : NodeId) (surv : List NodeId) →
   elemℕ x surv ≡ false → elemℕ y surv ≡ true → (x ≡ᵇ y) ≡ false
 elem-neq x y surv hx hy with x ≡ᵇ y in eqxy
 ... | false = refl
-... | true  = ⊥-elim (f≢t (trans (sym hx)
+... | true  = ⊥-elim (f≡t-absurd (trans (sym hx)
                 (trans (cong (λ z → elemℕ z surv) (≡ᵇ→≡ x y eqxy)) hy)))
 
 -- membership through keepAbsent, on the branch where x is not a survivor
@@ -369,15 +346,7 @@ nubLen-partition (x ∷ xs) B with elemℕ x B in eqB
 ...   | false = cong suc (nubLen-partition xs B)
 
 -- ── nubLen permutation-invariance (via same membership) ──
-∨-swap : ∀ (a b c : Bool) → (a ∨ (b ∨ c)) ≡ (b ∨ (a ∨ c))
-∨-swap a b c = trans (sym (∨-assoc a b c))
-                     (trans (cong (_∨ c) (∨-comm a b)) (∨-assoc b a c))
 
-≡ᵇ-sym : ∀ (a b : ℕ) → (a ≡ᵇ b) ≡ (b ≡ᵇ a)
-≡ᵇ-sym zero    zero    = refl
-≡ᵇ-sym zero    (suc b) = refl
-≡ᵇ-sym (suc a) zero    = refl
-≡ᵇ-sym (suc a) (suc b) = ≡ᵇ-sym a b
 
 elem-head : ∀ (y : NodeId) (ys : List NodeId) → elemℕ y (y ∷ ys) ≡ true
 elem-head y ys rewrite ≡ᵇ-refl y = refl
@@ -400,7 +369,7 @@ removeℕ-absent : ∀ (x : NodeId) (ys : List NodeId) →
   elemℕ x ys ≡ false → removeℕ x ys ≡ ys
 removeℕ-absent x []       h = refl
 removeℕ-absent x (y ∷ ys) h with x ≡ᵇ y in exy
-... | true  = ⊥-elim (f≢t (sym h))
+... | true  = ⊥-elim (f≡t-absurd (sym h))
 ... | false = cong (y ∷_) (removeℕ-absent x ys h)
 
 removeℕ-other : ∀ (x z : NodeId) (ys : List NodeId) → (z ≡ᵇ x) ≡ false →
@@ -421,11 +390,11 @@ elem-removeℕ-self x (y ∷ ys) with x ≡ᵇ y in exy
 
 nubLen-empty : ∀ (ys : List NodeId) → (∀ z → elemℕ z ys ≡ false) → nubLen ys ≡ 0
 nubLen-empty []       h = refl
-nubLen-empty (y ∷ ys) h = ⊥-elim (f≢t (trans (sym (h y)) (elem-head y ys)))
+nubLen-empty (y ∷ ys) h = ⊥-elim (f≡t-absurd (trans (sym (h y)) (elem-head y ys)))
 
 nubLen-remove : ∀ (x : NodeId) (ys : List NodeId) →
   elemℕ x ys ≡ true → nubLen ys ≡ suc (nubLen (removeℕ x ys))
-nubLen-remove x []       h = ⊥-elim (f≢t h)
+nubLen-remove x []       h = ⊥-elim (f≡t-absurd h)
 nubLen-remove x (y ∷ ys) h with x ≡ᵇ y in exy
 ... | true  with elemℕ y ys in eqYY
 ...   | true  = nubLen-remove x ys (trans (cong (λ w → elemℕ w ys) (≡ᵇ→≡ x y exy)) eqYY)

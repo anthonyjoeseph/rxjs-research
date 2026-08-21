@@ -15,6 +15,14 @@ open import Fixture.Wide using (dead-wide-a; dead-wide-b;
 open import Fixture.Live using (live-used; dead-beside-live)
 open import Fixture.Token using (T)
 
+-- A DEAD `module M` BESIDE A LIVE NAME, which is the fixpoint row: the report
+-- reads the bound name (`Dead-Mod`, keyword off) and a --fix that compares the
+-- raw item text instead matches nothing and keeps it.  Nothing errors -- the
+-- run says "fixed", the finding survives, and only a second run reveals it.
+-- Hence the selftest FIXES a copy and re-checks it, rather than trusting the
+-- word "fixed".
+open import Fixture.Mod using (module Dead-Mod; live-mod)
+
 -- THE BLANKET ROWS.  Neither has a `using` list, so each takes every name its
 -- module has and this file's real dependencies are written down nowhere.  Both
 -- must be reported BLANKET and neither DEAD: the use check cannot decide them
@@ -37,4 +45,4 @@ open import Fixture.BarePublic public
 -- `dead-in-comment-only` is discussed here and used nowhere.
 
 alive : Set
-alive = live-used T-rue
+alive = live-used T-rue live-mod

@@ -6,10 +6,8 @@ open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 
-open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff;
-                           complete; CloseReason; cutPending;
-                           EmitKind; subscribe; delivery; plumbing;
-                           InstEmit; _at_from_as_)
+open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; complete; cutPending; EmitKind;
+  subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 
 ------------------------------------------------------------------
 -- The protocol automaton: InstEmit's contract made explicit.

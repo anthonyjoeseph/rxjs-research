@@ -7,7 +7,7 @@ module CLI.Decode where
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; T)
 open import Data.Char using () renaming (toℕ to charToℕ)
 open import Data.Fin using (Fin; zero; suc; toℕ)
-open import Data.List using (List; []; _∷_; map; length)
+open import Data.List using (List; []; _∷_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -15,24 +15,20 @@ open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; toList) renaming (_++_ to _++ˢ_)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Vec using (Vec; lookup; fromList)
+open import Data.Unit using (tt)
+open import Data.Vec using (lookup; fromList)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEmit)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                          inputsBelowᵉ;
-                          Ctx; Val; Closed; Exp; Tm; Fn;
-                          input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          μᵉ; varᵉ; deferᵉ;
-                          varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
-                          inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                          add; sub; mul; eqᵖ; ltᵖ; notᵖ)
-open import Rx.Evaluator using (Slot; scripted; shared; Slots; evaluate)
+open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+  strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+open import Rx.Evaluator using (evaluate)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Implementation using (impl-batchSimultaneous)
-open import CLI.JSON
+open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
 open import CLI.Encode using (encodeStream; encodeBatched)
 
 ------------------------------------------------------------------------

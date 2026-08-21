@@ -4,7 +4,7 @@
 -- and towerℕ, the store predicate stBounded?, the descent order dBound,
 -- the hop measure hopD in full, the seed arithmetic (prod≤3pow,
 -- seed-covers, budget-covers), the size/fnCap/ofW analytics with their
--- ren/subΘ/elim laws, the state predicates INV? and widthOK?, and the
+-- ren/subΘ/elim laws, the state predicate INV?, and the
 -- retired ledger walk's ARITHMETIC (walkCap, anchorᴬ) kept solely to
 -- support the four machine-checked absurdity records that killed it.
 --
@@ -33,29 +33,14 @@
 -- The roadmap for the whole proof lives in Verify-Budget-Sufficient.agda.
 module Verify-Budget-Sufficient.Measures where
 
-open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; not;
-                                if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; _<_;
-                                _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl;
-                                       ≤-reflexive; <-≤-trans; ≤-pred;
-                                       +-suc; +-identityʳ;
-                                       +-comm; +-assoc; +-monoʳ-<;
-                                       +-monoˡ-<; +-monoˡ-≤;
-                                       *-monoˡ-≤; *-monoʳ-≤;
-                                       m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤;
-                                       *-suc; m≤m+n; m≤n+m; n≤1+n;
-                                       m≤n⇒m<n∨m≡n; +-mono-≤; m≤m*n;
-                                       ^-monoʳ-≤; *-assoc;
-                                       +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ;
-                                       *-distribʳ-+; *-distribˡ-+; *-identityʳ; <⇒≤;
-                                       ^-monoˡ-≤; ^-*-assoc;
-                                       ^-distribˡ-+-*; *-mono-≤;
-                                       +-monoʳ-≤; *-comm;
-                                       m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ;
-                                       suc-injective; <-irrefl; ≡ᵇ⇒≡;
-                                       ≤-antisym; m^n≢0; m^n>0)
-open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _<_; _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; ≤-pred; +-suc; +-identityʳ; +-comm; +-assoc;
+  +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤; *-suc; m≤m+n; m≤n+m; n≤1+n;
+  +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ; *-distribʳ-+;
+  *-distribˡ-+; *-identityʳ; ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; *-comm;
+  m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ; suc-injective; <-irrefl; ≤-antisym; m^n≢0; m^n>0)
+open import Data.Empty   using (⊥)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
@@ -79,74 +64,34 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
-open import Rx.Prim      using (Fuel; Tick; Id; Source; InstEmit;
-                                _at_from_as_; EmitKind; subscribe;
-                                InstEvent; init; value; close; handoff;
-                                complete; exhausted;
-                                Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad;
-                                Timed; after_,_; ObservableInput; hot; cold)
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete;
+  exhausted; Gas; g0; gs; gasDouble; gasPow2; gasTower; gasPad; Timed; after_,_;
+  ObservableInput; hot; cold; towerℕ)
 -- towerℕ is gasTower's ℕ shadow and lives beside it now that budgetAt's
 -- own height is a recurrence reading it; re-exported here because the
 -- whole budget stratum reads it through this module
-open import Rx.Prim      using (towerℕ) public
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData;
-                                inputsBelowᵉ;
-                                Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ;
-                                syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ;
-                                shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
-                                subΘExp; subΘTm; subΘTms;
-                                varIx;
-                                renExp; renTm; renTms; Ren∈; ext∈; ++Ren;
-                                wkExp; wkTm; reify;
-                                Exp; Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
-                                fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-                                strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-                                input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                                mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-                                exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-                                elimGExp; elimGTm; elimGTms;
-                                elimDExp; elimDTm; elimDTms;
-                                compare∈; _⊟_; ⊟-++ˡ; ⊟-++ʳ; unfoldμ;
-                                evalWith; evalTm; applyFn; lookupEnv)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ;
-                                 hopD-unfoldμ)
-open import Rx.Slot-Hop using (slotHop; slotHopD; ηAt)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; LiveSource;
-                                Slot; scripted; shared; resolve; mkHot;
-                                arrVal; scanVals; memberSource;
-                                slotSize; inputSize;
-                                RegId; Chain;
-                                NodeState; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                oneShotBurst; installNode; setNode; lookupNode;
-                                NodeId;
-                                root; share-sink; _↠_; Frame; AllOp;
-                                map-f; scan-f; take-f; from-inner;
-                                thru-outer; Stream;
-                                sched-init; st-init; sched-next;
-                                schedHeadOf; schedGo; schedEarlier;
-                                cascadeLatch; cascadeFinish; sweepLive;
-                                takeVals; takeDispatch; cutThrough; pathHasNode;
-                                dropSource; arrSource; chainsOf; cascadeGo;
-                                Path; arrTy;
-                                subscribeE; stepFrame; pushBurst;
-                                subscribeInner; chainStep; subscribeAll;
-                                mintNode; mintSource; mintOrdinal; register;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
-                                splitEvents; splitBurst; retagEvents;
-                                mergeBump; switchKill;
-                                thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
-                                sharedPlumb; sharedConnect; subscribeSharedSlot;
-                                burstCompleted;
-                                shareLatch; shareAdmit; shareFinish; shareGo;
-                                foldPath; dispatchShare; arrTick;
-                                aliveThroughᶠ;
-                                cascade; drain; evaluate;
-                                hasDry; dryEvent; sameSource;
-                                budgetAt; slotsSize; blowH; capsHgo; capsBase)
+open import Rx.Prim using (_at_from_as_; after_,_; close; cold; complete; exhausted; g0; Gas; gasDouble; gasPad;
+  gasPow2; gasTower; gs; handoff; hot; Id; init; InstEmit; InstEvent; ObservableInput; Source;
+  Tick; Timed; towerℕ; value)
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ; Ctx; Closed; Val; sizeᵉ; sizeᵗ;
+  sizeᵗˢ; sizeᵛ; syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
+  subΘExp; subΘTm; subΘTms; varIx; renExp; renTm; renTms; Ren∈; ext∈; ++Ren; wkTm; reify; Exp;
+  Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  add; sub; mul; eqᵖ; ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm;
+  elimDTms; compare∈; ⊟-++ˡ; ⊟-++ʳ; unfoldμ; evalWith; applyFn; lookupEnv)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
+open import Rx.Slot-Hop using (slotHop; ηAt)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; resolve; mkHot; scanVals; memberSource; RegId; Chain;
+  NodeState; scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st; installNode;
+  setNode; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
+  Stream; sched-next; schedHeadOf; schedGo; schedEarlier; cascadeFinish; sweepLive; takeVals;
+  cutThrough; pathHasNode; dropSource; Path; splitEvents; retagEvents; hasDry; dryEvent;
+  sameSource; capsHgo)
+open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
+open import Decide using (T-to; T⇒≡true; f≡t-absurd; ifEq; ifLe1; ifNeq; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
 -- dry-freeness composes over ++ (the other direction from
@@ -316,8 +261,6 @@ stBounded? B sched st =
 ∧-true true  b h = refl , h
 ∧-true false b ()
 
-∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → a ∧ b ≡ true
-∧-intro refl refl = refl
 
 schedHeadOf-bounded : ∀ {n} {Γ : Ctx n} (B : ℕ) (l : LiveSource Γ)
   {a : Arrival Γ} {l′ : LiveSource Γ} →
@@ -365,11 +308,6 @@ pop-bounded B sched st eq bnd
 -- eventual cascade dry proof composes, whatever its core shape
 ------------------------------------------------------------------
 
-T-to : ∀ {b : Bool} → b ≡ true → T b
-T-to refl = tt
-
-T⇒≡true : ∀ b → T b → b ≡ true
-T⇒≡true true _ = refl
 
 -- generic: two pointwise `all`s zip into an `all` of their combined
 -- predicate — the two-hypothesis sibling of all-impl below.  It LIVED in
@@ -393,12 +331,6 @@ all-impl p q imp (x ∷ xs) h
   with ∧-true (p x) (all p xs) h
 ... | px , pxs = ∧-intro (imp x px) (all-impl p q imp xs pxs)
 
-≤ᵇ-widen : ∀ (v : ℕ) {B B′ : ℕ} → B ≤ B′ → (v ≤ᵇ B) ≡ true → (v ≤ᵇ B′) ≡ true
-≤ᵇ-widen v {B} {B′} le h with ≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ v B (T-to h)) le)
-... | w = T-elim w
-  where
-  T-elim : ∀ {b : Bool} → T b → b ≡ true
-  T-elim {true} _ = refl
 
 boundedLive-widen : ∀ {n} {Γ : Ctx n} {B B′ : ℕ} → B ≤ B′ →
   (l : LiveSource Γ) → boundedLive B l ≡ true → boundedLive B′ l ≡ true
@@ -833,9 +765,6 @@ unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
 unconn-cons-≤ sl cs s =
   sum-tab-mono _ _ (unconnAt-cons-≤ sl cs s)
 
-f≡t-absurd : ∀ {A : Set} → false ≡ true → A
-f≡t-absurd ()
-
 -- unconn is ANTITONE in the connected set: connecting more can only
 -- lower the count.  Paired with subscribeE-connected-mono this is what
 -- carries unconn-insert's strict drop across the def's own walk, so the
@@ -1044,11 +973,6 @@ hopW^suc V =
 -- sizeᵉ e ≤ V already gives V ≥ 1, since every expression has size ≥ 1.
 
 -- the pm leaf is 0 or 1 either way
-ifLe1 : ∀ (a b : ℕ) → (if a ≡ᵇ b then 1 else 0) ≤ 1
-ifLe1 a b with a ≡ᵇ b
-... | true  = ≤-refl
-... | false = z≤n
-
 -- OPAQUE on purpose.  Everything below states bounds in terms of szB
 -- and never needs its definition; leaving it transparent makes Agda try
 -- to invert `^` to solve the monotonicity lemmas' implicit sizes, which
@@ -1550,7 +1474,7 @@ slotDef-size sl i {d} eq =
 -- one per link plus one for b — a headcount, not a margin.  The
 -- assembly below spends all of it and closes by `≤-reflexive`.
 --
--- PROBED 2026-08-14 (Demand-Probe series S), at the tightest legal
+-- PROBED-HISTORICAL 2026-08-14 (Demand-Probe series S), at the tightest legal
 -- budget V := slotsSize, which is the worst case since any larger V
 -- only inflates hopR:
 --   depth 1:  V = 16,  compound = 3^17 ≈ 2^27,   hopR exp 17^17 ≈ 8.3e20
@@ -2036,9 +1960,6 @@ dBound-bound {V} {R} {U} {r} {s} s≤V r≤R =
 module _ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (V : ℕ) where
 
 
-
-
-
 ------------------------------------------------------------------
 -- PHASE 3, THE ASSEMBLY: the emitted-value invariant's engine.
 --
@@ -2090,11 +2011,6 @@ varIx-++ʳ (u ∷ Θloc) (there x)   ()   | inj₁ y′
 varIx-++ʳ (u ∷ Θloc) (there x)   refl | inj₂ z′ = s≤s (varIx-++ʳ Θloc x eq′)
 
 -- the pm leaf at a position that is not the one being asked about
-ifNeq : ∀ (a b : ℕ) → (a ≡ b → ⊥) → (if a ≡ᵇ b then 1 else 0) ≡ 0
-ifNeq a b ne with a ≡ᵇ b in eq
-... | false = refl
-... | true  = ⊥-elim (ne (≡ᵇ⇒≡ a b (subst T (sym eq) tt)))
-
 -- pm of a RENAMED term is 0 at any index no variable is renamed onto.
 -- Stated over an arbitrary renaming rather than over wkTm directly, so
 -- the induction can pass under binders — where the index and the
@@ -2334,12 +2250,6 @@ varIx-ix (u ∷ Θloc) (there x)   refl | inj₂ z′ = cong suc (varIx-ix Θloc
 varIx<len : ∀ {t} {Θ : List Ty} (z : t ∈ Θ) → varIx z < length Θ
 varIx<len (here _)  = s≤s z≤n
 varIx<len (there p) = s≤s (varIx<len p)
-
-ifEq : ∀ (a b : ℕ) → a ≡ b → 1 ≤ (if a ≡ᵇ b then 1 else 0)
-ifEq a b e with a ≡ᵇ b in q
-... | true  = s≤s z≤n
-... | false = ⊥-elim (subst T q (≡⇒≡ᵇ a b e))
-
 
 -- (H0), PROVEN.  A coefficient is read at index 0 of the clause's own
 -- binder — a LOCAL index — and this says substitution leaves every
@@ -3239,7 +3149,6 @@ mutual
          (size-subΘᵗ V Θloc σ x hσ) (size-subΘᵗˢ V Θloc σ xs hσ)
 
 
-
 -- (G6) oneShotBurst emits only init / value / close-exhausted / complete —
 -- never close-dried — so its single emit is dry-free.  List induction over the
 -- value payload (each `value` rejects dryEvent) plus the literal heads.
@@ -3670,8 +3579,8 @@ applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
 --     adding one re-opens this core.)  So the width cap Ω (ofW,
 --     the max-shaped closure mirroring fnCap clause for clause,
 --     seeded ΩAt = program + slots) NEVER GROWS: it rides the walk
---     as Ψ does, with NO ledger position at all (widthOK? below —
---     flat, no existential).
+--     as Ψ does, with NO ledger position at all (widthOK?, flat and
+--     with no existential — DELETED 2026-08-21, record below).
 --
 --     THE ANCHOR: fold counts are now entry-anchored.  A list
 --     delivered to a frame is a concatenation of per-subscription
@@ -3720,14 +3629,15 @@ applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
 --     behavior-preserving, Unit-Test guards).
 --
 --     WHAT REMAINS is grind, not design: (a) the ofW invariance /
---     preservation mirrors (W10/W11 below — literal fnCap-grind
---     repeats); (b) STATED 2026-07-24: subscribeE-walk (below the
---     W11 block) is the JOINT FACE — the wet conjuncts with their
+--     preservation mirrors (W10/W11 — literal fnCap-grind repeats;
+--     W11 DELETED 2026-08-21, record below); (b) STATED 2026-07-24:
+--     subscribeE-walk is the JOINT FACE — the wet conjuncts with their
 --     receipt E′ ≤ E·3^(suc Ψ·walkCap), the dry half, and the
 --     length ledger (mintCount delta, burstLen, registered path
 --     lengths) in one hypothesis block under one ceiling; its
 --     clause grind extends the ground walkS clauses conjunct by
 --     conjunct, consuming W11 for hop targets and hasAtLeast-peel
+--     (BOTH RETIRED with the walk)
 --     against dBound-μ/-hop/-connect for the fuel; (c) RETIRED —
 --     the face's receipt anchors the spend a priori, so no
 --     lineage-indexed (or any per-fold) receipt is needed; (d) the
@@ -5185,17 +5095,7 @@ len-subΘTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
 len-subΘTms Θloc σ []       = refl
 len-subΘTms Θloc σ (y ∷ ys) = cong suc (len-subΘTms Θloc σ ys)
 
-len-elimGTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-  (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-  length (elimGTms x cl ts) ≡ length ts
-len-elimGTms x cl []       = refl
-len-elimGTms x cl (y ∷ ys) = cong suc (len-elimGTms x cl ys)
 
-len-elimDTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-  (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-  length (elimDTms x cl ts) ≡ length ts
-len-elimDTms x cl []       = refl
-len-elimDTms x cl (y ∷ ys) = cong suc (len-elimDTms x cl ys)
 
 -- ofW is renaming-invariant (mirror of fnCap-renᵉ/ᵗ/ᵗˢ)
 mutual
@@ -5336,147 +5236,6 @@ mutual
     ⊔-lub (ofW-subΘᵗ Ω Θloc σ y hσ (⊔ˡ (ofWᵗ y) (ofWᵗˢ ys) h))
           (ofW-subΘᵗˢ Ω Θloc σ ys hσ (⊔ʳ (ofWᵗ y) (ofWᵗˢ ys) h))
 
--- subst on the Δ-index of Exp is transparent to ofWᵉ (J on the equality)
-ofW-substᴱ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Δ′ Θ t} (p : Δ ≡ Δ′) (e : Exp Γ Δᵍ Δ Θ t) →
-  ofWᵉ (subst (λ ζ → Exp Γ Δᵍ ζ Θ t) p e) ≡ ofWᵉ e
-ofW-substᴱ refl e = refl
-
--- elimG/D keep every width ≤ host ⊔ closure (mirror of fnCap-elimG/D)
-mutual
-  ofW-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
-    ofWᵉ (elimGExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
-  ofW-elimG x cl (input i)       = z≤n
-  ofW-elimG x cl (ofᵉ ts)        =
-    ⊔-elim-help (length ts) (ofWᵗˢ ts) (ofWᵉ cl)
-                (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimGTms x cl ts))
-                       (m≤m⊔n (length ts) (ofWᵉ cl)))
-                (ofW-elimGᵗˢ x cl ts)
-  ofW-elimG x cl emptyᵉ          = z≤n
-  ofW-elimG x cl (mapᵉ f e)      =
-    ⊔-elim-help (ofWᵗ f) (ofWᵉ e) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl f) (ofW-elimG x cl e)
-  ofW-elimG x cl (takeᵉ c e)     =
-    ⊔-elim-help (ofWᵗ c) (ofWᵉ e) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl c) (ofW-elimG x cl e)
-  ofW-elimG x cl (scanᵉ f z e)   =
-    ⊔-elim-help (ofWᵗ f) ((ofWᵗ z) ⊔ (ofWᵉ e)) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl f)
-                (⊔-elim-help (ofWᵗ z) (ofWᵉ e) (ofWᵉ cl)
-                             (ofW-elimGᵗ x cl z) (ofW-elimG x cl e))
-  ofW-elimG x cl (mergeAllᵉ e)   = ofW-elimG x cl e
-  ofW-elimG x cl (concatAllᵉ e)  = ofW-elimG x cl e
-  ofW-elimG x cl (switchAllᵉ e)  = ofW-elimG x cl e
-  ofW-elimG x cl (exhaustAllᵉ e) = ofW-elimG x cl e
-  ofW-elimG x cl (μᵉ e)          = ofW-elimG (there x) cl e
-  ofW-elimG x cl (varᵉ y)        = z≤n
-  ofW-elimG x cl (deferᵉ e)      =
-    ≤-trans (≤-reflexive (ofW-substᴱ (⊟-++ˡ x) (elimDExp (∈-++⁺ˡ x) cl e)))
-            (ofW-elimD (∈-++⁺ˡ x) cl e)
-
-  ofW-elimD : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
-    ofWᵉ (elimDExp x cl e) ≤ ofWᵉ e ⊔ ofWᵉ cl
-  ofW-elimD x cl (input i)       = z≤n
-  ofW-elimD x cl (ofᵉ ts)        =
-    ⊔-elim-help (length ts) (ofWᵗˢ ts) (ofWᵉ cl)
-                (subst (_≤ length ts ⊔ ofWᵉ cl) (sym (len-elimDTms x cl ts))
-                       (m≤m⊔n (length ts) (ofWᵉ cl)))
-                (ofW-elimDᵗˢ x cl ts)
-  ofW-elimD x cl emptyᵉ          = z≤n
-  ofW-elimD x cl (mapᵉ f e)      =
-    ⊔-elim-help (ofWᵗ f) (ofWᵉ e) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl f) (ofW-elimD x cl e)
-  ofW-elimD x cl (takeᵉ c e)     =
-    ⊔-elim-help (ofWᵗ c) (ofWᵉ e) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl c) (ofW-elimD x cl e)
-  ofW-elimD x cl (scanᵉ f z e)   =
-    ⊔-elim-help (ofWᵗ f) ((ofWᵗ z) ⊔ (ofWᵉ e)) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl f)
-                (⊔-elim-help (ofWᵗ z) (ofWᵉ e) (ofWᵉ cl)
-                             (ofW-elimDᵗ x cl z) (ofW-elimD x cl e))
-  ofW-elimD x cl (mergeAllᵉ e)   = ofW-elimD x cl e
-  ofW-elimD x cl (concatAllᵉ e)  = ofW-elimD x cl e
-  ofW-elimD x cl (switchAllᵉ e)  = ofW-elimD x cl e
-  ofW-elimD x cl (exhaustAllᵉ e) = ofW-elimD x cl e
-  ofW-elimD x cl (μᵉ e)          = ofW-elimD x cl e
-  ofW-elimD x cl (varᵉ y)        with compare∈ x y
-  ... | inj₁ refl = ≤-reflexive (ofW-renᵉ (λ ()) (λ ()) (λ ()) cl)
-  ... | inj₂ y′   = z≤n
-  ofW-elimD {Δᵍ = Δᵍ} x cl (deferᵉ e) =
-    ≤-trans (≤-reflexive (ofW-substᴱ (⊟-++ʳ {Δᵍ = Δᵍ} x)
-                                    (elimDExp (∈-++⁺ʳ Δᵍ x) cl e)))
-            (ofW-elimD (∈-++⁺ʳ Δᵍ x) cl e)
-
-  ofW-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
-    ofWᵗ (elimGTm x cl tm) ≤ ofWᵗ tm ⊔ ofWᵉ cl
-  ofW-elimGᵗ x cl (varᵗ y)      = z≤n
-  ofW-elimGᵗ x cl unit̂          = z≤n
-  ofW-elimGᵗ x cl (bool̂ _)      = z≤n
-  ofW-elimGᵗ x cl (nat̂ _)       = z≤n
-  ofW-elimGᵗ x cl (pairᵗ a b)   =
-    ⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b)
-  ofW-elimGᵗ x cl (fstᵗ p)      = ofW-elimGᵗ x cl p
-  ofW-elimGᵗ x cl (sndᵗ p)      = ofW-elimGᵗ x cl p
-  ofW-elimGᵗ x cl (inlᵗ a)      = ofW-elimGᵗ x cl a
-  ofW-elimGᵗ x cl (inrᵗ a)      = ofW-elimGᵗ x cl a
-  ofW-elimGᵗ x cl (caseᵗ s l r) =
-    ⊔-elim-help (ofWᵗ s) ((ofWᵗ l) ⊔ (ofWᵗ r)) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl s)
-                (⊔-elim-help (ofWᵗ l) (ofWᵗ r) (ofWᵉ cl)
-                             (ofW-elimGᵗ x cl l) (ofW-elimGᵗ x cl r))
-  ofW-elimGᵗ x cl (ifᵗ c a b)   =
-    ⊔-elim-help (ofWᵗ c) ((ofWᵗ a) ⊔ (ofWᵗ b)) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl c)
-                (⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
-                             (ofW-elimGᵗ x cl a) (ofW-elimGᵗ x cl b))
-  ofW-elimGᵗ x cl (primᵗ _ a)   = ofW-elimGᵗ x cl a
-  ofW-elimGᵗ x cl (strmᵗ e)     = ofW-elimG x cl e
-
-  ofW-elimDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-    (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u) →
-    ofWᵗ (elimDTm x cl tm) ≤ ofWᵗ tm ⊔ ofWᵉ cl
-  ofW-elimDᵗ x cl (varᵗ y)      = z≤n
-  ofW-elimDᵗ x cl unit̂          = z≤n
-  ofW-elimDᵗ x cl (bool̂ _)      = z≤n
-  ofW-elimDᵗ x cl (nat̂ _)       = z≤n
-  ofW-elimDᵗ x cl (pairᵗ a b)   =
-    ⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b)
-  ofW-elimDᵗ x cl (fstᵗ p)      = ofW-elimDᵗ x cl p
-  ofW-elimDᵗ x cl (sndᵗ p)      = ofW-elimDᵗ x cl p
-  ofW-elimDᵗ x cl (inlᵗ a)      = ofW-elimDᵗ x cl a
-  ofW-elimDᵗ x cl (inrᵗ a)      = ofW-elimDᵗ x cl a
-  ofW-elimDᵗ x cl (caseᵗ s l r) =
-    ⊔-elim-help (ofWᵗ s) ((ofWᵗ l) ⊔ (ofWᵗ r)) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl s)
-                (⊔-elim-help (ofWᵗ l) (ofWᵗ r) (ofWᵉ cl)
-                             (ofW-elimDᵗ x cl l) (ofW-elimDᵗ x cl r))
-  ofW-elimDᵗ x cl (ifᵗ c a b)   =
-    ⊔-elim-help (ofWᵗ c) ((ofWᵗ a) ⊔ (ofWᵗ b)) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl c)
-                (⊔-elim-help (ofWᵗ a) (ofWᵗ b) (ofWᵉ cl)
-                             (ofW-elimDᵗ x cl a) (ofW-elimDᵗ x cl b))
-  ofW-elimDᵗ x cl (primᵗ _ a)   = ofW-elimDᵗ x cl a
-  ofW-elimDᵗ x cl (strmᵗ e)     = ofW-elimD x cl e
-
-  ofW-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    ofWᵗˢ (elimGTms x cl ts) ≤ ofWᵗˢ ts ⊔ ofWᵉ cl
-  ofW-elimGᵗˢ x cl []       = z≤n
-  ofW-elimGᵗˢ x cl (y ∷ ys) =
-    ⊔-elim-help (ofWᵗ y) (ofWᵗˢ ys) (ofWᵉ cl)
-                (ofW-elimGᵗ x cl y) (ofW-elimGᵗˢ x cl ys)
-
-  ofW-elimDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    ofWᵗˢ (elimDTms x cl ts) ≤ ofWᵗˢ ts ⊔ ofWᵉ cl
-  ofW-elimDᵗˢ x cl []       = z≤n
-  ofW-elimDᵗˢ x cl (y ∷ ys) =
-    ⊔-elim-help (ofWᵗ y) (ofWᵗˢ ys) (ofWᵉ cl)
-                (ofW-elimDᵗ x cl y) (ofW-elimDᵗˢ x cl ys)
 
 -- eval never widens: every of-list in the result comes from the
 -- template's strm-subtrees (subΘ'd) or the environment
@@ -5518,125 +5277,27 @@ ofW-evalWith Ω (primᵗ notᵖ arg) env hσ h = z≤n
 ofW-evalWith Ω (strmᵗ e) []ᵃ       hσ h = h
 ofW-evalWith Ω (strmᵗ e) (v ∷ᵃ vs) hσ h = ofW-subΘᵉ Ω [] (v ∷ᵃ vs) e hσ h
 
--- machine faces, mirroring fnCapLive / fnCapNode / frameB? /
--- pathB? / regsB? with the flat cap Ω
-ofWLive : ∀ {n} {Γ : Ctx n} → ℕ → LiveSource Γ → Bool
-ofWLive Ω l =
-  all (λ tv → ofWᵛ (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ Ω)
-      (LiveSource.pending l)
-
-ofWNode : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
-ofWNode Ω (scan-st {t} v)   = ofWᵛ t v ≤ᵇ Ω
-ofWNode Ω (concat-st q _ _) = all (λ o → ofWᵉ o ≤ᵇ Ω) q
-ofWNode Ω (take-st _)       = true
-ofWNode Ω (merge-st _ _)    = true
-ofWNode Ω (switch-st _ _)   = true
-ofWNode Ω (exhaust-st _ _)  = true
-
-frameΩ? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
-frameΩ? Ω (map-f fn)         = ofWᵗ fn ≤ᵇ Ω
-frameΩ? Ω (scan-f fn _)      = ofWᵗ fn ≤ᵇ Ω
-frameΩ? Ω (take-f _)         = true
-frameΩ? Ω (from-inner _ _ _) = true
-frameΩ? Ω (thru-outer _ _)   = true
-
-pathΩ? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-pathΩ? Ω root           = true
-pathΩ? Ω (share-sink i) = true
-pathΩ? Ω (f ↠ p)        = frameΩ? Ω f ∧ pathΩ? Ω p
-
-regsΩ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
-       → List (RegId × Source × Chain Γ t) → Bool
-regsΩ? Ω = all (λ en → pathΩ? Ω (proj₂ (proj₂ (proj₂ en))))
-
--- the Ω seed: program plus slots, a sum dominating the max —
--- shaped exactly like ΨAt
-inputOfW : ∀ {n} {Γ : Ctx n} {t : Ty} → ObservableInput (Val Γ t) → ℕ
-inputOfW {t = t} (hot async) =
-  sum (map (λ tv → ofWᵛ t (Timed.val tv)) async)
-inputOfW {t = t} (cold sync async) =
-  sum (map (ofWᵛ t) sync)
-  + sum (map (λ tv → ofWᵛ t (Timed.val tv)) async)
-
-slotOfW : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
-slotOfW (scripted i) = inputOfW i
-slotOfW (shared d)   = ofWᵉ d
-
-slotsOfW : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsOfW sl = sum (tabulate λ i → slotOfW (sl i))
-
--- THE FLAT WIDTH INVARIANT: every width in the machine ≤ Ω —
--- stores, node states, registered frames, and the (never-changing)
--- slots.  No ledger position: Ω is a constant of the whole run.
-widthOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-         → ℕ → Sched Γ → EvalSt e → Bool
-widthOK? Ω sched st =
-  all (ofWLive Ω) (Sched.live sched)
-  ∧ all (λ kv → ofWNode Ω (proj₂ kv)) (EvalSt.nodes st)
-  ∧ regsΩ? Ω (EvalSt.registry st)
-  ∧ (slotsOfW (Sched.slots sched) ≤ᵇ Ω)
-
-eventΩ? : ∀ {n} {Γ : Ctx n} {u} → ℕ → InstEvent (Val Γ u) → Bool
-eventΩ? {u = u} Ω (value v) = ofWᵛ u v ≤ᵇ Ω
-eventΩ? Ω (init _)    = true
-eventΩ? Ω (close _ _) = true
-eventΩ? Ω (handoff _) = true
-eventΩ? Ω complete    = true
-
-burstΩ? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ u → Bool
-burstΩ? Ω = all (λ em → all (eventΩ? Ω) (InstEmit.events em))
 
 ------------------------------------------------------------------
--- (W11) THE WIDTH WALK — PROVEN (2026-07-25), below.  Ω is flat, so
--- every statement is pure preservation: no existential, no receipt,
--- no widening.  The clique lives at the bottom of the file:
+-- DELETED (2026-08-21): (W11) THE WIDTH WALK, and its whole cone —
+-- the Ω state predicates (widthOK? / pathΩ? / frameΩ? / eventΩ? /
+-- burstΩ? / regsΩ? / ofWLive / ofWNode / slotOfW / slotsOfW), the
+-- ofW elimG/elimD laws, and the 61 preservation lemmas that stood
+-- over them in .Wet/Part3 (W11-A/B), .Wet/Part4 and .Wet/Part5.
+-- 1820 lines, all PROVEN, with ZERO consumers: the joint face that
+-- read the width conjuncts was the ledger walk, retired 2026-08-13,
+-- and the collapsed walk (.Walk-Level) carries width as `dWᵉ ≤ cWid`
+-- on the caps side instead.  It reached Main only through a `public`
+-- re-export in .Wet/Part6, which is what made a self-consuming
+-- mutual cluster read as wired.
 --
---   subscribeE-width ← subscribeAll-width, pushBurst-width,
---                      subscribeE-input-width (→ sharedSlot /
---                      sharedConnect-width), subscribeE-defer-width
---   stepFrame-width  ← the five frames, as stepFrame-wet:
---                      map (map-applyFn-Ω off ofW-evalWith),
---                      scan (scanVals-ofW), take (takeVals-Ω,
---                      cutThrough-regsΩ/-closesΩ), thru-outer
---                      (thruConsume/thruWalk/thruWrap-width),
---                      from-inner (concatDrain/innerFinish-width)
---   cascadeGo-width  ← chainStep-width ← foldPath-width ←
---                      dispatchShare-width ← shareGo-width
---
--- over the flat state lemmas (W11-A) mirroring install-INV /
--- register-INV / addLive-INV / latch-INV / shareFinish-INV.
--- widthOK? has FOUR conjuncts (live, nodes, registry, slots) against
--- INV?'s six: no length rider, so register-width pays no ledger edge
--- at all where register-INV pays a ×2.  The ONE width mint in the
--- machine is ofᵉ, and it mints exactly its own list, which the entry
--- seed ΩAt already dominates — that is why the walk needs no running
--- position where the size ledger needs capᴱ.
---
--- The joint face that consumed this (its widthOK? / ofWᵉ / pathΩ?
--- conjuncts, where the width bound fed the hop targets' rank drops)
--- was the ledger walk, RETIRED 2026-08-13 — see the module header.
--- widthOK? survives for the wet family; the Ω TRIO does not, because
--- Ω fed only walkCap's base and the collapsed walk (.Walk-Level)
--- carries width as `dWᵉ ≤ cWid` on the caps side instead.
---
--- WORTH TRYING, LATER: fnCapᵉ and ofWᵉ differ in only two clauses —
--- ofᵉ mints a width (`length ts ⊔ …`) where fnCap does not, and
--- fnCap pairs each fn with its caseWᵗ.  Otherwise they are the same
--- recursion, and the fnCap half of INV? has the same four-conjunct
--- shape as widthOK?.  A module parameterised over the measure would
--- collapse this walk and the proven fnCap half into one.
---
--- DECIDED 2026-07-25: NOT then — W11 was ground as a direct mirror
--- instead.  The fnCap half is not a freestanding artifact (it lives
--- as conjuncts inside subscribeE-walkS's clause induction and the
--- wet clique), the joint face also states INV?, and the two measures
--- differ per clause, so the abstraction needs hooks and is not free.
--- Restructuring INV? mid-proof would churn both at once, and an
--- abstraction that turned out unclean halfway would leave INV?
--- half-refactored — the worst outcome.  REVISIT at end-of-proof
--- cleanup, once Formal-Verification is discharged and nothing is in
--- flux: the two walks are now both proven, so the merge would be a
--- pure deduplication with no open risk.
+-- The ofW MEASURES stay, and that is the check that this was a
+-- superseded predecessor rather than a missing wire: `ofWᵉ` is spent
+-- by .Walk-Level (the successor) and `ofWᵛ` by Rx.Frame-Width, so
+-- what died is the retired walk's PROOFS over the vocabulary, not
+-- the vocabulary.  RECOVERY: `git log --diff-filter=D --
+-- agda/src/Verify-Budget-Sufficient/Wet/Part5.agda` finds the commit;
+-- it also carries what each lemma established.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -5665,19 +5326,4 @@ regsLen? ℓ = all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ �
 -- checked by `make refuted`.  What they establish: a single shared
 -- anchor cannot serve the demand, the s′ reset and the receipt ceiling
 -- at once, and a d-indexed anchor is impossible outright.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -33,6 +33,9 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `wiring-selftest` | [wiring.md](wiring.md) | ship a wiring checker that has stopped firing |
 | `wiring-gate` | [wiring.md](wiring.md) | leave a definition, postulate or module with no route to Main |
 | `wiring-refuted` | [wiring.md](wiring.md) | leave a refutation `Refuted.Main` does not claim |
+| `wiring-probed` | [evidence.md](evidence.md) | leave a probe `Probed.Main` does not claim |
+| `evidence-selftest` | [evidence.md](evidence.md) | ship an evidence checker that has stopped firing |
+| `evidence-check` | [evidence.md](evidence.md) | let proof code depend on a probe or a refutation, or keep a probe whose target is discharged |
 | `unsafe-check` | [unsafe-check.md](unsafe-check.md) | slip an unsafe pragma onto the proof path |
 | `dup-selftest` | [find.md](find.md) | ship a duplicate checker that has stopped firing |
 | `dup-check` | [find.md](find.md) | prove the same fact twice under two names |
@@ -42,7 +45,8 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `dev-changed-selftest` | [gate.md](gate.md) | ship a light gate that passes while checking nothing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
 | `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
-| `refuted` | [wiring.md](wiring.md) | land a refutation that does not typecheck |
+| `refuted` | [evidence.md](evidence.md) | land a refutation that does not typecheck |
+| `probed` | [evidence.md](evidence.md) | land a probe that does not typecheck |
 | `bug-cache` | [bug-cache.md](bug-cache.md) | regress a known impl counterexample |
 
 ## The rest
@@ -58,3 +62,4 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [harness.md](harness.md) | `make harness` — the compiled calculator, and why its numbers prove nothing |
 | [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
+| [evidence.md](evidence.md) | `agda/evidence/` — the library boundary that makes a `src` import of a probe or a refutation unresolvable, and how a probe expires |

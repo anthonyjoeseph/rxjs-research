@@ -20,7 +20,8 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; is
                                 inputsBelowᵉ;
                                 input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 concatAllᵉ; exhaustAllᵉ; evalTm; applyFn)
-open import Rx.Evaluator using (Slot; scripted; shared; Slots; evaluate)
+open import Rx.Evaluator using (evaluate)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Data.Bool using (T)
 open import Spec         using (spec-batchSimultaneous; valuesOf)
 

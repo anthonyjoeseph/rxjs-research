@@ -30,29 +30,41 @@
 
 module Verify-Budget-Sufficient.Psi-Split where
 
-open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∧_; _∨_; not)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_; _⊔_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; ≤-reflexive; *-identityʳ; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⊔m;
-         m≤m⊔n; n≤1+n)
-open import Data.List    using (List; []; _∷_; _++_; map; length)
-open import Data.Bool.ListAction using (all; any)
+  using (≤⇒≤ᵇ; ≤ᵇ⇒≤)
+open import Data.List    using (List; []; _∷_; map; length)
+open import Data.Bool.ListAction using (all)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Unit    using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent;
-                           value; init; close; handoff; complete;
-                           CloseReason; cut; cutPending; exhausted; dried;
-                           gasPad; gasTower; towerℕ;
-                           InstEmit; _at_from_as_; EmitKind; delivery)
-open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; applyFn; _×ᵗ_; _≟ᵗ_; sizeᵉ; syncSizeᵉ;
-                          sizeᵗ; sizeᵛ)
-open import Rx.Evaluator
-open import Verify-Budget-Sufficient.Caps-Face
+open import Rx.Prim using (Source; InstEvent; value; init; close; handoff; complete; InstEmit)
+open import Rx.Exp  using (Ty; Ctx; Closed; Val; sizeᵛ)
+open import Rx.Evaluator using (_↠_; Chain; EvalSt; Frame; from-inner;
+                                lookupNode; map-f; NodeId; NodeState; Path;
+                                RegId; retagEvents; root; scan-f; Sched;
+                                share-sink; splitEvents; Stream; take-f;
+                                thru-outer)
+open import Rx.Slots using (Slots; slotsSize)
+open import Verify-Budget-Sufficient.Measures using
+  (all-impl; all-zip; burstB?; caseWᵗ;
+                                                      eventB?; fnCapBounded?; fnCapNode;
+                                                      fnCapᵗ; fnCapᵛ; frameB?; INV-parts;
+                                                      INV?; pathB?; pathLen; regsB?;
+                                                      regsB?-widen; slotsFnCap; stBounded?;
+                                                      ∧-true)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (burstCaps?; eventCaps?; frameSz?; pathSz?; regsSz?)
+open import Verify-Budget-Sufficient.Delivery-Walk using
+  (chP?; regP?)
+open import Verify-Budget-Sufficient.Caps using
+  (Caps)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 valΨ? : ∀ {n} {Γ : Ctx n} → ℕ → (u : Ty) → Val Γ u → Bool
 valΨ? Ψ u v = fnCapᵛ u v ≤ᵇ Ψ

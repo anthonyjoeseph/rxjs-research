@@ -20,7 +20,7 @@ THE ESCALATION TRIGGERS, all three mechanical:
     This is the case the dev loop is documented to lie about, and it is the
     only case the user's rule cares about.
   · a changed file is NOT dev-checkable at all — anything under
-    `agda/refuted`, which has its own root and its own target.
+    `agda/evidence/refuted`, which has its own root and its own target.
   · DRIFT: too many commits since the last green heavy gate.  A light gate is
     a bet that the consumers still typecheck, and a long run of unchecked bets
     is exactly how a tree gets far down a wrong road cheaply.

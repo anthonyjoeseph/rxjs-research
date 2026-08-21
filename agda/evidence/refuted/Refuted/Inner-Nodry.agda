@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE INNER-NODRY INV? ASSEMBLY, as stated, is FALSE.
 --
--- REFUTATION: machine-checked `… → ⊥`.  See REFUTATION.md for why this
+-- REFUTATION: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE` notes.
 --
 -- WHAT IS WRONG.  `subscribeE-inner-nodry-inv` claims INV? at the inner

@@ -34,9 +34,9 @@ open import Data.Fin  using (Fin; toℕ)
 open import Data.Bool using (T; true; false; if_then_else_)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; trans; cong; sym; subst)
+  using (_≡_; trans; cong; sym; subst)
 
-open import Rx.Exp       using (Ctx; Exp; Closed; inputsBelowᵉ; isData; Val)
+open import Rx.Exp       using (Ctx; Closed; inputsBelowᵉ; isData; Val)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Prim      using (ObservableInput)
 open import Rx.Hop-Depth using (hopDᵉ)

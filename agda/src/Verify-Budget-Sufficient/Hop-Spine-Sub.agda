@@ -22,8 +22,8 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Hop-Spine-Sub where
 
-open import Data.Bool using (Bool; true; false; _∧_)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<_; s≤s; z≤n)
+open import Data.Bool using (Bool; true; _∧_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; 1+n≰n; ≤-refl; ≤-reflexive; ≤-total;
                                        ^-monoʳ-≤; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
                                        +-mono-≤; +-monoˡ-≤; +-monoʳ-≤;
@@ -56,11 +56,11 @@ open import Rx.Exp using (Ty; Ctx; Val; Tm; Exp; Ren∈; ext∈;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; hopDᵗˢ; pmᵗ; pmᵉ; pmᵗˢ)
-open import Rx.Hop-Spine using (spnᵉ; spnᵗ; spnᵗˢ; spnᵛ)
-open import Verify-Budget-Sufficient.Measures using (∧-true; ∧-intro; T-to; T⇒≡true;
-                                                     1*≤; hopD-wkReify;
-                                                     pm-subΘᵗ; varIx-ix; ifEq)
+open import Rx.Hop-Spine using (spnᵉ; spnᵗ; spnᵗˢ)
+open import Verify-Budget-Sufficient.Measures using (∧-true; 1*≤; hopD-wkReify; pm-subΘᵗ;
+                                                    varIx-ix)
 open import Verify-Budget-Sufficient.Hop-Spine-Face using (valHopSpn?; B≤powB)
+open import Decide using (T-to; T⇒≡true; ifEq; ∧-intro)
 
 ------------------------------------------------------------------
 -- THE ARITHMETIC, and it is one fact.  Every multiplying clause needs

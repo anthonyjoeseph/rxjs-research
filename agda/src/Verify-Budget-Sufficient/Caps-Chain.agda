@@ -54,7 +54,7 @@ open import Data.Nat.Properties
          +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; *-suc; n≤1+n;
          m≤m+n; m≤n+m; m≤m*n)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; subst)
+  using (_≡_; sym; trans; cong; subst)
 
 open import Rx.Evaluator
   using (sizeAt; widAt; fCharge; fLvl;

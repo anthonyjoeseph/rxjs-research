@@ -20,84 +20,48 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part2 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not; T)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_; _∸_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ≤-pred; m≤n+m; 1+n≰n; ≤⇒≤ᵇ; ≤ᵇ⇒≤; +-suc; +-comm; +-assoc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
+open import Data.Nat     using (suc; _≤_; z≤n; _≡ᵇ_; _<ᵇ_; _+_)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Data.Unit    using (⊤; tt)
-open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Unit    using (⊤)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; subst)
 
-open import Relation.Nullary using (Dec; yes; no)
+open import Relation.Nullary using (yes; no)
 
 -- from .Caps-Bridge, not from the top module: the top module is the
 -- active caps grind, and importing it here would put this file on that
 -- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
 -- not change, only which module proves it, so nothing else here needed
 -- to move with it.
-open import Rx.Prim      using (Fuel; Gas; g0; gs; Tick; Id; Source; Ordinal; InstEmit;
-                                hot; cold;
-                                InstEvent; init; value; close; handoff; complete;
-                                EmitKind; delivery; subscribe; plumbing; CloseReason; exhausted;
-                                dried;
-                                cut; cutPending; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; Fn; obs; applyFn; mapᵉ;
-                                unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Tm; scanᵉ; takeᵉ; evalTm;
-                                input; ofᵉ; emptyᵉ; varᵉ; deferᵉ; mergeAllᵉ; concatAllᵉ;
-                                switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Slots; Slot; scripted; shared; Stream;
-                                RegId; Chain; Path; root; share-sink; _↠_; Frame;
-                                map-f; scan-f; take-f; from-inner; thru-outer; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; aliveThroughᶠ;
-                                takeVals; takeDispatch; cutThrough; setNode; pathHasNode; memberSource;
-                                NodeId; NodeState; lookupNode; scan-st; take-st; merge-st;
-                                concat-st; switch-st; exhaust-st;
-                                sched-init; st-init; sched-next; LiveSource;
-                                schedGo; schedHeadOf; schedFinish; schedEarlier;
-                                arrTy; arrSource; arrVal; arrTick;
-                                chainsOf; chainsGo; chainStep;
-                                foldPath; dispatchShare; stepFrame;
-                                cascadeLatch; cascadeGo; cascadeFinish;
-                                subscribeE; cascade; drain; evaluate;
-                                oneShotBurst; mintSource; register; splitEvents;
-                                pushBurst; scanVals; installNode; mintNode; retagEvents;
-                                sameSource; dryEvent; hasDry;
-                                dropSource; sweepLive; budgetAt)
-open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init;
-                                stepProtocol; runProtocol; paidUp; settle; hasOwed;
-                                payOwed; paidOff; applyEvents; removeOne;
-                                cancelOwed; bumpOwed; settleInstant;
-                                checkFinal; Accepted; accepted; WellFormed;
-                                hasValue; valsLast?)
+open import Rx.Prim      using (Gas; Tick; Id; Source; hot; cold; InstEvent; init; value; close; complete; subscribe;
+  exhausted; _at_from_as_)
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; cutThrough; pathHasNode; memberSource; NodeId;
+  sched-init; st-init; sched-next; LiveSource; schedGo; schedHeadOf; schedEarlier; arrTy;
+  arrSource; chainsOf; chainsGo; cascadeFinish; subscribeE; oneShotBurst; mintSource;
+  sameSource; dropSource; sweepLive)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
+open import Rx.Protocol  using (ProtocolSt; Owed; countIn; protocol-init; stepProtocol; runProtocol; applyEvents;
+  settleInstant)
 
 ------------------------------------------------------------------
 -- glue: runProtocol distributes over ++, and a fully-paid final
 -- state is accepted
 ------------------------------------------------------------------
 
-open import Verify-Well-Formed.Part1 public
+open import Verify-Well-Formed.Part1 using (allShareSunk; cachesValid; countRegs; liveTypeOK?;
+                                           regTyped?; sameTy)
+open import Decide using (true≢false; ∧-intro; ∧-trueʳ; ∧-trueˡ; ∨-trueʳ; ≡ᵇ-refl; ≡ᵇ→≡;
+                          ≤ᵇ-true)
 
-∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
-∧-trueˡ {true} _ = refl
-
-∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
-∧-trueʳ {true} h = h
-
-∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
-∧-intro refl refl = refl
-
-if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
-if-false b eq rewrite eq = refl
-
-if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
-if-true b eq rewrite eq = refl
 
 sameTy-sound : ∀ (a b : Ty) → sameTy a b ≡ true → a ≡ b
 sameTy-sound a b h with a ≟ᵗ b
@@ -121,10 +85,6 @@ liveHas : ∀ {n} {Γ : Ctx n} → Source → Ty → List (LiveSource Γ) → Bo
 liveHas s τ []       = false
 liveHas s τ (l ∷ ls) =
   ((LiveSource.source l ≡ᵇ s) ∧ sameTy τ (LiveSource.elemTy l)) ∨ liveHas s τ ls
-
-∨-trueʳ : ∀ (x : Bool) → (x ∨ true) ≡ true
-∨-trueʳ false = refl
-∨-trueʳ true  = refl
 
 -- the arrival schedGo pops is one of the live sources it drew from
 schedGo-mem : ∀ {n} {Γ : Ctx n} (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
@@ -484,10 +444,6 @@ burst-init e ins = record
 -- base clauses of subscribeE-wf must exhibit.
 
 -- a ≤ b reflected as the Bool the protocol's freshness guard tests
-≤ᵇ-true : ∀ (a b : ℕ) → a ≤ b → (a ≤ᵇ b) ≡ true
-≤ᵇ-true a b p with a ≤ᵇ b | ≤⇒≤ᵇ p
-... | true | _ = refl
-
 -- settleInstant on an absent instant just publishes the horizon (its
 -- own current-match must be discharged separately from stepProtocol's)
 settleInstant-nothing : (S : ProtocolSt) → ProtocolSt.current S ≡ nothing →
