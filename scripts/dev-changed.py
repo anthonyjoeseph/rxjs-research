@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""The CHANGED-SET dev sweep, and the decision of whether the full gate is owed.
+
+`make agda` costs many minutes and re-proves the whole tower.  Most edits
+cannot possibly need it: `make agda-dev` emits a module with no multi-member
+mutual block VERBATIM, so for such a module the dev check IS a real check, and
+the only thing the full build adds is the consumers.
+
+So this script does two jobs, and the SECOND is the one that matters:
+
+  1. dev-check every .agda this working tree has changed under `agda/src`.
+  2. decide, mechanically, whether `make agda` is still owed — and FAIL if it
+     is, so `make gate-light` cannot be used where it is not valid.
+
+THE ESCALATION TRIGGERS, all three mechanical:
+
+  · a changed module HAS a multi-member mutual block.  There, agda-dev stubs
+    the block, termination of the real mutual recursion is not checked, and
+    postulates do not reduce — a bad measure passes dev and fails the gate.
+    This is the case the dev loop is documented to lie about, and it is the
+    only case the user's rule cares about.
+  · a changed file is NOT dev-checkable at all — anything under
+    `agda/refuted`, which has its own root and its own target.
+  · DRIFT: too many commits since the last green `make gate`.  A light gate is
+    a bet that the consumers still typecheck, and a long run of unchecked bets
+    is exactly how a tree gets far down a wrong road cheaply.
+
+WHAT THE LIGHT GATE DOES NOT CHECK, stated because a silent gap is worse than
+a slow build: the changed module's CONSUMERS.  A signature edit that its own
+file accepts can break every importer, and only the full build sees that.  The
+reverse-dependency cone is REPORTED here by name and count so the size of the
+bet is visible; pass --deps to dev-check it too.
+"""
+import argparse
+import importlib.util
+import os
+import re
+import subprocess
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join("agda", "src")
+STAMP = os.path.join(REPO, ".gate-full-stamp")
+MULTI = re.compile(r"^\s*\d+ blocks?, (\d+) multi-member", re.M)
+
+
+# WHY A CEILING ON THE CHANGED SET: the light gate wins by checking ONE module
+# instead of the tower.  It stops winning when the changed set grows -- N dev
+# checks run sequentially, each rebuilding its own cone, and the full build
+# buys the whole tower for roughly the same money.  `--max-files` is where that
+# crossover is drawn, and past it the tool escalates rather than grinding.
+def _load(name: str):
+    """Import a sibling script, so the two tools cannot drift apart."""
+    path = os.path.join(REPO, "scripts", name + ".py")
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def git(*args) -> str:
+    return subprocess.run(("git",) + args, cwd=REPO, capture_output=True,
+                          text=True).stdout
+
+
+def changed_files() -> list[str]:
+    """Every .agda this tree has touched relative to HEAD, tracked or not."""
+    out = set()
+    for line in git("diff", "--name-only", "HEAD", "--",
+                    "agda").split("\n"):
+        if line.strip().endswith(".agda"):
+            out.add(line.strip())
+    for line in git("status", "--porcelain", "--", "agda").split("\n"):
+        if line.startswith("?? "):
+            p = line[3:].strip()
+            if p.endswith(".agda"):
+                out.add(p)
+            elif p.endswith(os.sep):
+                for root, _, fs in os.walk(os.path.join(REPO, p)):
+                    for f in fs:
+                        if f.endswith(".agda"):
+                            out.add(os.path.relpath(
+                                os.path.join(root, f), REPO))
+    return sorted(out)
+
+
+def multi_member(rel_src: str) -> int | None:
+    """How many multi-member mutual blocks, via the free --list pass."""
+    pr = subprocess.run([sys.executable,
+                         os.path.join(REPO, "scripts", "agda-dev.py"),
+                         "--list", rel_src],
+                        cwd=REPO, capture_output=True, text=True)
+    m = MULTI.search(pr.stdout + pr.stderr)
+    return int(m.group(1)) if m else None
+
+
+def dev_check(rel_src: str, budget: str) -> tuple[int, str]:
+    pr = subprocess.run([sys.executable,
+                         os.path.join(REPO, "scripts", "agda-dev.py"),
+                         "--budget", budget, rel_src],
+                        cwd=REPO, capture_output=True, text=True)
+    return pr.returncode, pr.stdout + pr.stderr
+
+
+def consumers(mods: set[str]) -> set[str]:
+    """Every module that transitively imports one of `mods` — the unchecked bet."""
+    ci = _load("check-imports")
+    ci.TREES = list(ci.CLAIM_ROOT)
+    files = []
+    for tree in ci.TREES:
+        for root, _, fs in os.walk(os.path.join(REPO, tree)):
+            for f in fs:
+                if f.endswith(".agda"):
+                    files.append(os.path.relpath(
+                        os.path.join(root, f), REPO))
+    graph = ci.import_graph(files)
+    rev: dict = {}
+    for src, dsts in graph.items():
+        for d in dsts:
+            rev.setdefault(d, set()).add(src)
+    seen, stack = set(), list(mods)
+    while stack:
+        m = stack.pop()
+        for up in rev.get(m, ()):
+            if up not in seen:
+                seen.add(up)
+                stack.append(up)
+    return seen - mods
+
+
+def commits_since_full() -> int | None:
+    if not os.path.exists(STAMP):
+        return None
+    sha = open(STAMP, encoding="utf-8").read().strip().split()[0]
+    out = git("rev-list", "--count", sha + "..HEAD").strip()
+    return int(out) if out.isdigit() else None
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--files", nargs="*", default=None,
+                    help="override the changed set (selftest / manual use)")
+    ap.add_argument("--budget", default="45")
+    ap.add_argument("--max-files", type=int, default=6,
+                    help="above this many changed modules, escalate: N "
+                         "sequential dev checks cost more than one full "
+                         "build, which checks the whole tower for the price")
+    ap.add_argument("--drift", type=int, default=10,
+                    help="commits since the last green `make gate` before the "
+                         "full build is owed regardless of what changed")
+    ap.add_argument("--deps", action="store_true",
+                    help="also dev-check the reverse-dependency cone")
+    ap.add_argument("--verdict-only", action="store_true",
+                    help="decide escalation from the free --list pass; run no "
+                         "real check")
+    ap.add_argument("--stamp", action="store_true",
+                    help="record HEAD as the last green full gate, and exit")
+    a = ap.parse_args()
+
+    if a.stamp:
+        with open(STAMP, "w", encoding="utf-8") as fh:
+            fh.write(git("rev-parse", "HEAD").strip() + "\n")
+        print("dev-changed: stamped this commit as the last green full gate")
+        return 0
+
+    files = a.files if a.files is not None else changed_files()
+    src_files = [f for f in files if f.startswith(SRC + os.sep)]
+    other = [f for f in files if not f.startswith(SRC + os.sep)]
+
+    print(f"dev-changed: {len(files)} changed .agda file(s)"
+          f" — {len(src_files)} in {SRC}, {len(other)} elsewhere")
+    if not files:
+        print("dev-changed: nothing changed under agda/ — no Agda was checked, "
+              "and this is a REPORT rather than a pass")
+
+    escalate = []
+    # A dev check is only cheap SINGLY.  Each one pays its own startup and
+    # rechecks the changed module's dependency cone; past a handful, the full
+    # build is the better buy -- it costs about the same and checks EVERYTHING,
+    # consumers included, which the light gate explicitly does not.
+    if len(src_files) > a.max_files:
+        escalate.append(f"{len(src_files)} changed modules in {SRC} (limit "
+                        f"{a.max_files}) — that many dev checks costs more "
+                        f"than one full build, which checks the consumers too")
+    for f in other:
+        escalate.append(f"{f}: not dev-checkable (its tree has its own root) "
+                        f"— `make refuted` / `make gate` owns it")
+
+    fail = 0
+    multi = {}
+    for f in src_files:
+        rel = os.path.relpath(f, SRC)
+        k = multi_member(rel)
+        multi[f] = k
+        if k is None:
+            escalate.append(f"{f}: --list could not be read, so the block "
+                            f"structure is UNKNOWN — assume the worst")
+        elif k > 0:
+            escalate.append(f"{f}: {k} multi-member mutual block(s) — agda-dev "
+                            f"stubs them, so a dev pass here is not a check")
+
+    if a.verdict_only:
+        for line in escalate:
+            print("dev-changed: ESCALATE  " + line)
+        print("dev-changed: FULL GATE REQUIRED" if escalate
+              else "dev-changed: light gate sufficient for this changed set")
+        return 2 if escalate else 0
+
+    checkable = [f for f in src_files if multi.get(f) == 0]
+    if a.deps:
+        ci = _load("check-imports")
+        ci.TREES = list(ci.CLAIM_ROOT)
+        mods = {ci.module_of(f) for f in src_files}
+        cone = consumers(mods)
+        print(f"dev-changed: --deps: adding {len(cone)} consumer module(s)")
+        by_mod = {ci.module_of(f): f for f in src_files}
+        for m in sorted(cone):
+            p = os.path.join(SRC, m.replace(".", os.sep) + ".agda")
+            if os.path.exists(os.path.join(REPO, p)) and p not in by_mod:
+                if multi_member(os.path.relpath(p, SRC)) == 0:
+                    checkable.append(p)
+
+    for f in checkable:
+        rc, out = dev_check(os.path.relpath(f, SRC), a.budget)
+        tail = [l for l in out.split("\n") if l.strip()][-1:] or [""]
+        print(f"dev-changed: {'ok  ' if rc == 0 else 'FAIL'}  {f}"
+              f"  — {tail[0].strip()}")
+        if rc != 0:
+            fail = 1
+            print(out.rstrip())
+
+    if src_files and not checkable and not escalate:
+        print("dev-changed: every changed module was skipped — nothing was "
+              "actually checked")
+        fail = 1
+
+    n = commits_since_full()
+    if n is None:
+        escalate.append("no record of a green `make gate` in this working copy "
+                        "— the stamp is written by `make gate` and wiped by a "
+                        "clean, so this is the cold-cache case")
+    elif n > a.drift:
+        escalate.append(f"{n} commits since the last green `make gate` "
+                        f"(limit {a.drift}) — the consumers have gone "
+                        f"unchecked for too long")
+    else:
+        print(f"dev-changed: {n} commit(s) since the last green full gate "
+              f"(limit {a.drift})")
+
+    mods = {_load("check-imports").module_of(f) for f in src_files} \
+        if src_files else set()
+    if mods:
+        cone = consumers(mods)
+        print(f"dev-changed: NOT CHECKED — {len(cone)} consumer module(s) of "
+              f"the changed set; the light gate bets these still typecheck")
+        for m in sorted(cone)[:12]:
+            print(f"                {m}")
+        if len(cone) > 12:
+            print(f"                … and {len(cone) - 12} more")
+
+    for line in escalate:
+        print("dev-changed: ESCALATE  " + line)
+    if fail:
+        print("dev-changed: RED — a dev check failed above")
+        return 1
+    if escalate:
+        print("dev-changed: FULL GATE REQUIRED — run `make gate`")
+        return 2
+    print(f"dev-changed: {len(checkable)} module(s) dev-green; no multi-member "
+          f"block touched, so `make agda` adds only the consumers")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

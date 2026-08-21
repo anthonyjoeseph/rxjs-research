@@ -175,7 +175,7 @@ def split_list(inner: str) -> list[str]:
     false-positive class this checker has had: no token can ever equal
     `module M`, so every such import read as dead, and the use that pays for
     it (`open M ...`, a module application) is not an import declaration and
-    so was never even looked at.  It deleted 21 real imports and broke the
+    so was never even looked at.  It deleted 18 real imports and broke the
     build.
     """
     out = []

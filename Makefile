@@ -1,4 +1,4 @@
-.PHONY: stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: gate gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -86,6 +86,17 @@ help:
 	@echo "                  a human to rule on — always exits 0, deletes"
 	@echo "                  nothing (see scripts/check-wiring.py)"
 	@echo "  wiring-gate   the same check, but EXITS 1 on a violation"
+	@echo "  gate-light    THE DEFAULT GATE: every cheap check, plus a real dev"
+	@echo "                  check of each module this tree touched.  Refuses to"
+	@echo "                  pass when the full build is still owed — a touched"
+	@echo "                  multi-member block, a file outside agda/src, or too"
+	@echo "                  many commits of drift.  See docs/gate.md"
+	@echo "                  DRIFT=n  raise/lower the commit limit (default 10)"
+	@echo "                  ARGS='--max-files n'  the changed-set ceiling"
+	@echo "                  DEPS=1   dev-check the consumer cone too"
+	@echo "  gate          THE MERGE GATE: gate-light's cheap half plus the full"
+	@echo "                  tower, the refutations and the bug cache.  Many"
+	@echo "                  minutes; stamps the commit gate-light counts from"
 	@echo "  postulates    every postulate in agda/src by name — the work ledger"
 	@echo "  find          SEARCH FIRST, made cheap: search the declared TYPE of"
 	@echo "                  every statement in agda/src.  Always the whole tree —"
@@ -556,20 +567,70 @@ roadmap-selftest:
 # and the tab-indented lines after it become orphans ("recipe commences before
 # first target").  That is why this note sits here rather than beside the line it
 # is about; a recipe-internal comment must itself be tab-indented to be one.
+# Everything decidable without Agda: seconds, and deliberately FIRST, so a
+# textual violation never costs a full build to discover.  Both gates run it.
+GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted unsafe-check \
+             dup-selftest dup-check imports-selftest \
+             roadmap-selftest roadmap-check dev-changed-selftest
+
+gate-cheap:
+	@for t in $(GATE_CHEAP); do \
+	  $(MAKE) --no-print-directory $$t || exit $$?; \
+	done
+
+# THE LIGHT GATE.  The cheap checks, plus a real dev check of every module this
+# tree has touched — and `dev-changed` FAILS if the full build is still owed,
+# so this target cannot be used where it is not valid.  See docs/gate.md.
+gate-light:
+	@$(MAKE) --no-print-directory gate-cheap
+	@$(MAKE) --no-print-directory dev-changed
+	@echo "gate-light: ALL GREEN"
+
+# THE MERGE GATE.  Everything, including the full tower.  Stamps the commit on
+# the way out, which is what `dev-changed`'s drift trigger counts from.
 gate:
-	@$(MAKE) --no-print-directory wiring-selftest
-	@$(MAKE) --no-print-directory wiring-gate
-	@$(MAKE) --no-print-directory wiring-refuted
-	@$(MAKE) --no-print-directory unsafe-check
-	@$(MAKE) --no-print-directory dup-selftest
-	@$(MAKE) --no-print-directory dup-check
-	@$(MAKE) --no-print-directory imports-selftest
-	@$(MAKE) --no-print-directory roadmap-selftest
-	@$(MAKE) --no-print-directory roadmap-check
+	@$(MAKE) --no-print-directory gate-cheap
 	@$(MAKE) --no-print-directory agda
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory bug-cache
+	@scripts/dev-changed.py --stamp
 	@echo "gate: ALL GREEN"
+
+# The one way this driver can lie is by checking NOTHING and exiting 0 — an
+# empty changed set, or a multi-member block it failed to notice.  Both
+# directions are pinned, against real modules whose block structure is a fact
+# rather than a fixture, and via --verdict-only so it costs no typecheck.
+dev-changed-selftest:
+	@fail=0; \
+	  m=agda/src/Verify-Budget-Sufficient/Walk-Level.agda; \
+	  n=agda/src/Verify-Budget-Sufficient/Walk-Level/Arms.agda; \
+	  out=$$(scripts/dev-changed.py --verdict-only --files $$m 2>&1); ec=$$?; \
+	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
+	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
+	  [ $$ec -eq 2 ] \
+	    || { echo "SELFTEST FAIL: escalation exited $$ec, not 2 — make must go red"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --verdict-only --files $$n 2>&1); ec=$$?; \
+	  echo "$$out" | grep -q 'light gate sufficient' \
+	    || { echo "SELFTEST FAIL: a module with NO multi-member block escalated — the light gate would never be usable"; fail=1; }; \
+	  [ $$ec -eq 0 ] \
+	    || { echo "SELFTEST FAIL: the no-block case exited $$ec, not 0"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --verdict-only --max-files 2 --files $$n $$m $$n $$m 2>&1); \
+	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
+	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --verdict-only --files agda/refuted/Refuted/Main.agda 2>&1); \
+	  echo "$$out" | grep -q 'ESCALATE' \
+	    || { echo "SELFTEST FAIL: a file outside agda/src did not escalate — nothing would have checked it"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --verdict-only --files 2>&1); \
+	  echo "$$out" | grep -q '0 changed .agda file(s)' \
+	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; a file outside agda/src escalates because no dev check can reach it; and an empty changed set says so rather than passing quietly)"; \
+	  else exit 1; fi
+
+# Only the modules THIS TREE has touched since the last commit — a dev check is
+# cheap singly and stops being cheap in bulk, so the driver has a ceiling.
+dev-changed:
+	@scripts/dev-changed.py --budget $(AGDA_DEV_BUDGET) \
+	  $(if $(DRIFT),--drift $(DRIFT)) $(if $(DEPS),--deps) $(ARGS)
 
 # ─────────────────────────────────────────────────────────────────────────
 # DETACHED BUILDS -- always launch a long target through `make bg`.

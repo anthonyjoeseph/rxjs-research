@@ -16,6 +16,14 @@ not a property of the tool. The one file that legitimately carries dates is
 `typecheck-performance-numbers.md`, because a timing's age IS information about
 the timing — and that is why it is not in the scan.
 
+## Which gate (`make gate-light` vs `make gate`)
+
+Start at [gate.md](gate.md). `gate-light` is the default: the whole cheap block
+below, plus a real dev check of the modules this tree touched. It **refuses to
+pass** when the full build is still owed — a touched multi-member mutual block,
+a file outside `agda/src`, too many changed modules, or too many commits of
+drift — so the choice is the machine's, not yours.
+
 ## The gate, in order (`make gate`)
 
 | Target | Doc | What it will not let you do |
@@ -29,6 +37,7 @@ the timing — and that is why it is not in the scan.
 | `imports-selftest` | [imports-check.md](imports-check.md) | ship an import checker that has stopped firing |
 | `imports-check` | [imports-check.md](imports-check.md) | leave an import no name in the file spends, or one that names nothing it takes |
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
+| `dev-changed-selftest` | [gate.md](gate.md) | ship a light gate that passes while checking nothing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
 | `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
 | `refuted` | [wiring.md](wiring.md) | land a refutation that does not typecheck |
@@ -40,6 +49,7 @@ the timing — and that is why it is not in the scan.
 | --- | --- |
 | [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, and the comment-stripped mirror Agda actually checks |
 | [agda-dev.md](agda-dev.md) | `make agda-dev` — the per-member iteration loop |
+| [gate.md](gate.md) | `make gate-light` vs `make gate` — the four escalation triggers, and the consumer cone neither dev check reaches |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard, and why an edge costs |
