@@ -480,7 +480,7 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- That is a restatement of both leaves and of what their consumer must
 -- supply — NOT a weakening, since the unconditional form is now refuted
 -- (CLAUDE.md's one sufficient justification for adding a hypothesis).
--- It is deliberately NOT done here: this family is tier 2 and tier 0 is
+-- It is deliberately NOT done here: this family is tier 2 and tier 1 is
 -- open, so the finding is recorded and the repair scheduled, not ground.
 postulate
   cutThrough-close-bound-dying : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}

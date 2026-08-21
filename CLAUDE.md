@@ -230,8 +230,9 @@ directives, and report review. Standing protocol, per Anthony:
   which still require asking first.
 - **Run continuously through the weekend** — Anthony: "continue and continue, don't stop
   for context window or usage credits." Do not wind down because a session is long,
-  context is compacting, or spend is high. Work the task queue (tiers 0 → 1 → 2 → 3) end
-  to end: when a worker leg finishes, review it, merge it, launch the next. The only full
+  context is compacting, or spend is high. Work the task queue from its
+  lowest-numbered open tier upward, end to end: when a worker leg finishes, review
+  it, merge it, launch the next. The only full
   stops are the standing ones: a spec question, or the impossibility pair.
 
 ## Running long Agda builds — the rules; mechanics in `docs/`

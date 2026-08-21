@@ -96,9 +96,11 @@ else lives in the code.
   from here and from the ledger, numbers come from somewhere that should not
   exist. Find it and delete it.
 
-**The tier law and the risk classes are DEFINED IN CLAUDE.md** — tier 0 finishes
-first, then 1, then 2, then 3, strictly; classes worst-first are FALSITY, SHAPE,
-VACUITY, DIFFICULTY, GRINDABLE. This file only ASSIGNS them. Read that section
+**The tier law and the risk classes are DEFINED IN CLAUDE.md** — the
+lowest-numbered tier below finishes first, strictly, and an emptied tier is
+DELETED rather than renumbered, so the numbers are names and not positions;
+classes worst-first are FALSITY, SHAPE, VACUITY, DIFFICULTY, GRINDABLE. This
+file only ASSIGNS them. Read that section
 before re-classifying anything: what counts as evidence for lowering a class, the
 convergence test for whether a spawned FALSITY is progress, and why GRINDABLE is
 the delegation boundary, all live there. A GRINDABLE row must name its worked
@@ -111,43 +113,49 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed/ — tier 2
-     ├─ budget-sufficient                Caps-Bridge.agda — PROVEN from:
+     ├─ budget-sufficient                Caps-Bridge.agda — a REAL BODY over:
      │   ├─ burst-dry/-bounded ┐ all three are projections of ONE
      │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
      │   │                                ← subscribeE-wet ← wet-landing-lift
-     │   │                                  ← subscribeE-walk-level   [tier 0]
-     │   └─ drain-dry   ← cascade-wet-via-caps     [tier 0: subscribeE-inner-nodry]
+     │   │                                  ← subscribeE-walk-level   proven
+     │   └─ drain-dry   ← cascade-wet-via-caps     proven
      └─ the well-formedness branch       its own postulates — tier 2
 ```
 
 The caps route does not replace the wet contract — it rests on it: both
 branches of `budget-sufficient` read `subscribeE-wet`'s `hasDry`/`INV?`
-conjuncts, so no amount of caps work retires tier 0.
+conjuncts, and both of those routes are real definitions — `subscribeE-wet`,
+`wet-landing-lift`, `subscribeE-walk-level` and `cascade-wet-via-caps` all the
+way down, with the `walkFace` family ground on every clause and the whole
+Walk-Level tree holding no live postulate.
 
-## Tier 0 — THE ANCHOR CHAIN (everything else waits on this)
-
-Work top to bottom. Every full route, receipt, and ruling lives in the
-named postulate's own header.
-
-Rows are available to their siblings as postulates, so the bottom of the tier
-is technically runnable while the top is open. **It is not run: per CLAUDE.md's
-risk-reduction priority, while this tier holds an open row of a worse class,
-workers do not fan out across its GRINDABLE rows.**
-
-A row's class here must agree with its postulate's header, which is where the
+A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-The walkFace family is GROUND — `walkFace` is a real definition on every clause
-and the Walk-Level tree holds no live postulate — so the one remaining row sits
-on the burst side.
+## Tier 1 — `budget-sufficient` (the lowest open tier)
 
-- **`switchKill-context`** (Burst-Walk) — GRINDABLE: pure preservation, and
-  every quantity in the conclusion appears in a hypothesis.
+**The tier is ONE statement, not a directory.** `budget-sufficient`
+(Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false`, and it is the only
+CLAIM the `Verify-Budget-Sufficient` tree exports: 45 of the tree's 48 modules
+sit in Caps-Bridge's import cone, and the other three are `MODULE_ROOTS` off
+Main by design (`Demand-Probe`, `Demand-Programs`, `Scan-Node-Probe`).
 
-## Tier 1 — Verify-Budget-Sufficient (parked behind tier 0)
+**It is not the tree's only DOOR, and the other two are import-hygiene debt.**
+`Verify-Well-Formed` also draws `mint-install-survives` (Node-Fresh) by name,
+and re-exports `Node-Table` BLANKET and `public` — so Node-Table's utility
+lemmas cross two tier boundaries and reach `The-Proof`, which then cites two of
+them (`≡ᵇ→≡`, `≡ᵇ-refl`) at a module that does not define them. That is the
+`public`-re-export harm in one instance: `grep` and `make find` point at the
+wrong home. Neither door carries proof obligations, so neither changes the
+tier's rows — they are work for the imports migration.
 
-Labour, not risk: nothing here can discover a design failure, and an anchor
-failure would move the ground under all of it.
+**"A REAL BODY" IS NOT "POSTULATE-FREE".** `budget-sufficient` is a definition
+rather than a postulate; the rows below are the leaves still under it. Reading
+a real body as a discharged cone is how a row gets mis-ranked — the census that
+mis-classed `subscribeE-inner-nodry-inv` read conclusions and never asked what
+its named suppliers needed.
+
+Labour, not risk: nothing here can discover a design failure.
 
 - **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY, and the
   module header buckets it BLOCKED: `depth-conn-storeNest`, `depth-all-bound`,
@@ -163,8 +171,8 @@ failure would move the ground under all of it.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
-Built on `budget-sufficient`, so proving anything here while tier 0 is open
-bets on ground an anchor failure would move. The branch's own design question
+Built on `budget-sufficient`, so proving anything here while tier 1 is open
+bets on ground a `Verify-Budget-Sufficient` failure would move. The branch's own design question
 is **merge coherence, and it is UNSTATED**: `mergeCertAt` is the decidable
 predicate, probed at reachable states by Root-Probe, but the coherence itself
 owes a statement, a mid-fold FoldInv form, and the consumer rewrites that spend

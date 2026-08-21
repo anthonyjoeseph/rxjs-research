@@ -3,8 +3,10 @@
 -- the walk/cascade burst content landed at Ŝ with no tower constant,
 -- and (2026-08-13) the cascade's DRY half off the same run: the third
 -- flavour is `nodry`, gas-conditioned through the walk's GOK hook, and
--- `cascadeGo-nodry` — the ex-anchor — is now a projection of `cascadeGo-burst-nodry`.  The
--- anchor's risk lives in ONE per-frame face, `stepFrame-nodry` (its own header carries the census).
+-- `cascadeGo-nodry` — the ex-anchor — is now a projection of `cascadeGo-burst-nodry`.
+-- THE ANCHOR CHAIN IS DISCHARGED: `stepFrame-nodry`, which carried the last of
+-- its risk, is a real definition, and this module's only live postulate is
+-- `subscribeE-Ψ`.
 --
 -- Landed from Caps-Burst-Walk-Probe (DELETED; git history) (2026-08-10), which
 -- was v2 of the route: v1's two bridging postulates were BOTH
@@ -62,11 +64,10 @@
 -- (`stepFrame-nodry`).  Four of
 -- its conjuncts come off that one call — the level bound and `capsOK?`
 -- verbatim, `valsCaps?` verbatim, and `regP? (pathSz? …)` via
--- `capsOK?-regs` on that same `capsOK?`.  ALL THREE STATE-LOCAL WET
--- LEAVES ARE PROVEN — the map, take and scan leaves
--- — leaving `wet-inner` and `wet-thru`, the two *All edges, which
--- carry the wet content (same family as `subscribeInner-demand`,
--- .Anchor-Dry), and `stepFrame-nodry`, which carries the dry.
+-- `capsOK?-regs` on that same `capsOK?`.  EVERY LEAF IS PROVEN —
+-- the three state-local wet leaves (map, take, scan), `wet-inner` and
+-- `wet-thru` (the two *All edges, same family as `subscribeInner-demand`,
+-- ex-.Anchor-Dry), and `stepFrame-nodry`, which carries the dry.
 --
 -- Also home to frameBΨ?/pathBΨ?/regsBΨ?, RELOCATED from .Caps-Bridge
 -- (they were defined there, downstream of this module's consumers).
@@ -153,6 +154,7 @@ open import Verify-Budget-Sufficient.Caps-Face
          eventsCaps?-widen; burstCaps?-widen; valsCaps?-lvl; valsCaps?-parts;
          pathSz?-len; pathSz?-tail; pathSz?-widen;
          capsOK?-count; capsOK?-delivered; capsOK?-regs; shareLatch-caps;
+         switchKill-caps;
          frameStep-mono-j; frameStep-0; stepFrame-face; frameBud;
          -- the INV? assembly's peel, and the two ladder side conditions it
          -- and its call site spend
@@ -1582,12 +1584,12 @@ fnCapB-finish Ψ i true  out h =
 
 
 ------------------------------------------------------------------
--- THE DRY FACE OF ONE FRAME (stepFrame-nodry) — WHERE THE ANCHOR'S RISK NOW LIVES
--- (2026-08-13; the ruling is `cascadeGo-nodry`'s header).
+-- THE DRY FACE OF ONE FRAME (stepFrame-nodry) — WHERE THE ANCHOR'S RISK USED TO
+-- LIVE, and it is now a real definition (the ruling is `cascadeGo-nodry`'s header).
 --
 -- One frame of one delivery, run on the WALK'S OWN MINTED GAS, emits
--- no dried close.  This is the anchor postulate (`cascadeGo-nodry`,
--- `cascadeGo-nodry`) with everything transport-shaped stripped off: the walk carries
+-- no dried close.  This is the ex-anchor (`cascadeGo-nodry`)
+-- with everything transport-shaped stripped off: the walk carries
 -- dryness through appends and widens mechanically (`EbB`/`BbB`'s third
 -- flavour), so the entire dry content of the cascade concentrates in
 -- this one per-frame face.
@@ -1640,19 +1642,18 @@ fnCapB-finish Ψ i true  out h =
 --           under Ŝ by the walk's own landing arithmetic (lvl-fits +
 --           capsAt-suc-full, `cascadeGo-burst-nodry`'s payoff arithmetic).
 --
--- CLASS: FALSITY, inherited from the anchor — this face IS the
--- anchor's risky region (a from-inner subscribe mid-delivery), now
--- with a named engine instead of an unnamed gap.  A failure here that
--- is not a walk-level failure means the walk cannot supply (i) or
--- (ii), which would be a finding about the ledger, not this face.
--- CANNOT BE PROBED, same receipt as the anchor: the gas family is
--- abstract, and `budgetAt` is a tower the checker will not normalise.
+-- THIS FACE WAS THE ANCHOR'S RISKY REGION (a from-inner subscribe
+-- mid-delivery), carried as FALSITY until it was ground.  The receipt
+-- that still matters: it CANNOT BE PROBED, same as the anchor — the gas
+-- family is abstract and `budgetAt` is a tower the checker will not
+-- normalise — so the discharge is a proof, and never could have been a probe.
 --
--- ═══ THE FIVE-FRAME CENSUS, 2026-08-13 — three frames are now REAL ═══
+-- ═══ THE FIVE-FRAME CENSUS — ALL FIVE ARE NOW REAL ═══
 --
--- `stepFrame-nodry` is no longer a monolith: it is an assembly over the
--- frame constructors, and the risk does NOT spread evenly across them.
--- Reading `stepFrame` (Rx/Evaluator:1252-1275) and everything it calls:
+-- `stepFrame-nodry` is an assembly over the frame constructors, and the risk
+-- did NOT spread evenly across them.  The census is kept because it is what
+-- located the consolidation below; the column says where each frame's dryness
+-- CAME FROM, not what is still owed:
 --
 --   map-f    — events are literally `[]`.                    PROVEN, refl
 --   scan-f   — every `dispatch` arm emits `[]`.              PROVEN, refl
@@ -1661,14 +1662,14 @@ fnCapB-finish Ψ i true  out h =
 --              (`cutThrough-nodry` — every close it
 --              makes is `cut`/`cutPending`).                 PROVEN
 --   from-inner — `innerReact` → `innerFinish`, whose only
---              emitting arm is concatᵒ's `concatDrain`.      postulated
+--              emitting arm is concatᵒ's `concatDrain`.      via SiNodry
 --   thru-outer — `thruWrap`/`thruWalk`/`thruConsume`, whose
 --              events are `switchKill`'s closes (cutThrough
---              again, free) plus `subscribeInner`'s.         postulated
+--              again, free) plus `subscribeInner`'s.         via SiNodry
 --
 -- ═══ THE CONSOLIDATION THAT FALLS OUT, and it is the finding ═══
 --
--- Chase the two postulated frames to their leaves and they MEET:
+-- Chase those two frames to their leaves and they MEET:
 -- `concatDrain` (Evaluator:1195) emits nothing of its own — its `bs`
 -- is `subscribeInner`'s, appended down the queue.  `switchKill` is
 -- cutThrough.  So after the three proven frames, EVERY remaining
@@ -1712,7 +1713,8 @@ fnCapB-finish Ψ i true  out h =
 -- hypothetical one.
 --
 -- WHAT THAT MAKES THE TWO FRAMES: transport over ONE leaf, named
--- below as `SiNodry` and postulated once.  The `-core` pair keeps
+-- below as `SiNodry` and — at the time of the ruling — postulated once,
+-- since PROVEN as `subscribeInner-nodry`.  The `-core` pair keeps
 -- that structural rather than prose — each frame is a real definition
 -- applying its core to the single leaf, so `subscribeInner-nodry` has
 -- a consumer from the minute it is stated and the census above is
@@ -2344,11 +2346,12 @@ abstract
   concatNode-vb = concatNode-vb-go
 
 -- ─────────────────────────────────────────────────────────────────
--- THE NODRY RESIDUE LEAVES.  `innerReact-nodry` / `thruOuter-nodry` are
+-- THE NODRY RESIDUE, NOW EMPTY.  `innerReact-nodry` / `thruOuter-nodry` are
 -- real bodies that case-split the evaluator's dispatch and APPLY
--- `subscribeInner-nodry` at each arm calling `subscribeInner`; these are
--- what those bodies cannot pay.  Every one is a genuine open obligation
--- and none takes a proven lemma as an argument.
+-- `subscribeInner-nodry` at each arm calling `subscribeInner`; what those
+-- bodies could not pay used to be postulated here.  Nothing is: the one
+-- surviving member is `switchKill-context`, a real body, and the four NOTEs
+-- below are what it and its neighbours THREAD rather than assert.
 --
 -- NOTE ON slFc: slotsFnCap sl ≤ Ψ is THREADED, not postulated.  It is a
 -- static capsule invariant that OKB cannot reach — `walkOK` is
@@ -2380,19 +2383,55 @@ abstract
 -- level the step reports — so the level the walk re-reads its ledgers at is
 -- CARRIED rather than asserted, which is what the refuted same-level form
 -- (Refuted.Thru-Loop) got wrong.
-postulate
-
-  -- OKB + regP? after switchKill; needed by the switch arm's subscribeInner-nodry call.
-  switchKill-context : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
-    (cur : Maybe NodeId)
-    (sched₀ : Sched Γ) (st₀ : EvalSt e) →
-    OKB {e = e} c sl Ψ J sched₀ st₀ →
-    regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
-    let sched₁ = proj₁ (proj₂ (switchKill cur sched₀ st₀))
-        st₁    = proj₂ (proj₂ (switchKill cur sched₀ st₀))
-    in OKB {e = e} c sl Ψ J sched₁ st₁
-       × regP? (PbB c Ψ J) (EvalSt.registry st₁) ≡ true
+-- OKB + regP? after switchKill; needed by the switch arm's
+-- subscribeInner-nodry call.  A REAL BODY, and the whole of it is a
+-- three-way split of the conjunction along the faces that already own the
+-- pieces — nothing about `switchKill` is re-derived here.
+--
+-- WHY THIS ONE IS AT THE SAME LEVEL, where the thru side's same-level form
+-- is REFUTED (Refuted.Thru-Loop): `switchKill` only ever DROPS.  It filters
+-- the registry through `cutThrough`, sweeps `live` against the survivors and
+-- grows `cancelled` — and `capsOK?` reads none of the last.  `thruConsume`'s
+-- concat park GROWS a node's queue, which is what `capsOK?`'s width conjunct
+-- bounds, so there a post-state need not satisfy the invariant at the level
+-- its pre-state did.  Dropping cannot break an upper bound; appending can.
+--
+-- THE SPLIT.  `walkOK` is slots-eq × `capsOK?`, and the Ψ half is
+-- `fnCapBounded?`, so the three pieces land on three faces:
+--
+--   Sched.slots ≡ sl    ← switchKill-Ψ's first conjunct (the record update
+--                          touches `live`, never `slots`, so this is the
+--                          hypothesis itself — but read it off the face that
+--                          states it, not off record eta)
+--   capsOK?             ← switchKill-caps (.Caps-Face/Part4), at frameStep J c
+--   fnCapBounded?       ← switchKill-Ψ's second conjunct
+--
+-- and the registry ledger recombines entrywise: `regP?-Ψ` peels the Ψ half of
+-- `PbB` to feed switchKill-Ψ, which hands the Ψ half back at the new state,
+-- while the SIZE half comes out of the new `capsOK?` by `capsOK?-regs` —
+-- `regsSz?` IS `regP?` of that half.  `regP?-of-parts` glues them.  Neither
+-- face hands back the conjunction, which is why the peel-and-glue pair exists.
+switchKill-context : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
+  (cur : Maybe NodeId)
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  OKB {e = e} c sl Ψ J sched₀ st₀ →
+  regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
+  let sched₁ = proj₁ (proj₂ (switchKill cur sched₀ st₀))
+      st₁    = proj₂ (proj₂ (switchKill cur sched₀ st₀))
+  in OKB {e = e} c sl Ψ J sched₁ st₁
+     × regP? (PbB c Ψ J) (EvalSt.registry st₁) ≡ true
+switchKill-context c sl Ψ J cur sched₀ st₀ ((slEq , cOK) , fcb) rp =
+  ((proj₁ Ψr , cOK₁) , proj₁ (proj₂ Ψr))
+  , regP?-of-parts c Ψ J (EvalSt.registry st₁)
+      (capsOK?-regs (frameStep J c) sched₁ st₁ cOK₁)
+      (proj₁ (proj₂ (proj₂ Ψr)))
+  where
+  sched₁ = proj₁ (proj₂ (switchKill cur sched₀ st₀))
+  st₁    = proj₂ (proj₂ (switchKill cur sched₀ st₀))
+  cOK₁   = switchKill-caps (frameStep J c) cur sched₀ st₀ cOK
+  Ψr     = switchKill-Ψ sl Ψ cur sched₀ st₀ slEq fcb
+             (regP?-Ψ c Ψ J (EvalSt.registry st₀) rp)
 
 -- THE DRAIN'S LOOP INVARIANT, at the level the step LANDS at.  Exact twin of
 -- `thruConsume-nodry-loop`: the caps half is the caps face's own
@@ -3722,19 +3761,20 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 -- law proved mechanical exactly as the route predicted — appends by
 -- `hasDry-append`/`any-dry-++`, seeds and deliveries by computation
 -- (`dryEvent` is false on value/init/close-exhausted/handoff/complete),
--- widens for free (dryness is level-independent).  What remains is the
--- per-frame face, `stepFrame-nodry`, where the WHOLE of the
--- anchor's former risk now lives — one named postulate whose from-inner
--- case consumes the COLLAPSED walk face (`subscribeE-walk-level`,
--- .Walk-Level), the statement built to be satisfiable mid-delivery.
+-- widens for free (dryness is level-independent).  What remained was the
+-- per-frame face, `stepFrame-nodry`, where the WHOLE of the anchor's former
+-- risk lived — a real definition now, whose from-inner case consumes the
+-- COLLAPSED walk face (`subscribeE-walk-level`, .Walk-Level), the statement
+-- built to be satisfiable mid-delivery.  That was the last of it: the anchor
+-- chain holds no postulate.
 --
 -- WHAT THIS MOVE BUYS, in risk-ledger terms: `cascadeGo-nodry` and
 -- `subscribeE-wet-core` used to be two independent FALSITY rows.  Both
 -- now bottom out in `subscribeE-walk-level` (the wet core by
 -- instantiation, the anchor through `subscribeInner-nodry`), so the
--- tier-0 risk CONSOLIDATES onto one statement — plus `stepFrame-nodry`'s two named
--- manufacture obligations, (i) mid-delivery INV? and (ii) the
--- general-id fuel, each a crib of a proven sibling.
+-- anchor risk CONSOLIDATED onto one statement — plus `stepFrame-nodry`'s two
+-- named manufacture obligations, (i) mid-delivery INV? and (ii) the
+-- general-id fuel, each a crib of a proven sibling, and each since paid.
 --
 -- History (mirror census 2026-08-12, demand-side probe 2026-08-13,
 -- the can't-probe receipt): superseded by this discharge; recover the

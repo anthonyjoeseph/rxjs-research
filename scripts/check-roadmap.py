@@ -4,10 +4,10 @@
 WHY THIS IS A GATE AND NOT A CONVENTION.  The roadmap's order is the only
 thing in the repo that says what to work on next, so a stale sort silently
 re-aims the next session — and it re-aims toward the SAFE end, because
-grinding is what looks like progress.  Measured 2026-08-20: tier 0's sole
-SHAPE row sat in the NINTH slot behind four DIFFICULTY rows, and the session
-read the tier top-down, picked DIFFICULTY, and was about to fan the rest out
-as GRINDABLE — the riskiest row on the anchor tier going untouched precisely
+grinding is what looks like progress.  Measured 2026-08-20: the anchor
+tier's sole SHAPE row sat in the NINTH slot behind four DIFFICULTY rows, and
+the session read the tier top-down, picked DIFFICULTY, and was about to fan
+the rest out as GRINDABLE — its riskiest row going untouched precisely
 because the list said it was ninth.  A rule you can satisfy while still
 failing is a rule that needs a machine (the same argument as `make find`).
 
