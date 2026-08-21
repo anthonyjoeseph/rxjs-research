@@ -139,6 +139,28 @@ marker cannot belong to a sibling.
 and runs no agda, which is what makes the root exclusion testable at
 `gate-cheap` speed.
 
+### The sweep has a TOTAL budget, not just a per-module one
+
+`--budget` bounds one check; nothing bounded the sum. A changed set of five
+modules low in the tower has a 48-module cone, and 48 per-module budgets is
+more wall clock than the one build that checks all of them — so
+`--cone-budget` (default 300 s) stops the sweep and NAMES what it left. Cone
+coverage is partial by design; what is forbidden is partial coverage that
+reads as complete.
+
+## THE CHANGED SET IS MEASURED FROM THE LAST GREEN HEAVY GATE, NOT FROM HEAD
+
+This one produced a false green in the flow it matters most in. `make gate`
+after a commit sees a clean tree; a HEAD diff is empty; nothing is checked;
+`gate-light: ALL GREEN`. The gate had not looked at the commit at all — and
+land-then-gate is the flow every leg of this campaign uses.
+
+What the light gate owes is everything the last green HEAVY gate did not
+cover, and the stamp already records that commit. So `dev-changed` diffs from
+the stamp, and the changed set survives committing. With no stamp there is
+nothing to diff from and the drift trigger escalates anyway, which is the
+cold-cache case handled correctly for a different reason.
+
 Ask for the verdict alone, at no typecheck cost:
 
 ```

@@ -36,6 +36,7 @@ import importlib.util
 import os
 import re
 import subprocess
+import time
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -63,10 +64,31 @@ def git(*args) -> str:
                           text=True).stdout
 
 
+def gate_base() -> str:
+    """The commit the last green heavy gate covered, or HEAD.
+
+    THE CHANGED SET IS NOT "DIFF AGAINST HEAD", AND MEASURING IT THAT WAY IS A
+    FALSE GREEN.  A session that commits and then runs `make gate` has a clean
+    tree, so a HEAD diff is empty, so nothing is checked, and the gate says ALL
+    GREEN about a commit it never looked at.  That is the flow every leg of
+    this campaign uses -- land the work, then gate it.
+
+    What the light gate actually owes is everything the last green HEAVY gate
+    did not cover, which the stamp already records.  With no stamp there is
+    nothing to diff from, and the drift trigger escalates anyway.
+    """
+    if not os.path.exists(STAMP):
+        return "HEAD"
+    sha = open(STAMP, encoding="utf-8").read().strip().split()[0]
+    ok = subprocess.run(("git", "cat-file", "-e", sha + "^{commit}"),
+                        cwd=REPO, capture_output=True).returncode == 0
+    return sha if ok else "HEAD"
+
+
 def changed_files() -> list[str]:
-    """Every .agda this tree has touched relative to HEAD, tracked or not."""
+    """Every .agda uncovered by the last green heavy gate, tracked or not."""
     out = set()
-    for line in git("diff", "--name-only", "HEAD", "--",
+    for line in git("diff", "--name-only", gate_base(), "--",
                     "agda").split("\n"):
         if line.strip().endswith(".agda"):
             out.add(line.strip())
@@ -156,6 +178,13 @@ def main() -> int:
                          "a few dev passes rather than the whole build")
     ap.add_argument("--deps", action="store_true",
                     help="also dev-check the reverse-dependency cone")
+    ap.add_argument("--cone-budget", type=int, default=300,
+                    help="total wall-clock seconds the CONE sweep may spend. "
+                         "The per-module budget bounds one check; nothing "
+                         "bounded the sum, so a changed set low in the tower "
+                         "(48-module cone) could outspend the one build that "
+                         "checks all of it. Past this the remainder is "
+                         "reported unchecked, never silently dropped.")
     ap.add_argument("--plan", action="store_true",
                     help="print the sweep PLAN — which modules would be dev "
                          "checked and which cone members are held back — then "
@@ -294,8 +323,15 @@ def main() -> int:
     # the bet the light path was making anyway, so it is reported as still
     # unchecked and the sweep goes on.
     unchecked = []
+    cone_spent = 0.0
     for f in checkable:
+        if f in cone_only and cone_spent > a.cone_budget:
+            unchecked.append(f)
+            continue
+        t0 = time.time()
         rc, out = dev_check(os.path.relpath(f, SRC), a.budget)
+        if f in cone_only:
+            cone_spent += time.time() - t0
         tail = [l for l in out.split("\n") if l.strip()][-1:] or [""]
         # agda-dev's PROCESS exit is 1 for any red; the budget kill is
         # distinguishable only by the per-member `(exit 124)` it reports.  A
@@ -323,8 +359,13 @@ def main() -> int:
         cone = consumers(mods)
         if deps:
             print(f"dev-changed: the cone was CHECKED — {len(cone)} consumer "
-                  f"module(s), minus the claim roots and "
-                  f"{len(unchecked)} over budget")
+                  f"module(s) in {cone_spent:.0f}s, minus the claim roots and "
+                  f"{len(unchecked)} left unchecked (per-module budget or the "
+                  f"{a.cone_budget}s sweep budget)")
+            for m in unchecked[:12]:
+                print(f"                unchecked: {m}")
+            if len(unchecked) > 12:
+                print(f"                … and {len(unchecked) - 12} more")
         else:
             print(f"dev-changed: NOT CHECKED — {len(cone)} consumer module(s) "
                   f"of the changed set; the light gate bets these still "

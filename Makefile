@@ -659,10 +659,17 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
 	  echo "$$out" | grep -q 'FAIL  agda/src/Verify-Well-Formed.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files agda/src/Verify-Budget-Sufficient/Caps-Bridge.agda 2>&1); \
+	  echo "$$out" | grep -q 'unchecked: ' \
+	    || { echo "SELFTEST FAIL: the cone sweep spent past its TOTAL budget — the per-module budget bounds one check and nothing bounded the sum, so a changed set low in the tower outspends the one build that checks all of it"; fail=1; }; \
+	  if [ -f .gate-heavy-stamp ]; then \
+	    python3 -c 'import importlib.util,sys; sp=importlib.util.spec_from_file_location("dc","scripts/dev-changed.py"); m=importlib.util.module_from_spec(sp); sp.loader.exec_module(m); sys.exit(0 if m.gate_base() != "HEAD" else 1)' \
+	      || { echo "SELFTEST FAIL: the changed set is measured against HEAD while a heavy-gate stamp exists — a session that COMMITS then gates has a clean tree, so nothing gets checked and the gate reports ALL GREEN about a commit it never looked at"; fail=1; }; \
+	  fi; \
 	  out=$$(scripts/dev-changed.py --verdict-only --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
 	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; a file outside agda/src escalates because no dev check can reach it; and an empty changed set says so rather than passing quietly)"; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src escalates because no dev check can reach it; and an empty changed set says so rather than passing quietly)"; \
 	  else exit 1; fi
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is
