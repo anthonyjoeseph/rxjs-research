@@ -356,3 +356,22 @@ finList-Ψ : ∀ {n} {Γ : Ctx n} {u} (Ψ : ℕ) (b : Bool) →
       (if b then complete ∷ [] else []) ≡ true
 finList-Ψ Ψ true  = refl
 finList-Ψ Ψ false = refl
+
+-- All ↔ all FOR THE Ψ PREDICATE.  The scan ledgers in .Wet are stated
+-- over `All` and `_≤_` while every burst predicate here is a `Bool` and
+-- `≡ true`, so a face that spends one inside the other crosses this pair
+-- twice.  They sit HERE, with the predicate, because two faces need them
+-- at once — .Burst-Walk's stepFrame-level scan leaf and the level walk's
+-- scan push — and this module is below both.  (.Wet's allB-* pair is the
+-- same bridge for `valB?`, which carries the SIZE half alongside; these
+-- see only Ψ, which is the whole point of the split.)
+allΨ-to : ∀ {n} {Γ : Ctx n} {s} (Ψ : ℕ) (vs : List (Val Γ s)) →
+  valsΨ? Ψ vs ≡ true → All (λ v → fnCapᵛ s v ≤ Ψ) vs
+allΨ-to Ψ []       h = []ᵃ
+allΨ-to Ψ (v ∷ vs) h =
+  ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ h))) ∷ᵃ allΨ-to Ψ vs (proj₂ (∧-true _ _ h))
+
+allΨ-of : ∀ {n} {Γ : Ctx n} {s} (Ψ : ℕ) (vs : List (Val Γ s)) →
+  All (λ v → fnCapᵛ s v ≤ Ψ) vs → valsΨ? Ψ vs ≡ true
+allΨ-of Ψ []       h          = refl
+allΨ-of Ψ (v ∷ vs) (p ∷ᵃ ps) = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ p)) (allΨ-of Ψ vs ps)

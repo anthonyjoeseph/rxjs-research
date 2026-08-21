@@ -588,9 +588,14 @@ WalkTail⁻ᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
 -- until the hop half moved to the SPINE exponent, which is scan-specific;
 -- another chain clause needing the SAME split at a single bound would want
 -- them back verbatim.
-WalkStmt⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} → Closed Γ u → Set
-WalkStmt⁻ᴴ {n} {Γ} {t} {e} {u} b =
-  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) (g : Gas) →
+-- GAS-FIXED, because the one clause stated at it needs the walk's own
+-- INDUCTION HYPOTHESIS beside it and that hypothesis is stated at a fixed
+-- gas (`WalkStmtAt`).  The un-fixed `WalkStmt⁻ᴴ` this replaces had exactly
+-- one user and could not have one that closed: see walk-scan-rest.
+WalkStmtAt⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+  Gas → Closed Γ u → Set
+WalkStmtAt⁻ᴴ {n} {Γ} {t} {e} {u} g b =
+  ∀ (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ) →
   WalkTail⁻ᴴ {e = e} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
 WalkLevel : Set
@@ -1101,8 +1106,17 @@ postulate
   -- transparent, mapValue-B, mapValue-hop, oneShot-tail-dry, and regsLen?
   -- straight off the hypothesis.  THE ONE DIFFERENCE, and it is the whole
   -- residue: the values here are `map evalTm ts`, not a slot's, so their
-  -- size/weight bound comes from an evalTms lemma — and `evalTms-caps`
-  -- (.Caps-Face/Part7, PROVEN) has NO wet twin.  That twin is this row.
+  -- size/weight bound comes from an evalTms lemma.
+  --
+  -- ⚠ "evalTms-caps HAS NO WET TWIN. THAT TWIN IS THIS ROW" WAS WRONG
+  -- (corrected 2026-08-20).  `ofVals-B` (.Wet/Part1) IS that twin and is
+  -- PROVEN: it gives `all (valB? (capᴱ W (E * 3 ^ suc Ψ)) Ψ u)` over
+  -- `map evalTm ts` from a size and a fnCap hypothesis on the terms, i.e.
+  -- BOTH halves this row needs.  It is not a drop-in — its bound is
+  -- capᴱ-shaped and has to be fitted under the caps ladder's B, which is
+  -- the actual residue — but "no twin exists" would send the next reader
+  -- to re-derive a proven lemma, which is the one failure the SEARCH FIRST
+  -- rule exists to prevent.  Fit it; do not restate it.
   walk-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (ts : List (Tm Γ [] [] [] u)) → WalkStmt {e = e} (ofᵉ ts)
   -- spent one-shot — GRINDABLE, and the CHEAPEST row in the family: it is
@@ -1126,10 +1140,69 @@ postulate
   -- emptyᵉ clause (.Subscribe-Face), not the open sibling walk-of.
   walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
     WalkStmt {e = e} (emptyᵉ {t = u})
-  -- the eight OTHER conjuncts of the scan clause — DIFFICULTY, and it is
-  -- the map clause's census verbatim at this shape; that clause is now a
-  -- real body (`walk-map` ⊗ `pushMap-wet`, .Walk-Level/Parts), so it is
-  -- the worked instance rather than a sibling guess.
+  -- the eight OTHER conjuncts of the scan clause — SHAPE, and the
+  -- restatement has been made: this leaf now takes the walk's own
+  -- INDUCTION HYPOTHESIS (`wb : WalkStmtAt g b`) and is stated at a fixed
+  -- gas, like every other clause in the family.
+  --
+  -- ⚠ WHY IT WAS UNPROVABLE AS FIRST STATED (2026-08-20), and it is not a
+  -- matter of difficulty.  The old form quantified over an ARBITRARY
+  -- `b : Closed Γ s` with no hypothesis about it, while all eight of its
+  -- conjuncts are assertions about the result of `subscribeE g (scanᵉ f z b)`
+  -- — which unfolds THROUGH b's own subscribe.  Nothing could close that:
+  -- this leaf is not recursive (walkFace is), and it cannot be made mutual
+  -- with walkFace because it lives BELOW it.  `walkFace` does hand `wb` to
+  -- `walk-scan`, and `walk-scan` spends it on `walk-scan-source` and
+  -- `walk-scan-hop-spn` — but it was never threaded to this leaf, so the
+  -- one hypothesis that makes the clause provable stopped one call short.
+  -- The tell was visible in the family without looking at any proof: every
+  -- sibling clause (walk-map, walk-take, and both scan halves above) takes
+  -- `wb`, and this one did not.
+  --
+  -- The restatement is NOT a weakening and needs no further justification
+  -- than that: `wb` is the induction hypothesis, it is already in scope at
+  -- the single call site, and the alternative reading — that the clause is
+  -- true without it — is refuted by the shape of the statement rather than
+  -- by any fact about scan.
+  --
+  -- For what the eight then cost, the map clause is the worked instance:
+  -- a real body (`walk-map` ⊗ `pushMap-wet`, .Walk-Level/Parts).
+  --
+  -- THE MIRROR, AND ITS COVERAGE BOUNDARY (2026-08-20).  `subscribeE-walkS`
+  -- (.Wet/Part2) is a PROVEN recursive wet walk whose scanᵉ clause mirrors
+  -- this one piece for piece, and `subscribeE-caps`' scanᵉ clause mirrors
+  -- the caps column.  Between them they FIX this clause's skeleton:
+  --   witness       `j₀ + suc (j₁ + j₂)`
+  --   seed, size    `evalSeed-caps` — its j₀ is what pays the seed's eval
+  --   seed, Ψ       `fnCap-evalWith Ψ z []ᵃ tt` — NO ladder, Ψ does not grow
+  --   mint+install  `INV?-install`, with `capsOK?-setNode` /
+  --                 `capsOK?-nextNode` on the caps side
+  --   recursion     `wb`, at `suc (j + j₀)`
+  --   the push      a bespoke Ψ-only face over a `stepScan-wet`
+  --
+  -- BUT THE MIRROR CANNOT BE CALLED, and the reason is the INDEX SYSTEM
+  -- rather than the mathematics: `capᴱ W E = (2 + 2 * W) ^ E` (with E
+  -- growing as `E * 3 ^ suc Ψ`) and `frameStep`'s `iterSize` are two
+  -- different exponential ladders, and they meet only where .Caps-Bridge
+  -- instantiates them together at the TOP (`sizeCapAt` / `capsAt`), never
+  -- at an arbitrary mid-walk `frameStep (j + j′) c`.  That is the same
+  -- reason map needed its own `pushMap-wet` instead of reusing the
+  -- frame-generic `pushBurst-wet`.  So: read the mirror for the
+  -- ingredients and their indices; do not try to import it.
+  --
+  -- A related note, because it reads like a contradiction and is not:
+  -- `pushBurst-wet` IS frame-generic and proven, while the DEAD ROUTE
+  -- beside `pushBurst-walk` rules a frame-generic wet push face FALSE.
+  -- The refutation is about the HOP ledger, which is frame-specific; Ψ and
+  -- the capᴱ size index are not.  Different columns.  And the hop column
+  -- is the one column THIS row does not owe — `walk-scan` pays conjunct 7
+  -- through `walk-scan-hop-spn` ⊗ `burstHopSpn-cap`.
+  --
+  -- Finally, the accumulator needs NO new invariant field: `INV?` already
+  -- covers node states on both axes (`fnCapNode Ψ (scan-st v)` is
+  -- `fnCapᵛ v ≤ᵇ Ψ`; `stBounded?` carries `boundedNode`), so the bound
+  -- comes in and goes out as a projection of a hypothesis this leaf
+  -- already takes.  `INV?-setNode` (.Walk-Level/Parts) is the step.
   --
   -- ⚠ CLASS HISTORY, because this header and the ledger had DRIFTED apart:
   -- this row was moved to FALSITY in PROOF-STATE on 2026-08-20 while this
@@ -1150,8 +1223,9 @@ postulate
   -- *budget* really is map-difficulty, which is what this leaf's shape
   -- records; none of these eight ever sees the fold's arithmetic.
   walk-scan-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-    (b : Closed Γ s) → WalkStmt⁻ᴴ {e = e} (scanᵉ f z b)
+    (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+    (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) →
+    WalkStmtAt⁻ᴴ {e = e} g (scanᵉ f z b)
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)
   -- registration + parked body — GRINDABLE.  The clause that MINTS a
   -- registry entry, so regsLen?'s growth is paid here, and it is the

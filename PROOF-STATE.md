@@ -141,9 +141,9 @@ measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
 - **`walk-scan-rest`** (Walk-Level) — DIFFICULTY: the scan frame's own wet push
-  face, last of the three; the frame-generic form is REFUTED. takeᵉ and mapᵉ are
-  postulate-free end to end now, so both are worked instances and what is left
-  unfunded is scanᵉ's exponential hop index.
+  face, last of the three; the frame-generic form is REFUTED. Restated to carry
+  the walk's induction hypothesis, without which no proof existed. takeᵉ and
+  mapᵉ are postulate-free, so both are worked instances.
 - **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
   the one conjunct of arm B not closed by computation. Header carries the
   refutation pinning its shape and a proven source per conjunct;

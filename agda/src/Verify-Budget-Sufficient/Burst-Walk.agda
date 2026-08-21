@@ -874,18 +874,8 @@ lookupNode-fnCap Ψ nid ((k , ns) ∷ r) h with k ≡ᵇ nid
 ... | true  = proj₁ (∧-true _ _ h)
 ... | false = lookupNode-fnCap Ψ nid r (proj₂ (∧-true _ _ h))
 
--- All ↔ all, the Ψ direction only (Wet's allB-* pair carries the size
--- half alongside, which this leaf never sees)
-allΨ-to : ∀ {n} {Γ : Ctx n} {s} (Ψ : ℕ) (vs : List (Val Γ s)) →
-  valsΨ? Ψ vs ≡ true → All (λ v → fnCapᵛ s v ≤ Ψ) vs
-allΨ-to Ψ []       h = []ᵃ
-allΨ-to Ψ (v ∷ vs) h =
-  ≤ᵇ⇒≤ _ _ (T-to (proj₁ (∧-true _ _ h))) ∷ᵃ allΨ-to Ψ vs (proj₂ (∧-true _ _ h))
-
-allΨ-of : ∀ {n} {Γ : Ctx n} {s} (Ψ : ℕ) (vs : List (Val Γ s)) →
-  All (λ v → fnCapᵛ s v ≤ Ψ) vs → valsΨ? Ψ vs ≡ true
-allΨ-of Ψ []       h          = refl
-allΨ-of Ψ (v ∷ vs) (p ∷ᵃ ps) = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ p)) (allΨ-of Ψ vs ps)
+-- (the All ↔ all Ψ bridges moved DOWN to .Psi-Split, with the
+-- predicate; imported back through the wholesale open above)
 
 wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)
