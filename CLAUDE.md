@@ -680,6 +680,19 @@ design to move, and it is the one worth naming when you find it.
   refutation (record, restate, re-rank) or a confidence receipt (`-- PROBED <date>:` in
   the postulate's own header, saying what shapes were covered). **An unprobed probeable
   postulate is the cheapest unmanaged risk in the repo.**
+- **AND PROBE THE ASSEMBLY'S CONCLUSION, NOT ONLY ITS LEAVES.** A real body over
+  postulated leaves has a conclusion that COMPUTES exactly as a postulate's does, so
+  it is probeable — and it is the one thing nobody instantiates, because it
+  typechecks and so reads as settled. Its falsity is the retroactive kind: every
+  clause already ground under it was proving something false, and the leaves inherit
+  the defect without any of them being individually wrong. Measured once on this
+  campaign's expensive spine: a leaf was probed, refuted, and the same witness then
+  refuted the definition consuming it, whose own bound was smaller — so the leaf's
+  refutation was the *cheaper* half of the finding. **The tell that it is worth the
+  minute: the leaf's bound and the assembly's bound are stated in the SAME currency**,
+  since then a witness against one arithmetic is a witness against both, and you get
+  the upper result for free by instantiating the parent at the same program.
+
 - **AND ASSUME A PROBE ALREADY EXISTED, UNTIL A SEARCH HAS FAILED (Anthony).** This
   is SEARCH FIRST arriving at the evidence, and it binds on every row that is not
   GRINDABLE — a FALSITY, SHAPE, VACUITY or DIFFICULTY row is exactly the kind that

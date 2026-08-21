@@ -37,11 +37,14 @@
 --     separate family, and must NOT ride `subscribeE-caps` (circular —
 --     that face takes `depthE ≤ dep` as a hypothesis).
 --
--- BUCKETS: (a) trivially zero — ofᵉ, emptyᵉ, deferᵉ, g0(μᵉ), scripted
--- slot, takeᵉ(zero).  (b) IH + arithmetic — mapᵉ, takeᵉ(suc), scanᵉ,
+-- BUCKETS: (a) trivially zero — ofᵉ, emptyᵉ, deferᵉ, g0(μᵉ),
+-- takeᵉ(zero).  (b) IH + arithmetic — mapᵉ, takeᵉ(suc), scanᵉ,
 -- over the burst-zero and installNode lemmas below.  (d) BLOCKED,
--- three named postulates — `depth-conn-storeNest` (the main IH
--- double-counts `slotNest (shared d)`, needs a tighter gas induction),
+-- three named postulates — `depth-conn-input` (the main IH
+-- double-counts `slotNest (shared d)`, needs a tighter gas induction;
+-- its predecessor took the def as a free argument and was refuted for
+-- it — Refuted.Depth-Conn, and the scripted slot moved into this leaf
+-- with the repair),
 -- `depth-all-bound` (needs the preservation conjunct, finding (4)),
 -- `depth-μ-bound` (sizeᵉ (unfoldμ body) > sizeᵉ (μᵉ body) kills the
 -- size IH; the honest route is the guarded-context discipline —
@@ -62,6 +65,7 @@ open import Data.Nat.Properties
 open import Data.Fin   using (Fin)
 open import Data.Vec   using (lookup)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
+open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (false; true)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -82,7 +86,7 @@ open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthConn; depthAll; depthBurst)
+  using (depthE; depthAll; depthBurst)
 
 ------------------------------------------------------------------
 -- THE MEASURE — the state's contribution to subscribe-time depth,
@@ -104,32 +108,109 @@ slotNest : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
 slotNest (shared d)   = sizeᵉ d
 slotNest (scripted _) = 0
 
-slotsNestMax : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsNestMax {n} sl = foldr _⊔_ 0 (tabulate {n = n} (λ i → slotNest (sl i)))
+-- A SUM OVER THE SLOTS, AND THE `foldr _⊔_ 0` IT REPLACES WAS
+-- REFUTED — Refuted.Depth-Chain, and the defect was the CURRENCY
+-- rather than any statement written over it.  Slots are STRATIFIED, so
+-- slot k's def may reference inputs strictly below k and the connects
+-- CHAIN; each link is traversed by one `thru-outer` frame and the arcs
+-- ADD.  A max over the slots does not grow with the chain at all, so
+-- the two sides grew in different variables — the left in the chain
+-- LENGTH, the right in one def's SIZE — and a chain longer than its
+-- largest def crossed: nine links of size 5 over a base of size 7
+-- measured depth 9 against a store of 7, and against the parent's own
+-- right-hand side of 8.
+--
+-- A SUM IS THE RIGHT CURRENCY BECAUSE THE CHAIN CANNOT REVISIT.
+-- Stratification makes the connect indices strictly decreasing, so
+-- each slot is entered at most once along any path and `Σ slotNest`
+-- pays for the whole chain; pointwise `slotNest ≤ slotSize` then keeps
+-- it under the caps, which is what `slots-nest-≤-size` and
+-- `storeNest-capped` do — and the sum form makes that proof SMALLER,
+-- since it is sum monotonicity rather than max-of-tabulate ≤
+-- sum-of-tabulate.
+--
+-- NOT A WEAKENING: the max was false, so this replaces a refuted
+-- measure rather than retreating from a true one.  Every statement
+-- written over `storeNestMax` keeps its text verbatim, which is why
+-- the refutation cost no clause below it.
+--
+-- THE NODE HALF IS NOT COVERED BY THAT ARGUMENT and is unprobed:
+-- `storeNestMax` still joins the two halves with `⊔`, because `+`
+-- there would need `slotsSize + nodeCeil ≤ cSize` and the caps supply
+-- each side separately.  Whether reads of parked observables chain the
+-- way slot defs do wants a state the evaluator actually REACHED, so it
+-- is a separate build.
+slotsNestSum : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
+slotsNestSum {n} sl = sum (tabulate {n = n} (λ i → slotNest (sl i)))
 
 storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
 storeNestMax sched st =
-  slotsNestMax (Sched.slots sched) ⊔ nodesNestMax (EvalSt.nodes st)
+  slotsNestSum (Sched.slots sched) ⊔ nodesNestMax (EvalSt.nodes st)
 
 ------------------------------------------------------------------
 -- BUCKET (d) — the three hard postulates (schedule-blockers)
 ------------------------------------------------------------------
 
 postulate
-  -- depthConn (gs fuel') = depthE fuel' d (share-sink i).
-  -- KEY: pathLen(share-sink i) = 0 definitionally (Measures:5614), so
+  -- STATED AT `input i`, NOT AT THE DEF, and that is a repair rather
+  -- than a convenience.  The predecessor took the def `d` as its own
+  -- argument, quantified over every `Closed Γ (lookup Γ i)` there is
+  -- with nothing tying it to `sched` — and REFUTED:
+  -- Refuted.Depth-Conn.  THIS STATEMENT WAS THEN REFUTED TOO, over the
+  -- max that `storeNestMax` used to be (Refuted.Depth-Chain), and
+  -- repaired by changing the MEASURE rather than the statement: the
+  -- text below is unchanged and the chain witness no longer reaches
+  -- it, 9 against a sum of 47 where the max gave 7.
+  -- The bound is believable only through
+  -- `sizeᵉ d = slotNest (shared d) ≤ slotsNestMax (Sched.slots sched)`,
+  -- which holds when `d` IS slot i's def and is a size the right-hand
+  -- side has never heard of when it is not: at a program whose every
+  -- slot is `scripted`, the store measures 0 while any `d` with one
+  -- `thru-outer` arc connects at 1.  The caller reached the def by
+  -- `with Sched.slots sched i` and so always had the missing fact,
+  -- which is the classic shape — a statement admitting instances its
+  -- caller cannot make.  Reading the slot INSIDE the statement is
+  -- better than conditioning on a provenance equation: there is no free
+  -- variable left to instantiate wrongly, the `scripted` branch comes
+  -- along for free (`0 ≤ _`), and the caller loses its `with`.
+  --
+  -- WHAT SURVIVES THE REPAIR is the obstacle the predecessor's header
+  -- described, unchanged.  depthConn (gs fuel') = depthE fuel' d
+  -- (share-sink i), and pathLen (share-sink i) = 0 definitionally, so
   -- depth-compositional gives ≤ sizeᵉ d + 0 + storeNestMax sched st'
   -- = sizeᵉ d + storeNestMax sched st (register doesn't touch nodes).
-  -- But goal is ≤ storeNestMax sched st; gap is sizeᵉ d (= slotNest
-  -- (shared d) ≤ storeNestMax sched st), so natural-number arithmetic
-  -- cannot absorb the double-count.  Needs a JOINT induction with
-  -- depth-all-bound (both require storeNestMax preservation through
-  -- subscribeE — census finding (4)).
-  depth-conn-storeNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+  -- The goal is ≤ storeNestMax sched st, so the gap is exactly the
+  -- sizeᵉ d that is now known to be ≤ the right-hand side — and
+  -- natural-number arithmetic cannot absorb the double-count.  Needs a
+  -- JOINT induction with depth-all-bound (both require storeNestMax
+  -- preservation through subscribeE — census finding (4)).
+  --
+  -- AND A `⊔` IS THE WRONG INSTINCT — MEASURED, NOT ARGUED.  The
+  -- earlier reading of the double-count was that the two currencies
+  -- alternate rather than compose (a store read enters at
+  -- `share-sink`, which resets the path), so
+  -- `(sizeᵉ b + pathLen κ) ⊔ storeNestMax` would make this clause
+  -- arithmetic.  That shape is refuted a fortiori by
+  -- Refuted.Depth-Chain, which gives `1 ⊔ 7 = 7` against a depth of 9:
+  -- a max cannot pay for a CHAIN of connects, and it was the max in
+  -- `storeNestMax` itself that had to become a sum.  Recorded here
+  -- because it was the plausible next move and it is dead.
+  --
+  -- WHAT THE SUM DOES *NOT* FIX IS THIS CLAUSE.  The double-count is
+  -- untouched: the goal after `depth-compositional` is still
+  -- `sizeᵉ d + storeNestMax ≤ storeNestMax`.  What the sum ADDS is that
+  -- the right-hand side now SPLITS, so the shape to test is a sharper
+  -- leaf bounded by the slots at or below `i` — strictly decreasing
+  -- down the chain by stratification, with `sizeᵉ d` absorbed by the
+  -- summand for `i` itself.  That is a JOINT restatement with
+  -- `depth-compositional`, whose own right-hand side would have to
+  -- carry the partial sum, so it is a design leg and a measurement
+  -- before it is a route: nothing here is evidence that it closes.
+  depth-conn-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (g : Gas) (i : Fin n)
     (κ : Path Γ (lookup Γ i) t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    depthConn g i d κ bid now sched st ≤ storeNestMax sched st
+    depthE g (input i) κ bid now sched st ≤ storeNestMax sched st
 
   -- depthAll's burst uses thru-outer (the spending arc).  Bounding the
   -- inner subscribes requires storeNestMax preservation through
@@ -240,6 +321,15 @@ storeNestMax-installTake sched st k =
 -- depthE = 0 at b=emptyᵉ with storeNestMax(post-install)=5 > 2=RHS,
 -- ruling out any hidden dependence of depthE on the scan accumulator.
 -- Shapes NOT covered: shared-slot inner b, post-cascade state.
+-- AND THE FIGURE 5 WAS MEASURED UNDER THE OLD MAX.  `storeNestMax`'s
+-- slot half is now a SUM (Refuted.Depth-Chain forced it), and the two
+-- agree only when the probe's slots contributed 0 apiece — which that
+-- probe's program is not recorded as having guaranteed, and the probe
+-- is deleted.  The CONCLUSION it drew is unaffected either way: the 5
+-- came from `nodeNestMax(scan-st v)`, the half that did not move, and
+-- what the row ruled out was a dependence of `depthE` on the
+-- accumulator.  It is the arithmetic of the number that is no longer
+-- pinned.
 -- NOTE: nodeNestMax(scan-st v) = sizeᵛ t v (NOT 0), so storeNestMax
 -- increases when installing with a non-trivial value.  The proof cannot
 -- go through depth-compositional at (sched₁, st₀) directly; it needs
@@ -327,13 +417,12 @@ private
   depth-compositional-go (gs fuel) (μᵉ body) κ bid now sched st =
     depth-μ-bound fuel body κ bid now sched st
 
-  -- BUCKET (d): input — slot dispatch, BLOCKED for the shared case
-  depth-compositional-go g (input i) κ bid now sched st
-    with Sched.slots sched i
-  ... | scripted _ = z≤n
-  ... | shared d   =
+  -- BUCKET (d): input — BLOCKED.  No `with` on the slot: the leaf reads
+  -- it, which is what stops a free def from being instantiated against a
+  -- store that does not hold it (Refuted.Depth-Conn).
+  depth-compositional-go g (input i) κ bid now sched st =
     ≤-trans
-      (depth-conn-storeNest g i d κ bid now sched st)
+      (depth-conn-input g i κ bid now sched st)
       (m≤n+m (storeNestMax sched st) (suc (pathLen κ)))
 
   -- BUCKET (b): mapᵉ — burst(map-f) = 0 by frame clause; IH on b

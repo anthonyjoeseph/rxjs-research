@@ -165,12 +165,20 @@ a real body as a discharged cone is how a row gets mis-ranked — the census tha
 mis-classed `subscribeE-inner-nodry-inv` read conclusions and never asked what
 its named suppliers needed.
 
-Labour, not risk: nothing here can discover a design failure.
+Labour MOSTLY, and the qualifier has been earned twice here — the second time
+reaching the ASSEMBLY rather than a leaf. The connect leaf was refuted for
+admitting instances its caller cannot make; then `depth-compositional` itself
+was refuted at a concrete nine-slot program, because the MEASURE under it was a
+max over the slots while the connects CHAIN. Neither cost a clause, but a real
+body's own conclusion is no safer than a postulate's, and a row whose OBSTACLE
+is written down is not thereby a row whose STATEMENT is right. Probe the residue
+before grinding it.
 
 - **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY, and the
-  module header buckets it BLOCKED: `depth-conn-storeNest`, `depth-all-bound`,
-  `depth-μ-bound`, `installScan-depth-bound`. No worked precedent among them, and
-  `depth-μ-bound`'s size IH is refuted in its own header. Obstacles and routes there.
+  module header buckets it BLOCKED: `depth-conn-input`, `depth-all-bound`,
+  `depth-μ-bound`, `installScan-depth-bound`. No worked precedent among them, two of
+  the four replace a refuted predecessor, and the measure all four are stated over
+  was refuted too. Obstacles and routes there.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

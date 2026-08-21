@@ -25,3 +25,7 @@ open import Refuted.Thru-Loop
   using (thruConsume-nodry-loop-absurd)
 open import Refuted.Inner-Nodry
   using (inner-nodry-inv-regLen-absurd)
+open import Refuted.Depth-Conn
+  using (depth-conn-free-def-absurd)
+open import Refuted.Depth-Chain
+  using (depth-conn-input-absurd; depth-compositional-absurd)

@@ -44,13 +44,11 @@
 
 module Verify-Budget-Sufficient.Depth-Bound where
 
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≤ᵇ_; _⊔_; z≤n)
-open import Data.Nat.Properties using (≤-trans; +-mono-≤; n≤1+n; ≤-refl;
-                                       ⊔-lub; m≤m+n; m≤n+m; ≤ᵇ⇒≤)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≤ᵇ_; _⊔_; z≤n)
+open import Data.Nat.Properties using (≤-trans; +-mono-≤; n≤1+n; ≤-refl; ⊔-lub; ≤ᵇ⇒≤)
 open import Data.Bool    using (Bool; true)
-open import Data.List    using (List; []; _∷_; foldr; tabulate)
+open import Data.List    using (List; []; _∷_; foldr)
 open import Data.Bool.ListAction using (all)
-open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin) renaming (zero to fzero; suc to fsuc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -66,8 +64,7 @@ open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 -- the wet family (pathLen, from .Measures) and the caps face (Caps,
 -- capsOK?), each imported below from the module that defines it
 open import Verify-Budget-Sufficient.Measures using
-  (boundedNode; pathLen; stB-nodes;
-                                                      ∧-true; szB)
+  (boundedNode; pathLen; stB-nodes; sum-tab-mono; ∧-true; szB)
 open import Verify-Budget-Sufficient.Caps using
   (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
@@ -83,7 +80,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 -- that module defines what this one consumes and the reverse import
 -- would be a cycle.  The 2026-08-05 census findings travelled with it.
 open import Verify-Budget-Sufficient.Depth-Compositional
-  using (nodeNestMax; nodesNestMax; slotNest; slotsNestMax; storeNestMax;
+  using (nodeNestMax; nodesNestMax; slotNest; slotsNestSum; storeNestMax;
          depth-compositional)
 open import Decide using (T-to)
 
@@ -138,20 +135,16 @@ slotNest-≤-slotSize : ∀ {n} {Γ : Ctx n} {k t} (s : Slot Γ k t) →
 slotNest-≤-slotSize (scripted _) = z≤n
 slotNest-≤-slotSize (shared _)   = ≤-refl
 
-tabulate-⊔≤-sum : ∀ {n} (f g : Fin n → ℕ) → (∀ i → f i ≤ g i) →
-  foldr _⊔_ 0 (tabulate f) ≤ sum (tabulate g)
-tabulate-⊔≤-sum {zero}  f g dom = z≤n
-tabulate-⊔≤-sum {suc n} f g dom =
-  ⊔-lub (≤-trans (dom fzero)
-                 (m≤m+n (g fzero) (sum (tabulate (λ i → g (fsuc i))))))
-        (≤-trans (tabulate-⊔≤-sum (λ i → f (fsuc i)) (λ i → g (fsuc i))
-                                  (λ i → dom (fsuc i)))
-                 (m≤n+m (sum (tabulate (λ i → g (fsuc i)))) (g fzero)))
-
+-- SUM MONOTONICITY, and it was ALREADY PROVEN one module down:
+-- `sum-tab-mono` in `.Measures`.  `slotsNestSum` became a sum when the
+-- max was refuted (Refuted.Depth-Chain), and this is the whole cost of
+-- that on the cap side — the local max-of-tabulate ≤ sum-of-tabulate
+-- lemma with its two `⊔-lub` arms is gone, replaced by a lemma the
+-- chain below already had.
 slots-nest-≤-size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) →
-  slotsNestMax sl ≤ slotsSize sl
+  slotsNestSum sl ≤ slotsSize sl
 slots-nest-≤-size {n} sl =
-  tabulate-⊔≤-sum {n} (λ i → slotNest (sl i)) (λ i → slotSize (sl i))
+  sum-tab-mono {n} (λ i → slotNest (sl i)) (λ i → slotSize (sl i))
     (λ i → slotNest-≤-slotSize (sl i))
 
 storeNest-capped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
