@@ -853,29 +853,17 @@ wet-take {e = e} {s = s} c sl Ψ J sf id now nid path′ vals fin sched st
 
 ------------------------------------------------------------------
 -- THE SCAN LEAF — also a REAL PROOF, cribbed from
--- `stepFrame-scan-wet` (Wet:441), the same clause proven against the
+-- `stepFrame-scan-wet` (.Wet/Part1), the same clause proven against the
 -- capᴱ ledger.  The one difference that matters: the caps half is NOT
 -- re-derived (the assembly already holds it), so this needs only the
--- fnCap half of the node lookup — hence `lookupNode-fnCap` below rather
--- than the two-sided `lookupNode-B`, whose `boundedNode` premise
--- nothing at this level can pay.
+-- fnCap half of the node lookup — `lookupNode-fnCap` rather than the
+-- two-sided `lookupNode-B`, whose `boundedNode` premise nothing at this
+-- level can pay.
 
--- the fnCap-ONLY half of `lookupNode-B` (Wet:416)
-NodeΨ : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Set
-NodeΨ Ψ nothing   = ⊤
-NodeΨ Ψ (just ns) = fnCapNode Ψ ns ≡ true
-
-lookupNode-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (nid : NodeId)
-  (nodes : List (NodeId × NodeState Γ)) →
-  all (λ kv → fnCapNode Ψ (proj₂ kv)) nodes ≡ true →
-  NodeΨ Ψ (lookupNode nid nodes)
-lookupNode-fnCap Ψ nid []            h = tt
-lookupNode-fnCap Ψ nid ((k , ns) ∷ r) h with k ≡ᵇ nid
-... | true  = proj₁ (∧-true _ _ h)
-... | false = lookupNode-fnCap Ψ nid r (proj₂ (∧-true _ _ h))
-
--- (the All ↔ all Ψ bridges moved DOWN to .Psi-Split, with the
--- predicate; imported back through the wholesale open above)
+-- (`NodeΨ` / `lookupNode-fnCap` and the All ↔ all Ψ bridges all moved
+-- DOWN to .Psi-Split, with the predicate — the level walk's scan push
+-- needs the node lookup too and sits BELOW this module; imported back
+-- through the wholesale open above)
 
 wet-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (c : Caps) (sl : Slots Γ) (Ψ J : ℕ)

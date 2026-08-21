@@ -75,7 +75,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 subscribeInner; splitEvents; retagEvents;
                                 thruConsume; thruWalk; thruWrap;
                                 mergeBump; switchKill; cutThrough; sweepLive;
-                                takeVals;
+                                takeVals; scanVals;
                                 lookupNode; setNode; pathHasNode; LiveSource;
                                 sameSource; installNode; NodeId; register; mintNode)
 
@@ -108,7 +108,7 @@ open import Verify-Budget-Sufficient.Caps-Face
 open import Verify-Budget-Sufficient.Psi-Split
 -- the chain-charge algebra subscribeE-caps' own *All head spends
 open import Verify-Budget-Sufficient.Caps-Chain
-  using (chain-desc; op-step; burst-index; burst-nil; burst-step;
+  using (chain-desc; op-step; op-step-eval; burst-index; burst-nil; burst-step;
          op-step-mu; quad-arith;
          op-desc; op-desc-eval; push-desc; frame-desc; tail-desc;
          walk-desc; inner-desc;
@@ -422,6 +422,31 @@ INV?-setNode Ψ B nid ns sched st bn fn inv =
   nodesΨ = proj₂ (∧-true (all (fnCapLive Ψ) (Sched.live sched))
                          (all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st))
                          (proj₁ (proj₂ parts)))
+
+-- THE SAME WRITE, MINUS THE STORE CONJUNCT — and the reason there are
+-- two of these is a fact about the evaluator, not a convenience.  A
+-- frame that FOLDS its node state (scan, whose accumulator the user's fn
+-- grows) cannot preserve `INV? Ψ B` at a fixed B at all: `boundedNode B`
+-- is a SIZE bound on that accumulator.  Every OTHER conjunct survives
+-- untouched, so `INV⁻?` (.Psi-Split) is what a fold transports, and the
+-- store bound is re-supplied at the caller from the caps receipt the
+-- level already produced.
+INV⁻?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (Ψ B : ℕ) (nid : NodeId) (ns : NodeState Γ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  fnCapNode Ψ ns ≡ true →
+  INV⁻? Ψ B sched st ≡ true →
+  INV⁻? Ψ B sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+INV⁻?-setNode Ψ B nid ns sched st fn h =
+  ∧-intro (∧-intro (fcB-live Ψ sched st (proj₁ parts))
+             (all-setNode (fnCapNode Ψ) nid ns (EvalSt.nodes st)
+                (fcB-nodes Ψ sched st (proj₁ parts)) fn))
+    (∧-intro (proj₁ (proj₂ parts))
+      (∧-intro (proj₁ (proj₂ (proj₂ parts)))
+        (∧-intro (proj₁ (proj₂ (proj₂ (proj₂ parts))))
+                 (proj₂ (proj₂ (proj₂ (proj₂ parts)))))))
+  where
+  parts = INV⁻?-parts Ψ B sched st h
 
 -- INV? across a node install plus a nextNode mint, lifted one level.
 -- Conjunct by conjunct: stBounded?'s live entry transports via liveEq,
@@ -1052,7 +1077,7 @@ pushMap-wet {n = n} {Γ = Γ} {s = s} {u = u} Ψ B F ℓ r̂ r̂′ η g bid now
 -- that funds the ℓ ledger's charge for the one longer path.
 --
 -- `wb` IS THE RECURSION, PINNED AT THE CALLER'S GAS, for the reason
--- WalkStmtᴴˢᶠ's header gives: a bare `walkFace b` at the gas-polymorphic
+-- WalkStmtᴴˢˢ's header gives: a bare `walkFace b` at the gas-polymorphic
 -- type is a partial application whose fuel the termination checker reads
 -- as unknown, and it rejects the whole walk group.
 walk-take-suc : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1234,7 +1259,7 @@ walk-take {Γ = Γ} {e = e} g cnt b wb = go (evalTm cnt) refl
 -- the one longer path.
 --
 -- `wb` IS THE RECURSION, PINNED AT THE CALLER'S GAS, for the reason
--- WalkStmtᴴˢᶠ's header gives: a bare `walkFace b` at the gas-polymorphic
+-- WalkStmtᴴˢˢ's header gives: a bare `walkFace b` at the gas-polymorphic
 -- type is a partial application whose fuel the termination checker reads
 -- as unknown, and it rejects the whole walk group.
 walk-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
@@ -1371,19 +1396,167 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
                 (frameStep-+assoc-burst c (suc j) j₁ j₂ sl (proj₁ PB)
                    (proj₁ (proj₂ (proj₂ PBc))))
 
--- THE SOURCE BURST'S HOP RECEIPT, AND IT IS NO LONGER A LEAF.  The
--- conjunct is `burstHopD?` about the SOURCE's OWN burst — `proj₁ r` for
--- `r = subscribeE g b (scan-f f nid ↠ κ) …` — so no part of the scan push
--- face enters it.  It is the walk face's own eighth conjunct AT `b`, and
--- everything this body does is discharge the walk face's hypotheses at the
+-- ─── THE scan FRAME, WET, Ψ COLUMN ONLY ─────────────────────────────
+-- `stepFrame … (scan-f fn nid) …` (Rx.Evaluator) reads the node table,
+-- and on a matching `scan-st` it runs `scanVals` and writes the folded
+-- accumulator back.  THE ACCUMULATOR GROWS, and that single fact is why
+-- this face is Ψ-only where take's is two-sided: `boundedNode B (scan-st
+-- acc′)` is a SIZE bound on the accumulator, and a fold does not respect
+-- it at a fixed B.  Ψ it does respect — `applyFn` mints no new fn — so
+-- what a scan step transports is exactly `INV⁻?` (.Psi-Split), and the
+-- store conjunct comes back at the caller off the caps receipt the level
+-- already produced.  Same division of labour as pushMap-wet's, one
+-- conjunct deeper: map's stepFrame does not touch the node table at all.
+--
+-- THE MIRROR IS `stepFrame-scan-wet` (.Wet/Part1), PROVEN, and this is
+-- its Ψ column with the size column deleted: the same six inert arms off
+-- the node lookup, the same `w ≟ᵗ u` guard, the same `scanVals-fnCap` in
+-- the one live arm.  The lookup's Ψ face comes from `lookupNode-fnCap`
+-- rather than the two-sided `lookupNode-B`, whose `boundedNode` premise
+-- nothing at this column can pay.  (Only the Ψ half transfers; the
+-- mirror's E-ladder does not — see the coverage note on the assembly
+-- below.)
+stepScan-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ψ B ℓ : ℕ) (g : Gas) (bid : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ →
+  INV⁻? Ψ B sched st ≡ true →
+  valsΨ? Ψ vals ≡ true →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = stepFrame g bid now (scan-f fn nid) κ vals fin sched st
+  in (INV⁻? Ψ B (proj₁ (proj₂ (proj₂ (proj₂ r))))
+              (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+   × (valsΨ? Ψ (proj₁ r) ≡ true)
+   × (any dryEvent (proj₁ (proj₂ r)) ≡ false)
+   × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+stepScan-wet {u = u} Ψ B ℓ g bid now fn nid κ vals fin sched st hfn h vΨ rgs
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-fnCap Ψ nid (EvalSt.nodes st)
+         (fcB-nodes Ψ sched st (proj₁ (INV⁻?-parts Ψ B sched st h)))
+... | nothing                | _ = h , refl , refl , rgs
+... | just (take-st _)       | _ = h , refl , refl , rgs
+... | just (merge-st _ _)    | _ = h , refl , refl , rgs
+... | just (concat-st _ _ _) | _ = h , refl , refl , rgs
+... | just (switch-st _ _)   | _ = h , refl , refl , rgs
+... | just (exhaust-st _ _)  | _ = h , refl , refl , rgs
+... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
+...   | no _     = h , refl , refl , rgs
+...   | yes refl =
+  INV⁻?-setNode Ψ B nid (scan-st (proj₂ run)) sched st
+    (T⇒≡true _ (≤⇒≤ᵇ (proj₁ fcRun))) h
+  , allΨ-of Ψ (proj₁ run) (proj₂ fcRun)
+  , refl
+  , rgs
+  where
+  run   = scanVals fn ac vals
+  fcRun = scanVals-fnCap Ψ fn ac vals hfn
+            (≤ᵇ⇒≤ _ _ (T-to nb))
+            (allΨ-to Ψ vals vΨ)
+
+-- THE BURST INDUCTION AT scan-f, WET HALF — pushTake-wet's and
+-- pushMap-wet's sibling, and it borrows one thing from each.  From take:
+-- the STATE MOVES, so the induction threads `sd₁`/`st₁` instead of
+-- re-using `sched`/`st`, and the retag layer needs a lemma because the
+-- dispatch is stuck behind a node lookup.  From map: the conclusion is
+-- the Ψ predicate and NOT `burstB?`, because the size half would need a
+-- growth theorem across a frame that grows values, while the caller can
+-- re-supply it from the level's own caps receipt for free.
+--
+-- WHAT IT DOES NOT OWE, and it is a whole column: the HOP ledger.  The
+-- scan clause's hop conjunct is paid on the SPINE — `walk-scan-hop-spn`
+-- ⊗ `burstHopSpn-cap` — which is also why the DEAD ROUTE beside
+-- `pushBurst-walk` (a frame-generic wet push face is FALSE, and it is
+-- false on the hop axis) does not bite here.  So there are four
+-- conjuncts where take has five, and each emit reassembles from three
+-- `all`/`any` facts rather than four.
+pushScan-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (Ψ B ℓ : ℕ) (g : Gas) (bid : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  caseWᵗ fn ⊔ fnCapᵗ fn ≤ Ψ →
+  INV⁻? Ψ B sched st ≡ true →
+  burstΨ? Ψ str ≡ true →
+  hasDry str ≡ false →
+  regsLen? ℓ (EvalSt.registry st) ≡ true →
+  let r = pushBurst g bid now (scan-f fn nid) κ str sched st
+  in (INV⁻? Ψ B (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+   × (burstΨ? Ψ (proj₁ r) ≡ true)
+   × (hasDry (proj₁ r) ≡ false)
+   × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
+pushScan-wet Ψ B ℓ g bid now fn nid κ [] sched st hfn invW bΨ hDry rgs =
+  invW , refl , refl , rgs
+pushScan-wet {n = n} {Γ = Γ} {s = s} {u = u} Ψ B ℓ g bid now fn nid κ
+  (em ∷ ems) sched st hfn invW bΨ hDry rgs =
+  W1 , ∧-intro EMITΨ W2 , cong₂ _∨_ EMITD W3 , W4
+  where
+  E    = InstEmit.events em
+  sp   = splitEvents {A = Val Γ u} E
+  step = stepFrame g bid now (scan-f fn nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sd₁  = proj₁ (proj₂ (proj₂ (proj₂ step)))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ step)))
+  eΨ   = proj₁ (∧-true _ _ bΨ)
+  dSp  = ∨-false (any dryEvent E) (hasDry ems) hDry
+  SF   = stepScan-wet Ψ B ℓ g bid now fn nid κ
+           (proj₁ sp) (proj₂ (proj₂ sp)) sched st hfn invW
+           (splitEvents-vals-Ψ {A = Val Γ u} Ψ E eΨ) rgs
+  S1   = proj₁ SF
+  S2   = proj₁ (proj₂ SF)
+  S3   = proj₁ (proj₂ (proj₂ SF))
+  S4   = proj₂ (proj₂ (proj₂ SF))
+  IH   = pushScan-wet Ψ B ℓ g bid now fn nid κ ems sd₁ st₁ hfn
+           S1 (proj₂ (∧-true _ _ bΨ)) (proj₂ dSp) S4
+  W1   = proj₁ IH
+  W2   = proj₁ (proj₂ IH)
+  W3   = proj₁ (proj₂ (proj₂ IH))
+  W4   = proj₂ (proj₂ (proj₂ IH))
+  EMITΨ : all (eventΨ? Ψ)
+              (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                 ++ map value (proj₁ step)
+                 ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+            ≡ true
+  EMITΨ = all-++-intro (eventΨ? Ψ) (proj₁ (proj₂ sp)) _
+            (splitEvents-bk-Ψ {t = u} Ψ E)
+            (all-++-intro (eventΨ? Ψ) (retagEvents (proj₁ (proj₂ step))) _
+               (retagEvents-Ψ {u = u} Ψ (proj₁ (proj₂ step)))
+               (all-++-intro (eventΨ? Ψ) (map value (proj₁ step)) _
+                  (mapValue-Ψ Ψ (proj₁ step) S2)
+                  (finList-Ψ {n = n} {Γ = Γ} {u = u} Ψ
+                     (proj₁ (proj₂ (proj₂ step))))))
+  EMITD : any dryEvent
+              (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ step))
+                 ++ map value (proj₁ step)
+                 ++ (if proj₁ (proj₂ (proj₂ step)) then complete ∷ [] else []))
+            ≡ false
+  EMITD = any-++-false dryEvent (proj₁ (proj₂ sp)) _
+            (splitEvents-bk-dry {u = u} E (proj₁ dSp))
+            (any-++-false dryEvent (retagEvents (proj₁ (proj₂ step))) _
+               (retagEvents-dry (proj₁ (proj₂ step)) S3)
+               (any-++-false dryEvent (map value (proj₁ step)) _
+                  (mapValue-dry (proj₁ step))
+                  (finList-dry {A = Val Γ u} (proj₁ (proj₂ (proj₂ step))))))
+
+-- THE SOURCE WALK, AND IT IS NO LONGER A LEAF.  Every conjunct it
+-- returns is about the SOURCE's own subscription — `subscribeE g b
+-- (scan-f f nid ↠ κ) …` — so no part of the scan PUSH enters any of
+-- them.  It is the walk face's whole tail AT `b`, and everything this
+-- body does is discharge that face's twenty-six hypotheses at the
 -- minted-and-installed state.
+--
+-- IT RETURNS THE TAIL WHOLE BECAUSE IT HAS TWO CONSUMERS, and the
+-- prologue below is the reason: `walk-scan-source` takes the hop
+-- conjunct, `walk-scan-rest` takes the other eight, and neither can
+-- reach them without these fifty lines.  Projecting one conjunct here
+-- and re-deriving the prologue at the other consumer is the shape this
+-- deliberately does not have.
 --
 -- `wb` IS THAT RECURSION, APPLIED TO `b` AND PINNED AT THE CALLER'S GAS —
 -- and the pinning is load-bearing, not tidiness: passing the bare
 -- `walkFace b` at the gas-POLYMORPHIC type is a PARTIAL application, whose
 -- fuel the termination checker reads as unknown, and it rejects the whole
 -- walk group (walk-mu with it).  Why, and the shape that works, is in
--- WalkStmtᴴˢᶠ's header, beside the type that carries the pin.
+-- WalkStmtᴴˢˢ's header, beside the type that carries the pin.
 --
 -- THE TEMPLATE IS `subscribeE-caps`'s OWN scanᵉ CLAUSE (.Subscribe-Face),
 -- PROVEN, AT THESE VERY INDICES, and the one thing to carry from it is
@@ -1398,16 +1571,14 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
 -- syncSize axis, and `syncSizeᵉ (scanᵉ f z b)` is a `suc`: the source's
 -- demand is therefore strictly below the frame's whatever the hops do,
 -- which is what funds the ℓ ledger's charge for the longer path.
-walk-scan-source-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+walk-scan-source-tail : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢᶠ {e = e} g f z b
-walk-scan-source-burst g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
-walk-scan-source-burst {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
+  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢˢ {e = e} g f z b
+walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs =
-  proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SUB)))))))
+  SUB
   where
   -- the size splits, verbatim from the caps twin
   szsum : sizeᵗ f + sizeᵗ z + sizeᵉ b ≤ Caps.cSize (frameStep j c)
@@ -1477,7 +1648,7 @@ walk-scan-source-burst {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bu
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ ⊑both) refl refl bnd fnN invW
-  SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc (j + j₀))
+  SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops (suc (j + j₀))
           (scan-f f nid ↠ κ) bid now sl sched₀ st₀
           2≤S 1≤R hCR slEq slC slSz inv₀
           (≤-trans szb′ (proj₁ ⊑both))
@@ -1487,11 +1658,11 @@ walk-scan-source-burst {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bu
           (frameStep-chain-suc c (j + j₀) (pathLen κ) 2≤S
              (≤-trans lC (proj₁ ⊑₀)))
           (scan-step f z b sl _ bud nst)
-          (chain-desc (sizeᵗ f + sizeᵗ z) (sizeᵉ b) ops′ hidx)
+          (chain-desc (sizeᵗ f + sizeᵗ z) (sizeᵉ b) ops hidx)
           (≤-trans (m≤m⊔n _ _) dpt)
           invW′ fcb pB′
           s2 fS rS ceil
-          (≤-trans (op-desc-eval (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₀
+          (≤-trans (op-desc-eval (Caps.cSize c) (Caps.cWid c) dep bud ops j j₀
                       2≤S (s≤s szz)) lb)
           ≤-refl
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
@@ -1504,7 +1675,9 @@ walk-scan-source-burst {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bu
 walk-scan-source : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
   (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢ⁰ {e = e} g f z b
-walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
+walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
+walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs =
   burstHopSpnH-intro F (slotHop F sl) (pmᵗ F 0 f) BND
@@ -1519,9 +1692,13 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl 
   r = subscribeE g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
         (proj₂ (mintNode sched))
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
-  frB = walk-scan-source-burst g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
+  -- the source tail whole, of which this face wants the SEVENTH conjunct
+  -- and `walk-scan-rest` wants the other eight
+  SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
+          κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
           s2 fS rS ceil lb dmd gas lℓ rgs
+  frB = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC)))))))
   -- THE NODE HALF, AND IT IS NOW GAPLESS.  `mint-install-survives`
   -- (.Node-Fresh) is exactly this shape — mint, install, subscribe under a
   -- frame naming the minted nid, read the node back — and it is PROVEN there
@@ -1564,6 +1741,150 @@ walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl
   src = walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
           s2 fS rS ceil lb dmd gas lℓ rgs
+
+-- THE EIGHT OTHER CONJUNCTS OF THE scan CLAUSE, ASSEMBLED — and after
+-- the source tail above it is `walk-map`'s clause with three
+-- substitutions and no new mathematics: `op-step` becomes the
+-- eval-shaped `op-step-eval` (the seed is BUILT, so the callee runs at
+-- `suc (j + j₀)` rather than `suc j`), `pushMap-wet` becomes
+-- `pushScan-wet`, and the INV? conjunct is rebuilt from two halves
+-- instead of widened whole.
+--
+-- THAT LAST ONE IS THE ONLY REAL DIFFERENCE, and it is the finding this
+-- body encodes.  map's push preserves `INV? Ψ B` outright — its
+-- stepFrame returns `sched` and `st` verbatim — so walk-map widens the
+-- receipt it already has.  scan's push writes the node table on every
+-- emit and the accumulator GROWS, so no fixed-B store bound survives it.
+-- The repair is not a stronger wet face: it is to notice that the store
+-- bound is ALREADY PROVEN at the new level, by the caps column, and to
+-- take it from there — `capsOK?`'s first conjunct IS `stBounded?` at
+-- `cSize`.  So the wet face carries `INV⁻?` (everything a fold does
+-- preserve), the caps face carries the rest, and `INV?-of-stB` puts them
+-- back together.  Nothing is widened in Ψ and nothing is re-proven.
+--
+-- ONE subst, NOT THREE.  The witness is `j₀ + suc (j₁ + j₂)` and every
+-- fact arrives at `(suc (j + j₀) + j₁) + j₂`, so a single index equation
+-- (`EQ`) transports all four caps-level conjuncts — the caps twin's
+-- nested `frameStep-+assoc-{caps,burst,count}` pairs are that same
+-- associativity done one lemma at a time.
+--
+-- THE HOP COLUMN IS NOT OWED HERE.  `walk-scan` pays conjunct 7 through
+-- `walk-scan-hop-spn` ⊗ `burstHopSpn-cap`, which is why this face's wet
+-- half can be Ψ-only and why the DEAD ROUTE beside `pushBurst-walk` —
+-- frame-generic wet push faces are FALSE on the hop axis — does not
+-- reach it.
+--
+-- COVERAGE BOUNDARY, kept because it is what a reader will try next:
+-- `subscribeE-walkS`'s scanᵉ clause (.Wet/Part2) mirrors this piece for
+-- piece and is PROVEN, but on the `capᴱ W E` ladder with E growing as
+-- `E * 3 ^ suc Ψ`, which meets `frameStep`'s `iterSize` only where
+-- .Caps-Bridge instantiates both at the top.  Read it for ingredients
+-- and indices; it cannot be imported.
+walk-scan-rest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+  (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) →
+  WalkStmtAt⁻ᴴ {e = e} g (scanᵉ f z b)
+walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
+walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
+  κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  j₀ + suc (j₁ + j₂)
+    , subst (λ x → capsOK? (frameStep x c)
+                     (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
+            (sym EQ) (proj₁ (proj₂ PBc))
+    , CAPSB
+    , subst (λ x → burstCount? (frameStep x c) (proj₁ PB) ≡ true)
+            (sym EQ) (proj₁ (proj₂ (proj₂ (proj₂ PBc))))
+    , op-step-eval (Caps.cSize c) (Caps.cWid c) dep bud ops′ j j₀ j₁ j₂ 2≤S
+        (s≤s szz) a₄
+        (≤-trans (proj₂ (proj₂ (proj₂ (proj₂ PBc))))
+                 (burst-index (Caps.cSize c) (Caps.cWid c) dep bud
+                    (length (proj₁ res)) (J₀ + j₁) (J₀ + j₁) 2≤S
+                    (countLen (frameStep (J₀ + j₁) c) (proj₁ res) a₃)))
+    , subst (λ x → INV? Ψ (Caps.cSize (frameStep x c))
+                     (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
+            (sym EQ)
+            (INV?-of-stB Ψ (Caps.cSize (frameStep ((J₀ + j₁) + j₂) c))
+               (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB))
+               (proj₁ (capsOK?-parts (frameStep ((J₀ + j₁) + j₂) c)
+                         (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB))
+                         (proj₁ (proj₂ PBc))))
+               (INV⁻?-widen (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB))
+                  (proj₁ ⊑₂) V1))
+    , burstB?-halves (frameStep (j + (j₀ + suc (j₁ + j₂))) c) sl Ψ (proj₁ PB)
+        CAPSB V2
+    , V3 , V4
+  where
+  -- the size splits, the two this face actually spends
+  szsum : sizeᵗ f + sizeᵗ z + sizeᵉ b ≤ Caps.cSize (frameStep j c)
+  szsum = ≤-trans (n≤1+n (sizeᵗ f + sizeᵗ z + sizeᵉ b)) szb
+  szfz  = ≤-trans (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b)) szsum
+  szf   = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) szfz
+  szz   = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) szfz
+  capf  = ≤-trans (m≤m⊔n (caseWᵗ f ⊔ fnCapᵗ f) _) fnC
+  -- `evalSeed-caps`' witness IS this, definitionally, which is what lets
+  -- the level step be NAMED here instead of threaded out of the source
+  -- tail — and it is the same `s≤s` the caps twin hands op-step-eval
+  j₀     = suc (sizeᵗ z)
+  J₀     = suc (j + j₀)
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (scan-st (evalTm z)) st
+  SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
+          κ bid now sl sched st
+          2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+          s2 fS rS ceil lb dmd gas lℓ rgs
+  j₁  = proj₁ SRC
+  a₁  = proj₁ (proj₂ SRC)
+  a₂  = proj₁ (proj₂ (proj₂ SRC))
+  a₃  = proj₁ (proj₂ (proj₂ (proj₂ SRC)))
+  a₄  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SRC))))
+  a₅  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC)))))
+  a₆  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC))))))
+  a₈  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC))))))))
+  a₉  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC))))))))
+  res = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁ st₀
+  -- the frame receipts at the PUSH's level, straight off monotonicity in
+  -- j: the source tail's own ⊑-chain is not needed to get here
+  j≤J : j ≤ J₀ + j₁
+  j≤J = ≤-trans (≤-trans (m≤m+n j j₀) (m≤m+n (j + j₀) j₁))
+                (n≤1+n ((j + j₀) + j₁))
+  monoJ = frameStep-mono-j c 2≤S j≤J
+  PBc = pushBurst-caps c dep bud (J₀ + j₁) g bid now (scan-f f nid) κ
+          (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
+          (trans (KeepsC.slotsEq
+                   (subscribeE-keeps g b (scan-f f nid ↠ κ) bid now sched₁ st₀))
+                 slEq)
+          slC slSz a₁
+          (T⇒≡true _ (≤⇒≤ᵇ (≤-trans szf (proj₁ monoJ))))
+          (pathSz?-⊑ κ monoJ pC)
+          (≤-trans lC (proj₁ monoJ))
+          a₂ a₃
+          (≤-trans (m≤n⊔m _ _) dpt)
+  j₂  = proj₁ PBc
+  ⊑₂  = frameStep-⊑-+ c 2≤S (J₀ + j₁) j₂
+  PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)
+          (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  WET = pushScan-wet Ψ (Caps.cSize (frameStep (J₀ + j₁) c)) ℓ g bid now f nid κ
+          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+          capf
+          (INV⁻?-of Ψ (Caps.cSize (frameStep (J₀ + j₁) c))
+             (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) a₅)
+          (burstΨ?-of (Caps.cSize (frameStep (J₀ + j₁) c)) Ψ (proj₁ res) a₆)
+          a₈ a₉
+  V1  = proj₁ WET
+  V2  = proj₁ (proj₂ WET)
+  V3  = proj₁ (proj₂ (proj₂ WET))
+  V4  = proj₂ (proj₂ (proj₂ WET))
+  EQ : j + (j₀ + suc (j₁ + j₂)) ≡ (J₀ + j₁) + j₂
+  EQ = trans (sym (+-assoc j j₀ (suc (j₁ + j₂))))
+         (trans (+-suc (j + j₀) (j₁ + j₂))
+                (cong suc (sym (+-assoc (j + j₀) j₁ j₂))))
+  CAPSB : burstCaps? (frameStep (j + (j₀ + suc (j₁ + j₂))) c) sl (proj₁ PB) ≡ true
+  CAPSB = subst (λ x → burstCaps? (frameStep x c) sl (proj₁ PB) ≡ true)
+                (sym EQ) (proj₁ (proj₂ (proj₂ PBc)))
 
 -- THE scan CLAUSE, ASSEMBLED.  Nothing is proven here that the two leaves
 -- do not already say; the point of the assembly is that it puts the row's

@@ -91,6 +91,97 @@ regsBΨ? : ∀ {n} {Γ : Ctx n} {t} → ℕ
         → List (RegId × Source × Chain Γ t) → Bool
 regsBΨ? Ψ = all (λ en → pathBΨ? Ψ (proj₂ (proj₂ (proj₂ en))))
 
+-- THE INVARIANT MINUS ITS STORE CONJUNCT — `INV?` with `stBounded?`
+-- dropped, named the way `WalkTail⁻` names WalkTail-minus-one-conjunct.
+--
+-- WHY EXACTLY THIS CONJUNCT, and it is a fact about the evaluator rather
+-- than a convenience.  A frame that FOLDS its node state (scan, whose
+-- accumulator is grown by the user's fn) cannot preserve `INV? Ψ B` at a
+-- fixed B: `boundedNode B (scan-st acc)` is a SIZE bound on the
+-- accumulator and the fold grows it.  Every OTHER conjunct survives such
+-- a step untouched — the scan step writes the node table and nothing
+-- else, so the registry, the live ring and the slots are literally the
+-- same — and the Ψ conjuncts survive because no applyFn mints a new fn.
+-- So the split is one conjunct wide, and the size receipt the caps face
+-- already produced at the new level supplies it: `INV?-of-stB` below.
+INV⁻? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+      → ℕ → ℕ → Sched Γ → EvalSt e → Bool
+INV⁻? Ψ B sched st =
+  fnCapBounded? Ψ sched st
+  ∧ (length (EvalSt.registry st) ≤ᵇ B)
+  ∧ regsB? B Ψ (EvalSt.registry st)
+  ∧ (slotsSize (Sched.slots sched) ≤ᵇ B)
+  ∧ (slotsFnCap (Sched.slots sched) ≤ᵇ Ψ)
+
+INV⁻?-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  INV? Ψ B sched st ≡ true → INV⁻? Ψ B sched st ≡ true
+INV⁻?-of Ψ B sched st inv
+  with INV-parts Ψ B sched st inv
+... | _ , hfc , hrl , hrb , hss , hsfc =
+  ∧-intro hfc (∧-intro hrl (∧-intro hrb (∧-intro hss hsfc)))
+
+-- THE ASSEMBLY, and it is INV?-of-parts with the store conjunct arriving
+-- from the OTHER column.  Not a widening in either argument: the store
+-- bound is taken at the level the caller wants and the rest is already
+-- there, which is the whole point of the split.
+INV?-of-stB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  stBounded? B sched st ≡ true → INV⁻? Ψ B sched st ≡ true →
+  INV? Ψ B sched st ≡ true
+INV?-of-stB Ψ B sched st hsb h⁻ = ∧-intro hsb h⁻
+
+-- and it PROJECTS the way INV? does, for the same reason `INV-parts`
+-- exists: _∧_ matches on its first argument, so every peel has to name
+-- the Bool it splits off or the solver is left with a metavariable in
+-- stuck position.  Done once, here.
+INV⁻?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → INV⁻? Ψ B sched st ≡ true →
+  (fnCapBounded? Ψ sched st ≡ true)
+  × ((length (EvalSt.registry st) ≤ᵇ B) ≡ true)
+  × (regsB? B Ψ (EvalSt.registry st) ≡ true)
+  × ((slotsSize (Sched.slots sched) ≤ᵇ B) ≡ true)
+  × ((slotsFnCap (Sched.slots sched) ≤ᵇ Ψ) ≡ true)
+INV⁻?-parts Ψ B sched st h
+  with ∧-true (fnCapBounded? Ψ sched st) _ h
+... | hfc , r1 with ∧-true (length (EvalSt.registry st) ≤ᵇ B) _ r1
+... | hrl , r2 with ∧-true (regsB? B Ψ (EvalSt.registry st)) _ r2
+... | hrb , r3 with ∧-true (slotsSize (Sched.slots sched) ≤ᵇ B) _ r3
+... | hss , hsfc = hfc , hrl , hrb , hss , hsfc
+
+-- and it widens on the B axis exactly as INV? does, conjunct by
+-- conjunct — the three B-indexed ones through ≤ᵇ-widen and its `all`
+-- liftings, the Ψ-indexed two untouched.
+INV⁻?-widen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {Ψ B B′ : ℕ}
+  (sched : Sched Γ) (st : EvalSt e) → B ≤ B′ →
+  INV⁻? Ψ B sched st ≡ true → INV⁻? Ψ B′ sched st ≡ true
+INV⁻?-widen {Ψ = Ψ} {B = B} sched st le h
+  with INV⁻?-parts _ B sched st h
+... | hfc , hrl , hrb , hss , hsfc =
+  ∧-intro hfc
+    (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) le hrl)
+      (∧-intro (regsB?-widen (EvalSt.registry st) le hrb)
+        (∧-intro (≤ᵇ-widen (slotsSize (Sched.slots sched)) le hss) hsfc)))
+
+-- A NODE LOOKUP CARRIES THE Ψ FACE OF WHATEVER IT FINDS — the fnCap-only
+-- half of `lookupNode-B` (.Wet/Part1), whose `boundedNode` premise a
+-- Ψ-only face has nothing to pay with.  It sits HERE rather than with
+-- either consumer because there are now two of them on opposite sides of
+-- the burst face: the stepFrame-level scan leaf above it and the level
+-- walk's scan push below, and this module is under both.
+NodeΨ : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Set
+NodeΨ Ψ nothing   = ⊤
+NodeΨ Ψ (just ns) = fnCapNode Ψ ns ≡ true
+
+lookupNode-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) nodes ≡ true →
+  NodeΨ Ψ (lookupNode nid nodes)
+lookupNode-fnCap Ψ nid []            h = tt
+lookupNode-fnCap Ψ nid ((k , ns) ∷ r) h with k ≡ᵇ nid
+... | true  = proj₁ (∧-true _ _ h)
+... | false = lookupNode-fnCap Ψ nid r (proj₂ (∧-true _ _ h))
+
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -302,13 +393,18 @@ INV?-reindex Ψ B B′ sched st inv hsb hrl hrsz hss
 -- map push and the burst face's inner walk — and this module is below
 -- both.
 --
--- Two of the four are UNCONDITIONAL, and that is a fact about the
+-- Three of the five are UNCONDITIONAL, and that is a fact about the
 -- reassembly rather than about Ψ: splitEvents puts only bookkeeping in
--- its back list, and a terminator carries no value.  There is no
--- RETAG flavour here, and that is deliberate: map's stepFrame emits
--- `[]` literally, so its retag layer reduces away and never needs a
--- lemma; scan's is the first face that will, and it can be written
--- then rather than parked here now.
+-- its back list, a retagged list is value-free, and a terminator
+-- carries no value.
+--
+-- THE RETAG FLAVOUR EXISTS NOW, AND WHY IT DID NOT BEFORE IS THE
+-- INTERESTING HALF.  map's stepFrame emits `[]` LITERALLY, so its retag
+-- layer reduces away and its push face needs no lemma at all.  scan's
+-- also emits `[]` — in every arm of its dispatch — but the dispatch is
+-- STUCK behind a node lookup, so the layer cannot reduce and has to be
+-- discharged by a lemma instead.  Same emitted list, different proof
+-- obligation, and the difference is where the node table is read.
 ------------------------------------------------------------------
 
 splitEvents-vals-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
@@ -343,6 +439,19 @@ splitEvents-bk-Ψ {t = t} Ψ (handoff _ ∷ es) =
   ∧-intro refl (splitEvents-bk-Ψ {t = t} Ψ es)
 splitEvents-bk-Ψ {t = t} Ψ (complete ∷ es) =
   splitEvents-bk-Ψ {t = t} Ψ es
+
+-- a retagged list is value-free, so the Ψ test is unconditional —
+-- `retagEvents-B` / `-hop`'s twin (.Walk-Level/Parts, where those two
+-- sit beside the take push that is their only consumer)
+retagEvents-Ψ : ∀ {n} {Γ : Ctx n} {u} {A : Set} (Ψ : ℕ)
+  (es : List (InstEvent A)) →
+  all (eventΨ? {u = u} Ψ) (retagEvents {A = A} {B = Val Γ u} es) ≡ true
+retagEvents-Ψ Ψ []               = refl
+retagEvents-Ψ Ψ (value _   ∷ es) = retagEvents-Ψ Ψ es
+retagEvents-Ψ Ψ (init _    ∷ es) = ∧-intro refl (retagEvents-Ψ Ψ es)
+retagEvents-Ψ Ψ (close _ _ ∷ es) = ∧-intro refl (retagEvents-Ψ Ψ es)
+retagEvents-Ψ Ψ (handoff _ ∷ es) = ∧-intro refl (retagEvents-Ψ Ψ es)
+retagEvents-Ψ Ψ (complete  ∷ es) = ∧-intro refl (retagEvents-Ψ Ψ es)
 
 mapValue-Ψ : ∀ {n} {Γ : Ctx n} {u} (Ψ : ℕ) (vs : List (Val Γ u)) →
   valsΨ? Ψ vs ≡ true → all (eventΨ? Ψ) (map value vs) ≡ true
