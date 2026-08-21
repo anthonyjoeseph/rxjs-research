@@ -140,10 +140,6 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`shared-live-INV`** (Walk-Level) — GRINDABLE: the live-share join's INV?,
-  the one conjunct of arm B not closed by computation. Header carries the
-  refutation pinning its shape and a proven source per conjunct;
-  `input-wet-scripted-four` spends the same lemma.
 - **`input-wet-scripted-four`** (Walk-Level) — GRINDABLE: takes NO walk face, so
   nothing recurses and no induction has to be designed. Header carries the full
   census against a PROVEN clause-for-clause twin, plus two chores that read as

@@ -113,42 +113,90 @@ open import Verify-Budget-Sufficient.Caps-Nest
 open import Verify-Budget-Sufficient.Walk-Level.Parts public
 
 
-postulate
-  -- ARM B's INV?, AND ONLY IT.  The live-share join registers and touches
-  -- nothing else, so four of the wet five close by computation or by the
-  -- hypothesis (see the body below); this is the fifth.
-  --
-  -- ⚠ THE CAPS RECEIPT IS LOAD-BEARING, AND WITHOUT IT THIS IS FALSE AT
-  -- j′ = 0.  Stated first as `INV? at j → INV? at (j + j′) after register`
-  -- with no caps hypothesis; that is refuted by INV?'s own third conjunct,
-  -- `length (EvalSt.registry st) ≤ᵇ B` (.Measures).  `register` APPENDS one
-  -- entry, so the length goes L ↦ suc L, while j′ = 0 leaves B alone — and
-  -- a registry sitting exactly at its cap satisfies the hypothesis and
-  -- refutes the conclusion.  j′ = 0 is not hypothetical here: this face
-  -- quantifies j′ universally and the caller supplies it.
-  --
-  -- The repair is not `1 ≤ j′` (which the dispatch cannot supply) but the
-  -- observation that the length conjunct never came from widening in the
-  -- first place: `capsOK?` (.Caps-Face/Part1) carries
-  -- `length (registry st) ≤ᵇ Caps.cReg c` at the POST-state, and PROVEN
-  -- `frameStep-reg≤size` (.Caps) lifts cReg to cSize at any j.  So the
-  -- caps face already pays for the entry and this lemma spends its receipt.
-  --
-  -- GRINDABLE: third conjunct from `cOK′` through frameStep-reg≤size, the
-  -- other five by widening across `frameStep-mono-j` — stBounded? and
-  -- regsB? through their own -widen lemmas, pathB? for the new entry from
-  -- `pB` through the same ⊑ᶜ, and the two slots conjuncts unchanged (slots
-  -- never move).  The scripted census's shape B needs exactly this lemma
-  -- too, so input-wet-scripted-four spends it rather than restating it.
-  shared-live-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (Ψ j j′ : ℕ) (src : Source) (κ : Path Γ u t)
-    (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    Caps.cReg c ≤ Caps.cSize c →
-    capsOK? (frameStep (j + j′) c) sched (register src κ st) ≡ true →
-    INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
-    pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-    INV? Ψ (Caps.cSize (frameStep (j + j′) c)) sched (register src κ st) ≡ true
+-- ARM B's INV?, AND ONLY IT.  The live-share join registers and touches
+-- nothing else, so four of the wet five close by computation or by the
+-- hypothesis (see the body below); this is the fifth.
+--
+-- ⚠ THE CAPS RECEIPT IS LOAD-BEARING, AND WITHOUT IT THIS IS FALSE AT
+-- j′ = 0.  Stated first as `INV? at j → INV? at (j + j′) after register`
+-- with no caps hypothesis; that is refuted by INV?'s own third conjunct,
+-- `length (EvalSt.registry st) ≤ᵇ B` (.Measures).  `register` APPENDS one
+-- entry, so the length goes L ↦ suc L, while j′ = 0 leaves B alone — and
+-- a registry sitting exactly at its cap satisfies the hypothesis and
+-- refutes the conclusion.  j′ = 0 is not hypothetical here: this face
+-- quantifies j′ universally and the caller supplies it.
+--
+-- The repair is not `1 ≤ j′` (which the dispatch cannot supply) but the
+-- observation that the length conjunct never came from widening in the
+-- first place: `capsOK?` (.Caps-Face/Part1) carries
+-- `length (registry st) ≤ᵇ Caps.cReg c` at the POST-state, and PROVEN
+-- `frameStep-reg≤size` (.Caps) lifts cReg to cSize at any j.  So the
+-- caps face already pays for the entry and this lemma spends its receipt.
+--
+-- WHAT THE BODY SPENDS, conjunct by conjunct.  Three WIDEN across the one
+-- inequality `le` that `frameStep-mono-j` delivers — stBounded? and regsB?
+-- through their own -widen lemmas, and the slotsSize conjunct through plain
+-- `≤ᵇ-widen`.  Two pass VERBATIM, because they are indexed by Ψ and not by
+-- the size: fnCapBounded?, and the slotsFnCap conjunct.  The third is the
+-- one that cannot widen, and it is the caps receipt being spent: `cOK′`'s
+-- own registry bound lifted from cReg to cSize by `frameStep-reg≤size`.
+-- The new registry entry is `pathB?-widen κ le pB`, appended by
+-- `all-++-intro`.
+--
+-- CORRECTED: this paragraph used to say "the other five by widening" and
+-- "the two slots conjuncts unchanged (slots never move)".  Slots indeed
+-- never move, but conjunct 5 compares slotsSize against B, and B is exactly
+-- what grows — so it widens like the rest.  Only the two Ψ-indexed
+-- conjuncts are untouched.
+--
+-- PROVEN TWIN: `register-INV` (.Wet/Part1) is this statement on the
+-- `capᴱ W E` ladder — same five arms in the same order, and its `regOK`
+-- transfers under the ladder substitution.  Only the length arm differs,
+-- and that difference is the whole point of the caps hypothesis: there it
+-- comes from the ×2 ledger edge, here it is SPENT from the caps receipt,
+-- which is why this face survives j′ = 0 where an unconditional
+-- restatement would not.
+--
+-- The scripted census's shape B needs exactly this lemma too, so
+-- input-wet-scripted-four spends it rather than restating it.
+shared-live-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (Ψ j j′ : ℕ) (src : Source) (κ : Path Γ u t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ Caps.cSize c →
+  Caps.cReg c ≤ Caps.cSize c →
+  capsOK? (frameStep (j + j′) c) sched (register src κ st) ≡ true →
+  INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
+  pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
+  INV? Ψ (Caps.cSize (frameStep (j + j′) c)) sched (register src κ st) ≡ true
+shared-live-INV {u = u} c Ψ j j′ src κ sched st 2≤S hCR cOK′ inv pB
+  with INV-parts Ψ (Caps.cSize (frameStep j c)) sched st inv
+... | sb , fc , rl , rb , ss , sf =
+  ∧-intro (stBounded-widen le sched st sb)
+  (∧-intro fc
+  (∧-intro lenOK
+  (∧-intro regOK
+  (∧-intro (≤ᵇ-widen (slotsSize (Sched.slots sched)) le ss) sf))))
+  where
+  le : Caps.cSize (frameStep j c) ≤ Caps.cSize (frameStep (j + j′) c)
+  le = proj₁ (frameStep-mono-j c 2≤S (m≤m+n j j′))
+  lenOK : (length (EvalSt.registry st
+                   ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
+            ≤ᵇ Caps.cSize (frameStep (j + j′) c)) ≡ true
+  regCap : (length (EvalSt.registry st
+                    ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
+             ≤ᵇ Caps.cReg (frameStep (j + j′) c)) ≡ true
+  regCap = proj₂ (proj₂ (proj₂ (proj₂
+    (capsOK?-parts (frameStep (j + j′) c) sched (register src κ st) cOK′))))
+  lenOK = ≤ᵇ-widen (length (EvalSt.registry st
+                            ++ (EvalSt.nextReg st , src , u , κ) ∷ []))
+            (frameStep-reg≤size c (j + j′) (≤-trans (s≤s z≤n) 2≤S) hCR)
+            regCap
+  regOK : regsB? (Caps.cSize (frameStep (j + j′) c)) Ψ
+            (EvalSt.registry st
+             ++ (EvalSt.nextReg st , src , u , κ) ∷ []) ≡ true
+  regOK = all-++-intro _ (EvalSt.registry st) _
+            (regsB?-widen (EvalSt.registry st) le rb)
+            (∧-intro (pathB?-widen κ le pB) refl)
 
 -- ARM C's RECURSIVE WALK, ASSEMBLED.  This is `wl` at the slot's stored
 -- def and nothing else: `sharedConnect` makes exactly ONE recursive call,
