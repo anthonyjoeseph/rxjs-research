@@ -140,20 +140,9 @@ census disclaims its own verification ("derived by reading the evaluator and the
 measures, NOT by typechecking — treat each named ingredient as located, not
 spent"), so every row governed by it inherits that caveat.
 
-- **`scripted-cold-empty-four`** (Walk-Level) — GRINDABLE: the async shape is
-  now a real body, and every step it spends serves this one too, minus the
-  tail. What is left is to apply the two slot bounds below and account for the
-  close the empty shape emits and the async one does not.
-- **`scripted-sync-valB`** (Walk-Level) — GRINDABLE: a scripted slot's sync
-  prefix is size- and Ψ-bounded. Route in the header; the Ψ half's lemma is now
-  proven, and the async shape already spends this leaf, so its fit is checked.
-- **`scripted-sync-hopD`** (Walk-Level) — GRINDABLE: the same prefix's values
-  weigh no more in hop depth than the input that replays them. slotHop is a
-  fixpoint over the slots, which is the fact to spend.
-- **`walk-defer-eight` / `walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in
-  that order. None recurses or pushes, so none needs a push face or reaches the
-  ledger conjuncts. The first two already have real consumers, so their fit gets
-  typechecked rather than asserted. Residues are in the headers.
+- **`walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in that order. Neither
+  recurses nor pushes, so neither reaches the ledger conjuncts. `walk-empty`
+  has a real consumer, so its fit is typechecked. Residues in the headers.
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: all six conjuncts
   have a named source in scope. Header carries the per-conjunct inventory.
 - **`switchKill-context`** (Burst-Walk) — GRINDABLE: pure preservation, and

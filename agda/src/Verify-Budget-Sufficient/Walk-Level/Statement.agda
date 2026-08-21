@@ -1160,23 +1160,6 @@ postulate
   walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
     WalkStmt {e = e} (emptyᵉ {t = u})
   -- (walk-mu is GROUND — forward-declared below, body after walkFace)
-  -- registration + parked body — GRINDABLE.  The clause that MINTS a
-  -- registry entry, so regsLen?'s growth is paid here, and it is the
-  -- ONLY row in this family that neither recurses nor pushes: install,
-  -- mint, park, register, and the burst is `init src ∷ []` (Evaluator:
-  -- 1485-1496).  So four of the wet five are cheap — no values in the
-  -- burst at all, hence burstB? and burstHopD? over an empty payload
-  -- (`hopDᵉ V η (deferᵉ e) = 0`), hasDry by computation on a lone init,
-  -- INV? by INV?-install (below, PROVEN) then addLive-INV (.Wet/Part2,
-  -- PROVEN).  The fifth, regsLen?, IS DISCHARGED (2026-08-19): `walk-defer`
-  -- below is a real body pairing this leaf with PROVEN register-regsLen,
-  -- which is why this leaf is at WalkStmt⁻ rather than WalkStmt.  What the
-  -- defer clause registers is `thru-outer mergeᵒ nid ↠ κ` over an
-  -- installNode — one longer than κ, and installNode leaves the registry
-  -- alone — so the growth is funded by G, which is at least 1 here because
-  -- `syncSizeᵉ (deferᵉ e) = 1` sits in dBound's summand position.
-  walk-defer-eight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (body : Closed Γ u) → WalkStmt⁻ {e = e} (deferᵉ body)
 
 -- THE *All BODY'S PIECES — INV?-install (below, after all-setNode) and the
 -- push face its assembly (below) consumes.

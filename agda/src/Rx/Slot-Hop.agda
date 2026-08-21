@@ -36,8 +36,9 @@ open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; trans; cong; sym; subst)
 
-open import Rx.Exp       using (Ctx; Exp; Closed; inputsBelowᵉ)
+open import Rx.Exp       using (Ctx; Exp; Closed; inputsBelowᵉ; isData; Val)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
+open import Rx.Prim      using (ObservableInput)
 open import Rx.Hop-Depth using (hopDᵉ)
 -- PROVEN (ex-postulate 2026-08-14): the η congruence slotHop-fix spends
 open import Rx.Hop-Eta-Cong using (hopD-η-congᵉ)
@@ -94,6 +95,21 @@ slotHop V sl i = slotHopD V (ηAt V sl (toℕ i)) (sl i)
 -- THE FIXPOINT, assembled: at a shared slot, slotHop's staged answer
 -- is the def's hopD under the full slotHop environment — the equation
 -- the walk face's input clause charges against.
+-- AND THE SCRIPTED SIDE OF THE SAME FIXPOINT, which is the easy half and was
+-- never stated: a scripted slot replays stored values and subscribes nothing,
+-- so it contributes NO hop at all.  `slotHopD` says so outright, and the slot
+-- equation is what carries that up to `slotHop`.
+--
+-- This is the bound a scripted `input i` reports against, because
+-- `hopDᵉ V η (input i)` IS `η i` -- so at a scripted slot the hop budget a
+-- clause must fit its emitted values into is exactly ZERO, which is why its
+-- consumers pair this with the hopDᵛ emptiness of a data type.
+slotHop-scripted : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) (i : Fin n)
+  {ok : T (isData (lookup Γ i))}
+  (x : ObservableInput (Val Γ (lookup Γ i))) →
+  sl i ≡ scripted {ok = ok} x → slotHop V sl i ≡ 0
+slotHop-scripted V sl i x eq = cong (slotHopD V (ηAt V sl (toℕ i))) eq
+
 slotHop-fix : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) (i : Fin n)
   {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
   sl i ≡ shared d {ok = ok} →
