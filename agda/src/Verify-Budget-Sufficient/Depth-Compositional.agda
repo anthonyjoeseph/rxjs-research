@@ -60,18 +60,20 @@ module Verify-Budget-Sufficient.Depth-Compositional where
 open import Data.Nat
   using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub;
+  using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub; n≤1+n;
          m≤m⊔n; m≤n⊔m; +-suc; ≤-reflexive)
 open import Data.Fin   using (Fin)
 open import Data.Vec   using (lookup)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (false; true)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
-  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; sizeᵉ; sizeᵗ; sizeᵛ; input;
+  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; sizeᵗ; sizeᵛ; input;
   ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ;
   deferᵉ)
 open import Rx.Evaluator
@@ -237,16 +239,67 @@ postulate
     depthAll g op initSt b κ bid now sched st
       ≤ suc (sizeᵉ b) + pathLen κ + storeNestMax sched st
 
-  -- unfoldμ body is LARGER than μᵉ body, so the size IH fails; the
-  -- honest route is the guarded-context discipline (μ-vars under
-  -- deferᵉ, which contributes 0 to depthE).
-  -- NB: {r} is the outer path's tgt type; {u} is the μ's own recursive
-  -- type.  These need not be equal.
-  depth-μ-bound : ∀ {n} {Γ : Ctx n} {r u} {e : Closed Γ r}
-    (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u) (κ : Path Γ u r)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    depthE fuel (unfoldμ body) κ bid now sched st
-      ≤ sizeᵉ (μᵉ body) + pathLen κ + storeNestMax sched st
+  -- SUBSTITUTION UNDER THE GUARD, which is what `unfoldμ` is: it is
+  -- `elimGExp (here refl) (μᵉ body) body`, and `elimGExp` reaches a
+  -- `varᵉ` only by descending into a `deferᵉ` — because `μᵉ` puts its
+  -- variable in the GUARDED context while `varᵉ` reads the unguarded
+  -- one, so the only route from the binder to the variable is the
+  -- `deferᵉ` that moves `Δᵍ ++ Δ` into `Δ`.  The guardedness is a
+  -- property of the SYNTAX, not a discipline anyone maintains.
+  --
+  -- So the substituted term appears only in positions `depthE` returns
+  -- 0 on without looking inside, and the statement is over an ARBITRARY
+  -- `cl`: the induction genuinely does not care what was substituted,
+  -- which is the content of the whole route.  The `deferᵉ` clause is
+  -- `z≤n`; the rest is the structural recursion `depth-compositional`
+  -- already does, on `body` rather than on its unfolding.
+  --
+  -- STATED OVER `sizeᵉ body`, NOT `sizeᵉ (μᵉ body)`, so the parent's
+  -- `suc` is spent in the assembly below rather than smuggled into the
+  -- leaf.  The obstacle its predecessor's header named — `unfoldμ body`
+  -- is LARGER than `μᵉ body`, so the size IH fails — was a fact about
+  -- the route through `sizeᵉ (unfoldμ body)`, never about the
+  -- statement, and this leaf is the route that does not take it.
+  -- PROBED 2026-08-21 (Probed.Depth-Mu): depth is INDEPENDENT OF GAS,
+  -- which is the region the falsity candidate lived in — `unfoldμ`
+  -- grows the term once per unfolding and no right-hand side here
+  -- mentions gas, so an arc charged inside a `deferᵉ` would cross any
+  -- fixed bound.  Measured at two gas values twenty apart: a one-layer
+  -- guarded body gives 1 and 1, a two-layer body 2 and 2, with the
+  -- store held at 0 by an all-`scripted` slot.  Depth tracks the BODY's
+  -- own nesting and nothing else.
+  -- THE ROWS PIN THE PARENT, so they instantiate this leaf at
+  -- `cl = μᵉ body` and at nothing else — the generality in `cl` is the
+  -- part of the route that carries the induction, and it is unprobed by
+  -- construction, since only the parent's conclusion computes at a
+  -- program.
+  -- Shapes NOT covered: `mergeAllᵉ` guards only, so no map/take/scan
+  -- frame above the guard; no nested `μᵉ`; no shared slot in the store,
+  -- so the interaction with the connect chain is untested; and the
+  -- guarded body uses its variable exactly once.
+  depth-subst-guarded : ∀ {n} {Γ : Ctx n} {r u} {e : Closed Γ r}
+    (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u) (cl : Closed Γ u)
+    (κ : Path Γ u r) (bid : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    depthE fuel (elimGExp (here refl) cl body) κ bid now sched st
+      ≤ sizeᵉ body + pathLen κ + storeNestMax sched st
+
+-- THE RECEIPT FOR THIS ARITHMETIC IS ON `depth-subst-guarded`, NOT
+-- HERE, and the reason is a gap in E3's tense model worth naming: a
+-- receipt is `-- PROBED` over a live postulate and
+-- `-- PROBED-HISTORICAL` over a proven one, and this is NEITHER — a
+-- real body over a leaf that is still open.  Marking it HISTORICAL
+-- would assert the statement is settled, which is the lying comment E3
+-- exists to prevent, arriving from the other side.  So the receipt
+-- follows the statement that is still OPEN, downward to the leaf.
+depth-μ-bound : ∀ {n} {Γ : Ctx n} {r u} {e : Closed Γ r}
+  (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u) (κ : Path Γ u r)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  depthE fuel (unfoldμ body) κ bid now sched st
+    ≤ sizeᵉ (μᵉ body) + pathLen κ + storeNestMax sched st
+depth-μ-bound fuel body κ bid now sched st =
+  ≤-trans (depth-subst-guarded fuel body (μᵉ body) κ bid now sched st)
+          (+-mono-≤ (+-mono-≤ (n≤1+n (sizeᵉ body)) ≤-refl) ≤-refl)
 
 ------------------------------------------------------------------
 -- BUCKET (b) — burst = 0 for non-thru-outer frames (provable by

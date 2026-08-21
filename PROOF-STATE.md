@@ -176,9 +176,9 @@ before grinding it.
 
 - **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY, and the
   module header buckets it BLOCKED: `depth-conn-input`, `depth-all-bound`,
-  `depth-μ-bound`, `installScan-depth-bound`. No worked precedent among them, two of
-  the four replace a refuted predecessor, and the measure all four are stated over
-  was refuted too. Obstacles and routes there.
+  `depth-subst-guarded`, `installScan-depth-bound`. Two replace a refuted
+  predecessor, the measure all four are stated over was refuted too, and two now
+  carry probe receipts naming the region reached. Obstacles and routes there.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

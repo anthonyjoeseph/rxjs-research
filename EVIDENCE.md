@@ -158,6 +158,20 @@ here is one `make refuted` run, and it is paid outside the gate.
   lying comment. Failing then puts the re-read in the hands of whoever has the
   statement in front of them. The marker is mechanical; re-reading the PROSE
   under it is the actual obligation.
+- **AND WHEN A POSTULATE BECOMES AN ASSEMBLY, THE RECEIPT FOLLOWS THE OPEN
+  STATEMENT DOWNWARD.** E3 knows two tenses — `-- PROBED` over a live
+  postulate, `-- PROBED-HISTORICAL` over a proven one — and the repo's central
+  move produces a THIRD: a real body over leaves that are still open. Such a
+  statement is neither, and marking it HISTORICAL asserts it is settled, which
+  is the lying comment E3 exists to prevent arriving from the other side. **Do
+  not invent a marker** — a spelling the check does not know is a receipt it
+  cannot audit, which is the finding E3 already reports. Move the receipt into
+  the header of the LEAF, and say in it which instantiation the rows reached:
+  rows that pin the parent's conclusion instantiate the leaf at whatever the
+  assembly passes, and the leaf's generality is the part they do not touch. E3
+  reads an indented receipt on a `postulate` block member, so the leaf's own
+  header is a legal home.
+
 - **A `-- PROBED` RECEIPT MAY OUTLIVE ITS PROBE, AND THAT IS FINE.** A receipt
   names the probe it came from; when the probe has been deleted, that name will
   not be in `probed/`. It is not a dangling reference to repair — the receipt is
