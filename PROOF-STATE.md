@@ -135,14 +135,12 @@ risk-reduction priority, while this tier holds an open row of a worse class,
 workers do not fan out across its GRINDABLE rows.**
 
 A row's class here must agree with its postulate's header, which is where the
-research lives; where they disagree, the header wins. The walkFace family
-census disclaims its own verification ("derived by reading the evaluator and the
-measures, NOT by typechecking — treat each named ingredient as located, not
-spent"), so every row governed by it inherits that caveat.
+research lives; where they disagree, the header wins.
 
-- **`walk-empty` / `walk-of`** (Walk-Level) — GRINDABLE, in that order. Neither
-  recurses nor pushes, so neither reaches the ledger conjuncts. `walk-empty`
-  has a real consumer, so its fit is typechecked. Residues in the headers.
+The walkFace family is GROUND — `walkFace` is a real definition on every clause
+and the Walk-Level tree holds no live postulate — so both remaining rows sit on
+the burst side.
+
 - **`subscribeE-inner-nodry-inv`** (Burst-Walk) — GRINDABLE: all six conjuncts
   have a named source in scope. Header carries the per-conjunct inventory.
 - **`switchKill-context`** (Burst-Walk) — GRINDABLE: pure preservation, and

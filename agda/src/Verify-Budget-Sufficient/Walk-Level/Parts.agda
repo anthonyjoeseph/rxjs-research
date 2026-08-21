@@ -53,13 +53,13 @@ open import Rx.Exp       using (Ty; obs; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+�
                                 Ctx; Closed; Val; Exp; Tm; Fn;
                                 inputsBelowᵉ; isData;
                                 _≟ᵗ_;
-                                sizeᵉ; sizeᵗ; sizeᵛ; syncSizeᵉ; syncSizeᵗ;
+                                sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵉ; syncSizeᵗ;
                                 shellSizeᵉ; innerᵉ;
                                 input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                                 mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
                                 μᵉ; varᵉ; unfoldμ; applyFn; evalTm)
 open import Rx.Frame-Width using (dWᵉ; dWᵗ; pWᵉ; pWᵛ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ; pmᵗ; hopD-unfoldμ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ; hopD-unfoldμ)
 open import Rx.Slot-Hop  using (slotHop; slotHop-fix)
 open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
                                 RegId; Chain;
@@ -90,7 +90,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Slots; Slot; shared; scripted;
 open import Verify-Budget-Sufficient.Wet
 -- the caps face: only the five predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face
-  using (capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
+  using (evalTms-caps;
+         capsOK?; burstCaps?; burstCount?; pathSz?; slotsCaps?; nest;
          widNode; merge-step; concat-step; switch-step; exhaust-step;
          frameSz?; capsOK?-mono; capsOK?-setNode; capsOK?-nextNode;
          pathSz?-⊑; frameStep-chain-suc; frameStep-⊑-+;
@@ -138,7 +139,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          frameStep-+assoc-count; pushBurst-caps)
 open import Verify-Budget-Sufficient.Hop-Spine-Face
   using (burstHopSpn?; burstHopSpn-cap; burstHopSpnH?; burstHopSpnH-headline;
-         burstHopSpnH-intro; scanSeed-hopSpn)
+         burstHopSpnH-intro; scanSeed-hopSpn; hopD-evalTm)
 open import Verify-Budget-Sufficient.Hop-Spine-Push
   using (scanAccSpn?; nodeAccSpn?; nodeAccSpn?-scan; pushBurst-scan-hopSpn)
 open import Verify-Budget-Sufficient.Caps-Nest
@@ -656,6 +657,154 @@ input-wet-scripted-regs ℓ g i b κ bid now sched st (cold sync (d ∷ ds)) slo
   with Sched.slots sched i | slotEq
 ... | .(scripted (cold sync (d ∷ ds))) | refl =
   register-regsLen ℓ (Sched.nextSource sched) κ st pℓ rgs
+
+-- THE empty CLAUSE, ASSEMBLED — the cheapest row in the walk family, and the
+-- one that shows what "the state is untouched" actually buys.
+--
+-- `subscribeE fuel emptyᵉ κ id now sched st` is `oneShotBurst [] id sched`
+-- with `st` handed straight back, so the burst is one emit carrying
+-- `init src ∷ close src exhausted ∷ complete ∷ []` — three events, not one
+-- of them a `value`.  Four of the nine conjuncts fall to `refl` on that:
+-- `eventB?` and `hopDev?` are `true` on every non-value event by definition,
+-- so both value predicates hold at any bound and any r; and `close _
+-- exhausted` is not `close _ dried`, so `hasDry` is `false` by computation
+-- rather than by a lemma.  The ninth is `rgs` verbatim.
+--
+-- THE CAPS FOUR ARE THE TWIN'S, DELEGATED.  `subscribeE-caps`' emptyᵉ clause
+-- reports `j′ = 0` — a leaf enters no operator, so the level does not move
+-- and the sweep being inflationary is its whole proof.  Nothing here restates
+-- that.  THE WITNESS DOES NOT REDUCE TO `0` HERE, and that is a fact about
+-- the twin rather than about this clause: its case tree splits on `ops` before
+-- the expression, so with `ops` a variable `proj₁ CAPS` is stuck and a
+-- `+-identityʳ` transport has nothing to move.  Widening instead of
+-- transporting is what makes this body indifferent to the witness — and it is
+-- the same move every other arm in this family already makes.
+--
+-- AND THE MINT IS TRANSPARENT TO THE STATE CONJUNCT, which is why widening
+-- the bound is the WHOLE of that conjunct: `mintSource` writes `nextSource`
+-- alone, while `INV?` reads the schedule only through `Sched.live` and
+-- `Sched.slots`.  So `INV? Ψ B sched₁ st` and `INV? Ψ B sched st` are the same
+-- term — record eta, no transport — and the only index that moved is the size
+-- cap.  The caps twin leans on exactly this for its own first conjunct.
+walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
+  WalkStmt {e = e} (emptyᵉ {t = u})
+walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  proj₁ CAPS
+    , proj₁ (proj₂ CAPS)
+    , proj₁ (proj₂ (proj₂ CAPS))
+    , proj₁ (proj₂ (proj₂ (proj₂ CAPS)))
+    , proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
+    , INV?-widen sched st
+        (proj₁ (frameStep-mono-j c 2≤S (m≤m+n j (proj₁ CAPS)))) invW
+    , refl , refl , refl , rgs
+  where
+  CAPS = subscribeE-caps c dep bud ops j g (emptyᵉ {t = u}) κ bid now sl sched st
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+
+-- A LITERAL'S PAYLOAD, WET, FROM THE CAPS RECEIPT PLUS ONE HYPOTHESIS.
+--
+-- `valCaps?` and `valB?` share their SIZE conjunct and differ only in the
+-- second — width against the caps ladder, fn-cap against Ψ — so a caps
+-- receipt on `map evalTm ts` is already half of the wet one, and the missing
+-- half is `fnCapᵗˢ ts ≤ Ψ`, which is `fnCapᵉ (ofᵉ ts) ≤ Ψ` verbatim.  The
+-- per-term step is `fnCap-evalWith` at the empty environment, `evalTm` being
+-- `evalWith _ []ᵃ` by definition, and `fnCapᵗˢ` folding by `⊔` is what makes
+-- the two projections `⊔ˡ` and `⊔ʳ`.
+--
+-- Stated over the caps receipt rather than over a size bound because that is
+-- the form the caller HAS: `evalTms-caps` hands back exactly this, and it is
+-- the same receipt `subscribeE-caps`' own literal clause spends.  `ofVals-B`
+-- (.Wet/Part1) is the capᴱ-ladder twin of this statement and is NOT a
+-- drop-in — its bound is `capᴱ W (E * 3 ^ suc Ψ)`, and fitting an exponential
+-- under the caps ladder's B is a bigger job than the lemma it would save.
+ofVals-B-caps : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (Ψ : ℕ) (sl : Slots Γ)
+  (ts : List (Tm Γ [] [] [] u)) →
+  all (valCaps? c sl u) (map (λ tm → evalTm tm) ts) ≡ true →
+  fnCapᵗˢ ts ≤ Ψ →
+  all (valB? (Caps.cSize c) Ψ u) (map (λ tm → evalTm tm) ts) ≡ true
+ofVals-B-caps c Ψ sl []       hc hf = refl
+ofVals-B-caps {u = u} c Ψ sl (y ∷ ys) hc hf
+  with ∧-true (valCaps? c sl u (evalTm y))
+              (all (valCaps? c sl u) (map (λ tm → evalTm tm) ys)) hc
+... | h1 , h2 =
+  ∧-intro (∧-intro (valCaps?-size c sl u (evalTm y) h1)
+                   (T⇒≡true (fnCapᵛ u (evalTm y) ≤ᵇ Ψ)
+                     (≤⇒≤ᵇ (fnCap-evalWith Ψ y []ᵃ tt
+                             (⊔ˡ (caseWᵗ y ⊔ fnCapᵗ y) (fnCapᵗˢ ys) hf)))))
+          (ofVals-B-caps c Ψ sl ys h2
+            (⊔ʳ (caseWᵗ y ⊔ fnCapᵗ y) (fnCapᵗˢ ys) hf))
+
+-- THE SAME PAYLOAD'S HOP, and here the whole content is that `hopDᵗˢ` folds by
+-- `⊔` while `hopD-evalTm` (.Hop-Spine-Face) bounds each evaluated term by its
+-- own syntactic hop.  Stated at a FREE `r` above `hopDᵗˢ` rather than at
+-- `hopDᵗˢ` itself, so the caller spends it at `hopDᵉ F η (ofᵉ ts)` — which IS
+-- `hopDᵗˢ F η ts` — with `≤-refl` and never needs a widening step.
+ofVals-hop : ∀ {n} {Γ : Ctx n} {u} (F : ℕ) (η : Fin n → ℕ) (r : ℕ)
+  (ts : List (Tm Γ [] [] [] u)) → hopDᵗˢ F η ts ≤ r →
+  all (λ v → hopDᵛ F η u v ≤ᵇ r) (map (λ tm → evalTm tm) ts) ≡ true
+ofVals-hop F η r []       h = refl
+ofVals-hop {u = u} F η r (y ∷ ys) h =
+  ∧-intro (T⇒≡true (hopDᵛ F η u (evalTm y) ≤ᵇ r)
+            (≤⇒≤ᵇ (≤-trans (hopD-evalTm F η y)
+                           (⊔ˡ (hopDᵗ F η y) (hopDᵗˢ F η ys) h))))
+          (ofVals-hop F η r ys (⊔ʳ (hopDᵗ F η y) (hopDᵗˢ F η ys) h))
+
+-- THE of CLAUSE, ASSEMBLED — a one-shot burst carrying one value per term,
+-- with the state handed straight back.
+--
+-- THE ops SPLIT IS LOAD-BEARING AND IT IS NOT COSMETIC.  `subscribeE-caps`'
+-- case tree splits on `ops` BEFORE the expression, so with `ops` a variable the
+-- twin does not reduce and its witness stays stuck at `proj₁ (subscribeE-caps
+-- …)` — which is fine for a conjunct that can be WIDENED (see walk-empty) and
+-- fatal for one that has to be MET, as the payload conjuncts here do.  Split
+-- `ops`, and the twin's literal clause reduces: its witness is `j₀ + 3` for the
+-- `j₀` that `evalTms-caps` reports, so calling `evalTms-caps` at the twin's own
+-- arguments gets the payload receipt at an index this body can name.  The `+ 3`
+-- is the twin's width fold, and `⊑₃` below is its `⊑₃`.
+--
+-- The rest is the same four-way shape every one-shot clause in this family
+-- has: `mapValue-B` / `mapValue-hop` over the payload with `all-++-intro` for
+-- the burst's `close`/`complete` tail, `oneShot-tail-dry` for `hasDry`, `rgs`
+-- for the registry, and `INV?-widen` for the state — the mint being invisible
+-- to a predicate that reads the schedule through `live` and `slots` alone.
+walk-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (ts : List (Tm Γ [] [] [] u)) → WalkStmt {e = e} (ofᵉ ts)
+walk-of ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs
+walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ bid now sl sched st
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
+  s2 fS rS ceil lb dmd gas lℓ rgs =
+  proj₁ CAPS
+    , proj₁ (proj₂ CAPS)
+    , proj₁ (proj₂ (proj₂ CAPS))
+    , proj₁ (proj₂ (proj₂ (proj₂ CAPS)))
+    , proj₂ (proj₂ (proj₂ (proj₂ CAPS)))
+    , INV?-widen sched st
+        (proj₁ (frameStep-mono-j c 2≤S (m≤m+n j (proj₁ CAPS)))) invW
+    , ∧-intro (all-++-intro _ (map value VALS) _
+                (mapValue-B B′ Ψ u VALS PAYB) refl)
+              refl
+    , ∧-intro (all-++-intro _ (map value VALS) _
+                (mapValue-hop F (slotHop F sl) _ VALS
+                  (ofVals-hop F (slotHop F sl) _ ts ≤-refl)) refl)
+              refl
+    , cong (λ x → x ∨ false)
+           (oneShot-tail-dry VALS (Sched.nextSource sched))
+    , rgs
+  where
+  CAPS = subscribeE-caps c dep bud (suc ops′) j g (ofᵉ ts) κ bid now sl sched st
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+  VALS = map (λ tm → evalTm tm) ts
+  B′   = Caps.cSize (frameStep (j + proj₁ CAPS) c)
+  EV   = evalTms-caps c j sl ts 2≤S slC (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
+  ⊑₃ : frameStep (j + proj₁ EV) c ⊑ᶜ frameStep (j + (proj₁ EV + 3)) c
+  ⊑₃ = frameStep-mono-j c 2≤S (+-monoʳ-≤ j (m≤m+n (proj₁ EV) 3))
+  PAYB : all (valB? B′ Ψ u) VALS ≡ true
+  PAYB = ofVals-B-caps (frameStep (j + (proj₁ EV + 3)) c) Ψ sl ts
+           (valsCaps?-widen sl u VALS ⊑₃ (proj₂ EV)) fnC
 
 -- THE take CLAUSE, ASSEMBLED — and the `zero` arm is PROVEN, not a leaf.
 --
