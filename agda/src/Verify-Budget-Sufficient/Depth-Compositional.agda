@@ -73,24 +73,27 @@ open +-*-Solver using (solve; _:=_; _:+_; con)
 open import Data.Fin   using (Fin; toℕ)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
 open import Data.List.Relation.Unary.Any using (here)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (Bool; false; true; if_then_else_; T; _∧_)
 open import Data.Bool.ListAction using (all)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Product using (_×_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Vec using (lookup)
 open import Rx.Prim
   using (Gas; g0; gs; Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
   complete)
 open import Rx.Exp
-  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; input; ofᵉ;
+  using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; input; ofᵉ;
   emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
-  take-f; from-inner; thru-outer; mintNode; installNode; subscribeE; splitEvents; stepFrame;
+  take-f; from-inner; thru-outer; mintNode; installNode; subscribeE; subscribeAll;
+  splitEvents; stepFrame;
   root; share-sink; register; lookupNode; thruConsume; switchKill)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
@@ -879,42 +882,67 @@ innerNest sl x = nestDᵉ sl x + slotsNestBelow sl (maxInputᵉ x)
 -- the below-sum's step at `suc (toℕ i)` is what pays — the same equality
 -- the connect clause spends.  A predicate that split them would be
 -- refuted by the connect and could not be repaired by tightening either.
-valND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ → Val Γ (obs u) → Bool
-valND? sl C o = innerNest sl o ≤ᵇ C
+--
+-- AND INDEXED BY THE ELEMENT TYPE, the way `valCaps?` is, because
+-- `emit-cap`'s own recursion generalises it: a `mapᵉ f b` descends to
+-- `b`, whose element type is whatever `f` consumes, so a predicate
+-- stated only at `obs u` is not the one the recursion can carry.  The
+-- data arms are `true` because a value with no observable in it has no
+-- nesting to bound; the product and sum arms RECURSE rather than join
+-- them, since a pair of observables is exactly the value a catch-all
+-- would wave through unread.
+valND? : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → (w : Ty) → Val Γ w → Bool
+valND? sl C unitᵗ    _        = true
+valND? sl C boolᵗ    _        = true
+valND? sl C natᵗ     _        = true
+valND? sl C (s ×ᵗ w) (a , b)  = valND? sl C s a ∧ valND? sl C w b
+valND? sl C (s +ᵗ w) (inj₁ a) = valND? sl C s a
+valND? sl C (s +ᵗ w) (inj₂ b) = valND? sl C w b
+valND? sl C (obs w)  o        = innerNest sl o ≤ᵇ C
 
-valsND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ → List (Val Γ (obs u)) → Bool
-valsND? sl C = all (valND? sl C)
+valsND? : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → (w : Ty) → List (Val Γ w) → Bool
+valsND? sl C w = all (valND? sl C w)
 
-eventND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ →
-  InstEvent (Val Γ (obs u)) → Bool
-eventND? sl C (value o)   = valND? sl C o
-eventND? sl C (init _)    = true
-eventND? sl C (close _ _) = true
-eventND? sl C (handoff _) = true
-eventND? sl C complete    = true
+eventND? : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → (w : Ty) →
+  InstEvent (Val Γ w) → Bool
+eventND? sl C w (value o)   = valND? sl C w o
+eventND? sl C w (init _)    = true
+eventND? sl C w (close _ _) = true
+eventND? sl C w (handoff _) = true
+eventND? sl C w complete    = true
 
-burstND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ → Stream Γ (obs u) → Bool
-burstND? sl C = all (λ em → all (eventND? sl C) (InstEmit.events em))
+burstND? : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → (w : Ty) → Stream Γ w → Bool
+burstND? sl C w = all (λ em → all (eventND? sl C w) (InstEmit.events em))
+
+-- THE CLAUSE'S OWN STATEMENT, named once so the leaves and the body
+-- cannot drift: a subscribe's burst carries nothing more deeply nested
+-- than the expression that emitted it, measured at the ENTRY slots.
+EmitCap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  → Gas → Closed Γ u → Path Γ u t → Id → Tick
+  → Sched Γ → EvalSt e → Set
+EmitCap {u = u} g b κ bid now sched st =
+  burstND? (Sched.slots sched) (innerNest (Sched.slots sched) b) u
+    (proj₁ (subscribeE g b κ bid now sched st)) ≡ true
 
 -- the walk reads the VALUES out of a burst's events, so the predicate has
 -- to come apart the same way `splitEvents` does.  Its `Ψ` and `caps`
 -- twins are in .Psi-Split and .Caps-Face.Part4; this is the same
 -- induction over the five event shapes, four of which carry no value.
-splitEvents-vals-ND : ∀ {n} {Γ : Ctx n} {u} {A : Set}
-  (sl : Slots Γ) (C : ℕ) (es : List (InstEvent (Val Γ (obs u)))) →
-  all (eventND? sl C) es ≡ true →
-  valsND? sl C (proj₁ (splitEvents {A = A} es)) ≡ true
-splitEvents-vals-ND sl C [] h = refl
-splitEvents-vals-ND {A = A} sl C (value o ∷ es) h =
-  ∧-intro (∧-trueˡ h) (splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h))
-splitEvents-vals-ND {A = A} sl C (init _ ∷ es) h =
-  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
-splitEvents-vals-ND {A = A} sl C (close _ _ ∷ es) h =
-  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
-splitEvents-vals-ND {A = A} sl C (handoff _ ∷ es) h =
-  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
-splitEvents-vals-ND {A = A} sl C (complete ∷ es) h =
-  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
+splitEvents-vals-ND : ∀ {n} {Γ : Ctx n} {A : Set}
+  (sl : Slots Γ) (C : ℕ) (w : Ty) (es : List (InstEvent (Val Γ w))) →
+  all (eventND? sl C w) es ≡ true →
+  valsND? sl C w (proj₁ (splitEvents {A = A} es)) ≡ true
+splitEvents-vals-ND sl C w [] h = refl
+splitEvents-vals-ND {A = A} sl C w (value o ∷ es) h =
+  ∧-intro (∧-trueˡ h) (splitEvents-vals-ND {A = A} sl C w es (∧-trueʳ h))
+splitEvents-vals-ND {A = A} sl C w (init _ ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C w es (∧-trueʳ h)
+splitEvents-vals-ND {A = A} sl C w (close _ _ ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C w es (∧-trueʳ h)
+splitEvents-vals-ND {A = A} sl C w (handoff _ ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C w es (∧-trueʳ h)
+splitEvents-vals-ND {A = A} sl C w (complete ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C w es (∧-trueʳ h)
 
 -- the one arithmetic move the clique makes, and it makes it once: the
 -- path term sits BETWEEN the cap's two subject terms, so spending a
@@ -939,7 +967,7 @@ inner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
   (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → valND? sl C o ≡ true →
+  Sched.slots sched ≡ sl → valND? sl C (obs u) o ≡ true →
   depthInner (gs fuel) op nid κ bid now o sched st ≤ C + pathNestD κ
 inner-nest fuel ih sl C op nid κ bid now o sched st refl hv =
   ≤-trans (ih o (from-inner op nid (Sched.nextNode sched) ↠ κ) bid now
@@ -958,7 +986,7 @@ consumeS-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e)
   (nd : Maybe (NodeState Γ)) →
-  Sched.slots sched ≡ sl → valND? sl C o ≡ true →
+  Sched.slots sched ≡ sl → valND? sl C (obs u) o ≡ true →
   depthConsumeS (gs fuel) nid κ bid now o sched st nd ≤ C + pathNestD κ
 consumeS-nest fuel ih sl C nid κ bid now o sched st
   (just (switch-st cur od)) hs hv =
@@ -983,7 +1011,7 @@ consume-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
   (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → valND? sl C o ≡ true →
+  Sched.slots sched ≡ sl → valND? sl C (obs u) o ≡ true →
   depthConsume (gs fuel) op nid κ bid now o sched st ≤ C + pathNestD κ
 consume-nest fuel ih sl C mergeᵒ nid κ bid now o sched st hs hv =
   inner-nest fuel ih sl C mergeᵒ nid κ bid now o sched st hs hv
@@ -1002,7 +1030,7 @@ walk-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
   (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → valsND? sl C vals ≡ true →
+  Sched.slots sched ≡ sl → valsND? sl C (obs u) vals ≡ true →
   depthWalk (gs fuel) op nid κ bid now vals sched st ≤ C + pathNestD κ
 walk-nest fuel ih sl C op nid κ bid now [] sched st hs hvs = z≤n
 walk-nest fuel ih sl C op nid κ bid now (o ∷ os) sched st hs hvs =
@@ -1024,14 +1052,14 @@ burst-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
   (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (stream : Stream Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → burstND? sl C stream ≡ true →
+  Sched.slots sched ≡ sl → burstND? sl C (obs u) stream ≡ true →
   depthBurst (gs fuel) bid now (thru-outer op nid) κ stream sched st
     ≤ suc (C + pathNestD κ)
 burst-nest fuel ih sl C op nid κ bid now [] sched st hs hb = z≤n
 burst-nest {Γ = Γ} {u = u} fuel ih sl C op nid κ bid now (em ∷ ems) sched st
   hs hb =
   ⊔-lub (s≤s (walk-nest fuel ih sl C op nid κ bid now (proj₁ sp) sched st hs
-                (splitEvents-vals-ND {A = Val Γ u} sl C
+                (splitEvents-vals-ND {A = Val Γ u} sl C (obs u)
                    (InstEmit.events em) (∧-trueˡ hb))))
         (burst-nest fuel ih sl C op nid κ bid now ems sched' st'
            (trans (KeepsC.slotsEq (stepFrame-keeps (gs fuel) bid now
@@ -1047,6 +1075,143 @@ burst-nest {Γ = Γ} {u = u} fuel ih sl C op nid κ bid now (em ∷ ems) sched s
   sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
   st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
+postulate
+  -- WHAT A SUBSCRIBE'S BURST EMITS IS NO MORE DEEPLY NESTED THAN THE
+  -- EXPRESSION THAT EMITTED IT, and this is all that is left of the
+  -- `*All` face: the burst arm, the walk, the consume and the payload
+  -- entry are real bodies over it, and so is the arm's gas split.
+  --
+  -- IT IS THE SUM AND NOT THE TWO CONJUNCTS, and the `input` shape is
+  -- why.  At `b = input i` the emitter's own nesting is 0 while what it
+  -- emits comes out of the slot's def, so a nesting-only conjunct is
+  -- FALSE there; the below-sum's step at `suc (toℕ i)` is what pays,
+  -- which is the same equality the connect clause spends.  A predicate
+  -- splitting them would be refuted by the connect and no tightening
+  -- would repair it.
+  --
+  -- ITS PREDECESSOR — the same statement over a SUMMING `nestDᵗˢ` — IS
+  -- REFUTED, and the refutation is why `Rx.Nest-Depth` reads an `ofᵉ`
+  -- list with a `⊔`.  A step function may hand its input observable to
+  -- an `ofᵉ` list twice; under the sum, the emitted inner then measured
+  -- 3 where its emitter measured 2, while its own DEPTH was 2 — the
+  -- measure was over the depth by exactly the duplication.  Measured at
+  -- that program (Probed.Nest-Depth §3), which is now the row that keeps
+  -- the sum from coming back.
+  --
+  -- PROBED 2026-08-22 (Probed.Emit-Cap): TRUE at the program that
+  -- refuted its predecessor, and true at the connect.  Two rows, each
+  -- pinned by a `false` row at one less, which is what says neither
+  -- passed by being empty — `burstND?` is an `all` over an `all` and is
+  -- green on an empty burst, so a bare `true` row would be worth
+  -- nothing.  The bound came out at 2 and TIGHT in both: the duplication
+  -- program, where the summing predecessor put the emitted inner at 3
+  -- against the same 2; and `b = input i` over a two-link chain, where
+  -- the emitter's own nesting is 0 and the below-sum is carrying the
+  -- whole bound — which is the row that says the SUM above is not a
+  -- convenience.
+  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat queue or switch
+  -- cut; one link, so a long chain is untested and the below-sum's
+  -- accumulation down a stratified descent is exactly where a bound
+  -- read off ONE slot would fail; no `scanᵉ` emitter, so the product
+  -- term is unreached; and no post-cascade state.
+  --
+  -- AND ONE SHAPE IS UNCOVERED BECAUSE IT IS UNINHABITED, which is
+  -- worth more than a row.  A SCRIPTED slot contributes 0 to the
+  -- below-sum (`slotNest`), while subscribing one emits the script's own
+  -- payloads — so at `b = input i` over a scripted slot carrying a
+  -- nested observable, the bound would be 0 against a positive
+  -- emission, and no tightening could repair it.  It cannot arise:
+  -- `Slot`'s `scripted` constructor carries `ok : T (isData t)` and
+  -- `isData (obs _)` is `false`, so a slot of OBSERVABLE type is always
+  -- `shared` and always charged.  The mirror's scripted clauses at this
+  -- type discharge on that field rather than on an argument.  The same
+  -- shape one level over is REFUTED and recorded at the constructor
+  -- (.Rx.Slots): an obs-typed SHARED def emits values of positive hop,
+  -- so a hop bound zeroing the share boundary is false — which is why
+  -- the shared half is charged here and the scripted half need not be.
+  --
+  -- AND IT HAS A PROVEN MIRROR, which is where the grind starts rather
+  -- than a reason to call this mechanical: `subscribeE-caps`
+  -- (.Subscribe-Face) concludes with `burstCaps? … sl (proj₁ r) ≡ true`
+  -- over this same `subscribeE` recursion, and it is discharged.  The
+  -- clauses correspond; what does NOT correspond is that the caps face
+  -- lets its level FLOAT — its conclusion is a Σ over `j′` with a fourth
+  -- conjunct bounding it — while the bound here is fixed at
+  -- `innerNest sl b` and has nothing to spend.  Whether that float is
+  -- load-bearing in the mirror's clauses is the question that decides
+  -- whether this row is a transcription or a proof, and it is not
+  -- answered yet, so the class stays where it is.
+  --
+  -- WHAT IT IS NOT ASKED FOR: slot preservation.  The consumer moves its
+  -- own cap between the entry scheduler and the reached one with the
+  -- PROVEN `subscribeE-slots` (Keeps-Ring), off a `KeepsC` family
+  -- covering `stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`,
+  -- `switchKill` and `concatDrain` besides — so this never sees the
+  -- question, and the leaves below are read at the ENTRY slots for the
+  -- same reason.  That is not a weakening: the two schedulers' slots are
+  -- the same number by that proven lemma, and the consumer already
+  -- spends the equality on its own cap, so entry-side reading costs one
+  -- `subst` at one call site and buys clauses whose hypothesis and
+  -- conclusion name the same slots.  Read at the reached scheduler,
+  -- every clause would have to transport before it could recurse.
+  -- THE CONNECT, and the only leaf with content: a subscribe at `input i`
+  -- emits out of the SLOT's def, so the emitter's own nesting is 0 and
+  -- the whole bound is the below-sum's step at `suc (toℕ i)`.  Stated
+  -- over the clause rather than its four arms because three of them are
+  -- provable and one is not: the `scripted` arms emit `map value sync`
+  -- at a type `Slot`'s own field certifies is DATA, and `isData` is
+  -- hereditary with `isData (obs _) = false`, so no observable can hide
+  -- in such a payload and `valND?` is `true` there for a reason the type
+  -- system already carries.  Splitting them off needs the reduction
+  -- technique the caps face uses for its own `with`-on-the-slot clause,
+  -- which is the next step and not this one.
+  emit-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    EmitCap g (input i) κ bid now sched st
+
+  emit-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (ts : List (Tm Γ [] [] [] u)) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    EmitCap g (ofᵉ ts) κ bid now sched st
+
+  emit-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {s}
+    (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
+    (κ : Path Γ u t) (bid : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    EmitCap g (mapᵉ f b) κ bid now sched st
+
+  emit-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (c : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
+    (κ : Path Γ u t) (bid : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    EmitCap g (takeᵉ c b) κ bid now sched st
+
+  emit-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {s}
+    (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+    (b : Closed Γ s) (κ : Path Γ u t) (bid : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    EmitCap g (scanᵉ f z b) κ bid now sched st
+
+  -- THE FOUR `*All` CLAUSES SHARE ONE LEAF, and the bound is why: each
+  -- of them puts a `suc` on `nestDᵉ` and leaves `maxInputᵉ` alone, and
+  -- `suc a + c` reduces to `suc (a + c)`, so `innerNest sl (mergeAllᵉ b)`
+  -- IS `suc (innerNest sl b)` — the same term at all four, with only the
+  -- op and the initial node state differing, and neither of those is
+  -- read by the bound.
+  emit-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (initSt : NodeState Γ)
+    (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    burstND? (Sched.slots sched) (suc (innerNest (Sched.slots sched) b)) u
+      (proj₁ (subscribeAll g op initSt b κ bid now sched st)) ≡ true
+
+  emit-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u)
+    (κ : Path Γ u t) (bid : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    EmitCap (gs fuel) (μᵉ body) κ bid now sched st
+
 -- depthAll's burst uses thru-outer (the spending arc).  Census finding
 -- (4) read this as owing `storeNestMax` preservation through
 -- `subscribeE`, proved simultaneously; it owes neither.  The cap does not
@@ -1056,7 +1221,11 @@ burst-nest {Γ = Γ} {u = u} fuel ih sl C op nid κ bid now (em ∷ ems) sched s
 -- because a route that turned out unnecessary is the kind a later reader
 -- would otherwise re-schedule.
 --
--- PROBED 2026-08-21 (Probed.Depth-All): the burst takes a MAX across
+-- PROBED-HISTORICAL 2026-08-21 (Probed.Depth-All), historical because the
+-- arm these rows instantiate is a real body now — its residue is the leaf
+-- block above, and the probe declares `emit-of`, the clause its own outer
+-- takes.  The finding is unchanged and is why the arm's `suc` suffices:
+-- the burst takes a MAX across
 -- SIBLINGS, not a sum.  A merge over one slot-chain top measures 5;
 -- a merge over two independent 4-link chains measures 5 as well,
 -- with the store held at 9 in both rows by using the same slots.
@@ -1139,7 +1308,9 @@ burst-nest {Γ = Γ} {u = u} fuel ih sl C op nid κ bid now (em ∷ ems) sched s
 -- `blowH (capsBase e ins)`, which carries `2 * poolCount (towerℕ m) m`
 -- and is astronomically above any exponential in `sizeᵉ e`.
 --
--- PROBED 2026-08-21 (Probed.Nest-Depth), AND THE MEASURE IS DERIVED
+-- PROBED-HISTORICAL 2026-08-21 (Probed.Nest-Depth), historical for the same
+-- reason and retargeted to `emit-map`, the clause whose subject the rows'
+-- duplicating program actually is.  AND THE MEASURE IS DERIVED
 -- RATHER THAN FITTED — which is why the rows ask for EQUALITY and not
 -- domination.  Charge one `suc` per `*All` layer, because that is what
 -- `depthFrame` at `thru-outer` charges, and charge a `scanᵉ` its
@@ -1329,85 +1500,42 @@ burst-nest {Γ = Γ} {u = u} fuel ih sl C op nid κ bid now (em ∷ ems) sched s
 --
 -- WHAT WAS RIGHT is the half that mattered: the gas is the measure, and
 -- what is left over is one fact about what a burst emits.
-postulate
-  -- WHAT A SUBSCRIBE'S BURST EMITS IS NO MORE DEEPLY NESTED THAN THE
-  -- EXPRESSION THAT EMITTED IT, and this is all that is left of the
-  -- `*All` face: the burst arm, the walk, the consume and the payload
-  -- entry are real bodies over it, and so is the arm's gas split.
-  --
-  -- IT IS THE SUM AND NOT THE TWO CONJUNCTS, and the `input` shape is
-  -- why.  At `b = input i` the emitter's own nesting is 0 while what it
-  -- emits comes out of the slot's def, so a nesting-only conjunct is
-  -- FALSE there; the below-sum's step at `suc (toℕ i)` is what pays,
-  -- which is the same equality the connect clause spends.  A predicate
-  -- splitting them would be refuted by the connect and no tightening
-  -- would repair it.
-  --
-  -- ITS PREDECESSOR — the same statement over a SUMMING `nestDᵗˢ` — IS
-  -- REFUTED, and the refutation is why `Rx.Nest-Depth` reads an `ofᵉ`
-  -- list with a `⊔`.  A step function may hand its input observable to
-  -- an `ofᵉ` list twice; under the sum, the emitted inner then measured
-  -- 3 where its emitter measured 2, while its own DEPTH was 2 — the
-  -- measure was over the depth by exactly the duplication.  Measured at
-  -- that program (Probed.Nest-Depth §3), which is now the row that keeps
-  -- the sum from coming back.
-  --
-  -- PROBED 2026-08-22 (Probed.Emit-Cap): TRUE at the program that
-  -- refuted its predecessor, and true at the connect.  Two rows, each
-  -- pinned by a `false` row at one less, which is what says neither
-  -- passed by being empty — `burstND?` is an `all` over an `all` and is
-  -- green on an empty burst, so a bare `true` row would be worth
-  -- nothing.  The bound came out at 2 and TIGHT in both: the duplication
-  -- program, where the summing predecessor put the emitted inner at 3
-  -- against the same 2; and `b = input i` over a two-link chain, where
-  -- the emitter's own nesting is 0 and the below-sum is carrying the
-  -- whole bound — which is the row that says the SUM above is not a
-  -- convenience.
-  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat queue or switch
-  -- cut; one link, so a long chain is untested and the below-sum's
-  -- accumulation down a stratified descent is exactly where a bound
-  -- read off ONE slot would fail; no `scanᵉ` emitter, so the product
-  -- term is unreached; and no post-cascade state.
-  --
-  -- AND ONE SHAPE IS UNCOVERED BECAUSE IT IS UNINHABITED, which is
-  -- worth more than a row.  A SCRIPTED slot contributes 0 to the
-  -- below-sum (`slotNest`), while subscribing one emits the script's own
-  -- payloads — so at `b = input i` over a scripted slot carrying a
-  -- nested observable, the bound would be 0 against a positive
-  -- emission, and no tightening could repair it.  It cannot arise:
-  -- `Slot`'s `scripted` constructor carries `ok : T (isData t)` and
-  -- `isData (obs _)` is `false`, so a slot of OBSERVABLE type is always
-  -- `shared` and always charged.  The mirror's scripted clauses at this
-  -- type discharge on that field rather than on an argument.  The same
-  -- shape one level over is REFUTED and recorded at the constructor
-  -- (.Rx.Slots): an obs-typed SHARED def emits values of positive hop,
-  -- so a hop bound zeroing the share boundary is false — which is why
-  -- the shared half is charged here and the scripted half need not be.
-  --
-  -- AND IT HAS A PROVEN MIRROR, which is where the grind starts rather
-  -- than a reason to call this mechanical: `subscribeE-caps`
-  -- (.Subscribe-Face) concludes with `burstCaps? … sl (proj₁ r) ≡ true`
-  -- over this same `subscribeE` recursion, and it is discharged.  The
-  -- clauses correspond; what does NOT correspond is that the caps face
-  -- lets its level FLOAT — its conclusion is a Σ over `j′` with a fourth
-  -- conjunct bounding it — while the bound here is fixed at
-  -- `innerNest sl b` and has nothing to spend.  Whether that float is
-  -- load-bearing in the mirror's clauses is the question that decides
-  -- whether this row is a transcription or a proof, and it is not
-  -- answered yet, so the class stays where it is.
-  --
-  -- WHAT IT IS NOT ASKED FOR: slot preservation.  The consumer moves its
-  -- own cap between the entry scheduler and the reached one with the
-  -- PROVEN `subscribeE-slots` (Keeps-Ring), off a `KeepsC` family
-  -- covering `stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`,
-  -- `switchKill` and `concatDrain` besides — so the statement below is
-  -- read at the reached scheduler and never sees the question.
-  emit-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    let r  = subscribeE g b κ bid now sched st
-        sl = Sched.slots (proj₁ (proj₂ r))
-    in burstND? sl (innerNest sl b) (proj₁ r) ≡ true
+
+-- THE CLAUSE LIST, and it is a real body: every arm either reduces to
+-- `true` outright or names the one leaf above that covers it.  Four arms
+-- are proven here and they are the value-free ones — `emptyᵉ` and a
+-- `μᵉ` out of gas emit a source's bracket and nothing else, `deferᵉ`
+-- emits its `init` and schedules the body for the next tick, and `varᵉ`
+-- has no closed inhabitant at all.  A burst with no `value` event
+-- satisfies `burstND?` by computation, at any bound, which is what makes
+-- these `refl` rather than arithmetic.
+emit-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) → EmitCap g b κ bid now sched st
+emit-cap g (input i) κ bid now sched st =
+  emit-input g i κ bid now sched st
+emit-cap g (ofᵉ ts) κ bid now sched st =
+  emit-of g ts κ bid now sched st
+emit-cap g emptyᵉ κ bid now sched st = refl
+emit-cap g (mapᵉ f b) κ bid now sched st =
+  emit-map g f b κ bid now sched st
+emit-cap g (takeᵉ c b) κ bid now sched st =
+  emit-take g c b κ bid now sched st
+emit-cap g (scanᵉ f z b) κ bid now sched st =
+  emit-scan g f z b κ bid now sched st
+emit-cap g (mergeAllᵉ b) κ bid now sched st =
+  emit-all g mergeᵒ (merge-st 0 false) b κ bid now sched st
+emit-cap {u = u} g (concatAllᵉ b) κ bid now sched st =
+  emit-all g concatᵒ (concat-st {t = u} [] false false) b κ bid now sched st
+emit-cap g (switchAllᵉ b) κ bid now sched st =
+  emit-all g switchᵒ (switch-st nothing false) b κ bid now sched st
+emit-cap g (exhaustAllᵉ b) κ bid now sched st =
+  emit-all g exhaustᵒ (exhaust-st false false) b κ bid now sched st
+emit-cap g0 (μᵉ body) κ bid now sched st = refl
+emit-cap (gs fuel) (μᵉ body) κ bid now sched st =
+  emit-mu fuel body κ bid now sched st
+emit-cap g (varᵉ ()) κ bid now sched st
+emit-cap g (deferᵉ body) κ bid now sched st = refl
 
 -- THE ARM AT ZERO GAS.  Unchanged in content from the clause it was
 -- split out of; it is a separate name now only because its sibling
@@ -1466,6 +1594,17 @@ depth-all-burst fuel ih op initSt b κ bid now sched st =
   r   = subscribeE (gs fuel) b (thru-outer op nid ↠ κ) bid now
           (proj₂ (mintNode sched)) (installNode nid initSt st)
   sl′ = Sched.slots (proj₁ (proj₂ r))
+  -- THE ONE TRANSPORT the entry-side reading costs, and it is spent
+  -- against the same proven equality the outer `subst` spends: the leaf
+  -- names the slots the subscribe STARTED at, the walk names the ones it
+  -- reached, and `subscribeE-slots` says they are the same map.
+  entry : burstND? sl′ (innerNest sl′ b) (obs _) (proj₁ r) ≡ true
+  entry =
+    subst (λ sl → burstND? sl (innerNest sl b) (obs _) (proj₁ r) ≡ true)
+          (sym (subscribeE-slots (gs fuel) b (thru-outer op nid ↠ κ) bid now
+                  (proj₂ (mintNode sched)) (installNode nid initSt st)))
+          (emit-cap (gs fuel) b (thru-outer op nid ↠ κ) bid now
+             (proj₂ (mintNode sched)) (installNode nid initSt st))
   reached : depthBurst (gs fuel) bid now (thru-outer op nid) κ
               (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
             ≤ suc (nestDᵉ sl′ b) + pathNestD κ
@@ -1473,8 +1612,7 @@ depth-all-burst fuel ih op initSt b κ bid now sched st =
   reached =
     ≤-trans (burst-nest fuel ih sl′ (innerNest sl′ b) op nid κ bid now
                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) refl
-               (emit-cap (gs fuel) b (thru-outer op nid ↠ κ) bid now
-                  (proj₂ (mintNode sched)) (installNode nid initSt st)))
+               entry)
             (≤-reflexive (cap-shuffle (nestDᵉ sl′ b) (pathNestD κ)
                             (slotsNestBelow sl′ (maxInputᵉ b))))
 

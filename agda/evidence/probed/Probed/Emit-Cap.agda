@@ -1,4 +1,12 @@
--- TARGET: emit-cap
+-- TARGET: emit-map
+-- TARGET: emit-input
+--
+-- TWO TARGETS, one per section, because the statement these rows were
+-- written against is a real body now and its clause list dispatches to
+-- a leaf apiece: §1's subject is a `mapᵉ`, §2's is an `input`.  The
+-- rows are unchanged — a clause's leaf concludes exactly what the
+-- parent concludes at that clause, so what was evidence about the
+-- monolith is evidence about the leaf it became.
 --
 -- THE STATEMENT IS ONE DAY OLD AND ITS PREDECESSOR IS REFUTED, which is
 -- the whole reason this file exists before any of it is ground.  The
@@ -90,13 +98,13 @@ dupBound = refl
 -- LOAD-BEARING: this is the leaf, at the program that killed its
 -- predecessor.  Under a summing list clause the emitted inner measures
 -- 3 against this bound of 2 and the row is `false`.
-dupRow : burstND? slD (innerNest slD srcD) (proj₁ rD) ≡ true
+dupRow : burstND? slD (innerNest slD srcD) (obs natᵗ) (proj₁ rD) ≡ true
 dupRow = refl
 
 -- NON-VACUITY, and tightness with it: one less and the same predicate
 -- fails, so the burst is non-empty, it carries a `value`, and that
 -- value's nesting is exactly the emitter's.
-dupTight : burstND? slD 1 (proj₁ rD) ≡ false
+dupTight : burstND? slD 1 (obs natᵗ) (proj₁ rD) ≡ false
 dupTight = refl
 
 ------------------------------------------------------------------
@@ -145,7 +153,7 @@ slC : Slots Γ₂
 slC = Sched.slots (proj₁ (proj₂ rC))
 
 -- LOAD-BEARING: the leaf at the shape where its nesting half is 0.
-connRow : burstND? slC (innerNest slC srcC) (proj₁ rC) ≡ true
+connRow : burstND? slC (innerNest slC srcC) (obs natᵗ) (proj₁ rC) ≡ true
 connRow = refl
 
 -- and the same non-vacuity pin.  A nesting-only bound would be 0 here,
@@ -153,5 +161,5 @@ connRow = refl
 connBound : innerNest slC srcC ≡ 2
 connBound = refl
 
-connTight : burstND? slC 1 (proj₁ rC) ≡ false
+connTight : burstND? slC 1 (obs natᵗ) (proj₁ rC) ≡ false
 connTight = refl

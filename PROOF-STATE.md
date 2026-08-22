@@ -251,9 +251,19 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`emit-cap`** (Depth-Compositional) — DIFFICULTY, all that is left of the
-  `*All` face: a burst emits nothing more deeply nested than what emitted it.
-  Everything around it is a real body now. Its predecessor is refuted.
+- **`emit-input`** (Depth-Compositional) — DIFFICULTY, the connect and the only
+  leaf with content: the emitter's own nesting is 0 at a slot, so the whole
+  bound is the below-sum's step. Probed green at the shape that refuted the
+  predecessor. Its three `scripted` arms are provable — `isData` is hereditary.
+- **`emit-map`**, **`emit-scan`** (Depth-Compositional) — DIFFICULTY: both apply
+  a function to the payload, so both want the nesting member of the `applyFn`
+  family that exists in every other currency and in none here.
+- **`emit-of`**, **`emit-take`** (Depth-Compositional) — DIFFICULTY: a term list's
+  own nesting, and a filter that emits a sub-list of what it was handed.
+- **`emit-all`** (Depth-Compositional) — DIFFICULTY, shared by all four `*All`
+  clauses because each puts one `suc` on the bound and leaves `maxInputᵉ` alone.
+- **`emit-mu`** (Depth-Compositional) — DIFFICULTY: the unfolding's nesting
+  against the body's, which is a substitution fact about `unfoldμ`.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

@@ -1,4 +1,4 @@
--- TARGET: emit-cap
+-- TARGET: emit-of
 --
 -- THE BURST ARM IS WHAT THESE ROWS ISOLATE, and the arm is now a real
 -- BODY: the gas split, the walk, the consume and the payload entry are
