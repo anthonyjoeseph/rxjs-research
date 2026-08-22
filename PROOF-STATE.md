@@ -229,6 +229,15 @@ so the rows ask for equality, not domination, and no constant passes both. It
 stays out of `src` until scheduled, because landing it enlarges `depthCap`'s
 first summand and re-opens every clause of `depth-compositional-go`.
 
+AND THE PRODUCT COMPOUNDS: a scan inside the outer scan's step function makes
+the measure predict `j · (k · w + 1) + 1`, and `depthE` returns exactly that.
+One factor per nested scan, unbounded — so `depthE` is exponential in the
+program size and every fixed-degree product of caps fields is dead, including
+the `cSize · cSize` guessed earlier. The open question is now a single
+arithmetic one: the bound is spent as a level count through `opIterD` and levels
+exponentiate, so does the height budget absorb an exponential level count? A
+tower it does not; an exponential is undecided, and that is the next thing.
+
 - **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
   (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.
   Do not grind it; the statement and its parent's are both restatements, into the

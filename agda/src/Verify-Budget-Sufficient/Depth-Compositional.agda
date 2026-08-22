@@ -565,12 +565,34 @@ postulate
   -- Two products, so no constant passes both, and a zero-wrap row pins
   -- the collapse to 1.
   --
-  -- Shapes NOT covered, and they are why this is still a postulate:
-  -- `mergeAllᵉ` only; ONE scan, so a scan inside another scan's step
-  -- function is untested and is exactly where a third factor would
-  -- appear; no slot descent, so the connect arc is unmeasured and
-  -- `slotsNestBelow` is the term that would carry it; no post-cascade
-  -- state.  The measure is NOT in `src` yet on purpose — landing it
+  -- AND THE PRODUCT COMPOUNDS, which is the row that settles the
+  -- currency rather than merely confirming the measure.  Put a scan
+  -- inside the outer scan's STEP FUNCTION, seeded by the incoming
+  -- accumulator, and the inner scan's layers are re-applied once per
+  -- outer payload: the measure predicts `j · (k · w + 1) + 1`, and
+  -- `depthE` returns exactly that (22 at two wraps, three inner, three
+  -- outer).  One factor per nested scan, with no bound on how many.
+  --
+  -- So `depthE` is EXPONENTIAL in the program size — each factor costs a
+  -- constant of syntax and multiplies — and every fixed-degree product
+  -- of caps fields is dead, `cSize · cSize` included.  That closes the
+  -- guess two commits back by measurement rather than by argument, and
+  -- it sharpens the one open question to a single arithmetic one: the
+  -- depth bound is spent as a LEVEL COUNT through `opIterD`, and levels
+  -- exponentiate, so what has to be checked is whether the height
+  -- budget absorbs an EXPONENTIAL level count.  A tower it certainly
+  -- does not (`Caps`'s own header defends that when it forbids `cWid`
+  -- from re-entering the delivery count); an exponential is undecided
+  -- and is the next thing to settle.
+  --
+  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
+  -- layer, whose queueing `nodesNestMax` charges separately; no slot
+  -- descent, so the connect arc is unmeasured here and `slotsNestBelow`
+  -- is the term that would carry it; no post-cascade state; and the
+  -- compounding row is degree THREE, so nothing here says the pattern
+  -- continues past it — only that it does not stop at two.
+  --
+  -- The measure is NOT in `src` yet on purpose — landing it
   -- means enlarging `depthCap`'s first summand, which re-opens every
   -- clause of this block, and that is a grind to schedule rather than
   -- one to start on a guess.

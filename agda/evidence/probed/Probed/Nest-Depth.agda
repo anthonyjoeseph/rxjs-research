@@ -121,7 +121,7 @@ wraps : ℕ → Step → Step
 wraps zero    t = t
 wraps (suc m) t = strmᵗ (mergeAllᵉ (ofᵉ (wraps m t ∷ [])))
 
-nats : ℕ → List (Tm Γ₀ [] [] [] natᵗ)
+nats : ∀ {Θ} → ℕ → List (Tm Γ₀ [] [] Θ natᵗ)
 nats zero    = []
 nats (suc m) = nat̂ m ∷ nats m
 
@@ -169,3 +169,52 @@ lowVal = refl
 
 highVal : nestDᵉ slots₀ (rootProg 7 29) ≡ 204
 highVal = refl
+
+------------------------------------------------------------------
+-- §2  A SCAN INSIDE A SCAN'S STEP FUNCTION — the third factor
+--
+-- §1's shapes leave one question that decides the whole currency: is the
+-- product degree TWO, or does it compound?  A degree-2 product is
+-- polynomial in the syntax and a `cSize · cSize` cap would hold; an
+-- unbounded degree is exponential, and no fixed-degree product can.
+--
+-- The outer scan's step function here RUNS AN INNER SCAN seeded by the
+-- old accumulator, so the inner scan's `w · k` layers are themselves
+-- re-applied once per outer payload.  The measure predicts `j · k · w`
+-- and the rows ask `depthE` whether it agrees.
+------------------------------------------------------------------
+
+Step₂ : Set
+Step₂ = Fn Γ₀ [] [] ((obs natᵗ ×ᵗ natᵗ) ∷ []) (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+
+acc₂ : Step₂
+acc₂ = fstᵗ (varᵗ (here refl))
+
+wraps₂ : ℕ → Step₂ → Step₂
+wraps₂ zero    t = t
+wraps₂ (suc m) t = strmᵗ (mergeAllᵉ (ofᵉ (wraps₂ m t ∷ [])))
+
+-- the outer step: an inner scan whose SEED is the incoming accumulator
+innerStep : ℕ → ℕ → Step
+innerStep w k =
+  strmᵗ (mergeAllᵉ
+    (scanᵉ (wraps₂ w acc₂) (fstᵗ (varᵗ (here refl))) (ofᵉ (nats k))))
+
+prog₂ : ℕ → ℕ → ℕ → Closed Γ₀ (obs natᵗ)
+prog₂ w k j = scanᵉ (innerStep w k) seedᵗ (ofᵉ (nats j))
+
+rootProg₂ : ℕ → ℕ → ℕ → Closed Γ₀ natᵗ
+rootProg₂ w k j = mergeAllᵉ (prog₂ w k j)
+
+-- LOAD-BEARING, and it is the row the currency turns on.  The inner
+-- scan yields an `obs`, so flattening it back costs one layer and the
+-- inner step is worth `suc (k · w)`; the outer scan re-applies that once
+-- per payload, so the prediction is `j · (k · w + 1) + 1 = 22`.  A
+-- degree-2 measure cannot produce it.
+deepVal : nestDᵉ slots₀ (rootProg₂ 2 3 3) ≡ 22
+deepVal = refl
+
+deepRow : depthE (gasN 90) (rootProg₂ 2 3 3) rootPath 0 0
+            (sched-init (rootProg₂ 2 3 3) slots₀) (st-init (rootProg₂ 2 3 3))
+          ≡ nestDᵉ slots₀ (rootProg₂ 2 3 3)
+deepRow = refl
