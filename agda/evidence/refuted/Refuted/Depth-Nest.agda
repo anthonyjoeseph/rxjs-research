@@ -10,7 +10,11 @@
 -- READ THE WITNESS TYPES, NOT THOSE NAMES.  All three statements have
 -- since been RESTATED in `src` with a nesting term, and the witnesses
 -- below do not reach the restatements: they measure exactly the
--- quantity the restatements added.  What is refuted is the form each
+-- quantity the restatements added.  The first witness type is spelled
+-- over the CURRENT `depthCapN`, which has since lost the node arm the
+-- refuted form also carried — a strictly smaller right-hand side, so the
+-- refutation is if anything easier, and identical here because
+-- `st-init` parks no nodes.  What is refuted is the form each
 -- witness type spells out — the PREDECESSOR — and what this file is
 -- kept for is the ROUTE those forms represent, which no restatement
 -- revives.
@@ -174,8 +178,8 @@ depthN : depthAll (gasN 70) mergeᵒ initSt₀ (prog 4 12)
            (root {Γ = Γ₀} {t = natᵗ}) 0 0 schedN stN ≡ 49
 depthN = refl
 
-capN : depthCapN {e = rootProg 4 12} (suc (sizeᵉ (prog 4 12)))
-         (maxInputᵉ (prog 4 12)) (root {Γ = Γ₀} {t = natᵗ}) schedN stN ≡ 38
+capN : depthCapN (suc (sizeᵉ (prog 4 12)))
+         (maxInputᵉ (prog 4 12)) (root {Γ = Γ₀} {t = natᵗ}) schedN ≡ 38
 capN = refl
 
 -- the PARENT's two sides at the merge that consumes the scan.  `depthE`
@@ -201,7 +205,7 @@ depth-all-bound-absurd :
      (κ : Path Γ u t) (bid : Id) (now : Tick)
      (sched : Sched Γ) (st : EvalSt e) →
      depthAll g op initSt b κ bid now sched st
-       ≤ depthCapN (suc (sizeᵉ b)) (maxInputᵉ b) κ sched st) → ⊥
+       ≤ depthCapN (suc (sizeᵉ b)) (maxInputᵉ b) κ sched) → ⊥
 depth-all-bound-absurd h =
   ≤⇒≤ᵇ (subst₂ _≤_ depthN capN
           (h (gasN 70) mergeᵒ initSt₀ (prog 4 12) root 0 0 schedN stN))

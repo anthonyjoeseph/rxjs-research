@@ -97,10 +97,10 @@ _ = refl
 -- the leaf holds here with no room at all and any accumulation
 -- whatsoever refutes it.  The size figures above are kept because they
 -- are what makes that slack legible as a number.
-_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 1
+_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ ≡ 1
 _ = refl
 
-_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 2
+_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ ≡ 2
 _ = refl
 
 -- LOAD-BEARING, and the gas pair is the whole row: these two differ in

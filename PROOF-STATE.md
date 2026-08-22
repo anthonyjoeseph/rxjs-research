@@ -200,17 +200,29 @@ Both remaining leaves are strengthened by it, and `Probed.Nest-Depth`'s rows now
 pin the cap itself as an EQUALITY with the depth.
 
 AND THE CURRENCY IS NOW ONE THROUGHOUT, which the first half of that tightening
-left owed and the burst arm forced. `slotNest` charged a def's size beside its
-nesting and `nodeNestMax` charged a queued inner's size alone, so a
-`concatAllᵉ` that queues an emitted inner put a SIZE into a cap that no longer
-reads one — the same mismatch one level down, and unfixable by any cleverer
-proof. Both now charge `nestDᵉ`, `nodeNestMax` taking the `Slots` it needs to,
-and the one leaf that covers the emitted inner covers the queued one with it.
-Two of the three consumers got smaller: the slot half of the tower bound is
-`nestD-tower` with a level to spare rather than a two-summand `sum2H`, and the
-connect's payment is an equality again. The probe rows moved with the measure —
-a nine-link chain's store reads 9 where it read 60, against a depth of 5, so
-what margin is left is of the same order as the thing it bounds.
+left owed. `slotNest` charged a def's size beside its nesting and `nodeNestMax`
+charged a queued inner's size alone; both now charge `nestDᵉ`, `nodeNestMax`
+taking the `Slots` it needs to. Two of the three consumers got smaller: the slot
+half of the tower bound is `nestD-tower` with a level to spare rather than a
+two-summand `sum2H`, and the connect's payment is an equality again. The probe
+rows moved with the measure — a nine-link chain's store reads 9 where it read
+60, against a depth of 5, so what margin is left is of the same order as the
+thing it bounds.
+
+AND THEN THE CAP STOPPED READING THE STATE AT ALL, which is the finding the
+burst arm actually produced — not the one it was expected to. It was expected to
+collect on the currency change above: a `concatAllᵉ` queues an emitted inner
+into `nodeNestMax`, so a size there looked to demand the cap bound an emitted
+inner's size. Working the arm's arithmetic instead showed the cap's node arm is
+UNREACHABLE from `depthE` — `depthDrain` is the only clause that reads a queue's
+content and it hangs off the delivery family — and that the arm was the thing
+blocking on it, since a `thru-outer` frame's `suc` cannot be pushed through a
+bare join. Dropping it strengthens every statement below, and pays: `cap-≤-store`
+lost a half, three arithmetic lemmas and the connect lost a join layer, the
+install lemma and its `setNode` induction went entirely, and the burst arm's
+remaining obligation is slot preservation with no state conjunct at all. The
+store measure keeps the arm for the delivery face, which is the face that reads a
+queue.
 
 WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
 `depth-capped`, its `3 · cSize` conclusion, the `storeNestMax`-under-`capsOK?`
@@ -227,9 +239,9 @@ multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
 - **`depth-all-burst-gs`** (Depth-Compositional) — DIFFICULTY, all that is left of
-  the `*All` face. The arm is a real body split on its gas and the `g0` half is
-  discharged, which checks the claim that the GAS is what the route descends on.
-  One leaf left: an emitted inner's nesting is bounded by its emitter's.
+  the `*All` face. Real body split on its gas, `g0` half discharged. Owes an
+  emitted inner's nesting bounded by its emitter's, plus slot preservation across
+  `subscribeE`; no state conjunct.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

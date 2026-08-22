@@ -28,8 +28,9 @@
 -- evidence about the sum and not about the max that was refuted.
 --
 -- SHAPES NOT COVERED: only `mergeAllᵉ` — no concat/switch/exhaust
--- burst, whose `initSt` differs and whose queueing is what
--- `nodesNestMax` charges; no nested burst; no state the cascade has
+-- burst, whose `initSt` differs and whose queueing is charged by the
+-- store's node half, which the cap does not read; no nested burst; no
+-- state the cascade has
 -- run over; and the two chains here are the same length, so a burst
 -- over siblings of DIFFERENT depths is untested (a max would be
 -- invisible in these rows if both arms were equal — they are, at 4
@@ -166,5 +167,5 @@ _ = refl
 -- layers in the store is what the depth face actually faces here, and 9
 -- against 5 is the margin that is left.  A crossing now has to outrun a
 -- quantity of the same order as the thing it measures.
-_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 9
+_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT ≡ 9
 _ = refl
