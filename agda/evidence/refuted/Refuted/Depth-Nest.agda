@@ -86,7 +86,7 @@ module Refuted.Depth-Nest where
 open import Data.Bool  using (false; true)
 open import Data.Empty using (⊥)
 open import Data.List  using (List; []; _∷_)
-open import Data.Nat   using (ℕ; zero; suc; _+_; _≤_; z≤n; s≤s)
+open import Data.Nat   using (ℕ; zero; suc; _+_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤-reflexive)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec   using () renaming ([] to []ⱽ)
@@ -95,6 +95,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ;
   fstᵗ; varᵗ; ofᵉ; mergeAllᵉ; scanᵉ; sizeᵉ)
+open import Rx.Frame-Width using (outWᵉ; innWᵉ; dWᵉ; pmIᵉ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator using (EvalSt; Sched; Path; NodeState; AllOp; mergeᵒ;
   merge-st; root; sched-init; st-init)
@@ -265,3 +266,53 @@ depth-capped-absurd h =
           (h capsQ (gasN 215) (rootProg 7 29) root 0 0 schedQ stQ
              okQ z≤n (≤-reflexive sizeQ) (s≤s z≤n)))
 
+------------------------------------------------------------------
+-- §D  THE WIDTH ROUTE IS DEAD, AND THIS IS WHY IT LOOKED ALIVE
+--
+-- `Rx.Frame-Width`'s `innWⱽ` and `pmIⱽ` each carry an EXPONENTIAL at a
+-- `scanᵉ` — `(pmIᵗⱽ … f ⊔ 1) ^ outWⱽ … e`, a per-fold multiplier raised
+-- to the source's payload count — and that reads, from the clause
+-- alone, exactly like the mechanism §A–§C refute.  It is not.  The
+-- exponential's BASE is `pmIᵗⱽ … 0 f ⊔ 1`, and a step function that
+-- merely re-wraps its accumulator has `pmIᵗⱽ … 0 f ≡ 1`: one wrap layer
+-- is `strmᵗ (mergeAllᵉ (ofᵉ (t ∷ [])))`, whose `outWⱽ` is
+-- `1 * innWⱽ (ofᵉ (t ∷ []))` — it MULTIPLIES BY ONE and adds nothing.
+-- So the base is 1, `1 ^ k` is 1, and the whole family is blind to `w`.
+--
+-- That is not an accident of these four measures; it is what they
+-- measure.  Width is how many payloads travel abreast, and a wrap adds
+-- DEPTH — one more layer on the same single payload.  `widthMax` below
+-- is the max of all four at once, so the row refutes the entire route
+-- and not one candidate: 24 against a depth of 49, and the 24 is `2 * k`
+-- with no `w` in it at all.
+--
+-- LOAD-BEARING.  Every summand is computed, not degenerate: `outWᵉ` is
+-- 24 and grows with `k`, so the row fails the moment any measure here
+-- learns to see a wrap.  What makes it decisive is the ⊔: a bound by
+-- ANY function of these four is a bound by their max up to
+-- monotonicity, so no reshuffling of them survives.
+--
+-- WHAT SURVIVES is the SHAPE, and it is already charged elsewhere:
+-- `scanFrame-caps` pays a scan frame `length vals * suc (sizeᵗ fn)` —
+-- payload count times step size, this witness's `k · w` with both
+-- factors named.  The depth face needs a measure of that shape; what it
+-- may not do is read one off the width family, which does not have it.
+------------------------------------------------------------------
+
+widthMax : ∀ {n} {Γ : Ctx n} {t} → Slots Γ → Closed Γ t → ℕ
+widthMax {n = n} sl e =
+  outWᵉ n sl e ⊔ innWᵉ n sl e ⊔ dWᵉ n sl e ⊔ pmIᵉ n sl 0 e
+
+widthN : widthMax slots₀ (rootProg 4 12) ≡ 24
+widthN = refl
+
+width-route-absurd :
+  (∀ {n} {Γ : Ctx n} {t} {e′ : Closed Γ t} {u}
+     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
+     (κ : Path Γ u t) (bid : Id) (now : Tick)
+     (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e′) →
+     depthAll g op initSt b κ bid now sched st ≤ widthMax sl (mergeAllᵉ b))
+  → ⊥
+width-route-absurd h =
+  ≤⇒≤ᵇ (subst₂ _≤_ depthN widthN
+          (h (gasN 70) mergeᵒ initSt₀ (prog 4 12) root 0 0 slots₀ schedN stN))

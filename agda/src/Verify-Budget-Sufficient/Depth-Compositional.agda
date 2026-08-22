@@ -524,9 +524,34 @@ postulate
   -- can pay for.  Restating means conditioning on the caps, whose
   -- `valCaps?` already bounds `sizeᵛ` — and `sizeᵛ (obs t) v` IS
   -- `sizeᵉ v`, so the nesting of a reachable value is bounded there and
-  -- nowhere in the program text.  `depth-capped`'s `3 · cSize`
-  -- interface has room for it (114 against 49 at this witness), so the
-  -- restatement stops below that line.
+  -- nowhere in the program text.
+  --
+  -- AND THE RESTATEMENT DOES NOT STOP AT `depth-capped`, WHICH THIS
+  -- HEADER PREVIOUSLY CLAIMED IT WOULD.  `3 · cSize` has room at THIS
+  -- witness (114 against 49) and none in general, because a constant
+  -- multiple is still linear: `depth-capped-absurd` walks the same
+  -- family out to `w = 7, k = 29` and measures 204 against 201.  The
+  -- interface has to move too.
+  --
+  -- THE CURRENCY TO MOVE IT INTO IS ALREADY IN THE TREE, and it is not
+  -- a bigger multiple.  `scanFrame-caps` charges a scan frame
+  -- `length vals * suc (sizeᵗ fn)` folds — burst cardinality times step
+  -- size, which is `k · w` with the two factors named — and the size
+  -- and width faces both read their bound at that count
+  -- (`iterSize S (length vals * suc (sizeᵗ fn)) B`,
+  -- `iterFold S … M`).  So the product this statement dies on is the
+  -- product those faces already pay, and the depth face is the one
+  -- reading a linear cap where its siblings read a fold count.
+  --
+  -- WHAT MAKES THAT LANDABLE is that the consumers do not fix the
+  -- number: `subscribeE-inner-nodry` takes the depth bound as a free
+  -- parameter `dep` and spends it through `opIterD` into a LEVEL, so
+  -- enlarging the bound changes an argument and no signature.  What it
+  -- does change is how many levels get climbed, and levels
+  -- exponentiate — so the bound may not be tower-valued, which is the
+  -- same height budget `Caps`'s own header defends when it forbids
+  -- `cWid` from re-entering the delivery count.  A fold count is not
+  -- tower-valued; that is why it is the candidate and a tower is not.
   depth-all-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)

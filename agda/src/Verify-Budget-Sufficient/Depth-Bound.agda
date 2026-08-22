@@ -206,25 +206,44 @@ storeNest-capped c sched st cap slB =
 -- capsH-step ABOVE `capsH e sl id`.  So the gas is strictly the wrong
 -- side of the goal, and a true lemma buys nothing.  Do not re-derive it.
 --
--- THE LIVE ROUTE, AND THE WIDTH MACHINERY ALREADY WALKED IT.  The
--- refuting mechanism is not new to this development — it is stated
--- outright in `Rx.Frame-Width`, whose `pmIⱽ` at a `scanᵉ` is
--- `(pmIᵗⱽ … f ⊔ 1) ^ (outWⱽ … e)`: a per-step multiplier raised to the
--- SOURCE'S EMISSION COUNT, and `outWⱽ … (ofᵉ ts)` is `length ts`.  That
--- is this witness exactly, with the exponent read off the syntax.  So
--- the quantity that dominates is already known, and so is what bounds
--- it: `Caps-Face/Part1`'s `Wᴱ` bundles all four width measures —
--- `pmIᵉ` included — under one `M`, and `Caps-Face/Part2` establishes
--- `Wᴱ sl (iterFold S (sizeᵉ e) M) e`, an ITERATED fold of depth
--- `sizeᵉ e`.  An iterated fold dominates an exponential in the syntax;
--- `3 · cSize` cannot.
+-- THE WIDTH ROUTE IS DEAD, AND IT IS THE ONE THAT LOOKS ALIVE.
+-- `Rx.Frame-Width`'s `innWⱽ` and `pmIⱽ` each carry an exponential at a
+-- `scanᵉ` — `(pmIᵗⱽ … f ⊔ 1) ^ (outWⱽ … e)`, a per-fold multiplier
+-- raised to the source's payload count — which reads, from the clause
+-- alone, exactly like the mechanism refuted above, and `Wᴱ` bundles all
+-- four measures under one dominating `M` that `Caps-Face/Part2` supplies
+-- as `iterFold S (sizeᵉ e) M`.  Every step of that reading is true and
+-- the route still does not exist: the exponential's BASE is
+-- `pmIᵗⱽ … 0 f ⊔ 1`, and a step function that re-wraps its accumulator
+-- has `pmIᵗⱽ … 0 f ≡ 1`, because one wrap layer's `outWⱽ` is
+-- `1 * innWⱽ (ofᵉ (t ∷ []))` — it multiplies by one and adds nothing.
+-- `1 ^ k` is 1, and the family is blind to the wrap count entirely.
 --
--- So the restatement is a currency swap with a worked precedent beside
--- it, not new mathematics: state the depth face's conclusion in the
--- `iterFold` currency the width face already uses for the same
--- exponential, and let `capsH`'s slack absorb it.  What still has to be
--- settled is which level's fold, since `frameStep` advances the index
--- these measures are read at.
+-- REFUTED 2026-08-21 (Refuted.Depth-Nest, `width-route-absurd`), and
+-- against the MAX of all four at once, so no reshuffling of them
+-- survives: 24 against a depth of 49, with the 24 being `2 · k` and
+-- carrying no `w`.  This is what the measures are for — width is how
+-- many payloads travel abreast, and a wrap adds one layer to a single
+-- payload, which is the other axis.  Do not re-derive it from the scan
+-- clause; the clause is not the base.
+--
+-- AND THE COUNT IS NAMED, not left to be chosen.  `frameStep j c`'s
+-- `cWid` field IS `iterFold (cSize c) j (cWid c)`, so "which fold" is
+-- "which level", and the scan frame's own receipt fixes it:
+-- `scanFrame-caps` charges `length vals * suc (sizeᵗ fn)` — burst
+-- cardinality times step size, this witness's `k · w` with both factors
+-- named — and the size and width faces each read their bound at exactly
+-- that count.  The depth face is the outlier reading a linear cap where
+-- its siblings read a fold count.
+--
+-- THE BOUND MAY NOT BE TOWER-VALUED, and that is the constraint that
+-- makes this a choice rather than a shrug.  The consumers spend the
+-- depth bound as a free parameter — `subscribeE-inner-nodry` takes
+-- `dep` and feeds it through `opIterD` into a LEVEL — so enlarging it
+-- costs no signature but buys levels, and levels exponentiate.  Handing
+-- them a tower would demand tower-many stories, which is the height
+-- budget `Caps`'s own header defends when it forbids `cWid` from
+-- re-entering the delivery count.  A fold count is not tower-valued.
 depth-capped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

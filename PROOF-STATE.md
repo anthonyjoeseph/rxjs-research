@@ -206,14 +206,21 @@ the route advertises as "tower-free". Two routes are already closed: the tight
 syntactic one by the witnesses, and bounding depth by the GAS — true, and
 recorded as a dead route in `depth-capped`'s header, because `budgetAt-gs-pad`
 puts the budget a full capsH-step ABOVE `capsH e sl id`, the wrong side of the
-goal. The live route needs no new mathematics, because the width face already walked
-it: `Rx.Frame-Width`'s `pmIⱽ` at a `scanᵉ` IS `(per-step ⊔ 1) ^ (outWⱽ e)`, a
-multiplier raised to the source's emission count — this witness, read off the
-syntax. `Caps-Face/Part1`'s `Wᴱ` bundles that measure with the other three under
-one `M`, and Part2 establishes `Wᴱ sl (iterFold S (sizeᵉ e) M) e`. An iterated
-fold dominates an exponential; `3 · cSize` cannot. So the repair is a currency
-swap with a worked precedent beside it, and what remains open is which level's
-fold, since `frameStep` advances the index those measures are read at.
+goal. The route that reads as live is dead, and it was checked rather than believed.
+`Rx.Frame-Width`'s `innWⱽ`/`pmIⱽ` each carry an exponential at a `scanᵉ` —
+`(pmIᵗⱽ f ⊔ 1) ^ outWⱽ e` — and `Wᴱ` bundles all four measures under one `M`,
+so the clause reads exactly like this mechanism. Its BASE is 1: a wrap layer's
+`outWⱽ` is `1 * innWⱽ (ofᵉ (t ∷ []))`, multiplying by one and adding nothing, so
+the family cannot see the wrap count at all. Refuted against the max of all four
+(`width-route-absurd`, 24 against 49, the 24 being `2 · k` with no `w`) — width
+is payloads abreast, and a wrap is depth. What survives is the SHAPE, charged
+elsewhere: `scanFrame-caps` pays a scan frame `length vals * suc (sizeᵗ fn)`
+folds, this witness's `k · w` with both factors named, and `frameStep j c`'s
+`cWid` IS `iterFold (cSize c) j (cWid c)`, so the count fixes the level. The
+consumers spend the bound as a free parameter (`dep`, through `opIterD`), so
+enlarging it costs no signature — but it buys levels, and levels exponentiate,
+so the bound may not be tower-valued. A fold count is not; a new measure of that
+shape is what the restatement needs, and no existing one has it.
 
 - **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
   (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.
