@@ -589,12 +589,42 @@ depthCapN sz mx κ sched =
 -- witnesses, which says where the next probe goes — not that the cap
 -- is repairable by keeping it.
 --
+-- AND THE EXPORTED WIDENING IS FALSE TOO, which is what settles it:
+-- `sizeᵉ b + nestDᵉ b + pathLen κ + storeNestMax sched st` reads 56
+-- where `depthE` reads 70, and 60 against a depth measured two ticks
+-- later.  A scan whose step merges its accumulator with a CONSTANT
+-- emitter grows its emission count by a constant per tick, so the total
+-- over the scan's own emissions is QUADRATIC in the tick count while
+-- every term of that bound is linear in it.  Restoring `sizeᵉ` is
+-- therefore refuted by machine rather than by the argument above, and
+-- no re-weighting of a syntactic sum survives — the two sides are of
+-- different degree in the one knob.
+--
 -- SO THE RESTATEMENT IS THE ONE BOTH SIBLING FACES ALREADY MADE: an
 -- emitted payload's measure is bounded by an ITERATED function of the
 -- emitter's, not by the emitter's own (`applyFn-iterSize` on the caps
 -- face's size half, `applyFn-iterFold` on its width half).  The depth
 -- face is the third member of that family and does not yet have its
 -- iterator.
+--
+-- AND THE INDEX TO ITERATE ON IS THE GAS, WHICH IS WHAT MAKES THE
+-- BURST ARM CLOSE.  A cap read off the subject alone cannot: the arm
+-- applies its hypothesis at the emitted PAYLOAD, whose size and
+-- nesting both exceed the emitter's, so a monotone function of the
+-- subject is going the wrong way.  Gas goes the right way — the `gs`
+-- clause is the only entry into a payload and it peels one — and
+-- `applyFn-iterSize` already bounds the payload's size by
+-- `iterSize S (sizeᵗ fn) V` from a bound `V` on the argument's, so the
+-- descent's growth is a known number of iterator steps rather than an
+-- unknown.  The obligation that replaces this cap is arithmetic:
+-- `iterSize` iterated once per unit of gas, dominated from `capsH`.
+--
+-- AND THE TOP-LINE CLAIM IS NOT WHAT IS FALSE — the route to it is.
+-- `depthE≤capsH-root` (Caps-Bridge) chains this cap through
+-- `nest-store≤capsH` into `capsH e ins 0`, which is `blowH` of a tower
+-- and dominates 70 with room the refutation does not come near.  What
+-- has to move is the intermediate currency and the `Nest-Tower`
+-- arithmetic above it, not the statement the tier exports.
 depthCap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {u}
   (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) → ℕ
 depthCap {n = n} b κ sched =

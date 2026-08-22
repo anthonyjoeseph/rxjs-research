@@ -268,6 +268,18 @@ the width half). The depth face is that family's third member and has no
 iterator yet. The exported widening `cap-≤-store` re-admits `sizeᵉ` and still
 covers both witnesses — the next probe, not a repair.
 
+AND THAT PROBE WENT RED. The exported bound reads 56 where `depthE` reads 70,
+and 52 against a depth of 35 two ticks earlier — so the two sides differ in
+DEGREE, not by a constant. A scan whose step merges its accumulator with a
+constant emitter grows its emission count per tick, and the `*All` over the
+scan runs over every accumulator it emitted, so the delivered count is
+quadratic in the tick count while every term of the bound is linear in it.
+Restoring `sizeᵉ` is refuted by machine, and no re-weighting of a syntactic sum
+survives a difference in degree. WHAT IS NOT FALSE IS THE TOP-LINE CLAIM:
+`depthE≤capsH-root` lands in `capsH e ins 0`, `blowH` of a tower, which
+dominates 70 with room these rows do not come near. The intermediate currency
+and the `Nest-Tower` arithmetic above it are what move.
+
 - **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated AND the
   occurrence repair refuted with it (Refuted.Emit-Map): at a payload of nesting
   0 the emitted nesting is the payload's WIDTH. So `EmitCap` is the depth face's

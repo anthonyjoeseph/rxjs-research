@@ -44,14 +44,15 @@ open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Data.Nat using (_≤_; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; s≤s)
 
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; varᵗ; ofᵉ;
-  emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; fstᵗ)
+  emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; fstᵗ; sizeᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init)
-open import Verify-Budget-Sufficient.Depth-Compositional using (depthCap)
+open import Verify-Budget-Sufficient.Measures using (pathLen)
+open import Verify-Budget-Sufficient.Depth-Compositional using (depthCap; storeNestMax)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 
@@ -148,3 +149,100 @@ depth-compositional-absurd :
      depthE g b κ bid now sched st ≤ depthCap b κ sched) → ⊥
 depth-compositional-absurd h with h g20 progA root 0 0 schedA stA
 ... | s≤s (s≤s (s≤s ()))
+
+
+------------------------------------------------------------------
+-- § 3  AND THE EXPORTED WIDENING DOES NOT SURVIVE EITHER.
+--
+-- `cap-≤-store` re-admits the size term this cap dropped, so § 1 and
+-- § 2 leave open the obvious repair: put `sizeᵉ` back.  It is refuted
+-- here, by machine rather than by argument.
+--
+-- THE KNOB IS THE TICK COUNT AND THE TWO SIDES DIFFER IN DEGREE.  The
+-- scan's step merges its accumulator with a CONSTANT emitter, so the
+-- accumulator's emission count grows by a constant per tick, and the
+-- `*All` over the scan runs over every accumulator it emitted — total
+-- emissions QUADRATIC in the tick count.  Every term of the exported
+-- bound is linear in it.  Four ticks: depth 35 under a bound of 52.
+-- Six ticks: depth 70 over a bound of 56.  The pair is the evidence,
+-- not either row — one row above the crossing would leave open whether
+-- some re-weighting of the same syntactic sum covers it, and a
+-- difference in degree says no re-weighting does.
+--
+-- The step is ADDITIVE and not duplicating on purpose: doubling the
+-- accumulator doubles its SYNTAX per tick too, and normalising that
+-- costs minutes where this costs seconds — same crossing, and the rows
+-- have to be cheap enough to keep in the gate.
+------------------------------------------------------------------
+
+gN : ℕ → Gas
+gN zero    = g0
+gN (suc n) = gs (gN n)
+
+dupF : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+dupF = strmᵗ (mergeAllᵉ (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])) ∷ [])))
+
+base3 : Closed Γ₀ natᵗ
+base3 = ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ nat̂ 4 ∷ nat̂ 5 ∷ [])
+
+-- emits 2^0 + 2^1 + 2^2 + 2^3 values from syntax of constant size
+vC : Closed Γ₀ natᵗ
+vC = mergeAllᵉ (scanᵉ dupF (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) base3)
+
+bC : Closed Γ₀ (obs natᵗ)
+bC = ofᵉ (strmᵗ vC ∷ [])
+
+progC : Closed Γ₀ natᵗ
+progC = mergeAllᵉ (mergeAllᵉ (mapᵉ fA bC))
+
+schedC : Sched Γ₀
+schedC = sched-init progC slots₀
+
+stC : EvalSt progC
+stC = st-init progC
+
+sizeC : sizeᵉ progC ≡ 46
+sizeC = refl
+
+nestC : nestDᵉ slots₀ progC ≡ 10
+nestC = refl
+
+-- the EXPORTED right-hand side, measured whole rather than argued from
+-- its two zero terms
+exportRHS : sizeᵉ progC + nestDᵉ slots₀ progC
+              + pathLen (root {Γ = Γ₀} {t = natᵗ}) + storeNestMax schedC stC ≡ 56
+exportRHS = refl
+
+depthC : depthE (gN 200) progC (root {Γ = Γ₀} {t = natᵗ}) 0 0 schedC stC ≡ 70
+depthC = refl
+
+
+-- TWO TICKS FEWER, AND THE BOUND WINS THERE.  The emission count is
+-- QUADRATIC in the tick count — the step adds a constant emitter per
+-- tick, and the merge runs over every accumulator the scan emitted —
+-- while every term of the exported bound is LINEAR in it.  So the two
+-- sides differ in DEGREE, and the pair of rows is what says so: at
+-- four ticks the bound holds with room, at six it is beaten.  A row
+-- above the crossing alone would leave open whether some re-weighting
+-- of the same syntactic sum could be made to cover it.
+base4 : Closed Γ₀ natᵗ
+base4 = ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ [])
+
+vD : Closed Γ₀ natᵗ
+vD = mergeAllᵉ (scanᵉ dupF (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) base4)
+
+progD : Closed Γ₀ natᵗ
+progD = mergeAllᵉ (mergeAllᵉ (mapᵉ fA (ofᵉ (strmᵗ vD ∷ []))))
+
+schedD : Sched Γ₀
+schedD = sched-init progD slots₀
+
+stD : EvalSt progD
+stD = st-init progD
+
+exportRHS-D : sizeᵉ progD + nestDᵉ slots₀ progD
+                + pathLen (root {Γ = Γ₀} {t = natᵗ}) + storeNestMax schedD stD ≡ 52
+exportRHS-D = refl
+
+depthD : depthE (gN 200) progD (root {Γ = Γ₀} {t = natᵗ}) 0 0 schedD stD ≡ 35
+depthD = refl
