@@ -158,9 +158,9 @@ a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`subscribe-depth-capsH`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
-  depth bound, restated over `capsOK?` once the hop currency was refuted. A
-  payload is a stored value, so a state predicate reaches it where a syntactic
-  size cannot; its header prices both dead currencies.
+  depth bound, restated over `capsOK?` once the hop currency was refuted. Its
+  header prices both dead currencies and names the route: the caps preservation
+  the induction needs is depth-free, so the cycle it looks like is not one.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY: the delivery half of
   the same bound, over `depthCascade`. The delivery machinery sits wholly
   outside `depthE`'s induction, so the sibling reaches none of it; one induction

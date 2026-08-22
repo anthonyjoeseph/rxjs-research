@@ -1108,6 +1108,25 @@ abstract
 -- The premises are `subscribeE-caps`'s own, at the same level, which is
 -- what lets the two meet at a call site rather than at a coincidence.
 
+-- THE ROUTE, AND THE CIRCULARITY IT LOOKS LIKE IS NOT ONE.  A depth
+-- induction has to bound its measure at states the walk STEPS to, so it
+-- needs caps preservation — and `subscribeE-caps` takes a depth bound as
+-- a HYPOTHESIS, which reads as a cycle.  `sub-charge` (below) is the way
+-- through: it is proven, it takes no depth premise, and it gets there by
+-- instantiating that hypothesis at `depthE`'s own value with `≤-refl`.
+-- What it hands back is caps at the stepped state together with a level
+-- bound `j′ ≤ opIterD S W (depthE g b κ …) bud ops j` — and the depth in
+-- THAT bound is the source subscribe's, one chain edge down, so the
+-- structural hypothesis on the source covers it.  Each clause is then:
+-- bound the source by the hypothesis, spend `sub-charge` to reach the
+-- burst's state, bound the frames there.
+--
+-- WHAT IS STILL TO DECIDE, and it is why this is not a grind: the
+-- measure spends a `suc` in exactly two places — a `thru-outer` frame
+-- and a concatAll drain — and both are reached under a `⊔`, so the
+-- question is whether ONE level allowance serves both or whether the
+-- statement has to be indexed by which arc it is under.
+
 -- WHY THE PREDECESSOR IS GONE, AND WHY A SIZE PREMISE DOES NOT REPAIR
 -- IT.  `depth-hop` bounded this by `hopDᵉ V η b + pathNestD κ`, and
 -- every arm needed a payload's synchronous size under `V`.  `V` cannot
