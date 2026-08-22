@@ -35,7 +35,8 @@ open import Rx.Exp  using (Ctx; Closed; Exp; natᵗ; strmᵗ; ofᵉ; mergeAllᵉ
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator using (EvalSt; Sched; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
-open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax)
+open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax;
+  depthCap)
 
 Γ₁ : Ctx 1
 Γ₁ = natᵗ ∷ⱽ []ⱽ
@@ -80,6 +81,17 @@ _ : sizeᵉ (μᵉ body₁) ≡ 7
 _ = refl
 
 _ : sizeᵉ (μᵉ body₂) ≡ 11
+_ = refl
+
+-- the leaf's own right-hand side, restated over the CAP.  DEGENERATE on
+-- the slot half — this program has no shared slot, so the partial sum
+-- is 0 at every cut and the figure cannot distinguish the cap from the
+-- old `storeNestMax` bound; it is here so the crossing against the
+-- depth rows below is read off the statement that is actually open.
+_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 6
+_ = refl
+
+_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 10
 _ = refl
 
 -- LOAD-BEARING, and the gas pair is the whole row: these two differ in

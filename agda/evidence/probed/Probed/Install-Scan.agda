@@ -54,17 +54,16 @@ open import Data.Product using (proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin  using (Fin) renaming (zero to fz; suc to fs)
-open import Data.Nat  using (_+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp  using (Ctx; Closed; Exp; Fn; Val; natᵗ; obs; _×ᵗ_; nat̂; emptyᵉ; mergeAllᵉ; ofᵉ; strmᵗ; fstᵗ; varᵗ;
-  input; evalTm; sizeᵉ; sizeᵛ)
+  input; evalTm; sizeᵛ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; root; sched-init; st-init; scan-st; scan-f; mintNode; installNode; _↠_)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
-open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax;
+  depthCap;
   nodesNestMax)
 
 Γ₄ : Ctx 4
@@ -211,6 +210,9 @@ _ = refl
 
 -- LOAD-BEARING: the statement's own right-hand side, at the entry
 -- store, so a crossing reads as two numbers rather than an inference.
-_ : sizeᵉ bᶜ + (1 + pathLen (root {Γ = Γ₄} {t = obs (obs natᵗ)}))
-      + storeNestMax sched st ≡ 24
+-- Restated over the CAP with the rest of the bound: the `⊔` with the
+-- node half now sits OUTSIDE, which is what makes the entry store's
+-- masking of the accumulator visible here as well.
+_ : depthCap bᶜ (scan-f fᶜ nid ↠ (root {Γ = Γ₄} {t = obs (obs natᵗ)}))
+      sched st ≡ 24
 _ = refl

@@ -1,5 +1,4 @@
 -- TARGET: depth-all-bound
--- TARGET: depth-conn-input
 --
 -- THE BURST OVER SEVERAL CHAIN TOPS.  `Refuted.Depth-Chain` measured
 -- what a single connect costs — one arc per link, accumulating down a
@@ -37,15 +36,14 @@ open import Data.Unit using (tt)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Data.Nat using (_+_)
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; nat̂; strmᵗ; input; ofᵉ;
   mergeAllᵉ; sizeᵉ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (EvalSt; Sched; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
-open import Verify-Budget-Sufficient.Measures using (pathLen)
-open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax)
+open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax;
+  depthCap)
 
 g30 : Gas
 g30 = gs (gs (gs (gs (gs (gs (gs (gs (gs (gs
@@ -146,7 +144,9 @@ _ : depthE g30 progTwo root 0 0 schedT stT ≡ 5
 _ = refl
 
 -- the PARENT's conclusion at the harder of the two, spelled out so a
--- crossing is visible as a number rather than inferred
-_ : sizeᵉ progTwo + pathLen (root {Γ = Γ₉} {t = natᵗ})
-      + storeNestMax schedT stT ≡ 58
+-- crossing is visible as a number rather than inferred.  Read over the
+-- CAP the bound was restated to, not over `storeNestMax`: the slot half
+-- is now the partial sum below the program's own stratification level,
+-- so the two figures are only equal when every slot is under the cut.
+_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 51
 _ = refl

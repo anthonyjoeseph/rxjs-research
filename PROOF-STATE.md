@@ -173,23 +173,31 @@ max over the slots while the connects CHAIN. Neither cost a clause, but a real
 body's own conclusion is no safer than a postulate's, and a row whose OBSTACLE
 is written down is not thereby a row whose STATEMENT is right.
 
-The residue has now been probed through, and what it bought is that the risk
-moved rather than shrank. The statements are no longer the thing to doubt first —
-the repaired sum has a margin that grows with the chain, install-invariance holds
-with the leak channel deliberately open, and the burst takes a max. What the
-probing turned up instead is that the top row's statement cannot support its own
-`input` clause in any currency now available, so that row is SHAPE and the work
-there is a restatement, not a grind.
+The residue has now been probed through, and the restatement it forced has
+landed: `depth-compositional` is proved against a cap whose slot half is the
+partial sum below the program's own stratification level, the connect is a real
+clause paying by an equality at its own index, and the leaf that used to stand
+there is gone. Nothing downstream moved — the exported statement keeps its text
+and spends one bridge. What remains on this tier is the three leaves the
+restatement carried along, each re-read against the new right-hand side rather
+than inheriting a figure.
 
-- **`depth-compositional`'s residue** (Depth-Compositional) — SHAPE, since the
-  double-count makes a restatement of `depth-conn-input` unavoidable and only one
-  currency is left standing; the residue route is refuted in its header.
-  `depth-all-bound`, `depth-subst-guarded`, `installScan-depth-bound` are the
-  probed leaves under it. Restate over the partial sum; do not grind.
+- **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY: the burst feeds
+  `depthBurst` the state the REAL `subscribeE` produced while the cap reads the
+  entry state, so the preservation conjunct has to be proved as a second conjunct
+  of the same induction. Probed: the burst takes a max across siblings, not a sum.
+- **`installScan-depth-bound`** (Depth-Compositional) — DIFFICULTY: the take twin
+  beside it is proven, but does NOT transfer — `nodeNestMax (take-st _)` is 0
+  while `nodeNestMax (scan-st v)` is `sizeᵛ v`, so the node half genuinely grows
+  and the content is that `depthE` never reads it. Probed with that channel open.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
   unconditional form is false.
+- **`depth-subst-guarded`** (Depth-Compositional) — GRINDABLE: the `deferᵉ` clause
+  is `z≤n` and the rest is the structural recursion the assembly above it already
+  performs, on `body` rather than on its unfolding; the guardedness is a property
+  of the syntax, so nothing has to be maintained.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.
