@@ -294,6 +294,21 @@ is `nest-subΘ`, the nesting mirror of `wid-subΘ`. Iterating on the GAS instead
 is dead before it starts — `budgetAt-gs-pad` exhibits the budget as a tower
 above `capsH`, so a cap must be smaller than the gas to be spendable.
 
+AND THE GENEROUS CEILING ALREADY EXISTS UNDER ANOTHER NAME — the search for
+`nest-subΘ` found `hopDᵉ` instead. It is this accounting written correctly:
+`suc` per `*All` layer as here, but `mapᵉ` MULTIPLIES the source's depth by the
+template's occurrence count, and `scanᵉ` charges an exponential in a refold
+bound rather than a product with the source's width, so neither witness outruns
+it. It is already closed under substitution — `hopD-sub-spnᵉ`,
+`applyFn-hopSpn`, `hopD-unfoldμ`, `hopD-η-congᵉ`, `slotHop-fix`, fifteen
+modules — and it dominates `depthE` at all four refutation witnesses, which is
+the risky region itself. And `subscribeE-wet-via-caps` carries a gas hypothesis
+over `hopDᵉ Ŝ (slotHop Ŝ sl) b` in the SAME signature as the `depOK`
+hypothesis this face exists to discharge, at the same `sl` and `Ŝ`, so `V` and
+`η` are not inventions either. This face has been proving `depOK` in a private
+currency nothing else in the tree uses. The restatement is the swap, and it
+deletes rather than repairs.
+
 - **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated AND the
   occurrence repair refuted with it (Refuted.Emit-Map): at a payload of nesting
   0 the emitted nesting is the payload's WIDTH. So `EmitCap` is the depth face's

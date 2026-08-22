@@ -638,6 +638,52 @@ depthCapN sz mx κ sched =
 -- measures; it read them, and paid for the generosity with tower
 -- growth it already had.
 --
+-- AND THE GENEROUS CEILING ALREADY EXISTS, UNDER ANOTHER NAME.  A
+-- search for the missing substitution lemma found `hopDᵉ`
+-- (Rx.Hop-Depth) instead, and it is the accounting this cap was
+-- reaching for, written correctly: `suc` per `*All` layer, the same as
+-- here; but `mapᵉ f e` charges `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e`,
+-- MULTIPLYING the source's depth by the template's occurrence count
+-- because "the source's depth lands at every Θ-var occurrence" — which
+-- is precisely what this cap's `nestDᵗ f + nestDᵉ b` does not do; and
+-- `scanᵉ f z e` charges `(2 + pmᵗ V 0 f) ^ V * (…)`, an exponential in
+-- the refold bound rather than a product with the source's width, so
+-- the quadratic gadget cannot outrun it.  Its `input` clause reads a
+-- slot ENVIRONMENT `η i`, and its own header records the constant-0
+-- version as machine-REFUTED — the same refutation this cap's slot half
+-- was rebuilt around, arrived at independently.
+--
+-- IT IS ALSO ALREADY CLOSED UNDER SUBSTITUTION, WHICH IS THE WHOLE
+-- DIFFICULTY: `hopD-sub-spnᵉ` (Hop-Spine-Sub) bounds
+-- `hopDᵉ V η (subΘExp Θloc σ e)` under an `EnvPlug` hypothesis about
+-- the environment, `applyFn-hopSpn` (Hop-Spine-Step) is the emitted-
+-- payload instance, `hopD-unfoldμ` gives the μ clause, `hopD-η-congᵉ`
+-- the slot-cut congruence and `slotHop-fix` the slot half.  So
+-- `nest-subΘ` should not be written: it is `hopD-sub-spnᵉ`, proven.
+--
+-- MEASURED AT THE FOUR REFUTATION WITNESSES: `hopDᵉ` dominates
+-- `depthE` at every one, including the two that killed this cap — the
+-- two small programs at a refold bound of one, and both rows of the
+-- quadratic gadget at four.  That is evidence reaching the RISKY
+-- region rather than a degenerate row, because those four programs are
+-- the region.  It is a receipt at four programs and not a theorem, and
+-- it is not landed as a probe yet for one reason: a probe must name a
+-- LIVE postulate as its target, and the statement it would test does
+-- not exist yet.  It goes in with the restatement.
+--
+-- AND THE CONSUMER ALREADY ASKS FOR IT IN THAT CURRENCY, WHICH IS THE
+-- part that says this is a reinvention and not a coincidence.
+-- `subscribeE-wet-via-caps` (Caps-Bridge) carries, in ONE signature,
+-- a gas hypothesis stated over `hopDᵉ Ŝ (slotHop Ŝ sl) b` and the
+-- `depOK` hypothesis `depthE g b κ id now sched st ≤ capsH e sl id`
+-- that this module exists to discharge — same `sl`, same
+-- `Ŝ = sizeCapAt e sl (suc id)`, adjacent lines.  So `V` and `η` do
+-- not have to be invented either.  This face has been proving `depOK`
+-- in a private currency that nothing else in the tree uses, beside a
+-- hypothesis in the tree's own depth currency with fifteen modules of
+-- machinery behind it.  `make dup-check` cannot see that: the two
+-- statements are not the same fact, only the same job.
+--
 -- SO THE ROUTE IS A GENEROUS DEPTH CEILING, NOT A SIXTH TIGHT ONE.
 -- The currency `nestDᵉ` chose is not what is wrong — its product term
 -- `outWᵉ src * nestDᵗ f` is the right accounting, charging one re-wrap
