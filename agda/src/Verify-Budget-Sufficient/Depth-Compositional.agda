@@ -73,10 +73,10 @@ open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
-  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; sizeᵗ; sizeᵛ; input;
-  ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ;
-  deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ;
-  primᵗ; strmᵗ; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
+  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; sizeᵗ;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+  strmᵗ; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
@@ -100,8 +100,31 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- validated by Depth-Compositional-Probe § A.
 ------------------------------------------------------------------
 
+-- A NODE IS CHARGED FOR WHAT THE DEPTH FAMILY READS OUT OF IT, and
+-- `lookupNode` appears exactly twice in that family: `depthConsumeS`,
+-- whose only non-zero arm needs a `switch-st` and spends its `cur`
+-- rather than its size, and `depthReact`, which routes to `depthFin`,
+-- whose only non-zero arm needs a `concat-st` and WALKS its queue.  So
+-- the queue is charged and everything else is 0 — a `scan-st` in
+-- particular, whose accumulator no clause of the family ever looks at.
+--
+-- IT USED TO CHARGE `sizeᵛ t v` FOR A SCAN NODE, mirroring
+-- `boundedNode`, and that over-approximation was the whole of one
+-- postulate: the scan clause installs its seed before recursing, so the
+-- IH ran against a store the entry-state right-hand side did not name,
+-- and the gap was exactly the accumulator.  Charging the truth closes
+-- it against the same `setNode` induction the take clause already used.
+-- `boundedNode` is NOT changed to match — it is the state invariant the
+-- caps face maintains, and the accumulator is bounded there for reasons
+-- that have nothing to do with subscribe-side depth.
+--
+-- RECOVERY: the probe `Probed.Install-Scan`, deleted with that
+-- postulate, held a four-link shared-slot chain under a scan whose
+-- accumulator varied 1 → 41 with the depth flat at 4 — the measured
+-- form of what the clause now proves.  `git log -S'Probed.Install-Scan'
+-- --all` restores the fixture if a later measure needs one.
 nodeNestMax : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
-nodeNestMax (scan-st {t} v)       = sizeᵛ t v
+nodeNestMax (scan-st _)           = 0
 nodeNestMax (concat-st {t} q _ _) = foldr (λ o acc → sizeᵉ o ⊔ acc) 0 q
 nodeNestMax (take-st _)           = 0
 nodeNestMax (merge-st _ _)        = 0
@@ -482,6 +505,28 @@ postulate
   -- 58.  The mirror-side findings above are untouched, since nothing
   -- about `depthAll` moved — only the right-hand side, and it got
   -- SMALLER, which is the direction that could have refuted this.
+  --
+  -- REFUTED 2026-08-21 (Refuted.Depth-Nest), AND THE RECEIPT ABOVE IS
+  -- WHAT AIMED IT: the one shape it names as untested is a NESTED
+  -- burst, and that is the shape this statement dies at.  A `scanᵉ`
+  -- whose step function wraps its own accumulator gains `w` nesting
+  -- levels PER TICK while the syntax gains `4` per wrap and `1` per
+  -- listed source value — so the left side grows in `w · k` and the
+  -- right in `w + k`, and at `w = 4, k = 12` the depth is 49 against a
+  -- cap of 38.  `depthE` of a `scanᵉ` charges its emissions nothing
+  -- (`burst-scf-zero`), which is exactly what makes a scan a free
+  -- generator of nesting; the charge lands only here, in the `*All`
+  -- that consumes it.
+  --
+  -- The sibling-max finding above SURVIVES and is not what failed: the
+  -- burst does take a max across siblings.  It accumulates down
+  -- NESTING, which is a different axis and the one no syntactic term
+  -- can pay for.  Restating means conditioning on the caps, whose
+  -- `valCaps?` already bounds `sizeᵛ` — and `sizeᵛ (obs t) v` IS
+  -- `sizeᵉ v`, so the nesting of a reachable value is bounded there and
+  -- nowhere in the program text.  `depth-capped`'s `3 · cSize`
+  -- interface has room for it (114 against 49 at this witness), so the
+  -- restatement stops below that line.
   depth-all-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)
@@ -620,6 +665,19 @@ private
   ... | false = ⊔-lub (m≤m⊔n _ _)
                       (≤-trans (setNode-take-nodesNestMax nid k rest) (m≤n⊔m _ _))
 
+  -- the same induction for a scan node, which is 0-weight for the same
+  -- reason: `nodeNestMax` charges only what the family reads.
+  setNode-scan-nodesNestMax : ∀ {n} {Γ : Ctx n} {u}
+    (nid : NodeId) (v : Val Γ u)
+    (nodes : List (NodeId × NodeState Γ)) →
+    nodesNestMax (setNode nid (scan-st v) nodes) ≤ nodesNestMax nodes
+  setNode-scan-nodesNestMax nid v [] = z≤n
+  setNode-scan-nodesNestMax nid v ((j , ns) ∷ rest) with j ≡ᵇ nid
+  ... | true  = ⊔-lub z≤n (m≤n⊔m _ _)
+  ... | false = ⊔-lub (m≤m⊔n _ _)
+                      (≤-trans (setNode-scan-nodesNestMax nid v rest)
+                               (m≤n⊔m _ _))
+
 -- After mintNode + installNode(take-st(suc k)), storeNestMax is
 -- unchanged: nodeNestMax(take-st _) = 0, and mintNode preserves slots.
 -- stated over the CAP rather than over `storeNestMax`, because that is
@@ -637,55 +695,17 @@ depthCap-installTake b κ sched st k =
     (setNode-take-nodesNestMax (Sched.nextNode sched) (suc k)
       (EvalSt.nodes st))
 
--- INSTALL-INVARIANCE for scan: installing a scan node does not increase
--- the subscribe-side depth beyond the ENTRY store bound.
---
--- `depthFrame` at a `scan-f` frame is 0 definitionally, so
--- the scan accumulator's value is never read during subscribe.  The IH
--- on b runs against (sched₁, installNode nid (scan-st v) st), but the
--- storeNestMax bound refers to the ENTRY (sched, st) — no size of v
--- appears on the RHS.
---
--- PROBED 2026-08-21 (Probed.Install-Scan): the region the previous
--- receipt named as uncovered.  `b = input` at the top of a four-link
--- SHARED slot chain — the shape whose arcs ADD, and the shape that
--- refuted this row's sibling — with only the accumulator varied:
---
---   sizeᵛ v  1 → 41,  node half 1 → 41,  post-install store 22 → 41,
---   entry store 22,  RHS = 24,  depth 4 in BOTH cases.
---
--- RESTATED over `depthCap` when the connect landed, and the RHS row was
--- re-read at 24 — unchanged, because the entry store's slot half
--- dominates here and the `⊔` moving outward does not move a figure the
--- left arm already wins.  The leak channel this row exists to hold open
--- is untouched: the node half still varies 1 → 41 with the accumulator
--- while the depth does not.
---
--- The leak channel was open: the store the left side is evaluated
--- against exceeded the entry store the right side names by 19, so an
--- arc charged to the accumulator would have been unpayable.  None was.
--- Gas-stable at 20 and 60, which rules out a fuel-truncated figure
--- masquerading as invariance.  This SUPERSEDES the 2026-08-07 receipt,
--- whose probe is deleted and whose figure 5 was measured under the old
--- max — its conclusion is reproduced above and its arithmetic no longer
--- needs pinning.
--- STILL NOT COVERED: post-cascade state, and a `concat-st` node, whose
--- `nodeNestMax` is a `⊔` over a queue rather than one value and so
--- varies along an axis those rows do not touch.
--- NOTE: nodeNestMax(scan-st v) = sizeᵛ t v (NOT 0), so storeNestMax
--- increases when installing with a non-trivial value.  The proof cannot
--- go through depth-compositional at (sched₁, st₀) directly; it needs
--- an install-invariance argument showing depthE ignores the fresh node.
-postulate
-  installScan-depth-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (b : Closed Γ s)
-    (f : Fn Γ [] [] [] (u ×ᵗ s) u)
-    (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (v : Val Γ u) (sched : Sched Γ) (st : EvalSt e) →
-    depthE g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) bid now
-               (proj₂ (mintNode sched))
+-- and the scan twin, which is now a twin: it was a postulate for as long
+-- as the measure charged for the accumulator.
+depthCap-installScan : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u s}
+  (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e)
+  (v : Val Γ s) →
+  depthCap b κ (proj₂ (mintNode sched))
                (installNode (proj₁ (mintNode sched)) (scan-st v) st)
-      ≤ depthCap b (scan-f f (proj₁ (mintNode sched)) ↠ κ) sched st
+    ≤ depthCap b κ sched st
+depthCap-installScan b κ sched st v =
+  ⊔-mono-≤ ≤-refl
+    (setNode-scan-nodesNestMax (Sched.nextNode sched) v (EvalSt.nodes st))
 
 ------------------------------------------------------------------
 -- ARITHMETIC HELPERS — proved here.
@@ -721,9 +741,10 @@ take-size-arith c b nid κ sched st =
                         (maxInputᵉ b) (maxInputᵉ (takeᵉ c b)) (m≤n⊔m _ _)))
            ≤-refl
 
--- scan: same shape as map-size-arith (no sizeᵗ seed on LHS)
--- because installScan-depth-bound routes the IH through the ENTRY
--- store (storeNestMax sched st), bypassing the installed scan value.
+-- scan: same shape as map-size-arith, because the install is absorbed
+-- BEFORE this arithmetic runs — `depthCap-installScan` returns the IH's
+-- post-install cap to the entry cap, so what is left here is the syntax
+-- payment alone.
 scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
   (nid : NodeId) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
@@ -838,13 +859,16 @@ private
     st₀    = installNode nid (take-st (suc k)) st
     r      = subscribeE fuel b (take-f nid ↠ κ) bid now sched₁ st₀
 
-  -- BUCKET (b): scanᵉ — burst(scan-f) = 0; IH routed through ENTRY store
-  -- via installScan-depth-bound (install-invariance: depthE never reads
-  -- the freshly-installed scan accumulator on the subscribe side).
+  -- BUCKET (b): scanᵉ — burst(scan-f) = 0, and the IH comes back through
+  -- the ENTRY store because installing the seed is 0-weight: nothing in
+  -- the depth family reads a scan node, so `nodeNestMax` does not charge
+  -- for it and this clause is the take clause with a different node.
   depth-compositional-go fuel (scanᵉ f seed b) κ bid now sched st =
     ≤-trans
       (⊔-lub
-        (installScan-depth-bound fuel b f κ bid now (evalTm seed) sched st)
+        (≤-trans
+          (depth-compositional-go fuel b (scan-f f nid ↠ κ) bid now sched₁ st₀)
+          (depthCap-installScan b (scan-f f nid ↠ κ) sched st (evalTm seed)))
         (≤-trans (burst-scf-zero fuel bid now f nid κ
                     (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
                  z≤n))
@@ -870,6 +894,14 @@ private
     depth-all-bound fuel exhaustᵒ (exhaust-st false false) b κ bid now sched st
 
 
+-- REFUTED 2026-08-21 (Refuted.Depth-Nest, `depth-compositional-sum-absurd`):
+-- this statement is FALSE, and so is the body below — a `scanᵉ` that wraps
+-- its own accumulator makes `depthE` grow in `wraps × ticks` while
+-- `sizeᵉ b` grows in `wraps + ticks`.  Measured 49 against 38.  The leaf
+-- `depth-all-bound`'s header carries the mechanism and the repair; the
+-- currency, not the induction, is what has to change, and `depth-capped`
+-- above the line keeps its statement.  Everything reachable from here is
+-- resting on a false lemma until that restatement lands.
 abstract
   depth-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)

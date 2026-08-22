@@ -173,23 +173,27 @@ max over the slots while the connects CHAIN. Neither cost a clause, but a real
 body's own conclusion is no safer than a postulate's, and a row whose OBSTACLE
 is written down is not thereby a row whose STATEMENT is right.
 
-The residue has now been probed through, and the restatement it forced has
-landed: `depth-compositional` is proved against a cap whose slot half is the
-partial sum below the program's own stratification level, the connect is a real
-clause paying by an equality at its own index, and the leaf that used to stand
-there is gone. Nothing downstream moved — the exported statement keeps its text
-and spends one bridge. What remains on this tier is the three leaves the
-restatement carried along, each re-read against the new right-hand side rather
-than inheriting a figure.
+A THIRD TIME, AND THIS ONE MOVES THE CURRENCY. The slot half was repaired from
+a max to a sum and the connect and scan leaves became real clauses, all of it
+sound — and then the one shape `depth-all-bound`'s own receipt named as untested
+refuted the whole face. A `scanᵉ` whose step wraps its own accumulator gains
+nesting PER TICK, so `depthE` grows in `wraps × ticks` while every syntactic
+right-hand side grows in `wraps + ticks`; a sum cannot dominate a product. So
+`depth-compositional` is FALSE as a real body, not merely unproven, and the
+statement above it is where this tier now starts.
 
-- **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY: the burst feeds
-  `depthBurst` the state the REAL `subscribeE` produced while the cap reads the
-  entry state, so the preservation conjunct has to be proved as a second conjunct
-  of the same induction. Probed: the burst takes a max across siblings, not a sum.
-- **`installScan-depth-bound`** (Depth-Compositional) — DIFFICULTY: the take twin
-  beside it is proven, but does NOT transfer — `nodeNestMax (take-st _)` is 0
-  while `nodeNestMax (scan-st v)` is `sizeᵛ v`, so the node half genuinely grows
-  and the content is that `depthE` never reads it. Probed with that channel open.
+What survives is the interface: `depth-capped` is already caps-conditioned and
+its `3 · cSize` has room (114 against the measured 49), so the restatement stops
+below that line and nothing above it moves. What has to change is the CURRENCY —
+the caps' `valCaps?` bounds `sizeᵛ`, and `sizeᵛ (obs t) v` IS `sizeᵉ v`, so the
+nesting of a reachable value is bounded there and nowhere in the program text.
+Adding the hypothesis is licensed exactly because the unconditional form is
+refuted.
+
+- **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
+  (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.
+  Do not grind it; the statement and its parent's are both restatements, into the
+  caps currency, and the sibling-max finding survives untouched.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

@@ -54,7 +54,7 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Gas; Tick; Id)
-open import Rx.Exp       using (Ctx; Closed; sizeᵉ; sizeᵛ)
+open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; scan-st;
                                 take-st; merge-st;
                                 concat-st; switch-st; exhaust-st;
@@ -112,7 +112,7 @@ foldr-⊔-bounded B f p dom (x ∷ xs) h
 
 node-nest-bounded : ∀ {n} {Γ : Ctx n} (B : ℕ) (ns : NodeState Γ) →
   boundedNode B ns ≡ true → nodeNestMax ns ≤ B
-node-nest-bounded B (scan-st {t} v)   h = ≤ᵇ⇒≤ (sizeᵛ t v) B (T-to h)
+node-nest-bounded B (scan-st _)      h = z≤n
 node-nest-bounded B (concat-st q _ _) h =
   foldr-⊔-bounded B sizeᵉ (λ o → sizeᵉ o ≤ᵇ B)
     (λ o ho → ≤ᵇ⇒≤ (sizeᵉ o) B (T-to ho)) q h

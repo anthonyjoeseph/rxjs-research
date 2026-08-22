@@ -29,3 +29,5 @@ open import Refuted.Depth-Conn
   using (depth-conn-free-def-absurd)
 open import Refuted.Depth-Chain
   using (depth-conn-input-absurd; depth-compositional-absurd)
+open import Refuted.Depth-Nest
+  using (depth-all-bound-absurd; depth-compositional-sum-absurd)
