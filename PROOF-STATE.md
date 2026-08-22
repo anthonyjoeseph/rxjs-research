@@ -224,6 +224,19 @@ remaining obligation is slot preservation with no state conjunct at all. The
 store measure keeps the arm for the delivery face, which is the face that reads a
 queue.
 
+AND THE ARM'S PRESERVATION CONJUNCT IS NOT OWED — IT WAS ALREADY PROVEN, which a
+search found and no amount of grinding would have. With the cap a function of
+`Sched.slots` alone, the one fact carrying the arm's own cap back to the entry
+cap is that a subscribe keeps the slots, and `subscribeE-slots` (Keeps-Ring) says
+exactly that, unconditionally, off a `KeepsC` family that also covers
+`stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`, `switchKill` and
+`concatDrain` — everything a burst-side clique threads state through. So the leaf
+is restated at the scheduler the burst REACHED and the `gs` arm substitutes with
+the proven lemma. What is left on it is one sum: an emitted inner's root-path cap
+under its emitter's. The sum and not its two conjuncts, because at a connect the
+emitter's own nesting is 0 while the inner comes out of the slot's def, and the
+below-sum's step is what pays for it.
+
 WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
 `depth-capped`, its `3 · cSize` conclusion, the `storeNestMax`-under-`capsOK?`
 inversion, and `three-size≤capsH` with the pool-lower chain that proved it.
@@ -238,10 +251,10 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`depth-all-burst-gs`** (Depth-Compositional) — DIFFICULTY, all that is left of
-  the `*All` face. Real body split on its gas, `g0` half discharged. Owes an
-  emitted inner's nesting bounded by its emitter's, plus slot preservation across
-  `subscribeE`; no state conjunct.
+- **`depth-all-burst-reached`** (Depth-Compositional) — DIFFICULTY, all that is
+  left of the `*All` face. Both halves of the arm around it are real: the `g0`
+  gas half, and the `subst` that spends the proven `subscribeE-slots`. Owes one
+  thing — an emitted inner's root-path cap bounded by its emitter's.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

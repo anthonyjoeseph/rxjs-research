@@ -25,7 +25,7 @@
 --
 -- The rows behind this shape live in `Probed.Nest-Depth`, and the
 -- receipt they earned sits in the header of the statement they are
--- evidence about (`depth-all-burst-gs`, the one arm of that face still
+-- evidence about (`depth-all-burst-reached`, the one arm of that face still
 -- open): this measure equals `depthE` ON
 -- THE NOSE — not merely dominates it — at three programs, the third of
 -- which is a scan nested inside another scan's step function, and says

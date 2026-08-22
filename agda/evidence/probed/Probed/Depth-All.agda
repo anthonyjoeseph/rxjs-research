@@ -1,4 +1,4 @@
--- TARGET: depth-all-burst-gs
+-- TARGET: depth-all-burst-reached
 --
 -- THE BURST ARM IS WHAT THESE ROWS ISOLATE, which is now also the only
 -- half of the face still open: its outer arm is proven inside the

@@ -31,15 +31,15 @@
 --     `nestDᵉ (mergeAllᵉ b) ≡ suc (nestDᵉ b)` — the cap's path measure
 --     charges that frame and no other, and the constructor grants
 --     exactly the one unit it charges.
--- (4) THE REAL WORK: every clause that calls `depthBurst` feeds it the
---     state produced by running the REAL `subscribeE`, while the RHS
---     reads the ENTRY state.  The `storeNestMax`-preservation conjunct
---     is what `depth-all-burst-gs` (below) absorbs; when it is ground it
---     must be proved as a second conjunct of the same induction, not a
---     separate family, and must NOT ride `subscribeE-caps` (circular —
---     that face takes `depthE ≤ dep` as a hypothesis).  Its sibling arm
---     needed the same induction for a different reason and is proven
---     inside it; see that leaf's header.
+-- (4) WAS THE REAL WORK, AND IS DISCHARGED: every clause that calls
+--     `depthBurst` feeds it the scheduler the REAL `subscribeE`
+--     produced, while the RHS reads the ENTRY one.  With the cap a
+--     function of `Sched.slots` alone, the preservation conjunct is
+--     exactly `subscribeE-slots` (Keeps-Ring), unconditional and
+--     PROVEN, so the `gs` arm substitutes with it and nothing about
+--     preservation remains inside a leaf.  It never needed
+--     `subscribeE-caps`, which would have been circular — that face
+--     takes `depthE ≤ dep` as a hypothesis.
 --
 -- BUCKETS: (a) trivially zero — ofᵉ, emptyᵉ, deferᵉ, g0(μᵉ),
 -- takeᵉ(zero), and the g0 connect.  (b) IH + arithmetic — mapᵉ,
@@ -47,10 +47,10 @@
 -- (c) THE CONNECT, a real clause: `input` recurses into the slot's own
 -- def and pays for it out of the summand admitting slot `i` to the
 -- partial sum.  (d) BLOCKED, two named postulates —
--- `depth-all-burst-gs` (needs the preservation conjunct, finding (4);
--- it is the burst half of the `*All` clauses at POSITIVE gas — the
--- outer half is proven in the assembly itself and the zero-gas half in
--- bucket (b′)) and
+-- `depth-all-burst-reached` (the burst half of the `*All` clauses at
+-- POSITIVE gas, read at the scheduler the burst reached; the outer half
+-- is proven in the assembly itself, the zero-gas half in bucket (b′),
+-- and finding (4) is spent rather than absorbed) and
 -- `depth-μ-bound` (sizeᵉ (unfoldμ body) > sizeᵉ (μᵉ body) kills the
 -- size IH; the honest route is the guarded-context discipline —
 -- μ-variable occurrences sit under deferᵉ, and deferᵉ contributes 0
@@ -97,6 +97,7 @@ open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; sum-tab-mono)
 open import Verify-Budget-Sufficient.Caps-Nest using (sum-tab-slack)
+open import Verify-Budget-Sufficient.Keeps-Ring using (subscribeE-slots)
 open import Data.Empty using (⊥-elim)
 open import Decide using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ)
 open import Verify-Budget-Sufficient.Caps-Depth
@@ -926,7 +927,30 @@ postulate
   -- at it, so the whole burst-side clique collapses to the ONE `suc` a
   -- `thru-outer` frame charges and the cap's `suc` pays it.  What is
   -- left is this leaf, and its gas is the thing the route descends on.
-  depth-all-burst-gs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  --
+  -- AND THE PRESERVATION CONJUNCT IS SPENT RATHER THAN OWED, which is
+  -- what the statement below reads at the REACHED scheduler for.  The
+  -- cap reads a scheduler through `Sched.slots` and nothing else, so the
+  -- one fact that moves the arm's own cap back to the entry cap is that
+  -- a subscribe keeps the slots — and that is PROVEN, unconditionally,
+  -- as `subscribeE-slots` (Keeps-Ring), off a `KeepsC` family covering
+  -- `stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`, `switchKill` and
+  -- `concatDrain` besides.  The `gs` clause below substitutes with it and
+  -- this leaf never sees the question, so nothing here is conditioned on
+  -- a scheduler agreement: the two schedulers agree by construction
+  -- because the statement is made where the burst is.
+  --
+  -- WHAT IS LEFT ON IT, in one line and in the SUM currency: an emitted
+  -- inner's cap at a root path is bounded by its emitter's, that is
+  -- `nestDᵉ sl o + slotsNestBelow sl (maxInputᵉ o)` under
+  -- `nestDᵉ sl b + slotsNestBelow sl (maxInputᵉ b)`.  The SUM and not
+  -- the two conjuncts: at `b = input i` the emitter's own nesting is 0
+  -- while the inner comes out of the slot's def, and the below-sum's step
+  -- at `suc (toℕ i)` is what pays for it — the same equality the connect
+  -- clause already spends.  The four other shapes check by hand: `ofᵉ`
+  -- with equality, `mapᵉ` off its function's own term measure, `scanᵉ`
+  -- off the product term, which IS the per-payload re-wrap.
+  depth-all-burst-reached : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (fuel : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
@@ -934,10 +958,11 @@ postulate
         nid = proj₁ (mintNode sched)
         r   = subscribeE g b (thru-outer op nid ↠ κ) bid now
                 (proj₂ (mintNode sched)) (installNode nid initSt st)
+        sl′ = Sched.slots (proj₁ (proj₂ r))
     in depthBurst g bid now (thru-outer op nid) κ
          (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ depthCapN (suc (nestDᵉ (Sched.slots sched) b))
-                     (maxInputᵉ b) κ sched
+         ≤ suc (nestDᵉ sl′ b) + pathNestD κ
+             + slotsNestBelow sl′ (maxInputᵉ b)
 
   -- SUBSTITUTION UNDER THE GUARD, which is what `unfoldμ` is: it is
   -- `elimGExp (here refl) (μᵉ body) body`, and `elimGExp` reaches a
@@ -1156,7 +1181,14 @@ one-≤-capN : ∀ {n} {Γ : Ctx n} {t} {u}
 one-≤-capN N mx κ sched = s≤s z≤n
 
 -- THE ARM, split on its gas.  The `g0` clause is the clique above; the
--- `gs` clause is the leaf, and nothing else remains of this face.
+-- `gs` clause is an assembly over ONE leaf, and nothing else remains of
+-- this face.  Its whole content is the `subst`: the cap is a function of
+-- `Sched.slots` alone, so the PROVEN `subscribeE-slots` carries the leaf's
+-- statement at the scheduler the burst reached back to the entry one, and
+-- the two `nestDᵉ`/`slotsNestBelow` readings move together under a single
+-- motive.  That is the dividend of the cap losing its node arm — before
+-- it, this rewrite would have had to move a store as well, and no
+-- unconditional lemma says a subscribe keeps THAT.
 depth-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (bid : Id) (now : Tick)
@@ -1177,7 +1209,17 @@ depth-all-burst g0 op initSt b κ bid now sched st =
   r   = subscribeE g0 b (thru-outer op nid ↠ κ) bid now
           (proj₂ (mintNode sched)) (installNode nid initSt st)
 depth-all-burst (gs fuel) op initSt b κ bid now sched st =
-  depth-all-burst-gs fuel op initSt b κ bid now sched st
+  subst (λ sl → depthBurst (gs fuel) bid now (thru-outer op nid) κ
+                  (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                  ≤ suc (nestDᵉ sl b) + pathNestD κ
+                      + slotsNestBelow sl (maxInputᵉ b))
+        (subscribeE-slots (gs fuel) b (thru-outer op nid ↠ κ) bid now
+           (proj₂ (mintNode sched)) (installNode nid initSt st))
+        (depth-all-burst-reached fuel op initSt b κ bid now sched st)
+  where
+  nid = proj₁ (mintNode sched)
+  r   = subscribeE (gs fuel) b (thru-outer op nid ↠ κ) bid now
+          (proj₂ (mintNode sched)) (installNode nid initSt st)
 
 -- NOTHING IS OWED FOR AN INSTALL ANY MORE, and the two lemmas that
 -- used to pay for one are gone with the node arm.  `mintNode` leaves the
