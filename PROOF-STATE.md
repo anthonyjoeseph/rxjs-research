@@ -173,17 +173,19 @@ max over the slots while the connects CHAIN. Neither cost a clause, but a real
 body's own conclusion is no safer than a postulate's, and a row whose OBSTACLE
 is written down is not thereby a row whose STATEMENT is right.
 
-The residue has now been probed through, and what it bought is that the
-remaining risk is ROUTE risk: the repaired sum has a margin that grows with the
-chain, install-invariance holds with the leak channel deliberately open, and the
-burst takes a max. So the obstacles in those headers are the work, and the
-statements are no longer the thing to doubt first.
+The residue has now been probed through, and what it bought is that the risk
+moved rather than shrank. The statements are no longer the thing to doubt first —
+the repaired sum has a margin that grows with the chain, install-invariance holds
+with the leak channel deliberately open, and the burst takes a max. What the
+probing turned up instead is that the top row's statement cannot support its own
+`input` clause in any currency now available, so that row is SHAPE and the work
+there is a restatement, not a grind.
 
-- **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY, and the
-  module header buckets it BLOCKED: `depth-conn-input`, `depth-all-bound`,
-  `depth-subst-guarded`, `installScan-depth-bound`. All four now carry receipts
-  naming the region reached, the repaired measure included. What is left is the
-  double-count — arithmetic, not truth. Routes in those headers.
+- **`depth-compositional`'s residue** (Depth-Compositional) — SHAPE, since the
+  double-count makes a restatement of `depth-conn-input` unavoidable and only one
+  currency is left standing; the residue route is refuted in its header.
+  `depth-all-bound`, `depth-subst-guarded`, `installScan-depth-bound` are the
+  probed leaves under it. Restate over the partial sum; do not grind.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
