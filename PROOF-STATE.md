@@ -199,6 +199,22 @@ it does not report, and that is the defect rather than the arithmetic. Its call
 site is not where it fails: `Caps-Bridge` passes `baseCaps`, whose `cSize` reads
 `entryCeil`.
 
+AND THE GOAL IS SLACK, so all of this lives in the route. The only consumer is
+`depthE≤capsH-root`, and `capsH m 0` is `blowH m`, carrying
+`2 * poolCount (towerℕ m) m` — astronomical. What has to go is the middle term
+the route advertises as "tower-free". Two routes are already closed: the tight
+syntactic one by the witnesses, and bounding depth by the GAS — true, and
+recorded as a dead route in `depth-capped`'s header, because `budgetAt-gs-pad`
+puts the budget a full capsH-step ABOVE `capsH e sl id`, the wrong side of the
+goal. The live route needs no new mathematics, because the width face already walked
+it: `Rx.Frame-Width`'s `pmIⱽ` at a `scanᵉ` IS `(per-step ⊔ 1) ^ (outWⱽ e)`, a
+multiplier raised to the source's emission count — this witness, read off the
+syntax. `Caps-Face/Part1`'s `Wᴱ` bundles that measure with the other three under
+one `M`, and Part2 establishes `Wᴱ sl (iterFold S (sizeᵉ e) M) e`. An iterated
+fold dominates an exponential; `3 · cSize` cannot. So the repair is a currency
+swap with a worked precedent beside it, and what remains open is which level's
+fold, since `frameStep` advances the index those measures are read at.
+
 - **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
   (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.
   Do not grind it; the statement and its parent's are both restatements, into the

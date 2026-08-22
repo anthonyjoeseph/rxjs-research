@@ -186,6 +186,45 @@ storeNest-capped c sched st cap slB =
 -- bracketing it, on the stated grounds that the static width measures
 -- tower in the syntax.  The statement is false because it admits caps
 -- its caller never passes.
+--
+-- WHAT THE CONSUMER ACTUALLY WANTS IS SLACK, AND THAT IS THE GOOD NEWS.
+-- The only consumer is `depthE≤capsH-root`, whose conclusion is
+-- `≤ capsH e ins 0` — and `capsH m 0` is `blowH m`, which carries
+-- `2 * poolCount (towerℕ m) m`.  So the target is astronomically true
+-- and every crossing above lives in the ROUTE, not the goal.  The header
+-- below this one advertises that route as "tower-free"; tower-free is
+-- precisely what a product cannot be.
+--
+-- DEAD ROUTE 2026-08-21: BOUND THE DEPTH BY THE GAS.  It is the obvious
+-- repair and it is true — every `suc` in the depth family (`depthFrame`
+-- at a thru-outer, `depthFinC` at a drain) is followed by a
+-- `depthInner`/`depthConn` peel before another can occur, so
+-- `depthE g … ≤ <gas length>` needs only the lexicographic induction
+-- this face already performs.  It CANNOT CHAIN: `budgetAt-gs-pad`
+-- (Burst-Walk) gives `budgetAt e sl id ≡ gs (gasPad k (gasTower
+-- (3 + capsHgo (capsBase e sl) (suc id))))`, a tower of height one
+-- capsH-step ABOVE `capsH e sl id`.  So the gas is strictly the wrong
+-- side of the goal, and a true lemma buys nothing.  Do not re-derive it.
+--
+-- THE LIVE ROUTE, AND THE WIDTH MACHINERY ALREADY WALKED IT.  The
+-- refuting mechanism is not new to this development — it is stated
+-- outright in `Rx.Frame-Width`, whose `pmIⱽ` at a `scanᵉ` is
+-- `(pmIᵗⱽ … f ⊔ 1) ^ (outWⱽ … e)`: a per-step multiplier raised to the
+-- SOURCE'S EMISSION COUNT, and `outWⱽ … (ofᵉ ts)` is `length ts`.  That
+-- is this witness exactly, with the exponent read off the syntax.  So
+-- the quantity that dominates is already known, and so is what bounds
+-- it: `Caps-Face/Part1`'s `Wᴱ` bundles all four width measures —
+-- `pmIᵉ` included — under one `M`, and `Caps-Face/Part2` establishes
+-- `Wᴱ sl (iterFold S (sizeᵉ e) M) e`, an ITERATED fold of depth
+-- `sizeᵉ e`.  An iterated fold dominates an exponential in the syntax;
+-- `3 · cSize` cannot.
+--
+-- So the restatement is a currency swap with a worked precedent beside
+-- it, not new mathematics: state the depth face's conclusion in the
+-- `iterFold` currency the width face already uses for the same
+-- exponential, and let `capsH`'s slack absorb it.  What still has to be
+-- settled is which level's fold, since `frameStep` advances the index
+-- these measures are read at.
 depth-capped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
