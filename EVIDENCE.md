@@ -113,6 +113,28 @@ Short of that, repair it: a refutation that still states the same impossibility
 in today's vocabulary is worth keeping, and `make refuted` going red is the
 signal to make that call rather than a thing to route around.
 
+### A refutation must STATE the currency it refutes, not import it
+
+**A refutation that reads a MEASURE out of `src` tracks whatever that measure
+means today, and what it refutes is therefore whatever the statement says
+today — which is not what it was written against.** The failure is silent in
+the direction that matters: a repair that enlarges the measure enlarges the
+right-hand side too, and the crossing the witness established quietly becomes
+an equality. Nothing goes red. The refutation still typechecks, still gets
+counted, still reads as a live finding, and is now evidence for nothing.
+
+So when a repair moves a measure, **localise the old one in the refutation** —
+`fooOld` beside the imported `foo` — with a line saying which repair moved it.
+That is the same reasoning as the state-ability rule above, one level in: the
+statement being refuted includes the definitions it is written over, so keeping
+the finding state-able can mean re-deriving a definition and not only a type.
+
+**AND THE NUMERIC ROWS BESIDE THE WITNESS ARE WHAT CATCH IT.** A witness whose
+figures are pinned by `refl` — store 7, depth 9, right-hand side 8 — fails
+loudly the moment any of them moves, naming the number. A witness that computes
+its sides inline does not. This is the strongest argument for spelling the
+figures out even where the `⊥` does not need them.
+
 ### Keeping a refutation after its route is settled (Anthony)
 
 **Do not reflexively delete a refutation because the surrounding goal has since

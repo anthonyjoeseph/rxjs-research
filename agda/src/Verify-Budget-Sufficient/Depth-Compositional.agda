@@ -60,13 +60,12 @@ module Verify-Budget-Sufficient.Depth-Compositional where
 open import Data.Nat
   using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s; _≡ᵇ_; _<ᵇ_)
 open import Data.Nat.Properties
-  using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub; n≤1+n;
-         m≤m⊔n; m≤n⊔m; +-suc; ≤-reflexive; ≤ᵇ⇒≤; n≮n; +-identityʳ;
-         ⊔-mono-≤)
+  using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub; n≤1+n; m≤m⊔n; m≤n⊔m; +-suc; ≤-reflexive; ≤ᵇ⇒≤; n≮n;
+  +-identityʳ; ⊔-mono-≤)
 open import Data.Fin   using (Fin; toℕ)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
 open import Data.List.Relation.Unary.Any using (here)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; cong)
 open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (Bool; false; true; if_then_else_; T; _∧_)
 open import Data.Maybe using (nothing)
@@ -82,13 +81,14 @@ open import Rx.Evaluator
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
   take-f; mintNode; installNode; subscribeE; splitEvents; stepFrame; setNode;
   share-sink; register)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 
 -- pathLen, imported from .Measures where it is defined — the
 -- SAME pathLen `depth-capped`'s statement reads, so the landing plugs
 -- into its consumer unchanged.
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; sum-tab-mono)
+  (pathLen; sum-tab-mono; +-mix4)
 open import Verify-Budget-Sufficient.Caps-Nest using (sum-tab-slack)
 open import Data.Empty using (⊥-elim)
 open import Decide using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ)
@@ -134,9 +134,20 @@ nodeNestMax (exhaust-st _ _)      = 0
 nodesNestMax : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
 nodesNestMax = foldr (λ kv acc → nodeNestMax (proj₂ kv) ⊔ acc) 0
 
-slotNest : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
-slotNest (shared d)   = sizeᵉ d
-slotNest (scripted _) = 0
+-- A SHARED SLOT PAYS ITS DEF'S NESTING TOO, and that is where the
+-- refutation's product had to land.  A def reached through `input` is
+-- entered by the mirror with the def in hand, so its own scan/`*All`
+-- structure deepens exactly as the root program's does; charging only
+-- `sizeᵉ d` was the same undercount `depth-all-bound` was refuted for.
+--
+-- Charging it HERE rather than descending inside `nestDᵉ` is forced:
+-- see that module's header — a descending `input` clause is stuck on a
+-- variable fuel.  What it costs is `slotNest-≤-slotSize` and the chain
+-- above it, which fed the caps-conditioned interface this refutation
+-- retires anyway.
+slotNest : ∀ {n} {Γ : Ctx n} {k t} → Slots Γ → Slot Γ k t → ℕ
+slotNest sl (shared d)   = sizeᵉ d + nestDᵉ sl d
+slotNest sl (scripted _) = 0
 
 -- A SUM OVER THE SLOTS, AND THE `foldr _⊔_ 0` IT REPLACES WAS
 -- REFUTED — Refuted.Depth-Chain, and the defect was the CURRENCY
@@ -171,7 +182,7 @@ slotNest (scripted _) = 0
 -- way slot defs do wants a state the evaluator actually REACHED, so it
 -- is a separate build.
 slotsNestSum : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsNestSum {n} sl = sum (tabulate {n = n} (λ i → slotNest (sl i)))
+slotsNestSum {n} sl = sum (tabulate {n = n} (λ i → slotNest sl (sl i)))
 
 storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
 storeNestMax sched st =
@@ -319,7 +330,7 @@ mutual
                                       (inputsBelowᵗˢ k ms) h))
 
 slotNestBelow : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → Fin n → ℕ
-slotNestBelow sl k i = if toℕ i <ᵇ k then slotNest (sl i) else 0
+slotNestBelow sl k i = if toℕ i <ᵇ k then slotNest sl (sl i) else 0
 
 slotsNestBelow : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ → ℕ
 slotsNestBelow {n} sl k = sum (tabulate {n = n} (slotNestBelow sl k))
@@ -338,7 +349,7 @@ if-mono true  false x h with h refl
 slotNestBelow-mono : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (k k′ : ℕ) → k ≤ k′ →
   (i : Fin n) → slotNestBelow sl k i ≤ slotNestBelow sl k′ i
 slotNestBelow-mono sl k k′ le i =
-  if-mono (toℕ i <ᵇ k) (toℕ i <ᵇ k′) (slotNest (sl i))
+  if-mono (toℕ i <ᵇ k) (toℕ i <ᵇ k′) (slotNest sl (sl i))
           (≤ᵇ-widen (suc (toℕ i)) le)
 
 slotsNestBelow-mono : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (k k′ : ℕ) → k ≤ k′ →
@@ -419,13 +430,14 @@ depthCapN sz mx κ sched st =
 
 depthCap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u}
   (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) → ℕ
-depthCap b κ sched st = depthCapN (sizeᵉ b) (maxInputᵉ b) κ sched st
+depthCap {n = n} b κ sched st =
+  depthCapN (sizeᵉ b + nestDᵉ (Sched.slots sched) b) (maxInputᵉ b) κ sched st
 
 slotsNestBelow-≤-sum : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (k : ℕ) →
   slotsNestBelow sl k ≤ slotsNestSum sl
 slotsNestBelow-≤-sum {n} sl k =
-  sum-tab-mono {n} (slotNestBelow sl k) (λ i → slotNest (sl i))
-    (λ i → if-mono (toℕ i <ᵇ k) true (slotNest (sl i)) (λ _ → refl))
+  sum-tab-mono {n} (slotNestBelow sl k) (λ i → slotNest sl (sl i))
+    (λ i → if-mono (toℕ i <ᵇ k) true (slotNest sl (sl i)) (λ _ → refl))
 
 -- and the bridge the export spends: the below-sum is a summand of the
 -- whole sum, and the node half is the other arm of `storeNestMax`'s
@@ -433,47 +445,53 @@ slotsNestBelow-≤-sum {n} sl k =
 -- nothing downstream of this module moves.
 cap-≤-store : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u}
   (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-  depthCap b κ sched st ≤ sizeᵉ b + pathLen κ + storeNestMax sched st
-cap-≤-store b κ sched st = ⊔-lub slotHalf nodeHalf
+  depthCap b κ sched st
+    ≤ sizeᵉ b + nestDᵉ (Sched.slots sched) b + pathLen κ
+        + storeNestMax sched st
+cap-≤-store {n = n} b κ sched st = ⊔-lub slotHalf nodeHalf
   where
-  slotHalf : sizeᵉ b + pathLen κ + slotsNestBelow (Sched.slots sched) (maxInputᵉ b)
-               ≤ sizeᵉ b + pathLen κ + storeNestMax sched st
+  SZ : ℕ
+  SZ = sizeᵉ b + nestDᵉ (Sched.slots sched) b
+  slotHalf : SZ + pathLen κ + slotsNestBelow (Sched.slots sched) (maxInputᵉ b)
+               ≤ SZ + pathLen κ + storeNestMax sched st
   slotHalf = +-mono-≤ ≤-refl
                (≤-trans (slotsNestBelow-≤-sum (Sched.slots sched) (maxInputᵉ b))
                         (m≤m⊔n _ _))
   nodes≤store : nodesNestMax (EvalSt.nodes st) ≤ storeNestMax sched st
   nodes≤store = m≤n⊔m _ _
   store≤goal : storeNestMax sched st
-                 ≤ sizeᵉ b + pathLen κ + storeNestMax sched st
-  store≤goal = m≤n+m (storeNestMax sched st) (sizeᵉ b + pathLen κ)
+                 ≤ SZ + pathLen κ + storeNestMax sched st
+  store≤goal = m≤n+m (storeNestMax sched st) (SZ + pathLen κ)
   nodeHalf : nodesNestMax (EvalSt.nodes st)
-               ≤ sizeᵉ b + pathLen κ + storeNestMax sched st
+               ≤ SZ + pathLen κ + storeNestMax sched st
   nodeHalf = ≤-trans nodes≤store store≤goal
 
 -- THE PAYMENT, and it is an EQUALITY at the one index that matters.
 -- Slot `i`'s summand is masked out below the cut `toℕ i` and present at
 -- `suc (toℕ i)`, so admitting slot `i` to the sum buys exactly
--- `slotNest (sl i)` — which is `sizeᵉ d` on the nose for the def the
--- assembly is about to recurse on.  That is the whole content of the
--- restatement: the charge and the payment are the same number.
+-- `slotNest sl (sl i)` — which is `sizeᵉ d + nestDᵉ sl d` on the nose
+-- for the def the assembly is about to recurse on.  That is the whole
+-- content of the restatement: the charge and the payment are the same
+-- number, and they stayed the same number when the nesting term was
+-- added to both sides of it.
 <ᵇ-irrefl : ∀ (a : ℕ) → (a <ᵇ a) ≡ false
 <ᵇ-irrefl a = force-false (a <ᵇ a)
   (λ h → ⊥-elim (n≮n a (≤ᵇ⇒≤ (suc a) a (T-to h))))
 
 slotsNestBelow-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n) →
-  slotNest (sl i) + slotsNestBelow sl (toℕ i)
+  slotNest sl (sl i) + slotsNestBelow sl (toℕ i)
     ≤ slotsNestBelow sl (suc (toℕ i))
 slotsNestBelow-step sl i =
   sum-tab-slack (slotNestBelow sl (toℕ i)) (slotNestBelow sl (suc (toℕ i)))
-    (slotNest (sl i))
+    (slotNest sl (sl i))
     (slotNestBelow-mono sl (toℕ i) (suc (toℕ i)) (n≤1+n (toℕ i)))
     i slack
   where
-  slack : slotNest (sl i) + slotNestBelow sl (toℕ i) i
+  slack : slotNest sl (sl i) + slotNestBelow sl (toℕ i) i
             ≤ slotNestBelow sl (suc (toℕ i)) i
   slack rewrite <ᵇ-irrefl (toℕ i)
               | ≤ᵇ-true (suc (toℕ i)) (suc (toℕ i)) ≤-refl
-        = ≤-reflexive (+-identityʳ (slotNest (sl i)))
+        = ≤-reflexive (+-identityʳ (slotNest sl (sl i)))
 
 ------------------------------------------------------------------
 -- BUCKET (d) — the three hard postulates (schedule-blockers)
@@ -594,39 +612,43 @@ postulate
   -- compounding row is degree THREE, so nothing here says the pattern
   -- continues past it — only that it does not stop at two.
   --
-  -- AND THE ROUTE INTO `src` HAS ONE DESIGN CHOICE IN IT, WITH ONE
-  -- ANSWER.  Enlarging `depthCap`'s first summand to
-  -- `sizeᵉ b + nestD b` leaves the `input` clause owing the SLOT
-  -- definition's nesting, and there are exactly two places to pay it.
+  -- AND THE ROUTE INTO `src` HAD ONE DESIGN CHOICE IN IT, WHOSE FIRST
+  -- ANSWER WAS WRONG.  Enlarging `depthCap`'s first summand to
+  -- `sizeᵉ b + nestDᵉ b` leaves the `input` clause owing the SLOT
+  -- definition's nesting, and there were exactly two places to pay it.
   --
-  -- Paying it in `slotNest` is the tempting one — it already pays
-  -- `sizeᵉ d` on the nose, and `slotsNestBelow-step` is built around
-  -- that being an equality — and it is WRONG, because `slotNest` is
-  -- held pointwise under `slotsSize` by `slots-nest-≤-size`, which is
-  -- what keeps `storeNest-capped` under the caps.  The nesting quantity
-  -- is exponential in the program (the compounding row above), so no
-  -- bound by a size survives there, and that lemma is not one this
-  -- development can afford to lose.
+  -- DEAD ROUTE 2026-08-21: PAY IT IN THE MEASURE, by descending into
+  -- slot definitions on slot fuel with a visited set — `outWⱽ`'s shape,
+  -- whose `input` clause is already written that way and whose `j` is
+  -- the lexicographic measure a connect spends.  It was chosen first,
+  -- and for a good reason: it kept `slots-nest-≤-size`, which held
+  -- `slotNest` pointwise under `slotsSize` and kept `storeNest-capped`
+  -- under the caps.  It is STRUCTURALLY DEAD.  The consumer fixes the
+  -- fuel at the slot count `n`, a VARIABLE, so `nestDⱽ n [] sl (input i)`
+  -- never reduces, and the parent has no more fuel than the child it
+  -- would recurse into — there is no inequality to prove even in
+  -- principle, and no lemma repairs it.  `outWⱽ` gets away with the
+  -- shape by threading `j` through its own consumers; a measure read off
+  -- a `Sched` cannot.
   --
-  -- So the measure pays it ITSELF, by descending into slot definitions
-  -- on slot fuel with a visited set — exactly `outWⱽ`'s shape, whose
-  -- `input` clause is already written that way and whose `j` is the
-  -- lexicographic measure a connect spends.  Then `slotNest`,
-  -- `slotsNestSum` and `slots-nest-≤-size` keep their text, and the
-  -- restatement is confined to this module plus `depth-capped`'s own
-  -- chain, where `three-size-le-blowH` gives way to the matching
-  -- arithmetic into `blowH`.
-  --
-  -- The measure is NOT in `src` yet on purpose — landing it
-  -- means enlarging `depthCap`'s first summand, which re-opens every
-  -- clause of this block, and that is a grind to schedule rather than
-  -- one to start on a guess.
+  -- So it is paid in `slotNest`, which already pays `sizeᵉ d` on the
+  -- nose and whose `slotsNestBelow-step` is an equality at exactly the
+  -- index the `input` clause needs — the charge and the payment stayed
+  -- the same number when the nesting went onto both.  What that cost was
+  -- `slots-nest-≤-size`, `storeNest-capped` and `depth-capped`, since an
+  -- exponential quantity has no bound by a size: the whole
+  -- caps-conditioned interface went, and `depth-compositional` reaches
+  -- the root directly now (`nest-store≤capsH`, Caps-Bridge, whose header
+  -- carries what the deleted module knew).  That was the right trade
+  -- rather than a loss — the interface was refuted anyway, and it was
+  -- refuted for reading a level it does not report.
   depth-all-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     depthAll g op initSt b κ bid now sched st
-      ≤ depthCapN (suc (sizeᵉ b)) (maxInputᵉ b) κ sched st
+      ≤ depthCapN (suc (sizeᵉ b) + suc (nestDᵉ (Sched.slots sched) b))
+                  (maxInputᵉ b) κ sched st
 
   -- SUBSTITUTION UNDER THE GUARD, which is what `unfoldμ` is: it is
   -- `elimGExp (here refl) (μᵉ body) body`, and `elimGExp` reaches a
@@ -692,10 +714,15 @@ depth-μ-bound : ∀ {n} {Γ : Ctx n} {r u} {e : Closed Γ r}
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   depthE fuel (unfoldμ body) κ bid now sched st
     ≤ depthCap (μᵉ body) κ sched st
-depth-μ-bound fuel body κ bid now sched st =
+depth-μ-bound {n = n} fuel body κ bid now sched st =
   ≤-trans (depth-subst-guarded fuel body (μᵉ body) κ bid now sched st)
-          (⊔-mono-≤ (+-mono-≤ (+-mono-≤ (n≤1+n (sizeᵉ body)) ≤-refl) ≤-refl)
-                    ≤-refl)
+          (⊔-mono-≤ (+-mono-≤ (+-mono-≤ step ≤-refl) ≤-refl) ≤-refl)
+  where
+  -- `μᵉ` adds one to the SIZE and nothing to the nesting, so the whole
+  -- first summand climbs by exactly the one `suc`
+  step : sizeᵉ body + nestDᵉ (Sched.slots sched) body
+           ≤ suc (sizeᵉ body) + nestDᵉ (Sched.slots sched) body
+  step = n≤1+n (sizeᵉ body + nestDᵉ (Sched.slots sched) body)
 
 ------------------------------------------------------------------
 -- BUCKET (b) — burst = 0 for non-thru-outer frames (provable by
@@ -813,13 +840,24 @@ private
     ≤-trans (≤-reflexive (+-suc a p))
             (s≤s (+-mono-≤ (m≤n+m a c) ≤-refl))
 
+  -- the two summands of the enlarged cap travel together, so every
+  -- `*-size-arith` needs the middle pair swapped: the SIZE the operator
+  -- adds sits beside the size below it, and the NESTING it adds beside
+  -- the nesting below it, while `arith-step` delivers them grouped the
+  -- other way
+  arith-step₂ : ∀ (S N p C D : ℕ) → (S + N) + suc p ≤ (suc (C + S) + (D + N)) + p
+  arith-step₂ S N p C D =
+    ≤-trans (arith-step (S + N) p (C + D))
+            (≤-reflexive (cong (_+ p) (cong suc (+-mix4 C D S N))))
+
 -- sizeᵉ b + 1 ≤ 1 + sizeᵗ f + sizeᵉ b = sizeᵉ (mapᵉ f b)
 map-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
   (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
   depthCap b (map-f f ↠ κ) sched st ≤ depthCap (mapᵉ f b) κ sched st
-map-size-arith f b κ sched st =
-  ⊔-mono-≤ (+-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ f))
+map-size-arith {n = n} f b κ sched st =
+  ⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b) (nestDᵉ (Sched.slots sched) b)
+                        (pathLen κ) (sizeᵗ f) (nestDᵗ (Sched.slots sched) f))
                      (slotsNestBelow-mono (Sched.slots sched)
                         (maxInputᵉ b) (maxInputᵉ (mapᵉ f b)) (m≤n⊔m _ _)))
            ≤-refl
@@ -829,8 +867,9 @@ take-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (nid : NodeId)
   (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
   depthCap b (take-f nid ↠ κ) sched st ≤ depthCap (takeᵉ c b) κ sched st
-take-size-arith c b nid κ sched st =
-  ⊔-mono-≤ (+-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ c))
+take-size-arith {n = n} c b nid κ sched st =
+  ⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b) (nestDᵉ (Sched.slots sched) b)
+                        (pathLen κ) (sizeᵗ c) 0)
                      (slotsNestBelow-mono (Sched.slots sched)
                         (maxInputᵉ b) (maxInputᵉ (takeᵉ c b)) (m≤n⊔m _ _)))
            ≤-refl
@@ -844,8 +883,9 @@ scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (nid : NodeId) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
   depthCap b (scan-f f nid ↠ κ) sched st
     ≤ depthCap (scanᵉ f seed b) κ sched st
-scan-size-arith f seed b nid κ sched st =
-  ⊔-mono-≤ (+-mono-≤ (arith-step (sizeᵉ b) (pathLen κ) (sizeᵗ f + sizeᵗ seed))
+scan-size-arith {n = n} f seed b nid κ sched st =
+  ⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b) (nestDᵉ (Sched.slots sched) b)
+                        (pathLen κ) (sizeᵗ f + sizeᵗ seed) _)
                      (slotsNestBelow-mono (Sched.slots sched)
                         (maxInputᵉ b) (maxInputᵉ (scanᵉ f seed b))
                         (m≤n⊔m _ _)))
@@ -909,18 +949,21 @@ private
     below : slotsNestBelow sl (maxInputᵉ d) ≤ slotsNestBelow sl (toℕ i)
     below = slotsNestBelow-mono sl (maxInputᵉ d) (toℕ i)
               (inputsBelow⇒maxᵉ (toℕ i) d ok)
-    -- slot `i`'s summand, which IS `sizeᵉ d`
-    step : sizeᵉ d + slotsNestBelow sl (toℕ i)
+    -- slot `i`'s summand, which IS `sizeᵉ d + nestDᵉ sl d` — the child's
+    -- whole charge, size and nesting together, on the nose
+    step : sizeᵉ d + nestDᵉ sl d + slotsNestBelow sl (toℕ i)
              ≤ slotsNestBelow sl (suc (toℕ i))
-    step = subst (λ s → slotNest s + slotsNestBelow sl (toℕ i)
+    step = subst (λ s → slotNest sl s + slotsNestBelow sl (toℕ i)
                           ≤ slotsNestBelow sl (suc (toℕ i)))
                  slotEq (slotsNestBelow-step sl i)
     -- `pathLen (share-sink i)` is 0 definitionally: the connect resets
     -- the path, which is why the goal's own `κ` is free room here.
-    slotPay : sizeᵉ d + 0 + slotsNestBelow sl (maxInputᵉ d)
+    slotPay : sizeᵉ d + nestDᵉ sl d + 0 + slotsNestBelow sl (maxInputᵉ d)
                 ≤ slotsNestBelow sl (suc (toℕ i))
-    slotPay = ≤-trans (+-mono-≤ (≤-reflexive (+-identityʳ (sizeᵉ d))) below)
-                      step
+    slotPay = ≤-trans
+                (+-mono-≤ (≤-reflexive (+-identityʳ (sizeᵉ d + nestDᵉ sl d)))
+                          below)
+                step
 
   -- BUCKET (b): mapᵉ — burst(map-f) = 0 by frame clause; IH on b
   depth-compositional-go fuel (mapᵉ f b) κ bid now sched st =
@@ -1001,7 +1044,8 @@ abstract
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     depthE g b κ bid now sched st
-      ≤ sizeᵉ b + pathLen κ + storeNestMax sched st
+      ≤ sizeᵉ b + nestDᵉ (Sched.slots sched) b + pathLen κ
+          + storeNestMax sched st
   depth-compositional g b κ bid now sched st =
     ≤-trans (depth-compositional-go g b κ bid now sched st)
             (cap-≤-store b κ sched st)

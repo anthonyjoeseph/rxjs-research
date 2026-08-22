@@ -10,7 +10,7 @@
 -- only with the syntax that lists them.
 --
 -- THEY DO NOT ADD.  Measured: one chain top gives 5, two independent
--- chain tops under one burst give 5 as well, with the store at 51 in
+-- chain tops under one burst give 5 as well, with the store at 60 in
 -- both rows by construction (same slots) so the rows isolate the
 -- burst.  The burst takes a MAX across siblings, which is the opposite
 -- of what the chain does down a stratified descent — so the arc that
@@ -125,10 +125,10 @@ stT = st-init progTwo
 -- isolate the burst.  None is vacuous: every quantity is a numeral
 -- Agda computed, and the last row is the parent's own conclusion at
 -- the harder program, which is the row a crossing would show up in.
-_ : storeNestMax schedO stO ≡ 51
+_ : storeNestMax schedO stO ≡ 60
 _ = refl
 
-_ : storeNestMax schedT stT ≡ 51
+_ : storeNestMax schedT stT ≡ 60
 _ = refl
 
 _ : sizeᵉ progOne ≡ 5
@@ -148,5 +148,5 @@ _ = refl
 -- CAP the bound was restated to, not over `storeNestMax`: the slot half
 -- is now the partial sum below the program's own stratification level,
 -- so the two figures are only equal when every slot is under the cut.
-_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 51
+_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 60
 _ = refl

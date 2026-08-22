@@ -99,17 +99,20 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
 -- `chainStep-caps`, whose statement is stated at the chain depth measure.
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
--- depth-capped (proven in Depth-Bound): depthE ≤ 3·cSize when capsOK?.
--- Consumed by depthE≤capsH-root (at the SMALL baseCaps — the general-id
+-- `depth-compositional` (Depth-Compositional): the depth mirror bounded
+-- by its own syntax — size, nesting, path and store.  Consumed by
+-- depthE≤capsH-root (at the SMALL baseCaps — the general-id
 -- depth bound does NOT route through depth-capped; see the depOK
 -- premise on sub-charge-capsOK-lift).
 -- Acyclic: Depth-Bound imports Wet and Subscribe-Face, NOT Caps-Bridge.
-open import Verify-Budget-Sufficient.Depth-Bound using (depth-capped)
+open import Verify-Budget-Sufficient.Depth-Compositional
+  using (depth-compositional; storeNestMax)
+open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
-  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; three-size-le-blowH;
+  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body;
   frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize;
   1≤capsAt-reg; _⊑ᶜ_; Caps; caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0;
   frameStep-full; frameStep-mono-j; sizeCount)
@@ -1103,38 +1106,68 @@ abstract
     capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
   init-capsOK? = init-capsOK?-go
 
--- Wires three-size-le-blowH (Caps.agda:1413): three pre-blowup sizes ≤ capsH e ins 0.
--- cSize(baseCaps e ins) = 2 + sizeᵉ e + slotsSize ins = 2 + X definitionally
--- (both sides reduce to suc(suc(sizeᵉ e + slotsSize ins))), so
--- three-size-le-blowH X E (s≤s (s≤s z≤n)) with X = sizeᵉ e + slotsSize ins and
--- E = entryCeil n ins e applies directly.
-three-size≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  Caps.cSize (baseCaps e ins) + Caps.cSize (baseCaps e ins)
-    + Caps.cSize (baseCaps e ins)
-    ≤ capsH e ins 0
-three-size≤capsH {n = n} e ins =
-  three-size-le-blowH (sizeᵉ e + slotsSize ins) (entryCeil n ins e) (s≤s (s≤s z≤n))
+-- THE ROOT DEPTH BOUND, RESTATED 2026-08-21 over the nesting measure.
+--
+-- WHAT WENT: `depth-capped` (Depth-Bound.agda, DELETED) and its
+-- `3 · cSize` conclusion, with `three-size≤capsH` and the whole
+-- caps-conditioned route.  All of it was refuted together
+-- (Refuted.Depth-Nest — `depth-capped-absurd`, 204 against 201): a
+-- constant multiple of `cSize` cannot dominate a quantity that
+-- COMPOUNDS, one factor per nested scan, and `capsOK?` is checked at the
+-- entry state while the deep accumulator is reached much later.  The
+-- module's header carried the mechanism, the two dead routes (bound the
+-- depth by the gas; bound it by the width family) and the reading of
+-- `opIterD`'s height budget that shows this consumer never needed any of
+-- it.  Read it at that commit before re-deriving any of them.
+--
+-- RECOVERY: `git show <the commit that deleted Depth-Bound.agda>`
+-- restores the node-half kit — `foldr-⊔-bounded`, `node-nest-bounded`,
+-- `nodesNestMax-bounded`, an inversion of `stBounded?`'s `boundedNode`
+-- test — which is still TRUE and is the apparatus a stored-state
+-- version of the leaf below would want.  Only the SLOT half broke, and
+-- it broke because `slotNest` now pays its def's nesting.
+--
+-- WHAT REPLACES IT: `depth-compositional` reaches the root directly.
+-- Its conclusion at `sched-init`/`st-init`/`root` is purely SYNTACTIC —
+-- `pathLen root` is 0, `st-init`'s nodes are empty, and
+-- `Sched.slots (sched-init e ins)` is `ins` — so the remaining
+-- obligation carries no state hypothesis at all, which is what made the
+-- old statement false.  And the target is astronomically slack:
+-- `capsH e ins 0` is `blowH (capsBase e ins)`, carrying
+-- `2 * poolCount (towerℕ m) m`.
+--
+-- AND THE TARGET DOMINATES, which is why this leaf is DIFFICULTY and not
+-- FALSITY.  `blowH m` is `6 + m + 2 * poolCount (towerℕ m) m`, and
+-- `poolCount` is `poolBody` wherever there is anything to count:
+-- `lvls M M d 0 (dCapᶜ M M M d (suc M) 0)` at `M = towerℕ m`.  It STARTS
+-- its level climb at a `dCapᶜ` built from `towerℕ m` and then climbs `m`
+-- times, and every level climb is a `fLvlD` sweep — so the target is
+-- above `towerℕ m`, which is above any exponential in `m`, which is
+-- where the nesting measure lives.  What makes it work rather than
+-- trivial: the only PROVEN pool lower bound was linear
+-- (`capsBase-le-pool`, `m ≤ poolCount (towerℕ m) m`), and `blowH` and
+-- `poolBody` are `abstract` for measured performance reasons, so the
+-- route is symbolic and cannot be probed at numerals.
+--
+-- The leaf below is the arithmetic that spends that slack.  It
+-- SUPERSEDES `three-size-le-blowH`, which delivered only `3 · m` out of
+-- the same `blowH` and cannot reach an exponential; the pool-lower chain
+-- that proved it (`capsBase-le-pool` and the `lvls` inflation lemmas) is
+-- the apparatus this leaf's proof will want, one strengthening up.
+postulate
+  nest-store≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    sizeᵉ e + nestDᵉ ins e + 0
+      + storeNestMax (sched-init e ins) (st-init e)
+      ≤ capsH e ins 0
 
--- Wires depth-capped (Depth-Bound.agda:244): root depth bound via the base caps.
--- Applies depth-capped at c := baseCaps e ins (the PRE-BLOWUP inner argument of
--- capsAt e ins 0's frameBlowup), then chains with three-size≤capsH.
--- Four side-conditions at baseCaps / sched-init / st-init / root:
---   (i)   init-capsOK?-base e ins
---   (ii)  slotsSize ins ≤ cSize(baseCaps e ins):  m≤n+m (slotsSize ins) (2 + sizeᵉ e)
---   (iii) sizeᵉ e ≤ cSize(baseCaps e ins):  ≤-trans (m≤n+m sizeᵉ e 2) (m≤m+n ...)
---   (iv)  suc(pathLen root) = 1 ≤ cSize(baseCaps e ins):  s≤s z≤n
 depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
     ≤ capsH e ins 0
 depthE≤capsH-root e ins =
   ≤-trans
-    (depth-capped (baseCaps e ins) (budgetAt e ins 0) e root 0 0
-       (sched-init e ins) (st-init e)
-       (init-capsOK?-base e ins)
-       (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
-       (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
-       (s≤s z≤n))
-    (three-size≤capsH e ins)
+    (depth-compositional (budgetAt e ins 0) e root 0 0
+       (sched-init e ins) (st-init e))
+    (nest-store≤capsH e ins)
 
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
 -- Mirrors cascade-wet-via-caps (~line 526) structurally.

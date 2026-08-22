@@ -165,89 +165,52 @@ a real body as a discharged cone is how a row gets mis-ranked — the census tha
 mis-classed `subscribeE-inner-nodry-inv` read conclusions and never asked what
 its named suppliers needed.
 
-Labour MOSTLY, and the qualifier has been earned twice here — the second time
-reaching the ASSEMBLY rather than a leaf. The connect leaf was refuted for
-admitting instances its caller cannot make; then `depth-compositional` itself
-was refuted at a concrete nine-slot program, because the MEASURE under it was a
-max over the slots while the connects CHAIN. Neither cost a clause, but a real
-body's own conclusion is no safer than a postulate's, and a row whose OBSTACLE
-is written down is not thereby a row whose STATEMENT is right.
+Labour MOSTLY, and the qualifier has been earned four times here, twice at an
+ASSEMBLY rather than a leaf. The connect leaf admitted instances its caller
+cannot make; `depth-compositional` was refuted at a nine-slot program because
+the measure under it took a max where connects CHAIN; then the one shape
+`depth-all-bound`'s own receipt named as untested refuted the whole face — a
+`scanᵉ` whose step wraps its accumulator gains nesting PER TICK, so `depthE`
+grows in `wraps × ticks` while every syntactic right-hand side grew in
+`wraps + ticks`; and the interface above it fell to the same product at seven
+wraps over twenty-nine ticks, 204 against 201, every hypothesis satisfied and
+`capsOK?` by `refl`. A real body's own conclusion is no safer than a
+postulate's, and a row whose OBSTACLE is written down is not thereby a row whose
+STATEMENT is right.
 
-A THIRD TIME, AND THIS ONE MOVES THE CURRENCY. The slot half was repaired from
-a max to a sum and the connect and scan leaves became real clauses, all of it
-sound — and then the one shape `depth-all-bound`'s own receipt named as untested
-refuted the whole face. A `scanᵉ` whose step wraps its own accumulator gains
-nesting PER TICK, so `depthE` grows in `wraps × ticks` while every syntactic
-right-hand side grows in `wraps + ticks`; a sum cannot dominate a product. So
-`depth-compositional` is FALSE as a real body, not merely unproven, and the
-statement above it is where this tier now starts.
+THE FACE IS NOW RESTATED, over a measure derived from the evaluator and pinned
+by `Probed.Nest-Depth`: one `suc` per `*All` layer, and a `scanᵉ` worth its
+source's payload count times its step function's layers. It EQUALS `depthE` —
+not merely dominates it — at three programs, the third a scan nested inside
+another scan's step function, which says the product COMPOUNDS: one factor per
+nested scan, so the measure is exponential in the program and no fixed-degree
+product of caps fields could have replaced it. `depthCap`,
+`depth-compositional`, `depth-all-bound` and `slotNest` all carry it now, a
+shared slot paying its def's nesting beside its size.
 
-THE INTERFACE DOES NOT SURVIVE EITHER, and that was checked rather than
-assumed. `depth-capped` looked safe — its `3 · cSize` gives 114 against the
-first witness's 49 — but the multiplier is a CONSTANT and the gap is a product,
-so seven wraps over twenty-nine ticks give 204 against 201. Refuted at
-`caps 67 67 67`, every hypothesis satisfied, `capsOK?` by `refl`.
+WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
+`depth-capped`, its `3 · cSize` conclusion, the `storeNestMax`-under-`capsOK?`
+inversion, and `three-size≤capsH` with the pool-lower chain that proved it.
+`depth-compositional` reaches the root directly, where `pathLen root` is 0,
+`st-init`'s nodes are empty and `Sched.slots (sched-init e ins)` is `ins` — so
+the remaining obligation carries NO state hypothesis, which is exactly what made
+the old statement false: `capsOK?` was checked at the entry state and the
+conclusion was about a depth reached much later. Three dead routes are recorded
+where they were tried: bound the depth by the GAS (true, and `budgetAt-gs-pad`
+puts the budget a full capsH-step the wrong side of the goal), bound it by the
+WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
+multiplies by one and adds nothing — refuted against the max of all four
+measures at once), and take a fixed-degree product of caps fields.
 
-AND THE THIRD WITNESS NAMES THE REPAIR. `depth-capped` checks `capsOK?` at the
-ENTRY state and concludes about a depth reached much later; the deeply nested
-value is a scan's stored accumulator, which `stBounded?` → `boundedNode` bounds
-by `cSize`. So the hypothesis holds where it is checked — empty nodes — and
-fails where it is spent. Everywhere else this face reports GROWTH,
-`frameStep j ↦ frameStep (j + j′)`, and `sub-charge` already produces such a
-`j′` over exactly this burst. The depth face is the one place that reads a level
-it does not report, and that is the defect rather than the arithmetic. Its call
-site is not where it fails: `Caps-Bridge` passes `baseCaps`, whose `cSize` reads
-`entryCeil`.
-
-AND THE GOAL IS SLACK, so all of this lives in the route. The only consumer is
-`depthE≤capsH-root`, and `capsH m 0` is `blowH m`, carrying
-`2 * poolCount (towerℕ m) m` — astronomical. What has to go is the middle term
-the route advertises as "tower-free". Two routes are already closed: the tight
-syntactic one by the witnesses, and bounding depth by the GAS — true, and
-recorded as a dead route in `depth-capped`'s header, because `budgetAt-gs-pad`
-puts the budget a full capsH-step ABOVE `capsH e sl id`, the wrong side of the
-goal. The route that reads as live is dead, and it was checked rather than believed.
-`Rx.Frame-Width`'s `innWⱽ`/`pmIⱽ` each carry an exponential at a `scanᵉ` —
-`(pmIᵗⱽ f ⊔ 1) ^ outWⱽ e` — and `Wᴱ` bundles all four measures under one `M`,
-so the clause reads exactly like this mechanism. Its BASE is 1: a wrap layer's
-`outWⱽ` is `1 * innWⱽ (ofᵉ (t ∷ []))`, multiplying by one and adding nothing, so
-the family cannot see the wrap count at all. Refuted against the max of all four
-(`width-route-absurd`, 24 against 49, the 24 being `2 · k` with no `w`) — width
-is payloads abreast, and a wrap is depth. What survives is the SHAPE, charged
-elsewhere: `scanFrame-caps` pays a scan frame `length vals * suc (sizeᵗ fn)`
-folds, this witness's `k · w` with both factors named, and `frameStep j c`'s
-`cWid` IS `iterFold (cSize c) j (cWid c)`, so the count fixes the level. The
-consumers spend the bound as a free parameter (`dep`, through `opIterD`), so
-enlarging it costs no signature — but it buys levels, and levels exponentiate,
-so the bound may not be tower-valued. A fold count is not; a new measure of that
-shape is what the restatement needs, and no existing one has it.
-
-That measure is now derived and pinned (`Probed.Nest-Depth`): one `suc` per
-`*All` layer, and a `scanᵉ` worth its source's payload count times its step
-function's layers. It equals `depthE` exactly at both crossings — 49 and 204 —
-so the rows ask for equality, not domination, and no constant passes both. It
-stays out of `src` until scheduled, because landing it enlarges `depthCap`'s
-first summand and re-opens every clause of `depth-compositional-go`.
-
-AND THE PRODUCT COMPOUNDS: a scan inside the outer scan's step function makes
-the measure predict `j · (k · w + 1) + 1`, and `depthE` returns exactly that.
-One factor per nested scan, unbounded — so `depthE` is exponential in the
-program size and every fixed-degree product of caps fields is dead, including
-the `cSize · cSize` guessed earlier. The open question is now a single
-arithmetic one — and it turns out to be a weak one, because that caveat sat on
-the wrong consumer. A `dep` spent through `opIterD` does climb levels tower-ly
-per unit, but that `dep` bounds `depthInner` and arrives on
-`sub-charge-capsOK-lift`'s `depOK` premise. `depth-capped` has exactly one
-consumer, `depthE≤capsH-root`, which chains into `capsH e ins 0` via
-`three-size-le-blowH` — so all a restated conclusion owes is to sit under
-`blowH (capsBase e ins)`, which carries `2 * poolCount (towerℕ m) m`. The
-repair is: state the conclusion in the pinned nesting measure, and replace
-`three-size-le-blowH` with the matching arithmetic into `blowH`.
-
-- **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
-  (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.
-  Do not grind it; the statement and its parent's are both restatements, into the
-  caps currency, and the sibling-max finding survives untouched.
+- **`nest-store≤capsH`** (Caps-Bridge) — DIFFICULTY, the tier's new anchor: the
+  whole depth face now reduces to one syntactic inequality into
+  `blowH (capsBase e ins)`. Not FALSITY, and its header says why the target
+  dominates; what is real work is that the proven `poolCount` lower bound is
+  linear and `blowH` is `abstract`.
+- **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY, downgraded from
+  FALSITY by rows that reached the product itself: the burst's sibling-max
+  finding survives, and the nesting term the restatement added is what the
+  witnesses were measuring. No worked twin, so not GRINDABLE.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

@@ -43,8 +43,15 @@
 -- every statement written over it kept its text.  Re-deriving the max
 -- HERE is not resurrecting vocabulary in `src` — it is the only way to
 -- keep the finding state-able, and the finding is about the currency,
--- which is precisely what left `src`.  `slotNest` and `slotsSize` are
--- still the real ones.
+-- which is precisely what left `src`.
+--
+-- AND `slotNest` HAD TO BE LOCALISED TOO, for the same reason one step
+-- later: `Refuted.Depth-Nest` forced a shared slot to charge its def's
+-- NESTING beside its size, so the real `slotNest` no longer computes the
+-- currency these rows are about.  Importing it made this file's own
+-- numbers move — 7 became 8 — which would have quietly turned the § C
+-- crossing into an equality and retired a refutation by accident.  Both
+-- halves of the old currency are therefore stated here.
 --
 -- WHEN THE WITNESSES WERE WRITTEN both were INHABITED: the sum landed
 -- in the same commit, and before it `depth-compositional` was a live
@@ -73,12 +80,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; nat̂; strmᵗ; input; ofᵉ;
   mergeAllᵉ; sizeᵉ)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Slots using (Slots; Slot; shared; scripted)
 open import Rx.Evaluator using (EvalSt; Sched; Path; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
-open import Verify-Budget-Sufficient.Depth-Compositional using (slotNest;
-  nodesNestMax)
+open import Verify-Budget-Sufficient.Depth-Compositional using (nodesNestMax)
 
 -- gas enough to walk the longest chain here twice over: each link
 -- peels one at the connect and one at the payload entry
@@ -92,9 +98,14 @@ g30 = gs (gs (gs (gs (gs (gs (gs (gs (gs (gs
 -- The left side has outrun a right side that never moved.
 ----------------------------------------------------------------------
 
--- the measure as it stood: a MAX over the slots
+-- the measure as it stood: a MAX over the slots, each slot charging its
+-- def's SIZE and nothing else
+slotNestOld : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
+slotNestOld (shared d)   = sizeᵉ d
+slotNestOld (scripted _) = 0
+
 slotsNestMaxOld : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsNestMaxOld {n} sl = foldr _⊔_ 0 (tabulate {n = n} (λ i → slotNest (sl i)))
+slotsNestMaxOld {n} sl = foldr _⊔_ 0 (tabulate {n = n} (λ i → slotNestOld (sl i)))
 
 storeNestMaxOld : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   Sched Γ → EvalSt e → ℕ

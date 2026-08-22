@@ -88,10 +88,13 @@ _ = refl
 -- is 0 at every cut and the figure cannot distinguish the cap from the
 -- old `storeNestMax` bound; it is here so the crossing against the
 -- depth rows below is read off the statement that is actually open.
-_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 6
+-- The cap now also carries the NESTING term the depth face was restated
+-- over, which is what the +1 per `mergeAllᵉ` layer is: one above the
+-- size at `body₁`, two at `body₂`.
+_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 7
 _ = refl
 
-_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 10
+_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 12
 _ = refl
 
 -- LOAD-BEARING, and the gas pair is the whole row: these two differ in

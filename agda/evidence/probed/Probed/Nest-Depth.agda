@@ -39,62 +39,19 @@
 module Probed.Nest-Depth where
 
 open import Data.List using (List; []; _∷_)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_)
+open import Data.Nat  using (ℕ; zero; suc)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec  using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
-open import Rx.Exp  using (Ctx; Closed; Exp; Tm; Fn; natᵗ; obs; _×ᵗ_; nat̂;
-  strmᵗ; fstᵗ; sndᵗ; pairᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; unit̂; bool̂; varᵗ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Frame-Width using (outWᵉ)
+open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; fstᵗ; varᵗ; ofᵉ; scanᵉ; mergeAllᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Path; root; sched-init; st-init)
+-- THE MEASURE ITSELF, from `src` — these rows are evidence about the
+-- definition the proof uses, not about a local copy of it
+open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
-
-------------------------------------------------------------------
--- the candidate measure
-------------------------------------------------------------------
-
-mutual
-  nestDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  nestDᵉ sl (input i)              = 0
-  nestDᵉ sl (ofᵉ ts)               = nestDᵗˢ sl ts
-  nestDᵉ sl emptyᵉ                 = 0
-  nestDᵉ sl (mapᵉ f e)             = nestDᵗ sl f + nestDᵉ sl e
-  nestDᵉ sl (takeᵉ c e)            = nestDᵉ sl e
-  -- THE PRODUCT: one re-wrap per delivered payload
-  nestDᵉ {n = n} sl (scanᵉ f z e)  =
-    nestDᵗ sl z + outWᵉ n sl e * nestDᵗ sl f + nestDᵉ sl e
-  -- THE SPENDING ARC: one suc per *All layer
-  nestDᵉ sl (mergeAllᵉ e)          = suc (nestDᵉ sl e)
-  nestDᵉ sl (concatAllᵉ e)         = suc (nestDᵉ sl e)
-  nestDᵉ sl (switchAllᵉ e)         = suc (nestDᵉ sl e)
-  nestDᵉ sl (exhaustAllᵉ e)        = suc (nestDᵉ sl e)
-  nestDᵉ sl (μᵉ e)                 = nestDᵉ sl e
-  nestDᵉ sl (varᵉ x)               = 0
-  nestDᵉ sl (deferᵉ e)             = nestDᵉ sl e
-
-  nestDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  nestDᵗ sl (varᵗ x)      = 0
-  nestDᵗ sl unit̂          = 0
-  nestDᵗ sl (bool̂ _)      = 0
-  nestDᵗ sl (nat̂ _)       = 0
-  nestDᵗ sl (pairᵗ a b)   = nestDᵗ sl a + nestDᵗ sl b
-  nestDᵗ sl (fstᵗ p)      = nestDᵗ sl p
-  nestDᵗ sl (sndᵗ p)      = nestDᵗ sl p
-  nestDᵗ sl (inlᵗ a)      = nestDᵗ sl a
-  nestDᵗ sl (inrᵗ a)      = nestDᵗ sl a
-  nestDᵗ sl (caseᵗ s l r) = nestDᵗ sl s + nestDᵗ sl l + nestDᵗ sl r
-  nestDᵗ sl (ifᵗ c a b)   = nestDᵗ sl c + nestDᵗ sl a + nestDᵗ sl b
-  nestDᵗ sl (primᵗ _ a)   = nestDᵗ sl a
-  nestDᵗ sl (strmᵗ e)     = nestDᵉ sl e
-
-  nestDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  nestDᵗˢ sl []       = 0
-  nestDᵗˢ sl (y ∷ ys) = nestDᵗ sl y + nestDᵗˢ sl ys
 
 ------------------------------------------------------------------
 -- the harness: Refuted.Depth-Nest's family, which is where the
