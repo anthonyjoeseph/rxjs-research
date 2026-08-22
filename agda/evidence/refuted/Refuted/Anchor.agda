@@ -346,7 +346,7 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- widths are syntax-fixed (strmᵗ is Tm's only obs introduction and
 -- substitution plugs into list elements, never appends); and a sync
 -- frame has no μ feedback (a μ-bound variable lives in Δᵍ and is
--- reachable only under deferᵉ, Rx/Exp.agda:76-79, which crosses a
+-- reachable only under deferᵉ, Rx.Exp-79, which crosses a
 -- tick).  A scan therefore folds at most as many times per frame as
 -- emissions arrive, and that count is entry data.
 

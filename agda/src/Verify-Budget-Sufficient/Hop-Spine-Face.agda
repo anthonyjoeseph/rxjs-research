@@ -444,7 +444,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 --     splitEvents-valsCaps) is against suc (cWid c).
 --   · the natural size-denominated candidate is REFUTED, with a
 --     machine-checked receipt sitting on the measure itself
---     (Rx/Exp:500): `syncSizeᵉ` does NOT bound emissions per instant —
+--     (Rx.Exp): `syncSizeᵉ` does NOT bound emissions per instant —
 --     valueCount 30 against syncSizeᵉ 20 at K = 4, with K = 1..3 all
 --     holding, which is why it looks true from small cases.
 
@@ -564,7 +564,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 --
 -- the eight — GRINDABLE, and it is walk-map's census verbatim at this
 -- shape.  scanᵉ mints no subscription mapᵉ does not: subscribeE's scan
--- clause (Evaluator:1453) installs ONE node, subscribes the source with
+-- clause (Rx.Evaluator) installs ONE node, subscribes the source with
 -- `scan-f f nid ↠ κ`, and pushes the resulting burst — the same
 -- install-subscribe-push the other chain frames run, with `scanFrame-caps`
 -- (.Caps-Face, PROVEN) paying the frame charge and `subscribeE-caps`
@@ -572,7 +572,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- which is what the shape of this leaf records.
 -- the hop conjunct — DIFFICULTY, and the whole of this row's risk.  What
 -- it owes is the ACCUMULATOR INVARIANT, `hopDᵛ accᵢ ≤ (2 + pmᵗ V 0 f) ^
--- sizeᵛ accᵢ * B`, carried along `scanVals`' fold (Evaluator:1279) and
+-- sizeᵛ accᵢ * B`, carried along `scanVals`' fold (Rx.Evaluator) and
 -- closed against the clause's `(2 + pmᵗ V 0 f) ^ V` by the store bound
 -- `sizeᵛ accᵢ ≤ V` — which is HYPOTHESIS-SIDE here (INV? + ceil + F ≡ Ŝ,
 -- see the store-invariant paragraph above) and needs no new premise.

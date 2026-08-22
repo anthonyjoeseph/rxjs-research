@@ -42,7 +42,7 @@ open import Rx.Prim        using (InstEmit)
 open import Implementation using (impl-batchSimultaneous; BatchSt; batch-init;
                                  step-batch)
 
--- The fold's EMITTED groups: `foldBatch` (Implementation:119) with its terminal
+-- The fold's EMITTED groups: `foldBatch` (.Implementation) with its terminal
 -- `flushBatch` removed.  It differs from `foldBatch` in exactly one clause, and
 -- that one clause is the entire point — the flush is what forces a
 -- still-growing batch out early and makes the unqualified prefix claim false.

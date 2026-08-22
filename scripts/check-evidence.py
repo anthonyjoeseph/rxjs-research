@@ -114,21 +114,47 @@ def check_e2(evidence, postulates):
     return missing, dead, n
 
 
-# A RECEIPT, in the marker form CLAUDE.md specifies -- the DATE is what makes
-# this a receipt rather than a mention of the convention, and two files discuss
-# the word "PROBED" in prose that must never be read as evidence.
-# The suffix is captured LOOSELY and validated after, so an unrecognised
-# variant is a FINDING rather than a silent skip.  Two receipts in this tree
-# were spelled `PROBED-GREEN`, a marker someone invented for exactly the
-# distinction this check enforces -- and a regex admitting only the two legal
-# spellings would have walked straight past both.
+# A RECEIPT, in the marker form CLAUDE.md specifies: the marker opens a comment
+# line and a COLON closes it.  The colon is what separates a receipt from the
+# several files that discuss the word "PROBED" in prose, and it replaced a
+# requirement that the marker carry a DATE -- which had quietly become
+# unsatisfiable, since `make comments-check` forbids a date anywhere in
+# `agda/src` or `agda/evidence`.  Two gate checks cannot both be obeyed, so this
+# half of E3 was matching NOTHING while reporting itself clean, and the tree's
+# six real receipts were invisible to the check written to expire them.  A
+# discriminator one sibling check forbids is worse than no discriminator: it
+# fails silent and it reports a total, and a total of zero reads as tidy.
+#
+# EVERY NEAR MISS IS A FINDING RATHER THAN A SKIP, which is the whole design and
+# the reason this check has a MATCH regex and a CANDIDATE one.  Three ways a
+# receipt slips past a strict pattern, all of them live in this tree at the time
+# of writing: an invented SUFFIX (two were spelled `PROBED-GREEN`, a marker
+# someone coined for exactly the distinction E3 enforces); a marker with no
+# colon at all, trailing a parenthetical instead; and an OBSCURED one, written
+# `-- -- PROBED:` so that the marker sits inside the comment TEXT -- which also
+# walks it past `make comments-check`'s ordering rule, since a doubled dash is
+# prose to every checker in the repo.  A pattern admitting only the legal
+# spelling would have reported all three as absent.
+#
 # LEADING WHITESPACE IS ALLOWED, because a receipt on a block member is
 # indented and an anchor at column 0 made it a SILENT SKIP -- not reported, not
 # counted, not a subject.  That is the one outcome this check exists to prevent,
 # and it went unnoticed until a real receipt was written inside a `postulate`
 # block and the receipt total did not move.
-RECEIPT = re.compile(r"^\s*--\s*PROBED(?P<suffix>-[A-Z-]+)?\s+(?P<date>\d{4}-\d{2}-\d{2})")
-LEGAL_SUFFIX = (None, "-HISTORICAL")
+RECEIPT = re.compile(r"^\s*--\s*PROBED(?P<suffix>-[A-Z-]+)?\s*:")
+# the CANDIDATE form: any run of comment dashes, then the bare marker word.
+# Anything matching this and not `RECEIPT` is reported, never dropped.
+CANDIDATE = re.compile(r"^\s*(?:--\s*)+(?=PROBED\b)")
+# ONE LEGAL SPELLING, AND NO HISTORICAL VARIANT.  A receipt whose statement has
+# been PROVEN is deleted, not re-marked: the theorem says more than the probe
+# ever did, so the coverage claim is superseded rather than dated, and what is
+# worth keeping (a harness, a sha) is a `RECOVERY:` pointer and not a receipt.
+# That is E2's law arriving from the header's side -- a probe expires with its
+# target -- and it is what removes a standing CONTRADICTION between two gate
+# checks: `make comments-check` blacklists `PROBED-HISTORICAL` as a historical
+# marker, so the one spelling this check used to demand at the moment of
+# discharge was a spelling its sibling refused to let anyone write.
+LEGAL_SUFFIX = (None,)
 # The subject line: a top-level declaration, which is what a header sits above.
 DECL = re.compile(r"^(?!--)(?P<name>[^\s:(){}]+)\s*:")
 POSTBLOCK = re.compile(r"^\s*postulate\b")
@@ -144,9 +170,9 @@ def check_e3(src, postulates):
     integrity outlives the apparatus they describe.  Nothing checked them.
 
     Two findings.  An ORPHANED receipt sits above no declaration at all, so no
-    reader and no check can tell what it is evidence ABOUT.  A MISMARKED one
-    claims the wrong tense: a receipt on a live postulate is `-- PROBED`, and
-    one whose statement has since been PROVEN is `-- PROBED-HISTORICAL`.
+    reader and no check can tell what it is evidence ABOUT.  A STALE one sits
+    above a statement that is no longer a postulate, and it is DELETED --
+    a receipt has exactly one legal tense.
 
     The second is the one worth having, and the moment it fires is the point of
     it: discharging a statement turns every receipt above it into a claim about
@@ -165,6 +191,13 @@ def check_e3(src, postulates):
         for i, line in enumerate(lines):
             m = RECEIPT.match(line)
             if not m:
+                c = CANDIDATE.match(line)
+                if c:
+                    n += 1
+                    mismarked.append((
+                        p, i + 1, "-", "PROBED",
+                        "unreadable as a receipt -- the marker must OPEN the "
+                        "comment (one `--`, no doubling) and END in a colon"))
                 continue
             n += 1
             # the subject is the first declaration below the comment block.
@@ -191,17 +224,13 @@ def check_e3(src, postulates):
             if suffix not in LEGAL_SUFFIX:
                 mismarked.append((p, i + 1, "-", "PROBED" + suffix,
                                   "not a receipt marker this check knows "
-                                  "(use `PROBED` or `PROBED-HISTORICAL`)"))
+                                  "(a receipt is `PROBED`, and it has exactly "
+                                  "one legal tense)"))
                 continue
             if subject is None:
                 orphaned.append((p, i + 1))
                 continue
-            live = subject in postulates
-            hist = suffix == "-HISTORICAL"
-            if live and hist:
-                mismarked.append((p, i + 1, subject, "PROBED-HISTORICAL",
-                                  "a LIVE postulate"))
-            elif not live and not hist:
+            if subject not in postulates:
                 mismarked.append((p, i + 1, subject, "PROBED",
                                   "no longer a postulate"))
     return orphaned, mismarked, n
@@ -251,16 +280,20 @@ def report(src, evidence, namespaces, postulates, gate):
                   "as evidence and")
             print("    is enforced as nothing.")
             continue
-        want = "PROBED" if marker == "PROBED-HISTORICAL" else "PROBED-HISTORICAL"
         print(f"{p}:{i}: E3 — receipt on {subj!r} is marked `{marker}`, but "
               f"{subj!r} is {why}")
-        print(f"    Write `-- {want}` instead, and RE-READ the receipt while "
-              f"you are here:")
-        print("    a receipt written against an open statement keeps asserting "
-              "a live risk")
-        print("    after that statement is proven, and a live risk class "
-              "standing in the")
-        print("    header of a proven definition is a lying comment.")
+        print("    DELETE the receipt, and re-read it while you are here.  A "
+              "receipt written")
+        print("    against an open statement keeps asserting a live risk after "
+              "that statement")
+        print("    is proven, and a live risk class standing in the header of a "
+              "proven")
+        print("    definition is a lying comment.  The theorem says more than "
+              "the probe ever")
+        print("    did, so the coverage claim is superseded rather than dated; "
+              "if the probe")
+        print("    left a harness worth recovering, that is a `RECOVERY:` "
+              "pointer.")
 
     n = len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
     if n == 0:
@@ -324,7 +357,11 @@ def selftest():
         "E3 fires on an invented marker rather than skipping it")
     run(os.path.join(fx, "receipt-prose"), os.path.join(fx, "empty"),
         {"live-one"}, None,
-        "E3 quiet on prose mentioning PROBED with no date")
+        "E3 quiet on prose where the marker does not open the comment")
+    run(os.path.join(fx, "receipt-nearmiss"), os.path.join(fx, "empty"),
+        {"live-one", "live-two"}, "unreadable as a receipt",
+        "E3 fires on a marker doubled into the comment text, and on one with "
+        "no colon -- rather than counting zero receipts and reporting clean")
     run(os.path.join(fx, "receipt-indented"), os.path.join(fx, "empty"),
         {"live-one"}, "is no longer a postulate",
         "E3 reads an INDENTED receipt on a `postulate` block member, rather "
@@ -343,9 +380,12 @@ def selftest():
           "discharged out from under the receipt -- on a receipt above no "
           "declaration at all, and on an invented marker rather than skipping "
           "it; and stays quiet on a receipt above a live postulate and on "
-          "prose mentioning the word with no date.  A receipt INDENTED inside "
-          "a `postulate` block is read and attributed to its own block "
-          "member, not skipped and not credited to the member above it)")
+          "prose where the marker does not open the comment.  A receipt "
+          "INDENTED inside a `postulate` block is read and attributed to its "
+          "own block member, not skipped and not credited to the member above "
+          "it -- and a NEAR MISS is a finding rather than a skip, so a marker "
+          "doubled into the comment text or written with no colon is reported "
+          "instead of dropping the receipt total to a tidy-looking zero)")
     return 0
 
 

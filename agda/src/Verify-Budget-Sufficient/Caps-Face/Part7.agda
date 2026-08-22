@@ -1,6 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part7
 -- thruOuter-face … reach-via-size-absurd
--- (lines 7014–8318 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
@@ -108,7 +107,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part2 using
 open import Decide using (T-to; T⇒≡true; ∧-intro)
 
 thruOuter-face :
-  -- subscribeInner-caps  (Verify-Budget-Sufficient/Subscribe-Face.agda:951)
+  -- subscribeInner-caps  (.Subscribe-Face)
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
     (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
     (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
@@ -416,7 +415,7 @@ stepFrame-face :
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
    ) →
-  -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -567,7 +566,7 @@ walkH :
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
    ) →
-  -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -680,7 +679,7 @@ cascadeGo-deliveries :
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
    ) →
-  -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -794,7 +793,7 @@ cascadeGo-level :
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
    ) →
-  -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -882,7 +881,7 @@ cascadeGo-caps :
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
    ) →
-  -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -1182,8 +1181,12 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- `depth-hop`'s induction and belongs beside it.
 --
 -- CONDITIONED ON `capsOK?`, deliberately: the unconditional form is
--- false for the same reason `depthE ≤ capsH` is (Depth-Bound.agda:11) —
--- a state may carry an arbitrarily deep store that no cap has seen
+-- false for the same reason a state-free `depthE ≤ capsH` is — a state
+-- may carry an arbitrarily deep store that no cap has seen, and the
+-- witness is an adversarial `map-f` chain.  That finding is prose and
+-- not a machine refutation, and the module it was written in is gone;
+-- `Caps-Bridge`'s own account of the `depOK` premise is where it now
+-- lives, with the recovery sha beside it.
 postulate
   cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -1219,7 +1222,7 @@ caps-tick :
               (proj₁ (proj₂ (proj₂ r′))) ≡ true)
        × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
    ) →
-  -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))

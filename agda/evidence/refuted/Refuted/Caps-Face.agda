@@ -42,7 +42,7 @@ open import Verify-Budget-Sufficient.Caps using
 -- satisfying capsOK? with ZERO slack and a `b` whose size is exactly the
 -- level's cSize, and demands capsOK? at the SAME level afterwards.  But
 -- the subscribe frame itself folds: subscribeE's scanᵉ clause
--- (Rx/Evaluator.agda:958) installs `scan-st (evalTm seed)` and runs the
+-- (Rx.Evaluator) installs `scan-st (evalTm seed)` and runs the
 -- source's sync burst through pushBurst with the scan-f frame, and
 -- dispatch updates that node once per synchronous payload.  A cap-sized
 -- `b` with one duplicating fold therefore lands at sizeStep C C, above
@@ -60,9 +60,9 @@ open import Verify-Budget-Sufficient.Caps using
 -- caps-tick must apply caps-frame at every inner subscribe inside that
 -- cascade, and there are exactly two such call sites:
 --
---  · subscribeInner   (Rx/Evaluator.agda:531) — a *All consuming an
+--  · subscribeInner   (Rx.Evaluator) — a *All consuming an
 --    obs payload mid-cascade, reached from stepFrame
---  · sharedConnect    (Rx/Evaluator.agda:871) — a shared slot's lazy
+--  · sharedConnect    (Rx.Evaluator) — a shared slot's lazy
 --    connect, which subscribes the def mid-cascade
 --
 -- At both, earlier chains in the SAME cascade have already grown the

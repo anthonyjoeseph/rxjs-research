@@ -70,10 +70,10 @@ postulate
   -- pieces that do not exist as DEFINITIONS today, only as postulated
   -- abstractions or nowhere at all:
   --   (1) a tick per emission.  InstEmit's fields are events, instant,
-  --       source, kind (Rx.Prim:118-123) — no Tick.  The arrival's
+  --       source, kind (Rx.Prim) — no Tick.  The arrival's
   --       tick is threaded through subscribeE/foldPath internally
-  --       (Arrival.tick, Rx.Evaluator:69; consumed at foldPath's call
-  --       site, Rx.Evaluator:1599) and discarded before it reaches
+  --       (Arrival.tick, Rx.Evaluator; consumed at foldPath's call
+  --       site, Rx.Evaluator) and discarded before it reaches
   --       Stream.  So there is no way, today, to read "the tick of
   --       this emit" back off `evaluate`'s result — the same gap
   --       `causality`'s `emittedBefore` runs into below.

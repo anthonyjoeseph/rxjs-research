@@ -37,8 +37,8 @@
 -- recombines them pointwise into `burstB? (cSize c′) Ψ` — a real
 -- proof.  Stating the receipt at the CASCADE level (walk entered at
 -- J = 0) makes the landing-level bound the exact arithmetic
--- `cascadeGo-caps` (.Caps-Face:4901) already proves, cribbed term for
--- term; then `capsAt-suc-full` (.Caps:893, refl) lands the widened
+-- `cascadeGo-caps` (.Caps-Face) already proves, cribbed term for
+-- term; then `capsAt-suc-full` (.Caps, refl) lands the widened
 -- caps half on `capsAt e sl (suc id)`, whose cSize IS the dry target
 -- Ŝ = sizeCapAt e sl (suc id).  Dm = (2·B + 12) · towerℕ (suc sz)
 -- appears NOWHERE — the anchor's content is no longer a second,
@@ -59,7 +59,7 @@
 -- gas guard.
 
 -- THE FRAME FACE IS NOT A POSTULATE.  `stepFrame-burst-face` is
--- an ASSEMBLY over the PROVEN `stepFrame-face` (.Caps-Face:4678) plus
+-- an ASSEMBLY over the PROVEN `stepFrame-face` (.Caps-Face) plus
 -- five per-frame WET leaves (`wet-face`) plus the DRY face
 -- (`stepFrame-nodry`).  Four of
 -- its conjuncts come off that one call — the level bound and `capsOK?`
@@ -400,11 +400,11 @@ fuel-pred (s≤s h) = h
 -- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
 -- carries the ∧-composable form, the dry lemmas speak the other
 
--- THE SEVERING CLOSE IS NEVER DRY.  `cutThrough` (Rx/Evaluator:246) is
+-- THE SEVERING CLOSE IS NEVER DRY.  `cutThrough` (Rx.Evaluator) is
 -- the only event source shared by take's cut and switch's kill, and
 -- every close it mints carries `cut` or `cutPending` — the two REASONS
 -- an operator ends a chain.  `dried` is minted in exactly one place
--- (`subscribeInner g0`, Evaluator:1006) and this is not it.  So both
+-- (`subscribeInner g0`, Rx.Evaluator) and this is not it.  So both
 -- severing paths are dry-free UNCONDITIONALLY: no gas hypothesis, no
 -- caps, no level.  Consequence for `stepFrame-nodry`: of `stepFrame`'s five frames,
 -- take-f needs nothing beyond this lemma, and thru-outer's switchᵒ
@@ -450,7 +450,7 @@ OKB c sl Ψ J sched st =
 -- caps face plus five per-frame WET leaves, of which the three
 -- STATE-LOCAL ones are proven here and the two *All edges remain.
 --
--- WHAT THE CAPS SIDE ALREADY GIVES.  `stepFrame-face` (Caps-Face:4678)
+-- WHAT THE CAPS SIDE ALREADY GIVES.  `stepFrame-face` (.Caps-Face)
 -- picks a j′ and reports the level bound, `capsOK?`, `valsCaps?` and
 -- the emitted-events caps half, all at J+j′.  One more conjunct falls
 -- straight out of that `capsOK?`: `regP? (pathSz? …)` IS
@@ -476,7 +476,7 @@ OKB c sl Ψ J sched st =
 
 -- THE siC HYPOTHESIS (SiCFace), named once: `stepFrame-face`'s own first
 -- argument.  It is a PARAMETER rather than an import because the
--- supplier (`subscribeInner-caps`, Subscribe-Face:951, PROVEN) lives in
+-- supplier (`subscribeInner-caps`, .Subscribe-Face, PROVEN) lives in
 -- the most expensive module in the tree (timings:
 -- typecheck-performance-numbers.md) and importing it here would cost
 -- this module its fast loop.  Caps-Bridge, which imports both, applies it.
@@ -509,7 +509,7 @@ SiCFace =
 
 -- THE ifc HYPOTHESIS (IfcFace), named once: `stepFrame-face`'s second
 -- argument.  It is a PARAMETER rather than an import because the
--- supplier (`innerFinish-caps`, Subscribe-Face:1760, PROVEN) lives in
+-- supplier (`innerFinish-caps`, .Subscribe-Face, PROVEN) lives in
 -- the most expensive module in the tree (timings:
 -- typecheck-performance-numbers.md) and importing it here would cost
 -- this module its fast loop.  Caps-Bridge, which imports both, applies it.
@@ -669,7 +669,7 @@ subscribeInner-Ψ {Γ = Γ} {t = t} sl Ψ (gs fuel) op allNid κ id now o sched 
 
 -- THE MAP LEAF — a REAL PROOF.  `stepFrame` on a map-f touches
 -- no state and emits no events, so five of the six conjuncts pass
--- straight through; the sixth is `applyFn-fnCap` (Wet:232) pointwise
+-- straight through; the sixth is `applyFn-fnCap` (.Wet) pointwise
 -- against the chain's own `caseWᵗ ⊔ fnCapᵗ ≤ Ψ`.
 
 regP?-Ψ : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (Ψ J : ℕ)
@@ -912,7 +912,7 @@ wet-scan {s = s} {u = u} c sl Ψ J sf id now fn nid path′ vals fin sched st
 ------------------------------------------------------------------
 -- THE FROM-INNER LEAF — an assembly over ONE postulate.
 --
--- `innerReact` (Evaluator:1233) passes its payloads through UNTOUCHED
+-- `innerReact` (Rx.Evaluator) passes its payloads through UNTOUCHED
 -- on two of its three paths: the not-finished path (`fin = false`), and
 -- the ABSORBED path (`fin = true`, but some registration under this
 -- inner instance is still live, so the completion is swallowed).  Only
@@ -1553,7 +1553,7 @@ wet-face c sl Ψ J sf id now (thru-outer op nid) path′ vals fin sched st ok pb
 -- consᵈ and shareLatch touch only delivered/completedSources/dying,
 -- fields fnCapBounded? never reads, so those two are transparent.
 -- shareFinish sweeps live and filters the registry: sweepLive-fnCap
--- (Wet:514) is exactly the live half, and nodes ride through.
+-- (.Wet) is exactly the live half, and nodes ride through.
 ------------------------------------------------------------------
 
 fnCapB-latch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -1591,7 +1591,7 @@ fnCapB-finish Ψ i true  out h =
 -- this one per-frame face.
 
 -- THE GAS HYPOTHESIS IS THE POINT.  `sf ≡ budgetAt e sl id` — the one
--- gas `chainStep` mints (Rx/Evaluator:1598), carried to the frame by
+-- gas `chainStep` mints (Rx.Evaluator), carried to the frame by
 -- the walk's GOK/g-mint hook (.Delivery-Walk, built for exactly this).
 -- Without it the statement is FALSE: `subscribeInner g0` emits a
 -- dried close and the depth premise does not exclude g0 (depth
@@ -1666,12 +1666,12 @@ fnCapB-finish Ψ i true  out h =
 -- ═══ THE CONSOLIDATION THAT FALLS OUT, and it is the finding ═══
 
 -- Chase those two frames to their leaves and they MEET:
--- `concatDrain` (Evaluator:1195) emits nothing of its own — its `bs`
+-- `concatDrain` (Rx.Evaluator) emits nothing of its own — its `bs`
 -- is `subscribeInner`'s, appended down the queue.  `switchKill` is
 -- cutThrough.  So after the three proven frames, EVERY remaining
 -- dried-close risk in the whole cascade is `subscribeInner`, whose two
 -- clauses are:
---   · `g0`      — emits `close drySource dried` (Evaluator:1006).
+--   · `g0`      — emits `close drySource dried` (Rx.Evaluator).
 --                 THE one dry mint in the evaluator.  Excluded by the
 --                 gas hypothesis: `budgetAt` is a `gasPad` of a
 --                 `gasTower`, never `g0`.
@@ -1774,7 +1774,7 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- `gasPad (2 ^ N) (gasTower H)`, and `2 ^ N` is positive whatever N is,
 -- so the gas the machine mints always carries a `gs` head.  Hence
 -- `subscribeInner g0` — the sole site that emits `close _ dried`
--- (Rx/Evaluator:1006) — is UNREACHABLE under the gas hypothesis, as a
+-- (Rx.Evaluator) — is UNREACHABLE under the gas hypothesis, as a
 -- theorem rather than as an appeal to the tower's size.
 2^-pos : ∀ (m : ℕ) → Σ ℕ (λ k → 2 ^ m ≡ suc k)
 2^-pos zero    = 0 , refl
@@ -1814,7 +1814,7 @@ budgetAt-gs-pad e sl id
 -- EX-RESIDUE, PROVEN.  It was postulated on the grounds
 -- that `outWᵛ` sits outside this module's import scope — a missing
 -- import, not a mathematical obstacle, and the wrong reason for a
--- postulate.  `dWᵛ` at an `obs` type IS `dWᵉ` (Rx/Frame-Width:411,
+-- postulate.  `dWᵛ` at an `obs` type IS `dWᵉ` (Rx.Frame-Width,
 -- definitional) and `valCaps?` already carries
 -- `pWᵛ n sl (obs u) o ≤ᵇ cWid` with `pWᵛ = outWᵛ ⊔ dWᵛ`, so the bound
 -- is ⊔'s right injection.
@@ -1822,7 +1822,7 @@ budgetAt-gs-pad e sl id
 -- WHAT ACTUALLY BLOCKED IT, recorded because the error message points
 -- somewhere else: `valsCaps?` is NOT just `all valCaps?` — it carries
 -- a second conjunct bounding the LIST LENGTH by `suc (cWid c)`
--- (Caps-Face/Part5:809).  A hand-peel that assumes the `all` shape
+-- (Caps-Face/.Part5).  A hand-peel that assumes the `all` shape
 -- fails with a mismatch reported against `sizeᵉ o ≤ᵇ …`, which reads
 -- like an `∧`-association problem and is not one.  `valsCaps?-parts`
 -- is the lemma that splits it; use it rather than peeling by hand.
@@ -3642,7 +3642,7 @@ module BurstWalk
 -- THE PAYOFF (cascadeGo-burst-nodry) — the walk/cascade burst content, at Ŝ, with no Dm,
 -- AND the cascade's dry half, off the SAME run.
 --
--- The level arithmetic is `cascadeGo-caps`'s own (Caps-Face:4901),
+-- The level arithmetic is `cascadeGo-caps`'s own (.Caps-Face),
 -- cribbed term for term: Res.cnt through dWalkᶜ-mono and cDel-body,
 -- Res.hi through lvls-mono and sizeCount-body.  Then capsAt-suc-full
 -- lands the widened caps half on capsAt (suc id) — whose cSize IS

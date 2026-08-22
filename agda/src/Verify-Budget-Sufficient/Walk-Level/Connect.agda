@@ -229,7 +229,7 @@ private
     -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
-    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- weakening.  `subscribeSharedSlot` (Rx.Evaluator) reaches
     -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
     -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
     -- operation on an already-connected share; the unconditioned
@@ -422,7 +422,7 @@ abstract
     -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
-    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- weakening.  `subscribeSharedSlot` (Rx.Evaluator) reaches
     -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
     -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
     -- operation on an already-connected share; the unconditioned
@@ -534,7 +534,7 @@ private
     -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
-    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- weakening.  `subscribeSharedSlot` (Rx.Evaluator) reaches
     -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
     -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
     -- operation on an already-connected share; the unconditioned
@@ -699,7 +699,7 @@ abstract
     -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
-    -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+    -- weakening.  `subscribeSharedSlot` (Rx.Evaluator) reaches
     -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
     -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
     -- operation on an already-connected share; the unconditioned
@@ -791,7 +791,7 @@ sharedConnect-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- FRESHNESS, added, and it is a PRECONDITION OF THE
   -- OPERATION rather than a convenience of today's caller — which is
   -- what makes this a restatement of a true theorem and not a
-  -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
+  -- weakening.  `subscribeSharedSlot` (Rx.Evaluator) reaches
   -- `sharedConnect` only in the `else` of `if memberSource (toℕ i)
   -- (EvalSt.connectedShares st)`, so the evaluator NEVER runs this
   -- operation on an already-connected share; the unconditioned

@@ -254,7 +254,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --
 --   ℓ  ←  REFUTED AT Ŝ.  The walk demands
 --                          `pathLen κ + G ≤ ℓ`, and G is the demand
---                          MEASURED AT Ŝ, so `sucV≤d` (.Measures:6476)
+--                          MEASURED AT Ŝ, so `sucV≤d` (.Measures)
 --                          gives `suc Ŝ ≤ G` under the same
 --                          one-hop-or-one-share side condition GAP 4
 --                          runs on.  Then `pathLen κ + G ≥ G > Ŝ`, and
@@ -482,6 +482,16 @@ size≤sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 size≤sizeCapAt e sl id =
   ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
+
+-- and so does the slot telescope's, out of the SAME summand.  The depth
+-- mirror is what wants this one: `depth-hop`'s size condition is not
+-- inherited at the `input` clause, where the subject's own `sizeᵉ` is 1
+-- and the recursion enters a shared def of any size at all
+-- REFUTED: `Refuted.Depth-Hop`, `depth-hop-slot-absurd`
+slotsSize≤sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : Id) → slotsSize sl ≤ sizeCapAt e sl id
+slotsSize≤sizeCapAt e sl id =
+  ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
 
 -- REFUTED: `wet-ceiling-absurd` and
 --   `wet-ell-absurd` now live in `refuted/Refuted/Wet.agda`, checked by

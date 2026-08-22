@@ -240,7 +240,7 @@ postulate
     in FoldInv id envSrc (evs ++ evs′) fin′ sched₁ st₁ S
 
   -- thru-outer, and it STRICTLY CONTAINS the concat residue above — do not
-  -- pick it up first.  Read off the evaluator (Evaluator:1293): this clause is
+  -- pick it up first.  Read off the evaluator (Rx.Evaluator): this clause is
   -- `thruWrap op nid fin (thruWalk fuel op nid κ id now vals sched st)`, and
   -- `thruWalk` (:1166) FOLDS `thruConsume` over the value LIST, threading
   -- (sched, st) element to element.  Three consequences, none of them visible

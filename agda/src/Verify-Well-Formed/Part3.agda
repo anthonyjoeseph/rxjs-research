@@ -250,7 +250,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --
 -- REFUTED: `git show 94a5a3c^:agda/probe/Battery-Burst-Done.agda` holds
 --   `burst-done-false-absurd`, a proven ⊥.
---   oneShotBurst-wf's own header (below, ~line 876) had said so all along:
+--   oneShotBurst-wf's own header had said so all along:
 --   `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it
 --   must come from the walk order."  So it now comes from the walk order —
 --   `subscribeE-wf` and every per-clause receipt TAKE it as the premise `deq`,
@@ -260,13 +260,13 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 postulate
   -- mapᵉ GAP 1: hasDry propagates inward through the map push.
   --
-  -- ROUTE: `pushBurst-map-char` (Part5:432) shows that
+  -- ROUTE: `pushBurst-map-char` (.Part5) shows that
   -- subscribeE (mapᵉ f b) κ ... ≡ (map (reEmit (map (applyFn f))) burst, sched, st)
   -- where burst = proj₁ (subscribeE b (map-f f ↠ κ) ...).  `stepFrame (map-f f)`
-  -- returns evs = [] (Evaluator:1271-1272), so the events of each reEmitted emit are
+  -- returns evs = [] (Rx.Evaluator), so the events of each reEmitted emit are
   -- exactly: `splitEvents(inner events).bookkeeping ++ map value vals′ ++ finFlag`.
   -- `close s dried` events are in the bookkeeping list (splitEvents-nodry,
-  -- Walk-Level:1139) and never in map value or the finFlag (mapValue-dry :1070,
+  -- .Walk-Level) and never in map value or the finFlag (mapValue-dry :1070,
   -- finList-dry :1081).  Therefore `hasDry (map (reEmit g) burst) = hasDry burst`
   -- in both directions.  The needed direction (outer false → inner false) is the
   -- contrapositive: if inner has a dried event, so does the reEmit of it.
@@ -282,7 +282,7 @@ postulate
     hasDry (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ false
 
   -- mapᵉ GAP 2: pushBurst map frame preserves valsLast?.
-  -- REAL SHAPE MISMATCH: subscribeE-map-wf (~line 1920) does NOT return valsLast?;
+  -- REAL SHAPE MISMATCH: subscribeE-map-wf does NOT return valsLast?;
   -- subscribeE-wf's conclusion REQUIRES it.
   map-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
@@ -293,7 +293,7 @@ postulate
   -- scanᵉ GAP 1: hasDry propagates inward through the scan push.
   --
   -- ROUTE: `stepFrame (scan-f fn nid)` also returns evs = []
-  -- (Evaluator:1274-1284 — the scan frame writes only to the node table, never
+  -- (Rx.Evaluator — the scan frame writes only to the node table, never
   -- emitting protocol events).  So the events of each pushBurst emit are
   -- `splitEvents(inner events).bookkeeping ++ map value vals′ ++ finFlag`,
   -- the same shape as the map case above.  `hasDry` is therefore preserved
@@ -315,7 +315,7 @@ postulate
            ≡ false
 
   -- scanᵉ GAP 3: pushBurst scan-f preserves valsLast?.
-  -- REAL SHAPE MISMATCH: subscribeE-scan-wf (~line 2003) does NOT return valsLast?;
+  -- REAL SHAPE MISMATCH: subscribeE-scan-wf does NOT return valsLast?;
   -- subscribeE-wf's conclusion REQUIRES it.
   scan-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
@@ -337,18 +337,18 @@ postulate
   -- needs before the outer side reduces at all.
   --
   -- ROUTE: Same structural argument as scan-nodry-push.  The `evs`
-  -- from `takeDispatch` in the NON-cut case are [] (Evaluator:1096).  In the
+  -- from `takeDispatch` in the NON-cut case are [] (Rx.Evaluator).  In the
   -- CUT case, `evs = closes` where `closes = proj₁ (proj₂ (cutThrough ...))`.
-  -- `cutThrough` (Evaluator:251-261) emits only `close src cut` or
+  -- `cutThrough` (Rx.Evaluator) emits only `close src cut` or
   -- `close src cutPending` — never `close src dried`.  Therefore
   -- `any dryEvent closes = false`, so `retagEvents closes` is also dry-free by
-  -- `retagEvents-dry` (Walk-Level:1049).  The pushBurst events are
+  -- `retagEvents-dry` (.Walk-Level).  The pushBurst events are
   -- `bk ++ retagEvents closes ++ map value vals′ ++ finFlag`, all dry-free when
   -- the inner emit's events are dry-free.  Same import obstacle as scan-nodry-push
   -- (ingredients in Walk-Level, not Part3).
   --
   -- EXTRA PREMISE: `ecEq : evalTm count ≡ suc k` is needed because the evaluator
-  -- case-splits on `evalTm count` (Evaluator:1440-1451) before the takeᵉ clause
+  -- case-splits on `evalTm count` (Rx.Evaluator) before the takeᵉ clause
   -- reduces.  Without it the outer hasDry does not reduce to the inner hasDry.
   take-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
@@ -448,7 +448,7 @@ postulate
   -- ── THE INPUT CLAUSE'S ARMS ──────────────────────────────────────
   -- These three are the residue of `subscribeE-input-wf` (assembled at
   -- the foot of this file), which splits on `Sched.slots sched i` to
-  -- mirror the evaluator (Evaluator:1400).  The other two arms are NOT
+  -- mirror the evaluator (Rx.Evaluator).  The other two arms are NOT
   -- here because they are DISCHARGED there, by proven lemmas:
   --   · hot and live      → `initReg-wf` (above), at src := toℕ i
   --   · cold, no async    → `oneShotBurst-wf` (.Part2)
@@ -456,7 +456,7 @@ postulate
   -- `subscribeE … (input i) …`, so none of them can be discharged by a
   -- proof of a different arm.
 
-  -- SHARED slot.  `subscribeSharedSlot` (Evaluator:1384) is its own
+  -- SHARED slot.  `subscribeSharedSlot` (Rx.Evaluator) is its own
   -- three-way split — spent share, live share, and `sharedConnect`,
   -- which RECURSES into subscribeE on the stored def at one less gas.
   -- That recursion is why this arm is a leaf and not an application:
@@ -500,7 +500,7 @@ postulate
   --
   -- STRUCTURAL OBSTACLE: the emit is `(init src ∷ map value sync)
   -- at id from src as subscribe`.  `runProtocol` must handle this combined
-  -- init + values emit.  `stepProtocol-faithful` (Part5:415) handles value-free
+  -- init + values emit.  `stepProtocol-faithful` (.Part5) handles value-free
   -- transforms of bursts, and `initReg-run` (above) covers `init src ∷ []` only.
   -- No lemma in the repo handles `init ∷ map value sync` in a single emit for
   -- protocol-state purposes.  The protocol is value-agnostic for the init step
@@ -540,7 +540,7 @@ postulate
   -- deferᵉ: init + register, no inner burst at subscribe time.
   --
   -- ROUTE: `subscribeE fuel (deferᵉ body) κ ...` reduces to
-  -- (Evaluator:1485-1496):
+  -- (Rx.Evaluator):
   --   burst  = ((init src ∷ []) at id from src as subscribe) ∷ []
   --   sched' = sched₄ (after mintNode, mintSource, mintOrdinal, live ∷= entry)
   --   st'    = register src (thru-outer mergeᵒ nid ↠ κ) (installNode nid (merge-st 0 false) st)
@@ -548,8 +548,8 @@ postulate
   -- Three of the four conclusion conjuncts are immediate:
   --   · hasDry premise is VACUOUS: `init src` is not `close _ dried`, so
   --     `any dryEvent (init src ∷ []) = false`.
-  --   · valsLast? = true by `valsLast? (em ∷ []) = true` (Protocol:323).
-  --   · runProtocol equation: `initReg-run id src S ...` (lines 106-115 above)
+  --   · valsLast? = true by `valsLast? (em ∷ []) = true` (Rx.Protocol).
+  --   · runProtocol equation: `initReg-run id src S ...`, above,
   --     applies — the emit shape matches exactly.
   --
   -- REMAINING: BurstInv id sched₄ (register src ... (installNode nid ... st)) S′.
@@ -653,14 +653,14 @@ postulate
 --     `ecEq : evalTm count ≡ ec` as ORDINARY arguments, each consumer doing
 --     its own `rewrite ecEq`.
 --   · THE ZERO ARM IS FREE, and a wholesale postulate would hide that —
---     `take 0` never subscribes its source (Evaluator:1442), so
+--     `take 0` never subscribes its source (Rx.Evaluator), so
 --     it is `emptyᵉ` verbatim and the PROVEN `oneShotBurst-wf` closes it.
 --     Same pattern as at the cold/no-async arm.
 --   · AND ONE PREMISE COULD NOT BE PAID — `subscribeE-take-wf`'s `dyF`,
 --     `∀ s → memberSource s (EvalSt.dying …) ≡ false`.  Its own comment said
 --     it "rides in from the enclosing cascade"; that was backwards, since
 --     `cascadeLatch` SEEDS `dying` before any chain is processed
---     (Evaluator:1639), so inside a cascade the premise is false, not free —
+--     (Rx.Evaluator), so inside a cascade the premise is false, not free —
 --     and `subscribeE-wf`, the only caller, quantifies over an arbitrary `st`
 --     and holds no hypothesis about `dying`.  The first pin below refutes the
 --     naive leaf outright.
@@ -698,7 +698,7 @@ postulate
 -- receipt): the statement quantifies over every `st : EvalSt e`, so a
 -- constructed inhabitant refutes it outright.  Reachability is established
 -- separately and does not rest on this pin — `cascadeLatch` produces
--- exactly these states (Evaluator:1644, and .Part13's `dsrc`, which proves
+-- exactly these states (Rx.Evaluator, and .Part13's `dsrc`, which proves
 -- dying-freeness there only OFF `arrSource a`).
 --
 -- ANONYMOUS by the bug-cache idiom: a named pin is a proven definition with
@@ -777,7 +777,7 @@ _ = λ n Γ bal → 1+n≢0 (bal {Γ′ = Γ} {t = natᵗ} 0 0 (0 ∷ []) 0 (0 �
 --
 --     liveTypeOK? (toℕ i) (lookup Γ i) (Sched.live sched) ≡ true
 --
--- which nothing in scope supplies, because `Sched` (Evaluator:63) is a
+-- which nothing in scope supplies, because `Sched` (Rx.Evaluator) is a
 -- plain record whose `live` and `slots` are independent and nothing
 -- tied them across a schedule transition.  Anthony's ruling
 -- put the fact on BurstInv/Inv/Mid as the `hot-live` field rather than

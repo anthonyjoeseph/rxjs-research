@@ -412,7 +412,7 @@ burst-index S W d k m j J 2≤S hm =
 --
 -- The clause holds `suc (sizeᵉ TERM) ≤ suc m′` and owes
 -- `suc (sizeᵉ SOURCE) ≤ m′`, and every chain constructor's size is
--- `suc (head + source)` (Rx.Exp:466-475), so ONE lemma covers the whole
+-- `suc (head + source)` (Rx.Exp), so ONE lemma covers the whole
 -- family: `hd := sizeᵗ f` for map and take, `hd := sizeᵗ f + sizeᵗ z`
 -- for scan (`+` associates left, so its head being a sum costs no
 -- rewrite), and `hd := 0` for the headless six (mergeAll, concatAll,

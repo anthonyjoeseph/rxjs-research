@@ -1,6 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part5
 -- innerFinish-zero … reach-reset
--- (lines 5200–6073 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part5 where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_)

@@ -68,13 +68,11 @@ cache.
 3. Name it in `Probed/Main.agda`'s `using (…)`, or `wiring-probed` will call
    it unreachable.
 4. Put the RECEIPT — which shapes were covered — in the target postulate's own
-   header in `src`, as `-- PROBED <date>:`. The probe is apparatus; the
-   receipt is the finding, and it belongs next to the statement. A receipt on a
-   `postulate` BLOCK MEMBER is indented, and E3 reads it there and attributes
-   it to that member rather than to the member above — but only since the day
-   a real one was written that way and the receipt total did not move. Two
-   receipts had been invisible, one of them for days, so if you are auditing
-   coverage against a count taken before that, take it again.
+   header in `src`, as `-- PROBED:` — the marker OPENS the comment line and
+   ENDS in a colon, and there is no other legal spelling. The probe is
+   apparatus; the receipt is the finding, and it belongs next to the statement.
+   A receipt on a `postulate` BLOCK MEMBER is indented, and E3 reads it there
+   and attributes it to that member rather than to the member above.
 
 ## What bites
 
@@ -87,6 +85,24 @@ cache.
   will look like the gate breaking on a success. The repair is to DELETE the
   probe (or retarget it), never to relax E2 — an expired probe is exactly what
   this check exists to surface.
+- **E3 fires at the same moment, and the repair is the same: DELETE the
+  receipt.** A receipt has one tense and no dated variant. What is worth
+  keeping is the apparatus, and that is a `RECOVERY:` pointer naming the sha —
+  the coverage claim itself is superseded by the theorem, which says strictly
+  more than any set of rows did.
+- **A near miss is reported, not skipped.** Three spellings slip past a strict
+  pattern and each has been live in this tree: an invented suffix
+  (`PROBED-GREEN`), a marker trailing a parenthetical with no colon, and an
+  OBSCURED one written `-- -- PROBED:`, which also walks past
+  `comments-check`'s ordering rule because a doubled dash is prose to every
+  checker here. E3 reports all three rather than dropping the receipt total.
+- **THE DISCRIMINATOR USED TO BE A DATE, AND THAT IS WHY THE CHECK ROTTED.**
+  `RECEIPT` required `-- PROBED <date>:`, which `make comments-check` then
+  outlawed everywhere in `agda/src` and `agda/evidence`. Two gate checks
+  cannot both be obeyed: E3's receipt half matched NOTHING from that day,
+  reported itself clean, and hid six real receipts — three of them stale, on
+  statements since proven. A discriminator a sibling check forbids fails
+  silent AND reports a total, and a total of zero reads as tidy.
 - **A probe that pins the EVALUATOR is not a probe.** If its rows survive
   their target because what they really test is that some composite reduces,
   it is a unit test: move it to `Implementation/Unit-Test.agda`, which is

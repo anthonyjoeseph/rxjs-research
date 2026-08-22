@@ -81,13 +81,21 @@ comments-check` on every comment in `agda/src` and `agda/evidence`; a date is a 
 failure** — since a rule stated in a file nobody checks is the thing this whole section
 is about.
 
-**LINE NUMBERS ARE THE WORST CASE AND THERE IS NO EXCEPTION FOR THEM.** A stale name at
-least fails a `grep` loudly; a stale line number resolves, points at unrelated code, and
-is believed. Measured on the sweep that recorded this rule: of the citations this file
-carried, two named things that had since been deleted, one named a duplicate the
-compiler had already removed, one enumerated a set of `make` targets that had since
-grown, and every line number in the file was wrong. Not one of the rules they were
-attached to had stopped being true — which is the argument in a sentence.
+**LINE NUMBERS ARE THE WORST CASE AND THERE IS NO EXCEPTION FOR THEM, HERE OR IN A
+SOURCE COMMENT.** A stale name at least fails a `grep` loudly; a stale line number
+resolves, points at unrelated code, and is believed. Measured on the sweep that recorded
+this rule: of the citations this file carried, two named things that had since been
+deleted, one named a duplicate the compiler had already removed, one enumerated a set of
+`make` targets that had since grown, and every line number in the file was wrong. Not
+one of the rules they were attached to had stopped being true — which is the argument in
+a sentence.
+
+**AND `agda/src` WAS NO BETTER, WHICH IS WHY `make comments-check` NOW POLICES IT.** Of
+the `file:line` citations in the two trees, TEN pointed past the end of the file they
+named — a module had been split — and the in-range ones had drifted onto continuation
+lines, one being cited eight times. Every single site already named the declaration in
+backticks beside the number, so deleting 141 of them cost nothing: the name is the part
+that works, and `make find` takes names.
 
 ## THE GATE — `make gate`, and what each check will not let you do
 
@@ -103,7 +111,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `wiring-refuted` | same law over `agda/evidence/refuted`, rooted at `Refuted.Main` — every witness is claimed | [docs/wiring.md](docs/wiring.md), EVIDENCE.md |
 | `wiring-probed` | same law over `agda/evidence/probed`, rooted at `Probed.Main` — this is what replaced the probes' old self-granted reachability exemptions | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `evidence-selftest` | E1 and E2 still fire | [docs/evidence.md](docs/evidence.md) |
-| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, and its marker says whether that statement is still a postulate, so DISCHARGING one fails the gate until the receipt above it has been re-read | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
+| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, whose statement must still be a POSTULATE, so DISCHARGING one fails the gate until the receipt above it has been re-read and DELETED. A receipt has exactly one tense, and no dated variant of the marker: the theorem says more than the probe ever did, so on discharge the coverage claim is superseded rather than historicised, and whatever harness is worth keeping becomes a `RECOVERY:` pointer. Every NEAR MISS is a finding too, because a receipt a strict pattern walks past leaves the check reporting a tidy zero — which is what a requirement for a DATE in the marker did, silently, from the day its sibling check outlawed dates in source comments | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `unsafe-check` | no `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` etc. on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-selftest` | the duplicate checker still fires | [docs/find.md](docs/find.md) |
 | `dup-check` | no two declarations proving the same fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
@@ -112,7 +120,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-selftest` | every comment check still fires, and four precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
-| `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date or a historical marker; a block's evidence sits LAST and in order; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; no explanation names the subject of a section the same block already carries, which is redundancy that DRIFTS rather than merely repeats; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
+| `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date, a historical marker or a LINE NUMBER — in any of `Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`; a block's evidence sits LAST and in order; no marker is DOUBLED into the comment text (`-- -- RECOVERY:`), which is a marker every checker here reads as prose while a human reads it as a marker; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; no explanation names the subject of a section the same block already carries, which is redundancy that DRIFTS rather than merely repeats; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
 | `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` | the refutations typecheck | EVIDENCE.md |
 | `probed` | the probes typecheck | EVIDENCE.md |
@@ -701,7 +709,7 @@ design to move, and it is the one worth naming when you find it.
 - **PROBE BEFORE GRINDING.** If a postulate's sides are computable, instantiate it at
   concrete programs **in `agda/evidence/probed/`, checked with `make agda-dev`** and pinned by `refl` —
   bug-cache shaped, seconds per loop. Every probe ends in exactly one of two states: a
-  refutation (record, restate, re-rank) or a confidence receipt (`-- PROBED <date>:` in
+  refutation (record, restate, re-rank) or a confidence receipt (`-- PROBED:` in
   the postulate's own header, saying what shapes were covered). **An unprobed probeable
   postulate is the cheapest unmanaged risk in the repo.**
 - **AND PROBE THE ASSEMBLY'S CONCLUSION, NOT ONLY ITS LEAVES.** A real body over

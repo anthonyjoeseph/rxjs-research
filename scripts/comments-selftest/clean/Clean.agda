@@ -18,3 +18,15 @@ module Clean where
 -- RECOVERY: git show 853c49e7ca7d24 restores the width walk and its cone.
 ------------------------------------------------------------------
 postulate leaf : Set
+
+-- AND A NUMERAL IS NOT A CITATION.  The refold bound is V = 4, twenty
+-- units of gas suffice, the depth came out 21 against 20, and the row at
+-- line 2 of the series is degenerate -- none of which addresses a reader
+-- to a position in a file, so the sixth check must stay silent here.
+postulate numerals : Set
+
+-- AND A SIGNAL IS NOT A LINE NUMBER EITHER.  Two Killed:9 builds is a
+-- reaper's exit status, and Bug:14 names no module this tree declares --
+-- so the prefix is required to be a real module basename, which is what
+-- keeps the sixth check from being a rule people route around.
+postulate signals : Set

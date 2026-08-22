@@ -1,6 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part4
 -- DELIVERY CLIQUE SLOTS (HEAVY block) … obsList-nodeWid
--- (lines 3664–5199 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part4 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)

@@ -1,6 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part6
 -- innerFinish-face-keep … innerFinish-concat-face
--- (lines 6074–7013 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part6 where
 
 open import Data.Bool    using (Bool; true; false; not; if_then_else_)
@@ -144,13 +143,13 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- one the goal wants.  This head dispatches every node case itself:
 -- nothing / scan / take / merge / switch / exhaust / concat+no all go
 -- to `innerFinish-face-keep` at j′ = 0, and concat+yes is the one real
--- obligation — `innerFinish-caps` (Subscribe-Face:1761), which is
+-- obligation — `innerFinish-caps` (.Subscribe-Face), which is
 -- exactly what H1 and H2 were added to feed.
 -- `ifc` (IfcFace = innerFinish-caps' type) threads as the FIRST kit arg
 -- so the proof can call innerFinish-caps without creating a circular
 -- import — Subscribe-Face already imports Caps-Face.
 innerFinish-concat-face-go :
-    -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+    -- ifc  (innerFinish-caps, .Subscribe-Face)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
       (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
       (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -177,29 +176,29 @@ innerFinish-concat-face-go :
          × (all (eventCaps? (frameStep (j + j′) c) sl)
                 (proj₁ (proj₂ r)) ≡ true)
          × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
-    -- burstCaps?-∷  (Verify-Budget-Sufficient/Caps-Face.agda:3608)
+    -- burstCaps?-∷  (.Caps-Face)
     (∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
       (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
       all (eventCaps? c sl) (InstEmit.events em) ≡ true →
       burstCaps? c sl str ≡ true →
       burstCaps? c sl (em ∷ str) ≡ true
      ) →
-    -- valsCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3625)
+    -- valsCaps?-slots  (.Caps-Face)
     (∀ {n} {Γ : Ctx n} {c : Caps} {sl sl′ : Slots Γ}
       (u : Ty) (vs : List (Val Γ u)) → sl′ ≡ sl →
       all (valCaps? c sl u) vs ≡ true → all (valCaps? c sl′ u) vs ≡ true
      ) →
-    -- eventsCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3630)
+    -- eventsCaps?-slots  (.Caps-Face)
     (∀ {n} {Γ : Ctx n} {u} {c : Caps} {sl sl′ : Slots Γ}
       (evs : List (InstEvent (Val Γ u))) → sl′ ≡ sl →
       all (eventCaps? c sl) evs ≡ true → all (eventCaps? c sl′) evs ≡ true
      ) →
-    -- burstCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3635)
+    -- burstCaps?-slots  (.Caps-Face)
     (∀ {n} {Γ : Ctx n} {u} {c : Caps} {sl sl′ : Slots Γ}
       (str : Stream Γ u) → sl′ ≡ sl →
       burstCaps? c sl str ≡ true → burstCaps? c sl′ str ≡ true
      ) →
-    -- obsListCaps?-slots  (Verify-Budget-Sufficient/Caps-Face.agda:3640)
+    -- obsListCaps?-slots  (.Caps-Face)
     (∀ {n} {Γ : Ctx n} {s} {c : Caps} {sl sl′ : Slots Γ}
       (q : List (Closed Γ s)) → sl′ ≡ sl →
       all (obsCaps? c sl) q ≡ true → all (obsCaps? c sl′) q ≡ true
@@ -808,7 +807,7 @@ private
 
 abstract
   thruOuter-face-core :
-    -- subscribeInner-caps  (Verify-Budget-Sufficient/Subscribe-Face.agda:951)
+    -- subscribeInner-caps  (.Subscribe-Face)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId)
       (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -840,7 +839,7 @@ abstract
       (o : Exp Γ Δᵍ Δ Θ u) → sizeᵉ o ≤ C →
       (syncSizeᵉ o ≤ C) × (hopDᵉ C η o ≤ hopR C)
      ) →
-    -- foldPath-sink-N  (Verify-Budget-Sufficient/Deliveries.agda:787)
+    -- foldPath-sink-N  (.Deliveries)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
         (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
@@ -849,7 +848,7 @@ abstract
                                    vals evs fin sched st)))
           ≡ delivN st (proj₂ (proj₂ (dispatchShare sf gas id now i vals fin sched st)))
      ) →
-    -- shareGo-skip-N  (Verify-Budget-Sufficient/Deliveries.agda:824)
+    -- shareGo-skip-N  (.Deliveries)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
         (vals : List (Val Γ (lookup Γ i))) (fin : Bool) (rid : RegId)
@@ -859,7 +858,7 @@ abstract
         delivN st (proj₂ (proj₂ (shareGo sf gas id now i vals fin ((rid , p) ∷ ps) sched st)))
           ≡ delivN st (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
      ) →
-    -- shareGo-cons-N  (Verify-Budget-Sufficient/Deliveries.agda:840)
+    -- shareGo-cons-N  (.Deliveries)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
         (vals : List (Val Γ (lookup Γ i))) (fin : Bool) (rid : RegId)
@@ -875,7 +874,7 @@ abstract
                  + delivN st₁ (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps
                                               (proj₁ (proj₂ fp)) st₁))))
      ) →
-    -- shareFinish-len  (Verify-Budget-Sufficient/Delivery-Walk.agda:129)
+    -- shareFinish-len  (.Delivery-Walk)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (i : Fin n) (fin : Bool) (out : Stream Γ t × Sched Γ × EvalSt e) →
       length (EvalSt.registry (proj₂ (proj₂ (shareFinish i fin out))))
@@ -913,7 +912,7 @@ abstract
 -- dropped: the drain is what eventually consumes them, and dropping them
 -- here would orphan `burstCaps?-∷` and the four `*-slots` transports
 innerFinish-concat-face-core :
-    -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
+    -- ifc  (innerFinish-caps, .Subscribe-Face)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
       (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
       (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))

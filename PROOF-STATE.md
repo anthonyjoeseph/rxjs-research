@@ -157,10 +157,10 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`depth-hop`** (Depth-Compositional) — DIFFICULTY (was FALSITY): every clause,
-  both `Slot` constructors, all four `*All`s, a stratified telescope and a
-  populated store, probed TIGHT — and the series killed the ∀ V form, so it can
-  kill. Left: a state deep in a cascade, and `caseᵗ`; mirror in its header.
+- **`depth-hop`** (Depth-Compositional) — DIFFICULTY: restated over `syncSizeᵉ`
+  and the slots width, both refutations spent, and probed where the new measure
+  admits what the old one excluded. Every clause but the burst arm closes off
+  the mirror; that arm is the one design decision left.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

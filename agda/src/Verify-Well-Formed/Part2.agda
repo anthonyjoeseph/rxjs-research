@@ -280,7 +280,7 @@ HotLive {Γ = Γ} sched = ∀ (i : Fin _) →
 
 postulate
   -- BASE.  `sched-init`'s live list is `concat (tabulate (mkHot ins))`,
-  -- and `mkHot ins i` (Evaluator:110) emits exactly one LiveSource for a
+  -- and `mkHot ins i` (Rx.Evaluator) emits exactly one LiveSource for a
   -- hot slot, with `source = toℕ i` and `elemTy = lookup Γ i`.  So the
   -- fact holds by construction; what it costs is the concat/tabulate
   -- membership argument, which is why it is a leaf rather than a proof.
@@ -345,7 +345,7 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- the between-cascades carrier of the first global coherence field
     caches       : cachesValid (EvalSt.nodes st) (EvalSt.registry st) ≡ true
     -- A HOT SLOT'S ORDINAL IS LIVE AT THE SLOT'S ELEMENT TYPE.
-    -- `mkHot` (Evaluator:110) establishes this at sched-init and NOTHING
+    -- `mkHot` (Rx.Evaluator) establishes this at sched-init and NOTHING
     -- carried it afterwards, so subscribeE's hot/live input arm could not
     -- pay initReg-wf's `ltok` — the finding is in subscribeE-input-wf's
     -- header (.Part3), where `BurstInv.hot-live binv i` spends it.  It is a

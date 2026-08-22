@@ -23,7 +23,7 @@ So the law charges **explaining** and leaves **evidence** free, which is the
 same split the roadmap's row budget already uses for names. Everything below
 follows from that.
 
-## The six checks
+## The eight checks
 
 **1 — Dates.** No calendar date in any comment. A receipt's content is its
 *coverage statement* — which shapes were reached, which were not — and coverage
@@ -55,6 +55,14 @@ harness row may never claim.
 
 Deliberately **not** on it: `SEALED`, `SPLIT`, `RESOLVED`, `SETTLED`,
 `FRESHNESS`, `ASSEMBLY`.
+
+`PROBED-HISTORICAL` on that list once CONTRADICTED `make evidence-check`,
+which demanded exactly that spelling on a receipt whose statement had been
+proven — so the one marker E3 required at the moment of discharge was one this
+check refused to let anyone write. It was resolved in E3's favour of deleting
+rather than dating: a receipt has one legal tense, and on discharge it goes,
+its recoverable apparatus becoming a `RECOVERY:` pointer. Do not re-admit the
+spelling to make a stale receipt legal; delete the receipt.
 
 **3 — Shape.** A block's evidence sits at its end, in the order `REFUTED` /
 `DEAD ROUTE` / `TWIN`, then `PROBED`, then `RECOVERY`. Rank one is *what is
@@ -142,6 +150,56 @@ its own subject cannot fire against itself. At the sweep that introduced it,
 **6 — Explanation budget.** The prose before the first evidence marker, with
 sha-bearing lines free. Nothing evidential is ever what has to give.
 
+**7 — Line numbers.** No comment cites a line, in any of three forms:
+`Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`. The
+rule is CLAUDE.md's own, arriving in the source tree: a stale *name* fails a
+`grep` loudly, while a stale line number **resolves**, points at unrelated
+code, and is believed.
+
+The census that added the check measured how far gone it already was. Of the
+36 `file:line` citations, **ten pointed past the end of the file they named** —
+`Wet.agda:4125` in a 188-line file, because the module had been split — and the
+in-range ones had drifted onto whatever was under them, `Subscribe-Face.agda:1760`
+being cited eight times and landing on `(proj₁ (proj₂ CD)))`. A further 91 used
+the extensionless form. Not one of the surrounding findings had stopped being
+true, which is the whole argument: the citation is the only part that rotted,
+and deleting it cost nothing, because **every one of those sites already named
+the declaration in backticks beside the number.**
+
+The check is deliberately blind to whether a number happens to be right today.
+A correct line number is a decay clock that has not gone off; policing
+correctness would mean re-validating every citation on every edit to every
+cited file, which is the maintenance burden that produced the rot.
+
+**The extensionless form is why the prefix must be a real module basename.** A
+blanket `Word:digits` pattern cannot have this form, because `Killed:9` is a
+signal and `V = 4` is a numeral — and a check that calls those line numbers is
+a check people learn to route around. So the pattern is built from the `.agda`
+stems in the two trees at run time: it fires on `Wet` because `Wet.agda` is
+there, and stays silent on anything that is not a module. That also makes it
+self-maintaining, the same way the postulate-twin fixture is.
+
+**8 — Obscured markers.** A marker doubled into the comment text —
+`-- -- RECOVERY:` — is a finding, and it is the one check here that exists
+because of the *other* checks. `blocks` strips exactly one `--` from a comment
+line, which is correct, so a second one leaves the marker word inside the text:
+the ordering rule reads it as prose and lets it stand mid-block, and the
+reference pass never validates the sha it names. It is a marker that is
+invisible to every checker in this repo while reading, to a human, exactly like
+one that is not.
+
+Three were live in `agda/src` when the check was written, every one a
+`RECOVERY` naming a sha nothing resolved, and two of them in the file whose
+header the campaign was actively working in. `make evidence-check` had two more
+of its own, in the `PROBED` spelling, plus a third that trailed a parenthetical
+instead of ending in a colon.
+
+**The doubled form is reported rather than admitted, and that is the design.**
+Loosening the marker pattern to accept it would make it *legal*, and a marker's
+whole job is to be the one shape a reader and a machine agree on. The same
+reasoning runs through E3's near-miss half in `make evidence-check`: report the
+spelling, keep the canon narrow.
+
 ## Where the budget comes from, and why it is not tighter
 
 Measured over `agda/src`: 2357 comment blocks, ~1.08M comment characters;
@@ -167,6 +225,8 @@ For calibration, the count it fires on at each ceiling: 2000 → 73 blocks,
 | echoes | delete the mention; the ledger below already carries it, resolvably. |
 | shape | move the evidence to the foot of the block, in order. If the stranded prose is superseded framing, it goes rather than moves. |
 | references | resolve it, or demote the section to `DEAD ROUTE:`, which names nothing and is not validated. A `REFUTED:` used as *emphasis* rather than as a ledger entry is the common case — reword it to name the module in backticks mid-prose. |
+| line numbers | delete the number and keep the name. Every site the census found already had one in backticks; where a module is worth naming, `.Sibling` or `Rx.Module` is the form, and `make find Q='…'` takes names rather than positions. |
+| obscured | write ONE `--`. The marker then becomes real evidence, so it must also sit at the foot of its block and its reference must resolve — which is the point: un-doubling it hands the line to two checks that had never seen it. |
 | budget | **usually SPLIT, not cut.** A blank line separates blocks, so the ceiling caps one unstructured explanation rather than what a declaration may carry: an essay holding ten findings becomes ten blocks, each with its own heading and ledger, and nothing is deleted. Cut only when one block holds ONE finding and still runs long — then it is superseded framing, and what survives is usually a fifth of the words. |
 
 ## The fixtures
@@ -175,10 +235,11 @@ For calibration, the count it fires on at each ceiling: 2000 → 73 blocks,
 exactly one.
 
 The two that matter most are the **must-not** direction. `clean` passes only if
-all four precision properties hold at once — an indented `ASSEMBLED`/`MEASURED`
-is a continuation and not a marker, an undated `SEALED:` is rationale and not
-history, an indented line after `PROBED` is not stranded prose, and a `git show`
-pointer is not an explanation. `sha` pins that last one as load-bearing rather
+six precision properties hold at once — an indented `ASSEMBLED`/`MEASURED` is a
+continuation and not a marker, an undated `SEALED:` is rationale and not
+history, an indented line after `PROBED` is not stranded prose, a `git show`
+pointer is not an explanation, a bare numeral (`V = 4`, `21 against 20`) is not
+a citation, and neither is a signal (`Killed:9`) or a non-module prefix. `sha` pins that last one as load-bearing rather
 than decorative: its raw comment total is well over budget and its charged total
 well under, so dropping the exemption turns it red.
 
@@ -188,7 +249,13 @@ the day that postulate is discharged — and it *would* be, since discharging
 them is the point of the campaign — and would then pass while reporting the
 check as dead.
 
-The six structural fixtures run with `--no-refs`, so each tests one thing;
+`lineref` carries all three citation forms, and asserts each by name — the
+path-and-colon one, the prose one, and the extensionless one — so a pattern
+narrowed to two of the three cannot pass. `obscured` asserts the marker's NAME
+in the output as well as the heading, so a check that fires without saying which
+marker it found does not pass.
+
+The eight structural fixtures run with `--no-refs`, so each tests one thing;
 `ref-ok` and `ref-bad` are the two that resolve references. `ref-bad` names
 something no edit can accidentally make valid: an undeclared name, and a sha of
 all `f`s.

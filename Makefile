@@ -678,7 +678,7 @@ comments-selftest:
 	    scripts/check-comments.py --no-refs --dir scripts/comments-selftest/$$d > /dev/null 2>&1 \
 	      || { echo "SELFTEST FAIL: the $$d fixture was REJECTED — a precision property of the checker has died"; fail=1; }; \
 	  done; \
-	  for d in dated history shape order fat echo; do \
+	  for d in dated history shape order fat echo lineref obscured; do \
 	    if scripts/check-comments.py --no-refs --dir scripts/comments-selftest/$$d > /dev/null 2>&1; then \
 	      echo "SELFTEST FAIL: the $$d fixture PASSED — that check is dead"; fail=1; \
 	    fi; \
@@ -701,6 +701,20 @@ comments-selftest:
 	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/echo 2>&1 \
 	    | grep -q 'ECHOES ITS OWN LEDGER' \
 	    || { echo "SELFTEST FAIL: prose naming its own ledger's subject was not reported"; fail=1; }; \
+	  lr=$$(scripts/check-comments.py --no-refs --dir scripts/comments-selftest/lineref 2>&1); \
+	  echo "$$lr" | grep -q 'LINE-NUMBER CITATIONS' \
+	    || { echo "SELFTEST FAIL: a line-number citation was not reported"; fail=1; }; \
+	  echo "$$lr" | grep -q 'Wet.agda:4125' \
+	    || { echo "SELFTEST FAIL: the path-and-colon citation form was missed"; fail=1; }; \
+	  echo "$$lr" | grep -q 'line 1920' \
+	    || { echo "SELFTEST FAIL: the prose citation form was missed -- only the path form fires"; fail=1; }; \
+	  echo "$$lr" | grep -q 'Wet:514' \
+	    || { echo "SELFTEST FAIL: the extensionless Module:NN form was missed -- the form this tree writes most often"; fail=1; }; \
+	  ob=$$(scripts/check-comments.py --no-refs --dir scripts/comments-selftest/obscured 2>&1); \
+	  echo "$$ob" | grep -q 'OBSCURED MARKERS' \
+	    || { echo "SELFTEST FAIL: a marker doubled into the comment text was not reported -- the form no other check in this repo can see"; fail=1; }; \
+	  echo "$$ob" | grep -q 'RECOVERY' \
+	    || { echo "SELFTEST FAIL: the obscured marker was reported without naming which marker it was"; fail=1; }; \
 	  scripts/check-comments.py --dir scripts/comments-selftest/ref-ok > /dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a TWIN naming a PROVEN definition, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
@@ -724,7 +738,7 @@ comments-selftest:
 	      || { echo "SELFTEST FAIL: a TWIN naming live postulate $$pn was not reported as one"; fail=1; }; \
 	    rm -rf $$d; \
 	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all six checks fire, including a TWIN naming a live postulate read from the ledger; an indented marker, an undated SEALED, a sha pointer and a resolving reference do not)"; \
+	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all eight checks fire, including a TWIN naming a live postulate read from the ledger and a marker doubled into the comment text; an indented marker, an undated SEALED, a sha pointer, a bare numeral and a resolving reference do not)"; \
 	  else exit 1; fi
 
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a

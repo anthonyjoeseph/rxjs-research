@@ -80,6 +80,25 @@ explanation is under 200 characters and the p90 is under a thousand, so the
 budget touches under two percent of blocks and every one of them is an essay
 that grew a paragraph at a time.  Nothing evidential is ever what has
 to give, because none of it is charged.
+
+SIXTH CHECK — LINE NUMBERS: no comment cites a line, in either the
+`Module.agda:414` form or the prose `line 1920` form.  CLAUDE.md already bans
+these in itself and calls them the worst case, and the argument is that a stale
+NAME fails a grep loudly while a stale line number RESOLVES, points at
+unrelated code, and is believed.  The census that added this check found that
+holds here too, and not marginally: of the 36 `file:line` citations in the two
+trees, TEN pointed past the end of the file they named — `Wet.agda:4125` in a
+188-line file, because the module was split — and the in-range ones landed on
+whatever had drifted under them, `Subscribe-Face.agda:1760` being cited eight
+times and resolving to `(proj₁ (proj₂ CD)))`.  Not one of the surrounding
+findings had stopped being true, which is the argument in a sentence: the
+citation is the only part that rotted, and deleting it costs nothing, because
+what it was reaching for has a NAME and `make find` takes names.
+
+The check is deliberately blind to whether the number happens to be right
+today.  A correct line number is a decay clock that has not gone off yet, and
+policing correctness would mean re-validating every citation on every edit to
+every cited file — which is the maintenance burden that produced the rot.
 """
 
 import argparse
@@ -117,6 +136,23 @@ DURABLE_RE = re.compile(
     r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b(?!-)"
 )
 
+# AN OBSCURED MARKER — `-- -- RECOVERY:` — IS A MARKER NO CHECK IN THIS REPO CAN
+# SEE.  `blocks` strips exactly one `--` from a comment line, which is right,
+# so a doubled dash leaves the marker word sitting inside the comment TEXT: the
+# ordering rule reads it as prose and lets it stand mid-block, and the reference
+# pass never validates what it names.  Three were live in the tree when this
+# check was written, every one a `RECOVERY` naming a sha nothing resolved, and
+# `make evidence-check` had two more of its own in the `PROBED` spelling.
+#
+# It is worth a check of its own rather than a looser DURABLE_RE, and that is
+# the whole design: admitting the doubled form would make it LEGAL, and a
+# marker's job is to be the one shape a reader and a machine agree on.  A near
+# miss is reported so the author writes the canonical line -- the same reason E3
+# reports its own three near-miss spellings instead of counting zero receipts.
+OBSCURED_RE = re.compile(
+    r"^(?:--\s*)+(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b"
+)
+
 # The markers whose text names something that can STOP EXISTING.  `DEAD ROUTE`
 # is deliberately absent and unvalidated: it has no referent by construction --
 # it records that a way of proving something cannot work, and there is no object
@@ -138,6 +174,33 @@ SHA_TOKEN = re.compile(r"\b[0-9a-f]{7,40}\b")
 # tax punctuation, and reading it as prose stranded behind the evidence would
 # report every banner-closed block in the tree.
 RULE_LINE = re.compile(r"^[-=─━═_*+#.·]{3,}\s*$")
+
+# SIXTH CHECK's vocabulary.  Two forms, and both are cited in this tree today:
+# a path with a colon-line, and prose naming a line outright.  A bare number is
+# NOT matched — this tree is full of legitimate numerals (gas counts, depths,
+# `V = 4`), and the two forms below are the only ones that address a READER to a
+# position in a file, which is the thing that rots.  `line` is required to be
+# followed by a number of at least two digits so that ordinary prose about "line
+# 1" of a derivation is not swept up.
+LINEREF = re.compile(
+    r"[A-Za-z][A-Za-z0-9_./-]*\.agda:\d+"
+    r"|\blines?\s+\d{2,}\b"
+)
+
+# AND THE SAME CITATION WITHOUT THE EXTENSION — `Wet:514`, `Evaluator:729`,
+# `.Caps-Face:4901` — which is the form this tree writes most often and the
+# form a blanket pattern cannot have: `Killed:9` is a SIGNAL, and a rule that
+# calls it a line number is a rule people learn to route around.  So the
+# prefix has to be a module this tree actually declares, which makes the
+# check precise and self-maintaining at once: it fires on `Wet` because
+# `Wet.agda` is there, and stays silent on anything that is not a module.
+def _module_ref_re(dirs):
+    names = sorted({p.stem for d in dirs for p in pathlib.Path(d).rglob("*.agda")},
+                   key=len, reverse=True)
+    if not names:
+        return None
+    alt = "|".join(re.escape(n) for n in names)
+    return re.compile(r"(?<![A-Za-z0-9_-])(?:" + alt + r"):\d+")
 GITLOG = re.compile(r"git log[^`\n]*agda/")
 
 
@@ -356,17 +419,26 @@ def check_refs(refs, root):
     return bad
 
 
-def audit(files, budget):
-    dated, hist, shape, fat, refs, echo = [], [], [], [], [], []
+def audit(files, budget, modref=None):
+    dated, hist, shape, fat, refs, echo, lines_ = [], [], [], [], [], [], []
+    obsc = []
     for f in files:
         for start, body in blocks(f):
             for off, line in enumerate(body):
+                m = OBSCURED_RE.match(line)
+                if m:
+                    obsc.append((f, start + off, m.group(1)))
                 m = DATE_RE.search(line)
                 if m:
                     dated.append((f, start + off, m.group(0)))
                 m = HISTORY_RE.match(line)
                 if m:
                     hist.append((f, start + off, m.group(1)))
+                m = LINEREF.search(line)
+                if m is None and modref is not None:
+                    m = modref.search(line)
+                if m:
+                    lines_.append((f, start + off, m.group(0)))
 
             secs = sections(body)
             for off, kind, text in secs:
@@ -411,7 +483,7 @@ def audit(files, budget):
                     m = pat.search(expl)
                     if m:
                         echo.append((f, start, kind, m.group(0)))
-    return dated, hist, shape, fat, refs, echo
+    return dated, hist, shape, fat, refs, echo, lines_, obsc
 
 
 def main():
@@ -433,7 +505,8 @@ def main():
         print(f"comments-check: no .agda files under {', '.join(str(d) for d in dirs)}")
         return 1
 
-    dated, hist, shape, fat, refs, echo = audit(files, args.budget)
+    dated, hist, shape, fat, refs, echo, lines_, obsc = audit(
+        files, args.budget, _module_ref_re([root / d for d in DEFAULT_DIRS]))
     dangling = [] if args.no_refs else check_refs(refs, root)
 
     if dated:
@@ -507,14 +580,41 @@ def main():
         print("ages while the section stays live, and then nothing says which sentence")
         print("is current. Delete the mention and let the ledger carry it.")
 
-    if dated or hist or shape or fat or dangling or echo:
+    if lines_:
+        print(f"\nLINE-NUMBER CITATIONS — {len(lines_)} comment(s) naming a line:")
+        for f, lineno, ref in lines_[:40]:
+            print(f"  {f}:{lineno}  {ref}")
+        if len(lines_) > 40:
+            print(f"  … and {len(lines_) - 40} more")
+        print("\nA stale NAME fails a grep loudly; a stale line number RESOLVES, points")
+        print("at unrelated code, and is believed.  Measured on this tree: ten of the")
+        print("thirty-six `file:line` citations pointed past the end of the file they")
+        print("named, and the in-range ones had drifted onto continuation lines.  Name")
+        print("the DECLARATION instead — `make find Q='…'` takes names and not")
+        print("positions, and a name survives every edit that moves the code.")
+
+    if obsc:
+        print(f"\nOBSCURED MARKERS — {len(obsc)} line(s) where a marker sits "
+              f"inside the comment text:")
+        for f, lineno, kind in obsc[:40]:
+            print(f"  {f}:{lineno}  {kind}")
+        if len(obsc) > 40:
+            print(f"  … and {len(obsc) - 40} more")
+        print("\nA doubled dash — `-- -- RECOVERY:` — puts the marker word in the")
+        print("comment's TEXT rather than in marker position, so every checker in this")
+        print("repo reads it as prose: the ordering rule lets it stand mid-block and")
+        print("the reference pass never validates what it names.  Write ONE `--`.")
+        print("Admitting the doubled form instead would make it legal, and a marker's")
+        print("whole job is to be the one shape a reader and a machine agree on.")
+
+    if dated or hist or shape or fat or dangling or echo or lines_ or obsc:
         return 1
 
     n = len(files)
     print(f"comments-check: {n} file(s), no dated comment, no historical marker, "
-          f"evidence last and in order, every reference resolving, no "
-          f"explanation echoing its own ledger, every explanation within its "
-          f"{args.budget}-char budget")
+          f"no line-number citation, evidence last and in order, every reference "
+          f"resolving, no explanation echoing its own ledger, every explanation "
+          f"within its {args.budget}-char budget")
     return 0
 
 

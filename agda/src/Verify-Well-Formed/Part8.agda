@@ -258,7 +258,7 @@ subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
   st₁    = proj₂ (proj₂ r₀)
 
 -- THE ZERO ARM IS FREE, and a wholesale postulate would hide that.
--- `take 0` never subscribes its source (Evaluator:1442) — it is `emptyᵉ`
+-- `take 0` never subscribes its source (Rx.Evaluator) — it is `emptyᵉ`
 -- verbatim, a spent one-shot — so the PROVEN `oneShotBurst-wf` closes it
 -- outright and the valsLast? conjunct is `refl` by computation.  Same pattern
 -- as at the cold/no-async arm: a postulate hides not just unpaid premises but
@@ -319,7 +319,8 @@ subscribeE-wf fuel emptyᵉ κ id now sched st S binv deq nodry =
   in S′ , run , binv′ , refl
 
 -- ── mapᵉ: REAL subscribeE-map-wf called here ─────────────────────────────────
--- Gap: map-valsLast-push bridges inner valsLast? to outer (~line 1920 has no valsLast?).
+-- Gap: map-valsLast-push bridges inner valsLast? to outer, since
+-- subscribeE-map-wf returns none.
 subscribeE-wf fuel (mapᵉ f b) κ id now sched st S binv deq nodry =
   let (S′ , run₀ , binv₀ , vl₀) =
         subscribeE-wf fuel b (map-f f ↠ κ) id now sched st S binv deq
@@ -366,7 +367,8 @@ subscribeE-wf {Γ = Γ} {e = e} {u = u}
     in S″ , run , binv″ , vl
 
 -- ── scanᵉ: REAL subscribeE-scan-wf called here ───────────────────────────────
--- Gap: scan-valsLast-push bridges inner valsLast? to outer (~line 2003 has no valsLast?).
+-- Gap: scan-valsLast-push bridges inner valsLast? to outer, since
+-- subscribeE-scan-wf returns none.
 subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv deq nodry =
   let nid    = proj₁ (mintNode sched)
       sched₁ = proj₂ (mintNode sched)
@@ -411,7 +413,7 @@ subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv deq nodry =
 
 -- ════════════════════════════════════════════════════════════════
 -- subscribeE-wf BODY
--- Forward type declaration is at the start of this section (~line 1097).
+-- Forward type declaration is at the start of this section.
 -- All five proven lemmas it calls are defined above:
 --   oneShotBurst-wf  (~882), subscribeE-map-wf  (~1920),
 --   subscribeE-scan-wf (~2003), subscribeE-take-wf (~3060).
@@ -421,7 +423,7 @@ subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv deq nodry =
 -- ── input ────────────────────────────────────────────────────────────────────
 
 -- `subscribeE` NEVER WRITES `dying`.  The field has exactly two writers —
--- `shareLatch` (Evaluator:1514), reached only from dispatchShare ← foldPath,
+-- `shareLatch` (Rx.Evaluator), reached only from dispatchShare ← foldPath,
 -- and `cascadeLatch` (:1639), reached only from the cascade — and subscribeE
 -- calls neither: its one share route is `sharedConnect` (:1367), which touches
 -- `registry`, `connectedShares` and `completedSources` and leaves `dying`

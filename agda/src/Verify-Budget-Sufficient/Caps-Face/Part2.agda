@@ -1,6 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part2
 -- ONE foldStep PER SYNTAX NODE … END OF PLUG SECTION
--- (lines 1441–2765 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part2 where
 
 open import Data.Bool    using (true; false; _∧_; if_then_else_)

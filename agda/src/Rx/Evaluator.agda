@@ -630,9 +630,9 @@ fLvl S W J = J + fCharge S W J
 -- not cover and `suc B * suc B` does.  Each of the four clause shapes
 -- then lands in one monotonicity step.
 --
--- PROBED: the mutual recursion of the two charges (§ 0) and the four clause
---   shapes' monotonicity step (§ 5).  The probe is spent;
---   `git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda` recovers its rows.
+-- RECOVERY: `git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda` restores the
+--   rows for the mutual recursion of the two charges and for the four clause
+--   shapes' monotonicity step.
 
 -- THE BUDGET IS RE-READ AT EVERY FRAME ENTRY, AND THE DEPTH FUEL `d` IS
 -- WHAT PAYS FOR THE RE-READING.  `fLvlD S W (suc d) J` spends one unit
@@ -661,8 +661,8 @@ fLvl S W J = J + fCharge S W J
 -- the fuel `d` is threaded as the argument that descends and the d = 0
 -- clause is the old family's own k = 0 answer, `J + m`.
 --
--- PROBED: the refresh's soundness (§ 1).  The probe is spent;
---   `git show 94a5a3c^:agda/probe/Refresh-Probe.agda` recovers its rows.
+-- RECOVERY: `git show 94a5a3c^:agda/probe/Refresh-Probe.agda` restores the
+--   rows for the refresh's soundness.
 
 -- AND `d` IS THE BUDGET RECURRENCE'S OWN HEIGHT, THREADED EXPLICITLY
 -- (the ruling).  It is NOT read off (S, W, J): a fuel read

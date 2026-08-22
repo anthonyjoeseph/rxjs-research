@@ -3,6 +3,6 @@
 -- receipts in this repo were spelled `PROBED-GREEN`.
 module Unknown where
 
--- PROBED-GREEN 2026-01-01: covered the two hot shapes.
+-- PROBED-GREEN: covered the two hot shapes.
 postulate
   live-one : Set

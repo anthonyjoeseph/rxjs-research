@@ -16,7 +16,7 @@
 
 -- THE STATEMENT IS subscribeE-caps ⊗ THE WET CONTENT, ONE Σ.  The caps
 -- half (hypotheses and the first four conclusion conjuncts) is
--- `subscribeE-caps`'s own face VERBATIM (.Subscribe-Face:937, GROUND) —
+-- `subscribeE-caps`'s own face VERBATIM (.Subscribe-Face, GROUND) —
 -- same prelims, same level index, same charge `j + j′ ≤ opIterD S W dep
 -- bud ops j`.  That is deliberate: the level-threading pattern is
 -- PROVEN through the whole mutual block there, so the grind adds wet

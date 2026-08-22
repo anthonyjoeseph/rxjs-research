@@ -89,7 +89,7 @@ paid-empty S ceq with ProtocolSt.current S | ceq
 -- the root frame-0 exit (.Part8's subscribe-wf, its sole consumer), where
 -- `st` is the ROOT subscribe's output over `st-init e` — and `subscribeE`
 -- never writes `dying`: the field's only two writers are `shareLatch`
--- (Evaluator:1514, reached only from dispatchShare ← foldPath) and
+-- (Rx.Evaluator, reached only from dispatchShare ← foldPath) and
 -- `cascadeLatch` (:1639, reached only from the cascade).  `subscribeE-dying`
 -- (.Part8) is that fact, and `st-init` has `dying ≡ []`, so the premise
 -- discharges by `refl`.  This is the same `dyF` the takeᵉ clause could NOT
@@ -249,7 +249,7 @@ postulate
   --   not exist in the repo today.  The gap was invisible while this was a
   --   -core, and became a type error the moment the assembly was real.
   --
-  -- PROBED (Probed.Root, `make probed`), NON-VACUOUSLY, in the
+  -- PROBED: NON-VACUOUSLY (`Probed.Root`, `make probed`), in the
   --   assembled form: `cachesValid` holds at the settled root exit for seven
   --   programs whose node lists are pinned non-empty in the same file — merge
   --   (one inner, two inners, nested), concat, switch, exhaust, and

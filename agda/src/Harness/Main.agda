@@ -8,7 +8,7 @@
 -- the TYPECHECKER at all:
 --
 --   * the `fLvlD`/`sizeAt`/`widAt`/`regAt` family is `abstract`
---     (Evaluator:729) and `blowH` is `abstract` (Evaluator:899), both for a
+--     `abstract` in `Rx.Evaluator`, as is `blowH`, both for a
 --     measured performance reason — with the bodies visible, one whnf
 --     unfolds the whole loop and the consuming module runs past an hour.
 --     `poolCount` is NOT itself abstract, but it calls `fLvlD`, so
@@ -171,7 +171,7 @@ rowAt 8 = "runDry (sucG (progD 7 8)) (progD 7 8)  [TRUE = REFUTES] = "
 --
 -- WHAT WAS TRIED.  This harness was built partly on the hypothesis that
 -- `poolCount`'s silence in the typechecker was OPACITY (`fLvlD` is
--- `abstract` at Evaluator:729, `blowH` at :899) and that the GHC backend,
+-- `abstract` at Rx.Evaluator, `blowH` at :899) and that the GHC backend,
 -- which ignores `abstract`, would therefore compute it.
 --
 -- WHAT HAPPENED.  Native, -O, at the SMALLEST POSSIBLE ARGUMENTS:

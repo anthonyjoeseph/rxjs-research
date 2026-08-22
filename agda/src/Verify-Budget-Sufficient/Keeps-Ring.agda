@@ -289,12 +289,10 @@ open import Verify-Budget-Sufficient.Measures using
 -- hopD as written: a program whose allowance is 2 and whose very first
 -- emission is 3.
 --
--- PROBED: `git show 94a5a3c^:agda/probe/Hop-Descent-Probe.agda` carries
---   the witness as refl-checked numbers plus an absurd pattern, together
---   with mul-exceeds / mul-fits and the four static descent rows this
---   header cites.  COVERED: the three claimed hop-descent sites and the
---   two coefficient candidates; NOT covered: anything outside the
---   scripted-slot shapes.
+-- RECOVERY: `git show 94a5a3c^:agda/probe/Hop-Descent-Probe.agda` restores
+--   the witness above as refl-checked numbers plus an absurd pattern,
+--   together with mul-exceeds / mul-fits and the four static descent rows
+--   this header cites — the apparatus, which is the half worth recovering.
 
 -- WHY, and it is a CALIBRATION bug in one coefficient rather than a
 -- failure of the remaining-hop idea.  hopD's mapᵉ clause scales by a

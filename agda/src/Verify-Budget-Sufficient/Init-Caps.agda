@@ -82,7 +82,7 @@ baseCaps {n = n} e sl =
 
 
 
--- pWᵛ j sl t v = outWᵛ j sl t v ⊔ dWᵛ j sl t v (Frame-Width.agda:418-419)
+-- pWᵛ j sl t v = outWᵛ j sl t v ⊔ dWᵛ j sl t v (.Frame-Width-419)
 -- cong₂ _⊔_ p q : outWᵛ ⊔ dWᵛ ≡ 0 ⊔ 0; and 0 ⊔ 0 = 0 definitionally
 
 ----------------------------------------------------------------------

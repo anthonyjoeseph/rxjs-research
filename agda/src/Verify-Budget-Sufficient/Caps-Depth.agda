@@ -25,10 +25,10 @@
 --     stands still).  Depth demand is dynamic; no static measure
 --     dominates it;
 --   · the evaluator's own GAS.  It threads perfectly — the peel
---     discipline at Rx.Evaluator:672-695 was designed as exactly this
+--     discipline at Rx.Evaluator was designed as exactly this
 --     bridge — but it is FALSE at the only instantiation planned for
 --     `dep`: `capsAt` runs at `d := capsH e sl id` and the instant's gas
---     sits one `blowH` story ABOVE that (Rx.Evaluator:710-717, "a
+--     sits one `blowH` story ABOVE that (Rx.Evaluator, "a
 --     stratification, not a domination").  A hypothesis known false at
 --     its own supply site is not a hypothesis.
 
@@ -70,10 +70,10 @@
 -- its callees' mirrors.  Opaque, every supply would need a rewrite.
 
 -- WHAT IS STILL OWED, AND IT IS OWED AT THE TOP.  `dep` is instantiated
--- nowhere yet.  When it is (`capsAt`, .Caps:449-458, reads
+-- nowhere yet.  When it is (`capsAt`, .Caps, reads
 -- `d := capsH e sl id`), the obligation is ONE statement —
 -- `depthChain`/`depthE` at the instant's own entry arguments ≤
--- `capsH e sl id` — the very inequality Rx.Evaluator:710-718 records as
+-- `capsH e sl id` — the very inequality Rx.Evaluator records as
 -- "owed by the signature pass rather than by this definition ...
 -- Reported, not assumed".  Two facts about it are already known: the
 -- gas bridge does NOT suffice (the stratification above), and any real

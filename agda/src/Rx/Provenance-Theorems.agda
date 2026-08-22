@@ -24,7 +24,7 @@ xs ⊆ᵢ ys = All (λ x → x ∈ ys) xs
 ids : ∀ {n} {Γ : Ctx n} {t} → Stream Γ t → List Id
 ids = map InstEmit.instant
 
--- {0 … fuel}: Fuel is ℕ (Rx.Prim:10-11) and Id is ℕ too (Rx.Prim:55-56),
+-- {0 … fuel}: Fuel is ℕ (Rx.Prim) and Id is ℕ too (Rx.Prim),
 -- so the horizon is the literal enumeration — 0 is the subscribe
 -- frame's instant, 1 … fuel the drain counter's (Rx.Evaluator.evaluate,
 -- Rx.Evaluator.drain: nextId starts at 1 and increments once per

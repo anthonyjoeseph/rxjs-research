@@ -521,7 +521,7 @@ sharedPlumb-count N (em ∷ ems) h =
                             (all (λ em′ → valCountᵉ (InstEmit.events em′) ≤ᵇ N) ems) h)))
 
 -- § 4.  A LIST IS NO LONGER THAN THE SIZE THAT COUNTS IT.
--- (`len≤sizeᵗˢ`, the term-list form, is already in .Caps-Face:1122.)
+-- (`len≤sizeᵗˢ`, the term-list form, is already in .Caps-Face.)
 
 1≤sizeᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → 1 ≤ sizeᵛ t v
 1≤sizeᵛ unitᵗ    _        = s≤s z≤n
@@ -2497,7 +2497,7 @@ subscribeAll-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- than about its source: this head is where the operator's `op-step`
   -- actually sits, and its four callers delegate their whole body to it,
   -- so it inherits their index and their hypothesis verbatim.  Every
-  -- *All constructor's size is `suc (sizeᵉ b)` (Rx.Exp:469-472), which is
+  -- *All constructor's size is `suc (sizeᵉ b)` (Rx.Exp), which is
   -- why the caller's `suc (sizeᵉ (mergeAllᵉ b)) ≤ ops` reads as this
   suc (suc (sizeᵉ b)) ≤ ops →
   depthAll g op ns b κ id now sched st ≤ dep →

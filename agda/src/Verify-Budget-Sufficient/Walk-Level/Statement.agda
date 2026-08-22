@@ -778,7 +778,7 @@ WalkLevelCore =
 -- burstHopD? / hasDry / regsLen? conjuncts do not mention j′ at all.
 
 -- AT THE DEGENERATE CORNER: `opIterD` is the identity at m = 0
--- (`opIterD-0`, .Rx.Evaluator) and `ops` sits in the m position, so
+-- (`opIterD-0`, `Rx.Evaluator`) and `ops` sits in the m position, so
 -- `ops = 0` would pin j′ = 0.  It is excluded by the `suc (sizeᵉ b) ≤
 -- ops` hypothesis — the positivity is already threaded.  `dep = 0` and
 -- `bud = 0` ARE reachable and are harmless: opIterD's `suc m` clause
@@ -804,7 +804,7 @@ WalkLevelCore =
 --            application.
 
 -- THE GAS-PEEL FINDING, and it is what took the chain frames off
--- FALSITY.  In .Rx.Evaluator the mapᵉ, takeᵉ-`suc k` and scanᵉ clauses
+-- FALSITY.  In `Rx.Evaluator` the mapᵉ, takeᵉ-`suc k` and scanᵉ clauses
 -- each pass `fuel` UNCHANGED to both the recursive `subscribeE` and the
 -- following `pushBurst`, and takeᵉ-`zero` never subscribes at all.  The
 -- ONLY clauses that consume gas are μᵉ and subscribeAll/subscribeInner.

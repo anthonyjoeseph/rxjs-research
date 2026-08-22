@@ -579,7 +579,7 @@ switchKill-regsLen ℓ (just v) sched st h =
 -- REGISTERING KEEPS THE LENGTH LEDGER, given the new path fits.  The
 -- sibling of switchKill-regsLen above.
 --
--- `register` APPENDS rather than prepends (Evaluator:319 — `registry st
+-- `register` APPENDS rather than prepends (Rx.Evaluator — `registry st
 -- ++ (nextReg , src , u , path) ∷ []`), so this is all-++-intro over the
 -- old registry and a SINGLETON, not a cons.  Worth saying because the
 -- cons reading typechecks nowhere and the shape is invisible from the name.
@@ -780,19 +780,19 @@ walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ
 --
 -- `subscribeE fuel (takeᵉ count b)` at `evalTm count ≡ zero` is
 -- `let (burst , sched₁) = oneShotBurst [] id sched in burst , sched₁ , st`
--- (Evaluator:1441-44), the SAME TERM symbol for symbol as the emptyᵉ clause
--- at Evaluator:1432-34.  So the arm IS walk-empty at a different subscribed
+-- (Rx.Evaluator), the SAME TERM symbol for symbol as the emptyᵉ clause
+-- at Rx.Evaluator.  So the arm IS walk-empty at a different subscribed
 -- expression, and every hypothesis transports the easy way because every
 -- measure is SMALLER at emptyᵉ:
 --
---   sizeᵉ emptyᵉ = 1 ≤ suc (sizeᵗ cnt + sizeᵉ b)     (Rx.Exp:461,463)
---   syncSizeᵉ likewise                               (Rx.Exp:514,516)
---   dWⱽ … emptyᵉ = 0                                 (Rx.Frame-Width:347)
---   depthE fuel emptyᵉ … = 0                         (.Caps-Depth:219)
---   fnCapᵉ emptyᵉ = 0                                (.Measures:3771)
---   nest e sl cs = syncSizeᵉ e + resid sl cs         (.Caps-Nest:134)
+--   sizeᵉ emptyᵉ = 1 ≤ suc (sizeᵗ cnt + sizeᵉ b)     (Rx.Exp,463)
+--   syncSizeᵉ likewise                               (Rx.Exp,516)
+--   dWⱽ … emptyᵉ = 0                                 (Rx.Frame-Width)
+--   depthE fuel emptyᵉ … = 0                         (.Caps-Depth)
+--   fnCapᵉ emptyᵉ = 0                                (.Measures)
+--   nest e sl cs = syncSizeᵉ e + resid sl cs         (.Caps-Nest)
 --
--- and `dBound V R U r s = s + suc V * (r + suc R * U)` (.Measures:1936) is
+-- and `dBound V R U r s = s + suc V * (r + suc R * U)` (.Measures) is
 -- monotone in both moving positions by inspection, so the demand hypothesis
 -- needs no lemma — `1 ≤ syncSizeᵉ (takeᵉ …)` is `s≤s z≤n` because that clause
 -- is literally a `suc`.
@@ -800,11 +800,11 @@ walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ
 -- `rewrite ecEq` IS WHAT LETS IT REDUCE, and it is not optional: the
 -- evaluator's takeᵉ clause opens `with evalTm count`, so the goal is stuck on
 -- that scrutinee until it is known.  Precedent, same evaluator clause and same
--- move: `subscribeE-take0-wf` (.Verify-Well-Formed/Part8:272).
+-- move: `subscribeE-take0-wf` (Verify-Well-Formed.Part8).
 --
 -- THE ONE CONJUNCT THAT IS NOT A TRANSPORT is burstHopD?: walk-empty reports
 -- it at `hopDᵉ F η emptyᵉ = 0` and this clause is asked for it at
--- `hopDᵉ F η (takeᵉ cnt b) = hopDᵉ F η b` (Rx.Hop-Depth:198,203).  Widening
+-- `hopDᵉ F η (takeᵉ cnt b) = hopDᵉ F η b` (Rx.Hop-Depth,203).  Widening
 -- upward is exactly burstHopD?-widen above.
 walk-take-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →

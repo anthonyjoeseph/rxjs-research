@@ -5,4 +5,4 @@ module Orphan where
 live-one : Set
 live-one = Set
 
--- PROBED 2026-01-01: covered the two hot shapes.
+-- PROBED: covered the two hot shapes.

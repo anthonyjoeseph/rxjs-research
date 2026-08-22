@@ -26,4 +26,5 @@ open import Refuted.Thru-Loop
 open import Refuted.Inner-Nodry
   using (inner-nodry-inv-regLen-absurd)
 open import Refuted.Depth-Hop
-  using (theDepth; theRow; depth-hop-∀V-absurd)
+  using (theDepth; theRow; depth-hop-∀V-absurd;
+         slotSubjSize; slotBound; slotDepth; slotRow; depth-hop-slot-absurd)

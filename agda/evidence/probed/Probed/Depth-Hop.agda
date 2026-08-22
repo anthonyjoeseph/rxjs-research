@@ -28,15 +28,18 @@
 -- depths are pinned by `refl` beside each domination row, so a row
 -- cannot pass by the left-hand side collapsing to 0.
 --
--- ⚠ AND THE COVERAGE IS `V ∈ {1, 4}` AT THE ROOT PATH WITH AN EMPTY
--- STORE — and `V = 1` only on the two small programs, since the
--- gadget needs the exponential.  Nothing here says anything about a non-empty path, a slot
--- telescope, or the `input` clause — which is where the predecessor's
--- first two refutations lived — and monotonicity of `hopDᵉ` in `V` is
--- not proven anywhere, so these rows do not transfer to another `V`.
+-- ⚠ AND THE COVERAGE IS `V ∈ {1, 4}`, WHICH IS THE BOUNDARY THAT
+-- MATTERS MOST HERE — `V = 1` only on the two small programs, since the
+-- gadget needs the exponential.  Monotonicity of `hopDᵉ` in `V` is not
+-- proven anywhere, so NO row transfers to another `V`; and `V` is chosen
+-- adequate for the whole program in every section below, so a def large
+-- against a small `V` is a region this file does not reach at all —
+-- `Refuted.Depth-Hop` is what stands there.  The non-root path, both
+-- `Slot` constructors and a mid-run store are reached, in § 5 to § 7 and
+-- § 11.
 module Probed.Depth-Hop where
 
-open import Data.Bool using (true)
+open import Data.Bool using (true; false)
 open import Data.Fin using (zero; suc)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
@@ -46,9 +49,9 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_)
 open import Data.Product using (proj₁; proj₂; _×_)
 
 open import Rx.Prim using (Gas; g0; gs; cold)
-open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; varᵗ;
+open import Rx.Exp using (Ctx; Closed; Exp; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; varᵗ;
   ofᵉ; emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; fstᵗ; input; deferᵉ; μᵉ; varᵉ; takeᵉ;
-  concatAllᵉ; switchAllᵉ; exhaustAllᵉ)
+  concatAllᵉ; switchAllᵉ; exhaustAllᵉ; sizeᵉ; syncSizeᵉ; unfoldμ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Sched; EvalSt; root; share-sink; _↠_;
   from-inner; thru-outer; mergeᵒ; sched-init; st-init; subscribeE; Stream)
@@ -591,3 +594,106 @@ _ = refl
 -- is ever wanted, is the compiled harness (`make harness`), which runs
 -- real bodies and would report a number — `measured-not-rechecked`,
 -- and so useless for THIS purpose, which is a `refl`.
+
+------------------------------------------------------------------
+-- § 12  THE REGION THE SIZE CONDITION OPENS — `syncSizeᵉ b ≤ V` where
+-- `sizeᵉ b ≤ V` once stood.  The two measures part company at exactly
+-- one constructor: `sizeᵉ (deferᵉ e) = suc (sizeᵉ e)` while `syncSizeᵉ
+-- (deferᵉ e) = 1`.  So the whole region the weaker hypothesis admits is
+-- programs with a large `deferᵉ` body, and this section is that region
+-- at the smallest `V` each program admits — which is the sharp
+-- direction, since `V` also drives the bound.
+--
+-- WHY IT IS WORTH INSTANTIATING RATHER THAN ARGUING.  `depthE` and
+-- `hopDᵉ` both charge a defer body ZERO, so the condition looks safe
+-- from the clause list alone; what the clause list does not settle is
+-- that the burst arm re-subscribes an EMITTED inner at full `sizeᵛ`,
+-- and an emitted inner can be a defer whose body the store still has
+-- to serve.  Rows, not reasoning.
+--
+-- ⚠ AND THE THIRD CONDITION IS TRIVIAL HERE — every program below runs
+-- over `slots₀`, the empty store, so `slotsSize ≤ V` costs nothing and
+-- these rows say nothing about it.  The slot side is
+-- `Refuted.Depth-Hop`'s, and it is a refutation rather than a receipt.
+------------------------------------------------------------------
+
+-- twenty literals: `sizeᵉ` and `syncSizeᵉ` agree on this one, so all of
+-- the divergence below comes from the `deferᵉ` wrapping it
+lits20 : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Exp Γ Δᵍ Δ Θ natᵗ
+lits20 = ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ nat̂ 4 ∷ nat̂ 5 ∷ nat̂ 6
+            ∷ nat̂ 7 ∷ nat̂ 8 ∷ nat̂ 9 ∷ nat̂ 10 ∷ nat̂ 11 ∷ nat̂ 12 ∷ nat̂ 13
+            ∷ nat̂ 14 ∷ nat̂ 15 ∷ nat̂ 16 ∷ nat̂ 17 ∷ nat̂ 18 ∷ nat̂ 19 ∷ [])
+
+-- § 8's `deferᵉ progA` AT THE FLOOR OF `V`.  The size condition put this
+-- program out of reach at any `V` below its size; the sync one admits
+-- it at `V = 2`, where the bound is 0 and the body's own depth is 4.
+-- LOAD-BEARING at its sharpest: a bound of 0 fails on any charge at all
+_ : syncSizeᵉ progG ≡ 1
+_ = refl
+
+_ : (sizeᵉ progG ≤ᵇ 2) ≡ false
+_ = refl
+
+_ : hopDᵉ 2 (slotHop 2 slots₀) progG ≡ 0
+_ = refl
+
+_ : (depthE (gN 20) progG root 0 0 schedG stG
+       ≤ᵇ hopDᵉ 2 (slotHop 2 slots₀) progG + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+-- and § 8's defer INSIDE a subscribing layer, so the frame that would
+-- pay for the body is a `*All` rather than the root.  LOAD-BEARING, and
+-- tight: 1 against 1, at a `V` the old condition excluded
+_ : syncSizeᵉ progH ≡ 5
+_ = refl
+
+_ : (sizeᵉ progH ≤ᵇ 5) ≡ false
+_ = refl
+
+_ : hopDᵉ 5 (slotHop 5 slots₀) progH ≡ 1
+_ = refl
+
+_ : (depthE (gN 20) progH root 0 0 schedH stH
+       ≤ᵇ hopDᵉ 5 (slotHop 5 slots₀) progH + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+-- THE `μᵉ` RE-ENTRY, which is the clause the condition exists for: the
+-- guarded body carries the twenty literals behind a defer, so
+-- `syncSizeᵉ` is 8 and `sizeᵉ` is not.
+bodyR : Exp Γ₀ (natᵗ ∷ []) [] [] natᵗ
+bodyR = mergeAllᵉ (ofᵉ (strmᵗ (deferᵉ lits20)
+                     ∷ strmᵗ (deferᵉ (varᵉ (here refl))) ∷ []))
+
+progR : Closed Γ₀ natᵗ
+progR = μᵉ bodyR
+
+schedR : Sched Γ₀
+schedR = sched-init progR slots₀
+
+stR : EvalSt progR
+stR = st-init progR
+
+_ : syncSizeᵉ progR ≡ 8
+_ = refl
+
+-- THE ROW THE WHOLE CONDITION TURNS ON: one unfolding puts `sizeᵉ` out
+-- of reach of the `V` the subject was admitted at, so the old condition
+-- is not merely unbounded in the abstract — it is destroyed at a
+-- concrete program, in the step `depthE` takes at `gs`
+_ : (sizeᵉ (unfoldμ bodyR) ≤ᵇ 8) ≡ false
+_ = refl
+
+-- LOAD-BEARING, and tight: 1 against 1, with the μ unfolding for as
+-- long as twenty units of gas last and the bound not growing with it
+_ : hopDᵉ 8 (slotHop 8 slots₀) progR ≡ 1
+_ = refl
+
+_ : depthE (gN 20) progR root 0 0 schedR stR ≡ 1
+_ = refl
+
+_ : (depthE (gN 20) progR root 0 0 schedR stR
+       ≤ᵇ hopDᵉ 8 (slotHop 8 slots₀) progR + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl

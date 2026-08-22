@@ -11,15 +11,15 @@
 -- merely at a leaf, and it was deleted rather than repaired.  The
 -- findings that outlive it are below; the code is in git.
 --
--- -- RECOVERY: git show 725296e:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda
--- restores the whole nesting face — `depthCap`, `depthCapN`, the
--- 16-head induction, the `emit-*` leaves, `emit-cap`, `depth-μ-bound`,
--- `depth-subst-guarded`, `storeNestMax`, `cap-≤-store`; its measure
--- `Rx.Nest-Depth`; its tower arithmetic
--- `Verify-Budget-Sufficient.Nest-Tower`; and the ten evidence files
--- that could no longer be STATED once it went (Refuted.Depth-Comp,
--- .Depth-Nest, .Depth-Conn, .Depth-Chain, .Emit-Map, .Emit-Scan;
--- Probed.Depth-All, .Depth-Mu, .Emit-Cap, .Nest-Depth).
+-- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda`
+--   restores the whole nesting face — `depthCap`, `depthCapN`, the
+--   16-head induction, the `emit-*` leaves, `emit-cap`, `depth-μ-bound`,
+--   `depth-subst-guarded`, `storeNestMax`, `cap-≤-store`; its measure
+--   `Rx.Nest-Depth`; its tower arithmetic
+--   `Verify-Budget-Sufficient.Nest-Tower`; and the ten evidence files
+--   that could no longer be STATED once it went (Refuted.Depth-Comp,
+--   .Depth-Nest, .Depth-Conn, .Depth-Chain, .Emit-Map, .Emit-Scan;
+--   Probed.Depth-All, .Depth-Mu, .Emit-Cap, .Nest-Depth).
 
 -- ⚠ WHAT WAS REFUTED, AND IT IS THE PART TO READ BEFORE PROPOSING A
 -- MEASURE.  The cap was `nestDᵉ b + pathNestD κ` plus a store term.
@@ -86,7 +86,8 @@ open import Data.Nat.Properties using (⊔-lub)
 open import Data.List using ([]; _∷_)
 open import Data.Product using (proj₁; proj₂)
 open import Rx.Prim using (Gas; Id; Tick; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; sizeᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; syncSizeᵉ)
+open import Rx.Slots using (slotsSize)
 open import Rx.Evaluator
   using (Sched; EvalSt; NodeId; Path; Stream; _↠_; map-f; scan-f; take-f;
   from-inner; thru-outer; root; share-sink; splitEvents; stepFrame)
@@ -121,12 +122,12 @@ pathNestD (thru-outer _ _ ↠ p)    = suc (pathNestD p)
 -- definitionally for take-f, so `depthBurst` over that frame is a fold
 -- of `0 ⊔ IH` — a three-line list induction.
 --
--- -- RECOVERY: git show 725296e:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda
--- restores `burst-mapf-zero` and `burst-scf-zero`, the map-f and
--- scan-f siblings of this proof (same induction, same shape).  They
--- were unwired when the nesting face went, since their only consumer
--- was its induction; a depth induction in any currency will want them
--- back at its map and scan clauses.
+-- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda`
+--   restores `burst-mapf-zero` and `burst-scf-zero`, the map-f and
+--   scan-f siblings of this proof (same induction, same shape).  They
+--   were unwired when the nesting face went, since their only consumer
+--   was its induction; a depth induction in any currency will want them
+--   back at its map and scan clauses.
 ------------------------------------------------------------------
 
 burst-takef-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -191,12 +192,12 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `make dup-check` could not see that: the two statements are not the
 -- same fact, only the same job.
 --
--- -- PROBED: DOMINATION AT THE FOUR REFUTATION WITNESSES.
--- `hopDᵉ` dominates `depthE` at every program that killed the
--- predecessor — the two small programs at a refold bound of one (depth
--- 4 and 8), and both rows of the quadratic gadget at four (35 and 70).
--- That is evidence reaching the RISKY region rather than a degenerate
--- row, because those four programs ARE the region.
+-- PROBED: DOMINATION AT THE FOUR REFUTATION WITNESSES (`Probed.Depth-Hop`).
+--   `hopDᵉ` dominates `depthE` at every program that killed the
+--   predecessor — the two small programs at a refold bound of one (depth
+--   4 and 8), and both rows of the quadratic gadget at four (35 and 70).
+--   That is evidence reaching the RISKY region rather than a degenerate
+--   row, because those four programs ARE the region.
 
 -- ⚠ AND IT IS NOT TRUE FOR EVERY `V` — REFUTED as first
 -- stated (`Refuted.Depth-Hop`).  `hopDᵉ`'s scan clause is
@@ -206,7 +207,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `hopDᵉ` charges 0 for at every `V`, so only the refold factor could
 -- ever pay for its depth of 8, and at `V = 0` there is no factor.  It
 -- needs twenty units of gas and a program of constant size; the
--- quadratic gadget is not required.  The two
+-- quadratic gadget is not required.  The `V`
 -- conditions below are that refutation's repair and not a weakening —
 -- the unconditional form is false, so the conditioned one replaces it —
 -- and they are the shape every other hop consumer in this tree already
@@ -216,36 +217,40 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `size≤sizeCapAt` are both PROVEN — which is why the root consumer can
 -- discharge both without a new leaf.
 
--- ⚠ AND `sizeᵉ b ≤ V` IS THE CONDITION THE BURST ARM WILL TEST, which is
+-- ⚠ AND THE SIZE CONDITION IS THE ONE THE BURST ARM WILL TEST, which is
 -- worth writing down before it is ground: `b` shrinks at every
--- structural descent, so the condition is inherited for free there, but
+-- structural descent, so the condition is inherited for free THERE — the
+-- two clauses that are not structural descents have their own blocks
+-- below — but
 -- at the burst arm `b` becomes an emitted PAYLOAD whose size may EXCEED
 -- its emitter's — that is the difficulty the whole face is about.  The
 -- caps machinery is what re-establishes it (`applyFn-iterSize` bounds an
 -- emitted payload's size by the cap), which is why `V` is a size CAP and
--- not `sizeᵉ e`.  If that arm cannot re-establish it from what the
--- statement carries, the finding is a caps hypothesis — the shape
+-- not `sizeᵉ e`; and it re-establishes MORE than the arm needs, since
+-- `syncSize≤sizeᵉ` turns a `sizeᵉ` bound on the payload into this
+-- condition in one step.  If that arm cannot re-establish it from what
+-- the statement carries, the finding is a caps hypothesis — the shape
 -- `cascade-depth-capsH` already has — and not a smaller `V`.
 --
--- -- PROBED: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT.
--- The three regions this receipt used to name as unreached — off the
--- root path, the slot telescope, the `input` clause — are reached, and
--- the rows are tight rather than slack, which is the part worth
--- trusting.  A two-slot STRATIFIED telescope whose slot 1 reads slot 0
--- gives 3 against 3, with two of the three units coming out of the η
--- chain instead of the program's syntax, and it exercises `ηAt`'s
--- `suc k` branch — the one `Rx.Slot-Hop` records series W as having
--- missed entirely.  A scripted slot charged 0 gives 1 against 1, with
--- the subscription moved into the map's function so the row can fail.
--- `deferᵉ`, the other constant-0 clause and the same shape that killed
--- the predecessor's `input`, gives 0 against 0 wrapping the deepest
--- program in the file, and 1 against 1 nested under a `*All`.  `μᵉ`
--- unfolding for twenty units of gas gives 1 against 1.  `takeᵉ` over
--- that deepest program gives 4 against 4.  And all four `*All`
--- operators give 4 against 4 at one nesting — the uniform `suc` clause
--- was the widest untested coverage claim in the measure, since
--- cancelling and dropping change which inners are LIVE and not how
--- deep a live one sits.
+-- PROBED: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT (`Probed.Depth-Hop`).
+--   The three regions this receipt used to name as unreached — off the
+--   root path, the slot telescope, the `input` clause — are reached, and
+--   the rows are tight rather than slack, which is the part worth
+--   trusting.  A two-slot STRATIFIED telescope whose slot 1 reads slot 0
+--   gives 3 against 3, with two of the three units coming out of the η
+--   chain instead of the program's syntax, and it exercises `ηAt`'s
+--   `suc k` branch — the one `Rx.Slot-Hop` records series W as having
+--   missed entirely.  A scripted slot charged 0 gives 1 against 1, with
+--   the subscription moved into the map's function so the row can fail.
+--   `deferᵉ`, the other constant-0 clause and the same shape that killed
+--   the predecessor's `input`, gives 0 against 0 wrapping the deepest
+--   program in the file, and 1 against 1 nested under a `*All`.  `μᵉ`
+--   unfolding for twenty units of gas gives 1 against 1.  `takeᵉ` over
+--   that deepest program gives 4 against 4.  And all four `*All`
+--   operators give 4 against 4 at one nesting — the uniform `suc` clause
+--   was the widest untested coverage claim in the measure, since
+--   cancelling and dropping change which inners are LIVE and not how
+--   deep a live one sits.
 
 -- AND A MID-RUN STATE, REACHED BY RUNNING: the state the root
 -- subscribe RETURNS — registry, node table and delivered set all
@@ -255,8 +260,9 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- state is PROJECTED out of `subscribeE`, never written as a record
 -- update, so it is one the evaluator can actually be in.
 
--- SO THE CLASS COMES DOWN, FALSITY → DIFFICULTY, and the region the
--- evidence reached is nameable in full: every clause of `hopDᵉ`; all
+-- THE REGION THE PROBE SERIES REACHED IS NAMEABLE IN FULL, which is what
+-- makes its silence about the two blocks below readable rather than
+-- reassuring: every clause of `hopDᵉ`; all
 -- four `*All` operators; both `Slot` constructors; a two-slot
 -- stratified telescope at stage 1; three of three `Path`
 -- constructors; a payload-regrowing scan, which is the shape that
@@ -319,8 +325,8 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `depthFold` walks κ frame by frame and pays `depthFrame` at each,
 -- which is why this currency has the term in it at all.
 
--- ⚠ AND THE CONDITIONS ARE NOT KNOWN TO BE TIGHT — the refutation kills
--- `V = 0` and nothing more.  `V = 1` was MEASURED to hold on the same
+-- ⚠ AND THE CONDITIONS ARE NOT KNOWN TO BE TIGHT — the ∀ V refutation
+-- kills `V = 0` and nothing more.  `V = 1` was MEASURED to hold on the same
 -- program, with no margin whatever (the green row is in
 -- `Probed.Depth-Hop`), so `2 ≤ V` is the tree's idiom rather than a
 -- boundary this evidence found.  Do not weaken either condition on the
@@ -333,10 +339,61 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- shared slot was ever covered.
 ------------------------------------------------------------------
 
+-- ⚠ THE SIZE CONDITION IS NOT INHERITED AT THE `input` CLAUSE, WHICH IS
+-- WHY THERE IS A THIRD CONDITION.  A slot read is not a structural
+-- descent: `depthE` recurses into the shared DEF, and the subject's own
+-- `sizeᵉ (input i) ≡ 1` bounds nothing whatever about that def.  So `V`
+-- sits at its floor of 2 while the def is as large as you like, and the
+-- def outruns the bound its own slot reports — 21 against 20, at a source
+-- of twenty literals, which `hopDᵉ` charges nothing for at any `V` and
+-- `depthE` charges one nesting level each.  `slotsSize (Sched.slots
+-- sched) ≤ V` is the repair, and it costs no leaf at either end:
+-- `slotDef-size` (.Measures) turns it into the def's own size at the
+-- clause, and `slotsSize≤sizeCapAt` discharges it at the root out of
+-- `capsBase`'s slot summand.  The mirror had it all along —
+-- `subscribeE-caps` takes exactly this hypothesis beside its own size
+-- condition, which is the diff worth doing before believing any of these
+-- signatures.
+-- REFUTED: `depth-hop-slot-absurd` (`Refuted.Depth-Hop`), whose figures
+--   are pinned by `refl`, so a repair that closes the gap has to move one
+--   of them by name
+
+-- ⚠ AND THE CONDITION IS OVER `syncSizeᵉ` BECAUSE THE `μᵉ` RE-ENTRY
+-- DESTROYS `sizeᵉ`.  `depthE` at `gs` recurses on `unfoldμ body`, and
+-- `size-unfoldμ` (.Keeps-Ring) bounds that only by `sizeᵉ (μᵉ body) *
+-- sizeᵉ (μᵉ body)` — a square per unfold, so a FIXED `V` cannot survive
+-- repeated unfolding, while the bound does not move at all:
+-- `hopD-unfoldμ` is an EQUALITY, so the clause's obligation is this
+-- statement at a bigger subject and nothing else.  `syncSizeᵉ` is the
+-- measure the two sides already agree on — it and `hopDᵉ` and `depthE`
+-- all charge a `deferᵉ` body ZERO, `elimG` substitutes only under
+-- defers, and so `unfoldμ-shrinks` (.Measures) makes the condition
+-- STRICTLY DECREASE across the very step that squares the size.  It is a
+-- STRENGTHENING the root consumer pays nothing for: `syncSize≤sizeᵉ`
+-- composes with `size≤sizeCapAt` in one `≤-trans`, and both witnesses in
+-- `Refuted.Depth-Hop` stay excluded by the arithmetic that excluded them
+-- before.
+-- DEAD ROUTE: closing that clause through the induction hypothesis with a
+--   condition over `sizeᵉ`.  The hypothesis the clause needs is exactly
+--   the one unfolding destroys, so no measure and no clause order
+--   recovers it — what had to change was the condition itself.
+-- PROBED: THE REGION THE TWO MEASURES PART COMPANY IN, which is the whole
+--   region this strengthening opens: a large `deferᵉ` body, admitted here
+--   and excluded by `sizeᵉ` at any `V` below its size.  Twenty literals
+--   under a bare `deferᵉ` hold at `V = 2` against a bound of 0, with the
+--   body's own depth at 4.  The same body under `mergeAllᵉ`, where the
+--   burst arm subscribes the emitted inner at full size, holds TIGHT at 1
+--   against 1.  And a `μᵉ` whose body emits both that source and its own
+--   recursive variable holds tight at 1 against 1 while
+--   `sizeᵉ (unfoldμ body) ≤ V` computes to `false` — the step the
+--   condition turns on, pinned by `refl` in `Probed.Depth-Hop`.  Not
+--   reached: nested `μᵉ`, and a `deferᵉ` body large against a `V` the
+--   slot telescope must also fit.
+
 postulate
   depth-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (V : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ V → sizeᵉ b ≤ V →
+    2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
     depthE g b κ bid now sched st
       ≤ hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ

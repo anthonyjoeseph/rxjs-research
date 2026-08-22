@@ -1,4 +1,4 @@
--- GAP 4's ASSEMBLY (Wet.agda:4125-4199).  THE JOINT INVARIANT BRIDGE
+-- GAP 4's ASSEMBLY (.Wet-4199).  THE JOINT INVARIANT BRIDGE
 -- between the caps face's `capsOK?` (Caps-Face.agda) and the wet
 -- family's `INV?` (Measures.agda).
 --
@@ -9,7 +9,7 @@
 -- counterpart for.  They also read registry cardinality at DIFFERENT
 -- indices (INV? at cSize, capsOK? at cReg).  So this module threads a
 -- JOINT invariant through one cascade, each face fed by its own tick:
--- `caps-tick` (Caps-Face:6752, PROVEN) supplies the boundedness half,
+-- `caps-tick` (.Caps-Face, PROVEN) supplies the boundedness half,
 -- and the four postulated suppliers below (S1-S4) supply the rest.
 -- `cascadeGo-caps` concludes boundedness only, no dry — dryness stays
 -- on the gas axis (S3, P2's unchanged dry half).
@@ -65,14 +65,15 @@ open import Verify-Budget-Sufficient.Measures using
                                                       fnCapᵉ; fnCapᵛ; hasDry-append; hopR;
                                                       INV-parts; INV?; pathB?; pathLen;
                                                       pop-bounded; pop-slots; pow1; regsB?;
-                                                      slotsFnCap; stBounded?; unconn; valB?;
+                                                      slotsFnCap; stBounded?; syncSize≤sizeᵉ;
+                                                      unconn; valB?;
                                                       valB?-widen; V≤C; ΨAt; ∧-true; szB)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
 open import Verify-Budget-Sufficient.Wet.Part6 using
   (caps-fuel-root; cascadeFinish-INV; cascadeLatch-INV; chainsOf-B; init-INV;
    pop-head-bounded; pop-INV; sizeCapAt; sizeCapAt-mono; 2≤sizeCapAt;
-   size≤sizeCapAt)
+   size≤sizeCapAt; slotsSize≤sizeCapAt)
 open import Verify-Budget-Sufficient.Wet.Part1 using
   (INV?-widen)
 open import Verify-Budget-Sufficient.Wet.Part3 using
@@ -135,7 +136,7 @@ open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-wid
 -- state facts about them.  `frameB? B Ψ f` bundles a size test and a
 -- weight test per frame (`(sizeᵗ fn ≤ᵇ B) ∧ ((caseWᵗ fn ⊔ fnCapᵗ fn) ≤ᵇ
 -- Ψ)` on map-f/scan-f, `true` elsewhere) — and `frameSz? B f` (the
--- caps side, Caps-Face.agda:254) is EXACTLY its size half, clause for
+-- caps side, .Caps-Face) is EXACTLY its size half, clause for
 -- clause.  So the missing half is the Ψ-only one, and both it and the
 -- recombination lemmas that reunite the two into the real
 -- `frameB?`/`pathB?`/`regsB?` (Measures.agda) that INV? reads now live
@@ -162,10 +163,10 @@ open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-wid
 -- { ... }` update anywhere in the mutual delivery clique ever touches
 -- the `slots` field.  Most of the clique's own slots-invariance is
 -- ALREADY PROVEN one layer down:
--- `Keeps-Ring.agda:952` (`subscribeE-slots`) carries it through the
+-- `.Keeps-Ring` (`subscribeE-slots`) carries it through the
 -- whole subscribe clique via the `Keeps` invariant, `Caps-Face.agda:
 -- 3690+` (`foldPath-slots`/`dispatchShare-slots`/`shareGo-slots`) has
--- the delivery side, and `Measures.agda:493` (`finish-slots`) covers
+-- the delivery side, and `.Measures` (`finish-slots`) covers
 -- `cascadeFinish`.  Only two thin wrappers were missing — `chainStep`
 -- (one call into `foldPath`) and `cascadeGo`'s own fold over chains —
 -- and both are direct compositions of what already exists.
@@ -204,10 +205,10 @@ slots-tick a id sched st =
 -- and NOT by the from-scratch walk over stepFrame/pushBurst/
 -- subscribeInner/... this module's header once anticipated.  Ψ never
 -- needs to grow (caseW is substitution-invariant, per INV?'s own
--- header at Measures.agda:5316-5323), so `fn-tick`'s conclusion —
+-- header at .Measures-5323), so `fn-tick`'s conclusion —
 -- Ψ-indexed only, no numeric B/E reading — is satisfied by ANY witness
 -- INV? holds at, regardless of the size-axis bound reached.  That
--- means the already-proven `cascadeGo-walk` (Wet.agda:2145, folding
+-- means the already-proven `cascadeGo-walk` (.Wet, folding
 -- the WHOLE six-conjunct INV? over the chains list at a GROWING
 -- ledger bound) is directly usable here: embed the caps-level input
 -- bound `B` into `capᴱ B 3` (via `pow1`), widen the input facts across
@@ -349,7 +350,7 @@ fn-tick {e = e} a id sched st inv val =
 -- ══ pinned and one cited:
 --
 -- (1) THE CONCLUSION IS `cascadeGo-nodry`'s VERBATIM.  `cascadeFinish`
---     returns (Sched × EvalSt) and emits NOTHING (Evaluator:1683), so a
+--     returns (Sched × EvalSt) and emits NOTHING (Rx.Evaluator), so a
 --     cascade's stream IS its cascadeGo's — pinned by `refl` just above
 --     `dry-tick` below.  The paragraph above reads "`cascade` IS
 --     cascadeLatch → cascadeGo → cascadeFinish" and infers that all three
@@ -398,7 +399,7 @@ fn-tick {e = e} a id sched st inv val =
 -- INV? it is given, and "the call site happens to supply it" — which
 -- here it demonstrably does — remains not a reason.
 -- ── WHAT THE DRY HALF ACTUALLY REDUCES TO ──────────────
--- `cascadeFinish` returns a (Sched × EvalSt) and NO emits (Evaluator:1683),
+-- `cascadeFinish` returns a (Sched × EvalSt) and NO emits (Rx.Evaluator),
 -- so a cascade's stream IS its cascadeGo's, and dry-tick's conclusion is
 -- `cascadeGo-nodry`'s conclusion verbatim at the latched state.  Pinned
 -- rather than argued, because it is what shows that latch/finish
@@ -641,7 +642,7 @@ dry-tick {n = n} {e = e} a id sched st inv val pre valC =
 ------------------------------------------------------------------
 -- S4 `sub-charge` : GAP 4 (a)'s missing subscribe-level charge.  NO
 -- MISALIGNMENT FOUND, and no postulate needed — `subscribeE-caps`
--- (Subscribe-Face.agda:906, GROUND) already carries the hypothesis
+-- (.Subscribe-Face, GROUND) already carries the hypothesis
 -- `depthE g b κ bid now sched st ≤ dep` and already concludes
 -- `j + j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) dep bud ops j` as the
 -- fourth component of its Σ.  `depthE`'s argument list (g, b, κ, bid,
@@ -846,7 +847,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
 -- NOTE ON `cOK`: the first attempt named this hypothesis `caps` and
 -- Agda rejected the LHS with "caps is not a constructor of the
 -- datatype _≡_".  CAUSE, confirmed: `caps` IS a constructor in scope —
--- it is the `Caps` record's own constructor (Caps.agda:105,
+-- it is the `Caps` record's own constructor (.Caps,
 -- `constructor caps`) — so in a pattern the name resolves to that
 -- constructor instead of binding fresh.  Same family as the
 -- PatternShadowsConstructor warning `make agda-all` prints for
@@ -894,7 +895,7 @@ pop-head-widCaps c sched st eq cOK
 
 -- the joint reader the cascade dry face wants.  The SIZE half is
 -- free: `sizeCapAt e sl id` IS `Caps.cSize (capsAt e sl id)` by
--- definition (Wet.agda:4117), so GAP 3's pop-head-bounded already
+-- definition (.Wet), so GAP 3's pop-head-bounded already
 -- supplies it; only the width half above is new content.
 pop-head-valCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (sched : Sched Γ) (st : EvalSt e)
@@ -903,9 +904,9 @@ pop-head-valCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id) sched st ≡ true →
   capsOK? (capsAt e (Sched.slots sched) id) sched st ≡ true →
   valCaps? (capsAt e (Sched.slots sched) id) (Sched.slots sched) (arrTy a) (arrVal a) ≡ true
--- `valB? B Ψ u v = (sizeᵛ u v ≤ᵇ B) ∧ (fnCapᵛ u v ≤ᵇ Ψ)` (Measures:5337)
+-- `valB? B Ψ u v = (sizeᵛ u v ≤ᵇ B) ∧ (fnCapᵛ u v ≤ᵇ Ψ)` (.Measures)
 -- and `valCaps? c sl u v = (sizeᵛ u v ≤ᵇ cSize c) ∧ (pWᵛ n sl u v ≤ᵇ cWid c)`
--- (Caps-Face:667).  At `B = sizeCapAt e sl id = cSize (capsAt e sl id)`
+-- (.Caps-Face).  At `B = sizeCapAt e sl id = cSize (capsAt e sl id)`
 -- the two FIRST conjuncts are literally the same Bool, so the size half
 -- is a projection off pop-head-bounded — via ∧-true, since valB? is a
 -- Bool conjunction and not a Σ (the first attempt used proj₁ directly
@@ -997,21 +998,21 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- SPEND `depth-capped` AT THE PRE-BLOWUP BASE CAPS, NOT AT
 -- `capsAt e ins 0`.  This is the whole content of the arrangement and
 -- it is not visible from the goal, so it is written out here, at the one
--- site that spends it.  `capsAt e sl zero` is ITSELF a `frameBlowup` (Caps.agda:452;
+-- site that spends it.  `capsAt e sl zero` is ITSELF a `frameBlowup` (.Caps;
 -- `baseCaps-is-inner` below pins that by `refl`), so its `cSize` is
 -- `sizeStep` iterated `sizeCount`-many times.  Routing the depth bound
 -- through THAT number demands `3 · cSize (capsAt e ins 0) ≤ capsH`,
 -- i.e. that `poolCount` at `M = towerℕ capsBase` dominate an
 -- EXPONENTIAL of `sizeCount` at `M = S₀` — a cross-`M` growth-rate
 -- argument that exists nowhere in this repo.  The one chain relating
--- the two, `capsAt-tower` (Caps.agda:1322), points the WRONG WAY: it
+-- the two, `capsAt-tower` (.Caps), points the WRONG WAY: it
 -- gives `cSize ≤ towerℕ capsH`, and `towerℕ h ≫ h`, so it makes the
 -- goal harder.  `depth-capped` quantifies over ANY caps satisfying
 -- `capsOK?`; nothing forces the blown-up one.
 --
 -- AND THE SMALL CAPS IS THE HONEST PLACE TO STAND, because at the ROOT
 -- the state is `st-init`/`sched-init`: three of `capsOK?`'s five
--- conjuncts (Caps-Face.agda:299) are then VACUOUS — empty registry
+-- conjuncts (.Caps-Face) are then VACUOUS — empty registry
 -- kills `regsSz?` and the `length … ≤ᵇ cReg` bound, empty
 -- `EvalSt.nodes` kills the `widNode` sweep — and the two that survive
 -- (`stBounded?`, the `widLive` sweep) are bounded by SYNTAX-level
@@ -1066,9 +1067,8 @@ init-capsOK?-0 {n = n} e ins =
 -- standing normalization contract (see sizeCount's header): these are
 -- PROOFS, no consumer ever unfolds them, and an unfoldable body here
 -- hands VWF's conversion the whole capsOK?-mono/frameStep-mono-j proof
--- tower — measured as an OOM (two Killed:9 builds; VWF was
--- green the same morning with the postulate in this spot, i.e. with
--- exactly this opacity).  The alias pattern rather than a plain
+-- tower — measured as an OOM, twice, and VWF is green with the
+-- postulate in this spot, i.e. with exactly this opacity.  The alias pattern rather than a plain
 -- abstract block because the bodies lean on untyped where-bindings,
 -- which abstract refuses to infer.
 private
@@ -1149,24 +1149,17 @@ abstract
 -- `M = suc (entryCeil n ins e)` — and that is NOT the bound used below.
 -- `depth-hop` is instantiated at `sizeCapAt e ins 1`, the SIZE cap the
 -- consumer itself reads (`subscribeE-wet-via-caps`, at
--- `Ŝ = sizeCapAt e sl (suc id)`), because the statement's two conditions
--- are `2 ≤ V` and `sizeᵉ e ≤ V` and NOTHING RELATES `entryCeil` TO
--- `sizeᵉ e` — Caps' own header records that its only two facts bound
--- SLOT widths by it.  `2≤sizeCapAt` and `size≤sizeCapAt` discharge both
--- conditions here with no new leaf.  What does NOT transfer is the
--- induction: a scan's refold is an EXPONENTIAL in `hopDᵉ` where it was
--- a product with the source's width in `nestDᵉ`, so the height has to
--- absorb an exponential rather than a product.  That is the one open
--- arithmetic question the depth face has left, and `capsH` is `blowH`
--- of a tower, which is the side of the comparison with room in it.
+-- `Ŝ = sizeCapAt e sl (suc id)`), because its conditions are over
+-- `syncSizeᵉ e` and the slot width and NOTHING RELATES `entryCeil` TO
+-- EITHER — Caps' own header records its only two facts bound SLOT
+-- widths by it.  `2≤sizeCapAt`, `size≤sizeCapAt` (via `syncSize≤sizeᵉ`)
+-- and `slotsSize≤sizeCapAt` discharge all three with no new leaf.
+-- What does NOT transfer is the induction: a scan's refold is an
+-- EXPONENTIAL in `hopDᵉ` where it was a product with the source's
+-- width in `nestDᵉ`, so the height has to absorb an exponential rather
+-- than a product.  That is the depth face's one open arithmetic
+-- question, and `capsH` is `blowH` of a tower — the side with room.
 --
--- -- RECOVERY: git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda
--- restores the height arithmetic that assembly used, most of which is
--- currency-INDEPENDENT and will be wanted again: `sum2H`/`sum3H`/
--- `sucH`/`hUp`/`hIn`/`1≤3x`/`payL`/`payR` for moving a bound up a
--- tower, `tower-sum-tab` for a slot telescope, and
--- `entryCeil-slotWid`.  Only the three `nestD-*` inductions and
--- `slotNest-tower`/`storeNest-tower` died with their measure.
 -- ⚠ AND THE HEIGHT `3 * capsBase e ins` IS A PARAMETER, NOT A FINDING.
 -- It is inherited from the deleted arithmetic, where the measure was a
 -- product; at a size cap `V` the refold factor is `(2 + p) ^ V`, so the
@@ -1175,6 +1168,13 @@ abstract
 -- different instance of that side condition — `3m+1≤towerℕ` is the
 -- `k = 3m` one and is spent below.  Nothing above this leaf reads the
 -- height.
+-- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
+--   restores the height arithmetic that assembly used, most of which is
+--   currency-INDEPENDENT and will be wanted again: `sum2H`/`sum3H`/
+--   `sucH`/`hUp`/`hIn`/`1≤3x`/`payL`/`payR` for moving a bound up a
+--   tower, `tower-sum-tab` for a slot telescope, and
+--   `entryCeil-slotWid`.  Only the three `nestD-*` inductions and
+--   `slotNest-tower`/`storeNest-tower` died with their measure.
 
 -- RECOVERY: `git show 555ee43^:agda/src/Verify-Budget-Sufficient/Depth-Bound.agda`
 --   restores the node-half kit — `foldr-⊔-bounded`, `node-nest-bounded`,
@@ -1218,11 +1218,13 @@ depthE≤capsH-root e ins =
   ≤-trans
     (depth-hop (sizeCapAt e ins 1) (budgetAt e ins 0) e root 0 0
        (sched-init e ins) (st-init e)
-       (2≤sizeCapAt e ins 1) (size≤sizeCapAt e ins 1))
+       (2≤sizeCapAt e ins 1)
+       (≤-trans (syncSize≤sizeᵉ e) (size≤sizeCapAt e ins 1))
+       (slotsSize≤sizeCapAt e ins 1))
     (hop≤capsH e ins)
 
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
--- Mirrors cascade-wet-via-caps (~line 526) structurally.
+-- Mirrors cascade-wet-via-caps structurally.
 -- Wet hypotheses: those of subscribeE-wet (Wet.agda:~4303).
 -- Caps additions: capsOK? at the entry level + dWᵉ ≤ cWid.
 -- burst-caps (below) is a closed corollary at the root call.
@@ -1237,9 +1239,11 @@ depthE≤capsH-root e ins =
 -- `sub-charge-capsOK-lift-core` postulate is replaced outright.
 -- What made it provable is the LAST premise, depOK: the general-id
 -- depth bound `depthE … ≤ capsH e sl id` is a RUN INVARIANT, not a
--- lemma — the unconditional form is FALSE (Depth-Bound.agda's header:
--- an adversarial state with a long map-f chain breaks any state-free
--- `depthE ≤ capsH`), and "reachable" is not a first-class predicate
+-- lemma — the unconditional form is FALSE (an adversarial state with a
+-- long map-f chain breaks any state-free `depthE ≤ capsH`; that finding
+-- is prose, never machine-checked, and the module holding it is the one
+-- the recovery pointer above restores), and "reachable" is not a
+-- first-class predicate
 -- here, so the bound enters as a premise exactly the way nestOK/opsOK
 -- did and is owed by whoever owns the run structure: burst-caps
 -- discharges it at the root via depthE≤capsH-root, and the eventual
@@ -1542,8 +1546,8 @@ sizeE≤cap e ins =
 -- supply.  So the two calls merged rather than the second one growing.
 --
 -- pathLen root = 0, so suc (pathLen root) = 1 ≤ B (moot at the root).
--- `EvalSt.connectedShares (st-init e) = []` (Evaluator:943) and
--- `Sched.slots (sched-init e ins) = ins` (Evaluator:118), so the
+-- `EvalSt.connectedShares (st-init e) = []` (Rx.Evaluator) and
+-- `Sched.slots (sched-init e ins) = ins` (Rx.Evaluator), so the
 -- premises reduce to the root bounds at (capsAt e ins 0).
 --
 -- RECOVERY: git show c87c91a restores the split form.

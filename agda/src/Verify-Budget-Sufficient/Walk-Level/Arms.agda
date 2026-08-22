@@ -95,7 +95,7 @@ open import Decide using (T⇒≡true; ∧-intro)
 --     close, handoff and complete alike (.Measures) and these two arms emit
 --     no values at all, so both are refl.
 --   · hasDry                `dryEvent` fires on `close _ dried` ALONE
---     (Evaluator:370); arm A emits `close _ exhausted`, arm B emits no
+--     (Rx.Evaluator); arm A emits `close _ exhausted`, arm B emits no
 --     close.  refl both times.
 --   · INV? (arm A)          the state is untouched, so this is INV?-widen
 --     across the cap step, and `frameStep-mono-j` supplies the step.
@@ -516,7 +516,7 @@ scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 -- connects, so nothing here recurses and no induction has to be designed.
 -- The caps receipts arrive as HYPOTHESES, so only the wet five are owed.
 
--- What subscribeE produces (Evaluator:1401-1426), and the ingredient for
+-- What subscribeE produces (Rx.Evaluator), and the ingredient for
 -- each conjunct.  Every one named below is PROVEN except where marked:
 --
 --   A. hot, memberSource ≡ true — burst init/close-exhausted/complete;
@@ -524,7 +524,7 @@ scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 --        INV?       INV?-widen (.Wet/Part1) over +-identityʳ
 --        burstB?    no values in the burst — computation
 --        burstHopD? no values in the burst — computation
---        hasDry     dryEvent fires on `dried` ALONE (Evaluator:370), and
+--        hasDry     dryEvent fires on `dried` ALONE (Rx.Evaluator), and
 --                   this burst carries `exhausted` — computation
 --        regsLen?   registry untouched — the hypothesis, as-is
 --
@@ -551,8 +551,8 @@ scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
 -- THE MINT IS TRANSPARENT TO INV?, which is why C and D need no lemma for
 -- it: INV? reads the schedule ONLY through `Sched.live` and `Sched.slots`
--- (Measures:4438, via stBounded? and fnCapBounded?), while mintSource and
--- mintOrdinal touch `nextSource` / `nextOrdinal` alone (Evaluator:305).
+-- (.Measures, via stBounded? and fnCapBounded?), while mintSource and
+-- mintOrdinal touch `nextSource` / `nextOrdinal` alone (Rx.Evaluator).
 -- The record update reduces, so the mint is invisible to the predicate.
 -- Only D's addLive genuinely moves `live`, and that is addLive-INV's job.
 

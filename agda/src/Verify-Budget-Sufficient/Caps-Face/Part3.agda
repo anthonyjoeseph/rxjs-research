@@ -1,6 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part3
 -- wid-subΘ … closeList-caps
--- (lines 2766–3663 of the original Caps-Face.agda)
 module Verify-Budget-Sufficient.Caps-Face.Part3 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
