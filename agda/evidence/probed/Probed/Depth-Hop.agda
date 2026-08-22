@@ -1,6 +1,6 @@
 -- THE DEPTH FACE'S NEW CURRENCY, INSTANTIATED AT THE FOUR PROGRAMS
 -- THAT KILLED THE OLD ONE.
--- TARGET: depth-hop
+-- TARGET: depth-hop-all-burst
 --
 -- EVIDENCE, not a claim: `src` cannot import this file (the library
 -- layout makes `Probed.Depth-Hop` unresolvable from there) and nothing
@@ -37,6 +37,16 @@
 -- `Refuted.Depth-Hop` is what stands there.  The non-root path, both
 -- `Slot` constructors and a mid-run store are reached, in § 5 to § 7 and
 -- § 11.
+-- WHAT THIS FILE IS EVIDENCE FOR, AND WHICH ROWS CARRY IT.  `depth-hop`
+-- is a real body over ONE leaf — `depth-hop-all-burst`, the `thru-outer`
+-- walk arm — and that leaf carries the same three conditions every row
+-- below instantiates.  So a row whose program contains a `*All`
+-- constructor runs through the leaf and is LOAD-BEARING for it: § 5,
+-- § 10, § 11 and § 12's refold.  The scan, slot and parking rows —
+-- § 1 to § 4 and § 6 to § 9 — are DEGENERATE for the leaf, since the
+-- clauses they exercise close without it; they are kept as coverage of
+-- the currency, which is what the conditions are stated over.
+
 module Probed.Depth-Hop where
 
 open import Data.Bool using (true; false)

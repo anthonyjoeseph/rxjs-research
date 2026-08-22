@@ -81,19 +81,34 @@
 
 module Verify-Budget-Sufficient.Depth-Compositional where
 
-open import Data.Nat using (ℕ; suc; _+_; _≤_; z≤n)
-open import Data.Nat.Properties using (⊔-lub)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
+open import Data.Nat.Properties using (⊔-lub; ≤-trans; m≤n+m; m≤n⊔m;
+  *-identityˡ; *-monoˡ-≤; +-monoˡ-≤; +-monoʳ-≤; +-suc; ≤-reflexive; n≤1+n)
+open import Data.Fin using (Fin; toℕ)
+open import Data.Vec using (lookup)
 open import Data.List using ([]; _∷_)
+open import Data.Bool using (false)
+open import Data.Maybe using (nothing)
 open import Data.Product using (proj₁; proj₂)
-open import Rx.Prim using (Gas; Id; Tick; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; syncSizeᵉ)
-open import Rx.Slots using (slotsSize)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
+open import Rx.Exp using (Ctx; Closed; Val; Exp; Fn; Tm; _×ᵗ_; natᵗ; obs;
+  syncSizeᵉ; unfoldμ; evalTm;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+open import Rx.Slots using (Slot; slotsSize; scripted; shared)
 open import Rx.Evaluator
-  using (Sched; EvalSt; NodeId; Path; Stream; _↠_; map-f; scan-f; take-f;
-  from-inner; thru-outer; root; share-sink; splitEvents; stepFrame)
-open import Rx.Hop-Depth using (hopDᵉ)
-open import Rx.Slot-Hop using (slotHop)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst)
+  using (Sched; EvalSt; NodeId; Path; Stream; AllOp; NodeState; _↠_; map-f;
+  scan-f; take-f; from-inner; thru-outer; root; share-sink; splitEvents;
+  stepFrame; subscribeE; mintNode; installNode; take-st; mergeᵒ; concatᵒ;
+  switchᵒ; exhaustᵒ;
+  merge-st; concat-st; switch-st; exhaust-st; scan-st)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; pmᵗ; hopD-unfoldμ)
+open import Rx.Slot-Hop using (slotHop; slotHop-fix)
+open import Verify-Budget-Sufficient.Caps-Depth
+  using (depthE; depthBurst; depthAll; depthTake; depthSlot)
+open import Verify-Budget-Sufficient.Measures
+  using (syncSize-unfoldμ; syncSize≤sizeᵉ; slotDef-size; 1≤pow)
 
 ------------------------------------------------------------------
 -- THE PATH MEASURE — the one arc on a path that a subscribe actually
@@ -118,17 +133,44 @@ pathNestD (from-inner _ _ _ ↠ p)  = pathNestD p
 pathNestD (thru-outer _ _ ↠ p)    = suc (pathNestD p)
 
 ------------------------------------------------------------------
--- THE FRAME BURSTS THAT COST NOTHING.  `depthFrame` returns 0
--- definitionally for take-f, so `depthBurst` over that frame is a fold
--- of `0 ⊔ IH` — a three-line list induction.
---
--- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda`
---   restores `burst-mapf-zero` and `burst-scf-zero`, the map-f and
---   scan-f siblings of this proof (same induction, same shape).  They
---   were unwired when the nesting face went, since their only consumer
---   was its induction; a depth induction in any currency will want them
---   back at its map and scan clauses.
+-- THE THREE FRAME BURSTS THAT COST NOTHING.  `depthFrame` returns 0
+-- definitionally for map-f, scan-f and take-f alike, so `depthBurst`
+-- over any of the three is a fold of `0 ⊔ IH` — one list induction per
+-- frame, and the reason `depth-hop`'s chain clauses need no arithmetic
+-- on their burst disjunct at all: it is bounded by zero, so `⊔-lub`
+-- closes that side with `z≤n` whatever the subject's hop turns out to
+-- be.  The `from-inner` and `thru-outer` frames are NOT here, and that
+-- is the whole content of the split: those two reach `depthReact` and
+-- `depthWalk`, which is where the depth actually lives.
 ------------------------------------------------------------------
+
+burst-mapf-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (bid : Id) (now : Tick)
+  (f : Fn Γ [] [] [] s u) (κ : Path Γ u t)
+  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst fuel bid now (map-f f) κ stream sched st ≤ 0
+burst-mapf-zero fuel bid now f κ [] sched st = z≤n
+burst-mapf-zero {Γ = Γ} {u = u} fuel bid now f κ (em ∷ ems) sched st =
+  ⊔-lub z≤n (burst-mapf-zero fuel bid now f κ ems sched' st')
+  where
+  sp     = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r      = stepFrame fuel bid now (map-f f) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
+
+burst-scf-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fuel : Gas) (bid : Id) (now : Tick)
+  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst fuel bid now (scan-f f nid) κ stream sched st ≤ 0
+burst-scf-zero fuel bid now f nid κ [] sched st = z≤n
+burst-scf-zero {Γ = Γ} {u = u} fuel bid now f nid κ (em ∷ ems) sched st =
+  ⊔-lub z≤n (burst-scf-zero fuel bid now f nid κ ems sched' st')
+  where
+  sp     = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r      = stepFrame fuel bid now (scan-f f nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
 burst-takef-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Gas) (bid : Id) (now : Tick)
@@ -145,6 +187,27 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
   st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
 ------------------------------------------------------------------
+------------------------------------------------------------------
+-- THE WALK ARM'S SUBJECT, NAMED.  A `thru-outer` frame's burst is the
+-- one `depthBurst` this face cannot bound by zero, and its bound has to
+-- be stated at the SUBSCRIBE'S OWN OUTPUTS rather than over an
+-- arbitrary stream: an inner delivered by some other stream has a depth
+-- unrelated to `b`, so the general form is FALSE.  This abbreviation is
+-- what pins the three arguments to the subscribe that produced them.
+------------------------------------------------------------------
+
+allBurst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  → Gas → AllOp → NodeState Γ → Closed Γ (obs u) → Path Γ u t
+  → Id → Tick → (sched : Sched Γ) → EvalSt e → ℕ
+allBurst g op ns b κ bid now sched st =
+  depthBurst g bid now (thru-outer op nid) κ
+    (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns st
+  r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+
 -- THE RESTATEMENT, AND IT IS A SWAP RATHER THAN A REPAIR.
 --
 -- A search for the substitution lemma the refuted cap needed found
@@ -390,10 +453,235 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 --   reached: nested `μᵉ`, and a `deferᵉ` body large against a `V` the
 --   slot telescope must also fit.
 
+------------------------------------------------------------------
+-- THE ONE LEAF, AND IT IS THE WALK.  Of `depthE`'s four heads only the
+-- `thru-outer` burst is a gap: the other three reduce to this face's own
+-- induction plus arithmetic, and the three chain frames' bursts are
+-- bounded by zero.  A `thru-outer` burst is not, because it reaches
+-- `depthWalk`, which SUBSCRIBES every emitted inner — so the hop edge's
+-- `suc` has to be earned against payloads of `b` rather than read off a
+-- clause of the measure.  The conditions are the ones the whole block
+-- above is about, and this is the only statement still asserting them.
+------------------------------------------------------------------
+
 postulate
-  depth-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (V : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
+  depth-hop-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+    (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
-    depthE g b κ bid now sched st
-      ≤ hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ
+    allBurst g op ns b κ bid now sched st
+      ≤ suc (hopDᵉ V (slotHop V (Sched.slots sched)) b) + pathNestD κ
+
+------------------------------------------------------------------
+-- THE TWO MONOTONICITY STEPS THE CHAIN EDGES NEED.  A `mapᵉ` and a
+-- `scanᵉ` both recurse into their source at the SAME path depth, so the
+-- clause closes as soon as the source's own hop is at most the
+-- subject's — which is arithmetic on `hopDᵉ`'s clause and not a fact
+-- about the evaluator.  `takeᵉ` needs no step at all: `hopDᵉ` is EQUAL
+-- on a take and its source.
+------------------------------------------------------------------
+
+hopD-map-mono : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ) (η : Fin n → ℕ)
+  (f : Fn Γ Δᵍ Δ Θ s u) (e : Exp Γ Δᵍ Δ Θ s) →
+  hopDᵉ V η e ≤ hopDᵉ V η (mapᵉ f e)
+hopD-map-mono V η f e =
+  ≤-trans
+    (subst (_≤ (pmᵗ V 0 f ⊔ 1) * hopDᵉ V η e)
+           (*-identityˡ (hopDᵉ V η e))
+           (*-monoˡ-≤ (hopDᵉ V η e) (m≤n⊔m (pmᵗ V 0 f) 1)))
+    (m≤n+m ((pmᵗ V 0 f ⊔ 1) * hopDᵉ V η e) (hopDᵗ V η f))
+
+
+hopD-scan-mono : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ) (η : Fin n → ℕ)
+  (f : Fn Γ Δᵍ Δ Θ (u ×ᵗ s) u) (z : Tm Γ Δᵍ Δ Θ u) (e : Exp Γ Δᵍ Δ Θ s) →
+  hopDᵉ V η e ≤ hopDᵉ V η (scanᵉ f z e)
+hopD-scan-mono V η f z e =
+  ≤-trans
+    (m≤n+m (hopDᵉ V η e) (hopDᵗ V η f + hopDᵗ V η z))
+    (subst (_≤ (2 + pmᵗ V 0 f) ^ V * S)
+           (*-identityˡ S)
+           (*-monoˡ-≤ S (1≤pow (suc (pmᵗ V 0 f)) V)))
+  where S = hopDᵗ V η f + hopDᵗ V η z + hopDᵉ V η e
+
+-- every chain constructor charges `syncSizeᵉ` a `suc` over a sum whose
+-- RIGHT summand is the source, so one step serves the map, take and scan
+-- clauses alike — and it is stated over bare naturals precisely so that
+-- `scanᵉ`'s two-summand left half needs no separate case
+sync-src : ∀ {a b V} → suc (a + b) ≤ V → b ≤ V
+sync-src {a} {b} h = ≤-trans (≤-trans (m≤n+m b a) (n≤1+n (a + b))) h
+
+------------------------------------------------------------------
+-- THE FOUR HEADS, MUTUALLY.  The split is `depthE`'s own and not an
+-- invented decomposition: `input` reaches `depthSlot`, `takeᵉ` reaches
+-- `depthTake`, and all four `*All` constructors reach `depthAll`.  Each
+-- head recurses back into `depth-hop` at a subject the CALLER made
+-- structurally smaller, or — at a share connect and at a `μᵉ` re-entry —
+-- at one less gas, which is why the whole block terminates on the pair.
+------------------------------------------------------------------
+
+depth-hop-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (V : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  depthE g (input i) κ bid now sched st
+    ≤ slotHop V (Sched.slots sched) i + pathNestD κ
+
+-- THE SLOT IS A PARAMETER, WITH ITS EQUATION BESIDE IT, and that is not
+-- a convenience: `slotHop V sl i` UNFOLDS through `sl i`, so a `with` on
+-- the slot rewrites the bound as well as the subject and the fixpoint no
+-- longer applies to what is left.  Taking the slot as an argument keeps
+-- the bound in `slotHop` form, which is the form `slotHop-fix` speaks.
+--
+-- At a shared slot the def is subscribed at `share-sink i`, whose
+-- nesting is 0, and the fixpoint says the staged number IS that def's
+-- hop — so the arm is an equality transport, with `slotDef-size` paying
+-- for the def's own size condition out of the slots width.
+depth-hop-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (V : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  (w : Slot Γ (toℕ i) (lookup Γ i)) → Sched.slots sched i ≡ w →
+  depthSlot g i κ bid now sched st w
+    ≤ slotHop V (Sched.slots sched) i + pathNestD κ
+
+-- the count is a `natᵗ` term, so the clause splits on a VALUE the
+-- subject cannot see; past that split it is the `scanᵉ` clause exactly,
+-- and `hopDᵉ` being EQUAL on a take and its source is what makes the
+-- source's own bound land with no monotonicity step
+depth-hop-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (k : Val Γ natᵗ) →
+  2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  depthTake g b κ bid now sched st k
+    ≤ hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ
+
+-- STATED AT THE `suc`, which is what makes it serve all four `*All`
+-- constructors at once: `hopDᵉ` charges every one of them
+-- `suc (hopDᵉ V η b)`, so the four clauses below are applications and
+-- the operator is a parameter rather than four near-copies.  The outer
+-- source's own disjunct is pure arithmetic — the frame charges the PATH
+-- a level where the measure charges the SUBJECT one, and `+-suc` is the
+-- whole content of moving between them
+depth-hop-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  depthAll g op ns b κ bid now sched st
+    ≤ suc (hopDᵉ V (slotHop V (Sched.slots sched)) b) + pathNestD κ
+
+depth-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  depthE g b κ bid now sched st
+    ≤ hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ
+
+depth-hop-input V g i κ bid now sched st 2≤V slB =
+  depth-hop-slot V g i κ bid now sched st 2≤V slB (Sched.slots sched i) refl
+
+depth-hop-slot V g  i κ bid now sched st 2≤V slB (scripted _) eq = z≤n
+depth-hop-slot V g0  i κ bid now sched st 2≤V slB (shared d)   eq = z≤n
+depth-hop-slot V (gs fuel) i κ bid now sched st 2≤V slB (shared d) eq =
+  ≤-trans
+    (depth-hop V fuel d (share-sink i) bid now sched _ 2≤V
+       (≤-trans (syncSize≤sizeᵉ d)
+          (≤-trans (slotDef-size (Sched.slots sched) i eq) slB))
+       slB)
+    (subst (λ X → X + 0 ≤ slotHop V (Sched.slots sched) i + pathNestD κ)
+           (slotHop-fix V (Sched.slots sched) i eq)
+           (+-monoʳ-≤ (slotHop V (Sched.slots sched) i) z≤n))
+
+depth-hop-take V g b κ bid now sched st zero    2≤V szB slB = z≤n
+depth-hop-take V g b κ bid now sched st (suc k) 2≤V szB slB =
+  ⊔-lub
+    (depth-hop V g b (take-f nid ↠ κ) bid now sched₁ st₀ 2≤V szB slB)
+    (≤-trans (burst-takef-zero g bid now nid κ
+                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) z≤n)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (take-st (suc k)) st
+  r      = subscribeE g b (take-f nid ↠ κ) bid now sched₁ st₀
+
+depth-hop-all V g op ns b κ bid now sched st 2≤V szB slB =
+  ⊔-lub
+    (≤-trans (depth-hop V g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+                2≤V szB slB)
+             (≤-reflexive
+                (+-suc (hopDᵉ V (slotHop V (Sched.slots sched)) b)
+                       (pathNestD κ))))
+    (depth-hop-all-burst V g op ns b κ bid now sched st 2≤V szB slB)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns st
+
+depth-hop V g (input i) κ bid now sched st 2≤V szB slB =
+  depth-hop-input V g i κ bid now sched st 2≤V slB
+-- the one-shots and the two parking constructors reach no subscribe, so
+-- `depthE` is 0 there and the bound is free
+depth-hop V g (ofᵉ ts)   κ bid now sched st 2≤V szB slB = z≤n
+depth-hop V g emptyᵉ     κ bid now sched st 2≤V szB slB = z≤n
+depth-hop V g (deferᵉ _) κ bid now sched st 2≤V szB slB = z≤n
+depth-hop V g (varᵉ ())  κ bid now sched st 2≤V szB slB
+-- a chain edge: the source at ONE MORE FRAME but the same path nesting,
+-- so the induction hypothesis lands at `pathNestD κ` unchanged and the
+-- only arithmetic owed is that the source's hop is at most the
+-- subject's.  The burst disjunct is bounded by zero
+depth-hop V g (mapᵉ f b) κ bid now sched st 2≤V szB slB =
+  ⊔-lub
+    (≤-trans (depth-hop V g b (map-f f ↠ κ) bid now sched st
+                2≤V (sync-src szB) slB)
+             (+-monoˡ-≤ (pathNestD κ)
+                (hopD-map-mono V (slotHop V (Sched.slots sched)) f b)))
+    (≤-trans (burst-mapf-zero g bid now f κ
+                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) z≤n)
+  where r = subscribeE g b (map-f f ↠ κ) bid now sched st
+depth-hop V g (takeᵉ count b) κ bid now sched st 2≤V szB slB =
+  depth-hop-take V g b κ bid now sched st (evalTm count)
+    2≤V (sync-src szB) slB
+-- the mint is a `nextNode` bump, so `Sched.slots sched₁` REDUCES to
+-- `Sched.slots sched` and the slots hypothesis crosses unchanged — which
+-- is why this clause needs no slots-preservation lemma
+depth-hop V g (scanᵉ f seed b) κ bid now sched st 2≤V szB slB =
+  ⊔-lub
+    (≤-trans (depth-hop V g b (scan-f f nid ↠ κ) bid now sched₁ st₀
+                2≤V (sync-src szB) slB)
+             (+-monoˡ-≤ (pathNestD κ)
+                (hopD-scan-mono V (slotHop V (Sched.slots sched)) f seed b)))
+    (≤-trans (burst-scf-zero g bid now f nid κ
+                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) z≤n)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (scan-st (evalTm seed)) st
+  r      = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁ st₀
+-- the four hop edges are APPLICATIONS of one leaf, because `hopDᵉ`
+-- charges every one of them `suc (hopDᵉ V η b)` and the operator and the
+-- initial node state are the leaf's parameters
+depth-hop V g (mergeAllᵉ b)   κ bid now sched st 2≤V szB slB =
+  depth-hop-all V g mergeᵒ (merge-st 0 false) b κ bid now sched st
+    2≤V (≤-trans (n≤1+n _) szB) slB
+depth-hop V g (concatAllᵉ b)  κ bid now sched st 2≤V szB slB =
+  depth-hop-all V g concatᵒ (concat-st [] false false) b κ bid now sched st
+    2≤V (≤-trans (n≤1+n _) szB) slB
+depth-hop V g (switchAllᵉ b)  κ bid now sched st 2≤V szB slB =
+  depth-hop-all V g switchᵒ (switch-st nothing false) b κ bid now sched st
+    2≤V (≤-trans (n≤1+n _) szB) slB
+depth-hop V g (exhaustAllᵉ b) κ bid now sched st 2≤V szB slB =
+  depth-hop-all V g exhaustᵒ (exhaust-st false false) b κ bid now sched st
+    2≤V (≤-trans (n≤1+n _) szB) slB
+depth-hop V g0 (μᵉ body) κ bid now sched st 2≤V szB slB = z≤n
+-- the re-entry, and the clause the condition was restated for: the
+-- recursion is on the GAS, `hopD-unfoldμ` is an EQUALITY so the bound
+-- does not move, and `syncSize-unfoldμ` carries the condition across the
+-- very substitution that squares `sizeᵉ`
+depth-hop V (gs fuel) (μᵉ body) κ bid now sched st 2≤V szB slB =
+  subst (λ X → depthE fuel (unfoldμ body) κ bid now sched st ≤ X + pathNestD κ)
+        (hopD-unfoldμ V (slotHop V (Sched.slots sched)) body)
+        (depth-hop V fuel (unfoldμ body) κ bid now sched st 2≤V
+           (subst (_≤ V) (sym (syncSize-unfoldμ body))
+              (≤-trans (n≤1+n _) szB))
+           slB)

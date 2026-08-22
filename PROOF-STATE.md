@@ -157,10 +157,10 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`depth-hop`** (Depth-Compositional) — DIFFICULTY: restated over `syncSizeᵉ`
-  and the slots width, both refutations spent, and probed where the new measure
-  admits what the old one excluded. Every clause but the burst arm closes off
-  the mirror; that arm is the one design decision left.
+- **`depth-hop-all-burst`** (Depth-Compositional) — SHAPE, so restate rather
+  than grind: all that is left of `depth-hop`, and its conclusion needs a
+  per-inner hop bound no hypothesis carries. The one producer is the walk
+  face's own landing, which pins `V` to a size cap and wants a caps context.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
