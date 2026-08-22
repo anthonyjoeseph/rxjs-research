@@ -185,7 +185,7 @@ not merely dominates it — at three programs, the third a scan nested inside
 another scan's step function, which says the product COMPOUNDS: one factor per
 nested scan, so the measure is exponential in the program and no fixed-degree
 product of caps fields could have replaced it. `depthCap`,
-`depth-compositional`, `depth-all-bound` and `slotNest` all carry it now, a
+`depth-compositional`, `depth-all-burst` and `slotNest` all carry it now, a
 shared slot paying its def's nesting beside its size.
 
 WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
@@ -202,10 +202,10 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY, downgraded from
-  FALSITY by rows that reached the product itself: the burst's sibling-max
-  finding survives, and the nesting term the restatement added is what the
-  witnesses were measuring. No worked twin, so not GRINDABLE.
+- **`depth-all-burst`** (Depth-Compositional) — DIFFICULTY, all that is left of the
+  `*All` face: the outer arm is proven inside the assembly, the only place the IH
+  exists. This one reads the state the real `subscribeE` produced while the cap
+  reads the entry state, so finding (4)'s conjunct lands here.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

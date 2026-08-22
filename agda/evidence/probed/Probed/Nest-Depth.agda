@@ -1,9 +1,16 @@
 ------------------------------------------------------------------
--- TARGET: depth-all-bound
+-- TARGET: depth-all-burst
+--
+-- RETARGETED WHEN THE FACE SPLIT.  `depth-all-bound` is gone: its outer
+-- arm is proven inside the assembly's own induction and its burst arm is
+-- the leaf named above.  A `⊔` sits under a bound exactly when both arms
+-- do, so these rows were always evidence about both — what is left to be
+-- evidence FOR is the half still open.
 --
 -- THE CANDIDATE MEASURE FOR THE RESTATEMENT, instantiated before any of
--- it is written into `src`.  `depth-all-bound` is refuted
--- (Refuted.Depth-Nest) because its cap is linear in the syntax while
+-- it is written into `src`.  The PREDECESSOR of this face — the form with
+-- no nesting term, which is what `Refuted.Depth-Nest`'s witness type
+-- states — is refuted because its cap is linear in the syntax while
 -- `depthE` grows in `wraps × ticks`, and the width family cannot supply
 -- the product either — `width-route-absurd` refutes all four measures at
 -- once, because a wrap layer multiplies width by one.  So the
@@ -98,8 +105,8 @@ rootPath = root {Γ = Γ₀} {t = natᵗ}
 -- §1  THE MEASURE PREDICTS THE DEPTH EXACTLY, at both crossings
 ------------------------------------------------------------------
 
--- LOAD-BEARING: 4·12+1, and the depth side is the 49 that refutes
--- `depth-all-bound`.
+-- LOAD-BEARING: 4·12+1, and the depth side is the 49 that refutes the
+-- predecessor of the face this file targets.
 lowRow : depthE (gasN 70) (rootProg 4 12) rootPath 0 0
            (sched-init (rootProg 4 12) slots₀) (st-init (rootProg 4 12))
          ≡ nestDᵉ slots₀ (rootProg 4 12)

@@ -7,6 +7,14 @@
 -- `3 · cSize` is a CONSTANT multiple of a bound the same product
 -- outruns.
 --
+-- READ THE WITNESS TYPES, NOT THOSE NAMES.  All three statements have
+-- since been RESTATED in `src` with a nesting term, and the witnesses
+-- below do not reach the restatements: they measure exactly the
+-- quantity the restatements added.  What is refuted is the form each
+-- witness type spells out — the PREDECESSOR — and what this file is
+-- kept for is the ROUTE those forms represent, which no restatement
+-- revives.
+--
 -- AND THE THIRD WITNESS IS THE ONE THAT NAMES THE REPAIR.
 -- `depth-capped` checks `capsOK?` at the ENTRY state and concludes about
 -- a depth reached much later.  The deeply nested value here is the

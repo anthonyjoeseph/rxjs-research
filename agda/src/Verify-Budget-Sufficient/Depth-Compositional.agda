@@ -32,10 +32,12 @@
 -- (4) THE REAL WORK: every clause that calls `depthBurst` feeds it the
 --     state produced by running the REAL `subscribeE`, while the RHS
 --     reads the ENTRY state.  The `storeNestMax`-preservation conjunct
---     is what `depth-all-bound` (below) absorbs; when it is ground it
+--     is what `depth-all-burst` (below) absorbs; when it is ground it
 --     must be proved as a second conjunct of the same induction, not a
 --     separate family, and must NOT ride `subscribeE-caps` (circular —
---     that face takes `depthE ≤ dep` as a hypothesis).
+--     that face takes `depthE ≤ dep` as a hypothesis).  Its sibling arm
+--     needed the same induction for a different reason and is proven
+--     inside it; see that leaf's header.
 --
 -- BUCKETS: (a) trivially zero — ofᵉ, emptyᵉ, deferᵉ, g0(μᵉ),
 -- takeᵉ(zero), and the g0 connect.  (b) IH + arithmetic — mapᵉ,
@@ -43,7 +45,9 @@
 -- (c) THE CONNECT, a real clause: `input` recurses into the slot's own
 -- def and pays for it out of the summand admitting slot `i` to the
 -- partial sum.  (d) BLOCKED, two named postulates —
--- `depth-all-bound` (needs the preservation conjunct, finding (4)) and
+-- `depth-all-burst` (needs the preservation conjunct, finding (4); it is
+-- the burst half of the `*All` clauses, whose outer half is proven in
+-- the assembly itself) and
 -- `depth-μ-bound` (sizeᵉ (unfoldμ body) > sizeᵉ (μᵉ body) kills the
 -- size IH; the honest route is the guarded-context discipline —
 -- μ-variable occurrences sit under deferᵉ, and deferᵉ contributes 0
@@ -79,7 +83,7 @@ open import Rx.Exp
 open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
-  take-f; mintNode; installNode; subscribeE; splitEvents; stepFrame; setNode;
+  take-f; thru-outer; mintNode; installNode; subscribeE; splitEvents; stepFrame; setNode;
   share-sink; register)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
@@ -93,7 +97,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using (sum-tab-slack)
 open import Data.Empty using (⊥-elim)
 open import Decide using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthAll; depthBurst)
+  using (depthE; depthBurst)
 
 ------------------------------------------------------------------
 -- THE MEASURE — the state's contribution to subscribe-time depth,
@@ -138,7 +142,9 @@ nodesNestMax = foldr (λ kv acc → nodeNestMax (proj₂ kv) ⊔ acc) 0
 -- refutation's product had to land.  A def reached through `input` is
 -- entered by the mirror with the def in hand, so its own scan/`*All`
 -- structure deepens exactly as the root program's does; charging only
--- `sizeᵉ d` was the same undercount `depth-all-bound` was refuted for.
+-- `sizeᵉ d` was the same undercount the `*All` face's PREDECESSOR was
+-- refuted for — the form with no nesting term, which is what
+-- `Refuted.Depth-Nest`'s witness types state.
 --
 -- Charging it HERE rather than descending inside `nestDᵉ` is forced:
 -- see that module's header — a descending `input` clause is stuck on a
@@ -646,13 +652,102 @@ postulate
   -- carries what the deleted module knew).  That was the right trade
   -- rather than a loss — the interface was refuted anyway, and it was
   -- refuted for reading a level it does not report.
-  depth-all-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  -- THE FACE SPLIT INTO ITS TWO ARMS, AND ONLY THE BURST ONE IS A LEAF.
+  -- `depthAll` reduces to `depthE … ⊔ depthBurst …` — Caps-Depth is
+  -- deliberately not `abstract`, so both arms are visible from here —
+  -- so the four `*All` clauses of the assembly below close with `⊔-lub`
+  -- over an OUTER half they prove and this BURST half they assume.
+  --
+  -- DEAD ROUTE 2026-08-22: STATE THE OUTER ARM AS A LEAF OF ITS OWN.
+  -- It was written that way first, alongside this one, and it is
+  -- STRUCTURALLY DEAD — not hard, impossible.  The arm's only route is
+  -- the take/scan buckets' route step for step: the assembly's own
+  -- recursion at the SUB-expression, then the install lemma, then the
+  -- `*All` layer's cap arithmetic.  That first step is the induction
+  -- hypothesis, and it is available only INSIDE the induction: a
+  -- standalone lemma would have to call the assembly at an expression
+  -- of the same size as its own argument, so nothing decreases and no
+  -- measure repairs it.  The decrease happens at the CALLER, which is
+  -- exactly where the proof now lives.
+  --
+  -- AND THE `initSt` GENERALITY WAS A SYMPTOM OF THE SAME THING, worth
+  -- recording because it read as the blocker.  Stated standalone, the
+  -- arm quantifies over a free initial node state, the install lemma
+  -- needs that state to weigh 0, and the unconditional form is NOT
+  -- refuted — `depthE` never reads `nodesNestMax`, only the cap does,
+  -- and installing can only raise it — so a hypothesis was not
+  -- licensed and the arm looked stuck.  Inline in the clause the
+  -- question does not arise: the state is the literal one the evaluator
+  -- installs, and its weight is `refl`.  An over-general argument in a
+  -- statement is worth suspecting of being a statement that belongs
+  -- somewhere else.
+  --
+  -- WHAT IS LEFT HERE IS THE ARM THAT CANNOT BE INLINED, and finding
+  -- (4) above says why: its scheduler and state come out of the REAL
+  -- `subscribeE`, while the cap reads the entry state, so it owes a
+  -- preservation argument no arithmetic supplies.  The three
+  -- projections below are that subscribe's stream, scheduler and state,
+  -- in that order.
+  --
+  -- DEAD ROUTE 2026-08-22: RUN THE ASSEMBLY'S OWN INDUCTION AT THE
+  -- EMITTED INNER AND DOMINATE ITS CAP.  It is the obvious route and
+  -- the arms line up: the burst reaches `depthE` at each delivered
+  -- inner observable one gas lower, and the `*All` layer's two `suc`s
+  -- pay exactly the frame's charge and the extra path frame, leaving
+  -- the inner's own size-plus-nesting to be covered by the source's.
+  -- It is STRUCTURALLY DEAD IN THE SIZE TERM.  Take a scan whose step
+  -- re-wraps its own accumulator inside one more `*All` layer per tick:
+  -- the accumulator's NESTING grows by one per delivered payload and
+  -- the measure pays for precisely that, since the scan clause's
+  -- `outWᵉ · nestDᵗ` IS the per-payload re-wrap — but its SIZE grows by
+  -- a constant per payload too, and the target's size term is fixed
+  -- syntax.  So the child's cap outruns the parent's by the size term
+  -- alone, at a program where the depths are fine.
+  --
+  -- WHICH IS TO SAY THE BLOCKAGE IS SLACK, NOT FALSITY.  At that same
+  -- program the depth IS the nesting, so nothing here is refuted and no
+  -- hypothesis is licensed; what is wrong is that `depthCap` reads the
+  -- size currency at all.  `Probed.Nest-Depth` says so in the strongest
+  -- available form: its rows report `depthE` EQUAL to `nestDᵉ`, not
+  -- dominated by it, so the `sizeᵉ` summand buys nothing at any row
+  -- reached.  Those rows are all at the root with no slot and no node
+  -- store, so they do NOT reach the two places the size currency is
+  -- load-bearing — the connect, which pays a def's `sizeᵉ` through
+  -- `slotNest`, and `nodeNestMax`, which charges a concat queue by its
+  -- observables' `sizeᵉ`.  Both of those keep paying under any repair;
+  -- the summand in question is the one read off the SUBJECT.
+  --
+  -- AND THE `pathLen` SUMMAND IS NOT SLACK, WHICH IS THE PART THE ROWS
+  -- CANNOT SEE, since `pathLen root` is 0 in every one of them.
+  -- Spending arc 2 charges a `suc` for a `from-inner` frame that came
+  -- out of the PATH rather than out of the subject, so a cap with no
+  -- path term cannot pay for it — dropping the summand is not the
+  -- repair, restating it in the nesting currency is.
+  --
+  -- SO THE CANDIDATE REPAIR IS THE CAP READ OFF NESTING THROUGHOUT: the
+  -- subject's `sizeᵉ` gone, the below-sum kept, and the path and node
+  -- halves restated in the same currency.  Under it this arm's leaf is
+  -- exactly "an emitted inner's nesting is bounded by its emitter's
+  -- nesting", which is the one thing the measure was derived to pay and
+  -- which the scan clause pays on the nose.  That is a restatement of
+  -- the whole face rather than of this statement, which is why it is
+  -- recorded and not done here.
+  -- THE BURST ARM, over the stream the outer subscribe returned.  Its
+  -- own scheduler and state come out of that subscribe rather than out
+  -- of `sched`/`st`, which is why the arm cannot be stated over
+  -- arbitrary ones: the three projections are the subscribe's stream,
+  -- scheduler and state, in that order.
+  depth-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    depthAll g op initSt b κ bid now sched st
-      ≤ depthCapN (suc (sizeᵉ b) + suc (nestDᵉ (Sched.slots sched) b))
-                  (maxInputᵉ b) κ sched st
+    let nid = proj₁ (mintNode sched)
+        r   = subscribeE g b (thru-outer op nid ↠ κ) bid now
+                (proj₂ (mintNode sched)) (installNode nid initSt st)
+    in depthBurst g bid now (thru-outer op nid) κ
+         (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+         ≤ depthCapN (suc (sizeᵉ b) + suc (nestDᵉ (Sched.slots sched) b))
+                     (maxInputᵉ b) κ sched st
 
   -- SUBSTITUTION UNDER THE GUARD, which is what `unfoldμ` is: it is
   -- `elimGExp (here refl) (μᵉ body) body`, and `elimGExp` reaches a
@@ -778,29 +873,24 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
   sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
   st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
 
--- setNode with take-st never increases nodesNestMax: nodeNestMax(take-st _) = 0.
+-- INSTALLING A 0-WEIGHT NODE NEVER RAISES `nodesNestMax`, over the
+-- HYPOTHESIS rather than over a constructor.  It was two copies of this
+-- induction — one for `take-st`, one for `scan-st` — differing only in
+-- the state installed, and both closed their `true` arm with `z≤n`
+-- because the constructor made the weight literally 0.  Taking the
+-- weight's vanishing as a premise buys the other four states at the same
+-- price, which is what the `*All` clauses need: `merge-st`, `switch-st`,
+-- `exhaust-st` and `concat-st []` all read 0, each by `refl`.
 private
-  setNode-take-nodesNestMax : ∀ {n} {Γ : Ctx n}
-    (nid : NodeId) (k : ℕ)
+  setNode-nodesNestMax-0 : ∀ {n} {Γ : Ctx n}
+    (nid : NodeId) (s : NodeState Γ) → nodeNestMax s ≡ 0 →
     (nodes : List (NodeId × NodeState Γ)) →
-    nodesNestMax (setNode nid (take-st k) nodes) ≤ nodesNestMax nodes
-  setNode-take-nodesNestMax nid k [] = z≤n
-  setNode-take-nodesNestMax nid k ((j , ns) ∷ rest) with j ≡ᵇ nid
-  ... | true  = ⊔-lub z≤n (m≤n⊔m _ _)
+    nodesNestMax (setNode nid s nodes) ≤ nodesNestMax nodes
+  setNode-nodesNestMax-0 nid s eq [] = ⊔-lub (≤-reflexive eq) z≤n
+  setNode-nodesNestMax-0 nid s eq ((j , ns) ∷ rest) with j ≡ᵇ nid
+  ... | true  = ⊔-lub (≤-trans (≤-reflexive eq) z≤n) (m≤n⊔m _ _)
   ... | false = ⊔-lub (m≤m⊔n _ _)
-                      (≤-trans (setNode-take-nodesNestMax nid k rest) (m≤n⊔m _ _))
-
-  -- the same induction for a scan node, which is 0-weight for the same
-  -- reason: `nodeNestMax` charges only what the family reads.
-  setNode-scan-nodesNestMax : ∀ {n} {Γ : Ctx n} {u}
-    (nid : NodeId) (v : Val Γ u)
-    (nodes : List (NodeId × NodeState Γ)) →
-    nodesNestMax (setNode nid (scan-st v) nodes) ≤ nodesNestMax nodes
-  setNode-scan-nodesNestMax nid v [] = z≤n
-  setNode-scan-nodesNestMax nid v ((j , ns) ∷ rest) with j ≡ᵇ nid
-  ... | true  = ⊔-lub z≤n (m≤n⊔m _ _)
-  ... | false = ⊔-lub (m≤m⊔n _ _)
-                      (≤-trans (setNode-scan-nodesNestMax nid v rest)
+                      (≤-trans (setNode-nodesNestMax-0 nid s eq rest)
                                (m≤n⊔m _ _))
 
 -- After mintNode + installNode(take-st(suc k)), storeNestMax is
@@ -809,28 +899,15 @@ private
 -- what the take clause's IH now returns.  Only the node half moves:
 -- `mintNode` leaves the slots alone, so the whole left arm — the
 -- below-sum included — is definitionally unchanged.
-depthCap-installTake : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u}
+depthCap-install0 : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u}
   (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e)
-  (k : ℕ) →
+  (s : NodeState Γ) → nodeNestMax s ≡ 0 →
   depthCap b κ (proj₂ (mintNode sched))
-               (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)
+               (installNode (proj₁ (mintNode sched)) s st)
     ≤ depthCap b κ sched st
-depthCap-installTake b κ sched st k =
+depthCap-install0 b κ sched st s eq =
   ⊔-mono-≤ ≤-refl
-    (setNode-take-nodesNestMax (Sched.nextNode sched) (suc k)
-      (EvalSt.nodes st))
-
--- and the scan twin, which is now a twin: it was a postulate for as long
--- as the measure charged for the accumulator.
-depthCap-installScan : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u s}
-  (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e)
-  (v : Val Γ s) →
-  depthCap b κ (proj₂ (mintNode sched))
-               (installNode (proj₁ (mintNode sched)) (scan-st v) st)
-    ≤ depthCap b κ sched st
-depthCap-installScan b κ sched st v =
-  ⊔-mono-≤ ≤-refl
-    (setNode-scan-nodesNestMax (Sched.nextNode sched) v (EvalSt.nodes st))
+    (setNode-nodesNestMax-0 (Sched.nextNode sched) s eq (EvalSt.nodes st))
 
 ------------------------------------------------------------------
 -- ARITHMETIC HELPERS — proved here.
@@ -879,7 +956,7 @@ take-size-arith {n = n} c b nid κ sched st =
            ≤-refl
 
 -- scan: same shape as map-size-arith, because the install is absorbed
--- BEFORE this arithmetic runs — `depthCap-installScan` returns the IH's
+-- BEFORE this arithmetic runs — `depthCap-install0` returns the IH's
 -- post-install cap to the entry cap, so what is left here is the syntax
 -- payment alone.
 scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
@@ -894,6 +971,35 @@ scan-size-arith {n = n} f seed b nid κ sched st =
                         (maxInputᵉ b) (maxInputᵉ (scanᵉ f seed b))
                         (m≤n⊔m _ _)))
            ≤-refl
+
+-- THE `*All` ARM, and it serves all four operators from one statement:
+-- `sizeᵉ`, `nestDᵉ` and `maxInputᵉ` treat `mergeAllᵉ`, `concatAllᵉ`,
+-- `switchAllᵉ` and `exhaustAllᵉ` identically — `suc` on the first two,
+-- unchanged on the third — so the four caps are one term and the
+-- conclusion is written at `depthCapN` rather than at any constructor.
+-- The install is folded in HERE rather than left to the clause, because
+-- unlike take and scan the `*All` clauses have a second arm to state and
+-- the node weight is the only thing that differs between the four.
+-- `≤-refl` on the below-sum where the siblings need
+-- `slotsNestBelow-mono`: a `*All` layer adds no input.
+private
+  all-outer-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (op : AllOp) (s : NodeState Γ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+    nodeNestMax s ≡ 0 →
+    depthCap b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+               (proj₂ (mintNode sched))
+               (installNode (proj₁ (mintNode sched)) s st)
+      ≤ depthCapN (suc (sizeᵉ b) + suc (nestDᵉ (Sched.slots sched) b))
+                  (maxInputᵉ b) κ sched st
+  all-outer-arith {n = n} op s b κ sched st eq =
+    ≤-trans (depthCap-install0 b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+               sched st s eq)
+            (⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b)
+                                   (nestDᵉ (Sched.slots sched) b)
+                                   (pathLen κ) 0 1)
+                                ≤-refl)
+                      ≤-refl)
 
 ------------------------------------------------------------------
 -- THE ASSEMBLY — structurally recursive on `b`; dispatch order follows
@@ -989,7 +1095,7 @@ private
       (⊔-lub
         (≤-trans
           (depth-compositional-go fuel b (take-f nid ↠ κ) bid now sched₁ st₀)
-          (depthCap-installTake b (take-f nid ↠ κ) sched st k))
+          (depthCap-install0 b (take-f nid ↠ κ) sched st (take-st (suc k)) refl))
         (≤-trans (burst-takef-zero fuel bid now nid κ
                     (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
                  z≤n))
@@ -1009,7 +1115,8 @@ private
       (⊔-lub
         (≤-trans
           (depth-compositional-go fuel b (scan-f f nid ↠ κ) bid now sched₁ st₀)
-          (depthCap-installScan b (scan-f f nid ↠ κ) sched st (evalTm seed)))
+          (depthCap-install0 b (scan-f f nid ↠ κ) sched st
+             (scan-st (evalTm seed)) refl))
         (≤-trans (burst-scf-zero fuel bid now f nid κ
                     (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
                  z≤n))
@@ -1020,19 +1127,62 @@ private
     st₀    = installNode nid (scan-st (evalTm seed)) st
     r      = subscribeE fuel b (scan-f f nid ↠ κ) bid now sched₁ st₀
 
-  -- BUCKET (d): *All — all four delegate to depth-all-bound;
-  -- suc (sizeᵉ b) IS sizeᵉ (*Allᵉ b) definitionally
+  -- BUCKET (b)+(d): *All — the OUTER arm is this induction at `b`, the
+  -- BURST arm is the one leaf left.  `suc (sizeᵉ b)` IS `sizeᵉ (*Allᵉ b)`
+  -- definitionally, and so is the nesting `suc`, which is why one
+  -- `all-outer-arith` covers four constructors.  The `refl` is
+  -- `nodeNestMax` of the installed state: nothing in the depth family
+  -- reads an outer node, so all four weigh 0 and the IH comes back
+  -- through the ENTRY store, exactly as take and scan do.
   depth-compositional-go fuel (mergeAllᵉ b) κ bid now sched st =
-    depth-all-bound fuel mergeᵒ (merge-st 0 false) b κ bid now sched st
+    ⊔-lub
+      (≤-trans (depth-compositional-go fuel b
+                  (thru-outer mergeᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith mergeᵒ (merge-st 0 false) b κ sched st refl))
+      (depth-all-burst fuel mergeᵒ (merge-st 0 false) b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (merge-st 0 false) st
 
   depth-compositional-go {u = u} fuel (concatAllᵉ b) κ bid now sched st =
-    depth-all-bound fuel concatᵒ (concat-st {t = u} [] false false) b κ bid now sched st
+    ⊔-lub
+      (≤-trans (depth-compositional-go fuel b
+                  (thru-outer concatᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith concatᵒ (concat-st {t = u} [] false false)
+                  b κ sched st refl))
+      (depth-all-burst fuel concatᵒ (concat-st {t = u} [] false false)
+         b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (concat-st {t = u} [] false false) st
 
   depth-compositional-go fuel (switchAllᵉ b) κ bid now sched st =
-    depth-all-bound fuel switchᵒ (switch-st nothing false) b κ bid now sched st
+    ⊔-lub
+      (≤-trans (depth-compositional-go fuel b
+                  (thru-outer switchᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith switchᵒ (switch-st nothing false)
+                  b κ sched st refl))
+      (depth-all-burst fuel switchᵒ (switch-st nothing false)
+         b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (switch-st nothing false) st
 
   depth-compositional-go fuel (exhaustAllᵉ b) κ bid now sched st =
-    depth-all-bound fuel exhaustᵒ (exhaust-st false false) b κ bid now sched st
+    ⊔-lub
+      (≤-trans (depth-compositional-go fuel b
+                  (thru-outer exhaustᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith exhaustᵒ (exhaust-st false false)
+                  b κ sched st refl))
+      (depth-all-burst fuel exhaustᵒ (exhaust-st false false)
+         b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (exhaust-st false false) st
 
 
 -- ITS PREDECESSOR IS REFUTED 2026-08-21 (Refuted.Depth-Nest,

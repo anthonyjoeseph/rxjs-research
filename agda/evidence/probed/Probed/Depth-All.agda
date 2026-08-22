@@ -1,4 +1,9 @@
--- TARGET: depth-all-bound
+-- TARGET: depth-all-burst
+--
+-- THE BURST ARM IS WHAT THESE ROWS ISOLATE, which is now also the only
+-- half of the face still open: its outer arm is proven inside the
+-- assembly's own induction, so what the rows read through `depthCap`
+-- rests on a leaf on one side and on a body on the other.
 --
 -- THE BURST OVER SEVERAL CHAIN TOPS.  `Refuted.Depth-Chain` measured
 -- what a single connect costs — one arc per link, accumulating down a
