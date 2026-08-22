@@ -19,3 +19,5 @@ module Probed.Main where
 open import Probed.Root using ()
 open import Probed.Depth-All using ()
 open import Probed.Depth-Mu using ()
+open import Probed.Install-Scan using ()
+open import Probed.Depth-Conn-Sum using ()

@@ -198,6 +198,24 @@ postulate
   -- `storeNestMax` itself that had to become a sum.  Recorded here
   -- because it was the plausible next move and it is dead.
   --
+  -- PROBED 2026-08-21 (Probed.Depth-Conn-Sum): the statement's text was
+  -- never re-instantiated after the measure moved under it, and it holds
+  -- with a margin that GROWS with the chain — the property the max
+  -- lacked.  Accumulating chains at 6 and 9 links give depth 6/9
+  -- against a sum of 32/47, so three more links cost 3 depth and 15
+  -- sum; § D is Refuted.Depth-Chain's own nine-link witness, and the 47
+  -- is the first machine reading of the sum there.  A cheaper link was
+  -- tried and is not a threat: an `obs`-ladder chain whose links cost 2
+  -- apiece has depth 1 at BOTH lengths, because a bare
+  -- `mergeAllᵉ (input j)` recurses on the subscribe side where the
+  -- mirror charges nothing, and every `suc` comes from a `thru-outer`
+  -- burst — which needs the synchronous re-wrap the expensive link is
+  -- paying for.  The size is what generates the depth, so the ratio is
+  -- bounded away from 1 by the mechanism and not by the encoding.
+  -- NOT COVERED: a non-empty store (all rows at `st-init`, so the `⊔`
+  -- never selects the node half), and a `scripted` slot mixed into a
+  -- chain.
+  --
   -- WHAT THE SUM DOES *NOT* FIX IS THIS CLAUSE.  The double-count is
   -- untouched: the goal after `depth-compositional` is still
   -- `sizeᵉ d + storeNestMax ≤ storeNestMax`.  What the sum ADDS is that
@@ -379,25 +397,31 @@ storeNestMax-installTake sched st k =
 -- INSTALL-INVARIANCE for scan: installing a scan node does not increase
 -- the subscribe-side depth beyond the ENTRY store bound.
 --
--- depthFrame(scan-f fn nid) = 0 definitionally (Caps-Depth:362), so
+-- `depthFrame` at a `scan-f` frame is 0 definitionally, so
 -- the scan accumulator's value is never read during subscribe.  The IH
 -- on b runs against (sched₁, installNode nid (scan-st v) st), but the
 -- storeNestMax bound refers to the ENTRY (sched, st) — no size of v
 -- appears on the RHS.
 --
--- PROBED 2026-08-07: Install-Scan-Depth-Probe.agda §2 confirms
--- depthE = 0 at b=emptyᵉ with storeNestMax(post-install)=5 > 2=RHS,
--- ruling out any hidden dependence of depthE on the scan accumulator.
--- Shapes NOT covered: shared-slot inner b, post-cascade state.
--- AND THE FIGURE 5 WAS MEASURED UNDER THE OLD MAX.  `storeNestMax`'s
--- slot half is now a SUM (Refuted.Depth-Chain forced it), and the two
--- agree only when the probe's slots contributed 0 apiece — which that
--- probe's program is not recorded as having guaranteed, and the probe
--- is deleted.  The CONCLUSION it drew is unaffected either way: the 5
--- came from `nodeNestMax(scan-st v)`, the half that did not move, and
--- what the row ruled out was a dependence of `depthE` on the
--- accumulator.  It is the arithmetic of the number that is no longer
--- pinned.
+-- PROBED 2026-08-21 (Probed.Install-Scan): the region the previous
+-- receipt named as uncovered.  `b = input` at the top of a four-link
+-- SHARED slot chain — the shape whose arcs ADD, and the shape that
+-- refuted this row's sibling — with only the accumulator varied:
+--
+--   sizeᵛ v  1 → 41,  node half 1 → 41,  post-install store 22 → 41,
+--   entry store 22,  RHS = 24,  depth 4 in BOTH cases.
+--
+-- The leak channel was open: the store the left side is evaluated
+-- against exceeded the entry store the right side names by 19, so an
+-- arc charged to the accumulator would have been unpayable.  None was.
+-- Gas-stable at 20 and 60, which rules out a fuel-truncated figure
+-- masquerading as invariance.  This SUPERSEDES the 2026-08-07 receipt,
+-- whose probe is deleted and whose figure 5 was measured under the old
+-- max — its conclusion is reproduced above and its arithmetic no longer
+-- needs pinning.
+-- STILL NOT COVERED: post-cascade state, and a `concat-st` node, whose
+-- `nodeNestMax` is a `⊔` over a queue rather than one value and so
+-- varies along an axis those rows do not touch.
 -- NOTE: nodeNestMax(scan-st v) = sizeᵛ t v (NOT 0), so storeNestMax
 -- increases when installing with a non-trivial value.  The proof cannot
 -- go through depth-compositional at (sched₁, st₀) directly; it needs

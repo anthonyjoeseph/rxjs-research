@@ -171,14 +171,19 @@ admitting instances its caller cannot make; then `depth-compositional` itself
 was refuted at a concrete nine-slot program, because the MEASURE under it was a
 max over the slots while the connects CHAIN. Neither cost a clause, but a real
 body's own conclusion is no safer than a postulate's, and a row whose OBSTACLE
-is written down is not thereby a row whose STATEMENT is right. Probe the residue
-before grinding it.
+is written down is not thereby a row whose STATEMENT is right.
+
+The residue has now been probed through, and what it bought is that the
+remaining risk is ROUTE risk: the repaired sum has a margin that grows with the
+chain, install-invariance holds with the leak channel deliberately open, and the
+burst takes a max. So the obstacles in those headers are the work, and the
+statements are no longer the thing to doubt first.
 
 - **`depth-compositional`'s residue** (Depth-Compositional) — DIFFICULTY, and the
   module header buckets it BLOCKED: `depth-conn-input`, `depth-all-bound`,
-  `depth-subst-guarded`, `installScan-depth-bound`. Two replace a refuted
-  predecessor, the measure all four are stated over was refuted too, and two now
-  carry probe receipts naming the region reached. Obstacles and routes there.
+  `depth-subst-guarded`, `installScan-depth-bound`. All four now carry receipts
+  naming the region reached, the repaired measure included. What is left is the
+  double-count — arithmetic, not truth. Routes in those headers.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
