@@ -157,10 +157,18 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`subscribeE-hops`** (Depth-Compositional) — DIFFICULTY, all that is left of
-  `depth-hop`: a burst's payloads have hop at most their emitter's. Probed
-  tight at all four `*All`s and at a substituted payload; the arms are a second
-  subscribe-level ring whose substitution half is already proven.
+- **`hops-input`** (Hop-Burst-Face) — DIFFICULTY, the slot arm of the burst
+  payload conditions: a scripted slot's payloads are its own script, but a
+  SHARED slot subscribes a def, so this arm is the connect sub-clique and not
+  one clause.
+- **`hops-scan`** (Hop-Burst-Face) — DIFFICULTY, the scan arm: the emitted
+  accumulator's hop is exponential in `V`, and the exponent arrives through the
+  per-value spine rather than any per-step size comparison, so the arm has to
+  be stated at the spine and converted once.
+- **`hops-all`** (Hop-Burst-Face) — DIFFICULTY, the `*All` arm, shared by all
+  four constructors: the payloads come from inners subscribed at runtime, so
+  this is the frame walk and the inner descent, and the gas is what terminates
+  it.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
@@ -168,6 +176,15 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 - **`hopD-le-tower`** (Caps-Bridge) — DIFFICULTY: the measure-to-tower half, at
   the height the deleted arithmetic already used. Its tower step survives and is
   spent by a real body; the induction does not, a refold being an exponential.
+- **`hops-of`** (Hop-Burst-Face) — GRINDABLE, the one-shot arm: payloads are
+  `evalTm` of the terms written in the source, which `hopD-evalWith` already
+  bounds by their own `hopDᵗ`. Probed tight at four paths.
+- **`hops-map`** (Hop-Burst-Face) — GRINDABLE, the map arm: `hopD-map-emit`
+  does the per-payload arithmetic and `pushMap-wet` the fold, so the work is
+  that face with four conjuncts dropped. Probed tight at a substituted payload.
+- **`hops-take`** (Hop-Burst-Face) — GRINDABLE, the take arm: the frame does
+  not touch a value and `hopDᵉ` is EQUAL on a take and its source, so
+  `pushTake-wet` is the whole shape.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.

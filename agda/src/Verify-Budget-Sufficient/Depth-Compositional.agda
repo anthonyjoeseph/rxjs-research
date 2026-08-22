@@ -87,7 +87,7 @@ open import Data.Nat.Properties using (⊔-lub; ≤-trans; m≤n+m; m≤n⊔m;
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
 open import Data.List using (List; []; _∷_)
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; proj₁; proj₂)
@@ -113,6 +113,8 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Measures
   using (syncSize-unfoldμ; syncSize≤sizeᵉ; slotDef-size; 1≤pow;
   burstHopD?; hopDev?)
+open import Verify-Budget-Sufficient.Hop-Burst-Face
+  using (burstSync?; syncEv?; subscribeE-hops)
 open import Verify-Budget-Sufficient.Keeps-Ring
   using (KeepsC; subscribeE-slots; stepFrame-keeps; thruConsume-keeps;
   switchKill-keeps)
@@ -245,16 +247,6 @@ allBurst g op ns b κ bid now sched st =
 -- each payload, and stating it the same way is what lets both halves
 -- travel through the fold as `all`s over one list — so a tail is a
 -- projection instead of a re-establishment.
-syncEv? : ∀ {n} {Γ : Ctx n} {u} → ℕ → InstEvent (Val Γ (obs u)) → Bool
-syncEv? V (value v)   = syncSizeᵉ v ≤ᵇ V
-syncEv? V (init _)    = true
-syncEv? V (close _ _) = true
-syncEv? V (handoff _) = true
-syncEv? V complete    = true
-
-burstSync? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ (obs u) → Bool
-burstSync? V = all (λ em → all (syncEv? V) (InstEmit.events em))
-
 -- the frame is handed the VALUES and both predicates speak of EVENTS, so
 -- one induction over the event list moves each of them across the split
 split-hop : ∀ {n} {Γ : Ctx n} {u} {A : Set} (V : ℕ) (η : Fin n → ℕ) (d : ℕ)
@@ -317,26 +309,6 @@ split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 -- descended instead.  Harmless there, and one more place the two were
 -- not the same measure.
 
--- AND THE CONSUMER ALREADY ASKS IN THIS CURRENCY, which is the part
--- that says the swap is a reinvention undone and not a coincidence.
--- `subscribeE-wet-via-caps` (Caps-Bridge) carries, in ONE signature, a
--- gas hypothesis stated over `hopDᵉ Ŝ (slotHop Ŝ sl) b` and the
--- `depOK` hypothesis `depthE g b κ id now sched st ≤ capsH e sl id`
--- that this module exists to discharge — same `sl`, same
--- `Ŝ = sizeCapAt e sl (suc id)`, adjacent lines.  So `V` and `η` do
--- not have to be invented: `V`'s two nameable instantiations coincide,
--- the consumer's `sizeCapAt e sl (suc id)` and `suc (entryCeil n ins
--- e)`, which is the `M` the tower arithmetic is stated at.
--- `make dup-check` could not see that: the two statements are not the
--- same fact, only the same job.
---
--- PROBED: DOMINATION AT THE FOUR REFUTATION WITNESSES (`Probed.Depth-Hop`).
---   `hopDᵉ` dominates `depthE` at every program that killed the
---   predecessor — the two small programs at a refold bound of one (depth
---   4 and 8), and both rows of the quadratic gadget at four (35 and 70).
---   That is evidence reaching the RISKY region rather than a degenerate
---   row, because those four programs ARE the region.
-
 -- ⚠ AND IT IS NOT TRUE FOR EVERY `V` — REFUTED as first
 -- stated (`Refuted.Depth-Hop`).  `hopDᵉ`'s scan clause is
 -- `(2 + pmᵗ V 0 f) ^ V * (…)`, so at `V = 0` the factor is 1 and a scan
@@ -354,41 +326,6 @@ split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 -- `Ŝ = sizeCapAt e sl (suc id)`, where `2≤sizeCapAt` and
 -- `size≤sizeCapAt` are both PROVEN — which is why the root consumer can
 -- discharge both without a new leaf.
-
--- ⚠ AND THE SIZE CONDITION IS THE ONE THE BURST ARM WILL TEST, which is
--- worth writing down before it is ground: `b` shrinks at every
--- structural descent, so the condition is inherited for free THERE — the
--- two clauses that are not structural descents have their own blocks
--- below — but
--- at the burst arm `b` becomes an emitted PAYLOAD whose size may EXCEED
--- its emitter's — that is the difficulty the whole face is about.  The
--- caps machinery is what re-establishes it (`applyFn-iterSize` bounds an
--- emitted payload's size by the cap), which is why `V` is a size CAP and
--- not `sizeᵉ e`; and it re-establishes MORE than the arm needs, since
--- `syncSize≤sizeᵉ` turns a `sizeᵉ` bound on the payload into this
--- condition in one step.  If that arm cannot re-establish it from what
--- the statement carries, the finding is a caps hypothesis — the shape
--- `cascade-depth-capsH` already has — and not a smaller `V`.
---
--- PROBED: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT (`Probed.Depth-Hop`).
---   The three regions this receipt used to name as unreached — off the
---   root path, the slot telescope, the `input` clause — are reached, and
---   the rows are tight rather than slack, which is the part worth
---   trusting.  A two-slot STRATIFIED telescope whose slot 1 reads slot 0
---   gives 3 against 3, with two of the three units coming out of the η
---   chain instead of the program's syntax, and it exercises `ηAt`'s
---   `suc k` branch — the one `Rx.Slot-Hop` records series W as having
---   missed entirely.  A scripted slot charged 0 gives 1 against 1, with
---   the subscription moved into the map's function so the row can fail.
---   `deferᵉ`, the other constant-0 clause and the same shape that killed
---   the predecessor's `input`, gives 0 against 0 wrapping the deepest
---   program in the file, and 1 against 1 nested under a `*All`.  `μᵉ`
---   unfolding for twenty units of gas gives 1 against 1.  `takeᵉ` over
---   that deepest program gives 4 against 4.  And all four `*All`
---   operators give 4 against 4 at one nesting — the uniform `suc` clause
---   was the widest untested coverage claim in the measure, since
---   cancelling and dropping change which inners are LIVE and not how
---   deep a live one sits.
 
 -- AND A MID-RUN STATE, REACHED BY RUNNING: the state the root
 -- subscribe RETURNS — registry, node table and delivered set all
@@ -479,172 +416,6 @@ split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 
 
 
--- ⚠ THE SIZE CONDITION IS NOT INHERITED AT THE `input` CLAUSE, WHICH IS
--- WHY THERE IS A THIRD CONDITION.  A slot read is not a structural
--- descent: `depthE` recurses into the shared DEF, and the subject's own
--- `sizeᵉ (input i) ≡ 1` bounds nothing whatever about that def.  So `V`
--- sits at its floor of 2 while the def is as large as you like, and the
--- def outruns the bound its own slot reports — 21 against 20, at a source
--- of twenty literals, which `hopDᵉ` charges nothing for at any `V` and
--- `depthE` charges one nesting level each.  `slotsSize (Sched.slots
--- sched) ≤ V` is the repair, and it costs no leaf at either end:
--- `slotDef-size` (.Measures) turns it into the def's own size at the
--- clause, and `slotsSize≤sizeCapAt` discharges it at the root out of
--- `capsBase`'s slot summand.  The mirror had it all along —
--- `subscribeE-caps` takes exactly this hypothesis beside its own size
--- condition, which is the diff worth doing before believing any of these
--- signatures.
--- REFUTED: `depth-hop-slot-absurd` (`Refuted.Depth-Hop`), whose figures
---   are pinned by `refl`, so a repair that closes the gap has to move one
---   of them by name
-
--- ⚠ AND THE CONDITION IS OVER `syncSizeᵉ` BECAUSE THE `μᵉ` RE-ENTRY
--- DESTROYS `sizeᵉ`.  `depthE` at `gs` recurses on `unfoldμ body`, and
--- `size-unfoldμ` (.Keeps-Ring) bounds that only by `sizeᵉ (μᵉ body) *
--- sizeᵉ (μᵉ body)` — a square per unfold, so a FIXED `V` cannot survive
--- repeated unfolding, while the bound does not move at all:
--- `hopD-unfoldμ` is an EQUALITY, so the clause's obligation is this
--- statement at a bigger subject and nothing else.  `syncSizeᵉ` is the
--- measure the two sides already agree on — it and `hopDᵉ` and `depthE`
--- all charge a `deferᵉ` body ZERO, `elimG` substitutes only under
--- defers, and so `unfoldμ-shrinks` (.Measures) makes the condition
--- STRICTLY DECREASE across the very step that squares the size.  It is a
--- STRENGTHENING the root consumer pays nothing for: `syncSize≤sizeᵉ`
--- composes with `size≤sizeCapAt` in one `≤-trans`, and both witnesses in
--- `Refuted.Depth-Hop` stay excluded by the arithmetic that excluded them
--- before.
--- DEAD ROUTE: closing that clause through the induction hypothesis with a
---   condition over `sizeᵉ`.  The hypothesis the clause needs is exactly
---   the one unfolding destroys, so no measure and no clause order
---   recovers it — what had to change was the condition itself.
--- PROBED: THE REGION THE TWO MEASURES PART COMPANY IN, which is the whole
---   region this strengthening opens: a large `deferᵉ` body, admitted here
---   and excluded by `sizeᵉ` at any `V` below its size.  Twenty literals
---   under a bare `deferᵉ` hold at `V = 2` against a bound of 0, with the
---   body's own depth at 4.  The same body under `mergeAllᵉ`, where the
---   burst arm subscribes the emitted inner at full size, holds TIGHT at 1
---   against 1.  And a `μᵉ` whose body emits both that source and its own
---   recursive variable holds tight at 1 against 1 while
---   `sizeᵉ (unfoldμ body) ≤ V` computes to `false` — the step the
---   condition turns on, pinned by `refl` in `Probed.Depth-Hop`.  Not
---   reached: nested `μᵉ`, and a `deferᵉ` body large against a `V` the
---   slot telescope must also fit.
-
-------------------------------------------------------------------
--- THE CONTENT LEAF, and after the fold below it is the whole of what
--- `depth-hop` still owes.  Nothing in `2 ≤ V`, `syncSizeᵉ b ≤ V` and the
--- slots width mentions a payload, and the fold consumes one payload
--- condition per emitted inner — so this is where the face's remaining
--- risk went, and the two conjuncts are the two hypotheses the re-entry
--- needs.  The hop conjunct is the sharp one: at no slack it makes the
--- frame's own `suc` and the measure's hop edge the SAME unit, which is
--- why the arm's bound comes out tight rather than generous.
---
--- IT IS STATED AT THE SUBSCRIBE, NOT AT THE ARM, and that is the whole
--- reason for its shape: an arbitrary `κ : Path Γ (obs u) t` rather than
--- the arm's `thru-outer op nid ↠ κ`, and `sl` a parameter with its
--- equation beside it rather than `Sched.slots sched` read in place.
--- Neither generality is free decoration.  The burst is `subscribeE`'s
--- FIRST projection — the values `b` itself emits, before any frame runs
--- — so nothing in the claim is about the `*All` at all, and pinning the
--- path to the arm's would make the induction quantify over a shape its
--- own `*All` clause has to leave.  `subscribeE-caps` is the same clique
--- at the same generality, which is what says this is a shape a body can
--- be written at rather than a statement lifted for tidiness.
---
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- THE ARMS ARE A MIRROR, NOT NEW MATHEMATICS, and that is the one thing
--- that sizes this row.  Every frame's own arithmetic is discharged — a
--- payload built at SUBSTITUTION rather than written in the source is
--- exactly what the substitution kit covers — and so is every frame's
--- FOLD over a burst: the wet push faces land this exact conjunct at
--- their own frame, one face per frame, with the same clause structure a
--- mirror would have.
---
--- WHAT THOSE FACES BUNDLE IT WITH is why they cannot simply be spent
--- here: the invariant, the fnCap burst predicate, dryness and the
--- registry ledger all arrive as hypotheses beside the hop receipt, and
--- carrying four more currencies is how a hop statement acquires a caps
--- context by the back door.  So the work is those faces with their other
--- conjuncts dropped, under a dispatch at this generality — a mirror
--- whose every piece has a discharged original, which is what makes the
--- arms separable and what makes the remaining risk labour rather than
--- design.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- THE OTHER PRODUCER IS THE WALK FACE'S OWN LANDING, and it is NOT
--- circular: `WalkStmt` (.Walk-Level/Statement) takes `depthE g b κ … ≤
--- dep` as a PARAMETER and lands this exact hop conjunct at this exact
--- instantiation — `subscribeAll-walk`'s body spends it as its own
--- seventh receipt — so `depth-hop-all`'s first disjunct is what would
--- pay for it.  The cost is the context: `F ≡ sizeCapAt e sl (suc id)`
--- PINS `V` to a size cap, and `capsOK?`, `INV?`, the path predicates,
--- the registry ledger and the ceiling all arrive as hypotheses — the
--- shape `cascade-depth-capsH` already has.  Per-inner termination is the
--- GAS: `depthInner` peels one before entering the payload.
---
--- ⚠ THAT IS A ROUTE AND NOT EVIDENCE, so it ranks this row at nothing and
--- licenses no restatement: trading the postulate for those hypotheses
--- would launder tracked debt into untracked, and only a refutation of the
--- unconditional form buys that.
--- DEAD ROUTE: spending an existing depth-free producer, so that no caps
---   context is needed at all.  `subscribeE-wet`'s landing carries
---   `hasDry` and `INV?` and no burst-hop conjunct, and the hop-spine
---   face reaches only the `scan-f` frame at push level — so there is
---   nothing already landed to spend, and a depth-free supplier is this
---   statement rather than a lemma reaching it.
--- TWIN: `hopD-map-emit` and `hopD-unfoldμ` for the per-frame
---   arithmetic; `pushMap-wet`, `pushTake-wet`, `pushScan-wet` and
---   `pushThru-walk` for the fold at each frame; `subscribeE-caps` for
---   the constructor dispatch above them, at this same generality.
--- PROBED: `Probed.Depth-Hop` §§ 13 and 15 — the CONSUMING ASSEMBLY's
---   conclusion and then BOTH CONJUNCTS OF THIS STATEMENT ITSELF, at the
---   arm's instantiation.  § 13 instantiates `allBurst` directly, so no
---   outer descent can be carrying the bound the way it can in a row over
---   a whole program: all four `AllOp`s, each on its own program's initial
---   state, over a syntactic outer emitting one `*All` inner, at the
---   smallest `V` the condition admits — 2 against 2 every time.  § 15
---   computes the two Bools instead of the arm's arithmetic, so a payload
---   deeper than its emitter fails a row the fold's `⊔` could have
---   hidden; the same four operators are green there, and a budget one
---   unit lower is FALSE, which is what makes the series LOAD-BEARING at
---   zero margin rather than merely green.
---   § 15 also reaches the region no syntactic outer can: a `mapᵉ` whose
---   function puts its ARGUMENT under a `*All`, where every payload is a
---   hop deeper than the inner the source carried and the depth appears
---   at substitution rather than in the source.  What pays for it is
---   `pmᵗ`'s occurrence coefficient, and it pays exactly — 1 against 1 —
---   which is the clause whose predecessor was refuted for reading that
---   coefficient at the unsubstituted source.  Conjuncts covered: the
---   hop conjunct against the measure's hop edge, the sync conjunct at
---   the same `V`, and the four walks' subscribe / park / cancel / drop
---   behaviour.  Not reached: a path that is not `thru-outer … ↠ root`,
---   so `pathNestD` is 0 throughout and no frame below the outer runs,
---   and the slot telescope, since every program runs over an empty slot
---   vector.
---   AND THE ONE DIRECTION THAT COULD FAIL IS NOT REACHABLE AT ALL, which
---   is that section's § 14 and carries no row deliberately: only the
---   exponential `scanᵉ` clause lets an emitted inner's hop outrun its
---   emitter's, and reaching it needs many refolds, which need a long
---   source, which raises `syncSizeᵉ b` — so the condition forces a `V`
---   whose `3 ^ V` outruns whatever nesting those refolds built.  The
---   risky region is excluded by the hypothesis rather than by luck, and
---   what would reach it is an emission that is not syntax: a scripted
---   slot, which the slots width bounds the same way, or a `μᵉ` re-entry,
---   which `hopD-unfoldμ` holds fixed.
-------------------------------------------------------------------
-postulate
-  subscribeE-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (V : ℕ) (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ V → syncSizeᵉ b ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
-    let r = subscribeE g b κ bid now sched st
-        η = slotHop V sl
-    in (burstHopD? V η (hopDᵉ V η b) (proj₁ r) ≡ true)
-     × (burstSync? V (proj₁ r) ≡ true)
 
 
 -- THE ARM'S OWN INSTANTIATION, and it needs no arithmetic: `mintNode`

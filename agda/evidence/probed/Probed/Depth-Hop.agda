@@ -1,6 +1,6 @@
 -- THE DEPTH FACE'S NEW CURRENCY, INSTANTIATED AT THE FOUR PROGRAMS
 -- THAT KILLED THE OLD ONE.
--- TARGET: subscribeE-hops
+-- TARGET: hops-of
 --
 -- EVIDENCE, not a claim: `src` cannot import this file (the library
 -- layout makes `Probed.Depth-Hop` unresolvable from there) and nothing
@@ -38,14 +38,16 @@
 -- `Slot` constructors and a mid-run store are reached, in § 5 to § 7 and
 -- § 11.
 -- WHAT THIS FILE IS EVIDENCE FOR, AND WHICH ROWS CARRY IT.  `depth-hop`
--- is a real body over ONE leaf — `allBurst-hops`, the payload condition
--- the `thru-outer` walk arm consumes — and that leaf carries the same
--- three conditions every row below instantiates.  So a row whose program contains a `*All`
--- constructor runs through the leaf and is LOAD-BEARING for it: § 5,
--- § 10, § 11 and § 12's refold.  The scan, slot and parking rows —
--- § 1 to § 4 and § 6 to § 9 — are DEGENERATE for the leaf, since the
--- clauses they exercise close without it; they are kept as coverage of
--- the currency, which is what the conditions are stated over.
+-- is a real body all the way down to a per-constructor dispatch, and
+-- what remains postulated is that dispatch's ARMS — each carrying the
+-- same three conditions every row below instantiates.  A row whose
+-- program contains a `*All` constructor runs through the `*All` arm and
+-- is LOAD-BEARING for it: § 5, § 10, § 11 and § 12's refold.  The scan,
+-- slot and parking rows — § 1 to § 4 and § 6 to § 9 — are DEGENERATE
+-- for that arm, since the clauses they exercise close without it; they
+-- are kept as coverage of the currency, which is what the conditions
+-- are stated over.  § 15 is the only section that reads an arm's own two
+-- Bools directly rather than through the assembly's arithmetic.
 
 module Probed.Depth-Hop where
 
@@ -73,7 +75,8 @@ open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Measures using (burstHopD?)
 open import Verify-Budget-Sufficient.Depth-Compositional
-  using (pathNestD; allBurst; burstSync?)
+  using (pathNestD; allBurst)
+open import Verify-Budget-Sufficient.Hop-Burst-Face using (burstSync?)
 
 gN : ℕ → Gas
 gN zero    = g0
